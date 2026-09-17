@@ -2701,7 +2701,13 @@
         if (!openModal) navigateBack();
       }
     });
-    $("#panel-toggle").addEventListener("click", toggleCalendar);
+    // 📦752 — El botón-flecha que separaba sidebar y contenido se reemplazó por
+    // el segmentado "Agenda / Correo" del topbar. Cada tab FIJA el estado (en
+    // vez de alternarlo) para que el control se comporte como tabs reales.
+    var tabAgenda = $("#tab-agenda");
+    var tabCorreo = $("#tab-correo");
+    if (tabAgenda) tabAgenda.addEventListener("click", function () { setCalendarVisible(true); });
+    if (tabCorreo) tabCorreo.addEventListener("click", function () { setCalendarVisible(false); });
     // Loop 45c — Toggle "Todas las empresas" ahora se renderiza dentro de la
     // toolbar del calendario grande, no del header oculto. El handler se
     // re-adjunta en el bloque de bindings de la toolbar (después de appendChild)
@@ -2720,13 +2726,30 @@
       gmailIndicator.style.cursor = "pointer";
     }
     updateGmailIndicator();
-    $("#search-input").addEventListener("input", (e) => {
+    // 📦752 — El buscador del topbar se retiró: la búsqueda vive en el panel de
+    // correo (#mail-search-input), que escribe el mismo state.searchQuery. Se
+    // deja el binding con guard por si el input vuelve a existir en el shell.
+    var headerSearch = $("#search-input");
+    if (headerSearch) headerSearch.addEventListener("input", (e) => {
       state.searchQuery = e.target.value;
       // 📦691 — El search cambia la lista, queremos ir al top
       state._resetMailListScroll = true;
       // Re-renderizamos la lista de correos (siempre visible en el área principal)
       renderMailList($("#mail-list-container"));
     });
+  }
+
+  // 📦752 — Fija la visibilidad del overlay del calendario (Agenda / Correo).
+  // El segmentado del topbar llama acá en vez de alternar, así el control se
+  // siente como tabs y no como un switch.
+  function setCalendarVisible(visible) {
+    if (state.calendarVisible === visible) {
+      // Si ya está en esa vista, igual re-renderizamos por si hay que refrescar
+      render();
+      return;
+    }
+    state.calendarVisible = visible;
+    render();
   }
 
   // Alterna la visibilidad del overlay deslizante del calendario
@@ -2790,13 +2813,18 @@
   }
 
   function renderHeaderState() {
-    // Botón de flecha: actualiza estado y tooltip
-    // data-calendar-visible="false" (default): flecha → "abrir calendario"
-    // data-calendar-visible="true": flecha ← "cerrar calendario"
-    const toggle = $("#panel-toggle");
-    toggle.setAttribute("data-calendar-visible", state.calendarVisible);
-    toggle.setAttribute("aria-label", state.calendarVisible ? "Ocultar calendario" : "Mostrar calendario");
-    toggle.title = state.calendarVisible ? "Ocultar calendario (ver correo)" : "Mostrar calendario";
+    // 📦752 — Topbar premium v2. El control segmentado "Agenda / Correo"
+    // reemplaza al botón-flecha: fija `state.calendarVisible` y se pinta como
+    // tab activa. Se conservan los data-attributes que consume el CSS de la
+    // cadena de layout (#content-area y #calendar-slide).
+    var tabAgenda = $("#tab-agenda");
+    var tabCorreo = $("#tab-correo");
+    if (tabAgenda) tabAgenda.setAttribute("aria-selected", state.calendarVisible ? "true" : "false");
+    if (tabCorreo) tabCorreo.setAttribute("aria-selected", state.calendarVisible ? "false" : "true");
+
+    // Chip de fecha: mes visible de la agenda, como en el diseño objetivo.
+    var chipFecha = $("#chip-fecha");
+    if (chipFecha) chipFecha.textContent = state.viewMonthLabel || D.MONTH_VIEW.label;
 
     // Área de contenido: actualiza data-calendar-visible para atenuar el correo
     const contentArea = $("#content-area");
@@ -2841,29 +2869,39 @@
       return v > 0 ? v : "—";
     }
 
+    // 📦752 — KPI cards premium v2: tarjeta blanca, tile de icono con fondo
+    // suave, número grande en Manrope, etiqueta en versalitas y subtexto.
+    // Cada tarjeta navega a la vista que representa (igual que el diseño objetivo).
     const items = [
-      { icon: D.ICONS.mail, color: "blue", value: kpiValue(unread), label: "Correos no leídos", sub: state.mails.length + " totales" },
-      { icon: D.ICONS.calendarPlus, color: "green", value: kpiValue(todayEvents), label: "Reuniones hoy", sub: nextSub },
-      { icon: D.ICONS.link, color: "yellow", value: kpiValue(pending), label: "Invitaciones pendientes", sub: "Requieren confirmar" },
-      { icon: D.ICONS.checkCircle, color: "red", value: kpiValue(critical), label: "Eventos críticos", sub: criticalSub },
+      { id: "kpi-correos", icon: D.ICONS.mail, tone: "", value: kpiValue(unread), label: "Correos no leídos", sub: state.mails.length + " totales",
+        go: function () { setCalendarVisible(false); } },
+      { id: "kpi-reuniones", icon: D.ICONS.calendarPlus, tone: "is-green", value: kpiValue(todayEvents), label: "Reuniones hoy", sub: nextSub,
+        go: function () { state.selectedDate = D.MONTH_VIEW.todayIso; state.calView = "day"; setCalendarVisible(true); } },
+      { id: "kpi-invitaciones", icon: D.ICONS.link, tone: "is-amber", value: kpiValue(pending), label: "Invitaciones pendientes", sub: "Requieren confirmar",
+        go: function () { state.mailFilter = "meeting"; state._resetMailListScroll = true; setCalendarVisible(false); } },
+      { id: "kpi-criticos", icon: D.ICONS.checkCircle, tone: "is-red", value: kpiValue(critical), label: "Eventos críticos", sub: criticalSub,
+        chip: criticalThisMonth === 0,
+        go: function () { state.calView = "schedule"; setCalendarVisible(true); } },
     ];
 
     const strip = $("#kpi-strip");
     strip.innerHTML = "";
-    items.forEach((it, idx) => {
-      const item = el("div", { class: "kair-kpi-item" });
-      item.innerHTML = `
-        <div class="kair-kpi__icon kair-kpi__icon--${it.color}">${it.icon}</div>
-        <div>
-          <div class="kair-kpi__value">${it.value}</div>
-          <div class="kair-kpi__label">${it.label}</div>
-          <div class="kair-kpi__subdata">${it.sub}</div>
-        </div>
-      `;
-      strip.appendChild(item);
-      if (idx < items.length - 1) {
-        strip.appendChild(el("div", { class: "kair-kpi-divider" }));
-      }
+    items.forEach((it) => {
+      const card = el("button", { class: "kair-kpi", id: it.id, type: "button", title: it.label });
+      // Los iconos del set vienen en 13/14px: se escalan a 19px como el diseño.
+      const icon = it.icon.replace(/width="\d+" height="\d+"/, 'width="19" height="19"');
+      const subHtml = it.chip
+        ? '<span class="kair-kpi__chip is-green">' + it.sub + '</span>'
+        : it.sub;
+      card.innerHTML =
+        '<span class="kair-kpi__ico ' + it.tone + '">' + icon + '</span>' +
+        '<span>' +
+          '<span class="kair-kpi__n">' + it.value + '</span>' +
+          '<span class="kair-kpi__l">' + it.label + '</span>' +
+          '<span class="kair-kpi__s">' + subHtml + '</span>' +
+        '</span>';
+      card.addEventListener("click", it.go);
+      strip.appendChild(card);
     });
   }
 
@@ -2886,14 +2924,18 @@
     const eventDates = new Set(visibleEvents.map((e) => e.date));
 
     // Mini-calendario
-    const mini = el("div", { class: "kair-mini-cal" });
+    // 📦752 — Mini-calendario premium: cabecera con mes + navegación, grilla de
+    // 7 columnas y hasta 3 puntitos de color por día (categorías con eventos).
+    const mini = el("div", { class: "kair-card mini" });
     mini.innerHTML = `
-      <div class="kair-mini-cal__header">
-        <button class="kair-icon-btn" style="width:22px;height:22px;" title="Mes anterior" id="mini-prev">${D.ICONS.chevronLeft}</button>
-        <span>${state.viewMonthLabel}</span>
-        <button class="kair-icon-btn" style="width:22px;height:22px;" title="Mes siguiente" id="mini-next">${D.ICONS.chevronRight}</button>
+      <div class="mini__head">
+        <span class="mini__m">${state.viewMonthLabel}</span>
+        <span class="mini__nav">
+          <button class="mini__nb" type="button" title="Mes anterior" aria-label="Mes anterior" id="mini-prev">${D.ICONS.chevronLeft}</button>
+          <button class="mini__nb" type="button" title="Mes siguiente" aria-label="Mes siguiente" id="mini-next">${D.ICONS.chevronRight}</button>
+        </span>
       </div>
-      <div class="kair-mini-cal__grid" id="mini-grid"></div>
+      <div class="mini__grid" id="mini-grid"></div>
     `;
     container.appendChild(mini);
 
@@ -2911,30 +2953,32 @@
         if (!categoryColor[k]) categoryColor[k] = D.FALLBACK_CATEGORIES[k].color;
       });
     }
-    const dayColors = {}; // iso -> color del primer evento del día
+    // 📦752 — Hasta 3 puntitos por día (categorías distintas con eventos), como
+    // el diseño objetivo. Antes se pintaba UN punto con el color del primer evento.
+    const dayDots = {};
     visibleEvents.forEach((ev) => {
-      if (ev.date && !dayColors[ev.date]) {
-        dayColors[ev.date] = categoryColor[ev.category] || "#174ea6";
-      }
+      if (!ev.date) return;
+      const col = categoryColor[ev.category] || "#2057B8";
+      if (!dayDots[ev.date]) dayDots[ev.date] = [];
+      if (dayDots[ev.date].indexOf(col) < 0 && dayDots[ev.date].length < 3) dayDots[ev.date].push(col);
     });
     const grid = $("#mini-grid", mini);
     D.WEEKDAY_LABELS.forEach((w) => {
-      grid.appendChild(el("div", { class: "kair-mini-cal__weekday" }, w.slice(0, 1)));
+      grid.appendChild(el("div", { class: "mini__wd" }, w.slice(0, 1)));
     });
     monthGrid.flat().forEach((c) => {
-      const hasEvents = eventDates.has(c.iso);
-      const isSelected = state.selectedDate === c.iso;
-      const dayColor = hasEvents ? dayColors[c.iso] : null;
+      const dots = dayDots[c.iso] || [];
+      const isSelected = state.selectedDate === c.iso && !c.isToday;
+      const cls = "mini__d" + (!c.inMonth ? " is-out" : "") + (c.isToday ? " is-today" : "") + (isSelected ? " is-sel" : "");
       const btn = el("button", {
-        class: "kair-mini-cal__day",
-        "data-out": !c.inMonth ? "true" : "false",
-        "data-today": c.isToday ? "true" : "false",
-        "data-selected": isSelected && !c.isToday ? "true" : "false",
-        "data-has-events": hasEvents ? "true" : "false",
-        "data-event-color": dayColor || "",
-        style: dayColor ? { "--event-color": dayColor } : {},
-        title: hasEvents ? `${c.day} — Hay eventos` : `${c.day} — Sin eventos`,
-      }, String(c.day));
+        class: cls,
+        type: "button",
+        "data-d": c.iso,
+        title: dots.length ? `${c.day} — Hay eventos` : `${c.day} — Sin eventos`,
+      });
+      btn.innerHTML = String(c.day) + (dots.length
+        ? '<span class="mini__dots">' + dots.map((col) => '<span class="mini__dot" style="background:' + col + '"></span>').join("") + '</span>'
+        : "");
       btn.addEventListener("click", () => {
         state.selectedDate = c.iso;
         render();
@@ -2942,39 +2986,49 @@
       grid.appendChild(btn);
     });
 
-    // F4-revert — Leyenda: título + círculos pequeños + texto (estilo imagen objetivo)
-    // Click en un item → toggle on/off de la categoría
-    const legend = el("div", { class: "kair-legend" });
-    legend.innerHTML = `<div class="kair-legend__title">Tipos de evento</div>`;
-    Object.values(D.EVENT_CATEGORIES).forEach((cat) => {
+    // 📦752 — "Tipos de evento" premium: punto de color + nombre + contador de
+    // eventos, con estado apagado cuando la categoría está oculta. Reemplaza a
+    // la leyenda legacy (`.kair-legend`) del rediseño anterior.
+    const categorias = Object.values(D.EVENT_CATEGORIES);
+    const hayOcultos = categorias.some((cat) => !state.activeCategories.has(cat.id));
+    const legend = el("div", { class: "kair-card tipos" + (hayOcultos ? " has-off" : "") });
+    legend.innerHTML = '<div class="tipos__t">Tipos de evento</div><div id="tipos-list"></div>' +
+      '<div class="tipos__hint">Hay tipos ocultos. Haz clic para volver a mostrarlos.</div>';
+    const tiposList = $("#tipos-list", legend);
+    categorias.forEach((cat) => {
       const isActive = state.activeCategories.has(cat.id);
+      const count = state.events.filter((e) => e.category === cat.id).length;
       const item = el("button", {
-        class: "kair-legend__item",
-        "data-active": isActive ? "true" : "false",
+        class: "tipos__i" + (isActive ? "" : " is-off"),
+        type: "button",
+        "data-tipo": cat.id,
         title: isActive ? `Mostrando ${cat.label} — clic para ocultar` : `${cat.label} oculto — clic para mostrar`,
       });
-      item.innerHTML = `<span class="kair-legend__dot" style="background:${cat.color};"></span><span>${cat.label}</span>`;
+      item.innerHTML = `<span class="tipos__dot" style="background:${cat.color};"></span>` +
+        `<span class="tipos__n">${cat.label}</span>` +
+        `<span class="tipos__c">${count}</span>`;
       item.addEventListener("click", () => toggleCategory(cat.id));
-      legend.appendChild(item);
+      tiposList.appendChild(item);
     });
     container.appendChild(legend);
 
-    // Integración correo
-    // 📦605 (paso 1) — kair-sidebar-integ para flex-shrink:0 (queda fija al fondo)
-    const integ = el("div", {
-      class: "kair-sidebar-integ mt-auto p-3",
-      style: { borderTop: "1px solid var(--kair-border-soft)", background: "#fafbfc", marginTop: "auto", padding: "12px" },
-    });
+    // 📦752 — Tarjeta "Integración correo" premium, con el botón "Abrir bandeja"
+    // que cambia al modo Correo (antes era solo texto informativo).
+    const integ = el("div", { class: "kair-card sidecard" });
     integ.innerHTML = `
-      <div class="flex items-center gap-2 mb-2" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--kair-text-muted);">
-        ${D.ICONS.mail.replace('width="13" height="13"', 'width="12" height="12"')}
-        <span style="color:var(--kair-primary);">Integración correo</span>
+      <div class="sidecard__h">
+        ${D.ICONS.mail.replace(/width="\d+" height="\d+"/, 'width="14" height="14"')}
+        Integración correo
       </div>
-      <p style="font-size:0.75rem;line-height:1.5;color:var(--kair-text-light);margin:0;">
-        Arrastra un correo desde la bandeja hacia cualquier día del calendario para crear un evento rápido.
-      </p>
+      <p class="sidecard__p"><b>Arrastra un correo</b> desde la bandeja hacia cualquier día del calendario para crear un evento rápido.</p>
+      <button class="sidecard__btn" id="btn-abrir-bandeja" type="button">
+        Abrir bandeja
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
     `;
     container.appendChild(integ);
+    const abrirBandeja = $("#btn-abrir-bandeja", integ);
+    if (abrirBandeja) abrirBandeja.addEventListener("click", () => setCalendarVisible(false));
   }
 
   function toggleCategory(catId) {

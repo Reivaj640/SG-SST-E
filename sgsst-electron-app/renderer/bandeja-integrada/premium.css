@@ -1,0 +1,1787 @@
+/* ═══════════════════════════════════════════════════════════════════
+   K+AIR · BANDEJA INTEGRADA — Capa premium v2
+   ═══════════════════════════════════════════════════════════════════
+   Sistema visual: mismo dialecto premium que Dashboard (📦749) y
+   Configuración (📦751) — Manrope + Inter, tokens --kair-*, cards de
+   20px, bordes sutiles, acentos semánticos.
+
+   ESTRATEGIA (2 capas, igual que Configuración 📦751):
+     1. TOKENS — se definen los tokens premium v2 y se REMAPEAN los
+        tokens legacy de `styles.css` (--kair-primary, --kair-bg-card,
+        --kair-text-muted, --email-*, …) a sus equivalentes premium.
+        Eso re-skinea automáticamente todo el CSS legacy que usa
+        variables, sin reescribir 5.700 líneas.
+     2. COMPONENTES — recetas explícitas para las piezas donde la
+        geometría legacy no coincide con el diseño objetivo
+        (topbar, KPI cards, sidebar, correo, agenda, modales).
+
+   Este archivo se carga DESPUÉS de `styles.css` en `index.html`,
+   así que gana por orden de cascada a igual especificidad.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ══════════ 0. TIPOGRAFÍA ══════════ */
+/* Mismo par tipográfico que el resto del premium (Manrope display + UI sans).
+   El @import va antes de toda regla (requisito de CSS). Si no hay red, cae a
+   las fuentes del sistema por el stack de fallback de cada token. */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ══════════ 1. TOKENS PREMIUM v2 ══════════ */
+:root {
+  /* Superficies */
+  --kair-bg: #FBFCFB;
+  --kair-surface: #FFFFFF;
+
+  /* Texto */
+  --kair-text: #14213D;
+  --kair-text-2: #748096;
+  --kair-text-3: #9AA4B8;
+
+  /* Bordes */
+  --kair-border: #E8EBEE;
+  --kair-border-2: #DFE4E9;
+
+  /* Acentos semánticos */
+  --kair-blue: #2057B8;
+  --kair-blue-h: #1A4A9E;
+  --kair-blue-soft: #EDF3FC;
+  --kair-blue-soft2: #A9C6F2;
+  --kair-green: #1BB888;
+  --kair-green-d: #12996F;
+  --kair-green-soft: #E7F7F1;
+  --kair-amber: #E7A224;
+  --kair-amber-d: #B07A15;
+  --kair-amber-soft: #FCF4E4;
+  --kair-red: #DA5563;
+  --kair-red-d: #C13B4B;
+  --kair-red-soft: #FBEDEF;
+  --kair-slate: #5B6B8C;
+  --kair-slate-soft: #EEF1F6;
+  --kair-navy: #14213D;
+
+  /* Radios */
+  --kair-r-lg: 24px;
+  --kair-r-md: 20px;
+  --kair-r-sm: 12px;
+  --kair-r-xs: 10px;
+
+  /* Sombras */
+  --kair-sh-sm: 0 1px 2px rgba(20, 33, 61, .04), 0 1px 6px rgba(20, 33, 61, .03);
+  --kair-sh-md: 0 6px 24px rgba(20, 33, 61, .08), 0 2px 8px rgba(20, 33, 61, .04);
+  --kair-sh-lg: 0 16px 48px rgba(20, 33, 61, .16), 0 4px 12px rgba(20, 33, 61, .08);
+
+  /* Transición + tipografía */
+  --kair-t: 180ms cubic-bezier(.4, 0, .2, 1);
+  --kair-font-t: 'Manrope', system-ui, -apple-system, sans-serif;
+  --kair-font-b: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* ── Remapeo legacy → premium ─────────────────────────────────────
+     `styles.css` es 100% variable-driven: estos aliases hacen que todo
+     el CSS legacy adopte la paleta premium sin tocarlo. */
+  --kair-primary: var(--kair-blue);
+  --kair-primary-hover: var(--kair-blue-h);
+  --kair-primary-bg: var(--kair-blue-soft);
+  --kair-success: var(--kair-green);
+  --kair-warning: var(--kair-amber);
+  --kair-danger: var(--kair-red);
+  --kair-info: var(--kair-slate);
+  --kair-bg-app: var(--kair-bg);
+  --kair-bg-card: var(--kair-surface);
+  --kair-bg-hover: #F7FAFE;
+  --kair-bg-soft: var(--kair-blue-soft);
+  --kair-border-soft: #F0F2F5;
+  --kair-text-strong: var(--kair-text);
+  --kair-text-body: var(--kair-text);
+  --kair-text-muted: var(--kair-text-2);
+  --kair-text-light: var(--kair-text-3);
+  --kair-shadow-card: var(--kair-sh-sm);
+  --kair-shadow-pop: var(--kair-sh-lg);
+
+  /* Tokens de correo legacy (Gmail-style) → premium */
+  --email-bg: var(--kair-surface);
+  --email-bg-read: #F7FAFE;
+  --email-border: var(--kair-border);
+  --email-text-primary: var(--kair-text);
+  --email-text-secondary: var(--kair-text-2);
+  --email-accent: var(--kair-blue);
+  --email-quote-border: var(--kair-border-2);
+
+  /* Tipografía oficial del sistema premium */
+  --kair-font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --kair-font-display: 'Manrope', 'Inter', system-ui, sans-serif;
+
+  /* Radios oficiales */
+  --kair-radius-control: 12px;
+  --kair-radius-card: 20px;
+  --kair-radius-modal: 22px;
+  --kair-radius-pill: 999px;
+
+  /* Sombras oficiales */
+  --kair-shadow-soft: 0 8px 18px rgba(32, 87, 184, .15);
+}
+
+/* ══════════ 2. BASE ══════════ */
+html, body {
+  background: var(--kair-bg);
+  color: var(--kair-text);
+  font-family: var(--kair-font-b);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #D6DBE2; border-radius: 8px; border: 3px solid var(--kair-bg); }
+::-webkit-scrollbar-thumb:hover { background: #C4CBD4; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.kair-app {
+  background: var(--kair-bg);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* `.kair-main` legacy traía padding 12/16 + overflow:auto. El padding ahora lo
+   aportan el topbar, la tira de KPI y el shell; y el scroll es interno (layout
+   → content-area → panel), así que acá se bloquea para no romper la cadena. */
+.kair-main {
+  padding: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ══════════ 3. TOPBAR ══════════ */
+.kair-top {
+  padding: 18px 28px 0;
+  flex: none;
+}
+.kair-top__crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--kair-text-3);
+  margin-bottom: 10px;
+}
+.kair-top__crumb b { color: var(--kair-text-2); font-weight: 500; }
+.kair-top__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.kair-top__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--kair-r-sm);
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.kair-top__tt { min-width: 0; }
+.kair-top__h1 {
+  font-family: var(--kair-font-t);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  color: var(--kair-text);
+}
+.kair-top__sub { font-size: 12px; color: var(--kair-text-3); margin-top: 1px; }
+.kair-top__sp { flex: 1; }
+.kair-top__actions { display: flex; align-items: center; gap: 8px; }
+/* CTA del topbar: solo icono (compacto), para no duplicar el "Redactar" de la
+   toolbar del correo. */
+.kair-top__actions .kair-header__action--primary { padding: 8px 11px; }
+
+/* Chip de fecha (mes visible) */
+.kair-chip-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kair-text-2);
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+/* Control segmentado (Agenda / Correo · vistas del calendario) */
+.kair-seg {
+  display: flex;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-xs);
+  padding: 3px;
+  gap: 2px;
+  box-shadow: var(--kair-sh-sm);
+}
+.kair-seg__b {
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kair-text-2);
+  transition: var(--kair-t);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.kair-seg__b:hover { color: var(--kair-text); }
+.kair-seg__b[aria-selected="true"],
+.kair-seg__b.is-active,
+.kair-seg__b[data-active="true"] {
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+}
+
+/* Botón volver del topbar */
+.kair-top__back {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--kair-t);
+  flex: none;
+  box-shadow: var(--kair-sh-sm);
+}
+.kair-top__back:hover {
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  border-color: var(--kair-blue-soft2);
+}
+
+/* Chip de estado Gmail */
+.kair-top .kair-header__indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kair-text-2);
+  box-shadow: var(--kair-sh-sm);
+}
+.kair-top .kair-header__indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--kair-text-3);
+  flex: none;
+}
+.kair-top .kair-header__indicator[data-connected="true"] { color: var(--kair-green-d); }
+.kair-top .kair-header__indicator[data-connected="true"] .kair-header__indicator-dot { background: var(--kair-green); }
+.kair-top .kair-header__indicator[data-connected="false"] { color: var(--kair-text-3); }
+.kair-top .kair-header__indicator[data-connected="false"] .kair-header__indicator-dot { background: var(--kair-red); }
+
+/* ══════════ 4. BOTONES ══════════ */
+.kair-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--kair-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--kair-t);
+  cursor: pointer;
+}
+.kair-icon-btn:hover {
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+}
+
+.kair-header__action--primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--kair-r-xs);
+  background: var(--kair-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  transition: var(--kair-t);
+  box-shadow: 0 1px 2px rgba(32, 87, 184, .3);
+  white-space: nowrap;
+}
+.kair-header__action--primary:hover { background: var(--kair-blue-h); }
+
+.kair-header__action--ghost,
+.kair-header__action--secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--kair-r-xs);
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border-2);
+  color: var(--kair-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  white-space: nowrap;
+}
+.kair-header__action--ghost:hover,
+.kair-header__action--secondary:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+}
+
+.kair-link-btn {
+  background: none;
+  border: none;
+  color: var(--kair-blue);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-link-btn:hover { background: var(--kair-blue-soft); }
+
+/* NOTA (📦752) — El dialecto `.kair-btn` del prototipo NO se portó: el marcado
+   vivo de la bandeja no lo emite (usa `.kair-header__action--*` en el topbar y
+   `.kair-mail-compose-bar__btn` / `.kair-cal-toolbar__create` en los paneles).
+   Si en el futuro se porta markup del prototipo, reintroducir acá las variantes
+   `--p` (primario), `--g` (ghost) y `--d` (peligro). */
+
+/* ══════════ 5. KPI STRIP ══════════ */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 16px 28px 4px;
+  flex: none;
+}
+.kair-kpi {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-md);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  transition: var(--kair-t);
+  box-shadow: var(--kair-sh-sm);
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+.kair-kpi:hover {
+  border-color: var(--kair-blue-soft2);
+  box-shadow: var(--kair-sh-md);
+  transform: translateY(-1px);
+}
+.kair-kpi__ico {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--kair-r-sm);
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.kair-kpi__ico.is-green { background: var(--kair-green-soft); color: var(--kair-green-d); }
+.kair-kpi__ico.is-amber { background: var(--kair-amber-soft); color: var(--kair-amber-d); }
+.kair-kpi__ico.is-red { background: var(--kair-red-soft); color: var(--kair-red-d); }
+.kair-kpi__n {
+  display: block;
+  font-family: var(--kair-font-t);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  color: var(--kair-text);
+}
+.kair-kpi__l {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--kair-text-2);
+  margin-top: 3px;
+}
+.kair-kpi__s {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--kair-text-3);
+  margin-top: 1px;
+}
+.kair-kpi__chip {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.kair-kpi__chip.is-green { background: var(--kair-green-soft); color: var(--kair-green-d); }
+.kair-kpi__chip.is-amber { background: var(--kair-amber-soft); color: var(--kair-amber-d); }
+.kair-kpi__chip.is-blue { background: var(--kair-blue-soft); color: var(--kair-blue); }
+
+/* ══════════ 6. SHELL: SIDEBAR + CONTENIDO ══════════ */
+/* Shell: sidebar (250px) + área de contenido.
+   OJO: son DOS columnas. El layout legacy tenía 3 (sidebar · botón-flecha ·
+   contenido); al retirar el botón-flecha en 📦752 hay que quitar esa columna o
+   el contenido queda comprimido en un carril de 26px.
+   Se conserva `align-items: stretch` + `grid-template-rows: 1fr` del legacy —
+   de eso depende la cadena de alturas para el scroll interno. */
+.kair-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  gap: 16px;
+  padding: 14px 28px 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.kair-card {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-md);
+  box-shadow: var(--kair-sh-sm);
+}
+
+/* El sidebar pasa a ser un contenedor transparente: cada bloque interno
+   (mini-calendario, tipos de evento, integración) es su propia tarjeta. */
+.kair-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Tarjetas del sidebar */
+.mini { padding: 14px; }
+.mini__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.mini__m { font-family: var(--kair-font-t); font-size: 13px; font-weight: 700; }
+.mini__nav { display: flex; gap: 2px; }
+.mini__nb {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-3);
+  transition: var(--kair-t);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.mini__nb:hover { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.mini__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.mini__wd {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--kair-text-3);
+  text-align: center;
+  padding: 4px 0 6px;
+}
+.mini__d {
+  position: relative;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--kair-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--kair-t);
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+.mini__d:hover { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.mini__d.is-out { color: #C8CFD9; pointer-events: none; }
+.mini__d.is-today { background: var(--kair-blue); color: #fff; font-weight: 700; }
+.mini__d.is-today:hover { background: var(--kair-blue-h); }
+.mini__d.is-sel { box-shadow: inset 0 0 0 1.5px var(--kair-blue); color: var(--kair-blue); font-weight: 700; }
+.mini__d.is-sel.is-today { color: #fff; }
+.mini__dots {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+.mini__dot { width: 4px; height: 4px; border-radius: 50%; }
+.mini__d.is-today .mini__dot { opacity: .85; }
+
+.tipos { padding: 14px; }
+.tipos__t {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--kair-text-3);
+  margin-bottom: 10px;
+}
+.tipos__i {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--kair-r-xs);
+  cursor: pointer;
+  transition: var(--kair-t);
+  user-select: none;
+  border: none;
+  background: none;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+}
+.tipos__i:hover { background: var(--kair-bg); }
+.tipos__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; transition: var(--kair-t); }
+.tipos__n { font-size: 12.5px; font-weight: 500; color: var(--kair-text-2); flex: 1; }
+.tipos__c {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--kair-text-3);
+  background: var(--kair-bg);
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.tipos__i.is-off { opacity: .38; }
+.tipos__i.is-off .tipos__dot { background: var(--kair-border-2) !important; }
+.tipos__hint { font-size: 11px; color: var(--kair-text-3); margin-top: 8px; padding: 0 8px; display: none; }
+.tipos.has-off .tipos__hint { display: block; }
+
+.sidecard { padding: 14px; background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFE 100%); }
+.sidecard__h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--kair-blue);
+  margin-bottom: 8px;
+}
+.sidecard__p { font-size: 12px; color: var(--kair-text-2); line-height: 1.55; }
+.sidecard__p b { color: var(--kair-text); font-weight: 600; }
+.sidecard__btn {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kair-blue);
+  background: var(--kair-surface);
+  transition: var(--kair-t);
+  cursor: pointer;
+  font-family: inherit;
+}
+.sidecard__btn:hover { background: var(--kair-blue-soft); border-color: var(--kair-blue-soft2); }
+
+/* NOTA (📦752) — El botón-flecha (`#panel-toggle`) que separaba el sidebar del
+   contenido se eliminó: lo reemplaza el segmentado Agenda/Correo del topbar.
+   Sus reglas se quitaron para no dejar CSS muerto. */
+
+/* Footer oculto (el contador de eventos vive en el pie de la agenda) */
+.kair-footer { display: none !important; }
+
+/* ══════════ 7. ÁREA DE CONTENIDO + CORREO ══════════ */
+.kair-content-area {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-md);
+  box-shadow: var(--kair-sh-sm);
+}
+
+.kair-mail-stack {
+  display: grid;
+  grid-template-columns: 388px 1fr;
+  height: 100%;
+  gap: 0;
+  transition: opacity 240ms ease;
+}
+.kair-mail-stack__list {
+  border-right: 1px solid var(--kair-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  background: var(--kair-surface);
+}
+.kair-mail-stack__detail {
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  background: var(--kair-surface);
+}
+
+/* ── Toolbar de correo (Redactar / Sincronizar / Orden) ── */
+.kair-mail-compose-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 0;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.kair-mail-compose-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  white-space: nowrap;
+}
+.kair-mail-compose-bar__btn:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+}
+/* Redactar = acción primaria, como en el diseño objetivo */
+.kair-mail-compose-bar__btn:first-child {
+  background: var(--kair-blue);
+  border-color: var(--kair-blue);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(32, 87, 184, .3);
+}
+.kair-mail-compose-bar__btn:first-child:hover {
+  background: var(--kair-blue-h);
+  border-color: var(--kair-blue-h);
+  color: #fff;
+}
+/* El selector de orden se alinea a la derecha */
+.kair-mail-compose-bar__btn#mail-sort-toggle { margin-left: auto; }
+
+/* ── Buscador de la bandeja ── */
+.kair-mail-search {
+  padding: 10px 12px 8px !important;
+  border-bottom: none !important;
+  flex-shrink: 0;
+}
+.kair-mail-search__input {
+  width: 100% !important;
+  height: 38px;
+  padding: 0 34px 0 36px !important;
+  border: 1px solid var(--kair-border-2) !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  background: var(--kair-bg) !important;
+  color: var(--kair-text) !important;
+  box-sizing: border-box;
+  transition: var(--kair-t);
+}
+.kair-mail-search__input:focus {
+  outline: none !important;
+  border-color: var(--kair-blue) !important;
+  background: var(--kair-surface) !important;
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, .1);
+}
+.kair-mail-search__input::placeholder { color: var(--kair-text-3); }
+.kair-mail-search__clear {
+  right: 14px !important;
+  border-radius: 50%;
+  transition: var(--kair-t);
+}
+.kair-mail-search__clear:hover { background: var(--kair-slate-soft); color: var(--kair-text); }
+.kair-mail-search__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* ── Carpetas (chips) ── */
+.kair-mail-list-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 12px 10px;
+  flex-shrink: 0;
+  background: var(--kair-surface);
+}
+.kair-mail-list-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5.5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--kair-text-2);
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-mail-list-filter svg { color: var(--kair-text-3); transition: var(--kair-t); }
+.kair-mail-list-filter:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+}
+.kair-mail-list-filter:hover svg { color: var(--kair-blue); }
+.kair-mail-list-filter[data-active="true"] {
+  background: var(--kair-blue-soft);
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+}
+.kair-mail-list-filter[data-active="true"] svg { color: var(--kair-blue); }
+.kair-mail-list-filter__badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 6.5px;
+  min-width: 18px;
+  text-align: center;
+  background: var(--kair-slate);
+  color: #fff;
+}
+.kair-mail-list-filter[data-active="true"] .kair-mail-list-filter__badge { background: var(--kair-blue); }
+
+/* ── Lista de correos ── */
+.kair-scroll { border-top: 1px solid var(--kair-border); }
+
+.kair-mail-row,
+.email-row {
+  display: grid;
+  grid-template-columns: 20px 36px 1fr 62px 22px;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 11px 12px 11px 8px;
+  border-bottom: 1px solid #F0F2F5;
+  background: var(--kair-surface);
+  cursor: pointer;
+  transition: background var(--kair-t);
+  position: relative;
+}
+.kair-mail-row:hover,
+.email-row:hover {
+  background: #F7FAFE;
+  box-shadow: none;
+}
+.kair-mail-row[data-selected="true"],
+.email-row[data-selected="true"] {
+  background: var(--kair-blue-soft);
+  box-shadow: none;
+}
+.kair-mail-row[data-selected="true"]::before,
+.email-row[data-selected="true"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--kair-blue);
+  border-radius: 0 2px 2px 0;
+}
+/* Leído / no leído: el diseño objetivo marca la fila con punto azul + negrita */
+.kair-mail-row[data-unread="false"],
+.email-row[data-unread="false"] { background: var(--kair-surface); }
+.kair-mail-row[data-unread="true"] .kair-mail-row__sender,
+.email-row[data-unread="true"] .email-row__sender {
+  font-weight: 700;
+  color: var(--kair-text);
+}
+.kair-mail-row__sender {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kair-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-row__time {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--kair-text-3);
+  white-space: nowrap;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__time {
+  color: var(--kair-blue);
+  font-weight: 600;
+}
+/* Línea del asunto: el wrapper contiene [tag] [badge N] [asunto] [— preview].
+   El asunto y el preview se truncan por separado (flex + min-width: 0). */
+.kair-mail-row__subject {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.kair-mail-row__subject-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--kair-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__subject-text,
+.email-row[data-unread="true"] .email-row__subject-text {
+  color: var(--kair-text);
+  font-weight: 700;
+}
+.kair-mail-row__preview {
+  font-size: 12px;
+  color: var(--kair-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+/* Nombre + email del remitente (cuando el sender es nombre + correo) */
+.kair-mail-row__sender-name,
+.email-row__sender-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kair-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-row__sender-email,
+.email-row__sender-email {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--kair-text-3);
+  margin-left: 4px;
+}
+/* Contador "N mensajes" del hilo */
+.kair-mail-row__count {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--kair-text-2);
+  background: var(--kair-slate-soft);
+  border-radius: 999px;
+  padding: 1px 6px;
+  flex: none;
+}
+/* Acciones al hover: fuera del grid para no romper las 5 columnas */
+.kair-mail-row__hover-actions {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: none;
+  align-items: center;
+  gap: 2px;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  padding: 2px;
+  box-shadow: var(--kair-sh-sm);
+  z-index: 2;
+}
+.kair-mail-row:hover .kair-mail-row__hover-actions { display: flex; }
+.kair-mail-row__hover-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--kair-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-mail-row__hover-btn:hover { background: var(--kair-blue-soft); color: var(--kair-blue); }
+
+/* Contenedores internos de la fila */
+.kair-mail-row__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.kair-mail-row__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.kair-mail-row__star {
+  color: #C4CBD4;
+  opacity: 0;
+  transition: var(--kair-t);
+  cursor: pointer;
+}
+.kair-mail-row:hover .kair-mail-row__star { opacity: 1; }
+.kair-mail-row__star[data-active="true"] {
+  opacity: 1;
+  color: var(--kair-amber);
+}
+.kair-mail-row__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--kair-font-t);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.kair-mail-row__unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kair-blue);
+  margin: 0 auto;
+}
+.kair-mail-row__star { color: var(--kair-amber); }
+.kair-mail-row__attachment { color: var(--kair-text-3); }
+
+/* ── Detalle / lector ── */
+.kair-mail-detail { background: var(--kair-surface); }
+.kair-mail-detail__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+  flex-wrap: wrap;
+}
+.kair-mail-detail__toolbar .kair-icon-btn { width: 32px; height: 32px; border-radius: 8px; }
+.kair-mail-detail__header {
+  padding: 18px 26px 0;
+}
+.kair-mail-detail__subject {
+  font-family: var(--kair-font-t);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.015em;
+  line-height: 1.3;
+  color: var(--kair-text);
+  word-break: break-word;
+}
+.kair-mail-detail__sender-row { display: flex; align-items: flex-start; gap: 11px; margin-top: 14px; }
+.kair-mail-detail__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--kair-font-t);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+/* Remitente del lector: el correo va en un <span> con estilo en línea dentro de
+   `__sender-name`, así que acá solo se tipografía el nombre. */
+.kair-mail-detail__sender-name { font-size: 13.5px; font-weight: 700; color: var(--kair-text); }
+.kair-mail-detail__recipients { margin-top: 3px; }
+.kair-mail-detail__recipient-row { font-size: 12px; color: var(--kair-text-3); margin-top: 2px; display: flex; gap: 6px; }
+.kair-mail-detail__recipient-label { font-weight: 600; color: var(--kair-text-2); flex: none; }
+.kair-mail-detail__recipient-value { color: var(--kair-text-3); min-width: 0; }
+.kair-mail-detail__details-list { font-size: 12.5px; }
+.kair-mail-detail__details-hint { font-size: 11.5px; color: var(--kair-text-3); margin-top: 8px; }
+.kair-mail-detail__time-main { font-size: 12px; font-weight: 500; color: var(--kair-text-2); }
+.kair-mail-detail__time-relative { font-size: 11px; color: var(--kair-text-3); margin-top: 1px; }
+.kair-mail-detail__show-details {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kair-blue);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.kair-mail-detail__show-details:hover { text-decoration: underline; }
+.kair-mail-detail__details-panel {
+  margin-top: 12px;
+  background: var(--kair-bg);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-xs);
+  padding: 10px 14px;
+  font-size: 12.5px;
+}
+.kair-mail-detail__body { font-size: 13.5px; line-height: 1.7; color: var(--kair-text); }
+.kair-mail-detail__reply {
+  border-top: 1px solid var(--kair-border);
+  padding: 11px 16px;
+  background: #FAFBFC;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.kair-mail-detail__reply-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--kair-border-2);
+  border-radius: 999px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--kair-text);
+  background: var(--kair-surface);
+  outline: none;
+  transition: var(--kair-t);
+}
+.kair-mail-detail__reply-input:focus {
+  border-color: var(--kair-blue);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, .1);
+}
+.kair-mail-detail__reply-input::placeholder { color: var(--kair-text-3); }
+
+/* Chips de etiquetas y tags del correo */
+.kair-mail-tag,
+.kair-mail-label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.kair-mail-tag--meeting { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.kair-mail-tag--urgent { background: var(--kair-red-soft); color: var(--kair-red-d); }
+.kair-mail-tag--normal { background: var(--kair-slate-soft); color: var(--kair-text-2); }
+
+/* ── Estados vacíos ── */
+.kair-mail-empty { color: var(--kair-text-3); padding: 56px 24px; text-align: center; }
+.kair-mail-empty__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--kair-r-sm);
+  background: var(--kair-slate-soft);
+  color: var(--kair-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+}
+.kair-mail-empty__icon svg { color: currentColor; }
+.kair-pulse {
+  background: var(--kair-slate-soft) !important;
+  animation: kairPulse 1.4s ease-in-out infinite;
+}
+@keyframes kairPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+/* Etiquetas de usuario (sección al pie de la lista) */
+.kair-labels-section { border-top: 1px solid var(--kair-border) !important; padding: 10px 12px !important; }
+.kair-label-chip-btn { font-family: inherit; transition: var(--kair-t); }
+.kair-label-chip-btn:hover { background: var(--kair-blue-soft) !important; }
+
+/* ══════════ 8. AGENDA / CALENDARIO ══════════ */
+.kair-calendar-slide { background: var(--kair-surface); }
+
+/* ── Toolbar de la agenda ── */
+.kair-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.kair-cal-toolbar__create {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--kair-r-xs);
+  border: none;
+  background: var(--kair-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  box-shadow: 0 1px 2px rgba(32, 87, 184, .3);
+}
+.kair-cal-toolbar__create:hover { background: var(--kair-blue-h); }
+.kair-cal-toolbar__nav { display: flex; gap: 2px; }
+.kair-cal-toolbar__nav .kair-icon-btn { width: 30px; height: 30px; border-radius: 8px; }
+.kair-cal-toolbar__month-label {
+  font-family: var(--kair-font-t);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--kair-text);
+  padding: 0 4px;
+}
+.kair-cal-toolbar__divider { display: none; }
+.kair-cal-toolbar__views {
+  display: flex;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-xs);
+  padding: 3px;
+  gap: 2px;
+  margin-left: auto;
+  box-shadow: var(--kair-sh-sm);
+}
+.kair-cal-toolbar__view {
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--kair-text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-cal-toolbar__view:hover { color: var(--kair-text); }
+.kair-cal-toolbar__view[data-active="true"] {
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+}
+
+/* ── Switch "Todas las empresas" ── */
+.kair-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  user-select: none;
+}
+.kair-toggle__track {
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: #D9DEE5;
+  position: relative;
+  transition: var(--kair-t);
+  flex: none;
+  display: block;
+}
+.kair-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 33, 61, .25);
+  transition: var(--kair-t);
+  display: block;
+}
+.kair-toggle[data-on="true"] .kair-toggle__track { background: var(--kair-blue); }
+.kair-toggle[data-on="true"] .kair-toggle__thumb { transform: translateX(15px); }
+.kair-toggle__label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--kair-text-2);
+  white-space: nowrap;
+}
+
+/* ── Vista MES ── */
+.kair-month-weekday {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--kair-text-3);
+  padding: 8px 10px;
+  text-align: left;
+}
+/* IMPORTANTE: la grilla del mes NO emite `.kair-month-grid`. El contenedor y la
+   cabecera de días se pintan con estilos EN LÍNEA desde `renderBigCalendar`
+   (display:grid + repeat(7,1fr) + gap:1px sobre el color de borde). Por eso las
+   celdas van SIN borde propio: el hueco de 1px ya hace la separación (si se
+   agrega borde, se ven líneas dobles). */
+.kair-month-cell {
+  background: var(--kair-surface);
+  padding: 6px;
+  min-height: 96px;
+  gap: 3px;
+  transition: background var(--kair-t);
+}
+.kair-month-cell:hover { background: #F7FAFE; }
+.kair-month-cell[data-out="true"] { background: #FCFDFD; }
+.kair-month-cell[data-out="true"] .kair-month-cell__day { color: #C8CFD9; opacity: 1; }
+.kair-month-cell[data-today="true"] { background: var(--kair-blue-soft); }
+.kair-month-cell[data-drop-active="true"] {
+  background: var(--kair-blue-soft);
+  outline: 2px solid var(--kair-blue-soft2);
+  outline-offset: -2px;
+}
+.kair-month-cell__day {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--kair-text-2);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex: none;
+}
+.kair-month-cell[data-today="true"] .kair-month-cell__day {
+  background: var(--kair-blue);
+  color: #fff;
+  font-weight: 700;
+}
+.kair-month-cell--festivo {
+  background: linear-gradient(180deg, #FEF6F7 0%, var(--kair-surface) 100%);
+  border-top: 2px solid var(--kair-red-soft);
+}
+.kair-month-cell--festivo .kair-month-cell__day { color: var(--kair-red-d); font-weight: 700; }
+.kair-month-event {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2.5px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: var(--kair-t);
+  border: none;
+  text-align: left;
+  width: 100%;
+}
+.kair-month-event:hover { filter: brightness(.97); }
+.kair-month-event__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.kair-month-event--cumplido { opacity: .5; }
+.kair-month-event--cumplido .kair-month-event__title { text-decoration: line-through; }
+.kair-month-event__more {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--kair-text-3);
+  background: none;
+  border: none;
+  padding: 1px 4px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.kair-month-event__more:hover { color: var(--kair-blue); }
+
+/* ── Vistas SEMANA / DÍA (grilla horaria) ── */
+.kair-week-header,
+.kair-week-day-head,
+.kair-day-hours,
+.kair-week-hours { border-color: var(--kair-border); }
+.kair-week-day-head {
+  padding: 9px 6px;
+  text-align: center;
+  border-right: 1px solid var(--kair-border);
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-week-day-head:hover { background: #F7FAFE; }
+.kair-week-day-head--today { background: var(--kair-blue-soft); }
+.kair-week-dow,
+.kair-week-hour-label__text {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--kair-text-3);
+}
+.kair-week-num {
+  font-family: var(--kair-font-t);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kair-text);
+}
+.kair-week-day-head--today .kair-week-num {
+  background: var(--kair-blue);
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1px auto 0;
+}
+.kair-week-today-pill {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  background: var(--kair-blue);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1.5px 7px;
+}
+.kair-week-col { border-right: 1px solid var(--kair-border); }
+.kair-week-col--today { background: #F3F7FD; }
+.kair-week-hour-line,
+.kair-day-hour-line { border-bottom: 1px solid #F0F2F5; }
+.kair-week-event,
+.kair-day-event,
+.kair-cal-event {
+  border-radius: 8px;
+  padding: 4px 7px 4px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  border: none;
+  text-align: left;
+  transition: var(--kair-t);
+}
+.kair-week-event:hover,
+.kair-day-event:hover { filter: brightness(.97); box-shadow: var(--kair-sh-sm); }
+.kair-week-event__title,
+.kair-day-event__title { font-weight: 600; }
+.kair-week-event__time,
+.kair-day-event__time,
+.kair-cal-event__time { font-size: 10px; font-weight: 500; opacity: .75; }
+.kair-week-now-line,
+.kair-day-now-line,
+.kair-cal-now-line { background: var(--kair-red); }
+.kair-week-allday-chip,
+.kair-allday-chip {
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+/* ── Vista PROGRAMAR (lista de agenda) ── */
+.kair-agenda-head__title,
+.kair-agenda-head {
+  font-family: var(--kair-font-t);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--kair-text-2);
+  text-transform: capitalize;
+}
+.kair-agenda-item,
+.kair-agenda-week__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  border-top: 1px solid #F0F2F5;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-agenda-item:hover,
+.kair-agenda-week__item:hover { background: #F7FAFE; }
+.kair-agenda-item__title { font-size: 13px; font-weight: 600; color: var(--kair-text); }
+.kair-agenda-item__time { font-size: 12px; font-weight: 600; color: var(--kair-text-2); }
+.kair-agenda-item__meta,
+.kair-agenda-item__cat { font-size: 11.5px; color: var(--kair-text-3); }
+.kair-agenda-item__bar { width: 3px; border-radius: 2px; align-self: stretch; }
+.kair-agenda-empty,
+.kair-day-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--kair-text-3);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ── Pie de la agenda ── */
+.kair-cal-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px 2px;
+  flex-shrink: 0;
+}
+.kair-cal-footer__hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--kair-text-3);
+}
+.kair-cal-footer__counter { font-size: 11.5px; color: var(--kair-text-3); margin-left: auto; }
+.kair-cal-footer__counter b { color: var(--kair-text-2); font-weight: 600; }
+
+/* ══════════ 9. MODALES ══════════ */
+/* ⚠️ CRÍTICO: la regla base NO debe declarar `display`. El modal vive en el HTML
+   con el atributo `hidden`, y quien lo oculta es la regla del NAVEGADOR
+   (`[hidden] { display: none }`), que solo pierde si una regla propia declara
+   `display` en el mismo elemento. Si acá se pone `display: flex`, el overlay
+   queda visible SIEMPRE tapando toda la bandeja (bug real de 📦752: la pantalla
+   se veía lavada por el velo oscuro + blur del modal fantasma).
+   El `display: flex` va SIEMPRE en `:not([hidden])`, igual que en el CSS legacy. */
+.kair-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 33, 61, .45);
+  backdrop-filter: blur(2px);
+  z-index: 500000;   /* por encima del redactor flotante (400000) y de la firma (450000) */
+  padding: 24px;
+}
+.kair-modal-overlay:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kair-modal,
+.kair-event-modal {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-md);
+  box-shadow: var(--kair-sh-lg);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.kair-event-modal__header,
+.kair-signature-modal__header,
+.kair-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--kair-border);
+}
+.kair-event-modal__title,
+.kair-signature-modal__header h3,
+.kair-modal__title {
+  font-family: var(--kair-font-t);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--kair-text);
+  flex: 1;
+}
+.kair-event-modal__close,
+.kair-signature-modal__close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-event-modal__close:hover,
+.kair-signature-modal__close:hover { background: var(--kair-slate-soft); color: var(--kair-text); }
+.kair-event-modal__body,
+.kair-signature-modal__body,
+.kair-modal__body { padding: 18px 22px; overflow-y: auto; }
+.kair-event-modal__field,
+.kair-signature-modal__label,
+.kair-field__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kair-text-2);
+  margin-bottom: 7px;
+  display: block;
+}
+.kair-input,
+.kair-select,
+.kair-textarea,
+.kair-event-modal__field input,
+.kair-event-modal__field select,
+.kair-event-modal__field textarea,
+.kair-signature-modal__textarea {
+  width: 100%;
+  border: 1px solid var(--kair-border-2);
+  border-radius: var(--kair-r-xs);
+  padding: 10px 13px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: var(--kair-surface);
+  color: var(--kair-text);
+  transition: var(--kair-t);
+  box-sizing: border-box;
+}
+.kair-input:focus,
+.kair-select:focus,
+.kair-textarea:focus,
+.kair-signature-modal__textarea:focus {
+  outline: none;
+  border-color: var(--kair-blue);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, .12);
+}
+.kair-event-modal__btn,
+.kair-signature-modal__btn,
+.kair-modal__footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--kair-r-xs);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+}
+.kair-event-modal__btn--primary,
+.kair-signature-modal__btn--primary {
+  background: var(--kair-blue);
+  border-color: var(--kair-blue);
+  color: #fff;
+}
+.kair-event-modal__btn--primary:hover,
+.kair-signature-modal__btn--primary:hover { background: var(--kair-blue-h); border-color: var(--kair-blue-h); }
+.kair-event-modal__btn--danger,
+.kair-event-modal__btn--danger-solid {
+  background: var(--kair-red-soft);
+  border-color: #F2C9CE;
+  color: var(--kair-red-d);
+}
+.kair-event-modal__actions,
+.kair-event-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--kair-border);
+  background: #FAFBFC;
+}
+.kair-event-modal__category,
+.kair-event-modal__meta { font-size: 12.5px; color: var(--kair-text-2); }
+.kair-duration-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.kair-duration-row__btn {
+  padding: 6px 12px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-duration-row__btn:hover { border-color: var(--kair-blue-soft2); }
+.kair-duration-row__btn[data-active="true"],
+.kair-duration-row__btn.is-active {
+  background: var(--kair-blue);
+  border-color: var(--kair-blue);
+  color: #fff;
+}
+
+/* ══════════ 10. REDACTOR FLOTANTE ══════════ */
+.compose-panel {
+  border-radius: var(--kair-r-md) var(--kair-r-md) 0 0;
+  border: 1px solid var(--kair-border);
+  box-shadow: var(--kair-sh-lg);
+  background: var(--kair-surface);
+}
+.compose-panel__titlebar,
+.compose-panel__header {
+  background: var(--kair-blue-soft);
+  border-bottom: 1px solid var(--kair-blue-soft2);
+  border-radius: var(--kair-r-md) var(--kair-r-md) 0 0;
+  padding: 12px 14px;
+}
+.compose-panel__title {
+  font-family: var(--kair-font-t);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--kair-blue);
+}
+.compose-panel__btn { border-radius: 7px; transition: var(--kair-t); }
+.compose-panel__btn:hover { background: rgba(32, 87, 184, .12); }
+.compose-panel__field { border-bottom: 1px solid #F0F2F5; }
+.compose-panel__input,
+.compose-panel__textarea {
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--kair-text);
+  background: transparent;
+  border: none;
+}
+.compose-panel__input:focus,
+.compose-panel__textarea:focus { outline: none; }
+.compose-panel__footer {
+  border-top: 1px solid #F0F2F5;
+  padding: 10px 14px;
+}
+.compose-panel__send {
+  background: var(--kair-blue);
+  color: #fff;
+  border-radius: var(--kair-r-xs);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.compose-panel__send:hover { background: var(--kair-blue-h); }
+.compose-panel__chip,
+.compose-panel__chip-avatar {
+  border-radius: 999px;
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ══════════ 11. TOASTS ══════════ */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.kair-toast {
+  /* El contenedor no captura clicks (para no bloquear la UI), pero la píldora SÍ
+     tiene que capturarlos: adentro viven los botones de "Deshacer" y "Posponer". */
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--kair-navy);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 11px 18px;
+  border-radius: 999px;
+  box-shadow: var(--kair-sh-lg);
+  max-width: min(92vw, 480px);
+  animation: kairToastIn .22s ease;
+}
+.kair-toast__title { font-weight: 600; }
+.kair-toast__desc { font-size: 12px; opacity: .78; margin-top: 1px; }
+.kair-toast--success .kair-toast__icon { color: #4ADE9C; }
+.kair-toast--error .kair-toast__icon { color: #F09AA4; }
+.kair-toast--warning .kair-toast__icon { color: var(--kair-amber); }
+.kair-toast--info .kair-toast__icon { color: #8FB8F0; }
+@keyframes kairToastIn {
+  from { opacity: 0; transform: translateY(8px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ══════════ 12. RESPONSIVE ══════════ */
+@media (max-width: 1280px) {
+  .kair-layout { grid-template-columns: 224px 1fr; padding: 14px 20px 18px; }
+  .kair-mail-stack { grid-template-columns: 330px 1fr; }
+  .kpis { padding: 14px 20px 4px; }
+  .kair-top { padding: 16px 20px 0; }
+}
+@media (max-width: 1080px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kair-layout { grid-template-columns: 1fr; }
+  .kair-layout .kair-sidebar { display: none; }
+  .kair-mail-stack { grid-template-columns: 1fr; }
+  .kair-mail-stack__list { border-right: none; border-bottom: 1px solid var(--kair-border); }
+}
+@media (max-width: 640px) {
+  .kair-top { padding: 14px 16px 0; }
+  .kpis { grid-template-columns: 1fr; padding: 12px 16px 2px; }
+  .kair-layout { padding: 12px 16px 16px; }
+  .kair-top__sub { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

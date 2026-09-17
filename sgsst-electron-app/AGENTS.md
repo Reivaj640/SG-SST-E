@@ -1612,6 +1612,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 |--------|--------------------|-------|
 | Dashboard principal | ✅ (📦749) | Piloto — referencia de implementación |
 | Configuración | ✅ (📦751) | No usa `kair-premium`: capa propia scoped `.kair-config` + Header System v2 |
+| Bandeja Integrada | ✅ (📦752) | No usa `kair-premium`: capa propia `premium.css` (tokens + remapeo legacy) + topbar/segmentado propios. Es un iframe con scope aislado |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -1727,4 +1728,131 @@ El iframe se carga con token en `renderer.js` (`showSettingsPage`):
 
 `node main/test-config-premium-v2.js` → **37/37 OK** (tokens, capa premium, header v2, tabs,
 dark, integridad de llaves/HTML, cache-bust y handlers intactos).
+
+---
+
+## 🆕 Bandeja Integrada · Premium v2 (📦752, 2026-09-17)
+
+La **Bandeja Integrada** (`renderer/bandeja-integrada/`) se migró al look premium v2 del
+diseño objetivo `kair-bandeja.html` (prototipo autocontenido que pasó el user): topbar con
+breadcrumb + icono/título + chip de fecha + segmentado **Agenda / Correo**, 4 KPI cards,
+sidebar de tarjetas (mini-calendario, tipos de evento con contador, integración correo) y
+el correo (toolbar, carpetas, lista, lector) + agenda (mes/semana/día/programar) re-skineados.
+
+### Estrategia: 2 capas (mismo patrón que Configuración 📦751)
+
+1. **Remapeo de tokens.** `styles.css` (5.778 líneas, legacy Gmail-style) es **100%
+   variable-driven**. `premium.css` define los **tokens premium v2** (`--kair-surface`,
+   `--kair-blue: #2057B8`, `--kair-sh-*`, `--kair-r-*`, `--kair-font-t/b`) y **remapea los
+   tokens legacy** a sus equivalentes premium (`--kair-primary`, `--kair-bg-card`,
+   `--kair-text-muted`, `--kair-text-light`, `--email-*`, `--kair-shadow-*`, `--radius`).
+   Resultado: todo el CSS legacy adopta la paleta premium **sin reescribirlo**.
+2. **Recetas de componentes** para donde la geometría legacy no coincide: topbar,
+   KPI cards, sidebar, filas de correo, carpetas, lector, toolbar de agenda, celdas del
+   mes, modales, redactor, toasts, scrollbar y responsive.
+
+`premium.css` se carga **después** de `styles.css` en `index.html` → gana por cascada a
+igual especificidad. **No usa la clase `kair-premium`** de `shared/kair-premium.css` (el
+iframe tiene su propio scope y su propio dialecto, igual que Configuración con `.kair-config`).
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `renderer/bandeja-integrada/premium.css` | **NUEVO** (1.788 líneas). Tokens + remapeo + recetas premium. |
+| `renderer/bandeja-integrada/index.html` | Topbar premium (`.kair-top`), segmentado `#tab-agenda`/`#tab-correo`, KPI `.kpis`, sidebar sin tarjeta propia. |
+| `renderer/bandeja-integrada/app.js` | `renderKpiStrip` (KPI cards que navegan), `renderSidebar` (mini/tipos/sidecard), `renderHeaderState` (segmentado + chip de fecha), `bindHeader` (tabs + guard del search), `setCalendarVisible()`. |
+| `renderer.js` | Cache-bust del iframe `?v=683` → `?v=685`. |
+| `main/test-bandeja-premium-v2.js` | **NUEVO**. Smoke test estático (37 checks). |
+
+### Hallazgo crítico: 12 archivos JS huérfanos
+
+`index.html` carga **solo `app.js`** (+ `data.js`, `icons.js`, `kair-calendar*.js`,
+`colombia-festivos.js`, `file-viewer`). **No** carga `init.js`, `handlers.js`, `state.js`,
+`helpers.js`, `mail-operations.js`, `calendar-operations.js`, `compose-modal.js`,
+`event-modal.js`, `render-mail-list.js`, `render-mail-detail.js`, `render-sidebar.js`,
+`render-calendar.js`. Esos 12 archivos tienen un **contrato DOM paralelo y divergente**
+(emiten clases que no existen en vivo, p. ej. `kair-sidebar__minical`) y referencian helpers
+inexistentes. **`app.js` es el único contrato vivo: cualquier rediseño se hace ahí.**
+Ojo: `init.js:40` hace `innerHTML=""` de `#kair-app` y reconstruye el skeleton — si algún día
+se agrega ese `<script>`, **destruye el topbar de `index.html`**.
+
+### Contrato DOM del topbar (lo que NO se puede renombrar)
+
+`bindHeader()` y `renderHeaderState()` corren en `init()` **sin guards**, así que estos IDs
+deben existir siempre en `index.html`: `#btn-back`, `#btn-refresh`, `#refresh-icon`,
+`#btn-compose`, `#btn-signature`, `#gmail-indicator`, `#gmail-indicator-text`, `#kpi-strip`,
+`#sidebar`, `#content-area`, `#mail-list-container`, `#mail-detail-container`,
+`#calendar-slide`, `#footer-events-count`, `#footer-view`, `#modal-overlay`, `#event-modal`,
+`#toast-container` y los `#fv-*`. `renderFooter()` tampoco tiene guards.
+
+### Cambios intencionales respecto de la versión anterior
+
+- **Se eliminó `#panel-toggle`** (el botón-flecha entre sidebar y contenido) → lo reemplaza
+  el segmentado Agenda/Correo, que **fija** el estado (`setCalendarVisible(true|false)`) en
+  vez de alternarlo. Se conservan `#content-area[data-calendar-visible]` y
+  `#calendar-slide[data-visible]`, que es de lo que depende el CSS del slide.
+- **Se eliminó del topbar el buscador `#search-input`** (el binding quedó con guard): la
+  búsqueda vive en `#mail-search-input` del panel de correo y escribe el mismo
+  `state.searchQuery`. Antes era invisible igual, porque `styles.css` ocultaba el header
+  completo (`.kair-header { display:none !important }`).
+- **Se eliminaron** el chip de empresa `#company-name` (el scope de empresa se ve en el
+  toggle "Todas las empresas" de la toolbar de la agenda), los iconos decorativos de
+  notificaciones/configuración (no tenían handler) y el botón de prueba `#btn-fv-test`
+  (`wireFileViewerDemo()` ya validaba con `if (btn && input)`; el preview de adjuntos sigue
+  funcionando por `#fv-file-input`).
+- **El CTA "Redactar" del topbar es solo icono** para no duplicar el "Redactar" con label de
+  la toolbar del correo (que es donde lo pone el diseño objetivo).
+
+### Cache-bust (doble)
+
+1. `renderer.js` → `renderer/bandeja-integrada/index.html?v=685` (el iframe).
+2. `index.html` → `styles.css?v=…`, `premium.css?v=20260917-premium-fix1` y `app.js?v=…` (los
+   sub-recursos del iframe se cachean aparte del documento).
+
+### Verificación
+
+`node main/test-bandeja-premium-v2.js` → **42/42 OK** (topbar, contrato DOM crítico, render
+premium en app.js, capa CSS, cache-bust y los 5 checks de regresión de los bugs de 📦752-fix1).
+Correr también los smoke tests históricos de la bandeja (`main/test-compose-bem.js`,
+`main/test-auditoria-visual.js`).
+Nota: `test-compose-bem.js` y `test-auditoria-visual.js` ya venían fallando antes de 📦752
+(buscan reglas `.message-block--expanded` y `.kair-mail-message__avatar{width:32px}` que no
+existen en el repo).
+
+### 🐛 Bugs de la primera pasada (📦752-fix1, encontrados en la validación visual)
+
+La primera versión se veía **casi vacía y lavada**. Dos causas, ambas en `premium.css`:
+
+1. **`.kair-layout` quedó con 3 columnas** (`250px 26px 1fr`) después de retirar el
+   botón-flecha `#panel-toggle`. Al quedar solo 2 hijos (sidebar + área de contenido), el
+   contenido se acomodó en el **carril de 26px** → la lista de correos y el calendario se
+   veían como una tira vertical de ~5px. **Fix**: `grid-template-columns: 250px 1fr` (y las
+   dos media queries: `224px 1fr` y `1fr`). Lección: al sacar un hijo de un grid, revisar
+   SIEMPRE el `grid-template-columns` de las 3 declaraciones (base + 2 breakpoints).
+
+2. **`.kair-modal-overlay` declaraba `display: flex` en la regla base.** El modal vive en
+   `index.html` con el atributo `hidden`, y **quien lo oculta es la regla del NAVEGADOR**
+   (`[hidden] { display: none }`). Como una regla propia gana sobre la del navegador, el
+   overlay quedó **visible siempre**: un velo `rgba(...,.45)` + `backdrop-filter: blur(2px)`
+   tapando toda la bandeja. **Fix**: la regla base NO declara `display`; el `display:flex`
+   va en `.kair-modal-overlay:not([hidden])` (mismo patrón que el CSS legacy).
+   **REGLA PARA FUTURAS CAPAS**: en este módulo, si un elemento del HTML lleva el atributo
+   `hidden` (p. ej. `#modal-overlay`, `#fv-overlay`, `#mail-details-panel`), la capa nueva
+   **NUNCA** debe declarar `display` en su selector base.
+
+También se corrigió que `.kair-toast` no capturaba clicks: `#toast-container` es
+`pointer-events: none` (para no bloquear la UI) pero la píldora necesita
+`pointer-events: auto`, porque adentro viven los botones de "Deshacer" y "Posponer".
+
+Los tres casos quedaron **blindados con checks de regresión** en
+`main/test-bandeja-premium-v2.js` (bloques 6.a/6.b/6.c) → el test pasó de 37 a **42 checks**.
+
+### Pendiente de validación visual
+
+Falta revisar en pantalla: (1) que el scroll interno de la lista de correos y del lector
+funcione bien tras cambiar `.kair-mail-stack` a 388px, (2) el aspecto del sidebar de 3
+tarjetas en la columna de 250px, (3) contraste del modo oscuro si el padre aplica tema
+(esta capa **no** define overrides dark).
+
 
