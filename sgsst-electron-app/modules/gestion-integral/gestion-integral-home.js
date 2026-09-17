@@ -58,7 +58,11 @@ class GestionIntegralHome {
         mainArea.style.flex = '1';
 
         // 📦491 — Skeleton mientras cargan estadísticas de Gestión Integral (4 widgets + 1 chart)
-        mainArea.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
+                // 📦756 — Esqueleto del home con las MISMAS clases y espacios que el contenido real
+        // (hero + 3 metricas + 2 tarjetas + grilla de submodulos). Antes era
+        // KairSkeleton.kpiStrip(N) [+ chartBars], que dibujaba 4 tarjetas genéricas de otra
+        // forma/radio/alto: al llegar los datos TODO saltaba de lugar.
+        mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 });
 
         // 📦491-fix — Agregar al DOM ANTES del await para que el skeleton sea visible
         contentContainer.appendChild(mainArea);

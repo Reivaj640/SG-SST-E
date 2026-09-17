@@ -58,7 +58,11 @@ class GestionSaludHome {
         mainArea.style.flex = '1';
 
         // 📦491 — Skeleton mientras cargan las estadísticas de Gestión Salud
-        mainArea.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
+                // 📦756 — Esqueleto del home con las MISMAS clases y espacios que el contenido real
+        // (hero + 3 metricas + 2 tarjetas + grilla de submodulos). Antes era
+        // KairSkeleton.kpiStrip(N) [+ chartBars], que dibujaba 4 tarjetas genéricas de otra
+        // forma/radio/alto: al llegar los datos TODO saltaba de lugar.
+        mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 });
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);

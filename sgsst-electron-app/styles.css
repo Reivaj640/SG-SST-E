@@ -7338,23 +7338,39 @@ position: relative;
   width: 100%;
 }
 
-/* ── KPI Strip ─────────────────────────────────────────────────── */
+/* ── KPI Strip ─────────────────────────────────────────────────────
+   📦756 — Métricas ALINEADAS con las tarjetas reales del sistema premium
+   (.kair-health / .kair-metric-card en shared/kair-components.css):
+   mismo gutter lateral, mismo gap, mismo radio, mismo padding y mismo
+   alto mínimo. Si estos números se desalinean, al llegar los datos la
+   tira "salta": eso era lo que se veía como esqueleto que no encaja.
+
+   Un submódulo que tenga KPIs con OTRA medida puede alinear el esqueleto
+   sin tocar este archivo: alcanza con declarar las variables en el
+   contenedor que recibe el esqueleto, por ejemplo
+     #mi-contenedor .ks-kpi-strip { --ks-kpi-min: 180px; --ks-kpi-radius: 14px; }
+   Variables: --ks-kpi-min, --ks-kpi-gap, --ks-kpi-pad, --ks-kpi-radius,
+   --ks-kpi-minh, --ks-kpi-align, --ks-kpi-text. */
 .ks-kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(var(--ks-kpi-min, 220px), 1fr));
+  gap: var(--ks-kpi-gap, clamp(10px, 1.2vw, 16px));      /* = .kair-health */
+  padding: 0 clamp(4px, 0.6vw, 8px);                     /* = gutter de .kair-health */
+  margin-bottom: var(--ks-kpi-mb, 0);                    /* .kair-content arranca sin margen */
 }
 
 .ks-kpi-card {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: var(--ks-kpi-radius, var(--kair-radius-card, 20px));  /* = .kair-metric-card */
+  padding: var(--ks-kpi-pad, clamp(15px, 1.6vw, 22px) clamp(15px, 1.6vw, 20px));
   display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 104px;
+  flex-direction: column;                 /* = .kair-metric-card (columna, no fila) */
+  align-items: var(--ks-kpi-align, stretch);
+  justify-content: var(--ks-kpi-justify, flex-start);
+  text-align: var(--ks-kpi-text, left);
+  min-height: var(--ks-kpi-minh, clamp(110px, 10vw, 140px));  /* = .kair-metric-card */
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .ks-kpi-card,
@@ -7369,6 +7385,7 @@ position: relative;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  width: 100%;
 }
 
 /* ── Tabla ─────────────────────────────────────────────────────── */
@@ -7416,13 +7433,17 @@ position: relative;
   border-bottom-color: #334155;
 }
 
-/* ── Chart ─────────────────────────────────────────────────────── */
+/* ── Chart ─────────────────────────────────────────────────────────
+   📦756 — Alineado con la tarjeta real que lo contiene (.kair-card:
+   radio 20px, padding clamp(14,1.5vw,20), borde --kair-line) y con el
+   alto real del área de chart (.kair-chart: clamp(130px,13vw,170px)). */
 .ks-chart {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 12px;
-  padding: 20px;
-  min-height: 280px;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: var(--kair-radius-card, 20px);
+  padding: clamp(14px, 1.5vw, 20px);
+  min-height: clamp(220px, 22vw, 280px);
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .ks-chart,
@@ -7568,11 +7589,12 @@ position: relative;
   min-width: 0;
 }
 
-/* ── Card ──────────────────────────────────────────────────────── */
+/* ── Card ──────────────────────────────────────────────────────────
+   📦756 — Mismo radio/borde/padding que la tarjeta real (.kair-card). */
 .ks-card {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 12px;
+  background: var(--kair-card, #ffffff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: var(--kair-radius-card, 20px);
   overflow: hidden;
   display: flex;
   flex-direction: column;

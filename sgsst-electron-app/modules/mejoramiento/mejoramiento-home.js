@@ -62,7 +62,11 @@ class MejoramientoHome {
         mainArea.id = 'app-container';
         mainArea.className = 'mejoramiento-home';
         mainArea.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem; box-sizing: border-box;';
-        mainArea.innerHTML = KairSkeleton.kpiStrip(4);
+                // 📦756 — Esqueleto del home con las MISMAS clases y espacios que el contenido real
+        // (hero + 3 metricas + 2 tarjetas + grilla de submodulos). Antes era
+        // KairSkeleton.kpiStrip(N) [+ chartBars], que dibujaba 4 tarjetas genéricas de otra
+        // forma/radio/alto: al llegar los datos TODO saltaba de lugar.
+        mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 });
         layout.appendChild(mainArea);
 
         // 5. Pintar contenido premium (lee MejoramientoStore si está disponible)

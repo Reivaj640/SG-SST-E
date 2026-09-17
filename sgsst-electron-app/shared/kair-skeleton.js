@@ -321,8 +321,7 @@
    * @param {string} component - nombre del componente ('kpiStrip', 'table', etc.)
    * @param {object} opts - opciones que se pasan al componente
    */
-  function show(target, component, opts) {
-    var el = typeof target === 'string' ? document.querySelector(target) : target;
+  function show(target, component, opts) {    var el = typeof target === 'string' ? document.querySelector(target) : target;
     if (!el) {
       console.warn('[KairSkeleton] target no encontrado:', target);
       return;
@@ -349,6 +348,134 @@
     if (inner) inner.remove();
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 📦756 — ESQUELETOS PREMIUM (encaje exacto con el contenido real)
+  //
+  // PROBLEMA QUE RESUELVEN: los homes de módulo usaban `kpiStrip(4)` (+ a veces
+  // `chartBars`), que dibujaba 4 tarjetas genéricas con OTRA forma: radio 12px
+  // (real 20px), padding 20px (real 15-22px), min-height 104px (real 110-140px),
+  // fila con avatar (real: columna label/valor/descripcion/barra), sin hero, sin
+  // grilla de contenido y sin grilla de submódulos. Cuando llegaban los datos,
+  // TODO saltaba de lugar y de tamaño.
+  //
+  // SOLUCIÓN: estos generadores reutilizan las clases REALES del sistema premium
+  // (.kair-health, .kair-hero-card, .kair-metric-card, .kair-content, .kair-card,
+  // .kair-chart, .kair-legend, .kair-task, .kair-modules, .kair-module-grid,
+  // .kair-module) y sólo cambian el texto por barras .ks-bar. Así el borde, el
+  // radio, el padding, el gap y el alto mínimo son EXACTAMENTE los del contenido
+  // final: al llegar los datos, nada se mueve.
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Tarjeta métrica (equivale a .kair-metric-card con datos). */
+  function metricCard() {
+    return '<article class="kair-metric-card">' +
+      '<div class="kair-metric-head">' + _bar({ variant: 'text-sm', width: '54%' }) + '</div>' +
+      '<div class="kair-metric-value">' + _bar({ variant: 'number', width: '58%' }) + '</div>' +
+      '<div class="kair-metric-desc">' + _bar({ variant: 'text-sm', width: '76%' }) + '</div>' +
+      '<span class="kair-progress">' + _bar({ variant: 'text', width: '100%', height: '7px' }) + '</span>' +
+      '</article>';
+  }
+
+  /** Tira de N tarjetas métricas (sin hero) — para submodulos que solo tienen KPIs. */
+  function metricStrip(count) {
+    var n = (count === undefined || count === null) ? 4 : count;
+    var html = '<section class="kair-health">';
+    for (var i = 0; i < n; i++) html += metricCard();
+    html += '</section>';
+    return html;
+  }
+
+  /**
+   * Hero strip del home: 1 tarjeta hero (ocupa 2 columnas) + N tarjetas métricas.
+   * @param {number} metrics - cantidad de tarjetas métricas (default 3)
+   */
+  function homeHero(metrics) {
+    var n = (metrics === undefined || metrics === null) ? 3 : metrics;
+    var html = '<section class="kair-health">';
+    html += '<article class="kair-hero-card">' +
+      '<div class="kair-hero-eyebrow">' + _bar({ variant: 'text-sm', width: '36%' }) + '</div>' +
+      '<h2>' + _bar({ variant: 'text-lg', width: '70%' }) + '</h2>' +
+      '<p class="kair-hero-msg">' + _bar({ variant: 'text-sm', width: '92%' }) + '</p>' +
+      '<div class="kair-hero-score">' + _bar({ variant: 'number', width: '76px', height: '30px' }) +
+        '<span>' + _bar({ variant: 'text-sm', width: '58px' }) + '</span></div>' +
+      '</article>';
+    for (var i = 0; i < n; i++) html += metricCard();
+    html += '</section>';
+    return html;
+  }
+
+  /** Filas de tareas (equivale a .kair-task dentro de "En tu radar"). */
+  function taskRows(count) {
+    var n = (count === undefined || count === null) ? 4 : count;
+    var html = '';
+    for (var i = 0; i < n; i++) {
+      html += '<div class="kair-task">' +
+        '<span class="kair-task-icon">' + _bar({ variant: 'avatar', width: '34px', height: '34px', style: 'border-radius:11px;' }) + '</span>' +
+        '<div>' + _bar({ variant: 'text', width: '62%' }) +
+          _bar({ variant: 'text-sm', width: '42%', style: 'margin-top:3px;' }) + '</div>' +
+        '</div>';
+    }
+    return html;
+  }
+
+  /** Grilla de contenido del home: tarjeta de chart + tarjeta lateral. */
+  function homeContent(opts) {
+    var o = opts || {};
+    var rows = (o.rows === undefined || o.rows === null) ? 4 : o.rows;
+    var chartCard = '<article class="kair-card">' +
+      '<div class="kair-card-head"><div>' +
+        _bar({ variant: 'title', width: '48%' }) +
+        _bar({ variant: 'text-sm', width: '64%', style: 'margin-top:5px;' }) +
+      '</div></div>' +
+      '<div class="kair-chart">' + _bar({ variant: 'text', width: '100%', height: '100%', style: 'border-radius:0;' }) + '</div>' +
+      '<div class="kair-legend">' +
+        _bar({ variant: 'text-sm', width: '104px' }) +
+        _bar({ variant: 'text-sm', width: '88px' }) +
+      '</div>' +
+      '</article>';
+    var sideCard = '<article class="kair-card">' +
+      '<div class="kair-row-title"><div>' +
+        _bar({ variant: 'title', width: '44%' }) +
+        _bar({ variant: 'text-sm', width: '60%', style: 'margin-top:5px;' }) +
+      '</div></div>' +
+      taskRows(rows) +
+      '</article>';
+    return '<section class="kair-content">' + chartCard + sideCard + '</section>';
+  }
+
+  /**
+   * Grilla de submódulos: tarjeta con header + N tarjetas de módulo.
+   * @param {number} count - cantidad de submódulos (default 6)
+   */
+  function homeModules(count) {
+    var n = (count === undefined || count === null) ? 6 : count;
+    var html = '<section class="kair-modules"><article class="kair-card">' +
+      '<div class="kair-card-head"><div>' +
+        _bar({ variant: 'title', width: '44%' }) +
+        _bar({ variant: 'text-sm', width: '68%', style: 'margin-top:5px;' }) +
+      '</div>' + _bar({ variant: 'button' }) + '</div>' +
+      '<div class="kair-module-grid">';
+    for (var i = 0; i < n; i++) {
+      html += '<article class="kair-module">' +
+        '<div class="kair-module-n">' + _bar({ variant: 'text-sm', width: '32px' }) + '</div>' +
+        '<strong>' + _bar({ variant: 'text', width: '80%' }) + '</strong>' +
+        '<small>' + _bar({ variant: 'text-sm', width: '56%' }) + '</small>' +
+        '</article>';
+    }
+    html += '</div></article></section>';
+    return html;
+  }
+
+  /**
+   * ESQUELETO ESTÁNDAR DEL HOME (lo que usan todos los módulos):
+   * hero strip + grilla de contenido + grilla de submódulos.
+   * @param {object} opts - { metrics: 3, rows: 4, modules: 6 }
+   */
+  function home(opts) {
+    var o = opts || {};
+    return homeHero(o.metrics) + homeContent({ rows: o.rows }) + homeModules(o.modules);
+  }
+
   // Mapa de componentes para `show()`
   var _components = {
     kpiStrip: kpiStrip,
@@ -360,7 +487,15 @@
     form: form,
     detail: detail,
     list: list,
-    card: card
+    card: card,
+    // 📦756 — Premium (encaje exacto con el contenido real)
+    home: home,
+    homeHero: homeHero,
+    homeContent: homeContent,
+    homeModules: homeModules,
+    metricCard: metricCard,
+    metricStrip: metricStrip,
+    taskRows: taskRows
   };
 
   // ─── API pública ─────────────────────────────────────────────────
@@ -381,12 +516,21 @@
     list: list,
     card: card,
 
+    // 📦756 — Premium: mismos contenedores/clases que el contenido real
+    home: home,
+    homeHero: homeHero,
+    homeContent: homeContent,
+    homeModules: homeModules,
+    metricCard: metricCard,
+    metricStrip: metricStrip,
+    taskRows: taskRows,
+
     // Helpers
     show: show,
     hide: hide,
 
     // Metadata
-    version: '1.0.0',
+    version: '1.1.0',
     cssRequired: true  // Requiere las reglas .ks-* en styles.css
   };
 })();

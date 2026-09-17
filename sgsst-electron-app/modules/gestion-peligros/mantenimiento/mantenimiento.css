@@ -368,3 +368,23 @@ HEADER K+AIR v3.0 — Card + Tabs (estandarizado como capacitaciones)
 [data-theme="dark"] .kair-mnt-wrapper { --kair-mnt-primary: #4da6ff; --kair-mnt-primary-hover: #66b3ff; --kair-mnt-primary-light: rgba(77, 166, 255, 0.15); --kair-mnt-primary-rgb: 77, 166, 255; --kair-mnt-success: #5cb85c; --kair-mnt-success-light: rgba(92, 184, 92, 0.15); --kair-mnt-warning: #ffc107; --kair-mnt-warning-light: rgba(255, 193, 7, 0.15); --kair-mnt-danger: #ff6b6b; --kair-mnt-danger-light: rgba(255, 107, 107, 0.15); --kair-mnt-bg: #1a1a2e; --kair-mnt-bg-card: #16213e; --kair-mnt-bg-input: #1a1a2e; --kair-mnt-bg-hover: #1e2a4a; --kair-mnt-bg-app: #0f1629; --kair-mnt-border: #2a3a5c; --kair-mnt-border-light: #1e2a4a; --kair-mnt-border-focus: #4da6ff; --kair-mnt-text: #e0e0e0; --kair-mnt-text-secondary: #a0aec0; --kair-mnt-text-light: #718096; --kair-mnt-text-muted: #4a5568; }
 [data-theme="dark"] .kair-mnt-toast--success { background: #1a2e1a; color: #86efac; border-color: #2d4a2d; }
 [data-theme="dark"] .kair-mnt-toast--error { background: #2e1a1a; color: #fca5a5; border-color: #4a2d2d; }
+
+/* 📦756 — ENCAJE DEL ESQUELETO con las tarjetas KPI reales de este submódulo.
+   El esqueleto (.ks-kpi-strip / .ks-kpi-card) usa por defecto las medidas del
+   sistema premium (220px, radio 20px, alto mínimo 110-140px, texto a la
+   izquierda). Estas tarjetas son más chicas y centradas, así que le pasamos sus
+   medidas reales por variables: así el bloque sombreado ocupa EXACTAMENTE el
+   mismo espacio que las tarjetas que lo reemplazan y no hay salto al cargar. */
+#kair-mnt-resumen-content .ks-kpi-strip,
+#kair-mnt-cronograma-kpis .ks-kpi-strip,
+.kair-mnt-kpis .ks-kpi-strip {
+  --ks-kpi-min: 180px;
+  --ks-kpi-gap: var(--kair-mnt-space-4);
+  --ks-kpi-radius: var(--kair-mnt-radius-lg);
+  --ks-kpi-pad: var(--kair-mnt-space-4) var(--kair-mnt-space-5);
+  --ks-kpi-minh: 0px;
+  --ks-kpi-align: center;
+  --ks-kpi-justify: center;
+  --ks-kpi-text: center;
+  --ks-kpi-mb: var(--kair-mnt-space-5);
+}

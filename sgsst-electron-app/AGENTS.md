@@ -778,6 +778,7 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 | `test-bandeja-toolbar-compacta.js` | 50 | Toolbar compacta (📦754): 1 fila de acciones + fila de carpetas, menú "Más", fix del helper `el()` |
 | `test-bandeja-paginacion.js` | 48 | Paginación (📦755): esquema, sync `append`, scroll infinito, botón "Cargar más", fixes del cupo |
 | `test-bandeja-paginacion-funcional.js` | 22 | **FUNCIONAL** (📦755): páginas sin solaparse, contador, `page_token` y ventana de fechas — contra SQLite real |
+| `test-skeleton-encaje.js` | 26 | Encaje del esqueleto (📦756): compara radio/borde/padding/gap/alto del esqueleto contra las tarjetas reales, en los 7 homes y en el submódulo Mantenimiento |
 
 **Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.
 
@@ -938,6 +939,47 @@ async renderMainArea(container) {
 ```
 
 ### Reglas críticas
+
+1. **📦756 — EL ESQUELETO TIENE QUE ENCAJAR CON EL CONTENIDO REAL.** El bloque sombreado
+   que se ve mientras cargan los datos debe ocupar **exactamente el mismo espacio** que el
+   contenido que lo reemplaza; si no, al llegar los datos todo salta de lugar.
+   Medido en 📦756, los homes usaban `KairSkeleton.kpiStrip(4)`, que dibujaba 4 tarjetas
+   genéricas con OTRA forma:
+
+   | Medida | Esqueleto viejo (`.ks-kpi-card`) | Tarjeta real (`.kair-metric-card`) |
+   |---|---|---|
+   | Radio | 12px | **20px** (`--kair-radius-card`) |
+   | Padding | 20px fijo | clamp(15px, 1.6vw, 22px) / clamp(15px, 1.6vw, 20px) |
+   | Alto mínimo | 104px | **clamp(110px, 10vw, 140px)** |
+   | Layout | fila con avatar de 48px | **columna** (label / valor / descripción / barra) |
+   | Contenedor | gap 16px + margin-bottom 24px, sin gutter | `.kair-health`: gap clamp(10,1.2vw,16) + gutter clamp(4,0.6vw,8) |
+   | Borde | `--border-color` (#e2e8f0) | `--kair-line` (#e8ebee) |
+   | Estructura | 4 tarjetas iguales (+ chart de 280px) | hero oscuro (2 columnas) + 3 métricas + 2 tarjetas + grilla de submódulos |
+
+   **Solución (la definitiva)**: los generadores `KairSkeleton.home()`, `homeHero()`,
+   `homeContent()`, `homeModules()`, `metricStrip()` y `metricCard()` **reutilizan las clases
+   REALES** (`.kair-health`, `.kair-hero-card`, `.kair-metric-card`, `.kair-content`,
+   `.kair-card`, `.kair-chart`, `.kair-legend`, `.kair-task`, `.kair-modules`,
+   `.kair-module-grid`, `.kair-module`) y sólo cambian el texto por barras `.ks-bar`. El
+   radio, el borde, el padding, el gap y el alto mínimo son idénticos **por construcción**:
+   no hay una segunda hoja de estilos que se pueda desincronizar.
+   - Los 7 homes de módulo usan `mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 })`.
+   - El CSS `.ks-*` que sí sigue existiendo (para tablas, listas, formularios y KPIs) quedó
+     **alineado** a las medidas premium y expone variables (`--ks-kpi-min`, `--ks-kpi-gap`,
+     `--ks-kpi-pad`, `--ks-kpi-radius`, `--ks-kpi-minh`, `--ks-kpi-align`, `--ks-kpi-text`).
+   - Un submódulo con KPIs de otra medida alinea su esqueleto **sin tocar styles.css**,
+     declarando las variables en el contenedor. Ejemplo real (📦756) en
+     `mantenimiento.css`: sus tarjetas son de 180px y centradas, así que el esqueleto hereda
+     `--ks-kpi-min: 180px`, `--ks-kpi-pad: var(--kair-mnt-space-4) var(--kair-mnt-space-5)`, etc.
+   - `kair-skeleton.js` se cargaba **sin `?v=`** en index.html → ahora tiene cache-bust.
+
+   **Regla práctica**: antes de usar un esqueleto genérico, mirá el componente REAL que va a
+   reemplazarlo y compará radio, borde, padding, gap y alto mínimo. Si difieren, hay salto.
+
+2. **`?.` y `||` con default**: `KairSkeleton.show(container, 'table', { rows: 12 })` inyecta
+   `.ks-skeleton-state` dentro del target; `hide()` borra ese wrapper. El `show` guarda el
+   HTML previo en `dataset.ksPrev` (no lo restaura solo).
+
 
 1. **Orden del DOM**: `appendChild` debe ir ANTES del `await renderMainArea/loadStats`. Si invertís el orden, el await termina antes de que mainArea sea visible.
 2. **Retardo 200ms**: `setTimeout(200)` mínimo entre `appendChild` y `await`. `requestAnimationFrame` (16ms) es insuficiente.
