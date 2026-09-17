@@ -191,7 +191,11 @@ function normalizeMessage(gMsg, threadId, connectionId) {
  * @param {string} options.configPath - ruta al config.json (default: app.getPath('userData')/config.json)
  * @param {string} options.folder - folder de Gmail (default: 'INBOX')
  * @param {number} options.maxResults - máximo de threads a sincronizar (default: 50)
- * @returns {Promise<{success, data?: {synced, total, folder}, error?: string}>}
+ * @param {boolean} [options.append] - 📦755 — true = traer la PÁGINA SIGUIENTE (correos más
+ *   viejos) SIN borrar los que ya están en el cache. Es lo que usa "Cargar más correos".
+ * @param {string} [options.pageToken] - 📦755 — token de página explícito (si no se pasa,
+ *   en modo append se usa el guardado en email_sync_state).
+ * @returns {Promise<{success, data?: {synced, total, folder, nextPageToken, hasMore}, error?: string}>}
  */
 async function syncInbox(options) {
   options = options || {};
@@ -206,7 +210,19 @@ async function syncInbox(options) {
   })();
   var folder = options.folder || 'INBOX';
   var maxResults = options.maxResults || 25; // 📦 P1-2 fix: reducir de 50 a 25 para quota
-  logFn('[email-sync] syncInbox inicio · folder=' + folder + ' maxResults=' + maxResults);
+  // 📦755 — Modo "cargar más": pedimos UNA página más y la AGREGAMOS al cache.
+  var append = options.append === true;
+  var requestedPageToken = options.pageToken || null;
+  if (append && !requestedPageToken) {
+    try {
+      var savedState = emailDb.getSyncState(folder);
+      requestedPageToken = savedState ? savedState.pageToken : null;
+    } catch (e) {
+      console.warn('[email-sync] No se pudo leer el estado de paginación:', e.message);
+    }
+  }
+  logFn('[email-sync] syncInbox inicio · folder=' + folder + ' maxResults=' + maxResults +
+        (append ? ' · APPEND (página siguiente)' : ''));
 
   if (!configPath) {
     return { success: false, error: 'configPath es requerido (no se pudo derivar del app.getPath)' };
@@ -219,11 +235,28 @@ async function syncInbox(options) {
   }
 
   // 2. Obtener perfil del usuario (email + messageCount)
+  // 📦755-fix — Si el perfil falla (rate limit de Gmail, hipo de red), NO abortamos el
+  // sync: usamos el email de la conexión ya guardada. Antes esto devolvía
+  // "No se pudo obtener el perfil de Gmail" y el user veía un toast de error al
+  // pedir "cargar más correos", aunque los tokens estuvieran perfectos.
   var profileResult = await googleGmail.getProfile(configPath);
-  if (!profileResult.success || !profileResult.data || !profileResult.data.email) {
-    return { success: false, error: 'No se pudo obtener el perfil de Gmail' };
+  var userEmail = null;
+  if (profileResult && profileResult.success && profileResult.data && profileResult.data.email) {
+    userEmail = profileResult.data.email;
+  } else {
+    try {
+      var conns = emailDb.getAllConnections();
+      if (conns && conns.length > 0 && conns[0].email) {
+        userEmail = conns[0].email;
+        logFn('[email-sync] getProfile falló (' + ((profileResult && profileResult.error) || 'sin detalle') + ') → uso el email de la conexión guardada: ' + userEmail);
+      }
+    } catch (e) {
+      console.warn('[email-sync] No se pudo leer la conexión guardada:', e.message);
+    }
+    if (!userEmail) {
+      return { success: false, error: 'No se pudo obtener el perfil de Gmail' };
+    }
   }
-  var userEmail = profileResult.data.email;
 
   // 3. Guardar/actualizar la conexión
   emailDb.saveConnection({
@@ -241,17 +274,24 @@ async function syncInbox(options) {
     configPath: configPath,
     folder: folder,  // F1.B-fix — Pasar folder al listInbox para que use el query correcto
     maxResults: maxResults,
+    // 📦755 — En modo "cargar más" arrancamos desde el token guardado; si no,
+    // desde la primera página.
+    pageToken: requestedPageToken || undefined,
     extraQuery: labelIds ? ['label:' + folder.toLowerCase()] : [],
-    fetchAll: true,              // Recorrer varias páginas
-    maxTotalResults: 25          // 📦748 — Antes 500 (y luego 50). El detalle de CADA
-                                 // mensaje se pide 1×1 y el rate limiter es 40/min → 25
-                                 // correos ≈ 40s. Es lo que muestra la lista de la Bandeja.
+    fetchAll: false,             // 📦755 — Una página por vez (antes fetchAll:true con tope 25,
+                                 // que daba lo mismo pero pedía el token de forma implícita)
+    maxTotalResults: maxResults  // 📦748 — El detalle de CADA mensaje se pide 1×1 y el rate
+                                 // limiter es 120/min → 25 correos ≈ 40s. Es una "página".
   });
   logFn('[email-sync] listInbox OK: ' + (listResult.data ? listResult.data.length : 0) + ' mensajes en ' + ((Date.now() - __t0) / 1000).toFixed(1) + 's');
 
   if (!listResult.success || !Array.isArray(listResult.data)) {
     return { success: false, error: 'listInbox falló: ' + (listResult.error || 'unknown') };
   }
+
+  // 📦755 — Token de la PÁGINA SIGUIENTE de Gmail (para el próximo "cargar más").
+  var nextPageToken = listResult.nextPageToken || null;
+  var hasMore = !!nextPageToken || listResult.data.length >= maxResults;
 
   // 5. Recolectar los threadIds que están en el resultado del API.
   // Se usa después del UPSERT para limpiar solo los huérfanos (threads que
@@ -415,33 +455,67 @@ async function syncInbox(options) {
   // Solo se eliminan los threads del folder que NO están en el nuevo resultado
   // del API. Esto preserva los threads durante el sync (el user no pierde el
   // correo que está viendo) y al mismo tiempo mantiene el cache limpio.
-  try {
-    var currentThreads = emailDb.getThreadsFromCache({ folder: folder, maxResults: 1000 });
-    var orphanIds = [];
-    for (var ci = 0; ci < currentThreads.length; ci++) {
-      var cthreadId = currentThreads[ci].id;
-      if (!newThreadIds.has(cthreadId)) {
-        orphanIds.push(cthreadId);
+  //
+  // 📦755 — VENTANA DE FECHAS: ahora el cache puede tener MÁS de una página
+  // (el user pidió "cargar más"). Un sync normal solo trae la página 1, así que
+  // considerar huérfano a todo lo que no está en esa página BORRARÍA los correos
+  // viejos que el user ya cargó. Solo se consideran huérfanos los threads DENTRO
+  // de la ventana de fechas que acabamos de traer (los más nuevos): si un thread
+  // de esa ventana ya no aparece, es porque se borró/archivó en Gmail.
+  if (!append) {
+    try {
+      var cutoff = null;
+      for (var di = 0; di < listResult.data.length; di++) {
+        var dRaw = listResult.data[di] && listResult.data[di].date;
+        var dMs = dRaw ? new Date(dRaw).getTime() : NaN;
+        if (!isNaN(dMs) && (cutoff === null || dMs < cutoff)) cutoff = dMs;
       }
-    }
-    if (orphanIds.length > 0) {
-      var deleted = emailDb.deleteThreadsByIds(userEmail, orphanIds);
-      if (deleted.changes > 0) {
-        console.log('[email-sync] Limpiados ' + deleted.changes + ' threads huerfanos (folder=' + folder + ')');
+      var currentThreads = emailDb.getThreadsFromCache({ folder: folder, maxResults: 5000 });
+      var orphanIds = [];
+      for (var ci = 0; ci < currentThreads.length; ci++) {
+        var cthread = currentThreads[ci];
+        if (newThreadIds.has(cthread.id)) continue;
+        // Fuera de la ventana sincronizada → pertenece a una página vieja: NO se toca.
+        if (cutoff !== null && cthread.last_message_date && cthread.last_message_date < cutoff) continue;
+        orphanIds.push(cthread.id);
       }
+      if (orphanIds.length > 0) {
+        var deleted = emailDb.deleteThreadsByIds(userEmail, orphanIds);
+        if (deleted.changes > 0) {
+          console.log('[email-sync] Limpiados ' + deleted.changes + ' threads huerfanos (folder=' + folder + ')');
+        }
+      }
+    } catch (e) {
+      console.warn('[email-sync] Error limpiando threads huerfanos:', e.message);
     }
-  } catch (e) {
-    console.warn('[email-sync] Error limpiando threads huerfanos:', e.message);
   }
 
-  logFn('[email-sync] syncInbox FIN · ' + synced + ' threads guardados de ' + listResult.data.length + ' · ' + ((Date.now() - __t0) / 1000).toFixed(1) + 's total');
+  // 8. 📦755 — Guardar el estado de paginación de esta carpeta: el token de la
+  // página siguiente (lo usa "cargar más correos") y cuántos threads se trajeron.
+  try {
+    var prevState = emailDb.getSyncState(folder);
+    emailDb.saveSyncState({
+      folder: folder,
+      connectionId: userEmail,
+      pageToken: nextPageToken,
+      loadedCount: (append ? ((prevState && prevState.loadedCount) || 0) : 0) + synced,
+      pagesLoaded: ((prevState && prevState.pagesLoaded) || 0) + 1
+    });
+  } catch (e) {
+    console.warn('[email-sync] No se pudo guardar el estado de paginación:', e.message);
+  }
+
+  logFn('[email-sync] syncInbox FIN · ' + synced + ' threads guardados de ' + listResult.data.length + ' · ' + ((Date.now() - __t0) / 1000).toFixed(1) + 's total' + (hasMore ? ' · hay más páginas' : ' · última página'));
   return {
     success: true,
     data: {
       synced: synced,
       total: listResult.data.length,
       folder: folder,
-      connectionId: userEmail
+      connectionId: userEmail,
+      nextPageToken: nextPageToken,
+      hasMore: hasMore,
+      append: append
     }
   };
 }

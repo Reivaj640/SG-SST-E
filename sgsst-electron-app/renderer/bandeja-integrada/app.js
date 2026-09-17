@@ -35,6 +35,15 @@
     labels: [],                // F1-Feature1 — labels de Gmail cacheados
     refreshing: false,
     mailLoading: false,
+    // 📦755 — Paginación de la lista de correos.
+    // `mailLoaded` = cuántos threads pedimos al cache (crece de a PAGE_SIZE cuando
+    // el user scrollea al final o toca "Cargar más"). `mailTotal` = cuántos hay en
+    // el cache para la carpeta actual (según el mismo filtro). `mailHasMore` =
+    // todavía quedan correos (en el cache o en una página más de Gmail).
+    mailLoaded: 25,
+    mailTotal: 0,
+    mailHasMore: false,
+    mailLoadingMore: false,
     allCompanies: true,
     searchQuery: "",
     checkedIds: new Set(),
@@ -72,6 +81,10 @@
   // ====== Atajos ======
   const D = window.KairData;
   const $ = (sel, root = document) => root.querySelector(sel);
+  // 📦755 — Cuántos correos se piden por página (sync + lista). Coincide con el
+  // tope del sync (25): cada página cuesta 1 request de listado + 25 de detalle,
+  // y el cupo de Gmail es 120/min. Subirlo gasta cupo más rápido.
+  const PAGE_SIZE = 25;
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
   // F2 — Helper para obtener el estilo (color, bg, border) de una categoría.
@@ -110,6 +123,12 @@
     Object.entries(attrs).forEach(([k, v]) => {
       if (k === "class") node.className = v;
       else if (k === "html") node.innerHTML = v;
+      // 📦755 — `id` NO estaba soportado: se ignoraba en silencio. Cualquier
+      // elemento creado con el() + id quedaba SIN id, así que los handlers que lo
+      // buscaban con $("#ese-id") nunca se enganchaban (bug real: el botón de
+      // orden de la lista de correos no respondía desde 📦754).
+      else if (k === "id") node.id = v;
+      else if (k === "hidden") node.hidden = v === true;
       else if (k.startsWith("data-")) node.setAttribute(k, v);
       else if (k === "style" && typeof v === "object") Object.assign(node.style, v);
       else if (k === "onClick") node.addEventListener("click", v);
@@ -1414,18 +1433,24 @@
   // disparar sync en background para mantenerlo actualizado.
   // Si falla o no está conectado, fallback a la versión legacy (Gmail directo).
   // F1.B-fix — Acepta opciones { folder, forceSync } para soportar INBOX y SENT
+  // 📦755 — Ahora respeta `state.mailLoaded`: la lista puede mostrar MÁS de una
+  // página (el user pidió "cargar más"), así que se pide todo lo cargado, no 25 fijo.
   async function loadMailsFromCache(options) {
     options = options || {};
     var folder = options.folder || state.mailFolder || 'INBOX';
     var forceSync = options.forceSync || false;
     var api = getElectronAPI();
+    var limit = Math.max(PAGE_SIZE, state.mailLoaded || PAGE_SIZE);
     if (!api || !api.emailCache) {
       console.warn("[BandejaIntegrada] electronAPI.emailCache no disponible, fallback a Gmail directo");
       return loadMailsFromGmail();
     }
     try {
       // 1. Leer del cache SQLite (instantáneo, sin API call)
-      var cacheResult = await api.emailCache.getThreads({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
+      var cacheResult = await api.emailCache.getThreads({ folder: folder, maxResults: limit });
+      // 📦755 — Total en el cache (mismo filtro) → alimenta "Mostrando X de Y" y
+      // decide si queda algo por mostrar sin tocar la red.
+      refreshMailTotal(folder);
       if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data) && cacheResult.data.length > 0) {
         console.log("[BandejaIntegrada] Cache SQLite retorno " + cacheResult.data.length + " threads (folder=" + folder + ")");
         // F1.B-fix — SIEMPRE actualizar state.mails con el cache del folder actual.
@@ -1469,10 +1494,12 @@
         return [];
       }
       console.log("[BandejaIntegrada] Cache vacío, sincronizando con Gmail por primera vez (folder=" + folder + ")...");
-      var syncResult = await api.emailCache.syncInbox({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
+      var syncResult = await api.emailCache.syncInbox({ folder: folder, maxResults: PAGE_SIZE });
       if (syncResult && syncResult.success && syncResult.data) {
         console.log("[BandejaIntegrada] Primer sync: " + syncResult.data.synced + " threads guardados en SQLite");
-        var afterResult = await api.emailCache.getThreads({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
+        state.mailHasMore = !!(syncResult.data && syncResult.data.hasMore);
+        refreshMailTotal(folder);
+        var afterResult = await api.emailCache.getThreads({ folder: folder, maxResults: limit });
         if (afterResult && afterResult.success && Array.isArray(afterResult.data)) {
           return afterResult.data.map(threadToMail);
         }
@@ -1484,6 +1511,164 @@
       console.error("[BandejaIntegrada] Error cargando desde cache, fallback a Gmail directo:", e);
       return loadMailsFromGmail();
     }
+  }
+
+  // 📦755 — Cuántos correos hay en el cache para la carpeta que se está viendo.
+  // Se pide en paralelo (no bloquea la lista) y actualiza el pie "Mostrando X de Y".
+  function refreshMailTotal(folder, opts) {
+    opts = opts || {};
+    var api = getElectronAPI();
+    if (!api || !api.emailCache || !api.emailCache.countThreads) return Promise.resolve(0);
+    var target = folder || state.mailFolder || 'INBOX';
+    return api.emailCache.countThreads({ folder: target })
+      .then(function (r) {
+        if (!r || !r.success || !r.data) return 0;
+        if (state.mailFolder !== target) return r.data.total;   // el user ya cambió de carpeta
+        state.mailTotal = r.data.total || 0;
+        updateMailPagerFooter();
+        return state.mailTotal;
+      })
+      .catch(function () { return 0; });
+  }
+
+  // 📦755 — Refresca SOLO el pie de la lista ("Mostrando 25 de 137" + botón) sin
+  // re-renderizar las filas. Esto es clave: si re-renderizáramos, el scroll de la
+  // lista saltaría mientras el user está bajando.
+  function updateMailPagerFooter() {
+    var foot = document.getElementById("mail-pager");
+    if (!foot) return;
+    var shown = Math.min(state.mails.length, state.mailLoaded);
+    var total = Math.max(state.mailTotal, shown);
+    foot.innerHTML = buildMailPagerHTML(shown, total);
+    var btn = foot.querySelector("#mail-loadmore");
+    if (btn) btn.addEventListener("click", function () { loadMoreMails(); });
+  }
+
+  // 📦755 — HTML del pie de lista (contador + botón "Cargar más").
+  // Separado para poder repintarlo solo a él (sin tocar las filas).
+  function buildMailPagerHTML(shown, total) {
+    var canLoad = state.mailHasMore || total > shown;
+    if (!canLoad) {
+      if (shown === 0) return "";
+      return '<div class="kair-mail-pager__end">No hay más correos</div>';
+    }
+    var left = total > shown ? (total - shown) : null;
+    return '' +
+      '<div class="kair-mail-pager__info">Mostrando <b>' + shown + '</b> de <b>' + total + '</b>' +
+      (left ? ' · quedan ' + left : '') + '</div>' +
+      '<button class="kair-mail-pager__btn" id="mail-loadmore" ' + (state.mailLoadingMore ? 'disabled' : '') + '>' +
+      (state.mailLoadingMore
+        ? 'Cargando correos…'
+        : 'Cargar más correos' + (left ? ' (' + left + ')' : '')) +
+      '</button>';
+  }
+
+  // 📦755-fix — Aviso de error de "cargar más" con throttle: si el usuario insiste
+  // (o el scroll dispara varias veces), no le tiramos 5 toasts iguales seguidos.
+  function notifyLoadMoreError(errorMsg) {
+    var now = Date.now();
+    var errKey = String(errorMsg || 'error');
+    if (state._lastLoadMoreErrorShown && state._lastLoadMoreErrorAt &&
+        errKey === state._lastLoadMoreErrorShown && (now - state._lastLoadMoreErrorAt) < 30000) {
+      return;
+    }
+    state._lastLoadMoreErrorShown = errKey;
+    state._lastLoadMoreErrorAt = now;
+    toast("No se pudieron cargar más correos", errorMsg || "Reintentá en unos segundos", "error");
+  }
+
+  /**
+   * 📦755 — Trae la PÁGINA SIGUIENTE de correos.
+   *
+   * Dos caminos, en este orden:
+   *  1. Si el cache local ya tiene más de lo que estamos mostrando (por ejemplo
+   *     porque el sync en background trajo más, o porque ya se cargó antes),
+   *     solo pedimos el pedazo que falta. Es instantáneo y no gasta cupo de Gmail.
+   *  2. Si el cache no tiene más, pedimos a Gmail la página siguiente con el
+   *     nextPageToken guardado (`append: true`), que AGREGA los correos viejos
+   *     sin borrar los que ya estaban.
+   */
+  function loadMoreMails() {
+    if (state.mailLoadingMore) return Promise.resolve(false);
+    var api = getElectronAPI();
+    if (!api || !api.emailCache) return Promise.resolve(false);
+    // 📦755-fix — No apilarse con un sync en curso (auto-refresh o post-envío): el
+    // cupo de Gmail es 120 requests/min y cada página cuesta 26. Si hay otro sync
+    // corriendo, esperamos: la página se pide cuando termine.
+    if (typeof isAnySyncInFlight === "function" && isAnySyncInFlight()) {
+      console.log("[BandejaIntegrada] 'Cargar más' postergado: hay un sync en curso");
+      return Promise.resolve(false);
+    }
+    var folder = state.mailFolder || 'INBOX';
+    var shown = Math.min(state.mails.length, state.mailLoaded);
+    state._lastLoadMoreAt = Date.now();   // 📦755-fix — cooldown del scroll infinito
+
+    // Camino 1: el cache local ya tiene más de lo mostrado → leer del cache (0 requests)
+    if (state.mailTotal > shown) {
+      state.mailLoaded = shown + PAGE_SIZE;
+      state.mailLoadingMore = true;
+      updateMailPagerFooter();
+      return api.emailCache.getThreads({ folder: folder, maxResults: state.mailLoaded })
+        .then(function (r) {
+          if (r && r.success && Array.isArray(r.data)) {
+            applyThreadsToState(r.data);
+            state.mailHasMore = state.mailTotal > state.mails.length || state.mailHasMore;
+            render();
+          }
+          return true;
+        })
+        .catch(function (e) {
+          console.warn("[BandejaIntegrada] loadMoreMails (cache) falló:", e && e.message);
+          return false;
+        })
+        .then(function (res) {
+          state.mailLoadingMore = false;
+          updateMailPagerFooter();
+          return res;
+        });
+    }
+
+    // Camino 2: pedir a Gmail la página siguiente (correos más viejos)
+    if (!state.gmailTokenValid) {
+      toast("Sin conexión con Gmail", "Reconectá la cuenta para ver correos más viejos", "warning");
+      return Promise.resolve(false);
+    }
+    state.mailLoadingMore = true;
+    updateMailPagerFooter();
+    console.log("[BandejaIntegrada] Cargando la página siguiente de " + folder + " desde Gmail...");
+    return api.emailCache.syncInbox({ folder: folder, maxResults: PAGE_SIZE, append: true })
+      .then(function (r) {
+        if (!r || !r.success) {
+          notifyLoadMoreError((r && r.error) || "Reintentá en unos segundos");
+          return false;
+        }
+        var added = (r.data && r.data.synced) || 0;
+        state.mailHasMore = !!(r.data && r.data.hasMore);
+        state.mailLoaded = shown + PAGE_SIZE;
+        return api.emailCache.countThreads({ folder: folder }).then(function (cr) {
+          if (cr && cr.success && cr.data) state.mailTotal = cr.data.total || 0;
+          return api.emailCache.getThreads({ folder: folder, maxResults: state.mailLoaded });
+        }).then(function (cacheResult) {
+          if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data)) {
+            applyThreadsToState(cacheResult.data);
+            render();
+          }
+          if (added === 0 && !state.mailHasMore) {
+            toast("No hay más correos", "Ya estás viendo todo lo que hay en " + folder, "info");
+          }
+          return true;
+        });
+      })
+      .catch(function (e) {
+        console.warn("[BandejaIntegrada] loadMoreMails (Gmail) falló:", e && e.message);
+        notifyLoadMoreError((e && e.message) || "Error inesperado");
+        return false;
+      })
+      .then(function (res) {
+        state.mailLoadingMore = false;
+        updateMailPagerFooter();
+        return res;
+      });
   }
 
   // Sync en background (no bloquea la UI). Dispara cada vez que se carga
@@ -1534,17 +1719,28 @@
   // el cupo de Gmail → syncs vencidos y Enviados sin actualizar.
   var _folderSyncInFlight = {};
 
+  // 📦755-fix — ¿Hay algún sync corriendo? Lo consultan "Cargar más" y el
+  // auto-refresh para no apilarse y no agotar el cupo de Gmail (120 req/min).
+  function isAnySyncInFlight() {
+    if (_syncInFlight) return true;
+    for (var k in _folderSyncInFlight) {
+      if (Object.prototype.hasOwnProperty.call(_folderSyncInFlight, k)) return true;
+    }
+    return false;
+  }
+
   function refreshFolderNow(folder, opts) {
     opts = opts || {};
     var api = getElectronAPI();
     if (!api || !api.emailCache || !api.emailCache.syncInbox) return Promise.resolve(false);
     var target = folder || state.mailFolder || 'INBOX';
     if (_folderSyncInFlight[target]) return _folderSyncInFlight[target];
-    var limit = opts.maxResults || 25;
+    var limit = opts.maxResults || PAGE_SIZE;
     var run = api.emailCache.syncInbox({ folder: target, maxResults: limit })
       .then(function (r) {
         if (!r || !r.success) return false;
-        return api.emailCache.getThreads({ folder: target, maxResults: limit });
+        // 📦755 — Preservar la ventana cargada (el user pudo haber pedido más páginas)
+        return api.emailCache.getThreads({ folder: target, maxResults: Math.max(limit, state.mailLoaded) });
       })
       .then(function (cacheResult) {
         if (!cacheResult || !cacheResult.success || !Array.isArray(cacheResult.data)) return false;
@@ -1553,6 +1749,8 @@
         applyThreadsToState(cacheResult.data);
         console.log("[BandejaIntegrada] Refresco inmediato: " + state.mails.length + " threads (folder=" + target + ")");
         render();
+        // 📦755 — Mantener el pie de paginación al día
+        refreshMailTotal(target);
         return true;
       })
       .catch(function (e) {
@@ -1571,14 +1769,27 @@
     var api = getElectronAPI();
     if (!api || !api.emailCache) return;
     if (_syncInFlight) return;   // 📦748 — ya hay un sync en curso, no apilar
+    // 📦755-fix — Si el user acaba de pedir "cargar más" (o se está cargando una
+    // página), no disparamos OTRO sync de 26 requests encima: el cupo de Gmail es
+    // 120/min y con el auto-refresh cada 30s se agotaba → el sync fallaba con
+    // "No se pudo obtener el perfil de Gmail". Se saltea este ciclo y sigue en el próximo.
+    if (state.mailLoadingMore || (Date.now() - (state._lastLoadMoreAt || 0) < 15000)) {
+      console.log("[BandejaIntegrada] Background sync postergado (carga de página reciente)");
+      return;
+    }
     _syncInFlight = true;
     var currentFolder = state.mailFolder || 'INBOX';
-    api.emailCache.syncInbox({ folder: currentFolder, maxResults: 25 }).then(function (r) { // 📦 P1-2 fix: reducir de 50 a 25
+    api.emailCache.syncInbox({ folder: currentFolder, maxResults: PAGE_SIZE }).then(function (r) {
       if (r && r.success) {
         console.log("[BandejaIntegrada] Background sync OK: " + r.data.synced + " threads (folder=" + currentFolder + ")");
+        // 📦755 — El sync de la página 1 nos dice si Gmail todavía tiene páginas
+        // más viejas (nextPageToken) → alimenta el "Cargar más".
+        if (state.mailFolder === currentFolder) state.mailHasMore = !!(r.data && r.data.hasMore);
         // F4-fix — Re-leer el cache (ahora con datos completos: subject, sender, etc.)
         // y re-renderizar. Sin esto, el user ve los datos vacíos del cache anterior.
-        return api.emailCache.getThreads({ folder: currentFolder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
+        // 📦755 — Se relee TODO lo cargado (no solo 25) para no perder las páginas
+        // que el user ya había pedido con "Cargar más".
+        return api.emailCache.getThreads({ folder: currentFolder, maxResults: Math.max(PAGE_SIZE, state.mailLoaded) });
       } else {
         console.warn("[BandejaIntegrada] Background sync failed:", r && r.error);
         // 📦614-fix — Notificar al user con un toast claro + acción sugerida.
@@ -1599,6 +1810,8 @@
           applyThreadsToState(cacheResult.data);
           console.log("[BandejaIntegrada] Re-cargados " + state.mails.length + " threads (folder=" + currentFolder + ")");
           render();
+          // 📦755 — El total del cache pudo crecer con el sync → refrescar el pie
+          refreshMailTotal(currentFolder);
         } else {
           console.log("[BandejaIntegrada] Sync completó pero el user ya cambió a folder " + state.mailFolder + ", no actualizo state.mails");
         }
@@ -1948,7 +2161,7 @@
       setTimeout(function () {
         var api = getElectronAPI();
         if (api && api.emailCache && api.emailCache.syncInbox) {
-          api.emailCache.syncInbox({ folder: "SENT", maxResults: 25 }).then(function (r) { // 📦 P1-2 fix: reducir de 50 a 25
+          api.emailCache.syncInbox({ folder: "SENT", maxResults: PAGE_SIZE }).then(function (r) {
             if (r && r.success) {
               console.log("[BandejaIntegrada] SENT pre-cargado en background: " + r.data.synced + " threads");
             }
@@ -2905,9 +3118,14 @@
     if ($("#refresh-icon")) $("#refresh-icon").classList.add("kair-spin");
     render();
     // Sync con IPC real + spinner
-    api.emailCache.syncInbox({ folder: state.mailFolder || 'INBOX', maxResults: 25 })
+    // 📦755 — El sync trae la página 1 (lo más nuevo) pero la relectura mantiene
+    // TODAS las páginas que el user ya cargó, para no perder su lugar.
+    api.emailCache.syncInbox({ folder: state.mailFolder || 'INBOX', maxResults: PAGE_SIZE })
       .then(function (r) {
-        if (r && r.success) return api.emailCache.getThreads({ folder: state.mailFolder || 'INBOX', maxResults: 25 });
+        if (r && r.success) {
+          state.mailHasMore = !!(r.data && r.data.hasMore);
+          return api.emailCache.getThreads({ folder: state.mailFolder || 'INBOX', maxResults: Math.max(PAGE_SIZE, state.mailLoaded) });
+        }
         throw new Error((r && r.error) || 'sync falló');
       })
       .then(function (cacheResult) {
@@ -3896,17 +4114,15 @@
     };
 
     // Loop 37 — Botón "Redactar" Gmail-style (prominent, arriba de la lista).
-    // 📦615 — Unificamos las 3 acciones principales en una sola barra:
-    //   [+ Redactar] (primary, azul sólido) + [⟳ Sincronizar] (secondary, outline)
-    //   + [≡ Recientes ▾] (secondary, outline, dropdown de orden).
+    // 📦615 — Unificamos las acciones principales en una sola barra.
+    // 📦754 — La barra ahora se comparte con el buscador y el orden (1 sola fila).
     // ANTES: había un header `kair-mail-list-header` aparte con título "Bandeja
     // de Entrada 16" + refresh + sort, y arriba solo Redactar. Era confuso porque
     // el contador "Bandeja de Entrada 16" se duplicaba con la tab azul de abajo
-    // ("Bandeja de entrada 16"). Ahora el header desapareció y los 3 botones
-    // quedan juntos, como en Gmail.
+    // ("Bandeja de entrada 16"). Ahora el header desapareció.
     const composeBar = el("div", { class: "kair-mail-compose-bar" });
-    // Orden actual (default: más recientes primero) — se calcula acá porque el
-    // sort toggle ahora vive dentro del composeBar.
+    // Orden actual (default: más recientes primero) — se usa para el botón de orden,
+    // que ahora vive al final de la toolbar (misma fila que las acciones).
     var sortBy = state.mailSortBy || "recent";
     var sortLabel = sortBy === "oldest" ? "Más antiguos" : sortBy === "unread" ? "No leídos" : "Reciente";
     composeBar.innerHTML = `
@@ -3918,15 +4134,17 @@
         ${D.ICONS.refresh}
         <span>Sincronizar</span>
       </button>
-      <button class="kair-mail-compose-bar__btn" id="mail-sort-toggle" data-active="${sortBy === "recent" ? "false" : "true"}" title="Cambiar orden">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="9" y2="18"></line></svg>
-        <span>${sortLabel}</span>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-      </button>
     `;
-    container.appendChild(composeBar);
+    // 📦754 — Toolbar COMPACTA de UNA sola fila: [Redactar] [⟳] [buscador flexible]
+    // [orden ▾]. Antes esto ocupaba 2 filas (acciones arriba, buscador abajo) + 3
+    // filas de carpetas = 5 filas antes del primer correo. El ancho/alto recuperado
+    // se lo lleva la lista de correos. "Sincronizar" y "Orden" quedan solo con el
+    // icono porque en el panel (388px) no entran 3 etiquetas + buscador: el tooltip
+    // explica la acción, y el orden no-default se pinta en azul (`data-active`).
+    const toolbar = el("div", { class: "kair-mail-toolbar" });
+    toolbar.appendChild(composeBar);
 
-    // Wire up compose + refresh + sort (los 3 viven en composeBar ahora)
+    // Wire up compose + refresh + sort (compose/refresh viven en composeBar)
     setTimeout(function () {
       var composeBtn = $("#mail-compose-btn", container);
       if (composeBtn) {
@@ -3967,8 +4185,11 @@
       }
     }, 0);
 
-    // F1.D — Input de búsqueda en tiempo real arriba de los filtros
-    const searchContainer = el("div", { class: "kair-mail-search", style: { padding: "8px 14px", borderBottom: "1px solid var(--kair-border-soft, #e9ecef)" } });
+    // F1.D — Input de búsqueda en tiempo real.
+    // 📦754 — Ya NO lleva padding/borde propio: vive dentro de `.kair-mail-toolbar`
+    // (una sola fila) y toma el espacio flexible. El alto que antes ocupaba el
+    // buscador en su propia fila ahora lo usa la lista de correos.
+    const searchContainer = el("div", { class: "kair-mail-search" });
 
     // F1-Feature2 — Chips de operadores. Se renderizan en vivo (al inicio y al tipear).
     // La función updateOperatorChips se define más abajo (necesita applySearchFilter).
@@ -4004,7 +4225,9 @@
     });
     searchIcon.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
     // Wrapper para posicionar el icono relativo al input
-    const searchWrapper = el("div", { style: { position: "relative" } });
+    // 📦754 — `flex: 1` + `minWidth: 0` para que el buscador ocupe el espacio libre
+    // de la fila (entre los botones de acción y el de orden) sin desbordar.
+    const searchWrapper = el("div", { class: "kair-mail-search__wrap", style: { position: "relative", flex: "1 1 auto", minWidth: "0" } });
     searchWrapper.appendChild(searchIcon);
     searchWrapper.appendChild(searchInput);
     // Botón X para limpiar búsqueda (aparece solo si hay query)
@@ -4067,7 +4290,7 @@
       if (!existingChipsContainer) {
         existingChipsContainer = el("div", { class: "kair-mail-search__chips" });
         // Insertar como primer hijo del searchContainer (antes del wrapper con el icono)
-        var wrapper = container.querySelector("div[style*='position: relative']");
+        var wrapper = container.querySelector(".kair-mail-search__wrap") || container.querySelector("div[style*='position: relative']");
         if (wrapper) {
           container.insertBefore(existingChipsContainer, wrapper);
         } else {
@@ -4148,12 +4371,34 @@
       }
     }
     searchContainer.appendChild(searchWrapper);
-    container.appendChild(searchContainer);
+    // 📦754 — El buscador entra en la MISMA fila de la toolbar (flex: 1).
+    toolbar.appendChild(searchContainer);
+
+    // 📦754 — Botón de orden al final de la fila (mismo id/comportamiento de antes).
+    // Va solo con iconos (no entra la etiqueta en el panel de 388px) pero el tooltip
+    // dice el orden actual, y cuando NO es el default queda pintado en azul
+    // (`data-active="true"`) para que el estado se vea de un vistazo.
+    const sortBtn = el("button", {
+      class: "kair-mail-sort-btn",
+      id: "mail-sort-toggle",
+      "data-active": sortBy === "recent" ? "false" : "true",
+      title: "Orden: " + sortLabel + " — click para cambiar"
+    });
+    sortBtn.innerHTML =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="9" y2="18"></line></svg>' +
+      '<span>' + sortLabel + '</span>' +
+      '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    toolbar.appendChild(sortBtn);
+
+    container.appendChild(toolbar);
 
     // Filtros
     const filters = el("div", { class: "kair-mail-list-filters" });
     const filterDefs = [
-      { id: "all", label: "Bandeja de entrada", icon: D.ICONS.inbox, isFolder: true, folder: "INBOX" },
+      // 📦754-fix6 — "Recibidos" en vez de "Bandeja de entrada": es el mismo dato que
+      // ya muestra la tab de arriba, y con la etiqueta corta las 6 carpetas entran
+      // en 2 líneas finas sin que ninguna quede cortada.
+      { id: "all", label: "Recibidos", icon: D.ICONS.inbox, isFolder: true, folder: "INBOX" },
       { id: "unread", label: "No leídos", icon: D.ICONS.mailOpen },
       { id: "flagged", label: "Marcados", icon: D.ICONS.star },
       { id: "meeting", label: "Reuniones", icon: D.ICONS.calendarPlus },
@@ -4167,7 +4412,38 @@
       { id: "important", label: "Importantes", icon: D.ICONS.alertTriangle, isFolder: true, folder: "IMPORTANT" },
       { id: "archive", label: "Archivados", icon: D.ICONS.archive, isFolder: true, folder: "ARCHIVE" },
     ];
-    filterDefs.forEach((f) => {
+
+    // 📦754 — Aplica un filtro/carpeta. Misma lógica que antes, extraída para que
+    // la usen tanto las carpetas visibles como las del menú "Más".
+    // 📦755 — Al cambiar de carpeta se reinicia la paginación (volvemos a la
+    // página 1), si no la lista arrancaría mostrando lo cargado de la OTRA carpeta.
+    const applyFilter = (f) => {
+      state.mailFilter = f.id;
+      // 📦691 — El filter cambia la lista, queremos ir al top
+      state._resetMailListScroll = true;
+      // F1.B-fix — Si el filtro cambia de folder (Enviados), re-cargar mails desde SENT
+      if (f.isFolder) {
+        resetMailPagination(f.folder);
+        loadMailsFromCache({ folder: f.folder, forceSync: true });
+      } else if (state.mailFolder !== "INBOX") {
+        // Volver a INBOX si no es folder
+        resetMailPagination("INBOX");
+        loadMailsFromCache({ folder: "INBOX", forceSync: true });
+      } else {
+        render();
+      }
+    };
+
+    // 📦755 — Vuelve la paginación a la página 1 (para cambios de carpeta).
+    function resetMailPagination(folder) {
+      state.mailFolder = folder;
+      state.mailLoaded = PAGE_SIZE;
+      state.mailTotal = 0;
+      state.mailHasMore = false;
+      state.mailLoadingMore = false;
+    }
+
+    const makeFilterBtn = (f) => {
       const isActive = state.mailFilter === f.id;
       const count = counts[f.id];
       const btn = el("button", {
@@ -4175,27 +4451,79 @@
         "data-active": isActive,
       });
       btn.innerHTML = `${f.icon.replace(/width="\d+" height="\d+"/, 'width="11" height="11"')} ${f.label} ${count > 0 ? `<span class="kair-mail-list-filter__badge">${count}</span>` : ""}`;
-      btn.addEventListener("click", () => {
-        state.mailFilter = f.id;
-        // 📦691 — El filter cambia la lista, queremos ir al top
-        state._resetMailListScroll = true;
-        // F1.B-fix — Si el filtro cambia de folder (Enviados), re-cargar mails desde SENT
-        if (f.isFolder) {
-          state.mailFolder = f.folder;
-          loadMailsFromCache({ folder: f.folder, forceSync: true });
-        } else {
-          // Volver a INBOX si no es folder
-          if (state.mailFolder !== "INBOX") {
-            state.mailFolder = "INBOX";
-            loadMailsFromCache({ folder: "INBOX", forceSync: true });
-          } else {
-            render();
-          }
-        }
+      btn.addEventListener("click", () => applyFilter(f));
+      return btn;
+    };
+
+    // 📦754 — Solo las 2 carpetas más usadas quedan a la vista; TODO el resto (las 3
+    // vistas rápidas + las 6 carpetas de Gmail) vive en el menú "Más". Así la fila de
+    // carpetas es UNA sola línea (Recibidos · Enviados · Más) y la bandeja queda en
+    // 2 líneas de controles, sin chips cortados ni escondidos.
+    const PRIMARY_FILTERS = ["all", "sent"];
+    filterDefs
+      .filter((f) => PRIMARY_FILTERS.indexOf(f.id) >= 0)
+      .forEach((f) => filters.appendChild(makeFilterBtn(f)));
+
+    // 📦754 — Fila de carpetas: `[Recibidos 22] [Enviados] [Más ▾]`.
+    // 📦754-fix7 — Se queda con esos 2 chips + el menú "Más", que ahora también
+    // contiene las 3 vistas rápidas (No leídos, Marcados, Reuniones) además de las
+    // 6 carpetas de Gmail. Resultado: la bandeja queda en 2 líneas de controles.
+    const filterRow = el("div", { class: "kair-mail-filter-row" });
+
+    // Los 9 filtros del menú "Más ▾": primero las 3 vistas rápidas, después las
+    // 6 carpetas (el orden sale de `filterDefs`). El botón muestra la activa, así el
+    // filtro nunca se "pierde" aunque no esté entre los 2 visibles.
+    const secondaryFilters = filterDefs.filter((f) => PRIMARY_FILTERS.indexOf(f.id) < 0);
+    if (secondaryFilters.length > 0) {
+      const activeSecondary = secondaryFilters.filter((f) => state.mailFilter === f.id)[0];
+      const moreWrap = el("div", { class: "kair-mail-more" });
+      const moreBtn = el("button", {
+        class: "kair-mail-list-filter kair-mail-list-filter--more",
+        "data-active": !!activeSecondary,
+        title: "Más vistas y carpetas (No leídos, Marcados, Reuniones, Borradores, Papelera, Spam, Destacados, Importantes, Archivados)"
       });
-      filters.appendChild(btn);
-    });
-        container.appendChild(filters);
+      moreBtn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' +
+        '<span>' + (activeSecondary ? activeSecondary.label : "Más") + '</span>' +
+        '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+      // OJO: el helper `el()` no soporta el atributo `hidden` → se setea aparte.
+      const menu = el("div", { class: "kair-mail-folders-menu" });
+      menu.hidden = true;
+      // Separa las vistas rápidas (No leídos / Marcados / Reuniones) de las carpetas
+      // reales de Gmail: son cosas distintas y mezcladas confunden.
+      let sepInserted = false;
+      secondaryFilters.forEach((f) => {
+        if (!sepInserted && f.isFolder) {
+          menu.appendChild(el("div", { class: "kair-mail-folders-menu__sep" }));
+          sepInserted = true;
+        }
+        const count = counts[f.id];
+        const item = el("button", {
+          class: "kair-mail-folders-menu__item",
+          "data-active": state.mailFilter === f.id,
+        });
+        item.innerHTML = f.icon.replace(/width="\d+" height="\d+"/, 'width="13" height="13"') +
+          '<span class="kair-mail-folders-menu__label">' + f.label + '</span>' +
+          (count > 0 ? '<span class="kair-mail-list-filter__badge">' + count + '</span>' : "");
+        item.addEventListener("click", () => {
+          menu.hidden = true;
+          applyFilter(f);
+        });
+        menu.appendChild(item);
+      });
+      moreBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+      });
+      moreWrap.appendChild(moreBtn);
+      moreWrap.appendChild(menu);
+      filterRow.appendChild(filters);
+      filterRow.appendChild(moreWrap);
+    } else {
+      filterRow.appendChild(filters);
+    }
+
+    container.appendChild(filterRow);
 
     // 📦 P2-5 — Labels de usuario como filtros clickeables
     var userLabelsSection = el("div", { class: "kair-labels-section", style: { padding: "8px 14px", borderTop: "1px solid var(--kair-border-soft, #e9ecef)" } });
@@ -4454,8 +4782,50 @@
 
         list.appendChild(row);
       });
+
+      // 📦755 — PIE DE LA LISTA (paginación): contador "Mostrando X de Y" + botón
+      // "Cargar más correos". Va DENTRO del contenedor con scroll para que se vea
+      // al llegar al final (y pueda dispararse el scroll infinito de abajo).
+      if (!state.mailLoading && filtered.length > 0) {
+        const pager = el("div", { class: "kair-mail-pager", id: "mail-pager" });
+        const shownCount = Math.min(state.mails.length, state.mailLoaded);
+        const totalCount = Math.max(state.mailTotal, shownCount);
+        pager.innerHTML = buildMailPagerHTML(shownCount, totalCount);
+        list.appendChild(pager);
+      }
     }
     container.appendChild(list);
+
+    // 📦755 — SCROLL INFINITO: cuando el user llega cerca del final de la lista,
+    // se pide la página siguiente automáticamente (sin tener que buscar el botón).
+    // El listener se cuelga del `list` NUEVO de cada render, así que no se acumula:
+    // el elemento viejo (y su listener) se descarta al vaciar el container.
+    if (!state.mailLoading) {
+      list.addEventListener("scroll", function () {
+        // Se puede cargar más si el cache tiene más de lo mostrado O si Gmail
+        // todavía tiene páginas (misma condición que el botón del pie).
+        var shown = Math.min(state.mails.length, state.mailLoaded);
+        var canLoadMore = state.mailHasMore || state.mailTotal > shown;
+        if (state.mailLoadingMore || !canLoadMore) return;
+        var remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+        // 📦755-fix — "Armado" del scroll infinito: se dispara UNA página por llegada
+        // al final. Si el user sigue bajando, el primer evento de scroll queda lejos
+        // del final (se agregaron 25 filas) y vuelve a armarse. Sin esto, el solo
+        // hecho de que la lista crezca encadenaba 4-5 páginas seguidas (26 requests
+        // cada una) y agotaba el cupo de Gmail → syncs fallidos.
+        var sinceLast = Date.now() - (state._lastLoadMoreAt || 0);
+        if (remaining > 400 || sinceLast > 5000) state._autoLoadArmed = true;
+        if (remaining > 220) return;
+        if (!state._autoLoadArmed) return;
+        // Cooldown: nunca dos cargas automáticas en menos de 1,5s
+        if (sinceLast < 1500) return;
+        state._autoLoadArmed = false;
+        loadMoreMails();
+      });
+    }
+    // Botón "Cargar más" (por si el user no scrollea: siempre hay una acción visible)
+    var pagerBtn = document.getElementById("mail-loadmore");
+    if (pagerBtn) pagerBtn.addEventListener("click", function () { loadMoreMails(); });
 
     // 📦691 — Restaurar el scroll position en el próximo frame de pintado.
     // requestAnimationFrame garantiza que el DOM ya esté renderizado cuando
@@ -7846,6 +8216,10 @@
     // 2. Remover listener de visibilitychange
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 
+    // 📦754 — Remover listeners del menú "Más carpetas"
+    document.removeEventListener('click', handleFoldersMenuOutsideClick);
+    document.removeEventListener('keydown', handleFoldersMenuEscape);
+
     // 3. Limpiar timeouts/intervals pendientes
     if (state._resizeTimeout) {
       clearTimeout(state._resizeTimeout);
@@ -7891,6 +8265,27 @@
     }
   }
 
+  // 📦754 — Cerrar el menú "Más carpetas" de la lista de correos.
+  // Un ÚNICO listener global (registrado una sola vez) en vez de registrar uno por
+  // cada re-render de la lista: evita acumular handlers y cierres espurios.
+  function handleFoldersMenuOutsideClick(e) {
+    var menus = document.querySelectorAll('.kair-mail-folders-menu');
+    for (var i = 0; i < menus.length; i++) {
+      if (menus[i].hasAttribute('hidden')) continue;
+      var wrap = menus[i].parentNode;
+      // Si el click fue dentro del wrapper (el botón "Más" o el propio menú), no cerrar.
+      if (wrap && !wrap.contains(e.target)) menus[i].hidden = true;
+    }
+  }
+
+  function handleFoldersMenuEscape(e) {
+    if (e.key !== 'Escape') return;
+    var menus = document.querySelectorAll('.kair-mail-folders-menu');
+    for (var i = 0; i < menus.length; i++) {
+      if (!menus[i].hasAttribute('hidden')) menus[i].hidden = true;
+    }
+  }
+
   // Reemplazar el listener original de visibilitychange por uno referenciable
   document.removeEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') {
@@ -7900,6 +8295,10 @@
     }
   });
   document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  // 📦754 — Listeners del menú "Más carpetas" (registrados una sola vez)
+  document.addEventListener('click', handleFoldersMenuOutsideClick);
+  document.addEventListener('keydown', handleFoldersMenuEscape);
 
   // Exponer API pública en window para que renderer.js pueda llamar destroy()
   window.BandejaIntegrada = {

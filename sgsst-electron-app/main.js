@@ -2038,6 +2038,30 @@ ipcMain.handle('email-cache:get-threads', async (event, options) => {
   }
 });
 
+// 📦755 — Cuenta los threads del cache para una carpeta/filtro. La Bandeja la usa
+// para mostrar "Mostrando 25 de 137" y saber si todavía quedan correos por traer.
+ipcMain.handle('email-cache:count-threads', async (event, options) => {
+  try {
+    var total = emailDb.countThreadsFromCache(options || {});
+    return { success: true, data: { total: total } };
+  } catch (e) {
+    console.error('[email-cache] Error en count-threads:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// 📦755 — Estado de paginación de una carpeta (nextPageToken guardado por el sync).
+// Lo usa la Bandeja para saber si Gmail todavía tiene páginas más viejas.
+ipcMain.handle('email-cache:get-sync-state', async (event, folder) => {
+  try {
+    var state = emailDb.getSyncState(folder || 'INBOX');
+    return { success: true, data: state };
+  } catch (e) {
+    console.error('[email-cache] Error en get-sync-state:', e);
+    return { success: false, error: e.message };
+  }
+});
+
 // Lee un thread completo con todos sus mensajes
 ipcMain.handle('email-cache:get-thread', async (event, threadId) => {
   try {

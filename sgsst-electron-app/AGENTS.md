@@ -475,7 +475,7 @@ bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=' + current
 document.body.appendChild(bandejaIntegradaFrame);
 ```
 
-**Cache-bust dinámico (`?v=N`):** cada vez que se cambia código de la Bandeja Integrada, hay que bumpear el `currentVersion` (actualmente en `v=617`) en `renderer.js` línea ~1044. Sin esto, el navegador cachea la versión vieja y no se ven los cambios.
+**Cache-bust dinámico (`?v=N`):** cada vez que se cambia código de la Bandeja Integrada, hay que bumpear el `currentVersion` (actualmente en `v=695`) en `renderer.js` **línea ~1131** (verificado 2026-09; la referencia vieja "línea ~1044 / v=617" quedó obsoleta). Sin esto, el navegador cachea la versión vieja y no se ven los cambios.
 
 ### Comunicación iframe ↔ renderer principal
 - **renderer → Bandeja**: `bandejaIntegradaFrame.contentWindow.postMessage({ type: 'bandeja-integrada-toggle' }, '*')`
@@ -510,7 +510,7 @@ document.body.appendChild(bandejaIntegradaFrame);
 
 ### Cómo extender la Bandeja Integrada
 1. Modificar archivos en `renderer/bandeja-integrada/`
-2. Bumpear cache-bust en `renderer.js` (línea ~1044: `?v=N+1`)
+2. Bumpear cache-bust en `renderer.js` (línea ~1131: `?v=N+1`, hoy `?v=695`)
 3. Si agregás un IPC handler nuevo en `main.js`, exponerlo en `preload.js`
 4. Si agregás un módulo SQLite nuevo, actualizar `main/email-schema-sql.js` + `main/email-db.js` + `main/email-sync.js`
 5. NO commitear sin autorización explícita del usuario
@@ -752,7 +752,14 @@ ipcMain.handle('seguimiento-incapacidad:buscarPorCedula', (event, { empresaId, c
 
 ## 🧪 Tests smoke (en `main/test-*.js`)
 
-Desde v0.1.120, el proyecto tiene **9 archivos de tests smoke** en `sgsst-electron-app/main/test-*.js` que validan que los cambios no rompen nada. **Todos están en `.gitignore`** (no se commitean).
+Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/test-*.js` que validan que los cambios no rompen nada.
+
+**OJO — hay dos grupos:**
+- Los `test-fixes-loopN.js` / `test-compose-bem.js` (históricos, 📦 de la Bandeja vieja) **están en
+  `.gitignore`** (no se commitean).
+- Los de la Bandeja Integrada premium **SÍ se commitean** (van con el cambio): `test-bandeja-premium-v2.js`,
+  `test-firma-imagen.js`, `test-bandeja-toolbar-compacta.js`, `test-bandeja-paginacion.js` y
+  `test-bandeja-paginacion-funcional.js`.
 
 ### Archivos de test
 | Archivo | Checks | Qué valida |
@@ -766,9 +773,22 @@ Desde v0.1.120, el proyecto tiene **9 archivos de tests smoke** en `sgsst-electr
 | `test-fixes-loop6.js` | 4 | 2 errores runtime (m is not defined + tailwindcss) |
 | `test-fixes-loop7.js` | 8 | 3 mejoras visuales del preview de Z.ai (avatar 32px, sort, footer) |
 | `test-fixes-loop8.js` | 10 | 3 ajustes de la imagen objetivo (para plano, 1 de N, weekday) |
-| **Total** | **157** | Acumulado histórico |
+| `test-bandeja-premium-v2.js` | 42 | Migración premium v2 (📦752): topbar, KPI cards, sidebar, capa CSS y contrato DOM |
+| `test-firma-imagen.js` | 88 | Firma con imagen (📦753): MIME en línea, `cid:`, adjuntos, cupo de Gmail, no-leídos, respuesta rápida |
+| `test-bandeja-toolbar-compacta.js` | 50 | Toolbar compacta (📦754): 1 fila de acciones + fila de carpetas, menú "Más", fix del helper `el()` |
+| `test-bandeja-paginacion.js` | 48 | Paginación (📦755): esquema, sync `append`, scroll infinito, botón "Cargar más", fixes del cupo |
+| `test-bandeja-paginacion-funcional.js` | 22 | **FUNCIONAL** (📦755): páginas sin solaparse, contador, `page_token` y ventana de fechas — contra SQLite real |
 
-**Nota:** el total puede variar si se agregan o quitan tests. Siempre correr los 9 antes de commitear.
+**Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.
+
+### ⚠️ Tests FUNCIONALES: se corren con Electron, no con `node`
+`better-sqlite3` está compilado para el ABI de Electron, así que un test que abra la base con `node`
+a secas falla con `ERR_DLOPEN_FAILED`. Hay que correrlo con el Node de Electron:
+```powershell
+$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-bandeja-paginacion-funcional.js
+```
+(`ELECTRON_RUN_AS_NODE=1` ejecuta Electron como Node puro: sin ventana, sin GPU, sin problemas de sandbox.)
+
 
 ### Patrón de test
 Cada test sigue el mismo patrón:
@@ -2075,6 +2095,218 @@ Fixes:
   (3) que un correo enviado aparezca **en segundos** en Enviados (respuesta rápida y redactor),
   (4) que no vuelva a aparecer el error "El sync tardó más de 120s sin responder" en consola.
 - Cache-bust: iframe `?v=690`, `premium.css?v=20260918-firma-imagen-fix2`,
-  `app.js?v=20260918-firma-imagen-fix4`.
+  `app.js?v=20260918-firma-imagen-fix4`. → **superado por 📦754/📦755**: hoy es `?v=695`,
+  `premium.css?v=20260918-paginacion-correos` y `app.js?v=20260918-paginacion-correos-fix2`.
+
+---
+
+## 📦754 · Bandeja Integrada — toolbar compacta (2 filas en vez de 5)
+
+**Pedido del user**: "mejorar esta sección para ahorrar espacio y que sea más intuitiva, sin quitar
+espacio y que este espacio sea aprovechado para tener más espacio para mostrar correos manteniendo
+mi estilo premium" (apuntando a la zona `[+ Redactar] [⟳ Sincronizar] [≡ Reciente ▾]` + buscador +
+3 filas de chips de carpetas).
+
+### Antes vs después
+
+| | Antes | Ahora |
+|---|---|---|
+| Filas de "chrome" antes del primer correo | **5** (acciones / buscador / 3 filas de carpetas) | **2** (toolbar / fila de carpetas) |
+| Acciones | Redactar + Sincronizar (con etiqueta) | Redactar (**con** etiqueta) + Sincronizar (**solo icono**, tooltip) |
+| Buscador | Fila propia (38px) | Dentro de la toolbar (32px, `flex: 1`) |
+| Orden | Botón en la barra de acciones | Botón al final de la misma fila (solo icono + tooltip con el orden actual) |
+| Carpetas | 11 chips en 3 filas (`flex-wrap: wrap`) | **2 chips** (Recibidos · Enviados) + `Más ▾` con **9 filtros** (No leídos, Marcados, Reuniones + las 6 carpetas de Gmail) |
+
+### Decisiones y por qué
+
+1. **El panel de correos mide 388px** (`330px` bajo 1280px de ventana, `1fr` en mobile — ver
+   `.kair-mail-stack grid-template-columns`). Ese ancho manda: no entran 3 etiquetas + buscador.
+   Por eso `Sincronizar` y `Orden` quedan **solo icono** con `title`. El orden no-default se pinta
+   azul (`data-active="true"`) para que el estado se vea sin etiqueta.
+2. **A la vista solo `Recibidos` y `Enviados` (fix7)**: con esos 2 chips + `Más ▾` la fila de
+   carpetas es UNA línea y la bandeja queda en 2 líneas de controles en total (el pedido explícito
+   del user). Todo lo demás vive en el menú `Más ▾`: las 3 vistas rápidas (`unread`, `flagged`,
+   `meeting`) **primero**, un separador, y después las 6 carpetas de Gmail (`drafts`, `trash`,
+   `spam`, `starred`, `important`, `archive`). El botón muestra la vista activa, así el filtro
+   nunca se "pierde".
+3. **`applyFilter(f)`** — la lógica del click (cambiar `state.mailFilter`, `_resetMailListScroll`,
+   y recargar la carpeta si `isFolder`) se extrajo a una función y la usan **los chips y el menú**.
+   Antes estaba inline en el forEach de los chips.
+4. **La fila de carpetas usa `flex-wrap: wrap` + `display: contents` (fix6)**: la primera versión
+   usaba UNA línea con `overflow-x: auto` y, con 388px de panel, el último chip visible quedaba
+   **cortado a la mitad** (se veía como un error de dibujado, ver la captura del user). Con
+   `.kair-mail-list-filters { display: contents }` los chips son items de la fila y envuelven junto
+   con el botón `Más`. Desde el fix7 no hace falta envolver (son 3 elementos) pero el wrap queda
+   como red de seguridad en ventanas angostas.
+5. **El menú `Más` se ancla a LA FILA, no al botón**: `.kair-mail-filter-row { position: relative }`
+   y `.kair-mail-folders-menu { position: absolute; right: 0; top: calc(100% + 2px) }`. Si se
+   anclara al botón, al envolver el botón a la 2ª línea el menú de 198px se saldría del panel.
+   Con 9 items además lleva `max-height: 70vh; overflow-y: auto` para no salirse en ventanas bajas.
+6. **Un solo listener global** para cerrar el menú (`handleFoldersMenuOutsideClick` +
+   `handleFoldersMenuEscape`, registrados al cargar y removidos en `destroy()`). Lo obvio era
+   registrar el listener dentro del render de la lista, pero `renderMailList` corre en **cada**
+   `render()` → se acumulaban handlers.
+
+### Pitfalls confirmados (ampliación de la regla histórica)
+
+1. **`display` + `[hidden]`**: `.kair-mail-folders-menu` NO declara `display` en su regla base;
+   el `display:flex` vive en `.kair-mail-folders-menu:not([hidden])`. Si se declara en la base,
+   pisa el `[hidden] { display:none }` del navegador y **el menú queda siempre abierto** (mismo bug
+   que el `.kair-modal-overlay` del 📦752). El test lo valida explícitamente.
+2. **El helper `el(tag, attrs)` de `app.js` NO soporta el atributo `hidden`** (solo `class`, `html`,
+   `data-*`, `style`, `onClick/onInput/onChange`, `title`, `aria-label`, `type`, `placeholder`,
+   `value`). `el("div", { hidden: true })` se ignora en silencio → hay que hacer `menu.hidden = true`
+   después de crearlo.
+3. **Especificidad de `:first-child`**: al sacar el botón de orden de `.kair-mail-compose-bar`,
+   `:first-child` volvió a apuntar a "Redactar" (que es el que debe verse azul). Mover botones entre
+   contenedores cambia qué elemento matchea `:first-child` — revisar los estilos que dependen de eso.
+
+### Validación
+
+- `node main/test-bandeja-toolbar-compacta.js` → **48/48 OK** (nuevo).
+- `node main/test-bandeja-premium-v2.js` → 42/42 OK · `node main/test-firma-imagen.js` → 88/88 OK.
+- Validado en pantalla por el user (2 rondas de capturas).
+
+### fix6 (feedback visual del user sobre 📦754)
+
+El user probó y mandó 2 capturas: la toolbar y el menú se veían bien, pero el chip **"No leídos"
+quedaba cortado a la mitad** contra el borde de la tira (la fila tenía `overflow-x: auto` y con
+388px de panel no entraban las 6 carpetas). Ajustes aplicados:
+
+- `.kair-mail-filter-row`: `flex-wrap: wrap` + `position: relative` (bloque contenedor del menú).
+- `.kair-mail-list-filters`: `display: contents` → sus chips son items de la fila y envuelven
+  junto con el botón `Más` (el wrapper deja de aportar caja; ya no hay scroll horizontal).
+- Etiqueta `all`: "Bandeja de entrada" → **"Recibidos"** (la tab de arriba ya dice el nombre largo).
+- Chips más compactos: fuente 11.5px, padding `5px 10px`, gap 5px.
+- `@media (max-width: 1280px)`: se esconden los iconitos de las carpetas (el panel baja a 330px).
+  El chevron del botón `Más` NO se esconde.
+- **El menú `Más` ahora se ancla a la FILA** (`right: 0` contra `.kair-mail-filter-row`): al
+  envolver, el botón puede caer en la 2ª línea y, si el menú se anclara a él, se saldría del panel.
+
+### fix7 (pedido explícito del user: "así lo quiero", 2 líneas)
+
+**Línea 1**: `[+ Redactar] [⟳] [buscador flexible] [≡ ▾]` — sin cambios.
+**Línea 2**: `[Recibidos 22] [Enviados] [Más ▾]` — `PRIMARY_FILTERS = ["all", "sent"]`.
+
+Todo el resto vive en el menú `Más ▾`: **primero las 3 vistas** (`unread`, `flagged`, `meeting`),
+un **separador** (`.kair-mail-folders-menu__sep`) y después las **6 carpetas** de Gmail. Con 9 items
+el menú lleva `max-height: 70vh; overflow-y: auto` para no salirse en ventanas bajas.
+
+Lección: un contenedor con `overflow-x: auto` para "que entre todo" es una trampa cuando el panel
+es angosto — el último elemento visible queda cortado y se lee como error de dibujado. Y cuando el
+panel tiene ancho fijo, la única forma de garantizar UNA línea es reducir la cantidad de elementos
+visibles (mover el resto a un menú), no achicar infinitamente los chips.
+
+---
+
+## 📦755 · Bandeja Integrada — ver TODOS los correos (paginación)
+
+**Pedido del user**: "como podemos ver todos los correos... ya que actualmente no tenemos esa opción
+de ver todos los correos bien sea con la barra de desplazamiento o con una paginación".
+
+### El diagnóstico
+
+La Bandeja **solo podía mostrar los 25 correos más nuevos** por dos topes que se sumaban:
+
+1. **El sync** (`email-sync.syncInbox`) pedía siempre **la PRIMERA página** de Gmail
+   (`maxResults: 25`, sin `pageToken`) y después **borraba del cache todo lo que no estuviera en esa
+   página** (limpieza de huérfanos). O sea: el cache nunca podía tener más de 25 threads por carpeta.
+2. **La lista** leía el cache con `getThreads({ maxResults: 25 })` fijo, sin offset.
+
+No había scroll infinito ni botón de "cargar más": el final de la lista simplemente terminaba.
+
+### La solución (4 capas)
+
+| Capa | Cambio |
+|---|---|
+| **Schema** | Nueva tabla `email_sync_state` (folder PK, `page_token`, `loaded_count`, `pages_loaded`). Idempotente: `CREATE TABLE IF NOT EXISTS` dentro de `EMAIL_SCHEMA_SQL`, que `main.js` ejecuta en cada arranque → las bases existentes la crean solas. |
+| **email-db.js** | `getThreadsFromCache` acepta `offset` (`LIMIT @maxResults OFFSET @offset`); nuevo `countThreadsFromCache`; nuevos `saveSyncState` / `getSyncState` / `resetSyncState`. El WHERE se extrajo a **`buildThreadsWhere()`** para que la lista y el contador usen EXACTAMENTE el mismo filtro (si no, "Mostrando 25 de 137" mentiría). El contador va envuelto en una subquery porque el operador `to:` necesita el `last_to_list` que sale de `email_messages`. |
+| **email-sync.js** | `syncInbox({ append: true })` = traer la **página siguiente** desde el `nextPageToken` guardado, **agregando** al cache. Devuelve `nextPageToken` + `hasMore` y guarda el estado. `fetchAll: false` (una página por vez, explícito). |
+| **Renderer** | `state.mailLoaded` (ventana cargada) + `loadMoreMails()` + scroll infinito + pie "Mostrando X de Y" con botón. |
+
+### Decisión clave: la limpieza de huérfanos NO puede borrar lo que el user cargó
+
+`syncInbox` borraba los threads de la carpeta que no venían en la respuesta de Gmail (para limpiar
+los que se borraron/archivaron). Con paginación eso es **destructivo**: el sync de fondo trae solo la
+página 1, así que habría borrado las páginas 2, 3, … que el user acababa de pedir.
+
+Fix: **ventana de fechas**. Se calcula la fecha más vieja de la página traída (`cutoff`) y solo se
+consideran huérfanos los threads **dentro** de esa ventana (`last_message_date >= cutoff`). Los más
+viejos pertenecen a páginas siguientes y no se tocan. Además la limpieza se saltea por completo en
+modo `append`. El test funcional lo verifica: sin la ventana se habrían borrado 35 correos de 60.
+
+### Los dos caminos de "cargar más" (en este orden)
+
+1. **Cache local primero** (`mailTotal > mostrado`): solo se amplía `state.mailLoaded` y se relee el
+   cache. **Cero requests a Gmail** → instantáneo.
+2. **Gmail después** (el cache ya se agotó): `syncInbox({ append: true })` con el `pageToken`
+   guardado → 1 request de listado + 25 de detalle ≈ 40s (mismo costo que el sync normal, respeta el
+   cupo de 120/min del 📦753).
+
+El **scroll infinito** dispara lo mismo al llegar a 220px del final; el **botón del pie** es la
+acción visible para quien no scrollea y también el indicador de "Cargando correos…". El pie se
+repinta SOLO él (`updateMailPagerFooter`) cuando llega el total: si se re-renderizara la lista, el
+scroll del user saltaría.
+
+### Pitfall encontrado en el camino: `el()` ignoraba `id`
+
+El helper `el(tag, attrs)` de `app.js` soportaba `class`, `html`, `data-*`, `style`, `onClick`,
+`onInput`, `onChange`, `title`, `aria-label`, `type`, `placeholder` y `value`… **pero NO `id`**: se
+ignoraba en silencio. Consecuencia real: el botón de orden (`#mail-sort-toggle`) se crea con
+`el("button", { id: "mail-sort-toggle", ... })` desde el 📦754, quedaba **sin id**, y el handler que
+lo busca con `$("#mail-sort-toggle")` **nunca se enganchaba** (el botón no hacía nada).
+
+Fix: `el()` ahora soporta `id` (y `hidden`). **Regla**: antes de crear un elemento con `el()` y
+buscarlo después por id, verificar que el helper soporte ese atributo — o setearlo a mano
+(`node.id = "x"`), como se hacía con `menu.hidden`.
+
+### Validación
+
+- `node main/test-bandeja-paginacion.js` → **48/48 OK** (estructural, nuevo).
+- **`test-bandeja-paginacion-funcional.js` → 22/22 OK** (FUNCIONAL contra SQLite en memoria:
+  páginas sin solaparse, contador que coincide con la lista, `page_token` por carpeta, y la ventana
+  de fechas de la limpieza). ⚠️ Se corre con
+  `$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-bandeja-paginacion-funcional.js` porque
+  `better-sqlite3` está compilado para el ABI de Electron (con `node` a secas da `ERR_DLOPEN_FAILED`).
+- `test-bandeja-toolbar-compacta.js` 50/50 · `test-bandeja-premium-v2.js` 42/42 ·
+  `test-firma-imagen.js` 88/88.
+- Cache-bust: iframe `?v=695`, `premium.css`/`app.js?v=20260918-paginacion-correos-fix2`.
+
+### fix (prueba real del user: log de consola)
+
+El user probó la paginación y **funcionó**, pero en el medio apareció un toast
+**"No se pudieron cargar más correos · No se pudo obtener el perfil de Gmail"** y el log mostró
+**10+ "Cargando la página siguiente de INBOX desde Gmail..." encadenados**. Diagnóstico:
+
+1. **El scroll infinito encadenaba páginas.** Al agregar 25 filas la lista crecía y volvía a
+   disparar el evento de scroll (y el navegador emite varios eventos por gesto). Cada página son
+   **26 requests**; 4-5 páginas seguidas + el auto-refresh cada 30s (26 requests más) superan el
+   cupo de Gmail (120/min, ver 📦753) → el sync empezó a fallar y uno de los pedidos reventó en
+   `getProfile`.
+2. **`getProfile` abortaba todo el sync.** Si esa llamada fallaba (rate limit, hipo de red) el sync
+   devolvía `No se pudo obtener el perfil de Gmail` aunque los tokens estuvieran perfectos y el
+   email ya estuviera guardado en `email_connections`.
+
+Fixes:
+
+- **Scroll infinito "armado"**: se dispara UNA página por llegada al final. Si el user sigue
+  bajando, el primer evento de scroll queda lejos del final (se agregaron 25 filas) y vuelve a
+  armarse (`if (remaining > 400 || sinceLast > 5000) state._autoLoadArmed = true`). Más un
+  **cooldown de 1,5s** entre cargas automáticas.
+- **No apilar syncs**: `isAnySyncInFlight()` (sync de fondo + syncs por carpeta). "Cargar más"
+  posterga si hay otro sync corriendo, y el **auto-refresh se saltea el ciclo** si se acaba de
+  cargar una página (`mailLoadingMore` o `_lastLoadMoreAt < 15s`). Prioriza la acción del user
+  sobre el refresco automático.
+- **`getProfile` con fallback**: si falla, se usa el email de `emailDb.getAllConnections()[0]`.
+  Solo se aborta si tampoco hay conexión guardada.
+- **Toast con throttle** (`notifyLoadMoreError`, 30s por mensaje distinto): si el user insiste o el
+  scroll dispara varias veces, no recibe 5 toasts iguales.
+
+**Lección**: al agregar paginación sobre una API con cupo (Gmail), el scroll infinito es un
+multiplicador de requests. Hay que ponerle freno explícito (armado + cooldown) y hacer que las
+tareas automáticas (auto-refresh) cedan prioridad a la acción del usuario.
+
+
+
 
 

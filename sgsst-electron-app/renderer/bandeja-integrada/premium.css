@@ -681,20 +681,32 @@ html, body {
   background: var(--kair-surface);
 }
 
-/* ── Toolbar de correo (Redactar / Sincronizar / Orden) ── */
+/* ── Toolbar de correo COMPACTA (📦754) ──────────────────────────────
+   Una sola fila: [Redactar] [⟳] [buscador flexible] [orden ▾].
+   ANTES: acciones en una fila + buscador en otra + 3 filas de carpetas = 5 filas
+   de "chrome" antes del primer correo. AHORA: 2 filas (toolbar + carpetas) y todo
+   el alto recuperado se lo lleva la lista de correos. */
+.kair-mail-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
 .kair-mail-compose-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 12px 0;
-  flex-wrap: wrap;
+  padding: 0;
   flex-shrink: 0;
 }
 .kair-mail-compose-bar__btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
+  gap: 6px;
+  padding: 6px 12px;
+  height: 32px;
   border-radius: var(--kair-r-xs);
   border: 1px solid var(--kair-border-2);
   background: var(--kair-surface);
@@ -705,6 +717,7 @@ html, body {
   cursor: pointer;
   transition: var(--kair-t);
   white-space: nowrap;
+  box-sizing: border-box;
 }
 .kair-mail-compose-bar__btn:hover {
   border-color: var(--kair-blue-soft2);
@@ -723,22 +736,59 @@ html, body {
   border-color: var(--kair-blue-h);
   color: #fff;
 }
-/* El selector de orden se alinea a la derecha */
-.kair-mail-compose-bar__btn#mail-sort-toggle { margin-left: auto; }
 
-/* ── Buscador de la bandeja ── */
-.kair-mail-search {
-  padding: 10px 12px 8px !important;
-  border-bottom: none !important;
+/* ── Botón de orden (vive al final de la fila de la toolbar) ── */
+.kair-mail-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
   flex-shrink: 0;
+  transition: var(--kair-t);
+  box-sizing: border-box;
 }
+.kair-mail-sort-btn svg { color: var(--kair-text-3); transition: var(--kair-t); }
+.kair-mail-sort-btn:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+}
+.kair-mail-sort-btn:hover svg { color: var(--kair-blue); }
+.kair-mail-sort-btn[data-active="true"] {
+  background: var(--kair-blue-soft);
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+}
+.kair-mail-sort-btn[data-active="true"] svg { color: var(--kair-blue); }
+
+/* ── Buscador de la bandeja (ocupa el espacio flexible de la fila) ── */
+.kair-mail-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+.kair-mail-search__wrap { min-width: 0; }
 .kair-mail-search__input {
   width: 100% !important;
-  height: 38px;
-  padding: 0 34px 0 36px !important;
+  height: 32px;
+  padding: 0 32px 0 32px !important;
   border: 1px solid var(--kair-border-2) !important;
   border-radius: 999px !important;
-  font-size: 13px !important;
+  font-size: 12.5px !important;
   background: var(--kair-bg) !important;
   color: var(--kair-text) !important;
   box-sizing: border-box;
@@ -752,28 +802,51 @@ html, body {
 }
 .kair-mail-search__input::placeholder { color: var(--kair-text-3); }
 .kair-mail-search__clear {
-  right: 14px !important;
+  right: 12px !important;
   border-radius: 50%;
   transition: var(--kair-t);
 }
 .kair-mail-search__clear:hover { background: var(--kair-slate-soft); color: var(--kair-text); }
-.kair-mail-search__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.kair-mail-search__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0; }
 
-/* ── Carpetas (chips) ── */
-.kair-mail-list-filters {
+/* Solo "Redactar" (primera acción) conserva su etiqueta; el resto queda
+   icono + tooltip. En el panel de 388px no hay ancho para 3 etiquetas + buscador:
+   los botones bajan de ~120px a ~32px y ese ancho se lo lleva el buscador. */
+.kair-mail-compose-bar__btn:not(:first-child) span { display: none; }
+.kair-mail-compose-bar__btn:not(:first-child) { padding: 0 9px; }
+.kair-mail-sort-btn span { display: none; }
+.kair-mail-sort-btn { padding: 0 9px; gap: 4px; }
+
+/* ── Carpetas (chips): 1 línea ──
+   📦754-fix7 — A la vista solo quedan `Recibidos` y `Enviados` + el menú `Más ▾`
+   (que ahora también trae las vistas No leídos / Marcados / Reuniones). Con 3 chips
+   la fila es UNA línea y la bandeja queda en 2 líneas de controles en total.
+   El `flex-wrap` se mantiene por seguridad en ventanas muy angostas.
+
+   El menú de "Más" se posiciona contra LA FILA (no contra el botón): así abre
+   siempre dentro del panel, sin importar en qué línea cayó el botón al envolver. */
+.kair-mail-filter-row {
+  position: relative;      /* bloque contenedor del menú "Más" */
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 12px 10px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px 10px;
   flex-shrink: 0;
   background: var(--kair-surface);
+  min-width: 0;
+}
+/* El wrapper de los chips no aporta caja: sus chips son items de la fila y
+   envuelven junto con el botón "Más". */
+.kair-mail-list-filters {
+  display: contents;
 }
 .kair-mail-list-filter {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5.5px 11px;
-  font-size: 12px;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 11.5px;
   font-weight: 600;
   font-family: inherit;
   color: var(--kair-text-2);
@@ -782,6 +855,8 @@ html, body {
   border-radius: 999px;
   cursor: pointer;
   transition: var(--kair-t);
+  flex-shrink: 0;      /* los chips nunca se comprimen: envuelven a la línea siguiente */
+  white-space: nowrap;
 }
 .kair-mail-list-filter svg { color: var(--kair-text-3); transition: var(--kair-t); }
 .kair-mail-list-filter:hover {
@@ -807,8 +882,128 @@ html, body {
 }
 .kair-mail-list-filter[data-active="true"] .kair-mail-list-filter__badge { background: var(--kair-blue); }
 
+/* En el panel angosto (≤1280px el panel baja de 388px a 330px) se esconden los
+   iconitos de las carpetas visibles: así `Recibidos · Enviados · Más` nunca se
+   parten en 2 líneas. El chevron del botón "Más" NO se esconde (marca que es un
+   desplegable). */
+@media (max-width: 1280px) {
+  .kair-mail-list-filter:not(.kair-mail-list-filter--more) svg { display: none; }
+}
+
+/* ── Menú "Más" (vistas rápidas + carpetas de Gmail) ──
+   ⚠️ El `display` NO se declara en la regla base: si se declarara, pisaría el
+   `[hidden] { display:none }` del navegador y el menú quedaría siempre abierto
+   (mismo bug histórico del `.kair-modal-overlay`). Se aplica en `:not([hidden])`. */
+.kair-mail-more { display: inline-flex; }
+.kair-mail-list-filter--more { gap: 5px; }
+.kair-mail-list-filter--more svg:last-child { opacity: .65; }
+.kair-mail-folders-menu {
+  position: absolute;
+  top: calc(100% + 2px);   /* 2px + los 10px de padding inferior de la fila */
+  right: 0;                /* alineado al borde derecho del panel */
+  z-index: 40;
+  min-width: 198px;
+  padding: 6px;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-sm);
+  box-shadow: 0 12px 28px rgba(15, 30, 60, .16);
+}
+/* 9 items: si la ventana es baja, el menú scrollea en vez de salirse del panel. */
+.kair-mail-folders-menu:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+/* Separa las vistas rápidas (No leídos / Marcados / Reuniones) de las carpetas
+   reales de Gmail: son cosas distintas y mezcladas confunden. */
+.kair-mail-folders-menu__sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--kair-border);
+}
+.kair-mail-folders-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--kair-r-xs);
+  background: transparent;
+  color: var(--kair-text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-mail-folders-menu__item svg { color: var(--kair-text-3); flex-shrink: 0; transition: var(--kair-t); }
+.kair-mail-folders-menu__item:hover { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.kair-mail-folders-menu__item:hover svg { color: var(--kair-blue); }
+.kair-mail-folders-menu__item[data-active="true"] { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.kair-mail-folders-menu__item[data-active="true"] svg { color: var(--kair-blue); }
+.kair-mail-folders-menu__label { flex: 1; white-space: nowrap; }
+
 /* ── Lista de correos ── */
 .kair-scroll { border-top: 1px solid var(--kair-border); }
+
+/* ── 📦755 Pie de paginación: "Mostrando X de Y" + "Cargar más correos" ──
+   Va al final de la lista (dentro del contenedor con scroll). El scroll infinito
+   dispara lo mismo al llegar a ~220px del final; este bloque es la acción visible
+   para quien no scrollea y el indicador de que se está cargando. */
+.kair-mail-pager {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px 18px;
+  border-top: 1px dashed var(--kair-border);
+  margin-top: 6px;
+}
+.kair-mail-pager__info {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--kair-text-3);
+}
+.kair-mail-pager__info b { color: var(--kair-text-2); }
+.kair-mail-pager__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--kair-blue-soft2);
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-mail-pager__btn:hover:not([disabled]) {
+  background: var(--kair-blue);
+  border-color: var(--kair-blue);
+  color: #fff;
+}
+.kair-mail-pager__btn[disabled] {
+  opacity: .65;
+  cursor: default;
+}
+.kair-mail-pager__end {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--kair-text-3);
+  padding: 14px 12px 18px;
+  text-align: center;
+  border-top: 1px dashed var(--kair-border);
+  margin-top: 6px;
+}
 
 .kair-mail-row,
 .email-row {

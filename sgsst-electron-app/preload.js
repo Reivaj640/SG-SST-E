@@ -195,9 +195,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Patrón Mail-0: driver que lee de SQLite instantáneo en vez de llamar al API cada vez.
   emailCache: {
     // Sincroniza el inbox desde Gmail al cache local
+    // 📦755 — Con { append: true } trae la PÁGINA SIGUIENTE (correos más viejos)
+    // sin borrar los que ya están cacheados ("cargar más correos").
     syncInbox: (options) => ipcRenderer.invoke('email-cache:sync-inbox', options),
     // Lee los threads del cache (instantáneo, sin API call)
     getThreads: (options) => ipcRenderer.invoke('email-cache:get-threads', options),
+    // 📦755 — Cuenta los threads del cache (total para "Mostrando X de Y")
+    countThreads: (options) => ipcRenderer.invoke('email-cache:count-threads', options),
+    // 📦755 — Estado de paginación guardado (nextPageToken de la carpeta)
+    getSyncState: (folder) => ipcRenderer.invoke('email-cache:get-sync-state', folder),
     // Lee un thread completo con sus mensajes
     getThread: (threadId) => ipcRenderer.invoke('email-cache:get-thread', threadId),
     // Estadísticas (totales para el footer)

@@ -154,8 +154,72 @@ function saveThread(thread) {
  */
 function getThreadsFromCache(options) {
   options = options || {};
-  const folder = options.folder || 'INBOX';
   const maxResults = options.maxResults || 50;
+  // 📦755 — Paginación: `offset` permite pedir la página siguiente del cache
+  // local (los correos ya traídos por "cargar más") sin volver a llamar a Gmail.
+  const offset = options.offset || 0;
+  const built = buildThreadsWhere(options);
+  const params = Object.assign({}, built.params, { maxResults: maxResults, offset: offset });
+
+  // 📦657-fix3 — LEFT JOIN con el último message de cada thread para traer
+  // to_list/cc_list. Sin esto, la UI no puede mostrar el destinatario en
+  // SENT sin tener que abrir el detalle (lazy load).
+  // Usamos una subquery correlated que toma el message con la fecha MAX
+  // por thread_id. SQLite soporta esto con row_number() o con MAX+GROUP BY,
+  // pero la forma más portable es la subquery escalar con MAX.
+  const rows = db().prepare(`
+    SELECT t.*,
+           (SELECT to_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_to_list,
+           (SELECT cc_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_cc_list
+    FROM email_threads t
+    WHERE ${built.where}
+    ORDER BY t.last_message_date DESC
+    LIMIT @maxResults OFFSET @offset
+  `).all(params);
+
+  // Deserializar JSON fields
+  return rows.map(deserializeThread);
+}
+
+/**
+ * 📦755 — Cuenta cuántos threads hay en el cache para una carpeta/filtro.
+ * La usa la Bandeja para saber si todavía quedan correos por mostrar
+ * ("Mostrando 25 de 137") y para habilitar el botón "Cargar más correos".
+ *
+ * Reusa el MISMO builder de WHERE que getThreadsFromCache, así el número
+ * siempre coincide con lo que devuelve la lista (mismo filtro/búsqueda).
+ * Va envuelto en una subquery porque el filtro `to:` necesita el
+ * `last_to_list` que se calcula desde email_messages.
+ */
+function countThreadsFromCache(options) {
+  options = options || {};
+  const built = buildThreadsWhere(options);
+  const row = db().prepare(`
+    SELECT COUNT(*) AS c FROM (
+      SELECT t.id,
+             (SELECT to_list FROM email_messages
+               WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+               LIMIT 1) AS last_to_list
+      FROM email_threads t
+      WHERE ${built.where}
+    )
+  `).get(built.params);
+  return row ? row.c : 0;
+}
+
+/**
+ * 📦755 — Arma el WHERE de threads a partir de las opciones (folder, unread,
+ * operadores de búsqueda). Extraído de getThreadsFromCache para que la lista
+ * y el contador usen EXACTAMENTE el mismo filtro.
+ * @returns {{where: string, params: Object}}
+ */
+function buildThreadsWhere(options) {
+  options = options || {};
+  const folder = options.folder || 'INBOX';
   const onlyUnread = options.onlyUnread || false;
   const rawSearchQuery = options.searchQuery || '';
 
@@ -164,7 +228,7 @@ function getThreadsFromCache(options) {
 
   // Construir WHERE clause
   let where = 'folder = @folder';
-  const params = { folder: folder, maxResults: maxResults };
+  const params = { folder: folder };
   if (onlyUnread) {
     where += ' AND has_unread = 1';
   }
@@ -207,28 +271,7 @@ function getThreadsFromCache(options) {
     params.after = new Date(searchTokens.after).getTime();
   }
 
-  // 📦657-fix3 — LEFT JOIN con el último message de cada thread para traer
-  // to_list/cc_list. Sin esto, la UI no puede mostrar el destinatario en
-  // SENT sin tener que abrir el detalle (lazy load).
-  // Usamos una subquery correlated que toma el message con la fecha MAX
-  // por thread_id. SQLite soporta esto con row_number() o con MAX+GROUP BY,
-  // pero la forma más portable es la subquery escalar con MAX.
-  const rows = db().prepare(`
-    SELECT t.*,
-           (SELECT to_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
-             LIMIT 1) AS last_to_list,
-           (SELECT cc_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
-             LIMIT 1) AS last_cc_list
-    FROM email_threads t
-    WHERE ${where}
-    ORDER BY t.last_message_date DESC
-    LIMIT @maxResults
-  `).all(params);
-
-  // Deserializar JSON fields
-  return rows.map(deserializeThread);
+  return { where: where, params: params };
 }
 
 function getThreadFromCache(threadId) {
@@ -692,11 +735,72 @@ function getCacheStats(connectionId) {
   return { threads: total, unread: unread, labels: labels };
 }
 
+// =====================================================================
+// 📦755 — Estado de paginación por carpeta
+// =====================================================================
+
+/**
+ * Guarda (upsert) el estado de paginación de una carpeta: el nextPageToken de
+ * Gmail y cuántos threads/páginas se trajeron. Lo usa el sync para saber desde
+ * dónde seguir cuando el user pide "cargar más correos".
+ *
+ * @param {Object} state - { folder, connectionId, pageToken, loadedCount, pagesLoaded }
+ */
+function saveSyncState(state) {
+  state = state || {};
+  const folder = state.folder || 'INBOX';
+  const stmt = db().prepare(`
+    INSERT INTO email_sync_state (folder, connection_id, page_token, loaded_count, pages_loaded, updated_at)
+    VALUES (@folder, @connection_id, @page_token, @loaded_count, @pages_loaded, @updated_at)
+    ON CONFLICT(folder) DO UPDATE SET
+      connection_id = excluded.connection_id,
+      page_token = excluded.page_token,
+      loaded_count = excluded.loaded_count,
+      pages_loaded = excluded.pages_loaded,
+      updated_at = excluded.updated_at
+  `);
+  return stmt.run({
+    folder: folder,
+    connection_id: state.connectionId || state.connection_id || null,
+    page_token: state.pageToken !== undefined ? state.pageToken : null,
+    loaded_count: state.loadedCount || 0,
+    pages_loaded: state.pagesLoaded || 0,
+    updated_at: Date.now()
+  });
+}
+
+/**
+ * Lee el estado de paginación de una carpeta. Devuelve null si nunca se sincronizó.
+ */
+function getSyncState(folder) {
+  const row = db().prepare('SELECT * FROM email_sync_state WHERE folder = ? LIMIT 1').get(folder || 'INBOX');
+  if (!row) return null;
+  return {
+    folder: row.folder,
+    connection_id: row.connection_id,
+    pageToken: row.page_token,
+    page_token: row.page_token,
+    loadedCount: row.loaded_count,
+    loaded_count: row.loaded_count,
+    pagesLoaded: row.pages_loaded,
+    pages_loaded: row.pages_loaded,
+    updated_at: row.updated_at
+  };
+}
+
+/**
+ * Borra el estado de paginación de una carpeta (vuelve a la página 1).
+ * Se usa cuando el sync completo reinicia la ventana de mensajes.
+ */
+function resetSyncState(folder) {
+  return db().prepare('DELETE FROM email_sync_state WHERE folder = ?').run(folder || 'INBOX');
+}
+
 module.exports = {
   // Conexiones
   saveConnection, getConnection, getAllConnections,
   // Threads
-  saveThread, getThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
+  saveThread, getThreadsFromCache, countThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
   // Mensajes
   saveMessage, getMessagesFromCache, propagateUnreadChange, recomputeThreadUnread,
   // Labels
@@ -705,6 +809,8 @@ module.exports = {
   saveAttachment, deleteAttachmentsByMessage, getAttachmentsByMessage,
   // Utilidades
   getCacheStats,
+  // 📦755 — Paginación
+  saveSyncState, getSyncState, resetSyncState,
   // 📦 P2-4 fix: Parser de búsqueda
   parseSearchQuery
 };

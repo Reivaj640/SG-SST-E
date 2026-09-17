@@ -126,6 +126,19 @@ const EMAIL_SCHEMA_SQL = `
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_attachments_message ON email_attachments(message_id);
+
+  -- 📦755 — Estado de paginación por carpeta.
+  -- Guarda el nextPageToken que devuelve Gmail para poder pedir la PÁGINA
+  -- SIGUIENTE cuando el user pide "cargar más correos" (o scrollea hasta el
+  -- final de la lista). Sin esto no había forma de ver más de los primeros 25.
+  CREATE TABLE IF NOT EXISTS email_sync_state (
+    folder TEXT PRIMARY KEY,
+    connection_id TEXT,
+    page_token TEXT,                          -- nextPageToken de Gmail (página siguiente)
+    loaded_count INTEGER NOT NULL DEFAULT 0,  -- cuántos threads se trajeron en total
+    pages_loaded INTEGER NOT NULL DEFAULT 0,  -- cuántas páginas se pidieron
+    updated_at INTEGER
+  );
 `;
 
 // =====================================================================
