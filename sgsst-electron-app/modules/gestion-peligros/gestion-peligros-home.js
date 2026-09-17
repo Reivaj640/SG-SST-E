@@ -724,40 +724,31 @@ class GestionPeligrosHome {
 		var medicionesHechas = (stats.mediciones && stats.mediciones.realizadas) || 0;
 
 		var items = [
-			{ label: 'Inspecciones', total: inspecciones, value: inspeccionesCumplidas, color: '#174ea6' },
-			{ label: 'Mantenimiento', total: mantenimiento, value: mantenimientoHecho, color: '#178666' },
-			{ label: 'Peligros', total: peligros, value: peligrosEvaluados, color: '#c28316' },
-			{ label: 'Mediciones', total: mediciones, value: medicionesHechas, color: '#a83a48' }
+			{ label: 'Inspecciones', total: inspecciones, value: inspeccionesCumplidas, color: 'var(--kair-blue, #2057b8)' },
+			{ label: 'Mantenimiento', total: mantenimiento, value: mantenimientoHecho, color: 'var(--kair-mint, #1bb888)' },
+			{ label: 'Peligros', total: peligros, value: peligrosEvaluados, color: 'var(--kair-amber, #e7a224)' },
+			{ label: 'Mediciones', total: mediciones, value: medicionesHechas, color: 'var(--kair-red, #da5563)' }
 		];
 
-		var rowH = 32;
-		var gapY = 8;
-		var PAD_L = 120, PAD_R = 80, PAD_T = 14, PAD_B = 14;
-		var H = PAD_T + PAD_B + items.length * (rowH + gapY);
-		var W = 690;
-		var barX = PAD_L;
-		var barW = W - PAD_L - PAD_R;
-
-		var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block;">';
+		// 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro de
+		// una caja de alto fijo se estiraba sin conservar proporción y el texto se deformaba
+		// y se montaba. Una barra es una caja: con HTML se dibuja exacta y nunca se sale.
+		var html = '<div class="kair-bar-chart">';
 		for (var i = 0; i < items.length; i++) {
 			var item = items[i];
-			var y = PAD_T + i * (rowH + gapY);
-			var barY = y;
-			var pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
-			var filledW = Math.max(2, (barW * pct) / 100);
-			// Label a la izquierda
-			svg += '<text x="' + (PAD_L - 10) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="11" fill="#637189">' + item.label + '</text>';
-			// Track
-			svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + rowH + '" rx="6" ry="6" fill="#eef0f1"/>';
-			// Fill
-			svg += '<rect x="' + barX + '" y="' + barY + '" width="' + filledW + '" height="' + rowH + '" rx="6" ry="6" fill="' + item.color + '"/>';
-			// Value a la derecha: "X / Y (Z%)"
-			var label = item.value + ' / ' + item.total + '  (' + pct + '%)';
-			svg += '<text x="' + (W - PAD_R) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="11" font-weight="600" fill="#212529">' + label + '</text>';
+			var total = Number(item.total) || 0;
+			var value = Number(item.value) || 0;
+			var pct = total > 0 ? Math.round((value / total) * 100) : 0;
+			var w = Math.max(0, Math.min(100, pct));
+			html += '<div class="kair-bar-chart__row">'
+				+ '<span class="kair-bar-chart__label">' + item.label + '</span>'
+				+ '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + w + '%;background:' + item.color + '"></i></span>'
+				+ '<span class="kair-bar-chart__value">' + value + ' <small>/ ' + total + '</small></span>'
+				+ '</div>';
 		}
-		svg += '</svg>';
+		html += '</div>';
 
-		el.innerHTML = svg;
+		el.innerHTML = html;
 	}
 
 	renderSubmodulesGrid() {
@@ -880,7 +871,7 @@ class GestionPeligrosHome {
 			+ '    <div class="kair-card-hint">Inspecciones · Mantenimiento · Peligros · Mediciones</div>'
 			+ '  </div>'
 			+ '</div>'
-			+ '<div class="kair-chart" id="kair-chart-peligros"></div>';
+			+ '<div class="kair-chart kair-chart--flow" id="kair-chart-peligros"></div>';
 		content.appendChild(chartCard);
 
 		const radarCard = document.createElement('article');

@@ -191,7 +191,7 @@ class VerificacionHome {
                     <div class="kair-card-hint">% de actividades completadas en cada proceso de verificación</div>
                 </div>
             </div>
-            <div class="kair-chart">${this.renderChartVerificacion(submStats)}</div>
+            <div class="kair-chart kair-chart--flow">${this.renderChartVerificacion(submStats)}</div>
         `;
         content.appendChild(chartCard);
 
@@ -447,45 +447,32 @@ class VerificacionHome {
     }
 
     /**
-     * Renderiza un chart SVG nativo con barras horizontales por submódulo.
+     * Renderiza el gráfico de cumplimiento por submódulo con BARRAS HTML (no SVG).
+     * 📦758 · Antes se dibujaba con `<svg viewBox="0 0 400 200">`: al estirarse al ancho
+     * real de la tarjeta, el texto se aplastaba y se encimaba. Una barra es una caja:
+     * con HTML se dibuja exacta y el alto lo pone el contenido.
      */
     renderChartVerificacion(submStats) {
         if (submStats.length === 0) {
-            return '<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg"><text x="200" y="100" text-anchor="middle" fill="#748096" font-size="13">Sin submódulos</text></svg>';
+            return '<div class="kair-bar-chart__row"><span class="kair-bar-chart__label" style="grid-column:1/-1;text-align:center">Sin submódulos</span></div>';
         }
-
-        const W = 400, H = 200;
-        const barH = 22;
-        const gap = 12;
-        const labelW = 60;
-        const valueW = 110;
-        const barAreaW = W - labelW - valueW - 20;
-        const startY = 16;
 
         const maxTotal = Math.max(...submStats.map(s => s.total), 1);
 
-        let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-
-        submStats.forEach((s, i) => {
-            const y = startY + i * (barH + gap);
+        let html = '<div class="kair-bar-chart">';
+        submStats.forEach(s => {
             const pct = s.total > 0 ? (s.completados / s.total) * 100 : 0;
-            const barW = s.total > 0 ? Math.max(8, (s.completados / maxTotal) * barAreaW) : 0;
-            const color = pct >= 80 ? '#1bb888' : pct >= 50 ? '#2057b8' : pct >= 25 ? '#e7a224' : '#da5563';
+            const width = s.total > 0 ? Math.max(6, (s.completados / maxTotal) * 100) : 0;
+            const color = pct >= 80 ? 'var(--kair-mint, #1bb888)' : pct >= 50 ? 'var(--kair-blue, #2057b8)' : pct >= 25 ? 'var(--kair-amber, #e7a224)' : 'var(--kair-red, #da5563)';
 
-            // Label
-            svg += `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" fill="#14213d" font-size="12" font-weight="600">${s.code}</text>`;
-            // Bar background
-            svg += `<rect x="${labelW}" y="${y}" width="${barAreaW}" height="${barH}" fill="#f3f6f6" rx="6"/>`;
-            // Bar fill
-            if (barW > 0) {
-                svg += `<rect x="${labelW}" y="${y}" width="${barW}" height="${barH}" fill="${color}" rx="6"/>`;
-            }
-            // Value label
-            svg += `<text x="${labelW + barAreaW + 8}" y="${y + barH / 2 + 4}" fill="#748096" font-size="11">${s.completados}/${s.total} (${Math.round(pct)}%)</text>`;
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + s.code + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + width.toFixed(1) + '%;background:' + color + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + s.completados + '/' + s.total + ' <small>(' + Math.round(pct) + '%)</small></span>'
+                + '</div>';
         });
-
-        svg += '</svg>';
-        return svg;
+        html += '</div>';
+        return html;
     }
 
     /**

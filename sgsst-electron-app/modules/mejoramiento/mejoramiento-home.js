@@ -159,7 +159,7 @@ class MejoramientoHome {
                     <div class="kair-card-hint">Cantidad de acciones en cada estado del ciclo</div>
                 </div>
             </div>
-            <div class="kair-chart">${this.renderChartMejoramiento(abiertas, enProceso, cerradas, vencidas)}</div>
+            <div class="kair-chart kair-chart--flow">${this.renderChartMejoramiento(abiertas, enProceso, cerradas, vencidas)}</div>
         `;
         content.appendChild(chartCard);
 
@@ -274,49 +274,37 @@ class MejoramientoHome {
     }
 
     /**
-     * Renderiza un chart SVG nativo con barras horizontales por estado.
+     * Renderiza el gráfico de acciones por estado con BARRAS HTML (no SVG).
+     * 📦758 · Antes se dibujaba con `<svg viewBox="0 0 400 200">`: al estirarse al ancho
+     * real de la tarjeta, el texto se aplastaba y se encimaba. Una barra es una caja:
+     * con HTML se dibuja exacta y el alto lo pone el contenido.
      */
     renderChartMejoramiento(abiertas, enProceso, cerradas, vencidas) {
         const estados = [
-            { label: 'Abiertas',    value: abiertas,   color: '#2057b8' },
-            { label: 'En proceso',  value: enProceso,  color: '#e7a224' },
-            { label: 'Cerradas',    value: cerradas,   color: '#1bb888' },
-            { label: 'Vencidas',    value: vencidas,   color: '#da5563' }
+            { label: 'Abiertas',    value: abiertas,   color: 'var(--kair-blue, #2057b8)' },
+            { label: 'En proceso',  value: enProceso,  color: 'var(--kair-amber, #e7a224)' },
+            { label: 'Cerradas',    value: cerradas,   color: 'var(--kair-mint, #1bb888)' },
+            { label: 'Vencidas',    value: vencidas,   color: 'var(--kair-red, #da5563)' }
         ];
 
         const total = estados.reduce((sum, e) => sum + e.value, 0);
         const maxVal = Math.max(...estados.map(e => e.value), 1);
 
-        const W = 400, H = 200;
-        const barH = 22;
-        const gap = 14;
-        const labelW = 100;
-        const valueW = 80;
-        const barAreaW = W - labelW - valueW - 20;
-        const startY = 16;
+        let html = '<div class="kair-bar-chart">';
+        estados.forEach(e => {
+            const value = e.value || 0;
+            const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+            const width = value > 0 ? Math.max(6, (value / maxVal) * 100) : 0;
+            const fillColor = value === 0 ? 'var(--kair-line, #e8ebee)' : e.color;
 
-        let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-
-        estados.forEach((e, i) => {
-            const y = startY + i * (barH + gap);
-            const barW = e.value > 0 ? Math.max(8, (e.value / maxVal) * barAreaW) : 0;
-            const fillColor = e.value === 0 ? '#e8ebee' : e.color;
-
-            // Label
-            svg += `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" fill="#14213d" font-size="12" font-weight="600">${e.label}</text>`;
-            // Bar background
-            svg += `<rect x="${labelW}" y="${y}" width="${barAreaW}" height="${barH}" fill="#f3f6f6" rx="6"/>`;
-            // Bar fill
-            if (barW > 0) {
-                svg += `<rect x="${labelW}" y="${y}" width="${barW}" height="${barH}" fill="${fillColor}" rx="6"/>`;
-            }
-            // Value label
-            const pct = total > 0 ? Math.round((e.value / total) * 100) : 0;
-            svg += `<text x="${labelW + barAreaW + 8}" y="${y + barH / 2 + 4}" fill="#748096" font-size="11">${e.value} (${pct}%)</text>`;
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + e.label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + width.toFixed(1) + '%;background:' + fillColor + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + value + ' <small>(' + pct + '%)</small></span>'
+                + '</div>';
         });
-
-        svg += '</svg>';
-        return svg;
+        html += '</div>';
+        return html;
     }
 
     /**

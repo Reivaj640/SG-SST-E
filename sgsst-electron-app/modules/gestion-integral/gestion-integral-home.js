@@ -258,7 +258,7 @@ class GestionIntegralHome {
             + '    <div class="kair-card-hint">Avance anual · actividades programadas vs ejecutadas</div>'
             + '  </div>'
             + '</div>'
-            + '<div class="kair-chart" id="kair-chart-plan"></div>';
+            + '<div class="kair-chart kair-chart--flow" id="kair-chart-plan"></div>';
         content.appendChild(chartCard);
 
         const radarCard = document.createElement('article');
@@ -370,36 +370,42 @@ class GestionIntegralHome {
     renderChartPlan(data) {
         var el = document.getElementById('kair-chart-plan');
         if (!el) return;
-        var porcentaje = data.porcentajeAvance || 0;
-        var total = data.totalActividades || 0;
-        var ejecutadas = data.actividadesEjecutadas || 0;
-        var pendientes = data.actividadesPendientes || 0;
-        var W = 690, H = 170;
-        var PAD_L = 30, PAD_R = 10, PAD_T = 14, PAD_B = 24;
-        // 📦754 · Línea simple de % acumulado + barra horizontal con progreso.
-        // Si en el futuro hay datos mensuales, se reemplaza por curva SVG.
-        var pctVal = Math.min(100, porcentaje);
-        var barX = PAD_L;
-        var barW = (W - PAD_L - PAD_R);
-        var barH = 22;
-        var barY = (H - PAD_B) / 2 - barH / 2;
-        var filledW = (barW * pctVal) / 100;
 
-        // Construir SVG con barra horizontal + leyenda + sub-texto
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block;">'
-            + '<line x1="' + PAD_L + '" y1="' + (H - PAD_B) + '" x2="' + (W - PAD_R) + '" y2="' + (H - PAD_B) + '" stroke="#e9ecef" stroke-width="1"/>'
-            + '<text x="' + PAD_L + '" y="' + (PAD_T + 14) + '" font-family="Manrope, sans-serif" font-size="12" fill="#637189">Progreso anual del Plan de Trabajo SST</text>'
-            + '<text x="' + (W - PAD_R) + '" y="' + (PAD_T + 14) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="20" font-weight="800" fill="#174ea6">' + porcentaje + '%</text>'
-            + '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="11" ry="11" fill="#eef0f1"/>'
-            + '<rect x="' + barX + '" y="' + barY + '" width="' + filledW + '" height="' + barH + '" rx="11" ry="11" fill="#174ea6"/>'
-            + '</svg>';
+        // 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro
+        // de una caja de alto fijo se estiraba sin conservar proporción: el texto se
+        // deformaba y se montaba sobre las otras etiquetas ("36%" encima de "ejecutadas").
+        // Una barra es una caja: con HTML se dibuja exacta, nunca deformada, y el alto
+        // lo pone el contenido (jamás se sale de la tarjeta).
+        var pct = Number(data.porcentajeAvance) || 0;
+        if (!isFinite(pct)) pct = 0;
+        var ejecutadas = Number(data.actividadesEjecutadas) || 0;
+        var pendientes = Number(data.actividadesPendientes) || 0;
+        var total = Number(data.totalActividades) || 0;
+        var pctClamped = Math.max(0, Math.min(100, pct));
+
+        function _n(v) { return String(Math.round(Number(v) || 0)); }
+        function _bar(label, pctVal, valueText) {
+            var w = Math.max(0, Math.min(100, Number(pctVal) || 0));
+            return '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + w.toFixed(1) + '%"></i></span>'
+                + '<span class="kair-bar-chart__value">' + valueText + '</span>'
+                + '</div>';
+        }
 
         el.innerHTML = ''
-            + svg
-            + '<div style="display:flex;justify-content:space-between;margin-top:10px;font:500 12px Manrope;color:#637189;">'
-            + '  <span><strong style="color:#212529;">' + ejecutadas + '</strong> ejecutadas</span>'
-            + '  <span><strong style="color:#212529;">' + pendientes + '</strong> pendientes</span>'
-            + '  <span><strong style="color:#212529;">' + total + '</strong> totales</span>'
+            + '<div class="kair-bar-chart">'
+            + '  <div class="kair-bar-chart__head">'
+            + '    <span class="kair-bar-chart__title">Progreso anual del Plan de Trabajo SST</span>'
+            + '    <span class="kair-bar-chart__big">' + _n(pct) + '%</span>'
+            + '  </div>'
+            + _bar('Avance ejecutado', pctClamped, _n(ejecutadas) + ' <small>/ ' + _n(total) + '</small>')
+            + _bar('Pendiente por ejecutar', 100 - pctClamped, _n(pendientes) + ' <small>actividades</small>')
+            + '  <div class="kair-bar-chart__foot">'
+            + '    <span><strong>' + _n(ejecutadas) + '</strong> ejecutadas</span>'
+            + '    <span><strong>' + _n(pendientes) + '</strong> pendientes</span>'
+            + '    <span><strong>' + _n(total) + '</strong> totales</span>'
+            + '  </div>'
             + '</div>';
     }
 

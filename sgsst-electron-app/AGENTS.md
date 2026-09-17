@@ -266,6 +266,52 @@ async renderMainArea(container) {
 - **Cache-bust obligatorio**: cada vez que se modifique `kair-design-tokens.css` o `kair-components.css`, bumpear `?v=YYYYMMDD-HHMM-descriptor` en `index.html`. **Lo mismo aplica a `styles.css`** y a cada `<script>` de módulo home. Bumpear `?v=YYYYMMDD-vN-rediseno` (o `-fix-*`) tras CADA cambio.
 - **NO agregar `margin: 0 auto` a headers que comparten container con cards** — esto centra el bloque y lo desalinea del resto. Usar `margin: 0 lateral` + `max-width` igual al container padre.
 - **Para scroll interno en flex chain**: TODOS los niveles intermedios necesitan `flex: 1` O `height: 100%` + `min-height: 0` para que `overflow: auto` funcione. Si una clase usada en JS no tiene reglas CSS, agregarlas (caso histórico: `.k-app-layout`).
+- **🚨 📦757 — EL GRÁFICO NO PUEDE SALIRSE DE SU TARJETA.** El área del gráfico
+  (`.kair-chart`) mide `clamp(130px, 13vw, 170px)` y su SVG se posiciona absoluto ocupando
+  toda la caja: `.kair-chart svg { width:100%; height:100%; position:absolute; inset:0 }`.
+  **Nunca** le pongas al SVG un `style="height:auto"` (ni `width`): el estilo EN LÍNEA le gana
+  al CSS, el SVG pasa a medir `ancho × (viewBoxH/viewBoxW)` — con un viewBox 690×170 eso es
+  ~25% del ancho, o sea MÁS que los 170px de la caja — y como nada lo recortaba, las líneas,
+  la barra y el texto se derramaban sobre el relleno y el borde inferior de la card. Bug real
+  reportado con captura en "Ejecución del Plan Anual" (home de Gestión Integral); lo mismo
+  estaba en Peligros y Salud. Reglas:
+  1. El SVG se genera **sin** `width`/`height` en línea (a lo sumo `style="display:block"`).
+  2. `.kair-chart` lleva `overflow: hidden` + `border-radius: 10px` como red de seguridad: si
+     un gráfico se pasa de alto, se recorta a su caja en vez de invadir la tarjeta.
+  3. Vale para CUALQUIER elemento dentro de un `.kair-chart` (paths, textos, tooltips): el que
+     se salga, se recorta.
+  4. Test: `node main/test-chart-overflow.js` (verifica que ningún módulo use alto/ancho en
+     línea en el SVG y que `.kair-chart` recorte).
+- **🚨 📦758 — UNA BARRA SE DIBUJA CON CAJAS HTML, NO CON UN DIBUJO ESTIRADO.** Después de
+  📦757 (el gráfico ya no se salía de la tarjeta) el user volvió con OTRA captura: en
+  "Ejecución del Plan Anual" se veía el `36 %` **encima** de la palabra "ejecutadas".
+  Causa: el dibujo usaba `<svg preserveAspectRatio="none">`, que significa "estirá el
+  dibujo para llenar la caja". Al cambiar el ancho de la tarjeta, TODO se deforma: el
+  texto se estira a lo ancho y se aplasta a lo alto, y las posiciones internas (medidas
+  en un lienzo de 690px) dejan de coincidir con el tamaño real de la caja → texto montado
+  sobre texto. **Regla:** las barras se dibujan con el componente HTML `.kair-bar-chart`
+  (filas `label | barra | valor` en una rejilla de 3 columnas, ancho de relleno real en %,
+  alto del contenido). Un `<svg>` dentro de `.kair-chart` solo se justifica para dibujos
+  de líneas (Recursos), y en ese caso: nada de `preserveAspectRatio="none"` y **nada de
+  texto adentro del dibujo** (los meses van como texto normal debajo, en
+  `.kair-bar-chart__months`).
+  - Cajas: `.kair-chart--flow` = `height: auto` + `min-height: clamp(130px,13vw,170px)`
+    (el alto lo pone el contenido, pero un dibujo de líneas conserva dónde dibujarse);
+    `.kair-chart--flow > svg` = `position: static` + alto propio `clamp(96px,9.5vw,130px)`.
+  - **Regla de la rejilla**: el valor mide lo que mide su texto (`max-content`) para que
+    todos los valores queden alineados al borde derecho; nunca `auto` (deja hueco y
+    desalinea las filas).
+  - Tests: `node main/test-chart-overflow.js` (20 checks, estructura) y
+    `node main/test-grafico-se-ve-bien.js` (39 checks, **ejecuta el código real** con un
+    DOM mínimo y verifica los porcentajes de cada barra, los textos y las reglas CSS).
+  - Medición real (temporal, ya borrada): se abrió el gráfico en Electron a 1500/1100/900px
+    y se midió caja por caja → `valorDerechaMenosChart = 0` en todas las filas, hueco
+    label↔barra y barra↔valor siempre igual (8.8-12px), tarjeta de gráfico y tarjeta de
+    radar con el MISMO alto (270px a 1500, 228px a 1100).
+- **📦756/📦757/📦758 — Cache-bust de los homes de módulo**: los `*-home.js` se cargan con
+  `<script src="modules/.../x-home.js?v=...">` en `index.html`. **Cada vez que se toca un home hay
+  que bumpear SU `?v=`** (📦756 lo omitió para 4 homes: recursos, amenazas, verificación y
+  mejoramiento; se corrigió en 📦757). No alcanza con bumpear `styles.css`.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
@@ -779,6 +825,8 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 | `test-bandeja-paginacion.js` | 48 | Paginación (📦755): esquema, sync `append`, scroll infinito, botón "Cargar más", fixes del cupo |
 | `test-bandeja-paginacion-funcional.js` | 22 | **FUNCIONAL** (📦755): páginas sin solaparse, contador, `page_token` y ventana de fechas — contra SQLite real |
 | `test-skeleton-encaje.js` | 26 | Encaje del esqueleto (📦756): compara radio/borde/padding/gap/alto del esqueleto contra las tarjetas reales, en los 7 homes y en el submódulo Mantenimiento |
+| `test-chart-overflow.js` | 20 | El gráfico no se sale de su tarjeta ni deforma su texto (📦757+📦758): sin alto/ancho en línea, sin `preserveAspectRatio="none"`, sin texto dentro del dibujo, los 7 homes usan `.kair-bar-chart` + `.kair-chart--flow`, y cache-bust |
+| `test-grafico-se-ve-bien.js` | 39 | Los gráficos se ven bien (📦758): **EJECUTA el código real** de los 7 homes con un DOM mínimo y verifica el HTML producido (porcentajes de cada barra, textos, filas) + las reglas CSS que impiden que se pisen |
 
 **Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.
 

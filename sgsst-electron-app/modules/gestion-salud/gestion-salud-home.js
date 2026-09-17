@@ -945,41 +945,33 @@ Trabajadores con inducción al día
     renderChartSalud(indicadores) {
         var el = document.getElementById('kair-chart-salud');
         if (!el) return;
-        var frecuencia = indicadores.frecuencia || 0;
-        var severidad = indicadores.severidad || 0;
-        var prevalencia = indicadores.prevalencia || 0;
-        var incidencia = indicadores.incidencia || 0;
 
+        // 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro de
+        // una caja de alto fijo se estiraba sin conservar proporción y el texto se deformaba
+        // y se montaba. Una barra es una caja: con HTML se dibuja exacta y nunca se sale.
         var items = [
-            { label: 'Frecuencia', value: frecuencia, color: '#174ea6' },
-            { label: 'Severidad', value: severidad, color: '#178666' },
-            { label: 'Prevalencia', value: prevalencia, color: '#c28316' },
-            { label: 'Incidencia', value: incidencia, color: '#a83a48' }
+            { label: 'Frecuencia', value: Number(indicadores.frecuencia) || 0, color: 'var(--kair-blue, #2057b8)' },
+            { label: 'Severidad', value: Number(indicadores.severidad) || 0, color: 'var(--kair-mint, #1bb888)' },
+            { label: 'Prevalencia', value: Number(indicadores.prevalencia) || 0, color: 'var(--kair-amber, #e7a224)' },
+            { label: 'Incidencia', value: Number(indicadores.incidencia) || 0, color: 'var(--kair-red, #da5563)' }
         ];
 
-        var rowH = 28;
-        var gapY = 6;
-        var PAD_L = 110, PAD_R = 20, PAD_T = 14, PAD_B = 14;
-        var H = PAD_T + PAD_B + items.length * (rowH + gapY);
-        var W = 690;
-        var maxVal = Math.max.apply(null, items.map(function (i) { return i.value; }).concat([1]));
-        var barX = PAD_L;
-        var barW = W - PAD_L - PAD_R;
+        var maxVal = 1;
+        for (var k = 0; k < items.length; k++) { if (items[k].value > maxVal) maxVal = items[k].value; }
 
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block;">';
+        var html = '<div class="kair-bar-chart">';
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
-            var y = PAD_T + i * (rowH + gapY);
-            var barY = y;
-            var filledW = Math.max(2, (barW * item.value) / maxVal);
-            svg += '<text x="' + (PAD_L - 10) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="11" fill="#637189">' + item.label + '</text>';
-            svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + rowH + '" rx="6" ry="6" fill="#eef0f1"/>';
-            svg += '<rect x="' + barX + '" y="' + barY + '" width="' + filledW + '" height="' + rowH + '" rx="6" ry="6" fill="' + item.color + '"/>';
-            svg += '<text x="' + (W - PAD_R) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="12" font-weight="700" fill="#212529">' + item.value.toFixed(2) + '</text>';
+            var w = Math.max(0, Math.min(100, (item.value / maxVal) * 100));
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + item.label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + w.toFixed(1) + '%;background:' + item.color + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + item.value.toFixed(2) + '</span>'
+                + '</div>';
         }
-        svg += '</svg>';
+        html += '</div>';
 
-        el.innerHTML = svg;
+        el.innerHTML = html;
     }
 
     renderSubmodulesGrid() {
@@ -1104,7 +1096,7 @@ Trabajadores con inducción al día
             + '    <div class="kair-card-hint">Frecuencia · Severidad · Prevalencia · Incidencia</div>'
             + '  </div>'
             + '</div>'
-            + '<div class="kair-chart" id="kair-chart-salud"></div>';
+            + '<div class="kair-chart kair-chart--flow" id="kair-chart-salud"></div>';
         content.appendChild(chartCard);
 
         const radarCard = document.createElement('article');

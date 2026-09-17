@@ -179,7 +179,7 @@ class GestionAmenazasHome {
                     <div class="kair-card-hint">Distribución de documentos cargados</div>
                 </div>
             </div>
-            <div class="kair-chart">${this.renderChartAmenazas(cached)}</div>
+            <div class="kair-chart kair-chart--flow">${this.renderChartAmenazas(cached)}</div>
         `;
         content.appendChild(chartCard);
 
@@ -399,11 +399,14 @@ class GestionAmenazasHome {
     }
 
     /**
-     * Renderiza un chart SVG nativo con barras horizontales por submódulo.
+     * Renderiza el gráfico de cobertura documental con BARRAS HTML (no SVG).
+     * 📦758 · Antes se dibujaba con `<svg viewBox="0 0 400 160">`: al estirarse al ancho
+     * real de la tarjeta, el texto se aplastaba y se encimaba. Una barra es una caja:
+     * con HTML se dibuja exacta y el alto lo pone el contenido.
      */
     renderChartAmenazas(cached) {
         if (this.submodules.length === 0) {
-            return '<svg viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg"><text x="200" y="80" text-anchor="middle" fill="#748096" font-size="13">Sin submódulos</text></svg>';
+            return '<div class="kair-bar-chart__row"><span class="kair-bar-chart__label" style="grid-column:1/-1;text-align:center">Sin submódulos</span></div>';
         }
 
         const labels = this.submodules.map(sub => {
@@ -418,36 +421,21 @@ class GestionAmenazasHome {
         });
         const maxCount = Math.max(...counts, 1);
 
-        const W = 400, H = 160;
-        const barH = 24;
-        const gap = 12;
-        const labelW = 90;
-        const valueW = 90;
-        const barAreaW = W - labelW - valueW - 20;
-        const startY = 16;
-
-        let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-
+        let html = '<div class="kair-bar-chart">';
         labels.forEach((label, i) => {
-            const y = startY + i * (barH + gap);
-            const barW = counts[i] > 0 ? Math.max(8, (counts[i] / maxCount) * barAreaW) : 0;
-            const fillPct = (counts[i] / maxCount) * 100;
-            const color = counts[i] === 0 ? '#e8ebee' : fillPct > 70 ? '#1bb888' : fillPct > 30 ? '#2057b8' : '#e7a224';
+            const count = counts[i] || 0;
+            const fillPct = (count / maxCount) * 100;
+            const width = count > 0 ? Math.max(6, fillPct) : 0;
+            const color = count === 0 ? 'var(--kair-line, #e8ebee)' : fillPct > 70 ? 'var(--kair-mint, #1bb888)' : fillPct > 30 ? 'var(--kair-blue, #2057b8)' : 'var(--kair-amber, #e7a224)';
 
-            // Label
-            svg += `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" fill="#14213d" font-size="12" font-weight="600">${label}</text>`;
-            // Bar background
-            svg += `<rect x="${labelW}" y="${y}" width="${barAreaW}" height="${barH}" fill="#f3f6f6" rx="6"/>`;
-            // Bar fill
-            if (barW > 0) {
-                svg += `<rect x="${labelW}" y="${y}" width="${barW}" height="${barH}" fill="${color}" rx="6"/>`;
-            }
-            // Value label
-            svg += `<text x="${labelW + barAreaW + 8}" y="${y + barH / 2 + 4}" fill="#748096" font-size="11">${counts[i]} archivo${counts[i] !== 1 ? 's' : ''}</text>`;
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + width.toFixed(1) + '%;background:' + color + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + count + ' <small>archivo' + (count !== 1 ? 's' : '') + '</small></span>'
+                + '</div>';
         });
-
-        svg += '</svg>';
-        return svg;
+        html += '</div>';
+        return html;
     }
 
     /**

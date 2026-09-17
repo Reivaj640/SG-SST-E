@@ -90,9 +90,54 @@ h1, h2, h3, h4 { font-family: var(--kair-font-display); letter-spacing: -0.5px; 
 @media (max-width: 880px) { .kair-content { grid-template-columns: 1fr; } }
 
 /* ------- Chart SVG -------
-   Altura reducida para que el card quepa sin scroll en viewport 800-900px. */
-.kair-chart { height: clamp(130px, 13vw, 170px); position: relative; border-bottom: 1px solid var(--kair-line-soft); background: repeating-linear-gradient(0deg, transparent 0 43px, #f0f2f3 44px), repeating-linear-gradient(90deg, transparent 0 75px, #f6f7f7 76px); }
-.kair-chart svg { width: 100%; height: 100%; position: absolute; inset: 0; }
+   Altura reducida para que el card quepa sin scroll en viewport 800-900px.
+   📦757 — `overflow: hidden` + radio: red de seguridad para que NADA de lo que se
+   dibuje dentro del área del gráfico se salga de la tarjeta. El SVG va con
+   `position:absolute; inset:0`, así que si un gráfico se pasa de alto (por ejemplo
+   por un `height:auto` puesto en línea), ANTES se derramaba sobre el relleno y el
+   borde inferior de la card (líneas y barras "fuera del cuadro"). */
+.kair-chart { height: clamp(130px, 13vw, 170px); position: relative; border-bottom: 1px solid var(--kair-line-soft); border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(0deg, transparent 0 43px, #f0f2f3 44px), repeating-linear-gradient(90deg, transparent 0 75px, #f6f7f7 76px); }
+.kair-chart svg { width: 100%; height: 100%; position: absolute; inset: 0; display: block; }
+
+/* ------- Bar chart HTML (sin SVG) — 📦758 -------
+   POR QUÉ EXISTE: los gráficos de barras se dibujaban con `<svg>` +
+   `preserveAspectRatio="none"` (estirar sin conservar proporción) dentro de una caja
+   que mide 130-170px de alto y cambia de ancho. Resultado: el texto, las barras y las
+   líneas se deformaban y se montaban unos sobre otros ("36%" encima de "ejecutadas").
+   La barra es una CAJA, no una forma libre: con HTML se dibuja exacta, sin deformar
+   nada, y el alto lo pone el contenido (nunca se sale de la tarjeta).
+   Se usa con `.kair-chart` (que sigue siendo el marco + la cuadrícula de fondo). */
+/* El alto lo pone el contenido (para que las barras HTML nunca se aplasten), pero se
+   conserva el alto mínimo real de la caja para que un dibujo de líneas (que se ubica
+   dentro ocupando toda la caja) siga teniendo dónde dibujarse. */
+.kair-chart--flow { height: auto; min-height: clamp(130px, 13vw, 170px); display: flex; flex-direction: column; justify-content: center; border-bottom: none; }
+/* Un dibujo de líneas ocupa el espacio que dejan los textos de abajo (los meses).
+   OJO: es el ÚNICO lugar donde un SVG dentro de un `.kair-chart` lleva alto propio;
+   acá NO hay estirado (`preserveAspectRatio="none"`), así que el dibujo conserva su
+   proporción. Los gráficos de barras ya no usan dibujo, usan cajas HTML. */
+.kair-chart--flow > svg { position: static; inset: auto; display: block; width: 100%; height: clamp(96px, 9.5vw, 130px); }
+
+.kair-bar-chart { display: flex; flex-direction: column; gap: clamp(7px, 0.85vw, 11px); padding: clamp(2px, 0.4vw, 6px) 0; font-family: var(--kair-font-ui); }
+.kair-bar-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.kair-bar-chart__title { font-size: clamp(11px, 1vw, 13px); font-weight: 600; color: var(--kair-muted); min-width: 0; }
+.kair-bar-chart__big { font: 800 clamp(18px, 1.9vw, 24px) / 1 var(--kair-font-display); letter-spacing: -0.04em; color: var(--kair-blue-ink); white-space: nowrap; }
+
+/* Cada fila: etiqueta | barra | valor. Las 3 columnas son cajas separadas, así que
+   NUNCA se pisan. El valor mide lo que mide su texto (`max-content`) y se pega al borde
+   derecho, para que todos los valores queden alineados entre sí. */
+.kair-bar-chart__row { display: grid; grid-template-columns: minmax(64px, 0.85fr) minmax(64px, 2.4fr) max-content; align-items: center; gap: clamp(7px, 0.8vw, 12px); }
+.kair-bar-chart__label { font-size: clamp(10px, 0.92vw, 12px); color: var(--kair-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kair-bar-chart__track { height: clamp(16px, 1.7vw, 22px); border-radius: var(--kair-radius-pill); background: var(--kair-line-soft); overflow: hidden; }
+.kair-bar-chart__fill { height: 100%; display: block; border-radius: var(--kair-radius-pill); background: var(--kair-blue); transition: width var(--kair-transition); }
+.kair-bar-chart__value { font-size: clamp(10px, 0.95vw, 12px); font-weight: 700; color: var(--kair-ink); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.kair-bar-chart__value small { font-weight: 500; color: var(--kair-faint); }
+
+.kair-bar-chart__foot { display: flex; justify-content: space-between; gap: clamp(8px, 1vw, 16px); padding-top: clamp(6px, 0.7vw, 10px); border-top: 1px solid var(--kair-line-soft); font-size: clamp(10px, 0.95vw, 12px); color: var(--kair-muted); }
+.kair-bar-chart__foot strong { color: var(--kair-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Nombres de los meses debajo de un gráfico de líneas: texto normal repartido, sin
+   dibujarlo dentro del gráfico (ahí se estiraba y se encimaba). */
+.kair-bar-chart__months { border-top: none; padding-top: clamp(5px, 0.6vw, 9px); font-size: clamp(9px, 0.85vw, 11px); color: var(--kair-faint); }
+.kair-bar-chart__months span { flex: 1; text-align: center; }
 
 /* ------- Legend (debajo del chart) ------- */
 .kair-legend { display: flex; gap: clamp(12px, 1.5vw, 20px); font-size: clamp(10px, 0.9vw, 11px); color: var(--kair-muted); padding-top: clamp(10px, 1.1vw, 15px); flex-wrap: wrap; }

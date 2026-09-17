@@ -647,7 +647,7 @@ margin-bottom: 0.5rem;
             + '    <div class="kair-card-hint">Acumulado anual · presupuesto vs. ejecución real</div>'
             + '  </div>'
             + '</div>'
-            + '<div class="kair-chart" id="kair-chart-presupuesto"></div>'
+            + '<div class="kair-chart kair-chart--flow" id="kair-chart-presupuesto"></div>'
             + '<div class="kair-legend">'
             + '  <span><i class="kair-dot"></i>Ejecutado real</span>'
             + '  <span><i class="kair-dot" style="background:#d4dae3"></i>Planeado</span>'
@@ -782,12 +782,11 @@ margin-bottom: 0.5rem;
         }
         var planeadoPath = pathFor(data.planeado);
         var ejecutadoPath = pathFor(data.ejecutado);
-        var labelSvg = '';
-        for (var i = 0; i < labels.length; i++) {
-            labelSvg += '<text x="' + xi(i).toFixed(2) + '" y="' + (H - 4) + '" text-anchor="middle">' + labels[i] + '</text>';
-        }
+        // 📦758 · Los nombres de los meses NO se dibujan dentro del gráfico: el gráfico se
+        // estira a lo ancho de la tarjeta, y un texto que se estira queda deformado y
+        // encimado. Ahora van como texto normal (HTML), repartidos debajo del dibujo.
         el.innerHTML = ''
-            + '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
+            + '<svg viewBox="0 0 ' + W + ' ' + H + '">'
             + '  <defs>'
             + '    <linearGradient id="kair-grad" x1="0" x2="0" y1="0" y2="1">'
             + '      <stop offset="0" stop-color="#2057b8" stop-opacity=".18"/>'
@@ -797,8 +796,10 @@ margin-bottom: 0.5rem;
             + '  <path d="' + planeadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="none" stroke="#d4dae3" stroke-width="3" stroke-dasharray="5 7"/>'
             + '  <path d="' + ejecutadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="url(#kair-grad)"/>'
             + '  <path d="' + ejecutadoPath + '" fill="none" stroke="#2057b8" stroke-width="3.5"/>'
-            + '  <g font-family="DM Sans" font-size="10" fill="#aab1bd">' + labelSvg + '</g>'
-            + '</svg>';
+            + '</svg>'
+            + '<div class="kair-bar-chart__foot kair-bar-chart__months">'
+            + labels.map(function (m) { return '<span>' + m + '</span>'; }).join('')
+            + '</div>';
     }
 
     renderSubmodulesGrid() {
