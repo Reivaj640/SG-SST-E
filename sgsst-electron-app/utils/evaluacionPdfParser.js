@@ -15,20 +15,35 @@ class EvaluacionPdfParser {
     }
 
     /**
+     * Normaliza texto para comparaciones: sin acentos, en mayúsculas.
+     * Los PDFs reales mezclan "Resolución 312" / "RESOLUCIÓN 0312" / "estándares"
+     * / "ESTANDARES" y la comparación cruda (con tilde y mayúsculas exactas)
+     * rechazaba archivos válidos.
+     */
+    normalizar(texto) {
+        return String(texto || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+    }
+
+    /**
      * Valida el formato del PDF según el tipo de fuente
      * @param {string} text - Texto extraído del PDF
      * @param {string} sourceType - Tipo de fuente ('ministerio' o 'arl')
      * @returns {Object} Resultado de la validación
      */
     validatePdfFormat(text, sourceType) {
+        const t = this.normalizar(text);
         if (sourceType === 'ministerio') {
             // Validar formato del Ministerio
-            const hasHeader = text.includes('Número Radicado:') || 
-                             text.includes('Nombre de la Empresa :');
-            const hasTable = text.includes('ESTÁNDARES MÍNIMOS SGSST') ||
-                           text.includes('TABLA DE VALORES Y CALIFICACIÓN');
+            const hasHeader = t.includes('NUMERO RADICADO:') ||
+                             t.includes('NOMBRE DE LA EMPRESA:') ||
+                             t.includes('NOMBRE DE LA EMPRESA :');
+            const hasTable = t.includes('ESTANDARES MINIMOS SGSST') ||
+                           t.includes('TABLA DE VALORES Y CALIFICACION');
             const hasItems = /\d+\.\d+\.\d+/.test(text); // Busca patrones como 1.1.1
-            
+
             if (!hasHeader) {
                 return { isValid: false, reason: 'No se encontró el encabezado del Ministerio' };
             }
@@ -38,15 +53,17 @@ class EvaluacionPdfParser {
             if (!hasItems) {
                 return { isValid: false, reason: 'No se encontraron ítems de evaluación' };
             }
-            
+
             return { isValid: true };
         } else if (sourceType === 'arl') {
-            // Validar formato de ARL
-            const hasHeader = text.includes('INFORME DE ESTANDARES MÍNIMOS') ||
-                             text.includes('Resolución 312');
-            const hasTable = text.includes('TABLA DE VALORES Y CALIFICACIÓN');
+            // Validar formato de ARL: el encabezado puede venir como
+            // "INFORME DE ESTÁNDARES MÍNIMOS" o como "Resolución 0312/312 de ..."
+            const hasHeader = t.includes('INFORME DE ESTANDARES MINIMOS') ||
+                             /RESOLUCION\s*0?312/.test(t);
+            const hasTable = t.includes('TABLA DE VALORES Y CALIFICACION') ||
+                            t.includes('TABLA DE VALORES Y CALIFICACIONES');
             const hasItems = /\d+\.\d+\.\d+/.test(text);
-            
+
             if (!hasHeader) {
                 return { isValid: false, reason: 'No se encontró el encabezado del informe ARL' };
             }
@@ -56,10 +73,10 @@ class EvaluacionPdfParser {
             if (!hasItems) {
                 return { isValid: false, reason: 'No se encontraron ítems de evaluación' };
             }
-            
+
             return { isValid: true };
         }
-        
+
         return { isValid: false, reason: 'Tipo de fuente no reconocido' };
     }
 
@@ -477,9 +494,17 @@ class EvaluacionPdfParser {
             const formatValidation = this.validatePdfFormat(result.text, sourceType);
             if (!formatValidation.isValid) {
                 console.warn(`[EvaluacionPdfParser] Formato de PDF no reconocido: ${formatValidation.reason}`);
+                // Mensaje específico cuando el archivo es una certificación de la ARL
+                // (lo certifica Colmena/SURA/etc.): no es un error del archivo, es que
+                // el usuario eligió un documento que no es el informe de evaluación.
+                let mensaje = `Formato de PDF no reconocido: ${formatValidation.reason}`;
+                if (this.normalizar(result.text).includes('CERTIFICA QUE LA EMPRESA')) {
+                    mensaje = 'Este archivo es una certificación de la ARL, no el informe de estándares mínimos. ' +
+                              'Carga el archivo "Informe Res 0312 ..." de la misma carpeta.';
+                }
                 return {
                     success: false,
-                    error: `Formato de PDF no reconocido: ${formatValidation.reason}`,
+                    error: mensaje,
                     year: new Date().getFullYear().toString(),
                     source: sourceType,
                     fileName: this.extractFileName(pdfPath),

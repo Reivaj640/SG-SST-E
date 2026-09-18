@@ -398,7 +398,19 @@
 
 /* ══════════ AVISOS ══════════ */
 .ev-scope .toasts,
-.ev-scope.toasts { position: fixed; right: 20px; bottom: 20px; z-index: 90; display: flex; flex-direction: column; gap: 10px; max-width: min(380px, calc(100vw - 40px)); }
+.ev-scope.toasts {
+  position: fixed; right: 20px; bottom: 20px; z-index: 90;
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: min(380px, calc(100vw - 40px));
+  /* ⚠️ El nodo lleva la clase genérica `.ev-scope`, que le pondría fondo blanco,
+     alto 100% y relleno propios del módulo. Sin estas anulaciones quedaba una
+     franja blanca fija de ~380px de ancho por TODA la altura de la ventana,
+     tapando la interfaz de la app a la derecha (bug real visto en capturas). */
+  background: none;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+}
 .ev-scope .toast,
 .ev-scope.toast { display: flex; align-items: flex-start; gap: 10px; background: var(--kair-surface); border: 1px solid var(--kair-border); border-left: 3px solid var(--kair-slate); border-radius: var(--kair-r-sm); box-shadow: var(--kair-sh-md); padding: 12px 14px; font-size: 13.5px; font-weight: 600; animation: tin 200ms cubic-bezier(.22, .8, .36, 1); }
 .ev-scope .toast svg { width: 17px; height: 17px; flex: none; margin-top: 1px; }
