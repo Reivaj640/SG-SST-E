@@ -447,6 +447,8 @@ class EvaluacionPdfParser {
      */
     async parsePdf(pdfPath, sourceType) {
         try {
+            // Normalizar alias: algunos llamadores envían 'min' en vez de 'ministerio'
+            if (sourceType === 'min') sourceType = 'ministerio';
             console.log(`[EvaluacionPdfParser] Procesando PDF: ${pdfPath}`);
             
             // Verificar que el archivo existe

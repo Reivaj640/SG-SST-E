@@ -408,6 +408,110 @@ async renderMainArea(container) {
     en 0 — hay que usar `win.showInactive()`; y el puente tiene que estar inyectado **antes**
     del script de la vista, o el primer `leer-todos` se pierde.
   - Test: `node main/test-archivo-retencion-premium.js` (50 checks).
+- **📦761 — Evaluación Inicial del SG-SST: se adoptó el prototipo premium v2 completo y se
+  recableó al backend (segunda pasada sobre el mismo módulo).** Después de 📦759 (que había
+  modernizado el módulo conservando su estructura) el usuario trajo un prototipo que **sí
+  rediseñaba** la pantalla: barra superior con icono, pestañas con **chip del PDF activo**, 3
+  tarjetas de indicadores (las de críticos y planes **clicables**, que llevan a su pestaña),
+  **medidor de cumplimiento en SVG** (antes era un `<canvas>`), bloque PHVA con estado vacío,
+  tarjeta de archivo fuente, selector de PDF de **dos paneles** con migas, y los modales de
+  detalle / formulario / confirmación / **seguimiento** / **responsables**.
+  - **Archivos**: `index.html` (solo marcado) + `evaluacion-inicial-view.css` (todo bajo
+    `.ev-scope`) + `evaluacion-inicial-view.js`. El componente se exporta como
+    `window.EvaluacionInicialView` y mantiene el alias viejo `EvaluacionInicialSgSst`.
+  - **Contratos reales que usa** (el prototipo proponía otros que NO existen:
+    `listarFuentesEvaluacion`, `cargarEvaluacionPDF`, `createPlan`…): `findSubmodulePath` +
+    `readDirectory` para listar los PDF de `Diagnostico Ministerio` / `Diagnostico ARL`,
+    `processEvaluacionPdf(pdfPath, sourceType)`, `evaluacionActionPlans.listar/guardar/eliminar`
+    y `openPath` para ver el documento. **Volver** usa el callback que pasa `renderer.js`.
+  - **Adaptador**: el parser devuelve `findings` con `{code, desc, max, grade, status}` y la
+    vista trabaja con `{c, d, max, obt, estado}`; los planes viven en la base y se arman campo
+    por campo (`planDesdeBackend` / `planHaciaBackend`). Los estados se traducen incluyendo
+    **`parcial`** (el prototipo solo conocía cumple / no cumple).
+  - **Lo que el prototipo dejaba como aviso y ahora funciona de verdad**: agregar
+    **seguimientos** y gestionar **responsables** (antes mostraba "disponible al integrar").
+  - **Modo oscuro completo** con los DOS atributos (`dark` y `dark-legacy`). El prototipo no
+    traía ninguno.
+  - 🚨 **Lección de EOL de este repo (me pasó dos veces):** `renderer.js` tiene saltos de línea
+    **mezclados** por diseño (mezcla de CRLF y LF). El `edit` y `write` los normalizan y el
+    diff pasa a mostrar 7.000 líneas cambiadas. Para tocar ese archivo: `git checkout --` para
+    restaurarlo y después aplicar el cambio con reemplazos de texto que **no** toquen los
+    finales de línea, verificando que el conteo de CRLF/LF quede igual. `git diff --numstat`
+    tiene que dar pocas líneas.
+  - **Herramienta**: `main/_preview-evaluacion-v2.js` (en `.gitignore`) monta la vista real con
+    un backend simulado que responde con la forma EXACTA del parser, y ejercita todo el flujo
+    (cargar PDF, tabs, búsqueda, planes, seguimiento, responsables, eliminar, volver) sacando
+    capturas en claro y oscuro.
+  - Tests: `node main/test-evaluacion-inicial-v2.js` (64 checks, nuevo). El test de 📦759
+    (`test-evaluacion-inicial-premium.js`) se conservó reducido a lo que sigue vigente
+    (modo oscuro y que no vuelva el CSS global), 43 checks.
+  - 🚨 **EL ERROR QUE HAY QUE NO REPETIR AL ADOPTAR UN PROTOTIPO (bug real del 📦761):**
+    el prototipo del módulo venía como un **documento HTML completo** con su marcado en
+    el `<body>`. Se dejó el marcado en el `index.html` del módulo y el componente solo
+    hacía `document.getElementById('ev-root')` — **y el submódulo quedaba en blanco** con
+    `[K+AIREVAL][MODULO][INIT][ERR] no se encontró el marcado del módulo`.
+    Por qué: este componente **no se monta por iframe** (a diferencia de Archivo y
+    Retención). `renderer.js` hace `new Componente(contenedor, ...)` y llama `render()`
+    con un contenedor del **documento principal**; el `index.html` del módulo **nunca se
+    carga**. Conclusión: **el componente tiene que inyectar su propio marcado** en
+    `render()` (`marcadoVista()` devuelve el HTML embebido y se hace
+    `contenedor.innerHTML`). El `index.html` queda solo como envoltorio para abrir la
+    vista suelta en desarrollo.
+    **Regla general, antes de adoptar cualquier prototipo:** averiguar CÓMO se monta el
+    submódulo (`iframe` vs `new Componente(contenedor)`) y de dónde sale su marcado. Si
+    es `new Componente(...)`, el HTML del prototipo se embebe en el `.js`; si es iframe,
+    el HTML se queda como archivo y el wrapper versiona la URL.
+  - **Los modales se mueven al `<body>` y los estilos tienen que contemplarlo.** Como los
+    modales son `position: fixed`, adentro de un contenedor con `flex`/`transform` `fixed`
+    se comporta como `absolute` y no cubre la ventana. Se mueven al `<body>` con la clase
+    `ev-scope` puesta, así que las reglas de modales se escriben **de las dos formas**
+    (`.ev-scope .overlay, .ev-scope.overlay { … }`). Los tokens se movieron a `:root`
+    justamente para que esos nodos no se queden sin colores. Y `destroy()` los saca del
+    `<body>` para no dejarlos colgados.
+  - **Truco de verificación de geometría** (más confiable que la captura): medir el
+    `getBoundingClientRect()` del modal y del velo contra `window.innerWidth/Height`.
+    En este módulo dio `overlay: [0,0,1440,980]` con ventana `1440×980` → encaja perfecto.
+    Ojo: `capturePage()` puede devolver una imagen mal compuesta (en esta sesión pintó un
+    rectángulo blanco de exactamente 720×490, o sea **la mitad** de la ventana) — cuando
+    la medida dice que encaja y la captura no, **gana la medida**.
+  - 🚨🚨 **LA APP CARGA BOOTSTRAP 5.3 DESDE INTERNET Y SUS CLASES CHOCAN CON LAS NUESTRAS
+    (bug real del 📦761, el más caro de la sesión).** El módulo se veía perfecto en el
+    entorno de pruebas pero en la app el modal quedaba **pegado arriba a la izquierda y
+    estirado a todo el alto** (medido: 420 × 617 en vez de 420 × 285) y el velo oscuro no
+    cubría la pantalla. Causa: `index.html` carga
+    `https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css`, y Bootstrap
+    define `.modal { position: fixed; top:0; left:0; width:100%; height:100%; overflow:auto;
+    z-index:1055 }` (más `.modal-dialog`, `.modal-content`, `.modal-open`…).
+    **Cómo diagnosticarlo (receta que sirvió):** enumerar el CSSOM y ver qué reglas matchean
+    el nodo:
+    ```js
+    for (const ss of document.styleSheets) {
+      let reglas; try { reglas = ss.cssRules } catch { continue }
+      for (const r of reglas) {
+        if (!r.selectorText || !r.style) continue;
+        if (r.style.getPropertyValue('position') && el.matches(r.selectorText))
+          console.log(ss.href, r.selectorText, r.style.getPropertyValue('position'));
+      }
+    }
+    ```
+    Eso devolvió `bootstrap.min.css :: .modal { position: fixed }` y cerró el caso.
+    **Tres reglas para que no vuelva a pasar:**
+    1. **Antes de adoptar un diseño, revisar si sus clases ya existen en Bootstrap.**
+       Las que usa este módulo y Bootstrap también define: `modal`, `card`, `row`, `btn`,
+       `text-*`, `d-*`, `search`, `badge`, `toast`, `container`. Bootstrap gana en las
+       propiedades que NO declaramos (su `.modal` obligaba a `position`, `width`, `height`,
+       `top`, `left`). Hay que **neutralizarlas explícitamente** y no confiar en que "nuestra
+       clase pesa más".
+    2. **Bootstrap tiene que cargarse ANTES que las hojas propias de la app.** Estaba al
+       final de la lista de `<link>`, así que le ganaba a todo lo que no declarara la
+       propiedad. Se movió al principio de `index.html` (una librería externa va debajo).
+       Verificado: **ninguna hoja propia de la app define `.modal`** (0 reglas en `styles.css`,
+       `development-styles.css` y las de `shared/`), así que moverlo no cambia nada más.
+    3. **El test aislado NO alcanza.** Hay que probar con las hojas de la app cargadas, o al
+       menos con Bootstrap. Nuevo test: `test-evaluacion-inicial-bootstrap.js` (22 checks)
+       monta el módulo con Bootstrap cargado y **mide la geometría** del modal (posición,
+       alto, centrado, y que las tarjetas no hereden el fondo de Bootstrap). Usa una copia
+       local `main/_bootstrap-5.3.0.min.css` para no depender de la conexión.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
@@ -923,7 +1027,9 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 | `test-skeleton-encaje.js` | 26 | Encaje del esqueleto (📦756): compara radio/borde/padding/gap/alto del esqueleto contra las tarjetas reales, en los 7 homes y en el submódulo Mantenimiento |
 | `test-chart-overflow.js` | 20 | El gráfico no se sale de su tarjeta ni deforma su texto (📦757+📦758): sin alto/ancho en línea, sin `preserveAspectRatio="none"`, sin texto dentro del dibujo, los 7 homes usan `.kair-bar-chart` + `.kair-chart--flow`, y cache-bust |
 | `test-grafico-se-ve-bien.js` | 39 | Los gráficos se ven bien (📦758): **EJECUTA el código real** de los 7 homes con un DOM mínimo y verifica el HTML producido (porcentajes de cada barra, textos, filas) + las reglas CSS que impiden que se pisen |
-| `test-evaluacion-inicial-premium.js` | 45 | Evaluación Inicial del SG-SST en premium (📦759): que NO vuelva el CSS global inyectado desde el `.js`, que la capa premium cubra los 3 puntos de montaje (módulo + `#k-modal-root` + los 4 `<dialog>`), que el gauge lea sus colores de la paleta, que no queden colores en línea, que el modo oscuro cubra `dark` Y `dark-legacy`, y cache-bust |
+| `test-evaluacion-inicial-premium.js` | 43 | Evaluación Inicial del SG-SST — ronda anterior (📦759): conserva las verificaciones de que el modo oscuro cubra `dark` Y `dark-legacy` y de que NO vuelva el CSS global inyectado desde el `.js`. Lo específico del rediseño v2 lo cubre el test de abajo |
+| `test-evaluacion-inicial-v2.js` | 64 | Evaluación Inicial del SG-SST v2 (📦761): **EJECUTA la vista real** con un backend simulado y verifica la estructura del diseño nuevo (barra superior, pestañas, 3 indicadores clicables, medidor SVG, PHVA, los 5 modales), el adaptador `findings → estándares`, que los planes se guarden y se borren contra la base, el modo oscuro en los DOS atributos y el contrato con `renderer.js` |
+| `test-evaluacion-inicial-bootstrap.js` | 22 | **Necesita ventana: `npx electron main/test-evaluacion-inicial-bootstrap.js`.** Choque con Bootstrap (📦761): monta el módulo con `bootstrap.min.css` cargado y **mide la geometría** del modal contra la ventana (que no quede `position: fixed`, que no se estire a todo el alto, que quede centrado y con su ancho de 420px) y que las tarjetas no hereden el fondo de la librería. Usa la copia local `main/_bootstrap-5.3.0.min.css` para no depender de la conexión |
 | `test-archivo-retencion-premium.js` | 50 | Archivo y Retención en premium (📦760): **EJECUTA la vista real** y verifica el adaptador de campos contra la forma exacta del backend (que el Tipo salga de los 4 booleanos, que la hoja se lea de `hojaOrigen`, y que el payload mande `disposicion` y no `disposicionFinal`), la estructura nueva, la edición en línea, el guardado masivo, los `type` del puente y el modo oscuro en todos los bloques |
 
 **Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.

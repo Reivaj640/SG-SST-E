@@ -106,15 +106,18 @@ check('CSS base: la regla que apaga las vistas excluye la activa (no las tapa)',
 check('CSS premium: repite la exclusión por si la hoja base no está',
   /\.kair-eval-scope \.k-view:not\(\.active\)/.test(premium));
 
-// ── 8. Cache-bust de todo lo que se toca ─────────────────────────────────────
-check('Cache-bust: el .css base lleva ?v= nuevo',
-  /evaluacion-inicial-sg-sst\.css\?v=EVAL-INICIAL-20260918-premium/.test(html));
-check('Cache-bust: la hoja premium se carga con ?v=',
-  /evaluacion-inicial-sg-sst-premium\.css\?v=EVAL-INICIAL-20260918-premium/.test(html));
-check('Cache-bust: el .js lleva ?v= nuevo (antes se cargaba sin versión)',
-  /evaluacion-inicial-sg-sst\.js\?v=EVAL-INICIAL-20260918-premium/.test(html));
-check('Orden de carga: la hoja premium va DESPUÉS de la base',
-  html.indexOf('evaluacion-inicial-sg-sst.css') < html.indexOf('evaluacion-inicial-sg-sst-premium.css'));
+// ── 8. Cache-bust ────────────────────────────────────────────────────────────
+// OJO: desde 📦761 el módulo se reescribió con el prototipo premium v2 y este test
+// quedó apuntando a los archivos de la versión anterior (`evaluacion-inicial-sg-sst.css`
+// / `.js` / `-premium.css`), que ya no se cargan. Acá solo se conserva la verificación
+// de que el cache-bust siga existiendo; lo específico de v2 lo cubre
+// `test-evaluacion-inicial-v2.js`.
+check('Cache-bust: la hoja y el script del módulo se cargan versionados',
+  /evaluacion-inicial-(view|sg-sst)[a-z-]*\.css\?v=/.test(html) &&
+  /evaluacion-inicial-(view|sg-sst)[a-z-]*\.js\?v=/.test(html));
+check('Cache-bust: las hojas viejas ya no se cargan',
+  html.indexOf('evaluacion-inicial-sg-sst.css?v=') < 0 &&
+  html.indexOf('evaluacion-inicial-sg-sst-premium.css?v=') < 0);
 
 // ── 9. El contrato del DOM no se rompió ──────────────────────────────────────
 ['#view-dashboard', '#view-hallazgos', '#view-actions', 'gaugeChart', 'kpi-score',

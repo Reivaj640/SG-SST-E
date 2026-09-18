@@ -5272,14 +5272,15 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
     } else if (submoduleName === "2.3.1 Evaluación inicial del SG-SST") {
-      createComponentSafely(window.EvaluacionInicialSgSst,
+            // 📦761 — Componente reescrito con el diseño premium v2; el marcado vive en su index.html.
+      createComponentSafely(window.EvaluacionInicialView,
         submoduleContentDiv,
         moduleName,
         submoduleName,
         safeBackToModuleCallback
       );
-      if (!window.EvaluacionInicialSgSst) {
-        console.error('❌ EvaluacionInicialSgSst no encontrado');
+      if (!window.EvaluacionInicialView) {
+        console.error('❌ EvaluacionInicialView no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 

@@ -5,12 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net http://localhost:8080 blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://fonts.googleapis.com http://localhost:3001 http://localhost:3010 http://localhost:3011 http://localhost:8080 https://firma.k-air.com ws://localhost:3010 ws://localhost:3011 ws://localhost:8080 blob:; frame-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; child-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; worker-src 'self' blob:; object-src 'self' blob:; ">
   <title>K+AIR</title>
+  <!-- Bootstrap PRIMERO: es una librería externa y tiene que quedar debajo de las
+       hojas propias de la app. Cargado al final le ganaba a los módulos en las
+       propiedades que ellos no declaran (caso real 📦761: la clase `.modal` de
+       Bootstrap rompía los modales de Evaluación Inicial). -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="styles.css?v=20260918-skeleton-encaje">
   <link rel="stylesheet" href="development-styles.css">
-  <link rel="stylesheet" href="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.css?v=EVAL-INICIAL-20260918-premium">
-  <!-- 📦759 — Capa premium de Evaluación Inicial. Va DESPUÉS del .css base para poder
-       reasignar los tokens (--ei-*) y reestilizar los componentes sin reescribir la hoja. -->
-  <link rel="stylesheet" href="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst-premium.css?v=EVAL-INICIAL-20260918-premium">
+  <!-- 📦761 — Evaluación Inicial del SG-SST: hoja única, todo bajo `.ev-scope`.
+       Antes eran dos hojas (`--ei-*` + `--k-*`) más un bloque de CSS que el propio
+       componente inyectaba al <head> con `:root` global; eso se eliminó. -->
+  <link rel="stylesheet" href="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-view.css?v=EVAL-20260918-v2b-fix-overlays">
   <link rel="stylesheet" href="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.css">
 
   <!-- Scripts para animación de fondo (Vanta.js) -->
@@ -21,7 +26,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
   <!-- Cargar estilos externos necesarios -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="assets/css/bootstrap-icons.css">
 
   <!-- 📦713 (2026-08-15) — Módulo Gestión Humana: CSS del shell -->
@@ -305,7 +309,7 @@
   <script src="modules/gestion-integral/politica/politica-logic.js"></script>
   <script src="modules/gestion-integral/objetivos-sst/objetivos-sst-logic.js?v=OBJETIVOS-20260915-v4-fix-strip-720"></script>
   <script src="modules/gestion-integral/archivo-retencion/archivo-retencion.js"></script>
-  <script src="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.js?v=EVAL-INICIAL-20260918-premium"></script>
+  <script src="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-view.js?v=EVAL-20260918-v2b-fix-overlays"></script>
   <script src="modules/gestion-integral/gestion-del-cambio/gestion-cambio-logic.js"></script>
   <script src="modules/gestion-salud/sociodemografica/sociodemografica-component.js"></script>
   <script src="modules/gestion-salud/perfiles-cargo-profesiograma/perfiles-cargo-profesiograma-component.js"></script>
