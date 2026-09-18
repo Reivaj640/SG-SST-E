@@ -166,8 +166,17 @@ html{-webkit-text-size-adjust:100%}
    apagado. OJO tambien: la clase .emo-scope se la agregan los modales/cajon/avisos
    que se mudan al <body>; por eso el layout NUNCA por clase sola. */
 .emo-scope#emo-root{height:100%;display:flex;flex-direction:column;min-height:0}
+/* 📦769 — APROVECHAR TODO EL ANCHO.
+   Antes esta regla tenía `max-width: 1240px; margin: 0 auto`, que CENTRA el contenido
+   y deja franjas vacías a los costados que crecen con la ventana. Medido a 1800px de
+   ancho se perdían **273 px a la izquierda y 288 px a la derecha** (561 px en total),
+   y a 1366px todavía se perdían 56 + 71 px. El resumen y la lista de certificados
+   usan ese espacio: las 4 tarjetas de indicadores, las dos columnas del resumen y la
+   tabla de certificados se estiran mejor cuanto más ancho tengan.
+   Se quita el tope y el centrado; el aire de los costados lo da el relleno, que es
+   proporcional (clamp) para que en pantallas chicas no coma contenido. */
 .emo-scope .emo-kair-main{
-  max-width:1240px;margin:0 auto;padding:26px 28px 32px;
+  max-width:none;margin:0;padding:clamp(14px, 1.6vw, 26px) clamp(14px, 1.8vw, 34px) 32px;
   width:100%;flex:1 0 auto;
   display:flex;flex-direction:column;min-height:0;
 }
@@ -315,8 +324,11 @@ html{-webkit-text-size-adjust:100%}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   padding:14px 16px;border-bottom:1px solid var(--kair-border);
 }
+/* 📦769 — El buscador tenía un tope fijo de 340px, pensado para el layout de 1240px.
+   Ahora que la barra usa todo el ancho, se deja crecer un poco en pantallas grandes
+   (hasta 520px) para no quedar como un control diminuto dentro de una barra ancha. */
 .emo-scope .emo-kair-search{
-  position:relative;flex:1 1 240px;min-width:200px;max-width:340px;
+  position:relative;flex:1 1 240px;min-width:200px;max-width:clamp(340px, 26vw, 520px);
 }
 .emo-scope .emo-kair-search svg{
   position:absolute;left:12px;top:50%;transform:translateY(-50%);

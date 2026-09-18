@@ -667,6 +667,47 @@ async renderMainArea(container) {
   Si el formato no se reconoce (sin cédula ni nombre), avisa y deja el formulario intacto.
   - Cache-bump: `EMO-20260918-v5-lectura-pdf`. Test: 95 checks, incluida la unidad del
     extractor con texto real embebido. Verificado de punta a punta con un PDF real del Drive.
+- **📦769 — EMO (3.1.4): la pantalla ahora aprovecha TODO el ancho + el header del 2.9.1.**
+  - **El ancho:** `.emo-kair-main` tenía `max-width: 1240px; margin: 0 auto`, que **centra** el
+    contenido y deja franjas vacías que CRECEN con la ventana. Medido en la app: a 1800 px de
+    ancho se perdían **273 px a la izquierda y 288 a la derecha (561 px en total)**, y a 1366 px
+    todavía se perdían 56 + 71 px. Afectaba justo a lo que más ancho necesita: las 4 tarjetas de
+    indicadores, las dos columnas del resumen y la tabla de certificados.
+    **Fix:** `max-width: none; margin: 0` y el aire de los costados pasa a ser proporcional
+    (`padding: clamp(14px, 1.6vw, 26px) clamp(14px, 1.8vw, 34px) 32px`) para que en pantallas
+    chicas el relleno no coma contenido. Además el buscador tenía un tope fijo de 340 px
+    pensado para el layout angosto: ahora `max-width: clamp(340px, 26vw, 520px)`.
+    Medido después: a 1800 px el contenido mide **1800 (0 px perdidos de cada lado)**, las
+    columnas del resumen pasan de 750 a **994 px**, y en los tres anchos probados (1800/1366/1024)
+    y los tres temas (claro/`dark`/`dark-legacy`) **no hay desborde horizontal**. El relleno
+    escala solo: 26 px a 1684 px de ancho, 14,4 px a 900. Cache-bump:
+    `EMO-20260918-v8-tabla-altura-fix-ancho-completo`.
+  - **La regla general (vale para cualquier módulo):** un `max-width` con `margin: 0 auto` en el
+    contenedor de contenido es una decisión de diseño, no un detalle. Si la pantalla va a mostrar
+    tablas o grillas de indicadores, ese tope **desperdicia el ancho de las pantallas grandes**.
+    Antes de dejarlo, medir `getBoundingClientRect()` del contenedor contra `window.innerWidth`.
+  - **El header del 2.9.1 (📦764):** su bloque de reglas está al final de
+    `evaluacion-proveedores.css` y lleva **`!important` a propósito**. Motivo: en la app,
+    **ninguna regla `.ep-header*` de ninguna hoja llegaba a aplicarse** —verificado recorriendo
+    el CSSOM completo: 0 reglas con `ep-header` matchean el nodo, y no hay estilos en línea—,
+    pese a que la hoja carga (245 reglas), el `<link>` está bien puesto, el contenedor
+    `.evaluacion-proveedores` existe en el `<body>` y el elemento **coincide** con el selector
+    (`h.matches('.evaluacion-proveedores .ep-header') === true`). Síntoma: el header medía
+    **1678 px de alto**, el icono quedaba `display: inline` con ancho `auto` y los botones
+    caían 1517 px más abajo. Con `!important` el header baja a **194 px** y el icono recupera
+    su caja de 44×44; sin `!important` vuelve a romperse (probado ida y vuelta). Es una
+    excepción deliberada a la regla de "no usar `!important`": **si algún día se encuentra la
+    causa, hay que sacarlos**.
+  - ⚠️ **Hallazgo sin cerrar (no bloquea al usuario):** en los arneses de diagnóstico, al montar
+    el componente 2.9.1 por `executeJavaScript` **el `<link>` de su hoja desaparece del DOM**
+    (las hojas bajan de 35 a 28 y la del módulo ya no está). No se pudo aislar la causa, y no se
+    descarta que sea un artefacto del arnés (el `document` que se consulta podría no ser el mismo
+    que recibe el montaje). **No se pudo confirmar el header en la app real por esta vía.** Si
+    aparece un problema visual en 2.9.1, empezar por acá.
+  - **Cómo se midió** (receta reutilizable para "desperdicio de ancho"): montar la vista en una
+    ventana a 1800/1366/1024 y comparar `getBoundingClientRect()` del contenedor contra
+    `window.innerWidth`, mirando `maxWidth`, `marginLeft/Right` y `paddingLeft` calculados, más
+    `document.documentElement.scrollWidth` para descartar desborde horizontal.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
