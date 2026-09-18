@@ -3,7 +3,7 @@
    CSS Oficial · Sistema Visual K+AIR · Submódulo 3.1.4
    ═══════════════════════════════════════════════════════ */
 
-:root {
+body.em-viewer-scope {
     --em-primary: #174ea6;
     --em-primary-hover: #185abd;
     --em-primary-light: rgba(23, 78, 166, 0.08);
@@ -69,9 +69,9 @@
     --em-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+body.em-viewer-scope, body.em-viewer-scope * { margin: 0; padding: 0; box-sizing: border-box; }
 
-body {
+body.em-viewer-scope {
     font-family: var(--em-font);
     background-color: var(--em-bg-app);
     color: var(--em-text-primary);

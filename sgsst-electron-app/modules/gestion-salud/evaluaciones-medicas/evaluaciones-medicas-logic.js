@@ -33,7 +33,14 @@ class EvaluacionesMedicasComponent {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const html = await response.text();
-            portalContainer.innerHTML = html;
+            // 📦766 — blindaje contra fugas al documento principal: el fragmento se
+            // inyecta con innerHTML dentro del DOM global, así que cualquier <link>
+            // del head cargaría su hoja para TODA la app. Se eliminan antes de
+            // inyectar (el <style> del portal ya viene acotado a #em-portal-container
+            // en evaluaciones-medicas-home.html). El <script> del final del HTML no
+            // se ejecuta vía innerHTML; initPortalJS() lo vuelve a agregar limpio.
+            const safeHtml = html.replace(/<link[^>]*>/gi, '');
+            portalContainer.innerHTML = safeHtml;
             this.initPortalJS();
         } catch (error) {
             console.error('[EvaluacionesMedicasComponent] Error cargando portal:', error);
