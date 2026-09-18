@@ -512,6 +512,100 @@ async renderMainArea(container) {
        monta el módulo con Bootstrap cargado y **mide la geometría** del modal (posición,
        alto, centrado, y que las tarjetas no hereden el fondo de Bootstrap). Usa una copia
        local `main/_bootstrap-5.3.0.min.css` para no depender de la conexión.
+- **📦762 — EVALUACIONES MÉDICAS OCUPACIONALES (3.1.4): el módulo NO guardaba nada y pasó al
+  premium v2 con los certificados persistidos.** Antes era un **explorador de carpetas**
+  (`getDocumentFolders` + `readDirectory`): no existía ningún registro de trabajador, examen,
+  concepto de aptitud ni vencimiento. Se adoptó el prototipo `kair-evaluaciones-medicas.html`
+  y se le agregó la base.
+  - **Archivos**: `evaluaciones-medicas-v2.js` (componente + marcado EMBEBIDO), `.css` (todo
+    bajo `.emo-scope`) y `.html` (copia legible del marcado). Puente:
+    `main/evaluaciones-medicas-bridge.js` (tabla `evaluaciones_medicas_certificados`).
+  - **Cómo se monta**: igual que 📦761 — **NO es iframe**, `renderer.js` le pasa un contenedor
+    del documento principal, así que el componente inyecta su propio marcado. Y hay **dos**
+    globals con el mismo nombre: `evaluaciones-medicas-logic.js` (el módulo viejo, que sigue
+    cargado) define `window.EvaluacionesMedicasComponent` y el nuevo también; **el orden de
+    los `<script>` decide** y el nuevo va DESPUÉS. Es frágil: si alguien reordena, vuelve el
+    viejo y con él su CSS global. Conviene sacar ese `<script>`.
+  - **Regla legal que gobierna el diseño**: Res. 2346 de 2007 art. 12 — cada evaluación es un
+    evento sanitario independiente. **Renovar NO modifica ni borra el certificado anterior**:
+    agrega uno nuevo enlazado por `certificado_origen`, y el detalle muestra el historial del
+    trabajador por cédula. El diagnóstico clínico no se archiva (solo el concepto y las
+    recomendaciones laborales) y "Apto con recomendaciones" **exige** cargarlas.
+  - 🚨🚨 **EL BUG MÁS CARO DE ESTE PAQUETE: la hoja NO estaba linkeada en `index.html`.**
+    Se conectó el `<script>` y **se olvidó el `<link rel="stylesheet">`**. Síntoma en la app:
+    la pantalla quedaba casi vacía con **un dibujo gigante** y el módulo medía **26.259 px de
+    alto** (26 veces la ventana). Causa: **un `<svg>` sin tamaño efectivo se estira a todo el
+    ancho de su contenedor**; el módulo tiene 42 iconos y sin CSS ninguno quedaba acotado
+    (se midieron SVGs de 1440×1440 dentro de los iconos). Diagnóstico que lo cerró: enumerar
+    el CSSOM y ver que **la hoja no aparecía** entre las cargadas (`hojas: []`), y medir los
+    15 elementos más grandes del módulo. Con la hoja cargada: 311 reglas, icono 20×20, y el
+    módulo vuelve a medir la ventana (980 px) sin nada desbordado.
+    **Regla: al adoptar un diseño, verificar LOS DOS enganches — el script Y la hoja.** Y si
+    se ve un gráfico enorme, sospechar del CSS que no cargó, no del SVG.
+  - **Cómo se construyó (y por qué el CSS/JS son la fuente de verdad)**: el prototipo reusaba
+    nombres que ya existen en la app (`kair-card`, `kair-header`, `kair-modal`, `kair-table`)
+    y en Bootstrap (`modal`, `card`, `btn`, `overlay`). Se pasó una vez por un script de
+    migración que: (1) prefijó **todas** las clases a `emo-`; (2) puso **todos** los selectores
+    —incluidos los de etiqueta (`body`, `h1`, `button`)— bajo `.emo-scope`; (3) movió los
+    tokens del prototipo de `:root` a `.emo-scope` porque la app **ya usa `--kair-*`** con
+    otros valores y dejarlos sueltos **pisaba la paleta de toda la aplicación**; (4) embebió el
+    marcado en el `.js`. Ese script se retiró: **ahora se edita el CSS y el JS a mano**, con
+    las dos reglas marcadas en el encabezado de la hoja.
+  - **Modo oscuro agregado de cero** (el prototipo no traía ninguno), cubriendo los DOS
+    atributos de la app y con los nombres de token **del prototipo**, no los de la app.
+  - **Piezas que la lógica genera y la hoja no tenía**: los contenedores de texto de las filas
+    de lista necesitan `display:flex;flex-direction:column` (el prototipo usaba `<div>` y la
+    lógica usa `<span>`: sin eso el nombre y el detalle salían pegados en la misma línea), y
+    la paginación viene en el marcado con el atributo `hidden`, así que hay que mostrarla.
+    **Regla: si la lógica genera HTML, verificar que cada clase generada tenga regla en la
+    hoja** (el test lo comprueba).
+  - Test: `node main/test-evaluaciones-medicas-v2.js` (**85 checks**). Verificación visual con
+    montaje real y puente simulado: `npx electron main/_preview-emo.js`.
+  - **Pendiente heredado del home de Salud: RESUELTO en 📦763** (ver la entrada siguiente).
+- **📦763 — HOME DE GESTIÓN DE LA SALUD: el error de consola era DOS problemas distintos, y el
+  mensaje apuntaba al lugar equivocado.** El síntoma era:
+  `[SALUD] Error refrescando estadísticas: TypeError: Cannot read properties of undefined
+  (reading 'cache')` en `gestion-salud-home.js` al abrir el módulo.
+  - **(1) `window._saludHomeState` no se creaba en NINGÚN archivo.** El home usa esa memoria de
+    sesión (`.cache` y `.lastUpdate`, dos `Map` por empresa) en `refreshStats` y en un
+    `renderMainArea` viejo, pero nadie la definía. Se define al cargar el archivo, de forma
+    idempotente (`= window._saludHomeState || {…}`) y además la escritura queda protegida con
+    un `if (!window._saludHomeState)` para que nunca pueda volver a cortar la carga.
+  - **(2) El mensaje NO venía de la caché.** El texto "reading 'cache'" engañaba: el error real
+    se lanzaba en `updateWidgetsUI`, cuyas guardas eran `if (data.X && this.widgets.X)` y
+    **`this.widgets` nunca se inicializa** (es del sistema de widgets viejo que el rediseño
+    premium dejó sin usar; los `create*Widget()` son código muerto). La segunda mitad de la
+    guarda leía `this.widgets.ausentismo` → TypeError, y el `catch` de `refreshStats` lo
+    reportaba con el texto de "refrescando estadísticas". **Lección: cuando el mensaje de un
+    error señala una propiedad, leer el STACK, no confiar en el texto** (el nombre de la
+    propiedad del mensaje es el que se estaba leyendo, no necesariamente el que falla). Se
+    agregó un `if (!this.widgets) return;` al principio y se protegió la llamada a
+    `renderIndicesChart` con `typeof … === 'function'`.
+  - **(3) `this.saludStats` NUNCA se asignaba.** El render activo (`renderMainArea`, el de más
+    abajo del archivo — hay un `renderMainArea` viejo antes que quedó anulado) lee
+    `this.saludStats || {}`, así que el home mostraba todo en 0 aunque el backend tuviera
+    datos. Los datos se guardaban solo en la caché de sesión, que nadie leía. Ahora se asigna.
+  - **(4) Los nombres de campo del backend NO son los que lee el render.** Medido con la
+    empresa real (`Tempoactiva`), las 7 respuestas son:
+    `ausentismo → {pendientes, activos, cerrados, total}` · `accidentes → {totalYear, mesActual,
+    mensual[12]}` · `examenes → {totalYear, mesActual}` · `seguimientos → {totalAnio,
+    realizadosAnio, totalMes, realizadosMes}` · `recursos → {stats}` (puede ser `null`) ·
+    `remisiones → success:false 'Empresa no configurada'` · `indicadores → success:false
+    COMPANY_NOT_FOUND`. El render espera `totalExamenes/realizados/pendientes`,
+    `total/completados/pendientes`, `total/investigados/pendientes`, `tasaAusentismo/
+    totalTrabajadores`. Se agregó el adaptador `_adaptarRespuestasSalud()` con el mapeo
+    documentado, a prueba de fallos (`r = r || {}`) y **sin inventar** los datos que el backend
+    no informa (`totalTrabajadores` y `tasaAusentismo` quedan en 0 para no calcular una tasa
+    falsa; los casos de ausentismo se exponen aparte como `totalCasos`).
+  - **Cómo se diagnosticó** (receta reutilizable): se corrió el home real dentro de la app
+    cargando el archivo por `executeJavaScript`, se envolvió el método sospechoso para registrar
+    qué recibe, y se capturó **el stack completo** interceptando `console.error`. Eso dio
+    `at GestionSaludHome.updateWidgetsUI (<anonymous>:263:45)` y desmintió la hipótesis inicial.
+  - **Cache-bust**: se bumpeó el `?v=` del home en `index.html` a
+    `GESTION-SALUD-20260918-fix-home-cache`, y se actualizó la versión esperada en
+    `test-chart-overflow.js` (que la fija por módulo).
+  - Test: `node main/test-gestion-salud-home.js` (**26 checks**). Verificación en la app real:
+    correr el home y afirmar que **no** aparece ningún error de consola.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
@@ -1030,6 +1124,7 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 | `test-evaluacion-inicial-premium.js` | 43 | Evaluación Inicial del SG-SST — ronda anterior (📦759): conserva las verificaciones de que el modo oscuro cubra `dark` Y `dark-legacy` y de que NO vuelva el CSS global inyectado desde el `.js`. Lo específico del rediseño v2 lo cubre el test de abajo |
 | `test-evaluacion-inicial-v2.js` | 64 | Evaluación Inicial del SG-SST v2 (📦761): **EJECUTA la vista real** con un backend simulado y verifica la estructura del diseño nuevo (barra superior, pestañas, 3 indicadores clicables, medidor SVG, PHVA, los 5 modales), el adaptador `findings → estándares`, que los planes se guarden y se borren contra la base, el modo oscuro en los DOS atributos y el contrato con `renderer.js` |
 | `test-evaluacion-inicial-bootstrap.js` | 22 | **Necesita ventana: `npx electron main/test-evaluacion-inicial-bootstrap.js`.** Choque con Bootstrap (📦761): monta el módulo con `bootstrap.min.css` cargado y **mide la geometría** del modal contra la ventana (que no quede `position: fixed`, que no se estire a todo el alto, que quede centrado y con su ancho de 420px) y que las tarjetas no hereden el fondo de la librería. Usa la copia local `main/_bootstrap-5.3.0.min.css` para no depender de la conexión |
+| `test-evaluaciones-medicas-v2.js` | 85 | Evaluaciones Médicas Ocupacionales v2 (📦762): valida el **puente de base** (nombre, cédula, tipo, concepto, fechas y la regla de "Apto con recomendaciones" — todo ANTES de tocar la base), la **construcción** del módulo (clases prefijadas `emo-`, 107 ids del contrato, marcado balanceado, todos los selectores bajo `.emo-scope`, tokens fuera de `:root`), el **registro en la app** (los 4 puntos del patrón puente + `renderer.js` + **que la hoja esté linkeada en `index.html`**) y la **regla legal** de la renovación (certificado nuevo enlazado al anterior). Verificación visual: `npx electron main/_preview-emo.js` |
 | `test-archivo-retencion-premium.js` | 50 | Archivo y Retención en premium (📦760): **EJECUTA la vista real** y verifica el adaptador de campos contra la forma exacta del backend (que el Tipo salga de los 4 booleanos, que la hoja se lea de `hojaOrigen`, y que el payload mande `disposicion` y no `disposicionFinal`), la estructura nueva, la edición en línea, el guardado masivo, los `type` del puente y el modo oscuro en todos los bloques |
 
 **Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.

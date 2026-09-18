@@ -1,0 +1,918 @@
+/* ============================================================
+   K+AIR · Evaluaciones Medicas Ocupacionales (3.1.4) — hoja del modulo
+   ============================================================
+   ORIGEN: se genero una sola vez a partir del prototipo
+   kair-evaluaciones-medicas.html con un script de migracion (ya retirado).
+   A PARTIR DE ACA ESTE ARCHIVO ES LA FUENTE DE VERDAD: se edita a mano.
+
+   DOS REGLAS QUE NO SE PUEDEN ROMPER:
+   1. TODOS los selectores van bajo .emo-scope (incluidos los de etiqueta como
+      body, h1, button). El componente se inyecta en el documento principal de la
+      app: un selector suelto le cambiaria el estilo a TODA la aplicacion. Los
+      tokens del prototipo tampoco pueden quedar en :root por el mismo motivo
+      (la app ya usa --kair-* con otros valores).
+   2. Las CLASES van con el prefijo privado emo- (o emo-kair-). El prototipo
+      reusaba nombres que ya existen en la app Y en Bootstrap (modal, card,
+      btn, overlay, kair-card...), y eso choca en las dos direcciones.
+
+   El marcado vive embebido en evaluaciones-medicas-v2.js (el componente no
+   puede leer archivos locales); evaluaciones-medicas-v2-markup.html es la
+   copia legible para revisar. La logica y los datos, en el mismo .js.
+   Puente de base: main/evaluaciones-medicas-bridge.js.
+   Test: 
+ode main/test-evaluaciones-medicas-v2.js.
+   Verificacion visual: 
+px electron main/_preview-emo.js.
+   ============================================================ */
+
+/* ============================================================
+   K+AIR · Premium v2 — Tokens (Tabla 4 del documento técnico)
+   Regla: cero valores hexadecimales fuera de este bloque.
+   ============================================================ */
+.emo-scope{
+  --kair-bg:#FBFCFB;
+  --kair-surface:#FFFFFF;
+  --kair-text:#14213D;
+  --kair-text-2:#748096;
+  --kair-text-3:#9AA4B8;
+  --kair-border:#E8EBEE;
+  --kair-blue:#2057B8;
+  --kair-blue-hover:#1A4A9E;
+  --kair-blue-soft:#EDF3FC;
+  --kair-green:#1BB888;
+  --kair-red:#DA5563;
+  --kair-amber:#E7A224;
+  --kair-navy:#14213D;
+  --kair-green-soft:#E4F6F0;
+  --kair-red-soft:#FBECEE;
+  --kair-amber-soft:#FCF3DF;
+  --kair-shadow:0 1px 2px rgba(20,33,61,.04), 0 8px 24px rgba(20,33,61,.06);
+  --kair-shadow-lift:0 4px 12px rgba(20,33,61,.08), 0 12px 32px rgba(20,33,61,.10);
+  --kair-shadow-modal:0 24px 64px rgba(20,33,61,.24);
+  --kair-r-lg:24px;
+  --kair-r-md:20px;
+  --kair-r-sm:12px;
+  --kair-r-xs:10px;
+  --kair-t:180ms cubic-bezier(.4,0,.2,1);
+}
+.emo-scope *{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+.emo-scope body{
+  background:var(--kair-bg);
+  color:var(--kair-text);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  min-height:100vh;
+}
+.emo-scope h1, .emo-scope h2, .emo-scope h3, .emo-scope h4{font-family:'Manrope','Inter',sans-serif;letter-spacing:-.01em}
+.emo-scope button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.emo-scope input, .emo-scope select, .emo-scope textarea{font-family:inherit;font-size:14px;color:var(--kair-text)}
+.emo-scope :focus-visible{outline:2px solid var(--kair-blue);outline-offset:2px;border-radius:4px}
+.emo-scope svg{display:block}
+
+/* ---------- Header System v2 ---------- */
+.emo-scope .emo-kair-header{
+  background:var(--kair-surface);
+  border-bottom:1px solid var(--kair-border);
+  padding:18px 28px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  position:sticky;top:0;z-index:40;
+}
+.emo-scope .emo-kair-header__id{display:flex;align-items:center;gap:14px;min-width:0}
+.emo-scope .emo-kair-header__icon{
+  width:46px;height:46px;border-radius:var(--kair-r-sm);
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.emo-scope .emo-kair-header__crumb{
+  font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--kair-text-3);margin-bottom:2px;
+}
+.emo-scope .emo-kair-header__title{font-size:18px;font-weight:800;line-height:1.25}
+.emo-scope .emo-kair-header__sub{font-size:12.5px;color:var(--kair-text-2);margin-top:1px}
+.emo-scope .emo-kair-header__actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.emo-scope .emo-kair-empchip{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 14px;border-radius:999px;
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  font-size:12.5px;font-weight:600;
+}
+.emo-scope .emo-kair-empchip svg{width:14px;height:14px}
+
+/* ---------- Tabs de navegación interna ---------- */
+.emo-scope .emo-kair-tabs{
+  background:var(--kair-surface);border-bottom:1px solid var(--kair-border);
+  padding:0 28px;display:flex;gap:4px;
+}
+.emo-scope .emo-kair-tab{
+  padding:12px 16px;font-size:13.5px;font-weight:600;color:var(--kair-text-2);
+  border-bottom:2px solid transparent;
+  display:inline-flex;align-items:center;gap:8px;
+  transition:color var(--kair-t), border-color var(--kair-t);
+}
+.emo-scope .emo-kair-tab svg{width:15px;height:15px}
+.emo-scope .emo-kair-tab:hover{color:var(--kair-text)}
+.emo-scope .emo-kair-tab.emo-is-active{color:var(--kair-blue);border-bottom-color:var(--kair-blue)}
+
+/* ---------- Botones ---------- */
+.emo-scope .emo-kair-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 16px;border-radius:var(--kair-r-xs);
+  font-size:13.5px;font-weight:600;line-height:1;
+  border:1px solid transparent;
+  transition:background var(--kair-t), color var(--kair-t), border-color var(--kair-t), box-shadow var(--kair-t), transform var(--kair-t);
+  white-space:nowrap;
+}
+.emo-scope .emo-kair-btn svg{width:16px;height:16px;flex-shrink:0}
+.emo-scope .emo-kair-btn--primary{background:var(--kair-blue);color:var(--kair-surface);box-shadow:0 1px 2px rgba(20,33,61,.12)}
+.emo-scope .emo-kair-btn--primary:hover{background:var(--kair-blue-hover)}
+.emo-scope .emo-kair-btn--primary:active{transform:translateY(1px)}
+.emo-scope .emo-kair-btn--ghost{background:var(--kair-surface);color:var(--kair-text-2);border-color:var(--kair-border)}
+.emo-scope .emo-kair-btn--ghost:hover{color:var(--kair-text);border-color:var(--kair-text-3)}
+.emo-scope .emo-kair-btn--soft{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.emo-scope .emo-kair-btn--soft:hover{background:var(--kair-blue);color:var(--kair-surface)}
+.emo-scope .emo-kair-btn--sm{padding:7px 12px;font-size:12.5px;border-radius:8px}
+.emo-scope .emo-kair-btn:disabled{opacity:.55;cursor:not-allowed}
+.emo-scope .emo-kair-iconbtn{
+  width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--kair-text-2);border:1px solid var(--kair-border);background:var(--kair-surface);
+  transition:all var(--kair-t);
+}
+.emo-scope .emo-kair-iconbtn:hover{color:var(--kair-blue);border-color:var(--kair-blue);background:var(--kair-blue-soft)}
+.emo-scope .emo-kair-iconbtn svg{width:15px;height:15px}
+
+/* ---------- Chips suaves (semántico, no decorativo) ---------- */
+.emo-scope .emo-kair-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:999px;
+  font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  line-height:1.2;white-space:nowrap;
+}
+.emo-scope .emo-kair-chip svg{width:12px;height:12px}
+.emo-scope .emo-kair-chip--blue{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.emo-scope .emo-kair-chip--green{background:var(--kair-green-soft);color:var(--kair-green)}
+.emo-scope .emo-kair-chip--amber{background:var(--kair-amber-soft);color:var(--kair-amber)}
+.emo-scope .emo-kair-chip--red{background:var(--kair-red-soft);color:var(--kair-red)}
+.emo-scope .emo-kair-chip--neutral{background:var(--kair-bg);color:var(--kair-text-2);border:1px solid var(--kair-border)}
+
+
+/* ---------- Layout principal y pantallas ---------- */
+.emo-scope .emo-kair-main{max-width:1240px;margin:0 auto;padding:26px 28px 60px}
+.emo-scope .emo-kair-screen{display:none}
+.emo-scope .emo-kair-screen.emo-is-active{display:block;animation:kair-fadein 220ms ease}
+@keyframes kair-fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- KPI cards ---------- */
+.emo-scope .emo-kair-kpis{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;
+}
+.emo-scope .emo-kair-kpi{
+  background:var(--kair-surface);border:1px solid var(--kair-border);
+  border-radius:var(--kair-r-md);padding:18px 20px;
+  display:flex;align-items:center;gap:14px;
+  box-shadow:var(--kair-shadow);
+  transition:box-shadow var(--kair-t), transform var(--kair-t);
+  text-align:left;width:100%;
+}
+.emo-scope .emo-kair-kpi:hover{box-shadow:var(--kair-shadow-lift);transform:translateY(-1px)}
+.emo-scope .emo-kair-kpi[data-jump]{cursor:pointer}
+.emo-scope .emo-kair-kpi__icon{
+  width:44px;height:44px;border-radius:var(--kair-r-sm);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.emo-scope .emo-kair-kpi__icon svg{width:20px;height:20px}
+.emo-scope .emo-kair-kpi__icon--blue{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.emo-scope .emo-kair-kpi__icon--green{background:var(--kair-green-soft);color:var(--kair-green)}
+.emo-scope .emo-kair-kpi__icon--amber{background:var(--kair-amber-soft);color:var(--kair-amber)}
+.emo-scope .emo-kair-kpi__icon--red{background:var(--kair-red-soft);color:var(--kair-red)}
+.emo-scope .emo-kair-kpi__value{font-family:'Manrope',sans-serif;font-size:26px;font-weight:800;line-height:1.1}
+.emo-scope .emo-kair-kpi__label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--kair-text-3);margin-top:2px}
+
+/* ---------- Tarjeta contenedora ---------- */
+.emo-scope .emo-kair-card{
+  background:var(--kair-surface);border:1px solid var(--kair-border);
+  border-radius:var(--kair-r-md);box-shadow:var(--kair-shadow);
+}
+.emo-scope .emo-kair-card__head{
+  padding:16px 20px;border-bottom:1px solid var(--kair-border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+.emo-scope .emo-kair-card__title{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
+  display:flex;align-items:center;gap:9px;
+}
+.emo-scope .emo-kair-card__title svg{width:17px;height:17px;color:var(--kair-blue)}
+.emo-scope .emo-kair-card__hint{font-size:12px;color:var(--kair-text-3);margin-top:2px}
+
+/* ---------- Grids del resumen ---------- */
+.emo-scope .emo-kair-rgrid{display:grid;grid-template-columns:7fr 5fr;gap:16px;margin-bottom:16px;align-items:stretch}
+.emo-scope .emo-kair-rgrid--eq{grid-template-columns:1fr 1fr}
+.emo-scope .emo-kair-rgrid:last-child{margin-bottom:0}
+
+/* ---------- Filas de alerta de vigencia ---------- */
+.emo-scope .emo-kair-alertrow{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 20px;border-bottom:1px dashed var(--kair-border);
+}
+.emo-scope .emo-kair-alertrow:last-child{border-bottom:none}
+.emo-scope .emo-kair-alertrow__txt{flex:1;min-width:0}
+.emo-scope .emo-kair-alertrow__name{font-weight:600;font-size:13.5px;line-height:1.3}
+.emo-scope .emo-kair-alertrow__sub{font-size:12px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-alertfoot{
+  display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--kair-border);flex-wrap:wrap;
+}
+.emo-scope .emo-kair-okbox{
+  margin:0 20px 18px;background:var(--kair-green-soft);color:var(--kair-green);
+  border-radius:var(--kair-r-xs);padding:14px 16px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:10px;
+}
+.emo-scope .emo-kair-okbox svg{width:17px;height:17px;flex-shrink:0}
+.emo-scope .emo-kair-okbox[hidden]{display:none}
+
+/* ---------- Tiles de documentos de referencia ---------- */
+.emo-scope .emo-kair-doctile{
+  width:100%;text-align:left;
+  display:flex;align-items:center;gap:13px;
+  border:1px solid var(--kair-border);border-radius:var(--kair-r-sm);
+  padding:13px 15px;margin:0 20px 10px;background:var(--kair-surface);
+  transition:border-color var(--kair-t), box-shadow var(--kair-t);
+}
+.emo-scope .emo-kair-doctile:hover{border-color:var(--kair-blue);box-shadow:var(--kair-shadow)}
+.emo-scope .emo-kair-doctile:last-of-type{margin-bottom:18px}
+.emo-scope .emo-kair-doctile__icon{
+  width:40px;height:40px;border-radius:var(--kair-r-xs);flex-shrink:0;
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  display:flex;align-items:center;justify-content:center;
+}
+.emo-scope .emo-kair-doctile__icon svg{width:18px;height:18px}
+.emo-scope .emo-kair-doctile__icon--green{background:var(--kair-green-soft);color:var(--kair-green)}
+.emo-scope .emo-kair-doctile__txt{flex:1;min-width:0}
+.emo-scope .emo-kair-doctile__name{font-weight:600;font-size:13.5px;line-height:1.3}
+.emo-scope .emo-kair-doctile__sub{font-size:12px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-doctile svg.emo-kair-doctile__arrow{width:15px;height:15px;color:var(--kair-text-3);flex-shrink:0}
+
+/* ---------- Barras de gráfica (horizontal) ---------- */
+.emo-scope .emo-kair-chartwrap{padding:16px 20px 18px}
+.emo-scope .emo-kair-chartrow{display:flex;align-items:center;gap:12px;margin-bottom:11px;font-size:13px}
+.emo-scope .emo-kair-chartrow:last-child{margin-bottom:0}
+.emo-scope .emo-kair-chartrow__label{
+  width:168px;color:var(--kair-text-2);flex-shrink:0;text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.emo-scope .emo-kair-chartrow__track{
+  flex:1;height:14px;border-radius:999px;background:var(--kair-bg);
+  border:1px solid var(--kair-border);overflow:hidden;
+}
+.emo-scope .emo-kair-chartrow__track i{display:block;height:100%;border-radius:999px;transition:width 320ms ease}
+.emo-scope .emo-kair-chartrow__val{width:26px;font-weight:700;flex-shrink:0;font-family:'Manrope',sans-serif}
+.emo-scope .emo-kair-chartsvg{padding:8px 20px 14px}
+.emo-scope .emo-kair-chartsvg svg{width:100%;height:auto}
+
+/* ---------- Últimos certificados ---------- */
+.emo-scope .emo-kair-lastrow{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 20px;border-bottom:1px dashed var(--kair-border);
+}
+.emo-scope .emo-kair-lastrow:last-child{border-bottom:none}
+.emo-scope .emo-kair-lastrow__txt{flex:1;min-width:0}
+.emo-scope .emo-kair-lastrow__name{font-weight:600;font-size:13.5px;line-height:1.3}
+.emo-scope .emo-kair-lastrow__sub{font-size:12px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-lastfoot{padding:12px 20px;border-top:1px solid var(--kair-border)}
+
+/* ---------- Barra única de filtros ---------- */
+.emo-scope .emo-kair-filters{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:14px 16px;border-bottom:1px solid var(--kair-border);
+}
+.emo-scope .emo-kair-search{
+  position:relative;flex:1 1 240px;min-width:200px;max-width:340px;
+}
+.emo-scope .emo-kair-search svg{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  width:15px;height:15px;color:var(--kair-text-3);pointer-events:none;
+}
+.emo-scope .emo-kair-input, .emo-scope .emo-kair-select{
+  background:var(--kair-surface);border:1px solid var(--kair-border);
+  border-radius:var(--kair-r-xs);padding:9px 12px;font-size:13.5px;
+  transition:border-color var(--kair-t), box-shadow var(--kair-t);
+  width:100%;
+}
+.emo-scope .emo-kair-input:focus, .emo-scope .emo-kair-select:focus{
+  outline:none;border-color:var(--kair-blue);
+  box-shadow:0 0 0 3px var(--kair-blue-soft);
+}
+.emo-scope .emo-kair-search .emo-kair-input{padding-left:36px}
+.emo-scope .emo-kair-select{width:auto;min-width:130px;cursor:pointer}
+.emo-scope .emo-kair-filters__count{
+  margin-left:auto;font-size:12.5px;color:var(--kair-text-2);
+  display:flex;align-items:center;gap:12px;
+}
+.emo-scope .emo-kair-linkbtn{
+  color:var(--kair-blue);font-size:12.5px;font-weight:600;
+  padding:6px 10px;border-radius:8px;
+  transition:background var(--kair-t);
+}
+.emo-scope .emo-kair-linkbtn:hover{background:var(--kair-blue-soft)}
+.emo-scope .emo-kair-linkbtn[hidden]{display:none}
+
+/* ---------- Tabla enterprise ---------- */
+.emo-scope .emo-kair-tablewrap{overflow-x:auto;border-radius:0 0 var(--kair-r-md) var(--kair-r-md)}
+.emo-scope .emo-kair-table{width:100%;border-collapse:collapse;min-width:940px}
+.emo-scope .emo-kair-table thead th{
+  position:sticky;top:0;z-index:2;
+  background:var(--kair-surface);
+  font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--kair-text-3);text-align:left;
+  padding:12px 12px;border-bottom:1px solid var(--kair-border);
+  white-space:nowrap;
+}
+.emo-scope .emo-kair-table thead th[data-sort]{cursor:pointer;user-select:none}
+.emo-scope .emo-kair-table thead th[data-sort]:hover{color:var(--kair-blue)}
+.emo-scope .emo-kair-table thead th .emo-kair-sort{
+  display:inline-block;width:10px;margin-left:4px;color:var(--kair-blue);
+}
+.emo-scope .emo-kair-table tbody td{
+  padding:13px 9px;border-bottom:1px solid var(--kair-border);
+  font-size:13.5px;color:var(--kair-text);vertical-align:middle;
+}
+.emo-scope .emo-kair-table tbody tr{transition:background var(--kair-t)}
+.emo-scope .emo-kair-table tbody tr:hover{background:var(--kair-bg)}
+.emo-scope .emo-kair-table tbody tr:last-child td{border-bottom:none}
+.emo-scope .emo-kair-provcell{display:flex;align-items:center;gap:12px;min-width:180px}
+.emo-scope .emo-kair-avatar{
+  width:38px;height:38px;border-radius:var(--kair-r-sm);
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  font-size:13px;font-weight:700;font-family:'Manrope',sans-serif;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.emo-scope .emo-kair-provcell__name{font-weight:600;line-height:1.3}
+.emo-scope .emo-kair-provcell__nit{font-size:12px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-objcell{color:var(--kair-text-2);max-width:128px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emo-scope .emo-kair-fecha{color:var(--kair-text-2);white-space:nowrap}
+.emo-scope .emo-kair-vencecell{white-space:nowrap}
+.emo-scope .emo-kair-vencecell__delta{font-size:11.5px;margin-top:2px;font-weight:600}
+.emo-scope .emo-kair-vencecell__delta--red{color:var(--kair-red)}
+.emo-scope .emo-kair-vencecell__delta--amber{color:var(--kair-amber)}
+.emo-scope .emo-kair-vencecell__delta--green{color:var(--kair-green)}
+.emo-scope .emo-kair-vencecell__delta--blue{color:var(--kair-blue)}
+.emo-scope .emo-kair-vencecell__delta--neutral{color:var(--kair-text-3);font-weight:500}
+.emo-scope .emo-kair-actions{display:flex;gap:5px;align-items:center}
+.emo-scope .emo-kair-actions .emo-kair-btn--sm{padding:7px 8px}
+
+/* ---------- Paginación ---------- */
+.emo-scope .emo-kair-pagin{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-top:1px solid var(--kair-border);
+  font-size:12.5px;color:var(--kair-text-2);
+}
+.emo-scope .emo-kair-pagin__btns{display:flex;gap:8px}
+
+/* ---------- Estado vacío ---------- */
+.emo-scope .emo-kair-empty{
+  display:none;text-align:center;padding:64px 24px;color:var(--kair-text-2);
+}
+.emo-scope .emo-kair-empty.emo-is-visible{display:block}
+.emo-scope .emo-kair-empty__icon{
+  width:64px;height:64px;border-radius:var(--kair-r-md);
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+}
+.emo-scope .emo-kair-empty__icon svg{width:28px;height:28px}
+.emo-scope .emo-kair-empty__title{font-family:'Manrope',sans-serif;font-weight:800;font-size:16px;color:var(--kair-text);margin-bottom:4px}
+
+/* ---------- Skeleton ---------- */
+.emo-scope .emo-kair-skel{
+  height:52px;margin:10px 16px;border-radius:var(--kair-r-sm);
+  background:linear-gradient(90deg, var(--kair-bg) 25%, var(--kair-blue-soft) 50%, var(--kair-bg) 75%);
+  background-size:200% 100%;
+  animation:kair-skel 1.1s ease-in-out infinite;
+}
+@keyframes kair-skel{from{background-position:200% 0}to{background-position:-200% 0}}
+.emo-scope .emo-kair-skel[hidden]{display:none}
+
+
+/* ---------- Drawer: Marco Normativo ---------- */
+.emo-scope .emo-kair-backdrop{
+  position:fixed;inset:0;background:rgba(20,33,61,.42);
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  opacity:0;pointer-events:none;transition:opacity var(--kair-t);z-index:60;
+}
+.emo-scope .emo-kair-backdrop.emo-is-open{opacity:1;pointer-events:auto}
+.emo-scope .emo-kair-drawer{
+  position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;
+  background:var(--kair-surface);z-index:70;
+  transform:translateX(102%);transition:transform 220ms cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+  box-shadow:var(--kair-shadow-modal);
+}
+.emo-scope .emo-kair-drawer.emo-is-open{transform:none}
+.emo-scope .emo-kair-drawer__head{
+  background:var(--kair-navy);color:var(--kair-surface);
+  padding:22px 24px;position:relative;flex-shrink:0;
+}
+.emo-scope .emo-kair-drawer__head h2{font-size:18px;font-weight:800}
+.emo-scope .emo-kair-drawer__head p{font-size:12.5px;color:var(--kair-text-3);margin-top:3px}
+.emo-scope .emo-kair-drawer__close{
+  position:absolute;top:16px;right:16px;
+  width:34px;height:34px;border-radius:10px;
+  color:var(--kair-surface);display:flex;align-items:center;justify-content:center;
+  transition:background var(--kair-t);
+}
+.emo-scope .emo-kair-drawer__close:hover{background:rgba(255,255,255,.14)}
+.emo-scope .emo-kair-drawer__close svg{width:17px;height:17px}
+.emo-scope .emo-kair-drawer__body{flex:1;overflow-y:auto;padding:22px 24px}
+.emo-scope .emo-kair-formula{
+  background:var(--kair-blue);color:var(--kair-surface);
+  border-radius:var(--kair-r-sm);padding:16px;text-align:center;
+  margin-bottom:20px;
+}
+.emo-scope .emo-kair-formula__label{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.emo-scope .emo-kair-formula__calc{font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;margin-top:5px;letter-spacing:.01em}
+.emo-scope .emo-kair-sec-title{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
+  margin-bottom:12px;
+}
+.emo-scope .emo-kair-typerow{
+  display:flex;align-items:center;gap:12px;
+  border:1px solid var(--kair-border);border-radius:var(--kair-r-xs);
+  padding:10px 14px;margin-bottom:8px;font-size:13.5px;
+}
+.emo-scope .emo-kair-typerow__num{
+  width:22px;height:22px;border-radius:7px;flex-shrink:0;
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.emo-scope .emo-kair-typerow__txt{flex:1;min-width:0}
+.emo-scope .emo-kair-typerow__name{font-weight:600;line-height:1.3}
+.emo-scope .emo-kair-typerow__hint{display:block;font-size:11.5px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-level{
+  border:1px solid var(--kair-border);border-left-width:4px;
+  border-radius:var(--kair-r-xs);
+  padding:14px 16px;margin-bottom:12px;background:var(--kair-surface);
+}
+.emo-scope .emo-kair-level--red{border-left-color:var(--kair-red)}
+.emo-scope .emo-kair-level--amber{border-left-color:var(--kair-amber)}
+.emo-scope .emo-kair-level--green{border-left-color:var(--kair-green)}
+.emo-scope .emo-kair-level--blue{border-left-color:var(--kair-blue)}
+.emo-scope .emo-kair-level__top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.emo-scope .emo-kair-level__range{font-size:13.5px;font-weight:700}
+.emo-scope .emo-kair-level--red .emo-kair-level__range{color:var(--kair-red)}
+.emo-scope .emo-kair-level--amber .emo-kair-level__range{color:var(--kair-amber)}
+.emo-scope .emo-kair-level--green .emo-kair-level__range{color:var(--kair-green)}
+.emo-scope .emo-kair-level--blue .emo-kair-level__range{color:var(--kair-blue)}
+.emo-scope .emo-kair-level__result{
+  background:var(--kair-bg);border:1px solid var(--kair-border);
+  border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--kair-text-2);
+}
+.emo-scope .emo-kair-level__result b{color:var(--kair-text)}
+.emo-scope .emo-kair-note{
+  background:var(--kair-blue-soft);border-radius:var(--kair-r-xs);
+  padding:13px 15px;font-size:12.5px;color:var(--kair-text-2);
+  margin-top:18px;
+}
+.emo-scope .emo-kair-note b{color:var(--kair-text)}
+.emo-scope .emo-kair-note--warn{background:var(--kair-amber-soft)}
+.emo-scope .emo-kair-drawer__foot{
+  display:flex;gap:10px;padding:16px 24px;border-top:1px solid var(--kair-border);flex-shrink:0;
+}
+.emo-scope .emo-kair-drawer__foot .emo-kair-btn{flex:1;justify-content:center}
+
+/* ---------- Overlay + Modal premium ---------- */
+.emo-scope .emo-kair-overlay{
+  position:fixed;inset:0;background:rgba(20,33,61,.45);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  padding:28px;z-index:80;
+  opacity:0;pointer-events:none;transition:opacity var(--kair-t);
+}
+.emo-scope .emo-kair-overlay.emo-is-open{opacity:1;pointer-events:auto}
+.emo-scope .emo-kair-modal{
+  background:var(--kair-surface);border-radius:var(--kair-r-md);
+  width:960px;max-width:100%;max-height:calc(100vh - 56px);
+  display:flex;flex-direction:column;
+  box-shadow:var(--kair-shadow-modal);
+  transform:translateY(10px) scale(.985);
+  transition:transform var(--kair-t);
+}
+.emo-scope .emo-kair-modal--sm{width:560px}
+.emo-scope .emo-kair-overlay.emo-is-open .emo-kair-modal{transform:none}
+.emo-scope .emo-kair-modal__head{
+  padding:20px 26px;border-bottom:1px solid var(--kair-border);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-shrink:0;
+}
+.emo-scope .emo-kair-modal__head h2{font-size:17px;font-weight:800}
+.emo-scope .emo-kair-modal__head p{font-size:12.5px;color:var(--kair-text-2);margin-top:2px}
+.emo-scope .emo-kair-modal__body{
+  padding:24px 26px;overflow-y:auto;flex:1;
+  display:grid;grid-template-columns:5fr 7fr;gap:26px;
+}
+.emo-scope .emo-kair-modal--sm .emo-kair-modal__body{display:block}
+.emo-scope .emo-kair-modal__foot{
+  padding:16px 26px;border-top:1px solid var(--kair-border);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0;
+  background:var(--kair-surface);border-radius:0 0 var(--kair-r-md) var(--kair-r-md);
+}
+.emo-scope .emo-kair-modal__coltitle{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
+  padding-bottom:10px;border-bottom:1px solid var(--kair-border);margin-bottom:16px;
+}
+.emo-scope .emo-kair-field{margin-bottom:14px}
+.emo-scope .emo-kair-field label{
+  display:block;font-size:12.5px;font-weight:600;color:var(--kair-text-2);
+  margin-bottom:6px;
+}
+.emo-scope .emo-kair-field label b{color:var(--kair-red)}
+.emo-scope .emo-kair-field textarea.emo-kair-input{min-height:84px;resize:vertical}
+.emo-scope .emo-kair-field__row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.emo-scope .emo-kair-field__hint{font-size:11.5px;color:var(--kair-text-3);margin-top:5px}
+.emo-scope .emo-kair-field__error{
+  display:none;font-size:12px;color:var(--kair-red);margin-top:5px;font-weight:500;
+}
+.emo-kair-field.emo-has-error .emo-kair-input,
+.emo-scope .emo-kair-field.emo-has-error .emo-kair-select{border-color:var(--kair-red)}
+.emo-scope .emo-kair-field.emo-has-error .emo-kair-field__error{display:block}
+.emo-scope .emo-kair-routebox{
+  display:flex;align-items:center;gap:8px;
+  background:var(--kair-bg);border:1px dashed var(--kair-border);
+  border-radius:var(--kair-r-xs);padding:10px 12px;
+  font-size:12.5px;color:var(--kair-text-2);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.emo-scope .emo-kair-routebox b{color:var(--kair-text);font-weight:600}
+.emo-scope .emo-kair-evlist{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.emo-scope .emo-kair-evchip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  border-radius:999px;padding:6px 8px 6px 12px;font-size:12px;font-weight:600;
+  max-width:100%;
+}
+.emo-scope .emo-kair-evchip svg{width:13px;height:13px;flex-shrink:0}
+.emo-scope .emo-kair-evchip button{
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--kair-blue);transition:background var(--kair-t);
+}
+.emo-scope .emo-kair-evchip button:hover{background:var(--kair-surface)}
+.emo-scope .emo-kair-evchip button svg{width:10px;height:10px}
+
+/* ---------- Radio-cards de concepto de aptitud ---------- */
+.emo-scope .emo-kair-conceptos{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.emo-scope .emo-kair-concepto{
+  position:relative;
+  border:1px solid var(--kair-border);border-radius:var(--kair-r-xs);
+  padding:12px 14px;cursor:pointer;user-select:none;
+  transition:border-color var(--kair-t), background var(--kair-t), box-shadow var(--kair-t);
+}
+.emo-scope .emo-kair-concepto:hover{border-color:var(--kair-blue);box-shadow:var(--kair-shadow)}
+.emo-scope .emo-kair-concepto input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:pointer;z-index:1}
+.emo-scope .emo-kair-concepto__dot{
+  width:16px;height:16px;border-radius:50%;flex-shrink:0;
+  border:2px solid var(--kair-text-3);margin-bottom:8px;
+  transition:all var(--kair-t);
+}
+.emo-scope .emo-kair-concepto.emo-is-sel{border-color:var(--kair-blue);background:var(--kair-blue-soft)}
+.emo-scope .emo-kair-concepto.emo-is-sel .emo-kair-concepto__dot{border-color:var(--kair-blue);box-shadow:inset 0 0 0 3px var(--kair-surface);background:var(--kair-blue)}
+.emo-scope .emo-kair-concepto__name{font-size:13.5px;font-weight:700;line-height:1.3}
+.emo-scope .emo-kair-concepto__desc{font-size:11.5px;color:var(--kair-text-3);margin-top:2px}
+.emo-scope .emo-kair-interp{
+  border:1px solid var(--kair-border);border-left-width:4px;border-radius:var(--kair-r-xs);
+  padding:12px 14px;font-size:12.5px;color:var(--kair-text-2);
+  margin-top:14px;background:var(--kair-surface);
+  transition:border-color var(--kair-t);
+}
+.emo-scope .emo-kair-interp b{color:var(--kair-text)}
+.emo-scope .emo-kair-interp--green{border-left-color:var(--kair-green)}
+.emo-scope .emo-kair-interp--amber{border-left-color:var(--kair-amber)}
+.emo-scope .emo-kair-interp--blue{border-left-color:var(--kair-blue)}
+.emo-scope .emo-kair-interp--red{border-left-color:var(--kair-red)}
+.emo-scope .emo-kair-interp--neutral{border-left-color:var(--kair-text-3)}
+.emo-scope .emo-kair-interp.emo-is-error{border-left-color:var(--kair-red)}
+
+/* ---------- Pantalla detalle ---------- */
+.emo-scope .emo-kair-backline{margin-bottom:14px}
+.emo-scope .emo-kair-detailhero{
+  background:var(--kair-surface);border:1px solid var(--kair-border);
+  border-top:4px solid var(--kair-blue);
+  border-radius:var(--kair-r-md);box-shadow:var(--kair-shadow);
+  padding:22px 24px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+}
+.emo-scope .emo-kair-detailhero__id{display:flex;align-items:center;gap:16px;min-width:0}
+.emo-scope .emo-kair-detailhero__avatar{
+  width:56px;height:56px;border-radius:var(--kair-r-sm);
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  font-size:19px;font-weight:800;font-family:'Manrope',sans-serif;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.emo-scope .emo-kair-detailhero__name{font-size:20px;font-weight:800;font-family:'Manrope',sans-serif}
+.emo-scope .emo-kair-detailhero__meta{font-size:13px;color:var(--kair-text-2);margin-top:3px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.emo-scope .emo-kair-detailhero__score{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.emo-scope .emo-kair-detailgrid{display:grid;grid-template-columns:5fr 7fr;gap:16px;align-items:start}
+.emo-scope .emo-kair-secbox{padding:20px 22px}
+.emo-scope .emo-kair-secbox__title{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
+  display:flex;align-items:center;gap:9px;
+  padding-bottom:12px;border-bottom:1px solid var(--kair-border);margin-bottom:14px;
+}
+.emo-scope .emo-kair-secbox__title svg{width:17px;height:17px;color:var(--kair-blue)}
+.emo-scope .emo-kair-inforow{
+  display:flex;justify-content:space-between;gap:16px;
+  padding:9px 0;border-bottom:1px dashed var(--kair-border);font-size:13.5px;
+}
+.emo-scope .emo-kair-inforow:last-child{border-bottom:none}
+.emo-scope .emo-kair-inforow__k{color:var(--kair-text-2);flex-shrink:0}
+.emo-scope .emo-kair-inforow__v{font-weight:600;text-align:right}
+.emo-scope .emo-kair-obsbox{
+  background:var(--kair-bg);border-left:3px solid var(--kair-blue);
+  border-radius:8px;padding:12px 14px;font-size:13.5px;color:var(--kair-text-2);
+}
+.emo-scope .emo-kair-evrows{display:flex;flex-direction:column;gap:8px}
+.emo-scope .emo-kair-evrow{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid var(--kair-border);border-radius:var(--kair-r-xs);
+  padding:9px 12px;font-size:13px;
+}
+.emo-scope .emo-kair-evrow svg{width:15px;height:15px;color:var(--kair-blue);flex-shrink:0}
+.emo-scope .emo-kair-evrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emo-scope .emo-kair-evrow small{color:var(--kair-text-3);flex-shrink:0}
+.emo-scope .emo-kair-histrow{
+  display:flex;align-items:center;gap:12px;
+  border:1px solid var(--kair-border);border-radius:var(--kair-r-xs);
+  padding:10px 14px;font-size:13.5px;margin-bottom:8px;
+}
+.emo-scope .emo-kair-histrow.emo-is-current{border-color:var(--kair-blue);background:var(--kair-blue-soft)}
+.emo-scope .emo-kair-histrow__txt{flex:1;min-width:0}
+.emo-scope .emo-kair-histrow__t{font-weight:600;line-height:1.3}
+.emo-scope .emo-kair-histrow__s{display:block;font-size:11.5px;color:var(--kair-text-3);margin-top:1px}
+.emo-scope .emo-kair-histrow small{color:var(--kair-text-3);flex-shrink:0}
+
+/* ---------- Toasts ---------- */
+.emo-scope .emo-kair-toasts{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  z-index:100;pointer-events:none;width:min(480px,calc(100vw - 32px));
+}
+.emo-scope .emo-kair-toast{
+  display:flex;align-items:center;gap:11px;
+  background:var(--kair-navy);color:var(--kair-surface);
+  border-radius:var(--kair-r-sm);padding:13px 18px;
+  box-shadow:var(--kair-shadow-modal);
+  font-size:13.5px;font-weight:500;
+  animation:kair-toastin 220ms ease;
+  max-width:100%;
+}
+.emo-scope .emo-kair-toast svg{width:17px;height:17px;flex-shrink:0}
+.emo-scope .emo-kair-toast--ok svg{color:var(--kair-green)}
+.emo-scope .emo-kair-toast--warn svg{color:var(--kair-amber)}
+.emo-scope .emo-kair-toast--err svg{color:var(--kair-red)}
+.emo-scope .emo-kair-toast--info svg{color:var(--kair-blue)}
+.emo-scope .emo-kair-toast.emo-is-leaving{animation:kair-toastout 200ms ease forwards}
+@keyframes kair-toastin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes kair-toastout{to{opacity:0;transform:translateY(10px)}}
+
+/* ---------- Impresión del marco normativo ---------- */
+@media print{
+  body.emo-print-marco .emo-kair-header,
+  body.emo-print-marco .emo-kair-tabs,
+  body.emo-print-marco .emo-kair-main,
+  body.emo-print-marco .emo-kair-modal,
+  body.emo-print-marco .emo-kair-overlay,
+.emo-scope body.emo-print-marco .emo-kair-toasts{display:none !important}
+.emo-scope body.emo-print-marco .emo-kair-backdrop{display:none}
+.emo-scope body.emo-print-marco .emo-kair-drawer{
+    position:static;width:100%;max-width:100%;
+    transform:none;box-shadow:none;display:block;
+  }
+  body.emo-print-marco .emo-kair-drawer__close,
+.emo-scope body.emo-print-marco .emo-kair-drawer__foot{display:none}
+}
+
+/* ---------- Movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce){
+.emo-scope *, .emo-scope *::before, .emo-scope *::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
+
+/* ---------- Responsive: escritorio → móvil ---------- */
+@media (max-width:1024px){
+.emo-scope .emo-kair-modal__body{grid-template-columns:1fr}
+.emo-scope .emo-kair-detailgrid{grid-template-columns:1fr}
+.emo-scope .emo-kair-rgrid, .emo-scope .emo-kair-rgrid--eq{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+.emo-scope .emo-kair-header{padding:14px 16px;flex-wrap:wrap}
+.emo-scope .emo-kair-header__actions{width:100%;justify-content:flex-start;flex-wrap:wrap}
+.emo-scope .emo-kair-tabs{padding:0 14px}
+.emo-scope .emo-kair-tab{padding:11px 12px;font-size:13px}
+.emo-scope .emo-kair-main{padding:18px 14px 48px}
+.emo-scope .emo-kair-kpis{grid-template-columns:repeat(2,1fr);gap:10px}
+.emo-scope .emo-kair-kpi{padding:14px}
+.emo-scope .emo-kair-kpi__value{font-size:22px}
+.emo-scope .emo-kair-filters__count{margin-left:0;width:100%;justify-content:space-between}
+.emo-scope .emo-kair-search{max-width:none}
+  /* Tabla → tarjetas */
+.emo-scope .emo-kair-tablewrap{display:none}
+.emo-scope .emo-kair-mobilelist{display:flex;flex-direction:column;gap:10px;padding:14px}
+.emo-scope .emo-kair-mcard{
+    border:1px solid var(--kair-border);border-radius:var(--kair-r-sm);
+    padding:14px;display:flex;flex-direction:column;gap:10px;
+  }
+.emo-scope .emo-kair-mcard__top{display:flex;align-items:center;gap:11px}
+.emo-scope .emo-kair-mcard__name{font-weight:700;font-size:14px;line-height:1.3}
+.emo-scope .emo-kair-mcard__nit{font-size:12px;color:var(--kair-text-3)}
+.emo-scope .emo-kair-mcard__meta{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    font-size:12.5px;color:var(--kair-text-2);
+  }
+.emo-scope .emo-kair-mcard__vence{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--kair-text-2)}
+.emo-scope .emo-kair-mcard__actions{display:flex;gap:8px;border-top:1px dashed var(--kair-border);padding-top:10px}
+.emo-scope .emo-kair-mcard__actions .emo-kair-btn{flex:1;justify-content:center}
+.emo-scope .emo-kair-chartrow__label{width:96px;font-size:12px}
+.emo-scope .emo-kair-detailhero{padding:16px}
+.emo-scope .emo-kair-doctile{margin-left:14px;margin-right:14px}
+.emo-scope .emo-kair-drawer{width:100vw}
+}
+@media (min-width:761px){
+.emo-scope .emo-kair-mobilelist{display:none}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RAÍZ DEL MÓDULO
+   El prototipo se montaba en el <body> de su propia pagina y pintaba ahi el fondo;
+   dentro de la app el componente recibe un contenedor del documento principal, asi
+   que la caja que crea render() tiene que pintar el fondo y ocupar el alto. Sin esto
+   el modulo quedaba transparente y se veia el fondo de la app detras, y las tarjetas
+   "flotaban" sin lienzo.
+   ══════════════════════════════════════════════════════════════════ */
+.emo-scope{
+  background:var(--kair-bg);
+  color:var(--kair-text);
+  font-family:'Inter','Manrope',system-ui,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  height:100%;
+  min-height:100%;
+  -webkit-font-smoothing:antialiased;
+}
+.emo-scope *,
+.emo-scope *::before,
+.emo-scope *::after{box-sizing:border-box}
+
+/* ---------- Nodos generados por la logica ----------
+   El prototipo define estas clases para las filas de lista, pero sus contenedores de
+   texto estan pensados para hijos de bloque (en el prototipo eran <div>). La logica los
+   arma con <span>, que son en linea: sin esto el nombre y el detalle salen pegados en
+   la misma linea (se veia como "Carlos Andres RojasPeriodico - vence..."). */
+.emo-scope .emo-kair-alertrow__txt,
+.emo-scope .emo-kair-lastrow__txt,
+.emo-scope .emo-kair-histrow__txt,
+.emo-scope .emo-kair-mcell__txt{display:flex;flex-direction:column;min-width:0}
+.emo-scope .emo-kair-alertrow__name,
+.emo-scope .emo-kair-lastrow__name,
+.emo-scope .emo-kair-histrow__t,
+.emo-scope .emo-kair-mcell__txt b{font-weight:600;font-size:13.5px;line-height:1.3}
+.emo-scope .emo-kair-alertrow__sub,
+.emo-scope .emo-kair-lastrow__sub,
+.emo-scope .emo-kair-histrow__s,
+.emo-scope .emo-kair-mcell__txt small{font-size:12px;color:var(--kair-text-3)}
+.emo-scope .emo-kair-alertrow__dias{
+  font-size:12px;font-weight:700;color:var(--kair-amber);flex-shrink:0;
+}
+/* Celda del trabajador en la tabla (nombre arriba, cedula abajo) */
+.emo-scope .emo-workercell{display:flex;align-items:center;gap:11px;min-width:0}
+.emo-scope .emo-workercell > span{display:flex;flex-direction:column;min-width:0}
+.emo-scope .emo-workercell b{font-weight:600;font-size:13.5px;line-height:1.3}
+.emo-scope .emo-workercell small{font-size:12px;color:var(--kair-text-3)}
+.emo-scope .emo-kair-mut{color:var(--kair-text-3);display:block;font-size:12px;margin-top:1px}
+.emo-scope .emo-kair-inlineempty{
+  padding:18px 20px;font-size:13px;color:var(--kair-text-3);text-align:center;
+}
+.emo-scope .emo-kair-docpill{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+  background:var(--kair-blue-soft);color:var(--kair-blue);font-size:12.5px;font-weight:600;
+  border:1px solid transparent;cursor:pointer;
+}
+.emo-scope .emo-kair-docpill:hover{border-color:var(--kair-blue)}
+
+/* ---------- Chips de concepto y estado ----------
+   El prototipo define los colores de chip como clases sueltas (emo-chip--green).
+   La logica los arma como 'emo-chip emo-chip--<color>': hace falta la base. */
+.emo-scope .emo-chip{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+  font-size:11.5px;font-weight:600;white-space:nowrap;
+}
+.emo-scope .emo-chip--green{background:var(--kair-green-soft);color:var(--kair-green)}
+.emo-scope .emo-chip--amber{background:var(--kair-amber-soft);color:var(--kair-amber)}
+.emo-scope .emo-chip--red{background:var(--kair-red-soft);color:var(--kair-red)}
+.emo-scope .emo-chip--blue{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.emo-scope .emo-chip--slate{background:rgba(20,33,61,.06);color:var(--kair-text-2)}
+
+/* ---------- Acciones de la tabla ---------- */
+.emo-scope .emo-row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.emo-scope .emo-icon-btn{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--kair-r-xs);
+  border:1px solid var(--kair-border);background:var(--kair-surface);color:var(--kair-text-2);
+  font-size:12px;font-weight:600;cursor:pointer;transition:var(--kair-t);
+}
+.emo-scope .emo-icon-btn:hover{border-color:var(--kair-blue);color:var(--kair-blue)}
+.emo-scope .emo-kair-mcell{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  padding:11px 13px;border:1px solid var(--kair-border);border-radius:var(--kair-r-sm);
+  background:var(--kair-surface);cursor:pointer;
+}
+.emo-scope .emo-kair-mcell:hover{border-color:var(--kair-blue)}
+.emo-scope .emo-kair-histrow__dot{
+  width:9px;height:9px;border-radius:999px;background:var(--kair-blue);flex-shrink:0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DEFENSA CONTRA BOOTSTRAP 5.3
+   La app carga Bootstrap desde internet. El paso de prefijado ya renombro
+   `.modal` -> `.emo-kair-modal` y `.overlay` -> `.emo-kair-overlay`, asi que NO
+   chocan. Igual se anulan las variables `--bs-*` que Bootstrap impone a cualquier
+   `.card`/`.btn`, porque el modulo reusa esas palabras en `.emo-kair-card`/`.emo-btn`.
+   Queda explicito para que no vuelva a pasar lo de 📦761.
+   ══════════════════════════════════════════════════════════════════ */
+.emo-scope .emo-kair-modal,
+.emo-scope .emo-kair-overlay,
+.emo-scope .emo-kair-backdrop{
+  --bs-modal-zindex:auto;
+  --bs-modal-width:auto;
+  --bs-modal-bg:transparent;
+  --bs-modal-border-width:0;
+  outline:0;
+}
+.emo-scope .emo-kair-card{
+  --bs-card-spacer-y:0;
+  --bs-card-spacer-x:0;
+  --bs-card-border-width:1px;
+  --bs-card-bg:transparent;
+}
+.emo-scope .emo-btn{
+  --bs-btn-padding-x:12px;
+  --bs-btn-padding-y:8px;
+  --bs-btn-font-size:13.5px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODO OSCURO — lo agrega K+AIR, el prototipo no lo traia.
+   Cubre los DOS atributos que aplica `scripts/theme-manager.js`:
+   `data-theme="dark"` (tema "Sistema" con el SO oscuro) y
+   `data-theme="dark-legacy"` (tema "Oscuro" elegido a mano).
+   Los nombres de token son los del PROTOTIPO (los `--kair-*` que el declara en su
+   propio bloque), no los de la app: el modulo trae su propia paleta.
+   ══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .emo-scope,
+[data-theme="dark-legacy"] .emo-scope,
+[data-theme="dark"] .emo-scope.emo-kair-overlay,
+[data-theme="dark-legacy"] .emo-scope.emo-kair-overlay,
+[data-theme="dark"] .emo-scope.emo-kair-backdrop,
+[data-theme="dark-legacy"] .emo-scope.emo-kair-backdrop,
+[data-theme="dark"] .emo-scope.emo-kair-drawer,
+[data-theme="dark-legacy"] .emo-scope.emo-kair-drawer,
+[data-theme="dark"] .emo-scope.emo-kair-toasts,
+[data-theme="dark-legacy"] .emo-scope.emo-kair-toasts{
+  --kair-bg:#131824;
+  --kair-surface:#1B2230;
+  --kair-text:#E8EDF5;
+  --kair-text-2:#98A4B8;
+  --kair-text-3:#6F7C93;
+  --kair-border:#2C3648;
+  --kair-blue:#5B93E8;
+  --kair-blue-hover:#6EA3EF;
+  --kair-blue-soft:rgba(91,147,232,.16);
+  --kair-green:#45C99B;
+  --kair-green-soft:rgba(69,201,155,.16);
+  --kair-amber:#E8B455;
+  --kair-amber-soft:rgba(232,180,85,.16);
+  --kair-red:#E8737F;
+  --kair-red-soft:rgba(232,115,127,.16);
+  --kair-navy:#0F1520;
+  --kair-shadow:0 1px 2px rgba(0,0,0,.3);
+  --kair-shadow-lift:0 6px 24px rgba(0,0,0,.4);
+  --kair-shadow-modal:0 24px 64px rgba(0,0,0,.55);
+}
+/* Colores que el prototipo escribio a mano sobre los nodos. Los nombres de clase son
+   los REALES de la hoja (todos `emo-kair-*`), verificados contra ella: en el primer
+   intento estaban inventados y no aplicaban. */
+[data-theme="dark"] .emo-scope .emo-kair-table tbody tr:hover,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-table tbody tr:hover{background:#1F2836}
+[data-theme="dark"] .emo-scope .emo-kair-empty,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-empty{background:#1B2230}
+[data-theme="dark"] .emo-scope .emo-kair-avatar,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-avatar{color:#0F1520}
+[data-theme="dark"] .emo-scope .emo-kair-btn--primary,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-btn--primary{color:#0F1520}
+[data-theme="dark"] .emo-scope .emo-kair-concepto.emo-is-sel,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-concepto.emo-is-sel{border-color:var(--kair-blue)}
+[data-theme="dark"] .emo-scope .emo-kair-histrow.emo-is-current,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-histrow.emo-is-current{border-color:var(--kair-blue)}
+[data-theme="dark"] .emo-scope .emo-kair-chartrow__track,
+[data-theme="dark-legacy"] .emo-scope .emo-kair-chartrow__track{background:#262F3F}

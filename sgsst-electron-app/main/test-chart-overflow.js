@@ -159,7 +159,9 @@ check('Cache-bust: kair-components.css con ?v= nuevo (📦758)',
 const homes = {
   'gestion-integral': 'GESTION-INTEGRAL-20260918-bar-chart-html',
   'gestion-peligros': 'GESTION-PELIGROS-20260918-bar-chart-html',
-  'gestion-salud': 'GESTION-SALUD-20260918-bar-chart-html',
+  // 📦763 — se bumpeó al corregir el error de consola del home (memoria de sesión
+  // faltante + `this.widgets` inexistente). La versión vieja era ...bar-chart-html.
+  'gestion-salud': 'GESTION-SALUD-20260918-fix-home-cache',
   'recursos': 'RECURSOS-20260918-bar-chart-html',
   'gestion-amenazas': 'GESTION-AMENAZAS-20260918-bar-chart-html',
   'verificacion': 'VERIFICACION-20260918-bar-chart-html',

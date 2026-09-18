@@ -5417,8 +5417,11 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
 
     } else if (submoduleName === "3.1.4 Evaluaciones médicas") {
       console.log("📄 Cargando submódulo: Evaluaciones médicas");
-      if (window.EvaluacionesMedicasComponent) {
-        const evaluacionesComponent = new window.EvaluacionesMedicasComponent(
+      // 📦762 — Componente rediseñado (premium v2) y con certificados persistidos
+      // en la base. Reemplaza al explorador de carpetas anterior; el marcado del
+      // prototipo se inyecta desde el propio componente (ver `_armar-emo.js`).
+      if (window.EvaluacionesMedicasView) {
+        const evaluacionesComponent = new window.EvaluacionesMedicasView(
           submoduleContentDiv,
           currentCompany,
           moduleName,
@@ -5427,7 +5430,7 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
         );
         evaluacionesComponent.render();
       } else {
-        console.error('❌ EvaluacionesMedicasComponent no encontrado');
+        console.error('❌ EvaluacionesMedicasView no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 

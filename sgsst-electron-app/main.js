@@ -99,6 +99,9 @@ const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridg
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
 // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
 const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = require('./main/profesiograma-bridge');
+// 📦762 — Certificados de aptitud del submódulo 3.1.4 Evaluaciones Médicas
+// Ocupacionales. Antes no se guardaba nada (era solo un explorador de carpetas).
+const { registerEvaluacionesMedicasHandlers, SCHEMA_SQL: EMO_CERT_SCHEMA_SQL } = require('./main/evaluaciones-medicas-bridge');
 // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario
 // Hasta ahora el iframe de Bandeja Integrada estaba disponible para todos los
 // usuarios. Con este bridge, el admin puede condicionar el acceso por usuario
@@ -643,6 +646,16 @@ function initDbOnce() {
       console.log('[DB] 📦531 · Tabla evaluacion_action_plans creada/verificada');
     } catch (eapErr) {
       console.error('[DB] 📦531 · Error creando tabla evaluacion_action_plans:', eapErr.message);
+    }
+
+    // 📦762 — Schema de certificados de aptitud del submódulo 3.1.4
+    // Evaluaciones Médicas Ocupacionales. El control de vigencia se consulta
+    // por vencimiento, y el historial del trabajador por (empresa_id, cedula).
+    try {
+      db.exec(EMO_CERT_SCHEMA_SQL);
+      console.log('[DB] 📦762 · Tabla evaluaciones_medicas_certificados creada/verificada');
+    } catch (emoErr) {
+      console.error('[DB] 📦762 · Error creando tabla evaluaciones_medicas_certificados:', emoErr.message);
     }
 
     // 📦 Bandeja Integrada — Schema de emails (5 tablas: connections, threads,
@@ -10143,6 +10156,8 @@ try {
   // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
   registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
   registerEvaluacionActionPlansHandlers(app, { getDb });
+  // 📦762 — Certificados de aptitud de 3.1.4 Evaluaciones Médicas Ocupacionales
+  registerEvaluacionesMedicasHandlers(app, { getDb });
   registerSyncHandlers(app, { getDb });
   // 📦658 — Handlers IPC del módulo FURAT (upload-file, list-metadata)
   registerFuratHandlers(app);

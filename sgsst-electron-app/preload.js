@@ -727,6 +727,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     guardar: (params) => ipcRenderer.invoke('evaluacion-action-plans:guardar', params),
     eliminar: (params) => ipcRenderer.invoke('evaluacion-action-plans:eliminar', params)
   },
+  // 📦762 — Certificados de aptitud del submódulo 3.1.4 Evaluaciones Médicas
+  // Ocupacionales. El módulo antes solo listaba archivos del disco y no guardaba
+  // nada; ahora los certificados se persisten por empresa y alimentan el control
+  // de vigencia. La renovación agrega un certificado nuevo enlazado al anterior
+  // (Res. 2346 de 2007 art. 12: el certificado previo no se modifica ni se borra).
+  evaluacionesMedicas: {
+    listar: (params) => ipcRenderer.invoke('evaluaciones-medicas:listar', params),
+    guardar: (params) => ipcRenderer.invoke('evaluaciones-medicas:guardar', params),
+    eliminar: (params) => ipcRenderer.invoke('evaluaciones-medicas:eliminar', params)
+  },
   // 📦537 — Sync multipc. Sincroniza datos de una empresa entre varias PCs
   // usando una carpeta compartida (Google Drive por ahora, TrueNAS después).
   // La BD local de cada PC queda intacta; solo se sincroniza un JSON resumen.

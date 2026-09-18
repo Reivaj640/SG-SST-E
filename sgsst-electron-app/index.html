@@ -16,6 +16,11 @@
        Antes eran dos hojas (`--ei-*` + `--k-*`) más un bloque de CSS que el propio
        componente inyectaba al <head> con `:root` global; eso se eliminó. -->
   <link rel="stylesheet" href="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-view.css?v=EVAL-20260918-v2c-toast-strip">
+  <!-- 📦762 — 3.1.4 Evaluaciones Médicas: hoja del módulo. TODOS sus selectores van bajo
+       `.emo-scope` y las clases llevan el prefijo privado `emo-`. OJO: si esta hoja no
+       se carga, el módulo queda sin estilos y los iconos (SVG sin tamaño en línea) se
+       estiran a todo el ancho, inflando la pantalla. -->
+  <link rel="stylesheet" href="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-v2.css?v=EMO-20260918-v2-premium">
   <link rel="stylesheet" href="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.css">
 
   <!-- Scripts para animación de fondo (Vanta.js) -->
@@ -292,6 +297,12 @@
   <script src="modules/gestion-salud/reportes-accidentes/reportes-accidentes-logic.js"></script>
   <script src="modules/gestion-salud/restricciones-medicas/restricciones-medicas-logic.js"></script>
   <script src="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-logic.js"></script>
+  <!-- 📦762 — 3.1.4 Evaluaciones Médicas: componente rediseñado (premium v2) con los
+       certificados de aptitud persistidos en la base. Va DESPUÉS del `-logic.js` a
+       propósito: ese archivo también define `window.EvaluacionesMedicasComponent` (el
+       portal viejo) y el componente nuevo redefine ese global como alias; el orden
+       decide cuál queda. -->
+  <script src="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-v2.js?v=EMO-20260918-v2-premium"></script>
   <script src="modules/recursos/responsable-sg/responsable-sg-logic.js"></script>
   <script src="modules/gestion-amenazas/plan-prevencion/plan-prevencion-logic.js"></script>
   <script src="modules/gestion-amenazas/examenes-brigadista/examenes-brigadista-logic.js"></script>
@@ -318,7 +329,7 @@
   <script src="shared/sidebar-icons.js"></script>
   <script src="modules/gestion-integral/gestion-integral-home.js?v=GESTION-INTEGRAL-20260918-bar-chart-html"></script>
   <script src="modules/recursos/recursos-home.js?v=RECURSOS-20260918-bar-chart-html"></script>
-  <script src="modules/gestion-salud/gestion-salud-home.js?v=GESTION-SALUD-20260918-bar-chart-html"></script>
+  <script src="modules/gestion-salud/gestion-salud-home.js?v=GESTION-SALUD-20260918-fix-home-cache"></script>
   <script src="modules/gestion-peligros/gestion-peligros-home.js?v=GESTION-PELIGROS-20260918-bar-chart-html"></script>
   <script src="modules/gestion-amenazas/gestion-amenazas-home.js?v=GESTION-AMENAZAS-20260918-bar-chart-html"></script>
   <!-- 📦709 (2026-08-15) — Módulo Gestión Humana (nuevo top-level, v0.1.191) -->

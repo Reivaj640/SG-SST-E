@@ -1,6 +1,27 @@
 // gestion-salud-home.js - Componente para el home del módulo "Gestión de la Salud"
 // 📦754 · Rediseño premium visual (header minimal + hero + 3 metric cards + chart + radar + grid).
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   📦763 — MEMORIA DE SESIÓN DEL HOME DE SALUD (faltaba por completo)
+
+   `refreshStats()` y el primer `renderMainArea` usaban `window._saludHomeState`
+   (`.cache` y `.lastUpdate`, dos Map por empresa) pero **ese objeto nunca se creaba
+   en ningún archivo**. La consecuencia era un error en consola al abrir el módulo:
+
+     [SALUD] Error refrescando estadísticas:
+     TypeError: Cannot read properties of undefined (reading 'cache')
+
+   y, como el `throw` cortaba la función ANTES de guardar, `this.saludStats` tampoco
+   se asignaba: el home quedaba sin datos y el hero mostraba 0 %.
+
+   Se define acá, una sola vez, al cargar el archivo. Es idempotente: si por algún
+   motivo ya existiera (otra versión cargada antes), se respeta.
+   ───────────────────────────────────────────────────────────────────────────── */
+window._saludHomeState = window._saludHomeState || {
+    cache: new Map(),        // empresa -> datos normalizados del home
+    lastUpdate: new Map()    // empresa -> marca de tiempo de la última carga
+};
+
 class GestionSaludHome {
     constructor(container, moduleName, submodules, companyName) {
         this.container = container;
@@ -84,6 +105,17 @@ class GestionSaludHome {
 
     /**
      * Refresca las estadísticas en segundo plano y actualiza los widgets existentes.
+     *
+     * 📦763 · Dos correcciones acá:
+     *   1. `this.saludStats` NUNCA se asignaba. El render activo (`renderMainArea`,
+     *      el de la línea ~1036) lee `this.saludStats`, así que quedaba siempre en
+     *      `null` y el home mostraba todo en 0. Los datos se guardaban solo en la
+     *      caché de sesión, que nadie leía.
+     *   2. Se pasa cada respuesta por `_adaptarRespuestasSalud()` porque el backend
+     *      usa OTROS nombres de campo que el render (ver el comentario del helper).
+     *      Sin el adaptador, la misma función que arregla el error habría dejado el
+     *      panel mostrando 0 donde el backend SÍ tiene datos (ej.: ausentismo tiene
+     *      5 casos y el render esperaba `totalTrabajadores`).
      */
     async refreshStats() {
         const company = this.currentCompany;
@@ -101,19 +133,27 @@ class GestionSaludHome {
         window.electronAPI.getIndicadoresSaludStats(company)
       ]);
 
-      const newData = {
-        inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
-        ausentismo: ausResult.success ? ausResult.data : null,
-        accidentes: accResult.success ? accResult.data : null,
-        examenes: examResult.success ? examResult.data : null,
-        seguimientos: segResult.success ? segResult.data : null,
-        remisiones: remResult.success ? remResult.data : null,
-        indicadores: indicadoresResult.success ? indicadoresResult.data : null
-      };
+      const newData = this._adaptarRespuestasSalud({
+        recursos: recursosResult,
+        ausentismo: ausResult,
+        accidentes: accResult,
+        examenes: examResult,
+        seguimientos: segResult,
+        remisiones: remResult,
+        indicadores: indicadoresResult
+      });
 
-            // Guardar en caché de sesión
+            // 📦763 · Guardar en la memoria de sesión, DEFENSIVO:
+            // si por lo que sea no estuviera definida, se crea acá en vez de tirar
+            // un TypeError que corta toda la carga (era el error de consola).
+            if (!window._saludHomeState) {
+                window._saludHomeState = { cache: new Map(), lastUpdate: new Map() };
+            }
             window._saludHomeState.cache.set(company, newData);
             window._saludHomeState.lastUpdate.set(company, Date.now());
+
+            // 📦763 · Asignar al estado del componente: es lo que LEE el render.
+            this.saludStats = newData;
 
             // Actualizar widgets si el componente sigue montado
             this.updateWidgetsUI(newData);
@@ -123,8 +163,110 @@ class GestionSaludHome {
         }
     }
 
+    /**
+     * 📦763 — Adaptador de nombres: BACKEND → RENDER.
+     *
+     * Los manejadores de `main.js` devuelven nombres de campo DISTINTOS a los que lee
+     * `renderMainArea`. Verificado midiendo las 7 respuestas con la empresa real:
+     *
+     *   ausentismo   -> { pendientes, activos, cerrados, total }   (el render lee tasaAusentismo / totalTrabajadores)
+     *   accidentes   -> { totalYear, mesActual, mensual[12] }      (el render lee total / investigados / pendientes)
+     *   examenes     -> { totalYear, mesActual }                   (el render lee totalExamenes / realizados / pendientes)
+     *   seguimientos -> { totalAnio, realizadosAnio }              (el render lee total / completados / pendientes)
+     *
+     * Mapeo aplicado (evidencia, no suposición):
+     *   accidentes.total        <- totalYear      (accidentes del año en curso)
+     *   accidentes.pendientes   <- totalYear      (el backend NO distingue investigados:
+     *                                              se asume pendiente, como hacía el widget
+     *                                              original de este mismo archivo)
+     *   examenes.totalExamenes  <- totalYear
+     *   examenes.realizados     <- mesActual
+     *   seguimientos.total      <- totalAnio
+     *   seguimientos.completados<- realizadosAnio
+     *   seguimientos.pendientes <- totalAnio - realizadosAnio
+     *   ausentismo.totalCasos   <- total          (dato NUEVO y correcto que antes se perdía;
+     *                                              NO se inventa `totalTrabajadores` porque el
+     *                                              backend no lo informa: se deja 0 para que el
+     *                                              render no calcule una tasa falsa)
+     *
+     * Los campos que el backend no informa quedan en 0 en vez de `undefined`: así el
+     * render no propaga `NaN` a los porcentajes ni al gráfico.
+     */
+    _adaptarRespuestasSalud(r) {
+        /* A prueba de fallos: si llega sin argumento (por ejemplo porque una consulta
+           falló antes de armar el objeto), se sigue con un objeto vacío en vez de
+           romper. Devuelve todo en 0 / null, que es exactamente lo que el render
+           espera para una empresa sin datos. */
+        r = r || {};
+        const datos = (res) => (res && res.success !== false)
+            ? (res.data !== undefined ? res.data : (res.stats !== undefined ? res.stats : null))
+            : null;
+        const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : 0;
+
+        const aus = datos(r.ausentismo) || {};
+        const acc = datos(r.accidentes) || {};
+        const exa = datos(r.examenes) || {};
+        const seg = datos(r.seguimientos) || {};
+        const rec = datos(r.recursos) || {};
+        const rem = datos(r.remisiones) || {};
+        const ind = datos(r.indicadores) || {};
+
+        const accTotal = num(acc.totalYear);
+        const exaTotal = num(exa.totalYear);
+        const segTotal = num(seg.totalAnio);
+        const segHechos = num(seg.realizadosAnio);
+
+        return {
+            // `recursos.stats` puede venir en null (empresa sin datos): no hay que romper
+            inducciones: (rec && rec.inducciones) ? rec.inducciones : null,
+            ausentismo: {
+                totalCasos: num(aus.total),
+                pendientes: num(aus.pendientes),
+                activos: num(aus.activos),
+                cerrados: num(aus.cerrados),
+                // El backend no informa trabajadores ni tasa: se dejan en 0 para que el
+                // render no arme una tasa con datos que no existen.
+                totalTrabajadores: 0,
+                tasaAusentismo: 0,
+                diasPerdidos: 0
+            },
+            accidentes: {
+                total: accTotal,
+                pendientes: accTotal,
+                investigados: 0,
+                mensual: Array.isArray(acc.mensual) ? acc.mensual : []
+            },
+            examenes: {
+                totalExamenes: exaTotal,
+                realizados: num(exa.mesActual),
+                pendientes: Math.max(0, exaTotal - num(exa.mesActual))
+            },
+            seguimientos: {
+                total: segTotal,
+                completados: segHechos,
+                pendientes: Math.max(0, segTotal - segHechos)
+            },
+            remisiones: rem && typeof rem === 'object' ? rem : {},
+            indicadores: ind && typeof ind === 'object' ? ind : {}
+        };
+    }
+
     updateWidgetsUI(data) {
         if (!data) return;
+
+        /* 📦763 — ORIGEN DEL ERROR DE CONSOLA.
+           Esta función es del sistema de WIDGETS viejo (`this.widgets.*`), que el
+           rediseño premium dejó sin usar: `this.widgets` **nunca se inicializa** (no
+           hay `this.widgets = {}` en el constructor ni en ningún lado del archivo) y
+           los `create*Widget()` son código muerto. Las guardas de cada línea eran
+           `if (data.X && this.widgets.X)`: la segunda mitad lanzaba
+           `TypeError: Cannot read properties of undefined (reading 'ausentismo')`
+           —el nombre de la propiedad es el que se estaba leyendo— y ese `throw` lo
+           atrapaba el catch de `refreshStats`, que lo mostraba como
+           "[SALUD] Error refrescando estadísticas". El error NO era de la caché: era
+           esta línea, y la caché era un problema aparte (también corregido arriba).
+           Se sale temprano si no hay widgets en vez de tocar propiedades de undefined. */
+        if (!this.widgets) return;
 
         // Actualizar Inducciones
         if (data.inducciones && this.widgets.inducciones) {
@@ -155,7 +297,11 @@ if (data.accidentes) {
 this.renderAccidentesChart(data.accidentes);
 }
 if (data.indicadores) {
-this.renderIndicesChart(data.indicadores);
+    // 📦763 · Guarda de existencia: si el método no estuviera definido, esto lanzaba
+    // otro TypeError que el catch de refreshStats reportaba igual que el anterior.
+    if (typeof this.renderIndicesChart === 'function') {
+        this.renderIndicesChart(data.indicadores);
+    }
 }
     }
 
@@ -411,7 +557,12 @@ renderMainArea(container) {
         widgetsContainer.className = 'widgets-container';
 
         // Obtener datos iniciales del caché de sesión si existen
-        const cachedData = window._saludHomeState.cache.get(this.currentCompany) || {};
+        // 📦763 · Defensivo: si la memoria de sesión no estuviera disponible, se sigue
+        // con un objeto vacío en vez de tirar un TypeError (misma causa raíz del error
+        // de consola que se corrigió en refreshStats).
+        const cachedData = (window._saludHomeState && window._saludHomeState.cache)
+            ? (window._saludHomeState.cache.get(this.currentCompany) || {})
+            : {};
 
         // Crear widgets pasando datos cacheados para renderizado instantáneo
         const examenesWidget = this.createExamenesWidget(cachedData.examenes);
