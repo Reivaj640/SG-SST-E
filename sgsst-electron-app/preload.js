@@ -735,7 +735,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   evaluacionesMedicas: {
     listar: (params) => ipcRenderer.invoke('evaluaciones-medicas:listar', params),
     guardar: (params) => ipcRenderer.invoke('evaluaciones-medicas:guardar', params),
-    eliminar: (params) => ipcRenderer.invoke('evaluaciones-medicas:eliminar', params)
+    eliminar: (params) => ipcRenderer.invoke('evaluaciones-medicas:eliminar', params),
+    // 📦766 — Adjuntar el PDF que entrega la IPS: abre el diálogo nativo de
+    // archivos y lo copia a la carpeta del año en la ruta del backend
+    // (3. Gestión de la Salud / 3.1.4 / 3.1.4.1 / <AÑO>). Devuelve la ruta final.
+    adjuntar: (params) => ipcRenderer.invoke('evaluaciones-medicas:adjuntar-certificado', params),
+    // 📦768 — Lee el PDF adjuntado (reutiliza la extracción de restricciones
+    // médicas) y devuelve nombre, cédula, cargo, tipo, IPS, fecha, concepto y
+    // recomendaciones para pre-llenar el formulario.
+    extraer: (params) => ipcRenderer.invoke('evaluaciones-medicas:extraer-certificado', params)
   },
   // 📦537 — Sync multipc. Sincroniza datos de una empresa entre varias PCs
   // usando una carpeta compartida (Google Drive por ahora, TrueNAS después).

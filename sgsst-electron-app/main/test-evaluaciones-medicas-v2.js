@@ -29,12 +29,15 @@ const ROOT = path.join(__dirname, '..');
 const DIR = path.join(ROOT, 'modules', 'gestion-salud', 'evaluaciones-medicas');
 const F_JS = path.join(DIR, 'evaluaciones-medicas-v2.js');
 const F_CSS = path.join(DIR, 'evaluaciones-medicas-v2.css');
-const F_MARKUP = path.join(DIR, 'evaluaciones-medicas-v2-markup.html');
 const F_BRIDGE = path.join(ROOT, 'main', 'evaluaciones-medicas-bridge.js');
 
 const js = fs.readFileSync(F_JS, 'utf8');
 const css = fs.readFileSync(F_CSS, 'utf8');
-const markup = fs.readFileSync(F_MARKUP, 'utf8');
+// 📦766 — la copia legible `evaluaciones-medicas-v2-markup.html` se eliminó en la
+// auditoría (era código muerto). La fuente de verdad del marcado es el bloque
+// MARKUP_RAW embebido en el propio componente; se extrae directamente de ahí.
+const mMarkup = js.match(/var MARKUP_RAW = `([\s\S]*?)`;\s*$/m);
+const markup = mMarkup ? mMarkup[1] : '';
 const bridge = fs.readFileSync(F_BRIDGE, 'utf8');
 const renderer = fs.readFileSync(path.join(ROOT, 'renderer.js'), 'utf8');
 const preload = fs.readFileSync(path.join(ROOT, 'preload.js'), 'utf8');
@@ -234,9 +237,77 @@ check('main.js: requiere el puente',
 check('main.js: crea el esquema al abrir la base',
   /db\.exec\(EMO_CERT_SCHEMA_SQL\)/.test(mainJs));
 check('main.js: registra los handlers',
-  /registerEvaluacionesMedicasHandlers\(app, \{ getDb \}\)/.test(mainJs));
-check('preload.js: expone evaluacionesMedicas.listar/guardar/eliminar',
-  /evaluacionesMedicas:\s*\{[\s\S]{0,400}evaluaciones-medicas:listar[\s\S]{0,300}evaluaciones-medicas:guardar[\s\S]{0,300}evaluaciones-medicas:eliminar/.test(preload));
+  /registerEvaluacionesMedicasHandlers\(app, \{ getDb, getCompanyRootPath \}\)/.test(mainJs));
+check('main.js: pasa la ruta de empresa al puente (para el archivo por año)',
+  /\{ getDb, getCompanyRootPath \}/.test(mainJs));
+check('preload.js: expone evaluacionesMedicas.listar/guardar/eliminar/adjuntar',
+  /evaluacionesMedicas:\s*\{[\s\S]{0,400}evaluaciones-medicas:listar[\s\S]{0,300}evaluaciones-medicas:guardar[\s\S]{0,300}evaluaciones-medicas:eliminar[\s\S]{0,400}evaluaciones-medicas:adjuntar-certificado/.test(preload));
+check('puente: registra el canal adjuntar-certificado',
+  /evaluaciones-medicas:adjuntar-certificado/.test(bridge));
+check('puente: el adjuntar copia a la ruta del backend por año',
+  /Certificados de Aptitud Medica/.test(bridge) && /dialog\.showOpenDialog/.test(bridge) && /copyFile/.test(bridge));
+check('v2.js: adjuntar usa el diálogo nativo (ya no el prompt de la carpeta)',
+  /evaluacionesMedicas\.adjuntar/.test(js) && !/window\.prompt\('Elegí el certificado escaneado/.test(js));
+/* 📦767-fix — el bug que hacía que "Registrar" no mostrara nada: abrirOverlay se
+   llamaba con el id del modal INTERNO, pero la visibilidad la controla la CAPA
+   (.emo-kair-overlay.emo-is-open en el CSS). Estas dos verificaciones lo atrapan. */
+(function () {
+  var llamadas = (jsSinComentarios.match(/abrirOverlay\('([^']+)'\)/g) || [])
+    .map(function (m) { return m.slice(14, -2); });
+  var sinCapa = llamadas.filter(function (id) {
+    var m = markup.match(new RegExp('<div[^>]*id="' + id + '"[^>]*>'));
+    if (!m) return true; // ni existe
+    var tag = m[0];
+    if (/emo-kair-overlay/.test(tag)) return false; // es la capa misma
+    /* es el modal interno: el último <div> abierto antes debe ser la capa overlay */
+    var idx = markup.indexOf(tag);
+    var tags = markup.slice(0, idx).match(/<div class="([^"]*)"[^>]*>/g);
+    var padre = tags ? tags[tags.length - 1] : null;
+    return !(padre && /emo-kair-overlay/.test(padre));
+  });
+  check('v2.js: cada abrirOverlay apunta a una capa .emo-kair-overlay (o a un modal cuyo padre la es)',
+    llamadas.length > 0 && sinCapa.length === 0, 'sin capa: ' + sinCapa.join(', '));
+})();
+check('v2.js: el clic en el fondo reconoce las clases reales (emo-kair-overlay / emo-kair-backdrop)',
+  /classList\.contains\('emo-kair-overlay'\)/.test(js) && /classList\.contains\('emo-kair-backdrop'\)/.test(js));
+
+/* ══════════════ D. EXTRACCIÓN DE DATOS DEL PDF (📦768) ══════════════ */
+check('puente: registra el canal extraer-certificado',
+  /evaluaciones-medicas:extraer-certificado/.test(bridge));
+check('preload.js: expone evaluacionesMedicas.extraer',
+  /extraer:\s*\(params\)\s*=>\s*ipcRenderer\.invoke\('evaluaciones-medicas:extraer-certificado'/.test(preload));
+check('v2.js: al adjuntar se dispara la lectura del PDF',
+  /rellenarDesdePdf\(res\.path\)/.test(js) && /evaluacionesMedicas\.extraer/.test(js));
+(function () {
+  /* Unidad del extractor con el texto real (reducido) del certificado Comfamiliar. */
+  var muestra = [
+    'COMFAMILIAR ATLANTICO',
+    'CONCEPTO OCUPACIONAL',
+    'DOCUMENTO : CC 1047239028 PACIENTE: CARIDAD CALDERON CARELIS DELCARMEN',
+    'Evaluación Ocupacional: Evaluación Médica de Ingreso Fecha de atención: 11/06/2026',
+    'Cargo: AUXILIAR DE COCINA Fecha de atención: 11/06/2026',
+    'RECOMENDACIONES LABORALES:',
+    'USO DE EPP SEGUN RIESGO',
+    'MANEJO EPS/ARL:',
+    'CONCEPTO MEDICO OCUPACIONAL: APTO PARA EL CARGO'
+  ].join('\n');
+  var d = mod.extraerDatosCertificado(muestra);
+  check('Extractor: nombre, cédula, cargo, tipo, fecha, IPS y concepto del PDF',
+    d.trabajador === 'CARIDAD CALDERON CARELIS DELCARMEN' &&
+    d.cedula === '1047239028' &&
+    d.cargo === 'AUXILIAR DE COCINA' &&
+    d.tipo === 'Preingreso' &&
+    d.fechaExamen === '2026-06-11' &&
+    d.ips === 'COMFAMILIAR ATLANTICO' &&
+    d.conceptoDb === 'APTO' &&
+    d.recomendaciones.indexOf('USO DE EPP') !== -1,
+    JSON.stringify(d));
+  /* La IPS dice "Evaluación Médica de Ingreso"; el catálogo del formulario lo
+     maneja como 'Preingreso'. Si esto cambia, el campo queda vacío y el botón
+     de guardar queda bloqueado por la validación. */
+  check('Extractor: "de Ingreso" de la IPS → Preingreso del catálogo',
+    mod.extraerDatosCertificado('Evaluación Ocupacional: Evaluación Médica de Ingreso').tipo === 'Preingreso');
+})();
 check('renderer.js: monta el componente nuevo',
   /window\.EvaluacionesMedicasView\b/.test(renderer));
 /* ESTA es la verificacion que habria atrapado el bug visual: sin la hoja cargada, los

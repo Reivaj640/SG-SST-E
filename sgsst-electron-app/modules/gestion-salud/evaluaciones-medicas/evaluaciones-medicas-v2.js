@@ -64,7 +64,6 @@
     { clave: 'aplazado', db: 'APLAZADO', etiqueta: 'Aplazado', chip: 'blue', desc: 'Requiere exámenes complementarios', nivel: 'blue' },
     { clave: 'noapto', db: 'NO APTO', etiqueta: 'No Apto', chip: 'red', desc: 'No autorizado para el cargo', nivel: 'red' }
   ];
-  var RUTA_BASE = '/Salud/3.1.4.1 Certificados/';
   var DIAS_POR_VENCER = 30;
 
   /* ══════════════ ESTADO ══════════════ */
@@ -627,8 +626,14 @@
 
     var ruta = $('#rm-ruta');
     if (ruta) {
-      var nom = (base && base.trabajador) || '';
-      ruta.textContent = RUTA_BASE + (nom ? nom.toUpperCase() : 'TRABAJADOR') + '/';
+      /* 📦767 — la pista refleja el archivo real (al editar) o la carpeta del
+         año según la fecha del examen (registro nuevo). */
+      if (base && base.archivo) {
+        ruta.textContent = String(base.archivo).split(/[\\/]/).pop();
+      } else {
+        var fAnio = ((($('#rm-fecha') || {}).value) || hoyISO() || '').slice(0, 4);
+        ruta.textContent = 'carpeta ' + (fAnio || String(new Date().getFullYear()));
+      }
     }
     actualizarVencimiento();
     actualizarInterpretacion();
@@ -771,49 +776,125 @@
     }
   }
 
-  /* El prototipo pide "adjuntar certificado escaneado". El escaneo vive en la carpeta
-     del módulo, así que se elige desde ahí con el mismo listado que ya usa el
-     submódulo (no hay diálogo nativo de archivos expuesto al renderer). */
+  /* 📦766 — Adjuntar el certificado que entrega la IPS. Antes se elegía entre
+     los archivos que ya estaban en la carpeta del módulo; ahora se abre el
+     diálogo nativo de archivos y el puente copia el PDF a la ruta del backend
+     por año (…/3.1.4.1. Certificados de Aptitud Medica/<AÑO del examen>/),
+     creando las carpetas si hacen falta. El año sale de la fecha del examen. */
   async function adjuntarCertificado() {
     var a = api();
     var ruta = $('#rm-ruta');
-    if (!a || !a.getDocumentFolders) { toast('No se puede explorar la carpeta del módulo.', 'err'); return; }
+    if (!a || !a.evaluacionesMedicas || typeof a.evaluacionesMedicas.adjuntar !== 'function') {
+      toast('Este canal de archivos no está disponible.', 'err');
+      return;
+    }
     try {
-      var res = await a.getDocumentFolders({
-        companyName: empresaId, moduleName: 'Gestión de la Salud', submoduleName: '3.1.4 Evaluaciones médicas'
-      });
-      var pdfs = ((res && res.files) || []).filter(function (f) {
-        return /\.(pdf|png|jpe?g)$/i.test(f.name || '');
-      });
-      if (!pdfs.length) {
-        toast('No hay PDF ni imágenes en la carpeta del módulo. Guardá el certificado ahí y volvé a intentar.', 'info');
+      var fecha = (($('#rm-fecha') || {}).value || '');
+      var anio = (fecha.length >= 4) ? fecha.slice(0, 4) : String(new Date().getFullYear());
+      var res = await a.evaluacionesMedicas.adjuntar({ empresaId: empresaId, anio: anio });
+      if (!res) return;
+      if (res.success === false) {
+        if (res.error && res.error.code === 'CANCELADO') return; // el usuario cerró el diálogo
+        toast('No se pudo adjuntar: ' + ((res.error && res.error.message) || 'error desconocido'), 'err');
+        klog('FORM', 'ADJUNTAR', 'ERR', (res.error && res.error.code) || 'unknown');
         return;
       }
-      var lista = pdfs.map(function (f, i) { return (i + 1) + ') ' + f.name; }).join('\n');
-      var elegido = window.prompt('Elegí el certificado escaneado:\n\n' + lista, '1');
-      var idx = parseInt(elegido, 10) - 1;
-      if (isNaN(idx) || idx < 0 || idx >= pdfs.length) return;
-      S.archivoFormulario = pdfs[idx].path;
-      if (ruta) ruta.textContent = pdfs[idx].path;
-      toast('Soporte adjuntado: ' + pdfs[idx].name, 'ok');
-      klog('FORM', 'ADJUNTAR', 'OK', pdfs[idx].name);
+      S.archivoFormulario = res.path;
+      if (ruta) ruta.textContent = res.fileName || String(res.path).split(/[\\/]/).pop();
+      toast('Certificado guardado en la carpeta ' + anio + ': ' + (res.fileName || ''), 'ok');
+      klog('FORM', 'ADJUNTAR', 'OK', res.path);
+      /* 📦768 — leer el PDF adjuntado y pre-llenar lo que falte del formulario */
+      await rellenarDesdePdf(res.path);
     } catch (e) {
       klog('FORM', 'ADJUNTAR', 'ERR', e.message);
-      toast('No se pudo leer la carpeta: ' + e.message, 'err');
+      toast('No se pudo adjuntar: ' + e.message, 'err');
+    }
+  }
+
+  /* 📦768 — el puente extrae los datos del certificado (misma lectura de PDF que
+     usa restricciones médicas) y acá se pre-llenan SOLO los campos vacíos: lo que
+     el usuario ya haya escrito no se toca. */
+  async function rellenarDesdePdf(pdfPath) {
+    var a = api();
+    if (!a || !a.evaluacionesMedicas || typeof a.evaluacionesMedicas.extraer !== 'function') return;
+    try {
+      var res = await a.evaluacionesMedicas.extraer({ pdfPath: pdfPath });
+      if (!res || res.success !== true || !res.data) {
+        if (res && res.error && res.error.code === 'FORMATO_NO_RECONOCIDO') {
+          toast(res.error.message, 'info');
+        }
+        return;
+      }
+      var d = res.data;
+      var llenados = [];
+      var siVacio = function (sel, valor, etiqueta) {
+        var n = $(sel);
+        if (n && valor && !n.value) { n.value = valor; llenados.push(etiqueta); }
+      };
+      siVacio('#rm-nombre', d.trabajador, 'nombre');
+      siVacio('#rm-cedula', d.cedula ? puntosCedula(d.cedula) : '', 'cédula');
+      siVacio('#rm-cargo', d.cargo, 'cargo');
+      siVacio('#rm-ips', d.ips, 'IPS');
+      siVacio('#rm-recomendaciones', d.recomendaciones, 'recomendaciones');
+
+      var f = $('#rm-fecha');
+      if (f && d.fechaExamen) {
+        /* La fecha viene pre-llenada con HOY por defecto: el dato del PDF gana
+           sobre ese valor, pero no sobre una fecha que el usuario haya elegido. */
+        if (!f.value || f.value === hoyISO()) {
+          f.value = d.fechaExamen;
+          llenados.push('fecha');
+        }
+      }
+      var selTipo = $('#rm-tipo');
+      if (selTipo && d.tipo && !selTipo.value) {
+        var opt = null;
+        for (var i = 0; i < selTipo.options.length; i++) {
+          if (selTipo.options[i].value === d.tipo) { opt = selTipo.options[i]; break; }
+        }
+        if (opt) { selTipo.value = d.tipo; llenados.push('tipo'); }
+      }
+      if (d.conceptoDb && !conceptoElegido()) {
+        var c = null;
+        for (var j = 0; j < CONCEPTOS.length; j++) { if (CONCEPTOS[j].db === d.conceptoDb) { c = CONCEPTOS[j]; break; } }
+        if (c) { marcarConcepto(c.clave); llenados.push('concepto'); }
+      }
+      if (llenados.length) {
+        actualizarVencimiento();
+        actualizarInterpretacion();
+        validarFormulario();
+        toast('Datos leídos del PDF: ' + (d.trabajador || d.cedula || 'certificado') + ' · ' + llenados.join(', '), 'ok');
+        klog('FORM', 'EXTRAER', 'OK', llenados.join(','));
+      }
+    } catch (e) {
+      klog('FORM', 'EXTRAER', 'ERR', e.message);
     }
   }
 
   /* ══════════════ OVERLAYS (pila + Esc) ══════════════ */
   var pila = [];
-  function abrirOverlay(id) {
+  /* 📦767-fix — la visibilidad la controla la CAPA overlay (.emo-kair-overlay +
+     .emo-is-open en el CSS), no el modal interno. Si nos pasan el id del modal
+     interno (ej. 'modal-cert'), resolvemos su capa padre para no repetir el bug
+     donde el formulario "abría" (llegaba al log) pero nunca se mostraba. */
+  function _capaOverlay(id) {
     var el = $('#' + id);
+    if (!el) return null;
+    if (el.classList.contains('emo-kair-modal') && el.parentElement &&
+        el.parentElement.classList.contains('emo-kair-overlay')) {
+      return el.parentElement;
+    }
+    return el;
+  }
+  function abrirOverlay(id) {
+    var el = _capaOverlay(id);
     if (!el) return;
     el.classList.remove('emo-hidden');
     el.classList.add('emo-is-open');
     if (pila.indexOf(id) === -1) pila.push(id);
   }
   function cerrarOverlay(id) {
-    var el = $('#' + id);
+    var el = _capaOverlay(id);
     if (!el) return;
     el.classList.add('emo-hidden');
     el.classList.remove('emo-is-open');
@@ -925,7 +1006,9 @@
     var buscar = function (attr) { return t.closest ? t.closest('[' + attr + ']') : null; };
     var el;
 
-    if (t.classList && (t.classList.contains('emo-overlay') || t.classList.contains('emo-backdrop'))) {
+    /* 📦767-fix — las capas usan las clases emo-kair-overlay / emo-kair-backdrop;
+       con las viejas (emo-overlay / emo-backdrop) el clic en el fondo nunca cerraba. */
+    if (t.classList && (t.classList.contains('emo-kair-overlay') || t.classList.contains('emo-kair-backdrop') || t.classList.contains('emo-overlay') || t.classList.contains('emo-backdrop'))) {
       var oid = t.getAttribute('id');
       if (oid === 'backdrop-marco') cerrarMarco();
       else if (oid === 'overlay-doc') cerrarDocumento();
@@ -1552,7 +1635,7 @@
             <label>Ruta de archivo</label>
             <div class="emo-kair-routebox">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-              <span>/Salud/3.1.4.1 Certificados/<b id="rm-ruta">TRABAJADOR</b>/</span>
+              <span>3.1.4.1. Certificados de Aptitud Medica/<b id="rm-ruta">sin archivo</b></span>
             </div>
           </div>
           <div class="emo-kair-evlist" id="rm-lista"></div>
@@ -1759,6 +1842,11 @@
     on('#rm-fecha', 'change', function () {
       var v = $('#rm-vence');
       if (v && tipoVence((($('#rm-tipo') || {}).value || '')) && !v.value) v.value = sumaAnio(this.value);
+      /* 📦767 — la pista de archivo sigue el año de la fecha elegida */
+      var r = $('#rm-ruta');
+      if (r && !S.archivoFormulario) {
+        r.textContent = 'carpeta ' + (this.value || '').slice(0, 4);
+      }
       validarFormulario();
     });
     ['#rm-nombre', '#rm-cedula', '#rm-cargo', '#rm-area', '#rm-ips', '#rm-recomendaciones', '#rm-vence']

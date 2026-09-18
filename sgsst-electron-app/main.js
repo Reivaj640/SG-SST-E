@@ -10157,7 +10157,7 @@ try {
   registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
   registerEvaluacionActionPlansHandlers(app, { getDb });
   // 📦762 — Certificados de aptitud de 3.1.4 Evaluaciones Médicas Ocupacionales
-  registerEvaluacionesMedicasHandlers(app, { getDb });
+  registerEvaluacionesMedicasHandlers(app, { getDb, getCompanyRootPath });
   registerSyncHandlers(app, { getDb });
   // 📦658 — Handlers IPC del módulo FURAT (upload-file, list-metadata)
   registerFuratHandlers(app);
