@@ -158,10 +158,40 @@ html{-webkit-text-size-adjust:100%}
 
 
 /* ---------- Layout principal y pantallas ---------- */
-.emo-scope .emo-kair-main{max-width:1240px;margin:0 auto;padding:26px 28px 60px}
+/* La raíz inyectada (#emo-root) llena el contenedor que le da la app
+   (.submodule-content ya trae height:100%) y apila header + tabs + main en columna.
+   Selector por ID con la clase DEL PROPIO nodo: `.emo-scope #emo-root` NO servia —
+   exige un ANCESTRO con .emo-scope y #emo-root ES la caja .emo-scope (la clase se
+   la pone render() a si misma), asi que nunca coincidia y el display:flex quedaba
+   apagado. OJO tambien: la clase .emo-scope se la agregan los modales/cajon/avisos
+   que se mudan al <body>; por eso el layout NUNCA por clase sola. */
+.emo-scope#emo-root{height:100%;display:flex;flex-direction:column;min-height:0}
+.emo-scope .emo-kair-main{
+  max-width:1240px;margin:0 auto;padding:26px 28px 32px;
+  width:100%;flex:1 0 auto;
+  display:flex;flex-direction:column;min-height:0;
+}
 .emo-scope .emo-kair-screen{display:none}
-.emo-scope .emo-kair-screen.emo-is-active{display:block;animation:kair-fadein 220ms ease}
+.emo-scope .emo-kair-screen.emo-is-active{
+  display:flex;flex-direction:column;flex:1;min-height:0;
+  animation:kair-fadein 220ms ease;
+}
 @keyframes kair-fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* La tarjeta de la lista de certificados estira hasta el fondo de la ventana y la
+   zona de la tabla ocupa el espacio sobrante (el vacio queda DENTRO de la tarjeta,
+   no debajo de ella). Solo escritorio: en movil la tabla se reemplaza por tarjetas. */
+@media (min-width:761px){
+  .emo-scope #screen-certificados .emo-kair-card{
+    flex:1;min-height:0;display:flex;flex-direction:column;
+  }
+  .emo-scope #screen-certificados .emo-kair-tablewrap{
+    flex:1;min-height:0;overflow:auto;
+  }
+  .emo-scope #screen-certificados .emo-kair-empty.emo-is-visible{
+    display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;
+  }
+}
 
 /* ---------- KPI cards ---------- */
 .emo-scope .emo-kair-kpis{

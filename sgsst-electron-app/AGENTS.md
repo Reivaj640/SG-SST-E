@@ -606,6 +606,67 @@ async renderMainArea(container) {
     `test-chart-overflow.js` (que la fija por módulo).
   - Test: `node main/test-gestion-salud-home.js` (**26 checks**). Verificación en la app real:
     correr el home y afirmar que **no** aparece ningún error de consola.
+- **📦766 — AUDITORÍA DE EMO (3.1.4): fuga crítica de estilos al documento principal + higiene.**
+  El portal viejo (`evaluaciones-medicas-home.html`) se inyecta con `innerHTML` en el DOM
+  global (`evaluaciones-medicas-logic.js → loadPortalHome`), y su `<style>` traía `:root`,
+  `body` y `*` sueltos: al inyectarse, **pisaban las variables del design system global**
+  (`--primary`, `--bg-card`, `--text-muted`, `--border`, `--radius`, `--shadow-lg`) para toda
+  la app, y el reset `*` borraba márgenes/rellenos de todos los módulos. Además traía
+  `<link>` a Font Awesome y Google Fonts que también cargaban en global.
+  - **Fix P0 (doble candado)**: (1) todo el bloque `<style>` del portal quedó **acotado a
+    `#em-portal-container`** (cada selector, incluidas las reglas de una línea y las
+    `@media`), las variables pasaron de `:root` a ese contenedor y las fuentes externas se
+    cambiaron por la pila del sistema; (2) en `logic.js` el HTML recibido por `fetch` se
+    sanitiza con `html.replace(/<link[^>]*>/gi, '')` **antes** del `innerHTML`.
+  - **Fix P1 (muertos)**: eliminados `index.js` (CommonJS sin uso), `evaluaciones-component.js`
+    (apuntaba a `evaluaciones-viewer.html`, que no existe) y `evaluaciones-medicas-v2-markup.html`
+    (copia estática del marcado embebido en el v2; nadie lo cargaba).
+  - **Fix P2 (prevención viewer)**: `evaluaciones-medicas-view.css` definía `:root { --em-* }`.
+    Vivía solo en el iframe, pero si algún día se linkeaba en `index.html` filtraría. Ahora
+    las variables y el reset están en `body.em-viewer-scope` y el `<body>` de
+    `evaluaciones-medicas-view.html` lleva esa clase — fuera del iframe las reglas no
+    coinciden con nada y no pueden fugar.
+  - **Fix P3 (offline)**: los 8 iconos Font Awesome del portal (`fa-arrow-left`,
+    `fa-stethoscope`, `fa-file-medical`, `fa-plus-circle`, `fa-chart-pie`, `fa-clock`,
+    `fa-file-export`, `fa-shield-alt`) se reemplazaron por **SVG inline** estilo Lucide
+    (`stroke="currentColor"`, dimensionados con `#em-portal-container svg { width:1em; height:1em }`),
+    y se quitó el CDN. OJO: `evaluaciones-medicas-view.html` y `exportar-informe-seguimiento.html`
+    (ventana nueva) **siguen con Font Awesome CDN** — queda como deuda conocida (funcionan,
+    pero sin internet no cargan iconos).
+  - **Regla durable**: cuando un HTML se inyecta con `innerHTML` en el DOM principal, su
+    `<style>` se activa en GLOBAL. Acotar todo a un contenedor propio (`#id`) y sanitizar
+    `<link>` antes de inyectar. Nunca confiar en que "solo se usa dentro de su módulo".
+- **📦767 — EMO (3.1.4): adjuntar el PDF que entrega la IPS con diálogo nativo + copia por
+  año.** Antes "adjuntar" solo elegía entre los archivos que ya estaban en la carpeta del
+  módulo (con un `prompt` numerado). Ahora el canal `evaluaciones-medicas:adjuntar-certificado`
+  (puente) abre `dialog.showOpenDialog`, copia el PDF a
+  `<empresa>/3. Gestión de la Salud/3.1.4 Evaluaciones médicas/3.1.4.1. Certificados de
+  Aptitud Medica/<AÑO del examen>/` y devuelve la ruta final que se guarda en el registro.
+  - `_resolverSubcarpeta(base, prefijo, clave, nombreCanonico)`: encuentra la carpeta real
+    aunque varíe el nombre ("3. Gestión de la Salud", "3. Gestion de la salud"…) y la crea
+    con nombre canónico si falta. Verificado contra la estructura real del Drive.
+  - El año sale de la fecha del examen del formulario (`#rm-fecha`); sin fecha, año actual.
+  - Nunca pisa un archivo: "CARELIS CARIDAD (1).pdf". El renderer trata `CANCELADO` en
+    silencio (el usuario cerró el diálogo).
+  - Cache-bump: `EMO-20260918-v3-adjuntar-pdf`. Test: 89 checks (`_handlerAdjuntar` y
+    `_resolverSubcarpeta` exportados para pruebas).
+  - **📦767-fix (modal)**: `abrirOverlay('modal-cert')` ponía `emo-is-open` en el modal
+    INTERNO, pero la visibilidad la controla la CAPA (`.emo-kair-overlay.emo-is-open`), así
+    que el formulario "abría" en el log y nunca se mostraba. `_capaOverlay(id)` resuelve la
+    capa padre cuando le pasan el modal. Mismo caso con el clic en el fondo: buscaba clases
+    viejas (`emo-overlay`) cuando el diseño usa `emo-kair-overlay`/`emo-kair-backdrop`. El
+    test de humo ahora atrapa ambos (cada `abrirOverlay('…')` debe apuntar a una capa).
+- **📦768 — EMO (3.1.4): al adjuntar el PDF de la IPS, el formulario se pre-llena solo.**
+  Reutiliza `utils/remisionUtils.js` (la MISMA extracción de texto del submódulo de
+  restricciones médicas, pdf-parse). El puente expone `evaluaciones-medicas:extraer-certificado`
+  → `extraerDatosCertificado(text)` con regexes del formato "CONCEPTO OCUPACIONAL" de las IPS
+  (probado con Comfamiliar Atlántico): nombre, cédula, cargo, tipo (normalizado al catálogo),
+  IPS (primera línea), fecha de atención (→ ISO), concepto (`CONCEPTO MEDICO OCUPACIONAL:` →
+  APTO / APTO CON RECOMENDACIONES / APLAZADO / NO APTO) y recomendaciones. El renderer
+  (`rellenarDesdePdf`) llena SOLO los campos vacíos: lo que el usuario escribió no se toca.
+  Si el formato no se reconoce (sin cédula ni nombre), avisa y deja el formulario intacto.
+  - Cache-bump: `EMO-20260918-v5-lectura-pdf`. Test: 95 checks, incluida la unidad del
+    extractor con texto real embebido. Verificado de punta a punta con un PDF real del Drive.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
@@ -759,6 +820,8 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 5. **`child_process.spawn()` sin `windowsHide: true`** abre una ventana de consola negra que parpadea al cerrarse. SIEMPRE pasar `{windowsHide: true}` en Windows. Aplica a TODOS los spawn de Python/VBS/cscript (16 lugares en main.js + investigacion_handlers.js).
 
 6. **NO agregar colores/accent decorativos** cuando el usuario reporta clipping o bordes cortados. Primero diagnosticar geometría (padding, overflow, scrollbars, container width). El usuario prefiere fixes mínimos sin color.
+
+7. **`.emo-scope #emo-root` no coincide NUNCA** (submódulo Evaluaciones Médicas, sep 2026): `render()` le pone la clase `emo-scope` a la PROPIA caja raíz (`id="emo-root"`), así que un selector `.emo-scope #emo-root` exige un ancestro con esa clase que no existe → la regla queda muerta y el `display:flex` nunca aplica. La prueba de humo `CSS: TODOS los selectores están bajo .emo-scope` exige que cada selector EMPIECE con `.emo-scope`, así que la forma correcta es `.emo-scope#emo-root` (misma especificidad, mismo nodo, cumple la prueba). Síntoma: el arreglo "funciona" en un lab donde el `<body>` tiene clase `emo-scope` (el body actúa de ancestro) pero NO en la app real. Lección: validar los labs SIN clases auxiliares que la app real no tiene, y medir con `getComputedStyle` en la cadena real de contenedores (`.submodule-content` → `#emo-root` → `.emo-kair-main`) en vez de confiar en capturas.
 
 ### Stores y estado
 - Cada módulo tiene un `kair-store.js` con patrón pub/sub: `getState()`, `setState()`, `subscribe(fn)`, `actions`
