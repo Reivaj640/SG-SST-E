@@ -1,785 +1,817 @@
 <!DOCTYPE html>
+<!--
+  ============================================================================
+  K+AIR — Rendición de Cuentas SG-SST (Premium v1 · objetivo aprobado)
+  Modernización premium del formulario de rendición de cuentas:
+    - Topbar premium: empresa, vista previa, guardar, volver
+    - Fila de estado: píldora "Borrador · Periodo" + última actualización
+    - Navegación por pestañas (6 secciones) con subrayado activo estilo evaluación
+    - Ancho completo del contenedor en modo maximizado
+    - Estado Actual con medidor circular, chips dinámicos y acceso rápido
+  Contratos preservados (integración con rendicion-logic.js):
+    #backToModuleBtn, switchSection(id, el), saveReport(), finalizeReport()
+  ============================================================================
+-->
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Rendición de Cuentas SG-SST</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* =========================================
-           4. SISTEMA VISUAL OFICIAL (COHERENTE)
-           ========================================= */
-        :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR · Rendición de Cuentas SG-SST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ================= 1. TOKENS ================= */
+:root{
+  --kair-bg:#FBFCFB;
+  --kair-surface:#FFFFFF;
+  --kair-text:#14213D;
+  --kair-text-2:#748096;
+  --kair-text-3:#9AA4B8;
+  --kair-border:#E8EBEE;
+  --kair-blue:#2057B8;
+  --kair-blue-ink:#17418C;
+  --kair-blue-soft:#EAF0FB;
+  --kair-green:#1BB888;
+  --kair-green-soft:#E3F6EF;
+  --kair-amber:#E7A224;
+  --kair-amber-soft:#FBF1DE;
+  --kair-red:#DA5563;
+  --kair-red-soft:#FBE7E9;
+  --kair-slate:#64748B;
+  --kair-slate-soft:#F1F4F8;
+  --kair-radius:14px;
+  --kair-radius-sm:10px;
+  --kair-font-title:'Manrope','Inter',system-ui,sans-serif;
+  --kair-font-body:'Inter',system-ui,sans-serif;
+  --kair-t:180ms cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--kair-font-body);
+  background:var(--kair-bg);
+  color:var(--kair-text);
+  font-size:14px;
+  line-height:1.55;
+}
+button{font-family:inherit}
+svg{display:block}
 
-            --bg-body: #f8f9fa;
-            --bg-card: #ffffff;
-            --border-color: #dee2e6;
+.kair-page{max-width:none;margin:0;padding:20px 28px 64px}
 
-            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
+/* ================= 2. TOPBAR ================= */
+.kair-topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.kair-module-id{display:flex;align-items:center;gap:14px;min-width:0}
+.kair-module-id__icon{
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
+  background:var(--kair-blue-soft);color:var(--kair-blue);
+  display:flex;align-items:center;justify-content:center;
+}
+.kair-module-id__title{font-family:var(--kair-font-title);font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.kair-module-id__desc{font-size:13px;color:var(--kair-text-2);margin-top:2px}
+.kair-topbar__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
-            --radius: 0.375rem;
-            --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-        }
+/* Chips y botones */
+.kair-chip{
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+  border-radius:999px;background:var(--kair-slate-soft);color:var(--kair-slate);
+  font-size:12px;font-weight:600;white-space:nowrap;
+}
+.kair-chip--blue{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.kair-chip--green{background:var(--kair-green-soft);color:#0E8A63}
+.kair-chip--amber{background:var(--kair-amber-soft);color:#A96F0B}
+.kair-chip--red{background:var(--kair-red-soft);color:#B23440}
+.kair-btn{
+  display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;
+  border-radius:10px;border:1px solid transparent;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all var(--kair-t);white-space:nowrap;background:transparent;
+  color:var(--kair-text-2);
+}
+.kair-btn--outline{border-color:var(--kair-border);color:var(--kair-text);background:var(--kair-surface)}
+.kair-btn--outline:hover{border-color:var(--kair-blue);color:var(--kair-blue);background:var(--kair-blue-soft)}
+.kair-btn--primary{background:var(--kair-blue);color:#fff;box-shadow:0 4px 12px rgba(32,87,184,.25)}
+.kair-btn--primary:hover{background:var(--kair-blue-ink)}
+.kair-btn--ghost{color:var(--kair-text-2)}
+.kair-btn--ghost:hover{background:var(--kair-slate-soft);color:var(--kair-text)}
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+/* ================= 3. FILA DE ESTADO ================= */
+.kair-statusrow{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:16px;flex-wrap:wrap;
+}
+.kair-status-pill{
+  display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;
+  border-radius:999px;background:var(--kair-blue-soft);color:var(--kair-blue);
+  font-size:12px;font-weight:700;
+}
+.kair-status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--kair-blue)}
+.kair-status-meta{font-size:12px;color:var(--kair-text-3)}
 
-        body {
-            font-family: var(--font-family);
-            background-color: var(--bg-body);
-            color: var(--text-dark);
-            line-height: 1.5;
-            font-size: 0.9rem;
-        }
+/* ================= 4. TABS (estilo premium evaluación: subrayado activo) ================= */
+.kair-stepper{
+  display:flex;align-items:center;gap:6px;margin-top:16px;
+  border-bottom:1px solid var(--kair-border);padding:0 2px;overflow-x:auto;
+}
+.kstep{
+  display:inline-flex;align-items:center;gap:7px;padding:10px 12px;
+  border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
+  background:transparent;cursor:pointer;
+  font-size:13.5px;font-weight:600;color:var(--kair-text-2);white-space:nowrap;
+  transition:all var(--kair-t);flex-shrink:0;
+}
+.kstep svg{width:16px;height:16px;flex-shrink:0}
+.kstep:hover{color:var(--kair-text);background:transparent}
+.kstep.is-active{color:var(--kair-blue);border-bottom-color:var(--kair-blue);background:transparent;font-weight:700}
+.kstep .pdot{width:7px;height:7px;border-radius:50%;background:var(--kair-amber);flex-shrink:0}
 
-        /* =========================================
-           HEADER — Card Pattern (k-section-card)
-           ========================================= */
-        .k-section-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-sm);
-            flex-shrink: 0;
-        }
+/* ================= 5. CONTENIDO ================= */
+.kair-sections{margin-top:20px}
+.kview{display:none;animation:kfade .28s ease}
+.kview.is-active{display:block}
+@keyframes kfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-        .header-back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            padding: 0.375rem 0.75rem;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            color: #5a6378;
-            background: transparent;
-            border: none;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            transition: background 0.15s ease;
-            font-family: var(--font-family);
-        }
+.kair-card{
+  background:var(--kair-surface);border:1px solid var(--kair-border);
+  border-radius:var(--kair-radius);padding:20px 22px;margin-bottom:16px;
+}
+.kair-card__head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.kair-card__title{font-family:var(--kair-font-title);font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px}
+.kair-card__title .tic{width:30px;height:30px;border-radius:9px;background:var(--kair-blue-soft);color:var(--kair-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kair-card__hint{font-size:12px;color:var(--kair-text-3);margin-top:-10px;margin-bottom:14px}
 
-        .header-back-btn:hover {
-            background: #e8f0fe;
-            color: var(--primary);
-        }
+/* Grids de formulario */
+.kfg{display:grid;gap:14px}
+.kfg--2{grid-template-columns:1fr 1fr}
+.kfg--3{grid-template-columns:repeat(3,1fr)}
+.kfld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.kfld__lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--kair-text-2)}
+.kfld__lbl--plain{text-transform:none;letter-spacing:0;font-size:13px}
+.kin{
+  width:100%;height:40px;padding:0 12px;border:1px solid var(--kair-border);
+  border-radius:var(--kair-radius-sm);font-family:inherit;font-size:13.5px;
+  color:var(--kair-text);background:#FDFDFE;transition:border-color var(--kair-t);
+}
+.kin:focus{outline:none;border-color:var(--kair-blue);background:#fff;box-shadow:0 0 0 3px rgba(32,87,184,.10)}
+textarea.kin{height:auto;min-height:96px;padding:10px 12px;resize:vertical;line-height:1.5}
+select.kin{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23748096' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+.kfld__meta{font-size:11.5px;color:var(--kair-text-3)}
+.kin[readonly]{background:var(--kair-slate-soft);color:var(--kair-text-2);cursor:default}
 
-        /* ── Tabs integrados ── */
-        .rendicion-tabs {
-            display: flex;
-            align-items: center;
-            background: #fdfdfd;
-            border-top: 1px solid var(--border-color);
-            padding: 0 1.5rem;
-            overflow-x: auto;
-        }
+/* Layout general: 2 columnas */
+.kgen{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;align-items:start}
+.kgen__main,.kgen__side{min-width:0}
 
-        .rendicion-tab {
-            padding: 0 1.25rem;
-            height: 46px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            border-bottom: 3px solid transparent;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
+/* ================= 6. ESTADO ACTUAL ================= */
+.kstate__gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:18px 0 20px}
+.kgauge{position:relative;width:min(390px,100%);height:270px;overflow:hidden}
+.kgauge svg{width:390px;height:390px;transform:rotate(0deg)}
+.kgauge .gtrack{fill:none;stroke:var(--kair-slate-soft);stroke-width:11.5;stroke-linecap:round}
+.kgauge .gfill{fill:none;stroke:var(--kair-green);stroke-width:11.5;stroke-linecap:round;transition:stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1)}
+.kgauge__pct{
+  position:absolute;left:0;right:0;top:178px;text-align:center;
+  font-family:var(--kair-font-title);font-size:40px;font-weight:800;color:var(--kair-text);letter-spacing:-.02em;
+}
+.kgauge__pct small{font-size:24px;font-weight:800}
+.kstate__sublbl{text-align:center;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--kair-text-2);margin-top:4px}
+.kstate__chips{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.kstate__divider{height:1px;background:var(--kair-border);margin:16px -22px}
+.kstate__foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.kstate__workers{display:flex;align-items:center;gap:12px}
+.kstate__workers .wico{width:36px;height:36px;border-radius:10px;background:var(--kair-blue-soft);color:var(--kair-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kstate__workers b{font-family:var(--kair-font-title);font-size:19px;font-weight:800;display:block;line-height:1.15}
+.kstate__workers span{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--kair-text-2)}
+.kstate__link{
+  display:inline-flex;align-items:center;gap:6px;border:none;background:transparent;
+  color:var(--kair-blue);font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.kstate__link:hover{text-decoration:underline}
 
-        .rendicion-tab:hover {
-            color: var(--primary);
-            background: #f0f7ff;
-        }
+/* ================= 7. TABLAS ================= */
+.ktable-wrap{width:100%;overflow-x:auto;border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm)}
+.ktable{width:100%;border-collapse:collapse;background:#fff;min-width:640px}
+.ktable th{
+  background:#F6F8FA;text-align:left;padding:10px 14px;font-size:10.5px;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--kair-text-2);
+  border-bottom:1px solid var(--kair-border);white-space:nowrap;
+}
+.ktable td{padding:12px 14px;border-bottom:1px solid var(--kair-border);font-size:13px;vertical-align:middle}
+.ktable tr:last-child td{border-bottom:none}
+.ktable tbody tr{transition:background var(--kair-t)}
+.ktable tbody tr:hover{background:#F8FAFC}
+.kpill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.kpill--green{background:var(--kair-green-soft);color:#0E8A63}
+.kpill--amber{background:var(--kair-amber-soft);color:#A96F0B}
+.kpill--red{background:var(--kair-red-soft);color:#B23440}
+.kpill--slate{background:var(--kair-slate-soft);color:var(--kair-slate)}
+.kiconbtn{
+  width:30px;height:30px;border-radius:8px;border:1px solid var(--kair-border);
+  background:#fff;color:var(--kair-text-2);cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center;transition:all var(--kair-t);
+}
+.kiconbtn:hover{border-color:var(--kair-blue);color:var(--kair-blue);background:var(--kair-blue-soft)}
 
-        .rendicion-tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
+/* Métricas mini (incidentes) */
+.kmetrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.kmetric{background:#F8FAFC;border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);padding:14px 16px;position:relative;overflow:hidden}
+.kmetric::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kair-slate)}
+.kmetric--danger::before{background:var(--kair-red)}
+.kmetric--warning::before{background:var(--kair-amber)}
+.kmetric b{font-family:var(--kair-font-title);font-size:22px;font-weight:800;display:block;line-height:1.1}
+.kmetric span{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--kair-text-2)}
 
-        /* Dark theme — Card Pattern */
-        [data-theme="dark"] .k-section-card {
-            background: #2d3748;
-            border-color: #4a5568;
-        }
+/* Firma */
+.ksign{
+  border:1.5px dashed #C9D2DE;border-radius:var(--kair-radius-sm);height:132px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--kair-text-3);background:#FDFDFE;margin-bottom:12px;cursor:pointer;transition:all var(--kair-t);
+}
+.ksign:hover{border-color:var(--kair-blue);color:var(--kair-blue);background:var(--kair-blue-soft)}
+.ksign__name{text-align:center;font-weight:700;font-size:13.5px;color:var(--kair-text)}
+.ksign__role{text-align:center;font-size:11.5px;color:var(--kair-text-2)}
 
-        [data-theme="dark"] .rendicion-tabs {
-            background: #2d3748;
-            border-top-color: #4a5568;
-        }
+/* CTA final */
+.kfinal{display:flex;justify-content:center;margin-top:8px}
+.kfinal .kair-btn{height:46px;padding:0 30px;font-size:14px;border-radius:12px;gap:9px}
 
-        [data-theme="dark"] .rendicion-tab {
-            color: #a0aec0;
-        }
+/* Toast */
+#toast{
+  visibility:hidden;min-width:260px;background:#14213D;color:#fff;text-align:left;
+  border-radius:12px;padding:13px 16px;position:fixed;z-index:2000;bottom:26px;right:26px;
+  opacity:0;transform:translateY(8px);transition:all .35s ease;font-size:13px;font-weight:600;
+  box-shadow:0 12px 30px rgba(20,33,61,.28);display:flex;align-items:center;gap:9px;
+}
+#toast.show{visibility:visible;opacity:1;transform:none}
 
-        [data-theme="dark"] .rendicion-tab:hover {
-            color: #90cdf4;
-            background: #4a5568;
-        }
+/* Acciones globales (ahora integradas en cada tarjeta; sección de botones superior opcional) */
+.kglobal-actions{display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px}
 
-        [data-theme="dark"] .rendicion-tab.active {
-            color: #90cdf4;
-            border-bottom-color: #90cdf4;
-        }
-
-        [data-theme="dark"] .header-back-btn {
-            color: #a0aec0;
-        }
-
-        [data-theme="dark"] .header-back-btn:hover {
-            background: #4a5568;
-            color: #90cdf4;
-        }
-
-        /* Responsive — Card Pattern */
-        @media (max-width: 900px) {
-            .rendicion-tabs {
-                padding: 0 1rem;
-            }
-
-            .rendicion-tab {
-                padding: 0 0.75rem;
-                font-size: 0.8125rem;
-            }
-        }
-
-        /* =========================================
-           CONTENIDO PRINCIPAL
-           ========================================= */
-        .container-fluid {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 1.5rem 2rem;
-        }
-        .section-view {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-        .section-view.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* =========================================
-           COMPONENTES DE FORMULARIO & TARJETAS
-           ========================================= */
-        .section-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-sm);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--text-dark);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Formularios Grid */
-        .form-grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-        .form-grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-        .form-control {
-            width: 100%;
-            padding: 0.6rem;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            font-size: 0.95rem;
-            background: #fdfdfd;
-        }
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: white;
-        }
-        textarea.form-control {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        /* Métricas KPI */
-        .metrics-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .metric-card-mini {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: var(--radius);
-            border-left: 4px solid var(--primary);
-        }
-        .metric-val {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-dark);
-        }
-        .metric-lbl {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
-        /* Tablas Estándar */
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-        }
-        .k-table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1000px;
-            background: white;
-        }
-        .k-table th {
-            background: #f1f3f5;
-            text-align: left;
-            padding: 0.85rem 1rem;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            border-bottom: 2px solid var(--border-color);
-            white-space: nowrap;
-        }
-        .k-table td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            vertical-align: middle;
-            font-size: 0.9rem;
-        }
-        .k-table tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        /* Estados */
-        .badge {
-            padding: 0.35rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        .badge-success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .badge-warning {
-            background: #fff3cd;
-            color: #856404;
-        }
-        .badge-danger {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        /* Botones */
-        .btn {
-            padding: 0.6rem 1.2rem;
-            border: none;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-dark);
-        }
-        .btn-outline:hover {
-            background: #f1f3f5;
-        }
-
-        /* Firma Digital Placeholder */
-        .signature-box {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--radius);
-            height: 150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            background: #fdfdfd;
-            margin-bottom: 1rem;
-        }
-
-        /* Toast */
-        #toast {
-            visibility: hidden;
-            min-width: 250px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 4px;
-            padding: 16px;
-            position: fixed;
-            z-index: 2000;
-            bottom: 30px;
-            right: 30px;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-        #toast.show {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
+/* ================= 8. RESPONSIVE ================= */
+@media (max-width:1000px){
+  .kgen{grid-template-columns:1fr}
+  .kfg--3{grid-template-columns:1fr 1fr}
+  .kair-stepper{flex-wrap:wrap;row-gap:0}
+}
+@media (max-width:680px){
+  .kair-page{padding:14px 14px 48px}
+  .kfg--2,.kfg--3,.kmetrics{grid-template-columns:1fr}
+  .kstate__divider{margin:16px -22px}
+}
+/* ================= 9. IMPRESIÓN ================= */
+@media print{
+  body{background:#fff}
+  .kair-topbar__actions,.kstep,.kglobal-actions,#toast{display:none !important}
+  .kview{display:block !important;page-break-after:always}
+  .kview:last-child{page-break-after:auto}
+  .kair-card{border:1px solid #ccc;box-shadow:none}
+}
+</style>
 </head>
 <body>
+<div class="kair-page">
 
-    <!-- HEADER — Card Pattern (k-section-card, tabs integrados) -->
-    <div class="k-section-card" style="margin-bottom:0; border-radius:0 0 var(--radius) var(--radius);">
-        <!-- Fila 1: contenido principal -->
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-            <div style="display:flex; align-items:center; gap:0.75rem;">
-                <i class="bi bi-file-earmark-check" style="color:#174ea6; font-size:1.25rem;"></i>
-                <div>
-                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Rendición de Cuentas SG-SST</h3>
-                    <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión del informe anual de rendición de cuentas del SG-SST.</p>
-                </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:0.75rem;">
-                <button class="header-back-btn" id="backToModuleBtn" title="Volver al módulo principal">
-                    <i class="fas fa-arrow-left"></i> Volver
-                </button>
-            </div>
-        </div>
-        <!-- Fila 2: tabs integrados -->
-        <div class="rendicion-tabs">
-            <div class="rendicion-tab active" onclick="switchSection('general', this)">1. General</div>
-            <div class="rendicion-tab" onclick="switchSection('resultados', this)">2. Resultados SG-SST</div>
-            <div class="rendicion-tab" onclick="switchSection('normativo', this)">3. Normativo & Riesgos</div>
-            <div class="rendicion-tab" onclick="switchSection('incidentes', this)">4. Incidentes & AT</div>
-            <div class="rendicion-tab" onclick="switchSection('plan', this)">5. Plan de Acción</div>
-            <div class="rendicion-tab" onclick="switchSection('cierre', this)">6. Cierre & Firmas</div>
-        </div>
+  <!-- ================= TOPBAR ================= -->
+  <header class="kair-topbar">
+    <div class="kair-module-id">
+      <span class="kair-module-id__icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10"/><path d="M9 9h10"/><path d="M9 14h10"/><path d="M9 19h10"/><path d="M4 4h.01"/><path d="M4 9h.01"/><path d="M4 14h.01"/><path d="M4 19h.01"/></svg>
+      </span>
+      <div>
+        <h1 class="kair-module-id__title">Rendición de Cuentas SG-SST</h1>
+        <p class="kair-module-id__desc">Gestión del informe anual de rendición de cuentas del SG-SST.</p>
+      </div>
     </div>
+    <div class="kair-topbar__actions">
+      <span class="kair-chip kair-chip--blue">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h6"/></svg>
+        <span id="rendicion-company">Tempoactiva</span>
+      </span>
+      <button type="button" class="kair-btn kair-btn--outline" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8V3.5h10V8"/><path d="M7 17H4.5c-.8 0-1.5-.7-1.5-1.5v-5C3 9.7 3.7 9 4.5 9h15c.8 0 1.5.7 1.5 1.5v5c0 .8-.7 1.5-1.5 1.5H17"/><rect x="7" y="14" width="10" height="6.5" rx="1"/></svg>
+        Vista Previa Impresión
+      </button>
+      <button type="button" class="kair-btn kair-btn--primary" onclick="saveReport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h11L19.5 8v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 20V5A1.5 1.5 0 0 1 5 3.5Z"/><path d="M8 3.5V8h7V3.5"/><path d="M7.5 13.5h9M7.5 17h6"/></svg>
+        Guardar Cambios
+      </button>
+      <button type="button" class="kair-btn kair-btn--ghost" id="backToModuleBtn" title="Volver al módulo principal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+        Volver
+      </button>
+    </div>
+  </header>
 
-    <main class="container-fluid">
+  <!-- ================= FILA DE ESTADO ================= -->
+  <div class="kair-statusrow">
+    <span class="kair-status-pill"><span class="dot"></span><span id="status-pill-text">Borrador · Periodo 2024</span></span>
+    <span class="kair-status-meta" id="status-updated">Última actualización: hoy --:--</span>
+  </div>
 
-        <!-- Acciones Globales -->
-        <div style="margin-bottom: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
-            <button class="btn btn-outline" onclick="window.print()"><i class="fas fa-print"></i> Vista Previa Impresión</button>
-            <button class="btn btn-primary" onclick="saveReport()"><i class="fas fa-save"></i> Guardar Cambios</button>
+  <!-- ================= STEPPER ================= -->
+  <nav class="kair-stepper" role="tablist" aria-label="Secciones del informe">
+    <button type="button" class="kstep is-active" onclick="switchSection('general', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>1. General</button>
+    <button type="button" class="kstep" onclick="switchSection('resultados', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>2. Resultados SG-SST</button>
+    <button type="button" class="kstep" onclick="switchSection('normativo', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>3. Normativo &amp; Riesgos</button>
+    <button type="button" class="kstep" onclick="switchSection('incidentes', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>4. Incidentes &amp; AT</button>
+    <button type="button" class="kstep" onclick="switchSection('plan', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>5. Plan de Acción <span class="pdot" title="Acciones pendientes"></span></button>
+    <button type="button" class="kstep" onclick="switchSection('cierre', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L17.36 9.643a.48.48 0 0 1-.12.421l-6.602 6.602a3 3 0 0 1-1.905.872l-3.16.474a.5.5 0 0 1-.57-.57l.474-3.16a3 3 0 0 1 .872-1.905l6.602-6.602a.48.48 0 0 1 .421-.12z"/></svg>6. Cierre &amp; Firmas</button>
+  </nav>
+
+  <!-- ================= CONTENIDO ================= -->
+  <main class="kair-sections">
+
+    <!-- ========== 1 · GENERAL ========== -->
+    <section id="general" class="kview is-active">
+      <div class="kgen">
+        <div class="kgen__main">
+          <div class="kair-card">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span>Información General y Periodo</div>
+            </div>
+            <div class="kfg kfg--3" style="margin-bottom:14px">
+              <div class="kfld">
+                <label class="kfld__lbl">Razón Social</label>
+                <input type="text" class="kin" value="TEMPOACTIVA EST S.A.S." readonly>
+              </div>
+              <div class="kfld">
+                <label class="kfld__lbl">NIT</label>
+                <input type="text" class="kin" value="900511178-1" readonly>
+              </div>
+              <div class="kfld">
+                <label class="kfld__lbl">Periodo Evaluado</label>
+                <select class="kin" id="periodo-eval">
+                  <option selected>2024</option>
+                  <option>2023</option>
+                </select>
+              </div>
+            </div>
+            <div class="kfg kfg--2" style="margin-bottom:14px">
+              <div class="kfld">
+                <label class="kfld__lbl">Representante Legal</label>
+                <input type="text" class="kin" value="Freedy Enrique Torrez Madariaga">
+              </div>
+              <div class="kfld">
+                <label class="kfld__lbl">Responsable SG-SST</label>
+                <input type="text" class="kin" value="Javier Robles Fontalvo">
+              </div>
+            </div>
+            <div class="kfld">
+              <label class="kfld__lbl">Base Legal Aplicable</label>
+              <input type="text" class="kin" value="Decreto 1072/2015, Res. 0312/2019, Res. 2341/2021">
+            </div>
+          </div>
         </div>
 
-        <!-- SECCIÓN 1: GENERAL -->
-        <div id="general" class="section-view active">
-            <div class="section-card">
-                <div class="card-header">
-                    <div class="card-title"><i class="fas fa-file-alt"></i> Información General y Periodo</div>
-                </div>
-                <div class="form-grid-3">
-                    <div class="form-group">
-                        <label class="form-label">Razón Social</label>
-                        <input type="text" class="form-control" value="TEMPOACTIVA EST S.A.S." readonly>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">NIT</label>
-                        <input type="text" class="form-control" value="900511178-1" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Periodo Evaluado</label>
-                        <select class="form-control">
-                            <option selected>2024</option>
-                            <option>2023</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label class="form-label">Representante Legal</label>
-                        <input type="text" class="form-control" value="Freedy Enrique Torrez Madariaga">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Responsable SG-SST</label>
-                        <input type="text" class="form-control" value="Javier Robles Fontalvo">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Base Legal Aplicable</label>
-                    <input type="text" class="form-control" value="Decreto 1072/2015, Res. 0312/2019, Res. 2341/2021">
-                </div>
+        <div class="kgen__side">
+          <div class="kair-card kstate">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5 9.5 11l4 4L21 7.5"/><path d="M15.5 7.5H21V13"/></svg></span>Estado Actual</div>
+              <span class="kair-chip" id="kstate-periodo">Periodo 2024</span>
             </div>
-
-            <div class="form-grid-2">
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-users"></i> Equipo de Trabajo</div></div>
-                    <div class="form-group"><label class="form-label">Coordinador COPASST</label><input type="text" class="form-control" placeholder="Nombre"></div>
-                    <div class="form-group"><label class="form-label">Vigía SST</label><input type="text" class="form-control" placeholder="Nombre"></div>
-                </div>
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-chart-line"></i> Estado Actual</div></div>
-                    <div class="metrics-row">
-                        <div class="metric-card-mini" style="border-color: var(--primary);">
-                            <div class="metric-val">91%</div>
-                            <div class="metric-lbl">Cumplimiento Global</div>
-                        </div>
-                        <div class="metric-card-mini" style="border-color: var(--success);">
-                            <div class="metric-val">154</div>
-                            <div class="metric-lbl">Trabajadores</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="kstate__gauge-wrap">
+              <div class="kgauge" id="kgauge" data-pct="91">
+                <svg viewBox="0 0 168 168">
+                  <path class="gtrack" d="M 20 116 A 64 64 0 0 1 148 116"/>
+                  <path class="gfill" id="kgauge-fill" d="M 20 116 A 64 64 0 0 1 148 116"/>
+                </svg>
+                <div class="kgauge__pct"><span id="kgauge-num">0</span><small>%</small></div>
+              </div>
+              <div class="kstate__sublbl">Cumplimiento Global</div>
+              <div class="kstate__chips">
+                <span class="kair-chip kair-chip--green" id="st-chip-si">0 en Sí</span>
+                <span class="kair-chip kair-chip--amber" id="st-chip-parcial">0 Parcial</span>
+                <span class="kair-chip" id="st-chip-total">0 evaluados</span>
+              </div>
             </div>
+            <div class="kstate__divider"></div>
+            <div class="kstate__foot">
+              <div class="kstate__workers">
+                <span class="wico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg></span>
+                <div><b>154</b><span>Trabajadores</span></div>
+              </div>
+              <button type="button" class="kstate__link" onclick="goToIncidentes()">
+                Ver Incidentes &amp; AT
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- SECCIÓN 2: RESULTADOS SG-SST -->
-        <div id="resultados" class="section-view">
-            <div class="section-card">
-                <div class="card-header">
-                    <div class="card-title"><i class="fas fa-chart-bar"></i> Resultados del SG-SST por Estándar</div>
-                    <button class="btn btn-outline" style="font-size: 0.8rem;"><i class="fas fa-sync-alt"></i> Actualizar Datos</button>
-                </div>
-
-                <div class="table-wrapper">
-                    <table class="k-table">
-                        <thead>
-                            <tr>
-                                <th>Estándar</th>
-                                <th>Descripción</th>
-                                <th>Estado</th>
-                                <th>% Cumplimiento</th>
-                                <th>Observaciones</th>
-                                <th>Editar</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>1</strong></td>
-                                <td>Política del SG-SST</td>
-                                <td><span class="badge badge-success">Sí</span></td>
-                                <td>100%</td>
-                                <td>-</td>
-                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
-                            </tr>
-                            <tr>
-                                <td><strong>2</strong></td>
-                                <td>Gestión de Riesgos</td>
-                                <td><span class="badge badge-success">Sí</span></td>
-                                <td>95%</td>
-                                <td>-</td>
-                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
-                            </tr>
-                            <tr>
-                                <td><strong>3</strong></td>
-                                <td>Planificación y Programas</td>
-                                <td><span class="badge badge-warning">Parcial</span></td>
-                                <td>75%</td>
-                                <td>Falta actualizar PTA</td>
-                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
-                            </tr>
-                            <tr>
-                                <td><strong>10</strong></td>
-                                <td>Auditoría y Revisión</td>
-                                <td><span class="badge badge-warning">Parcial</span></td>
-                                <td>70%</td>
-                                <td>Pendiente auditoría interna</td>
-                                <td><button class="btn btn-outline" style="padding: 0.2rem 0.5rem;"><i class="fas fa-edit"></i></button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="section-card">
-                <div class="card-header"><div class="card-title"><i class="fas fa-chart-pie"></i> Indicadores de Desempeño (2024)</div></div>
-                <div class="form-grid-3">
-                    <div class="form-group">
-                        <label class="form-label">Tasa de Accidentalidad</label>
-                        <input type="text" class="form-control" value="1.8%">
-                        <small class="text-muted">Meta: < 2%</small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Tasa de Ausentismo (EL)</label>
-                        <input type="text" class="form-control" value="0.8%">
-                        <small class="text-muted">Meta: < 1%</small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">% Capacitaciones Ejecutadas</label>
-                        <input type="text" class="form-control" value="92%">
-                        <small class="text-muted">Meta: 95%</small>
-                    </div>
-                </div>
-            </div>
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.9-2.9 2.9-4.3 5.5-4.3s4.6 1.4 5.5 4.3"/><path d="M15.5 5.4a3.2 3.2 0 0 1 0 5.9"/><path d="M17.5 14.9c1.6.7 2.7 2 3 4.1"/></svg></span>Equipo de Trabajo</div>
         </div>
-
-        <!-- SECCIÓN 3: NORMATIVO & RIESGOS -->
-        <div id="normativo" class="section-view">
-            <div class="form-grid-2">
-                <!-- Matriz Legal -->
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-balance-scale"></i> Matriz de Cumplimiento Legal</div></div>
-                    <div class="table-wrapper">
-                        <table class="k-table" style="min-width: 600px;">
-                            <thead><tr><th>Requisito Legal</th><th>Norma</th><th>Cumple</th></tr></thead>
-                            <tbody>
-                                <tr><td>Política SG-SST</td><td>D.1072/15</td><td><span class="badge badge-success">Sí</span></td></tr>
-                                <tr><td>Plan Anual</td><td>D.1072/15</td><td><span class="badge badge-success">Sí</span></td></tr>
-                                <tr><td>Riesgo Psicosocial</td><td>Res. 2646/08</td><td><span class="badge badge-warning">Parcial</span></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Brechas -->
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-search"></i> Brechas y Hallazgos</div></div>
-                    <div class="form-group">
-                        <label class="form-label">No Conformidad Principal</label>
-                        <textarea class="form-control">NC-001: Auditoría interna no programada para el periodo 2024.</textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Riesgos Críticos No Controlados</label>
-                        <textarea class="form-control">R-001: Caídas en mismo nivel (En proceso de señalización).</textarea>
-                    </div>
-                </div>
-            </div>
+        <div class="kfg kfg--2">
+          <div class="kfld">
+            <label class="kfld__lbl">Coordinador COPASST</label>
+            <input type="text" class="kin" placeholder="Nombre">
+          </div>
+          <div class="kfld">
+            <label class="kfld__lbl">Vigía SST</label>
+            <input type="text" class="kin" placeholder="Nombre">
+          </div>
         </div>
+        <p class="kair-card__hint" style="margin-top:12px">Los nombres del equipo alimentan las firmas de la pestaña 6 y el informe final.</p>
+      </div>
+    </section>
 
-        <!-- SECCIÓN 4: INCIDENTES & AT -->
-        <div id="incidentes" class="section-view">
-            <div class="section-card">
-                <div class="card-header">
-                    <div class="card-title"><i class="fas fa-first-aid"></i> Análisis de Accidentes de Trabajo</div>
-                </div>
-                <!-- Resumen -->
-                <div class="metrics-row" style="margin-bottom: 2rem;">
-                    <div class="metric-card-mini" style="border-color: var(--danger);">
-                        <div class="metric-val">4</div>
-                        <div class="metric-lbl">AT Totales</div>
-                    </div>
-                    <div class="metric-card-mini">
-                        <div class="metric-val">0</div>
-                        <div class="metric-lbl">Mortalidad</div>
-                    </div>
-                    <div class="metric-card-mini" style="border-color: var(--warning);">
-                        <div class="metric-val">0</div>
-                        <div class="metric-lbl">Enf. Laborales</div>
-                    </div>
-                </div>
-
-                <!-- Tabla Detalle -->
-                <div class="table-wrapper">
-                    <table class="k-table">
-                        <thead>
-                            <tr>
-                                <th>N°</th>
-                                <th>Fecha</th>
-                                <th>Trabajador</th>
-                                <th>Tipo de Lesión</th>
-                                <th>Días Perdidos</th>
-                                <th>Investigación</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>AT-001</td><td>15/03/2024</td><td>[Nombre 1]</td><td>Corte superficial</td><td>2</td>
-                                <td><span class="badge badge-success">Completada</span></td>
-                            </tr>
-                            <tr>
-                                <td>AT-002</td><td>22/06/2024</td><td>[Nombre 2]</td><td>Esguince tobillo</td><td>5</td>
-                                <td><span class="badge badge-success">Completada</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+    <!-- ========== 2 · RESULTADOS SG-SST ========== -->
+    <section id="resultados" class="kview">
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg></span>Resultados del SG-SST por Estándar</div>
+          <button type="button" class="kair-btn kair-btn--outline" style="height:32px;font-size:12.5px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3.5V7h-3.5"/></svg>
+            Actualizar Datos
+          </button>
         </div>
-
-        <!-- SECCIÓN 5: PLAN DE MEJORAMIENTO -->
-        <div id="plan" class="section-view">
-            <div class="section-card">
-                <div class="card-header">
-                    <div class="card-title"><i class="fas fa-rocket"></i> Plan de Acción Correctiva y Preventiva</div>
-                    <button class="btn btn-primary" style="font-size: 0.8rem;"><i class="fas fa-plus"></i> Nueva Acción</button>
-                </div>
-                <div class="table-wrapper">
-                    <table class="k-table">
-                        <thead>
-                            <tr>
-                                <th>Acción</th>
-                                <th>Tipo</th>
-                                <th>Responsable</th>
-                                <th>Fechas (Inicio - Fin)</th>
-                                <th>Estado</th>
-                                <th>Avance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Auditoría Interna SG-SST</td>
-                                <td>Correctiva</td>
-                                <td>Coordinador SST</td>
-                                <td>15/01/2025 - 28/02/2025</td>
-                                <td><span class="badge badge-warning">Programada</span></td>
-                                <td>0%</td>
-                            </tr>
-                            <tr>
-                                <td>Aplicación Batería Psicosocial</td>
-                                <td>Preventiva</td>
-                                <td>ARL</td>
-                                <td>01/02/2025 - 31/03/2025</td>
-                                <td><span class="badge badge-warning">Programada</span></td>
-                                <td>0%</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="ktable-wrap">
+          <table class="ktable" id="tabla-resultados">
+            <thead>
+              <tr><th>Estándar</th><th>Descripción</th><th>Estado</th><th>% Cumplimiento</th><th>Observaciones</th><th>Editar</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1</strong></td><td>Política del SG-SST</td>
+                <td><span class="kpill kpill--green">Sí</span></td><td>100%</td><td>-</td>
+                <td><button type="button" class="kiconbtn" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4.5L19.7 8.8a2 2 0 0 0 0-2.9l-1.6-1.6a2 2 0 0 0-2.9 0L4 15.5V20Z"/><path d="m13.5 6.5 4 4"/></svg></button></td>
+              </tr>
+              <tr>
+                <td><strong>2</strong></td><td>Gestión de Riesgos</td>
+                <td><span class="kpill kpill--green">Sí</span></td><td>95%</td><td>-</td>
+                <td><button type="button" class="kiconbtn" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4.5L19.7 8.8a2 2 0 0 0 0-2.9l-1.6-1.6a2 2 0 0 0-2.9 0L4 15.5V20Z"/><path d="m13.5 6.5 4 4"/></svg></button></td>
+              </tr>
+              <tr>
+                <td><strong>3</strong></td><td>Planificación y Programas</td>
+                <td><span class="kpill kpill--amber">Parcial</span></td><td>75%</td><td>Falta actualizar PTA</td>
+                <td><button type="button" class="kiconbtn" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4.5L19.7 8.8a2 2 0 0 0 0-2.9l-1.6-1.6a2 2 0 0 0-2.9 0L4 15.5V20Z"/><path d="m13.5 6.5 4 4"/></svg></button></td>
+              </tr>
+              <tr>
+                <td><strong>10</strong></td><td>Auditoría y Revisión</td>
+                <td><span class="kpill kpill--amber">Parcial</span></td><td>70%</td><td>Pendiente auditoría interna</td>
+                <td><button type="button" class="kiconbtn" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4.5L19.7 8.8a2 2 0 0 0 0-2.9l-1.6-1.6a2 2 0 0 0-2.9 0L4 15.5V20Z"/><path d="m13.5 6.5 4 4"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        <!-- SECCIÓN 6: CIERRE & FIRMAS -->
-        <div id="cierre" class="section-view">
-            <div class="section-card">
-                <div class="card-header"><div class="card-title"><i class="fas fa-clipboard"></i> Conclusiones y Decisiones de la Alta Dirección</div></div>
-                <div class="form-group">
-                    <label class="form-label">Conclusiones del Periodo 2024</label>
-                    <textarea class="form-control" style="height: 150px;">El Sistema de Gestión ha mantenido un nivel de cumplimiento del 91%. Se redujo la tasa de accidentalidad en un 28% respecto al año anterior. Se identifica la necesidad de programar la auditoría interna para el primer trimestre de 2025.</textarea>
-                </div>
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label class="form-label">Decisión 1</label>
-                        <input type="text" class="form-control" value="Aprobar presupuesto para auditoría interna SG-SST">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Decisión 2</label>
-                        <input type="text" class="form-control" value="Contratar servicio de batería de riesgo psicosocial">
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-grid-2">
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-signature"></i> Firma Representante Legal</div></div>
-                    <div class="signature-box">
-                        Arrastre firma aquí o haga clic para firmar
-                    </div>
-                    <div style="text-align: center; font-weight: bold;">Freedy Enrique Torrez Madariaga</div>
-                    <div style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">Representante Legal</div>
-                </div>
-                <div class="section-card">
-                    <div class="card-header"><div class="card-title"><i class="fas fa-signature"></i> Firma Responsable SG-SST</div></div>
-                    <div class="signature-box">
-                        Arrastre firma aquí o haga clic para firmar
-                    </div>
-                    <div style="text-align: center; font-weight: bold;">Javier Robles Fontalvo</div>
-                    <div style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">Responsable SG-SST</div>
-                </div>
-            </div>
-
-            <div style="margin-top: 2rem; text-align: center;">
-                <button class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem;" onclick="finalizeReport()">
-                    <i class="fas fa-file-pdf"></i> CERRAR Y GENERAR INFORME FINAL
-                </button>
-            </div>
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M12 12a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12A8.5 8.5 0 0 1 3.5 20.5"/></svg></span>Indicadores de Desempeño (<span id="kinds-periodo">2024</span>)</div>
         </div>
+        <div class="kfg kfg--3">
+          <div class="kfld">
+            <label class="kfld__lbl">Tasa de Accidentalidad</label>
+            <input type="text" class="kin" value="1.8%">
+            <span class="kfld__meta">Meta: &lt; 2%</span>
+          </div>
+          <div class="kfld">
+            <label class="kfld__lbl">Tasa de Ausentismo (EL)</label>
+            <input type="text" class="kin" value="0.8%">
+            <span class="kfld__meta">Meta: &lt; 1%</span>
+          </div>
+          <div class="kfld">
+            <label class="kfld__lbl">% Capacitaciones Ejecutadas</label>
+            <input type="text" class="kin" value="92%">
+            <span class="kfld__meta">Meta: 95%</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    </main>
+    <!-- ========== 3 · NORMATIVO & RIESGOS ========== -->
+    <section id="normativo" class="kview">
+      <div class="kgen">
+        <div class="kgen__main">
+          <div class="kair-card">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v17"/><path d="M5 7h14"/><path d="M5.5 7 3.5 12a3.2 3.2 0 0 0 6 0L7.5 7"/><path d="M18.5 7 16.5 12a3.2 3.2 0 0 0 6 0L20.5 7"/></svg></span>Matriz de Cumplimiento Legal</div>
+            </div>
+            <div class="ktable-wrap">
+              <table class="ktable" style="min-width:520px">
+                <thead><tr><th>Requisito Legal</th><th>Norma</th><th>Cumple</th></tr></thead>
+                <tbody>
+                  <tr><td>Política SG-SST</td><td>D.1072/15</td><td><span class="kpill kpill--green">Sí</span></td></tr>
+                  <tr><td>Plan Anual</td><td>D.1072/15</td><td><span class="kpill kpill--green">Sí</span></td></tr>
+                  <tr><td>Riesgo Psicosocial</td><td>Res. 2646/08</td><td><span class="kpill kpill--amber">Parcial</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="kgen__side">
+          <div class="kair-card">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></span>Brechas y Hallazgos</div>
+            </div>
+            <div class="kfld" style="margin-bottom:14px">
+              <label class="kfld__lbl kfld__lbl--plain">No Conformidad Principal</label>
+              <textarea class="kin">NC-001: Auditoría interna no programada para el periodo 2024.</textarea>
+            </div>
+            <div class="kfld">
+              <label class="kfld__lbl kfld__lbl--plain">Riesgos Críticos No Controlados</label>
+              <textarea class="kin">R-001: Caídas en mismo nivel (En proceso de señalización).</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <!-- Toast Notification -->
-    <div id="toast">Guardado exitosamente</div>
+    <!-- ========== 4 · INCIDENTES & AT ========== -->
+    <section id="incidentes" class="kview">
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 19.5H3Z"/><path d="M12 10v4"/><path d="M12 16.8h.01"/></svg></span>Análisis de Accidentes de Trabajo</div>
+        </div>
+        <div class="kmetrics">
+          <div class="kmetric kmetric--danger"><b>4</b><span>AT Totales</span></div>
+          <div class="kmetric"><b>0</b><span>Mortalidad</span></div>
+          <div class="kmetric kmetric--warning"><b>0</b><span>Enf. Laborales</span></div>
+        </div>
+        <div class="ktable-wrap">
+          <table class="ktable">
+            <thead>
+              <tr><th>N°</th><th>Fecha</th><th>Trabajador</th><th>Tipo de Lesión</th><th>Días Perdidos</th><th>Investigación</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>AT-001</td><td>15/03/2024</td><td>[Nombre 1]</td><td>Corte superficial</td><td>2</td><td><span class="kpill kpill--green">Completada</span></td></tr>
+              <tr><td>AT-002</td><td>22/06/2024</td><td>[Nombre 2]</td><td>Esguince tobillo</td><td>5</td><td><span class="kpill kpill--green">Completada</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-    <script>
-        // =========================================
-        // LÓGICA DE NAVEGACIÓN Y GESTIÓN
-        // =========================================
+    <!-- ========== 5 · PLAN DE ACCIÓN ========== -->
+    <section id="plan" class="kview">
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c7.5-1 13.5-7 14.5-14.5C12 5.5 6 11.5 5 19Z"/><path d="M5 19c3-5 7-9 11.5-11.5"/></svg></span>Plan de Acción Correctiva y Preventiva</div>
+          <button type="button" class="kair-btn kair-btn--primary" style="height:32px;font-size:12.5px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Nueva Acción
+          </button>
+        </div>
+        <div class="ktable-wrap">
+          <table class="ktable">
+            <thead>
+              <tr><th>Acción</th><th>Tipo</th><th>Responsable</th><th>Fechas (Inicio - Fin)</th><th>Estado</th><th>Avance</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Auditoría Interna SG-SST</td><td>Correctiva</td><td>Coordinador SST</td><td>15/01/2025 - 28/02/2025</td><td><span class="kpill kpill--amber">Programada</span></td><td>0%</td></tr>
+              <tr><td>Aplicación Batería Psicosocial</td><td>Preventiva</td><td>ARL</td><td>01/02/2025 - 31/03/2025</td><td><span class="kpill kpill--amber">Programada</span></td><td>0%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-        function switchSection(sectionId, navElement) {
-            // Ocultar todas las secciones
-            document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
-            // Quitar clase active de botones
-            document.querySelectorAll('.rendicion-tab').forEach(el => el.classList.remove('active'));
+    <!-- ========== 6 · CIERRE & FIRMAS ========== -->
+    <section id="cierre" class="kview">
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5a3 3 0 0 1 6 0"/><path d="m9 13.5 2 2 4-4"/></svg></span>Conclusiones y Decisiones de la Alta Dirección</div>
+        </div>
+        <div class="kfld" style="margin-bottom:14px">
+          <label class="kfld__lbl kfld__lbl--plain">Conclusiones del Periodo <span id="kconcl-periodo">2024</span></label>
+          <textarea class="kin" style="min-height:120px">El Sistema de Gestión ha mantenido un nivel de cumplimiento del 91%. Se redujo la tasa de accidentalidad en un 28% respecto al año anterior. Se identifica la necesidad de programar la auditoría interna para el primer trimestre de 2025.</textarea>
+        </div>
+        <div class="kfg kfg--2">
+          <div class="kfld">
+            <label class="kfld__lbl">Decisión 1</label>
+            <input type="text" class="kin" value="Aprobar presupuesto para auditoría interna SG-SST">
+          </div>
+          <div class="kfld">
+            <label class="kfld__lbl">Decisión 2</label>
+            <input type="text" class="kin" value="Contratar servicio de batería de riesgo psicosocial">
+          </div>
+        </div>
+      </div>
 
-            // Mostrar sección seleccionada
-            document.getElementById(sectionId).classList.add('active');
-            // Activar botón
-            navElement.classList.add('active');
-        }
+      <div class="kgen">
+        <div class="kgen__main">
+          <div class="kair-card">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M4 16.5c2-1 3-3.5 3-6.5V7.5L14 5v5c0 3-1 5.5-3 6.5"/></svg></span>Firma Representante Legal</div>
+            </div>
+            <div class="ksign">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c3-1 4-4 4.5-6.5L12 4l3.5 9.5c.5 2.5 1.5 5.5 4.5 6.5"/></svg>
+              Arrastre firma aquí o haga clic para firmar
+            </div>
+            <div class="ksign__name">Freedy Enrique Torrez Madariaga</div>
+            <div class="ksign__role">Representante Legal</div>
+          </div>
+        </div>
+        <div class="kgen__side">
+          <div class="kair-card">
+            <div class="kair-card__head">
+              <div class="kair-card__title"><span class="tic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M4 16.5c2-1 3-3.5 3-6.5V7.5L14 5v5c0 3-1 5.5-3 6.5"/></svg></span>Firma Responsable SG-SST</div>
+            </div>
+            <div class="ksign">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c3-1 4-4 4.5-6.5L12 4l3.5 9.5c.5 2.5 1.5 5.5 4.5 6.5"/></svg>
+              Arrastre firma aquí o haga clic para firmar
+            </div>
+            <div class="ksign__name">Javier Robles Fontalvo</div>
+            <div class="ksign__role">Responsable SG-SST</div>
+          </div>
+        </div>
+      </div>
 
-        function saveReport() {
-            // Simulación de guardado
-            const toast = document.getElementById("toast");
-            toast.textContent = "Información guardada exitosamente en borrador";
-            toast.className = "show";
-            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
-        }
+      <div class="kfinal">
+        <button type="button" class="kair-btn kair-btn--primary" onclick="finalizeReport()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="M8.5 12h7M8.5 15.5h7"/></svg>
+          CERRAR Y GENERAR INFORME FINAL
+        </button>
+      </div>
+    </section>
 
-        function finalizeReport() {
-            const confirmed = confirm("¿Está seguro de cerrar el periodo de Rendición de Cuentas? Esta acción generará el informe oficial PDF.");
-            if (confirmed) {
-                const toast = document.getElementById("toast");
-                toast.textContent = "Generando Informe PDF Oficial...";
-                toast.className = "show";
-                setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
-                // Aquí iría la lógica real de generación de PDF
-            }
-        }
-    </script>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.2 2.4 2.4 4.6-4.8"/></svg>
+  <span id="toast-text">Guardado exitosamente</span>
+</div>
+
+<script>
+/* ============================================================================
+   K+AIR · Rendición de Cuentas SG-SST — Lógica de navegación y gestión
+   Contratos preservados: switchSection(id, el), saveReport(), finalizeReport()
+   ========================================================================== */
+(function(){
+'use strict';
+
+var MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+/* ---------- Navegación entre secciones ---------- */
+window.switchSection = function(sectionId, navElement){
+  document.querySelectorAll('.kview').forEach(function(el){ el.classList.remove('is-active'); });
+  document.querySelectorAll('.kstep').forEach(function(el){ el.classList.remove('is-active'); });
+  var view = document.getElementById(sectionId);
+  if (view) view.classList.add('is-active');
+  if (navElement) navElement.classList.add('is-active');
+  else {
+    var steps = document.querySelectorAll('.kstep');
+    for (var i = 0; i < steps.length; i++){
+      var onclickAttr = steps[i].getAttribute('onclick') || '';
+      if (onclickAttr.indexOf("'" + sectionId + "'") !== -1){ steps[i].classList.add('is-active'); break; }
+    }
+  }
+  window.scrollTo && window.scrollTo(0, 0);
+};
+
+window.goToIncidentes = function(){
+  var steps = document.querySelectorAll('.kstep');
+  for (var i = 0; i < steps.length; i++){
+    var onclickAttr = steps[i].getAttribute('onclick') || '';
+    if (onclickAttr.indexOf("'incidentes'") !== -1){ window.switchSection('incidentes', steps[i]); return; }
+  }
+  window.switchSection('incidentes', null);
+};
+
+/* ---------- Toast ---------- */
+var toastTimer = null;
+function showToast(msg){
+  var toast = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toast.classList.remove('show'); }, 3200);
+}
+window.showToast = showToast;
+
+/* ---------- Guardado ---------- */
+window.saveReport = function(){
+  showToast('Información guardada exitosamente en borrador');
+  updateTimestamp();
+};
+
+window.finalizeReport = function(){
+  var confirmed = window.confirm('¿Está seguro de cerrar el periodo de Rendición de Cuentas? Esta acción generará el informe oficial PDF.');
+  if (confirmed){
+    showToast('Generando Informe PDF Oficial...');
+  }
+};
+
+/* ---------- Hora de última actualización ---------- */
+function fmtHora(d){
+  var h = d.getHours(), m = d.getMinutes();
+  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+}
+function updateTimestamp(){
+  var el = document.getElementById('status-updated');
+  if (el) el.textContent = 'Última actualización: hoy ' + fmtHora(new Date());
+}
+
+/* ---------- Periodo dinámico ---------- */
+function currentPeriod(){
+  var sel = document.getElementById('periodo-eval');
+  return sel ? sel.value : '2024';
+}
+function refreshPeriodLabels(){
+  var p = currentPeriod();
+  var pill = document.getElementById('status-pill-text');
+  if (pill) pill.textContent = 'Borrador · Periodo ' + p;
+  var kp = document.getElementById('kstate-periodo');
+  if (kp) kp.textContent = 'Periodo ' + p;
+  var ki = document.getElementById('kinds-periodo');
+  if (ki) ki.textContent = p;
+  var kc = document.getElementById('kconcl-periodo');
+  if (kc) kc.textContent = p;
+}
+
+/* ---------- Medidor circular ---------- */
+function initGauge(){
+  var wrap = document.getElementById('kgauge');
+  var fill = document.getElementById('kgauge-fill');
+  var num = document.getElementById('kgauge-num');
+  if (!wrap || !fill) return;
+  var pct = Math.max(0, Math.min(100, parseInt(wrap.getAttribute('data-pct'), 10) || 0));
+  var path = fill;
+  var len = path.getTotalLength();
+  path.style.strokeDasharray = String(len);
+  path.style.strokeDashoffset = String(len);
+  /* animar en el siguiente frame */
+  setTimeout(function(){
+    path.style.strokeDashoffset = String(len * (1 - pct / 100));
+  }, 250);
+  /* contador numérico */
+  if (num){
+    var start = null;
+    var dur = 1100;
+    function step(ts){
+      if (!start) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var eased = 1 - Math.pow(1 - t, 3);
+      num.textContent = String(Math.round(eased * pct));
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+}
+
+/* ---------- Chips de estado derivados de la tabla Resultados ---------- */
+function refreshStateChips(){
+  var tbody = document.querySelector('#tabla-resultados tbody');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  var si = 0, parcial = 0;
+  rows.forEach(function(r){
+    var pill = r.querySelector('.kpill');
+    if (!pill) return;
+    var txt = pill.textContent.trim().toLowerCase();
+    if (txt === 'sí' || txt === 'si') si++;
+    else if (txt === 'parcial') parcial++;
+  });
+  var c1 = document.getElementById('st-chip-si');
+  var c2 = document.getElementById('st-chip-parcial');
+  var c3 = document.getElementById('st-chip-total');
+  if (c1) c1.textContent = si + ' en Sí';
+  if (c2) c2.textContent = parcial + ' Parcial';
+  if (c3) c3.textContent = rows.length + ' evaluados';
+}
+
+/* ---------- Empresa dinámica ---------- */
+function initCompany(){
+  var company = null;
+  try {
+    if (window.rendicionPortalComponent && window.rendicionPortalComponent.company){
+      company = window.rendicionPortalComponent.company;
+    }
+  } catch(e){}
+  if (!company){
+    try {
+      var params = new URLSearchParams(window.location.search);
+      company = params.get('company');
+    } catch(e){}
+  }
+  if (company){
+    var el = document.getElementById('rendicion-company');
+    if (el) el.textContent = company;
+  }
+}
+
+/* ---------- Arranque ---------- */
+document.addEventListener('DOMContentLoaded', function(){
+  initCompany();
+  refreshPeriodLabels();
+  updateTimestamp();
+  initGauge();
+  refreshStateChips();
+
+  var sel = document.getElementById('periodo-eval');
+  if (sel){
+    sel.addEventListener('change', function(){
+      refreshPeriodLabels();
+      showToast('Periodo ' + sel.value + ' seleccionado');
+    });
+  }
+});
+
+})();
+</script>
 </body>
 </html>
