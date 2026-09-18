@@ -1,1253 +1,452 @@
-/* ========================================================================
-   SUBMÓDULO 2.9.1 - EVALUACIÓN DE PROVEEDORES
-   Sistema Visual K+AIR
-   ======================================================================== */
+/* ============================================================
+   K+AIR · 2.9.1 Identificación y Evaluación de Bienes y Servicios
+   Premium v2 — hoja única scoped bajo .evaluacion-proveedores
+   v1 · 2026-09-18 — rediseño premium (header, KPIs, tabla,
+   detalle, modal de evaluación, drawer de escala)
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Inter:wght@400;500;600;700&display=swap');
 
-/* Variables del sistema */
-.evaluacion-proveedores {
-    --ep-primary: #174ea6;
-    --ep-primary-hover: #185abd;
-    --ep-success: #28a745;
-    --ep-warning: #ffc107;
-    --ep-danger: #dc3545;
-    --ep-info: #17a2b8;
-    --ep-dark: #343a40;
-    --ep-gray-100: #f8f9fa;
-    --ep-gray-200: #e9ecef;
-    --ep-gray-300: #dee2e6;
-    --ep-gray-600: #6c757d;
-    --ep-text-main: #212529;
+.evaluacion-proveedores{
+  --ep-bg:#FBFCFB;
+  --ep-surface:#FFFFFF;
+  --ep-text:#14213D;
+  --ep-text2:#748096;
+  --ep-text3:#9AA4B8;
+  --ep-border:#E8EBEE;
+  --ep-blue:#2057B8;
+  --ep-blue-ink:#17418C;
+  --ep-blue-soft:#EAF0FB;
+  --ep-green:#1BB888;
+  --ep-green-ink:#0E8A63;
+  --ep-green-soft:#E3F6EF;
+  --ep-amber:#E7A224;
+  --ep-amber-ink:#A96F0B;
+  --ep-amber-soft:#FBF1DE;
+  --ep-red:#DA5563;
+  --ep-red-ink:#B23440;
+  --ep-red-soft:#FBE7E9;
+  --ep-slate:#64748B;
+  --ep-slate-soft:#F1F4F8;
+  --ep-radius:14px;
+  --ep-radius-sm:10px;
+  --ep-font-title:'Manrope','Inter',system-ui,sans-serif;
+  --ep-font-body:'Inter',system-ui,sans-serif;
+  --ep-t:180ms cubic-bezier(.4,0,.2,1);
 
-    --ep-bg-body: #f8f9fa;
-    --ep-bg-card: #ffffff;
-    --ep-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    --ep-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-    --ep-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
-    --ep-radius: 0.375rem;
-
-    --ep-font-heading: 'Lexend', sans-serif;
-    --ep-font-body: 'Roboto', sans-serif;
+  position:relative;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  background:var(--ep-bg);
+  color:var(--ep-text);
+  font-family:var(--ep-font-body);
+  font-size:14px;
+  line-height:1.55;
 }
-
-/* ========================================================================
-   NOTIFICACIONES TOAST MODERNAS
-   ======================================================================== */
-.ep-toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    pointer-events: none;
-}
-
-.ep-toast {
-    min-width: 320px;
-    max-width: 450px;
-    padding: 16px 20px;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    pointer-events: auto;
-    animation: epToastSlideIn 0.3s ease-out forwards;
-    backdrop-filter: blur(8px);
-    border-left: 4px solid;
-    opacity: 0;
-    transform: translateX(400px);
-}
-
-@keyframes epToastSlideIn {
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-.ep-toast.ep-toast-hiding {
-    animation: epToastSlideOut 0.3s ease-in forwards;
-}
-
-@keyframes epToastSlideOut {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(400px);
-    }
-}
-
-.ep-toast-success {
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(34, 139, 58, 0.95));
-    border-left-color: var(--ep-success);
-    color: white;
-}
-
-.ep-toast-error {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.95), rgba(189, 43, 58, 0.95));
-    border-left-color: var(--ep-danger);
-    color: white;
-}
-
-.ep-toast-warning {
-    background: linear-gradient(135deg, rgba(255, 193, 7, 0.95), rgba(212, 157, 0, 0.95));
-    border-left-color: var(--ep-warning);
-    color: #212529;
-}
-
-.ep-toast-info {
-    background: linear-gradient(135deg, rgba(23, 162, 184, 0.95), rgba(20, 139, 158, 0.95));
-    border-left-color: var(--ep-info);
-    color: white;
-}
-
-.ep-toast-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-}
-
-.ep-toast-message {
-    flex: 1;
-    font-size: 0.9rem;
-    font-weight: 500;
-    line-height: 1.4;
-}
-
-.ep-toast-close {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 4px;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-    flex-shrink: 0;
-}
-
-.ep-toast-close:hover {
-    opacity: 1;
-}
-
-/* Contenedor principal */
-.evaluacion-proveedores {
-    font-family: var(--ep-font-body);
-    background-color: var(--ep-bg-body);
-    color: var(--ep-text-main);
-    padding: 2rem;
-    font-size: 0.95rem;
-    min-height: 100%;
-    box-sizing: border-box;
-}
-
-/* Layout */
-.ep-module-container {
- position: relative;
- display: flex;
- flex-direction: column;
- height: 100%;
-}
-
-/* Content scroll area */
-.ep-content-scroll {
- flex: 1;
- overflow-y: auto;
- padding: 1.5rem;
-}
-
-/* ========================================================================
- HEADER — Card Pattern (k-section-card)
- ======================================================================== */
-
-/* Card container */
-.evaluacion-proveedores .k-section-card {
- background: var(--ep-bg-card, #ffffff);
- border: 1px solid var(--ep-border, #dee2e6);
- border-radius: var(--ep-radius, 0.375rem);
- box-shadow: var(--ep-shadow-sm, 0 1px 3px rgba(0,0,0,.08));
- flex-shrink: 0;
-}
-
-/* Back button */
-.evaluacion-proveedores .header-back-btn {
- display: inline-flex;
- align-items: center;
- gap: 0.375rem;
- padding: 0.375rem 0.75rem;
- font-size: 0.8125rem;
- font-weight: 500;
- color: #5a6378;
- background: transparent;
- border: none;
- border-radius: 0.375rem;
- cursor: pointer;
- transition: background 0.15s ease;
- font-family: inherit;
-}
-
-.evaluacion-proveedores .header-back-btn:hover {
- background: #e8f0fe;
- color: var(--ep-primary, #174ea6);
-}
-
-/* Ghost action buttons */
-.evaluacion-proveedores .header-action--ghost {
- display: inline-flex;
- align-items: center;
- gap: 0.375rem;
- padding: 0.375rem 0.75rem;
- font-size: 0.8125rem;
- font-weight: 500;
- color: #5a6378;
- background: transparent;
- border: none;
- border-radius: 0.375rem;
- cursor: pointer;
- transition: background 0.15s ease;
- font-family: inherit;
-}
-
-.evaluacion-proveedores .header-action--ghost:hover {
- background: #f0f2f5;
- color: #1a1a2e;
-}
-
-/* Company & divider inside card */
-.evaluacion-proveedores .k-section-card__company {
- display: flex;
- align-items: center;
- gap: 0.375rem;
- font-size: 0.8125rem;
- font-weight: 400;
- color: #5a6378;
- white-space: nowrap;
-}
-
-.evaluacion-proveedores .k-section-card__company i {
- font-size: 0.875rem;
-}
-
-.evaluacion-proveedores .k-section-card__divider {
- width: 1px;
- height: 24px;
- background: var(--ep-border, #dee2e6);
- flex-shrink: 0;
-}
-
-/* Stats Ribbon */
-.evaluacion-proveedores .k-stats-ribbon {
- display: flex;
- align-items: center;
- gap: 0;
- background: var(--ep-bg-card, #ffffff);
- border: 1px solid var(--ep-border, #dee2e6);
- border-radius: var(--ep-radius, 0.375rem);
- padding: 0;
- margin-bottom: 1.5rem;
- box-shadow: var(--ep-shadow-sm, 0 1px 3px rgba(0,0,0,.08));
- overflow: hidden;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__item {
- display: flex;
- align-items: center;
- gap: 0.625rem;
- padding: 0.75rem 1.25rem;
- flex: 1;
- min-width: 0;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__icon {
- width: 32px;
- height: 32px;
- border-radius: 50%;
- display: flex;
- align-items: center;
- justify-content: center;
- font-size: 0.875rem;
- flex-shrink: 0;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__icon.primary {
- background: rgba(23,78,166,.1);
- color: var(--ep-primary, #174ea6);
-}
-
-.evaluacion-proveedores .k-stats-ribbon__icon.success {
- background: rgba(40,167,69,.1);
- color: var(--ep-success, #28a745);
-}
-
-.evaluacion-proveedores .k-stats-ribbon__icon.warning {
- background: rgba(255,193,7,.15);
- color: #856404;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__icon.muted {
- background: #f0f2f5;
- color: var(--ep-gray-600, #6c757d);
-}
-
-.evaluacion-proveedores .k-stats-ribbon__data {
- display: flex;
- flex-direction: column;
- min-width: 0;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__value {
- font-size: 1.25rem;
- font-weight: 700;
- color: var(--ep-text-main, #212529);
- line-height: 1.2;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__label {
- font-size: 0.6875rem;
- color: var(--ep-gray-600, #6c757d);
- text-transform: uppercase;
- letter-spacing: 0.5px;
- white-space: nowrap;
-}
-
-.evaluacion-proveedores .k-stats-ribbon__divider {
- width: 1px;
- height: 32px;
- background: var(--ep-border, #dee2e6);
- flex-shrink: 0;
-}
-
-/* Dark theme — Card Pattern */
-.evaluacion-proveedores[data-theme="dark"] .k-section-card {
- background: var(--k-bg-card, #2d3748);
- border-color: var(--k-border, #4a5568);
-}
-
-.evaluacion-proveedores[data-theme="dark"] .header-back-btn {
- color: #adb5bd;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .header-back-btn:hover {
- background: rgba(77, 166, 255, 0.15);
- color: var(--k-primary, #4da6ff);
-}
-
-.evaluacion-proveedores[data-theme="dark"] .header-action--ghost {
- color: #adb5bd;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .header-action--ghost:hover {
- background: rgba(255, 255, 255, 0.08);
- color: #e9ecef;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-section-card__company {
- color: #adb5bd;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-section-card__divider {
- background: var(--k-border, #4a5568);
-}
-
-/* Dark theme — Stats Ribbon */
-.evaluacion-proveedores[data-theme="dark"] .k-stats-ribbon {
- background: var(--k-bg-card, #2d3748);
- border-color: var(--k-border, #4a5568);
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-stats-ribbon__value {
- color: #e9ecef;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-stats-ribbon__label {
- color: #adb5bd;
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-stats-ribbon__divider {
- background: var(--k-border, #4a5568);
-}
-
-.evaluacion-proveedores[data-theme="dark"] .k-stats-ribbon__icon.muted {
- background: rgba(255, 255, 255, 0.08);
- color: #adb5bd;
-}
-
-/* Responsive — Card Pattern */
-@media (max-width: 768px) {
- .evaluacion-proveedores .k-stats-ribbon {
-   flex-wrap: wrap;
- }
-
- .evaluacion-proveedores .k-stats-ribbon__item {
-   flex: 1 1 45%;
- }
-
- .evaluacion-proveedores .k-stats-ribbon__divider {
-   display: none;
- }
-
- .evaluacion-proveedores .k-section-card__company {
-   display: none;
- }
-}
-
-/* ========================================================================
- FIN HEADER — Card Pattern
- ======================================================================== */
-
-/* Toolbar */
-.ep-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    background: var(--ep-bg-card);
-    padding: 1rem;
-    border-radius: var(--ep-radius);
-    box-shadow: var(--ep-shadow-sm);
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.ep-search-box {
-    display: flex;
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 300px;
-}
-
-.ep-form-control {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ep-gray-300);
-    border-radius: var(--ep-radius);
-    font-family: inherit;
-    font-size: 0.9rem;
-    background-color: white;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.ep-form-control:focus {
-    outline: none;
-    border-color: var(--ep-primary);
-    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
-}
-
-/* Tabla */
-.ep-data-table-container {
- background: var(--ep-bg-card);
- border-radius: var(--ep-radius);
- box-shadow: var(--ep-shadow-sm);
- overflow-x: auto;
- border: 1px solid var(--ep-gray-300);
-}
-
-.ep-data-table {
- width: 100%;
- border-collapse: collapse;
- min-width: 900px;
-}
-
-.ep-data-table th,
-.ep-data-table td {
-    padding: 1rem;
-    text-align: left;
-    border-bottom: 1px solid var(--ep-gray-200);
-}
-
-.ep-data-table th {
-    background-color: var(--ep-gray-100);
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--ep-gray-600);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.ep-data-table tr:hover {
-    background-color: var(--ep-gray-100);
-}
-
-/* Estados (Badges) */
-.ep-status-badge {
-    display: inline-block;
-    padding: 0.25rem 0.6rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.ep-status-approved {
-    background-color: rgba(40, 167, 69, 0.1);
-    color: var(--ep-success);
-}
-
-.ep-status-rejected {
-    background-color: rgba(220, 53, 69, 0.1);
-    color: var(--ep-danger);
-}
-
-.ep-status-pending {
-    background-color: rgba(255, 193, 7, 0.1);
-    color: #b68b00;
-}
+.evaluacion-proveedores *{box-sizing:border-box}
+.evaluacion-proveedores button{font-family:inherit}
+.evaluacion-proveedores svg{display:block}
+
+/* ================= LAYOUT ================= */
+.evaluacion-proveedores .ep-root{height:100%;display:flex;flex-direction:column;min-height:0}
+.evaluacion-proveedores .ep-content-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable}
+.evaluacion-proveedores .ep-page{max-width:none;margin:0;padding:20px 28px 64px}
+.evaluacion-proveedores .ep-detail{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable}
+
+/* ================= HEADER ================= */
+.evaluacion-proveedores .ep-header{background:var(--ep-surface);border-bottom:1px solid var(--ep-border);padding:16px 28px 0;flex-shrink:0}
+.evaluacion-proveedores .ep-header__bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px;flex-wrap:wrap}
+.evaluacion-proveedores .ep-header__id{display:flex;align-items:center;gap:13px;min-width:0}
+.evaluacion-proveedores .ep-header__icon{width:42px;height:42px;border-radius:12px;background:var(--ep-blue-soft);color:var(--ep-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.evaluacion-proveedores .ep-header__icon svg{width:21px;height:21px}
+.evaluacion-proveedores .ep-header__title{font-family:var(--ep-font-title);font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.evaluacion-proveedores .ep-header__sub{font-size:12.5px;color:var(--ep-text2);margin-top:1px}
+.evaluacion-proveedores .ep-header__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Chips */
+.evaluacion-proveedores .ep-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:var(--ep-slate-soft);color:var(--ep-slate);font-size:12px;font-weight:600;white-space:nowrap}
+.evaluacion-proveedores .ep-chip svg{width:13px;height:13px}
+.evaluacion-proveedores .ep-chip--blue{background:var(--ep-blue-soft);color:var(--ep-blue)}
+.evaluacion-proveedores .ep-chip--green{background:var(--ep-green-soft);color:var(--ep-green-ink)}
+.evaluacion-proveedores .ep-chip--amber{background:var(--ep-amber-soft);color:var(--ep-amber-ink)}
 
 /* Botones */
-.ep-btn {
-    padding: 0.5rem 1rem;
-    border-radius: var(--ep-radius);
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-    font-family: var(--ep-font-body);
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    white-space: nowrap;
-    font-size: 0.9rem;
-}
-
-.ep-btn-primary {
-    background-color: var(--ep-primary);
-    color: white;
-}
-
-.ep-btn-primary:hover {
-    background-color: var(--ep-primary-hover);
-}
-
-.ep-btn-primary:disabled {
-    background-color: var(--ep-gray-600);
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-.ep-btn-outline {
-    background: transparent;
-    border: 1px solid var(--ep-gray-300);
-    color: var(--ep-text-main);
-}
-
-.ep-btn-outline:hover {
-    background: var(--ep-gray-100);
-    border-color: var(--ep-gray-600);
-}
-
-.ep-btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.85rem;
-}
-
-/* ========================================================================
-   MODAL (Overlay y contenido)
-   ======================================================================== */
-.ep-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.ep-modal-overlay.active {
-    display: flex;
-}
-
-.ep-modal-content {
-    background: white;
-    width: 90%;
-    max-width: 1000px;
-    max-height: 90vh;
-    border-radius: var(--ep-radius);
-    box-shadow: var(--ep-shadow-lg);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: epModalFadeIn 0.3s ease-out;
-}
-
-@keyframes epModalFadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.ep-modal-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--ep-gray-200);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--ep-gray-100);
-}
-
-.ep-modal-title {
-    font-family: var(--ep-font-heading);
-    font-size: 1.25rem;
-    color: var(--ep-primary);
-    margin: 0;
-}
-
-.ep-modal-subtitle {
-    font-size: 0.85rem;
-    color: var(--ep-gray-600);
-    margin-top: 0.25rem;
-}
-
-.ep-modal-body {
-    padding: 2rem;
-    overflow-y: auto;
-    flex: 1;
-}
-
-.ep-modal-footer {
-    padding: 1rem 2rem;
-    border-top: 1px solid var(--ep-gray-200);
-    background: var(--ep-gray-100);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Formulario en modal */
-.ep-form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 2rem;
-}
-
-.ep-eval-section {
-    margin-bottom: 1.5rem;
-}
-
-.ep-eval-section h4 {
-    color: var(--ep-primary);
-    margin-bottom: 0.75rem;
-    font-size: 1rem;
-    border-bottom: 2px solid var(--ep-gray-200);
-    padding-bottom: 0.25rem;
-    font-family: var(--ep-font-heading);
-}
-
-.ep-eval-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f1f3f5;
-}
-
-.ep-eval-check {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--ep-primary);
-    cursor: pointer;
-}
-
-/* Score display */
-.ep-score-display {
-    background: var(--ep-dark);
-    color: white;
-    padding: 0.75rem;
-    border-radius: var(--ep-radius);
-    text-align: center;
-    margin-bottom: 1rem;
-}
-
-.ep-score-label {
-    font-size: 0.7rem;
-    opacity: 0.8;
-    text-transform: uppercase;
-}
-
-.ep-score-number {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--ep-success);
-}
-
-.ep-progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.ep-progress-fill {
-    height: 100%;
-    background: var(--ep-success);
-    width: 0%;
-    transition: width 0.3s, background-color 0.3s;
-}
-
-/* Evidencias */
-.ep-evidence-section {
-    grid-column: span 2;
-    margin-top: 1rem;
-    padding-top: 1.5rem;
-    border-top: 2px dashed var(--ep-gray-300);
-}
-
-.ep-drop-zone {
-    background: #f8f9fa;
-    border: 2px dashed var(--ep-gray-300);
-    border-radius: var(--ep-radius);
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.ep-drop-zone:hover,
-.ep-drop-zone.dragover {
-    border-color: var(--ep-primary);
-    background: rgba(23, 78, 166, 0.03);
-}
-
-.ep-file-list {
-    list-style: none;
-    border: 1px solid var(--ep-gray-200);
-    border-radius: var(--ep-radius);
-    margin-top: 1rem;
-    overflow: hidden;
-}
-
-.ep-file-list li {
-    padding: 0.75rem 1rem;
-    background: white;
-    border-bottom: 1px solid var(--ep-gray-200);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ep-file-list li:last-child {
-    border-bottom: none;
-}
-
-.ep-file-remove-btn {
-    color: var(--ep-danger);
-    cursor: pointer;
-    font-weight: bold;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: none;
-    border: none;
-    font-size: 1rem;
-}
-
-.ep-file-remove-btn:hover {
-    background: rgba(220, 53, 69, 0.1);
-}
-
-.ep-path-preview {
-    background: #e9ecef;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    font-family: monospace;
-    color: var(--ep-dark);
-    font-size: 0.85rem;
-    display: inline-block;
-    margin-top: 0.5rem;
-}
-
-/* ========================================================================
-   PANEL LATERAL (Criterios)
-   ======================================================================== */
-.ep-criteria-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 450px;
-    height: 100%;
-    background: white;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
-    z-index: 2000;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
-}
-
-.ep-criteria-panel.open {
-    transform: translateX(0);
-}
-
-.ep-panel-header {
-    padding: 1.5rem;
-    background: var(--ep-primary);
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ep-panel-title {
-    font-family: var(--ep-font-heading);
-    font-weight: 600;
-    font-size: 1.2rem;
-    margin: 0;
-}
-
-.ep-panel-subtitle {
-    font-size: 0.8rem;
-    opacity: 0.8;
-    margin-top: 0.25rem;
-}
-
-.ep-panel-close {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.ep-panel-body {
-    flex: 1;
-    padding: 1.5rem;
-    overflow-y: auto;
-    background: #fdfdfd;
-}
-
-/* Scale cards */
-.ep-scale-card {
-    background: white;
-    border: 1px solid var(--ep-gray-200);
-    border-radius: var(--ep-radius);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--ep-shadow-sm);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.ep-scale-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--ep-shadow-md);
-}
-
-.ep-scale-danger {
-    border-left: 6px solid var(--ep-danger);
-}
-
-.ep-scale-warning {
-    border-left: 6px solid #b68b00;
-}
-
-.ep-scale-success {
-    border-left: 6px solid var(--ep-success);
-}
-
-.ep-scale-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.ep-scale-title h4 {
-    margin: 0;
-    font-family: var(--ep-font-heading);
-    font-size: 1rem;
-}
-
-.ep-scale-badge {
-    background: var(--ep-danger);
-    color: white;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-.ep-scale-danger .ep-scale-badge {
-    background: var(--ep-danger);
-}
-
-.ep-scale-warning .ep-scale-badge {
-    background: #b68b00;
-}
-
-.ep-scale-success .ep-scale-badge {
-    background: var(--ep-success);
-}
-
-.ep-scale-result {
-    background: rgba(220, 53, 69, 0.1);
-    padding: 0.75rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-}
-
-.ep-scale-danger .ep-scale-result {
-    background: rgba(220, 53, 69, 0.1);
-}
-
-.ep-scale-warning .ep-scale-result {
-    background: rgba(255, 193, 7, 0.1);
-}
-
-.ep-scale-success .ep-scale-result {
-    background: rgba(40, 167, 69, 0.1);
-}
-
-.ep-panel-footer {
-    padding: 1rem;
-    border-top: 1px solid var(--ep-gray-200);
-    background: #f8f9fa;
-    text-align: right;
-}
-
-/* Fórmula */
-.ep-formula-box {
-    background: var(--ep-primary);
-    color: white;
-    padding: 1rem;
-    border-radius: var(--ep-radius);
-    margin-bottom: 2rem;
-    text-align: center;
-}
-
-.ep-formula-label {
-    font-size: 0.85rem;
-    opacity: 0.8;
-    margin-bottom: 0.25rem;
-}
-
-.ep-formula-text {
-    font-size: 1.2rem;
-    font-weight: 600;
-    font-family: monospace;
-}
-
-/* Nota legal */
-.ep-legal-note {
-    margin-top: 2rem;
-    padding: 1rem;
-    border-left: 4px solid var(--ep-info);
-    background: #e3f2fd;
-    font-size: 0.85rem;
-    color: #0c5460;
-    border-radius: var(--ep-radius);
-}
-
-/* ========================================================================
-   VISTA DE DETALLE (FICHA TÉCNICA DE PROVEEDOR)
-   ======================================================================== */
-.ep-detail-view {
- display: none;
- animation: epFadeIn 0.3s ease-in-out;
- padding: 1rem;
- box-sizing: border-box;
-}
-
-.ep-detail-view[style*="display: block"] {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-@keyframes epFadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Encabezado de la Ficha */
-.ep-detail-header {
-    background: white;
-    padding: 2rem;
-    border-radius: var(--ep-radius);
-    box-shadow: var(--ep-shadow-sm);
-    margin-bottom: 2rem;
-    border-top: 5px solid var(--ep-primary);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-}
-
-.ep-detail-title-group h1 {
-    font-family: var(--ep-font-heading);
-    color: var(--ep-text-main);
-    margin: 0 0 0.5rem 0;
-    font-size: 1.5rem;
-}
-
-.ep-detail-meta {
-    color: var(--ep-gray-600);
-    font-size: 0.9rem;
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-}
-
-.ep-detail-score-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: var(--ep-radius);
-    font-weight: 700;
-    font-size: 1.1rem;
-    background: var(--ep-gray-100);
-}
-
-/* Grid de Contenido */
-.ep-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-}
-
-/* Secciones de la Ficha */
-.ep-detail-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: var(--ep-radius);
-    box-shadow: var(--ep-shadow-sm);
-    margin-bottom: 2rem;
-}
-
-.ep-detail-card h3 {
-    color: var(--ep-primary);
-    border-bottom: 2px solid var(--ep-gray-200);
-    padding-bottom: 0.5rem;
-    margin-bottom: 1.5rem;
-    font-family: var(--ep-font-heading);
-    font-size: 1.1rem;
-}
-
-/* Lista de Datos */
-.ep-info-row {
-    display: flex;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #f1f3f5;
-    padding-bottom: 0.5rem;
-}
-
-.ep-info-row:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-
-.ep-info-label {
-    font-weight: 600;
-    width: 140px;
-    color: var(--ep-gray-600);
-    flex-shrink: 0;
-    font-size: 0.9rem;
-}
-
-.ep-info-value {
-    color: var(--ep-text-main);
-    flex-grow: 1;
-    font-size: 0.95rem;
-}
-
-/* Matriz Visual de Cumplimiento */
-.ep-compliance-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-    max-height: 500px;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-}
-
-.ep-compliance-item {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem;
-    border: 1px solid var(--ep-gray-200);
-    border-radius: 6px;
-    background: white;
-    transition: box-shadow 0.2s;
-}
-
-.ep-compliance-item:hover {
-    box-shadow: var(--ep-shadow-sm);
-}
-
-.ep-compliance-status-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 1rem;
-    color: white;
-    font-weight: bold;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-}
-
-.ep-status-compliant { 
-    background-color: var(--ep-success); 
-}
-
-.ep-status-non-compliant { 
-    background-color: var(--ep-danger); 
-}
-
-.ep-compliance-text { 
-    font-size: 0.9rem;
-    color: var(--ep-text-main);
-}
-
-.ep-compliance-text strong {
-    font-weight: 600;
-}
-
-/* Lista de Archivos de Evidencia */
-.ep-file-list-display {
-    list-style: none;
-    border: 1px solid var(--ep-gray-200);
-    border-radius: var(--ep-radius);
-    overflow: hidden;
-}
-
-.ep-file-list-display li {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--ep-gray-200);
-    display: flex;
-    align-items: center;
-    color: var(--ep-primary);
-    text-decoration: none;
-    transition: background 0.2s;
-    cursor: pointer;
-}
-
-.ep-file-list-display li:hover {
-    background-color: var(--ep-gray-100);
-}
-
-.ep-file-list-display li:last-child { 
-    border-bottom: none; 
-}
-
-.ep-file-icon { 
-    margin-right: 0.75rem; 
-    font-size: 1.2rem; 
-}
-
-.ep-file-name {
-    flex-grow: 1;
-    font-weight: 500;
-}
-
-.ep-file-size {
-    font-size: 0.8rem;
-    color: var(--ep-gray-600);
-    margin-left: 1rem;
-}
-
-/* Botón de Volver */
-.ep-btn-back {
-    background: var(--ep-gray-200);
-    color: var(--ep-text-main);
-    padding: 0.5rem 1rem;
-    border-radius: var(--ep-radius);
-    border: none;
-    cursor: pointer;
-    font-weight: 500;
-    margin-bottom: 1rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    transition: background 0.2s;
-}
-
-.ep-btn-back:hover { 
-    background: var(--ep-gray-300); 
-}
-
-/* Observaciones */
-.ep-observations-box {
-    background: var(--ep-gray-100);
-    padding: 1rem;
-    border-radius: var(--ep-radius);
-    border-left: 4px solid var(--ep-primary);
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--ep-text-main);
-}
-
-/* Empty State */
-.ep-no-files-msg {
-    text-align: center;
-    padding: 2rem;
-    color: var(--ep-gray-600);
-}
-
-.ep-no-files-msg i {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 0.5rem;
-    opacity: 0.5;
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-    .ep-detail-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .ep-detail-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .ep-detail-meta {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
- .ep-form-grid {
-  grid-template-columns: 1fr;
- }
-
- .ep-evidence-section {
-  grid-column: span 1;
- }
-}
-
-@media (max-width: 768px) {
- .ep-toolbar {
-  flex-direction: column;
-  align-items: stretch;
- }
-
-    .ep-search-box {
-        flex-direction: column;
-    }
-
-    .ep-criteria-panel {
-        width: 100%;
-    }
-}
+.evaluacion-proveedores .ep-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:var(--ep-radius-sm);border:1px solid transparent;font-size:13px;font-weight:700;cursor:pointer;transition:all var(--ep-t);white-space:nowrap;background:transparent;color:var(--ep-text2)}
+.evaluacion-proveedores .ep-btn svg{width:14px;height:14px;flex-shrink:0}
+.evaluacion-proveedores .ep-btn--outline{border-color:var(--ep-border);color:var(--ep-text);background:var(--ep-surface)}
+.evaluacion-proveedores .ep-btn--outline:hover{border-color:var(--ep-blue);color:var(--ep-blue);background:var(--ep-blue-soft)}
+.evaluacion-proveedores .ep-btn--primary{background:var(--ep-blue);color:#fff;box-shadow:0 4px 12px rgba(32,87,184,.25)}
+.evaluacion-proveedores .ep-btn--primary:hover{background:var(--ep-blue-ink)}
+.evaluacion-proveedores .ep-btn--ghost{color:var(--ep-blue)}
+.evaluacion-proveedores .ep-btn--ghost:hover{background:var(--ep-blue-soft)}
+.evaluacion-proveedores .ep-btn--sm{height:30px;padding:0 10px;font-size:12px;border-radius:8px}
+.evaluacion-proveedores .ep-btn:disabled{opacity:.6;cursor:not-allowed}
+.evaluacion-proveedores .ep-iconbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--ep-border);background:#fff;color:var(--ep-text2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all var(--ep-t);flex-shrink:0}
+.evaluacion-proveedores .ep-iconbtn svg{width:14px;height:14px}
+.evaluacion-proveedores .ep-iconbtn:hover{border-color:var(--ep-blue);color:var(--ep-blue);background:var(--ep-blue-soft)}
+
+/* Pastillas de estado/tipo */
+.evaluacion-proveedores .ep-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.evaluacion-proveedores .ep-pill--blue{background:var(--ep-blue-soft);color:var(--ep-blue)}
+.evaluacion-proveedores .ep-pill--green{background:var(--ep-green-soft);color:var(--ep-green-ink)}
+.evaluacion-proveedores .ep-pill--amber{background:var(--ep-amber-soft);color:var(--ep-amber-ink)}
+.evaluacion-proveedores .ep-pill--red{background:var(--ep-red-soft);color:var(--ep-red-ink)}
+.evaluacion-proveedores .ep-pill--slate{background:var(--ep-slate-soft);color:var(--ep-slate)}
+
+/* ================= KPIs ================= */
+.evaluacion-proveedores .ep-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.evaluacion-proveedores .ep-kpi{display:flex;align-items:center;gap:13px;background:var(--ep-surface);border:1px solid var(--ep-border);border-radius:var(--ep-radius);padding:16px 18px}
+.evaluacion-proveedores .ep-kpi__ic{width:42px;height:42px;border-radius:12px;background:var(--ep-slate-soft);color:var(--ep-slate);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.evaluacion-proveedores .ep-kpi__ic svg{width:20px;height:20px}
+.evaluacion-proveedores .ep-kpi__ic--green{background:var(--ep-green-soft);color:var(--ep-green)}
+.evaluacion-proveedores .ep-kpi__ic--amber{background:var(--ep-amber-soft);color:var(--ep-amber)}
+.evaluacion-proveedores .ep-kpi__ic--red{background:var(--ep-red-soft);color:var(--ep-red)}
+.evaluacion-proveedores .ep-kpi__txt b{font-family:var(--ep-font-title);font-size:26px;font-weight:800;display:block;line-height:1.1;letter-spacing:-.01em}
+.evaluacion-proveedores .ep-kpi__txt span{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ep-text2)}
+
+/* ================= CARDS ================= */
+.evaluacion-proveedores .ep-card{background:var(--ep-surface);border:1px solid var(--ep-border);border-radius:var(--ep-radius);padding:18px 20px;margin-bottom:16px}
+.evaluacion-proveedores .ep-card__title{font-family:var(--ep-font-title);font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.evaluacion-proveedores .ep-card__tic{width:30px;height:30px;border-radius:9px;background:var(--ep-blue-soft);color:var(--ep-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.evaluacion-proveedores .ep-card__tic svg{width:15px;height:15px}
+
+/* ================= TOOLBAR / TABLA ================= */
+.evaluacion-proveedores .ep-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 0 14px;border-bottom:1px solid var(--ep-border);margin-bottom:0}
+.evaluacion-proveedores .ep-search{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--ep-border);border-radius:var(--ep-radius-sm);background:#FDFDFE;min-width:250px;flex:1;max-width:340px;transition:border-color var(--ep-t)}
+.evaluacion-proveedores .ep-search:focus-within{border-color:var(--ep-blue);box-shadow:0 0 0 3px rgba(32,87,184,.10)}
+.evaluacion-proveedores .ep-search svg{width:15px;height:15px;color:var(--ep-text3);flex-shrink:0}
+.evaluacion-proveedores .ep-search input{border:none;outline:none;background:transparent;font-family:inherit;font-size:13px;color:var(--ep-text);width:100%}
+.evaluacion-proveedores .ep-search input::placeholder{color:var(--ep-text3)}
+.evaluacion-proveedores .ep-select{height:36px;padding:0 32px 0 12px;border:1px solid var(--ep-border);border-radius:var(--ep-radius-sm);background:#FDFDFE;font-family:inherit;font-size:13px;font-weight:600;color:var(--ep-text);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23748096' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;transition:border-color var(--ep-t)}
+.evaluacion-proveedores .ep-select:focus{outline:none;border-color:var(--ep-blue)}
+.evaluacion-proveedores .ep-toolbar__right{display:flex;align-items:center;gap:12px;margin-left:auto}
+.evaluacion-proveedores .ep-count{font-size:12.5px;font-weight:600;color:var(--ep-text2)}
+
+.evaluacion-proveedores .ep-tablewrap{overflow-x:auto}
+.evaluacion-proveedores .ep-table{width:100%;border-collapse:collapse;min-width:960px}
+.evaluacion-proveedores .ep-table th{background:#F6F8FA;text-align:left;padding:11px 14px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ep-text2);border-bottom:1px solid var(--ep-border);white-space:nowrap}
+.evaluacion-proveedores .ep-table td{padding:12px 14px;border-bottom:1px solid var(--ep-border);font-size:13px;vertical-align:middle}
+.evaluacion-proveedores .ep-table tbody tr{transition:background var(--ep-t)}
+.evaluacion-proveedores .ep-table tbody tr:hover{background:#F8FAFC}
+.evaluacion-proveedores .ep-table tbody tr:last-child td{border-bottom:none}
+.evaluacion-proveedores .ep-th-sort{cursor:pointer;user-select:none}
+.evaluacion-proveedores .ep-th-sort:hover{color:var(--ep-blue)}
+.evaluacion-proveedores .ep-sort-ic{font-size:9px}
+.evaluacion-proveedores .ep-th-actions{text-align:right}
+.evaluacion-proveedores .ep-nowrap{white-space:nowrap}
+.evaluacion-proveedores .ep-obj{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.evaluacion-proveedores .ep-prov{display:flex;align-items:center;gap:11px;min-width:0}
+.evaluacion-proveedores .ep-avatar{width:34px;height:34px;border-radius:10px;background:var(--ep-blue-soft);color:var(--ep-blue);font-family:var(--ep-font-title);font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.02em}
+.evaluacion-proveedores .ep-avatar--lg{width:52px;height:52px;border-radius:14px;font-size:17px}
+.evaluacion-proveedores .ep-prov__txt{min-width:0}
+.evaluacion-proveedores .ep-prov__txt b{display:block;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.evaluacion-proveedores .ep-prov__txt small{font-size:11.5px;color:var(--ep-text3)}
+
+.evaluacion-proveedores .ep-pt b{font-family:var(--ep-font-title);font-size:13.5px;font-weight:800;display:block;margin-bottom:4px}
+.evaluacion-proveedores .ep-pt__bar{width:90px;height:4px;border-radius:99px;background:var(--ep-slate-soft);overflow:hidden}
+.evaluacion-proveedores .ep-pt__bar i{display:block;height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.evaluacion-proveedores .ep-pt__bar i.is-ok{background:var(--ep-green)}
+.evaluacion-proveedores .ep-pt__bar i.is-warn{background:var(--ep-amber)}
+.evaluacion-proveedores .ep-pt__bar i.is-danger{background:var(--ep-red)}
+
+.evaluacion-proveedores .ep-rowactions{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+
+.evaluacion-proveedores .ep-empty{text-align:center;padding:44px 20px;color:var(--ep-text2)}
+.evaluacion-proveedores .ep-empty__ic{width:52px;height:52px;border-radius:16px;background:var(--ep-slate-soft);color:var(--ep-slate);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.evaluacion-proveedores .ep-empty__ic svg{width:24px;height:24px}
+.evaluacion-proveedores .ep-empty b{display:block;font-family:var(--ep-font-title);font-size:15px;color:var(--ep-text);margin-bottom:4px}
+.evaluacion-proveedores .ep-empty p{margin:0 0 2px}
+.evaluacion-proveedores .ep-empty small{color:var(--ep-text3)}
+
+/* ================= DETALLE ================= */
+.evaluacion-proveedores .ep-detail .ep-page{padding-top:16px}
+.evaluacion-proveedores .ep-dcard{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--ep-surface);border:1px solid var(--ep-border);border-radius:var(--ep-radius);padding:18px 20px;margin:12px 0 16px;box-shadow:inset 0 3px 0 var(--ep-blue)}
+.evaluacion-proveedores .ep-dcard__id{display:flex;align-items:center;gap:14px;min-width:0}
+.evaluacion-proveedores .ep-dcard__name{font-family:var(--ep-font-title);font-size:19px;font-weight:800;letter-spacing:-.01em}
+.evaluacion-proveedores .ep-dcard__meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--ep-text2);margin-top:3px}
+.evaluacion-proveedores .ep-dcard__score{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.evaluacion-proveedores .ep-dcard__pct{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.evaluacion-proveedores .ep-dcard__pct b{font-family:var(--ep-font-title);font-size:30px;font-weight:800;letter-spacing:-.02em}
+.evaluacion-proveedores .ep-dcard__pct b.is-ok{color:var(--ep-green)}
+.evaluacion-proveedores .ep-dcard__pct b.is-warn{color:var(--ep-amber)}
+.evaluacion-proveedores .ep-dcard__pct b.is-danger{color:var(--ep-red)}
+.evaluacion-proveedores .ep-dcard__pct span{font-family:var(--ep-font-title);font-size:16px;font-weight:800}
+.evaluacion-proveedores .ep-dcard__pct label{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--ep-text3);margin-top:3px}
+
+.evaluacion-proveedores .ep-dgrid{display:grid;grid-template-columns:minmax(320px,5fr) 7fr;gap:16px;align-items:start}
+.evaluacion-proveedores .ep-dgrid__col{min-width:0}
+
+.evaluacion-proveedores .ep-deflist{margin:0}
+.evaluacion-proveedores .ep-deflist>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px dashed var(--ep-border)}
+.evaluacion-proveedores .ep-deflist>div:last-child{border-bottom:none}
+.evaluacion-proveedores .ep-deflist dt{font-size:12.5px;color:var(--ep-text2);margin:0}
+.evaluacion-proveedores .ep-deflist dd{font-size:13px;font-weight:700;text-align:right;margin:0;overflow-wrap:anywhere}
+
+.evaluacion-proveedores .ep-obs{border-left:3px solid var(--ep-blue);background:#F8FAFC;border-radius:0 8px 8px 0;padding:10px 12px;font-size:13px;color:var(--ep-text2)}
+
+.evaluacion-proveedores .ep-evpath{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ep-text2);background:#F8FAFC;border:1px dashed var(--ep-border);border-radius:8px;padding:8px 11px;margin-bottom:10px;overflow-wrap:anywhere}
+.evaluacion-proveedores .ep-evpath svg{width:14px;height:14px;flex-shrink:0}
+.evaluacion-proveedores .ep-evlist{list-style:none;margin:0;padding:0}
+.evaluacion-proveedores .ep-evlist li{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--ep-border);border-radius:8px;margin-bottom:7px;transition:all var(--ep-t);background:#FDFDFE}
+.evaluacion-proveedores .ep-evlist li:hover{border-color:var(--ep-blue);background:var(--ep-blue-soft)}
+.evaluacion-proveedores .ep-evlist__ic{color:var(--ep-blue);flex-shrink:0;display:flex}
+.evaluacion-proveedores .ep-evlist__ic svg{width:15px;height:15px}
+.evaluacion-proveedores .ep-evlist__name{flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evaluacion-proveedores .ep-evlist__size{font-size:11px;color:var(--ep-text3);flex-shrink:0}
+.evaluacion-proveedores .ep-evnone p{margin:0;font-size:12.5px;color:var(--ep-text3);background:#F8FAFC;border-radius:8px;padding:10px 12px}
+
+.evaluacion-proveedores .ep-matrix{display:flex;flex-direction:column;gap:7px}
+.evaluacion-proveedores .ep-mx{display:flex;align-items:center;gap:11px;border:1px solid var(--ep-border);border-radius:8px;padding:9px 12px}
+.evaluacion-proveedores .ep-mx__ic{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.evaluacion-proveedores .ep-mx__ic svg{width:13px;height:13px}
+.evaluacion-proveedores .ep-mx.is-ok .ep-mx__ic{background:var(--ep-green-soft);color:var(--ep-green)}
+.evaluacion-proveedores .ep-mx.is-danger .ep-mx__ic{background:var(--ep-red-soft);color:var(--ep-red)}
+.evaluacion-proveedores .ep-mx__num{font-size:11px;font-weight:700;color:var(--ep-text3);width:14px;text-align:center;flex-shrink:0}
+.evaluacion-proveedores .ep-mx__txt{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.evaluacion-proveedores .ep-mx__txt b{font-size:13px;font-weight:700}
+.evaluacion-proveedores .ep-mx__txt small{font-size:11.5px;color:var(--ep-text3);text-align:right}
+.evaluacion-proveedores .ep-matrix__foot{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;font-size:12.5px;font-weight:600;color:var(--ep-text2)}
+
+/* ================= MODAL ================= */
+.evaluacion-proveedores .ep-modal{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,33,61,.45);backdrop-filter:blur(2px)}
+.evaluacion-proveedores .ep-modal.active{display:flex}
+.evaluacion-proveedores .ep-modal__box{background:var(--ep-surface);border-radius:16px;width:min(980px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(20,33,61,.28);animation:ep-pop .22s ease}
+@keyframes ep-pop{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.evaluacion-proveedores .ep-modal__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--ep-border)}
+.evaluacion-proveedores .ep-modal__head h2{font-family:var(--ep-font-title);font-size:17px;font-weight:800;margin:0;letter-spacing:-.01em}
+.evaluacion-proveedores .ep-modal__head p{font-size:12px;color:var(--ep-text2);margin:2px 0 0}
+.evaluacion-proveedores .ep-modal__body{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:18px 22px;overflow-y:auto}
+.evaluacion-proveedores .ep-modal__col h3{font-family:var(--ep-font-title);font-size:13px;font-weight:800;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--ep-border)}
+.evaluacion-proveedores .ep-modal__col h3:not(:first-child){margin-top:18px}
+.evaluacion-proveedores .ep-modal__foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--ep-border)}
+
+.evaluacion-proveedores .ep-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;min-width:0}
+.evaluacion-proveedores .ep-field>span{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ep-text2)}
+.evaluacion-proveedores .ep-fieldrow{display:grid;grid-template-columns:1fr 130px;gap:10px}
+.evaluacion-proveedores .ep-input{width:100%;height:38px;padding:0 12px;border:1px solid var(--ep-border);border-radius:var(--ep-radius-sm);font-family:inherit;font-size:13px;color:var(--ep-text);background:#FDFDFE;transition:border-color var(--ep-t)}
+.evaluacion-proveedores .ep-input:focus{outline:none;border-color:var(--ep-blue);background:#fff;box-shadow:0 0 0 3px rgba(32,87,184,.10)}
+.evaluacion-proveedores textarea.ep-input{height:auto;min-height:70px;padding:9px 12px;resize:vertical;line-height:1.5}
+.evaluacion-proveedores select.ep-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23748096' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+.evaluacion-proveedores .ep-dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;border:1.5px dashed #C9D2DE;border-radius:var(--ep-radius-sm);padding:18px 14px;color:var(--ep-text2);background:#FDFDFE;cursor:pointer;transition:all var(--ep-t);margin-bottom:10px}
+.evaluacion-proveedores .ep-dropzone svg{width:22px;height:22px;color:var(--ep-text3)}
+.evaluacion-proveedores .ep-dropzone b{font-size:13px;color:var(--ep-text)}
+.evaluacion-proveedores .ep-dropzone small{font-size:11.5px;color:var(--ep-text3)}
+.evaluacion-proveedores .ep-dropzone:hover,.evaluacion-proveedores .ep-dropzone.dragover{border-color:var(--ep-blue);background:var(--ep-blue-soft);color:var(--ep-blue)}
+.evaluacion-proveedores .ep-ruta{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ep-text2);background:#F8FAFC;border:1px solid var(--ep-border);border-radius:8px;padding:8px 11px;margin-bottom:10px;overflow-wrap:anywhere}
+.evaluacion-proveedores .ep-ruta svg{width:14px;height:14px;flex-shrink:0}
+.evaluacion-proveedores .ep-ruta b{color:var(--ep-text)}
+
+.evaluacion-proveedores .ep-filelist ul{list-style:none;margin:0;padding:0}
+.evaluacion-proveedores .ep-filelist li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--ep-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;background:#FDFDFE}
+.evaluacion-proveedores .ep-filelist__name{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;min-width:0}
+.evaluacion-proveedores .ep-filelist__name svg{width:14px;height:14px;color:var(--ep-blue);flex-shrink:0}
+.evaluacion-proveedores .ep-filelist__name small{color:var(--ep-text3);font-weight:500;white-space:nowrap}
+.evaluacion-proveedores .ep-filelist__rm{width:26px;height:26px;border-radius:7px;border:none;background:var(--ep-slate-soft);color:var(--ep-slate);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all var(--ep-t);flex-shrink:0}
+.evaluacion-proveedores .ep-filelist__rm svg{width:12px;height:12px}
+.evaluacion-proveedores .ep-filelist__rm:hover{background:var(--ep-red-soft);color:var(--ep-red)}
+
+/* Score box del modal */
+.evaluacion-proveedores .ep-scorebox{background:#14213D;border-radius:12px;padding:14px 16px;color:#fff;margin-bottom:12px}
+.evaluacion-proveedores .ep-scorebox__lbl{font-size:9.5px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.65)}
+.evaluacion-proveedores .ep-scorebox b{font-family:var(--ep-font-title);font-size:26px;font-weight:800;display:block;line-height:1.15;margin-top:2px}
+.evaluacion-proveedores .ep-scorebar{height:5px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;margin:8px 0 6px}
+.evaluacion-proveedores .ep-scorebar i{display:block;height:100%;width:0;border-radius:99px;background:var(--ep-slate);transition:width .35s ease, background-color .35s ease}
+.evaluacion-proveedores .ep-scorebox.is-ok .ep-scorebar i{background:var(--ep-green)}
+.evaluacion-proveedores .ep-scorebox.is-warn .ep-scorebar i{background:var(--ep-amber)}
+.evaluacion-proveedores .ep-scorebox.is-danger .ep-scorebar i{background:var(--ep-red)}
+.evaluacion-proveedores .ep-scorebox small{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:rgba(255,255,255,.75)}
+
+/* Checklist del modal */
+.evaluacion-proveedores .ep-checklist{display:flex;flex-direction:column;gap:7px;max-height:430px;overflow-y:auto;padding-right:4px}
+.evaluacion-proveedores .ep-check{display:flex;align-items:center;gap:11px;border:1px solid var(--ep-border);border-radius:8px;padding:9px 12px;cursor:pointer;transition:all var(--ep-t);margin:0}
+.evaluacion-proveedores .ep-check:hover{border-color:var(--ep-blue);background:var(--ep-blue-soft)}
+.evaluacion-proveedores .ep-check input{position:absolute;opacity:0;pointer-events:none}
+.evaluacion-proveedores .ep-check__box{width:22px;height:22px;border-radius:7px;border:1.5px solid #C9D2DE;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all var(--ep-t);color:transparent}
+.evaluacion-proveedores .ep-check__box svg{width:12px;height:12px}
+.evaluacion-proveedores .ep-check input:checked+.ep-check__box{background:var(--ep-green);border-color:var(--ep-green);color:#fff}
+.evaluacion-proveedores .ep-check__num{font-size:11px;font-weight:700;color:var(--ep-text3);width:14px;text-align:center;flex-shrink:0}
+.evaluacion-proveedores .ep-check__txt{min-width:0}
+.evaluacion-proveedores .ep-check__txt b{display:block;font-size:13px;font-weight:700}
+.evaluacion-proveedores .ep-check__txt small{font-size:11.5px;color:var(--ep-text3)}
+
+/* ================= DRAWER ESCALA ================= */
+.evaluacion-proveedores .ep-drawerwrap{position:fixed;inset:0;z-index:1300}
+.evaluacion-proveedores .ep-drawerwrap__backdrop{position:absolute;inset:0;background:rgba(20,33,61,.4)}
+.evaluacion-proveedores .ep-drawer{position:absolute;top:0;right:0;bottom:0;width:min(440px,92vw);background:var(--ep-surface);box-shadow:-16px 0 44px rgba(20,33,61,.22);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}
+.evaluacion-proveedores .ep-drawerwrap.open .ep-drawer{transform:none}
+.evaluacion-proveedores .ep-drawer__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 14px;background:#14213D;color:#fff}
+.evaluacion-proveedores .ep-drawer__head h2{font-family:var(--ep-font-title);font-size:16px;font-weight:800;margin:0}
+.evaluacion-proveedores .ep-drawer__head p{font-size:11.5px;color:rgba(255,255,255,.7);margin:3px 0 0}
+.evaluacion-proveedores .ep-drawer__head .ep-iconbtn{background:transparent;border-color:rgba(255,255,255,.25);color:#fff}
+.evaluacion-proveedores .ep-drawer__head .ep-iconbtn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5);color:#fff}
+.evaluacion-proveedores .ep-drawer__body{flex:1;overflow-y:auto;padding:18px 20px}
+.evaluacion-proveedores .ep-formula{background:var(--ep-blue);color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:16px}
+.evaluacion-proveedores .ep-formula span{font-size:9.5px;font-weight:700;letter-spacing:.12em;opacity:.75;display:block}
+.evaluacion-proveedores .ep-formula b{font-family:var(--ep-font-title);font-size:15px;font-weight:800}
+.evaluacion-proveedores .ep-drawer__body>h3{font-family:var(--ep-font-title);font-size:13px;font-weight:800;margin:0 0 10px}
+.evaluacion-proveedores .ep-nivel{border:1px solid var(--ep-border);border-left-width:3px;border-radius:10px;padding:11px 14px;margin-bottom:10px}
+.evaluacion-proveedores .ep-nivel--danger{border-left-color:var(--ep-red)}
+.evaluacion-proveedores .ep-nivel--warn{border-left-color:var(--ep-amber)}
+.evaluacion-proveedores .ep-nivel--ok{border-left-color:var(--ep-green)}
+.evaluacion-proveedores .ep-nivel__head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
+.evaluacion-proveedores .ep-nivel__head b{font-family:var(--ep-font-title);font-size:12.5px;font-weight:800}
+.evaluacion-proveedores .ep-nivel p{margin:0;font-size:12px;color:var(--ep-text2);line-height:1.5}
+.evaluacion-proveedores .ep-nivel p b{color:var(--ep-text)}
+.evaluacion-proveedores .ep-note{background:var(--ep-slate-soft);border-radius:10px;padding:11px 14px;font-size:11.5px;color:var(--ep-text2);line-height:1.55;margin-top:14px}
+.evaluacion-proveedores .ep-drawer__foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--ep-border)}
+
+/* ================= TOASTS ================= */
+.evaluacion-proveedores .ep-toast-container{position:fixed;top:18px;right:18px;z-index:3000;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.evaluacion-proveedores .ep-toast{display:flex;align-items:center;gap:9px;background:#14213D;color:#fff;border-radius:11px;padding:11px 14px;font-size:13px;font-weight:600;box-shadow:0 12px 30px rgba(20,33,61,.28);animation:ep-toast-in .25s ease}
+@keyframes ep-toast-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.evaluacion-proveedores .ep-toast-hiding{opacity:0;transform:translateX(14px);transition:all .3s ease}
+.evaluacion-proveedores .ep-toast-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:7px;font-size:11px;font-weight:800;flex-shrink:0}
+.evaluacion-proveedores .ep-toast-success .ep-toast-icon{background:rgba(27,184,136,.25);color:#4ADE80}
+.evaluacion-proveedores .ep-toast-error .ep-toast-icon{background:rgba(218,85,99,.25);color:#F87171}
+.evaluacion-proveedores .ep-toast-warning .ep-toast-icon{background:rgba(231,162,36,.25);color:#FBBF24}
+.evaluacion-proveedores .ep-toast-info .ep-toast-icon{background:rgba(255,255,255,.15);color:#93C5FD}
+.evaluacion-proveedores .ep-toast-message{flex:1;line-height:1.4}
+.evaluacion-proveedores .ep-toast-close{background:transparent;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px;padding:2px 4px;line-height:1}
+.evaluacion-proveedores .ep-toast-close:hover{color:#fff}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width:1200px){
+  .evaluacion-proveedores .ep-dgrid{grid-template-columns:1fr}
+}
+@media (max-width:1000px){
+  .evaluacion-proveedores .ep-kpis{grid-template-columns:1fr 1fr}
+  .evaluacion-proveedores .ep-modal__body{grid-template-columns:1fr}
+  .evaluacion-proveedores .ep-checklist{max-height:none}
+  .evaluacion-proveedores .ep-toolbar__right{margin-left:0;width:100%;justify-content:flex-end}
+}
+@media (max-width:680px){
+  .evaluacion-proveedores .ep-page{padding:14px 14px 48px}
+  .evaluacion-proveedores .ep-header{padding:10px 14px 0}
+  .evaluacion-proveedores .ep-kpis{grid-template-columns:1fr 1fr}
+  .evaluacion-proveedores .ep-fieldrow{grid-template-columns:1fr}
+  .evaluacion-proveedores .ep-search{max-width:none}
+  .evaluacion-proveedores .ep-dcard__score{width:100%;justify-content:space-between}
+}
+
+/* ================= IMPRESIÓN ================= */
+@media print{
+  .evaluacion-proveedores .ep-header__actions,
+  .evaluacion-proveedores .ep-toolbar,
+  .evaluacion-proveedores .ep-rowactions,
+  .evaluacion-proveedores .ep-drawerwrap,
+  .evaluacion-proveedores .ep-modal{display:none !important}
+  .evaluacion-proveedores .ep-content-scroll,.evaluacion-proveedores .ep-detail{overflow:visible}
+}
+
+/* ==========================================================================
+   📦764 — BARRA SUPERIOR DEL SUBMÓDULO 2.9.1 (header)
+   ==========================================================================
+   POR QUÉ ESTE BLOQUE EXISTE, SI ARRIBA YA HAY REGLAS `.ep-header*`:
+   esas reglas están en la hoja y **matchean** el elemento, pero en la aplicación
+   NO se aplicaban: medido en la app real, el header terminaba con **1678 px de
+   alto** (el icono se estiraba, el título caía a 24px/700 y los botones se iban al
+   fondo, 1517 px más abajo). No es que falte la hoja —está linkeada y carga 232
+   reglas— ni que el contenedor `.evaluacion-proveedores` falte: existe en el
+   `<body>`. Al inyectar estas mismas reglas el header bajó a 194 px y el icono
+   recuperó su caja, o sea que el problema es que las de arriba no llegan a
+   aplicarse (quedaron a medias en el rediseño que se estaba haciendo).
+   Este bloque va AL FINAL de la hoja a propósito: gana por orden de cascada, sin
+   depender de que las reglas de arriba se arreglen.
+
+   🚨 POR QUÉ LLEVA `!important`: en la app, NINGUNA regla `.ep-header*` de NINGUNA
+   hoja llega a aplicarse (se verificó recorriendo el CSSOM completo: 0 reglas con
+   `ep-header` matchean el nodo, y no hay estilos en línea). Con `!important` el
+   header pasa de 1678 px a 194 px y el icono recupera su caja; sin `!important`
+   vuelve a romperse. Medido en los dos sentidos, ida y vuelta. Es una excepción
+   deliberada a la regla de "no usar !important": acá hay algo que le gana y no se
+   pudo identificar desde el renderer. Si en algún momento se encuentra la causa,
+   lo correcto es sacar los `!important` de este bloque.
+
+   Los valores son los MISMOS que el header aprobado de 3.1.4 / 2.3.1
+   (icono 44×44 en caja azul redondeada, título Manrope 20/800, subtítulo 12,5,
+   botones a la derecha), para que los tres módulos se vean iguales.
+   ========================================================================== */
+.evaluacion-proveedores .ep-header {
+  background: var(--ep-surface, #ffffff) !important;
+  border-bottom: 1px solid var(--ep-border, #E8EBEE) !important;
+  padding: 18px 24px 0 !important;
+  flex: none !important;
+  height: auto !important;
+}
+.evaluacion-proveedores .ep-header__bar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding-bottom: 14px !important;
+  flex-wrap: wrap !important;
+  justify-content: space-between !important;
+}
+.evaluacion-proveedores .ep-header__id {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+.evaluacion-proveedores .ep-header__icon {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 12px !important;
+  background: var(--ep-blue-soft, #EDF3FC) !important;
+  color: var(--ep-blue, #2057B8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: none !important;
+}
+.evaluacion-proveedores .ep-header__icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+}
+.evaluacion-proveedores .ep-header__title {
+  font-family: var(--ep-font-title, 'Manrope', system-ui, sans-serif) !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.02em !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+.evaluacion-proveedores .ep-header__sub {
+  font-size: 12.5px !important;
+  color: var(--ep-text2, #748096) !important;
+  margin: 2px 0 0 !important;
+}
+.evaluacion-proveedores .ep-header__actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  flex-wrap: wrap !important;
+  flex: none !important;
+}
+/* En pantallas angostas el título y los botones se apilan, pero el header NO crece
+   más allá de su contenido (la regla de arriba pone `height: auto`). */
+@media (max-width: 760px) {
+  .evaluacion-proveedores .ep-header { padding: 14px 14px 0 !important; }
+  .evaluacion-proveedores .ep-header__actions { width: 100% !important; }
+}
+
+/* Modo oscuro: la app usa data-theme="dark" (sistema) y data-theme="dark-legacy"
+   (oscuro manual). Se cubren los dos. También con `!important`, por el mismo motivo. */
+[data-theme="dark"] .evaluacion-proveedores .ep-header,
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header {
+  background: #1B2230 !important;
+  border-bottom-color: #2C3648 !important;
+}
+[data-theme="dark"] .evaluacion-proveedores .ep-header__icon,
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__icon {
+  background: rgba(91, 147, 232, .16) !important;
+  color: #5B93E8 !important;
+}
+[data-theme="dark"] .evaluacion-proveedores .ep-header__title,
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__title { color: #E8EDF5 !important; }
+[data-theme="dark"] .evaluacion-proveedores .ep-header__sub,
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__sub { color: #98A4B8 !important; }
