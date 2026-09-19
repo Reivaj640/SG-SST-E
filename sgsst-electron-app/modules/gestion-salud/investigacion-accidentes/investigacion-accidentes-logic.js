@@ -66,7 +66,7 @@ class InvestigacionAccidentesComponent {
         container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}`;
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260919-premium`;
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
@@ -208,7 +208,7 @@ class InvestigacionAccidentesComponent {
         this.container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=INV-20260919-premium`;
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
@@ -232,7 +232,7 @@ class InvestigacionAccidentesComponent {
     this.container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        let src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}`;
+        let src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260919-premium`;
         if (investigacionNombre) {
             src += `&nombre=${encodeURIComponent(investigacionNombre)}`;
         }
@@ -624,7 +624,7 @@ InvestigacionAccidentesComponent.prototype.showNewDocumentViewer = function() {
     iframe.style.border = 'none';
 
     // Pasar parámetros a la nueva interfaz a través de la URL
-    const viewerUrl = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    const viewerUrl = `./modules/gestion-salud/investigacion-accidentes/investigaciones-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=INV-20260919-premium`;
     iframe.src = viewerUrl;
 
   this.container.appendChild(header);

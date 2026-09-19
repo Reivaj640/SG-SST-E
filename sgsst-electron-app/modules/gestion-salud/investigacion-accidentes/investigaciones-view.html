@@ -6,38 +6,48 @@
 <title>Gestión de Investigaciones - K+AIR</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="investigaciones-view.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="investigaciones-view.css?v=INV-20260919-premium">
 </head>
 <body>
 
 <div class="inv-layout">
 
-<!-- Header -->
-<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="fas fa-microscope" style="color:#174ea6; font-size:1.25rem;"></i>
-      <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Gestión de Investigaciones</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.2 Ver Investigaciones</p>
+<!-- 📦780 — HEADER SYSTEM v2 (premium) -->
+<header class="inv-header-v2">
+  <nav class="inv-breadcrumb" aria-label="Ruta de navegación">
+    <span>Gestión de la Salud</span>
+    <span class="inv-sep">›</span>
+    <span>3.2.2</span>
+    <span class="inv-sep">›</span>
+    <strong>Ver Investigaciones</strong>
+  </nav>
+  <div class="inv-header-row">
+    <div class="inv-header-left">
+      <span class="inv-header-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/></svg>
+      </span>
+      <div class="inv-header-titles">
+        <h1 class="inv-title">Gestión de Investigaciones</h1>
+        <p class="inv-sub">Gestión de la Salud — 3.2.2 Ver Investigaciones</p>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <span class="k-section-card__company">
-        <i class="kair-icon-building"></i>
+    <div class="inv-header-actions">
+      <span class="inv-company" title="Empresa activa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01"/></svg>
         <span id="invCompanyName">—</span>
       </span>
-      <div class="k-section-card__divider"></div>
-      <button class="header-action--ghost" id="refreshBtn" title="Actualizar lista">
-        <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar
+      <button class="inv-btn" id="refreshBtn" title="Actualizar lista">
+        <svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span>Actualizar</span>
       </button>
-      <button class="header-back-btn" id="backBtn" title="Volver al portal">
-        <i class="fas fa-arrow-left"></i> Volver
+      <button class="inv-btn inv-btn--primary" id="backBtn" title="Volver al portal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Volver</span>
       </button>
     </div>
   </div>
-</div>
+</header>
 
 <!-- Contenido principal con scroll -->
 <div class="inv-body">
@@ -181,6 +191,6 @@
 <script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
 <script src="../../../shared/file-viewer.js"></script>
 
-<script src="investigaciones-viewer.js"></script>
+<script src="investigaciones-viewer.js?v=INV-20260919-premium"></script>
 </body>
 </html>

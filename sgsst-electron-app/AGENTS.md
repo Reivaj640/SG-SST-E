@@ -2130,6 +2130,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
 | Restricciones y Remisiones (3.1.6) | ✅ (📦775-779) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`), Control (`.remctl-scope`) y Estadísticas (`.remstat-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
+| Investigación de Accidentes (3.2.2) | ✅ (📦780) | No usa `kair-premium`: portal scoped `.inv-portal-scope` + Realizar/Ver con Header System v2 y tokens `--inv-*` remapeados; se quitó el `<link>` global que filtraba `html`/`body`/`.k-section-card` |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2147,6 +2148,8 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦777**: Restricciones y Remisiones (3.1.6) — **alineación de la paleta** de `enviar-remision-v2.css` y `control-remisiones-v2.css` a la canónica de la app (`shared/kair-design-tokens.css`, la de Recursos / Gestión Integral). Traían una paleta propia (`#2456d6` azul, `#eef1f7` fondo, `#e3e8f2` borde, `Segoe UI`, radio 14px) que se veía distinta; ahora usan `#2057b8` / `#fbfcfb` / `#e8ebee` / `DM Sans` + `Manrope` / radio 20px, y el modo oscuro `#0f172a` / `#1a2334` / `#6ea8fe`.
 - **📦778**: Control de Remisiones (3.1.6) — el Excel real `GI-FO-012` trae **encabezados repetidos y filas vacías** en el medio; el backend las contaba como registros (18 en vez de 8). Ahora `get-control-remisiones-data` **descarta filas vacías y encabezados repetidos** y devuelve **`rowNumbers`** (nº de fila real) para que el guardado por celda A1 no se desalinee.
 - **📦779**: Estadísticas de Remisiones (3.1.6) — nueva sección que **deriva métricas del Control** (KPIs + 6 gráficos: sexo, tipo de evaluación, rango de edad, concepto médico, top cargos y estado civil), con normalización de valores inconsistentes del Excel y el mismo dialecto premium v2.
+- **📦780**: Investigación de Accidentes e Incidentes (3.2.2) — las 3 vistas (portal + Realizar + Ver) al premium v2; se quitó el `<link>` **global** que filtraba `html`/`body`/`.k-section-card` a toda la app; Header System v2, tokens canónicos, `[data-theme^="dark"]` y cache-bust de los iframes.
+- **📦781**: Investigación de Accidentes (3.2.2) — "Ver Investigaciones" ahora aprovecha **todo el ancho** en maximizada (`.inv-body` sin `max-width:1200px` centrado); buscador con tope (`clamp`) y toggle de vista al extremo derecho.
 
 ---
 
@@ -3374,6 +3377,82 @@ pantalla real que **deriva sus métricas del Control de Remisiones** (mismo orig
 - `estadisticas-remisiones-v2.js` + `.css` (nuevos), `restricciones-medicas-logic.js`
   (`showEstadisticasRemisionesPage`), `restricciones-medicas-home.html`/`.js` (`rmEnterEstadisticas`),
   `index.html` (CSS+JS con cache-bust `REM-20260919-v3-estadisticas`).
+
+---
+
+## 🆕 Investigación de Accidentes e Incidentes · Premium v2 (📦780, 2026-09-19)
+
+El submódulo **3.2.2** (`modules/gestion-salud/investigacion-accidentes/`) tiene **3 vistas**, todas
+montadas como **iframe** desde `investigacion-accidentes-logic.js`: el portal (`investigacion-home.html`),
+"Realizar Investigación" (`investigacion-accidentes-view.html`) y "Ver Investigaciones"
+(`investigaciones-view.html`). Se migraron las 3 al premium v2.
+
+### 🚨 La fuga global más grave hasta ahora
+
+`investigacion-accidentes-view.css` estaba linkeada **DOS veces**: dentro de su iframe (correcto) **y en
+`index.html`** (línea 24). Esa copia global traía:
+
+- `html, body { margin:0; height:100vh; overflow:hidden }` → forzaba el layout de TODA la app.
+- `body { display:flex; flex-direction:column }` → global.
+- `:root { --inv-* }` → global.
+- `.k-section-card { … }` **sin scope** → afectaba a los ~20 módulos que usan esa clase genérica.
+
+**Fix**: se **quitó el `<link>` global** de `index.html` (el iframe ya carga la hoja). Verificado con `rg`
+que ningún elemento del app principal usa clases `inv-*` y que `styles.css` no define `.k-section-card`.
+
+### Portal premium
+
+- Marcado bajo `.inv-portal-scope` (sin `:root` ni `*` globales).
+- Header System v2 (breadcrumb + icon chip + título Manrope + subtítulo + Volver).
+- 2 KPI (Pendientes / Completadas) + 2 acciones principales + 4 herramientas, iconos SVG inline (sin CDN).
+- Modo oscuro para `dark` y `dark-legacy`.
+
+### Realizar / Ver: tokens + Header v2 + dark
+
+- **Tokens** remapeados a la canónica (`#2057b8`, `#fbfcfb`, `#e8ebee`, DM Sans + Manrope, radios 12/16/20).
+- **Header System v2** reemplazó el `k-section-card` viejo; los botones (`Visualizar/Imprimir/Volver`,
+  `Actualizar/Volver`) conservan sus ids y pasaron a SVG inline (el botón Actualizar rota su SVG con la
+  clase `fa-spin` que el JS ya agregaba → se define la animación `inv-btn-spin`).
+- **Modo oscuro**: se usó el selector **`[data-theme^="dark"]`** (cubre `dark` Y `dark-legacy`) en TODO el
+  CSS de las dos vistas (truco 📦773). En "Ver" la vista solo tenía 9 reglas oscuras (el header) → se
+  agregó el bloque completo de tokens oscuros.
+- **Bug de modo oscuro**: la card "Configuración" (`.inv-combined-left`) tenía `background:#fafbfc` +
+  `[data-theme="dark"]` (sin `dark-legacy`) → quedaba blanca con el tema oscuro manual. Corregido.
+- **Tipografía**: el header v2 vive FUERA de `.inv-layout` (que declaraba la fuente) → se movió
+  `font-family: var(--inv-font-body)` al `body`.
+
+### Cache-bust
+
+- `index.html` → logic.js con `?v=INV-20260919-premium`.
+- `logic.js` → las **4 URLs de iframe** con `&v=INV-20260919-premium`.
+- Las 2 hojas y los 2 scripts de las vistas con `?v=INV-20260919-premium`.
+
+### 📦781 — Aprovechar el ancho en maximizada
+
+En **"Ver Investigaciones"** el contenido quedaba **centrado a 1200px** (`.inv-body { max-width:1200px;
+margin:0 auto }`): a 1900px de ventana se perdían **~350px por lado**. Ahora:
+
+- `.inv-body` → `max-width: none; margin: 0` + padding proporcional `clamp(14px, 1.6vw, 26px) clamp(14px, 1.8vw, 34px) 32px`.
+- El buscador (con `flex:1` se estiraba a **~1300px**) → `max-width: clamp(340px, 30vw, 640px)`.
+- El toggle de vista (grid/lista) → `margin-left: auto` (al extremo derecho de la barra).
+- La vista **"Realizar" ya usaba todo el ancho** (su contenedor `.inv-main-wrapper`/`.inv-main-scroll` no tiene `max-width`); no se tocó.
+- **Regla** (📦769): un `max-width` + `margin:0 auto` en el contenedor de contenido es una decisión de
+  diseño que **desperdicia el ancho** en maximizada. Medir `getBoundingClientRect()` contra
+  `window.innerWidth` antes de dejarlo.
+
+### Verificación
+
+- Arnés de Electron (una vista por proceso): portal OK; "Realizar" con `headerV2:true`, `#2057b8`, DM Sans;
+  "Ver" con `headerV2:true`, DM Sans; claro y oscuro. **0 errores de consola** (el único
+  `KairSkeleton is not defined` es del arnés: en la app el shim lo toma del padre).
+- Test `tests/investigacion-accidentes/test-premium.js` → **28/28 OK**.
+- ⚠️ Nota del arnés: `loadFile` con `query` y el encadenado de vistas en el mismo proceso daban
+  `ERR_FAILED`; se resolvió cargando **una vista por proceso** y sin `query`.
+
+### Regla
+
+Cuando un CSS se linkea **globalmente** además de dentro de su iframe, revisar si trae `html`/`body`/`*`
+o clases genéricas (`.k-section-card`): aunque el módulo "funcione", está pisando a toda la app.
 
 ---
 

@@ -21,7 +21,10 @@
        se carga, el módulo queda sin estilos y los iconos (SVG sin tamaño en línea) se
        estiran a todo el ancho, inflando la pantalla. -->
   <link rel="stylesheet" href="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-v2.css?v=EMO-20260918-v8-tabla-altura-fix-ancho-completo">
-  <link rel="stylesheet" href="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.css">
+  <!-- 📦780 — Se QUITÓ el <link> global a investigacion-accidentes-view.css:
+       el submódulo lo carga DENTRO de su iframe, así que cargarlo acá era
+       redundante y además FILTRABA a toda la app (traía `html, body {height:100vh;
+       overflow:hidden}` y un `.k-section-card` sin scope). -->
 
   <!-- Scripts para animación de fondo (Vanta.js) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
@@ -384,7 +387,7 @@
   <script src="modules/verificacion/revision-alta-direccion/revision-alta-direccion-component.js"></script>
   <script src="modules/mejoramiento/mejoramiento-store.js"></script>
   <script src="modules/mejoramiento/mejoramiento-home.js?v=MEJORAMIENTO-20260918-bar-chart-html"></script>
-  <script src="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js"></script>
+  <script src="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js?v=INV-20260919-premium"></script>
   <script src="modules/recursos/copasst/copasst-logic.js?v=COPASST-20260915-v1-premium"></script>
 <script src="modules/recursos/copasst/copasst-portal-logic.js?v=COPASST-20260915-v1-premium"></script>
   <script src="modules/recursos/comite-convivencia/comite-convivencia-logic.js?v=CONVIVENCIA-20260915-v1-premium"></script>
