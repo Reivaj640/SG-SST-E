@@ -17633,7 +17633,7 @@ async function ensureGestionCambioExcel(filePath) {
 
 /**
  * 📦XXX — Clasifica un estado de cambio en una de las 5 etapas del pipeline.
- * Misma lógica que gestion-cambio-logic.js#renderPipeline.
+ * Misma lógica que gestion-cambio-v2.js#renderPipeline.
  */
 function classifyCambioPipeline(estado) {
   const e = String(estado || '').toLowerCase().trim();

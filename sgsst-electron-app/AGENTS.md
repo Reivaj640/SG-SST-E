@@ -2128,6 +2128,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Bandeja Integrada | ✅ (📦752) | No usa `kair-premium`: capa propia `premium.css` (tokens + remapeo legacy) + topbar/segmentado propios. Es un iframe con scope aislado |
 | Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
+| Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2139,6 +2140,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦751**: Configuración del Sistema migrada a premium v2 (capa scoped `.kair-config` + remapeo de tokens legacy; Header System v2 con breadcrumb + icono/título + tabs con subrayado; soporte dark/dark-legacy).
 - **📦772**: Perfil de Cargo y Profesiograma (3.1.3) migrado a premium v2 (tokens premium en su `:root`; Header System v2 con breadcrumb + icono/título; tabs con subrayado azul estilo Evaluación Inicial; modo oscuro en los 2 atributos; `destroy()` + cache-bust).
 - **📦773**: Reportes de Accidentes (3.2.1 · FURAT) migrado a premium v2 (tokens `--furat-*` remapeados en su `:root`; Header System v2; tabs con subrayado; modo oscuro cubriendo `dark` y `dark-legacy` con `[data-theme^="dark"]`; reset scoped; cache-bust triple).
+- **📦774**: Gestión del Cambio (2.11.1) migrado a premium v2: de 6 archivos (logic + 2 css + html + viewer + index) a UN solo par CSS+JS con el marcado embebido; capa scoped `.gdc-scope` + tokens `--gdc-*`; overlays al `<body>` envueltos en `.gdc-scope`; vigía `MutationObserver` + `destroy()`; se conservó exacto el contrato de datos Excel (4 IPC) y la máquina de estados.
 
 ---
 
@@ -3033,6 +3035,95 @@ Los 2 tests funcionales del módulo quedan como deuda (el módulo no tenía test
   de Font Awesome (deuda offline, mismo pendiente que los viewers EMO y el 3.1.3).
 - El `.kpi-strip` sigue a ancho completo (flush) mientras el header está inset: es el diseño previo; si
   se quiere alinear, envolverlo con el mismo `clamp(...)` del header.
+
+---
+
+## 🆕 Gestión del Cambio · Premium v2 (📦774, 2026-09-19)
+
+El submódulo **2.11.1** (`modules/gestion-integral/gestion-del-cambio/`) se migró al estilo **premium v2**.
+Es el módulo de **gestión del cambio** (GI-FO-058 / GI-FO-059): registro de cambios con pipeline de 5
+etapas, lista de chequeo de 13 ítems, evaluación de riesgos y plan de cierre.
+
+### De 6 archivos a 1 par (marcado EMBEBIDO, no iframe)
+
+La implementación vieja tenía 6 archivos: `gestion-cambio-logic.js` (componente) + `gestion-cambio-view.html`
+(marcado) + `gestion-cambio-view.css` + `gestion-cambio-modal.css` + `gestion-cambio-viewer.js` + `index.js`
+(CommonJS). **Los 6 se eliminaron.** Ahora hay solo:
+
+| Archivo | Rol |
+|---------|-----|
+| `gestion-cambio-v2.js` | Componente + marcado EMBEBIDO en la constante `MARCADO` |
+| `gestion-cambio-v2.css` | Todos los estilos, bajo `.gdc-scope` |
+
+`renderer.js` (línea ~5359, **sin cambios**) hace
+`new window.GestionDelCambioComponent(contenedor, empresa, módulo, sub, safeBackToModuleCallback)` y
+`render()`. **No es iframe**: el componente inyecta su propio marcado (`this.raiz.innerHTML = MARCADO`) →
+regla de 📦761. El `index.html` dejó de cargar `gestion-cambio-logic.js` y ahora carga la hoja + el `.js` v2
+con cache-bust `GDC-20260918-v1-premium`.
+
+### CSS: capa scoped `.gdc-scope` con tokens propios
+
+- **Todos** los selectores van bajo `.gdc-scope` (el test lo verifica recorriendo el CSS y falla si alguno
+  queda suelto). Tokens propios `--gdc-*` (azul `#2057B8`, tinta `#14213D`, borde `#E8EBEE`, sombras
+  `rgba(20,33,61,…)`, radios 20/14/10/8, transición 180ms).
+- **Sin `:root` global**: los tokens viven en `.gdc-scope` para no pisar la paleta de la app (lección 📦762).
+- **Modo oscuro** para `[data-theme="dark"]` **y** `[data-theme="dark-legacy"]` (los dos que aplica
+  `scripts/theme-manager.js`).
+- Clases con prefijo `gdc-` (el prototipo viejo usaba `kair-gc-*`). Sin nombres genéricos sueltos
+  (`badge`, `card`, `btn`, `modal`, `overlay`…) — el test lo verifica.
+
+### Overlays al `<body>` ENVUELTOS en `.gdc-scope` (patrón 📦761)
+
+El modal del asistente y los toasts son `position: fixed`; adentro de un contenedor con `flex`/`transform`
+`fixed` se comporta como `absolute` y no cubre la ventana. Por eso se **mueven al `<body>`**, pero
+**envueltos en un `<div class="gdc-scope">`** — si no, como el CSS usa selectores descendientes
+(`.gdc-scope .gdc-modal`), al salir del árbol del componente perderían TODOS los estilos.
+
+### Vigía de navegación (por qué hace falta)
+
+`renderer.js` solo llama `destroy()` del componente activo cuando el **siguiente** se monta por
+`createComponentSafely`; los montajes directos **no avisan**. Como el componente deja capas en el `<body>`,
+al navegar a otro submódulo quedarían flotando (era el bug del "modal flotante"). Solución: un
+**`MutationObserver`** sobre `documentElement` que, si el host O la raíz salen del documento
+(`!host.isConnected || !self.raiz.isConnected`), llama a `#limpiarCapas()` (retira los nodos del body,
+desconecta el observer, suelta el ESC y desbloquea el scroll). `destroy()` hace lo mismo de forma explícita.
+Un `render()` repetido también llama `#limpiarCapas()` primero (no duplica capas).
+
+### Contrato de datos EXCEL (intacto)
+
+El componente usa **exactamente 4 canales** IPC (verificado por el test):
+`loadGestionCambioData(empresa)` · `saveGestionCambioData(empresa, data)` ·
+`generateGestionCambioId(empresa)` · `updateGestionCambioEstado(empresa, id, estado, extra)`.
+Los handlers viven en `main.js` (líneas ~17762-17973) y NO se tocaron. La máquina de estados y la lista de
+chequeo de 13 ítems (Rh1-4, Rl1-3, Sst1-6) y los 8 tipos de cambio se conservan igual.
+
+### Validaciones de transición (no se pueden saltar)
+
+- **Aprobado** exige la lista de chequeo **completa** (los 13 ítems vía `CLAVES`) y el **nivel de riesgo**.
+- **En Ejecución** exige **al menos una aprobación** (SST o área).
+- **Cerrado** exige **fecha de ejecución** y **fecha de cierre**.
+
+### Verificación
+
+- `node main/test-gestion-cambio-v2.js` → **69/69 OK** (registro en `index.html`, construcción del
+  componente, CSS bajo `.gdc-scope` + dark, contrato de datos y validaciones).
+- Verificación funcional con arnés temporal (`main/_preview-gdc.js`, en `.gitignore`): monta el componente
+  real con un puente simulado y confirmó **5 filas**, KPIs `pend 3 / alto 2 / activos 4 / mes 1`, pipeline
+  `1/1/1/1/1`, el asistente **"Paso 1 de 4"** con **8 tipos** y **13 ítems** de checklist, y el modo oscuro
+  (`dark-legacy`: fondo `#131824`, texto `#E8EDF5`, tarjeta `#1B2230`). **Sin errores de consola.**
+
+### Limpieza de código muerto
+
+- Se eliminaron los 6 archivos viejos del módulo (nada los referenciaba; solo quedaba un comentario en
+  `main.js` que se actualizó a `gestion-cambio-v2.js#renderPipeline`).
+- El comentario de `classifyCambioPipeline` en `main.js` tenía un placeholder `📦XXX` (preexistente).
+
+### Pendiente
+
+- El CSS usa `font: … 'Inter', …` pero la app **no carga Inter** → cae a `system-ui`. Si se quiere
+  consistencia con el resto del sistema premium, cambiar a `'DM Sans'` (el `--kair-font-ui` de la app).
+- Iconos: el header y el modal usan **SVG inline**; revisar si quedó algún `<i class="fas">` en el cuerpo
+  que dependa de un CDN (el módulo no carga Font Awesome).
 
 
 
