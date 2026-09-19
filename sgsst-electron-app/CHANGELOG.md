@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.207] - 2026-09-19
 
-### 🆕📦739-782 · Migración premium v2 de los submódulos (Inducciones → Investigación de Accidentes)
+### 🆕📦739-783 · Migración premium v2 de los submódulos (Inducciones → Registro Estadístico)
 
 Segunda gran ola del rediseño premium (después de los homes de módulo, `📦730-738`): se migraron al dialecto **premium v2** todos los submódulos con UI propia, y se consolidó el sistema de diseño compartido.
 
@@ -40,6 +40,7 @@ Segunda gran ola del rediseño premium (después de los homes de módulo, `📦7
 | 778 | Control de Remisiones (3.1.6) | Descarta filas vacías y encabezados repetidos del Excel + `rowNumbers` para el guardado por celda |
 | 779 | Estadísticas de Remisiones (3.1.6) | Nueva sección: KPIs + 6 gráficos derivados del Control |
 | 780-782 | Investigación de Accidentes (3.2.2) | Las 3 vistas al premium v2 + fix de la fuga global de estilos + ancho completo + lista en 2 columnas en maximizada |
+| 783 | Registro y Análisis Estadístico (3.2.3) | Header System v2 + scoping total del CSS (se quitaron las clases GLOBALES `.k-section-card`/`.header-back-btn`) + modo oscuro en los 2 atributos + chips con `color-mix` + los 9 gráficos Chart.js con colores de tema |
 
 #### Limpieza
 

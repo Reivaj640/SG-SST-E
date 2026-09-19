@@ -2131,6 +2131,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
 | Restricciones y Remisiones (3.1.6) | ✅ (📦775-779) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`), Control (`.remctl-scope`) y Estadísticas (`.remstat-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
 | Investigación de Accidentes (3.2.2) | ✅ (📦780) | No usa `kair-premium`: portal scoped `.inv-portal-scope` + Realizar/Ver con Header System v2 y tokens `--inv-*` remapeados; se quitó el `<link>` global que filtraba `html`/`body`/`.k-section-card` |
+| Registro y Análisis Estadístico (3.2.3) | ✅ (📦783) | No usa `kair-premium`: tokens `--k-*` remapeados a la canónica + Header System v2; se quitaron `.k-section-card`/`.header-back-btn` (clases GLOBALES) y se scopearon las reglas `.k-*`; gráficos Chart.js theme-aware |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2150,6 +2151,8 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦779**: Estadísticas de Remisiones (3.1.6) — nueva sección que **deriva métricas del Control** (KPIs + 6 gráficos: sexo, tipo de evaluación, rango de edad, concepto médico, top cargos y estado civil), con normalización de valores inconsistentes del Excel y el mismo dialecto premium v2.
 - **📦780**: Investigación de Accidentes e Incidentes (3.2.2) — las 3 vistas (portal + Realizar + Ver) al premium v2; se quitó el `<link>` **global** que filtraba `html`/`body`/`.k-section-card` a toda la app; Header System v2, tokens canónicos, `[data-theme^="dark"]` y cache-bust de los iframes.
 - **📦781**: Investigación de Accidentes (3.2.2) — "Ver Investigaciones" ahora aprovecha **todo el ancho** en maximizada (`.inv-body` sin `max-width:1200px` centrado); buscador con tope (`clamp`) y toggle de vista al extremo derecho.
+- **📦782**: Investigación de Accidentes (3.2.2) — la vista de LISTA pasa a **2 columnas** en maximizada (`@media (min-width:1360px)`, `repeat(2, minmax(0,1fr))`); la cuadrícula no se toca; el estado vacío y el esqueleto llevan `grid-column: 1 / -1`.
+- **📦783**: Registro y Análisis Estadístico (3.2.3) migrado a premium v2 — Header System v2, tokens `--k-*` remapeados a la canónica, scoping total del CSS (se quitaron las clases GLOBALES `.k-section-card`/`.header-back-btn`), modo oscuro en los DOS atributos, chips con `color-mix` y los 9 gráficos Chart.js con colores de tema.
 
 ---
 
@@ -3463,6 +3466,101 @@ En "Ver Investigaciones" el modo **lista** (el que se ve por defecto; el botón 
   sus hijos que no sean tarjetas (estados vacíos, esqueletos, avisos) y darles `grid-column: 1 / -1`.
 - **Umbral**: `1360px` (cada columna ≈ 640px). Si en otra pantalla "maximizado" no alcanza, se ajusta
   ese número en la media query.
+
+### 📦783 — Registro y Análisis Estadístico (3.2.3) al premium v2
+
+El submódulo **3.2.3** (`modules/gestion-salud/registro-estadistico/`) es una tabla de 19 columnas
+(paginada, filtrable, ordenable) + un tablero con 8 KPIs, 3 indicadores SG-SST (IFA/IG/PA), panel de
+alertas, **9 gráficos Chart.js**, 2 tablas Top 5 y recomendaciones automáticas.
+
+#### Cómo se monta (NO es iframe) — y su riesgo de fuga
+
+`renderer.js#showRegistroEstadisticoContent` hace **`fetch` del HTML** y lo inyecta con
+`container.innerHTML = doc.body.innerHTML` en el **documento PRINCIPAL**; el CSS se appendea al
+`<head>` **global** y el JS también. O sea: el CSS de este módulo queda activo en TODA la app
+mientras esté abierto (misma clase de riesgo que el portal de EMO 📦766 y el de Remisiones 📦775).
+
+#### 🚨 Lo que se arregló: 2 clases GLOBALES de otros módulos
+
+El header era una `.k-section-card` (clase que usan **~20 módulos**) y el botón usaba
+`.header-back-btn`; el CSS definía `.kair-s323 .k-section-card { background:#ffffff; … }`. Eso
+acoplaba este módulo con una clase compartida. Se reemplazó por un **Header System v2 propio**
+(`.kair-s323-header-v2`, `.kair-s323-header-icon`, `.kair-s323-title`, `.kair-s323-btn`) y se
+**borraron** esas reglas → el módulo ya no define ninguna clase genérica de otro módulo.
+
+Además se scopearon las reglas que quedaban sueltas (`.k-spinner`, `.k-btn-sample`, `.k-action-btns`,
+`.k-btn-action`, `.k-dash-actions`) y se renombraron los `@keyframes` globales
+(`kSpinnerRotate`→`kairS323Spinner`, `kFadeIn`→`kairS323FadeIn`, `kSlideUp`→`kairS323SlideUp`).
+
+#### Estrategia: remapeo de tokens conservando los NOMBRES
+
+El JS escribe **estilos en línea** con `var(--k-text-muted)`, `var(--k-primary)`, etc. Por eso **no**
+se renombraron los tokens: se conservaron los nombres `--k-*` y **solo se cambiaron los valores** a
+la paleta canónica (`#2057b8` / `#14213d` / `#748096` / `#e8ebee` / `#fbfcfb`, DM Sans + Manrope).
+Así los estilos en línea que genera el JS siguen funcionando sin tocar el JS.
+
+- Se agregó `--k-radius-card: 20px` (los controles quedan en `--k-radius: 12px`) y se aplicó a
+  tarjetas, toolbar, tabla, filtros y KPI cards.
+- `--k-font` pasó de `'Segoe UI'` a `'DM Sans'`; los títulos usan `--k-font-display` (Manrope 800).
+
+#### Chips y estados: `color-mix` en vez de 13 hex duplicados
+
+Los badges (13 variantes), los estados SG-SST y las alertas tenían fondos hex fijos que se veían
+mal en oscuro. Ahora el fondo **se deriva del color del texto**:
+
+```css
+.kair-s323-badge { background: color-mix(in srgb, currentColor 12%, transparent); }
+```
+
+y cada variante solo declara `color`. Sirve igual en claro y en oscuro sin duplicar reglas.
+
+#### Modo oscuro: los DOS atributos con UN selector
+
+Se reemplazó el bloque `[data-theme="dark"]` (que solo cubría el tema Sistema) por
+**`[data-theme^="dark"]`**, que matchea `dark` **y** `dark-legacy` (el Oscuro manual).
+⚠️ **Detalle que hay que recordar**: en oscuro `--k-primary` es un azul **claro** (`#6ea8fe`, para
+que se lea como texto sobre fondo oscuro), así que **las superficies que usan `--k-primary` como
+FONDO** (botón primario, cabecera del modal, badge de período, número de las recomendaciones,
+paginación activa) necesitan un azul **oscuro** (`#2f5fa8`) o el texto blanco no se leería. Están
+listadas en una sola regla agrupada.
+
+#### Los 9 gráficos siguen el tema
+
+Los datasets usaban la paleta vieja (`#174ea6`, `#28a745`…) y Chart.js no tenía colores de eje
+propios → en oscuro los ejes quedaban grises sobre fondo oscuro. Ahora, al inicio de `renderCharts`:
+
+```js
+const _isDark = (document.documentElement.getAttribute('data-theme') || '').indexOf('dark') === 0;
+Chart.defaults.color = _isDark ? '#98a6bf' : '#748096';
+Chart.defaults.borderColor = _isDark ? 'rgba(255,255,255,0.08)' : 'rgba(20,33,61,0.08)';
+Chart.defaults.font.family = "'DM Sans', system-ui, -apple-system, sans-serif";
+```
+
+(Chart.js usa esos defaults globales para ticks, leyenda y rejilla, así que con 4 líneas quedan los
+9 gráficos alineados.) **Limitación conocida**: los colores se fijan al **renderizar** el tablero, así
+que cambiar el tema con el tablero ya abierto no repinta los gráficos. En el flujo real no pasa: el
+tema lo aplica `theme-manager.js` al arrancar, antes de que el módulo se cargue.
+
+#### Verificación
+
+- `node tests/registro-estadistico/test-premium.js` → **24/24 OK** (header v2, los **49 ids** del
+  contrato con el JS, paleta canónica, cero selectores sueltos, cero `.k-section-card`, dark en los
+  dos atributos, `color-mix`, keyframes con prefijo y los cache-bust).
+- Arnés de Electron (con `window.Chart` simulado, porque el CDN no está offline): claro →
+  `#fbfcfb` / `#2057b8` / tarjeta `20px` / título Manrope 800 20px; `dark` y `dark-legacy` → idénticos
+  (`#0f172a` / `#6ea8fe` / `#1a2334`); pestaña Tablero → **8 KPIs, 3 SG-SST, 21 alertas, 2 Top 5,
+  6 recomendaciones y los 9 gráficos** con sus ids; badge de período en oscuro → `#2f5fa8`;
+  **0 errores de consola**.
+- Cache-bust: token `RES-20260919-v1-premium` en el CSS, el HTML, el JS y el guard del `<link>`.
+- ⚠️ **EOL**: el directorio es `i/lf w/crlf`. Al tocar los 3 archivos el diff salió de **miles de
+  líneas**; se normalizaron a **LF** y el diff bajó a 246/147 (CSS), 29/18 (HTML) y 20/13 (JS).
+  Mismo gotcha de 📦773.
+
+#### Regla
+
+Si un módulo se monta con `innerHTML` en el documento principal, **revisar qué clases GLOBALES usa
+su HTML** (`.k-section-card`, `.header-back-btn`, `.card`, `.modal`, `.badge`…): mientras el módulo
+esté abierto, su CSS puede redefinirlas para toda la app. Reemplazarlas por clases propias del módulo.
 
 ### Verificación
 

@@ -6097,26 +6097,30 @@ function showRegistroEstadisticoContent(container, currentCompany, moduleName, s
   container.innerHTML = '<p>Cargando registro estadístico...</p>';
 
   const BASE = 'modules/gestion-salud/registro-estadistico/';
+  const TOKEN = 'RES-20260919-v1-premium';
 
-  if (!document.querySelector(`link[href="${BASE}registro-estadistico.css"]`)) {
+  if (!document.querySelector(`link[href="${BASE}registro-estadistico.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'registro-estadistico.css';
+    cssLink.href = BASE + 'registro-estadistico.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
-  fetch(BASE + 'registro-estadistico.html')
+  fetch(BASE + 'registro-estadistico.html?v=' + TOKEN)
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     })
     .then(html => {
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      // El HTML se inyecta con innerHTML en el documento PRINCIPAL: un <link> a un CDN
+      // cargaria en GLOBAL. Se descartan antes de inyectar.
+      const limpio = html.replace(/<link[^>]*https?:[^>]*>/gi, '');
+      const doc = new DOMParser().parseFromString(limpio, 'text/html');
       container.innerHTML = doc.body.innerHTML;
 
       function loadModuleScript() {
         const s = document.createElement('script');
-        s.src = BASE + 'registro-estadistico.js';
+        s.src = BASE + 'registro-estadistico.js?v=' + TOKEN;
         document.head.appendChild(s);
       }
 

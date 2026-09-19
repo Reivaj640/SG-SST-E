@@ -690,23 +690,30 @@
     `).join('');
   }
 
-  const CHART_COLORS = ['#174ea6','#28a745','#ffc107','#dc3545','#17a2b8','#6f42c1','#fd7e14','#20c997','#e83e8c','#6610f2'];
+  const CHART_COLORS = ['#2057b8','#1bb888','#e7a224','#da5563','#3f7fbf','#6d5bb8','#e08a2e','#2fbfa0','#c0506a','#5b6bd6'];
 
   function renderCharts(data) {
     destroyCharts();
+
+    // Colores de ejes/leyenda/rejilla según el tema (claro / oscuro).
+    // Chart.js usa estos defaults globales para ticks, leyenda y grid.
+    const _isDark = (document.documentElement.getAttribute('data-theme') || '').indexOf('dark') === 0;
+    Chart.defaults.color = _isDark ? '#98a6bf' : '#748096';
+    Chart.defaults.borderColor = _isDark ? 'rgba(255,255,255,0.08)' : 'rgba(20,33,61,0.08)';
+    Chart.defaults.font.family = "'DM Sans', system-ui, -apple-system, sans-serif";
 
     const byYear = countBy(data, 0).sort((a, b) => a[0] - b[0]);
     const avgYear = data.length / Math.max(byYear.length, 1);
     dashCharts.push(new Chart(document.getElementById('kChartByYear'), {
       type: 'bar',
-      data: { labels: byYear.map(y => y[0]), datasets: [{ label: 'Eventos', data: byYear.map(y => y[1]), backgroundColor: '#174ea6', borderRadius: 4 }] },
+      data: { labels: byYear.map(y => y[0]), datasets: [{ label: 'Eventos', data: byYear.map(y => y[1]), backgroundColor: '#2057b8', borderRadius: 4 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
       plugins: [{ id: 'avgLine', afterDatasetsDraw(chart) {
         const { ctx, chartArea: { left, right }, scales: { y } } = chart;
         const yPos = y.getPixelForValue(avgYear);
-        ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 1.5;
+        ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#da5563'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(left, yPos); ctx.lineTo(right, yPos); ctx.stroke();
-        ctx.fillStyle = '#dc3545'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'right';
+        ctx.fillStyle = '#da5563'; ctx.font = '11px DM Sans'; ctx.textAlign = 'right';
         ctx.fillText(`Prom: ${avgYear.toFixed(1)}`, right, yPos - 5); ctx.restore();
       }}]
     }));
@@ -714,35 +721,35 @@
     const bySev = countBy(data, 10);
     dashCharts.push(new Chart(document.getElementById('kChartSeveridad'), {
       type: 'doughnut',
-      data: { labels: bySev.map(s => s[0]), datasets: [{ data: bySev.map(s => s[1]), backgroundColor: ['#28a745','#ffc107','#17a2b8','#dc3545','#6f42c1'] }] },
+      data: { labels: bySev.map(s => s[0]), datasets: [{ data: bySev.map(s => s[1]), backgroundColor: ['#1bb888','#e7a224','#3f7fbf','#da5563','#6d5bb8'] }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } } } }
     }));
 
     const monthCounts = MONTHS.map(m => data.filter(r => r[2] === m).length);
     dashCharts.push(new Chart(document.getElementById('kChartMensual'), {
       type: 'bar',
-      data: { labels: MONTH_SHORT, datasets: [{ label: 'Eventos', data: monthCounts, backgroundColor: monthCounts.map(c => c >= 10 ? '#dc3545' : c >= 6 ? '#ffc107' : '#174ea6'), borderRadius: 4 }] },
+      data: { labels: MONTH_SHORT, datasets: [{ label: 'Eventos', data: monthCounts, backgroundColor: monthCounts.map(c => c >= 10 ? '#da5563' : c >= 6 ? '#e7a224' : '#2057b8'), borderRadius: 4 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
 
     const byParte = countBy(data, 13).slice(0, 8);
     dashCharts.push(new Chart(document.getElementById('kChartParteCuerpo'), {
       type: 'bar',
-      data: { labels: byParte.map(p => p[0]), datasets: [{ label: 'Eventos', data: byParte.map(p => p[1]), backgroundColor: '#17a2b8', borderRadius: 4 }] },
+      data: { labels: byParte.map(p => p[0]), datasets: [{ label: 'Eventos', data: byParte.map(p => p[1]), backgroundColor: '#3f7fbf', borderRadius: 4 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
 
     const byMec = countBy(data, 14);
     dashCharts.push(new Chart(document.getElementById('kChartMecanismo'), {
       type: 'bar',
-      data: { labels: byMec.map(m => m[0].length > 35 ? m[0].substring(0, 35) + '…' : m[0]), datasets: [{ label: 'Eventos', data: byMec.map(m => m[1]), backgroundColor: '#28a745', borderRadius: 4 }] },
+      data: { labels: byMec.map(m => m[0].length > 35 ? m[0].substring(0, 35) + '…' : m[0]), datasets: [{ label: 'Eventos', data: byMec.map(m => m[1]), backgroundColor: '#1bb888', borderRadius: 4 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
 
     const byLugar = countBy(data, 15);
     dashCharts.push(new Chart(document.getElementById('kChartLugar'), {
       type: 'bar',
-      data: { labels: byLugar.map(l => l[0]), datasets: [{ label: 'Eventos', data: byLugar.map(l => l[1]), backgroundColor: '#6f42c1', borderRadius: 4 }] },
+      data: { labels: byLugar.map(l => l[0]), datasets: [{ label: 'Eventos', data: byLugar.map(l => l[1]), backgroundColor: '#6d5bb8', borderRadius: 4 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
 
@@ -750,8 +757,8 @@
     dashCharts.push(new Chart(document.getElementById('kChartTipoAnio'), {
       type: 'bar',
       data: { labels: years, datasets: [
-        { label: 'Deportivo', data: years.map(y => data.filter(r => r[0] === y && r[9] === 'Deportivo').length), backgroundColor: '#fd7e14', borderRadius: 4 },
-        { label: 'Propios del trabajo', data: years.map(y => data.filter(r => r[0] === y && r[9] === 'Propios del trabajo').length), backgroundColor: '#174ea6', borderRadius: 4 },
+        { label: 'Deportivo', data: years.map(y => data.filter(r => r[0] === y && r[9] === 'Deportivo').length), backgroundColor: '#e08a2e', borderRadius: 4 },
+        { label: 'Propios del trabajo', data: years.map(y => data.filter(r => r[0] === y && r[9] === 'Propios del trabajo').length), backgroundColor: '#2057b8', borderRadius: 4 },
       ]},
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
@@ -767,8 +774,8 @@
     dashCharts.push(new Chart(document.getElementById('kChartSevSexo'), {
       type: 'bar',
       data: { labels: sevList, datasets: [
-        { label: 'Hombre', data: sevList.map(s => data.filter(r => r[10] === s && r[6] === 'Hombre').length), backgroundColor: '#1565c0', borderRadius: 4 },
-        { label: 'Mujer', data: sevList.map(s => data.filter(r => r[10] === s && r[6] === 'Mujer').length), backgroundColor: '#c62828', borderRadius: 4 },
+        { label: 'Hombre', data: sevList.map(s => data.filter(r => r[10] === s && r[6] === 'Hombre').length), backgroundColor: '#3f7fbf', borderRadius: 4 },
+        { label: 'Mujer', data: sevList.map(s => data.filter(r => r[10] === s && r[6] === 'Mujer').length), backgroundColor: '#c0506a', borderRadius: 4 },
       ]},
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 11 } } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     }));
