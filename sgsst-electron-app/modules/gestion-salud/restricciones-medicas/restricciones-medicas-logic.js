@@ -27,16 +27,21 @@ class RestriccionesMedicasComponent {
 
         // Cargar el HTML del portal moderno
         try {
-            const response = await fetch('./modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.html');
+            const response = await fetch('./modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.html?v=REM-20260919-v2-portal-premium');
             if (!response.ok) throw new Error('No se pudo cargar el portal');
             const html = await response.text();
 
+            // 📦775 — El portal se inyecta con innerHTML en el DOCUMENTO PRINCIPAL:
+            // cualquier <link> de la página se cargaría en global. Se quitan por
+            // seguridad (el portal ya no usa CDNs; los iconos son SVG inline).
+            const htmlLimpio = html.replace(/<link[^>]*>/gi, '');
+
             // Inyectar HTML en el contenedor
-            this.container.innerHTML = html;
+            this.container.innerHTML = htmlLimpio;
 
             // Cargar el JS del portal dinámicamente
             const script = document.createElement('script');
-            script.src = './modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.js';
+            script.src = './modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.js?v=REM-20260919-v2-portal-premium';
             script.onload = () => {
                 // Portal listo, funciones de navegación disponibles
             };
@@ -82,178 +87,36 @@ class RestriccionesMedicasComponent {
         this.container.appendChild(cardsContainer);
     }
 
-    // --- Lógica para la sección "Ver Remisiones Médicas" (Navegador de Archivos) ---
-
-    showVerRemisionesPage() {
-        this.container.innerHTML = '';
-        this.currentPath = null;
-        this.pathHistory = [];
-
-        const header = this.createHeader('Ver Remisiones Médicas', () => this.render());
-        this.container.appendChild(header);
-
-        const navBar = document.createElement('div');
-        navBar.className = 'file-nav-bar';
-        this.container.appendChild(navBar);
-
-        const mainLayout = document.createElement('div');
-        mainLayout.className = 'remisiones-layout';
-
-        const resultsCol = document.createElement('div');
-        resultsCol.id = 'search-results-col';
-        resultsCol.className = 'search-results-col';
-        mainLayout.appendChild(resultsCol);
-
-        const previewCol = document.createElement('div');
-        previewCol.id = 'preview-col';
-        previewCol.className = 'preview-col';
-        previewCol.innerHTML = `<div class="preview-placeholder">Seleccione un documento para previsualizarlo.</div>`;
-        mainLayout.appendChild(previewCol);
-
-        this.container.appendChild(mainLayout);
-
-        this.navigateToInitialPath();
-    }
-
-    async navigateToInitialPath() {
-        try {
-            const result = await window.electronAPI.findSubmodulePath(this.companyName, this.moduleName, this.submoduleName);
-            if (result.success) {
-                this.navigateToPath(result.path);
-            } else {
-                document.getElementById('search-results-col').innerHTML = `<p>Error al encontrar la ruta inicial: ${result.error}</p>`;
-            }
-        } catch (error) {
-            document.getElementById('search-results-col').innerHTML = `<p>Error crítico al buscar ruta: ${error.message}</p>`;
-        }
-    }
-
-    async navigateToPath(path) {
-        const resultsCol = document.getElementById('search-results-col');
-        resultsCol.innerHTML = `<p>Cargando...</p>`;
-        try {
-            const items = await window.electronAPI.readDirectory(path);
-            this.currentPath = path;
-            this.updateNavBar();
-            this.displayItems(items);
-        } catch (error) {
-            resultsCol.innerHTML = `<p>Error al leer directorio: ${error.message}</p>`;
-        }
-    }
-
-    updateNavBar() {
-        const navBar = this.container.querySelector('.file-nav-bar');
-        navBar.innerHTML = '';
-
-        const upButton = document.createElement('button');
-        upButton.innerHTML = '&#8679; Subir Nivel';
-        upButton.className = 'btn btn-secondary btn-sm';
-        upButton.disabled = this.pathHistory.length === 0;
-        upButton.addEventListener('click', () => {
-            if (this.pathHistory.length > 0) {
-                const parentPath = this.pathHistory.pop();
-                this.navigateToPath(parentPath);
-            }
-        });
-        navBar.appendChild(upButton);
-
-        const breadcrumb = document.createElement('span');
-        breadcrumb.className = 'breadcrumb-display';
-        breadcrumb.textContent = this.currentPath;
-        navBar.appendChild(breadcrumb);
-    }
-
-    displayItems(items) {
-        const resultsCol = document.getElementById('search-results-col');
-        resultsCol.innerHTML = '';
-        const list = document.createElement('ul');
-        list.className = 'search-results-list';
-
-        const allowedExtensions = ['.pdf', '.doc', '.docx'];
-        const folders = items.filter(item => item.isDirectory);
-        const files = items.filter(item => !item.isDirectory && allowedExtensions.includes(item.name.slice(item.name.lastIndexOf('.')).toLowerCase()));
-
-        folders.forEach(folder => {
-            const li = document.createElement('li');
-            li.innerHTML = `📁 ${folder.name}`;
-            li.addEventListener('click', () => {
-                this.pathHistory.push(this.currentPath);
-                this.navigateToPath(folder.path);
-            });
-            list.appendChild(li);
-        });
-
-        files.forEach(file => {
-            const li = document.createElement('li');
-            li.innerHTML = `📄 ${file.name}`;
-            li.addEventListener('click', () => this.previewDocument(file.path));
-            list.appendChild(li);
-        });
-
-        if (list.children.length === 0) {
-            resultsCol.innerHTML = '<p>No hay archivos o carpetas para mostrar.</p>';
-        }
-        resultsCol.appendChild(list);
-    }
-
-    async previewDocument(filePath) {
-        const previewCol = document.getElementById('preview-col');
-        const fileExtension = filePath.split('.').pop().toLowerCase();
-
-        // Mostrar indicador de carga
-        previewCol.innerHTML = `<div class="preview-placeholder">Cargando previsualización...</div>`;
-
-        if (fileExtension === 'pdf') {
-            // Los PDF se cargan directamente
-            previewCol.innerHTML = `<iframe src="${filePath}" width="100%" height="100%" style="border: none;"></iframe>`;
-        } else if (fileExtension === 'doc' || fileExtension === 'docx') {
-            // Para DOC y DOCX, llamar a la conversión
-            try {
-                const result = await window.electronAPI.convertDocxToPdf(filePath);
-                if (result.success) {
-                    // Cargar el PDF temporal en el iframe
-                    // Añadimos un timestamp para evitar problemas de caché del iframe
-                    previewCol.innerHTML = `<iframe src="${result.pdf_path}?t=${new Date().getTime()}" width="100%" height="100%" style="border: none;"></iframe>`;
-                } else {
-                    // Mostrar error de conversión
-                    previewCol.innerHTML = `<div class="preview-error"><h3>Error de Conversión</h3><p>${result.error}</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
-                    previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
-                }
-            } catch (error) {
-                // Mostrar error de IPC
-                previewCol.innerHTML = `<div class="preview-error"><h3>Error Inesperado</h3><p>${error.message}</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
-                previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
-            }
-        } else {
-            // Para otras extensiones, mostrar mensaje de no soportado
-            previewCol.innerHTML = `<div class="preview-error"><h3>Previsualización no disponible</h3><p>La previsualización para archivos <strong>.${fileExtension}</strong> no está soportada.</p><button class="btn btn-primary">Abrir con aplicación externa</button></div>`;
-            previewCol.querySelector('button').addEventListener('click', () => window.electronAPI.openPath(filePath));
-        }
-    }
-
     // --- Lógica para la sección "Enviar Remisiones" ---
 
     showEnviarRemisionPage() {
+        // 📦773 — premium v2: componente embebido (sin iframe). Mismo contrato
+        // de datos (selectPdfFile / processRemisionPdf directo) y la redirige
+        // al informe oficial la sigue haciendo el padre vía onNavigateToInforme.
         this.container.innerHTML = '';
-        // Configurar contenedor padre: ocupa el espacio disponible, no el viewport completo
         this.container.style.display = 'flex';
         this.container.style.flexDirection = 'column';
         this.container.style.height = '100%';
         this.container.style.flex = '1';
+        this.container.style.minHeight = '0';
         this.container.style.overflow = 'hidden';
         var self = this;
 
-        self._messageHandler = function(e) { self.handleIframeMessage(e); };
-        window.addEventListener('message', self._messageHandler);
-
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'width:100%;height:100%;flex:1;border:none;display:block;';
-        iframe.src = `./modules/gestion-salud/restricciones-medicas/enviar-remision.html`
-                   + `?company=${encodeURIComponent(this.companyName)}`
-                   + `&module=${encodeURIComponent(this.moduleName)}`
-                   + `&submodule=${encodeURIComponent(this.submoduleName)}`;
-        self._viewerFrame = iframe;
-        this.container.appendChild(iframe);
+        if (!window.EnviarRemisionV2Component) {
+            console.error('❌ EnviarRemisionV2Component no está cargado (index.html)');
+            this._renderFallbackCards();
+            return;
+        }
+        this._enviarV2 = new window.EnviarRemisionV2Component(this.container, {
+            companyName: this.companyName,
+            onBack: function () { self.render(); },
+            onNavigateToInforme: function (extractedData) {
+                self.extractedData = extractedData;
+                self.showGenerarInformePage(extractedData);
+            },
+            logMessage: this.logMessage
+        });
+        this._enviarV2.render();
     }
 
     showGenerarInformePage(extractedData) {
@@ -274,281 +137,13 @@ class RestriccionesMedicasComponent {
                    + `?company=${encodeURIComponent(this.companyName)}`
                    + `&module=${encodeURIComponent(this.moduleName)}`
                    + `&submodule=${encodeURIComponent(this.submoduleName)}`
-                   + `&data=${encodeURIComponent(JSON.stringify(extractedData))}`;
+                   + `&data=${encodeURIComponent(JSON.stringify(extractedData))}`
+                   + `&v=REM-20260919-v2-premium`;
         self._viewerFrame = iframe;
         this.container.appendChild(iframe);
     }
 
-    createFileSelectionBox() {
-        const box = document.createElement('div');
-        box.className = 'widget-box';
-        box.innerHTML = '<h4>1. Selección de Archivo</h4>';
-        const inputGroup = document.createElement('div');
-        inputGroup.className = 'input-group';
-        const pathInput = document.createElement('input');
-        pathInput.type = 'text';
-        pathInput.id = 'pdf-path-input';
-        pathInput.placeholder = 'Ningún archivo seleccionado...';
-        pathInput.disabled = true;
-        inputGroup.appendChild(pathInput);
-        const browseBtn = document.createElement('button');
-        browseBtn.textContent = 'Buscar PDF';
-        browseBtn.className = 'btn btn-primary';
-        browseBtn.addEventListener('click', async () => {
-            const filePath = await window.electronAPI.selectPdfFile();
-            if (filePath) {
-                pathInput.value = filePath;
-                this.logMessage('Archivo seleccionado. Procesando...');
-                this.processSelectedPdf(filePath);
-            }
-        });
-        inputGroup.appendChild(browseBtn);
-        box.appendChild(inputGroup);
-        return box;
-    }
-
-    createActionsBox() {
-        const box = document.createElement('div');
-        box.className = 'widget-box';
-        box.innerHTML = '<h4>2. Acciones</h4>';
-        const generateBtn = document.createElement('button');
-        generateBtn.id = 'generate-doc-btn';
-        generateBtn.textContent = 'Generar y Guardar';
-        generateBtn.className = 'btn btn-success btn-full';
-        generateBtn.disabled = true;
-        generateBtn.addEventListener('click', () => this.handleGeneration());
-        box.appendChild(generateBtn);
-        const sendBox = document.createElement('div');
-        sendBox.className = 'send-buttons-group';
-        const whatsappBtn = document.createElement('button');
-        whatsappBtn.id = 'send-whatsapp-btn';
-        whatsappBtn.textContent = 'Enviar por WhatsApp';
-        whatsappBtn.className = 'btn btn-info';
-        whatsappBtn.disabled = true;
-        whatsappBtn.addEventListener('click', () => this.handleSendWhatsApp());
-        sendBox.appendChild(whatsappBtn);
-        const emailBtn = document.createElement('button');
-        emailBtn.id = 'send-email-btn';
-        emailBtn.textContent = 'Enviar por Correo';
-        emailBtn.className = 'btn btn-info';
-        emailBtn.disabled = true;
-        emailBtn.addEventListener('click', () => this.handleSendEmail());
-        sendBox.appendChild(emailBtn);
-        box.appendChild(sendBox);
-        return box;
-    }
-
-    createDataDisplayBox() {
-        const box = document.createElement('div');
-        box.className = 'widget-box';
-        box.innerHTML = '<h4>Datos Extraídos</h4>';
-        const dataContainer = document.createElement('div');
-        dataContainer.id = 'extracted-data-container';
-        dataContainer.className = 'extracted-data-container';
-        dataContainer.innerHTML = '<p class="placeholder-text">Esperando archivo PDF para procesar...</p>';
-        box.appendChild(dataContainer);
-        return box;
-    }
-
-    createLogBox() {
-        const box = document.createElement('div');
-        box.className = 'widget-box';
-        box.innerHTML = '<h4>Registro de Actividad</h4>';
-        const logText = document.createElement('div');
-        logText.id = 'remision-log-text';
-        logText.className = 'log-text-area';
-        box.appendChild(logText);
-        return box;
-    }
-
-    async processSelectedPdf(filePath) {
-        document.getElementById('generate-doc-btn').disabled = true;
-        document.getElementById('send-whatsapp-btn').disabled = true;
-        document.getElementById('send-email-btn').disabled = true;
-        try {
-            const result = await window.electronAPI.processRemisionPdf(filePath);
-            if (result.success) {
-                this.extractedData = result.data;
-                this.displayExtractedData(this.extractedData);
-                this.logMessage('Extracción de datos completada.');
-                document.getElementById('generate-doc-btn').disabled = false;
-            } else {
-                this.logMessage(`Error en la extracción: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            this.logMessage(`Error crítico al llamar al proceso de Python: ${error.message}`, 'error');
-        }
-    }
-
-    displayExtractedData(data) {
-        const container = document.getElementById('extracted-data-container');
-        container.innerHTML = '';
-        const table = document.createElement('table');
-        table.className = 'data-table';
-        for (const [key, value] of Object.entries(data)) {
-            const row = table.insertRow();
-            row.insertCell().textContent = key;
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = value;
-            input.className = 'form-control-sm';
-            input.addEventListener('change', (e) => { this.extractedData[key] = e.target.value; });
-            row.insertCell().appendChild(input);
-        }
-        container.appendChild(table);
-    }
     
-    async handleGeneration() {
-        if (!this.extractedData) {
-            this.logMessage('No hay datos extraídos para generar el documento.', 'error');
-            return;
-        }
-
-        try {
-            this.logMessage('Generando documento de remisión...');
-            const generateBtn = document.getElementById('generate-doc-btn');
-            generateBtn.disabled = true;
-            generateBtn.textContent = 'Generando...';
-            
-            // Llamar al proceso de Python para generar el documento
-            const result = await window.electronAPI.generateRemisionDocument(
-                this.extractedData,
-                this.companyName
-            );
-            
-            if (result.success) {
-                this.lastGeneratedDoc = result.documentPath;
-                this.logMessage(`Documento generado exitosamente: ${result.documentPath}`);
-
-                if (result.controlUpdated) {
-                    this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
-                } else if (result.controlWarning) {
-                    this.logMessage(`⚠ ADVERTENCIA: ${result.controlWarning}`, 'warning');
-                    alert(`Documento generado exitosamente.\n\n⚠ El archivo de control no se pudo actualizar:\n${result.controlWarning}\n\nPor favor, cierre el archivo Excel y vuelva a intentar.`);
-                } else {
-                    this.logMessage(`Archivo de control actualizado: ${result.controlPath}`);
-                }
-
-                // Habilitar botones de envío
-                document.getElementById('send-whatsapp-btn').disabled = false;
-                document.getElementById('send-email-btn').disabled = false;
-
-                // Mostrar mensaje de éxito
-                if (!result.controlWarning) {
-                    alert('Documento generado exitosamente.');
-                }
-            } else {
-                this.logMessage(`Error al generar documento: ${result.error}`, 'error');
-                alert(`Error al generar documento: ${result.error}`);
-            }
-        } catch (error) {
-            this.logMessage(`Error crítico al generar documento: ${error.message}`, 'error');
-            alert(`Error crítico al generar documento: ${error.message}`);
-        } finally {
-            const generateBtn = document.getElementById('generate-doc-btn');
-            generateBtn.disabled = false;
-            generateBtn.textContent = 'Generar y Guardar';
-        }
-    }
-
-    async handleSendWhatsApp() {
-        if (!this.extractedData || !this.lastGeneratedDoc) {
-            this.logMessage('No hay documento generado para enviar.', 'error');
-            alert('No hay documento generado para enviar.');
-            return;
-        }
-
-        try {
-            this.logMessage('Preparando envío por WhatsApp...');
-            const whatsappBtn = document.getElementById('send-whatsapp-btn');
-            whatsappBtn.disabled = true;
-            whatsappBtn.textContent = 'Enviando...';
-            
-            // Llamar al proceso de Python para enviar por WhatsApp
-            const result = await window.electronAPI.sendRemisionByWhatsapp(
-                this.lastGeneratedDoc,
-                this.extractedData,
-                this.companyName
-            );
-            
-            if (result.success) {
-                this.logMessage('Mensaje de WhatsApp preparado. Se abrirá WhatsApp Web.');
-                alert('Se abrirá WhatsApp Web con el mensaje preparado. Por favor, revise y envíe el mensaje.');
-            } else {
-                this.logMessage(`Error al preparar WhatsApp: ${result.error}`, 'error');
-                alert(`Error al preparar WhatsApp: ${result.error}`);
-            }
-        } catch (error) {
-            this.logMessage(`Error crítico al preparar WhatsApp: ${error.message}`, 'error');
-            alert(`Error crítico al preparar WhatsApp: ${error.message}`);
-        } finally {
-            const whatsappBtn = document.getElementById('send-whatsapp-btn');
-            whatsappBtn.disabled = false;
-            whatsappBtn.textContent = 'Enviar por WhatsApp';
-        }
-    }
-
-    async handleSendEmail() {
-        if (!this.extractedData || !this.lastGeneratedDoc) {
-            this.logMessage('No hay documento generado para enviar.', 'error');
-            alert('No hay documento generado para enviar.');
-            return;
-        }
-
-        try {
-            this.logMessage('Preparando envío por correo electrónico...');
-            this.logMessage(`Datos a enviar - Documento: ${this.lastGeneratedDoc}, Empresa: ${this.companyName}`);
-            
-            // Registrar algunos datos clave para depuración
-            const cedula = this.extractedData['No. Identificación'] || 'No disponible';
-            const nombre = this.extractedData['Nombre Completo'] || 'No disponible';
-            const fechaAtencion = this.extractedData['Fecha de Atención'] || 'No disponible';
-            const afiliacion = this.extractedData['Afiliación'] || 'No disponible';
-            
-            this.logMessage(`Datos del trabajador - Cédula: ${cedula}, Nombre: ${nombre}, Fecha: ${fechaAtencion}, Afiliación: ${afiliacion}`, 'info');
-            
-            const emailBtn = document.getElementById('send-email-btn');
-            emailBtn.disabled = true;
-            emailBtn.textContent = 'Enviando...';
-            
-            // Llamar al proceso de Python para enviar por correo
-            const result = await window.electronAPI.sendRemisionByEmail(
-                this.lastGeneratedDoc,
-                this.extractedData,
-                this.companyName
-            );
-            
-            this.logMessage(`Respuesta del servidor: ${JSON.stringify(result)}`, 'info');
-            
-            if (result.success) {
-                this.logMessage('Correo electrónico enviado exitosamente.');
-                alert('Correo electrónico enviado exitosamente.');
-            } else {
-                // Verificar si el error tiene más detalles
-                let errorMessage = result.error || 'Error desconocido al enviar el correo';
-                if (typeof result === 'string') {
-                    try {
-                        const parsedError = JSON.parse(result);
-                        errorMessage = parsedError.error || parsedError.message || errorMessage;
-                    } catch (e) {
-                        // Si no se puede parsear, usar el mensaje original
-                    }
-                }
-                
-                this.logMessage(`Error al enviar correo: ${errorMessage}`, 'error');
-                alert(`Error al enviar correo: ${errorMessage}`);
-            }
-        } catch (error) {
-            this.logMessage(`Error crítico al enviar correo: ${error.message}`, 'error');
-            this.logMessage(`Stack trace: ${error.stack}`, 'error');
-            alert(`Error crítico al enviar correo: ${error.message}`);
-        } finally {
-            const emailBtn = document.getElementById('send-email-btn');
-            emailBtn.disabled = false;
-            emailBtn.textContent = 'Enviar por Correo';
-        }
-    }
-
     logMessage(message, type = 'info') {
         const logArea = document.getElementById('remision-log-text');
         if (logArea) {
@@ -561,57 +156,6 @@ class RestriccionesMedicasComponent {
 
     // --- Métodos de Ayuda ---
 
-    createModernHeader(titleText, subtitleText, onBack) {
-        const header = document.createElement('header');
-        header.className = 'rem-header';
-
-        const leftSide = document.createElement('div');
-        leftSide.className = 'rem-header-left';
-
-        const backBtn = document.createElement('button');
-        backBtn.className = 'btn btn-back';
-        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-        backBtn.onclick = onBack;
-        leftSide.appendChild(backBtn);
-
-        const titleGroup = document.createElement('div');
-        const h1 = document.createElement('h1');
-        h1.className = 'rem-title';
-        h1.textContent = titleText;
-        titleGroup.appendChild(h1);
-
-        if (subtitleText) {
-            const p = document.createElement('p');
-            p.className = 'rem-subtitle';
-            p.textContent = subtitleText;
-            titleGroup.appendChild(p);
-        }
-        leftSide.appendChild(titleGroup);
-        header.appendChild(leftSide);
-
-        const rightSide = document.createElement('div');
-        rightSide.className = 'rem-header-right';
-        const refreshBtn = document.createElement('button');
-        refreshBtn.className = 'rem-btn-icon';
-        refreshBtn.title = 'Actualizar';
-        refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
-        // El evento de refresh se manejará según el contexto
-        rightSide.appendChild(refreshBtn);
-        header.appendChild(rightSide);
-
-        return header;
-    }
-
-    createHeader(titleText, onBack) {        const header = document.createElement('div');
-        header.className = 'submodule-header';
-        header.appendChild(this.createBackButton('&#8592; Volver', onBack));
-        const title = document.createElement('h3');
-        title.textContent = titleText;
-        title.style.flexGrow = '1';
-        title.style.textAlign = 'center';
-        header.appendChild(title);
-        return header;
-    }
     
     createBackButton(text, onClick) {
         const backButton = document.createElement('button');
@@ -630,188 +174,32 @@ class RestriccionesMedicasComponent {
     }
 
     async _renderControlRemisionesView() {
+        // 📦773 — premium v2: componente embebido (sin iframe ni CSS legacy).
+        // Conserva el contrato: getControlRemisionesData + updateExcelCell (firma real
+        // { filePath, cellAddress, newValue }) + openPath.
         this.container.innerHTML = '';
-        
-        // Cargar CSS específico
-        this._loadControlStyles();
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+        this.container.style.height = '100%';
+        this.container.style.flex = '1';
+        this.container.style.minHeight = '0';
+        this.container.style.overflow = 'hidden';
+        var self = this;
 
-        const header = this.createModernHeader(
-            'Control de Remisiones', 
-            'Seguimiento al estado de las remisiones enviadas a las EPS',
-            () => this.render()
-        );
-        this.container.appendChild(header);
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'control-remisiones-wrapper';
-        this.container.appendChild(wrapper);
-
-        // Función interna para renderizar contenido
-        const renderContent = async () => {
-            wrapper.innerHTML = `
-                <div class="ctrl-loading">
-                    <i class="fas fa-circle-notch fa-spin"></i>
-                    <p>Consultando archivo de control oficial...</p>
-                </div>
-            `;
-
-            try {
-                const result = await window.electronAPI.getControlRemisionesData(this.companyName);
-                wrapper.innerHTML = ''; // Limpiar carga
-
-                if (result.success) {
-                    if (result.rows && result.rows.length > 0) {
-                        // Crear Card
-                        const card = document.createElement('div');
-                        card.className = 'ctrl-card';
-                        
-                        // Header de la Card
-                        card.innerHTML = `
-                            <div class="ctrl-card-header">
-                                <h4><i class="fas fa-table"></i> Registros de Remisiones</h4>
-                                <span class="ctrl-info-item"><i class="fas fa-file-excel"></i> ${result.rows.length} registros</span>
-                            </div>
-                        `;
-
-                        // Contenedor de Tabla
-                        const tableContainer = document.createElement('div');
-                        tableContainer.className = 'ctrl-table-container';
-
-                        const table = document.createElement('table');
-                        table.className = 'ctrl-table';
-
-                        // Encabezado de Tabla
-                        const thead = document.createElement('thead');
-                        const headerRow = document.createElement('tr');
-                        if (result.headers && Array.isArray(result.headers)) {
-                            result.headers.forEach(headerText => {
-                                const th = document.createElement('th');
-                                th.textContent = headerText;
-                                headerRow.appendChild(th);
-                            });
-                        }
-                        thead.appendChild(headerRow);
-                        table.appendChild(thead);
-
-                        // Cuerpo de Tabla
-                        const tbody = document.createElement('tbody');
-                        result.rows.forEach((row, rowIndex) => {
-                            const tr = document.createElement('tr');
-                            if (Array.isArray(row)) {
-                                row.forEach((cellData, cellIndex) => {
-                                    const td = document.createElement('td');
-                                    
-                                    // Si es la última columna (Estado/Observación), hacerla editable con estilo moderno
-                                    if (cellIndex === row.length - 1) {
-                                        const input = document.createElement('input');
-                                        input.type = 'text';
-                                        input.className = 'ctrl-input';
-                                        input.value = cellData != null ? cellData.toString() : '';
-                                        input.placeholder = 'Añadir observación...';
-                                        input.addEventListener('change', (e) => {
-                                            this.saveCellData(rowIndex, cellIndex, e.target.value, result.filePath);
-                                        });
-                                        td.appendChild(input);
-                                    } else {
-                                        td.textContent = cellData != null ? cellData.toString() : '';
-                                    }
-                                    tr.appendChild(td);
-                                });
-                            }
-                            tbody.appendChild(tr);
-                        });
-                        table.appendChild(tbody);
-                        tableContainer.appendChild(table);
-                        card.appendChild(tableContainer);
-
-                        // Footer de Información
-                        const footer = document.createElement('div');
-                        footer.className = 'ctrl-info-bar';
-                        footer.innerHTML = `
-                            <div class="ctrl-info-item">
-                                <i class="fas fa-hdd"></i>
-                                <span>Ruta: ${result.filePath}</span>
-                            </div>
-                            <div class="ctrl-info-item">
-                                <i class="fas fa-info-circle"></i>
-                                <span>La última columna es editable</span>
-                            </div>
-                        `;
-                        card.appendChild(footer);
-                        wrapper.appendChild(card);
-                        
-                    } else {
-                        wrapper.innerHTML = `
-                            <div class="ctrl-empty">
-                                <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
-                                <h3>No hay datos disponibles</h3>
-                                <p>El archivo de control para ${this.companyName} está vacío.</p>
-                                <button class="ctrl-btn-retry" id="retry-btn">Reintentar</button>
-                            </div>
-                        `;
-                        wrapper.querySelector('#retry-btn')?.addEventListener('click', renderContent);
-                    }
-                } else {
-                    wrapper.innerHTML = `
-                        <div class="ctrl-error">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <h3>Error al cargar datos</h3>
-                            <p>${result.error}</p>
-                            <button class="ctrl-btn-retry" id="retry-btn">Intentar de nuevo</button>
-                        </div>
-                    `;
-                    wrapper.querySelector('#retry-btn').addEventListener('click', renderContent);
-                }
-            } catch (error) {
-                wrapper.innerHTML = `
-                    <div class="ctrl-error">
-                        <i class="fas fa-bomb"></i>
-                        <h3>Error inesperado</h3>
-                        <p>${error.message}</p>
-                        <button class="ctrl-btn-retry" id="retry-btn">Reiniciar vista</button>
-                    </div>
-                `;
-                wrapper.querySelector('#retry-btn').addEventListener('click', renderContent);
-            }
-        };
-
-        await renderContent();
-    }
-
-    _loadControlStyles() {
-        const cssId = 'ctrl-remisiones-styles';
-        if (!document.getElementById(cssId)) {
-            const link = document.createElement('link');
-            link.id = cssId;
-            link.rel = 'stylesheet';
-            link.href = './modules/gestion-salud/restricciones-medicas/control-remisiones.css';
-            document.head.appendChild(link);
+        if (!window.ControlRemisionesV2Component) {
+            console.error('❌ ControlRemisionesV2Component no está cargado (index.html)');
+            this._renderFallbackCards();
+            return;
         }
+        this._controlV2 = new window.ControlRemisionesV2Component(this.container, {
+            companyName: this.companyName,
+            onBack: function () { self.render(); },
+            logMessage: this.logMessage
+        });
+        this._controlV2.render();
     }
 
     // Agrega este método a la clase RestriccionesMedicasComponent
-    async saveCellData(rowIndex, colIndex, newValue, filePath) {
-        try {
-            this.logMessage(`Guardando cambios en fila ${rowIndex + 2}, columna ${colIndex + 1}...`);
-            const result = await window.electronAPI.updateExcelCell(
-                filePath, 
-                rowIndex + 2, // +1 por encabezado (Fila 1), +1 por base 1-indexed de Excel
-                colIndex + 1, // 1-indexed para Excel
-                newValue
-            );
-            
-            if (result.success) {
-                this.logMessage('Cambios guardados exitosamente en el archivo Excel.');
-            } else {
-                this.logMessage(`Error al guardar cambios: ${result.error}`, 'error');
-                alert(`Error al guardar cambios: ${result.error}`);
-            }
-        } catch (error) {
-            this.logMessage(`Error crítico al guardar cambios: ${error.message}`, 'error');
-            alert(`Error crítico al guardar cambios: ${error.message}`);
-        }
-    }
-
     showPlaceholder(featureName) {
         alert(`La funcionalidad '${featureName}' se implementará en el futuro.`);
     }
@@ -1145,7 +533,7 @@ RestriccionesMedicasComponent.prototype.showNewDocumentViewer = function() {
     iframe.style.border = 'none';
     iframe.style.display = 'block';
 
-    const viewerUrl = `./modules/gestion-salud/restricciones-medicas/remisiones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    const viewerUrl = `./modules/gestion-salud/restricciones-medicas/remisiones-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=REM-20260919-v2-premium`;
     iframe.src = viewerUrl;
     self._viewerFrame = iframe;
 

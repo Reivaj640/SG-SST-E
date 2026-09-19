@@ -3,36 +3,66 @@
    Sistema Visual Oficial K+AIR — Aislado, sin dependencias globales
    ============================================================================ */
 
+/* 📦775 — Remapeo al dialecto premium v2 (mismos valores que
+   shared/kair-design-tokens.css). El informe vive en un iframe aislado, así que
+   reasignar sus tokens es seguro y NO filtra a la app. */
 :root {
-    --env-primary: #174ea6;
-    --env-primary-hover: #185abd;
-    --env-primary-light: #e8f0fe;
-    --env-success: #28a745;
-    --env-success-light: #d4edda;
-    --env-success-hover: #218838;
-    --env-warning: #ffc107;
-    --env-warning-light: #fff3cd;
-    --env-danger: #dc3545;
-    --env-danger-light: #f8d7da;
-    --env-info: #17a2b8;
-    --env-info-light: #d1ecf1;
+    --env-primary: #2057b8;
+    --env-primary-hover: #1a4a9e;
+    --env-primary-light: #eaf1fb;
+    --env-success: #1bb888;
+    --env-success-light: #e6f5ef;
+    --env-success-hover: #12996f;
+    --env-warning: #e7a224;
+    --env-warning-light: #fbf0db;
+    --env-danger: #da5563;
+    --env-danger-light: #fae6e9;
+    --env-info: #2057b8;
+    --env-info-light: #eaf1fb;
     --env-wa: #25d366;
     --env-wa-hover: #1da851;
-    --env-text-primary: #212529;
-    --env-text-secondary: #495057;
-    --env-text-muted: #6c757d;
-    --env-bg-body: #f0f2f5;
+    --env-text-primary: #14213d;
+    --env-text-secondary: #4d5b75;
+    --env-text-muted: #98a2b3;
+    --env-bg-body: #fbfcfb;
     --env-bg-card: #ffffff;
-    --env-border: #dee2e6;
-    --env-border-light: #f1f3f5;
-    --env-radius: 0.375rem;
-    --env-radius-lg: 0.5rem;
-    --env-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --env-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
-    --env-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.05);
-    --env-font-heading: 'Lexend', sans-serif;
-    --env-font-body: 'Roboto', sans-serif;
-    --env-transition: all 0.2s ease-in-out;
+    --env-border: #e8ebee;
+    --env-border-light: #eef0f1;
+    --env-radius: 10px;
+    --env-radius-lg: 16px;
+    --env-shadow-sm: 0 1px 2px rgba(37, 56, 82, 0.05);
+    --env-shadow-md: 0 2px 7px rgba(37, 56, 82, 0.08);
+    --env-shadow-lg: 0 8px 18px rgba(37, 56, 82, 0.12);
+    --env-font-heading: 'Manrope', 'DM Sans', sans-serif;
+    --env-font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+    --env-transition: all 0.18s ease-out;
+}
+
+/* 📦775 — Modo oscuro (los DOS atributos que aplica scripts/theme-manager.js) */
+[data-theme="dark"],
+[data-theme="dark-legacy"] {
+    --env-primary: #6ea8fe;
+    --env-primary-hover: #8ab4f8;
+    --env-primary-light: rgba(110, 168, 254, 0.16);
+    --env-success: #3ecf9a;
+    --env-success-light: rgba(62, 207, 154, 0.16);
+    --env-success-hover: #34b98a;
+    --env-warning: #f0b45a;
+    --env-warning-light: rgba(240, 180, 90, 0.16);
+    --env-danger: #e56a76;
+    --env-danger-light: rgba(229, 106, 118, 0.16);
+    --env-info: #6ea8fe;
+    --env-info-light: rgba(110, 168, 254, 0.16);
+    --env-text-primary: #e8edf5;
+    --env-text-secondary: #a9b4c6;
+    --env-text-muted: #748096;
+    --env-bg-body: #0f172a;
+    --env-bg-card: #1a2334;
+    --env-border: #2f3d55;
+    --env-border-light: #263349;
+    --env-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --env-shadow-md: 0 2px 7px rgba(0, 0, 0, 0.3);
+    --env-shadow-lg: 0 8px 18px rgba(0, 0, 0, 0.4);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -53,6 +83,16 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+}
+
+/* 📦775 — Contenido del header alineado con .env-body (mismo ancho centrado).
+   Antes el título quedaba pegado al borde izquierdo mientras las tarjetas iban
+   centradas a 900px: se veía desalineado de arriba a abajo. */
+.env-header-inner {
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 1.5rem;
 }
 
 /* === HEADER === */

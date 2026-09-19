@@ -9,32 +9,36 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─────────── DESIGN TOKENS (locales, sin tocar globales) ─────────── */
+/* 📦775 — Remapeo al dialecto premium v2 (mismos valores que
+   shared/kair-design-tokens.css). El visor vive en un iframe aislado, así que
+   reasignar sus tokens en :root es seguro y NO filtra a la app. */
 :root {
-    /* Colores oficiales K+AIR */
-    --kair-primary: #174ea6;
-    --kair-primary-hover: #185abd;
-    --kair-success: #28a745;
-    --kair-warning: #ffc107;
-    --kair-danger: #dc3545;
-    --kair-info: #6c757d;
+    /* Colores oficiales K+AIR (premium) */
+    --kair-primary: #2057b8;
+    --kair-primary-hover: #1a4a9e;
+    --kair-success: #1bb888;
+    --kair-warning: #e7a224;
+    --kair-danger: #da5563;
+    --kair-info: #2057b8;
 
     /* Fondos */
-    --kair-bg-app: #f8f9fa;
+    --kair-bg-app: #fbfcfb;
     --kair-bg-card: #ffffff;
-    --kair-bg-hover: #f1f4f9;
-    --kair-bg-active: #e8f0fe;
+    --kair-bg-hover: #f3f6f6;
+    --kair-bg-active: #eaf1fb;
 
     /* Bordes */
-    --kair-border: #dee2e6;
-    --kair-border-light: #e9ecef;
+    --kair-border: #e8ebee;
+    --kair-border-light: #eef0f1;
 
     /* Texto */
-    --kair-text-primary: #1a1a2e;
-    --kair-text-secondary: #5a6378;
-    --kair-text-muted: #8a93a6;
+    --kair-text-primary: #14213d;
+    --kair-text-secondary: #4d5b75;
+    --kair-text-muted: #98a2b3;
 
     /* Tipografía */
-    --kair-font: 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    --kair-font: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --kair-font-display: 'Manrope', 'DM Sans', sans-serif;
 
     /* Espaciado (escala 4px) */
     --kair-space-1: 4px;
@@ -1486,24 +1490,24 @@
    ═══════════════════════════════════════════════════════════════════ */
 [data-theme="dark"] .kair-body,
 [data-theme="dark-legacy"] .kair-body {
-    --kair-primary: #4da6ff;
-    --kair-primary-hover: #66b3ff;
-    --kair-success: #5cb85c;
-    --kair-warning: #f0ad4e;
-    --kair-danger: #d9534f;
-    --kair-info: #5bc0de;
+    --kair-primary: #6ea8fe;
+    --kair-primary-hover: #8ab4f8;
+    --kair-success: #3ecf9a;
+    --kair-warning: #f0b45a;
+    --kair-danger: #e56a76;
+    --kair-info: #6ea8fe;
 
-    --kair-bg-app: #1a202c;
-    --kair-bg-card: #2d3748;
-    --kair-bg-hover: #374151;
-    --kair-bg-active: rgba(77, 166, 255, 0.15);
+    --kair-bg-app: #0f172a;
+    --kair-bg-card: #1a2334;
+    --kair-bg-hover: #24314a;
+    --kair-bg-active: rgba(110, 168, 254, 0.15);
 
-    --kair-border: #4a5568;
-    --kair-border-light: #374151;
+    --kair-border: #2f3d55;
+    --kair-border-light: #263349;
 
-    --kair-text-primary: #e9ecef;
-    --kair-text-secondary: #cbd5e0;
-    --kair-text-muted: #8a93a6;
+    --kair-text-primary: #e8edf5;
+    --kair-text-secondary: #a9b4c6;
+    --kair-text-muted: #748096;
 
     --kair-shadow-card: 0 1px 2px rgba(0,0,0,0.3);
     --kair-shadow-md: 0 2px 8px rgba(0,0,0,0.3);
@@ -1524,13 +1528,13 @@
 
 [data-theme="dark"] .kair-search__input:focus,
 [data-theme="dark-legacy"] .kair-search__input:focus {
-    box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.2);
+    box-shadow: 0 0 0 2px rgba(110, 168, 254, 0.2);
 }
 
 /* En dark mode, la pill del header necesita un poco más de contraste */
 [data-theme="dark"] .kair-header__pill,
 [data-theme="dark-legacy"] .kair-header__pill {
-    background: rgba(77, 166, 255, 0.2);
+    background: rgba(110, 168, 254, 0.2);
 }
 
 /* En dark mode, el header company se ve mejor con bg-card */
@@ -1642,7 +1646,7 @@
 /* En dark mode, los skeletons usan tonos oscuros */
 [data-theme="dark"] .kair-skeleton,
 [data-theme="dark-legacy"] .kair-skeleton {
-    background: linear-gradient(90deg, #2d3748 25%, #374151 50%, #2d3748 75%);
+    background: linear-gradient(90deg, #1a2334 25%, #24314a 50%, #1a2334 75%);
     background-size: 200% 100%;
 }
 

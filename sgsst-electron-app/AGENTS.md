@@ -2129,6 +2129,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
+| Restricciones y Remisiones (3.1.6) | ✅ (📦775) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar/Control embebidos (`.remenv-scope`/`.remctl-scope`) + visor e informe con tokens remapeados |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2141,6 +2142,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦772**: Perfil de Cargo y Profesiograma (3.1.3) migrado a premium v2 (tokens premium en su `:root`; Header System v2 con breadcrumb + icono/título; tabs con subrayado azul estilo Evaluación Inicial; modo oscuro en los 2 atributos; `destroy()` + cache-bust).
 - **📦773**: Reportes de Accidentes (3.2.1 · FURAT) migrado a premium v2 (tokens `--furat-*` remapeados en su `:root`; Header System v2; tabs con subrayado; modo oscuro cubriendo `dark` y `dark-legacy` con `[data-theme^="dark"]`; reset scoped; cache-bust triple).
 - **📦774**: Gestión del Cambio (2.11.1) migrado a premium v2: de 6 archivos (logic + 2 css + html + viewer + index) a UN solo par CSS+JS con el marcado embebido; capa scoped `.gdc-scope` + tokens `--gdc-*`; overlays al `<body>` envueltos en `.gdc-scope`; vigía `MutationObserver` + `destroy()`; se conservó exacto el contrato de datos Excel (4 IPC) y la máquina de estados.
+- **📦775**: Restricciones y Remisiones (3.1.6) — segunda pasada premium: portal del módulo migrado a premium y **scoped** (`.rm-portal-scope`, se corrigió la fuga de `:root`/`*` al inyectarse con `innerHTML`), visor (`remisiones-view.css`) e informe (`generar-informe-remision.css`) con tokens remapeados a premium + dark en el informe, header del informe alineado con el cuerpo, limpieza de 9 archivos muertos y ~600 líneas huérfanas; el test subió a 62 checks.
 
 ---
 
@@ -3124,6 +3126,123 @@ chequeo de 13 ítems (Rh1-4, Rl1-3, Sst1-6) y los 8 tipos de cambio se conservan
   consistencia con el resto del sistema premium, cambiar a `'DM Sans'` (el `--kair-font-ui` de la app).
 - Iconos: el header y el modal usan **SVG inline**; revisar si quedó algún `<i class="fas">` en el cuerpo
   que dependa de un CDN (el módulo no carga Font Awesome).
+
+---
+
+## 🆕 Restricciones y Remisiones · Premium v2, segunda pasada (📦775, 2026-09-19)
+
+El submódulo **3.1.6** (`modules/gestion-salud/restricciones-medicas/`) tiene 5 interfaces. Una pasada
+previa (sin número de commit, en curso) migró **Enviar Remisión** y **Control de Remisiones** a
+componentes embebidos premium (`.remenv-scope` / `.remctl-scope`). En 📦775 se completó el resto.
+
+### Estado de las 5 interfaces
+
+| Interfaz | Cómo se monta | Estado |
+|----------|---------------|--------|
+| Portal (home del módulo) | `fetch` + `innerHTML` en el documento principal | 📦775 premium + scoped |
+| Ver Remisiones Médicas (visor) | `<iframe>` → `remisiones-view.html` | 📦775 tokens premium |
+| Enviar Remisiones | componente embebido | ✅ v2 (pasada previa) |
+| Control de Remisiones | componente embebido | ✅ v2 (pasada previa) |
+| Generar Informe | `<iframe>` → `generar-informe-remision.html` | 📦775 tokens premium + dark |
+
+### 🚨 El portal FILTRABA tokens a toda la app (bug tipo 📦766)
+
+`restricciones-medicas-logic.js#render()` hace `fetch` del portal y
+`this.container.innerHTML = html`. El HTML traía un `<style>` con **`:root`** (`--primary: #174ea6`,
+`--bg-card`, `--text-dark`, `--border`, `--radius`, `--shadow-lg`) y un **reset `* { margin:0; padding:0 }`**.
+Un `<style>` insertado por `innerHTML` aplica a TODO el documento, así que mientras el submódulo estaba
+abierto la app entera heredaba esos nombres genéricos (mismo patrón del portal de EMO, 📦766).
+
+**Fix (doble candado):**
+1. El portal se reescribió como **fragmento** con TODO bajo `.rm-portal-scope` (el `*` quedó como
+   `.rm-portal-scope *`), sin `:root`. Los tokens locales (`--rmp-*`) mapean a `--kair-*` con respaldo.
+2. En `render()` se **sanitiza** el HTML antes de inyectarlo:
+   `html.replace(/<link[^>]*>/gi, '')` (los `<link>` del portal cargaban CDNs en global). Se eliminaron
+   los CDN de Font Awesome y Bootstrap Icons (los iconos ahora son **SVG inline**).
+
+Verificado con un arnés de Electron: tras inyectar el portal, `--primary`, `--bg-card` y `--text-dark`
+del `documentElement` quedan **vacíos** (antes los pisaba).
+
+### Portal premium
+
+- Breadcrumb + icon chip + título Manrope 800 + botón "Volver al Menú".
+- 2 acciones principales (Ver Remisiones = card primaria con gradiente azul; Enviar = card con icono verde).
+- 4 tarjetas de herramientas (Control, Estadísticas, Exportar, Configuración) con iconos SVG.
+- **Contenido centrado** en pantallas anchas: `.rm-portal { max-width: 1120px; margin: 0 auto; }`.
+  En maximizada (1920px) antes quedaba pegado a la izquierda (tenía el `max-width` SIN centrar);
+  verificado con un arnés que mide el hueco izquierdo/derecho (392px y 392px a 1904px de host).
+- Modo oscuro para `[data-theme="dark"]` y `[data-theme="dark-legacy"]`.
+- Cache-bust en el `fetch` del HTML y en el `<script>` del home (`?v=REM-20260919-v2-portal-premium`).
+
+### Visor e informe: remapeo de tokens (iframe aislado)
+
+Ambos viven en `<iframe>`, así que sus `:root` están aislados. Se aplicó la **técnica de remapeo de
+tokens** (📦751) en vez de reescribir reglas:
+- **Visor** (`remisiones-view.css`): `--kair-primary #174ea6 → #2057b8`, `--kair-bg-app #f8f9fa → #fbfcfb`,
+  texto `#1a1a2e → #14213d`, borde `#dee2e6 → #e8ebee`, fuente Roboto → **DM Sans**; el bloque oscuro pasó
+  a la paleta premium (`#0f172a`/`#1a2334`/`#6ea8fe`). Se reemplazaron los 3 hex sueltos que quedaban
+  (`rgba(77,166,255)` y el gradiente del skeleton). Se agregó el `<link>` de DM Sans + Manrope y cache-bust.
+- **Informe** (`generar-informe-remision.css`): `--env-*` remapeados a premium; **se agregó modo oscuro**
+  (no tenía) para los dos atributos; el header tenía colores **en línea** hardcodeados
+  (`#ffffff`, `#dee2e6`, `#174ea6`, `#1a1a2e`) → tokenizados a `var(--env-*)` para que sigan el tema;
+  el icono de empresa `kair-icon-building` (clase de `styles.css`, no disponible en el iframe) → SVG inline;
+  fuente Roboto/Lexend → DM Sans/Manrope; cache-bust en el `<link>` y en la URL del iframe.
+- **Alineación del informe (paso 3)**: el header tenía el **título pegado al borde izquierdo** mientras
+  `.env-body` iba **centrado a 900px** → se veía desalineado de arriba a abajo. Se envolvió el contenido
+  del header en **`.env-header-inner`** con el MISMO `max-width: 900px; margin: 0 auto; padding: 0 1.5rem`
+  del cuerpo, así el título, el stepper y las tarjetas comparten los mismos bordes. Medido a 1904px de
+  ancho: antes el título estaba en `x=81` y la tarjeta en `x=526`; ahora el stepper y la tarjeta quedan
+  ambos en `x=526` (852px de ancho). **Regla**: cuando un header y su contenido no comparten contenedor,
+  darles el mismo `max-width` + `margin: 0 auto` (y el mismo padding) para que los bordes coincidan.
+
+### Cache-bust
+
+- Portal: `?v=REM-20260919-v2-portal-premium` (fetch HTML + script home).
+- Visor: `remisiones-view.css?v=REM-20260919-v2-premium` + `&v=REM-20260919-v2-premium` en la URL del iframe.
+- Informe: `generar-informe-remision.css?v=REM-20260919-v2-premium` + `&v=…` en la URL del iframe.
+
+### Verificación
+
+- `node main/test-remisiones-v2.js` → **62/62 OK** (se agregaron 19 checks de portal/visor/informe).
+- Arnés de Electron: portal sin fuga + claro/oscuro; visor con `--kair-primary #2057b8`; informe con
+  `--env-primary #2057b8` (claro) y `#6ea8fe` (oscuro).
+- ⚠️ **Nota del arnés**: el informe no se puede cargar con `loadFile` cuando el `<head>` tiene los CDN y
+  no hay red (Electron rechaza con `ERR_FAILED`); para verificarlo se copia el HTML al módulo quitando
+  los `<link>` con `https?` (conservando el CSS local) y se borra al terminar.
+
+### Limpieza de código muerto (mismo 📦775)
+
+El módulo tenía **9 archivos muertos** y ~600 líneas de código huérfano en el `logic.js`:
+
+| Archivo | Por qué estaba muerto |
+|---------|----------------------|
+| `enviar-remision.html` / `.js` / `.css` | reemplazados por `enviar-remision-v2.*` |
+| `control-remisiones.css` | su loader `_loadControlStyles()` **nunca se llamaba** |
+| `restricciones-view.html` / `.css` / `restricciones-viewer.js` | 0 referencias (el visor real es `remisiones-view.*`) |
+| `restricciones-component.js` | apuntaba a `restricciones-viewer.html` (archivo inexistente); solo lo listaba jsdoc |
+| `index.js` | requería el `logic` (que **no** tiene `module.exports` y usa `window`) y nadie lo cargaba |
+
+- **Métodos huérfanos del `logic.js`** (19, ~600 líneas): la cadena del explorador viejo
+  (`showVerRemisionesPage` + `navigateToInitialPath`/`navigateToPath`/`updateNavBar`/`displayItems`/`previewDocument`),
+  los helpers del flujo viejo (`createFileSelectionBox`/`createActionsBox`/`createDataDisplayBox`/`createLogBox`
+  + `processSelectedPdf`/`displayExtractedData`/`handleGeneration`/`handleSendWhatsApp`/`handleSendEmail`),
+  `createModernHeader`, `createHeader`, `_loadControlStyles` y `saveCellData`. Se eliminaron con un script que
+  localiza la firma y **balancea llaves** (el `logic.js` pasó de ~1300 a 798 líneas, −37 %).
+  Se verificó que ningún método vivo los llamara y que los nombres homónimos de otros módulos son independientes.
+- **`modules/gestion-salud/index.js`**: se quitó el `require('./restricciones-medicas')` (ya no existe el `index`).
+- **`jsdoc.json` + `scripts/generate-docs.js`**: se quitaron `restricciones-component.js` y `restricciones-viewer.js`.
+- **Verificación**: `node --check` OK; `test-remisiones-v2.js` 62/62; y un **smoke funcional con Electron**
+  (portal renderiza con sus 6 tarjetas → monta Enviar v2 → monta Control v2 → vuelve al portal, **0 errores de consola**).
+- **Regla**: al migrar una pantalla, borrar los archivos que reemplaza y sus loaders. Un loader de CSS
+  (`_loadControlStyles`) que nadie llama deja el `.css` huérfano y es fácil de pasar por alto.
+
+### Pendiente
+
+- El **portal** y el **informe** todavía cargan CDN (Font Awesome/Bootstrap Icons en el informe; Google
+  Fonts en ambos). El portal ya quedó sin CDN; el informe sigue usándolos para 12 iconos — deuda offline
+  conocida, igual que los viewers EMO.
+- El visor ya era `kair-*` v2.0 (jul-2026) con dark mode; solo se le remapearon los colores. Si se quiere
+  el Header System v2 completo (icon chip + Manrope 800), es una pasada aparte.
 
 
 
