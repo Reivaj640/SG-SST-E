@@ -2132,6 +2132,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Restricciones y Remisiones (3.1.6) | ✅ (📦775-779) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`), Control (`.remctl-scope`) y Estadísticas (`.remstat-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
 | Investigación de Accidentes (3.2.2) | ✅ (📦780) | No usa `kair-premium`: portal scoped `.inv-portal-scope` + Realizar/Ver con Header System v2 y tokens `--inv-*` remapeados; se quitó el `<link>` global que filtraba `html`/`body`/`.k-section-card` |
 | Registro y Análisis Estadístico (3.2.3) | ✅ (📦783) | No usa `kair-premium`: tokens `--k-*` remapeados a la canónica + Header System v2; se quitaron `.k-section-card`/`.header-back-btn` (clases GLOBALES) y se scopearon las reglas `.k-*`; gráficos Chart.js theme-aware |
+| Frecuencia de la Accidentalidad (3.3.1) | ✅ (📦784) | No usa `kair-premium`: tokens propios `--freq-*` scoped + Header System v2; se quitó el `:root` + `*` + `body` GLOBALES y se scopearon 139 selectores; el gráfico SVG lee la paleta con `tok()` |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2153,6 +2154,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦781**: Investigación de Accidentes (3.2.2) — "Ver Investigaciones" ahora aprovecha **todo el ancho** en maximizada (`.inv-body` sin `max-width:1200px` centrado); buscador con tope (`clamp`) y toggle de vista al extremo derecho.
 - **📦782**: Investigación de Accidentes (3.2.2) — la vista de LISTA pasa a **2 columnas** en maximizada (`@media (min-width:1360px)`, `repeat(2, minmax(0,1fr))`); la cuadrícula no se toca; el estado vacío y el esqueleto llevan `grid-column: 1 / -1`.
 - **📦783**: Registro y Análisis Estadístico (3.2.3) migrado a premium v2 — Header System v2, tokens `--k-*` remapeados a la canónica, scoping total del CSS (se quitaron las clases GLOBALES `.k-section-card`/`.header-back-btn`), modo oscuro en los DOS atributos, chips con `color-mix` y los 9 gráficos Chart.js con colores de tema.
+- **📦784**: Frecuencia de la Accidentalidad (3.3.1) migrada a premium v2 — Header System v2, tokens propios `--freq-*` scoped (se quitó el `:root` + `*` + `body` GLOBALES que pisaban tokens y márgenes de TODA la app), 139 selectores scopados, modo oscuro en los DOS atributos y el gráfico SVG leyendo la paleta con `tok()`.
 
 ---
 
@@ -3561,6 +3563,153 @@ tema lo aplica `theme-manager.js` al arrancar, antes de que el módulo se cargue
 Si un módulo se monta con `innerHTML` en el documento principal, **revisar qué clases GLOBALES usa
 su HTML** (`.k-section-card`, `.header-back-btn`, `.card`, `.modal`, `.badge`…): mientras el módulo
 esté abierto, su CSS puede redefinirlas para toda la app. Reemplazarlas por clases propias del módulo.
+
+### 📦784 — Frecuencia de la Accidentalidad (3.3.1) al premium v2
+
+El submódulo **3.3.1** (`modules/gestion-salud/frecuencia-accidentalidad/`) tiene una tabla mensual
+**editable** (12 filas × AT/Trabajadores, se guarda al confirmar con Enter/blur), 5 KPIs, tarjeta de
+meta, un **gráfico SVG nativo** (12 barras + línea de meta), 12 tarjetas de mes, 4 colapsables con
+barras de progreso, la referencia del indicador y la metodología.
+
+#### 🚨🚨 La fuga más grave de la serie: `:root` + `*` + `body` GLOBALES
+
+`renderer.js#showFrecuenciaAccidentalidadContent` monta el módulo con `fetch` + `innerHTML` en el
+**documento PRINCIPAL** y appendea su hoja al `<head>` **global**. Esa hoja traía:
+
+1. **`:root { --kair-primary, --kair-card, --kair-text, --kair-shadow, … }`** → sobrescribía tokens
+   de `shared/kair-design-tokens.css` (`--kair-card`, `--kair-text` y `--kair-shadow` chocaban por
+   NOMBRE EXACTO). Como el `:root` del módulo va después en la cascada, **podía dejar el tema oscuro
+   en blanco** mientras el módulo estaba abierto.
+2. **`* { box-sizing; margin:0; padding:0 }`** → **borraba los márgenes y rellenos de TODA la app**.
+3. **`body { overflow:hidden; height:100% }`** → forzaba el layout de la ventana completa.
+4. **~60 clases `.kair-*` sin scope** (`.kair-card`, `.kair-kpi`, `.kair-table`, `.kair-btn`,
+   `.kair-badge`, `.kair-empty`, `.kair-toast`, `.kair-input`, `.kair-progress-*`, `.kair-collapsible*`,
+   `.kair-month-card*`, `.kair-target-*`, …) que **chocan** con `shared/kair-components.css`,
+   `shared/kair-premium.css` y `styles.css` (p. ej. el `.kair-kpi` del módulo imponía
+   `text-align:center` a los `.kair-kpi` premium de otros módulos).
+
+#### Cómo se arregló
+
+1. **Tokens propios `--freq-*`** (renombrados los 104 usos) y movidos de `:root` a
+   `.frecuencia-container`. Se conservaron los NOMBRES originales solo cambiando el prefijo, y los
+   valores se remapearon a la paleta canónica (`#2057b8` / `#14213d` / `#748096` / `#e8ebee` /
+   `#fcfbfb`, DM Sans + Manrope, radios 20px tarjeta / 12px control).
+2. **Reset scoped**: `*` → `.frecuencia-container, .frecuencia-container *` (box-sizing) y
+   `.frecuencia-container *` (margin/padding). `body` → se fusionó en la regla del contenedor.
+3. **139 selectores scopados** bajo `.frecuencia-container` con un script. ⚠️ **Ojo con los
+   selectores MULTILÍNEA**: un script que solo mira líneas que terminan en `{` deja la PRIMERA línea
+   de un selector partido sin scopar (pasó con `.kair-table thead th,` dentro de 2 `@media`). Hay que
+   verificar con una búsqueda de selectores sueltos, no confiar en el script.
+4. **Header System v2** propio (`.freq-header-v2`, `.freq-header-icon`, `.freq-title`, `.freq-btn`,
+   `.freq-select`) y se **borraron** las reglas `.k-section-card` / `.header-back-btn` /
+   `.header-action--ghost`.
+5. **`@keyframes` renombrados**: `pulse`→`freqPulse`, `slideIn`→`freqSlideIn` (eran nombres globales).
+6. **Modo oscuro con `[data-theme^="dark"]`** (antes solo `[data-theme="dark"]`, así que el tema
+   Oscuro manual quedaba claro) + el detalle de que las superficies con acento de FONDO necesitan la
+   versión oscura del acento (`#2f5fa8`) para que el texto blanco se lea.
+
+#### El gráfico (y las celdas) ahora leen la paleta
+
+Todos los colores del gráfico SVG, de la tabla, de las tarjetas de mes y de las barras de progreso
+estaban **hardcodeados en el JS** (`#174ea6`, `#28a745`, `#ffc107`, `#dc3545`, `#6c757d`, `#212529`…)
+y no seguían ni la paleta ni el tema. Ahora hay 2 helpers:
+
+```js
+function tok(name, fallback) {           // lee un token CSS del módulo
+  var host = document.querySelector('.frecuencia-container') || document.documentElement;
+  return getComputedStyle(host).getPropertyValue(name).trim() || fallback;
+}
+function palette() { return { bg: tok('--freq-bg','#fbfcfb'), danger: tok('--freq-danger','#da5563'), … }; }
+```
+
+y `renderChart` / `renderTabla` / `renderColapsables` / `renderMonthCards` hacen `var C = palette();`
+al entrar (se relee en cada render, así sigue el tema).
+
+⚠️ **Nota sobre SVG**: `fill="var(--x)"` como ATRIBUTO no es confiable; por eso se lee el valor con
+`getComputedStyle` y se concatena el color ya resuelto.
+
+#### Limpieza
+
+- **Código muerto eliminado**: `buildGridLines()` y `buildChartPoints()` (nunca se llamaban) y
+  `escapeHtml()` (solo lo usaba el anterior).
+- **Iconos**: el header usaba `bi bi-copy` / `bi bi-arrow-clockwise` de Bootstrap Icons, cuyo
+  `<link>` vive en el `<head>` del HTML… que **se descarta** al inyectar solo `doc.body.innerHTML` →
+  **nunca renderizaban**. Ahora son SVG inline.
+- El SVG del gráfico ganó `display:block` (evita el hueco de línea base). Mantiene `height:auto`
+  porque su contenedor usa `min-height` (no alto fijo), así que no aplica el riesgo de 📦757.
+- El cache-bust del `<script>` pasó de `?_t=Date.now()` (rompía toda cache) a `?v=TOKEN`.
+
+#### Gráfico y tabla en PARALELO en maximizada
+
+En maximizada el gráfico ocupaba todo el ancho y la tabla quedaba debajo. Ahora, en
+`@media (min-width: 1360px)`, `.freq-duo` (que envuelve las 2 tarjetas en el HTML) usa
+`grid-template-columns: minmax(0,1fr) minmax(0,1fr)` → **gráfico y tabla lado a lado**. En ventanas
+normales van uno debajo del otro (`grid-template-columns: 1fr`).
+
+Detalle fino: la tabla mide ~773px de alto y el gráfico ~382px, así que con `align-items: start`
+quedaba un hueco visible debajo del gráfico. Las tarjetas del `duo` se volvieron
+`display:flex; flex-direction:column` con `.kair-chart-container { flex: 1 }` para que **se estiren
+al mismo alto** y el gráfico se centre en el espacio libre **sin deformarse** (el SVG conserva su
+proporción por el `viewBox` + el `preserveAspectRatio` por defecto, que lo escala para encajar).
+Medido: a 1600px las 2 tarjetas miden 773px de alto; a 1200px vuelven a su alto natural (508 / 773)
+apiladas.
+
+**Regla**: al poner 2 tarjetas de contenido en paralelo, decidir explícitamente qué pasa con el
+alto — `align-items: start` deja huecos si los contenidos difieren mucho; `stretch` + `flex: 1` en
+el hijo que debe crecer da tarjetas alineadas.
+
+**Y la tabla tiene que ENTRAR COMPLETA en su columna**: con `white-space: nowrap` en el `th`, el
+ancho **mínimo** de la tabla era **836px** (los encabezados "Trabajadores" e "Índice Frecuencia" no
+podían partir), así que en la columna de ~800px del layout en paralelo la última columna (**Estado**)
+quedaba cortada y aparecía **scroll horizontal** — el usuario lo reportó con captura. Con
+`white-space: normal` + `line-height: 1.2` en el `th` el mínimo bajó a **≤620px** y la tabla entra
+completa (medido: a 620/660/700/740/780/820/900px NO desborda, y el encabezado sigue en **una** línea
+de 40px porque las palabras caben). **Regla**: si una tabla va a vivir en una columna, su `th` no
+puede llevar `nowrap`; hay que medir el `scrollWidth` contra el `clientWidth` a varios anchos.
+
+**Y después el usuario pidió ANCHOS FIJOS en maximizada** (que la tabla no se reparta según el
+contenido): dentro del mismo `@media (min-width: 1360px)` se agregó `table-layout: fixed` +
+`width` por columna (`th:nth-child(n)`) más `overflow:hidden; text-overflow:ellipsis` en `th`/`td`
+como red. Reparto final (**suma exacta 100%**): **Mes 10% · AT 8% · Trabajadores 24% ·
+Índice Frecuencia 28% · Meta 8% · Estado 22%**. Medido (con **0 celdas recortadas** y sin desborde):
+
+| Pantalla | Ancho tabla | Mes | AT | Trabajadores | Índice Frecuencia | Meta | Estado |
+|---|---|---|---|---|---|---|---|
+| 1920 (vw 1904) | 845px | 84.50 | 67.59 | 202.80 | 236.61 | 67.59 | 185.95 |
+| 1900 (vw 1884) | 835px | 83.53 | 66.83 | 200.50 | 233.92 | 66.83 | 183.84 |
+| 1760 (vw 1744) | 768px | 76.81 | 61.45 | 184.38 | 215.11 | 61.45 | 169.05 |
+| 1600 (vw 1584) | 691px | 69.14 | 55.31 | 165.94 | 193.59 | 55.31 | 152.16 |
+| 1440 (vw 1424) | 615px | 61.45 | 49.16 | 147.50 | 172.11 | 49.16 | 135.27 |
+
+Por debajo de 1360px vuelve a `table-layout: auto` (la tabla se apila y ocupa todo el ancho).
+
+⚠️ **Gotcha de los porcentajes con `table-layout: fixed`**: si los 6 `width` **no suman 100%**, el
+sobrante se reparte proporcionalmente y los anchos reales NO son los declarados (p. ej. con
+8.5/10/19/22/12/20 = 91.5% la columna AT terminó midiendo 92px en vez de 84px). Dejar la suma en 100.
+⚠️ **Gotcha de la simulación**: el arnés usaba los meses COMPLETOS ("Septiembre") y reportaba
+recortes que en la app no existen, porque el Excel trae las **3 letras** (ENE, FEB, SEP…). Verificar
+el dato real antes de "arreglar" un ancho por un recorte que no ocurre.
+⚠️ **Límite real**: el badge automático (🤖, que marca un mes con AT contado desde la caracterización)
+necesita ~58px, así que con AT por debajo de 8% se recorta en ventanas de ≤1600px (en maximizada no).
+
+⚠️ **Lección de cache-bust (costó una ronda de validación)**: se cambió el CSS **sin bumpear el
+token** y el usuario siguió viendo la hoja vieja (la columna "Estado" seguía cortada y él creyó que
+el arreglo no funcionaba). Como el `<script>` ya no usa `?_t=Date.now()`, **cada edición del CSS/HTML/JS
+exige bumpear `TOKEN` en `renderer.js`** (terminó en `FREQ-20260919-v3-anchos-fijos`).
+
+#### Verificación
+
+- `node tests/frecuencia-accidentalidad/test-premium.js` → **28/28 OK** (incluye "NO hay `:root`
+  global", "NO hay reset `*` global", "NO hay regla `body` global", "TODOS los selectores están bajo
+  `.frecuencia-container`" y "los 32 ids del contrato siguen presentes").
+- Arnés de Electron con el puente simulado: claro → contenedor `#fbfcfb`, `--freq-primary` `#2057b8`,
+  tarjetas 20px, título Manrope 800, **5 KPIs, 12 filas, 12 tarjetas de mes, 4 colapsables, 9 barras**
+  y el gráfico (580px) con rellenos `#fbfcfb` + `#1bb888`×10 + `#e7a224`×2; `dark` y `dark-legacy` →
+  idénticos (`#0f172a` / `#6ea8fe` / `#1a2334`) y el gráfico **cambia a `#3ecf9a` / `#f0b45a`**;
+  badge en oscuro `#2f5fa8`; **0 errores de consola**.
+- Cache-bust: token `FREQ-20260919-v1-premium` en el CSS, el HTML, el JS y el guard del `<link>`.
+- EOL: el directorio es `i/lf w/crlf`; se normalizaron los 3 archivos a **LF** (diff final:
+  395/332 CSS, 33/24 HTML, 41/45 JS).
 
 ### Verificación
 

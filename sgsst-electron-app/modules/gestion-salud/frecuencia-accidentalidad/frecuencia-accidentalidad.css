@@ -4,138 +4,157 @@
    Sistema Visual Oficial K+AIR
    ============================================================ */
 
-/* ── Variables CSS (Sistema Visual K+AIR) ── */
-:root {
-  --kair-primary: #174ea6;
-  --kair-primary-hover: #185abd;
-  --kair-success: #28a745;
-  --kair-warning: #ffc107;
-  --kair-danger: #dc3545;
-  --kair-bg: #f8f9fa;
-  --kair-card: #ffffff;
-  --kair-text: #2d3748;
-  --kair-text-sec: #6c757d;
-  --kair-border: #dee2e6;
-  --kair-radius: 0.375rem;
-  --kair-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-  --kair-shadow-lg: 0 4px 12px rgba(0,0,0,0.12);
-  --kair-font: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-}
+/* ── Tokens del módulo — SCOPED bajo .frecuencia-container ──
+   🚨 Antes esto era un `:root` GLOBAL: al inyectarse la hoja en document.head
+   pisaba --kair-card / --kair-text / --kair-shadow de shared/kair-design-tokens.css
+   para TODA la app (y podía romper el modo oscuro). Ahora los tokens llevan
+   prefijo propio --freq-* y viven dentro del contenedor del módulo. */
+.frecuencia-container {
+  --freq-primary: #2057b8;
+  --freq-primary-hover: #1a4a9e;
+  --freq-primary-soft: #eaf1fb;
+  --freq-success: #1bb888;
+  --freq-warning: #e7a224;
+  --freq-danger: #da5563;
+  --freq-bg: #fbfcfb;
+  --freq-card: #ffffff;
+  --freq-text: #14213d;
+  --freq-text-sec: #748096;
+  --freq-border: #e8ebee;
+  --freq-radius: 12px;
+  --freq-radius-card: 20px;
+  --freq-shadow: 0 2px 7px rgba(37,56,82,0.08);
+  --freq-shadow-lg: 0 12px 32px rgba(20,33,61,0.18);
+  --freq-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --freq-font-display: 'Manrope', 'DM Sans', sans-serif;
 
-/* ── Reset y Base ── */
-* { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
-}
-
-body {
-  font-family: var(--kair-font);
-  background: var(--kair-bg);
-  color: var(--kair-text);
+  /* Base + layout (antes eran las reglas GLOBALES `*` y `body`) */
+  font-family: var(--freq-font);
+  background: var(--freq-bg);
+  color: var(--freq-text);
   height: 100%;
   line-height: 1.5;
   overflow: hidden;
-}
-
-/* ── Wrapper Container ── */
-.frecuencia-container {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-/* ── Header System — Card Pattern (k-section-card) ── */
+.frecuencia-container /* Reset SCOPED — antes `* { box-sizing:border-box; margin:0; padding:0 }` era
+   GLOBAL y borraba los márgenes/rellenos de TODA la app mientras el módulo
+   estaba abierto (misma clase de fuga que el portal de EMO, 📦766). */
+.frecuencia-container,
+.frecuencia-container * {
+  box-sizing: border-box;
+}
 
-/* Card container */
-.frecuencia-container .k-section-card {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.375rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+.frecuencia-container * {
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Header System v2 (premium) ──
+   Antes el header era una .k-section-card (clase GLOBAL que comparten ~20
+   módulos) y usaba .header-back-btn / .header-action--ghost. Ahora es propio:
+   el módulo ya no define ninguna clase genérica ajena. */
+.frecuencia-container .freq-header-v2 {
   flex-shrink: 0;
-}
-
-/* Back button */
-.frecuencia-container .header-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #5a6378;
   background: transparent;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  font-family: inherit;
+  padding: 16px clamp(16px, 1.8vw, 28px) 0;
 }
-
-.frecuencia-container .header-back-btn:hover {
-  background: #e8f0fe;
-  color: #174ea6;
-}
-
-/* Ghost action buttons */
-.frecuencia-container .header-action--ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #5a6378;
-  background: transparent;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  font-family: inherit;
-}
-
-.frecuencia-container .header-action--ghost:hover:not(:disabled) {
-  background: #f0f2f5;
-  color: #1a1a2e;
-}
-
-/* Company & divider inside card */
-.frecuencia-container .k-section-card__company {
+.frecuencia-container .freq-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: #5a6378;
-  white-space: nowrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--freq-text-sec);
 }
+.frecuencia-container .freq-breadcrumb strong { color: var(--freq-text); font-weight: 700; }
+.frecuencia-container .freq-breadcrumb .freq-sep { opacity: .7; }
 
-.frecuencia-container .k-section-card__company i {
-  font-size: 0.875rem;
+.frecuencia-container .freq-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 0 14px;
 }
-
-.frecuencia-container .k-section-card__divider {
-  width: 1px;
-  height: 24px;
-  background: #dee2e6;
+.frecuencia-container .freq-header-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.frecuencia-container .freq-header-icon {
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--freq-radius);
+  background: var(--freq-primary-soft);
+  color: var(--freq-primary);
 }
+.frecuencia-container .freq-header-icon svg { width: 22px; height: 22px; }
+.frecuencia-container .freq-title {
+  font-family: var(--freq-font-display);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--freq-text);
+}
+.frecuencia-container .freq-sub { font-size: 12.5px; color: var(--freq-text-sec); margin-top: 3px; }
 
-/* Dark Theme */
-[data-theme="dark"] .frecuencia-container .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
-[data-theme="dark"] .frecuencia-container .k-section-card h3 { color: #e0e0e0; }
-[data-theme="dark"] .frecuencia-container .k-section-card p { color: #9e9e9e; }
-[data-theme="dark"] .frecuencia-container .k-section-card__company { color: #9e9e9e; }
-[data-theme="dark"] .frecuencia-container .k-section-card__divider { background: #3a3a4d; }
-[data-theme="dark"] .frecuencia-container .header-back-btn { color: #9e9e9e; }
-[data-theme="dark"] .frecuencia-container .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
-[data-theme="dark"] .frecuencia-container .header-action--ghost { color: #9e9e9e; }
-[data-theme="dark"] .frecuencia-container .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
+.frecuencia-container .freq-header-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap; }
+.frecuencia-container .freq-company {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--freq-text-sec);
+  white-space: nowrap;
+  background: var(--freq-card);
+  border: 1px solid var(--freq-border);
+  border-radius: var(--freq-radius);
+}
+.frecuencia-container .freq-company svg { width: 15px; height: 15px; flex-shrink: 0; }
+.frecuencia-container .freq-year-label { font-size: 12.5px; color: var(--freq-text-sec); }
+.frecuencia-container .freq-select {
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-family: var(--freq-font);
+  color: var(--freq-text);
+  background: var(--freq-card);
+  border: 1px solid var(--freq-border);
+  border-radius: var(--freq-radius);
+  cursor: pointer;
+}
+.frecuencia-container .freq-select:focus { outline: none; border-color: var(--freq-primary); box-shadow: 0 0 0 3px rgba(32,87,184,0.15); }
+.frecuencia-container .freq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1px solid var(--freq-border);
+  border-radius: var(--freq-radius);
+  background: var(--freq-card);
+  color: var(--freq-text);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--freq-font);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 180ms ease-out, color 180ms ease-out, border-color 180ms ease-out;
+}
+.frecuencia-container .freq-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.frecuencia-container .freq-btn:hover:not(:disabled) {
+  background: var(--freq-primary-soft);
+  border-color: var(--freq-primary);
+  color: var(--freq-primary);
+}
+.frecuencia-container .freq-btn--primary { background: var(--freq-primary); border-color: var(--freq-primary); color: #fff; }
+.frecuencia-container .freq-btn--primary:hover:not(:disabled) { background: var(--freq-primary-hover); color: #fff; }
+.frecuencia-container .freq-btn--icon { padding: 8px 10px; }
 
 /* ── Container ── */
-.kair-container {
+.frecuencia-container .kair-container {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
@@ -147,14 +166,14 @@ body {
 }
 
 /* ── Main Content Scrolleable ── */
-.k-main-content {
+.frecuencia-container .k-main-content {
   flex: 1;
   overflow-y: auto;
   padding: 1.25rem 2%;
 }
 
 /* ── Sync Bar ── */
-.kair-sync-bar {
+.frecuencia-container .kair-sync-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -162,12 +181,12 @@ body {
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: rgba(23, 78, 166, 0.04);
-  border-radius: var(--kair-radius);
-  border: 1px solid rgba(23, 78, 166, 0.1);
+  background: color-mix(in srgb, var(--freq-primary) 5%, transparent);
+  border-radius: var(--freq-radius);
+  border: 1px solid color-mix(in srgb, var(--freq-primary) 12%, transparent);
 }
 
-.kair-badge {
+.frecuencia-container .kair-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -175,118 +194,166 @@ body {
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: rgba(23, 78, 166, 0.08);
-  border: 1px solid rgba(23, 78, 166, 0.2);
-  color: var(--kair-primary);
+  background: color-mix(in srgb, var(--freq-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--freq-primary) 22%, transparent);
+  color: var(--freq-primary);
 }
 
-.kair-badge-success {
+.frecuencia-container .kair-badge-success {
   background: rgba(40, 167, 69, 0.08);
   border-color: rgba(40, 167, 69, 0.2);
-  color: var(--kair-success);
+  color: var(--freq-success);
 }
 
-.kair-badge-warning {
-  background: rgba(255, 193, 7, 0.08);
-  border-color: rgba(255, 193, 7, 0.2);
-  color: #856404;
+.frecuencia-container .kair-badge-warning {
+  background: color-mix(in srgb, var(--freq-warning) 16%, transparent);
+  border-color: color-mix(in srgb, var(--freq-warning) 30%, transparent);
+  color: #b07c1a;
 }
 
-.kair-dot {
+.frecuencia-container .kair-dot {
   width: 8px; 
   height: 8px;
   border-radius: 50%;
-  background: var(--kair-success);
-  animation: pulse 2s infinite;
+  background: var(--freq-success);
+  animation: freqPulse 2s infinite;
 }
 
-@keyframes pulse { 
+@keyframes freqPulse { 
   0%, 100% { opacity: 1; transform: scale(1); } 
   50% { opacity: 0.5; transform: scale(0.9); } 
 }
 
-.kair-sync-info {
+.frecuencia-container .kair-sync-info {
   font-size: 0.75rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   font-style: italic;
 }
 
 /* ── Cards ── */
-.kair-card {
-  background: var(--kair-card);
-  border-radius: var(--kair-radius);
-  box-shadow: var(--kair-shadow);
-  border: 1px solid var(--kair-border);
+.frecuencia-container .kair-card {
+  background: var(--freq-card);
+  border-radius: var(--freq-radius-card);
+  box-shadow: var(--freq-shadow);
+  border: 1px solid var(--freq-border);
   padding: 1.25rem;
   margin-bottom: 1.25rem;
 }
 
-.kair-card-title {
+/* ── Gráfico + Tabla en PARALELO (2 columnas en maximizada) ──
+   En maximizada el gráfico y la tabla se muestran lado a lado para aprovechar
+   el ancho; en ventanas normales van uno debajo del otro. */
+.frecuencia-container .freq-duo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+.frecuencia-container .freq-duo > .kair-card {
+  margin-bottom: 0;
+}
+@media (min-width: 1360px) {
+  .frecuencia-container .freq-duo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  /* Las 2 tarjetas se estiran al MISMO alto (el de la tabla) y el gráfico se
+     centra en el espacio libre, sin deformarse: el SVG conserva su proporcion
+     porque su viewBox + preserveAspectRatio por defecto lo escalan para encajar. */
+  .frecuencia-container .freq-duo > .kair-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .frecuencia-container .freq-duo > .kair-card .kair-chart-container {
+    flex: 1;
+    min-height: 0;
+  }
+  /* Anchos FIJOS de las columnas de la tabla en maximizada: con
+     `table-layout: fixed` la tabla deja de repartirse el ancho segun el
+     contenido y cada columna mide el % de abajo (el 100% del ancho de la
+     tabla). Asi el reparto es siempre el mismo y "Estado" nunca se corta. */
+  .frecuencia-container .kair-table {
+    table-layout: fixed;
+  }
+  .frecuencia-container .kair-table th:nth-child(1) { width: 10%; } /* Mes (17 -> 10) */
+  .frecuencia-container .kair-table th:nth-child(2) { width: 8%; }  /* AT (10 -> 8; 7% recortaba el badge auto) */
+  .frecuencia-container .kair-table th:nth-child(3) { width: 24%; } /* Trabajadores */
+  .frecuencia-container .kair-table th:nth-child(4) { width: 28%; } /* Indice Frecuencia */
+  .frecuencia-container .kair-table th:nth-child(5) { width: 8%; }  /* Meta (12 -> 8) */
+  .frecuencia-container .kair-table th:nth-child(6) { width: 22%; } /* Estado */
+  /* Con layout fijo, lo que no entra se recorta en vez de empujar la tabla. */
+  .frecuencia-container .kair-table td,
+  .frecuencia-container .kair-table th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.frecuencia-container .kair-card-title {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--kair-text);
+  color: var(--freq-text);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.kair-card-subtitle {
+.frecuencia-container .kair-card-subtitle {
   font-size: 0.8rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   font-weight: 400;
 }
 
 /* ── KPIs Grid ── */
-.kair-kpis {
+.frecuencia-container .kair-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
-.kair-kpi {
-  background: var(--kair-card);
-  border-radius: var(--kair-radius);
-  box-shadow: var(--kair-shadow);
-  border: 1px solid var(--kair-border);
+.frecuencia-container .kair-kpi {
+  background: var(--freq-card);
+  border-radius: var(--freq-radius-card);
+  box-shadow: var(--freq-shadow);
+  border: 1px solid var(--freq-border);
   padding: 1rem;
   text-align: center;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.kair-kpi:hover {
+.frecuencia-container .kair-kpi:hover {
   transform: translateY(-2px);
-  box-shadow: var(--kair-shadow-lg);
+  box-shadow: var(--freq-shadow-lg);
 }
 
-.kair-kpi-label { 
+.frecuencia-container .kair-kpi-label {
   font-size: 0.75rem; 
-  color: var(--kair-text-sec); 
+  color: var(--freq-text-sec); 
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
-.kair-kpi-value { 
+.frecuencia-container .kair-kpi-value {
   font-size: 1.75rem; 
   font-weight: 700;
   line-height: 1.2;
 }
 
-.kair-kpi-sub { 
+.frecuencia-container .kair-kpi-sub {
   font-size: 0.7rem; 
-  color: var(--kair-text-sec); 
+  color: var(--freq-text-sec); 
   margin-top: 0.25rem;
 }
 
-.kair-kpi-value.success { color: var(--kair-success); }
-.kair-kpi-value.danger { color: var(--kair-danger); }
-.kair-kpi-value.warning { color: var(--kair-warning); }
-.kair-kpi-value.primary { color: var(--kair-primary); }
+.frecuencia-container .kair-kpi-value.success { color: var(--freq-success); }
+.frecuencia-container .kair-kpi-value.danger { color: var(--freq-danger); }
+.frecuencia-container .kair-kpi-value.warning { color: var(--freq-warning); }
+.frecuencia-container .kair-kpi-value.primary { color: var(--freq-primary); }
 
 /* ── Chart Container ── */
-.kair-chart-container {
+.frecuencia-container .kair-chart-container {
   width: 100%;
   min-height: 300px;
   display: flex;
@@ -295,77 +362,81 @@ body {
 }
 
 /* ── Table ── */
-.kair-table-wrap {
+.frecuencia-container .kair-table-wrap {
   overflow-x: auto;
-  border-radius: var(--kair-radius);
-  border: 1px solid var(--kair-border);
+  border-radius: var(--freq-radius-card);
+  border: 1px solid var(--freq-border);
 }
 
-.kair-table { 
+.frecuencia-container .kair-table {
   width: 100%; 
   border-collapse: collapse; 
   font-size: 0.85rem;
-  background: var(--kair-card);
+  background: var(--freq-card);
 }
 
-.kair-table thead th { 
-  background: var(--kair-primary); 
+.frecuencia-container .kair-table thead th {
+  background: var(--freq-primary); 
   color: #fff; 
   padding: 0.75rem 0.5rem; 
   font-weight: 600; 
   text-align: center;
-  white-space: nowrap;
+  /* `normal` (no nowrap): los encabezados largos ("Índice Frecuencia",
+     "Trabajadores") parten en 2 líneas cuando la columna es angosta, así la
+     tabla entra completa en la columna del layout en paralelo. */
+  white-space: normal;
+  line-height: 1.2;
 }
 
-.kair-table thead th:first-child { 
+.frecuencia-container .kair-table thead th:first-child {
   text-align: left; 
-  border-top-left-radius: var(--kair-radius);
+  border-top-left-radius: var(--freq-radius);
 }
 
-.kair-table thead th:last-child {
-  border-top-right-radius: var(--kair-radius);
+.frecuencia-container .kair-table thead th:last-child {
+  border-top-right-radius: var(--freq-radius);
 }
 
-.kair-table tbody tr { 
-  border-bottom: 1px solid var(--kair-border); 
+.frecuencia-container .kair-table tbody tr {
+  border-bottom: 1px solid var(--freq-border); 
 }
 
-.kair-table tbody tr:nth-child(even) { 
-  background: #f8f9fa; 
+.frecuencia-container .kair-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--freq-text-sec) 5%, var(--freq-card));
 }
 
-.kair-table tbody tr:hover {
-  background: rgba(23, 78, 166, 0.04);
+.frecuencia-container .kair-table tbody tr:hover {
+  background: color-mix(in srgb, var(--freq-primary) 5%, transparent);
 }
 
-.kair-table td { 
+.frecuencia-container .kair-table td {
   padding: 0.6rem 0.5rem; 
   text-align: center;
   vertical-align: middle;
 }
 
-.kair-table td:first-child { 
+.frecuencia-container .kair-table td:first-child {
   font-weight: 600; 
   text-align: left;
-  color: var(--kair-text);
+  color: var(--freq-text);
 }
 
-.kair-table tfoot tr {
-  background: rgba(23, 78, 166, 0.06);
-  border-top: 2px solid var(--kair-primary);
+.frecuencia-container .kair-table tfoot tr {
+  background: color-mix(in srgb, var(--freq-primary) 7%, transparent);
+  border-top: 2px solid var(--freq-primary);
   font-weight: 700;
 }
 
-.kair-table tfoot td {
+.frecuencia-container .kair-table tfoot td {
   padding: 0.75rem 0.5rem;
 }
 
 /* ── Editable Cells ── */
-.kair-editable {
-  color: var(--kair-primary);
+.frecuencia-container .kair-editable {
+  color: var(--freq-primary);
   font-weight: 600;
   cursor: pointer;
-  text-decoration: underline dotted var(--kair-primary);
+  text-decoration: underline dotted var(--freq-primary);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   transition: background 0.2s;
@@ -373,27 +444,27 @@ body {
   min-width: 40px;
 }
 
-.kair-editable:hover { 
-  background: rgba(23, 78, 166, 0.08);
+.frecuencia-container .kair-editable:hover {
+  background: color-mix(in srgb, var(--freq-primary) 10%, transparent);
 }
 
-.kair-input {
+.frecuencia-container .kair-input {
   width: 70px;
   padding: 0.35rem 0.5rem;
-  border: 2px solid var(--kair-primary);
+  border: 2px solid var(--freq-primary);
   border-radius: 4px;
   font-size: 0.85rem;
-  font-family: var(--kair-font);
+  font-family: var(--freq-font);
   outline: none;
   text-align: center;
 }
 
-.kair-input:focus {
-  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.2);
+.frecuencia-container .kair-input:focus {
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.2);
 }
 
 /* ── Status Badges ── */
-.kair-badge-status {
+.frecuencia-container .kair-badge-status {
   display: inline-block;
   padding: 0.25rem 0.6rem;
   border-radius: 9999px;
@@ -404,18 +475,18 @@ body {
   letter-spacing: 0.3px;
 }
 
-.kair-badge-cumple { background: var(--kair-success); }
-.kair-badge-excede { background: var(--kair-danger); }
+.frecuencia-container .kair-badge-cumple { background: var(--freq-success); }
+.frecuencia-container .kair-badge-excede { background: var(--freq-danger); }
 
 /* ── Buttons ── */
-.kair-btn {
+.frecuencia-container .kair-btn {
   background: transparent;
-  color: var(--kair-primary);
-  border: 1px solid var(--kair-primary);
-  border-radius: var(--kair-radius);
+  color: var(--freq-primary);
+  border: 1px solid var(--freq-primary);
+  border-radius: var(--freq-radius);
   padding: 0.5rem 1rem;
   cursor: pointer;
-  font-family: var(--kair-font);
+  font-family: var(--freq-font);
   font-weight: 600;
   font-size: 0.8rem;
   display: inline-flex;
@@ -424,43 +495,43 @@ body {
   transition: all 0.2s;
 }
 
-.kair-btn:hover { 
-  background: var(--kair-primary); 
+.frecuencia-container .kair-btn:hover {
+  background: var(--freq-primary); 
   color: #fff; 
 }
 
-.kair-btn-primary {
-  background: var(--kair-primary);
+.frecuencia-container .kair-btn-primary {
+  background: var(--freq-primary);
   color: #fff;
-  border-color: var(--kair-primary);
+  border-color: var(--freq-primary);
 }
 
-.kair-btn-primary:hover {
-  background: var(--kair-primary-hover);
-  border-color: var(--kair-primary-hover);
+.frecuencia-container .kair-btn-primary:hover {
+  background: var(--freq-primary-hover);
+  border-color: var(--freq-primary-hover);
 }
 
-.kair-btn-light {
+.frecuencia-container .kair-btn-light {
   background: rgba(255,255,255,0.1);
   color: #fff;
   border-color: rgba(255,255,255,0.3);
 }
 
-.kair-btn-light:hover {
+.frecuencia-container .kair-btn-light:hover {
   background: rgba(255,255,255,0.2);
 }
 
 /* ── Collapsibles ── */
-.kair-collapsible { 
-  background: var(--kair-card); 
-  border-radius: var(--kair-radius); 
-  box-shadow: var(--kair-shadow); 
-  border: 1px solid var(--kair-border); 
+.frecuencia-container .kair-collapsible {
+  background: var(--freq-card); 
+  border-radius: var(--freq-radius-card); 
+  box-shadow: var(--freq-shadow); 
+  border: 1px solid var(--freq-border); 
   margin-bottom: 1rem; 
   overflow: hidden; 
 }
 
-.kair-collapsible-header { 
+.frecuencia-container .kair-collapsible-header {
   width: 100%; 
   display: flex; 
   align-items: center; 
@@ -469,70 +540,70 @@ body {
   background: transparent; 
   border: none; 
   cursor: pointer; 
-  color: var(--kair-text); 
-  font-family: var(--kair-font); 
+  color: var(--freq-text); 
+  font-family: var(--freq-font); 
   font-size: 0.9rem; 
   font-weight: 700;
   transition: background 0.2s;
 }
 
-.kair-collapsible-header:hover {
-  background: rgba(23, 78, 166, 0.04);
+.frecuencia-container .kair-collapsible-header:hover {
+  background: color-mix(in srgb, var(--freq-primary) 5%, transparent);
 }
 
-.kair-collapsible-body { 
-  border-top: 1px solid var(--kair-border); 
+.frecuencia-container .kair-collapsible-body {
+  border-top: 1px solid var(--freq-border); 
   padding: 1.1rem;
   display: none;
 }
 
-.kair-collapsible-body.open {
+.frecuencia-container .kair-collapsible-body.open {
   display: block;
 }
 
-.kair-collapsible-arrow {
+.frecuencia-container .kair-collapsible-arrow {
   font-size: 0.7rem;
   transition: transform 0.2s;
 }
 
-.kair-collapsible-arrow.open {
+.frecuencia-container .kair-collapsible-arrow.open {
   transform: rotate(90deg);
 }
 
 /* ── Progress Bars ── */
-.kair-progress-wrap {
+.frecuencia-container .kair-progress-wrap {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.5rem;
 }
 
-.kair-progress-label {
+.frecuencia-container .kair-progress-label {
   flex: 0 0 160px;
   font-size: 0.8rem;
   text-align: right;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.kair-progress-track {
+.frecuencia-container .kair-progress-track {
   flex: 1;
   height: 20px;
-  background: #e9ecef;
+  background: color-mix(in srgb, var(--freq-text-sec) 18%, transparent);
   border-radius: 4px;
   overflow: hidden;
 }
 
-.kair-progress-fill {
+.frecuencia-container .kair-progress-fill {
   height: 100%;
   border-radius: 4px;
   transition: width 0.5s ease;
   opacity: 0.85;
 }
 
-.kair-progress-value {
+.frecuencia-container .kair-progress-value {
   flex: 0 0 40px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -540,35 +611,35 @@ body {
 }
 
 /* ── Methodology ── */
-.kair-methodology { 
+.frecuencia-container .kair-methodology {
   font-size: 0.85rem; 
-  color: var(--kair-text-sec); 
+  color: var(--freq-text-sec); 
   line-height: 1.7; 
 }
 
-.kair-methodology strong { 
-  color: var(--kair-text); 
+.frecuencia-container .kair-methodology strong {
+  color: var(--freq-text); 
 }
 
-.kair-method-formula { 
+.frecuencia-container .kair-method-formula {
   padding: 0.75rem 1rem;
-  border-left: 3px solid var(--kair-primary); 
+  border-left: 3px solid var(--freq-primary); 
   margin-bottom: 0.75rem;
-  background: rgba(23, 78, 166, 0.04);
-  border-radius: 0 var(--kair-radius) var(--kair-radius) 0;
+  background: color-mix(in srgb, var(--freq-primary) 5%, transparent);
+  border-radius: 0 var(--freq-radius) var(--freq-radius) 0;
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
 }
 
 /* ── Toast ── */
-.kair-toast {
+.frecuencia-container .kair-toast {
   position: fixed; 
   bottom: 1.25rem; 
   right: 1.25rem;
-  background: var(--kair-success);
+  background: var(--freq-success);
   color: #fff;
   padding: 0.75rem 1.25rem;
-  border-radius: var(--kair-radius);
+  border-radius: var(--freq-radius);
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
   font-size: 0.85rem;
   font-weight: 600;
@@ -576,33 +647,33 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  animation: slideIn 0.3s ease;
+  animation: freqSlideIn 0.3s ease;
   max-width: 400px;
 }
 
-.kair-toast.error { 
-  background: var(--kair-danger); 
+.frecuencia-container .kair-toast.error {
+  background: var(--freq-danger); 
 }
 
-.kair-toast.warning {
-  background: var(--kair-warning);
+.frecuencia-container .kair-toast.warning {
+  background: var(--freq-warning);
   color: #333;
 }
 
-@keyframes slideIn { 
+@keyframes freqSlideIn { 
   from { transform: translateX(100%); opacity: 0; } 
   to { transform: translateX(0); opacity: 1; } 
 }
 
 /* ── Loading ── (removido en 📦490 — usa KairSkeleton.* desde shared/kair-skeleton.js) */
 
-.kair-loading-text {
-  color: var(--kair-text-sec);
+.frecuencia-container .kair-loading-text {
+  color: var(--freq-text-sec);
   font-size: 0.9rem;
 }
 
 /* ── Empty State ── */
-.kair-empty {
+.frecuencia-container .kair-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -611,287 +682,332 @@ body {
   text-align: center;
 }
 
-.kair-empty-icon {
+.frecuencia-container .kair-empty-icon {
   width: 64px;
   height: 64px;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   opacity: 0.5;
   margin-bottom: 1rem;
 }
 
-.kair-empty h3 {
+.frecuencia-container .kair-empty h3 {
   font-size: 1.1rem;
-  color: var(--kair-text);
+  color: var(--freq-text);
   margin-bottom: 0.5rem;
 }
 
-.kair-empty p {
+.frecuencia-container .kair-empty p {
   font-size: 0.85rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   max-width: 400px;
 }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .kair-kpis {
+  .frecuencia-container .kair-kpis {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .frecuencia-container .k-section-card > div:first-child {
-    flex-wrap: wrap;
-    padding: 1rem !important;
-  }
-  .frecuencia-container .k-section-card__company {
-    display: none;
-  }
+  .frecuencia-container .freq-header-v2 { padding-left: 16px; padding-right: 16px; }
+  .frecuencia-container .freq-company { display: none; }
   
-  .kair-sync-bar {
+  .frecuencia-container .kair-sync-bar {
     flex-direction: column;
     align-items: flex-start;
   }
   
-  .kair-table-wrap {
+  .frecuencia-container .kair-table-wrap {
     font-size: 0.75rem;
   }
   
-  .kair-collapsible-header {
+  .frecuencia-container .kair-collapsible-header {
     font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
-  .kair-kpis {
+  .frecuencia-container .kair-kpis {
     grid-template-columns: 1fr;
   }
 
-  .kair-container {
+  .frecuencia-container .kair-container {
     padding: 0.75rem;
   }
 }
 
 /* ── Pantallas Grandes (≥1920px - Full HD) ── */
 @media (min-width: 1920px) {
-  .kair-container {
+  .frecuencia-container .kair-container {
     max-width: 1800px;
     padding: 1.5rem 3rem;
   }
 
-  .kair-kpis {
+  .frecuencia-container .kair-kpis {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
-  .kair-chart-container {
+  .frecuencia-container .kair-chart-container {
     min-height: 400px;
   }
 
-  .kair-table {
+  .frecuencia-container .kair-table {
     font-size: 0.9rem;
   }
 
-  .kair-table thead th,
-  .kair-table td {
+  .frecuencia-container .kair-table thead th,
+  .frecuencia-container .kair-table td {
     padding: 0.75rem 0.6rem;
   }
 
-  .kair-kpi-value {
+  .frecuencia-container .kair-kpi-value {
     font-size: 2rem;
   }
 
-  .kair-kpi-label {
+  .frecuencia-container .kair-kpi-label {
     font-size: 0.85rem;
   }
 
-  .kair-card-title {
+  .frecuencia-container .kair-card-title {
     font-size: 1.15rem;
   }
 }
 
 /* ── Pantallas Muy Grandes (≥2560px - MacBook Pro 16", 2K, 4K) ── */
 @media (min-width: 2560px) {
-  .kair-container {
+  .frecuencia-container .kair-container {
     max-width: 2400px;
     padding: 2rem 4rem;
   }
 
-  .kair-kpis {
+  .frecuencia-container .kair-kpis {
     grid-template-columns: repeat(8, 1fr);
   }
 
-  .kair-chart-container {
+  .frecuencia-container .kair-chart-container {
     min-height: 500px;
   }
 
-  .kair-table {
+  .frecuencia-container .kair-table {
     font-size: 0.95rem;
   }
 
-  .kair-table thead th,
-  .kair-table td {
+  .frecuencia-container .kair-table thead th,
+  .frecuencia-container .kair-table td {
     padding: 0.85rem 0.75rem;
   }
 
-  .kair-kpi-value {
+  .frecuencia-container .kair-kpi-value {
     font-size: 2.25rem;
   }
 
-  .kair-kpi-label {
+  .frecuencia-container .kair-kpi-label {
     font-size: 0.9rem;
   }
 
-  .kair-card-title {
+  .frecuencia-container .kair-card-title {
     font-size: 1.25rem;
   }
 
-  .kair-methodology {
+  .frecuencia-container .kair-methodology {
     font-size: 1rem;
   }
 }
 
 /* ── Target Card ── */
-.kair-target-card {
-  background: var(--kair-card);
-  border-radius: var(--kair-radius);
-  border: 1px solid var(--kair-border);
+.frecuencia-container .kair-target-card {
+  background: var(--freq-card);
+  border-radius: var(--freq-radius-card);
+  border: 1px solid var(--freq-border);
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: var(--kair-shadow);
+  box-shadow: var(--freq-shadow);
   flex-wrap: wrap;
 }
 
-.kair-target-icon {
+.frecuencia-container .kair-target-icon {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: rgba(23, 78, 166, 0.1);
+  background: color-mix(in srgb, var(--freq-primary) 12%, transparent);
+  color: var(--freq-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.kair-target-label {
+.frecuencia-container .kair-target-label {
   font-size: 0.85rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   margin-bottom: 0.25rem;
 }
 
-.kair-target-value {
+.frecuencia-container .kair-target-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--kair-primary);
+  color: var(--freq-primary);
 }
 
-.kair-target-info {
+.frecuencia-container .kair-target-info {
   flex: 1;
 }
 
-.kair-target-badge {
+.frecuencia-container .kair-target-badge {
   padding: 0.35rem 0.85rem;
-  border-radius: var(--kair-radius);
+  border-radius: var(--freq-radius);
   font-size: 0.85rem;
   font-weight: 600;
 }
 
-.kair-target-badge.success {
+.frecuencia-container .kair-target-badge.success {
   background: rgba(40, 167, 69, 0.1);
-  color: var(--kair-success);
+  color: var(--freq-success);
   border: 1px solid rgba(40, 167, 69, 0.3);
 }
 
-.kair-target-badge.warning {
-  background: rgba(255, 193, 7, 0.1);
-  color: #856404;
+.frecuencia-container .kair-target-badge.warning {
+  background: color-mix(in srgb, var(--freq-warning) 16%, transparent);
+  color: #b07c1a;
   border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
-.kair-target-badge.danger {
+.frecuencia-container .kair-target-badge.danger {
   background: rgba(220, 53, 69, 0.1);
-  color: var(--kair-danger);
+  color: var(--freq-danger);
   border: 1px solid rgba(220, 53, 69, 0.3);
 }
 
 /* ── Section Title ── */
-.kair-section-title {
+.frecuencia-container .kair-section-title {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--kair-text);
+  color: var(--freq-text);
   margin-bottom: 1rem;
   margin-top: 0.5rem;
 }
 
 /* ── Month Cards Grid ── */
-.kair-month-cards-grid {
+.frecuencia-container .kair-month-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
 
-.kair-month-card {
-  background: var(--kair-card);
-  border-radius: var(--kair-radius);
-  border: 1px solid var(--kair-border);
-  box-shadow: var(--kair-shadow);
+.frecuencia-container .kair-month-card {
+  background: var(--freq-card);
+  border-radius: var(--freq-radius-card);
+  border: 1px solid var(--freq-border);
+  box-shadow: var(--freq-shadow);
   padding: 0.85rem;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.kair-month-card:hover {
+.frecuencia-container .kair-month-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--kair-shadow-lg);
+  box-shadow: var(--freq-shadow-lg);
 }
 
-.kair-month-card-name {
+.frecuencia-container .kair-month-card-name {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--kair-text);
+  color: var(--freq-text);
   margin-bottom: 0.5rem;
 }
 
-.kair-month-card-value {
+.frecuencia-container .kair-month-card-value {
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.25rem;
 }
 
-.kair-month-card-detail {
+.frecuencia-container .kair-month-card-detail {
   font-size: 0.7rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
   margin-bottom: 0.5rem;
 }
 
 /* ── Reference Card ── */
-.kair-ref-card {
+.frecuencia-container .kair-ref-card {
   font-size: 0.85rem;
-  color: var(--kair-text-sec);
+  color: var(--freq-text-sec);
 }
 
-.kair-ref-title {
+.frecuencia-container .kair-ref-title {
   font-weight: 700;
-  color: var(--kair-text);
+  color: var(--freq-text);
   margin-bottom: 0.75rem;
 }
 
-.kair-ref-grid {
+.frecuencia-container .kair-ref-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 0.75rem;
 }
 
-.kair-ref-calc {
+.frecuencia-container .kair-ref-calc {
   margin-top: 0.75rem;
   padding: 0.5rem 0.75rem;
-  background: #f1f3f5;
-  border-radius: var(--kair-radius);
+  background: color-mix(in srgb, var(--freq-text-sec) 10%, var(--freq-card));
+  border-radius: var(--freq-radius);
   font-size: 0.85rem;
 }
 
 /* ── Badge Auto AT ── */
-.freq-badge-auto {
+.frecuencia-container .freq-badge-auto {
   font-size: 11px;
   margin-right: 2px;
   cursor: help;
 }
+
+/* ============================================================
+   MODO OSCURO
+   Cubre LOS DOS atributos que aplica la app (scripts/theme-manager.js):
+   data-theme="dark" (tema Sistema con el SO oscuro) y
+   data-theme="dark-legacy" (Oscuro elegido a mano).
+   El selector ^="dark" matchea los dos con una sola regla.
+   Antes el módulo solo cubría el primero y, además, su :root global
+   pisaba los tokens de la app y podía romper el tema oscuro.
+   ============================================================ */
+
+[data-theme^="dark"] .frecuencia-container {
+  --freq-primary: #6ea8fe;
+  --freq-primary-hover: #8ab8ff;
+  --freq-primary-soft: #1b2a44;
+  --freq-success: #3ecf9a;
+  --freq-warning: #f0b45a;
+  --freq-danger: #e56a76;
+  --freq-bg: #0f172a;
+  --freq-card: #1a2334;
+  --freq-text: #e8edf5;
+  --freq-text-sec: #98a6bf;
+  --freq-border: #2f3d55;
+  --freq-shadow: 0 2px 7px rgba(0,0,0,0.35);
+  --freq-shadow-lg: 0 12px 32px rgba(0,0,0,0.55);
+}
+
+/* Las superficies que usan un color de acento como FONDO con texto blanco
+   necesitan la versión OSCURA del acento: en el tema oscuro los acentos son
+   claros (para leerse como texto) y el blanco encima no se leería. */
+[data-theme^="dark"] .frecuencia-container .freq-btn--primary,
+[data-theme^="dark"] .frecuencia-container .kair-btn-primary,
+[data-theme^="dark"] .frecuencia-container .kair-badge-cumple,
+[data-theme^="dark"] .frecuencia-container .kair-badge-excede {
+  background: #2f5fa8;
+  border-color: #2f5fa8;
+  color: #ffffff;
+}
+
+[data-theme^="dark"] .frecuencia-container .kair-toast {
+  background: #22304a;
+  color: #e8edf5;
+}
+[data-theme^="dark"] .frecuencia-container .kair-toast.error { background: #a8404c; color: #ffffff; }
+[data-theme^="dark"] .frecuencia-container .kair-toast.warning { background: #b8811f; color: #ffffff; }
+[data-theme^="dark"] .frecuencia-container .kair-badge-warning,
+[data-theme^="dark"] .frecuencia-container .kair-target-badge.warning { color: var(--freq-warning); }
+[data-theme^="dark"] .frecuencia-container .freq-select:focus { box-shadow: 0 0 0 3px rgba(110,168,254,0.25); }
+[data-theme^="dark"] .frecuencia-container .kair-empty-icon { color: #4a5c7d; }

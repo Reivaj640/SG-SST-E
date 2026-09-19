@@ -21,10 +21,28 @@ var availableFiles = [];
   function getElement(id) {
     return document.getElementById(id);
   }
-  
-  function escapeHtml(str) {
-    if (str === undefined || str === null) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  /* Lee un token CSS del módulo (--freq-*). El JS escribe colores en estilos
+     en línea y en atributos SVG, así que en vez de hex fijos lee la paleta
+     real: así el gráfico y las celdas siguen la paleta y el tema (claro/oscuro). */
+  function tok(name, fallback) {
+    var host = document.querySelector('.frecuencia-container') || document.documentElement;
+    var v = getComputedStyle(host).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  function palette() {
+    return {
+      bg: tok('--freq-bg', '#fbfcfb'),
+      card: tok('--freq-card', '#ffffff'),
+      text: tok('--freq-text', '#14213d'),
+      axis: tok('--freq-text-sec', '#748096'),
+      grid: tok('--freq-border', '#e8ebee'),
+      primary: tok('--freq-primary', '#2057b8'),
+      success: tok('--freq-success', '#1bb888'),
+      warn: tok('--freq-warning', '#e7a224'),
+      danger: tok('--freq-danger', '#da5563')
+    };
   }
   
   function showToast(msg, type) {
@@ -51,32 +69,6 @@ var availableFiles = [];
   function getCompanyName() {
     var params = new URLSearchParams(window.location.search);
     return params.get('company') || localStorage.getItem('selectedCompany') || '';
-  }
-  
-  function buildGridLines(P, cH, W, maxV) {
-    var lines = '';
-    for (var i = 0; i < 6; i++) {
-      var y = P.t + cH - (i / 5) * cH;
-      var val = (maxV / 5 * i).toFixed(2);
-      lines += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#dee2e6" stroke-width="0.5" stroke-dasharray="4,4"/>';
-      lines += '<text x="' + (P.l - 10) + '" y="' + (y + 4) + '" text-anchor="end" fill="#6c757d" font-size="11">' + val + '</text>';
-    }
-    return lines;
-  }
-  
-  function buildChartPoints(pts, P, cH) {
-    var g = '';
-    for (var i = 0; i < pts.length; i++) {
-      var p = pts[i];
-      g += '<g>';
-      g += '<circle cx="' + p.x + '" cy="' + p.y + '" r="5" fill="#fff" stroke="#174ea6" stroke-width="2"/>';
-      g += '<text x="' + p.x + '" y="' + (P.t + cH + 20) + '" text-anchor="middle" fill="#6c757d" font-size="10">' + escapeHtml(p.label) + '</text>';
-      if (p.at > 0) {
-        g += '<text x="' + p.x + '" y="' + (p.y - 12) + '" text-anchor="middle" fill="#2d3748" font-size="9" font-weight="600">' + p.val + '</text>';
-      }
-      g += '</g>';
-    }
-    return g;
   }
   
 function configurarRutas(year) {
@@ -308,6 +300,7 @@ if (chartContainer) {
   }
   
   function renderChart() {
+    var C = palette();
     var fM = indicadores.frecuenciaMensual;
     var meta = indicadores.config.metaFrecuencia;
 
@@ -330,23 +323,23 @@ if (chartContainer) {
     var barWidth = cW / 12 * 0.6;
     var gap = cW / 12;
 
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;font-family:var(--kair-font)">';
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;font-family:var(--freq-font)">';
 
     // Fondo
-    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="#fafbfc" rx="4"/>';
+    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="' + C.bg + '" rx="4"/>';
 
     // Línea de meta
     if (meta > 0) {
       var targetY = P.t + cH - (meta / maxV) * cH;
-      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="#dc3545" stroke-width="1.5" stroke-dasharray="6,4"/>';
-      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="#dc3545" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
+      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="' + C.danger + '" stroke-width="1.5" stroke-dasharray="6,4"/>';
+      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="' + C.danger + '" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
     }
 
     // Grid Y axis
     for (var i = 0; i <= 5; i++) {
       var y = P.t + (i / 5) * cH;
-      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#e9ecef" stroke-width="1"/>';
-      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="#adb5bd" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
+      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="' + C.grid + '" stroke-width="1"/>';
+      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="' + C.axis + '" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
     }
 
     // Barras
@@ -354,19 +347,19 @@ if (chartContainer) {
       var x = P.l + i * gap + gap * 0.2;
       var barHeight = (month.indiceFrecuencia / maxV) * cH;
       var y = P.t + cH - barHeight;
-      var status = month.accidentes === 0 ? '#28a745' : month.indiceFrecuencia <= meta ? '#28a745' : month.indiceFrecuencia <= meta * 5 ? '#ffc107' : '#dc3545';
+      var status = month.accidentes === 0 ? C.success : month.indiceFrecuencia <= meta ? C.success : month.indiceFrecuencia <= meta * 5 ? C.warn : C.danger;
 
       svg += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" fill="' + status + '" rx="3" opacity="0.85"/>';
 
       if (month.indiceFrecuencia > 0) {
-        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="#212529" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceFrecuencia.toFixed(1) + '</text>';
+        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="' + C.text + '" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceFrecuencia.toFixed(1) + '</text>';
       }
 
-      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="#6c757d" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
+      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="' + C.axis + '" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
     });
 
     // Label Y
-    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="#6c757d" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Frecuencia</text>';
+    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="' + C.axis + '" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Frecuencia</text>';
 
     svg += '</svg>';
 
@@ -374,6 +367,7 @@ if (chartContainer) {
   }
   
   function renderTabla() {
+    var C = palette();
     var fM = indicadores.frecuenciaMensual;
     var meta = indicadores.config.metaFrecuencia;
     
@@ -390,8 +384,8 @@ if (chartContainer) {
       var badge = row.isAuto ? '<span class="freq-badge-auto" title="Auto desde Caracterizacion">🤖</span>' : '';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="accidentes" tabindex="0">' + badge + row.accidentes + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
-      html += '<td style="font-weight:700;color:' + (exc ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceFrecuencia, 4) + '</td>';
-      html += '<td style="color:#6c757d">' + meta + '</td>';
+      html += '<td style="font-weight:700;color:' + (exc ? C.danger : C.success) + '">' + fmt(row.indiceFrecuencia, 4) + '</td>';
+      html += '<td style="color:' + C.axis + '">' + meta + '</td>';
       html += '<td><span class="kair-badge-status ' + (exc ? 'kair-badge-excede' : 'kair-badge-cumple') + '">' + (exc ? 'EXCEDE' : 'CUMPLE') + '</span></td>';
       html += '</tr>';
     });
@@ -413,7 +407,7 @@ if (chartContainer) {
     
     var tablaFoot = getElement('tablaFoot');
     if (tablaFoot) {
-      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalAT + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIF, 4) + '</td><td>' + meta + '</td><td>-</td></tr>';
+      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalAT + '</td><td>' + promTrab + '</td><td style="color:' + C.primary + '">' + fmt(promIF, 4) + '</td><td>' + meta + '</td><td>-</td></tr>';
     }
   }
   
@@ -466,6 +460,7 @@ if (chartContainer) {
   }
   
   function renderColapsables() {
+    var C = palette();
     var seccionesContainer = getElement('seccionesColapsables');
     if (!seccionesContainer) return;
     
@@ -481,7 +476,7 @@ if (chartContainer) {
       { title: 'Distribucion Mensual Historica', data: caracterizacion.mesHistorico, key: 'mes', val: 'total' }
     ].filter(function(s) { return s.data && s.data.length > 0; });
     
-    var colors = ['#174ea6', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#6610f2'];
+    var colors = [C.primary, C.success, C.warn, C.danger, '#6d5bb8', '#2fbfa0', '#e08a2e', '#5b6bd6'];
     
     var html = '';
     
@@ -559,6 +554,7 @@ if (chartContainer) {
   }
 
   function renderMonthCards() {
+    var C = palette();
     var container = getElement('monthCards');
     if (!container) return;
 
@@ -570,7 +566,7 @@ if (chartContainer) {
 
     fM.forEach(function(month) {
       var status = month.accidentes === 0 ? 'success' : month.indiceFrecuencia <= meta ? 'success' : month.indiceFrecuencia <= meta * 5 ? 'warning' : 'danger';
-      var statusColor = status === 'success' ? '#28a745' : status === 'warning' ? '#856404' : '#dc3545';
+      var statusColor = status === 'success' ? C.success : status === 'warning' ? C.warn : C.danger;
       var statusLabel = status === 'success' ? 'Sin AT' : status === 'warning' ? 'Precaución' : 'Crítico';
 
       html += '<div class="kair-month-card" style="border-top: 3px solid ' + statusColor + '">';

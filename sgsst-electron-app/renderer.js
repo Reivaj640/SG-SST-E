@@ -6146,31 +6146,35 @@ function showFrecuenciaAccidentalidadContent(container, currentCompany, moduleNa
   container.innerHTML = '<p style="color: blue;">Cargando frecuencia de la accidentalidad... (v3)</p>';
 
   const BASE = 'modules/gestion-salud/frecuencia-accidentalidad/';
+  const TOKEN = 'FREQ-20260919-v6-anchos-b';
 
   // Cargar CSS si no está cargado
-  if (!document.querySelector(`link[href="${BASE}frecuencia-accidentalidad.css"]`)) {
+  if (!document.querySelector(`link[href="${BASE}frecuencia-accidentalidad.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'frecuencia-accidentalidad.css';
+    cssLink.href = BASE + 'frecuencia-accidentalidad.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
   // Cargar HTML y luego el script
-  fetch(BASE + 'frecuencia-accidentalidad.html')
+  fetch(BASE + 'frecuencia-accidentalidad.html?v=' + TOKEN)
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     })
     .then(html => {
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      // El HTML se inyecta con innerHTML en el documento PRINCIPAL: un <link> a un CDN
+      // cargaria en GLOBAL. Se descartan antes de inyectar.
+      const limpio = html.replace(/<link[^>]*https?:[^>]*>/gi, '');
+      const doc = new DOMParser().parseFromString(limpio, 'text/html');
       container.innerHTML = doc.body.innerHTML;
 
       // Guardar empresa seleccionada para que el módulo la use
       localStorage.setItem('selectedCompany', currentCompany);
 
       // Cargar el script del módulo con tag script (con cache-busting)
-      var ts = Date.now();
-      var scriptUrl = BASE + 'frecuencia-accidentalidad.js?_t=' + ts;
+      // Cache-bust por token (antes ?_t=Date.now() rompia toda cache)
+      var scriptUrl = BASE + 'frecuencia-accidentalidad.js?v=' + TOKEN;
       console.log('[FrecuenciaAccidentalidad] Cargando script tag:', scriptUrl);
       
       var s = document.createElement('script');
