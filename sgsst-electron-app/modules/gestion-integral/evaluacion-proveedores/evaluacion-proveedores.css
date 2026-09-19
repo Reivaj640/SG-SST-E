@@ -53,15 +53,26 @@
 .evaluacion-proveedores .ep-page{max-width:none;margin:0;padding:20px 28px 64px}
 .evaluacion-proveedores .ep-detail{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable}
 
-/* ================= HEADER ================= */
-.evaluacion-proveedores .ep-header{background:var(--ep-surface);border-bottom:1px solid var(--ep-border);padding:16px 28px 0;flex-shrink:0}
-.evaluacion-proveedores .ep-header__bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:14px;flex-wrap:wrap}
-.evaluacion-proveedores .ep-header__id{display:flex;align-items:center;gap:13px;min-width:0}
-.evaluacion-proveedores .ep-header__icon{width:42px;height:42px;border-radius:12px;background:var(--ep-blue-soft);color:var(--ep-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.evaluacion-proveedores .ep-header__icon svg{width:21px;height:21px}
-.evaluacion-proveedores .ep-header__title{font-family:var(--ep-font-title);font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
-.evaluacion-proveedores .ep-header__sub{font-size:12.5px;color:var(--ep-text2);margin-top:1px}
-.evaluacion-proveedores .ep-header__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* ================= HEADER =================
+   Unificado (📦769-fix hallazgo): un solo juego de reglas, SIN !important. El
+   parche !important de 📦764 se eliminó: la causa que lo motivó (reglas base sin
+   aplicar en la app) ya no reproduce — verificado en laboratorio con la cadena real
+   de contenedores: sin el parche el header mide ~113px y el icono 42px, nada de
+   los 1678px históricos. Valores = los aprobados en 3.1.4 / 2.3.1 (44×44). El
+   header va LIMPIO (sin fondo ni borde inferior), como la barra de Evaluación
+   Inicial: la separación la hacen las tabs de abajo, no una caja. */
+.evaluacion-proveedores .ep-header{padding:18px 24px 0;flex-shrink:0}
+.evaluacion-proveedores .ep-header__bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:14px;flex-wrap:wrap}
+.evaluacion-proveedores .ep-header__id{display:flex;align-items:center;gap:14px;min-width:0;flex:1}
+.evaluacion-proveedores .ep-header__icon{width:44px;height:44px;min-width:44px;border-radius:12px;background:var(--ep-blue-soft);color:var(--ep-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.evaluacion-proveedores .ep-header__icon svg{width:22px;height:22px}
+.evaluacion-proveedores .ep-header__title{font-family:var(--ep-font-title);font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin:0}
+.evaluacion-proveedores .ep-header__sub{font-size:12.5px;color:var(--ep-text2);margin:2px 0 0}
+.evaluacion-proveedores .ep-header__actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex-shrink:0}
+@media (max-width:760px){
+  .evaluacion-proveedores .ep-header{padding:14px 14px 0}
+  .evaluacion-proveedores .ep-header__actions{width:100%;justify-content:flex-start}
+}
 
 /* Chips */
 .evaluacion-proveedores .ep-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:var(--ep-slate-soft);color:var(--ep-slate);font-size:12px;font-weight:600;white-space:nowrap}
@@ -340,113 +351,18 @@
   .evaluacion-proveedores .ep-content-scroll,.evaluacion-proveedores .ep-detail{overflow:visible}
 }
 
-/* ==========================================================================
-   📦764 — BARRA SUPERIOR DEL SUBMÓDULO 2.9.1 (header)
-   ==========================================================================
-   POR QUÉ ESTE BLOQUE EXISTE, SI ARRIBA YA HAY REGLAS `.ep-header*`:
-   esas reglas están en la hoja y **matchean** el elemento, pero en la aplicación
-   NO se aplicaban: medido en la app real, el header terminaba con **1678 px de
-   alto** (el icono se estiraba, el título caía a 24px/700 y los botones se iban al
-   fondo, 1517 px más abajo). No es que falte la hoja —está linkeada y carga 232
-   reglas— ni que el contenedor `.evaluacion-proveedores` falte: existe en el
-   `<body>`. Al inyectar estas mismas reglas el header bajó a 194 px y el icono
-   recuperó su caja, o sea que el problema es que las de arriba no llegan a
-   aplicarse (quedaron a medias en el rediseño que se estaba haciendo).
-   Este bloque va AL FINAL de la hoja a propósito: gana por orden de cascada, sin
-   depender de que las reglas de arriba se arreglen.
-
-   🚨 POR QUÉ LLEVA `!important`: en la app, NINGUNA regla `.ep-header*` de NINGUNA
-   hoja llega a aplicarse (se verificó recorriendo el CSSOM completo: 0 reglas con
-   `ep-header` matchean el nodo, y no hay estilos en línea). Con `!important` el
-   header pasa de 1678 px a 194 px y el icono recupera su caja; sin `!important`
-   vuelve a romperse. Medido en los dos sentidos, ida y vuelta. Es una excepción
-   deliberada a la regla de "no usar !important": acá hay algo que le gana y no se
-   pudo identificar desde el renderer. Si en algún momento se encuentra la causa,
-   lo correcto es sacar los `!important` de este bloque.
-
-   Los valores son los MISMOS que el header aprobado de 3.1.4 / 2.3.1
-   (icono 44×44 en caja azul redondeada, título Manrope 20/800, subtítulo 12,5,
-   botones a la derecha), para que los tres módulos se vean iguales.
-   ========================================================================== */
-.evaluacion-proveedores .ep-header {
-  background: var(--ep-surface, #ffffff) !important;
-  border-bottom: 1px solid var(--ep-border, #E8EBEE) !important;
-  padding: 18px 24px 0 !important;
-  flex: none !important;
-  height: auto !important;
-}
-.evaluacion-proveedores .ep-header__bar {
-  display: flex !important;
-  align-items: center !important;
-  gap: 14px !important;
-  padding-bottom: 14px !important;
-  flex-wrap: wrap !important;
-  justify-content: space-between !important;
-}
-.evaluacion-proveedores .ep-header__id {
-  display: flex !important;
-  align-items: center !important;
-  gap: 14px !important;
-  min-width: 0 !important;
-  flex: 1 !important;
-}
-.evaluacion-proveedores .ep-header__icon {
-  width: 44px !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  border-radius: 12px !important;
-  background: var(--ep-blue-soft, #EDF3FC) !important;
-  color: var(--ep-blue, #2057B8) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex: none !important;
-}
-.evaluacion-proveedores .ep-header__icon svg {
-  width: 22px !important;
-  height: 22px !important;
-  display: block !important;
-}
-.evaluacion-proveedores .ep-header__title {
-  font-family: var(--ep-font-title, 'Manrope', system-ui, sans-serif) !important;
-  font-size: 20px !important;
-  font-weight: 800 !important;
-  letter-spacing: -.02em !important;
-  line-height: 1.2 !important;
-  margin: 0 !important;
-}
-.evaluacion-proveedores .ep-header__sub {
-  font-size: 12.5px !important;
-  color: var(--ep-text2, #748096) !important;
-  margin: 2px 0 0 !important;
-}
-.evaluacion-proveedores .ep-header__actions {
-  display: flex !important;
-  align-items: center !important;
-  gap: 9px !important;
-  flex-wrap: wrap !important;
-  flex: none !important;
-}
-/* En pantallas angostas el título y los botones se apilan, pero el header NO crece
-   más allá de su contenido (la regla de arriba pone `height: auto`). */
-@media (max-width: 760px) {
-  .evaluacion-proveedores .ep-header { padding: 14px 14px 0 !important; }
-  .evaluacion-proveedores .ep-header__actions { width: 100% !important; }
-}
-
-/* Modo oscuro: la app usa data-theme="dark" (sistema) y data-theme="dark-legacy"
-   (oscuro manual). Se cubren los dos. También con `!important`, por el mismo motivo. */
-[data-theme="dark"] .evaluacion-proveedores .ep-header,
-[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header {
-  background: #1B2230 !important;
-  border-bottom-color: #2C3648 !important;
-}
+/* Modo oscuro: la app usa data-theme="dark" (tema "Sistema" con SO oscuro) y
+   data-theme="dark-legacy" (oscuro manual). Se cubren los dos. SIN !important:
+   el parche de 764 fue eliminado tras verificar en laboratorio (cadena real de
+   contenedores) que las reglas base aplican solas; estas reglas ganan por
+   especificidad (atributo + 2 clases > 2 clases). El header no lleva fondo ni
+   borde, asi que aqui solo se ajustan icono y textos. */
 [data-theme="dark"] .evaluacion-proveedores .ep-header__icon,
 [data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__icon {
-  background: rgba(91, 147, 232, .16) !important;
-  color: #5B93E8 !important;
+  background: rgba(91, 147, 232, .16);
+  color: #5B93E8;
 }
 [data-theme="dark"] .evaluacion-proveedores .ep-header__title,
-[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__title { color: #E8EDF5 !important; }
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__title { color: #E8EDF5; }
 [data-theme="dark"] .evaluacion-proveedores .ep-header__sub,
-[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__sub { color: #98A4B8 !important; }
+[data-theme="dark-legacy"] .evaluacion-proveedores .ep-header__sub { color: #98A4B8; }

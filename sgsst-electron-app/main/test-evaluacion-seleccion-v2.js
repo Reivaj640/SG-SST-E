@@ -84,6 +84,25 @@ check('Módulo: conserva la firma que espera renderer.js (container, module, tit
   /function EvaluacionSeleccionComponent\(container, moduleName, submoduleTitle, backToModuleCallback, currentCompany\)/.test(js));
 check('Módulo: expone render()',
   /EvaluacionSeleccionComponent\.prototype\.render/.test(js));
+check('Módulo: destroy() retira del <body> las capas mudadas (bug del modal flotante)',
+  /prototype\.destroy = function \(\)/.test(js) &&
+  /_nodosEnBody\.forEach\(function \(n\) \{ if \(n\.parentNode\) n\.parentNode\.removeChild\(n\); \}\)/.test(js));
+check('Módulo: vigía de navegación — si el contenedor sale del documento, se limpian las capas',
+  /new MutationObserver/.test(js) && /if \(!host\.isConnected\) _limpiarCapas\(\)/.test(js));
+check('Módulo: un render repetido no duplica capas en el body',
+  /_limpiarCapas\(\);\s*\n\s*host\.innerHTML = ''/.test(js));
+check('Volver: el botón llama al callback de renderer.js (backCb), no un toast de pendiente',
+  /\$\('#evs-btn-volver'\)\.addEventListener\('click'[\s\S]*?typeof backCb === 'function'[\s\S]*?backCb\(\); return;/.test(js) &&
+  js.indexOf('integración pendiente') === -1);
+check('Tabs: estilo subrayado — la línea es del contenedor (1px) y la activa 2px azul',
+  /\.evs-pv-tabs\{[^}]*border-bottom:1px solid var\(--kair-border\)[^}]*\}/.test(css) &&
+  /\.evs-pv-tab\{[^}]*border-bottom:2px solid transparent[^}]*margin-bottom:-1px/.test(css) &&
+  /\.evs-pv-tab\.evs-is-active\{[^}]*color:var\(--kair-blue\)[^}]*border-bottom-color:var\(--kair-blue\)/.test(css));
+check('Tabs: la píldora navy NO vuelve (sin fondo en la activa ni box-shadow)',
+  !/\.evs-pv-tab\.evs-is-active\{[^}]*background:var\(--kair-navy\)/.test(css) &&
+  !/\.evs-pv-tab\.evs-is-active\{[^}]*box-shadow/.test(css));
+check('Tabs: sin overflow-x (flex-wrap:wrap, lección del chip cortado)',
+  /\.evs-pv-tabs\{[^}]*flex-wrap:wrap/.test(css) && !/\.evs-pv-tabs\{[^}]*overflow-x/.test(css));
 check('Módulo: inyecta su propio marcado en el contenedor',
   /marcadoRaiz\.innerHTML = MARKUP_RAW/.test(js) && /host\.appendChild\(marcadoRaiz\)/.test(js));
 check('Módulo: raíz con alcance .evs-scope (el CSS es exclusivo del módulo)',

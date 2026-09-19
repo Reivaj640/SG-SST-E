@@ -38,6 +38,20 @@
   /* Marcador global del nodo raíz inyectado (lo usan $, $$ y el ESC) */
   var marcadoRaiz = null;
   var backCb = null;
+  /* Capas mudadas al <body> (overlays y avisos) y vigía de navegación:
+     renderer.js destruye el componente SOLO cuando el siguiente se monta
+     por createComponentSafely; los submódulos montados directo (p.ej.
+     2.11.1 Gestión del Cambio) NO llaman destroy, y las capas quedaban
+     flotando sobre la pantalla siguiente (bug del modal "Nuevo Asociado"
+     encima de otro submódulo). El vigía limpia solo cuando el contenedor
+     sale del documento, por el camino que sea. */
+  var _nodosEnBody = [];
+  var _obsHost = null;
+  function _limpiarCapas() {
+    if (_obsHost) { try { _obsHost.disconnect(); } catch (e) {} _obsHost = null; }
+    _nodosEnBody.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+    _nodosEnBody = [];
+  }
 
   /* ══════════════ Lógica pura + catálogos (del prototipo) ══════════════ */
 /*__PURE_START__*/
@@ -241,6 +255,10 @@ function kpis(asociados, evaluaciones, ncs, ahora){
     var host = this.container;
     if (!host) { klog('MODULO', 'INIT', 'ERR', 'sin contenedor'); return; }
 
+    /* Render repetido (o reentrada): quitar primero lo que la corrida
+       anterior hubiera dejado en el <body>. */
+    _limpiarCapas();
+
     host.innerHTML = '';
     marcadoRaiz = document.createElement('div');
     marcadoRaiz.className = 'evs-scope';
@@ -249,14 +267,35 @@ function kpis(asociados, evaluaciones, ncs, ahora){
     host.appendChild(marcadoRaiz);
 
     /* Overlays y avisos: position:fixed → se mudan al body (dentro de un
-       contenedor con transform se comportan como absolute). */
-    Array.prototype.forEach.call(
-      marcadoRaiz.querySelectorAll('.evs-overlay, .evs-toasts'),
-      function (n) { n.classList.add('evs-scope'); document.body.appendChild(n); }
+       contenedor con transform se comportan como absolute). Se registran
+       para poder retirarlos en destroy()/al navegar fuera. */
+    _nodosEnBody = Array.prototype.slice.call(
+      marcadoRaiz.querySelectorAll('.evs-overlay, .evs-toasts')
     );
+    _nodosEnBody.forEach(function (n) { n.classList.add('evs-scope'); document.body.appendChild(n); });
+
+    /* Vigía: si el contenedor sale del documento (navegación a otro
+       submódulo por CUALQUIER camino), se retiran las capas del body.
+       Cubre los montajes directos de renderer.js que no llaman destroy. */
+    if (typeof MutationObserver !== 'undefined') {
+      _obsHost = new MutationObserver(function () {
+        if (!host.isConnected) _limpiarCapas();
+      });
+      _obsHost.observe(document.documentElement, { childList: true, subtree: true });
+    }
 
     iniciarInterfaz();
     klog('MODULO', 'INIT', 'OK', '2.10.1 premium v2');
+  };
+
+  /* Limpieza al desmontar: renderer.js la invoca vía createComponentSafely
+     cuando el SIGUIENTE submódulo también se monta por ahí; para el resto
+     de caminos actúa el vigía de render(). */
+  EvaluacionSeleccionComponent.prototype.destroy = function () {
+    _limpiarCapas();
+    if (this.container) this.container.innerHTML = '';
+    marcadoRaiz = null;
+    klog('MODULO', 'DESTROY', 'OK', 'capas retiradas');
   };
 
   /* ══════════════ Interfaz (capa DOM del prototipo, adaptada) ══════════════ */
@@ -1080,9 +1119,10 @@ $('#evs-btn-exportar').addEventListener('click', exportarCSV);
 
 /* Volver + overlays + teclado */
 $('#evs-btn-volver').addEventListener('click', function(){
-  /* PUNTO DE INTEGRACIÓN: window.electronAPI.volver() → navegación al módulo contenedor */
-  PV_LOG('NAV', 'VOLVER', 'OK');
-  toast('Volver al menú principal (integración pendiente).', 'info');
+  /* PUNTO DE INTEGRACIÓN: vuelve al home del módulo con el callback que pasa renderer.js */
+  if (typeof backCb === 'function') { PV_LOG('NAV', 'VOLVER', 'OK'); backCb(); return; }
+  PV_LOG('NAV', 'VOLVER', 'ERR', 'sin callback de retorno');
+  toast('No se pudo volver al menú principal.', 'err');
 });
 $$('[data-close]').forEach(function(b){
   b.addEventListener('click', function(){ closeOverlay(b.getAttribute('data-close')); });
