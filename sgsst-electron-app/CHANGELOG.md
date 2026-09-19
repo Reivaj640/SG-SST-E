@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.207] - 2026-09-19
 
-### 🆕📦739-777 · Migración premium v2 de los submódulos (Inducciones → Remisiones)
+### 🆕📦739-782 · Migración premium v2 de los submódulos (Inducciones → Investigación de Accidentes)
 
 Segunda gran ola del rediseño premium (después de los homes de módulo, `📦730-738`): se migraron al dialecto **premium v2** todos los submódulos con UI propia, y se consolidó el sistema de diseño compartido.
 
@@ -37,10 +37,14 @@ Segunda gran ola del rediseño premium (después de los homes de módulo, `📦7
 | 772-773 | Perfil de Cargo (3.1.3) + FURAT (3.2.1) | Tokens premium en `:root` + Header System v2 |
 | 774 | Gestión del Cambio (2.11.1) | De 6 archivos a 1 par CSS+JS con el marcado embebido |
 | 775-777 | Restricciones/Remisiones (3.1.6) | Portal scoped (fix de fuga de tokens) + flujo completo de 3 pasos + vista previa + cancelar + alineación de paleta |
+| 778 | Control de Remisiones (3.1.6) | Descarta filas vacías y encabezados repetidos del Excel + `rowNumbers` para el guardado por celda |
+| 779 | Estadísticas de Remisiones (3.1.6) | Nueva sección: KPIs + 6 gráficos derivados del Control |
+| 780-782 | Investigación de Accidentes (3.2.2) | Las 3 vistas al premium v2 + fix de la fuga global de estilos + ancho completo + lista en 2 columnas en maximizada |
 
 #### Limpieza
 
 - Se eliminaron **decenas de archivos muertos** y código huérfano (p. ej. `restricciones-medicas-logic.js` pasó de ~60 KB a ~19 KB; Gestión del Cambio de 6 archivos a 1 par CSS+JS).
+- Se quitó el `<link>` **global** de `investigacion-accidentes-view.css` en `index.html` (el submódulo ya lo carga dentro de su iframe): traía `html, body { height:100vh; overflow:hidden }` y un `.k-section-card` **sin scope** que pisaban a toda la app.
 - Regla documentada en `AGENTS.md`: al migrar una pantalla, borrar los archivos que reemplaza y sus loaders.
 
 #### Docs

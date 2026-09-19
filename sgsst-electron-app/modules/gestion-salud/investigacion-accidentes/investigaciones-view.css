@@ -1926,6 +1926,35 @@ width: 100%;
 }
 
 /* ============================================================================
+LISTA EN DOS COLUMNAS — SOLO en maximizada (>= 1360px)
+En maximizada las tarjetas de la vista de LISTA quedaban a todo el ancho (~1900px)
+con muchísimo espacio vacío. Acá la lista pasa a 2 columnas.
+NO aplica a la vista de CUADRÍCULA (.inv-cards-grid), que conserva su auto-fill.
+Si el umbral no coincide con tu pantalla, cambiá el 1360px de la media query.
+============================================================================ */
+
+@media (min-width: 1360px) {
+.inv-cards-list:not(.inv-cards-grid) {
+display: grid;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 0.75rem 1rem;
+align-items: start;
+}
+
+.inv-cards-list:not(.inv-cards-grid) .inv-card {
+margin-bottom: 0;
+}
+}
+
+/* El estado vacío y el esqueleto ocupan TODAS las columnas (no media tarjeta).
+Vale para la lista de 2 columnas y para la cuadrícula; en la lista normal
+(display:block) la propiedad se ignora. */
+.inv-cards-list > .inv-empty,
+.inv-cards-list > .ks-list {
+grid-column: 1 / -1;
+}
+
+/* ============================================================================
 RESPONSIVE — 768px and 480px breakpoints
 ============================================================================ */
 

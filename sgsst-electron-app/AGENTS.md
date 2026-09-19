@@ -3440,6 +3440,30 @@ margin:0 auto }`): a 1900px de ventana se perdían **~350px por lado**. Ahora:
   diseño que **desperdicia el ancho** en maximizada. Medir `getBoundingClientRect()` contra
   `window.innerWidth` antes de dejarlo.
 
+### 📦782 — Lista en DOS columnas en maximizada
+
+En "Ver Investigaciones" el modo **lista** (el que se ve por defecto; el botón muestra el icono
+`fa-th-large` = "cambiar a cuadrícula") ponía las tarjetas a **todo el ancho** (~1884px con la ventana a
+1900px), con muchísimo espacio vacío a la derecha. Ahora, **solo en maximizada**, la lista pasa a
+**2 columnas**:
+
+- `.inv-cards-list:not(.inv-cards-grid)` dentro de `@media (min-width: 1360px)` →
+  `display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; align-items: start`
+  y las tarjetas pierden su `margin-bottom: 0.75rem`.
+- **"Solo este modo"**: la vista de **cuadrícula** (`.inv-cards-grid`, `auto-fill minmax(340px,1fr)`)
+  **NO se tocó** — verificado: a 1900px sigue dando sus 5 columnas de 350px.
+- **Estado vacío y esqueleto**: al volverse grilla, `.inv-empty` y `.ks-list` (`KairSkeleton.list()`
+  devuelve **UN** wrapper con N items) habrían quedado **a media columna**. Ahora llevan
+  `grid-column: 1 / -1` (vale también para la cuadrícula, donde era un bug preexistente).
+- **Medido** con un arnés de Electron (copia temporal del HTML sin los `<link>` de CDN): 1900px →
+  `display:grid`, `cols: 900.09px 900.09px`, tarjetas lado a lado, `margin-bottom:0`; 1200px →
+  `display:block`, 1 columna, `margin-bottom:12px`; vacío a 1900px → 1816px = ancho de la lista.
+- **Regla**: para "N columnas solo cuando hay espacio" usar una **media query**, no `auto-fit` (en
+  pantallas ultra anchas daría 3+ columnas). Y al convertir un contenedor a grilla, revisar **todos**
+  sus hijos que no sean tarjetas (estados vacíos, esqueletos, avisos) y darles `grid-column: 1 / -1`.
+- **Umbral**: `1360px` (cada columna ≈ 640px). Si en otra pantalla "maximizado" no alcanza, se ajusta
+  ese número en la media query.
+
 ### Verificación
 
 - Arnés de Electron (una vista por proceso): portal OK; "Realizar" con `headerV2:true`, `#2057b8`, DM Sans;

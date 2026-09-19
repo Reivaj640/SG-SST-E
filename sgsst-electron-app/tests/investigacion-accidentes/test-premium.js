@@ -123,10 +123,19 @@ check('Ver CSS: el cuerpo usa TODO el ancho en maximizada (sin max-width centrad
   !/\.inv-body \{[^}]*max-width: 1200px;/.test(listCss.replace(/\n/g, ' ')));
 check('Ver CSS: el buscador tiene un tope razonable (no se estira a todo el ancho)',
   /\.inv-search-wrapper \{[^}]*max-width: clamp\(/.test(listCss.replace(/\n/g, ' ')));
+check('Ver CSS: la LISTA pasa a 2 columnas solo en maximizada (>=1360px)',
+  /@media \(min-width: 1360px\)/.test(listCss) &&
+  /\.inv-cards-list:not\(\.inv-cards-grid\) \{[^}]*display: grid;/.test(listCss.replace(/\n/g, ' ')) &&
+  /\.inv-cards-list:not\(\.inv-cards-grid\) \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/.test(listCss.replace(/\n/g, ' ')) &&
+  /\.inv-cards-list:not\(\.inv-cards-grid\) \.inv-card \{[^}]*margin-bottom: 0;/.test(listCss.replace(/\n/g, ' ')));
+check('Ver CSS: la 2-columnas NO toca la vista de CUADRÍCULA (auto-fill intacto)',
+  /\.inv-cards-list\.inv-cards-grid \{[^}]*grid-template-columns: repeat\(auto-fill, minmax\(340px, 1fr\)\);/.test(listCss.replace(/\n/g, ' ')));
+check('Ver CSS: estado vacío y esqueleto ocupan todas las columnas (no media tarjeta)',
+  /\.inv-cards-list > \.inv-empty,[^}]*\.inv-cards-list > \.ks-list \{[^}]*grid-column: 1 \/ -1;/.test(listCss.replace(/\n/g, ' ')));
 
 /* ══════════════ E. CACHE-BUST DE LOS IFRAMES ══════════════ */
 check('logic.js: las 4 URLs de iframe llevan cache-bust ?v=INV-',
-  (logic.match(/\.html\?[^`]*&v=INV-20260919-premium/g) || []).length === 4);
+  (logic.match(/\.html\?[^`]*&v=INV-/g) || []).length === 4);
 check('logic.js: compila (node --check)',
   (function () {
     try { require('child_process').execSync('node --check "' + F_LOGIC + '"', { stdio: 'pipe' }); return true; }
