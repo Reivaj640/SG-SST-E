@@ -4,16 +4,20 @@
  * "Enviar Remisión" y "Control de Remisiones" pasaron de páginas
  * con iframe (enviar-remision.html + bridge de postMessage) y una
  * tabla legacy, a dos componentes embebidos con marcado propio.
+ * Además (📦776) "Enviar Remisión" cubre el FLUJO COMPLETO en una sola
+ * interfaz (cargar PDF → generar el informe oficial → enviar a la EPS):
+ * la página vieja generar-informe-remision.html y el modal de envío
+ * quedaron fuera.
  * Este test comprueba:
  *
  *   A. REGISTRO en index.html (4 archivos con cache-bust, tras el logic).
  *   B. RECABLEADO de restricciones-medicas-logic.js: los dos puntos de
- *      montaje usan los componentes v2 y el iframe viejo quedó fuera;
- *      la redirección al informe oficial se conserva.
+ *      montaje usan los componentes v2 y el flujo viejo quedó fuera.
  *   C. CONSTRUCCIÓN de los componentes: compilan, exportan el global,
  *      conservan los canales de datos reales y las lecciones
  *      (avisos envueltos al body, destroy + vigía).
  *   D. EL CSS: todo bajo su alcance, modo oscuro, sin genéricos.
+ *   E. El PORTAL y el VISOR (📦775).
  *
  * Correr con: node main/test-remisiones-v2.js
  * ============================================================ */
@@ -39,11 +43,17 @@ const logic = fs.readFileSync(F_LOGIC, 'utf8');
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const portal = fs.readFileSync(path.join(DIR, 'restricciones-medicas-home.html'), 'utf8');
 const viewCss = fs.readFileSync(path.join(DIR, 'remisiones-view.css'), 'utf8');
-const infCss = fs.readFileSync(path.join(DIR, 'generar-informe-remision.css'), 'utf8');
-const infHtml = fs.readFileSync(path.join(DIR, 'generar-informe-remision.html'), 'utf8');
 
 const checks = [];
 function check(name, ok, extra) { checks.push({ name: name, ok: !!ok, extra: extra }); }
+
+/* Versiones sin comentarios: los comentarios históricos pueden mencionar
+   archivos viejos sin que eso sea código muerto. */
+function sinComentarios(t) {
+  return t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/[^\n]*$/gm, '');
+}
+const logicSin = sinComentarios(logic);
+const envJsSin = sinComentarios(envJs);
 
 function scopedCssOk(css, scope) {
   const limpio = css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -96,23 +106,22 @@ check('logic.js: compila (node --check)',
     try { execSync('node --check "' + F_LOGIC + '"', { stdio: 'pipe' }); return true; }
     catch (e) { return false; }
   })());
-check('logic.js: showEnviarRemisionPage monta EnviarRemisionV2Component (sin iframe)',
+check('logic.js: showEnviarRemisionPage monta EnviarRemisionV2Component (sin iframe ni informe)',
   /showEnviarRemisionPage\(\)[\s\S]*?new window\.EnviarRemisionV2Component\(this\.container, \{/.test(logic) &&
-  !/showEnviarRemisionPage\(\)[\s\S]*?enviar-remision\.html/.test(logic));
+  !/enviar-remision\.html/.test(logicSin) && !/generar-informe-remision/.test(logicSin));
 check('logic.js: _renderControlRemisionesView monta ControlRemisionesV2Component (sin tabla legacy)',
   /_renderControlRemisionesView\(\)[\s\S]*?new window\.ControlRemisionesV2Component\(this\.container, \{/.test(logic));
-check('logic.js: la redirección al informe oficial se conserva (onNavigateToInforme → showGenerarInformePage)',
-  /onNavigateToInforme: function \(extractedData\)[\s\S]*?self\.showGenerarInformePage\(extractedData\)/.test(logic));
 check('logic.js: el volver del portal sigue siendo render() (antesala)',
   /onBack: function \(\) \{ self\.render\(\); \}/.test(logic));
 check('logic.js: el explorador de archivos (remisiones-view.html) NO se tocó',
   /remisiones-view\.html\?company=/.test(logic));
-check('logic.js: el generador de informe (generar-informe-remision.html) NO se tocó',
-  /generar-informe-remision\.html/.test(logic));
-check('logic.js: el bridge de mensajes sigue intacto (process-remision-pdf-request)',
-  /case 'process-remision-pdf-request'/.test(logic) &&
-  /case 'continue-to-send-request'/.test(logic) &&
-  /case 'navigate-to-generar-informe-request'/.test(logic));
+check('logic.js: el flujo viejo (informe iframe + modal de envío) quedó FUERA',
+  !/generar-informe-remision/.test(logicSin) && !/showGenerarInformePage/.test(logicSin) &&
+  !/_renderSendOnlyPage/.test(logicSin) && !/env-modal/.test(logicSin));
+check('logic.js: el bridge conserva los handlers del visor (preview/folders/volver)',
+  /case 'get-pdf-preview-request'/.test(logic) &&
+  /case 'get-document-folders-request'/.test(logic) &&
+  /case 'back-to-module-request'/.test(logic));
 
 /* ══════════════ C. CONSTRUCCIÓN DE LOS COMPONENTES ══════════════ */
 ['enviar-remision-v2.js', 'control-remisiones-v2.js'].forEach(function (f) {
@@ -130,17 +139,33 @@ check('Enviar: expone window.EnviarRemisionV2Component',
   /window\.EnviarRemisionV2Component\s*=\s*EnviarRemisionV2Component/.test(envJs));
 check('Control: expone window.ControlRemisionesV2Component',
   /window\.ControlRemisionesV2Component\s*=\s*ControlRemisionesV2Component/.test(ctlJs));
-check('Enviar: constructor recibe (container, opts) con companyName/onBack/onNavigateToInforme',
+check('Enviar: constructor recibe (container, opts) con companyName/onBack/logMessage',
   /constructor\(container, opts\)/.test(envJs) &&
-  /this\.onNavigateToInforme = opts\.onNavigateToInforme/.test(envJs));
+  /this\.onBack = opts\.onBack/.test(envJs) && /this\.logMessage = opts\.logMessage/.test(envJs));
 check('Control: constructor recibe (container, opts) con companyName/onBack',
   /constructor\(container, opts\)/.test(ctlJs) &&
   /this\.onBack = opts\.onBack/.test(ctlJs));
 check('Enviar: usa los canales reales selectPdfFile y processRemisionPdf',
   /electronAPI\.selectPdfFile\(\)/.test(envJs) &&
   /electronAPI\.processRemisionPdf\(filePath\)/.test(envJs));
-check('Enviar: tras extraer redirige al informe por el callback (mismo flujo de negocio)',
-  /self\.onNavigateToInforme\(self\.extractedData\)/.test(envJs));
+check('Enviar: el FLUJO COMPLETO vive en el componente (3 pasos, sin redirigir a otra pantalla)',
+  /PASOS = \['Cargar PDF', 'Generar informe oficial', 'Enviar a la EPS'\]/.test(envJs) &&
+  !/onNavigateToInforme/.test(envJsSin) && !/generar-informe-remision/.test(envJsSin));
+check('Enviar: genera el informe oficial con generateRemisionDocument',
+  /electronAPI\.generateRemisionDocument\(this\.extractedData, this\.companyName\)/.test(envJs));
+check('Enviar: envía con sendRemisionByWhatsapp / sendRemisionByEmail',
+  /electronAPI\.sendRemisionByWhatsapp\(this\.documentPath/.test(envJs) &&
+  /electronAPI\.sendRemisionByEmail\(this\.documentPath/.test(envJs));
+check('Enviar: busca el contacto con getContactInfo',
+  /electronAPI\.getContactInfo\(cedula/.test(envJs));
+check('Enviar: el paso 3 trae VISTA PREVIA del informe antes de enviar (abre el visor)',
+  /id="remenv-preview-name"/.test(envJs) && /id="remenv-ver-informe"/.test(envJs) &&
+  /#renderPreview\(\)/.test(envJs) && /#verInforme\(\)/.test(envJs) &&
+  /kairFV\.openWithFileViewerFromPath\(this\.documentPath\)/.test(envJs));
+check('Enviar: botón Cancelar con confirmación que reinicia el flujo sin borrar nada',
+  /id="remenv-cancelar"/.test(envJs) && /id="remenv-confirm"/.test(envJs) &&
+  /#cancelarProceso\(\)/.test(envJs) && /this\.extractedData = null;/.test(envJs) &&
+  /this\.documentPath = null;/.test(envJs) && /#mostrarPaso\(1\)/.test(envJs));
 check('Control: usa getControlRemisionesData con la empresa',
   /electronAPI\.getControlRemisionesData\(this\.companyName\)/.test(ctlJs));
 check('Control: guarda con la FIRMA REAL del backend { filePath, cellAddress, newValue }',
@@ -198,7 +223,7 @@ check('CSS: llaves y comentarios balanceados',
 check('CSS: responsive para modo ventana (@media 980px)',
   /@media \(max-width: 980px\)/.test(envCss) && /@media \(max-width: 980px\)/.test(ctlCss));
 
-/* ══════════════ E. PORTAL + VISOR + INFORME (📦775) ══════════════ */
+/* ══════════════ E. PORTAL + VISOR (📦775) ══════════════ */
 check('Portal: el marcado va bajo .rm-portal-scope',
   /<div class="rm-portal-scope">/.test(portal) &&
   /\.rm-portal-scope \{/.test(portal));
@@ -235,18 +260,6 @@ check('Visor: dark premium (--kair-primary #6ea8fe / bg #0f172a) en los 2 atribu
   /\[data-theme="dark"\] \.kair-body,\s*\n\[data-theme="dark-legacy"\] \.kair-body \{[\s\S]*?--kair-primary: #6ea8fe;[\s\S]*?--kair-bg-app: #0f172a;/.test(viewCss));
 check('Visor: sin colores viejos (#174ea6 / #4da6ff / 77, 166, 255)',
   !/#174ea6|#4da6ff|77, 166, 255/.test(viewCss));
-check('Informe: tokens premium (--env-primary #2057b8 / bg #fbfcfb / DM Sans)',
-  /--env-primary: #2057b8;/.test(infCss) && /--env-bg-body: #fbfcfb;/.test(infCss) &&
-  /--env-font-body: 'DM Sans'/.test(infCss));
-check('Informe: modo oscuro dark y dark-legacy (--env-primary #6ea8fe)',
-  /\[data-theme="dark"\],\s*\n\[data-theme="dark-legacy"\] \{[\s\S]*?--env-primary: #6ea8fe;/.test(infCss));
-check('Informe: el header en línea usa tokens (sigue el modo oscuro)',
-  /background: var\(--env-bg-card\);/.test(infHtml) && !/#dee2e6|#ffffff/.test(infHtml));
-check('Informe: tipografía premium (DM Sans + Manrope) en el link de Google Fonts',
-  /family=DM\+Sans[^"]*family=Manrope/.test(infHtml));
-check('Informe: el header comparte el ancho centrado del cuerpo (.env-header-inner)',
-  /\.env-header-inner \{[\s\S]*?max-width: 900px;[\s\S]*?margin: 0 auto;/.test(infCss) &&
-  /<div class="env-header-inner">/.test(infHtml));
 
 /* ══════════════ Reporte ══════════════ */
 let failed = 0;
@@ -256,4 +269,4 @@ checks.forEach(function (c) {
 });
 console.log('\n' + (checks.length - failed) + '/' + checks.length + ' checks OK');
 if (failed) { console.log('❌ ' + failed + ' checks FALLARON'); process.exit(1); }
-console.log('✅ 3.1.6 Enviar y Control de Remisiones en premium v2 embebido, conservando el contrato de datos y el flujo al informe oficial');
+console.log('✅ 3.1.6 Enviar (flujo completo en una interfaz) y Control de Remisiones en premium v2, conservando el contrato de datos');

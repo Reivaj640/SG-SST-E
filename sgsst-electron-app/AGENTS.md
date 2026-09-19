@@ -2129,7 +2129,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
-| Restricciones y Remisiones (3.1.6) | ✅ (📦775) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar/Control embebidos (`.remenv-scope`/`.remctl-scope`) + visor e informe con tokens remapeados |
+| Restricciones y Remisiones (3.1.6) | ✅ (📦775-776) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`) y Control (`.remctl-scope`) embebidos + visor con tokens remapeados |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2143,6 +2143,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦773**: Reportes de Accidentes (3.2.1 · FURAT) migrado a premium v2 (tokens `--furat-*` remapeados en su `:root`; Header System v2; tabs con subrayado; modo oscuro cubriendo `dark` y `dark-legacy` con `[data-theme^="dark"]`; reset scoped; cache-bust triple).
 - **📦774**: Gestión del Cambio (2.11.1) migrado a premium v2: de 6 archivos (logic + 2 css + html + viewer + index) a UN solo par CSS+JS con el marcado embebido; capa scoped `.gdc-scope` + tokens `--gdc-*`; overlays al `<body>` envueltos en `.gdc-scope`; vigía `MutationObserver` + `destroy()`; se conservó exacto el contrato de datos Excel (4 IPC) y la máquina de estados.
 - **📦775**: Restricciones y Remisiones (3.1.6) — segunda pasada premium: portal del módulo migrado a premium y **scoped** (`.rm-portal-scope`, se corrigió la fuga de `:root`/`*` al inyectarse con `innerHTML`), visor (`remisiones-view.css`) e informe (`generar-informe-remision.css`) con tokens remapeados a premium + dark en el informe, header del informe alineado con el cuerpo, limpieza de 9 archivos muertos y ~600 líneas huérfanas; el test subió a 62 checks.
+- **📦776**: Restricciones y Remisiones (3.1.6) — el flujo de **Enviar Remisión** ahora es UNO SOLO: los 3 pasos (Cargar PDF → Generar informe oficial → Enviar a la EPS) viven dentro del componente premium `enviar-remision-v2` (antes el paso 1 saltaba a la página vieja `generar-informe-remision.html` y a un modal de envío aparte, con otro diseño). El paso 3 trae **vista previa del informe** (nombre del documento + resumen + botón "Ver informe" que abre el visor) y un botón **Cancelar** con confirmación que reinicia el flujo sin borrar nada. Se borraron la página del informe, el modal de envío, `env-modal.css` y ~390 líneas más del `logic.js` (métodos + handlers del bridge viejo).
 
 ---
 
@@ -3238,11 +3239,70 @@ El módulo tenía **9 archivos muertos** y ~600 líneas de código huérfano en 
 
 ### Pendiente
 
-- El **portal** y el **informe** todavía cargan CDN (Font Awesome/Bootstrap Icons en el informe; Google
-  Fonts en ambos). El portal ya quedó sin CDN; el informe sigue usándolos para 12 iconos — deuda offline
-  conocida, igual que los viewers EMO.
+- El **portal** y el **visor** todavía cargan CDN (Google Fonts). Deuda offline conocida, igual que los
+  viewers EMO. El **informe** que también cargaba CDN se eliminó en 📦776.
 - El visor ya era `kair-*` v2.0 (jul-2026) con dark mode; solo se le remapearon los colores. Si se quiere
   el Header System v2 completo (icon chip + Manrope 800), es una pasada aparte.
+
+---
+
+## 🆕 Enviar Remisión · Flujo completo en UNA interfaz (📦776, 2026-09-19)
+
+El flujo de **Enviar Remisión** (3.1.6) se veía como **dos pantallas distintas**: el componente premium
+`enviar-remision-v2` (paso 1 "Cargar PDF") redirigía —tras extraer los datos— a la página vieja
+`generar-informe-remision.html` (otro diseño, con su propio stepper de 4 pasos) y luego a un modal de
+envío legacy (`env-modal.css`). El usuario pidió **continuidad y homogeneidad**.
+
+### Qué se hizo
+
+Se movieron los 3 pasos DENTRO del componente premium, con su track de 3 pasos:
+
+| Paso | Acción | API directa (sin bridge) |
+|------|--------|--------------------------|
+| 1 · Cargar PDF | selecciona y procesa el PDF | `selectPdfFile` + `processRemisionPdf` |
+| 2 · Generar informe oficial | muestra los datos extraídos y genera el documento | `generateRemisionDocument(extractedData, empresa)` |
+| 3 · Enviar a la EPS | WhatsApp / correo con los contactos de la base | `getContactInfo(cedula, empresa)` + `sendRemisionByWhatsapp` / `sendRemisionByEmail` |
+
+- El componente **ya no redirige**: `#mostrarPaso(n)` alterna las tarjetas (PDF / datos / enviar) y el
+  track marca el progreso. Se eliminó el callback `onNavigateToInforme`.
+- Como es un componente **embebido** (no iframe), llama a `window.electronAPI.*` **directo** — no usa el
+  bridge de `postMessage`.
+- **Vista previa ANTES de enviar** (buena práctica): el paso 3 abre con un panel "Vista previa del informe
+  oficial" que muestra el nombre del documento, un resumen de los datos clave (trabajador, cédula, fecha,
+  cargo) y un botón **"Ver informe"** que abre el `.docx` generado en el visor
+  (`window.kairFV.openWithFileViewerFromPath(documentPath)`, con respaldo en `electronAPI.openPath`). Así
+  el usuario corrobora el documento antes de elegir WhatsApp/correo.
+- **Cancelar con confirmación**: en los pasos 2 y 3 el header muestra un botón **"Cancelar"** que abre un
+  diálogo de confirmación; al confirmar, el componente limpia su estado (`extractedData`, `documentPath`,
+  contactos) y vuelve al paso 1 **sin borrar los archivos ya generados**. El botón se oculta en el paso 1
+  (no hay nada que cancelar) y el diálogo también se cierra al hacer clic en el fondo o en "Seguir".
+
+### Limpieza
+
+- **Borrados**: `generar-informe-remision.html/.js/.css` (la página vieja) y `env-modal.css` (el modal).
+- **`logic.js`**: fuera `showGenerarInformePage`, `_renderSendOnlyPage`, `_loadContactInfo`,
+  `_handleModalWhatsApp`, `_handleModalEmail`, `_closeSendModal`, `_loadModalStyles` y los 9 casos del
+  bridge del flujo viejo (`select-pdf-file-request`, `process-remision-pdf-request`,
+  `generate-remision-doc-request`, `send-remision-whatsapp-request`, `send-remision-email-request`,
+  `informe-data-request`, `back-to-verify-request`, `continue-to-send-request`,
+  `navigate-to-generar-informe-request`). Se **conservaron** los handlers del visor (preview, carpetas,
+  descarga, `back-to-module-request`). El `logic.js` quedó en **~19 KB** (venía de ~60 KB).
+- El módulo quedó con **10 archivos**, todos en uso.
+
+### Verificación
+
+- `node main/test-remisiones-v2.js` → **59/59 OK** (los checks del flujo viejo se reemplazaron por los del
+  flujo nuevo: 3 pasos, `generateRemisionDocument`, `sendRemisionByWhatsapp/Email`, `getContactInfo`).
+- **Smoke funcional con Electron** del flujo completo: clic en la zona de carga → paso 2 (6 campos
+  extraídos, track en "Generar informe oficial") → "Generar Informe Oficial" → paso 3 (track en
+  "Enviar a la EPS", contactos cargados) → clic en WhatsApp → enviado. **0 errores de consola.**
+- Cache-bust: `?v=REM-20260919-v2-flujo-completo` en `logic.js` + `enviar-remision-v2.*`.
+
+### Regla
+
+Si un componente tiene un **track de pasos** pero delega los siguientes a **otra pantalla**, el usuario
+verá un salto de diseño. La solución es traer todos los pasos al mismo componente (o replicar el mismo
+Header/stepper/dialecto en la pantalla destino). Acá se eligió lo primero.
 
 
 

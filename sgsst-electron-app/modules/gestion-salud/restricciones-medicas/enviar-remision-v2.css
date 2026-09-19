@@ -83,6 +83,8 @@
 .remenv-scope .remenv-btn--ghost:hover:not(:disabled) { background: var(--remenv-blue-soft); border-color: var(--remenv-blue); color: var(--remenv-blue); }
 .remenv-scope .remenv-btn--primary { background: var(--remenv-blue); color: #fff; }
 .remenv-scope .remenv-btn--primary:hover:not(:disabled) { background: var(--remenv-blue-ink); }
+.remenv-scope .remenv-btn--danger { background: var(--remenv-red); color: #fff; }
+.remenv-scope .remenv-btn--danger:hover:not(:disabled) { background: #b8464f; }
 
 /* ── Pasos del recorrido ── */
 .remenv-scope .remenv-track {
@@ -177,6 +179,100 @@
 .remenv-scope .remenv-next__text b { display: block; font-size: 13px; margin-bottom: 2px; }
 .remenv-scope .remenv-next__text p { margin: 0; font-size: 12px; color: var(--remenv-muted); line-height: 1.5; }
 
+/* ── Botones: tamaños ── */
+.remenv-scope .remenv-btn--sm { padding: 5px 10px; font-size: 12px; }
+.remenv-scope .remenv-btn--sm svg { width: 13px; height: 13px; }
+.remenv-scope .remenv-btn--lg { padding: 11px 20px; font-size: 14px; }
+.remenv-scope .remenv-btn--lg svg { width: 17px; height: 17px; }
+
+/* ── Paso 2: grilla de datos extraídos ── */
+.remenv-scope .remenv-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.remenv-scope .remenv-grid__item {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 10px 12px; border-radius: var(--remenv-radius-sm);
+  background: var(--remenv-bg); border: 1px solid var(--remenv-line);
+  border-left: 3px solid var(--remenv-blue);
+}
+.remenv-scope .remenv-grid__label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--remenv-faint);
+}
+.remenv-scope .remenv-grid__value { font-size: 13px; font-weight: 600; word-break: break-word; }
+.remenv-scope .remenv-grid__empty { grid-column: 1 / -1; text-align: center; color: var(--remenv-muted); padding: 20px; }
+
+/* ── Paso 2: generar informe ── */
+.remenv-scope .remenv-generate { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.remenv-scope .remenv-generate .remenv-progress { margin-top: 0; }
+.remenv-scope .remenv-ok {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%;
+  padding: 11px 14px; border-radius: var(--remenv-radius-sm);
+  background: var(--remenv-green-soft); color: var(--remenv-green);
+}
+.remenv-scope .remenv-ok > svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.remenv-scope .remenv-ok > div { flex: 1; min-width: 0; }
+.remenv-scope .remenv-ok b { display: block; font-size: 13px; }
+.remenv-scope .remenv-ok span { font-size: 11.5px; opacity: .85; word-break: break-all; }
+
+/* ── Paso 3: vista previa del informe ── */
+.remenv-scope .remenv-preview {
+  border: 1px solid var(--remenv-line); border-radius: var(--remenv-radius);
+  background: var(--remenv-bg); padding: 14px; margin-bottom: 16px;
+}
+.remenv-scope .remenv-preview__top { display: flex; align-items: center; gap: 11px; }
+.remenv-scope .remenv-preview__icon {
+  width: 40px; height: 40px; border-radius: 11px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--remenv-blue-soft); color: var(--remenv-blue);
+}
+.remenv-scope .remenv-preview__icon svg { width: 20px; height: 20px; }
+.remenv-scope .remenv-preview__info { flex: 1; min-width: 0; }
+.remenv-scope .remenv-preview__info b { display: block; font-size: 13.5px; }
+.remenv-scope .remenv-preview__info span { display: block; font-size: 11.5px; color: var(--remenv-muted); word-break: break-all; }
+.remenv-scope .remenv-preview__meta {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px; margin-top: 13px;
+}
+.remenv-scope .remenv-preview__row { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.remenv-scope .remenv-preview__label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--remenv-faint);
+}
+.remenv-scope .remenv-preview__value { font-size: 12.5px; font-weight: 600; word-break: break-word; }
+
+/* ── Paso 3: enviar a la EPS ── */
+.remenv-scope .remenv-send__hint {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 16px;
+  font-size: 12.5px; color: var(--remenv-muted); line-height: 1.5;
+}
+.remenv-scope .remenv-send__hint svg { width: 15px; height: 15px; color: var(--remenv-green); flex: 0 0 auto; }
+.remenv-scope .remenv-send { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.remenv-scope .remenv-send__btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 20px 14px; border-radius: var(--remenv-radius);
+  background: var(--remenv-card); border: 1px solid var(--remenv-line);
+  cursor: pointer; font-family: inherit; color: var(--remenv-ink);
+  transition: border-color var(--remenv-t), background var(--remenv-t), transform var(--remenv-t);
+}
+.remenv-scope .remenv-send__btn:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--remenv-blue); }
+.remenv-scope .remenv-send__btn:disabled { opacity: .55; cursor: not-allowed; }
+.remenv-scope .remenv-send__btn > svg { width: 26px; height: 26px; }
+.remenv-scope .remenv-send__btn--wa > svg { color: #25d366; }
+.remenv-scope .remenv-send__btn--mail > svg { color: var(--remenv-blue); }
+.remenv-scope .remenv-send__label { font-size: 14px; font-weight: 800; }
+.remenv-scope .remenv-send__contact { font-size: 12px; color: var(--remenv-muted); word-break: break-all; }
+.remenv-scope .remenv-send__status {
+  display: flex; align-items: center; gap: 9px; margin-top: 14px;
+  padding: 11px 14px; border-radius: var(--remenv-radius-sm);
+  background: var(--remenv-blue-soft); color: var(--remenv-blue-ink);
+  font-size: 12.5px; font-weight: 600;
+}
+.remenv-scope .remenv-send__status svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.remenv-scope .remenv-send__status.is-ok { background: var(--remenv-green-soft); color: var(--remenv-green); }
+.remenv-scope .remenv-send__status.is-error { background: var(--remenv-red-soft); color: var(--remenv-red); }
+
 /* ── Registro de actividad ── */
 .remenv-scope .remenv-log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .remenv-scope .remenv-log__body {
@@ -217,6 +313,28 @@
 .remenv-scope .remenv-toast__title { margin: 0; font-size: 13px; font-weight: 800; }
 .remenv-scope .remenv-toast__msg { margin: 2px 0 0; font-size: 12px; color: var(--remenv-muted); line-height: 1.45; }
 
+/* ── Confirmación de cancelar ── */
+.remenv-scope .remenv-confirm {
+  position: fixed; inset: 0; z-index: 1300;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 33, 61, .45); padding: 20px;
+}
+.remenv-scope .remenv-confirm__box {
+  width: 100%; max-width: 420px; text-align: center;
+  background: var(--remenv-card); border: 1px solid var(--remenv-line);
+  border-radius: var(--remenv-radius); box-shadow: var(--remenv-shadow);
+  padding: 26px 24px;
+}
+.remenv-scope .remenv-confirm__icon {
+  width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--remenv-amber-soft); color: var(--remenv-amber);
+}
+.remenv-scope .remenv-confirm__icon svg { width: 26px; height: 26px; }
+.remenv-scope .remenv-confirm__title { margin: 0 0 8px; font-size: 16px; font-weight: 800; }
+.remenv-scope .remenv-confirm__msg { margin: 0 0 20px; font-size: 13px; color: var(--remenv-muted); line-height: 1.55; }
+.remenv-scope .remenv-confirm__actions { display: flex; gap: 10px; justify-content: center; }
+
 /* ── Modo oscuro ── */
 [data-theme="dark"] .remenv-scope, [data-theme="dark-legacy"] .remenv-scope {
   --remenv-bg: #0f1622;
@@ -246,4 +364,7 @@
   .remenv-scope .remenv-log { min-height: 220px; }
   .remenv-scope .remenv-track__label { display: none; }
   .remenv-scope .remenv-header__sub { display: none; }
+  .remenv-scope .remenv-grid { grid-template-columns: 1fr; }
+  .remenv-scope .remenv-send { grid-template-columns: 1fr; }
+  .remenv-scope .remenv-preview__meta { grid-template-columns: 1fr; }
 }
