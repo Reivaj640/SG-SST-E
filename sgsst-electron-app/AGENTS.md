@@ -2129,7 +2129,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
-| Restricciones y Remisiones (3.1.6) | ✅ (📦775-776) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`) y Control (`.remctl-scope`) embebidos + visor con tokens remapeados |
+| Restricciones y Remisiones (3.1.6) | ✅ (📦775-777) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`) y Control (`.remctl-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2144,6 +2144,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦774**: Gestión del Cambio (2.11.1) migrado a premium v2: de 6 archivos (logic + 2 css + html + viewer + index) a UN solo par CSS+JS con el marcado embebido; capa scoped `.gdc-scope` + tokens `--gdc-*`; overlays al `<body>` envueltos en `.gdc-scope`; vigía `MutationObserver` + `destroy()`; se conservó exacto el contrato de datos Excel (4 IPC) y la máquina de estados.
 - **📦775**: Restricciones y Remisiones (3.1.6) — segunda pasada premium: portal del módulo migrado a premium y **scoped** (`.rm-portal-scope`, se corrigió la fuga de `:root`/`*` al inyectarse con `innerHTML`), visor (`remisiones-view.css`) e informe (`generar-informe-remision.css`) con tokens remapeados a premium + dark en el informe, header del informe alineado con el cuerpo, limpieza de 9 archivos muertos y ~600 líneas huérfanas; el test subió a 62 checks.
 - **📦776**: Restricciones y Remisiones (3.1.6) — el flujo de **Enviar Remisión** ahora es UNO SOLO: los 3 pasos (Cargar PDF → Generar informe oficial → Enviar a la EPS) viven dentro del componente premium `enviar-remision-v2` (antes el paso 1 saltaba a la página vieja `generar-informe-remision.html` y a un modal de envío aparte, con otro diseño). El paso 3 trae **vista previa del informe** (nombre del documento + resumen + botón "Ver informe" que abre el visor) y un botón **Cancelar** con confirmación que reinicia el flujo sin borrar nada. Se borraron la página del informe, el modal de envío, `env-modal.css` y ~390 líneas más del `logic.js` (métodos + handlers del bridge viejo).
+- **📦777**: Restricciones y Remisiones (3.1.6) — **alineación de la paleta** de `enviar-remision-v2.css` y `control-remisiones-v2.css` a la canónica de la app (`shared/kair-design-tokens.css`, la de Recursos / Gestión Integral). Traían una paleta propia (`#2456d6` azul, `#eef1f7` fondo, `#e3e8f2` borde, `Segoe UI`, radio 14px) que se veía distinta; ahora usan `#2057b8` / `#fbfcfb` / `#e8ebee` / `DM Sans` + `Manrope` / radio 20px, y el modo oscuro `#0f172a` / `#1a2334` / `#6ea8fe`.
 
 ---
 
@@ -3303,6 +3304,45 @@ Se movieron los 3 pasos DENTRO del componente premium, con su track de 3 pasos:
 Si un componente tiene un **track de pasos** pero delega los siguientes a **otra pantalla**, el usuario
 verá un salto de diseño. La solución es traer todos los pasos al mismo componente (o replicar el mismo
 Header/stepper/dialecto en la pantalla destino). Acá se eligió lo primero.
+
+---
+
+## 🆕 Remisiones · Alineación a la paleta canónica (📦777, 2026-09-19)
+
+Al validar contra los módulos principales (**Recursos**, **Gestión Integral**), los dos componentes
+embebidos de Remisiones (`enviar-remision-v2` y `control-remisiones-v2`) traían una **paleta propia** que
+no coincidía con el resto del sistema. Se remapearon sus tokens (técnica 📦751) a los valores canónicos de
+`shared/kair-design-tokens.css`:
+
+| Token | Antes (propio) | Ahora (canónico) |
+|-------|----------------|------------------|
+| azul | `#2456d6` | `#2057b8` |
+| azul oscuro | `#1b3f9e` | `#172c4c` |
+| azul suave | `#e8eefc` | `#eaf1fb` |
+| fondo | `#eef1f7` | `#fbfcfb` |
+| borde | `#e3e8f2` | `#e8ebee` |
+| tinta | `#16233b` | `#14213d` |
+| muted | `#66738c` | `#748096` |
+| faint | `#93a0b8` | `#aab1bd` |
+| verde | `#0f9d63` | `#1bb888` |
+| verde suave | `#e3f6ec` | `#e6f5ef` |
+| ámbar | `#b97e12` | `#e7a224` |
+| ámbar suave | `#fbf1da` | `#fbf0db` |
+| rojo | `#d64550` | `#da5563` |
+| rojo suave | `#fbe7e9` | `#fae6e9` |
+| radio | `14px` / `10px` | `20px` / `12px` |
+| fuente | `'Segoe UI', 'Manrope'` | `'DM Sans'` (UI) + `'Manrope'` (títulos) |
+| sombra | `0 1px 2px …, 0 8px 24px rgba(22,35,59,.07)` | `0 2px 7px rgba(37,56,82,.08)` |
+| oscuro | `#0f1622` / `#1a2434` / `#5b8def` | `#0f172a` / `#1a2334` / `#6ea8fe` |
+
+- Los **títulos** (`.remenv-header__title`, `.remenv-card__title`, `.remctl-header__title`,
+  `.remctl-card__title`) pasaron a `Manrope` 800 y subieron 1px (18/15px) para el look display canónico.
+- Se agregó `--remenv-font-display` / `--remctl-font-display` (Manrope).
+- **Verificación**: arnés de Electron que compara los tokens computados del v2 contra los canónicos →
+  **`alineado: true`**, sin fallos; fuentes `DM Sans`, radio `20px`, títulos `Manrope`. Test `63/63`.
+- **Regla**: al migrar un submódulo, **usar la paleta canónica** (`shared/kair-design-tokens.css`), no una
+  propia. Si el diseño trae su propia paleta, remapear los tokens a los valores canónicos (no reescribir
+  reglas). Un azul distinto (`#2456d6` vs `#2057b8`) se nota al lado de los demás módulos.
 
 
 

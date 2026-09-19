@@ -6,28 +6,33 @@
    ============================================================ */
 
 .remenv-scope {
-  --remenv-bg: #eef1f7;
+  /* 📦777 — Tokens ALINEADOS a la paleta premium canónica de la app
+     (shared/kair-design-tokens.css, la que usan Recursos, Gestión Integral y los
+     demás submódulos). Antes este módulo traía una paleta propia (#2456d6 /
+     #eef1f7 / Segoe UI) que se veía distinta al resto del sistema. */
+  --remenv-bg: #fbfcfb;
   --remenv-card: #ffffff;
-  --remenv-line: #e3e8f2;
-  --remenv-ink: #16233b;
-  --remenv-muted: #66738c;
-  --remenv-faint: #93a0b8;
-  --remenv-blue: #2456d6;
-  --remenv-blue-ink: #1b3f9e;
-  --remenv-blue-soft: #e8eefc;
-  --remenv-green: #0f9d63;
-  --remenv-green-soft: #e3f6ec;
-  --remenv-red: #d64550;
-  --remenv-red-soft: #fbe7e9;
-  --remenv-amber: #b97e12;
-  --remenv-amber-soft: #fbf1da;
-  --remenv-violet: #6d4fd0;
-  --remenv-violet-soft: #efeafc;
-  --remenv-radius: 14px;
-  --remenv-radius-sm: 10px;
-  --remenv-font: 'Segoe UI', 'Manrope', system-ui, sans-serif;
-  --remenv-t: 180ms cubic-bezier(.4, 0, .2, 1);
-  --remenv-shadow: 0 1px 2px rgba(22, 35, 59, .05), 0 8px 24px rgba(22, 35, 59, .07);
+  --remenv-line: #e8ebee;
+  --remenv-ink: #14213d;
+  --remenv-muted: #748096;
+  --remenv-faint: #aab1bd;
+  --remenv-blue: #2057b8;
+  --remenv-blue-ink: #172c4c;
+  --remenv-blue-soft: #eaf1fb;
+  --remenv-green: #1bb888;
+  --remenv-green-soft: #e6f5ef;
+  --remenv-red: #da5563;
+  --remenv-red-soft: #fae6e9;
+  --remenv-amber: #e7a224;
+  --remenv-amber-soft: #fbf0db;
+  --remenv-violet: #7c4dbe;
+  --remenv-violet-soft: #f1eafb;
+  --remenv-radius: 20px;
+  --remenv-radius-sm: 12px;
+  --remenv-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --remenv-font-display: 'Manrope', 'DM Sans', sans-serif;
+  --remenv-t: 180ms ease-out;
+  --remenv-shadow: 0 2px 7px rgba(37, 56, 82, .08);
 }
 
 .remenv-scope {
@@ -59,7 +64,7 @@
 }
 .remenv-scope .remenv-header__icon svg { width: 20px; height: 20px; }
 .remenv-scope .remenv-header__text { flex: 1 1 auto; min-width: 0; }
-.remenv-scope .remenv-header__title { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.remenv-scope .remenv-header__title { margin: 0; font-family: var(--remenv-font-display); font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
 .remenv-scope .remenv-header__sub { margin: 2px 0 0; font-size: 12px; color: var(--remenv-muted); }
 .remenv-scope .remenv-header__chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -127,7 +132,7 @@
   padding: 13px 18px; border-bottom: 1px solid var(--remenv-line);
 }
 .remenv-scope .remenv-card__head svg { width: 16px; height: 16px; color: var(--remenv-blue); }
-.remenv-scope .remenv-card__title { margin: 0; font-size: 14px; font-weight: 800; flex: 1; }
+.remenv-scope .remenv-card__title { margin: 0; font-family: var(--remenv-font-display); font-size: 15px; font-weight: 800; flex: 1; }
 .remenv-scope .remenv-card__body { padding: 18px; }
 
 /* ── Zona de carga ── */
@@ -335,26 +340,26 @@
 .remenv-scope .remenv-confirm__msg { margin: 0 0 20px; font-size: 13px; color: var(--remenv-muted); line-height: 1.55; }
 .remenv-scope .remenv-confirm__actions { display: flex; gap: 10px; justify-content: center; }
 
-/* ── Modo oscuro ── */
+/* ── Modo oscuro (paleta premium canónica: #0f172a / #1a2334 / #6ea8fe) ── */
 [data-theme="dark"] .remenv-scope, [data-theme="dark-legacy"] .remenv-scope {
-  --remenv-bg: #0f1622;
-  --remenv-card: #1a2434;
-  --remenv-line: #2a3a52;
+  --remenv-bg: #0f172a;
+  --remenv-card: #1a2334;
+  --remenv-line: #2f3d55;
   --remenv-ink: #e8edf5;
-  --remenv-muted: #9aabc3;
-  --remenv-faint: #6d7f99;
-  --remenv-blue: #5b8def;
-  --remenv-blue-ink: #8fb0f5;
-  --remenv-blue-soft: #22314d;
-  --remenv-green: #3ecf8e;
-  --remenv-green-soft: #17352a;
-  --remenv-red: #f2707a;
-  --remenv-red-soft: #3d2327;
-  --remenv-amber: #e8b34b;
-  --remenv-amber-soft: #3a3018;
-  --remenv-violet: #9a86e8;
-  --remenv-violet-soft: #2c2547;
-  --remenv-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .4);
+  --remenv-muted: #a9b4c6;
+  --remenv-faint: #748096;
+  --remenv-blue: #6ea8fe;
+  --remenv-blue-ink: #8ab4f8;
+  --remenv-blue-soft: rgba(110, 168, 254, .16);
+  --remenv-green: #3ecf9a;
+  --remenv-green-soft: rgba(62, 207, 154, .16);
+  --remenv-red: #e56a76;
+  --remenv-red-soft: rgba(229, 106, 118, .16);
+  --remenv-amber: #f0b45a;
+  --remenv-amber-soft: rgba(240, 180, 90, .16);
+  --remenv-violet: #a98bf0;
+  --remenv-violet-soft: rgba(169, 139, 240, .16);
+  --remenv-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .4);
 }
 
 /* ── Responsive: modo ventana / estrecho ── */

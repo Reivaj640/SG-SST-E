@@ -222,6 +222,17 @@ check('CSS: llaves y comentarios balanceados',
   (ctlCss.match(/\{/g) || []).length === (ctlCss.match(/\}/g) || []).length);
 check('CSS: responsive para modo ventana (@media 980px)',
   /@media \(max-width: 980px\)/.test(envCss) && /@media \(max-width: 980px\)/.test(ctlCss));
+check('CSS: tokens del v2 ALINEADOS a la paleta premium canónica (kair-design-tokens)',
+  /--remenv-blue: #2057b8;/.test(envCss) && /--remctl-blue: #2057b8;/.test(ctlCss) &&
+  /--remenv-bg: #fbfcfb;/.test(envCss) && /--remctl-bg: #fbfcfb;/.test(ctlCss) &&
+  /--remenv-ink: #14213d;/.test(envCss) && /--remctl-ink: #14213d;/.test(ctlCss) &&
+  /--remenv-line: #e8ebee;/.test(envCss) && /--remctl-line: #e8ebee;/.test(ctlCss) &&
+  /--remenv-font: 'DM Sans'/.test(envCss) && /--remctl-font: 'DM Sans'/.test(ctlCss) &&
+  /--remenv-radius: 20px;/.test(envCss) && /--remctl-radius: 20px;/.test(ctlCss) &&
+  /--remenv-font-display: 'Manrope'/.test(envCss) && /--remctl-font-display: 'Manrope'/.test(ctlCss));
+check('CSS: el v2 no conserva la paleta propia vieja (#2456d6 / #eef1f7 / Segoe UI)',
+  !/#2456d6|#eef1f7|#e3e8f2|Segoe UI/.test(envCss.replace(/\/\*[\s\S]*?\*\//g, '')) &&
+  !/#2456d6|#eef1f7|#e3e8f2|Segoe UI/.test(ctlCss.replace(/\/\*[\s\S]*?\*\//g, '')));
 
 /* ══════════════ E. PORTAL + VISOR (📦775) ══════════════ */
 check('Portal: el marcado va bajo .rm-portal-scope',

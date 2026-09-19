@@ -62,15 +62,29 @@ contratos; cada API se conecta en su propia fase con verificación independiente
 
 ### 2.1 Módulos con tratamiento premium v2
 
-El proyecto completó la migración visual de la capa de acceso y de cuatro módulos funcionales al
-sistema **premium v2**. La tabla resume el inventario.
+El proyecto completó la migración visual de la capa de acceso, de los **8 homes de módulo** y de los
+**submódulos con UI propia** al sistema **premium v2** (olas 📦730-738 y 📦739-777). La tabla resume el
+inventario.
 
 | Módulo | Referencia | Alcance del rediseño | Estado |
 |--------|-----------|----------------------|--------|
 | Panel de Control | `renderDashboard` (`renderer.js`) | Hero "Estado General" con conclusión humanizada; 4 KPI; 7 tarjetas de módulos; pendientes con severidad y acento lateral; filtros Todos/Críticos/Hoy; skeleton y toasts. | Completado y verificado (📦748/📦749) |
+| Homes de los 8 módulos | `modules/*/‹modulo›-home.js` | Header + hero con score compuesto + 3 metric cards + chart SVG nativo + "En tu radar" + grid de submódulos; skeleton que encaja; gráficos con cajas HTML (sin deformar). | Completado y verificado (📦730-738, 📦756-758) |
 | Documentos de Contratación | `modules/gestion-humana/documentos` | KPI strip en vivo; tabla enterprise con búsqueda y paginación; expediente por empleado con semáforo; modal de subida drag & drop. | Completado y verificado |
 | Programa de Capacitación | `modules/recursos/capacitaciones` | Dashboard con hero y 3 gráficas SVG sin librerías; listado con barra única de filtros; modales crear/editar/completar/eliminar; exportación CSV real. | Completado y verificado |
-| Inducción y Reinducción | `modules/recursos/inducciones` | Dashboard con 6 gráficas y "En tu radar" dinámico; registro con búsqueda y micro-barras; modal registrar/editar con validación inline. | Completado y verificado |
+| Inducción y Reinducción | `modules/recursos/inducciones` | Dashboard con 6 gráficas y "En tu radar" dinámico; registro con búsqueda y micro-barras; modal registrar/editar con validación inline. | Completado y verificado (📦739-746) |
+| Bandeja Integrada | `renderer/bandeja-integrada` | Topbar premium + KPI + sidebar + correo/agenda; firma con imagen (CID); toolbar compacta; paginación de todos los correos. | Completado y verificado (📦747-755) |
+| Configuración | `components/config/config-viewer.html` | Capa scoped `.kair-config` + remapeo de tokens; Header System v2; tabs con subrayado. | Completado y verificado (📦751) |
+| Archivo y Retención (2.5.1) | `modules/gestion-integral/archivo-retencion` | Fila expandible + edición en línea + guardado masivo; adaptador explícito contra el backend del Excel. | Completado y verificado (📦760) |
+| Evaluación Inicial del SG-SST (2.3.1) | `modules/gestion-integral/evaluacion-inicial-sg-sst` | Prototipo premium v2 recableado al backend; medidor SVG; modales de detalle/formulario/seguimiento/responsables. | Completado y verificado (📦759-761) |
+| Evaluaciones Médicas (3.1.4) | `modules/gestion-salud/evaluaciones-medicas` | Certificados persistidos (SQLite); ancho completo; adjuntar el PDF de la IPS con diálogo nativo + pre-llenado; portal sin fugas. | Completado y verificado (📦762-769) |
+| Rendición de Cuentas SG-SST | `modules/verificacion/rendicion-cuentas` | Rediseño premium completo (portal de bienvenida + vistas). | Completado y verificado (📦763) |
+| Identificación de Bienes y Servicios (2.9.1) | `modules/gestion-integral/...` | Rediseño premium + Header System v2. | Completado y verificado (📦764) |
+| Evaluación y Selección (2.10.1) | `modules/gestion-integral/evaluacion-seleccion` | Rediseño premium v2; tabs con subrayado; fix del botón Volver. | Completado y verificado (📦770-771) |
+| Perfil de Cargo y Profesiograma (3.1.3) | `modules/gestion-salud/perfiles-cargo-profesiograma` | Tokens premium en `:root` propio; Header System v2; tabs con subrayado. | Completado y verificado (📦772) |
+| Reportes de Accidentes · FURAT (3.2.1) | `modules/gestion-salud/reportes-accidentes` | Tokens premium; Header System v2; tabs con subrayado; fix del alto del iframe. | Completado y verificado (📦773) |
+| Gestión del Cambio (2.11.1) | `modules/gestion-integral/gestion-del-cambio` | De 6 archivos a 1 par CSS+JS con el marcado embebido; overlays al body; vigía + `destroy()`. | Completado y verificado (📦774) |
+| Restricciones y Remisiones (3.1.6) | `modules/gestion-salud/restricciones-medicas` | Portal scoped (fix de fuga); Enviar con flujo completo de 3 pasos + vista previa + cancelar; Control editable; visor con tokens premium. | Completado y verificado (📦775-777) |
 | Acceso (login, splash, empresas) | shell Electron | Login con validación inline, splash con progreso real y grid de empresas activas; contratos `login()`, `getEmpresasActivas()`, `entrarEmpresa(id)`. | **Ya integrado en la app Electron** (Fase 0 cubierta) |
 
 > **Nota de gestión:** el PDF original marcaba el módulo de acceso como "artefacto por restaurar en el

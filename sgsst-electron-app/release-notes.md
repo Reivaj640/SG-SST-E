@@ -1,121 +1,66 @@
-# K+AIR v0.1.196
+# K+AIR v0.1.207
 
-## 🔄 RE-AUDIT-2026-09-10 (v0.1.196) — Mejoras al sistema de actualizaciones + Modal firma dual
+## 🎨 Migración premium v2 de los submódulos (📦739-777)
 
-Auditoría exhaustiva del sistema de auto-update identificó 14 hallazgos. Este release cierra 12 de ellos con cambios defensivos que mejoran seguridad, performance y robustez SIN alterar el comportamiento del usuario.
+Segunda gran ola del rediseño visual: después de los **homes de módulo** (📦730-738, v0.1.197-205), se migraron al dialecto **premium v2** todos los submódulos con interfaz propia. El objetivo fue que TODO el sistema comparta la misma paleta, tipografía y patrones de componentes.
 
-### Componentes del release
+### Sistema de diseño
 
-#### 🔴 P0 — Críticos
+- **Paleta canónica** (`shared/kair-design-tokens.css`): azul `#2057b8`, tinta `#14213d`, muted `#748096`, borde `#e8ebee`, canvas `#fbfcfb`, verde `#1bb888`, ámbar `#e7a224`, rojo `#da5563`.
+- **Tipografía**: DM Sans (UI) + Manrope (títulos, 800).
+- **Radios**: tarjetas 20px, controles 12px, pills 999px.
+- **Header System v2**: breadcrumb + icon chip + título Manrope + subtítulo + acciones, transparente sobre el canvas.
+- **Tabs con subrayado**: la activa lleva una línea azul de 2px montada sobre la línea gris.
+- **Modo oscuro**: cubre los DOS atributos que aplica la app (`data-theme="dark"` y `dark-legacy`).
+- **`shared/kair-premium.css`** (📦749): dialecto compartido reutilizable.
 
-- **P0-1 · Differential downloads re-habilitados (con rollback)**
-  - `main.js` ahora descarga PARCHES (~20-50 MB) en vez del instalador completo (391 MB) por default.
-  - Override de seguridad: env var `KAIR_USE_FULL_UPDATE=1` fuerza full download (modo conservador).
-  - Si el bug histórico de SHA512 mismatch persiste, electron-updater cae a full download automáticamente (graceful degradation).
-  - **8-20x más rápido** para clientes con internet lento.
-  - Workaround original (📦583 Loop 11) documentado con rationale y criterio de rollback.
+### Submódulos migrados
 
-- **P0-3 · Fallback de `quitAndInstall` ahora lanza Update.exe manualmente**
-  - ANTES: si `quitAndInstall` fallaba, la app se cerraba sin instalar el update.
-  - AHORA: busca `Update.exe` (Squirrel bootstrapper) en `resources/../Update.exe` y lo lanza con `--processStartAndWait` en background.
-  - Si `Update.exe` no existe, loguea warning y el user queda en versión vieja (que sí funciona).
+| Submódulo | Novedad principal |
+|-----------|-------------------|
+| Inducciones | Gráficos SVG nativos (sin Chart.js) + KPI cards con chips |
+| Capacitaciones / Presupuesto | Modal de período + rediseño de 3 vistas |
+| COPASST + Comité de Convivencia | Portal sin caja |
+| Bandeja Integrada | Premium v2 + firma con imagen (CID) + toolbar compacta + paginación |
+| Dashboard principal | Piloto del dialecto (hero + KPI + módulos + pendientes) |
+| Configuración | Capa scoped `.kair-config` + remapeo de tokens |
+| Archivo y Retención | Vista con fila expandible + edición en línea |
+| Evaluación Inicial del SG-SST | Reescritura premium v2 recableada al backend |
+| Evaluaciones Médicas (EMO) | Certificados persistidos + ancho completo + adjuntar PDF |
+| Rendición de Cuentas | Rediseño premium completo |
+| Identificación de Bienes (2.9.1) | Rediseño premium |
+| Evaluación y Selección (2.10.1) | Rediseño + tabs con subrayado + fix del botón Volver |
+| Perfil de Cargo (3.1.3) | Tokens premium + Header System v2 |
+| Reportes de Accidentes / FURAT (3.2.1) | Tokens premium + tabs con subrayado |
+| Gestión del Cambio (2.11.1) | De 6 archivos a 1 par CSS+JS (marcado embebido) |
+| Restricciones / Remisiones (3.1.6) | Portal scoped (fix de fuga) + flujo completo de 3 pasos + vista previa del informe + cancelar + alineación de paleta |
 
-- **P0-2 · Version bump a 0.1.196** — sincroniza con los 5 commits de la rama Dev-Pc (v0.1.192, v0.1.193, v0.1.194, v0.1.195 + este).
+### Correcciones destacadas
 
-#### 🟠 P1 — Importantes (zero-trauma)
+- **Fuga de tokens globales** (portal de EMO y de Remisiones): su `<style>` inyectado con `innerHTML` pisaba `:root` y `*` de TODA la app. Ahora todo va scoped.
+- **Gráficos deformados** en los homes: las barras se dibujan con cajas HTML, no con un SVG estirado.
+- **Skeleton que no encajaba**: el esqueleto de carga ahora reutiliza las clases reales (radio, borde, padding y alto coinciden).
+- **Bandeja Integrada**: sync con Gmail arreglado (rate limiter 40→120/min), correos leídos que "revivían", paginación real de todos los correos.
 
-- **P1-1 · Cierre limpio de SQLite en `before-quit`**
-  - Nueva función `closeDatabaseSafely()` ejecuta `PRAGMA wal_checkpoint(TRUNCATE)` + `db.close()` antes de cualquier quit.
-  - Reduce riesgo de archivos WAL inconsistentes cuando Squirrel mata el proceso durante un update.
-  - Llamado desde `before-quit` (no desde `cleanupProcesses`) para no afectar otros contextos.
+### Limpieza
 
-- **P1-4 · `installer.nsh` ahora usa SIGTERM antes de SIGKILL**
-  - ANTES: `taskkill /F` mataba Python/K+AIR inmediatamente, sin permitir cleanup.
-  - AHORA: primero `taskkill` (SIGTERM) → espera 5s → solo si sigue vivo, `taskkill /F` (SIGKILL).
-  - Le da tiempo a `before-quit` handler de cerrar DB y persistir transacciones.
-
-#### 🟡 P2 — Quick wins (0 riesgo)
-
-- **P2-1 · Quitado `Cache-Control: no-cache`**
-  - Anti-patrón: forzaba re-validación en cada check, aumentando latencia y reduciendo rate-limit efectivo de GitHub.
-  - GitHub ya devuelve ETag y electron-updater lo respeta.
-
-- **P2-4 · Borrado bloque de código muerto comentado**
-  - 12 líneas comentadas en `main.js:10132-10143` (`// --- Eventos del Auto-Updater (TEMPORALMENTE COMENTADO) ---`).
-  - Los listeners reales están en `main.js:878-1012`.
-
-- **P2-5 · Fix fallback peligroso en `get-app-version`**
-  - ANTES: retornaba `'1.0.0'` en error → updater podía pensar que era versión muy vieja y forzar update.
-  - AHORA: retorna `''` (string vacío) para que el caller decida.
-
-- **P1-5 · Renombrado test engañoso**
-  - `main/test-auto-update-semanas.js` → `main/test-gestacion-auto-update-semanas.js`.
-  - El nombre original confundía: NO testea el sistema de auto-update, testea el "auto-update de semanas de gestación" (salud materna).
-
-### Componentes de la versión anterior incluidos
-
-Este release también incluye los commits de v0.1.192-v0.1.195 que estaban sin publicar:
-
-- **v0.1.192** — 3 fixes de auditoría: race condition script (`start-firma-tunnel.ps1`), PDF copy en `createForCompany`, rate limit `verifyLimiter 30/min` en `/api/sign/:token/verify`.
-- **v0.1.193** — Fix A.1 (devOtp en test mode) + Fix B (cleanup-orphan-pdfs.js con SHA-256 manifest).
-- **v0.1.194** — Fix C-21 (2 índices faltantes en migración 014) + 3 fixes pre-FASE 4 (OTP dummy, mailer test-mode, resend-otp source-of-truth).
-- **v0.1.195** — Fix modal DUAL_FIRMADO en polling (entry faltante en `_TRANSICION_FIRMA`).
+- Decenas de archivos muertos eliminados (p. ej. `restricciones-medicas-logic.js` pasó de ~60 KB a ~19 KB; Gestión del Cambio de 6 archivos a 1 par).
+- Regla documentada: al migrar una pantalla, borrar los archivos que reemplaza y sus loaders.
 
 ### Para validar
 
-1. **Differential download funciona**:
-   ```bash
-   # Limpiar install existente
-   # Instalar v0.1.196 fresh
-   # Verificar que dist/ tiene .blockmap
-   # Confirmar que downloads son <50 MB (no 391 MB)
-   ```
+1. Recorrer los submódulos migrados en claro y oscuro → todo debe compartir la misma paleta y tipografía.
+2. Confirmar que abrir un submódulo **NO** cambia los colores del resto de la app (fuga de tokens).
+3. En "Enviar Remisión" (3.1.6): cargar PDF → revisar datos → generar informe → ver la vista previa → cancelar (vuelve al paso 1 sin borrar archivos).
 
-2. **DB close funciona**:
-   ```bash
-   # Iniciar K+AIR, abrir un módulo que escriba a DB
-   # Cerrar la app
-   # Verificar en logs: "[DB] ✅ DB cerrada limpiamente"
-   # Verificar que no quedan archivos .sqlite-wal > 0 bytes
-   ```
+### Docs
 
-3. **SIGTERM graceful shutdown**:
-   ```bash
-   # Iniciar K+AIR
-   # Publicar un release nuevo en staging
-   # Cuando se aplica el update, verificar que el instalador NSIS espera 5s
-   # antes de SIGKILL
-   ```
+- `AGENTS.md` — playbook de migración + specs técnicas ST-01 a ST-08 + lecciones por migración.
+- `CHANGELOG.md` — entrada `[0.1.207]`.
+- `CONTEXT.md` y `README.md` — actualizados.
 
-4. **Override `KAIR_USE_FULL_UPDATE=1`**:
-   ```bash
-   # PowerShell: $env:KAIR_USE_FULL_UPDATE=1; electron .
-   # Verificar en logs: "differential download DESHABILITADO"
-   ```
+### Archivos
 
-### Hotfix policy (P1-3 documentado)
-
-- NUNCA publicar updates sin test end-to-end de la versión final.
-- Si un update sale mal: publicar HOTFIX (v0.1.197+) que arregla el problema, no rollback.
-- Squirrel.Windows mantiene 1 versión anterior en disco como auto-rollback si la nueva crashea en primer launch.
-- `KAIR_USE_FULL_UPDATE=1` permite volver al modo conservador en cualquier momento sin recompilar.
-
-### Pendiente (NO incluido en este release)
-
-- P1-2 (prompt de trabajo sucio antes de auto-install): requiere cambios en renderer.js, deferido para v0.1.197.
-- P2-2 (limpieza de timers): deuda técnica consciente, bajo impacto.
-- P2-3 (cancelar download en before-quit): bajo impacto, deferido.
-
-### Archivos modificados
-
-- `package.json` (version bump)
-- `main.js` (P0-1, P0-3, P1-1, P2-1, P2-4, P2-5)
-- `installer.nsh` (P1-4)
-- `main/test-gestacion-auto-update-semanas.js` (renombrado desde `test-auto-update-semanas.js`)
-- `release-notes.md` (este archivo)
-
-### Tests
-
-- Suite completa `npm test` (si aplica al componente)
-- `node main/test-gestacion-auto-update-semanas.js` debe pasar (test rename preserva funcionalidad)
-- Validación end-to-end del update (instalar fresh, aplicar update, validar funcional)
+- `package.json` (versión 0.1.207)
+- `shared/kair-premium.css`, `shared/kair-design-tokens.css`, `shared/kair-components.css`
+- `AGENTS.md`, `README.md`, `CONTEXT.md`, `CHANGELOG.md`, `release-notes.md`

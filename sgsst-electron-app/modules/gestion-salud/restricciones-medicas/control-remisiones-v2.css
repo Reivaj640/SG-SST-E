@@ -5,26 +5,30 @@
    ============================================================ */
 
 .remctl-scope {
-  --remctl-bg: #eef1f7;
+  /* 📦777 — Tokens ALINEADOS a la paleta premium canónica de la app
+     (shared/kair-design-tokens.css, la que usan Recursos, Gestión Integral y los
+     demás submódulos). */
+  --remctl-bg: #fbfcfb;
   --remctl-card: #ffffff;
-  --remctl-line: #e3e8f2;
-  --remctl-ink: #16233b;
-  --remctl-muted: #66738c;
-  --remctl-faint: #93a0b8;
-  --remctl-blue: #2456d6;
-  --remctl-blue-ink: #1b3f9e;
-  --remctl-blue-soft: #e8eefc;
-  --remctl-green: #0f9d63;
-  --remctl-green-soft: #e3f6ec;
-  --remctl-red: #d64550;
-  --remctl-red-soft: #fbe7e9;
-  --remctl-amber: #b97e12;
-  --remctl-amber-soft: #fbf1da;
-  --remctl-radius: 14px;
-  --remctl-radius-sm: 10px;
-  --remctl-font: 'Segoe UI', 'Manrope', system-ui, sans-serif;
-  --remctl-t: 180ms cubic-bezier(.4, 0, .2, 1);
-  --remctl-shadow: 0 1px 2px rgba(22, 35, 59, .05), 0 8px 24px rgba(22, 35, 59, .07);
+  --remctl-line: #e8ebee;
+  --remctl-ink: #14213d;
+  --remctl-muted: #748096;
+  --remctl-faint: #aab1bd;
+  --remctl-blue: #2057b8;
+  --remctl-blue-ink: #172c4c;
+  --remctl-blue-soft: #eaf1fb;
+  --remctl-green: #1bb888;
+  --remctl-green-soft: #e6f5ef;
+  --remctl-red: #da5563;
+  --remctl-red-soft: #fae6e9;
+  --remctl-amber: #e7a224;
+  --remctl-amber-soft: #fbf0db;
+  --remctl-radius: 20px;
+  --remctl-radius-sm: 12px;
+  --remctl-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --remctl-font-display: 'Manrope', 'DM Sans', sans-serif;
+  --remctl-t: 180ms ease-out;
+  --remctl-shadow: 0 2px 7px rgba(37, 56, 82, .08);
 }
 
 .remctl-scope {
@@ -56,7 +60,7 @@
 }
 .remctl-scope .remctl-header__icon svg { width: 20px; height: 20px; }
 .remctl-scope .remctl-header__text { flex: 1 1 auto; min-width: 0; }
-.remctl-scope .remctl-header__title { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.remctl-scope .remctl-header__title { margin: 0; font-family: var(--remctl-font-display); font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
 .remctl-scope .remctl-header__sub { margin: 2px 0 0; font-size: 12px; color: var(--remctl-muted); }
 .remctl-scope .remctl-header__chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -118,7 +122,7 @@
   padding: 13px 18px; border-bottom: 1px solid var(--remctl-line); flex: 0 0 auto;
 }
 .remctl-scope .remctl-card__head svg { width: 16px; height: 16px; color: var(--remctl-blue); }
-.remctl-scope .remctl-card__title { margin: 0; font-size: 14px; font-weight: 800; flex: 1; }
+.remctl-scope .remctl-card__title { margin: 0; font-family: var(--remctl-font-display); font-size: 15px; font-weight: 800; flex: 1; }
 .remctl-scope .remctl-card__count {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 4px 11px; border-radius: 999px;
@@ -220,24 +224,24 @@
 .remctl-scope .remctl-toast__title { margin: 0; font-size: 13px; font-weight: 800; }
 .remctl-scope .remctl-toast__msg { margin: 2px 0 0; font-size: 12px; color: var(--remctl-muted); line-height: 1.45; }
 
-/* ── Modo oscuro ── */
+/* ── Modo oscuro (paleta premium canónica: #0f172a / #1a2334 / #6ea8fe) ── */
 [data-theme="dark"] .remctl-scope, [data-theme="dark-legacy"] .remctl-scope {
-  --remctl-bg: #0f1622;
-  --remctl-card: #1a2434;
-  --remctl-line: #2a3a52;
+  --remctl-bg: #0f172a;
+  --remctl-card: #1a2334;
+  --remctl-line: #2f3d55;
   --remctl-ink: #e8edf5;
-  --remctl-muted: #9aabc3;
-  --remctl-faint: #6d7f99;
-  --remctl-blue: #5b8def;
-  --remctl-blue-ink: #8fb0f5;
-  --remctl-blue-soft: #22314d;
-  --remctl-green: #3ecf8e;
-  --remctl-green-soft: #17352a;
-  --remctl-red: #f2707a;
-  --remctl-red-soft: #3d2327;
-  --remctl-amber: #e8b34b;
-  --remctl-amber-soft: #3a3018;
-  --remctl-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px rgba(0, 0, 0, .4);
+  --remctl-muted: #a9b4c6;
+  --remctl-faint: #748096;
+  --remctl-blue: #6ea8fe;
+  --remctl-blue-ink: #8ab4f8;
+  --remctl-blue-soft: rgba(110, 168, 254, .16);
+  --remctl-green: #3ecf9a;
+  --remctl-green-soft: rgba(62, 207, 154, .16);
+  --remctl-red: #e56a76;
+  --remctl-red-soft: rgba(229, 106, 118, .16);
+  --remctl-amber: #f0b45a;
+  --remctl-amber-soft: rgba(240, 180, 90, .16);
+  --remctl-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .4);
 }
 
 /* ── Responsive ── */

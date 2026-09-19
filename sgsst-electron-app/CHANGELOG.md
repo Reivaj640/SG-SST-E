@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.207] - 2026-09-19
+
+### 🆕📦739-777 · Migración premium v2 de los submódulos (Inducciones → Remisiones)
+
+Segunda gran ola del rediseño premium (después de los homes de módulo, `📦730-738`): se migraron al dialecto **premium v2** todos los submódulos con UI propia, y se consolidó el sistema de diseño compartido.
+
+#### Sistema de diseño
+
+- **`shared/kair-premium.css`** (`📦749`) — extracción del "dialecto premium" (hero, KPI, chips, tasks, modules, segmented) scoped bajo `.kair-premium`, para reutilizar en cualquier submódulo.
+- **`shared/kair-design-tokens.css`** + **`shared/kair-components.css`** — tokens canónicos (azul `#2057b8`, tinta `#14213d`, muted `#748096`, borde `#e8ebee`, canvas `#fbfcfb`, DM Sans + Manrope, radios 20/12). Todos los submódulos migrados usan ESTA paleta.
+- **Header System v2** — breadcrumb + icon chip + título Manrope 800 + subtítulo + acciones, transparente sobre el canvas.
+- **Modo oscuro** — cobertura de los DOS atributos de la app (`data-theme="dark"` y `dark-legacy`); patrón reutilizable `[data-theme^="dark"]`.
+- **Cache-bust + test de humo** en cada migración.
+
+#### Submódulos migrados
+
+| 📦 | Submódulo | Detalle |
+|----|-----------|---------|
+| 739-746 | Inducciones | Gráficos SVG nativos, KPI cards con chips, blindaje anti-fugas CSS |
+| 740-741 | Capacitaciones / Presupuesto | Modal de período + rediseño de 3 vistas |
+| 743 | COPASST + Comité de Convivencia | Paquete premium (portal sin caja) |
+| 747-755 | Bandeja Integrada | Premium v2 + firma con imagen (CID) + toolbar compacta + paginación |
+| 748-749 | Dashboard principal | Hero + KPI + modules + pendientes (piloto del dialecto) |
+| 751 | Configuración | Capa scoped `.kair-config` + remapeo de tokens |
+| 756-758 | Skeleton + gráficos de los 7 homes | Esqueleto que encaja + barras HTML (sin deformar) |
+| 759-761 | Evaluación Inicial + Archivo/Retención | Reescritura premium v2 recableada al backend |
+| 762-769 | Evaluaciones Médicas (EMO) | Certificados persistidos + ancho completo + adjuntar PDF |
+| 763-764 | Rendición de Cuentas + 2.9.1 Bienes | Rediseño premium |
+| 770-771 | Evaluación y Selección (2.10.1) | Rediseño + tabs con subrayado + fix del botón Volver |
+| 772-773 | Perfil de Cargo (3.1.3) + FURAT (3.2.1) | Tokens premium en `:root` + Header System v2 |
+| 774 | Gestión del Cambio (2.11.1) | De 6 archivos a 1 par CSS+JS con el marcado embebido |
+| 775-777 | Restricciones/Remisiones (3.1.6) | Portal scoped (fix de fuga de tokens) + flujo completo de 3 pasos + vista previa + cancelar + alineación de paleta |
+
+#### Limpieza
+
+- Se eliminaron **decenas de archivos muertos** y código huérfano (p. ej. `restricciones-medicas-logic.js` pasó de ~60 KB a ~19 KB; Gestión del Cambio de 6 archivos a 1 par CSS+JS).
+- Regla documentada en `AGENTS.md`: al migrar una pantalla, borrar los archivos que reemplaza y sus loaders.
+
+#### Docs
+
+- `AGENTS.md` — playbook de migración, specs técnicas ST-01 a ST-08 (`📦750`) y una sección por migración con las lecciones aprendidas.
+- `docs/especificaciones-tecnicas-sg-sst-v1.md` — contrato técnico de los próximos submódulos.
+
+#### Archivos
+
+- `package.json` — versión `0.1.207`
+- `shared/kair-premium.css`, `shared/kair-design-tokens.css`, `shared/kair-components.css`
+- `AGENTS.md`, `README.md`, `CONTEXT.md`, `CHANGELOG.md`
+
 ## [0.1.205] - 2026-09-13
 
 ### 🆕📦738 · Sidebar lateral: rediseño premium visual (4 iteraciones)
