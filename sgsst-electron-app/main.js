@@ -3911,24 +3911,39 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
 
     // La primera fila son los encabezados (fila 1 del Excel)
     const headers = allData[0]; // Fila 1 del Excel
-    const rows = allData.slice(1); // Filas 2 en adelante del Excel
+    const expectedColumns = headers.length;
+
+    // 📦778 — Normalizar (pad/truncate) y DESCARTAR filas basura del Excel:
+    //   · filas VACÍAS (todas las celdas en blanco)
+    //   · ENCABEZADOS REPETIDOS en medio de la hoja
+    // El archivo real GI-FO-012 trae una copia del encabezado después de la
+    // primera tanda de datos + varias filas vacías; antes se contaban como
+    // registros (aparecían como una fila de encabezado "de datos" y engordaban
+    // los KPIs). Ver 📦778.
+    const normRow = function (row) {
+      var r = Array.isArray(row) ? row.slice(0, expectedColumns) : [];
+      while (r.length < expectedColumns) r.push('');
+      return r;
+    };
+    const keyDe = function (row) {
+      return row.map(function (c) { return String(c == null ? '' : c).trim().toLowerCase(); }).join('\u0001');
+    };
+    const headerKey = keyDe(normRow(headers));
+    const descartadas = { vacias: 0, encabezados: 0 };
+    const rows = [];
+    const rowNumbers = []; // nº de fila REAL del Excel (1-based) de cada fila válida
+    allData.slice(1).forEach(function (raw, idx) {
+      const excelRow = idx + 2; // la fila 1 del Excel es el encabezado
+      const row = normRow(raw);
+      const noVacia = row.some(function (c) { return c !== null && c !== undefined && String(c).trim() !== ''; });
+      if (!noVacia) { descartadas.vacias++; return; }
+      if (keyDe(row) === headerKey) { descartadas.encabezados++; return; }
+      rows.push(row);
+      rowNumbers.push(excelRow);
+    });
 
     sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
-    sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
-
-    // Validar y ajustar la longitud de las filas
-    const expectedColumns = headers.length;
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i].length < expectedColumns) {
-        // Rellenar con cadenas vacías si faltan columnas
-        while (rows[i].length < expectedColumns) {
-          rows[i].push('');
-        }
-      } else if (rows[i].length > expectedColumns) {
-        // Truncar si hay demasiadas columnas
-        rows[i] = rows[i].slice(0, expectedColumns);
-      }
-    }
+    sendLog(`[MAIN] Filas de datos válidas: ${rows.length} (descartadas: ${descartadas.vacias} vacías, ${descartadas.encabezados} encabezados repetidos)`);
 
     // Log para depuración
     sendLog(`[MAIN] Primeras 3 filas de datos:`, 'DEBUG');
@@ -3940,6 +3955,7 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
       success: true,
       headers: headers,
       rows: rows,
+      rowNumbers: rowNumbers,
       filePath: excelFilePath,
       companyName
     };

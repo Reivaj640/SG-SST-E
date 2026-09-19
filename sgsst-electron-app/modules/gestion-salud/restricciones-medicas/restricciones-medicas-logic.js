@@ -159,6 +159,31 @@ class RestriccionesMedicasComponent {
         this._controlV2.render();
     }
 
+    async showEstadisticasRemisionesPage() {
+        // 📦779 — premium v2: métricas derivadas del Control de Remisiones
+        // (mismo origen de datos: getControlRemisionesData).
+        this.container.innerHTML = '';
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
+        this.container.style.height = '100%';
+        this.container.style.flex = '1';
+        this.container.style.minHeight = '0';
+        this.container.style.overflow = 'hidden';
+        var self = this;
+
+        if (!window.EstadisticasRemisionesV2Component) {
+            console.error('❌ EstadisticasRemisionesV2Component no está cargado (index.html)');
+            this._renderFallbackCards();
+            return;
+        }
+        this._statsV2 = new window.EstadisticasRemisionesV2Component(this.container, {
+            companyName: this.companyName,
+            onBack: function () { self.render(); },
+            logMessage: this.logMessage
+        });
+        this._statsV2.render();
+    }
+
     // Agrega este método a la clase RestriccionesMedicasComponent
     showPlaceholder(featureName) {
         alert(`La funcionalidad '${featureName}' se implementará en el futuro.`);

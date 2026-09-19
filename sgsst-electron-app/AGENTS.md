@@ -2129,7 +2129,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Gestión del Cambio (2.11.1) | ✅ (📦774) | No usa `kair-premium`: capa propia scoped `.gdc-scope` + tokens `--gdc-*` + Header System v2 (marcado EMBEBIDO en el `.js`, no iframe) |
-| Restricciones y Remisiones (3.1.6) | ✅ (📦775-777) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`) y Control (`.remctl-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
+| Restricciones y Remisiones (3.1.6) | ✅ (📦775-779) | No usa `kair-premium`: portal scoped `.rm-portal-scope` + Enviar (flujo completo de 3 pasos, `.remenv-scope`), Control (`.remctl-scope`) y Estadísticas (`.remstat-scope`) embebidos + visor con tokens remapeados; paleta alineada a `kair-design-tokens` |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2145,6 +2145,8 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦775**: Restricciones y Remisiones (3.1.6) — segunda pasada premium: portal del módulo migrado a premium y **scoped** (`.rm-portal-scope`, se corrigió la fuga de `:root`/`*` al inyectarse con `innerHTML`), visor (`remisiones-view.css`) e informe (`generar-informe-remision.css`) con tokens remapeados a premium + dark en el informe, header del informe alineado con el cuerpo, limpieza de 9 archivos muertos y ~600 líneas huérfanas; el test subió a 62 checks.
 - **📦776**: Restricciones y Remisiones (3.1.6) — el flujo de **Enviar Remisión** ahora es UNO SOLO: los 3 pasos (Cargar PDF → Generar informe oficial → Enviar a la EPS) viven dentro del componente premium `enviar-remision-v2` (antes el paso 1 saltaba a la página vieja `generar-informe-remision.html` y a un modal de envío aparte, con otro diseño). El paso 3 trae **vista previa del informe** (nombre del documento + resumen + botón "Ver informe" que abre el visor) y un botón **Cancelar** con confirmación que reinicia el flujo sin borrar nada. Se borraron la página del informe, el modal de envío, `env-modal.css` y ~390 líneas más del `logic.js` (métodos + handlers del bridge viejo).
 - **📦777**: Restricciones y Remisiones (3.1.6) — **alineación de la paleta** de `enviar-remision-v2.css` y `control-remisiones-v2.css` a la canónica de la app (`shared/kair-design-tokens.css`, la de Recursos / Gestión Integral). Traían una paleta propia (`#2456d6` azul, `#eef1f7` fondo, `#e3e8f2` borde, `Segoe UI`, radio 14px) que se veía distinta; ahora usan `#2057b8` / `#fbfcfb` / `#e8ebee` / `DM Sans` + `Manrope` / radio 20px, y el modo oscuro `#0f172a` / `#1a2334` / `#6ea8fe`.
+- **📦778**: Control de Remisiones (3.1.6) — el Excel real `GI-FO-012` trae **encabezados repetidos y filas vacías** en el medio; el backend las contaba como registros (18 en vez de 8). Ahora `get-control-remisiones-data` **descarta filas vacías y encabezados repetidos** y devuelve **`rowNumbers`** (nº de fila real) para que el guardado por celda A1 no se desalinee.
+- **📦779**: Estadísticas de Remisiones (3.1.6) — nueva sección que **deriva métricas del Control** (KPIs + 6 gráficos: sexo, tipo de evaluación, rango de edad, concepto médico, top cargos y estado civil), con normalización de valores inconsistentes del Excel y el mismo dialecto premium v2.
 
 ---
 
@@ -3304,6 +3306,74 @@ Se movieron los 3 pasos DENTRO del componente premium, con su track de 3 pasos:
 Si un componente tiene un **track de pasos** pero delega los siguientes a **otra pantalla**, el usuario
 verá un salto de diseño. La solución es traer todos los pasos al mismo componente (o replicar el mismo
 Header/stepper/dialecto en la pantalla destino). Acá se eligió lo primero.
+
+---
+
+## 🆕 Control de Remisiones · filas basura del Excel (📦778, 2026-09-19)
+
+El Control de Remisiones mostraba **18 "registros"** cuando en realidad había **8**. La causa estaba en el
+archivo real `GI-FO-012 CONTROL DE REMISIONES.xlsx`: la hoja trae **una copia del encabezado en la fila 6**
+(después de la primera tanda de datos) y **9 filas vacías** (7-15) antes de la segunda tanda.
+
+- El handler `get-control-remisiones-data` (`main.js`) tomaba `allData[0]` como encabezados y
+  `allData.slice(1)` como datos → el encabezado repetido aparecía como **fila de datos** (resaltada por
+  `tbody tr:nth-child(even)`) y las filas vacías engordaban los KPIs (Pendientes).
+- **Fix (backend)**: al leer se **normalizan** las filas (pad/truncate a las columnas del encabezado) y se
+  **descartan** las filas vacías y las que repiten el encabezado. Log: `Filas de datos válidas: N
+  (descartadas: X vacías, Y encabezados repetidos)`.
+- **Fix crítico asociado**: al descartar filas, el **índice** de la fila ya no coincide con la **fila
+  real** del Excel, y el guardado de la última columna (`updateExcelCell` con dirección A1) habría
+  escrito en la fila equivocada. El backend ahora devuelve **`rowNumbers`** (nº de fila real, 1-based,
+  por cada fila válida) y el componente lo usa para armar la dirección (`U17` en vez de `U7`).
+- **Verificación**: contra el Excel real → 18 → **8 filas** (9 vacías + 1 encabezado descartados);
+  KPIs `8 / 8 / 0`; mapeo `rowNumbers` correcto (la 6ª fila válida es la fila 17 del Excel). Test `65/65`.
+
+### Regla
+
+Un Excel "de control" puede tener **encabezados repetidos** y **filas vacías** en el medio (copiar/pegar,
+bloques separados). Al leerlo para una tabla, **filtrar la basura en el backend** — y si se filtra,
+devolver el **número de fila real** para que las escrituras por celda (A1) no se desalineen.
+
+---
+
+## 🆕 Estadísticas de Remisiones · nueva sección (📦779, 2026-09-19)
+
+El card "Estadísticas de Remisiones" del portal 3.1.6 era un **placeholder** ("Próximamente"). Ahora es una
+pantalla real que **deriva sus métricas del Control de Remisiones** (mismo origen: `getControlRemisionesData`
+→ Excel `GI-FO-012`). No hay datos nuevos: se calcula sobre las filas del control.
+
+### Métricas
+
+- **KPIs**: total de remisiones, con seguimiento (última columna no vacía, igual que el Control), pendientes
+  y **edad promedio**.
+- **6 gráficos**: por sexo (donut SVG + leyenda), por tipo de evaluación (barras), por rango de edad
+  (columnas `<30/30-39/40-49/50-59/60+`), por concepto médico laboral (barras), top cargos (barras, top 6)
+  y por estado civil (barras).
+- **Nota al pie**: cuántas remisiones se analizaron y cuántas no tienen fecha de atención.
+
+### Decisiones
+
+- **Normalización de valores** (`#normSexo`, `#normEval`, `#normConcepto`, `#normCivil`): el Excel real trae
+  valores inconsistentes (`Masculino`/`MASCULINO`, `INGRESO`/`EVALUACIÓN MÉDICA DE INGRESO`,
+  `Soltero(a)`/`SOLTERO(A)`/`SEPARADO PARENTESCO: NINGUNO`). Sin normalizar, cada variante sería una
+  barra distinta.
+- **Barras como cajas HTML** (lección 📦758): nunca SVG estirado. El donut sí es SVG (proporción fija).
+- **Mismo dialecto premium v2** (`.remstat-scope`, tokens canónicos, dark en los 2 atributos), coherente
+  con Enviar y Control.
+- **Sin series por mes**: 5 de 8 remisiones no tienen "Fecha de Atención" en el Excel, así que una serie
+  temporal saldría casi vacía. Se muestra la nota y se omite ese gráfico.
+
+### Verificación
+
+- Arnés de Electron con el Excel real: KPIs `8 / 8 / 0 / 47 años`, 6 gráficos (donut 2, eval 4, edad 5,
+  concepto 2, cargos 6, EPS 3), claro y oscuro, **0 errores de consola**.
+- Test `main/test-remisiones-v2.js` → **77/77 OK** (12 checks nuevos de Estadísticas).
+
+### Archivos
+
+- `estadisticas-remisiones-v2.js` + `.css` (nuevos), `restricciones-medicas-logic.js`
+  (`showEstadisticasRemisionesPage`), `restricciones-medicas-home.html`/`.js` (`rmEnterEstadisticas`),
+  `index.html` (CSS+JS con cache-bust `REM-20260919-v3-estadisticas`).
 
 ---
 

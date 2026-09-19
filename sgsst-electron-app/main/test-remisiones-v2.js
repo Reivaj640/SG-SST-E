@@ -33,14 +33,19 @@ const F_ENV_JS = path.join(DIR, 'enviar-remision-v2.js');
 const F_ENV_CSS = path.join(DIR, 'enviar-remision-v2.css');
 const F_CTL_JS = path.join(DIR, 'control-remisiones-v2.js');
 const F_CTL_CSS = path.join(DIR, 'control-remisiones-v2.css');
+const F_STAT_JS = path.join(DIR, 'estadisticas-remisiones-v2.js');
+const F_STAT_CSS = path.join(DIR, 'estadisticas-remisiones-v2.css');
 const F_LOGIC = path.join(DIR, 'restricciones-medicas-logic.js');
 
 const envJs = fs.readFileSync(F_ENV_JS, 'utf8');
 const envCss = fs.readFileSync(F_ENV_CSS, 'utf8');
 const ctlJs = fs.readFileSync(F_CTL_JS, 'utf8');
 const ctlCss = fs.readFileSync(F_CTL_CSS, 'utf8');
+const statJs = fs.readFileSync(F_STAT_JS, 'utf8');
+const statCss = fs.readFileSync(F_STAT_CSS, 'utf8');
 const logic = fs.readFileSync(F_LOGIC, 'utf8');
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const mainJs = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
 const portal = fs.readFileSync(path.join(DIR, 'restricciones-medicas-home.html'), 'utf8');
 const viewCss = fs.readFileSync(path.join(DIR, 'remisiones-view.css'), 'utf8');
 
@@ -170,10 +175,18 @@ check('Control: usa getControlRemisionesData con la empresa',
   /electronAPI\.getControlRemisionesData\(this\.companyName\)/.test(ctlJs));
 check('Control: guarda con la FIRMA REAL del backend { filePath, cellAddress, newValue }',
   /electronAPI\.updateExcelCell\(\{[\s\S]*?filePath: this\.filePath,[\s\S]*?cellAddress:[\s\S]*?newValue: newValue[\s\S]*?\}\)/.test(ctlJs));
-check('Control: la dirección de celda es A1 (letras + fila con encabezado)',
-  /#direccionA1\(colIndex, rowIndex\)/.test(ctlJs) &&
+check('Control: la dirección de celda es A1 (letras + fila REAL del Excel, vía rowNumbers)',
+  /#direccionA1\(colIndex, excelRow\)/.test(ctlJs) &&
   /String\.fromCharCode\(65 \+ m\)/.test(ctlJs) &&
-  /return letras \+ \(rowIndex \+ 2\)/.test(ctlJs));
+  /return letras \+ excelRow/.test(ctlJs) &&
+  /this\.rowNumbers\[rowIndex\] \|\| \(rowIndex \+ 2\)/.test(ctlJs));
+check('Control: consume rowNumbers del backend (fila real tras filtrar basura)',
+  /this\.rowNumbers = Array\.isArray\(result\.rowNumbers\)/.test(ctlJs));
+check('Backend: get-control-remisiones-data descarta filas VACÍAS y ENCABEZADOS repetidos',
+  /const descartadas = \{ vacias: 0, encabezados: 0 \}/.test(mainJs) &&
+  /if \(keyDe\(row\) === headerKey\) \{ descartadas\.encabezados\+\+; return; \}/.test(mainJs) &&
+  /rowNumbers\.push\(excelRow\)/.test(mainJs) &&
+  /rowNumbers: rowNumbers,/.test(mainJs));
 check('Control: abre el Excel con openPath',
   /electronAPI\.openPath\(self\.filePath\)/.test(ctlJs));
 check('Ambos: avisos se mudan al <body> ENVUELTOS en su alcance (lección del modal)',
@@ -271,6 +284,39 @@ check('Visor: dark premium (--kair-primary #6ea8fe / bg #0f172a) en los 2 atribu
   /\[data-theme="dark"\] \.kair-body,\s*\n\[data-theme="dark-legacy"\] \.kair-body \{[\s\S]*?--kair-primary: #6ea8fe;[\s\S]*?--kair-bg-app: #0f172a;/.test(viewCss));
 check('Visor: sin colores viejos (#174ea6 / #4da6ff / 77, 166, 255)',
   !/#174ea6|#4da6ff|77, 166, 255/.test(viewCss));
+
+/* ══════════════ F. ESTADÍSTICAS DE REMISIONES (📦779) ══════════════ */
+check('index.html: carga la hoja y el componente de Estadísticas con cache-bust',
+  /estadisticas-remisiones-v2\.css\?v=/.test(indexHtml) && /estadisticas-remisiones-v2\.js\?v=/.test(indexHtml));
+check('Estadísticas: compila (vm.Script)',
+  (function () { try { new vm.Script(statJs, { filename: 'estadisticas-remisiones-v2.js' }); return true; } catch (e) { return false; } })());
+check('Estadísticas: expone window.EstadisticasRemisionesV2Component',
+  /window\.EstadisticasRemisionesV2Component\s*=\s*EstadisticasRemisionesV2Component/.test(statJs));
+check('Estadísticas: usa getControlRemisionesData (mismo origen que el Control)',
+  /electronAPI\.getControlRemisionesData\(this\.companyName\)/.test(statJs));
+check('Estadísticas: normaliza sexo/evaluación/concepto/estado civil/edad y arma los 6 gráficos',
+  /#normSexo\(/.test(statJs) && /#normEval\(/.test(statJs) && /#normConcepto\(/.test(statJs) &&
+  /#normCivil\(/.test(statJs) && /#rangoEdad\(/.test(statJs) &&
+  /#renderBars\(/.test(statJs) && /#renderCols\(/.test(statJs) && /#renderDonut\(/.test(statJs) &&
+  /#remstat-civil/.test(statJs) && !/#normEps\(/.test(statJs));
+check('Estadísticas: barras como cajas HTML (sin SVG estirado)',
+  /remstat-bar__fill/.test(statJs) && /remstat-col__bar/.test(statJs) && !/preserveAspectRatio/.test(statJs));
+check('Estadísticas: avisos al body envueltos + destroy + vigía',
+  /wrap\.className = 'remstat-scope'/.test(statJs) && /document\.body\.appendChild\(wrap\)/.test(statJs) &&
+  /destroy\(\)[\s\S]*?#limpiarCapas\(\)/.test(statJs) && /!host\.isConnected \|\| !self\.raiz \|\| !self\.raiz\.isConnected/.test(statJs));
+check('Estadísticas CSS: TODO bajo .remstat-scope, sin :root, sin genéricos',
+  scopedCssOk(statCss, '.remstat-scope').length === 0 &&
+  !/(^|\})\s*:root\s*\{/.test(statCss.replace(/\/\*[\s\S]*?\*\//g, '')) &&
+  !/^\s*\.(btn|card|badge|toast|modal|overlay|chip|tab)\s*[,{]/m.test(statCss));
+check('Estadísticas CSS: modo oscuro dark y dark-legacy',
+  /\[data-theme="dark"\] \.remstat-scope/.test(statCss) && /\[data-theme="dark-legacy"\] \.remstat-scope/.test(statCss));
+check('Estadísticas CSS: tokens alineados a la canónica (#2057b8 / #fbfcfb / DM Sans / 20px)',
+  /--remstat-blue: #2057b8;/.test(statCss) && /--remstat-bg: #fbfcfb;/.test(statCss) &&
+  /--remstat-font: 'DM Sans'/.test(statCss) && /--remstat-radius: 20px;/.test(statCss));
+check('logic.js: showEstadisticasRemisionesPage monta el componente',
+  /showEstadisticasRemisionesPage\(\)[\s\S]*?new window\.EstadisticasRemisionesV2Component\(this\.container, \{/.test(logic));
+check('Portal: la card de Estadísticas llama a rmEnterEstadisticas (ya no es placeholder)',
+  portal.indexOf('rmEnterEstadisticas()') >= 0 && portal.indexOf("rmPlaceholder('Estadísticas')") === -1);
 
 /* ══════════════ Reporte ══════════════ */
 let failed = 0;

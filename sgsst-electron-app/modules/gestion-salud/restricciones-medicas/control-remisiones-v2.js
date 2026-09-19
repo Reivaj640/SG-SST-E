@@ -104,6 +104,7 @@
 
       this.headers = [];
       this.rows = [];
+      this.rowNumbers = [];
       this.filePath = '';
       this.isDestroyed = false;
       this.raiz = null;
@@ -215,6 +216,7 @@
         if (result && result.success) {
           this.headers = Array.isArray(result.headers) ? result.headers : [];
           this.rows = Array.isArray(result.rows) ? result.rows : [];
+          this.rowNumbers = Array.isArray(result.rowNumbers) ? result.rowNumbers : [];
           this.filePath = result.filePath || '';
           if (this.rows.length) this.#renderTable();
           else {
@@ -318,15 +320,19 @@
         return;
       }
       try {
+        // 📦778 — el backend descarta filas vacías y encabezados repetidos, así
+        // que el índice de la fila ya no coincide con la fila real del Excel.
+        // `rowNumbers[rowIndex]` guarda el nº de fila REAL para escribir bien.
+        var excelRow = this.rowNumbers[rowIndex] || (rowIndex + 2);
         var result = await window.electronAPI.updateExcelCell({
           filePath: this.filePath,
-          cellAddress: this.#direccionA1(colIndex, rowIndex),
+          cellAddress: this.#direccionA1(colIndex, excelRow),
           newValue: newValue
         });
         if (result && result.success) {
           if (input) { input.classList.add('is-saved'); setTimeout(function () { input.classList.remove('is-saved'); }, 1400); }
           this.#toast('Guardado', 'La observación se guardó en el Excel de control.', 'success');
-          if (this.logMessage) this.logMessage('Control de remisiones: celda actualizada (' + this.#direccionA1(colIndex, rowIndex) + ').');
+          if (this.logMessage) this.logMessage('Control de remisiones: celda actualizada (' + this.#direccionA1(colIndex, excelRow) + ').');
         } else {
           this.#toast('Error al guardar', (result && result.error) || 'No se pudo escribir en el Excel.', 'error');
         }
@@ -336,11 +342,11 @@
       }
     }
 
-    /* Columna 0 → A, 13 → N, 26 → AA … + fila (encabezado ocupa la 1) */
-    #direccionA1(colIndex, rowIndex) {
+    /* Columna 0 → A, 13 → N, 26 → AA … ; excelRow = nº de fila REAL del Excel (1-based) */
+    #direccionA1(colIndex, excelRow) {
       var n = colIndex + 1, letras = '';
       while (n > 0) { var m = (n - 1) % 26; letras = String.fromCharCode(65 + m) + letras; n = Math.floor((n - 1) / 26); }
-      return letras + (rowIndex + 2);
+      return letras + excelRow;
     }
 
     #esc(s) {
