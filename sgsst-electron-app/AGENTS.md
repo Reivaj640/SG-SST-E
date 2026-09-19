@@ -2126,6 +2126,8 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Dashboard principal | ✅ (📦749) | Piloto — referencia de implementación |
 | Configuración | ✅ (📦751) | No usa `kair-premium`: capa propia scoped `.kair-config` + Header System v2 |
 | Bandeja Integrada | ✅ (📦752) | No usa `kair-premium`: capa propia `premium.css` (tokens + remapeo legacy) + topbar/segmentado propios. Es un iframe con scope aislado |
+| Perfil de Cargo y Profesiograma | ✅ (📦772) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
+| Reportes de Accidentes (FURAT) | ✅ (📦773) | No usa `kair-premium`: tokens premium en su `:root` propio (iframe aislado) + Header System v2 |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -2135,6 +2137,8 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦748**: Dashboard premium v2 (CSS scoped `.kair-dashboard` en `styles.css`).
 - **📦749**: Extracción del dialecto a `shared/kair-premium.css` scoped `.kair-premium`; dashboard migrado como piloto; `styles.css` vuelve a su rol de estilos legacy.
 - **📦751**: Configuración del Sistema migrada a premium v2 (capa scoped `.kair-config` + remapeo de tokens legacy; Header System v2 con breadcrumb + icono/título + tabs con subrayado; soporte dark/dark-legacy).
+- **📦772**: Perfil de Cargo y Profesiograma (3.1.3) migrado a premium v2 (tokens premium en su `:root`; Header System v2 con breadcrumb + icono/título; tabs con subrayado azul estilo Evaluación Inicial; modo oscuro en los 2 atributos; `destroy()` + cache-bust).
+- **📦773**: Reportes de Accidentes (3.2.1 · FURAT) migrado a premium v2 (tokens `--furat-*` remapeados en su `:root`; Header System v2; tabs con subrayado; modo oscuro cubriendo `dark` y `dark-legacy` con `[data-theme^="dark"]`; reset scoped; cache-bust triple).
 
 ---
 
@@ -2798,6 +2802,237 @@ Fixes:
 **Lección**: al agregar paginación sobre una API con cupo (Gmail), el scroll infinito es un
 multiplicador de requests. Hay que ponerle freno explícito (armado + cooldown) y hacer que las
 tareas automáticas (auto-refresh) cedan prioridad a la acción del usuario.
+
+---
+
+## 🆕 Perfil de Cargo y Profesiograma · Premium v2 (📦772, 2026-09-18)
+
+El submódulo **3.1.3** (`modules/gestion-salud/perfiles-cargo-profesiograma/`) se migró al estilo
+**premium v2** siguiendo el patrón de Evaluación Inicial (📦761) y Evaluación y Selección (📦770).
+
+### Cómo se monta (iframe)
+
+`renderer.js` hace `new PerfilesCargoProfesiogramaComponent(container, company, module, sub, safeBackToModuleCallback)`
+y el componente carga un **iframe** con la UI completa → per el patrón 📦761, el HTML se queda como
+archivo y el **wrapper versiona la URL**. El componente ahora tiene **`destroy()`** (remueve el
+listener de mensajes y limpia el contenedor) y el render hace
+`removeEventListener` + `addEventListener` para que **un render repetido no duplique el listener**.
+
+### Estrategia: tokens premium en su `:root` propio
+
+El CSS vive en un bloque `<style>` DENTRO del HTML (iframe aislado, no envenena la app). El diseño
+era variable-driven (`:root` con tokens genéricos `--primary`, `--bg-card`, `--border`…) — se
+**remapearon los valores** al dialecto premium (#2057B8 / #14213D / #748096 / #E8EBEE / sombras
+rgba(20,33,61,…)) y se agregaron variables nuevas (`--row-hover`, `--slate-soft`, `--dirty-bg`,
+`--sk-1/--sk-2`) para los colores que estaban hardcodeados.
+
+### Header System v2
+
+```
+.app-header                    ← transparente sobre el canvas (sin card/borde)
+  .breadcrumb                  ← Gestión de la Salud › 3.1.3 › Inicio (SE CONSERVÓ: el JS
+                                 lo usa — switchView escribe #bc-current con el nombre de la vista)
+  .app-header-row
+    .app-header-left           ← .header-icon (44×44, radio 12, blue-soft, SVG stethoscope)
+                                 + .app-title (Manrope 800, 20px) + .app-sub
+    .header-actions            ← 3 .header-btn (outline; Volver en primary) con SVG inline
+.tabs-bar                      ← transparente + línea gris 1px + tabs con subrayado
+```
+
+- **Tabs con subrayado** (patrón Evaluación Inicial): activa = `color: var(--primary)` +
+  `border-bottom-color: var(--primary)` (2px que se monta sobre la línea con `margin-bottom:-1px`);
+  hover SOLO cambia el color (sin fondo); contenedor con `flex-wrap: wrap` (no `overflow-x`).
+- **Iconos en SVG inline** en el header y las 7 tabs. El resto del módulo conserva Font Awesome
+  (el iframe lo carga por CDN — deuda conocida offline).
+- **Se conservó intacto**: los ids `btn-import`/`btn-export`/`btn-back`, los `data-view` de las 7
+  tabs, los 3 badges, el contrato postMessage `{ action: 'backToModule' }` (campo `action`, no `type`)
+  y TODA la lógica del viewer.js (sin cambios).
+
+### Modo oscuro
+
+Bloque de tokens para `[data-theme="dark"]` **y** `[data-theme="dark-legacy"]` (theme-manager.js
+propaga el tema a TODOS los iframes). Cubre superficies hardcodeadas: tags (5 variantes soft),
+toast (`.toast:not(.success):not(.error)` para no pisar los toasts de éxito/error), dialog-overlay
+e inputs/selects del formulario. El CSS del explorer (prestado de `responsable-sg-view.css`) ya
+tiene su propio modo oscuro.
+
+### Fixes incluidos
+
+- **`.view:not(.active) { display: none }`** — el toggle `.view`/`.view.active` tenía igual
+  especificidad (lección 📦759; funcionaba por orden, ahora es a prueba de reorden).
+- **Colores tokenizados**: gradiente del hero premium (#2057B8 → #14213D), tablas
+  (`th` → `var(--bg-body)`, `td` → `var(--border)`, hover → `var(--row-hover)`), ipr-cells,
+  dirty-row, skeleton, botones, search-box, dialog y detail-panel → todo con variables que el
+  bloque oscuro remapea.
+
+### Cache-bust (triple)
+
+1. `component.js` → URL del iframe `?v=PCP-20260918-premium`.
+2. `viewer.html` → script del viewer `?v=PCP-20260918-premium`.
+3. `index.html` → script del componente `?v=PCP-20260918-premium`.
+
+### Verificación
+
+`node tests/profesiograma/test-premium-v2.js` → **39/39 OK** (tokens, header v2, tabs, fix .view,
+colores, dark, componente con destroy/cache-bust, integridad JS/HTML). Los 12 tests históricos del
+módulo (`tests/profesiograma/test-*.js`): 6 pasan; 4 requieren el Excel GI-FO-047 en Temp (no está
+en esta máquina) y 2 tienen 1 FAIL preexistente de lógica del bridge (export: primera fila del
+Excel; prof-id: grupoOcupacional null) — el bridge NO se tocó en esta migración.
+
+### Pendiente
+
+- Reemplazar los iconos FA del cuerpo (KPIs, module-cards, hero, diálogos) por SVG inline y quitar
+  los 3 CDN (deuda offline, mismo pendiente de los viewers EMO).
+- Divergencia de nombres en el bridge: `matriz` devuelve `tipoExamenId` (camelCase) pero
+  `cargos:get` devuelve `tipo_examen_id` (snake_case) — revisar si algún día se toca el puente.
+
+---
+
+## 🆕 Reportes de Accidentes (FURAT) · Premium v2 (📦773, 2026-09-18)
+
+El submódulo **3.2.1** (`modules/gestion-salud/reportes-accidentes/`) se migró al estilo **premium v2**
+siguiendo el patrón de Evaluación Inicial (📦761), Evaluación y Selección (📦771) y Perfil de Cargo
+(📦772). Es un módulo **FURAT** (reporte de accidentes de trabajo) con dashboard, biblioteca de
+archivos por año y modales de carga/metadata.
+
+### Cómo se monta (iframe)
+
+`renderer.js` hace `new ReportesAccidentesComponent(container, company, module, sub, safeBackToModuleCallback)`
+y el componente carga un **iframe** con `reportes-accidentes-view.html`. El wrapper versiona la URL y
+ahora **`setupFrameCommunication` remueve el listener anterior antes de agregar** (un render repetido no
+duplica el listener; `destroy()` ya existía y lo remueve).
+
+### Estrategia: tokens premium en su `:root` propio
+
+El CSS (`reportes-accidentes-view.css`, ~3.2k líneas) ya tenía su propio namespace `--furat-*` en
+`:root`. Como el módulo vive en un **iframe aislado**, remapear los valores ahí es seguro (no filtra a
+la app). Se remapearon al dialecto premium: azul `#2057b8`, tinta `#14213d`, muted `#98a2b3`,
+borde `#e8ebee`, canvas `#fbfcfb`, sombras `rgba(37,56,82,…)`, tipografía DM Sans + Manrope. Se
+agregaron variables nuevas para las superficies que estaban **hardcodeadas** (`--furat-row-hover`,
+`--furat-slate-soft`, `--furat-blue-soft`, `--furat-header-icon-bg`, `--furat-line-soft`).
+
+### Header System v2
+
+```
+.furat-header-v2               ← transparente sobre el canvas (sin card/borde)
+  .furat-breadcrumb            ← Gestión de la Salud › 3.2.1 › Reportes de Accidentes
+  .furat-header-row
+    .furat-header-left         ← .furat-header-icon (44×44, radio 12, var(--furat-header-icon-bg), SVG shield)
+                                 + .furat-title (Manrope 800, 20px) + .furat-subtitle
+    .furat-header-actions      ← .furat-header-company (SVG building + #header-company-text)
+                                 + .furat-back-btn (outline) con SVG inline
+  .em-tabs                     ← tabs con subrayado (ver abajo)
+```
+
+- **Contrato conservado**: `#backBtn` (el viewer postea `back-to-module-request`), `#header-company-text`,
+  `.em-tabs` / `.em-tab` / `.em-tab--active` (el viewer engancha el click y alterna la clase) y
+  `data-view="dashboard|library"`. **No renombrar** esas clases: el JS las busca por nombre.
+- **Iconos SVG inline** en el header y las 2 tabs. Se quitó el CDN de **Bootstrap Icons** (no se usaba
+  en ningún lado). Font Awesome se conserva para el cuerpo del módulo (KPIs, tablas, modales).
+
+### Tabs con subrayado (patrón Evaluación Inicial)
+
+La línea es del contenedor (`border-bottom: 1px solid var(--furat-border)`) y la tab activa monta su
+subrayado de 2px encima (`margin-bottom: -1px`). Hover **solo cambia el color** (sin fondo). El
+contenedor usa **`flex-wrap: wrap`** (no `overflow-x`, lección del chip cortado 📦754).
+
+### Modo oscuro: los DOS atributos con UN selector
+
+🚨 **Truco reutilizable**: la app aplica `data-theme="dark"` (tema Sistema) y `data-theme="dark-legacy"`
+(Oscuro manual). En vez de duplicar las **128 reglas** oscuras, se usa el selector de atributo
+**`[data-theme^="dark"]`** (empieza con "dark"), que matchea ambos. Un solo reemplazo global
+`[data-theme="dark"]` → `[data-theme^="dark"]` cubrió todo el archivo.
+- El bloque de tokens oscuros define también las variables nuevas del header (`--furat-header-icon-bg`, etc.).
+- Se eliminaron las reglas viejas de header con hex fijo (`#1e1e2f` / `#3a3a4d`): ya no hacen falta porque
+  todo el header está tokenizado.
+
+### Higiene de CSS
+
+- **Reset scoped**: `* { … }` → `body, .furat-app, .furat-app * { … }` (por si algún día se linkea fuera
+  del iframe).
+- **Código muerto eliminado**: el bloque viejo `.furat-header*` (0 usos) tenía **propiedades huérfanas y
+  una llave de más** (el archivo venía desbalanceado 623/624). Con la limpieza quedó **596/596**. También
+  se eliminó el bloque **duplicado** de `.k-section-card` / `.header-back-btn` / `.em-tabs` (había dos
+  copias del mismo header).
+- Se reemplazaron los tokens viejos `#f8f9fa` / `#dee2e6` / `#5a6378` / `#174ea6` (ya no existen en el CSS).
+
+### 🐛 Fallo de diseño encontrado en la validación visual: el BODY scrolleaba
+
+El usuario mandó una captura donde se veían **solo las tabs pegadas al borde superior** y el header
+(breadcrumb + título + Volver) había desaparecido. Diagnóstico con un arnés de Electron que mide
+geometría (`getBoundingClientRect` + `scrollHeight`): el body medía **1310px** contra un viewport de
+**755px** y `.kair-container` medía **1038px** (se estiraba con el contenido). Causa: el CSS tenía
+`body { min-height: 100vh; overflow-y: auto }` y `.furat-app { min-height: 100vh }`. Con `min-height`
+el contenedor **crece con el contenido**, así que el `overflow-y: auto` interno nunca se activa y el
+que scrollea es el **body** → al bajar, el header se va de pantalla. Es exactamente el gotcha 📦682 de
+este archivo ("Body debe ser `height:100vh + overflow:hidden`, no `min-height`").
+- **Fix**: `body { height: 100vh; overflow: hidden }`, `.furat-app { height: 100vh; min-height: 0;
+  overflow: hidden }` y `.kpi-strip { flex-shrink: 0 }`. Medido después: `body.scrollHeight == innerHeight`
+  (755) y al scrollear el contenido (`.furat-view` → `scrollTop 555`) el header queda en `top: 0`.
+- **Segundo arreglo**: el `.kpi-strip` iba **a todo el ancho** (flush) mientras el header y las cards
+  están inset ~23px → se veía desalineado. Ahora lleva
+  `margin: 0 clamp(16px, 1.8vw, 28px) 16px`.
+- **Receta de verificación visual** (arnés temporal, en `.gitignore`): cargar la vista real en un
+  `BrowserWindow`, `showInactive()`, y medir con `executeJavaScript`: rect del header/tabs/kpi, `body.scrollHeight`
+  vs `innerHeight`, el scroller real y su `scrollHeight`, y las fuentes/colores calculados. Con la ventana
+  **sin mostrar** Electron mide todo en 0 → hay que usar `win.showInactive()`. Y ojo: el scroller de este
+  módulo es **`.furat-view--active`** (no `.k-main-content`).
+
+### 🐛 fix2 — el iframe no llenaba el alto (contenido recortado)
+
+Segunda captura del usuario: **"no se ve nada"** — se veían el header y las tabs, pero ni la franja de
+KPIs ni el contenido. Diagnóstico con un arnés que monta el componente dentro de la cadena REAL de la
+app (`#main-content → .main-canvas → .module-content-area → .submodule-content`, sin login):
+- La cadena SÍ es definida (`#main-content` = 735px en 1280×800, 508px en 1146×573).
+- Con el arnés, el iframe mide 715px y la franja de KPIs aparece en `top: 175`. Con las dos variantes
+  (vieja y nueva) de `logic.js`. O sea: la cadena por sí sola no explicaba el síntoma.
+- Lo que sí era frágil: `logic.js` ponía el **contenedor en `height: auto` + `min-height: 100%`** y el
+  **iframe en `min-height: 100%`**, una resolución circular que en algunos contextos cae al alto por
+  defecto del iframe (~150px) → solo se veía el header y el resto quedaba recortado (más aún con
+  `overflow: hidden`).
+- **Fix**: el iframe se estira con `flex: 1; height: 100%; min-height: 0; display: block` (el
+  contenedor ya es `flex column`), y el contenedor pasa a `height: 100%; min-height: 0; overflow: hidden`
+  (el scroll vive DENTRO del iframe, no en el contenedor padre). Se quitó `height: auto` +
+  `min-height: 100%` y el `scrolling`/`overflow` del iframe.
+- **CSS**: se cambió `height: 100vh` por `html, body { height: 100% }` + `body { height: 100% }` y
+  `.furat-app { height: 100% }` — es el patrón que ya usan `frecuencia-accidentalidad` y
+  `severidad-accidentalidad` (iframes hermanos que sí funcionan). `vh` dentro de un iframe anidado
+  puede desincronizarse; `%` contra la cadena real es lo probado en esta app.
+- **Cache-bust**: se bumpeó el token a `FURAT-20260918-premium-fix2` (CSS + viewer + logic.js en
+  `index.html`) — el arreglo anterior se había hecho SIN bumpear el token, así que el usuario podía
+  seguir viendo el CSS viejo cacheado. **Regla**: cada vez que se toca el CSS/HTML/JS del módulo,
+  bumpear el token, aunque sea el mismo día.
+- Test: `node tests/reportes-accidentes/test-premium-v2.js` → **47/47 OK** (se agregaron 2 checks del
+  iframe y 2 del contenedor).
+
+### 🚨 EOL: el diff salía como "todo el archivo cambiado"
+
+`git ls-files --eol` mostró que **todo el directorio está `i/lf w/crlf`**: el índice guarda LF y el
+working tree tiene CRLF (checkout de Windows). Git **no marca** los archivos que no se tocan (usa la
+caché de stat), pero al **tocar** un archivo compara el CRLF del working contra el LF del índice y el
+diff sale de **miles de líneas**. Fix: normalizar los archivos editados a **LF** (el EOL del índice).
+Con eso el diff bajó a 298/377 en el CSS y 32/24 en el HTML. **Regla**: antes de editar un archivo,
+correr `git ls-files --eol -- <ruta>`; si dice `i/lf w/crlf` y lo vas a tocar, normalizá a LF al final
+(o esperá un diff gigante).
+
+### Cache-bust (triple)
+
+1. `logic.js` → URL del iframe `&v=FURAT-20260918-premium`.
+2. `view.html` → `<link>` del CSS y `<script>` del viewer con `?v=FURAT-20260918-premium`.
+3. `index.html` → script de `reportes-accidentes-logic.js?v=FURAT-20260918-premium`.
+
+### Verificación
+
+`node tests/reportes-accidentes/test-premium-v2.js` → **41/41 OK** (tokens, header v2, tabs, dark con
+`^="dark"`, reset scoped, componente con guard/cache-bust, integridad JS, cache-bust triple, CDN).
+Los 2 tests funcionales del módulo quedan como deuda (el módulo no tenía tests antes de 📦773).
+
+### Pendiente
+
+- Reemplazar los iconos FA del cuerpo (KPIs, tablas, modales, dropzone) por SVG inline y quitar el CDN
+  de Font Awesome (deuda offline, mismo pendiente que los viewers EMO y el 3.1.3).
+- El `.kpi-strip` sigue a ancho completo (flush) mientras el header está inset: es el diseño previo; si
+  se quiere alinear, envolverlo con el mismo `clamp(...)` del header.
 
 
 

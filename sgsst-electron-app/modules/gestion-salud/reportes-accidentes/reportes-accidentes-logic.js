@@ -17,22 +17,30 @@ class ReportesAccidentesComponent {
         const viewerFrame = document.createElement('iframe');
         viewerFrame.id = 'furat-viewer-frame';
         viewerFrame.style.width = '100%';
-        viewerFrame.style.minHeight = '100%';
+        // 📦773-fix2 — El iframe DEBE llenar el alto del módulo. Antes usaba
+        // min-height:100% sobre un contenedor con height:auto → resolución
+        // circular → el iframe caía a su alto por defecto (~150px) y el
+        // contenido quedaba recortado. Ahora: flex:1 + min-height:0 (el
+        // contenedor ya es flex column) para que ocupe todo el espacio.
+        viewerFrame.style.flex = '1';
+        viewerFrame.style.height = '100%';
+        viewerFrame.style.minHeight = '0';
         viewerFrame.style.border = 'none';
-        viewerFrame.scrolling = 'auto';
-        // 📦683 — Permitir scroll del iframe cuando el contenido es más grande
-        viewerFrame.style.overflow = 'auto';
+        viewerFrame.style.display = 'block';
 
         // Construir la URL con parámetros de la empresa y módulo
-        const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        // 📦773 — ?v= cache-bust: sin esto un rediseño no se ve hasta limpiar la caché
+        const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=FURAT-20260918-premium-fix2`;
         viewerFrame.src = viewerUrl;
 
         // Limpiar contenedor y agregar iframe
         this.container.innerHTML = '';
-        this.container.style.height = 'auto';
-        this.container.style.minHeight = '100%';
-        // 📦683 — Permitir scroll del contenedor cuando el iframe es más grande
-        this.container.style.overflow = 'auto';
+        // 📦773-fix2 — El contenedor mantiene height:100% (el que ya trae
+        // .submodule-content) y NO permite scroll propio: el scroll vive
+        // DENTRO del iframe (.k-main-content), no en el contenedor padre.
+        this.container.style.height = '100%';
+        this.container.style.minHeight = '0';
+        this.container.style.overflow = 'hidden';
         this.container.appendChild(viewerFrame);
 
         // Establecer comunicación entre frames
@@ -40,6 +48,10 @@ class ReportesAccidentesComponent {
     }
 
     setupFrameCommunication(viewerFrame) {
+        // 📦773 — Evitar listeners duplicados si render() se llama más de una vez
+        if (this._messageHandler) {
+            window.removeEventListener('message', this._messageHandler);
+        }
         // Escuchar mensajes del iframe
         const messageHandler = (event) => {
             // Solo procesar mensajes del propio iframe FURAT

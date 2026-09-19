@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <!-- kair-* CSS del file explorer (reuso del Responsable SG) -->
     <link rel="stylesheet" href="../../../modules/recursos/responsable-sg/responsable-sg-view.css">
 
@@ -17,22 +17,31 @@
            SISTEMA VISUAL OFICIAL (K+AIR)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
         :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --primary-light: #e8f0fe;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-            --bg-body: #f0f2f5;
+            --primary: #2057B8;
+            --primary-hover: #1A4A9E;
+            --primary-light: #EDF3FC;
+            --success: #1BB888;
+            --success-hover: #12996F;
+            --warning: #E7A224;
+            --warning-hover: #B07A15;
+            --danger: #DA5563;
+            --danger-hover: #C13B4B;
+            --info: #5B6B8C;
+            --text-dark: #14213D;
+            --text-muted: #748096;
+            --text-3: #9AA4B8;
+            --bg-body: #FBFCFB;
             --bg-card: #ffffff;
-            --border: #dee2e6;
+            --border: #E8EBEE;
+            --row-hover: #F6F8FB;
+            --slate-soft: #EEF1F6;
+            --dirty-bg: #FCF4E4;
+            --sk-1: #EEF1F6;
+            --sk-2: #DFE4E9;
             --radius: 0.5rem;
-            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-            --shadow-md: 0 5px 15px rgba(0,0,0,0.08);
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+            --shadow-sm: 0 1px 2px rgba(20,33,61,.04), 0 1px 6px rgba(20,33,61,.03);
+            --shadow-md: 0 6px 24px rgba(20,33,61,.08), 0 2px 8px rgba(20,33,61,.04);
+            --shadow-lg: 0 16px 48px rgba(20,33,61,.16), 0 4px 12px rgba(20,33,61,.08);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
@@ -48,16 +57,15 @@
             overflow: hidden;
         }
 
-        /* ━━━ HEADER (BREADCRUMB + ACTIONS) ━━━ */
+        /* ━━━ HEADER v2 (breadcrumb + icono/título + acciones, transparente) ━━━ */
         .app-header {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1.5rem;
-            background: white;
-            border-bottom: 1px solid var(--border);
+            flex-direction: column;
+            gap: 4px;
+            padding: 14px 1.5rem 0;
+            background: transparent;
+            border-bottom: none;
             flex-shrink: 0;
-            gap: 1rem;
         }
         .breadcrumb {
             display: flex;
@@ -65,63 +73,102 @@
             gap: 0.5rem;
             font-size: 0.8125rem;
             color: var(--text-muted);
-            flex: 1;
             min-width: 0;
         }
         .breadcrumb a { color: var(--text-muted); text-decoration: none; }
         .breadcrumb a:hover { color: var(--primary); }
-        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .breadcrumb .current { color: var(--primary); font-weight: 600; }
         .breadcrumb .sep { opacity: 0.5; }
+
+        .app-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .app-header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+        .header-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--primary-light);
+            color: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            flex: none;
+        }
+        .header-icon svg { width: 21px; height: 21px; }
+        .app-titles { min-width: 0; }
+        .app-title {
+            font-family: 'Manrope', 'Roboto', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            line-height: 1.25;
+            color: var(--text-dark);
+        }
+        .app-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
+            flex: none;
         }
         .header-btn {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: #f8f9fa;
+            gap: 7px;
+            padding: 8px 14px;
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 0.8rem;
+            font-weight: 600;
             color: var(--text-dark);
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap;
         }
         .header-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+        .header-btn svg { width: 15px; height: 15px; flex: none; }
         .header-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
         .header-btn.primary:hover { background: var(--primary-hover); color: white; }
 
-        /* ━━━ TABS ━━━ */
+        /* ━━━ TABS (subrayado, patrón Evaluación Inicial) ━━━ */
         .tabs-bar {
             display: flex;
             align-items: center;
-            gap: 0;
-            background: white;
+            gap: 6px;
+            background: transparent;
             border-bottom: 1px solid var(--border);
             padding: 0 1.5rem;
             flex-shrink: 0;
-            overflow-x: auto;
+            flex-wrap: wrap;
         }
         .tab {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 0.75rem 1rem;
+            gap: 7px;
+            padding: 10px 12px;
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
             color: var(--text-muted);
             font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
             white-space: nowrap;
-            transition: all 0.2s;
+            transition: color 0.2s;
         }
-        .tab:hover { color: var(--primary); background: rgba(23, 78, 166, 0.04); }
-        .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+        .tab svg { width: 15px; height: 15px; }
+        .tab:hover { color: var(--text-dark); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
         .tab .badge {
             display: inline-block;
             padding: 1px 7px;
@@ -139,7 +186,7 @@
             padding: 1.5rem;
             min-height: 0;
         }
-        .view { display: none; }
+        .view:not(.active) { display: none; }
         .view.active { display: block; }
         #view-explorer { padding: 0; }
         #view-explorer iframe { display: block; }
@@ -156,7 +203,7 @@
 
         /* ━━━ HOME VIEW ━━━ */
         .hero {
-            background: linear-gradient(135deg, #174ea6 0%, #1a3a6e 100%);
+            background: linear-gradient(135deg, #2057B8 0%, #14213D 100%);
             border-radius: 10px;
             padding: 28px 36px;
             color: white;
@@ -212,7 +259,7 @@
             margin-bottom: 1.5rem;
         }
         .kpi {
-            background: white;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 14px;
@@ -239,7 +286,7 @@
             gap: 14px;
         }
         .module-card {
-            background: white;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 18px;
@@ -266,7 +313,7 @@
 
         /* ━━━ TABLES ━━━ */
         .data-card {
-            background: white;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             box-shadow: var(--shadow-sm);
@@ -292,7 +339,7 @@
         .data-table th {
             text-align: left;
             padding: 10px 12px;
-            background: #f8f9fa;
+            background: var(--bg-body);
             border-bottom: 2px solid var(--border);
             font-weight: 600;
             font-size: 0.78rem;
@@ -302,10 +349,10 @@
         }
         .data-table td {
             padding: 10px 12px;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
-        .data-table tr:hover td { background: #fafbfc; }
+        .data-table tr:hover td { background: var(--row-hover); }
         .data-table .empty {
             text-align: center;
             padding: 32px;
@@ -318,7 +365,7 @@
         .ipr-cell {
             width: 28px; height: 24px;
             display: flex; align-items: center; justify-content: center;
-            background: #f1f3f5; color: #adb5bd;
+            background: var(--slate-soft); color: var(--text-3);
             border-radius: 4px;
             font-size: 0.7rem;
             font-weight: 700;
@@ -327,9 +374,9 @@
             user-select: none;
             border: 2px solid transparent;
         }
-        .ipr-cell:hover { background: #e2e6ea; transform: scale(1.1); }
+        .ipr-cell:hover { background: var(--border); transform: scale(1.1); }
         .ipr-cell.on { background: var(--success); color: white; }
-        .ipr-cell.on:hover { background: #1e7e34; }
+        .ipr-cell.on:hover { background: var(--success-hover); }
         .ipr-cell.dirty { border-color: var(--warning); position: relative; }
         .ipr-cell.dirty::after {
             content: '';
@@ -342,7 +389,7 @@
         }
 
         /* Dirty row indicator (cargo con cambios pendientes) */
-        tr.dirty-row { background: #fff8e6 !important; }
+        tr.dirty-row { background: var(--dirty-bg) !important; }
         tr.dirty-row td:first-child::before {
             content: '●';
             color: var(--warning);
@@ -356,14 +403,14 @@
             display: inline-flex; align-items: center; gap: 6px;
             padding: 6px 12px;
             border: 1px solid var(--border);
-            background: white;
+            background: var(--bg-card);
             color: var(--text-dark);
             border-radius: 6px;
             font-size: 0.8rem;
             cursor: pointer;
             transition: all 0.2s;
         }
-        .btn:hover { background: #f8f9fa; }
+        .btn:hover { background: var(--bg-body); }
         .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
         .btn.primary:hover { background: var(--primary-hover); }
         .btn.danger { color: var(--danger); border-color: var(--danger); }
@@ -374,7 +421,7 @@
         .search-box {
             display: flex; align-items: center; gap: 8px;
             padding: 6px 10px;
-            background: white;
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 6px;
             min-width: 240px;
@@ -407,7 +454,7 @@
             z-index: 1000;
         }
         .dialog {
-            background: white;
+            background: var(--bg-card);
             border-radius: 8px;
             width: 100%;
             max-width: 540px;
@@ -473,7 +520,7 @@
 
         /* Cargo detail panel */
         .detail-panel {
-            background: #f8f9fa;
+            background: var(--bg-body);
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 14px;
@@ -483,7 +530,7 @@
 
         /* Skeleton */
         .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background: linear-gradient(90deg, var(--sk-1) 25%, var(--sk-2) 50%, var(--sk-1) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 4px;
@@ -491,6 +538,46 @@
         @keyframes shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
+        }
+
+        /* ══ Modo oscuro (los 2 atributos que aplica theme-manager.js) ══ */
+        [data-theme="dark"], [data-theme="dark-legacy"] {
+            --primary: #5B93E8;
+            --primary-hover: #6EA3EF;
+            --primary-light: rgba(91,147,232,.16);
+            --success: #45C99B;
+            --success-hover: #3BA574;
+            --warning: #E8B455;
+            --warning-hover: #D9A63F;
+            --danger: #E8737F;
+            --danger-hover: #D96470;
+            --info: #98A4B8;
+            --text-dark: #E8EDF5;
+            --text-muted: #98A4B8;
+            --text-3: #6F7C93;
+            --bg-body: #131824;
+            --bg-card: #1B2230;
+            --border: #2C3648;
+            --row-hover: #232B3B;
+            --slate-soft: #232B3B;
+            --dirty-bg: rgba(232,180,85,.10);
+            --sk-1: #232B3B;
+            --sk-2: #2C3648;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.25);
+            --shadow-md: 0 6px 24px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.4);
+        }
+        [data-theme="dark"] .tag.success, [data-theme="dark-legacy"] .tag.success { background: rgba(69,201,155,.16); color: #45C99B; }
+        [data-theme="dark"] .tag.warning, [data-theme="dark-legacy"] .tag.warning { background: rgba(232,180,85,.16); color: #E8B455; }
+        [data-theme="dark"] .tag.danger, [data-theme="dark-legacy"] .tag.danger { background: rgba(232,115,127,.16); color: #E8737F; }
+        [data-theme="dark"] .tag.info, [data-theme="dark-legacy"] .tag.info { background: rgba(152,164,184,.16); color: #98A4B8; }
+        [data-theme="dark"] .tag.muted, [data-theme="dark-legacy"] .tag.muted { background: rgba(152,164,184,.16); color: #98A4B8; }
+        [data-theme="dark"] .toast:not(.success):not(.error), [data-theme="dark-legacy"] .toast:not(.success):not(.error) { background: #E8EDF5; color: #14213D; }
+        [data-theme="dark"] .dialog-overlay, [data-theme="dark-legacy"] .dialog-overlay { background: rgba(0,0,0,.6); }
+        [data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select, [data-theme="dark"] .form-group textarea,
+        [data-theme="dark-legacy"] .form-group input, [data-theme="dark-legacy"] .form-group select, [data-theme="dark-legacy"] .form-group textarea {
+            background: var(--bg-card);
+            color: var(--text-dark);
         }
     </style>
 </head>
@@ -505,47 +592,65 @@
             <span class="sep">›</span>
             <span class="current" id="bc-current">Inicio</span>
         </nav>
-        <div class="header-actions">
-            <button class="header-btn" id="btn-import" title="Importar GI-FO-047 desde Excel">
-                <i class="fas fa-file-excel"></i>
-                <span>Importar Excel</span>
-            </button>
-            <button class="header-btn" id="btn-export" title="Exportar profesiograma a Excel">
-                <i class="fas fa-download"></i>
-                <span>Exportar Excel</span>
-            </button>
-            <button class="header-btn primary" id="btn-back">
-                <i class="fas fa-arrow-left"></i>
-                <span>Volver</span>
-            </button>
+        <div class="app-header-row">
+            <div class="app-header-left">
+                <div class="header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 3.5h3l1.5 4-2 1.5a12.5 12.5 0 0 0 6.7 6l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 2.8 5.7a2 2 0 0 1 2-2.2"/></svg>
+                </div>
+                <div class="app-titles">
+                    <h1 class="app-title">Perfil de Cargo y Profesiograma</h1>
+                    <p class="app-sub">Matriz de exámenes médicos ocupacionales por cargo (GI-FO-047).</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" id="btn-import" title="Importar GI-FO-047 desde Excel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6"/><path d="m9.5 14.5 2.5 2.5 2.5-2.5"/></svg>
+                    <span>Importar Excel</span>
+                </button>
+                <button class="header-btn" id="btn-export" title="Exportar profesiograma a Excel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+                    <span>Exportar Excel</span>
+                </button>
+                <button class="header-btn primary" id="btn-back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+                    <span>Volver</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- TABS -->
     <div class="tabs-bar">
         <button class="tab active" data-view="home">
-            <i class="fas fa-home"></i> Inicio
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+            Inicio
         </button>
         <button class="tab" data-view="matriz">
-            <i class="fas fa-table"></i> Matriz de Exámenes
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg>
+            Matriz de Exámenes
             <span class="badge" id="badge-cargos">0</span>
         </button>
         <button class="tab" data-view="pruebas">
-            <i class="fas fa-stethoscope"></i> Descripción de Pruebas
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 3.5h3l1.5 4-2 1.5a12.5 12.5 0 0 0 6.7 6l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 2.8 5.7a2 2 0 0 1 2-2.2"/></svg>
+            Descripción de Pruebas
             <span class="badge" id="badge-pruebas">0</span>
         </button>
         <button class="tab" data-view="recomendaciones">
-            <i class="fas fa-exclamation-triangle"></i> Recomendaciones
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            Recomendaciones
         </button>
         <button class="tab" data-view="vacunacion">
-            <i class="fas fa-syringe"></i> Vacunación
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4L15 5z"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/></svg>
+            Vacunación
             <span class="badge" id="badge-vacunas">0</span>
         </button>
         <button class="tab" data-view="alturas">
-            <i class="fas fa-shield-alt"></i> Trabajo en Alturas
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/></svg>
+            Trabajo en Alturas
         </button>
         <button class="tab" data-view="explorer">
-            <i class="fas fa-folder-open"></i> Perfiles de Cargo
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+            Perfiles de Cargo
         </button>
     </div>
 
@@ -608,7 +713,7 @@
                     <div class="desc">Requisitos y restricciones para actividades de trabajo en alturas según hallazgos.</div>
                 </div>
                 <div class="module-card" data-action="open-explorer">
-                    <div class="icon" style="background:#6c757d"><i class="fas fa-folder-open"></i></div>
+                    <div class="icon" style="background:var(--text-muted)"><i class="fas fa-folder-open"></i></div>
                     <div class="title">Perfiles de Cargo</div>
                     <div class="desc">Explorador de archivos del submódulo: navegación, preview y descarga de los perfiles y documentos asociados.</div>
                 </div>
@@ -821,6 +926,6 @@
     <!-- DIALOG OVERLAY (se inyecta dinámicamente) -->
     <div id="dialog-host"></div>
 
-    <script src="./perfiles-cargo-profesiograma-viewer.js"></script>
+    <script src="./perfiles-cargo-profesiograma-viewer.js?v=PCP-20260918-premium"></script>
 </body>
 </html>

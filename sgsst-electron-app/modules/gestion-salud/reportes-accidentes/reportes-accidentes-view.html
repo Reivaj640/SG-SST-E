@@ -4,48 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FURAT - Gestión de Reportes de Accidentes</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="reportes-accidentes-view.css">
+    <link rel="stylesheet" href="reportes-accidentes-view.css?v=FURAT-20260918-premium-fix2">
 </head>
 <body>
     <div class="furat-app">
-        <!-- 📦678 — Header estandarizado al patrón del 3.1.4 (k-section-card + header-back-btn).
-             Mismo estilo que los módulos EMO, Gestión del Cambio, Planes, etc. -->
-        <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
-            <!-- Fila 1: contenido principal (título + company + volver) -->
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-                <div style="display:flex; align-items:center; gap:0.75rem;">
-                    <i class="fas fa-shield-alt" style="color:#174ea6; font-size:1.25rem;"></i>
-                    <div>
-                        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Reportes de Accidentes</h3>
-                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.1 · FURAT</p>
+        <!-- 📦773 — HEADER SYSTEM v2 (premium). Breadcrumb + icon chip + título
+             Manrope + subtítulo + acciones. Transparente sobre el canvas.
+             Contrato conservado: #backBtn, #header-company-text, .em-tabs/.em-tab
+             (viewer.js engancha el click y alterna em-tab--active) y data-view. -->
+        <header class="furat-header-v2">
+            <nav class="furat-breadcrumb" aria-label="Ruta de navegación">
+                <span>Gestión de la Salud</span>
+                <span class="furat-breadcrumb__sep">›</span>
+                <span>3.2.1</span>
+                <span class="furat-breadcrumb__sep">›</span>
+                <strong>Reportes de Accidentes</strong>
+            </nav>
+            <div class="furat-header-row">
+                <div class="furat-header-left">
+                    <span class="furat-header-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </span>
+                    <div class="furat-header-titles">
+                        <h1 class="furat-title">Reportes de Accidentes</h1>
+                        <p class="furat-subtitle">Gestión de la Salud — 3.2.1 · FURAT</p>
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:0.75rem;">
-                    <span class="k-section-card__company">
-                        <i class="kair-icon-building"></i>
+                <div class="furat-header-actions">
+                    <span class="furat-header-company">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
                         <span id="header-company-text">—</span>
                     </span>
-                    <div class="k-section-card__divider"></div>
-                    <button class="header-back-btn" id="backBtn" title="Volver al módulo">
-                        <i class="fas fa-arrow-left"></i> Volver
+                    <button class="furat-back-btn" id="backBtn" type="button" title="Volver al módulo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        <span>Volver</span>
                     </button>
                 </div>
             </div>
-            <!-- Fila 2: tabs integrados -->
             <nav class="em-tabs" role="tablist">
                 <button class="em-tab em-tab--active" data-view="dashboard" role="tab">
-                    <i class="fas fa-chart-pie" aria-hidden="true"></i>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
                     <span>Resumen</span>
                 </button>
                 <button class="em-tab" data-view="library" role="tab">
-                    <i class="fas fa-folder-open" aria-hidden="true"></i>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
                     <span>Biblioteca</span>
                 </button>
             </nav>
-        </div>
+        </header>
 
         <!-- 📦658 — KPI Strip oficial (Sistema Visual v1.0) -->
         <div class="kpi-strip" role="region" aria-label="Indicadores de reportes de accidentes">
@@ -638,7 +646,7 @@
     <!-- 📦676 — Sistema de notificaciones moderno unificado (KAIRToast).
          Se autoinstancia en window.KAIRToast. Mismo sistema que el resto de la app. -->
     <script src="../../../assets/js/kair-toast.js"></script>
-    <script src="reportes-accidentes-viewer.js"></script>
+    <script src="reportes-accidentes-viewer.js?v=FURAT-20260918-premium-fix2"></script>
     <!-- 📦608-fix15 — File-viewer bundle (IIFE web-full) + helper genérico -->
     <script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
     <script src="../../../shared/file-viewer.js"></script>

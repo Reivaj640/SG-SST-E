@@ -16,6 +16,8 @@ class PerfilesCargoProfesiogramaComponent {
 
     render() {
         this.container.innerHTML = ''; // Limpiar el contenedor
+        // Remover antes de agregar: un render repetido no duplica el listener
+        window.removeEventListener('message', this.handleIframeMessage);
         window.addEventListener('message', this.handleIframeMessage);
 
         const iframe = document.createElement('iframe');
@@ -24,10 +26,16 @@ class PerfilesCargoProfesiogramaComponent {
         iframe.style.border = 'none';
 
         // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `modules/gestion-salud/perfiles-cargo-profesiograma/perfiles-cargo-profesiograma-viewer.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        // ?v= cache-bust: bumpear al modificar viewer.html o viewer.js
+        const viewerUrl = `modules/gestion-salud/perfiles-cargo-profesiograma/perfiles-cargo-profesiograma-viewer.html?v=PCP-20260918-premium&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
 
         this.container.appendChild(iframe);
+    }
+
+    destroy() {
+        window.removeEventListener('message', this.handleIframeMessage);
+        if (this.container) this.container.innerHTML = '';
     }
 
     handleIframeMessage(event) {
