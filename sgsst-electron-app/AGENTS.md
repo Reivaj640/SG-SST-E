@@ -3692,10 +3692,20 @@ el dato real antes de "arreglar" un ancho por un recorte que no ocurre.
 ⚠️ **Límite real**: el badge automático (🤖, que marca un mes con AT contado desde la caracterización)
 necesita ~58px, así que con AT por debajo de 8% se recorta en ventanas de ≤1600px (en maximizada no).
 
-⚠️ **Lección de cache-bust (costó una ronda de validación)**: se cambió el CSS **sin bumpear el
-token** y el usuario siguió viendo la hoja vieja (la columna "Estado" seguía cortada y él creyó que
-el arreglo no funcionaba). Como el `<script>` ya no usa `?_t=Date.now()`, **cada edición del CSS/HTML/JS
-exige bumpear `TOKEN` en `renderer.js`** (terminó en `FREQ-20260919-v3-anchos-fijos`).
+⚠️🚨 **Lección de cache-bust — son DOS niveles y costó 2 rondas de validación**: hay un módulo que se
+monta desde `renderer.js` (`showFrecuenciaAccidentalidadContent`), así que el cache-bust tiene **dos
+eslabones**:
+
+1. `index.html` → `<script src="renderer.js?v=...">` (el token del PROPIO renderer).
+2. `renderer.js` → `const TOKEN = 'FREQ-...'` (el que versiona el CSS/HTML/JS del módulo).
+
+Si se bumpea **solo el 2**, la app sigue cargando el `renderer.js` **cacheado**, que contiene el
+`TOKEN` viejo → el navegador sirve el CSS viejo y **el cambio no se ve NUNCA** (el usuario mandó
+captura dos veces de la tabla cortada creyendo que el arreglo no funcionaba). Pasó exactamente eso:
+se bumpéo `TOKEN` a `v6` pero `index.html` seguía con `renderer.js?v=20260916-premium-split`.
+**Regla: al tocar `renderer.js` hay que bumpear LOS DOS tokens.** El test ahora lo verifica
+(`index.html: el <script> de renderer.js lleva un token`), pero eso solo comprueba que EXISTA uno —
+si el cambio "no se ve", **lo primero es revisar si el `renderer.js` del `index.html` quedó viejo**.
 
 #### Verificación
 

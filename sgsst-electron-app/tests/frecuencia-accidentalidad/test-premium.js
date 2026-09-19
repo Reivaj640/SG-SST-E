@@ -183,6 +183,8 @@ check('renderer.js: sanitiza los <link> a CDN antes de inyectar el HTML con inne
   /parseFromString\(limpio, 'text\/html'\)/.test(renderer));
 check('renderer.js: el cache-bust del script ya no usa ?_t=Date.now()',
   !/frecuencia-accidentalidad\.js\?_t=' \+ ts/.test(renderer));
+check('index.html: el <script> de renderer.js lleva un token (sin el, la app usa el renderer cacheado y el TOKEN nuevo nunca llega)',
+  /<script src="renderer\.js\?v=[^"]+"><\/script>/.test(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')));
 
 /* ══════════════ Reporte ══════════════ */
 let failed = 0;
