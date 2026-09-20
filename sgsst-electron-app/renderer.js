@@ -6302,20 +6302,19 @@ function showIndiceMortalidadContent(container, currentCompany, moduleName, subm
 }
 
 function showPrevalenciaContent(container, currentCompany, moduleName, submoduleName) {
-  console.log('[PrevalenciaEL] showPrevalenciaContent INICIADO');
-
+  const TOKEN = 'PREV-20260919-v1-premium';
   const BASE = './modules/gestion-salud/prevalencia-enfermedad-laboral/';
 
   // Cargar CSS si no está cargado
-  if (!document.querySelector(`link[href="${BASE}prevalencia-enfermedad-laboral.css"]`)) {
+  if (!document.querySelector(`link[href="${BASE}prevalencia-enfermedad-laboral.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'prevalencia-enfermedad-laboral.css';
+    cssLink.href = BASE + 'prevalencia-enfermedad-laboral.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
   // Cargar HTML y luego el script
-  const htmlUrl = BASE + 'prevalencia-enfermedad-laboral.html';
+  const htmlUrl = BASE + 'prevalencia-enfermedad-laboral.html?v=' + TOKEN;
 
   fetch(htmlUrl)
     .then(r => {
@@ -6323,8 +6322,11 @@ function showPrevalenciaContent(container, currentCompany, moduleName, submodule
       return r.text();
     })
     .then(html => {
+      // Sanitize: remove external <link> tags (CDN)
+      var sanitized = html.replace(/<link[^>]*href=["']https?:\/\/[^"']*["'][^>]*>/gi, '');
+
       var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
+      var doc = parser.parseFromString(sanitized, 'text/html');
 
       var sourceBody = doc.body;
       var elements = sourceBody.children;
@@ -6342,10 +6344,8 @@ function showPrevalenciaContent(container, currentCompany, moduleName, submodule
       // Guardar empresa seleccionada para que el módulo la use
       localStorage.setItem('selectedCompany', currentCompany);
 
-      // Cargar el script del módulo
-      var ts = Date.now();
-      var scriptUrl = BASE + 'prevalencia-enfermedad-laboral.js?_t=' + ts;
-
+      // Cargar el script del módulo con TOKEN (cache-bust de 2 niveles)
+      var scriptUrl = BASE + 'prevalencia-enfermedad-laboral.js?v=' + TOKEN;
       var s = document.createElement('script');
       s.src = scriptUrl;
       document.body.appendChild(s);

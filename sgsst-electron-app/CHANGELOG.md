@@ -62,6 +62,33 @@ El gráfico y la tabla ahora se muestran **lado a lado en maximizada**, igual qu
 
 ---
 
+### 📦787 · Prevalencia de Enfermedad Laboral (3.3.4) migrada al premium v2
+
+Migración al dialecto premium v2 del submódulo 3.3.4 (`modules/gestion-salud/prevalencia-enfermedad-laboral/`), con Header System v2, tokens propios scoped, tabla blindada, Chart.js theme-aware y gráfico + tabla en paralelo en maximizada.
+
+#### Cambios
+
+- **Header System v2** con breadcrumb + icon chip + título Manrope 800 + subtítulo + acciones, transparente sobre el canvas. **Iconos en SVG inline** (se quitó el CDN de Bootstrap Icons y los `<i class="bi ...">` que nunca renderizaban porque el `<link>` del `<head>` se descarta al inyectar solo `doc.body`).
+- **Tokens propios `--prev-*` scoped** bajo `.prevalencia-container`: se eliminó el `:root` + `*` + `body` GLOBALES que pisaban tokens y márgenes de TODA la app.
+- **Modo oscuro en los DOS atributos** (`data-theme="dark"` + `data-theme="dark-legacy"` con selector `[data-theme^="dark"]`).
+- **Tabla con blindaje anti-fugas**: `min-width: 0 !important` + `max-width: 100% !important` + `table-layout: fixed` con **6 anchos fijos que suman exactamente 100%** (Mes 12 / Casos EL 12 / Trabajadores 16 / Prevalencia 28 / Meta 10 / Estado 22).
+- **Chart.js theme-aware**: gradientes claro/oscuro, los 4 plugins (metaZone, barLabels, promedioLine, metaLine) y `Chart.defaults` (color, borderColor, font) + tooltip y ejes leyendo la paleta con `tok()`/`palette()`.
+- **`tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla/renderFallbackChart** (se relee la paleta en cada render, así sigue el tema).
+- **Resize handler con cleanup**: un solo `window.__prevResizeHandler` con `removeEventListener` del anterior.
+- **Gráfico y tabla en paralelo en maximizada** (`.prev-duo`, mismo patrón que `.freq-duo`/`.sev-duo`/`.mort-duo`). El JS pone `display = ''` (no `'block'`) para que el estilo en línea no pise el `display:flex` de la media query.
+- **Código muerto eliminado**: `escapeHtml()` y 15 `console.log` de ruido (2 convertidos a `console.error`).
+- **renderer.js parcheado**: TOKEN + cache-bust en 2 niveles (index.html → renderer.js, renderer.js → CSS/HTML/JS del módulo) + sanitizar `<link>` CDN inyectados con `innerHTML`.
+- **Test 46/46 OK**.
+- **EOL normalizado a LF** (el directorio era `i/lf w/crlf`).
+
+#### Verificación (arnés real de Electron)
+
+- Ventana normal (inner 1184) → `cols 1113px` (1 columna), apiladas, sin desborde.
+- Maximizada (inner 1904) → `cols 690px 690px`, chart y table 604×604, lado a lado, **0 celdas recortadas**.
+- `dark` y `dark-legacy` → idénticos (`#0f172a` / `#1a2334` / `#e8edf5`).
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)

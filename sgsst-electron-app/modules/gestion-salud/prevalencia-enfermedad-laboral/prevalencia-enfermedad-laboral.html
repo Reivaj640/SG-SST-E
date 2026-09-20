@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>K+AIR - Prevalencia de Enfermedad Laboral</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="prevalencia-enfermedad-laboral.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -13,34 +12,61 @@
 <div class="prevalencia-container">
 
 <!-- ============================================================ -->
-<!-- HEADER — Card Pattern (k-section-card)                      -->
+<!-- HEADER SYSTEM v2                                             -->
 <!-- ============================================================ -->
-<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="fas fa-clipboard2-pulse" style="color:#174ea6; font-size:1.25rem;"></i>
+<div class="prev-header-v2">
+  <div class="prev-breadcrumb">
+    <span onclick="window.parent && window.parent.postMessage && window.parent.postMessage({type:'back-to-module-request'},'*')">Gestion de la Salud</span>
+    <span>&#8250;</span>
+    <span>3.3.4</span>
+    <span>&#8250;</span>
+    <span class="prev-bc-current">Prevalencia de Enfermedad Laboral</span>
+  </div>
+  <div class="prev-header-row">
+    <div class="prev-header-left">
+      <div class="prev-header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
       <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Prevalencia de Enfermedad Laboral</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.3.4 Prevalencia</p>
+        <h3 class="prev-title">Prevalencia de Enfermedad Laboral</h3>
+        <p class="prev-subtitle">Gestion de la Salud — 3.3.4 Prevalencia</p>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <span class="k-section-card__company">
-        <i class="kair-icon-building"></i>
+    <div class="prev-header-actions">
+      <span class="prev-company">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="2" width="16" height="20" rx="2"/>
+          <path d="M9 22v-4h6v4"/>
+          <path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>
+        </svg>
         <span id="header-company-text">—</span>
       </span>
-      <div class="k-section-card__divider"></div>
-      <label style="font-size:0.75rem;color:#64748B;margin-right:4px;">Año:</label>
-      <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid #dee2e6;border-radius:4px;background:#ffffff;color:#212529;cursor:pointer;"></select>
-      <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid #dee2e6;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5a6378;font-size:0.8rem;">
-        <i class="bi bi-copy"></i>
+      <div class="prev-divider"></div>
+      <label style="font-size:0.75rem;color:var(--prev-text-sec);">Año:</label>
+      <select id="yearFilter" class="prev-select"></select>
+      <button id="btnCloneYear" class="prev-btn" title="Clonar a año siguiente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        Clonar
       </button>
-      <div class="k-section-card__divider"></div>
-      <button class="header-action--ghost" id="btnRefrescar" title="Refrescar datos">
-        <i class="bi bi-arrow-clockwise"></i> Refrescar
+      <div class="prev-divider"></div>
+      <button class="prev-btn" id="btnRefrescar" title="Refrescar datos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Refrescar
       </button>
-      <button class="header-back-btn" id="btn-back-module" title="Volver a Gestión de la Salud">
-        <i class="fas fa-arrow-left"></i> Volver
+      <button class="prev-btn prev-btn--primary" id="btn-back-module" title="Volver a Gestión de la Salud">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Volver
       </button>
     </div>
   </div>
@@ -61,7 +87,7 @@ Vinculado a Excel de origen
 </div>
 
 <!-- ==================== LOADING ==================== -->
-<div id="loadingSection" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6rem 0;gap:0.75rem;color:#64748b;">
+<div id="loadingSection" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6rem 0;gap:0.75rem;color:var(--prev-text-sec);">
 <p>Cargando indicadores...</p>
 </div>
 
@@ -99,7 +125,7 @@ Vinculado a Excel de origen
 <!-- ==================== META SECTION ==================== -->
 <section class="kair-meta-section" id="metaSection" style="display:none">
 <div class="kair-meta-icon">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--prev-primary)" stroke-width="2">
 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
 </svg>
 </div>
@@ -112,6 +138,9 @@ Vinculado a Excel de origen
 <span class="kair-promedio-badge" id="promedioBadge">Prevalencia: -</span>
 </div>
 </section>
+
+<!-- ==================== GRÁFICO + TABLA — 2 columnas en maximizada ==================== -->
+<div class="prev-duo">
 
 <!-- ==================== CHART ==================== -->
 <section class="kair-chart-section" id="chartSection" style="display:none">
@@ -140,15 +169,15 @@ Vinculado a Excel de origen
 
 <!-- ==================== TABLE ==================== -->
 <section class="kair-table-section" id="tableSection" style="display:none">
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+<div style="display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1rem; border-bottom:1px solid var(--prev-border); flex-wrap:wrap; gap:0.5rem;">
   <div style="display:flex; align-items:center; gap:0.5rem;">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
       <polyline points="14 2 14 8 20 8"></polyline>
       <line x1="16" y1="13" x2="8" y2="13"></line>
       <line x1="16" y1="17" x2="8" y2="17"></line>
     </svg>
-    <span style="font-size:0.875rem; font-weight:600; color:#1E293B;">Tabla de Prevalencia - Editable</span>
+    <span style="font-size:0.875rem; font-weight:600; color:var(--prev-text);">Tabla de Prevalencia - Editable</span>
   </div>
   <span class="kair-edit-hint">Clic en un valor para editar</span>
 </div>
@@ -174,6 +203,8 @@ Vinculado a Excel de origen
   <strong>Fórmula:</strong> (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100.000
 </div>
 </section>
+</div>
+<!-- /prev-duo -->
 
 <!-- ==================== METHODOLOGY ==================== -->
 <section class="kair-methodology-section" id="methodologySection" style="display:none">
