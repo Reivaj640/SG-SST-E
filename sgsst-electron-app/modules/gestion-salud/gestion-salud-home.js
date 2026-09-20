@@ -1100,11 +1100,44 @@ Trabajadores con inducción al día
         // 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro de
         // una caja de alto fijo se estiraba sin conservar proporción y el texto se deformaba
         // y se montaba. Una barra es una caja: con HTML se dibuja exacta y nunca se sale.
+        //
+        // 📦791 — BUG: el backend (`excel-bridge.leerIndicadores`) NO devuelve `frecuencia`,
+        // `severidad`, `prevalencia` ni `incidencia` como escalares: devuelve
+        // `frecuenciaMensual`/`severidadMensual` (con `indiceFrecuencia`/`indiceSeveridad` por
+        // mes) y `config.prevalenciaEL`/`config.incidenciaEL` (suma anual). El gráfico leía los
+        // 4 campos inexistentes y `Number(undefined) || 0` daba 0.00 en las 4 barras.
+        // Ahora se derivan de los datos reales (y se sigue aceptando el escalar si algún día
+        // el backend lo agrega).
+        var fM = Array.isArray(indicadores.frecuenciaMensual) ? indicadores.frecuenciaMensual : [];
+        var sM = Array.isArray(indicadores.severidadMensual) ? indicadores.severidadMensual : [];
+        var fNZ = fM.filter(function (m) { return Number(m.indiceFrecuencia) > 0; });
+        var sNZ = sM.filter(function (m) { return Number(m.indiceSeveridad) > 0; });
+        var cfg = indicadores.config || {};
+
+        // Frecuencia y severidad: promedio de los meses con valor (mismo criterio que el KPI
+        // del módulo 3.3.1, que promedia solo los meses no-cero).
+        var frecuencia = Number(indicadores.frecuencia);
+        if (!frecuencia) {
+            frecuencia = fNZ.length
+                ? fNZ.reduce(function (s, m) { return s + Number(m.indiceFrecuencia); }, 0) / fNZ.length
+                : 0;
+        }
+        var severidad = Number(indicadores.severidad);
+        if (!severidad) {
+            severidad = sNZ.length
+                ? sNZ.reduce(function (s, m) { return s + Number(m.indiceSeveridad); }, 0) / sNZ.length
+                : 0;
+        }
+
+        // Prevalencia e incidencia: el backend las entrega sumadas en `config`.
+        var prevalencia = Number(indicadores.prevalencia) || Number(cfg.prevalenciaEL) || 0;
+        var incidencia = Number(indicadores.incidencia) || Number(cfg.incidenciaEL) || 0;
+
         var items = [
-            { label: 'Frecuencia', value: Number(indicadores.frecuencia) || 0, color: 'var(--kair-blue, #2057b8)' },
-            { label: 'Severidad', value: Number(indicadores.severidad) || 0, color: 'var(--kair-mint, #1bb888)' },
-            { label: 'Prevalencia', value: Number(indicadores.prevalencia) || 0, color: 'var(--kair-amber, #e7a224)' },
-            { label: 'Incidencia', value: Number(indicadores.incidencia) || 0, color: 'var(--kair-red, #da5563)' }
+            { label: 'Frecuencia', value: frecuencia, color: 'var(--kair-blue, #2057b8)' },
+            { label: 'Severidad', value: severidad, color: 'var(--kair-mint, #1bb888)' },
+            { label: 'Prevalencia', value: prevalencia, color: 'var(--kair-amber, #e7a224)' },
+            { label: 'Incidencia', value: incidencia, color: 'var(--kair-red, #da5563)' }
         ];
 
         var maxVal = 1;

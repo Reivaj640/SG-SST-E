@@ -191,7 +191,8 @@
             gap: 8px;
         }
 
-        .ct-search-title i { color: var(--ct-primary); }
+        .ct-search-title i,
+        .ct-search-title svg { color: var(--ct-primary); stroke: var(--ct-primary); }
 
         .ct-search-row {
             display: flex;
@@ -398,8 +399,14 @@
             color: var(--ct-text-muted);
         }
 
-        .ct-empty-state i {
+        /* Cubre BOTH el <i> viejo y el <svg> nuevo: un <svg> sin tamaño
+           se estira a todo el contenedor (bug real, mismo patrón de 📦762). */
+        .ct-empty-state i,
+        .ct-empty-state svg {
             font-size: 3rem;
+            width: 3rem;
+            height: 3rem;
+            stroke: currentColor;
             margin-bottom: 1rem;
             opacity: 0.3;
         }
@@ -477,7 +484,8 @@
             gap: 10px;
         }
 
-        .ct-modal-header h3 i { color: var(--ct-primary); }
+        .ct-modal-header h3 i,
+        .ct-modal-header h3 svg { color: var(--ct-primary); stroke: var(--ct-primary); }
 
         .ct-modal-close {
             background: none;

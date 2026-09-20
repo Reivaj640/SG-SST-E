@@ -170,6 +170,25 @@ ok('ESTADISTICAS: botones de filtro premium', /applyStatsFiltersBtn" class="aus-
 ok('ESTADISTICAS: conserva los IDs de filtros', ['applyStatsFiltersBtn','clearStatsFiltersBtn'].every(id => estadisticas.indexOf('id="' + id + '"') !== -1));
 ok('ESTADISTICAS: radios premium (20px)', /\.aus-scope \.estadisticas-dashboard \.k-stats-ribbon\{[\s\S]{0,300}?border-radius: 20px/.test(compJs));
 
+// ============ Consulta de Trabajadores (iframe) ============
+const consulta = fs.readFileSync(path.join(dir, 'consulta-trabajadores.html'), 'utf8');
+ok('CONSULTA: tokens canonicos', /--ct-primary:\s*#2057b8/.test(consulta));
+ok('CONSULTA: dark en los 2 atributos', /\[data-theme\^="dark"\]/.test(consulta));
+ok('CONSULTA: Header System v2', /ct-header-v2/.test(consulta) && /ct-header-icon/.test(consulta));
+ok('CONSULTA: sin iconos Font Awesome', !/<i class="fa[srlb]? fa-/.test(consulta));
+// Regresión 📦762: al reemplazar un <i> por un <svg>, la regla de tamaño que
+// apuntaba a `i` deja de aplicar y el <svg> se estira a todo el contenedor.
+ok('CONSULTA: empty state cubre svg (no solo i)', /\.ct-empty-state i,\s*\.ct-empty-state svg\s*\{[\s\S]{0,200}?width:\s*3rem/.test(consulta));
+ok('CONSULTA: search-title cubre svg', /\.ct-search-title svg/.test(consulta));
+ok('CONSULTA: modal header cubre svg', /\.ct-modal-header h3 svg/.test(consulta));
+
+// ============ Generar Informe (iframe) ============
+const informe = fs.readFileSync(path.join(dir, 'informe-pri-builder.html'), 'utf8');
+ok('INFORME: sin CDN (offline)', !/cdnjs|fonts\.googleapis/.test(informe));
+ok('INFORME: tokens canonicos', /--primary:\s*#2057b8/.test(informe));
+ok('INFORME: dark en los 2 atributos', /\[data-theme\^="dark"\]/.test(informe));
+ok('INFORME: Header System v2', /builder-icon/.test(informe) && /builder-h2/.test(informe));
+
 // ============ Reporte ============
 var failed = 0;
 checks.forEach(function (c) {

@@ -167,6 +167,30 @@ Primera de 4 vistas del paquete de gestación (todas iframes).
 
 ---
 
+### 📦791 · 2 fixes posteriores a la migración (Consulta de Trabajadores + Indicadores de Salud)
+
+#### 1. Consulta de Trabajadores — icono del estado vacío gigante
+
+Al reemplazar los `<i class="fas ...">` por `<svg>` inline, la regla que les daba tamaño seguía apuntando a `i` (`.ct-empty-state i { font-size: 3rem }`), así que el `<svg>` quedaba **sin ancho/alto** y se estiraba a todo el contenedor. Es el mismo patrón de 📦762.
+
+- Fix: variante `svg` en las 3 reglas que apuntaban a `i` (`.ct-empty-state`, `.ct-search-title`, `.ct-modal-header h3`) con `width/height` explícitos.
+- **Regla**: al cambiar un `<i>` por un `<svg>`, TODA regla que lo dimensionaba por `font-size` necesita su variante `svg` con `width/height`.
+- Auditoría con Electron midiendo TODOS los SVG de las vistas migradas (home, Registrar, Ver, Seguimiento, Estadísticas): ninguno más tenía el problema.
+
+#### 2. Home de Gestión de la Salud — "Indicadores de Salud" mostraba 0.00
+
+`renderChartSalud()` leía `indicadores.frecuencia`/`.severidad`/`.prevalencia`/`.incidencia`, pero `excel-bridge.leerIndicadores()` NO devuelve esos escalares: devuelve `frecuenciaMensual[]`/`severidadMensual[]` (con `indiceFrecuencia`/`indiceSeveridad` por mes) y `config.prevalenciaEL`/`config.incidenciaEL` (sumas anuales). Como los 4 campos eran `undefined`, `Number(undefined) || 0` daba 0.00 en las 4 barras.
+
+- Fix: frecuencia y severidad se derivan del **promedio de los meses con valor** (mismo criterio que el KPI del módulo 3.3.1); prevalencia e incidencia de `config.*`; se sigue aceptando el escalar si el backend lo agrega (retrocompatible).
+- Verificado con Electron (mock con la forma real del backend): **2.00 / 15.00 / 123.45 / 67.89** (antes 0.00).
+
+#### Tests
+
+- `tests/gestion-salud/test-home-indicadores.js` → **8/8** (nuevo).
+- `tests/ausentismo/test-premium.js` → **121/121** (11 checks nuevos de Consulta + Informe).
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)
