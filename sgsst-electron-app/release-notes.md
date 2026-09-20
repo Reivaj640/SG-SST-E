@@ -1,6 +1,6 @@
-# K+AIR v0.1.207
+# K+AIR v0.1.208
 
-## 🎨 Migración premium v2 de los submódulos (📦739-784)
+## 🎨 Migración premium v2 de los submódulos (📦739-785)
 
 Segunda gran ola del rediseño visual: después de los **homes de módulo** (📦730-738, v0.1.197-205), se migraron al dialecto **premium v2** todos los submódulos con interfaz propia. El objetivo fue que TODO el sistema comparta la misma paleta, tipografía y patrones de componentes.
 
@@ -39,6 +39,8 @@ Segunda gran ola del rediseño visual: después de los **homes de módulo** (�
 | Investigación de Accidentes (3.2.2) | Las 3 vistas al premium v2 + fix de fuga global + ancho completo + lista en 2 columnas en maximizada |
 | Registro y Análisis Estadístico (3.2.3) | Header System v2 + CSS scopado (sin clases globales) + los 9 gráficos Chart.js con colores de tema |
 | Frecuencia de la Accidentalidad (3.3.1) | Header System v2 + tokens `--freq-*` scoped (se quitó el `:root`/`*`/`body` GLOBALES) + el gráfico SVG lee la paleta + gráfico y tabla en paralelo (anchos de columna fijos y blindados) + filas de 35px + gráfico a todo el alto + los 12 meses en una fila en maximizada |
+| Severidad de la Accidentalidad (3.3.2) | Header System v2 + tokens `--sev-*` scoped (se quitó el `:root`/`*`/`body` GLOBALES) + 125 selectores scopados + tabla blindada (`min-width:0 !important` + `table-layout:fixed`) con 7 anchos fijos que suman 100% + gráfico SVG leyendo la paleta + wrapper `.sev-duo` en paralelo (gráfico+tabla) en maximizada + meses grid 6/12 + código muerto eliminado + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + test 21/21 |
+| Indice de Mortalidad (3.3.3) | Header System v2 + tokens --mort-* scoped (se quito el :\root/*/ody GLOBALES) + tabla blindada (min-width:0 !important + table-layout:fixed) con 7 anchos fijos que suman 100% + Chart.js theme-aware con gradientes dark/light + tok()/palette() en getStatusBadge/getValueColor/renderizar/renderizarTabla + resize handler con cleanup + codigo muerto eliminado (escapeHtml) + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + sanitizar link CDN + test 38/38 |
 
 ### Correcciones destacadas
 

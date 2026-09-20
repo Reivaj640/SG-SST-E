@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.208] - 2026-09-19
+
+### 📦786 · Índice de Mortalidad (3.3.3) migrada al premium v2
+
+Migración al dialecto premium v2 del submódulo 3.3.3 (`modules/gestion-salud/indice-mortalidad/`), con Header System v2, tokens propios scoped, tabla blindada, Chart.js theme-aware y resize handler con cleanup.
+
+#### Cambios
+
+- **Header System v2** con breadcrumb + icon chip + título Manrope 800 + subtítulo + acciones, transparente sobre el canvas.
+- **Tokens propios `--sev-*` scoped** bajo `.severidad-container`: se eliminó el `:root` + `*` + `body` GLOBALES que pisaban tokens y márgenes de TODA la app (mismo patrón que 📦784 Frecuencia). 125 selectores scopados.
+- **Modo oscuro en los DOS atributos** (`data-theme="dark"` + `data-theme="dark-legacy"` con selector `[data-theme^="dark"]`).
+- **Tabla con blindaje anti-fugas**: `min-width: 0 !important` + `max-width: 100% !important` + `table-layout: fixed` con 7 anchos fijos que suman exactamente 100% (Mes 9/14/14/14/17/10/22%).
+- **Gráfico SVG leyendo la paleta** con `tok()` y `palette()` (helpers que leen tokens CSS computados), en vez de hex hardcodeados.
+- **Wrapper `.sev-duo` en paralelo** (gráfico + tabla lado a lado) en maximizada (`@media (min-width: 1360px)`).
+- **Meses grid 6/12**: `repeat(6, minmax(0,1fr))` en ventana, `repeat(12, minmax(0,1fr))` en maximizada.
+- **Código muerto eliminado**: `buildGridLines()`, `buildChartPoints()` y `escapeHtml()`.
+- **renderer.js parcheado**: TOKEN + cache-bust en 2 niveles (index.html → renderer.js, renderer.js → CSS/HTML/JS del módulo) + sanitizar `<link>` CDN inyectados con `innerHTML`.
+- **Test 21/21 OK**.
+- **EOL normalizado a LF** (el directorio era `i/lf w/crlf`).
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)

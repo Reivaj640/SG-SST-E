@@ -21,10 +21,26 @@ var availableFiles = [];
   function getElement(id) {
     return document.getElementById(id);
   }
-  
-  function escapeHtml(str) {
-    if (str === undefined || str === null) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  /* Lee un token CSS del modulo (--sev-*): los colores escritos por el JS
+     siguen la paleta y el tema (claro/oscuro). */
+  function tok(name, fallback) {
+    var host = document.querySelector('.severidad-container') || document.documentElement;
+    var v = getComputedStyle(host).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  function palette() {
+    return {
+      bg: tok('--sev-bg', '#fbfcfb'),
+      text: tok('--sev-text', '#14213d'),
+      axis: tok('--sev-text-sec', '#748096'),
+      grid: tok('--sev-border', '#e8ebee'),
+      primary: tok('--sev-primary', '#2057b8'),
+      success: tok('--sev-success', '#1bb888'),
+      warn: tok('--sev-warning', '#e7a224'),
+      danger: tok('--sev-danger', '#da5563')
+    };
   }
   
   function showToast(msg, type) {
@@ -51,32 +67,6 @@ var availableFiles = [];
   function getCompanyName() {
     var params = new URLSearchParams(window.location.search);
     return params.get('company') || localStorage.getItem('selectedCompany') || '';
-  }
-  
-  function buildGridLines(P, cH, W, maxV) {
-    var lines = '';
-    for (var i = 0; i < 6; i++) {
-      var y = P.t + cH - (i / 5) * cH;
-      var val = (maxV / 5 * i).toFixed(2);
-      lines += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#dee2e6" stroke-width="0.5" stroke-dasharray="4,4"/>';
-      lines += '<text x="' + (P.l - 10) + '" y="' + (y + 4) + '" text-anchor="end" fill="#6c757d" font-size="11">' + val + '</text>';
-    }
-    return lines;
-  }
-  
-  function buildChartPoints(pts, P, cH) {
-    var g = '';
-    for (var i = 0; i < pts.length; i++) {
-      var p = pts[i];
-      g += '<g>';
-      g += '<circle cx="' + p.x + '" cy="' + p.y + '" r="5" fill="#fff" stroke="#dc3545" stroke-width="2"/>';
-      g += '<text x="' + p.x + '" y="' + (P.t + cH + 20) + '" text-anchor="middle" fill="#6c757d" font-size="10">' + escapeHtml(p.label) + '</text>';
-      if (p.val > 0) {
-        g += '<text x="' + p.x + '" y="' + (p.y - 12) + '" text-anchor="middle" fill="#2d3748" font-size="9" font-weight="600">' + p.val + '</text>';
-      }
-      g += '</g>';
-    }
-    return g;
   }
   
 function configurarRutas(year) {
@@ -205,8 +195,11 @@ function cargarDatos() {
 
     renderKPIs();
     renderTargetCard();
-    renderChart();
+    // La tabla se renderiza ANTES que el grafico: el grafico mide el alto real
+    // de su contenedor (que se estira al de la tabla) y necesita que la tabla
+    // ya este en el DOM para medir bien.
     renderTabla();
+    renderChart();
     renderMonthCards();
     renderReference();
   }
@@ -284,6 +277,7 @@ if (chartContainer) {
   }
   
   function renderChart() {
+    var C = palette();
     var sM = indicadores.severidadMensual;
     var config = indicadores.config || {};
     var meta = config.metaSeveridad || 0;
@@ -292,11 +286,12 @@ if (chartContainer) {
     if (!container) return;
 
     var containerWidth = container.offsetWidth || 800;
-    var screenWidth = window.innerWidth;
 
-    var baseWidth = screenWidth >= 2560 ? 1400 : screenWidth >= 1920 ? 1200 : 800;
-    var W = Math.max(800, Math.min(containerWidth, baseWidth));
-    var H = Math.max(320, Math.round(W * 0.4));
+    // El viewBox se ajusta EXACTAMENTE al contenedor (ancho x alto reales) para
+    // que el SVG (width:100%) llene el espacio. Antes habia un tope de ancho
+    // (baseWidth) y un alto fijo del 40%: el grafico dejaba franjas vacias.
+    var W = Math.max(320, Math.round(containerWidth));
+    var H = Math.max(320, Math.round(W * 0.4), container.offsetHeight || 0);
 
     var P = { t: 30, r: 40, b: 50, l: 60 };
     var cW = W - P.l - P.r;
@@ -307,23 +302,23 @@ if (chartContainer) {
     var barWidth = cW / 12 * 0.6;
     var gap = cW / 12;
 
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;font-family:var(--kair-font)">';
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;font-family:var(--sev-font)">';
 
     // Fondo
-    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="#fafbfc" rx="4"/>';
+    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="' + C.bg + '" rx="4"/>';
 
     // Línea de meta
     if (meta > 0) {
       var targetY = P.t + cH - (meta / maxV) * cH;
-      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="#dc3545" stroke-width="1.5" stroke-dasharray="6,4"/>';
-      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="#dc3545" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
+      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="' + C.danger + '" stroke-width="1.5" stroke-dasharray="6,4"/>';
+      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="' + C.danger + '" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
     }
 
     // Grid Y axis
     for (var i = 0; i <= 5; i++) {
       var y = P.t + (i / 5) * cH;
-      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#e9ecef" stroke-width="1"/>';
-      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="#adb5bd" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
+      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="' + C.grid + '" stroke-width="1"/>';
+      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="' + C.axis + '" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
     }
 
     // Barras
@@ -331,19 +326,19 @@ if (chartContainer) {
       var x = P.l + i * gap + gap * 0.2;
       var barHeight = (month.indiceSeveridad / maxV) * cH;
       var y = P.t + cH - barHeight;
-      var status = month.indiceSeveridad === 0 ? '#28a745' : month.indiceSeveridad <= meta ? '#28a745' : month.indiceSeveridad <= meta * 5 ? '#ffc107' : '#dc3545';
+      var status = month.indiceSeveridad === 0 ? C.success : month.indiceSeveridad <= meta ? C.success : month.indiceSeveridad <= meta * 5 ? C.warn : C.danger;
 
       svg += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" fill="' + status + '" rx="3" opacity="0.85"/>';
 
       if (month.indiceSeveridad > 0) {
-        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="#212529" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceSeveridad.toFixed(1) + '</text>';
+        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="' + C.text + '" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceSeveridad.toFixed(1) + '</text>';
       }
 
-      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="#6c757d" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
+      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="' + C.axis + '" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
     });
 
     // Label Y
-    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="#6c757d" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Severidad</text>';
+    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="' + C.axis + '" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Severidad</text>';
 
     svg += '</svg>';
 
@@ -351,6 +346,7 @@ if (chartContainer) {
   }
   
   function renderTabla() {
+    var C = palette();
     var sM = indicadores.severidadMensual;
     var config = indicadores.config || {};
     var meta = config.metaSeveridad || 0;
@@ -368,8 +364,8 @@ if (chartContainer) {
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasPerdidos" tabindex="0">' + (row.diasPerdidos || 0) + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="diasCargados" tabindex="0">' + (row.diasCargados || 0) + '</span></td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
-      html += '<td style="font-weight:700;color:' + (exceed ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceSeveridad, 4) + '</td>';
-      html += '<td style="color:#6c757d">' + fmt(meta, 4) + '</td>';
+      html += '<td style="font-weight:700;color:' + (exceed ? C.danger : C.success) + '">' + fmt(row.indiceSeveridad, 4) + '</td>';
+      html += '<td style="color:' + C.axis + '">' + fmt(meta, 4) + '</td>';
       html += '<td><span class="kair-badge-status ' + (exceed ? 'kair-badge-excede' : 'kair-badge-cumple') + '">' + (exceed ? 'EXCEDE' : 'CUMPLE') + '</span></td>';
       html += '</tr>';
     });
@@ -393,7 +389,7 @@ if (chartContainer) {
     
     var tablaFoot = getElement('tablaFoot');
     if (tablaFoot) {
-      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalDiasIncap + '</td><td>' + totalDiasCarg + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIS, 4) + '</td><td>' + fmt(meta, 4) + '</td><td>-</td></tr>';
+      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalDiasIncap + '</td><td>' + totalDiasCarg + '</td><td>' + promTrab + '</td><td style="color:' + C.primary + '">' + fmt(promIS, 4) + '</td><td>' + fmt(meta, 4) + '</td><td>-</td></tr>';
     }
   }
   
@@ -464,6 +460,7 @@ input.addEventListener('blur', commit);
   }
 
   function renderMonthCards() {
+    var C = palette();
     var container = getElement('monthCards');
     if (!container) return;
 
@@ -475,7 +472,7 @@ input.addEventListener('blur', commit);
 
     sM.forEach(function(month) {
       var status = month.indiceSeveridad === 0 ? 'success' : month.indiceSeveridad <= meta ? 'success' : month.indiceSeveridad <= meta * 5 ? 'warning' : 'danger';
-      var statusColor = status === 'success' ? '#28a745' : status === 'warning' ? '#856404' : '#dc3545';
+      var statusColor = status === 'success' ? C.success : status === 'warning' ? C.warn : C.danger;
       var statusLabel = status === 'success' ? 'Sin AT' : status === 'warning' ? 'Precaución' : 'Crítico';
 
       html += '<div class="kair-month-card" style="border-top: 3px solid ' + statusColor + '">';
@@ -581,6 +578,18 @@ if (btnClone) {
     });
   }
   
+  /* Re-render del grafico al redimensionar (con debounce). Se guarda UN solo
+     handler en window para que reabrir el modulo no acumule listeners. */
+  if (window.__sevResizeHandler) window.removeEventListener('resize', window.__sevResizeHandler);
+  var _sevResizeTimer = null;
+  window.__sevResizeHandler = function() {
+    clearTimeout(_sevResizeTimer);
+    _sevResizeTimer = setTimeout(function() {
+      if (document.querySelector('.severidad-container') && indicadores) renderChart();
+    }, 250);
+  };
+  window.addEventListener('resize', window.__sevResizeHandler);
+
   setTimeout(cargarDatos, 100);
   
 })();

@@ -6200,31 +6200,35 @@ function showSeveridadAccidentalidadContent(container, currentCompany, moduleNam
   container.innerHTML = '<p style="color: blue;">Cargando severidad de la accidentalidad... (v1)</p>';
 
   const BASE = 'modules/gestion-salud/severidad-accidentalidad/';
+  const TOKEN = 'SEV-20260919-v1-premium';
 
   // Cargar CSS si no está cargado
-  if (!document.querySelector(`link[href="${BASE}severidad-accidentalidad.css"]`)) {
+  if (!document.querySelector(`link[href="${BASE}severidad-accidentalidad.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'severidad-accidentalidad.css';
+    cssLink.href = BASE + 'severidad-accidentalidad.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
   // Cargar HTML y luego el script
-  fetch(BASE + 'severidad-accidentalidad.html')
+  fetch(BASE + 'severidad-accidentalidad.html?v=' + TOKEN)
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     })
     .then(html => {
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      // El HTML se inyecta con innerHTML en el documento PRINCIPAL: un <link> a un CDN
+      // cargaria en GLOBAL. Se descartan antes de inyectar.
+      const limpio = html.replace(/<link[^>]*https?:[^>]*>/gi, '');
+      const doc = new DOMParser().parseFromString(limpio, 'text/html');
       container.innerHTML = doc.body.innerHTML;
 
       // Guardar empresa seleccionada para que el módulo la use
       localStorage.setItem('selectedCompany', currentCompany);
 
       // Cargar el script del módulo con tag script (con cache-busting)
-      var ts = Date.now();
-      var scriptUrl = BASE + 'severidad-accidentalidad.js?_t=' + ts;
+      // Cache-bust por token (antes ?_t=Date.now() rompia toda cache)
+      var scriptUrl = BASE + 'severidad-accidentalidad.js?v=' + TOKEN;
       console.log('[SeveridadAccidentalidad] Cargando script tag:', scriptUrl);
 
       var s = document.createElement('script');
@@ -6244,74 +6248,51 @@ function showSeveridadAccidentalidadContent(container, currentCompany, moduleNam
 }
 
 function showIndiceMortalidadContent(container, currentCompany, moduleName, submoduleName) {
-  console.log('[IndiceMortalidad] ✅ showIndiceMortalidadContent INICIADO');
-  console.log('[IndiceMortalidad] container:', container);
-  console.log('[IndiceMortalidad] currentCompany:', currentCompany);
-  console.log('[IndiceMortalidad] moduleName:', moduleName);
-  console.log('[IndiceMortalidad] submoduleName:', submoduleName);
-
+  const TOKEN = 'MORT-20260919-v1-premium';
   const BASE = './modules/gestion-salud/indice-mortalidad/';
-  console.log('[IndiceMortalidad] Ruta BASE:', BASE);
 
   // Cargar CSS si no está cargado
-  if (!document.querySelector(`link[href="${BASE}indice-mortalidad.css"]`)) {
+  if (!document.querySelector(`link[href="${BASE}indice-mortalidad.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'indice-mortalidad.css';
+    cssLink.href = BASE + 'indice-mortalidad.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
   // Cargar HTML y luego el script
-  const htmlUrl = BASE + 'indice-mortalidad.html';
-  console.log('[IndiceMortalidad] Intentando fetch:', htmlUrl);
+  const htmlUrl = BASE + 'indice-mortalidad.html?v=' + TOKEN;
 
   fetch(htmlUrl)
     .then(r => {
-      console.log('[IndiceMortalidad] Fetch response status:', r.status, r.ok ? 'OK' : 'FALLO');
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.text();
     })
     .then(html => {
-      // Parser el HTML completo
+      // Sanitize: remove external <link> tags (CDN)
+      var sanitized = html.replace(/<link[^>]*href=["']https?:\/\/[^"']*["'][^>]*>/gi, '');
+
       var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
-      
-      // Mover todos los elementos del body al contenedor
+      var doc = parser.parseFromString(sanitized, 'text/html');
+
       var sourceBody = doc.body;
       var elements = sourceBody.children;
       while (elements.length > 0) {
         container.appendChild(elements[0]);
       }
-      
-      console.log('[IndiceMortalidad] HTML insertado, elementos移入');
-      console.log('[IndiceMortalidad] tableSection elemento:', !!container.querySelector('#tableSection'));
-      
+
       // Cargar Chart.js si no está disponible
       if (typeof Chart === 'undefined') {
-        console.log('[IndiceMortalidad] Cargando Chart.js...');
         var chartScript = document.createElement('script');
         chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-        chartScript.onload = function() { console.log('[IndiceMortalidad] Chart.js cargado OK'); };
-        chartScript.onerror = function(e) { console.error('[IndiceMortalidad] Error cargando Chart.js', e); };
         document.head.appendChild(chartScript);
       }
 
-      // Guardar empresa seleccionada para que el módulo la use
       localStorage.setItem('selectedCompany', currentCompany);
 
-      // Cargar el script del módulo con tag script (con cache-busting)
-      var ts = Date.now();
-      var scriptUrl = BASE + 'indice-mortalidad.js?_t=' + ts;
-      console.log('[IndiceMortalidad] Cargando script tag:', scriptUrl);
-
+      // Cargar el script del módulo con TOKEN (cache-bust de 2 niveles)
+      var scriptUrl = BASE + 'indice-mortalidad.js?v=' + TOKEN;
       var s = document.createElement('script');
       s.src = scriptUrl;
-      s.onload = function() {
-        console.log('[IndiceMortalidad] Script cargado OK');
-      };
-      s.onerror = function(e) {
-        console.error('[IndiceMortalidad] Error cargando script:', e);
-      };
       document.body.appendChild(s);
     })
     .catch(error => {
