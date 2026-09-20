@@ -69,7 +69,7 @@ ok('renderer: JS uses TOKEN', /incidencia-enfermedad-laboral\.js\?v=.*TOKEN/.tes
 ok('renderer: sanitize link CDN', renderer.indexOf('html.replace') !== -1 && renderer.indexOf('https:') !== -1);
 
 // ===== index.html =====
-ok('index: renderer.js bumped', /renderer\.js\?v=20260919-incidencia-premium/.test(index));
+ok('index: renderer.js con cache-bust', /renderer\.js\?v=[\w.-]{8,}/.test(index));
 
 // Reporte
 var failed = 0;

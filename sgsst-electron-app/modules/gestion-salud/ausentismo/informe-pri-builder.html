@@ -4,26 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generador de Informe PRI - K+AIR</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #4F46E5;
-            --primary-light: #EEF2FF;
-            --secondary: #F1F5F9;
-            --accent: #10B981;
-            --danger: #EF4444;
-            --warning: #F59E0B;
-            --text-main: #1E293B;
-            --text-muted: #64748B;
-            --border: #E2E8F0;
-            --bg: #F8FAFC;
+            --primary: #2057b8;
+            --primary-light: #eaf1fb;
+            --secondary: #f3f4f6;
+            --accent: #1bb888;
+            --danger: #da5563;
+            --warning: #e7a224;
+            --text-main: #14213d;
+            --text-muted: #748096;
+            --border: #e8ebee;
+            --bg: #fbfcfb;
+            --bg-card: #ffffff;
+            --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
         }
+
+        /* Modo oscuro — cubre dark + dark-legacy */
+        [data-theme^="dark"] {
+            --primary: #6ea8fe;
+            --primary-light: rgba(110,168,254,0.12);
+            --secondary: #1e2738;
+            --accent: #3ecf9a;
+            --danger: #e56a76;
+            --warning: #f0b45a;
+            --text-main: #E8EDF5;
+            --text-muted: #98a6bf;
+            --border: #2a3446;
+            --bg: #0f172a;
+            --bg-card: #1a2334;
+        }
+
+        /* En oscuro el primario es azul claro: el texto blanco no se lee */
+        [data-theme^="dark"] .btn-primary,
+        [data-theme^="dark"] .btn.btn-primary { color: #0f172a; }
 
         * { box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text-main);
             margin: 0;
@@ -33,7 +56,7 @@
 
         /* Report Builder - Ahora se muestra directamente */
         .report-builder {
-            background: white;
+            background: var(--bg-card);
             width: 100%;
             height: 100vh;
             display: flex;
@@ -41,39 +64,36 @@
             overflow: hidden;
         }
 
-        /* Header */
-        .builder-header { 
-            padding: 12px 24px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            background: #FFFFFF; 
-        }
-        
-        .builder-title { 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-        }
-        
-        .builder-title i { 
-            font-size: 20px; 
-            color: var(--primary); 
-        }
-        
-        .btn-close { 
-            background: none; 
-            border: none; 
-            font-size: 20px; 
-            color: var(--text-muted); 
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        
-        .btn-close:hover {
-            color: var(--danger);
-        }
+        /* ===== Header System v2 ===== */
+.builder-header {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-card);
+    flex-shrink: 0;
+}
+.builder-title { display: flex; align-items: center; gap: 0.75rem; }
+.builder-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--primary-light);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.builder-icon svg { width: 22px; height: 22px; stroke: var(--primary); }
+.builder-h2 {
+    margin: 0; font-family: var(--font-display);
+    font-size: 20px; font-weight: 800;
+    color: var(--text-main); line-height: 1.2;
+}
+.builder-sub { font-size: 0.8125rem; color: var(--text-muted); }
+.btn-close {
+    background: none; border: 1px solid transparent; border-radius: 12px;
+    color: var(--text-muted); cursor: pointer; padding: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color .15s, background .15s, border-color .15s;
+}
+.btn-close:hover { color: var(--danger); background: rgba(218,85,99,.10); border-color: var(--danger); }
 
         /* Body */
         .builder-body { 
@@ -85,7 +105,7 @@
         /* Sidebar */
         .config-sidebar { 
             width: 280px; 
-            background: #F8FAFC; 
+            background: var(--bg); 
             border-right: 1px solid var(--border); 
             padding: 16px; 
             overflow-y: auto; 
@@ -93,7 +113,7 @@
         
         .config-section { 
             margin-bottom: 20px; 
-            border-bottom: 1px solid #E2E8F0; 
+            border-bottom: 1px solid var(--border); 
             padding-bottom: 15px; 
         }
         
@@ -139,7 +159,7 @@
             overflow-y: auto; 
             border: 1px solid var(--border); 
             border-radius: 6px; 
-            background: white; 
+            background: var(--bg-card); 
         }
         
         .case-item { 
@@ -182,7 +202,7 @@
         /* Preview Area */
         .preview-area { 
             flex: 1; 
-            background: #E2E8F0; 
+            background: var(--border); 
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
@@ -195,7 +215,7 @@
             justify-content: space-between; 
             align-items: center;
             padding: 10px 20px; 
-            background: white; 
+            background: var(--bg-card); 
             border-bottom: 1px solid var(--border);
             box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
             z-index: 10;
@@ -208,7 +228,7 @@
         }
         
         .btn-nav { 
-            background: white; 
+            background: var(--bg-card); 
             border: 1px solid var(--border); 
             padding: 4px 10px; 
             border-radius: 4px; 
@@ -241,7 +261,7 @@
         .report-page {
             width: 210mm; 
             min-height: 297mm; 
-            background: white;
+            background: var(--bg-card);
             padding: 40px 50px; 
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
             margin-bottom: 20px; 
@@ -285,17 +305,17 @@
         }
         
         .data-table th { 
-            background: #F1F5F9; 
-            color: #64748B; 
+            background: var(--secondary); 
+            color: var(--text-muted); 
             padding: 4px 6px; 
-            border: 1px solid #E2E8F0; 
+            border: 1px solid var(--border); 
             text-align: left; 
             font-size: 8pt; 
         }
         
         .data-table td {
             padding: 4px 6px;
-            border: 1px solid #E2E8F0;
+            border: 1px solid var(--border);
             vertical-align: top;
             text-align: left;
         }
@@ -303,7 +323,7 @@
         .label-cell {
             width: 18% !important;
             font-weight: 600;
-            background: #F8FAFC;
+            background: var(--bg);
             text-align: left !important;
             padding: 4px 6px !important;
         }
@@ -378,7 +398,7 @@
         .builder-footer { 
             padding: 10px 24px; 
             border-top: 1px solid var(--border); 
-            background: #F8FAFC; 
+            background: var(--bg); 
             display: flex; 
             justify-content: space-between;
             align-items: center;
@@ -566,13 +586,17 @@
 
         <div class="builder-header">
             <div class="builder-title">
-                <i class="fas fa-file-medical-alt"></i>
+                <div class="builder-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                </div>
                 <div>
-                    <h2 style="margin:0; font-size:16px;">Informe de Gestión PRI</h2>
-                    <span style="font-size:11px; color:var(--text-muted);">Seguimiento de incapacidades - K+AIR</span>
+                    <h2 class="builder-h2">Informe de Gestión PRI</h2>
+                    <span class="builder-sub">Seguimiento de incapacidades · K+AIR</span>
                 </div>
             </div>
-            <button class="btn-close" onclick="closeReportBuilder()" title="Cerrar">&times;</button>
+            <button class="btn-close" onclick="closeReportBuilder()" title="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
         </div>
 
         <div class="builder-body">
@@ -1542,16 +1566,16 @@
                 <div class="report-header">
                     <div>
                         <h1 class="report-title-main">INFORME CONSOLIDADO PRI</h1>
-                        <p style="margin:5px 0 0 0; font-size:10pt; color:#64748B;">
+                        <p style="margin:5px 0 0 0; font-size:10pt; color:var(--text-muted);">
                             Seguimiento de Incapacidades - K+AIR
                         </p>
-                        <p style="margin:2px 0 0 0; font-size:9pt; color:#64748B;">
+                        <p style="margin:2px 0 0 0; font-size:9pt; color:var(--text-muted);">
                             Periodo: ${startDate} al ${endDate}
                         </p>
                     </div>
                     <div style="text-align:right">
                         <h2 style="font-size:12pt; margin:0;">${currentCompanyName}</h2>
-                        <span style="font-size:9pt; color:#64748B;">Generado: ${today}</span>
+                        <span style="font-size:9pt; color:var(--text-muted);">Generado: ${today}</span>
                     </div>
                 </div>
 
@@ -1632,7 +1656,7 @@
                     </tbody>
                 </table>
 
-                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid var(--border); padding-top:10px;">
                     Página 1 - Resumen Gerencial | K+AIR - Sistema de Gestión SG-SST
                 </div>
             </div>`;
@@ -1678,9 +1702,9 @@
             let page1Content = `
             <div class="report-page">
                 <!-- Encabezado Individual -->
-                <div class="report-header" style="border-bottom:1px solid #E2E8F0;">
+                <div class="report-header" style="border-bottom:1px solid var(--border);">
                     <div>
-                        <h2 style="font-size:14pt; color:#1E293B; margin:0;">FICHA DETALLADA DE CASO</h2>
+                        <h2 style="font-size:14pt; color:var(--text-main); margin:0;">FICHA DETALLADA DE CASO</h2>
                         <p style="font-size:9pt; color:#4338CA; margin:5px 0 0 0;">
                             ID Caso: PRI-2024-${c.id} | ${c.name}
                         </p>
@@ -1733,7 +1757,7 @@
                         <td class="label-cell">Diagnóstico</td>
                         <td colspan="3">
                             <strong>${c.diag}</strong> 
-                            <span style="color:#64748B; font-size:8pt;">(CIE-10: ${c.cie10})</span>
+                            <span style="color:var(--text-muted); font-size:8pt;">(CIE-10: ${c.cie10})</span>
                         </td>
                     </tr>
                     ${c.fechaCierre || c.motivoCierre ? `
@@ -1784,7 +1808,7 @@
                 </div>
                 ` : ''}
 
-                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid var(--border); padding-top:10px;">
                     Página ${pgo + 1} de ${totalGlobalPages()} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
                 </div>
             </div>`;
@@ -1795,10 +1819,10 @@
                 page2Content = `
                 <div class="report-page">
                     <!-- Encabezado Página 2 -->
-                    <div class="report-header" style="border-bottom:1px solid #E2E8F0;">
+                    <div class="report-header" style="border-bottom:1px solid var(--border);">
                         <div>
-                            <h2 style="font-size:14pt; color:#1E293B; margin:0;">FICHA DETALLADA DE CASO (Continuación)</h2>
-                            <p style="font-size:9pt; color:#64748B; margin:5px 0 0 0;">
+                            <h2 style="font-size:14pt; color:var(--text-main); margin:0;">FICHA DETALLADA DE CASO (Continuación)</h2>
+                            <p style="font-size:9pt; color:var(--text-muted); margin:5px 0 0 0;">
                                 ID Caso: PRI-2024-${c.id} | ${c.name}
                             </p>
                         </div>
@@ -1876,7 +1900,7 @@
                     ` : ''}
 
                     <!-- Footer Página 2 -->
-                    <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
+                    <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid var(--border); padding-top:10px;">
                         Página ${pgo + 2} de ${totalGlobalPages()} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
                     </div>
                 </div>`;
@@ -2029,9 +2053,13 @@
             //   si en el futuro se agregan secciones con fondo, se conservan.
             const printableCss = `
                 @page { size: A4 portrait; margin: 0; }
-                * { box-sizing: border-box; }
+                /* En oscuro el primario es azul claro: el texto blanco no se lee */
+        [data-theme^="dark"] .btn-primary,
+        [data-theme^="dark"] .btn.btn-primary { color: #0f172a; }
+
+        * { box-sizing: border-box; }
                 html, body {
-                    margin: 0; padding: 0; background: white;
+                    margin: 0; padding: 0; background: var(--bg-card);
                     color: #1e293b;
                     font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
                     font-size: 10pt;
@@ -2044,7 +2072,7 @@
                     width: 210mm; height: 297mm;
                     padding: 14mm 16mm; margin: 0 auto;
                     position: relative; overflow: hidden;
-                    background: white;
+                    background: var(--bg-card);
                     page-break-after: always !important;
                     break-after: page !important;
                 }
@@ -2111,7 +2139,7 @@
                     font-weight: 600;
                     border: 1px solid #94a3b8;
                     color: #1e293b;
-                    background: white;
+                    background: var(--bg-card);
                 }
                 .bg-warning-light, .bg-success-light, .bg-danger-light {
                     background: white !important;

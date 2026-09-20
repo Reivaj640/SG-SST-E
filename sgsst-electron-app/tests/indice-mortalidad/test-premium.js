@@ -71,7 +71,10 @@ ok('renderer: sanitize link CDN', renderer.indexOf('html.replace') !== -1 && ren
 ok('renderer: console.log removed', !/console\.log.*IndiceMortalidad.*INICIADO/.test(renderer));
 
 // index.html
-ok('index: renderer.js bumped', /renderer\.js\?v=20260919-mortalidad-duo/.test(index));
+// El token de renderer.js en index.html es COMPARTIDO por todos los módulos:
+// solo conserva el valor de la última migración. Se valida que exista un
+// cache-bust real (no el valor exacto, que cambia en cada migración).
+ok('index: renderer.js con cache-bust', /renderer\.js\?v=[\w.-]{8,}/.test(index));
 
 // Report
 var failed = 0;

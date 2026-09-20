@@ -188,6 +188,11 @@ class MedicionAusentismoComponent {
         this.container.innerHTML = '';
         // Añadir clase específica para identificar este módulo y permitir estilos específicos
         this.container.classList.add('medicion-ausentismo');
+        // Blindaje anti-fugas: todos los <style> inyectados están scopados bajo .aus-scope.
+        // Los nodos que se montan en <body> (paneles/modales/overlays) también lo reciben.
+        this.container.classList.add('aus-scope');
+        // Tokens --aus-* + estilos premium de TODAS las vistas (idempotente).
+        this._injectPremiumViewsStyles();
         window.currentMedicionAusentismoComponent = this;
 
         switch (this.currentView) {
@@ -461,79 +466,41 @@ class MedicionAusentismoComponent {
         // Contenedor wrapper con scroll condicional
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'seguimiento-incapacidades-scroll-wrapper';
-        scrollWrapper.style.cssText = `
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
-        `;
+        scrollWrapper.style.cssText = 'position:relative;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;';
 
         // Guardar referencia global del componente
         window.medicAusentismoComponent = this;
 
-        // Agregar FontAwesome dinámicamente si no está cargado
-        if (!document.querySelector('link[href*="font-awesome"]') && !document.querySelector('link[href*="fontawesome"]')) {
-            const fontAwesomeLink = document.createElement('link');
-            fontAwesomeLink.rel = 'stylesheet';
-            fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
-            document.head.appendChild(fontAwesomeLink);
-        }
-
-        // Contenedor principal
         const mainContent = document.createElement('div');
-        mainContent.style.cssText = `
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-            min-height: 100%;
-            box-sizing: border-box;
-        `;
+        mainContent.style.cssText = 'max-width:1400px;margin:0 auto;padding:20px;width:100%;min-height:100%;box-sizing:border-box;';
 
-        // Header con botón volver
+        // Header premium
         const headerSection = document.createElement('div');
-        headerSection.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #dee2e6;
-        `;
+        headerSection.className = 'aus-view-header';
+        headerSection.style.borderBottom = 'none';
 
         const leftSection = document.createElement('div');
-        leftSection.style.cssText = `display: flex; align-items: center; gap: 10px;`;
+        leftSection.className = 'aus-view-head-left';
 
-        const headerIcon = document.createElement('i');
-        headerIcon.className = 'fas fa-user-injured';
-        headerIcon.style.cssText = `color: #174ea6; font-size: 20px;`;
+        const headerIcon = document.createElement('div');
+        headerIcon.className = 'aus-view-icon';
+        headerIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
 
+        const headerTitleContainer = document.createElement('div');
         const headerTitle = document.createElement('h3');
+        headerTitle.className = 'aus-view-title';
         headerTitle.textContent = 'Seguimiento de Incapacidades';
-        headerTitle.style.cssText = `font-size: 18px; font-weight: 600; margin: 0; color: #1E293B;`;
-
+        const headerSub = document.createElement('p');
+        headerSub.className = 'aus-view-subtitle';
+        headerSub.textContent = 'Gestiona y sigue el estado de las incapacidades médicas.';
+        headerTitleContainer.appendChild(headerTitle);
+        headerTitleContainer.appendChild(headerSub);
         leftSection.appendChild(headerIcon);
-        leftSection.appendChild(headerTitle);
+        leftSection.appendChild(headerTitleContainer);
 
         const backBtn = document.createElement('button');
-        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-        backBtn.style.cssText = `
-            padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
-            cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-            border: 1px solid #dee2e6; background-color: #f8f9fa; color: #64748B;
-            transition: all 0.2s;
-        `;
-        backBtn.onmouseover = function() {
-            this.style.backgroundColor = '#e2e8f0';
-            this.style.color = '#174ea6';
-            this.style.borderColor = '#174ea6';
-        };
-        backBtn.onmouseout = function() {
-            this.style.backgroundColor = '#f8f9fa';
-            this.style.color = '#64748B';
-            this.style.borderColor = '#dee2e6';
-        };
+        backBtn.className = 'aus-btn';
+        backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver';
         backBtn.onclick = () => {
             this.currentView = 'main';
             this.render();
@@ -543,45 +510,39 @@ class MedicionAusentismoComponent {
         headerSection.appendChild(backBtn);
         mainContent.appendChild(headerSection);
 
-        // KPI Cards Grid
+        // KPI Cards
         const kpiGrid = document.createElement('div');
-        kpiGrid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 25px;
-        `;
+        kpiGrid.className = 'aus-kpis';
 
-        const createKPICard = (icon, title, value, sub, color) => {
+        const SVG_KPI = {
+            seguimiento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+            pric: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+            sinIniciar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            cerrados: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        };
+
+        const createKPICard = (iconSvg, title, value, sub, variant) => {
             const card = document.createElement('div');
-            card.style.cssText = `
-                background: white; padding: 20px; border-radius: 12px;
-                border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px;
-            `;
+            card.className = 'aus-kpi';
 
             const iconDiv = document.createElement('div');
-            iconDiv.style.cssText = `
-                width: 50px; height: 50px; border-radius: 10px; display: flex;
-                align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
-                background: ${color.bg}; color: ${color.text};
-            `;
-            iconDiv.innerHTML = `<i class="${icon}"></i>`;
+            iconDiv.className = 'aus-kpi__icon' + (variant ? ' aus-kpi__icon--' + variant : '');
+            iconDiv.innerHTML = iconSvg;
 
             const infoDiv = document.createElement('div');
-            infoDiv.style.cssText = `flex: 1;`;
+            infoDiv.className = 'aus-kpi__body';
 
             const titleEl = document.createElement('h3');
+            titleEl.className = 'aus-kpi__title';
             titleEl.textContent = title;
-            titleEl.style.cssText = `font-size: 13px; color: #64748B; margin-bottom: 4px; text-transform: uppercase;`;
 
             const valueEl = document.createElement('div');
-            valueEl.className = 'kpi-value';
+            valueEl.className = 'aus-kpi__value kpi-value';
             valueEl.textContent = value;
-            valueEl.style.cssText = `font-size: 24px; font-weight: 700; color: #1E293B;`;
 
             const subEl = document.createElement('div');
+            subEl.className = 'aus-kpi__sub';
             subEl.textContent = sub;
-            subEl.style.cssText = `font-size: 12px; color: #64748B; margin-top: 2px;`;
 
             infoDiv.appendChild(titleEl);
             infoDiv.appendChild(valueEl);
@@ -592,48 +553,21 @@ class MedicionAusentismoComponent {
             return card;
         };
 
-        // Crear las 4 tarjetas KPI
-        kpiGrid.appendChild(createKPICard(
-            'fas fa-spinner',
-            'En Seguimiento',
-            this.kpiEnSeguimiento || '0',
-            'Casos con seguimiento activo',
-            { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' }
-        ));
-
-        kpiGrid.appendChild(createKPICard(
-            'fas fa-hourglass-half',
-            'Casos PRIC',
-            this.kpiCasosPRIC || '0',
-            'Próximos a vencer',
-            { bg: 'rgba(245, 158, 11, 0.1)', text: '#F59E0B' }
-        ));
-
-        kpiGrid.appendChild(createKPICard(
-            'fas fa-file-exclamation',
-            'Sin Iniciar',
-            this.kpiSinIniciar || '0',
-            'Requieren iniciar gestión',
-            { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' }
-        ));
-
-        kpiGrid.appendChild(createKPICard(
-            'fas fa-check-circle',
-            'Cerrados (Mes)',
-            this.kpiCerradosMes || '0',
-            'Altas exitosas',
-            { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' }
-        ));
+        kpiGrid.appendChild(createKPICard(SVG_KPI.seguimiento, 'En Seguimiento', this.kpiEnSeguimiento || '0', 'Casos con seguimiento activo', ''));
+        kpiGrid.appendChild(createKPICard(SVG_KPI.pric, 'Casos PRIC', this.kpiCasosPRIC || '0', 'Próximos a vencer', 'amber'));
+        kpiGrid.appendChild(createKPICard(SVG_KPI.sinIniciar, 'Sin Iniciar', this.kpiSinIniciar || '0', 'Requieren iniciar gestión', 'red'));
+        kpiGrid.appendChild(createKPICard(SVG_KPI.cerrados, 'Cerrados (Mes)', this.kpiCerradosMes || '0', 'Altas exitosas', 'green'));
 
         mainContent.appendChild(kpiGrid);
 
-        // Filters Container
+        // Filtros
         const filtersContainer = document.createElement('div');
-        filtersContainer.style.cssText = `
-            background: white; padding: 20px; border-radius: 12px;
-            border: 1px solid #e2e8f0; margin-bottom: 20px;
-            display: flex; flex-wrap: wrap; align-items: flex-end; gap: 15px;
-        `;
+        filtersContainer.className = 'aus-card';
+        filtersContainer.style.marginBottom = '20px';
+
+        const filtersBar = document.createElement('div');
+        filtersBar.className = 'aus-filters';
+        filtersBar.style.borderBottom = 'none';
 
         const currentYear = new Date().getFullYear();
         const months = [
@@ -641,89 +575,83 @@ class MedicionAusentismoComponent {
             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
 
-        filtersContainer.innerHTML = `
-            <div style="flex: 2; min-width: 200px;">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Buscar Paciente</label>
-                <input type="text" id="seguimientoSearchInput" class="form-control" placeholder="Nombre o Cédula..."
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+        filtersBar.innerHTML = `
+            <div class="aus-field" style="grid-column: span 2;">
+                <label class="aus-field__label" for="seguimientoSearchInput">Buscar Paciente</label>
+                <input type="text" id="seguimientoSearchInput" class="aus-input" placeholder="Nombre o Cédula...">
             </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Estado</label>
-                <select id="seguimientoEstadoFilter" class="form-control"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="seguimientoEstadoFilter">Estado</label>
+                <select id="seguimientoEstadoFilter" class="aus-input">
                     <option value="">Todos</option>
                     <option value="En curso">En curso</option>
                     <option value="Próximo a vencer">Próximo a vencer</option>
                     <option value="Finalizado">Finalizado</option>
                 </select>
             </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Tipo</label>
-                <select id="seguimientoTipoFilter" class="form-control"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="seguimientoTipoFilter">Tipo</label>
+                <select id="seguimientoTipoFilter" class="aus-input">
                     <option value="">Todos</option>
                     <option value="EPS">EPS</option>
                     <option value="ARL">ARL</option>
                 </select>
             </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Año</label>
-                <select id="seguimientoYearFilter" class="form-control"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="seguimientoYearFilter">Año</label>
+                <select id="seguimientoYearFilter" class="aus-input">
                     <option value="">Todos</option>
-                    <!-- Los años se llenarán dinámicamente después de cargar los datos -->
                 </select>
             </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Mes</label>
-                <select id="seguimientoMonthFilter" class="form-control"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: #fff;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="seguimientoMonthFilter">Mes</label>
+                <select id="seguimientoMonthFilter" class="aus-input">
                     <option value="">Todos</option>
                     ${months.map((month, index) => `<option value="${index}">${month}</option>`).join('')}
                 </select>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button id="seguimientoFilterBtn" class="btn btn-primary"
-                    style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none; background-color: #174ea6; color: white;">
-                    <i class="fas fa-filter"></i> Filtrar
+            <div class="aus-filters-actions">
+                <button id="seguimientoFilterBtn" class="aus-btn aus-btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    Filtrar
                 </button>
-                <button id="seguimientoClearBtn" class="btn btn-outline"
-                    style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0; background: white; color: #1E293B;">
-                    <i class="fas fa-times"></i> Limpiar
+                <button id="seguimientoClearBtn" class="aus-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Limpiar
                 </button>
             </div>
         `;
 
+        filtersContainer.appendChild(filtersBar);
         mainContent.appendChild(filtersContainer);
 
-        // Table Container
+        // Tabla
         const tableContainer = document.createElement('div');
-        tableContainer.style.cssText = `
-            background: white; border-radius: 12px;
-            border: 1px solid #e2e8f0; overflow: hidden; overflow-x: auto;
-        `;
+        tableContainer.className = 'aus-card';
 
         tableContainer.innerHTML = `
-            <table style="width: 100%; border-collapse: collapse; min-width: 1100px;">
-                <thead>
-                    <tr>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Empleado</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Tipo</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;" title="¿Es un caso PRI formal?">PRI</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Periodo</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Avance</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Estado</th>
-                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="seguimientoTableBody">
-                    <tr>
-                        <td colspan="7" class="ks-loading-cell" style="padding: 16px;">
-                            ${KairSkeleton.table(8, 7)}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="ausentismo-table-wrapper" style="max-height: none; min-height: 0; overflow-y: visible; border-radius: 20px;">
+                <table class="ausentismo-table" style="min-width: 1100px;">
+                    <thead>
+                        <tr>
+                            <th>Empleado</th>
+                            <th>Tipo</th>
+                            <th title="¿Es un caso PRI formal?">PRI</th>
+                            <th>Periodo</th>
+                            <th>Avance</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seguimientoTableBody">
+                        <tr>
+                            <td colspan="7" class="ks-loading-cell" style="padding: 16px;">
+                                ${KairSkeleton.table(8, 7)}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         `;
 
         mainContent.appendChild(tableContainer);
@@ -1666,8 +1594,8 @@ class MedicionAusentismoComponent {
             console.log('[DEBUG renderSeguimientoTableWithBody] No hay datos para mostrar');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px; color: #64748B;">
-                        <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <td colspan="7" class="aus-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
                         <p>No hay seguimientos para mostrar</p>
                     </td>
                 </tr>
@@ -1745,7 +1673,7 @@ class MedicionAusentismoComponent {
                 : '');
             let priBadge;
             if (priValor === 'SI') {
-                priBadge = '<span class="sp-pri-badge is-pri" title="Caso PRI formal"><i class="fas fa-clipboard-check"></i> PRI</span>';
+                priBadge = '<span class="sp-pri-badge is-pri" title="Caso PRI formal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;vertical-align:-2px;"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><polyline points="9 14 11 16 15 12"/></svg> PRI</span>';
             } else if (priValor === 'NO') {
                 priBadge = '<span class="sp-pri-badge is-no-pri-strong" title="Seguimiento: NO es caso PRI formal">⚠ Seg.</span>';
             } else {
@@ -1758,47 +1686,47 @@ class MedicionAusentismoComponent {
                 'Sin fechas';
 
             return `
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#F8FAFC'" onmouseout="this.style.backgroundColor='white'">
-                    <td style="padding: 15px;">
+                <tr>
+                    <td>
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #F1F5F9; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #64748B; font-size: 14px;">${initials}</div>
+                            <div class="aus-avatar">${initials}</div>
                             <div>
-                                <div style="font-weight: 500; color: #1E293B;">${nombre}</div>
-                                <div style="font-size: 12px; color: #64748B;">CC: ${cedula}</div>
+                                <div class="aus-cell-main">${nombre}</div>
+                                <div class="aus-cell-sub">CC: ${cedula}</div>
                             </div>
                         </div>
                     </td>
-                    <td style="padding: 15px;">
-                        <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${tipo === 'ARL' ? '#FEF3C7' : '#DCFCE7'}; color: ${tipo === 'ARL' ? '#92400E' : '#166534'};">${tipo}</span>
+                    <td>
+                        <span class="aus-badge ${tipo === 'ARL' ? 'aus-badge--amber' : 'aus-badge--green'}">${tipo}</span>
                     </td>
-                    <td style="padding: 15px;">
+                    <td>
                         ${priBadge}
                     </td>
-                    <td style="padding: 15px;">
-                        <div style="font-size: 13px; color: #1E293B;">${periodoStr}</div>
-                        <div style="font-size: 11px; color: #64748B;">${diasIncapacidad} Días</div>
+                    <td>
+                        <div class="aus-cell-main">${periodoStr}</div>
+                        <div class="aus-cell-sub">${diasIncapacidad} Días</div>
                     </td>
-                    <td style="padding: 15px;">
-                        <div style="width: 100px;">
-                            <div style="font-size: 11px; color: #64748B; margin-bottom: 2px; text-align: right;">${avancePorcentaje}% (${avanceDescripcion})</div>
-                            <div style="width: 100%; height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden;">
-                                <div style="width: ${avancePorcentaje}%; height: 100%; background: ${avanceColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
+                    <td>
+                        <div class="aus-progress">
+                            <div class="aus-progress__label">${avancePorcentaje}% (${avanceDescripcion})</div>
+                            <div class="aus-progress__track">
+                                <div class="aus-progress__bar" style="width: ${avancePorcentaje}%; background: ${avanceColor};"></div>
                             </div>
                         </div>
                     </td>
-                    <td style="padding: 15px;">
-                        <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${badgeClass === 'badge-active' ? '#DCFCE7' : badgeClass === 'badge-pending' ? '#FEF3C7' : '#F3F4F6'}; color: ${badgeClass === 'badge-active' ? '#166534' : badgeClass === 'badge-pending' ? '#92400E' : '#374151'};">${estado}</span>
+                    <td>
+                        <span class="aus-badge ${badgeClass === 'badge-active' ? 'aus-badge--green' : badgeClass === 'badge-pending' ? 'aus-badge--amber' : 'aus-badge--gray'}">${estado}</span>
                     </td>
-                    <td style="padding: 15px;">
+                    <td>
                         <div style="display: flex; gap: 5px;">
-                            <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Ver Detalles" onclick="if(window.medicAusentismoComponent) window.medicAusentismoComponent.openDetailModal(${JSON.stringify(empleado).replace(/"/g, '&quot;')})">
-                                <i class="fas fa-eye"></i>
+                            <button class="aus-icon-btn" title="Ver Detalles" onclick="if(window.medicAusentismoComponent) window.medicAusentismoComponent.openDetailModal(${JSON.stringify(empleado).replace(/"/g, '&quot;')})">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
-                            <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Agregar Nota" onclick="console.log('Agregar nota:', '${nombre.replace(/'/g, "\\'")}');">
-                                <i class="fas fa-sticky-note"></i>
+                            <button class="aus-icon-btn" title="Agregar Nota" onclick="console.log('Agregar nota:', '${nombre.replace(/'/g, "\\'")}');">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </button>
-                            <button style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B; transition: all 0.2s;" title="Adjuntar Archivo" onclick="console.log('Adjuntar:', '${nombre.replace(/'/g, "\\'")}');">
-                                <i class="fas fa-paperclip"></i>
+                            <button class="aus-icon-btn" title="Adjuntar Archivo" onclick="console.log('Adjuntar:', '${nombre.replace(/'/g, "\\'")}');">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             </button>
                         </div>
                     </td>
@@ -2817,7 +2745,7 @@ class MedicionAusentismoComponent {
             const style = document.createElement('style');
             style.id = styleId;
             style.textContent = `
-                :root {
+                 .aus-scope{
                     --sp-primary: #4F46E5;
                     --sp-primary-light: #EEF2FF;
                     --sp-secondary: #F1F5F9;
@@ -2829,54 +2757,59 @@ class MedicionAusentismoComponent {
                     --sp-bg-panel: #FFFFFF;
                 }
 
-                /* Panel Slideover */
-                .seguimiento-backdrop {
+                /* El backdrop se monta en <body> con la clase .aus-scope EN SÍ MISMO,
+                   así que hay que cubrir las dos formas: descendiente y self. */
+                .aus-scope /* Panel Slideover */
+                .seguimiento-backdrop,
+                .aus-scope.seguimiento-backdrop{
                     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                     background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000;
                     opacity: 0; visibility: hidden; transition: all 0.3s ease;
                 }
-                .seguimiento-backdrop.active { opacity: 1; visibility: visible; }
+                .aus-scope .seguimiento-backdrop.active,
+                .aus-scope.seguimiento-backdrop.active{ opacity: 1; visibility: visible; }
 
-                .seguimiento-panel {
+                .aus-scope .seguimiento-panel{
                     position: fixed; top: 0; right: 0; width: 95%; max-width: 1100px; height: 100%;
                     background: var(--sp-bg-panel); box-shadow: -5px 0 30px rgba(0,0,0,0.1);
                     transform: translateX(100%); transition: transform 0.3s ease; z-index: 2001;
                     display: flex; flex-direction: column;
                 }
-                .seguimiento-backdrop.active .seguimiento-panel { transform: translateX(0); }
+                .aus-scope .seguimiento-backdrop.active .seguimiento-panel,
+                .aus-scope.seguimiento-backdrop.active .seguimiento-panel{ transform: translateX(0); }
 
-                /* Header */
-                .sp-panel-header {
+                .aus-scope /* Header */
+                .sp-panel-header{
                     padding: 15px 30px; border-bottom: 1px solid var(--sp-border);
                     display: flex; justify-content: space-between; align-items: center; background: #FAFAFA; flex-shrink: 0;
                 }
-                .sp-header-info h2 { font-size: 18px; font-weight: 600; color: var(--sp-text-main); }
-                .sp-header-info p { font-size: 12px; color: var(--sp-text-muted); margin-top: 2px; }
-                .sp-close-btn {
+                .aus-scope .sp-header-info h2{ font-size: 18px; font-weight: 600; color: var(--sp-text-main); }
+                .aus-scope .sp-header-info p{ font-size: 12px; color: var(--sp-text-muted); margin-top: 2px; }
+                .aus-scope .sp-close-btn{
                     width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--sp-border);
                     background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
                 }
-                .sp-close-btn:hover { background: var(--sp-danger); color: white; border-color: var(--sp-danger); }
+                .aus-scope .sp-close-btn:hover{ background: var(--sp-danger); color: white; border-color: var(--sp-danger); }
 
-                /* Navegación Horizontal */
-                .sp-horizontal-nav {
+                .aus-scope /* Navegación Horizontal */
+                .sp-horizontal-nav{
                     display: flex; background: white; border-bottom: 1px solid var(--sp-border); padding: 0 20px;
                     overflow-x: auto; flex-shrink: 0;
                 }
-                .sp-nav-item {
+                .aus-scope .sp-nav-item{
                     padding: 15px 20px; color: var(--sp-text-muted); font-size: 13px; font-weight: 500;
                     border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
                     display: flex; align-items: center; gap: 8px; transition: all 0.2s;
                 }
-                .sp-nav-item:hover { color: var(--sp-text-main); background: var(--sp-secondary); }
-                .sp-nav-item.active {
+                .aus-scope .sp-nav-item:hover{ color: var(--sp-text-main); background: var(--sp-secondary); }
+                .aus-scope .sp-nav-item.active{
                     color: var(--sp-primary); border-bottom-color: var(--sp-primary); font-weight: 600;
                 }
-                .sp-nav-item i { font-size: 14px; }
+                .aus-scope .sp-nav-item i{ font-size: 14px; }
 
-                /* 📦 Bloqueo de pasos: las navs futuras a la sección activa están bloqueadas
+                .aus-scope /* 📦 Bloqueo de pasos: las navs futuras a la sección activa están bloqueadas
                 con candado y sin pointer-events. Solo "Siguiente" las desbloquea. */
-                .sp-nav-item.is-locked-step {
+                .sp-nav-item.is-locked-step{
                     opacity: 0.4;
                     cursor: not-allowed;
                     pointer-events: none;
@@ -2888,59 +2821,59 @@ class MedicionAusentismoComponent {
                         rgba(100, 116, 139, 0.04) 8px
                     );
                 }
-                .sp-nav-item .sp-nav-lock-icon {
+                .aus-scope .sp-nav-item .sp-nav-lock-icon{
                     font-size: 11px;
                     margin-left: 4px;
                     color: var(--sp-text-muted);
                 }
 
-                /* Área de Contenido */
-                .sp-content-area {
+                .aus-scope /* Área de Contenido */
+                .sp-content-area{
                     flex: 1; padding: 25px 30px; overflow-y: auto; background: #FDFEFE;
                 }
-                .sp-form-section { display: none; animation: spFadeIn 0.3s ease; }
-                .sp-form-section.active { display: block; }
+                .aus-scope .sp-form-section{ display: none; animation: spFadeIn 0.3s ease; }
+                .aus-scope .sp-form-section.active{ display: block; }
                 @keyframes spFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-                .sp-section-title {
+                .aus-scope .sp-section-title{
                     font-size: 16px; font-weight: 600; color: var(--sp-text-main); margin-bottom: 20px;
                     border-bottom: 1px solid var(--sp-border); padding-bottom: 10px;
                     display: flex; align-items: center; gap: 10px;
                 }
-                .sp-section-title i { color: var(--sp-primary); }
+                .aus-scope .sp-section-title i{ color: var(--sp-primary); }
 
-                /* Grid Forms */
-                .sp-form-grid {
+                .aus-scope /* Grid Forms */
+                .sp-form-grid{
                     display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
                     gap: 18px 25px; margin-bottom: 25px;
                 }
-                .sp-form-group { display: flex; flex-direction: column; gap: 6px; }
-                .sp-form-group.full-width { grid-column: 1 / -1; }
+                .aus-scope .sp-form-group{ display: flex; flex-direction: column; gap: 6px; }
+                .aus-scope .sp-form-group.full-width{ grid-column: 1 / -1; }
 
-                .sp-form-label {
+                .aus-scope .sp-form-label{
                     font-size: 11.5px; font-weight: 600; color: var(--sp-text-muted); text-transform: uppercase; letter-spacing: 0.3px;
                 }
 
-                .sp-form-control {
+                .aus-scope .sp-form-control{
                     width: 100%; padding: 10px 12px; border: 1px solid var(--sp-border);
                     border-radius: 6px; font-size: 13px; background: white; font-family: inherit;
                     transition: all 0.2s;
                 }
-                .sp-form-control:focus {
+                .aus-scope .sp-form-control:focus{
                     outline: none; border-color: var(--sp-primary);
                     box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
                 }
-                .sp-form-control:disabled {
+                .aus-scope .sp-form-control:disabled{
                     background: #F3F4F6; cursor: not-allowed; color: #9CA3AF;
                 }
-                .sp-form-control[readonly] {
+                .aus-scope .sp-form-control[readonly]{
                     background: #F9FAFB; color: var(--sp-text-main);
                 }
 
-                /* 📦 Wizard de validación — recuadro rojo universal para TODO input/select/
+                .aus-scope /* 📦 Wizard de validación — recuadro rojo universal para TODO input/select/
                 textarea vacío, sea obligatorio u opcional. La distinción "obligatorio" se
                 sigue marcando con el asterisco rojo en el label, no con el recuadro. */
-                .sp-form-control.is-empty {
+                .sp-form-control.is-empty{
                     border-color: #EF4444 !important;
                     background: #FEF2F2;
                     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>");
@@ -2949,74 +2882,74 @@ class MedicionAusentismoComponent {
                     background-size: 14px;
                     padding-right: 32px;
                 }
-                .sp-form-control.is-empty:focus {
+                .aus-scope .sp-form-control.is-empty:focus{
                     outline: none;
                     border-color: #EF4444 !important;
                     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
                 }
 
-                /* 📦 SELECTS: el ícono no debe chocar con la flecha nativa del dropdown.
+                .aus-scope /* 📦 SELECTS: el ícono no debe chocar con la flecha nativa del dropdown.
                 Movemos el ícono a la izquierda de la flecha y reservamos espacio. */
-                select.sp-form-control.is-empty {
+                select.sp-form-control.is-empty{
                     padding-right: 44px;
                     background-position: right 28px center;
                 }
 
-                /* Asterisco rojo en label cuando el campo es requerido */
-                .sp-form-label[data-required-mark="true"]::after {
+                .aus-scope /* Asterisco rojo en label cuando el campo es requerido */
+                .sp-form-label[data-required-mark="true"]::after{
                     content: ' *';
                     color: #EF4444;
                     font-weight: 700;
                 }
 
-                /* Contador de completitud en el header de cada sección */
-                .sp-section-completitud {
+                .aus-scope /* Contador de completitud en el header de cada sección */
+                .sp-section-completitud{
                     margin-left: auto; font-size: 12px; font-weight: 500;
                     padding: 4px 10px; border-radius: 12px;
                     background: var(--sp-secondary); color: var(--sp-text-muted);
                     transition: all 0.25s ease;
                 }
-                .sp-section-completitud.is-complete {
+                .aus-scope .sp-section-completitud.is-complete{
                     background: #D1FAE5; color: #065F46;
                 }
-                .sp-section-completitud.is-incomplete {
+                .aus-scope .sp-section-completitud.is-incomplete{
                     background: #FEE2E2; color: #991B1B;
                 }
 
-                /* Mensaje inline de error pegado al primer campo vacío de la sección */
-                .sp-required-hint {
+                .aus-scope /* Mensaje inline de error pegado al primer campo vacío de la sección */
+                .sp-required-hint{
                     display: block; font-size: 11.5px; color: #DC2626;
                     margin-top: 4px; font-weight: 500;
                 }
 
-                /* Footer reorganizado con navegación de wizard */
-                .sp-panel-footer {
+                .aus-scope /* Footer reorganizado con navegación de wizard */
+                .sp-panel-footer{
                     padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
                     display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
                     gap: 12px;
                 }
-                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
-                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
-                .sp-panel-footer-progress {
+                .aus-scope .sp-panel-footer-left{ display: flex; gap: 8px; align-items: center; }
+                .aus-scope .sp-panel-footer-right{ display: flex; gap: 8px; align-items: center; }
+                .aus-scope .sp-panel-footer-progress{
                     font-size: 12px; color: var(--sp-text-muted);
                     padding: 6px 12px; border-radius: 16px;
                     background: var(--sp-secondary);
                 }
-                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
+                .aus-scope .sp-panel-footer-progress strong{ color: var(--sp-text-main); font-weight: 600; }
 
-                /* Subsection */
-                .sp-subsection {
+                .aus-scope /* Subsection */
+                .sp-subsection{
                     background: white; border: 1px solid var(--sp-border); border-radius: 8px;
                     padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
                 }
-                .sp-subsection-title {
+                .aus-scope .sp-subsection-title{
                     font-size: 14px; font-weight: 600; color: var(--sp-text-main); margin-bottom: 15px;
                     display: flex; align-items: center; gap: 8px;
                 }
-                .sp-subsection-title i { color: var(--sp-accent); font-size: 12px; }
+                .aus-scope .sp-subsection-title i{ color: var(--sp-accent); font-size: 12px; }
 
-                /* 📦 Banner PRI — estado formal del caso (PRIC vs seguimiento simple) */
-                .sp-pri-banner {
+                .aus-scope /* 📦 Banner PRI — estado formal del caso (PRIC vs seguimiento simple) */
+                .sp-pri-banner{
                     padding: 12px 30px; flex-shrink: 0;
                     display: flex; align-items: center; gap: 12px;
                     border-bottom: 1px solid var(--sp-border);
@@ -3024,169 +2957,169 @@ class MedicionAusentismoComponent {
                     background: var(--sp-secondary);
                     transition: background-color 0.25s ease, border-color 0.25s ease;
                 }
-                .sp-pri-banner .sp-pri-banner-icon {
+                .aus-scope .sp-pri-banner .sp-pri-banner-icon{
                     width: 36px; height: 36px; border-radius: 50%;
                     display: flex; align-items: center; justify-content: center;
                     font-size: 16px; flex-shrink: 0;
                 }
-                .sp-pri-banner .sp-pri-banner-text { flex: 1; line-height: 1.35; }
-                .sp-pri-banner .sp-pri-banner-text strong { font-weight: 600; }
-                .sp-pri-banner .sp-pri-banner-text small { display: block; font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+                .aus-scope .sp-pri-banner .sp-pri-banner-text{ flex: 1; line-height: 1.35; }
+                .aus-scope .sp-pri-banner .sp-pri-banner-text strong{ font-weight: 600; }
+                .aus-scope .sp-pri-banner .sp-pri-banner-text small{ display: block; font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
 
-                /* Estado 1: Caso PRI formal */
-                .sp-pri-banner.is-pri {
+                .aus-scope /* Estado 1: Caso PRI formal */
+                .sp-pri-banner.is-pri{
                     background: linear-gradient(90deg, #ECFDF5 0%, #D1FAE5 100%);
                     border-bottom-color: #10B981;
                 }
-                .sp-pri-banner.is-pri .sp-pri-banner-icon { background: var(--sp-accent); color: white; }
+                .aus-scope .sp-pri-banner.is-pri .sp-pri-banner-icon{ background: var(--sp-accent); color: white; }
 
-                /* Estado 2: Caso con seguimiento pero NO PRI formal */
-                .sp-pri-banner.is-no-pri {
+                .aus-scope /* Estado 2: Caso con seguimiento pero NO PRI formal */
+                .sp-pri-banner.is-no-pri{
                     background: linear-gradient(90deg, #FFFBEB 0%, #FEF3C7 100%);
                     border-bottom-color: #F59E0B;
                 }
-                .sp-pri-banner.is-no-pri .sp-pri-banner-icon { background: #F59E0B; color: white; }
+                .aus-scope .sp-pri-banner.is-no-pri .sp-pri-banner-icon{ background: #F59E0B; color: white; }
 
-                /* Estado 3: Aún sin clasificar (caso recién creado sin valor) */
-                .sp-pri-banner.is-unclassified {
+                .aus-scope /* Estado 3: Aún sin clasificar (caso recién creado sin valor) */
+                .sp-pri-banner.is-unclassified{
                     background: linear-gradient(90deg, #F8FAFC 0%, #F1F5F9 100%);
                     border-bottom-color: var(--sp-border);
                 }
-                .sp-pri-banner.is-unclassified .sp-pri-banner-icon { background: #94A3B8; color: white; }
+                .aus-scope .sp-pri-banner.is-unclassified .sp-pri-banner-icon{ background: #94A3B8; color: white; }
 
-                /* Botones contextuales del banner — el control de decisión vive aquí para
+                .aus-scope /* Botones contextuales del banner — el control de decisión vive aquí para
                 que NUNCA dependa de navegar a una sección atenuada. */
-                .sp-pri-banner .sp-pri-banner-actions {
+                .sp-pri-banner .sp-pri-banner-actions{
                     display: flex; gap: 8px; flex-shrink: 0; align-items: center;
                 }
-                .sp-pri-banner .sp-pri-banner-btn {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn{
                     padding: 7px 14px; border-radius: 6px; cursor: pointer;
                     font-size: 12px; font-weight: 600; white-space: nowrap;
                     display: inline-flex; align-items: center; gap: 6px;
                     transition: all 0.2s; border: 1px solid transparent;
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-pri {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-pri{
                     background: var(--sp-accent); color: white;
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-pri:hover {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-pri:hover{
                     background: #059669; transform: translateY(-1px);
                     box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25);
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-no-pri {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-no-pri{
                     background: white; color: #92400E; border-color: #F59E0B;
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-no-pri:hover {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-no-pri:hover{
                     background: #FEF3C7; transform: translateY(-1px);
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-ghost {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-ghost{
                     background: transparent; color: #4F46E5; border-color: #4F46E5;
                 }
-                .sp-pri-banner .sp-pri-banner-btn.is-ghost:hover {
+                .aus-scope .sp-pri-banner .sp-pri-banner-btn.is-ghost:hover{
                     background: var(--sp-primary-light); transform: translateY(-1px);
                 }
 
-                /* 📦701 — Banner BD: estado del caso actual en SQLite + acciones */
-                .sp-bd-banner {
+                .aus-scope /* 📦701 — Banner BD: estado del caso actual en SQLite + acciones */
+                .sp-bd-banner{
                     display: flex; align-items: center; gap: 12px;
                     padding: 10px 16px;
                     border-radius: 8px;
                     margin: 0 16px 12px;
                     transition: all 0.2s ease;
                 }
-                .sp-bd-banner .sp-bd-banner-icon {
+                .aus-scope .sp-bd-banner .sp-bd-banner-icon{
                     width: 32px; height: 32px; border-radius: 6px;
                     display: flex; align-items: center; justify-content: center;
                     font-size: 14px; flex-shrink: 0;
                 }
-                .sp-bd-banner .sp-bd-banner-text { flex: 1; line-height: 1.35; font-size: 13px; }
-                .sp-bd-banner .sp-bd-banner-text strong { font-weight: 600; }
-                .sp-bd-banner .sp-bd-banner-text small { display: block; font-size: 11.5px; opacity: 0.8; margin-top: 2px; }
-                .sp-bd-banner .sp-bd-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
-                .sp-bd-banner.is-unsaved { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-                .sp-bd-banner.is-unsaved .sp-bd-banner-icon { background: #94a3b8; color: white; }
-                .sp-bd-banner.is-saved { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
-                .sp-bd-banner.is-saved .sp-bd-banner-icon { background: #10b981; color: white; }
-                .sp-bd-banner.is-exported { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; }
-                .sp-bd-banner.is-exported .sp-bd-banner-icon { background: #3b82f6; color: white; }
-                .sp-bd-banner.is-error { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
-                .sp-bd-banner.is-error .sp-bd-banner-icon { background: #ef4444; color: white; }
-                .sp-btn-export { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
-                .sp-btn-export:hover:not(:disabled) { background: #059669; }
-                .sp-btn-export:disabled { background: #10b981; }
+                .aus-scope .sp-bd-banner .sp-bd-banner-text{ flex: 1; line-height: 1.35; font-size: 13px; }
+                .aus-scope .sp-bd-banner .sp-bd-banner-text strong{ font-weight: 600; }
+                .aus-scope .sp-bd-banner .sp-bd-banner-text small{ display: block; font-size: 11.5px; opacity: 0.8; margin-top: 2px; }
+                .aus-scope .sp-bd-banner .sp-bd-banner-actions{ display: flex; gap: 6px; flex-shrink: 0; }
+                .aus-scope .sp-bd-banner.is-unsaved{ background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+                .aus-scope .sp-bd-banner.is-unsaved .sp-bd-banner-icon{ background: #94a3b8; color: white; }
+                .aus-scope .sp-bd-banner.is-saved{ background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+                .aus-scope .sp-bd-banner.is-saved .sp-bd-banner-icon{ background: #10b981; color: white; }
+                .aus-scope .sp-bd-banner.is-exported{ background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; }
+                .aus-scope .sp-bd-banner.is-exported .sp-bd-banner-icon{ background: #3b82f6; color: white; }
+                .aus-scope .sp-bd-banner.is-error{ background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+                .aus-scope .sp-bd-banner.is-error .sp-bd-banner-icon{ background: #ef4444; color: white; }
+                .aus-scope .sp-btn-export{ background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+                .aus-scope .sp-btn-export:hover:not(:disabled){ background: #059669; }
+                .aus-scope .sp-btn-export:disabled{ background: #10b981; }
 
-                /* Atenuación — sólo aplica a Calificación PCL, que genuinamente requiere
+                .aus-scope /* Atenuación — sólo aplica a Calificación PCL, que genuinamente requiere
                 ser caso PRI formal. La sección Etapas PRIC nunca se atenúa: el usuario debe
                 poder entrar a diligenciar lo que aplique sin estar bloqueado. */
-                .sp-section-dimmed { opacity: 0.45; pointer-events: none; transition: opacity 0.25s ease; }
-                .sp-section-dimmed .sp-subsection { position: relative; }
-                .sp-nav-item.is-dimmed { opacity: 0.5; }
-                .sp-nav-item.is-dimmed i { color: var(--sp-text-muted); }
+                .sp-section-dimmed{ opacity: 0.45; pointer-events: none; transition: opacity 0.25s ease; }
+                .aus-scope .sp-section-dimmed .sp-subsection{ position: relative; }
+                .aus-scope .sp-nav-item.is-dimmed{ opacity: 0.5; }
+                .aus-scope .sp-nav-item.is-dimmed i{ color: var(--sp-text-muted); }
 
-                /* Badge de modalidad en la tabla principal */
-                .sp-pri-badge {
+                .aus-scope /* Badge de modalidad en la tabla principal */
+                .sp-pri-badge{
                     display: inline-flex; align-items: center; gap: 5px;
                     padding: 3px 9px; border-radius: 12px;
                     font-size: 11px; font-weight: 600;
                     letter-spacing: 0.2px;
                     white-space: nowrap;
                 }
-                .sp-pri-badge i { font-size: 11px; line-height: 1; }
-                .sp-pri-badge.is-pri { background: #D1FAE5; color: #065F46; }
-                .sp-pri-badge.is-no-pri { background: #F1F5F9; color: #64748B; }
-                .sp-pri-badge.is-no-pri-strong { background: #FEF3C7; color: #92400E; }
+                .aus-scope .sp-pri-badge i{ font-size: 11px; line-height: 1; }
+                .aus-scope .sp-pri-badge.is-pri{ background: #D1FAE5; color: #065F46; }
+                .aus-scope .sp-pri-badge.is-no-pri{ background: #F1F5F9; color: #64748B; }
+                .aus-scope .sp-pri-badge.is-no-pri-strong{ background: #FEF3C7; color: #92400E; }
 
-                /* Tabla de Recomendaciones */
-                .sp-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-                .sp-data-table th {
+                .aus-scope /* Tabla de Recomendaciones */
+                .sp-data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+                .aus-scope .sp-data-table th{
                     text-align: left; padding: 10px; background: var(--sp-secondary);
                     border: 1px solid var(--sp-border); font-size: 11px; color: var(--sp-text-muted); font-weight: 600;
                 }
-                .sp-data-table td { padding: 8px; border: 1px solid var(--sp-border); }
-                .sp-data-table input, .sp-data-table select {
+                .aus-scope .sp-data-table td{ padding: 8px; border: 1px solid var(--sp-border); }
+                .aus-scope .sp-data-table input, .aus-scope .sp-data-table select{
                     border: none; background: transparent; width: 100%; font-size: 13px; font-family: inherit;
                 }
-                .sp-data-table input:focus, .sp-data-table select:focus {
+                .aus-scope .sp-data-table input:focus, .aus-scope .sp-data-table select:focus{
                     outline: 1px solid var(--sp-primary); background: var(--sp-primary-light);
                 }
 
-                /* Footer */
-                .sp-panel-footer {
+                .aus-scope /* Footer */
+                .sp-panel-footer{
                     padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
                     display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
                     gap: 12px;
                 }
-                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
-                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
-                .sp-panel-footer-progress {
+                .aus-scope .sp-panel-footer-left{ display: flex; gap: 8px; align-items: center; }
+                .aus-scope .sp-panel-footer-right{ display: flex; gap: 8px; align-items: center; }
+                .aus-scope .sp-panel-footer-progress{
                     font-size: 12px; color: var(--sp-text-muted);
                     padding: 6px 12px; border-radius: 16px;
                     background: var(--sp-secondary);
                 }
-                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
-                .sp-btn {
+                .aus-scope .sp-panel-footer-progress strong{ color: var(--sp-text-main); font-weight: 600; }
+                .aus-scope .sp-btn{
                     padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500;
                     cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none;
                     transition: all 0.2s;
                 }
-                .sp-btn-primary { background: var(--sp-primary); color: white; }
-                .sp-btn-primary:hover { background: #4338CA; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); }
-                .sp-btn-outline { background: white; border: 1px solid var(--sp-border); color: var(--sp-text-main); }
-                .sp-btn-outline:hover { background: var(--sp-secondary); border-color: #CBD5E1; }
-                .sp-btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
-                .sp-btn-outline:disabled:hover { background: white; border-color: var(--sp-border); transform: none; box-shadow: none; }
-                .sp-btn-success { background: var(--sp-accent); color: white; }
-                .sp-btn-success:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }
-                .sp-btn-sm { padding: 4px 8px; font-size: 11px; }
+                .aus-scope .sp-btn-primary{ background: var(--sp-primary); color: white; }
+                .aus-scope .sp-btn-primary:hover{ background: #4338CA; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); }
+                .aus-scope .sp-btn-outline{ background: white; border: 1px solid var(--sp-border); color: var(--sp-text-main); }
+                .aus-scope .sp-btn-outline:hover{ background: var(--sp-secondary); border-color: #CBD5E1; }
+                .aus-scope .sp-btn-outline:disabled{ opacity: 0.4; cursor: not-allowed; }
+                .aus-scope .sp-btn-outline:disabled:hover{ background: white; border-color: var(--sp-border); transform: none; box-shadow: none; }
+                .aus-scope .sp-btn-success{ background: var(--sp-accent); color: white; }
+                .aus-scope .sp-btn-success:hover{ background: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }
+                .aus-scope .sp-btn-sm{ padding: 4px 8px; font-size: 11px; }
 
-                /* Scrollbar personalizado */
-                .sp-content-area::-webkit-scrollbar { width: 8px; }
-                .sp-content-area::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 4px; }
-                .sp-content-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
-                .sp-content-area::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+                .aus-scope /* Scrollbar personalizado */
+                .sp-content-area::-webkit-scrollbar{ width: 8px; }
+                .aus-scope .sp-content-area::-webkit-scrollbar-track{ background: #F1F5F9; border-radius: 4px; }
+                .aus-scope .sp-content-area::-webkit-scrollbar-thumb{ background: #CBD5E1; border-radius: 4px; }
+                .aus-scope .sp-content-area::-webkit-scrollbar-thumb:hover{ background: #94A3B8; }
 
-                .sp-horizontal-nav::-webkit-scrollbar { height: 6px; }
-                .sp-horizontal-nav::-webkit-scrollbar-track { background: #F8FAFC; }
-                .sp-horizontal-nav::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 3px; }
+                .aus-scope .sp-horizontal-nav::-webkit-scrollbar{ height: 6px; }
+                .aus-scope .sp-horizontal-nav::-webkit-scrollbar-track{ background: #F8FAFC; }
+                .aus-scope .sp-horizontal-nav::-webkit-scrollbar-thumb{ background: #E2E8F0; border-radius: 3px; }
             `;
             document.head.appendChild(style);
         }
@@ -4121,6 +4054,7 @@ class MedicionAusentismoComponent {
             </div>
         `;
 
+        backdrop.classList.add('aus-scope');
         document.body.appendChild(backdrop);
 
         // Cerrar al hacer clic en el backdrop
@@ -4311,6 +4245,7 @@ class MedicionAusentismoComponent {
                 </div>
             </div>
         `;
+        modal.classList.add('aus-scope');
         document.body.appendChild(modal);
 
         try {
@@ -4643,6 +4578,7 @@ class MedicionAusentismoComponent {
             </div>
         `;
 
+        modal.classList.add('aus-scope');
         document.body.appendChild(modal);
 
         // Cerrar al hacer clic en el backdrop
@@ -6424,8 +6360,8 @@ class MedicionAusentismoComponent {
 
         // Crear modal dinámicamente con diseño moderno
         const modalHTML = `
-            <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); z-index: 10000; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: #1E293B; animation: fadeIn 0.2s ease-out;">
-                <div style="background: white; padding: 0; border-radius: 16px; max-width: 650px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; max-height: 90vh;">
+            <div id="modalSeleccionRegistro" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); z-index: 10000; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: #1E293B; animation: ausFadeIn 0.2s ease-out;">
+                <div style="background: white; padding: 0; border-radius: 16px; max-width: 650px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; display: flex; flex-direction: column; animation: ausSlideUp 0.3s ease-out; max-height: 90vh;">
 
                     <!-- Header Moderno -->
                     <div style="padding: 24px; background: linear-gradient(135deg, #64748B 0%, #475569 100%); color: white; display: flex; align-items: center; gap: 16px;">
@@ -7073,124 +7009,341 @@ class MedicionAusentismoComponent {
             });
     }
 
+    /* ============================================================
+       PREMIUM v2 — tokens --aus-* + estilos de las vistas
+       Registrar Ausentismo y Ver Ausentismo.
+       Todo scoped bajo .aus-scope (blindaje anti-fugas).
+       ============================================================ */
+    _injectPremiumViewsStyles() {
+        const id = 'aus-premium-views-css';
+        if (document.getElementById(id)) return;
+        const style = document.createElement('style');
+        style.id = id;
+        style.textContent = `
+        .aus-scope {
+            --aus-primary: #2057b8;
+            --aus-primary-soft: #eaf1fb;
+            --aus-primary-hover: #1a4a9e;
+            --aus-success: #1bb888;
+            --aus-success-soft: #e6f5ef;
+            --aus-warning: #e7a224;
+            --aus-warning-soft: #fbf0db;
+            --aus-danger: #da5563;
+            --aus-danger-soft: #fae6e9;
+            --aus-text: #14213d;
+            --aus-text-sec: #748096;
+            --aus-text-muted: #aab1bd;
+            --aus-border: #e8ebee;
+            --aus-border-light: #f3f4f6;
+            --aus-bg: #fbfcfb;
+            --aus-card: #ffffff;
+            --aus-shadow-sm: 0 1px 3px rgba(37,56,82,.06);
+            --aus-shadow-md: 0 2px 7px rgba(37,56,82,.08);
+            --aus-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --aus-font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
+        }
+        [data-theme^="dark"] .aus-scope {
+            --aus-primary: #6ea8fe;
+            --aus-primary-soft: rgba(110,168,254,0.12);
+            --aus-primary-hover: #8fbfff;
+            --aus-success: #3ecf9a;
+            --aus-success-soft: rgba(62,207,154,0.12);
+            --aus-warning: #f0b45a;
+            --aus-warning-soft: rgba(240,180,90,0.12);
+            --aus-danger: #e56a76;
+            --aus-danger-soft: rgba(229,106,118,0.12);
+            --aus-text: #E8EDF5;
+            --aus-text-sec: #98a6bf;
+            --aus-text-muted: #6b7a90;
+            --aus-border: #2a3446;
+            --aus-border-light: #1e2738;
+            --aus-bg: #0f172a;
+            --aus-card: #1a2334;
+        }
+
+        /* Card */
+        .aus-scope .aus-card {
+            background: var(--aus-card);
+            border: 1px solid var(--aus-border);
+            border-radius: 20px;
+            box-shadow: var(--aus-shadow-sm);
+            overflow: hidden;
+            font-family: var(--aus-font);
+            animation: ausCardIn .28s cubic-bezier(.22,1,.36,1);
+        }
+        @keyframes ausCardIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header de vista */
+        .aus-scope .aus-view-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 15px; padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--aus-border);
+            flex-wrap: wrap;
+        }
+        .aus-scope .aus-view-head-left { display: flex; align-items: center; gap: 0.75rem; }
+        .aus-scope .aus-view-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: var(--aus-primary-soft);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .aus-scope .aus-view-icon svg { width: 22px; height: 22px; stroke: var(--aus-primary); }
+        .aus-scope .aus-view-title {
+            font-family: var(--aus-font-display);
+            font-size: 18px; font-weight: 800; color: var(--aus-text); margin: 0; line-height: 1.2;
+        }
+        .aus-scope .aus-view-subtitle { font-size: 13px; color: var(--aus-text-sec); margin: 3px 0 0 0; }
+
+        /* Botones */
+        .aus-scope .aus-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 12px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            border: 1px solid var(--aus-border);
+            background: var(--aus-card); color: var(--aus-text-sec);
+            transition: background .15s, color .15s, border-color .15s, transform .15s, box-shadow .15s;
+            font-family: inherit; white-space: nowrap;
+        }
+        .aus-scope .aus-btn:hover:not(:disabled) {
+            background: var(--aus-primary-soft); color: var(--aus-primary);
+            border-color: var(--aus-primary);
+            transform: translateY(-1px);            /* restaura el "lift" del original */
+            box-shadow: var(--aus-shadow-md);
+        }
+        .aus-scope .aus-btn:active:not(:disabled) { transform: translateY(0); }
+        .aus-scope .aus-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .aus-scope .aus-btn--primary { background: var(--aus-primary); color: #fff; border-color: var(--aus-primary); }
+        .aus-scope .aus-btn--primary:hover:not(:disabled) {
+            background: var(--aus-primary-hover); color: #fff;
+            box-shadow: 0 4px 12px rgba(32,87,184,.28);
+        }
+        [data-theme^="dark"] .aus-scope .aus-btn--primary:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+        .aus-scope .aus-btn svg { width: 15px; height: 15px; stroke: currentColor; }
+
+        /* Formulario */
+        .aus-scope .aus-form-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 20px; padding: 1.5rem;
+        }
+        .aus-scope .aus-form-grid .full-width { grid-column: span 2; }
+        @media (min-width: 1200px) {
+            .aus-scope .aus-form-grid { grid-template-columns: repeat(3, 1fr); }
+            .aus-scope .aus-form-grid .full-width { grid-column: span 3; }
+        }
+        @media (max-width: 768px) {
+            .aus-scope .aus-form-grid { grid-template-columns: 1fr; }
+            .aus-scope .aus-form-grid .full-width { grid-column: span 1; }
+            .aus-scope .aus-view-header { flex-direction: column; align-items: flex-start; }
+            .aus-scope .aus-view-header .aus-btn { width: 100%; justify-content: center; }
+        }
+
+        .aus-scope .aus-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .aus-scope .aus-field__label {
+            font-size: 12px; font-weight: 600; color: var(--aus-text-sec);
+            text-transform: uppercase; letter-spacing: .03em;
+        }
+        .aus-scope .aus-input {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid var(--aus-border); border-radius: 12px;
+            font-size: 14px; font-family: var(--aus-font);
+            color: var(--aus-text); background: var(--aus-card);
+            transition: border-color .15s, box-shadow .15s;
+            outline: none;
+        }
+        .aus-scope .aus-input::placeholder { color: var(--aus-text-muted); }
+        .aus-scope .aus-input:focus { border-color: var(--aus-primary); box-shadow: 0 0 0 3px var(--aus-primary-soft); }
+        .aus-scope .aus-input[readonly] { background: var(--aus-border-light); cursor: not-allowed; color: var(--aus-text-sec); }
+
+        .aus-scope .aus-form-actions {
+            display: flex; justify-content: flex-end; gap: 15px; flex-wrap: wrap;
+            border-top: 1px solid var(--aus-border);
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* Status */
+        .aus-scope .aus-status {
+            padding: 10px 14px; margin: 1rem 1.5rem 0;
+            border-radius: 12px; font-weight: 500; font-size: 14px; text-align: center;
+        }
+
+        /* Filtros */
+        .aus-scope .aus-filters {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--aus-border);
+            background: var(--aus-border-light);
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px; align-items: end;
+        }
+        .aus-scope .aus-filters .aus-field__label { font-size: 11px; }
+        .aus-scope .aus-filters-actions { display: flex; align-items: flex-end; gap: 10px; }
+
+        /* Tabla */
+        .aus-scope .ausentismo-table-wrapper {
+            overflow-x: auto; overflow-y: auto;
+            max-height: calc(100vh - 400px); min-height: 400px;
+            border-radius: 0 0 20px 20px;
+        }
+        .aus-scope .ausentismo-table { width: 100%; border-collapse: collapse; }
+        .aus-scope .ausentismo-table thead th {
+            background: var(--aus-border-light);
+            padding: 12px 15px; text-align: left;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .04em; color: var(--aus-text-sec);
+            position: sticky; top: 0; z-index: 5;
+            border-bottom: 1px solid var(--aus-border);
+            white-space: nowrap;
+        }
+        .aus-scope .ausentismo-table tbody tr {
+            border-bottom: 1px solid var(--aus-border);
+            transition: background-color .15s;
+        }
+        .aus-scope .ausentismo-table tbody tr:hover { background: var(--aus-border-light); }
+        .aus-scope .ausentismo-table td {
+            padding: 10px 15px; font-size: 13px; color: var(--aus-text);
+            vertical-align: middle;
+        }
+        .aus-scope .aus-cell-ellipsis { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .aus-scope .aus-badge {
+            display: inline-block; padding: 4px 10px; border-radius: 9999px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap;
+        }
+        .aus-scope .aus-badge--blue   { background: #dbeafe; color: #1d4ed8; }
+        .aus-scope .aus-badge--amber  { background: #fef3c7; color: #d97706; }
+        .aus-scope .aus-badge--green  { background: #d1fae5; color: #059669; }
+        [data-theme^="dark"] .aus-scope .aus-badge--blue  { background: rgba(110,168,254,.18); color: #8fbfff; }
+        [data-theme^="dark"] .aus-scope .aus-badge--amber { background: rgba(240,180,90,.18); color: #f0b45a; }
+        [data-theme^="dark"] .aus-scope .aus-badge--green { background: rgba(62,207,154,.18); color: #3ecf9a; }
+
+        .aus-scope .aus-row-actions { text-align: center; white-space: nowrap; }
+        .aus-scope .aus-icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 30px; height: 30px; border-radius: 9px; cursor: pointer;
+            background: var(--aus-card); border: 1px solid var(--aus-border);
+            color: var(--aus-text-sec); transition: background .15s, color .15s, border-color .15s;
+            margin-right: 4px;
+        }
+        .aus-scope .aus-icon-btn svg { width: 15px; height: 15px; stroke: currentColor; }
+        .aus-scope .aus-icon-btn--edit:hover { background: var(--aus-primary-soft); color: var(--aus-primary); border-color: var(--aus-primary); }
+        .aus-scope .aus-icon-btn--danger { color: var(--aus-danger); border-color: var(--aus-danger); }
+        .aus-scope .aus-icon-btn--danger:hover { background: var(--aus-danger-soft); }
+
+        .aus-scope .aus-empty { text-align: center; padding: 48px 20px; color: var(--aus-text-sec); }
+        .aus-scope .aus-empty svg { width: 48px; height: 48px; stroke: var(--aus-text-muted); margin-bottom: 12px; opacity: .5; }
+        .aus-scope .aus-empty p { margin: 0; font-size: 14px; }
+
+        /* ===== Seguimiento de Incapacidades ===== */
+        .aus-scope .aus-kpis {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; margin-bottom: 25px;
+        }
+        .aus-scope .aus-kpi {
+            background: var(--aus-card); padding: 20px; border-radius: 20px;
+            border: 1px solid var(--aus-border); display: flex; align-items: center; gap: 15px;
+            box-shadow: var(--aus-shadow-sm);
+        }
+        .aus-scope .aus-kpi__icon {
+            width: 50px; height: 50px; border-radius: 12px; display: flex;
+            align-items: center; justify-content: center; flex-shrink: 0;
+            background: var(--aus-primary-soft);
+        }
+        .aus-scope .aus-kpi__icon svg { width: 22px; height: 22px; stroke: var(--aus-primary); }
+        .aus-scope .aus-kpi__icon--amber { background: var(--aus-warning-soft); }
+        .aus-scope .aus-kpi__icon--amber svg { stroke: var(--aus-warning); }
+        .aus-scope .aus-kpi__icon--red { background: var(--aus-danger-soft); }
+        .aus-scope .aus-kpi__icon--red svg { stroke: var(--aus-danger); }
+        .aus-scope .aus-kpi__icon--green { background: var(--aus-success-soft); }
+        .aus-scope .aus-kpi__icon--green svg { stroke: var(--aus-success); }
+        .aus-scope .aus-kpi__body { flex: 1; min-width: 0; }
+        .aus-scope .aus-kpi__title { font-size: 12px; color: var(--aus-text-sec); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+        .aus-scope .aus-kpi__value { font-family: var(--aus-font-display); font-size: 24px; font-weight: 800; color: var(--aus-text); line-height: 1.1; }
+        .aus-scope .aus-kpi__sub { font-size: 12px; color: var(--aus-text-sec); margin-top: 2px; }
+
+        .aus-scope .aus-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--aus-border-light); display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: var(--aus-text-sec); font-size: 13px; flex-shrink: 0;
+        }
+        .aus-scope .aus-cell-main { font-weight: 600; color: var(--aus-text); font-size: 13px; }
+        .aus-scope .aus-cell-sub { font-size: 11px; color: var(--aus-text-sec); }
+
+        .aus-scope .aus-progress { width: 100px; }
+        .aus-scope .aus-progress__label { font-size: 11px; color: var(--aus-text-sec); margin-bottom: 3px; text-align: right; }
+        .aus-scope .aus-progress__track { width: 100%; height: 6px; background: var(--aus-border); border-radius: 9999px; overflow: hidden; }
+        .aus-scope .aus-progress__bar { height: 100%; background: var(--aus-primary); border-radius: 9999px; transition: width .3s ease; }
+
+        .aus-scope .aus-badge--gray { background: var(--aus-border-light); color: var(--aus-text-sec); }
+        [data-theme^="dark"] .aus-scope .aus-badge--gray { background: rgba(255,255,255,.08); color: var(--aus-text-sec); }
+
+        .aus-scope .aus-btn--danger { color: var(--aus-danger); border-color: var(--aus-danger); }
+        .aus-scope .aus-btn--danger:hover:not(:disabled) { background: var(--aus-danger-soft); color: var(--aus-danger); border-color: var(--aus-danger); }
+
+        /* Scrollbar de la tabla */
+        .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
+        .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar-track { background: var(--aus-border-light); border-radius: 8px; }
+        .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar-thumb { background: var(--aus-text-muted); border-radius: 8px; }
+        .aus-scope .ausentismo-table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--aus-text-sec); }
+
+        /* Accesibilidad: sin movimiento si el SO lo pide */
+        @media (prefers-reduced-motion: reduce) {
+            .aus-scope .aus-card { animation: none; }
+            .aus-scope .aus-btn { transition: none; }
+            .aus-scope .aus-btn:hover:not(:disabled) { transform: none; }
+        }
+        `;
+        document.head.appendChild(style);
+    }
+
     async renderRegistrarAusentismoView(container) {
         console.log('[DEBUG] renderRegistrarAusentismoView: Iniciando renderizado del formulario modernizado.');
         container.innerHTML = '';
+        this._injectPremiumViewsStyles();
 
         // Contenedor wrapper con scroll condicional
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'registrar-ausentismo-scroll-wrapper';
-        scrollWrapper.style.cssText = `
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
-        `;
+        scrollWrapper.style.cssText = 'position:relative;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;';
 
-        // Contenedor principal modernizado
         const mainContent = document.createElement('div');
-        mainContent.style.cssText = `
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-      width: 100%;
-      min-height: 100%;
-      box-sizing: border-box;
-        `;
+        mainContent.style.cssText = 'max-width:1400px;margin:0 auto;padding:20px;width:100%;min-height:100%;box-sizing:border-box;';
 
-        // 📦443 (2026-06-25) — Notificación toast ELIMINADA.
-        // Antes había un notificationDiv con position:fixed + translateX(120%)
-        // que asomaba una franja verde en la esquina superior derecha (sistema
-        // viejo de notificaciones). Ahora todo va por window.parent.updateNotifier
-        // (sistema estándar del proyecto, mismo que 6.1.3), así que ya no
-        // necesitamos este div. Si el fallback del showNotification legacy
-        // llega a buscarlo, simplemente no mostrará nada (mejor que el viejo
-        // div verde que se asomaba).
-
-        // Contenedor del formulario
+        // Card del formulario (conserva .registrar-ausentismo-form: disableForm/limpiarFormulario lo usan)
         const formContainer = document.createElement('div');
-        formContainer.className = 'registrar-ausentismo-form';
-        formContainer.style.cssText = `
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #dee2e6;
-        `;
+        formContainer.className = 'registrar-ausentismo-form aus-card';
 
-        // Header del formulario con botón volver
+        // Header premium
         const formHeader = document.createElement('div');
-        formHeader.className = 'form-header-responsive';
-        formHeader.style.cssText = `
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-        `;
-        
+        formHeader.className = 'aus-view-header';
+
         const leftSection = document.createElement('div');
-        leftSection.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
-        
-        const formIcon = document.createElement('i');
-        formIcon.className = 'fas fa-plus-circle';
-        formIcon.style.cssText = `color: #174ea6; font-size: 20px;`;
-        
+        leftSection.className = 'aus-view-head-left';
+
+        const formIcon = document.createElement('div');
+        formIcon.className = 'aus-view-icon';
+        formIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>';
+
         const formTitleContainer = document.createElement('div');
         const formTitle = document.createElement('h3');
+        formTitle.className = 'aus-view-title';
         formTitle.textContent = 'Formulario de Registro';
-        formTitle.style.cssText = `font-size: 18px; font-weight: 600; margin: 0; color: #1E293B;`;
-        
         const formSubtitle = document.createElement('p');
+        formSubtitle.className = 'aus-view-subtitle';
         formSubtitle.textContent = 'Ingrese los datos completos para registrar una nueva incapacidad.';
-        formSubtitle.style.cssText = `font-size: 14px; color: #64748B; margin: 4px 0 0 0;`;
-        
         formTitleContainer.appendChild(formTitle);
         formTitleContainer.appendChild(formSubtitle);
         leftSection.appendChild(formIcon);
         leftSection.appendChild(formTitleContainer);
-        
-        // Botón Volver
+
         const backBtn = document.createElement('button');
-        backBtn.className = 'back-btn';
-        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-        backBtn.style.cssText = `
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-            color: #64748B;
-            transition: all 0.2s;
-            white-space: nowrap;
-        `;
-        backBtn.onmouseover = function() {
-            this.style.backgroundColor = '#e2e8f0';
-            this.style.color = '#174ea6';
-            this.style.borderColor = '#174ea6';
-        };
-        backBtn.onmouseout = function() {
-            this.style.backgroundColor = '#f8f9fa';
-            this.style.color = '#64748B';
-            this.style.borderColor = '#dee2e6';
-        };
+        backBtn.className = 'aus-btn';
+        backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver';
         backBtn.onclick = () => {
             this.currentView = 'main';
             this.render();
         };
-        
+
         formHeader.appendChild(leftSection);
         formHeader.appendChild(backBtn);
         formContainer.appendChild(formHeader);
@@ -7198,128 +7351,56 @@ class MedicionAusentismoComponent {
         // Área de estado (oculta por defecto)
         const statusDiv = document.createElement('div');
         statusDiv.id = 'form-status';
-        statusDiv.style.cssText = `
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            text-align: center;
-            display: none;
-        `;
+        statusDiv.className = 'aus-status';
+        statusDiv.style.display = 'none';
         formContainer.appendChild(statusDiv);
 
-        // Agregar estilos responsivos
-        const styleTag = document.createElement('style');
-        styleTag.textContent = `
-            .form-grid-responsive {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
-      .form-grid-responsive .full-width {
-        grid-column: span 2;
-      }
-      @media (min-width: 1200px) {
-        .form-grid-responsive {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        .form-grid-responsive .full-width {
-          grid-column: span 3;
-        }
-      }
-      @media (max-width: 768px) {
-                .form-grid-responsive {
-                    grid-template-columns: 1fr;
-                }
-                .form-grid-responsive .full-width {
-                    grid-column: span 1;
-                }
-                .form-header-responsive {
-                    flex-direction: column !important;
-                    align-items: flex-start !important;
-                }
-                .form-header-responsive .back-btn {
-                    width: 100%;
-                    justify-content: center;
-                }
-            }
-        `;
-        formContainer.appendChild(styleTag);
-
-        // Formulario con grid layout responsivo
+        // Formulario
         const form = document.createElement('form');
         form.id = 'registrar-ausentismo-form';
-        form.className = 'form-grid-responsive';
-
+        form.className = 'aus-form-grid';
         form.innerHTML = `
-            <div class="form-group-modern">
-                <label for="cedula-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Cédula del Empleado</label>
-                <input type="text" id="cedula-input" class="form-control-modern" placeholder="Ej: 12345678" 
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="cedula-input">Cédula del Empleado</label>
+                <input type="text" id="cedula-input" class="aus-input" placeholder="Ej: 12345678">
             </div>
-
-            <div class="form-group-modern">
-                <label for="nombre-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Nombre Completo</label>
-                <input type="text" id="nombre-input" class="form-control-modern" placeholder="Nombre completo" readonly
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #f8f9fa; cursor: not-allowed;"
-                    onfocus="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="nombre-input">Nombre Completo</label>
+                <input type="text" id="nombre-input" class="aus-input" placeholder="Nombre completo" readonly>
             </div>
-
-            <div class="form-group-modern">
-                <label for="cargo-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Cargo</label>
-                <input type="text" id="cargo-input" class="form-control-modern" placeholder="Cargo actual" readonly
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #f8f9fa; cursor: not-allowed;"
-                    onfocus="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="cargo-input">Cargo</label>
+                <input type="text" id="cargo-input" class="aus-input" placeholder="Cargo actual" readonly>
             </div>
-
-            <div class="form-group-modern">
-                <label for="departamento-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Departamento / Área</label>
-                <input type="text" id="departamento-input" class="form-control-modern" placeholder="Departamento" readonly
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #f8f9fa; cursor: not-allowed;"
-                    onfocus="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="departamento-input">Departamento / Área</label>
+                <input type="text" id="departamento-input" class="aus-input" placeholder="Departamento" readonly>
             </div>
-
-            <div class="form-group-modern">
-                <label for="empresa-usuaria-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Empresa Usuaria</label>
-                <input type="text" id="empresa-usuaria-input" class="form-control-modern" placeholder="Empresa donde presta el servicio" readonly
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #f8f9fa; cursor: not-allowed;"
-                    onfocus="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="empresa-usuaria-input">Empresa Usuaria</label>
+                <input type="text" id="empresa-usuaria-input" class="aus-input" placeholder="Empresa donde presta el servicio" readonly>
             </div>
-
-            <div class="form-group-modern">
-                <label for="genero-select" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Género</label>
-                <select id="genero-select" class="form-control-modern" 
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="genero-select">Género</label>
+                <select id="genero-select" class="aus-input">
                     <option value="">Seleccione...</option>
                     <option value="Masculino">Masculino</option>
                     <option value="Femenino">Femenino</option>
                     <option value="Otro">Otro</option>
                 </select>
             </div>
-
-            <div class="form-group-modern">
-                <label for="clase-incapacidad-select" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Clase de Incapacidad</label>
-                <select id="clase-incapacidad-select" class="form-control-modern" required
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="clase-incapacidad-select">Clase de Incapacidad</label>
+                <select id="clase-incapacidad-select" class="aus-input" required>
                     <option value="">Seleccione...</option>
                     <option value="EPS">EPS</option>
                     <option value="ARL">ARL</option>
                     <option value="EMPRESA">EMPRESA</option>
                 </select>
             </div>
-
-            <div class="form-group-modern">
-                <label for="tipo-incapacidad-select" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Tipo de Incapacidad</label>
-                <select id="tipo-incapacidad-select" class="form-control-modern" required
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="tipo-incapacidad-select">Tipo de Incapacidad</label>
+                <select id="tipo-incapacidad-select" class="aus-input" required>
                     <option value="">Seleccione...</option>
                     <option value="ACCIDENTE DE TRANSITO">ACCIDENTE DE TRANSITO</option>
                     <option value="ACCIDENTE LABORAL">ACCIDENTE LABORAL</option>
@@ -7330,58 +7411,34 @@ class MedicionAusentismoComponent {
                     <option value="CALAMIDAD DOMÉSTICA">CALAMIDAD DOMÉSTICA</option>
                 </select>
             </div>
-
-            <div class="form-group-modern">
-                <label for="entidad-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Entidad (EPS/ARL)</label>
-                <input type="text" id="entidad-input" class="form-control-modern" placeholder="Entidad de salud" readonly
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #f8f9fa; cursor: not-allowed;"
-                    onfocus="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="entidad-input">Entidad (EPS/ARL)</label>
+                <input type="text" id="entidad-input" class="aus-input" placeholder="Entidad de salud" readonly>
             </div>
-
-            <div class="form-group-modern">
-                <label for="fecha-inicio-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Fecha de Inicio</label>
-                <input type="date" id="fecha-inicio-input" class="form-control-modern" required
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="fecha-inicio-input">Fecha de Inicio</label>
+                <input type="date" id="fecha-inicio-input" class="aus-input" required>
             </div>
-
-            <div class="form-group-modern">
-                <label for="fecha-fin-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Fecha de Finalización</label>
-                <input type="date" id="fecha-fin-input" class="form-control-modern" required
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="fecha-fin-input">Fecha de Finalización</label>
+                <input type="date" id="fecha-fin-input" class="aus-input" required>
             </div>
-
-            <div class="form-group-modern">
-                <label for="codigo-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Código Diagnóstico (CIE-10)</label>
-                <input type="text" id="codigo-input" class="form-control-modern" placeholder="Ej: Z34.0"
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field">
+                <label class="aus-field__label" for="codigo-input">Código Diagnóstico (CIE-10)</label>
+                <input type="text" id="codigo-input" class="aus-input" placeholder="Ej: Z34.0">
             </div>
-
-            <div class="form-group-modern full-width">
-                <label for="descripcion-input" style="display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px;">Descripción Diagnóstico</label>
-                <input type="text" id="descripcion-input" class="form-control-modern" placeholder="Descripción del diagnóstico"
-                    style="width: 100%; padding: 10px 14px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; transition: all 0.2s; background-color: #fff;"
-                    onfocus="this.style.borderColor='#174ea6'; this.style.boxShadow='0 0 0 3px rgba(23, 78, 166, 0.1)'"
-                    onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'">
+            <div class="aus-field full-width">
+                <label class="aus-field__label" for="descripcion-input">Descripción Diagnóstico</label>
+                <input type="text" id="descripcion-input" class="aus-input" placeholder="Descripción del diagnóstico">
             </div>
-
-            <div class="form-actions-modern full-width" style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 15px; border-top: 1px solid #dee2e6; padding-top: 20px; flex-wrap: wrap;">
-                <button type="button" id="limpiar-btn" class="btn btn-secondary-modern"
-                    style="padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #dee2e6; background-color: #f8f9fa; color: #1E293B; transition: all 0.2s;"
-                    onmouseover="this.style.backgroundColor='#e2e8f0'; this.style.transform='translateY(-1px)'"
-                    onmouseout="this.style.backgroundColor='#f8f9fa'; this.style.transform='translateY(0)'">
-                    <i class="fas fa-eraser"></i> Limpiar
+            <div class="aus-form-actions full-width">
+                <button type="button" id="limpiar-btn" class="aus-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                    Limpiar
                 </button>
-                <button type="button" id="registrar-btn" class="btn btn-primary-modern"
-                    style="padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none; background-color: #174ea6; color: white; transition: all 0.2s;"
-                    onmouseover="this.style.backgroundColor='#185abd'; this.style.transform='translateY(-1px)'"
-                    onmouseout="this.style.backgroundColor='#174ea6'; this.style.transform='translateY(0)'">
-                    <i class="fas fa-save"></i> Registrar Incapacidad
+                <button type="button" id="registrar-btn" class="aus-btn aus-btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Registrar Incapacidad
                 </button>
             </div>
         `;
@@ -7708,7 +7765,7 @@ class MedicionAusentismoComponent {
             font-size: 14px;
             font-weight: 500;
             color: ${currentConfig.text};
-            animation: slideDown 0.3s ease-out;
+            animation: ausSlideDown 0.3s ease-out;
             margin-bottom: 20px;
             ${loading ? 'position: relative; overflow: hidden;' : ''}
         `;
@@ -7754,7 +7811,7 @@ class MedicionAusentismoComponent {
             const style = document.createElement('style');
             style.id = 'status-animations';
             style.textContent = `
-                @keyframes slideDown {
+                @keyframes ausSlideDown {
                     from {
                         opacity: 0;
                         transform: translateY(-10px);
@@ -7857,7 +7914,7 @@ class MedicionAusentismoComponent {
             display: flex;
             justify-content: center;
             align-items: center;
-            animation: fadeIn 0.2s ease-out;
+            animation: ausFadeIn 0.2s ease-out;
         `;
 
         // Crear modal
@@ -7869,7 +7926,7 @@ class MedicionAusentismoComponent {
             max-width: 500px;
             width: 90%;
             overflow: hidden;
-            animation: slideUp 0.3s ease-out;
+            animation: ausSlideUp 0.3s ease-out;
         `;
 
         // Header del modal
@@ -8029,16 +8086,17 @@ class MedicionAusentismoComponent {
         overlay.appendChild(modal);
 
         // Agregar al documento
+        overlay.classList.add('aus-scope');
         document.body.appendChild(overlay);
 
         // Agregar animaciones CSS dinámicamente
         const style = document.createElement('style');
         style.textContent = `
-            @keyframes fadeIn {
+            @keyframes ausFadeIn {
                 from { opacity: 0; }
                 to { opacity: 1; }
             }
-            @keyframes slideUp {
+            @keyframes ausSlideUp {
                 from { 
                     opacity: 0;
                     transform: translateY(20px);
@@ -8065,113 +8123,44 @@ class MedicionAusentismoComponent {
         container.style.padding = '';
         container.innerHTML = '';
 
-        // Contenedor wrapper. El scroll real lo hace el padre (.submodule-content)
-        // que tiene `overflow-y: auto` inline en renderer.js. Este wrapper solo
-        // // sirve para mantener los estilos relativos y permitir que el botón
-        // // FAB apunte a un selector estable dentro de la vista.
-        // 📦640 (fix4) — Simplificado. `height: 100%` colapsaba, `flex: 1` no
-        // limitaba. Ahora dejamos que el contenido fluya naturalmente y el
-        // scroll lo maneja el contenedor padre real.
+        // Contenedor wrapper. El scroll real lo hace el padre (.submodule-content).
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'ver-ausentismo-scroll-wrapper';
-        scrollWrapper.style.cssText = `
-            position: relative;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-        `;
+        scrollWrapper.style.cssText = 'position:relative;width:100%;display:flex;flex-direction:column;';
 
-        // Contenedor principal modernizado
-        // 📦640 (fix3) — Quitado `min-height: 100%` que forzaba al scrollWrapper
-        // a expandirse al contenido. Ahora el mainContent crece con su contenido
-        // y el scrollWrapper (con `overflow-y: auto`) muestra la barra interna.
         const mainContent = document.createElement('div');
-        mainContent.style.cssText = `
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-            box-sizing: border-box;
-            flex-shrink: 0;
-        `;
+        mainContent.style.cssText = 'max-width:100%;margin:0 auto;padding:20px;width:100%;box-sizing:border-box;flex-shrink:0;';
 
-        // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
-        // Ahora todo va por window.parent.updateNotifier (estándar K+AIR).
-
-        // Contenedor de la lista
+        // Card de la lista
         const listContainer = document.createElement('div');
-        listContainer.className = 'ver-ausentismo-list';
-        listContainer.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #dee2e6;
-        `;
+        listContainer.className = 'ver-ausentismo-list aus-card';
 
-        // Header de la lista
+        // Header premium
         const listHeader = document.createElement('div');
-        listHeader.style.cssText = `
-            padding: 20px 25px;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-        `;
+        listHeader.className = 'aus-view-header';
 
         const leftSection = document.createElement('div');
-        leftSection.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
+        leftSection.className = 'aus-view-head-left';
 
-        const listIcon = document.createElement('i');
-        listIcon.className = 'fas fa-list-ul';
-        listIcon.style.cssText = `color: #174ea6; font-size: 20px;`;
+        const listIcon = document.createElement('div');
+        listIcon.className = 'aus-view-icon';
+        listIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
 
         const listTitleContainer = document.createElement('div');
         const listTitle = document.createElement('h3');
+        listTitle.className = 'aus-view-title';
         listTitle.textContent = 'Registros de Ausentismo';
-        listTitle.style.cssText = `font-size: 18px; font-weight: 600; margin: 0; color: #1E293B;`;
-
         const listSubtitle = document.createElement('p');
+        listSubtitle.className = 'aus-view-subtitle';
         listSubtitle.textContent = 'Consulta y filtra el histórico de incapacidades.';
-        listSubtitle.style.cssText = `font-size: 14px; color: #64748B; margin: 4px 0 0 0;`;
-
         listTitleContainer.appendChild(listTitle);
         listTitleContainer.appendChild(listSubtitle);
         leftSection.appendChild(listIcon);
         leftSection.appendChild(listTitleContainer);
 
-        // Botón Volver
         const backBtn = document.createElement('button');
-        backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-        backBtn.style.cssText = `
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-            color: #64748B;
-            transition: all 0.2s;
-            white-space: nowrap;
-        `;
-        backBtn.onmouseover = function() {
-            this.style.backgroundColor = '#e2e8f0';
-            this.style.color = '#174ea6';
-            this.style.borderColor = '#174ea6';
-        };
-        backBtn.onmouseout = function() {
-            this.style.backgroundColor = '#f8f9fa';
-            this.style.color = '#64748B';
-            this.style.borderColor = '#dee2e6';
-        };
+        backBtn.className = 'aus-btn';
+        backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver';
         backBtn.onclick = () => {
             this.currentView = 'main';
             this.render();
@@ -8183,30 +8172,21 @@ class MedicionAusentismoComponent {
 
         // Barra de filtros
         const filtersBar = document.createElement('div');
-        filtersBar.style.cssText = `
-            padding: 20px 25px;
-            border-bottom: 1px solid #dee2e6;
-            background: #f8f9fa;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        `;
-
+        filtersBar.className = 'aus-filters';
         filtersBar.innerHTML = `
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Buscar</label>
-                <input type="text" id="searchFilter" placeholder="Nombre, Cédula..." 
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="searchFilter">Buscar</label>
+                <input type="text" id="searchFilter" class="aus-input" placeholder="Nombre, Cédula...">
             </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Año</label>
-                <select id="yearFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="yearFilter">Año</label>
+                <select id="yearFilter" class="aus-input">
                     <option value="">Cargando años...</option>
                 </select>
             </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Mes</label>
-                <select id="monthFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="monthFilter">Mes</label>
+                <select id="monthFilter" class="aus-input">
                     <option value="">Todos</option>
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
@@ -8222,92 +8202,52 @@ class MedicionAusentismoComponent {
                     <option value="12">Diciembre</option>
                 </select>
             </div>
-            <div class="filter-group">
-                <label style="display: block; font-size: 12px; font-weight: 500; color: #64748B; margin-bottom: 4px;">Tipo</label>
-                <select id="typeFilter" style="width: 100%; padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 14px;">
+            <div class="aus-field">
+                <label class="aus-field__label" for="typeFilter">Tipo</label>
+                <select id="typeFilter" class="aus-input">
                     <option value="">Cargando tipos...</option>
                 </select>
             </div>
-            <div style="display: flex; align-items: flex-end; gap: 10px;">
-                <button id="applyFiltersBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background-color: #174ea6; color: white; transition: all 0.2s;">
-                    <i class="fas fa-filter"></i> Filtrar
+            <div class="aus-filters-actions">
+                <button id="applyFiltersBtn" class="aus-btn aus-btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    Filtrar
                 </button>
-                <button id="clearFiltersBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid #dee2e6; background-color: #f8f9fa; color: #64748B; transition: all 0.2s;">
-                    <i class="fas fa-times"></i> Limpiar
+                <button id="clearFiltersBtn" class="aus-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Limpiar
                 </button>
             </div>
         `;
-
         listContainer.appendChild(filtersBar);
 
         const tableWrapper = document.createElement('div');
-        // 📦640 (fix6) — ID agregado para que el FAB apunte directamente a este
-        // contenedor (que tiene su propio overflow: auto). Antes el FAB apuntaba
-        // al `submodule-content`, que también scrollea pero mueve TODO (filtros
-        // + tabla). Apuntando al tableWrapper, el botón solo afecta la tabla.
         tableWrapper.id = 'ausentismo-table-scroll';
         tableWrapper.className = 'ausentismo-table-wrapper';
-        tableWrapper.style.cssText = `
-            overflow-x: auto;
-            overflow-y: auto;
-            max-height: calc(100vh - 400px);
-            min-height: 400px;
-            border-radius: 8px;
-        `;
-
-        // Agregar estilos para scrollbar personalizado
-        const styleTag = document.createElement('style');
-        styleTag.textContent = `
-            .ausentismo-table-wrapper::-webkit-scrollbar {
-                width: 10px;
-                height: 10px;
-            }
-            .ausentismo-table-wrapper::-webkit-scrollbar-track {
-                background: #f1f5f9;
-                border-radius: 8px;
-            }
-            .ausentismo-table-wrapper::-webkit-scrollbar-thumb {
-                background: #cbd5e1;
-                border-radius: 8px;
-            }
-            .ausentismo-table-wrapper::-webkit-scrollbar-thumb:hover {
-                background: #94a3b8;
-            }
-            .ausentismo-table {
-                width: 100%;
-                min-width: fit-content;
-            }
-        `;
-        listContainer.appendChild(styleTag);
 
         const table = document.createElement('table');
         table.className = 'ausentismo-table';
-        table.style.cssText = `
-            width: 100%;
-            border-collapse: collapse;
-        `;
-
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">No</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Nombre</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Cédula</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Cargo</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Empresa Usuaria</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Área/Dpto</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Género</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Mes</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">N° Días</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Clase</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Tipo</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Entidad</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Año</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Inicio</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Fin</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Código</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Descripción</th>
-                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5; width: 110px;">Acciones</th>
+                    <th>No</th>
+                    <th>Nombre</th>
+                    <th>Cédula</th>
+                    <th>Cargo</th>
+                    <th>Empresa Usuaria</th>
+                    <th>Área/Dpto</th>
+                    <th>Género</th>
+                    <th>Mes</th>
+                    <th>N° Días</th>
+                    <th>Clase</th>
+                    <th>Tipo</th>
+                    <th>Entidad</th>
+                    <th>Año</th>
+                    <th>Fecha Inicio</th>
+                    <th>Fecha Fin</th>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th style="text-align: center; width: 110px;">Acciones</th>
                 </tr>
             </thead>
             <tbody id="ausentismoTableBody">
@@ -8336,7 +8276,7 @@ class MedicionAusentismoComponent {
         if (typeof window.ScrollToTopBottomButton === 'function') {
             this.scrollFab = new window.ScrollToTopBottomButton({
                 target: '#ausentismo-table-scroll',
-                color: '#174ea6'
+                color: '#2057b8'
             });
             this.scrollFab.init();
         } else {
@@ -8576,8 +8516,8 @@ class MedicionAusentismoComponent {
         if (!data || data.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="18" style="text-align: center; padding: 40px; color: #64748B;">
-                        <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <td colspan="18" class="aus-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
                         <p>No hay registros para mostrar</p>
                     </td>
                 </tr>
@@ -8588,14 +8528,11 @@ class MedicionAusentismoComponent {
         tbody.innerHTML = data.map((row, index) => {
             const clase = row['CLASE DE INCAPACIDAD'] || 'EPS';
             const tipo = row['TIPO DE INCAPACIDAD'] || '-';
-            let badgeColor = '#dbeafe';
-            let badgeText = '#1d4ed8';
+            let badgeClass = 'aus-badge--blue';
             if (clase === 'ARL') {
-                badgeColor = '#fef3c7';
-                badgeText = '#d97706';
+                badgeClass = 'aus-badge--amber';
             } else if (clase.includes('LICENCIA')) {
-                badgeColor = '#d1fae5';
-                badgeText = '#059669';
+                badgeClass = 'aus-badge--green';
             }
 
             // Obtener valores de todas las columnas - Nombres exactos del Excel
@@ -8651,34 +8588,30 @@ class MedicionAusentismoComponent {
             }).replace(/'/g, '&#39;');
 
             return `
-                <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='white'">
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${no}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="${nombre}">${nombre}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${cedula}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${cargo}">${cargo}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${empresaUsuaria}">${empresaUsuaria}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${areaDpto}">${areaDpto}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${genero}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${mes}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${noDias}</td>
-                    <td style="padding: 12px 15px;">
-                        <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; background-color: ${badgeColor}; color: ${badgeText}; white-space: nowrap;">
-                            ${clase}
-                        </span>
-                    </td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${tipo}">${tipo}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${entidad}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${anio}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaInicio}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaFin}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${codigo}</td>
-                    <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${descripcion}">${descripcion}</td>
-                    <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
-                        <button data-row='${rowJson}' class="btn-ausentismo-edit" title="Editar este registro" style="background: #ffffff; color: #174ea6; border: 1.5px solid #174ea6; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-right: 4px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#eff6ff';" onmouseout="this.style.background='#ffffff';">
-                            <i class="fas fa-pen"></i>
+                <tr>
+                    <td style="white-space: nowrap;">${no}</td>
+                    <td class="aus-cell-ellipsis" style="max-width: 180px;" title="${nombre}">${nombre}</td>
+                    <td style="white-space: nowrap;">${cedula}</td>
+                    <td class="aus-cell-ellipsis" style="max-width: 120px;" title="${cargo}">${cargo}</td>
+                    <td class="aus-cell-ellipsis" style="max-width: 150px;" title="${empresaUsuaria}">${empresaUsuaria}</td>
+                    <td class="aus-cell-ellipsis" style="max-width: 120px;" title="${areaDpto}">${areaDpto}</td>
+                    <td style="white-space: nowrap;">${genero}</td>
+                    <td style="white-space: nowrap;">${mes}</td>
+                    <td style="white-space: nowrap;">${noDias}</td>
+                    <td><span class="aus-badge ${badgeClass}">${clase}</span></td>
+                    <td class="aus-cell-ellipsis" style="max-width: 150px;" title="${tipo}">${tipo}</td>
+                    <td style="white-space: nowrap;">${entidad}</td>
+                    <td style="white-space: nowrap;">${anio}</td>
+                    <td style="white-space: nowrap;">${fechaInicio}</td>
+                    <td style="white-space: nowrap;">${fechaFin}</td>
+                    <td style="white-space: nowrap;">${codigo}</td>
+                    <td class="aus-cell-ellipsis" style="max-width: 200px;" title="${descripcion}">${descripcion}</td>
+                    <td class="aus-row-actions">
+                        <button data-row='${rowJson}' class="aus-icon-btn aus-icon-btn--edit btn-ausentismo-edit" title="Editar este registro">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button data-row='${rowJson}' class="btn-ausentismo-delete" title="Eliminar este registro" style="background: #ffffff; color: #dc2626; border: 1.5px solid #dc2626; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='#ffffff';">
-                            <i class="fas fa-trash"></i>
+                        <button data-row='${rowJson}' class="aus-icon-btn aus-icon-btn--danger btn-ausentismo-delete" title="Eliminar este registro">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </td>
                 </tr>
@@ -8823,6 +8756,7 @@ class MedicionAusentismoComponent {
             </div>
         `;
 
+        overlay.classList.add('aus-scope');
         document.body.appendChild(overlay);
 
         const close = () => overlay.remove();
@@ -8943,6 +8877,7 @@ class MedicionAusentismoComponent {
             </div>
         `;
 
+        overlay.classList.add('aus-scope');
         document.body.appendChild(overlay);
 
         const close = () => overlay.remove();
@@ -9017,19 +8952,19 @@ class MedicionAusentismoComponent {
             const styleEl = document.createElement('style');
             styleEl.id = 'kpi-stats-ribbon-css';
       styleEl.textContent = `
-      .estadisticas-dashboard .k-stats-ribbon {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon{
         display: flex;
         align-items: center;
         gap: 0;
-        background: #ffffff;
-        border: 1px solid #dee2e6;
-        border-radius: 0.625rem;
+        background: var(--aus-card);
+        border: 1px solid var(--aus-border);
+        border-radius: 20px;
         padding: 0;
         margin-bottom: 1.5rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        box-shadow: 0 1px 2px 0 1px 3px rgba(37,56,82,.06);
         overflow: hidden;
       }
-      .estadisticas-dashboard .k-stats-ribbon__item {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__item{
         display: flex;
         align-items: center;
         gap: 0.75rem;
@@ -9037,7 +8972,7 @@ class MedicionAusentismoComponent {
         flex: 1;
         min-width: 0;
       }
-      .estadisticas-dashboard .k-stats-ribbon__icon {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__icon{
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -9047,132 +8982,132 @@ class MedicionAusentismoComponent {
         font-size: 1rem;
         flex-shrink: 0;
       }
-      .estadisticas-dashboard .k-stats-ribbon__icon.primary { background: #e8f0fe; color: #174ea6; }
-      .estadisticas-dashboard .k-stats-ribbon__icon.success { background: #d4edda; color: #28a745; }
-      .estadisticas-dashboard .k-stats-ribbon__icon.warning { background: #fff3cd; color: #856404; }
-      .estadisticas-dashboard .k-stats-ribbon__icon.muted { background: #f0f2f5; color: #6c757d; }
-      .estadisticas-dashboard .k-stats-ribbon__data {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__icon.primary{ background: var(--aus-primary-soft); color: var(--aus-primary); }
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__icon.success{ background: var(--aus-success-soft); color: var(--aus-success); }
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__icon.warning{ background: var(--aus-warning-soft); color: var(--aus-warning); }
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__icon.muted{ background: var(--aus-border-light); color: var(--aus-text-sec); }
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__data{
         display: flex;
         flex-direction: column;
         min-width: 0;
       }
-      .estadisticas-dashboard .k-stats-ribbon__value {
-        font-family: 'Lexend', sans-serif;
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__value{
+        font-family: 'Manrope', 'DM Sans', sans-serif;
         font-size: 1.375rem;
         font-weight: 700;
-        color: #1a1a2e;
+        color: var(--aus-text);
         line-height: 1.2;
       }
-      .estadisticas-dashboard .k-stats-ribbon__value--muted {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__value--muted{
         font-size: 1rem;
-        color: #6c757d;
+        color: var(--aus-text-sec);
       }
-      .estadisticas-dashboard .k-stats-ribbon__label {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__label{
         font-size: 0.6875rem;
-        color: #6c757d;
+        color: var(--aus-text-sec);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         white-space: nowrap;
       }
-      .estadisticas-dashboard .k-stats-ribbon__divider {
+      .aus-scope .estadisticas-dashboard .k-stats-ribbon__divider{
         width: 1px;
         height: 36px;
-        background: #e5e7eb;
+        background: var(--aus-border);
         flex-shrink: 0;
       }
-      .estadisticas-dashboard .k-section-card {
-        background: #ffffff;
-        border: 1px solid #dee2e6;
-        border-radius: 0.625rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      .aus-scope .estadisticas-dashboard .k-section-card{
+        background: var(--aus-card);
+        border: 1px solid var(--aus-border);
+        border-radius: 20px;
+        box-shadow: 0 1px 2px 0 1px 3px rgba(37,56,82,.06);
         margin-bottom: 1.5rem;
       }
-      .estadisticas-dashboard .k-charts-grid {
+      .aus-scope .estadisticas-dashboard .k-charts-grid{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 1.5rem;
         margin-bottom: 1.5rem;
       }
-      .estadisticas-dashboard .k-chart-card {
-        background: #ffffff;
-        border: 1px solid #dee2e6;
-        border-radius: 0.625rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      .aus-scope .estadisticas-dashboard .k-chart-card{
+        background: var(--aus-card);
+        border: 1px solid var(--aus-border);
+        border-radius: 20px;
+        box-shadow: 0 1px 2px 0 1px 3px rgba(37,56,82,.06);
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
       }
-      .estadisticas-dashboard .k-chart-card__title {
+      .aus-scope .estadisticas-dashboard .k-chart-card__title{
         margin: 0 0 1rem 0;
         font-size: 0.9375rem;
         font-weight: 600;
-        color: #1E293B;
+        color: var(--aus-text);
       }
-      .estadisticas-dashboard .k-chart-card__body {
+      .aus-scope .estadisticas-dashboard .k-chart-card__body{
         position: relative;
         flex: 1;
         min-height: 260px;
       }
-      .estadisticas-dashboard .k-filters-bar {
+      .aus-scope .estadisticas-dashboard .k-filters-bar{
         display: flex;
         flex-wrap: wrap;
         align-items: flex-end;
         gap: 0.75rem;
         padding: 1.25rem 1.5rem;
       }
-      .estadisticas-dashboard .k-filter-group {
+      .aus-scope .estadisticas-dashboard .k-filter-group{
         display: flex;
         flex-direction: column;
         min-width: 0;
         flex: 1 1 140px;
       }
-      .estadisticas-dashboard .k-filter-label {
+      .aus-scope .estadisticas-dashboard .k-filter-label{
         display: block;
         font-size: 0.6875rem;
         font-weight: 600;
-        color: #64748B;
+        color: var(--aus-text-sec);
         margin-bottom: 0.375rem;
         text-transform: uppercase;
         letter-spacing: 0.3px;
       }
-      .estadisticas-dashboard .k-filter-select {
+      .aus-scope .estadisticas-dashboard .k-filter-select{
         width: 100%;
-        padding: 0.5rem 0.75rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
+        padding: 12px 0.75rem;
+        border: 1px solid var(--aus-border);
+        border-radius: 12px;
         font-size: 0.875rem;
-        color: #1E293B;
-        background: #ffffff;
-        transition: border-color 0.2s;
+        color: var(--aus-text);
+        background: var(--aus-card);
+        transition: border-color 0.15s;
         appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 0.75rem center;
         padding-right: 2rem;
       }
-      .estadisticas-dashboard .k-filter-select:focus {
+      .aus-scope .estadisticas-dashboard .k-filter-select:focus{
         outline: none;
-        border-color: #174ea6;
-        box-shadow: 0 0 0 3px rgba(23,78,166,0.1);
+        border-color: var(--aus-primary);
+        box-shadow: 0 0 0 3px var(--aus-primary-soft);
       }
-      .estadisticas-dashboard .k-filter-actions {
+      .aus-scope .estadisticas-dashboard .k-filter-actions{
         display: flex;
-        gap: 0.5rem;
+        gap: 12px;
         align-items: center;
         flex-shrink: 0;
       }
       @media (max-width: 992px) {
-        .estadisticas-dashboard .k-charts-grid { grid-template-columns: 1fr 1fr; }
+        .aus-scope .estadisticas-dashboard .k-charts-grid{ grid-template-columns: 1fr 1fr; }
       }
       @media (max-width: 768px) {
-        .estadisticas-dashboard .k-stats-ribbon { flex-wrap: wrap; }
-        .estadisticas-dashboard .k-stats-ribbon__item { flex: 1 1 45%; }
-        .estadisticas-dashboard .k-stats-ribbon__divider { display: none; }
-        .estadisticas-dashboard .k-charts-grid { grid-template-columns: 1fr; }
-        .estadisticas-dashboard .k-filters-bar { flex-direction: column; }
-        .estadisticas-dashboard .k-filter-group { flex: 1 1 100%; }
-        .estadisticas-dashboard .k-filter-actions { width: 100%; }
-        .estadisticas-dashboard .k-filter-actions button { flex: 1; }
+        .aus-scope .estadisticas-dashboard .k-stats-ribbon{ flex-wrap: wrap; }
+        .aus-scope .estadisticas-dashboard .k-stats-ribbon__item{ flex: 1 1 45%; }
+        .aus-scope .estadisticas-dashboard .k-stats-ribbon__divider{ display: none; }
+        .aus-scope .estadisticas-dashboard .k-charts-grid{ grid-template-columns: 1fr; }
+        .aus-scope .estadisticas-dashboard .k-filters-bar{ flex-direction: column; }
+        .aus-scope .estadisticas-dashboard .k-filter-group{ flex: 1 1 100%; }
+        .aus-scope .estadisticas-dashboard .k-filter-actions{ width: 100%; }
+        .aus-scope .estadisticas-dashboard .k-filter-actions button{ flex: 1; }
       }
       `;
             document.head.appendChild(styleEl);
@@ -9185,114 +9120,114 @@ class MedicionAusentismoComponent {
             const styleEl2 = document.createElement('style');
             styleEl2.id = 'extended-stats-css';
             styleEl2.textContent = `
-      .extended-stats-container { margin-top: 1.5rem; }
-      .extended-stats-container .es-empty { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
-      .es-tabs-header { background: #fff; border: 1px solid #dee2e6; border-radius: 0.625rem 0.625rem 0 0; padding: 1rem 1.25rem; border-bottom: none; }
-      .es-tabs-title { margin: 0 0 0.875rem 0; font-size: 1.0625rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
-      .es-tabs-title i { color: #174ea6; }
-      .es-tabs-badge { background: #e8f0fe; color: #174ea6; font-size: 0.75rem; font-weight: 600; padding: 0.1875rem 0.625rem; border-radius: 999px; margin-left: auto; }
-      .es-tabs-nav { display: flex; gap: 0.375rem; flex-wrap: wrap; }
-      .es-tab-btn { padding: 0.5rem 0.875rem; border: 1px solid #dee2e6; background: #f8f9fa; color: #495057; border-radius: 0.4375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4375rem; transition: all 0.15s ease; }
-      .es-tab-btn:hover { background: #e9ecef; border-color: #adb5bd; }
-      .es-tab-btn.active { background: #174ea6; border-color: #174ea6; color: #fff; box-shadow: 0 1px 3px rgba(23,78,166,0.25); }
-      .es-tabs-body { background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 0.625rem 0.625rem; padding: 1.25rem; }
-      .es-tab-panel { display: none; animation: esFadeIn 0.2s ease-out; }
-      .es-tab-panel.active { display: block; }
+      .aus-scope .extended-stats-container{ margin-top: 1.5rem; }
+      .aus-scope .extended-stats-container .es-empty{ padding: 2rem; text-align: center; color: var(--aus-text-sec); font-size: 0.9375rem; }
+      .aus-scope .es-tabs-header{ background: var(--aus-card); border: 1px solid var(--aus-border); border-radius: 20px 20px 0 0; padding: 1rem 1.25rem; border-bottom: none; }
+      .aus-scope .es-tabs-title{ margin: 0 0 0.875rem 0; font-size: 1.0625rem; font-weight: 600; color: var(--aus-text); display: flex; align-items: center; gap: 12px; }
+      .aus-scope .es-tabs-title i{ color: var(--aus-primary); }
+      .aus-scope .es-tabs-badge{ background: var(--aus-primary-soft); color: var(--aus-primary); font-size: 0.75rem; font-weight: 600; padding: 0.1875rem 20px; border-radius: 999px; margin-left: auto; }
+      .aus-scope .es-tabs-nav{ display: flex; gap: 0.375rem; flex-wrap: wrap; }
+      .aus-scope .es-tab-btn{ padding: 12px 0.875rem; border: 1px solid var(--aus-border); background: var(--aus-border-light); color: var(--aus-text-sec); border-radius: 10px; font-size: 0.8125rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; transition: all 0.15s ease; }
+      .aus-scope .es-tab-btn:hover{ background: var(--aus-border-light); border-color: var(--aus-text-muted); }
+      .aus-scope .es-tab-btn.active{ background: var(--aus-primary); border-color: var(--aus-primary); color: var(--aus-card); box-shadow: 0 1px 3px rgba(32,87,184,.25); }
+      .aus-scope .es-tabs-body{ background: var(--aus-card); border: 1px solid var(--aus-border); border-top: none; border-radius: 0 0 20px 20px; padding: 1.25rem; }
+      .aus-scope .es-tab-panel{ display: none; animation: esFadeIn 0.15s ease-out; }
+      .aus-scope .es-tab-panel.active{ display: block; }
       @keyframes esFadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
 
-      /* Tier 1 — KPI Regulatorios */
-      .es-reg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
-      .es-reg-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; transition: border-color 0.15s ease; }
-      .es-reg-card:hover { border-color: #174ea6; }
-      .es-reg-card__icon { width: 44px; height: 44px; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
-      .es-reg-card__icon.primary { background: #e8f0fe; color: #174ea6; }
-      .es-reg-card__icon.warning { background: #fff3cd; color: #856404; }
-      .es-reg-card__icon.danger { background: #f8d7da; color: #721c24; }
-      .es-reg-card__icon.muted { background: #f0f2f5; color: #6c757d; }
-      .es-reg-card__data { display: flex; flex-direction: column; min-width: 0; }
-      .es-reg-card__label { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.1875rem; }
-      .es-reg-card__value { font-size: 1.625rem; font-weight: 700; color: #1a1a2e; line-height: 1.15; margin-bottom: 0.25rem; }
-      .es-reg-card__sub { font-size: 0.6875rem; color: #6c757d; line-height: 1.35; }
+      .aus-scope /* Tier 1 — KPI Regulatorios */
+      .es-reg-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .aus-scope .es-reg-card{ display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; background: var(--aus-border-light); border: 1px solid var(--aus-border-light); border-radius: 12px; transition: border-color 0.15s ease; }
+      .aus-scope .es-reg-card:hover{ border-color: var(--aus-primary); }
+      .aus-scope .es-reg-card__icon{ width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+      .aus-scope .es-reg-card__icon.primary{ background: var(--aus-primary-soft); color: var(--aus-primary); }
+      .aus-scope .es-reg-card__icon.warning{ background: var(--aus-warning-soft); color: var(--aus-warning); }
+      .aus-scope .es-reg-card__icon.danger{ background: var(--aus-danger-soft); color: var(--aus-danger); }
+      .aus-scope .es-reg-card__icon.muted{ background: var(--aus-border-light); color: var(--aus-text-sec); }
+      .aus-scope .es-reg-card__data{ display: flex; flex-direction: column; min-width: 0; }
+      .aus-scope .es-reg-card__label{ font-size: 0.75rem; font-weight: 600; color: var(--aus-text-sec); text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.1875rem; }
+      .aus-scope .es-reg-card__value{ font-size: 1.625rem; font-weight: 700; color: var(--aus-text); line-height: 1.15; margin-bottom: 0.25rem; }
+      .aus-scope .es-reg-card__sub{ font-size: 0.6875rem; color: var(--aus-text-sec); line-height: 1.35; }
 
-      /* Comparativa YoY */
-      .es-yoy { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem 1.25rem; }
-      .es-yoy__title { margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
-      .es-yoy__years { font-size: 0.75rem; color: #174ea6; background: #e8f0fe; padding: 0.125rem 0.5rem; border-radius: 999px; font-weight: 600; }
-      .es-yoy__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-      .es-yoy__cell { display: flex; flex-direction: column; gap: 0.125rem; }
-      .es-yoy__label { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
-      .es-yoy__current { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; line-height: 1.2; }
-      .es-yoy__prev { font-size: 0.75rem; color: #6c757d; }
-      .es-var { font-size: 0.8125rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 0.375rem; margin-top: 0.25rem; width: fit-content; }
-      .es-var.up { background: #f8d7da; color: #721c24; }
-      .es-var.down { background: #d4edda; color: #155724; }
-      .es-var.neutral { background: #e9ecef; color: #6c757d; }
-      .es-yoy__empty { margin: 0; padding: 0.5rem; font-size: 0.8125rem; color: #6c757d; text-align: center; }
+      .aus-scope /* Comparativa YoY */
+      .es-yoy{ background: var(--aus-border-light); border: 1px solid var(--aus-border-light); border-radius: 12px; padding: 1rem 1.25rem; }
+      .aus-scope .es-yoy__title{ margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; color: var(--aus-text); display: flex; align-items: center; gap: 12px; }
+      .aus-scope .es-yoy__years{ font-size: 0.75rem; color: var(--aus-primary); background: var(--aus-primary-soft); padding: 0.125rem 12px; border-radius: 999px; font-weight: 600; }
+      .aus-scope .es-yoy__grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+      .aus-scope .es-yoy__cell{ display: flex; flex-direction: column; gap: 0.125rem; }
+      .aus-scope .es-yoy__label{ font-size: 0.6875rem; color: var(--aus-text-sec); font-weight: 500; }
+      .aus-scope .es-yoy__current{ font-size: 1.5rem; font-weight: 700; color: var(--aus-text); line-height: 1.2; }
+      .aus-scope .es-yoy__prev{ font-size: 0.75rem; color: var(--aus-text-sec); }
+      .aus-scope .es-var{ font-size: 0.8125rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 12px; border-radius: 0.375rem; margin-top: 0.25rem; width: fit-content; }
+      .aus-scope .es-var.up{ background: var(--aus-danger-soft); color: var(--aus-danger); }
+      .aus-scope .es-var.down{ background: var(--aus-success-soft); color: var(--aus-success); }
+      .aus-scope .es-var.neutral{ background: var(--aus-border-light); color: var(--aus-text-sec); }
+      .aus-scope .es-yoy__empty{ margin: 0; padding: 12px; font-size: 0.8125rem; color: var(--aus-text-sec); text-align: center; }
 
-      /* Tier 3 — Distribuciones */
-      .es-dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
-      .es-dist-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
-      .es-dist-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; }
-      .es-dist-card__head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.625rem; border-bottom: 1px solid #e9ecef; }
-      .es-dist-card__head i { color: #174ea6; font-size: 1rem; }
-      .es-dist-card__head h4 { margin: 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; flex: 1; }
-      .es-dist-card__total { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
-      .es-dist-card__body { display: flex; flex-direction: column; gap: 0.5rem; }
-      .es-bar-row { display: grid; grid-template-columns: 130px 1fr 60px; align-items: center; gap: 0.625rem; }
-      .es-bar-row__label { font-size: 0.8125rem; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-      .es-bar-row__label i { color: #6c757d; margin-right: 0.1875rem; }
-      .es-bar-track { height: 0.625rem; background: #e9ecef; border-radius: 999px; overflow: hidden; }
-      .es-bar-fill { height: 100%; background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); border-radius: 999px; transition: width 0.3s ease; min-width: 2px; }
-      .es-bar-fill--duration { background: linear-gradient(90deg, #6f42c1 0%, #d63384 100%); }
-      .es-bar-fill--gender.es-bar-fill--femenino { background: linear-gradient(90deg, #d63384 0%, #f06292 100%); }
-      .es-bar-fill--gender.es-bar-fill--masculino { background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); }
-      .es-bar-fill--gender.es-bar-fill--otro { background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%); }
-      .es-bar-row__count { font-size: 0.8125rem; font-weight: 600; color: #1a1a2e; text-align: right; }
-      .es-bar-row__count small { font-weight: 400; color: #6c757d; }
+      .aus-scope /* Tier 3 — Distribuciones */
+      .es-dist-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .aus-scope .es-dist-grid-2{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .aus-scope .es-dist-card{ background: var(--aus-border-light); border: 1px solid var(--aus-border-light); border-radius: 12px; padding: 1rem; }
+      .aus-scope .es-dist-card__head{ display: flex; align-items: center; gap: 12px; margin-bottom: 0.75rem; padding-bottom: 20px; border-bottom: 1px solid var(--aus-border-light); }
+      .aus-scope .es-dist-card__head i{ color: var(--aus-primary); font-size: 1rem; }
+      .aus-scope .es-dist-card__head h4{ margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--aus-text); flex: 1; }
+      .aus-scope .es-dist-card__total{ font-size: 0.6875rem; color: var(--aus-text-sec); font-weight: 500; }
+      .aus-scope .es-dist-card__body{ display: flex; flex-direction: column; gap: 12px; }
+      .aus-scope .es-bar-row{ display: grid; grid-template-columns: 130px 1fr 60px; align-items: center; gap: 20px; }
+      .aus-scope .es-bar-row__label{ font-size: 0.8125rem; color: var(--aus-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .aus-scope .es-bar-row__label i{ color: var(--aus-text-sec); margin-right: 0.1875rem; }
+      .aus-scope .es-bar-track{ height: 20px; background: var(--aus-border-light); border-radius: 999px; overflow: hidden; }
+      .aus-scope .es-bar-fill{ height: 100%; background: linear-gradient(90deg, var(--aus-primary) 0%, #4285f4 100%); border-radius: 999px; transition: width 0.3s ease; min-width: 2px; }
+      .aus-scope .es-bar-fill--duration{ background: linear-gradient(90deg, #6f42c1 0%, #d63384 100%); }
+      .aus-scope .es-bar-fill--gender.es-bar-fill--femenino{ background: linear-gradient(90deg, #d63384 0%, #f06292 100%); }
+      .aus-scope .es-bar-fill--gender.es-bar-fill--masculino{ background: linear-gradient(90deg, var(--aus-primary) 0%, #4285f4 100%); }
+      .aus-scope .es-bar-fill--gender.es-bar-fill--otro{ background: linear-gradient(90deg, var(--aus-text-sec) 0%, var(--aus-text-muted) 100%); }
+      .aus-scope .es-bar-row__count{ font-size: 0.8125rem; font-weight: 600; color: var(--aus-text); text-align: right; }
+      .aus-scope .es-bar-row__count small{ font-weight: 400; color: var(--aus-text-sec); }
 
-      /* Heatmap */
-      .es-dist-card--heatmap { margin-top: 0; }
-      .es-heatmap-container { overflow-x: auto; }
-      .es-heatmap-table { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 0.75rem; }
-      .es-heatmap-th { font-weight: 600; color: #495057; padding: 0.375rem 0.25rem; text-align: center; background: #f8f9fa; border-radius: 0.25rem; font-size: 0.6875rem; }
-      .es-heatmap-cell { text-align: center; padding: 0.5rem 0.25rem; border-radius: 0.25rem; font-weight: 600; min-width: 36px; transition: transform 0.15s ease; }
-      .es-heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1; position: relative; }
-      .es-heatmap-legend { display: flex; align-items: center; gap: 0.25rem; justify-content: center; margin-top: 0.75rem; font-size: 0.6875rem; color: #6c757d; }
-      .es-heatmap-legend__swatch { width: 18px; height: 12px; border-radius: 0.1875rem; }
+      .aus-scope /* Heatmap */
+      .es-dist-card--heatmap{ margin-top: 0; }
+      .aus-scope .es-heatmap-container{ overflow-x: auto; }
+      .aus-scope .es-heatmap-table{ width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 0.75rem; }
+      .aus-scope .es-heatmap-th{ font-weight: 600; color: var(--aus-text-sec); padding: 0.375rem 0.25rem; text-align: center; background: var(--aus-border-light); border-radius: 0.25rem; font-size: 0.6875rem; }
+      .aus-scope .es-heatmap-cell{ text-align: center; padding: 12px 0.25rem; border-radius: 0.25rem; font-weight: 600; min-width: 36px; transition: transform 0.15s ease; }
+      .aus-scope .es-heatmap-cell:hover{ transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1; position: relative; }
+      .aus-scope .es-heatmap-legend{ display: flex; align-items: center; gap: 0.25rem; justify-content: center; margin-top: 0.75rem; font-size: 0.6875rem; color: var(--aus-text-sec); }
+      .aus-scope .es-heatmap-legend__swatch{ width: 18px; height: 12px; border-radius: 0.1875rem; }
 
-      /* Tier 2 — Rankings */
-      .es-rank-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
-      .es-rank-summary__cell { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%); border: 1px solid #d6e3fc; border-radius: 0.5rem; }
-      .es-rank-summary__cell > i { font-size: 1.5rem; color: #174ea6; margin-top: 0.125rem; }
-      .es-rank-summary__value { display: block; font-size: 1.75rem; font-weight: 700; color: #1a1a2e; line-height: 1.1; }
-      .es-rank-summary__label { display: block; font-size: 0.8125rem; color: #174ea6; font-weight: 600; margin-top: 0.1875rem; }
-      .es-rank-summary__sub { display: block; font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
-      .es-rank-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.875rem; }
-      .es-rank-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; overflow: hidden; }
-      .es-rank-card--full { grid-column: 1 / -1; }
-      .es-rank-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.4375rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e9ecef; }
-      .es-rank-card h4 i { color: #174ea6; }
-      .es-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-      .es-table th { text-align: left; padding: 0.4375rem 0.625rem; background: #f1f3f5; color: #495057; font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid #dee2e6; }
-      .es-table td { padding: 0.5rem 0.625rem; border-bottom: 1px solid #f1f3f5; color: #1a1a2e; vertical-align: middle; }
-      .es-table tbody tr:hover { background: #f8f9fa; }
-      .es-td-idx { width: 36px; color: #6c757d; font-weight: 600; }
-      .es-td-center { text-align: center; }
-      .es-td-strong { font-weight: 700; color: #174ea6; }
-      .es-td-muted { color: #6c757d; font-size: 0.75rem; }
-      .es-trab-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
-      .es-trab-meta { font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
-      .es-empty-row { text-align: center; color: #6c757d; padding: 1rem; font-size: 0.8125rem; margin: 0; }
-      .es-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; }
-      .es-badge--danger { background: #f8d7da; color: #721c24; }
-      .es-badge--warning { background: #fff3cd; color: #856404; }
+      .aus-scope /* Tier 2 — Rankings */
+      .es-rank-summary{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .aus-scope .es-rank-summary__cell{ display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; background: linear-gradient(135deg, var(--aus-border-light) 0%, var(--aus-primary-soft) 100%); border: 1px solid #d6e3fc; border-radius: 12px; }
+      .aus-scope .es-rank-summary__cell > i{ font-size: 1.5rem; color: var(--aus-primary); margin-top: 0.125rem; }
+      .aus-scope .es-rank-summary__value{ display: block; font-size: 1.75rem; font-weight: 700; color: var(--aus-text); line-height: 1.1; }
+      .aus-scope .es-rank-summary__label{ display: block; font-size: 0.8125rem; color: var(--aus-primary); font-weight: 600; margin-top: 0.1875rem; }
+      .aus-scope .es-rank-summary__sub{ display: block; font-size: 0.6875rem; color: var(--aus-text-sec); margin-top: 0.125rem; }
+      .aus-scope .es-rank-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.875rem; }
+      .aus-scope .es-rank-card{ background: var(--aus-border-light); border: 1px solid var(--aus-border-light); border-radius: 12px; padding: 1rem; overflow: hidden; }
+      .aus-scope .es-rank-card--full{ grid-column: 1 / -1; }
+      .aus-scope .es-rank-card h4{ margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: var(--aus-text); display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--aus-border-light); }
+      .aus-scope .es-rank-card h4 i{ color: var(--aus-primary); }
+      .aus-scope .es-table{ width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+      .aus-scope .es-table th{ text-align: left; padding: 10px 20px; background: var(--aus-border-light); color: var(--aus-text-sec); font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid var(--aus-border); }
+      .aus-scope .es-table td{ padding: 12px 20px; border-bottom: 1px solid var(--aus-border-light); color: var(--aus-text); vertical-align: middle; }
+      .aus-scope .es-table tbody tr:hover{ background: var(--aus-border-light); }
+      .aus-scope .es-td-idx{ width: 36px; color: var(--aus-text-sec); font-weight: 600; }
+      .aus-scope .es-td-center{ text-align: center; }
+      .aus-scope .es-td-strong{ font-weight: 700; color: var(--aus-primary); }
+      .aus-scope .es-td-muted{ color: var(--aus-text-sec); font-size: 0.75rem; }
+      .aus-scope .es-trab-name{ font-weight: 600; color: var(--aus-text); font-size: 0.8125rem; }
+      .aus-scope .es-trab-meta{ font-size: 0.6875rem; color: var(--aus-text-sec); margin-top: 0.125rem; }
+      .aus-scope .es-empty-row{ text-align: center; color: var(--aus-text-sec); padding: 1rem; font-size: 0.8125rem; margin: 0; }
+      .aus-scope .es-badge{ display: inline-block; padding: 0.125rem 12px; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; }
+      .aus-scope .es-badge--danger{ background: var(--aus-danger-soft); color: var(--aus-danger); }
+      .aus-scope .es-badge--warning{ background: var(--aus-warning-soft); color: var(--aus-warning); }
 
       /* Responsive */
       @media (max-width: 768px) {
-        .es-rank-grid { grid-template-columns: 1fr; }
-        .es-bar-row { grid-template-columns: 90px 1fr 50px; }
-        .es-tabs-nav { gap: 0.25rem; }
-        .es-tab-btn { font-size: 0.75rem; padding: 0.4375rem 0.625rem; }
+        .aus-scope .es-rank-grid{ grid-template-columns: 1fr; }
+        .aus-scope .es-bar-row{ grid-template-columns: 90px 1fr 50px; }
+        .aus-scope .es-tabs-nav{ gap: 0.25rem; }
+        .aus-scope .es-tab-btn{ font-size: 0.75rem; padding: 10px 20px; }
       }
       `;
             document.head.appendChild(styleEl2);
@@ -9309,15 +9244,6 @@ class MedicionAusentismoComponent {
             overflow-x: hidden;
         `;
 
-        // Agregar FontAwesome dinámicamente si no está cargado
-        if (!document.querySelector('link[href*="font-awesome"]') && !document.querySelector('link[href*="fontawesome"]')) {
-            const fontAwesomeLink = document.createElement('link');
-            fontAwesomeLink.rel = 'stylesheet';
-            fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
-            document.head.appendChild(fontAwesomeLink);
-            console.log('[DEBUG] FontAwesome agregado dinámicamente');
-        }
-
     // Contenedor principal — Full-width, fondo gris
     const mainContent = document.createElement('div');
     mainContent.className = 'estadisticas-dashboard';
@@ -9326,7 +9252,7 @@ class MedicionAusentismoComponent {
       width: 100%;
       min-height: 100%;
       box-sizing: border-box;
-      background: #f8f9fa;
+      background: var(--aus-border-light);
     `;
 
     // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
@@ -9352,18 +9278,18 @@ class MedicionAusentismoComponent {
       gap: 0.75rem;
     `;
 
-    const dashboardIcon = document.createElement('i');
-    dashboardIcon.className = 'fas fa-chart-line';
-    dashboardIcon.style.cssText = `color: #174ea6; font-size: 1.25rem;`;
+    const dashboardIcon = document.createElement('div');
+    dashboardIcon.className = 'aus-view-icon';
+    dashboardIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
 
     const dashboardTitleContainer = document.createElement('div');
     const dashboardTitle = document.createElement('h3');
+    dashboardTitle.className = 'aus-view-title';
     dashboardTitle.textContent = 'Estadísticas de Ausentismo';
-    dashboardTitle.style.cssText = `font-size: 1.125rem; font-weight: 600; margin: 0; color: #1E293B;`;
 
     const dashboardSubtitle = document.createElement('p');
+    dashboardSubtitle.className = 'aus-view-subtitle';
     dashboardSubtitle.textContent = 'Métricas y tendencias del ausentismo por causa médica.';
-    dashboardSubtitle.style.cssText = `font-size: 0.8125rem; color: #64748B; margin: 0.25rem 0 0 0;`;
 
     dashboardTitleContainer.appendChild(dashboardTitle);
     dashboardTitleContainer.appendChild(dashboardSubtitle);
@@ -9371,32 +9297,8 @@ class MedicionAusentismoComponent {
     leftSection.appendChild(dashboardTitleContainer);
 
     const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-    backBtn.style.cssText = `
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.375rem;
-      border: 1px solid #dee2e6;
-      background-color: #f8f9fa;
-      color: #64748B;
-      transition: all 0.2s;
-      white-space: nowrap;
-    `;
-    backBtn.onmouseover = function() {
-      this.style.backgroundColor = '#e2e8f0';
-      this.style.color = '#174ea6';
-      this.style.borderColor = '#174ea6';
-    };
-    backBtn.onmouseout = function() {
-      this.style.backgroundColor = '#f8f9fa';
-      this.style.color = '#64748B';
-      this.style.borderColor = '#dee2e6';
-    };
+    backBtn.className = 'aus-btn';
+    backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver';
     backBtn.onclick = () => {
       this.currentView = 'main';
       this.render();
@@ -9495,11 +9397,13 @@ class MedicionAusentismoComponent {
         </select>
       </div>
       <div class="k-filter-actions">
-        <button id="applyStatsFiltersBtn" style="padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: none; background-color: #174ea6; color: white; transition: all 0.2s; white-space: nowrap;">
-          <i class="fas fa-filter"></i> Filtrar
+        <button id="applyStatsFiltersBtn" class="aus-btn aus-btn--primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Filtrar
         </button>
-        <button id="clearStatsFiltersBtn" style="padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; border: 1px solid #dee2e6; background-color: #f8f9fa; color: #64748B; transition: all 0.2s; white-space: nowrap;">
-          <i class="fas fa-times"></i> Limpiar
+        <button id="clearStatsFiltersBtn" class="aus-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Limpiar
         </button>
       </div>
     `;

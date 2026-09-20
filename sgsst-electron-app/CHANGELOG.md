@@ -120,6 +120,53 @@ Migración al dialecto premium v2 del submódulo 3.3.5 (`modules/gestion-salud/i
 
 ---
 
+### 📦789 · Medición del Ausentismo (3.3.6) migrada al premium v2 (Fase 1 + vistas)
+
+Migración al dialecto premium v2 del submódulo 3.3.6 (`modules/gestion-salud/ausentismo/`), en dos fases: home + blindaje de fugas, y luego las vistas.
+
+#### Fase 1 — Home + blindaje
+
+- **Home (iframe)**: Header System v2 + paleta canónica + modo oscuro (los 2 atributos) + 10 iconos SVG inline (0 Font Awesome).
+- **`initThemeSync()`**: pide el tema al padre (`get-theme-request`) y escucha `theme-changed` — antes el iframe se quedaba claro si se creaba DESPUÉS de aplicar el tema.
+- **Blindaje**: los **7 bloques `<style>`** que el componente inyectaba en el `<head>` GLOBAL (~684 líneas con `:root --sp-*`, 95 clases sin scope y selectores de etiqueta como `textarea`) quedaron scopados bajo `.aus-scope` con un transformador CSS propio (respeta `@keyframes` verbatim, recurre en `@media`, preserva comentarios).
+- `:root --sp-*` → `.aus-scope`; selectores de etiqueta scopados; `@keyframes` genéricos (`fadeIn`/`slideDown`/`slideUp`) renombrados a `ausFadeIn`/`ausSlideDown`/`ausSlideUp`.
+- `.aus-scope` aplicado al contenedor + los **6 nodos montados en `<body>`** (panel, modales, overlays).
+- 🚨 **Trampa del scopeado en nodos montados en `<body>`**: el backdrop del panel se appendea a `<body>`, así que se le puso `.aus-scope` A SÍ MISMO — pero los selectores `.aus-scope .seguimiento-backdrop` exigen un **ancestro**, así que no aplicaban y el panel quedaba en `translateX(100%)` (**fuera de pantalla**). Fix: variante **self** (`.aus-scope.seguimiento-backdrop`), mismo patrón de 📦761.
+
+#### Vistas
+
+- **Registrar Ausentismo** y **Ver Ausentismo**: reescritas con clases premium + SVG (0 colores inline, 0 Font Awesome). Se conservaron los 15 IDs del formulario, los IDs de filtros, `ausentismoTableBody`, el target del FAB y las clases de delegación.
+- **Seguimiento de Incapacidades**: header + 4 KPIs + filtros + tabla premium (avatar, progress, badges, acciones SVG); se eliminó la inyección de Font Awesome por CDN.
+- **Estadísticas**: los bloques `.k-*`/`.es-*` remapeados a tokens `--aus-*` (148 reemplazos) → **dark automático**; radios 20/12; header v2; 2ª inyección de Font Awesome CDN eliminada.
+- **Consulta de Trabajadores**: tokens canónicos + modo oscuro + Header System v2 + 7 iconos SVG.
+- **Generar Informe**: **CDN → local** (Google Fonts + Font Awesome desde `assets/css/`) → **ya funciona offline**; tokens canónicos + modo oscuro + Header v2 + contraste del botón primario en oscuro.
+- **`_injectPremiumViewsStyles()`** se llama en `render()` (antes solo en 2 vistas → Seguimiento y Estadísticas quedaban sin estilos).
+
+#### Correcciones
+
+- Se corrigieron 2 tests que asertaban el token **compartido** de `renderer.js` en `index.html` (Mortalidad y Prevalencia venían fallando desde 📦788); ahora validan que exista un cache-bust real.
+
+#### Verificación
+
+- Test `tests/ausentismo/test-premium.js` → **110/110** (incluye 3 checks de regresión del backdrop self).
+- Arnés real de Electron en claro / `dark` / `dark-legacy` para todas las vistas.
+
+---
+
+### 📦790 · Seguimiento de Gestación (3.3.6) — home migrado
+
+Primera de 4 vistas del paquete de gestación (todas iframes).
+
+- **Tokens `--v3-*`** (azul viejo `#174ea6`, familia de `auditoria-anual.css`) remapeados a la paleta canónica (`#2057b8`, `#14213d`, `#748096`, `#e8ebee`, `#fbfcfb`), radios 20/12, fuente DM Sans.
+- **Modo oscuro**: bloque `[data-theme^="dark"]` con los 20 tokens oscuros.
+- **Header System v2**: transparente, título **Manrope 800 20px**, icono convertido en **chip 44×44** (radio 12, blue-soft).
+- **Contraste**: override del botón primario en oscuro (texto oscuro sobre azul claro).
+- 🚨 **Bug propio detectado con Electron**: la inserción del bloque oscuro **consumió el `}` de cierre del `:root`**, así que el bloque quedaba anidado dentro de `:root` (CSS inválido) y **no aplicaba**. Se detectó midiendo `getComputedStyle` en tema oscuro (el fondo seguía claro) y se corrigió.
+
+**Pendiente**: `gestacion-antesala`, `gestacion-seguimiento-mensual` y `gestacion-reportes` (mismo patrón).
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)

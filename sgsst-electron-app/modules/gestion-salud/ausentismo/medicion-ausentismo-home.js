@@ -86,7 +86,38 @@ function waitForElement(selector, timeout = 5000, maxRetries = 10, baseDelay = 1
     });
 }
 
+/**
+ * Sincroniza el tema con la ventana padre.
+ * theme-manager.js propaga el tema a los iframes existentes al CAMBIAR el tema,
+ * pero si este iframe se crea DESPUES de aplicar el tema no lo recibe. Por eso
+ * pedimos el tema al padre al cargar y escuchamos los cambios.
+ */
+function initThemeSync() {
+    function applyTheme(theme, mode) {
+        var html = document.documentElement;
+        if (theme === 'dark') {
+            html.setAttribute('data-theme', mode === 'dark' ? 'dark-legacy' : 'dark');
+        } else {
+            html.removeAttribute('data-theme');
+        }
+    }
+    window.addEventListener('message', function (event) {
+        var d = event.data || {};
+        if (d.type === 'theme-changed') {
+            applyTheme(d.theme, d.mode);
+        } else if (d.type === 'get-theme-response') {
+            applyTheme(d.theme, d.preference);
+        }
+    });
+    try {
+        if (window.parent && window.parent !== window && window.parent.postMessage) {
+            window.parent.postMessage({ type: 'get-theme-request' }, '*');
+        }
+    } catch (e) { /* sin acceso al padre */ }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    initThemeSync();
     initializePortal();
 });
 

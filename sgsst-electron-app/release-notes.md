@@ -1,6 +1,6 @@
 # K+AIR v0.1.208
 
-## 🎨 Migración premium v2 de los submódulos (📦739-788)
+## 🎨 Migración premium v2 de los submódulos (📦739-790)
 
 Segunda gran ola del rediseño visual: después de los **homes de módulo** (📦730-738, v0.1.197-205), se migraron al dialecto **premium v2** todos los submódulos con interfaz propia. El objetivo fue que TODO el sistema comparta la misma paleta, tipografía y patrones de componentes.
 
@@ -43,6 +43,8 @@ Segunda gran ola del rediseño visual: después de los **homes de módulo** (�
 | Índice de Mortalidad (3.3.3) | Header System v2 + tokens `--mort-*` scoped (se quitó el `:root`/`*`/`body` GLOBALES) + tabla blindada (`min-width:0 !important` + `table-layout:fixed`) con 7 anchos fijos que suman 100% + Chart.js theme-aware con gradientes dark/light + `tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla + resize handler con cleanup + código muerto eliminado (`escapeHtml`) + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + sanitizar `<link>` CDN + **gráfico y tabla en paralelo en maximizada** (`📦786-fix`) + test 46/46 |
 | Prevalencia de Enfermedad Laboral (3.3.4) | Header System v2 + tokens `--prev-*` scoped (se quitó el `:root`/`*`/`body` GLOBALES) + tabla blindada (`min-width:0 !important` + `table-layout:fixed`) con 6 anchos fijos que suman 100% + Chart.js theme-aware + `tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla/renderFallbackChart + resize handler con cleanup + iconos SVG inline (se quitó el CDN de Bootstrap Icons) + código muerto eliminado (`escapeHtml` + 15 `console.log`) + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + sanitizar `<link>` CDN + **gráfico y tabla en paralelo en maximizada** (`.prev-duo`) + test 46/46 |
 | Incidencia de Enfermedad Laboral (3.3.5) | Módulo hermano de Prevalencia generado con renombres **case-sensitive** (`casosEL`→`casosNuevosEL` sin romper `totalCasosEL`) + Header System v2 + tokens `--inc-*` scoped + tabla blindada con 6 anchos fijos que suman 100% + Chart.js theme-aware + `tok()`/`palette()` + resize con cleanup + **estilos del error que la hoja vieja no definía** (`.kair-error-icon`/`.kair-error-msg`/`.kair-retry-btn`) + iconos SVG inline + código muerto eliminado + renderer.js con TOKEN + cache-bust en 2 niveles + **gráfico y tabla en paralelo** (`.inc-duo`) + test 46/46 |
+| Medición del Ausentismo (3.3.6) | **Fase 1**: home premium v2 (Header v2 + SVG + dark + `initThemeSync`) + **blindaje de los 7 bloques `<style>`** inyectados en el `<head>` global (~684 líneas) scopados bajo `.aus-scope` (con `:root` movido y `@keyframes` genéricos renombrados) + `.aus-scope` en contenedor y 6 nodos de `<body>` + **fix del panel** (variante *self* `.aus-scope.seguimiento-backdrop`). **Vistas**: Registrar/Ver reescritas (0 colores inline, 0 FA) + Seguimiento (KPIs/filtros/tabla/avatar/progress/badges) + Estadísticas (tokens `--aus-*` → dark automático) + Consulta (tokens + Header v2 + SVG) + Generar Informe (**CDN → local**, ya funciona offline) + **2 CDN de Font Awesome eliminados** + test 110/110 |
+| Seguimiento de Gestación (3.3.6) | **Home** migrado: tokens `--v3-*` → canónica + dark (2 atributos) + Header System v2 (transparente, Manrope 800 20px, icon chip 44×44) + contraste del botón en oscuro. Quedan antesala/mensual/reportes |
 
 ### Correcciones destacadas
 
