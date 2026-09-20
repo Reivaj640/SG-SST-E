@@ -267,25 +267,6 @@
     flex: 1;
     min-height: 0;
   }
-  /* Anchos FIJOS de las columnas de la tabla en maximizada: con
-     `table-layout: fixed` la tabla deja de repartirse el ancho segun el
-     contenido y cada columna mide el % de abajo (el 100% del ancho de la
-     tabla). Asi el reparto es siempre el mismo y "Estado" nunca se corta. */
-  .frecuencia-container .kair-table {
-    table-layout: fixed;
-  }
-  .frecuencia-container .kair-table th:nth-child(1) { width: 10%; } /* Mes (17 -> 10) */
-  .frecuencia-container .kair-table th:nth-child(2) { width: 8%; }  /* AT (10 -> 8; 7% recortaba el badge auto) */
-  .frecuencia-container .kair-table th:nth-child(3) { width: 24%; } /* Trabajadores */
-  .frecuencia-container .kair-table th:nth-child(4) { width: 28%; } /* Indice Frecuencia */
-  .frecuencia-container .kair-table th:nth-child(5) { width: 8%; }  /* Meta (12 -> 8) */
-  .frecuencia-container .kair-table th:nth-child(6) { width: 22%; } /* Estado */
-  /* Con layout fijo, lo que no entra se recorta en vez de empujar la tabla. */
-  .frecuencia-container .kair-table td,
-  .frecuencia-container .kair-table th {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
 .frecuencia-container .kair-card-title {
@@ -370,15 +351,46 @@
 
 .frecuencia-container .kair-table {
   width: 100%; 
+  /* BLINDAJE: otras hojas de la app traen `table.kair-table { min-width: 1080px }`
+     SIN scope y se inyectan en el <head> global al abrir esos módulos, asi que
+     la tabla heredaba un ancho minimo ajeno y `width: 100%` no se respetaba.
+     `min-width: 0` + `max-width: 100%` lo neutralizan. */
+  min-width: 0 !important;
+  max-width: 100% !important;
   border-collapse: collapse; 
   font-size: 0.85rem;
   background: var(--freq-card);
 }
 
+/* ── Anchos FIJOS de las columnas ──
+   Con `table-layout: fixed` la tabla deja de repartirse el ancho segun el
+   contenido: cada columna mide el % de abajo y el reparto es SIEMPRE el mismo,
+   asi que las 6 columnas entran y NUNCA aparece scroll horizontal.
+   Va FUERA de la media query a proposito: antes vivia dentro de
+   `@media (min-width: 1360px)` y si la media query no matcheaba la tabla
+   volvia a repartirse por contenido y se salia.
+   Los % DEBEN sumar 100: si no, el sobrante se reparte proporcionalmente y los
+   anchos reales no son los declarados. */
+.frecuencia-container .kair-table {
+  table-layout: fixed;
+}
+.frecuencia-container .kair-table th:nth-child(1) { width: 12%; } /* Mes */
+.frecuencia-container .kair-table th:nth-child(2) { width: 9%; }  /* AT (menos de 8% recorta el badge auto) */
+.frecuencia-container .kair-table th:nth-child(3) { width: 22%; } /* Trabajadores (reducido) */
+.frecuencia-container .kair-table th:nth-child(4) { width: 25%; } /* Indice Frecuencia (reducido) */
+.frecuencia-container .kair-table th:nth-child(5) { width: 9%; }  /* Meta */
+.frecuencia-container .kair-table th:nth-child(6) { width: 23%; } /* Estado */
+/* Con layout fijo, lo que no entra se recorta en vez de empujar la tabla. */
+.frecuencia-container .kair-table td,
+.frecuencia-container .kair-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .frecuencia-container .kair-table thead th {
   background: var(--freq-primary); 
   color: #fff; 
-  padding: 0.75rem 0.5rem; 
+  padding: 0.5rem 0.5rem; 
   font-weight: 600; 
   text-align: center;
   /* `normal` (no nowrap): los encabezados largos ("Índice Frecuencia",
@@ -410,7 +422,7 @@
 }
 
 .frecuencia-container .kair-table td {
-  padding: 0.6rem 0.5rem; 
+  padding: 0.3rem 0.5rem; 
   text-align: center;
   vertical-align: middle;
 }
@@ -428,7 +440,7 @@
 }
 
 .frecuencia-container .kair-table tfoot td {
-  padding: 0.75rem 0.5rem;
+  padding: 0.4rem 0.5rem;
 }
 
 /* ── Editable Cells ── */
@@ -437,7 +449,7 @@
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline dotted var(--freq-primary);
-  padding: 0.25rem 0.5rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 4px;
   transition: background 0.2s;
   display: inline-block;
@@ -756,7 +768,7 @@
 
   .frecuencia-container .kair-table thead th,
   .frecuencia-container .kair-table td {
-    padding: 0.75rem 0.6rem;
+    padding: 0.55rem 0.6rem;
   }
 
   .frecuencia-container .kair-kpi-value {
@@ -793,7 +805,7 @@
 
   .frecuencia-container .kair-table thead th,
   .frecuencia-container .kair-table td {
-    padding: 0.85rem 0.75rem;
+    padding: 0.65rem 0.75rem;
   }
 
   .frecuencia-container .kair-kpi-value {
@@ -892,9 +904,29 @@
 /* ── Month Cards Grid ── */
 .frecuencia-container .kair-month-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* Modo ventana: 2 filas de 6 tarjetas. */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
+}
+
+/* Modo maximizado: las 12 tarjetas en UNA sola fila. */
+@media (min-width: 1360px) {
+  .frecuencia-container .kair-month-cards-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .frecuencia-container .kair-month-card {
+    padding: 0.7rem;
+  }
+  .frecuencia-container .kair-month-card-name {
+    font-size: 0.8rem;
+  }
+  .frecuencia-container .kair-month-card-value {
+    font-size: 1.15rem;
+  }
+  .frecuencia-container .kair-month-card-detail {
+    font-size: 0.68rem;
+  }
 }
 
 .frecuencia-container .kair-month-card {

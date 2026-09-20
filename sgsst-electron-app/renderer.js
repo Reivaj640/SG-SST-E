@@ -6146,7 +6146,7 @@ function showFrecuenciaAccidentalidadContent(container, currentCompany, moduleNa
   container.innerHTML = '<p style="color: blue;">Cargando frecuencia de la accidentalidad... (v3)</p>';
 
   const BASE = 'modules/gestion-salud/frecuencia-accidentalidad/';
-  const TOKEN = 'FREQ-20260919-v6-anchos-b';
+  const TOKEN = 'FREQ-20260919-v11-meses-12';
 
   // Cargar CSS si no está cargado
   if (!document.querySelector(`link[href="${BASE}frecuencia-accidentalidad.css?v=${TOKEN}"]`)) {

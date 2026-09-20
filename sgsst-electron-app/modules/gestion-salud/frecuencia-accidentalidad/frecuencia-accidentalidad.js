@@ -242,8 +242,11 @@ function cargarDatos() {
 
     renderKPIs();
     renderTargetCard();
-    renderChart();
+    // La tabla se renderiza ANTES que el grafico: el grafico mide el alto real
+    // de su contenedor (que se estira al de la tabla) y necesita que la tabla
+    // ya este en el DOM para medir bien.
     renderTabla();
+    renderChart();
     renderMonthCards();
     renderReference();
     renderColapsables();
@@ -308,11 +311,13 @@ if (chartContainer) {
     if (!container) return;
 
     var containerWidth = container.offsetWidth || 800;
-    var screenWidth = window.innerWidth;
 
-    var baseWidth = screenWidth >= 2560 ? 1400 : screenWidth >= 1920 ? 1200 : 800;
-    var W = Math.max(800, Math.min(containerWidth, baseWidth));
-    var H = Math.max(320, Math.round(W * 0.4));
+    // El viewBox se ajusta EXACTAMENTE al contenedor (ancho x alto reales) para
+    // que el SVG, que va con width:100%, llene todo el espacio disponible.
+    // Antes habia un tope de ancho (baseWidth) y un alto fijo del 40%: el viewBox
+    // no coincidia con la caja y el grafico dejaba franjas vacias arriba y abajo.
+    var W = Math.max(320, Math.round(containerWidth));
+    var H = Math.max(320, Math.round(W * 0.4), container.offsetHeight || 0);
 
     var P = { t: 30, r: 40, b: 50, l: 60 };
     var cW = W - P.l - P.r;
@@ -672,6 +677,19 @@ if (btnClone) {
     });
   }
   
+  /* Re-render del grafico al redimensionar la ventana (con debounce): asi vuelve
+     a medir el alto disponible y no queda con el viewBox viejo. Se guarda UN
+     solo handler en window para que reabrir el modulo no acumule listeners. */
+  if (window.__freqResizeHandler) window.removeEventListener('resize', window.__freqResizeHandler);
+  var _freqResizeTimer = null;
+  window.__freqResizeHandler = function() {
+    clearTimeout(_freqResizeTimer);
+    _freqResizeTimer = setTimeout(function() {
+      if (document.querySelector('.frecuencia-container') && indicadores) renderChart();
+    }, 250);
+  };
+  window.addEventListener('resize', window.__freqResizeHandler);
+
   setTimeout(cargarDatos, 100);
   
 })();

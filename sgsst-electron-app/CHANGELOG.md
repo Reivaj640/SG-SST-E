@@ -41,7 +41,7 @@ Segunda gran ola del rediseño premium (después de los homes de módulo, `📦7
 | 779 | Estadísticas de Remisiones (3.1.6) | Nueva sección: KPIs + 6 gráficos derivados del Control |
 | 780-782 | Investigación de Accidentes (3.2.2) | Las 3 vistas al premium v2 + fix de la fuga global de estilos + ancho completo + lista en 2 columnas en maximizada |
 | 783 | Registro y Análisis Estadístico (3.2.3) | Header System v2 + scoping total del CSS (se quitaron las clases GLOBALES `.k-section-card`/`.header-back-btn`) + modo oscuro en los 2 atributos + chips con `color-mix` + los 9 gráficos Chart.js con colores de tema |
-| 784 | Frecuencia de la Accidentalidad (3.3.1) | Header System v2 + tokens propios `--freq-*` scoped (se quitó el `:root` + `*` + `body` GLOBALES) + 139 selectores scopados + modo oscuro en los 2 atributos + el gráfico SVG leyendo la paleta con `tok()` |
+| 784 | Frecuencia de la Accidentalidad (3.3.1) | Header System v2 + tokens propios `--freq-*` scoped (se quitó el `:root` + `*` + `body` GLOBALES) + 139 selectores scopados + modo oscuro en los 2 atributos + el gráfico SVG leyendo la paleta con `tok()`; gráfico y tabla **en paralelo** en maximizada con anchos de columna **fijos** (`table-layout: fixed` + blindaje contra `min-width` ajenos), filas de 48 → **35px**, gráfico a **todo el alto** de su tarjeta (intervalo del eje 48 → 86px) y los 12 meses en **1 fila de 12** en maximizada / **2 filas de 6** en ventana |
 
 #### Limpieza
 

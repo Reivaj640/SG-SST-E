@@ -186,6 +186,17 @@ check('renderer.js: el cache-bust del script ya no usa ?_t=Date.now()',
 check('index.html: el <script> de renderer.js lleva un token (sin el, la app usa el renderer cacheado y el TOKEN nuevo nunca llega)',
   /<script src="renderer\.js\?v=[^"]+"><\/script>/.test(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')));
 
+check('CSS: los 12 meses van en 6 columnas (2 filas) y en 12 columnas (1 fila) en maximizada',
+  /\.kair-month-cards-grid \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/.test(cssLimpio.replace(/\n/g, ' ')) &&
+  /@media \(min-width: 1360px\) \{[^@]*grid-template-columns: repeat\(12, minmax\(0, 1fr\)\);/.test(cssLimpio.replace(/\n/g, ' ')));
+check('JS: el gráfico mide el alto REAL del contenedor (llena el espacio)',
+  /var H = Math\.max\(320, Math\.round\(W \* 0\.4\), container\.offsetHeight \|\| 0\);/.test(js) &&
+  /var W = Math\.max\(320, Math\.round\(containerWidth\)\);/.test(js));
+check('JS: la tabla se renderiza ANTES del gráfico (para poder medir el alto)',
+  js.indexOf('renderTabla();') < js.indexOf('renderChart();'));
+check('JS: re-render del gráfico al redimensionar (con un solo handler en window)',
+  /window\.__freqResizeHandler/.test(js) && /removeEventListener\('resize', window\.__freqResizeHandler\)/.test(js));
+
 /* ══════════════ Reporte ══════════════ */
 let failed = 0;
 checks.forEach(function (c) {

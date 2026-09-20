@@ -3707,6 +3707,64 @@ se bumpéo `TOKEN` a `v6` pero `index.html` seguía con `renderer.js?v=20260916-
 (`index.html: el <script> de renderer.js lleva un token`), pero eso solo comprueba que EXISTA uno —
 si el cambio "no se ve", **lo primero es revisar si el `renderer.js` del `index.html` quedó viejo**.
 
+#### 🚨🚨 El `min-width` AJENO: por qué la tabla medía 900px en un contenedor de 584px
+
+Síntoma: `table-layout: fixed` + `width: 100%` + 6 columnas que suman 100%… y la tabla **igual** medía
+**900px** con scroll horizontal y la columna "Estado" cortada.
+
+Receta de diagnóstico que lo cerró (pedírsela al usuario para la consola):
+
+```js
+const t = document.querySelector('.kair-table');
+const w = document.querySelector('.kair-table-wrap');
+console.log('wrap', w.clientWidth, w.scrollWidth);
+console.log('table', getComputedStyle(t).width, getComputedStyle(t).tableLayout);
+[...t.querySelectorAll('thead th')].forEach((th, i) => console.log(i + 1, getComputedStyle(th).width));
+```
+
+Dio `layout: fixed` (o sea, **la hoja nueva SÍ estaba cargada**) pero `cssWidth = 900px` y las
+columnas exactamente 12/9/22/25/9/23% **de 900** → `width: 100%` no se respetaba: algo **externo** le
+imponía un ancho mínimo. Y sí: otros módulos traen reglas **SIN SCOPE** como
+`table.kair-table { min-width: 1080px }` (Archivo y Retención, `archivo-retencion-view.css:181`) que se
+inyectan en el `<head>` **global**.
+
+**Fix — blindar la tabla**:
+```css
+.frecuencia-container .kair-table {
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+```
+**Regla**: cuando un módulo usa una clase **GENÉRICA** del design system (`.kair-table`, `.kair-card`,
+`.kair-kpi`, `.kair-empty`…), **otro módulo puede estar redefiniéndola globalmente**. Antes de pelear
+con el layout, volcar las reglas que matchean el nodo y ver quién setea `width`/`min-width`/`max-width`.
+Y ojo: acá se gastaron **3 rondas de validación** suponiendo que era caché cuando el CSS ya estaba bien.
+
+#### Alto de filas, alto del gráfico y grilla de meses (los 3 ajustes finos que pidió el usuario)
+
+1. **Alto de filas**: lo maneja el `padding` de `td`/`th` + el de las celdas editables. Bajó de **48 a
+   35px** con `td { padding: 0.3rem }`, `th { padding: 0.5rem }` y `.kair-editable { padding: 0.1rem 0.4rem }`
+   (y los mismos valores en los `@media` de ≥1920 y ≥2560, si no vuelven a crecer en monitores grandes).
+2. **Alto del gráfico**: el `viewBox` tenía un **tope de ancho** (`baseWidth` 800/1200/1400) y un alto
+   fijo del **40% del ancho**, así que dentro de la tarjeta estirada dejaba franjas vacías. Ahora el
+   viewBox se ajusta **exactamente** al contenedor:
+   ```js
+   var W = Math.max(320, Math.round(containerWidth));
+   var H = Math.max(320, Math.round(W * 0.4), container.offsetHeight || 0);
+   ```
+   Con eso el SVG (que va con `width:100%`) llena la caja: el intervalo del eje pasó de **48 a 86px**.
+   ⚠️ **Hay que renderizar la TABLA ANTES del GRÁFICO** en `renderizar()`, porque el gráfico mide el
+   alto de su contenedor y ese alto depende de la tabla (que es la que estira la fila del `duo`).
+   ⚠️ Y hay que **re-renderizar al redimensionar** (debounce 250 ms) guardando **UN solo** handler en
+   `window.__freqResizeHandler` (con `removeEventListener` del anterior) para que reabrir el módulo no
+   acumule listeners ni deje closures con datos viejos.
+3. **Grilla "Detalle por Mes"**: `repeat(6, minmax(0,1fr))` en ventana (2 filas de 6) y
+   `repeat(12, minmax(0,1fr))` en `@media (min-width: 1360px)` (1 fila de 12). Con 12 columnas hay que
+   achicar un poco el contenido de la tarjeta (`padding`, nombre, valor y detalle) o el texto se corta
+   (medido: 139px por tarjeta a 1920, 101px a 1453, **0 recortes**).
+
 #### Verificación
 
 - `node tests/frecuencia-accidentalidad/test-premium.js` → **28/28 OK** (incluye "NO hay `:root`
