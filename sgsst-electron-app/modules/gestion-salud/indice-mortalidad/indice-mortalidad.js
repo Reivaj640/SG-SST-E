@@ -27,27 +27,35 @@ if (typeof window !== 'undefined' && window.electronAPI) {
 }
 
   function getElement(id) {
-    // Buscar primero por ID directa
     var el = document.getElementById(id);
     if (el) return el;
-    
-    // Buscar por selector
     el = document.querySelector('#' + id);
     if (el) return el;
-    
-    // Buscar cualquier elemento que contenga el ID parcial
     el = document.querySelector('[id*="' + id + '"]');
     if (el) return el;
-    
-    // Buscar por clase
-    var clase = id.replace('Section', '-section').replace('Section', '');
-    el = document.querySelector('.' + clase);
-    return el;
+    return null;
   }
 
-  function escapeHtml(str) {
-    if (str === undefined || str === null) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function tok(name, fallback) {
+    var host = document.querySelector('.indice-mortalidad-container') || document.documentElement;
+    return getComputedStyle(host).getPropertyValue(name).trim() || fallback;
+  }
+
+  function palette() {
+    return {
+      bg:          tok('--mort-bg','#fbfcfb'),
+      card:        tok('--mort-card','#ffffff'),
+      primary:     tok('--mort-primary','#2057b8'),
+      primarySoft: tok('--mort-primary-soft','#eaf1fb'),
+      success:     tok('--mort-success','#1bb888'),
+      warning:     tok('--mort-warning','#e7a224'),
+      danger:      tok('--mort-danger','#da5563'),
+      text:        tok('--mort-text','#14213d'),
+      textSec:     tok('--mort-text-sec','#748096'),
+      textMuted:   tok('--mort-text-muted','#aab1bd'),
+      border:      tok('--mort-border','#e8ebee'),
+      borderLight: tok('--mort-border-light','#f3f4f6')
+    };
   }
 
   function showToast(msg, type) {
@@ -98,32 +106,22 @@ function updateHeaderContext() {
   function getStatusBadge(valor, meta) {
     valor = toNum(valor);
     meta = toNum(meta);
-
-    if (valor === 0 && meta === 0) {
-      return { label: 'CUMPLE', color: '#16a34a' };
-    }
-    if (isNaN(valor) || isNaN(meta)) {
-      return { label: 'SIN DATOS', color: '#6b7280' };
-    }
-    if (valor > meta) {
-      return { label: 'EXCEDE', color: '#dc2626' };
-    }
-    if (valor === meta) {
-      return { label: 'CUMPLE', color: '#16a34a' };
-    }
-    if (valor === 0) {
-      return { label: 'SIN AT', color: '#16a34a' };
-    }
-    return { label: 'CUMPLE', color: '#16a34a' };
+    var C = palette();
+    if (valor === 0 && meta === 0) return { label: 'CUMPLE', color: C.success };
+    if (isNaN(valor) || isNaN(meta)) return { label: 'SIN DATOS', color: C.textMuted };
+    if (valor > meta) return { label: 'EXCEDE', color: C.danger };
+    if (valor === meta) return { label: 'CUMPLE', color: C.success };
+    if (valor === 0) return { label: 'SIN AT', color: C.success };
+    return { label: 'CUMPLE', color: C.success };
   }
 
   function getValueColor(valor, meta) {
     valor = toNum(valor);
     meta = toNum(meta);
-
-    if (valor > meta && meta > 0) return '#dc2626';
-    if (valor === 0) return '#16a34a';
-    return '#2563eb';
+    var C = palette();
+    if (valor > meta && meta > 0) return C.danger;
+    if (valor === 0) return C.success;
+    return C.primary;
   }
 
   // ==================== CHART ====================
@@ -139,12 +137,14 @@ function updateHeaderContext() {
 
     // Gradientes para barras (rojo mortal / verde sin mortalidad)
     var chartHeight = ctx.height || 300;
+    var C = palette();
+    var isDark = (document.documentElement.getAttribute('data-theme') || '').indexOf('dark') === 0;
     var gradRed = ctx2d.createLinearGradient(0, 0, 0, chartHeight);
-    gradRed.addColorStop(0, '#f87171');
-    gradRed.addColorStop(1, '#dc2626');
+    gradRed.addColorStop(0, isDark ? '#f0a0a0' : '#f87171');
+    gradRed.addColorStop(1, isDark ? '#e56a76' : '#dc2626');
     var gradGreen = ctx2d.createLinearGradient(0, 0, 0, chartHeight);
-    gradGreen.addColorStop(0, '#4ade80');
-    gradGreen.addColorStop(1, '#16a34a');
+    gradGreen.addColorStop(0, isDark ? '#7ee8b8' : '#4ade80');
+    gradGreen.addColorStop(1, isDark ? '#3ecf9a' : '#1bb888');
 
     var colores = valores.map(function(v) {
       return toNum(v) > 0 ? gradRed : gradGreen;
@@ -160,9 +160,9 @@ function updateHeaderContext() {
         var area = chart.chartArea;
         var c = chart.ctx;
         c.save();
-        c.fillStyle = 'rgba(22, 163, 74, 0.04)';
+        c.fillStyle = isDark ? 'rgba(62,207,154,0.06)' : 'rgba(27,184,136,0.04)';
         c.fillRect(area.left, metaY, area.width, area.bottom - metaY);
-        c.fillStyle = 'rgba(220, 38, 38, 0.04)';
+        c.fillStyle = isDark ? 'rgba(229,106,118,0.06)' : 'rgba(218,85,99,0.04)';
         c.fillRect(area.left, area.top, area.width, metaY - area.top);
         c.restore();
       }
@@ -178,7 +178,7 @@ function updateHeaderContext() {
           var val = chart.data.datasets[0].data[i];
           if (val > 0) {
             c.save();
-            c.fillStyle = '#374151';
+            c.fillStyle = C.text;
             c.font = 'bold 10px sans-serif';
             c.textAlign = 'center';
             c.fillText(val.toFixed(1) + '%', bar.x, bar.y - 6);
@@ -197,14 +197,14 @@ function updateHeaderContext() {
         var y = yScale.getPixelForValue(proporcionAnual);
         var c = chart.ctx;
         c.save();
-        c.strokeStyle = '#7c3aed';
+        c.strokeStyle = isDark ? '#c4a0fa' : '#7c3aed';
         c.setLineDash([8, 4]);
         c.lineWidth = 2;
         c.beginPath();
         c.moveTo(chart.chartArea.left, y);
         c.lineTo(chart.chartArea.right, y);
         c.stroke();
-        c.fillStyle = '#7c3aed';
+        c.fillStyle = isDark ? '#c4a0fa' : '#7c3aed';
         c.font = 'bold 11px sans-serif';
         c.fillText('Anual: ' + proporcionAnual + '%', chart.chartArea.right - 95, y - 6);
         c.restore();
@@ -220,14 +220,14 @@ function updateHeaderContext() {
         var y = yScale.getPixelForValue(meta);
         var c = chart.ctx;
         c.save();
-        c.strokeStyle = '#2563eb';
+        c.strokeStyle = isDark ? '#8fbfff' : '#2563eb';
         c.setLineDash([6, 4]);
         c.lineWidth = 2;
         c.beginPath();
         c.moveTo(chart.chartArea.left, y);
         c.lineTo(chart.chartArea.right, y);
         c.stroke();
-        c.fillStyle = '#2563eb';
+        c.fillStyle = isDark ? '#8fbfff' : '#2563eb';
         c.font = 'bold 11px sans-serif';
         c.fillText('Meta: ' + meta + '%', chart.chartArea.right - 85, y - 6);
         c.restore();
@@ -238,6 +238,10 @@ function updateHeaderContext() {
 
     // Intentar cargar Chart.js dinámicamente
     if (typeof Chart !== 'undefined') {
+      Chart.defaults.color = isDark ? '#98a6bf' : C.textSec;
+      Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(20,33,61,0.08)';
+      Chart.defaults.font.family = "'DM Sans', system-ui, -apple-system, sans-serif";
+
       chartInstance = new Chart(ctx2d, {
         type: 'bar',
         data: {
@@ -267,10 +271,10 @@ function updateHeaderContext() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#fff',
-              titleColor: '#111827',
-              bodyColor: '#374151',
-              borderColor: '#e5e7eb',
+              backgroundColor: C.card,
+              titleColor: C.text,
+              bodyColor: C.textSec,
+              borderColor: C.border,
               borderWidth: 1,
               cornerRadius: 6,
               padding: 10,
@@ -290,14 +294,14 @@ function updateHeaderContext() {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { font: { size: 11, weight: '500' }, color: '#6b7280' }
+              ticks: { font: { size: 11, weight: '500' }, color: C.textMuted }
             },
             y: {
               beginAtZero: true,
-              grid: { color: '#f3f4f6' },
+              grid: { color: C.borderLight },
               ticks: {
                 font: { size: 11 },
-                color: '#6b7280',
+                color: C.textMuted,
                 callback: function(v) { return v + '%'; },
                 padding: 6
               }
@@ -591,6 +595,7 @@ function renderizar() {
     var mortalMensual = indicadores.eventosMortalesMensual || [];
     var meta = toNum(indicadores.meta) || 0;
     var totalAT = toNum(indicadores.totalAT) || 0;
+    var C = palette();
 
     // Calcular métricas desde eventosMortalesMensual (fuente de verdad)
     var totalMortal = 0;
@@ -610,18 +615,18 @@ function renderizar() {
 
     if (kpiTotalAT) {
       kpiTotalAT.textContent = totalAT;
-      kpiTotalAT.style.color = '#2563eb';
+      kpiTotalAT.style.color = C.primary;
     }
     if (kpiEventos) {
       kpiEventos.textContent = totalMortal;
-      kpiEventos.style.color = totalMortal > 0 ? '#dc2626' : '#16a34a';
+      kpiEventos.style.color = totalMortal > 0 ? C.danger : C.success;
       kpiEventos.className = 'kair-kpi-value ' + (totalMortal > 0 ? 'danger' : 'success');
     }
     // Subtítulo del KPI: fuente de datos
     var kpiEventosSev = getElement('kpiEventosSev');
     if (kpiEventosSev) {
-      kpiEventosSev.textContent = 'Fuente: Severidad (días cargados = 6000)';
-      kpiEventosSev.style.color = '#6c757d';
+      kpiEventosSev.textContent = 'Fuente: Severidad (dias cargados = 6000)';
+      kpiEventosSev.style.color = C.textMuted;
     }
     if (kpiTasa) {
       kpiTasa.textContent = proporcion + '%';
@@ -638,9 +643,9 @@ function renderizar() {
     }
     if (promedioBadge) {
       promedioBadge.textContent = 'Proporción: ' + proporcion + '%';
-      var isOk = getValueColor(resultado, meta) !== '#dc2626';
-      promedioBadge.style.background = isOk ? '#dcfce7' : '#fee2e2';
-      promedioBadge.style.color = isOk ? '#16a34a' : '#dc2626';
+      var isOk = getValueColor(resultado, meta) !== C.danger;
+      promedioBadge.style.background = isOk ? C.successSoft : C.dangerSoft;
+      promedioBadge.style.color = isOk ? C.success : C.danger;
     }
 
     // Actualizar metodología
@@ -708,6 +713,7 @@ function renderizar() {
     var mortalMensual = indicadores.eventosMortalesMensual || [];
     var meta = toNum(indicadores.meta) || 0;
     var totalAT = toNum(indicadores.totalAT) || 0;
+    var C = palette();
 
     var html = '';
     var totalMortal = 0;
@@ -725,26 +731,25 @@ function renderizar() {
 
       html += '<tr' + rowClass + '>';
       html += '<td>' + row.mesLabel + '</td>';
-      html += '<td><span class="kair-cell-value" style="color:#2563eb;font-weight:600">' + toNum(row.totalATMes) + '</span></td>';
-      html += '<td><span class="kair-cell-value" style="color:' + (toNum(row.eventosMortales) > 0 ? '#dc2626' : '#16a34a') + ';font-weight:600">' + toNum(row.eventosMortales) + '</span></td>';
-      html += '<td><span style="color:' + (esMortal ? '#dc2626' : '#6c757d') + ';font-weight:' + (esMortal ? '700' : '400') + '">' + diasCargados + (esMortal ? ' <span class="kair-badge-mortal">MORTAL</span>' : '') + '</span></td>';
+      html += '<td><span style="color:' + C.primary + ';font-weight:600">' + toNum(row.totalATMes) + '</span></td>';
+      html += '<td><span style="color:' + (toNum(row.eventosMortales) > 0 ? C.danger : C.success) + ';font-weight:600">' + toNum(row.eventosMortales) + '</span></td>';
+      html += '<td><span style="color:' + (esMortal ? C.danger : C.textMuted) + ';font-weight:' + (esMortal ? '700' : '400') + '">' + diasCargados + (esMortal ? ' <span class="kair-badge-mortal">MORTAL</span>' : '') + '</span></td>';
       html += '<td style="font-weight:700;color:' + getValueColor(resultado, meta) + '">' + proporcion + '%</td>';
-      html += '<td style="color:#6c757d">' + meta + '</td>';
+      html += '<td style="color:' + C.textMuted + '">' + meta + '</td>';
       html += '<td><span class="kair-status-badge" style="background:' + estado.color + '">' + estado.label + '</span></td>';
       html += '</tr>';
     });
 
     tbody.innerHTML = html;
 
-    // Footer con totales acumulados
     if (tfoot) {
       var proporcionTotal = totalAT > 0 ? ((totalMortal / totalAT) * 100).toFixed(2) : '0.00';
       tfoot.innerHTML = '<tr class="kair-table-total">'
         + '<td>TOTAL</td>'
-        + '<td style="color:#2563eb;font-weight:700">' + totalAT + '</td>'
-        + '<td style="color:' + (totalMortal > 0 ? '#dc2626' : '#16a34a') + ';font-weight:700">' + totalMortal + '</td>'
-        + '<td style="color:#6c757d">—</td>'
-        + '<td style="color:#174ea6;font-weight:700">' + proporcionTotal + '%</td>'
+        + '<td style="color:' + C.primary + ';font-weight:700">' + totalAT + '</td>'
+        + '<td style="color:' + (totalMortal > 0 ? C.danger : C.success) + ';font-weight:700">' + totalMortal + '</td>'
+        + '<td style="color:' + C.textMuted + '">\u2014</td>'
+        + '<td style="color:' + C.primary + ';font-weight:700">' + proporcionTotal + '%</td>'
         + '<td>' + meta + '</td>'
         + '<td>-</td>'
         + '</tr>';
@@ -853,12 +858,14 @@ if (btnClone) {
 
   updateHeaderContext();
 
-  // Resize chart on window resize (maximize/restore)
-  window.addEventListener('resize', function() {
-    if (chartInstance) {
-      chartInstance.resize();
-    }
-  });
+  // Resize chart on window resize (single handler, no accumulation)
+  if (window.__mortResizeHandler) {
+    window.removeEventListener('resize', window.__mortResizeHandler);
+  }
+  window.__mortResizeHandler = function() {
+    if (chartInstance) chartInstance.resize();
+  };
+  window.addEventListener('resize', window.__mortResizeHandler);
 
   cargarDatos();
 }
