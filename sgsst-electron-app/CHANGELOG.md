@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.208] - 2026-09-19
 
-### 📦786 · Índice de Mortalidad (3.3.3) migrada al premium v2
+### 📦785 · Severidad de la Accidentalidad (3.3.2) migrada al premium v2
 
-Migración al dialecto premium v2 del submódulo 3.3.3 (`modules/gestion-salud/indice-mortalidad/`), con Header System v2, tokens propios scoped, tabla blindada, Chart.js theme-aware y resize handler con cleanup.
+Migración al dialecto premium v2 del submódulo 3.3.2 (`modules/gestion-salud/severidad-accidentalidad/`), con Header System v2, tokens propios scoped, tabla blindada, gráfico SVG theme-aware y wrapper en paralelo en maximizada.
 
 #### Cambios
 
@@ -24,6 +24,41 @@ Migración al dialecto premium v2 del submódulo 3.3.3 (`modules/gestion-salud/i
 - **renderer.js parcheado**: TOKEN + cache-bust en 2 niveles (index.html → renderer.js, renderer.js → CSS/HTML/JS del módulo) + sanitizar `<link>` CDN inyectados con `innerHTML`.
 - **Test 21/21 OK**.
 - **EOL normalizado a LF** (el directorio era `i/lf w/crlf`).
+
+---
+
+### 📦786 · Índice de Mortalidad (3.3.3) migrada al premium v2
+
+Migración al dialecto premium v2 del submódulo 3.3.3 (`modules/gestion-salud/indice-mortalidad/`), con Header System v2, tokens propios scoped, tabla blindada, Chart.js theme-aware y resize handler con cleanup.
+
+#### Cambios
+
+- **Header System v2** con breadcrumb + icon chip + título Manrope 800 + subtítulo + acciones, transparente sobre el canvas.
+- **Tokens propios `--mort-*` scoped** bajo `.indice-mortalidad-container`: se eliminó el `:root` + `*` + `body` GLOBALES que pisaban tokens y márgenes de TODA la app. Selectores scopados.
+- **Modo oscuro en los DOS atributos** (`data-theme="dark"` + `data-theme="dark-legacy"` con selector `[data-theme^="dark"]`).
+- **Tabla con blindaje anti-fugas**: `min-width: 0 !important` + `max-width: 100% !important` + `table-layout: fixed` con 7 anchos fijos que suman exactamente 100% (Mes/Total AT/AT Mortales/Días Cargados/Proporción/Meta/Estado = 12/12/14/14/16/10/22%).
+- **Chart.js theme-aware**: gradientes claro/oscuro, `Chart.defaults` (color, borderColor, font) y los plugins (metaZone, barLabels, anualLine, metaLine) leyendo la paleta con `tok()`/`palette()`.
+- **`tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla** (se relee la paleta en cada render, así sigue el tema).
+- **Resize handler con cleanup**: un solo `window.__mortResizeHandler` con `removeEventListener` del anterior (reabrir el módulo no acumula listeners).
+- **Código muerto eliminado**: `escapeHtml()`.
+- **renderer.js parcheado**: TOKEN + cache-bust en 2 niveles (index.html → renderer.js, renderer.js → CSS/HTML/JS del módulo) + sanitizar `<link>` CDN inyectados con `innerHTML`.
+- **Test 38/38 OK**.
+- **EOL normalizado a LF** (el directorio era `i/lf w/crlf`).
+
+---
+
+### 📦786-fix · Índice de Mortalidad (3.3.3) — gráfico y tabla en paralelo en maximizada
+
+El gráfico y la tabla ahora se muestran **lado a lado en maximizada**, igual que Frecuencia de la Accidentalidad (3.3.1) y Severidad de la Accidentalidad (3.3.2). En ventana normal siguen uno debajo del otro.
+
+#### Cambios
+
+- **HTML**: `#chartSection` + `#tableSection` envueltos en `<div class="mort-duo">`.
+- **CSS**: `.mort-duo` con `grid-template-columns: 1fr` por defecto y `minmax(0,1fr) minmax(0,1fr)` en `@media (min-width: 1360px)`; las 2 tarjetas pasan a `display:flex; flex-direction:column` para estirarse al MISMO alto (el de la tabla) y `.kair-chart-container { flex:1; min-height:0 }` para que el canvas (Chart.js `responsive:true` + `maintainAspectRatio:false`) ocupe el espacio libre sin deformarse.
+- **JS**: `chartSection/tableSection.style.display = ''` en vez de `'block'` — el **estilo en línea le ganaba al `display:flex`** de la media query, así que había que quitar la propiedad para que el CSS decida el display.
+- **Cache-bust en 2 niveles**: `MORT-20260919-v2-duo` (renderer.js → módulo) + `renderer.js?v=20260919-mortalidad-duo` (index.html → renderer.js).
+- **Test 46/46 OK** (8 checks nuevos: wrapper del duo, grid 1/2 columnas, tarjetas flex, chart container `flex:1` y que el JS no fije display en línea).
+- **Medido con arnés real de Electron**: maximizada (inner 1904) → `cols 690px 690px`, chart y table 580×580, lado a lado, sin desborde; ventana normal (inner 1184) → `cols 1113px` (1 columna), apiladas, sin desborde.
 
 ---
 

@@ -52,16 +52,26 @@ ok('JS: resize handler stored', /__mortResizeHandler/.test(js));
 ok('JS: removeEventListener pattern', /removeEventListener.*__mortResizeHandler/.test(js));
 ok('JS: palette() in renderizar', /function renderizar[\s\S]*?var C = palette\(\)/.test(js));
 ok('JS: palette() in renderizarTabla', /function renderizarTabla[\s\S]*?var C = palette\(\)/.test(js));
+ok('JS: chart/table sin display inline (para el duo)', /chartSection\.style\.display = ''/.test(js) && /tableSection\.style\.display = ''/.test(js));
+
+// DUO — gráfico + tabla en paralelo (maximizada)
+ok('HTML: wrapper .mort-duo existe', /<div class="mort-duo">/.test(html));
+ok('HTML: cierra .mort-duo', /\/mort-duo/.test(html));
+ok('HTML: chart y table dentro del duo', /<div class="mort-duo">[\s\S]*kair-chart-section[\s\S]*kair-table-section[\s\S]*<\/div>/.test(html));
+ok('CSS: .mort-duo grid 1 columna base', /\.mort-duo\s*\{[\s\S]*?grid-template-columns:\s*1fr;/.test(css));
+ok('CSS: .mort-duo 2 columnas en maximizada', /@media \(min-width:\s*1360px\)[\s\S]*?\.mort-duo\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(0,\s*1fr\)/.test(css));
+ok('CSS: .mort-duo estira tarjetas en flex', /\.mort-duo > \.kair-chart-section,[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column/.test(css));
+ok('CSS: chart container flex:1 en el duo', /\.mort-duo > \.kair-chart-section \.kair-chart-container\s*\{[\s\S]*?flex:\s*1;[\s\S]*?min-height:\s*0;/.test(css));
 
 // renderer.js
-ok('renderer: TOKEN = MORT-20260919-v1-premium', /const TOKEN = 'MORT-20260919-v1-premium'/.test(renderer));
+ok('renderer: TOKEN = MORT-20260919-v2-duo', /const TOKEN = 'MORT-20260919-v2-duo'/.test(renderer));
 ok('renderer: CSS uses TOKEN', /indice-mortalidad\.css\?v=\$\{TOKEN\}/.test(renderer));
 ok('renderer: JS uses TOKEN', /indice-mortalidad\.js\?v=.*TOKEN/.test(renderer));
 ok('renderer: sanitize link CDN', renderer.indexOf('html.replace') !== -1 && renderer.indexOf('https:') !== -1);
 ok('renderer: console.log removed', !/console\.log.*IndiceMortalidad.*INICIADO/.test(renderer));
 
 // index.html
-ok('index: renderer.js bumped', /renderer\.js\?v=20260919-mortalidad-premium/.test(index));
+ok('index: renderer.js bumped', /renderer\.js\?v=20260919-mortalidad-duo/.test(index));
 
 // Report
 var failed = 0;

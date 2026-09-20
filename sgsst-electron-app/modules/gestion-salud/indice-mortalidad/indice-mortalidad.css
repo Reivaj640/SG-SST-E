@@ -341,6 +341,37 @@ Scope: .indice-mortalidad-container
 }
 
 /* =========================================
+6b. DUO — GRÁFICO + TABLA EN PARALELO
+   En maximizada el gráfico y la tabla se muestran lado a lado para aprovechar
+   el ancho; en ventanas normales van uno debajo del otro. */
+.indice-mortalidad-container .mort-duo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+.indice-mortalidad-container .mort-duo > .kair-chart-section,
+.indice-mortalidad-container .mort-duo > .kair-table-section {
+  margin-bottom: 0;
+}
+@media (min-width: 1360px) {
+  .indice-mortalidad-container .mort-duo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  /* Las 2 tarjetas se estiran al MISMO alto (el de la tabla) y el gráfico
+     (Chart.js responsive) ocupa el espacio libre sin deformarse. */
+  .indice-mortalidad-container .mort-duo > .kair-chart-section,
+  .indice-mortalidad-container .mort-duo > .kair-table-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .indice-mortalidad-container .mort-duo > .kair-chart-section .kair-chart-container {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+/* =========================================
 7. CHART SECTION
 ========================================= */
 .indice-mortalidad-container .kair-chart-section {

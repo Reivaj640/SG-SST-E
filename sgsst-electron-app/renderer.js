@@ -6248,7 +6248,7 @@ function showSeveridadAccidentalidadContent(container, currentCompany, moduleNam
 }
 
 function showIndiceMortalidadContent(container, currentCompany, moduleName, submoduleName) {
-  const TOKEN = 'MORT-20260919-v1-premium';
+  const TOKEN = 'MORT-20260919-v2-duo';
   const BASE = './modules/gestion-salud/indice-mortalidad/';
 
   // Cargar CSS si no está cargado

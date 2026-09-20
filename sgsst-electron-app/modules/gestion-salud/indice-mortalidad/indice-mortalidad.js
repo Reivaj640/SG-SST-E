@@ -663,8 +663,10 @@ function renderizar() {
 
     if (kpiSection) kpiSection.style.display = 'grid';
     if (metaSection) metaSection.style.display = 'flex';
-    if (chartSection) chartSection.style.display = 'block';
-    if (tableSection) tableSection.style.display = 'block';
+    // '' (no 'block'): deja que el CSS decida el display para que en maximizada
+    // el .mort-duo pueda ponerlas en flex (2 columnas) sin que el estilo en linea lo pise.
+    if (chartSection) chartSection.style.display = '';
+    if (tableSection) tableSection.style.display = '';
     if (methodologySection) methodologySection.style.display = 'block';
 
     // Renderizar tabla (con try-catch para no bloquear el resto)
