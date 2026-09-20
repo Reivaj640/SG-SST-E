@@ -6436,7 +6436,48 @@ box-shadow: var(--box-shadow) !important;
    con top/left calculados del rect del badge). La flecha indica el origen
    apuntando al badge. NO usa backdrop — el resto de la app sigue
    interactuable. Cierra con click fuera, ESC, o el botón X. */
+/* ── Tokens premium del popover de alertas (scoped) ─────────────────────── */
+.kair-alerts-panel,
+.kair-alerts-popover {
+  --ka-primary: #2057b8;
+  --ka-primary-soft: #eaf1fb;
+  --ka-primary-hover: #1a4a9e;
+  --ka-ink: #14213d;
+  --ka-muted: #748096;
+  --ka-faint: #aab1bd;
+  --ka-line: #e8ebee;
+  --ka-soft: #f3f6f6;
+  --ka-card: #ffffff;
+  --ka-canvas: #fbfcfb;
+  --ka-danger: #da5563;
+  --ka-mint: #1bb888;
+  --ka-amber: #e7a224;
+  --ka-radius-card: 20px;
+  --ka-radius-control: 12px;
+  --ka-shadow: 0 8px 24px rgba(37,56,82,.12), 0 2px 6px rgba(37,56,82,.06);
+  --ka-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --ka-font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
+}
+
+[data-theme^="dark"] .kair-alerts-panel,
+[data-theme^="dark"] .kair-alerts-popover {
+  --ka-primary: #6ea8fe;
+  --ka-primary-soft: rgba(110,168,254,0.12);
+  --ka-primary-hover: #8fbfff;
+  --ka-ink: #E8EDF5;
+  --ka-muted: #98a6bf;
+  --ka-faint: #6b7a90;
+  --ka-line: #2a3446;
+  --ka-soft: #1e2738;
+  --ka-card: #1a2334;
+  --ka-canvas: #0f172a;
+  --ka-danger: #e56a76;
+  --ka-mint: #3ecf9a;
+  --ka-amber: #f0b45a;
+  --ka-shadow: 0 8px 24px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+}
 .kair-alerts-panel {
+  font-family: var(--ka-font);
   position: fixed;
   z-index: 1090;
   opacity: 0;
@@ -6464,34 +6505,35 @@ box-shadow: var(--box-shadow) !important;
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 8px solid #fff;
+  border-bottom: 8px solid var(--ka-card);
   filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, 0.08));
   /* left se setea via JS para apuntar al centro del badge */
 }
 
 [data-theme="dark"] .kair-alerts-panel__arrow,
 [data-theme="dark-legacy"] .kair-alerts-panel__arrow {
-  border-bottom-color: #1f2937;
+  border-bottom-color: var(--ka-card);
 }
 
 .kair-alerts-panel--above .kair-alerts-panel__arrow {
   top: auto;
   bottom: -8px;
   border-bottom: none;
-  border-top: 8px solid #fff;
+  border-top: 8px solid var(--ka-card);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
 }
 
 [data-theme="dark"] .kair-alerts-panel--above .kair-alerts-panel__arrow,
 [data-theme="dark-legacy"] .kair-alerts-panel--above .kair-alerts-panel__arrow {
-  border-top-color: #1f2937;
+  border-top-color: var(--ka-card);
 }
 
 /* Contenedor interno del panel (la "tarjeta" blanca) */
 .kair-alerts-popover {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  font-family: var(--ka-font);
+  background: var(--ka-card);
+  border-radius: var(--ka-radius-card);
+  box-shadow: var(--ka-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -6500,8 +6542,8 @@ box-shadow: var(--box-shadow) !important;
 
 [data-theme="dark"] .kair-alerts-popover,
 [data-theme="dark-legacy"] .kair-alerts-popover {
-  background: #1f2937;
-  color: #e5e7eb;
+  background: var(--ka-card);
+  color: var(--ka-line);
 }
 
 .kair-alerts-popover__head {
@@ -6509,47 +6551,48 @@ box-shadow: var(--box-shadow) !important;
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border-bottom: 1px solid var(--ka-line);
+  background: var(--ka-soft);
 }
 
 [data-theme="dark"] .kair-alerts-popover__head,
 [data-theme="dark-legacy"] .kair-alerts-popover__head {
-  background: #111827;
-  border-bottom-color: #374151;
+  background: var(--ka-soft);
+  border-bottom-color: var(--ka-line);
 }
 
 .kair-alerts-popover__title-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #174ea6;
+  color: var(--ka-primary);
 }
 
 [data-theme="dark"] .kair-alerts-popover__title-wrap,
 [data-theme="dark-legacy"] .kair-alerts-popover__title-wrap {
-  color: #60a5fa;
+  color: var(--ka-primary);
 }
 
 .kair-alerts-popover__title {
+  font-family: var(--ka-font-display);
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: var(--ka-ink);
 }
 
 [data-theme="dark"] .kair-alerts-popover__title,
 [data-theme="dark-legacy"] .kair-alerts-popover__title {
-  color: #f3f4f6;
+  color: var(--ka-ink);
 }
 
 .kair-alerts-popover__count {
-  background: #dc3545;
-  color: #fff;
+  background: var(--ka-danger);
+  color: var(--ka-card);
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--ka-radius-card);
   min-width: 22px;
   text-align: center;
 }
@@ -6558,23 +6601,23 @@ box-shadow: var(--box-shadow) !important;
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--ka-muted);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--ka-radius-control);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .kair-alerts-popover__close:hover {
-  background: #e5e7eb;
-  color: #111827;
+  background: var(--ka-line);
+  color: var(--ka-ink);
 }
 
 [data-theme="dark"] .kair-alerts-popover__close:hover,
 [data-theme="dark-legacy"] .kair-alerts-popover__close:hover {
-  background: #374151;
-  color: #f3f4f6;
+  background: var(--ka-line);
+  color: var(--ka-ink);
 }
 
 .kair-alerts-popover__body {
@@ -6585,26 +6628,26 @@ box-shadow: var(--box-shadow) !important;
 
 .kair-alerts-popover__foot {
   padding: 10px 16px;
-  border-top: 1px solid #e5e7eb;
-  background: #f8fafc;
+  border-top: 1px solid var(--ka-line);
+  background: var(--ka-soft);
   display: flex;
   justify-content: center;
 }
 
 [data-theme="dark"] .kair-alerts-popover__foot,
 [data-theme="dark-legacy"] .kair-alerts-popover__foot {
-  background: #111827;
-  border-top-color: #374151;
+  background: var(--ka-soft);
+  border-top-color: var(--ka-line);
 }
 
 .kair-alerts-popover__calendar-link {
   background: transparent;
-  border: 1px solid #d1d5db;
-  color: #174ea6;
+  border: 1px solid var(--ka-line);
+  color: var(--ka-primary);
   font-size: 12px;
   font-weight: 600;
   padding: 7px 14px;
-  border-radius: 6px;
+  border-radius: var(--ka-radius-control);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -6613,20 +6656,20 @@ box-shadow: var(--box-shadow) !important;
 }
 
 .kair-alerts-popover__calendar-link:hover {
-  background: #eff6ff;
-  border-color: #174ea6;
+  background: var(--ka-primary-soft);
+  border-color: var(--ka-primary);
 }
 
 [data-theme="dark"] .kair-alerts-popover__calendar-link,
 [data-theme="dark-legacy"] .kair-alerts-popover__calendar-link {
-  border-color: #4b5563;
-  color: #60a5fa;
+  border-color: var(--ka-line);
+  color: var(--ka-primary);
 }
 
 [data-theme="dark"] .kair-alerts-popover__calendar-link:hover,
 [data-theme="dark-legacy"] .kair-alerts-popover__calendar-link:hover {
-  background: #1e3a8a;
-  border-color: #60a5fa;
+  background: var(--ka-primary-soft);
+  border-color: var(--ka-primary);
 }
 
 /* Lista de items */
@@ -6640,22 +6683,22 @@ box-shadow: var(--box-shadow) !important;
   flex-direction: column;
   gap: 6px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--ka-soft);
   transition: background-color 0.15s;
 }
 
 .kair-alerts-item:hover {
-  background: #f8fafc;
+  background: var(--ka-soft);
 }
 
 [data-theme="dark"] .kair-alerts-item,
 [data-theme="dark-legacy"] .kair-alerts-item {
-  border-bottom-color: #374151;
+  border-bottom-color: var(--ka-line);
 }
 
 [data-theme="dark"] .kair-alerts-item:hover,
 [data-theme="dark-legacy"] .kair-alerts-item:hover {
-  background: #111827;
+  background: var(--ka-soft);
 }
 
 .kair-alerts-item__head {
@@ -6674,7 +6717,7 @@ box-shadow: var(--box-shadow) !important;
 
 .kair-alerts-item__type {
   font-weight: 600;
-  color: #475569;
+  color: var(--ka-muted);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   font-size: 10px;
@@ -6682,36 +6725,37 @@ box-shadow: var(--box-shadow) !important;
 
 [data-theme="dark"] .kair-alerts-item__type,
 [data-theme="dark-legacy"] .kair-alerts-item__type {
-  color: #94a3b8;
+  color: var(--ka-faint);
 }
 
 .kair-alerts-item__rel {
   margin-left: auto;
-  color: #dc3545;
+  color: var(--ka-danger);
   font-weight: 600;
   font-size: 11px;
 }
 
 .kair-alerts-item__title {
+  font-family: var(--ka-font);
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--ka-ink);
   line-height: 1.3;
 }
 
 [data-theme="dark"] .kair-alerts-item__title,
 [data-theme="dark-legacy"] .kair-alerts-item__title {
-  color: #f3f4f6;
+  color: var(--ka-ink);
 }
 
 .kair-alerts-item__meta {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--ka-muted);
 }
 
 [data-theme="dark"] .kair-alerts-item__meta,
 [data-theme="dark-legacy"] .kair-alerts-item__meta {
-  color: #9ca3af;
+  color: var(--ka-faint);
 }
 
 .kair-alerts-item__actions {
@@ -6721,11 +6765,11 @@ box-shadow: var(--box-shadow) !important;
 }
 
 .kair-alerts-item__btn {
-  background: #174ea6;
-  color: #fff;
+  background: var(--ka-primary);
+  color: var(--ka-card);
   border: none;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--ka-radius-control);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -6736,34 +6780,34 @@ box-shadow: var(--box-shadow) !important;
 }
 
 .kair-alerts-item__btn:hover {
-  background: #0d3a82;
+  background: var(--ka-primary-hover);
 }
 
 .kair-alerts-item__btn[data-kair-alerts-action="open"]:has(svg path[d^="M20 6"]) {
-  background: #28a745;
+  background: var(--ka-mint);
 }
 
 .kair-alerts-item__btn[data-kair-alerts-action="open"]:has(svg path[d^="M20 6"]):hover {
-  background: #1e7e34;
+  background: var(--ka-mint);
 }
 
 /* Empty state */
 .kair-alerts-empty {
   padding: 40px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--ka-muted);
 }
 
 .kair-alerts-empty__title {
   margin: 12px 0 4px;
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--ka-ink);
 }
 
 [data-theme="dark"] .kair-alerts-empty__title,
 [data-theme="dark-legacy"] .kair-alerts-empty__title {
-  color: #f3f4f6;
+  color: var(--ka-ink);
 }
 
 .kair-alerts-empty__desc {

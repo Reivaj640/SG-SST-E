@@ -191,6 +191,31 @@ Al reemplazar los `<i class="fas ...">` por `<svg>` inline, la regla que les dab
 
 ---
 
+### 📦792 · Popover "Pendientes" (KairAlerts) modernizado a premium v2
+
+El panel flotante que se abre con la campana (`shared/kair-alerts.js`) tenía su CSS en **`styles.css`** (bloque de 334 líneas). Estado: 28 colores hardcodeados (`#174ea6`, `#dc3545`, `#111827`, `#1f2937`…), **0 tokens canónicos**, radio 10px, sombras genéricas y sin las fuentes del sistema; sí tenía dark mode.
+
+#### Cambios
+
+- **Tokens locales `--ka-*`** scoped bajo `.kair-alerts-panel` / `.kair-alerts-popover`, mapeados a la paleta canónica + bloque `[data-theme^="dark"]` con los 15 tokens oscuros (cubre `dark` + `dark-legacy`).
+- **60 reemplazos** de colores hardcodeados → `var(--ka-*)`.
+- Radios 10px → **20px** (tarjeta) / 12px (controles); sombra del sistema.
+- Fuentes **DM Sans** (UI) + **Manrope** (título).
+
+#### Bug encontrado
+
+- 🚨 `#111827` se usaba para **dos cosas distintas**: fondo oscuro del header/footer **y** color de texto. Un único mapeo (`→ var(--ka-ink)`) dejó el header **claro en modo oscuro**. Se separó: fondo → `var(--ka-soft)`, texto → `var(--ka-ink)`.
+- **Regla**: antes de tokenizar por valor, verificar si ese hex se usa como superficie y como texto (mapear por **propiedad**, no solo por valor).
+- **Dato clave**: `shared/kair-design-tokens.css` **NO tiene variantes dark** (los `--kair-*` son solo claros), por eso el popover necesita sus propios tokens + bloque dark.
+
+#### Verificación
+
+- Arnés real de Electron en claro / `dark` / `dark-legacy`: fondo `#ffffff`/`#1a2334`, radio 20px, header `#f3f6f6`/`#1e2738`, título `#14213d`/`#e8edf5` en Manrope, `--ka-primary` `#2057b8`/`#6ea8fe`.
+- CSS balanceado (1407/1407), EOL LF.
+- Cache-bust de `styles.css` → `20260920-alerts-premium`.
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)
