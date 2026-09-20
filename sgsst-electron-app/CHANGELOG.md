@@ -89,6 +89,37 @@ Migración al dialecto premium v2 del submódulo 3.3.4 (`modules/gestion-salud/p
 
 ---
 
+### 📦788 · Incidencia de Enfermedad Laboral (3.3.5) migrada al premium v2
+
+Migración al dialecto premium v2 del submódulo 3.3.5 (`modules/gestion-salud/incidencia-enfermedad-laboral/`), con Header System v2, tokens propios scoped, tabla blindada, Chart.js theme-aware y gráfico + tabla en paralelo en maximizada.
+
+#### Cambios
+
+- **Módulo hermano de Prevalencia (3.3.4)**: los archivos originales eran **idénticos salvo renombres**, así que el CSS y el JS se **generaron desde los de Prevalencia ya migrados** con renombres controlados y el HTML se escribió a mano para conservar sus etiquetas propias.
+- 🚨 **La trampa del renombre masivo**: `casosEL` → `casosNuevosEL` tiene que ser **case-sensitive**; un `-replace` de PowerShell (case-insensitive por defecto) convierte también `totalCasosEL` en `totalcasosNuevosEL` y **rompe los totales**. Con `String.split().join()` de Node (case-sensitive) `totalCasosEL` no se toca (tiene `C` mayúscula).
+- **Header System v2** con breadcrumb + icon chip + título Manrope 800 + subtítulo + acciones, transparente sobre el canvas. **Iconos en SVG inline** (se quitó el CDN de Bootstrap Icons).
+- **Tokens propios `--inc-*` scoped** bajo `.incidencia-container`: se eliminó el `:root` + `*` + `body` GLOBALES.
+- **Modo oscuro en los DOS atributos** (`data-theme="dark"` + `data-theme="dark-legacy"` con selector `[data-theme^="dark"]`).
+- **Tabla con blindaje anti-fugas**: `min-width: 0 !important` + `max-width: 100% !important` + `table-layout: fixed` con **6 anchos fijos que suman exactamente 100%** (Mes 12 / Casos Nuevos EL 12 / Trabajadores 16 / Incidencia 28 / Meta 10 / Estado 22).
+- **Chart.js theme-aware**: gradientes claro/oscuro, los 4 plugins (metaZone, barLabels, promedioLine, metaLine) y `Chart.defaults` + tooltip y ejes leyendo la paleta con `tok()`/`palette()`.
+- **`tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla/renderFallbackChart**.
+- **Resize handler con cleanup**: un solo `window.__incResizeHandler` con `removeEventListener` del anterior.
+- **Gráfico y tabla en paralelo en maximizada** (`.inc-duo`). El JS pone `display = ''` (no `'block'`) para que el estilo en línea no pise el `display:flex` de la media query.
+- **Se agregaron a la hoja los estilos del error** (`.kair-error-icon`, `.kair-error-msg`, `.kair-retry-btn`) que el HTML usaba y la hoja vieja **no definía** (salían sin estilo).
+- **Se conservaron las diferencias reales de Incidencia**: KPI "CASOS NUEVOS EL (AÑO)", Meta "<5 (Coordinador SST)", el párrafo extra `<strong>Meta:</strong>` de la metodología, la interpretación con "nuevos casos" y el botón **Reintentar**.
+- **Código muerto eliminado**: `escapeHtml()` y 15 `console.log` de ruido (2 convertidos a `console.error`).
+- **renderer.js parcheado**: TOKEN + cache-bust en 2 niveles + sanitizar `<link>` CDN inyectados con `innerHTML`.
+- **Test 46/46 OK**.
+- **EOL normalizado a LF**.
+
+#### Verificación (arnés real de Electron)
+
+- Ventana normal (inner 1184) → `cols 1113px` (1 columna), apiladas, sin desborde, 0 recortes.
+- Maximizada (inner 1904) → `cols 690px 690px`, chart y table 619×619, lado a lado, **0 celdas recortadas**.
+- `dark` y `dark-legacy` → idénticos (`#0f172a` / `#1a2334` / `#e8edf5`).
+
+---
+
 ## [0.1.207] - 2026-09-19
 
 ### 🆕📦739-784 · Migración premium v2 de los submódulos (Inducciones → Frecuencia de la Accidentalidad)

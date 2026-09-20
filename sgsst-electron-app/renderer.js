@@ -6357,18 +6357,19 @@ function showPrevalenciaContent(container, currentCompany, moduleName, submodule
 }
 
 function showIncidenciaContent(container, currentCompany, moduleName, submoduleName) {
-  console.log('[IncidenciaEL] showIncidenciaContent INICIADO');
-
+  const TOKEN = 'INC-20260919-v1-premium';
   const BASE = './modules/gestion-salud/incidencia-enfermedad-laboral/';
 
-  if (!document.querySelector(`link[href="${BASE}incidencia-enfermedad-laboral.css"]`)) {
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}incidencia-enfermedad-laboral.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');
     cssLink.rel = 'stylesheet';
-    cssLink.href = BASE + 'incidencia-enfermedad-laboral.css';
+    cssLink.href = BASE + 'incidencia-enfermedad-laboral.css?v=' + TOKEN;
     document.head.appendChild(cssLink);
   }
 
-  const htmlUrl = BASE + 'incidencia-enfermedad-laboral.html';
+  // Cargar HTML y luego el script
+  const htmlUrl = BASE + 'incidencia-enfermedad-laboral.html?v=' + TOKEN;
 
   fetch(htmlUrl)
     .then(r => {
@@ -6376,8 +6377,11 @@ function showIncidenciaContent(container, currentCompany, moduleName, submoduleN
       return r.text();
     })
     .then(html => {
+      // Sanitize: remove external <link> tags (CDN)
+      var sanitized = html.replace(/<link[^>]*href=["']https?:\/\/[^"']*["'][^>]*>/gi, '');
+
       var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
+      var doc = parser.parseFromString(sanitized, 'text/html');
 
       var sourceBody = doc.body;
       var elements = sourceBody.children;
@@ -6385,17 +6389,18 @@ function showIncidenciaContent(container, currentCompany, moduleName, submoduleN
         container.appendChild(elements[0]);
       }
 
+      // Cargar Chart.js si no está disponible
       if (typeof Chart === 'undefined') {
         var chartScript = document.createElement('script');
         chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
         document.head.appendChild(chartScript);
       }
 
+      // Guardar empresa seleccionada para que el módulo la use
       localStorage.setItem('selectedCompany', currentCompany);
 
-      var ts = Date.now();
-      var scriptUrl = BASE + 'incidencia-enfermedad-laboral.js?_t=' + ts;
-
+      // Cargar el script del módulo con TOKEN (cache-bust de 2 niveles)
+      var scriptUrl = BASE + 'incidencia-enfermedad-laboral.js?v=' + TOKEN;
       var s = document.createElement('script');
       s.src = scriptUrl;
       document.body.appendChild(s);
