@@ -4014,3 +4014,26 @@ duplicada sin versión (`mantenimiento-component.js`) y tipografía Manrope/DM S
 Cache-bust `GESTION-PELIGROS-20260921-fix-home-datos`. REGLA: cuando una vista compuesta lee de varios
 puentes, verificar el nombre exacto de cada campo en el puente (no asumir) y confirmar que el resultado
 termina asignado en el estado que la vista realmente lee.
+
+### 📦800 — Auditoría Anual (6.1.2): botón "Nueva auditoría" abría un modal sin estilo
+
+El botón "Nueva auditoría" (hub y lista) no mostraba el formulario. Dos fallos:
+
+1. **Cero CSS para el modal**: `.kair-aud-modal`, `__backdrop/panel/head/body/foot/close/error`,
+   `.kair-aud-form-row`, `.kair-aud-btn*`, confirm y toast fallback **no tenían ninguna regla** en
+   `auditoria-anual.css`. Sin `display:none` base ni `--open { display:flex }`, el modal quedaba
+   como bloque visible al final del body (o invisible según el cascade), y los `--v3-*` no
+   resolvían porque el nodo vive en `<body>`, fuera de `.kair-v3-module`.
+2. **Vista de lista con placeholder**: el handler de `[data-action="new-audit"]` solo mostraba
+   "En la versión enterprise…"; la fachada `openAuditoriaForm` fallaba en silencio si
+   `__kairAudInstance` era null. Además el guard `_clickBound` del hub impedía re-bindear tras
+   destroy+re-render → al re-entrar al módulo el botón del hub dejaba de funcionar.
+
+**Fix**: +432 líneas de CSS (modal/confirm/toast con tokens `--aud-*` declarados EN el modal +
+dark con `[data-theme^="dark"]`), `console.warn` en la fachada, handler real en la lista,
+bind en cada render del hub (sin `_clickBound`), cache-bust `AUD-20260921-modal-css` en 3 niveles
+(index.html + loadCss CSS + loadScript list-view), EOL normalizado a LF. `node --check` OK.
+
+**Regla**: un modal montado en `<body>` necesita sus propios tokens (no hereda los del scope del
+módulo) y su propia regla `display:none` + estado abierto; verificar que toda clase generada por
+el JS tenga regla en la hoja.

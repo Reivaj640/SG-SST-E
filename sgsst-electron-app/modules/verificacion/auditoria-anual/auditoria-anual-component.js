@@ -46,8 +46,8 @@ AuditoriaAnualComponent.prototype._loadCSS = function (callback) {
     document.head.appendChild(s);
   }
 
-  /* Cascada: CSS único + design system + 6 vistas v3 */
-  loadCss('modules/verificacion/auditoria-anual/auditoria-anual.css', function () {
+  /* Cascada: CSS único + design system + 6 vistas v3 (cache-bust AUD-20260921-modal-css) */
+  loadCss('modules/verificacion/auditoria-anual/auditoria-anual.css?v=AUD-20260921-modal-css', function () {
     loadScript('modules/verificacion/auditoria-anual/kair-icons.js', function () {
       loadScript('modules/verificacion/auditoria-anual/kair-ui.js', function () {
         loadScript('modules/verificacion/auditoria-anual/kair-types.js', function () {
@@ -56,7 +56,7 @@ AuditoriaAnualComponent.prototype._loadCSS = function (callback) {
               loadScript('modules/verificacion/auditoria-anual/kair-store.js', function () {
                 loadScript('modules/verificacion/auditoria-anual/kair-store-bridge.js', function () {
                   loadScript('modules/verificacion/auditoria-anual/auditoria-hub-view.js', function () {
-                    loadScript('modules/verificacion/auditoria-anual/auditoria-list-view.js', function () {
+                    loadScript('modules/verificacion/auditoria-anual/auditoria-list-view.js?v=AUD-20260921-modal-css', function () {
                       loadScript('modules/verificacion/auditoria-anual/auditoria-editor-view.js', function () {
                         loadScript('modules/verificacion/auditoria-anual/auditoria-cronograma-view.js', function () {
                           loadScript('modules/verificacion/auditoria-anual/auditoria-hallazgos-view.js', function () {
@@ -999,7 +999,14 @@ AuditoriaAnualComponent.prototype._deleteHallazgo = function (id) {
 /* Helpers expuestos para que las vistas disparen el modal */
 window.kairAuditoriaAnual = {
   openAuditoriaForm: function (auditoria) {
-    if (window.__kairAudInstance) window.__kairAudInstance._openAuditoriaForm(auditoria);
+    if (window.__kairAudInstance) {
+      window.__kairAudInstance._openAuditoriaForm(auditoria);
+    } else {
+      console.warn('[K+AIRSST][6.1.2] openAuditoriaForm: instancia del componente no disponible (__kairAudInstance null)');
+      if (window.updateNotifier) {
+        window.updateNotifier.show({ type: 'warning', title: 'Nueva auditoría', subtitle: 'El módulo aún no terminó de cargar. Intenta de nuevo en unos segundos.' });
+      }
+    }
   },
   openHallazgoForm: function (hallazgo, defaultAuditoriaId) {
     if (window.__kairAudInstance) window.__kairAudInstance._openHallazgoForm(hallazgo, defaultAuditoriaId);

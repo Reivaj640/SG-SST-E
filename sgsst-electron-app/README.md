@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.211 (desarrollo) — último publicado v0.1.205
+**Versión:** 0.1.211 (desarrollo) — último publicado v0.1.205 · 📦800 fix botón Nueva auditoría (6.1.2)
 **Última actualización:** 21 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 

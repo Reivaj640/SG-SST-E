@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.211] - 2026-09-21
 
+### 📦800 · Auditoría Anual (6.1.2) — botón "Nueva auditoría" abría un modal sin estilo
+
+El botón "Nueva auditoría" (hub y lista) no mostraba el formulario: el modal existía en el DOM pero **tenía cero reglas CSS** (`.kair-aud-modal`, botones, filas del formulario, confirm y toast fallback no estaban en la hoja), y en la vista de lista el botón solo disparaba un placeholder ("versión enterprise").
+
+#### Cambios
+
+- **`auditoria-anual.css` +432 líneas**: estilos del modal (oculto por defecto, `--open` flex, backdrop, panel radio 20, formulario 2 columnas, botones ghost/primary), diálogo de confirmación y toast de respaldo. Los tokens `--aud-*` se declaran **sobre el propio modal** (vive en `<body>`, fuera de `.kair-v3-module` donde están los `--v3-*`) con la paleta canónica; modo oscuro con `[data-theme^="dark"]` (cubre `dark` y `dark-legacy`).
+- **Fachada `openAuditoriaForm`**: `console.warn` + aviso visible si `__kairAudInstance` es null (antes fallaba en silencio).
+- **`auditoria-list-view.js`**: el botón de la lista ahora abre el modal real (`window.kairAuditoriaAnual.openAuditoriaForm(null)`) en vez del placeholder.
+- **`auditoria-hub-view.js`**: el guard `_clickBound` impedía re-bindear tras destroy+re-render (botón dejaba de funcionar al re-entrar al módulo); se bindea en cada render (el handler ya tiene su propio guard `view !== 'hub'`). Se quitaron los `console.log` de debug.
+- **Cache-bust** `AUD-20260921-modal-css` en `index.html` (script del componente) + `loadCss` del CSS + `loadScript` de la vista de lista.
+- **EOL**: los 3 archivos del módulo normalizados a LF (el índice los tiene en LF; el working tree estaba en CRLF y el diff salía de miles de líneas).
+
 ### 📦799 · Home Gestión de Peligros y Riesgos — fix de datos reales en hero, tarjetas y gráficas
 
 El home premium (📦754) se veía todo en cero (hero "0% cumplimiento", INSPECCIONES 0/0, MANTENIMIENTO 0/0, PELIGROS 0/0, barras "Cumplimiento por área" en 0) aunque la empresa tuviera datos reales.

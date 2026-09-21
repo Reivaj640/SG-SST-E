@@ -325,12 +325,17 @@ var AuditoriaListView = (function () {
       });
     }
 
-    // Botón nueva auditoría
+    // Botón nueva auditoría → abre el modal real del componente (fachada window.kairAuditoriaAnual)
     var newBtn = container.querySelector('[data-action="new-audit"]');
     if (newBtn) {
       newBtn.addEventListener('click', function () {
-        if (window.updateNotifier) {
-          window.updateNotifier.show({ type: 'info', title: 'Nueva auditoría', subtitle: 'En la versión enterprise, este botón abre el formulario de nueva auditoría.' });
+        if (window.kairAuditoriaAnual && typeof window.kairAuditoriaAnual.openAuditoriaForm === 'function') {
+          window.kairAuditoriaAnual.openAuditoriaForm(null);
+        } else {
+          console.warn('[K+AIRSST][6.1.2] kairAuditoriaAnual.openAuditoriaForm no disponible');
+          if (window.updateNotifier) {
+            window.updateNotifier.show({ type: 'warning', title: 'Nueva auditoría', subtitle: 'El módulo aún no terminó de cargar. Intenta de nuevo en unos segundos.' });
+          }
         }
       });
     }
