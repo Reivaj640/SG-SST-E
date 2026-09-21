@@ -30,8 +30,33 @@ class MetodologiaIpevrComponent {
  return;
  }
 
+ // 📦608-fix13: el iframe pide abrir un archivo en el modal file-viewer del parent
+ if (event.data.type === 'open-file-viewer-modal' && event.data.filePath) {
+ if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+ window.kairFV.openWithFileViewerFromPath(event.data.filePath);
+ } else {
+ console.warn('[MetodologiaIpevrLogic] kairFV.openWithFileViewerFromPath no disponible');
+ }
+ return;
+ }
+
  if (event.data.type.endsWith('-request')) {
  const action = event.data.type.replace('-request', '');
+
+ // 📦608-fix15: para previews Office, el helper hace el switch a readFileBytes
+ // y ya postea la respuesta con `mode: 'file-viewer'`. No posteamos dos veces.
+ if (action === 'get-pdf-preview' || action === 'get-word-preview' || action === 'get-excel-preview') {
+ const apiName = action === 'get-pdf-preview' ? 'getPDFPreview'
+ : action === 'get-word-preview' ? 'getWordPreview'
+ : 'getExcelPreview';
+ if (window.KairDocPreview && typeof window.KairDocPreview.handleRequest === 'function') {
+ window.KairDocPreview.handleRequest(event, apiName);
+ } else {
+ // Fallback al flujo viejo si el helper no está cargado
+ this.handleStandardRequest(event, apiName);
+ }
+ return;
+ }
 
  switch (action) {
  case 'back-to-module':
@@ -42,15 +67,6 @@ class MetodologiaIpevrComponent {
  break;
  case 'get-documents-in-folder':
  this.handleStandardRequest(event, 'getDocumentsInFolder');
- break;
- case 'get-pdf-preview':
- this.handleStandardRequest(event, 'getPDFPreview');
- break;
- case 'get-word-preview':
- this.handleStandardRequest(event, 'getWordPreview');
- break;
- case 'get-excel-preview':
- this.handleStandardRequest(event, 'getExcelPreview');
  break;
  case 'download-document':
  this.handleStandardRequest(event, 'downloadDocument');

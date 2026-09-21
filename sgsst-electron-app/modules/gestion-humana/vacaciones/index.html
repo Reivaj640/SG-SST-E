@@ -1,0 +1,42 @@
+<!-- modules/gestion-humana/vacaciones/index.html
+     📦757 · Vista "Vacaciones" — Estilo demo Tempoactiva
+     Estructura:
+       - 4 KPIs (Pendientes, Aprobadas, Disfrutadas, Por Notificar a Cliente)
+       - Header sección + botones (Listado Mensual, Solicitar Vacaciones)
+       - Tabs: Todas (N) | Solicitada (N) | Aprobada (N) | Rechazada (N) | Disfrutada (N)
+       - Tabla con columnas: Trabajador, Cargo, Sede, Fecha Inicio, Fecha Fin, Días, Estado, Cliente, Acciones
+       - Info box "Flujo de Vacaciones"
+     IDs con prefijo `va-` para evitar colisiones. -->
+
+<div class="va-wrapper" id="va-wrapper">
+  <div class="va-kpi-section">
+    <div id="va-kpi-bar" class="va-kpi-bar"></div>
+  </div>
+
+  <div class="va-section-head">
+    <div class="va-section-head__text">
+      <h2 class="va-section-head__title">Gestión de Vacaciones</h2>
+      <p class="va-section-head__subtitle">Programación, aprobaciones y notificación a clientes</p>
+    </div>
+    <div class="va-section-head__actions">
+      <button id="va-listado-mes" class="va-btn va-btn--ghost" type="button">
+        <i class="fas fa-download"></i> Listado Mensual
+      </button>
+      <button id="va-solicitar" class="va-btn va-btn--primary" type="button">
+        <i class="fas fa-plus"></i> Solicitar Vacaciones
+      </button>
+    </div>
+  </div>
+
+  <div class="va-tabs" id="va-tabs"></div>
+  <div id="va-table-wrap" class="va-table-wrap"></div>
+
+  <div class="va-info-box">
+    <div class="va-info-box__icon"><i class="fas fa-info-circle"></i></div>
+    <div class="va-info-box__body">
+      <h4 class="va-info-box__title">Flujo de Vacaciones — TEMPOACTIVA</h4>
+      <p class="va-info-box__text">Mensualmente (ej: en julio se envían las de agosto), Recursos Humanos genera el listado de personal próximo a salir de vacaciones. Los jefes inmediatos (como Cabo Roberto en Turipaná) son quienes programan las vacaciones de su personal según la operación. Idealmente, debe notificarse a los clientes cuando un trabajador saldrá de vacaciones para que ellos resuelvan la cobertura.</p>
+      <p class="va-info-box__text">Usa el botón <strong>"Listado Mensual"</strong> para exportar el reporte del próximo mes (formato similar al que enviaba Lilimare por correo).</p>
+    </div>
+  </div>
+</div>

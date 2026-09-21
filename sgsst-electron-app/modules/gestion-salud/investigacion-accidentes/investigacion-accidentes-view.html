@@ -6,39 +6,50 @@
   <title>Investigación de Accidentes - K+AIR</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="investigacion-accidentes-view.css">
+  <link rel="stylesheet" href="investigacion-accidentes-view.css?v=INV-20260919-premium">
 </head>
 <body>
 
   <!-- ============================================================ -->
-  <!-- HEADER — Card Pattern (k-section-card)                      -->
+  <!-- 📦780 — HEADER SYSTEM v2 (premium)                          -->
   <!-- ============================================================ -->
-  <div class="k-section-card" style="padding:0; margin-bottom:0;">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <i class="fas fa-search-plus" style="color:#174ea6; font-size:1.25rem;"></i>
-        <div>
-          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Realizar Investigación</h3>
-          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.2 Nueva Investigación</p>
+  <header class="inv-header-v2">
+    <nav class="inv-breadcrumb" aria-label="Ruta de navegación">
+      <span>Gestión de la Salud</span>
+      <span class="inv-sep">›</span>
+      <span>3.2.2</span>
+      <span class="inv-sep">›</span>
+      <strong>Realizar Investigación</strong>
+    </nav>
+    <div class="inv-header-row">
+      <div class="inv-header-left">
+        <span class="inv-header-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>
+        </span>
+        <div class="inv-header-titles">
+          <h1 class="inv-title">Realizar Investigación</h1>
+          <p class="inv-sub">Gestión de la Salud — 3.2.2 Nueva Investigación</p>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <button class="header-action--ghost" id="downloadBtn" disabled title="Descargar informe">
-          <i class="fas fa-download"></i> Descargar
+      <div class="inv-header-actions">
+        <button class="inv-btn" id="downloadBtn" disabled title="Mostrar el informe generado en su carpeta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Visualizar</span>
         </button>
-        <button class="header-action--ghost" id="printBtn" disabled title="Imprimir informe">
-          <i class="fas fa-print"></i> Imprimir
+        <button class="inv-btn" id="printBtn" disabled title="Abrir el informe para imprimir (Ctrl+P)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Imprimir</span>
         </button>
-        <div class="k-section-card__divider"></div>
-        <button class="header-back-btn" id="backBtn" title="Volver al módulo anterior">
-          <i class="fas fa-arrow-left"></i> Volver
+        <button class="inv-btn inv-btn--primary" id="backBtn" title="Volver al módulo anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          <span>Volver</span>
         </button>
       </div>
     </div>
-  </div>
+  </header>
 
   <!-- ============================================================ -->
   <!-- MAIN WRAPPER — Vertical flow with sticky action bar         -->
@@ -163,6 +174,7 @@
         </div>
         <div class="inv-card-body">
           <textarea id="contextInput" class="inv-context-textarea" rows="3" placeholder="Agrega cualquier detalle adicional que no esté presente en el FURAT y que pueda ser relevante para el análisis de causa raíz..."></textarea>
+          <div id="contextHint" class="inv-context-hint">Mínimo 20 caracteres para que el análisis lo considere.</div>
         </div>
       </div>
 
@@ -183,6 +195,8 @@
               <i class="fas fa-check-circle"></i>
               <span id="analysisCompletionTime"></span>
             </span>
+            <!-- Badge de estado de revisión (reviewing / approved / dirty) -->
+            <span id="analysisReviewBadge" class="inv-review-badge hidden"></span>
           </div>
         </div>
         <div class="inv-card-body">
@@ -193,6 +207,51 @@
               </div>
               <p>El análisis de causa raíz se mostrará aquí</p>
               <p class="inv-empty-subtitle">Procesa un documento PDF para comenzar</p>
+            </div>
+          </div>
+
+          <!-- ── Toolbar de revisión (oculto hasta que haya análisis) ── -->
+          <div id="analysisReviewToolbar" class="inv-review-toolbar hidden">
+            <!-- Estado 1: Solo botón "Revisar" -->
+            <div class="inv-review-actions inv-review-actions--idle" id="reviewActionsIdle">
+              <button type="button" class="inv-btn inv-btn--primary" id="btnStartReview">
+                <i class="fas fa-edit"></i> Revisar análisis
+              </button>
+              <span class="inv-review-hint">Valida que el análisis de causa raíz esté correcto antes de generar el informe</span>
+            </div>
+            <!-- Estado 2: Toolbar de revisión completa -->
+            <div class="inv-review-actions inv-review-actions--reviewing hidden" id="reviewActionsReviewing">
+              <div class="inv-review-feedback">
+                <label for="regenerateFeedback">
+                  <i class="fas fa-comment-dots"></i> Feedback para la IA (opcional):
+                </label>
+                <textarea id="regenerateFeedback" class="inv-textarea" rows="2"
+                  placeholder="Ej: enfócate en ergonomía, no en capacitación. El nivel 3 debe mencionar X..."></textarea>
+              </div>
+              <div class="inv-review-buttons">
+                <button type="button" class="inv-btn inv-btn--secondary" id="btnRegenerateAll">
+                  <i class="fas fa-sync"></i> Regenerar análisis completo
+                </button>
+                <button type="button" class="inv-btn inv-btn--ghost" id="btnCancelReview">
+                  <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="inv-btn inv-btn--success" id="btnApproveAnalysis">
+                  <i class="fas fa-check"></i> Aprobar análisis
+                </button>
+              </div>
+            </div>
+            <!-- Estado 3: Botones post-aprobación -->
+            <div class="inv-review-actions inv-review-actions--approved hidden" id="reviewActionsApproved">
+              <span class="inv-review-success">
+                <i class="fas fa-check-circle"></i> Aprobado · listo para generar informe
+              </span>
+              <button type="button" class="inv-btn inv-btn--secondary" id="btnReReview">
+                <i class="fas fa-redo"></i> Re-revisar
+              </button>
+              <button type="button" class="inv-btn inv-btn--primary" id="btnGenerateReportFromApproval"
+                title="Abrir el diálogo para guardar el informe .docx de la investigación">
+                <i class="fas fa-file-word"></i> Generar Informe
+              </button>
             </div>
           </div>
         </div>
@@ -244,12 +303,11 @@
     </div>
   </div><!-- /inv-main-wrapper -->
 
-  <!-- ============================================================ -->
-  <!-- GLOBAL PROGRESS (thin bar under header)                      -->
-  <!-- ============================================================ -->
-  <div id="globalProgress" class="inv-global-progress hidden">
-    <div class="inv-global-progress-bar"></div>
-  </div>
+  <!-- ============================================================
+       GLOBAL PROGRESS (thin bar under header)
+       ELIMINADO 2026-06-27: nunca fue controlado por JS (código muerto).
+       El progreso real vive en #progressArea dentro del action bar.
+       ============================================================ -->
 
   <!-- ============================================================ -->
   <!-- SAVE REPORT MODAL (UNCHANGED — all IDs preserved)           -->
@@ -279,9 +337,7 @@
           </div>
         </div>
         <div id="saveModalFolderList" class="save-modal-folder-list">
-          <div class="save-modal-loading">
-            <i class="fas fa-spinner fa-spin"></i> Cargando directorios...
-          </div>
+          <!-- El JS inyecta KairSkeleton.list(6) al cargar -->
         </div>
         <div class="save-modal-toolbar">
           <button id="saveModalNewFolderBtn" class="save-modal-toolbar-btn" title="Crear carpeta nueva">
@@ -318,6 +374,6 @@
     </div>
   </div>
 
-  <script src="investigacion-accidentes-main.js"></script>
+  <script src="investigacion-accidentes-main.js?v=INV-20260919-premium"></script>
 </body>
 </html>

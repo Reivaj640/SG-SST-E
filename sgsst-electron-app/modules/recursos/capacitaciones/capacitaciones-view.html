@@ -1,37 +1,45 @@
-<link rel="stylesheet" href="./modules/recursos/capacitaciones/capacitaciones-view.css">
+<link rel="stylesheet" href="./modules/recursos/capacitaciones/capacitaciones-view.css?v=CAP-20260915-v11-periodo-stretch">
 
 <div class="k-app-layout">
 
 <!-- HEADER — Card k-section-card (tabs integrados) -->
-<div class="k-section-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
-  <!-- Fila 1: contenido principal -->
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="bi bi-mortarboard-fill" style="color:#174ea6; font-size:1.25rem;"></i>
-      <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Programa de Capacitación</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Cronograma y gestión de capacitaciones SG-SST.</p>
+<div class="k-section-card cap-header" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+  <div class="cap-header__inner">
+    <!-- Breadcrumb -->
+    <nav class="cap-breadcrumb" aria-label="Ruta de navegación">
+      <span>Inicio</span><i class="bi bi-chevron-right"></i>
+      <span>Gestión</span><i class="bi bi-chevron-right"></i>
+      <span>Recursos</span><i class="bi bi-chevron-right"></i>
+      <span class="is-current">Capacitación</span>
+    </nav>
+
+    <!-- Fila principal -->
+    <div class="cap-header-row">
+      <div class="cap-header-left">
+        <div class="cap-header-icon"><i class="bi bi-mortarboard-fill"></i></div>
+        <div>
+          <h3>Programa de Capacitación</h3>
+          <p>Cronograma y gestión de capacitaciones SG-SST.</p>
+        </div>
       </div>
-    </div>
-    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-      <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
-        <i class="bi bi-building" style="font-size:0.875rem;"></i>
-        <span id="header-company-text">—</span>
-      </span>
-      <div style="width:1px; height:24px; background:#dee2e6;"></div>
-      <button id="btn-back-module" class="header-back-btn" title="Volver al módulo Recursos">
-        <i class="bi bi-arrow-left"></i> Volver
-      </button>
-      <button id="btn-create-period-header" class="header-action--secondary" title="Crear periodo para el año siguiente">
-        <i class="bi bi-calendar-plus"></i> Crear Periodo
-      </button>
-      <button id="btn-export-excel" class="header-action--ghost" title="Exportar cronograma">
-        <i class="bi bi-download"></i> Exportar
-      </button>
+      <div class="cap-header-right">
+        <span class="cap-period-pill" title="Período (hoja del Excel) actualmente cargado">
+          <i class="bi bi-calendar3"></i> Período activo · <span id="badge-periodo-activo">—</span>
+        </span>
+        <button id="btn-back-module" class="header-back-btn" title="Volver al módulo Recursos">
+          <i class="bi bi-arrow-left"></i> Volver
+        </button>
+        <button id="btn-export-excel" class="header-action--ghost" title="Exportar cronograma">
+          <i class="bi bi-download"></i> Exportar
+        </button>
+        <button id="btn-create-period-header" class="header-action--primary" title="Crear periodo para el año siguiente">
+          <i class="bi bi-plus-lg"></i> Crear Período
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Fila 2: tabs (dentro del card) -->
+  <!-- Tabs (dentro del card) -->
   <div class="capacitaciones-tabs">
     <button class="capacitaciones-tab active" data-view="dashboard">
       <i class="bi bi-speedometer2"></i> Dashboard
@@ -81,66 +89,105 @@
   <!-- VISTA: DASHBOARD -->
   <section id="view-dashboard" class="k-view-section active">
 
-  <!-- Franja de estadísticas compacta -->
-  <div class="k-stats-ribbon">
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon primary"><i class="bi bi-calendar-check"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-total">0</span>
-        <span class="k-stats-ribbon__label">Programadas</span>
+  <!-- 1+2) HERO + METRIC CARDS — fila única de 4 tarjetas alineadas -->
+  <div class="cap-metrics">
+    <article class="kair-hero-card cap-hero">
+      <div class="cap-hero-main">
+        <div class="kair-hero-eyebrow" id="hero-eyebrow">ESTADO GENERAL · PLAN —</div>
+        <h2 id="hero-title">Cargando plan…</h2>
+        <p class="kair-hero-msg" id="hero-msg">—</p>
       </div>
-      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-completed">0</span>
-        <span class="k-stats-ribbon__label">Realizadas</span>
+      <div class="cap-hero-foot">
+        <div class="cap-hero-progress"><i id="hero-progress-bar" style="width:0%"></i></div>
+        <div class="kair-hero-score cap-hero-score">
+          <span id="hero-score">0%</span>
+          <span>CUMPLIMIENTO</span>
+        </div>
       </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-pending">0</span>
-        <span class="k-stats-ribbon__label">Pendientes</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon muted"><i class="bi bi-people"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value k-stats-ribbon__value--muted" id="stat-participants">N/D</span>
-        <span class="k-stats-ribbon__label">Asistencia</span>
-      </div>
-    </div>
+    </article>
+
+    <article class="kair-metric-card kair-metric-card--danger">
+      <span class="kair-metric-head">Ejecución del plan</span>
+      <div class="kair-metric-value"><span id="metric-comp">0</span> <small>/ <span id="metric-total">0</span></small></div>
+      <p class="kair-metric-desc">Actividades ejecutadas del programa</p>
+      <div class="kair-progress"><i id="metric-comp-bar" style="width:0%"></i></div>
+    </article>
+    <article class="kair-metric-card kair-metric-card--warning">
+      <span class="kair-metric-head">Pendientes</span>
+      <div class="kair-metric-value" id="metric-pend">0</div>
+      <p class="kair-metric-desc">Requieren gestión este período</p>
+      <div class="kair-progress"><i id="metric-pend-bar" style="width:0%"></i></div>
+    </article>
+    <article class="kair-metric-card kair-metric-card--info">
+      <span class="kair-metric-head">Asistencia</span>
+      <div class="kair-metric-value" id="metric-asist">N/D</div>
+      <p class="kair-metric-desc" id="metric-asist-desc">Sin datos de asistencia</p>
+      <div class="kair-progress"><i id="metric-asist-bar" style="width:0%"></i></div>
+    </article>
   </div>
 
-  <!-- Gráficas -->
-  <div class="k-charts-grid">
-    <div class="k-chart-container">
-      <div class="k-chart-header">
-        <div class="k-chart-title">Actividades SST vs PYP</div>
+  <!-- 3) GRID: Ejecución del plan (líneas) + Composición (dona) -->
+  <div class="cap-grid-2 cap-grid-charts">
+    <article class="kair-card">
+      <div class="kair-card-head">
+        <div>
+          <h3>Ejecución del plan</h3>
+          <div class="kair-card-hint">Acumulado anual · programado vs. ejecutado</div>
+        </div>
       </div>
-      <div class="k-chart-body k-chart-body--donut">
-        <canvas id="typeChart"></canvas>
+      <div class="cap-chart-box"><canvas id="planLineChart"></canvas></div>
+      <div class="cap-chart-legend">
+        <span><i style="background:#2057b8"></i>Ejecutado real</span>
+        <span><i class="cap-chart-legend__dash" style="border-top:2px dashed #b6bfcc"></i>Planeado</span>
       </div>
-    </div>
-    <div class="k-chart-container">
-      <div class="k-chart-header">
-        <div class="k-chart-title">Ejecución Mensual</div>
+    </article>
+    <article class="kair-card">
+      <div class="kair-card-head">
+        <div>
+          <h3>Composición del plan</h3>
+          <div class="kair-card-hint">Distribución por línea · SST vs PYP</div>
+        </div>
       </div>
-      <div class="k-chart-body">
-        <canvas id="trainingChart"></canvas>
+      <div class="cap-donut-stack">
+        <div class="cap-chart-box cap-chart-box--donut"><canvas id="typeChart"></canvas></div>
+        <div class="cap-donut-legend" id="donut-legend"></div>
       </div>
-    </div>
+    </article>
   </div>
 
-  <!-- Próximas Capacitaciones -->
-  <div class="k-chart-container k-recent-list-container">
-    <div class="k-chart-title" style="margin-bottom: 1rem;">Próximas Capacitaciones</div>
-    <div id="recent-list"></div>
+  <!-- 4) GRID: Ejecución mensual (barras) + En tu radar -->
+  <div class="cap-grid-2 cap-grid-charts">
+    <article class="kair-card">
+      <div class="kair-card-head">
+        <div>
+          <h3>Ejecución mensual</h3>
+          <div class="kair-card-hint">Actividades por mes · completadas vs. pendientes</div>
+        </div>
+      </div>
+      <div class="cap-chart-box"><canvas id="trainingChart"></canvas></div>
+      <div class="cap-chart-legend">
+        <span><i style="background:#174ea6"></i>Completadas</span>
+        <span><i style="background:#f6d9a0"></i>Pendientes</span>
+      </div>
+    </article>
+    <article class="kair-card cap-radar-card">
+      <div class="kair-card-head">
+        <div>
+          <h3>En tu radar</h3>
+          <div class="kair-card-hint">Requieren gestión próxima</div>
+        </div>
+      </div>
+      <div id="radar-list"></div>
+      <div class="cap-radar-evidencias" id="radar-evidencias" style="display:none;">
+        <span class="cap-radar-evidencias__icon"><i class="bi bi-paperclip"></i></span>
+        <span class="cap-radar-evidencias__body">
+          <span class="cap-radar-evidencias__title">Evidencias pendientes</span>
+          <span class="cap-radar-evidencias__meta"><strong id="radar-evidencias-count">0</strong> actividades sin soporte cargado</span>
+        </span>
+        <span class="cap-radar-pill cap-radar-pill--warning"><i class="cap-radar-pill__dot"></i>Pendiente</span>
+      </div>
+      <button type="button" class="cap-radar-link" id="link-ver-listado">Ver listado completo →</button>
+    </article>
   </div>
 
   </section>
@@ -150,34 +197,46 @@
 
             <div class="k-toolbar">
                 <div class="k-filter-group">
-                    <select id="yearFilter" class="k-form-select">
-                        <option value="">Cargando años...</option>
-                    </select>
-                    <select id="typeFilter" class="k-form-select">
-                        <option value="">Todos los Tipos</option>
-                        <option value="sst">Seguridad (SST)</option>
-                        <option value="pyp">Medicina Preventiva (PYP)</option>
-                    </select>
-                    <select id="statusFilter" class="k-form-select">
-                        <option value="">Todos los Estados</option>
-                        <option value="completed">Completada</option>
-                        <option value="pending">Pendiente</option>
-                    </select>
-                    <select id="monthFilter" class="k-form-select">
-                        <option value="">Todos los Meses</option>
-                        <option value="1">Enero</option>
-                        <option value="2">Febrero</option>
-                        <option value="3">Marzo</option>
-                        <option value="4">Abril</option>
-                        <option value="5">Mayo</option>
-                        <option value="6">Junio</option>
-                        <option value="7">Julio</option>
-                        <option value="8">Agosto</option>
-                        <option value="9">Septiembre</option>
-                        <option value="10">Octubre</option>
-                        <option value="11">Noviembre</option>
-                        <option value="12">Diciembre</option>
-                    </select>
+                    <label class="k-filter-pill">
+                        <select id="yearFilter" class="k-form-select">
+                            <option value="">Cargando años...</option>
+                        </select>
+                        <i class="bi bi-chevron-down"></i>
+                    </label>
+                    <label class="k-filter-pill">
+                        <select id="typeFilter" class="k-form-select">
+                            <option value="">Todos los Tipos</option>
+                            <option value="sst">Seguridad (SST)</option>
+                            <option value="pyp">Medicina Preventiva (PYP)</option>
+                        </select>
+                        <i class="bi bi-chevron-down"></i>
+                    </label>
+                    <label class="k-filter-pill">
+                        <select id="statusFilter" class="k-form-select">
+                            <option value="">Todos los Estados</option>
+                            <option value="completed">Completada</option>
+                            <option value="pending">Pendiente</option>
+                        </select>
+                        <i class="bi bi-chevron-down"></i>
+                    </label>
+                    <label class="k-filter-pill">
+                        <select id="monthFilter" class="k-form-select">
+                            <option value="">Todos los Meses</option>
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                        <i class="bi bi-chevron-down"></i>
+                    </label>
                 </div>
                 <div class="d-flex gap-2">
                     <button class="k-btn k-btn-outline" id="btn-clear-filters">
@@ -197,13 +256,20 @@
                             <th>Tipo</th>
                             <th style="min-width:130px">Fecha</th>
                             <th>Instructor</th>
+                            <th>Ubicación</th>
                             <th>Duración</th>
+                            <th style="min-width:90px">Hora</th>
                             <th>Estado</th>
-                            <th class="text-right" style="min-width:120px">Acciones</th>
+                            <th class="text-center" style="min-width:80px">Evidencia</th>
+                            <th class="text-right" style="min-width:150px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="trainings-table-body"></tbody>
                 </table>
+                <div class="k-pagination" id="pagination-wrap" style="display:none;">
+                    <span class="k-pagination__info" id="pagination-info">Mostrando 0–0 de 0 actividades</span>
+                    <div class="k-pagination__pages" id="pagination-pages"></div>
+                </div>
             </div>
         </section>
 
@@ -219,10 +285,13 @@
     <div class="k-modal">
 
         <div class="k-modal-header">
-            <h3 class="k-modal-title" id="modal-title">
-                <i class="bi bi-plus-circle" id="modal-icon"></i>
-                Nueva Capacitación
-            </h3>
+            <div class="k-modal-headtext">
+                <h3 class="k-modal-title" id="modal-title">
+                    <i class="bi bi-plus-circle" id="modal-icon"></i>
+                    Nueva Capacitación
+                </h3>
+                <p class="k-modal-subtitle">Las actividades se agregan al cronograma del período activo.</p>
+            </div>
             <button type="button" class="btn-close-modal" aria-label="Cerrar">
                 <i class="bi bi-x-lg"></i>
             </button>
@@ -233,49 +302,83 @@
                 <!-- ID oculto del registro en edición (vacío en modo crear) -->
                 <input type="hidden" id="training-id" value="">
 
-                <!-- Fila 1: Nombre y Tipo -->
-                <div class="k-form-grid">
-                    <div>
+                <!-- Sección 1: Información general -->
+                <div class="k-form-section">
+                    <div class="k-form-section__head">
+                        <div class="k-form-section__title">Información general</div>
+                        <div class="k-form-section__hint">Nombre de la actividad y línea a la que pertenece.</div>
+                    </div>
+                    <div class="k-form-field-full">
                         <label class="k-form-label" for="trainingName">Nombre *</label>
                         <input type="text" id="trainingName" class="k-form-control"
                                placeholder="Ej: Uso de EPP" required>
                     </div>
-                    <div>
-                        <label class="k-form-label" for="trainingType">Tipo *</label>
-                        <select id="trainingType" class="k-form-control">
-                            <option value="sst">Seguridad (SST)</option>
-                            <option value="pyp">Medicina Preventiva (PYP)</option>
-                        </select>
+                    <div class="k-form-grid" style="margin-top:1rem; margin-bottom:0;">
+                        <div>
+                            <label class="k-form-label" for="trainingType">Tipo *</label>
+                            <select id="trainingType" class="k-form-control">
+                                <option value="sst">Seguridad (SST)</option>
+                                <option value="pyp">Medicina Preventiva (PYP)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="k-form-label" for="trainingDuration">Duración (Horas)</label>
+                            <input type="number" id="trainingDuration" class="k-form-control"
+                                   placeholder="2" value="2" min="1">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Fila 2: Fecha y Duración -->
-                <div class="k-form-grid">
-                    <div>
-                        <label class="k-form-label" for="trainingDate">Fecha Programada *</label>
-                        <input type="date" id="trainingDate" class="k-form-control" required>
+                <!-- Sección 2: Logística -->
+                <div class="k-form-section" style="margin-bottom:0;">
+                    <div class="k-form-section__head">
+                        <div class="k-form-section__title">Logística</div>
+                        <div class="k-form-section__hint">Fecha, responsable y lugar de la sesión.</div>
                     </div>
-                    <div>
-                        <label class="k-form-label" for="trainingDuration">Duración (Horas)</label>
-                        <input type="number" id="trainingDuration" class="k-form-control"
-                               placeholder="2" value="2" min="1">
+                    <div class="k-form-grid">
+                        <div>
+                            <label class="k-form-label" for="trainingDate">Fecha Programada *</label>
+                            <input type="date" id="trainingDate" class="k-form-control" required>
+                        </div>
+                        <div>
+                            <label class="k-form-label" for="trainingHora">Hora (opcional)</label>
+                            <div style="display:flex; gap:6px; align-items:stretch;">
+                                <input type="time" id="trainingHora" class="k-form-control"
+                                       style="flex:1;" min="06:00" max="20:00">
+                                <button type="button" id="clearTrainingHora"
+                                        title="Limpiar hora"
+                                        aria-label="Limpiar hora"
+                                        style="background:transparent; border:1px solid #d1d5db; border-radius:6px; padding:0 10px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; min-width:38px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                         aria-hidden="true">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <small style="display:block; margin-top:4px; color:#6b7280; font-size:0.8rem;">Sin hora → no aparece en el calendario. Click en 🗑️ para quitarla.</small>
+                        </div>
                     </div>
-                </div>
-
-                <!-- Fila 3: Instructor y Participantes -->
-                <div class="k-form-grid">
-                    <div>
-                        <label class="k-form-label" for="trainingInstructor">Instructor</label>
-                        <select id="trainingInstructor" class="k-form-control">
-                            <option value="Técnico">Técnico Interno</option>
-                            <option value="ARL">ARL</option>
-                            <option value="Olga Pinto">ARL - Olga Pinto</option>
-                        </select>
+                    <div class="k-form-grid">
+                        <div>
+                            <label class="k-form-label" for="trainingInstructor">Instructor</label>
+                            <input type="text" id="trainingInstructor" class="k-form-control"
+                                   placeholder="Nombre del instructor (libre)" autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="k-form-label" for="trainingUbicacion">Ubicación</label>
+                            <input type="text" id="trainingUbicacion" class="k-form-control"
+                                   placeholder="Lugar donde se realizará (libre)" autocomplete="off">
+                        </div>
                     </div>
-                    <div>
-                        <label class="k-form-label" for="trainingParticipants">Participantes</label>
-                        <input type="number" id="trainingParticipants" class="k-form-control"
-                               placeholder="0" value="0" min="0">
+                    <div class="k-form-grid" style="margin-bottom:0;">
+                        <div>
+                            <label class="k-form-label" for="trainingParticipants">Participantes</label>
+                            <input type="number" id="trainingParticipants" class="k-form-control"
+                                   placeholder="0" value="0" min="0">
+                        </div>
+                        <div></div>
                     </div>
                 </div>
             </form>
@@ -285,6 +388,92 @@
             <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
             <button type="button" class="k-btn k-btn-primary" id="btn-save-training">
                 <i class="bi bi-check-lg"></i> Guardar
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- MODAL: NUEVO PERÍODO DE CAPACITACIÓN -->
+<!-- ======================== -->
+<div class="k-modal-overlay" id="periodModal">
+    <div class="k-modal k-modal-sm">
+
+        <div class="k-modal-header">
+            <div class="k-modal-headtext">
+                <h3 class="k-modal-title">Nuevo periodo de capacitación</h3>
+                <p class="k-modal-subtitle">Defina el programa anual que contendrá las actividades.</p>
+            </div>
+            <button type="button" class="btn-close-modal" aria-label="Cerrar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="k-modal-body">
+            <div class="k-form-field-full" style="margin-bottom:1rem;">
+                <label class="k-form-label" for="period-name">Nombre del periodo <span style="color:var(--k-danger);">*</span></label>
+                <input type="text" id="period-name" class="k-form-control" placeholder="Plan 2027" autocomplete="off">
+            </div>
+            <div class="k-form-field-sm">
+                <label class="k-form-label" for="period-year">Vigencia <span style="color:var(--k-danger);">*</span></label>
+                <select id="period-year" class="k-form-control"></select>
+            </div>
+        </div>
+
+        <div class="k-modal-footer">
+            <button type="button" class="k-btn k-btn-ghost btn-close-modal">Cancelar</button>
+            <button type="button" class="k-btn k-btn-primary" id="btn-period-create">Crear periodo</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- MODAL: EVIDENCIAS DE CAPACITACIÓN -->
+<!-- ======================== -->
+<div class="k-modal-overlay" id="evidenciaModal">
+    <div class="k-modal" style="max-width: 720px;">
+
+        <div class="k-modal-header">
+            <h3 class="k-modal-title" id="evidencia-modal-title">
+                <i class="bi bi-paperclip"></i>
+                Evidencias
+            </h3>
+            <button type="button" class="btn-close-modal" aria-label="Cerrar" data-close-evidencia>
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="k-modal-body">
+            <p class="k-evidencia-cap-label" id="evidencia-cap-label">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span id="evidencia-cap-name">—</span>
+            </p>
+
+            <!-- Dropzone -->
+            <label class="k-evidencia-dropzone" id="evidenciaDropzone" for="evidenciaFileInput">
+                <input type="file" id="evidenciaFileInput" multiple
+                       accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                       style="position:absolute; opacity:0; pointer-events:none; width:1px; height:1px;">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <div class="k-evidencia-dropzone-title">Arrastrá archivos acá o hacé clic</div>
+                <div class="k-evidencia-dropzone-hint">Formatos: PDF, JPG, PNG, GIF, DOC, DOCX</div>
+            </label>
+
+            <!-- Lista de archivos -->
+            <div class="k-evidencia-section-title">
+                <span>Archivos cargados</span>
+                <span class="k-evidencia-count" id="evidenciaCount">0</span>
+            </div>
+            <div class="k-evidencia-list" id="evidenciaList">
+                <!-- Se llena por JS -->
+            </div>
+        </div>
+
+        <div class="k-modal-footer">
+            <button type="button" class="k-btn k-btn-outline btn-close-modal" data-close-evidencia>
+                Cerrar
             </button>
         </div>
 

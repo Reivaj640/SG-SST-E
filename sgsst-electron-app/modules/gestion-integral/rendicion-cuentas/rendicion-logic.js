@@ -47,7 +47,7 @@ class RendicionCuentasComponent {
 
     // Cargar el HTML del portal
     try {
-      const response = await fetch(`./modules/gestion-integral/rendicion-cuentas/rendicion-home.html`);
+      const response = await fetch(`./modules/gestion-integral/rendicion-cuentas/rendicion-home.html?v=REND-20260917-v2-header-fullwidth`);
       if (response.ok) {
         const html = await response.text();
         portalContainer.innerHTML = html;
@@ -76,7 +76,7 @@ class RendicionCuentasComponent {
 
     // Cargar el JS del portal dinámicamente
     const script = document.createElement('script');
-    script.src = './modules/gestion-integral/rendicion-cuentas/rendicion-home.js';
+    script.src = './modules/gestion-integral/rendicion-cuentas/rendicion-home.js?v=REND-20260917-v2-header-fullwidth';
     script.onload = () => {
       console.log('[RendicionCuentasComponent] rendicion-home.js cargado');
     };
@@ -105,7 +105,7 @@ class RendicionCuentasComponent {
 
     try {
       // Cargar el HTML directamente
-      const response = await fetch(`./modules/gestion-integral/rendicion-cuentas/rendicion-cuentas.html`);
+      const response = await fetch(`./modules/gestion-integral/rendicion-cuentas/rendicion-cuentas.html?v=REND-20260917-v2-header-fullwidth`);
       if (response.ok) {
         const html = await response.text();
         

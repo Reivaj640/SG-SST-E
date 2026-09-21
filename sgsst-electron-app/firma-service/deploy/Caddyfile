@@ -1,0 +1,42 @@
+# =============================================================================
+# K+AIR Firma Electrónica — Caddyfile (producción, HTTPS automático)
+# =============================================================================
+# Caddy obtiene y renueva SOLO el certificado Let's Encrypt y redirige
+# HTTP → HTTPS. El servicio Node escucha en 127.0.0.1:3001 (nunca público).
+#
+# DOMINIO: reemplaza CAMBIAR-ME.sslip.io por tu dominio real:
+#   - Sin comprar dominio: firma.<IP-VM-con-guiones>.sslip.io
+#     (ej. firma.152-67-33-10.sslip.io — sslip.io resuelve ese hostname a la IP)
+#   - Con eu.org aprobado:  kair-firma.eu.org (o el que te asignen)
+#
+# Instalar:  sudo cp Caddyfile /etc/caddy/Caddyfile
+#            sudo systemctl reload caddy    (o restart si es la 1ª vez)
+# =============================================================================
+
+CAMBIAR-ME.sslip.io {
+	# Encabezados de seguridad extra (el servicio ya pone varios vía helmet;
+	# estos son defensa en profundidad a nivel del borde)
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		# Eliminar cabeceras que delatan al backend
+		-Server
+		-X-Powered-By
+	}
+
+	# Toda la app detrás del proxy local
+	reverse_proxy 127.0.0.1:3001 {
+		# Pasa la IP real del firmante al servicio (la trazabilidad la usa
+		# como evidencia). Con TRUST_PROXY=loopback el servicio la acepta
+		# solo desde este proxy local.
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Logs de acceso (auditoría del borde; además del logger interno)
+	log {
+		output file /var/log/caddy/kair-firma-access.log
+		format json
+	}
+}

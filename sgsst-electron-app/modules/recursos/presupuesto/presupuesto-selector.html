@@ -6,6 +6,9 @@
     <title>Selector de Archivos - K+AIR</title>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
     
     <style>
         /* =========================================
@@ -228,35 +231,77 @@ HEADER ACTION BUTTONS
         .k-toast.success { border-left-color: var(--k-success); }
         .k-toast.error { border-left-color: var(--k-danger); }
 
+        /* ═══════════════════════════════════════════════════════════
+           PREMIUM v1 (2026-09-15) — Header sin tarjeta, breadcrumb,
+           tarjetas de año y panel de archivo con acabado premium
+           (patrón aprobado en Capacitación).
+           ═══════════════════════════════════════════════════════════ */
+        body { background: var(--kair-canvas, #fbfcfb); }
+        .content-area { max-width: 1400px; gap: clamp(18px, 2vw, 28px); }
+
+        .pres-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .pres-header__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+        .pres-header__icon { width: 44px; height: 44px; border-radius: 12px; background: #e3ecfb; color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .pres-header__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .pres-header__crumb span { padding: 0 4px; }
+        .pres-header__title { margin: 0; font: 800 clamp(17px, 1.7vw, 23px)/1.15 var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; color: var(--kair-ink, #14213d); }
+        .pres-header__sub { font-size: 0.8125rem; color: var(--kair-muted, #748096); margin: 2px 0 0 0; }
+        .pres-header__right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .pres-header__company { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--kair-muted, #748096); background: var(--kair-soft, #f3f6f6); border-radius: 999px; padding: 0.35rem 0.8rem; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .header-back-btn { padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600; border: 1px solid var(--kair-line, #e8ebee); background: #fff; color: #536177; }
+        .header-back-btn:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+
+        /* Tarjetas de año — premium */
+        .year-grid { gap: clamp(12px, 1.3vw, 18px); }
+        .year-card {
+            border: 1px solid var(--kair-line, #e8ebee); border-radius: var(--kair-radius-card, 20px);
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04); background: var(--kair-card, #fff);
+        }
+        .year-card:hover { border-color: #c8d7ef; box-shadow: 0 10px 24px rgba(28, 49, 92, 0.08); transform: translateY(-3px); }
+        .year-card.selected { border: 2px solid var(--kair-blue, #2057b8); background: #eef4fd; }
+        .year-icon { color: var(--kair-blue, #2057b8); opacity: 1; }
+        .year-number { font-family: var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; }
+
+        /* Panel de archivo — premium */
+        .file-context-panel {
+            border: 1px solid var(--kair-line, #e8ebee); border-left: 4px solid var(--kair-blue, #2057b8);
+            border-radius: var(--kair-radius-card, 20px); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+        }
+        .k-btn-outline { background: #fff; border: 1px solid var(--kair-line, #e8ebee); color: #536177; border-radius: 10px; font-weight: 600; font-size: 0.85rem; }
+        .k-btn-outline:hover { background: var(--kair-soft, #f3f6f6); border-color: var(--kair-line, #e8ebee); }
+        .k-btn-primary { background: var(--kair-blue, #2057b8); border-radius: 10px; font-weight: 700; font-size: 0.85rem; box-shadow: 0 8px 18px rgba(32, 87, 184, 0.15); }
+        .k-btn-primary:hover { background: #1a4ba0; }
+
+        .section-title { font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; color: var(--kair-ink, #14213d); margin: 0 0 1rem; }
     </style>
 </head>
 <body>
 
 <div class="content-area">
 
-<!-- HEADER — Card independiente -->
-<div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
-  <div style="display:flex; align-items:center; gap:0.75rem;">
-    <i class="fas fa-coins" style="color:#174ea6; font-size:1.25rem;"></i>
+<!-- HEADER — Premium: sin tarjeta, breadcrumb + título -->
+<div class="pres-header">
+  <div class="pres-header__left">
+    <div class="pres-header__icon"><i class="fas fa-history"></i></div>
     <div>
-      <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Histórico de Presupuestos</h3>
-      <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Seleccione el año fiscal para gestionar su presupuesto.</p>
+      <div class="pres-header__crumb">Recursos<span>/</span>Presupuesto</div>
+      <h1 class="pres-header__title">Histórico de Presupuestos</h1>
+      <p class="pres-header__sub">Seleccione el año fiscal para gestionar su presupuesto.</p>
     </div>
   </div>
-  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-    <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
-      <i class="fas fa-building" style="font-size:0.875rem;"></i>
+  <div class="pres-header__right">
+    <span class="pres-header__company">
+      <i class="fas fa-building"></i>
       <span id="header-company-text">—</span>
     </span>
-    <div style="width:1px; height:24px; background:#dee2e6;"></div>
-    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al módulo Recursos">
+    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al inicio">
       <i class="fas fa-arrow-left"></i> Volver
     </button>
   </div>
 </div>
         <!-- Grid Container -->
         <div>
-            <h3 style="margin-top:0; font-weight:600; font-size:1.1rem; margin-bottom:1rem;">Seleccione Año Fiscal</h3>
+            <h3 class="section-title">Seleccione Año Fiscal</h3>
             <div class="year-grid" id="yearOptions">
                 <!-- Inyectado por JS -->
             </div>
@@ -294,6 +339,11 @@ HEADER ACTION BUTTONS
     </div>
 
     <script>
+        // 📦708 (Fase 3.5) — Helper para acceder a KairConfirm del parent (modernos)
+        function _confirmDialog() {
+            return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
+        }
+
         // Lógica de Renderizado y Eventos (Conecta con tu JS existente)
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ [UI Selector] Inicializado. Esperando datos...');
@@ -319,7 +369,7 @@ HEADER ACTION BUTTONS
 
             // Navegación
             document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
-                window.parent.postMessage({ action: 'backToSubmodules' }, '*');
+                window.parent.postMessage({ action: 'backToHome' }, '*');
             });
 
             // Acciones de Archivo
@@ -330,14 +380,23 @@ HEADER ACTION BUTTONS
                 }
             });
 
-            document.getElementById('duplicateFileBtn')?.addEventListener('click', () => {
+            document.getElementById('duplicateFileBtn')?.addEventListener('click', async () => {
                 const selectedFile = window.parent.selectedFile;
                 if (selectedFile) {
                     const yearMatch = selectedFile.name.match(/(20\d{2})/);
                     const currentYear = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
                     const nextYear = currentYear + 1;
-                    
-                    if(confirm(`¿Desea clonar este presupuesto para el año ${nextYear}? Se mantendrán las partidas pero se reiniciarán los valores ejecutados.`)) {
+
+                    // 📦708 (Fase 3.5) — Modernizado: usa KairConfirm (estilo 6.1.2)
+                    const confirmed = await _confirmDialog().confirm({
+                        title: '📋 ¿Clonar presupuesto?',
+                        message: 'Vas a clonar el presupuesto "' + selectedFile.name + '" para el año ' + nextYear + '.',
+                        details: 'Se mantendrán las partidas pero se reiniciarán los valores ejecutados.',
+                        confirmText: 'Sí, clonar',
+                        cancelText: 'Cancelar',
+                        type: 'info'
+                    });
+                    if (confirmed) {
                         window.parent.postMessage({
                             action: 'duplicate-budget-file',
                             currentFilePath: selectedFile.path,

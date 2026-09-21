@@ -12,38 +12,47 @@
 <div class="frecuencia-container">
 
   <!-- ============================================================ -->
-  <!-- HEADER — Card Pattern (k-section-card)                      -->
+  <!-- HEADER SYSTEM v2 (premium) — breadcrumb + icon chip + título -->
   <!-- ============================================================ -->
-  <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <i class="fas fa-chart-line" style="color:#174ea6; font-size:1.25rem;"></i>
+  <header class="freq-header-v2">
+    <nav class="freq-breadcrumb" aria-label="Ruta de navegación">
+      <span>Gestión de la Salud</span>
+      <span class="freq-sep">›</span>
+      <span>3.3.1</span>
+      <span class="freq-sep">›</span>
+      <strong>Frecuencia de la Accidentalidad</strong>
+    </nav>
+    <div class="freq-header-row">
+      <div class="freq-header-left">
+        <span class="freq-header-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        </span>
         <div>
-          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Frecuencia de la Accidentalidad</h3>
-          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.3.1 Frecuencia</p>
+          <h3 class="freq-title">Frecuencia de la Accidentalidad</h3>
+          <p class="freq-sub">Gestión de la Salud — 3.3.1 Frecuencia</p>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <span class="k-section-card__company">
-          <i class="bi bi-building"></i>
+      <div class="freq-header-actions">
+        <span class="freq-company">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
           <span id="header-company-text">—</span>
         </span>
-        <div class="k-section-card__divider"></div>
-        <label style="font-size:0.75rem;color:#64748B;margin-right:4px;">Año:</label>
-        <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid #dee2e6;border-radius:4px;background:#ffffff;color:#212529;cursor:pointer;"></select>
-        <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid #dee2e6;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5a6378;font-size:0.8rem;">
-          <i class="bi bi-copy"></i>
+        <label class="freq-year-label" for="yearFilter">Año</label>
+        <select id="yearFilter" class="freq-select"></select>
+        <button id="btnCloneYear" class="freq-btn freq-btn--icon" title="Clonar a año siguiente">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
-        <div class="k-section-card__divider"></div>
-        <button class="header-action--ghost" id="btnRefrescar" title="Refrescar datos">
-          <i class="bi bi-arrow-clockwise"></i> Refrescar
+        <button class="freq-btn" id="btnRefrescar" title="Refrescar datos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refrescar
         </button>
-        <button class="header-back-btn" id="btnVolver" title="Volver a Gestión de la Salud">
-          <i class="fas fa-arrow-left"></i> Volver
+        <button class="freq-btn freq-btn--primary" id="btnVolver" title="Volver a Gestión de la Salud">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Volver
         </button>
       </div>
     </div>
-  </div>
+  </header>
 
   <main class="kair-container" id="app">
     <div class="k-main-content">
@@ -91,7 +100,7 @@
     <!-- ==================== TARGET CARD ==================== -->
     <div class="kair-target-card" id="targetCard">
       <div class="kair-target-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
       </div>
@@ -104,6 +113,9 @@
       </div>
     </div>
 
+    <!-- ========== GRÁFICO + TABLA — 2 columnas en maximizada ========== -->
+    <div class="freq-duo">
+
     <!-- ==================== CHART ==================== -->
     <div class="kair-card">
       <div class="kair-card-title">
@@ -115,11 +127,8 @@
         Índice de Frecuencia Mensual
         <span class="kair-badge" style="font-size: 0.65rem; padding: 2px 8px;">EXCEL ORIGEN</span>
       </div>
-      <div class="kair-chart-container" id="chartContainer">
-        <div class="kair-loading">
-          <div class="kair-spinner"></div>
-          <p class="kair-loading-text">Cargando gráfico...</p>
-        </div>
+<div class="kair-chart-container" id="chartContainer">
+        <!-- El JS inyecta KairSkeleton.chartBars(12) al cargar datos -->
       </div>
     </div>
 
@@ -135,7 +144,7 @@
           </svg>
           Tabla de Frecuencia - Editable
         </div>
-        <span style="font-size: 0.8rem; color: var(--kair-text-sec);">
+        <span style="font-size: 0.8rem; color: var(--freq-text-sec);">
           Clic en un valor para editar
         </span>
       </div>
@@ -156,6 +165,8 @@
         </table>
       </div>
     </div>
+    </div>
+    <!-- /freq-duo -->
 
     <!-- ==================== MONTH CARDS GRID ==================== -->
     <h3 class="kair-section-title">Detalle por Mes</h3>
@@ -196,14 +207,14 @@
         <p class="kair-method-formula">
           IF = (AT / Trabajadores) × 100
         </p>
-        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+        <p style="font-size: 0.8rem; color: var(--freq-text-sec); margin-top: 0.5rem;">
           Resultado por cada 100 trabajadores (Resolución 0312 de 2019)
         </p>
         <p style="margin-top: 1rem;"><strong>Flujo de datos bidireccional:</strong></p>
         <p class="kair-method-formula">
           Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa, sin copias intermedias
         </p>
-        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+        <p style="font-size: 0.8rem; color: var(--freq-text-sec); margin-top: 1rem;">
           <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 0312 de 2019.
         </p>
       </div>

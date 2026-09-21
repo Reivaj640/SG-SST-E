@@ -12,60 +12,103 @@
    - Barra de acciones sticky inferior
    ============================================================================ */
 
+/* ── k-section-card (header) ─────────────────────────────────────── */
+.k-section-card {
+  background: #ffffff;
+  border: 1px solid var(--inv-border-light);
+  border-radius: 0.5rem;
+  box-shadow: var(--inv-shadow-sm);
+}
+
+/* ── Global body/html reset (necesario para que el contenido aproveche
+   todo el ancho del iframe — Chrome aplica margin: 8px por defecto al body
+   y muchas reglas de este CSS están scoped a .inv-layout que el body no tiene).
+   FIX 2026-06-27: height:100vh (no min-height) + overflow:hidden en body.
+   El bug era que con min-height:100vh + contenido más alto que viewport,
+   el body crecía y el iframe recortaba ~27px entre header y action bar.
+   Ahora el body es EXACTO al viewport; el overflow interno lo maneja .inv-main-scroll. */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  /* 📦780 — el header v2 vive FUERA de .inv-layout, así que la tipografía y el
+     color base se declaran en el body para que TODO herede el look premium. */
+  font-family: var(--inv-font-body);
+  background-color: var(--inv-surface);
+  color: var(--inv-text-primary);
+}
+html { overflow-x: hidden; }
+
+.k-section-card__divider {
+  width: 1px;
+  height: 1.5rem;
+  background: #e2e8f0;
+}
+
 /* ── Design Tokens ────────────────────────────────────────────── */
 :root {
-  --inv-primary: #174ea6;
-  --inv-primary-hover: #185abd;
-  --inv-primary-light: #e8f0fe;
-  --inv-primary-dark: #0d3a7a;
-  --inv-success: #28a745;
-  --inv-success-light: #d4edda;
-  --inv-warning: #ffc107;
-  --inv-warning-light: #fff3cd;
-  --inv-danger: #dc3545;
-  --inv-danger-light: #f8d7da;
-  --inv-info: #17a2b8;
-  --inv-info-light: #d1ecf1;
-  --inv-surface: #f8f9fa;
+  /* 📦780 — Tokens alineados a la paleta premium canónica de la app
+     (shared/kair-design-tokens.css). Antes traían una paleta propia
+     (#174ea6 / #eef0f3 / Lexend+Roboto) que se veía distinta al resto. */
+  --inv-primary: #2057b8;
+  --inv-primary-hover: #1a4a9e;
+  --inv-primary-light: #eaf1fb;
+  --inv-primary-dark: #172c4c;
+  --inv-success: #1bb888;
+  --inv-success-light: #e6f5ef;
+  --inv-warning: #e7a224;
+  --inv-warning-light: #fbf0db;
+  --inv-danger: #da5563;
+  --inv-danger-light: #fae6e9;
+  --inv-info: #2057b8;
+  --inv-info-light: #eaf1fb;
+  --inv-surface: #fbfcfb;
   --inv-surface-card: #ffffff;
-  --inv-text-primary: #1a1a2e;
-  --inv-text-secondary: #4a5568;
-  --inv-text-muted: #718096;
-  --inv-border: #dee2e6;
-  --inv-border-light: #e9ecef;
-  --inv-radius: 0.5rem;
-  --inv-radius-lg: 0.75rem;
-  --inv-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --inv-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
-  --inv-transition: all 0.2s ease;
-  --inv-font-display: 'Lexend', 'Segoe UI', sans-serif;
-  --inv-font-body: 'Roboto', 'Segoe UI', sans-serif;
+  --inv-text-primary: #14213d;
+  --inv-text-secondary: #4d5b75;
+  --inv-text-muted: #98a2b3;
+  --inv-border: #e8ebee;
+  --inv-border-light: #eef0f1;
+  --inv-radius: 12px;
+  --inv-radius-lg: 16px;
+  --inv-shadow-sm: 0 1px 2px rgba(37, 56, 82, 0.05);
+  --inv-shadow-md: 0 2px 7px rgba(37, 56, 82, 0.08);
+  --inv-shadow-lg: 0 8px 18px rgba(37, 56, 82, 0.12);
+  --inv-transition: all 0.18s ease-out;
+  --inv-font-display: 'Manrope', 'DM Sans', sans-serif;
+  --inv-font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
   --inv-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 }
 
-/* ── Dark Mode ────────────────────────────────────────────────── */
-[data-theme="dark"] {
-  --inv-primary: #4da6ff;
-  --inv-primary-hover: #66b3ff;
-  --inv-primary-light: rgba(77, 166, 255, 0.15);
-  --inv-primary-dark: #0d3a7a;
-  --inv-success: #5cb85c;
-  --inv-success-light: rgba(92, 184, 92, 0.15);
-  --inv-warning: #f0ad4e;
-  --inv-warning-light: rgba(240, 173, 78, 0.15);
-  --inv-danger: #d9534f;
-  --inv-danger-light: rgba(217, 83, 79, 0.15);
-  --inv-info: #5bc0de;
-  --inv-info-light: rgba(91, 192, 222, 0.15);
-  --inv-surface: #1a202c;
-  --inv-surface-card: #2d3748;
-  --inv-text-primary: #e9ecef;
-  --inv-text-secondary: #adb5bd;
-  --inv-text-muted: #adb5bd;
-  --inv-border: #4a5568;
-  --inv-border-light: #3a4556;
-  --inv-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+/* ── Dark Mode — [data-theme^="dark"] cubre dark Y dark-legacy ── */
+[data-theme^="dark"] {
+  --inv-primary: #6ea8fe;
+  --inv-primary-hover: #8ab4f8;
+  --inv-primary-light: rgba(110, 168, 254, 0.15);
+  --inv-primary-dark: #172c4c;
+  --inv-success: #3ecf9a;
+  --inv-success-light: rgba(62, 207, 154, 0.15);
+  --inv-warning: #f0b45a;
+  --inv-warning-light: rgba(240, 180, 90, 0.15);
+  --inv-danger: #e56a76;
+  --inv-danger-light: rgba(229, 106, 118, 0.15);
+  --inv-info: #6ea8fe;
+  --inv-info-light: rgba(110, 168, 254, 0.15);
+  --inv-surface: #0f172a;
+  --inv-surface-card: #1a2334;
+  --inv-text-primary: #e8edf5;
+  --inv-text-secondary: #a9b4c6;
+  --inv-text-muted: #a9b4c6;
+  --inv-border: #2f3d55;
+  --inv-border-light: #263349;
+  --inv-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --inv-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
@@ -101,11 +144,14 @@
   background-color: #a8a8a8;
 }
 
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
+[data-theme^="dark"] ::-webkit-scrollbar-thumb {
   background-color: #4a5568;
 }
 
-.inv-layout .hidden {
+/* FIX 2026-06-27: antes .inv-layout .hidden — el body NUNCA tiene la clase
+   .inv-layout, así que la regla nunca aplicaba y los elementos con clase
+   "hidden" no se ocultaban. Ahora es global: cualquier .hidden se oculta. */
+.hidden {
   display: none !important;
 }
 
@@ -166,7 +212,8 @@
 }
 
 /* Ghost action buttons */
-.inv-layout .header-action--ghost {
+.inv-layout .header-action--ghost,
+.k-section-card .header-action--ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -175,21 +222,46 @@
   font-weight: 500;
   color: #5a6378;
   background: transparent;
-  border: none;
+  border: 1px solid #e2e8f0;
   border-radius: 0.375rem;
   cursor: pointer;
   transition: background 0.15s ease;
   font-family: inherit;
 }
 
-.inv-layout .header-action--ghost:hover:not(:disabled) {
+.inv-layout .header-action--ghost:hover:not(:disabled),
+.k-section-card .header-action--ghost:hover:not(:disabled) {
   background: #f0f2f5;
   color: #1a1a2e;
 }
 
-.inv-layout .header-action--ghost:disabled {
+.inv-layout .header-action--ghost:disabled,
+.k-section-card .header-action--ghost:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.inv-layout .header-back-btn,
+.k-section-card .header-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #174ea6;
+  background: transparent;
+  border: 1px solid #174ea6;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.inv-layout .header-back-btn:hover,
+.k-section-card .header-back-btn:hover {
+  background: #174ea6;
+  color: #ffffff;
 }
 
 /* Company & divider inside card */
@@ -215,23 +287,30 @@
 }
 
 /* Dark Theme */
-[data-theme="dark"] .inv-layout .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
-[data-theme="dark"] .inv-layout .k-section-card h3 { color: #e0e0e0; }
-[data-theme="dark"] body .k-section-card p { color: #9e9e9e; }
-[data-theme="dark"] body .k-section-card__company { color: #9e9e9e; }
-[data-theme="dark"] body .k-section-card__divider { background: #3a3a4d; }
-[data-theme="dark"] body .header-back-btn { color: #9e9e9e; }
-[data-theme="dark"] body .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
-[data-theme="dark"] body .header-action--ghost { color: #9e9e9e; }
-[data-theme="dark"] body .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
+[data-theme^="dark"] .inv-layout .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme^="dark"] .inv-layout .k-section-card h3 { color: #e0e0e0; }
+[data-theme^="dark"] body .k-section-card p { color: #9e9e9e; }
+[data-theme^="dark"] body .k-section-card__company { color: #9e9e9e; }
+[data-theme^="dark"] body .k-section-card__divider { background: #3a3a4d; }
+[data-theme^="dark"] body .header-back-btn { color: #9e9e9e; }
+[data-theme^="dark"] body .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
+[data-theme^="dark"] body .header-action--ghost { color: #9e9e9e; }
+[data-theme^="dark"] body .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
 
 /* ================================================================
    MAIN WRAPPER — Vertical layout with sticky action bar
+   FIX 2026-06-27: usar flex:1 en lugar de height:calc(100vh - 53px).
+   El bug era que el header (k-section-card) está AFUERA del wrapper
+   y el cálculo hardcoded de 53px no coincidía con la altura real del
+   header (~84px), causando que el body overflows ~30px y el iframe
+   recortara header y action bar. Ahora flex:1 hace que el wrapper
+   ocupe el espacio restante después del header, sin asumir alturas.
    ================================================================ */
 .inv-main-wrapper {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 53px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -239,28 +318,25 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.25rem 1.5rem 6rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  /* FIX 2026-06-27: padding horizontal 2rem (32px) + scrollbar-gutter:stable.
+     En ventanas estrechas el scrollbar vertical (~15px) recortaba el borde
+     derecho de las cards. scrollbar-gutter:stable reserva el espacio del
+     scrollbar desde el inicio, evitando que se "coma" el padding derecho. */
+  padding: 1.25rem 2rem 6rem;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
+  /* Aprovechar TODO el ancho disponible del viewport. Sin max-width para que la
+     tabla 5 PorQués × 5 categorías 5M pueda expandirse en pantallas maximizadas.
+     Los cards internos (.inv-card, .inv-combined-card) ya manejan su propio padding
+     interno, así que no necesitamos recortar el wrapper. */
   width: 100%;
+  margin: 0;
 }
 
 /* ================================================================
    GLOBAL PROGRESS (thin bar under header)
+   ELIMINADO 2026-06-27: código muerto sin uso en JS.
    ================================================================ */
-.inv-global-progress {
-  height: 4px;
-  background-color: var(--inv-surface-card);
-  position: sticky;
-  top: 53px;
-  z-index: 99;
-}
-
-.inv-global-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--inv-primary) 0%, var(--inv-primary-hover) 100%);
-  transition: width 0.5s ease;
-}
 
 /* ================================================================
    CONTEXT BADGES
@@ -437,11 +513,14 @@
 .inv-combined-left {
   padding: 1.25rem;
   border-right: 1px solid var(--inv-border-light);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  /* FIX 2026-06-27: antes gradient #f8fafc→#f1f5f9 (casi imperceptible pero
+     suficiente para que el lado izquierdo se viera "apagado" vs el derecho
+     blanco puro). Ahora flat #fafbfc — visualmente simétrico con la derecha. */
+  background: #fafbfc;
 }
 
-[data-theme="dark"] .inv-combined-left {
-  background: linear-gradient(135deg, #1e2a3a 0%, #243447 100%);
+[data-theme^="dark"] .inv-combined-left {
+  background: #1a2230;
 }
 
 .inv-combined-right {
@@ -515,6 +594,14 @@
   position: relative;
 }
 
+/* El input file del dropzone SIEMPRE debe estar oculto (solo se usa via JS al clickear el dropzone).
+   Bug histórico: .hidden solo aplicaba dentro de .inv-layout, así que #fileInput se veía
+   cuando el contenido del dropzone era corto (ej: "Archivo procesado exitosamente"). */
+.inv-drop-zone #fileInput.hidden,
+.inv-drop-zone #fileInput[hidden] {
+  display: none !important;
+}
+
 .inv-drop-zone:hover {
   border-color: var(--inv-primary);
   background-color: rgba(23, 78, 166, 0.02);
@@ -530,6 +617,34 @@
   border-color: var(--inv-success);
   border-style: solid;
   background-color: rgba(40, 167, 69, 0.03);
+}
+
+/* Drop zone cuando el PDF ya fue PROCESADO (datos extraídos) */
+.inv-drop-zone.is-processed {
+  border-color: var(--inv-success);
+  border-style: solid;
+  background-color: rgba(40, 167, 69, 0.08);
+  cursor: default;
+  pointer-events: none;
+}
+
+.inv-drop-zone.is-processed .inv-drop-icon {
+  background-color: var(--inv-success);
+}
+
+.inv-drop-zone.is-processed .inv-drop-icon i {
+  color: #ffffff;
+  font-size: 1.35rem;
+}
+
+.inv-drop-zone.is-processed .inv-drop-title {
+  color: var(--inv-success);
+  font-weight: 600;
+}
+
+.inv-drop-zone.is-processed .inv-drop-subtitle {
+  color: var(--inv-success);
+  opacity: 0.85;
 }
 
 .inv-drop-icon {
@@ -891,6 +1006,13 @@
   box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
 }
 
+.inv-context-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--inv-text-muted);
+  font-style: italic;
+}
+
 /* ================================================================
    ANALYSIS RESULTS
    ================================================================ */
@@ -898,6 +1020,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow-x: auto; /* permite scroll horizontal en la tabla 5 Porqués */
 }
 
 /* ── Why Cards ── */
@@ -985,7 +1108,7 @@
   border: 1px solid rgba(23, 78, 166, 0.15);
 }
 
-[data-theme="dark"] .inv-fishbone-summary {
+[data-theme^="dark"] .inv-fishbone-summary {
   background: linear-gradient(135deg, rgba(77, 166, 255, 0.1) 0%, rgba(77, 166, 255, 0.05) 100%);
   border-color: rgba(77, 166, 255, 0.2);
 }
@@ -1604,7 +1727,6 @@
   border-radius: 3px;
 }
 
-.save-modal-loading,
 .save-modal-empty {
   display: flex;
   align-items: center;
@@ -1626,7 +1748,7 @@
   user-select: none;
 }
 
-[data-theme="dark"] .save-modal-folder-item {
+[data-theme^="dark"] .save-modal-folder-item {
   border-bottom-color: var(--inv-border-light);
 }
 
@@ -1644,7 +1766,7 @@
   padding-left: calc(0.75rem - 3px);
 }
 
-[data-theme="dark"] .save-modal-folder-item.selected {
+[data-theme^="dark"] .save-modal-folder-item.selected {
   background: rgba(77, 166, 255, 0.15);
 }
 
@@ -1864,3 +1986,380 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   REVIEW TOOLBAR (An�lisis de Causa Ra�z)
+   Sistema de 3 estados: idle ? reviewing ? approved (con dirty)
+   ============================================================ */
+
+.inv-review-toolbar {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--inv-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.inv-review-toolbar.hidden {
+  display: none;
+}
+
+.inv-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inv-review-actions.hidden {
+  display: none;
+}
+
+.inv-review-actions--idle {
+  justify-content: flex-start;
+}
+
+.inv-review-hint {
+  font-size: 0.8125rem;
+  color: var(--inv-text-muted);
+  margin-left: 0.5rem;
+}
+
+/* Botones de revisi�n (estilo consistente con K+AIR) */
+.inv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--inv-radius);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.inv-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inv-btn--primary {
+  background: var(--inv-primary, #2563eb);
+  color: white;
+  border-color: var(--inv-primary, #2563eb);
+}
+
+.inv-btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.inv-btn--secondary {
+  background: white;
+  color: var(--inv-text-primary);
+  border-color: var(--inv-border);
+}
+
+.inv-btn--secondary:hover:not(:disabled) {
+  background: var(--inv-surface-hover, #f3f4f6);
+}
+
+.inv-btn--ghost {
+  background: transparent;
+  color: var(--inv-text-muted);
+  border-color: transparent;
+}
+
+.inv-btn--ghost:hover:not(:disabled) {
+  background: var(--inv-surface-hover, #f3f4f6);
+}
+
+.inv-btn--success {
+  background: var(--inv-success, #16a34a);
+  color: white;
+  border-color: var(--inv-success, #16a34a);
+}
+
+.inv-btn--success:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+/* Textarea de feedback */
+.inv-review-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1 1 100%;
+}
+
+.inv-review-feedback label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--inv-text-primary);
+}
+
+.inv-textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--inv-border);
+  border-radius: var(--inv-radius);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  resize: vertical;
+  min-height: 2.5rem;
+}
+
+.inv-textarea:focus {
+  outline: none;
+  border-color: var(--inv-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* Badge de estado de revisi�n */
+.inv-review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.inv-review-badge.hidden {
+  display: none;
+}
+
+.inv-review-badge--reviewing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.inv-review-badge--approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.inv-review-badge--dirty {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.inv-review-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--inv-success, #16a34a);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Tabla editable de 5 Porqués */
+.inv-why-table {
+  width: 100%;
+  min-width: 60rem; /* fuerza scroll horizontal en vez de cortar columnas */
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  background: white;
+  border-radius: var(--inv-radius);
+  overflow: hidden;
+}
+
+.inv-why-table th,
+.inv-why-table td {
+  border: 1px solid var(--inv-border-light);
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.inv-why-table th {
+  background: var(--inv-surface-card, #f9fafb);
+  font-weight: 600;
+  color: var(--inv-text-primary);
+}
+
+.inv-why-table th.inv-why-col-nivel {
+  width: 5.5rem;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  background: var(--inv-surface-card, #f9fafb);
+  z-index: 2;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+/* (Eliminado) La columna Acción fue movida al header de cada nivel (inv-why-level-header). */
+
+.inv-why-table td.inv-why-cell-nivel {
+  text-align: center;
+  font-weight: 600;
+  background: var(--inv-surface-card, #f9fafb);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+  min-width: 5.5rem;
+}
+
+.inv-why-level-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.inv-why-level-number {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--inv-text-primary, #1f2937);
+}
+
+.inv-why-cell-edit {
+  min-width: 6rem;
+  min-height: 2.5rem;
+  cursor: text;
+  border-radius: 4px;
+  padding: 0.25rem 0.375rem;
+  transition: background 0.15s ease;
+}
+
+.inv-why-cell-edit:hover {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.inv-why-cell-edit:focus {
+  outline: none;
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.inv-why-cell-edit.is-user-edited {
+  background: #fef9c3;
+  border-left: 3px solid #facc15;
+}
+
+.inv-why-cell-na {
+  color: var(--inv-text-muted, #9ca3af);
+  font-style: italic;
+}
+
+/* (Eliminado) La columna Acción fue movida al header de cada nivel (inv-why-level-header)
+   para garantizar visibilidad sin depender de CSS sticky. */
+
+.inv-btn-regenerate-level {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--inv-border);
+  background: white;
+  color: var(--inv-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-size: 0.95rem;
+}
+
+.inv-btn-regenerate-level:hover:not(:disabled) {
+  border-color: var(--inv-primary, #2563eb);
+  color: var(--inv-primary, #2563eb);
+  transform: rotate(180deg);
+}
+
+.inv-btn-regenerate-level:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.inv-btn-regenerate-level.regenerating {
+  animation: inv-spin 1s linear infinite;
+}
+
+@keyframes inv-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Feedback visual de regeneración por nivel ─────────────────────────
+   - Flash verde temporal (1.6s) en las celdas que el modelo acaba de
+     regenerar, para que el usuario vea QUÉ fila cambió.
+   - Badge persistente "✨" junto al número del nivel regenerado,
+     para que pueda identificarlo incluso después de la animación.
+   El merge JS (_onRegenerateLevel) quita la clase tras 1700ms para
+   permitir re-flash si vuelve a regenerar el mismo nivel.
+   ─────────────────────────────────────────────────────────────────── */
+@keyframes inv-flash-regenerated {
+  0%   { background: #d1fae5; box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.55); }
+  60%  { background: #d1fae5; box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.25); }
+  100% { background: transparent; box-shadow: inset 0 0 0 0 transparent; }
+}
+.inv-why-cell-edit.is-just-regenerated {
+  animation: inv-flash-regenerated 1.6s ease-out;
+}
+
+.inv-why-level-number.is-regenerated {
+  position: relative;
+  color: var(--inv-primary, #2563eb);
+  cursor: help;
+}
+.inv-why-level-number.is-regenerated::after {
+  content: ' ✨';
+  font-size: 0.75rem;
+  margin-left: 0.15rem;
+  vertical-align: super;
+}
+
+/* ============================================================================
+   📦780 — HEADER SYSTEM v2 (premium). Breadcrumb + icon chip + título Manrope
+   + subtítulo + acciones. Transparente sobre el canvas (sin card/borde).
+   ============================================================================ */
+.inv-header-v2 {
+  flex-shrink: 0;
+  padding: 16px clamp(14px, 1.6vw, 24px) 0;
+  background: transparent;
+}
+.inv-breadcrumb {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  font-size: 12.5px; color: var(--inv-text-muted); margin-bottom: 12px;
+}
+.inv-breadcrumb strong { color: var(--inv-text-primary); font-weight: 700; }
+.inv-breadcrumb .inv-sep { opacity: .7; }
+.inv-header-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--inv-border);
+}
+.inv-header-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.inv-header-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--inv-primary-light); color: var(--inv-primary);
+}
+.inv-header-icon svg { width: 22px; height: 22px; }
+.inv-header-titles { min-width: 0; }
+.inv-title {
+  font-family: var(--inv-font-display); font-size: 19px; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1.2; margin: 0; color: var(--inv-text-primary);
+}
+.inv-sub { font-size: 12.5px; color: var(--inv-text-muted); margin: 3px 0 0; }
+.inv-header-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap; }
+.inv-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  border-radius: 10px; border: 1px solid var(--inv-border);
+  background: var(--inv-surface-card); color: var(--inv-text-secondary);
+  cursor: pointer; transition: var(--inv-transition);
+}
+.inv-btn svg { width: 15px; height: 15px; }
+.inv-btn:hover:not(:disabled) { background: var(--inv-primary-light); border-color: var(--inv-primary); color: var(--inv-primary); }
+.inv-btn:disabled { opacity: .55; cursor: not-allowed; }
+.inv-btn--primary { background: var(--inv-primary); border-color: var(--inv-primary); color: #fff; }
+.inv-btn--primary:hover:not(:disabled) { background: var(--inv-primary-hover); color: #fff; }

@@ -231,13 +231,16 @@ var RevisionAltaDireccionComponent = (function() {
      TOAST · Feedback visual no-bloqueante
      ═══════════════════════════════════════════════════════════════════════ */
 
-  /* F-Sileo (2026-06-19): toast() ahora es un proxy a Sileo.
-     Mantiene la firma (title, msg, type) para no tocar los ~30 call-sites. */
   function toast(title, msg, type) {
-    if (window.Sileo && window.Sileo[type || 'info']) {
-      window.Sileo[type || 'info']({ title: title, description: msg });
+    if (window.updateNotifier && typeof window.updateNotifier.show === 'function') {
+      window.updateNotifier.show({
+        type: type || 'info',
+        title: title,
+        subtitle: msg || '',
+        autoClose: type === 'error' ? 6000 : type === 'warning' ? 4000 : 5000
+      });
     } else {
-      /* Fallback al sistema legacy si Sileo no está cargado todavía */
+      /* Fallback al sistema legacy si updateNotifier no está disponible */
       var stack = document.getElementById('kair-rad-toast-stack');
       if (!stack) return;
       var icons = {
@@ -320,25 +323,9 @@ var RevisionAltaDireccionComponent = (function() {
    * @param {string} [opts.variant]   - 'danger' | 'warning' | 'info' (default: 'danger')
    * @returns {Promise<boolean>}    - true si el usuario aceptó, false si canceló
    */
-  /* F-Sileo (2026-06-19): _showConfirmDialog() ahora es un proxy a Sileo.confirm.
-     Mantiene la firma ({title, message, acceptLabel, cancelLabel, warning, variant}).
-     Devuelve Promise<boolean> igual que antes. */
   function _showConfirmDialog(opts) {
     try { console.log('[K+AIRSST][6.1.3][DELETE-MODAL] _showConfirmDialog() opts:', opts); } catch (e) {}
 
-    if (window.Sileo && window.Sileo.confirm) {
-      var description = opts.message || '¿Estás seguro?';
-      if (opts.warning) description += '\n\n⚠ ' + opts.warning;
-      return window.Sileo.confirm({
-        title:      opts.title || 'Confirmar acción',
-        description: description,
-        confirmText: opts.acceptLabel || 'Confirmar',
-        cancelText:  opts.cancelLabel || 'Cancelar',
-        danger:     opts.variant !== 'warning' /* default: danger */
-      });
-    }
-
-    /* Fallback al modal legacy si Sileo aún no cargó */
     return new Promise(function(resolve) {
       var overlay = _ensureConfirmModal();
       document.getElementById('kair-rad-confirm-title-text').textContent = opts.title || 'Confirmar acción';
@@ -653,23 +640,6 @@ var RevisionAltaDireccionComponent = (function() {
       link.href = href;
       document.head.appendChild(link);
       log('CSS_LOAD', 'INFO', href);
-    }
-    /* F-Sileo (2026-06-19): cargar assets de Sileo vanilla (aislado a 6.1.3) */
-    if (!document.querySelector('link[href*="k-sileo.css"]')) {
-      var sileoCss = document.createElement('link');
-      sileoCss.rel = 'stylesheet';
-      sileoCss.href = 'shared/k-sileo.css';
-      document.head.appendChild(sileoCss);
-      log('SILEO_CSS', 'INFO', 'shared/k-sileo.css');
-    }
-    if (!document.querySelector('script[src*="k-sileo.js"]') && !window.Sileo) {
-      var sileoScript = document.createElement('script');
-      sileoScript.src = 'shared/k-sileo.js';
-      sileoScript.onload = function () { log('SILEO_JS', 'INFO', 'Cargado y listo'); };
-      sileoScript.onerror = function () { log('SILEO_JS', 'ERROR', 'No se pudo cargar shared/k-sileo.js'); };
-      document.head.appendChild(sileoScript);
-    } else {
-      log('SILEO_JS', 'INFO', 'Ya estaba cargado');
     }
   }
 
@@ -1778,11 +1748,9 @@ var RevisionAltaDireccionComponent = (function() {
     var cta = document.getElementById('kair-rad-cta-new');
     if (cta) {
       cta.addEventListener('click', async function() {
-        var t = null;
-        try { t = Sileo.loading({ title: 'Nueva Revisión Gerencial', description: 'Creando borrador inicial...' }); } catch (e) {}
+        toast('Nueva Revisión Gerencial', 'Creando borrador inicial...', 'info');
         try {
           var result = await guardarRevision({}, true);
-          if (t) { try { t.dismiss(); } catch (e) {} }
           if (result && result.success && result.revision) {
             /* Poner la nueva como ciclo activo */
             state.cicloActivo = result.revision;
@@ -1791,7 +1759,6 @@ var RevisionAltaDireccionComponent = (function() {
             navigate('revisiones-list');
           }
         } catch (e) {
-          if (t) { try { t.dismiss(); } catch (e) {} }
           log('NEW', 'ERROR', e && e.message ? e.message : String(e));
           navigate('revisiones-list');
         }
@@ -1907,18 +1874,15 @@ var RevisionAltaDireccionComponent = (function() {
             navigate('revisiones-editor', { id: state.cicloActivo.id });
             return;
           }
-          var t = null;
-          try { t = Sileo.loading({ title: 'Iniciando ciclo de revisión', description: 'Conforme a G-PR-001' }); } catch (e) {}
+          toast('Iniciando ciclo de revisión', 'Conforme a G-PR-001', 'info');
           try {
             var result = await guardarRevision({}, true);
-            if (t) { try { t.dismiss(); } catch (e) {} }
             if (result && result.success && result.revision) {
               navigate('revisiones-editor', { id: result.revision.id });
             } else {
               navigate('revisiones-list');
             }
           } catch (e) {
-            if (t) { try { t.dismiss(); } catch (e) {} }
             log('OPEN_CYCLE', 'ERROR', e && e.message ? e.message : String(e));
             navigate('revisiones-list');
           }

@@ -6,11 +6,17 @@ class KAIRToast {
 
   get hub() {
     if (!this._hub) {
-      this._hub = document.getElementById('notification-hub');
+      // 📦696 — Si estamos en un iframe, usar el hub del PARENT (donde SÍ está
+      // el CSS de styles.css y el <div id="notification-hub">). El iframe
+      // no carga styles.css (heredar estilos cross-frame es complejo), así
+      // que el toast se ve sin estilo si se renderiza local.
+      var isInIframe = (typeof window !== 'undefined' && window.parent && window.parent !== window);
+      var doc = isInIframe ? window.parent.document : document;
+      this._hub = doc.getElementById('notification-hub');
       if (!this._hub) {
-        const el = document.createElement('div');
+        const el = doc.createElement('div');
         el.id = 'notification-hub';
-        document.body.appendChild(el);
+        doc.body.appendChild(el);
         this._hub = el;
       }
     }

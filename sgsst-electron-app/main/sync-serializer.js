@@ -1,0 +1,997 @@
+/**
+ * main/sync-serializer.js
+ *
+ * Serializer/Deserializer para el sync multipc de K+AIR (📦536).
+ * Convierte los datos sincronizables de una empresa entre la BD local
+ * (SQLite) y un archivo .kairsync (JSON) con last-write-wins por registro.
+ *
+ * Tablas sincronizables (lo que SI va al hub):
+ *   - evaluacion_action_plans   (planes de acción 2.3.1, incluye seguimientos+responsables)
+ *   - gestaciones + seguimiento_gestacion_mensual   (📦466, Salud Materna)
+ *   - eventos_cumplidos
+ *   - eventos_rapidos
+ *   - ausentismo                 (vía IPC de medición ausentismo — ver 📦538)
+ *
+ * Tablas NO sincronizables (quedan locales por PC):
+ *   - users, roles, companies, user_company_roles, sessions
+ *   - config (config.json vive local)
+ *   - cualquier tabla de OTRAS empresas (filtro por empresa_id)
+ *
+ * Diseño:
+ *   - El JSON se construye como un snapshot completo de la empresa, NO diffs.
+ *     Empresa típica < 1MB, aceptable para sync frecuente.
+ *   - Cada registro lleva su propio `updatedAt` (ISO 8601). El merge compara
+ *     updatedAt remoto vs local para decidir quién gana (last-write-wins).
+ *   - Si el archivo remoto está corrupto, el puller lo mueve a .bak y sigue.
+ *   - Si la versión del .kairsync no coincide, se rechaza con error claro.
+ *   - Las funciones de tabla que no existan aún (ej: la app nunca entró a
+ *     gestaciones) devuelven array vacío silenciosamente, no rompen.
+ *
+ * Este módulo NO se conecta a Electron ni abre archivos del hub por su cuenta.
+ * Solo exporta funciones puras de transformacion BD <-> JSON. La lectura/
+ * escritura del archivo .kairsync la hace el SyncService (📦537).
+ */
+'use strict';
+
+const fsp = require('fs').promises;
+const path = require('path');
+
+const SYNC_VERSION = 1;
+const MOD = 'SYNC-SERIALIZER';
+
+// =====================================================================
+// SERIALIZE: BD local -> JSON para subir al hub
+// =====================================================================
+
+/**
+ * Genera el JSON consolidado de una empresa para subir al hub.
+ * Lee TODOS los registros sincronizables de las tablas filtradas por
+ * empresaId, los empaca en la estructura definida en §5.1 del spec.
+ *
+ * @param {object} db - better-sqlite3 db handle
+ * @param {string} companyKey - Identificador único de la empresa (= currentCompany)
+ * @param {string} pcId - ID de la PC que está escribiendo
+ * @param {string} userName - Nombre del usuario actual
+ * @param {string} appVersion - Versión de la app (ej: '0.1.114')
+ * @returns {object} Objeto JSON listo para serializar con JSON.stringify
+ */
+function serializeEmpresaToSync(db, companyKey, pcId, userName, appVersion) {
+  if (!db) throw new Error('[' + MOD + '] db requerido');
+  if (!companyKey) throw new Error('[' + MOD + '] companyKey requerido');
+
+  var now = new Date().toISOString();
+
+  return {
+    version: SYNC_VERSION,
+    companyKey: companyKey,
+    lastWriteAt: now,
+    lastWriter: {
+      pcId: pcId || 'unknown',
+      userName: userName || 'unknown',
+      appVersion: appVersion || '0.0.0'
+    },
+    entities: {
+      planes_accion: _serializePlanesAccion(db, companyKey),
+      gestaciones: _serializeGestaciones(db, companyKey),
+      eventos_cumplidos: _serializeEventosCumplidos(db, companyKey),
+      eventos_rapidos: _serializeEventosRapidos(db, companyKey),
+      // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2).
+      // El catálogo NO se sincroniza (es el mismo para todas las empresas),
+      // solo las tablas de asignaciones y divulgaciones por empresa.
+      roles_responsabilidades_asignacion: _serializeRolesResponsabilidadesAsignacion(db, companyKey),
+      roles_responsabilidades_divulgacion: _serializeRolesResponsabilidadesDivulgacion(db, companyKey),
+      // 📦706 (2026-08-14) — Multi-documento: sync de los PDFs por divulgación
+      roles_responsabilidades_divulgacion_documento: _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey)
+      // ausentismo: lo agregamos en 📦538 cuando veamos la estructura
+      // real del bridge de medición ausentismo
+    }
+  };
+}
+
+function _serializePlanesAccion(db, companyKey) {
+  try {
+    var rows = db.prepare(
+      'SELECT id, year, source, plan_json, updated_at FROM evaluacion_action_plans ' +
+      'WHERE empresa_id = ? ORDER BY updated_at DESC'
+    ).all(companyKey);
+
+    return rows.map(function (row) {
+      var plan;
+      try {
+        plan = JSON.parse(row.plan_json);
+      } catch (e) {
+        console.error('[' + MOD + '] Plan con JSON invalido (id=' + row.id + '): ' + e.message);
+        return null;
+      }
+      return {
+        id: row.id,
+        year: row.year || '',
+        source: row.source,
+        plan: plan,
+        updatedAt: row.updated_at
+      };
+    }).filter(function (p) { return p !== null; });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando planes_accion:', e.message);
+    return [];
+  }
+}
+
+function _serializeGestaciones(db, companyKey) {
+  try {
+    // Verificar si la tabla existe antes de consultar (puede que la app
+    // nunca haya entrado al módulo de gestación)
+    var tableExists = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='gestaciones'"
+    ).get();
+    if (!tableExists) return [];
+
+    var rows = db.prepare(
+      'SELECT * FROM gestaciones WHERE empresa_id = ? ORDER BY actualizado_en DESC'
+    ).all(companyKey);
+
+    var result = [];
+    for (var i = 0; i < rows.length; i++) {
+      var g = rows[i];
+      var seguimientos = [];
+      try {
+        seguimientos = db.prepare(
+          'SELECT * FROM seguimiento_gestacion_mensual WHERE gestacion_id = ? ORDER BY fecha ASC'
+        ).all(g.id);
+      } catch (e) {
+        // Si la tabla de seguimientos no existe, seguir con array vacio
+        console.warn('[' + MOD + '] No se pudieron cargar seguimientos de gestacion ' + g.id + ': ' + e.message);
+      }
+      result.push({
+        id: g.id,
+        gestante: g,
+        seguimientos: seguimientos,
+        updatedAt: g.actualizado_en || g.created_at || new Date().toISOString()
+      });
+    }
+    return result;
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando gestaciones:', e.message);
+    return [];
+  }
+}
+
+function _serializeEventosCumplidos(db, companyKey) {
+  try {
+    var tableExists = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos_cumplidos'"
+    ).get();
+    if (!tableExists) return [];
+
+    // 📦694-fix3 — El schema real usa (evento_id PK, empresa_id, cumplido_en, nota)
+    // NO tiene columna `updated_at` ni `id`. Usar `cumplido_en` como "updatedAt"
+    // proxy y `evento_id` como id para que el sync multipc tenga last-write-wins.
+    var rows = db.prepare(
+      'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos ' +
+      'WHERE empresa_id = ? ORDER BY cumplido_en DESC'
+    ).all(companyKey);
+
+    return rows.map(function (r) {
+      return {
+        id: r.evento_id,
+        evento: r,
+        updatedAt: r.cumplido_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando eventos_cumplidos:', e.message);
+    return [];
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación)
+function _serializeRolesResponsabilidadesAsignacion(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_asignacion WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function(r) {
+      return {
+        id: r.id,
+        empresa_id: r.empresa_id,
+        rol_id: r.rol_id,
+        persona_cedula: r.persona_cedula,
+        persona_nombre: r.persona_nombre,
+        persona_cargo: r.persona_cargo,
+        fecha_asignacion: r.fecha_asignacion,
+        fecha_vigencia_hasta: r.fecha_vigencia_hasta,
+        documento_soporte_path: r.documento_soporte_path,
+        creado_por: r.creado_por,
+        creado_en: r.creado_en,
+        actualizado_en: r.actualizado_en,
+        activo: r.activo,
+        updatedAt: r.actualizado_en || r.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_asignacion:', e.message);
+    return [];
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación)
+// 📦706-fix18 (2026-08-14) — Sincroniza también las columnas nuevas:
+// periodo, es_nueva_contratacion, fecha_vigencia_hasta (necesarias para
+// que el cambio de "1 fila por persona" funcione entre PCs).
+function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_divulgacion WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function(r) {
+      return {
+        id: r.id,
+        empresa_id: r.empresa_id,
+        persona_cedula: r.persona_cedula,
+        persona_nombre: r.persona_nombre,
+        persona_cargo: r.persona_cargo,
+        version_responsabilidades: r.version_responsabilidades,
+        estado: r.estado,
+        fecha_divulgacion: r.fecha_divulgacion,
+        fecha_aceptacion: r.fecha_aceptacion,
+        metodo: r.metodo,
+        ip: r.ip,
+        user_agent: r.user_agent,
+        documento_soporte_path: r.documento_soporte_path,
+        creado_en: r.creado_en,
+        // 📦706-fix18 — Columnas nuevas del multi-documento
+        periodo: r.periodo,
+        es_nueva_contratacion: r.es_nueva_contratacion,
+        fecha_vigencia_hasta: r.fecha_vigencia_hasta,
+        updatedAt: r.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_divulgacion:', e.message);
+    return [];
+  }
+}
+
+function _serializeEventosRapidos(db, companyKey) {
+  try {
+    var tableExists = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos_rapidos'"
+    ).get();
+    if (!tableExists) return [];
+
+    // 📦694-fix3 — El schema real de eventos_rapidos NO tiene columna `empresa_id`.
+    // Filtramos por todas las PCs sincronizan TODOS los rapidos (subóptimo pero
+    // no rompe). Cuando se agregue empresa_id a eventos_rapidos (issue separado),
+    // este filtro se actualiza.
+    var rows = db.prepare(
+      'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at ' +
+      'FROM eventos_rapidos ORDER BY updated_at DESC'
+    ).all();
+
+    return rows.map(function (r) {
+      return {
+        id: r.id,
+        evento: r,
+        updatedAt: r.updated_at || r.created_at || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando eventos_rapidos:', e.message);
+    return [];
+  }
+}
+
+// =====================================================================
+// DESERIALIZE: JSON del hub -> BD local con last-write-wins por registro
+// =====================================================================
+
+/**
+ * Aplica un JSON remoto a la BD local con last-write-wins por registro.
+ * Por cada registro remoto, compara updatedAt con el local (busca por id):
+ *   - Si no existe local -> INSERT
+ *   - Si remoto mas nuevo -> UPDATE local con el remoto
+ *   - Si local mas nuevo o igual -> SKIP (mantener local)
+ *
+ * @param {object} db - better-sqlite3 db handle
+ * @param {object} syncData - JSON parseado del archivo .kairsync
+ * @param {object} [options] - { conflictLog: function(localRec, remoteRec) }
+ * @returns {object} { applied: N, conflicts: M, skipped: K, byEntity: {...} }
+ */
+function deserializeSyncToDb(db, syncData, options) {
+  if (!db) throw new Error('[' + MOD + '] db requerido');
+  if (!syncData || typeof syncData !== 'object') {
+    throw new Error('[' + MOD + '] syncData debe ser objeto JSON parseado');
+  }
+  if (syncData.version !== SYNC_VERSION) {
+    throw new Error(
+      '[' + MOD + '] version del .kairsync (' + syncData.version +
+      ') no coincide con la esperada (' + SYNC_VERSION + ')'
+    );
+  }
+
+  options = options || {};
+  var conflictLog = options.conflictLog || function () {};
+
+  var result = {
+    applied: 0,
+    conflicts: 0,
+    skipped: 0,
+    byEntity: {
+      planes_accion: { applied: 0, conflicts: 0, skipped: 0 },
+      gestaciones: { applied: 0, conflicts: 0, skipped: 0 },
+      eventos_cumplidos: { applied: 0, conflicts: 0, skipped: 0 },
+      eventos_rapidos: { applied: 0, conflicts: 0, skipped: 0 },
+      // 📦705 (2026-08-13) — Roles y Responsabilidades
+      roles_responsabilidades_asignacion: { applied: 0, conflicts: 0, skipped: 0 },
+      roles_responsabilidades_divulgacion: { applied: 0, conflicts: 0, skipped: 0 },
+      // 📦706 (2026-08-14) — Multi-documento
+      roles_responsabilidades_divulgacion_documento: { applied: 0, conflicts: 0, skipped: 0 }
+    }
+  };
+
+  var entities = syncData.entities || {};
+  if (entities.planes_accion) {
+    _deserializePlanesAccion(db, entities.planes_accion, syncData.companyKey, result, conflictLog);
+  }
+  if (entities.gestaciones) {
+    _deserializeGestaciones(db, entities.gestaciones, syncData.companyKey, result, conflictLog);
+  }
+  if (entities.eventos_cumplidos) {
+    _deserializeEventosCumplidos(db, entities.eventos_cumplidos, syncData.companyKey, result, conflictLog);
+  }
+  if (entities.eventos_rapidos) {
+    _deserializeEventosRapidos(db, entities.eventos_rapidos, syncData.companyKey, result, conflictLog);
+  }
+  // 📦705 (2026-08-13) — Roles y Responsabilidades
+  if (entities.roles_responsabilidades_asignacion) {
+    _deserializeRolesResponsabilidadesAsignacion(db, entities.roles_responsabilidades_asignacion, syncData.companyKey, result, conflictLog);
+  }
+  if (entities.roles_responsabilidades_divulgacion) {
+    _deserializeRolesResponsabilidadesDivulgacion(db, entities.roles_responsabilidades_divulgacion, syncData.companyKey, result, conflictLog);
+  }
+  // 📦706 (2026-08-14) — Multi-documento
+  if (entities.roles_responsabilidades_divulgacion_documento) {
+    _deserializeRolesResponsabilidadesDivulgacionDocumento(db, entities.roles_responsabilidades_divulgacion_documento, syncData.companyKey, result, conflictLog);
+  }
+
+  return result;
+}
+
+function _deserializePlanesAccion(db, remoteRecords, companyKey, result, conflictLog) {
+  var counter = result.byEntity.planes_accion;
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.updatedAt) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+
+    var local = db.prepare(
+      'SELECT id, plan_json, updated_at FROM evaluacion_action_plans WHERE id = ? AND empresa_id = ?'
+    ).get(remote.id, companyKey);
+
+    if (!local) {
+      // No existe local -> INSERT
+      try {
+        db.prepare(
+          'INSERT INTO evaluacion_action_plans (id, empresa_id, year, source, plan_json, updated_at) ' +
+          'VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(
+          remote.id,
+          companyKey,
+          remote.year || '',
+          remote.source || 'manual',
+          JSON.stringify(remote.plan),
+          remote.updatedAt
+        );
+        counter.applied++;
+        result.applied++;
+      } catch (e) {
+        console.error('[' + MOD + '] Error insertando plan ' + remote.id + ': ' + e.message);
+        counter.skipped++;
+        result.skipped++;
+      }
+    } else if (remote.updatedAt > local.updated_at) {
+      // Remoto es mas nuevo -> UPDATE
+      try {
+        db.prepare(
+          'UPDATE evaluacion_action_plans ' +
+          'SET plan_json = ?, source = ?, year = ?, updated_at = ? ' +
+          'WHERE id = ? AND empresa_id = ?'
+        ).run(
+          JSON.stringify(remote.plan),
+          remote.source || 'manual',
+          remote.year || '',
+          remote.updatedAt,
+          remote.id,
+          companyKey
+        );
+        counter.applied++;
+        counter.conflicts++;
+        result.applied++;
+        result.conflicts++;
+        conflictLog(
+          { id: remote.id, updatedAt: local.updated_at },
+          { id: remote.id, updatedAt: remote.updatedAt }
+        );
+      } catch (e) {
+        console.error('[' + MOD + '] Error actualizando plan ' + remote.id + ': ' + e.message);
+        counter.skipped++;
+        result.skipped++;
+      }
+    } else {
+      // Local mas nuevo o igual -> SKIP
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+function _deserializeGestaciones(db, remoteRecords, companyKey, result, conflictLog) {
+  // Verificar que la tabla existe antes de intentar escribir
+  var tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='gestaciones'"
+  ).get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla gestaciones no existe, saltando merge');
+    return;
+  }
+
+  var counter = result.byEntity.gestaciones;
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.updatedAt || !remote.gestante) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+
+    try {
+      // 1) UPSERT de la gestante (last-write-wins por updatedAt)
+      var localG = db.prepare(
+        'SELECT id, actualizado_en FROM gestaciones WHERE id = ?'
+      ).get(remote.id);
+      var g = remote.gestante;
+      if (!localG) {
+        // INSERT gestante nueva
+        var colsG = Object.keys(g);
+        var placeholdersG = colsG.map(function () { return '?'; }).join(', ');
+        var valuesG = colsG.map(function (k) { return g[k] != null ? g[k] : null; });
+        var stmtG = db.prepare(
+          'INSERT INTO gestaciones (' + colsG.join(', ') + ') VALUES (' + placeholdersG + ')'
+        );
+        stmtG.run.apply(stmtG, valuesG);
+        counter.applied++;
+        result.applied++;
+      } else if (g.actualizado_en && g.actualizado_en > localG.actualizado_en) {
+        // UPDATE gestante con datos mas nuevos
+        var setG = Object.keys(g).map(function (k) { return k + ' = ?'; }).join(', ');
+        var valuesG2 = Object.keys(g).map(function (k) { return g[k] != null ? g[k] : null; });
+        valuesG2.push(remote.id);
+        var stmtG2 = db.prepare(
+          'UPDATE gestaciones SET ' + setG + ' WHERE id = ?'
+        );
+        stmtG2.run.apply(stmtG2, valuesG2);
+        counter.applied++;
+        result.applied++;
+      } else {
+        counter.skipped++;
+        result.skipped++;
+      }
+
+      // 2) UPSERT de cada seguimiento (last-write-wins)
+      if (Array.isArray(remote.seguimientos)) {
+        // Verificar que la tabla de seguimientos existe
+        var segTableExists = db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='seguimiento_gestacion_mensual'"
+        ).get();
+        if (!segTableExists) {
+          console.warn('[' + MOD + '] Tabla seguimiento_gestacion_mensual no existe, saltando merge de seguimientos');
+          continue;
+        }
+
+        for (var j = 0; j < remote.seguimientos.length; j++) {
+          var seg = remote.seguimientos[j];
+          if (!seg || !seg.id) {
+            counter.skipped++;
+            result.skipped++;
+            continue;
+          }
+          // La tabla seguimiento_gestacion_mensual tiene su propio updatedAt-ish.
+          // Usamos creado_en como proxy si no hay updated_at explicito.
+          // Si created/updated es null, saltamos.
+          var localS = db.prepare(
+            'SELECT id, creado_en FROM seguimiento_gestacion_mensual WHERE id = ?'
+          ).get(seg.id);
+          if (!localS) {
+            // INSERT
+            try {
+              var colsS = Object.keys(seg);
+              var placeholdersS = colsS.map(function () { return '?'; }).join(', ');
+              var valuesS = colsS.map(function (k) { return seg[k] != null ? seg[k] : null; });
+              var stmtS = db.prepare(
+                'INSERT INTO seguimiento_gestacion_mensual (' + colsS.join(', ') + ') VALUES (' + placeholdersS + ')'
+              );
+              stmtS.run.apply(stmtS, valuesS);
+              counter.applied++;
+              result.applied++;
+            } catch (insertErr) {
+              counter.skipped++;
+              result.skipped++;
+            }
+          } else {
+            // Ya existe local. Last-write-wins: comparamos creado_en.
+            // En la tabla seguimiento_gestacion_mensual el timestamp es creado_en
+            // (no hay columna updated_at). Si el remoto es mas nuevo, UPDATE.
+            var segUpdated = seg.creado_en || seg.actualizado_en;
+            if (segUpdated && (!localS.creado_en || segUpdated > localS.creado_en)) {
+              try {
+                var setS = Object.keys(seg).map(function (k) { return k + ' = ?'; }).join(', ');
+                var valuesS2 = Object.keys(seg).map(function (k) { return seg[k] != null ? seg[k] : null; });
+                valuesS2.push(seg.id);
+                var stmtS2 = db.prepare(
+                  'UPDATE seguimiento_gestacion_mensual SET ' + setS + ' WHERE id = ?'
+                );
+                stmtS2.run.apply(stmtS2, valuesS2);
+                counter.applied++;
+                result.applied++;
+              } catch (updErr) {
+                counter.skipped++;
+                result.skipped++;
+              }
+            } else {
+              counter.skipped++;
+              result.skipped++;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error mergeando gestacion ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos_cumplidos'"
+  ).get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla eventos_cumplidos no existe, saltando merge');
+    return;
+  }
+
+  // 📦694-fix3 — Ajustar al schema real: PK = evento_id, sin updated_at,
+  // timestamp es cumplido_en. Usamos evento_id en lugar de id y cumplido_en
+  // para comparar last-write-wins.
+  var counter = result.byEntity.eventos_cumplidos;
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.updatedAt) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+
+    var local = db.prepare(
+      'SELECT evento_id, cumplido_en FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
+    ).get(remote.id, companyKey);
+
+    if (!local) {
+      try {
+        var evento = remote.evento || {};
+        db.prepare(
+          'INSERT OR IGNORE INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota) ' +
+          'VALUES (?, ?, ?, ?)'
+        ).run(remote.id, companyKey, remote.updatedAt, evento.nota || '');
+        counter.applied++;
+        result.applied++;
+      } catch (e) {
+        console.error('[' + MOD + '] Error insertando evento_cumplido ' + remote.id + ': ' + e.message);
+        counter.skipped++;
+        result.skipped++;
+      }
+    } else if (remote.updatedAt > local.cumplido_en) {
+      try {
+        var eventoUpd = remote.evento || {};
+        db.prepare(
+          'UPDATE eventos_cumplidos SET cumplido_en = ?, nota = ? ' +
+          'WHERE evento_id = ? AND empresa_id = ?'
+        ).run(remote.updatedAt, eventoUpd.nota || '', remote.id, companyKey);
+        counter.applied++;
+        counter.conflicts++;
+        result.applied++;
+        result.conflicts++;
+      } catch (e) {
+        console.error('[' + MOD + '] Error actualizando evento_cumplido ' + remote.id + ': ' + e.message);
+        counter.skipped++;
+        result.skipped++;
+      }
+    } else {
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación) — deserialización
+function _deserializeRolesResponsabilidadesAsignacion(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_asignacion no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_asignacion || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.rol_id || !remote.empresa_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      var local = db.prepare(
+        'SELECT id, actualizado_en FROM roles_responsabilidades_asignacion WHERE id = ? AND empresa_id = ?'
+      ).get(remote.id, companyKey);
+      if (!local) {
+        db.prepare(`
+          INSERT INTO roles_responsabilidades_asignacion
+            (empresa_id, rol_id, persona_cedula, persona_nombre, persona_cargo,
+             fecha_asignacion, fecha_vigencia_hasta, documento_soporte_path,
+             creado_por, creado_en, actualizado_en, activo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          remote.empresa_id, remote.rol_id, remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.fecha_asignacion, remote.fecha_vigencia_hasta, remote.documento_soporte_path,
+          remote.creado_por, remote.creado_en, remote.actualizado_en, remote.activo != null ? remote.activo : 1
+        );
+        counter.applied++;
+        result.applied++;
+      } else {
+        db.prepare(`
+          UPDATE roles_responsabilidades_asignacion
+          SET persona_cedula = ?, persona_nombre = ?, persona_cargo = ?,
+              fecha_asignacion = ?, fecha_vigencia_hasta = ?, documento_soporte_path = ?,
+              actualizado_en = ?, activo = ?
+          WHERE id = ? AND empresa_id = ?
+        `).run(
+          remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.fecha_asignacion, remote.fecha_vigencia_hasta, remote.documento_soporte_path,
+          remote.actualizado_en, remote.activo != null ? remote.activo : 1,
+          remote.id, companyKey
+        );
+        counter.applied++;
+        result.applied++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando asignacion ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación) — deserialización
+// 📦706-fix18 (2026-08-14) — INSERT/UPDATE incluyen periodo, es_nueva_contratacion,
+// fecha_vigencia_hasta para que el sync respete la regla "1 fila por persona".
+function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_divulgacion no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_divulgacion || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.persona_cedula || !remote.empresa_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      var local = db.prepare(
+        'SELECT id, creado_en FROM roles_responsabilidades_divulgacion WHERE id = ? AND empresa_id = ?'
+      ).get(remote.id, companyKey);
+      if (!local) {
+        // 📦706-fix18 — 16 columnas (3 nuevas: periodo, es_nueva_contratacion, fecha_vigencia_hasta)
+        db.prepare(`
+          INSERT INTO roles_responsabilidades_divulgacion
+            (empresa_id, persona_cedula, persona_nombre, persona_cargo,
+             version_responsabilidades, estado, fecha_divulgacion, fecha_aceptacion,
+             metodo, ip, user_agent, documento_soporte_path, creado_en,
+             periodo, es_nueva_contratacion, fecha_vigencia_hasta)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          remote.empresa_id, remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.version_responsabilidades, remote.estado, remote.fecha_divulgacion, remote.fecha_aceptacion,
+          remote.metodo || 'app', remote.ip, remote.user_agent, remote.documento_soporte_path, remote.creado_en,
+          remote.periodo || null, remote.es_nueva_contratacion || 0, remote.fecha_vigencia_hasta || null
+        );
+        counter.applied++;
+        result.applied++;
+      } else {
+        // 📦706-fix18 — UPDATE incluye las 3 columnas nuevas para mantener consistencia
+        db.prepare(`
+          UPDATE roles_responsabilidades_divulgacion
+          SET persona_nombre = ?, persona_cargo = ?, estado = ?,
+              fecha_divulgacion = ?, fecha_aceptacion = ?,
+              documento_soporte_path = ?,
+              periodo = COALESCE(?, periodo),
+              es_nueva_contratacion = COALESCE(?, es_nueva_contratacion),
+              fecha_vigencia_hasta = ?
+          WHERE id = ? AND empresa_id = ?
+        `).run(
+          remote.persona_nombre, remote.persona_cargo, remote.estado,
+          remote.fecha_divulgacion, remote.fecha_aceptacion, remote.documento_soporte_path,
+          remote.periodo, remote.es_nueva_contratacion, remote.fecha_vigencia_hasta,
+          remote.id, companyKey
+        );
+        counter.applied++;
+        result.applied++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando divulgacion ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// 📦706 (2026-08-14) — Multi-documento: serialización de los PDFs por
+// divulgación. Append-only: cada documento es 1 fila. Sincronizamos por
+// empresa_id y por divulgacion_id (los IDs son globales pero filtramos
+// por empresa para que cada PC solo sincronice sus docs).
+function _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion_documento'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_divulgacion_documento WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function (r) {
+      return {
+        id: r.id,
+        divulgacion_id: r.divulgacion_id,
+        empresa_id: r.empresa_id,
+        persona_cedula: r.persona_cedula,
+        file_path: r.file_path,
+        filename: r.filename,
+        bytes: r.bytes,
+        fecha_carga: r.fecha_carga,
+        fecha_documento: r.fecha_documento,
+        es_actual: r.es_actual,
+        es_correccion: r.es_correccion,
+        metodo: r.metodo,
+        ip: r.ip,
+        user_agent: r.user_agent,
+        creado_por: r.creado_por,
+        observaciones: r.observaciones,
+        updated_at: r.fecha_carga // usar fecha_carga como updated_at
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_divulgacion_documento:', e.message);
+    return [];
+  }
+}
+
+// 📦706 (2026-08-14) — Multi-documento: deserialización. INSERT OR IGNORE
+// por id (PK). Si la divulgacion padre no existe en el destino, el doc
+// queda "huérfano" pero la siguiente divulgación-sync los traerá. Logueamos
+// warning si pasa.
+function _deserializeRolesResponsabilidadesDivulgacionDocumento(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion_documento'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_divulgacion_documento no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_divulgacion_documento || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.divulgacion_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      // Verificar que la divulgacion padre existe (FK)
+      var divExists = db.prepare(
+        'SELECT id FROM roles_responsabilidades_divulgacion WHERE id = ?'
+      ).get(remote.divulgacion_id);
+      if (!divExists) {
+        counter.skipped++;
+        result.skipped++;
+        continue;
+      }
+      db.prepare(`
+        INSERT OR IGNORE INTO roles_responsabilidades_divulgacion_documento
+          (id, divulgacion_id, empresa_id, persona_cedula, file_path, filename, bytes,
+           fecha_carga, fecha_documento, es_actual, es_correccion, metodo, ip, user_agent,
+           creado_por, observaciones)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        remote.id, remote.divulgacion_id, remote.empresa_id, remote.persona_cedula,
+        remote.file_path, remote.filename, remote.bytes, remote.fecha_carga,
+        remote.fecha_documento, remote.es_actual, remote.es_correccion, remote.metodo,
+        remote.ip, remote.user_agent, remote.creado_por, remote.observaciones
+      );
+      counter.applied++;
+      result.applied++;
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando doc ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+  result.byEntity.roles_responsabilidades_divulgacion_documento = counter;
+}
+
+function _deserializeEventosRapidos(db, remoteRecords, companyKey, result, conflictLog) {
+  // 📦694-fix3 — Implementar merge real de eventos_rapidos.
+  // La tabla tiene id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion,
+  // google_event_id, attendees, created_at, updated_at. No tiene empresa_id
+  // (sincronizamos todos, filtrado futuro). Usamos last-write-wins por updated_at.
+  var tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos_rapidos'"
+  ).get();
+  if (!tableExists) return;
+
+  var counter = result.byEntity.eventos_rapidos;
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote || !remote.id || !remote.updatedAt) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+    var local = db.prepare(
+      'SELECT id, updated_at FROM eventos_rapidos WHERE id = ?'
+    ).get(remote.id);
+
+    try {
+      if (!local) {
+        var ev = remote.evento || {};
+        db.prepare(
+          'INSERT OR IGNORE INTO eventos_rapidos ' +
+          '(id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(
+          ev.id || remote.id,
+          ev.titulo || '',
+          ev.fecha || null,
+          ev.hora_inicio || null,
+          ev.hora_fin || null,
+          ev.tipo || 'rapido',
+          ev.descripcion || null,
+          ev.google_event_id || null,
+          ev.attendees || null,
+          ev.created_at || remote.updatedAt,
+          ev.updated_at || remote.updatedAt
+        );
+        counter.applied++;
+        result.applied++;
+      } else if (remote.updatedAt > (local.updated_at || '')) {
+        var evU = remote.evento || {};
+        db.prepare(
+          'UPDATE eventos_rapidos SET titulo = ?, fecha = ?, hora_inicio = ?, hora_fin = ?, ' +
+          'tipo = ?, descripcion = ?, google_event_id = ?, attendees = ?, updated_at = ? ' +
+          'WHERE id = ?'
+        ).run(
+          evU.titulo || '',
+          evU.fecha || null,
+          evU.hora_inicio || null,
+          evU.hora_fin || null,
+          evU.tipo || 'rapido',
+          evU.descripcion || null,
+          evU.google_event_id || null,
+          evU.attendees || null,
+          evU.updated_at || remote.updatedAt,
+          remote.id
+        );
+        counter.applied++;
+        counter.conflicts++;
+        result.applied++;
+        result.conflicts++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error merge evento_rapido ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// =====================================================================
+// I/O helpers: leer/escribir el archivo .kairsync en disco
+// =====================================================================
+
+/**
+ * Escribe el JSON a <hubPath>/empresa.kairsync.
+ * Crea la carpeta si no existe.
+ */
+async function writeSyncFile(hubPath, syncData) {
+  if (!hubPath) throw new Error('[' + MOD + '] hubPath requerido');
+  if (!syncData) throw new Error('[' + MOD + '] syncData requerido');
+
+  // Crear carpeta del hub si no existe
+  try {
+    await fsp.mkdir(hubPath, { recursive: true });
+  } catch (e) {
+    throw new Error('[' + MOD + '] No se pudo crear hubPath ' + hubPath + ': ' + e.message);
+  }
+
+  var filePath = path.join(hubPath, 'empresa.kairsync');
+  var json = JSON.stringify(syncData, null, 2);
+  await fsp.writeFile(filePath, json, 'utf8');
+  return filePath;
+}
+
+/**
+ * Lee <hubPath>/empresa.kairsync.
+ * Devuelve null si no existe (normal en primer arranque).
+ * Devuelve null si está corrupto (mover a .bak lo hace el SyncService 📦537).
+ */
+async function readSyncFile(hubPath) {
+  if (!hubPath) throw new Error('[' + MOD + '] hubPath requerido');
+
+  var filePath = path.join(hubPath, 'empresa.kairsync');
+  try {
+    var content = await fsp.readFile(filePath, 'utf8');
+    var data = JSON.parse(content);
+    return data;
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      return null; // No existe, normal en primer arranque
+    }
+    console.error('[' + MOD + '] Error leyendo ' + filePath + ': ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Detecta archivos "Conflicto de copia" de Google Drive en el hub path.
+ * Google Drive genera archivos tipo "empresa (Conflicto de copia 2026-07-13 18-45-23).kairsync"
+ * cuando 2 PCs escriben casi simultaneamente.
+ *
+ * @param {string} hubPath
+ * @returns {Array<{conflictPath: string, mainPath: string}>}
+ */
+async function detectConflictFiles(hubPath) {
+  if (!hubPath) throw new Error('[' + MOD + '] hubPath requerido');
+
+  var conflicts = [];
+  try {
+    var files = await fsp.readdir(hubPath);
+    for (var i = 0; i < files.length; i++) {
+      var name = files[i];
+      if (name.indexOf('Conflicto de copia') !== -1 && name.endsWith('.kairsync')) {
+        // Extraer el nombre base (lo que esta antes del " (Conflicto...")
+        var baseMatch = name.match(/^(.+?)\s+\(Conflicto de copia[^)]*\)\.kairsync$/);
+        if (baseMatch) {
+          conflicts.push({
+            conflictPath: path.join(hubPath, name),
+            mainPath: path.join(hubPath, baseMatch[1] + '.kairsync')
+          });
+        }
+      }
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      console.error('[' + MOD + '] Error detectando conflictos en ' + hubPath + ': ' + e.message);
+    }
+  }
+  return conflicts;
+}
+
+// =====================================================================
+// Exports
+// =====================================================================
+
+module.exports = {
+  // Funciones principales
+  serializeEmpresaToSync: serializeEmpresaToSync,
+  deserializeSyncToDb: deserializeSyncToDb,
+
+  // Helpers de I/O
+  writeSyncFile: writeSyncFile,
+  readSyncFile: readSyncFile,
+  detectConflictFiles: detectConflictFiles,
+
+  // Constantes
+  SYNC_VERSION: SYNC_VERSION
+};

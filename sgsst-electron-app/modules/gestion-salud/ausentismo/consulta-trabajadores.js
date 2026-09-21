@@ -6,6 +6,13 @@
  * (MedicionAusentismoComponent) que actúa como proxy al backend.
  * ========================================================================== */
 
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 const ConsultaTrabajadores = {
     empresaActiva: null,     // Se recibe via SET_COMPANY_CONTEXT
     resultados: [],
@@ -68,7 +75,7 @@ function ejecutarBusqueda() {
     }
 
     var tableContainer = document.getElementById('ct-table-container');
-    tableContainer.innerHTML = '<div class="ct-loading"><i class="fas fa-spinner"></i><p>Buscando en ' + ConsultaTrabajadores.empresaActiva + '...</p></div>';
+    tableContainer.innerHTML = KairSkeleton.list(8);
     document.getElementById('ct-stats-bar').style.display = 'none';
 
   ConsultaTrabajadores._searchStart = performance.now();
@@ -98,7 +105,7 @@ function ejecutarBusqueda() {
  */
 function onSearchResponse(data) {
     var elapsed = Math.round(performance.now() - (ConsultaTrabajadores._searchStart || performance.now()));
-    
+
     // El renderer suele envolver el resultado en 'payload'
     var response = data.payload || data;
 
@@ -291,8 +298,15 @@ function limpiarBusqueda() {
 }
 
 function goBackToHome() {
+    // [📦454 2026-07-01] Cambiado de 'back-to-module-request' a 'back-to-submodule-home'.
+    // El handler global de renderer.js para back-to-module-request navegaba al
+    // MODULO principal (no al submódulo de Medición de Ausentismo) porque el
+    // componente de Medición de Ausentismo no califica como Portal Component
+    // (no tiene window.*PortalComponent). Usar back-to-submodule-home invoca
+    // el branch que detecta currentSubmodule y llama showSubmoduleContent(),
+    // que es exactamente lo que el usuario espera desde Consulta de Trabajadores.
     if (window.parent && window.parent.postMessage) {
-        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+        window.parent.postMessage({ type: 'back-to-submodule-home' }, '*');
     }
 }
 
@@ -308,12 +322,37 @@ function renderizarError(mensaje) {
 }
 
 function mostrarToast(mensaje, tipo) {
-    var toast = document.getElementById('ct-toast');
-    var toastMessage = document.getElementById('ct-toast-message');
-    toast.className = 'ct-toast toast-' + (tipo || 'info');
-    toastMessage.textContent = mensaje;
-    toast.classList.add('show');
-    setTimeout(function () { toast.classList.remove('show'); }, 3500);
+    // [📦453 2026-07-01] Migrado al sistema de notificaciones K+AIR (estandar 6.1.3).
+    // El toast custom ct-toast era local al iframe y tenia look inconsistente
+    // con el resto de la app. Ahora usa window.parent.updateNotifier.show()
+    // con fallback a window.updateNotifier para que funcione tambien si el
+    // modulo se monta standalone (sin iframe).
+    var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+    if (notifier && typeof notifier.show === 'function') {
+        var titles = {
+            success: 'Busqueda completada',
+            warning: 'Atencion',
+            error: 'Error en la consulta',
+            info: 'Informacion'
+        };
+        var autoCloses = {
+            success: 4000,
+            warning: 5000,
+            error: 6000,
+            info: 4000
+        };
+        notifier.show({
+            type: tipo || 'info',
+            title: titles[tipo] || 'Consulta de Trabajadores',
+            subtitle: mensaje,
+            autoClose: autoCloses[tipo] || 4500
+        });
+        return;
+    }
+    // Fallback final: console (silencioso, no rompe el flujo si no hay notifier).
+    if (tipo === 'error') console.error('[consulta-trabajadores]', mensaje);
+    else if (tipo === 'warning') console.warn('[consulta-trabajadores]', mensaje);
+    else console.log('[consulta-trabajadores]', mensaje);
 }
 
 function normalizarEstado(estado) {

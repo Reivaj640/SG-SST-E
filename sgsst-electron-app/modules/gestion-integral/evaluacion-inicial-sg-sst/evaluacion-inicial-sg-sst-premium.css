@@ -1,0 +1,1164 @@
+/* ============================================================
+   K+AIR · Evaluación Inicial del SG-SST — Capa premium (📦759)
+   ============================================================
+   POR QUÉ EXISTE (no es CSS duplicado, es la corrección de raíz):
+   El componente tenía DOS capas de estilo que se peleaban entre sí:
+     1. `evaluacion-inicial-sg-sst.css` (scoped a .ev-inicial-sgsst, con modo oscuro).
+     2. Un bloque de 270 líneas inyectado desde `evaluacion-inicial-sg-sst.js`
+        (línea 2363) con un `:root` GLOBAL (`--primary`, `--text-dark`, `--bg-card`,
+        `--border`…) y reglas `.k-*` SIN scope. Como se inyecta al <head> DESPUÉS del
+        <link>, le ganaba al .css en cada empate de especificidad y contaminaba toda
+        la app (esos nombres genéricos los usan otros módulos).
+   Ese bloque se eliminó y lo que hacía falta de él (barra PHVA, layout, modal de
+   archivos) vive ahora acá, con scope real.
+
+   Cómo funciona: en lugar de reescribir 2600 líneas de JS y 1280 de CSS, se reasignan
+   los TOKENS que el módulo ya usaba (`--ei-*`, `--k-*`) a la paleta premium. Como el
+   módulo ya estaba tokenizado (201 usos de var()), el 80% del cambio visual sale de
+   las primeras 40 líneas de este archivo.
+
+   Alcance: `.kair-eval-scope` se aplica a TRES lugares, porque el componente tiene tres
+   puntos de montaje (ver el JS):
+     · el contenedor del módulo (.ev-inicial-sgsst)
+     · #k-modal-root (el modal de "Seleccionar PDF", que va al body)
+     · los `<dialog>` de Planes de Acción (que también van al body)
+   Antes, la capa 2 solo cubría el primero → los modales quedaban SIN modo oscuro
+   (por eso el modal se veía blanco con el tema oscuro puesto).
+   ============================================================ */
+
+/* ══════════════════════════════════════════════════════════════════
+   1. TOKENS — la paleta premium reemplaza a la paleta Bootstrap
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope {
+    /* — Tokens propios del módulo (--ei-*) — */
+    --ei-primary:       var(--kair-blue, #2057b8);
+    --ei-primary-dark:  var(--kair-blue-ink, #172c4c);
+    --ei-primary-light: rgba(32, 87, 184, 0.09);
+    --ei-success:       var(--kair-mint, #1bb888);
+    --ei-warning:       var(--kair-amber, #e7a224);
+    --ei-danger:        var(--kair-red, #da5563);
+    --ei-info:          var(--kair-blue, #2057b8);
+    --ei-text-dark:     var(--kair-ink, #14213d);
+    --ei-text-muted:    var(--kair-muted, #748096);
+    --ei-border:        var(--kair-line, #e8ebee);
+    --ei-border-light:  var(--kair-line-soft, #eef0f1);
+    --ei-bg-card:       var(--kair-card, #ffffff);
+    /* Superficie real de las cajas del módulo. Se usa un token propio (y no
+       `--ei-bg-card`) porque la hoja base vuelve a declarar ese token en `.ev-inicial-sgsst`
+       con el blanco fijo y, por prioridad, le ganaba al modo oscuro: con el tema oscuro
+       puesto, las tarjetas y los modales seguían blancos. */
+    --ei-surface:       var(--kair-card, #ffffff);
+    --ei-bg-app:        var(--kair-canvas, #fbfcfb);
+    --ei-shadow-sm:     0 1px 2px rgba(37, 56, 82, 0.05);
+    --ei-shadow-md:     var(--kair-shadow-card, 0 2px 7px rgba(37, 56, 82, 0.08));
+    --ei-radius:        var(--kair-radius-control, 12px);
+    --ei-radius-lg:     var(--kair-radius-card, 20px);
+
+    /* — Escala semántica "suave" (fondo + texto) para badges, chips y avisos — */
+    --ei-primary-soft:  #eaf1fb;
+    --ei-success-soft:  #e6f5ef;
+    --ei-warning-soft:  #fbf0db;
+    --ei-danger-soft:   #fae6e9;
+    --ei-info-soft:     #eaf1fb;
+    --ei-success-text:  #16805f;
+    --ei-warning-text:  #a56d00;
+    --ei-danger-text:   #a83a48;
+    --ei-track:         var(--kair-line-soft, #eef0f1);
+
+    /* — Puente a los tokens `--k-*` que usa el .css externo — */
+    --k-primary:        var(--ei-primary);
+    --k-primary-light:  var(--ei-primary-soft);
+    --k-success:        var(--ei-success);
+    --k-success-light:  var(--ei-success-soft);
+    --k-warning:        var(--ei-warning);
+    --k-warning-light:  var(--ei-warning-soft);
+    --k-danger:         var(--ei-danger);
+    --k-danger-light:   var(--ei-danger-soft);
+    --k-bg-card:        var(--ei-bg-card);
+    --k-border:         var(--ei-border);
+    --k-text-main:      var(--ei-text-dark);
+    --k-text-muted:     var(--ei-text-muted);
+    --k-shadow-sm:      var(--ei-shadow-sm);
+    --k-radius-lg:      var(--ei-radius-lg);
+
+    /* — Tokens genéricos que el HTML usa en estilos escritos a mano.
+         Estaban definidos en un `:root` global que contaminaba la app entera;
+         ahora viven acá, con scope. — */
+    --primary:          var(--ei-primary);
+    --primary-hover:    #1a4ba0;
+    --primary-dark:     var(--ei-primary-dark);
+    --primary-light:    var(--ei-primary-soft);
+    --primary-soft:     var(--ei-primary-soft);
+    --success:          var(--ei-success);
+    --warning:          var(--ei-warning);
+    --danger:           var(--ei-danger);
+    --info:             var(--ei-info);
+    --text-dark:        var(--ei-text-dark);
+    --text-muted:       var(--ei-text-muted);
+    --bg-body:          var(--ei-bg-app);
+    --bg-card:          var(--ei-bg-card);
+    --border:           var(--ei-border);
+    --border-light:     var(--ei-border-light);
+    --radius:           var(--ei-radius);
+    --radius-lg:        var(--ei-radius-lg);
+    --shadow-sm:        var(--ei-shadow-sm);
+    --shadow-md:        var(--ei-shadow-md);
+
+    /* — Tipografía premium (antes: 'Segoe UI', Roboto) — */
+    --ei-font: var(--kair-font-ui, 'DM Sans', system-ui, -apple-system, sans-serif);
+    --ei-font-display: var(--kair-font-display, 'Manrope', 'DM Sans', sans-serif);
+}
+
+/* Modo oscuro: se cubren LOS DOS atributos que usa la app.
+   `theme-manager.js` aplica `dark` cuando el tema es "Sistema" con el SO oscuro, y
+   `dark-legacy` cuando el usuario elige "Oscuro" a mano. El módulo solo cubría el
+   primero → con el tema oscuro manual quedaba claro. */
+[data-theme="dark"] .kair-eval-scope,
+[data-theme="dark-legacy"] .kair-eval-scope,
+[data-theme="dark"] .kair-eval-scope.ev-inicial-sgsst,
+[data-theme="dark-legacy"] .kair-eval-scope.ev-inicial-sgsst,
+[data-theme="dark"] .kair-eval-scope .k-module-layout,
+[data-theme="dark-legacy"] .kair-eval-scope .k-module-layout {
+    --ei-primary:       #5b93e8;
+    --ei-primary-dark:  #2f6ac4;
+    --ei-primary-light: rgba(91, 147, 232, 0.16);
+    --ei-success:       #45c99b;
+    --ei-warning:       #e8b455;
+    --ei-danger:        #e8737f;
+    --ei-info:          #5b93e8;
+    --ei-text-dark:     #e8edf5;
+    --ei-text-muted:    #98a4b8;
+    --ei-border:        #2c3648;
+    --ei-border-light:  #262f3f;
+    /* Superficie de las cajas. Se llama `--ei-surface` (no `--ei-bg-card`) porque la hoja
+       base declara `--ei-bg-card` en `.ev-inicial-sgsst` en líneas separadas, con la misma
+       prioridad y DESPUÉS de este archivo en la cascada: ese blanco le ganaba al oscuro. */
+    --ei-surface:       #1b2230;
+    --ei-bg-app:        #131824;
+    --ei-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.3);
+    --ei-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.4);
+
+    /* Los alias `--k-*` y los genéricos (`--primary`, `--text-dark`, `--bg-card`…) también
+       tienen que apuntar a los valores oscuros: si no, vuelven a `:root` y el contenido
+       queda con tinta oscura sobre superficies oscuras. */
+    --k-primary:        var(--ei-primary);
+    --k-primary-light:  var(--ei-primary-soft);
+    --k-success:        var(--ei-success);
+    --k-success-light:  var(--ei-success-soft);
+    --k-warning:        var(--ei-warning);
+    --k-warning-light:  var(--ei-warning-soft);
+    --k-danger:         var(--ei-danger);
+    --k-danger-light:   var(--ei-danger-soft);
+    --k-bg-card:        var(--ei-surface);
+    --k-border:         var(--ei-border);
+    --k-text-main:      var(--ei-text-dark);
+    --k-text-muted:     var(--ei-text-muted);
+    --primary:          var(--ei-primary);
+    --primary-hover:    #6ea3ef;
+    --primary-dark:     var(--ei-primary-dark);
+    --primary-light:    var(--ei-primary-soft);
+    --primary-soft:     var(--ei-primary-soft);
+    --success:          var(--ei-success);
+    --warning:          var(--ei-warning);
+    --danger:           var(--ei-danger);
+    --info:             var(--ei-info);
+    --text-dark:        var(--ei-text-dark);
+    --text-muted:       var(--ei-text-muted);
+    --bg-body:          var(--ei-bg-app);
+    --bg-card:          var(--ei-surface);
+    --border:           var(--ei-border);
+    --border-light:     var(--ei-border-light);
+
+    --ei-primary-soft:  rgba(91, 147, 232, 0.16);
+    --ei-success-soft:  rgba(69, 201, 155, 0.16);
+    --ei-warning-soft:  rgba(232, 180, 85, 0.16);
+    --ei-danger-soft:   rgba(232, 115, 127, 0.16);
+    --ei-info-soft:     rgba(91, 147, 232, 0.16);
+    --ei-success-text:  #58d3a8;
+    --ei-warning-text:  #e8b455;
+    --ei-danger-text:   #e8737f;
+    --ei-track:         #262f3f;
+
+    --primary-hover:    #6ea3ef;
+}
+
+/* Modales: el <dialog> se cuelga del <body>, y el <body> arrastra el `color` base del
+   navegador (negro puro). Las etiquetas de formulario que no declaran color propio
+   heredaban ese negro y quedaban invisibles sobre el fondo oscuro. Acá se fija la tinta
+   correcta para todo el contenido de los modales. */
+dialog.k-modal.kair-eval-scope,
+#k-modal-root.kair-eval-scope,
+.kair-eval-scope .k-file-selector-content,
+.kair-eval-scope .k-modal-content {
+    color: var(--ei-text-dark);
+}
+
+/* Etiquetas de estado dentro de los modales: el texto de color sobre su propio fondo
+   suave queda con muy poco contraste en oscuro (azul sobre azul). Ahí se usa la tinta
+   normal. */
+[data-theme="dark"] .kair-eval-scope .k-modal-content .k-badge,
+[data-theme="dark-legacy"] .kair-eval-scope .k-modal-content .k-badge,
+[data-theme="dark"] .kair-eval-scope .k-file-selector-content .k-badge,
+[data-theme="dark-legacy"] .kair-eval-scope .k-file-selector-content .k-badge {
+    color: var(--ei-text-dark);
+}
+
+/* Etiquetas de formulario de los modales */
+.kair-eval-scope .k-modal-content label {
+    color: var(--ei-text-dark);
+    font-family: var(--ei-font);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   2. BASE — tipografía y lienzo
+   ══════════════════════════════════════════════════════════════════ */
+/* Se apunta a `.kair-eval-scope` SOLO (no a `.kair-eval-scope.ev-inicial-sgsst`).
+   Motivo: los modales y los <dialog> del módulo viven en el <body> y no tienen la clase
+   del módulo, así que una regla que exija las dos clases no les llega nunca. Y si algún
+   día el contenedor pierde la clase propia, el módulo se quedaría sin tipografía y sin
+   fondo. Con una sola clase, la capa premium cubre los 3 puntos de montaje. */
+/* El lienzo (fondo + tipografía) va SOLO en los elementos que ocupan la pantalla del
+   módulo. En los modales, `background` sobre el contenedor los dejaría como un bloque
+   opaco que tapa todo: ahí solo interesa la tipografía y la tinta, no el fondo. */
+.kair-eval-scope.ev-inicial-sgsst,
+.kair-eval-scope.ev-inicial-sgsst .k-module-layout,
+.kair-eval-scope.k-module-container {
+    font-family: var(--ei-font);
+    font-size: 14px;
+    color: var(--ei-text-dark);
+    background: var(--ei-bg-app);
+}
+
+#k-modal-root.kair-eval-scope,
+dialog.k-modal.kair-eval-scope,
+.kair-eval-scope .k-file-selector-modal {
+    font-family: var(--ei-font);
+    font-size: 14px;
+    color: var(--ei-text-dark);
+    background: transparent;
+}
+
+/* Navegación por pestañas: el motor es la clase `active` (lo pone switchTab en el JS).
+   🐛 OJO — acá había un bug real, que también estaba en el .css base:
+       .k-view { display: none }  y  .k-view.active { display: block }
+   tienen EXACTAMENTE la misma prioridad (0,2,0). Cuando dos reglas empatan, gana la que
+   está declarada más abajo en el archivo. Con la regla que apaga escrita después, la
+   vista activa quedaba invisible: al cambiar de pestaña, la tabla no aparecía nunca
+   (el botón sí se marcaba, porque eso es una clase aparte).
+   La solución es que la regla que apaga NO aplique cuando la vista está activa. */
+.kair-eval-scope .k-view:not(.active) { display: none; }
+.kair-eval-scope .k-view.active { display: block; }
+
+.kair-eval-scope .k-module-layout { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.kair-eval-scope .k-module-container { height: 100%; width: 100%; overflow: hidden; }
+.kair-eval-scope .k-module-content { padding: clamp(16px, 1.8vw, 26px); }
+
+/* Los títulos del módulo usan la tipografía de titulares y el interletrado premium */
+.kair-eval-scope .k-card-header h3,
+.kair-eval-scope .k-modal-header h3,
+.kair-eval-scope .k-section-card h3 {
+    font-family: var(--ei-font-display);
+    letter-spacing: -0.02em;
+}
+
+/* El contenedor de modales del módulo (vive en el <body>). Las reglas de acá abajo usan
+   `.kair-eval-scope`, y el JS le agrega esa clase al crearlo; esta regla extra la asegura
+   por si el nodo ya existía de un montaje anterior. */
+#k-modal-root { pointer-events: none; }
+#k-modal-root > .k-file-selector-modal { pointer-events: auto; }
+
+/* ══════════════════════════════════════════════════════════════════
+   3. HEADER — de "card de Bootstrap" a barra premium
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-section-card {
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--ei-radius-lg);
+    box-shadow: none;
+    margin-bottom: clamp(16px, 1.8vw, 24px);
+}
+
+/* Botones de acción del header: píldora, borde sutil, hover azul suave */
+.kair-eval-scope .header-action--outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 15px;
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--kair-text-2, #4d5b75);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-pill, 999px);
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .header-action--outline:hover {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+    color: var(--ei-primary);
+}
+
+.kair-eval-scope .header-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 15px;
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--kair-text-2, #4d5b75);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-control, 12px);
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .header-back-btn:hover {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+    color: var(--ei-primary);
+}
+
+.kair-eval-scope .header-select {
+    padding: 9px 13px;
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ei-text-dark);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-control, 12px);
+    cursor: pointer;
+}
+
+/* Separador vertical del header (era un div con #dee2e6 escrito a mano) */
+.kair-eval-scope .k-header-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--ei-border);
+}
+
+/* El título y el subtítulo del header (estilos escritos en el HTML) */
+.kair-eval-scope .k-header-title {
+    margin: 0;
+    font-family: var(--ei-font-display);
+    font-size: clamp(16px, 1.5vw, 19px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-header-subtitle {
+    margin: 3px 0 0;
+    font-size: 12.5px;
+    color: var(--ei-text-muted);
+}
+
+.kair-eval-scope .k-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--ei-primary-soft);
+    color: var(--ei-primary);
+    font-size: 18px;
+    flex: 0 0 38px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   4. TABS — indicador tipo cápsula, al estilo del sistema premium
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .evaluacion-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    padding: 0 clamp(16px, 1.5vw, 24px) 10px;
+    border-top: 1px solid var(--ei-border-light);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.kair-eval-scope .evaluacion-tabs::-webkit-scrollbar { display: none; }
+
+.kair-eval-scope .evaluacion-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px;
+    margin: 4px 0 0;
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ei-text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--kair-radius-pill, 999px);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .evaluacion-tab:hover {
+    color: var(--ei-primary);
+    background: var(--ei-primary-soft);
+}
+
+.kair-eval-scope .evaluacion-tab.active {
+    color: #fff;
+    background: var(--ei-primary);
+    box-shadow: 0 6px 14px rgba(32, 87, 184, 0.22);
+}
+
+[data-theme="dark"] .kair-eval-scope .evaluacion-tab.active,
+[data-theme="dark-legacy"] .kair-eval-scope .evaluacion-tab.active {
+    color: #0f1520;
+    box-shadow: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   5. FRANJA DE KPIs — era una barra con divisores; ahora 3 tarjetas
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-stats-ribbon {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--ei-radius-lg);
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: clamp(16px, 1.8vw, 22px);
+    overflow: hidden;
+}
+
+.kair-eval-scope .k-stats-ribbon__item {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: clamp(14px, 1.4vw, 20px) clamp(14px, 1.5vw, 22px);
+    gap: 13px;
+}
+
+.kair-eval-scope .k-stats-ribbon__divider {
+    width: 1px;
+    height: auto;
+    align-self: stretch;
+    background: var(--ei-border-light);
+}
+
+.kair-eval-scope .k-stats-ribbon__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    font-size: 17px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+}
+
+.kair-eval-scope .k-stats-ribbon__icon.primary { background: var(--ei-primary-soft); color: var(--ei-primary); }
+.kair-eval-scope .k-stats-ribbon__icon.danger  { background: var(--ei-danger-soft);  color: var(--ei-danger-text); }
+.kair-eval-scope .k-stats-ribbon__icon.warning { background: var(--ei-warning-soft); color: var(--ei-warning-text); }
+.kair-eval-scope .k-stats-ribbon__icon.success { background: var(--ei-success-soft); color: var(--ei-success-text); }
+
+.kair-eval-scope .k-stats-ribbon__value {
+    font-family: var(--ei-font-display);
+    font-size: clamp(20px, 2vw, 27px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-stats-ribbon__label {
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.65px;
+    text-transform: uppercase;
+    color: var(--ei-text-muted);
+}
+
+.kair-eval-scope .k-stats-ribbon__pct {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ei-primary);
+    background: var(--ei-primary-soft);
+    padding: 3px 9px;
+    border-radius: var(--kair-radius-pill, 999px);
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   6. TARJETAS
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-card {
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--ei-radius-lg);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.kair-eval-scope .k-card-header {
+    padding: clamp(14px, 1.5vw, 20px) clamp(15px, 1.6vw, 22px);
+    border-bottom: 1px solid var(--ei-border-light);
+    background: var(--ei-surface);
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.kair-eval-scope .k-card-header h3 {
+    font-size: clamp(14px, 1.3vw, 16px);
+    font-weight: 700;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-card-body { padding: clamp(15px, 1.6vw, 22px); }
+
+.kair-eval-scope .k-grid-charts { gap: clamp(12px, 1.4vw, 18px); }
+
+/* Gauge: el canvas deja aire arriba y el número queda centrado */
+.kair-eval-scope .k-chart-label {
+    font-family: var(--ei-font-display);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--ei-text-dark);
+}
+
+/* Tarjeta de la fuente (PDF cargado) */
+.kair-eval-scope .k-card-source { border-style: dashed; }
+
+.kair-eval-scope .k-source-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: var(--ei-primary-soft);
+    color: var(--ei-primary);
+    font-size: 19px;
+}
+
+.kair-eval-scope .k-source-info h4 {
+    margin: 0;
+    font-family: var(--ei-font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-source-info p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--ei-text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   7. BARRAS PHVA — antes las dibujaba el <style> inyectado sin scope
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-phva-bars { display: flex; flex-direction: column; gap: 14px; }
+.kair-eval-scope .k-progress-group { display: flex; flex-direction: column; gap: 6px; }
+
+.kair-eval-scope .k-progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--ei-text-muted);
+}
+
+.kair-eval-scope .k-progress-label span:last-child {
+    font-family: var(--ei-font-display);
+    font-size: 13px;
+    letter-spacing: -0.02em;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-progress-bar {
+    height: 8px;
+    border-radius: var(--kair-radius-pill, 999px);
+    background: var(--ei-track);
+    overflow: hidden;
+}
+
+.kair-eval-scope .k-progress-fill {
+    height: 100%;
+    border-radius: var(--kair-radius-pill, 999px);
+    transition: width var(--kair-transition, 180ms ease-out);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   8. TABLAS
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-table { font-family: var(--ei-font); }
+
+.kair-eval-scope .k-table th {
+    padding: 11px clamp(10px, 1vw, 15px);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--ei-text-muted);
+    background: var(--kair-canvas, #fbfcfb);
+    border-bottom: 1px solid var(--ei-border);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-table th,
+[data-theme="dark-legacy"] .kair-eval-scope .k-table th {
+    background: #161c28;
+}
+
+.kair-eval-scope .k-table td {
+    padding: 12px clamp(10px, 1vw, 15px);
+    font-size: 13px;
+    color: var(--ei-text-dark);
+    border-bottom: 1px solid var(--ei-border-light);
+}
+
+.kair-eval-scope .k-table tbody tr:hover { background: var(--ei-primary-soft); }
+.kair-eval-scope .k-table tr.k-row-warning { background: var(--ei-warning-soft); }
+.kair-eval-scope .k-table tr.k-row-warning:hover { background: var(--ei-warning-soft); }
+
+.kair-eval-scope .k-empty-table {
+    padding: 2.5rem 1rem;
+    font-style: normal;
+    font-size: 13px;
+    color: var(--ei-text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   9. BOTONES
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-btn {
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 15px;
+    border-radius: var(--kair-radius-control, 12px);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.kair-eval-scope .k-btn-primary {
+    background: var(--ei-primary);
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(32, 87, 184, 0.18);
+}
+
+.kair-eval-scope .k-btn-primary:hover { background: var(--primary-hover); }
+
+.kair-eval-scope .k-btn-outline {
+    background: var(--ei-surface);
+    border-color: var(--ei-border);
+    color: var(--kair-text-2, #4d5b75);
+}
+
+.kair-eval-scope .k-btn-outline:hover {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+    color: var(--ei-primary);
+}
+
+.kair-eval-scope .k-btn-sm { padding: 6px 11px; font-size: 11.5px; border-radius: 10px; }
+
+/* Botón fantasma (el modal de archivos usa .btn.btn-ghost) */
+.kair-eval-scope .btn-ghost {
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--kair-radius-control, 12px);
+    border: 1px solid var(--ei-border);
+    background: var(--ei-surface);
+    color: var(--kair-text-2, #4d5b75);
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .btn-ghost:hover {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+    color: var(--ei-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   10. BADGES y utilidades de color
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-badge {
+    font-family: var(--ei-font);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 5px 10px;
+    border-radius: var(--kair-radius-pill, 999px);
+    display: inline-block;
+}
+
+.kair-eval-scope .k-badge-success { background: var(--ei-success-soft); color: var(--ei-success-text); }
+.kair-eval-scope .k-badge-warning { background: var(--ei-warning-soft); color: var(--ei-warning-text); }
+.kair-eval-scope .k-badge-danger  { background: var(--ei-danger-soft);  color: var(--ei-danger-text); }
+.kair-eval-scope .k-badge-info    { background: var(--ei-info-soft);    color: var(--ei-primary); }
+.kair-eval-scope .k-badge--inline { padding: 4px 9px; }
+
+.kair-eval-scope .text-primary { color: var(--ei-primary) !important; }
+.kair-eval-scope .text-success { color: var(--ei-success) !important; }
+.kair-eval-scope .text-warning { color: var(--ei-warning) !important; }
+.kair-eval-scope .text-danger  { color: var(--ei-danger) !important; }
+.kair-eval-scope .text-muted   { color: var(--ei-text-muted) !important; }
+
+/* El buscador de estándares (decorativo hoy: no filtra) */
+.kair-eval-scope .k-input-search {
+    padding: 9px 14px;
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    color: var(--ei-text-dark);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-control, 12px);
+}
+
+.kair-eval-scope .k-input-search:focus {
+    outline: none;
+    border-color: var(--ei-primary);
+    box-shadow: 0 0 0 3px var(--ei-primary-soft);
+}
+
+/* Inputs y textareas de los modales (los .k-input sueltos que había) */
+.kair-eval-scope .k-input,
+.kair-eval-scope .k-form-control {
+    font-family: var(--ei-font);
+    font-size: 13px;
+    color: var(--ei-text-dark);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-control, 12px);
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .k-input:focus,
+.kair-eval-scope .k-form-control:focus {
+    outline: none;
+    border-color: var(--ei-primary);
+    box-shadow: 0 0 0 3px var(--ei-primary-soft);
+}
+
+.kair-eval-scope .k-form-label {
+    font-family: var(--ei-font);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--ei-text-muted);
+}
+
+/* Estados vacíos */
+.kair-eval-scope .k-empty-state,
+.kair-eval-scope .k-empty-state-small {
+    font-style: normal;
+    font-size: 13px;
+    color: var(--ei-text-muted);
+    padding: 2rem 1rem;
+}
+
+/* Indicador de "Procesando…" */
+.kair-eval-scope .k-loading-badge {
+    font-family: var(--ei-font);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ei-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   11. MODALES
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-modal-content {
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-modal, 22px);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+.kair-eval-scope .k-modal-header {
+    padding: clamp(18px, 2vw, 26px);
+    border-bottom: 1px solid var(--ei-border-light);
+}
+
+.kair-eval-scope .k-modal-header h3 {
+    font-size: clamp(17px, 1.6vw, 21px);
+    font-weight: 700;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-modal-subtitle { font-size: 12.5px; color: var(--ei-text-muted); }
+.kair-eval-scope .k-modal-body { padding: clamp(18px, 2vw, 26px); }
+
+.kair-eval-scope .k-modal-footer {
+    padding: clamp(14px, 1.5vw, 20px) clamp(18px, 2vw, 26px);
+    border-top: 1px solid var(--ei-border-light);
+    gap: 10px;
+}
+
+.kair-eval-scope .k-modal-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--ei-primary-soft);
+    color: var(--ei-primary);
+}
+
+.kair-eval-scope .k-modal-icon i { color: var(--ei-primary); font-size: 22px; }
+
+.kair-eval-scope .k-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 15px;
+    color: var(--ei-text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .k-modal-close:hover {
+    background: var(--ei-danger-soft);
+    color: var(--ei-danger-text);
+}
+
+/* Los <dialog> de Planes de Acción (se abren con showModal, van al body) */
+dialog.kair-eval-scope.k-modal {
+    background: transparent;
+    border: none;
+    padding: 0;
+    max-width: 95vw;
+    max-height: 95vh;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   12. SELECTOR DE ARCHIVOS (modal de PDF)
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-file-selector-modal {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+.kair-eval-scope .k-file-selector-content {
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-modal, 22px);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+}
+
+.kair-eval-scope .k-file-selector-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--ei-border-light);
+}
+
+.kair-eval-scope .k-file-selector-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--ei-font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ei-text-dark);
+}
+
+.kair-eval-scope .k-file-selector-title i { color: var(--ei-primary); }
+
+.kair-eval-scope .k-file-selector-sidebar {
+    background: var(--kair-canvas, #fbfcfb);
+    border-right: 1px solid var(--ei-border-light);
+    padding: 16px;
+}
+
+[data-theme="dark"] .kair-eval-scope .k-file-selector-sidebar,
+[data-theme="dark-legacy"] .kair-eval-scope .k-file-selector-sidebar {
+    background: #161c28;
+}
+
+.kair-eval-scope .k-file-section-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--ei-text-muted);
+    margin-bottom: 10px;
+}
+
+.kair-eval-scope .k-file-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 12px;
+    border-radius: var(--kair-radius-control, 12px);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .k-file-item:hover {
+    background: var(--ei-primary-soft);
+    border-color: transparent;
+}
+
+.kair-eval-scope .k-file-item.active {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+}
+
+.kair-eval-scope .k-file-item-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    background: var(--ei-primary-soft);
+    color: var(--ei-primary);
+    flex: 0 0 34px;
+}
+
+.kair-eval-scope .k-file-item-icon.folder { background: var(--ei-warning-soft); color: var(--ei-warning-text); }
+.kair-eval-scope .k-file-item-icon.pdf    { background: var(--ei-danger-soft);  color: var(--ei-danger-text); }
+
+.kair-eval-scope .k-file-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ei-text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kair-eval-scope .k-file-item-meta { font-size: 11px; color: var(--ei-text-muted); margin-top: 2px; }
+
+.kair-eval-scope .k-file-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--kair-radius-pill, 999px);
+    background: var(--ei-primary-soft);
+    color: var(--ei-primary);
+}
+
+.kair-eval-scope .k-file-selector-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--ei-border-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.kair-eval-scope .k-file-go-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--kair-text-2, #4d5b75);
+    background: var(--ei-surface);
+    border: 1px solid var(--ei-border);
+    border-bottom: 1px solid var(--ei-border);
+    border-radius: var(--kair-radius-control, 12px);
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: var(--kair-transition, 180ms ease-out);
+}
+
+.kair-eval-scope .k-file-go-back:hover {
+    background: var(--ei-primary-soft);
+    border-color: var(--ei-primary);
+    color: var(--ei-primary);
+}
+
+/* La barra "Raíz" del modal: antes ocupaba todo el ancho con fondo gris y un borde
+   inferior grueso, y se veía como una franja pegada. Ahora es una línea discreta. */
+.kair-eval-scope .k-file-breadcrumb {
+    padding: 0 0 10px;
+    font-size: 11.5px;
+    color: var(--ei-text-muted);
+    background: transparent;
+    border-bottom: 1px solid var(--ei-border-light);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.kair-eval-scope .k-file-breadcrumb-item { color: var(--ei-primary); cursor: pointer; }
+.kair-eval-scope .k-file-breadcrumb-current { color: var(--ei-text-dark); font-weight: 600; }
+
+.kair-eval-scope .k-file-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(30px, 4vw, 56px) 24px;
+    text-align: center;
+    color: var(--ei-text-muted);
+}
+
+.kair-eval-scope .k-file-empty-icon {
+    font-size: 2.6rem;
+    line-height: 1;
+    color: var(--kair-faint, #aab1bd);
+    margin-bottom: 16px;
+}
+
+.kair-eval-scope .k-file-empty-title {
+    font-family: var(--ei-font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ei-text-dark);
+    margin-bottom: 6px;
+}
+
+.kair-eval-scope .k-file-empty-desc {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ei-text-muted);
+    max-width: 340px;
+    margin: 0 auto;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   13. AVISO DE PLANES HUÉRFANOS (el bloque ámbar con estilo a mano)
+   ══════════════════════════════════════════════════════════════════ */
+.kair-eval-scope .k-orphan-row td {
+    background: var(--ei-warning-soft);
+    border-left: 3px solid var(--ei-warning);
+    padding: 0;
+}
+
+.kair-eval-scope .k-orphan-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 16px;
+    cursor: pointer;
+    color: var(--ei-warning-text);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.kair-eval-scope .k-orphan-hint { font-weight: 500; opacity: 0.75; margin-left: 8px; }
+
+.kair-eval-scope .k-orphan-body { padding: 0 16px 14px; }
+
+.kair-eval-scope .k-collapsed,
+.kair-eval-scope .kair-collapsed { display: none; }
+
+.kair-eval-scope .k-btn-warning {
+    background: var(--ei-warning);
+    color: #2a1e00;
+    border: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   14. MODO OSCURO — las cajas que traían el blanco escrito a mano
+   ══════════════════════════════════════════════════════════════════ */
+/* Las tarjetas, tablas, modales y campos del .css base tenían `#ffffff`, `#f8f9fa` y
+   `#dee2e6` escritos directamente en vez de usar los tokens. Por eso, con el tema oscuro
+   elegido, todo el contenido seguía viéndose blanco aunque el fondo ya fuera oscuro.
+   Acá se reemplazan esos valores fijos por los tokens, así siguen el tema. */
+[data-theme="dark"] .kair-eval-scope .k-card,
+[data-theme="dark-legacy"] .kair-eval-scope .k-card,
+[data-theme="dark"] .kair-eval-scope .k-section-card,
+[data-theme="dark-legacy"] .kair-eval-scope .k-section-card,
+[data-theme="dark"] .kair-eval-scope .k-modal-content,
+[data-theme="dark-legacy"] .kair-eval-scope .k-modal-content,
+[data-theme="dark"] .kair-eval-scope .k-file-selector-content,
+[data-theme="dark-legacy"] .kair-eval-scope .k-file-selector-content {
+    background: var(--ei-surface);
+    border-color: var(--ei-border);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-card-header,
+[data-theme="dark-legacy"] .kair-eval-scope .k-card-header {
+    background: var(--ei-surface);
+    border-bottom-color: var(--ei-border-light);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-btn-outline,
+[data-theme="dark-legacy"] .kair-eval-scope .k-btn-outline,
+[data-theme="dark"] .kair-eval-scope .btn-ghost,
+[data-theme="dark-legacy"] .kair-eval-scope .btn-ghost,
+[data-theme="dark"] .kair-eval-scope .header-action--outline,
+[data-theme="dark-legacy"] .kair-eval-scope .header-action--outline,
+[data-theme="dark"] .kair-eval-scope .header-back-btn,
+[data-theme="dark-legacy"] .kair-eval-scope .header-back-btn,
+[data-theme="dark"] .kair-eval-scope .header-select,
+[data-theme="dark-legacy"] .kair-eval-scope .header-select,
+[data-theme="dark"] .kair-eval-scope .k-input,
+[data-theme="dark-legacy"] .kair-eval-scope .k-input,
+[data-theme="dark"] .kair-eval-scope .k-form-control,
+[data-theme="dark-legacy"] .kair-eval-scope .k-form-control {
+    background: var(--ei-surface);
+    border-color: var(--ei-border);
+    color: var(--ei-text-dark);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-table td,
+[data-theme="dark-legacy"] .kair-eval-scope .k-table td {
+    color: var(--ei-text-dark);
+    border-bottom-color: var(--ei-border-light);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-table th,
+[data-theme="dark-legacy"] .kair-eval-scope .k-table th {
+    color: var(--ei-text-muted);
+    border-bottom-color: var(--ei-border);
+}
+
+/* Los avisos con fondo claro escrito a mano (fila de huérfanos, estado vacío) */
+[data-theme="dark"] .kair-eval-scope .k-file-item:hover,
+[data-theme="dark-legacy"] .kair-eval-scope .k-file-item:hover {
+    background: var(--ei-primary-soft);
+}
+
+[data-theme="dark"] .kair-eval-scope .k-file-empty-icon,
+[data-theme="dark-legacy"] .kair-eval-scope .k-file-empty-icon {
+    color: var(--ei-text-muted);
+}
+
+/* El separador del header usaba #dee2e6 a mano */
+[data-theme="dark"] .kair-eval-scope .k-header-sep,
+[data-theme="dark-legacy"] .kair-eval-scope .k-header-sep {
+    background: var(--ei-border);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   15. RESPONSIVE — pantallas angostas
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 980px) {
+    .kair-eval-scope .k-stats-ribbon { flex-wrap: wrap; }
+    .kair-eval-scope .k-stats-ribbon__item { flex: 1 1 45%; }
+    .kair-eval-scope .k-stats-ribbon__divider { display: none; }
+}
+
+@media (max-width: 768px) {
+    .kair-eval-scope .k-stats-ribbon__item { flex: 1 1 100%; }
+    .kair-eval-scope .k-grid-charts { grid-template-columns: 1fr; }
+    .kair-eval-scope .k-form-row { grid-template-columns: 1fr; }
+}

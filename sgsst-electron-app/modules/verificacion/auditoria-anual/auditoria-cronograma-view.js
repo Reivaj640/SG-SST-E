@@ -67,7 +67,7 @@ var AuditoriaCronogramaView = (function () {
         { key: 'plan_accion', label: 'Plan de Acción' },
         { key: 'implementacion', label: 'Implementación' }
       ];
-      if (window.Sileo) Sileo.info({ title: 'Modo manual activo', description: 'Programa los hitos haciendo click en las celdas del calendario.' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'info', title: 'Modo manual activo', subtitle: 'Programa los hitos haciendo click en las celdas del calendario.' });
       render(_currentContainer || document.querySelector('.kair-v3-module, .kair-aud-module') || document.body);
     });
   }
@@ -136,12 +136,12 @@ var AuditoriaCronogramaView = (function () {
   function _crearCronogramaParaAnio(anio) {
     var empresaId = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.id) || null;
     if (!anio) return Promise.reject(new Error('Año no especificado'));
-    if (window.Sileo) {
-      Sileo.info({ title: 'Creando cronograma ' + anio + '…', description: 'Generando plantilla con 4 fases × 12 meses vacíos.' });
+    if (window.updateNotifier) {
+      window.updateNotifier.show({ type: 'info', title: 'Creando cronograma ' + anio + '…', subtitle: 'Generando plantilla con 4 fases × 12 meses vacíos.' });
     }
     return window.electronAPI.auditoriaAnual.crearCronograma(empresaId, anio).then(function (resp) {
       if (resp && resp.success) {
-        if (window.Sileo) Sileo.success({ title: 'Cronograma ' + anio + ' creado', description: resp.data.archivo });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Cronograma ' + anio + ' creado', subtitle: resp.data.archivo });
         /* Marcar el año como con archivo para no volver a crearlo. */
         if (_state.aniosConArchivo.indexOf(anio) === -1) {
           _state.aniosConArchivo.push(anio);
@@ -150,11 +150,11 @@ var AuditoriaCronogramaView = (function () {
         render(_currentContainer || document.querySelector('.kair-v3-hub') || document.body);
         return resp;
       } else if (resp && resp.error) {
-        if (window.Sileo) Sileo.error({ title: 'Error al crear', description: resp.error.message });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Error al crear', subtitle: resp.error.message, autoClose: 6000 });
         return Promise.reject(new Error(resp.error.message));
       }
     }).catch(function (err) {
-      if (window.Sileo) Sileo.error({ title: 'Error', description: err.message || 'Error desconocido' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Error', subtitle: err.message || 'Error desconocido', autoClose: 6000 });
       return Promise.reject(err);
     });
   }
@@ -1053,15 +1053,15 @@ var AuditoriaCronogramaView = (function () {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         var hId = btn.getAttribute('data-remove-hito');
-        if (window.Sileo) {
-          Sileo.confirm({
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual.showConfirm) {
+          window.kairAuditoriaAnual.showConfirm({
             title: '¿Eliminar hito?',
-            description: 'Esta acción no se puede deshacer.',
-            confirmText: 'Eliminar', danger: true
+            message: 'Esta acción no se puede deshacer.',
+            acceptLabel: 'Eliminar', danger: true
           }).then(function (ok) {
             if (ok) {
               KairStore.actions.removeCronogramaItem(hId);
-              if (window.Sileo) Sileo.success({ title: 'Hito eliminado' });
+              if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hito eliminado' });
               if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
                 window.kairAuditoriaAnual._refreshView();
               }
@@ -1098,7 +1098,7 @@ var AuditoriaCronogramaView = (function () {
     var obs = obsEl ? obsEl.value : '';
 
     if (!auditText) {
-      if (window.Sileo) Sileo.error({ title: 'Escribe o selecciona una auditoría' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Escribe o selecciona una auditoría', autoClose: 6000 });
       auditEl.focus();
       return;
     }
@@ -1127,8 +1127,8 @@ var AuditoriaCronogramaView = (function () {
         estado: estado,
         observaciones: obs
       });
-      if (window.Sileo) Sileo.success({
-        title: auditLabel ? 'Hito creado (texto libre)' : 'Hito creado'
+      if (window.updateNotifier) window.updateNotifier.show({
+        type: 'success', title: auditLabel ? 'Hito creado (texto libre)' : 'Hito creado'
       });
 
       /* F21.29 (2026-06-20): si el año del hito NO tiene archivo Excel,
@@ -1148,7 +1148,7 @@ var AuditoriaCronogramaView = (function () {
         auditLabel: auditLabel,
         fase: fase, mes: mes, anio: anio, estado: estado, observaciones: obs
       });
-      if (window.Sileo) Sileo.success({ title: 'Hito actualizado' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hito actualizado' });
     }
 
     /* F21.24 (2026-06-20): cerrar el modal y refrescar el view. */

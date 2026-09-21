@@ -7,7 +7,6 @@
 (function() {
   'use strict';
 
-  console.log('[PrevalenciaEL] Módulo JS cargado');
 
 var api;
 var indicadores;
@@ -21,21 +20,35 @@ var pendingChanges = {};
 
 if (typeof window !== 'undefined' && window.electronAPI) {
   api = window.electronAPI.prevalencia;
-  console.log('[PrevalenciaEL] electronAPI asignada:', !!api);
 }
 
   function getElement(id) {
     var el = document.getElementById(id);
     if (el) return el;
     el = document.querySelector('#' + id);
-    if (el) return el;
-    el = document.querySelector('[id*="' + id + '"]');
     return el;
   }
 
-  function escapeHtml(str) {
-    if (str === undefined || str === null) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function tok(name, fallback) {
+    var host = document.querySelector('.prevalencia-container') || document.documentElement;
+    return getComputedStyle(host).getPropertyValue(name).trim() || fallback;
+  }
+
+  function palette() {
+    return {
+      bg:          tok('--prev-bg','#fbfcfb'),
+      card:        tok('--prev-card','#ffffff'),
+      primary:     tok('--prev-primary','#2057b8'),
+      primarySoft: tok('--prev-primary-soft','#eaf1fb'),
+      success:     tok('--prev-success','#1bb888'),
+      warning:     tok('--prev-warning','#e7a224'),
+      danger:      tok('--prev-danger','#da5563'),
+      text:        tok('--prev-text','#14213d'),
+      textSec:     tok('--prev-text-sec','#748096'),
+      textMuted:   tok('--prev-text-muted','#aab1bd'),
+      border:      tok('--prev-border','#e8ebee'),
+      borderLight: tok('--prev-border-light','#f3f4f6')
+    };
   }
 
   function showToast(msg, type) {
@@ -86,29 +99,28 @@ function updateHeaderContext() {
   function getStatusBadge(valor, meta) {
     valor = toNum(valor);
     meta = toNum(meta);
+    var C = palette();
 
     if (isNaN(valor) || isNaN(meta)) {
-      return { label: 'SIN DATOS', color: '#6b7280' };
-    }
-    if (meta === 0 && valor === 0) {
-      return { label: 'CUMPLE', color: '#16a34a' };
+      return { label: 'SIN DATOS', color: C.textMuted };
     }
     if (meta === 0) {
-      return { label: 'CUMPLE', color: '#16a34a' };
+      return { label: 'CUMPLE', color: C.success };
     }
     if (valor > meta) {
-      return { label: 'EXCEDE', color: '#dc2626' };
+      return { label: 'EXCEDE', color: C.danger };
     }
-    return { label: 'CUMPLE', color: '#16a34a' };
+    return { label: 'CUMPLE', color: C.success };
   }
 
   function getValueColor(valor, meta) {
     valor = toNum(valor);
     meta = toNum(meta);
+    var C = palette();
 
-    if (meta > 0 && valor > meta) return '#dc2626';
-    if (valor === 0) return '#16a34a';
-    return '#2563eb';
+    if (meta > 0 && valor > meta) return C.danger;
+    if (valor === 0) return C.success;
+    return C.primary;
   }
 
   // ==================== CALCULAR PREVALENCIA ====================
@@ -131,12 +143,14 @@ function updateHeaderContext() {
     }
 
     var chartHeight = ctx.height || 300;
+    var C = palette();
+    var isDark = (document.documentElement.getAttribute('data-theme') || '').indexOf('dark') === 0;
     var gradBlue = ctx2d.createLinearGradient(0, 0, 0, chartHeight);
-    gradBlue.addColorStop(0, '#60a5fa');
-    gradBlue.addColorStop(1, '#2563eb');
+    gradBlue.addColorStop(0, isDark ? '#8fbfff' : '#60a5fa');
+    gradBlue.addColorStop(1, isDark ? '#6ea8fe' : '#2563eb');
     var gradGreen = ctx2d.createLinearGradient(0, 0, 0, chartHeight);
-    gradGreen.addColorStop(0, '#4ade80');
-    gradGreen.addColorStop(1, '#16a34a');
+    gradGreen.addColorStop(0, isDark ? '#7ee8b8' : '#4ade80');
+    gradGreen.addColorStop(1, isDark ? '#3ecf9a' : '#1bb888');
 
     var colores = valores.map(function(v) {
       return toNum(v) > 0 ? gradBlue : gradGreen;
@@ -151,9 +165,9 @@ function updateHeaderContext() {
         var area = chart.chartArea;
         var c = chart.ctx;
         c.save();
-        c.fillStyle = 'rgba(40, 167, 69, 0.04)';
+        c.fillStyle = isDark ? 'rgba(62,207,154,0.06)' : 'rgba(27,184,136,0.04)';
         c.fillRect(area.left, metaY, area.width, area.bottom - metaY);
-        c.fillStyle = 'rgba(220, 53, 69, 0.04)';
+        c.fillStyle = isDark ? 'rgba(229,106,118,0.06)' : 'rgba(218,85,99,0.04)';
         c.fillRect(area.left, area.top, area.width, metaY - area.top);
         c.restore();
       }
@@ -168,7 +182,7 @@ function updateHeaderContext() {
           var val = chart.data.datasets[0].data[i];
           if (val > 0) {
             c.save();
-            c.fillStyle = '#374151';
+            c.fillStyle = C.text;
             c.font = 'bold 10px sans-serif';
             c.textAlign = 'center';
             c.fillText(val.toFixed(1), bar.x, bar.y - 6);
@@ -186,14 +200,14 @@ function updateHeaderContext() {
         var y = yScale.getPixelForValue(promedioAnual);
         var c = chart.ctx;
         c.save();
-        c.strokeStyle = '#7c3aed';
+        c.strokeStyle = isDark ? '#c4a0fa' : '#7c3aed';
         c.setLineDash([8, 4]);
         c.lineWidth = 2;
         c.beginPath();
         c.moveTo(chart.chartArea.left, y);
         c.lineTo(chart.chartArea.right, y);
         c.stroke();
-        c.fillStyle = '#7c3aed';
+        c.fillStyle = isDark ? '#c4a0fa' : '#7c3aed';
         c.font = 'bold 11px sans-serif';
         c.fillText('Promedio: ' + promedioAnual.toFixed(1), chart.chartArea.right - 110, y - 6);
         c.restore();
@@ -208,14 +222,14 @@ function updateHeaderContext() {
         var y = yScale.getPixelForValue(meta);
         var c = chart.ctx;
         c.save();
-        c.strokeStyle = '#28a745';
+        c.strokeStyle = isDark ? '#3ecf9a' : '#1bb888';
         c.setLineDash([6, 4]);
         c.lineWidth = 2;
         c.beginPath();
         c.moveTo(chart.chartArea.left, y);
         c.lineTo(chart.chartArea.right, y);
         c.stroke();
-        c.fillStyle = '#28a745';
+        c.fillStyle = isDark ? '#3ecf9a' : '#1bb888';
         c.font = 'bold 11px sans-serif';
         c.fillText('Meta: ' + meta, chart.chartArea.right - 80, y - 6);
         c.restore();
@@ -225,6 +239,10 @@ function updateHeaderContext() {
     var allPlugins = [metaZonePlugin, barLabelsPlugin, promedioLinePlugin, metaLinePlugin];
 
     if (typeof Chart !== 'undefined') {
+      Chart.defaults.color = isDark ? '#98a6bf' : C.textSec;
+      Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(20,33,61,0.08)';
+      Chart.defaults.font.family = "'DM Sans', system-ui, -apple-system, sans-serif";
+
       chartInstance = new Chart(ctx2d, {
         type: 'bar',
         data: {
@@ -254,10 +272,10 @@ function updateHeaderContext() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#fff',
-              titleColor: '#111827',
-              bodyColor: '#374151',
-              borderColor: '#e5e7eb',
+              backgroundColor: C.card,
+              titleColor: C.text,
+              bodyColor: C.textSec,
+              borderColor: C.border,
               borderWidth: 1,
               cornerRadius: 6,
               padding: 10,
@@ -276,14 +294,14 @@ function updateHeaderContext() {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { font: { size: 11, weight: '500' }, color: '#6b7280' }
+              ticks: { font: { size: 11, weight: '500' }, color: C.textMuted }
             },
             y: {
               beginAtZero: true,
-              grid: { color: '#f3f4f6' },
+              grid: { color: C.borderLight },
               ticks: {
                 font: { size: 11 },
-                color: '#6b7280',
+                color: C.textMuted,
                 callback: function(v) { return v.toFixed(0); },
                 padding: 6
               }
@@ -300,6 +318,7 @@ function updateHeaderContext() {
   function renderFallbackChart(canvas, meses, valores, meta, promedioAnual) {
     canvas.style.display = 'none';
     var container = canvas.parentNode;
+    var C = palette();
 
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '100%');
@@ -324,7 +343,7 @@ function updateHeaderContext() {
       line.setAttribute('y1', y);
       line.setAttribute('x2', width - padding.right);
       line.setAttribute('y2', y);
-      line.setAttribute('stroke', '#e5e7eb');
+      line.setAttribute('stroke', C.border);
       line.setAttribute('stroke-width', '1');
       svg.appendChild(line);
 
@@ -332,7 +351,7 @@ function updateHeaderContext() {
       text.setAttribute('x', padding.left - 10);
       text.setAttribute('y', y + 4);
       text.setAttribute('text-anchor', 'end');
-      text.setAttribute('fill', '#6c757d');
+      text.setAttribute('fill', C.textSec);
       text.setAttribute('font-size', '11');
       text.textContent = val;
       svg.appendChild(text);
@@ -347,7 +366,7 @@ function updateHeaderContext() {
       var x = padding.left + barWidth * idx + barWidth * 0.1;
       var barW = barWidth * 0.8;
 
-      var color = valNum > 0 ? '#2563eb' : '#16a34a';
+      var color = valNum > 0 ? C.primary : C.success;
 
       var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('x', x);
@@ -362,7 +381,7 @@ function updateHeaderContext() {
       label.setAttribute('x', x + barW / 2);
       label.setAttribute('y', height - 10);
       label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('fill', '#6c757d');
+      label.setAttribute('fill', C.textSec);
       label.setAttribute('font-size', '10');
       label.textContent = meses[idx];
       svg.appendChild(label);
@@ -387,7 +406,7 @@ function updateHeaderContext() {
       metaLine.setAttribute('y1', metaY);
       metaLine.setAttribute('x2', width - padding.right);
       metaLine.setAttribute('y2', metaY);
-      metaLine.setAttribute('stroke', '#28a745');
+      metaLine.setAttribute('stroke', C.success);
       metaLine.setAttribute('stroke-width', '2');
       metaLine.setAttribute('stroke-dasharray', '6,4');
       svg.appendChild(metaLine);
@@ -400,8 +419,6 @@ function updateHeaderContext() {
 function configurarRutas(year) {
   return new Promise(function(resolve, reject) {
     companyName = getCompanyName();
-    console.log('[PrevalenciaEL] ===== CONFIGURAR RUTAS =====');
-    console.log('[PrevalenciaEL] companyName:', companyName, '| year:', year);
 
     if (!companyName) {
       showToast('No se ha seleccionado una empresa', 'warning');
@@ -411,7 +428,6 @@ function configurarRutas(year) {
 
     if (api && api.configurarRutas) {
       api.configurarRutas(companyName, year || undefined).then(function(res) {
-        console.log('[PrevalenciaEL] Respuesta de configurarRutas:', res);
 
         if (res.success) {
           if (res.data.availableFiles) {
@@ -423,17 +439,16 @@ function configurarRutas(year) {
           }
           resolve(true);
         } else {
-          console.log('[PrevalenciaEL] ERROR en configurarRutas:', res.error);
+          console.error('[PrevalenciaEL] ERROR en configurarRutas:', res.error);
           showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
           resolve(false);
         }
       })['catch'](function(e) {
-        console.log('[PrevalenciaEL] EXCEPTION en configurarRutas:', e.message);
+        console.error('[PrevalenciaEL] EXCEPTION en configurarRutas:', e.message);
         showToast('Error de conexion: ' + e.message, 'error');
         resolve(false);
       });
     } else {
-      console.log('[PrevalenciaEL] API no disponible, simulando exito');
       resolve(true);
     }
   });
@@ -476,7 +491,6 @@ function updateYearLabels(fileName) {
 
 // ==================== CARGAR DATOS ====================
 function cargarDatos() {
-  console.log('[PrevalenciaEL] ===== CARGAR DATOS =====');
 
   showLoading(true);
   pendingChanges = {};
@@ -485,32 +499,26 @@ function cargarDatos() {
 
   configurarRutas(year).then(function(rutasOk) {
     if (!rutasOk) {
-      console.log('[PrevalenciaEL] ERROR: No se pudieron configurar las rutas');
       renderEmptyState();
       return;
     }
 
     if (api && api.leerIndicadores) {
       api.leerIndicadores().then(function(res) {
-        console.log('[PrevalenciaEL] leerIndicadores response:', res);
 
         if (res.success) {
-          console.log('[PrevalenciaEL] indicadores cargados OK');
           indicadores = res.data;
         } else {
-          console.log('[PrevalenciaEL] ERROR leerIndicadores:', res.error);
           showToast(res.error && res.error.message || 'Error al leer indicadores', 'error');
           indicadores = null;
         }
 
         renderizar();
       })['catch'](function(e) {
-        console.log('[PrevalenciaEL] usando datos demo:', e.message);
         indicadores = generateDemoData();
         renderizar();
       });
     } else {
-      console.log('[PrevalenciaEL] Modo demo sin API');
       indicadores = generateDemoData();
       renderizar();
     }
@@ -569,6 +577,7 @@ function renderizar() {
     // Extraer datos de prevalencia del excel
     var prevalenciaMensualBackend = indicadores.prevalenciaMensual || [];
     var meta = toNum(indicadores.meta) || 0;
+    var C = palette();
 
     // Construir prevalencia mensual desde los datos del backend
     var prevalenciaMensual = [];
@@ -621,7 +630,7 @@ function renderizar() {
     }
     if (kpiTotalEL) {
       kpiTotalEL.textContent = totalCasosEL;
-      kpiTotalEL.style.color = totalCasosEL > 0 ? '#f59e0b' : '#16a34a';
+      kpiTotalEL.style.color = totalCasosEL > 0 ? C.warning : C.success;
       kpiTotalEL.className = 'kair-kpi-value ' + (totalCasosEL > 0 ? 'warning' : 'success');
     }
     if (kpiTrabProm) {
@@ -639,9 +648,9 @@ function renderizar() {
     }
     if (promedioBadge) {
       promedioBadge.textContent = 'Prevalencia: ' + fmt(prevalenciaPromedio, 2);
-      var isOk = getValueColor(prevalenciaPromedio, meta) !== '#dc2626';
-      promedioBadge.style.background = isOk ? '#dcfce7' : '#fee2e2';
-      promedioBadge.style.color = isOk ? '#16a34a' : '#dc2626';
+      var isOk = getValueColor(prevalenciaPromedio, meta) !== C.danger;
+      promedioBadge.style.background = isOk ? C.successSoft : C.dangerSoft;
+      promedioBadge.style.color = isOk ? C.success : C.danger;
     }
 
     // Actualizar metodología
@@ -659,8 +668,10 @@ function renderizar() {
 
     if (kpiSection) kpiSection.style.display = 'grid';
     if (metaSection) metaSection.style.display = 'flex';
-    if (chartSection) chartSection.style.display = 'block';
-    if (tableSection) tableSection.style.display = 'block';
+    // '' (no 'block'): deja que el CSS decida el display para que en maximizada
+    // el .prev-duo pueda ponerlas en flex (2 columnas) sin que el estilo en linea lo pise.
+    if (chartSection) chartSection.style.display = '';
+    if (tableSection) tableSection.style.display = '';
     if (methodologySection) methodologySection.style.display = 'block';
 
     // Renderizar tabla
@@ -690,6 +701,7 @@ function renderizar() {
     var tbody = getElement('tableBody');
     var tfoot = getElement('tableFoot');
     if (!tbody) return;
+    var C = palette();
 
     var html = '';
     var totalCasosEL = 0;
@@ -717,9 +729,9 @@ function renderizar() {
       html += '<tr>';
       html += '<td>' + row.mesLabel + '</td>';
       html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="casosEL" tabindex="0">' + toNum(casosELDisplay) + '</span></td>';
-      html += '<td><span class="kair-cell-value" style="color:#2563eb;font-weight:600">' + toNum(trabDisplay) + '</span></td>';
+      html += '<td><span class="kair-cell-value" style="color:' + C.primary + ';font-weight:600">' + toNum(trabDisplay) + '</span></td>';
       html += '<td style="font-weight:700;color:' + getValueColor(prevalenciaCalc, meta) + '">' + fmt(prevalenciaCalc, 2) + '</td>';
-      html += '<td style="color:#6c757d">' + meta + '</td>';
+      html += '<td style="color:' + C.textSec + '">' + meta + '</td>';
       html += '<td><span class="kair-status-badge" style="background:' + estadoCalc.color + '">' + estadoCalc.label + '</span></td>';
       html += '</tr>';
     });
@@ -735,9 +747,9 @@ function renderizar() {
       prevalenciaTotal = Math.round(prevalenciaTotal * 100) / 100;
       tfoot.innerHTML = '<tr class="kair-table-total">'
         + '<td>TOTAL</td>'
-        + '<td style="color:#f59e0b;font-weight:700">' + totalCasosEL + '</td>'
-        + '<td style="color:#2563eb;font-weight:700">' + (countMeses > 0 ? Math.round(totalTrab / countMeses) : 0) + '</td>'
-        + '<td style="color:#174ea6;font-weight:700">' + fmt(prevalenciaTotal, 2) + '</td>'
+        + '<td style="color:' + C.warning + ';font-weight:700">' + totalCasosEL + '</td>'
+        + '<td style="color:' + C.primary + ';font-weight:700">' + (countMeses > 0 ? Math.round(totalTrab / countMeses) : 0) + '</td>'
+        + '<td style="color:' + C.primary + ';font-weight:700">' + fmt(prevalenciaTotal, 2) + '</td>'
         + '<td>' + meta + '</td>'
         + '<td>-</td>'
         + '</tr>';
@@ -875,11 +887,9 @@ function renderizar() {
 
   // ==================== INICIALIZAR ====================
 function init() {
-  console.log('[PrevalenciaEL] ===== INIT =====');
 
   if (window.electronAPI) {
     api = window.electronAPI.prevalencia;
-    console.log('[PrevalenciaEL] electronAPI asignada:', !!api);
   }
 
   var btnBack = getElement('btn-back-module');
@@ -962,11 +972,14 @@ if (btnClone) {
 
   updateHeaderContext();
 
-  window.addEventListener('resize', function() {
-    if (chartInstance) {
-      chartInstance.resize();
-    }
-  });
+  // Resize del gráfico: UN solo handler guardado en window (no acumula al reabrir)
+  if (window.__prevResizeHandler) {
+    window.removeEventListener('resize', window.__prevResizeHandler);
+  }
+  window.__prevResizeHandler = function() {
+    if (chartInstance) chartInstance.resize();
+  };
+  window.addEventListener('resize', window.__prevResizeHandler);
 
   cargarDatos();
 }

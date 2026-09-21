@@ -40,6 +40,14 @@ function rmEnterControlRemisiones() {
     }
 }
 
+/** Entrar a la sección de Estadísticas de Remisiones (📦779) */
+function rmEnterEstadisticas() {
+    if (window.restriccionesMedicasPortalComponent &&
+        typeof window.restriccionesMedicasPortalComponent.showEstadisticasRemisionesPage === 'function') {
+        window.restriccionesMedicasPortalComponent.showEstadisticasRemisionesPage();
+    }
+}
+
 /** Placeholder para funciones en desarrollo */
 function rmPlaceholder(featureName) {
     const name = featureName || 'Esta función';

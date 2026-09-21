@@ -1,0 +1,491 @@
+/* modules/gestion-humana/carpetas/index.css
+ * I-AUDIT-2026-09-11 (Carpetas v0.2.0) · Design tokens + componentes BEM
+ * Réplica del prototipo HTML (kair-documentos-contratacion.pdf) adaptado a K+AIR.
+ * Patrón: mismas clases BEM que el PDF, scoped a este módulo para no colisionar
+ * con otros estilos del shell GH (kair-*, gh-*).
+ */
+
+:root {
+  --kair-primary: #174ea6;
+  --kair-primary-hover: #185abd;
+  --kair-primary-light: #e8f0fe;
+  --kair-success: #28a745;
+  --kair-success-light: #e6f4ea;
+  --kair-success-text: #1e7e34;
+  --kair-warning: #ffc107;
+  --kair-warning-light: #fff8e1;
+  --kair-warning-text: #8a6d00;
+  --kair-danger: #dc3545;
+  --kair-danger-light: #fdecea;
+  --kair-danger-text: #b02a37;
+  --kair-info: #6c757d;
+  --kair-info-light: #f1f3f5;
+  --kair-bg: #f8f9fa;
+  --kair-surface: #ffffff;
+  --kair-border: #dee2e6;
+  --kair-text: #1a1a2e;
+  --kair-text-muted: #5a6378;
+  --kair-text-light: #6c757d;
+  --kair-track: #e9edf2;
+  --kair-radius-sm: 6px;
+  --kair-radius-md: 10px;
+  --kair-shadow-card: 0 1px 2px rgba(0,0,0,0.04);
+  --kair-shadow-overlay: 0 12px 32px rgba(26,26,46,0.18);
+  --kair-transition: 160ms ease;
+}
+
+/* ========== UTILIDADES ========== */
+.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+
+/* ========== BOTONES ========== */
+.kair-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--kair-radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--kair-transition), color var(--kair-transition), border-color var(--kair-transition);
+  font-family: inherit;
+}
+.kair-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.kair-btn--primary { background: var(--kair-primary); color: #fff; }
+.kair-btn--primary:hover:not(:disabled) { background: var(--kair-primary-hover); }
+.kair-btn--outline { background: var(--kair-surface); color: var(--kair-text-muted); border-color: var(--kair-border); }
+.kair-btn--outline:hover:not(:disabled) { border-color: var(--kair-primary); color: var(--kair-primary); background: var(--kair-primary-light); }
+.kair-btn--ghost { background: transparent; color: var(--kair-text-muted); }
+.kair-btn--ghost:hover:not(:disabled) { background: var(--kair-info-light); color: var(--kair-text); }
+
+.kair-icon-btn {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--kair-radius-sm);
+  background: transparent; border: none; cursor: pointer; color: var(--kair-text-muted);
+  transition: background var(--kair-transition), color var(--kair-transition);
+}
+.kair-icon-btn:hover { background: var(--kair-primary-light); color: var(--kair-primary); }
+.kair-icon-btn--danger:hover { background: var(--kair-danger-light); color: var(--kair-danger); }
+
+/* ========== BADGES ========== */
+.kair-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--kair-radius-sm);
+  font-size: 0.75rem; font-weight: 500;
+  width: fit-content;
+}
+.kair-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.kair-badge--success { background: var(--kair-success-light); color: var(--kair-success-text); }
+.kair-badge--warning { background: var(--kair-warning-light); color: var(--kair-warning-text); }
+.kair-badge--danger  { background: var(--kair-danger-light);  color: var(--kair-danger-text); }
+.kair-badge--primary { background: var(--kair-primary-light); color: var(--kair-primary); }
+.kair-badge--info    { background: var(--kair-info-light);    color: var(--kair-text-muted); }
+
+/* ========== AVATAR ========== */
+.kair-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--kair-primary-light);
+  color: var(--kair-primary);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8125rem; font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.kair-avatar--lg { width: 56px; height: 56px; font-size: 1.125rem; }
+
+/* ========== KPI STRIP ========== */
+.kair-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 20px;
+  box-shadow: var(--kair-shadow-card);
+  margin-bottom: 1rem;
+}
+.kair-kpi-item {
+  display: flex; align-items: center; gap: 0.875rem;
+  padding: 0 1rem;
+  border-left: 1px solid var(--kair-border);
+}
+.kair-kpi-item:first-child { border-left: none; padding-left: 0; }
+.kair-kpi-item:last-child { padding-right: 0; }
+.kair-kpi-item__icon {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+.kair-kpi-item__icon--primary { background: var(--kair-primary-light); color: var(--kair-primary); }
+.kair-kpi-item__icon--success { background: var(--kair-success-light); color: var(--kair-success); }
+.kair-kpi-item__icon--warning { background: var(--kair-warning-light); color: var(--kair-warning-text); }
+.kair-kpi-item__icon--info    { background: var(--kair-info-light); color: var(--kair-text-muted); }
+.kair-kpi-item__body { flex: 1; min-width: 0; }
+.kair-kpi-item__value { font-size: 1.75rem; font-weight: 700; color: var(--kair-text); line-height: 1; }
+.kair-kpi-item__label { font-size: 0.75rem; text-transform: uppercase; color: var(--kair-text-muted); letter-spacing: 0.05em; margin-top: 0.25rem; }
+.kair-kpi-item__subdata { font-size: 0.75rem; color: var(--kair-text-light); margin-top: 0.125rem; }
+.kair-kpi-item__subdata--success { color: var(--kair-success-text); }
+.kair-kpi-item__subdata--warning { color: var(--kair-warning-text); }
+
+/* ========== TOOLBAR ========== */
+/* 📦743 · Los estilos críticos (display:grid + columns) están inline en el JS
+ * para sortear un override del shell de K+AIR. Este CSS provee el resto del styling
+ * (background, border, padding, hover) y los estilos de los hijos. */
+.kair-toolbar {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.kair-search { position: relative; min-width: 0; }
+.kair-search input { width: 100%; }
+.kair-select { min-width: 140px; }
+.kair-toolbar__count {
+  color: var(--kair-text-muted);
+  font-size: 0.8125rem;
+  justify-self: end;
+  white-space: nowrap;
+}
+.kair-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--kair-text-muted); font-size: 0.875rem; }
+.kair-search input {
+  width: 100%; padding: 8px 12px 8px 38px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  font-family: inherit; font-size: 0.875rem; color: var(--kair-text);
+  background: var(--kair-surface);
+  box-sizing: border-box;
+}
+.kair-search input:focus {
+  outline: none;
+  border-color: var(--kair-primary);
+  /* box-shadow removido: generaba repintado raro dentro del border del toolbar */
+}
+.kair-select {
+  height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  background: var(--kair-surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235a6378'><path d='M7 10l5 5 5-5z'/></svg>") no-repeat right 8px center / 16px;
+  appearance: none; -webkit-appearance: none;
+  font-family: inherit; font-size: 0.8125rem; color: var(--kair-text);
+  cursor: pointer;
+}
+.kair-select:focus { outline: none; border-color: var(--kair-primary); box-shadow: 0 0 0 3px var(--kair-primary-light); }
+.kair-toolbar__count { color: var(--kair-text-muted); font-size: 0.8125rem; margin-left: auto; }
+
+/* ========== TABLA ========== */
+.kair-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  font-size: 0.875rem;
+}
+.kair-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--kair-text-muted);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+}
+.kair-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--kair-info-light);
+  vertical-align: middle;
+}
+.kair-table tbody tr:hover { background: var(--kair-bg); }
+.kair-table tbody tr:last-child td { border-bottom: none; }
+.col--actions { text-align: right; }
+
+.kair-emp { display: flex; align-items: center; gap: 0.75rem; }
+.kair-emp__name { font-weight: 500; color: var(--kair-text); }
+.kair-emp__doc { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+
+/* ========== BARRA DE PROGRESO ========== */
+.kair-progress { display: flex; align-items: center; gap: 0.5rem; }
+.kair-progress__track {
+  width: 92px; height: 6px;
+  background: var(--kair-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.kair-progress__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--kair-primary);
+  transition: width var(--kair-transition);
+}
+.kair-progress__fill--success { background: var(--kair-success); }
+.kair-progress__fill--warning { background: var(--kair-warning); }
+.kair-progress__fill--danger  { background: var(--kair-danger); }
+.kair-progress__label { font-size: 0.75rem; font-weight: 500; color: var(--kair-text-muted); }
+
+/* ========== PAGINACIÓN ========== */
+.kair-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--kair-info-light);
+  font-size: 0.8125rem; color: var(--kair-text-muted);
+  flex-wrap: wrap; gap: 0.5rem;
+}
+.kair-pagination__info { color: var(--kair-text-muted); }
+.kair-pagination__page { font-weight: 600; color: var(--kair-text); }
+.kair-pager-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  background: var(--kair-surface);
+  cursor: pointer; color: var(--kair-text-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.kair-pager-btn:hover:not(:disabled) { border-color: var(--kair-primary); color: var(--kair-primary); }
+.kair-pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ========== ESTADO VACÍO ========== */
+.kair-empty {
+  padding: 2.5rem 1.5rem; text-align: center;
+  color: var(--kair-text-muted);
+}
+.kair-empty > i { font-size: 2.5rem; color: var(--kair-text-light); margin-bottom: 0.75rem; }
+.kair-empty__title { font-size: 0.9375rem; font-weight: 600; color: var(--kair-text); margin-bottom: 0.375rem; }
+.kair-empty__msg { font-size: 0.875rem; max-width: 420px; margin: 0 auto 1rem; }
+
+/* ========== INFO CARD (detalle expediente) ========== */
+.kair-info-card {
+  display: flex; gap: 1.5rem;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--kair-shadow-card);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.kair-info-card__body { flex: 1; min-width: 280px; }
+.kair-info-card__name { font-size: 1.25rem; font-weight: 600; color: var(--kair-text); }
+.kair-info-card__role { color: var(--kair-text-muted); font-size: 0.875rem; margin-top: 0.125rem; }
+.kair-info-card__meta { display: flex; gap: 1.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.kair-info-card__meta-label { font-size: 0.7rem; text-transform: uppercase; color: var(--kair-text-muted); letter-spacing: 0.05em; }
+.kair-info-card__meta-value { font-weight: 500; color: var(--kair-text); margin-top: 0.125rem; }
+.kair-info-card__side { min-width: 230px; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
+.kair-completitud__head { display: flex; gap: 0.5rem; align-items: center; width: 100%; justify-content: space-between; font-size: 0.8125rem; color: var(--kair-text-muted); }
+.kair-completitud__head strong { color: var(--kair-text); font-size: 0.9375rem; }
+
+/* ========== GRID DE CATEGORÍAS ========== */
+.kair-detail-grid {
+  display: grid;
+  /* 📦747 · Grid responsivo (auto-fill + minmax) — patrón del shell GH.
+   * Se adapta al ancho disponible: 6 cols en pantallas wide, 4 en laptop
+   * normal (1366-1700px), 2 en pantallas chicas. Mantiene min 280px por
+   * card para legibilidad de nombres largos de categoría y archivo. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.kair-cat-card {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  overflow: hidden;
+  box-shadow: var(--kair-shadow-card);
+}
+.kair-cat-card__head {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--kair-info-light);
+}
+.kair-cat-card__icon {
+  width: 34px; height: 34px;
+  background: var(--kair-primary-light); color: var(--kair-primary);
+  border-radius: var(--kair-radius-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.kair-cat-card__title { font-size: 0.9375rem; font-weight: 600; color: var(--kair-text); }
+.kair-cat-card__count { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.kair-cat-card__body { padding: 0.75rem; }
+
+/* ========== FILA DE ARCHIVO ========== */
+.kair-file-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--kair-info-light); border-radius: var(--kair-radius-sm);
+  margin-bottom: 0.5rem;
+}
+.kair-file-row:last-child { margin-bottom: 0; }
+/* 📦743 · Documento importado del flujo de Contratación (read-only) */
+.kair-file-row--imported {
+  border-color: var(--kair-primary-light);
+  background: linear-gradient(0deg, var(--kair-primary-light) 0%, transparent 100%);
+}
+.kair-file-row__icon {
+  width: 30px; height: 30px;
+  background: var(--kair-info-light); color: var(--kair-text-muted);
+  border-radius: var(--kair-radius-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.kair-file-row__body { flex: 1; min-width: 0; }
+.kair-file-row__name {
+  font-weight: 500; color: var(--kair-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kair-file-row__meta { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.kair-file-row__actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+
+/* ========== SLOT VACÍO ========== */
+.kair-file-empty {
+  border: 2px dashed var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 1.25rem; text-align: center;
+  color: var(--kair-text-muted); font-size: 0.875rem;
+}
+.kair-file-empty > i { font-size: 1.75rem; color: var(--kair-text-light); margin-bottom: 0.5rem; display: block; }
+.kair-file-empty > div { margin-bottom: 0.625rem; }
+
+/* ========== MODAL ========== */
+.kair-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(26,26,46,0.45);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.kair-modal {
+  background: var(--kair-surface);
+  border-radius: var(--kair-radius-md);
+  width: min(560px, 100%);
+  max-height: min(88vh, 760px);
+  box-shadow: var(--kair-shadow-overlay);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.kair-modal__head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--kair-info-light);
+  gap: 1rem;
+}
+.kair-modal__title { font-size: 1.0625rem; font-weight: 600; color: var(--kair-text); }
+.kair-modal__subtitle { font-size: 0.8125rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.kair-modal__body { padding: 1rem 1.25rem; overflow-y: auto; flex: 1; }
+.kair-modal__foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--kair-info-light);
+  flex-wrap: wrap;
+}
+.kair-modal__hint { font-size: 0.75rem; color: var(--kair-text-muted); }
+
+/* ========== FORM FIELDS ========== */
+.kair-field { margin-bottom: 0.875rem; }
+.kair-field__label {
+  display: block;
+  font-size: 0.8125rem; font-weight: 600;
+  color: var(--kair-text);
+  margin-bottom: 0.375rem;
+}
+
+/* ========== DROPZONE ========== */
+.kair-dropzone {
+  border: 2px dashed var(--kair-border);
+  background: var(--kair-bg);
+  border-radius: var(--kair-radius-md);
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--kair-transition), background var(--kair-transition);
+}
+.kair-dropzone:hover, .kair-dropzone.is-dragover {
+  border-color: var(--kair-primary);
+  background: var(--kair-primary-light);
+}
+.kair-dropzone > i {
+  font-size: 2rem; color: var(--kair-text-muted); margin-bottom: 0.5rem; display: block;
+}
+.kair-dropzone__title { font-size: 0.9375rem; color: var(--kair-text); }
+.kair-dropzone__title a { color: var(--kair-primary); text-decoration: none; font-weight: 500; }
+.kair-dropzone__title a:hover { text-decoration: underline; }
+.kair-dropzone__hint { font-size: 0.8125rem; color: var(--kair-text-muted); margin-top: 0.375rem; }
+
+/* ========== LISTA DE ARCHIVOS (vacía por ahora — el dialog del SO lo maneja) ========== */
+.kair-uplist { margin-top: 0.75rem; }
+
+/* ========== SKELETON ========== */
+.kair-skel {
+  background: var(--kair-track);
+  border-radius: 4px;
+  animation: kair-shimmer 1.4s linear infinite;
+  background-image: linear-gradient(90deg, var(--kair-track) 0%, rgba(255,255,255,0.65) 50%, var(--kair-track) 100%);
+  background-size: 200% 100%;
+}
+@keyframes kair-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========== GHOST BUTTONS (en header de sección) ========== */
+.gh-btn {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+}
+.gh-btn--outline {
+  background: white;
+  border-color: #dee2e6;
+  color: #495057;
+}
+.gh-btn--outline:hover { background: var(--kair-primary-light); color: var(--kair-primary); border-color: var(--kair-primary); }
+
+/* ========== WRAPPER (patrón del shell GH, ver 📦770) ==========
+ * Igual que .doc-wrapper, .db-wrapper, .af-wrapper, etc.
+ * El shell provee .gh-content con overflow:hidden, así que CADA módulo
+ * envuelve su contenido en un wrapper con overflow-y:auto para hacer
+ * scroll interno. Sin este wrapper, las 4+ categorías del detail view
+ * se desbordan y se cortan visualmente.
+ */
+.carp-wrapper {
+  padding: 1.5rem;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--kair-bg);
+  box-sizing: border-box;
+}
+.carp-wrapper::-webkit-scrollbar { width: 10px; }
+.carp-wrapper::-webkit-scrollbar-track { background: transparent; }
+.carp-wrapper::-webkit-scrollbar-thumb { background: #c1c8d0; border-radius: 5px; border: 2px solid #f8f9fa; }
+.carp-wrapper::-webkit-scrollbar-thumb:hover { background: #9aa3ad; }
+.carp-wrapper { scrollbar-width: thin; scrollbar-color: #c1c8d0 transparent; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1100px) {
+  .kair-kpi-strip { grid-template-columns: 1fr 1fr; row-gap: 1.25rem; }
+  .kair-kpi-item { border-left: none !important; padding: 0 0.5rem; }
+  .kair-kpi-item:nth-child(odd) { border-right: 1px solid var(--kair-border); padding-right: 1rem; }
+}
+@media (max-width: 880px) {
+  .kair-detail-grid { grid-template-columns: 1fr; }
+  .kair-info-card__side { align-items: flex-start; min-width: 0; }
+}
+@media (max-width: 640px) {
+  .kair-kpi-strip { grid-template-columns: 1fr; padding: 12px 16px; }
+  .kair-kpi-item { border-bottom: 1px solid var(--kair-border); padding-bottom: 0.875rem; }
+  .kair-kpi-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .kair-toolbar__count { display: none; }
+}

@@ -1,11 +1,19 @@
 // investigacion-accidentes-main.js - Script principal para la interfaz moderna de investigación de accidentes
 
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[INVESTIGACION-ACCIDENTES-MAIN] Script cargado y DOM listo');
 
     // Elementos del DOM
     const fileInput = document.getElementById('fileInput');
     const dropZone = document.getElementById('dropZone');
+    const dropZoneContent = document.getElementById('dropZoneContent');
     const selectedFileInfo = document.getElementById('selectedFileInfo');
     const selectedFileName = document.getElementById('selectedFileName');
     const selectedFileSize = document.getElementById('selectedFileSize');
@@ -24,6 +32,14 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedPdfPath = null;
     let extractedData = null;
     let analysisResult = null;
+    let lastReportPath = null;   // ruta del último informe .docx generado
+    let isAnalyzing = false;     // guard contra doble-click en Iniciar Análisis
+
+    // ── Estado de revisión del análisis (feature nuevo) ──
+    let analysisState = 'idle';     // 'idle' | 'reviewing' | 'approved' | 'dirty'
+    let analysisEdits = {};         // {PorQue1: {Mano de Obra: 'edit', ...}, ...} — ediciones inline del usuario
+    let analysisOriginalBackup = null;  // copia profunda del análisis para "Deshacer" tras regenerar
+    let isRegenerating = false;     // guard contra doble-click en Regenerar
     
     // Obtener empresa desde parámetros de URL o window.currentCompany
     const urlParams = new URLSearchParams(window.location.search);
@@ -40,8 +56,42 @@ document.addEventListener('DOMContentLoaded', function() {
         companyNameElement.textContent = currentEmpresa;
     }
 
+    // Cambia el estado visual del dropzone según la fase del PDF.
+    // Estados:
+    //   'initial'  → "Selecciona un archivo PDF" + icono PDF (estado por defecto)
+    //   'selected' → mismo aspecto que initial pero con clase has-file (verde) tras seleccionar
+    //   'processed' → "✓ Archivo procesado exitosamente" + icono check, fondo verde, no clickeable
+    function setDropzoneState(state) {
+        if (!dropZone || !dropZoneContent) return;
+        if (state === 'processed') {
+            dropZone.classList.remove('has-file');
+            dropZone.classList.add('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-check-circle"></i></div>' +
+                '<p class="inv-drop-title">Archivo procesado exitosamente</p>' +
+                '<p class="inv-drop-subtitle">Datos del FURAT extraídos</p>';
+        } else if (state === 'selected') {
+            dropZone.classList.add('has-file');
+            dropZone.classList.remove('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-file-pdf"></i></div>' +
+                '<p class="inv-drop-title">PDF listo para procesar</p>' +
+                '<p class="inv-drop-subtitle">Extrayendo datos…</p>';
+        } else {
+            // initial / reset
+            dropZone.classList.remove('has-file');
+            dropZone.classList.remove('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-file-pdf"></i></div>' +
+                '<p class="inv-drop-title">Selecciona un archivo PDF</p>' +
+                '<p class="inv-drop-subtitle">o arrastra y suelta aquí</p>';
+        }
+    }
+
     // Evento para abrir el diálogo de selección de archivo
     dropZone.addEventListener('click', function() {
+        // No abrir selector si el archivo ya fue procesado (se debe quitar antes con la X)
+        if (dropZone.classList.contains('is-processed')) return;
         fileInput.click();
     });
 
@@ -49,10 +99,27 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             const file = e.target.files[0];
-            
-            // Validar que sea un PDF
-            if (file.type !== 'application/pdf') {
-                showToast('Error', 'Por favor selecciona un archivo PDF válido.', 'error');
+
+            // Validar tipo (MIME o extensión como fallback)
+            const isPdfByMime = file.type === 'application/pdf';
+            const isPdfByExt = /\.pdf$/i.test(file.name);
+            if (!isPdfByMime && !isPdfByExt) {
+                showToast('Archivo no válido', 'Solo se aceptan archivos PDF para el FURAT.', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validar tamaño (50MB máximo, alineado con investigaciones-viewer)
+            const MAX_SIZE = 50 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                showToast('Archivo demasiado grande', `El archivo pesa ${sizeMb}MB. Máximo permitido: 50MB.`, 'error');
+                fileInput.value = '';
+                return;
+            }
+            if (file.size === 0) {
+                showToast('Archivo vacío', 'El archivo PDF no contiene datos.', 'error');
+                fileInput.value = '';
                 return;
             }
 
@@ -60,45 +127,58 @@ document.addEventListener('DOMContentLoaded', function() {
             const reader = new FileReader();
             reader.onload = async function(event) {
                 const arrayBuffer = event.target.result;
-                
+
                 // Enviar el archivo al proceso principal para guardarlo temporalmente
                 try {
                     // Usar la comunicación con el padre para guardar el archivo temporalmente
-                    const saveResult = await callParentAPI('save-temp-pdf-file', { 
-                        filename: file.name, 
-                        data: Array.from(new Uint8Array(arrayBuffer)) 
+                    const saveResult = await callParentAPI('save-temp-pdf-file', {
+                        filename: file.name,
+                        data: Array.from(new Uint8Array(arrayBuffer))
                     });
-                    
+
                     // Extraer la ruta del archivo del resultado
                     selectedPdfPath = saveResult.filePath || saveResult;
-                    
+
                     // Mostrar información del archivo seleccionado
                     selectedFileName.textContent = file.name;
                     selectedFileSize.textContent = formatFileSize(file.size);
                     selectedFileInfo.classList.remove('hidden');
-                    
-                    // Actualizar estado visual
-                    dropZone.classList.add('has-file');
+
+                    // Actualizar estado visual del dropzone a "seleccionado" (extrayendo...)
+                    setDropzoneState('selected');
                     updateStepStatus(1, 'completed');
-                    
+
                     // Habilitar botón de análisis
                     processBtn.disabled = false;
-                    
+
                     // INICIAR PROCESAMIENTO AUTOMÁTICO DEL PDF
                     showToast('Procesando PDF', 'Extrayendo datos del documento...', 'info');
+                    logActivity('info', 'Archivo cargado: ' + file.name + ' (' + formatFileSize(file.size) + ')');
                     await processPdfFile(selectedPdfPath);
-                    
+
                     showToast('Archivo seleccionado', `Datos extraídos de: ${file.name}`, 'success');
                 } catch (error) {
                     console.error('Error guardando archivo temporal:', error);
                     showToast('Error', `No se pudo procesar el archivo: ${error.message}`, 'error');
+                    logActivity('error', 'Error al procesar PDF: ' + error.message);
                 }
             };
-            
+
             reader.onerror = function() {
-                showToast('Error', 'No se pudo leer el archivo.', 'error');
+                showToast('Error', 'No se pudo leer el archivo del disco.', 'error');
+                fileInput.value = '';
             };
-            
+
+            reader.onprogress = function(progressEvent) {
+                if (progressEvent.lengthComputable) {
+                    // Mostrar feedback durante la lectura del archivo grande
+                    const pct = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+                    if (pct < 100 && progressEvent.total > 1024 * 1024) {
+                        selectedFileSize.textContent = formatFileSize(progressEvent.loaded) + ' / ' + formatFileSize(progressEvent.total) + ' (' + pct + '%)';
+                    }
+                }
+            };
+
             reader.readAsArrayBuffer(file);
         }
     });
@@ -117,18 +197,30 @@ document.addEventListener('DOMContentLoaded', function() {
     dropZone.addEventListener('drop', function(e) {
         e.preventDefault();
         dropZone.classList.remove('dragover');
-        
+
         if (e.dataTransfer.files.length > 0) {
             const file = e.dataTransfer.files[0];
-            
-            if (file.type === 'application/pdf') {
-                // Simular evento de cambio en el input
-                const event = new Event('change', { bubbles: true });
-                fileInput.files = e.dataTransfer.files;
-                fileInput.dispatchEvent(event);
-            } else {
-                showToast('Error', 'Solo se aceptan archivos PDF.', 'error');
+
+            // Validar tipo antes de pasar al flujo principal
+            const isPdfByMime = file.type === 'application/pdf';
+            const isPdfByExt = /\.pdf$/i.test(file.name);
+            if (!isPdfByMime && !isPdfByExt) {
+                showToast('Archivo no válido', 'Solo se aceptan archivos PDF para el FURAT.', 'error');
+                return;
             }
+
+            // Validar tamaño
+            const MAX_SIZE = 50 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                showToast('Archivo demasiado grande', `El archivo pesa ${sizeMb}MB. Máximo permitido: 50MB.`, 'error');
+                return;
+            }
+
+            // Simular evento de cambio en el input para reutilizar todo el flujo
+            const event = new Event('change', { bubbles: true });
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(event);
         }
     });
 
@@ -137,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInput.value = '';
         selectedPdfPath = null;
         selectedFileInfo.classList.add('hidden');
-        dropZone.classList.remove('has-file');
+        setDropzoneState('initial');
         processBtn.disabled = true;
         updateStepStatus(1, 'pending');
         
@@ -180,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fileInput.value = '';
             selectedPdfPath = null;
             selectedFileInfo.classList.add('hidden');
-            dropZone.classList.remove('has-file');
+            setDropzoneState('initial');
             
             // Limpiar datos y análisis
             extractedData = null;
@@ -233,16 +325,100 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // ── Botones header: Visualizar investigación + Imprimir ──────────────
+  // Estos listeners solo se registran una vez. La habilitación (disabled=false)
+  // se hace recién cuando se genera el informe exitosamente.
+  const downloadBtn = document.getElementById('downloadBtn');
+  const printBtn = document.getElementById('printBtn');
+
+  function _disableReportButtons() {
+    if (downloadBtn) downloadBtn.disabled = true;
+    if (printBtn) printBtn.disabled = true;
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function() {
+      if (!lastReportPath) {
+        showToast('Sin informe', 'Primero debes generar un informe para visualizarlo.', 'warning');
+        return;
+      }
+      const api = window.electronAPI && window.electronAPI.showItemInFolder
+        ? window.electronAPI
+        : {
+            showItemInFolder: (p) => callParentAPI('show-item-in-folder', { filePath: p })
+          };
+      try {
+        const result = await api.showItemInFolder(lastReportPath);
+        if (result && result.success) {
+          logActivity('success', 'Carpeta abierta: ' + lastReportPath);
+        } else {
+          const msg = (result && result.error) || 'No se pudo abrir la carpeta.';
+          showToast('Error', msg, 'error');
+          logActivity('error', 'No se pudo visualizar la investigación: ' + msg);
+        }
+      } catch (err) {
+        console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en Visualizar:', err);
+        showToast('Error', 'No se pudo visualizar la investigación: ' + err.message, 'error');
+      }
+    });
+  }
+
+  if (printBtn) {
+    printBtn.addEventListener('click', async function() {
+      if (!lastReportPath) {
+        showToast('Sin informe', 'Primero debes generar un informe para imprimir.', 'warning');
+        return;
+      }
+      const api = window.electronAPI && window.electronAPI.openPath
+        ? window.electronAPI
+        : { openPath: (p) => callParentAPI('open-path', { filePath: p }) };
+      try {
+        const result = await api.openPath(lastReportPath);
+        if (result && result.success) {
+          logActivity('info', 'Documento abierto para impresión: ' + lastReportPath);
+          showToast('Documento abierto', 'Use Ctrl+P para imprimir.', 'info');
+        } else {
+          const msg = (result && result.error) || 'No se pudo abrir el documento.';
+          showToast('Error', msg, 'error');
+          logActivity('error', 'No se pudo abrir para impresión: ' + msg);
+        }
+      } catch (err) {
+        console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en Imprimir:', err);
+        showToast('Error', 'No se pudo abrir para impresión: ' + err.message, 'error');
+      }
+    });
+  }
+
   // Botón de procesamiento - Solo ejecuta el análisis si los datos ya están extraídos
     processBtn.addEventListener('click', async function() {
         if (!extractedData) {
             showToast('Error', 'Primero debes seleccionar y procesar un archivo PDF.', 'error');
             return;
         }
-        
-        // Ejecutar solo el análisis con los datos ya extraídos
+        if (isAnalyzing) {
+            showToast('Análisis en curso', 'Ya hay un análisis ejecutándose. Espera a que termine.', 'warning');
+            return;
+        }
         await runAnalysis();
     });
+
+    // ── Listeners del toolbar de revisión del análisis ──
+    // IMPORTANTE: se bindean AQUÍ (no en la inicialización) porque los handlers
+    // window._onXxx se definen MÁS ABAJO en este mismo archivo. Si se bindearan
+    // en la inicialización, serían undefined y el clic no haría nada.
+    function _bindReviewToolbarListeners() {
+        const btnStartReview = document.getElementById('btnStartReview');
+        const btnRegenerateAll = document.getElementById('btnRegenerateAll');
+        const btnCancelReview = document.getElementById('btnCancelReview');
+        const btnApproveAnalysis = document.getElementById('btnApproveAnalysis');
+        const btnReReview = document.getElementById('btnReReview');
+        if (btnStartReview) btnStartReview.addEventListener('click', window._onStartReview);
+        if (btnRegenerateAll) btnRegenerateAll.addEventListener('click', window._onRegenerateAll);
+        if (btnCancelReview) btnCancelReview.addEventListener('click', window._onCancelReview);
+        if (btnApproveAnalysis) btnApproveAnalysis.addEventListener('click', window._onApproveAnalysis);
+        if (btnReReview) btnReReview.addEventListener('click', window._onReReview);
+    }
+    // Se llamará al final del archivo (después de definir _onRegenerateAll)
 
     // Botón de volver
     backBtn.addEventListener('click', function() {
@@ -317,7 +493,10 @@ return await callParentAPI('generate-accident-report', combinedData);
             
             // Actualizar paso 2 como completado
             updateStepStatus(2, 'completed');
-            
+
+            // Marcar el dropzone como "procesado" (icono check verde, no clickeable)
+            setDropzoneState('processed');
+
             // Mostrar datos extraídos
             displayExtractedData(extractedData);
             
@@ -345,6 +524,11 @@ return await callParentAPI('generate-accident-report', combinedData);
     // Función separada para ejecutar el análisis
     async function runAnalysis() {
         console.log('[INVESTIGACION-ACCIDENTES-MAIN] Iniciando análisis de causa raíz');
+
+        // Guard contra doble-click o clicks múltiples durante análisis largos de IA
+        isAnalyzing = true;
+        if (processBtn) processBtn.disabled = true;
+        if (clearBtn) clearBtn.disabled = true;
 
         try {
             // Mostrar barra de progreso
@@ -393,41 +577,97 @@ return await callParentAPI('generate-accident-report', combinedData);
             // Variable para tracking del tiempo de carga
             const analysisStartTime = Date.now();
             let modelLoadingCheckInterval;
-            
-            // Verificar progreso de carga del modelo
+
+            // ── Progreso inteligente basado en historial ─────────────────
+            // Iteración 2: tras probar en frío, el cap de 30% durante 25s hacía
+            // que análisis rápidos (15s) solo llegaran a 18%. Ahora easing
+            // exponencial desde el segundo 1, con coeficiente 4.0 → al alcanzar
+            // el baseline estimado la barra llega a ~98%.
+            // ─────────────────────────────────────────────────────────────
+            let analysisHistory = {};
+            try {
+                analysisHistory = JSON.parse(localStorage.getItem('kair_analysis_history') || '{}');
+            } catch (e) { /* localStorage no disponible */ }
+
+            const historyBaseline = (typeof analysisHistory.averageTime === 'number' && analysisHistory.averageTime > 0)
+                ? analysisHistory.averageTime : null;
+            // Default 30s (mucho más realista que 60s — modelo warm suele ser ~10-20s)
+            const estimatedTotal = historyBaseline || 30;
+
+            function formatElapsed(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return m > 0 ? `${m}m ${s}s` : `${s}s`;
+            }
+
+            function computeProgress(elapsed) {
+                // Easing exponencial agresivo: 1 - e^(-4 * ratio)
+                //   ratio=0.25 → 63%
+                //   ratio=0.50 → 86%
+                //   ratio=0.75 → 95%
+                //   ratio=1.00 → 98%
+                const ratio = elapsed / estimatedTotal;
+                const eased = 100 * (1 - Math.exp(-4 * ratio));
+                // Cap 96% hasta terminar de verdad
+                return { pct: Math.min(96, eased) };
+            }
+
+            // Verificar progreso de carga del modelo (cada 500ms para máxima suavidad)
             modelLoadingCheckInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - analysisStartTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                
+
                 const statusEl = document.getElementById('analysis-status');
                 const substatusEl = document.getElementById('analysis-substatus');
                 const progressEl = document.getElementById('model-progress');
                 const progressTextEl = document.getElementById('model-progress-text');
-                
+
+                const { pct } = computeProgress(elapsed);
+
                 if (statusEl) {
-                    statusEl.textContent = `Cargando modelo de IA... (${minutes}m ${seconds}s)`;
+                    if (historyBaseline) {
+                        statusEl.textContent = `Generando análisis... (${formatElapsed(elapsed)})`;
+                    } else {
+                        statusEl.textContent = `Iniciando análisis... (${formatElapsed(elapsed)})`;
+                    }
                 }
-                
+
                 if (substatusEl) {
-                    substatusEl.textContent = 'El servidor se está iniciando. Esto solo ocurre en la primera ejecución.';
+                    if (historyBaseline) {
+                        substatusEl.textContent = `Análisis típico: ~${formatElapsed(Math.round(historyBaseline))} (basado en tu historial)`;
+                    } else if (elapsed < 20) {
+                        substatusEl.textContent = 'Primera ejecución: estimando tiempo del modelo...';
+                    } else {
+                        substatusEl.textContent = 'Procesando con el modelo (más lento de lo habitual)...';
+                    }
                 }
-                
-                // Actualizar barra de progreso (estimado basado en tiempo típico de 5 minutos)
+
                 if (progressEl) {
-                    const estimatedProgress = Math.min((elapsed / 300) * 100, 95); // 300s = 5 min
-                    progressEl.style.width = `${estimatedProgress}%`;
+                    progressEl.style.width = `${pct}%`;
                 }
-                
+
                 if (progressTextEl) {
-                    const estimatedProgress = Math.min((elapsed / 300) * 100, 95);
-                    progressTextEl.textContent = `${Math.round(estimatedProgress)}% completado - Estimado: ${Math.max(0, 5 - minutes)}m ${Math.max(0, 60 - seconds)}s restantes`;
+                    const elapsedStr = formatElapsed(elapsed);
+                    if (historyBaseline) {
+                        const remaining = Math.max(0, Math.round(historyBaseline - elapsed));
+                        progressTextEl.textContent = `${Math.round(pct)}% completado · ${elapsedStr} transcurridos · ~${remaining}s restantes`;
+                    } else {
+                        progressTextEl.textContent = `${Math.round(pct)}% completado · ${elapsedStr} transcurridos`;
+                    }
                 }
-            }, 2000);
+            }, 500);
 
             // Analizar los datos extraídos
             analysisResult = await api.analyzeAccident(extractedData, contextoAdicional);
-            
+
+            // Desanidar el wrapper {success, data, validation, ...} para tener
+            // SOLO el objeto de análisis ({PorQue1..PorQue5}).
+            // Si NO desanidamos, `analysisResult` queda con wrapper y
+            // `renderEditableAnalysisTable` no encuentra las claves PorQue,
+            // mostrando "No se pudo renderizar el análisis en formato editable."
+            if (analysisResult && analysisResult.success === true && analysisResult.data) {
+                analysisResult = analysisResult.data;
+            }
+
             // Detener verificación de progreso
             clearInterval(modelLoadingCheckInterval);
 
@@ -435,6 +675,31 @@ return await callParentAPI('generate-accident-report', combinedData);
             const totalTime = Math.floor((Date.now() - analysisStartTime) / 1000);
             const totalMinutes = Math.floor(totalTime / 60);
             const totalSeconds = totalTime % 60;
+
+            // Persistir tiempo real como baseline para próxima corrida
+            // EMA asimétrica: si la corrida actual fue MÁS RÁPIDA que el promedio,
+            // baja el promedio rápido (peso 60% al nuevo); si fue más lenta,
+            // sube lento (peso 20% al nuevo) para no reaccionar a outliers lentos.
+            try {
+                const prev = analysisHistory || {};
+                const prevAvg = (typeof prev.averageTime === 'number' && prev.averageTime > 0) ? prev.averageTime : null;
+                let newAvg;
+                if (!prevAvg) {
+                    newAvg = totalTime;
+                } else if (totalTime < prevAvg) {
+                    newAvg = prevAvg * 0.4 + totalTime * 0.6;
+                } else {
+                    newAvg = prevAvg * 0.8 + totalTime * 0.2;
+                }
+                const newHistory = {
+                    lastTime: totalTime,
+                    averageTime: Math.round(newAvg),
+                    count: (prev.count || 0) + 1,
+                    lastUpdated: new Date().toISOString()
+                };
+                localStorage.setItem('kair_analysis_history', JSON.stringify(newHistory));
+                analysisHistory = newHistory;
+            } catch (e) { /* localStorage no disponible, no crítico */ }
 
             // Actualizar mensaje final
             const statusEl = document.getElementById('analysis-status');
@@ -446,14 +711,14 @@ return await callParentAPI('generate-accident-report', combinedData);
                 statusEl.textContent = '¡Análisis completado!';
             }
             if (substatusEl) {
-                substatusEl.textContent = `Tiempo total: ${totalMinutes}m ${totalSeconds}s`;
+                substatusEl.textContent = `Tiempo total: ${formatElapsed(totalTime)}`;
             }
             if (progressEl) {
                 progressEl.style.width = '100%';
                 progressEl.classList.remove('progress-bar-animated');
             }
             if (progressTextEl) {
-                progressTextEl.textContent = 'Modelo listo para usar';
+                progressTextEl.textContent = `Completado en ${formatElapsed(totalTime)}`;
             }
 
             // Actualizar paso 4 como completado
@@ -465,15 +730,17 @@ return await callParentAPI('generate-accident-report', combinedData);
             logActivity('success', `Análisis de causa raíz completado en ${totalMinutes}m ${totalSeconds}s`);
 
 // ─────────────────────────────────────────────────────────────
-// MOSTRAR MODAL DE GUARDADO EN LUGAR DE GENERACIÓN AUTOMÁTICA
+// MOSTRAR TOOLBAR DE REVISIÓN (feature nuevo)
+// El usuario debe revisar/editar/aprobar el análisis ANTES de poder generar el informe.
 // ─────────────────────────────────────────────────────────────
-updateProgressBar(80, 'Preparando guardado del informe...');
-logActivity('info', 'Análisis completado. Seleccione ubicación para guardar el informe.');
+updateProgressBar(80, 'Análisis completado — revise antes de generar el informe');
+logActivity('info', 'Análisis completado. Pendiente de revisión por el usuario.');
 
-showToast('Análisis completado', 'Seleccione la ubicación y nombre del informe.', 'success');
+showToast('Análisis completado', 'Revisa el análisis y apruébalo antes de generar el informe.', 'success');
 
 progressArea.classList.add('hidden');
-saveModal.open();
+analysisState = 'idle';  // Mostrar toolbar en estado inicial
+showReviewToolbar();
             
         } catch (analysisError) {
             // Error específico del análisis
@@ -512,70 +779,70 @@ saveModal.open();
             updateStepStatus(4, 'error');
             showToast('Error en análisis', `El análisis falló: ${analysisError.message}`, 'error');
         } finally {
+            // Restaurar estado de botones y guard
+            isAnalyzing = false;
+            if (processBtn) processBtn.disabled = false;
+            if (clearBtn) clearBtn.disabled = false;
             // Ocultar barra de progreso
             progressArea.classList.add('hidden');
         }
     }
 
-    // Función para comunicarse con la ventana padre (iframe)
+// Función para comunicarse con la ventana padre (iframe)
     function callParentAPI(type, payload) {
         return new Promise((resolve, reject) => {
             // ID único para esta solicitud para emparejarla con la respuesta
             const requestId = `investigacion-accidentes-${Date.now()}-${Math.random()}`;
-            
+
             // Función para manejar la respuesta
             const handleResponse = (event) => {
                 // Verificar que el origen sea seguro (archivo local en este caso)
                 if (event.source !== window.parent) {
                     return;
                 }
-                
+
                 const response = event.data;
-                // Verificar si la respuesta corresponde a nuestra solicitud
                 const responseType = response.type;
                 const expectedResponseType = `investigacion-accidentes-${type}-request-response`;
-                
-                // Verificar que el requestId coincida con el nuestro para evitar conflictos con otros módulos
+                // El renderer responde con '-response' (no '-request-response') — aceptamos ambos formatos
+                const simpleResponseType = `investigacion-accidentes-${type}-response`;
+
+                // Verificar que el requestId coincida con el nuestro
                 if (response.requestId && response.requestId.startsWith('investigacion-accidentes-') && response.requestId === requestId) {
                     // Limpiar el timeout si existe
                     if (window._investigacionTimeoutClear && window._investigacionTimeoutClear[requestId]) {
                         window._investigacionTimeoutClear[requestId]();
                         delete window._investigacionTimeoutClear[requestId];
                     }
-                    
-                    // Manejar el caso especial para save-temp-pdf-file
-                    if (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-response') {
-                        // Limpiar el listener de eventos
-                        window.removeEventListener('message', handleResponse);
-                        
-      if (response.success) {
-        resolve(response.payload);
-      } else {
-        const errObj = response.error;
-        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
-        reject(new Error(errorMessage));
-      }
-    } else if (responseType === expectedResponseType) {
-      window.removeEventListener('message', handleResponse);
 
-      if (response.success) {
-        resolve(response.payload);
-      } else {
-        const errObj = response.error;
-        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
-        reject(new Error(errorMessage));
-      }
+                    // Aceptar respuesta con cualquier formato (-response, -request-response, save-temp-pdf-file especial)
+                    const isValidResponse =
+                        responseType === expectedResponseType ||
+                        responseType === simpleResponseType ||
+                        (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-response');
+
+                    if (isValidResponse) {
+                        window.removeEventListener('message', handleResponse);
+
+                        if (response.success) {
+                            resolve(response.payload);
+                        } else {
+                            const errObj = response.error;
+                            const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
+                            reject(new Error(errorMessage));
+                        }
+                        return;
                     }
-                } else if (responseType === `${type}-response`) {
-                    // Limpiar el timeout si existe
+                }
+
+                // Fallback: compatibilidad con formato antiguo (sin prefijo, sin requestId)
+                if (responseType === `${type}-response` && !response.requestId) {
                     if (window._investigacionTimeoutClear && window._investigacionTimeoutClear[requestId]) {
                         window._investigacionTimeoutClear[requestId]();
                         delete window._investigacionTimeoutClear[requestId];
                     }
-                    
-                    // Compatibilidad con el formato anterior por si acaso
                     window.removeEventListener('message', handleResponse);
-                    
+
                     if (response.success) {
                         resolve(response.payload);
                     } else {
@@ -606,6 +873,86 @@ saveModal.open();
             window._investigacionTimeoutClear = window._investigacionTimeoutClear || {};
             window._investigacionTimeoutClear[requestId] = () => clearTimeout(timeoutId);
         });
+    }
+
+    // Normaliza el valor de un campo del FURAT para corregir artefactos del script de extracción.
+    //
+    // Problemas conocidos en datos crudos del PDF (Invest_APP_V_3.PdfProcessor.extract_pdf_data):
+    //   - "No. Identificación": el script concatena identificación + parte del teléfono.
+    //     Ej: id="114326350408", tel="1143263504" → id real="1143263504"
+    //   - "Nombre Completo": el PDF tiene etiqueta "SEGUNDO APELLIDO" como primera línea
+    //     y luego las 4 partes (1er apellido, 2do apellido, 1er nombre, 2do nombre)
+    //     en orden Apellido1 + Apellido2 + Nombre1 + Nombre2. Se debe mostrar como
+    //     "Nombre1 Nombre2 Apellido1 Apellido2".
+    //   - "Cargo": el PDF antepone una categoría de zona (URBANA / ADMINISTRATIVO /
+    //     OPERATIVO) antes del cargo real. Solo se debe mostrar el cargo real
+    //     (última línea).
+    function normalizeFieldValue(key, value, allData) {
+        if (value == null || value === 'N/A') return value || 'N/A';
+        let s = String(value);
+
+        if (key === 'No. Identificación') {
+            // El script Python (Invest_APP_V_3.extract_pdf_data) tiene un bug conocido donde
+            // la identificación extraída incluye dígitos basura concatenados del campo siguiente.
+            // Ejemplo real: PDF id="1143263504" → extraído "114326350408" (12 dígitos).
+            // Heurística: las cédulas colombianas tienen 6-10 dígitos. Si el valor extraído
+            // tiene más de 10 dígitos, descartar del final hasta tener exactamente 10.
+            const idDigits = s.replace(/\D/g, '');
+            if (idDigits.length > 10 && /^\d+$/.test(idDigits)) {
+                const realId = idDigits.slice(0, 10);
+                console.log('[NORMALIZE] Identificación con dígitos basura:', s, '→', realId);
+                return realId;
+            }
+            return s;
+        }
+
+        if (key === 'Nombre Completo') {
+            // El PDF del FURAT guarda el nombre en líneas separadas, pero a veces varios
+            // valores vienen en una sola línea separados por muchos espacios (artefacto del
+            // formulario). Estrategia:
+            //   1. Separar por saltos de línea Y por secuencias de 3+ espacios
+            //   2. Limpiar cada palabra y filtrar vacías
+            //   3. Quitar la etiqueta "SEGUNDO APELLIDO" si aparece como primer elemento
+            //   4. Asumir formato PDF: [1erApellido, 2doApellido, 1erNombre, 2doNombre]
+            //      (puede haber solo 3 si falta un apellido o nombre)
+            //   5. Mostrar en español: Nombres primero, luego Apellidos
+            const tokens = s
+                .split(/\r?\n+|\s{3,}/)
+                .map(t => t.replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+            if (tokens.length === 0) return s;
+            const labelPatterns = /^(PRIMER|SEGUNDO|PRIMER\/SEGUNDO)\s+APELLIDO$/i;
+            const nameTokens = tokens[0].match(labelPatterns) ? tokens.slice(1) : tokens;
+            if (nameTokens.length === 1) return nameTokens[0];
+            // Dividir en 2 mitades: apellidos (primera mitad) + nombres (segunda mitad)
+            const half = Math.floor(nameTokens.length / 2);
+            const apellidos = nameTokens.slice(0, half);
+            const nombres = nameTokens.slice(half);
+            const reordered = [...nombres, ...apellidos].join(' ');
+            console.log('[NORMALIZE] Nombre reordenado:', s, '→', reordered);
+            return reordered;
+        }
+
+        if (key === 'Cargo') {
+            // Quitar categoría de zona (URBANA/ADMINISTRATIVO/OPERATIVO) si es la primera línea
+            const lines = s.split(/\r?\n+/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+            if (lines.length <= 1) return s;
+            const zonas = /^(URBANA|RURAL|ADMINISTRATIVO?|OPERATIVO?|MIXTA|COMERCIAL|INDUSTRIAL|SERVICIOS?|PRODUCCI[ÓO]N|DIRECCI[ÓO]N|GERENCIA)$/i;
+            const filtered = zonas.test(lines[0]) ? lines.slice(1) : lines;
+            const result = filtered.join(' ');
+            if (result !== s) console.log('[NORMALIZE] Cargo limpiado:', s, '→', result);
+            return result;
+        }
+
+        // Para cualquier campo con saltos de línea que no sea cargo/nombre/id,
+        // unir las líneas en un párrafo (ej: Descripcion del Accidente multi-línea)
+        if (s.includes('\n') && key !== 'Nombre Completo' && key !== 'Cargo') {
+            const joined = s.split(/\r?\n+/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' ');
+            if (joined !== s) console.log('[NORMALIZE] Multi-línea unificado:', key, '→', joined);
+            return joined;
+        }
+
+        return s;
     }
 
     // Función para mostrar datos extraídos
@@ -698,7 +1045,8 @@ saveModal.open();
   let htmlContent = '<div class="inv-data-grid">';
 
   fields.forEach(field => {
-    const value = actualData[field.key] || 'N/A';
+    const rawValue = actualData[field.key];
+    const value = rawValue ? normalizeFieldValue(field.key, rawValue, actualData) : 'N/A';
     htmlContent += `
   <div class="inv-data-field">
     <label>${field.label}</label>
@@ -709,7 +1057,8 @@ saveModal.open();
 
   htmlContent += '</div>';
 
-  const descripcion = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
+  const descripcionRaw = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
+  const descripcion = descripcionRaw !== 'N/A' ? normalizeFieldValue('Descripcion del Accidente', descripcionRaw, actualData) : 'N/A';
   if (descripcion && descripcion !== 'N/A') {
     htmlContent += `
   <div class="inv-data-description">
@@ -953,7 +1302,428 @@ saveModal.open();
         }
         
         analysisContent.innerHTML = htmlContent;
+
+        // ── Activar toolbar de revisión (feature nuevo) ──
+        showReviewToolbar();
     }
+
+    // ── Feature: Revisión del análisis de causa raíz (3 estados) ──
+    //
+    // Estados:
+    //   'idle'       → muestra botón "Revisar análisis"
+    //   'reviewing'  → muestra tabla editable + botones regenerar/aprobar/cancelar
+    //   'approved'   → muestra "✓ Aprobado" + botón "Re-revisar"
+    //   'dirty'      → usuario editó celda después de aprobar; requiere re-aprobación
+
+    // Categorías 5M que se muestran en la tabla editable
+    const FIVE_M_CATEGORIES = [
+        { key: 'Mano de Obra', label: '👷 Mano de Obra' },
+        { key: 'Método', label: '📋 Método', fallbackKey: 'Metodo' },
+        { key: 'Maquinaria', label: '⚙️ Maquinaria' },
+        { key: 'Medio Ambiente', label: '🌍 Medio Ambiente' },
+        { key: 'Material', label: '📦 Material' }
+    ];
+
+    // Construye la representación canónica del análisis (PorQue1..PorQue5)
+    function normalizeAnalysisData(rawAnalysis) {
+        if (!rawAnalysis || typeof rawAnalysis !== 'object') return null;
+        // Si ya viene en formato PorQue1..PorQue5, devolver tal cual
+        const keys = Object.keys(rawAnalysis);
+        if (keys.some(k => /PorQue\d/.test(k))) {
+            return rawAnalysis;
+        }
+        // Si viene como {Por Qué 1, Por Qué 2, ...}, convertir
+        const normalized = {};
+        for (let i = 1; i <= 5; i++) {
+            const key1 = `PorQue${i}`;
+            const key2 = `Por Qué ${i}`;
+            if (rawAnalysis[key1]) normalized[key1] = rawAnalysis[key1];
+            else if (rawAnalysis[key2]) normalized[key1] = rawAnalysis[key2];
+        }
+        return Object.keys(normalized).length ? normalized : null;
+    }
+
+    // Renderiza la tabla editable de 5 Porqués × 5 categorías
+    function renderEditableAnalysisTable(analysisData) {
+        const normalized = normalizeAnalysisData(analysisData);
+        if (!normalized) {
+            return '<p class="inv-error-hint">No se pudo renderizar el análisis en formato editable.</p>';
+        }
+        const levels = [1, 2, 3, 4, 5].filter(i => normalized[`PorQue${i}`]);
+        const headers = FIVE_M_CATEGORIES.map(cat => `<th>${cat.label}</th>`).join('');
+        const rows = levels.map(level => {
+            const porQue = normalized[`PorQue${level}`];
+            const cells = FIVE_M_CATEGORIES.map(cat => {
+                const raw = porQue[cat.key] !== undefined ? porQue[cat.key]
+                          : (cat.fallbackKey && porQue[cat.fallbackKey] !== undefined ? porQue[cat.fallbackKey]
+                          : 'N/A');
+                const value = raw || 'N/A';
+                const isNa = !value || value === 'N/A' || (typeof value === 'string' && value.trim().toUpperCase() === 'N/A');
+                const cellClass = isNa ? 'inv-why-cell-edit inv-why-cell-na' : 'inv-why-cell-edit';
+                const display = isNa ? 'N/A' : value;
+                return `<td><div class="${cellClass}" contenteditable="plaintext-only" spellcheck="true"
+                    data-level="${level}" data-cat="${cat.key}"
+                    oninput="window._onAnalysisCellEdit(this)">${escapeHtml(display)}</div></td>`;
+            }).join('');
+            const regenDisabled = isRegenerating ? 'disabled' : '';
+            // El botón ↻ va DENTRO de la celda de nivel para garantizar visibilidad
+            // (anteriormente estaba en una columna aparte que se ocultaba por overflow).
+            return `<tr>
+                <td class="inv-why-cell-nivel">
+                    <div class="inv-why-level-header">
+                        <span class="inv-why-level-number" data-level="${level}">${level}</span>
+                        <button type="button" class="inv-btn-regenerate-level" data-level="${level}"
+                            title="Regenerar solo este nivel con el feedback actual"
+                            aria-label="Regenerar nivel ${level}"
+                            ${regenDisabled} onclick="window._onRegenerateLevel(${level})">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </td>
+                ${cells}
+            </tr>`;
+        }).join('');
+        return `<table class="inv-why-table">
+            <thead>
+                <tr>
+                    <th class="inv-why-col-nivel">Nivel</th>
+                    ${headers}
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    // Muestra/oculta el toolbar según el estado
+    function showReviewToolbar() {
+        const toolbar = document.getElementById('analysisReviewToolbar');
+        const idle = document.getElementById('reviewActionsIdle');
+        const reviewing = document.getElementById('reviewActionsReviewing');
+        const approved = document.getElementById('reviewActionsApproved');
+        const badge = document.getElementById('analysisReviewBadge');
+        if (!toolbar || !idle || !reviewing || !approved || !badge) return;
+
+        toolbar.classList.remove('hidden');
+        badge.classList.remove('hidden');
+        idle.classList.add('hidden');
+        reviewing.classList.add('hidden');
+        approved.classList.add('hidden');
+        badge.classList.remove('inv-review-badge--reviewing', 'inv-review-badge--approved', 'inv-review-badge--dirty');
+
+        if (analysisState === 'idle') {
+            idle.classList.remove('hidden');
+            // No badge en idle (estado inicial)
+            badge.classList.add('hidden');
+            // Rehabilitar botón "Iniciar Análisis" (puede que venga de un estado approved previo)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
+        } else if (analysisState === 'reviewing') {
+            reviewing.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--reviewing');
+            badge.innerHTML = '<i class="fas fa-edit"></i> En revisión';
+            // Rehabilitar botón "Iniciar Análisis" (el usuario podría querer re-analizar desde cero)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
+        } else if (analysisState === 'approved') {
+            approved.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--approved');
+            badge.innerHTML = '<i class="fas fa-check"></i> Aprobado';
+            // Anti-rebote: cuando el análisis ya está aprobado, deshabilitar el botón
+            // "Iniciar Análisis" del footer para que el usuario no reinicie el flujo
+            // por accidente (el siguiente paso es "Generar Informe", no re-analizar).
+            if (processBtn) {
+                processBtn.disabled = true;
+                processBtn.title = 'Análisis aprobado — usa "Generar Informe" para continuar';
+            }
+        } else if (analysisState === 'dirty') {
+            reviewing.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--dirty');
+            badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Cambios sin re-aprobar';
+            // Rehabilitar botón "Iniciar Análisis" (estado dirty → permite re-empezar)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
+        }
+
+        // Habilitar/deshabilitar botón "Generar Informe" según estado
+        updateReportButtonState();
+    }
+
+    // Habilita/deshabilita el botón "Guardar Informe" del header según el estado
+    function updateReportButtonState() {
+        const reportBtn = document.getElementById('downloadBtn') ||
+                           document.querySelector('[data-action="generate-report"]');
+        if (!reportBtn) return;
+        const enabled = analysisState === 'approved';
+        reportBtn.disabled = !enabled;
+        reportBtn.title = enabled
+            ? 'Generar el informe .docx con el análisis aprobado'
+            : 'Aprueba el análisis antes de generar el informe';
+        reportBtn.classList.toggle('inv-btn--disabled-soft', !enabled);
+    }
+
+    // Construye el análisis efectivo: combina analysisResult + analysisEdits del usuario
+    function getEffectiveAnalysis() {
+        const base = normalizeAnalysisData(analysisResult) || {};
+        // Aplica las ediciones inline del usuario (sobrescriben el resultado del modelo)
+        const merged = {};
+        Object.keys(base).forEach(levelKey => {
+            merged[levelKey] = { ...base[levelKey] };
+        });
+        Object.keys(analysisEdits).forEach(levelKey => {
+            if (!merged[levelKey]) merged[levelKey] = {};
+            Object.keys(analysisEdits[levelKey]).forEach(catKey => {
+                merged[levelKey][catKey] = analysisEdits[levelKey][catKey];
+            });
+        });
+        return merged;
+    }
+
+    // ── Handlers del toolbar (expuestos como window.* para onclick inline) ──
+
+    window._onAnalysisCellEdit = function(div) {
+        const level = parseInt(div.dataset.level, 10);
+        const cat = div.dataset.cat;
+        if (!level || !cat) return;
+        if (!analysisEdits[`PorQue${level}`]) analysisEdits[`PorQue${level}`] = {};
+        const newValue = div.textContent.trim() || 'N/A';
+        const wasEdited = (analysisEdits[`PorQue${level}`][cat] !== undefined);
+        analysisEdits[`PorQue${level}`][cat] = newValue;
+        // Marcar celda visualmente
+        if (newValue.toUpperCase() === 'N/A') {
+            div.classList.add('inv-why-cell-na');
+        } else {
+            div.classList.remove('inv-why-cell-na');
+        }
+        div.classList.add('is-user-edited');
+        // Si ya estaba aprobado, marcar como dirty (requiere re-aprobación)
+        if (analysisState === 'approved') {
+            analysisState = 'dirty';
+            showReviewToolbar();
+        }
+    };
+
+    window._onStartReview = function() {
+        if (!analysisResult) return;
+        analysisState = 'reviewing';
+        // Renderizar tabla editable REEMPLAZANDO las cards originales del análisis.
+        // Si las dejábamos (concat), las cards ocupaban el viewport y empujaban la
+        // tabla (con los botones ↻ por nivel) fuera de la vista visible.
+        const editableHtml = renderEditableAnalysisTable(analysisResult);
+        analysisContent.innerHTML = editableHtml;
+        showReviewToolbar();
+    };
+
+    window._onCancelReview = function() {
+        if (!confirm('¿Cancelar la revisión? Se descartarán los cambios inline.')) return;
+        analysisState = 'idle';
+        analysisEdits = {};
+        // Re-renderizar el análisis en modo lectura
+        displayAnalysisResults(analysisResult);
+    };
+
+    window._onApproveAnalysis = function() {
+        analysisState = 'approved';
+        // Limpiar highlight de edición al aprobar
+        analysisContent.querySelectorAll('.is-user-edited').forEach(c => c.classList.remove('is-user-edited'));
+        showReviewToolbar();
+        showToast('Análisis aprobado', 'Ya puedes generar el informe.', 'success');
+    };
+
+    window._onReReview = function() {
+        analysisState = 'reviewing';
+        // Volver a mostrar la tabla editable con las ediciones aplicadas.
+        // REEMPLAZA las cards originales — no concatenar (ver _onStartReview).
+        const merged = getEffectiveAnalysis();
+        const editableHtml = renderEditableAnalysisTable(merged);
+        analysisContent.innerHTML = editableHtml;
+        showReviewToolbar();
+    };
+
+    // Helper para hacer POST a /regenerate con auto-recuperación de Flask/Ollama
+    async function callRegenerate(params) {
+        try {
+            // Usar la misma ruta IPC que ya está expuesta via preload
+            const api = window.electronAPI;
+            if (!api || typeof api.regenerateAnalysis !== 'function') {
+                // Fallback: usar callParentAPI (para iframe context)
+                return await callParentAPI('regenerate-analysis', params);
+            }
+            return await api.regenerateAnalysis(params);
+        } catch (e) {
+            console.error('[REGENERATE] Error:', e);
+            return { success: false, error: e.message };
+        }
+    }
+
+    // Regenerar un nivel específico usando el feedback del usuario
+    window._onRegenerateLevel = async function(level) {
+        if (isRegenerating) return;
+        if (!analysisResult) return;
+        const feedback = (document.getElementById('regenerateFeedback') || {}).value || '';
+        const btn = document.querySelector(`.inv-btn-regenerate-level[data-level="${level}"]`);
+        const btnIcon = btn ? btn.querySelector('i') : null;
+        if (btn) btn.disabled = true;
+        if (btnIcon) btnIcon.classList.add('regenerating');
+        isRegenerating = true;
+
+        try {
+            // Extraer la descripción del accidente — `extractedData` puede tener
+            // hasta doble wrapper ({success, data: {success, data: {campos}}})
+            // dependiendo de cómo lo devolvió el handler.
+            const innerData = extractedData?.data?.data || extractedData?.data || extractedData || {};
+            const descripcion =
+                innerData['Descripcion del Accidente'] ||
+                innerData['Descripcion'] ||
+                innerData['descripcion del accidente'] ||
+                innerData['descripcion'] ||
+                '';
+            const contexto = (document.getElementById('contextInput') || {}).value || '';
+            // Backup del análisis antes de regenerar (para "Deshacer")
+            analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
+            // Construir análisis actual pasando las ediciones inline del usuario para los niveles que NO se regeneran
+            const merged = getEffectiveAnalysis();
+            // Si regenera nivel N, los demás niveles mantienen las ediciones inline del usuario
+
+            const result = await callRegenerate({
+                descripcion: descripcion,
+                contexto: contexto,
+                feedback: feedback,
+                level: level,
+                currentAnalysis: merged
+            });
+
+            if (result && result.success && result.data) {
+                // Merge: reemplazar SOLO el nivel regenerado, mantener los demás (con ediciones)
+                const regeneratedLevelKey = `PorQue${level}`;
+                if (!analysisResult[regeneratedLevelKey]) analysisResult[regeneratedLevelKey] = {};
+                Object.keys(result.data[regeneratedLevelKey] || {}).forEach(cat => {
+                    analysisResult[regeneratedLevelKey][cat] = result.data[regeneratedLevelKey][cat];
+                });
+                // Si había una edición inline del usuario en ese nivel, descartarla (el modelo lo regeneró)
+                if (analysisEdits[regeneratedLevelKey]) {
+                    delete analysisEdits[regeneratedLevelKey];
+                }
+                // Limpiar backup si todo salió bien
+                analysisOriginalBackup = null;
+                // Re-renderizar tabla editable REEMPLAZANDO (no concatenar — ver _onStartReview).
+                const newMerged = getEffectiveAnalysis();
+                const editableHtml = renderEditableAnalysisTable(newMerged);
+                analysisContent.innerHTML = editableHtml;
+
+                // [Fix C] Diagnóstico: qué devolvió el modelo y cuánto tardó
+                try {
+                    const cats = result.data && result.data[regeneratedLevelKey] ? Object.keys(result.data[regeneratedLevelKey]) : [];
+                    console.log(`[REGENERATE] Nivel ${level} regenerado OK en ${(result.generation_time || 0).toFixed(1)}s — categorías devueltas: [${cats.join(', ')}]`);
+                    const rawLen = (result.raw_text || '').length;
+                    console.log(`[REGENERATE] raw_text (${rawLen} chars): ${(result.raw_text || '').slice(0, 220)}${rawLen > 220 ? '…' : ''}`);
+                    console.log(`[REGENERATE] data.PorQue${level}:`, result.data && result.data[regeneratedLevelKey]);
+                } catch (e) { console.warn('[REGENERATE] Error en logging:', e); }
+
+                // [Fix B] Badge persistente "regenerado por IA" en el número del nivel
+                const levelNumberEl = analysisContent.querySelector(
+                    `.inv-why-level-number[data-level="${level}"]`
+                );
+                if (levelNumberEl) levelNumberEl.classList.add('is-regenerated');
+
+                // [Fix A] Flash temporal en las celdas del nivel regenerado (1.6s)
+                // Permite al usuario ver QUÉ fila cambió y se quita sola para permitir
+                // re-flash si vuelve a regenerar el mismo nivel.
+                const regenCells = analysisContent.querySelectorAll(
+                    `.inv-why-cell-edit[data-level="${level}"]`
+                );
+                regenCells.forEach(c => {
+                    // Quitar clase primero para permitir re-disparar la animación
+                    c.classList.remove('is-just-regenerated');
+                    // Forzar reflow para reiniciar la animación
+                    void c.offsetWidth;
+                    c.classList.add('is-just-regenerated');
+                });
+                setTimeout(() => {
+                    regenCells.forEach(c => c.classList.remove('is-just-regenerated'));
+                }, 1700);
+
+                showToast('Nivel regenerado', `El nivel ${level} ha sido regenerado con el feedback aplicado.`, 'success');
+                logActivity('success', `Nivel ${level} del análisis regenerado con feedback`);
+            } else {
+                showToast('Error', result?.error || 'No se pudo regenerar el nivel', 'error');
+            }
+        } catch (e) {
+            showToast('Error', e.message, 'error');
+        } finally {
+            isRegenerating = false;
+            if (btn) btn.disabled = false;
+            if (btnIcon) btnIcon.classList.remove('regenerating');
+        }
+    };
+
+    // Regenerar el análisis completo usando el feedback del usuario
+    window._onRegenerateAll = async function() {
+        if (isRegenerating) return;
+        if (!analysisResult) return;
+        const feedback = (document.getElementById('regenerateFeedback') || {}).value || '';
+        if (!feedback.trim()) {
+            if (!confirm('No has escrito feedback. ¿Regenerar el análisis igualmente (sin guía específica)?')) return;
+        }
+        isRegenerating = true;
+        const btnRegen = document.getElementById('btnRegenerateAll');
+        if (btnRegen) btnRegen.disabled = true;
+
+        try {
+            // Extraer la descripción del accidente — `extractedData` puede tener
+            // hasta doble wrapper ({success, data: {success, data: {campos}}})
+            const innerData = extractedData?.data?.data || extractedData?.data || extractedData || {};
+            const descripcion =
+                innerData['Descripcion del Accidente'] ||
+                innerData['Descripcion'] ||
+                innerData['descripcion del accidente'] ||
+                innerData['descripcion'] ||
+                '';
+            const contexto = (document.getElementById('contextInput') || {}).value || '';
+            // Backup antes de regenerar todo
+            analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
+            const merged = getEffectiveAnalysis();
+
+            const result = await callRegenerate({
+                descripcion: descripcion,
+                contexto: contexto,
+                feedback: feedback,
+                level: null,  // null = regenerar todo
+                currentAnalysis: merged
+            });
+
+            if (result && result.success && result.data) {
+                // Reemplazar el análisis completo con el regenerado
+                // Mantener las ediciones inline de niveles que el modelo regeneró idénticos
+                analysisResult = result.data;
+                // Limpiar ediciones inline del usuario (todo se regeneró)
+                analysisEdits = {};
+                analysisOriginalBackup = null;
+                // Re-renderizar tabla editable REEMPLAZANDO (no concatenar — ver _onStartReview).
+                const editableHtml = renderEditableAnalysisTable(analysisResult);
+                analysisContent.innerHTML = editableHtml;
+                showToast('Análisis regenerado', 'Los 5 niveles han sido regenerados.', 'success');
+                logActivity('success', 'Análisis completo regenerado con feedback');
+            } else {
+                showToast('Error', result?.error || 'No se pudo regenerar el análisis', 'error');
+            }
+        } catch (e) {
+            showToast('Error', e.message, 'error');
+        } finally {
+            isRegenerating = false;
+            if (btnRegen) btnRegen.disabled = false;
+        }
+    };
+
+    // Bindear listeners del toolbar de revisión AHORA que todos los handlers existen.
+    // (Ver _bindReviewToolbarListeners más arriba — se pospuso para evitar referencias
+    //  a window._onXxx cuando aún eran undefined).
+    _bindReviewToolbarListeners();
 
     // Función para actualizar el estado de un paso
   function updateStepStatus(stepNumber, status) {
@@ -1011,7 +1781,24 @@ saveModal.open();
 let _toastContainer = null;
 let _toastCounter = 0;
 
+// Wrapper que usa el sistema moderno de notificaciones (window.parent.updateNotifier)
+// y cae al inv-toast legacy si no está disponible. Compatible con showToast(title, message, type).
 function showToast(title, message, type = 'info') {
+  // Intentar usar el sistema moderno (estilo 6.1.3) vía window.parent.updateNotifier
+  try {
+    const notifier = window.parent && window.parent.updateNotifier;
+    if (notifier && typeof notifier.show === 'function') {
+      notifier.show({
+        type: type || 'info',
+        title: title,
+        subtitle: message,
+        autoClose: type === 'error' ? 6000 : 4000,
+      });
+      return;
+    }
+  } catch (e) { /* fallback abajo */ }
+
+  // Fallback: inv-toast legacy (compatibilidad si updateNotifier no está)
 if (!_toastContainer) {
 _toastContainer = document.createElement('div');
 _toastContainer.id = 'toastContainer';
@@ -1123,7 +1910,7 @@ currentPath = dirPath;
 selectedItem = null;
 renameBtn.disabled = true;
 deleteBtn.disabled = true;
-folderListEl.innerHTML = '<div class="save-modal-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+folderListEl.innerHTML = KairSkeleton.list(6);
 
 try {
 const result = await callParentAPI('read-directory', { path: dirPath });
@@ -1494,8 +2281,8 @@ if (reportResult && reportResult.documentPath) {
 logActivity('success', `Informe generado: ${reportResult.documentPath}`);
 showToast('Informe generado', `Guardado en: ${reportResult.documentPath}`, 'success');
 
-const downloadBtn = document.getElementById('downloadBtn');
-const printBtn = document.getElementById('printBtn');
+// Guardar ruta y habilitar botones de header para acceder al informe
+lastReportPath = reportResult.documentPath;
 if (downloadBtn) downloadBtn.disabled = false;
 if (printBtn) printBtn.disabled = false;
 
@@ -1534,16 +2321,52 @@ if (newItemCancel) newItemCancel.addEventListener('click', _hideNewItemArea);
 if (filenameInput) filenameInput.addEventListener('input', updateSaveBtnState);
 
 if (newItemInput) {
-newItemInput.addEventListener('keydown', (e) => {
-if (e.key === 'Enter') { e.preventDefault(); _confirmCreateFolder(); }
-else if (e.key === 'Escape') { e.preventDefault(); _hideNewItemArea(); }
-});
-}
+    newItemInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); _confirmCreateFolder(); }
+      else if (e.key === 'Escape') { e.preventDefault(); _hideNewItemArea(); }
+    });
+  }
+
+  // ── Paso 3 (Contexto): actualizar stepper al escribir ────────────
+  const contextInput = document.getElementById('contextInput');
+  const contextHint = document.getElementById('contextHint');
+  if (contextInput) {
+    contextInput.addEventListener('input', function() {
+      const len = contextInput.value.trim().length;
+      if (len >= 20) {
+        updateStepStatus(3, 'completed');
+        if (contextHint) contextHint.style.display = 'none';
+      } else if (len > 0) {
+        updateStepStatus(3, 'active');
+        if (contextHint) {
+          contextHint.style.display = '';
+          contextHint.textContent = `Faltan ${20 - len} caracteres para considerarlo en el análisis.`;
+        }
+      } else {
+        updateStepStatus(3, 'pending');
+        if (contextHint) {
+          contextHint.style.display = '';
+          contextHint.textContent = 'Mínimo 20 caracteres para que el análisis lo considere.';
+        }
+      }
+    });
+  }
 
 document.addEventListener('keydown', (e) => {
 if (modal.classList.contains('hidden')) return;
 if (e.key === 'Escape' && !isRenaming && !isCreatingFolder) { close(); }
 });
+
+// Botón "Generar Informe" del toolbar de aprobación (HTML id=btnGenerateReportFromApproval).
+// Antes de este cambio, no había forma de abrir el saveModal desde la UI tras aprobar —
+// el approved toolbar solo tenía "Re-revisar". Ahora el botón dispara open() que hace
+// el setup completo (filename sugerido, navegación al dir por defecto, reset de estado).
+const btnGenerateReportFromApproval = document.getElementById('btnGenerateReportFromApproval');
+if (btnGenerateReportFromApproval) {
+    btnGenerateReportFromApproval.addEventListener('click', () => {
+        open();
+    });
+}
 
 return { open, close, navigateTo };
   })();
@@ -1556,7 +2379,7 @@ return { open, close, navigateTo };
         selectedPdfPath = urlFuratPath;
         if (selectedFileName) selectedFileName.textContent = autoFilename;
         if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
-        if (dropZone) dropZone.classList.add('has-file');
+        if (dropZone) setDropzoneState('selected');
         if (processBtn) processBtn.disabled = false;
         updateStepStatus(1, 'completed');
         showToast(
@@ -1569,11 +2392,54 @@ return { open, close, navigateTo };
             showToast('Error', 'No se pudo procesar el FURAT: ' + err.message, 'error');
         });
     } else if (urlNombre) {
-        showToast(
-            'Caso: ' + urlNombre,
-            'Selecciona o arrastra el FURAT PDF para continuar.',
-            'info'
-        );
+        // FALLBACK: el viewer no envió furatPath. Intentar encontrar el archivo
+        // en el módulo 3.2.1 buscando por nombre normalizado.
+        console.log('[INVESTIGACION-ACCIDENTES-MAIN] urlFuratPath vacío, buscando FURAT por nombre:', urlNombre);
+        showToast('Buscando FURAT...', 'Localizando el archivo en el sistema.', 'info');
+
+        // Usar directamente window.electronAPI.findFuratByName (preload expone el IPC).
+        // Si no está disponible por caché, hacer fallback a callParentAPI SIN prefijo
+        // (callParentAPI ya agrega 'investigacion-accidentes-' al inicio del tipo).
+        function _findFuratDirect(companyName, caseName) {
+            if (window.electronAPI && typeof window.electronAPI.findFuratByName === 'function') {
+                console.log('[INVESTIGACION-ACCIDENTES-MAIN] Usando window.electronAPI.findFuratByName directo');
+                return window.electronAPI.findFuratByName(companyName, caseName);
+            }
+            console.log('[INVESTIGACION-ACCIDENTES-MAIN] Fallback: usando callParentAPI con prefijo automático');
+            return callParentAPI('find-furat-by-name', { companyName, caseName });
+        }
+
+        _findFuratDirect(currentEmpresa, urlNombre).then(function(result) {
+            if (result && result.success && result.data && result.data.furatPath) {
+                const furatPath = result.data.furatPath;
+                console.log('[INVESTIGACION-ACCIDENTES-MAIN] FURAT encontrado por fallback:', furatPath);
+                const autoFilename = result.data.furatName || furatPath.split('\\').pop().split('/').pop();
+                selectedPdfPath = furatPath;
+                if (selectedFileName) selectedFileName.textContent = autoFilename;
+                if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
+                if (dropZone) setDropzoneState('selected');
+                if (processBtn) processBtn.disabled = false;
+                updateStepStatus(1, 'completed');
+                showToast('FURAT localizado', 'Procesando: ' + autoFilename, 'success');
+                logActivity('info', 'FURAT localizado por fallback: ' + autoFilename);
+                return processPdfFile(furatPath);
+            } else {
+                console.warn('[INVESTIGACION-ACCIDENTES-MAIN] FURAT no encontrado por fallback:', result);
+                showToast(
+                    'Caso: ' + urlNombre,
+                    'No se encontró el FURAT. Súbelo manualmente desde la dropzone.',
+                    'warning'
+                );
+                logActivity('warn', 'FURAT no encontrado en 3.2.1. Usuario debe subirlo manualmente.');
+            }
+        }).catch(function(err) {
+            console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en fallback findFuratByName:', err);
+            showToast(
+                'Caso: ' + urlNombre,
+                'No se pudo localizar el FURAT. Súbelo manualmente.',
+                'warning'
+            );
+        });
     }
 
     console.log('[INVESTIGACION-ACCIDENTES-MAIN] Inicialización completada');
