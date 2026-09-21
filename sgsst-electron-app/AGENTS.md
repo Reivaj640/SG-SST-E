@@ -3847,7 +3847,75 @@ no coincidía con el resto del sistema. Se remapearon sus tokens (técnica 📦7
   propia. Si el diseño trae su propia paleta, remapear los tokens a los valores canónicos (no reescribir
   reglas). Un azul distinto (`#2456d6` vs `#2057b8`) se nota al lado de los demás módulos.
 
+### 📦793 — Inspecciones Sistemáticas (4.2.4) — hub al premium v2
 
+El **hub** (landing) del submódulo `4.2.4 Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos`
+(`modules/gestion-peligros/inspecciones/`) migra al **Patrón A premium** (mismo que los 8 módulos home rediseñados
+en 📦730-737). Las 7 vistas funcionales (dashboard, historial, detalle, 4 formularios) **quedan intactas** y siguen
+usando el header legacy `.k-module-header` — `buildHeader()` en `inspeccion-templates.js` no se toca.
 
+#### Estructura nueva del hub (de arriba a abajo)
+
+1. **Page-header premium** (`.kair-page-header`): icono decorativo en chip 44×44 (`.kair-badge-ico`, fondo
+   `--kair-hover-soft` + color `--kair-primary`), título Manrope 800 20px (`.kair-title`), subtítulo muted 12.5px
+   (`.kair-sub`), 2 acciones a la derecha (`.kair-actions` con `Ver Historial` outline + `Volver` ghost).
+   **Sin breadcrumb pills, sin chip de empresa** — limpio como la referencia Evaluación Inicial.
+2. **Hero card con score compuesto** (`.kair-hero-card`): bloque grande con score `X%` (color `--kair-primary`,
+   42px/800) a la izquierda separado por border-right, título "Realizar Nueva Inspección" + descripción a la
+   derecha. Fondo `linear-gradient(135deg, var(--kair-card) 0%, var(--kair-hover-soft) 100%)`.
+   **Score** = `closedCount / total * 100` donde `closedStatuses = ["Ejecutado","Completada","Cumplida"]`.
+3. **3 metric cards** (`.kair-metric-strip` + `.kair-metric-card`): grid 3-col con icono 42×42 a color (blue/amber/red)
+   + valor 24px/800 + label uppercase 11px + sub 11px muted. Cálculos:
+   - `Inspecciones del mes` (azul): `count(date >= firstOfMonth)`
+   - `No conformidades` (amber): `count(status ∈ {Pendiente, Vencida, Sin Iniciar})`
+   - `Próximas a vencer` (rojo): `count(status ∈ {Pendiente, Programada, Sin Iniciar} ∧ date ∈ [now, now+7d])`
+4. **Chart SVG nativo** (barras horizontales, sin Chart.js): label "Nombre" + valor "X (Y%)" arriba, barra
+   coloreada con el `accent` del tipo (que ya viene en `INSPECTION_TYPE_LIST`). Empty state si `total === 0`.
+5. **Module grid** (`.kair-module-grid`): 4 cards de tipos (botiquín/extintores/instalaciones/equipos_emergencia)
+   con chip de código (`.kair-module-card__code`, fondo `hover-soft` + color `primary`) + revisión + título +
+   descripción + **flecha a la derecha** que se desplaza 2px al hover.
+6. **Inspecciones Recientes** (5 últimas): header de sección (`.kair-section-head`) con título uppercase + botón
+   ghost "Ver historial completo", tabla intacta.
+
+#### Layout flex chain (crítico para scroll interno)
+
+```js
+var wrap = tpl.el("div", { className: "kair-app" });
+wrap.style.cssText = "height:100%;display:flex;flex-direction:column;min-height:0;";
+
+var main = tpl.el("main", { className: "insp-hub-home" });
+main.style.cssText = "flex:1;min-height:0;overflow-y:auto;padding:0 1.5rem 1.5rem;box-sizing:border-box;";
+```
+
+Sin `display:flex;flex-direction:column;min-height:0`, el contenido se desborda sin scroll (mismo bug histórico
+que 📦735 Amenazas).
+
+#### CSS (~451 líneas nuevas)
+
+- 11 clases premium nuevas scopeadas bajo `.kair-app .kair-*`: `.kair-page-header`, `.kair-badge-ico`,
+  `.kair-titles`, `.kair-title`, `.kair-sub`, `.kair-actions`, `.kair-btn` (+ variantes `primary`/`outline`/`ghost`),
+  `.kair-hero-card` (+ 6 sub-clases), `.kair-metric-strip`, `.kair-metric-card` (+ 6 sub-clases + 3 variantes
+  `--blue`/`--amber`/`--red`), `.kair-chart-svg` + `.kair-chart-row` (+ 4 sub-clases + `.kair-chart-empty`),
+  `.kair-module-section`, `.kair-section-title`, `.kair-section-head`, `.kair-module-grid`,
+  `.kair-module-card` (+ 7 sub-clases).
+- Tokens **locales** del scope (no toca el design system global): `--kair-primary`, `--kair-hover-soft`,
+  `--kair-text-muted`, `--kair-text-soft`, `--kair-card`, `--kair-border`, `--kair-muted-bg`, `--kair-radius-sm`,
+  `--kair-radius-md`, `--kair-shadow-card`, `--kair-transition`, `--kair-font`.
+- **Responsive**: `@media (max-width: 1024px)` → metric strip a 2-col + grid 1-col + hero en columna.
+  `@media (max-width: 640px)` → metric strip a 1-col + header wrap.
+- **Dark theme** con selectores `[data-theme="dark"]` + `[data-theme="dark-legacy"]` (8 overrides para hero,
+  page-header, badge-ico, metric card, module card).
+- **Sintaxis validada** con `node --check` exit 0.
+
+#### Cache-bust
+
+- `inspeccion.css?v=20260915-hero-scope-fix` → `?v=20260920-hub-premium`
+
+#### Lo que NO se tocó
+
+- `inspeccion-templates.js` — `buildHeader()` queda legacy (lo siguen usando dashboard, historial, detalle,
+  4 formularios).
+- `api.js`, `store.js`, `router.js`, IPC, BD — intactos.
+- `inspeccion.css` línea 116-240 (`.k-module-header` legacy) — sigue ahí para las otras vistas.
 
 

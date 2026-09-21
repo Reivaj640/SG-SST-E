@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.209] - 2026-09-21
+
+### 📦793 · Inspecciones Sistemáticas (4.2.4) — hub al premium v2
+
+El hub (landing) del submódulo `4.2.4 Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos` migra al Patrón A premium (mismo que los 8 módulos home rediseñados en 📦730-737). Las 7 vistas funcionales (dashboard, historial, detalle, 4 formularios) quedan intactas y siguen usando el header legacy `.k-module-header`.
+
+#### Cambios
+
+- **Page-header premium limpio** en el hub: icono decorativo en chip 44×44 (`.kair-badge-ico`), título Manrope 800 20px, subtítulo muted, 2 acciones a la derecha (`Ver Historial` outline + `Volver` ghost). Sin breadcrumb pills, sin chip de empresa.
+- **Hero card con score compuesto** (`.kair-hero-card`): `% de cumplimiento general` calculado como `closedStatuses / total` donde `closedStatuses = ["Ejecutado","Completada","Cumplida"]`. Gradiente sutil blanco→blue-soft.
+- **3 metric cards** (`.kair-metric-strip` + `.kair-metric-card`):
+  - `Inspecciones del mes` (azul) — count donde `date >= firstOfMonth`
+  - `No conformidades` (amber) — count donde status ∈ {Pendiente, Vencida, Sin Iniciar}
+  - `Próximas a vencer` (rojo) — count donde status ∈ {Pendiente, Programada, Sin Iniciar} y date ∈ [now, now+7d]
+- **Chart SVG nativo** (barras horizontales, sin Chart.js): distribución por tipo de inspección con label "X (Y%)" + barra coloreada con el accent del tipo. Empty state si no hay inspecciones.
+- **Module grid** con flecha (Patrón A): 4 cards de tipos (botiquín/extintores/instalaciones/equipos_emergencia) con chip de código + revisión, descripción, hover sutil (translateY(-1px) + flecha que se desplaza).
+- **Sección Recientes** mejorada: header de sección con título uppercase + botón ghost "Ver historial completo", tabla intacta.
+- **Layout flex chain** en el wrap principal (`height:100%;display:flex;flex-direction:column;min-height:0`) + `main` con `flex:1;min-height:0;overflow-y:auto` para scroll interno correcto.
+- **CSS nuevo (~451 líneas)** scoped bajo `.kair-app .kair-*` con tokens locales (no choca con el design system global). Responsive a 1024px (métrica 2-col + grid 1-col) y 640px (métrica 1-col + header wrap).
+- **Modo oscuro completo** (dark + dark-legacy) via selectores `[data-theme^="dark"]` para todos los elementos nuevos.
+- **Sintaxis validada** con `node --check` exit 0.
+- **Cache-bust** `20260915-hero-scope-fix` → `20260920-hub-premium`.
+
+#### Lo que NO se tocó
+
+- `inspeccion-templates.js` — `buildHeader()` queda legacy porque las 7 vistas funcionales lo siguen usando.
+- `api.js`, `store.js`, `router.js`, IPC, BD — intactos.
+
+---
+
 ## [0.1.208] - 2026-09-19
 
 ### 📦785 · Severidad de la Accidentalidad (3.3.2) migrada al premium v2
