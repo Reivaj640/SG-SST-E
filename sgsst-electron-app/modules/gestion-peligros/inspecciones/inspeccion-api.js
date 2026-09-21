@@ -210,6 +210,30 @@
       return Promise.resolve({ success: true, data: { id: id } });
     },
 
+    /* 2026-09-21 — Reconexión a la carpeta real de la empresa.
+       En navegador (sin Electron) no hay carpeta: resuelven con un
+       "no soportado" amable que la vista oculta. */
+    explorarHistorico: function (companyId) {
+      if (isElectron && typeof global.electronAPI.inspeccionExplorarHistorico === "function") {
+        return Promise.resolve(global.electronAPI.inspeccionExplorarHistorico(companyId));
+      }
+      return Promise.resolve({ success: true, data: { found: false, folderPath: null, entries: [], notSupported: true } });
+    },
+
+    abrirRuta: function (targetPath) {
+      if (isElectron && typeof global.electronAPI.inspeccionAbrirRuta === "function") {
+        return Promise.resolve(global.electronAPI.inspeccionAbrirRuta(targetPath));
+      }
+      return Promise.resolve({ success: false, error: { code: "NOT_SUPPORTED", message: "Solo disponible en la aplicación de escritorio" } });
+    },
+
+    archivarInspeccion: function (payload) {
+      if (isElectron && typeof global.electronAPI.inspeccionArchivar === "function") {
+        return Promise.resolve(global.electronAPI.inspeccionArchivar(payload));
+      }
+      return Promise.resolve({ success: false, error: { code: "NOT_SUPPORTED", message: "Solo disponible en la aplicación de escritorio" } });
+    },
+
     /* Export a PDF (renderer-side con KairExport). El XLSX ya no pasa por
        acá: la vista llama directo a window.electronAPI.inspeccionExportarXlsx(insp)
        que dispara el handler `inspeccion:exportarXlsx` en el main process

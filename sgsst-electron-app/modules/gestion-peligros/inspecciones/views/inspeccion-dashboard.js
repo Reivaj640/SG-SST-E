@@ -27,8 +27,8 @@
         { label: "Nueva Inspección", variant: "primary", icon: tpl.icon("plus", 15), onClick: function () { ctx.go({ name: "hub" }); } }
       ],
       tabs: [
-        { id: "dashboard", label: "Programa", active: true, onClick: function () { ctx.go({ name: "dashboard" }); } },
-        { id: "hub", label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+        { id: "hub", label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
+        { id: "dashboard", label: "Programa anual", active: true, onClick: function () { ctx.go({ name: "dashboard" }); } },
         { id: "historial", label: "Historial", onClick: function () { ctx.go({ name: "historial" }); } }
       ]
     }));
@@ -44,7 +44,7 @@
       api.getProgram(new Date().getFullYear(), store.companyId).then(function (res) {
         if (!res.success) {
           main.innerHTML = "";
-          main.appendChild(tpl.buildCard("Error", tpl.el("div", { textContent: (res.error && res.error.message) || "Error", style: "color:#dc3545;" })));
+          main.appendChild(tpl.buildCard("Error", tpl.el("div", { textContent: (res.error && res.error.message) || "Error", style: "color:var(--kair-danger);" })));
           return;
         }
         currentProgram = res.data.program;
@@ -52,7 +52,7 @@
         renderProgram(currentProgram);
       }).catch(function (e) {
         main.innerHTML = "";
-        main.appendChild(tpl.buildCard("Error", tpl.el("div", { textContent: e.message, style: "color:#dc3545;" })));
+        main.appendChild(tpl.buildCard("Error", tpl.el("div", { textContent: e.message, style: "color:var(--kair-danger);" })));
       });
     }
 
@@ -130,7 +130,7 @@
           tr.appendChild(td);
         });
 
-        var pctColor = pct === 100 ? "#28a745" : pct > 0 ? "#174ea6" : "#5a6378";
+        var pctColor = pct === 100 ? "var(--kair-success)" : pct > 0 ? "var(--kair-primary)" : "var(--kair-text-muted)";
         tr.appendChild(tpl.el("td", { style: "text-align:center;" }, [tpl.el("span", { style: "font-weight:600;color:" + pctColor + ";", textContent: pct + "%" })]));
         var statusTd = tpl.el("td");
         statusTd.appendChild(tpl.statusPill(a.status));
@@ -149,10 +149,10 @@
       var grid = tpl.el("div", { className: "kair-grid", style: "grid-template-columns:1fr 2fr;" });
 
       var objBody = tpl.el("div", {}, [
-        tpl.el("p", { style: "font-size:0.875rem;color:#1a1a2e;line-height:1.6;", textContent: program.generalObjective }),
-        tpl.el("div", { style: "margin-top:16px;padding-top:16px;border-top:1px solid #dee2e6;" }, [
-          tpl.el("h3", { style: "font-size:0.85rem;font-weight:600;color:#1a1a2e;margin-bottom:8px;", textContent: "Objetivos Específicos" }),
-          tpl.el("ul", { style: "list-style:disc;padding-left:18px;font-size:0.8125rem;color:#5a6378;line-height:1.7;" }, [
+        tpl.el("p", { style: "font-size:0.875rem;color:var(--kair-text);line-height:1.6;", textContent: program.generalObjective }),
+        tpl.el("div", { style: "margin-top:16px;padding-top:16px;border-top:1px solid var(--kair-border);" }, [
+          tpl.el("h3", { style: "font-size:0.85rem;font-weight:600;color:var(--kair-text);margin-bottom:8px;", textContent: "Objetivos Específicos" }),
+          tpl.el("ul", { style: "list-style:disc;padding-left:18px;font-size:0.8125rem;color:var(--kair-text-muted);line-height:1.7;" }, [
             tpl.el("li", { textContent: "Identificar condiciones inseguras en los lugares de trabajo." }),
             tpl.el("li", { textContent: "Evaluar el cumplimiento normativo (Decreto 1072 de 2015)." }),
             tpl.el("li", { textContent: "Proponer mejoras con hallazgos y recomendaciones." }),
@@ -173,10 +173,10 @@
             tpl.el("span", { className: "kair-type-icon", style: "width:36px;height:36px;background-color:" + t.accent + "1a;color:" + t.accent + ";" }, [iconFor(t.type, 18)]),
             tpl.el("div", { style: "flex:1;min-width:0;" }, [
               tpl.el("div", { className: "kair-flex kair-gap-2" }, [
-                tpl.el("span", { style: "font-weight:600;font-size:0.9rem;color:#1a1a2e;", textContent: t.shortTitle }),
-                tpl.el("span", { style: "font-size:0.65rem;font-weight:700;color:#5a6378;background-color:#f1f3f5;padding:1px 6px;border-radius:4px;", textContent: t.code })
+                tpl.el("span", { style: "font-weight:600;font-size:0.9rem;color:var(--kair-text);", textContent: t.shortTitle }),
+                tpl.el("span", { style: "font-size:0.65rem;font-weight:700;color:var(--kair-text-muted);background-color:var(--kair-muted-bg);padding:1px 6px;border-radius:4px;", textContent: t.code })
               ]),
-              tpl.el("p", { style: "font-size:0.75rem;color:#5a6378;margin-top:4px;line-height:1.4;", textContent: t.description })
+              tpl.el("p", { style: "font-size:0.75rem;color:var(--kair-text-muted);margin-top:4px;line-height:1.4;", textContent: t.description })
             ])
           ])
         ]);

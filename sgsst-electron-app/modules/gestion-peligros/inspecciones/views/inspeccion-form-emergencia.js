@@ -36,7 +36,7 @@
       return tpl.buildHeader({
         onBack: function () { ctx.go({ name: "hub" }); },
         breadcrumb: [
-          { label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+          { label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
           { label: meta.shortTitle }
         ],
         title: meta.title, companyName: store.companyName, contextLabel: "SG-SST",
@@ -132,9 +132,9 @@
       var itemsBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
       itemsBody.appendChild(tableWrap);
 
-      var partWrap = tpl.el("div", { style: "padding:16px;border-top:1px solid #dee2e6;" });
+      var partWrap = tpl.el("div", { style: "padding:16px;border-top:1px solid var(--kair-border);" });
       var partHeader = tpl.el("div", { className: "kair-flex kair-flex--between", style: "margin-bottom:10px;" }, [
-        tpl.el("h4", { style: "font-size:0.85rem;font-weight:600;color:#1a1a2e;margin:0;", textContent: "Nombre Completo de Participantes" }),
+        tpl.el("h4", { style: "font-size:0.85rem;font-weight:600;color:var(--kair-text);margin:0;", textContent: "Nombre Completo de Participantes" }),
         tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--secondary", onclick: addParticipante, style: "padding:4px 10px;font-size:0.78rem;" }, [tpl.icon("plus", 12), tpl.el("span", { textContent: "Agregar" })])
       ]);
       partWrap.appendChild(partHeader);

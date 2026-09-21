@@ -963,6 +963,14 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
   // Devuelve el archivo serializado en base64.
   inspeccionExportarXlsx: (insp) => ipcRenderer.invoke('inspeccion:exportarXlsx', insp),
 
+  // 2026-09-21 — Reconexión a la carpeta real de la empresa:
+  // explorarHistorico lista el archivo histórico ("Inspeciones realizadas/
+  // <sede>/<fecha>/"), abrirRuta abre una entrada en el explorador del SO y
+  // archivar copia el formato de una inspección a la carpeta de la empresa.
+  inspeccionExplorarHistorico: (companyId) => ipcRenderer.invoke('inspeccion:explorarHistorico', companyId),
+  inspeccionAbrirRuta: (targetPath) => ipcRenderer.invoke('inspeccion:abrirRuta', targetPath),
+  inspeccionArchivar: (payload) => ipcRenderer.invoke('inspeccion:archivar', payload),
+
   // Backward-compat: consumido por gestion-peligros-home.js widgets
   inspecciones: {
     getStats: (companyName) => ipcRenderer.invoke('inspecciones:get-stats', companyName)

@@ -1,8 +1,11 @@
 /* ============================================================
- * K+AIR · Vista Hub (Centro de Inspecciones)
- * Patrón A — Submodule Home Premium (📦770+)
- * Estructura: Page-header · Hero con score · 3 metric cards ·
- *              Chart SVG nativo · Module grid (con flecha) · Recientes
+ * K+AIR · Vista Hub (Dashboard de Inspecciones)
+ * Patrón A — Submodule Home Premium (📦796)
+ * Referencia: preview premium 2026-09-21 (header estándar v7 +
+ * hero del programa con donut + 4 KPIs + formatos + recientes/avance)
+ * Estructura: Header v7 con pestañas · Hero programa anual ·
+ *             4 metric cards · Nueva inspección (formatos) ·
+ *             Recientes + Avance del programa
  * ============================================================ */
 (function (global) {
   "use strict";
@@ -13,116 +16,171 @@
 
   function Hub(root, ctx) {
     var store = global.KairStore.getState();
+    var currentYear = new Date().getFullYear();
 
     /* ── Layout principal (kair-app · flex chain) ── */
     var wrap = tpl.el("div", { className: "kair-app" });
     wrap.style.cssText = "height:100%;display:flex;flex-direction:column;min-height:0;";
 
-    /* ── Page-header premium (limpio, sin breadcrumb pills) ── */
-    wrap.appendChild(buildPageHeader({
+    /* ── Header estándar premium v7 + pestañas ── */
+    wrap.appendChild(tpl.buildHeader({
       title: "Inspecciones Sistemáticas",
       subtitle: "Centro de inspecciones a instalaciones, máquinas, equipos y elementos de emergencia.",
+      companyName: store.companyName,
+      titleIcon: "clipboard-check",
+      onBack: typeof ctx.backToModule === "function" ? ctx.backToModule : null,
+      backTitle: "Volver a Gestión de Peligros",
       actions: [
         {
           label: "Ver Historial",
-          variant: "outline",
+          variant: "secondary",
           icon: tpl.icon("history", 15),
           onClick: function () { ctx.go({ name: "historial" }); }
         },
         {
-          label: "Volver",
-          variant: "ghost",
-          icon: tpl.icon("arrow-left", 15),
-          onClick: function () { ctx.go({ name: "dashboard" }); }
+          label: "Nueva Inspección",
+          variant: "primary",
+          icon: tpl.icon("plus", 15),
+          onClick: function () {
+            var target = document.getElementById("insp-formatos");
+            if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
         }
+      ],
+      tabs: [
+        { id: "hub", label: "Dashboard", active: true, onClick: function () { ctx.go({ name: "hub" }); } },
+        { id: "dashboard", label: "Programa anual", onClick: function () { ctx.go({ name: "dashboard" }); } },
+        { id: "historial", label: "Historial", onClick: function () { ctx.go({ name: "historial" }); } }
       ]
     }));
 
     /* ── Main scrollable ── */
     var main = tpl.el("main", { className: "insp-hub-home" });
-    main.style.cssText = "flex:1;min-height:0;overflow-y:auto;padding:0 1.5rem 1.5rem;box-sizing:border-box;";
+    main.style.cssText = "flex:1;min-height:0;overflow-y:auto;padding:1.25rem 1.5rem 1.5rem;box-sizing:border-box;";
 
-    /* 1. Hero con score compuesto */
+    /* 1. Hero del programa anual (donut + acciones) */
     main.appendChild(buildHeroCard());
 
-    /* 2. 3 metric cards */
+    /* 2. 4 metric cards */
     main.appendChild(buildMetricStrip());
 
-    /* 3. Chart SVG nativo (distribución por tipo) */
-    main.appendChild(buildChartCard());
+    /* 3. Nueva inspección (formatos oficiales) */
+    main.appendChild(buildFormatos(ctx));
 
-    /* 4. Module grid (4 tipos con flecha) */
-    main.appendChild(buildModuleGrid(ctx));
-
-    /* 5. Recientes */
-    main.appendChild(buildRecientes());
+    /* 4. Recientes + Avance del programa */
+    var bottom = tpl.el("div", { className: "kair-hub-bottom" });
+    bottom.appendChild(buildRecientes(ctx));
+    bottom.appendChild(buildAvanceCard());
+    main.appendChild(bottom);
 
     wrap.appendChild(main);
     root.appendChild(wrap);
 
     /* ── Carga de datos ── */
-    loadStats();
-    loadRecent();
+    loadInspectionStats();
+    loadProgramStats();
 
-    /* ══════════════ Page-header premium ══════════════ */
-    function buildPageHeader(opts) {
-      var header = tpl.el("header", { className: "kair-page-header" });
-
-      var badge = tpl.el("div", { className: "kair-badge-ico" }, [tpl.icon("clipboard-check", 22)]);
-      header.appendChild(badge);
-
-      var titles = tpl.el("div", { className: "kair-titles" }, [
-        tpl.el("h1", { className: "kair-title", textContent: opts.title }),
-        tpl.el("p", { className: "kair-sub", textContent: opts.subtitle })
-      ]);
-      header.appendChild(titles);
-
-      var actions = tpl.el("div", { className: "kair-actions" });
-      (opts.actions || []).forEach(function (a) {
-        var cls = "kair-btn " + (
-          a.variant === "primary" ? "kair-btn-primary" :
-          a.variant === "ghost" ? "kair-btn-ghost" :
-          "kair-btn-outline"
-        );
-        var btn = tpl.el("button", { type: "button", className: cls, onclick: a.onClick });
-        if (a.icon) btn.appendChild(a.icon);
-        btn.appendChild(document.createTextNode(a.label));
-        actions.appendChild(btn);
-      });
-      header.appendChild(actions);
-
-      return header;
-    }
-
-    /* ══════════════ Hero card con score ══════════════ */
+    /* ══════════════ Hero del programa anual ══════════════ */
     function buildHeroCard() {
-      var hero = tpl.el("div", { className: "kair-hero-card" });
+      var hero = tpl.el("div", { className: "kair-hero-card kair-hero-card--program" });
 
-      var scoreWrap = tpl.el("div", { className: "kair-hero-card__score" });
-      var scoreVal = tpl.el("div", { className: "kair-hero-card__score-val", id: "insp-hero-score" });
-      scoreVal.textContent = "—%";
-      var scoreLbl = tpl.el("div", { className: "kair-hero-card__score-lbl", textContent: "Cumplimiento general" });
-      scoreWrap.appendChild(scoreVal);
-      scoreWrap.appendChild(scoreLbl);
-      hero.appendChild(scoreWrap);
-
-      var body = tpl.el("div", { className: "kair-hero-card__body" }, [
-        tpl.el("h2", { className: "kair-hero-card__title", textContent: "Realizar Nueva Inspección" }),
-        tpl.el("p", { className: "kair-hero-card__desc", textContent: "Seleccione uno de los formatos oficiales para registrar una inspección. Los datos pueden exportarse a PDF o Excel respetando el formato de cada documento." })
+      /* Izquierda: eyebrow + título + objetivo + acciones */
+      var body = tpl.el("div", { className: "kair-hero-card__body kair-hero-card__main" }, [
+        tpl.el("span", { className: "kair-hero-card__eyebrow", textContent: "PROGRAMA DE INSPECCIONES · SG-SST" }),
+        tpl.el("h2", { className: "kair-hero-card__title", id: "insp-hero-title", textContent: "Programa Anual " + currentYear }),
+        tpl.el("p", { className: "kair-hero-card__desc", id: "insp-hero-desc", textContent: "Cargando objetivo del programa..." })
       ]);
+
+      var actions = tpl.el("div", { className: "kair-hero-card__actions" }, [
+        tpl.el("button", {
+          type: "button",
+          className: "kair-hero-card__btn kair-hero-card__btn--white",
+          onclick: function () { ctx.go({ name: "dashboard" }); }
+        }, [tpl.icon("calendar-days", 15), document.createTextNode("Abrir programa")]),
+        tpl.el("button", {
+          type: "button",
+          className: "kair-hero-card__btn kair-hero-card__btn--outline",
+          onclick: function () { exportProgram(); }
+        }, [tpl.icon("file-down", 15), document.createTextNode("Exportar XLSX")])
+      ]);
+      body.appendChild(actions);
       hero.appendChild(body);
+
+      /* Derecha: donut de cumplimiento + meses programados/cumplidos */
+      var side = tpl.el("div", { className: "kair-hero-card__side" });
+
+      var donutWrap = tpl.el("div", { className: "kair-hero-card__donut", id: "insp-hero-donut" });
+      donutWrap.appendChild(tpl.el("span", { className: "kair-hero-card__donut-pct", id: "insp-hero-pct", textContent: "—%" }));
+      donutWrap.appendChild(tpl.el("span", { className: "kair-hero-card__donut-lbl", textContent: "INDICADOR" }));
+      side.appendChild(donutWrap);
+
+      var stats = tpl.el("div", { className: "kair-hero-card__stats" }, [
+        tpl.el("div", { className: "kair-hero-card__stat" }, [
+          tpl.el("span", { className: "kair-hero-card__stat-val", id: "insp-hero-prog", textContent: "—" }),
+          tpl.el("span", { className: "kair-hero-card__stat-lbl", textContent: "Meses programados" })
+        ]),
+        tpl.el("div", { className: "kair-hero-card__stat" }, [
+          tpl.el("span", { className: "kair-hero-card__stat-val", id: "insp-hero-done", textContent: "—" }),
+          tpl.el("span", { className: "kair-hero-card__stat-lbl", textContent: "Cumplidos" })
+        ])
+      ]);
+      side.appendChild(stats);
+      hero.appendChild(side);
 
       return hero;
     }
 
-    /* ══════════════ 3 metric cards ══════════════ */
+    /* Donut SVG theme-aware (relleno proporcional al porcentaje) */
+    function renderDonut(pct) {
+      var host = document.getElementById("insp-hero-donut");
+      if (!host) return;
+      host.innerHTML = "";
+      var size = 132, stroke = 12, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+      var filled = Math.max(0, Math.min(100, pct));
+      var svgNS = "http://www.w3.org/2000/svg";
+      var svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("width", String(size));
+      svg.setAttribute("height", String(size));
+      svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+      svg.classList.add("kair-hero-card__donut-svg");
+
+      var bg = document.createElementNS(svgNS, "circle");
+      bg.setAttribute("cx", String(size / 2));
+      bg.setAttribute("cy", String(size / 2));
+      bg.setAttribute("r", String(r));
+      bg.setAttribute("fill", "none");
+      bg.setAttribute("stroke", "rgba(255,255,255,0.18)");
+      bg.setAttribute("stroke-width", String(stroke));
+      svg.appendChild(bg);
+
+      var arc = document.createElementNS(svgNS, "circle");
+      arc.setAttribute("cx", String(size / 2));
+      arc.setAttribute("cy", String(size / 2));
+      arc.setAttribute("r", String(r));
+      arc.setAttribute("fill", "none");
+      arc.setAttribute("stroke", "#8ec5ff");
+      arc.setAttribute("stroke-width", String(stroke));
+      arc.setAttribute("stroke-linecap", "round");
+      arc.setAttribute("stroke-dasharray", String(c));
+      arc.setAttribute("stroke-dashoffset", String(c * (1 - filled / 100)));
+      arc.setAttribute("transform", "rotate(-90 " + size / 2 + " " + size / 2 + ")");
+      svg.appendChild(arc);
+
+      host.appendChild(svg);
+      var pctEl = tpl.el("span", { className: "kair-hero-card__donut-pct", textContent: Math.round(filled) + "%" });
+      host.appendChild(pctEl);
+      host.appendChild(tpl.el("span", { className: "kair-hero-card__donut-lbl", textContent: "INDICADOR" }));
+    }
+
+    /* ══════════════ 4 metric cards ══════════════ */
     function buildMetricStrip() {
-      var strip = tpl.el("div", { className: "kair-metric-strip" });
+      var strip = tpl.el("div", { className: "kair-metric-strip kair-metric-strip--4" });
 
       var cards = [
-        { id: "insp-m-total",  tone: "blue",  icon: "clipboard-list", label: "Inspecciones del mes",  value: "—", sub: "Total registradas" },
-        { id: "insp-m-nc",     tone: "amber", icon: "alert-triangle", label: "No conformidades",     value: "—", sub: "Abiertas / pendientes" },
-        { id: "insp-m-next",   tone: "red",   icon: "calendar-clock", label: "Próximas a vencer",    value: "—", sub: "En los próximos 7 días" }
+        { id: "insp-m-total",  tone: "blue",  icon: "clipboard-list", label: "Inspecciones totales",      value: "—", sub: "Registros acumulados" },
+        { id: "insp-m-month",  tone: "green", icon: "calendar-check", label: "Realizadas este mes",       value: "—", sub: "En " + monthName() },
+        { id: "insp-m-prog",   tone: "amber", icon: "calendar-days",  label: "Meses programados",         value: "—", sub: "— cumplidos" },
+        { id: "insp-m-ind",    tone: "rose",  icon: "gauge",          label: "Indicador de cumplimiento", value: "—", sub: "— actividades ejecutadas" }
       ];
 
       cards.forEach(function (c) {
@@ -133,7 +191,7 @@
           tpl.el("div", { className: "kair-metric-card__body" }, [
             tpl.el("div", { className: "kair-metric-card__value", id: c.id, textContent: c.value }),
             tpl.el("div", { className: "kair-metric-card__label", textContent: c.label }),
-            tpl.el("div", { className: "kair-metric-card__sub", textContent: c.sub })
+            tpl.el("div", { className: "kair-metric-card__sub", id: c.id + "-sub", textContent: c.sub })
           ])
         ]);
         strip.appendChild(card);
@@ -142,33 +200,23 @@
       return strip;
     }
 
-    /* ══════════════ Chart SVG nativo (distribución por tipo) ══════════════ */
-    function buildChartCard() {
-      var card = tpl.el("div", { className: "kair-card" });
-      card.appendChild(tpl.el("div", { className: "kair-card__header" }, [
-        tpl.el("h2", { className: "kair-card__title", textContent: "Distribución por tipo de inspección" })
-      ]));
-      var body = tpl.el("div", { className: "kair-card__body" });
-      body.appendChild(tpl.el("div", { id: "insp-chart", className: "kair-chart-svg" }, [
-        tpl.el("div", { className: "kair-loading", style: "padding:32px;" }, [
-          tpl.el("span", { className: "kair-spinner" }),
-          tpl.el("span", { textContent: "Cargando..." })
-        ])
-      ]));
-      card.appendChild(body);
-      return card;
+    function monthName() {
+      try {
+        return new Date().toLocaleDateString("es-CO", { month: "long" });
+      } catch (e) { return "el mes en curso"; }
     }
 
-    /* ══════════════ Module grid (4 tipos con flecha) ══════════════ */
-    function buildModuleGrid(ctx) {
-      var section = tpl.el("div", { className: "kair-module-section" });
-      section.appendChild(tpl.el("h2", { className: "kair-section-title", textContent: "Formatos de Inspección Disponibles" }));
+    /* ══════════════ Formatos de inspección ══════════════ */
+    function buildFormatos(ctx) {
+      var section = tpl.el("div", { className: "kair-module-section", id: "insp-formatos" });
+      section.appendChild(tpl.el("h2", { className: "kair-section-title", textContent: "Nueva inspección" }));
+      section.appendChild(tpl.el("p", { className: "kair-section-desc", textContent: "Inicia un registro con formato oficial en un clic." }));
 
-      var grid = tpl.el("div", { className: "kair-module-grid" });
+      var grid = tpl.el("div", { className: "kair-module-grid kair-module-grid--formats" });
       T.INSPECTION_TYPE_LIST.forEach(function (t) {
         var card = tpl.el("button", {
           type: "button",
-          className: "kair-module-card",
+          className: "kair-module-card kair-module-card--format",
           onclick: function () { ctx.go({ name: "nueva", inspectionType: t.type }); }
         }, [
           tpl.el("div", {
@@ -180,10 +228,13 @@
               tpl.el("span", { className: "kair-module-card__code", textContent: t.code }),
               tpl.el("span", { className: "kair-module-card__rev", textContent: t.revision })
             ]),
-            tpl.el("h3", { className: "kair-module-card__title", textContent: t.title }),
+            tpl.el("h3", { className: "kair-module-card__title", textContent: t.shortTitle }),
             tpl.el("p", { className: "kair-module-card__desc", textContent: t.description })
           ]),
-          tpl.el("div", { className: "kair-module-card__arrow" }, [tpl.icon("arrow-right", 18)])
+          tpl.el("div", { className: "kair-module-card__start" }, [
+            document.createTextNode("Comenzar"),
+            tpl.icon("arrow-right", 16)
+          ])
         ]);
         grid.appendChild(card);
       });
@@ -192,17 +243,17 @@
     }
 
     /* ══════════════ Recientes ══════════════ */
-    function buildRecientes() {
+    function buildRecientes(ctx) {
       var section = tpl.el("div", { className: "kair-module-section" });
 
       var head = tpl.el("div", { className: "kair-section-head" }, [
-        tpl.el("h2", { className: "kair-section-title", textContent: "Inspecciones Recientes" }),
+        tpl.el("h2", { className: "kair-section-title", textContent: "Registros recientes" }),
         tpl.el("button", {
           type: "button",
           className: "kair-btn kair-btn-ghost",
           onclick: function () { ctx.go({ name: "historial" }); }
         }, [
-          document.createTextNode("Ver historial completo"),
+          document.createTextNode("Ver historial"),
           tpl.icon("arrow-right", 14)
         ])
       ]);
@@ -278,93 +329,137 @@
       }
     }
 
-    /* ══════════════ Stats: score + métricas + chart ══════════════ */
-    function loadStats() {
+    /* ══════════════ Avance del programa ══════════════ */
+    function buildAvanceCard() {
+      var section = tpl.el("div", { className: "kair-module-section" });
+
+      var head = tpl.el("div", { className: "kair-section-head" }, [
+        tpl.el("h2", { className: "kair-section-title", textContent: "Avance del programa" }),
+        tpl.el("button", {
+          type: "button",
+          className: "kair-btn kair-btn-ghost",
+          onclick: function () { ctx.go({ name: "dashboard" }); }
+        }, [
+          document.createTextNode("Ver programa"),
+          tpl.icon("arrow-right", 14)
+        ])
+      ]);
+      section.appendChild(head);
+
+      var card = tpl.el("div", { className: "kair-card" });
+      var body = tpl.el("div", { className: "kair-card__body" });
+      body.appendChild(tpl.loadingBlock("Cargando programa..."));
+      card.appendChild(body);
+      section.appendChild(card);
+      return section;
+    }
+
+    function renderAvance(program) {
+      var host = document.querySelector(".kair-hub-bottom .kair-module-section:last-child .kair-card__body");
+      if (!host) return;
+      host.innerHTML = "";
+      var activities = (program && program.activities) || [];
+      if (!activities.length) {
+        host.appendChild(tpl.el("div", { className: "kair-chart-empty", textContent: "Sin actividades en el programa." }));
+        return;
+      }
+      activities.forEach(function (a) {
+        var pct = Math.round((a.percentage || 0) * 100);
+        var row = tpl.el("div", { className: "kair-avance-row" }, [
+          tpl.el("div", { className: "kair-avance-row__top" }, [
+            tpl.el("span", { className: "kair-avance-row__name", textContent: a.activity }),
+            tpl.el("span", { className: "kair-avance-row__pct", textContent: pct + "%" })
+          ]),
+          tpl.el("div", { className: "kair-avance-row__track" }, [
+            tpl.el("div", {
+              className: "kair-avance-row__fill" + (pct === 100 ? " is-full" : ""),
+              style: "width:" + pct + "%;"
+            })
+          ])
+        ]);
+        host.appendChild(row);
+      });
+    }
+
+    /* ══════════════ Stats de inspecciones ══════════════ */
+    function loadInspectionStats() {
       api.listInspections({}).then(function (res) {
         if (!res.success) throw new Error(res.error && res.error.message);
         var inspections = res.data.inspections || [];
 
         var now = new Date();
         var firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        var sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
         var totalMonth = inspections.filter(function (i) {
           return new Date(i.date) >= firstOfMonth;
         }).length;
 
-        var ncOpen = inspections.filter(function (i) {
-          return i.status === "Pendiente" || i.status === "Vencida" || i.status === "Sin Iniciar";
-        }).length;
-
-        var nextToExpire = inspections.filter(function (i) {
-          var d = new Date(i.date);
-          return (i.status === "Pendiente" || i.status === "Programada" || i.status === "Sin Iniciar") &&
-                 d >= now && d <= sevenDays;
-        }).length;
-
-        var closedStatuses = ["Ejecutado", "Completada", "Cumplida"];
-        var closedCount = inspections.filter(function (i) {
-          return closedStatuses.indexOf(i.status) >= 0;
-        }).length;
-        var score = inspections.length > 0 ? Math.round((closedCount / inspections.length) * 100) : 0;
-
-        var scoreEl = document.getElementById("insp-hero-score");
-        if (scoreEl) scoreEl.textContent = score + "%";
         var totalEl = document.getElementById("insp-m-total");
-        if (totalEl) totalEl.textContent = String(totalMonth);
-        var ncEl = document.getElementById("insp-m-nc");
-        if (ncEl) ncEl.textContent = String(ncOpen);
-        var nextEl = document.getElementById("insp-m-next");
-        if (nextEl) nextEl.textContent = String(nextToExpire);
-
-        renderChart(inspections);
+        if (totalEl) totalEl.textContent = String(inspections.length);
+        var monthEl = document.getElementById("insp-m-month");
+        if (monthEl) monthEl.textContent = String(totalMonth);
       }).catch(function (e) {
-        console.error("[insp-hub] loadStats error:", e);
+        console.error("[insp-hub] loadInspectionStats error:", e);
       });
     }
 
-    function renderChart(inspections) {
-      var chart = document.getElementById("insp-chart");
-      if (!chart) return;
-      chart.innerHTML = "";
+    /* ══════════════ Stats del programa ══════════════ */
+    function loadProgramStats() {
+      api.getProgram(currentYear, store.companyId).then(function (res) {
+        if (!res.success) throw new Error(res.error && res.error.message);
+        var program = res.data.program;
+        if (global.KairStore) global.KairStore.setProgram(program);
 
-      var counts = {};
-      T.INSPECTION_TYPE_LIST.forEach(function (t) { counts[t.type] = 0; });
-      inspections.forEach(function (i) {
-        if (counts[i.type] != null) counts[i.type]++;
-      });
+        var programmed = 0, completed = 0, executedActivities = 0;
+        var activities = (program && program.activities) || [];
+        activities.forEach(function (a) {
+          T.MONTHS.forEach(function (m) {
+            var v = a.monthlySchedule[m];
+            if (v === "p" || v === "c") programmed++;
+            if (v === "c") completed++;
+          });
+          if ((a.percentage || 0) >= 1) executedActivities++;
+        });
+        var indicator = programmed > 0 ? Math.round((completed / programmed) * 100) : 0;
 
-      var total = inspections.length;
-      var max = 0;
-      Object.keys(counts).forEach(function (k) { if (counts[k] > max) max = counts[k]; });
-      if (max === 0) max = 1;
+        /* Hero */
+        var descEl = document.getElementById("insp-hero-desc");
+        if (descEl && program && program.generalObjective) {
+          descEl.textContent = program.generalObjective;
+        }
+        renderDonut(indicator);
+        var progEl = document.getElementById("insp-hero-prog");
+        if (progEl) progEl.textContent = String(programmed);
+        var doneEl = document.getElementById("insp-hero-done");
+        if (doneEl) doneEl.textContent = String(completed);
 
-      if (total === 0) {
-        chart.appendChild(tpl.el("div", { className: "kair-chart-empty", textContent: "Sin inspecciones registradas todavía." }));
-        return;
-      }
+        /* KPIs */
+        var progVal = document.getElementById("insp-m-prog");
+        if (progVal) progVal.textContent = String(programmed);
+        var progSub = document.getElementById("insp-m-prog-sub");
+        if (progSub) progSub.textContent = completed + " cumplidos";
+        var indVal = document.getElementById("insp-m-ind");
+        if (indVal) indVal.textContent = indicator + "%";
+        var indSub = document.getElementById("insp-m-ind-sub");
+        if (indSub) indSub.textContent = executedActivities + "/" + activities.length + " actividades ejecutadas";
 
-      T.INSPECTION_TYPE_LIST.forEach(function (t) {
-        var count = counts[t.type] || 0;
-        var pctBar = max > 0 ? Math.round((count / max) * 100) : 0;
-        var pctTotal = total > 0 ? Math.round((count / total) * 100) : 0;
-
-        var row = tpl.el("div", { className: "kair-chart-row" }, [
-          tpl.el("div", { className: "kair-chart-row__label" }, [
-            tpl.el("span", { className: "kair-chart-row__name", textContent: t.shortTitle || t.title }),
-            tpl.el("span", { className: "kair-chart-row__val", textContent: count + " (" + pctTotal + "%)" })
-          ]),
-          tpl.el("div", { className: "kair-chart-row__track" }, [
-            tpl.el("div", { className: "kair-chart-row__fill", style: "width:" + pctBar + "%;background-color:" + t.accent + ";" })
-          ])
-        ]);
-        chart.appendChild(row);
+        /* Avance */
+        renderAvance(program);
+      }).catch(function (e) {
+        console.error("[insp-hub] loadProgramStats error:", e);
+        renderAvance(null);
       });
     }
 
-    function loadRecent() {
-      /* El bloque "Recientes" usa su propio api.listInspections dentro de loadInto(). */
-      /* Esta función queda como hook para futuras ampliaciones (filtros, paginación). */
+    function exportProgram() {
+      tpl.toast("Exportando", "Generando Excel del programa...", "info");
+      api.exportProgram(currentYear, store.companyId).then(function (res) {
+        if (!res.success) throw new Error(res.error && res.error.message);
+        if (global.KairExport) global.KairExport.downloadBlob(res.data.blob, res.data.filename);
+        tpl.toast("Éxito", "Programa exportado a Excel", "success");
+      }).catch(function (e) {
+        tpl.toast("Error", e.message, "error");
+      });
     }
 
     function iconFor(type, size) {

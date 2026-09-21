@@ -80,26 +80,29 @@
   function buildHeader(opts) {
     opts = opts || {};
 
-    var header = el("header", { className: "k-module-header no-print" });
+    var fragment = document.createDocumentFragment();
 
-    var left = el("div", { className: "k-header-left" });
-    var titleGroup = el("div", { className: "k-header-title-group" });
+    /* Header premium v7: chip 44 + título Manrope 800 + migas + estado/acciones/volver */
+    var header = el("header", { className: "kmi-header no-print" });
+    var row = el("div", { className: "kmi-header__row" });
 
-    var mainTitle = el("div", { className: "k-header-main-title" });
-    mainTitle.appendChild(icon(opts.titleIcon || "clipboard-check", 18));
-    mainTitle.appendChild(document.createTextNode(opts.title || "Inspecciones"));
-    titleGroup.appendChild(mainTitle);
+    var left = el("div", { className: "kmi-header__left" });
+    left.appendChild(el("span", { className: "kmi-header__chip" }, [icon(opts.titleIcon || "clipboard-check", 22)]));
 
-    var breadcrumb = el("div", { className: "k-header-breadcrumb" });
+    var titles = el("div", { className: "kmi-header__titles" });
+    titles.appendChild(el("h1", { className: "kmi-header__title", textContent: opts.title || "Inspecciones" }));
+
+    var meta = el("div", { className: "kmi-header__meta" });
+    var crumbs = el("nav", { className: "kmi-header__crumbs", "aria-label": "Miga de pan" });
     function addCrumb(label, onClick, current) {
       if (!label) return;
-      if (breadcrumb.childNodes.length) {
-        breadcrumb.appendChild(el("i", { className: "bi bi-chevron-right", "aria-hidden": "true" }));
+      if (crumbs.childNodes.length) {
+        crumbs.appendChild(el("span", { className: "kmi-header__crumb-sep", "aria-hidden": "true" }, [icon("chevron-right", 12)]));
       }
       if (onClick && !current) {
-        breadcrumb.appendChild(el("button", { type: "button", onclick: onClick, textContent: label }));
+        crumbs.appendChild(el("button", { type: "button", onclick: onClick, textContent: label }));
       } else {
-        breadcrumb.appendChild(el("span", { className: current ? "k-breadcrumb-item active" : "", textContent: label }));
+        crumbs.appendChild(el("span", { className: current ? "kmi-header__crumb is-current" : "kmi-header__crumb", textContent: label }));
       }
     }
 
@@ -110,33 +113,21 @@
         addCrumb(item.label, item.onClick, idx === opts.breadcrumb.length - 1);
       });
     } else {
-      addCrumb(opts.activeLabel || opts.sectionPill || "4.2.4 Inspecciones Sistemáticas", null, true);
+      addCrumb(opts.activeLabel || "4.2.4 Inspecciones Sistemáticas", null, true);
     }
-    titleGroup.appendChild(breadcrumb);
-    left.appendChild(titleGroup);
-    header.appendChild(left);
+    meta.appendChild(crumbs);
+    if (opts.subtitle) {
+      meta.appendChild(el("span", { className: "kmi-header__subtitle", textContent: opts.subtitle }));
+    }
+    titles.appendChild(meta);
+    left.appendChild(titles);
+    row.appendChild(left);
 
-    var right = el("div", { className: "k-header-right" });
+    var right = el("div", { className: "kmi-header__right" });
     var syncLabel = opts.statusLabel || "Sincronizado";
-    var syncIcon = opts.statusIcon || "bi-check-circle-fill";
+    var syncIcon = opts.statusIcon || "check-circle-2";
     var syncClass = opts.statusClass || "k-sync-synced";
-    right.appendChild(el("span", { className: "k-sync-badge " + syncClass }, [
-      el("i", { className: "bi " + syncIcon, "aria-hidden": "true" }),
-      document.createTextNode(" " + syncLabel)
-    ]));
-
-    if (opts.onBack) {
-      right.appendChild(el("button", {
-        type: "button",
-        className: "header-back-btn",
-        title: opts.backTitle || "Volver",
-        "aria-label": "Volver",
-        onclick: opts.onBack
-      }, [
-        el("i", { className: "bi bi-arrow-left", "aria-hidden": "true" }),
-        document.createTextNode("Volver")
-      ]));
-    }
+    right.appendChild(el("span", { className: "k-sync-badge " + syncClass }, [icon(syncIcon, 13), document.createTextNode(syncLabel)]));
 
     (opts.actions || []).slice(0, 3).forEach(function (a) {
       var btn = el("button", {
@@ -149,21 +140,31 @@
       btn.appendChild(document.createTextNode(a.label));
       right.appendChild(btn);
     });
-    header.appendChild(right);
 
-    var fragment = document.createDocumentFragment();
+    if (opts.onBack) {
+      right.appendChild(el("button", {
+        type: "button",
+        className: "kmi-header__back",
+        title: opts.backTitle || "Volver",
+        "aria-label": "Volver",
+        onclick: opts.onBack
+      }, [icon("arrow-left", 14), document.createTextNode("Volver")]));
+    }
+    row.appendChild(right);
+    header.appendChild(row);
     fragment.appendChild(header);
 
     if (opts.tabs && opts.tabs.length) {
-      var tabs = el("nav", { className: "kair-insp-tabs no-print", role: "tablist" });
+      var tabs = el("nav", { className: "kmi-tabs no-print", role: "tablist" });
       opts.tabs.forEach(function (t) {
         var tab = el("button", {
           type: "button",
-          className: "kair-insp-tab " + (t.active ? "kair-insp-tab--active" : ""),
+          role: "tab",
+          className: "kmi-tabs__tab" + (t.active ? " kmi-tabs__tab--active" : ""),
           onclick: t.onClick
         }, [document.createTextNode(t.label)]);
         if (typeof t.badge === "number") {
-          tab.appendChild(el("span", { className: "kair-insp-tab__badge", textContent: String(t.badge) }));
+          tab.appendChild(el("span", { className: "kmi-tabs__badge", textContent: String(t.badge) }));
         }
         tabs.appendChild(tab);
       });
@@ -174,11 +175,11 @@
   }
 
   var TONE_STYLES = {
-    primary: { bg: "#e8f0fe", fg: "#174ea6" },
-    success: { bg: "#d4edda", fg: "#155724" },
-    warning: { bg: "#fff3cd", fg: "#856404" },
-    danger:  { bg: "#f8d7da", fg: "#721c24" },
-    info:    { bg: "#e2e3e5", fg: "#495057" }
+    primary: { bg: "var(--kair-hover-soft)", fg: "var(--kair-primary)" },
+    success: { bg: "rgba(40, 167, 69, 0.12)", fg: "var(--kair-success)" },
+    warning: { bg: "rgba(255, 193, 7, 0.16)", fg: "var(--kair-warning-ink)" },
+    danger:  { bg: "rgba(220, 53, 69, 0.12)", fg: "var(--kair-danger)" },
+    info:    { bg: "var(--kair-muted-bg)", fg: "var(--kair-info-ink)" }
   };
 
   function buildKpiStrip(items) {
@@ -258,7 +259,15 @@
 
   function formatDate(d, opts) {
     try {
-      var date = typeof d === "string" ? new Date(d) : d;
+      var date = d;
+      if (typeof d === "string") {
+        /* Las fechas ISO sin hora ("2026-09-15") se parsean como UTC y en
+           husos negativos (Colombia UTC-5) se muestran un día atrás.
+           Se construye como fecha LOCAL para mostrar el día correcto. */
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+        date = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(d);
+      }
+      if (isNaN(date.getTime())) return String(d);
       if (opts && opts.short) {
         return date.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
       }

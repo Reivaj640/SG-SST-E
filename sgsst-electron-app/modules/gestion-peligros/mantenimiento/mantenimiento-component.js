@@ -6,9 +6,17 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
 (function () {
  'use strict';
 
+ /* ── SVGs inline (premium · sin Bootstrap Icons en el header) ── */
+ var SVG = {
+  gear: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  arrowLeft: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
+  calendar: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  chart: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>'
+ };
+
  var VIEWS = [
-  { key: 'cronograma', label: 'Cronograma', icon: 'bi-calendar3' },
-  { key: 'resumen', label: 'Resumen', icon: 'bi-bar-chart-line' }
+  { key: 'cronograma', label: 'Cronograma', iconSvg: SVG.calendar },
+  { key: 'resumen', label: 'Resumen', iconSvg: SVG.chart }
  ];
 
  function MantenimientoComponent(container, currentCompany, moduleName, submoduleTitle, backToModuleCallback) {
@@ -66,36 +74,28 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
 
  var tabsHtml = VIEWS.map(function (v) {
   return '<button class="k-mnt-tab' + (v.key === 'cronograma' ? ' k-mnt-tab--active' : '') + '" data-view="' + v.key + '">' +
-  '<i class="bi ' + v.icon + '"></i> ' + v.label +
+  v.iconSvg + ' <span>' + v.label + '</span>' +
   '</button>';
  }).join('');
 
  var headerHtml =
-  '<div class="k-section-card k-mnt-header-card">' +
+  '<header class="k-mnt-header-card">' +
   '<div class="k-mnt-header-row">' +
-  '<div class="k-mnt-header-left">' +
-  '<i class="bi bi-gear k-mnt-header-icon"></i>' +
-  '<div>' +
-  '<h3 class="k-mnt-header-title">Mantenimiento Periódico</h3>' +
-  '<ol class="k-mnt-header-breadcrumb">' +
-  '<li>Gestión de Peligros</li>' +
-  '<li>4.2.5</li>' +
-  '<li class="k-mnt-header-breadcrumb--active" id="kair-mnt-breadcrumb-active">Cronograma</li>' +
-  '</ol>' +
+  '<div class="kair-badge-ico">' + SVG.gear + '</div>' +
+  '<div class="kair-titles">' +
+  '<h1 class="kair-title">Mantenimiento Periódico</h1>' +
+  '<p class="kair-sub">Programación y seguimiento del mantenimiento de equipos, instalaciones y herramientas SG-SST.</p>' +
   '</div>' +
-  '</div>' +
-  '<div class="k-mnt-header-actions">' +
-  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="kair-icon-building"></i> <span></span></span>' +
-  '<div class="k-mnt-header-divider"></div>' +
-  '<button id="kair-mnt-btn-back" class="header-back-btn" title="Volver al módulo">' +
-  '<i class="bi bi-arrow-left"></i> Volver' +
+  '<div class="kair-actions">' +
+  '<button id="kair-mnt-btn-back" class="kair-btn kair-btn-ghost" title="Volver al módulo">' +
+  SVG.arrowLeft + ' <span>Volver</span>' +
   '</button>' +
   '</div>' +
   '</div>' +
   '<div class="k-mnt-tabs" id="kair-mnt-tabs">' +
   tabsHtml +
   '</div>' +
-  '</div>';
+  '</header>';
 
   var viewsHtml = VIEWS.map(function (v) {
    return '<div class="kair-mnt-view' + (v.key === 'cronograma' ? ' kair-mnt-view--active' : '') + '" id="kair-mnt-view-' + v.key + '">' +
@@ -193,12 +193,6 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
    }
   });
 
-  var breadcrumbActive = wrapper.querySelector('#kair-mnt-breadcrumb-active');
-  if (breadcrumbActive) {
-   var viewObj = VIEWS.find(function (v) { return v.key === viewKey; });
-   breadcrumbActive.textContent = viewObj ? viewObj.label : viewKey;
-  }
-
   setTimeout(function () {
    switch (viewKey) {
     case 'cronograma':
@@ -214,13 +208,8 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
  };
 
  MantenimientoComponent.prototype._updateHeaderContext = function () {
-  var wrapper = this.container.querySelector('.kair-mnt-wrapper');
-  if (!wrapper) return;
-
-  var companyEl = wrapper.querySelector('#kair-mnt-header-company span');
-  if (companyEl) {
-   companyEl.textContent = this.currentCompany || '';
-  }
+  /* Hook legado: el header premium ya no muestra chip de empresa.
+     Se conserva por compatibilidad pero no hace nada. */
  };
 
  window.MantenimientoComponent = MantenimientoComponent;

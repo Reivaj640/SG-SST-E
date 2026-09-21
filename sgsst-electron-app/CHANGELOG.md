@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.210] - 2026-09-21
+
+### 📦796 · Inspecciones Sistemáticas (4.2.4) — premium completo de las 7 vistas
+
+Cierre de la migración iniciada en 📦793 (hub). Las 7 vistas funcionales migran al header premium v7 (`buildHeader` con clases `kmi-*`: transparente, breadcrumb, píldora "Sincronizado", botón Volver) manteniendo intacto el flujo de datos.
+
+#### Cambios
+
+- **Header premium v7** en `inspeccion-templates.js` → heredan las 7 vistas (hub, dashboard de programa anual, historial, detalle, 4 formularios).
+- **Hub reescrito** como referencia: hero oscuro con score compuesto + donut SVG nativo + 4 KPIs + formatos verticales + recientes/avance.
+- **Historial**: filas con píldoras de filtro por tipo + buscador; **Dashboard/Programa**: tabla mensual con tokens; **Detalle + formularios**: tokens del sistema premium y modo oscuro redefinido bajo `[data-theme] .kair-app`.
+- **Verificación visual** en claro/oscuro, maximizado y modo ventana (1000px).
+- **Cache-bust** `20260921-premium-v2-inspecciones`.
+
+### 📦797 · Mantenimiento Periódico (4.2.5) — header premium
+
+`mantenimiento-component.js` + `mantenimiento.css` alineados al lenguaje visual premium (título Manrope 800, acciones consistentes, tokens canónicos). Las vistas funcionales (cronograma, resumen) no cambian de flujo. **Cache-bust** `20260921-premium-header` (5 referencias).
+
+### 📦798 · Inspecciones (4.2.4) — reconexión a la carpeta real de la empresa
+
+El submódulo vuelve a leer/escribir la carpeta SG-SST de la empresa (conexión que existió en 📦332/338 de mayo 2026 y quedó desactivada en la reconstrucción 📦500).
+
+#### Cambios
+
+- **Programa anual desde el Excel real**: `programa:obtener` lee `PROGRAMA DE INSPECCIONES.xlsx` de la carpeta 4.2.4. Encabezados de mes detectados **por texto** (Ene…Dic), no por posición fija; celdas de error `#VALUE!` y zona de firmas ignoradas; códigos `p`=programado, `c`=cumplido. `programa:actualizarActividad` con id `excel:<empresa>:<año>:<fila>` escribe la `c` en el Excel con **respaldo automático en `backup/` antes de cada escritura**. Cache en memoria por mtime del archivo. Sin carpeta/Excel → fallback a la libreta interna (`<userData>/kair-inspecciones-data.json`) como antes.
+- **Archivo histórico visible**: nuevo canal `inspeccion:explorarHistorico` escanea `Inspeciones realizadas/<Sede>/<DD-MM-AAAA>/`; la vista de Historial muestra la sección "Archivo histórico · carpeta de la empresa" (visitas con conteo de fotos/formatos + formatos rellenados sueltos tipo `GI-FO-026 1-2026.xlsx`) con botón **Abrir carpeta** (`inspeccion:abrirRuta` → `shell.openPath`).
+- **Archivado de inspecciones nuevas**: `inspeccion:archivar` genera el formato oficial (plantilla GI-FO) y lo guarda en `Inspeciones realizadas/<sede>/<fecha>/`; botón **"Archivar en carpeta"** en la vista de detalle.
+- **Migración legado**: `inspecciones_data.json` de la carpeta (formato 📦332) importado a la libreta interna una sola vez, idempotente por id.
+- **Fix de fechas** (submódulo completo): `formatDate` parseaba ISO sin hora como UTC y en Colombia (UTC-5) mostraba un día atrás; ahora se construye como fecha local.
+- **Preload**: 3 métodos nuevos (`inspeccionExplorarHistorico`, `inspeccionAbrirRuta`, `inspeccionArchivar`).
+- **Test nuevo** `main/test-inspecciones-carpeta.js`: **26/26** contra copia de la estructura real de la empresa (el Excel real quedó intacto, verificado).
+- **Cache-bust** `20260921-carpeta-v1` (api, templates, historial, detalle).
+
 ## [0.1.209] - 2026-09-21
 
 ### 📦793 · Inspecciones Sistemáticas (4.2.4) — hub al premium v2

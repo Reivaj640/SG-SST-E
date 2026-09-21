@@ -36,7 +36,7 @@
       return tpl.buildHeader({
         onBack: function () { ctx.go({ name: "hub" }); },
         breadcrumb: [
-          { label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+          { label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
           { label: meta.shortTitle }
         ],
         title: meta.title, companyName: store.companyName, contextLabel: "SG-SST",
@@ -138,7 +138,7 @@
       var itemsBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
       itemsBody.appendChild(tableWrap);
 
-      var metaGrid = tpl.el("div", { style: "padding:16px;border-top:1px solid #dee2e6;", className: "kair-grid kair-grid--3" });
+      var metaGrid = tpl.el("div", { style: "padding:16px;border-top:1px solid var(--kair-border);", className: "kair-grid kair-grid--3" });
       metaGrid.appendChild(field("Inspeccionado por", tpl.el("input", { className: "kair-input", value: state.data.inspeccionadoPor, oninput: function (e) { updateMeta("inspeccionadoPor", e.target.value); } })));
       metaGrid.appendChild(field("Cargo", tpl.el("input", { className: "kair-input", value: state.data.cargo, oninput: function (e) { updateMeta("cargo", e.target.value); } })));
       metaGrid.appendChild(field("Firma", tpl.el("input", { className: "kair-input", placeholder: "Nombre completo", value: state.data.firma, oninput: function (e) { updateMeta("firma", e.target.value); } })));

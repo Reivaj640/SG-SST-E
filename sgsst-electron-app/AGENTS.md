@@ -3947,3 +3947,49 @@ aplicado en 📦783 Registro, 📦784 Frecuencia, 📦785–792). Incluye:
 - Tests de contratos: validar IDs, scopes, ausencia de selectores globales y de colores hardcodeados.
 
 
+
+### 📦796 — Inspecciones Sistemáticas (4.2.4): premium completo de las 7 vistas
+
+Cierre de la migración iniciada en 📦793 (hub). Las 7 vistas funcionales (hub, dashboard de programa anual,
+historial, detalle y los 4 formularios) migran al header premium v7 (`buildHeader` con clases `kmi-*`,
+transparente, breadcrumb + Sincronizado + Volver), manteniendo intacto todo el flujo de datos.
+
+- **Header premium v7** en `inspeccion-templates.js` → heredan las 7 vistas; cache-bust `20260921-premium-v2-inspecciones`.
+- **Hub reescrito** (referencia): hero oscuro con score compuesto + donut SVG nativo + 4 KPIs + formatos
+  verticales + recientes/avance.
+- **Historial**: filas con píldoras de filtro por tipo; **Dashboard/Programa**: tabla mensual con tokens;
+  **Detalle + 4 formularios**: tokens del sistema + modo oscuro redefinido bajo `[data-theme] .kair-app`.
+- **Verificación visual** en claro/oscuro, maximizado y ventana 1000px.
+
+### 📦797 — Mantenimiento Periódico (4.2.5): header premium
+
+`mantenimiento-component.js` + `mantenimiento.css` alineados al header premium (mismo lenguaje visual
+del v7): título Manrope 800, acciones consistentes, tokens canónicos. Cache-bust `20260921-premium-header`
+(5 referencias en `index.html`). El cronograma y el resumen (vistas funcionales) no cambian de flujo.
+
+### 📦798 — Inspecciones (4.2.4): reconexión a la carpeta real de la empresa
+
+El submódulo vuelve a leer/escribir la carpeta SG-SST de la empresa en Drive (la conexión existió en
+📦332/338 de mayo 2026 y quedó desactivada en la reconstrucción 📦500; la firma `getCompanyRootPath`
+llegaba por deps pero no se usaba).
+
+- **Programa anual desde el Excel real**: `programa:obtener` lee `PROGRAMA DE INSPECCIONES.xlsx` de la
+  carpeta 4.2.4 (encabezados de mes detectados por texto Ene…Dic, no por posición fija — el Excel del
+  cliente tiene filas desalineadas; celdas de error `#VALUE!` y zona de firmas ignoradas; códigos
+  `p`=programado, `c`=cumplido). `programa:actualizarActividad` con id `excel:<empresa>:<año>:<fila>`
+  escribe la `c` en el Excel con **respaldo automático en `backup/` antes de cada escritura** (patrón
+  📦332). Cache en memoria por mtime (el calendario itera mes a mes). Sin carpeta/Excel → cae a la
+  libreta interna como antes.
+- **Histórico visible**: nuevo canal `inspeccion:explorarHistorico` escanea `Inspeciones realizadas/
+  <Sede>/<DD-MM-AAAA>/` y la vista de Historial muestra la sección "Archivo histórico · carpeta de la
+  empresa" (visitas con conteo de fotos/formatos + formatos sueltos tipo `GI-FO-026 1-2026.xlsx`),
+  con `inspeccion:abrirRuta` (shell.openPath) para abrir cada carpeta.
+- **Archivado**: `inspeccion:archivar` genera el formato oficial de la inspección y lo guarda en
+  `Inspeciones realizadas/<sede>/<fecha>/`; botón "Archivar en carpeta" en el detalle.
+- **Migración legado**: `inspecciones_data.json` de la carpeta (formato 📦332) se importa a la libreta
+  interna una sola vez, idempotente por id (`meta.legacyFolderImportedFor`).
+- **Fix de fechas** (todo el submódulo): `formatDate` parseaba las ISO sin hora como UTC y en Colombia
+  (UTC-5) mostraba un día atrás; ahora se construye fecha local.
+- **Preload**: 3 métodos nuevos (`inspeccionExplorarHistorico`, `inspeccionAbrirRuta`, `inspeccionArchivar`).
+- **Test nuevo** `main/test-inspecciones-carpeta.js`: **26/26** contra copia de la estructura real
+  (Excel intacto verificado). Cache-bust `20260921-carpeta-v1`.

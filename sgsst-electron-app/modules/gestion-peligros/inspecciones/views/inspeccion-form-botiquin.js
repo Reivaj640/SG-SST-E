@@ -40,7 +40,7 @@
       return tpl.buildHeader({
         onBack: function () { ctx.go({ name: "hub" }); },
         breadcrumb: [
-          { label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+          { label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
           { label: meta.shortTitle }
         ],
         title: meta.title,
@@ -136,12 +136,12 @@
       var itemsBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
       itemsBody.appendChild(tableWrap);
 
-      var verifDiv = tpl.el("div", { style: "padding:16px;border-top:1px solid #dee2e6;" }, [
-        tpl.el("h4", { style: "font-size:0.85rem;font-weight:600;color:#1a1a2e;margin-bottom:10px;", textContent: "Verificaciones Generales" })
+      var verifDiv = tpl.el("div", { style: "padding:16px;border-top:1px solid var(--kair-border);" }, [
+        tpl.el("h4", { style: "font-size:0.85rem;font-weight:600;color:var(--kair-text);margin-bottom:10px;", textContent: "Verificaciones Generales" })
       ]);
       var checksGrid = tpl.el("div", { style: "display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;" });
       state.data.checks.forEach(function (c, idx) {
-        checksGrid.appendChild(tpl.el("div", { style: "font-size:0.85rem;color:#1a1a2e;", textContent: c.label }));
+        checksGrid.appendChild(tpl.el("div", { style: "font-size:0.85rem;color:var(--kair-text);", textContent: c.label }));
         var rg = tpl.el("div", { className: "kair-radio-group" });
         ["SI", "NO", "NA"].forEach(function (v) {
           rg.appendChild(tpl.el("button", {

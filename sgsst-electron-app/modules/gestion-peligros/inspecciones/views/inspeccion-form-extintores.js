@@ -36,7 +36,7 @@
       return tpl.buildHeader({
         onBack: function () { ctx.go({ name: "hub" }); },
         breadcrumb: [
-          { label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+          { label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
           { label: meta.shortTitle }
         ],
         title: meta.title, companyName: store.companyName, contextLabel: "SG-SST",
@@ -159,7 +159,7 @@
 
       var itemsBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
       itemsBody.appendChild(tableWrap);
-      itemsBody.appendChild(tpl.el("div", { style: "padding:16px;border-top:1px solid #dee2e6;" }, [
+      itemsBody.appendChild(tpl.el("div", { style: "padding:16px;border-top:1px solid var(--kair-border);" }, [
         tpl.el("label", { className: "kair-form-label", textContent: "Observaciones generales" }),
         tpl.el("textarea", { className: "kair-textarea", rows: 2, value: state.data.observaciones, oninput: function (e) { state.data.observaciones = e.target.value; } })
       ]));

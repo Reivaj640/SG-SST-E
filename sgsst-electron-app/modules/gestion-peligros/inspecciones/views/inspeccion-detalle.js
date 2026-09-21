@@ -22,13 +22,13 @@
     api.getInspection(ctx.inspectionId).then(function (res) {
       if (!res.success) {
         main.innerHTML = "";
-        main.appendChild(tpl.buildCard("Error", tpl.el("div", { style: "color:#dc3545;", textContent: (res.error && res.error.message) || "Inspección no encontrada" })));
+        main.appendChild(tpl.buildCard("Error", tpl.el("div", { style: "color:var(--kair-danger);", textContent: (res.error && res.error.message) || "Inspección no encontrada" })));
         return;
       }
       renderDetalle(res.data.inspection);
     }).catch(function (e) {
       main.innerHTML = "";
-      main.appendChild(tpl.buildCard("Error", tpl.el("div", { style: "color:#dc3545;", textContent: e.message })));
+      main.appendChild(tpl.buildCard("Error", tpl.el("div", { style: "color:var(--kair-danger);", textContent: e.message })));
     });
 
     function renderDetalle(insp) {
@@ -62,7 +62,7 @@
       // Observations
       if (insp.observations) {
         main.appendChild(tpl.buildCard("Observaciones Generales", tpl.el("p", {
-          style: "font-size:0.875rem;color:#1a1a2e;line-height:1.6;margin:0;", textContent: insp.observations
+          style: "font-size:0.875rem;color:var(--kair-text);line-height:1.6;margin:0;", textContent: insp.observations
         })));
       }
       tpl.refreshIcons();
@@ -72,7 +72,7 @@
       return tpl.el("div", {}, [
         tpl.el("div", { className: "kair-detail-meta__label", textContent: label }),
         tpl.el("div", { className: "kair-detail-meta__value", textContent: value || "—" }),
-        sub ? tpl.el("div", { style: "color:#5a6378;font-size:0.72rem;", textContent: sub }) : null
+        sub ? tpl.el("div", { style: "color:var(--kair-text-muted);font-size:0.72rem;", textContent: sub }) : null
       ]);
     }
 
@@ -88,6 +88,7 @@
         companyName: store.companyName, contextLabel: "SG-SST",
         actions: [
           { label: "Eliminar", variant: "ghost", icon: tpl.icon("trash-2", 15), onClick: function () { del(insp.id); } },
+          { label: "Archivar en carpeta", variant: "secondary", icon: tpl.icon("archive", 15), onClick: function () { archivar(insp); } },
           { label: "Editar", variant: "secondary", icon: tpl.icon("pencil", 15), onClick: function () { ctx.go({ name: "editar", inspectionType: insp.type, inspectionId: insp.id }); } },
           { label: "Exportar PDF", variant: "primary", icon: tpl.icon("file-down", 15), onClick: function () { exportOne(insp.id, "pdf"); } }
         ]
@@ -133,7 +134,7 @@
         });
       }
       if (data.observaciones) {
-        tbody.appendChild(tpl.el("tr", {}, [tpl.el("td", { colSpan: 5, style: "background:#f8f9fa;", innerHTML: "<strong>Observaciones del botiquín:</strong> " + escapeHtml(data.observaciones) })]));
+        tbody.appendChild(tpl.el("tr", {}, [tpl.el("td", { colSpan: 5, className: "kair-table-note", innerHTML: "<strong>Observaciones del botiquín:</strong> " + escapeHtml(data.observaciones) })]));
       }
       table.appendChild(tbody);
       tableWrap.appendChild(table);
@@ -209,7 +210,7 @@
           tpl.el("td", { textContent: it.seguimiento || "—" })
         ]));
       });
-      tbody.appendChild(tpl.el("tr", {}, [tpl.el("td", { colSpan: 8, style: "background:#f8f9fa;padding-top:16px;", innerHTML: "<div style=\"display:flex;gap:24px;flex-wrap:wrap;\"><div><strong>Inspeccionado por:</strong> " + escapeHtml(data.inspeccionadoPor || "—") + "</div><div><strong>Cargo:</strong> " + escapeHtml(data.cargo || "—") + "</div></div>" })]));
+      tbody.appendChild(tpl.el("tr", {}, [tpl.el("td", { colSpan: 8, className: "kair-table-note", style: "padding-top:16px;", innerHTML: "<div style=\"display:flex;gap:24px;flex-wrap:wrap;\"><div><strong>Inspeccionado por:</strong> " + escapeHtml(data.inspeccionadoPor || "—") + "</div><div><strong>Cargo:</strong> " + escapeHtml(data.cargo || "—") + "</div></div>" })]));
       table.appendChild(tbody);
       tableWrap.appendChild(table);
       var body = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
@@ -291,6 +292,23 @@
         tpl.toast("Eliminada", "La inspección fue eliminada", "success");
         ctx.go({ name: "historial" });
       }).catch(function (e) { tpl.toast("Error", e.message, "error"); });
+    }
+
+    /* 2026-09-21 — Archiva la inspección en la carpeta real de la empresa:
+       genera el formato oficial y lo guarda en "Inspeciones realizadas/
+       <sede>/<fecha>/". Solo disponible en Electron con empresa configurada. */
+    function archivar(insp) {
+      if (!api.isElectron) {
+        tpl.toast("No disponible", "El archivado en carpeta solo funciona en la aplicación de escritorio", "warning");
+        return;
+      }
+      tpl.toast("Archivando", "Generando formato y guardando en la carpeta de la empresa...", "info");
+      api.archivarInspeccion({ id: insp.id, companyId: store.companyId, companyName: store.companyName })
+        .then(function (res) {
+          if (!res.success) throw new Error((res.error && res.error.message) || "No se pudo archivar");
+          tpl.toast("Archivada", "Formato guardado en: " + res.data.path, "success");
+        })
+        .catch(function (e) { tpl.toast("Error al archivar", e.message, "error"); });
     }
 
     tpl.refreshIcons();

@@ -22,10 +22,22 @@
  *     y retorna {totalInspecciones, completadas, pendientesMes,
  *                tasaCumplimiento, extintoresVigentes, extintoresTotal}
  *
- * Persistencia: <userData>/kair-inspecciones-data.json
+ * Persistencia: <userData>/kair-inspecciones-data.json (índice interno)
  * Plantillas:    <appPath>/utils/GI-FO-*.xlsx
+ *
+ * Conexión carpeta empresa (2026-09-21, reconexión post-📦500):
+ *   - Programa anual: si la empresa tiene carpeta configurada con
+ *     "PROGRAMA DE INSPECCIONES.xlsx", se lee/escribe ESE archivo (el real),
+ *     con respaldo automático en <carpeta>/backup/ antes de cada escritura.
+ *     Si no hay carpeta/Excel, cae a la libreta interna como antes.
+ *   - Histórico: nuevo canal inspeccion:explorarHistorico escanea
+ *     "Inspeciones realizadas/<Sede>/<DD-MM-AAAA>/" y lista los archivos.
+ *   - Archivado: inspeccion:archivar copia el formato exportado de una
+ *     inspección a "Inspeciones realizadas/<sede>/<fecha>/".
+ *   - Migración: inspecciones_data.json legado de la carpeta se importa
+ *     una sola vez a la libreta interna (idempotente por id).
  * ============================================================ */
-const { app, ipcMain, BrowserWindow } = require("electron");
+const { app, ipcMain, BrowserWindow, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const ExcelJS = require("exceljs");
@@ -59,11 +71,14 @@ function norm(s) {
 }
 
 /* Helper: extrae el texto plano de una celda que puede ser string, richText
-   o null (ExcelJS devuelve distinto según el tipo de celda). */
+   o null (ExcelJS devuelve distinto según el tipo de celda). Las celdas con
+   error de fórmula (ej. #VALUE!) llegan como objeto {error:...} y se tratan
+   como vacías — sin esto, una celda de error rompía el parseo del programa. */
 function cellText(cell) {
   var v = cell && cell.value;
   if (v == null || v === "") return "";
   if (typeof v === "string") return v;
+  if (v && v.error) return "";
   if (v && v.richText) return v.richText.map(function (rt) { return rt.text; }).join("");
   if (v && v.text) return v.text;
   return String(v);
@@ -74,6 +89,17 @@ function setText(ws, addr, val) {
 }
 
 let cache = null;
+
+/* Deps inyectadas por main.js ({ getCompanyRootPath }). Se guardan a nivel
+   módulo porque la reconexión a la carpeta de la empresa (2026-09-21) las
+   usa fuera del registro de handlers. */
+let _gDeps = {};
+
+/* Cache en memoria de programas leídos desde el Excel de la empresa.
+   Key: filePath + "|" + mtimeMs → evita releer el Excel en cada mes cuando
+   el calendario itera mes a mes, pero invalida automáticamente si el archivo
+   cambia (mtime distinto). Se invalida también tras cada escritura. */
+let _excelProgramCache = {};
 
 function load() {
   if (cache) return cache;
@@ -248,6 +274,554 @@ function updateActivity(activityId, patch) {
     console.warn("[K+AIRSST][PROGRAM][BROADCAST_FAIL]", e.message);
   }
   return ok({ activity: updated });
+}
+
+/* ============================================================
+ * Conexión a la carpeta real de la empresa (reconexión 2026-09-21)
+ * Patrón de resolución heredado de 📦332/338 (probado en producción mayo
+ * 2026): soporta "4. Gestión de Peligros y Riesgos" con/sin tilde, nombres
+ * de subcarpeta 4.2.4 variables, y fallback por prefijos.
+ * ============================================================ */
+
+async function _getCompanyRoot(companyName) {
+  if (!_gDeps || typeof _gDeps.getCompanyRootPath !== "function") return null;
+  if (!companyName || companyName === "default") return null;
+  try {
+    return await _gDeps.getCompanyRootPath(companyName);
+  } catch (e) {
+    console.warn("[K+AIRSST][4.2.4][ROOT_PATH][WARN]", e.message);
+    return null;
+  }
+}
+
+function _findInspeccionesDirSync(companyRoot) {
+  if (!companyRoot || !fs.existsSync(companyRoot)) return null;
+  var gestionPeligrosDir = path.join(companyRoot, "4. Gestion de Peligros y Riesgos");
+  if (!fs.existsSync(gestionPeligrosDir)) {
+    gestionPeligrosDir = path.join(companyRoot, "4. Gestión de Peligros y Riesgos");
+  }
+  if (fs.existsSync(gestionPeligrosDir)) {
+    try {
+      var entries = fs.readdirSync(gestionPeligrosDir);
+      var inspeccionesFolder = entries.find(function (f) { return f.indexOf("4.2.4") === 0; });
+      if (inspeccionesFolder) {
+        return path.join(gestionPeligrosDir, inspeccionesFolder);
+      }
+    } catch (e) { /* ignore readdir errors */ }
+  }
+  var directPath = path.join(companyRoot, "4.2.4");
+  if (fs.existsSync(directPath)) return directPath;
+  try {
+    var rootEntries = fs.readdirSync(companyRoot);
+    var gestionFolder = rootEntries.find(function (f) { return f.indexOf("4.") === 0; });
+    if (gestionFolder) {
+      var gestionFullPath = path.join(companyRoot, gestionFolder);
+      var subEntries = fs.readdirSync(gestionFullPath);
+      var inspFolder = subEntries.find(function (f) { return f.indexOf("4.2.4") === 0; });
+      if (inspFolder) return path.join(gestionFullPath, inspFolder);
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+async function _resolveInspeccionesDir(companyName) {
+  var root = await _getCompanyRoot(companyName);
+  if (!root) return null;
+  return _findInspeccionesDirSync(root);
+}
+
+/* Busca el Excel del programa anual en la carpeta 4.2.4. Prefiere el nombre
+   exacto; acepta variaciones ("PROGRAMA DE INSPECCIONES 2026.xlsx", etc.). */
+function _findProgramaExcel(dir) {
+  if (!dir || !fs.existsSync(dir)) return null;
+  var files;
+  try { files = fs.readdirSync(dir); } catch (e) { return null; }
+  var exact = files.find(function (f) {
+    return /^PROGRAMA DE INSPECCIONES\.xlsx$/i.test(f);
+  });
+  if (exact) return path.join(dir, exact);
+  var loose = files.find(function (f) {
+    return /^PROGRAMA\s+DE\s+INSPECCIONES.*\.xlsx$/i.test(f) && f.indexOf("~$") !== 0;
+  });
+  return loose ? path.join(dir, loose) : null;
+}
+
+/* Normaliza el texto de un encabezado de mes: trim + lowercase + sin tilde.
+   Acepta "Ene", "Enero", "ENERO", etc. */
+var _MONTH_HEADER_ALIASES = (function () {
+  var names = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  var map = {};
+  MONTHS.forEach(function (short, idx) {
+    map[short.toLowerCase()] = idx;
+    map[names[idx]] = idx;
+  });
+  return map;
+})();
+
+function _normHeader(s) {
+  return String(s || "").toLowerCase().replace(/[áàä]/g, "a").replace(/[éèë]/g, "e")
+    .replace(/[íìï]/g, "i").replace(/[óòö]/g, "o").replace(/[úùü]/g, "u")
+    .replace(/\s+/g, " ").trim();
+}
+
+/* Detecta el tipo de inspección a partir del texto de la actividad del
+   programa (los textos vienen del Excel real del cliente). */
+function _detectTypeFromActivity(text) {
+  var t = _normHeader(text);
+  if (t.indexOf("extintor") !== -1) return "extintores";
+  if (t.indexOf("botiquin") !== -1 || t.indexOf("primeros auxilios") !== -1) return "botiquin";
+  if (t.indexOf("equipo") !== -1 && t.indexOf("emergencia") !== -1) return "equipos_emergencia";
+  if (t.indexOf("instalacion") !== -1) return "instalaciones";
+  if (t.indexOf("proteccion personal") !== -1 || t.indexOf("epp") !== -1) return "epp";
+  if (t.indexOf("gerencial") !== -1 || t.indexOf("gerencia") !== -1) return "gerencial";
+  return null;
+}
+
+/* Lee el programa anual desde el Excel real de la empresa.
+   Retorna { program, filePath } o null si no hay carpeta/Excel/no se pudo
+   leer. El programa retornado tiene la MISMA forma que el de la libreta
+   interna, con ids "excel:<empresa>:<anio>:<fila>" para round-trip de
+   escritura, y source:"excel" para que la UI pueda diferenciar. */
+async function readProgramFromExcel(companyName, year) {
+  var dir = await _resolveInspeccionesDir(companyName);
+  if (!dir) return null;
+  var filePath = _findProgramaExcel(dir);
+  if (!filePath) return null;
+
+  var mtimeMs = 0;
+  try { mtimeMs = fs.statSync(filePath).mtimeMs; } catch (e) { /* ok */ }
+  var cacheKey = filePath + "|" + mtimeMs;
+  if (_excelProgramCache[cacheKey]) {
+    return { program: _excelProgramCache[cacheKey], filePath: filePath };
+  }
+
+  var wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.readFile(filePath);
+  } catch (e) {
+    console.error("[K+AIRSST][4.2.4][EXCEL_READ][ERROR]", e.message);
+    return null;
+  }
+  var ws = wb.getWorksheet("PROGRAMA") || wb.worksheets[0];
+  if (!ws) return null;
+
+  /* 1) Localizar la fila de encabezados buscando la celda "ACTIVIDADES"
+     y >= 6 encabezados de mes. Se detecta por texto, no por posición fija,
+     porque el Excel real tiene filas históricas desalineadas. */
+  var headerRow = 0, colMap = null;
+  var maxScan = Math.min(ws.rowCount || 40, 40);
+  for (var r = 1; r <= maxScan; r++) {
+    var row = ws.getRow(r);
+    var map = { months: {} };
+    var monthCount = 0;
+    row.eachCell({ includeEmpty: false }, function (cell, colNumber) {
+      var t = _normHeader(cellText(cell));
+      if (!t) return;
+      if (t === "actividades") map.actCol = colNumber;
+      else if (t === "responsable") map.respCol = colNumber;
+      else if (t.indexOf("objetivo general") !== -1) map.objGralCol = colNumber;
+      else if (t.indexOf("objetivos especificos") !== -1 || t.indexOf("objetivos específicos") !== -1) map.objEspCol = colNumber;
+      else if (t.indexOf("observaciones") !== -1) map.obsCol = colNumber;
+      else if (_MONTH_HEADER_ALIASES[t] !== undefined) {
+        if (map.months[_MONTH_HEADER_ALIASES[t]] === undefined) {
+          map.months[_MONTH_HEADER_ALIASES[t]] = colNumber;
+          monthCount++;
+        }
+      }
+    });
+    if (map.actCol && monthCount >= 6) { headerRow = r; colMap = map; break; }
+  }
+  if (!headerRow || !colMap) {
+    console.warn("[K+AIRSST][4.2.4][EXCEL_PARSE] No se encontró fila de encabezados con ACTIVIDADES + meses");
+    return null;
+  }
+
+  function txt(rowNum, col) {
+    if (!col) return "";
+    return cellText(ws.getRow(rowNum).getCell(col)).trim();
+  }
+
+  /* 2) Leer filas de actividades desde el encabezado+1. Se permite huecos
+     (celdas combinadas de objetivos) — se interrumpe tras 4 filas vacías
+     seguidas sin texto de actividad. Objetivos combinados se heredan de la
+     última fila que los trajo. */
+  var activities = [];
+  var lastObjGral = "", lastObjEsp = "";
+  var emptyStreak = 0;
+  for (var dr = headerRow + 1; dr <= headerRow + 60; dr++) {
+    var actText = txt(dr, colMap.actCol);
+    /* La zona de firmas del Excel real ("FIRMA DEL RESPONSABLE...") marca el
+       fin de las actividades. */
+    if (actText && _normHeader(actText).indexOf("firma") !== -1) break;
+    if (!actText) {
+      emptyStreak++;
+      if (emptyStreak >= 4) break;
+      continue;
+    }
+    emptyStreak = 0;
+    var g = txt(dr, colMap.objGralCol);
+    if (g) lastObjGral = g;
+    var e = txt(dr, colMap.objEspCol);
+    if (e && e.indexOf("#VALUE!") !== 0) lastObjEsp = e;
+
+    var schedule = emptySchedule();
+    Object.keys(colMap.months).forEach(function (mIdx) {
+      var raw = txt(dr, colMap.months[mIdx]).toLowerCase();
+      schedule[MONTHS[mIdx]] = raw === "p" || raw === "c" ? raw : "";
+    });
+    var pct = computePct(schedule);
+    activities.push({
+      id: "excel:" + companyName + ":" + year + ":" + dr,
+      row: dr,
+      specificObjective: lastObjEsp,
+      activity: actText,
+      responsible: txt(dr, colMap.respCol),
+      inspectionType: _detectTypeFromActivity(actText),
+      monthlySchedule: schedule,
+      percentage: pct,
+      status: deriveStatus(schedule, pct),
+      observations: txt(dr, colMap.obsCol) || null,
+      source: "excel"
+    });
+  }
+  if (activities.length === 0) return null;
+
+  var program = {
+    id: "prog_excel_" + companyName + "_" + year,
+    year: year,
+    companyId: companyName,
+    generalObjective: lastObjGral || GENERAL_OBJECTIVE,
+    activities: activities,
+    source: "excel",
+    excelPath: filePath
+  };
+  /* Cachear bajo la mtime actual y limpiar entradas viejas del mismo file */
+  Object.keys(_excelProgramCache).forEach(function (k) {
+    if (k.indexOf(filePath + "|") === 0 && k !== cacheKey) delete _excelProgramCache[k];
+  });
+  _excelProgramCache[cacheKey] = program;
+  return { program: program, filePath: filePath };
+}
+
+/* Escribe los cambios de una actividad (fila del Excel) de vuelta al archivo
+   real: respaldo automático en <carpeta>/backup/ antes de escribir (mismo
+   patrón que la versión de mayo 📦332). Solo toca las celdas de meses
+   (p/c/vacío), responsable y observaciones — nunca las columnas de
+   fórmulas (%/ESTADO) para no romper el Excel del cliente. */
+async function writeActivityToExcel(companyName, year, rowNum, patch) {
+  var dir = await _resolveInspeccionesDir(companyName);
+  if (!dir) return err("DIR_NOT_FOUND", "No se encontró la carpeta 4.2.4 de la empresa");
+  var filePath = _findProgramaExcel(dir);
+  if (!filePath) return err("EXCEL_NOT_FOUND", "No se encontró PROGRAMA DE INSPECCIONES.xlsx en la carpeta");
+
+  var wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.readFile(filePath);
+  } catch (e) {
+    return err("EXCEL_READ_FAILED", "No se pudo leer el Excel: " + e.message);
+  }
+  var ws = wb.getWorksheet("PROGRAMA") || wb.worksheets[0];
+  if (!ws) return err("EXCEL_EMPTY", "El Excel no tiene hojas");
+
+  /* Re-detectar columnas por encabezado (igual que la lectura) */
+  var colMap = null;
+  var maxScan = Math.min(ws.rowCount || 40, 40);
+  for (var r = 1; r <= maxScan; r++) {
+    var row = ws.getRow(r);
+    var map = { months: {} };
+    var monthCount = 0;
+    row.eachCell({ includeEmpty: false }, function (cell, colNumber) {
+      var t = _normHeader(cellText(cell));
+      if (!t) return;
+      if (t === "actividades") map.actCol = colNumber;
+      else if (t === "responsable") map.respCol = colNumber;
+      else if (t.indexOf("observaciones") !== -1) map.obsCol = colNumber;
+      else if (_MONTH_HEADER_ALIASES[t] !== undefined) {
+        if (map.months[_MONTH_HEADER_ALIASES[t]] === undefined) {
+          map.months[_MONTH_HEADER_ALIASES[t]] = colNumber;
+          monthCount++;
+        }
+      }
+    });
+    if (map.actCol && monthCount >= 6) { colMap = map; break; }
+  }
+  if (!colMap) return err("EXCEL_PARSE", "No se encontró la fila de encabezados del programa");
+
+  /* Respaldo antes de escribir (patrón 📦332 probado en producción) */
+  try {
+    var backupDir = path.join(dir, "backup");
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    var stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.copyFileSync(filePath, path.join(backupDir, path.basename(filePath, ".xlsx") + "_" + stamp + ".bak"));
+  } catch (e) {
+    console.warn("[K+AIRSST][4.2.4][BACKUP][WARN]", e.message);
+  }
+
+  var target = ws.getRow(rowNum);
+  if (patch.monthlySchedule) {
+    Object.keys(colMap.months).forEach(function (mIdx) {
+      var v = patch.monthlySchedule[MONTHS[mIdx]];
+      var cell = target.getCell(colMap.months[mIdx]);
+      if (v === "p" || v === "c") cell.value = v;
+      else if (v === "" || v == null) cell.value = null;
+    });
+  }
+  if (patch.responsible != null && colMap.respCol) {
+    target.getCell(colMap.respCol).value = String(patch.responsible);
+  }
+  if (patch.observations != null && colMap.obsCol) {
+    target.getCell(colMap.obsCol).value = String(patch.observations);
+  }
+  try {
+    await wb.xlsx.writeFile(filePath);
+  } catch (e) {
+    return err("EXCEL_WRITE_FAILED", "No se pudo guardar el Excel (¿está abierto en Excel?): " + e.message);
+  }
+
+  /* Invalidar cache y devolver la actividad reconstruida desde el Excel */
+  Object.keys(_excelProgramCache).forEach(function (k) {
+    if (k.indexOf(filePath + "|") === 0) delete _excelProgramCache[k];
+  });
+  var reloaded = await readProgramFromExcel(companyName, year);
+  if (reloaded) {
+    var found = reloaded.program.activities.find(function (a) { return a.row === rowNum; });
+    if (found) return ok({ activity: found });
+  }
+  return ok({ activity: { id: "excel:" + companyName + ":" + year + ":" + rowNum, row: rowNum } });
+}
+
+/* Programa "inteligente": Excel real si existe, libreta interna si no.
+   Misma forma de respuesta que getProgram() para no romper consumidores. */
+async function getProgramSmart(year, companyId) {
+  try {
+    var fromExcel = await readProgramFromExcel(companyId, year);
+    if (fromExcel && fromExcel.program) {
+      return ok({ program: fromExcel.program });
+    }
+  } catch (e) {
+    console.error("[K+AIRSST][4.2.4][PROGRAM][EXCEL_FALLBACK]", e.message);
+  }
+  return getProgram(year, companyId);
+}
+
+/* ============================================================
+ * Migración legado (📦332): el archivo inspecciones_data.json que la
+ * versión de mayo dejó en la carpeta de la empresa se importa UNA SOLA
+ * VEZ a la libreta interna. Idempotente por id de registro.
+ * ============================================================ */
+var _legacyImportAttempts = {};
+async function importLegacyFolderInspections(companyName) {
+  if (!companyName || companyName === "default") return false;
+  if (_legacyImportAttempts[companyName]) return false;
+  _legacyImportAttempts[companyName] = true;
+  try {
+    var dir = await _resolveInspeccionesDir(companyName);
+    if (!dir) return false;
+    var legacyFile = path.join(dir, "inspecciones_data.json");
+    if (!fs.existsSync(legacyFile)) return false;
+    var data = load();
+    data.meta = data.meta || {};
+    if (data.meta.legacyFolderImportedFor === companyName) return false;
+    var legacy = JSON.parse(fs.readFileSync(legacyFile, "utf-8"));
+    var list = (legacy && Array.isArray(legacy.inspections)) ? legacy.inspections : [];
+    var added = 0;
+    list.forEach(function (rec) {
+      if (!rec || !rec.id) return;
+      var exists = data.inspections.some(function (i) { return i.id === rec.id; }) ||
+        data.inspections.some(function (i) { return i.legacyId === rec.id; });
+      if (exists) return;
+      var type = String(rec.type || "").toLowerCase();
+      if (type === "extintor") type = "extintores";
+      var meta = INSPECTION_META[type] || { code: rec.format || "", title: "Inspección (histórico)" };
+      data.inspections.push({
+        id: "insp_legacy_" + rec.id,
+        legacyId: rec.id,
+        type: INSPECTION_META[type] ? type : "instalaciones",
+        code: meta.code,
+        title: meta.title,
+        date: rec.date || null,
+        performedBy: rec.inspector || "—",
+        role: null,
+        site: rec.location || null,
+        companyId: companyName,
+        companyName: companyName,
+        status: rec.status === "COMPLETED" ? "Completada" : (rec.status || "Histórico"),
+        observations: rec.observations || "Registro importado desde el archivo histórico de la carpeta de la empresa.",
+        data: {},
+        sourceFolder: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      added++;
+    });
+    data.meta.legacyFolderImportedFor = companyName;
+    if (added > 0) {
+      save();
+      console.log("[K+AIRSST][4.2.4][LEGACY_IMPORT] " + added + " registro(s) importados desde carpeta de " + companyName);
+    } else {
+      save(); /* guarda el flag meta igual para no releer en cada listado */
+    }
+    return added > 0;
+  } catch (e) {
+    console.warn("[K+AIRSST][4.2.4][LEGACY_IMPORT][WARN]", e.message);
+    return false;
+  }
+}
+
+/* ============================================================
+ * Exploración del histórico real: escanea "Inspeciones realizadas/
+ * <Sede>/<DD-MM-AAAA>/" de la carpeta de la empresa y devuelve entradas
+ * con sus archivos (fotos, formatos, informes). Solo lectura.
+ * ============================================================ */
+var PHOTO_EXT = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
+var DOC_EXT = [".xlsx", ".xls", ".pdf", ".docx", ".doc"];
+
+async function explorarHistoricoCarpeta(companyName) {
+  var dir = await _resolveInspeccionesDir(companyName);
+  if (!dir) {
+    return ok({ found: false, folderPath: null, entries: [] });
+  }
+  var entries = [];
+  var base = dir;
+  var historicoDir = path.join(dir, "Inspeciones realizadas");
+  var altDir = path.join(dir, "Inspecciones realizadas");
+  if (fs.existsSync(altDir)) historicoDir = altDir;
+
+  function scanFiles(folder) {
+    try {
+      return fs.readdirSync(folder)
+        .filter(function (f) { return f.indexOf("~$") !== 0; })
+        .map(function (f) {
+          var ext = path.extname(f).toLowerCase();
+          return { name: f, ext: ext, isPhoto: PHOTO_EXT.indexOf(ext) !== -1 };
+        });
+    } catch (e) { return []; }
+  }
+
+  if (fs.existsSync(historicoDir)) {
+    /* Archivos sueltos directamente en "Inspeciones realizadas" (ej. el
+       Informe General.xlsx) */
+    scanFiles(historicoDir).forEach(function (f) {
+      entries.push({
+        kind: "archivo",
+        sede: "Informe general",
+        fecha: null,
+        files: [f],
+        photoCount: 0,
+        path: historicoDir
+      });
+    });
+    /* Sedes → fechas */
+    var sedes = fs.readdirSync(historicoDir).filter(function (f) {
+      try { return fs.statSync(path.join(historicoDir, f)).isDirectory(); }
+      catch (e) { return false; }
+    });
+    sedes.forEach(function (sede) {
+      var sedePath = path.join(historicoDir, sede);
+      var fechas = fs.readdirSync(sedePath).filter(function (f) {
+        try { return fs.statSync(path.join(sedePath, f)).isDirectory(); }
+        catch (e) { return false; }
+      });
+      fechas.forEach(function (fechaDir) {
+        var fechaPath = path.join(sedePath, fechaDir);
+        var files = scanFiles(fechaPath);
+        if (files.length === 0) return;
+        var m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(fechaDir);
+        var fechaIso = m ? (m[3] + "-" + m[2] + "-" + m[1]) : null;
+        entries.push({
+          kind: "visita",
+          sede: sede,
+          fecha: fechaIso,
+          fechaLabel: fechaDir,
+          files: files,
+          photoCount: files.filter(function (f) { return f.isPhoto; }).length,
+          path: fechaPath
+        });
+      });
+    });
+  }
+
+  /* Formatos rellenados sueltos en la raíz de 4.2.4 (ej. "GI-FO-026 1-2026.xlsx") */
+  try {
+    fs.readdirSync(base).forEach(function (f) {
+      if (/^~\$/.test(f)) return;
+      var ext = path.extname(f).toLowerCase();
+      if (DOC_EXT.indexOf(ext) === -1) return;
+      if (!/GI-FO|GI-OD|INFORME|INSPECCI/i.test(f)) return;
+      if (/PROGRAMA DE INSPECCIONES/i.test(f)) return;
+      var m = /(\d{1,2})-(\d{4})/.exec(f);
+      var fechaIso = m ? (m[2] + "-" + String(m[1]).padStart(2, "0") + "-01") : null;
+      entries.push({
+        kind: "archivo",
+        sede: "Formato rellenado",
+        fecha: fechaIso,
+        files: [{ name: f, ext: ext, isPhoto: false }],
+        photoCount: 0,
+        path: base
+      });
+    });
+  } catch (e) { /* ignore */ }
+
+  entries.sort(function (a, b) {
+    var da = a.fecha ? new Date(a.fecha).getTime() : 0;
+    var db = b.fecha ? new Date(b.fecha).getTime() : 0;
+    return db - da;
+  });
+  return ok({ found: true, folderPath: dir, entries: entries });
+}
+
+/* ============================================================
+ * Archivado en la carpeta de la empresa (Fase D): genera el formato
+ * exportado de la inspección y lo guarda en "Inspeciones realizadas/
+ * <sede|General>/<DD-MM-AAAA>/", creando carpetas si no existen.
+ * La libreta interna sigue siendo el índice; la carpeta es el archivo oficial.
+ * ============================================================ */
+async function archivarInspeccionEnCarpeta(payload) {
+  var id = payload && payload.id;
+  var companyName = payload && (payload.companyName || payload.companyId);
+  if (!id) return err("INVALID_INPUT", "id es obligatorio");
+  var found = getInspection(id);
+  if (!found.success) return found;
+  var insp = found.data.inspection;
+  if (!TEMPLATES[insp.type]) {
+    return err("NO_TEMPLATE", "Este tipo de inspección no tiene formato para archivar");
+  }
+  var dir = await _resolveInspeccionesDir(companyName || insp.companyName);
+  if (!dir) {
+    return err("DIR_NOT_FOUND", "La empresa no tiene carpeta configurada o no se encontró la carpeta 4.2.4");
+  }
+  var exported = await exportXlsxFromTemplate(insp);
+  if (!exported.success) return exported;
+
+  var buffer = Buffer.from(exported.data.xlsxBase64, "base64");
+  var d = insp.date ? new Date(insp.date) : new Date();
+  if (isNaN(d.getTime())) d = new Date();
+  var dd = String(d.getDate()).padStart(2, "0");
+  var mm = String(d.getMonth() + 1).padStart(2, "0");
+  var yyyy = d.getFullYear();
+  var safe = function (s) {
+    return String(s || "").replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim().slice(0, 60) || "General";
+  };
+  var historicoDir = path.join(dir, "Inspeciones realizadas");
+  if (!fs.existsSync(historicoDir) && fs.existsSync(path.join(dir, "Inspecciones realizadas"))) {
+    historicoDir = path.join(dir, "Inspecciones realizadas");
+  }
+  var targetDir = path.join(historicoDir, safe(insp.site), dd + "-" + mm + "-" + yyyy);
+  try {
+    fs.mkdirSync(targetDir, { recursive: true });
+  } catch (e) {
+    return err("MKDIR_FAILED", "No se pudo crear la carpeta destino: " + e.message);
+  }
+  var fileName = (insp.code || "INSPECCION") + " " + safe(insp.site) + " " + dd + "-" + mm + "-" + yyyy + ".xlsx";
+  var targetPath = path.join(targetDir, fileName);
+  try {
+    fs.writeFileSync(targetPath, buffer);
+  } catch (e) {
+    return err("WRITE_FAILED", "No se pudo guardar el archivo: " + e.message);
+  }
+  console.log("[K+AIRSST][4.2.4][ARCHIVAR][OK] " + targetPath);
+  return ok({ path: targetPath, archived: true });
 }
 
 /* ---------- Inspecciones ---------- */
@@ -648,8 +1222,10 @@ function deleteInspection(id) {
 /* El home de gestion-peligros llama electronAPI.inspecciones.getStats(company)
    y espera {totalInspecciones, completadas, pendientesMes, tasaCumplimiento,
               extintoresVigentes, extintoresTotal, year, mes,
-              mensualCompletadas, mensualPendientes}. Leemos del nuevo store. */
-function getInspeccionesStats(companyName) {
+              mensualCompletadas, mensualPendientes}. Leemos del nuevo store.
+   2026-09-21 — async: el resumen del programa anual ahora puede venir del
+   Excel real de la carpeta de la empresa (getProgramSmart). */
+async function getInspeccionesStats(companyName) {
   try {
     var data = load();
     var companyId = companyName || "default";
@@ -714,9 +1290,17 @@ function getInspeccionesStats(companyName) {
       });
     }).length;
 
-    /* Programa anual de la empresa (mismo año actual) */
-    var programKey = companyId + ":" + anioActual;
-    var programSummary = summarizeProgram(data.programs[programKey]);
+    /* Programa anual de la empresa (mismo año actual) — Excel real si la
+       empresa tiene carpeta configurada; libreta interna si no. */
+    var programSummary = { programaTotal: 0, programaCompletadas: 0, programaPendientes: 0 };
+    try {
+      var progRes = await getProgramSmart(anioActual, companyId);
+      if (progRes && progRes.success && progRes.data && progRes.data.program) {
+        programSummary = summarizeProgram(progRes.data.program);
+      }
+    } catch (eProg) {
+      console.warn("[K+AIRSST][STATS][PROGRAM][WARN]", eProg.message);
+    }
 
     return ok({
       totalInspecciones: insps.length,
@@ -779,6 +1363,9 @@ function summarizeProgram(program) {
 // Firma flexible: acepta (app, deps) — usa el ipcMain importado arriba.
 // main.js llama registerInspeccionesHandlers(app, { getCompanyRootPath })
 function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
+  /* Guardar deps para la reconexión a la carpeta de la empresa */
+  _gDeps = _deps || {};
+
   /* 8 canales principales del nuevo módulo */
   ipcMain.handle("company:listar", async function () {
     try { return listCompanies(); }
@@ -786,13 +1373,15 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
   });
 
   ipcMain.handle("programa:obtener", async function (event, year, companyId) {
-    try { return getProgram(year, companyId || "default"); }
+    try { return await getProgramSmart(year, companyId || "default"); }
     catch (e) { console.error("[K+AIRSST][PROGRAM][GET][ERROR]", e); return err("GET_FAILED", e.message); }
   });
 
   // 📦543 — Helper: lee las inspecciones planificadas de UNA empresa.
   // Extraido del handler para poder llamarlo en loop cuando el scope es 'all'.
-  function _leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end) {
+  // 2026-09-21 — async: usa getProgramSmart (lee el Excel real de la empresa
+  // si existe; cacheado por mtime para no releerlo en cada mes del rango).
+  async function _leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end) {
     var startDate = new Date(start + "T00:00:00");
     var endDate = new Date(end + "T23:59:59");
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -806,7 +1395,7 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
       var monthIdx = cursor.getMonth();
       var monthName = MONTHS[monthIdx];
 
-      var programRes = getProgram(year, currentCompany);
+      var programRes = await getProgramSmart(year, currentCompany);
       if (programRes && programRes.success && programRes.data && programRes.data.program) {
         var program = programRes.data.program;
         var businessDays = getFirst5BusinessDays(year, monthIdx);
@@ -870,7 +1459,7 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
 
       // Si hay empresa valida, leer solo de ella
       if (currentCompany && currentCompany !== "default") {
-        return ok(_leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end));
+        return ok(await _leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end));
       }
 
       // 📦543 — Scope='all' → leer de todas las empresas del config
@@ -888,7 +1477,7 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
       console.log('[INSP-CAL] scope=all → iterando', allCompanies.length, 'empresas');
       var allEvents = [];
       for (var i = 0; i < allCompanies.length; i++) {
-        var evs = _leerInspeccionesCalendarioDeEmpresa(allCompanies[i], start, end);
+        var evs = await _leerInspeccionesCalendarioDeEmpresa(allCompanies[i], start, end);
         allEvents.push.apply(allEvents, evs);
       }
       return ok(allEvents);
@@ -904,13 +1493,28 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
       if (!activityId || typeof activityId !== "string") {
         return err("INVALID_INPUT", "activityId es obligatorio");
       }
+      /* 2026-09-21 — Actividades con prefijo "excel:<empresa>:<anio>:<fila>"
+         se escriben en el Excel real de la carpeta de la empresa (con
+         respaldo). Las demás siguen por la libreta interna. */
+      if (activityId.indexOf("excel:") === 0) {
+        var parts = activityId.split(":");
+        if (parts.length !== 4) return err("INVALID_ID", "Id de actividad de Excel inválido");
+        return await writeActivityToExcel(parts[1], parseInt(parts[2], 10), parseInt(parts[3], 10), patch || {});
+      }
       return updateActivity(activityId, patch || {});
     }
     catch (e) { console.error("[K+AIRSST][PROGRAM][ACTIVITY_UPDATE][ERROR]", e); return err("UPDATE_FAILED", e.message); }
   });
 
   ipcMain.handle("inspeccion:listar", async function (event, filter) {
-    try { return listInspections(filter || {}); }
+    try {
+      /* Importación idempotente del inspecciones_data.json legado que la
+         versión de mayo (📦332) dejó en la carpeta de la empresa. */
+      if (filter && (filter.companyId || filter.companyName)) {
+        await importLegacyFolderInspections(filter.companyName || filter.companyId);
+      }
+      return listInspections(filter || {});
+    }
     catch (e) { console.error("[K+AIRSST][INSPECTION][LIST][ERROR]", e); return err("LIST_FAILED", e.message); }
   });
 
@@ -972,12 +1576,41 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
     }
   });
 
-  /* Backward-compat: 1 canal para el home de gestion-peligros */
-  ipcMain.handle("inspecciones:get-stats", async function (event, companyName) {
-    return getInspeccionesStats(companyName);
+  /* 2026-09-21 — Explora el histórico real de la carpeta de la empresa
+     ("Inspeciones realizadas/<Sede>/<fecha>/") para mostrarlo en la vista
+     de historial. Solo lectura. */
+  ipcMain.handle("inspeccion:explorarHistorico", async function (event, companyId) {
+    try { return await explorarHistoricoCarpeta(companyId); }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][EXPLORAR][ERROR]", e); return err("EXPLORAR_FAILED", e.message); }
   });
 
-  console.log("[K+AIRSST][IPC][REGISTER][SUCCESS] handlers=8+1 (inspecciones nuevo contrato + get-stats legacy)");
+  /* Abre una ruta del explorador de archivos del SO. Las rutas vienen del
+     propio escaneo del bridge (entradas de explorarHistorico), no de input
+     libre del renderer. */
+  ipcMain.handle("inspeccion:abrirRuta", async function (event, targetPath) {
+    try {
+      if (!targetPath || typeof targetPath !== "string") {
+        return err("INVALID_INPUT", "ruta es obligatoria");
+      }
+      await shell.openPath(targetPath);
+      return ok({ opened: true });
+    } catch (e) { console.error("[K+AIRSST][INSPECTION][OPEN_PATH][ERROR]", e); return err("OPEN_FAILED", e.message); }
+  });
+
+  /* 2026-09-21 — Archiva una inspección en la carpeta de la empresa:
+     genera su formato oficial y lo guarda en "Inspeciones realizadas/
+     <sede>/<fecha>/". */
+  ipcMain.handle("inspeccion:archivar", async function (event, payload) {
+    try { return await archivarInspeccionEnCarpeta(payload || {}); }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][ARCHIVAR][ERROR]", e); return err("ARCHIVAR_FAILED", e.message); }
+  });
+
+  /* Backward-compat: 1 canal para el home de gestion-peligros */
+  ipcMain.handle("inspecciones:get-stats", async function (event, companyName) {
+    return await getInspeccionesStats(companyName);
+  });
+
+  console.log("[K+AIRSST][IPC][REGISTER][SUCCESS] handlers=8+3+1 (inspecciones nuevo contrato + carpeta empresa + get-stats legacy)");
 }
 
 module.exports = {

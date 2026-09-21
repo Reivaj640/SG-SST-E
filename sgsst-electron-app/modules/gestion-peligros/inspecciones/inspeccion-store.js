@@ -11,7 +11,7 @@
   "use strict";
 
   var state = {
-    view: { name: "dashboard" },
+    view: { name: "hub" },
     companyId: "default",
     companyName: "K+AIR Demo S.A.S.",
     program: null,

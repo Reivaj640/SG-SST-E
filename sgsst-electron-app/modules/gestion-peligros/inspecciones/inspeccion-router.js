@@ -14,15 +14,15 @@
   }
 
   function parseHash() {
-    var raw = (location.hash || "#/dashboard").replace(/^#\/?/, "");
+    var raw = (location.hash || "#/hub").replace(/^#\/?/, "");
     var parts = raw.split("/").filter(Boolean);
-    return { name: parts[0] || "dashboard", params: parts.slice(1) };
+    return { name: parts[0] || "hub", params: parts.slice(1) };
   }
 
   function render() {
     if (!viewContainer) return;
     var parsed = parseHash();
-    var handler = routes.get(parsed.name) || routes.get("dashboard");
+    var handler = routes.get(parsed.name) || routes.get("hub");
     viewContainer.innerHTML = "";
     try {
       handler(viewContainer, parsed.params);

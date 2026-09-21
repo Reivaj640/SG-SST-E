@@ -1,6 +1,7 @@
 /* ============================================================
- * K+AIR · Vista Historial
- * Tabla enterprise con búsqueda + filtro de tipo + acciones por fila
+ * K+AIR · Vista Historial (premium 📦796)
+ * Referencia 2026-09-21: buscador + píldoras de tipo + contador +
+ * filas con chip de icono, código, meta, estado y acciones por icono
  * ============================================================ */
 (function (global) {
   "use strict";
@@ -18,47 +19,135 @@
     var wrap = tpl.el("div", { className: "kair-app", style: "min-height:100vh;display:flex;flex-direction:column;" });
 
     wrap.appendChild(tpl.buildHeader({
-      onBack: function () { ctx.go({ name: "dashboard" }); },
+      onBack: function () { ctx.go({ name: "hub" }); },
       title: "Historial de Inspecciones",
       subtitle: "Inspecciones registradas",
-      companyName: store.companyName, contextLabel: "SG-SST",
+      companyName: store.companyName,
+      contextLabel: "SG-SST",
       actions: [
         { label: "Nueva Inspección", variant: "primary", icon: tpl.icon("plus", 15), onClick: function () { ctx.go({ name: "hub" }); } }
       ],
       tabs: [
-        { id: "dashboard", label: "Programa", onClick: function () { ctx.go({ name: "dashboard" }); } },
-        { id: "hub", label: "Inspecciones", onClick: function () { ctx.go({ name: "hub" }); } },
+        { id: "hub", label: "Dashboard", onClick: function () { ctx.go({ name: "hub" }); } },
+        { id: "dashboard", label: "Programa anual", onClick: function () { ctx.go({ name: "dashboard" }); } },
         { id: "historial", label: "Historial", active: true, onClick: function () { ctx.go({ name: "historial" }); } }
       ]
     }));
 
     var main = tpl.el("main", { className: "kair-main", style: "max-width:1600px;" });
 
-    // Filter bar
-    var filterBody = tpl.el("div", { className: "kair-filter-bar" }, [
-      tpl.el("div", { className: "kair-filter-bar__search" }, [
-        tpl.icon("search", 16),
-        tpl.el("input", { type: "text", placeholder: "Buscar por responsable, sede, código...", oninput: function (e) { query = e.target.value.toLowerCase(); renderTable(); } })
-      ]),
-      tpl.el("div", { className: "kair-flex kair-gap-2" }, [
-        tpl.icon("filter", 16),
-        (function () {
-          var sel = tpl.el("select", { className: "kair-select", style: "width:auto;min-width:200px;", onchange: function (e) { filterType = e.target.value; renderTable(); } });
-          sel.appendChild(tpl.el("option", { value: "all", textContent: "Todos los tipos" }));
-          T.INSPECTION_TYPE_LIST.forEach(function (t) {
-            sel.appendChild(tpl.el("option", { value: t.type, textContent: t.shortTitle + " (" + t.code + ")" }));
-          });
-          return sel;
-        })()
-      ])
-    ]);
-    main.appendChild(tpl.buildCard(null, filterBody));
+    /* ── Barra de filtros: búsqueda + píldoras de tipo ── */
+    var pills = tpl.el("div", { className: "kair-insp-filters__pills" });
+    function renderPills() {
+      pills.innerHTML = "";
+      var all = [{ type: "all", shortTitle: "Todas" }].concat(T.INSPECTION_TYPE_LIST);
+      all.forEach(function (t) {
+        var btn = tpl.el("button", {
+          type: "button",
+          className: "kair-insp-pill" + (filterType === t.type ? " kair-insp-pill--active" : ""),
+          textContent: t.shortTitle,
+          onclick: function () {
+            filterType = t.type;
+            renderPills();
+            renderList();
+          }
+        });
+        pills.appendChild(btn);
+      });
+    }
+    renderPills();
 
-    var tableCard = tpl.el("div", { className: "kair-card" });
-    var tableBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
-    tableBody.appendChild(tpl.loadingBlock("Cargando inspecciones..."));
-    tableCard.appendChild(tableBody);
-    main.appendChild(tableCard);
+    var filterBody = tpl.el("div", { className: "kair-insp-filters" }, [
+      tpl.el("div", { className: "kair-insp-filters__search" }, [
+        tpl.icon("search", 16),
+        tpl.el("input", { type: "text", placeholder: "Buscar por código, persona o sede...", oninput: function (e) { query = e.target.value.toLowerCase(); renderList(); } })
+      ]),
+      pills
+    ]);
+    main.appendChild(filterBody);
+
+    /* ── Contador ── */
+    var counter = tpl.el("div", { className: "kair-insp-counter", textContent: "Cargando inspecciones..." });
+    main.appendChild(counter);
+
+    /* ── Lista de filas ── */
+    var listCard = tpl.el("div", { className: "kair-card" });
+    var listBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
+    listBody.appendChild(tpl.loadingBlock("Cargando inspecciones..."));
+    listCard.appendChild(listBody);
+    main.appendChild(listCard);
+
+    /* ── Archivo histórico de la carpeta de la empresa (2026-09-21) ──
+       Explora "Inspeciones realizadas/<Sede>/<fecha>/" de la carpeta real
+       4.2.4 y lista las visitas antiguas con sus fotos/formatos. Solo
+       lectura; cada entrada abre su carpeta en el explorador del SO. */
+    var histBody = tpl.el("div", { className: "kair-card__body kair-card__body--flush" });
+    histBody.appendChild(tpl.loadingBlock("Explorando archivo histórico..."));
+    var histCard = tpl.el("div", { className: "kair-card", style: "margin-top:16px;" }, [
+      tpl.el("div", { className: "kair-card__header" }, [
+        tpl.el("h2", { className: "kair-card__title", textContent: "Archivo histórico · carpeta de la empresa" }),
+        tpl.el("span", { className: "kair-insp-row__code", textContent: "Inspecciones realizadas por sede y fecha" })
+      ]),
+      histBody
+    ]);
+    main.appendChild(histCard);
+
+    if (api.isElectron) {
+      api.explorarHistorico(store.companyId || store.companyName).then(function (res) {
+        if (!res.success) throw new Error(res.error && res.error.message);
+        renderHistorico(res.data);
+      }).catch(function (e) {
+        histBody.innerHTML = "";
+        histBody.appendChild(tpl.el("div", { style: "padding:20px 24px;font-size:0.82rem;color:var(--kair-text-muted);", textContent: "No se pudo leer el archivo histórico de la carpeta: " + e.message }));
+      });
+    } else {
+      histBody.innerHTML = "";
+      histBody.appendChild(tpl.el("div", { style: "padding:20px 24px;font-size:0.82rem;color:var(--kair-text-muted);", textContent: "El archivo histórico de la carpeta solo está disponible en la aplicación de escritorio." }));
+    }
+
+    function renderHistorico(data) {
+      histBody.innerHTML = "";
+      if (!data.found || !data.entries || data.entries.length === 0) {
+        histBody.appendChild(tpl.el("div", { style: "padding:20px 24px;font-size:0.82rem;color:var(--kair-text-muted);", textContent: "No se encontró archivo histórico en la carpeta 4.2.4 de esta empresa." }));
+        return;
+      }
+      var rows = tpl.el("div", { className: "kair-insp-rows" });
+      data.entries.forEach(function (en) {
+        var row = tpl.el("div", { className: "kair-insp-row" });
+        row.appendChild(tpl.el("span", {
+          className: "kair-insp-row__icon",
+          style: "background-color:var(--kair-text-muted);color:var(--kair-card);"
+        }, [tpl.icon("archive", 18)]));
+        var fileBits = [];
+        if (en.photoCount) fileBits.push(en.photoCount + (en.photoCount === 1 ? " foto" : " fotos"));
+        var docCount = en.files.length - en.photoCount;
+        if (docCount > 0) fileBits.push(docCount + (docCount === 1 ? " formato" : " formatos"));
+        var meta = [
+          en.sede,
+          en.fecha ? tpl.formatDate(en.fecha, { short: true }) : (en.fechaLabel || ""),
+          fileBits.join(" · ")
+        ].filter(Boolean).join("  ·  ");
+        row.appendChild(tpl.el("div", { className: "kair-insp-row__body" }, [
+          tpl.el("div", { className: "kair-insp-row__head" }, [
+            tpl.el("span", { className: "kair-insp-row__title", textContent: en.kind === "visita" ? "Visita de inspección" : (en.files[0] ? en.files[0].name : "Archivo") })
+          ]),
+          tpl.el("div", { className: "kair-insp-row__meta", textContent: meta })
+        ]));
+        row.appendChild(tpl.el("div", { className: "kair-insp-row__actions" }, [
+          tpl.el("button", {
+            type: "button", className: "kair-insp-row__btn", title: "Abrir carpeta",
+            onclick: function () {
+              api.abrirRuta(en.path).then(function (r) {
+                if (!r.success) tpl.toast("Error", (r.error && r.error.message) || "No se pudo abrir", "error");
+              });
+            }
+          }, [tpl.icon("folder-open", 15)])
+        ]));
+        rows.appendChild(row);
+      });
+      histBody.appendChild(rows);
+      tpl.refreshIcons();
+    }
 
     wrap.appendChild(main);
     root.appendChild(wrap);
@@ -73,14 +162,14 @@
         if (!res.success) throw new Error(res.error && res.error.message);
         allList = res.data.inspections;
         if (global.KairStore) global.KairStore.setInspections(allList);
-        renderTable();
+        renderList();
       }).catch(function (e) {
-        tableBody.innerHTML = "";
-        tableBody.appendChild(tpl.el("div", { style: "padding:24px;color:#dc3545;", textContent: e.message }));
+        listBody.innerHTML = "";
+        listBody.appendChild(tpl.el("div", { style: "padding:24px;color:var(--kair-danger);", textContent: e.message }));
       });
     }
 
-    function renderTable() {
+    function renderList() {
       var filtered = allList;
       if (filterType !== "all") filtered = filtered.filter(function (i) { return i.type === filterType; });
       if (query) {
@@ -91,11 +180,13 @@
             (i.code || "").toLowerCase().indexOf(query) !== -1;
         });
       }
-      tableBody.innerHTML = "";
+
+      counter.textContent = filtered.length + (filtered.length === 1 ? " inspección encontrada" : " inspecciones encontradas");
+      listBody.innerHTML = "";
 
       if (filtered.length === 0) {
         var btn = tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--primary", style: "margin-top:12px;", onclick: function () { ctx.go({ name: "hub" }); } }, [tpl.icon("plus", 14), tpl.el("span", { textContent: "Nueva inspección" })]);
-        tableBody.appendChild(tpl.emptyState(
+        listBody.appendChild(tpl.emptyState(
           "file-text",
           allList.length === 0 ? "Sin inspecciones registradas" : "Sin resultados para el filtro",
           allList.length === 0 ? "Realice su primera inspección desde el centro de inspecciones." : "Ajuste los filtros o el término de búsqueda.",
@@ -105,53 +196,63 @@
         return;
       }
 
-      var tableWrap = tpl.el("div", { className: "kair-table-wrap", style: "max-height:600px;" });
-      var table = tpl.el("table", { className: "kair-table" });
-      table.appendChild(tpl.el("thead", {}, [tpl.el("tr", {}, [
-        tpl.el("th", { textContent: "Tipo", style: "min-width:220px;" }),
-        tpl.el("th", { textContent: "Fecha", style: "width:120px;" }),
-        tpl.el("th", { textContent: "Realizada por" }),
-        tpl.el("th", { textContent: "Sede / Sitio" }),
-        tpl.el("th", { textContent: "Empresa" }),
-        tpl.el("th", { textContent: "Estado", style: "width:110px;" }),
-        tpl.el("th", { textContent: "Acciones", style: "width:240px;text-align:right;" })
-      ])]));
-
-      var tbody = tpl.el("tbody");
+      var rows = tpl.el("div", { className: "kair-insp-rows" });
       filtered.forEach(function (i) {
         var meta = T.INSPECTION_TYPES[i.type];
-        var tr = tpl.el("tr");
-        var tdTipo = tpl.el("td");
-        tdTipo.appendChild(tpl.el("div", { className: "kair-flex kair-gap-2" }, [
-          tpl.el("span", { className: "kair-type-icon", style: "width:32px;height:32px;background-color:" + (meta && meta.accent || "#174ea6") + "1a;color:" + (meta && meta.accent || "#174ea6") + ";" }, [tpl.icon("file-text", 16)]),
-          tpl.el("div", {}, [
-            tpl.el("div", { style: "font-weight:500;color:#1a1a2e;font-size:0.85rem;", textContent: (meta && meta.shortTitle) || i.title }),
-            tpl.el("div", { style: "font-size:0.7rem;color:#adb5bd;", textContent: i.code })
-          ])
-        ]));
-        tr.appendChild(tdTipo);
-        tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: tpl.formatDate(i.date, { short: true }) })]));
-        var whoTd = tpl.el("td");
-        whoTd.appendChild(tpl.el("div", { style: "font-size:0.85rem;color:#1a1a2e;font-weight:500;", textContent: i.performedBy }));
-        if (i.role) whoTd.appendChild(tpl.el("div", { style: "font-size:0.72rem;color:#5a6378;", textContent: i.role }));
-        tr.appendChild(whoTd);
-        tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: i.site || "—" })]));
-        tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: i.companyName || store.companyName || "—" })]));
-        tr.appendChild(tpl.el("td", {}, [tpl.statusPill(i.status)]));
-        var tdActions = tpl.el("td");
-        var actionsWrap = tpl.el("div", { style: "display:flex;justify-content:flex-end;gap:4px;" });
-        actionsWrap.appendChild(tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--ghost", style: "padding:4px 8px;font-size:0.75rem;", title: "Ver detalle", onclick: function () { ctx.go({ name: "detalle", inspectionId: i.id }); } }, [tpl.icon("eye", 14), tpl.el("span", { textContent: "Ver" })]));
-        actionsWrap.appendChild(tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--ghost", style: "padding:4px 8px;font-size:0.75rem;", title: "Exportar PDF", onclick: function () { exportOne(i.id, "pdf"); } }, [tpl.icon("file-down", 14), tpl.el("span", { textContent: "PDF" })]));
-        actionsWrap.appendChild(tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--ghost", style: "padding:4px 8px;font-size:0.75rem;", title: "Exportar Excel", onclick: function () { exportOne(i.id, "xlsx"); } }, [tpl.icon("file-down", 14), tpl.el("span", { textContent: "XLSX" })]));
-        actionsWrap.appendChild(tpl.el("button", { type: "button", className: "kair-header__action kair-header__action--ghost", style: "padding:4px 8px;font-size:0.75rem;color:#dc3545;", title: "Eliminar", onclick: function () { del(i.id); } }, [tpl.icon("trash-2", 14)]));
-        tdActions.appendChild(actionsWrap);
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
+        var accent = (meta && meta.accent) || "var(--kair-primary)";
+
+        var row = tpl.el("div", { className: "kair-insp-row" });
+
+        /* Icono del tipo */
+        row.appendChild(tpl.el("span", {
+          className: "kair-insp-row__icon",
+          style: "background-color:" + accent + "1a;color:" + accent + ";"
+        }, [iconFor(i.type, 18)]));
+
+        /* Título + código + meta */
+        var body = tpl.el("div", { className: "kair-insp-row__body" }, [
+          tpl.el("div", { className: "kair-insp-row__head" }, [
+            tpl.el("span", { className: "kair-insp-row__title", textContent: (meta && meta.title) || i.title }),
+            tpl.el("span", { className: "kair-insp-row__code", textContent: i.code || (meta && meta.code) || "" })
+          ]),
+          tpl.el("div", { className: "kair-insp-row__meta", textContent: buildMeta(i) })
+        ]);
+        row.appendChild(body);
+
+        /* Estado */
+        row.appendChild(tpl.el("div", { className: "kair-insp-row__status" }, [tpl.statusPill(i.status)]));
+
+        /* Acciones por icono */
+        var actions = tpl.el("div", { className: "kair-insp-row__actions" }, [
+          tpl.el("button", { type: "button", className: "kair-insp-row__btn", title: "Ver detalle", onclick: function () { ctx.go({ name: "detalle", inspectionId: i.id }); } }, [tpl.icon("eye", 15)]),
+          tpl.el("button", { type: "button", className: "kair-insp-row__btn", title: "Editar", onclick: function () { ctx.go({ name: "editar", inspectionType: i.type, inspectionId: i.id }); } }, [tpl.icon("pencil", 15)]),
+          tpl.el("button", { type: "button", className: "kair-insp-row__btn", title: "Exportar PDF", onclick: function () { exportOne(i.id, "pdf"); } }, [tpl.icon("file-down", 15)]),
+          tpl.el("button", { type: "button", className: "kair-insp-row__btn", title: "Exportar Excel", onclick: function () { exportOne(i.id, "xlsx"); } }, [tpl.icon("sheet", 15)]),
+          tpl.el("button", { type: "button", className: "kair-insp-row__btn kair-insp-row__btn--danger", title: "Eliminar", onclick: function () { del(i.id); } }, [tpl.icon("trash-2", 15)])
+        ]);
+        row.appendChild(actions);
+        rows.appendChild(row);
       });
-      table.appendChild(tbody);
-      tableWrap.appendChild(table);
-      tableBody.appendChild(tableWrap);
+      listBody.appendChild(rows);
       tpl.refreshIcons();
+    }
+
+    function buildMeta(i) {
+      var parts = [];
+      if (i.performedBy) parts.push(i.performedBy);
+      if (i.site) parts.push(i.site);
+      parts.push(tpl.formatDate(i.date, { short: true }));
+      return parts.join("  ·  ");
+    }
+
+    function iconFor(type) {
+      switch (type) {
+        case "botiquin": return tpl.icon("clipboard-list", 18);
+        case "extintores": return tpl.icon("flame", 18);
+        case "instalaciones": return tpl.icon("building-2", 18);
+        case "equipos_emergencia": return tpl.icon("siren", 18);
+        default: return tpl.icon("file-text", 18);
+      }
     }
 
     function exportOne(id, format) {
@@ -175,7 +276,6 @@
           if (!res || !res.success || !res.data || !res.data.xlsxBase64) {
             throw new Error((res && res.error && res.error.message) || "Error al generar XLSX");
           }
-          // Decodificar base64 → Uint8Array → Blob y descargar
           var binStr = atob(res.data.xlsxBase64);
           var bytes = new Uint8Array(binStr.length);
           for (var i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
@@ -202,7 +302,7 @@
         if (!res.success) throw new Error(res.error && res.error.message);
         allList = allList.filter(function (x) { return x.id !== id; });
         tpl.toast("Eliminada", "La inspección fue eliminada", "success");
-        renderTable();
+        renderList();
       }).catch(function (e) { tpl.toast("Error", e.message, "error"); });
     }
 
