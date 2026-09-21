@@ -3918,4 +3918,32 @@ que 📦735 Amenazas).
 - `api.js`, `store.js`, `router.js`, IPC, BD — intactos.
 - `inspeccion.css` línea 116-240 (`.k-module-header` legacy) — sigue ahí para las otras vistas.
 
+### 📦794 — Identificación de Peligros (4.1.2) migrada al premium v2
+
+Migración completa del submódulo `4.1.2 Identificación de Peligros` al dialecto premium v2 (mismo patrón
+aplicado en 📦783 Registro, 📦784 Frecuencia, 📦785–792). Incluye:
+
+- **Bridge IPC** (`main/identificacion-peligros-bridge.js`): reescrito con tokens scoped, modo oscuro en
+  ambos atributos (`[data-theme^="dark"]`), BOM/EOL normalizado a LF.
+- **Sub-componentes JS** (`kair-matriz-peligros-{header,matriz,indicadores,priorizacion,service}.js` +
+  `kair-matriz-peligros.js`): migrados al dialecto premium v2 con Header System v2, tokens scoped, sin
+  colores hardcodeados, sin selectores globales.
+- **CSS** (`kair-matriz-peligros.css`): scoped bajo `.km-wrapper`, modo oscuro completo, donut theme-aware
+  con helpers `tok()`/`palette()` que leen tokens CSS computados (en vez de hex hardcodeados).
+- **Home del módulo padre** (`gestion-peligros-home.js`): ajustes de integración.
+- **Test nuevo** (`main/test-identificacion-peligros.js`, 149 líneas, 9 contratos): valida tokens nuevos en
+  `.km-wrapper`, modo oscuro con re-definición de tokens (ambos atributos), reglas de especificidad oscuras,
+  sin colores sueltos en secciones claras, integridad estructural del CSS, donut con clase + sin atributos
+  stroke muertos, colores inline theme-aware, iconos 0 Font Awesome con Bootstrap local, cableado intacto.
+
+#### Reglas recordadas (ya estaban, ahora aplicadas a 4.1.2)
+
+- Scope `:root` + `*` + `body` GLOBALES son la fuga más grave: pisar tokens y márgenes de TODA la app.
+  Mover a scope del módulo (`.km-wrapper`).
+- Modo oscuro debe cubrir **ambos atributos** (`data-theme="dark"` + `data-theme="dark-legacy"`) con
+  selector `[data-theme^="dark"]`.
+- Gráficos que dependen del tema: helpers `tok()` / `palette()` que leen tokens CSS computados con
+  `getComputedStyle`, en vez de hex hardcodeados.
+- Tests de contratos: validar IDs, scopes, ausencia de selectores globales y de colores hardcodeados.
+
 

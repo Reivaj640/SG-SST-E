@@ -213,7 +213,9 @@ priorizacion.js — Vista Priorización: leyenda + sub-tabs + tabla semáforo / 
       html += '<tr><th style="font-size:0.75rem;font-weight:600;color:var(--km-text-muted);text-align:right;padding:8px;">' + labelsNP[i] + '</th>';
       for (var j = 0; j < 3; j++) {
         var c = cells[i + '|' + j] || 0;
-        var bg = c === 0 ? '#f8fafc' : (j === 2 && i === 2 ? '#fee2e2' : (j >= 1 || i >= 1) ? '#fff8e1' : '#d4edda');
+        /* Premium v2 — colores de la matriz de calor viven en los tokens
+           --km-mx-* (el modo oscuro los atenúa sin reglas por clase) */
+        var bg = c === 0 ? 'var(--km-mx-neutral)' : (j === 2 && i === 2 ? 'var(--km-mx-noaceptable)' : (j >= 1 || i >= 1) ? 'var(--km-mx-tolerable)' : 'var(--km-mx-aceptable)');
         html += '<td style="background:' + bg + ';border-radius:8px;padding:24px;text-align:center;font-size:1.5rem;font-weight:700;">' + c + '</td>';
       }
       html += '</tr>';

@@ -553,7 +553,7 @@ matriz.js — Vista Matriz: buscador + 3 dropdowns + tabla plana con todas las c
         body:
           '<p>Esta acción va a <strong>borrar todos los datos locales</strong> ' +
           'y reconstruirlos desde el archivo Excel actual.</p>' +
-          '<p style="margin-top:10px;color:#b45309;"><i class="bi bi-exclamation-triangle"></i> ' +
+          '<p style="margin-top:10px;color:#b07c1a;"><i class="bi bi-exclamation-triangle"></i> ' +
           '<strong>Atención:</strong> se perderán todas las ediciones manuales ' +
           'que hayas hecho y los IDs se regenerarán (pel_1, pel_2, …).</p>' +
           '<p style="margin-top:10px;">Si solo quieres <em>completar campos vacíos</em> ' +
@@ -654,6 +654,24 @@ matriz.js — Vista Matriz: buscador + 3 dropdowns + tabla plana con todas las c
           mismatchDetail: (read.data && read.data.mismatchDetail) || null
         };
         _render(container);
+        /* Header v2 — alimentar el badge de la pestaña "Matriz de peligros"
+           con el total real sin re-renderizar el header */
+        try {
+          document.dispatchEvent(new CustomEvent('km:matriz-loaded', {
+            detail: { total: (_stats && _stats.total) || 0 }
+          }));
+        } catch (e) {}
+        /* 📦794 — primera carga automática: la matriz local estaba vacía y se
+           pobló TODO desde el Excel. Avisar al usuario para que no parezca
+           que los datos aparecieron "de la nada". */
+        if (read.data && read.data.firstPopulate) {
+          KM.notify(
+            'Matriz cargada desde el Excel',
+            'Primera carga: se importaron ' + ((_stats && _stats.total) || 0) + ' peligros de GI-FO-019.',
+            'success',
+            8000
+          );
+        }
         /* Si detectamos desfase y el usuario NO ha cerrado el banner antes,
            disparamos un toast persistente para que se entere de la acción
            recomendada (reemplazar). */

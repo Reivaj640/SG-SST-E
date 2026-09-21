@@ -170,6 +170,10 @@ service.js — IPC + seed JSON fallback
           return Service.importXlsx(companyName, null, { mode: 'merge-empty' }).then(function (imp) {
             var needsReplace = false;
             var mismatchDetail = null;
+            /* 📦794 — primera carga: el merge-empty pobló TODO desde el Excel
+               porque el local estaba vacío. Hay que re-leer igual que cuando
+               se llenan campos, si no la vista mostraría el estado viejo. */
+            var firstPopulate = !!(imp && imp.data && imp.data.firstPopulate);
             if (imp && imp.success) {
               var filled = (imp.data && imp.data.fieldsFilled) || 0;
               var dbg = (imp.data && imp.data.debug) || null;
@@ -195,11 +199,12 @@ service.js — IPC + seed JSON fallback
                     'Use "Reemplazar desde Excel" para sincronizar.');
                 }
               }
-              if (filled > 0) {
+              if (filled > 0 || firstPopulate) {
                 return Service.read(companyName).then(function (fresh) {
                   if (fresh && fresh.data) {
                     fresh.data.needsReplace = needsReplace;
                     fresh.data.mismatchDetail = mismatchDetail;
+                    fresh.data.firstPopulate = firstPopulate;
                   }
                   return fresh;
                 });
@@ -211,6 +216,7 @@ service.js — IPC + seed JSON fallback
             if (readResult && readResult.data) {
               readResult.data.needsReplace = needsReplace;
               readResult.data.mismatchDetail = mismatchDetail;
+              readResult.data.firstPopulate = firstPopulate;
             }
             return readResult;
           }).catch(function () {

@@ -54,10 +54,12 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     var wrapper = document.createElement('div');
     wrapper.className = 'km-wrapper';
 
-    // Header estándar K+AIR v2.0 — UNA sola card (header + tabs juntos)
+    // Header estándar K+AIR v2 — card (miga de pan + título) + tabs separadas.
+    // Header.render devuelve DOS nodos top-level (card + barra de pestañas):
+    // hay que montar AMBOS, no solo el primero (F: las tabs no aparecían).
     var headerEl = document.createElement('div');
-    headerEl.innerHTML = Header.render({ currentView: this.currentView, company: this.currentCompany });
-    if (headerEl.firstChild) wrapper.appendChild(headerEl.firstChild);
+    headerEl.innerHTML = this._headerOpts();
+    while (headerEl.firstChild) wrapper.appendChild(headerEl.firstChild);
 
     // Views (incluye 'editor' para la vista seccionada de Nuevo/Editar peligro)
     var viewsEl = document.createElement('div');
@@ -73,6 +75,18 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     this._bindHeader();
     this._showActiveView();
     KM.log('PELIGROS', 'RENDER', 'SUCCESS', 'view=' + this.currentView);
+  };
+
+  /* Opciones del header (miga de pan: módulo › código › sección) */
+  KairMatrizPeligros.prototype._headerOpts = function (extra) {
+    var opts = {
+      currentView: this.currentView,
+      company: this.currentCompany,
+      moduleName: this.moduleName,
+      submoduleCode: (this.submoduleTitle || '').split(' ')[0] || '4.1.2'
+    };
+    if (extra) Object.keys(extra).forEach(function (k) { opts[k] = extra[k]; });
+    return Header.render(opts);
   };
 
   KairMatrizPeligros.prototype._bindHeader = function () {
@@ -120,22 +134,35 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
          cambió la lista de sedes/procesos/cargos */
       if (self.currentView === 'editor' && Editor && Editor.refresh) Editor.refresh();
     }, opts);
+    /* Badge de conteo en la pestaña "Matriz de peligros" (Header v2) */
+    document.addEventListener('km:matriz-loaded', function (e) {
+      var total = e.detail && e.detail.total;
+      if (total == null) return;
+      var wrapper = self.container && self.container.querySelector('.km-wrapper');
+      if (wrapper && Header.updateBadge) Header.updateBadge(wrapper, 'matriz', total);
+    }, opts);
   };
 
   KairMatrizPeligros.prototype._navigate = function (viewKey) {
     this.currentView = viewKey;
     var wrapper = this.container.querySelector('.km-wrapper');
     if (!wrapper) return;
-    var headerOpts = { currentView: this.currentView, company: this.currentCompany };
+    var extra = {};
     if (viewKey === 'editor' && this._editorSession) {
-      headerOpts.editorMode = this._editorSession.mode || 'new';
-      headerOpts.editorPeligroId = (this._editorSession.data && this._editorSession.data.id) || '';
+      extra.editorMode = this._editorSession.mode || 'new';
+      extra.editorPeligroId = (this._editorSession.data && this._editorSession.data.id) || '';
     }
+    /* Header.render devuelve DOS nodos (card + barra de pestañas) */
     var newHeader = document.createElement('div');
-    newHeader.innerHTML = Header.render(headerOpts);
+    newHeader.innerHTML = this._headerOpts(extra);
+    var newCard = newHeader.firstChild;
+    var newTabs = newCard ? newCard.nextSibling : null;
     var oldCard = wrapper.querySelector('.km-header-card');
-    if (oldCard) oldCard.replaceWith(newHeader.firstChild);
-    else wrapper.insertBefore(newHeader.firstChild, wrapper.firstChild);
+    var oldTabs = wrapper.querySelector('.km-header-tabs');
+    if (oldCard && newCard) oldCard.replaceWith(newCard);
+    else if (newCard) wrapper.insertBefore(newCard, wrapper.firstChild);
+    if (oldTabs) { if (newTabs) oldTabs.replaceWith(newTabs); else oldTabs.remove(); }
+    else if (newTabs) wrapper.appendChild(newTabs);
     this._bindHeader();
     this._showActiveView();
   };

@@ -122,10 +122,14 @@ indicadores.js — Vista KPIs: strip + 5 nuevos KPIs en grid 2 cols + 2 bar char
     var svg = '<div class="km-concentracion">' +
       '<div class="km-concentracion__hero">' +
         '<svg class="km-donut" viewBox="0 0 150 150" width="150" height="150">' +
-          '<circle cx="75" cy="75" r="55" fill="none" stroke="#f1f5f9" stroke-width="24"/>' +
-          '<circle cx="75" cy="75" r="55" fill="none" stroke="#dc2626" stroke-width="24" ' +
+          /* Premium v2 — el rail usa .km-donut__track para heredar el
+             token --km-track (antes era #f1f5f9 fijo y brillaba en oscuro) */
+          '<circle class="km-donut__track" cx="75" cy="75" r="55" fill="none" stroke-width="24"/>' +
+          /* Los stroke de estos dos circulos eran codigo muerto: la clase
+             CSS (.km-donut__seg--si/no) pisa el atributo siempre. */
+          '<circle cx="75" cy="75" r="55" fill="none" stroke-width="24" ' +
             'stroke-dasharray="' + segCritAltos + ' ' + (345.575 - segCritAltos) + '" stroke-dashoffset="0" transform="rotate(-90 75 75)" class="km-donut__seg km-donut__seg--si"/>' +
-          '<circle cx="75" cy="75" r="55" fill="none" stroke="#16a34a" stroke-width="24" ' +
+          '<circle cx="75" cy="75" r="55" fill="none" stroke-width="24" ' +
             'stroke-dasharray="' + segOtros + ' ' + (345.575 - segOtros) + '" stroke-dashoffset="-' + segCritAltos + '" transform="rotate(-90 75 75)" class="km-donut__seg km-donut__seg--no"/>' +
           '<text x="75" y="78" text-anchor="middle" class="km-concentracion__pct ' + pctCls + '">' + pct + '%</text>' +
           '<text x="75" y="95" text-anchor="middle" class="km-donut__label">Nivel I+II</text>' +

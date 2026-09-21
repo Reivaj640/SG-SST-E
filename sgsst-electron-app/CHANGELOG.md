@@ -33,6 +33,18 @@ El hub (landing) del submódulo `4.2.4 Inspecciones Sistemáticas a las Instalac
 - `inspeccion-templates.js` — `buildHeader()` queda legacy porque las 7 vistas funcionales lo siguen usando.
 - `api.js`, `store.js`, `router.js`, IPC, BD — intactos.
 
+### 📦794 · Identificación de Peligros (4.1.2) migrada al premium v2
+
+Migración completa del submódulo `4.1.2 Identificación de Peligros` al dialecto premium v2 (mismo patrón aplicado en 📦783, 784, 785–792). Incluye bridge IPC, los 4 sub-componentes (header / matriz / indicadores / priorización), el service, el CSS y un test nuevo de validación de contratos.
+
+#### Cambios
+
+- **Bridge IPC** (`main/identificacion-peligros-bridge.js`): reescrito con tokens scoped, modo oscuro en ambos atributos (`[data-theme^="dark"]`), BOM/EOL normalizado a LF.
+- **Sub-componentes JS** (`kair-matriz-peligros-{header,matriz,indicadores,priorizacion,service}.js` + `kair-matriz-peligros.js`): migrados al dialecto premium v2 con Header System v2, tokens scoped `--km-*` o equivalentes, sin colores hardcodeados, sin selectores globales.
+- **CSS** (`kair-matriz-peligros.css`): scoped bajo `.km-wrapper`, modo oscuro completo (`[data-theme^="dark"]`), donut theme-aware con helpers `tok()` / `palette()` que leen tokens CSS computados.
+- **Home del módulo padre** (`gestion-peligros-home.js`): ajustes de integración.
+- **Test nuevo** (`main/test-identificacion-peligros.js`, 149 líneas, 9 contratos): valida tokens nuevos en `.km-wrapper`, modo oscuro con re-definición de tokens (ambos atributos), reglas de especificidad oscuras, sin colores sueltos en secciones claras, integridad estructural del CSS, donut con clase + sin atributos stroke muertos, colores inline theme-aware, iconos 0 Font Awesome con Bootstrap local, cableado intacto.
+
 ---
 
 ## [0.1.208] - 2026-09-19

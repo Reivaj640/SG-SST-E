@@ -1,6 +1,13 @@
 // gestion-peligros-home.js - Componente para el home del módulo "Gestión de Peligros y Riesgos"
 // 📦754 · Rediseño premium visual (header minimal + hero + 3 metric cards + chart + radar + grid).
 
+// 📦793 — Estado de sesión del home (caché y última actualización, un Map por
+// empresa). `refreshStats()` lo usaba pero NUNCA se definía → el error de
+// consola `Cannot read properties of undefined (reading 'cache')`. Es el MISMO
+// bug que 📦763 arregló en el home de Gestión de la Salud. Se define al cargar
+// el archivo, de forma idempotente (por si el script se carga dos veces).
+window._peligrosHomeState = window._peligrosHomeState || { cache: new Map(), lastUpdate: new Map() };
+
 class GestionPeligrosHome {
 	constructor(container, moduleName, submodules, companyName) {
 		this.container = container;
@@ -107,6 +114,11 @@ class GestionPeligrosHome {
       peligros: (mpResult && mpResult.success) ? mpResult.data : null
     };
 
+    // 📦793 — Doble candado: si por lo que sea el estado no existe, se crea acá
+    // (así este home nunca vuelve a cortar la carga por un undefined).
+    if (!window._peligrosHomeState) {
+      window._peligrosHomeState = { cache: new Map(), lastUpdate: new Map() };
+    }
     window._peligrosHomeState.cache.set(company, newData);
     window._peligrosHomeState.lastUpdate.set(company, Date.now());
 
@@ -119,6 +131,13 @@ class GestionPeligrosHome {
 
 	updateWidgetsUI(data) {
 		if (!data) return;
+
+		// 📦793 — `this.widgets` NUNCA se inicializa (los `create*Widget()` que lo
+		// llenan son código muerto del sistema viejo). Sin esta guarda, la segunda
+		// mitad de cada condición (`this.widgets.X`) lanzaba
+		// `TypeError: Cannot read properties of undefined (reading 'inspecciones')`.
+		// Mismo bug que 📦763 en el home de Salud.
+		if (!this.widgets) return;
 
 		if (data.inspecciones && this.widgets.inspecciones) {
 			this.widgets.inspecciones.update(data.inspecciones);

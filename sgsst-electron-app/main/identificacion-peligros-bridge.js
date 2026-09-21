@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
 K+AIR â€” MÃ³dulo 4.1.2 IdentificaciÃ³n de Peligros
 Bridge â€” JSON CRUD + Motor GTC-45 (NDÃ—NE=NP, NPÃ—NC=NR)
 Persistencia: JSON en {userData}/identificacion-peligros-data/
@@ -726,6 +726,12 @@ function _addPeligro(matriz, cargoId, data) {
   fuente: (data && data.fuente) || '',
   medio: (data && data.medio) || '',
   individuo: (data && data.individuo) || '',
+  /* 📦794 — controles existentes: el editor y el merge-empty los usan, pero
+     al crearse un peligro nuevo (importar/reemplazar/primera carga) quedaban
+     perdidos porque no se copiaban del Excel. */
+  controlFuente: (data && data.controlFuente) || '',
+  controlMedio: (data && data.controlMedio) || '',
+  controlPersona: (data && data.controlPersona) || '',
   medidasExistenteFuente: (data && data.medidasExistenteFuente) || '',
   medidasExistenteMedio: (data && data.medidasExistenteMedio) || '',
   medidasExistenteIndividuo: (data && data.medidasExistenteIndividuo) || '',
@@ -2041,18 +2047,27 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
       if (!filePath || !fs.existsSync(filePath)) {
         return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'No se encontrÃ³ archivo .xlsx en la carpeta 4.1.2 de la empresa' } };
       }
-      if (mergeEmptyMode) {
+      /* 📦794 — PRIMERA CARGA: si el JSON local está vacío y el Excel SÍ trae
+         datos, el merge-empty no tendría nada que completar (itera sobre los
+         registros EXISTENTES). En ese caso poblamos TODO desde el Excel —
+         equivale a "Reemplazar" pero sin riesgo porque no hay nada local que
+         se pueda perder. El usuario lo vive como: abre la sección y la
+         matriz ya está cargada. */
+      var parsed = _parseMatrizXlsx(filePath);
+      if (!parsed.success) {
+        console.log('[KM_DEBUG] import: parse FAILED, error=', parsed.error);
+        return { success: false, error: { code: 'PARSE_ERROR', message: parsed.error } };
+      }
+      var existing = _readMatriz(companyName);
+      if (!existing || !existing.sedes) existing = { sedes: [] };
+      var excelSedeCount = (parsed.matriz && parsed.matriz.sedes) ? parsed.matriz.sedes.length : 0;
+      var firstPopulate = mergeEmptyMode && existing.sedes.length === 0 && excelSedeCount > 0;
+
+      if (mergeEmptyMode && !firstPopulate) {
         /* F439.3 (2026-06-24): modo merge-empty. Lee el Excel y para cada
            peligro existente en el JSON, completa SOLO los campos vacÃ­os
            con el valor del Excel. No sobrescribe nada que ya tenga
            contenido, asÃ­ es seguro correrlo varias veces. */
-        var parsed = _parseMatrizXlsx(filePath);
-        if (!parsed.success) {
-          console.log('[KM_DEBUG] merge-empty: parse FAILED, error=', parsed.error);
-          return { success: false, error: parsed.error };
-        }
-        var existing = _readMatriz(companyName);
-        if (!existing || !existing.sedes) existing = { sedes: [] };
         var fieldsFilled = 0;
         var debugLog = {
           sedesMatched: 0, procesosMatched: 0, cargosMatched: 0, peligrosMatched: 0,
@@ -2134,13 +2149,9 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
           }
         };
       }
-      var parsed = _parseMatrizXlsx(filePath);
-      if (!parsed.success) {
-        return { success: false, error: { code: 'PARSE_ERROR', message: parsed.error } };
-      }
-
-      /* En modo REEMPLAZAR (default): crear matriz nueva preservando solo metadata */
-      var existing = _readMatriz(companyName);
+      /* Modo REEMPLAZAR: crear matriz nueva preservando solo la metadata.
+         Modo append / primera carga (📦794): sobre la matriz existente se
+         crea ÃšNICAMENTE lo que falte (con local vacÃ­o crea todo). */
       var target;
       if (replaceMode) {
         target = _crearMatrizVacia(companyName);
@@ -2203,8 +2214,16 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
                 expuestos: srcPel.expuestos, peorConsecuencia: srcPel.peorConsecuencia,
                 criterioEstablecido: srcPel.criterioEstablecido, fuente: srcPel.fuente,
                 medio: srcPel.medio, individuo: srcPel.individuo,
+                controlFuente: srcPel.controlFuente, controlMedio: srcPel.controlMedio, controlPersona: srcPel.controlPersona,
                 medidasExistenteFuente: srcPel.medidasExistenteFuente, medidasExistenteMedio: srcPel.medidasExistenteMedio,
                 medidasExistenteIndividuo: srcPel.medidasExistenteIndividuo, medidasIntervencion: srcPel.medidasIntervencion,
+                /* 📦794 — los 5 desgloses de intervención y los 3 controles
+                   existentes se perdían en la creación (solo sobrevivían al
+                   segundo pase merge-empty). Ahora la primera carga queda
+                   completa de una vez. */
+                medidaEliminacion: srcPel.medidaEliminacion, medidaSustitucion: srcPel.medidaSustitucion,
+                medidaIngenieria: srcPel.medidaIngenieria, medidaAdministrativos: srcPel.medidaAdministrativos,
+                medidaEpp: srcPel.medidaEpp,
                 responsable: srcPel.responsable, plazo: srcPel.plazo, observaciones: srcPel.observaciones
               };
               _addPeligro(target, existingCargo.id, pelData);
@@ -2218,7 +2237,8 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
       return {
         success: true,
         data: {
-          mode: replaceMode ? 'replace' : 'append',
+          mode: replaceMode ? 'replace' : (firstPopulate ? 'first-populate' : 'append'),
+          firstPopulate: firstPopulate,
           rowsImported: parsed.rowsImported,
           sedesCreated: parsed.sedesCreated,
           procesosCreated: parsed.procesosCreated,
