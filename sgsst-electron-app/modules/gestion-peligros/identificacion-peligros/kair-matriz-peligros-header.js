@@ -6,6 +6,7 @@ Estructura (patrón premium de la app, ref. Perfil de Cargo y Profesiograma):
 - Miga de pan:  Módulo › 4.1.2 › Sección actual
 - Encabezado:   SIN tarjeta (transparente) — chip de icono (44x44) +
                 título Manrope 800 + subtítulo (con código GI-FO-019)
+                | botón "Volver" a la derecha (vuelve al home del módulo)
 - Barra de pestañas SEPARADA bajo el encabezado: icono SVG + label + badge
                 | acciones (Nuevo peligro / restablecer)
 
@@ -87,13 +88,17 @@ el header; las vistas conservan sus `bi` propios).
         '</div>';
     }
 
-    /* Fila principal: SOLO icono + título/subtítulo. Estructura estándar del
-       sistema (ref. Perfil de Cargo 3.1.3): encabezado transparente, sin
-       tarjeta, sin chip de empresa y sin botón Volver — la navegación entre
-       módulos la hace el marco general de la app. */
+    /* Fila principal: icono + título/subtítulo a la izquierda | Volver a la
+       derecha. Encabezado transparente (ref. Perfil de Cargo 3.1.3) con el
+       botón Volver que pide el usuario para volver rápido al módulo. */
     var mainRow =
       '<div class="km-header-card__main">' +
         titleBlock +
+        '<div class="km-header-card__right">' +
+          '<button type="button" class="km-header-card__back" data-action="back" title="Volver al módulo" aria-label="Volver al módulo">' +
+            '<span class="km-header-card__back-icon" aria-hidden="true">' + ICONS['arrow-left'] + '</span> Volver' +
+          '</button>' +
+        '</div>' +
       '</div>';
 
     /* Barra de pestañas SEPARADA (bajo la card) */
@@ -154,9 +159,12 @@ el header; las vistas conservan sus `bi` propios).
   Header.bindEvents = function (container, handlers) {
     handlers = handlers || {};
 
-    /* El botón "Volver" se retiró del encabezado (estructura Perfil de
-       Cargo); el editor conserva "Volver a la matriz" en la barra de
-       pestañas (data-action="back-to-matriz"). */
+    /* Botón "Volver" del encabezado (vuelve al home del módulo). El editor
+       conserva además "Volver a la matriz" en la barra de pestañas
+       (data-action="back-to-matriz"). */
+    var back = container.querySelector('[data-action="back"]');
+    if (back && handlers.onBack) back.addEventListener('click', handlers.onBack);
+
     var backToMatriz = container.querySelector('[data-action="back-to-matriz"]');
     if (backToMatriz && handlers.onBackToMatriz) backToMatriz.addEventListener('click', handlers.onBackToMatriz);
 

@@ -117,7 +117,7 @@ check('index.html carga bootstrap-icons local', INDEX.includes('assets/css/boots
 check('renderer.js monta KairMatrizPeligros en 4.1.2', RENDERER.includes('submoduleName === "4.1.2 Identificación de Peligros"') && RENDERER.includes('window.KairMatrizPeligros'));
 check('index.html: 8 scripts del módulo incluidos',
   (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js/g) || []).length === 8);
-check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260920-premium-v6-header-transparente'));
+check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260921-premium-v7-volver'));
 
 /* ── 9b. Header System v2 (miga de pan + card + tabs separadas) ── */
 check('header: miga de pan en el marcado', FILES.header.includes('km-header-card__breadcrumb'));
@@ -133,13 +133,13 @@ check('entry: _headerOpts con módulo y código', FILES.entry.includes('_headerO
 check('entry: escucha km:matriz-loaded para el badge', FILES.entry.includes('km:matriz-loaded') && FILES.entry.includes('updateBadge'));
 check('matriz: emite km:matriz-loaded con total', FILES.matriz.includes("km:matriz-loaded"));
 check('entry: render inicial monta AMBOS nodos (card + tabs)', FILES.entry.includes('while (headerEl.firstChild)'));
-check('index.html: 8 scripts del módulo con cache-bust v4', (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js\?v=20260920-premium-v6-header-transparente/g) || []).length === 8);
-check('header: SIN tarjeta (sin empresa ni Volver)', !FILES.header.includes('km-header-card__company') && !FILES.header.includes('data-action="back"'));
+check('index.html: 8 scripts del módulo con cache-bust v4', (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js\?v=20260921-premium-v7-volver/g) || []).length === 8);
+check('header: SIN tarjeta y SIN empresa (Volver conservado)', !FILES.header.includes('km-header-card__company') && FILES.header.includes('data-action="back"'));
 check('header: subtítulo con código GI-FO-019', FILES.header.includes('(GI-FO-019)'));
 check('css: .km-header-card transparente', /\.km-wrapper \.km-header-card \{[^}]*background: transparent;/.test(CSS));
 check('css: dark mantiene header transparente', /\[data-theme\^="dark"\] \.km-wrapper \.km-header-card \{ background: transparent/.test(CSS));
 
-check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260920-premium-v6-header-transparente'));
+check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260921-premium-v7-volver'));
 
 /* ── 9c. Primera carga automática (📦794) ── */
 check('bridge: detecta primera carga (local vacío + Excel con datos)', BRIDGE.includes('var firstPopulate = mergeEmptyMode') && BRIDGE.includes('existing.sedes.length === 0'));
