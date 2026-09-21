@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.211] - 2026-09-21
+
+### 📦799 · Home Gestión de Peligros y Riesgos — fix de datos reales en hero, tarjetas y gráficas
+
+El home premium (📦754) se veía todo en cero (hero "0% cumplimiento", INSPECCIONES 0/0, MANTENIMIENTO 0/0, PELIGROS 0/0, barras "Cumplimiento por área" en 0) aunque la empresa tuviera datos reales.
+
+#### Causa (dos fallos combinados)
+
+1. **Nunca se entregaba la información a la vista**: `refreshStats()` guardaba las respuestas de los puentes en la caché global de sesión, pero jamás asignaba `this.peligrosStats`, que es lo que lee `renderMainArea()`. Los datos llegaban bien y morían en la bodega.
+2. **Nombres de campos incompatibles**: la vista leía `inspecciones.total/realizadas/vencidas` y `mantenimiento.total/completados/atrasado`, pero los puentes devuelven `programaTotal/programaCompletadas/programaPendientes` (o `totalInspecciones/completadas/pendientesMes`) y `totalActividades/completadasMes/pendientesMes`. Cada lectura caía en `undefined` → 0.
+
+#### Cambios
+
+- **Mapeo explícito** en `refreshStats()` hacia los nombres que la vista consume + asignación real de `this.peligrosStats`. Con el Excel real de Tempoactiva (29 cumplidos + 10 programados) la tarjeta muestra 29/39.
+- **Mediciones y EPP marcados como "sin datos" (null)**: nunca tuvieron puente de datos, así que su barra se dibujaba 0/0 eternamente y arrastraban el score del hero a cero. Ahora el score compuesto solo promedia las áreas con datos y la barra de Mediciones solo aparece cuando exista un canal que la alimente.
+- **Ajustes pendientes de Mantenimiento (4.2.5)** de la auditoría 📦797: carga CSS duplicada sin versión en `mantenimiento-component.js` (href con `?v=20260921-premium-header` y selector `^=`) y tipografía del sistema (Manrope/DM Sans) en `mantenimiento.css`.
+- **Cache-bust** `GESTION-PELIGROS-20260918-bar-chart-html` → `GESTION-PELIGROS-20260921-fix-home-datos`.
+
 ## [0.1.210] - 2026-09-21
 
 ### 📦796 · Inspecciones Sistemáticas (4.2.4) — premium completo de las 7 vistas

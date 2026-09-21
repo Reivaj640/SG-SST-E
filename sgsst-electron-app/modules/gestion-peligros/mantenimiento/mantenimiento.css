@@ -26,7 +26,7 @@ Sistema Visual K+AIR v2.0 — BEM aislado con prefijo kair-mnt-
  --kair-mnt-text-secondary: #5a6378;
  --kair-mnt-text-light: #9ca3af;
  --kair-mnt-text-muted: #b0b7c3;
- --kair-mnt-font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+ --kair-mnt-font-family: var(--kair-font-ui, 'Manrope'), 'Segoe UI', system-ui, -apple-system, sans-serif;
  --kair-mnt-font-size-xs: 0.625rem;
  --kair-mnt-font-size-sm: 0.75rem;
  --kair-mnt-font-size-base: 0.8125rem;
@@ -117,6 +117,7 @@ HEADER K+AIR v3.0 — Card + Tabs (estandarizado como capacitaciones)
 .kair-mnt-wrapper .kair-title {
   font-size: 1.25rem;
   font-weight: 800;
+  font-family: var(--kair-font-ui, 'Manrope'), 'Segoe UI', system-ui, sans-serif;
   letter-spacing: -0.01em;
   line-height: 1.2;
   margin: 0;

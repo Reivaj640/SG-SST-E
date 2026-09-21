@@ -3993,3 +3993,24 @@ llegaba por deps pero no se usaba).
 - **Preload**: 3 métodos nuevos (`inspeccionExplorarHistorico`, `inspeccionAbrirRuta`, `inspeccionArchivar`).
 - **Test nuevo** `main/test-inspecciones-carpeta.js`: **26/26** contra copia de la estructura real
   (Excel intacto verificado). Cache-bust `20260921-carpeta-v1`.
+
+### 📦799 — Home Gestión de Peligros y Riesgos: fix de datos reales en hero, tarjetas y gráficas
+
+El home premium (📦754) mostraba TODO en cero aunque la empresa tuviera datos. Dos fallos combinados:
+
+1. **La información nunca llegaba a la vista**: `refreshStats()` guardaba las respuestas en la caché
+   global de sesión pero jamás asignaba `this.peligrosStats` (lo que lee `renderMainArea()`). Mismo
+   patrón de "datos en la bodega, no en el tablero" que 📦791 (gráfica de Salud).
+2. **Nombres incompatibles**: la vista leía `inspecciones.total/realizadas/vencidas` y
+   `mantenimiento.total/completados/atrasado`, pero los puentes devuelven
+   `programaTotal/programaCompletadas/programaPendientes` (o `totalInspecciones/completadas/pendientesMes`)
+   y `totalActividades/completadasMes/pendientesMes` → todo `undefined` → 0.
+
+Fix: mapeo explícito en `refreshStats()` + asignación real de `this.peligrosStats`. **Mediciones y EPP**
+(como nunca tuvieron puente de datos) pasan a "sin datos" (`null`): el score compuesto los excluye en
+vez de mostrar 0/0 eternamente, y la barra de Mediciones solo se dibuja cuando exista un canal que la
+alimente. Incluye los 2 ajustes pendientes de la auditoría de Mantenimiento (📦797): carga CSS
+duplicada sin versión (`mantenimiento-component.js`) y tipografía Manrope/DM Sans (`mantenimiento.css`).
+Cache-bust `GESTION-PELIGROS-20260921-fix-home-datos`. REGLA: cuando una vista compuesta lee de varios
+puentes, verificar el nombre exacto de cada campo en el puente (no asumir) y confirmar que el resultado
+termina asignado en el estado que la vista realmente lee.

@@ -48,8 +48,12 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
  };
 
  MantenimientoComponent.prototype._loadCSS = function (callback) {
-  var cssHref = 'modules/gestion-peligros/mantenimiento/mantenimiento.css';
-  var existingLink = document.querySelector('link[href="' + cssHref + '"]');
+  /* Cache-bust: mismo valor que index.html. El selector usa ^= para
+     reconocer el link aunque tenga ?v=... (antes el match exacto sin
+     query no encontraba el link de index.html y cargaba el CSS DOS veces,
+     la segunda SIN versión → podía servirse CSS viejo de caché). */
+  var cssHref = 'modules/gestion-peligros/mantenimiento/mantenimiento.css?v=20260921-premium-header';
+  var existingLink = document.querySelector('link[href^="modules/gestion-peligros/mantenimiento/mantenimiento.css"]');
   if (existingLink || this.cssLoaded) {
    this.cssLoaded = true;
    callback();

@@ -108,11 +108,44 @@ class GestionPeligrosHome {
     var mntoResult = results[1];
     var mpResult = results[2] || null;
 
+    var inspData = inspResult.success ? (inspResult.data || {}) : null;
+    var mntoData = mntoResult.success ? (mntoResult.data || {}) : null;
+    var mpData = (mpResult && mpResult.success) ? (mpResult.data || {}) : null;
+
+    // 📦799 — Mapeo a los nombres REALES que devuelven los puentes de datos.
+    // Antes se guardaba la respuesta cruda y la vista leía nombres que no
+    // existían en ella → todo se veía 0/0 aunque la empresa tuviera datos.
+    //   inspecciones:get-stats → programaTotal/programaCompletadas/programaPendientes
+    //   mantenimiento:get-stats → totalActividades/completadasMes/pendientesMes
+    //   matriz-peligros:stats → total/evaluados
     var newData = {
-      inspecciones: inspResult.success ? inspResult.data : null,
-      mantenimiento: mntoResult.success ? mntoResult.data : null,
-      peligros: (mpResult && mpResult.success) ? mpResult.data : null
+      inspecciones: inspData ? {
+        total: inspData.programaTotal || inspData.totalInspecciones || 0,
+        realizadas: inspData.programaCompletadas || inspData.completadas || 0,
+        vencidas: inspData.programaPendientes || inspData.pendientesMes || 0,
+        tasaCumplimiento: inspData.tasaCumplimiento || 0
+      } : null,
+      mantenimiento: mntoData ? {
+        total: mntoData.totalActividades || 0,
+        completados: mntoData.completadasMes || 0,
+        atrasado: mntoData.pendientesMes || 0,
+        tasaCumplimiento: mntoData.tasaCumplimiento || 0
+      } : null,
+      peligros: mpData ? {
+        total: mpData.total || 0,
+        evaluados: mpData.evaluados || 0,
+        tasaEvaluados: mpData.tasaEvaluados || 0
+      } : null,
+      // 📦799 — Mediciones y EPP aún no tienen puente de datos. Se marcan como
+      // "sin datos" (null) para que el puntaje general los ignore en vez de
+      // mostrar 0/0 eternamente y arrastrar el promedio a cero.
+      mediciones: null,
+      epp: null
     };
+
+    // 📦799 — La vista lee this.peligrosStats; solo guardar la caché global
+    // NUNCA alimentaba la interfaz (por eso todo se veía en cero).
+    this.peligrosStats = newData;
 
     // 📦793 — Doble candado: si por lo que sea el estado no existe, se crea acá
     // (así este home nunca vuelve a cortar la carga por un undefined).
@@ -745,9 +778,13 @@ class GestionPeligrosHome {
 		var items = [
 			{ label: 'Inspecciones', total: inspecciones, value: inspeccionesCumplidas, color: 'var(--kair-blue, #2057b8)' },
 			{ label: 'Mantenimiento', total: mantenimiento, value: mantenimientoHecho, color: 'var(--kair-mint, #1bb888)' },
-			{ label: 'Peligros', total: peligros, value: peligrosEvaluados, color: 'var(--kair-amber, #e7a224)' },
-			{ label: 'Mediciones', total: mediciones, value: medicionesHechas, color: 'var(--kair-red, #da5563)' }
+			{ label: 'Peligros', total: peligros, value: peligrosEvaluados, color: 'var(--kair-amber, #e7a224)' }
 		];
+		// 📦799 — La barra de Mediciones solo se dibuja cuando existe un puente
+		// de datos que la alimente (hoy no hay → antes quedaba 0/0 para siempre).
+		if (stats.mediciones) {
+			items.push({ label: 'Mediciones', total: mediciones, value: medicionesHechas, color: 'var(--kair-red, #da5563)' });
+		}
 
 		// 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro de
 		// una caja de alto fijo se estiraba sin conservar proporción y el texto se deformaba
@@ -887,7 +924,7 @@ class GestionPeligrosHome {
 			+ '<div class="kair-row-title">'
 			+ '  <div>'
 			+ '    <h3>Cumplimiento por área</h3>'
-			+ '    <div class="kair-card-hint">Inspecciones · Mantenimiento · Peligros · Mediciones</div>'
+			+ '    <div class="kair-card-hint">Inspecciones · Mantenimiento · Peligros</div>'
 			+ '  </div>'
 			+ '</div>'
 			+ '<div class="kair-chart kair-chart--flow" id="kair-chart-peligros"></div>';
