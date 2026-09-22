@@ -4,9 +4,9 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 var VIEWS = [
-  { key: 'resultado',  label: 'Resultado',  icon: 'bi-bullseye' },
-  { key: 'estructura', label: 'Estructura', icon: 'bi-shield-check' },
-  { key: 'proceso',    label: 'Proceso',    icon: 'bi-gear' }
+  { key: 'resultado',  label: 'Resultado',  icon: 'target' },
+  { key: 'estructura', label: 'Estructura', icon: 'shield-check' },
+  { key: 'proceso',    label: 'Proceso',    icon: 'settings' }
 ];
 
 function DefinicionIndicadoresComponent(container, currentCompany, moduleName, submoduleTitle, backToModuleCallback) {
@@ -43,69 +43,77 @@ DefinicionIndicadoresComponent.prototype._esc = function (str) {
   return div.innerHTML;
 };
 
+// ── Iconos Lucide (📦800) ────────────────────────────────────────
+DefinicionIndicadoresComponent.prototype._icon = function (name, size) {
+  return '<i data-lucide="' + name + '" style="width:' + (size || 16) + 'px;height:' + (size || 16) + 'px;display:inline-block;vertical-align:middle"></i>';
+};
+
+DefinicionIndicadoresComponent.prototype._refreshIcons = function () {
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    try { window.lucide.createIcons(); } catch (e) { /* ignore */ }
+  }
+};
+
 // ── Render UI ───────────────────────────────────────────────────
 DefinicionIndicadoresComponent.prototype._renderUI = function () {
   var self = this;
   var stats = IndicadoresService.getKpiStats();
 
-  // Header card (Capacitaciones pattern — BEM kair-ind-*)
-  var headerHtml =
-    '<div class="k-section-card" id="kair-ind-header-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">' +
-      '<div class="kair-ind-header-row">' +
-        '<div class="kair-ind-header-left">' +
-          '<i class="bi bi-graph-up kair-ind-header-icon"></i>' +
-          '<div>' +
-            '<h3 class="kair-ind-header-title">Definición de Indicadores</h3>' +
-            '<p class="kair-ind-header-subtitle">Submódulo 6.1.1 — Gestión de indicadores del SG-SST</p>' +
-          '</div>' +
-        '</div>' +
-        '<div class="kair-ind-header-actions">' +
-          '<span class="kair-ind-header-company" id="kair-ind-header-company"><i class="kair-icon-building"></i> <span id="header-company-text">' + this._esc(this.currentCompany) + '</span></span>' +
-          '<div class="kair-ind-header-divider"></div>' +
-          '<button class="header-back-btn" id="kair-ind-back"><i class="bi bi-arrow-left"></i> Volver</button>' +
-          '<button class="header-action--ghost" id="kair-ind-export"><i class="bi bi-download"></i> Exportar</button>' +
-        '</div>' +
-      '</div>' +
-      '<div class="kair-ind-tabs" id="kair-ind-tabs">';
+  /* 📦800 — Header premium v2 (estándar · kair-page-header + kair-badge-ico +
+     kair-titles + kair-actions). Mismos ids (#kair-ind-export, #kair-ind-back,
+     #kair-ind-tabs, #kair-ind-tab[data-view]) que el header viejo para no
+     tocar _initNavigation. La fuente de datos se anuncia en una píldora
+     suave (.kair-badge-soft) en lugar del badge custom kind-header__sync. */
+  var isExcel = IndicadoresService.getSource() === 'excel';
+  var syncLabel = isExcel
+    ? 'Sincronizado · INDICADORES ' + IndicadoresService.getYear() + '.xlsx'
+    : 'Datos de ejemplo (sin Excel en la carpeta)';
 
-  // Tabs (inside header card, Capacitaciones pattern)
+  var headerHtml =
+    '<header class="kair-page-header">' +
+      '<div class="kair-badge-ico">' + this._icon('target', 22) + '</div>' +
+      '<div class="kair-titles">' +
+        '<h1 class="kair-title">Definición de Indicadores</h1>' +
+        '<p class="kair-sub">Gestión de indicadores del SG-SST — definición, estructura, proceso y resultado.</p>' +
+      '</div>' +
+      '<div class="kair-actions">' +
+        '<span class="kair-badge-soft' + (isExcel ? '' : ' kair-badge-soft--warn') + '" title="' + this._esc(syncLabel) + '">' +
+          this._icon(isExcel ? 'check-circle-2' : 'info', 13) + '<span>' + this._esc(syncLabel) + '</span>' +
+        '</span>' +
+        '<button class="kair-btn kair-btn-outline" id="kair-ind-export">' + this._icon('download', 14) + ' Exportar</button>' +
+        '<button class="kair-btn kair-btn-ghost" id="kair-ind-back">' + this._icon('arrow-left', 14) + ' Volver</button>' +
+      '</div>' +
+    '</header>' +
+    '<div class="kair-ind-tabs" id="kair-ind-tabs">';
+
+  // Tabs (debajo del header, premium pattern como en Evaluación Inicial)
   headerHtml += VIEWS.map(function (v) {
     return '<button class="kair-ind-tab' + (v.key === self.currentView ? ' kair-ind-tab--active' : '') +
       '" data-view="' + v.key + '">' +
-      '<i class="bi ' + v.icon + '"></i> ' + v.label +
+      self._icon(v.icon, 15) + ' ' + v.label +
       '</button>';
   }).join('');
 
-  headerHtml += '</div></div>';
+  headerHtml += '</div>';
 
-  // KPI Strip
-  var kpiColorMap = {
-    total: { color: '#174ea6', bg: '#e8f0fe' },
-    cumplidos: { color: '#28a745', bg: '#e8f5e9' },
-    enProgreso: { color: '#174ea6', bg: '#e8f0fe' },
-    pendientes: { color: '#ffc107', bg: '#fff8e1' },
-    criticos: { color: '#dc3545', bg: '#fde8e8' },
-    tasa: { color: stats.tasaCumplimiento >= 70 ? '#28a745' : stats.tasaCumplimiento >= 40 ? '#ffc107' : '#dc3545',
-            bg: stats.tasaCumplimiento >= 70 ? '#e8f5e9' : stats.tasaCumplimiento >= 40 ? '#fff8e1' : '#fde8e8' }
-  };
-
+  /* KPI Strip — colores por clase (📦800): el color por estado sale del
+     CSS con tokens canónicos, ya no de hex inline. */
   var kpis = [
-    { key: 'total', icon: 'bi-bar-chart', value: stats.total, label: 'Total Indicadores' },
-    { key: 'cumplidos', icon: 'bi-check-circle', value: stats.cumplidos, label: 'Cumplidos' },
-    { key: 'enProgreso', icon: 'bi-arrow-repeat', value: stats.enProgreso, label: 'En Progreso' },
-    { key: 'pendientes', icon: 'bi-clock-history', value: stats.pendientes, label: 'Pendientes' },
-    { key: 'criticos', icon: 'bi-exclamation-triangle', value: stats.criticos, label: 'Críticos' },
-    { key: 'tasa', icon: 'bi-graph-up', value: stats.tasaCumplimiento + '%', label: 'Tasa Cumplimiento' }
+    { key: 'total', icon: 'bar-chart-3', value: stats.total, label: 'Total Indicadores' },
+    { key: 'cumplidos', icon: 'check-circle-2', value: stats.cumplidos, label: 'Cumplidos' },
+    { key: 'enProgreso', icon: 'refresh-cw', value: stats.enProgreso, label: 'En Progreso' },
+    { key: 'pendientes', icon: 'history', value: stats.pendientes, label: 'Pendientes' },
+    { key: 'criticos', icon: 'alert-triangle', value: stats.criticos, label: 'Críticos' },
+    { key: 'tasa', icon: 'trending-up', value: stats.tasaCumplimiento + '%', label: 'Tasa Cumplimiento' }
   ];
 
   var kpiHtml = kpis.map(function (kpi, idx) {
-    var c = kpiColorMap[kpi.key];
-    var item = '<div class="kair-ind-kpi-item">' +
-      '<div class="kair-ind-kpi-item__icon" style="background:' + c.bg + '">' +
-        '<i class="bi ' + kpi.icon + '" style="color:' + c.color + ';font-size:1rem"></i>' +
+    var item = '<div class="kair-ind-kpi-item kair-ind-kpi-item--' + kpi.key + '">' +
+      '<div class="kair-ind-kpi-item__icon">' +
+        self._icon(kpi.icon, 16) +
       '</div>' +
       '<div class="kair-ind-kpi-item__content">' +
-        '<span class="kair-ind-kpi-item__value" style="color:' + c.color + '">' + kpi.value + '</span>' +
+        '<span class="kair-ind-kpi-item__value">' + kpi.value + '</span>' +
         '<span class="kair-ind-kpi-item__label">' + kpi.label + '</span>' +
       '</div>' +
     '</div>';
@@ -117,9 +125,9 @@ DefinicionIndicadoresComponent.prototype._renderUI = function () {
   var toolbarHtml =
     '<div class="kair-ind-toolbar">' +
       '<div class="kair-ind-toolbar__search">' +
-        '<i class="bi bi-search"></i>' +
+        self._icon('search', 15) +
         '<input type="text" id="kair-ind-search" placeholder="Buscar indicador por nombre, definición o responsable..." class="kair-ind-toolbar__input" />' +
-        '<button class="kair-ind-toolbar__clear" id="kair-ind-search-clear" style="display:none"><i class="bi bi-x"></i></button>' +
+        '<button class="kair-ind-toolbar__clear" id="kair-ind-search-clear" style="display:none">' + self._icon('x', 14) + '</button>' +
       '</div>' +
     '</div>';
 
@@ -137,17 +145,17 @@ DefinicionIndicadoresComponent.prototype._renderUI = function () {
             '<span class="kair-ind-type-badge" id="kair-ind-modal-type-badge"></span>' +
             '<h3 class="kair-ind-modal__title" id="kair-ind-modal-title">Detalle</h3>' +
           '</div>' +
-          '<button class="kair-ind-modal__close" id="kair-ind-modal-close"><i class="bi bi-x-lg"></i></button>' +
+          '<button class="kair-ind-modal__close" id="kair-ind-modal-close">' + this._icon('x', 16) + '</button>' +
         '</div>' +
         '<div class="kair-ind-modal__tabs">' +
-          '<button class="kair-ind-modal__tab kair-ind-modal__tab--active" data-modal-tab="info"><i class="bi bi-info-circle"></i> Información</button>' +
-          '<button class="kair-ind-modal__tab" data-modal-tab="data"><i class="bi bi-file-text"></i> Datos Mensuales</button>' +
-          '<button class="kair-ind-modal__tab" data-modal-tab="chart"><i class="bi bi-bar-chart"></i> Tendencia</button>' +
+          '<button class="kair-ind-modal__tab kair-ind-modal__tab--active" data-modal-tab="info">' + this._icon('info', 14) + ' Información</button>' +
+          '<button class="kair-ind-modal__tab" data-modal-tab="data">' + this._icon('file-text', 14) + ' Datos Mensuales</button>' +
+          '<button class="kair-ind-modal__tab" data-modal-tab="chart">' + this._icon('bar-chart-3', 14) + ' Tendencia</button>' +
         '</div>' +
         '<div class="kair-ind-modal__content" id="kair-ind-modal-content"></div>' +
         '<div class="kair-ind-modal__footer">' +
           '<button class="kair-ind-btn kair-ind-btn--ghost" id="kair-ind-modal-cancel">Cerrar</button>' +
-          '<button class="kair-ind-btn kair-ind-btn--primary" id="kair-ind-modal-edit"><i class="bi bi-pencil"></i> Editar Indicador</button>' +
+          '<button class="kair-ind-btn kair-ind-btn--primary" id="kair-ind-modal-edit">' + this._icon('pencil', 14) + ' Editar Indicador</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -182,6 +190,15 @@ DefinicionIndicadoresComponent.prototype._initNavigation = function () {
   if (backBtn) {
     backBtn.onclick = function () {
       if (typeof self.backToModuleCallback === 'function') self.backToModuleCallback();
+    };
+  }
+
+  /* 📦800 — Exportar antes no tenía acción (botón muerto). Por ahora
+     informa con un toast; la exportación real a Excel vendrá después. */
+  var exportBtn = wrapper.querySelector('#kair-ind-export');
+  if (exportBtn) {
+    exportBtn.onclick = function () {
+      self._showToast('La exportación a Excel estará disponible próximamente', 'info');
     };
   }
 
@@ -241,6 +258,7 @@ DefinicionIndicadoresComponent.prototype._navigate = function (viewKey) {
   // Load view content
   setTimeout(function () {
     self._loadCurrentView();
+    self._refreshIcons();
   }, 50);
 };
 
@@ -278,11 +296,15 @@ DefinicionIndicadoresComponent.prototype._propagateSearch = function (q) {
 DefinicionIndicadoresComponent.prototype._showToast = function (title, type) {
   var container = document.getElementById('kair-ind-toast-container');
   if (!container) return;
-  var icon = type === 'success' ? 'bi-check-circle-fill' : type === 'error' ? 'bi-exclamation-circle-fill' : 'bi-info-circle-fill';
-  var color = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#174ea6';
+  var map = {
+    success: { icon: 'check-circle-2', color: '#1a9e74' },
+    error: { icon: 'alert-circle', color: '#d64550' },
+    info: { icon: 'info', color: '#2057b8' }
+  };
+  var m = map[type] || map.info;
   var toast = document.createElement('div');
   toast.className = 'kair-ind-toast kair-ind-toast--' + type;
-  toast.innerHTML = '<i class="bi ' + icon + '" style="color:' + color + ';font-size:1.1rem"></i><span>' + title + '</span>';
+  toast.innerHTML = this._icon(m.icon, 18).replace('<i ', '<i style="color:' + m.color + '" ') + '<span>' + this._esc(title) + '</span>';
   container.appendChild(toast);
   setTimeout(function () { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(function () { toast.remove(); }, 300); }, 3000);
 };
@@ -290,11 +312,21 @@ DefinicionIndicadoresComponent.prototype._showToast = function (title, type) {
 // ── Render ──────────────────────────────────────────────────────
 DefinicionIndicadoresComponent.prototype.render = function () {
   var self = this;
-  this._loadCSS(function () {
-    self._renderUI();
-    self._initNavigation();
-    self._loadCurrentView();
-  });
+  /* 📦800 — carga los indicadores reales del Excel de la empresa
+     (con fallback transparente a la libreta de ejemplo). */
+  var done = function () {
+    self._loadCSS(function () {
+      self._renderUI();
+      self._initNavigation();
+      self._loadCurrentView();
+      self._refreshIcons();
+    });
+  };
+  if (IndicadoresService && typeof IndicadoresService.loadData === 'function') {
+    IndicadoresService.loadData(this.currentCompany).finally(done);
+  } else {
+    done();
+  }
 };
 
 // ── Destroy ─────────────────────────────────────────────────────

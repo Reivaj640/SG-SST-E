@@ -848,6 +848,12 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
     abrirProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:abrirProcedimiento', { empresaId }),
   },
 
+  // 📦800 (2026-09-21) — Definición de Indicadores (Submódulo 6.1.1):
+  // lectura del "INDICADORES <año>.xlsx" real de la carpeta de la empresa.
+  verificacionIndicadores: {
+    obtener: (companyName, year) => ipcRenderer.invoke('indicadores:obtener', companyName, year),
+  },
+
   // --- Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19) ---
   auditoriaAnual: {
     cargarTodo: (empresaId) => ipcRenderer.invoke('auditoriaAnual:cargarTodo', { empresaId }),

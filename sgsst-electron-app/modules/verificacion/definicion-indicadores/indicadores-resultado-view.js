@@ -53,10 +53,20 @@ var IndicadoresResultadoView = (function () {
     _render();
   }
 
+  function _icon(name, size) {
+    return '<i data-lucide="' + name + '" style="width:' + (size || 16) + 'px;height:' + (size || 16) + 'px;display:inline-block;vertical-align:middle"></i>';
+  }
+
+  function _refreshIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      try { window.lucide.createIcons(); } catch (e) { /* ignore */ }
+    }
+  }
+
   function _renderSortIcon(field) {
     var active = _sortField === field;
-    var icon = active ? (_sortDir === 'asc' ? 'bi-sort-up' : 'bi-sort-down') : 'bi-arrow-down-up';
-    return '<i class="bi ' + icon + ' kair-ind-sort-icon' + (active ? ' kair-ind-sort-icon--active' : '') + '"></i>';
+    var icon = active ? (_sortDir === 'asc' ? 'arrow-up-narrow-wide' : 'arrow-down-wide-narrow') : 'arrow-up-down';
+    return _icon(icon, 14).replace('<i ', '<i class="kair-ind-sort-icon' + (active ? ' kair-ind-sort-icon--active' : '') + '" ');
   }
 
   function _renderRow(ind, idx) {

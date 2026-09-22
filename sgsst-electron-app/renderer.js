@@ -4690,7 +4690,7 @@ Promise.resolve().then(() => { _showModuleContentLock = false; });
 console.log(`Showing content for module: ${moduleName}`);
 // ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
 if (currentSubmodule) {
-console.warn(`🚨 [showModuleContent] BLOQUEANDO cambio de módulo porque estamos en submódulo: "${currentSubmodule}"`);
+console.warn(`[showModuleContent] Cambio de módulo bloqueado: hay submódulo activo "${currentSubmodule}".`);
 return;
 }
 
@@ -5039,7 +5039,7 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
 
     // --- Callback SEGURO para componentes que se portan mal ---
     const safeBackToModuleCallback = () => {
-        console.warn('[safeBackToModuleCallback] Se ha llamado al callback de retorno. Limpiando estado y mostrando home del módulo.');
+        console.log('[safeBackToModuleCallback] Retorno seguro al home del módulo.');
         if (currentActiveComponent && typeof currentActiveComponent.destroy === 'function') {
           try {
             currentActiveComponent.destroy();

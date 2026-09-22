@@ -293,25 +293,93 @@ var IndicadoresService = (function () {
     }
   ];
 
-  var ALL_INDICATORS = resultadoIndicators.concat(estructuraIndicators, procesoIndicators);
+  /* 📦800 — Libreta de ejemplo (fallback cuando la empresa no tiene el
+     Excel "INDICADORES <año>.xlsx" en su carpeta). Se preserva intacta. */
+  var ALL_MOCK = resultadoIndicators.concat(estructuraIndicators, procesoIndicators);
+
+  /* Estado activo: por defecto la libreta de ejemplo; loadData() lo
+     reemplaza por los indicadores reales del Excel de la empresa. */
+  var _all = ALL_MOCK;
+  var _source = 'mock';   /* 'excel' | 'mock' */
+  var _year = null;
+  var _file = null;
+
+  // ── Carga desde la carpeta real de la empresa (📦800) ────────────
+  /* Devuelve true si cargó datos reales. Nunca lanza: ante cualquier
+     fallo deja el mock activo (mismo criterio que inspecciones 📦798). */
+  async function loadData(company) {
+    try {
+      var api = window.electronAPI && window.electronAPI.verificacionIndicadores;
+      if (!api || typeof api.obtener !== 'function') return false;
+      var res = await api.obtener(company || null);
+      if (!res || !res.success || !res.data || res.data.source !== 'excel' ||
+          !Array.isArray(res.data.indicadores) || !res.data.indicadores.length) {
+        return false;
+      }
+      _all = res.data.indicadores.map(function (ind) {
+        ind.status = _deriveStatus(ind);
+        return ind;
+      });
+      _source = 'excel';
+      _year = res.data.year || null;
+      _file = res.data.file || null;
+      return true;
+    } catch (e) {
+      console.warn('[K+AIRIND] No se pudieron cargar indicadores reales, se usa la libreta de ejemplo:', e && e.message);
+      return false;
+    }
+  }
+
+  function getSource() { return _source; }
+  function getYear() { return _year; }
+  function getFile() { return _file; }
+
+  /* Estado derivado para los datos reales (el Excel no trae un campo
+     de estado; se calcula comparando el valor actual con la meta).
+     Dirección "menor es mejor" para las tasas clásicas de SST. */
+  function _deriveStatus(ind) {
+    var v = ind.currentValue;
+    if (v === null || v === undefined) return 'pendiente';
+    var name = (ind.name || '').toLowerCase();
+    var unit = (ind.unit || '').toLowerCase();
+    var t = (ind.target === null || ind.target === undefined) ? null : Number(ind.target);
+
+    if (/mortalidad/.test(name)) return v > 0 ? 'critico' : 'cumplido';
+
+    var minBetter = /frecuencia|severidad|prevalencia|incidencia|ausentismo/.test(name) ||
+                    /tasa|d[ií]as|eventos/.test(unit);
+    if (t === null) return 'en_progreso';
+
+    if (minBetter) {
+      if (v <= t) return 'cumplido';
+      if (t > 0 && v <= t * 1.5) return 'en_progreso';
+      return v > t * 5 ? 'critico' : 'pendiente';
+    }
+    /* mayor es mejor; normalizar fracción (meta 1) vs porcentaje (100) */
+    var vv = v;
+    if (t <= 1 && vv > 1) vv = vv / 100;
+    if (vv >= t) return 'cumplido';
+    if (t > 0 && vv >= t * 0.5) return 'en_progreso';
+    return 'pendiente';
+  }
 
   // ── Helpers ───────────────────────────────────────────────────
   function getKpiStats() {
-    var total = ALL_INDICATORS.length;
-    var cumplidos = ALL_INDICATORS.filter(function(i){return i.status==='cumplido';}).length;
-    var enProgreso = ALL_INDICATORS.filter(function(i){return i.status==='en_progreso';}).length;
-    var pendientes = ALL_INDICATORS.filter(function(i){return i.status==='pendiente';}).length;
-    var criticos = ALL_INDICATORS.filter(function(i){return i.status==='critico';}).length;
+    var total = _all.length;
+    var cumplidos = _all.filter(function(i){return i.status==='cumplido';}).length;
+    var enProgreso = _all.filter(function(i){return i.status==='en_progreso';}).length;
+    var pendientes = _all.filter(function(i){return i.status==='pendiente';}).length;
+    var criticos = _all.filter(function(i){return i.status==='critico';}).length;
     var tasa = total > 0 ? Math.round((cumplidos / total) * 100) : 0;
     return { total:total, cumplidos:cumplidos, enProgreso:enProgreso, pendientes:pendientes, criticos:criticos, tasaCumplimiento:tasa };
   }
 
   function getIndicadoresByType(type) {
-    return ALL_INDICATORS.filter(function(i){return i.type===type;});
+    return _all.filter(function(i){return i.type===type;});
   }
 
   function getIndicadorById(id) {
-    return ALL_INDICATORS.find(function(i){return i.id===id;}) || null;
+    return _all.find(function(i){return i.id===id;}) || null;
   }
 
   function getStatusLabel(status) {
@@ -319,29 +387,30 @@ var IndicadoresService = (function () {
     return labels[status] || status;
   }
 
+  /* 📦800 — Paleta canónica K+AIR (antes colores Bootstrap viejos) */
   function getStatusColor(status) {
-    var colors = { cumplido:'#28a745', en_progreso:'#174ea6', pendiente:'#ffc107', critico:'#dc3545' };
-    return colors[status] || '#6c757d';
+    var colors = { cumplido:'#1a9e74', en_progreso:'#2057b8', pendiente:'#c28316', critico:'#d64550' };
+    return colors[status] || '#748096';
   }
 
   function getStatusBg(status) {
-    var bgs = { cumplido:'#e8f5e9', en_progreso:'#e8f0fe', pendiente:'#fff8e1', critico:'#fde8e8' };
-    return bgs[status] || '#f8f9fa';
+    var bgs = { cumplido:'#e6f7f0', en_progreso:'#e9f3ff', pendiente:'#fdf3e0', critico:'#fdebec' };
+    return bgs[status] || '#eef1f5';
   }
 
   function getTypeColor(type) {
-    var colors = { RESULTADO:'#174ea6', ESTRUCTURA:'#28a745', PROCESO:'#e65100' };
-    return colors[type] || '#6c757d';
+    var colors = { RESULTADO:'#2057b8', ESTRUCTURA:'#1a9e74', PROCESO:'#e8862d' };
+    return colors[type] || '#748096';
   }
 
   function getTypeBg(type) {
-    var bgs = { RESULTADO:'#e8f0fe', ESTRUCTURA:'#e8f5e9', PROCESO:'#fff3e0' };
-    return bgs[type] || '#f8f9fa';
+    var bgs = { RESULTADO:'#e9f3ff', ESTRUCTURA:'#e6f7f0', PROCESO:'#fdf1e4' };
+    return bgs[type] || '#eef1f5';
   }
 
   function getFreqColor(freq) {
-    var colors = { Mensual:'#174ea6', Semestral:'#7b61ff', Anual:'#6c757d' };
-    return colors[freq] || '#6c757d';
+    var colors = { Mensual:'#2057b8', Semestral:'#6b3fb8', Anual:'#748096' };
+    return colors[freq] || '#748096';
   }
 
   function formatTarget(indicator) {
@@ -367,10 +436,16 @@ var IndicadoresService = (function () {
 
   return {
     MONTHS: MONTHS,
-    ALL_INDICATORS: ALL_INDICATORS,
+    /* 📦800 — getter dinámico: las vistas siempre leen el conjunto activo
+       (libreta de ejemplo o Excel real, lo que haya cargado loadData). */
+    get ALL_INDICATORS() { return _all; },
     resultadoIndicators: resultadoIndicators,
     estructuraIndicators: estructuraIndicators,
     procesoIndicators: procesoIndicators,
+    loadData: loadData,
+    getSource: getSource,
+    getYear: getYear,
+    getFile: getFile,
     getKpiStats: getKpiStats,
     getIndicadoresByType: getIndicadoresByType,
     getIndicadorById: getIndicadorById,

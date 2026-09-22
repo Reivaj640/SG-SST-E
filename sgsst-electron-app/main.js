@@ -85,6 +85,8 @@ const { registerIdentificacionPeligrosHandlers } = require('./main/identificacio
 
 // Importar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
 const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-direccion-bridge');
+// 📦800 (2026-09-21) — Importar handlers de Definición de Indicadores (Submódulo 6.1.1)
+const { registerVerificacionIndicadoresHandlers } = require('./main/indicadores-verificacion-bridge');
 // Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
 const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
@@ -10136,6 +10138,14 @@ try {
   sendLog('[MAIN] Handlers de Auditoría Anual (6.1.2) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Auditoría Anual: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Definición de Indicadores (Submódulo 6.1.1) — 📦800 (2026-09-21)
+try {
+  registerVerificacionIndicadoresHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Definición de Indicadores (6.1.1) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Definición de Indicadores: ${err.message}`, 'ERROR');
 }
 
 // Registrar handlers de Acciones Preventivas y Correctivas (Submódulo 7.1.1) — F21.41 (2026-06-21)

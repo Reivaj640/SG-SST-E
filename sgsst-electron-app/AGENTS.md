@@ -4052,3 +4052,20 @@ Migración al dialecto premium v2 (mismo patrón que FURAT 📦773 y Profesiogra
 **Verificación**: test `tests/mejoramiento/test-premium-v2.js` → 39/39 OK (4 checks de regresión del scroll); arnés Electron midió `clientHeight 492 / scrollHeight 5258`, `scrollTop 400`, `alignItems: normal`. Cache-bust `APC-20260921-v2-scroll` en los 4 sitios + test.
 
 **Regla**: en un layout grid `1fr auto`, si un hijo debe scrollear necesita `min-height: 0` Y su fila no puede quedar con `align-items: start` en el contenedor; verificar también que la clase del HTML exista en la hoja (un nombre huérfano = 0 reglas = sin scroll).
+
+### 📦802 — Verificación: Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3)
+
+Migración premium v2 de los 2 submódulos que quedaban en working tree, con conexión al Excel real de la empresa.
+
+**6.1.1 Definición de Indicadores**:
+- Bridge nuevo `main/indicadores-verificacion-bridge.js` (`registerVerificacionIndicadoresHandlers(app, { getCompanyRootPath })`): lee `INDICADORES <año>.xlsx` de `6. Verificación/6.1.1 …` (misma resolución de carpetas por variantes de acento que inspecciones 📦798). Hojas de definición RESULTADO/ESTRUCTURA/PROCESO + hojas de datos con series mensuales (doble fila: valor y denominador/"N° Trabajadores"). Match por nombre normalizado sin tildes. Sin carpeta → `{ source: 'none' }` y el frontend cae a la libreta de ejemplo.
+- Cableado: require + try/catch en `main.js`, `preload.js` → `verificacionIndicadores.obtener`.
+- Frontend: header premium `kair-page-header` (badge de origen Excel vs ejemplo), KPIs con tokens canónicos, Exportar con acción real, dark `[data-theme^="dark"]`. Cache-bust `index.html` (`?v=20260921-premium-v6` CSS, `-v2/-v3` scripts).
+- Tests: `main/test-indicadores-carpeta.js` **37/37** (Electron + Excel real: 18 indicadores, series, año, fallback).
+
+**6.1.3 Despliegue Estratégico**:
+- Vista premium v2: Header v2 (`kair-rad-despliegue-header` + badge-ico + Volver→`ctx.navigate('hub')` + Refrescar→`ctx.refresh()`), 4 metric cards, tabla blindada, `tok()`/`palette()`, IPC `listarIndicadores` con fallback mock.
+- Tokens scoped `--rad-desp-*` bajo `.kair-rad-view-despliegue` + dark `[data-theme^="dark"]` (sin `:root`/`*`/`body` globales). Cache-bust `?v=20260921-premium-v2`.
+- Test: `main/test-despliegue-estrategico-premium.js` **38/38**.
+
+**Nota**: los comentarios `📦800` en el código de 6.1.1 son numeración provisional de la sesión previa (📦800 real = Auditoría Anual); el commit es 📦802. `renderer.js` solo depura 2 mensajes de `console.warn`.

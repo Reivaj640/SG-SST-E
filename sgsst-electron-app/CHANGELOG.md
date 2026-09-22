@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.211] - 2026-09-21
 
+### 📦802 · Verificación — Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3)
+
+Migración premium v2 de los dos submódulos restantes de Verificación, con conexión al Excel real de la empresa.
+
+#### Definición de Indicadores (6.1.1)
+
+- **Bridge IPC nuevo** `main/indicadores-verificacion-bridge.js`: lee `INDICADORES <año>.xlsx` de `6. Verificación/6.1.1 …` (resuelve carpetas con variantes de acento, igual que inspecciones 📦798). Hojas de definición (RESULTADO/ESTRUCTURA/PROCESO) + hojas de datos con series mensuales (doble fila: valor y denominador). Match por nombre normalizado (sin tildes). Sin carpeta → `source: none` y el frontend cae a su libreta de ejemplo.
+- **Registro en `main.js`** (`registerVerificacionIndicadoresHandlers`) y **`preload.js`** expone `verificacionIndicadores.obtener`.
+- **Frontend premium v2**: header `kair-page-header` con badge de origen (Excel vs ejemplo), KPIs con tokens canónicos, exportar con acción real, dark con `[data-theme^="dark"]`.
+- **Cache-bust** en `index.html`: hoja `?v=20260921-premium-v6` y scripts `?v=20260921-premium-v2/v3`.
+- **Tests**: `main/test-indicadores-carpeta.js` → **37/37 OK** (Electron, Excel real de Tempoactiva: 18 indicadores, series dobles y simples, año, fallback).
+
+#### Despliegue Estratégico (6.1.3)
+
+- Vista premium v2: **Header v2** (badge-ico + título + Volver/Refrescar), 4 metric cards, tabla blindada, `tok()`/`palette()`, IPC `revisionAltaDireccion.listarIndicadores` con fallback mock.
+- Tokens scoped `--rad-desp-*` en `.kair-rad-view-despliegue` + dark `[data-theme^="dark"]` (sin `:root`/`*`/`body` globales).
+- **Cache-bust** `?v=20260921-premium-v2` del script en `index.html`.
+- **Test** `main/test-despliegue-estrategico-premium.js` → **38/38 OK**.
+
+#### Otros
+
+- `renderer.js`: 2 mensajes de `console.warn` depurados (sin emoji de alerta).
+- Nota: los comentarios en el código de 6.1.1 dicen `📦800` (numeración provisional de la sesión previa); el commit real es 📦802.
+
 ### 📦801 · Matriz de Control Operacional (7.1.1) — premium v2 + fix de scroll del editor
 
 Migración al dialecto premium v2 (Header System v2, tokens canónicos, dark completo) y arreglo del scroll roto en la vista de edición que el usuario reportó con captura.
