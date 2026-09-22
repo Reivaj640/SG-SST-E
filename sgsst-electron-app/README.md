@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.211 (desarrollo) — último publicado v0.1.205 · 📦802 Verificación 6.1.1 + 6.1.3
-**Última actualización:** 21 de septiembre de 2026
+**Versión:** 0.1.211 (desarrollo) — último publicado v0.1.205 · 📦793-804 Premium v2 masivo + 7 skills de calidad + EOL normalizado
+**Última actualización:** 22 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -22,7 +22,7 @@
 - ✅ **Release flow automatizado** 🆕 (v0.1.131+, `📦585`): Scripts `scripts/release.ps1` (flujo completo: push branch → tag → push tag → build) y `scripts/fix-release.ps1` (fallback con curl si electron-builder falla). Evitan el error 422 de "Published releases must have a valid tag". Ver `AGENTS.md` (sección "🆕 Release flow automatizado") para el detalle.
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
-- ✅ **9 Módulos Principales + 48 Submódulos con lógica**: Recursos (12), Gestión Integral (9), Salud (12), Peligros (4), Amenazas (2), Verificación (3), Mejoramiento (4), más `helpers` y `shared`
+- ✅ **9 Módulos Principales + 51 Submódulos con UI propia** 🆕 (v0.1.211): Recursos (12), Gestión Integral (9 implementados + 4 placeholder en roadmap), Gestión de la Salud (13 implementados + 5 placeholder), Gestión de Peligros y Riesgos (4 implementados + 7 placeholder), Gestión de Amenazas (2), Verificación (3 implementados + 1 placeholder), Mejoramiento (4 vistas), **Gestión Humana (12 — módulo top-level nuevo en v0.1.191)**, más `helpers` y `shared`. Total declarado en sidebar oficial: **67 entradas** (51 con UI real + 16 placeholder en roadmap normativo).
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -39,7 +39,8 @@
 - ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver `AGENTS.md` (sección "🎨 Sistema de Skeleton Screens") para el detalle.
 - ✅ **Rediseño premium visual de homes de módulos** 🆕 (v0.1.197-204, `📦730-737`): Los 8 homes principales del sistema (Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros y Riesgos, Gestión de Amenazas, Verificación, Mejoramiento + Recursos v2) ahora comparten un patrón visual premium unificado basado en `shared/kair-design-tokens.css` + `shared/kair-components.css`. Cada home muestra: header minimal con breadcrumb, hero card con score compuesto del módulo (promedio simple excluyendo sin datos), 3 metric cards, 1 chart SVG nativo, panel "En tu radar" con alertas condicionales, y grid responsivo de submódulos. Reemplaza los widgets individuales + charts Chart.js legacy por una composición data-driven. Reducción promedio de ~10KB por módulo en CSS legacy eliminado. Ver `AGENTS.md` (sección "K+AIR Premium Design System") para el detalle técnico completo y las lecciones aprendidas en el proceso.
 - ✅ **Sidebar lateral premium** 🆕 (v0.1.205, `📦738`): El sidebar lateral principal ("Módulos del Sistema" + "Salir") migró al design system compartido. Define `.kair-nav-card` y 12 componentes derivados en `shared/kair-sidebar.css`. **Decisiones de diseño iterativas** (4 versiones): sin border visible, fondo transparente por default, hover y activo usan el mismo `--kair-soft` (consistencia visual), icono sin caja de fondo. Las clases legacy `.sidebar-module-card*` conviven sin conflicto. Ver `AGENTS.md` (subsección "Sidebar premium (📦738)") para el detalle de las 4 iteraciones con feedback del user.
-- ✅ **Migración premium v2 de submódulos** 🆕 (v0.1.206-208, `📦739-790`): los submódulos con UI propia se migraron al dialecto **premium v2** (tokens de `shared/kair-design-tokens.css`, Header System v2 con breadcrumb + icon chip + título Manrope, tabs con subrayado, modo oscuro en los DOS atributos, cache-bust y test de humo). Cubre: Inducciones (gráficos SVG nativos), Presupuesto, COPASST/Comité de Convivencia, Configuración, Bandeja Integrada (premium + firma con imagen + toolbar compacta + paginación), Archivo y Retención, Evaluación Inicial del SG-SST, Evaluaciones Médicas Ocupacionales (con certificados persistidos), Rendición de Cuentas, Identificación de Bienes y Servicios (2.9.1), Evaluación y Selección de Proveedores (2.10.1), Perfil de Cargo y Profesiograma (3.1.3), Reportes de Accidentes/FURAT (3.2.1), Gestión del Cambio (2.11.1), Restricciones/Remisiones (3.1.6, flujo completo de 3 pasos con vista previa del informe y cancelación, Control con filas basura del Excel filtradas y nueva sección de Estadísticas) e Investigación de Accidentes e Incidentes (3.2.2, las 3 vistas + lista en 2 columnas en maximizada) y Registro y Análisis Estadístico (3.2.3, Header System v2 + CSS scopado + los 9 gráficos Chart.js con colores de tema) y Frecuencia de la Accidentalidad (3.3.1, tokens propios `--freq-*` scoped, gráfico y tabla en paralelo con anchos de columna fijos, gráfico a todo el alto y los 12 meses en una fila en maximizada) y Severidad de la Accidentalidad (3.3.2, tokens propios `--sev-*` scoped, tabla blindada con 7 anchos fijos que suman 100%, wrapper `.sev-duo` en paralelo, meses grid 6/12, código muerto eliminado) e Índice de Mortalidad (3.3.3, tokens propios `--mort-*` scoped, tabla blindada con 7 anchos fijos que suman 100%, Chart.js theme-aware con gradientes dark/light, resize handler con cleanup, código muerto eliminado, gráfico y tabla en paralelo en maximizada) Prevalencia de Enfermedad Laboral (3.3.4, tokens propios `--prev-*` scoped, tabla blindada con 6 anchos fijos que suman 100%, Chart.js theme-aware, resize handler con cleanup, iconos SVG inline, gráfico y tabla en paralelo en maximizada) e Incidencia de Enfermedad Laboral (3.3.5, módulo hermano generado desde Prevalencia con renombres controlados, tokens `--inc-*` scoped, tabla blindada con 6 anchos fijos, Chart.js theme-aware, gráfico y tabla en paralelo) y Medición del Ausentismo (3.3.6, home premium + blindaje de los 7 bloques de estilos inyectados en el `<head>` global scopados bajo `.aus-scope` + Registrar/Ver/Seguimiento/Estadísticas/Consulta/Informe premium, con Font Awesome CDN eliminado) y Seguimiento de Gestación (3.3.6, home con tokens canónicos + Header v2 + dark). Se extrajo el dialecto compartido a `shared/kair-premium.css` (`📦749`). Ver `AGENTS.md` (secciones "Playbook · Migrar un submódulo" y las entradas `📦739`-`📦790`) para el detalle.
+- ✅ **Migración premium v2 de submódulos** 🆕 (v0.1.206-211, `📦739-802`): los submódulos con UI propia se migraron al dialecto **premium v2** (tokens de `shared/kair-design-tokens.css`, Header System v2 con breadcrumb + icon chip + título Manrope, tabs con subrayado, modo oscuro en los DOS atributos, cache-bust y test de humo). Cubre: Inducciones (gráficos SVG nativos), Presupuesto, COPASST/Comité de Convivencia, Configuración, Bandeja Integrada (premium + firma con imagen + toolbar compacta + paginación), Archivo y Retención, Evaluación Inicial del SG-SST, Evaluaciones Médicas Ocupacionales (con certificados persistidos), Rendición de Cuentas, Identificación de Bienes y Servicios (2.9.1), Evaluación y Selección de Proveedores (2.10.1), Perfil de Cargo y Profesiograma (3.1.3), Reportes de Accidentes/FURAT (3.2.1), Gestión del Cambio (2.11.1), Restricciones/Remisiones (3.1.6, flujo completo de 3 pasos con vista previa del informe y cancelación, Control con filas basura del Excel filtradas y nueva sección de Estadísticas) e Investigación de Accidentes e Incidentes (3.2.2, las 3 vistas + lista en 2 columnas en maximizada) y Registro y Análisis Estadístico (3.2.3, Header System v2 + CSS scopado + los 9 gráficos Chart.js con colores de tema) y Frecuencia de la Accidentalidad (3.3.1, tokens propios `--freq-*` scoped, gráfico y tabla en paralelo con anchos de columna fijos, gráfico a todo el alto y los 12 meses en una fila en maximizada) y Severidad de la Accidentalidad (3.3.2, tokens propios `--sev-*` scoped, tabla blindada con 7 anchos fijos que suman 100%, wrapper `.sev-duo` en paralelo, meses grid 6/12, código muerto eliminado) e Índice de Mortalidad (3.3.3, tokens propios `--mort-*` scoped, tabla blindada con 7 anchos fijos que suman 100%, Chart.js theme-aware con gradientes dark/light, resize handler con cleanup, código muerto eliminado, gráfico y tabla en paralelo en maximizada) Prevalencia de Enfermedad Laboral (3.3.4, tokens propios `--prev-*` scoped, tabla blindada con 6 anchos fijos que suman 100%, Chart.js theme-aware, resize handler con cleanup, iconos SVG inline, gráfico y tabla en paralelo en maximizada) e Incidencia de Enfermedad Laboral (3.3.5, módulo hermano generado desde Prevalencia con renombres controlados, tokens `--inc-*` scoped, tabla blindada con 6 anchos fijos, Chart.js theme-aware, gráfico y tabla en paralelo) y Medición del Ausentismo (3.3.6, home premium + blindaje de los 7 bloques de estilos inyectados en el `<head>` global scopados bajo `.aus-scope` + Registrar/Ver/Seguimiento/Estadísticas/Consulta/Informe premium, con Font Awesome CDN eliminado) y Seguimiento de Gestación (3.3.6, home con tokens canónicos + Header v2 + dark) e Identificación de Peligros (4.1.2, `📦794-795` — bridge IPC + 4 sub-componentes premium v2 con Header System v2, donut theme-aware con helpers `tok()`/`palette()`, modo oscuro en los DOS atributos `[data-theme^="dark"]`, test de 9 contratos; header transparente v7 con botón Volver) e Inspecciones Sistemáticas (4.2.4, `📦793+796+798` — hub premium con score compuesto + 3 metric cards + chart SVG nativo + module grid; las 7 vistas funcionales con header premium v7 transparente con píldora "Sincronizado" y botón Volver; reconexión a `PROGRAMA DE INSPECCIONES.xlsx` de la empresa con respaldo automático en `backup/` antes de cada escritura) y Mantenimiento Periódico (4.2.5, `📦797` — header premium con badge-ico + título Manrope + acciones, tipografía del sistema aplicada en `mantenimiento.css`) y Auditoría Anual (6.1.2, `📦800` — fix del botón "Nueva auditoría" que abría un modal sin estilo: +432 líneas de CSS con tokens `--aud-*` scoped, fachada `openAuditoriaForm` con aviso si la instancia es null, fix del guard `_clickBound` del hub que impedía re-bindear tras `destroy()` + re-render) y Definición de Indicadores (6.1.1, `📦802` — bridge IPC `indicadores-verificacion-bridge` que lee `INDICADORES <año>.xlsx` con hojas RESULTADO/ESTRUCTURA/PROCESO + series mensuales doble fila valor/denominador, header premium con badge de origen Excel vs ejemplo, tabs prominentes con subrayado azul, tokens canónicos) y Despliegue Estratégico (6.1.3, `📦802` — Header v2 con Volver al hub + Refrescar, 4 metric cards, tabla blindada con 10 columnas, chart SVG nativo de barras horizontales, IPC `revisionAltaDireccion.listarIndicadores` con fallback mock, tokens `--rad-desp-*` scoped, dark unificado) y Matriz de Control Operacional (7.1.1, `📦801` — premium v2 + fix del scroll roto del editor con 3 causas diagnosticadas: `align-items:start` en `.kair-editor` que impedía estirar la fila del grid, `min-height:0` faltante en `.kair-editor__main`, y `class="kair-app-main"` huérfana en la vista lista — la correcta es `.kair-main`). El **home de Gestión de Peligros y Riesgos** recibió fix de datos reales (`📦799`): `refreshStats()` no asignaba `this.peligrosStats` (los datos llegaban bien y morían en la bodega) + nombres de campos incompatibles con los puentes — ahora Inspecciones muestra 29/39 con el Excel real de Tempoactiva. Se extrajo el dialecto compartido a `shared/kair-premium.css` (`📦749`). Ver `AGENTS.md` (secciones "Playbook · Migrar un submódulo" y las entradas `📦739`-`📦802`) para el detalle.
+- ✅ **Módulo Gestión Humana** 🆕 (v0.1.191, `📦709-720`): Módulo **top-level nuevo** (8º módulo principal del sistema) con 12 vistas operativas + backend completo de 16 handlers IPC. Cubre el ciclo de vida del personal: Dashboard de KPIs, **Contratación** con pipeline de onboarding de 6 pasos, **Carpetas** (archivo digital por trabajador con 3 tablas SQLite: categorias, expedientes, documentos), **Firma electrónica** (centro de control documental), Afiliaciones (EPS, Pensión, ARL, Caja de Compensación), Base de Personal (listado y gestión), Vacaciones, Permisos y Estados (incapacidades, maternidad, luto, permisos diversos), Comunicación (anuncios oficiales), Documentos (repositorio) y Trabajador Detalle (vista expandida). Shell HTML+CSS+JS separados (`gestion-humana-home.*` 📦713) con sidebar de 9 items, helper `KPIBar` compartido entre vistas (`shared/kpi-bar.css` 📦720) y modo oscuro unificado. El submódulo **Carpetas** es el más maduro: lista de expedientes con KPIs + tabla + paginación, vista de detalle con N categorías + progress, modal de subida con validación, CRUD inline de categorías y scroll interno arreglado en detail view. **Estado**: desplegado en 1 PC del cliente como "gestión humana" para gestionar ausentismo; el alcance se va ampliando a medida que el cliente lo pida.
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales
@@ -107,7 +108,7 @@
 | `docker-compose.yml`     | -      | Configuración Docker       |
 | `icon-config.json`       | -      | Configuración iconos       |
 
-### Módulos Principales (8 módulos)
+### Módulos Principales (9 módulos)
 
 ```
 modules/
@@ -158,6 +159,23 @@ modules/
 │
 ├── mejoramiento/              # Módulo 7: Acciones correctivas
 │   └── mejoramiento-home.js
+│
+├── gestion-humana/            # Módulo 8: Personal, Contratación, Firma electrónica 🆕
+│   ├── gestion-humana-home.js
+│   ├── gestion-humana-home.css
+│   ├── gestion-humana-home.html
+│   ├── dashboard/             # KPIs y distribuciones
+│   ├── base-personal/         # Listado y gestión de trabajadores
+│   ├── contratacion/          # Pipeline de onboarding (6 pasos)
+│   ├── carpetas/              # Archivo digital por trabajador (expedientes)
+│   ├── firma-electronica/     # Centro de control documental
+│   ├── afiliaciones/          # EPS, Pensión, ARL, Caja
+│   ├── vacaciones/            # Programación y aprobaciones
+│   ├── permisos/              # Incapacidades, maternidad, luto
+│   ├── comunicacion/          # Anuncios y mensajes oficiales
+│   ├── documentos/            # Repositorio documental
+│   ├── trabajador-detalle/    # Vista expandida de un trabajador
+│   └── shared/                # KPIBar compartido entre vistas
 │
 └── helpers/                   # Utilidades del sistema
     └── viewLoader.js
@@ -497,38 +515,112 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 - 📊 Estructura de hojas: `Matriz Cap. YYYY` (ej: `Matriz Cap. 2025`, `Matriz Cap. 2026`)
 - 🔄 Función backend: `duplicate-capacitaciones-sheet` (main.js)
 
-### Módulo 2: Gestión Integral (6 submódulos)
+### Módulo 2: Gestión Integral (13 submódulos — 9 implementados + 4 en roadmap)
 
-| Código | Submódulo                      | Archivos Principales                                     |
-|--------|--------------------------------|----------------------------------------------------------|
-| 2.1.1  | Política del SG-SST            | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
-| 2.2.1  | Objetivos SST                  | `objetivos-sst-logic.js`, `viewer.js`                    |
-| 2.3.1  | Evaluación Inicial SG-SST      | `evaluacion-inicial-sg-sst-logic.js`, `test.html`        |
-| 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js`, `plan-home.html`, `plan-viewer.js`, `plan-view.html`, `plan-view.css` |
-| 2.5.1  | Archivo y Retención Documental | En `renderer.js`                                         |
-| 2.6.1  | Rendición de Cuentas           | `rendicion-logic.js`, `viewer.js`                        |
+| Código | Submódulo                      | Estado | Archivos Principales                                     |
+|--------|--------------------------------|--------|----------------------------------------------------------|
+| 2.1.1  | Política del SG-SST            | ✅     | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
+| 2.2.1  | Objetivos SST                  | ✅     | `objetivos-sst-logic.js`, `viewer.js`                    |
+| 2.3.1  | Evaluación Inicial SG-SST      | ✅     | `evaluacion-inicial-sg-sst-logic.js`, `test.html`        |
+| 2.4.1  | Plan de Trabajo Anual          | ✅     | `plan-trabajo-logic.js`, `plan-home.js`, `plan-home.html`, `plan-viewer.js`, `plan-view.html`, `plan-view.css` |
+| 2.5.1  | Archivo y Retención Documental | ✅     | `archivo-retencion/*` (7 archivos)                       |
+| 2.6.1  | Rendición de Cuentas           | ✅     | `rendicion-logic.js`, `viewer.js`                        |
+| 2.7.1  | Matriz de requisitos legales   | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
+| 2.8.1  | Mecanismos de comunicaciones   | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
+| 2.9.1  | Identificación y Evaluación para la adquisición de bienes y servicios | ✅ | `evaluacion-proveedores/*` (3 archivos) |
+| 2.10.1 | Evaluación y selección de proveedores y contratistas | ✅     | `evaluacion-seleccion/*` (6 archivos, premium v2)         |
+| 2.11.1 | Gestión del Cambio             | ✅     | `gestion-del-cambio/*` (2 archivos, premium v2)           |
+| 2.12.1 | Equipos y Herramientas         | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
+| 2.13.1 | Elementos de Protección Personal | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
 
-### Módulo 3: Gestión de la Salud (8 submódulos)
+### Módulo 3: Gestión de la Salud (18 submódulos — 13 implementados + 5 en roadmap)
 
-| Código | Submódulo                    | Archivos Principales                                   |
-|--------|------------------------------|--------------------------------------------------------|
-| 3.1.1  | Diagnóstico Sociodemográfico | `sociodemografica-component.js`, `viewer.js`           |
-| 3.1.4  | Evaluaciones Médicas         | `evaluaciones-medicas-logic.js`, `component.js`        |
-| 3.1.6  | Restricciones Médicas        | `restricciones-medicas-logic.js`, `component.js`       |
-| 3.2.1  | Reporte de Accidentes        | `reportes-accidentes-logic.js`, `viewer.js`            |
-| 3.2.2  | Investigación de Accidentes  | `investigacion-accidentes-logic.js`, `handlers.js`  🤖|
-| 3.3.4  | Prevalencia de Enf. Laboral  | `prevalencia-enfermedad-laboral/` (4 archivos) 🆕      |
-| 3.3.5  | Incidencia de Enf. Laboral   | `incidencia-enfermedad-laboral/` (4 archivos) 🆕       |
-| 3.3.6  | Medición del Ausentismo      | `medicion-ausentismo.js`, `registrar-ausentismo.js`    |
+| Código | Submódulo                    | Estado | Archivos Principales                                   |
+|--------|------------------------------|--------|--------------------------------------------------------|
+| 3.1.1  | Descripción Sociodemográfica y Diagnóstico de Salud | ✅ | `sociodemografica-component.js`, `viewer.js` |
+| 3.1.2  | Actividades de medicina preventiva y promoción de la salud | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.1.3  | Perfil de Cargo y Profesiograma | ✅  | `perfiles-cargo-profesiograma/*` (4 archivos, premium v2) |
+| 3.1.4  | Evaluaciones Médicas         | ✅     | `evaluaciones-medicas-logic.js`, `component.js`        |
+| 3.1.5  | Custodia médica ocupacional  | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.1.6  | Restricciones y Recomendaciones Médicas | ✅ | `restricciones-medicas-logic.js`, `component.js` (12 archivos, premium v2, flujo 3 pasos) |
+| 3.1.7  | Estilos de Vida Saludables   | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.1.8  | Servicios de Higiene         | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.1.9  | Manejo de Residuos           | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.2.1  | Reporte de Accidentes (FURAT) | ✅    | `reportes-accidentes-logic.js`, `viewer.js`            |
+| 3.2.2  | Investigación de Accidentes e Incidentes | ✅ 🤖 | `investigacion-accidentes-logic.js`, `handlers.js` (con LLM Mistral 3 3B) |
+| 3.2.3  | Registro y Análisis Estadístico | ✅  | `registro-estadistico/*` (4 archivos, premium v2 + 9 charts Chart.js) |
+| 3.3.1  | Frecuencia de la Accidentalidad | ✅ | `frecuencia-accidentalidad/*` (4 archivos, premium v2, tokens `--freq-*`) |
+| 3.3.2  | Severidad de la Accidentalidad | ✅  | `severidad-accidentalidad/*` (4 archivos, premium v2, tokens `--sev-*`) |
+| 3.3.3  | Proporción de Accidentes de Trabajo Mortales | ✅ | `indice-mortalidad/*` (4 archivos, premium v2, tokens `--mort-*`) |
+| 3.3.4  | Prevalencia de Enf. Laboral  | ✅     | `prevalencia-enfermedad-laboral/` (4 archivos, premium v2) 🆕 |
+| 3.3.5  | Incidencia de Enf. Laboral   | ✅     | `incidencia-enfermedad-laboral/` (4 archivos, premium v2, módulo hermano de Prevalencia) 🆕 |
+| 3.3.6  | Medición del Ausentismo      | ✅     | `medicion-ausentismo.js`, `registrar-ausentismo.js`, 18 archivos en `ausentismo/` (premium v2, 7 bloques `<style>` blindados, 5 seguimientos múltiples) |
 
-### Módulos 4-7 (Resumen)
+### Módulo 4: Gestión de Peligros y Riesgos (11 submódulos — 4 implementados + 7 en roadmap)
 
-| Módulo                           | Submódulos  | Estado    |
-|----------------------------------|-------------|-----------|
-| 4. Gestión de Peligros y Riesgos | Home module | ✅ Activo |
-| 5. Gestión de Amenazas           | Home module | ✅ Activo |
-| 6. Verificación                  | Home module | ✅ Activo |
-| 7. Mejoramiento                  | Home module | ✅ Activo |
+| Código | Submódulo                                          | Estado | Archivos Principales |
+|--------|----------------------------------------------------|--------|----------------------|
+| 4.1.1  | Metodología IPEVR                                  | ✅     | `metodologia-ipevr/*` (5 archivos) |
+| 4.1.2  | Identificación de Peligros                          | ✅     | `identificacion-peligros/*` (9 archivos, premium v2 con bridge IPC + 4 sub-componentes + donut theme-aware) |
+| 4.1.3  | Identificación de Sustancias Químicas carcinogénas o con toxicidad | 🚧 Roadmap | Placeholder en sidebar |
+| 4.1.4  | Mediciones Ambientales                             | 🚧 Roadmap | Placeholder en sidebar |
+| 4.2.1  | Mediciones de Prevención y Control frente a Peligros | 🚧 Roadmap | Placeholder en sidebar |
+| 4.2.2  | Aplicación de las medidas de prevención y control por parte de los trabajadores | 🚧 Roadmap | Placeholder en sidebar |
+| 4.2.3  | Evaluación de procedimientos, instructivos internos de seguridad y salud en el trabajo | 🚧 Roadmap | Placeholder en sidebar |
+| 4.2.4  | Realización de Inspecciones Sistemáticas a las instalaciones, máquinas o equipos | ✅ | `inspecciones/*` (9 archivos, premium v2 hub + 7 vistas, reconexión a `PROGRAMA DE INSPECCIONES.xlsx` real) |
+| 4.2.5  | Mantenimiento Periódico de equipos, instalaciones, herramientas | ✅ | `mantenimiento/*` (5 archivos, premium v2 header) |
+| 4.2.6  | Entrega de EPP                                     | 🚧 Roadmap | Placeholder en sidebar |
+
+### Módulo 5: Gestión de Amenazas (2 submódulos)
+
+| Código | Submódulo                       | Archivos Principales                                |
+|--------|---------------------------------|-----------------------------------------------------|
+| 5.1.1  | Plan de Prevención de Emergencias | `plan-prevencion/*` (4 archivos)                   |
+| 5.1.2  | Exámenes Médicos Brigadista     | `examenes-brigadista/*` (4 archivos)                |
+
+### Módulo 6: Verificación (4 submódulos — 3 implementados + 1 en roadmap)
+
+| Código | Submódulo                       | Estado | Archivos Principales                                |
+|--------|---------------------------------|--------|-----------------------------------------------------|
+| 6.1.1  | Definición de Indicadores       | ✅     | `definicion-indicadores/*` (7 archivos, premium v2 + bridge IPC `indicadores-verificacion-bridge` que lee `INDICADORES <año>.xlsx`) |
+| 6.1.2  | Auditoría Anual                 | ✅     | `auditoria-anual/*` (16 archivos, premium v2 con modal CSS + fix del botón "Nueva auditoría") |
+| 6.1.3  | Revisión de la Alta Dirección   | ✅     | `revision-alta-direccion/*` (4 archivos, premium v2 + 4 metric cards + tabla blindada) |
+| 6.1.4  | Planificación de la Auditoría   | 🚧 Roadmap | Placeholder en sidebar; re-direcciona al home  |
+
+### Módulo 7: Mejoramiento (1 submódulo normativo activo, 4 vistas implementadas)
+
+| Código | Submódulo                       | Archivos Principales                                |
+|--------|---------------------------------|-----------------------------------------------------|
+| 7.1.1  | Acciones Preventivas y Correctivas (Matriz GI-FO-014) | `acciones-preventivas-correctivas/*` (4 archivos, premium v2 + fix de scroll del editor) |
+
+> **Nota técnica**: Mejoramiento se compone internamente de 4 vistas que comparten la misma norma 7.1.1:
+> - `acciones-preventivas-correctivas/` — vista principal de la Matriz de Control Operacional
+> - `acciones-mejora-atel/` — Acciones de Mejora AT-EL
+> - `acciones-mejora-gerencia/` — Acciones de Mejora Gerencia
+> - `planes-mejoramiento/` — Planes de Mejoramiento
+>
+> Esto se debe a que la Resolución 0312/2019 derogó la separación 7.1.2/3/4 y las unificó en el módulo único 7.1.1 (F21.49, 2026-06-21).
+
+### Módulo 8: Gestión Humana 🆕 (12 vistas, v0.1.191)
+
+Módulo top-level nuevo introducido en 📦709 (v0.1.191). Backend completo con 16 handlers IPC; UI implementada en `gestion-humana-home.*` con shell HTML+CSS+JS separados (📦713). 10 vistas en sidebar + 2 submódulos auxiliares (carpetas de expedientes + detalle de trabajador).
+
+| Vista                          | Archivos Principales                                | Estado |
+|--------------------------------|-----------------------------------------------------|--------|
+| Resumen (home)                 | `gestion-humana-home.js` + `.html` + `.css` (📦713)  | ✅     |
+| Dashboard                      | `dashboard/*` (3 archivos)                          | ✅     |
+| Contratación (onboarding 6 pasos) | `contratacion/*` (3 archivos)                    | ✅     |
+| Carpetas (expedientes)         | `carpetas/*` (2 archivos + bridge IPC `gestion-humana-bridge`) | ✅ |
+| Firma electrónica              | `firma-electronica/*` (2 archivos + bridge IPC con flujo dual) | ✅ |
+| Afiliaciones                   | `afiliaciones/*` (3 archivos, EPS/Pensión/ARL/Caja) | ✅     |
+| Base de Personal               | `base-personal/*` (3 archivos, listado + gestión)   | ✅     |
+| Vacaciones                     | `vacaciones/*` (3 archivos)                         | ✅     |
+| Permisos y Estados             | `permisos/*` (3 archivos, incapacidades + maternidad + luto + permisos diversos) | ✅ |
+| Comunicación                   | `comunicacion/*` (3 archivos, anuncios oficiales)   | ✅     |
+| Documentos                     | `documentos/*` (3 archivos, repositorio documental) | ✅     |
+| Trabajador Detalle             | `trabajador-detalle/*` (1 archivo, vista expandida) | ✅     |
+
+**Shared utilities del módulo**: `gestion-humana/shared/*` incluye el helper KPIBar compartido entre vistas (📦720) y CSS de index. El bridge IPC (`gestion-humana-bridge.js`) implementa el patrón `registerGestionHumanaHandlers(app, { getDb, validateSession })` con 16 handlers que cubren CRUD de los 10 dominios + Carpetas (expedientes con 3 tablas: categorias, expedientes, documentos).
 
 ---
 
@@ -1229,6 +1321,46 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.211 - 22 Sep 2026 🆕
+
+#### Cierre de la migración premium v2 — Peligros, Inspecciones, Mantenimiento, Verificación y Mejoramiento
+
+Después de 2 meses de trabajo (v0.1.206 → v0.1.211) con 70+ paquetes, el dialecto **premium v2** ya cubre los 8 módulos principales y la mayoría de submódulos con UI propia. En esta última tanda se cerraron los pendientes críticos del lado del usuario (datos reales, modales sin estilo, listeners stale) y los submódulos restantes de Verificación.
+
+**Módulos finalizados en v0.1.209-211:**
+
+- **📦793** — Inspecciones Sistemáticas (4.2.4): hub premium con score compuesto + 3 metric cards + chart SVG nativo + module grid (11 clases premium scopeadas bajo `.kair-app` + tokens locales + dark cubriendo dark + dark-legacy con `[data-theme^="dark"]`).
+- **📦794-795** — Identificación de Peligros (4.1.2): bridge IPC + 4 sub-componentes + service + CSS scopado bajo `.km-wrapper` con tokens propios `--km-*` + donut theme-aware con helpers `tok()`/`palette()` + test de 9 contratos + header transparente v7 con botón Volver.
+- **📦796** — Inspecciones Sistemáticas (4.2.4): premium completo de las 7 vistas funcionales (hub, dashboard, historial, detalle, 4 formularios) con header premium v7 (`kmi-*` transparente + breadcrumb + píldora "Sincronizado" + botón Volver) — datos y flujo intactos.
+- **📦797** — Mantenimiento Periódico (4.2.5): header premium (badge-ico + título + subtítulo + botones ghost/outline) alineado al lenguaje visual premium.
+- **📦798** — Inspecciones (4.2.4): reconexión a `PROGRAMA DE INSPECCIONES.xlsx` real de la empresa (conexión que existió en 📦332/338 y quedó desactivada en la reconstrucción 📦500). Detección de encabezados de mes **por texto** (Ene…Dic), códigos `p`=programado / `c`=cumplido, respaldo automático en `backup/` antes de cada escritura.
+- **📦799** — Home Gestión de Peligros: fix de datos reales en hero, tarjetas y gráficas. **Causa doble**: `refreshStats()` guardaba las respuestas en caché global pero nunca asignaba `this.peligrosStats` (datos morían en la bodega) + nombres de campos incompatibles con los puentes (`programaTotal` vs `total`, `completadasMes` vs `completados`). Mediciones y EPP marcados como `null` para que el score compuesto los excluya en vez de arrastrarlo a 0.
+- **📦800** — Auditoría Anual (6.1.2): el botón "Nueva auditoría" abría un modal sin estilo. Fix: +432 líneas de CSS con tokens `--aud-*` scoped sobre el propio modal (vive en `<body>`, fuera de `.kair-v3-module`) + fachada `openAuditoriaForm` con `console.warn` + updateNotifier si `__kairAudInstance` es null (antes fallaba en silencio) + fix del guard `_clickBound` del hub que impedía re-bindear tras `destroy()` + re-render (bind en cada render, el handler ya tiene guard `view !== 'hub'`).
+- **📦801** — Matriz de Control Operacional (7.1.1): premium v2 + fix del scroll roto del editor reportado con captura. **3 causas diagnosticadas**: (1) `.kair-editor` tenía `align-items: start` que impedía estirar la fila main del grid → `overflow-y: auto` nunca se activaba; (2) faltaba `min-height: 0` en `.kair-editor__main`; (3) la vista lista usaba `class="kair-app-main"` huérfana (la correcta es `.kair-main` con `flex:1; min-height:0; overflow-y:auto`).
+- **📦802** — Verificación: Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3) al premium v2 con Excel real. **6.1.1**: bridge `indicadores-verificacion-bridge` lee `INDICADORES <año>.xlsx` con resolución de carpetas por variantes de acento, hojas RESULTADO/ESTRUCTURA/PROCESO + series mensuales doble fila valor/denominador, match por nombre normalizado; header premium con badge de origen Excel vs ejemplo, tabs prominentes. **6.1.3**: Header v2 + 4 metric cards + tabla blindada + chart SVG nativo + IPC `revisionAltaDireccion.listarIndicadores` con fallback mock + tokens `--rad-desp-*` scoped. Tests 37/37 + 38/38 OK.
+- **📦803** — 7 skills de calidad/testing instaladas en `.agents/skills/`: `desktop-testing-electron` + `electron-playwright-cli` (agents-inc/spacecake-labs) y 5 de `addyosmani/agent-skills` (`interview-me`, `constraint-driven-development`, `doubt-driven-development`, `deprecation-and-migration`, `documentation-and-adrs`). Documentadas en AGENTS.md con disparadores, reglas críticas de Electron (teardown/mock/stub/xvfb) y workflow en 8 pasos.
+- **📦804** — Normalización de EOL en 211 archivos: solo conversión CRLF ↔ LF sin ningún cambio de contenido (verificado con `git diff -w` vacío). Working tree queda limpio. Sin impacto funcional; resuelve diffs espurios de miles de líneas que aparecían al revisar archivos mezclados.
+
+**Otros cambios:**
+
+- `renderer.js`: 2 mensajes de `console.warn` depurados (sin emoji de alerta 🚨) — más amable al usuario.
+- Cache-busts actualizados en `index.html` para todos los módulos modificados (Electron cachea agresivamente).
+- Tests nuevos: `test-indicadores-carpeta` (37/37), `test-despliegue-estrategico-premium` (38/38), `test-premium-v2` Mejoramiento (39/39), `test-identificacion-peligros` (9 contratos).
+- Documentación sincronizada: `CHANGELOG.md` con entradas por paquete, `AGENTS.md` con secciones dedicadas (`📦793` a `📦804`), `CONTEXT.md` con el rango de la migración.
+
+**Lecciones técnicas transferibles (las del rango 📦793-802):**
+
+- **Flex chain obligatorio para scroll interno**: `display:flex; flex-direction:column; min-height:0` en el layout + `flex:1; min-height:0; overflow-y:auto` en el main. Sin esto, el contenido se desborda sin scroll (ver 📦793, 📦801).
+- **Dark mode con `[data-theme^="dark"]`**: cubre dark + dark-legacy en un solo selector. NUNCA usar `[data-theme="dark"]` solo (deja dark-legacy sin estilo).
+- **Tabla blindada anti-fugas**: `min-width: 0 !important` + `max-width: 100% !important` + `table-layout: fixed` con anchos fijos que suman 100%. Patrón originado en 📦784-fix2 (Frecuencia) y replicado en Severidad, Mortalidad, Prevalencia, Incidencia, Mejoramiento, Despliegue Estratégico.
+- **Modal en `<body>` con tokens scoped sobre sí mismo**: cuando el modal vive fuera del wrapper del módulo (caso 6.1.2), los tokens `--aud-*` se declaran **sobre el propio modal** con paleta canónica + bloque `[data-theme^="dark"]` propio.
+- **Guard de re-bindear**: NO usar flags `_clickBound` en componentes que se destruyen y re-renderizan. Bindear en cada `render()` (el handler ya debe tener su guard interno, ej. `view !== 'hub'`).
+- **Datos en la bodega, no en el tablero**: cuando un componente consume datos de varias fuentes, cada función auxiliar debe **persistir su resultado** en `this.*` para que la vista lo encuentre. Patrón visto en 📦799 (Peligros) y 📦791 (Salud).
+
+**Estado del proyecto:** 8 módulos home rediseñados + sidebar premium + 70+ submódulos migrados. Próximas fases: panel dashboard horizontal, submenu Bandeja Integrada, sistema de notificaciones persistentes (en desarrollo).
+
+---
+
 ### v0.1.100 - 11 Jun 2026 🆕
 
 #### Estandarización de Headers - Patrón k-section-card
@@ -1514,9 +1646,9 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ---
 
-**Última actualización:** 11 de junio de 2026  
-**Versión del documento:** 2.5 (Estandarización de Headers - v0.1.100)  
-**Versión de la aplicación:** 0.1.100
+**Última actualización:** 22 de septiembre de 2026  
+**Versión del documento:** 2.6 (Migración premium v2 masiva v0.1.206-211 — `📦739-802`)
+**Versión de la aplicación:** 0.1.211
 
 ---
 
