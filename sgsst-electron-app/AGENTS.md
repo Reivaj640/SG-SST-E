@@ -21,7 +21,7 @@ python .opencode/skills/ui-ux-pro-max/scripts/search.py "<query>" --stack html-t
 **Stacks:** html-tailwind, react, nextjs, vue, svelte, swiftui, react-native, flutter, shadcn, jetpack-compose
 **Dominios:** product, style, typography, color, landing, chart, ux, web, prompt
 
-### Skills de Desarrollo
+### Skills de Desarrollo (Superpowers)
 
 | Skill | Cuando usarlo | Activacion |
 |-------|--------------|------------|
@@ -33,6 +33,39 @@ python .opencode/skills/ui-ux-pro-max/scripts/search.py "<query>" --stack html-t
 | **silent-failure-hunter** | Cazar errores silenciosos y error handling deficiente | Despues de escribir try-catch o fallbacks |
 | **security-review** | Review de seguridad: inyeccion, auth bypass, crypto, RCE, data exposure (confidence >= 8) | Despues de implementar, antes de commit, para codigo con input de usuario |
 | **commit-workflow** | Crear commits, push, PRs con mensajes significativos | Al hacer commit o PR |
+
+### Skills de Requisitos y Calidad (Addy Osmani · `.agents/skills/`)
+
+Skills de `addyosmani/agent-skills` seleccionadas por complementar Superpowers sin duplicar. Se activan con `skill({ name: "<nombre>" })`.
+
+| Skill | Cuando usarlo | Activacion |
+|-------|--------------|------------|
+| **interview-me** 🥇 | Extraer lo que el usuario realmente quiere: una pregunta a la vez hasta ~95% confianza. Mejor que brainstorming para pedidos vagos ("hazme X" sin detalle) | Pedido subespecificado; "interview me", "grill me", "are we sure?" |
+| **constraint-driven-development** 🥇 | Formalizar y hacer cumplir las reglas duras del proyecto como contrato escrito (`CONSTRAINTS.md`). Detecta cuando un agente "suaviza" checks (tests saltados, suppressions, thresholds bajados) | Definir/auditar estandares de calidad; cuando se note que se relajan reglas de AGENTS.md |
+| **doubt-driven-development** 🥈 | Revision adversarial fresh-context de cada decision no trivial antes de darla por buena: CLAIM → EXTRACT → DOUBT → RECONCILE. Seguro contra bugs de raiz escondida (caso Bootstrap 📦761) | Stakes altos (seguridad, auth, migraciones irreversibles); codigo unfamiliar; output "seguro" pero barato de verificar ahora |
+| **deprecation-and-migration** 🥈 | Gestionar retiro/migracion de sistemas viejos, APIs o features. Expand/contract, eliminar codigo zombie | Limpiar modulos legacy del repo; decidir si mantener o sunsetear algo |
+| **documentation-and-adrs** 🥉 | Architecture Decision Records: documentar el *porque* de decisiones arquitectonicas y cambios de API | Decisiones de arquitectura; shipping features; cambiar APIs publicas/IPC |
+
+**Nota:** `git-workflow-and-versioning` de este pack NO se instalo a proposito — choca con la convencion `📦n` obligatoria del repo.
+
+**Origen:** [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (98k★, MIT). Todas Safe / Low Risk. Docs: `.agents/skills/<nombre>/SKILL.md`.
+
+### Skills de Testing Electron (`.agents/skills/`)
+
+| Skill | Cuando usarlo | Activacion |
+|-------|--------------|------------|
+| **desktop-testing-electron** | Tests E2E con Playwright `_electron.launch()`, unit tests de main/preload (mock de `electron`/`contextBridge`/`ipcRenderer`), stub de dialogos nativos, CI headless con `xvfb-run` | Al escribir o correr tests de la app Electron |
+| **electron-playwright-cli** | Automatizar la app Electron en vivo: snapshots, clicks, typing, screenshots, extraccion de datos (CLI `electron-playwright-cli`) | Para interactuar/probar la app en runtime sin armar un test formal |
+
+**Reglas criticas (desktop-testing-electron):**
+- SIEMPRE `await electronApp.close()` en el teardown (procesos Electron rompen CI).
+- Mockear el modulo `electron` en unit tests (las APIs solo existen dentro del runtime).
+- Stub de `showOpenDialog`/`showSaveDialog` en E2E (bloquean el proceso).
+- CI headless Linux: `xvfb-run` o `xvfb-maybe`.
+
+**Config electron-playwright-cli:** crear `.playwright/cli.config.json` con `browser.launchOptions.args: ["main.js"]` apuntando al entry point del proceso main.
+
+**Tests existentes del repo** (patron scripts sueltos con `node`, sin framework): `tests/test-*.js`, `main/test-*.js` — se corren con `node <ruta>`. Las skills de arriba son para tests E2E/formales de la app Electron completa.
 
 ### Skills de Superpowers (Plugin Global)
 
@@ -57,11 +90,16 @@ Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta boot
 
 ### Workflow Recomendado para Desarrollo
 
-1. **feature-dev** - Workflow completo (7 fases: discovery, exploration, questions, architecture, implementation, review, summary)
-2. **code-simplifier** - Despues de implementar codigo
-3. **code-reviewer** - Antes de commit
-4. **security-review** - Antes de commit, para codigo con input de usuario o superficies de ataque
-5. **commit-workflow** - Al hacer commit
+1. **interview-me** - Si el pedido es vago o subespecificado (antes de todo)
+2. **constraint-driven-development** - Si no hay CONSTRAINTS.md o se estan relajando reglas
+3. **feature-dev** - Workflow completo (7 fases: discovery, exploration, questions, architecture, implementation, review, summary)
+4. **doubt-driven-development** - Si stakes altos o decision no trivial (antes de dar por bueno)
+5. **code-simplifier** - Despues de implementar codigo
+6. **code-reviewer** - Antes de commit
+7. **security-review** - Antes de commit, para codigo con input de usuario o superficies de ataque
+8. **commit-workflow** - Al hacer commit
+
+**Cuando NO usar Addy en paralelo a Superpowers:** no invocar `using-agent-skills` (meta-router de Addy) junto a `using-superpowers` — dos routers activos pelean por el routing. Elegir uno como primario; en este repo el primario es **Superpowers**.
 
 ### Proyecto K+AIR (SG-SST Electron)
 - Stack: Electron + vanilla JS + Python 3.11.9
