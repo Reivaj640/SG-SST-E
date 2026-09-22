@@ -4037,3 +4037,18 @@ bind en cada render del hub (sin `_clickBound`), cache-bust `AUD-20260921-modal-
 **Regla**: un modal montado en `<body>` necesita sus propios tokens (no hereda los del scope del
 módulo) y su propia regla `display:none` + estado abierto; verificar que toda clase generada por
 el JS tenga regla en la hoja.
+
+### 📦801 — Matriz de Control Operacional (7.1.1): premium v2 + fix de scroll del editor
+
+Migración al dialecto premium v2 (mismo patrón que FURAT 📦773 y Profesiograma 📦772) y arreglo del scroll roto en la vista de edición que el usuario reportó con captura.
+
+**Premium v2**: tokens en `:root` (iframe aislado → seguro), Header System v2 con SVG inline, dark con `[data-theme^="dark"]` (los 2 atributos), fix del selector roto `'\.kair-form-section'`, `_syncMejoramientoStore()` → `MejoramientoStore.update('711', …)` con guard, contrato DOM del header intacto.
+
+**Scroll del editor (3 causas)**:
+1. `.kair-editor` tenía `align-items: start` → la fila `main` del grid no se estiraba, `overflow-y: auto` nunca activaba y `.kair-app { overflow: hidden }` recortaba. Quitado (el sidebar ya tiene `align-self: start`).
+2. Faltaba `min-height: 0` en `.kair-editor__main` → el item del grid no podía encogerse bajo su contenido.
+3. La vista lista usaba `class="kair-app-main"` (clase huérfana: 0 reglas) en vez de `.kair-main` (que sí tiene `flex:1; min-height:0; overflow-y:auto`).
+
+**Verificación**: test `tests/mejoramiento/test-premium-v2.js` → 39/39 OK (4 checks de regresión del scroll); arnés Electron midió `clientHeight 492 / scrollHeight 5258`, `scrollTop 400`, `alignItems: normal`. Cache-bust `APC-20260921-v2-scroll` en los 4 sitios + test.
+
+**Regla**: en un layout grid `1fr auto`, si un hijo debe scrollear necesita `min-height: 0` Y su fila no puede quedar con `align-items: start` en el contenedor; verificar también que la clase del HTML exista en la hoja (un nombre huérfano = 0 reglas = sin scroll).

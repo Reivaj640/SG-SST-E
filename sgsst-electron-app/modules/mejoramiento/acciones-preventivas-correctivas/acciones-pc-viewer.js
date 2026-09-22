@@ -227,9 +227,19 @@ function populateCatalogos() {
   }
 }
 
+/* 📦801: sincroniza los KPIs del home de Mejoramiento (MejoramientoStore solo acepta '711') */
+function _syncMejoramientoStore() {
+  try {
+    if (window.MejoramientoStore && typeof window.MejoramientoStore.update === 'function') {
+      window.MejoramientoStore.update('711', state.data || []);
+    }
+  } catch (e) { /* el store puede no estar en el iframe standalone */ }
+}
+
 function render() {
   renderKpis();
   renderTable();
+  _syncMejoramientoStore();
 }
 
 /* ── Editor (modal) ── */
@@ -254,7 +264,7 @@ function openEditor(accion) {
 
   /* Reset secciones: abiertas por defecto */
   state.sectionsCollapsed = {};
-  document.querySelectorAll('\.kair-form-section').forEach(s => s.classList.remove('is-collapsed'));
+  document.querySelectorAll('.kair-form-section').forEach(s => s.classList.remove('is-collapsed'));
 
   updateEditorSidebar();
   updateBannerEstado();
@@ -802,7 +812,7 @@ function bindEvents() {
   /* Secciones colapsables */
   document.querySelectorAll('.kair-form-section__head').forEach(h => {
     h.addEventListener('click', () => {
-      const sec = h.closest('\.kair-form-section');
+      const sec = h.closest('.kair-form-section');
       sec.classList.toggle('is-collapsed');
     });
   });

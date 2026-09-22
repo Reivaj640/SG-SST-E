@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.211] - 2026-09-21
 
+### 📦801 · Matriz de Control Operacional (7.1.1) — premium v2 + fix de scroll del editor
+
+Migración al dialecto premium v2 (Header System v2, tokens canónicos, dark completo) y arreglo del scroll roto en la vista de edición que el usuario reportó con captura.
+
+#### Migración premium v2
+
+- **`acciones-pc-view.css`**: tokens premium en `:root` (azul `#2057b8`, tinta `#14213d`, DM Sans + Manrope, radios 20/12), Header System v2 (breadcrumb + icon chip 44×44 + título Manrope 800 + acciones con SVG inline), reset scoped, modo oscuro con `[data-theme^="dark"]` (cubre `dark` y `dark-legacy`), paleta vieja eliminada.
+- **`acciones-pc-view.html`**: marcado del Header v2; contrato DOM conservado (`#header-title`, `#header-subtitle`, `#header-breadcrumb` con `data-crumb`, `#btn-back`/`#btn-importar`/`#btn-exportar`, `#header-company-text`).
+- **`acciones-pc-viewer.js`**: fix del selector roto `'\.kair-form-section'` → `'.kair-form-section'`; nuevo `_syncMejoramientoStore()` llamado desde `render()` para `MejoramientoStore.update('711', …)` con guard de seguridad.
+- **`acciones-pc-logic.js` / `index.html`**: cache-bust de la URL del iframe y del `<script>`.
+
+#### Fix de scroll del editor (reportado con captura)
+
+1. **`.kair-editor` tenía `align-items: start`** (comentario "sidebar no se estira al 100%"): la fila `main` del grid no se estiraba al alto disponible, `.kair-editor__main` crecía con su contenido, `overflow-y: auto` nunca se activaba y `.kair-app { overflow: hidden }` recortaba sin scroll. Fix: quitar `align-items: start` (el sidebar ya tiene `align-self: start`).
+2. **Faltaba `min-height: 0` en `.kair-editor__main`**: sin eso el item del grid no puede encogerse por debajo de su contenido y el scroll interno tampoco funciona.
+3. **Vista de lista con clase huérfana**: el HTML usaba `class="kair-app-main"` pero el CSS solo define `.kair-main` (`flex:1; min-height:0; overflow-y:auto`) → la lista tampoco scrolleaba. Fix: `kair-app-main` → `kair-main`.
+
+#### Verificación
+
+- `node tests/mejoramiento/test-premium-v2.js` → **39/39 OK** (4 checks nuevos de regresión del scroll).
+- Arnés Electron real: editor `clientHeight 492` / `scrollHeight 5258`, `scrollTop` cambia a 400, `alignItems: normal`, body sin scroll.
+- `node --check` viewer y logic OK. EOL de los archivos en LF.
+- **Cache-bust** `APC-20260921-v2-scroll` en los 4 sitios + test.
+
 ### 📦800 · Auditoría Anual (6.1.2) — botón "Nueva auditoría" abría un modal sin estilo
 
 El botón "Nueva auditoría" (hub y lista) no mostraba el formulario: el modal existía en el DOM pero **tenía cero reglas CSS** (`.kair-aud-modal`, botones, filas del formulario, confirm y toast fallback no estaban en la hoja), y en la vista de lista el botón solo disparaba un placeholder ("versión enterprise").
