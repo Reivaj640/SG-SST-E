@@ -1,9 +1,17 @@
 # K+AIR — Contexto del Proyecto
 
-**Última actualización:** 19 de septiembre de 2026
-**Versión actual:** 0.1.208 (desarrollo) — último publicado v0.1.205
+**Última actualización:** 22 de septiembre de 2026
+**Versión actual:** 0.1.211 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.211 (📦805 — docs(readme): auditoría módulo por módulo):** Actualización del README para reflejar el estado real del repo. El README decía "8 módulos / 48 submódulos" cuando la realidad es **9 módulos / 51 submódulos con UI + 16 placeholder en roadmap = 67 declarados en sidebar oficial**. Se añadió el Módulo 8 **Gestión Humana** (top-level nuevo en v0.1.191 con 12 vistas: Resumen, Dashboard, Contratación, Carpetas, Firma electrónica, Afiliaciones, Base de Personal, Vacaciones, Permisos, Comunicación, Documentos, Trabajador Detalle) y se expandieron las tablas de los Módulos 2 (6→13), 3 (8→18), 4 (0→11), 5 (0→2), 6 (0→4) y 7 (0→4 vistas) con columna Estado (✅ implementado / 🚧 Roadmap). Solo commit `📦805` (172 inserciones / 40 borrados en `README.md`). No bumpea package.json porque es solo docs.
+
+> **🆕 v0.1.211 (📦793-804 — feat(premium v2): cierre masivo de migración premium v2 — Peligros + Inspecciones + Mantenimiento + Verificación + Mejoramiento):** 12 paquetes en 3 semanas cierran la migración premium v2 iniciada en v0.1.206. **Inspecciones Sistemáticas (4.2.4)** 📦793+796+798 — hub premium con score compuesto + 3 metric cards + chart SVG nativo; las 7 vistas funcionales con header premium v7; reconexión a `PROGRAMA DE INSPECCIONES.xlsx` real. **Identificación de Peligros (4.1.2)** 📦794-795 — bridge IPC + 4 sub-componentes premium v2 con Header System v2, donut theme-aware con helpers `tok()`/`palette()`, modo oscuro en los DOS atributos, test de 9 contratos. **Mantenimiento Periódico (4.2.5)** 📦797 — header premium con badge-ico + título Manrope + acciones. **Home Gestión de Peligros y Riesgos** 📦799 — fix de datos reales (Inspecciones 29/39 con el Excel real de Tempoactiva). Causa doble: `refreshStats()` no asignaba `this.peligrosStats` + nombres de campos incompatibles con los puentes. **Auditoría Anual (6.1.2)** 📦800 — fix del botón "Nueva auditoría" que abría un modal sin estilo: +432 líneas de CSS con tokens `--aud-*` scoped, fachada `openAuditoriaForm`, fix del guard `_clickBound`. **Matriz de Control Operacional (7.1.1)** 📦801 — premium v2 + fix del scroll roto del editor (3 causas diagnosticadas: `align-items:start` en `.kair-editor`, `min-height:0` faltante, `class="kair-app-main"` huérfana). **Verificación** 📦802 — Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3) al premium v2 con Excel real (bridge `indicadores-verificacion-bridge` lee `INDICADORES <año>.xlsx`). **Tests 37/37 + 38/38 + 39/39 + 9 OK**. **📦803** — 7 skills de calidad/testing instaladas. **📦804** — normalización de EOL en 211 archivos (CRLF↔LF, sin cambios de contenido). **Sistema de notificaciones persistentes** (📦805 sin commitear): 3 archivos nuevos (`notifications-{bridge,service,email}.js`) + 4 tests, spec+plan en `docs/superpowers/2026-09-22-notificaciones-persistentes-*`.
+
+> **🆕 v0.1.210 (📦796-798 — feat(inspecciones 4.2.4): reconexión a `PROGRAMA DE INSPECCIONES.xlsx` real):** Tras la migración premium v2 (📦793-796), se reconectó el módulo 4.2.4 Inspecciones al Excel real de la empresa (conexión que existió en 📦332/338 y quedó desactivada en la reconstrucción 📦500). Detección de encabezados de mes **por texto** (Ene…Dic), códigos `p`=programado / `c`=cumplido, respaldo automático en `backup/` antes de cada escritura. **Lecciones técnicas transferibles del rango 📦793-802**: flex chain obligatorio para scroll interno (`display:flex; flex-direction:column; min-height:0` + `flex:1; min-height:0; overflow-y:auto`); dark mode con `[data-theme^="dark"]` (cubre dark + dark-legacy); tabla blindada anti-fugas (`min-width:0 !important` + `table-layout:fixed` con anchos que suman 100%); modal en `<body>` con tokens scoped sobre sí mismo; guard de re-bindear (NO usar flags `_clickBound`); datos en la bodega, no en el tablero (cada función auxiliar debe persistir su resultado en `this.*`).
+
+> **🆕 v0.1.209 (📦793 — feat(inspecciones 4.2.4): hub premium + 7 vistas funcionales):** Cierre de la migración premium v2 iniciada en v0.1.206 para el módulo 4.2.4. **Hub premium**: score compuesto (3 componentes: cumplimiento programa, % cerradas a tiempo, % categorías evaluadas) + 3 metric cards (Inspecciones del mes, NC abiertas, Próximas a vencer 7d) + chart SVG nativo de distribución por tipo + module grid con flecha. **11 clases premium nuevas** scopeadas bajo `.kair-app` + tokens locales + dark cubriendo `dark + dark-legacy` con `[data-theme^="dark"]`. Header v7 transparente (sin breadcrumb pills / sin chip empresa / sin divider) + helper `handleSubmoduleClick` obligatorio (patrón aprendido de 📦731/732 donde faltaba). Cache-bust `20260918-premium-v7-inspecciones`.
 
 > **🆕 v0.1.208 (📦739-790 — feat(ui): migración premium v2 de los submódulos):** Segunda ola del rediseño premium (después de los homes de módulo, 📦730-738). Se migraron al dialecto **premium v2** todos los submódulos con UI propia, usando la paleta canónica de `shared/kair-design-tokens.css` (azul `#2057b8`, tinta `#14213d`, muted `#748096`, borde `#e8ebee`, canvas `#fbfcfb`, DM Sans + Manrope, radios 20/12) y el **Header System v2** (breadcrumb + icon chip + título Manrope + tabs con subrayado). Se extrajo el dialecto compartido a `shared/kair-premium.css` (📦749) y se documentó el playbook de migración en `AGENTS.md`. **Submódulos**: Inducciones (gráficos SVG nativos), Capacitaciones, Presupuesto, COPASST/Comité de Convivencia, Configuración (capa scoped `.kair-config` + remapeo de tokens), Bandeja Integrada (premium + firma con imagen CID + toolbar compacta + paginación), Dashboard principal (piloto), Archivo y Retención, Evaluación Inicial del SG-SST, Evaluaciones Médicas Ocupacionales (certificados persistidos), Rendición de Cuentas, 2.9.1 Identificación de Bienes, 2.10.1 Evaluación y Selección, 3.1.3 Perfil de Cargo y Profesiograma, 3.2.1 Reportes de Accidentes (FURAT), 2.11.1 Gestión del Cambio (marcado embebido), 3.1.6 Restricciones/Remisiones (flujo completo de 3 pasos con vista previa del informe y cancelación, Control con filas vacías/encabezados repetidos del Excel filtrados y nueva sección de Estadísticas con KPIs + 6 gráficos) y 3.2.2 Investigación de Accidentes e Incidentes (las 3 vistas + fix de la fuga global de `investigacion-accidentes-view.css` + ancho completo + lista en 2 columnas en maximizada) y 3.2.3 Registro y Análisis Estadístico (Header System v2 + scoping total del CSS, se quitaron las clases globales `.k-section-card`/`.header-back-btn`, + modo oscuro en los dos atributos + los 9 gráficos Chart.js con colores de tema) y 3.3.1 Frecuencia de la Accidentalidad (tokens propios `--freq-*` scoped — se quitó el `:root` + `*` + `body` GLOBALES que pisaban tokens y márgenes de toda la app — + 139 selectores scopados + el gráfico SVG leyendo la paleta con `tok()` + gráfico y tabla en paralelo con anchos de columna fijos y blindados contra `min-width` ajenos + filas de 35px + gráfico a todo el alto + los 12 meses en una fila en maximizada) y 3.3.2 Severidad de la Accidentalidad (tokens propios `--sev-*` scoped + Header System v2 + 125 selectores scopados + tabla blindada con 7 anchos fijos + gráfico SVG leyendo la paleta + wrapper `.sev-duo` en paralelo + código muerto eliminado + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + test 21/21) y 3.3.3 Índice de Mortalidad (tokens propios `--mort-*` scoped + Header System v2 + tabla blindada con 7 anchos fijos + Chart.js theme-aware con gradientes dark/light + `tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla + resize handler con cleanup + código muerto eliminado + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + **gráfico y tabla en paralelo en maximizada** (`📦786-fix`) + test 46/46) y 3.3.4 Prevalencia de Enfermedad Laboral (tokens propios `--prev-*` scoped + Header System v2 + tabla blindada con 6 anchos fijos que suman 100% + Chart.js theme-aware + `tok()`/`palette()` en getStatusBadge/getValueColor/renderizar/renderizarTabla/renderFallbackChart + resize handler con cleanup + iconos SVG inline (se quitó el CDN de Bootstrap Icons) + código muerto eliminado + renderer.js parcheado con TOKEN + cache-bust en 2 niveles + **gráfico y tabla en paralelo en maximizada** (`.prev-duo`) + test 46/46) y 3.3.5 Incidencia de Enfermedad Laboral (módulo hermano de Prevalencia generado con renombres case-sensitive + tokens `--inc-*` scoped + Header System v2 + tabla blindada con 6 anchos fijos + Chart.js theme-aware + `tok()`/`palette()` + resize con cleanup + estilos del error que la hoja vieja no definía + **gráfico y tabla en paralelo** (`.inc-duo`) + test 46/46). **Modo oscuro** cubierto en los DOS atributos (`data-theme="dark"` y `dark-legacy`). **Limpieza**: decenas de archivos muertos y código huérfano eliminados (p. ej. `restricciones-medicas-logic.js` pasó de ~60 KB a ~19 KB; Gestión del Cambio de 6 archivos a 1 par CSS+JS). **Docs**: `AGENTS.md` con el playbook + specs técnicas ST-01 a ST-08 (📦750). **Versión**: `package.json` en 0.1.208. Ver `CHANGELOG.md` [0.1.208] y `AGENTS.md` para el detalle.
 
@@ -122,14 +130,14 @@
 ├─────────────────────────────────────────────────────────┤
 │  RENDERER (Frontend)                                    │
 │  ├── index.html, renderer.js, styles.css                 │
-│  ├── modules/ (8 módulos, 48 submódulos)                │
+│  ├── modules/ (9 módulos, 51 submódulos con UI + 16 placeholder en roadmap = 67 declarados en sidebar oficial) │
 │  └── renderer/bandeja-integrada/ (iframe Gmail-look)    │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (~736 líneas, ~200 contratos IPC)       │
+│  └── preload.js (~1138 líneas, ~250 contratos IPC)      │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  ├── main.js (~20,173 líneas, 143+ handlers IPC)         │
+│  ├── main.js (~21,643 líneas, 160+ handlers IPC)         │
 │  ├── shared/ (google-gmail.js, google-auth.js, etc.)    │
 │  ├── main/ (email-sync.js, db-instance.js, etc.)        │
 │  └── components/ (config, seguimiento)                  │
@@ -154,11 +162,11 @@
 
 | Archivo | Líneas | Propósito |
 |---|---|---|
-| `main.js` | 20,173 | Backend Electron, handlers IPC |
-| `renderer.js` | 6,695 | Lógica de UI principal, navegación |
-| `preload.js` | 736 | Contratos IPC (electronAPI) |
-| `package.json` | 142 | Configuración npm + electron-builder |
-| `index.html` | 143 | Punto de entrada HTML |
+| `main.js` | 21,643 | Backend Electron, handlers IPC |
+| `renderer.js` | 7,270 | Lógica de UI principal, navegación |
+| `preload.js` | 1,138 | Contratos IPC (electronAPI) |
+| `package.json` | 178 | Configuración npm + electron-builder |
+| `index.html` | 508 | Punto de entrada HTML |
 | `jsdoc.json` | 19 | Config JSDoc (genera doc auto con `npm run docs:generate`) |
 
 ---
@@ -177,7 +185,7 @@ sgsst-electron-app/
 ├── preload.js                 ← IPC
 ├── index.html
 ├── styles.css                 ← sistema visual K+AIR
-├── modules/                   ← 8 módulos, 48 submódulos
+├── modules/                   ← 9 módulos, 51 submódulos con UI + 16 placeholder en roadmap
 ├── renderer/bandeja-integrada/ ← cliente Gmail (iframe)
 ├── shared/                    ← lógica compartida (Gmail API, etc.)
 ├── main/                      ← scripts backend (email-sync, db, etc.)

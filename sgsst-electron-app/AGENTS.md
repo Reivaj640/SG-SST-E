@@ -247,9 +247,11 @@ Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonic
 - Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
 - Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
 
-### K+AIR Premium Design System (v0.1.205 · 📦730-738)
+### K+AIR Premium Design System (v0.1.211 · 📦730-805)
 
-A partir de v0.1.197, los homes de módulos usan el sistema premium con tokens compartidos. **8 paquetes ya migrados** al patrón unificado (sep 2026):
+A partir de v0.1.197, los homes de módulos usan el sistema premium con tokens compartidos. **13 paquetes en el rango 📦730-805** migrados al patrón unificado (sep 2026, 3 olas):
+
+**Ola 1 — Homes de módulo (📦730-738, v0.1.197-205):** 8 homes rediseñados con score compuesto + metric cards + chart SVG nativo + module grid.
 
 | 📦 | Módulo | Versión | Score compuesto |
 |----|--------|---------|------------------|

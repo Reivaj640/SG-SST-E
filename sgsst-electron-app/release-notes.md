@@ -1,4 +1,62 @@
-# K+AIR v0.1.208
+# K+AIR v0.1.211
+
+## 🎨 Cierre de la migración premium v2 — Peligros + Inspecciones + Mantenimiento + Verificación + Mejoramiento (📦793-804)
+
+Tercera ola (y cierre) del rediseño premium v2: tras los homes de módulo (📦730-738, v0.1.197-205) y los submódulos iniciales (📦739-790, v0.1.208), se cierran los 5 módulos principales que faltaban con UI propia y sus submódulos de Verificación + Mejoramiento. **Submódulos finalizados en este rango**:
+
+### Inspecciones Sistemáticas (4.2.4) — 📦793 + 📦796 + 📦798
+
+- **Hub premium**: score compuesto (3 componentes: cumplimiento programa, % cerradas a tiempo, % categorías evaluadas) + 3 metric cards (Inspecciones del mes / NC abiertas / Próximas a vencer 7d) + chart SVG nativo de distribución por tipo + module grid con flecha.
+- **11 clases premium nuevas** scopeadas bajo `.kair-app` con tokens locales y dark cubriendo `dark + dark-legacy` con `[data-theme^="dark"]`.
+- **Las 7 vistas funcionales** migran al header premium v7 (`buildHeader` con clases `kmi-*`: transparente, breadcrumb, píldora "Sincronizado", botón Volver) manteniendo intacto el flujo de datos. Historial con píldoras de filtro por tipo + buscador; Dashboard/Programa con tabla mensual; Detalle + 4 formularios con tokens del sistema premium.
+- **Reconexión a `PROGRAMA DE INSPECCIONES.xlsx` real** (conexión que existió en 📦332/338 y quedó desactivada en la reconstrucción 📦500). Detección de encabezados de mes **por texto** (Ene…Dic), códigos `p`=programado / `c`=cumplido, respaldo automático en `backup/` antes de cada escritura.
+
+### Identificación de Peligros (4.1.2) — 📦794 + 📦795
+
+- Bridge IPC `identificacion-peligros-bridge.js` + 4 sub-componentes + service + CSS scopado bajo `.km-wrapper` con tokens propios `--km-*`.
+- Header System v2 con badge-ico + título Manrope + subtítulo + acciones (header transparente v7 con botón Volver).
+- Donut theme-aware con helpers `tok()`/`palette()`.
+- Modo oscuro en los DOS atributos `[data-theme^="dark"]`.
+- Test de 9 contratos (`test-identificacion-peligros.js`).
+
+### Mantenimiento Periódico (4.2.5) — 📦797
+
+- Header premium con badge-ico + título + subtítulo + botones ghost/outline alineado al lenguaje visual premium.
+- Tipografía del sistema aplicada en `mantenimiento.css` (Manrope/DM Sans).
+
+### Home Gestión de Peligros y Riesgos — 📦799
+
+- **Fix de datos reales** en hero, tarjetas y gráficas: el home premium (📦754) se veía todo en cero aunque la empresa tuviera datos reales.
+- **Causa doble**: `refreshStats()` guardaba las respuestas en la caché global pero nunca asignaba `this.peligrosStats` (datos morían en la bodega) + nombres de campos incompatibles con los puentes.
+- Ahora Inspecciones muestra **29/39** con el Excel real de Tempoactiva.
+- Mediciones y EPP marcados como `null` para que el score compuesto los excluya en vez de arrastrarlo a 0.
+
+### Auditoría Anual (6.1.2) — 📦800
+
+- **Fix del botón "Nueva auditoría"** que abría un modal sin estilo: el modal existía en el DOM pero tenía cero reglas CSS.
+- **`auditoria-anual.css` +432 líneas**: estilos del modal (oculto por defecto, `--open` flex, backdrop, panel radio 20, formulario 2 columnas, botones ghost/primary), diálogo de confirmación y toast de respaldo.
+- Tokens `--aud-*` scopados sobre el propio modal (vive en `<body>`, fuera de `.kair-v3-module`) + dark con `[data-theme^="dark"]`.
+- Fachada `openAuditoriaForm` con `console.warn` + updateNotifier si `__kairAudInstance` es null (antes fallaba en silencio).
+- Fix del guard `_clickBound` del hub que impedía re-bindear tras `destroy()` + re-render.
+
+### Matriz de Control Operacional (7.1.1) — 📦801
+
+- Premium v2 (Header System v2, tokens canónicos, dark completo).
+- **Fix del scroll roto del editor** reportado con captura. **3 causas diagnosticadas**: (1) `.kair-editor` tenía `align-items: start` que impedía estirar la fila `main` del grid → `overflow-y: auto` nunca se activaba; (2) faltaba `min-height: 0` en `.kair-editor__main`; (3) la vista de lista usaba `class="kair-app-main"` huérfana (la correcta es `.kair-main` con `flex:1; min-height:0; overflow-y:auto`).
+
+### Verificación — Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3) — 📦802
+
+- **6.1.1**: bridge IPC `indicadores-verificacion-bridge` lee `INDICADORES <año>.xlsx` con resolución de carpetas por variantes de acento + hojas RESULTADO/ESTRUCTURA/PROCESO + series mensuales doble fila valor/denominador + match por nombre normalizado. Header premium con badge de origen Excel vs ejemplo + tabs prominentes con subrayado azul + tokens canónicos. Test 37/37 OK.
+- **6.1.3**: Header v2 con Volver al hub + Refrescar + 4 metric cards + tabla blindada con 10 columnas + chart SVG nativo de barras horizontales + IPC `revisionAltaDireccion.listarIndicadores` con fallback mock + tokens `--rad-desp-*` scoped + dark unificado. Test 38/38 OK.
+
+### Herramientas y DX — 📦803 + 📦804
+
+- **📦803**: 7 skills de calidad/testing instaladas en `.agents/skills/` (2 de `agents-inc/spacecake-labs` + 5 de `addyosmani/agent-skills`).
+- **📦804**: normalización de EOL en 211 archivos (CRLF↔LF sin cambios de contenido, verificado con `git diff -w` vacío).
+
+### Documentación — 📦805
+
+- Auditoría módulo por módulo del README. **Realidad oculta**: el README decía "8 módulos / 48 submódulos" cuando en realidad son **9 módulos / 51 con UI + 16 placeholder en roadmap = 67 declarados en sidebar oficial**. Se añadió el Módulo 8 **Gestión Humana** (top-level nuevo v0.1.191, 12 vistas) y se expandieron las tablas de los Módulos 2 (6→13), 3 (8→18), 4 (0→11), 5 (0→2), 6 (0→4) y 7 (0→4 vistas) con columna Estado (✅ implementado / 🚧 Roadmap). Solo commit `📦805` (172 inserciones / 40 borrados en `README.md`).
 
 ## 🎨 Migración premium v2 de los submódulos (📦739-790)
 
@@ -85,6 +143,6 @@ Segunda gran ola del rediseño visual: después de los **homes de módulo** (�
 
 ### Archivos
 
-- `package.json` (versión 0.1.207)
+- `package.json` (versión 0.1.211)
 - `shared/kair-premium.css`, `shared/kair-design-tokens.css`, `shared/kair-components.css`
 - `AGENTS.md`, `README.md`, `CONTEXT.md`, `CHANGELOG.md`, `release-notes.md`
