@@ -81,8 +81,11 @@
 
   CarpetasComponent.prototype.render = async function () {
     var self = this;
+    // 📦810-fix · Marca de scope: TODA la hoja del módulo vive bajo .carp-scope
+    // (los --kair-* y las clases .kair-* propias ya no son globales).
+    self.container.classList.add('carp-scope');
     if (!window.electronAPI) {
-      self.container.innerHTML = '<div style="padding:2rem;color:#721c24;background:#f8d7da;border-radius:8px;">⚠️ electronAPI no disponible. K+AIR se está cargando.</div>';
+      self.container.innerHTML = '<div style="padding:2rem;color: var(--danger-color);background: rgba(217,83,79,0.18);border-radius:8px;">⚠️ electronAPI no disponible. K+AIR se está cargando.</div>';
       return;
     }
     if (self.view === 'list') {
@@ -103,10 +106,10 @@
     header.style.cssText = 'display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap;';
     header.innerHTML =
       '<div style="flex:1;">' +
-        '<h1 style="margin:0;font-size:1.25rem;color:#1a1a2e;display:flex;align-items:center;gap:0.5rem;">' +
-          '<i class="fas fa-folder-open" style="color:#174ea6;"></i> Carpetas' +
+        '<h1 style="margin:0;font-size:1.25rem;color: var(--text-color);display:flex;align-items:center;gap:0.5rem;">' +
+          '<i class="fas fa-folder-open" style="color: var(--primary-color);"></i> Carpetas' +
         '</h1>' +
-        '<p style="margin:0.125rem 0 0;font-size:0.8125rem;color:#5a6378;">Archivo digital por trabajador · ' + _esc(self.companyName || 'Empresa') + '</p>' +
+        '<p style="margin:0.125rem 0 0;font-size:0.8125rem;color: var(--text-light-color);">Archivo digital por trabajador · ' + _esc(self.companyName || 'Empresa') + '</p>' +
       '</div>';
     self.container.appendChild(header);
 
@@ -116,8 +119,7 @@
     // 📦743 — Estilos inline como workaround: el shell de K+AIR tiene un override
     // que rompe el CSS externo. Aplicamos los estilos críticos directo al elemento
     // para garantizar el layout en una sola línea.
-    toolbar.style.cssText =
-      'display: grid;' +
+    toolbar.style.cssText = 'display: grid;' +
       'grid-template-columns: minmax(300px, 1fr) auto auto auto;' +
       'align-items: center;' +
       'gap: 0.75rem;' +
@@ -128,9 +130,9 @@
       'margin-bottom: 0.75rem;';
     toolbar.innerHTML =
       '<div class="kair-search">' +
-        '<i class="fas fa-search kair-search__icon" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#5a6378;font-size:14px;pointer-events:none;"></i>' +
+        '<i class="fas fa-search kair-search__icon" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color: var(--text-light-color);font-size:14px;pointer-events:none;"></i>' +
         '<input type="search" id="carp-search" placeholder="Buscar por nombre, cédula o cargo…" value="' + _esc(self.list.search) + '" ' +
-          'style="width:100%;padding:8px 12px 8px 38px;border:1px solid #dee2e6;border-radius:6px;font-family:inherit;font-size:14px;color:#1a1a2e;background:white;outline:none;box-sizing:border-box;">' +
+          'style="width:100%;padding:8px 12px 8px 38px;border: 1px solid var(--border-color);border-radius:6px;font-family:inherit;font-size:14px;color: var(--text-color);background: var(--widget-bg-color);outline:none;box-sizing:border-box;">' +
       '</div>' +
       '<select class="kair-select" id="carp-estado">' +
         '<option value="todos">Estado · Todos</option>' +
@@ -138,14 +140,14 @@
         '<option value="incompleto">Incompleto</option>' +
         '<option value="critico">Crítico</option>' +
       '</select>' +
-      '<button class="kair-btn kair-btn--outline" id="carp-btn-categorias" style="white-space:nowrap;padding:7px 12px;border:1px solid #dee2e6;border-radius:6px;background:white;color:#5a6378;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;"><i class="fas fa-tags"></i> Gestionar categorías</button>' +
-      '<span class="kair-toolbar__count" id="carp-count" style="color:#5a6378;font-size:13px;justify-self:end;white-space:nowrap;"></span>';
+      '<button class="kair-btn kair-btn--outline" id="carp-btn-categorias" style="white-space:nowrap;padding:7px 12px;border: 1px solid var(--border-color);border-radius:6px;background: var(--widget-bg-color);color: var(--text-light-color);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;"><i class="fas fa-tags"></i> Gestionar categorías</button>' +
+      '<span class="kair-toolbar__count" id="carp-count" style="color: var(--text-light-color);font-size:13px;justify-self:end;white-space:nowrap;"></span>';
     self.container.appendChild(toolbar);
 
     // Tabla
     var tablaCard = document.createElement('div');
     tablaCard.className = 'kair-card';
-    tablaCard.style.cssText = 'background:white;border:1px solid #dee2e6;border-radius:10px;overflow:hidden;';
+    tablaCard.style.cssText = 'background: var(--widget-bg-color);border: 1px solid var(--border-color);border-radius:10px;overflow:hidden;';
     tablaCard.innerHTML =
       '<div style="overflow-x:auto;">' +
         '<table class="kair-table">' +
@@ -182,10 +184,10 @@
       });
       // 📦743 · Focus visible: cambiar border a azul al enfocar (igual que el select)
       inpSearch.addEventListener('focus', function () {
-        inpSearch.style.borderColor = '#174ea6';
+        inpSearch.style.borderColor = 'var(--primary-color)';
       });
       inpSearch.addEventListener('blur', function () {
-        inpSearch.style.borderColor = '#dee2e6';
+        inpSearch.style.borderColor = 'var(--border-color)';
       });
     }
     if (selEstado) {
@@ -208,7 +210,7 @@
     var tbody = self.container.querySelector('#carp-tbody');
     var countEl = self.container.querySelector('#carp-count');
     var pagEl = self.container.querySelector('#carp-pagination');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#5a6378;">Cargando…</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color: var(--text-light-color);">Cargando…</td></tr>';
 
     try {
       var r = await window.electronAPI.ghListExpedientes({
@@ -220,7 +222,7 @@
         pageSize: PAGE_SIZE
       });
       if (!r || !r.success) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#721c24;">⚠️ ' + _esc((r && r.error && r.error.message) || 'Error al cargar') + '</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color: var(--danger-color);">⚠️ ' + _esc((r && r.error && r.error.message) || 'Error al cargar') + '</td></tr>';
         return;
       }
       self.list.items = r.data.expedientes || [];
@@ -230,7 +232,7 @@
       self._renderPagination();
       if (countEl) countEl.textContent = self.list.total + ' expediente' + (self.list.total === 1 ? '' : 's');
     } catch (e) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#721c24;">⚠️ ' + _esc(e.message) + '</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color: var(--danger-color);">⚠️ ' + _esc(e.message) + '</td></tr>';
     } finally {
       self.loading = false;
     }
@@ -285,10 +287,10 @@
         '<td>' + contratoBadge + '</td>' +
         '<td>' +
           '<div class="kair-progress"><div class="kair-progress__track"><div class="kair-progress__fill ' + pctFill + '" style="width:' + (e.pct || 0) + '%;"></div></div><span class="kair-progress__label">' + e.categoriasPresentes + '/' + e.totalCategorias + '</span></div>' +
-          '<div style="font-size:0.75rem;color:#5a6378;margin-top:2px;">' + (e.totalDocs || 0) + ' archivo' + ((e.totalDocs || 0) === 1 ? '' : 's') + '</div>' +
+          '<div style="font-size:0.75rem;color: var(--text-light-color);margin-top:2px;">' + (e.totalDocs || 0) + ' archivo' + ((e.totalDocs || 0) === 1 ? '' : 's') + '</div>' +
         '</td>' +
         '<td>' + (estadoBadge[e.estado] || '') + '</td>' +
-        '<td style="color:#5a6378;">' + ult + '</td>' +
+        '<td style="color: var(--text-light-color);">' + ult + '</td>' +
         '<td class="col--actions" style="text-align:right;">' +
           '<button class="kair-btn kair-btn--ghost" data-action="ver" data-id="' + _esc(e.trabajadorId) + '">Ver expediente</button>' +
           '<button class="kair-icon-btn" data-action="subir" data-id="' + _esc(e.trabajadorId) + '" title="Subir documento"><i class="fas fa-upload"></i></button>' +
@@ -335,7 +337,7 @@
   // ========== VISTA DETALLE ==========
   CarpetasComponent.prototype._renderDetail = async function () {
     var self = this;
-    self.container.innerHTML = '<div style="padding:2rem;text-align:center;color:#5a6378;">Cargando expediente…</div>';
+    self.container.innerHTML = '<div style="padding:2rem;text-align:center;color: var(--text-light-color);">Cargando expediente…</div>';
     try {
       var r = await window.electronAPI.ghGetExpediente({
         token: null,
@@ -343,13 +345,13 @@
         trabajadorId: self.selectedTrabajadorId
       });
       if (!r || !r.success) {
-        self.container.innerHTML = '<div style="padding:2rem;color:#721c24;">⚠️ ' + _esc((r && r.error && r.error.message) || 'Error') + '</div>';
+        self.container.innerHTML = '<div style="padding:2rem;color: var(--danger-color);">⚠️ ' + _esc((r && r.error && r.error.message) || 'Error') + '</div>';
         return;
       }
       self.detail = r.data;
       self._renderDetailContent();
     } catch (e) {
-      self.container.innerHTML = '<div style="padding:2rem;color:#721c24;">⚠️ ' + _esc(e.message) + '</div>';
+      self.container.innerHTML = '<div style="padding:2rem;color: var(--danger-color);">⚠️ ' + _esc(e.message) + '</div>';
     }
   };
 
@@ -438,10 +440,10 @@
         var docsImportadosHtml = (cat.docsImportados || []).map(function (doc) {
           var pasoLabel = {1: 'Memo', 2: 'Contacto', 3: 'Examenes', 4: 'Firma', 5: 'Afiliaciones'}[doc.pasoNum] || 'Contratación';
           return '<div class="kair-file-row kair-file-row--imported" data-doc-id="' + _esc(doc.id) + '" data-doc-origen="contratacion" data-soporte-id="' + _esc(doc.id) + '" title="Documento del flujo de Contratación - solo lectura">' +
-            '<div class="kair-file-row__icon" style="background:#e8f0fe;color:#174ea6;"><i class="fas fa-link"></i></div>' +
+            '<div class="kair-file-row__icon" style="background: rgba(77,166,255,0.15);color: var(--primary-color);"><i class="fas fa-link"></i></div>' +
             '<div class="kair-file-row__body">' +
               '<div class="kair-file-row__name">' + _esc(doc.nombreArchivo) + '</div>' +
-              '<div class="kair-file-row__meta">' + _fmtBytes(doc.tamanoBytes) + ' · ' + _fmtDate(doc.fechaSubida) + ' · <span style="color:#174ea6;font-weight:500;">Paso ' + doc.pasoNum + ': ' + pasoLabel + '</span></div>' +
+              '<div class="kair-file-row__meta">' + _fmtBytes(doc.tamanoBytes) + ' · ' + _fmtDate(doc.fechaSubida) + ' · <span style="color: var(--primary-color);font-weight:500;">Paso ' + doc.pasoNum + ': ' + pasoLabel + '</span></div>' +
             '</div>' +
             '<div class="kair-file-row__actions">' +
               '<button class="kair-icon-btn" data-soporte-action="ver" title="Ver original" aria-label="Ver original ' + _esc(doc.nombreArchivo) + '"><i class="fas fa-external-link-alt"></i></button>' +
@@ -737,15 +739,15 @@
       var list = modal.querySelector('#carp-cat-list');
       if (!list) return;
       if (!cats.length) {
-        list.innerHTML = '<div style="padding:1rem;color:#5a6378;text-align:center;">Sin categorías</div>';
+        list.innerHTML = '<div style="padding:1rem;color: var(--text-light-color);text-align:center;">Sin categorías</div>';
         return;
       }
       list.innerHTML = cats.map(function (c) {
-        return '<div class="kair-cat-row" data-id="' + _esc(c.id) + '" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;border:1px solid #e9ecef;border-radius:6px;margin-bottom:0.5rem;">' +
-          '<i class="far fa-folder" style="color:#174ea6;"></i>' +
+        return '<div class="kair-cat-row" data-id="' + _esc(c.id) + '" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;border: 1px solid var(--border-color);border-radius:6px;margin-bottom:0.5rem;">' +
+          '<i class="far fa-folder" style="color: var(--primary-color);"></i>' +
           '<div style="flex:1;">' +
             '<div style="font-weight:500;">' + _esc(c.nombre) + '</div>' +
-            '<div style="font-size:0.75rem;color:#5a6378;">código: ' + _esc(c.codigo) + (c.activo ? '' : ' · inactiva') + '</div>' +
+            '<div style="font-size:0.75rem;color: var(--text-light-color);">código: ' + _esc(c.codigo) + (c.activo ? '' : ' · inactiva') + '</div>' +
           '</div>' +
           '<button class="kair-icon-btn" data-toggle="' + _esc(c.id) + '" title="' + (c.activo ? 'Desactivar' : 'Activar') + '"><i class="fas fa-power-off"></i></button>' +
         '</div>';

@@ -147,3 +147,34 @@
 }
 
 /* FOOTER removido (📦776 · usuario no lo quiere — quita espacio) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦810 · MODO OSCURO (overlay automático, append-only)
+   Cubre data-theme="dark" (Sistema + SO oscuro) y "dark-legacy" (Oscuro manual).
+   Los colores claros escritos a mano pasan a los tokens de styles.css, que ya
+   definen los dos temas (--bg-color, --widget-bg-color, --border-color…).
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .gh-shell,
+[data-theme="dark-legacy"] .gh-shell { background: var(--bg-color); color: var(--text-color); }
+[data-theme="dark"] .gh-header,
+[data-theme="dark-legacy"] .gh-header { background: var(--widget-bg-color); border-bottom: 1px solid var(--border-color); }
+[data-theme="dark"] .gh-header__title,
+[data-theme="dark-legacy"] .gh-header__title { color: var(--text-color); }
+[data-theme="dark"] .gh-header__icon,
+[data-theme="dark-legacy"] .gh-header__icon { color: var(--primary-color); }
+[data-theme="dark"] .gh-header__subtitle,
+[data-theme="dark-legacy"] .gh-header__subtitle { color: var(--text-light-color); }
+[data-theme="dark"] .gh-bell-btn,
+[data-theme="dark-legacy"] .gh-bell-btn { color: var(--text-light-color); }
+[data-theme="dark"] .gh-bell-btn:hover,
+[data-theme="dark-legacy"] .gh-bell-btn:hover { background: var(--bg-color); }
+[data-theme="dark"] .gh-tabs,
+[data-theme="dark-legacy"] .gh-tabs { background: var(--widget-bg-color); border-bottom: 1px solid var(--border-color); }
+[data-theme="dark"] .gh-tab,
+[data-theme="dark-legacy"] .gh-tab { color: var(--text-light-color); }
+[data-theme="dark"] .gh-tab:hover,
+[data-theme="dark-legacy"] .gh-tab:hover { color: var(--primary-color); background: var(--bg-color); }
+[data-theme="dark"] .gh-tab--active,
+[data-theme="dark-legacy"] .gh-tab--active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+[data-theme="dark"] .gh-content,
+[data-theme="dark-legacy"] .gh-content { background: var(--bg-color); }

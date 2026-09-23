@@ -214,7 +214,7 @@ class DashboardComponent {
     // Loading state
     var kpiBar = this.container.querySelector('#db-kpi-bar');
     if (kpiBar) {
-      kpiBar.innerHTML = '<div style="padding:1rem; color:#5a6378; text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
+      kpiBar.innerHTML = '<div style="padding:1rem; color: var(--text-light-color); text-align:center;"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
     }
 
     // Load data

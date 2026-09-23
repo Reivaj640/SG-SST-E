@@ -334,7 +334,7 @@ class GestionHumanaHome {
 
   _renderMissingComponent(content, className, err) {
     content.innerHTML =
-      '<div style="background:white; border:1px solid #f5c6cb; border-radius:0.5rem; padding:1.5rem; color:#721c24;">' +
+      '<div style="background: var(--widget-bg-color); border:1px solid #f5c6cb; border-radius:0.5rem; padding:1.5rem; color: var(--danger-color);">' +
         '<h3 style="margin:0 0 0.5rem;">⚠️ No se pudo cargar <code>' + className + '</code></h3>' +
         (err ? '<p style="margin:0; font-size:0.875rem;">' + err + '</p>' : '<p style="margin:0; font-size:0.875rem;">Verifica que el script esté cargado en <code>index.html</code>.</p>') +
       '</div>';
@@ -352,7 +352,7 @@ class GestionHumanaHome {
     var sec = document.createElement('div');
     sec.style.cssText = 'margin-top:1.5rem;';
     sec.innerHTML =
-      '<h2 style="margin:0 0 0.875rem; font-size:0.75rem; text-transform:uppercase; color:#5a6378; letter-spacing:0.5px; font-weight:600;">' +
+      '<h2 style="margin:0 0 0.875rem; font-size:0.75rem; text-transform:uppercase; color: var(--text-light-color); letter-spacing:0.5px; font-weight:600;">' +
         '<i class="fas fa-th-large"></i> Sub-módulos' +
       '</h2>';
     content.appendChild(sec);
@@ -445,22 +445,22 @@ class GestionHumanaHome {
   _renderNavCard(opts) {
     var self = this;
     var card = document.createElement('div');
-    card.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:0; overflow:hidden; transition:box-shadow 0.2s, transform 0.2s; display:flex; flex-direction:column;';
-    card.onmouseenter = function () { card.style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)'; card.style.transform = 'translateY(-2px)'; };
+    card.style.cssText = 'background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:0; overflow:hidden; transition:box-shadow 0.2s, transform 0.2s; display:flex; flex-direction:column;';
+    card.onmouseenter = function () { card.style.boxShadow = 'var(--box-shadow)'; card.style.transform = 'translateY(-2px)'; };
     card.onmouseleave = function () { card.style.boxShadow = ''; card.style.transform = ''; };
 
     var banner = document.createElement('div');
     banner.style.cssText = 'background:' + opts.iconBg + '; padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;';
     var pill = opts.ready
-      ? '<span style="background:#d4edda; color:#155724; padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">✓ Backend OK</span>'
-      : '<span style="background:#fff3cd; color:#856404; padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">⏳ Próximamente</span>';
+      ? '<span style="background: rgba(92,184,92,0.16); color: var(--success-color); padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">✓ Backend OK</span>'
+      : '<span style="background: rgba(240,173,78,0.16); color: var(--warning-color); padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">⏳ Próximamente</span>';
     banner.innerHTML =
-      '<div style="width:40px; height:40px; border-radius:0.5rem; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.08);">' +
+      '<div style="width:40px; height:40px; border-radius:0.5rem; background: var(--widget-bg-color); display:flex; align-items:center; justify-content:center; box-shadow: var(--box-shadow);">' +
         '<i class="fas ' + opts.icon + '" style="color:' + opts.iconColor + '; font-size:1.125rem;"></i>' +
       '</div>' +
       '<div style="flex:1; min-width:0;">' +
-        '<h3 style="margin:0; font-size:1rem; color:#1a1a2e;">' + opts.title + '</h3>' +
-        '<div style="font-size:0.7rem; color:#5a6378; text-transform:uppercase; letter-spacing:0.3px;">' + opts.subtitle + '</div>' +
+        '<h3 style="margin:0; font-size:1rem; color: var(--text-color);">' + opts.title + '</h3>' +
+        '<div style="font-size:0.7rem; color: var(--text-light-color); text-transform:uppercase; letter-spacing:0.3px;">' + opts.subtitle + '</div>' +
       '</div>' +
       pill;
     card.appendChild(banner);
@@ -469,18 +469,18 @@ class GestionHumanaHome {
     body.style.cssText = 'padding:1rem 1.25rem; flex:1; display:flex; flex-direction:column; gap:0.875rem;';
 
     var desc = document.createElement('p');
-    desc.style.cssText = 'margin:0; color:#495057; font-size:0.8125rem; line-height:1.5;';
+    desc.style.cssText = 'margin:0; color: var(--text-light-color); font-size:0.8125rem; line-height:1.5;';
     desc.textContent = opts.description;
     body.appendChild(desc);
 
     if (opts.kpis && opts.kpis.length > 0) {
       var kpiRow = document.createElement('div');
-      kpiRow.style.cssText = 'display:flex; gap:0.5rem; padding:0.5rem 0; border-top:1px solid #f1f3f5; border-bottom:1px solid #f1f3f5;';
+      kpiRow.style.cssText = 'display:flex; gap:0.5rem; padding:0.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);';
       opts.kpis.forEach(function (k) {
         kpiRow.innerHTML +=
           '<div style="flex:1; text-align:center;">' +
             '<div style="font-size:1rem; font-weight:700; color:' + k.color + '; line-height:1;">' + self._fmt(k.value) + '</div>' +
-            '<div style="font-size:0.6rem; text-transform:uppercase; color:#5a6378; letter-spacing:0.3px; margin-top:0.2rem;">' + k.label + '</div>' +
+            '<div style="font-size:0.6rem; text-transform:uppercase; color: var(--text-light-color); letter-spacing:0.3px; margin-top:0.2rem;">' + k.label + '</div>' +
           '</div>';
       });
       body.appendChild(kpiRow);
@@ -511,31 +511,31 @@ class GestionHumanaHome {
     var header = document.createElement('div');
     header.style.cssText = 'display:flex; align-items:center; gap:0.75rem; margin-bottom:1.25rem;';
     header.innerHTML =
-      '<button id="gh-btn-volver-home" type="button" style="background:white; border:1px solid #dee2e6; color:#495057; border-radius:0.375rem; padding:0.4rem 0.75rem; font-size:0.8125rem; cursor:pointer;">' +
+      '<button id="gh-btn-volver-home" type="button" style="background: var(--widget-bg-color); border: 1px solid var(--border-color); color: var(--text-light-color); border-radius:0.375rem; padding:0.4rem 0.75rem; font-size:0.8125rem; cursor:pointer;">' +
         '<i class="fas fa-arrow-left"></i> Volver' +
       '</button>' +
       '<div style="flex:1;">' +
-        '<h1 style="margin:0; font-size:1.25rem; color:#1a1a2e;">Carpetas</h1>' +
-        '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color:#5a6378;">Archivo digital por trabajador</p>' +
+        '<h1 style="margin:0; font-size:1.25rem; color: var(--text-color);">Carpetas</h1>' +
+        '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color: var(--text-light-color);">Archivo digital por trabajador</p>' +
       '</div>' +
-      '<span style="background:#fff3cd; color:#856404; padding:0.25rem 0.75rem; border-radius:1rem; font-size:0.7rem; font-weight:600;">⏳ Punto de partida</span>';
+      '<span style="background: rgba(240,173,78,0.16); color: var(--warning-color); padding:0.25rem 0.75rem; border-radius:1rem; font-size:0.7rem; font-weight:600;">⏳ Punto de partida</span>';
     content.appendChild(header);
     // Card central con explicacion
     var card = document.createElement('div');
-    card.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1.5rem; max-width:800px; margin:0 auto;';
+    card.style.cssText = 'background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:1.5rem; max-width:800px; margin:0 auto;';
     card.innerHTML =
       '<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">' +
-        '<div style="width:48px; height:48px; border-radius:0.5rem; background:#dbeafe; display:flex; align-items:center; justify-content:center;">' +
+        '<div style="width:48px; height:48px; border-radius:0.5rem; background: rgba(77,166,255,0.15); display:flex; align-items:center; justify-content:center;">' +
           '<i class="fas fa-folder-open" style="color:#1d4ed8; font-size:1.25rem;"></i>' +
         '</div>' +
         '<div>' +
-          '<h2 style="margin:0; font-size:1.05rem; color:#1a1a2e;">Esta vista se implementará pronto</h2>' +
-          '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color:#5a6378;">Las carpetas son un concepto NUEVO de Gestión Humana (distinto al "expediente" del modal de firma electrónica).</p>' +
+          '<h2 style="margin:0; font-size:1.05rem; color: var(--text-color);">Esta vista se implementará pronto</h2>' +
+          '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color: var(--text-light-color);">Las carpetas son un concepto NUEVO de Gestión Humana (distinto al "expediente" del modal de firma electrónica).</p>' +
         '</div>' +
       '</div>' +
-      '<div style="margin-top:1rem; padding:1rem; background:#f8f9fa; border:1px solid #e9ecef; border-radius:0.375rem;">' +
-        '<h3 style="margin:0 0 0.625rem; font-size:0.875rem; color:#1a1a2e;">Próximos pasos para implementar:</h3>' +
-        '<ol style="margin:0; padding-left:1.25rem; color:#495057; font-size:0.8125rem; line-height:1.7;">' +
+      '<div style="margin-top:1rem; padding:1rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius:0.375rem;">' +
+        '<h3 style="margin:0 0 0.625rem; font-size:0.875rem; color: var(--text-color);">Próximos pasos para implementar:</h3>' +
+        '<ol style="margin:0; padding-left:1.25rem; color: var(--text-light-color); font-size:0.8125rem; line-height:1.7;">' +
           '<li>Definir el modelo de datos: campos mínimos (id, id_trabajador, nombre, descripcion, estado, created_at, updated_at).</li>' +
           '<li>Crear migración SQL en <code>gestion-humana-schema-sql.js</code> (tabla <code>gh_carpetas</code>).</li>' +
           '<li>Implementar CRUD básico en un bridge nuevo (<code>main/carpetas-bridge.js</code>).</li>' +
@@ -543,7 +543,7 @@ class GestionHumanaHome {
           '<li>Integrar con base_personal (FK a la tabla de trabajadores).</li>' +
         '</ol>' +
       '</div>' +
-      '<div style="margin-top:1rem; padding:0.875rem 1rem; background:#dbeafe; border-radius:0.375rem; color:#1e3a8a; font-size:0.8125rem;">' +
+      '<div style="margin-top:1rem; padding:0.875rem 1rem; background: rgba(77,166,255,0.15); border-radius:0.375rem; color:#1e3a8a; font-size:0.8125rem;">' +
         '<i class="fas fa-info-circle" style="margin-right:0.375rem;"></i>' +
         '<strong>Tip:</strong> Mientras tanto, podés usar "Base de Personal" como punto de entrada por trabajador para ver los datos individuales, y "Firma electrónica" para ver el expediente del proceso de firma.' +
       '</div>';
@@ -560,13 +560,13 @@ class GestionHumanaHome {
     var item = GESTION_HUMANA_NAV.find(function (n) { return n.id === viewId; });
     var icon = item ? item.icon : 'fa-cube';
     content.innerHTML =
-      '<div style="background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:3rem 2rem; text-align:center; max-width:600px; margin:2rem auto;">' +
-        '<div style="width:64px; height:64px; border-radius:0.75rem; background:#fef3c7; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">' +
+      '<div style="background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:3rem 2rem; text-align:center; max-width:600px; margin:2rem auto;">' +
+        '<div style="width:64px; height:64px; border-radius:0.75rem; background: rgba(240,173,78,0.16); display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">' +
           '<i class="fas ' + icon + '" style="font-size:1.5rem; color:#a16207;"></i>' +
         '</div>' +
-        '<h2 style="margin:0 0 0.5rem; font-size:1.25rem; color:#1a1a2e;">' + t.title + '</h2>' +
-        '<p style="margin:0 0 1.25rem; color:#5a6378; font-size:0.875rem;">' + t.subtitle + '</p>' +
-        '<p style="margin:0; padding:0.875rem 1rem; background:#fff3cd; border-radius:0.375rem; color:#856404; font-size:0.8125rem;">' +
+        '<h2 style="margin:0 0 0.5rem; font-size:1.25rem; color: var(--text-color);">' + t.title + '</h2>' +
+        '<p style="margin:0 0 1.25rem; color: var(--text-light-color); font-size:0.875rem;">' + t.subtitle + '</p>' +
+        '<p style="margin:0; padding:0.875rem 1rem; background: rgba(240,173,78,0.16); border-radius:0.375rem; color: var(--warning-color); font-size:0.8125rem;">' +
           '<i class="fas fa-clock"></i> Esta vista se implementará en una fase posterior del rediseño de Gestión Humana (v0.2.0).' +
         '</p>' +
       '</div>';

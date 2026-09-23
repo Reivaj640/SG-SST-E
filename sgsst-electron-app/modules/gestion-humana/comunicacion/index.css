@@ -242,3 +242,56 @@
   border: 1px solid #e9ecef;
   border-radius: 0.5rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦810 · MODO OSCURO (overlay automático, append-only)
+   Cubre data-theme="dark" (Sistema + SO oscuro) y "dark-legacy" (Oscuro manual).
+   Los colores claros escritos a mano pasan a los tokens de styles.css, que ya
+   definen los dos temas (--bg-color, --widget-bg-color, --border-color…).
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .cm-wrapper,
+[data-theme="dark-legacy"] .cm-wrapper { background: var(--bg-color); }
+[data-theme="dark"] .cm-btn--primary,
+[data-theme="dark-legacy"] .cm-btn--primary { border-color: var(--primary-color); }
+[data-theme="dark"] .cm-btn--danger:hover,
+[data-theme="dark-legacy"] .cm-btn--danger:hover { color: var(--danger-color); }
+[data-theme="dark"] .cm-tabs,
+[data-theme="dark-legacy"] .cm-tabs { background: var(--widget-bg-color); border-bottom: 1px solid var(--border-color); }
+[data-theme="dark"] .cm-tab,
+[data-theme="dark-legacy"] .cm-tab { color: var(--text-light-color); }
+[data-theme="dark"] .cm-tab:hover,
+[data-theme="dark-legacy"] .cm-tab:hover { color: var(--primary-color); }
+[data-theme="dark"] .cm-tab--active,
+[data-theme="dark-legacy"] .cm-tab--active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+[data-theme="dark"] .cm-section-head__title,
+[data-theme="dark-legacy"] .cm-section-head__title { color: var(--text-color); }
+[data-theme="dark"] .cm-section-head__subtitle,
+[data-theme="dark-legacy"] .cm-section-head__subtitle { color: var(--text-light-color); }
+[data-theme="dark"] .cm-anuncio,
+[data-theme="dark-legacy"] .cm-anuncio { background: var(--widget-bg-color); border: 1px solid var(--border-color); }
+[data-theme="dark"] .cm-anuncio:hover,
+[data-theme="dark-legacy"] .cm-anuncio:hover { box-shadow: var(--box-shadow); }
+[data-theme="dark"] .cm-anuncio__title,
+[data-theme="dark-legacy"] .cm-anuncio__title { color: var(--text-color); }
+[data-theme="dark"] .cm-anuncio__meta,
+[data-theme="dark-legacy"] .cm-anuncio__meta { color: var(--text-light-color); }
+[data-theme="dark"] .cm-anuncio__content,
+[data-theme="dark-legacy"] .cm-anuncio__content { color: var(--text-color); }
+[data-theme="dark"] .cm-anuncio__footer,
+[data-theme="dark-legacy"] .cm-anuncio__footer { border-top: 1px solid var(--border-color); }
+[data-theme="dark"] .cm-mensaje,
+[data-theme="dark-legacy"] .cm-mensaje { background: var(--widget-bg-color); border: 1px solid var(--border-color); }
+[data-theme="dark"] .cm-mensaje__avatar,
+[data-theme="dark-legacy"] .cm-mensaje__avatar { background: rgba(77,166,255,0.15); color: var(--primary-color); }
+[data-theme="dark"] .cm-mensaje__from,
+[data-theme="dark-legacy"] .cm-mensaje__from { color: var(--text-color); }
+[data-theme="dark"] .cm-mensaje__date,
+[data-theme="dark-legacy"] .cm-mensaje__date { color: var(--text-light-color); }
+[data-theme="dark"] .cm-mensaje__subject,
+[data-theme="dark-legacy"] .cm-mensaje__subject { color: var(--primary-color); }
+[data-theme="dark"] .cm-mensaje__text,
+[data-theme="dark-legacy"] .cm-mensaje__text { color: var(--text-light-color); }
+[data-theme="dark"] .cm-mensaje__badge,
+[data-theme="dark-legacy"] .cm-mensaje__badge { color: var(--warning-color); }
+[data-theme="dark"] .cm-empty,
+[data-theme="dark-legacy"] .cm-empty { color: var(--text-light-color); background: var(--widget-bg-color); border: 1px solid var(--border-color); }

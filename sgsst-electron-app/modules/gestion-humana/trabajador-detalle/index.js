@@ -76,10 +76,10 @@ class TrabajadorDetalleComponent {
     var self = this;
     this.container.innerHTML = '';
     var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'padding:0; height:100%; overflow-y:auto; background:#f8f9fa;';
+    wrapper.style.cssText = 'padding:0; height:100%; overflow-y:auto; background: var(--bg-color);';
 
     if (this.loading) {
-      wrapper.innerHTML = '<div style="padding:3rem; text-align:center; color:#5a6378;"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
+      wrapper.innerHTML = '<div style="padding:3rem; text-align:center; color: var(--text-light-color);"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
       this.container.appendChild(wrapper);
       this._load().then(function () { self.render(); });
       return;
@@ -93,8 +93,8 @@ class TrabajadorDetalleComponent {
 
     // Back button
     var back = document.createElement('div');
-    back.style.cssText = 'padding:0.75rem 1.5rem; background:white; border-bottom:1px solid #e9ecef;';
-    back.innerHTML = '<button id="td-back" style="background:#f8f9fa; border:1px solid #dee2e6; padding:0.4rem 0.75rem; border-radius:0.375rem; cursor:pointer; color:#5a6378; font-size:0.8125rem; display:inline-flex; align-items:center; gap:0.4rem;"><i class="fas fa-arrow-left"></i> Volver a Base de Personal</button>';
+    back.style.cssText = 'padding:0.75rem 1.5rem; background: var(--widget-bg-color); border-bottom: 1px solid var(--border-color);';
+    back.innerHTML = '<button id="td-back" style="background: var(--bg-color); border: 1px solid var(--border-color); padding:0.4rem 0.75rem; border-radius:0.375rem; cursor:pointer; color: var(--text-light-color); font-size:0.8125rem; display:inline-flex; align-items:center; gap:0.4rem;"><i class="fas fa-arrow-left"></i> Volver a Base de Personal</button>';
     wrapper.appendChild(back);
 
     // Hero
@@ -124,7 +124,7 @@ class TrabajadorDetalleComponent {
     var hero = document.createElement('div');
     hero.style.cssText = 'background:linear-gradient(135deg, #174ea6 0%, #2d5dc7 100%); color:white; padding:1.5rem; display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;';
     hero.innerHTML =
-      '<div style="width:72px; height:72px; border-radius:50%; background:white; color:#174ea6; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:700; flex-shrink:0;">' + initials + '</div>' +
+      '<div style="width:72px; height:72px; border-radius:50%; background: var(--widget-bg-color); color: var(--primary-color); display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:700; flex-shrink:0;">' + initials + '</div>' +
       '<div style="flex:1; min-width:200px;">' +
         '<h1 style="margin:0; font-size:1.4rem; font-weight:600;">' + p.nombres + ' ' + p.apellidos + '</h1>' +
         '<div style="display:flex; align-items:center; gap:0.875rem; margin-top:0.375rem; font-size:0.875rem; opacity:0.95; flex-wrap:wrap;">' +
@@ -142,18 +142,18 @@ class TrabajadorDetalleComponent {
 
   _sectionCard(title, icon, body) {
     var card = document.createElement('div');
-    card.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1rem 1.125rem;';
+    card.style.cssText = 'background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:1rem 1.125rem;';
     card.innerHTML =
-      '<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.625rem; padding-bottom:0.5rem; border-bottom:1px solid #f1f3f5;">' +
-        '<i class="fas ' + icon + '" style="color:#174ea6;"></i>' +
-        '<h3 style="margin:0; font-size:0.95rem; color:#1a1a2e; font-weight:600;">' + title + '</h3>' +
+      '<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.625rem; padding-bottom:0.5rem; border-bottom: 1px solid var(--border-color);">' +
+        '<i class="fas ' + icon + '" style="color: var(--primary-color);"></i>' +
+        '<h3 style="margin:0; font-size:0.95rem; color: var(--text-color); font-weight:600;">' + title + '</h3>' +
       '</div>' +
       '<div>' + body + '</div>';
     return card;
   }
 
   _row(label, value) {
-    return '<div style="display:flex; justify-content:space-between; padding:0.3rem 0; font-size:0.8125rem; border-bottom:1px solid #f8f9fa;"><span style="color:#5a6378;">' + label + '</span><span style="color:#1a1a2e; font-weight:500; text-align:right; max-width:60%;">' + (value || '—') + '</span></div>';
+    return '<div style="display:flex; justify-content:space-between; padding:0.3rem 0; font-size:0.8125rem; border-bottom:1px solid #f8f9fa;"><span style="color: var(--text-light-color);">' + label + '</span><span style="color: var(--text-color); font-weight:500; text-align:right; max-width:60%;">' + (value || '—') + '</span></div>';
   }
 
   _renderDatosPersonales() {
@@ -204,9 +204,9 @@ class TrabajadorDetalleComponent {
   _afilRow(label, nombre, fecha) {
     var ok = !!nombre;
     return '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0; font-size:0.8125rem; border-bottom:1px solid #f8f9fa;">' +
-      '<span style="color:#5a6378; flex:1;">' + label + '</span>' +
+      '<span style="color: var(--text-light-color); flex:1;">' + label + '</span>' +
       '<span style="flex:1; text-align:right; color:' + (ok ? '#1a1a2e' : '#dc3545') + '; font-weight:500;">' + (nombre || '—') + '</span>' +
-      '<span style="color:#9ca3af; font-size:0.7rem; min-width:80px; text-align:right;">' + (fecha || '') + '</span>' +
+      '<span style="color: var(--text-lighter-color); font-size:0.7rem; min-width:80px; text-align:right;">' + (fecha || '') + '</span>' +
     '</div>';
   }
 
@@ -214,12 +214,12 @@ class TrabajadorDetalleComponent {
     var items = this.vacaciones.slice(0, 5);
     var body = '';
     if (items.length === 0) {
-      body = '<p style="color:#9ca3af; font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin vacaciones registradas</p>';
+      body = '<p style="color: var(--text-lighter-color); font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin vacaciones registradas</p>';
     } else {
       items.forEach(function (v) {
         var color = { 'solicitada': '#ffc107', 'aprobada': '#28a745', 'rechazada': '#dc3545', 'disfrutada': '#0d9488' }[v.estado] || '#5a6378';
         body += '<div style="padding:0.4rem 0; border-bottom:1px solid #f8f9fa; display:flex; justify-content:space-between; align-items:center; font-size:0.8125rem;">' +
-          '<span style="color:#1a1a2e;">' + (v.fechaInicio || '—') + ' → ' + (v.fechaFin || '—') + '</span>' +
+          '<span style="color: var(--text-color);">' + (v.fechaInicio || '—') + ' → ' + (v.fechaFin || '—') + '</span>' +
           '<span style="color:' + color + '; font-weight:600; text-transform:capitalize; font-size:0.7rem;">' + v.estado + '</span>' +
         '</div>';
       });
@@ -231,13 +231,13 @@ class TrabajadorDetalleComponent {
     var items = this.permisos.slice(0, 5);
     var body = '';
     if (items.length === 0) {
-      body = '<p style="color:#9ca3af; font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin permisos registrados</p>';
+      body = '<p style="color: var(--text-lighter-color); font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin permisos registrados</p>';
     } else {
       items.forEach(function (p) {
         var color = { 'activo': '#28a745', 'finalizado': '#6c757d', 'prorrogado': '#fd7e14' }[p.estado] || '#5a6378';
         body += '<div style="padding:0.4rem 0; border-bottom:1px solid #f8f9fa; font-size:0.8125rem;">' +
-          '<div style="display:flex; justify-content:space-between;"><span style="color:#1a1a2e; text-transform:capitalize;">' + (p.tipo || '—').replace(/_/g, ' ') + '</span><span style="color:' + color + '; font-weight:600; text-transform:capitalize; font-size:0.7rem;">' + p.estado + '</span></div>' +
-          '<div style="font-size:0.7rem; color:#5a6378;">' + (p.fechaInicio || '—') + (p.fechaFin ? ' → ' + p.fechaFin : '') + '</div>' +
+          '<div style="display:flex; justify-content:space-between;"><span style="color: var(--text-color); text-transform:capitalize;">' + (p.tipo || '—').replace(/_/g, ' ') + '</span><span style="color:' + color + '; font-weight:600; text-transform:capitalize; font-size:0.7rem;">' + p.estado + '</span></div>' +
+          '<div style="font-size:0.7rem; color: var(--text-light-color);">' + (p.fechaInicio || '—') + (p.fechaFin ? ' → ' + p.fechaFin : '') + '</div>' +
         '</div>';
       });
     }
@@ -248,13 +248,13 @@ class TrabajadorDetalleComponent {
     var items = this.documentos.slice(0, 5);
     var body = '';
     if (items.length === 0) {
-      body = '<p style="color:#9ca3af; font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin documentos generados</p>';
+      body = '<p style="color: var(--text-lighter-color); font-size:0.8125rem; text-align:center; margin:0.5rem 0;">Sin documentos generados</p>';
     } else {
       items.forEach(function (d) {
         var color = d.estado === 'firmado' ? '#28a745' : d.estado === 'anulado' ? '#6c757d' : '#fd7e14';
         body += '<div style="padding:0.4rem 0; border-bottom:1px solid #f8f9fa; font-size:0.8125rem;">' +
-          '<div style="display:flex; justify-content:space-between;"><span style="color:#1a1a2e;">' + (d.titulo || d.tipo) + '</span><span style="color:' + color + '; font-weight:600; text-transform:capitalize; font-size:0.7rem;">' + d.estado + '</span></div>' +
-          '<div style="font-size:0.7rem; color:#5a6378;">' + (d.createdAt ? d.createdAt.split('T')[0] : '—') + '</div>' +
+          '<div style="display:flex; justify-content:space-between;"><span style="color: var(--text-color);">' + (d.titulo || d.tipo) + '</span><span style="color:' + color + '; font-weight:600; text-transform:capitalize; font-size:0.7rem;">' + d.estado + '</span></div>' +
+          '<div style="font-size:0.7rem; color: var(--text-light-color);">' + (d.createdAt ? d.createdAt.split('T')[0] : '—') + '</div>' +
         '</div>';
       });
     }

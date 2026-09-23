@@ -973,7 +973,7 @@ class ContratacionComponent {
             '<div class="ct-field"><label>Fecha</label><input type="date" name="fecha" id="' + fechaInputId + '" value="' + defaultFecha + '" /></div>' +
             (p.num === 3 ? '<div class="ct-field"><label>IPS</label><input type="text" name="ips" id="' + ipsInputId + '" placeholder="Ej: IPS Compensar" /></div>' : '<div></div>') +
           '</div>' +
-          '<div class="ct-field"><label>Notas</label><textarea name="notas" id="' + notasInputId + '" rows="2" placeholder="Registrar detalles del paso..." style="width:100%;padding:0.5rem 0.7rem;border:1px solid #dee2e6;border-radius:0.35rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;">' + self._escHtml(notas || '') + '</textarea></div>' +
+          '<div class="ct-field"><label>Notas</label><textarea name="notas" id="' + notasInputId + '" rows="2" placeholder="Registrar detalles del paso..." style="width:100%;padding:0.5rem 0.7rem;border: 1px solid var(--border-color);border-radius:0.35rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;">' + self._escHtml(notas || '') + '</textarea></div>' +
           '<div class="ct-step__expand-actions">' +
             (sinEvidencia
               ? '<span class="ct-step__require-soporte"><i class="fas fa-paperclip"></i> ' + hintSinEvidencia + '</span>'

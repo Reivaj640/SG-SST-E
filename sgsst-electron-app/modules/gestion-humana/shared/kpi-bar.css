@@ -99,3 +99,18 @@
   background: #e9ecef;
   flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦810 · MODO OSCURO (overlay automático, append-only)
+   Cubre data-theme="dark" (Sistema + SO oscuro) y "dark-legacy" (Oscuro manual).
+   Los colores claros escritos a mano pasan a los tokens de styles.css, que ya
+   definen los dos temas (--bg-color, --widget-bg-color, --border-color…).
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .gh-kpi-bar,
+[data-theme="dark-legacy"] .gh-kpi-bar { background: var(--widget-bg-color); border: 1px solid var(--border-color); }
+[data-theme="dark"] .gh-kpi--clickable:hover,
+[data-theme="dark-legacy"] .gh-kpi--clickable:hover { background: var(--bg-color); }
+[data-theme="dark"] .gh-kpi__label,
+[data-theme="dark-legacy"] .gh-kpi__label { color: var(--text-light-color); }
+[data-theme="dark"] .gh-kpi-sep,
+[data-theme="dark-legacy"] .gh-kpi-sep { background: var(--border-color); }

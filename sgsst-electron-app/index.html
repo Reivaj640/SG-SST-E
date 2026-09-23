@@ -30,35 +30,39 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.waves.min.js"></script>
 
-  <!-- Font Awesome (íconos dentro del círculo) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Font Awesome: SOLO la copia local (assets/css/font-awesome.min.css, más abajo).
+       📦810 · Se quitó el CDN de cdnjs: misma hoja cargada dos veces y sin internet los
+       íconos tardaban/fallaban. La copia local trae las fuentes en assets/fonts/font-awesome/. -->
 
   <!-- Cargar estilos externos necesarios -->
   <link rel="stylesheet" href="assets/css/bootstrap-icons.css">
 
   <!-- 📦713 (2026-08-15) — Módulo Gestión Humana: CSS del shell -->
-  <link rel="stylesheet" href="modules/gestion-humana/gestion-humana-home.css">
+  <link rel="stylesheet" href="modules/gestion-humana/gestion-humana-home.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦720 (2026-08-15) — Módulo Gestión Humana: Helper KPIBar compartido -->
-  <link rel="stylesheet" href="modules/gestion-humana/shared/kpi-bar.css">
+  <link rel="stylesheet" href="modules/gestion-humana/shared/kpi-bar.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦714 (2026-08-15) — Módulo Gestión Humana: CSS por vista -->
-  <link rel="stylesheet" href="modules/gestion-humana/base-personal/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/base-personal/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦720 (2026-08-15) — Dashboard -->
-  <link rel="stylesheet" href="modules/gestion-humana/dashboard/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/dashboard/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦722 (2026-08-15) — Afiliaciones -->
-  <link rel="stylesheet" href="modules/gestion-humana/afiliaciones/index.css">
-  <!-- 📦722 (2026-08-15) — Documentos -->
-  <link rel="stylesheet" href="modules/gestion-humana/documentos/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/afiliaciones/index.css?v=GH-20260923-p0-dark-scopes">
+  <!-- 📦810 · Vista "Documentos" RETIRADA del nav de GH (reemplazada por Carpetas, commit 79b0fe02).
+       Ya NO se carga su CSS/JS (era código muerto: 88,6 KB JS + 695 líneas de CSS por arranque).
+       La CARPETA modules/gestion-humana/documentos/ se conserva a propósito: allí vive la
+       "firma operativa interna" (canvas + gh_firmas_digitales) que NO se elimina
+       (ver docs/kair-firma-integration/INTEGRATION.md). -->
   <!-- I-103.A1.6 · Firma electrónica (Fase 1) -->
-  <link rel="stylesheet" href="modules/gestion-humana/firma-electronica/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/firma-electronica/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦723 (2026-08-15) — Comunicación -->
-  <link rel="stylesheet" href="modules/gestion-humana/comunicacion/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/comunicacion/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦724 (2026-08-15) — Permisos -->
-  <link rel="stylesheet" href="modules/gestion-humana/permisos/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/permisos/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦725 (2026-08-15) — Vacaciones -->
-  <link rel="stylesheet" href="modules/gestion-humana/vacaciones/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/vacaciones/index.css?v=GH-20260923-p0-dark-scopes">
   <!-- 📦726 (2026-08-15) — Contratación -->
-  <link rel="stylesheet" href="modules/gestion-humana/contratacion/index.css">
-  <link rel="stylesheet" href="modules/gestion-humana/carpetas/index.css?v=FIX-CURRENTCOMPANY-20260912-1010">
+  <link rel="stylesheet" href="modules/gestion-humana/contratacion/index.css?v=GH-20260923-p0-dark-scopes">
+  <link rel="stylesheet" href="modules/gestion-humana/carpetas/index.css?v=GH-20260923-p0-dark-scopes">
 
   <!-- Fuentes locales (evitar timeouts de CDN) -->
   <link rel="stylesheet" href="assets/css/google-fonts.css">
@@ -349,20 +353,20 @@
   <script src="modules/gestion-amenazas/gestion-amenazas-home.js?v=GESTION-AMENAZAS-20260918-bar-chart-html"></script>
   <!-- 📦709 (2026-08-15) — Módulo Gestión Humana (nuevo top-level, v0.1.191) -->
   <script src="shared/colombia-festivos.js"></script>
-  <script src="modules/gestion-humana/shared/kpi-bar.js"></script>
-  <script src="modules/gestion-humana/gestion-humana-home.js"></script>
-  <script src="modules/gestion-humana/dashboard/index.js"></script>
-  <script src="modules/gestion-humana/base-personal/index.js"></script>
-  <script src="modules/gestion-humana/contratacion/index.js"></script>
-  <script src="modules/gestion-humana/carpetas/index.js?v=FIX-CURRENTCOMPANY-20260912-1010"></script>
-  <script src="modules/gestion-humana/vacaciones/index.js"></script>
-  <script src="modules/gestion-humana/permisos/index.js"></script>
-  <script src="modules/gestion-humana/afiliaciones/index.js"></script>
-  <script src="modules/gestion-humana/documentos/index.js"></script>
+  <script src="modules/gestion-humana/shared/kpi-bar.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/gestion-humana-home.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/dashboard/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/base-personal/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/contratacion/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/carpetas/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/vacaciones/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/permisos/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/afiliaciones/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <!-- 📦810 · documentos/index.js ya no se carga: vista retirada (ver nota arriba) -->
   <!-- I-103.A1.6 · Firma electrónica (Fase 1) -->
-  <script src="modules/gestion-humana/firma-electronica/index.js"></script>
-  <script src="modules/gestion-humana/comunicacion/index.js"></script>
-  <script src="modules/gestion-humana/trabajador-detalle/index.js"></script>
+  <script src="modules/gestion-humana/firma-electronica/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/comunicacion/index.js?v=GH-20260923-p0-dark-scopes"></script>
+  <script src="modules/gestion-humana/trabajador-detalle/index.js?v=GH-20260923-p0-dark-scopes"></script>
   <script src="modules/verificacion/verificacion-home.js?v=VERIFICACION-20260918-bar-chart-html"></script>
   <link rel="stylesheet" href="modules/verificacion/definicion-indicadores/definicion-indicadores.css?v=20260921-premium-v6">
   <script src="modules/verificacion/definicion-indicadores/definicion-indicadores-service.js?v=20260921-premium-v2"></script>
@@ -472,7 +476,7 @@
 <!-- Sistema de Notificaciones K+AIR (módulos) -->
 <script src="assets/js/kair-toast.js"></script>
 <!-- 📦GESTION-HUMANA-TOAST — Helper estandarizado (success/error/warning/info con title+subtitle) -->
-<script src="modules/gestion-humana/shared/kair-toast-helper.js"></script>
+<script src="modules/gestion-humana/shared/kair-toast-helper.js?v=GH-20260923-p0-dark-scopes"></script>
 <!-- 📦708 — Sistema de diálogos de confirmación (modales) -->
 <script src="assets/js/kair-confirm.js"></script>
 

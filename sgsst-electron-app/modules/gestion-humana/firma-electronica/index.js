@@ -364,7 +364,7 @@
       '          <span>Requiere firma de la empresa</span>',
       '        </label>',
       '      </div>',
-      '      <div id="fe-firma-rep-preview" class="fe-firma-rep-preview" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">',
+      '      <div id="fe-firma-rep-preview" class="fe-firma-rep-preview" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-color); border-radius: 4px;">',
       '        <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem;">',
       '          <i class="fas fa-info-circle"></i>',
       '          El representante legal de <strong id="fe-firma-rep-empresa-nombre"></strong> también firmará este documento.',
@@ -2224,7 +2224,7 @@
       if (confirmBtn) { confirmBtn.disabled = true; }
       if (hint) {
         hint.innerHTML =
-          '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:0.75rem;color:#92400e;font-size:0.8125rem;line-height:1.5;">' +
+          '<div style="background: rgba(240,173,78,0.16);border:1px solid #fcd34d;border-radius:6px;padding:0.75rem;color: var(--warning-color);font-size:0.8125rem;line-height:1.5;">' +
           '  <div style="font-weight:600;margin-bottom:0.25rem;"><i class="fas fa-exclamation-triangle"></i> Este tipo de documento no tiene template</div>' +
           '  <div style="margin-bottom:0.5rem;">Para generar "' + _esc(tipoLabel) + '" primero debes subir un template (.docx o .pdf).</div>' +
           '  <button id="fe-gen-subir-ahora" class="fe-btn fe-btn--primary fe-btn--sm" type="button"><i class="fas fa-cloud-upload-alt"></i> Subir template ahora</button>' +
@@ -2621,7 +2621,7 @@
       } else if (autoInviteOk === false) {
         feedbackEl.hidden = false;
         feedbackEl.textContent = 'No se envió la invitación automáticamente. Usa el botón "Enviar por correo" para enviarla manualmente.';
-        feedbackEl.style.color = '#92400e';
+        feedbackEl.style.color = 'var(--warning-color)';
       } else {
         feedbackEl.hidden = true;
       }
@@ -2657,7 +2657,7 @@
             feedbackEl.style.color = (r && r.success) ? '#065f46' : '#991b1b';
           }
         } catch (e) {
-          if (feedbackEl) { feedbackEl.hidden = false; feedbackEl.textContent = 'Error: ' + e.message; feedbackEl.style.color = '#991b1b'; }
+          if (feedbackEl) { feedbackEl.hidden = false; feedbackEl.textContent = 'Error: ' + e.message; feedbackEl.style.color = 'var(--danger-color)'; }
         }
       };
     }

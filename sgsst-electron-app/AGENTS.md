@@ -748,6 +748,66 @@ async renderMainArea(container) {
     ventana a 1800/1366/1024 y comparar `getBoundingClientRect()` del contenedor contra
     `window.innerWidth`, mirando `maxWidth`, `marginLeft/Right` y `paddingLeft` calculados, más
     `document.documentElement.scrollWidth` para descartar desborde horizontal.
+- **📦810 — GESTIÓN HUMANA: saneamiento pre-migración (P0/P1/P2 de la auditoría).** Antes de la
+  migración premium vista por vista se limpiaron los 5 hallazgos críticos. **SIN rediseño visual**:
+  misma cara en claro, misma estructura; solo deja de romper al resto y ya tiene modo oscuro.
+  - **P0 · Carpetas envenenaba los tokens GLOBALES.** `carpetas/index.css` declaraba 26 tokens
+    `--kair-*` en `:root` (5 chocaban con el DS oficial: `--kair-surface/-text/-track/-shadow-card/
+    -transition`) y clases `.kair-btn/.kair-card` sin scope que chocaban con
+    `shared/kair-components.css`. Como SIEMPRE se carga en `index.html`, pisaba el DS de toda la
+    app con valores distintos (su transición 160ms le ganaba a la oficial 180ms, su
+    `--kair-text #1a1a2e` al oficial `#14213d`). **Fix:** TODA la hoja quedó acotada bajo
+    `.carp-scope` (los 145 selectores con un script de transformación) y el bloque `:root` pasó a
+    `.carp-scope`, que el componente pone en su contenedor en `render()` (los modales también
+    cuelgan del contenedor, así que quedan cubiertos). Verificado en la app real: el root queda
+    con los valores del DS y dentro de Carpetas viven los suyos. **Mismo bug que 📦759/📦766,
+    versión tokens — regla idéntica: tokens del prototipo JAMÁS en `:root`.**
+  - **P1 · Vista "Documentos" era código muerto cargándose en cada arranque** (88,6 KB JS + 695
+    líneas CSS + 12,9 KB HTML): el shell la reemplazó por Carpetas (commit `79b0fe02`) y ya no
+    hay `case 'documentos'` en `gestion-humana-home.js`. Se QUITÓ la carga en `index.html`
+    (css + js). **La carpeta NO se borra**: `docs/kair-firma-integration/INTEGRATION.md` dice que
+    ahí vive la "firma operativa interna" (canvas + `gh_firmas_digitales`) y NO se elimina; queda
+    dormida y documentada con un comentario en `index.html`.
+  - **P1 · Modo oscuro 0% → cubierto en las 11 hojas del módulo** (shell + kpi-bar + 9 vistas con
+    CSS). Se hizo de forma SISTEMÁTICA con dos codemods (ambos borrados tras usarse; se pueden
+    regenerar de esta entrada):
+    1. **Overlay CSS append-only**: script que recorre cada regla, y si una declaración tiene un
+       color claro escrito a mano, emite al final del archivo `[data-theme="dark"] sel, [data-theme="dark-legacy"] sel { … }`
+       mapeando los hex claros a los tokens de `styles.css` (`--bg-color`, `--widget-bg-color`,
+       `--border-color`, `--text-color`, `--text-light-color`, `--text-lighter-color`,
+       `--primary-color`, `--success/danger/warning-color`, `--box-shadow(-lg)`), que **ya tienen
+       los dos temas definidos** → un solo overlay cubre los dos modos. 481 reglas generadas.
+       ⚠️ Gotcha del parser: un comentario `/* … */` pegado a la declaración invalidaba el
+       mapeo (`prop` quedaba "/* c */ background"); hay que limpiar comentarios de las
+       declaraciones antes de mapear.
+    2. **Codemod de estilos en línea** (los `style="…#hex…"` y `.style.cssText` del JS le ganan a
+       cualquier overlay — caso real: la `.kair-card` de Carpetas con `background:white` en línea):
+       reemplaza SOLO hexes mapeables dentro de strings de estilo por `var(--token)` (120
+       reemplazos en 9 vistas; `documentos/` se saltó a propósito por estar dormida).
+    3. Carpetas, que es token-based, además redeclara sus 26 tokens en oscuro bajo
+       `[data-theme="dark"] .carp-scope` y una regla extra para su `.kair-card`, que hereda de la
+       hoja GLOBAL (los tokens del DS `--kair-*` no tienen variante oscura: cuando una vista
+       premium viva dentro de otra hoja, sus `--kair-card/line` siguen claros — hay que oscurecer
+       a mano lo que se herede del DS).
+  - **P2 · Font Awesome: se quitó el CDN duplicado.** `index.html` cargaba FA 6.5 desde cdnjs
+    (línea 34) Y la copia local `assets/css/font-awesome.min.css` (línea 65, con webfonts locales
+    verificadas). Doble descarga y dependencia de internet al pedo: quedó solo la local.
+    La migración FA → SVG Lucide queda para la migración premium vista por vista (277 iconos,
+    69 en firma-electronica — es estética, no urgencia).
+  - **P2 · Heterogeneidad de diseño (azul #174ea6, radios 0,4rem, sin clamp):** es la migración
+    misma, se hace después por vista con el usuario. Este paquete solo saneó.
+  - **Cache-bust**: las 11 hojas GH + sus 12 JS quedaron con `?v=GH-20260923-p0-dark-scopes`
+    (antes NO tenían versión — regla del repo: tocar archivo propio = bumpear su `?v=`).
+  - **Verificación real**: arnés `main/_audit-gh.js` (borrado; recreable) montó el shell en
+    Electron real y midió: tokens globales intactos tras abrir Carpetas, shell/header/content
+    oscuros en AMBOS temas, y barrido de las 9 vistas sin wrappers blancos en oscuro — 28/28 OK.
+    Gotcha del arnés: `getComputedStyle` de un custom property devuelve el valor CON las var()
+    resueltas (esperar `#2d3748`, no el texto `var(--widget-bg-color)`); y caminar el CSSOM de
+    hojas `file://`/CDN puede lanzar SecurityError — para depurar reglas mejor `el.matches()` +
+    `getComputedStyle`.
+  - **Comprobado sin relación con este paquete:** `test-gestion-humana-bridge-write.js` falla con
+    2 checks (pasoActual) ya en HEAD limpio — preexistente (📦807-809, sesión concurrente), NO es
+    de este trabajo. `test-chart-overflow.js` 18/20 también falla en HEAD limpio por lo mismo.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript

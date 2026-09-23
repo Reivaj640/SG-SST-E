@@ -129,7 +129,7 @@ class ComunicacionComponent {
 
     if (this.loading) {
       var kpiBar = this.container.querySelector('#cm-kpi-bar');
-      if (kpiBar) kpiBar.innerHTML = '<div style="padding:1rem; text-align:center; color:#5a6378;"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
+      if (kpiBar) kpiBar.innerHTML = '<div style="padding:1rem; text-align:center; color: var(--text-light-color);"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
       await this._load();
     }
 
@@ -223,7 +223,7 @@ class ComunicacionComponent {
           '<span><i class="fas fa-user"></i> Por ' + self._escHtml(a.publicadoPor || '—') + '</span>' +
           '<span><i class="fas fa-calendar"></i> ' + self._escHtml(a.fechaPublicacion || '—') + '</span>' +
           (self._enviosByRef && self._enviosByRef[a.id] ? '<span class="cm-mensaje__badge"><i class="fas fa-check"></i> Enviado a ' + self._enviosByRef[a.id] + '</span>' : '') +
-          (self._pruebasByRef && self._pruebasByRef[a.id] ? '<span class="cm-mensaje__badge" style="background:#e9ecef;color:#495057;"><i class="fas fa-vial"></i> Probado</span>' : '') +
+          (self._pruebasByRef && self._pruebasByRef[a.id] ? '<span class="cm-mensaje__badge" style="background: var(--border-color);color: var(--text-light-color);"><i class="fas fa-vial"></i> Probado</span>' : '') +
         '</div>' +
         '<p class="cm-anuncio__content">' + self._escHtml(a.contenido) + '</p>' +
         '<div class="cm-anuncio__footer">' +
@@ -304,7 +304,7 @@ class ComunicacionComponent {
           '<p class="cm-mensaje__text">' + self._escHtml(m.contenido) + '</p>' +
           '<div class="cm-mensaje__actions">' +
             (self._enviosByRef && self._enviosByRef[m.id] ? '<span class="cm-mensaje__badge" title="Correos enviados"><i class="fas fa-check"></i> Enviado</span>' : '') +
-            (self._pruebasByRef && self._pruebasByRef[m.id] ? '<span class="cm-mensaje__badge" style="background:#e9ecef;color:#495057;" title="Prueba enviada"><i class="fas fa-vial"></i> Probado</span>' : '') +
+            (self._pruebasByRef && self._pruebasByRef[m.id] ? '<span class="cm-mensaje__badge" style="background: var(--border-color);color: var(--text-light-color);" title="Prueba enviada"><i class="fas fa-vial"></i> Probado</span>' : '') +
             '<button class="cm-btn cm-btn--ghost" data-vista-msg="' + self._escHtml(m.id) + '" type="button" title="Vista previa"><i class="fas fa-eye"></i></button>' +
             '<button class="cm-btn cm-btn--primary" data-enviar-msg="' + self._escHtml(m.id) + '" type="button" title="Enviar por correo"><i class="fas fa-paper-plane"></i></button>' +
             '<button class="cm-btn cm-btn--ghost" data-hist-msg="' + self._escHtml(m.id) + '" type="button" title="Historial de envíos"><i class="fas fa-clock-rotate-left"></i></button>' +
@@ -535,25 +535,25 @@ class ComunicacionComponent {
     var wrap = document.createElement('div');
     wrap.innerHTML =
       '<div id="cm-preview-backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">' +
-        '<div style="background:#fff;border-radius:0.75rem;max-width:620px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.25);">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #e9ecef;">' +
-            '<strong style="font-size:1rem;color:#1a1a2e;">' + self._escHtml(titulo) + '</strong>' +
-            '<button type="button" id="cm-preview-close" style="border:none;background:transparent;font-size:1.25rem;cursor:pointer;color:#5a6378;">×</button>' +
+        '<div style="background: var(--widget-bg-color);border-radius:0.75rem;max-width:620px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow: var(--box-shadow);">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom: 1px solid var(--border-color);">' +
+            '<strong style="font-size:1rem;color: var(--text-color);">' + self._escHtml(titulo) + '</strong>' +
+            '<button type="button" id="cm-preview-close" style="border:none;background:transparent;font-size:1.25rem;cursor:pointer;color: var(--text-light-color);">×</button>' +
           '</div>' +
           '<div style="padding:1rem 1.25rem;overflow-y:auto;">' +
-            '<div style="font-size:0.78rem;color:#5a6378;margin-bottom:0.5rem;"><strong>Para:</strong> ' + paraHtml + '</div>' +
-            '<div style="font-size:0.78rem;color:#5a6378;margin-bottom:0.25rem;"><strong>Asunto:</strong> ' + self._escHtml(subject) + '</div>' +
-            '<div style="border:1px solid #e9ecef;border-radius:0.5rem;padding:0.75rem;background:#f8f9fa;font-size:0.82rem;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:#1a1a2e;max-height:320px;overflow-y:auto;">' + self._escHtml(body) + '</div>' +
-            '<div style="margin-top:0.75rem;font-size:0.78rem;color:#5a6378;"><strong><i class="fas fa-paperclip"></i> Adjuntos</strong> ' +
+            '<div style="font-size:0.78rem;color: var(--text-light-color);margin-bottom:0.5rem;"><strong>Para:</strong> ' + paraHtml + '</div>' +
+            '<div style="font-size:0.78rem;color: var(--text-light-color);margin-bottom:0.25rem;"><strong>Asunto:</strong> ' + self._escHtml(subject) + '</div>' +
+            '<div style="border: 1px solid var(--border-color);border-radius:0.5rem;padding:0.75rem;background: var(--bg-color);font-size:0.82rem;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color: var(--text-color);max-height:320px;overflow-y:auto;">' + self._escHtml(body) + '</div>' +
+            '<div style="margin-top:0.75rem;font-size:0.78rem;color: var(--text-light-color);"><strong><i class="fas fa-paperclip"></i> Adjuntos</strong> ' +
               '<input type="file" id="cm-preview-files" multiple style="font-size:0.75rem;" />' +
               '<div id="cm-preview-stored" style="font-size:0.75rem;margin-top:0.25rem;"></div>' +
               '<div id="cm-preview-filelist" style="font-size:0.72rem;margin-top:0.2rem;"></div></div>' +
             '<div style="display:flex;gap:0.5rem;margin-top:0.75rem;align-items:center;flex-wrap:wrap;">' +
-              '<input type="text" id="cm-preview-testmail" value="' + self._escHtml(cuenta) + '" placeholder="Correo para la prueba" style="flex:1;min-width:200px;padding:0.45rem 0.6rem;border:1px solid #dee2e6;border-radius:0.4rem;font-size:0.8rem;" />' +
+              '<input type="text" id="cm-preview-testmail" value="' + self._escHtml(cuenta) + '" placeholder="Correo para la prueba" style="flex:1;min-width:200px;padding:0.45rem 0.6rem;border: 1px solid var(--border-color);border-radius:0.4rem;font-size:0.8rem;" />' +
               '<button type="button" id="cm-preview-sendtest" class="cm-btn cm-btn--primary"><i class="fas fa-vial"></i> Enviar prueba</button>' +
               (onProducir ? '<button type="button" id="cm-preview-sendprod" class="cm-btn cm-btn--primary" style="background:#28a745;border-color:#28a745;"><i class="fas fa-paper-plane"></i> Enviar producción</button>' : '') +
             '</div>' +
-            '<div style="font-size:0.72rem;color:#5a6378;margin-top:0.4rem;">La prueba llega <strong>SOLO</strong> a ese correo y queda anotada como PRUEBA. Ningún trabajador recibe nada.</div>' +
+            '<div style="font-size:0.72rem;color: var(--text-light-color);margin-top:0.4rem;">La prueba llega <strong>SOLO</strong> a ese correo y queda anotada como PRUEBA. Ningún trabajador recibe nada.</div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -705,30 +705,30 @@ class ComunicacionComponent {
       var fecha = String(e.created_at || '').slice(0, 16).replace('T', ' ');
       var estHtml = e.estado === 'enviado'
         ? '<span class="cm-mensaje__badge"><i class="fas fa-check"></i> Enviado</span>'
-        : '<span class="cm-mensaje__badge" style="background:#f8d7da;color:#721c24;">Fallido</span>';
+        : '<span class="cm-mensaje__badge" style="background: rgba(217,83,79,0.18);color: var(--danger-color);">Fallido</span>';
       return '<tr>' +
-        '<td style="padding:0.4rem 0.5rem;border-top:1px solid #f1f3f5;">' + fecha + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;border-top:1px solid #f1f3f5;">' + self._escHtml(e.destino || '—') + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;border-top:1px solid #f1f3f5;">' + self._escHtml(e.canal || '') + (esPrueba ? ' · prueba' : '') + '</td>' +
-        '<td style="padding:0.4rem 0.5rem;border-top:1px solid #f1f3f5;">' + estHtml + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;border-top: 1px solid var(--border-color);">' + fecha + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;border-top: 1px solid var(--border-color);">' + self._escHtml(e.destino || '—') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;border-top: 1px solid var(--border-color);">' + self._escHtml(e.canal || '') + (esPrueba ? ' · prueba' : '') + '</td>' +
+        '<td style="padding:0.4rem 0.5rem;border-top: 1px solid var(--border-color);">' + estHtml + '</td>' +
       '</tr>';
     }).join('');
     var wrap = document.createElement('div');
     wrap.innerHTML =
       '<div style="position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">' +
-        '<div style="background:#fff;border-radius:0.75rem;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.25);">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #e9ecef;">' +
-            '<strong style="font-size:1rem;color:#1a1a2e;">' + titulo + ' (' + lista.length + ')</strong>' +
-            '<button type="button" id="cm-hist-close" style="border:none;background:transparent;font-size:1.25rem;cursor:pointer;color:#5a6378;">×</button>' +
+        '<div style="background: var(--widget-bg-color);border-radius:0.75rem;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow: var(--box-shadow);">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom: 1px solid var(--border-color);">' +
+            '<strong style="font-size:1rem;color: var(--text-color);">' + titulo + ' (' + lista.length + ')</strong>' +
+            '<button type="button" id="cm-hist-close" style="border:none;background:transparent;font-size:1.25rem;cursor:pointer;color: var(--text-light-color);">×</button>' +
           '</div>' +
           '<div style="padding:1rem 1.25rem;overflow-y:auto;">' +
             (lista.length === 0
-              ? '<div style="font-size:0.82rem;color:#5a6378;">Sin envíos registrados todavía. Si ya enviaste y no aparece nada, cerrá la app por completo y volvé a abrirla.</div>'
+              ? '<div style="font-size:0.82rem;color: var(--text-light-color);">Sin envíos registrados todavía. Si ya enviaste y no aparece nada, cerrá la app por completo y volvé a abrirla.</div>'
               : '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;"><thead><tr>' +
-                '<th style="text-align:left;padding:0.4rem 0.5rem;color:#5a6378;">Fecha</th>' +
-                '<th style="text-align:left;padding:0.4rem 0.5rem;color:#5a6378;">Destino</th>' +
-                '<th style="text-align:left;padding:0.4rem 0.5rem;color:#5a6378;">Canal</th>' +
-                '<th style="text-align:left;padding:0.4rem 0.5rem;color:#5a6378;">Estado</th>' +
+                '<th style="text-align:left;padding:0.4rem 0.5rem;color: var(--text-light-color);">Fecha</th>' +
+                '<th style="text-align:left;padding:0.4rem 0.5rem;color: var(--text-light-color);">Destino</th>' +
+                '<th style="text-align:left;padding:0.4rem 0.5rem;color: var(--text-light-color);">Canal</th>' +
+                '<th style="text-align:left;padding:0.4rem 0.5rem;color: var(--text-light-color);">Estado</th>' +
                 '</tr></thead><tbody>' + filas + '</tbody></table>') +
           '</div>' +
         '</div>' +

@@ -223,21 +223,21 @@ class VacacionesComponent {
     var r = this._recomendarVacaciones(t);
     var base = 'border-radius:0.5rem;padding:0.7rem 0.9rem;font-size:0.78rem;margin-top:0.25rem;';
     if (!r.ok) {
-      zone.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe69b;color:#856404;' + base + '"><i class="fas fa-info-circle"></i> ' + self._escHtml(r.mensaje) + '</div>';
+      zone.innerHTML = '<div style="background: rgba(240,173,78,0.16);border:1px solid #ffe69b;color: var(--warning-color);' + base + '"><i class="fas fa-info-circle"></i> ' + self._escHtml(r.mensaje) + '</div>';
       return;
     }
     if (r.soloCompensar) {
-      zone.innerHTML = '<div style="background:#fff3cd;border:1px solid #ffe69b;color:#856404;' + base + '">' +
+      zone.innerHTML = '<div style="background: rgba(240,173,78,0.16);border:1px solid #ffe69b;color: var(--warning-color);' + base + '">' +
         '<strong>Saldo menor a 1 día: se compensa en dinero al terminar el contrato.</strong> Causados proporcionales: ' + r.causados + ' · Usados: ' + r.usados + ' · Saldo: <strong>' + r.saldo + '</strong> · Antigüedad: ' + self._escHtml(r.antiguedad) + '.</div>';
       return;
     }
     if (!r.sugerencia) {
-      zone.innerHTML = '<div style="background:#fff3cd;border:1px solid #ffe69b;color:#856404;' + base + '">' +
+      zone.innerHTML = '<div style="background: rgba(240,173,78,0.16);border:1px solid #ffe69b;color: var(--warning-color);' + base + '">' +
         '<strong>Sin saldo disponible.</strong> Causados proporcionales: ' + r.causados + ' · Usados: ' + r.usados + ' · Antigüedad: ' + self._escHtml(r.antiguedad) + '.' +
         (r.proximoAniversario ? ' Próximo aniversario: ' + self._fmtDate(r.proximoAniversario) + '.' : '') + '</div>';
       return;
     }
-    zone.innerHTML = '<div style="background:#e8f0fe;border:1px solid #c5d9f5;color:#174ea6;' + base + '">' +
+    zone.innerHTML = '<div style="background: rgba(77,166,255,0.15);border:1px solid #c5d9f5;color: var(--primary-color);' + base + '">' +
       '<div style="font-weight:600;margin-bottom:0.25rem;"><i class="fas fa-wand-magic-sparkles"></i> Sugerencia según su saldo</div>' +
       '<div>Antigüedad: <strong>' + self._escHtml(r.antiguedad) + '</strong> · Causados proporcionales: <strong>' + r.causados + '</strong> · Usados: <strong>' + r.usados + '</strong> · Saldo: <strong>' + r.saldo + '</strong></div>' +
       '<div style="margin-top:0.25rem;">A disfrutar: <strong>' + r.aDisfrutar + ' días</strong> — del <strong>' + self._fmtDate(r.sugerencia.inicio) + '</strong> al <strong>' + self._fmtDate(r.sugerencia.fin) + '</strong> (sin traslapar lo programado).' +
@@ -423,14 +423,14 @@ class VacacionesComponent {
     var r = this._recomendarVacaciones(t);
     var sol = this._solicitudAbierta(t.id);
     var saldoHtml = !r.ok
-      ? '<span style="color:#856404;">—</span>'
+      ? '<span style="color: var(--warning-color);">—</span>'
       : '<div class="va-table__name">' + r.saldo + '</div>' +
         '<div class="va-table__sub">C ' + r.causados + ' · U ' + r.usados + '</div>';
     var estadoHtml;
     if (sol) {
       estadoHtml = '<span class="va-badge va-badge--' + sol.estado + '">' + self._escHtml(sol.estado) + '</span>';
     } else {
-      estadoHtml = '<span style="display:inline-flex;align-items:center;font-size:0.68rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:0.75rem;background:#e9ecef;color:#6c757d;white-space:nowrap;">Sin solicitud</span>';
+      estadoHtml = '<span style="display:inline-flex;align-items:center;font-size:0.68rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:0.75rem;background: var(--border-color);color: var(--text-light-color);white-space:nowrap;">Sin solicitud</span>';
     }
     var actions = '';
     if (sol && sol.estado === 'solicitada') {
@@ -602,7 +602,7 @@ class VacacionesComponent {
               '<div class="va-field va-field--full" id="va-cedula-status" style="margin-top:-0.35rem;"></div>' +
               '<div class="va-field va-field--full"><label>Trabajador <span class="req">*</span></label>' +
                 '<select name="trabajadorId" required><option value="">— Selecciona un trabajador —</option>' + choices + '</select>' +
-                '<div id="va-trab-count" style="font-size:0.7rem;color:#5a6378;margin-top:0.2rem;"></div></div>' +
+                '<div id="va-trab-count" style="font-size:0.7rem;color: var(--text-light-color);margin-top:0.2rem;"></div></div>' +
               '<div class="va-field va-field--full" id="va-reco-zone"></div>' +
               '<div class="va-field"><label>Fecha Inicio <span class="req">*</span></label><input type="date" name="fechaInicio" required value="' + today + '" /></div>' +
               '<div class="va-field"><label>Fecha Fin <span class="req">*</span></label><input type="date" name="fechaFin" required /></div>' +
@@ -679,19 +679,19 @@ class VacacionesComponent {
       var st = cedulaState.status;
       var p = cedulaState.personal;
       if (st === 'ok-activo' && p) {
-        statusEl.innerHTML = '<div style="background:#e6f4ea;border:1px solid #a3d9b1;color:#146c2e;' + boxBase + '">' +
+        statusEl.innerHTML = '<div style="background: rgba(92,184,92,0.16);border:1px solid #a3d9b1;color:#146c2e;' + boxBase + '">' +
           '<i class="fas fa-circle-check"></i> <strong>Activo:</strong> ' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) +
           (p.cargo ? ' · ' + self._escHtml(p.cargo) : '') + '. Puedes continuar con las fechas.</div>';
       } else if (st === 'retirado' && p) {
-        statusEl.innerHTML = '<div style="background:#fdecea;border:1px solid #f5c2c7;color:#842029;' + boxBase + '">' +
+        statusEl.innerHTML = '<div style="background: rgba(217,83,79,0.18);border:1px solid #f5c2c7;color:#842029;' + boxBase + '">' +
           '<i class="fas fa-ban"></i> <strong>Trabajador retirado:</strong> ' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) +
           ' (CC ' + self._escHtml(p.cedula || '') + '). No se puede solicitar vacaciones.</div>';
       } else if (st === 'otro' && p) {
-        statusEl.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe69b;color:#856404;' + boxBase + '">' +
+        statusEl.innerHTML = '<div style="background: rgba(240,173,78,0.16);border:1px solid #ffe69b;color: var(--warning-color);' + boxBase + '">' +
           '<i class="fas fa-info-circle"></i> Estado en base: <strong>' + self._escHtml(p.estado || '') + '</strong> — ' +
           self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '.</div>';
       } else if (st === 'noexiste') {
-        statusEl.innerHTML = '<div style="background:#e9ecef;border:1px solid #ced4da;color:#495057;' + boxBase + '">' +
+        statusEl.innerHTML = '<div style="background: var(--border-color);border: 1px solid var(--border-color);color: var(--text-light-color);' + boxBase + '">' +
           '<i class="fas fa-user-xmark"></i> No existe un trabajador con esa cédula en esta empresa.</div>';
       } else {
         statusEl.innerHTML = '';
