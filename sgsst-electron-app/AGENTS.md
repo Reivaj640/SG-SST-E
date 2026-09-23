@@ -4112,22 +4112,22 @@ Migración premium v2 de los 2 submódulos que quedaban en working tree, con con
 
 ---
 
-## 🆕 Notificaciones persistentes (correo + eventos) (📦805, working tree — sin commit hasta autorización)
+## 🆕 Notificaciones persistentes (correo + eventos) (📦807-808 commiteado · 📦809 fix duplicación + tabs + tamaño)
 
 Feature de notificaciones persistentes en el proceso main (detección + persistencia + UI completa).
 
-**Archivos**: `main/notifications-bridge.js` (4 handlers IPC + tabla `notificaciones` con `dedupe_key` UNIQUE + índice único compuesto), `main/notifications-service.js` (detección con 12 fuentes de calendario + backoff + guard de reentrada), `main/notifications-email.js` (detector de correo del cache), `main/notifications-gate.js` (gate de bandeja fail-closed, mismo criterio que el bridge de permisos 📦702); cableado en `main.js` + `preload.js` (`window.electronAPI.notifications`); UI en `renderer.js` (badge + toast con escape HTML), `shared/kair-alerts.js` (panel notificaciones: listar `soloNoLeidas` + `marcarLeida` + ventana 15m/1h/6h/24h persistida), `styles.css` + `index.html` (estilos, dark y cache-bust) y `assets/js/update-notifications.js`.
+**Archivos**: `main/notifications-bridge.js` (4 handlers IPC + tabla `notificaciones` con `dedupe_key` UNIQUE + índice único compuesto + **`GLOBAL_COMPANY='*'`** y migración one-shot que consolida correos), `main/notifications-service.js` (detección con 12 fuentes de calendario + backoff + guard de reentrada), `main/notifications-email.js` (detector de correo del cache — **UNA fila global `company_key='*'` por thread, sin fan-out por empresa**), `main/notifications-gate.js` (gate de bandeja fail-closed, mismo criterio que el bridge de permisos 📦702); cableado en `main.js` + `preload.js` (`window.electronAPI.notifications`); UI en `renderer.js` (badge + toast con escape HTML), `shared/kair-alerts.js` (**tabs Pendientes/Notificaciones** con `_state.activeTab` + `localStorage['kair-alerts-tab']`, listar `soloNoLeidas`, correo global siempre navega, ventana 15m/1h/6h/24h persistida, **footer en ambas pestañas**, **`_pinPopoverHeight`/`_state.panelMinH` para tamaño estable al conmutar**), `styles.css` + `index.html` (estilos tabs, dark, notifs-list **sin `max-height`**, cache-bust `20260923-notifs-size`) y `assets/js/update-notifications.js`.
 
-**Seguridad**: sesión obligatoria en los 4 canales (`UNAUTHORIZED`), `companyKey` ajena a la sesión → `FORBIDDEN_COMPANY` (nunca empresas ajenas; `marcarLeida` solo marca ids de la sesión), gate `bandeja_integrada_enabled` fail-closed, y **sin log de `access_token`** en notifications-*.
+**Seguridad**: sesión obligatoria en los 4 canales (`UNAUTHORIZED`), `companyKey` ajena a la sesión → `FORBIDDEN_COMPANY` (nunca empresas ajenas; `marcarLeida` solo marca ids de la sesión + globales `'*'`), gate `bandeja_integrada_enabled` fail-closed, y **sin log de `access_token`** en notifications-*.
 
 **Tests** (correrlos antes de commitear; bridge/service usan better-sqlite3 → con Electron):
 
 ```powershell
-$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 25/25
+$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 28/28
 $env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-service.js  # 10/10
-node main/test-notificaciones-email.js     # 6/6
-node main/test-notificaciones-wiring.js    # 9/9
+node main/test-notificaciones-email.js     # 7/7
+node main/test-notificaciones-wiring.js    # 11/11
 node main/test-notificaciones-fuentes.js   # 52/52
-node main/test-notificaciones-ui.js        # 25/25
+node main/test-notificaciones-ui.js        # 36/36 (incluye checks de tamaño estable)
 node main/test-notificaciones-seguridad.js # 23/23 (seguridad: UNAUTHORIZED/FORBIDDEN/gate/token)
 ```

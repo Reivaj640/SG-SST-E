@@ -41,7 +41,22 @@ ok('styles.css dark mode para panel notifs', /\[data-theme\^="dark"\][^{]*\.kair
 ok('cache-bust styles.css en index.html', /styles\.css\?v=/.test(indexHtml));
 ok('index.html carga kair-alerts con cache-bust', /kair-alerts\.js\?v=/.test(indexHtml));
 ok('renderer toast buttonText Ver junto a onClick', /buttonText:\s*'Ver'/.test(renderer) && /onClick:\s*function/.test(renderer));
-ok('kair-alerts correo no navega si !activa o !companyKey o distinta', /!activa \|\| !companyKey \|\| companyKey !== activa/.test(alerts));
+// Correo global '*': siempre abre; solo bloquea si companyKey concreta != activa
+ok('kair-alerts abre correo global *', /companyKey === '\*'|\*\s*\|\|\s*!companyKey|isGlobal/.test(alerts));
+ok('kair-alerts bloquea correo de otra empresa concreta', /companyKey !== activa/.test(alerts));
+
+// ── Tabs Pendientes / Notificaciones ─────────────────────────────────
+ok('kair-alerts tiene tabs en el panel', /data-kair-alerts-action="tab"/.test(alerts) && /data-tab="pendientes"/.test(alerts) && /data-tab="notifs"/.test(alerts));
+ok('kair-alerts estado activeTab', /activeTab/.test(alerts));
+ok('kair-alerts persiste tab en localStorage', /kair-alerts-tab/.test(alerts));
+ok('kair-alerts conmuta vista por tab', /action === 'tab'/.test(alerts));
+ok('styles.css estilos de tabs', /\.kair-alerts-popover__tab/.test(stylesCss));
+ok('cache-bust con token notifs-size', /20260923-notifs-size/.test(indexHtml));
+// Altura estable entre pestañas
+ok('styles.css notifs-list sin max-height fijo', !/kair-alerts-notifs-list[^{]*\{[^}]*max-height/.test(stylesCss));
+ok('kair-alerts fija min-height del panel (_pinPopoverHeight)', /_pinPopoverHeight/.test(alerts) && /panelMinH/.test(alerts));
+ok('kair-alerts footer en ambas pestañas (sin condición de tab)', /popover__foot[\s\S]{0,400}open-calendar/.test(alerts) && !/activeTab === 'pendientes'\s*\?\s*'[\s\S]{0,80}popover__foot/.test(alerts));
+ok('kair-alerts resetea panelMinH al cerrar', /_state\.panelMinH = 0/.test(alerts));
 
 var f = 0;
 checks.forEach(function (c) {

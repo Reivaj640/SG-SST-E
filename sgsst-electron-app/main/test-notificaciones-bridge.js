@@ -92,7 +92,10 @@ if (dbOk) {
 
     const conTok = await handlers['notificaciones:listar']({}, { token: 'tok-ok', companyKey: 'emp1' });
     ok('listar con session ok', conTok && conTok.success === true && Array.isArray(conTok.data));
-    ok('listar filtra company', !!(conTok && conTok.data) && conTok.data.every(function (n) { return n.companyKey === 'emp1'; }));
+    // Correos van globales '*' (+ migración); eventos siguen por empresa.
+    ok('listar filtra company (+ global *)', !!(conTok && conTok.data) && conTok.data.every(function (n) {
+      return n.companyKey === 'emp1' || n.companyKey === '*';
+    }));
 
     const cnt = await handlers['notificaciones:getUnreadCount']({}, { token: 'tok-ok' });
     ok('getUnreadCount devuelve numero', cnt && cnt.success && typeof cnt.data.unread === 'number' && cnt.data.unread === 1);

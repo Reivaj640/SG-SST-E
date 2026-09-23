@@ -61,31 +61,27 @@ function createEmailDetector(deps) {
       }
     }
 
+    // El buzón Gmail es GLOBAL (config.json googleOAuth; email_connections no
+    // tiene columna company). Antes cada correo se atribuía a TODAS las
+    // empresas habilitadas → una fila por empresa (duplicación visible en el
+    // panel y en el badge). Ahora: UNA sola fila global con company_key='*',
+    // visible desde cualquier empresa de la sesión (el bridge la incluye
+    // siempre en listar/getUnreadCount/marcarLeida).
+    if (habilitadas.length === 0) return { nuevas: nuevas };
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      // Mapeo conexión→empresa (Task 5): si la fila trae empresa (schema
-      // futuro con company por conexión) se usa; si no (schema real), el
-      // correo se atribuye a TODAS las empresas habilitadas — el buzón es
-      // global y el aviso debe ser visible en cada contexto de empresa.
-      var empresasDeEste = r.company_key ? [r.company_key] : companies;
-      for (var c = 0; c < empresasDeEste.length; c++) {
-        var emp = empresasDeEste[c];
-        if (!emp) continue;
-        if (companies.length && companies.indexOf(emp) === -1) continue;
-        if (!bandejaEnabledFor(emp)) continue;
-        var key = bridge.buildDedupeKey('correo', emp, r.thread_id, null, 0);
-        nuevas.push({
-          tipo: 'correo',
-          ref_id: String(r.thread_id),
-          company_key: emp,
-          // companyKey (camel) también: notifications-service lo lee de nuevas[0]
-          // para el aviso webContents.send; company_key (snake) va al INSERT.
-          companyKey: emp,
-          titulo: String(r.subject || '(sin asunto)').slice(0, 200),
-          resumen: String(r.snippet || '').slice(0, 80),
-          dedupe_key: key
-        });
-      }
+      var key = bridge.buildDedupeKey('correo', '*', r.thread_id, null, 0);
+      nuevas.push({
+        tipo: 'correo',
+        ref_id: String(r.thread_id),
+        company_key: '*',
+        // companyKey (camel): notifications-service lo lee de nuevas[0] para
+        // el aviso webContents.send; company_key (snake) va al INSERT.
+        companyKey: '*',
+        titulo: String(r.subject || '(sin asunto)').slice(0, 200),
+        resumen: String(r.snippet || '').slice(0, 80),
+        dedupe_key: key
+      });
     }
     return { nuevas: nuevas };
   };

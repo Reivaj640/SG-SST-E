@@ -148,23 +148,23 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 
 ### 5.2 Sistema de Notificaciones Persistentes (feature nuevo, v0.1.212)
 
-**Estado:** operativo en main process, UI completa, 155/155 tests OK.
+**Estado:** operativo en main process, UI completa con tabs y **tamaño estable** (`_pinPopoverHeight`), **167/167 tests OK** (📦807-808 + fix duplicación/tabs/tamaño 📦809).
 
 **Archivos nuevos:**
-- `main/notifications-bridge.js` (209 líneas) — tabla `notificaciones` + 4 handlers IPC con `validateSession`
+- `main/notifications-bridge.js` (209+ líneas) — tabla `notificaciones` + 4 handlers IPC con `validateSession` + `GLOBAL_COMPANY='*'` + migración one-shot (consolida correos existentes)
 - `main/notifications-service.js` (266 líneas) — timers + detección + dedupe + emisión
-- `main/notifications-email.js` (99 líneas) — detector de correos sin llamar Gmail directo
+- `main/notifications-email.js` (99+ líneas) — detector de correos sin llamar Gmail directo; **UNA fila global `company_key='*'` por thread** (sin fan-out por empresa)
 - `main/notifications-gate.js` (50 líneas) — gate real `bandeja_integrada_enabled` con fail-closed
+**Tests (167/167 OK):**
 
-**Tests (155/155 OK):**
-- bridge 28/28, email 6/6, service 10/10, wiring 11/11, fuentes 52/52, ui 25/25, seguridad 23/23
+- bridge 28/28, email 7/7, service 10/10, wiring 11/11, fuentes 52/52, ui 36/36, seguridad 23/23
 
 **Funcionalidad:**
 - Detección cada 60s desde proceso main (Bandeja cerrada no afecta)
 - 12 fuentes de calendario: plan-trabajo (stub), capacitaciones, auditoría, eventos rápidos, gestaciones, inspecciones, mantenimiento + 5 recordatorios (copasst, convivencia, presupuesto, afiliación, inducciones)
 - Ventana configurable: 15min / 1h / 6h / 24h (default 24h) persistida en `localStorage`
 - Dedupe por `dedupe_key` UNIQUE (multi-ventana: keys distintas para cada ventana permiten re-notificar)
-- UI: badge en header + toast persistente (autoClose:0) + lista + marcar leída individual/todas + selector de ventana
+- UI: badge en header + toast persistente (autoClose:0) + **tabs Pendientes/Notificaciones** + marcar leída individual/todas + selector de ventana
 
 **Lecciones transferibles (de esta feature):**
 - Servicios main con timers: `setInterval + unref + stopAll en before-quit`
@@ -365,7 +365,7 @@ sgsst-electron-app/
 | Submódulos con UI | 51 |
 | Submódulos placeholder en sidebar | 16 |
 | Total declarado en sidebar | 67 |
-| Tests del feature Notificaciones | 155/155 OK |
+| Tests del feature Notificaciones | 167/167 OK |
 | Documentos en `docs/superpowers/` | 8 (4 specs + 4 plans) |
 
 ---

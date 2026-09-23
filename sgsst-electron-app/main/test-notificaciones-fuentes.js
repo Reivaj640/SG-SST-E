@@ -198,9 +198,8 @@ if (dbReal) {
   }
 }
 
-// ── Unidad: detector con filas SIN company_key (schema real) → 1 aviso por
-//    empresa habilitada (el buzón Gmail es global, el aviso debe verse en
-//    cada contexto de empresa).
+// ── Unidad: detector con filas SIN company_key (schema real) →
+//    UN solo aviso global company_key='*' (buzón compartido, sin fan-out).
 const dbStubSinCompany = {
   prepare: function (sql) {
     if (/has_unread/.test(sql) && /SELECT/.test(sql)) {
@@ -223,9 +222,9 @@ const dbStubSinCompany = {
     trySync: async function () { return false; }
   });
   const resSin = await detSin({ companies: ['emp1', 'emp2'] });
-  ok('detector: fila sin company_key → 1 aviso por empresa', resSin.nuevas.length === 2);
-  ok('detector: avisos con la empresa de cada contexto', resSin.nuevas.some(function (n) { return n.companyKey === 'emp1'; }) && resSin.nuevas.some(function (n) { return n.companyKey === 'emp2'; }));
-  ok('detector: dedupe key distinta por empresa', new Set(resSin.nuevas.map(function (n) { return n.dedupe_key; })).size === 2);
+  ok('detector: fila sin company_key → 1 aviso global (no 1 por empresa)', resSin.nuevas.length === 1);
+  ok('detector: company_key global *', resSin.nuevas.every(function (n) { return n.companyKey === '*' && n.company_key === '*'; }));
+  ok('detector: dedupe key única por thread', new Set(resSin.nuevas.map(function (n) { return n.dedupe_key; })).size === 1);
 
   const detSinOff = emailMod.createEmailDetector({
     getDb: function () { return dbStubSinCompany; },

@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807 Notificaciones persistentes (correo + 12 fuentes de calendario, 1 stub) + badge/toast/panel + 155/155 tests
-**Última actualización:** 22 de septiembre de 2026
+**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807-809 Notificaciones persistentes + fix duplicación correos (global `*`) + tabs Pendientes/Notificaciones (tamaño estable) + 167/167 tests
+**Última actualización:** 23 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -1345,18 +1345,18 @@ Feature completa de notificaciones in-app detectadas desde el proceso main, aunq
 **UI (renderer + shared):**
 
 - **`renderer.js`** — `_refreshNotifBadge()` compone `KairAlerts.getCount() + electronAPI.notifications.getUnreadCount`, listener `notificaciones:changed` dispara refresh + toast persistente (`autoClose: 0`) con escape `KairUI.esc()` (anti-XSS).
-- **`shared/kair-alerts.js`** — Nueva sección "Notificaciones" en el popover: lista `soloNoLeidas`, chip de empresa si ≠ activa, marcar individual ✓ + "Marcar todas", estado vacío canónico `kair-empty`, click correo solo navega si empresa activa coincide; selector de ventana **15m / 1h / 6h / 24h** (default 24h) persistido en `localStorage` y sincronizado al service vía `setVentana`.
+- **`shared/kair-alerts.js`** — Sección "Notificaciones" con **tabs Pendientes / Notificaciones** (default `pendientes`, persistido en `localStorage['kair-alerts-tab']`); lista `soloNoLeidas`, marcar individual ✓ + "Marcar todas", estado vacío canónico `kair-empty`, **correo global `'*'` siempre navega** (chip de empresa oculto); selector de ventana **15m / 1h / 6h / 24h** (default 24h) persistido y sincronizado al service vía `setVentana`.
 - **`assets/js/update-notifications.js`** (M) — Adaptación del toast persistente.
-- **`styles.css`** — Estilos del panel + dark `[data-theme^="dark"]`; cache-bust `?v=20260922-notifs-ui` en `index.html`.
+- **`styles.css`** — Estilos del panel + tabs (`.kair-alerts-popover__tab*`) + dark `[data-theme^="dark"]`; notifs-list **sin `max-height`**; cache-bust `?v=20260923-notifs-size` en `index.html`.
 
-**Tests — 155/155 OK:**
+**Tests — 167/167 OK:**
 
-- `main/test-notificaciones-bridge.js` → **28/28** (schema, dedupe_key, ventanaRango, 4 handlers, FORBIDDEN_COMPANY para company ajena, admin bypass)
-- `main/test-notificaciones-email.js` → **6/6** (detector, dedupe_key, gate off → 0)
+- `main/test-notificaciones-bridge.js` → **28/28** (schema, dedupe_key, ventanaRango, 4 handlers, FORBIDDEN_COMPANY, admin bypass, listar `company_key='*'`)
+- `main/test-notificaciones-email.js` → **7/7** (detector, dedupe_key global `correo:*:…`, gate off → 0)
 - `main/test-notificaciones-service.js` → **10/10** (fuente rota no mata tick, dedupe evita duplicados, emite solo si inserts, ventana distinta puede re-notificar, pasado >1h descartado)
 - `main/test-notificaciones-wiring.js` → **11/11** (main + preload + service tienen los hooks correctos, setVentana con validateSession)
-- `main/test-notificaciones-fuentes.js` → **52/52** (12 fuentes definidas + helpers + funciones generadoras + gate real + SQL_NO_LEIDOS exportado + detector con/sin company_key + gate off → 0)
-- `main/test-notificaciones-ui.js` → **25/25** (listener, badge, toast autoClose:0, kair-alerts sección, select ventana, localStorage, escape HTML, estilos + dark, cache-bust)
+- `main/test-notificaciones-fuentes.js` → **52/52** (12 fuentes definidas + helpers + funciones generadoras + gate real + SQL_NO_LEIDOS exportado + detector global `'*'` + gate off → 0)
+- `main/test-notificaciones-ui.js` → **36/36** (listener, badge, toast autoClose:0, kair-alerts sección, tabs, select ventana, localStorage, escape HTML, estilos + dark, cache-bust, **altura estable / footer ambas tabs**)
 - `main/test-notificaciones-seguridad.js` → **23/23** (sin token → UNAUTHORIZED, companyKey ajena → FORBIDDEN_COMPANY, marcarLeida ajeno → updated:0, getUnreadCount solo número, gate=0 → 0 correos, sin `access_token` en notifications-*)
 
 **Lecciones técnicas transferibles:**
@@ -1367,7 +1367,7 @@ Feature completa de notificaciones in-app detectadas desde el proceso main, aunq
 - **Multitenancy SQL**: siempre `WHERE company_key IN (empresas_del_usuario)` — los handlers nunca exponen datos de empresas ajenas; `admin` puede ver todas (bypass explícito).
 - **Reentrancia async**: `tick()` con `try { ... } finally { _inFlight = false }` para evitar que un email detector de 120s se solape con el siguiente tick.
 
-**Estado:** working tree con 26 archivos modificados/nuevos. Suite completa en verde. Pendiente commit + push con autorización del user.
+**Estado:** commiteado en 📦807 (+ corrección de conteo de fuentes en 📦808). Fix duplicación + tabs + tamaño estable en working tree (📦809 pendiente de autorización). Suite completa en verde (167/167). Push pendiente de autorización del user.
 
 ---
 

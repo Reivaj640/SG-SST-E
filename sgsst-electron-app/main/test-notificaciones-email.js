@@ -30,10 +30,12 @@ const dbStub = {
     trySync: async function () { return false; }
   });
   const res = await det({ companies: ['emp1', 'emp2'] });
-  ok('detecta 2 no leidos de emp1', res.nuevas.length === 2);
+  ok('detecta 2 no leidos', res.nuevas.length === 2);
   ok('tipo correo', res.nuevas[0].tipo === 'correo');
-  ok('dedupe_key bien formada', res.nuevas[0].dedupe_key.indexOf('correo:emp1:t1:') === 0);
-  ok('empresa sin flag omitida', res.nuevas.every(function (n) { return n.companyKey === 'emp1'; }));
+  // Buzón global: UNA fila por thread con company_key='*' (sin fan-out por empresa)
+  ok('dedupe_key global', res.nuevas[0].dedupe_key.indexOf('correo:*:t1:') === 0);
+  ok('company_key global *', res.nuevas.every(function (n) { return n.companyKey === '*' && n.company_key === '*'; }));
+  ok('sin duplicado por empresa', res.nuevas.length === 2 && res.nuevas[0].ref_id !== res.nuevas[1].ref_id);
   ok('no loguea snippet largo en titulo', res.nuevas[0].titulo.length <= 200);
 
   const detOff = emailMod.createEmailDetector({

@@ -64,6 +64,7 @@
   };
 
   // ── Estado privado ──────────────────────────────────────────────────
+  var NOTIF_TAB_KEY = 'kair-alerts-tab';
   var _state = {
     pending: [],          // array de eventos pendientes
     notifs: [],           // Task 6 — notificaciones sin leer (correo + eventos)
@@ -71,7 +72,14 @@
     isFetching: false,    // evita fetches concurrentes
     isOpen: false,        // popover abierto
     popoverEl: null,      // elemento DOM del popover
-    count: 0              // último conteo conocido
+    count: 0,             // último conteo conocido
+    panelMinH: 0,         // altura fijada del panel (misma en ambas pestañas)
+    // Tabs lado a lado: 'pendientes' | 'notifs'. Persistido en localStorage.
+    activeTab: (function () {
+      try {
+        return localStorage.getItem(NOTIF_TAB_KEY) === 'notifs' ? 'notifs' : 'pendientes';
+      } catch (e) { return 'pendientes'; }
+    })()
   };
 
   var _listeners = [];    // subscriptores de onCountChange
@@ -187,9 +195,21 @@
     }
     var token = _getToken();
     if (!token) return Promise.resolve([]);
-    var cntPromise = api.notifications.getUnreadCount({ token: token })
+    // Filtra por empresa activa si la hay (el bridge suma siempre los
+    // correos globales company_key='*' → un solo aviso por correo, no 5).
+    var ck = _getEmpresaId();
+    var cntPayload = ck
+      ? { token: token, companyKey: ck }
+      : { token: token };
+    var cntPromise = api.notifications.getUnreadCount(cntPayload)
       .catch(function () { return null; });
-    var listPromise = api.notifications.listar({ token: token, soloNoLeidas: true, limit: 50 })
+    var listPayload = {
+      token: token,
+      soloNoLeidas: true,
+      limit: 50
+    };
+    if (ck) listPayload.companyKey = ck;
+    var listPromise = api.notifications.listar(listPayload)
       .catch(function () { return null; });
     return Promise.all([cntPromise, listPromise]).then(function (results) {
       var cnt = results[0];
@@ -232,13 +252,11 @@
     var activa = _getEmpresaId();
     _closePopover();
     if (tipo === 'correo') {
-      // Click correo solo navega si la empresa activa coincide
-      if (!activa || !companyKey || companyKey !== activa) {
-        if (companyKey) {
-          _showToast('Notificación de otra empresa (' + _esc(companyKey) + ')', 'info');
-        } else {
-          _showToast('Selecciona una empresa para abrir el correo', 'info');
-        }
+      // company_key='*' = buzón global → siempre se puede abrir. Si es de
+      // otra empresa concreta y no coincide con la activa, solo avisar.
+      var isGlobal = !companyKey || companyKey === '*';
+      if (!isGlobal && activa && companyKey !== activa) {
+        _showToast('Notificación de otra empresa (' + _esc(companyKey) + ')', 'info');
         return;
       }
       var btnBandeja = document.getElementById('bandeja-integrada-button');
@@ -264,7 +282,8 @@
     var label = tipo === 'correo' ? 'Correo' : 'Evento';
     var color = tipo === 'correo' ? '#2057b8' : '#e7a224';
     var activa = _getEmpresaId();
-    var chipHtml = (n.companyKey && (!activa || n.companyKey !== activa))
+    // '*' (global) y vacío no llevan chip de empresa
+    var chipHtml = (n.companyKey && n.companyKey !== '*' && (!activa || n.companyKey !== activa))
       ? '<span class="kair-alerts-notifs__chip">' + _esc(n.companyKey) + '</span>'
       : '';
     var resumen = String(n.resumen || '').slice(0, 90);
@@ -483,6 +502,7 @@
     }
     var today = _todayMidnight();
     var items = _state.pending;
+    var activeTab = (_state.activeTab === 'notifs') ? 'notifs' : 'pendientes';
 
     var listHtml;
     if (items.length === 0) {
@@ -498,7 +518,8 @@
       listHtml = '<div class="kair-alerts-list" data-kair-alerts-list></div>';
     }
 
-    // Task 6 — Sección Notificaciones: lista no leídas + select de ventana
+    // Sección Notificaciones (vista del tab "Notificaciones"): lista no leídas
+    // + select de ventana de aviso.
     var notifs = _state.notifs;
     var notifCount = Array.isArray(notifs) ? notifs.length : 0;
     var notifSectionHtml =
@@ -518,6 +539,11 @@
           : '<div class="kair-alerts-notifs-list" data-kair-alerts-notifs-list></div>') +
       '</div>';
 
+    // Contenido del body: una sola vista visible a la vez (tabs conmutables).
+    var bodyHtml = (activeTab === 'notifs')
+      ? notifSectionHtml
+      : listHtml;
+
     // 📦 Panel lateral anclado al badge del calendario (NO modal). El arrow
     // CSS apunta hacia el badge para indicar visualmente el origen. Sin
     // backdrop: el resto de la app sigue siendo interactuable.
@@ -534,8 +560,18 @@
               '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>' +
               '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>' +
             '</svg>' +
-            '<h3 class="kair-alerts-popover__title">Pendientes</h3>' +
-            '<span class="kair-alerts-popover__count">' + items.length + '</span>' +
+            '<div class="kair-alerts-popover__tabs" role="tablist" aria-label="Secciones del panel">' +
+              '<button type="button" role="tab" class="kair-alerts-popover__tab' + (activeTab === 'pendientes' ? ' is-active' : '') + '"' +
+                ' data-kair-alerts-action="tab" data-tab="pendientes"' +
+                ' aria-selected="' + (activeTab === 'pendientes' ? 'true' : 'false') + '">' +
+                'Pendientes<span class="kair-alerts-popover__tab-n">' + items.length + '</span>' +
+              '</button>' +
+              '<button type="button" role="tab" class="kair-alerts-popover__tab' + (activeTab === 'notifs' ? ' is-active' : '') + '"' +
+                ' data-kair-alerts-action="tab" data-tab="notifs"' +
+                ' aria-selected="' + (activeTab === 'notifs' ? 'true' : 'false') + '">' +
+                'Notificaciones<span class="kair-alerts-popover__tab-n">' + notifCount + '</span>' +
+              '</button>' +
+            '</div>' +
           '</div>' +
           '<button type="button" class="kair-alerts-popover__close" data-kair-alerts-action="close" aria-label="Cerrar">' +
             '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -544,8 +580,7 @@
             '</svg>' +
           '</button>' +
         '</div>' +
-        '<div class="kair-alerts-popover__body">' + listHtml + '</div>' +
-        notifSectionHtml +
+        '<div class="kair-alerts-popover__body" data-kair-alerts-body>' + bodyHtml + '</div>' +
         '<div class="kair-alerts-popover__foot">' +
           '<button type="button" class="kair-alerts-popover__calendar-link" data-kair-alerts-action="open-calendar">' +
             '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -574,25 +609,42 @@
     _state.popoverEl = panel;
     _state.isOpen = true;
 
-    // Si hay items, renderízalos
-    if (items.length > 0) {
+    // Items de la vista activa
+    if (activeTab === 'pendientes' && items.length > 0) {
       var listEl = panel.querySelector('[data-kair-alerts-list]');
-      var frag = document.createDocumentFragment();
-      for (var i = 0; i < items.length; i++) {
-        frag.appendChild(_buildItemEl(items[i], today));
+      if (listEl) {
+        var frag = document.createDocumentFragment();
+        for (var i = 0; i < items.length; i++) {
+          frag.appendChild(_buildItemEl(items[i], today));
+        }
+        listEl.appendChild(frag);
       }
-      listEl.appendChild(frag);
     }
 
-    // Task 6 — Render de las notificaciones sin leer + select de ventana
-    if (notifCount > 0) {
+    if (activeTab === 'notifs' && notifCount > 0) {
       var notifsListEl = panel.querySelector('[data-kair-alerts-notifs-list]');
-      var notifFrag = document.createDocumentFragment();
-      for (var j = 0; j < notifs.length; j++) {
-        notifFrag.appendChild(_buildNotifItemEl(notifs[j]));
+      if (notifsListEl) {
+        var notifFrag = document.createDocumentFragment();
+        for (var j = 0; j < notifs.length; j++) {
+          notifFrag.appendChild(_buildNotifItemEl(notifs[j]));
+        }
+        notifsListEl.appendChild(notifFrag);
       }
-      notifsListEl.appendChild(notifFrag);
     }
+
+    // Misma altura en ambas pestañas: mide la vista activa y la otra,
+    // y fija min-height a la mayor (evita el salto al conmutar tabs).
+    _pinPopoverHeight(panel, {
+      bodyHtml: bodyHtml,
+      listHtml: listHtml,
+      notifSectionHtml: notifSectionHtml,
+      items: items,
+      notifs: notifs,
+      notifCount: notifCount,
+      today: today,
+      activeTab: activeTab
+    });
+
     var ventSel = panel.querySelector('[data-kair-alerts-ventana]');
     if (ventSel) {
       ventSel.value = String(_getNotifVentana());
@@ -608,6 +660,13 @@
         var action = actEl.getAttribute('data-kair-alerts-action');
         if (action === 'close') {
           _closePopover();
+        } else if (action === 'tab') {
+          var tab = actEl.getAttribute('data-tab') === 'notifs' ? 'notifs' : 'pendientes';
+          if (tab !== _state.activeTab) {
+            _state.activeTab = tab;
+            try { localStorage.setItem(NOTIF_TAB_KEY, tab); } catch (err) { }
+            _renderPopover();
+          }
         } else if (action === 'open-calendar') {
           _closePopover();
           var calBtn = document.getElementById('calendar-button');
@@ -742,6 +801,58 @@
     }
   }
 
+  function _fillPendientesList(root, items, today) {
+    var listEl = root.querySelector('[data-kair-alerts-list]');
+    if (!listEl) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < items.length; i++) {
+      frag.appendChild(_buildItemEl(items[i], today));
+    }
+    listEl.appendChild(frag);
+  }
+
+  function _fillNotifsList(root, notifs) {
+    var listEl = root.querySelector('[data-kair-alerts-notifs-list]');
+    if (!listEl) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < notifs.length; i++) {
+      frag.appendChild(_buildNotifItemEl(notifs[i]));
+    }
+    listEl.appendChild(frag);
+  }
+
+  // Mide la vista activa y la otra pestaña, y fija min-height a la MAYOR.
+  // Así Pendientes y Notificaciones miden lo mismo al conmutar (sin salto).
+  function _pinPopoverHeight(panel, opts) {
+    var pop = panel.querySelector('.kair-alerts-popover');
+    var body = panel.querySelector('[data-kair-alerts-body]');
+    if (!pop || !body) return;
+
+    pop.style.minHeight = '';
+    var hActive = pop.offsetHeight;
+    var activeHtml = body.innerHTML;
+
+    var otherHtml = (opts.activeTab === 'notifs') ? opts.listHtml : opts.notifSectionHtml;
+    body.innerHTML = otherHtml;
+    if (opts.activeTab === 'notifs') {
+      if (opts.items.length > 0) _fillPendientesList(body, opts.items, opts.today);
+    } else if (opts.notifCount > 0) {
+      _fillNotifsList(body, opts.notifs);
+    }
+    var hOther = pop.offsetHeight;
+
+    body.innerHTML = activeHtml;
+    if (opts.activeTab === 'pendientes' && opts.items.length > 0) {
+      _fillPendientesList(body, opts.items, opts.today);
+    } else if (opts.activeTab === 'notifs' && opts.notifCount > 0) {
+      _fillNotifsList(body, opts.notifs);
+    }
+
+    var h = Math.max(hActive, hOther, _state.panelMinH || 0);
+    _state.panelMinH = h;
+    pop.style.minHeight = h + 'px';
+  }
+
   function _openEventDetail(eventId) {
     // Busca el evento en el cache local
     var ev = null;
@@ -777,6 +888,7 @@
     }
     _state.popoverEl = null;
     _state.isOpen = false;
+    _state.panelMinH = 0;
     // Limpia los listeners globales que se agregaron al abrir
     if (_state._onDocClickOutside) {
       document.removeEventListener('click', _state._onDocClickOutside, true);

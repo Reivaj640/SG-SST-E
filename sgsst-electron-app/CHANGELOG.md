@@ -5,11 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.212] - 2026-09-23
+
+### 📦809 · Notificaciones — fix duplicación de correos (global `*`) + tabs Pendientes/Notificaciones
+
+#### Fix: una sola fila por correo (sin fan-out por empresa)
+
+- El buzón Gmail es global (sin columna de empresa en `email_threads`); antes cada correo se insertaba **una vez por empresa** con bandeja habilitada (47 × 5 = 235 no leídos). Ahora se inserta **una sola fila** con `company_key = '*'` (`GLOBAL_COMPANY` en `notifications-bridge.js`).
+- **Detector** `notifications-email.js`: sin fan-out; al menos 1 empresa con bandeja habilitada → 1 entrada por thread; `dedupe_key = correo:*:<ref>:0`.
+- **Bridge**: `listar` / `getUnreadCount` incluyen `OR company_key = '*'` siempre; `marcarLeida` acepta globales; `marcarTodas` añade `'*'` al target de sesión; helper `_esGlobal()`.
+- **Migración one-shot** en `_ensureSchema`: consolida filas existentes (DELETE duplicados por `ref_id` → UPDATE `company_key` a `'*'` → UPDATE `dedupe_key`).
+- **UI**: `_openNotif` abre correo si `companyKey` es `'*'`/vacío; chip de empresa oculto para `'*'`; `refreshNotifications` pasa `companyKey` de la empresa activa si la hay.
+
+#### UI: tabs "Pendientes" / "Notificaciones"
+
+- `shared/kair-alerts.js`: `_state.activeTab` + persistencia en `localStorage['kair-alerts-tab']` (default `pendientes`); `_renderPopover` con tabbar en el head (contadores) y cuerpo según tab; footer "Abrir calendario completo" en **ambas** pestañas; `_pinPopoverHeight`/`_state.panelMinH` fija `min-height` a la mayor vista (sin salto al conmutar).
+- `styles.css`: `.kair-alerts-popover__tabs` / `__tab` / `.is-active` / `__tab-n`.
+- `index.html`: cache-bust → `?v=20260923-notifs-size` (styles, kair-alerts).
+- **Tamaño estable entre pestañas**: footer en ambas, notifs-list sin `max-height: 200px`, `_pinPopoverHeight` fija `min-height` a la mayor vista (sin salto al conmutar).
+
+#### Tests — 167/167 OK
+
+- Suite: bridge **28/28**, service **10/10**, email **7/7**, wiring **11/11**, fuentes **52/52**, ui **36/36**, seguridad **23/23** (total 167; era 155).
+- `node --check` OK en `kair-alerts.js`, `notifications-bridge.js`, `notifications-email.js` y los tests tocados.
+
 ## [0.1.212] - 2026-09-22
 
-### 📦805 · Notificaciones persistentes (correo + eventos) — bridge, servicio, detección y UI
+### 📦807 · Notificaciones persistentes (correo + eventos) — bridge, servicio, detección y UI
 
-Feature nueva de notificaciones persistentes en el proceso main (correo + eventos de calendario) con UI completa (badge, toast, panel y ventana dedicada). Sin commit hasta autorización; el commit es 📦805.
+Feature nueva de notificaciones persistentes en el proceso main (correo + eventos de calendario) con UI completa (badge, toast, panel y ventana dedicada). Commiteado en 📦807 (corrección de conteo de fuentes en 📦808).
 
 #### Backend (proceso main)
 
@@ -31,7 +55,7 @@ Feature nueva de notificaciones persistentes en el proceso main (correo + evento
 #### Tests
 
 - `main/test-notificaciones-seguridad.js` (nuevo) → **23/23 OK**: 4 canales sin token → `UNAUTHORIZED`, companyKey ajena → `FORBIDDEN_COMPANY`, `marcarLeida` de otra empresa → `updated: 0`, `getUnreadCount` solo número, gate `bandeja_integrada_enabled=0` → 0 correos, y sin `access_token` en notifications-*.
-- Suite completa: bridge **25/25**, service **10/10**, email **6/6**, wiring **9/9**, fuentes **52/52**, ui **25/25**. `node --check` OK en `main.js`, `preload.js` y `notifications-*.js`.
+- Suite completa: bridge **28/28**, service **10/10**, email **6/6**, wiring **11/11**, fuentes **52/52**, ui **25/25**, seguridad **23/23** (total 155/155). `node --check` OK en `main.js`, `preload.js` y `notifications-*.js`.
 
 ## [0.1.211] - 2026-09-21
 

@@ -6568,6 +6568,58 @@ box-shadow: var(--box-shadow) !important;
   color: var(--ka-primary);
 }
 
+/* Tabs Pendientes / Notificaciones (lado a lado, conmutan la vista) */
+.kair-alerts-popover__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kair-alerts-popover__tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ka-muted);
+  font-family: var(--ka-font);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: var(--ka-radius-control, 12px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.kair-alerts-popover__tab:hover {
+  background: var(--ka-line);
+  color: var(--ka-ink);
+}
+
+.kair-alerts-popover__tab.is-active {
+  background: var(--ka-primary-soft, rgba(32, 87, 184, 0.12));
+  border-color: color-mix(in srgb, var(--ka-primary) 28%, transparent);
+  color: var(--ka-primary);
+}
+
+.kair-alerts-popover__tab-n {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--ka-line);
+  color: var(--ka-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.kair-alerts-popover__tab.is-active .kair-alerts-popover__tab-n {
+  background: var(--ka-primary);
+  color: var(--ka-card);
+}
+
 [data-theme="dark"] .kair-alerts-popover__title-wrap,
 [data-theme="dark-legacy"] .kair-alerts-popover__title-wrap {
   color: var(--ka-primary);
@@ -6864,9 +6916,9 @@ box-shadow: var(--box-shadow) !important;
   cursor: pointer;
 }
 
+/* Sin max-height fijo: la lista crece como la de Pendientes y el scroll
+   lo maneja .kair-alerts-popover__body (así ambas pestañas miden igual). */
 .kair-alerts-popover .kair-alerts-notifs-list {
-  max-height: 200px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
