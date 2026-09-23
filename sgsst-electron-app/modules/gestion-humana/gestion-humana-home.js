@@ -1,27 +1,50 @@
 // modules/gestion-humana/gestion-humana-home.js
-// 📦713 · Módulo "Gestión Humana" — Shell con HTML+CSS+JS separados (v0.2.0)
+// 📦811 · Módulo "Gestión Humana" — Shell + Home MIGRACIÓN PREMIUM (v0.3.0).
 //
-// Layout: sidebar 9 items (Resumen/Dashboard/Contratación/Firma electrónica/
-//          Afiliaciones/Base de Personal/Vacaciones/Permisos/Comunicación)
-//          + header con NIT/Bell + footer. CSS del shell en
-//          `gestion-humana-home.css` (link en index.html).
-// HTML del shell en `gestion-humana-home.html` (cargado via fetch en runtime).
-//
-// 8 vistas (placeholders "Próximamente" para las que faltan; las reales para
-// Base Personal y Contratación).
+// Shell: header premium (badge SVG + título + subtítulo con empresa) + tabs
+//        horizontales con iconos SVG inline (adiós Font Awesome en el shell)
+//        + contenido. CSS en `gestion-humana-home.css`; HTML en
+//        `gestion-humana-home.html` (fetch con fallback inline, DEBEN coincidir).
+// Home (Resumen): hero + 3 métricas + grid de las 9 áreas (navegación interna).
+// Las vistas de trabajo (Base de Personal, Contratación, etc.) se montan como
+// siempre con _mountExistingView — sin cambios de IPC ni de contratos.
 
+// 📦811 · Iconos del shell = SVG inline (estilo Lucide, stroke currentColor).
+// El shell YA NO usa Font Awesome (las vistas sí, hasta su propia migración).
 var GESTION_HUMANA_NAV = [
-  { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'fa-grip',             group: 'Principal' },
-  { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'fa-chart-line',       group: 'Gestión' },
-  { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'fa-user-plus',       group: 'Gestión' },
-  { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'fa-folder',          group: 'Documentos' },
-  { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
-  { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
-  { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
-  { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'fa-umbrella-beach',   group: 'Gestión' },
-  { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'fa-file-medical',     group: 'Gestión' },
-  { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'fa-bullhorn',        group: 'Colaboración' }
+  { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'grid',       group: 'Principal' },
+  { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'chart',      group: 'Gestión' },
+  { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'userplus',  group: 'Gestión' },
+  { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'folder',    group: 'Documentos' },
+  { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'filepen', group: 'Documentos' },
+  { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'shield',    group: 'Gestión' },
+  { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'users',      group: 'Gestión' },
+  { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'umbrella',   group: 'Gestión' },
+  { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'filemed',    group: 'Gestión' },
+  { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'megaphone', group: 'Colaboración' }
 ];
+
+// Diccionario de SVG (24×24, stroke-based)
+var GH_SVG = {
+  grid:      '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  chart:     '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 14l4-4 4 3 5-6"/><circle cx="20" cy="7" r="0.6"/>',
+  userplus:  '<circle cx="10" cy="7" r="3.5"/><path d="M3.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"/><path d="M18.5 8v5M16 10.5h5"/>',
+  folder:    '<path d="M3.5 6.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  filepen:   '<path d="M6 3.5h7L19 9v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M13 3.5V9h6"/><path d="M9.3 16.8 14.8 11l1.7 1.7-5.5 5.8-2.4.6z"/>',
+  shield:    '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/>',
+  users:     '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-3.3 2.7-5 5.5-5s5.5 1.7 5.5 5"/><circle cx="17" cy="9.5" r="2.6"/><path d="M15.8 14.7c2.6.3 4.7 1.9 4.7 4.3"/>',
+  umbrella:  '<path d="M12 3C7 3 3.5 7 3.5 11.5h17C20.5 7 17 3 12 3z"/><path d="M12 11.5V18a2 2 0 0 0 4 0"/><path d="M12 3V1.8"/>',
+  filemed:   '<path d="M6 3.5h7L19 9v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M13 3.5V9h6"/><path d="M12 12v5M9.5 14.5h5"/>',
+  megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V7L7 9H5a1 1 0 0 0-1 1z"/><path d="M16.2 9.8a3.5 3.5 0 0 1 0 4.4"/><path d="M18.8 7.5a7 7 0 0 1 0 9"/>',
+  bell:      '<path d="M6 9.5a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/>',
+  chevron:   '<path d="M9 6l6 6-6 6"/>',
+  pulse:     '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
+  checkflag: '<path d="M5 21V4"/><path d="M5 4.7C7.5 3 10 3 12 4.7s4.5 1.7 7 0V13c-2.5 1.7-5 1.7-7 0S7.5 11.7 5 13"/>'
+};
+
+function ghSvg(name, cls) {
+  return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (GH_SVG[name] || '') + '</svg>';
+}
 
 var GESTION_HUMANA_TITLES = {
   home:         { title: 'Resumen',          subtitle: 'Vista general del módulo de Gestión Humana' },
@@ -87,14 +110,12 @@ class GestionHumanaHome {
     }
   }
 
-  _nitFromCompany(name) {
-    var map = {
-      'Tempoactiva': '900.511.178-1',
-      'Temposum':    '800.123.456-7',
-      'Aseplus':     '900.222.333-4',
-      'Asel':        '901.555.666-7'
-    };
-    return map[name] || '900.511.178-1';
+  // 📦811 · Header: subtítulo dinámico con la empresa (antes venía quemado "TEMPOACTIVA EST S.A.S.")
+  _updateSubtitle() {
+    var el = this.container.querySelector('#gh-subtitle');
+    if (!el) return;
+    var empresa = this.companyName && this.companyName !== 'default_company' ? this.companyName : null;
+    el.textContent = 'Sistema de Gestión de Personal' + (empresa ? ' — ' + empresa : '');
   }
 
   // === DATA ===
@@ -173,8 +194,8 @@ class GestionHumanaHome {
       window.addEventListener('gh-shell-navigate', this._navHandler);
     }
 
-    // Set NIT badge (si existiera)
-    // (Removido por pedido del user — ya no se muestra el badge de empresa ni el NIT en el header)
+    // 📦811 · Subtítulo con la empresa activa
+    this._updateSubtitle();
 
     // Render view in content
     this._renderViewInto(this.contentEl);
@@ -194,18 +215,21 @@ class GestionHumanaHome {
     return '<div class="gh-shell" id="gh-shell">' +
       '<header class="gh-header">' +
         '<div class="gh-header__left">' +
-          '<h1 class="gh-header__title">' +
-            '<i class="fas fa-people-group gh-header__icon"></i> Gestión Humana' +
-          '</h1>' +
-          '<p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>' +
+          '<div class="gh-header__id">' +
+            '<span class="gh-header__badge" aria-hidden="true">' + ghSvg('users') + '</span>' +
+            '<div class="gh-header__text">' +
+              '<h1 class="gh-header__title">Gestión Humana</h1>' +
+              '<p class="gh-header__subtitle" id="gh-subtitle">Sistema de Gestión de Personal</p>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="gh-header__right">' +
-          '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">' +
-            '<i class="fas fa-bell"></i><span class="gh-bell-badge" id="gh-bell-badge"></span>' +
+          '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones" aria-label="Notificaciones">' +
+            ghSvg('bell') + '<span class="gh-bell-badge" id="gh-bell-badge"></span>' +
           '</button>' +
         '</div>' +
       '</header>' +
-      '<nav class="gh-tabs" id="gh-tabs" role="tablist"></nav>' +
+      '<nav class="gh-tabs" id="gh-tabs" role="tablist" aria-label="Secciones de Gestión Humana"></nav>' +
       '<main class="gh-content" id="gh-content"></main>' +
     '</div>';
   }
@@ -227,9 +251,9 @@ class GestionHumanaHome {
       btn.setAttribute('aria-selected', item.id === self.currentView ? 'true' : 'false');
       btn.setAttribute('title', item.label);
       if (expanded) {
-        // Maximizado: icono + label completo
+        // Maximizado: icono SVG + label completo
         btn.innerHTML =
-          '<i class="fas ' + item.icon + ' gh-tab__icon"></i>' +
+          '<span class="gh-tab__icon">' + ghSvg(item.icon) + '</span>' +
           '<span>' + item.label + '</span>';
       } else {
         // Modo ventana: solo shortLabel (abreviado) sin iconos
@@ -295,9 +319,6 @@ class GestionHumanaHome {
       case 'comunicacion':
         this._mountExistingView(content, 'ComunicacionComponent', 'Comunicación');
         break;
-      // 🔄 I-AUDIT-2026-09-11 (v0.1.198) · Vista de Carpetas (punto de partida).
-      // Aun NO tiene modulo real. Muestra los pasos para arrancar el modelo
-      // de datos (tabla, campos, CRUD basico) para que el user sepa que sigue.
       case 'carpetas':
         this._mountExistingView(content, 'CarpetasComponent', 'Carpetas');
         break;
@@ -341,234 +362,172 @@ class GestionHumanaHome {
   }
 
   // === VIEWS ===
+  // 📦811 · Home premium: hero (headline + big stat) + 3 métricas + grid de áreas.
+  // Los datos siguen saliendo de _loadKpis() (mismo backend gh:*, sin tocar IPC).
   _renderHomeView(content) {
     var self = this;
     content.innerHTML = '';
 
-    // KPIs bar
-    content.appendChild(this._renderKpisBar());
+    var scrollWrap = document.createElement('div');
+    scrollWrap.className = 'gh-home-scroll';
 
-    // Section title
-    var sec = document.createElement('div');
-    sec.style.cssText = 'margin-top:1.5rem;';
-    sec.innerHTML =
-      '<h2 style="margin:0 0 0.875rem; font-size:0.75rem; text-transform:uppercase; color: var(--text-light-color); letter-spacing:0.5px; font-weight:600;">' +
-        '<i class="fas fa-th-large"></i> Sub-módulos' +
-      '</h2>';
-    content.appendChild(sec);
+    // ── HERO ──
+    var empresa = this.companyName && this.companyName !== 'default_company' ? this.companyName : 'tu empresa';
+    var hero = document.createElement('section');
+    hero.className = 'gh-hero';
+    hero.innerHTML =
+      '<div class="gh-hero__main">' +
+        '<span class="gh-hero__eyebrow">Resumen del módulo</span>' +
+        '<h2 class="gh-hero__title">Talento humano bajo control</h2>' +
+        '<p class="gh-hero__sub">Personal, contratación, ausencias y documentos del equipo en un solo lugar' +
+          (this.companyName && this.companyName !== 'default_company' ? ' — ' + String(empresa).replace(/[<>&]/g, '') : '') + '.</p>' +
+      '</div>' +
+      '<div class="gh-hero__stat">' +
+        '<span class="gh-hero__value">' + this._fmt(this.kpis.personalActivos) + '</span>' +
+        '<span class="gh-hero__label">trabajadores activos</span>' +
+        '<span class="gh-hero__foot">de ' + this._fmt(this.kpis.personalTotal) + ' registrados</span>' +
+      '</div>';
+    scrollWrap.appendChild(hero);
 
-    // Grid de cards
+    // ── MÉTRICAS ──
+    var metrics = document.createElement('div');
+    metrics.className = 'gh-metrics';
+    metrics.appendChild(this._renderMetric({
+      tone: '', icon: 'pulse',
+      label: 'Contrataciones en proceso',
+      value: this.kpis.contratacionesEnProceso,
+      sub: 'de ' + this._fmt(this.kpis.contratacionesTotal) + ' convocatorias'
+    }));
+    metrics.appendChild(this._renderMetric({
+      tone: 'gh-metric--ok', icon: 'checkflag',
+      label: 'Onboarding completados',
+      value: this.kpis.completados,
+      sub: 'procesos finalizados'
+    }));
+    metrics.appendChild(this._renderMetric({
+      tone: 'gh-metric--neutral', icon: 'users',
+      label: 'Procesos cancelados',
+      value: this.kpis.cancelados,
+      sub: 'convocatorias descartadas'
+    }));
+    // nota de tono warn para "en proceso" si hay alguno
+    if ((this.kpis.contratacionesEnProceso || 0) > 0) {
+      metrics.firstChild.classList.add('gh-metric--warn');
+    }
+    scrollWrap.appendChild(metrics);
+
+    // ── GRID DE ÁREAS ──
+    var head = document.createElement('div');
+    head.className = 'gh-modwrap__head';
+    head.innerHTML = '<h3>Áreas del módulo</h3><span class="gh-modwrap__count">9 vistas</span>';
+    scrollWrap.appendChild(head);
+
     var grid = document.createElement('div');
-    grid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1rem;';
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-chart-line', iconColor: '#7c3aed', iconBg: '#f3e8ff',
-      title: 'Dashboard', subtitle: 'Vista general',
-      description: 'KPIs del módulo, distribuciones (sede, género, cargo, nivel educativo) y acceso rápido a las funciones más usadas.',
-      buttonText: 'Abrir Dashboard', buttonColor: '#7c3aed',
-      view: 'dashboard', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-users', iconColor: '#174ea6', iconBg: '#e8f0fe',
-      title: 'Base de Personal', subtitle: 'Trabajadores',
-      description: 'Listado de trabajadores activos e inactivos con búsqueda, filtros y CRUD completo. Datos de contacto, contrato, seguridad social y datos bancarios.',
-      kpis: [
-        { label: 'Activos', value: this.kpis.personalActivos, color: '#28a745' },
-        { label: 'Total',   value: this.kpis.personalTotal,   color: '#174ea6' }
-      ],
-      buttonText: 'Abrir Base de Personal', buttonColor: '#174ea6',
-      view: 'personal', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-user-plus', iconColor: '#0d9488', iconBg: '#ccfbf1',
-      title: 'Contratación', subtitle: 'Pipeline de onboarding',
-      description: 'Pipeline de 6 pasos para nuevos aspirantes: memo, contacto, exámenes, firma de documentos, afiliaciones y activación S400.',
-      kpis: [
-        { label: 'En Proceso',  value: this.kpis.contratacionesEnProceso, color: '#ffc107' },
-        { label: 'Completados', value: this.kpis.completados,             color: '#28a745' },
-        { label: 'Total',       value: this.kpis.contratacionesTotal,     color: '#174ea6' }
-      ],
-      buttonText: 'Abrir Contratación', buttonColor: '#0d9488',
-      view: 'contratacion', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-umbrella-beach', iconColor: '#ea580c', iconBg: '#ffedd5',
-      title: 'Vacaciones', subtitle: 'Programación y aprobaciones',
-      description: 'Solicitudes de vacaciones, aprobaciones, programación y notificación a clientes. Flujo mensual con tipos solicitada, aprobada, rechazada y disfrutada.',
-      buttonText: 'Abrir Vacaciones', buttonColor: '#ea580c',
-      view: 'vacaciones', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-file-medical', iconColor: '#be123c', iconBg: '#ffe4e6',
-      title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto',
-      description: 'Registro y seguimiento de permisos (incapacidad, maternidad, paternidad, luto, citas médicas, calamidad). Finalización automática y prórroga.',
-      buttonText: 'Abrir Permisos', buttonColor: '#be123c',
-      view: 'permisos', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-shield-halved', iconColor: '#0891b2', iconBg: '#cffafe',
-      title: 'Afiliaciones', subtitle: 'Seguridad social',
-      description: 'Estado 4/4 de cada trabajador: EPS, Fondo de Pensión, ARL y Caja de Compensación. Búsqueda por nombre o cédula.',
-      buttonText: 'Abrir Afiliaciones', buttonColor: '#0891b2',
-      view: 'afiliaciones', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-file-signature', iconColor: '#f59e0b', iconBg: '#fef3c7',
-      title: 'Firma electrónica', subtitle: 'Centro de control por trabajador',
-      description: 'Vista unificada del proceso de firma por trabajador. Tabla con estado agregado (pendiente, en proceso, completado), buscador por ID de solicitud y drill-down a expediente.',
-      buttonText: 'Abrir Firma electrónica', buttonColor: '#f59e0b',
-      view: 'firma-electronica', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
-      icon: 'fa-bullhorn', iconColor: '#a16207', iconBg: '#fef3c7',
-      title: 'Comunicación', subtitle: 'Anuncios y mensajes',
-      description: 'Tablón de anuncios oficiales (info, urgente, mantenimiento, evento) y mensajes directos entre trabajadores.',
-      buttonText: 'Abrir Comunicación', buttonColor: '#a16207',
-      view: 'comunicacion', ready: true
-    }));
-    sec.appendChild(grid);
-  }
+    grid.className = 'gh-modules';
 
-  _renderKpisBar() {
-    // 📦720 · Usa el helper compartido GHKPIBar (patrón Programa de Capacitación)
-    var self = this;
-    var bar = document.createElement('div');
-    var kpis = [
-      { icon: 'fa-user-check',         color: '#28a745', bg: '#d4edda', value: this._fmt(this.kpis.personalActivos),         label: 'Personal Activo' },
-      { icon: 'fa-user-clock',         color: '#0d9488', bg: '#ccfbf1', value: this._fmt(this.kpis.contratacionesEnProceso), label: 'Contrataciones en Proceso' },
-      { icon: 'fa-user-check-double',  color: '#174ea6', bg: '#e8f0fe', value: this._fmt(this.kpis.completados),             label: 'Completados' },
-      { icon: 'fa-user-xmark',         color: '#6c757d', bg: '#e9ecef', value: this._fmt(this.kpis.cancelados),              label: 'Cancelados' }
+    var CARDS = [
+      { view: 'dashboard', icon: 'chart', accent: '#7c3aed', tint: 'rgba(124,58,237,.12)',
+        title: 'Dashboard', sub: 'Vista general',
+        desc: 'KPIs del módulo, distribuciones por sede, género, cargo y nivel educativo, y acceso rápido a lo más usado.' },
+      { view: 'personal', icon: 'users', accent: '#2057b8', tint: 'rgba(32,87,184,.12)',
+        title: 'Base de Personal', sub: 'Trabajadores',
+        desc: 'Listado de trabajadores activos e inactivos con búsqueda, filtros y gestión completa: contacto, contrato, seguridad social y datos bancarios.',
+        chips: [
+          { label: 'Activos', value: this.kpis.personalActivos },
+          { label: 'Total', value: this.kpis.personalTotal }
+        ] },
+      { view: 'contratacion', icon: 'userplus', accent: '#0d9488', tint: 'rgba(13,148,136,.12)',
+        title: 'Contratación', sub: 'Pipeline de onboarding',
+        desc: 'Pipeline de 6 pasos para nuevos aspirantes: memo, contacto, exámenes, firma de documentos, afiliaciones y activación.',
+        chips: [
+          { label: 'En proceso', value: this.kpis.contratacionesEnProceso },
+          { label: 'Completados', value: this.kpis.completados }
+        ] },
+      { view: 'carpetas', icon: 'folder', accent: '#16a34a', tint: 'rgba(22,163,74,.12)',
+        title: 'Carpetas', sub: 'Archivo digital',
+        desc: 'Expediente digital por trabajador con categorías de documentos, estados de completitud y subida directa de archivos.' },
+      { view: 'firma-electronica', icon: 'filepen', accent: '#d97706', tint: 'rgba(217,119,6,.12)',
+        title: 'Firma electrónica', sub: 'Centro de control',
+        desc: 'Vista unificada del proceso de firma por trabajador: estados agregados, buscador por solicitud y expediente con trazabilidad.' },
+      { view: 'afiliaciones', icon: 'shield', accent: '#0891b2', tint: 'rgba(8,145,178,.12)',
+        title: 'Afiliaciones', sub: 'Seguridad social',
+        desc: 'Estado 4/4 de cada trabajador: EPS, Fondo de Pensión, ARL y Caja de Compensación, con búsqueda por nombre o cédula.' },
+      { view: 'vacaciones', icon: 'umbrella', accent: '#ea580c', tint: 'rgba(234,88,12,.12)',
+        title: 'Vacaciones', sub: 'Programación y aprobaciones',
+        desc: 'Solicitudes, aprobaciones y programación con flujo mensual: solicitada, aprobada, rechazada y disfrutada.' },
+      { view: 'permisos', icon: 'filemed', accent: '#be123c', tint: 'rgba(190,18,60,.10)',
+        title: 'Permisos y Estados', sub: 'Incapacidades, maternidad, luto',
+        desc: 'Registro y seguimiento de permisos (incapacidad, maternidad, paternidad, luto, citas médicas, calamidad) con finalización y prórroga.' },
+      { view: 'comunicacion', icon: 'megaphone', accent: '#a16207', tint: 'rgba(161,98,7,.12)',
+        title: 'Comunicación', sub: 'Anuncios y mensajes',
+        desc: 'Tablón de anuncios oficiales (info, urgente, mantenimiento, evento) y mensajes directos entre trabajadores.' }
     ];
-    window.GHKPIBar.render(bar, kpis);
-    return bar;
+    CARDS.forEach(function (c) { grid.appendChild(self._renderModCard(c)); });
+    scrollWrap.appendChild(grid);
+
+    content.appendChild(scrollWrap);
   }
 
-  _renderNavCard(opts) {
+  _renderMetric(m) {
+    var el = document.createElement('div');
+    el.className = 'gh-metric' + (m.tone ? ' ' + m.tone : '');
+    el.innerHTML =
+      '<div class="gh-metric__top">' +
+        '<span class="gh-metric__icon">' + ghSvg(m.icon) + '</span>' +
+        '<span class="gh-metric__label">' + m.label + '</span>' +
+      '</div>' +
+      '<div class="gh-metric__value">' + this._fmt(m.value) + '</div>' +
+      '<div class="gh-metric__sub">' + m.sub + '</div>';
+    return el;
+  }
+
+  _renderModCard(o) {
     var self = this;
-    var card = document.createElement('div');
-    card.style.cssText = 'background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:0; overflow:hidden; transition:box-shadow 0.2s, transform 0.2s; display:flex; flex-direction:column;';
-    card.onmouseenter = function () { card.style.boxShadow = 'var(--box-shadow)'; card.style.transform = 'translateY(-2px)'; };
-    card.onmouseleave = function () { card.style.boxShadow = ''; card.style.transform = ''; };
+    var card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'gh-mod';
+    card.style.setProperty('--gh-mod-accent', o.accent);
+    card.style.setProperty('--gh-mod-tint', o.tint);
 
-    var banner = document.createElement('div');
-    banner.style.cssText = 'background:' + opts.iconBg + '; padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;';
-    var pill = opts.ready
-      ? '<span style="background: rgba(92,184,92,0.16); color: var(--success-color); padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">✓ Backend OK</span>'
-      : '<span style="background: rgba(240,173,78,0.16); color: var(--warning-color); padding:0.2rem 0.5rem; border-radius:1rem; font-size:0.65rem; font-weight:600;">⏳ Próximamente</span>';
-    banner.innerHTML =
-      '<div style="width:40px; height:40px; border-radius:0.5rem; background: var(--widget-bg-color); display:flex; align-items:center; justify-content:center; box-shadow: var(--box-shadow);">' +
-        '<i class="fas ' + opts.icon + '" style="color:' + opts.iconColor + '; font-size:1.125rem;"></i>' +
-      '</div>' +
-      '<div style="flex:1; min-width:0;">' +
-        '<h3 style="margin:0; font-size:1rem; color: var(--text-color);">' + opts.title + '</h3>' +
-        '<div style="font-size:0.7rem; color: var(--text-light-color); text-transform:uppercase; letter-spacing:0.3px;">' + opts.subtitle + '</div>' +
-      '</div>' +
-      pill;
-    card.appendChild(banner);
-
-    var body = document.createElement('div');
-    body.style.cssText = 'padding:1rem 1.25rem; flex:1; display:flex; flex-direction:column; gap:0.875rem;';
-
-    var desc = document.createElement('p');
-    desc.style.cssText = 'margin:0; color: var(--text-light-color); font-size:0.8125rem; line-height:1.5;';
-    desc.textContent = opts.description;
-    body.appendChild(desc);
-
-    if (opts.kpis && opts.kpis.length > 0) {
-      var kpiRow = document.createElement('div');
-      kpiRow.style.cssText = 'display:flex; gap:0.5rem; padding:0.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);';
-      opts.kpis.forEach(function (k) {
-        kpiRow.innerHTML +=
-          '<div style="flex:1; text-align:center;">' +
-            '<div style="font-size:1rem; font-weight:700; color:' + k.color + '; line-height:1;">' + self._fmt(k.value) + '</div>' +
-            '<div style="font-size:0.6rem; text-transform:uppercase; color: var(--text-light-color); letter-spacing:0.3px; margin-top:0.2rem;">' + k.label + '</div>' +
-          '</div>';
-      });
-      body.appendChild(kpiRow);
+    var chips = '';
+    if (o.chips && o.chips.length) {
+      chips = '<span class="gh-mod__chips">' + o.chips.map(function (c) {
+        return '<span class="gh-mod__chip">' + c.label + ' <strong>' + self._fmt(c.value) + '</strong></span>';
+      }).join('') + '</span>';
     }
 
-    var btn = document.createElement('button');
-    btn.style.cssText = 'background:' + (opts.ready ? opts.buttonColor : '#9ca3af') + '; color:white; border:none; padding:0.55rem 1rem; border-radius:0.4rem; cursor:' + (opts.ready ? 'pointer' : 'not-allowed') + '; font-size:0.8125rem; font-weight:500; display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:auto;';
-    btn.innerHTML = '<i class="fas ' + (opts.ready ? 'fa-arrow-right' : 'fa-hourglass-half') + '"></i> ' + opts.buttonText;
-    btn.disabled = !opts.ready;
-    btn.onclick = function () {
-      if (!opts.ready) return;
-      self.currentView = opts.view;
-      self.render();
-    };
-    body.appendChild(btn);
+    card.innerHTML =
+      '<span class="gh-mod__tile">' + ghSvg(o.icon) + '</span>' +
+      '<span class="gh-mod__body">' +
+        '<span class="gh-mod__title">' + o.title + '</span>' +
+        '<span class="gh-mod__sub">' + o.sub + '</span>' +
+        '<span class="gh-mod__desc">' + o.desc + '</span>' +
+        chips +
+      '</span>' +
+      '<span class="gh-mod__go">' + ghSvg('chevron') + '</span>';
 
-    card.appendChild(body);
+    card.addEventListener('click', function () {
+      if (o.view !== self.currentView) {
+        self.currentView = o.view;
+        self.render();
+      }
+    });
     return card;
   }
 
-  // 🔄 I-AUDIT-2026-09-11 (v0.1.198) · Vista placeholder de Carpetas.
-  // Muestra los pasos para arrancar el modelo de datos. Es un punto de
-  // partida para que el user vea donde va y sepa que sigue.
-  _renderCarpetasView(content) {
-    var self = this;
-    content.innerHTML = '';
-    // Header con boton "Volver al inicio"
-    var header = document.createElement('div');
-    header.style.cssText = 'display:flex; align-items:center; gap:0.75rem; margin-bottom:1.25rem;';
-    header.innerHTML =
-      '<button id="gh-btn-volver-home" type="button" style="background: var(--widget-bg-color); border: 1px solid var(--border-color); color: var(--text-light-color); border-radius:0.375rem; padding:0.4rem 0.75rem; font-size:0.8125rem; cursor:pointer;">' +
-        '<i class="fas fa-arrow-left"></i> Volver' +
-      '</button>' +
-      '<div style="flex:1;">' +
-        '<h1 style="margin:0; font-size:1.25rem; color: var(--text-color);">Carpetas</h1>' +
-        '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color: var(--text-light-color);">Archivo digital por trabajador</p>' +
-      '</div>' +
-      '<span style="background: rgba(240,173,78,0.16); color: var(--warning-color); padding:0.25rem 0.75rem; border-radius:1rem; font-size:0.7rem; font-weight:600;">⏳ Punto de partida</span>';
-    content.appendChild(header);
-    // Card central con explicacion
-    var card = document.createElement('div');
-    card.style.cssText = 'background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:1.5rem; max-width:800px; margin:0 auto;';
-    card.innerHTML =
-      '<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">' +
-        '<div style="width:48px; height:48px; border-radius:0.5rem; background: rgba(77,166,255,0.15); display:flex; align-items:center; justify-content:center;">' +
-          '<i class="fas fa-folder-open" style="color:#1d4ed8; font-size:1.25rem;"></i>' +
-        '</div>' +
-        '<div>' +
-          '<h2 style="margin:0; font-size:1.05rem; color: var(--text-color);">Esta vista se implementará pronto</h2>' +
-          '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color: var(--text-light-color);">Las carpetas son un concepto NUEVO de Gestión Humana (distinto al "expediente" del modal de firma electrónica).</p>' +
-        '</div>' +
-      '</div>' +
-      '<div style="margin-top:1rem; padding:1rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius:0.375rem;">' +
-        '<h3 style="margin:0 0 0.625rem; font-size:0.875rem; color: var(--text-color);">Próximos pasos para implementar:</h3>' +
-        '<ol style="margin:0; padding-left:1.25rem; color: var(--text-light-color); font-size:0.8125rem; line-height:1.7;">' +
-          '<li>Definir el modelo de datos: campos mínimos (id, id_trabajador, nombre, descripcion, estado, created_at, updated_at).</li>' +
-          '<li>Crear migración SQL en <code>gestion-humana-schema-sql.js</code> (tabla <code>gh_carpetas</code>).</li>' +
-          '<li>Implementar CRUD básico en un bridge nuevo (<code>main/carpetas-bridge.js</code>).</li>' +
-          '<li>Construir UI: lista + crear + editar + ver detalle (drill-down).</li>' +
-          '<li>Integrar con base_personal (FK a la tabla de trabajadores).</li>' +
-        '</ol>' +
-      '</div>' +
-      '<div style="margin-top:1rem; padding:0.875rem 1rem; background: rgba(77,166,255,0.15); border-radius:0.375rem; color:#1e3a8a; font-size:0.8125rem;">' +
-        '<i class="fas fa-info-circle" style="margin-right:0.375rem;"></i>' +
-        '<strong>Tip:</strong> Mientras tanto, podés usar "Base de Personal" como punto de entrada por trabajador para ver los datos individuales, y "Firma electrónica" para ver el expediente del proceso de firma.' +
-      '</div>';
-    content.appendChild(card);
-    // Wire el boton "Volver"
-    setTimeout(function () {
-      var btn = content.querySelector('#gh-btn-volver-home');
-      if (btn) btn.onclick = function () { self.currentView = 'home'; self.render(); };
-    }, 0);
-  }
-
+  // 📦811 · Placeholder premium (solo se muestra si llega una vista desconocida)
   _renderPlaceholder(content, viewId) {
     var t = GESTION_HUMANA_TITLES[viewId] || { title: viewId, subtitle: '' };
     var item = GESTION_HUMANA_NAV.find(function (n) { return n.id === viewId; });
-    var icon = item ? item.icon : 'fa-cube';
+    var icon = item ? item.icon : 'grid';
     content.innerHTML =
-      '<div style="background: var(--widget-bg-color); border: 1px solid var(--border-color); border-radius:0.5rem; padding:3rem 2rem; text-align:center; max-width:600px; margin:2rem auto;">' +
-        '<div style="width:64px; height:64px; border-radius:0.75rem; background: rgba(240,173,78,0.16); display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;">' +
-          '<i class="fas ' + icon + '" style="font-size:1.5rem; color:#a16207;"></i>' +
-        '</div>' +
-        '<h2 style="margin:0 0 0.5rem; font-size:1.25rem; color: var(--text-color);">' + t.title + '</h2>' +
-        '<p style="margin:0 0 1.25rem; color: var(--text-light-color); font-size:0.875rem;">' + t.subtitle + '</p>' +
-        '<p style="margin:0; padding:0.875rem 1rem; background: rgba(240,173,78,0.16); border-radius:0.375rem; color: var(--warning-color); font-size:0.8125rem;">' +
-          '<i class="fas fa-clock"></i> Esta vista se implementará en una fase posterior del rediseño de Gestión Humana (v0.2.0).' +
-        '</p>' +
+      '<div class="gh-home-scroll">' +
+      '<div class="gh-placeholder">' +
+        '<div class="gh-placeholder__icon">' + ghSvg(icon) + '</div>' +
+        '<h2>' + t.title + '</h2>' +
+        '<p>' + t.subtitle + '</p>' +
+        '<p style="margin-top:10px;">Esta vista se implementará en una fase posterior del rediseño de Gestión Humana.</p>' +
+      '</div>' +
       '</div>';
   }
 

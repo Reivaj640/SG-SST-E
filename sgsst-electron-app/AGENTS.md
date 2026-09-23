@@ -808,6 +808,53 @@ async renderMainArea(container) {
   - **Comprobado sin relación con este paquete:** `test-gestion-humana-bridge-write.js` falla con
     2 checks (pasoActual) ya en HEAD limpio — preexistente (📦807-809, sesión concurrente), NO es
     de este trabajo. `test-chart-overflow.js` 18/20 también falla en HEAD limpio por lo mismo.
+- **📦811 — GESTIÓN HUMANA · SHELL + HOME premium (v0.3.0) + BUG LATENTE DE TOASTS.**
+  Primer paquete de la migración premium vista por vista (tras el saneamiento 📦810).
+  - **Diseño** (el aprobado por el usuario en Evaluación Inicial/EMO/2.9.1): header con badge de
+    ícono 44×44 (`--gh-accent-soft/--gh-accent`), título Manrope 800/20, subtítulo 12.5 muted
+    **con la empresa activa** (antes venía QUEMADO "TEMPOACTIVA EST S.A.S." — ahora lo llena
+    `_updateSubtitle()` tras inyectar el marcado); tabs con subrayado e **iconos SVG inline**
+    (diccionario `GH_SVG` + `ghSvg()`, 13 trazos estilo Lucide: grid, chart, userplus, folder,
+    filepen, shield, users, umbrella, filemed, megaphone, bell, chevron, pulse, checkflag) —
+    **Font Awesome queda FUERA del shell** (sigue en las vistas hijas hasta su propia migración);
+    home = hero (gradiente ink→accent + stat grande "trabajadores activos") + 3 métricas
+    (en proceso/completadas/canceladas) + grid de 9 tarjetas `.gh-mod` de área con tile teñido
+    por acento propio, chips de KPI cuando hay datos (Base de Personal, Contratación) y chevón
+    que se ilumina al pasar el mouse. **Todo el ancho disponible** (sin `max-width` + `margin:auto`):
+    padding lateral `clamp(16px,2vw,28px)` (📦769). Ancho de ventana < 1200 sigue colapsando las
+    tabs a `shortLabel` (📦716, se conservó).
+  - **Temas sin pelear con el DS:** las superficies usan los tokens de `styles.css`
+    (`--widget-bg-color`, `--bg-color`, `--border-color`, `--text-*`, `--box-shadow`) que YA tienen
+    los dos modos oscuros; los acentos de marca son `--gh-*` declarados en `.gh-shell` con su
+    bloque oscuro (`#2057b8` claro → `#6aa5ff` en dark). Así no se depende de que el DS tenga
+    variantes oscuras (no las tiene — ojo al heredar `--kair-card/#fff` de `kair-components.css`).
+  - **Clases históricas conservadas** (`gh-shell`, `gh-header`, `gh-tabs`, `gh-tab`, `gh-content`,
+    `gh-bell-*`) → el overlay de 📦810 y el resto del módulo no se rompen. El marcado del shell
+    vive en `gestion-humana-home.html` + fallback inline en `_fetchShellHtml()` y **los dos
+    coinciden** (⚠️ el `fetch()` falla en arneses sueltos porque resuelve relativo a la página;
+    en la app funciona relativo a `index.html` — el fallback es el respaldo).
+  - **Limpieza:** eliminados `_renderCarpetasView` (vista-placeholder vieja ya montada por
+    `CarpetasComponent`) y `_nitFromCompany` (sin uso desde que se quitó el badge NIT).
+  - 🐛 **BUG LATENTE ENCONTRADO POR EL ARNÉS (venía de fábrica):** en 5 vistas el helper de toasts
+    estaba declarado como MÉTODO `_toast() {}` pero se llamaba como PROPIEDAD `this._toast.error(...)`
+    → `TypeError: this._toast.error is not a function` en TODA ruta de error (explotaba el catch).
+    Otras 3 vistas ya lo tenían bien (`get _toast() {}`) y firma-electronica usa
+    `Object.defineProperty`. **Fix uniforme:** `_toast() {` → `get _toast() {` y el único llamado
+    `this._toast()` interno (en `_showToast`) → `this._toast`, en base-personal (22 sitios),
+    afiliaciones (2), permisos (8), dashboard (1), trabajador-detalle (1). `documentos/` se saltó
+    (dormida, 📦810). Moraleja: al homogeneizar APIs en un módulo viejo, verificar que declaración
+    y llamada sean del MISMO tipo (método vs getter) — `node --check` no lo atrapa, solo explota
+    en runtime cuando el camino de error se ejecuta.
+  - **Verificación real** (arnés `main/_preview-gh811.js`, borrado tras usar): monta el shell en
+    la app real con `Tempoactiva`, valida 28 checks (badge 44px + SVG, subtítulo con empresa, 10
+    tabs sin FA, hero/métricas/9 cards, click en card navega y marca el tab, sin desborde
+    horizontal a 1600 y a 1000 con shortLabel, fondos oscuros en `dark` y `dark-legacy`, 0 errores
+    de consola). **Nota de arnés:** `capturePage()` salía en BLANCO o mostraba el splash
+    (`#kair-splash` lo tapa todo) — en este entorno gana la medición, no el píxel; para captura
+    real, ventana visible + PowerShell GDI `CopyFromScreen`, y OJO: lanzar dos Electron a la vez
+    con el mismo archivo de salida bloquea el segundo.
+  - Cache-bust: `gestion-humana-home.css/js` → `GH-20260923-v2-premium-shell`; los 5 JS del fix de
+    toasts → `GH-20260923-v2-toast-getter`.
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript

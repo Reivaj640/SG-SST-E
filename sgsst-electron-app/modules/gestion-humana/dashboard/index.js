@@ -60,7 +60,7 @@ class DashboardComponent {
     return null;
   }
 
-  _toast() {
+  get _toast() {
     // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
     if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
     if (window.GestionHumanaToast) return window.GestionHumanaToast;
@@ -68,7 +68,7 @@ class DashboardComponent {
     return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
   }
   _showToast(msg, type) {
-    var t = this._toast();
+    var t = this._toast;
     if (!t) return;
     // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
     if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {

@@ -1,33 +1,35 @@
 <!-- modules/gestion-humana/gestion-humana-home.html
-     📦717 · Shell del módulo Gestión Humana con header K+AIR (patrón Programa de Capacitación)
-     Header unificado: icono + título + subtítulo (izq) / badge + NIT + Bell (der).
-     Tabs horizontales debajo con 9 sub-módulos (responsive: con/sin iconos según ancho).
-     Migrado de top bar (brand T + NIT) a header unificado con icono del módulo. -->
+     📦811 · Shell de Gestión Humana — MIGRACIÓN PREMIUM.
+     Header con badge de ícono (SVG inline) + título + subtítulo con la empresa,
+     tabs horizontales con subrayado (iconos SVG, sin Font Awesome) y contenido.
+     DEBE coincidir con el fallback inline de gestion-humana-home.js (_fetchShellHtml). -->
 
 <div class="gh-shell" id="gh-shell">
-  <!-- ═══ HEADER K+AIR (patrón Programa de Capacitación) ═══ -->
   <header class="gh-header">
     <div class="gh-header__left">
-      <h1 class="gh-header__title">
-        <i class="fas fa-people-group gh-header__icon"></i> Gestión Humana
-      </h1>
-      <p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>
+      <div class="gh-header__id">
+        <span class="gh-header__badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-3.3 2.7-5 5.5-5s5.5 1.7 5.5 5"/><circle cx="17" cy="9.5" r="2.6"/><path d="M15.8 14.7c2.6.3 4.7 1.9 4.7 4.3"/></svg>
+        </span>
+        <div class="gh-header__text">
+          <h1 class="gh-header__title">Gestión Humana</h1>
+          <p class="gh-header__subtitle" id="gh-subtitle">Sistema de Gestión de Personal</p>
+        </div>
+      </div>
     </div>
     <div class="gh-header__right">
-      <button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">
-        <i class="fas fa-bell"></i>
+      <button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones" aria-label="Notificaciones">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg>
         <span class="gh-bell-badge" id="gh-bell-badge"></span>
       </button>
     </div>
   </header>
 
-  <!-- ═══ TABS HORIZONTALES (9 sub-módulos, responsive) ═══ -->
-  <nav class="gh-tabs" id="gh-tabs" role="tablist">
+  <nav class="gh-tabs" id="gh-tabs" role="tablist" aria-label="Secciones de Gestión Humana">
     <!-- tabs se inyectan via JS -->
   </nav>
 
-  <!-- ═══ CONTENIDO: vista activa se inyecta via JS ═══ -->
   <main class="gh-content" id="gh-content">
-    <!-- vista activa -->
+    <!-- vista activa se inyecta via JS -->
   </main>
 </div>
