@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807 Notificaciones persistentes (correo + 11 fuentes de calendario) + badge/toast/panel + 155/155 tests
+**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807 Notificaciones persistentes (correo + 12 fuentes de calendario, 1 stub) + badge/toast/panel + 155/155 tests
 **Última actualización:** 22 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -1333,11 +1333,12 @@ Feature completa de notificaciones in-app detectadas desde el proceso main, aunq
 - **`main/notifications-service.js`** — Servicio con `init/getDb/getMainWindow/sources/getEnabledCompanies/emailDetector`, `tick()` con guard de reentrada `_inFlight`, ventana configurable (`setVentanaMs`), backoff exponencial (máx 5 min) tras fallos consecutivos, dedupe por `dedupe_key` y emisión `webContents.send('notificaciones:changed', { companyKey, unreadTotal, nuevas })`. Intervalo 60s; tick inmediato al arrancar.
 - **`main/notifications-email.js`** — Detector de correos: lee `email_threads` no leídos del cache SQLite (sin llamar Gmail; sync best-effort con timeout 120s), respeta el gate de bandeja y emite dedupe_keys con `correo:{company}:{thread_id}:0`.
 - **`main/notifications-gate.js`** — Gate real con misma lógica que el bridge de permisos (`bandeja-integrada-permissions-bridge` 📦702): admin siempre true, resto según `users.bandeja_integrada_enabled`, sin sesión activa → false (fail-closed). Sin llamadas duplicadas a `validateSession`.
-- **`main.js`** cableado en 5 puntos (requires L101-102, init L10445, start L10485, IPC `notificaciones:setVentana` con `validateSession` L10491, `stopAll` en cierre L18585). Helper genérico `_notifGlobalSource(id, genFn)` + `_notifPorEmpresaSource(id, listFn)` + `_notifConCacheTtl(id, listFn)` para las 11 fuentes. `getEnabledCompanies` acotado por `email_connections` (la conexión de correo es global — sin conexión → no hay correos que detectar).
+- **`main.js`** cableado en 5 puntos (requires L101-102, init L10445, start L10485, IPC `notificaciones:setVentana` con `validateSession` L10491, `stopAll` en cierre L18585). Helper genérico `_notifGlobalSource(id, genFn)` + `_notifPorEmpresaSource(id, listFn)` + `_notifConCacheTtl(id, listFn)` para las 12 fuentes. `getEnabledCompanies` acotado por `email_connections` (la conexión de correo es global — sin conexión → no hay correos que detectar).
 - **`preload.js`** namespace `notifications: { listar, marcarLeida, marcarTodas, getUnreadCount, setVentana, onChanged }`.
 
-**11 fuentes de calendario** (inyectables al servicio; el plan original mencionaba 12 con `plan-trabajo` como stub opcional — se omitió por no tener bridge de calendario en esta fase):
+**12 fuentes de calendario** (11 activas + 1 stub `plan-trabajo` que devuelve `[]` hasta tener bridge de calendario, misma estructura que las demás para drop-in futuro):
 
+- **1 stub**: `plan-trabajo` (`{ id: 'plan-trabajo', list: function () { return []; } }` — placeholder para el módulo 2.4.1 Plan de Trabajo Anual).
 - **6 bases de datos/Excel** vía `_notifPorEmpresaSource` / inline: capacitaciones (`_leerCapacitacionesDeEmpresa`), auditoría (`auditoria-anual-bridge._getFasesImpl`), eventos rápidos (`eventos-rapidos-bridge._listEventosRapidosImpl`), gestaciones (`gestacion-bridge._handlerEventosCalendario`), inspecciones (`inspecciones-bridge.getEventsCalendario`), mantenimiento (`mantenimiento-bridge.getCalendarEventsAll` con cache TTL).
 - **5 recordatorios** vía funciones nombradas extraídas de los handlers inline (misma lógica fin-de-semana→lunes, cero duplicación): copasst (`_genRecordatorioCopasstEvents`), convivencia (`_genRecordatorioConvivenciaEvents`), presupuesto (`_genRecordatorioPresupuestoEvents`), afiliación (`_genRecordatorioAfiliacionEvents`), inducciones (`_genRecordatorioInduccionesEvents`).
 
@@ -1406,7 +1407,7 @@ Después de 2 meses de trabajo (v0.1.206 → v0.1.211) con 70+ paquetes, el dial
 - **Guard de re-bindear**: NO usar flags `_clickBound` en componentes que se destruyen y re-renderizan. Bindear en cada `render()` (el handler ya debe tener su guard interno, ej. `view !== 'hub'`).
 - **Datos en la bodega, no en el tablero**: cuando un componente consume datos de varias fuentes, cada función auxiliar debe **persistir su resultado** en `this.*` para que la vista lo encuentre. Patrón visto en 📦799 (Peligros) y 📦791 (Salud).
 
-**Estado del proyecto:** 8 módulos home rediseñados + sidebar premium + 70+ submódulos migrados + **🆕 notificaciones persistentes (correo + 11 fuentes de calendario) operativas** — badge + toast + panel + selector de ventana 15m/1h/6h/24h. Próximas fases: panel dashboard horizontal, submenu Bandeja Integrada.
+**Estado del proyecto:** 8 módulos home rediseñados + sidebar premium + 70+ submódulos migrados + **🆕 notificaciones persistentes (correo + 12 fuentes de calendario, 1 stub) operativas** — badge + toast + panel + selector de ventana 15m/1h/6h/24h. Próximas fases: panel dashboard horizontal, submenu Bandeja Integrada.
 
 ---
 
