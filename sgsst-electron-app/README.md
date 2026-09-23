@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.211 (desarrollo) — último publicado v0.1.205 · 📦793-804 Premium v2 masivo + 7 skills de calidad + EOL normalizado
+**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807 Notificaciones persistentes (correo + 11 fuentes de calendario) + badge/toast/panel + 155/155 tests
 **Última actualización:** 22 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -1321,6 +1321,55 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.212 - 22 Sep 2026 🆕
+
+#### 📦807 · Notificaciones persistentes (correo + eventos de calendario)
+
+Feature completa de notificaciones in-app detectadas desde el proceso main, aunque la Bandeja esté cerrada. Badge en el header, toast persistente al recibir cambio, panel en el popover de KairAlerts con chip de empresa y selector de ventana configurable.
+
+**Backend (proceso main):**
+
+- **`main/notifications-bridge.js`** — Bridge IPC nuevo con tabla `notificaciones` (tipo `correo`/`evento`, `dedupe_key` UNIQUE + índice único compuesto para `COALESCE(fecha_evento, '')`) y 4 handlers (`listar`, `marcarLeida`, `marcarTodas`, `getUnreadCount`) con `validateSession` obligatoria + `FORBIDDEN_COMPANY` si la `companyKey` no es de la sesión o el user no es admin. `marcarLeida` solo actualiza ids cuya `company_key` pertenece a la sesión (no fuga entre empresas).
+- **`main/notifications-service.js`** — Servicio con `init/getDb/getMainWindow/sources/getEnabledCompanies/emailDetector`, `tick()` con guard de reentrada `_inFlight`, ventana configurable (`setVentanaMs`), backoff exponencial (máx 5 min) tras fallos consecutivos, dedupe por `dedupe_key` y emisión `webContents.send('notificaciones:changed', { companyKey, unreadTotal, nuevas })`. Intervalo 60s; tick inmediato al arrancar.
+- **`main/notifications-email.js`** — Detector de correos: lee `email_threads` no leídos del cache SQLite (sin llamar Gmail; sync best-effort con timeout 120s), respeta el gate de bandeja y emite dedupe_keys con `correo:{company}:{thread_id}:0`.
+- **`main/notifications-gate.js`** — Gate real con misma lógica que el bridge de permisos (`bandeja-integrada-permissions-bridge` 📦702): admin siempre true, resto según `users.bandeja_integrada_enabled`, sin sesión activa → false (fail-closed). Sin llamadas duplicadas a `validateSession`.
+- **`main.js`** cableado en 5 puntos (requires L101-102, init L10445, start L10485, IPC `notificaciones:setVentana` con `validateSession` L10491, `stopAll` en cierre L18585). Helper genérico `_notifGlobalSource(id, genFn)` + `_notifPorEmpresaSource(id, listFn)` + `_notifConCacheTtl(id, listFn)` para las 11 fuentes. `getEnabledCompanies` acotado por `email_connections` (la conexión de correo es global — sin conexión → no hay correos que detectar).
+- **`preload.js`** namespace `notifications: { listar, marcarLeida, marcarTodas, getUnreadCount, setVentana, onChanged }`.
+
+**11 fuentes de calendario** (inyectables al servicio; el plan original mencionaba 12 con `plan-trabajo` como stub opcional — se omitió por no tener bridge de calendario en esta fase):
+
+- **6 bases de datos/Excel** vía `_notifPorEmpresaSource` / inline: capacitaciones (`_leerCapacitacionesDeEmpresa`), auditoría (`auditoria-anual-bridge._getFasesImpl`), eventos rápidos (`eventos-rapidos-bridge._listEventosRapidosImpl`), gestaciones (`gestacion-bridge._handlerEventosCalendario`), inspecciones (`inspecciones-bridge.getEventsCalendario`), mantenimiento (`mantenimiento-bridge.getCalendarEventsAll` con cache TTL).
+- **5 recordatorios** vía funciones nombradas extraídas de los handlers inline (misma lógica fin-de-semana→lunes, cero duplicación): copasst (`_genRecordatorioCopasstEvents`), convivencia (`_genRecordatorioConvivenciaEvents`), presupuesto (`_genRecordatorioPresupuestoEvents`), afiliación (`_genRecordatorioAfiliacionEvents`), inducciones (`_genRecordatorioInduccionesEvents`).
+
+**UI (renderer + shared):**
+
+- **`renderer.js`** — `_refreshNotifBadge()` compone `KairAlerts.getCount() + electronAPI.notifications.getUnreadCount`, listener `notificaciones:changed` dispara refresh + toast persistente (`autoClose: 0`) con escape `KairUI.esc()` (anti-XSS).
+- **`shared/kair-alerts.js`** — Nueva sección "Notificaciones" en el popover: lista `soloNoLeidas`, chip de empresa si ≠ activa, marcar individual ✓ + "Marcar todas", estado vacío canónico `kair-empty`, click correo solo navega si empresa activa coincide; selector de ventana **15m / 1h / 6h / 24h** (default 24h) persistido en `localStorage` y sincronizado al service vía `setVentana`.
+- **`assets/js/update-notifications.js`** (M) — Adaptación del toast persistente.
+- **`styles.css`** — Estilos del panel + dark `[data-theme^="dark"]`; cache-bust `?v=20260922-notifs-ui` en `index.html`.
+
+**Tests — 155/155 OK:**
+
+- `main/test-notificaciones-bridge.js` → **28/28** (schema, dedupe_key, ventanaRango, 4 handlers, FORBIDDEN_COMPANY para company ajena, admin bypass)
+- `main/test-notificaciones-email.js` → **6/6** (detector, dedupe_key, gate off → 0)
+- `main/test-notificaciones-service.js` → **10/10** (fuente rota no mata tick, dedupe evita duplicados, emite solo si inserts, ventana distinta puede re-notificar, pasado >1h descartado)
+- `main/test-notificaciones-wiring.js` → **11/11** (main + preload + service tienen los hooks correctos, setVentana con validateSession)
+- `main/test-notificaciones-fuentes.js` → **52/52** (12 fuentes definidas + helpers + funciones generadoras + gate real + SQL_NO_LEIDOS exportado + detector con/sin company_key + gate off → 0)
+- `main/test-notificaciones-ui.js` → **25/25** (listener, badge, toast autoClose:0, kair-alerts sección, select ventana, localStorage, escape HTML, estilos + dark, cache-bust)
+- `main/test-notificaciones-seguridad.js` → **23/23** (sin token → UNAUTHORIZED, companyKey ajena → FORBIDDEN_COMPANY, marcarLeida ajeno → updated:0, getUnreadCount solo número, gate=0 → 0 correos, sin `access_token` en notifications-*)
+
+**Lecciones técnicas transferibles:**
+
+- **Servicios main con timers**: patrón `sync-service` aplicado — `_timer.unref()` para no bloquear cierre, `stopAll()` en `app.on('before-quit')` junto a otros servicios.
+- **Dedupe multi-ventana**: la `dedupe_key` incluye la `ventanaMs` para que el mismo evento pueda avisar en 24h y en 15min (keys distintas = permitido).
+- **Fail-closed por defecto**: gate de bandeja → `false` sin sesión activa. Mejor ocultar que mostrar.
+- **Multitenancy SQL**: siempre `WHERE company_key IN (empresas_del_usuario)` — los handlers nunca exponen datos de empresas ajenas; `admin` puede ver todas (bypass explícito).
+- **Reentrancia async**: `tick()` con `try { ... } finally { _inFlight = false }` para evitar que un email detector de 120s se solape con el siguiente tick.
+
+**Estado:** working tree con 26 archivos modificados/nuevos. Suite completa en verde. Pendiente commit + push con autorización del user.
+
+---
+
 ### v0.1.211 - 22 Sep 2026 🆕
 
 #### Cierre de la migración premium v2 — Peligros, Inspecciones, Mantenimiento, Verificación y Mejoramiento
@@ -1357,7 +1406,7 @@ Después de 2 meses de trabajo (v0.1.206 → v0.1.211) con 70+ paquetes, el dial
 - **Guard de re-bindear**: NO usar flags `_clickBound` en componentes que se destruyen y re-renderizan. Bindear en cada `render()` (el handler ya debe tener su guard interno, ej. `view !== 'hub'`).
 - **Datos en la bodega, no en el tablero**: cuando un componente consume datos de varias fuentes, cada función auxiliar debe **persistir su resultado** en `this.*` para que la vista lo encuentre. Patrón visto en 📦799 (Peligros) y 📦791 (Salud).
 
-**Estado del proyecto:** 8 módulos home rediseñados + sidebar premium + 70+ submódulos migrados. Próximas fases: panel dashboard horizontal, submenu Bandeja Integrada, sistema de notificaciones persistentes (en desarrollo).
+**Estado del proyecto:** 8 módulos home rediseñados + sidebar premium + 70+ submódulos migrados + **🆕 notificaciones persistentes (correo + 11 fuentes de calendario) operativas** — badge + toast + panel + selector de ventana 15m/1h/6h/24h. Próximas fases: panel dashboard horizontal, submenu Bandeja Integrada.
 
 ---
 
@@ -1648,7 +1697,7 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 **Última actualización:** 22 de septiembre de 2026  
 **Versión del documento:** 2.6 (Migración premium v2 masiva v0.1.206-211 — `📦739-802`)
-**Versión de la aplicación:** 0.1.211
+**Versión de la aplicación:** 0.1.212
 
 ---
 

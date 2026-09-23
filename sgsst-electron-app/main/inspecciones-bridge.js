@@ -1447,8 +1447,11 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
      Params: { start, end, currentCompany } (plano, NO envuelto en range).
 
      📦543 — Soporte para scope='all': si currentCompany es null, lee de
-     TODAS las empresas del config y concatena los eventos. */
-  ipcMain.handle("inspeccion:programa:getEventsCalendario", async function (event, params) {
+     TODAS las empresas del config y concatena los eventos.
+
+     Task 5 — extraído a _getEventsCalendarioImpl para poder exportarlo como
+     fuente de notificaciones (module.exports.getEventsCalendario). */
+  async function _getEventsCalendarioImpl(params) {
     try {
       var start = params && params.start;
       var end = params && params.end;
@@ -1486,6 +1489,12 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
       console.error("[K+AIRSST][INSPECTION][CAL_EVENTS][ERROR]", e);
       return err("GET_EVENTS_FAILED", e.message);
     }
+  }
+
+  module.exports.getEventsCalendario = _getEventsCalendarioImpl;
+
+  ipcMain.handle("inspeccion:programa:getEventsCalendario", async function (event, params) {
+    return _getEventsCalendarioImpl(params);
   });
 
   ipcMain.handle("programa:actualizarActividad", async function (event, activityId, patch) {

@@ -323,6 +323,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     remove: (id) => ipcRenderer.invoke('eventos-rapidos:remove', id)
   },
 
+  // --- Notificaciones persistentes (correo + eventos) ---
+  notifications: {
+    listar: (payload) => ipcRenderer.invoke('notificaciones:listar', payload),
+    marcarLeida: (payload) => ipcRenderer.invoke('notificaciones:marcarLeida', payload),
+    marcarTodas: (payload) => ipcRenderer.invoke('notificaciones:marcarTodas', payload),
+    getUnreadCount: (payload) => ipcRenderer.invoke('notificaciones:getUnreadCount', payload),
+    setVentana: (payload) => ipcRenderer.invoke('notificaciones:setVentana', payload),
+    onChanged: (cb) => ipcRenderer.on('notificaciones:changed', function (_e, data) { if (typeof cb === 'function') cb(data); })
+  },
+
   // --- K+AIR Calendar: agregadores de las 3 fuentes principales ---
   // Devuelven eventos en formato unificado: { id, title, date, start, end, type }.
   // type puede ser: 'plan' | 'capacitacion' | 'auditoria' | 'rapido' | 'vencido' | 'gestacion'.

@@ -6815,6 +6815,162 @@ box-shadow: var(--box-shadow) !important;
   font-size: 12px;
 }
 
+/* ── Task 6 · Sección Notificaciones (correo + eventos) ───────────────────
+   Segunda sección del popover, debajo de la lista de Pendientes. Los colores
+   usan los tokens --ka-* del popover (heredados), así que el modo oscuro
+   ([data-theme^="dark"]) aplica sin reglas extra de color. */
+.kair-alerts-popover .kair-alerts-notifs {
+  flex-shrink: 0;
+  border-top: 1px solid var(--ka-line);
+}
+
+.kair-alerts-popover .kair-alerts-notifs__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--ka-soft);
+  border-bottom: 1px solid var(--ka-soft);
+}
+
+.kair-alerts-popover .kair-alerts-notifs__title {
+  font-family: var(--ka-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ka-muted);
+}
+
+.kair-alerts-popover .kair-alerts-notifs__count {
+  background: var(--ka-primary-soft);
+  color: var(--ka-primary);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.kair-alerts-popover .kair-alerts-notifs__ventana {
+  margin-left: auto;
+  font-family: var(--ka-font);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ka-ink);
+  background: var(--ka-card);
+  border: 1px solid var(--ka-line);
+  border-radius: var(--ka-radius-control);
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ka-soft);
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item:hover {
+  background: var(--ka-soft);
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__type {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ka-muted);
+}
+
+.kair-alerts-popover .kair-alerts-notifs__chip {
+  background: var(--ka-soft);
+  border: 1px solid var(--ka-line);
+  color: var(--ka-ink);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 999px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ka-ink);
+  line-height: 1.35;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__resumen {
+  font-size: 11.5px;
+  color: var(--ka-muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__btn {
+  background: transparent;
+  border: 1px solid var(--ka-line);
+  color: var(--ka-primary);
+  font-family: var(--ka-font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--ka-radius-control);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kair-alerts-popover .kair-alerts-notifs-item__btn:hover {
+  background: var(--ka-primary-soft);
+  border-color: var(--ka-primary);
+}
+
+.kair-alerts-popover .kair-alerts-empty--notif {
+  padding: 14px 16px;
+  text-align: center;
+}
+
+/* El select nativo no hereda el tema: en oscuro quedaría blanco */
+[data-theme^="dark"] .kair-alerts-notifs__ventana {
+  background: var(--ka-soft);
+  color: var(--ka-ink);
+  border-color: var(--ka-line);
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VANTA FULLSCREEN MODE - Pantallas con fondo animado (Login / Home selección)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */

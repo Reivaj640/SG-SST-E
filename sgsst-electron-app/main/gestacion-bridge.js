@@ -1362,13 +1362,13 @@ function _handlerEventosCalendario(empresaId) {
         var stmtGestantes, paramsGestantes, gestantes;
         if (allCompanies) {
             stmtGestantes = db.prepare(
-                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
+                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp, empresa_id " +
                 "FROM gestaciones WHERE estado IN ('activo', 'reintegro')"
             );
             gestantes = stmtGestantes.all();
         } else {
             stmtGestantes = db.prepare(
-                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
+                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp, empresa_id " +
                 "FROM gestaciones WHERE empresa_id = ? AND estado IN ('activo', 'reintegro')"
             );
             gestantes = stmtGestantes.all(empresaId);
@@ -1451,7 +1451,9 @@ function _handlerEventosCalendario(empresaId) {
                 estado: g.estado,
                 gestanteId: g.id,
                 cedula: g.cedula,
-                clasificacion: g.clasificacion || 'bajo'
+                clasificacion: g.clasificacion || 'bajo',
+                // Task 5 — empresa en el nivel top (fuente de notificaciones)
+                empresa: g.empresa_id || null
             });
         });
 
@@ -1470,5 +1472,7 @@ module.exports = {
     // (mismo patron que evaluacion-action-plans-bridge.js)
     _handlerRegistrarGestante: _handlerRegistrarGestante,
     _handlerGuardarSeguimiento: _handlerGuardarSeguimiento,
-    _handlerEliminarSeguimiento: _handlerEliminarSeguimiento
+    _handlerEliminarSeguimiento: _handlerEliminarSeguimiento,
+    // Task 5 — fuente de notificaciones: eventos de calendario (todas las empresas)
+    _handlerEventosCalendario: _handlerEventosCalendario
 };

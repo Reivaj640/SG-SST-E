@@ -97,6 +97,12 @@ const { registerSeguimientoIncapacidadHandlers, SCHEMA_SQL: SEG_INC_SCHEMA_SQL, 
 const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
+// Notificaciones persistentes (correo + eventos) — bridge IPC + servicio de detección
+const { registerNotificationsHandlers } = require('./main/notifications-bridge');
+const notificationsService = require('./main/notifications-service');
+const { createEmailDetector } = require('./main/notifications-email');
+// Task 5 — gate real de bandeja (admin o users.bandeja_integrada_enabled=1)
+const { createBandejaGate } = require('./main/notifications-gate');
 // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
 // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
@@ -5067,7 +5073,10 @@ ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
 //
 // Params: { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD' }
 // Si no se pasa rango, se generan los 12 meses del año actual.
-ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
+// Task 5 — lógica extraída a función nombrada: la MISMA función sirve para el
+// handler IPC y para la fuente de notificaciones (no duplicar la lógica
+// fin de semana→lunes).
+async function _genRecordatorioCopasstEvents(params) {
   try {
     const params2 = params || {};
     const now = new Date();
@@ -5143,6 +5152,10 @@ ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
     sendLog(`[CAL-COPASST] Error generando recordatorios: ${e.message}`, 'ERROR');
     return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
   }
+}
+// Handler IPC: la MISMA función, reusada como fuente de notificaciones (Task 5).
+ipcMain.handle('recordatorio-copasst:get-events', function (event, params) {
+  return _genRecordatorioCopasstEvents(params);
 });
 
 // ── K+AIR Calendar: Recordatorio Acta Comite de Convivencia (📦523) ─────
@@ -5161,7 +5174,8 @@ ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
 // algun momento se cambia el autofill a mensual, sincronizar este
 // array con [1..12] tambien.)
 const CONVIVENCIA_RECORDATORIO_MONTHS = [2, 5, 8, 11]; // Feb, May, Ago, Nov
-ipcMain.handle('recordatorio-convivencia:get-events', async (event, params) => {
+// Task 5 — misma extracción que COPASST (misma función para IPC y fuente).
+async function _genRecordatorioConvivenciaEvents(params) {
   try {
     const params2 = params || {};
     const now = new Date();
@@ -5240,6 +5254,10 @@ ipcMain.handle('recordatorio-convivencia:get-events', async (event, params) => {
     sendLog(`[CAL-CONVIVENCIA] Error generando recordatorios: ${e.message}`, 'ERROR');
     return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
   }
+}
+// Handler IPC: la MISMA función, reusada como fuente de notificaciones (Task 5).
+ipcMain.handle('recordatorio-convivencia:get-events', function (event, params) {
+  return _genRecordatorioConvivenciaEvents(params);
 });
 
 // ── K+AIR Calendar: Recordatorio Actualización Presupuesto (📦524) ──────
@@ -5255,7 +5273,8 @@ const VENTANAS_PRESUPUESTO = [
   { day: 5,  ventana: '5 primeros días' },
   { day: 20, ventana: '20 primeros días' }
 ];
-ipcMain.handle('recordatorio-presupuesto:get-events', async (event, params) => {
+// Task 5 — misma extracción que COPASST (misma función para IPC y fuente).
+async function _genRecordatorioPresupuestoEvents(params) {
   try {
     const params2 = params || {};
     const now = new Date();
@@ -5331,6 +5350,10 @@ ipcMain.handle('recordatorio-presupuesto:get-events', async (event, params) => {
     sendLog(`[CAL-PRESUPUESTO] Error generando recordatorios: ${e.message}`, 'ERROR');
     return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
   }
+}
+// Handler IPC: la MISMA función, reusada como fuente de notificaciones (Task 5).
+ipcMain.handle('recordatorio-presupuesto:get-events', function (event, params) {
+  return _genRecordatorioPresupuestoEvents(params);
 });
 
 // ── K+AIR Calendar: Recordatorio Afiliación al SSSI (📦525) ────────────
@@ -5346,7 +5369,8 @@ ipcMain.handle('recordatorio-presupuesto:get-events', async (event, params) => {
 // del resto.
 //
 // Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
-ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
+// Task 5 — misma extracción que COPASST (misma función para IPC y fuente).
+async function _genRecordatorioAfiliacionEvents(params) {
   try {
     const params2 = params || {};
     const now = new Date();
@@ -5422,6 +5446,10 @@ ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
     sendLog(`[CAL-AFILIACION] Error generando recordatorios: ${e.message}`, 'ERROR');
     return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
   }
+}
+// Handler IPC: la MISMA función, reusada como fuente de notificaciones (Task 5).
+ipcMain.handle('recordatorio-afiliacion:get-events', function (event, params) {
+  return _genRecordatorioAfiliacionEvents(params);
 });
 
 // ── K+AIR Calendar: Recordatorio Actualización Inducciones (📦525) ──────
@@ -5435,7 +5463,8 @@ ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
 // recordatorios). Color indigo #6366f1 para distinguirse del resto.
 //
 // Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
-ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
+// Task 5 — misma extracción que COPASST (misma función para IPC y fuente).
+async function _genRecordatorioInduccionesEvents(params) {
   try {
     const params2 = params || {};
     const now = new Date();
@@ -5511,6 +5540,10 @@ ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
     sendLog(`[CAL-INDUCCIONES] Error generando recordatorios: ${e.message}`, 'ERROR');
     return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
   }
+}
+// Handler IPC: la MISMA función, reusada como fuente de notificaciones (Task 5).
+ipcMain.handle('recordatorio-inducciones:get-events', function (event, params) {
+  return _genRecordatorioInduccionesEvents(params);
 });
 
 // ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
@@ -10227,6 +10260,240 @@ try {
   sendLog('[MAIN] Handlers de K+AIR Calendar / eventos-rapidos registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de eventos-rapidos: ${err.message}`, 'ERROR');
+}
+
+// Notificaciones persistentes (correo + eventos) — bridge IPC + servicio de detección.
+// SIEMPRE después de que la DB esté lista (getDb() ya resuelve la conexión).
+try {
+  registerNotificationsHandlers(app, { getDb: getDb, validateSession: validateSession });
+
+  // ── Task 5: Fuentes de calendario (12 fuentes) ──
+  // Cada fuente llama a las funciones YA EXISTENTES (handlers extraídos a
+  // funciones nombradas o puentes exportados) — NO duplica la lógica
+  // fin de semana→lunes ni la lectura de Excels. list(range) devuelve
+  // eventos { id, title, date, start, type, empresa }; el servicio hace el
+  // filtro estricto de ventana (now-PAST_SLACK .. now+ventana) después.
+
+  // Empresas habilitadas (misma query que getEnabledCompanies de abajo).
+  function _notifEmpresas() {
+    try {
+      var db2 = getDb();
+      var rows2 = db2.prepare('SELECT DISTINCT company_key FROM companies').all();
+      return rows2.map(function (r) { return r.company_key; });
+    } catch (e) { return []; }
+  }
+
+  // ventanaRango devuelve ISO UTC; los generadores/puentes esperan fechas
+  // locales YYYY-MM-DD (mismo formato que pasa el adapter del calendario).
+  // Se amplia ±1 día para no perder eventos de frontera (el servicio
+  // descarta los extra con el filtro estricto de ventana).
+  function _notifRango(range) {
+    try {
+      var d1 = new Date(range && range.startIso);
+      var d2 = new Date(range && range.endIso);
+      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return {};
+      var p = function (n) { return String(n).padStart(2, '0'); };
+      var f = function (d) { return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+      d1.setDate(d1.getDate() - 1);
+      d2.setDate(d2.getDate() + 1);
+      return { start: f(d1), end: f(d2) };
+    } catch (e) { return {}; }
+  }
+
+  // Fuente GLOBAL (recordatorios): genera una vez y emite UN evento por
+  // empresa habilitada (el modelo de notificaciones es por empresa: cada
+  // empresa ve su recordatorio; el dedupe_key incluye company_key).
+  function _notifGlobalSource(id, genFn) {
+    return {
+      id: id,
+      list: async function (range) {
+        try {
+          var res = await genFn(_notifRango(range));
+          var evs = (res && res.success && res.data) || [];
+          var empresas = _notifEmpresas();
+          var out = [];
+          for (var i = 0; i < evs.length; i++) {
+            var ev = evs[i];
+            if (!ev || !ev.id || !ev.date) continue;
+            for (var j = 0; j < empresas.length; j++) {
+              out.push(Object.assign({}, ev, { empresa: empresas[j] }));
+            }
+          }
+          return out;
+        } catch (e) { return []; }
+      }
+    };
+  }
+
+  // Fuente POR EMPRESA: itera las empresas habilitadas llamando a la función
+  // existente y etiqueta cada evento con su empresa (si no la trae).
+  function _notifPorEmpresaSource(id, listDeEmpresa) {
+    return {
+      id: id,
+      list: async function (range) {
+        try {
+          var rango = _notifRango(range);
+          var empresas = _notifEmpresas();
+          var out = [];
+          for (var i = 0; i < empresas.length; i++) {
+            var res = await listDeEmpresa(empresas[i], rango);
+            var evs = (res && res.success && res.data) || [];
+            for (var j = 0; j < evs.length; j++) {
+              if (evs[j] && !evs[j].empresa) evs[j].empresa = empresas[i];
+            }
+            out.push.apply(out, evs);
+          }
+          return out;
+        } catch (e) { return []; }
+      }
+    };
+  }
+
+  // Cache TTL para las fuentes que leen Excels SIN cache propio
+  // (capacitaciones y mantenimiento): el tick corre cada 60s y un Excel no
+  // cambia por minuto — leerlo en cada tick bloquea el proceso main de forma
+  // síncrona (~1s por tick). Se refresca cada 10 min; si la lectura lanza,
+  // se devuelve [] SIN cachear (reintenta al próximo tick). Inspecciones ya
+  // tiene cache propio por mtime en el puente y queda sin TTL (fresca).
+  var NOTIF_FUENTE_TTL_MS = 10 * 60 * 1000;
+  var _notifCache = {};
+  function _notifConCacheTtl(id, listFn) {
+    return function (range) {
+      var hit = _notifCache[id];
+      if (hit && (Date.now() - hit.at) < NOTIF_FUENTE_TTL_MS) return hit.evs;
+      return Promise.resolve().then(function () { return listFn(range); }).then(function (evs) {
+        _notifCache[id] = { at: Date.now(), evs: evs || [] };
+        return evs || [];
+      }).catch(function () { return []; });
+    };
+  }
+
+  var _notifCalendarSources = [
+    // 1. Plan de trabajo — stub: requiere spec del Excel (mismo TODO que el handler IPC).
+    { id: 'plan-trabajo', list: function () { return []; } },
+    // 2. Capacitaciones — función ya existente (_leerCapacitacionesDeEmpresa),
+    //    con cache TTL (lee el Excel en cada llamada y el tick corre cada 60s).
+    (function () {
+      var srcCap = _notifPorEmpresaSource('capacitaciones', function (empresa, rango) {
+        return _leerCapacitacionesDeEmpresa(empresa, rango.start, rango.end, {});
+      });
+      srcCap.list = _notifConCacheTtl(srcCap.id, srcCap.list);
+      return srcCap;
+    })(),
+    // 3. Auditoría — impl extraída del puente auditoria-anual (getFases).
+    {
+      id: 'auditoria',
+      list: async function (range) {
+        try {
+          var resAud = await require('./main/auditoria-anual-bridge')._getFasesImpl(_notifRango(range));
+          return (resAud && resAud.success && resAud.data) || [];
+        } catch (e) { return []; }
+      }
+    },
+    // 4. Eventos rápidos — impl extraída del bridge (los eventos traen empresa).
+    {
+      id: 'eventos_rapidos',
+      list: async function (range) {
+        try {
+          var resRap = await require('./main/eventos-rapidos-bridge')._listEventosRapidosImpl(_notifRango(range));
+          return (resRap && resRap.success && resRap.data) || [];
+        } catch (e) { return []; }
+      }
+    },
+    // 5. Gestaciones — handler exportado del puente (null = todas las empresas;
+    //    los eventos traen empresa tras el enriquecimiento del puente).
+    {
+      id: 'gestaciones',
+      list: async function (range) {
+        try {
+          var resGes = await require('./main/gestacion-bridge')._handlerEventosCalendario(null);
+          return (resGes && resGes.success && resGes.data) || [];
+        } catch (e) { return []; }
+      }
+    },
+    // 6. Inspecciones — getEventsCalendario exportado (sin empresa → todas).
+    {
+      id: 'inspecciones',
+      list: async function (range) {
+        try {
+          var resInsp = await require('./main/inspecciones-bridge').getEventsCalendario(_notifRango(range));
+          return (resInsp && resInsp.success && resInsp.data) || [];
+        } catch (e) { return []; }
+      }
+    },
+    // 7. Mantenimientos — getCalendarEventsAll exportado (sin empresa → todas,
+    //    con etiquetado de empresa hecho por el propio puente), con cache TTL
+    //    (lee el Excel en cada llamada y el tick corre cada 60s).
+    {
+      id: 'mantenimiento',
+      list: _notifConCacheTtl('mantenimiento', async function (range) {
+        try {
+          var resMant = await require('./main/mantenimiento-bridge').getCalendarEventsAll(_notifRango(range));
+          return (resMant && resMant.success && resMant.data) || [];
+        } catch (e) { return []; }
+      })
+    },
+    // 8-12. Recordatorios — funciones extraídas de los handlers inline
+    //       (misma lógica fin de semana→lunes, cero duplicación).
+    _notifGlobalSource('recordatorio_copasst', _genRecordatorioCopasstEvents),
+    _notifGlobalSource('recordatorio_convivencia', _genRecordatorioConvivenciaEvents),
+    _notifGlobalSource('recordatorio_presupuesto', _genRecordatorioPresupuestoEvents),
+    _notifGlobalSource('recordatorio_afiliacion', _genRecordatorioAfiliacionEvents),
+    _notifGlobalSource('recordatorio_inducciones', _genRecordatorioInduccionesEvents)
+  ];
+
+  notificationsService.init({
+    getDb: getDb,
+    getMainWindow: function () { return mainWindow; },
+    sources: _notifCalendarSources,
+    getEnabledCompanies: function () {
+      try {
+        var db = getDb();
+        // Alcance documentado (Task 5): la conexión de correo es GLOBAL
+        // (1 OAuth en config.json; email_connections sin columna company,
+        // verificado contra el schema real) — todas las empresas comparten
+        // ese buzón. Con ≥1 conexión → todas; sin conexiones → [] (no hay
+        // correos que detectar). Las fuentes de calendario no dependen de
+        // esto (usan sus propias empresas vía _notifEmpresas).
+        var conns = db.prepare('SELECT COUNT(*) AS c FROM email_connections').get();
+        if (!conns || !conns.c) return [];
+        var rows = db.prepare('SELECT DISTINCT company_key FROM companies').all();
+        return rows.map(function (r) { return r.company_key; });
+      } catch (e) { return []; }
+    },
+    emailDetector: createEmailDetector({
+      getDb: getDb,
+      // Gate real de bandeja: admin o users.bandeja_integrada_enabled=1 del
+      // user de la sesión activa (mismo criterio que
+      // bandeja-integrada-permissions-bridge; delega en validateSession).
+      bandejaEnabledFor: createBandejaGate({ getDb: getDb, validateSession: validateSession }),
+      trySync: async function () {
+        try {
+          var sync = require('./main/email-sync.js');
+          if (typeof sync.syncInbox === 'function') {
+            await Promise.race([
+              sync.syncInbox({ folder: 'INBOX' }),
+              new Promise(function (_, rej) { setTimeout(function () { rej(new Error('sync timeout')); }, 120000); })
+            ]);
+            return true;
+          }
+        } catch (e) { /* log y seguir con cache local */ }
+        return false;
+      }
+    })
+  });
+  notificationsService.start(60000);
+  ipcMain.handle('notificaciones:setVentana', function (e, payload) {
+    payload = payload || {};
+    var sess = validateSession(payload.token);
+    if (!sess || sess.ok === false) return { success: false, error: 'UNAUTHORIZED' };
+    var n = parseInt(payload.ventanaMs, 10);
+    if (n > 0) notificationsService.setVentanaMs(n);
+    return { success: true, ventanaMs: n };
+  });
+  sendLog('[MAIN] Notificaciones persistentes: bridge + servicio iniciados (tick 60s)', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error inicializando notificaciones persistentes: ${err.message}`, 'ERROR');
 }
 
  // 📦658 — Handlers FURAT ya registrados arriba (línea 9698) — bloque duplicado eliminado.
@@ -18315,6 +18582,7 @@ function closeDatabaseSafely() {
 
 // Asegurar limpieza en cualquier intento de cierre
 app.on('before-quit', (e) => {
+    notificationsService.stopAll();
     cleanupProcesses();
     // v0.1.196 (P1-1): cerrar DB después de matar procesos. Si el user
     // tenía transacciones en curso, se persisten al main DB antes del quit.

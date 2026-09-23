@@ -136,7 +136,9 @@ function registerEventosRapidosHandlers(app, deps) {
   // P0-FILTER-1 (2026-09-07) — Aceptar `currentCompany` en el payload para
   // filtrar por empresa. Sin empresa válida → todos (compatibilidad con
   // scope='all' o sin empresa activa). Con empresa → solo de esa empresa.
-  ipcMain.handle('eventos-rapidos:list', async function (event, range) {
+  // Task 5 — extraído a _listEventosRapidosImpl para poder exportarlo como
+  // fuente de notificaciones (la MISMA función para IPC y fuente).
+  async function _listEventosRapidosImpl(range) {
     try {
       var db = getDb();
       if (!db) return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
@@ -182,7 +184,13 @@ function registerEventosRapidosHandlers(app, deps) {
       _log('LIST', 'ERROR ' + err.message);
       return { success: false, error: { code: 'INTERNAL_ERROR', message: err.message } };
     }
+  }
+
+  // Handler IPC: la MISMA función, reusada como fuente de notificaciones.
+  ipcMain.handle('eventos-rapidos:list', async function (event, range) {
+    return _listEventosRapidosImpl(range);
   });
+  module.exports._listEventosRapidosImpl = _listEventosRapidosImpl;
 
   // ── create ──────────────────────────────────────────────────────────
   ipcMain.handle('eventos-rapidos:create', async function (event, payload) {

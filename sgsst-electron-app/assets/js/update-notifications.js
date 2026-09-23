@@ -41,6 +41,24 @@ class UpdateNotificationManager {
      * @param {Function} options.onClick - Función al hacer clic en el botón
      * @param {number} options.autoClose - Tiempo de auto-cierre en ms (0 = no auto-cerrar)
      */
+    /**
+     * Escapa HTML de contenido que viene de fuentes externas (asunto de un
+     * correo, nombres de archivo, etc.) antes de inyectarlo en innerHTML.
+     */
+    esc(value) {
+        const s = String(value == null ? '' : value);
+        const A = String.fromCharCode(38);
+        const LT = String.fromCharCode(60);
+        const GT = String.fromCharCode(62);
+        const Q = String.fromCharCode(34);
+        const AP = String.fromCharCode(39);
+        return s.split(A).join(A + 'amp;')
+            .split(LT).join(LT + 'lt;')
+            .split(GT).join(GT + 'gt;')
+            .split(Q).join(Q + 'quot;')
+            .split(AP).join(AP + '#39;');
+    }
+
     show({ type, title, subtitle, message, progress, buttonText, onClick, autoClose = 5000 }) {
         console.log('[UPDATER] show() llamado:', { type, title, subtitle });
         console.log('[UPDATER] notification-hub existe:', !!this.hub);
@@ -83,7 +101,7 @@ class UpdateNotificationManager {
         if (buttonText && onClick) {
             actionHTML = `
                 <div class="toast-action">
-                    <button class="btn-toast-action">${buttonText}</button>
+                    <button class="btn-toast-action">${this.esc(buttonText)}</button>
                 </div>
             `;
         }
@@ -95,12 +113,12 @@ class UpdateNotificationManager {
                     <i class="fas ${icons[type]}"></i>
                 </div>
                 <div class="toast-title-group">
-                    <div class="toast-title">${title}</div>
-                    ${subtitle ? `<div class="toast-subtitle">${subtitle}</div>` : ''}
+                    <div class="toast-title">${this.esc(title)}</div>
+                    ${subtitle ? `<div class="toast-subtitle">${this.esc(subtitle)}</div>` : ''}
                 </div>
                 <button class="toast-close"><i class="fas fa-times"></i></button>
             </div>
-            ${message ? `<div class="toast-body">${message}</div>` : ''}
+            ${message ? `<div class="toast-body">${this.esc(message)}</div>` : ''}
             ${progressHTML}
             ${actionHTML}
         `;

@@ -4109,3 +4109,25 @@ Migración premium v2 de los 2 submódulos que quedaban en working tree, con con
 - Test: `main/test-despliegue-estrategico-premium.js` **38/38**.
 
 **Nota**: los comentarios `📦800` en el código de 6.1.1 son numeración provisional de la sesión previa (📦800 real = Auditoría Anual); el commit es 📦802. `renderer.js` solo depura 2 mensajes de `console.warn`.
+
+---
+
+## 🆕 Notificaciones persistentes (correo + eventos) (📦805, working tree — sin commit hasta autorización)
+
+Feature de notificaciones persistentes en el proceso main (detección + persistencia + UI completa).
+
+**Archivos**: `main/notifications-bridge.js` (4 handlers IPC + tabla `notificaciones` con `dedupe_key` UNIQUE + índice único compuesto), `main/notifications-service.js` (detección con 12 fuentes de calendario + backoff + guard de reentrada), `main/notifications-email.js` (detector de correo del cache), `main/notifications-gate.js` (gate de bandeja fail-closed, mismo criterio que el bridge de permisos 📦702); cableado en `main.js` + `preload.js` (`window.electronAPI.notifications`); UI en `renderer.js` (badge + toast con escape HTML), `shared/kair-alerts.js` (panel notificaciones: listar `soloNoLeidas` + `marcarLeida` + ventana 15m/1h/6h/24h persistida), `styles.css` + `index.html` (estilos, dark y cache-bust) y `assets/js/update-notifications.js`.
+
+**Seguridad**: sesión obligatoria en los 4 canales (`UNAUTHORIZED`), `companyKey` ajena a la sesión → `FORBIDDEN_COMPANY` (nunca empresas ajenas; `marcarLeida` solo marca ids de la sesión), gate `bandeja_integrada_enabled` fail-closed, y **sin log de `access_token`** en notifications-*.
+
+**Tests** (correrlos antes de commitear; bridge/service usan better-sqlite3 → con Electron):
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 25/25
+$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-service.js  # 10/10
+node main/test-notificaciones-email.js     # 6/6
+node main/test-notificaciones-wiring.js    # 9/9
+node main/test-notificaciones-fuentes.js   # 52/52
+node main/test-notificaciones-ui.js        # 25/25
+node main/test-notificaciones-seguridad.js # 23/23 (seguridad: UNAUTHORIZED/FORBIDDEN/gate/token)
+```

@@ -801,18 +801,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateBandejaIntegradaBadge(count) {
     var badge = document.getElementById('bandeja-integrada-badge');
     if (!badge) return;
-    if (count <= 0) {
+    // Task 6 — composición: pendientes del calendario (KairAlerts) + notificaciones no leídas
+    var total = (count || 0) + (window.__notifUnread || 0);
+    if (total <= 0) {
       badge.hidden = true;
       badge.textContent = '0';
-      badge.setAttribute('aria-label', 'Sin eventos pendientes');
-    } else if (count >= 100) {
+      badge.setAttribute('aria-label', 'Sin pendientes');
+    } else if (total >= 100) {
       badge.hidden = false;
       badge.textContent = '99+';
-      badge.setAttribute('aria-label', 'Más de 99 eventos pendientes');
+      badge.setAttribute('aria-label', 'Más de 99 pendientes');
     } else {
       badge.hidden = false;
-      badge.textContent = String(count);
-      badge.setAttribute('aria-label', count + ' evento' + (count === 1 ? '' : 's') + ' pendiente' + (count === 1 ? '' : 's'));
+      badge.textContent = String(total);
+      badge.setAttribute('aria-label', total + ' pendiente' + (total === 1 ? '' : 's'));
     }
   }
 
@@ -1074,6 +1076,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearInterval(_kairAlertsWait);
       }
     }, 500);
+  }
+
+  // Task 6 — Notificaciones persistentes (correo + eventos): badge compuesto
+  // + toast persistente al `notificaciones:changed`. La sección Notificaciones
+  // del panel vive en shared/kair-alerts.js; acá solo componemos y avisamos.
+  function _refreshNotifBadge() {
+    // Componer via KairAlerts (panel + unread) si está disponible
+    if (window.KairAlerts && typeof window.KairAlerts.refreshNotifications === 'function') {
+      window.KairAlerts.refreshNotifications();
+      return;
+    }
+    // Fallback (KairAlerts no disponible): consultar unread directo
+    if (!window.electronAPI || !window.electronAPI.notifications || !window.electronAPI.notifications.getUnreadCount) return;
+    var token = null;
+    try { token = localStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { token = null; }
+    if (!token) return;
+    window.electronAPI.notifications.getUnreadCount({ token: token })
+      .then(function (res) {
+        var unread = (res && res.success && res.data) ? (res.data.unread || res.data.count || res.data.total || 0) : 0;
+        window.__notifUnread = unread;
+        var alertsCount = (window.KairAlerts && window.KairAlerts.getCount) ? window.KairAlerts.getCount() : 0;
+        updateBandejaIntegradaBadge(alertsCount);
+      })
+      .catch(function () { });
+  }
+  window.__notifUnread = window.__notifUnread || 0;
+  if (window.electronAPI && window.electronAPI.notifications && window.electronAPI.notifications.onChanged) {
+    window.electronAPI.notifications.onChanged(function (data) {
+      _refreshNotifBadge();
+      if (data && data.nuevas && data.nuevas.length && window.updateNotifier && window.updateNotifier.show) {
+        var n = data.nuevas.length;
+        var tipo = data.nuevas[0].tipo;
+        var titulo = n === 1
+          ? (tipo === 'correo' ? '1 correo nuevo' : '1 evento próximo')
+          : (n + ' notificaciones nuevas');
+        var sub = (data.nuevas[0].companyKey && currentCompany && data.nuevas[0].companyKey !== currentCompany)
+          ? data.nuevas[0].companyKey : '';
+        window.updateNotifier.show({
+          type: 'info',
+          title: titulo,
+          subtitle: sub,
+          message: String(data.nuevas[0].titulo || '').slice(0, 80),
+          autoClose: 0,
+          buttonText: 'Ver',
+          onClick: function () {
+            // Abrir el panel Pendientes/Notificaciones (toggle del badge)
+            var badge = document.getElementById('bandeja-integrada-badge');
+            if (badge) badge.click();
+          }
+        });
+      }
+    });
+  }
+  _refreshNotifBadge();
+
+  // Task 6-fix — Re-aplicar la ventana persistida al arrancar (sin toast): la
+  // preferencia vive en localStorage y el servicio main no la conoce tras un
+  // reinicio. Ventana desde KairAlerts.getNotifVentana (kair-alerts.js).
+  if (window.electronAPI && window.electronAPI.notifications && window.electronAPI.notifications.setVentana) {
+    var _notifVentanaMs = (window.KairAlerts && typeof window.KairAlerts.getNotifVentana === 'function')
+      ? window.KairAlerts.getNotifVentana() : 86400000;
+    var _notifToken = null;
+    try { _notifToken = localStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { _notifToken = null; }
+    try { window.electronAPI.notifications.setVentana({ token: _notifToken, ventanaMs: _notifVentanaMs }).catch(function () { }); } catch (e) { }
   }
 
   // F4-fix — Toggle del botón Bandeja Integrada: si está abierto, lo cierra.

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.212] - 2026-09-22
+
+### 📦805 · Notificaciones persistentes (correo + eventos) — bridge, servicio, detección y UI
+
+Feature nueva de notificaciones persistentes en el proceso main (correo + eventos de calendario) con UI completa (badge, toast, panel y ventana dedicada). Sin commit hasta autorización; el commit es 📦805.
+
+#### Backend (proceso main)
+
+- **Bridge IPC nuevo** `main/notifications-bridge.js`: tabla `notificaciones` (tipo `correo`/`evento`, `dedupe_key` UNIQUE + índice único compuesto), 4 handlers (`listar`, `marcarLeida`, `marcarTodas`, `getUnreadCount`) con sesión obligatoria y filtro por empresa (`FORBIDDEN_COMPANY`; `marcarLeida` solo marca ids de la sesión).
+- **Servicio de detección** `main/notifications-service.js`: tick con 12 fuentes de calendario inyectables, ventana configurable (`setVentanaMs`), backoff exponencial tras fallos consecutivos y guard de reentrada; aviso al renderer vía `notificaciones:changed` con `unreadTotal`.
+- **Detector de correo** `main/notifications-email.js`: lee `email_threads` no leídos del cache (sin llamar Gmail directo; sync best-effort) y respeta el gate de bandeja.
+- **Gate real** `main/notifications-gate.js`: mismo criterio que el bridge de permisos (📦702) — admin siempre habilitado, resto según `users.bandeja_integrada_enabled`, sin sesión activa → false (fail-closed).
+- **Cableado**: registro y arranque en `main.js`; exposición en `preload.js` (`window.electronAPI.notifications`).
+
+#### UI
+
+- **Badge** con contador de no leídos en el header (escucha `notificaciones:changed`), **toast** persistente con escape HTML (`KairUI.esc`, anti-XSS), **panel** de notificaciones en `shared/kair-alerts.js` (listar `soloNoLeidas`, `marcarLeida`, selector de ventana 15m/1h/6h/24h persistido en localStorage) y **ventana** dedicada; estilos + dark en `styles.css` y cache-bust en `index.html` (`?v=20260922-notifs-ui`).
+
+#### Fixes incluidos
+
+- `mantenimiento-bridge`: ReferenceError corregido (los puentes de fuentes cargan con mock ipcMain y exportan la función para el test).
+- Toast de notificaciones: escape HTML en títulos (XSS esc).
+
+#### Tests
+
+- `main/test-notificaciones-seguridad.js` (nuevo) → **23/23 OK**: 4 canales sin token → `UNAUTHORIZED`, companyKey ajena → `FORBIDDEN_COMPANY`, `marcarLeida` de otra empresa → `updated: 0`, `getUnreadCount` solo número, gate `bandeja_integrada_enabled=0` → 0 correos, y sin `access_token` en notifications-*.
+- Suite completa: bridge **25/25**, service **10/10**, email **6/6**, wiring **9/9**, fuentes **52/52**, ui **25/25**. `node --check` OK en `main.js`, `preload.js` y `notifications-*.js`.
+
 ## [0.1.211] - 2026-09-21
 
 ### 📦802 · Verificación — Definición de Indicadores (6.1.1) + Despliegue Estratégico (6.1.3)

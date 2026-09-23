@@ -66,6 +66,7 @@
   // ── Estado privado ──────────────────────────────────────────────────
   var _state = {
     pending: [],          // array de eventos pendientes
+    notifs: [],           // Task 6 — notificaciones sin leer (correo + eventos)
     lastFetched: 0,       // timestamp del último fetch
     isFetching: false,    // evita fetches concurrentes
     isOpen: false,        // popover abierto
@@ -145,6 +146,146 @@
     if (typeof console !== 'undefined' && console[level]) {
       console[level]('[KairAlerts] ' + msg);
     }
+  }
+
+  // ── Notificaciones persistentes (Task 6) ────────────────────────────
+  // Correo + eventos: lista de no leídas + badge + preferencia de ventana.
+  // Reutiliza electronAPI.notifications (preload.js) y el token de sesión
+  // que vive en localStorage ('kair-auth-token', AUTH_TOKEN_KEY del renderer).
+  var NOTIF_VENTANA_DEFAULT = 86400000; // 24 horas
+  var NOTIF_VENTANA_KEY = 'kair-notif-ventana';
+
+  function _getToken() {
+    try {
+      return localStorage.getItem('kair-auth-token') || null;
+    } catch (e) { return null; }
+  }
+
+  function _getNotifVentana() {
+    try {
+      var v = parseInt(localStorage.getItem(NOTIF_VENTANA_KEY), 10);
+      return (v > 0) ? v : NOTIF_VENTANA_DEFAULT;
+    } catch (e) { return NOTIF_VENTANA_DEFAULT; }
+  }
+
+  function _setNotifVentana(ms) {
+    var v = parseInt(ms, 10);
+    if (!(v > 0)) v = NOTIF_VENTANA_DEFAULT;
+    try { localStorage.setItem(NOTIF_VENTANA_KEY, String(v)); } catch (e) { }
+    var api = (typeof global.electronAPI !== 'undefined') ? global.electronAPI : null;
+    if (api && api.notifications && api.notifications.setVentana) {
+      // El canal exige sesión (UNAUTHORIZED): token + ventanaMs en el payload.
+      api.notifications.setVentana({ token: _getToken(), ventanaMs: v }).catch(function () { });
+    }
+    _showToast('Ventana de aviso actualizada', 'success');
+  }
+
+  function refreshNotifications() {
+    var api = (typeof global.electronAPI !== 'undefined') ? global.electronAPI : null;
+    if (!api || !api.notifications || !api.notifications.listar || !api.notifications.getUnreadCount) {
+      return Promise.resolve([]);
+    }
+    var token = _getToken();
+    if (!token) return Promise.resolve([]);
+    var cntPromise = api.notifications.getUnreadCount({ token: token })
+      .catch(function () { return null; });
+    var listPromise = api.notifications.listar({ token: token, soloNoLeidas: true, limit: 50 })
+      .catch(function () { return null; });
+    return Promise.all([cntPromise, listPromise]).then(function (results) {
+      var cnt = results[0];
+      var lst = results[1];
+      var unread = (cnt && cnt.success && cnt.data) ? (cnt.data.unread || cnt.data.count || cnt.data.total || 0) : 0;
+      global.__notifUnread = unread;
+      if (lst && lst.success && Array.isArray(lst.data)) {
+        _state.notifs = lst.data;
+      }
+      // Recompone el badge: el renderer suma __notifUnread al conteo de alertas
+      _emitCountChange(_state.count);
+      // Re-render si el popover está abierto
+      if (_state.isOpen) {
+        _renderPopover();
+      }
+      return _state.notifs;
+    });
+  }
+
+  function _marcarNotifLeida(id) {
+    var api = (typeof global.electronAPI !== 'undefined') ? global.electronAPI : null;
+    var token = _getToken();
+    var nid = parseInt(id, 10);
+    if (!api || !api.notifications || !api.notifications.marcarLeida || !token || !(nid > 0)) {
+      _showToast('No se pudo marcar como leída', 'error');
+      return;
+    }
+    api.notifications.marcarLeida({ token: token, ids: [nid] }).then(function (res) {
+      if (res && res.success) {
+        refreshNotifications();
+      } else {
+        _showToast('No se pudo marcar como leída', 'error');
+      }
+    }).catch(function () {
+      _showToast('No se pudo marcar como leída', 'error');
+    });
+  }
+
+  function _openNotif(id, tipo, companyKey) {
+    var activa = _getEmpresaId();
+    _closePopover();
+    if (tipo === 'correo') {
+      // Click correo solo navega si la empresa activa coincide
+      if (!activa || !companyKey || companyKey !== activa) {
+        if (companyKey) {
+          _showToast('Notificación de otra empresa (' + _esc(companyKey) + ')', 'info');
+        } else {
+          _showToast('Selecciona una empresa para abrir el correo', 'info');
+        }
+        return;
+      }
+      var btnBandeja = document.getElementById('bandeja-integrada-button');
+      if (btnBandeja) btnBandeja.click();
+      else _showToast('Bandeja Integrada no disponible', 'error');
+      return;
+    }
+    // Evento: abre el detalle si está en pendientes; si no, el calendario
+    var ev = null;
+    for (var i = 0; i < _state.pending.length; i++) {
+      if (_state.pending[i].id === id) { ev = _state.pending[i]; break; }
+    }
+    if (ev) {
+      _openEventDetail(id);
+      return;
+    }
+    var calBtn = document.getElementById('calendar-button');
+    if (calBtn) calBtn.click();
+  }
+
+  function _buildNotifItemEl(n) {
+    var tipo = n.tipo || 'evento';
+    var label = tipo === 'correo' ? 'Correo' : 'Evento';
+    var color = tipo === 'correo' ? '#2057b8' : '#e7a224';
+    var activa = _getEmpresaId();
+    var chipHtml = (n.companyKey && (!activa || n.companyKey !== activa))
+      ? '<span class="kair-alerts-notifs__chip">' + _esc(n.companyKey) + '</span>'
+      : '';
+    var resumen = String(n.resumen || '').slice(0, 90);
+    var item = document.createElement('div');
+    item.className = 'kair-alerts-notifs-item';
+    item.setAttribute('data-notif-id', _esc(n.id));
+    item.setAttribute('data-notif-tipo', _esc(tipo));
+    item.setAttribute('data-notif-company', _esc(n.companyKey || ''));
+    item.innerHTML =
+      '<div class="kair-alerts-notifs-item__top">' +
+        '<span class="kair-alerts-notifs-item__dot" style="background:' + _esc(color) + '"></span>' +
+        '<span class="kair-alerts-notifs-item__type">' + _esc(label) + '</span>' +
+        chipHtml +
+      '</div>' +
+      '<div class="kair-alerts-notifs-item__title">' + _esc(n.titulo || '(sin título)') + '</div>' +
+      (resumen ? '<div class="kair-alerts-notifs-item__resumen">' + _esc(resumen) + '</div>' : '') +
+      '<div class="kair-alerts-notifs-item__actions">' +
+        '<button type="button" class="kair-alerts-notifs-item__btn" data-kair-alerts-action="open-notif">Abrir</button>' +
+        '<button type="button" class="kair-alerts-notifs-item__btn" data-kair-alerts-action="marcar-notif">Marcar leída</button>' +
+      '</div>';
+    return item;
   }
 
   // ── Lógica de fetch ─────────────────────────────────────────────────
@@ -357,6 +498,26 @@
       listHtml = '<div class="kair-alerts-list" data-kair-alerts-list></div>';
     }
 
+    // Task 6 — Sección Notificaciones: lista no leídas + select de ventana
+    var notifs = _state.notifs;
+    var notifCount = Array.isArray(notifs) ? notifs.length : 0;
+    var notifSectionHtml =
+      '<div class="kair-alerts-notifs" data-kair-alerts-notifs>' +
+        '<div class="kair-alerts-notifs__head">' +
+          '<span class="kair-alerts-notifs__title">Notificaciones</span>' +
+          '<span class="kair-alerts-notifs__count">' + notifCount + '</span>' +
+          '<select class="kair-alerts-notifs__ventana" data-kair-alerts-ventana aria-label="Ventana de aviso" title="Con cuánta anticipación avisar de eventos próximos">' +
+            '<option value="900000">15 min</option>' +
+            '<option value="3600000">1 h</option>' +
+            '<option value="21600000">6 h</option>' +
+            '<option value="86400000">24 h</option>' +
+          '</select>' +
+        '</div>' +
+        (notifCount === 0
+          ? '<div class="kair-alerts-empty kair-alerts-empty--notif"><p class="kair-alerts-empty__desc">Sin notificaciones sin leer.</p></div>'
+          : '<div class="kair-alerts-notifs-list" data-kair-alerts-notifs-list></div>') +
+      '</div>';
+
     // 📦 Panel lateral anclado al badge del calendario (NO modal). El arrow
     // CSS apunta hacia el badge para indicar visualmente el origen. Sin
     // backdrop: el resto de la app sigue siendo interactuable.
@@ -384,6 +545,7 @@
           '</button>' +
         '</div>' +
         '<div class="kair-alerts-popover__body">' + listHtml + '</div>' +
+        notifSectionHtml +
         '<div class="kair-alerts-popover__foot">' +
           '<button type="button" class="kair-alerts-popover__calendar-link" data-kair-alerts-action="open-calendar">' +
             '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -422,6 +584,23 @@
       listEl.appendChild(frag);
     }
 
+    // Task 6 — Render de las notificaciones sin leer + select de ventana
+    if (notifCount > 0) {
+      var notifsListEl = panel.querySelector('[data-kair-alerts-notifs-list]');
+      var notifFrag = document.createDocumentFragment();
+      for (var j = 0; j < notifs.length; j++) {
+        notifFrag.appendChild(_buildNotifItemEl(notifs[j]));
+      }
+      notifsListEl.appendChild(notifFrag);
+    }
+    var ventSel = panel.querySelector('[data-kair-alerts-ventana]');
+    if (ventSel) {
+      ventSel.value = String(_getNotifVentana());
+      ventSel.addEventListener('change', function () {
+        _setNotifVentana(parseInt(ventSel.value, 10) || 86400000);
+      });
+    }
+
     // Click handlers del panel
     panel.addEventListener('click', function (e) {
       var actEl = e.target.closest('[data-kair-alerts-action]');
@@ -438,6 +617,21 @@
           if (itemEl) {
             var evId = itemEl.getAttribute('data-event-id');
             _openEventDetail(evId);
+          }
+        } else if (action === 'open-notif') {
+          // Task 6 — abrir notificación (correo navega solo si la empresa activa coincide)
+          var nItemEl = actEl.closest('.kair-alerts-notifs-item');
+          if (nItemEl) {
+            _openNotif(
+              nItemEl.getAttribute('data-notif-id'),
+              nItemEl.getAttribute('data-notif-tipo'),
+              nItemEl.getAttribute('data-notif-company')
+            );
+          }
+        } else if (action === 'marcar-notif') {
+          var mItemEl = actEl.closest('.kair-alerts-notifs-item');
+          if (mItemEl) {
+            _marcarNotifLeida(mItemEl.getAttribute('data-notif-id'));
           }
         }
       }
@@ -643,6 +837,8 @@
       _renderBadge(count);
       _pinHeader(count);
       _emitCountChange(count);
+      // Task 6 — la sección Notificaciones también se refresca (recompone el badge)
+      refreshNotifications();
       // Si el popover está abierto y la lista cambió, re-render
       if (_state.isOpen) {
         _renderPopover();
@@ -669,6 +865,7 @@
     _closePopover();
     _listeners = [];
     _state.pending = [];
+    _state.notifs = [];
     _state.count = 0;
     _renderBadge(0);
     _pinHeader(0);
@@ -693,6 +890,15 @@
     getPendingEvents: function () {
       return Array.isArray(_state.pending) ? _state.pending.slice() : [];
     },
+    // Task 6 — API nueva: refresca la sección Notificaciones (unread + lista
+    // no leída), actualiza window.__notifUnread y recompone el badge.
+    refreshNotifications: refreshNotifications,
+    getNotifsCount: function () {
+      return Array.isArray(_state.notifs) ? _state.notifs.length : 0;
+    },
+    // Task 6-fix — API nueva: ventana persistida (ms). El renderer la re-aplica
+    // al arrancar para que el servicio main recupere la preferencia tras reinicio.
+    getNotifVentana: _getNotifVentana,
     version: '1.0.0'
   };
 })(typeof window !== 'undefined' ? window : this);
