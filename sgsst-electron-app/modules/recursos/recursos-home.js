@@ -764,42 +764,86 @@ margin-bottom: 0.5rem;
     renderChartPresupuesto(data) {
         var el = document.getElementById('kair-chart-presupuesto');
         if (!el) return;
+        this._presupuestoChartData = data;
+        var self = this;
         var labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        var W = 690, H = 220;
-        var PAD_L = 30, PAD_R = 10, PAD_T = 10, PAD_B = 20;
         var maxArr = data.planeado.concat(data.ejecutado);
         var maxVal = Math.max.apply(null, maxArr.concat([1]));
-        function xi(i) { return PAD_L + (i / 11) * (W - PAD_L - PAD_R); }
-        function yv(v) { return PAD_T + (1 - v / maxVal) * (H - PAD_T - PAD_B); }
-        // 📦763-fix — usar L (line-to, 1 par de coords) en lugar de C (cubic bezier, 3 pares).
-        // C sin los 6 números causa el error SVG: "Expected number, …C148.18…".
-        function pathFor(arr) {
-            var p = '';
-            for (var i = 0; i < arr.length; i++) {
-                p += (i === 0 ? 'M ' : ' L ') + xi(i).toFixed(2) + ' ' + yv(arr[i]).toFixed(2);
-            }
-            return p;
+        var PAD_T = 8, PAD_B = 8;
+        // 📦812 — El viewBox se dimensiona IGUAL que la caja visible (sin letterboxing):
+        // W = ancho real del contenedor, H = alto real del SVG (o el clamp del CSS como
+        // respaldo). Los puntos van al CENTRO de cada celda de mes ((i + 0.5) * W / 12)
+        // para caer exactamente sobre los <span> de meses (flex:1; text-align:center).
+        function svgHeightFallback() {
+            var vw = (typeof window !== 'undefined' && window.innerWidth) || 1200;
+            return Math.round(Math.min(130, Math.max(96, vw * 0.095)));
         }
-        var planeadoPath = pathFor(data.planeado);
-        var ejecutadoPath = pathFor(data.ejecutado);
-        // 📦758 · Los nombres de los meses NO se dibujan dentro del gráfico: el gráfico se
-        // estira a lo ancho de la tarjeta, y un texto que se estira queda deformado y
-        // encimado. Ahora van como texto normal (HTML), repartidos debajo del dibujo.
-        el.innerHTML = ''
-            + '<svg viewBox="0 0 ' + W + ' ' + H + '">'
-            + '  <defs>'
-            + '    <linearGradient id="kair-grad" x1="0" x2="0" y1="0" y2="1">'
-            + '      <stop offset="0" stop-color="#2057b8" stop-opacity=".18"/>'
-            + '      <stop offset="1" stop-color="#2057b8" stop-opacity="0"/>'
-            + '    </linearGradient>'
-            + '  </defs>'
-            + '  <path d="' + planeadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="none" stroke="#d4dae3" stroke-width="3" stroke-dasharray="5 7"/>'
-            + '  <path d="' + ejecutadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="url(#kair-grad)"/>'
-            + '  <path d="' + ejecutadoPath + '" fill="none" stroke="#2057b8" stroke-width="3.5"/>'
-            + '</svg>'
-            + '<div class="kair-bar-chart__foot kair-bar-chart__months">'
-            + labels.map(function (m) { return '<span>' + m + '</span>'; }).join('')
-            + '</div>';
+        function buildHtml(W, H) {
+            function xi(i) { return ((i + 0.5) * W) / 12; }
+            function yv(v) { return PAD_T + (1 - v / maxVal) * (H - PAD_T - PAD_B); }
+            // 📦763-fix — usar L (line-to, 1 par de coords) en lugar de C (cubic bezier, 3 pares).
+            // C sin los 6 números causa el error SVG: "Expected number, …C148.18…".
+            function pathFor(arr) {
+                var p = '';
+                for (var i = 0; i < arr.length; i++) {
+                    p += (i === 0 ? 'M ' : ' L ') + xi(i).toFixed(2) + ' ' + yv(arr[i]).toFixed(2);
+                }
+                return p;
+            }
+            var planeadoPath = pathFor(data.planeado);
+            var ejecutadoPath = pathFor(data.ejecutado);
+            // El relleno se cierra en el rango de datos (centro de Ene → centro de Dic),
+            // no en las esquinas del lienzo. La línea planeado NO se cierra: solo se traza.
+            var areaPath = ejecutadoPath
+                + ' L ' + xi(11).toFixed(2) + ' ' + H
+                + ' L ' + xi(0).toFixed(2) + ' ' + H + ' Z';
+            // 📦758 · Los nombres de los meses NO se dibujan dentro del gráfico: el gráfico se
+            // estira a lo ancho de la tarjeta, y un texto que se estira queda deformado y
+            // encimado. Ahora van como texto normal (HTML), repartidos debajo del dibujo.
+            return ''
+                + '<svg viewBox="0 0 ' + W + ' ' + H + '">'
+                + '  <defs>'
+                + '    <linearGradient id="kair-grad" x1="0" x2="0" y1="0" y2="1">'
+                + '      <stop offset="0" stop-color="#2057b8" stop-opacity=".18"/>'
+                + '      <stop offset="1" stop-color="#2057b8" stop-opacity="0"/>'
+                + '    </linearGradient>'
+                + '  </defs>'
+                + '  <path d="' + planeadoPath + '" fill="none" stroke="#d4dae3" stroke-width="3" stroke-dasharray="5 7"/>'
+                + '  <path d="' + areaPath + '" fill="url(#kair-grad)"/>'
+                + '  <path d="' + ejecutadoPath + '" fill="none" stroke="#2057b8" stroke-width="3.5"/>'
+                + '</svg>'
+                + '<div class="kair-bar-chart__foot kair-bar-chart__months">'
+                + labels.map(function (m) { return '<span>' + m + '</span>'; }).join('')
+                + '</div>';
+        }
+        var W = Math.round(el.clientWidth) || 690;
+        var H = svgHeightFallback();
+        el.innerHTML = buildHtml(W, H);
+        // Segunda pasada: medir el SVG real (si el DOM ya lo pinto) y ajustar el viewBox
+        // si el alto estimado no coincidía con el clamp CSS.
+        if (el.getElementsByTagName) {
+            var svgs = el.getElementsByTagName('svg');
+            if (svgs && svgs[0]) {
+                var rect = svgs[0].getBoundingClientRect ? svgs[0].getBoundingClientRect() : null;
+                var W2 = Math.round(svgs[0].clientWidth || (rect && rect.width)) || W;
+                var H2 = Math.round(svgs[0].clientHeight || (rect && rect.height)) || H;
+                if (W2 > 0 && H2 > 0 && (W2 !== W || H2 !== H)) {
+                    el.innerHTML = buildHtml(W2, H2);
+                }
+            }
+        }
+        // Re-render al redimensionar (el viewBox depende del ancho real de la caja).
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !window.__kairPresupuestoResizeBound) {
+            window.__kairPresupuestoResizeBound = true;
+            window.addEventListener('resize', function () {
+                clearTimeout(window.__kairPresupuestoResizeTimer);
+                window.__kairPresupuestoResizeTimer = setTimeout(function () {
+                    var chartEl = document.getElementById('kair-chart-presupuesto');
+                    if (chartEl && typeof chartEl._kairRerender === 'function') chartEl._kairRerender();
+                }, 200);
+            });
+        }
+        el._kairRerender = function () { self.renderChartPresupuesto(data); };
     }
 
     renderSubmodulesGrid() {

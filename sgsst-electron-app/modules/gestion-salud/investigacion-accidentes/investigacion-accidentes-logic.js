@@ -66,7 +66,7 @@ class InvestigacionAccidentesComponent {
         container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260919-premium`;
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260924-fullwidth`;
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';

@@ -231,6 +231,20 @@ check('Recursos: los 12 meses son texto normal debajo del dibujo, no parte del d
   recursos.indexOf('<text') < 0);
 check('Recursos: el dibujo en sí sigue existiendo (planeado punteado + ejecutado sólido)',
   (recursos.match(/<path /g) || []).length === 3);
+// 📦812 — alineación de la gráfica de Ejecución presupuestal
+const recursosSrc = fs.readFileSync(path.join(root, 'modules', 'recursos', 'recursos-home.js'), 'utf8');
+check('Recursos: viewBox dinámico (W/H variables, no el 690x220 fijo)',
+  /viewBox="0 0 ' \+ W \+ ' ' \+ H \+ '"/.test(recursosSrc) &&
+  /Math\.round\(el\.clientWidth\)/.test(recursosSrc) &&
+  !/var W = 690, H = 220/.test(recursosSrc));
+check('Recursos: los puntos van al centro de cada celda de mes ((i + 0.5) * W / 12)',
+  /\(i \+ 0\.5\) \* W \/ 12|\(i\+0\.5\)\*W\/12/.test(recursosSrc.replace(/\s+/g, ' ')) ||
+  /\(i \+ 0\.5\) \* W/.test(recursosSrc));
+check('Recursos: la línea planeado NO se cierra con Z (quitaba el contorno fantasma)',
+  !/planeadoPath \+ ' L /.test(recursosSrc));
+const dashPath = (recursos.match(/<path d="([^"]+)"[^>]*stroke-dasharray="5 7"/) || [])[1];
+check('Recursos: el path punteado renderizado no termina en Z', !!dashPath && !/Z/.test(dashPath),
+  dashPath ? dashPath.slice(-30) : 'sin path dasharray');
 
 // ── 8. Las reglas CSS que hacen que nada se pise ─────────────────────────────
 const css = fs.readFileSync(path.join(root, 'shared', 'kair-components.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

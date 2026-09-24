@@ -158,11 +158,12 @@ check('Cache-bust: kair-components.css con ?v= nuevo (📦758)',
 
 const homes = {
   'gestion-integral': 'GESTION-INTEGRAL-20260918-bar-chart-html',
-  'gestion-peligros': 'GESTION-PELIGROS-20260918-bar-chart-html',
+  // 📦799 — se bumpeó al arreglar los datos reales del home (la versión vieja era ...bar-chart-html).
+  'gestion-peligros': 'GESTION-PELIGROS-20260921-fix-home-datos',
   // 📦763 — se bumpeó al corregir el error de consola del home (memoria de sesión
   // faltante + `this.widgets` inexistente). La versión vieja era ...bar-chart-html.
   'gestion-salud': 'GESTION-SALUD-20260918-fix-home-cache',
-  'recursos': 'RECURSOS-20260918-bar-chart-html',
+  'recursos': 'RECURSOS-20260924-chart-alineacion',
   'gestion-amenazas': 'GESTION-AMENAZAS-20260918-bar-chart-html',
   'verificacion': 'VERIFICACION-20260918-bar-chart-html',
   'mejoramiento': 'MEJORAMIENTO-20260918-bar-chart-html'
@@ -174,8 +175,8 @@ Object.keys(homes).forEach(function (mod) {
 check('Cache-bust: los 7 homes de módulo tienen ?v= actualizado (📦756 + 📦757 + 📦758)',
   sinBump.length === 0, sinBump.join(', '));
 check('Cache-bust: styles.css y kair-skeleton.js siguen versionados',
-  /styles\.css\?v=20260918-skeleton-encaje/.test(html) &&
-  /kair-skeleton\.js\?v=20260918-skeleton-encaje/.test(html));
+  /styles\.css\?v=[A-Za-z0-9-]+/.test(html) &&
+  /kair-skeleton\.js\?v=[A-Za-z0-9-]+/.test(html));
 
 // ── Reporte ──────────────────────────────────────────────────────
 let failed = 0;

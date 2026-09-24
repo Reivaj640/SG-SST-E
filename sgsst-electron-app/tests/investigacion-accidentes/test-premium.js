@@ -73,6 +73,9 @@ check('Portal: conserva los handlers del home.js',
 check('Portal: modo oscuro dark y dark-legacy',
   /\[data-theme="dark"\] \.inv-portal-scope/.test(portal) &&
   /\[data-theme="dark-legacy"\] \.inv-portal-scope/.test(portal));
+check('Portal CSS: el portal usa TODO el ancho (sin max-width centrado)',
+  /\.invp-portal \{[^}]*max-width: none;/.test(portalLimpio.replace(/\n/g, ' ')) &&
+  !/\.invp-portal \{[^}]*max-width: 1120px;/.test(portalLimpio.replace(/\n/g, ' ')));
 
 /* ══════════════ C. VISTA "REALIZAR INVESTIGACIÓN" ══════════════ */
 check('Realizar: Header System v2 (breadcrumb + icon chip + título + acciones)',
