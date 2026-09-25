@@ -4041,7 +4041,7 @@ Widget: "35 / 50" + "⚠ Refuerzo necesario (15 pendientes)"  ✅ (real)
 
 ### Added
 - **Sistema de Inteligencia Artificial para Investigación de Accidentes**
-  - Servidor LLM persistente (`llm_server.py`) con modelo Mistral 3 3B Reasoning
+  - Servidor LLM persistente (`llm_server.py`) con modelo LLM local (Ollama)
   - Análisis automático de causa raíz mediante metodología 5 Porqués
   - Extracción de datos desde PDFs de reportes de accidentes
   - Generación automática de informes de investigación en formato DOCX

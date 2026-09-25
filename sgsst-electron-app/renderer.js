@@ -6678,7 +6678,7 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
 
     // Crear un iframe para cargar la nueva interfaz de configuraciones
     const iframe = document.createElement('iframe');
-    iframe.src = 'components/config/config-viewer.html?v=20260916-premium';
+    iframe.src = 'components/config/config-viewer.html?v=20260925-prompt-verbatim';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';

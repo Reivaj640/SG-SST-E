@@ -26,3 +26,6 @@ ttkbootstrap>=1.12
 
 # --- Servidor LLM (proxy Flask -> Ollama) ---
 flask>=3.0
+
+# --- Descarga de modelos GGUF desde HuggingFace (privados) ---
+huggingface_hub>=0.24

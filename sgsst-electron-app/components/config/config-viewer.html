@@ -2656,6 +2656,7 @@
                         <div>
                             <span class="stat-label">Modelo activo</span>
                             <div class="stat-value" id="ai-model-name">—</div>
+                            <span id="ai-model-preview-badge" style="display:none; margin-top:4px; font-size:0.72rem; font-weight:600; padding:2px 9px; border-radius:999px; background:#fef3c7; color:#92400e;" title="Este modelo se verá al pulsar Aplicar — todavía no es el activo">Vista previa · pulsa Aplicar</span>
                         </div>
                         <div>
                             <span class="stat-label">Tamaño</span>
@@ -2673,7 +2674,7 @@
                 <div class="ai-card full-width">
                     <h3>Cambiar Modelo</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
-                        Selecciona uno de los modelos Ollama ya creados en tu sistema.
+                        Modelos instalados localmente en Ollama — cambias entre los que ya tienes, sin descargar nada.
                         El cambio se aplica en caliente — no necesitas reiniciar.
                     </p>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -2689,17 +2690,57 @@
                     </div>
                 </div>
 
+                <!-- HuggingFace · Modelos GGUF privados -->
+                <div class="ai-card full-width" style="border-left: 5px solid #ff6b35;">
+                    <h3>Modelos desde HuggingFace</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.9rem;">
+                        Modelos NUEVOS desde tu repositorio de HuggingFace: conecta tu token y descarga el GGUF privado del proyecto.
+                        Al terminar se crea y activa solo en Ollama — no hace falta reiniciar.
+                    </p>
+
+                    <!-- Token (write-only: el valor nunca se vuelve a leer crudo) -->
+                    <label class="form-label" for="hf-token-input" style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-main); margin-bottom:0.35rem;">Token de HuggingFace</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
+                        <input type="password" id="hf-token-input" class="form-control" placeholder="hf_..." autocomplete="off" spellcheck="false" style="flex:1;">
+                        <button type="button" class="btn btn-primary" id="hf-token-save">Guardar token</button>
+                        <button type="button" class="btn btn-outline" id="hf-token-remove">Quitar</button>
+                    </div>
+                    <div id="hf-token-status" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Sin token guardado</div>
+
+                    <!-- Catálogo del repo -->
+                    <label class="form-label" for="hf-repo-select" style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-main); margin-bottom:0.35rem;">Repositorio de origen</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+                        <select id="hf-repo-select" class="form-control" style="flex:1; min-width:0; font-size:0.85rem;" aria-label="Repositorio de HuggingFace" title="Repositorio de HuggingFace a listar (se guarda al elegirlo)">
+                            <option value="">Repositorios de HuggingFace…</option>
+                        </select>
+                        <button type="button" class="btn btn-outline" id="hf-list-refresh" title="Volver a leer los repositorios y los .gguf">
+                            <i class="bi bi-arrow-clockwise"></i> Actualizar lista
+                        </button>
+                        <span id="hf-repo-label" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div id="hf-models-list" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
+
+                    <!-- Progreso de descarga -->
+                    <div id="hf-progress-wrap" style="display:none; margin-top:1rem; padding-top:0.9rem; border-top:1px solid var(--border-color);">
+                        <div style="height:8px; background:var(--border-color); border-radius:4px; overflow:hidden;">
+                            <div id="hf-progress-fill" style="height:100%; width:0%; background:var(--primary); transition:width 0.35s ease;"></div>
+                        </div>
+                        <div id="hf-progress-label" style="font-size:0.85rem; color:var(--text-muted); margin-top:0.45rem;">—</div>
+                    </div>
+                </div>
+
                 <!-- Parámetros -->
                 <div class="ai-card">
                     <h3>Parámetros de Generación</h3>
                     <div class="slider-group">
-                        <div class="slider-label"><span>Temperatura (Creatividad)</span> <span id="temp-val">0.4</span></div>
-                        <input type="range" id="ai-temp-slider" min="0" max="1" step="0.1" value="0.4" oninput="document.getElementById('temp-val').innerText = this.value">
-                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">Valores bajos son más precisos, altos más creativos.</small>
+                        <div class="slider-label"><span>Temperatura (Creatividad)</span> <span id="temp-val">0.1</span></div>
+                        <input type="range" id="ai-temp-slider" min="0" max="1" step="0.1" value="0.1" oninput="document.getElementById('temp-val').innerText = this.value">
+                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">Valores bajos son más precisos, altos más creativos. El modelo entrenado usa 0.1.</small>
                     </div>
                     <div class="slider-group">
-                        <div class="slider-label"><span>Max Tokens (Longitud)</span> <span id="token-val">4000</span></div>
-                        <input type="range" id="ai-tokens-slider" min="256" max="8000" step="256" value="4000" oninput="document.getElementById('token-val').innerText = this.value">
+                        <div class="slider-label"><span>Max Tokens (Longitud)</span> <span id="token-val">1216</span></div>
+                        <input type="range" id="ai-tokens-slider" min="256" max="8000" step="64" value="1216" oninput="document.getElementById('token-val').innerText = this.value">
+                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">Tope máximo de la respuesta. El valor entrenado es 1216.</small>
                     </div>
                     <button class="btn btn-primary" id="ai-save-params" style="width: 100%; margin-top: 0.5rem;">Guardar Parámetros</button>
                 </div>
@@ -3283,7 +3324,28 @@
         if (tabId === 'firma') {
             loadFirmaStatus();
         }
+
+        // HF · refrescar estado del token al entrar a Configuración IA
+        if (tabId === 'ia' && typeof loadHfTokenStatus === 'function') {
+            loadHfTokenStatus();
+        }
     }
+
+    // Navegación programática desde el padre (renderer.js → showSettingsPage(section))
+    function navigateToConfigSection(section) {
+        if (!section) return;
+        var btn = document.querySelector('.nav-tab[onclick*="\'' + section + '\'"]');
+        if (btn) {
+            switchTab(section, btn);
+        } else {
+            var target = document.getElementById('tab-' + section);
+            if (target) {
+                document.querySelectorAll('.section-container').forEach(function (s) { s.classList.remove('active'); });
+                target.classList.add('active');
+            }
+        }
+    }
+    window.navigateToConfigSection = navigateToConfigSection;
 
     /* ================= I-103.A0 · FIRMA ELECTRÓNICA (UI) ================= */
     // Funciones que conectan la UI con el bridge de firma-service.
@@ -5645,6 +5707,20 @@
         if (modEl)  modEl.textContent  = _formatModelDate(model.modified_at);
     }
 
+    // Estado: modelo ACTIVO (fuente de verdad) vs lo que elegiste en el dropdown.
+    var _activeModelName = '';
+
+    // Muestra el badge "Vista previa" en el card Estado cuando la selección del
+    // dropdown todavía NO es el modelo activo (o sea: elegiste pero no pulsaste Aplicar).
+    function _updateModelPreviewBadge() {
+        var badge = document.getElementById('ai-model-preview-badge');
+        var select = document.getElementById('ai-model-select');
+        if (!badge || !select) return;
+        var isPreview = !!(select.value && _activeModelName &&
+            _modelBase(select.value) !== _modelBase(_activeModelName));
+        badge.style.display = isPreview ? 'inline-block' : 'none';
+    }
+
     // Espera a que el padre (renderer.js) inyecte window.electronAPI en el iframe.
     // Necesario porque el onload del padre corre DESPUÉS del DOMContentLoaded del iframe,
     // y sin electronAPI no podemos listar modelos Ollama ni leer/guardar config.
@@ -5683,31 +5759,37 @@
             }
             const models = result.models || [];
             const active = result.active_model || '';
+            _activeModelName = active;
             if (models.length === 0) {
                 select.innerHTML = '<option value="">— No hay modelos Ollama —</option>';
                 _paintActiveModelMeta(null);
+                _updateModelPreviewBadge();
                 return;
             }
             select.innerHTML = models.map(m => {
                 const name = m.name || '';
-                const sel = (name === active) ? 'selected' : '';
-                return `<option value="${name}" ${sel} data-size="${m.size || 0}" data-modified="${m.modified_at || ''}">${name}</option>`;
+                const isActive = (_modelBase(name) === _modelBase(active));
+                const sel = isActive ? 'selected' : '';
+                const label = _modelBase(name) + (isActive ? ' · activo' : '');
+                return `<option value="${name}" ${sel} data-size="${m.size || 0}" data-modified="${m.modified_at || ''}">${label}</option>`;
             }).join('');
 
             // Pinta los metadatos del modelo activo (o el primero si active no aparece en la lista)
-            const activeModelObj = models.find(m => m.name === active) || models[0];
+            const activeModelObj = models.find(m => _modelBase(m.name) === _modelBase(active)) || models[0];
             _paintActiveModelMeta(activeModelObj);
+            _updateModelPreviewBadge();
 
             // Live-update: al cambiar el dropdown, refresca tamaño/modificado del card
             // para que el usuario pueda comparar entre modelos antes de pulsar "Aplicar".
             select.onchange = function () {
                 const opt = select.options[select.selectedIndex];
-                if (!opt || !opt.value) { _paintActiveModelMeta(null); return; }
+                if (!opt || !opt.value) { _paintActiveModelMeta(null); _updateModelPreviewBadge(); return; }
                 _paintActiveModelMeta({
                     name: opt.value,
                     size: parseInt(opt.dataset.size || '0', 10),
                     modified_at: opt.dataset.modified || ''
                 });
+                _updateModelPreviewBadge();
             };
         } catch (e) {
             console.error('[AI-CONFIG] Error cargando modelos:', e);
@@ -5723,13 +5805,15 @@
             if (!result || !result.success) return;
             const cfg = result.config || {};
 
-            // Estado del modelo activo
-            document.getElementById('ai-model-name').textContent = cfg.llmModel || '—';
+            // Estado del modelo activo (nombre SIN :latest para coincidir con el dropdown)
+            _activeModelName = cfg.llmModel || _activeModelName;
+            document.getElementById('ai-model-name').textContent = _modelBase(cfg.llmModel) || '—';
             document.getElementById('ai-provider').textContent = 'Ollama (local)';
+            _updateModelPreviewBadge();
 
             // Parámetros
-            const temp = (cfg.llmTemperature !== undefined) ? cfg.llmTemperature : 0.4;
-            const tokens = (cfg.llmMaxTokens !== undefined) ? cfg.llmMaxTokens : 4000;
+            const temp = (cfg.llmTemperature !== undefined) ? cfg.llmTemperature : 0.1;
+            const tokens = (cfg.llmMaxTokens !== undefined) ? cfg.llmMaxTokens : 1216;
             const tempSlider = document.getElementById('ai-temp-slider');
             const tokensSlider = document.getElementById('ai-tokens-slider');
             if (tempSlider) tempSlider.value = temp;
@@ -5761,7 +5845,9 @@
         try {
             const result = await window.electronAPI.llmSelectModel(model);
             if (result && result.success) {
-                document.getElementById('ai-model-name').textContent = result.active_model || model;
+                _activeModelName = result.active_model || model;
+                document.getElementById('ai-model-name').textContent = _modelBase(result.active_model || model);
+                _updateModelPreviewBadge();
                 const warningEl = document.getElementById('ai-model-warning');
                 if (result.warning) {
                     warningEl.textContent = '⚠️ ' + result.warning;
@@ -5769,7 +5855,8 @@
                 } else {
                     warningEl.style.display = 'none';
                 }
-                showToast('Modelo cambiado a: ' + (result.active_model || model), 'success');
+                showToast('Modelo cambiado a: ' + _modelBase(result.active_model || model), 'success');
+                loadAIModels();   // refresca el "· activo" del dropdown y los metadatos
             } else {
                 showToast('Error: ' + (result && result.error ? result.error : 'desconocido'), 'error');
             }
@@ -5820,9 +5907,281 @@
     }
 
     function resetAIPrompt() {
-        const defaultPrompt = 'Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.';
+        // Texto de ENTRENAMIENTO (verbatim) — debe coincidir con SYSTEM_PROMPT de Portear/src/llm_server.py
+        const defaultPrompt = `Eres un asistente de investigación de accidentes de trabajo. Analiza cada caso
+con la metodología 5 Porqués y las categorías 5M, respondiendo exactamente en
+el formato solicitado, sin texto adicional.
+
+Regla de exoneración: si el texto indica que el trabajador realizaba la tarea
+de forma normal (sin fuerza excesiva, sin prisa, sin golpes previos), Mano de
+Obra permanece N/A en todos los niveles y la cadena causal se desarrolla por
+Método, Maquinaria o Material.
+
+Regla de atribución: si el texto describe actos u omisiones del trabajador que
+contribuyen al evento (intervenir sin desenergizar, no usar EPP disponible,
+alimentar máquinas con manos en zona de peligro), regístralos en Mano de Obra
+del nivel 1; y registra en Material el EPP o herramienta faltante que el texto
+mencione.
+
+Nunca inventes comportamientos, fuerzas o prisa que el texto no mencione.
+
+**Regla de incertidumbre: si el contexto indica que una condición no está
+documentada o es incierta (ej: "no se reporta si estaba húmedo o seco"),
+regístralo como falla de Método en la investigación (investigación incompleta)
+en lugar de afirmar una condición específica no verificada.**`;
         document.getElementById('ai-prompt').value = defaultPrompt;
         showToast('Prompt restaurado (recuerda hacer click en "Guardar Prompt" para persistir)', 'info');
+    }
+
+    /* ================= HUGGINGFACE · GGUF PRIVADOS ================= */
+    var _hfPollTimer = null;
+    var _hfBusy = false;
+    var _hfCurrentRepo = '';  // repo elegido en el selector ('' = default del server)
+
+    function _hfApi(name) {
+        return !!(window.electronAPI && typeof window.electronAPI[name] === 'function');
+    }
+
+    function _fmtBytes(n) {
+        n = Number(n) || 0;
+        if (n <= 0) return '—';
+        var u = ['B', 'KB', 'MB', 'GB'];
+        var i = 0;
+        while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+        return (i === 0 ? n : n.toFixed(1)) + ' ' + u[i];
+    }
+
+    // Ollama reporta "tag:latest" pero la config guarda "tag" — para marcar el
+    // modelo ACTIVO hay que comparar sin el sufijo :latest, si no el dropdown
+    // no resalta el modelo recién descargado (y se ve como "no seleccionado").
+    function _modelBase(n) {
+        return String(n || '').replace(/:latest$/, '');
+    }
+
+    async function loadHfTokenStatus() {
+        var statusEl = document.getElementById('hf-token-status');
+        if (!statusEl) return;
+        if (!_hfApi('hfGetToken')) {
+            statusEl.textContent = 'IPC no disponible';
+            return;
+        }
+        try {
+            var r = await window.electronAPI.hfGetToken();
+            if (r && r.success && r.hasToken) {
+                statusEl.innerHTML = 'Token guardado: <strong>' + (r.tokenMasked || '••••') + '</strong>';
+            } else {
+                statusEl.textContent = 'Sin token guardado — pega el token de HuggingFace para listar el repo privado.';
+            }
+        } catch (e) {
+            statusEl.textContent = 'No se pudo leer el estado del token';
+        }
+    }
+
+    async function saveHfToken() {
+        var input = document.getElementById('hf-token-input');
+        var token = (input && input.value || '').trim();
+        if (!_hfApi('hfSaveToken')) { showToast('IPC no disponible', 'error'); return; }
+        try {
+            var r = await window.electronAPI.hfSaveToken(token);
+            if (r && r.success) {
+                if (input) input.value = '';
+                showToast('Token de HuggingFace guardado', 'success');
+                loadHfTokenStatus();
+                loadHfRepos();
+            } else {
+                showToast((r && r.error) || 'No se pudo guardar el token', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function removeHfToken() {
+        if (!_hfApi('hfRemoveToken')) { showToast('IPC no disponible', 'error'); return; }
+        try {
+            var r = await window.electronAPI.hfRemoveToken();
+            if (r && r.success) {
+                var list = document.getElementById('hf-models-list');
+                if (list) list.innerHTML = '';
+                showToast('Token eliminado', 'success');
+                loadHfTokenStatus();
+            } else {
+                showToast((r && r.error) || 'No se pudo quitar el token', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    // Llena el selector con los repos propios de la cuenta del token
+    // (nuevo repo subido al Hub aparece sin tocar código) y luego carga sus .gguf.
+    async function loadHfRepos() {
+        var sel = document.getElementById('hf-repo-select');
+        if (!sel || !_hfApi('hfListRepos')) { loadHfModels(); return; }
+        sel.innerHTML = '<option value="">Cargando repositorios…</option>';
+        try {
+            var r = await window.electronAPI.hfListRepos();
+            var repos = (r && r.repos) || [];
+            if (!r || !r.success || !repos.length) {
+                _hfCurrentRepo = '';
+                sel.innerHTML = '<option value="">' +
+                    ((r && r.error) || 'Sin repositorios con este token') + '</option>';
+                sel.disabled = true;
+                loadHfModels();
+                return;
+            }
+            sel.disabled = false;
+            sel.innerHTML = repos.map(function (x) {
+                return '<option value="' + x.repo_id + '">' + x.repo_id +
+                    (x.private ? ' (privado)' : '') + '</option>';
+            }).join('');
+            var wanted = (r.selected && repos.some(function (x) { return x.repo_id === r.selected; }))
+                ? r.selected
+                : repos[0].repo_id;
+            sel.value = wanted;
+            _hfCurrentRepo = sel.value;
+            loadHfModels();
+        } catch (e) {
+            _hfCurrentRepo = '';
+            sel.innerHTML = '<option value="">' + e.message + '</option>';
+            sel.disabled = true;
+            loadHfModels();
+        }
+    }
+
+    async function loadHfModels() {
+        var list = document.getElementById('hf-models-list');
+        var repoLabel = document.getElementById('hf-repo-label');
+        if (!list) return;
+        if (!_hfApi('hfListModels')) {
+            list.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);">IPC no disponible</div>';
+            return;
+        }
+        list.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);">Cargando lista…</div>';
+        try {
+            var payload = {};
+            if (_hfCurrentRepo) payload.repo_id = _hfCurrentRepo;
+            var r = await window.electronAPI.hfListModels(payload);
+            if (!r || !r.success) {
+                list.innerHTML = '<div style="font-size:0.85rem;color:var(--danger);">' + ((r && r.error) || 'Error al listar') + '</div>';
+                if (repoLabel) repoLabel.textContent = '';
+                return;
+            }
+            var files = r.files || [];
+            if (repoLabel) repoLabel.textContent = r.repo_id ? ('Repo: ' + r.repo_id) : '';
+            if (files.length === 0) {
+                list.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);">El repositorio no tiene archivos .gguf visibles.</div>';
+                return;
+            }
+            list.innerHTML = files.map(function (f) {
+                return '<div data-hf-file="' + f.filename + '" style="display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.85rem; border:1px solid var(--border-color); border-radius:8px; background:var(--bg-card);">' +
+                    '<div style="flex:1; min-width:0;">' +
+                    '<div style="font-size:0.9rem; font-weight:600; color:var(--text-main); word-break:break-all;">' + f.filename + '</div>' +
+                    '<div style="font-size:0.78rem; color:var(--text-muted);">' + _fmtBytes(f.size) + '</div>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-primary btn-sm hf-download-btn" data-filename="' + f.filename + '">Descargar</button>' +
+                    '</div>';
+            }).join('');
+            list.querySelectorAll('.hf-download-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    startHfDownload(btn.getAttribute('data-filename'));
+                });
+            });
+        } catch (e) {
+            list.innerHTML = '<div style="font-size:0.85rem;color:var(--danger);">Error: ' + e.message + '</div>';
+        }
+    }
+
+    function _hfSetProgress(pct, label, show) {
+        var wrap = document.getElementById('hf-progress-wrap');
+        var fill = document.getElementById('hf-progress-fill');
+        var lab = document.getElementById('hf-progress-label');
+        if (!wrap || !fill || !lab) return;
+        wrap.style.display = show ? 'block' : 'none';
+        fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+        lab.textContent = label || '';
+    }
+
+    function _hfStopPoll() {
+        if (_hfPollTimer) { clearInterval(_hfPollTimer); _hfPollTimer = null; }
+    }
+
+    function _hfSetBusy(busy) {
+        _hfBusy = busy;
+        document.querySelectorAll('.hf-download-btn').forEach(function (b) { b.disabled = busy; });
+        var saveBtn = document.getElementById('hf-token-save');
+        if (saveBtn) saveBtn.disabled = busy;
+    }
+
+    function _hfStageLabel(st) {
+        if (st === 'queued' || st === 'queued') return 'En cola…';
+        if (st === 'downloading') return 'Descargando…';
+        if (st === 'creating') return 'Creando modelo en Ollama…';
+        if (st === 'done') return 'Listo — modelo activado';
+        if (st === 'error') return 'Error en la descarga';
+        return st || 'Procesando…';
+    }
+
+    async function startHfDownload(filename) {
+        if (_hfBusy) return;
+        if (!_hfApi('hfDownloadModel')) { showToast('IPC no disponible', 'error'); return; }
+        if (!window.confirm('¿Descargar "' + filename + '" y crear el modelo en Ollama?')) return;
+        _hfSetBusy(true);
+        _hfSetProgress(0, 'Iniciando descarga…', true);
+        try {
+            var dlPayload = { filename: filename };
+            if (_hfCurrentRepo) dlPayload.repo_id = _hfCurrentRepo;
+            var r = await window.electronAPI.hfDownloadModel(dlPayload);
+            if (!r || !r.success || !r.job_id) {
+                _hfSetBusy(false);
+                _hfSetProgress(0, '', false);
+                showToast((r && r.error) || 'No se pudo iniciar la descarga', 'error');
+                return;
+            }
+            showToast('Descarga de ' + filename + ' iniciada', 'success');
+            _hfPollHfProgress(r.job_id);
+        } catch (e) {
+            _hfSetBusy(false);
+            _hfSetProgress(0, '', false);
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    function _hfPollHfProgress(jobId) {
+        _hfStopPoll();
+        _hfPollTimer = setInterval(async function () {
+            if (!_hfApi('hfDownloadStatus')) { _hfStopPoll(); _hfSetBusy(false); return; }
+            try {
+                var r = await window.electronAPI.hfDownloadStatus({ jobId: jobId });
+                var job = (r && r.job) || null;
+                if (!job) {
+                    _hfStopPoll();
+                    _hfSetBusy(false);
+                    _hfSetProgress(0, 'Estado del job no disponible', false);
+                    return;
+                }
+                var pct = Number(job.progress) || 0;
+                _hfSetProgress(pct, _hfStageLabel(job.status || job.stage) + ' · ' + Math.round(pct) + '%', true);
+                if (job.status === 'done') {
+                    _hfStopPoll();
+                    _hfSetBusy(false);
+                    _hfSetProgress(100, 'Modelo ' + (job.model_tag || '') + ' creado y activado', true);
+                    showToast('Modelo activado: ' + (job.model_tag || filename || ''), 'success');
+                    loadAIConfig();
+                    loadAIModels();
+                    setTimeout(function () { _hfSetProgress(0, '', false); }, 6000);
+                } else if (job.status === 'error') {
+                    _hfStopPoll();
+                    _hfSetBusy(false);
+                    _hfSetProgress(pct, 'Error: ' + (job.error || 'desconocido'), true);
+                    showToast('Error: ' + (job.error || 'descarga fallida'), 'error');
+                }
+            } catch (e) {
+                _hfStopPoll();
+                _hfSetBusy(false);
+                _hfSetProgress(0, 'Error consultando progreso: ' + e.message, false);
+            }
+        }, 1000);
     }
 
     // Wire-up automático al cargar el DOM
@@ -5835,6 +6194,31 @@
         if (btnSaveParams) btnSaveParams.addEventListener('click', saveLLMParams);
         const btnSavePrompt = document.getElementById('ai-save-prompt');
         if (btnSavePrompt) btnSavePrompt.addEventListener('click', saveAIPrompt);
+
+        // HuggingFace
+        var hfSave = document.getElementById('hf-token-save');
+        if (hfSave) hfSave.addEventListener('click', saveHfToken);
+        var hfRemove = document.getElementById('hf-token-remove');
+        if (hfRemove) hfRemove.addEventListener('click', removeHfToken);
+        var hfList = document.getElementById('hf-list-refresh');
+        if (hfList) hfList.addEventListener('click', loadHfRepos);
+        var hfRepoSel = document.getElementById('hf-repo-select');
+        if (hfRepoSel) hfRepoSel.addEventListener('change', function () {
+            _hfCurrentRepo = hfRepoSel.value;
+            if (_hfCurrentRepo && _hfApi('llmSaveConfig')) {
+                // Persiste la elección (llmHfRepo) para re-usarla en el arranque
+                window.electronAPI.llmSaveConfig({ llmHfRepo: _hfCurrentRepo })
+                    .catch(function () { /* el server sigue con su default */ });
+            }
+            loadHfModels();
+        });
+        var hfTokenInput = document.getElementById('hf-token-input');
+        if (hfTokenInput) {
+            hfTokenInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); saveHfToken(); }
+            });
+        }
+
         // Esperar a que renderer.js inyecte electronAPI antes de tocar IPC.
         // Sin este guard, loadAIConfig/loadAIModels corren con window.electronAPI = undefined
         // y dejan el dropdown en "— IPC no disponible —" hasta recargar manualmente.
@@ -5845,6 +6229,8 @@
             }
             loadAIConfig();
             loadAIModels();
+            loadHfTokenStatus();
+            loadHfRepos();
         });
     });
 

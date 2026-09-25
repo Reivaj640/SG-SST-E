@@ -66,8 +66,17 @@ check('HTML: un solo </head>', (html.match(/<\/head>/g) || []).length === 1);
 check('HTML: un solo </html>', (html.match(/<\/html>/g) || []).length === 1);
 
 // --- Cache-bust del iframe ---
-check('renderer.js: iframe con cache-bust premium', /components\/config\/config-viewer\.html\?v=20260916-premium/.test(renderer));
+check('renderer.js: iframe con cache-bust HF', /components\/config\/config-viewer\.html\?v=20260925-prompt-verbatim/.test(renderer));
 check('renderer.js: ya no queda el src sin token', !/'components\/config\/config-viewer\.html';/.test(renderer));
+
+// --- Sección HuggingFace (Fase 2 · Tarea 4) ---
+check('HTML: sección HF presente', /Modelos desde HuggingFace/.test(html));
+check('HTML: input token HF presente', /id="hf-token-input"/.test(html));
+check('HTML: lista HF presente', /id="hf-models-list"/.test(html));
+check('HTML: progreso HF presente', /id="hf-progress-wrap"/.test(html));
+check('HTML: navigateToConfigSection definida', /function navigateToConfigSection\s*\(/.test(html));
+check('HTML: APIs HF en JS', /loadHfTokenStatus/.test(html) && /loadHfModels/.test(html) && /startHfDownload/.test(html));
+check('HTML: switchTab refresca token HF en tab ia', /tabId === 'ia'/.test(html) && /loadHfTokenStatus\(\)/.test(html));
 
 // --- Handlers JS intactos ---
 check('HTML: switchTab sigue presente', /function switchTab\s*\(/.test(html));

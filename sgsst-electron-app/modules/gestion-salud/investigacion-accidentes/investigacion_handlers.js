@@ -1,10 +1,8 @@
-const { ipcMain, dialog, app } = require('electron');
+const { ipcMain, dialog, app, safeStorage } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fsp = require('fs').promises;
 const fs = require('fs');
-const { promisify } = require('util');
-const { execFile } = require('child_process');
 const http = require('http');
 
 // Determinar la ruta base del proyecto (raíz de sgsst-electron-app)
@@ -17,6 +15,16 @@ const LLM_SERVER_HOST = '127.0.0.1';
 const LLM_SERVER_PORT = 5555;  // Puerto Flask (llm_server.py)
 const LLM_SERVER_URL = `http://${LLM_SERVER_HOST}:${LLM_SERVER_PORT}`;
 const LLM_SERVER_SCRIPT = 'llm_server.py';
+
+// Ruta al script del servidor LLM: en dev usa Portear/src; en producción los
+// .py se empaquetan en process.resourcesPath/python-scripts (extraResources).
+function getLlmServerScriptPath() {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    const dir = isDev
+        ? PORTAR_SRC_PATH
+        : path.join(process.resourcesPath || PROJECT_ROOT, 'python-scripts');
+    return path.join(dir, LLM_SERVER_SCRIPT);
+}
 
 // Variable para rastrear el estado del servidor
 let llmServerProcess = null;
@@ -94,7 +102,7 @@ function sendLog(message, level = 'INFO') {
 /**
  * Realiza una petición HTTP al servidor LLM
  */
-function llmServerRequest(endpoint, method = 'GET', data = null) {
+function llmServerRequest(endpoint, method = 'GET', data = null, extraHeaders = null) {
     return new Promise((resolve, reject) => {
         const options = {
             hostname: LLM_SERVER_HOST,
@@ -102,7 +110,8 @@ function llmServerRequest(endpoint, method = 'GET', data = null) {
             path: endpoint,
             method: method,
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...(extraHeaders || {})
             },
             timeout: 1200000 // 20 minutos de timeout
         };
@@ -188,6 +197,83 @@ async function probeLlmServer() {
         req.on('timeout', () => { req.destroy(); resolve(false); });
         req.end();
     });
+}
+
+// ---------------------------------------------------------------------------
+// ensureLlmServerUp(): enciende Flask (:5555) si no está respondiendo.
+//
+// Contexto: desde la Fase 3 el servidor arranca bajo demanda (primer análisis
+// de AT), pero la pantalla Configuración › IA le pregunta a Flask (modelos,
+// config, HuggingFace) SIN pasar por el camino de análisis → ECONNREFUSED
+// 127.0.0.1:5555. Este helper se invoca al inicio de los handlers llm-* y
+// hf-* para garantizar que Flask esté vivo antes de hacer la petición.
+//
+// A diferencia de startLlmServer(), NO espera a que el modelo esté cargado
+// (en Configuración no hace falta) — solo a que Flask responda cualquier
+// cosa (probeLlmServer acepta respuestas HTTP de cualquier tipo).
+// ---------------------------------------------------------------------------
+let llmServerUpPromise = null;
+
+async function ensureLlmServerUp() {
+    if (await probeLlmServer()) return true;
+    if (llmServerUpPromise) return llmServerUpPromise;
+
+    llmServerUpPromise = (async () => {
+        try {
+            if (!llmServerProcess) {
+                const pythonExecutable = await resolvePython();
+                if (!pythonExecutable) {
+                    throw new Error('No se encontró Python en el sistema');
+                }
+                const serverScriptPath = getLlmServerScriptPath();
+                if (!fs.existsSync(serverScriptPath)) {
+                    throw new Error(`Script del servidor LLM no encontrado: ${serverScriptPath}`);
+                }
+                sendLog('[LLM] Encendiendo servidor Flask para Configuración…');
+                const proc = spawn(pythonExecutable, [serverScriptPath], {
+                    cwd: path.dirname(serverScriptPath),
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: true,
+                    env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+                });
+                // Los errores del child process son ASÍNCRONOS (no caen en try/catch)
+                let spawnError = null;
+                proc.on('error', (err) => {
+                    spawnError = err;
+                    sendLog(`[LLM] No se pudo iniciar Flask: ${err.message}`, 'ERROR');
+                });
+                proc.unref();
+                llmServerProcess = proc;
+
+                // Esperar hasta 60s a que Flask responda
+                for (let i = 0; i < 120; i++) {
+                    await new Promise(r => setTimeout(r, 500));
+                    if (spawnError) throw new Error(`No se pudo iniciar el servidor LLM: ${spawnError.message}`);
+                    if (await probeLlmServer()) {
+                        sendLog('[LLM] Servidor Flask listo (Configuración)');
+                        return true;
+                    }
+                }
+                throw new Error('El servidor LLM no respondió en 60s');
+            }
+
+            // Ya hay un proceso spawneado (startLlmServer en curso o Flask subiendo):
+            // solo esperar a que responda, sin duplicar el spawn.
+            for (let i = 0; i < 120; i++) {
+                if (await probeLlmServer()) return true;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            throw new Error('El servidor LLM no respondió en 60s');
+        } catch (e) {
+            llmServerProcess = null;
+            throw e;
+        } finally {
+            llmServerUpPromise = null;
+        }
+    })();
+
+    return llmServerUpPromise;
 }
 
 /**
@@ -345,7 +431,7 @@ async function startLlmServer() {
 		throw new Error('No se encontró Python en el sistema');
 	}
 
-    const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
+    const serverScriptPath = getLlmServerScriptPath();
     
     // Verificar que el script existe
     if (!require('fs').existsSync(serverScriptPath)) {
@@ -639,6 +725,8 @@ ipcMain.handle('investigacion-accidentes-process-accident-pdf', async (event, pd
  */
 ipcMain.handle('llm-list-models', async () => {
     try {
+        await ensureLlmServerUp();
+        await ensureOllamaRunning(); // /models consulta la API de Ollama
         const response = await llmServerRequest('/models', 'GET', null);
         return response;
     } catch (error) {
@@ -656,6 +744,7 @@ ipcMain.handle('llm-select-model', async (event, { model }) => {
         if (!model || typeof model !== 'string') {
             return { success: false, error: 'Se requiere el nombre del modelo' };
         }
+        await ensureLlmServerUp();
         const response = await llmServerRequest('/models/select', 'POST', { model });
         sendLog(`[LLM-CONFIG] Modelo cambiado a: ${response.active_model || model}`);
         return response;
@@ -670,6 +759,7 @@ ipcMain.handle('llm-select-model', async (event, { model }) => {
  */
 ipcMain.handle('llm-get-config', async () => {
     try {
+        await ensureLlmServerUp();
         const response = await llmServerRequest('/llm-config', 'GET', null);
         return response;
     } catch (error) {
@@ -684,11 +774,158 @@ ipcMain.handle('llm-get-config', async () => {
  */
 ipcMain.handle('llm-save-config', async (event, config) => {
     try {
+        await ensureLlmServerUp();
         const response = await llmServerRequest('/llm-config', 'POST', config || {});
         sendLog(`[LLM-CONFIG] Config guardada: model=${response.config?.llmModel}`);
         return response;
     } catch (error) {
         sendLog(`Error guardando config LLM: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
+// ============================================================================
+// IPC: HuggingFace (modelos GGUF privados) — Fase 1
+// Token en secrets.enc campo top-level `hfToken` (safeStorage).
+// Nunca se devuelve el token crudo al renderer (solo máscara).
+// ============================================================================
+
+function _hfSecretsPath() {
+    return path.join(app.getPath('userData'), 'secrets.enc');
+}
+
+function _readSecretsRaw() {
+    try {
+        const p = _hfSecretsPath();
+        if (!fs.existsSync(p)) return null;
+        if (!safeStorage || !safeStorage.isEncryptionAvailable || !safeStorage.isEncryptionAvailable()) return null;
+        return JSON.parse(safeStorage.decryptString(fs.readFileSync(p)));
+    } catch (e) {
+        sendLog(`[HF] Error leyendo secrets.enc: ${e.message}`, 'WARN');
+        return null;
+    }
+}
+
+function _writeSecretsRaw(obj) {
+    if (!safeStorage || !safeStorage.isEncryptionAvailable || !safeStorage.isEncryptionAvailable()) {
+        return false;
+    }
+    try {
+        fs.writeFileSync(_hfSecretsPath(), safeStorage.encryptString(JSON.stringify(obj)));
+        return true;
+    } catch (e) {
+        sendLog(`[HF] Error escribiendo secrets.enc: ${e.message}`, 'ERROR');
+        return false;
+    }
+}
+
+function _maskToken(t) {
+    if (!t || typeof t !== 'string') return '';
+    if (t.length <= 8) return '••••••••';
+    return t.slice(0, 4) + '…' + t.slice(-4);
+}
+
+function _getHfToken() {
+    const secrets = _readSecretsRaw();
+    return (secrets && typeof secrets.hfToken === 'string') ? secrets.hfToken : '';
+}
+
+ipcMain.handle('hf-save-token', async (event, { token } = {}) => {
+    try {
+        if (!token || typeof token !== 'string' || token.trim().length < 8) {
+            return { success: false, error: 'Token inválido (mínimo 8 caracteres)' };
+        }
+        const secrets = _readSecretsRaw() || { version: 2, empresas: {} };
+        secrets.hfToken = token.trim();
+        if (!_writeSecretsRaw(secrets)) {
+            return { success: false, error: 'No se pudo guardar (safeStorage no disponible)' };
+        }
+        return { success: true, tokenMasked: _maskToken(secrets.hfToken) };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('hf-get-token', async () => {
+    try {
+        const token = _getHfToken();
+        return { success: true, hasToken: !!token, tokenMasked: _maskToken(token) };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('hf-remove-token', async () => {
+    try {
+        const secrets = _readSecretsRaw();
+        if (secrets && secrets.hfToken) {
+            delete secrets.hfToken;
+            _writeSecretsRaw(secrets);
+        }
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('hf-list-repos', async () => {
+    try {
+        const token = _getHfToken();
+        if (!token) {
+            return { success: false, error: 'Guarda tu token de HuggingFace primero', repos: [] };
+        }
+        await ensureLlmServerUp();
+        const response = await llmServerRequest('/hf/repos', 'GET', null, { 'X-HF-Token': token });
+        return response;
+    } catch (error) {
+        sendLog(`Error listando repos HF: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message, repos: [] };
+    }
+});
+
+ipcMain.handle('hf-list-models', async (event, payload) => {
+    try {
+        const token = _getHfToken();
+        if (!token) {
+            return { success: false, error: 'Guarda tu token de HuggingFace primero', files: [] };
+        }
+        await ensureLlmServerUp();
+        const response = await llmServerRequest('/hf/list', 'POST', payload || {}, { 'X-HF-Token': token });
+        return response;
+    } catch (error) {
+        sendLog(`Error listando modelos HF: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message, files: [] };
+    }
+});
+
+ipcMain.handle('hf-download-model', async (event, payload) => {
+    try {
+        const token = _getHfToken();
+        if (!token) {
+            return { success: false, error: 'Guarda tu token de HuggingFace primero' };
+        }
+        await ensureLlmServerUp();
+        await ensureOllamaRunning(); // el worker necesita `ollama create`
+        const response = await llmServerRequest('/hf/download', 'POST', payload || {}, { 'X-HF-Token': token });
+        return response;
+    } catch (error) {
+        sendLog(`Error iniciando descarga HF: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('hf-download-status', async (event, { jobId } = {}) => {
+    try {
+        if (!jobId) return { success: false, error: 'jobId requerido' };
+        await ensureLlmServerUp();
+        const response = await llmServerRequest(
+            `/hf/progress?job_id=${encodeURIComponent(jobId)}`,
+            'GET',
+            null,
+            null
+        );
+        return response;
+    } catch (error) {
         return { success: false, error: error.message };
     }
 });
@@ -955,13 +1192,6 @@ ipcMain.handle('investigacion-accidentes-save-temp-pdf-file', async (event, file
     }
 });
 
-ipcMain.handle('investigacion-accidentes-get-config', async (event, empresa) => {
-	const pythonExecutable = await resolvePython();
-	const investAppPath = path.join(PORTAR_SRC_PATH, 'Invest_APP_V_3.py');
-    const { stdout } = await promisify(execFile)(pythonExecutable, [investAppPath, '--get-config', empresa], { cwd: path.dirname(investAppPath) });
-    return JSON.parse(stdout.trim());
-});
-
 /**
  * Inicializa el servidor LLM en segundo plano
  * Esta función retorna INMEDIATAMENTE - el modelo carga en background
@@ -1000,7 +1230,7 @@ async function initializeLlmServer() {
 	}
 	sendLog(`[LLM] Python resuelto: ${pythonExecutable}`);
 
-	const serverScriptPath = path.join(PORTAR_SRC_PATH, 'llm_server.py');
+	const serverScriptPath = getLlmServerScriptPath();
 	sendLog(`[LLM] Ruta del script: ${serverScriptPath}`);
 
 	// Verificar que el script existe
@@ -2413,12 +2643,9 @@ module.exports = {
   _findReportesAccidentesSubmodulePath
 };
 
-// Inicializar servidor automáticamente al cargar el módulo
-// Esto permite pre-cargar el modelo en segundo plano
-sendLog('[HANDLERS] Iniciando inicialización del módulo...');
-initializeLlmServer().then((result) => {
-    sendLog(`[HANDLERS] Módulo de handlers inicializado. Resultado: ${result}`);
-}).catch(err => {
-    sendLog(`[HANDLERS] Error en inicialización: ${err.message}`, 'WARN');
-});
+// Auto-start LAZY: el servidor LLM arranca bajo demanda al primer análisis
+// (analyzeAccidentViaServer → startLlmServer / initializeLlmServer).
+// No se precarga al cargar el módulo para evitar spawn de Python/Ollama
+// en cada arranque de la app.
+sendLog('[HANDLERS] Módulo de handlers cargado (LLM bajo demanda)');
 

@@ -52,13 +52,13 @@ class AccidentAnalyzer:
     Configuración por variables de entorno:
       - OLLAMA_HOST  (default: 127.0.0.1)
       - OLLAMA_PORT  (default: 11434)
-      - OLLAMA_MODEL (default: qwen-inv-at — modelo creado desde el Modelfile del proyecto)
+      - OLLAMA_MODEL (default: — vacío hasta configurar un modelo en Configuración › IA)
     """
 
     OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "127.0.0.1")
     OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
     OLLAMA_BASE_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
-    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen-inv-at")
+    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "")
     REQUEST_TIMEOUT = 600  # segundos — el análisis 5 Porqués puede tardar
 
     def __init__(self):
@@ -96,8 +96,8 @@ class AccidentAnalyzer:
             raise RuntimeError(
                 f"No se pudo conectar con Ollama en {self.OLLAMA_BASE_URL}: {e}. "
                 f"Asegurate de que Ollama este corriendo y que el modelo "
-                f"'{self.OLLAMA_MODEL}' este disponible (ejecuta setup_ollama.ps1 "
-                f"o 'ollama pull {self.OLLAMA_MODEL}')."
+                f"'{self.OLLAMA_MODEL}' este disponible (descargalo desde "
+                f"Configuracion > IA o 'ollama pull {self.OLLAMA_MODEL}')."
             ) from e
         response = json.loads(body) if body else {}
         msg = response.get("message", {}) or {}
@@ -1260,16 +1260,6 @@ if __name__ == "__main__":
         empresa = sys.argv[2]
         paths = Config.get_empresa_paths(empresa)
         print(json.dumps({"template_path": str(paths["plantilla"])}))
-        sys.exit(0)
-
-    if len(sys.argv) > 1 and sys.argv[1] == "--get-config" and len(sys.argv) > 2:
-        empresa = sys.argv[2]
-        paths = Config.get_empresa_paths(empresa)
-        config = {
-            "investigaciones": str(paths["investigaciones"]),
-            "plantilla": str(paths["plantilla"]),
-        }
-        print(json.dumps(config))
         sys.exit(0)
 
     # Nota: la verificacion de GPU ya no es necesaria aca. Ollama gestiona la

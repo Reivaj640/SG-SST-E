@@ -59,7 +59,12 @@ function exportarDatos() {
 }
 
 function abrirConfiguracion() {
-    alert('Función: Configuración\n\nSe abrirán las opciones de configuración del módulo de investigación.');
+    if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+            type: 'investigacion-home-action',
+            action: 'abrir-configuracion'
+        }, '*');
+    }
 }
 
 function callParentAPI(type, payload) {

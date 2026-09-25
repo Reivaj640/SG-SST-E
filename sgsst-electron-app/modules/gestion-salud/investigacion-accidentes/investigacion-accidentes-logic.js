@@ -66,7 +66,7 @@ class InvestigacionAccidentesComponent {
         container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260924-fullwidth`;
+        iframe.src = `./modules/gestion-salud/investigacion-accidentes/investigacion-home.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260924-hf-config`;
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
@@ -100,11 +100,31 @@ class InvestigacionAccidentesComponent {
                     this.handlePerformInvestigation();
                 } else if (action === 'ver-investigaciones') {
                     this.handleViewInvestigation();
+                } else if (action === 'abrir-configuracion') {
+                    this.openConfigIaTab();
                 }
             }
         };
 
         window.addEventListener('message', this._portalMessageHandler);
+    }
+
+    // Abre Configuración del sistema directo en la pestaña "Configuración IA".
+    openConfigIaTab() {
+        try {
+            if (typeof window.showSettingsPage === 'function') {
+                window.showSettingsPage('ia');
+                return;
+            }
+            if (typeof showSettingsPage === 'function') {
+                showSettingsPage('ia');
+                return;
+            }
+        } catch (e) {
+            console.warn('[INVESTIGACION] showSettingsPage falló:', e && e.message);
+        }
+        // Fallback: el listener de renderer.js ya sabe abrir Config con section
+        window.postMessage({ type: 'bandeja-integrada-open-config', section: 'ia' }, '*');
     }
     
     // Método para mostrar la nueva interfaz de investigación con IA
@@ -232,7 +252,7 @@ class InvestigacionAccidentesComponent {
     this.container.innerHTML = '';
 
         const iframe = document.createElement('iframe');
-        let src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260919-premium`;
+        let src = `./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&v=INV-20260925-calidad-banner`;
         if (investigacionNombre) {
             src += `&nombre=${encodeURIComponent(investigacionNombre)}`;
         }

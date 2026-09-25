@@ -1154,7 +1154,25 @@ showReviewToolbar();
         if (hasPorQueKeys) {
             // Formato del servidor: {"PorQue1": {...}, "PorQue2": {...}, ...}
     htmlContent += '<div class="five-whys-analysis">';
-    htmlContent += '<h3 style="margin-bottom: 20px; color: var(--inv-primary);"><i class="fas fa-brain" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
+    htmlContent += '<h3 style="margin-bottom: 10px; color: var(--inv-primary);"><i class="fas fa-brain" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
+
+    // Aviso de calidad: el servidor valida el análisis con el Backward Test; si
+    // llega con score < 70 (o con validation_warning), avisar al usuario para
+    // que lo revise — antes este aviso se generaba en el servidor y NUNCA se
+    // mostraba (el usuario recibía análisis de baja calidad sin saberlo).
+    const _valScore = results.validation && typeof results.validation.score === 'number'
+      ? results.validation.score : null;
+    const _valWarn = results.validation_warning || null;
+    if (_valWarn || (_valScore !== null && _valScore < 70)) {
+      const _warnText = _valWarn
+        ? _valWarn
+        : ('Análisis generado por debajo del umbral de calidad (score ' + _valScore + '/100)');
+      htmlContent +=
+        '<div class="inv-quality-warn">' +
+          '<i class="fas fa-exclamation-triangle"></i>' +
+          '<span><strong>Revisa con cuidado:</strong> ' + escapeHtml(_warnText) + '</span>' +
+        '</div>';
+    }
 
     const porQueKeys = allKeys
       .filter(key =>
@@ -1163,11 +1181,18 @@ showReviewToolbar();
         key.includes('Porqué') ||
         key.includes('Por que')
       )
+      .filter(key => {
+        // Tope de 5 niveles: si el modelo desbordó la metodología (niveles 6+),
+        // no se muestran. Clave sin número se conserva.
+        const n = parseInt(key.replace(/[^0-9]/g, ''), 10);
+        return isNaN(n) || n <= 5;
+      })
       .sort((a, b) => {
         const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
         const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
         return numA - numB;
-      });
+      })
+      .slice(0, 5);
 
     porQueKeys.forEach((key, index) => {
       const porQueData = analysisData[key];
@@ -1230,9 +1255,9 @@ showReviewToolbar();
         } else if (analysisData.cinco_porques && Array.isArray(analysisData.cinco_porques)) {
             // Formato anterior: {"cinco_porques": [...], "analisis_ishikawa": {...}}
     htmlContent += '<div class="five-whys">';
-    htmlContent += '<h3 style="margin-bottom: 20px; color: var(--inv-primary);"><i class="fas fa-search" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
+    htmlContent += '<h3 style="margin-bottom: 10px; color: var(--inv-primary);"><i class="fas fa-search" style="margin-right: 10px;"></i>Análisis 5 Por Qués</h3>';
 
-    analysisData.cinco_porques.forEach((item, index) => {
+    analysisData.cinco_porques.slice(0, 5).forEach((item, index) => {
       htmlContent += `
       <div class="inv-why-card" style="margin-bottom: 16px;">
         <div class="inv-why-header">

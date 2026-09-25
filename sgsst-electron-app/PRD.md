@@ -229,7 +229,7 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 ### 6.6 Investigación de Accidentes (con LLM)
 
 - **Origen**: 📦700+ en `modules/gestion-salud/investigacion-accidentes/`
-- **LLM**: Mistral 3 3B integrado via IPC, sin envío de datos personales fuera del repo
+- **LLM**: Qwen local vía Ollama/IPC, sin envío de datos personales fuera del repo
 - **3 vistas**: Editor + Lista + Detalle
 
 ### 6.7 Reportes y Estadísticas (3.2.3, 3.3.1-5)

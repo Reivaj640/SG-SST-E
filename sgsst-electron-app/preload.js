@@ -603,6 +603,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   llmGetConfig: () => ipcRenderer.invoke('llm-get-config'),
   llmSaveConfig: (config) => ipcRenderer.invoke('llm-save-config', config),
 
+  // --- HuggingFace (modelos GGUF privados) ---
+  hfListRepos: () => ipcRenderer.invoke('hf-list-repos'),
+  hfListModels: (payload) => ipcRenderer.invoke('hf-list-models', payload),
+  hfDownloadModel: (payload) => ipcRenderer.invoke('hf-download-model', payload),
+  hfDownloadStatus: (payload) => ipcRenderer.invoke('hf-download-status', payload),
+  hfSaveToken: (token) => ipcRenderer.invoke('hf-save-token', { token }),
+  hfGetToken: () => ipcRenderer.invoke('hf-get-token'),
+  hfRemoveToken: () => ipcRenderer.invoke('hf-remove-token'),
+
   // --- Investigación de Accidentes (Gestión) ---
   getInvestigacionStats: (companyName) => ipcRenderer.invoke('investigacion-accidentes-get-stats', { companyName }),
   listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),

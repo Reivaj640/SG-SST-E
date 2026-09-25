@@ -23,6 +23,7 @@ const F_VIEW_CSS = path.join(DIR, 'investigacion-accidentes-view.css');
 const F_LIST = path.join(DIR, 'investigaciones-view.html');
 const F_LIST_CSS = path.join(DIR, 'investigaciones-view.css');
 const F_LOGIC = path.join(DIR, 'investigacion-accidentes-logic.js');
+const F_MAIN = path.join(DIR, 'investigacion-accidentes-main.js');
 const F_INDEX = path.join(ROOT, 'index.html');
 
 const portal = fs.readFileSync(F_PORTAL, 'utf8');
@@ -31,6 +32,7 @@ const viewCss = fs.readFileSync(F_VIEW_CSS, 'utf8');
 const list = fs.readFileSync(F_LIST, 'utf8');
 const listCss = fs.readFileSync(F_LIST_CSS, 'utf8');
 const logic = fs.readFileSync(F_LOGIC, 'utf8');
+const mainJs = fs.readFileSync(F_MAIN, 'utf8');
 const indexHtml = fs.readFileSync(F_INDEX, 'utf8');
 
 function sinComentarios(t) {
@@ -142,6 +144,35 @@ check('logic.js: las 4 URLs de iframe llevan cache-bust ?v=INV-',
 check('logic.js: compila (node --check)',
   (function () {
     try { require('child_process').execSync('node --check "' + F_LOGIC + '"', { stdio: 'pipe' }); return true; }
+    catch (e) { return false; }
+  })());
+
+/* ══════════════ F. TOPE DE 5 NIVELES EN EL RENDER (5 Porqués) ══════════════
+   Regresión del bug donde el modelo generaba 36 niveles y el render
+   read-only los pintaba todos (el editable ya acotaba con [1..5]). */
+check('main.js: render read-only descarta claves de nivel >5',
+  /return isNaN\(n\) \|\| n <= 5;/.test(mainJs));
+check('main.js: render read-only con slice(0, 5) como red de seguridad',
+  /\.sort\([\s\S]{0,300}\)\s*\.slice\(0, 5\)/.test(mainJs));
+check('main.js: formato anterior cinco_porques limitado a 5',
+  /cinco_porques\.slice\(0, 5\)/.test(mainJs));
+check('main.js: la variante editable sigue acotando a [1, 2, 3, 4, 5]',
+  /levels\s*=\s*\[1,\s*2,\s*3,\s*4,\s*5\]/.test(mainJs));
+
+/* ══════════════ G. AVISO DE BAJA CALIDAD DEL ANÁLISIS (captura 2026-09-25) ═
+   El servidor ya devolvía validation_warning/validation.score pero el frontend
+   NUNCA los mostraba — el usuario recibía un análisis incoherente sin avisos. */
+check('main.js: banner de calidad si validation_warning o score < 70',
+  /results\.validation_warning \|\|/.test(mainJs) && /_valScore < 70/.test(mainJs));
+check('main.js: el banner usa la clase .inv-quality-warn con texto escapado',
+  /class=\\"inv-quality-warn|\\'\+/.test(mainJs) || /inv-quality-warn/.test(mainJs)
+  && /escapeHtml\(_warnText\)/.test(mainJs));
+check('view.css: la clase .inv-quality-warn existe con tokens y modo oscuro',
+  /\.inv-quality-warn/.test(fs.readFileSync(require('path').join(__dirname, '..', '..', 'modules', 'gestion-salud', 'investigacion-accidentes', 'investigacion-accidentes-view.css'), 'utf8'))
+  && /\[data-theme\^="dark"\] \.inv-quality-warn/.test(fs.readFileSync(require('path').join(__dirname, '..', '..', 'modules', 'gestion-salud', 'investigacion-accidentes', 'investigacion-accidentes-view.css'), 'utf8')));
+check('main.js: compila (node --check)',
+  (function () {
+    try { require('child_process').execSync('node --check "' + F_MAIN + '"', { stdio: 'pipe' }); return true; }
     catch (e) { return false; }
   })());
 

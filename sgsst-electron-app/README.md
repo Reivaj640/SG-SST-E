@@ -23,7 +23,7 @@
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
 - ✅ **9 Módulos Principales + 51 Submódulos con UI propia** 🆕 (v0.1.211): Recursos (12), Gestión Integral (9 implementados + 4 placeholder en roadmap), Gestión de la Salud (13 implementados + 5 placeholder), Gestión de Peligros y Riesgos (4 implementados + 7 placeholder), Gestión de Amenazas (2), Verificación (3 implementados + 1 placeholder), Mejoramiento (4 vistas), **Gestión Humana (12 — módulo top-level nuevo en v0.1.191)**, más `helpers` y `shared`. Total declarado en sidebar oficial: **67 entradas** (51 con UI real + 16 placeholder en roadmap normativo).
-- ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
+- ✅ **IA Integrada**: Análisis de accidentes con LLM local (Qwen GGUF vía Ollama)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
 - ✅ **Sistema Dual de Archivos**: PI-FO-076 (lista general) + PRI.xlsx (seguimiento)
@@ -547,7 +547,7 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 3.1.8  | Servicios de Higiene         | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
 | 3.1.9  | Manejo de Residuos           | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
 | 3.2.1  | Reporte de Accidentes (FURAT) | ✅    | `reportes-accidentes-logic.js`, `viewer.js`            |
-| 3.2.2  | Investigación de Accidentes e Incidentes | ✅ 🤖 | `investigacion-accidentes-logic.js`, `handlers.js` (con LLM Mistral 3 3B) |
+| 3.2.2  | Investigación de Accidentes e Incidentes | ✅ 🤖 | `investigacion-accidentes-logic.js`, `handlers.js` (con LLM local Qwen GGUF) |
 | 3.2.3  | Registro y Análisis Estadístico | ✅  | `registro-estadistico/*` (4 archivos, premium v2 + 9 charts Chart.js) |
 | 3.3.1  | Frecuencia de la Accidentalidad | ✅ | `frecuencia-accidentalidad/*` (4 archivos, premium v2, tokens `--freq-*`) |
 | 3.3.2  | Severidad de la Accidentalidad | ✅  | `severidad-accidentalidad/*` (4 archivos, premium v2, tokens `--sev-*`) |
@@ -629,7 +629,7 @@ Módulo top-level nuevo introducido en 📦709 (v0.1.191). Backend completo con 
 ### Módulo de Investigación de Accidentes (3.2.2)
 
 **Tecnología:**
-- **Modelo LLM**: Mistral 3 3B Reasoning (multimodal)
+- **Modelo LLM**: Qwen GGUF local (descargable desde Configuración › IA)
 - **Servidor**: Flask en puerto 5555
 - **Metodología**: 5 Porqués con categorías 5M
 

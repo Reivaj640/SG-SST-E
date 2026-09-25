@@ -1040,7 +1040,7 @@ html { overflow-x: hidden; }
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.875rem 1rem;
+  padding: 0.625rem 1rem;
   background: linear-gradient(135deg, var(--inv-primary-light) 0%, var(--inv-surface-card) 100%);
   border-bottom: 1px solid var(--inv-border-light);
 }
@@ -1060,6 +1060,7 @@ html { overflow-x: hidden; }
 }
 
 .inv-why-header p {
+  margin: 0;
   font-weight: 600;
   color: var(--inv-text-primary);
   font-size: 0.9375rem;
@@ -1129,6 +1130,24 @@ html { overflow-x: hidden; }
   color: var(--inv-text-secondary);
   line-height: 1.6;
 }
+
+/* ── Aviso de calidad del análisis (Backward Test < 70) ── */
+.inv-quality-warn {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  border-radius: var(--inv-radius);
+  border-left: 4px solid var(--inv-warning);
+  background: var(--inv-warning-light);
+  color: #856404;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.inv-quality-warn i { margin-top: 0.15rem; color: var(--inv-warning); }
+.inv-quality-warn strong { font-weight: 700; }
+[data-theme^="dark"] .inv-quality-warn { color: #f5d08a; }
 
 /* ── Root Causes Box ── */
 .inv-root-causes {

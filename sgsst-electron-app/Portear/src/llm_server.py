@@ -25,6 +25,9 @@ import json
 import time
 import re
 import logging
+import threading
+import subprocess
+import shutil
 from datetime import datetime
 from urllib import request as urllib_request
 from urllib.error import URLError, HTTPError
@@ -64,8 +67,9 @@ OLLAMA_PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
 OLLAMA_BASE_URL = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}"
 
 # Modelo activo — VARIABLE MUTABLE para permitir cambios en caliente desde la UI.
-# Antes era constante, ahora se puede cambiar via POST /models/select sin reiniciar.
-_current_model_name = os.environ.get("OLLAMA_MODEL", "qwen-inv-at")  # Creado desde Modelfile
+# Sin fallback silencioso: vacío = sin modelo configurado; la UI avisa y el
+# usuario descarga uno desde Configuración › IA (HuggingFace).
+_current_model_name = os.environ.get("OLLAMA_MODEL", "")
 
 # Lock para serializar cambios de modelo (evita race conditions entre threads)
 _model_lock = __import__('threading').Lock()
@@ -111,8 +115,10 @@ def _get_default_llm_config() -> dict:
     """Devuelve la config LLM por defecto. SYSTEM_PROMPT se resuelve aquí (lazy)."""
     return {
         "llmModel": get_current_model_name(),
-        "llmTemperature": 0.4,
-        "llmMaxTokens": 4000,
+        # Entrenamiento del modelo (Qwen3.5-0.8b-ia): temp 0.1, top_p 0.8,
+        # repeat_penalty 1.15, presence_penalty 0 (ver options en analyze/regenerate).
+        "llmTemperature": 0.1,
+        "llmMaxTokens": 1216,
         "llmSystemPrompt": SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else "",
     }
 
@@ -164,6 +170,9 @@ def update_llm_config(cfg: dict) -> dict:
     for key in ("llmTemperature", "llmMaxTokens", "llmSystemPrompt"):
         if key in cfg:
             current[key] = cfg[key]
+    # Repo HF activo (selector del panel Configuración › IA)
+    if "llmHfRepo" in cfg:
+        current["llmHfRepo"] = str(cfg["llmHfRepo"] or "").strip()[:200]
     # Modelo: si cambia, aplicar en caliente
     if "llmModel" in cfg and cfg["llmModel"] and cfg["llmModel"] != get_current_model_name():
         new_model = cfg["llmModel"].strip()
@@ -176,87 +185,60 @@ def update_llm_config(cfg: dict) -> dict:
 
 # ============================================================================
 # Prompt template para 5 Porqués
-# Separado en SYSTEM (instrucciones al modelo) y USER (datos del accidente).
+# SYSTEM = reglas de investigación; USER = plantilla entrenada + datos (verbatim).
 # Se envía vía Ollama /api/chat con messages separados para formato chat nativo.
 # ============================================================================
 
-SYSTEM_PROMPT = """Eres un analista experto en Seguridad y Salud en el Trabajo (SG-SST) especializado en investigación de accidentes laborales en Colombia, con conocimiento de la Resolución 0312 de 2019.
+SYSTEM_PROMPT = """Eres un asistente de investigación de accidentes de trabajo. Analiza cada caso
+con la metodología 5 Porqués y las categorías 5M, respondiendo exactamente en
+el formato solicitado, sin texto adicional.
 
-Tu tarea es analizar la descripción de un accidente laboral y generar un análisis de causa raíz usando la metodología de los 5 Porqués combinada con el diagrama de Ishikawa (espina de pescado) clasificado en 5 categorías M.
+Regla de exoneración: si el texto indica que el trabajador realizaba la tarea
+de forma normal (sin fuerza excesiva, sin prisa, sin golpes previos), Mano de
+Obra permanece N/A en todos los niveles y la cadena causal se desarrolla por
+Método, Maquinaria o Material.
+
+Regla de atribución: si el texto describe actos u omisiones del trabajador que
+contribuyen al evento (intervenir sin desenergizar, no usar EPP disponible,
+alimentar máquinas con manos en zona de peligro), regístralos en Mano de Obra
+del nivel 1; y registra en Material el EPP o herramienta faltante que el texto
+mencione.
+
+Nunca inventes comportamientos, fuerzas o prisa que el texto no mencione.
+
+**Regla de incertidumbre: si el contexto indica que una condición no está
+documentada o es incierta (ej: "no se reporta si estaba húmedo o seco"),
+regístralo como falla de Método en la investigación (investigación incompleta)
+en lugar de afirmar una condición específica no verificada.**"""
+
+# Plantilla entrenada (verbatim) del mensaje del USUARIO: instrucciones,
+# metodología 5 Porqués, reglas, formato estricto y cierre.
+# NO parafrasear: el modelo (Qwen3.5-0.8b-ia) fue afinado con ESTE texto exacto.
+INSTRUCCIONES_PROMPT = """INSTRUCCIONES: Genera un análisis 5 Porqués COMPLETO para el siguiente accidente laboral.
+
+METODOLOGÍA 5 PORQUÉS:
+- Cada nivel pregunta "¿Por qué?" al resultado del nivel anterior
+- El objetivo es llegar a la CAUSA RAÍZ que la empresa puede corregir con acciones concretas
+- Los niveles deben formar una CADENA CAUSAL COHERENTE (5→4→3→2→1→accidente)
+
+CATEGORÍAS 5M (analiza TODAS en CADA nivel):
+- Mano de Obra: acciones/comportamientos del trabajador (distracción, error, decisión, capacitación)
+- Método: procedimientos/normas/supervisión (falta de procedimiento, procedimiento inadecuado)
+- Maquinaria: equipos/vehículos/herramientas (falla mecánica, falta de mantenimiento)
+- Medio Ambiente: condiciones del lugar (iluminación, orden, señalización, temperatura)
+- Material: objetos/sustancias/EPP (material defectuoso, falta de EPP)
 
 REGLAS OBLIGATORIAS:
-1. Responde SIEMPRE en español colombiano, de forma técnica y objetiva.
-2. Genera EXACTAMENTE 5 niveles de "¿Por qué?".
-3. En CADA nivel analiza las 5 categorías 5M (si una categoría no aplica, marca "N/A").
-4. CADENA CAUSAL OBLIGATORIA — la pregunta de cada nivel es "¿Por qué ocurrió [causa principal del nivel anterior]?". Por lo tanto:
-   4a. Si en el nivel N una categoría X tiene una causa identificada, los niveles N+1, N+2, ... también deben responder a "¿por qué ocurrió esa causa?" — NO puedes dejar esa categoría en "N/A" en niveles intermedios (rompería la cadena).
-   4b. Solo se permite "N/A" en una categoría de un nivel intermedio si la causa ya quedó completamente resuelta y NO aplica seguir preguntando.
-   4c. Si en un nivel TODAS las categorías son "N/A", todos los niveles siguientes también deben ser "N/A" (no hay causa raíz para profundizar).
-   4d. La causa principal de cada nivel debe ser CONSECUENCIA directa de la causa del nivel anterior (cadena coherente 5→4→3→2→1).
-5. El nivel 5 debe identificar causas raíz ACCIONABLES que la empresa puede corregir.
-6. NO agregues explicaciones, introducciones, conclusiones, notas adicionales ni texto fuera del formato.
-7. NO uses "**", "###", ni otros marcadores de formato markdown.
-8. NO escribas los prompts de ejemplo ni las instrucciones de formato; responde SOLO con el análisis.
-9. Detente inmediatamente después del nivel 5.
+1. Genera EXACTAMENTE 5 niveles de análisis
+2. En CADA nivel, analiza TODAS las 5 categorías 5M (no solo una)
+3. Si una categoría NO contribuye a la causa en ese nivel, marca N/A
+4. La causa principal de cada nivel debe ser CONSECUENCIA del nivel anterior
+5. El último nivel debe identificar causas RAÍZ accionables por la empresa
+6. NO agregues explicaciones, introducciones, conclusiones, notas adicionales ni texto fuera del formato
+7. NO uses "**", "###", ni otros marcadores de formato markdown
+8. Detente inmediatamente después del nivel 5
 
-VALIDACIÓN OBLIGATORIA POR LECTURA INVERSA (BACKWARD TEST):
-Antes de entregar tu respuesta, DEBES leer tu propio análisis de nivel 5 hacia nivel 1 (de abajo hacia arriba) y verificar:
-
-  • ¿La causa raíz del nivel 5 explica por qué existe la causa del nivel 4?
-  • ¿La causa del nivel 4 explica por qué existe la causa del nivel 3?
-  • ¿La causa del nivel 3 explica por qué existe la causa del nivel 2?
-  • ¿La causa del nivel 2 explica por qué existe la causa del nivel 1?
-  • ¿La causa del nivel 1 es la causa inmediata del accidente?
-
-Aplica también la MATRIZ DE VALIDACIÓN al nivel 5 (causa raíz):
-  • COHERENCIA: ¿La lectura inversa tiene sentido completo?
-  • EVIDENCIA: ¿La causa es observable y verificable en la empresa?
-  • CONTROL: ¿La organización puede intervenir esa causa con un plan de acción?
-  • RECURRENCIA: ¿Esta causa podría explicar otros accidentes similares?
-  • EFECTIVIDAD: ¿Eliminar esta causa evitaría la repetición del accidente?
-
-Si encuentras saltos lógicos, identifica el nivel problemático y corrígelo INTERNAMENTE antes de responder. Solo entrega el análisis cuando la cadena inversa sea perfectamente coherente.
-
-IMPORTANTE SOBRE LA VALIDACIÓN: Tu validación interna es solo para tu control de calidad. NO la escribas en la respuesta final. NO escribas "Validación Inversa", "Matriz de Validación", ni ningún comentario sobre coherencia, evidencia, control o efectividad. El usuario solo quiere ver los 5 niveles del análisis. La validación es invisible — la haces en tu cabeza pero no la imprimes.
-
-EJEMPLO DE CADENA CORRECTA (Método):
-  Nivel 1: "No existe procedimiento escrito para manipular objetos cortantes"
-  Nivel 2: "No se realizó capacitación sobre el procedimiento existente"  ← contesta ¿por qué?
-  Nivel 3: "El supervisor no verificó la competencia del personal"       ← contesta ¿por qué?
-  Nivel 4: "La empresa carece de un programa de inducción específico"    ← contesta ¿por qué?
-  Nivel 5: "Falta de asignación presupuestal para formación en SST"     ← causa raíz accionable
-  → Lectura inversa: "Sin presupuesto para formación → sin inducción → sin verificar → sin capacitación → sin procedimiento → accidente" ✅ COHERENTE
-
-EJEMPLO DE CADENA INCORRECTA (NO hacer esto — N/A rompe la cadena):
-  Nivel 1: "No existe procedimiento escrito para manipular objetos cortantes"
-  Nivel 2: N/A           ← ❌ ROMPE LA CADENA. Nivel 2 DEBE responder ¿por qué no existe procedimiento?
-  Nivel 3: N/A
-  Nivel 4: "La empresa carece de un programa de inducción"  ← llega "de la nada"
-  Nivel 5: "Falta de presupuesto"
-  → Lectura inversa: "Sin presupuesto → inducción (sin conexión con niveles 2-3) → ..." ❌ SALTO LÓGICO
-
-EJEMPLO DE BACKWARD TEST EXITOSO (caso real de mesera con lesión lumbar):
-  Nivel 5: "No se estableció un sistema de supervisión y control de calidad en tareas de alto riesgo."
-    ↓ explica por qué
-  Nivel 4: "No existió un programa de inducción formal al cargo para la nueva trabajadora."
-    ↓ explica por qué
-  Nivel 3: "No hubo asignación presupuestal para la elaboración del documento técnico de seguridad."
-    ↓ explica por qué
-  Nivel 2: "No se creó o no se actualizó el manual de trabajo para cubrir esta operación específica."
-    ↓ explica por qué
-  Nivel 1: "No existía un procedimiento escrito que describiera la postura y técnica segura."
-    ↓ explica por qué
-  Accidente: "La trabajadora aplicó fuerza excesiva con mala técnica para levantar cubiertos."
-  → Cadena perfectamente coherente. ✅
-
-CATEGORÍAS 5M (definiciones):
-- Mano de Obra: acciones/comportamientos del trabajador (distracción, error, decisión, capacitación, EPP usado)
-- Método: procedimientos/normas/supervisión (falta de procedimiento, procedimiento inadecuado, falta de capacitación)
-- Maquinaria: equipos/vehículos/herramientas (falla mecánica, falta de mantenimiento, diseño inadecuado)
-- Medio Ambiente: condiciones del lugar (iluminación, orden, aseo, señalización, temperatura, ruido)
-- Material: objetos/sustancias/EPP (material defectuoso, falta de EPP, almacenamiento)
-
-FORMATO DE RESPUESTA ESTRICTO (usa este formato exacto, sin preámbulos):
+FORMATO DE RESPUESTA ESTRICTO (usa ESTE formato exacto):
 
 1. ¿Por qué ocurrió el accidente?
    • Mano de Obra: [causa específica o N/A]
@@ -291,13 +273,28 @@ FORMATO DE RESPUESTA ESTRICTO (usa este formato exacto, sin preámbulos):
    • Método: [causa específica o N/A]
    • Maquinaria: [causa específica o N/A]
    • Medio Ambiente: [causa específica o N/A]
-   • Material: [causa específica o N/A]"""
+   • Material: [causa específica o N/A]
+
+ACCIDENTE A ANALIZAR:"""
 
 
 def build_user_prompt(descripcion: str, contexto: str) -> str:
-    """Construye el mensaje del usuario con los datos del accidente."""
+    """Construye el mensaje del usuario: plantilla entrenada + datos del accidente.
+
+    NOTA (dataset v4_final): las secciones del accidente van en negrita
+    (**Descripción...**, **Contexto Adicional:**, **Análisis de 5 Porqués:**)
+    — el modelo se entrenó con ESE formato; sin los asteriscos queda fuera de
+    distribución (copia la plantilla literal en vez de analizar).
+    """
     contexto_str = contexto if contexto else "No se proporcionó contexto adicional."
-    return f"Descripción del accidente:\n{descripcion}\n\nContexto Adicional:\n{contexto_str}"
+    return (
+        INSTRUCCIONES_PROMPT
+        + "\n\n**Descripción del accidente:**\n"
+        + descripcion
+        + "\n\n**Contexto Adicional:**\n"
+        + contexto_str
+        + "\n\n**Análisis de 5 Porqués:**"
+    )
 
 
 # ============================================================================
@@ -353,6 +350,8 @@ def check_model_loaded() -> bool:
     queda en memoria.
     """
     global _model_ready, _last_check_ts
+    if not get_current_model_name():
+        return False
     now = time.time()
     if now - _last_check_ts < _CHECK_INTERVAL and _model_ready:
         return True
@@ -367,7 +366,10 @@ def check_model_loaded() -> bool:
         return True
     except HTTPError as e:
         if e.code == 404:
-            logger.warning(f"[OLLAMA] Modelo '{get_current_model_name()}' no existe. Ejecuta setup_ollama.ps1")
+            logger.warning(
+                f"[OLLAMA] Modelo '{get_current_model_name()}' no existe. "
+                "Descárgalo desde Configuración › IA (HuggingFace)."
+            )
             _model_ready = False
         else:
             _model_ready = False
@@ -415,6 +417,20 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
       4. Repite hasta MAX_RETRIES o hasta que pase la validación
       5. Siempre devuelve el mejor análisis encontrado
     """
+    if not get_current_model_name():
+        return {
+            "success": False,
+            "error": (
+                "No hay modelo de IA configurado. Ve a Configuración › IA "
+                "y descarga un modelo (HuggingFace)."
+            ),
+        }
+
+    llm_cfg = get_llm_config()
+    system_prompt = llm_cfg.get("llmSystemPrompt") or SYSTEM_PROMPT
+    temperature = float(llm_cfg.get("llmTemperature", 0.1))
+    max_tokens = int(llm_cfg.get("llmMaxTokens", 1216))
+
     user_prompt = build_user_prompt(descripcion, contexto)
     start_time = datetime.now()
     logger.info(f"[OLLAMA] Generando análisis ({len(descripcion)} chars desc, {len(contexto)} chars contexto)...")
@@ -451,17 +467,24 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
                 {
                     "model": get_current_model_name(),
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_content},
                     ],
                     "stream": False,
                     "think": False,
                     "options": {
-                        "temperature": 0.4,
-                        "top_p": 0.9,
+                        # Muestreo del entrenamiento: temp 0.1, top_p 0.8,
+                        # top_k 20, min_p 0, repeat_penalty 1.15, presence 0.
+                        "temperature": temperature,
+                        "top_p": 0.8,
                         "top_k": 20,
-                        "num_predict": 4000,
-                        "repeat_penalty": 1.1,
+                        "min_p": 0,
+                        "num_predict": max_tokens,
+                        "repeat_penalty": 1.15,
+                        "presence_penalty": 0,
+                        # Corte duro: si el modelo ignora "EXACTAMENTE 5 niveles"
+                        # y empieza a escribir el nivel 6, Ollama deja de generar.
+                        "stop": ["6. ¿Por qué", "6. Por qué", "6.¿Por qué"],
                     },
                 },
                 timeout=600,
@@ -496,6 +519,7 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
                     f"[OLLAMA] Análisis validado en intento {attempt + 1} "
                     f"(score={validation['score']}, tiempo={elapsed:.1f}s)"
                 )
+                _uniform_preguntas(parsed_result)
                 return {
                     "success": True,
                     "data": parsed_result,
@@ -505,7 +529,47 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
                     "attempts": attempt + 1,
                 }
 
-            # No pasó: preparar feedback para siguiente intento
+            # No pasó: si el fallo es CADENA ESTANCADA, el feedback no mueve a
+            # los modelos chiquitos (log 2026-09-24 19:58: intento 2 con
+            # feedback siguió en 19 celdas repetidas) → construir la cadena
+            # nivel por nivel, sustituyendo NOSOTROS la causa real.
+            if validation["details"].get("repetition_cells", 0) >= 6:
+                parsed_it, val_it, raw_it = _analyze_iterative_chain(
+                    descripcion, contexto, llm_cfg, system_prompt,
+                    seed_level1=parsed_result.get("PorQue1"),
+                )
+                rep_ss = validation["details"].get("repetition_cells", 999)
+                rep_it = val_it["details"].get("repetition_cells", 999)
+                # La calidad de la cadena va primero: el single-shot estancado
+                # puede ganar por score (el overlap léxico premia lo idéntico
+                # y el relleno genérico), así que si la iterativa repite MENOS
+                # celdas se devuelve AUNQUE su score sea menor. A igual
+                # repetición, gana el score. (Caso real 21:16: single-shot
+                # score=70 / 20 repetidas vs iterativa 68 / 10 repetidas.)
+                if rep_it < rep_ss or (rep_it == rep_ss and val_it["score"] > best_score):
+                    best_score = val_it["score"]
+                    best_result = {"parsed": parsed_it, "raw_text": raw_it, "validation": val_it, "iterative": True}
+                if val_it["valid"]:
+                    elapsed = (datetime.now() - start_time).total_seconds()
+                    logger.info(
+                        f"[OLLAMA] Cadena iterativa validada "
+                        f"(score={val_it['score']}, tiempo={elapsed:.1f}s)"
+                    )
+                    _uniform_preguntas(parsed_it)
+                    return {
+                        "success": True,
+                        "data": parsed_it,
+                        "raw_text": raw_it,
+                        "generation_time": elapsed,
+                        "validation": val_it,
+                        "attempts": attempt + 2,
+                        "mode": "iterativo",
+                    }
+                # La iterativa tampoco validó: el feedback retry tampoco serviría
+                # (mismo modelo, mismo problema). Devolver el mejor resultado.
+                break
+
+            # No pasó por otro motivo: preparar feedback para siguiente intento
             accumulated_feedback = _build_regeneration_feedback(validation)
 
         except Exception as e:
@@ -521,6 +585,7 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
             f"[OLLAMA] Backward Test no aprobado tras {MAX_RETRIES + 1} intentos. "
             f"Mejor score: {best_score}/100"
         )
+        _uniform_preguntas(best_result["parsed"])
         return {
             "success": True,
             "data": best_result["parsed"],
@@ -528,6 +593,7 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
             "generation_time": elapsed,
             "validation": best_result["validation"],
             "attempts": MAX_RETRIES + 1,
+            "mode": "iterativo" if best_result.get("iterative") else "single-shot",
             "validation_warning": (
                 f"Análisis entregado con score {best_score}/100 — "
                 "recomendamos revisar manualmente. Issues: "
@@ -563,18 +629,40 @@ def _strip_post_level5_content(text: str) -> str:
     start_level5 = m.start()
     after = text[start_level5:]
 
+    # El bloque del nivel 5 termina en el PRÓXIMO encabezado de nivel ("6. ¿Por qué...").
+    # SIN este corte, si el modelo escribe niveles 6+, la búsqueda de categorías
+    # recorría todo el texto restante hasta el ÚLTIMO nivel y no cortaba nada.
+    next_level = re.search(
+        r'\n\s*\d+\.\s*[¿?]?\s*Por\s*qu[eé]',
+        after,
+        re.IGNORECASE,
+    )
+    level5_region = after[: next_level.start()] if next_level else after
+
     # Encontrar la posición donde termina el bloque válido del nivel 5
     # (justo después de la última línea "Material:" o "• Material:")
+    # OJO: se toma el MÁXIMO entre patrones — "Medio Ambiente" aparece ANTES
+    # que "Material" en cada nivel y antes sobrescribía el fin de corte,
+    # comiéndose la línea Material del nivel 5.
     last_category_end = None
     for pattern in [
         r'[•\-\*\.\u2022]?\s*material\s*[:\-][^\n]*',  # "Material: ..." o "• Material: ..."
         r'[•\-\*\.\u2022]?\s*medio ambiente\s*[:\-][^\n]*',  # fallback
     ]:
-        for m2 in re.finditer(pattern, after, re.IGNORECASE | re.MULTILINE):
-            last_category_end = m2.end()
+        for m2 in re.finditer(pattern, level5_region, re.IGNORECASE | re.MULTILINE):
+            if last_category_end is None or m2.end() > last_category_end:
+                last_category_end = m2.end()
 
     if last_category_end:
-        cleaned = text[:start_level5] + after[:last_category_end]
+        cleaned = text[:start_level5] + level5_region[:last_category_end]
+        if len(cleaned) < len(text):
+            logger.info(
+                f"[PARSER] Stripped {len(text) - len(cleaned)} chars de contenido "
+                f"extra después del nivel 5"
+            )
+        return cleaned
+    if next_level:
+        cleaned = text[:start_level5] + level5_region
         if len(cleaned) < len(text):
             logger.info(
                 f"[PARSER] Stripped {len(text) - len(cleaned)} chars de contenido "
@@ -582,6 +670,38 @@ def _strip_post_level5_content(text: str) -> str:
             )
         return cleaned
     return text
+
+
+_CATEGORIES_ORDER = ("Mano de Obra", "Método", "Maquinaria", "Medio Ambiente", "Material")
+
+
+def _extract_categories(level_content: str) -> dict:
+    """Extrae los valores 5M de un bloque de nivel (dict catálogo → texto).
+
+    Aceptar bullets: • (Unicode), -, *, o . (Qwen3.5 a veces usa "• Mano" como ". Mano").
+    Solo devuelve categorías con texto real (N/A y vacíos quedan fuera).
+    """
+    values = {}
+    category_map = {
+        "mano de obra": "Mano de Obra",
+        "método": "Método",
+        "metodo": "Método",
+        "maquinaria": "Maquinaria",
+        "medio ambiente": "Medio Ambiente",
+        "material": "Material",
+    }
+    for cat_key, cat_name in category_map.items():
+        cat_pattern = rf"[•\-\*\.\u2022]\s*{re.escape(cat_key)}\s*[:\-]?\s*(.*?)(?=[•\-\*\.\u2022]\s*(?:Mano|M[eé]todo|Maquinaria|Medio|Material)|$)"
+        match = re.search(cat_pattern, level_content, re.IGNORECASE | re.DOTALL)
+        if match:
+            value = match.group(1).strip()
+            value = re.sub(r"^[:\-\s]+", "", value)
+            value = re.sub(r"\s+$", "", value)
+            # Limpiar corchetes decorativos que pone el modelo (ej: [texto] -> texto)
+            value = re.sub(r"^\[(.*)\]$", r"\1", value).strip()
+            if value and len(value) > 2 and value.upper() != "N/A":
+                values[cat_name] = value
+    return values
 
 
 def parse_5_whys(text: str) -> dict:
@@ -592,22 +712,23 @@ def parse_5_whys(text: str) -> dict:
 
     result = {}
 
-    category_map = {
-        "mano de obra": "Mano de Obra",
-        "método": "Método",
-        "metodo": "Método",
-        "maquinaria": "Maquinaria",
-        "medio ambiente": "Medio Ambiente",
-        "material": "Material",
-    }
-
     level_pattern = r"(\d+)\.\s*[¿?]?\s*Por\s*qu[eé][¿?]?\s*(?:ocurrió\s*el\s*accidente)?[:\s]*(.*?)(?=\d+\.\s*[¿?]?\s*Por\s*qu[eé][¿?]?|$)"
     levels = re.findall(level_pattern, text, re.DOTALL | re.IGNORECASE)
 
+    dropped_out_of_range = 0
     for level_num, level_content in levels:
-        level_key = f"PorQue{level_num}"
+        try:
+            level_n = int(level_num)
+        except ValueError:
+            continue
+        # Tope duro de la metodología: SOLO niveles 1-5. Modelos pequeños a veces
+        # generan 6, 10 o hasta 36 "porqués" y antes se pasaban al frontend entero.
+        if level_n < 1 or level_n > 5:
+            dropped_out_of_range += 1
+            continue
+        level_key = f"PorQue{level_n}"
         level_data = {
-            "Pregunta": f"¿Por qué? - Nivel {level_num}",
+            "Pregunta": f"¿Por qué? - Nivel {level_n}",
             "Mano de Obra": "N/A",
             "Método": "N/A",
             "Maquinaria": "N/A",
@@ -615,20 +736,20 @@ def parse_5_whys(text: str) -> dict:
             "Material": "N/A",
         }
 
-        for cat_key, cat_name in category_map.items():
-            # Aceptar bullets: • (Unicode), -, *, o . (Qwen3.5 a veces usa "• Mano" como ". Mano")
-            cat_pattern = rf"[•\-\*\.\u2022]\s*{re.escape(cat_key)}\s*[:\-]?\s*(.*?)(?=[•\-\*\.\u2022]\s*(?:Mano|M[eé]todo|Maquinaria|Medio|Material)|$)"
-            match = re.search(cat_pattern, level_content, re.IGNORECASE | re.DOTALL)
-            if match:
-                value = match.group(1).strip()
-                value = re.sub(r"^[:\-\s]+", "", value)
-                value = re.sub(r"\s+$", "", value)
-                # Limpiar corchetes decorativos que pone el modelo (ej: [texto] -> texto)
-                value = re.sub(r"^\[(.*)\]$", r"\1", value).strip()
-                if value and len(value) > 2 and value.upper() != "N/A":
-                    level_data[cat_name] = value
+        level_data.update(_extract_categories(level_content))
+
+        # Pregunta real de la cadena causal (extraída del texto del modelo o
+        # sintetizada con la causa principal del nivel anterior) — la UI la
+        # muestra como encabezado en lugar del genérico "¿Por qué? - Nivel N".
+        level_data["Pregunta"] = _build_pregunta(level_n, level_content, result)
 
         result[level_key] = level_data
+
+    if dropped_out_of_range:
+        logger.warning(
+            f"[PARSER] Descartados {dropped_out_of_range} niveles fuera de 1-5 "
+            f"(el modelo desbordó la metodología 5 Porqués)"
+        )
 
     if not result:
         logger.warning("No se encontraron niveles con patrón estándar, intentando parseo alternativo")
@@ -649,9 +770,16 @@ def parse_5_whys_alternative(text: str) -> dict:
         line = line.strip()
         level_match = re.match(r"^(\d+)\.", line)
         if level_match:
-            if current_level and current_data:
+            if current_level is not None and current_data:
                 result[f"PorQue{current_level}"] = current_data
-            current_level = level_match.group(1)
+            level_n = int(level_match.group(1))
+            # Tope duro: la metodología es 1-5. Si el modelo sigue numerando
+            # (6, 7, ...) se corta acá y no se generan niveles extra.
+            if level_n > 5:
+                current_level = None
+                current_data = {}
+                break
+            current_level = level_n
             current_data = {cat: "N/A" for cat in categories}
             current_data["Pregunta"] = line
             continue
@@ -676,6 +804,335 @@ def _is_na(value) -> bool:
         return True
     v = str(value).strip().upper()
     return v in ("N/A", "NA", "N.A.", "N.A", "-", "--", "")
+
+
+def _norm_cmp(value) -> str:
+    """Normaliza un texto de causa para comparar repeticiones entre niveles
+    (minúsculas, sin tildes, espacios colapsados, sin puntuación final)."""
+    v = re.sub(r"\s+", " ", str(value or "")).strip().lower()
+    v = re.sub(r"[áàäâ]", "a", v)
+    v = re.sub(r"[éèëê]", "e", v)
+    v = re.sub(r"[íìïî]", "i", v)
+    v = re.sub(r"[óòöô]", "o", v)
+    v = re.sub(r"[úùüû]", "u", v)
+    v = re.sub(r"[ñ]", "n", v)
+    return v.strip(" .;:,-")
+
+
+# Primer bullet de categoría 5M: separa la pregunta de las causas dentro del
+# contenido de un nivel (lo usa _build_pregunta para extraer la pregunta real).
+_CAT_SPLIT_RE = re.compile(
+    r"[•\-\*\.\u2022]\s*(?:mano de obra|m[eé]todo|maquinaria|medio ambiente|material)\s*[:\-]",
+    re.IGNORECASE,
+)
+
+
+def _build_pregunta(level_n: int, level_content: str, parsed_so_far: dict) -> str:
+    """Arma la pregunta (cadena causal) de un nivel para la UI.
+
+    1. Si el modelo escribió la pregunta ("2. ¿Por qué [causa nivel 1]?"), se
+       extrae el texto que quedó antes del primer bullet de categoría.
+    2. Si no la escribió, se sintetiza con la causa principal del nivel anterior
+       ("¿Por qué [causa]?") — así la UI muestra la cadena encadenada en vez
+       del título genérico "¿Por qué? - Nivel N".
+    """
+    head = _CAT_SPLIT_RE.split(level_content, maxsplit=1)[0]
+    head = re.sub(r"\s+", " ", head).strip(" \t\r\n:;\u2022-")
+    # El modelo chiquito copia la plantilla LITERAL ("¿Por qué [causa principal
+    # del nivel 1]?" sin sustituir la causa — captura 2026-09-24). Se trata como
+    # pregunta ausente y se sintetiza con la causa real del nivel anterior.
+    if re.search(r"causa principal del nivel", head, re.IGNORECASE):
+        head = ""
+    if len(head) >= 8:
+        # El parser ya consumió "Por qué", así que el resto es el complemento
+        # ("no hubo capacitación?"). Se reconstruye la pregunta completa.
+        q = head if head.startswith("¿") else "¿Por qué " + head
+        if "?" not in q:
+            q += "?"
+        return re.sub(r"\s+", " ", q)
+    if level_n == 1:
+        return "¿Por qué ocurrió el accidente?"
+    prev = parsed_so_far.get(f"PorQue{level_n - 1}") or {}
+    for cat in ("Mano de Obra", "Método", "Maquinaria", "Medio Ambiente", "Material"):
+        v = prev.get(cat, "N/A")
+        if not _is_na(v):
+            causa = re.sub(r"\s+", " ", str(v)).strip(" .;:,-")
+            return f"¿Por qué {causa}?"
+    return f"¿Por qué? - Nivel {level_n}"
+
+
+# Turno user de la cadena iterativa: pide SOLO el siguiente nivel, con la causa
+# real ya sustituida por nosotros (el modelo chiquito no sabe hacerlo).
+_CONTINUATION_PROMPT = (
+    "Continúa el análisis con el nivel {n}. Pregunta del nivel {n}: {pregunta}\n"
+    "Responde ÚNICAMENTE con el bloque del nivel {n}: las 5 categorías "
+    "(• Mano de Obra, • Método, • Maquinaria, • Medio Ambiente, • Material), "
+    "una línea por categoría. Escribe N/A si una categoría no contribuye a la "
+    "causa. NO repitas las causas del nivel anterior: cada causa debe ser NUEVA "
+    "y derivarse de la pregunta del nivel."
+)
+
+
+def _parse_single_level(text: str) -> dict:
+    """Parsea la respuesta de UN nivel de la cadena iterativa (categorías sin numerar)."""
+    data = {c: "N/A" for c in _CATEGORIES_ORDER}
+    data.update(_extract_categories(text))
+    return data
+
+
+def _pregunta_from_causa(level_data: dict) -> str:
+    """Arma "¿Por qué [causa principal]?" con la primera causa real del nivel.
+
+    Retorna "" si el nivel no tiene ninguna causa (la cadena termina ahí).
+    """
+    for cat in _CATEGORIES_ORDER:
+        v = level_data.get(cat, "N/A")
+        if not _is_na(v):
+            causa = re.sub(r"\s+", " ", str(v)).strip(" .;:,-")
+            return f"¿Por qué {causa}?"
+    return ""
+
+
+def _has_real_causes(level_data: dict) -> bool:
+    """True si el nivel tiene al menos una categoría con causa real (no N/A)."""
+    return any(not _is_na(level_data.get(c, "N/A")) for c in _CATEGORIES_ORDER)
+
+
+def _is_stagnant_vs(data: dict, prev: dict) -> bool:
+    """True si el nivel repite TODAS las causas del nivel anterior (copia).
+
+    Solo es estancamiento cuando NO aporta ni una causa nueva: si profundizó
+    aunque sea en una categoría, se acepta.
+    """
+    hits = 0
+    total = 0
+    for cat in _CATEGORIES_ORDER:
+        v = data.get(cat, "N/A")
+        p = prev.get(cat, "N/A")
+        if _is_na(v) and _is_na(p):
+            continue
+        total += 1
+        if not _is_na(v) and not _is_na(p) and _norm_cmp(v) == _norm_cmp(p):
+            hits += 1
+    return total > 0 and hits == total
+
+
+def _format_level_block(level_n: int, level_data: dict) -> str:
+    """Reconstruye el bloque de un nivel en el formato entrenado (para los
+    mensajes de asistente de la cadena iterativa y el raw_text)."""
+    pregunta = level_data.get("Pregunta") or f"¿Por qué? - Nivel {level_n}"
+    lines = [f"{level_n}. {pregunta}"]
+    for cat in _CATEGORIES_ORDER:
+        lines.append(f"   • {cat}: {level_data.get(cat, 'N/A') or 'N/A'}")
+    return "\n".join(lines)
+
+
+def _uniform_preguntas(parsed: dict) -> dict:
+    """Criterio del formato: el encabezado de cada nivel SIEMPRE es la pregunta
+    maestra "¿Por qué ocurrió el accidente?" — la cadena causal vive en el
+    CONTENIDO de cada categoría (cada celda debe derivarse de la misma "M" del
+    nivel anterior), no en el título del nivel. Antes el título saltaba a
+    cualquier causa del nivel anterior ("¿Por qué no había herramientas de
+    corte disponibles?"), lo que el usuario reportó como confuso (captura
+    2026-09-25)."""
+    for n in range(1, 6):
+        key = f"PorQue{n}"
+        if key in parsed:
+            parsed[key]["Pregunta"] = "¿Por qué ocurrió el accidente?"
+    return parsed
+
+
+def _analyze_iterative_chain(descripcion: str, contexto: str, llm_cfg: dict,
+                             system_prompt: str, seed_level1: dict = None):
+    """Construye la cadena causal NIVEL POR NIVEL (multi-turn chat).
+
+    Por qué existe: los modelos chiquitos (0.8B) copian la plantilla LITERAL en
+    el single-shot ("¿Por qué [causa principal del nivel 1]?") y repiten las
+    mismas causas en los 5 niveles, incluso cuando el feedback de regeneración
+    se lo dice explícito (log 2026-09-24 19:58: intento 1 con 20 celdas
+    repetidas e intento 2 con 19 tras feedback). Acá NOSOTROS sustituimos la
+    causa real en cada pregunta: el modelo solo tiene que responder UN nivel.
+
+    Flujo:
+      Turno 1: plantilla entrenada + accidente → el bloque del nivel 1 del
+               intento single-shot va como respuesta del asistente (seed).
+      Turnos 2-5: user pide el siguiente nivel con la causa REAL ya sustituida;
+               si el modelo regenera el análisis completo, se adoptan todos los
+               niveles que devolvió (desde el pedido en adelante).
+
+    Retorna (parsed, validation, raw_text).
+    """
+    temperature = float(llm_cfg.get("llmTemperature", 0.1))
+    max_tokens = int(llm_cfg.get("llmMaxTokens", 1216))
+
+    parsed = {}
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": build_user_prompt(descripcion, contexto)},
+    ]
+
+    # Seed: nivel 1 del intento single-shot (sus causas salen de la descripción
+    # y son válidas — la repetición empieza en el nivel 2).
+    if seed_level1 and _has_real_causes(seed_level1):
+        parsed["PorQue1"] = dict(seed_level1)
+        messages.append({"role": "assistant", "content": _format_level_block(1, seed_level1)})
+
+    for n in range(2, 6):
+        prev = parsed.get(f"PorQue{n - 1}")
+        if not prev:
+            break
+        pregunta = _pregunta_from_causa(prev)
+        if not pregunta:
+            break  # el nivel anterior quedó sin causas → la cadena termina
+        messages.append({
+            "role": "user",
+            "content": _CONTINUATION_PROMPT.format(n=n, pregunta=pregunta),
+        })
+
+        try:
+            response = _ollama_request(
+                "/api/chat",
+                "POST",
+                {
+                    "model": get_current_model_name(),
+                    "messages": messages,
+                    "stream": False,
+                    "think": False,
+                    "options": {
+                        "temperature": temperature,
+                        "top_p": 0.8,
+                        "top_k": 20,
+                        "min_p": 0,
+                        "num_predict": min(max_tokens, 512),
+                        "repeat_penalty": 1.15,
+                        "presence_penalty": 0,
+                        "stop": ["6. ¿Por qué", "6. Por qué", "6.¿Por qué"],
+                    },
+                },
+                timeout=600,
+            )
+        except Exception as e:
+            logger.error(f"[CADENA] Error generando el nivel {n}: {e}")
+            break
+
+        msg = response.get("message", {}) or {}
+        text = (msg.get("content") or "").strip()
+        if not text:
+            logger.warning(f"[CADENA] Nivel {n} llegó vacío — cadena cortada")
+            break
+
+        # Resolver los datos del nivel n: (1) regeneración numerada (se toman
+        # desde n en adelante), (2) bloque de un solo nivel (categorías sin numerar).
+        parsed_resp = parse_5_whys(text)
+        data_n = parsed_resp.get(f"PorQue{n}")
+        if not (data_n and _has_real_causes(data_n)):
+            single = _parse_single_level(text)
+            data_n = single if _has_real_causes(single) else None
+        if data_n is None:
+            logger.warning(f"[CADENA] Nivel {n} sin categorías legibles — cadena cortada")
+            break
+
+        # Anti-copia: si el bloque repite TODAS las causas del nivel anterior,
+        # un reintento del nivel (misma pregunta, más temperatura) puede romper
+        # la copia — temp 0.1 es casi determinístico y repite igual.
+        if _is_stagnant_vs(data_n, prev):
+            retry_msgs = messages[:-1] + [{
+                "role": "user",
+                "content": (
+                    "CORRECCIÓN: el nivel " + str(n) + " repitió las mismas causas del nivel anterior. "
+                    "Responde con causas NUEVAS que profundicen la pregunta: " + pregunta + "\n"
+                    "Responde ÚNICAMENTE con el bloque del nivel " + str(n)
+                    + " (las 5 categorías 5M), una línea por categoría."
+                ),
+            }]
+            try:
+                response2 = _ollama_request(
+                    "/api/chat",
+                    "POST",
+                    {
+                        "model": get_current_model_name(),
+                        "messages": retry_msgs,
+                        "stream": False,
+                        "think": False,
+                        "options": {
+                            "temperature": max(0.35, temperature),
+                            "top_p": 0.8,
+                            "top_k": 20,
+                            "min_p": 0,
+                            "num_predict": min(max_tokens, 512),
+                            "repeat_penalty": 1.15,
+                            "presence_penalty": 0,
+                            "stop": ["6. ¿Por qué", "6. Por qué", "6.¿Por qué"],
+                        },
+                    },
+                    timeout=600,
+                )
+                text2 = ((response2.get("message", {}) or {}).get("content") or "").strip()
+                cand2 = parse_5_whys(text2).get(f"PorQue{n}")
+                if not (cand2 and _has_real_causes(cand2)):
+                    single2 = _parse_single_level(text2)
+                    cand2 = single2 if _has_real_causes(single2) else None
+                if cand2 and _has_real_causes(cand2) and not _is_stagnant_vs(cand2, prev):
+                    data_n = cand2
+                    retry_msgs.append({"role": "assistant", "content": _format_level_block(n, data_n)})
+                    messages = retry_msgs
+                    logger.info(f"[CADENA] Nivel {n} re-generado tras copia (temp alta)")
+            except Exception as e:
+                logger.warning(f"[CADENA] Reintento del nivel {n} falló: {e}")
+
+        # Adoptar el nivel n y los que vengan en la misma respuesta (regeneración)
+        data_n["Pregunta"] = pregunta
+        parsed[f"PorQue{n}"] = data_n
+        for m in range(n + 1, 6):
+            data = parsed_resp.get(f"PorQue{m}")
+            if data and _has_real_causes(data):
+                data["Pregunta"] = (
+                    _pregunta_from_causa(parsed[f"PorQue{m - 1}"]) or data.get("Pregunta", "")
+                )
+                parsed[f"PorQue{m}"] = data
+
+        messages.append({"role": "assistant", "content": _format_level_block(n, parsed[f"PorQue{n}"])})
+        logger.info(f"[CADENA] Nivel {n} generado (modo iterativo)")
+
+    # Completar niveles faltantes con N/A (la cadena terminó antes del nivel 5)
+    for m in range(1, 6):
+        parsed.setdefault(f"PorQue{m}", {
+            "Pregunta": f"¿Por qué? - Nivel {m}",
+            **{c: "N/A" for c in _CATEGORIES_ORDER},
+        })
+
+    parsed = _enforce_causal_chain(parsed)
+
+    # Dedupe anti-relleno: si una categoría repite textualmente la del nivel
+    # anterior, el modelo no aportó nada nuevo ahí (log 2026-09-24 21:16: la
+    # iterativa vino bien en Mano de Obra/Método pero repetía Maquinaria/Medio
+    # Ambiente/Material en todos los niveles). La metodología 5M pide N/A en
+    # ese caso — más honesto que una copia que sugiere una causa distinta.
+    # Va DESPUÉS de _enforce_causal_chain (el fill copia el nivel anterior en
+    # los huecos; el dedupe revierte ese tipo de relleno engañoso).
+    deduped_cells = 0
+    for n in range(2, 6):
+        cur = parsed[f"PorQue{n}"]
+        prev = parsed[f"PorQue{n - 1}"]
+        for cat in _CATEGORIES_ORDER:
+            v = cur.get(cat, "N/A")
+            p = prev.get(cat, "N/A")
+            if not _is_na(v) and not _is_na(p) and _norm_cmp(v) == _norm_cmp(p):
+                cur[cat] = "N/A"
+                deduped_cells += 1
+    if deduped_cells:
+        logger.info(f"[CADENA] Dedupe: {deduped_cells} celda(s) repetidas pasaron a N/A")
+
+    validation = _validate_backward_chain(parsed)
+    logger.info(
+        f"[CADENA] Cadena iterativa completa: score={validation['score']}/100 "
+        f"valid={validation['valid']} repetition_cells={validation['details'].get('repetition_cells', 0)}"
+    )
+    # Encabezado constante por criterio del formato (antes de reconstruir el raw)
+    _uniform_preguntas(parsed)
+    _uniform_preguntas(parsed)  # encabezado constante: "¿Por qué ocurrió el accidente?" en los 5 niveles
+    raw_text = "\n\n".join(_format_level_block(m, parsed[f"PorQue{m}"]) for m in range(1, 6))
+    return parsed, validation, raw_text
 
 
 def _enforce_causal_chain(parsed: dict) -> dict:
@@ -926,8 +1383,38 @@ def _validate_backward_chain(parsed: dict) -> dict:
     if lexical_total > 0:
         avg_overlap = sum(lexical_overlaps) / lexical_total
         lexical_score = int(avg_overlap * 10)  # 0-10 pts
-    continuity_score = max(0, structural_score) + lexical_score
+
+    # 1c. Anti-repetición: un nivel que repite textualmente la causa del nivel
+    # anterior NO está profundizando (cadena estancada). Ojo: la repetición
+    # MAXIMIZA el overlap de 1b (texto idéntico = 100%), así que sin este
+    # castigo un análisis estancado sacaba ~98/100 y pasaba en el intento 1,
+    # sin disparar nunca la regeneración con feedback.
+    repeated_cells = []
+    for i in range(len(levels) - 1):
+        for cat in categories:
+            v_prev = parsed[levels[i]].get(cat, "N/A")
+            v_now = parsed[levels[i + 1]].get(cat, "N/A")
+            if _is_na(v_prev) or _is_na(v_now):
+                continue
+            if _norm_cmp(v_prev) == _norm_cmp(v_now):
+                repeated_cells.append(f"{cat} (nivel {i+2} = nivel {i+1})")
+    repetition_penalty = 0
+    if repeated_cells:
+        repetition_penalty = min(5 * len(repeated_cells), 30)
+        ejemplos = ", ".join(repeated_cells[:3])
+        # issues[0]: _build_regeneration_feedback toma los primeros 3, y este
+        # es el problema principal cuando la cadena está estancada.
+        issues.insert(
+            0,
+            f"Cadena estancada: {len(repeated_cells)} celda(s) repiten textualmente el nivel anterior "
+            f"({ejemplos}). Cada nivel debe responder ¿por qué? con una causa NUEVA derivada de la "
+            f"causa principal del nivel anterior, no repetir la misma.",
+        )
+    details["repetition_cells"] = len(repeated_cells)
+
+    continuity_score = max(0, structural_score - repetition_penalty) + lexical_score
     details["continuity"] = continuity_score
+    details["continuity_repetition"] = repetition_penalty
     details["continuity_structural"] = structural_score
     details["continuity_lexical"] = lexical_score
 
@@ -997,12 +1484,16 @@ def _validate_backward_chain(parsed: dict) -> dict:
     total_score = continuity_score + actionability_score + evidence_score + recurrence_score + effectiveness_score
     total_score = max(0, min(100, total_score))
 
-    is_valid = total_score >= 70
+    # Gate anti-estancamiento: con 6+ celdas repetidas la cadena NO progresa
+    # aunque el puntaje de otros criterios llegue a 70 (los otros 4 criterios
+    # suman hasta 60 y el overlap léxico premia lo idéntico).
+    is_valid = total_score >= 70 and len(repeated_cells) < 6
 
     logger.info(
         f"[BACKWARD_TEST] Score={total_score}/100 valid={is_valid} "
         f"continuity={continuity_score} actionability={actionability_score} "
-        f"evidence={evidence_score} recurrence={recurrence_score} effectiveness={effectiveness_score}"
+        f"evidence={evidence_score} recurrence={recurrence_score} effectiveness={effectiveness_score} "
+        f"repetition_cells={len(repeated_cells)}"
     )
     if issues:
         logger.warning(f"[BACKWARD_TEST] Issues: {issues}")
@@ -1057,14 +1548,22 @@ def load_model_endpoint():
         return jsonify({
             "success": False,
             "model_loaded": False,
-            "error": "Ollama no está corriendo. Ejecuta setup_ollama.ps1 o 'ollama serve'",
+            "error": "Ollama no está corriendo. Instálalo desde https://ollama.com/download e inténtalo de nuevo",
         }), 503
+
+    if not get_current_model_name():
+        return jsonify({
+            "success": False,
+            "error": (
+                "No hay modelo de IA configurado. Ve a Configuración › IA "
+                "y descarga un modelo (HuggingFace)."
+            ),
+        }), 400
 
     if not check_model_loaded():
         return jsonify({
             "success": False,
-            "model_loaded": False,
-            "error": f"Modelo '{get_current_model_name()}' no existe en Ollama. Ejecuta setup_ollama.ps1",
+            "error": f"Modelo '{get_current_model_name()}' no existe en Ollama. Descárgalo desde Configuración › IA",
         }), 503
 
     # Forzar warmup
@@ -1166,6 +1665,20 @@ def regenerate_endpoint():
     if not check_ollama_alive():
         return jsonify({"success": False, "error": "Ollama no está corriendo"}), 503
 
+    if not get_current_model_name():
+        return jsonify({
+            "success": False,
+            "error": (
+                "No hay modelo de IA configurado. Ve a Configuración › IA "
+                "y descarga un modelo (HuggingFace)."
+            ),
+        }), 400
+
+    llm_cfg = get_llm_config()
+    base_system_prompt = llm_cfg.get("llmSystemPrompt") or SYSTEM_PROMPT
+    regen_temperature = float(llm_cfg.get("llmTemperature", 0.1))
+    regen_max_tokens = int(llm_cfg.get("llmMaxTokens", 1216))
+
     # Construir el prompt específico para regeneración
     user_prompt = build_regenerate_user_prompt(descripcion, contexto, feedback, current_analysis, level)
 
@@ -1177,7 +1690,7 @@ def regenerate_endpoint():
         numbered_format = build_numbered_format(1, 5)
         context_block = "El usuario quiere regenerar el análisis 5 Porqués COMPLETO aplicando feedback específico."
 
-    system_prompt_regen = SYSTEM_PROMPT + "\n\n" + REGENERATE_PROMPT_TEMPLATE.format(
+    system_prompt_regen = base_system_prompt + "\n\n" + REGENERATE_PROMPT_TEMPLATE.format(
         scope=("el nivel " + str(level)) if level else "el análisis completo",
         context_block=context_block,
         regenerate_rule=(
@@ -1202,12 +1715,17 @@ def regenerate_endpoint():
                 ],
                 "stream": False,
                 "think": False,
-"options": {
-                    "temperature": 0.4,
-                    "top_p": 0.9,
+                "options": {
+                    # Muestreo del entrenamiento (igual que analyze).
+                    "temperature": regen_temperature,
+                    "top_p": 0.8,
                     "top_k": 20,
-                    "num_predict": 4000 if level is None else 1500,
-                    "repeat_penalty": 1.1,
+                    "min_p": 0,
+                    "num_predict": regen_max_tokens if level is None else min(regen_max_tokens, 1500),
+                    "repeat_penalty": 1.15,
+                    "presence_penalty": 0,
+                    # Corte duro: el análisis solo tiene niveles 1-5.
+                    "stop": ["6. ¿Por qué", "6. Por qué", "6.¿Por qué"],
                 },
             },
             timeout=600,
@@ -1220,6 +1738,7 @@ def regenerate_endpoint():
         parsed_result = parse_5_whys(analysis_text)
         # Post-procesar para reforzar la cadena causal (fill-forward de N/A rotos)
         parsed_result = _enforce_causal_chain(parsed_result)
+        _uniform_preguntas(parsed_result)
 
         return jsonify({
             "success": True,
@@ -1349,7 +1868,7 @@ def select_model_endpoint():
             "model_exists_in_ollama": model_exists,
             "warning": None if model_exists else (
                 f"El modelo '{new_model}' no existe en Ollama. "
-                "Ejecuta setup_ollama.ps1 para crearlo desde el .gguf correspondiente."
+                "Descárgalo desde Configuración › IA (HuggingFace)."
             ),
         })
     except Exception as e:
@@ -1386,6 +1905,315 @@ def save_llm_config_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ============================================================================
+# Endpoints HuggingFace (modelos GGUF privados — Fase 1)
+# Token SOLO via header X-HF-Token (memoria por request; nunca en config.json
+# ni en logs). Descarga async con job + progreso; luego Modelfile + ollama create.
+# ============================================================================
+
+_HF_DEFAULT_REPO = "Reivaj640/qwen3.5-0.8b-ia-v1"
+_HF_JOBS = {}  # job_id -> dict (status/stage/progress/error/...)
+_HF_JOBS_LOCK = threading.Lock()
+_CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def _hf_effective_repo(repo_id=None) -> str:
+    """Repo HF a usar: el pedido por el cliente > el guardado (llmHfRepo) > el default."""
+    if repo_id and str(repo_id).strip():
+        return str(repo_id).strip()
+    saved = str((_load_llm_config() or {}).get("llmHfRepo") or "").strip()
+    return saved or _HF_DEFAULT_REPO
+
+
+def _hf_models_dir() -> str:
+    """Carpeta local de modelos HF: <userData>/hf-models/."""
+    d = os.path.join(os.path.dirname(_CONFIG_PATH), "hf-models")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _find_ollama_cli():
+    """Resuelve el ejecutable de ollama (PATH o instalación local Windows)."""
+    exe = shutil.which("ollama")
+    if exe:
+        return exe
+    local = os.path.join(
+        os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe"
+    )
+    if os.path.isfile(local):
+        return local
+    return None
+
+
+def _hf_repo_tag_suffix(repo_id: str) -> str:
+    """Sufijo de etiqueta Ollama derivado del repo (evita colisiones v1/v2).
+
+    'Reivaj640/qwen3.5-0.8b-ia-v2' → '-v2' (repo termina en -vN).
+    Si no termina en -vN, usa el nombre del repo sanitizado → '-mi-repo'.
+    Sin repo → '' (compatibilidad con llamadas antiguas).
+    """
+    name = (repo_id or "").strip().split("/")[-1].lower()
+    if not name:
+        return ""
+    m = re.search(r"-v(\d+)$", name)
+    if m:
+        return f"-v{m.group(1)}"
+    clean = re.sub(r"[^a-z0-9._-]+", "-", name).strip("-. ")
+    return f"-{clean}" if clean else ""
+
+
+def _hf_model_tag(filename: str, repo_id: str = "") -> str:
+    """Nombre de modelo Ollama derivado del .gguf + versión del repo (prefijo hf-).
+
+    Dos repos con el mismo .gguf (p.ej. ia-v1 e ia-v2) generan etiquetas
+    distintas: hf-<archivo>-v1 vs hf-<archivo>-v2 — no se pisan entre sí.
+    """
+    base = os.path.splitext(os.path.basename(filename))[0]
+    tag = re.sub(r"[^a-z0-9._-]+", "-", base.lower()).strip("-")
+    return f"hf-{tag}{_hf_repo_tag_suffix(repo_id)}"
+
+
+def _hf_download_worker(job_id: str, repo_id: str, filename: str, token: str) -> None:
+    """Hilo: descarga .gguf → Modelfile → ollama create → activar modelo."""
+    job = _HF_JOBS.get(job_id)
+    if not job:
+        return
+    try:
+        from huggingface_hub import hf_hub_download, HfApi
+
+        with _HF_JOBS_LOCK:
+            job["status"] = "downloading"
+            job["stage"] = "downloading"
+            job["progress"] = 1.0
+
+        dest_dir = _hf_models_dir()
+
+        # Tamaño esperado (para progreso)
+        total_size = 0
+        try:
+            api = HfApi(token=token)
+            info = api.model_info(repo_id, files_metadata=True)
+            for s in (info.siblings or []):
+                if s.rfilename == filename:
+                    total_size = s.size or 0
+                    break
+        except Exception as e:
+            logger.warning(f"[HF] No pude obtener tamaño de {filename}: {e}")
+
+        stop_monitor = threading.Event()
+
+        def _monitor():
+            while not stop_monitor.is_set():
+                try:
+                    base = os.path.basename(filename)
+                    found = 0
+                    for root, _dirs, files in os.walk(dest_dir):
+                        for f in files:
+                            if base in f or f.endswith(".incomplete"):
+                                try:
+                                    found = max(
+                                        found, os.path.getsize(os.path.join(root, f))
+                                    )
+                                except OSError:
+                                    pass
+                    if total_size > 0 and found > 0:
+                        pct = min(99.0, (found / total_size) * 100.0)
+                        with _HF_JOBS_LOCK:
+                            if pct > job["progress"]:
+                                job["progress"] = round(pct, 1)
+                except Exception:
+                    pass
+                stop_monitor.wait(1.0)
+
+        mon = threading.Thread(target=_monitor, daemon=True)
+        mon.start()
+
+        local_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            token=token,
+            local_dir=dest_dir,
+        )
+        stop_monitor.set()
+
+        with _HF_JOBS_LOCK:
+            job["progress"] = 90.0
+            job["status"] = "creating"
+            job["stage"] = "creating"
+            job["local_path"] = local_path
+
+        tag = _hf_model_tag(filename, repo_id)
+        modelfile = os.path.join(dest_dir, f"Modelfile.{tag}")
+        with open(modelfile, "w", encoding="utf-8") as f:
+            f.write(f"FROM {local_path}\n")
+            f.write("PARAMETER temperature 0.1\n")
+            f.write("PARAMETER top_p 0.8\n")
+            f.write("PARAMETER top_k 20\n")
+            f.write("PARAMETER min_p 0\n")
+            f.write("PARAMETER repeat_penalty 1.15\n")
+            f.write("PARAMETER presence_penalty 0\n")
+            f.write("PARAMETER num_ctx 8192\n")
+
+        ollama = _find_ollama_cli()
+        if not ollama:
+            raise RuntimeError(
+                "No se encontró el ejecutable de Ollama. Instálalo desde https://ollama.com/download"
+            )
+
+        result = subprocess.run(
+            [ollama, "create", tag, "-f", modelfile],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"ollama create falló: {(result.stderr or result.stdout or '').strip()}"
+            )
+
+        # Activar como modelo actual (hot) + persistir en config.json
+        set_current_model_name(tag)
+        try:
+            update_llm_config({"llmModel": tag})
+        except Exception as e:
+            logger.warning(f"[HF] No pude persistir llmModel={tag}: {e}")
+
+        with _HF_JOBS_LOCK:
+            job["progress"] = 100.0
+            job["status"] = "done"
+            job["stage"] = "done"
+            job["model_tag"] = tag
+            job["finished_at"] = datetime.now().isoformat()
+        logger.info(f"[HF] Modelo {tag} creado y activado desde {repo_id}/{filename}")
+
+    except Exception as e:
+        logger.error(f"[HF] Error en job {job_id}: {e}")
+        with _HF_JOBS_LOCK:
+            job["status"] = "error"
+            job["stage"] = "error"
+            job["error"] = str(e)
+            job["finished_at"] = datetime.now().isoformat()
+
+
+@app.route("/hf/repos", methods=["GET"]) if app else None
+def hf_repos_endpoint():
+    """Lista los repos propios de la cuenta del token (selector del panel IA).
+    GET · Header: X-HF-Token (requerido).
+    → { success, repos: [{repo_id, last_modified, private}], selected? }
+    """
+    token = (request.headers.get("X-HF-Token") or "").strip()
+    if not token:
+        return jsonify({"success": False, "error": "Se requiere X-HF-Token"}), 401
+    try:
+        from huggingface_hub import HfApi
+
+        api = HfApi(token=token)
+        me = api.whoami(token=token) or {}
+        author = str(me.get("name") or (me.get("user") or {}).get("name") or "").strip()
+        if not author:
+            return jsonify({"success": False, "error": "El token no identifica una cuenta"}), 401
+        repos = []
+        for m in api.list_models(author=author, sort="lastModified", token=token):
+            lm = getattr(m, "lastModified", None)
+            repos.append({
+                "repo_id": m.id,
+                "last_modified": lm.isoformat() if lm else None,
+                "private": bool(getattr(m, "private", False)),
+            })
+        # Garantiza siempre el repo efectivo (config o default) aunque el
+        # listado del Hub salga vacío (p.ej. token con permisos acotados).
+        effective = _hf_effective_repo()
+        if effective and not any(r["repo_id"] == effective for r in repos):
+            repos.insert(0, {
+                "repo_id": effective,
+                "last_modified": None,
+                "private": True,
+            })
+        payload_out = {"success": True, "repos": repos}
+        saved = str((_load_llm_config() or {}).get("llmHfRepo") or "").strip()
+        if saved:
+            payload_out["selected"] = saved
+        return jsonify(payload_out)
+    except Exception as e:
+        logger.error(f"[HF] Error listando repos: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/hf/list", methods=["POST"]) if app else None
+def hf_list_endpoint():
+    """Lista archivos .gguf de un repo HF (por defecto el repo guardado o el default).
+    Body: { "repo_id"? } · Header: X-HF-Token (requerido).
+    """
+    token = (request.headers.get("X-HF-Token") or "").strip()
+    if not token:
+        return jsonify({"success": False, "error": "Se requiere X-HF-Token"}), 401
+    payload = request.get_json(silent=True) or {}
+    repo_id = _hf_effective_repo(payload.get("repo_id"))
+    try:
+        from huggingface_hub import HfApi
+
+        api = HfApi(token=token)
+        info = api.model_info(repo_id, files_metadata=True)
+        files = []
+        for s in (info.siblings or []):
+            name = s.rfilename or ""
+            if name.lower().endswith(".gguf"):
+                files.append({"filename": name, "size": s.size or 0})
+        return jsonify({"success": True, "repo_id": repo_id, "files": files})
+    except Exception as e:
+        logger.error(f"[HF] Error listando {repo_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/hf/download", methods=["POST"]) if app else None
+def hf_download_endpoint():
+    """Inicia descarga async de un .gguf. Devuelve { job_id } al instante.
+    Body: { "repo_id"?, "filename" } · Header: X-HF-Token (requerido).
+    """
+    token = (request.headers.get("X-HF-Token") or "").strip()
+    if not token:
+        return jsonify({"success": False, "error": "Se requiere X-HF-Token"}), 401
+    payload = request.get_json(silent=True) or {}
+    filename = (payload.get("filename") or "").strip()
+    repo_id = _hf_effective_repo(payload.get("repo_id"))
+    if not filename or not filename.lower().endswith(".gguf"):
+        return jsonify({"success": False, "error": "filename .gguf requerido"}), 400
+
+    job_id = f"hf-{int(time.time() * 1000)}-{os.urandom(3).hex()}"
+    with _HF_JOBS_LOCK:
+        _HF_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "stage": "queued",
+            "progress": 0.0,
+            "repo_id": repo_id,
+            "filename": filename,
+            "model_tag": None,
+            "local_path": None,
+            "error": None,
+            "started_at": datetime.now().isoformat(),
+            "finished_at": None,
+        }
+    t = threading.Thread(
+        target=_hf_download_worker, args=(job_id, repo_id, filename, token), daemon=True
+    )
+    t.start()
+    return jsonify({"success": True, "job_id": job_id})
+
+
+@app.route("/hf/progress", methods=["GET"]) if app else None
+def hf_progress_endpoint():
+    """Estado de un job de descarga. Query: job_id=..."""
+    job_id = (request.args.get("job_id") or "").strip()
+    with _HF_JOBS_LOCK:
+        job = _HF_JOBS.get(job_id)
+        snapshot = dict(job) if job else None
+    if not snapshot:
+        return jsonify({"success": False, "error": "Job no encontrado"}), 404
+    return jsonify({"success": True, "job": snapshot})
+
+
 def run_server():
     """Inicia el servidor Flask."""
     if not FLASK_AVAILABLE:
@@ -1404,22 +2232,27 @@ def run_server():
     logger.info(f"=== K+AIR · LLM Server (wrapper Ollama) ===")
     logger.info(f"Servidor Flask: http://{SERVER_HOST}:{SERVER_PORT}")
     logger.info(f"Ollama: {OLLAMA_BASE_URL} | Modelo: {get_current_model_name()}")
-    logger.info("Endpoints: GET /health, POST /load, POST /analyze, GET /status, GET /models, POST /models/select, GET /llm-config, POST /llm-config")
+    logger.info("Endpoints: GET /health, POST /load, POST /analyze, GET /status, GET /models, POST /models/select, GET /llm-config, POST /llm-config, GET /hf/repos, POST /hf/list, POST /hf/download, GET /hf/progress")
 
     # Verificar Ollama al inicio (no bloquea)
-    if check_ollama_alive():
+    if not get_current_model_name():
+        logger.warning(
+            "[WARN] No hay modelo de IA configurado. "
+            "Ve a Configuración › IA y descarga un modelo (HuggingFace)."
+        )
+    elif check_ollama_alive():
         logger.info("[OK] Ollama responde")
         if check_model_loaded():
             logger.info(f"[OK] Modelo '{get_current_model_name()}' disponible")
         else:
             logger.warning(
                 f"[WARN] Modelo '{get_current_model_name()}' no encontrado. "
-                "Ejecuta setup_ollama.ps1 primero."
+                "Descárgalo desde Configuración › IA (HuggingFace)."
             )
     else:
         logger.warning(
             f"[WARN] Ollama no responde en {OLLAMA_BASE_URL}. "
-            "Ejecuta 'ollama serve' antes de iniciar este servidor."
+            "Instálalo desde https://ollama.com/download e inténtalo de nuevo."
         )
 
     app.run(host=SERVER_HOST, port=SERVER_PORT, threaded=True)
