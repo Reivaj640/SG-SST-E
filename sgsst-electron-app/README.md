@@ -1321,6 +1321,29 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.215 - 27 Sep 2026 🆕
+
+#### 📦816 · Home de Capacitaciones — refactor al patrón premium v2 estilo Presupuesto
+
+El portal legacy del submódulo 1.2.1 (prefijo `cap-portal__*`, tokens `--cp-*` propios, header con logo y volver redundantes) se reemplazó por el patrón premium v2 replicado de `pres-home`: header con breadcrumb + icon chip + título Manrope + pill "Año Activo" + botón "Volver al Menú", y 2 main cards (Ver Cronograma gradient + Clonar Cronograma blanca). Las 4 cards placeholder con `alert()` se removieron.
+
+- **`cap-home.html`**: header premium v2 (breadcrumb "Recursos / Capacitaciones" + ícono SVG 🎓 + título "Capacitaciones" + subtítulo + pill "Año Activo" + botón "Volver al Menú"), 2 main cards (`main-action-card primary` con gradient azul para Ver Cronograma + `main-action-card` blanca con ícono naranja para Clonar Cronograma).
+- **`cap-home.css`**: 100% scoped bajo `.cap-home`, tokens `--kair-*` del design system, dark mode completo con `[data-theme^="dark"]` (cubre dark + dark-legacy), flex chain correcto.
+- **E2E nuevo**: `tests/cap-home-e2e.js` con jsdom (validación estructural sin display): 18/18 DOM + 15/15 CSS + 9/9 tokens + 11/11 estilos + callbacks OK.
+- **Cache-bust**: `capacitaciones-portal-logic.js?v=CAP-20260927-cap-home-premium-v2`.
+- **Versión**: bump 0.1.214 → 0.1.215.
+
+#### Antes vs después
+
+| Aspecto | Antes | Después |
+|---|---|---|
+| Header | Logo K+AIR + botón Volver propios | Premium v2 (breadcrumb + ícono + título + pill) |
+| Cards | 2 main + 4 placeholder (`alert()`) | 2 cards usadas (Ver Cronograma + Clonar) |
+| Tokens | `--cp-*` propios | `--kair-*` del design system |
+| Iconos | Bootstrap Icons CDN | SVGs inline |
+| Dark mode | ❌ no soportaba | ✅ con `[data-theme^="dark"]` |
+| E2E | manual | `tests/cap-home-e2e.js` con jsdom |
+
 ### v0.1.214 - 26 Sep 2026 🆕
 
 #### 📦815 · Splash de bienvenida — confetti estilo Stripe con tokens premium v2

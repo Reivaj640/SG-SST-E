@@ -3,7 +3,50 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
+
+## [0.1.215] - 2026-09-27
+
+### 📦816 · Home de Capacitaciones — refactor al patrón premium v2 estilo Presupuesto
+
+**Resumen:** El portal legacy del submódulo 1.2.1 (con prefijo `cap-portal__*` y tokens `--cp-*` propios) se reemplazó por el patrón premium v2 replicado de `pres-home` (Presupuesto): header con breadcrumb + icon chip + título Manrope + pill "Año Activo" + botón "Volver al Menú", y 2 main cards (Ver Cronograma gradient + Clonar Cronograma blanca). Las 4 cards placeholder con `alert()` se removieron porque no tienen contraparte funcional; sólo se mantienen las 2 acciones reales.
+
+| Antes | Después |
+|---|---|
+| Logo K+AIR + botón Volver propios del submódulo | Eliminados (los provee el shell premium v2) |
+| Header propio `cap-portal__header` | `cap-home__header` premium con breadcrumb + icono + título |
+| 6 cards (2 main + 4 "Gestión y Configuración") con placeholders | 2 cards (Ver Cronograma primary + Clonar Cronograma secondary) |
+| Tokens `--cp-*` propios sin dark mode | Scoped `.cap-home` + tokens `--kair-*` + dark con `[data-theme^="dark"]` |
+| Iconos Bootstrap Icons CDN (i class="bi bi-...") | SVGs inline (sin CDN, sin dependencia externa) |
+| `let/const` mezclado, `flex:1` y `padding` fijos | `flex:1; min-height:0` + `padding: clamp(16px,2vw,28px)` fluido |
+| Cache-bust faltante en `capacitaciones-portal-logic.js` | `?v=CAP-20260927-cap-home-premium-v2` agregado |
+
+**Archivos modificados:**
+- `modules/recursos/capacitaciones/cap-home.html` — reescrito (71 líneas)
+- `modules/recursos/capacitaciones/cap-home.css` — reescrito (259 líneas, 100% scoped)
+- `index.html` — cache-bust agregado a `capacitaciones-portal-logic.js`
+- `package.json` — bump 0.1.214 → 0.1.215 + `jsdom` devDep
+- `tests/cap-home-e2e.js` — nuevo E2E con jsdom (sin display, sólo estructural)
+
+**Funcionalidad preservada:**
+- `id="activeYear"` → `loadActiveYear()` lee año del Excel vía IPC
+- `enterCronograma()` → abre `CapacitacionesViewer`
+- `cloneCronograma()` → IPC `duplicate-capacitaciones-sheet`
+- `goBackToModule()` → postMessage al shell
+
+**Funciones removidas del UI (siguen en `cap-home.js` por seguridad):**
+- `importFromExcel()`, `exportCronograma()`, `openMatrizFormacion()`, `openRegistroAsistencia()`, `generateInformeCumplimiento()`, `openCertificados()` — todas eran `alert()` placeholders.
+
+**Bug detectado durante validación:** La primera versión del refactor usaba paths `../../../shared/...` (válidas para iframe como Presupuesto) pero Capacitaciones se carga vía `fetch + innerHTML` donde las URLs se resuelven desde el documento padre. Resultado: CSS no cargaba y la página salía sin estilos. **Fix:** paths relativas a `index.html` (`./shared/...`, `./modules/...`) + `<link>` explícito a `cap-home.css` (que se había omitido por error).
+
+**E2E (`tests/cap-home-e2e.js` con jsdom):**
+- 18/18 checks DOM OK (estructura, clases, contenido)
+- 15/15 reglas CSS requeridas presentes
+- 9/9 tokens kair presentes
+- 11/11 estilos clave validados (gradient, grid, flex, dark)
+- Callbacks onclick correctos: `enterCronograma()` + `cloneCronograma()` + `goBackToModule()`
+
+**Pendiente validación visual por Javier al reiniciar la app.**
 
 ## [0.1.214] - 2026-09-26
 

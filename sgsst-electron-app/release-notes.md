@@ -1,3 +1,54 @@
+# K+AIR v0.1.215
+
+## 🎨 Home de Capacitaciones al patrón premium v2 estilo Presupuesto (📦816)
+
+El portal legacy del submódulo 1.2.1 (con prefijo `cap-portal__*`, tokens `--cp-*` propios, header con logo K+AIR y botón Volver redundantes) se reemplazó por el patrón premium v2 replicado de `pres-home`: header con breadcrumb + icon chip + título Manrope + pill "Año Activo" + botón "Volver al Menú", y 2 main cards (Ver Cronograma gradient + Clonar Cronograma blanca).
+
+### Cambios principales
+
+- **Header premium v2**: breadcrumb "Recursos / Capacitaciones" + icon chip SVG 🎓 + título "Capacitaciones" + subtítulo + pill "Año Activo: 2026" + botón "Volver al Menú" (consistente con el shell).
+- **2 main cards** (reemplazan las 6 anteriores):
+  - **PRIMARY** (gradient azul): "Ver Cronograma de Capacitaciones" → abre el viewer
+  - **SECUNDARIA** (blanca con ícono naranja): "Clonar Cronograma" → IPC `duplicate-capacitaciones-sheet`
+- **Sin sección "Gestión y Configuración"**: las 4 cards placeholder con `alert()` (Importar, Exportar, Matriz, Asistencia, Informe, Certificados) se removieron porque no tienen contraparte funcional.
+- **Tokens `--kair-*` del design system** (sin tokens `--cp-*` propios).
+- **Iconos SVG inline** (sin dependencia de Bootstrap Icons CDN).
+- **Dark mode completo** con `[data-theme^="dark"]` (cubre dark + dark-legacy).
+
+### Bug detectado y corregido durante validación
+
+La primera versión del refactor usaba paths `../../../shared/...` válidas para iframe (como Presupuesto) pero **NO** para HTML inyectado vía `fetch + innerHTML`. Las URLs relativas se resuelven desde el documento padre (`index.html`), no desde el archivo fetched. **Fix**: paths relativas a `index.html` (`./shared/...`, `./modules/...`) + `<link>` explícito a `cap-home.css` (que se había omitido por error).
+
+### E2E nuevo
+
+`tests/cap-home-e2e.js` con jsdom (validación estructural sin display):
+- 18/18 checks DOM OK
+- 15/15 reglas CSS requeridas presentes
+- 9/9 tokens kair presentes
+- 11/11 estilos clave validados
+- Callbacks `enterCronograma()` + `cloneCronograma()` + `goBackToModule()` correctos
+
+### Archivos
+
+- `modules/recursos/capacitaciones/cap-home.html` — reescrito (71 líneas)
+- `modules/recursos/capacitaciones/cap-home.css` — reescrito (259 líneas, 100% scoped)
+- `index.html` — cache-bust `?v=CAP-20260927-cap-home-premium-v2` en `capacitaciones-portal-logic.js`
+- `package.json` — bump 0.1.214 → 0.1.215 + `jsdom` devDep
+- `tests/cap-home-e2e.js` — nuevo E2E con jsdom
+- `AGENTS.md` — gotcha 13 añadido (URLs en fetch + innerHTML)
+- `CHANGELOG.md` — entrada `[0.1.215]`
+- `CONTEXT.md`, `PRD.md`, `README.md`, `release-notes.md` — sincronizados
+
+### Para validar
+
+1. Abrir la app y navegar a Módulo **Recursos** → **1.2.1 Capacitaciones**.
+2. El render debe coincidir con el home de **Presupuesto** (mismo patrón premium v2).
+3. Click en "Ver Cronograma" debe abrir el viewer de capacitaciones.
+4. Click en "Clonar Cronograma" debe mostrar el toast de éxito.
+5. Validar en claro y los dos oscuros (Sistema + Oscuro).
+
+---
+
 # K+AIR v0.1.214
 
 ## 🎉 Splash de bienvenida con confetti estilo Stripe (📦815)

@@ -14,7 +14,7 @@ El producto es **usado en producción** por al menos 1 cliente (despliegue opera
 
 **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 **Última versión publicada:** v0.1.205 (instaladores de release)
-**Última versión de desarrollo:** v0.1.214 (HEAD en `origin/Dev-Pc`)
+**Última versión de desarrollo:** v0.1.215 (HEAD en `origin/Dev-Pc`)
 
 ---
 
@@ -274,7 +274,7 @@ sgsst-electron-app/
 ├── PRD.md                    # ESTE ARCHIVO
 ├── README.md                 # Descripción pública del producto
 ├── release-notes.md          # Notas de release
-├── package.json              # v0.1.214, deps + electron-builder config
+├── package.json              # v0.1.215, deps + electron-builder config
 ├── package-lock.json
 ├── main.js                   # 21,643 líneas, 160+ handlers IPC
 ├── preload.js                # 1,138 líneas, ~250 contratos IPC
@@ -376,7 +376,7 @@ sgsst-electron-app/
 
 | Métrica | Valor actual |
 |---|---|
-| Versión de desarrollo | 0.1.214 (HEAD: `903a2e9c 📦815`) |
+| Versión de desarrollo | 0.1.215 (HEAD: `9e017268 📦815-followup` → 📦816) |
 | Versión publicada | v0.1.205 |
 | Total archivos JS | 962 |
 | Total archivos CSS | 90 |
@@ -416,7 +416,7 @@ sgsst-electron-app/
 - [ ] Retención/purge de notificaciones leídas >30 días
 - [ ] Sync-service improvements (mejor resolución de conflictos, mejor UI de sync state)
 - [ ] Firma-service en producción (actualmente v0.1 esqueleto)
-- [ ] Release oficial v0.2.0 (consolidación de todas las features de v0.1.205 → v0.1.214)
+- [ ] Release oficial v0.2.0 (consolidación de todas las features de v0.1.205 → v0.1.215)
 
 ### 10.4 Backlog normativo (placeholders en sidebar)
 
