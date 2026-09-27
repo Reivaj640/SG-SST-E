@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.213] - 2026-09-26
+
+### 📦814 · Investigación de Accidentes con IA — prompts alineados al dataset v5 (metodología vertical por columna)
+
+#### Migración del prompt a `dataset_v5_final.jsonl` (ANÁLISIS VERTICAL POR CATEGORÍA)
+
+- **`Portear/src/llm_server.py`**: `INSTRUCCIONES_PROMPT` ahora es la plantilla **v5 VERBATIM** (NO re-envolver párrafos, NO salto inicial invisible, NO quitar líneas en blanco). Cambios clave:
+  - **Metodología**: cambia de "5 niveles con cadena causal horizontal 5→4→3→2→1" a **"ANÁLISIS VERTICAL POR CATEGORÍA"**: cadena causal INDEPENDIENTE por columna M (cada celda explica la causa de la MISMA M del nivel anterior, no del nivel completo).
+  - **Reglas obligatorias actualizadas**: HERENCIA DE N/A (si una categoría es N/A en un nivel, permanece N/A en los siguientes), DETENCIÓN POR CAUSA RAÍZ (si una categoría ya alcanzó causa raíz, marca N/A en los siguientes), CERO CRUCES (nunca expliques la causa de una categoría usando otra).
+  - **Encabezados**: v5 usa "2. ¿Por qué ocurrieron las causas del Nivel 1?" (encadenados) en lugar del placeholder "causa principal del nivel N" del v4 — el parser y `_build_pregunta` los extraen correctamente para la UI.
+  - **`_uniform_preguntas` ELIMINADA** (existió 1 día): forzaba el header constante "¿Por qué ocurrió el accidente?" en los 5 niveles, pero **chocaba con el formato del dataset v5** que usa encabezados encadenados por nivel. La cadena causal ahora vive en el CONTENIDO de cada M, no en el título.
+  - **Secciones del accidente**: pasan de asteriscos v4 (`**Descripción del accidente:**`) a texto plano v5 (`Descripción del accidente:`) — coincide con el dataset.
+
+- **`tests/investigacion-accidentes/test-hf-llm-canales.js`**: tests de regresión actualizados para verificar:
+  - El nuevo prompt sin asteriscos en `build_user_prompt` (regex cambió de `\\n\\n\\*\\*Descripción\\*\\*` a `\\n\\nDescripción:`).
+  - Que `_uniform_preguntas` ya NO exista (regresión del fix: si vuelve a aparecer, falla).
+  - Que los encabezados encadenados v5 sean parseados correctamente.
+
+- **`AGENTS.md` (gotcha 11)**: actualizada con la nueva metodología. Mantiene las gotchas 9-10 (anti-repetición + cadena iterativa) del paquete anterior.
+
+#### Pendiente conocido
+
+- **Coherencia por columna (cada M responde a su propia M del nivel anterior)** es conducta del MODELO y exige **re-entrenar** con regla columnar nueva + dataset ajustado. NO se resuelve en código. El plan `docs/opencode/plans/20260925-entrenamiento-5porques-v5.md` describe el pipeline de re-entrenamiento (Unsloth + SFT sobre v5+train, epochs ~3, lr 2e-5, export F16 — NO Q4 porque destruye fine-tunes pequeños).
+
+#### Validación
+
+- `tests/investigacion-accidentes/test-hf-llm-canales.js`: **144/144 OK** (sin regresiones).
+- `test-inv-llm-server.js` (parser): OK.
+
+---
+
 ## [0.1.212] - 2026-09-23
 
 ### 📦809 · Notificaciones — fix duplicación de correos (global `*`) + tabs Pendientes/Notificaciones

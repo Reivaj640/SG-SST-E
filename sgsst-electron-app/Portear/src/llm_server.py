@@ -216,10 +216,12 @@ en lugar de afirmar una condición específica no verificada.**"""
 # NO parafrasear: el modelo (Qwen3.5-0.8b-ia) fue afinado con ESTE texto exacto.
 INSTRUCCIONES_PROMPT = """INSTRUCCIONES: Genera un análisis 5 Porqués COMPLETO para el siguiente accidente laboral.
 
-METODOLOGÍA 5 PORQUÉS:
-- Cada nivel pregunta "¿Por qué?" al resultado del nivel anterior
-- El objetivo es llegar a la CAUSA RAÍZ que la empresa puede corregir con acciones concretas
-- Los niveles deben formar una CADENA CAUSAL COHERENTE (5→4→3→2→1→accidente)
+METODOLOGÍA 5 PORQUÉS (ANÁLISIS VERTICAL POR CATEGORÍA):
+- Debes realizar exactamente 5 niveles de profundidad
+- En CADA nivel evalúa las 5 categorías 5M (Mano de Obra, Método, Maquinaria, Medio Ambiente, Material)
+- CADENA CAUSAL INDEPENDIENTE POR COLUMNA: la causa de cada categoría en un nivel explica SOLO la causa de ESA MISMA categoría en el nivel anterior
+- NO unifiques las causas en una sola causa principal general; cada categoría tiene su propia cadena
+- El objetivo es llegar a CAUSAS RAÍZ que la empresa pueda corregir con acciones concretas
 
 CATEGORÍAS 5M (analiza TODAS en CADA nivel):
 - Mano de Obra: acciones/comportamientos del trabajador (distracción, error, decisión, capacitación)
@@ -232,11 +234,13 @@ REGLAS OBLIGATORIAS:
 1. Genera EXACTAMENTE 5 niveles de análisis
 2. En CADA nivel, analiza TODAS las 5 categorías 5M (no solo una)
 3. Si una categoría NO contribuye a la causa en ese nivel, marca N/A
-4. La causa principal de cada nivel debe ser CONSECUENCIA del nivel anterior
-5. El último nivel debe identificar causas RAÍZ accionables por la empresa
-6. NO agregues explicaciones, introducciones, conclusiones, notas adicionales ni texto fuera del formato
-7. NO uses "**", "###", ni otros marcadores de formato markdown
-8. Detente inmediatamente después del nivel 5
+4. HERENCIA DE N/A: si una categoría es N/A en un nivel, permanece N/A en todos los niveles siguientes
+5. DETENCIÓN POR CAUSA RAÍZ: si una categoría ya alcanzó su causa raíz en un nivel, marca N/A en esa categoría en los niveles siguientes
+6. CERO CRUCES: nunca expliques la causa de una categoría usando otra categoría distinta
+7. El último nivel con contenido debe identificar causas RAÍZ accionables por la empresa
+8. NO agregues explicaciones, introducciones, conclusiones, notas adicionales ni texto fuera del formato
+9. NO uses "**", "###", ni otros marcadores de formato markdown
+10. Detente inmediatamente después del nivel 5
 
 FORMATO DE RESPUESTA ESTRICTO (usa ESTE formato exacto):
 
@@ -247,28 +251,28 @@ FORMATO DE RESPUESTA ESTRICTO (usa ESTE formato exacto):
    • Medio Ambiente: [causa específica o N/A]
    • Material: [causa específica o N/A]
 
-2. ¿Por qué [causa principal del nivel 1]?
+2. ¿Por qué ocurrieron las causas del Nivel 1?
    • Mano de Obra: [causa específica o N/A]
    • Método: [causa específica o N/A]
    • Maquinaria: [causa específica o N/A]
    • Medio Ambiente: [causa específica o N/A]
    • Material: [causa específica o N/A]
 
-3. ¿Por qué [causa principal del nivel 2]?
+3. ¿Por qué ocurrieron las causas del Nivel 2?
    • Mano de Obra: [causa específica o N/A]
    • Método: [causa específica o N/A]
    • Maquinaria: [causa específica o N/A]
    • Medio Ambiente: [causa específica o N/A]
    • Material: [causa específica o N/A]
 
-4. ¿Por qué [causa principal del nivel 3]?
+4. ¿Por qué ocurrieron las causas del Nivel 3?
    • Mano de Obra: [causa específica o N/A]
    • Método: [causa específica o N/A]
    • Maquinaria: [causa específica o N/A]
    • Medio Ambiente: [causa específica o N/A]
    • Material: [causa específica o N/A]
 
-5. ¿Por qué [causa principal del nivel 4]?
+5. ¿Por qué ocurrieron las causas del Nivel 4? (Causas Raíz)
    • Mano de Obra: [causa específica o N/A]
    • Método: [causa específica o N/A]
    • Maquinaria: [causa específica o N/A]
@@ -281,19 +285,17 @@ ACCIDENTE A ANALIZAR:"""
 def build_user_prompt(descripcion: str, contexto: str) -> str:
     """Construye el mensaje del usuario: plantilla entrenada + datos del accidente.
 
-    NOTA (dataset v4_final): las secciones del accidente van en negrita
-    (**Descripción...**, **Contexto Adicional:**, **Análisis de 5 Porqués:**)
-    — el modelo se entrenó con ESE formato; sin los asteriscos queda fuera de
-    distribución (copia la plantilla literal en vez de analizar).
+    NOTA (dataset v5_final): las secciones del accidente van en texto plano
+    (sin asteriscos) y la metodología del prompt es VERTICAL POR CATEGORÍA.
     """
     contexto_str = contexto if contexto else "No se proporcionó contexto adicional."
     return (
         INSTRUCCIONES_PROMPT
-        + "\n\n**Descripción del accidente:**\n"
+        + "\n\nDescripción del accidente:\n"
         + descripcion
-        + "\n\n**Contexto Adicional:**\n"
+        + "\n\nContexto Adicional:\n"
         + contexto_str
-        + "\n\n**Análisis de 5 Porqués:**"
+        + "\n\nAnálisis de 5 Porqués:"
     )
 
 
@@ -519,7 +521,6 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
                     f"[OLLAMA] Análisis validado en intento {attempt + 1} "
                     f"(score={validation['score']}, tiempo={elapsed:.1f}s)"
                 )
-                _uniform_preguntas(parsed_result)
                 return {
                     "success": True,
                     "data": parsed_result,
@@ -555,7 +556,6 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
                         f"[OLLAMA] Cadena iterativa validada "
                         f"(score={val_it['score']}, tiempo={elapsed:.1f}s)"
                     )
-                    _uniform_preguntas(parsed_it)
                     return {
                         "success": True,
                         "data": parsed_it,
@@ -585,7 +585,6 @@ def analyze_via_ollama(descripcion: str, contexto: str = "") -> dict:
             f"[OLLAMA] Backward Test no aprobado tras {MAX_RETRIES + 1} intentos. "
             f"Mejor score: {best_score}/100"
         )
-        _uniform_preguntas(best_result["parsed"])
         return {
             "success": True,
             "data": best_result["parsed"],
@@ -927,19 +926,6 @@ def _format_level_block(level_n: int, level_data: dict) -> str:
     return "\n".join(lines)
 
 
-def _uniform_preguntas(parsed: dict) -> dict:
-    """Criterio del formato: el encabezado de cada nivel SIEMPRE es la pregunta
-    maestra "¿Por qué ocurrió el accidente?" — la cadena causal vive en el
-    CONTENIDO de cada categoría (cada celda debe derivarse de la misma "M" del
-    nivel anterior), no en el título del nivel. Antes el título saltaba a
-    cualquier causa del nivel anterior ("¿Por qué no había herramientas de
-    corte disponibles?"), lo que el usuario reportó como confuso (captura
-    2026-09-25)."""
-    for n in range(1, 6):
-        key = f"PorQue{n}"
-        if key in parsed:
-            parsed[key]["Pregunta"] = "¿Por qué ocurrió el accidente?"
-    return parsed
 
 
 def _analyze_iterative_chain(descripcion: str, contexto: str, llm_cfg: dict,
@@ -1129,8 +1115,6 @@ def _analyze_iterative_chain(descripcion: str, contexto: str, llm_cfg: dict,
         f"valid={validation['valid']} repetition_cells={validation['details'].get('repetition_cells', 0)}"
     )
     # Encabezado constante por criterio del formato (antes de reconstruir el raw)
-    _uniform_preguntas(parsed)
-    _uniform_preguntas(parsed)  # encabezado constante: "¿Por qué ocurrió el accidente?" en los 5 niveles
     raw_text = "\n\n".join(_format_level_block(m, parsed[f"PorQue{m}"]) for m in range(1, 6))
     return parsed, validation, raw_text
 
@@ -1738,7 +1722,6 @@ def regenerate_endpoint():
         parsed_result = parse_5_whys(analysis_text)
         # Post-procesar para reforzar la cadena causal (fill-forward de N/A rotos)
         parsed_result = _enforce_causal_chain(parsed_result)
-        _uniform_preguntas(parsed_result)
 
         return jsonify({
             "success": True,

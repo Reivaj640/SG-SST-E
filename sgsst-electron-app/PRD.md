@@ -229,7 +229,12 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 ### 6.6 Investigación de Accidentes (con LLM)
 
 - **Origen**: 📦700+ en `modules/gestion-salud/investigacion-accidentes/`
-- **LLM**: Qwen local vía Ollama/IPC, sin envío de datos personales fuera del repo
+- **LLM**: Qwen3.5-0.8b-ia (fine-tuneado) local vía Ollama/IPC, sin envío de datos personales fuera del repo
+- **Dataset**: `dataset_v5_final.jsonl` (metodología vertical por columna: cada M explica la causa de la MISMA M del nivel anterior, no del nivel completo). Las secciones del accidente van en texto plano (sin asteriscos v4).
+- **Reglas del prompt v5**: HERENCIA DE N/A, DETENCIÓN POR CAUSA RAÍZ, CERO CRUCES. Encabezados encadenados (`2. ¿Por qué ocurrieron las causas del Nivel 1?`).
+- **Aviso de calidad**: banner ámbar `.inv-quality-warn` cuando el servidor devuelve `validation_warning` o `score < 70`.
+- **Cadena anti-repetición**: `llm_server.py` valida con `_validate_backward_chain` (gate 6+ repetidas) + cadena iterativa `_analyze_iterative_chain` cuando hay estancamiento.
+- **Pendiente**: coherencia por columna exige re-entrenar con regla columnar nueva. Pipeline en `docs/opencode/plans/20260925-entrenamiento-5porques-v5.md` (Unsloth + SFT, export F16 — NO Q4).
 - **3 vistas**: Editor + Lista + Detalle
 
 ### 6.7 Reportes y Estadísticas (3.2.3, 3.3.1-5)

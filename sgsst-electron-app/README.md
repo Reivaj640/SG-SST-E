@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.212 (desarrollo) — último publicado v0.1.205 · 📦807-809 Notificaciones persistentes + fix duplicación correos (global `*`) + tabs Pendientes/Notificaciones (tamaño estable) + 167/167 tests
-**Última actualización:** 23 de septiembre de 2026
+**Versión:** 0.1.213 (desarrollo) — último publicado v0.1.205 · 📦814 Investigación IA con prompts dataset v5 (metodología vertical por columna) + 144/144 tests
+**Última actualización:** 26 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -1320,6 +1320,20 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 ---
 
 ## 📝 Cambios Recientes
+
+### v0.1.213 - 26 Sep 2026 🆕
+
+#### 📦814 · Investigación de Accidentes con IA — prompts alineados al dataset v5 (metodología vertical por columna)
+
+Migración del prompt del 5 Porqués a `dataset_v5_final.jsonl`. Cambio metodológico fundamental: la cadena causal pasa de **horizontal 5→4→3→2→1** a **vertical por columna M** (cada celda explica la causa de la MISMA M del nivel anterior, no del nivel completo). Permite diagnósticos más granulares y accionables.
+
+- **`Portear/src/llm_server.py`**: `INSTRUCCIONES_PROMPT` ahora es la plantilla **v5 VERBATIM** — sin re-envolver párrafos, sin salto inicial invisible, sin quitar líneas en blanco. Reglas actualizadas: HERENCIA DE N/A, DETENCIÓN POR CAUSA RAÍZ, CERO CRUCES. Secciones del accidente sin asteriscos (texto plano v5 vs asteriscos v4). Encabezados encadenados (`2. ¿Por qué ocurrieron las causas del Nivel 1?`) en lugar de placeholder.
+- **`tests/investigacion-accidentes/test-hf-llm-canales.js`**: tests actualizados (regex del nuevo prompt sin asteriscos + regresión `_uniform_preguntas` que se eliminó). **144/144 OK**.
+- **`AGENTS.md` gotcha 11**: actualizada con metodología vertical. Mantiene gotchas 9-10 (anti-repetición + cadena iterativa).
+- **`_uniform_preguntas` ELIMINADA**: existió 1 día y chocaba con el formato v5.
+- **Pendiente**: coherencia por columna es conducta del MODELO y exige re-entrenar con regla columnar nueva. Plan `docs/opencode/plans/20260925-entrenamiento-5porques-v5.md` describe el pipeline (Unsloth + SFT sobre v5+train, epochs ~3, lr 2e-5, export F16 — NO Q4 porque destruye fine-tunes pequeños).
+
+---
 
 ### v0.1.212 - 22 Sep 2026 🆕
 

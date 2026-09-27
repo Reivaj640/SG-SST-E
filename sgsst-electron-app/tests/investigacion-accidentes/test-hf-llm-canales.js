@@ -250,9 +250,9 @@ check('server: plantilla de usuario entrenada (INSTRUCCIONES 5 Porqués COMPLETO
   /INSTRUCCIONES: Genera un análisis 5 Porqués COMPLETO/.test(server) &&
   /REGLAS OBLIGATORIAS:\n1\. Genera EXACTAMENTE 5 niveles/.test(server) &&
   /ACCIDENTE A ANALIZAR:"""/.test(server));
-check('server: build_user_prompt arma plantilla + datos + cierre entrenado (con ** del dataset v4)',
-  /INSTRUCCIONES_PROMPT\s*\+\s*"\\n\\n\*\*Descripción del accidente:\*\*\\n"/.test(server) &&
-  /\+ "\\n\\n\*\*Análisis de 5 Porqués:\*\*"/.test(server));
+check('server: build_user_prompt arma plantilla + datos + cierre en texto plano (dataset v5)',
+  /INSTRUCCIONES_PROMPT\s*\+\s*"\\n\\nDescripción del accidente:\\n"/.test(server) &&
+  /\+ "\\n\\nAnálisis de 5 Porqués:"/.test(server));
 check('server: defaults llmMaxTokens 1216 (entrenamiento)',
   /"llmMaxTokens":\s*1216/.test(server) &&
   (server.match(/"llmMaxTokens",\s*1216/g) || []).length >= 2);
@@ -429,14 +429,14 @@ check('server: analyze prefiere la cadena con MENOS repetición aunque el score 
   server.includes('rep_it < rep_ss'));
 check('server: el dedupe va DESPUÉS de _enforce_causal_chain (no lo des-copiaría)',
   /_enforce_causal_chain\(parsed\)[\s\S]{0,900}deduped_cells/.test(server));
-/* ══════════════ K. ENCABEZADO CONSTANTE POR NIVEL (captura 2026-09-25) ══════
-   Criterio del usuario: cada nivel lleva SIEMPRE la pregunta maestra
-   "¿Por qué ocurrió el accidente?"; la cadena causal vive en el CONTENIDO de
-   cada M (del nivel anterior de la MISMA categoría), no en el título. */
-check('server: _uniform_preguntas define el encabezado constante',
-  server.includes('def _uniform_preguntas') && server.includes('"¿Por qué ocurrió el accidente?"'));
-check('server: encabezado constante se aplica en analyze, iterativa y regenerate',
-  (server.match(/_uniform_preguntas\(/g) || []).length >= 5);
+/* ══════════════ K. FORMATO DEL DATASET v5 (metodología vertical por columna) ═══
+   Regresión: la plantilla entrenada pasa a v5 (cadenas por COLUMNA: HERENCIA
+   DE N/A, DETENCIÓN POR CAUSA RAÍZ, CERO CRUCES) con encabezados de cadena
+   "¿Por qué ocurrieron las causas del Nivel N?". */
+check('server: INSTRUCCIONES_PROMPT es la plantilla v5 (metodología vertical + HERENCIA/CERO CRUCES)',
+  server.includes('ANÁLISIS VERTICAL POR CATEGORÍA') && server.includes('HERENCIA DE N/A') && server.includes('CERO CRUCES'));
+check('server: formato v5 con encabezados de cadena (¿Por qué ocurrieron las causas del Nivel 1?)',
+  server.includes('¿Por qué ocurrieron las causas del Nivel 1?'));
 /* ══════════════ REPORTE ══════════════ */
 
 var failed = 0;
