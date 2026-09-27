@@ -1321,6 +1321,33 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.216 - 27 Sep 2026 🆕
+
+#### 📦817 · Shell de Gestión Humana — header premium v2 (breadcrumb + pill + fondo continuo)
+
+El header del shell del módulo 8 migró al patrón premium v2 replicado del viewer de Capacitaciones: breadcrumb 3 niveles (`Inicio › Gestión › Gestión Humana`), pill "Empresa activa" dinámica, y fondo `var(--bg-color)` continuo sin bordes (header + tabs + content forman un solo bloque gris).
+
+- **HTML**: breadcrumb 3 niveles + pill `#gh-company-pill` con SVG icono casa + nombre dinámico; **eliminado** botón bell de notificaciones (ya existía como `gh-bell-btn`, ahora removido del chrome del shell).
+- **CSS**: tokens `--bg-color` (mismo gris que el resto de la app) en header y tabs; removidos `border-bottom` y `.gh-bell-*` styles; hover de tab usa `--gh-accent-soft` para destacar sobre fondo gris.
+- **JS**: nueva función `_updateCompanyPill()` (análoga a `_updateSubtitle()`); fallback inline en `_fetchShellHtml` actualizado para coincidir; llamada en `_renderShell()`.
+- **Decisiones explícitas del owner**:
+  - ❌ Sin botón Volver (el sidebar ya da navegación)
+  - ❌ Sin botón Nueva Contratación (las vistas individuales lo agregan si lo necesitan)
+- **Cache-bust**: `gestion-humana-home.css?v=GH-20260927-shell-no-borders` + JS `?v=GH-20260927-shell-no-borders`.
+- **Versión**: bump 0.1.215 → 0.1.216.
+
+#### Antes vs después
+
+| Aspecto | Antes | Después |
+|---|---|---|
+| Breadcrumb | ❌ | ✅ 3 niveles (`Inicio › Gestión › Gestión Humana`) |
+| Pill a la derecha | Botón bell | ✅ "Empresa activa: <nombre>" |
+| Fondo header | Blanco | Gris (`var(--bg-color)`) |
+| Fondo tabs | Blanco | Gris (sin distinción visual) |
+| Border divisor header/tabs | Línea gris | Eliminado |
+| Border divisor tabs/content | Línea gris | Eliminado |
+| Indicador tab activa | Subrayado azul | Subrayado azul (preservado) |
+
 ### v0.1.215 - 27 Sep 2026 🆕
 
 #### 📦816 · Home de Capacitaciones — refactor al patrón premium v2 estilo Presupuesto

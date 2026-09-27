@@ -118,6 +118,15 @@ class GestionHumanaHome {
     el.textContent = 'Sistema de Gestión de Personal' + (empresa ? ' — ' + empresa : '');
   }
 
+  // 📦817 · Header pill "Empresa activa": nombre dinámico de la empresa
+  _updateCompanyPill() {
+    var nameEl = this.container.querySelector('#gh-company-name');
+    if (!nameEl) return;
+    var empresa = this.companyName && this.companyName !== 'default_company' ? this.companyName : null;
+    nameEl.textContent = empresa || 'Sin empresa';
+    nameEl.title = empresa || 'Sin empresa seleccionada';
+  }
+
   // === DATA ===
   async _loadKpis() {
     if (!window.electronAPI || !window.electronAPI.ghListPersonal) return;
@@ -196,6 +205,8 @@ class GestionHumanaHome {
 
     // 📦811 · Subtítulo con la empresa activa
     this._updateSubtitle();
+    // 📦817 · Pill "Empresa activa" en el header
+    this._updateCompanyPill();
 
     // Render view in content
     this._renderViewInto(this.contentEl);
@@ -214,19 +225,27 @@ class GestionHumanaHome {
     // Fallback: HTML inline (debe coincidir con gestion-humana-home.html)
     return '<div class="gh-shell" id="gh-shell">' +
       '<header class="gh-header">' +
-        '<div class="gh-header__left">' +
-          '<div class="gh-header__id">' +
-            '<span class="gh-header__badge" aria-hidden="true">' + ghSvg('users') + '</span>' +
-            '<div class="gh-header__text">' +
-              '<h1 class="gh-header__title">Gestión Humana</h1>' +
-              '<p class="gh-header__subtitle" id="gh-subtitle">Sistema de Gestión de Personal</p>' +
+        '<nav class="gh-breadcrumb" aria-label="Ruta de navegación">' +
+          '<span>Inicio</span><span class="gh-breadcrumb__sep">›</span>' +
+          '<span>Gestión</span><span class="gh-breadcrumb__sep">›</span>' +
+          '<span class="gh-breadcrumb__current">Gestión Humana</span>' +
+        '</nav>' +
+        '<div class="gh-header__row">' +
+          '<div class="gh-header__left">' +
+            '<div class="gh-header__id">' +
+              '<span class="gh-header__badge" aria-hidden="true">' + ghSvg('users') + '</span>' +
+              '<div class="gh-header__text">' +
+                '<h1 class="gh-header__title">Gestión Humana</h1>' +
+                '<p class="gh-header__subtitle" id="gh-subtitle">Sistema de Gestión de Personal</p>' +
+              '</div>' +
             '</div>' +
           '</div>' +
-        '</div>' +
-        '<div class="gh-header__right">' +
-          '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones" aria-label="Notificaciones">' +
-            ghSvg('bell') + '<span class="gh-bell-badge" id="gh-bell-badge"></span>' +
-          '</button>' +
+          '<div class="gh-header__right">' +
+            '<span class="gh-pill" id="gh-company-pill" aria-live="polite">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1v-9"/></svg>' +
+              '<span>Empresa activa: <strong id="gh-company-name">—</strong></span>' +
+            '</span>' +
+          '</div>' +
         '</div>' +
       '</header>' +
       '<nav class="gh-tabs" id="gh-tabs" role="tablist" aria-label="Secciones de Gestión Humana"></nav>' +

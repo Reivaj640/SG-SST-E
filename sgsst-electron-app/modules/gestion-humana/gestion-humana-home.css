@@ -50,17 +50,45 @@
   --gh-red: #e8848f;
 }
 
-/* ═══ HEADER (badge + título + subtítulo / acciones) ═══ */
+/* ═══ HEADER (breadcrumb + badge + título + subtítulo / pill) ═══ */
 .gh-header {
-  background: var(--widget-bg-color);
-  border-bottom: 1px solid var(--border-color);
-  padding: clamp(12px, 1.4vw, 20px) clamp(16px, 2vw, 28px);
+  background: var(--bg-color);
+  border-bottom: none;
+  padding: clamp(10px, 1.2vw, 18px) clamp(16px, 2vw, 28px) clamp(12px, 1.4vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 0.9vw, 14px);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.gh-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-lighter-color, #8a93a3);
+  line-height: 1;
+}
+.gh-breadcrumb > span { white-space: nowrap; }
+.gh-breadcrumb__sep {
+  color: var(--text-lighter-color, #8a93a3);
+  opacity: 0.55;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.gh-breadcrumb__current {
+  color: var(--gh-accent);
+  font-weight: 700;
+}
+
+.gh-header__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  flex-shrink: 0;
-  overflow: hidden;
 }
 .gh-header__left { flex: 1; min-width: 0; display: flex; }
 .gh-header__id { display: flex; align-items: center; gap: 14px; min-width: 0; }
@@ -92,33 +120,39 @@
 }
 
 .gh-header__right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
-.gh-bell-btn {
-  position: relative;
-  width: 38px; height: 38px;
-  background: var(--widget-bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--gh-radius-ctl);
-  cursor: pointer;
-  color: var(--text-light-color);
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: border-color .15s ease, color .15s ease, background .15s ease;
-  font-family: inherit;
+
+/* Pill "Empresa activa · <nombre>" — estilo premium v2 (consistente con cap-home__pill) */
+.gh-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: var(--gh-accent-soft);
+  color: var(--gh-accent);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.gh-bell-btn svg { width: 18px; height: 18px; }
-.gh-bell-btn:hover { border-color: var(--gh-accent); color: var(--gh-accent); background: var(--gh-accent-soft); }
-.gh-bell-badge {
-  position: absolute; top: 8px; right: 9px;
-  width: 8px; height: 8px;
-  background: var(--gh-red);
-  border-radius: 50%;
-  display: none;
-  box-shadow: 0 0 0 2px var(--widget-bg-color);
+.gh-pill svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+.gh-pill strong {
+  color: var(--text-color);
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 /* ═══ TABS ═══ */
 .gh-tabs {
-  background: var(--widget-bg-color);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-color);
+  border-bottom: none;
   display: flex; align-items: stretch;
   padding: 0 clamp(8px, 1vw, 16px);
   overflow-x: auto; overflow-y: hidden;
@@ -139,7 +173,7 @@
   margin-bottom: -1px;
   transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
-.gh-tab:hover { color: var(--gh-accent); background: var(--bg-color); }
+.gh-tab:hover { color: var(--gh-accent); background: var(--gh-accent-soft); }
 .gh-tab--active { color: var(--gh-accent); border-bottom-color: var(--gh-accent); font-weight: 700; }
 .gh-tab__icon { display: inline-flex; width: 17px; height: 17px; }
 .gh-tab__icon svg { width: 17px; height: 17px; }
@@ -338,8 +372,11 @@
 }
 @media (max-width: 640px) {
   .gh-header { padding: 12px 16px; }
+  .gh-breadcrumb { font-size: 10.5px; }
+  .gh-header__row { gap: 0.75rem; flex-wrap: wrap; }
   .gh-header__badge { width: 38px; height: 38px; border-radius: 10px; }
   .gh-header__badge svg { width: 20px; height: 20px; }
   .gh-header__title { font-size: 17px; }
   .gh-header__subtitle { font-size: 11.5px; }
+  .gh-pill { font-size: 10.5px; padding: 6px 10px; }
 }

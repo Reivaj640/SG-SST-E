@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.216] - 2026-09-27
+
+### 📦817 · Shell de Gestión Humana — header premium v2 (breadcrumb + pill + fondo continuo)
+
+**Resumen:** El header del shell del módulo 8 migró al patrón premium v2 replicado del viewer de Capacitaciones: breadcrumb 3 niveles (`Inicio › Gestión › Gestión Humana`), pill "Empresa activa" dinámica, y fondo `var(--bg-color)` continuo sin bordes (header + tabs + content forman un solo bloque gris).
+
+**Decisiones del owner (explícitas en sesión):**
+- ❌ Sin botón **Volver** (el sidebar ya provee navegación al menú)
+- ❌ Sin botón **Nueva Contratación** (las vistas individuales lo agregan si lo necesitan)
+- ✅ Pill "Empresa activa · `<empresa>`" (con icono de casa + nombre dinámico vía `_updateCompanyPill()`)
+- ✅ Fondo `var(--bg-color)` en header + tabs (mismo gris que el resto de la app, sin distinción visual entre header/tabs/content)
+- ✅ Sin `border-bottom` en header ni en tabs (solo queda el underline azul de la tab activa como indicador)
+
+| Antes | Después |
+|---|---|
+| Logo/badge + título + subtítulo (sin breadcrumb) | Breadcrumb 3 niveles + badge + título + subtítulo |
+| Botón bell de notificaciones a la derecha | Pill "Empresa activa: <empresa>" con icono casa |
+| Fondo blanco (`--widget-bg-color`) en header | Fondo gris (`--bg-color`) — mismo que el resto |
+| Borde `1px solid var(--border-color)` separaba header/tabs y tabs/content | Sin bordes — bloque continuo |
+
+**Archivos modificados:**
+- `modules/gestion-humana/gestion-humana-home.html` — breadcrumb + pill + removido bell button
+- `modules/gestion-humana/gestion-humana-home.css` — tokens `--bg-color`, pill styles, hover de tab usa `--gh-accent-soft`, removidos `.gh-bell-*` styles y `border-bottom`
+- `modules/gestion-humana/gestion-humana-home.js` — nueva función `_updateCompanyPill()`, fallback inline actualizado, llamada en `_renderShell()`
+- `index.html` — cache-bust `?v=GH-20260927-shell-no-borders`
+- `package.json` — bump 0.1.215 → 0.1.216
+
+**Funcionalidad preservada:**
+- 9 vistas del shell (Resumen, Dashboard, Contratación, Carpetas, Firma, Afiliaciones, Base Personal, Vacaciones, Permisos, Comunicación) intactas
+- Sistema de tabs (`gh-tabs`, `gh-tab--active`) sin cambios de comportamiento
+- Subtítulo dinámico con la empresa (`#gh-subtitle`) sigue funcionando, complementado por el pill
+- Dark mode + dark-legacy funcionan vía tokens sin override extra
+
 ## [0.1.215] - 2026-09-27
 
 ### 📦816 · Home de Capacitaciones — refactor al patrón premium v2 estilo Presupuesto

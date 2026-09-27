@@ -1,3 +1,52 @@
+# K+AIR v0.1.216
+
+## 🎨 Shell de Gestión Humana — header premium v2 con breadcrumb + pill (📦817)
+
+El header del shell del módulo 8 migró al patrón premium v2 replicado del viewer de Capacitaciones: **breadcrumb 3 niveles** (`Inicio › Gestión › Gestión Humana`), **pill "Empresa activa"** dinámica con SVG icono casa + nombre de la empresa, **fondo `var(--bg-color)` continuo** sin bordes (header + tabs + content forman un solo bloque gris claro, mismo tono que el resto de la app).
+
+### Decisiones explícitas del owner (sesión 2026-09-27)
+
+- ❌ Sin botón **Volver** en el shell (el sidebar ya provee navegación al menú)
+- ❌ Sin botón **Nueva Contratación** en el shell (las vistas individuales lo agregan si lo necesitan)
+- ✅ Sí pill **"Empresa activa: <nombre>"** (da contexto de la empresa activa al entrar al módulo)
+- ✅ Fondo `var(--bg-color)` en header + tabs (mismo gris que el contenido, sin distinción visual)
+- ✅ Sin `border-bottom` divisorios (header → tabs → content en un solo bloque continuo)
+
+### Cambios técnicos
+
+- **HTML**: breadcrumb 3 niveles + pill `#gh-company-pill` con SVG icono casa + `<strong id="gh-company-name">`; eliminado botón bell de notificaciones.
+- **CSS**: tokens `--bg-color` en header y tabs (mismo gris que el resto); estilos `.gh-pill` y `.gh-breadcrumb` con tokens `--gh-accent` / `--gh-accent-soft`; hover de tab usa `--gh-accent-soft` para destacar; removidos `.gh-bell-*` styles y `border-bottom` divisorios.
+- **JS**: nueva función `_updateCompanyPill()` (análoga a `_updateSubtitle()`); fallback inline en `_fetchShellHtml` actualizado para coincidir con el HTML nuevo; llamada en `_renderShell()` junto a `_updateSubtitle()`.
+- **Cache-bust**: `gestion-humana-home.css?v=GH-20260927-shell-no-borders` + JS `?v=GH-20260927-shell-no-borders`.
+
+### Archivos modificados
+
+- `modules/gestion-humana/gestion-humana-home.html` — breadcrumb + pill, removido bell
+- `modules/gestion-humana/gestion-humana-home.css` — tokens `--bg-color`, pill styles, removidos bordes y bell styles
+- `modules/gestion-humana/gestion-humana-home.js` — nueva función `_updateCompanyPill()`, fallback inline actualizado
+- `index.html` — cache-bust CSS + JS
+- `package.json` — bump 0.1.215 → 0.1.216
+- `AGENTS.md`, `CHANGELOG.md`, `CONTEXT.md`, `PRD.md`, `README.md`, `release-notes.md` — sincronizados
+
+### Funcionalidad preservada
+
+- 9 vistas del shell intactas (Resumen, Dashboard, Contratación, Carpetas, Firma, Afiliaciones, Base Personal, Vacaciones, Permisos, Comunicación)
+- Sistema de tabs con underline (indicador de tab activa) sin cambios
+- Subtítulo dinámico con la empresa (`#gh-subtitle`) sigue funcionando, complementado por el pill
+- Dark mode + dark-legacy funcionan vía tokens sin override extra (el token `--bg-color` cambia solo en cada tema)
+
+### Para validar
+
+1. Abrir la app y navegar al módulo **Gestión Humana**.
+2. El header debe verse con fondo gris continuo (mismo tono que el contenido).
+3. Breadcrumb visible arriba: `Inicio › Gestión › Gestión Humana`.
+4. Pill a la derecha mostrando "Empresa activa: <nombre de la empresa>".
+5. Sin líneas grises divisorias entre header/tabs ni entre tabs/content.
+6. Tab activa (Resumen por default) con subrayado azul.
+7. Validar en los 3 temas (claro / oscuro sistema / oscuro legacy).
+
+---
+
 # K+AIR v0.1.215
 
 ## 🎨 Home de Capacitaciones al patrón premium v2 estilo Presupuesto (📦816)
