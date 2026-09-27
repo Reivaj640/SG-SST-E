@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.214] - 2026-09-26
+
+### 📦815 · Splash de bienvenida — confetti estilo Stripe con tokens premium v2
+
+El check verde hardcoded de Bootstrap (`#28a745`) del splash de bienvenida se reemplaza por una animación de confetti con 6 cuadrados rotando que vuelan + halo pulsante con gradiente verde→azul. Todo en línea con el design system premium v2 (sin colores hardcoded).
+
+- **`renderer.js` (línea 3150+)**: SVG rediseñado con `<defs><linearGradient id="kairSuccessGrad">` (verde `#1bb888` → azul `#2057b8`), `<circle class="loading-success-halo">` (radio 48), 6 `<rect class="loading-confetti-rect--N">` (3 colores premium: azul/verde/amber) y `<path>` con check premium. ViewBox ampliado 52→120.
+- **`styles.css`**:
+  - `.loading-success-circle` y `.loading-success-check` ahora usan `stroke: url(#kairSuccessGrad)` (degradado verde→azul) en lugar de `#28a745`.
+  - `.loading-success-halo`: nuevo círculo con fill del gradiente, opacity 0.15, animación `success-halo` (scale 1→1.12, opacity 0.15→0.28) infinito 1.8s.
+  - `.loading-confetti-rect--N`: 6 cuadrados con colores `var(--kair-blue/green/amber)`, transform-origin al centro del SVG, animación `confetti-spin` 0.9s que rota ±180° mientras vuela ±42px con stagger 50ms.
+  - `filter: drop-shadow(0 4px 14px rgba(27, 184, 136, 0.25))` para glow suave en light mode; `rgba(45, 211, 163, 0.45)` para dark.
+  - Mismo patrón aplicado al overlay legado `.kair-transition-success` (línea 5102+) por consistencia.
+- **`index.html`**: cache-bust `styles.css?v=20260926-confetti-success`.
+
+#### Antes vs después
+
+| Aspecto | Antes | Después |
+|---|---|---|
+| Color del check | `#28a745` (Bootstrap verde hardcoded) | Gradiente `#1bb888` → `#2057b8` (tokens premium v2) |
+| Tamaño del SVG | 52×52 | 120×120 (más espacio para confetti) |
+| Decoración | Solo círculo + check | Halo pulsante + 6 cuadrados confeti |
+| Tokens premium v2 | ❌ Hardcoded | ✅ `--kair-blue`, `--kair-green`, `--kair-amber` |
+| Dark mode | No soportado | Glow más intenso (`rgba(45, 211, 163, 0.45)`) |
+| Sensación | "Cargando..." de 2015 | Celebración estilo Stripe/Vercel |
+
+---
+
 ## [0.1.213] - 2026-09-26
 
 ### 📦814 · Investigación de Accidentes con IA — prompts alineados al dataset v5 (metodología vertical por columna)

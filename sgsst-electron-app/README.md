@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.213 (desarrollo) — último publicado v0.1.205 · 📦814 Investigación IA con prompts dataset v5 (metodología vertical por columna) + 144/144 tests
+**Versión:** 0.1.214 (desarrollo) — último publicado v0.1.205 · 📦815 Splash bienvenida confetti estilo Stripe (gradiente verde→azul, halo pulsante, 6 cuadrados rotando) + tokens premium v2
 **Última actualización:** 26 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -1320,6 +1320,30 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 ---
 
 ## 📝 Cambios Recientes
+
+### v0.1.214 - 26 Sep 2026 🆕
+
+#### 📦815 · Splash de bienvenida — confetti estilo Stripe con tokens premium v2
+
+El check verde hardcoded (`#28a745`) del splash de bienvenida se reemplaza por una animación de confetti con tokens premium v2. Mismo patrón aplicado al overlay legado `kair-transition-success` por consistencia.
+
+- **SVG rediseñado** (`renderer.js`): `<defs><linearGradient>` con verde→azul, halo pulsante, 6 cuadrados confeti en 3 colores (azul/verde/amber), check con stroke 4.5px y round caps. ViewBox 52→120.
+- **CSS**: tokens `--kair-blue`, `--kair-green`, `--kair-amber` (antes `#28a745` hardcoded). Animaciones `success-halo` (pulse infinito 1.8s) + `confetti-spin` (rotación ±180° + traslación ±42px, stagger 50ms).
+- **Glow dark mode**: `rgba(45, 211, 163, 0.45)` (más intenso que light).
+- **Cache-bust**: `styles.css?v=20260926-confetti-success`.
+- **Versión**: bump 0.1.213 → 0.1.214.
+
+#### Antes vs después
+
+| Aspecto | Antes | Después |
+|---|---|---|
+| Color | `#28a745` hardcoded | Gradiente verde→azul (tokens premium) |
+| Tamaño | 52×52 | 120×120 + halo + 6 confeti |
+| Tokens v2 | ❌ | ✅ `--kair-blue`, `--kair-green`, `--kair-amber` |
+| Dark mode | ❌ | ✅ glow más intenso |
+| Sensación | "Cargando..." 2015 | Stripe/Vercel moderno |
+
+---
 
 ### v0.1.213 - 26 Sep 2026 🆕
 

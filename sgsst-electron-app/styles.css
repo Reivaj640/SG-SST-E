@@ -5116,10 +5116,18 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   width: 80px;
   height: 80px;
   margin-bottom: 1rem;
+  filter: drop-shadow(0 4px 14px rgba(27, 184, 136, 0.25));
+}
+
+.kair-transition-success-halo {
+  fill: url(#kairSuccessGrad);
+  opacity: 0.15;
+  transform-origin: 40px 40px;
+  animation: success-halo 1.8s ease-out 0.4s infinite;
 }
 
 .kair-transition-success-circle {
-  stroke: #28a745;
+  stroke: url(#kairSuccessGrad);
   stroke-width: 3;
   fill: none;
   stroke-dasharray: 166;
@@ -5128,12 +5136,33 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 }
 
 .kair-transition-success-check {
-  stroke: #28a745;
-  stroke-width: 3;
+  stroke: url(#kairSuccessGrad);
+  stroke-width: 4.5;
   fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   stroke-dasharray: 50;
   stroke-dashoffset: 50;
   animation: kair-transition-success-check 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+}
+
+/* 6 cuadrados confetti (mismo patrón que loading-success) */
+.kair-transition-confetti-rect {
+  opacity: 0;
+  transform-origin: 40px 40px;
+}
+.kair-transition-confetti-rect--1 { fill: var(--kair-blue);    animation: confetti-spin 0.9s ease-out 0.5s forwards;  --tx: 0px;    --ty: -42px; --r: 180deg; }
+.kair-transition-confetti-rect--2 { fill: var(--kair-green);   animation: confetti-spin 0.9s ease-out 0.55s forwards; --tx: 38px;  --ty: -22px; --r: -180deg; }
+.kair-transition-confetti-rect--3 { fill: var(--kair-amber);   animation: confetti-spin 0.9s ease-out 0.6s forwards;  --tx: 42px;  --ty: 8px;   --r: 180deg; }
+.kair-transition-confetti-rect--4 { fill: var(--kair-blue);    animation: confetti-spin 0.9s ease-out 0.65s forwards; --tx: 22px;  --ty: 38px;  --r: -180deg; }
+.kair-transition-confetti-rect--5 { fill: var(--kair-green);   animation: confetti-spin 0.9s ease-out 0.7s forwards;  --tx: -22px; --ty: 38px;  --r: 180deg; }
+.kair-transition-confetti-rect--6 { fill: var(--kair-amber);   animation: confetti-spin 0.9s ease-out 0.75s forwards; --tx: -38px; --ty: -22px; --r: -180deg; }
+
+[data-theme^="dark"] .kair-transition-success-icon {
+  filter: drop-shadow(0 4px 18px rgba(45, 211, 163, 0.45));
+}
+[data-theme^="dark"] .kair-transition-success-halo {
+  opacity: 0.22;
 }
 
 .kair-transition-welcome {
@@ -5608,33 +5637,81 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   margin-top: 1rem;
 }
 
+/* ═══ 📦815 · LOADING SUCCESS — confetti estilo Stripe ═══ */
+
 .loading-success-icon {
-  width: 60px;
-  height: 60px;
+  width: 90px;
+  height: 90px;
+  filter: drop-shadow(0 4px 14px rgba(27, 184, 136, 0.25));
 }
 
+/* Halo difuso de fondo (gradiente verde→azul) */
+.loading-success-halo {
+  fill: url(#kairSuccessGrad);
+  opacity: 0.15;
+  transform-origin: 60px 60px;
+  animation: success-halo 1.8s ease-out 0.4s infinite;
+}
+
+/* Anillo principal con gradiente */
 .loading-success-circle {
-  stroke: #28a745;
-  stroke-width: 2;
-  fill: none;
-  stroke-dasharray: 166;
-  stroke-dashoffset: 166;
-  animation: success-circle 0.6s ease-out 0.2s forwards;
-}
-
-.loading-success-check {
-  stroke: #28a745;
+  stroke: url(#kairSuccessGrad);
   stroke-width: 3;
   fill: none;
-  stroke-linecap: round;
-  stroke-linecap: round;
-  stroke-dasharray: 50;
-  stroke-dashoffset: 50;
-  animation: success-check 0.4s ease-out 0.7s forwards;
+  stroke-dasharray: 201;
+  stroke-dashoffset: 201;
+  animation: success-circle 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.2s forwards;
 }
+
+/* Check premium con stroke grueso y round caps */
+.loading-success-check {
+  stroke: url(#kairSuccessGrad);
+  stroke-width: 5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: success-check 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+}
+
+/* 6 cuadrados confetti rotando y volando */
+.loading-confetti-rect {
+  opacity: 0;
+  transform-origin: 60px 60px;
+}
+.loading-confetti-rect--1 { fill: var(--kair-blue);    animation: confetti-spin 0.9s ease-out 0.5s forwards;  --tx: 0px;    --ty: -42px; --r: 180deg; }
+.loading-confetti-rect--2 { fill: var(--kair-green);   animation: confetti-spin 0.9s ease-out 0.55s forwards; --tx: 38px;  --ty: -22px; --r: -180deg; }
+.loading-confetti-rect--3 { fill: var(--kair-amber);   animation: confetti-spin 0.9s ease-out 0.6s forwards;  --tx: 42px;  --ty: 8px;   --r: 180deg; }
+.loading-confetti-rect--4 { fill: var(--kair-blue);    animation: confetti-spin 0.9s ease-out 0.65s forwards; --tx: 22px;  --ty: 38px;  --r: -180deg; }
+.loading-confetti-rect--5 { fill: var(--kair-green);   animation: confetti-spin 0.9s ease-out 0.7s forwards;  --tx: -22px; --ty: 38px;  --r: 180deg; }
+.loading-confetti-rect--6 { fill: var(--kair-amber);   animation: confetti-spin 0.9s ease-out 0.75s forwards; --tx: -38px; --ty: -22px; --r: -180deg; }
 
 @keyframes success-circle {
   to { stroke-dashoffset: 0; }
+}
+
+@keyframes success-check {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes success-halo {
+  0%, 100% { transform: scale(1); opacity: 0.15; }
+  50%      { transform: scale(1.12); opacity: 0.28; }
+}
+
+@keyframes confetti-spin {
+  0%   { transform: translate(-50%, -50%) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(calc(var(--tx) - 50%), calc(var(--ty) - 50%)) rotate(var(--r)); opacity: 0; }
+}
+
+/* Dark mode: glow más intenso */
+[data-theme^="dark"] .loading-success-icon {
+  filter: drop-shadow(0 4px 18px rgba(45, 211, 163, 0.45));
+}
+[data-theme^="dark"] .loading-success-halo {
+  opacity: 0.22;
 }
 
 @keyframes success-check {

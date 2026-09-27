@@ -3146,11 +3146,28 @@ function createTransitionOverlay() {
         <div class="loading-progress-percent">0%</div>
       </div>
 
-      <!-- Éxito -->
+      <!-- Éxito (📦815 · confetti estilo Stripe) -->
       <div class="loading-success" id="loading-success" style="display: none;">
-        <svg class="loading-success-icon" viewBox="0 0 52 52">
-          <circle class="loading-success-circle" cx="26" cy="26" r="25"/>
-          <path class="loading-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        <svg class="loading-success-icon" viewBox="0 0 120 120">
+          <defs>
+            <linearGradient id="kairSuccessGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1bb888"/>
+              <stop offset="100%" stop-color="#2057b8"/>
+            </linearGradient>
+          </defs>
+          <!-- Halo difuso de fondo (gradiente verde→azul) -->
+          <circle class="loading-success-halo" cx="60" cy="60" r="48" />
+          <!-- 6 cuadrados confetti (rotación 180°/-180° mientras vuelan) -->
+          <rect class="loading-confetti-rect loading-confetti-rect--1" x="57" y="57" width="6" height="6" rx="1.5"/>
+          <rect class="loading-confetti-rect loading-confetti-rect--2" x="57" y="57" width="5" height="5" rx="1.5"/>
+          <rect class="loading-confetti-rect loading-confetti-rect--3" x="58" y="58" width="6" height="6" rx="1.5"/>
+          <rect class="loading-confetti-rect loading-confetti-rect--4" x="57" y="57" width="5" height="5" rx="1.5"/>
+          <rect class="loading-confetti-rect loading-confetti-rect--5" x="58" y="58" width="6" height="6" rx="1.5"/>
+          <rect class="loading-confetti-rect loading-confetti-rect--6" x="57" y="57" width="5" height="5" rx="1.5"/>
+          <!-- Anillo principal con gradiente -->
+          <circle class="loading-success-circle" cx="60" cy="60" r="32"/>
+          <!-- Check premium con stroke grueso y round caps -->
+          <path class="loading-success-check" fill="none" d="M44 64 L56 74 L78 48"/>
         </svg>
         <div class="loading-welcome">¡Bienvenido!</div>
         <div class="loading-welcome-user" id="loading-welcome-user">Usuario</div>
