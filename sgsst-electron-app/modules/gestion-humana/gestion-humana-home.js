@@ -390,50 +390,61 @@ class GestionHumanaHome {
     var scrollWrap = document.createElement('div');
     scrollWrap.className = 'gh-home-scroll';
 
+    // 📦818 · Row hero + 3 metrics en una sola fila (4 columnas cuando hay ancho).
+    // Antes el hero iba full-width y las metrics abajo en otra fila.
+    var heroRow = document.createElement('div');
+    heroRow.className = 'gh-hero-row';
+
     // ── HERO ──
     var empresa = this.companyName && this.companyName !== 'default_company' ? this.companyName : 'tu empresa';
     var hero = document.createElement('section');
     hero.className = 'gh-hero';
+    // 📦818-fix · Subtítulo removido: el título "Talento humano bajo control" ya dice
+    // lo esencial; el hero debe quedar compacto para caber en 1/4 del row.
     hero.innerHTML =
       '<div class="gh-hero__main">' +
         '<span class="gh-hero__eyebrow">Resumen del módulo</span>' +
         '<h2 class="gh-hero__title">Talento humano bajo control</h2>' +
-        '<p class="gh-hero__sub">Personal, contratación, ausencias y documentos del equipo en un solo lugar' +
-          (this.companyName && this.companyName !== 'default_company' ? ' — ' + String(empresa).replace(/[<>&]/g, '') : '') + '.</p>' +
       '</div>' +
       '<div class="gh-hero__stat">' +
         '<span class="gh-hero__value">' + this._fmt(this.kpis.personalActivos) + '</span>' +
         '<span class="gh-hero__label">trabajadores activos</span>' +
         '<span class="gh-hero__foot">de ' + this._fmt(this.kpis.personalTotal) + ' registrados</span>' +
       '</div>';
-    scrollWrap.appendChild(hero);
+    heroRow.appendChild(hero);
 
     // ── MÉTRICAS ──
     var metrics = document.createElement('div');
     metrics.className = 'gh-metrics';
+
+    // 1. Contrataciones en proceso
+    var enProceso = this.kpis.contratacionesEnProceso || 0;
     metrics.appendChild(this._renderMetric({
-      tone: '', icon: 'pulse',
+      tone: 'gh-metric--warn',
       label: 'Contrataciones en proceso',
-      value: this.kpis.contratacionesEnProceso,
-      sub: 'de ' + this._fmt(this.kpis.contratacionesTotal) + ' convocatorias'
+      value: enProceso,
+      total: this.kpis.contratacionesTotal || 0,
+      sub: 'Activas en el pipeline'
     }));
+    // 2. Onboarding completados
     metrics.appendChild(this._renderMetric({
-      tone: 'gh-metric--ok', icon: 'checkflag',
+      tone: 'gh-metric--ok',
       label: 'Onboarding completados',
-      value: this.kpis.completados,
-      sub: 'procesos finalizados'
+      value: this.kpis.completados || 0,
+      total: this.kpis.contratacionesTotal || 0,
+      sub: 'Procesos finalizados'
     }));
+    // 3. Procesos cancelados
     metrics.appendChild(this._renderMetric({
-      tone: 'gh-metric--neutral', icon: 'users',
+      tone: 'gh-metric--neutral',
       label: 'Procesos cancelados',
-      value: this.kpis.cancelados,
-      sub: 'convocatorias descartadas'
+      value: this.kpis.cancelados || 0,
+      total: this.kpis.contratacionesTotal || 0,
+      sub: 'Convocatorias descartadas'
     }));
-    // nota de tono warn para "en proceso" si hay alguno
-    if ((this.kpis.contratacionesEnProceso || 0) > 0) {
-      metrics.firstChild.classList.add('gh-metric--warn');
-    }
     scrollWrap.appendChild(metrics);
+    heroRow.appendChild(metrics);
+    scrollWrap.appendChild(heroRow);
 
     // ── GRID DE ÁREAS ──
     var head = document.createElement('div');
@@ -488,15 +499,42 @@ class GestionHumanaHome {
   }
 
   _renderMetric(m) {
+    // 📦818-fix-v2 · Estilo "INDUCCIONES 104/108 Personal con inducción al día [bar]"
+    //   - SIN icono (la referencia no tiene iconos)
+    //   - Label arriba en uppercase, número+fraction en una sola línea
+    //   - Description abajo, progress bar al fondo (full-width del card)
+    //   - TODO left-aligned (sin centrado horizontal)
     var el = document.createElement('div');
     el.className = 'gh-metric' + (m.tone ? ' ' + m.tone : '');
+
+    var numStr, fracStr = '', pct = null;
+    if (typeof m.total === 'number' && m.total > 0) {
+      numStr = this._fmt(m.value);
+      fracStr = '<span class="gh-metric__total">/' + this._fmt(m.total) + '</span>';
+      if (typeof m.percent === 'number') pct = m.percent;
+      else pct = Math.round((m.value / m.total) * 1000) / 10;  // 1 decimal
+    } else if (typeof m.percent === 'number') {
+      numStr = this._fmt(m.percent);
+      fracStr = '<span class="gh-metric__pctsign">%</span>';
+      pct = m.percent;
+    } else {
+      numStr = this._fmt(m.value);
+    }
+
+    var progressHtml = '';
+    if (pct !== null) {
+      var pctClamped = Math.max(0, Math.min(100, pct));
+      progressHtml =
+        '<div class="gh-metric__progress">' +
+          '<div class="gh-metric__bar" style="width:' + pctClamped + '%"></div>' +
+        '</div>';
+    }
+
     el.innerHTML =
-      '<div class="gh-metric__top">' +
-        '<span class="gh-metric__icon">' + ghSvg(m.icon) + '</span>' +
-        '<span class="gh-metric__label">' + m.label + '</span>' +
-      '</div>' +
-      '<div class="gh-metric__value">' + this._fmt(m.value) + '</div>' +
-      '<div class="gh-metric__sub">' + m.sub + '</div>';
+      '<div class="gh-metric__label">' + m.label + '</div>' +
+      '<div class="gh-metric__value">' + numStr + fracStr + '</div>' +
+      '<div class="gh-metric__sub">' + m.sub + '</div>' +
+      progressHtml;
     return el;
   }
 

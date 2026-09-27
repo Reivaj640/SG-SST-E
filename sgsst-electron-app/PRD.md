@@ -14,7 +14,7 @@ El producto es **usado en producción** por al menos 1 cliente (despliegue opera
 
 **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 **Última versión publicada:** v0.1.205 (instaladores de release)
-**Última versión de desarrollo:** v0.1.216 (HEAD en `origin/Dev-Pc`)
+**Última versión de desarrollo:** v0.1.217 (HEAD en `origin/Dev-Pc`)
 
 ---
 
@@ -274,7 +274,7 @@ sgsst-electron-app/
 ├── PRD.md                    # ESTE ARCHIVO
 ├── README.md                 # Descripción pública del producto
 ├── release-notes.md          # Notas de release
-├── package.json              # v0.1.216, deps + electron-builder config
+├── package.json              # v0.1.217, deps + electron-builder config
 ├── package-lock.json
 ├── main.js                   # 21,643 líneas, 160+ handlers IPC
 ├── preload.js                # 1,138 líneas, ~250 contratos IPC

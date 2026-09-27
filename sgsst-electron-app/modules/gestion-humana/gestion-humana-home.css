@@ -196,17 +196,26 @@
   min-height: 0;
 }
 
-/* ═══ HOME: HERO ═══ */
+/* ═══ HOME: HERO + MÉTRICAS (4 cards en una sola fila en maximizado) ═══ */
+.gh-hero-row {
+  display: grid;
+  grid-template-columns: 1fr 3fr;        /* hero izquierda 1/4, metrics derecha 3/4 */
+  gap: clamp(10px, 1.2vw, 16px);
+  margin-bottom: clamp(16px, 2vw, 26px);
+  align-items: stretch;
+}
+
+/* ═══ HOME: HERO (ahora 1/4 del row, columna izquierda) ═══ */
 .gh-hero {
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, var(--gh-accent-ink) 0%, var(--gh-accent-strong) 58%, var(--gh-accent) 100%);
   border-radius: var(--gh-radius);
-  padding: clamp(18px, 2.2vw, 30px) clamp(20px, 2.4vw, 32px);
+  padding: clamp(14px, 1.5vw, 20px) clamp(18px, 2vw, 26px);
   color: #f2f6ff;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 24px; flex-wrap: wrap;
-  margin-bottom: clamp(14px, 1.6vw, 22px);
+  display: flex; flex-direction: column;
+  gap: 12px;
+  height: 100%;
 }
 .gh-hero::after {
   content: '';
@@ -224,36 +233,40 @@
   margin-bottom: 6px;
 }
 .gh-hero__title {
-  margin: 0 0 6px;
+  margin: 0;
   font-family: 'Manrope', 'DM Sans', sans-serif;
-  font-size: clamp(20px, 1.9vw, 27px);
-  font-weight: 800; letter-spacing: -0.01em; line-height: 1.15;
+  font-size: clamp(16px, 1.4vw, 19px);
+  font-weight: 800; letter-spacing: -0.01em; line-height: 1.18;
 }
-.gh-hero__sub { margin: 0; font-size: 13.5px; line-height: 1.5; color: rgba(242,246,255,0.82); max-width: 62ch; }
-.gh-hero__stat { text-align: right; flex-shrink: 0; position: relative; z-index: 1; }
+.gh-hero__sub { display: none; }  /* 📦818-fix: subtítulo removido (redundante con el título) */
+.gh-hero__stat { text-align: right; position: relative; z-index: 1; margin-top: auto; }
 .gh-hero__value {
   display: block;
   font-family: 'Manrope', 'DM Sans', sans-serif;
-  font-size: clamp(34px, 3.4vw, 48px); font-weight: 800; line-height: 1;
+  font-size: clamp(28px, 2.6vw, 36px); font-weight: 800; line-height: 1;
 }
-.gh-hero__label { display: block; font-size: 12.5px; font-weight: 600; color: rgba(242,246,255,0.9); margin-top: 6px; }
-.gh-hero__foot { display: block; font-size: 11.5px; color: rgba(242,246,255,0.65); margin-top: 2px; }
+.gh-hero__label { display: block; font-size: 12px; font-weight: 600; color: rgba(242,246,255,0.9); margin-top: 4px; }
+.gh-hero__foot { display: block; font-size: 11px; color: rgba(242,246,255,0.65); margin-top: 2px; }
 
-/* ═══ HOME: MÉTRICAS ═══ */
+/* ═══ HOME: MÉTRICAS (grid interno de 3 cols en la columna derecha) ═══ */
 .gh-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: clamp(10px, 1.2vw, 16px);
-  margin-bottom: clamp(16px, 2vw, 26px);
+  margin: 0;  /* el margin-bottom vive en .gh-hero-row */
 }
 .gh-metric {
   background: var(--widget-bg-color);
   border: 1px solid var(--border-color);
   border-radius: var(--gh-radius);
-  padding: 16px 18px 14px;
+  padding: 16px 18px 18px;
   position: relative;
   overflow: hidden;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
 }
+/* Acento tonal (3px barra izquierda) — complementario al bar de progreso horizontal */
 .gh-metric::before {
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
@@ -262,24 +275,62 @@
 .gh-metric--warn { --gh-m-tone: var(--gh-amber); }
 .gh-metric--ok { --gh-m-tone: var(--gh-mint); }
 .gh-metric--neutral { --gh-m-tone: var(--text-lighter-color); }
-.gh-metric__top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.gh-metric__icon {
-  width: 26px; height: 26px; border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--gh-accent-soft); color: var(--gh-accent);
-  flex-shrink: 0;
+
+/* Label upper, primero */
+.gh-metric__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  color: var(--text-light-color);
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
-.gh-metric--warn .gh-metric__icon { background: rgba(231,162,36,.14); color: var(--gh-amber); }
-.gh-metric--ok .gh-metric__icon { background: rgba(27,184,136,.14); color: var(--gh-mint); }
-.gh-metric--neutral .gh-metric__icon { background: var(--bg-color); color: var(--text-light-color); }
-.gh-metric__icon svg { width: 15px; height: 15px; }
-.gh-metric__label { font-size: 11.5px; font-weight: 600; letter-spacing: .03em; color: var(--text-light-color); text-transform: uppercase; }
+
+/* Número grande + fraction pequeña en línea */
 .gh-metric__value {
   font-family: 'Manrope', 'DM Sans', sans-serif;
-  font-size: clamp(24px, 2.2vw, 30px); font-weight: 800; line-height: 1.05;
+  font-size: clamp(22px, 1.9vw, 28px);
+  font-weight: 800;
+  line-height: 1.1;
   color: var(--text-color);
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
 }
-.gh-metric__sub { margin-top: 3px; font-size: 12px; color: var(--text-lighter-color); }
+.gh-metric__total,
+.gh-metric__pctsign {
+  font-size: 0.62em;
+  font-weight: 700;
+  color: var(--text-lighter-color);
+}
+
+/* Description */
+.gh-metric__sub {
+  font-size: 12px;
+  color: var(--text-lighter-color);
+  margin-top: 4px;
+}
+
+/* Bar de progreso horizontal al fondo (empuja con margin-top:auto) */
+.gh-metric__progress {
+  margin-top: auto;
+  padding-top: 14px;
+  height: 6px;
+  background: var(--bg-color);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.gh-metric__bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--gh-m-tone, var(--gh-accent));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.gh-metric--neutral .gh-metric__bar { background: var(--text-lighter-color); }
+.gh-metric--warn .gh-metric__bar { background: var(--gh-amber); }
+.gh-metric--ok .gh-metric__bar { background: var(--gh-mint); }
 
 /* ═══ HOME: GRID DE ÁREAS ═══ */
 .gh-modwrap__head {
@@ -367,8 +418,10 @@
 
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 900px) {
-  .gh-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .gh-hero__stat { text-align: left; }
+  .gh-hero-row { grid-template-columns: 1fr; }
+  .gh-metrics { grid-template-columns: 1fr; }
+  .gh-hero { flex-direction: column; align-items: flex-start; }
+  .gh-hero__stat { text-align: left; width: 100%; }
 }
 @media (max-width: 640px) {
   .gh-header { padding: 12px 16px; }

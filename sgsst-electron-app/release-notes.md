@@ -1,3 +1,60 @@
+# K+AIR v0.1.217
+
+## 🎨 Home de Gestión Humana — hero + métricas en fila + progress bars (📦818)
+
+El home (Resumen) del módulo 8 se reorganiza al patrón premium v2 estándar: **hero + 3 métricas en una sola fila** de 4 cards (maximizado), y las métricas ahora muestran formato `X/Y` con barra de progreso horizontal color-coded al fondo.
+
+### Cambios principales
+
+#### (a) Hero + métricas en fila de 4 columnas
+- Layout de 2 niveles: `.gh-hero-row` con grid `1fr 3fr` (hero izquierda, métricas derecha con grid interno `repeat(3, 1fr)`)
+- En maximizado: 4 cards lado a lado (1 hero + 3 metrics)
+- En ventana (<900px): todo a 1 columna
+
+#### (b) Hero compacto
+- Removido subtítulo "Personal, contratación, ausencias y documentos del equipo en un solo lugar — Tempoactiva." (redundante con el título)
+- Padding reducido (`clamp(14px, 1.5vw, 20px)`) + font del título `clamp(16px, 1.4vw, 19px)`
+- Stat (número grande + labels) anclado al fondo del card con `margin-top: auto` + `height: 100%`
+
+#### (c) Métricas con barra de progreso (estilo "INDUCCIONES 104/108")
+- `_renderMetric()` soporta 3 variantes: `{value,total}`, `{value,percent}`, `{value}` legacy
+- **Removido el icono** del `.gh-metric__top` (la referencia no tiene icono)
+- Fraction pegada al número (sin espacio): `0/1`
+- Progress bar horizontal al fondo (`margin-top: auto`), color del `--gh-m-tone` (warn=ámbar, ok=verde, neutral=gris)
+
+### Datos de las 3 métricas del home
+
+| Card | Antes | Ahora |
+|---|---|---|
+| Contrataciones en proceso | `0` + sub | `0/1` + barra ámbar al fondo |
+| Onboarding completados | `1` + sub | `1/1` + barra verde al fondo |
+| Procesos cancelados | `0` + sub | `0/1` + barra gris al fondo |
+
+### Archivos modificados
+
+- `modules/gestion-humana/gestion-humana-home.js` — wrapper `.gh-hero-row`, `_renderMetric()` reescrito con variantes, llamadas con `{value,total}`
+- `modules/gestion-humana/gestion-humana-home.css` — layout 4-col, hero compacto, métricas sin icono + progress bar al fondo
+- `index.html` — cache-bust CSS + JS `?v=GH-20260927-metrics-no-icon`
+- `package.json` — bump 0.1.216 → 0.1.217
+- `AGENTS.md`, `CHANGELOG.md`, `CONTEXT.md`, `PRD.md`, `README.md`, `release-notes.md` — sincronizados
+
+### Funcionalidad preservada
+
+- 9 vistas del shell intactas
+- Tabs del shell sin cambios
+- Backend IPC `gh:listPersonal`, `gh:listContrataciones` sin tocar
+- Dark mode + dark-legacy vía tokens
+
+### Para validar
+
+1. Abrir la app y navegar a **Gestión Humana → Resumen**.
+2. El hero y las 3 métricas deben estar en la misma fila en maximizado (4 cards lado a lado).
+3. El hero muestra: "RESUMEN DEL MÓDULO" / "Talento humano bajo control" / stat `1 trabajadores activos / de 1 registrados` anclado al fondo.
+4. Las métricas muestran: label uppercase + número `X/Y` con fraction pegada + sub + barra de progreso al fondo (color según estado).
+5. Validar en claro y los 2 oscuros.
+
+---
+
 # K+AIR v0.1.216
 
 ## 🎨 Shell de Gestión Humana — header premium v2 con breadcrumb + pill (📦817)

@@ -1321,6 +1321,18 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.217 - 27 Sep 2026 🆕
+
+#### 📦818 · Home de Gestión Humana — hero + métricas en fila con progress bars
+
+El home (Resumen) del módulo 8 se reorganizó al patrón premium v2 estándar: hero + 3 métricas en una sola fila de 4 cards (maximizado), métricas con formato `X/Y` y barra de progreso horizontal color-coded.
+
+- **Hero row 4-col**: layout `1fr 3fr` (hero izquierda, métricas derecha con grid interno de 3 cols). En ventana: colapsa a 1 columna.
+- **Hero compacto**: removido subtítulo redundante con el título, padding reducido, stat anclado al fondo con `margin-top: auto`.
+- **Métricas con progress bar**: removido icono (la referencia no tiene), formato `0/1` con fracción pegada al número, barra horizontal al fondo (ámbar/verde/gris según tone: warn/ok/neutral).
+- **Cache-bust**: `gestion-humana-home.{css,js}?v=GH-20260927-metrics-no-icon`.
+- **Versión**: bump 0.1.216 → 0.1.217.
+
 ### v0.1.216 - 27 Sep 2026 🆕
 
 #### 📦817 · Shell de Gestión Humana — header premium v2 (breadcrumb + pill + fondo continuo)

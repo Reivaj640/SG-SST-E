@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.217] - 2026-09-27
+
+### 📦818 · Home de Gestión Humana — hero + métricas en 4 columnas + progress bars
+
+**Resumen:** El home (Resumen) del módulo 8 se reorganiza para que el hero comparta fila con las 3 métricas (4 cards lado a lado en maximizado) y las métricas ahora muestran `X/Y` con barra de progreso horizontal color-coded (estilo premium v2 estándar).
+
+**Cambios principales:**
+
+#### (a) Hero + métricas en fila de 4 columnas (📦818-hero-row)
+- **Antes**: hero full-width en su propia fila + 3 metrics cards en otra fila debajo
+- **Después**: layout de 2 niveles → `.gh-hero-row` grid `1fr 3fr` (hero izquierda 25%, metrics derecha 75%) + `.gh-metrics` grid interno `repeat(3, 1fr)`
+- En maximizado: 4 cards lado a lado (1 hero + 3 metrics). En ventana (<900px): todo a 1 columna
+
+#### (b) Hero compacto (📦818-hero-compact)
+- Removido subtítulo "Personal, contratación, ausencias y documentos del equipo en un solo lugar — Tempoactiva." (redundante con el título "Talento humano bajo control")
+- Padding reducido (`clamp(14px, 1.5vw, 20px)`) + font del título `clamp(16px, 1.4vw, 19px)` + gap de 12px
+- Stat (número + labels) anclado al fondo del card con `margin-top: auto` + `height: 100%`
+
+#### (c) Métricas con barra de progreso (📦818-metrics-progress)
+- `_renderMetric()` soporta 3 variantes: `{value, total}` → "X/Y" + barra, `{value, percent}` → "X.X%" + barra, `{value}` → legacy sin barra
+- **Removido el icono** del `.gh-metric__top` (la referencia "INDUCCIONES 104/108" no tiene icono)
+- Fraction pegada al número (sin espacio): `0/1` en vez de `0 / 1`
+- Progress bar horizontal al fondo de cada card (`margin-top: auto`), color del `--gh-m-tone` (warn=ámbar, ok=verde, neutral=gris)
+- Las 3 metrics ahora: `0/1` warn · `1/1` ok · `0/1` neutral (eran integers simples)
+
+**Archivos modificados:**
+- `modules/gestion-humana/gestion-humana-home.js` — wrapper `.gh-hero-row`, `_renderMetric()` con variantes, llamadas con `{value,total}`
+- `modules/gestion-humana/gestion-humana-home.css` — layout 4-col, hero compacto, métricas sin icono + progress bar
+- `index.html` — cache-bust `?v=GH-20260927-metrics-no-icon`
+- `package.json` — bump 0.1.216 → 0.1.217
+
+**Funcionalidad preservada:**
+- 9 vistas del shell intactas
+- Tabs del shell sin cambios
+- Backend IPC `gh:listPersonal`, `gh:listContrataciones` sin tocar
+- Dark mode + dark-legacy vía tokens
+
 ## [0.1.216] - 2026-09-27
 
 ### 📦817 · Shell de Gestión Humana — header premium v2 (breadcrumb + pill + fondo continuo)
