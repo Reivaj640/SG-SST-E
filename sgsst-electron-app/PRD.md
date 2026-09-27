@@ -14,7 +14,7 @@ El producto es **usado en producción** por al menos 1 cliente (despliegue opera
 
 **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 **Última versión publicada:** v0.1.205 (instaladores de release)
-**Última versión de desarrollo:** v0.1.212 (HEAD en `origin/Dev-Pc`)
+**Última versión de desarrollo:** v0.1.214 (HEAD en `origin/Dev-Pc`)
 
 ---
 
@@ -148,14 +148,14 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 
 ### 5.2 Sistema de Notificaciones Persistentes (feature nuevo, v0.1.212)
 
-**Estado:** operativo en main process, UI completa con tabs y **tamaño estable** (`_pinPopoverHeight`), **167/167 tests OK** (📦807-808 + fix duplicación/tabs/tamaño 📦809).
+**Estado:** operativo en main process, UI completa con tabs y **tamaño estable** (`_pinPopoverHeight`), **155/155 tests OK** (📦807-808 + fix duplicación/tabs/tamaño 📦809).
 
 **Archivos nuevos:**
 - `main/notifications-bridge.js` (209+ líneas) — tabla `notificaciones` + 4 handlers IPC con `validateSession` + `GLOBAL_COMPANY='*'` + migración one-shot (consolida correos existentes)
 - `main/notifications-service.js` (266 líneas) — timers + detección + dedupe + emisión
 - `main/notifications-email.js` (99+ líneas) — detector de correos sin llamar Gmail directo; **UNA fila global `company_key='*'` por thread** (sin fan-out por empresa)
 - `main/notifications-gate.js` (50 líneas) — gate real `bandeja_integrada_enabled` con fail-closed
-**Tests (167/167 OK):**
+**Tests (155/155 OK):**
 
 - bridge 28/28, email 7/7, service 10/10, wiring 11/11, fuentes 52/52, ui 36/36, seguridad 23/23
 
@@ -173,6 +173,24 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 - Guard de reentrada: `try { ... } finally { _inFlight = false }` para evitar que un detector async (120s) se solape con el siguiente tick
 - `.apply(stmt, params)` no `.apply(db, params)` en better-sqlite3 (pertenece al statement, no a la db)
 - `CREATE UNIQUE INDEX ... COALESCE(...)` — SQLite no soporta UNIQUE con expresiones a nivel de tabla
+
+### 5.3 Splash de bienvenida con confetti estilo Stripe (feature nuevo, v0.1.214)
+
+**Estado:** operativo en login + splash, **validación visual pendiente por Javier al reiniciar** (📦815).
+
+**Archivos modificados:**
+- `renderer.js` (~líneas 3150+) — SVG del success con `<defs><linearGradient id="kairSuccessGrad">` (verde→azul), halo pulsante (`<circle r="52">` con `success-halo` 2s ease-out infinite), check con stroke gradiente (4.5px round caps) y 6 cuadrados confetti (`rect 6×6`) rotando ±180° mientras vuelan ±42px en 3 colores premium v2 (`--kair-blue`, `--kair-green`, `--kair-amber`). ViewBox 52→120 para que respire.
+- `styles.css` (líneas ~5604 + ~5102) — bloques `.loading-success-*` activo + `.kair-transition-success-*` espejo (CSS huérfano por consistencia).
+- `index.html` (línea 13) — cache-bust `styles.css?v=20260926-confetti-success`.
+
+**Tokens nuevos en `:root`:**
+- `--kair-blue`, `--kair-green`, `--kair-amber` (reutilizados del design system; antes no estaban en `:root`).
+
+**Patrón transferible (estilo Stripe):**
+- NO usar colores hardcoded (`#28a745` Bootstrap) → exponer como tokens `--kair-X` y consumir desde `stroke`/`fill` del SVG y desde los keyframes CSS.
+- Migrar AMBOS overlays (activo + legado) por consistencia si el componente se reactiva.
+- ViewBox generoso (≥120) para que el confetti respire.
+- Detalles completos en `design_system.md §15`.
 
 ---
 
@@ -256,7 +274,7 @@ sgsst-electron-app/
 ├── PRD.md                    # ESTE ARCHIVO
 ├── README.md                 # Descripción pública del producto
 ├── release-notes.md          # Notas de release
-├── package.json              # v0.1.212, deps + electron-builder config
+├── package.json              # v0.1.214, deps + electron-builder config
 ├── package-lock.json
 ├── main.js                   # 21,643 líneas, 160+ handlers IPC
 ├── preload.js                # 1,138 líneas, ~250 contratos IPC
@@ -358,7 +376,7 @@ sgsst-electron-app/
 
 | Métrica | Valor actual |
 |---|---|
-| Versión de desarrollo | 0.1.212 (HEAD: `c56ed18e 📦807`) |
+| Versión de desarrollo | 0.1.214 (HEAD: `903a2e9c 📦815`) |
 | Versión publicada | v0.1.205 |
 | Total archivos JS | 962 |
 | Total archivos CSS | 90 |
@@ -370,7 +388,8 @@ sgsst-electron-app/
 | Submódulos con UI | 51 |
 | Submódulos placeholder en sidebar | 16 |
 | Total declarado en sidebar | 67 |
-| Tests del feature Notificaciones | 167/167 OK |
+| Tests del feature Notificaciones | 155/155 OK |
+| Tests del feature 5 Porqués v5 | 144/144 OK |
 | Documentos en `docs/superpowers/` | 8 (4 specs + 4 plans) |
 
 ---
@@ -379,10 +398,9 @@ sgsst-electron-app/
 
 ### 10.1 Inmediato (este mes)
 
-- [ ] Arreglar `plan-trabajo` source cuando exista el bridge de calendario
-- [ ] Validación visual de Notificaciones Persistentes con Bandeja cerrada (criterio §9 del spec)
-- [ ] Bumpear cache-bust si la UI de notificaciones se toca
-- [ ] Push del commit 📦808 (corrección "11→12 fuentes" en README) cuando Javier lo autorice
+- [ ] Validación visual del splash confetti (📦815) por Javier al reiniciar la app
+- [ ] Re-entrenar modelo 5 Porqués con regla columnar nueva (v5+train, pipeline en `docs/opencode/plans/20260925-entrenamiento-5porques-v5.md`, Unsloth + SFT, export F16 — NO Q4 porque destruye fine-tunes pequeños)
+- [ ] Refactorizar 3 vistas JS de Gestión Humana (carpetas 805 líneas, trabajador-detalle 267, firma-electronica 2892) al patrón premium v2 — trabajo opcional, shell + 8 vistas individuales ya migradas
 
 ### 10.2 Próximo mes
 
@@ -398,7 +416,7 @@ sgsst-electron-app/
 - [ ] Retención/purge de notificaciones leídas >30 días
 - [ ] Sync-service improvements (mejor resolución de conflictos, mejor UI de sync state)
 - [ ] Firma-service en producción (actualmente v0.1 esqueleto)
-- [ ] Release oficial v0.2.0 (consolidación de todas las features de v0.1.205 → v0.1.212)
+- [ ] Release oficial v0.2.0 (consolidación de todas las features de v0.1.205 → v0.1.214)
 
 ### 10.4 Backlog normativo (placeholders en sidebar)
 

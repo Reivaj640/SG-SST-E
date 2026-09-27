@@ -776,7 +776,115 @@ El sistema legacy `--k-*` y el premium `kair-*` **coexisten**:
 
 ---
 
-## 15. Glosario visual
+## 15. Animaciones de éxito y celebración (confetti estilo Stripe)
+
+**Cuándo usarlo**: confirmaciones de carga completada (splash de bienvenida, save success, etc.). Es el cierre emocional de una acción — un check estático se ve "técnico", un confetti dice "lo lograste".
+
+**Patrón canónico aplicado en `📦815`** (splash de bienvenida de K+AIR):
+
+```html
+<svg class="loading-success-icon" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="kairSuccessGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="var(--kair-green)"/>
+      <stop offset="100%" stop-color="var(--kair-blue)"/>
+    </linearGradient>
+  </defs>
+  <!-- Halo pulsante (gradiente) -->
+  <circle class="loading-success-halo" cx="60" cy="60" r="48"/>
+  <!-- 6 cuadrados confetti rotando -->
+  <rect class="loading-confetti-rect loading-confetti-rect--1" .../>
+  <rect class="loading-confetti-rect loading-confetti-rect--2" .../>
+  ... (6 con stagger 50ms)
+  <!-- Anillo principal con gradiente -->
+  <circle class="loading-success-circle" cx="60" cy="60" r="32"/>
+  <!-- Check con stroke 4.5px + round caps -->
+  <path class="loading-success-check" fill="none" d="M44 64 L56 74 L78 48"/>
+</svg>
+```
+
+```css
+.loading-success-icon {
+  width: 90px;
+  height: 90px;
+  filter: drop-shadow(0 4px 14px rgba(27, 184, 136, 0.25));
+}
+.loading-success-halo {
+  fill: url(#kairSuccessGrad);
+  opacity: 0.15;
+  transform-origin: center;
+  animation: success-halo 1.8s ease-out 0.4s infinite;
+}
+.loading-success-circle {
+  stroke: url(#kairSuccessGrad);
+  stroke-width: 3;
+  fill: none;
+  stroke-dasharray: 201;
+  stroke-dashoffset: 201;
+  animation: success-circle 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.2s forwards;
+}
+.loading-success-check {
+  stroke: url(#kairSuccessGrad);
+  stroke-width: 5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: success-check 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+}
+.loading-confetti-rect {
+  opacity: 0;
+  transform-origin: 60px 60px;
+}
+/* 6 colores premium v2 rotando en sentidos alternados */
+.loading-confetti-rect--1 { fill: var(--kair-blue);  animation: confetti-spin 0.9s ease-out 0.5s forwards;  --tx: 0px;    --ty: -42px; --r: 180deg; }
+.loading-confetti-rect--2 { fill: var(--kair-green); animation: confetti-spin 0.9s ease-out 0.55s forwards; --tx: 38px;  --ty: -22px; --r: -180deg; }
+.loading-confetti-rect--3 { fill: var(--kair-amber); animation: confetti-spin 0.9s ease-out 0.6s forwards;  --tx: 42px;  --ty: 8px;   --r: 180deg; }
+.loading-confetti-rect--4 { fill: var(--kair-blue);  animation: confetti-spin 0.9s ease-out 0.65s forwards; --tx: 22px;  --ty: 38px;  --r: -180deg; }
+.loading-confetti-rect--5 { fill: var(--kair-green); animation: confetti-spin 0.9s ease-out 0.7s forwards;  --tx: -22px; --ty: 38px;  --r: 180deg; }
+.loading-confetti-rect--6 { fill: var(--kair-amber); animation: confetti-spin 0.9s ease-out 0.75s forwards; --tx: -38px; --ty: -22px; --r: -180deg; }
+
+@keyframes success-circle { to { stroke-dashoffset: 0; } }
+@keyframes success-check { to { stroke-dashoffset: 0; } }
+@keyframes success-halo {
+  0%, 100% { transform: scale(1); opacity: 0.15; }
+  50%      { transform: scale(1.12); opacity: 0.28; }
+}
+@keyframes confetti-spin {
+  0%   { transform: translate(-50%, -50%) rotate(0deg); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(calc(var(--tx) - 50%), calc(var(--ty) - 50%)) rotate(var(--r)); opacity: 0; }
+}
+
+/* Dark mode: glow más intenso */
+[data-theme^="dark"] .loading-success-icon {
+  filter: drop-shadow(0 4px 18px rgba(45, 211, 163, 0.45));
+}
+[data-theme^="dark"] .loading-success-halo {
+  opacity: 0.22;
+}
+```
+
+**Reglas del patrón**:
+
+1. **ViewBox 120×120** (no 52×52): necesita espacio para que el confetti vuele ~42px desde el centro sin salirse.
+2. **Gradient verde→azul** (`#1bb888` → `#2057b8`): identidad K+AIR, no verde Bootstrap hardcoded.
+3. **Stroke 5 + round caps** en el check: sensación moderna, no "examen corregido".
+4. **6 confetti en 3 colores premium** (azul/verde/amber): equilibra sin ser circo.
+5. **Stagger 50ms entre confetti**: orden visual, no todos a la vez.
+6. **Halo pulsante infinito** después del check: vida al componente, no "muerto" post-animación.
+7. **Dark mode**: glow más intenso (`0.45` vs `0.25`) para compensar el fondo oscuro.
+
+**Cuándo NO usarlo**:
+
+- Errores (usar icono de error rojo, no confetti)
+- Confirmaciones destructivas (usar icono neutro, no celebración)
+- Animaciones que se repiten en cada navegación (cansancio visual)
+
+---
+
+## 16. Glosario visual
 
 | Término | Significado |
 |---|---|

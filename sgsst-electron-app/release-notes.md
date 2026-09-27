@@ -1,3 +1,123 @@
+# K+AIR v0.1.214
+
+## 🎉 Splash de bienvenida con confetti estilo Stripe (📦815)
+
+El check verde Bootstrap hardcoded (`#28a745`) del splash de bienvenida se reemplazó por una animación moderna consistente con el design system premium v2.
+
+### Cambios visibles
+
+- **SVG rediseñado** con `<defs><linearGradient id="kairSuccessGrad">` (verde→azul) para el círculo y el check.
+- **Halo pulsante** (`<circle r="52">`) con animación `success-halo` 2s ease-out infinite.
+- **Check con stroke gradiente** (4.5px round caps) sobre el círculo.
+- **6 cuadrados confetti** (`rect 6×6`) rotando ±180° mientras vuelan ±42px en 3 colores premium v2 (`--kair-blue`, `--kair-green`, `--kair-amber`).
+- **ViewBox 52 → 120** para que el confetti respire.
+- **Glow drop-shadow** dark mode más intenso.
+
+### Tokens nuevos en `:root`
+
+- `--kair-blue`, `--kair-green`, `--kair-amber` (reutilizados del design system; antes no existían como custom properties).
+
+### Patrón transferible (estilo Stripe)
+
+- NO usar colores hardcoded (`#28a745` Bootstrap) → exponer como tokens `--kair-X` y consumir desde `stroke`/`fill` del SVG y desde los keyframes CSS.
+- Migrar AMBOS overlays (`#kair-loading-success.active` activo + `.kair-transition-success` legado CSS huérfano) por consistencia si el componente se reactiva.
+- ViewBox generoso (≥120) para que el confetti respire.
+- Detalles completos en `design_system.md §15`.
+
+### Archivos
+
+- `renderer.js` (~líneas 3150+) — SVG del success con `<defs>`, halo, 6 confetti rects, check premium.
+- `styles.css` — bloques `.loading-success-*` activo + `.kair-transition-success-*` espejo (CSS huérfano por consistencia).
+- `index.html` — cache-bust `styles.css?v=20260926-confetti-success`.
+- `package.json` — bump 0.1.213 → 0.1.214.
+- `AGENTS.md` — gotcha 12 añadido.
+- `CHANGELOG.md` — entrada `[0.1.214]`.
+- `CONTEXT.md`, `PRD.md`, `design_system.md`, `README.md` — sincronizados.
+
+### Para validar
+
+1. Reiniciar la app y hacer login → el splash debe mostrar el check con confetti en lugar del verde plano.
+2. Validar en claro y los dos oscuros (Sistema + Oscuro) que los colores del confetti son los premium v2 (no Bootstrap).
+3. Confirmar que el halo pulsa y los 6 cuadrados rotan mientras vuelan.
+
+---
+
+# K+AIR v0.1.213
+
+## 🧠 Investigación de Accidentes con IA — prompts del 5 Porqués alineados al dataset v5 (📦814)
+
+Migración metodología vertical por columna: cada celda M explica la causa de la MISMA M del nivel anterior (cadena causal INDEPENDIENTE por columna).
+
+### Reglas v5 implementadas
+
+- **HERENCIA DE N/A**: si una categoría es N/A en el nivel anterior, sigue siendo N/A en el siguiente.
+- **DETENCIÓN POR CAUSA RAÍZ**: cuando una celda identifica la causa raíz, no se pregunta más en esa columna.
+- **CERO CRUCES**: las categorías NO se mezclan entre sí.
+
+### Cambios técnicos
+
+- `INSTRUCCIONES_PROMPT` en `llm_server.py` ahora es la plantilla v5 VERBATIM (metodología vertical con encabezado "ANÁLISIS VERTICAL POR CATEGORÍA").
+- Secciones del accidente en texto plano (`\n\nDescripción del accidente:\n…\n\nContexto Adicional:\n…\n\nAnálisis de 5 Porqués:`) — el v5 eliminó los asteriscos del v4.
+- Parser acepta encabezados encadenados (`2. ¿Por qué ocurrieron las causas del Nivel 1?`).
+- `_uniform_preguntas` ELIMINADA (existió 1 día, chocaba con el formato v5).
+- Aviso de calidad visible: banner ámbar `.inv-quality-warn` si `validation_warning` o `score < 70`.
+
+### Pendiente
+
+- Re-entrenar el modelo con regla columnar nueva (pipeline en `docs/opencode/plans/20260925-entrenamiento-5porques-v5.md`, Unsloth + SFT sobre v5+train, export F16 — NO Q4 porque destruye fine-tunes pequeños).
+
+### Archivos
+
+- `Portear/src/llm_server.py` — `INSTRUCCIONES_PROMPT` reescrito a v5.
+- `Portear/src/config.json` — `llmSystemPrompt` sincronizado.
+- `modules/investigacion-accidentes/investigacion-accidentes-main.js` — parser v5 + banner de calidad.
+- `modules/investigacion-accidentes/view.css` — estilos `.inv-quality-warn` + dark.
+- `tests/investigacion-accidentes/test-hf-llm-canales.js` — 144/144 OK.
+- `package.json` — bump 0.1.212 → 0.1.213.
+- `AGENTS.md` — gotcha 11 añadido.
+- `CHANGELOG.md` — entrada `[0.1.213]`.
+
+---
+
+# K+AIR v0.1.212
+
+## 📬 Notificaciones Persistentes (📦807-812)
+
+Sistema completo de notificaciones in-app que detecta eventos desde el main process y los entrega al usuario sin depender de que la Bandeja Integrada esté abierta.
+
+### Cambios principales
+
+- **Bridge IPC** (`main/notifications-bridge.js`) con tabla `notificaciones` (tipo `correo`/`evento`, `dedupe_key` UNIQUE + índice único compuesto `COALESCE(fecha_evento,'')`).
+- **Service** (`main/notifications-service.js`): tick 60s, ventana configurable (15min/1h/6h/24h default 24h), guard de reentrada `_tickEnCurso`, backoff exponencial.
+- **Detector de correos** (`main/notifications-email.js`) sin fan-out: 1 fila global `company_key='*'` por thread.
+- **Gate** (`main/notifications-gate.js`): fail-closed, admin bypass.
+- **12 fuentes de calendario** (1 stub: plan-trabajo).
+- **UI completa**: badge en header + toast persistente (autoClose:0) + tabs Pendientes/Notificaciones + marcar leída individual/todas + selector de ventana.
+
+### Tests 155/155 OK
+
+- bridge 28/28, email 7/7, service 10/10, wiring 11/11, fuentes 52/52, ui 36/36, seguridad 23/23.
+
+### Fix de duplicación (📦809)
+
+- El buzón Gmail es global; antes cada correo se insertaba 1× por empresa con bandeja habilitada (47×5=235 no leídos). Ahora **UNA fila global** `company_key='*'` por thread.
+
+### Sincronización de docs (📦808)
+
+- README corregido: "11 fuentes" → "12 fuentes (1 stub: plan-trabajo)".
+- `PRD.md` (27 KB, 480 líneas): vision, 3 roles usuarios, stack, 10 convenciones, 9 módulos con 67 entradas, sistema notificaciones detallado.
+- `design_system.md` (27 KB, 430 líneas): 15 secciones cubriendo premium v2.
+
+### Archivos
+
+- `main/notifications-{bridge,service,email,gate}.js` — 4 archivos nuevos.
+- `shared/kair-alerts.js` — UI tabs + tamaño estable.
+- `assets/js/update-notifications.js` — adaptadores de toast.
+- `package.json` — bump 0.1.211 → 0.1.212.
+- `AGENTS.md`, `README.md`, `CHANGELOG.md`, `CONTEXT.md`, `PRD.md`, `design_system.md` — sincronizados.
+
+---
+
 # K+AIR v0.1.211
 
 ## 🎨 Cierre de la migración premium v2 — Peligros + Inspecciones + Mantenimiento + Verificación + Mejoramiento (📦793-804)
