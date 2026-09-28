@@ -87,6 +87,24 @@
     color: var(--text-main); line-height: 1.2;
 }
 .builder-sub { font-size: 0.8125rem; color: var(--text-muted); }
+/* 📦820 · Grupo de acciones del header: botón "Volver al Módulo" (ghost) + X (cerrar). */
+.builder-actions { display: flex; align-items: center; gap: 8px; }
+.btn-back {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 10px;
+    font-size: 0.8125rem; font-weight: 600;
+    font-family: inherit;
+    color: var(--text-muted); cursor: pointer;
+    background: transparent; border: 1px solid var(--border);
+    transition: color .15s, background .15s, border-color .15s;
+    white-space: nowrap;
+}
+.btn-back:hover {
+    color: var(--primary, #2057b8);
+    background: var(--primary-light, rgba(32,87,184,.08));
+    border-color: var(--primary, #2057b8);
+}
+.btn-back svg { width: 14px; height: 14px; flex-shrink: 0; }
 .btn-close {
     background: none; border: 1px solid transparent; border-radius: 12px;
     color: var(--text-muted); cursor: pointer; padding: 6px;
@@ -594,9 +612,17 @@
                     <span class="builder-sub">Seguimiento de incapacidades · K+AIR</span>
                 </div>
             </div>
-            <button class="btn-close" onclick="closeReportBuilder()" title="Cerrar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
+            <div class="builder-actions">
+                <!-- 📦820 · Botón "Volver al Módulo" explícito.
+                     Antes solo había un X (que además estaba roto fuera de iframe). -->
+                <button class="btn-back" onclick="closeReportBuilder()" title="Volver a la sección anterior">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    <span>Volver al Módulo</span>
+                </button>
+                <button class="btn-close" onclick="closeReportBuilder()" title="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
         </div>
 
         <div class="builder-body">
@@ -666,8 +692,11 @@
                     </div>
                     <div class="page-info" id="pageInfoText">Página 1 de 1</div>
                     <div style="display:flex; gap:5px;">
-                        <button class="btn-nav" onclick="exportToPDF()">
-                            <i class="fas fa-print"></i> Imprimir
+                        <!-- 📦819 · El label del botón refleja el modo implícito:
+                             en el Resumen imprime el informe completo; en un caso,
+                             solo ese caso. Evita sorpresas al imprimir. -->
+                        <button class="btn-nav" onclick="exportToPDF()" id="printBtn" title="Imprimir el informe completo">
+                            <i class="fas fa-print"></i> <span id="printBtnLabel">Imprimir</span>
                         </button>
                     </div>
                 </div>
@@ -787,11 +816,148 @@
                 });
             }
             
+            // 📦820 · Botón "Volver al Módulo" + fix del cierre multi-contexto.
+            // 📦821 · Arregla el TypeError del contexto de inyección directa.
+            //
+            // El builder se abre por 3 rutas distintas:
+            //
+            //   A) iframe / submodule-view  → window.parent !== window
+            //   B) carga directa en el mismo documento → window.parent === window
+            //      (renderer.js lo monta en contentArea > .main-canvas vía
+            //       loadModuleViewInContentArea(), SIN iframe)
+            //   C) window.open (ventana nueva) → window.opener !== null
+            //
+            // ⚠️ BUG 📦821: en la rama B esta función llamaba a `window.render()`.
+            // Ese nombre global NO lo define el shell de ausentismo: lo define otro
+            // módulo sin relación —
+            //   modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js
+            // Al invocarlo sin contexto, `this` no es su componente y la función
+            // revienta con:
+            //   TypeError: Cannot set properties of undefined (setting 'innerHTML')
+            //   at render (rendicion-viewer.js:138:29)
+            // lo que dejaba la aplicación colgada sin volver al módulo.
+            //
+            // La ruta correcta en B es el MISMO postMessage que usa la rama A:
+            // renderer.js acepta mensajes de la propia ventana
+            // (renderer.js:1396 → `const isFromSelf = event.source === window`) y
+            // responde a 'back-to-module-request' con
+            // showModuleContent(currentModule), que repinta el módulo y borra el
+            // builder del DOM.
+            var _priClosing = false;
+
             function closeReportBuilder() {
-                // Opcional: navegar atrás o cerrar
-                if (window.parent && window.parent.postMessage) {
-                    window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+                // Evita dobles ejecuciones (clic rápido, o X + ESC juntos).
+                if (_priClosing) return;
+                _priClosing = true;
+
+                // ── C) Ventana nueva abierta con window.open() ──
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        window.opener.focus();
+                    } catch (e) {
+                        /* si falla el focus, igual cerramos */
+                    }
+                    window.close();
+                    return;
                 }
+
+                var inIframe = !!(window.parent && window.parent !== window);
+
+                // 📦822 · El destino correcto NO es el módulo completo.
+                //
+                // El builder se abrió desde el PORTAL de "3.3.6 Medición del
+                // ausentismo por causa médica" (su home es un iframe con
+                // medicion-ausentismo-home.html). Al volver había que regresar
+                // a ese portal, no a la vista de tarjetas de todo el módulo
+                // Gestión de la Salud, que es lo que pintaba showModuleContent().
+                //
+                // renderer.js tiene la API correcta: showSubmoduleContent() →
+                // showMedicionAusentismoContent() → MedicionAusentismoComponent
+                // → renderMainView() → iframe con el home del portal.
+                //
+                // ⚠️ showSubmoduleContent(container, moduleName, submoduleName)
+                // EXIGE los 3 argumentos. El handler 'back-to-submodule-home' de
+                // renderer.js lo llama con uno solo, por eso no se usa ese mensaje.
+                if (!inIframe) {
+                    var mod = (typeof currentModule !== 'undefined' && currentModule) ? currentModule : null;
+                    var sub = (typeof currentSubmodule !== 'undefined' && currentSubmodule) ? currentSubmodule : null;
+                    var host = document.getElementById('content-area');
+
+                    if (mod && sub && host && typeof window.showSubmoduleContent === 'function') {
+                        console.log('[INFORME-PRI] Volviendo al portal del submódulo:', mod, '>', sub);
+                        window.showSubmoduleContent(host, mod, sub);
+                        return;
+                    }
+
+                    // Sin submódulo registrado: caemos al mensaje que el shell
+                    // entiende (renderer.js:1583) → showModuleContent().
+                    console.log('[INFORME-PRI] Sin submódulo registrado — pidiendo volver al módulo.');
+                    try {
+                        window.postMessage({ type: 'back-to-module-request' }, '*');
+                    } catch (e) {
+                        console.warn('[INFORME-PRI] postMessage falló, usando plan B:', e);
+                    }
+                } else {
+                    // ── A) iframe: el padre decide, contrato 'back-to-module-request' ──
+                    console.log('[INFORME-PRI] Volver al módulo — contexto: iframe');
+                    try {
+                        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+                    } catch (e) {
+                        console.warn('[INFORME-PRI] postMessage falló, usando plan B:', e);
+                    }
+                }
+
+                if (inIframe && window.frameElement) {
+                    // Si el padre no nos retira en 400ms, nos sacamos nosotros
+                    // para no dejar un shell vacío.
+                    setTimeout(function () {
+                        if (document.body && !document.body.dataset.__priReturned) {
+                            document.body.dataset.__priReturned = '1';
+                            try {
+                                window.frameElement.remove();
+                            } catch (e) { /* padre cross-origin: no podemos */ }
+                        }
+                    }, 400);
+                    return;
+                }
+
+                // ── Red de seguridad (rama B) ──
+                // Si tras 800ms el builder sigue montado, es que ninguna de las
+                // rutas respondió. Lo retiramos del DOM y re-renderizamos con las
+                // APIs de renderer.js (que tienen nombre propio, a diferencia del
+                // genérico render() que causaba el TypeError del 📦821).
+                setTimeout(function () {
+                    var root = document.getElementById('reportBuilder');
+                    if (!root || !document.body.contains(root)) {
+                        console.log('[INFORME-PRI] El portal ya se restauró.');
+                        return;
+                    }
+
+                    console.warn('[INFORME-PRI] Nadie respondió — forzando retorno.');
+
+                    var canvas = root.closest ? root.closest('.main-canvas') : null;
+                    var area = canvas || document.getElementById('content-area');
+                    if (area) area.innerHTML = '';
+
+                    var m = (typeof currentModule !== 'undefined' && currentModule) ? currentModule : null;
+                    var s = (typeof currentSubmodule !== 'undefined' && currentSubmodule) ? currentSubmodule : null;
+                    var ca = document.getElementById('content-area');
+
+                    if (m && s && ca && typeof window.showSubmoduleContent === 'function') {
+                        window.showSubmoduleContent(ca, m, s);
+                        return;
+                    }
+                    if (m && typeof window.showModuleContent === 'function') {
+                        window.showModuleContent(m);
+                        return;
+                    }
+                    if (typeof window.showHomePage === 'function') {
+                        window.showHomePage();
+                        return;
+                    }
+
+                    window.location.reload();
+                }, 800);
             }
 
             // Auto-inicializar al cargar el DOM
@@ -1970,6 +2136,23 @@
             document.getElementById('prevBtn').disabled = currentPage === 0;
             document.getElementById('nextBtn').disabled = currentPage === totalPages - 1;
 
+            // 📦819 · El botón de impresión es implícito: refleja en su label y title
+            // qué se va a generar, para que el usuario no imprima todo sin querer.
+            const printBtnLabel = document.getElementById('printBtnLabel');
+            const printBtn = document.getElementById('printBtn');
+            if (printBtnLabel && printBtn) {
+                if (currentPage === 0) {
+                    printBtnLabel.textContent = 'Imprimir informe';
+                    printBtn.title = `Imprimir el informe completo (${casesData.length} caso(s))`;
+                } else {
+                    const c = casesData[currentPage - 1];
+                    printBtnLabel.textContent = 'Imprimir este caso';
+                    printBtn.title = c
+                        ? `Imprimir solo la ficha de ${String(c.name || 'este caso')}`
+                        : 'Imprimir solo la ficha del caso visible';
+                }
+            }
+
             // Actualizar active en sidebar
             document.querySelectorAll('.case-item').forEach((item, index) => {
                 if(index === currentPage) item.classList.add('active');
@@ -2019,11 +2202,39 @@
                 return;
             }
 
-            // Calcular paginación GLOBAL: resumen (1 hoja) + cada caso (1 o 2 hojas
-            // según si tiene PCL/Recomendaciones activas).
-            let globalPage = 1;
-            const paginationPlan = [{ kind: 'summary' }]; // page 1 = resumen
-            casesData.forEach(() => {
+            // 📦819 · IMPRESIÓN IMPLÍCITA según la página visible (decisión del owner).
+            //
+            // ANTES: siempre se generaba el informe COMPLETO (resumen + todos los casos),
+            // sin importar en qué caso estuviera parado el usuario. `currentPage` solo
+            // afectaba el render en pantalla, nunca el PDF.
+            //
+            // AHORA: el botón "Imprimir" (y Ctrl+P) imprime LO QUE SE ESTÁ VIENDO:
+            //   - currentPage === 0 (Resumen General)  → informe completo (sin cambios)
+            //   - currentPage >= 1  (caso específico)   → solo ese caso, sin el resumen
+            //
+            // La paginación de footers ya recibía `pageNumOffset`, así que numerar
+            // un subconjunto no requiere cambios en `renderCaseDetailPage`.
+            const isResumenView = (currentPage === 0);
+            const casosAImprimir = isResumenView
+                ? casesData
+                : [casesData[currentPage - 1]].filter(Boolean);
+            const casoSeleccionado = !isResumenView ? casosAImprimir[0] : null;
+
+            console.log('[INFORME-PRI] Modo impresión:', isResumenView ? 'INFORME COMPLETO' : 'CASO INDIVIDUAL',
+                '— casos a imprimir:', casosAImprimir.length,
+                casoSeleccionado ? `(${casoSeleccionado.name})` : '');
+
+            if (casosAImprimir.length === 0) {
+                showInformeNotification('warning', 'Nada que imprimir', 'El caso seleccionado ya no está disponible.');
+                return;
+            }
+
+            // Calcular paginación GLOBAL: resumen (1 hoja, solo en modo completo) +
+            // cada caso (1 o 2 hojas según si tiene PCL/Recomendaciones activas).
+            let globalPage = isResumenView ? 1 : 0;
+            const paginationPlan = [];
+            if (isResumenView) paginationPlan.push({ kind: 'summary' }); // page 1 = resumen
+            casosAImprimir.forEach(() => {
                 const hasPCL = !!reportConfig.includePCL;
                 const hasRec = !!reportConfig.includeRecomendaciones;
                 const pages = (hasPCL || hasRec) ? 2 : 1;
@@ -2031,14 +2242,13 @@
             });
 
             // Generar HTML completo con numeración correlativa para los footers.
-            let bodyHTML = renderSummaryPageGlobal(1); // página 1 = resumen
-            globalPage = 1;
-            casesData.forEach((c, idx) => {
+            let bodyHTML = isResumenView ? renderSummaryPageGlobal(1) : '';
+            casosAImprimir.forEach((c, idx) => {
                 const caseStartPage = globalPage + 1; // la siguiente página disponible
                 // renderCaseDetailPage con pageNumOffset = caseStartPage - 1
                 // (porque internamente usa pgo+1 y pgo+2)
                 bodyHTML += renderCaseDetailPage(c, caseStartPage - 1);
-                globalPage += paginationPlan[1 + idx].pages;
+                globalPage += paginationPlan[isResumenView ? 1 + idx : idx].pages;
             });
             const totalHojas = globalPage;
 
@@ -2171,14 +2381,43 @@
             // Determinar carpeta destino: del último `filePath` conocido del backend
             // (se guarda al cargar datos) o fallback al folder de la empresa.
             const targetFolder = _getReportTargetFolder();
+            // 📦819-fix · Nombre del archivo:
+            //   - CASO individual  → `<nombre>_<cédula>_<fecha-hora>.pdf`
+            //     Ej: "CARELIS_DEL_CARMEN_CARIDAD_CALDERON_1047239028_2026-09-28_17-25-58.pdf"
+            //   - CONSOLIDADO      → `Resumen_General_<fecha-hora>.pdf`
+            //     Ej: "Resumen_General_2026-09-28_17-25-58.pdf"
+            // Sin prefijos "Caso_PRI"/"Informe_PRI" ni empresa (decisión del owner).
             const ts = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_').slice(0, 19);
-            const filename = `Informe_PRI_${(window.currentCompany || 'empresa').replace(/[^\w\-]/g, '_')}_${ts}.pdf`;
+
+            /** Normaliza un texto para usarlo en un nombre de archivo en Windows:
+             *  quita acentos, colapsa espacios y reemplaza caracteres no válidos por `_`. */
+            const _slug = (s) => String(s || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // é→e, ñ→n, …
+                .replace(/[^\w\s-]/g, '')                             // fuera letras/números/espacios/guion
+                .trim()
+                .replace(/\s+/g, '_')                                // espacios → _
+                .replace(/_{2,}/g, '_')                               // colapsa guiones bajos repetidos
+                .replace(/^_|_$/g, '');                               // quita guiones bajos de los bordes
+
+            let filename;
+            if (casoSeleccionado) {
+                const partes = [
+                    _slug(casoSeleccionado.name),
+                    _slug(casoSeleccionado.id_doc)
+                ].filter(Boolean);
+                filename = `${partes.join('_') || 'Caso'}_${ts}.pdf`;
+            } else {
+                filename = `Resumen_General_${ts}.pdf`;
+            }
+            console.log('[INFORME-PRI] filename:', filename);
 
             // Notificar al usuario mientras se procesa (puede tardar 1-3 s).
             showInformeNotification(
                 'info',
                 'Preparando impresión',
-                `Generando PDF multipágina con motor nativo (${totalHojas} hoja(s), ${casesData.length} caso(s))…`
+                casoSeleccionado
+                    ? `Generando PDF del caso seleccionado (${totalHojas} hoja(s))…`
+                    : `Generando PDF multipágina con motor nativo (${totalHojas} hoja(s), ${casosAImprimir.length} caso(s))…`
             );
 
             try {
@@ -2193,7 +2432,9 @@
                     showInformeNotification(
                         'success',
                         'PDF generado correctamente',
-                        `${totalHojas} hoja(s) — guardado en: ${result.path}`
+                        casoSeleccionado
+                            ? `Caso seleccionado — ${totalHojas} hoja(s) — guardado en: ${result.path}`
+                            : `${totalHojas} hoja(s) — guardado en: ${result.path}`
                     );
                 } else {
                     const errMsg = (result && result.error) || 'Error desconocido';
@@ -2319,6 +2560,7 @@
         }
 
         // Cerrar con ESC / Imprimir con Ctrl+P / Cmd+P → exportToPDF() (con concatenación y notifier)
+        // 📦820 · ESC usa la misma closeReportBuilder() multi-contexto que el botón Volver.
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeReportBuilder();

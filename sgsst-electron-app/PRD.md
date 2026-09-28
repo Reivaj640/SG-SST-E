@@ -1,7 +1,7 @@
 # PRD — K+AIR (Sistema de Gestión SG-SST)
 
 > **Para:** sesiones de AI que continúen el proyecto + Javier Robles F. (owner) como referencia.
-> **Versión del doc:** 0.1.212 (22 sept 2026) — sincronizada con `package.json` y commit `📦807`.
+> **Versión del doc:** 0.1.221 (28 sept 2026) — sincronizada con `package.json` y commit `📦822`.
 > **Estado:** Producto en desarrollo activo. **NO release oficial** desde v0.1.205 (los siguientes son commits de desarrollo).
 
 ---
@@ -14,7 +14,7 @@ El producto es **usado en producción** por al menos 1 cliente (despliegue opera
 
 **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 **Última versión publicada:** v0.1.205 (instaladores de release)
-**Última versión de desarrollo:** v0.1.217 (HEAD en `origin/Dev-Pc`)
+**Última versión de desarrollo:** v0.1.221 (HEAD en `origin/Dev-Pc`)
 
 ---
 

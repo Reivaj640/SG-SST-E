@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.221] - 2026-09-28
+
+### 📦819-822 — Informe de Gestión PRI: impresión por caso + retorno al portal
+
+**Resumen:** Cuatro iteraciones sobre `modules/gestion-salud/ausentismo/informe-pri-builder.html`: (📦819) la impresión se bifurca según la vista —consolidado completo desde Resumen General, solo ese caso desde un caso seleccionado—; (📦820) botón explícito "Volver al Módulo" con cierre multi-contexto; (📦821) fix del `TypeError` que colgaba la app; (📦822) el retorno lleva al portal del submódulo, no a la vista del módulo completo.
+
+**Archivo único modificado:** `modules/gestion-salud/ausentismo/informe-pri-builder.html` (el flujo vive entero en este archivo; `renderer.js` y el bridge IPC no se tocaron).
+
+#### (a) Impresión por caso (📦819)
+
+`exportToPDF()` bifurca por `currentPage`:
+
+| Vista activa | Qué imprime | Nombre del PDF |
+|---|---|---|
+| Resumen General (`currentPage === 0`) | Resumen ejecutivo + **todos** los casos del periodo | `Resumen_General_<FECHA_HORA>.pdf` |
+| Caso seleccionado (`currentPage >= 1`) | **Solo** ese caso, sin el resumen | `<NOMBRE>_<CÉDULA>_<FECHA_HORA>.pdf` |
+
+- `Ctrl+P` y el botón pasan por el **mismo** `exportToPDF()` (no hay una ruta de impresión paralela que se pueda desincronizar).
+- El label del botón es dinámico: "Imprimir informe" en Resumen General, "Imprimir este caso" en un caso.
+- Guard added: si el caso seleccionado ya no existe en `casesData` (p. ej. cambió el filtro de fechas), se aborta con aviso en vez de imprimir un PDF vacío.
+- La paginación se adapta cuando solo hay un caso: 1 de 1, sin flechas de navegación.
+- Helper nuevo `_slug()`: normaliza acentos (`NFD` + strip de diacríticos), espacios → `_`, conserva guiones, maneja nombre vacío. Ejemplo real: `CARELIS DEL CARMEN CARIDAD CALDERON` + `1047239028` → `CARELIS_DEL_CARMEN_CARIDAD_CALDERON_1047239028_2026-09-28_17-25-58.pdf`.
+
+#### (b) Botón "Volver al Módulo" (📦820)
+
+- Nuevo grupo `.builder-actions` en el header con un botón visible **← Volver al Módulo** (el X se conserva).
+- `closeReportBuilder()` pasa a ser **multi-contexto**, porque el builder se abre por 3 rutas y el código viejo (postMessage a `window.parent`) solo resolvía una:
+
+| Contexto | Detección | Retorno |
+|---|---|---|
+| Ventana nueva (`window.open`) | `window.opener && !window.opener.closed` | `opener.focus()` + `window.close()` |
+| iframe / embebido | `window.parent !== window` | `postMessage('back-to-module-request')` al padre + retiro del `frameElement` a 400ms |
+| Carga directa en el mismo documento | `window.parent === window` | vía `renderer.js` (ver 📦821/📦822) |
+
+- `ESC` delega a `closeReportBuilder()` (antes tenía su propia lógica): una sola ruta de salida para botón, X y teclado.
+- Guard anti-doble-ejecución (`_priClosing`) para que un clic rápido o X+ESC juntos no se pisen.
+
+#### (c) Fix del `TypeError` que colgaba la app (📦821)
+
+**Síntoma:** al pulsar Volver aparecía en consola
+
+```text
+TypeError: Cannot set properties of undefined (setting 'innerHTML')
+    at render (rendicion-viewer.js:138:29)
+```
+
+y la aplicación quedaba inservible, sin volver al módulo.
+
+**Causa raíz:** la rama de carga directa hacía un fallback a `window.render()`. Ese nombre global **no pertenece al shell de ausentismo**: lo declara un módulo sin relación (`modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js`). Invocado sin su contexto, su `container` queda `undefined` y revienta al asignar `innerHTML` — y antes de morir alcanza a tocar el DOM de otros módulos, por eso la app entera se colgaba.
+
+**Fix:** la rama de carga directa ahora usa el `postMessage` que `renderer.js` **sí** soporta para este caso — el propio listener acepta mensajes de la propia ventana (`renderer.js:1396`, `const isFromSelf = event.source === window`) y responde a `back-to-module-request`. `window.render()` quedó **completamente fuera del archivo** (solo se menciona en el comentario que documenta el bug).
+
+**Regla general:** nunca invocar un global genérico (`render`, `init`, `load`, `update`) desde código inyectado en el shell. Cada módulo carga como classic script en el mismo documento y sus funciones de nivel superior se vuelven globales del `window`, así que los nombres chocan. Llamar siempre a APIs con nombre propio del shell (`showModuleContent`, `showSubmoduleContent`, `showHomePage`).
+
+#### (d) El retorno lleva al portal, no al módulo (📦822)
+
+**Síntoma:** el botón ya funcionaba, pero devolvía al usuario a la pantalla de tarjetas de **Gestión de la Salud** en vez de al portal de **3.3.6 Medición del ausentismo por causa médica** de donde se abrió el builder.
+
+**Causa:** el handler `back-to-module-request` de `renderer.js:1583` hace exactamente dos cosas:
+
+```js
+currentSubmodule = null;          // borra el rastro de dónde venías
+showModuleContent(currentModule); // pinta el módulo COMPLETO
+```
+
+**Fix:** la ruta correcta es `showSubmoduleContent(container, moduleName, submoduleName)` (`renderer.js:5075`), que reconstruye el portal vía `showMedicionAusentismoContent()` → `MedicionAusentismoComponent` → `renderMainView()` → iframe con `medicion-ausentismo-home.html`. El builder la invoca directamente con `currentModule` / `currentSubmodule` leídos del ámbito global.
+
+> **Bug preexistente detectado (NO corregido, fuera de alcance):** el handler `back-to-submodule-home` de `renderer.js:1606-1615` llama `showSubmoduleContent(currentSubmodule)` con **un solo argumento**, cuando la función exige tres — con esa firma el `container` recibe un string y el retorno no ocurre. No se tocó `renderer.js` en este paquete; queda como fix pendiente.
+
+**Cadena de retorno final (rama de carga directa):**
+
+1. `showSubmoduleContent(#content-area, currentModule, currentSubmodule)` → portal del submódulo ← ruta normal
+2. sin submódulo registrado → `postMessage('back-to-module-request')`
+3. red de seguridad a 800 ms: si el builder sigue montado, se limpia el `.main-canvas` y se re-renderiza (`showSubmoduleContent` → `showModuleContent` → `showHomePage` → `location.reload()`)
+
+**Archivos modificados:**
+- `modules/gestion-salud/ausentismo/informe-pri-builder.html` — `exportToPDF()` bifurcado, `_slug()` nuevo, `.builder-actions` + botón, `closeReportBuilder()` reescrito (3 contextos + destino correcto), ESC delegado
+- `package.json` — bump 0.1.217 → 0.1.221
+
+**Validación:**
+- `node -c` sobre el JS embebido del builder (1842 líneas) → OK
+- Probado con casos reales de Tempoactiva: 2 casos detectados, 36 días perdidos en el periodo
+- Validado por el owner en la app: botón Volver, X y ESC vuelven al portal; el `TypeError` desapareció
+
+**Funcionalidad preservada:**
+- Backend IPC y bridge de ausentismo sin tocar
+- `renderer.js` sin tocar
+- Descarga de datos desde `PRI.xlsx` y el mapeo de columnas sin cambios
+- Filtros por fechas, checkboxes de configuración y paginación igual que antes
+
 ## [0.1.217] - 2026-09-27
 
 ### 📦818 · Home de Gestión Humana — hero + métricas en 4 columnas + progress bars

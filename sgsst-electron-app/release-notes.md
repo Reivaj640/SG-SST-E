@@ -1,3 +1,80 @@
+# K+AIR v0.1.221
+
+## 🖨️ Informe de Gestión PRI: imprimir un caso o el consolidado, y volver al portal (📦819-822)
+
+Cuatro mejoras al Informe de Gestión PRI (submódulo **3.3.6 Medición del ausentismo por causa médica**): la impresión ahora depende de dónde estés parado, y el botón de volver te devuelve exactamente al portal de donde saliste — sin romper la aplicación.
+
+### (a) Impresión: consolidado o caso individual (📦819)
+
+El botón de imprimir (y `Ctrl+P`) ahora hace **lo que corresponde según la vista activa**:
+
+| Dónde estás | Qué sale en el PDF | Cómo se llama el archivo |
+|---|---|---|
+| **Resumen General** | Resumen ejecutivo + todos los casos del periodo | `Resumen_General_2026-09-28_17-25-58.pdf` |
+| **Un caso seleccionado** | Solo ese caso, sin el resumen | `CARELIS_DEL_CARMEN_CARIDAD_CALDERON_1047239028_2026-09-28_17-25-58.pdf` |
+
+Antes el botón decía siempre "Imprimir informe" y generaba el consolidado completo aunque tuvieras un caso abierto.
+
+Detalles de la implementación:
+- El texto del botón cambia según el contexto: **"Imprimir informe"** o **"Imprimir este caso"**.
+- Si cambias el filtro de fechas y el caso que tenías abierto ya no existe, el builder avisa en vez de sacar un PDF en blanco.
+- Con un solo caso, la paginación muestra "Página 1 de 1" sin flechas.
+- Los nombres de archivo se limpian de acentos y espacios (`_slug()`), para que no se rompan al guardarse.
+
+### (b) Botón "Volver al Módulo" (📦820)
+
+El header del informe ahora tiene un botón visible **← Volver al Módulo**, al lado del X. La X y la tecla `ESC` hacen exactamente lo mismo: una sola ruta de salida para los tres.
+
+Funciona en los tres casos en que se puede abrir el informe:
+- en una ventana nueva (vuelve a la anterior y la cierra),
+- embebido en un iframe,
+- cargado dentro de la misma pantalla del módulo.
+
+### (c) Fix: la aplicación se colgaba al pulsar Volver (📦821)
+
+**Esto es lo que reportaste y ya está resuelto.** Al pulsar Volver salía en consola:
+
+```text
+TypeError: Cannot set properties of undefined (setting 'innerHTML')
+    at render (rendicion-viewer.js:138:29)
+```
+
+y la app quedaba muerta.
+
+**Por qué pasaba:** el informe, cuando se carga dentro de la pantalla del módulo, comparte documento con toda la app. El código pedía "volver" llamando a `window.render()` — pero ese nombre lo define un módulo **completamente diferente** (Rendición de Cuentas, del Módulo Gestión Integral). Llamado así, sin contexto, reventaba y antes de morir tocaba el HTML de otras pantallas.
+
+**Arreglo:** el informe ahora le pide al shell que lo repinte usando la API correcta, y `window.render()` desapareció por completo del archivo.
+
+> **Nota técnica para futuras sesiones:** nunca llamar a un global genérico como `render`, `init` o `load` desde código que se inyecte en la app. Como todos los módulos se cargan en el mismo documento, esos nombres se pisan. Usar siempre las funciones con nombre propio del shell: `showModuleContent`, `showSubmoduleContent`, `showHomePage`.
+
+### (d) El retorno lleva al portal, no al módulo completo (📦822)
+
+Después de arreglar el error, el botón volvía pero te dejaba en la **pantalla de tarjetas de Gestión de la Salud**, no en el portal de Medición del Ausentismo. Ahora vuelve al portal correcto (Registrar Ausentismo, Ver Ausentismo, Seguimiento, Estadísticas, Informe, Consulta de Trabajadores), que es de donde abriste el informe.
+
+### Archivos modificados
+
+- `modules/gestion-salud/ausentismo/informe-pri-builder.html` — impresión bifurcada, `_slug()`, botón Volver, `closeReportBuilder()` reescrito
+- `package.json` — bump 0.1.217 → 0.1.221
+- `AGENTS.md`, `CHANGELOG.md`, `CONTEXT.md`, `PRD.md`, `README.md`, `release-notes.md` — sincronizados
+
+### Sin cambios
+
+- Backend IPC y base de datos
+- `renderer.js` (el shell no se tocó)
+- La lectura del `PRI.xlsx` y el mapeo de columnas
+- Filtros por fechas y configuración del informe
+
+### Cómo validarlo
+
+1. Abre **Gestión de la Salud → 3.3.6 Medición del ausentismo** y entra al portal.
+2. Dale **Generar Informe PRI**.
+3. Con el **Resumen General** abierto, pulsa "Imprimir informe" → debe salir `Resumen_General_<fecha>.pdf` con el resumen y los 2 casos.
+4. Selecciona un caso (p. ej. **Carelis del Carmen Caridad Calderón**) → el botón debe decir "Imprimir este caso" y el PDF debe salir con nombre `CARELIS_..._1047239028_<fecha>.pdf` con un solo caso.
+5. Pulsa **← Volver al Módulo** → debes volver al portal de ausentismo, sin errores en consola.
+6. Repite con la **X** y con la tecla **ESC** → mismo resultado.
+
+---
+
 # K+AIR v0.1.217
 
 ## 🎨 Home de Gestión Humana — hero + métricas en fila + progress bars (📦818)

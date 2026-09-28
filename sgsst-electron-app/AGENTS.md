@@ -4253,3 +4253,52 @@ node main/test-notificaciones-fuentes.js   # 52/52
 node main/test-notificaciones-ui.js        # 36/36 (incluye checks de tamaño estable)
 node main/test-notificaciones-seguridad.js # 23/23 (seguridad: UNAUTHORIZED/FORBIDDEN/gate/token)
 ```
+
+---
+
+## 🆕 Gotcha: los globals del shell se PISON entre módulos — nunca llamar `window.render()` (📦821, 2026-09-28)
+
+**Síntoma**: al pulsar un botón "Volver" en una vista inyectada, la app LANZA y queda inservible:
+
+```text
+TypeError: Cannot set properties of undefined (setting 'innerHTML')
+    at render (rendicion-viewer.js:138:29)
+```
+
+El error apunta a un archivo de un **módulo sin relación** (Gestión Integral / Rendición de Cuentas) y nunca a la vista donde se hizo clic. Esa es la pista: **si la traza nombra un archivo que no estás tocando, estás llamando a un global que te robó otro módulo.**
+
+### Por qué pasa
+
+Todos los módulos se cargan como **classic scripts en el MISMO documento** (`index.html`). Las declaraciones de nivel superior (`function render() {}`) se convierten en propiedades de `window`. Como no hay módulos ES ni namespaces, **el último script en cargar gana el nombre**:
+
+```js
+// modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js
+async function render() { … this.container.innerHTML = … }   // ← gana window.render
+
+// modules/gestion-salud/ausentismo/informe-pri-builder.html (inyectado)
+if (typeof window.render === 'function') { window.render(); } // ← cree que es el suyo
+```
+
+Invocado como `window.render()`, el `this` es `window`, no la instancia del componente → `this.container` es `undefined` → revienta al asignar `innerHTML`. Y como ya había tocado otras cosas, la app entera se cuelga.
+
+### Regla
+
+1. **NUNCA** invocar un global genérico desde código inyectado en el shell: `render`, `init`, `load`, `update`, `close`, `open`, `show`, `reset`. Compiten con los de todos los demás módulos.
+2. Para repintar contenido usar **solo** las APIs con nombre propio del shell, todas en `renderer.js`:
+   - `showModuleContent(moduleName)` — el módulo completo
+   - `showSubmoduleContent(container, moduleName, submoduleName)` — un submódulo
+   - `showHomePage()` — el home
+3. ⚠️ **`showSubmoduleContent` exige los 3 argumentos.** Llamarla con uno solo hace que el `container` reciba un string y el retorno no ocurra en silencio. (Hoy el handler `back-to-submodule-home` de `renderer.js:1606` tiene justo ese bug — no lo uses como referencia.)
+4. `currentModule` y `currentSubmodule` son `let` de nivel superior en `renderer.js`: **no viven en `window`** pero sí en el ámbito léxico global, así que se leen como identificadores sueltos desde otro classic script (`typeof currentSubmodule !== 'undefined' ? currentSubmodule : null`).
+
+### Bonus: el `postMessage` de "volver" SÍ funciona sin iframe
+
+`renderer.js` acepta mensajes **de la propia ventana** (línea ~1396):
+
+```js
+const isFromSelf = event.source === window;   // "Allow messages from the window itself"
+```
+
+Así que cuando una vista se inyecta en el mismo documento (vía `loadModuleViewInContentArea()`, que monta el HTML en `contentArea > .main-canvas` **sin iframe** y re-ejecuta los scripts), `window.postMessage({ type: 'back-to-module-request' }, '*')` es un camino válido — mucho más seguro que adivinar a qué función global llamar.
+
+**Referencia**: `modules/gestion-salud/ausentismo/informe-pri-builder.html` → `closeReportBuilder()` (📦820-822), con las 3 ramas de contexto, el guard anti-doble-clic y la red de seguridad en cascada.

@@ -1321,6 +1321,20 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.221 - 28 Sep 2026 🆕
+
+#### 📦819-822 · Informe de Gestión PRI — impresión por caso + retorno al portal
+
+Cuatro iteraciones sobre `modules/gestion-salud/ausentismo/informe-pri-builder.html` (submódulo **3.3.6 Medición del ausentismo por causa médica**). Único archivo de código tocado: `renderer.js` y el bridge IPC quedaron intactos.
+
+- **📦819 · Impresión bifurcada por vista**: desde **Resumen General** sale el consolidado completo (`Resumen_General_<FECHA_HORA>.pdf`); desde un **caso seleccionado** sale solo ese caso, sin el resumen (`<NOMBRE>_<CÉDULA>_<FECHA_HORA>.pdf`). `Ctrl+P` y el botón usan el mismo `exportToPDF()`. Label dinámico "Imprimir informe" / "Imprimir este caso". Guard si el caso abierto ya no existe tras cambiar el filtro. Helper `_slug()` (NFD + strip de diacríticos, espacios → `_`).
+- **📦820 · Botón "← Volver al Módulo"** visible en el header (X conservado). `closeReportBuilder()` reescrito a multi-contexto: `window.opener` (ventana nueva) / `window.parent !== window` (iframe) / carga directa en el mismo documento. `ESC` delega a la misma función. Guard anti-doble-ejecución.
+- **📦821 · Fix del `TypeError` que colgaba la app**: `Cannot set properties of undefined (setting 'innerHTML') at render (rendicion-viewer.js:138:29)`. Causa: el fallback llamaba a `window.render()`, global que pertenece a `modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js`, no al shell de ausentismo. Fix: usar el `postMessage` que `renderer.js` soporta para mensajes de la propia ventana (`renderer.js:1396`, `isFromSelf`). `window.render()` eliminado del archivo.
+- **📦822 · Destino de retorno correcto**: antes `back-to-module-request` (`renderer.js:1583`) limpiaba `currentSubmodule` y pintaba el módulo completo. Ahora la rama directa llama `showSubmoduleContent(#content-area, currentModule, currentSubmodule)` → vuelve al portal de Medición del Ausentismo. Red de seguridad a 800 ms en cascada.
+- **Versión**: bump 0.1.217 → 0.1.221. **Validación**: `node -c` OK (1842 líneas) + validado por el owner en la app.
+
+> **Bug preexistente detectado, NO corregido**: `renderer.js:1606-1615` invoca `showSubmoduleContent(currentSubmodule)` con 1 argumento cuando la función exige 3 — el handler `back-to-submodule-home` no restauró la vista. Queda como fix pendiente.
+
 ### v0.1.217 - 27 Sep 2026 🆕
 
 #### 📦818 · Home de Gestión Humana — hero + métricas en fila con progress bars
