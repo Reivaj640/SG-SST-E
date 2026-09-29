@@ -5,6 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.222] - 2026-09-28
+
+### 📦823 — Notificaciones: el toast dice QUIÉN escribió, y "Ver" lleva al correo
+
+**Resumen:** El toast de "1 correo nuevo" solo mostraba el asunto: no se sabía quién lo mandó, y había un `*` suelto bajo el título. Además el botón "Ver" abría la pestaña equivocada, cerraba el panel si ya estaba abierto, y dejaba el toast flotando. Todo corregido de punta a punta (detector → bridge → service → toast → lista) con migración de schema incluida.
+
+#### (a) El remitente viaja desde el correo hasta la pantalla
+
+El dato **ya existía** en la base (`email_threads.last_sender_name` / `last_sender_email`, `email-schema-sql.js:47-48`); lo que faltaba era el camino. Se recorrió la cadena completa:
+
+| Archivo | Cambio |
+|---|---|
+`main/notifications-email.js` | El `SELECT` suma `last_sender_name` + `last_sender_email`; helper `formatRemitente()`; el payload emite `remitente` (ya formateado) + `remitente_nombre` + `remitente_email` |
+`main/notifications-bridge.js` | Columna `remitente TEXT` en `SCHEMA_SQL`; `migrateNotificaciones()` (ALTER TABLE idempotente); `listar` expone `remitente` |
+`main/notifications-service.js` | El `INSERT` persiste el remitente; `_asegurarSchema()` también aplica la migración |
+`renderer.js` | El subtítulo del toast pasa a ser `De: <remitente>` |
+`shared/kair-alerts.js` | La lista de Notificaciones suma la línea `De: …` sobre el asunto |
+`styles.css` | `.kair-alerts-notifs-item__from` (muted, con elipsis si es largo) |
+`index.html` | Cache-bust `?v=20260928-notifs-ver` |
+
+**Formato del remitente** (`formatRemitente`, exportado y testeado):
+
+| Entrada | Salida |
+|---|---|
+nombre + email | `Pausas Activas (pausas@acme.com)` |
+solo email (típico de noreply) | `noreply@acme.com` |
+nombre == email | `juan@acme.com` (no lo repite) |
+nada | `''` → la línea se omite, no se inventa texto |
+nombre larguísimo | recortado a 90 chars con `…` |
+
+**Migración — por qué no alcanza `CREATE TABLE IF NOT EXISTS`:** no altera tablas que ya existen, así que una BD creada antes de este paquete seguiría sin la columna y el `INSERT` del service reventaría. Por eso el `ALTER TABLE` va aparte en `migrateNotificaciones()`, que se exporta y la ejecutan **los dos lados** (bridge y service): si el timer del service hace su primer `INSERT` antes de que `main.js` registre los handlers, igual encuentra la columna. Es idempotente (checa `PRAGMA table_info`).
+
+#### (b) Fix del `*` suelto en el toast
+
+```js
+// antes
+var sub = (data.nuevas[0].companyKey && currentCompany && data.nuevas[0].companyKey !== currentCompany)
+  ? data.nuevas[0].companyKey : '';
+```
+
+Los correos son globales (`company_key = '*'`), así que `'*' !== 'Tempoactiva'` era cierto y se pintaba literalmente el asterisco bajo el título. Ahora el subtítulo es el remitente para correos, y la empresa solo para eventos **y solo si no es `'*'`**.
+
+#### (c) El botón "Ver" hacía 3 cosas mal
+
+**Antes:** `onClick` → `badge.click()` → `_togglePopover()`. Consecuencias:
+
+1. **Abría la pestaña equivocada.** `_state.activeTab` viene de `localStorage` con default `pendientes` (la de eventos del calendario). Un toast de "1 correo nuevo" te mostraba la lista de eventos; el correo estaba en la otra tab y tenías que adivinar que había que cambiarla.
+2. **Era un toggle.** Si el panel ya estaba abierto, el clic lo **cerraba** — al revés de lo que promete un botón que dice "Ver".
+3. **El toast no se cerraba.** `autoClose: 0` y el handler nunca llamaba a `remove()`, así que quedaba flotando tapando la pantalla hasta la X o hasta que llegara otro toast.
+
+**Ahora** — `KairAlerts.openTab(tab)` (abre en una tab concreta, nunca alterna, persiste la preferencia) y `KairAlerts.openFromToast(tipo)` (elige la tab según el tipo **y cierra el toast**).
+
+**Refactor de arquitectura:** la lógica del botón vivía en `renderer.js` (6000+ líneas acopladas al Electron, intestable). Se movió a `kair-alerts.js` para poder verificarla con jsdom sin cargar el shell entero. `renderer.js` solo delega y **conserva el fallback** al `badge.click()` viejo por si `KairAlerts` no estuviera cargado.
+
+#### (d) E2E nueva
+
+`tests/notificaciones-toast-e2e.js` — 5 escenarios con jsdom contra los **archivos reales** (`kair-alerts.js` y `update-notifications.js` se cargan tal cual; el payload lo arma el `formatRemitente()` real):
+
+| Escenario | Cubre |
+|---|---|
+E2E-1 | Llega correo → toast con remitente → clic en Ver → abre en `notifs`, persistida, toast borrado del DOM |
+E2E-2 | **Panel ya abierto** → no se cierra y cambia a `notifs` (el caso que fallaba) |
+E2E-3 | 3 clics seguidos en Ver → aguanta |
+E2E-4 | Evento → subtítulo con su empresa, nunca el `*`; abre `pendientes` |
+E2E-4b | Evento con `companyKey='*'` → sin subtítulo |
+E2E-5 | Sin `KairAlerts` → el fallback no revienta |
+
+**Gotcha de jsdom descubierto:** el harness necesita `url: 'https://kair.local/index.html'`. Con `file://` el `localStorage` lanza `SecurityError: localStorage is not available for opaque origins` y el módulo no carga ni una línea — el error aparece como un `DOMException {}` sin mensaje útil.
+
+**Tests — 222/222 en verde** (eran 155, +67):
+
+```
+tests/notificaciones-toast-e2e.js   25/25   (nueva)
+main/test-notificaciones-ui.js      52/52   (era 36: +16)
+main/test-notificaciones-bridge.js  32/32   (era 28: +4)
+main/test-notificaciones-email.js   17/17   (era  7: +10)
+main/test-notificaciones-service.js 10/10
+main/test-notificaciones-wiring.js  11/11
+main/test-notificaciones-fuentes.js 52/52
+main/test-notificaciones-seguridad.js 23/23
+```
+
+**Check del cache-bust desacoplado de la fecha:** el test de UI validaba el token literal `20260923-notifs-size`, así que cualquier cambio legítimo de CSS/JS lo rompía. Ahora valida el patrón `?v=\d{8}-` más el token vigente — el test no vuelve a envejecer con cada paquete.
+
+**Archivos modificados:** `main/notifications-{email,bridge,service}.js`, `renderer.js`, `shared/kair-alerts.js`, `styles.css`, `index.html`, 3 tests actualizados + 1 E2E nuevo, `package.json` (0.1.221 → 0.1.222).
+
+**Sin cambios:** la lógica de detección, el dedupe, el gate de seguridad, la sincronización de Gmail, la tabla `email_*` y el layout de las dos tabs. Los correos ya persistidos antes de este paquete quedan con el remitente vacío (la columna es nueva); a partir de los correos que lleguen se muestran completos.
+
 ## [0.1.221] - 2026-09-28
 
 ### 📦819-822 — Informe de Gestión PRI: impresión por caso + retorno al portal

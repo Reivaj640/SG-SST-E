@@ -13,6 +13,9 @@ var SCHEMA_SQL = [
   '  company_key   TEXT NOT NULL,',
   '  titulo        TEXT NOT NULL,',
   '  resumen       TEXT,',
+  // 📦823 — remitente ya formateado ("Nombre (email)"). NULL para eventos y
+  // para los correos ya persistidos antes de este paquete.
+  '  remitente     TEXT,',
   '  fecha_evento  TEXT,',
   "  created_at    TEXT NOT NULL DEFAULT (datetime('now')),",
   '  leida_at      TEXT,',
@@ -46,9 +49,40 @@ function _esGlobal(companyKey) {
   return companyKey === GLOBAL_COMPANY;
 }
 
+/**
+ * 📦823 — Migración idempotente de columnas nuevas.
+ *
+ * `CREATE TABLE IF NOT EXISTS` NO agrega columnas a una tabla que YA existe,
+ * así que una BD con la tabla creada antes de este paquete seguiría sin la
+ * columna y el INSERT del service reventaría. Por eso el ALTER va aparte.
+ *
+ * Se exporta y la ejecuta el service en su `_asegurarSchema` también: si el
+ * timer del service ticked antes de que main.js registrara los handlers del
+ * bridge, el INSERT igual tiene que encontrar la columna.
+ */
+function migrateNotificaciones(db) {
+  if (!db) return;
+  var cols = [
+    { name: 'remitente', ddl: 'ALTER TABLE notificaciones ADD COLUMN remitente TEXT' }
+  ];
+  for (var i = 0; i < cols.length; i++) {
+    try {
+      var info = db.prepare('PRAGMA table_info(notificaciones)').all();
+      var exists = info.some(function (c) { return c.name === cols[i].name; });
+      if (exists) continue;
+      db.exec(cols[i].ddl);
+      console.log('[notifs][migrate] columna agregada: ' + cols[i].name);
+    } catch (e) {
+      // Carrera entre dos processes o columna ya creada: no es fatal.
+      console.error('[notifs][migrate] ' + cols[i].name + ': ' + (e && e.message));
+    }
+  }
+}
+
 function _ensureSchema(db) {
   if (!db) return;
   db.exec(SCHEMA_SQL);
+  migrateNotificaciones(db);
   // Migración one-shot (idempotente): consolida correos duplicados por
   // empresa → UNA fila global '*' por ref_id (el fan-out viejo creaba
   // company_key por cada empresa habilitada con el mismo buzón).
@@ -146,6 +180,7 @@ function registerNotificationsHandlers(app, deps) {
             companyKey: r.company_key,
             titulo: r.titulo,
             resumen: r.resumen,
+            remitente: r.remitente || '',
             fechaEvento: r.fecha_evento,
             createdAt: r.created_at,
             leida: !!r.leida_at
@@ -255,5 +290,7 @@ module.exports = {
   buildDedupeKey: buildDedupeKey,
   ventanaRango: ventanaRango,
   registerNotificationsHandlers: registerNotificationsHandlers,
+  // 📦823 — el service la llama para garantizar la columna antes de su primer INSERT
+  migrateNotificaciones: migrateNotificaciones,
   GLOBAL_COMPANY: GLOBAL_COMPANY
 };

@@ -1107,23 +1107,45 @@ document.addEventListener('DOMContentLoaded', async () => {
       _refreshNotifBadge();
       if (data && data.nuevas && data.nuevas.length && window.updateNotifier && window.updateNotifier.show) {
         var n = data.nuevas.length;
-        var tipo = data.nuevas[0].tipo;
+        var primera = data.nuevas[0];
+        var tipo = primera.tipo;
         var titulo = n === 1
           ? (tipo === 'correo' ? '1 correo nuevo' : '1 evento próximo')
           : (n + ' notificaciones nuevas');
-        var sub = (data.nuevas[0].companyKey && currentCompany && data.nuevas[0].companyKey !== currentCompany)
-          ? data.nuevas[0].companyKey : '';
+        // 📦823 — Para correo el subtítulo es QUIÉN lo envió (no el asunto: ese
+        // va en el body). Antes caía el companyKey, que para el buzón global es
+        // literalmente '*' y salía como un asterisco suelto bajo el título.
+        var sub = '';
+        if (tipo === 'correo') {
+          var remitente = String(primera.remitente || '').trim();
+          if (remitente) sub = 'De: ' + remitente;
+        } else {
+          // Evento: la empresa SÍ es información útil, pero '*' (global) no.
+          var ck = primera.companyKey;
+          if (ck && ck !== '*' && currentCompany && ck !== currentCompany) sub = ck;
+        }
         window.updateNotifier.show({
           type: 'info',
           title: titulo,
           subtitle: sub,
-          message: String(data.nuevas[0].titulo || '').slice(0, 80),
+          message: String(primera.titulo || '').slice(0, 80),
           autoClose: 0,
           buttonText: 'Ver',
           onClick: function () {
-            // Abrir el panel Pendientes/Notificaciones (toggle del badge)
-            var badge = document.getElementById('bandeja-integrada-badge');
-            if (badge) badge.click();
+            // 📦823 — "Ver" tiene que LLEVAR a la notificación. Antes hacía
+            // `badge.click()` → _togglePopover(), que (a) abría la pestaña
+            // activa (default "pendientes", la de eventos) aunque el toast fuera
+            // de un correo, (b) si el panel ya estaba abierto lo cerraba, y
+            // (c) dejaba el toast flotando con autoClose:0.
+            // La lógica vive en KairAlerts.openFromToast() para poder
+            // verificarla con jsdom sin cargar el shell entero.
+            if (window.KairAlerts && typeof window.KairAlerts.openFromToast === 'function') {
+              window.KairAlerts.openFromToast(tipo);
+            } else {
+              // Sin KairAlerts: fallback al toggle del badge (comportamiento viejo).
+              var badge = document.getElementById('bandeja-integrada-badge');
+              if (badge) badge.click();
+            }
           }
         });
       }

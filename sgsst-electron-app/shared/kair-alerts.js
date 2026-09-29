@@ -287,6 +287,9 @@
       ? '<span class="kair-alerts-notifs__chip">' + _esc(n.companyKey) + '</span>'
       : '';
     var resumen = String(n.resumen || '').slice(0, 90);
+    // 📦823 — remitente del correo. Va entre la etiqueta de tipo y el asunto:
+    // es el dato que responde "¿quién me escribió?" sin abrir el panel.
+    var remitente = tipo === 'correo' ? String(n.remitente || '').trim().slice(0, 90) : '';
     var item = document.createElement('div');
     item.className = 'kair-alerts-notifs-item';
     item.setAttribute('data-notif-id', _esc(n.id));
@@ -298,6 +301,7 @@
         '<span class="kair-alerts-notifs-item__type">' + _esc(label) + '</span>' +
         chipHtml +
       '</div>' +
+      (remitente ? '<div class="kair-alerts-notifs-item__from">De: ' + _esc(remitente) + '</div>' : '') +
       '<div class="kair-alerts-notifs-item__title">' + _esc(n.titulo || '(sin título)') + '</div>' +
       (resumen ? '<div class="kair-alerts-notifs-item__resumen">' + _esc(resumen) + '</div>' : '') +
       '<div class="kair-alerts-notifs-item__actions">' +
@@ -914,6 +918,66 @@
     _renderPopover();
   }
 
+  /**
+   * 📦823 — Abre el panel en una pestaña concreta. NO es un toggle.
+   *
+   * Lo usa el botón "Ver" del toast de notificaciones. Antes ese botón hacía
+   * `badge.click()`, que caía en `_togglePopover()` y tenía dos defectos:
+   *   a) abría la pestaña que estuviera activa (default "pendientes"), así que
+   *      un toast de "1 correo nuevo" mostraba la lista de eventos y el
+   *      usuario tenía que adivinar que había que cambiar de tab;
+   *   b) si el panel ya estaba abierto, lo CERRABA (toggle), al revés de lo
+   *      que promete un botón que dice "Ver".
+   *
+   * Además persiste la tab elegida para que el siguiente popover (por ejemplo
+   * al pulsar el badge) abra donde el usuario dejó la vista.
+   *
+   * @param {'notifs'|'pendientes'} tab
+   */
+  function openTab(tab) {
+    var target = (tab === 'notifs') ? 'notifs' : 'pendientes';
+    if (target !== _state.activeTab) {
+      _state.activeTab = target;
+      try { localStorage.setItem(NOTIF_TAB_KEY, target); } catch (err) { }
+    }
+    // SIEMPRE repinta. `_renderPopover()` reemplaza el popover anterior, así
+    // que si ya estaba abierto queda ABIERTO en la tab pedida (no se cierra).
+    _renderPopover();
+  }
+
+  /**
+   * 📦823 — Handler del botón "Ver" del toast de notificaciones.
+   *
+   * Hace las TRES cosas que el botón promete:
+   *   1. abre el panel en la pestaña que corresponde (un correo vive en la
+   *      tab "notifs", no en la de eventos);
+   *   2. no lo cierra si ya estaba abierto (no es un toggle);
+   *   3. cierra el toast, que con autoClose:0 se quedaba flotando tapando.
+   *
+   * Vive aquí y no en renderer.js para que sea verificable con jsdom sin
+   * cargar el shell entero (renderer.js son 6k+ líneas acopladas al Electron).
+   *
+   * @param {'correo'|'evento'} tipo - tipo de la notificación del toast
+   * @returns {string} la pestaña que quedó activa ('notifs'|'pendientes')
+   */
+  function openFromToast(tipo) {
+    openTab(tipo === 'correo' ? 'notifs' : 'pendientes');
+    try {
+      var notif = global.updateNotifier;
+      if (notif && typeof notif.remove === 'function' && notif.currentToast) {
+        notif.remove(notif.currentToast);
+        notif.currentToast = null;
+      }
+    } catch (e) {
+      _log('warn', 'no se pudo cerrar el toast: ' + (e && e.message));
+    }
+    return getActiveTab();
+  }
+
+  function getActiveTab() {
+    return _state.activeTab === 'notifs' ? 'notifs' : 'pendientes';
+  }
+
   // ── API pública ─────────────────────────────────────────────────────
   function init() {
     _log('info', 'init()');
@@ -995,6 +1059,11 @@
     onCountChange: onCountChange,
     isOpen: isOpen,
     close: close,
+    // 📦823 — Abrir en una tab concreta (no toggle). Lo consume el botón "Ver"
+    // del toast de notificaciones (renderer.js).
+    openTab: openTab,
+    openFromToast: openFromToast,
+    getActiveTab: getActiveTab,
     destroy: destroy,
     // F4-fix — API nuevo: devuelve la lista de eventos pendientes (vencidos o que vencen hoy).
     // Usado por el badge de la Bandeja Integrada para mostrar el popover al hacer click.

@@ -1321,6 +1321,22 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.222 - 28 Sep 2026 🆕
+
+#### 📦823 · Notificaciones — el toast dice QUIÉN escribió + "Ver" lleva al correo
+
+El aviso de "1 correo nuevo" ahora muestra el remitente, y el botón "Ver" cumple lo que promete. El dato ya existía en la base (`email_threads.last_sender_name` / `last_sender_email`); faltaba el camino completo hasta la pantalla.
+
+- **Remitente de punta a punta**: `notifications-email.js` (SELECT + `formatRemitente()`) → `notifications-bridge.js` (columna `remitente` + `listar`) → `notifications-service.js` (INSERT) → `renderer.js` (subtítulo `De: <remitente>`) → `kair-alerts.js` (línea `De: …` en la lista) → `styles.css`. Formato: `Nombre (email)`, o solo el email si no hay nombre, `''` si no hay nada (la línea se omite, no se inventa).
+- **Migración de schema**: `CREATE TABLE IF NOT EXISTS` no altera tablas existentes, así que hay un `ALTER TABLE` idempotente aparte (`migrateNotificaciones()`), exportado y ejecutado **por el bridge y por el service** para no depender del orden de arranque.
+- **Fix del `*` suelto** bajo el título: el subtítulo era el `companyKey`, y el buzón global es `'*'`. Ahora los correos muestran el remitente; la empresa solo se muestra en eventos y solo si no es `'*'`.
+- **Fix del botón "Ver"** (3 bugs): abría la pestaña de eventos en vez de la del correo · si el panel ya estaba abierto lo cerraba (toggle) · el toast no se cerraba. Ahora `KairAlerts.openTab()` (abre en tab concreta, persiste) + `openFromToast()` (elige tab por tipo y cierra el toast). La lógica salió de `renderer.js` a `kair-alerts.js` para poder testearla; el renderer conserva el fallback.
+- **E2E nueva** `tests/notificaciones-toast-e2e.js`: 5 escenarios con jsdom contra los archivos reales, 25 checks (correo → Ver → `notifs` + toast borrado; panel abierto → no alterna; triple clic; evento → `pendientes`; evento global → sin subtítulo; sin `KairAlerts` → fallback). Requiere `url: 'https://…'` en jsdom porque con `file://` el `localStorage` lanza `SecurityError`.
+- **Tests 222/222** (eran 155): E2E 25 + bridge 32 + service 10 + email 17 + wiring 11 + fuentes 52 + ui 52 + seguridad 23. El check del cache-bust dejó de depender de una fecha literal.
+- **Versión**: bump 0.1.221 → 0.1.222. Cache-bust `?v=20260928-notifs-ver`.
+
+> Las notificaciones ya guardadas salen sin remitente (columna nueva); los correos que lleguen de ahora en adelante se muestran completos.
+
 ### v0.1.221 - 28 Sep 2026 🆕
 
 #### 📦819-822 · Informe de Gestión PRI — impresión por caso + retorno al portal

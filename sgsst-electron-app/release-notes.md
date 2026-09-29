@@ -1,3 +1,82 @@
+# K+AIR v0.1.222
+
+## 📬 Notificaciones: ahora sabes QUIÉN te escribió, y "Ver" te lleva al correo (📦823)
+
+El aviso de "1 correo nuevo" mejoró en dos frentes: te dice **de quién** es el correo, y el botón **"Ver"** ahora realmente te lleva a esa notificación (antes no).
+
+### (a) El toast muestra el remitente
+
+Antes el toast solo decía el asunto. Ahora:
+
+```
+1 correo nuevo
+De: Pausas Activas (pausas@acme.com)
+RV: Lista de asistencia de actividades Pausas activas
+                                    [ Ver ]
+```
+
+Cómo se arma el nombre:
+- con nombre y correo → `Pausas Activas (pausas@acme.com)`
+- sin nombre (típico de los `noreply`) → `noreply@acme.com`
+- si el nombre es el mismo correo → no lo repite
+- si no hay nada → la línea no aparece (no inventa texto)
+
+También se agregó **"De: …" en la lista de Notificaciones** (la pestaña del panel), encima del asunto.
+
+### (b) Se corrigió el `*` que salía bajo el título
+
+En la captura anterior, debajo de "1 correo nuevo" aparecía un asterisco suelto. Era un error: el toast mostraba la "empresa" del correo, y como la bandeja de Gmail es global esa empresa es `*`. Ya no sale. Para los eventos de calendario sí se sigue mostrando la empresa, que ahí sí sirve.
+
+### (c) El botón "Ver" ahora funciona como dice
+
+Tenía tres problemas, los tres corregidos:
+
+| Antes | Ahora |
+|---|---|
+| Abría la pestaña de **eventos**, no la del correo | Abre directo en **Notificaciones**, donde está el correo |
+| Si el panel ya estaba abierto, lo **cerraba** | Si ya está abierto, se queda abierto en la pestaña correcta |
+| El toast se quedaba **flotando** tapando la pantalla | El toast se cierra al hacer clic |
+
+Además, la pestaña que elegiste queda memorizada: la próxima vez que abras el panel con el botón del calendario, abre donde lo dejaste.
+
+### (d) Corrección técnica importante
+
+Se agregó una columna nueva a la base de datos para guardar el remitente. La migración es automática y segura: se aplica sola al abrir la app, no hay que hacer nada, y no se pierde ninguna notificación existente.
+
+### Cómo validarlo
+
+1. Reinicia la app (para que se aplique la migración y carguen los cambios).
+2. Pide que te llegue un correo nuevo a la cuenta conectada, sin abrirlo.
+3. Debe salir el toast con **"De: …"** y sin el asterisco.
+4. Dale **Ver** → debe abrirse el panel en la pestaña **Notificaciones** y el toast desaparece.
+5. Vuelve a abrir el panel con el botón del calendario → debe seguir en **Notificaciones**.
+6. Repite con el panel ya abierto → debe cambiar a Notificaciones sin cerrarse.
+
+**Nota:** las notificaciones que ya estaban guardadas salen sin el remitente (la columna se creó hoy). A partir de los correos nuevos se ven completas.
+
+### Archivos modificados
+
+- `main/notifications-email.js`, `main/notifications-bridge.js`, `main/notifications-service.js` — detectar, guardar y entregar el remitente
+- `renderer.js` — el subtítulo del toast y el botón Ver
+- `shared/kair-alerts.js` — línea del remitente en la lista + `openTab()` / `openFromToast()`
+- `styles.css`, `index.html` — estilo de la línea y cache-bust
+- `tests/notificaciones-toast-e2e.js` — **nueva** E2E del flujo completo (25 checks)
+- `main/test-notificaciones-{ui,bridge,email}.js` — actualizados (+30 checks)
+- `package.json` — bump 0.1.221 → 0.1.222
+- `AGENTS.md`, `CHANGELOG.md`, `CONTEXT.md`, `PRD.md`, `README.md`, `release-notes.md` — sincronizados
+
+### Sin cambios
+
+- La detección de correos, el deduplicado y el gate de seguridad
+- La sincronización con Gmail y la bandeja integrada
+- El layout de las dos pestañas del panel
+
+### Pruebas
+
+**222/222 en verde** (eran 155): E2E nueva 25/25, más las 7 suites de notificaciones (bridge 32, service 10, email 17, wiring 11, fuentes 52, ui 52, seguridad 23).
+
+---
+
 # K+AIR v0.1.221
 
 ## 🖨️ Informe de Gestión PRI: imprimir un caso o el consolidado, y volver al portal (📦819-822)

@@ -74,6 +74,10 @@ function _asegurarSchema(db) {
   // Lección Task 1: schema idempotente (IF NOT EXISTS). Si falla, DEJA FALLAR fuerte
   // (rechaza el tick) — nunca se traga acá dentro de un catch silencioso.
   if (db) db.exec(bridge.SCHEMA_SQL);
+  // 📦823 — CREATE TABLE IF NOT EXISTS no altera tablas ya creadas: la
+  // columna `remitente` la agrega la migración, y el service la aplica por su
+  // cuenta para no depender del orden de arranque (timer antes que handlers).
+  try { bridge.migrateNotificaciones(db); } catch (e) { _log('warn', 'migrate: ' + e.message); }
 }
 
 function _insertCountIfNew(row) {
@@ -81,9 +85,9 @@ function _insertCountIfNew(row) {
   if (!db) return 0;
   try {
     var info = db.prepare(
-      'INSERT OR IGNORE INTO notificaciones (tipo, ref_id, company_key, titulo, resumen, fecha_evento, dedupe_key) ' +
-      'VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(row.tipo, row.ref_id, row.company_key, row.titulo, row.resumen || null, row.fecha_evento || null, row.dedupe_key);
+      'INSERT OR IGNORE INTO notificaciones (tipo, ref_id, company_key, titulo, resumen, remitente, fecha_evento, dedupe_key) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(row.tipo, row.ref_id, row.company_key, row.titulo, row.resumen || null, row.remitente || null, row.fecha_evento || null, row.dedupe_key);
     return info.changes || 0;
   } catch (e) {
     _log('error', 'insert ' + e.message);

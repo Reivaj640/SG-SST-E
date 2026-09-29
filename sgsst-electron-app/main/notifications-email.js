@@ -10,7 +10,9 @@ var bridge = require('./notifications-bridge.js');
 // buzón se ve desde cualquier empresa). OJO: conservar el par `has_unread` +
 // `SELECT` (el fallback lo usa el test de regresión).
 var SQL_NO_LEIDOS =
-  'SELECT t.id AS thread_id, t.subject, t.snippet, c.email AS connection_email, c.id AS connection_id ' +
+  'SELECT t.id AS thread_id, t.subject, t.snippet, ' +
+  '  t.last_sender_name, t.last_sender_email, ' +
+  '  c.email AS connection_email, c.id AS connection_id ' +
   'FROM email_threads t ' +
   'LEFT JOIN email_connections c ON c.id = t.connection_id ' +
   "WHERE t.has_unread = 1 AND t.folder = 'INBOX' " +
@@ -20,6 +22,32 @@ var SQL_NO_LEIDOS =
 var SQL_NO_LEIDOS_FALLBACK =
   'SELECT t.id AS thread_id, t.subject, t.snippet ' +
   'FROM email_threads t WHERE t.has_unread = 1 LIMIT 50';
+
+/**
+ * 📦823 — Arma el texto del remitente para el toast y la lista.
+ *
+ * El usuario necesita saber QUIÉN le escribió, no solo de qué trata. La BD
+ * tiene `last_sender_name` + `last_sender_email` (email-schema-sql.js), pero:
+ *   - el nombre suele faltar ( Gmail lo manda vacío para noreply/aliases );
+ *   - a veces el "nombre" ES el email crudo ( "juan@acme.com" );
+ *   - hay que recortar: los nombres largos rompen el layout del toast.
+ *
+ * Devuelve '' cuando no hay nada (el caller decide si omite la línea entera).
+ */
+function formatRemitente(nombre, email, maxLen) {
+  var n = String(nombre == null ? '' : nombre).trim().replace(/\s+/g, ' ');
+  var e = String(email == null ? '' : email).trim();
+  var out;
+  if (n && e) {
+    // "Nombre (email)" salvo que el nombre ya sea el email.
+    out = n.toLowerCase() === e.toLowerCase() ? e : n + ' (' + e + ')';
+  } else {
+    out = n || e;
+  }
+  var max = maxLen || 90;
+  if (out.length > max) out = out.slice(0, max - 1).replace(/\s+$/, '') + '…';
+  return out;
+}
 
 /**
  * Crea el detector de correos. No llama Gmail directamente:
@@ -71,6 +99,7 @@ function createEmailDetector(deps) {
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var key = bridge.buildDedupeKey('correo', '*', r.thread_id, null, 0);
+      var remitente = formatRemitente(r.last_sender_name, r.last_sender_email);
       nuevas.push({
         tipo: 'correo',
         ref_id: String(r.thread_id),
@@ -80,6 +109,12 @@ function createEmailDetector(deps) {
         companyKey: '*',
         titulo: String(r.subject || '(sin asunto)').slice(0, 200),
         resumen: String(r.snippet || '').slice(0, 80),
+        // 📦823 — remitente ya formateado (nombre + email) para el toast y la
+        // lista. Viene '' cuando el hilo no trae remitente: los callers lo
+        // omiten en vez de inventar un texto.
+        remitente: remitente,
+        remitente_nombre: String(r.last_sender_name || '').trim(),
+        remitente_email: String(r.last_sender_email || '').trim(),
         dedupe_key: key
       });
     }
@@ -91,5 +126,7 @@ module.exports = {
   createEmailDetector: createEmailDetector,
   // Task 5 — exportados para el test (SQL alineado con email-schema-sql.js)
   SQL_NO_LEIDOS: SQL_NO_LEIDOS,
-  SQL_NO_LEIDOS_FALLBACK: SQL_NO_LEIDOS_FALLBACK
+  SQL_NO_LEIDOS_FALLBACK: SQL_NO_LEIDOS_FALLBACK,
+  // 📦823 — exportado para el test del formateo del remitente
+  formatRemitente: formatRemitente
 };

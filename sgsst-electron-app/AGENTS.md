@@ -4245,14 +4245,52 @@ Feature de notificaciones persistentes en el proceso main (detección + persiste
 **Tests** (correrlos antes de commitear; bridge/service usan better-sqlite3 → con Electron):
 
 ```powershell
-$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 28/28
+node tests/notificaciones-toast-e2e.js    # 25/25 — E2E del flujo toast → "Ver" (jsdom, sin Electron)
+$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 32/28
 $env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-service.js  # 10/10
-node main/test-notificaciones-email.js     # 7/7
+node main/test-notificaciones-email.js     # 17/7
 node main/test-notificaciones-wiring.js    # 11/11
 node main/test-notificaciones-fuentes.js   # 52/52
-node main/test-notificaciones-ui.js        # 36/36 (incluye checks de tamaño estable)
-node main/test-notificaciones-seguridad.js # 23/23 (seguridad: UNAUTHORIZED/FORBIDDEN/gate/token)
+node main/test-notificaciones-ui.js        # 52/36
+node main/test-notificaciones-seguridad.js # 23/23
 ```
+
+> 📦823 — la E2E (`tests/notificaciones-toast-e2e.js`) carga `shared/kair-alerts.js` y
+> `assets/js/update-notifications.js` **reales** en un jsdom y hace clic de verdad en
+> `.btn-toast-action`. Regla del harness: el JSDOM debe llevar `url: 'https://kair.local/index.html'`.
+> Con `file://` el `localStorage` lanza `SecurityError: localStorage is not available for opaque
+> origins`, el módulo no carga ni una línea y el error sale como un `DOMException {}` sin mensaje
+> útil (costó una vuelta entera de debug).
+
+### ⚠️ Gotcha de schema: `CREATE TABLE IF NOT EXISTS` NO altera tablas que ya existen (📦823)
+
+Es el error clásico de agregar una columna y jurar que "ya estaba". Si la tabla `notificaciones`
+se creó en una versión anterior, el `CREATE TABLE IF NOT EXISTS notificaciones (...)` del
+`SCHEMA_SQL` se ejecuta, **no hace nada**, y la columna nueva no existe → el `INSERT` revienta en
+producción y no en el test (el test crea la BD nueva desde cero, así que pasa siempre).
+
+**Patrón correcto cuando se agrega una columna** (el de este repo en 📦823):
+
+```js
+// 1) la columna va en el CREATE TABLE (BDs nuevas)
+'  remitente     TEXT,'
+
+// 2) y ADEMÁS un ALTER TABLE idempotente aparte (BDs existentes)
+function migrateNotificaciones(db) {
+  var info = db.prepare('PRAGMA table_info(notificaciones)').all();
+  if (info.some(c => c.name === 'remitente')) return;   // ya está
+  db.exec('ALTER TABLE notificaciones ADD COLUMN remitente TEXT');
+}
+
+// 3) y se exporta para que la ejecute el service también, no solo el bridge:
+//    el timer del service puede hacer su primer INSERT antes de que main.js
+//    registre los handlers del bridge.
+module.exports = { migrateNotificaciones: migrateNotificaciones };
+```
+
+**Regla:** toda columna nueva en una tabla de producción va con su `ALTER TABLE` idempotente
+exportado, y **la migración tiene que correr desde más de un punto de entrada** si hay más de un
+proceso que escribe (bridge IPC + service por timer).
 
 ---
 

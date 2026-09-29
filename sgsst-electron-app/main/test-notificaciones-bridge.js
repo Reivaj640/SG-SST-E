@@ -126,6 +126,30 @@ if (dbOk) {
     const admCnt = await handlers['notificaciones:getUnreadCount']({}, { token: 'tok-admin', companyKey: 'emp-otra' });
     ok('getUnreadCount admin bypass', admCnt && admCnt.success === true);
 
+    // ── 📦823 · Columna remitente: migración + exposición ──────────────
+    const cols = db.prepare('PRAGMA table_info(notificaciones)').all().map(function (c) { return c.name; });
+    ok('migración agrega la columna remitente', cols.indexOf('remitente') !== -1);
+
+    // Idempotente: correrla dos veces no debe romper nada.
+    try { bridge.migrateNotificaciones(db); ok('migración es idempotente', true); }
+    catch (e2) { ok('migración es idempotente', false); }
+
+    db.prepare(
+      'INSERT OR IGNORE INTO notificaciones (tipo, ref_id, company_key, titulo, resumen, remitente, dedupe_key) VALUES (?,?,?,?,?,?,?)'
+    ).run('correo', 'thr-remitente', '*', 'Asunto con remitente', 'snippet', 'Pausas Activas (pausas@acme.com)', 'correo:*:thr-remitente:0');
+
+    const listaRemitente = await handlers['notificaciones:listar']({}, { token: 'tok-ok', limit: 50 });
+    const filaRemitente = listaRemitente.data.filter(function (r) { return r.refId === 'thr-remitente'; })[0];
+    ok('listar expone el remitente', !!filaRemitente && filaRemitente.remitente === 'Pausas Activas (pausas@acme.com)');
+
+    // Un evento no tiene remitente → llega como '' (string vacío, nunca undefined)
+    db.prepare(
+      'INSERT OR IGNORE INTO notificaciones (tipo, ref_id, company_key, titulo, resumen, dedupe_key) VALUES (?,?,?,?,?,?)'
+    ).run('evento', 'ev-sin-remitente', 'emp1', 'Reunion', 'reunion', 'evento:emp1:ev-sin-remitente:2026-09-28T09:00:00:0');
+    const lista2 = await handlers['notificaciones:listar']({}, { token: 'tok-ok', limit: 50 });
+    const filaEvento = lista2.data.filter(function (r) { return r.refId === 'ev-sin-remitente'; })[0];
+    ok('evento sin remitente devuelve "" (no undefined)', !!filaEvento && filaEvento.remitente === '');
+
     report();
   })();
 } else {

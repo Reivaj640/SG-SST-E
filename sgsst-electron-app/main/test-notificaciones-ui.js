@@ -9,6 +9,8 @@ function ok(n, c) { checks.push({ name: n, ok: !!c }); }
 const renderer = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
 const alerts = fs.readFileSync(path.join(__dirname, '..', 'shared', 'kair-alerts.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const bridgeJs = fs.readFileSync(path.join(__dirname, 'notifications-bridge.js'), 'utf8');
+const serviceJs = fs.readFileSync(path.join(__dirname, 'notifications-service.js'), 'utf8');
 let stylesCss = '';
 try {
   stylesCss = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
@@ -51,7 +53,35 @@ ok('kair-alerts estado activeTab', /activeTab/.test(alerts));
 ok('kair-alerts persiste tab en localStorage', /kair-alerts-tab/.test(alerts));
 ok('kair-alerts conmuta vista por tab', /action === 'tab'/.test(alerts));
 ok('styles.css estilos de tabs', /\.kair-alerts-popover__tab/.test(stylesCss));
-ok('cache-bust con token notifs-size', /20260923-notifs-size/.test(indexHtml));
+// 📦823 — el token sube a notifs-remitente (el toast muestra QUIÉN escribió).
+// Se acepta cualquier token vigente (no se fija una fecha que envejezca el test).
+ok('cache-bust actualizado en index.html',
+  /shared\/kair-alerts\.js\?v=\d{8}-/.test(indexHtml) &&
+  /renderer\.js\?v=\d{8}-/.test(indexHtml) &&
+  /styles\.css\?v=\d{8}-/.test(indexHtml) &&
+  /kair-alerts\.js\?v=20260928-notifs-ver/.test(indexHtml));
+
+// ── 📦823 · Remitente visible en toast y en la lista ────────────────────
+ok('toast: subtitle "De: <remitente>"', /sub = 'De: '/.test(renderer));
+ok('toast: no muestra el companyKey global "*"', /ck !== '\*'/.test(renderer));
+ok('lista: renderiza la línea __from con el remitente', /kair-alerts-notifs-item__from/.test(alerts) && /De: '/.test(alerts));
+ok('lista: solo para tipo correo', /tipo === 'correo' \? String\(n\.remitente/.test(alerts));
+ok('styles.css estilo de __from', /\.kair-alerts-notifs-item__from/.test(stylesCss));
+ok('bridge expone remitente en listar', /remitente: r\.remitente \|\| ''/.test(bridgeJs));
+ok('bridge migra la columna remitente', /ADD COLUMN remitente TEXT/.test(bridgeJs) && /migrateNotificaciones/.test(bridgeJs));
+ok('service inserta remitente', /titulo, resumen, remitente, fecha_evento/.test(serviceJs));
+
+// ── 📦823 · Botón "Ver": abre la tab correcta, no alterna, cierra el toast ──
+ok('kair-alerts expone openTab en la API pública', /openTab: openTab/.test(alerts));
+ok('kair-alerts define openFromToast', /function openFromToast\(tipo\)/.test(alerts));
+ok('openFromToast: correo → notifs, evento → pendientes',
+  /openTab\(tipo === 'correo' \? 'notifs' : 'pendientes'\)/.test(alerts));
+ok('openFromToast: cierra el toast', /notif\.remove\(notif\.currentToast\)/.test(alerts));
+ok('openFromToast: NO usa toggle (no llama _closePopover)', !/function openFromToast[\s\S]{0,600}_closePopover\(\)/.test(alerts));
+ok('renderer delega en openFromToast', /KairAlerts\.openFromToast\(tipo\)/.test(renderer));
+ok('renderer conserva fallback al badge', /badge\.click\(\)/.test(renderer));
+ok('existe la E2E del flujo del toast',
+  fs.existsSync(path.join(__dirname, '..', 'tests', 'notificaciones-toast-e2e.js')));
 // Altura estable entre pestañas
 ok('styles.css notifs-list sin max-height fijo', !/kair-alerts-notifs-list[^{]*\{[^}]*max-height/.test(stylesCss));
 ok('kair-alerts fija min-height del panel (_pinPopoverHeight)', /_pinPopoverHeight/.test(alerts) && /panelMinH/.test(alerts));
