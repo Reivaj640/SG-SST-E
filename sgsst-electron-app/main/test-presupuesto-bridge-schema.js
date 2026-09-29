@@ -181,18 +181,35 @@ async function run() {
   // 4. Verificar columnas de cada tabla
   console.log('');
   console.log('[4] Verificando columnas...');
+  // 📦824 — Se cambió de "lista exacta" a "contiene las columnas originales +
+  // las del 📦824". La lista exacta convertía cada columna nueva en un test que
+  // hay que editar a mano, que es justo lo que pasó con este paquete: 2 tests
+  // en rojo porque el schema creció a propósito.
+  var PRESUPUESTOS_BASE = ['id', 'empresa_id', 'anio', 'nombre', 'notas', 'creado_en', 'actualizado_en', 'creado_por'];
+  var PRESUPUESTOS_824 = [
+    'archivo_origen', 'archivo_importado_en', 'archivo_nombre',
+    'total_declarado_asignado', 'total_declarado_ejecutado', 'ipc', 'avisos_importacion'
+  ];
   var colsPresupuestos = _tableInfo(db, 'presupuestos').map(function (c) { return c.name; });
+  PRESUPUESTOS_BASE.concat(PRESUPUESTOS_824).forEach(function (col) {
+    _assert(colsPresupuestos.indexOf(col) !== -1, 'presupuestos.' + col + ' existe');
+  });
   _assertDeepEqual(
-    colsPresupuestos,
-    ['id', 'empresa_id', 'anio', 'nombre', 'notas', 'creado_en', 'actualizado_en', 'creado_por'],
-    'columnas de presupuestos'
+    colsPresupuestos.slice(0, PRESUPUESTOS_BASE.length),
+    PRESUPUESTOS_BASE,
+    'columnas de presupuestos (base v1, en su orden original)'
   );
 
+  var PARTIDAS_BASE = ['id', 'presupuesto_id', 'numero', 'concepto', 'descripcion', 'activo', 'creado_en', 'actualizado_en'];
+  var PARTIDAS_824 = ['asignado_anual', 'ejecutado_acumulado', 'porcentaje_eje'];
   var colsPartidas = _tableInfo(db, 'presupuesto_partidas').map(function (c) { return c.name; });
+  PARTIDAS_BASE.concat(PARTIDAS_824).forEach(function (col) {
+    _assert(colsPartidas.indexOf(col) !== -1, 'presupuesto_partidas.' + col + ' existe');
+  });
   _assertDeepEqual(
-    colsPartidas,
-    ['id', 'presupuesto_id', 'numero', 'concepto', 'descripcion', 'activo', 'creado_en', 'actualizado_en'],
-    'columnas de presupuesto_partidas'
+    colsPartidas.slice(0, PARTIDAS_BASE.length),
+    PARTIDAS_BASE,
+    'columnas de presupuesto_partidas (base v1, en su orden original)'
   );
 
   var colsValores = _tableInfo(db, 'presupuesto_valores_mensuales').map(function (c) { return c.name; });
@@ -308,6 +325,10 @@ async function run() {
     'presupuesto:import-from-excel',
     'presupuesto:export-excel',
     'presupuesto:export-template',
+    // 📦824 — Duplicar un período a otro año (partidas + asignado, ejecución en
+    // cero, IPC vacío). Es lo que permite crear el 2027 sin volver a digitar
+    // las 14 partidas a mano.
+    'presupuesto:duplicar-periodo',
     'presupuesto:diag'
   ];
   _assertEqual(Object.keys(registeredHandlers).length, expectedChannels.length, 'cantidad de handlers registrados');

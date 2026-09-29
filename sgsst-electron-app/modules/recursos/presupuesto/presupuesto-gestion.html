@@ -390,7 +390,10 @@ tbody tr:hover { background: #f4f7fd; }
     <div>
       <div class="pres-header__crumb">Recursos<span>/</span>Presupuesto</div>
       <h1 class="pres-header__title" id="moduleTitle">Gestión Presupuestal</h1>
-      <p class="pres-header__sub">Administración de partidas presupuestales y ejecución.</p>
+      <!-- 📦824 — id agregado: updateFileInfo() escribe aquí de qué archivo
+           salió el período y cuándo se cargó, para que el dueño sepa si los
+           datos están al día sin abrir el Excel. -->
+      <p class="pres-header__sub" id="moduleSubtitle">Administración de partidas presupuestales y ejecución.</p>
     </div>
   </div>
   <div class="pres-header__right">
@@ -443,17 +446,17 @@ tbody tr:hover { background: #f4f7fd; }
 <div class="table-wrapper">
 <table id="budgetTable">
                 <colgroup>
-                    <col style="width: 50px;">   <!-- ID -->
-                    <col style="width: 250px;"> <!-- Detalle -->
-                    <col style="width: 130px;"> <!-- Asignación -->
-                    <col style="width: 130px;"> <!-- Ejecutado -->
+                    <col style="width: 40px;">   <!-- ID -->
+                    <col style="width: 240px;"> <!-- Detalle -->
+                    <col style="width: 90px;"> <!-- Asignación -->
+                    <col style="width: 90px;"> <!-- Ejecutado -->
                     <col style="width: 70px;">   <!-- % -->
-                    <!-- Meses -->
-                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
-                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
-                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
-                    <col style="width: 100px;"> <col style="width: 100px;"> <col style="width: 100px;">
-                    <col style="width: 100px;">  <!-- Acciones -->
+                    <!-- Meses: 40+240+90+90+70+12×75+80 = 1.510px -->
+                    <col style="width: 75px;"> <col style="width: 75px;"> <col style="width: 75px;">
+                    <col style="width: 75px;"> <col style="width: 75px;"> <col style="width: 75px;">
+                    <col style="width: 75px;"> <col style="width: 75px;"> <col style="width: 75px;">
+                    <col style="width: 75px;"> <col style="width: 75px;"> <col style="width: 75px;">
+                    <col style="width: 80px;">  <!-- Acciones -->
                 </colgroup>
                 <thead>
                     <tr>
@@ -560,20 +563,63 @@ function setupEventListeners() {
   document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
 
+/**
+ * 📦824 — El título SIEMPRE dice sobre qué período se está trabajando.
+ *
+ * BUG ORIGINAL: el año se sacaba con un regex del NOMBRE DEL ARCHIVO. Cuando el
+ * presupuesto venía de la BD, `currentFile.name` es "Presupuesto importado de
+ * PRESUPUESTO (BD)" — sin año — y el regex no encontraba nada, así que salía el
+ * texto "Presupuesto Desconocido". El año nunca estuvo perdido: venía en
+ * `currentFile.anio` y la vista lo estaba ignorando.
+ *
+ * Ahora el orden de preferencia es:
+ *   1. currentFile.anio        (BD — el período real, no un parseo)
+ *   2. regex del nombre        (Excel, por si se abre un archivo suelto)
+ *   3. "sin período"           (último recurso, en vez de "Desconocido")
+ */
 function updateFileInfo() {
   if (!currentFile) return;
-  const year = extractYearFromFileName(currentFile.name);
+  const year = currentFile.anio || extractYearFromFileName(currentFile.name);
+  const fuente = (currentFile.source === 'BD') ? '📦 BD' : '📄 Excel';
   const titleEl = document.getElementById('moduleTitle');
   if (titleEl) {
-    // 📦708 (Fase 3) — Mostrar indicador de fuente (BD vs Excel)
-    const fuente = (currentFile.source === 'BD') ? '📦 BD' : '📄 Excel';
-    titleEl.textContent = `Presupuesto ${year} (${fuente})`;
+    titleEl.textContent = year ? `Presupuesto ${year} (${fuente})` : `Presupuesto sin período (${fuente})`;
+  }
+
+  // 📦824 — Debajo del título, de dónde salió el período. Para el dueño esto es
+  // lo que responde "¿esto está al día?" sin tener que abrir el archivo.
+  const infoEl = document.getElementById('moduleSubtitle');
+  if (infoEl) {
+    const partes = [];
+    if (currentFile.source === 'BD') {
+      if (currentFile.archivoNombre) partes.push('Origen: ' + currentFile.archivoNombre);
+      if (currentFile.importadoEn) partes.push('Cargado: ' + formatearFechaCorta(currentFile.importadoEn));
+    } else {
+      partes.push(currentFile.name || '');
+    }
+    infoEl.textContent = partes.filter(Boolean).join(' · ');
+    infoEl.style.display = partes.length ? '' : 'none';
+  }
+}
+
+/**
+ * 📦824 — "2026-09-29T12:19:00.589Z" → "29 sep 2026, 07:19"
+ */
+function formatearFechaCorta(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) +
+      ', ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '';
   }
 }
 
         function extractYearFromFileName(fileName) {
-            const yearMatch = fileName.match(/(20\d{2})/);
-            return yearMatch ? yearMatch[1] : 'Desconocido';
+            if (!fileName) return null;
+            const yearMatch = String(fileName).match(/(20\d{2})/);
+            return yearMatch ? yearMatch[1] : null;
         }
 
         async function loadData() {

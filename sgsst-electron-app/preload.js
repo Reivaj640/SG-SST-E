@@ -375,6 +375,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   presupuestoDeletePartida: (payload) => ipcRenderer.invoke('presupuesto:delete-partida', payload),
   presupuestoSetMesValues: (payload) => ipcRenderer.invoke('presupuesto:set-mes-values', payload),
   presupuestoUpdateMeta: (payload) => ipcRenderer.invoke('presupuesto:update-meta', payload),
+  // 📦824 — Duplica un período a otro año (partidas sí, ejecución e IPC no).
+  presupuestoDuplicarPeriodo: (payload) => ipcRenderer.invoke('presupuesto:duplicar-periodo', payload),
   presupuestoDiag: (payload) => ipcRenderer.invoke('presupuesto:diag', payload),
 
   // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level) · FASE 0

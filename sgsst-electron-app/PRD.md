@@ -1,7 +1,7 @@
 # PRD — K+AIR (Sistema de Gestión SG-SST)
 
 > **Para:** sesiones de AI que continúen el proyecto + Javier Robles F. (owner) como referencia.
-> **Versión del doc:** 0.1.222 (28 sept 2026) — sincronizada con `package.json` y commit `📦823`.
+> **Versión del doc:** 0.1.223 (29 sept 2026) — sincronizada con `package.json` y commit `📦824`.
 > **Estado:** Producto en desarrollo activo. **NO release oficial** desde v0.1.205 (los siguientes son commits de desarrollo).
 
 ---
@@ -261,6 +261,39 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 - Frecuencia / Severidad / Mortalidad / Prevalencia / Incidencia con tokens scoped (`--freq-*`, `--sev-*`, `--mort-*`, `--prev-*`, `--inc-*`)
 - Patrón "tabla blindada": `min-width:0 !important` + `table-layout:fixed` con anchos que suman 100% — evita scroll horizontal y deformaciones
 - Gráficos con resize handler + cleanup
+
+### 6.8 Presupuesto SG-SST (1.1.3 Asignación de Recursos) — `📦824`
+
+**Modelo de datos invertido (v0.1.223):** SQLite es la **fuente de verdad**; el Excel de Drive es
+**plantilla y punto de entrada**. Antes el Excel era el almacén y la BD un espejo parcial, lo que
+hacía que cualquier guardado destruyera lo que la grilla no viajaba.
+
+**Requisitos del owner (definidos en sesión, 29 sept 2026):**
+
+| # | Requisito | Estado |
+|---|---|---|
+| 1 | La app muestra **siempre** información de la base de datos | ✅ |
+| 2 | El **año/período activo siempre visible** (matar el "Presupuesto Desconocido") | ✅ |
+| 3 | Al seleccionar un año del historial, mostrar lo **ya registrado en la BD** | ✅ |
+| 4 | Cada período **aislado**: editar un año no daña otro | ✅ |
+| 5 | Poder **importar los años que existen** en Drive (2019–2027) | ✅ |
+| 6 | Poder **exportar a Excel** cuando se necesite | ✅ |
+| 7 | No romper la función existente que escribe datos en el Excel | ✅ |
+| 8 | El **IPC** se guarda por período, es editable y **no altera el total** | ✅ |
+| 9 | El **Excel de Drive es la fuente de verdad de los datos** (aunque tenga bugs) | ✅ |
+| 10 | Reponer lo que rompió una migración previa fallida | ✅ |
+
+**Reglas de dominio derivadas del ACT-FO-043** (el formato oficial manda):
+
+- La **columna D** es `ASIGNACION PRESUPUESTO ANUAL`: un solo número por partida. Es la verdad y
+  **se preserva**; nunca se deriva sumando los meses.
+- Las **columnas G–R** son `EJECUCION PRESUPUESTAL` ENERO…DICIEMBRE: el gasto real de cada mes.
+  Suman la columna E (`EJECUTADO ACUMULADO`).
+- El formato **no trae presupuesto mensual**. Cualquier "asignado por mes" es un dato derivado,
+  existe solo para la curva *programada* del dashboard y **no se muestra en la grilla**.
+- La fila `TOTAL AÑO` de los archivos de Tempoactiva trae la fórmula **duplicada** (declara el
+  doble del asignado y ×1,71 del ejecutado). Se usa la **suma real** de las partidas y los
+  declarados se guardan aparte como **avisos** de importación, para que el owner vea qué encontró.
 
 ---
 

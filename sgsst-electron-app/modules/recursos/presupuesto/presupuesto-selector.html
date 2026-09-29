@@ -262,6 +262,53 @@ HEADER ACTION BUTTONS
         .year-icon { color: var(--kair-blue, #2057b8); opacity: 1; }
         .year-number { font-family: var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; }
 
+        /* 📦824 — Cards de período (BD) vs. de archivo (Drive, sin importar).
+           Mismo componente, distinto acento: la de BD lleva cifras y acciones,
+           la de Drive es solo una invitación a importar. */
+
+        .selector-section-title {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--kair-muted, #64748b);
+            margin: 10px 0 2px;
+        }
+
+        .year-card--bd { border-left: 3px solid var(--kair-blue, #2057b8); }
+        .year-card--pendiente { border-left: 3px solid var(--kair-line, #e8ebee); background: var(--kair-soft, #f8fafc); }
+        .year-card--pendiente .year-icon { color: var(--kair-muted, #94a3b8); }
+
+        .year-meta--cargado {
+            display: inline-block; margin-top: 4px; padding: 2px 9px;
+            background: #e8f0fc; color: var(--kair-blue, #2057b8);
+            border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .year-meta--small { font-size: 0.72rem; margin-top: 4px; opacity: 0.85; }
+        .year-meta--warn { color: var(--kair-warning, #b45309); font-size: 0.72rem; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+        .year-stats {
+            display: flex; flex-direction: column; gap: 3px;
+            margin-top: 10px; padding-top: 9px;
+            border-top: 1px dashed var(--kair-line, #e8ebee);
+            font-size: 0.78rem;
+        }
+        .year-stats > div { display: flex; justify-content: space-between; gap: 10px; }
+        .year-stats span { color: var(--kair-muted, #64748b); }
+        .year-stats b { font-variant-numeric: tabular-nums; color: var(--kair-ink, #1e293b); }
+
+        .year-actions { display: flex; gap: 7px; margin-top: 12px; }
+        .year-btn {
+            flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 10px; border-radius: 10px; cursor: pointer;
+            border: 1px solid var(--kair-line, #e8ebee);
+            background: #fff; color: #536177; font-weight: 600; font-size: 0.8rem;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .year-btn:hover { background: var(--kair-soft, #f3f6f6); }
+        .year-btn:active { transform: scale(0.98); }
+        .year-btn--primary { background: var(--kair-blue, #2057b8); border-color: var(--kair-blue, #2057b8); color: #fff; }
+        .year-btn--primary:hover { background: #17408a; }
+
         /* Panel de archivo — premium */
         .file-context-panel {
             border: 1px solid var(--kair-line, #e8ebee); border-left: 4px solid var(--kair-blue, #2057b8);
@@ -339,9 +386,49 @@ HEADER ACTION BUTTONS
     </div>
 
     <script>
+        // 📦824 — Caché de los .xlsx de Drive. La necesita `buscarArchivoDelAnio()`
+        // para poder reimportar un período que ya está en la BD.
+        let _driveFilesCache = [];
+
         // 📦708 (Fase 3.5) — Helper para acceder a KairConfirm del parent (modernos)
         function _confirmDialog() {
             return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
+        }
+
+        /**
+         * 📦824 — Respuesta del import. Muestra lo que pasó y, si terminó bien,
+         * abre el período para que el usuario vea el resultado de una vez.
+         */
+        function handleImportResponse(res) {
+            hideLoading();
+            if (!res.success) {
+                showNotification('No se pudo importar: ' + ((res.error && res.error.message) || 'error desconocido'), 'error');
+                window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
+                return;
+            }
+            const d = res.data || {};
+            const partes = [`${d.inserted || 0} partidas cargadas`, `asignado $${_fmt(d.totalAsignado)}`];
+            if (d.totalDeclarado && Math.abs(d.totalDeclarado - d.totalAsignado) > 1) {
+                partes.push(`el Excel declara $${_fmt(d.totalDeclarado)}`);
+            }
+            showNotification('Período ' + (d.anio || '') + ' importado: ' + partes.join(' · '), 'success');
+
+            // ⚠️ Avisos del Excel: se muestran, no se esconden. El caso típico es
+            // que la fila TOTAL AÑO del archivo no cuadre con la suma de las
+            // partidas; la app usa la suma real, pero hay que decirlo.
+            if (Array.isArray(d.avisos) && d.avisos.length) {
+                showNotification('Aviso del Excel: ' + d.avisos[0], 'warning', 9000);
+            }
+
+            if (d.presupuestoId) {
+                window.parent.postMessage({
+                    action: 'open-budget-from-db',
+                    presupuestoId: d.presupuestoId,
+                    anio: d.anio
+                }, '*');
+            } else {
+                window.parent.postMessage({ action: 'requestBudgetFiles' }, '*');
+            }
         }
 
         // Lógica de Renderizado y Eventos (Conecta con tu JS existente)
@@ -357,10 +444,17 @@ HEADER ACTION BUTTONS
       if (el) el.textContent = event.data.company;
     }
 
-    if (event.data.files) {
-                    renderYearCards(event.data.files);
+    // 📦824 — Llega un objeto con las DOS fuentes: `periodos` (BD, la fuente de
+    // verdad) y `files` (Drive, para los años que faltan). Antes solo venía
+    // `files`, y por eso el "historial" era un listado de archivos.
+    if (event.data.files || event.data.periodos) {
+                    _driveFilesCache = event.data.files || [];
+                    renderYearCards(event.data);
                 } else if (event.data.action === 'duplicateBudgetFile') {
                     handleDuplicateResponse(event.data);
+                } else if (event.data.type === 'bd-import-result') {
+                    // 📦824 — Volvió un import (nuevo período o reimportación).
+                    handleImportResponse(event.data);
                 } else if (event.data.error) {
                     showNotification(event.data.error, 'error');
                     hideLoading();
@@ -412,40 +506,208 @@ HEADER ACTION BUTTONS
             showLoading();
         });
 
-        function renderYearCards(files) {
+        /**
+         * 📦824 — El historial es de la BD, no de los archivos.
+         *
+         * Antes agrupaba los .xlsx de Drive por año y decía "N versión(es)", que
+         * respondía "¿hay un archivo?" y no "¿tengo el presupuesto de ese año?".
+         * Ahora la lista principal son los PERÍODOS CARGADOS en la BD, con su
+         * total y su % de ejecución, y los años que solo existen en Drive
+         * aparecen aparte, marcados como importables.
+         *
+         * Al hacer clic en un período de BD se abre DIRECTO (sin pasar por el
+         * Excel). Al hacer clic en uno de Drive se ofrece importarlo.
+         */
+        function renderYearCards(data) {
             hideLoading();
             const container = document.getElementById('yearOptions');
             container.innerHTML = '';
-            
-            if (!files || files.length === 0) {
+
+            const periodos = (data && data.periodos) || [];
+            const files = (data && data.files) || [];
+            const errorArchivos = data && data.errorArchivos;
+
+            if (!periodos.length && !files.length) {
                 container.innerHTML = `
                     <div class="empty-state" style="grid-column: 1/-1;">
                         <i class="fas fa-folder-open"></i>
-                        <p>No se encontraron archivos de presupuesto en el directorio.</p>
+                        <p>No hay presupuestos cargados ni archivos en Drive.</p>
+                        <p style="font-size: 0.85em; opacity: 0.75;">Verifica que Google Drive esté montado (G:) y que la carpeta 1.1.3 Asignación de Recursos tenga el archivo del año.</p>
                     </div>
                 `;
                 return;
             }
 
-            const filesByYear = {};
-            files.forEach(file => {
-                const yearMatch = file.name.match(/(20\d{2})/);
-                const year = yearMatch ? yearMatch[1] : 'General';
-                if (!filesByYear[year]) filesByYear[year] = [];
-                filesByYear[year].push(file);
+            // ── Años que YA están en la BD ──────────────────────────────
+            if (periodos.length) {
+                const titulo = document.createElement('div');
+                titulo.className = 'selector-section-title';
+                titulo.style.gridColumn = '1/-1';
+                titulo.innerHTML = '<i class="fas fa-database"></i> Períodos en la base de datos';
+                container.appendChild(titulo);
+
+                periodos.sort((a, b) => b.anio - a.anio).forEach(p => {
+                    container.appendChild(buildPeriodoCard(p));
+                });
+            }
+
+            // ── Años que solo existen en Drive (aún no importados) ──────
+            const aniosBd = new Set(periodos.map(p => Number(p.anio)));
+            const porAnio = {};
+            files.forEach(f => {
+                const m = String(f.name || '').match(/(20\d{2})/);
+                const y = m ? m[1] : 'General';
+                (porAnio[y] = porAnio[y] || []).push(f);
             });
 
-            Object.keys(filesByYear).sort((a, b) => b.localeCompare(a)).forEach(year => {
-                const card = document.createElement('div');
-                card.className = 'year-card';
-                card.innerHTML = `
-                    <i class="fas fa-calendar-alt year-icon"></i>
-                    <div class="year-number">${year}</div>
-                    <div class="year-meta">${filesByYear[year].length} Versión(es)</div>
-                `;
-                card.onclick = () => selectYear(year, filesByYear[year]);
-                container.appendChild(card);
-            });
+            const aniosPendientes = Object.keys(porAnio)
+                .filter(y => y !== 'General' && !aniosBd.has(Number(y)))
+                .sort((a, b) => b.localeCompare(a));
+
+            if (aniosPendientes.length) {
+                const titulo2 = document.createElement('div');
+                titulo2.className = 'selector-section-title';
+                titulo2.style.gridColumn = '1/-1';
+                titulo2.innerHTML = '<i class="fas fa-file-excel"></i> En Drive, sin importar todavía';
+                container.appendChild(titulo2);
+
+                aniosPendientes.forEach(year => {
+                    container.appendChild(buildPendienteCard(year, porAnio[year]));
+                });
+            }
+
+            if (errorArchivos) {
+                const aviso = document.createElement('div');
+                aviso.className = 'selector-section-title';
+                aviso.style.gridColumn = '1/-1';
+                aviso.style.color = 'var(--ks-warning, #b45309)';
+                aviso.innerHTML = '<i class="fas fa-triangle-exclamation"></i> No se pudieron leer los archivos de Drive: ' + _esc(errorArchivos);
+                container.appendChild(aviso);
+            }
+        }
+
+        function _esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function _fmt(n) {
+            const v = Number(n) || 0;
+            return v.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+        }
+
+        /** Card de un período YA cargado en BD: abrir = directo, sin Excel. */
+        function buildPeriodoCard(p) {
+            const card = document.createElement('div');
+            card.className = 'year-card year-card--bd';
+            const pct = Number(p.porcentaje) || 0;
+            const tono = pct > 100 ? 'var(--ks-danger, #b91c1c)' : pct > 90 ? 'var(--ks-warning, #b45309)' : 'var(--ks-success, #15803d)';
+            const avisos = Array.isArray(p.avisos) ? p.avisos.length : 0;
+
+            card.innerHTML = `
+                <i class="fas fa-calendar-alt year-icon"></i>
+                <div class="year-number">${p.anio}</div>
+                <div class="year-meta year-meta--cargado">Cargado en BD</div>
+                <div class="year-stats">
+                    <div><span>Asignado</span><b>$${_fmt(p.totalAsignado)}</b></div>
+                    <div><span>Ejecutado</span><b>$${_fmt(p.totalEjecutado)}</b></div>
+                    <div><span>Ejecución</span><b style="color:${tono}">${pct.toFixed(0)}%</b></div>
+                </div>
+                ${p.ipc ? `<div class="year-meta year-meta--small">IPC: ${(p.ipc * 100).toFixed(1).replace('.', ',')}%</div>` : ''}
+                ${avisos ? `<div class="year-meta year-meta--warn"><i class="fas fa-triangle-exclamation"></i> ${avisos} aviso(s) al importar</div>` : ''}
+                <div class="year-actions">
+                    <button class="year-btn year-btn--primary" data-accion="abrir">
+                        <i class="fas fa-table"></i> Abrir
+                    </button>
+                    <button class="year-btn" data-accion="actualizar" title="Reimportar el Excel de este año (reemplaza los datos)">
+                        <i class="fas fa-rotate"></i> Actualizar
+                    </button>
+                </div>
+            `;
+
+            card.querySelector('[data-accion="abrir"]').onclick = () => {
+                window.parent.postMessage({
+                    action: 'open-budget-from-db',
+                    presupuestoId: p.id,
+                    anio: p.anio
+                }, '*');
+            };
+
+            card.querySelector('[data-accion="actualizar"]').onclick = async () => {
+                const archivo = buscarArchivoDelAnio(p.anio);
+                if (!archivo) {
+                    await _confirmDialog().confirm({
+                        title: 'No se encontró el archivo',
+                        message: 'No hay un .xlsx de ' + p.anio + ' en la carpeta de Drive.',
+                        details: 'El presupuesto actual se conserva. Si quieres reemplazarlo, primero deja el archivo en Drive.',
+                        confirmText: 'Entendido',
+                        type: 'warning'
+                    });
+                    return;
+                }
+                const ok = await _confirmDialog().confirm({
+                    title: '¿Reimportar ' + p.anio + '?',
+                    message: 'Se reemplaza el presupuesto de ' + p.anio + ' con el contenido del Excel.',
+                    details: 'Esto NO toca los demás años. Lo que se cambie en la app para ' + p.anio + ' se pierde.',
+                    confirmText: 'Sí, reimportar',
+                    cancelText: 'Cancelar',
+                    type: 'warning'
+                });
+                if (!ok) return;
+                showLoading();
+                window.parent.postMessage({
+                    action: 'import-budget-to-db',
+                    file: archivo,
+                    anio: p.anio,
+                    overwrite: true
+                }, '*');
+            };
+
+            return card;
+        }
+
+        /** Card de un año que está en Drive pero NO en la BD. */
+        function buildPendienteCard(year, files) {
+            const card = document.createElement('div');
+            card.className = 'year-card year-card--pendiente';
+            const f = files[0];
+            card.innerHTML = `
+                <i class="fas fa-file-excel year-icon"></i>
+                <div class="year-number">${year}</div>
+                <div class="year-meta">En Drive, sin importar</div>
+                <div class="year-meta year-meta--small">${_esc(f.name || '')}</div>
+                <div class="year-actions">
+                    <button class="year-btn year-btn--primary" data-accion="importar">
+                        <i class="fas fa-download"></i> Importar
+                    </button>
+                </div>
+            `;
+            card.querySelector('[data-accion="importar"]').onclick = async () => {
+                const ok = await _confirmDialog().confirm({
+                    title: '¿Importar ' + year + ' a la base de datos?',
+                    message: 'Se crea el período ' + year + ' con los datos del Excel.',
+                    details: 'No se toca ningún otro año. Si el Excel tiene descuadres, la app te los avisa.',
+                    confirmText: 'Sí, importar',
+                    cancelText: 'Cancelar',
+                    type: 'info'
+                });
+                if (!ok) return;
+                showLoading();
+                window.parent.postMessage({
+                    action: 'import-budget-to-db',
+                    file: f,
+                    anio: Number(year),
+                    overwrite: false
+                }, '*');
+            };
+            return card;
+        }
+
+        /** Busca el .xlsx de un año en la lista de Drive. */
+        function buscarArchivoDelAnio(anio) {
+            if (typeof _driveFilesCache === 'undefined') return null;
+            const anioStr = String(anio);
+            return _driveFilesCache.find(f => String(f.name || '').match(/(20\d{2})/) &&
+                String(f.name).match(/(20\d{2})/)[1] === anioStr) || null;
         }
 
         function selectYear(year, files) {

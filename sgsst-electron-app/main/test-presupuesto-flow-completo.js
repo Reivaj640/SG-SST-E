@@ -180,10 +180,15 @@ async function run() {
   console.log('═══ FLUJO B: Editar en BD (Fase 3) ═══');
   console.log('');
 
-  // 3. Simular edición del usuario: cambiar el valor de enero de la partida 1
+  // 3. Simular edición del usuario.
+  //
+  // 📦824 — Lo que el usuario puede editar en la grilla son la columna D
+  // (asignación ANUAL) y las columnas G-R (ejecución mensual). NO puede editar
+  // un "asignado por mes": ese dato no existe en el ACT-FO-043, es un reparto
+  // que hace el handler. Por eso la edición de prueba es sobre el anual.
+  var NUEVO_ANUAL = 10000000;
   var partidasEditadas = JSON.parse(JSON.stringify(readResult.data.partidas));
-  partidasEditadas[0].valores[0].asignado = 1000000; // cambiar a 1.000.000
-  // Convertir al shape de Excel que espera bulk-save
+  partidasEditadas[0].asignado = NUEVO_ANUAL;   // columna D
   var COLUMN_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   var dataToSave = partidasEditadas.map(function (p) {
     var row = {
@@ -193,7 +198,10 @@ async function run() {
       ejecutado_acumulado: p.ejecutado
     };
     p.valores.forEach(function (v, idx) {
-      row[COLUMN_MESES[idx]] = v.asignado;
+      // 📦824 — Las columnas de mes del payload son la EJECUCIÓN mensual
+      // (columnas G-R del ACT-FO-043, "EJECUCION PRESUPUESTAL"). El asignado
+      // mensual es un reparto del anual que hace el handler, no viene de la UI.
+      row[COLUMN_MESES[idx]] = v.ejecutado;
     });
     return row;
   });
@@ -213,7 +221,14 @@ async function run() {
     anio: 2026
   });
   _assert(reRead.success === true, 're-read OK');
-  _assertEq(reRead.data.partidas[0].valores[0].asignado, 1000000, 'edición persistida: partida 1 mes 1 = 1.000.000');
+  // El ANUAL (columna D) es la verdad del documento: se conserva tal cual y
+  // NO se deriva sumando los 12 meses (que son un reparto inventado).
+  _assertEq(reRead.data.partidas[0].asignado, NUEVO_ANUAL, 'edición persistida: partida 1 anual = 10.000.000');
+  // Y los 12 meses repartidos dan exactamente ese anual (sin centavos sueltos).
+  var sumaMesesP1 = reRead.data.partidas[0].valores.reduce(function (s, v) { return s + v.asignado; }, 0);
+  _assert(Math.abs(sumaMesesP1 - NUEVO_ANUAL) < 0.01, 'los 12 meses repartidos suman el anual (' + Math.round(sumaMesesP1) + ')');
+  // La EJECUCIÓN no se toca al editar el presupuesto.
+  _assertEq(reRead.data.partidas[0].ejecutado, 6209816, 'la ejecución de la partida 1 no cambió (6.209.816)');
   _ok('FLUJO B COMPLETO: Edición en BD → Persistencia verificada');
 
   // ============================================================
@@ -228,11 +243,14 @@ async function run() {
     presupuestoId: presupuestoId
   });
   _assert(resumen.success === true, 'calcular-resumen OK');
-  // 1.000.000 + 776.227 × 11 (meses 2-12) = 1.000.000 + 8.538.497 = 9.538.497
-  // 0 + 0 = 0
-  // 240.000 / 12 × 12 = 240.000
-  // Total asignado: 9.538.497 + 0 + 240.000 = 9.778.497
-  _assertEq(resumen.data.resumen.totalAsignado, 9778497, 'resumen refleja la edición');
+  // 📦824 — El resumen suma los 12 meses ASIGNADOS, que son el reparto del
+  // anual, y por eso da exactamente lo mismo que la suma de las columnas D:
+  //   partida 1: 10.000.000
+  //   partida 2: 0
+  //   partida 3: 240.000
+  //   total: 10.240.000
+  _assertEq(resumen.data.resumen.totalAsignado, 10240000, 'resumen refleja la edición del anual');
+  _assertEq(resumen.data.resumen.totalEjecutado, 6449816, 'el resumen de ejecución no cambió');
 
   // 7. List-by-empresa
   var lista = _mockIpcHandlers['presupuesto:list-by-empresa']({}, {

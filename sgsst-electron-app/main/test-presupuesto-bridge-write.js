@@ -206,7 +206,11 @@ async function run() {
   _assertEq(valoresP1.length, 12, 'partida 1 tiene 12 valores');
   _assertEq(valoresP1[0].mes, 1, 'mes 1');
   _assertEq(valoresP1[0].asignado, 776227, 'mes 1 asignado = 776.227');
-  _assertEq(valoresP1[0].ejecutado, 0, 'mes 1 ejecutado = 0 (bulk-save no edita ejecutado)');
+  // 📦824 — Las columnas `enero..diciembre` del payload son la EJECUCIÓN
+  // mensual: es lo que el ACT-FO-043 titula "EJECUCION PRESUPUESTAL" en las
+  // columnas G-R. El asignado mensual no viene de la grilla: es el anual
+  // repartido entre 12, porque el formato no trae presupuesto por mes.
+  _assertEq(valoresP1[0].ejecutado, 776227, 'mes 1 ejecutado = 776.227 (lo que llegó en la columna del mes)');
   _assertEq(valoresP1[7].asignado, 776227, 'mes 8 asignado = 776.227');
   _assertEq(valoresP1[11].asignado, 776227, 'mes 12 asignado = 776.227');
 

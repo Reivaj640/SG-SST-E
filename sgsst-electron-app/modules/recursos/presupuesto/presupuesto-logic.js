@@ -133,6 +133,34 @@ class PresupuestoGestionComponent {
                 await this._handleImportBudgetToBD(event);
                 break;
 
+            // 📦824 — Alias en kebab-case que usa el selector nuevo. El selector
+            // histórico usaba camelCase ('importBudgetToBD'); los dos nombres
+            // conviven para no romper el flujo viejo.
+            case 'import-budget-to-db':
+                await this._handleImportBudgetToBD(event);
+                break;
+
+            // 📦824 — Abrir un PERÍODO que ya está en la BD, directo. Antes el
+            // selector solo sabía abrir ARCHIVOS de Drive; ahora al hacer clic en
+            // un año cargado se va a los datos, sin pasar por el Excel.
+            case 'open-budget-from-db':
+                await this._handleOpenBudgetFromBD({
+                    data: { presupuestoId: event.data.presupuestoId, anio: event.data.anio }
+                });
+                break;
+
+            // 📦824 — Duplicar un período (crear el año siguiente partiendo del
+            // actual). El Excel es la plantilla: se clonan las partidas con su
+            // ejecución en cero.
+            case 'duplicate-periodo':
+                await this._handleDuplicatePeriodo(event);
+                break;
+
+            // 📦824 — Editar el IPC del período actual (cambia cada año).
+            case 'set-ipc':
+                await this._handleSetIPC(event);
+                break;
+
             case 'viewBDResumen':
                 await this._handleViewBDResumen(event);
                 break;
@@ -317,7 +345,11 @@ createLoadingElement(message) {
             targetIframe.contentWindow.postMessage({
                 type: 'bd-import-result',
                 success: result.success,
-                data: result.data,
+                // 📦824 — `anio` y `presupuestoId` van en la respuesta para que el
+                // selector pueda abrir el período recién cargado sin tener que
+                // recargar la lista. Antes el selector se quedaba en un
+                // "importado" sin fuente de dónde sacar el id.
+                data: result.success ? Object.assign({ anio: anio }, result.data) : null,
                 error: result.error
             }, '*');
 
@@ -331,6 +363,89 @@ createLoadingElement(message) {
             targetIframe.contentWindow.postMessage({
                 type: 'bd-import-result',
                 success: false,
+                error: { code: 'INTERNAL', message: error.message }
+            }, '*');
+        }
+    }
+
+    /**
+     * 📦824 — Crea el período siguiente duplicando el actual.
+     *
+     * Lo decide el OWNER desde la app: "Empecemos el 2027 a partir del 2026".
+     * El bridge pone la ejecución en cero y deja el IPC vacío a propósito
+     * (cambia cada año y no debe heredarse por descuido).
+     */
+    async _handleDuplicatePeriodo(event) {
+        const origenId = event.data.presupuestoId || (this.currentFile && this.currentFile.presupuestoId);
+        const anioOrigen = Number(event.data.anio || (this.currentFile && this.currentFile.anio));
+        const anioDestino = event.data.anioDestino || (anioOrigen ? anioOrigen + 1 : null);
+        const targetIframe = this.container.querySelector('iframe');
+        if (!targetIframe) return;
+
+        if (!origenId || !anioDestino) {
+            targetIframe.contentWindow.postMessage({
+                type: 'bd-duplicate-result', success: false,
+                error: { code: 'INVALID_INPUT', message: 'Falta el presupuesto de origen o el año destino' }
+            }, '*');
+            return;
+        }
+
+        try {
+            if (!window.electronAPI || !window.electronAPI.presupuestoDuplicarPeriodo) {
+                throw new Error('API presupuestoDuplicarPeriodo no disponible');
+            }
+            this.log('INFO', `[FUENTE=BD] Duplicando ${origenId} → ${anioDestino}`);
+            const result = await window.electronAPI.presupuestoDuplicarPeriodo({
+                presupuestoIdOrigen: origenId,
+                anioDestino: anioDestino
+            });
+            targetIframe.contentWindow.postMessage({
+                type: 'bd-duplicate-result',
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+            if (result.success) {
+                this.log('INFO', `[FUENTE=BD] Período ${result.data.anio} creado con ${result.data.partidas} partidas`);
+            }
+        } catch (error) {
+            this.log('CRITICAL', `Error en duplicatePeriodo: ${error.message}`, error.stack);
+            targetIframe.contentWindow.postMessage({
+                type: 'bd-duplicate-result', success: false,
+                error: { code: 'INTERNAL', message: error.message }
+            }, '*');
+        }
+    }
+
+    /**
+     * 📦824 — Edita el IPC del período abierto.
+     * El IPC cambia cada año y lo digita el owner; por eso es editable y no se
+     * hereda al duplicar. NO altera el total: es un dato, no un multiplicador.
+     */
+    async _handleSetIPC(event) {
+        const presupuestoId = event.data.presupuestoId || (this.currentFile && this.currentFile.presupuestoId);
+        const targetIframe = this.container.querySelector('iframe');
+        if (!targetIframe) return;
+        if (!presupuestoId) return;
+
+        try {
+            if (!window.electronAPI || !window.electronAPI.presupuestoUpdateMeta) {
+                throw new Error('API presupuestoUpdateMeta no disponible');
+            }
+            const result = await window.electronAPI.presupuestoUpdateMeta({
+                presupuestoId: presupuestoId,
+                ipc: event.data.ipc
+            });
+            targetIframe.contentWindow.postMessage({
+                type: 'bd-ipc-updated',
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            this.log('CRITICAL', `Error en setIPC: ${error.message}`);
+            targetIframe.contentWindow.postMessage({
+                type: 'bd-ipc-updated', success: false,
                 error: { code: 'INTERNAL', message: error.message }
             }, '*');
         }
@@ -403,11 +518,22 @@ createLoadingElement(message) {
             }
             // Sintetizar un currentFile para que la gestion view funcione
             this.currentFile = {
-                name: result.data.presupuesto.nombre + ' (BD)',
-                path: '__BD__',  // sentinel — la gestion view no debería leerlo
-                source: 'BD',
                 presupuestoId: presupuestoId,
-                anio: result.data.presupuesto.anio
+                anio: result.data.presupuesto.anio,
+                // 📦824 — La vista de gestión los usa para el subtítulo
+                // ("de qué archivo vino, cuándo se cargó"). Antes no llegaban
+                // y el título quedaba en "Presupuesto Desconocido" porque solo
+                // miraba el nombre del archivo.
+                source: 'BD',
+                archivoNombre: result.data.presupuesto.archivoNombre || null,
+                importadoEn: result.data.presupuesto.archivoImportadoEn || null,
+                ipc: result.data.presupuesto.ipc,
+                avisos: result.data.presupuesto.avisos || [],
+                nombre: result.data.presupuesto.nombre,
+                // `name` se conserva por compatibilidad con la vista (columnas,
+                // mensajes), ya no es la fuente del año.
+                name: result.data.presupuesto.nombre + ' (BD)',
+                path: '__BD__'  // sentinel — la gestion view no debería leerlo
             };
             this.currentView = 'gestion';
             this.render();
@@ -428,11 +554,16 @@ createLoadingElement(message) {
         const presupuestoId = event.data.presupuestoId;
         const targetIframe = this.container.querySelector('iframe');
         if (!targetIframe) return;
+        // 📦824 FIX — `contentWindow` puede ser null aunque el iframe exista
+        // (todavía no carga, o se está reemplazando al cambiar de período). El
+        // `catch` de abajo lo tocaba otra vez y el TypeError del catch tapaba el
+        // error real, dejando al usuario sin saber qué pasó.
+        const enviar = (payload) => {
+            if (!targetIframe || !targetIframe.contentWindow) return;
+            targetIframe.contentWindow.postMessage(payload, '*');
+        };
         if (!presupuestoId) {
-            targetIframe.contentWindow.postMessage({
-                source: 'BD',
-                error: 'presupuestoId requerido'
-            }, '*');
+            enviar({ source: 'BD', error: 'presupuestoId requerido' });
             return;
         }
 
@@ -449,20 +580,17 @@ createLoadingElement(message) {
             // Convertir el shape de BD al shape de Excel
             const excelData = this._bdPartidasToExcelShape(result.data.partidas);
 
-            targetIframe.contentWindow.postMessage({
+            enviar({
                 source: 'BD',
                 presupuestoId: presupuestoId,
                 budgetData: excelData.processedData,
                 calculationData: excelData.filteredData,
                 formulaCells: excelData.formulaCells,
                 headers: excelData.headers
-            }, '*');
+            });
         } catch (error) {
             this.log('CRITICAL', `Error en requestBudgetFromDB: ${error.message}`, error.stack);
-            targetIframe.contentWindow.postMessage({
-                source: 'BD',
-                error: error.message
-            }, '*');
+            enviar({ source: 'BD', error: error.message });
         }
     }
 
@@ -488,10 +616,19 @@ createLoadingElement(message) {
                 ejecutado_acumulado: p.ejecutado,
                 porcentaje_ejecutado: (p.porcentaje || 0).toFixed(2) + '%'
             };
-            // Valores mensuales
+            // 📦824 FIX — Las columnas ENE..DIC muestran la EJECUCIÓN MENSUAL.
+            //
+            // El ACT-FO-043 las titula "EJECUCION PRESUPUESTAL" (fila 8) con el
+            // nombre del mes abajo (fila 9), y ahí viene el dinero realmente
+            // gastado mes a mes. Antes se ponía `val.asignado`, que es un
+            // reparto INVENTADO del anual entre 12 que hace el import porque el
+            // documento NO trae un presupuesto por mes. Se veía en pantalla
+            // 20.000 / 208.333,33 / 166.666,67 en cada mes de partidas que en el
+            // Excel tienen el mes en cero, y además se escondía la ejecución
+            // real (p. ej. los $2.000.000 de abril).
             for (var m = 0; m < 12; m++) {
                 var val = p.valores && p.valores[m] ? p.valores[m] : { mes: m + 1, asignado: 0, ejecutado: 0 };
-                row[COLUMN_MESES[m]] = val.asignado || 0;
+                row[COLUMN_MESES[m]] = val.ejecutado || 0;
             }
             processedData.push(row);
 
@@ -513,7 +650,9 @@ createLoadingElement(message) {
             porcentaje_ejecutado: totalAsignado > 0 ? ((totalEjecutado / totalAsignado) * 100).toFixed(2) + '%' : '0,00%'
         };
         for (var m3 = 0; m3 < 12; m3++) {
-            totalRow[COLUMN_MESES[m3]] = mensualesAsignado[m3];
+            // 📦824 — La fila TOTAL lleva EJECUCIÓN por mes, igual que las
+            // filas de detalle y que las columnas G-R del ACT-FO-043.
+            totalRow[COLUMN_MESES[m3]] = mensualesEjecutado[m3];
         }
         processedData.push(totalRow);
 
@@ -742,24 +881,66 @@ createLoadingElement(message) {
         this.messageHandlers.set(key, handler);
     }
 
+    /**
+     * 📦824 — El selector recibe DOS fuentes, no una.
+     *
+     * Antes solo mandaba `files` (los .xlsx de Drive), así que el "historial"
+     * era en realidad un listado de archivos. Eso obligaba a abrir el archivo
+     * para ver si había presupuesto de ese año, y no distinguía entre "hay un
+     * Excel de 2025" y "2025 está cargado en la BD".
+     *
+     * Ahora manda las dos cosas:
+     *   - periodos: los años que están EN LA BD, con su total y su % ejecución
+     *     (abrir uno de estos va directo a los datos, sin tocar el Excel)
+     *   - files: los .xlsx de Drive, para los años que aún no se han importado
+     *
+     * La BD es la fuente; el Excel es el punto de entrada para períodos nuevos.
+     */
     async sendFilesToSelectorIframe(iframe) {
+        // 1) Períodos ya cargados en BD (la fuente de verdad)
+        let periodos = [];
+        try {
+            if (window.electronAPI && window.electronAPI.presupuestoListByEmpresa) {
+                const resBd = await window.electronAPI.presupuestoListByEmpresa({
+                    companyName: this.currentCompany
+                });
+                if (resBd && resBd.success && resBd.data && resBd.data.presupuestos) {
+                    periodos = resBd.data.presupuestos;
+                    this.log('INFO', `📦 BD: ${periodos.length} período(s) cargado(s) para ${this.currentCompany}`);
+                }
+            }
+        } catch (e) {
+            // Un fallo acá NO debe tumbar el selector: sigue sirviendo para
+            // importar desde Drive, que es el caso nuevo.
+            this.log('WARN', `No se pudieron leer los períodos de BD: ${e.message}`);
+        }
+
+        // 2) Archivos de Drive (para los años que faltan por importar)
+        let files = [];
+        let errorArchivos = null;
         try {
             if (!window.electronAPI || !window.electronAPI.getPresupuestoFiles) {
                 throw new Error('API getPresupuestoFiles no disponible');
             }
             this.log('DEBUG', `Llamando a getPresupuestoFiles para la empresa: ${this.currentCompany}`);
             const result = await window.electronAPI.getPresupuestoFiles(this.currentCompany);
-
             if (result.success) {
-                this.log('DEBUG', `Archivos de presupuesto recibidos: ${result.files.length}`, result.files);
-                iframe.contentWindow.postMessage({ files: result.files }, '*');
+                files = result.files || [];
+                this.log('DEBUG', `Archivos de presupuesto recibidos: ${files.length}`);
             } else {
-                throw new Error(result.error);
+                errorArchivos = (result.error && result.error.message) || 'No se pudieron leer los archivos';
             }
         } catch (error) {
-            this.log('CRITICAL', 'Error crítico al cargar archivos de presupuesto:', error.message, error.stack);
-            iframe.contentWindow.postMessage({ error: error.message }, '*');
+            errorArchivos = error.message;
+            this.log('CRITICAL', 'Error al leer archivos de presupuesto:', error.message);
         }
+
+        iframe.contentWindow.postMessage({
+            files: files,
+            periodos: periodos,
+            errorArchivos: errorArchivos,
+            company: this.currentCompany
+        }, '*');
     }
 }
 

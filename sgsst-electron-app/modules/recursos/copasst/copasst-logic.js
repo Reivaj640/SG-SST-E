@@ -328,7 +328,12 @@ return div;
       const result = await window.electronAPI.getCopasstAutoFillData(this.currentCompany);
 
       if (!result || !result.success || !result.data) {
-        this._showAutoFillToast('Error al obtener datos para autollenado', 'error');
+        // 📦824 FIX — Este helper NUNCA fue definido: la llamada reventaba con
+        // "this._showAutoFillToast is not a function". El `finally` de abajo sí
+        // liberaba el botón, pero el usuario se quedaba sin saber qué pasó.
+        // Se usa el mismo toast que el resto del archivo (ver
+        // generateCopasstActa más abajo).
+        window.KAIRToast && window.KAIRToast.show('Error al obtener datos para autollenado', 'error');
         return;
       }
 

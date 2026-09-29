@@ -112,20 +112,26 @@ async function run() {
   var presupuestoId = createRes.data.presupuestoId;
 
   // bulk-save con 3 partidas
+  //
+  // 📦824 — `asignacion` es la columna D del ACT-FO-043 (anual) y
+  // `enero..diciembre` son las columnas G-R, que el formato titula "EJECUCION
+  // PRESUPUESTAL": el gasto de cada mes. Se mandan valores DISTINTOS a propósito
+  // para que el test detecte si se vuelven a confundir.
+  //
+  // Ojo: si se manda un `ejecutado_<mes>` explícito, ese manda; si viene en 0,
+  // se usa la columna del mes y, si tampoco hay, se restaura el de la BD.
   var saveRes = _mockIpcHandlers['presupuesto:bulk-save']({}, {
     presupuestoId: presupuestoId,
     data: [
       { id: 1, detalle: 'Honorarios profesionales SST', asignacion: 9314724,
-        enero: 776227, febrero: 776227, marzo: 776227, abril: 776227,
-        mayo: 776227, junio: 776227, julio: 776227, agosto: 776227,
-        septiembre: 776227, octubre: 776227, noviembre: 776227, diciembre: 776227 },
+        enero: 620000, febrero: 640000, marzo: 610000, abril: 0, mayo: 0, junio: 0,
+        julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0 },
       { id: 2, detalle: 'Compra de EPPs', asignacion: 0,
         enero: 0, febrero: 0, marzo: 0, abril: 0, mayo: 0, junio: 0,
         julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0 },
       { id: 3, detalle: 'Capacitaciones', asignacion: 240000,
-        enero: 20000, febrero: 20000, marzo: 20000, abril: 20000,
-        mayo: 20000, junio: 20000, julio: 20000, agosto: 20000,
-        septiembre: 20000, octubre: 20000, noviembre: 20000, diciembre: 20000 }
+        enero: 12000, febrero: 10000, marzo: 8000, abril: 0, mayo: 0, junio: 0,
+        julio: 0, agosto: 0, septiembre: 0, octubre: 0, noviembre: 0, diciembre: 0 }
     ]
   });
   _assert(saveRes.success === true, 'bulk-save OK');
@@ -182,12 +188,20 @@ async function run() {
   _assert(p1 && p1[0] === 1, 'partida 1 ID = 1');
   _assert(p1 && p1[2] === 'Honorarios profesionales SST', 'partida 1 Detalle = "Honorarios profesionales SST"');
   _assert(p1 && p1[3] === 9314724, 'partida 1 Asignación = 9.314.724');
-  _assert(p1 && p1[6] === 776227, 'partida 1 Enero = 776.227');
+  // 📦824 — Las columnas G-R del ACT-FO-043 son "EJECUCION PRESUPUESTAL": van
+  // lo GASTADO, no lo planeado. La v1 ponía el asignado (776.227) y por eso el
+  // archivo exportado mostraba 0% de ejecución frente a lo que la app sí tenía.
+  _assert(p1 && p1[4] === 1870000, 'partida 1 Ejecutado Acum. = 620k+640k+610k');
+  _assert(p1 && p1[6] === 620000, 'partida 1 Enero (ejecución) = 620.000');
+  _assert(p1 && p1[7] === 640000, 'partida 1 Febrero (ejecución) = 640.000');
+  _assert(p1 && p1[6] !== 776227, 'partida 1 Enero NO lleva el asignado (776.227)');
 
   // Fila 13 (índice 12) = TOTAL AÑO
   var totalRow = allData[12];
   _assert(totalRow && totalRow[0] === 'TOTAL AÑO', 'TOTAL AÑO en col A');
   _assert(totalRow && totalRow[3] === 9554724, 'TOTAL Asignación = 9.554.724');
+  _assert(totalRow && totalRow[4] === 1900000, 'TOTAL Ejecutado = 1.870.000 + 30.000');
+  _assert(totalRow && totalRow[6] === 632000, 'TOTAL Enero = 620.000 + 12.000');
 
   // ============================================================
   // TEST 3: error — presupuestoId no existe

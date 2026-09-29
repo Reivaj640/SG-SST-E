@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.223] - 2026-09-29
+
+### 📦824 — Presupuesto SG-SST: la BD es la fuente de verdad y el Excel la plantilla
+
+**Resumen:** El módulo 1.1.3 (Asignación de Recursos) guardaba los datos en el Excel de Drive y la base de datos era un espejo parcial. Todo guardado desde la UI **borraba y reinsertaba** las partidas, y lo que la grilla no viajaba (categoría, bloque del Excel, agregados) **se perdía en silencio**. En producción el 2026 de Tempoactiva quedó con 0 de 14 categorías y $9.366.043 de $27.819.284. Además la grilla mostraba **datos inventados** en las columnas ENE–DIC. Todo reordenado alrededor de la verdad del documento.
+
+#### (a) El ACT-FO-043 no tiene presupuesto mensual
+
+El formato real (leído del archivo de Tempoactiva):
+
+| Columna | Encabezado |
+|---|---|
+| A–F | `N · DESCRIPCION · DETALLE · ASIGNACION PRESUPUESTO ANUAL · EJECUTADO ACUMULADO · % EJE.` |
+| G–R | **"EJECUCION PRESUPUESTAL"** → `ENERO … DICIEMBRE` |
+
+Una sola asignación anual y ejecución mes a mes. El `presupuesto_valores_mensuales` tiene `asignado` y `ejecutado` por mes, así que el import **inventaba** el asignado mensual como `anual/12` — un dato que no está en ninguna parte. Peor: **la grilla mostraba ese invento** (`20.000 / 208.333,33 / 166.666,67` en partidas que en el Excel tienen el mes en cero) y `bulk-save` lo guardaba de vuelta, mientras la ejecución real (p. ej. los $2.000.000 de abril) **no aparecía en ninguna parte**.
+
+El modelo que quedó:
+
+| Dónde | Qué es | Fuente |
+|---|---|---|
+| `presupuesto_partidas.asignado_anual` | asignación anual | columna D — **verdad del documento** |
+| `presupuesto_valores_mensuales.ejecutado` | ejecución del mes | columnas G-R — **dato real** |
+| `presupuesto_valores_mensuales.asignado` | curva "programada" del dashboard | `anual/12` derivado — **nunca en la grilla** |
+
+Las columnas ENE–DIC de la grilla ahora muestran `valores[m].ejecutado` (y la fila TOTAL suma ejecución), que es literalmente lo que dice el encabezado del formato. `bulk-save` recibe esas columnas como ejecución y recalcula el mensual asignado, con el remanente en DICIEMBRE y `_redondearMoneda()`: `240.000/12` en coma flotante daba `9.999.999,999999998` y **ninguna** suma cuadraba con la columna D.
+
+#### (b) `bulk-save` destruía lo que la grilla no viajaba
+
+El handler hace `DELETE FROM presupuesto_partidas` y reinserta el payload. La grilla no conoce la categoría (col B del Excel), el número de bloque ni los agregados. La "preservación" de la categoría consultaba esa misma tabla **dos líneas después del DELETE** — sobre una tabla ya vacía. Siempre devolvía nada → `descripcion = NULL`.
+
+Lo engañoso: la preservación del `ejecutado` **sí** se leía antes del borrado, así que el ejecutado se salvaba y hacía pensar que el handler estaba bien. Una mitad funcionaba y la otra consultaba la tabla muerta.
+
+Defensa aplicada:
+- Snapshot `numero → {descripcion, numero_excel, asignado_anual}` **antes** del `DELETE`.
+- `asignado_anual` se preserva; **nunca** se deriva sumando los 12 meses.
+- `ejecutado_acumulado` y `porcentaje_eje` se recalculan desde los valores mensuales (que sí son dato real y coinciden con la columna E).
+- El lector, `_calcularResumen` y `_presupuestoStatsDesdeBd` usan `asignado_anual`, no `SUM(v.asignado)`.
+- `mesesConSobreEjecucion` se evalúa una vez por mes (contaba el mismo mes N veces, una por partida).
+
+#### (c) Exportar encima de la plantilla real
+
+`workbook.xlsx.readFile()` es asíncrono; sin `await` el workbook quedaba vacío y el export caía silenciosamente al fallback "generar desde cero" (encabezado y merges perdidos). Ahora el export se hace **encima del archivo oficial**, conservando encabezado, ACT-FO-043, merges y firmas. La fila `TOTAL AÑO` se escribe con la **suma real** de las partidas, no con lo que declaraba el Excel (el 2026 venía con la fórmula duplicada: declaraba $55.638.568 frente a una suma de $27.819.284, y ×1,71 en ejecutado). Los totales declarados se guardan aparte y se reportan como **avisos** de importación.
+
+**Bug de merges (corregido):** la plantilla combina la categoría en `B11:B22` (un texto sobre 12 partidas). Con otra distribución de partidas, escribir sobre una celda esclava no agrega texto — ExcelJS lo guarda en el **master** del merge, y 12 filas quedaban mostrando la categoría equivocada; si el `TOTAL` o el IPC caían dentro del rango, sus valores se perdían. Ahora se desarman los merges que se solapan con el rango de datos y se **reconstruyen** por bloque real de la BD. El merge del encabezado (`B8:B9`) queda intacto.
+
+#### (d) Other fixes
+
+- **`this._handleOpenBudgetFromDB` no existía** (el método se llama `_handleOpenBudgetFromBD`): el módulo se caía con `TypeError` al cambiar de período. Los 442 tests de backstory no lo veían porque el `postMessage` del renderer nunca se ejecuta en un test. Agregado `test-presupuesto-824-dispatch.js` (estático, parsea el `switch`) y un barrido de los 34 módulos `*-logic.js` que encontró **1 crash real más**: `this._showAutoFillToast()` en `copasst-logic.js`, un helper nunca definido.
+- **`contentWindow` nulo**: el `catch` de `_handleRequestBudgetFromDB` tocaba el iframe otra vez y el `TypeError` del `catch` tapaba el error real. Ahora pasa por un helper `enviar()` que valida `contentWindow`.
+- **Año siempre visible**: `updateFileInfo` usaba solo el nombre del archivo y caía en "Presupuesto Desconocido"; ahora usa `currentFile.anio` + subtítulo con origen y fecha de importación.
+- **Historial desde la BD**: el selector mostraba archivos de Drive; ahora lista los períodos cargados (con total, %, IPC y avisos) y aparte los archivos pendientes de importar.
+- **Duplicar período** (`presupuesto:duplicar-periodo`): clona partidas y asignado a otro año, con ejecución en cero e IPC vacío (el IPC cambia cada año y lo define el owner).
+- **Ancho de columnas**: los 12 meses de 100px → 75px; la tabla pasó de 1.810px a 1.510px.
+- `PRAGMA foreign_keys = ON` en `main.js` (activado en 📦824 y nunca consolidationado).
+
+#### Tests: 473/473
+
+`test-presupuesto-824-{real,aislamiento,export-plantilla,roundtrip,dispatch}` + las 7 suites del bridge. El nuevo `roundtrip` (21 checks) es el que faltaba: **importa el Excel real y guarda con el payload que realmente manda la grilla**; los demás importaban y ya, nunca guardaban después de importar. Al reintroducir el bug baja a 14/17 con el síntoma exacto `0/14`.
+
+**Gafas recalibradas:** 5 tests affine afirmaban el contrato viejo (meses = asignado). Cuando código y test comparten el mismo malentendido, ambos dan verde.
+
+Bump 0.1.222 → 0.1.223.
+
 ## [0.1.222] - 2026-09-28
 
 ### 📦823 — Notificaciones: el toast dice QUIÉN escribió, y "Ver" lleva al correo

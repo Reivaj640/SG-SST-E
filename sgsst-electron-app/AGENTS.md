@@ -4294,6 +4294,126 @@ proceso que escribe (bridge IPC + service por timer).
 
 ---
 
+### ⚠️ Handler que borra y reinserta: el snapshot va ANTES del DELETE (📦824)
+
+`presupuesto:bulk-save` hacía `DELETE FROM presupuesto_partidas WHERE presupuesto_id = ?` y
+reinsertaba el payload. La grilla **no viaja** la categoría (col B del Excel), el `numero_excel` ni
+los agregados, así que los tres se perdían en cada guardado.
+
+Lo que lo hace difícil de ver: la preservación del `ejecutado` **sí** se leía antes del borrado
+(`ejecutadoPrevio`), o sea que el ejecutado se salvaba y hacía pensar que el handler ya estaba
+seguro. La categoría, en cambio, se "preservaba" consultando `presupuesto_partidas` **dos líneas
+después del DELETE** — sobre la tabla ya vacía. Siempre `undefined` → `NULL`.
+
+**Regla:** en un handler que borra y reinserta, **toda** la preservación debe leer de un snapshot
+tomado ANTES del `DELETE`. Si un campo se preserva y otro no, sospechá que el que no se preserva
+lee después del borrado.
+
+```js
+// MAL: la consulta va sobre la tabla que el DELETE de arriba ya vació
+localDb.prepare('DELETE FROM presupuesto_partidas WHERE presupuesto_id = ?').run(id);
+// ...
+var previo = db.prepare('SELECT descripcion FROM presupuesto_partidas WHERE id = ?').get(id); // NULL
+
+// BIEN: snapshot antes, y un UPDATE que lo use
+var snap = db.prepare('SELECT numero, descripcion FROM presupuesto_partidas WHERE presupuesto_id = ?').all(id);
+localDb.prepare('DELETE FROM presupuesto_partidas WHERE presupuesto_id = ?').run(id);
+// ... snap.get(numero).descripcion
+```
+
+**Y si la UI no puede garantizar un campo, se RECALCULA en vez de preservarse:** los agregados se
+derivan con subconsultas sobre el detalle, así que por construcción no pueden discrepar del
+detalle. Lo que **no** se puede recalcular es un dato que viene de una fuente externa — ese se
+preserva, nunca se deriva.
+
+### ⚠️ Un dato derivado NUNCA puede ser la fuente de la verdad (📦824)
+
+El ACT-FO-043 tiene la asignación **anual** en la columna D y la **ejecución mes a mes** en G-R.
+No trae presupuesto por mes. Como `presupuesto_valores_mensuales` tiene `asignado` y `ejecutado`
+por mes, el import inventaba `asignado = anual/12` — y la grilla mostraba ese invento
+(`20.000 / 208.333,33 / 166.666,67` en partidas que en el Excel tienen el mes en cero) mientras la
+ejecución real no aparecía en ninguna parte.
+
+Peor: se llegó a **recalcular el anual sumando los 12 meses inventados**, y un solo mes en cero
+comía $20.000 del total oficial.
+
+| Dónde | Qué es | Fuente |
+|---|---|---|
+| `presupuesto_partidas.asignado_anual` | asignación anual | col D — **verdad** |
+| `presupuesto_valores_mensuales.ejecutado` | ejecución del mes | cols G-R — **dato real** |
+| `presupuesto_valores_mensuales.asignado` | curva "programada" | `anual/12` derivado — **nunca en la grilla** |
+
+**Reglas:**
+1. El anual sale de la columna D y **se preserva**. Nunca `SUM(meses)`.
+2. Al repartir un total entre N, redondear a 2 decimales y poner el remanente en el último período,
+   para que la suma dé exactamente el total. Sin eso, `10.000.000/12` deja
+   `9.999.999,999999998` y ninguna suma cuadra.
+3. Antes de guardar algo derivado, preguntarse de qué dato del documento sale. Si no sale de
+   ninguno, es invención y no debería estar en pantalla.
+
+### ⚠️ ExcelJS: escribir en una celda ESCLAVA de un merge corrompe la columna (📦824)
+
+El ACT-FO-043 combina la categoría en `B11:B22` (un texto que cubre 12 partidas). Si la BD tiene
+otra distribución, escribir sobre una celda esclava **no agrega texto**: ExcelJS lo guarda en el
+**master** del merge. El archivo exportado quedaba con 12 filas mostrando la categoría
+equivocada, y si el `TOTAL` o el IPC caían dentro del rango, sus valores se perdían.
+
+```js
+// 1) desarmar los merges que se SOLAPAN con el rango donde van los datos
+ws.model.merges.slice().forEach(m => {
+  var mm = String(m).match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!mm) return;
+  if (+mm[4] >= FILA_DATOS_INI && +mm[2] <= FILA_DATOS_FIN) { try { ws.unMergeCells(m); } catch (e) {} }
+});
+// 2) escribir la categoría en la fila donde abre cada bloque
+// 3) rearmar por bloque real: ws.mergeCells('B' + ini + ':B' + fin)
+```
+
+**Nunca confíes en que la plantilla tiene la misma distribución de filas que tus datos.** Los merges
+están calibrados al layout de SU archivo. Y al leer, `getRow(n).getCell(c).value` en una esclava
+devuelve el valor del **master** — que es justo lo que vería un humano al abrir el Excel, así que
+sirve para verificar.
+
+### ⚠️ Un typo en el dispatch de `postMessage` no lo caza ningún test (📦824)
+
+`handleIframeMessage` llamaba `this._handleOpenBudgetFromDB` cuando el método se llamaba
+`_handleOpenBudgetFromBD`. TypeError en runtime, el módulo se caía al cambiar de período. Los 442
+tests de backstory no lo detectaron: **todos son de backend** (bridge/IPC), y el `postMessage` del
+renderer nunca se ejecuta en un test.
+
+**Regla:** un dispatch por `postMessage` necesita un test **estático** que lo cubra, no uno que lo
+ejecute. `main/test-presupuesto-824-dispatch.js` parsea el `switch` y verifica que cada `case`
+llame a un método que exista y que cada `action:` que mandan los iframes tenga su `case`. Al
+escribir ese parser: cortar entre un `case` y el siguiente (no buscar el `break;` con un regex de
+tamaño fijo), acotar el análisis al método (el archivo tiene más de un `switch`) y aceptar
+indentación de 2 y de 4 espacios — con solo 4 salen ~30 falsos positivos.
+
+Vale la pena correr ese chequeo sobre los 34 módulos `*-logic.js` cuando se toque cualquier
+`switch` de mensajes: en este barrido apareció 1 crash real más.
+
+### 📦824 — Tests de Presupuesto
+
+```
+npx electron main/test-presupuesto-824-real.js            # 38/38  import del Excel real de Drive
+npx electron main/test-presupuesto-824-aislamiento.js     # 23/23  un año no daña a otro
+npx electron main/test-presupuesto-824-export-plantilla.js# 34/34  export sobre la plantilla oficial
+npx electron main/test-presupuesto-824-roundtrip.js       # 21/21  import → guardar como la grilla
+node    main/test-presupuesto-824-dispatch.js             #  7/7   dispatch de postMessage
+node    main/test-presupuesto-bridge-{schema,read,write,import,export,granular}.js
+npx electron main/test-presupuesto-flow-completo.js       # 31/31
+```
+
+> 📦824 — `roundtrip` es el que faltaba: **importa el Excel real y guarda con el payload que
+> realmente manda la grilla**. Los demás importaban y ya, nunca guardaban después de importar, y por
+> eso 442 checks en verde mientras el bug destruía datos en producción. Al reintroducir el bug baja
+> a 14/17 con el síntoma exacto `0/14` categorías.
+>
+> **Al testear exports con plantilla, derivá la aritmética de filas de la longitud de tus datos**
+> (`FILA_TOTAL = 10 + N`), no hardcodees números de fila. Y **dá valores DISTINTOS a asignado y
+> ejecutado** en los datos de prueba, para que el test detecte si se vuelven a confundir.
+
+---
+
 ## 🆕 Gotcha: los globals del shell se PISON entre módulos — nunca llamar `window.render()` (📦821, 2026-09-28)
 
 **Síntoma**: al pulsar un botón "Volver" en una vista inyectada, la app LANZA y queda inservible:

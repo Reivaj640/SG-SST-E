@@ -129,7 +129,7 @@ const { registerFuratHandlers } = require('./main/furat-bridge');
 // FASE 0: Bridge registrado, schema creado, handlers stub. La UI sigue usando
 // Excel. El bridge NO está expuesto en preload.js — los canales existen pero
 // nada los llama hasta Fase 1. Plan: docs/plans/presupuesto-bd-migration.md
-const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL } = require('./main/presupuesto-bridge');
+const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, SCHEMA_ALTERS: PRESUPUESTO_SCHEMA_ALTERS, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL, MIGRATION_IDS: PRESUPUESTO_MIGRATION_IDS } = require('./main/presupuesto-bridge');
 // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level: Base de Personal + Contratación)
 // FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
 // no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
@@ -490,6 +490,21 @@ function initDbOnce() {
     // (email-db.js la usa para CRUD de threads/messages/labels).
     require('./main/db-instance').setDb(db);
     db.pragma('journal_mode = WAL');
+    // 📦824 (2026-09-29) — foreign_keys ACTIVO.
+    //
+    // SQLite las deja APAGADAS por defecto y por conexión. Nunca se activaron,
+    // así que todos los "ON DELETE CASCADE" declarados en los schemas (presupuesto,
+    // gestión humana, etc.) eran decorativos: borrar un presupuesto dejaba
+    // partidas y valores mensuales huérfanos en la BD.
+    //
+    // El orden importa: va inmediatamente después de abrir la conexión y ANTES
+    // de ejecutar cualquier schema, porque un PRAGMA no altera conexiones ya
+    // abiertas ni transactions empezadas.
+    //
+    // ⚠️ Efecto secundario a vigilar: con foreign_keys=ON, borrar un padre con
+    // hijos huérfanos (de {}) falla o cascada donde antes no pasaba nada. Si
+    // aparece algún "FOREIGN KEY constraint failed" nuevo, es por acá.
+    db.pragma('foreign_keys = ON');
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -690,15 +705,57 @@ function initDbOnce() {
     }
     // 📦708 (2026-08-15) — Schema Presupuesto SG-SST (1.1.3 Asignación de Recursos).
     // 3 tablas: presupuestos + presupuesto_partidas + presupuesto_valores_mensuales.
-    // Mismo patrón que FURAT_SCHEMA_SQL. Migrations vacías en v1.
+    //
+    // 📦824 (2026-09-29) — Tres arreglos que solo se ven con una BD real:
+    //
+    // 1) ALTER TABLE de las columnas nuevas. `CREATE TABLE IF NOT EXISTS` NO
+    //    altera una tabla que ya existe, así que en toda base creada por la v1
+    //    estas columnas no existían. Se aplican una por una con try/catch:
+    //    el fallo esperado ("duplicate column name", cuando la BD ya es nueva)
+    //    es inocuo y no interrumpe el resto.
+    // 2) Migraciones con control de versión. PRESUPUESTO_MIGRATIONS_SQL estuvo
+    //    vacío desde la v1 con la nota "no hay schema previo que migrar", o sea
+    //    la infraestructura nunca se probó. Ahora se registran en
+    //    _presupuesto_migrations y solo corren una vez.
+    // 3) foreign_keys. Ver initDbOnce: se activa ANTES, en la apertura de la BD.
     try {
       db.exec(PRESUPUESTO_SCHEMA_SQL);
       console.log('[DB] 📦708 · Tablas de presupuesto (presupuestos / partidas / valores_mensuales) creadas/verificadas');
-      if (Array.isArray(PRESUPUESTO_MIGRATIONS_SQL) && PRESUPUESTO_MIGRATIONS_SQL.length > 0) {
-        for (var pmi = 0; pmi < PRESUPUESTO_MIGRATIONS_SQL.length; pmi++) {
-          try { db.exec(PRESUPUESTO_MIGRATIONS_SQL[pmi]); } catch (pmErr) { /* skip */ }
+
+      var presAltersOk = 0, presAltersNew = 0;
+      if (Array.isArray(PRESUPUESTO_SCHEMA_ALTERS)) {
+        for (var pa = 0; pa < PRESUPUESTO_SCHEMA_ALTERS.length; pa++) {
+          try {
+            db.exec(PRESUPUESTO_SCHEMA_ALTERS[pa]);
+            presAltersNew++;
+          } catch (paErr) {
+            presAltersOk++;   // "duplicate column name" = ya existía
+          }
         }
-        console.log('[DB] 📦708 · ' + PRESUPUESTO_MIGRATIONS_SQL.length + ' migraciones de presupuesto aplicadas');
+      }
+      console.log('[DB] 📦824 · ' + PRESUPUESTO_SCHEMA_ALTERS.length + ' columnas de presupuesto verificadas (' + presAltersNew + ' nuevas, ' + presAltersOk + ' ya existentes)');
+
+      if (Array.isArray(PRESUPUESTO_MIGRATIONS_SQL) && PRESUPUESTO_MIGRATIONS_SQL.length > 0) {
+        db.exec('CREATE TABLE IF NOT EXISTS _presupuesto_migrations (id TEXT PRIMARY KEY, aplicada_en TEXT NOT NULL)');
+        var yaAplicadas = {};
+        try {
+          var filasMig = db.prepare('SELECT id FROM _presupuesto_migrations').all();
+          for (var fm = 0; fm < filasMig.length; fm++) yaAplicadas[filasMig[fm].id] = true;
+        } catch (readMigErr) { /* tabla recién creada */ }
+
+        var aplicadas = 0;
+        for (var pmi = 0; pmi < PRESUPUESTO_MIGRATIONS_SQL.length; pmi++) {
+          var migId = (PRESUPUESTO_MIGRATION_IDS && PRESUPUESTO_MIGRATION_IDS[pmi]) || ('presup-mig-' + pmi);
+          if (yaAplicadas[migId]) continue;
+          try {
+            db.exec(PRESUPUESTO_MIGRATIONS_SQL[pmi]);
+            db.prepare('INSERT OR IGNORE INTO _presupuesto_migrations (id, aplicada_en) VALUES (?, ?)').run(migId, new Date().toISOString());
+            aplicadas++;
+          } catch (pmErr) {
+            console.error('[DB] 📦824 · migración de presupuesto "' + migId + '" falló:', pmErr.message);
+          }
+        }
+        if (aplicadas > 0) console.log('[DB] 📦824 · ' + aplicadas + ' migraciones de presupuesto aplicadas de ' + PRESUPUESTO_MIGRATIONS_SQL.length);
       }
     } catch (presErr) {
       console.error('[DB] 📦708 · Error creando schema de presupuesto:', presErr.message);
@@ -16090,6 +16147,119 @@ async function calculateAfiliacionStats(basePath, companyName) {
  * @param {string} companyName - Nombre de la empresa
  * @returns {Promise<Object>} Stats de presupuesto
  */
+/**
+ * 📦824 (2026-09-29) — Calcula las estadísticas de presupuesto desde la BD.
+ *
+ * Devuelve EXACTAMENTE el mismo shape que la rama de Excel de
+ * calculatePresupuestoStats, para poder ser drop-in en los dos llamadores.
+ * Devuelve null si no hay presupuesto en BD (y entonces el caller cae al Excel).
+ *
+ * Por qué el shape tiene que ser idéntico: los dos llamadores hacen
+ * `stats.alertas`, `stats.estado`, `stats.totalAsignado`, etc. Un shape
+ * distinto rompe el dashboard en silencio (NaN en pantalla, no un error).
+ */
+async function _presupuestoStatsDesdeBd(companyName, anio) {
+  if (typeof db === 'undefined' || !db || !companyName) return null;
+  const year = anio || new Date().getFullYear();
+
+  const stats = {
+    totalAsignado: 0,
+    totalEjecutado: 0,
+    porcentajeEjecucion: 0,
+    saldoDisponible: 0,
+    estado: 'ok', // 'ok', 'warning', 'danger'
+    alertas: [],
+    ejecucionMensual: {
+      programada: new Array(12).fill(0),
+      ejecutada: new Array(12).fill(0)
+    },
+    mesesConSobreEjecucion: [],
+    desviacionSignificativa: false,
+    // 📦824 — para que el dashboard sepa de dónde salieron las cifras.
+    origen: 'BD'
+  };
+
+  try {
+    // La empresa se resuelve por nombre (lo que traen los llamadores) contra
+    // companies; la BD guarda company_key en los presupuestos.
+    const comp = db.prepare(
+      'SELECT company_key FROM companies WHERE display_name = ? OR company_key = ? LIMIT 1'
+    ).get(companyName, companyName);
+    if (!comp) return null;
+
+    const pres = db.prepare(
+      'SELECT id, anio, nombre FROM presupuestos WHERE empresa_id = ? AND anio = ? LIMIT 1'
+    ).get(comp.company_key, year);
+    if (!pres) return null;
+
+    const filas = db.prepare(
+      'SELECT v.mes AS mes, v.asignado AS asignado, v.ejecutado AS ejecutado, ' +
+      '       p.asignado_anual AS asignado_anual ' +
+      'FROM presupuesto_valores_mensuales v ' +
+      'JOIN presupuesto_partidas p ON p.id = v.partida_id ' +
+      'WHERE p.presupuesto_id = ? AND p.activo = 1 AND v.anio = ? ' +
+      'ORDER BY v.mes'
+    ).all(pres.id, year);
+
+    if (!filas || filas.length === 0) return null;
+
+    // 📦824 — El presupuesto TOTAL es la columna D de cada partida
+    // (`asignado_anual`), no la suma de los 12 meses. El ACT-FO-043 no trae
+    // presupuesto por mes, así que los meses son un reparto derivado: sumarlos
+    // daba 9.999.999,999999998 en vez de 10.000.000 y el % de ejecución del
+    // módulo salía descuadrado.
+    for (const f of filas) {
+      const asignado = Number(f.asignado) || 0;
+      const ejecutado = Number(f.ejecutado) || 0;
+      const m = (Number(f.mes) || 1) - 1;
+      if (m >= 0 && m < 12) {
+        stats.ejecucionMensual.programada[m] += asignado;
+        stats.ejecucionMensual.ejecutada[m] += ejecutado;
+      }
+    }
+
+    // Total anual: una vez por partida, desde la columna D.
+    const totales = db.prepare(
+      'SELECT COALESCE(SUM(asignado_anual),0) AS a, COALESCE(SUM(ejecutado_acumulado),0) AS e ' +
+      'FROM presupuesto_partidas WHERE presupuesto_id = ? AND activo = 1'
+    ).get(pres.id);
+    stats.totalAsignado = Number(totales && totales.a) || 0;
+    stats.totalEjecutado = Number(totales && totales.e) || 0;
+
+    // 📦824 — Sobre-ejecución: se evalúa UNA vez por mes contra lo programado
+    // ese mes. Antes se evaluaba dentro del bucle de filas, así que un mes con
+    // 5 partidas sobre-ejecutadas se contaba 5 veces y la alerta decía "5 mes(es)"
+    // cuando había un solo mes.
+    for (let m = 0; m < 12; m++) {
+      const prog = stats.ejecucionMensual.programada[m] || 0;
+      const eje = stats.ejecucionMensual.ejecutada[m] || 0;
+      if (prog > 0 && eje > prog * 1.1) stats.mesesConSobreEjecucion.push(m + 1);
+    }
+
+    stats.saldoDisponible = stats.totalAsignado - stats.totalEjecutado;
+    stats.porcentajeEjecucion = stats.totalAsignado > 0
+      ? Math.round((stats.totalEjecutado / stats.totalAsignado) * 100)
+      : 0;
+    stats.desviacionSignificativa = Math.abs(stats.porcentajeEjecucion - 60) > 20;
+
+    if (stats.porcentajeEjecucion > 100) {
+      stats.estado = 'danger';
+      stats.alertas.push('Presupuesto sobre-ejecutado');
+    } else if (stats.porcentajeEjecucion > 90) {
+      stats.estado = 'warning';
+      stats.alertas.push('Presupuesto cerca del límite');
+    }
+    if (stats.mesesConSobreEjecucion.length > 0) {
+      stats.alertas.push('Sobre-ejecución en ' + stats.mesesConSobreEjecucion.length + ' mes(es)');
+    }
+
+    return stats;
+  } catch (e) {
+    sendLog('[Presupuesto] Error leyendo stats desde BD: ' + e.message, 'ERROR');
+    return null;   // cae al Excel en vez de romper el dashboard
+  }
+}
+
 async function calculatePresupuestoStats(basePath, companyName) {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth(); // 0-11
@@ -16108,6 +16278,27 @@ async function calculatePresupuestoStats(basePath, companyName) {
     mesesConSobreEjecucion: [],
     desviacionSignificativa: false
   };
+
+  // ========================================================================
+  // 📦824 (2026-09-29) — La BD es la fuente de verdad. El Excel es respaldo.
+  //
+  // Esta función era la ÚLTIMA lectora del Excel: el módulo de gestión leía de
+  // la BD y el dashboard seguía leyendo el .xlsx del disco. Con los dos
+  // desalineados (el Excel declara el doble en su fila TOTAL AÑO), el dashboard
+  // y la pantalla de gestión mostraban cifras distintas para lo mismo.
+  //
+  // Ahora se calcula desde la BD cuando hay un presupuesto importado, y solo
+  // se cae al Excel si no hay nada. El shape de retorno es IDÉNTICO al del
+  // parser de Excel de abajo, para que los dos llamadores (dashboard:3211 y
+  // recursos-home:7539) no se enteren del cambio de fuente.
+  // ========================================================================
+  const statsBd = await _presupuestoStatsDesdeBd(companyName, currentYear);
+  if (statsBd) {
+    sendLog('[Presupuesto] Stats desde BD · ' + Math.round(statsBd.totalAsignado).toLocaleString('es-CO') +
+      ' asignado / ' + Math.round(statsBd.totalEjecutado).toLocaleString('es-CO') + ' ejecutado', 'INFO');
+    return statsBd;
+  }
+  sendLog('[Presupuesto] Sin presupuesto en BD para ' + companyName + ' ' + currentYear + ' — se lee el Excel', 'WARN');
 
   try {
     if (!basePath) return stats;

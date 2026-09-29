@@ -18,7 +18,12 @@
 'use strict';
 
 const { ipcMain } = require('electron');
-const { PRESUPUESTO_SCHEMA_SQL, PRESUPUESTO_MIGRATIONS_SQL } = require('./presupuesto-schema-sql');
+const {
+  PRESUPUESTO_SCHEMA_SQL,
+  PRESUPUESTO_SCHEMA_ALTERS,
+  PRESUPUESTO_MIGRATIONS_SQL,
+  PRESUPUESTO_MIGRATION_IDS
+} = require('./presupuesto-schema-sql');
 
 const MOD = 'PRESUPUESTO';
 
@@ -117,7 +122,23 @@ function _rowToPresupuesto(r) {
     notas: r.notas || '',
     creadoEn: r.creado_en,
     actualizadoEn: r.actualizado_en,
-    creadoPor: r.creado_por
+    creadoPor: r.creado_por,
+    // 📦824 — Datos del archivo de origen. La UI los usa para mostrar de dónde
+    // salió el presupuesto y para avisar cuando el Excel cambió.
+    archivoOrigen: r.archivo_origen || null,
+    archivoNombre: r.archivo_nombre || null,
+    archivoImportadoEn: r.archivo_importado_en || null,
+    // El TOTAL que declara el Excel, guardado aparte del calculado. Si no
+    // coinciden, la diferencia está en la fila de resumen del archivo.
+    totalDeclaradoAsignado: r.total_declarado_asignado,
+    totalDeclaradoEjecutado: r.total_declarado_ejecutado,
+    // 📦824 — IPC por período, editable por el owner (cambia cada año).
+    ipc: r.ipc,
+    // Avisos del import (JSON array) — p. ej. el TOTAL AÑO del Excel que no cuadra.
+    avisos: (function () {
+      if (!r.avisos_importacion) return [];
+      try { return JSON.parse(r.avisos_importacion); } catch (e) { return []; }
+    })()
   };
 }
 
@@ -132,7 +153,10 @@ function _getPartidasConValores(presupuestoId) {
   if (!localDb) return [];
 
   var partidasRows = localDb.prepare(
-    "SELECT id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en " +
+    // 📦824 — se suman las columnas del archivo de Excel que la v1 no leía:
+    // el anual real, el ejecutado acumulado y el % de ejecución.
+    "SELECT id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en, " +
+    "  asignado_anual, ejecutado_acumulado, porcentaje_eje, numero_excel " +
     "FROM presupuesto_partidas " +
     "WHERE presupuesto_id = ? AND activo = 1 " +
     "ORDER BY numero ASC"
@@ -172,7 +196,15 @@ function _getPartidasConValores(presupuestoId) {
       totalEjecutado += ejecutado;
     }
 
-    var porcentaje = totalAsignado > 0 ? (totalEjecutado / totalAsignado) * 100 : 0;
+    // 📦824 — El ANUAL de la partida es la columna D del ACT-FO-043
+    // (`asignado_anual`), que es lo que escribió el archivo. El `asignado` que
+    // se devuelve antes era la SUMA de los 12 meses, y esos meses son un reparto
+    // derivado: al recalcularlos la suma daba 9.999.999,999999998 en vez de
+    // 10.000.000. Se usa la columna D y, solo si no existe, se cae a la suma.
+    var anualDeLaPartida = (p.asignado_anual !== null && p.asignado_anual !== undefined)
+      ? p.asignado_anual
+      : totalAsignado;
+    var porcentajeReal = anualDeLaPartida > 0 ? (totalEjecutado / anualDeLaPartida) * 100 : 0;
 
     return {
       id: p.id,
@@ -182,9 +214,14 @@ function _getPartidasConValores(presupuestoId) {
       activo: p.activo,
       creadoEn: p.creado_en,
       actualizadoEn: p.actualizado_en,
-      asignado: totalAsignado,
+      asignadoAnual: p.asignado_anual,
+      ejecutadoAcumulado: p.ejecutado_acumulado,
+      porcentajeEje: p.porcentaje_eje,
+      numeroExcel: p.numero_excel,
+      asignado: anualDeLaPartida,
+      asignadoSumaMeses: totalAsignado,
       ejecutado: totalEjecutado,
-      porcentaje: porcentaje,
+      porcentaje: porcentajeReal,
       valores: valoresFull
     };
   });
@@ -200,10 +237,14 @@ function _calcularResumen(partidas) {
   var mensualEjecutado = new Array(12).fill(0);
 
   partidas.forEach(function (p) {
+    // 📦824 — El total asignado sale de la columna D de cada partida
+    // (`p.asignado`), no de la suma de los 12 meses. La curva "programada" de
+    // cada mes (`mensualAsignado`) sí sigue viniendo del reparto, porque es lo
+    // único que existe mes a mes.
+    totalAsignado += p.asignado || 0;
     p.valores.forEach(function (v, idx) {
       mensualAsignado[idx] += v.asignado;
       mensualEjecutado[idx] += v.ejecutado;
-      totalAsignado += v.asignado;
       totalEjecutado += v.ejecutado;
     });
   });
@@ -245,6 +286,11 @@ function _handlerListByEmpresa(token, companyName) {
   try {
     var rows = localDb.prepare(
       "SELECT p.id, p.empresa_id, p.anio, p.nombre, p.notas, p.creado_en, p.actualizado_en, p.creado_por, " +
+      // 📦824 — Sin estas columnas, _rowToPresupuesto devolvía ipc/archivo/
+      // avisos en undefined: el selector de período no tenía con qué armar la
+      // ficha de cada año. Lo detectó test-presupuesto-824-aislamiento.js.
+      "  p.archivo_origen, p.archivo_nombre, p.archivo_importado_en, " +
+      "  p.total_declarado_asignado, p.total_declarado_ejecutado, p.ipc, p.avisos_importacion, " +
       "  (SELECT COUNT(*) FROM presupuesto_partidas WHERE presupuesto_id = p.id AND activo = 1) AS partidas_count, " +
       "  (SELECT COALESCE(SUM(v.asignado), 0) FROM presupuesto_valores_mensuales v " +
       "     JOIN presupuesto_partidas pp ON pp.id = v.partida_id " +
@@ -293,7 +339,11 @@ function _handlerGet(token, presupuestoId) {
 
   try {
     var row = localDb.prepare(
-      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por " +
+      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por, " +
+      // 📦824 — columnas del 📦824 (rastro del Excel + IPC + avisos). Sin estas,
+      // el detalle de un período llegaba a la UI con todo en undefined.
+      "archivo_origen, archivo_nombre, archivo_importado_en, " +
+      "total_declarado_asignado, total_declarado_ejecutado, ipc, avisos_importacion " +
       "FROM presupuestos WHERE id = ?"
     ).get(presupuestoId);
 
@@ -343,7 +393,11 @@ function _handlerGetByEmpresaAnio(token, companyName, anio) {
 
   try {
     var row = localDb.prepare(
-      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por " +
+      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por, " +
+      // 📦824 — columnas del 📦824 (rastro del Excel + IPC + avisos). Sin estas,
+      // el detalle de un período llegaba a la UI con todo en undefined.
+      "archivo_origen, archivo_nombre, archivo_importado_en, " +
+      "total_declarado_asignado, total_declarado_ejecutado, ipc, avisos_importacion " +
       "FROM presupuestos WHERE empresa_id = ? AND anio = ?"
     ).get(company.company_key, anioNum);
 
@@ -610,9 +664,9 @@ function _handlerSetMesValues(token, partidaId, anio, mes, asignado, ejecutado) 
  * presupuesto:update-meta
  * Actualiza el nombre y/o las notas de un presupuesto.
  *
- * Input: { presupuestoId, nombre?, notas? }
+ * Input: { presupuestoId, nombre?, notas?, ipc? }
  */
-function _handlerUpdateMeta(token, presupuestoId, nombre, notas) {
+function _handlerUpdateMeta(token, presupuestoId, nombre, notas, ipc) {
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
@@ -638,16 +692,49 @@ function _handlerUpdateMeta(token, presupuestoId, nombre, notas) {
       updates.push('notas = ?');
       values.push(notas);
     }
+    // 📦824 — El IPC es un DATO DEL PERÍODO, y cambia cada año (el owner lo
+    // digita por período: 5,2% en 2026, otro en 2027...). Por eso es editable
+    // y NO se aplica automáticamente al total: se guarda tal cual y el total
+    // sigue siendo la suma de las partidas. Quien lo pone es el owner.
+    if (ipc !== undefined) {
+      if (ipc === null || ipc === '') {
+        updates.push('ipc = ?');
+        values.push(null);
+      } else {
+        var nIpc = Number(ipc);
+        if (isNaN(nIpc)) {
+          return _err('INVALID_INPUT', 'El IPC debe ser un número (por ejemplo 0.052 para 5,2%)');
+        }
+        // Se acepta 5.2 (porcentaje) o 0.052 (fracción): se normaliza a fracción.
+        if (nIpc > 1) nIpc = nIpc / 100;
+        if (nIpc < 0 || nIpc > 1) {
+          return _err('INVALID_INPUT', 'El IPC debe estar entre 0% y 100%');
+        }
+        updates.push('ipc = ?');
+        values.push(nIpc);
+      }
+    }
     if (updates.length === 0) {
-      return _err('INVALID_INPUT', 'Debe pasar al menos nombre o notas');
+      return _err('INVALID_INPUT', 'Debe pasar al menos nombre, notas o ipc');
     }
     updates.push('actualizado_en = ?');
     values.push(new Date().toISOString());
     values.push(presupuestoId);
 
-    localDb.prepare('UPDATE presupuestos SET ' + updates.join(', ') + ' WHERE id = ?').run.apply(null, values);
+    // 📦824 — `.run.apply(null, values)` fallaba con "Illegal invocation" en
+    // better-sqlite3 (el motor de producción). Los tests usaban sql.js, donde
+    // sí funciona, así que el bug llevaba meses escondido: el IPC nunca se
+    // guardaba y el handler devolvía INTERNAL sin que nadie lo notara.
+    // Se invoca con el statement como receptor: `stmt.run(...values)`.
+    localDb.prepare('UPDATE presupuestos SET ' + updates.join(', ') + ' WHERE id = ?').run(...values);
 
-    return _ok({ presupuestoId: presupuestoId });
+    // 📦824 — Se devuelve el presupuesto ya actualizado: la UI muestra el IPC
+    // guardado sin tener que releer.
+    var actualizado = localDb.prepare(
+      'SELECT id, anio, nombre, notas, ipc FROM presupuestos WHERE id = ?'
+    ).get(presupuestoId);
+
+    return _ok({ presupuestoId: presupuestoId, presupuesto: actualizado });
   } catch (e) {
     console.error('[' + MOD + '][update-meta]', e.message);
     return _err('INTERNAL', e.message);
@@ -667,40 +754,126 @@ function _handlerUpdateMeta(token, presupuestoId, nombre, notas) {
  *   - Última fila: TOTAL AÑO (suma de todas las partidas)
  *
  * Devuelve un Buffer con el .xlsx listo para escribir a disco.
+ *
+ * 📦824 — plantillaPath (opcional)
+ * Si se pasa la ruta de un Excel ACT-FO-043 real, se abre ESE archivo y se
+ * escriben los datos encima, en vez de generar uno desde cero. Motivo: el
+ * archivo generado desde cero pierde el encabezado del sistema, el código
+ * ACT-FO-043, los merges de categoría, el pie de firmas y el formato — es decir,
+ * no sirve para entregar a auditoría ni a la ARL.
+ *
+ * La plantilla también es la base de "duplicar período": se hereda la
+ * estructura y se cambian los datos.
+ *
+ * Sin plantilla, se mantiene el comportamiento original (hoja nueva).
  */
-function _buildPresupuestoXLSX(presupuesto, partidas) {
-  var ExcelJS = require('exceljs');
-  var workbook = new ExcelJS.Workbook();
-  var ws = workbook.addWorksheet('Presupuesto ' + presupuesto.anio);
+function _buildPresupuestoXLSX(presupuesto, partidas, plantillaPath) {
+  return _buildPresupuestoXLSXAsync(presupuesto, partidas, plantillaPath);
+}
 
-  // Headers en fila 9
-  var headerRow = ws.getRow(9);
-  headerRow.values = [
-    '',                                  // A: ID
-    '',                                  // B: (vacía)
-    'Detalle',                           // C
-    'Asignación',                        // D
-    'Ejecutado Acumulado',               // E
-    '% Ejecutado',                       // F
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+async function _buildPresupuestoXLSXAsync(presupuesto, partidas, plantillaPath) {
+  var ExcelJS = require('exceljs');
+
+  // ── Plantilla? ───────────────────────────────────────────────────────
+  //
+  // 📦824 — `workbook.xlsx.readFile()` es ASÍNCRONO (devuelve Promise). Sin
+  // await, el workbook quedaba vacío, `ws` salía undefined y el export caía
+  // al fallback "generar desde cero" — que es justo lo que se quería evitar.
+  // El síntoma era silencioso: el archivo salía, pero sin encabezado ni merges.
+  var workbook;
+  var ws;
+  var usandoPlantilla = false;
+  if (plantillaPath) {
+    try {
+      var fsMod = require('fs');
+      if (fsMod.existsSync(plantillaPath)) {
+        workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(plantillaPath);
+        // La hoja del formato es la que tiene 'PRESUPUESTO' en el nombre;
+        // si no existe se usa la primera.
+        ws = workbook.worksheets.find(function (s) { return /PRESUP/i.test(s.name); }) || workbook.worksheets[0];
+        usandoPlantilla = !!ws;
+      } else {
+        console.warn('[' + MOD + '][export] La plantilla no existe: ' + plantillaPath + ' — se genera desde cero');
+      }
+    } catch (e) {
+      console.warn('[' + MOD + '][export] No se pudo usar la plantilla "' + plantillaPath + '": ' + e.message + ' — se genera desde cero');
+      workbook = null;
+      ws = null;
+      usandoPlantilla = false;
+    }
+  }
+
+  if (!usandoPlantilla) {
+    workbook = new ExcelJS.Workbook();
+    ws = workbook.addWorksheet('Presupuesto ' + presupuesto.anio);
+    // Headers en fila 9
+    var headerRow = ws.getRow(9);
+    headerRow.values = [
+      '',                                  // A: ID
+      '',                                  // B: (vacía)
+      'Detalle',                           // C
+      'Asignación',                        // D
+      'Ejecutado Acumulado',               // E
+      '% Ejecutado',                       // F
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre' // G-R
   ];
 
-  // Anchos de columna
-  ws.columns = [
-    { width: 10 }, { width: 5 }, { width: 30 },
-    { width: 15 }, { width: 15 }, { width: 12 }
-  ];
-  for (var c = 0; c < 12; c++) ws.getColumn(7 + c).width = 12;
+    // Anchos de columna
+    ws.columns = [
+      { width: 10 }, { width: 5 }, { width: 30 },
+      { width: 15 }, { width: 15 }, { width: 12 }
+    ];
+    for (var c = 0; c < 12; c++) ws.getColumn(7 + c).width = 12;
+  }
+
+  // ── Celdas combinadas: diagnóstico antes de escribir ────────────────
+  //
+  // 📦824 FIX (bug real, encontrado probando con el Excel de Tempoactiva) —
+  // El ACT-FO-043 oficial combina la categoría (col B) con celdas combinadas:
+  // `B11:B22` es un solo texto que cubre 12 partidas ("SISTEMA INTEGRAL DE
+  // ..."). Cuando la BD tiene OTRA distribución de partidas, escribir sobre una
+  // celda esclava no agrega texto: ExcelJS lo guarda en el master del merge.
+  //
+  // El síntoma era un archivo exportado donde 12 filas mostraban la categoría
+  // equivocada y —peor— si la fila TOTAL o la del IPC caía dentro del rango
+  // combinado, el valor se perdía porque se escribía dentro del merge.
+  //
+  // Se deshacen los merges que SE SOLAPAN con el rango donde van los datos y
+  // se reconstruyen al final, según los bloques REALES de categoría de la BD.
+  var FILA_DATOS_INI = 10;
+  var FILA_DATOS_FIN = FILA_DATOS_INI + (partidas.length - 1);
+  if (usandoPlantilla && ws.model && ws.model.merges && ws.model.merges.length) {
+    var _mergesChocan = [];
+    ws.model.merges.forEach(function (m) {
+      var mm = String(m).match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+      if (!mm) return;
+      var _ini = parseInt(mm[2], 10);
+      var _fin = parseInt(mm[4], 10);
+      if (_fin >= FILA_DATOS_INI && _ini <= FILA_DATOS_FIN) _mergesChocan.push(m);
+    });
+    _mergesChocan.forEach(function (m) {
+      try { ws.unMergeCells(m); } catch (e) { /* ya no era un merge */ }
+    });
+    if (_mergesChocan.length) {
+      console.log('[' + MOD + '][export] Se deshicieron ' + _mergesChocan.length +
+        ' combinación(es) de la plantilla que chocaban con los datos: ' + _mergesChocan.join(', '));
+    }
+  }
 
   // Datos
+  // 📦824 — La categoría (col B) se escribe solo en la primera fila de cada
+  // bloque; las demás son celdas esclavas del mismo merge (ver arriba).
   var COLUMN_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   var totalAsignado = 0;
   var totalEjecutado = 0;
   var mensualesAsignado = new Array(12).fill(0);
+  var mensualesEjecutado = new Array(12).fill(0);
+  var categoriaPrevia = null;
 
   partidas.forEach(function (p, idx) {
-    var rowIdx = 10 + idx;
+    var rowIdx = FILA_DATOS_INI + idx;
     var row = ws.getRow(rowIdx);
     row.getCell(1).value = p.numero;  // A: ID
     row.getCell(3).value = p.concepto;  // C: Detalle
@@ -709,20 +882,64 @@ function _buildPresupuestoXLSX(presupuesto, partidas) {
     var pct = (p.asignado > 0) ? ((p.ejecutado || 0) / p.asignado * 100) : 0;
     row.getCell(6).value = pct.toFixed(2) + '%';  // F: %
 
-    // Valores mensuales (G-R = columnas 7-18)
+    // Columnas G-R = ENE..DIC = "EJECUCION PRESUPUESTAL" del ACT-FO-043, que es
+    // la EJECUCIÓN MES A MES, no el asignado.
+    //
+    // 📦824 BUG: la v1 escribía `v.asignado` en esas columnas. O sea que el
+    // archivo exportado mostraba el presupuesto planeado donde debía ir lo
+    // gastado — por eso todo salía en 0% de ejecución frente a lo que la app sí
+    // tenía. Ahora va el ejecutado del mes.
     if (p.valores) {
       p.valores.forEach(function (v, mIdx) {
-        row.getCell(7 + mIdx).value = v.asignado || 0;
-        mensualesAsignado[mIdx] += v.asignado || 0;
+        row.getCell(7 + mIdx).value = v.ejecutado || 0;
+        mensualesEjecutado[mIdx] += v.ejecutado || 0;
       });
+    }
+
+    // 📦824 — Categoría (col B). Se escribe en TODA fila que abre un bloque;
+    // los merges del rango de datos ya se deshicieron arriba, así que escribir
+    // aquí nunca cae en una celda esclava.
+    if (usandoPlantilla) {
+      if (p.descripcion && p.descripcion !== categoriaPrevia) {
+        row.getCell(2).value = p.descripcion;
+        categoriaPrevia = p.descripcion;
+      }
+      if (p.numeroExcel) row.getCell(1).value = p.numeroExcel;
     }
 
     totalAsignado += p.asignado || 0;
     totalEjecutado += p.ejecutado || 0;
   });
 
+  // 📦824 — Reconstruir las combinaciones de la columna B según los bloques
+  // REALES de categoría de la BD, para que el archivo siga con el formato
+  // oficial (una categoría combinada por bloque) y no con 12 filas repitiendo
+  // el mismo texto.
+  if (usandoPlantilla) {
+    var _catActual = null, _iniCat = null, _finCat = null;
+    partidas.forEach(function (p, idx) {
+      var f = FILA_DATOS_INI + idx;
+      if (p.descripcion !== _catActual) {
+        if (_catActual && _finCat > _iniCat) {
+          try { ws.mergeCells('B' + _iniCat + ':B' + _finCat); } catch (e) { }
+        }
+        _catActual = p.descripcion; _iniCat = f; _finCat = f;
+      } else {
+        _finCat = f;
+      }
+    });
+    if (_catActual && _finCat > _iniCat) {
+      try { ws.mergeCells('B' + _iniCat + ':B' + _finCat); } catch (e) { }
+    }
+  }
+
   // Fila TOTAL AÑO
-  var totalRowIdx = 10 + partidas.length;
+  //
+  // 📦824 — Esta fila se escribe con la SUMA REAL de las partidas, no con lo que
+  // declaraba el Excel original. El 2026 de Tempoactiva venía con la fórmula
+  // mal (contaba cada partida dos veces: declaraba 55.638.568 frente a una suma
+  // de 27.819.284) y también mal en la ejecución. Al exportar se corrige.
+  var totalRowIdx = FILA_DATOS_INI + partidas.length;
   var totalRow = ws.getRow(totalRowIdx);
   totalRow.getCell(1).value = 'TOTAL AÑO';
   totalRow.getCell(3).value = 'TOTAL AÑO';
@@ -731,7 +948,33 @@ function _buildPresupuestoXLSX(presupuesto, partidas) {
   var totalPct = totalAsignado > 0 ? (totalEjecutado / totalAsignado * 100) : 0;
   totalRow.getCell(6).value = totalPct.toFixed(2) + '%';
   for (var m = 0; m < 12; m++) {
-    totalRow.getCell(7 + m).value = mensualesAsignado[m];
+    // Columnas de ejecución (G-R), igual que las filas de detalle.
+    totalRow.getCell(7 + m).value = mensualesEjecutado[m];
+  }
+
+  // 📦824 — Fila IPC, si el período lo tiene definido. El IPC es un dato
+  // editable por año (cambia cada año y lo digita el owner), así que se
+  // escribe con su valor real y solo si existe.
+  //
+  // ⚠️ Solo si la fila NO está dentro de un merge. La plantilla oficial usa
+  // celdas combinadas para las categorías (B11:B22 cubre 12 partidas). Si el
+  // presupuesto tiene MENOS partidas que la plantilla, la fila del IPC cae
+  // dentro de ese rango, y escribir ahí no agrega una fila: sobrescribe el
+  // valor de la categoría (ExcelJS lo guarda en la celda master del merge).
+  // En ese caso se salta y el IPC sigue disponible en la BD.
+  if (presupuesto.ipc !== null && presupuesto.ipc !== undefined) {
+    var ipcRowIdx = totalRowIdx + 1;
+    var ipcCellB = ws.getRow(ipcRowIdx).getCell(2);
+    if (ipcCellB.isMerged) {
+      console.warn('[' + MOD + '][export] Fila ' + ipcRowIdx + ' cae dentro de una celda combinada de la plantilla; ' +
+        'se omite la fila IPC en el archivo (el valor queda en la BD)');
+    } else {
+      var ipcRow = ws.getRow(ipcRowIdx);
+      ipcRow.getCell(2).value = 'IPC';
+      ipcRow.getCell(3).value = (Number(presupuesto.ipc) * 100).toFixed(1).replace('.', ',') + '%';
+      ipcRow.getCell(4).value = totalAsignado * (1 + Number(presupuesto.ipc));
+      ipcRow.getCell(5).value = totalEjecutado * (1 + Number(presupuesto.ipc));
+    }
   }
 
   return workbook.xlsx.writeBuffer();
@@ -747,7 +990,7 @@ function _buildPresupuestoXLSX(presupuesto, partidas) {
  *
  * Devuelve: { success, path, size }
  */
-async function _handlerExportExcel(token, presupuestoId, outputPath) {
+async function _handlerExportExcel(token, presupuestoId, outputPath, plantillaPath) {
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
@@ -762,7 +1005,11 @@ async function _handlerExportExcel(token, presupuestoId, outputPath) {
   var presRow;
   try {
     presRow = localDb.prepare(
-      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por " +
+      "SELECT id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por, " +
+      // 📦824 — columnas del 📦824 (rastro del Excel + IPC + avisos). Sin estas,
+      // el detalle de un período llegaba a la UI con todo en undefined.
+      "archivo_origen, archivo_nombre, archivo_importado_en, " +
+      "total_declarado_asignado, total_declarado_ejecutado, ipc, avisos_importacion " +
       "FROM presupuestos WHERE id = ?"
     ).get(presupuestoId);
   } catch (e) {
@@ -802,6 +1049,12 @@ async function _handlerExportExcel(token, presupuestoId, outputPath) {
       numero: p.numero,
       concepto: p.concepto,
       descripcion: p.descripcion || '',
+      // 📦824 — se leen los valores del archivo para escribir el anual y el
+      // acumulado tal como venían, no solo lo que se calcula sumando meses.
+      asignadoAnual: p.asignado_anual,
+      ejecutadoAcumulado: p.ejecutado_acumulado,
+      porcentajeEje: p.porcentaje_eje,
+      numeroExcel: p.numero_excel,
       asignado: totalAsig,
       ejecutado: totalEjec,
       porcentaje: totalAsig > 0 ? (totalEjec / totalAsig * 100) : 0,
@@ -809,10 +1062,13 @@ async function _handlerExportExcel(token, presupuestoId, outputPath) {
     };
   });
 
-  // 3. Generar el archivo .xlsx (writeBuffer es async)
+  // 3. Generar el .xlsx (writeBuffer es async)
   var buffer;
   try {
-    buffer = await _buildPresupuestoXLSX(presupuesto, partidas);
+    // 📦824 — Si se pasa plantilla, se escribe ENCIMA del archivo oficial en vez
+    // de generar uno pelado (que pierdo el encabezado del sistema, los merges de
+    // categoría y el pie de firmas).
+    buffer = await _buildPresupuestoXLSX(presupuesto, partidas, plantillaPath);
   } catch (e) {
     console.error('[' + MOD + '][export-excel] build error:', e.message);
     return _err('BUILD_ERROR', 'Error generando Excel: ' + e.message);
@@ -918,13 +1174,69 @@ function _handlerBulkSave(token, presupuestoId, data) {
   try {
     localDb.exec('BEGIN TRANSACTION;');
 
-    // Soft-delete partidas existentes (cascade a valores_mensuales)
+    // 📦824 — Se preserva el EJECUTADO de lo que ya está en la BD.
+    //
+    // BUG ORIGINAL (grave, pérdida de dato confirmada por diseño): este
+    // handler borraba TODAS las partidas y las reinsertaba con `ejecutado = 0`
+    // hardcodeado. Cada guardado de la UI ponía la ejecución real en cero —
+    // por eso las 168 filas de la base de Tempoactiva están todas en 0, siendo
+    // que el Excel de origen declara 33.694.321,66 ejecutados.
+    //
+    // La UI nunca manda el ejecutado (viene de una tabla read-only), así que no
+    // puede venir en `row`. La solución NO es confiar en la UI: es leer el valor
+    // real de la BD antes de borrar y restaurarlo por (numero, mes).
+    var ejecutadoPrevio = {};
+    try {
+      var rowsPrevios = localDb.prepare(
+        "SELECT p.numero AS numero, v.mes AS mes, v.ejecutado AS ejecutado " +
+        "FROM presupuesto_valores_mensuales v " +
+        "JOIN presupuesto_partidas p ON p.id = v.partida_id " +
+        "WHERE p.presupuesto_id = ?"
+      ).all(presupuestoId);
+      for (var ep = 0; ep < rowsPrevios.length; ep++) {
+        ejecutadoPrevio[rowsPrevios[ep].numero + ':' + rowsPrevios[ep].mes] = rowsPrevios[ep].ejecutado || 0;
+      }
+    } catch (epErr) {
+      console.warn('[' + MOD + '][bulk-save] no se pudo leer el ejecutado previo: ' + epErr.message);
+    }
+
+    // 📦824 FIX (pérdida de dato confirmada en producción) — Lo mismo con el
+    // resto de campos que la UI NO viaja a través de la grilla: la categoría
+    // (col B del Excel), el número de bloque del Excel y los agregados.
+    //
+    // El bug: la "preservación" de `descripcion` consultaba
+    // `presupuesto_partidas` DESPUÉS del DELETE de dos líneas más abajo, o sea
+    // sobre una tabla ya vacía → siempre daba NULL. Resultado real medido: el
+    // 2026 de Tempoactiva quedó con 0 de 14 categorías, y los agregados en NULL,
+    // que es lo que hacía que las tarjetas no cuadraran.
+    //
+    // El arreglo: leer el estado COMPLETO de las partidas ANTES de borrar y
+    // usarlo como respaldo. Así un guardado solo puede cambiar lo que la UI
+    // realmente cambió.
+    var partidasPrevias = {};
+    try {
+      var pPrevias = localDb.prepare(
+        "SELECT numero, descripcion, numero_excel, asignado_anual " +
+        "FROM presupuesto_partidas WHERE presupuesto_id = ?"
+      ).all(presupuestoId);
+      for (var pp = 0; pp < pPrevias.length; pp++) {
+        partidasPrevias[pPrevias[pp].numero] = pPrevias[pp];
+      }
+    } catch (ppErr) {
+      console.warn('[' + MOD + '][bulk-save] no se pudo leer el estado previo de las partidas: ' + ppErr.message);
+    }
+
+    // Borrado real (no soft-delete) + borrado explícito de los valores, porque
+    // los ON DELETE CASCADE declarados en el schema solo funcionan con
+    // PRAGMA foreign_keys=ON (ya activo en main.js desde 📦824, pero no
+    // dependemos de eso: borrar explícito es correcto en ambos casos).
+    localDb.prepare("DELETE FROM presupuesto_valores_mensuales WHERE partida_id IN (SELECT id FROM presupuesto_partidas WHERE presupuesto_id = ?)").run(presupuestoId);
     localDb.prepare("DELETE FROM presupuesto_partidas WHERE presupuesto_id = ?").run(presupuestoId);
 
     // Preparar statements
     var stmtInsertPartida = localDb.prepare(
-      "INSERT INTO presupuesto_partidas (id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en) " +
-      "VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+      "INSERT INTO presupuesto_partidas (id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en, asignado_anual, ejecutado_acumulado, porcentaje_eje, numero_excel) " +
+      "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)"
     );
     var stmtInsertValor = localDb.prepare(
       "INSERT INTO presupuesto_valores_mensuales (partida_id, anio, mes, asignado, ejecutado, notas, actualizado_en) " +
@@ -933,6 +1245,7 @@ function _handlerBulkSave(token, presupuestoId, data) {
 
     var insertedPartidas = 0;
     var insertedValores = 0;
+    var ejecutadosRestaurados = 0;
     var COLUMN_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
     for (var i = 0; i < partidasInput.length; i++) {
@@ -941,30 +1254,115 @@ function _handlerBulkSave(token, presupuestoId, data) {
       var numero = (typeof row.id === 'number') ? row.id : (i + 1);
       var concepto = (typeof row.detalle === 'string') ? row.detalle.trim() : String(row.detalle || '');
 
-      stmtInsertPartida.run(newPartidaId, presupuestoId, numero, concepto, now, now);
+      // 📦824 — `descripcion` se conserva si la UI no la manda. El respaldo se
+      // lee del SNAPSHOT tomado ANTES del borrado (antes se consultaba la tabla
+      // ya vacía y por eso se perdía la categoría de TODAS las partidas).
+      var descripcion = null;
+      if (typeof row.descripcion === 'string' && row.descripcion.trim() !== '') {
+        descripcion = row.descripcion.trim();
+      } else if (partidasPrevias[numero] && typeof partidasPrevias[numero].descripcion === 'string' &&
+        partidasPrevias[numero].descripcion.trim() !== '') {
+        descripcion = partidasPrevias[numero].descripcion.trim();
+      }
+
+      // 📦824 FIX — El número de bloque del Excel tampoco viaja por la grilla;
+      // sin respaldo se perdía en cada guardado.
+      var numeroExcel = (row.numeroExcel || (partidasPrevias[numero] && partidasPrevias[numero].numero_excel)) || null;
+
+      // 📦824 FIX — El anual (columna D del ACT-FO-043) es la verdad del
+      // documento y NO se deriva de los meses. Si la UI no lo manda, se toma del
+      // snapshot. Antes de esto el import lo repartía entre 12 meses y cualquier
+      // hueco en ese reparto se comía el total.
+      //
+      // ⚠️ Se mira el valor CRUDO antes de convertirlo: `_toNumericValue(undefined)`
+      // devuelve 0, no null, y con un `|| null` la fila se ponía en 0 en vez de
+      // conservar el anual que ya estaba en la BD.
+      var asignadoAnual;
+      if (row.asignacion === null || row.asignacion === undefined || row.asignacion === '') {
+        var previo = partidasPrevias[numero];
+        asignadoAnual = (previo && previo.asignado_anual !== null && previo.asignado_anual !== undefined)
+          ? previo.asignado_anual
+          : null;
+      } else {
+        asignadoAnual = _toNumericValue(row.asignacion);
+      }
+
+      // 📦824 — se conservan los 3 campos del Excel que la v1 descartaba.
+      stmtInsertPartida.run(
+        newPartidaId, presupuestoId, numero, concepto, descripcion, now, now,
+        asignadoAnual,
+        _toNumericValue(row.ejecutado) || null,
+        _toNumericValue(row.porcentaje_eje) || null,
+        numeroExcel
+      );
       insertedPartidas++;
 
-      // Detectar si hay al menos un valor mensual != 0
-      var hasMonthly = false;
-      for (var c = 0; c < 12; c++) {
-        if (_toNumericValue(row[COLUMN_MESES[c]]) > 0) { hasMonthly = true; break; }
-      }
-
-      // Insertar 12 valores mensuales.
-      // Estrategia:
-      //   - Si hay valores mensuales, se usan como ASIGNADO por mes
-      //   - Si NO hay valores mensuales, se distribuye el anual en 12
-      //   - El ejecutado por mes siempre arranca en 0 (la UI lo edita después)
-      // Esto preserva los datos del usuario y mantiene consistencia con
-      // el importador desde Excel (Fase 4).
-      var asignadoTotal = _toNumericValue(row.asignacion);
+      // 📦824 — Cómo se interpretan las 12 columnas de mes del payload.
+      //
+      // La grilla las titula como el ACT-FO-043: "EJECUCION PRESUPUESTAL"
+      // (fila 8) con el nombre del mes debajo (fila 9). O sea que `row[mes]`
+      // es el dinero GASTADO ese mes, no un presupuesto mensual.
+      //
+      // El ACT-FO-043 NO trae presupuesto por mes: la asignación va solo en la
+      // columna D (anual). El `asignado` de cada mes es un reparto derivado
+      // (anual/12) que existe únicamente para dibujar la curva "programada" del
+      // dashboard, y se vuelve a calcular aquí — no viene de la grilla.
+      //
+      // El resto del remanente se mete en DICIEMBRE para que la suma de los 12
+      // dé EXACTAMENTE el anual: con 2.500.000/12 = 208.333,33 el redondeo en
+      // coma flotante dejaba centavos fuera y el total no cuadraba con la
+      // columna D.
+      //
+      // Se redondea a 2 decimales (precisión de la moneda) ANTES de calcular el
+      // remanente: sin eso, 10.000.000/12 en coma flotante daba
+      // 9.999.999,999999998 en la BD y ninguna suma cuadraba.
+      var asignadoMesBase = (asignadoAnual === null) ? 0 : _redondearMoneda(asignadoAnual / 12);
       for (var m = 0; m < 12; m++) {
-        var asignadoMes = hasMonthly
-          ? _toNumericValue(row[COLUMN_MESES[m]])
-          : (asignadoTotal / 12);
-        stmtInsertValor.run(newPartidaId, pres.anio, m + 1, asignadoMes, 0, now);
+        var asignadoMes = (m === 11 && asignadoAnual !== null)
+          ? _redondearMoneda(asignadoAnual - (asignadoMesBase * 11))
+          : asignadoMesBase;
+
+        // El ejecutado puede venir explícito (import) o en la columna del mes.
+        var ejecutadoMes = _toNumericValue(row['ejecutado_' + COLUMN_MESES[m]]);
+        if (!ejecutadoMes) ejecutadoMes = _toNumericValue(row[COLUMN_MESES[m]]);
+        if (!ejecutadoMes) {
+          var key = numero + ':' + (m + 1);
+          ejecutadoMes = ejecutadoPrevio[key] !== undefined ? ejecutadoPrevio[key] : 0;
+          if (ejecutadoMes > 0) ejecutadosRestaurados++;
+        }
+
+        stmtInsertValor.run(newPartidaId, pres.anio, m + 1, asignadoMes, ejecutadoMes, now);
         insertedValores++;
       }
+    }
+
+    // 📦824 FIX — Agregados por partida.
+    //
+    // `ejecutado_acumulado` SÍ se recalcula: los 12 meses son DATO REAL del
+    // Excel (columnas G-R = "EJECUCION PRESUPUESTAL") y su suma coincide con la
+    // columna E del ACT-FO-043.
+    //
+    // `asignado_anual` NO se recalcula NUNCA. La columna D ("ASIGNACION PRESUPUESTO
+    // ANUAL") es la verdad del documento, y los 12 meses de ASIGNADO son un
+    // reparto INVENTADO que hace el import (anual/12) porque el formato no trae
+    // un asignado por mes. Recalcular el anual sumando ese reparto convierte
+    // cualquier hueco en el número oficial: medido en Tempoactiva 2026, la
+    // partida "Realización de Capacitaciones" (D = 240.000) quedaba en 220.000
+    // porque marzo venía en 0. El anual se preserva arriba (insert + snapshot);
+    // el % sí se recalcula porque se deriva de los dos.
+    try {
+      localDb.prepare(
+        "UPDATE presupuesto_partidas SET " +
+        "  ejecutado_acumulado = (SELECT COALESCE(SUM(v.ejecutado),0) FROM presupuesto_valores_mensuales v WHERE v.partida_id = presupuesto_partidas.id) " +
+        "WHERE presupuesto_id = ?"
+      ).run(presupuestoId);
+      localDb.prepare(
+        "UPDATE presupuesto_partidas SET porcentaje_eje = " +
+        "  CASE WHEN asignado_anual > 0 THEN ROUND((ejecutado_acumulado / asignado_anual) * 100, 2) ELSE 0 END " +
+        "WHERE presupuesto_id = ?"
+      ).run(presupuestoId);
+    } catch (aggErr) {
+      console.warn('[' + MOD + '][bulk-save] no se pudieron recalcular los agregados: ' + aggErr.message);
     }
 
     // Actualizar timestamp del presupuesto
@@ -975,6 +1373,9 @@ function _handlerBulkSave(token, presupuestoId, data) {
     return _ok({
       inserted: insertedPartidas,
       valores: insertedValores,
+      // 📦824 — se reporta cuántos ejecutados se salvaron del borrado, para que
+      // el bug sea visible si alguna vez vuelve a pasar.
+      ejecutadosRestaurados: ejecutadosRestaurados,
       presupuestoId: presupuestoId,
       savedAt: now
     });
@@ -1044,6 +1445,18 @@ function _newPresupuestoId() {
 
 function _newPartidaId() {
   return 'pp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+
+/**
+ * Redondea a 2 decimales (precisión de la moneda).
+ *
+ * 📦824 — Repartir un anual entre 12 meses en coma flotable produce valores como
+ * 833.333,3333333334. Con eso la suma de los 12 meses daba 9.999.999,999999998
+ * y NINGUNA suma del sistema cuadraba con la columna D del ACT-FO-043.
+ */
+function _redondearMoneda(n) {
+  if (n === null || n === undefined || isNaN(n)) return 0;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 /**
@@ -1119,7 +1532,28 @@ function _parsePresupuestoXLSX(filePath) {
   var dataStartIndex = 9;
   var rawData = allData.slice(dataStartIndex);
   var partidas = [];
-  var nextNumero = 1;
+  var avisos = [];
+
+  // 📦824 — El total que DECLARA el Excel y el factor IPC. Se leen de la fila de
+  // cierre ANTES del break, porque ahí están.
+  //
+  // En el Excel 2026 de Tempoactiva la fila "TOTAL AÑO" declara 55.638.568
+  // cuando las 14 partidas suman 27.819.284: el doble exacto. Es un bug de
+  // fórmula en el archivo (cuenta cada partida dos veces). Guardamos el valor
+  // declarado para REPORTARLO en vez de propagarlo como verdad.
+  var totalDeclaradoAsignado = null;
+  var totalDeclaradoEjecutado = null;
+  var ipc = null;
+
+  // 📦824 — CATEGORÍA (col B) con forward-fill.
+  //
+  // El Excel usa celdas combinadas para la categoría: B11:B22 es un solo texto
+  // "SISTEMA INTEGRAL DE GESTION DE SEGURIDAD..." que cubre 12 partidas. Con
+  // sheet_to_json solo la PRIMERA fila de un merge trae el valor y las demás
+  // vienen null. Sin propagar, 11 partidas quedan sin categoría — que es
+  // justo lo que pasaba: la v1 ponía descripcion='' fijo y se perdían todas.
+  var categoriaActual = '';
+  var cerrado = false;
 
   for (var i = 0; i < rawData.length; i++) {
     var row = rawData[i];
@@ -1127,11 +1561,37 @@ function _parsePresupuestoXLSX(filePath) {
 
     var firstCell = row[COL.id];
     var secondCell = row[1]; // B — puede tener "TOTAL AÑO" si A-B está merged
+    var thirdCell = row[COL.detalle];
+    var colB = row[1];
 
-    // Stop en TOTAL AÑO
+    // 📦824 — La fila IPC va DESPUÉS de la de TOTAL AÑO, así que se revisa
+    // primero: se sigue leyendo una fila más (en vez de cortar en seco) para no
+    // perder el factor, que es justo lo que explica por qué el total del Excel
+    // no cuadra con la suma de las partidas.
+    if (typeof colB === 'string' && colB.trim().toUpperCase() === 'IPC') {
+      ipc = _toNumericValue(row[2]) || null;
+      continue;
+    }
+
+    // 📦824 — La fila de cierre se lee, pero NO se corta en seco: la fila IPC
+    // viene justo después y es la que explica por qué el total del Excel no
+    // cuadra con la suma de las partidas. Se marca `cerrado` y se sigue una fila
+    // más; en la siguiente iteración se corta de verdad.
     if ((typeof firstCell === 'string' && firstCell.indexOf('TOTAL AÑO') >= 0) ||
-        (typeof secondCell === 'string' && secondCell.indexOf('TOTAL AÑO') >= 0)) {
-      break;
+        (typeof secondCell === 'string' && secondCell.indexOf('TOTAL AÑO') >= 0) ||
+        (typeof thirdCell === 'string' && thirdCell.indexOf('TOTAL AÑO') >= 0)) {
+      totalDeclaradoAsignado = _toNumericValue(row[COL.asignacion]) || null;
+      totalDeclaradoEjecutado = _toNumericValue(row[COL.ejecucion]) || null;
+      cerrado = true;
+      continue;
+    }
+
+    // Ya pasamos la fila de cierre y no era la IPC: no hay más partidas.
+    if (cerrado) break;
+
+    // Propagar la categoría del merge hacia abajo
+    if (typeof colB === 'string' && colB.trim() !== '') {
+      categoriaActual = colB.trim();
     }
 
     // Saltar filas vacías
@@ -1141,34 +1601,120 @@ function _parsePresupuestoXLSX(filePath) {
     // Parsear valores mensuales.
     // Estructura del Excel:
     //   - Col D (asignacion) = ASIGNADO TOTAL ANUAL (no se desglosa por mes)
-    //   - Col E (ejecucion) = EJECUTADO TOTAL ANUAL
-    //   - Cols G-R (meses) = EJECUTADO MENSUAL (por mes)
+    //   - Col E (ejecucion)  = EJECUTADO ACUMULADO a la fecha del archivo
+    //   - Cols G-R (meses)   = EJECUTADO MENSUAL (por mes)
     //
-    // Para la BD, distribuimos el asignado anual en 12 meses (asignado_mes = total/12)
-    // para que SUM(v.asignado) por partida == total anual (consistente con la UI).
-    // El ejecutado mensual se guarda tal cual viene del Excel.
+    // Para la BD se distribuye el anual en 12 meses (asignado_mes = total/12)
+    // para que SUM(asignado) por partida == total anual. Ese valor DERIVADO se
+    // compara contra la col D real, que se guarda aparte como asignado_anual.
     var valores = [];
     var asignadoTotal = _toNumericValue(row[COL.asignacion]);
-    var asignadoPorMes = asignadoTotal / 12;
+    var ejecutadoAcumulado = _toNumericValue(row[COL.ejecucion]);
+    var asignadoPorMes = _redondearMoneda(asignadoTotal / 12);
+    var sumaEjecutadoMes = 0;
     for (var m = 0; m < 12; m++) {
       var ejecutadoMes = _toNumericValue(row[COL.meses[m]]);
-      valores.push({ mes: m + 1, asignado: asignadoPorMes, ejecutado: ejecutadoMes });
+      sumaEjecutadoMes += ejecutadoMes;
+      // 📦824 — El remanente va en DICIEMBRE y se redondea a centavos, para que
+      // la suma de los 12 dé EXACTAMENTE la columna D. Sin esto, 240.000/12 en
+      // coma flotante dejaba el total anual descuadrado.
+      var asignadoMes = (m === 11)
+        ? _redondearMoneda(asignadoTotal - (asignadoPorMes * 11))
+        : asignadoPorMes;
+      valores.push({ mes: m + 1, asignado: asignadoMes, ejecutado: ejecutadoMes });
     }
 
+    // 📦824 — Comprobación: el ejecutado de los 12 meses debería dar el
+    // acumulado de la col E. Si no da, el Excel tiene un descuadre y se avisa
+    // (no se corrige en silencio: la fuente de verdad es el Excel).
+    if (ejecutadoAcumulado > 0 && Math.abs(sumaEjecutadoMes - ejecutadoAcumulado) > 1) {
+      avisos.push(
+        'Partida "' + String(detalle).trim().slice(0, 40) + '": la suma de los 12 meses (' +
+        Math.round(sumaEjecutadoMes).toLocaleString('es-CO') + ') no cuadra con el ejecutado acumulado de la fila (' +
+        Math.round(ejecutadoAcumulado).toLocaleString('es-CO') + '). Se guardó la suma de los meses.'
+      );
+    }
+
+    // 📦824 — La columna N del Excel NO numera partidas: numera BLOQUES de
+    // categoría. En el 2026 vale 1 (ASESORIAS SST), 2 (SISTEMA INTEGRAL, que
+    // abarca 12 partidas) y 3 (PAPELERIA SG-SST), y viene en celdas combinadas,
+    // así que solo la primera fila de cada bloque trae el número.
+    //
+    // Usar ese valor como `numero` rompía con UNIQUE(presupuesto_id, numero):
+    // las 12 filas del bloque 2 caían al mismo número y el import moría con
+    // "UNIQUE constraint failed" (lo detectó test-presupuesto-824-real.js).
+    // Se separan los dos conceptos: `numero` sigue siendo la posición de la
+    // partida (1..N, lo que la UI y el export usan) y el número del Excel se
+    // guarda aparte en numero_excel para poder rastrear el bloque al exportar.
+    var numeroExcel = _toNumericValue(row[COL.id]);
+    var numero = partidas.length + 1;
+
     partidas.push({
-      numero: nextNumero++,
+      numero: numero,
+      numeroExcel: (numeroExcel > 0) ? Math.round(numeroExcel) : null,
       concepto: typeof detalle === 'string' ? detalle.trim() : String(detalle),
-      descripcion: '',
+      // 📦824 — la categoría del Excel (col B), no '' fijo como antes.
+      descripcion: categoriaActual,
       asignado: asignadoTotal,
-      ejecutado: _toNumericValue(row[COL.ejecucion]),
+      ejecutado: ejecutadoAcumulado,
+      porcentaje_eje: _toNumericValue(row[COL.pct]) || null,
       valores: valores
     });
+  }
+
+  // 📦824 — Validación cruzada: el TOTAL AÑO declarado vs la suma real.
+  //
+  // El Excel 2026 de Tempoactiva falla en LAS DOS columnas de esa fila:
+  //   - asignado: declara 55.638.568 cuando las 14 partidas suman 27.819.284 (×2)
+  //   - ejecutado: declara 33.694.321,66 cuando las partidas ejecutan 19.696.874,33 (×1,71)
+  // Las 3 filas con ejecución sí cuadran internamente (la suma de sus 12 meses
+  // da exactamente su acumulado), así que el error está en la fila de resumen,
+  // no en el detalle.
+  //
+  // Se usa SIEMPRE la suma de las partidas y se reporta la diferencia. Usar el
+  // declarado importaría un presupuesto inflado ~2×.
+  var sumaCalculada = partidas.reduce(function (a, p) { return a + (p.asignado || 0); }, 0);
+  var sumaEjecCalculada = partidas.reduce(function (a, p) { return a + (p.ejecutado || 0); }, 0);
+
+  if (totalDeclaradoAsignado !== null && partidas.length > 0) {
+    var dif = Math.abs(totalDeclaradoAsignado - sumaCalculada);
+    if (dif > 1) {
+      var factor = sumaCalculada > 0 ? totalDeclaradoAsignado / sumaCalculada : 0;
+      avisos.push(
+        'La fila "TOTAL AÑO" del Excel declara ' + Math.round(totalDeclaradoAsignado).toLocaleString('es-CO') +
+        ' de asignado pero la suma de las ' + partidas.length + ' partidas da ' + Math.round(sumaCalculada).toLocaleString('es-CO') +
+        ' (diferencia de ' + Math.round(dif).toLocaleString('es-CO') + ', factor ' + (Math.round(factor * 100) / 100) + '). ' +
+        'Se usó la suma de las partidas. Revisar la fórmula de esa fila en el Excel.'
+      );
+    }
+  }
+
+  if (totalDeclaradoEjecutado !== null && sumaEjecCalculada > 0) {
+    var difEj = Math.abs(totalDeclaradoEjecutado - sumaEjecCalculada);
+    if (difEj > 1) {
+      var factorEj = sumaEjecCalculada > 0 ? totalDeclaradoEjecutado / sumaEjecCalculada : 0;
+      avisos.push(
+        'La fila "TOTAL AÑO" del Excel declara ' + Math.round(totalDeclaradoEjecutado).toLocaleString('es-CO') +
+        ' de ejecutado pero las partidas suman ' + Math.round(sumaEjecCalculada).toLocaleString('es-CO') +
+        ' (diferencia de ' + Math.round(difEj).toLocaleString('es-CO') + ', factor ' + (Math.round(factorEj * 100) / 100) + '). ' +
+        'Se usó la suma de las partidas.'
+      );
+    }
   }
 
   return {
     sheetName: sheetName,
     range: correctedRangeStr,
-    nombre: 'Presupuesto importado de ' + sheetName,
+    nombre: 'Presupuesto importado de ' + sheetName.trim(),
+    // 📦824 — rastro del archivo + los totales que DECLARA el Excel.
+    archivoNombre: filePath ? String(filePath).split(/[\\/]/).pop() : null,
+    archivoOrigen: filePath || null,
+    totalDeclaradoAsignado: totalDeclaradoAsignado,
+    totalDeclaradoEjecutado: totalDeclaradoEjecutado,
+    ipc: ipc,
+    sumaCalculadaAsignado: sumaCalculada,
+    sumaCalculadaEjecutado: sumaEjecCalculada,
+    avisos: avisos,
     partidas: partidas
   };
 }
@@ -1230,13 +1776,23 @@ function _handlerImportFromExcel(token, filePath, companyName, anio, options) {
   }
 
   if (dryRun) {
+    // 📦824 — el dryRun es la vista previa: debe enseñar los mismos avisos que
+    // vería el usuario al importar, para decidir antes de escribir en BD.
     return _ok({
       dryRun: true,
       parsed: {
         sheetName: parsed.sheetName,
         range: parsed.range,
         nombre: parsed.nombre,
+        archivoNombre: parsed.archivoNombre,
         partidasCount: parsed.partidas.length,
+        // 📦824 — los totales van en la vista previa: son justo lo que el
+        // usuario necesita comparar contra el Excel antes de importar.
+        totalAsignado: parsed.sumaCalculadaAsignado,
+        totalDeclarado: parsed.totalDeclaradoAsignado,
+        totalDeclaradoEjecutado: parsed.totalDeclaradoEjecutado,
+        ipc: parsed.ipc,
+        avisos: parsed.avisos || [],
         firstPartida: parsed.partidas[0] ? { numero: parsed.partidas[0].numero, concepto: parsed.partidas[0].concepto } : null,
         lastPartida: parsed.partidas[parsed.partidas.length - 1] ? { numero: parsed.partidas[parsed.partidas.length - 1].numero, concepto: parsed.partidas[parsed.partidas.length - 1].concepto } : null
       }
@@ -1265,25 +1821,57 @@ function _handlerImportFromExcel(token, filePath, companyName, anio, options) {
     try {
       var newPresId;
       if (existing && overwrite) {
-        // 5a. Overwrite: borrar las partidas viejas (cascada a valores) y reusar el mismo id
+        // 5a. Overwrite: borrar partidas + valores explícitamente (los
+        // ON DELETE CASCADE del schema solo aplican con foreign_keys=ON) y
+        // reusar el mismo id.
+        localDb.prepare("DELETE FROM presupuesto_valores_mensuales WHERE partida_id IN (SELECT id FROM presupuesto_partidas WHERE presupuesto_id = ?)").run(existing.id);
         localDb.prepare("DELETE FROM presupuesto_partidas WHERE presupuesto_id = ?").run(existing.id);
-        localDb.prepare("UPDATE presupuestos SET actualizado_en = ?, nombre = ? WHERE id = ?")
-          .run(now, parsed.nombre || ('Presupuesto ' + companyName + ' ' + anioNum), existing.id);
+        // 📦824 — se actualizan también el rastro del archivo y los totales
+        // declarados: un overwrite viene de un Excel nuevo, y dejarlo con los
+        // metadatos del anterior haría creer que la fuente no cambió.
+        localDb.prepare(
+          "UPDATE presupuestos SET actualizado_en = ?, nombre = ?, " +
+          "archivo_origen = ?, archivo_nombre = ?, archivo_importado_en = ?, " +
+          "total_declarado_asignado = ?, total_declarado_ejecutado = ?, ipc = ?, avisos_importacion = ? " +
+          "WHERE id = ?"
+        ).run(
+          now,
+          parsed.nombre || ('Presupuesto ' + companyName + ' ' + anioNum),
+          parsed.archivoOrigen,
+          parsed.archivoNombre,
+          now,
+          parsed.totalDeclaradoAsignado,
+          parsed.totalDeclaradoEjecutado,
+          parsed.ipc,
+          parsed.avisos && parsed.avisos.length ? JSON.stringify(parsed.avisos) : null,
+          existing.id
+        );
         newPresId = existing.id;
         replacedId = existing.id;
       } else {
         // 5b. Crear nuevo
         newPresId = _newPresupuestoId();
         localDb.prepare(
-          "INSERT INTO presupuestos (id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por) " +
-          "VALUES (?, ?, ?, ?, '', ?, ?, ?)"
-        ).run(newPresId, company.company_key, anioNum, parsed.nombre || ('Presupuesto ' + companyName + ' ' + anioNum), now, now, auth.user && auth.user.id ? auth.user.id : null);
+          "INSERT INTO presupuestos (id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por, " +
+          "archivo_origen, archivo_nombre, archivo_importado_en, total_declarado_asignado, total_declarado_ejecutado, ipc, avisos_importacion) " +
+          "VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(
+          newPresId, company.company_key, anioNum,
+          parsed.nombre || ('Presupuesto ' + companyName + ' ' + anioNum),
+          now, now, auth.user && auth.user.id ? auth.user.id : null,
+          parsed.archivoOrigen, parsed.archivoNombre, now,
+          parsed.totalDeclaradoAsignado, parsed.totalDeclaradoEjecutado, parsed.ipc,
+          parsed.avisos && parsed.avisos.length ? JSON.stringify(parsed.avisos) : null
+        );
       }
 
       // 6. Insertar partidas + valores
+      // 📦824 — descripcion ya no se pisa con '' (era la categoría del Excel,
+      // col B, con celdas combinadas), y se guardan los 3 campos que la v1
+      // descartaba: asignado_anual, ejecutado_acumulado, porcentaje_eje.
       stmtInsertPartida = localDb.prepare(
-        "INSERT INTO presupuesto_partidas (id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en) " +
-        "VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+        "INSERT INTO presupuesto_partidas (id, presupuesto_id, numero, concepto, descripcion, activo, creado_en, actualizado_en, asignado_anual, ejecutado_acumulado, porcentaje_eje, numero_excel) " +
+        "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)"
       );
       stmtInsertValor = localDb.prepare(
         "INSERT INTO presupuesto_valores_mensuales (partida_id, anio, mes, asignado, ejecutado, notas, actualizado_en) " +
@@ -1293,7 +1881,14 @@ function _handlerImportFromExcel(token, filePath, companyName, anio, options) {
       for (var p = 0; p < parsed.partidas.length; p++) {
         var partidaData = parsed.partidas[p];
         var newPartidaId = _newPartidaId();
-        stmtInsertPartida.run(newPartidaId, newPresId, partidaData.numero, partidaData.concepto, now, now);
+        stmtInsertPartida.run(
+          newPartidaId, newPresId, partidaData.numero, partidaData.concepto,
+          partidaData.descripcion || null, now, now,
+          partidaData.asignado !== undefined ? partidaData.asignado : null,
+          partidaData.ejecutado !== undefined ? partidaData.ejecutado : null,
+          partidaData.porcentaje_eje !== undefined ? partidaData.porcentaje_eje : null,
+          partidaData.numeroExcel !== undefined ? partidaData.numeroExcel : null
+        );
         insertedPartidas++;
         for (var v = 0; v < partidaData.valores.length; v++) {
           var val = partidaData.valores[v];
@@ -1307,16 +1902,159 @@ function _handlerImportFromExcel(token, filePath, companyName, anio, options) {
       throw e;
     }
 
+    // 📦824 — Si el Excel venía con inconsistencias, se registra en consola
+    // aunque el import sea exitoso: el import NO debe fallar por un descuadre
+    // del archivo, pero tampoco debe esconderse en silencio.
+    if (parsed.avisos && parsed.avisos.length) {
+      console.warn('[' + MOD + '][import-from-excel] ' + parsed.avisos.length + ' aviso(s) del Excel:');
+      parsed.avisos.forEach(function (av) { console.warn('  · ' + av); });
+    }
+
     return _ok({
       inserted: insertedPartidas,
       valores: insertedValores,
       presupuestoId: newPresId,
       sheetName: parsed.sheetName,
       range: parsed.range,
-      replaced: replacedId
+      replaced: replacedId,
+      // 📦824 — el import responde qué encontró, para que la UI pueda avisar.
+      archivoNombre: parsed.archivoNombre,
+      totalAsignado: parsed.sumaCalculadaAsignado,
+      totalDeclarado: parsed.totalDeclaradoAsignado,
+      ipc: parsed.ipc,
+      avisos: parsed.avisos || []
     });
   } catch (e) {
     console.error('[' + MOD + '][import-from-excel] DB error:', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * presupuesto:duplicar-periodo
+ * 📦824 — Crea un período NUEVO a partir de uno existente, para empezar el
+ * siguiente año sin arrancar de cero.
+ *
+ * Qué copia y qué no (decisión de negocio, no técnica):
+ *   - COPIA: la lista de partidas (concepto, categoría, asignado anual).
+ *     El Excel ACT-FO-043 tiene una estructura de partidas que se mantiene
+ *     año a año; es la "plantilla" y debe conservarse.
+ *   - PONE EN CERO: toda la ejecución. Un presupuesto de 2027 no puede
+ *     arrancar con lo ejecutado de 2026.
+ *   - VACÍO: el IPC. El owner lo digita para el año nuevo (cambia cada año) —
+ *     por eso NO se hereda, para que no se le pase por alto.
+ *
+ * El aislamiento entre períodos es la misma garantía que da
+ * test-presupuesto-824-aislamiento.js: tocar el nuevo no puede mover el viejo.
+ *
+ * Input: { token, presupuestoIdOrigen, anioDestino, nombre? }
+ */
+function _handlerDuplicarPeriodo(token, presupuestoIdOrigen, anioDestino, nombre) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  var anioNum = parseInt(anioDestino, 10);
+  if (!anioNum || anioNum < 2000 || anioNum > 2100) {
+    return _err('INVALID_INPUT', 'anioDestino debe ser un año entre 2000 y 2100');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var origen = localDb.prepare('SELECT * FROM presupuestos WHERE id = ?').get(presupuestoIdOrigen);
+    if (!origen) return _err('NOT_FOUND', 'El presupuesto origen no existe');
+
+    // El destino no puede pisar un período existente: es la misma protección
+    // que evita perder trabajo por un clic en falso.
+    var existente = localDb.prepare('SELECT id FROM presupuestos WHERE empresa_id = ? AND anio = ?')
+      .get(origen.empresa_id, anioNum);
+    if (existente) {
+      return _err('ALREADY_EXISTS',
+        'Ya existe un presupuesto para ' + origen.anio + ' → ' + anioNum + '. Reimporta ese año o bórralo primero.',
+        { existingId: existente.id });
+    }
+
+    var partidas = localDb.prepare(
+      'SELECT numero, concepto, descripcion, asignado_anual FROM presupuesto_partidas ' +
+      'WHERE presupuesto_id = ? AND activo = 1 ORDER BY numero'
+    ).all(origen.id);
+
+    if (partidas.length === 0) {
+      return _err('EMPTY_SOURCE', 'El presupuesto de ' + origen.anio + ' no tiene partidas para duplicar');
+    }
+
+    var now = new Date().toISOString();
+    var nuevoId = _newPresupuestoId();
+    var nombreFinal = (typeof nombre === 'string' && nombre.trim())
+      ? nombre.trim()
+      : 'Presupuesto ' + anioNum;
+
+    localDb.exec('BEGIN TRANSACTION;');
+    try {
+      // La cabecera hereda la procedencia para que se sepa de dónde salió el
+      // período nuevo (el Excel del año destino todavía no existe).
+      localDb.prepare(
+        'INSERT INTO presupuestos (id, empresa_id, anio, nombre, notas, creado_en, actualizado_en, creado_por, ' +
+        'archivo_origen, archivo_nombre, avisos_importacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(
+        nuevoId, origen.empresa_id, anioNum, nombreFinal,
+        'Duplicado del presupuesto ' + origen.anio,
+        now, now, auth.user && auth.user.id ? auth.user.id : null,
+        null, null,
+        'Creado duplicando el período ' + origen.anio + '. La ejecución quedó en cero.'
+      );
+
+      var stmtPartida = localDb.prepare(
+        'INSERT INTO presupuesto_partidas (id, presupuesto_id, numero, concepto, descripcion, activo, ' +
+        'creado_en, actualizado_en, asignado_anual, ejecutado_acumulado, porcentaje_eje, numero_excel) ' +
+        'VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, 0, 0, ?)'
+      );
+      var stmtValor = localDb.prepare(
+        // 📦824 — OJO con las comillas: en SQLite "" es un IDENTIFICADOR, no un
+        // string vacío. Con "" el INSERT moría con "no such column: """ .
+        // Un string vacío va con comillas simples ''.
+        'INSERT INTO presupuesto_valores_mensuales (partida_id, anio, mes, asignado, ejecutado, notas, actualizado_en) ' +
+        'VALUES (?, ?, ?, ?, 0, \'\', ?)'
+      );
+
+      var insertadas = 0, valores = 0;
+      for (var i = 0; i < partidas.length; i++) {
+        var p = partidas[i];
+        var pid = _newPartidaId();
+        stmtPartida.run(pid, nuevoId, i + 1, p.concepto, p.descripcion, now, now, p.asignado_anual, p.numero_excel);
+        insertadas++;
+        // 12 meses con el asignado repartido (misma regla que el import) y
+        // ejecución en cero: un año nuevo arranca en blanco.
+        var anual = Number(p.asignado_anual) || 0;
+        for (var m = 1; m <= 12; m++) {
+          stmtValor.run(pid, anioNum, m, anual / 12, now);
+          valores++;
+        }
+      }
+
+      localDb.exec('COMMIT;');
+
+      return _ok({
+        presupuestoId: nuevoId,
+        anio: anioNum,
+        anioOrigen: origen.anio,
+        nombre: nombreFinal,
+        partidas: insertadas,
+        valores: valores,
+        // Se dice explícitamente qué NO se heredó, para que la UI lo muestre.
+        avisos: [
+          'La ejecución quedó en cero (es un período nuevo).',
+          'El IPC no se heredó: defínelo para ' + anioNum + ' cuando lo confirmes.',
+          'El asignado anual se repartió en 12 meses iguales, como en el import.'
+        ]
+      });
+    } catch (e2) {
+      localDb.exec('ROLLBACK;');
+      throw e2;
+    }
+  } catch (e) {
+    console.error('[' + MOD + '][duplicar-periodo]', e.message);
     return _err('INTERNAL', e.message);
   }
 }
@@ -1384,7 +2122,7 @@ function registerPresupuestoHandlers(app, deps) {
   ipcMain.handle('presupuesto:update-meta', function (event, payload) {
     try {
       var p = payload || {};
-      return _handlerUpdateMeta(p.token || '', p.presupuestoId, p.nombre, p.notas);
+      return _handlerUpdateMeta(p.token || '', p.presupuestoId, p.nombre, p.notas, p.ipc);
     } catch (e) {
       console.error('[' + MOD + '][update-meta]', e.message);
       return _err('INTERNAL', e.message);
@@ -1444,7 +2182,9 @@ function registerPresupuestoHandlers(app, deps) {
   ipcMain.handle('presupuesto:export-excel', async function (event, payload) {
     try {
       var p = payload || {};
-      return await _handlerExportExcel(p.token || '', p.presupuestoId, p.outputPath);
+      // 📦824 — plantillaPath: si viene, se escribe encima del ACT-FO-043 real
+      // en vez de generar un archivo pelado que no sirve para entregar.
+      return await _handlerExportExcel(p.token || '', p.presupuestoId, p.outputPath, p.plantillaPath);
     } catch (e) {
       console.error('[' + MOD + '][export-excel]', e.message);
       return _err('INTERNAL', e.message);
@@ -1453,6 +2193,17 @@ function registerPresupuestoHandlers(app, deps) {
   ipcMain.handle('presupuesto:export-template', _stub('presupuesto:export-template'));
 
   // --------- Diagnóstico (Fase 0+, sigue activo) ---------
+  // 📦824 — Duplicar período (crear el año siguiente partiendo del actual).
+  ipcMain.handle('presupuesto:duplicar-periodo', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerDuplicarPeriodo(p.token || '', p.presupuestoIdOrigen, p.anioDestino, p.nombre);
+    } catch (e) {
+      console.error('[' + MOD + '][duplicar-periodo]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
   ipcMain.handle('presupuesto:diag', function (event, payload) {
     try {
       var localDb = _getDb ? _getDb() : null;
@@ -1497,5 +2248,11 @@ function registerPresupuestoHandlers(app, deps) {
 module.exports = {
   registerPresupuestoHandlers: registerPresupuestoHandlers,
   SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL,
-  MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL
+  // 📦824 — ALTERs de columnas nuevas. Se exportan aparte porque
+  // `CREATE TABLE IF NOT EXISTS` no altera tablas ya creadas y un ALTER repetido
+  // revienta con "duplicate column name": main.js los aplica uno a uno con
+  // try/catch, que es donde el fallo esperado es inocuo.
+  SCHEMA_ALTERS: PRESUPUESTO_SCHEMA_ALTERS,
+  MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL,
+  MIGRATION_IDS: PRESUPUESTO_MIGRATION_IDS
 };

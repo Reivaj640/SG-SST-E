@@ -1,4 +1,61 @@
-# K+AIR v0.1.222
+# K+AIR v0.1.223
+
+## 💰 Presupuesto SG-SST: los datos ya no se pierden, y las columnas muestran lo real (📦824)
+
+El submódulo 1.1.3 (Asignación de Recursos) tenía un problema serio: **cada vez que guardabas, se perdía información sin avisar**. En tu presupuesto 2026 eso había dejado las categorías en blanco y el total descuadrado. Ya está corregido, con respaldo previo de tu base de datos.
+
+### (a) Se había borrado parte de tu presupuesto 2026
+
+Guardabas el período y la app **borraba todo y reescribía desde la pantalla**. Como la pantalla no conoce la información de a qué categoría pertenece cada partida (esa información vive en una columna del Excel que ahí no se muestra), al reescribir se perdía.
+
+**Cómo quedó:**
+
+| | Antes de guardar | Ahora |
+|---|---|---|
+| Categorías (ASESORIAS SST, SISTEMA INTEGRAL, PAPELERIA) | se borraban | **se conservan** |
+| Asignación anual | se perdía | **se conserva** |
+| Dinero ya gastado | se conservaba | se conserva |
+
+Y como se conservaba lo que ya habías gastado, **no se notaba que faltaba algo** — hasta que las tarjetas dejaron de cuadrar.
+
+**Tu presupuesto 2026 ya fue reimportado** y quedó con las 14 partidas, las 3 categorías y $19.696.874 de ejecución (71%).
+
+### (b) Las columnas de mes mostraban un número inventado
+
+El formato ACT-FO-043 tiene el presupuesto del año en **una sola columna** y, aparte, el **gasto real de cada mes**. No tiene "cuánto se debe gastar en marzo".
+
+La app llenaba ese dato que no existe repartiendo el total entre 12 meses, y lo mostraba como si fuera real: `208.333,33` repetido doce veces en partidas que en tu Excel tienen el mes en cero. Y mientras ocupaba ese espacio, **el dato que sí importa — cuánto gastaste de verdad cada mes — no se veía en ningún lado**.
+
+**Ahora las columnas ENE–DIC muestran el gasto real de cada mes**, tal como dice tu Excel. Por ejemplo, en "Realización de Diagnóstico Psicosocial" vas a ver los $2.000.000 de abril, que antes no aparecían.
+
+### (c) El total sale del Excel, no de un cálculo
+
+El total asignado ahora se lee **directamente de la columna del Excel** (la que dice "ASIGNACION PRESUPUESTO ANUAL"), que es el número bueno. Antes se armaba sumando los meses, y un solo mes en cero hacía que el total quedara corto — por eso faltaban $20.000 en una partida.
+
+También se corrigió que las sumas no cuadraban por centavos: al repartir $10.000.000 entre 12 meses, la calculadora dejaba $9.999.999,999999998.
+
+### (d) Exportar a Excel usa tu archivo original
+
+Antes de exportar se generaba una tabla pelada, sin el formato oficial. Ahora el botón **Exportar** toma tu archivo de Drive como base: conserva el encabezado, el código ACT-FO-043, los rótulos, las celdas combinadas y el área de firmas.
+
+La fila de totales se escribe con **la suma real de las partidas**. Tu Excel de origen trae esa fila con un error (declara el doble de lo que suman las partidas); al exportar se corrige y te avisas por consola qué encontró.
+
+### (e) Períodos independientes y duplicado rápido
+
+- El **año activo siempre se ve** arriba (ya no aparece "Presupuesto Desconocido").
+- Al elegir un año del historial ves **lo que ya está cargado en la app**, no el archivo de Drive.
+- **Cada año está aislado**: tocar el 2026 no daña el 2025.
+- Botón **Duplicar** para crear el año siguiente con las partidas ya escritas — la ejecución arranca en cero y el IPC (inflación) queda vacío porque cambia cada año.
+- **IPC** por período, editable, y **no altera el total**.
+
+### (f) Otros fixes
+
+- Cambiar de año ya no rompe la app (un error de nombre impedía abrir otro período).
+- La tabla es más angosta: **1.510px en vez de 1.810px**, ya casi no se desplaza de lado.
+- Se corrigió un error en el autollenado de actas de COPASST que no mostraba aviso al usuario.
+
+---
+
 
 ## 📬 Notificaciones: ahora sabes QUIÉN te escribió, y "Ver" te lleva al correo (📦823)
 
