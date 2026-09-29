@@ -1,0 +1,323 @@
+/**
+ * main/eventos-cumplidos-bridge.js
+ *
+ * Bridge IPC para marcar/desmarcar eventos del K+AIR Calendar como cumplidos
+ * (persistente en SQLite). Aplica a CUALQUIER tipo (capacitacion, gestacion,
+ * auditoria, plan, rapido, rapido, vencido — lo que el adapter del calendario
+ * emita como event.id).
+ *
+ * Esquema:
+ *   eventos_cumplidos:
+ *     evento_id  TEXT PRIMARY KEY  (el ID del event que viene del adapter)
+ *     empresa_id TEXT NOT NULL     (por seguridad / futuro listado por empresa)
+ *     cumplido_en TEXT NOT NULL    (ISO timestamp de cuándo se marcó)
+ *     nota        TEXT DEFAULT ''  (opcional, ej: "hecho el 15/07")
+ *
+ * Diseño:
+ *   - NO toca los modulos origen (capacitaciones Excel, gestacion seguimiento,
+ *     etc.). El cumplimiento es solo una marca personal en el calendario.
+ *   - Persistencia por evento_id (cualquier formato: 'gest-...', 'cap-1-...',
+ *     'rapido-uuid', 'aud-...', 'plan-...').
+ *   - El adapter del calendario enriquece cada event con `cumplido: true`
+ *     y `cumplido_en: ISO` para que el chip del calendario se atenúe.
+ */
+'use strict';
+
+const { ipcMain } = require('electron');
+
+const MOD = 'EVENTOS-CUMPLIDOS';
+
+// ---------- DB handle inyectada por main.js ----------
+let _getDb = null;
+
+// ---------- SQL Schema ----------
+const SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS eventos_cumplidos (
+    evento_id   TEXT PRIMARY KEY,
+    -- 📦694-fix2 — empresa_id ahora es nullable. Un cumplimiento en modo
+    -- "Todas las empresas" (scope=all) no tiene una empresa específica del
+    -- user, pero el evento SÍ pertenece a una empresa. Por ahora se guarda
+    -- null cuando el frontend no puede determinar la empresa activa. La columna
+    -- se mantiene indexada para que listar(null) siga siendo eficiente.
+    empresa_id  TEXT,
+    cumplido_en TEXT NOT NULL,
+    nota        TEXT DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_eventos_cumplidos_empresa
+    ON eventos_cumplidos(empresa_id);
+`;
+
+// 📦694-fix2 — Migración defensiva para DBs existentes con empresa_id NOT NULL.
+// SQLite NO permite ALTER COLUMN para quitar NOT NULL, así que recreamos la tabla.
+// Es idempotente: si la tabla ya es nullable, no hace nada.
+function _ensureSchemaMigrated(db) {
+  if (!db) return;
+  try {
+    var cols = db.prepare("PRAGMA table_info(eventos_cumplidos)").all();
+    var empresaCol = (cols || []).find(function (c) { return c.name === 'empresa_id'; });
+    if (empresaCol && empresaCol.notnull === 1) {
+      console.log('[📦694-DEBUG][' + MOD + '] Migrando eventos_cumplidos: empresa_id NOT NULL → nullable');
+      db.exec(`
+        BEGIN TRANSACTION;
+        ALTER TABLE eventos_cumplidos RENAME TO eventos_cumplidos__old;
+        CREATE TABLE eventos_cumplidos (
+          evento_id   TEXT PRIMARY KEY,
+          empresa_id  TEXT,
+          cumplido_en TEXT NOT NULL,
+          nota        TEXT DEFAULT ''
+        );
+        INSERT INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota)
+          SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos__old;
+        DROP TABLE eventos_cumplidos__old;
+        CREATE INDEX IF NOT EXISTS idx_eventos_cumplidos_empresa
+          ON eventos_cumplidos(empresa_id);
+        COMMIT;
+      `);
+      console.log('[📦694-DEBUG][' + MOD + '] Migración completada ✓');
+    }
+  } catch (migErr) {
+    console.error('[' + MOD + '] Error en migración de schema:', migErr.message);
+  }
+
+  // 📦702-fix3 (2026-08-13) — Migración one-shot para registros huérfanos con
+  // empresa_id IS NULL. El bug histórico del UPSERT (que no actualizaba empresa_id)
+  // dejó registros con empresa_id=NULL cuando el frontend pasaba null al marcar.
+  // Como el WHERE 'empresa_id = ?' en scope='company' nunca matchea NULL en SQL,
+  // esos eventos aparecían tachados en "Todas las empresas" pero NO en la
+  // empresa sola — bug visible para el user.
+  //
+  // El formato del evento_id es `{tipo}-{empresa}-{resto}`, ej:
+  //   cap-Tempoactiva-14-capacitaci-n-en-manejo-de-sustancias
+  //   gest-Tempoactiva-3-...-consulta
+  //   recordatorio-Tempoactiva-copasst-ene-2026
+  //   mto-Tempoactiva-3-...-mantenimiento
+  //   insp-Tempoactiva-3-...-inspeccion
+  //
+  // Extraemos la empresa (entre el 1er y 2do '-') y la asignamos.
+  // Idempotente: solo afecta registros con empresa_id IS NULL, así que correr
+  // la migración múltiples veces no cambia nada.
+  try {
+    var beforeFixCount = db.prepare(
+      "SELECT COUNT(*) as c FROM eventos_cumplidos WHERE empresa_id IS NULL"
+    ).get();
+    if (beforeFixCount && beforeFixCount.c > 0) {
+      console.log('[📦702-DEBUG][' + MOD + '] Migración one-shot: ' + beforeFixCount.c +
+                  ' registros con empresa_id=NULL. Inferyendo empresa del prefijo del evento_id...');
+      var result = db.prepare(`
+        UPDATE eventos_cumplidos
+        SET empresa_id = SUBSTR(
+          evento_id,
+          INSTR(evento_id, '-') + 1,
+          INSTR(SUBSTR(evento_id, INSTR(evento_id, '-') + 1), '-') - 1
+        )
+        WHERE empresa_id IS NULL
+          -- El formato del id tiene al menos 2 guiones: {tipo}-{empresa}-{resto}
+          AND evento_id LIKE '%-%-%'
+      `).run();
+      console.log('[📦702-DEBUG][' + MOD + '] Migración one-shot completada ✓ ' +
+                  '(' + (result && result.changes ? result.changes : 0) + ' registros actualizados)');
+    }
+  } catch (oneShotErr) {
+    console.error('[' + MOD + '] Error en migración one-shot de empresa_id:', oneShotErr.message);
+  }
+}
+
+// ---------- Handlers internos (reusables, testeables) ----------
+
+/**
+ * Lista todos los eventos cumplidos de una empresa.
+ * Devuelve un array de { evento_id, empresa_id, cumplido_en, nota }.
+ *
+ * 📦543 — Soporte para empresaId === null: devuelve cumplidos de TODAS las
+ * empresas (usado por el toggle "Todas las empresas" del calendario).
+ */
+function _handlerListarCumplidos(empresaId) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  try {
+    var db = _getDb();
+    var rows;
+    if (!empresaId) {
+      // scope='all' → todas las empresas
+      rows = db.prepare(
+        'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos ORDER BY cumplido_en DESC'
+      ).all();
+    } else {
+      rows = db.prepare(
+        'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos WHERE empresa_id = ? ORDER BY cumplido_en DESC'
+      ).all(empresaId);
+    }
+    return { success: true, data: rows };
+  } catch (e) {
+    console.error('[' + MOD + '][LISTAR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+/**
+ * Marca un evento como cumplido. UPSERT: si ya existe, actualiza nota y timestamp.
+ */
+function _handlerMarcarCumplido(empresaId, eventoId, nota) {
+  if (!_getDb) {
+    console.error('[📦694-DEBUG][' + MOD + '][MARCAR] NO_DB — base de datos no inyectada');
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  // 📦694-fix2 — empresaId ahora es OPCIONAL. Un cumplimiento en modo "Todas las
+  // empresas" se guarda con empresa_id=null. eventoId sigue siendo obligatorio
+  // porque es la PK de la tabla.
+  if (!eventoId) {
+    console.error('[📦694-DEBUG][' + MOD + '][MARCAR] VALIDATION — eventoId=' + eventoId);
+    return {
+      success: false,
+      error: { code: 'VALIDATION', message: 'eventoId es requerido' }
+    };
+  }
+  try {
+    var db = _getDb();
+    var now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(evento_id) DO UPDATE SET
+        empresa_id  = excluded.empresa_id,
+        cumplido_en = excluded.cumplido_en,
+        nota        = excluded.nota
+    `).run(eventoId, empresaId, now, nota || '');
+    console.log('[' + MOD + '][MARCAR] ' + eventoId + ' en ' + empresaId);
+    // 📦538 — Trigger push al hub multipc
+    try {
+      var syncService = require('./sync-service');
+      syncService.debouncedPush(empresaId);
+    } catch (syncErr) {
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
+    return { success: true, data: { eventoId: eventoId, cumplidoEn: now, nota: nota || '' } };
+  } catch (e) {
+    console.error('[' + MOD + '][MARCAR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+/**
+ * Desmarca un evento cumplido (DELETE).
+ */
+function _handlerDesmarcarCumplido(empresaId, eventoId) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  // 📦694-fix2 — empresaId ahora es OPCIONAL. Si llega null, borramos por evento_id
+  // sin filtrar por empresa. Si llega string, filtramos por ambos.
+  if (!eventoId) {
+    return {
+      success: false,
+      error: { code: 'VALIDATION', message: 'eventoId es requerido' }
+    };
+  }
+  try {
+    var db = _getDb();
+    var result;
+    if (empresaId) {
+      result = db.prepare(
+        'DELETE FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
+      ).run(eventoId, empresaId);
+    } else {
+      result = db.prepare(
+        'DELETE FROM eventos_cumplidos WHERE evento_id = ?'
+      ).run(eventoId);
+    }
+    console.log('[' + MOD + '][DESMARCAR] ' + eventoId + ' (cambios=' + result.changes + ')');
+    // 📦538 — Trigger push al hub multipc (si hay empresaId)
+    try {
+      var syncService = require('./sync-service');
+      if (empresaId) {
+        syncService.debouncedPush(empresaId);
+      }
+    } catch (syncErr) {
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
+    return { success: true, deleted: result.changes > 0 };
+  } catch (e) {
+    console.error('[' + MOD + '][DESMARCAR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+// ---------- Registro de handlers IPC ----------
+function registerEventosCumplidosHandlers(app, deps) {
+  _getDb = deps && deps.getDb ? deps.getDb : null;
+
+  // 📦694-fix2 — Migrar tabla de NOT NULL a nullable (idempotente)
+  if (_getDb) {
+    try {
+      _ensureSchemaMigrated(_getDb());
+    } catch (e) {
+      console.error('[' + MOD + '][MIGRATION] ' + e.message);
+    }
+  }
+
+  console.log('[' + MOD + '][INIT][INFO] Registrando handlers de cumplimiento de eventos...');
+
+  // 📦694 — Helper: aceptar tanto `eventoId` (camelCase, convención del bridge)
+  // como `evento_id` (snake_case, convención de columnas SQLite) en los payloads.
+  // Defensa en profundidad: si un call site nuevo usa el formato equivocado, NO falla
+  // silenciosamente con "VALIDATION", sigue funcionando.
+  function _normalizeCumplidoPayload(params) {
+    return {
+      empresaId: params.empresaId || params.empresa_id || null,
+      eventoId:  params.eventoId  || params.evento_id  || null,
+      nota:      params.nota      || ''
+    };
+  }
+
+  // Listar (consumido por kair-calendar-adapter.js)
+  ipcMain.handle('eventos-cumplidos:listar', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      var norm = _normalizeCumplidoPayload(params);
+      return _handlerListarCumplidos(norm.empresaId);
+    } catch (e) {
+      console.error('[' + MOD + '][HANDLER-LISTAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  // Marcar
+  ipcMain.handle('eventos-cumplidos:marcar', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      console.log('[📦694-DEBUG][' + MOD + '][MARCAR][RECV] payload crudo=' + JSON.stringify(params));
+      var norm = _normalizeCumplidoPayload(params);
+      console.log('[📦694-DEBUG][' + MOD + '][MARCAR][NORM] empresaId=' + norm.empresaId + ' eventoId=' + norm.eventoId);
+      return _handlerMarcarCumplido(norm.empresaId, norm.eventoId, norm.nota);
+    } catch (e) {
+      console.error('[' + MOD + '][HANDLER-MARCAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  // Desmarcar
+  ipcMain.handle('eventos-cumplidos:desmarcar', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      console.log('[📦694-DEBUG][' + MOD + '][DESMARCAR][RECV] payload crudo=' + JSON.stringify(params));
+      var norm = _normalizeCumplidoPayload(params);
+      console.log('[📦694-DEBUG][' + MOD + '][DESMARCAR][NORM] empresaId=' + norm.empresaId + ' eventoId=' + norm.eventoId);
+      return _handlerDesmarcarCumplido(norm.empresaId, norm.eventoId);
+    } catch (e) {
+      console.error('[' + MOD + '][HANDLER-DESMARCAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  console.log('[' + MOD + '][INIT][SUCCESS] 3 handlers de cumplimiento de eventos registrados');
+}
+
+module.exports = {
+  registerEventosCumplidosHandlers: registerEventosCumplidosHandlers,
+  SCHEMA_SQL: SCHEMA_SQL,
+  // Exportar handlers internos para tests / debug
+  _handlerListarCumplidos: _handlerListarCumplidos,
+  _handlerMarcarCumplido: _handlerMarcarCumplido,
+  _handlerDesmarcarCumplido: _handlerDesmarcarCumplido
+};

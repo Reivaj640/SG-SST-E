@@ -2941,3 +2941,435 @@
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   6.1.2 · Modales (auditoría / hallazgo), confirm y toast fallback
+   v1.0 · 2026-09-21 — el botón "Nueva auditoría" abría un modal SIN CSS
+   (cero reglas .kair-aud-modal en la hoja). El modal vive en <body>,
+   FUERA de .kair-v3-module donde se definen --v3-* → los tokens se
+   declaran AQUÍ, sobre el propio modal, con la paleta canónica.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.kair-aud-modal {
+  --aud-blue: #2057b8;
+  --aud-blue-hover: #1a4a9e;
+  --aud-blue-soft: #eaf1fb;
+  --aud-ink: #14213d;
+  --aud-muted: #748096;
+  --aud-line: #e8ebee;
+  --aud-canvas: #fbfcfb;
+  --aud-card: #ffffff;
+  --aud-danger: #da5563;
+  --aud-success: #1bb888;
+  --aud-radius-card: 20px;
+  --aud-radius-ctl: 12px;
+  --aud-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --aud-font-display: 'Manrope', 'DM Sans', system-ui, sans-serif;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--aud-font);
+  color: var(--aud-ink);
+}
+
+.kair-aud-modal--open { display: flex; }
+
+.kair-aud-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.kair-aud-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 3rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--aud-card);
+  border: 1px solid var(--aud-line);
+  border-radius: var(--aud-radius-card);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+.kair-aud-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--aud-line);
+  flex-shrink: 0;
+}
+
+.kair-aud-modal__head h3 {
+  margin: 0;
+  font-family: var(--aud-font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--aud-ink);
+}
+
+.kair-aud-modal__close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--aud-line);
+  border-radius: var(--aud-radius-ctl);
+  background: transparent;
+  color: var(--aud-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.kair-aud-modal__close:hover {
+  background: var(--aud-canvas);
+  color: var(--aud-ink);
+}
+
+.kair-aud-modal__body {
+  padding: 1.2rem 1.4rem;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.kair-aud-modal__body form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.kair-aud-modal__body label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--aud-muted);
+}
+
+.kair-aud-modal__body input,
+.kair-aud-modal__body select,
+.kair-aud-modal__body textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--aud-line);
+  border-radius: var(--aud-radius-ctl);
+  background: #ffffff;
+  color: var(--aud-ink);
+  font-family: var(--aud-font);
+  font-size: 0.875rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.kair-aud-modal__body input:focus,
+.kair-aud-modal__body select:focus,
+.kair-aud-modal__body textarea:focus {
+  border-color: var(--aud-blue);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.15);
+}
+
+.kair-aud-modal__body textarea { resize: vertical; min-height: 72px; }
+
+.kair-aud-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.kair-aud-modal__error {
+  min-height: 1.1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--aud-danger);
+}
+
+.kair-aud-modal__error:empty { display: none; }
+
+.kair-aud-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.9rem 1.4rem;
+  border-top: 1px solid var(--aud-line);
+  background: var(--aud-canvas);
+  flex-shrink: 0;
+}
+
+.kair-aud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--aud-radius-ctl);
+  border: 1px solid transparent;
+  font-family: var(--aud-font);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.kair-aud-btn--ghost {
+  background: transparent;
+  border-color: var(--aud-line);
+  color: var(--aud-muted);
+}
+
+.kair-aud-btn--ghost:hover {
+  background: var(--aud-canvas);
+  color: var(--aud-ink);
+}
+
+.kair-aud-btn--primary {
+  background: var(--aud-blue);
+  border-color: var(--aud-blue);
+  color: #ffffff;
+}
+
+.kair-aud-btn--primary:hover {
+  background: var(--aud-blue-hover);
+  border-color: var(--aud-blue-hover);
+}
+
+/* ── Confirm (dialogo de confirmacion, montado en <body>) ── */
+.kair-aud-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.kair-aud-confirm-modal {
+  width: min(420px, calc(100vw - 2rem));
+  padding: 1.6rem 1.4rem 1.3rem;
+  background: #ffffff;
+  border: 1px solid #e8ebee;
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  text-align: center;
+}
+
+.kair-aud-confirm-modal__icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #eaf1fb;
+  color: #2057b8;
+  font-size: 1.35rem;
+}
+
+.kair-aud-confirm-modal__icon--danger {
+  background: #fae6e9;
+  color: #da5563;
+}
+
+.kair-aud-confirm-modal__title {
+  margin: 0 0 0.4rem;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #14213d;
+}
+
+.kair-aud-confirm-modal__msg {
+  margin: 0 0 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #748096;
+}
+
+.kair-aud-confirm-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.kair-aud-confirm-modal__actions .k-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kair-aud-confirm-modal__actions .k-btn-ghost {
+  background: transparent;
+  border-color: #e8ebee;
+  color: #748096;
+}
+
+.kair-aud-confirm-modal__actions .k-btn-ghost:hover {
+  background: #fbfcfb;
+  color: #14213d;
+}
+
+.kair-aud-confirm-modal__actions .k-btn-primary {
+  background: #2057b8;
+  border-color: #2057b8;
+  color: #ffffff;
+}
+
+.kair-aud-confirm-modal__actions .k-btn-primary:hover { background: #1a4a9e; }
+
+.kair-aud-confirm-modal__actions .k-btn-danger {
+  background: #da5563;
+  border-color: #da5563;
+  color: #ffffff;
+}
+
+.kair-aud-confirm-modal__actions .k-btn-danger:hover { background: #c44452; }
+
+/* ── Toast fallback (solo si updateNotifier no esta disponible) ── */
+.kair-aud-toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.kair-aud-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 260px;
+  max-width: 360px;
+  padding: 0.75rem 0.9rem;
+  background: #ffffff;
+  border: 1px solid #e8ebee;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 250ms ease, transform 250ms ease;
+  pointer-events: auto;
+}
+
+.kair-aud-toast--show { opacity: 1; transform: translateY(0); }
+
+.kair-aud-toast > i { font-size: 1.1rem; margin-top: 1px; }
+.kair-aud-toast--success > i { color: #1bb888; }
+.kair-aud-toast--error > i { color: #da5563; }
+.kair-aud-toast--warning > i { color: #e7a224; }
+.kair-aud-toast--info > i { color: #2057b8; }
+
+.kair-aud-toast__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #14213d;
+}
+
+.kair-aud-toast__msg {
+  font-size: 0.78rem;
+  color: #748096;
+  line-height: 1.4;
+}
+
+/* ── Dark (covers data-theme="dark" y "dark-legacy") ── */
+[data-theme^="dark"] .kair-aud-modal {
+  --aud-blue: #6ea8fe;
+  --aud-blue-hover: #8bbaff;
+  --aud-blue-soft: #1e2a44;
+  --aud-ink: #e8edf5;
+  --aud-muted: #98a2b3;
+  --aud-line: #2a3548;
+  --aud-canvas: #131824;
+  --aud-card: #1a2334;
+}
+
+[data-theme^="dark"] .kair-aud-modal__backdrop,
+[data-theme^="dark"] .kair-aud-confirm-overlay {
+  background: rgba(2, 6, 16, 0.68);
+}
+
+[data-theme^="dark"] .kair-aud-modal__body input,
+[data-theme^="dark"] .kair-aud-modal__body select,
+[data-theme^="dark"] .kair-aud-modal__body textarea {
+  background: #131824;
+  color: #e8edf5;
+}
+
+[data-theme^="dark"] .kair-aud-btn--primary,
+[data-theme^="dark"] .kair-aud-confirm-modal__actions .k-btn-primary {
+  color: #0f172a;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal {
+  background: #1a2334;
+  border-color: #2a3548;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal__icon {
+  background: #1e2a44;
+  color: #6ea8fe;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal__icon--danger {
+  background: #3a2229;
+  color: #e56a76;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal__title { color: #e8edf5; }
+[data-theme^="dark"] .kair-aud-confirm-modal__msg { color: #98a2b3; }
+
+[data-theme^="dark"] .kair-aud-confirm-modal__actions .k-btn-ghost {
+  border-color: #2a3548;
+  color: #98a2b3;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal__actions .k-btn-ghost:hover {
+  background: #131824;
+  color: #e8edf5;
+}
+
+[data-theme^="dark"] .kair-aud-confirm-modal__actions .k-btn-primary {
+  background: #6ea8fe;
+  border-color: #6ea8fe;
+  color: #0f172a;
+}
+
+[data-theme^="dark"] .kair-aud-toast {
+  background: #1a2334;
+  border-color: #2a3548;
+}
+
+[data-theme^="dark"] .kair-aud-toast__title { color: #e8edf5; }
+[data-theme^="dark"] .kair-aud-toast__msg { color: #98a2b3; }

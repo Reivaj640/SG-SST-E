@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Fuentes -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
     
     <style>
         /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -253,44 +256,224 @@
         .action-icon.danger { color: var(--danger); }
         .action-icon.info { color: var(--info); }
 
+        /* 📦708 (Fase 2) — Sección "Estado Base de Datos" */
+        .bd-section {
+            margin-top: 2.5rem;
+            background: linear-gradient(135deg, #f8fbff 0%, #e8f0fe 100%);
+            border: 1px solid #d0e1f9;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            text-align: left;
+        }
+        .bd-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .bd-section-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin: 0;
+        }
+        .bd-section-header .badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .bd-section-header .badge.ok { background: #d4edda; color: #155724; }
+        .bd-section-header .badge.missing { background: #f8d7da; color: #721c24; }
+        .bd-section-header .badge.loading { background: #e2e3e5; color: #383d41; }
+        .bd-status-text {
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+        .bd-stats {
+            display: flex;
+            gap: 1.5rem;
+            margin: 0.75rem 0 1rem;
+            flex-wrap: wrap;
+        }
+        .bd-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .bd-stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.3px;
+        }
+        .bd-stat-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        .bd-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .bd-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-family: 'Roboto', sans-serif;
+        }
+        .bd-btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .bd-btn-primary:hover { background: var(--primary-hover); }
+        .bd-btn-primary:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+        }
+        .bd-btn-secondary {
+            background: white;
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+        .bd-btn-secondary:hover { background: var(--primary-light); }
+        .bd-btn-danger {
+            background: white;
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+        .bd-btn-danger:hover { background: #f8d7da; }
+        .bd-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 400px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .bd-toast.error { background: #dc3545; }
+        .bd-toast.warn { background: #ffc107; color: #212529; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
         @media (max-width: 768px) {
             .main-actions { grid-template-columns: 1fr; }
             .hero-title { font-size: 1.8rem; }
             .portal-card { padding: 2rem 1.5rem; }
         }
+
+        /* ═══════════════════════════════════════════════════════════
+           PREMIUM v1 (2026-09-15) — Portal sin caja gigante, header
+           tipo breadcrumb, tarjetas con acabado premium (patrón
+           aprobado en Capacitación).
+           ═══════════════════════════════════════════════════════════ */
+        body { background: var(--kair-canvas, #fbfcfb); }
+
+        .pres-home { width: 100%; max-width: 1400px; margin: 0 auto; box-sizing: border-box; }
+        /* El contenedor legacy centra sus hijos (align-items:center) y trae
+           padding propio; con el layout full-width premium necesitamos hijos
+           a todo el ancho y un padding acorde al nuevo diseño. */
+        .portal-container.pres-home { align-items: stretch; padding: clamp(16px, 2vw, 28px); }
+        .portal-container.pres-home > * { width: 100%; box-sizing: border-box; }
+
+        /* Header premium */
+        .pres-home__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: clamp(18px, 2.2vw, 30px); }
+        .pres-home__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+        .pres-home__icon { width: 44px; height: 44px; border-radius: 12px; background: #e3ecfb; color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .pres-home__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .pres-home__crumb span { padding: 0 4px; }
+        .pres-home__title { margin: 0; font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Lexend'); letter-spacing: -0.04em; color: var(--kair-ink, #14213d); }
+        .pres-home__sub { color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px); margin: 5px 0 0 0; max-width: 640px; line-height: 1.55; }
+        .pres-home__header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .pres-home__pill { font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px; background: #e3ecfb; color: var(--kair-blue, #2057b8); white-space: nowrap; }
+        .pres-home__back {
+            display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+            font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
+            border-radius: 10px; transition: all 0.18s; background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee);
+        }
+        .pres-home__back:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+
+        /* Tarjetas de acceso principal */
+        .main-action-card {
+            border: 1px solid var(--kair-line, #e8ebee); border-radius: var(--kair-radius-card, 20px);
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+        }
+        .main-action-card.primary {
+            background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
+            border-color: transparent;
+        }
+        .main-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10); border-color: #c8d7ef; }
+        .main-action-card.primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
+
+        /* Sección de herramientas */
+        .quick-actions { margin-top: clamp(22px, 2.6vw, 36px); }
+        .quick-actions-title {
+            font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'Lexend');
+            letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
+            border-bottom: 0; padding-bottom: 0; margin-bottom: clamp(12px, 1.3vw, 18px); display: block;
+        }
+        .action-card {
+            background: var(--kair-card, #fff); border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: 16px; box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04);
+        }
+        .action-card:hover { border-color: #c8d7ef; background: #fff; box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07); transform: translateY(-3px); }
+        .action-icon { border-radius: 10px; background: var(--kair-soft, #f3f6f6); box-shadow: none; }
+        .action-title { color: var(--kair-ink, #14213d); font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-    <div class="portal-container">
-        <div class="portal-card">
-            
-            <div class="portal-header">
-                <div class="portal-logo">K+<span>AIR</span></div>
-                <a class="back-btn-internal" onclick="goBackToModule()">
+    <div class="portal-container pres-home">
+
+        <!-- HEADER PREMIUM — sin caja, breadcrumb + título -->
+        <div class="pres-home__header">
+            <div class="pres-home__left">
+                <div class="pres-home__icon"><i class="fas fa-coins"></i></div>
+                <div>
+                    <div class="pres-home__crumb">Recursos<span>/</span>Presupuesto</div>
+                    <h1 class="pres-home__title">Asignación de Recursos</h1>
+                    <p class="pres-home__sub">Administre los recursos financieros del Sistema de Gestión de Seguridad y Salud en el Trabajo: presupuestos anuales, ejecuciones mensuales y proyecciones de inversión.</p>
+                </div>
+            </div>
+            <div class="pres-home__header-right">
+                <span class="pres-home__pill"><i class="fas fa-calendar-check" style="margin-right:6px;"></i>Vigencia: <span id="activeYear">2025</span></span>
+                <a class="pres-home__back" onclick="goBackToModule()">
                     <i class="fas fa-arrow-left"></i>
                     <span>Volver al Menú</span>
                 </a>
             </div>
+        </div>
 
-            <div class="status-pill">
-                <i class="fas fa-coins"></i> Gestión Presupuestal: <span id="activeYear">2025</span>
-            </div>
-
-            <h1 class="hero-title">Asignación de Recursos</h1>
-            <p class="hero-subtitle">
-                Administre los recursos financieros destinados al Sistema de Gestión de Seguridad y Salud en el Trabajo. Controle presupuestos anuales, ejecuciones mensuales y proyecciones de inversión.
-            </p>
-
-            <div class="main-actions">
+        <div class="main-actions">
                 
                 <div class="main-action-card primary" onclick="enterBudget()">
                     <div class="main-action-icon">
-                        <i class="fas fa-chart-line"></i>
+                        <i class="fas fa-chart-line" id="main-action-icon-gestionar"></i>
                     </div>
                     <div class="main-action-content">
-                        <div class="action-title">Gestionar Presupuesto</div>
-                        <div class="action-desc">Ver y editar el presupuesto del año actual con detalle de partidas y ejecución.</div>
+                        <div class="action-title" id="main-action-title-gestionar">Gestionar Presupuesto</div>
+                        <div class="action-desc" id="main-action-desc-gestionar">Ver y editar el presupuesto del año actual con detalle de partidas y ejecución.</div>
                     </div>
                 </div>
 
@@ -304,6 +487,60 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- 📦708 (Fase 3.5) — Sección "Base de Datos Local" OCULTA del home.
+                 Ahora se accede desde el botón "📊 Info BD" en el header de la gestion view.
+                 El JS sigue intacto en presupuesto-home.js (helpers, state, postMessage
+                 handlers) por si querés mostrarla de nuevo. Solo ocultamos visualmente
+                 para mantener el home limpio y centrado en los accesos principales. -->
+            <div class="bd-section" id="bd-section" style="display: none;">
+                <div class="bd-section-header">
+                    <i class="fas fa-database" style="color: var(--primary); font-size: 1.1rem;"></i>
+                    <h3>Base de Datos Local</h3>
+                    <span class="badge loading" id="bd-badge">cargando…</span>
+                </div>
+                <div class="bd-status-text" id="bd-status-text">
+                    Verificando si hay un presupuesto en la base de datos local para <span id="bd-year-label">este año</span>…
+                </div>
+                <div class="bd-stats" id="bd-stats" style="display:none;">
+                    <div class="bd-stat">
+                        <span class="bd-stat-label">Partidas</span>
+                        <span class="bd-stat-value" id="bd-stat-partidas">—</span>
+                    </div>
+                    <div class="bd-stat">
+                        <span class="bd-stat-label">Asignado</span>
+                        <span class="bd-stat-value" id="bd-stat-asignado">—</span>
+                    </div>
+                    <div class="bd-stat">
+                        <span class="bd-stat-label">Ejecutado</span>
+                        <span class="bd-stat-value" id="bd-stat-ejecutado">—</span>
+                    </div>
+                    <div class="bd-stat">
+                        <span class="bd-stat-label">% Cumplimiento</span>
+                        <span class="bd-stat-value" id="bd-stat-pct">—</span>
+                    </div>
+                </div>
+                <div class="bd-actions" id="bd-actions">
+                    <button class="bd-btn bd-btn-primary" id="bd-btn-import" onclick="importCurrentBudgetToBD()" disabled>
+                        <i class="fas fa-file-import"></i> Importar Excel a BD
+                    </button>
+                    <button class="bd-btn bd-btn-secondary" id="bd-btn-resumen" onclick="viewBDResumen()" disabled>
+                        <i class="fas fa-eye"></i> Ver resumen desde BD
+                    </button>
+                    <button class="bd-btn bd-btn-primary" id="bd-btn-edit-bd" onclick="editFromBD()" style="display:none;">
+                        <i class="fas fa-edit"></i> Editar desde BD (Fase 3)
+                    </button>
+                    <button class="bd-btn bd-btn-secondary" id="bd-btn-reimport" onclick="reimportBudgetToBD()" style="display:none;">
+                        <i class="fas fa-sync"></i> Re-importar (reemplazar)
+                    </button>
+                    <button class="bd-btn bd-btn-success" id="bd-btn-export" onclick="exportBudgetToExcel()" style="display:none;">
+                        <i class="fas fa-file-excel"></i> Exportar a Excel (Fase 5)
+                    </button>
+                    <button class="bd-btn bd-btn-primary" id="bd-btn-add" onclick="addPartidaToBD()" style="display:none;">
+                        <i class="fas fa-plus-circle"></i> + Nueva Partida (Fase 3.5)
+                    </button>
+                </div>
             </div>
 
             <div class="quick-actions">
@@ -338,7 +575,6 @@
                 </div>
             </div>
 
-        </div>
     </div>
 
     <script src="presupuesto-home.js"></script>

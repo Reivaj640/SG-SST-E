@@ -76,15 +76,16 @@
    Scope: .capacitaciones-container
    ========================================= */
 
-/* Card container */
-.capacitaciones-container .k-section-card {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+/* Header SIN tarjeta (diseño objetivo): el header vive directo sobre el
+   fondo de la página — sin caja blanca, sin borde, sin sombra. */
+.capacitaciones-container .k-section-card.cap-header {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-/* Back button */
+/* Back button — ghost sin borde (diseño objetivo: "← Volver" en texto gris) */
 .capacitaciones-container .header-back-btn {
   display: inline-flex;
   align-items: center;
@@ -94,7 +95,7 @@
   font-weight: 500;
   color: #5a6378;
   background: transparent;
-  border: 1px solid #dee2e6;
+  border: none;
   border-radius: 0.375rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -102,9 +103,8 @@
 }
 
 .capacitaciones-container .header-back-btn:hover {
-  background: #e8f0fe;
-  color: #174ea6;
-  border-color: #174ea6;
+  background: #f0f2f5;
+  color: #1a1a2e;
 }
 
 /* Action button: secondary */
@@ -157,7 +157,7 @@
   gap: 0;
   margin: 0 -1.5rem;
   padding: 0 1.5rem;
-  border-top: 1px solid #dee2e6;
+  border-top: none;
   overflow-x: auto;
 }
 
@@ -280,61 +280,8 @@
   }
 }
 
-/* Dark theme — Stats & Charts (preserved from v2.0) */
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon {
-  background: #1e1e2e;
-  border-color: #3a3a4a;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__icon.primary {
-  background: rgba(77, 166, 255, 0.15);
-  color: var(--k-primary);
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__icon.success {
-  background: rgba(92, 184, 92, 0.15);
-  color: var(--k-success);
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__icon.warning {
-  background: rgba(255, 193, 7, 0.15);
-  color: #f0ad4e;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__icon.muted {
-  background: rgba(255,255,255,0.05);
-  color: #6c757d;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__value {
-  color: #e0e0e0;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__value--muted {
-  color: #6c757d;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__label {
-  color: #8a8a9a;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__divider {
-  background: #3a3a4a;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-stats-ribbon__pct {
-  color: var(--k-primary);
-  background: rgba(77, 166, 255, 0.15);
-}
-
-.capacitaciones-container[data-theme="dark"] .k-charts-grid .k-chart-container {
-  background: #1e1e2e;
-  border-color: #3a3a4a;
-}
-
-.capacitaciones-container[data-theme="dark"] .k-chart-title {
-  color: #e0e0e0;
-}
+/* (Stats ribbon + charts legacy eliminados en el rediseño premium)
+   El dashboard ahora usa hero + metric cards + cap-grid-2. */
 
 .k-main-content {
     flex: 1;
@@ -410,222 +357,6 @@
 }
 
 /* =========================================
-4. DASHBOARD — STATS RIBBON (compacto)
-========================================= */
-
-.k-stats-ribbon {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: var(--k-bg-card);
-  border: 1px solid var(--k-border);
-  border-radius: var(--k-radius-lg);
-  padding: 0;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--k-shadow-sm);
-  overflow: hidden;
-}
-
-.k-stats-ribbon__item {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.75rem 1.25rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.k-stats-ribbon__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.k-stats-ribbon__icon.primary {
-  background: var(--k-primary-light);
-  color: var(--k-primary);
-}
-.k-stats-ribbon__icon.success {
-  background: var(--k-success-light);
-  color: var(--k-success);
-}
-.k-stats-ribbon__icon.warning {
-  background: var(--k-warning-light);
-  color: #856404;
-}
-.k-stats-ribbon__icon.muted {
-  background: #f0f2f5;
-  color: var(--k-text-muted);
-}
-
-.k-stats-ribbon__data {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.k-stats-ribbon__value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--k-text-main);
-  line-height: 1.2;
-}
-
-.k-stats-ribbon__value--muted {
-  font-size: 1rem;
-  color: var(--k-text-muted);
-}
-
-.k-stats-ribbon__label {
-  font-size: 0.6875rem;
-  color: var(--k-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.k-stats-ribbon__pct {
-  margin-left: auto;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--k-primary);
-  background: var(--k-primary-light);
-  padding: 0.125rem 0.5rem;
-  border-radius: 10px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.k-stats-ribbon__divider {
-  width: 1px;
-  height: 32px;
-  background: var(--k-border);
-  flex-shrink: 0;
-}
-
-/* =========================================
-5. GRÁFICOS
-========================================= */
-
-.k-charts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.k-chart-container {
-  background: var(--k-bg-card);
-  border: 1px solid var(--k-border);
-  border-radius: var(--k-radius-lg);
-  padding: 1.25rem;
-  margin-bottom: 0;
-  box-shadow: var(--k-shadow-sm);
-  display: flex;
-  flex-direction: column;
-}
-
-.k-chart-body {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  min-height: 220px;
-  height: 220px;
-  overflow: hidden;
-}
-
-.k-chart-body--donut {
-  min-height: 200px;
-  height: 200px;
-}
-
-.k-chart-body canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.k-chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-.k-chart-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--k-text-main);
-}
-
-.k-chart-container {
-    background: var(--k-bg-card);
-    border: 1px solid var(--k-border);
-    border-radius: var(--k-radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: var(--k-shadow-sm);
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.k-chart-body {
-    position: relative;
-    flex: 1;
-    width: 100%;
-    min-height: 300px;
-    height: 300px;
-    overflow: hidden;
-}
-.k-chart-body canvas {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.k-chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-.k-chart-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--k-text-main);
-}
-.k-chart-title.k-chart-title--center {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-/* =========================================
-6. LISTAS RECIENTES
-========================================= */
-
-.k-recent-list-container { margin-bottom: 0; }
-
-.k-recent-item {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--k-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.k-recent-item:last-child { border-bottom: none; }
-.k-recent-item-title { font-weight: 600; font-size: 0.9rem; }
-.k-recent-item-meta { font-size: 0.8rem; color: var(--k-text-muted); }
-
-/* =========================================
    8. TOOLBAR & FILTROS
    ========================================= */
 
@@ -671,12 +402,25 @@
     border-top: none;
     border-radius: 0 0 var(--k-radius-lg) var(--k-radius-lg);
     overflow-x: auto;
+    margin-top: 0;
+    padding: 0;
+}
+/* Eliminar cualquier gap entre los filtros y la tabla */
+.k-toolbar + .k-table-container {
+    margin-top: 0;
+    border-top: none;
+}
+.k-toolbar {
+    margin-bottom: 0;
+    border-bottom: none;
 }
 
 .k-table {
     width: 100%;
     border-collapse: collapse;
+    border-spacing: 0;
     font-size: 0.95rem;
+    margin: 0;
 }
 .k-table th {
     background-color: var(--k-bg-app);
@@ -739,25 +483,28 @@
     display: flex !important;
 }
 
-/* Todo lo que está DENTRO del overlay NO necesita !important
-   porque ya está contenido por el overlay mismo.
-   Se usa selector más específico para neutralizar CSS global de otros módulos. */
+/* Selector con mayor especificidad + !important para ganar cascade
+   contra inducciones-view.css y revision-alta-direccion-v2.css */
 .k-modal-overlay .k-modal {
     position: relative !important;
     top: auto !important;
     left: auto !important;
     height: auto !important;
-    max-height: 80vh;
-    background: var(--k-bg-card);
-    width: 92%;
-    max-width: 620px;
-    border-radius: 12px;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: none;
-    animation: modalSlideIn 0.3s ease-out;
+    max-height: 80vh !important;
+    background: var(--k-bg-card) !important;
+    width: 92% !important;
+    max-width: 620px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    /* Blindaje: evaluacion-inicial-sg-sst.js inyecta .k-modal{align-items:center!important}
+       global; sin esto, header/body/footer se encogen al contenido (~230px) en vez de
+       estirar al ancho del modal. Especificidad 0-2-0 gana al 0-1-0 de ellos. */
+    align-items: stretch !important;
+    overflow: hidden !important;
+    border: none !important;
+    animation: modalSlideIn 0.3s ease-out !important;
 }
 
 @keyframes modalSlideIn {
@@ -766,16 +513,15 @@
 }
 
 .k-modal-header {
-    padding: 0.95rem 1.25rem;
-    background: var(--k-bg-app);
-    border-bottom: 1px solid var(--k-border);
+    padding: 1.15rem 1.25rem 0.35rem;
+    background: transparent;
+    border-bottom: none;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     width: 100%;
     box-sizing: border-box;
     border-radius: 12px 12px 0 0;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .k-modal-title {
@@ -824,17 +570,37 @@
 }
 
 .k-modal-footer {
-    padding: 0.85rem 1.25rem;
-    background: var(--k-bg-app);
-    border-top: 1px solid var(--k-border);
+    padding: 0.85rem 1.25rem 1.1rem;
+    background: transparent;
+    border-top: none;
     display: flex;
     justify-content: flex-end;
     gap: 0.625rem;
     width: 100%;
     box-sizing: border-box;
     border-radius: 0 0 12px 12px;
-    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.04);
 }
+
+/* Botón fantasma del pie (Cancelar): texto gris sin borde */
+.k-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #5a6378;
+    background: transparent;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-family: var(--k-font-family);
+}
+.k-btn-ghost:hover { background: #f0f2f5; color: #1a1a2e; }
+
+/* Campo angosto (Vigencia del período) */
+.k-form-field-sm { width: 190px; max-width: 100%; }
 
 /* =========================================
    12. FORMULARIOS (modal)
@@ -850,12 +616,10 @@
 
 .k-form-label {
     display: block;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    color: var(--k-text-muted);
-    text-transform: uppercase;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--k-text-main);
     margin-bottom: 0.375rem;
-    letter-spacing: 0.5px;
 }
 
 .k-form-control {
@@ -937,22 +701,13 @@ select.k-form-control {
    15. RESPONSIVE
    ========================================= */
 
-@media (max-width: 992px) {
-  .k-charts-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 768px) {
-  .k-stats-ribbon { flex-wrap: wrap; }
-  .k-stats-ribbon__item { flex: 1 1 45%; }
-  .k-stats-ribbon__divider { display: none; }
-}
-
 /* =========================================
 13. CONFIRM MODAL — variantes
 ========================================= */
 
+/* periodModal: ganar cascade contra inducciones-view.css y revision-alta-direccion-v2.css */
 .k-modal-overlay .k-modal.k-modal-sm {
- max-width: 440px;
+ max-width: 420px !important;
 }
 
 .k-modal-warning {
@@ -981,4 +736,945 @@ select.k-form-control {
 .capacitaciones-container[data-theme="dark"] .k-modal-warning {
  color: #f0ad4e;
  background: rgba(240, 173, 78, 0.1);
+}
+
+/* =========================================
+   16. EVIDENCIAS — Modal & Cell Button
+   ========================================= */
+
+.k-evidencia-cap-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--k-text-muted);
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--k-bg-app);
+    border-radius: var(--k-radius-md);
+    border-left: 3px solid var(--k-primary);
+}
+
+.k-evidencia-cap-label i {
+    color: var(--k-primary);
+    font-size: 1rem;
+}
+
+.k-evidencia-cap-label #evidencia-cap-name {
+    font-weight: 500;
+    color: var(--k-text-main);
+}
+
+.k-evidencia-dropzone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    margin-bottom: 1.25rem;
+    border: 2px dashed var(--k-border);
+    border-radius: var(--k-radius-lg);
+    background: var(--k-bg-app);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.k-evidencia-dropzone:hover,
+.k-evidencia-dropzone.is-dragging {
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-dropzone i {
+    font-size: 2rem;
+    color: var(--k-primary);
+    margin-bottom: 0.5rem;
+}
+
+.k-evidencia-dropzone-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--k-text-main);
+    margin-bottom: 0.25rem;
+}
+
+.k-evidencia-dropzone-hint {
+    font-size: 0.78rem;
+    color: var(--k-text-muted);
+}
+
+.k-evidencia-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+    margin: 0.5rem 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--k-border);
+}
+
+.k-evidencia-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 11px;
+    background: var(--k-primary-light);
+    color: var(--k-primary);
+}
+
+.k-evidencia-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.k-evidencia-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--k-bg-app);
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md);
+    transition: all 0.15s ease;
+}
+
+.k-evidencia-item:hover {
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--k-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    background: var(--k-bg-card);
+    color: var(--k-primary);
+}
+
+.k-evidencia-item-icon.is-pdf {
+    color: #dc3545;
+    background: var(--k-danger-light);
+}
+.k-evidencia-item-icon.is-image {
+    color: #28a745;
+    background: var(--k-success-light);
+}
+.k-evidencia-item-icon.is-doc {
+    color: #174ea6;
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.k-evidencia-item-name {
+    font-size: 0.875rem;
+    color: var(--k-text-main);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+
+.k-evidencia-item-meta {
+    font-size: 0.72rem;
+    color: var(--k-text-muted);
+}
+
+.k-evidencia-item-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.k-evidencia-item-actions .k-btn {
+    height: 30px;
+    width: 30px;
+}
+
+.k-evidencia-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--k-text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.k-evidencia-empty i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* Botón de evidencia en la tabla */
+.k-evidencia-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    width: 32px;
+    padding: 0;
+    border: 1px solid var(--k-border);
+    background: var(--k-bg-card);
+    color: var(--k-text-muted);
+    border-radius: var(--k-radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.k-evidencia-btn:hover {
+    border-color: var(--k-primary);
+    color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-btn.has-files {
+    color: var(--k-primary);
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-btn-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    border-radius: 9px;
+    background: var(--k-primary);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark theme — Evidencias */
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone:hover,
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone.is-dragging {
+    border-color: var(--k-primary);
+    background: rgba(77, 166, 255, 0.15);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-pdf {
+    background: rgba(217, 83, 79, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-image {
+    background: rgba(92, 184, 92, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-doc {
+    background: rgba(77, 166, 255, 0.15);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   📦 Fase 3 — Indicador visual de conflicto de horario en la tabla
+   Una capacitación está en conflicto si se solapa con otra del mismo
+   día/empresa. El backend NO valida — esta es validación client-side.
+   ════════════════════════════════════════════════════════════════════════ */
+.capacitaciones-container tr.k-row-conflict {
+    background-color: rgba(220, 53, 69, 0.06);
+    border-left: 3px solid var(--k-danger, #dc3545);
+}
+.capacitaciones-container tr.k-row-conflict:hover {
+    background-color: rgba(220, 53, 69, 0.12);
+}
+.capacitaciones-container tr.k-row-conflict td:first-child::before {
+    content: '⚠️';
+    margin-right: 0.4rem;
+    font-size: 0.85rem;
+}
+.capacitaciones-container[data-theme="dark"] tr.k-row-conflict {
+    background-color: rgba(220, 53, 69, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] tr.k-row-conflict:hover {
+    background-color: rgba(220, 53, 69, 0.22);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+   17. REDISEÑO PREMIUM (sistema kair-* compartido + componentes cap-*)
+   Reutiliza shared/kair-components.css (cargado global en index.html).
+   Las variables --kair-* viven en :root; en dark mode se redefinen
+   scopeadas al contenedor para que hero/cards/metrics se adapten solas.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ------- Dark theme: redefinir tokens kair para que los componentes
+   compartidos (kair-card, kair-metric-card) hereden el tema oscuro ------- */
+.capacitaciones-container[data-theme="dark"] {
+    --kair-card: #2d3748;
+    --kair-line: #4a5568;
+    --kair-line-soft: #3a4356;
+    --kair-ink: #e9ecef;
+    --kair-muted: #adb5bd;
+    --kair-faint: #7d8798;
+    --kair-canvas: #1a202c;
+    --kair-soft: #232b3a;
+}
+
+/* Ajustes dark de colores hardcodeados en kair-components.css */
+.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-head { color: #9aa7ba; }
+.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-value { color: #e9ecef; }
+.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-value small { color: #7d8798; }
+.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-progress,
+.capacitaciones-container[data-theme="dark"] .kair-progress-bar { background: #232b3a; }
+.capacitaciones-container[data-theme="dark"] .kair-card-head h3,
+.capacitaciones-container[data-theme="dark"] .kair-row-title h3 { color: #e9ecef; }
+
+/* Variante info (barra azul) para metric cards — complementa --danger/--warning */
+.kair-metric-card--info .kair-progress i { background: var(--kair-blue, #2057b8); }
+
+/* =========================================
+   HEADER PREMIUM
+   ========================================= */
+
+.cap-header__inner {
+    padding: 1.125rem 1.5rem 0;
+}
+
+.cap-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--k-text-muted);
+    margin-bottom: 0.875rem;
+}
+.cap-breadcrumb i { font-size: 0.6rem; color: var(--kair-faint, #aab1bd); }
+.cap-breadcrumb .is-current { color: var(--k-text-main); font-weight: 600; }
+
+.cap-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1.125rem;
+    flex-wrap: wrap;
+}
+
+.cap-header-left { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+
+.cap-header-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--k-primary-light, #e8f0fe);
+    color: var(--k-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.cap-header-left h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--k-text-main);
+    letter-spacing: -0.02em;
+}
+.cap-header-left p {
+    font-size: 0.8125rem;
+    color: var(--k-text-muted);
+    margin: 0.25rem 0 0 0;
+}
+
+.cap-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+}
+
+/* Empresa como chip (Header System v2.0): pill con borde + icono */
+.cap-company {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--k-bg-app);
+    border: 1px solid var(--k-border);
+    color: var(--k-text-main);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.cap-company i { font-size: 0.75rem; color: var(--k-text-muted); }
+
+.cap-period-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--k-bg-app);
+    border: 1px solid var(--k-border);
+    color: var(--k-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.cap-period-pill i { font-size: 0.75rem; }
+.cap-period-pill #badge-periodo-activo { color: var(--k-primary); font-weight: 700; }
+
+/* Botón primario del header (Crear Período) — sólido azul */
+.capacitaciones-container .header-action--primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: var(--k-primary);
+    border: 1px solid var(--k-primary);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: var(--k-font-family);
+    box-shadow: 0 2px 6px rgba(23, 78, 166, 0.25);
+}
+.capacitaciones-container .header-action--primary:hover {
+    background: var(--k-primary-hover);
+    border-color: var(--k-primary-hover);
+    transform: translateY(-1px);
+}
+
+/* Tabs dentro del nuevo header (sin margin negativo: el padding lo da el inner) */
+.cap-header .capacitaciones-tabs { margin: 0; padding: 0 1.5rem; }
+
+/* =========================================
+   DASHBOARD — HERO + MÉTRICAS + GRIDS
+   ========================================= */
+
+/* Override: el score grande vive en un span#hero-score (el CSS compartido
+   achata TODOS los spans de .kair-hero-score) */
+.cap-hero .kair-hero-score #hero-score {
+    font: 800 clamp(22px, 2.4vw, 32px) var(--kair-font-display, 'Manrope', sans-serif);
+    color: #ffffff;
+    display: inline;
+    text-align: inherit;
+    margin-top: 0;
+    letter-spacing: -0.02em;
+}
+
+/* Hero compacto con las MISMAS dimensiones del home de Recursos
+   (alto compartido clamp(110px,10vw,140px) de .kair-hero-card): texto
+   arriba, pie con barra de progreso + score a la derecha. Sin blobs. */
+.cap-hero {
+    margin: 0;
+    width: auto;
+    box-sizing: border-box;
+    min-height: 0;
+    padding: clamp(15px, 1.6vw, 22px) clamp(15px, 1.7vw, 24px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+.cap-hero::after, .cap-hero::before { display: none; }
+
+.cap-hero-main { flex: 1; min-width: 0; position: relative; z-index: 1; }
+
+.cap-hero h2 {
+    max-width: none;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 6px 0 4px;
+}
+.cap-hero .kair-hero-msg {
+    max-width: none;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Pie del hero: barra de progreso flexible + score alineado a la derecha */
+.cap-hero-foot {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    position: relative;
+    z-index: 1;
+}
+.cap-hero-foot .cap-hero-progress { flex: 1; margin-top: 0; }
+
+.cap-hero .kair-hero-score.cap-hero-score {
+    position: static;
+    flex-shrink: 0;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    z-index: 1;
+    font-size: clamp(18px, 1.9vw, 26px);
+}
+.cap-hero .kair-hero-score.cap-hero-score span { text-align: right; }
+
+.cap-hero-progress {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.cap-hero-progress i {
+    display: block;
+    height: 100%;
+    background: var(--kair-mint, #1bb888);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+/* Fila superior: MISMAS dimensiones que .kair-health en Recursos —
+   retícula fluida minmax(220px) con el hero ocupando 2 columnas. */
+.cap-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: clamp(10px, 1.2vw, 16px);
+    margin: 0 0 clamp(12px, 1.3vw, 17px) 0;
+    padding: 0 clamp(4px, 0.6vw, 8px);
+    box-sizing: border-box;
+}
+.cap-metrics > .cap-hero { grid-column: span 2; }
+@media (max-width: 880px) {
+    .cap-metrics > .cap-hero { grid-column: span 1; }
+}
+
+.cap-grid-2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(10px, 1.2vw, 17px);
+    margin: 0 0 clamp(12px, 1.3vw, 17px) 0;
+    padding: 0 clamp(4px, 0.6vw, 8px);
+    box-sizing: border-box;
+}
+.cap-grid-2:last-child { margin-bottom: 0; }
+
+/* Fila de gráficas: línea amplia (izq) + dona más angosta (der) */
+.cap-grid-charts { grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); }
+
+.cap-chart-box {
+    position: relative;
+    height: 260px;
+    width: 100%;
+}
+.cap-chart-box--donut { height: 210px; flex: none; min-width: 0; }
+.cap-chart-box canvas {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.cap-chart-legend {
+    display: flex;
+    gap: 1.25rem;
+    font-size: 0.72rem;
+    color: var(--k-text-muted);
+    padding-top: 0.75rem;
+    flex-wrap: wrap;
+}
+.cap-chart-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+/* Marcador de línea " Planeado" (guionado, sin punto) */
+.cap-chart-legend__dash {
+    width: 14px !important;
+    height: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    margin-bottom: 3px;
+}
+
+/* Dona centrada arriba + leyenda DEBAJO en filas con separador */
+.cap-donut-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+}
+
+.cap-donut-legend {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.35rem;
+    border-top: 1px solid var(--kair-line-soft, #eef0f1);
+}
+.cap-donut-legend__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.15rem;
+    border-bottom: 1px solid var(--kair-line-soft, #eef0f1);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+    white-space: nowrap;
+}
+.cap-donut-legend__name { display: inline-flex; align-items: center; gap: 0.5rem; }
+.cap-donut-legend__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.cap-donut-legend__pct { color: var(--k-text-muted); font-weight: 500; }
+
+/* =========================================
+   DASHBOARD — EN TU RADAR
+   ========================================= */
+
+.cap-radar-card { display: flex; flex-direction: column; }
+
+.cap-radar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--kair-line-soft, #eef0f1);
+}
+.cap-radar-item:last-child { border-bottom: none; }
+
+.cap-radar-item__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--k-primary-light);
+    color: var(--k-primary);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.cap-radar-item__body { flex: 1; min-width: 0; }
+.cap-radar-item__name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.cap-radar-item__meta {
+    font-size: 0.75rem;
+    color: var(--k-text-muted);
+    margin-top: 3px;
+}
+
+/* Pastilla de estado (Programada / Pendiente) */
+.cap-radar-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    background: var(--k-primary-light, #e8f0fe);
+    color: var(--k-primary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cap-radar-pill__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.cap-radar-pill--warning { background: #fdf0d3; color: #9a6b10; }
+
+.cap-radar-empty {
+    text-align: center;
+    padding: 1rem 0.5rem;
+    color: var(--k-text-muted);
+    font-size: 0.85rem;
+}
+
+.cap-radar-evidencias {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--kair-line-soft, #eef0f1);
+}
+.cap-radar-evidencias__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fdf0d3;
+    color: #b45309;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+.cap-radar-evidencias__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cap-radar-evidencias__title { font-size: 0.85rem; font-weight: 600; color: var(--k-text-main); }
+.cap-radar-evidencias__meta { font-size: 0.75rem; color: var(--k-text-muted); margin-top: 3px; }
+.cap-radar-evidencias__meta strong { color: var(--k-text-main); }
+
+.cap-radar-link {
+    margin-top: 0.85rem;
+    background: none;
+    border: none;
+    color: var(--kair-blue, #2057b8);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    align-self: flex-start;
+    font-family: var(--k-font-family);
+}
+.cap-radar-link:hover { text-decoration: underline; }
+
+/* =========================================
+   LISTADO — FILTROS PILL / TABLA / PAGINACIÓN
+   ========================================= */
+
+.k-filter-pill {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.k-filter-pill .k-form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    border-radius: 999px;
+    background-color: var(--k-bg-card);
+    border: 1px solid var(--k-border);
+    padding: 0.45rem 2rem 0.45rem 0.9rem;
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--k-text-main);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+.k-filter-pill .k-form-select:hover { border-color: var(--k-primary); }
+.k-filter-pill .k-form-select:focus {
+    outline: none;
+    border-color: var(--k-primary);
+    box-shadow: 0 0 0 3px var(--k-primary-light);
+}
+.k-filter-pill > i {
+    position: absolute;
+    right: 12px;
+    pointer-events: none;
+    color: var(--k-text-muted);
+    font-size: 0.65rem;
+}
+
+/* Header de tabla refinado: uppercase gris */
+.capacitaciones-container .k-table th {
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.5px;
+    color: var(--k-text-muted);
+}
+
+/* Nombre: bold, máximo 2 líneas con ellipsis */
+.k-cell-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 260px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Pills con dot (tipo y estado) */
+.k-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1;
+}
+.k-pill__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+.k-pill--sst     { background: var(--k-primary-light); color: var(--k-primary); }
+.k-pill--pyp     { background: rgba(108, 117, 125, 0.12); color: var(--k-text-muted); }
+.k-pill--success { background: var(--k-success-light); color: var(--k-success); }
+.k-pill--warning { background: var(--k-warning-light); color: #856404; }
+
+.capacitaciones-container[data-theme="dark"] .k-pill--pyp { background: rgba(255,255,255,0.08); }
+.capacitaciones-container[data-theme="dark"] .k-pill--warning { color: #f0ad4e; }
+
+/* Botones de acción sutiles (ghost, sin bordes de color) */
+.k-action-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--k-text-muted);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    padding: 0;
+    font-size: 0.85rem;
+}
+.k-action-btn:hover { background: var(--k-primary-light); color: var(--k-primary); }
+.k-action-btn--success:hover { background: var(--k-success-light); color: var(--k-success); }
+.k-action-btn--warning:hover { background: var(--k-warning-light); color: #856404; }
+.k-action-btn--danger:hover  { background: var(--k-danger-light);  color: var(--k-danger); }
+.capacitaciones-container[data-theme="dark"] .k-action-btn--warning:hover { color: #f0ad4e; }
+
+/* Paginación cliente */
+.k-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--k-border);
+    flex-wrap: wrap;
+}
+.k-pagination__info { font-size: 0.8125rem; color: var(--k-text-muted); }
+.k-pagination__pages { display: flex; gap: 4px; align-items: center; }
+.k-page-btn {
+    min-width: 30px;
+    height: 30px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--k-text-muted);
+    cursor: pointer;
+    padding: 0 8px;
+    font-family: var(--k-font-family);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.k-page-btn:hover:not(:disabled):not(.is-active) { background: var(--k-bg-app); color: var(--k-text-main); }
+.k-page-btn.is-active { background: var(--k-primary); color: #ffffff; }
+.k-page-btn:disabled { opacity: 0.35; cursor: default; }
+.k-page-ellipsis { color: var(--k-text-muted); font-size: 0.8125rem; padding: 0 2px; }
+
+/* =========================================
+   MODALES — secciones y subtítulo
+   ========================================= */
+
+.k-modal-headtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.k-modal-subtitle {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--k-text-muted);
+}
+
+.k-form-section {
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-lg);
+    padding: 1rem 1.125rem;
+    margin-bottom: 1rem;
+    background: var(--k-bg-card);
+}
+.k-form-section__head { margin-bottom: 0.875rem; }
+.k-form-section__title { font-size: 0.8125rem; font-weight: 700; color: var(--k-text-main); }
+.k-form-section__hint { font-size: 0.75rem; color: var(--k-text-muted); margin-top: 2px; }
+.k-form-field-full { width: 100%; }
+
+/* =========================================
+   DARK THEME — componentes premium cap-*
+   ========================================= */
+
+.capacitaciones-container[data-theme="dark"] .cap-breadcrumb { color: #adb5bd; }
+.capacitaciones-container[data-theme="dark"] .cap-breadcrumb .is-current { color: #e9ecef; }
+.capacitaciones-container[data-theme="dark"] .cap-header-left h3 { color: #e9ecef; }
+.capacitaciones-container[data-theme="dark"] .cap-header-left p { color: #adb5bd; }
+.capacitaciones-container[data-theme="dark"] .cap-period-pill {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+    color: #adb5bd;
+}
+.capacitaciones-container[data-theme="dark"] .cap-company {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+    color: #e9ecef;
+}
+.capacitaciones-container[data-theme="dark"] .cap-company i { color: #adb5bd; }
+.capacitaciones-container[data-theme="dark"] .cap-header-icon {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.capacitaciones-container[data-theme="dark"] .cap-radar-item { border-bottom-color: #3a4356; }
+.capacitaciones-container[data-theme="dark"] .cap-radar-evidencias { background: #232b3a; }
+.capacitaciones-container[data-theme="dark"] .k-filter-pill .k-form-select { background-color: var(--k-bg-card); }
+.capacitaciones-container[data-theme="dark"] .k-form-section { background: var(--k-bg-card); }
+
+/* =========================================
+   RESPONSIVE — premium
+   ========================================= */
+
+@media (max-width: 992px) {
+    .cap-grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .cap-header__inner { padding: 1rem 1rem 0; }
+    .cap-header .capacitaciones-tabs { padding: 0 1rem; }
+    .cap-chart-box--donut { flex: none; }
 }

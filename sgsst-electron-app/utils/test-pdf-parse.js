@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const pdf = require('pdf-parse');
+const pdf = require('./pdfjs-shim');
 
 async function analyzePdf(filePath, name) {
     console.log('\n' + '='.repeat(80));

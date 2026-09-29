@@ -1,0 +1,180 @@
+/* ============================================================
+ * K+AIR Sidebar — Premium Design System (📦738)
+ * ============================================================
+ * Componentes reutilizables para los sidebars laterales de la app.
+ * Migra `.sidebar-module-card` legacy a `.kair-nav-card` con
+ * tokens del design system compartido (kair-design-tokens.css).
+ *
+ * Componentes:
+ *   .kair-nav-card              — card de navegación principal (módulo)
+ *   .kair-nav-card__icon        — wrapper del icono SVG
+ *   .kair-nav-card__text        — columna con título + subtítulo
+ *   .kair-nav-card__title       — título (ej. "Recursos")
+ *   .kair-nav-card__subtitle    — subtítulo (ej. "Capacitación, Roles")
+ *   .kair-nav-card--active      — estado activo (módulo seleccionado)
+ *   .kair-nav-card--footer      — variante para "Salir" (dashed border)
+ *   .kair-nav-card__badge       — badge opcional (alertas, score)
+ *   .kair-nav-section-header    — header de sección ("Módulos del Sistema")
+ *
+ * Convenciones:
+ *   - Convive con legacy `.sidebar-module-card` (sin conflicto)
+ *   - Usa SOLO tokens de kair-design-tokens.css (sin colores hardcoded)
+ *   - Transiciones con var(--kair-transition) consistente
+ * ============================================================ */
+
+/* ── Card principal (button) ─────────────────────────────────────── */
+.kair-nav-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    padding: 10px 12px;
+    gap: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: var(--kair-radius-card);
+    text-align: left;
+    cursor: pointer;
+    font-family: var(--kair-font-ui);
+    color: var(--kair-ink);
+    transition: background-color var(--kair-transition),
+                transform var(--kair-transition);
+    box-sizing: border-box;
+}
+
+.kair-nav-card:hover {
+    background-color: var(--kair-soft);
+}
+
+.kair-nav-card:active {
+    transform: scale(0.98);
+}
+
+/* Estado activo — solo background sutil, sin border ni box-shadow */
+.kair-nav-card--active {
+    background-color: var(--kair-soft);
+}
+
+.kair-nav-card--active .kair-nav-card__title {
+    color: var(--kair-blue);
+}
+
+.kair-nav-card--active .kair-nav-card__icon {
+    color: var(--kair-blue);
+}
+
+/* ── Icono ───────────────────────────────────────────────────────── */
+/* Sin caja de fondo — solo el SVG con color. El color cambia
+   sutilmente entre inactivo (gris-azul) y activo (azul vibrante). */
+.kair-nav-card__icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--kair-blue-ink);
+    transition: color var(--kair-transition);
+}
+
+.kair-nav-card__icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.8;
+    display: block;
+}
+
+/* ── Texto (columna título + subtítulo) ──────────────────────────── */
+.kair-nav-card__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.kair-nav-card__title {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--kair-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--kair-font-ui);
+}
+
+.kair-nav-card__subtitle {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--kair-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--kair-font-ui);
+}
+
+/* ── Badge opcional (alertas / score) ────────────────────────────── */
+.kair-nav-card__badge {
+    background-color: var(--kair-red);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 999px;
+    margin-left: auto;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.kair-nav-card__badge--warn {
+    background-color: var(--kair-amber);
+}
+
+.kair-nav-card__badge--ok {
+    background-color: var(--kair-mint);
+}
+
+/* ── Variante footer (Salir) ────────────────────────────────────── */
+.kair-nav-card--footer {
+    background-color: transparent;
+}
+
+.kair-nav-card--footer:hover {
+    background-color: var(--kair-soft);
+}
+
+/* ── Header de sección ("Módulos del Sistema") ──────────────────── */
+.kair-nav-section-header-li {
+    list-style: none;
+    padding: 8px 4px 10px;
+    margin: 0;
+}
+
+.kair-nav-section-header {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--kair-muted);
+    font-family: var(--kair-font-ui);
+}
+
+/* ── Wrappers de lista ───────────────────────────────────────────── */
+.kair-nav-card-li,
+.kair-nav-footer-li {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Separador antes del footer "Salir" */
+.kair-nav-footer-li {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--kair-line);
+    margin-top: 16px;
+}

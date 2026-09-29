@@ -1,0 +1,2 @@
+# Esta carpeta almacena los PDFs firmados (con metadata embebida).
+# Los archivos se crean en runtime y NO se commitean.

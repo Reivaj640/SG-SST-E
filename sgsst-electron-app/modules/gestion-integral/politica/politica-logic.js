@@ -29,6 +29,19 @@ this.container.appendChild(iframe);
 
 handleIframeMessage(event) {
 if (!event.data || !event.data.type) return;
+
+// 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+if (event.data.type === 'open-file-viewer-modal') {
+    const filePath = event.data.filePath;
+    if (!filePath) return;
+    if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+        window.kairFV.openWithFileViewerFromPath(filePath);
+    } else {
+        console.warn('[PoliticaLogic] kairFV.openWithFileViewerFromPath no disponible');
+    }
+    return;
+}
+
 if (event.data.type.endsWith('-request')) {
 const action = event.data.type.replace('-request', '');
 if (action === 'back-to-module') {
@@ -36,7 +49,11 @@ window.removeEventListener('message', this.handleIframeMessage);
 // No llamar onBackToModuleHome() — el renderer main handler (renderer.js:869)
 // ya se encarga de la navegación. Llamarlo aquí causa instancia duplicada.
 } else {
-this.handleStandardRequest(event, this.getApiMap()[action]);
+    const apiMap = this.getApiMap();
+    const apiName = apiMap[action];
+    if (apiName) {
+        window.KairDocPreview.handleRequest(event, apiName);
+    }
 }
 }
 }

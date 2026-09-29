@@ -1,266 +1,197 @@
 <!DOCTYPE html>
+<!--
+  ============================================================================
+  K+AIR | Portal Rendición de Cuentas (Premium v1)
+  Mismo contrato que rendicion-home.js espera:
+    ids: activePeriod, workersCount, reportStatus, loadingOverlay, loadingText
+    clases: info-card-icon (variantes primary/success/warning)
+    funciones: goBackToModule(), enterRendicion(), importFromExcel(), exportReport(), viewHistory()
+  ============================================================================
+-->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>K+AIR | Portal Rendición de Cuentas</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-           SISTEMA VISUAL OFICIAL (K+AIR)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-        :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --primary-light: #e8f0fe;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-            --bg-body: #f0f2f5;
-            --bg-card: #ffffff;
-            --border: #dee2e6;
-            --radius: 0.5rem;
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        :root{
+            --kair-bg:#FBFCFB;
+            --kair-surface:#FFFFFF;
+            --kair-text:#14213D;
+            --kair-text-2:#748096;
+            --kair-text-3:#9AA4B8;
+            --kair-border:#E8EBEE;
+            --kair-blue:#2057B8;
+            --kair-blue-ink:#17418C;
+            --kair-blue-soft:#EAF0FB;
+            --kair-green:#1BB888;
+            --kair-green-soft:#E3F6EF;
+            --kair-amber:#E7A224;
+            --kair-amber-soft:#FBF1DE;
+            --kair-slate-soft:#F1F4F8;
+            --kair-radius:16px;
+            --kair-font-title:'Manrope','Inter',system-ui,sans-serif;
+            --kair-font-body:'Inter',system-ui,sans-serif;
+            --kair-t:180ms cubic-bezier(.4,0,.2,1);
+        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            font-family:var(--kair-font-body);
+            background:var(--kair-bg);
+            color:var(--kair-text);
+            font-size:14px;
+            min-height:100vh;
+            display:flex;
+            flex-direction:column;
+        }
+        button{font-family:inherit;cursor:pointer}
+
+        .portal-container{
+            flex:1;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:2rem 1.5rem;
+        }
+        .portal-card{
+            background:var(--kair-surface);
+            width:100%;
+            max-width:1080px;
+            border:1px solid var(--kair-border);
+            border-radius:var(--kair-radius);
+            padding:2.75rem 3rem 3rem;
+            text-align:center;
+            animation:kfade .45s ease;
+        }
+        @keyframes kfade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+        .portal-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:2.4rem;
+            padding-bottom:1.4rem;
+            border-bottom:1px solid var(--kair-border);
+        }
+        .portal-logo{
+            font-family:var(--kair-font-title);
+            font-size:1.05rem;
+            font-weight:800;
+            color:var(--kair-blue);
+            display:flex;
+            align-items:center;
+            gap:9px;
+            letter-spacing:.01em;
+        }
+        .portal-logo .lg{
+            width:34px;height:34px;border-radius:10px;
+            background:var(--kair-blue-soft);color:var(--kair-blue);
+            display:flex;align-items:center;justify-content:center;
+        }
+        .back-btn-internal{
+            display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;
+            font-size:13px;font-weight:600;color:var(--kair-text-2);
+            border-radius:10px;border:1px solid var(--kair-border);
+            background:var(--kair-surface);transition:all var(--kair-t);
+        }
+        .back-btn-internal:hover{color:var(--kair-blue);border-color:var(--kair-blue);background:var(--kair-blue-soft)}
+        .back-btn-internal:focus,.back-btn-internal:active{text-decoration:none}
+
+        .hero-eyebrow{
+            display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 12px;
+            border-radius:999px;background:var(--kair-blue-soft);color:var(--kair-blue);
+            font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+            margin-bottom:1rem;
+        }
+        .hero-title{
+            font-family:var(--kair-font-title);
+            font-size:2.1rem;font-weight:800;letter-spacing:-.02em;
+            color:var(--kair-text);margin-bottom:.6rem;
+        }
+        .hero-subtitle{
+            color:var(--kair-text-2);
+            font-size:1rem;
+            margin-bottom:2.4rem;
+            max-width:620px;
+            margin-left:auto;margin-right:auto;
+            line-height:1.65;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-dark);
-            font-size: 1rem;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        .info-cards-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+            gap:1rem;
+            margin-bottom:2.4rem;
+        }
+        .info-card{
+            background:#F8FAFC;
+            border:1px solid var(--kair-border);
+            border-radius:14px;
+            padding:1.35rem 1.5rem;
+            text-align:left;
+        }
+        .info-card-icon{
+            width:42px;height:42px;border-radius:11px;
+            display:flex;align-items:center;justify-content:center;
+            margin-bottom:.9rem;
+        }
+        .info-card-icon.primary{background:var(--kair-blue-soft);color:var(--kair-blue)}
+        .info-card-icon.success{background:var(--kair-green-soft);color:#0E8A63}
+        .info-card-icon.warning{background:var(--kair-amber-soft);color:#A96F0B}
+        .info-card-label{
+            font-size:.72rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+            color:var(--kair-text-2);margin-bottom:.2rem;
+        }
+        .info-card-value{
+            font-family:var(--kair-font-title);
+            font-size:1.45rem;font-weight:800;letter-spacing:-.01em;
+            color:var(--kair-text);
         }
 
-        /* PORTAL CONTENEDOR PRINCIPAL */
-        .portal-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            overflow-y: auto;
+        .main-action-btn{
+            display:inline-flex;align-items:center;gap:10px;
+            padding:.95rem 2.4rem;
+            font-family:var(--kair-font-title);
+            font-size:.95rem;font-weight:700;
+            color:#fff;background:var(--kair-blue);
+            border:none;border-radius:12px;
+            transition:all var(--kair-t);
+            box-shadow:0 5px 16px rgba(32,87,184,.28);
+            margin:0 0 2.1rem;
         }
+        .main-action-btn:hover{background:var(--kair-blue-ink);transform:translateY(-2px);box-shadow:0 8px 22px rgba(32,87,184,.34)}
 
-        .portal-card {
-            background: white;
-            width: 100%;
-            max-width: 1100px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-lg);
-            padding: 3rem;
-            text-align: center;
-            animation: fadeIn 0.5s ease-out;
+        .secondary-actions{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+        .secondary-btn{
+            display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;
+            font-size:.85rem;font-weight:600;color:var(--kair-text-2);
+            background:var(--kair-surface);
+            border:1px solid var(--kair-border);border-radius:10px;
+            transition:all var(--kair-t);
         }
+        .secondary-btn:hover{color:var(--kair-blue);border-color:var(--kair-blue);background:var(--kair-blue-soft)}
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .loading-overlay{
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(251,252,251,.94);
+            display:none;align-items:center;justify-content:center;flex-direction:column;gap:1rem;
+            z-index:9999;
         }
-
-        /* BARRA SUPERIOR INTERNA DEL PORTAL */
-        .portal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid #f1f3f5;
+        .loading-overlay.active{display:flex}
+        .spinner{
+            width:46px;height:46px;border:3.5px solid var(--kair-blue-soft);
+            border-top-color:var(--kair-blue);border-radius:50%;
+            animation:kspin .9s linear infinite;
         }
+        @keyframes kspin{to{transform:rotate(360deg)}}
+        .loading-text{color:var(--kair-text-2);font-size:.95rem}
 
-        .portal-logo {
-            font-family: 'Lexend', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .back-btn-internal {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s;
-            background: #f8f9fa;
-            border: 1px solid var(--border);
-        }
-
-        .back-btn-internal:hover {
-            color: var(--primary);
-            background: var(--primary-light);
-            border-color: var(--primary);
-        }
-
-        /* HERO SECTION */
-        .hero-title {
-            font-family: 'Lexend', sans-serif;
-            font-size: 2.5rem;
-            color: var(--text-dark);
-            margin-bottom: 0.5rem;
-        }
-
-        .hero-subtitle {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            max-width: 650px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-
-        /* INFO CARDS */
-        .info-cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2.5rem;
-        }
-
-        .info-card {
-            background: var(--bg-body);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            text-align: left;
-            border: 1px solid var(--border);
-        }
-
-        .info-card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .info-card-icon.primary { background: var(--primary-light); color: var(--primary); }
-        .info-card-icon.success { background: #d4edda; color: var(--success); }
-        .info-card-icon.warning { background: #fff3cd; color: var(--warning); }
-
-        .info-card-label {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 0.25rem;
-        }
-
-        .info-card-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-dark);
-        }
-
-        /* BOTÓN PRINCIPAL - ENTRADA */
-        .main-action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 1rem 3rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: white;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(23, 78, 166, 0.3);
-            margin: 2.5rem 0; /* Centrado vertical perfecto entre widgets */
-        }
-
-        .main-action-btn:hover {
-            background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(23, 78, 166, 0.4);
-        }
-        
-        .main-action-btn i {
-            font-size: 1.3rem;
-        }
-
-        /* ACCIONES SECUNDARIAS */
-        .secondary-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .secondary-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: var(--text-dark);
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .secondary-btn:hover {
-            color: var(--primary);
-            border-color: var(--primary);
-            background: var(--primary-light);
-        }
-
-        /* LOADING OVERLAY */
-        .loading-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(255,255,255,0.95);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 1rem;
-            z-index: 9999;
-        }
-
-        .loading-overlay.active { display: flex; }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid var(--primary-light);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            color: var(--text-muted);
-            font-size: 1rem;
+        @media (max-width:680px){
+            .portal-card{padding:2rem 1.4rem}
+            .hero-title{font-size:1.6rem}
         }
     </style>
 </head>
@@ -277,17 +208,20 @@
             <!-- Header -->
             <div class="portal-header">
                 <button class="back-btn-internal" onclick="goBackToModule()" title="Volver al módulo principal">
-                    <i class="bi bi-arrow-left"></i>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
                     <span>Volver al Módulo</span>
                 </button>
                 <div class="portal-logo">
-                    <i class="bi bi-file-earmark-check"></i>
+                    <span class="lg">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="m8.5 14.5 2.2 2.2 4.8-4.8"/></svg>
+                    </span>
                     K+AIR RENDICIÓN
                 </div>
             </div>
 
             <!-- Hero Section -->
-            <h1 class="hero-title">📊 Rendición de Cuentas SG-SST</h1>
+            <span class="hero-eyebrow">Informe anual · SG-SST</span>
+            <h1 class="hero-title">Rendición de Cuentas SG-SST</h1>
             <p class="hero-subtitle">
                 Gestiona el informe anual de rendición de cuentas del Sistema de Gestión de Seguridad y Salud en el Trabajo
             </p>
@@ -296,7 +230,7 @@
             <div class="info-cards-grid">
                 <div class="info-card">
                     <div class="info-card-icon primary">
-                        <i class="bi bi-calendar-check"></i>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/></svg>
                     </div>
                     <div class="info-card-label">Periodo Activo</div>
                     <div class="info-card-value" id="activePeriod">2024</div>
@@ -304,7 +238,7 @@
 
                 <div class="info-card">
                     <div class="info-card-icon success">
-                        <i class="bi bi-people"></i>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.9-2.9 2.9-4.3 5.5-4.3s4.6 1.4 5.5 4.3"/><path d="M15.5 5.4a3.2 3.2 0 0 1 0 5.9"/><path d="M17.5 14.9c1.6.7 2.7 2 3 4.1"/></svg>
                     </div>
                     <div class="info-card-label">Trabajadores</div>
                     <div class="info-card-value" id="workersCount">154</div>
@@ -312,33 +246,33 @@
 
                 <div class="info-card">
                     <div class="info-card-icon warning">
-                        <i class="bi bi-file-earmark-text"></i>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="M8.5 12.5h7M8.5 16h7"/></svg>
                     </div>
                     <div class="info-card-label">Estado del Informe</div>
-                    <div class="info-card-value" id="reportStatus" style="font-size: 1rem;">En elaboración</div>
+                    <div class="info-card-value" id="reportStatus" style="font-size:1.05rem">En elaboración</div>
                 </div>
             </div>
 
             <!-- Botón Principal -->
             <button class="main-action-btn" onclick="enterRendicion()">
-                <i class="bi bi-box-arrow-in-right"></i>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3.5h4.5a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="m3.5 12 9-8v16Z"/></svg>
                 <span>Entrar a Rendición de Cuentas</span>
             </button>
 
             <!-- Acciones Secundarias -->
             <div class="secondary-actions">
                 <button class="secondary-btn" onclick="importFromExcel()">
-                    <i class="bi bi-file-earmark-excel"></i>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="M9 13.5 12 16l3-2.5"/><path d="M12 16v-7"/></svg>
                     <span>Importar Excel</span>
                 </button>
 
                 <button class="secondary-btn" onclick="exportReport()">
-                    <i class="bi bi-download"></i>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11"/><path d="m8 10.5 4 4 4-4"/><path d="M5 19.5h14"/></svg>
                     <span>Exportar Informe</span>
                 </button>
 
                 <button class="secondary-btn" onclick="viewHistory()">
-                    <i class="bi bi-clock-history"></i>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 1 2.5 6"/><path d="M3.5 12H1.8M3.5 12l-1-2.2"/><path d="M12 8v4.2l3 1.8"/></svg>
                     <span>Ver Historial</span>
                 </button>
             </div>

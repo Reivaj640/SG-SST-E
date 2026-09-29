@@ -1,6 +1,13 @@
 (function() {
 'use strict';
 
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 var investigations = [];
 var filteredInvestigations = [];
 var currentFilter = 'todas';
@@ -325,12 +332,42 @@ if (inv.estado === 'pendiente') {
 var furatFile = (inv.archivos || []).find(function(f) {
 return f.name.toUpperCase().includes('FURAT') && (f.extension || '').toLowerCase() === 'pdf';
 });
+// Fallback 1: archivo cuyo nombre coincide con inv.nombre (común cuando el FURAT
+// está en la misma carpeta que la investigación)
+if (!furatFile) {
+furatFile = (inv.archivos || []).find(function(f) {
+return f.name === inv.nombre && (f.extension || '').toLowerCase() === 'pdf';
+});
+}
+// Fallback 2: cualquier PDF en la lista
 if (!furatFile) {
 furatFile = (inv.archivos || []).find(function(f) {
 return (f.extension || '').toLowerCase() === 'pdf';
 });
 }
 var furatPath = furatFile ? furatFile.path : '';
+
+// Fallback 3: buscar el FURAT vía cross-reference data (cuando está en otra carpeta,
+// ej: 3.2.1 cuando la investigación está en 3.2.2). xrefData se carga en
+// loadCrossReferenceData() y contiene matched/unmatched entre investigaciones y FURATs.
+if (!furatPath && xrefMatch && xrefMatch.furatPath) {
+  furatPath = xrefMatch.furatPath;
+  console.log('[INV-MGR] ℹ️ FURAT localizado vía cross-reference para "' + inv.nombre + '":', furatPath);
+}
+// Fallback 4: year mismatch (mismo nombre, año diferente)
+if (!furatPath && xrefMismatch && xrefMismatch.furatPath) {
+  furatPath = xrefMismatch.furatPath;
+  console.log('[INV-MGR] ⚠️ FURAT localizado con año diferente para "' + inv.nombre + '":', furatPath);
+}
+
+console.log('[INV-MGR] 🔍 Construyendo botón para investigación:', {
+invNombre: inv.nombre,
+archivosCount: (inv.archivos || []).length,
+furatPath: furatPath,
+furatFileName: furatFile ? furatFile.name : (xrefMatch && xrefMatch.furatPath ? xrefMatch.furatPath.split(/[\\\/]/).pop() : null),
+fullPath: inv.fullPath || null,
+relativePath: inv.relativePath || null
+});
 actionBtnHtml = '<button class="inv-card__action-btn ' + actionBtnClass + '"'
 + ' data-invnombre="' + escapeHtml(inv.nombre) + '"'
 + ' data-furatpath="' + escapeHtml(furatPath) + '"'
@@ -615,7 +652,7 @@ container.innerHTML = '<div class="inv-empty">'
 
 function showLoading() {
 var container = document.getElementById('investigationsList');
-container.innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Cargando investigaciones...</p></div>';
+container.innerHTML = KairSkeleton.list(8);
 }
 
 function hideLoading() {}
@@ -636,7 +673,7 @@ document.getElementById('backBtn').addEventListener('click', function() {
 document.getElementById('refreshBtn').addEventListener('click', function() {
 var icon = document.getElementById('refreshIcon');
 icon.classList.add('fa-spin');
-document.getElementById('investigationsList').innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Actualizando...</p></div>';
+document.getElementById('investigationsList').innerHTML = KairSkeleton.list(4);
 xrefData = null;
 loadAllData().then(function() {
 icon.classList.remove('fa-spin');
@@ -953,18 +990,30 @@ if (inv.estado === 'pendiente') {
 var furatFile = (inv.archivos || []).find(function(f) {
 return f.name.toUpperCase().includes('FURAT') && (f.extension || '').toLowerCase() === 'pdf';
 });
+// Fallback 1: archivo cuyo nombre coincide con inv.nombre
+if (!furatFile) {
+furatFile = (inv.archivos || []).find(function(f) {
+return f.name === inv.nombre && (f.extension || '').toLowerCase() === 'pdf';
+});
+}
+// Fallback 2: cualquier PDF
 if (!furatFile) {
 furatFile = (inv.archivos || []).find(function(f) {
 return (f.extension || '').toLowerCase() === 'pdf';
 });
 }
+console.log('[INV-MGR] 🔍 Preview StartBtn:', {
+invNombre: inv.nombre,
+furatPath: furatFile ? furatFile.path : '',
+furatFileName: furatFile ? furatFile.name : null
+});
 startBtn.style.display = '';
 startBtn.dataset.invnombre = inv.nombre;
 startBtn.dataset.furatpath = furatFile ? furatFile.path : '';
 }
 }
 
-iframeContainer.innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Cargando documento...</p></div>';
+iframeContainer.innerHTML = KairSkeleton.detail(6);
 
 try {
 var ext = extension.toLowerCase();
@@ -981,8 +1030,8 @@ iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div 
 return;
 }
 
-if (result && result.data) {
-iframeContainer.innerHTML = '<iframe src="data:application/pdf;base64,' + result.data + '" style="width:100%;height:450px;border:none;"></iframe>';
+if (result && result.success) {
+_renderPreview(iframeContainer, result, filePath);
 } else {
 iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div class="inv-empty__icon"><i class="fas fa-exclamation-triangle"></i></div><h3>Error al cargar</h3><p>No se pudo obtener la vista previa del documento.</p></div>';
 }
@@ -992,7 +1041,55 @@ iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div 
 }
 };
 
+// 📦608: renderiza file-viewer (Office nativo) o iframe PDF legacy según el modo
+function _renderPreview(container, result, filePath) {
+if (!container) return;
+container.innerHTML = '';
+var expandBtn = document.getElementById('previewExpandBtn');
+
+if (result && result.mode === 'file-viewer' && result.data && result.data.bytes) {
+  if (window.KairDocPreview && typeof window.KairDocPreview.mountInContainer === 'function') {
+    window.KairDocPreview.mountInContainer(container, result);
+  } else if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+    window.kairFV.mountInContainer(container, result.data);
+  } else {
+    container.innerHTML = '<div style="padding:20px;color:#b91c1c;">file-viewer no disponible</div>';
+    return;
+  }
+  if (expandBtn) {
+    expandBtn.style.display = '';
+    expandBtn.dataset.filePath = filePath || '';
+  }
+} else if (result && result.data) {
+  var base64 = (typeof result.data === 'string') ? result.data : result.data.base64Data || result.base64Data;
+  if (!base64) {
+    container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+    return;
+  }
+  container.innerHTML = '<iframe src="data:application/pdf;base64,' + base64 + '" style="width:100%;height:450px;border:none;"></iframe>';
+  if (expandBtn) expandBtn.style.display = 'none';
+} else {
+  container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+  if (expandBtn) expandBtn.style.display = 'none';
+}
+}
+
+// 📦608-fix13: pide al parent que abra el archivo en el modal file-viewer global
+function _expandFileViewer(filePath) {
+if (!filePath) return;
+try {
+  window.top.postMessage({ type: 'open-file-viewer-modal', filePath: filePath, source: 'investigacion-accidentes' }, '*');
+} catch (e) {
+  console.error('[INV-MGR] Error enviando postMessage al parent:', e);
+}
+}
+
 window._startInvestigation = function(invNombre, furatPath) {
+console.log('[INV-MGR] 🖱️ _startInvestigation clickeado:', {
+invNombre: invNombre,
+furatPath: furatPath,
+furatPathEmpty: !furatPath
+});
 window.parent.postMessage({
 type: 'iniciar-investigacion-desde-viewer',
 investigacionNombre: invNombre || '',
@@ -1000,12 +1097,29 @@ furatPath: furatPath || ''
 }, '*');
 };
 
+// NOTA: la versión duplicada que existía al final del archivo fue eliminada.
+// Solo se conserva esta definición (líneas 1105-1111 originales).
+
 function closePreview() {
 document.getElementById('previewOverlay').classList.add('hidden');
 document.getElementById('previewFieldGrid').innerHTML = '';
 document.getElementById('previewIframeContainer').innerHTML = '';
 document.getElementById('previewStartBtn').style.display = 'none';
+// 📦608: ocultar botón "Ver completo" al cerrar
+var expandBtn = document.getElementById('previewExpandBtn');
+if (expandBtn) expandBtn.style.display = 'none';
 }
+
+// 📦608: listener del botón "Ver completo"
+document.addEventListener('DOMContentLoaded', function() {
+var expandBtn = document.getElementById('previewExpandBtn');
+if (expandBtn) {
+  expandBtn.addEventListener('click', function() {
+    var filePath = expandBtn.dataset.filePath || '';
+    if (filePath) _expandFileViewer(filePath);
+  });
+}
+});
 
 function truncatePath(p) {
 if (!p) return '—';
@@ -1070,6 +1184,20 @@ return unsafe
 
 function showToast(title, message, type) {
 type = type || 'info';
+// Intentar usar el sistema moderno (estilo 6.1.3) vía window.parent.updateNotifier
+try {
+  var notifier = window.parent && window.parent.updateNotifier;
+  if (notifier && typeof notifier.show === 'function') {
+    notifier.show({
+      type: type,
+      title: title,
+      subtitle: message,
+      autoClose: type === 'error' ? 6000 : 4000,
+    });
+    return;
+  }
+} catch (e) { /* fallback abajo */ }
+// Fallback: inv-toast legacy
 var container = document.getElementById('toastContainer');
 
 var icons = {
@@ -1101,14 +1229,6 @@ window._dismissToast(toastEl.id);
 
 toastEl._timeoutId = timeoutId;
 }
-
-window._startInvestigation = function(invNombre, furatPath) {
-window.parent.postMessage({
-type: 'iniciar-investigacion-desde-viewer',
-investigacionNombre: invNombre || '',
-furatPath: furatPath || ''
-}, '*');
-};
 
 window._dismissToast = function(toastId) {
 var toastEl = document.getElementById(toastId);

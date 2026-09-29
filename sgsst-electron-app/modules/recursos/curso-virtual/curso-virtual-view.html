@@ -3,161 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Curso Virtual 50 Horas</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Estilos -->
+    <title>K+AIR · 1.2.3 Curso Virtual 50 Horas · Visualizador</title>
+    <!-- Iconos K+AIR (bootstrap-icons) -->
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <!-- Estilos del módulo (namespace canónico kair-*) -->
     <link rel="stylesheet" href="curso-virtual-view.css">
 </head>
-<body>
+<body class="kair-body">
 
-    <!-- HEADER -->
-    <header class="app-header">
-        <div class="header-left">
-            <!-- Botón para volver AL MÓDULO (Global) -->
-            <button class="btn btn-ghost" id="backToModuleBtn" title="Regresar al módulo">
-                <i class="fas fa-arrow-left"></i>
-                <span style="margin-left:5px; font-weight:500;">Módulo</span>
-            </button>
-            <div class="app-title">Curso Virtual 50 Horas</div>
-            <span class="badge-mod">SG-SST</span>
-        </div>
-        
-        <div class="header-actions">
-            <!-- BOTÓN: CERRAR DOC -->
-            <button class="btn btn-ghost" id="closeDocBtn" title="Cerrar documento / Volver a archivos" disabled style="opacity: 0.3;">
-                <i class="fas fa-times"></i>
-                <span style="font-size: 0.85rem; margin-left:4px;">Cerrar</span>
-            </button>
+<!-- ═══════════════════════════════════════════════════════════════════
+     K+AIR · 1.2.3 Curso Virtual 50 Horas · Visualizador v2.0
+     Rediseño Opción C — Híbrido incremental
+     v2.0 · 2026-07-10 — UX explorador moderno sobre iframe existente
+     Migración → v2.0:
+       - Namespace kair-docs-* → kair-* (canónico)
+       - Removida dependencia font-awesome (no existe en el proyecto)
+       - Soporte dark mode ([data-theme="dark"] y [data-theme="dark-legacy"])
+     ═══════════════════════════════════════════════════════════════════ -->
 
-            <div class="divider"></div>
+<div class="kair-root" id="appRoot">
 
-            <!-- Botones de Acción sobre Documento -->
-            <button class="btn btn-ghost" id="downloadBtn" title="Descargar documento" disabled style="opacity: 0.3;">
-                <i class="fas fa-download"></i>
-            </button>
-            <button class="btn btn-ghost" id="printBtn" title="Imprimir documento" disabled style="opacity: 0.3;">
-                <i class="fas fa-print"></i>
-            </button>
+    <!-- ─────────── HEADER K+AIR (Patrón 2) ─────────── -->
+    <header class="kair-header">
+        <div class="kair-header__bar">
+            <div class="kair-header__left">
+                <button class="kair-header__back" id="backToModuleBtn" title="Volver al módulo">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <span class="kair-header__pill">1.2.3</span>
+            </div>
+            <div class="kair-header__center">
+                <h1 class="kair-header__title">Curso Virtual 50 Horas</h1>
+                <p class="kair-header__subtitle" id="headerSubtitle">Material y certificados del curso virtual de 50 horas SST</p>
+            </div>
+            <div class="kair-header__right">
+                <span class="kair-header__company" id="headerCompany">
+                    <i class="kair-icon-building"></i>
+                    <span id="companyName">—</span>
+                </span>
+                <span class="kair-header__divider"></span>
+                <button class="kair-header__action kair-header__action--success" id="uploadBtn" title="Subir archivo">
+                    <i class="bi bi-upload"></i>
+                    <span>Subir</span>
+                </button>
+                <button class="kair-header__action kair-header__action--ghost" id="refreshBtn" title="Refrescar">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
         </div>
     </header>
 
-    <!-- BODY LAYOUT -->
-    <div class="app-body">
-        
-        <!-- SIDEBAR: NAVIGATION & FILES -->
-        <aside class="sidebar">
-            
-            <!-- BOTÓN DE REGRESO EN SIDEBAR -->
-            <div class="sidebar-header">
-                <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
-                    <i class="fas fa-level-up-alt"></i> Volver a carpeta anterior
+    <!-- ─────────── BREADCRUMB MULTINIVEL ─────────── -->
+    <nav class="kair-breadcrumb" id="breadcrumb" aria-label="Ruta de carpetas">
+        <!-- Generado dinámicamente por _renderBreadcrumb() -->
+    </nav>
+
+    <!-- ─────────── TOOLBAR (búsqueda + sort + vista) ─────────── -->
+    <div class="kair-toolbar">
+        <div class="kair-toolbar__left">
+            <div class="kair-search">
+                <i class="bi bi-search kair-search__icon"></i>
+                <input type="text" id="searchInput" class="kair-search__input"
+                       placeholder="Buscar archivos..." autocomplete="off">
+                <button class="kair-search__clear" id="searchClearBtn" title="Limpiar" aria-hidden="true">
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
+            <div class="kair-sort">
+                <select id="sortSelect" class="kair-sort__select" title="Ordenar por">
+                    <option value="name-asc">Nombre (A → Z)</option>
+                    <option value="name-desc">Nombre (Z → A)</option>
+                    <option value="size-desc">Tamaño (mayor primero)</option>
+                    <option value="size-asc">Tamaño (menor primero)</option>
+                    <option value="date-desc">Modificado (más reciente)</option>
+                    <option value="date-asc">Modificado (más antiguo)</option>
+                </select>
+            </div>
+        </div>
+        <div class="kair-toolbar__right">
+            <div class="kair-view-toggle" role="group" aria-label="Cambiar vista">
+                <button class="kair-view-toggle__btn is-active" id="viewListBtn"
+                        data-view="list" aria-pressed="true" title="Vista de lista">
+                    <i class="bi bi-list-ul" aria-hidden="true"></i>
+                </button>
+                <button class="kair-view-toggle__btn" id="viewGridBtn"
+                        data-view="grid" aria-pressed="false" title="Vista de cuadrícula">
+                    <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="kair-stats" id="docsStats">
+                <span class="kair-stats__count" id="docCount">0</span>
+                <span class="kair-stats__label">archivos</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────── LAYOUT 3 PANELES ─────────── -->
+    <main class="kair-layout" id="docsLayout">
+
+        <!-- PANEL IZQUIERDO: Árbol de carpetas -->
+        <aside class="kair-sidebar" id="folderSidebar" aria-label="Carpetas">
+            <div class="kair-sidebar__head">
+                <i class="bi bi-folder2-open"></i>
+                <span>Carpetas</span>
+            </div>
+            <div class="kair-sidebar__body" id="folderList">
+                <!-- Skeleton / folders generados dinámicamente -->
+            </div>
+            <button class="kair-sidebar__collapse" id="sidebarCollapseBtn" title="Contraer panel">
+                <span class="kair-collapse-chevron kair-collapse-chevron--left" aria-hidden="true"></span>
+            </button>
+        </aside>
+
+        <!-- PANEL CENTRAL: Lista/Grid de documentos -->
+        <section class="kair-main" id="docsMain" aria-label="Documentos">
+            <div class="kair-main__body" id="fileList">
+                <!-- Skeleton / documentos generados dinámicamente -->
+            </div>
+            <footer class="kair-main__footer" id="docsFooter">
+                <span id="footerCount">0 archivos</span>
+                <span class="kair-main__footer-sep">·</span>
+                <span id="footerSize">0 B</span>
+                <span class="kair-main__footer-sep">·</span>
+                <span id="footerLastMod">—</span>
+            </footer>
+        </section>
+
+        <!-- PANEL DERECHO: Preview PDF -->
+        <aside class="kair-preview" id="previewPanel" aria-label="Vista previa" data-state="empty">
+            <div class="kair-preview__head">
+                <div class="kair-preview__title">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <span id="docName" title="">Selecciona un documento</span>
+                </div>
+                <div class="kair-preview__actions">
+                    <button class="kair-preview__action kair-preview__action--primary" id="expandPreviewBtn" disabled title="Ver documento completo en modal" style="display:none;">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                        <span>Ver completo</span>
+                    </button>
+                    <button class="kair-preview__action" id="downloadBtn" disabled title="Descargar">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button class="kair-preview__action" id="printBtn" disabled title="Imprimir">
+                        <i class="bi bi-printer"></i>
+                    </button>
+                    <button class="kair-preview__action" id="closeDocBtn" disabled title="Cerrar">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                    <button class="kair-preview__collapse" id="previewCollapseBtn" title="Contraer">
+                        <span class="kair-collapse-chevron kair-collapse-chevron--right" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sub-toolbar de zoom (visible solo cuando hay documento) -->
+            <div class="kair-preview__toolbar" id="previewToolbar">
+                <button class="kair-preview__zoom-btn" id="zoomOutBtn" title="Alejar">
+                    <i class="bi bi-dash"></i>
+                </button>
+                <span class="kair-preview__zoom-level" id="zoomLevelDisplay">100%</span>
+                <button class="kair-preview__zoom-btn" id="zoomInBtn" title="Acercar">
+                    <i class="bi bi-plus"></i>
+                </button>
+                <span class="kair-preview__zoom-sep"></span>
+                <button class="kair-preview__zoom-btn" id="fitWidthBtn" title="Ajustar al ancho">
+                    <i class="bi bi-arrows-angle-expand"></i>
                 </button>
             </div>
 
-            <!-- Breadcrumb -->
-            <div class="breadcrumb-nav" id="breadcrumb">
-                <div class="crumb-item"><i class="fas fa-hdd"></i> Raíz</div>
-            </div>
-
-            <div class="list-header">
-                Carpetas
-            </div>
-            <div class="sidebar-content" id="folderList">
-                <!-- Populated by JS -->
-            </div>
-
-            <div class="list-header">
-                Documentos
-                <span id="docCount" style="font-weight: 400; text-transform: none; font-size:0.75rem;">0</span>
-            </div>
-            <div class="sidebar-content" id="fileList">
-                <!-- Populated by JS -->
+            <div class="kair-preview__body" id="viewerContainer">
+                <!-- Empty state -->
+                <div class="kair-empty" id="emptyState">
+                    <div class="kair-empty__icon">
+                        <i class="bi bi-file-earmark-richtext"></i>
+                    </div>
+                    <h3 class="kair-empty__title">Vista previa no disponible</h3>
+                    <p class="kair-empty__desc">Selecciona un documento de la lista para visualizarlo aquí.</p>
+                </div>
             </div>
         </aside>
 
-        <!-- MAIN VIEWER AREA -->
-        <main class="viewer-stage">
-            
-            <!-- Empty State (Shown initially) -->
-            <div class="empty-state" id="emptyState">
-                <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
-                <h2 class="empty-title">Explorador de Archivos</h2>
-                <p class="empty-desc">Seleccione una carpeta del panel izquierdo para navegar o haga clic en un archivo para visualizarlo.</p>
-            </div>
+    </main>
+</div>
 
-            <!-- Toolbar (Shown when file selected) -->
-            <div class="viewer-toolbar" id="toolbar">
-                <div class="tool-group">
-                    <span id="docName" style="font-weight: 600; color: var(--text-dark); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
-                </div>
-                <div class="tool-group">
-                    <button class="btn btn-ghost" id="zoomOutBtn" title="Reducir Zoom"><i class="fas fa-minus"></i></button>
-                    <span id="zoomLevelDisplay" style="font-size: 0.9rem; width: 50px; text-align: center;">100%</span>
-                    <button class="btn btn-ghost" id="zoomInBtn" title="Aumentar Zoom"><i class="fas fa-plus"></i></button>
-                    <div class="divider"></div>
-                    <button class="btn btn-ghost" id="fitWidthBtn" title="Ajustar a ancho"><i class="fas fa-arrows-alt-h"></i></button>
-                </div>
-            </div>
-
-            <!-- Content Area -->
-            <div class="viewer-content" id="viewerContainer" style="display: none;">
-                <!-- Iframe will be injected here -->
-            </div>
-
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="spinner"></div>
-                <p style="margin-top:10px; font-size: 0.9rem; font-weight: 500;">Cargando documento...</p>
-            </div>
-
-        </main>
-
+<!-- ─────────── LOADING OVERLAY ─────────── -->
+<div class="kair-loading" id="loadingOverlay" aria-hidden="true">
+    <div class="kair-loading__spinner">
+        <i class="bi bi-arrow-repeat"></i>
     </div>
+    <p class="kair-loading__text" id="loadingText">Cargando...</p>
+</div>
 
-    <!-- Notification System -->
-    <div class="notification" id="notification">
-        <i class="notification-icon fas fa-check-circle"></i>
-        <div class="notification-message">Operación completada con éxito</div>
-    </div>
+<!-- ─────────── CONTEXT MENU ─────────── -->
+<div class="kair-context-menu" id="contextMenu" role="menu" aria-hidden="true">
+    <button class="kair-context-menu__item" id="openFileBtn" role="menuitem">
+        <i class="bi bi-box-arrow-up-right"></i>
+        <span>Abrir con app predeterminada</span>
+    </button>
+    <div class="kair-context-menu__divider"></div>
+    <button class="kair-context-menu__item kair-context-menu__item--danger" id="deleteFileBtn" role="menuitem">
+        <i class="bi bi-trash3"></i>
+        <span>Eliminar archivo</span>
+    </button>
+</div>
 
-    <!-- CONTEXT MENU (Clic Derecho) -->
-    <div id="contextMenu" class="context-menu" style="display: none;">
-        <div class="context-menu-item" id="openFileBtn">
-            <i class="fas fa-external-link-alt"></i>
-            <span>Abrir archivo</span>
+<!-- ─────────── CONFIRM MODAL ─────────── -->
+<div class="kair-modal-overlay" id="confirmModal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="kair-modal">
+        <div class="kair-modal__header">
+            <div class="kair-modal__icon">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <h3 class="kair-modal__title">Confirmar eliminación</h3>
         </div>
-        <div class="context-menu-divider"></div>
-        <div class="context-menu-item danger" id="deleteFileBtn">
-            <i class="fas fa-trash-alt"></i>
-            <span>Eliminar</span>
-        </div>
-    </div>
-
-    <!-- CONFIRM MODAL -->
-    <div id="confirmModal" class="confirm-modal" style="display: none;">
-        <div class="confirm-modal-content">
-            <div class="confirm-modal-header">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>¿Eliminar archivo?</h3>
-            </div>
-            <div class="confirm-modal-body">
-                <p>Estás a punto de eliminar:</p>
-                <p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
-                <p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="confirm-modal-footer">
-                <button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
-                <button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
+        <div class="kair-modal__body">
+            <p class="kair-modal__text">¿Está seguro de eliminar el siguiente archivo?</p>
+            <div class="kair-modal__file-name" id="confirmFileName">—</div>
+            <div class="kair-modal__warning">
+                <i class="bi bi-info-circle"></i>
+                <span>Esta acción no se puede deshacer.</span>
             </div>
         </div>
+        <div class="kair-modal__footer">
+            <button class="kair-modal__btn kair-modal__btn--ghost" id="confirmCancelBtn">Cancelar</button>
+            <button class="kair-modal__btn kair-modal__btn--danger" id="confirmAcceptBtn">
+                <i class="bi bi-trash3"></i> Eliminar
+            </button>
+        </div>
     </div>
+</div>
 
-    <!-- TOAST CONTAINER -->
-    <div id="kToastContainer" class="k-toast-container"></div>
+<!-- ─────────── TOAST CONTAINER ─────────── -->
+<div class="kair-toast-container" id="kToastContainer" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="curso-virtual-viewer.js"></script>
+<!-- ─────────── HIDDEN UPLOAD INPUT ─────────── -->
+<input type="file" id="hiddenFileInput" multiple style="display:none" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt,.jpg,.jpeg,.png">
+
+<script src="curso-virtual-viewer.js"></script>
+<!-- 📦608-fix15 — File-viewer bundle (IIFE web-full) + helper genérico -->
+<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+<script src="../../../shared/file-viewer.js"></script>
 </body>
 </html>

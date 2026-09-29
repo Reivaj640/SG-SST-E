@@ -4,16 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>K+AIR | Evaluaciones Médicas</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
         /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
            SISTEMA VISUAL OFICIAL (K+AIR)
            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-        :root {
+        #em-portal-container {
             --primary: #174ea6;
             --primary-hover: #185abd;
             --primary-light: #e8f0fe;
@@ -30,10 +26,10 @@
             --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        #em-portal-container, #em-portal-container * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
 
-        body {
-            font-family: 'Roboto', sans-serif;
+        #em-portal-container {
+            font-family: system-ui, 'Segoe UI', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-dark);
             font-size: 1rem;
@@ -45,7 +41,7 @@
         }
 
         /* PORTAL CONTENEDOR PRINCIPAL */
-        .portal-container {
+        #em-portal-container .portal-container {
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -58,7 +54,7 @@
             height: 100%;
         }
 
-        .portal-card {
+        #em-portal-container .portal-card {
             background: white;
             width: 100%;
             max-width: 1100px;
@@ -81,7 +77,7 @@
         }
 
         /* BARRA SUPERIOR INTERNA DEL PORTAL */
-        .portal-header {
+        #em-portal-container .portal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -90,14 +86,14 @@
             border-bottom: 1px solid #f1f3f5;
         }
 
-        .portal-logo {
-            font-family: 'Lexend', sans-serif;
+        #em-portal-container .portal-logo {
+            font-family: system-ui, 'Segoe UI', sans-serif;
             font-size: 1.5rem;
             font-weight: 600;
             color: var(--primary);
         }
 
-        .back-btn-internal {
+        #em-portal-container .back-btn-internal {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -112,16 +108,16 @@
             border: 1px solid var(--border);
         }
 
-        .back-btn-internal:hover {
+        #em-portal-container .back-btn-internal:hover {
             color: var(--primary);
             background: var(--primary-light);
             border-color: var(--primary);
         }
 
-        .back-btn-internal i { font-size: 0.85rem; }
+        #em-portal-container .back-btn-internal i { font-size: 0.85rem; }
 
         /* STATUS PILL */
-        .status-pill {
+        #em-portal-container .status-pill {
             display: flex;
             justify-content: center;
             align-items: center;
@@ -137,14 +133,14 @@
         }
 
         /* HERO SECTION */
-        .hero-title {
-            font-family: 'Lexend', sans-serif;
+        #em-portal-container .hero-title {
+            font-family: system-ui, 'Segoe UI', sans-serif;
             font-size: 2.5rem;
             color: var(--text-dark);
             margin-bottom: 0.5rem;
         }
 
-        .hero-subtitle {
+        #em-portal-container .hero-subtitle {
             color: var(--text-muted);
             font-size: 1.05rem;
             margin-bottom: 2.5rem;
@@ -155,7 +151,7 @@
         }
 
         /* GRID PRINCIPAL DE ACCIONES */
-        .main-actions {
+        #em-portal-container .main-actions {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
@@ -163,7 +159,7 @@
             flex-shrink: 0;
         }
 
-        .main-action-card {
+        #em-portal-container .main-action-card {
             background: white;
             border: 2px solid var(--border);
             border-radius: var(--radius);
@@ -176,33 +172,33 @@
             text-align: left;
         }
 
-        .main-action-card:hover {
+        #em-portal-container .main-action-card:hover {
             border-color: var(--primary);
             box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
             transform: translateY(-2px);
         }
 
-        .main-action-card.primary {
+        #em-portal-container .main-action-card.primary {
             background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
             border-color: var(--primary);
             color: white;
         }
 
-        .main-action-card.primary:hover {
+        #em-portal-container .main-action-card.primary:hover {
             box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
         }
 
-        .main-action-card.primary .action-title,
-        .main-action-card.primary .action-desc {
+        #em-portal-container .main-action-card.primary .action-title,
+        #em-portal-container .main-action-card.primary .action-desc {
             color: white;
         }
 
-        .main-action-card.primary .main-action-icon {
+        #em-portal-container .main-action-card.primary .main-action-icon {
             background: rgba(255,255,255,0.2);
             color: white;
         }
 
-        .main-action-icon {
+        #em-portal-container .main-action-icon {
             width: 50px;
             height: 50px;
             border-radius: 10px;
@@ -215,27 +211,27 @@
             flex-shrink: 0;
         }
 
-        .main-action-content .action-title {
+        #em-portal-container .main-action-content .action-title {
             font-weight: 600;
             font-size: 1.05rem;
             margin-bottom: 0.35rem;
             color: var(--text-dark);
         }
 
-        .main-action-content .action-desc {
+        #em-portal-container .main-action-content .action-desc {
             font-size: 0.85rem;
             color: var(--text-muted);
             line-height: 1.4;
         }
 
         /* SECCIÓN DE ACCIONES RÁPIDAS */
-        .quick-actions {
+        #em-portal-container .quick-actions {
             margin-top: 3rem;
             text-align: left;
             flex-shrink: 0;
         }
 
-        .quick-actions-title {
+        #em-portal-container .quick-actions-title {
             font-size: 1.05rem;
             font-weight: 600;
             margin-bottom: 1.5rem;
@@ -245,13 +241,13 @@
             display: inline-block;
         }
 
-        .actions-grid {
+        #em-portal-container .actions-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 1.25rem;
         }
 
-        .action-card {
+        #em-portal-container .action-card {
             background: #f8f9fa;
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -264,14 +260,14 @@
             text-align: left;
         }
 
-        .action-card:hover {
+        #em-portal-container .action-card:hover {
             border-color: var(--primary);
             background: white;
             box-shadow: 0 5px 15px rgba(0,0,0,0.08);
             transform: translateY(-3px);
         }
 
-        .action-icon {
+        #em-portal-container .action-icon {
             width: 42px;
             height: 42px;
             border-radius: 8px;
@@ -285,61 +281,64 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        .action-title {
+        #em-portal-container .action-title {
             font-weight: 600;
             font-size: 0.95rem;
             margin-bottom: 0.25rem;
             color: var(--text-dark);
         }
 
-        .action-desc {
+        #em-portal-container .action-desc {
             font-size: 0.8rem;
             color: var(--text-muted);
             line-height: 1.4;
         }
 
         /* COLORES POR TIPO */
-        .action-icon.success { color: var(--success); }
-        .action-icon.warning { color: var(--warning); }
-        .action-icon.danger  { color: var(--danger);  }
-        .action-icon.info    { color: var(--info);    }
-        .action-icon.muted   { color: var(--text-muted); }
+        #em-portal-container .action-icon.success { color: var(--success); }
+        #em-portal-container .action-icon.warning { color: var(--warning); }
+        #em-portal-container .action-icon.danger  { color: var(--danger);  }
+        #em-portal-container .action-icon.info    { color: var(--info);    }
+        #em-portal-container .action-icon.muted   { color: var(--text-muted); }
 
         /* RESPONSIVE */
         @media (max-width: 768px) {
-            .main-actions {
+            #em-portal-container .main-actions {
                 grid-template-columns: 1fr;
             }
-            .hero-title {
+            #em-portal-container .hero-title {
                 font-size: 1.8rem;
             }
-            .portal-card {
+            #em-portal-container .portal-card {
                 padding: 2rem 1.5rem;
             }
-            .portal-header {
+            #em-portal-container .portal-header {
                 flex-direction: column;
                 gap: 1rem;
             }
         }
-    </style>
+    
+        /* 📦766: iconos SVG inline (antes Font Awesome CDN) */
+        #em-portal-container svg { width: 1em; height: 1em; }
+        </style>
 </head>
 <body>
 
-    <div class="portal-container">
+    <div class="portal-container" id="em-portal-container">
         <div class="portal-card">
 
             <!-- BARRA SUPERIOR INTERNA -->
             <div class="portal-header">
                 <div class="portal-logo">K+<span>AIR</span></div>
                 <a class="back-btn-internal" onclick="emGoBackToModule()">
-                    <i class="fas fa-arrow-left"></i>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                     <span>Volver al Menú</span>
                 </a>
             </div>
 
             <!-- STATUS PILL -->
             <div class="status-pill">
-                <i class="fas fa-stethoscope"></i>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
                 Gestión de la Salud &nbsp;·&nbsp; 3.1.4
             </div>
 
@@ -356,7 +355,7 @@
                 <!-- VER EVALUACIONES REALIZADAS -->
                 <div class="main-action-card primary" onclick="emEnterViewer()">
                     <div class="main-action-icon">
-                        <i class="fas fa-file-medical"></i>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 10v4"/><path d="M10 12h4"/></svg>
                     </div>
                     <div class="main-action-content">
                         <div class="action-title">Ver Evaluaciones Realizadas</div>
@@ -367,7 +366,7 @@
                 <!-- REGISTRAR NUEVA EVALUACIÓN -->
                 <div class="main-action-card" onclick="emRegistrarEvaluacion()">
                     <div class="main-action-icon" style="background: #e8f5e9; color: #28a745;">
-                        <i class="fas fa-plus-circle"></i>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
                     </div>
                     <div class="main-action-content">
                         <div class="action-title">Registrar Nueva Evaluación</div>
@@ -385,28 +384,28 @@
 
                     <!-- ESTADÍSTICAS DE APTITUD -->
                     <div class="action-card" onclick="emEstadisticas()">
-                        <div class="action-icon info"><i class="fas fa-chart-pie"></i></div>
+                        <div class="action-icon info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></div>
                         <div class="action-title">Estadísticas de Aptitud</div>
                         <div class="action-desc">Ver distribución de resultados: aptos, con restricción y no aptos.</div>
                     </div>
 
                     <!-- PRÓXIMOS VENCIMIENTOS -->
                     <div class="action-card" onclick="emVencimientos()">
-                        <div class="action-icon warning"><i class="fas fa-clock"></i></div>
+                        <div class="action-icon warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
                         <div class="action-title">Próximos Vencimientos</div>
                         <div class="action-desc">Identificar trabajadores con evaluaciones próximas a vencer.</div>
                     </div>
 
                     <!-- EXPORTAR INFORME -->
                     <div class="action-card" onclick="emExportarInforme()">
-                        <div class="action-icon success"><i class="fas fa-file-export"></i></div>
+                        <div class="action-icon success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m15 15-3 3-3-3"/></svg></div>
                         <div class="action-title">Exportar Informe</div>
                         <div class="action-desc">Generar reporte consolidado de evaluaciones médicas en PDF o Excel.</div>
                     </div>
 
                     <!-- CUSTODIA MÉDICA -->
                     <div class="action-card" onclick="emCustodiaMedica()">
-                        <div class="action-icon muted"><i class="fas fa-shield-alt"></i></div>
+                        <div class="action-icon muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
                         <div class="action-title">Custodia Médica</div>
                         <div class="action-desc">Gestionar la custodia de historias clínicas ocupacionales.</div>
                     </div>

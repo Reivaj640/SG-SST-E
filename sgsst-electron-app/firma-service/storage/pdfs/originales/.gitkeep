@@ -1,0 +1,3 @@
+# Esta carpeta almacena los PDFs originales congelados
+# antes de generar la solicitud de firma.
+# Los archivos se crean en runtime y NO se commitean.

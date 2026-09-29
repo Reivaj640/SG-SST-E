@@ -1,0 +1,88 @@
+<!-- modules/gestion-humana/dashboard/index.html
+     📦721 · Vista "Dashboard" — HTML separado (SIN header secundario, empieza con KPIs)
+     Estructura:
+       - KPIs (6) via #db-kpi-bar (helper GHKPIBar)
+       - Charts row 1: Personal por Cargo + Distribución por Estado
+       - Charts row 2: Nivel Educativo (donut) + Pipeline de Contratación
+       - Quick access (4 cards)
+     IDs con prefijo `db-` para evitar colisiones. -->
+
+<div class="db-wrapper" id="db-wrapper">
+  <!-- ═══ KPIs (6) — via helper GHKPIBar ═══ -->
+  <div class="db-kpi-section">
+    <div id="db-kpi-bar" class="db-kpi-bar"></div>
+  </div>
+
+  <!-- ═══ Charts row 1: Personal por Cargo + Distribución por Estado ═══ -->
+  <div class="db-charts-row">
+    <div class="db-chart-card">
+      <div class="db-chart-card__head">
+        <div class="db-chart-card__head-text">
+          <h3>Personal por Cargo</h3>
+          <p>Distribución por rol</p>
+        </div>
+        <!-- 📦750 · Toggle de filtro: Todos / Activos / Retirados -->
+        <div class="db-chart-toggle" data-chart-toggle="cargo">
+          <button type="button" class="db-chart-toggle__btn is-active" data-filter="all">Todos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="activo">Activos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="retirado">Retirados</button>
+        </div>
+      </div>
+      <div id="db-chart-cargo" class="db-chart-card__body"></div>
+    </div>
+    <div class="db-chart-card">
+      <div class="db-chart-card__head">
+        <div class="db-chart-card__head-text">
+          <h3>Distribución por Estado</h3>
+          <p>Estado actual</p>
+        </div>
+        <div class="db-chart-toggle" data-chart-toggle="estado">
+          <button type="button" class="db-chart-toggle__btn is-active" data-filter="all">Todos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="activo">Activos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="retirado">Retirados</button>
+        </div>
+      </div>
+      <div id="db-chart-estado" class="db-chart-card__body"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Charts row 2: Antigüedad + Top EPS ═══ -->
+  <div class="db-charts-row">
+    <div class="db-chart-card">
+      <div class="db-chart-card__head">
+        <div class="db-chart-card__head-text">
+          <h3>Antigüedad del Personal</h3>
+          <p>Años desde fecha de ingreso</p>
+        </div>
+        <!-- 📦752 · Mismo toggle que el row 1 (afecta solo a este chart) -->
+        <div class="db-chart-toggle" data-chart-toggle="antiguedad">
+          <button type="button" class="db-chart-toggle__btn is-active" data-filter="all">Todos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="activo">Activos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="retirado">Retirados</button>
+        </div>
+      </div>
+      <div id="db-chart-antiguedad" class="db-chart-card__body"></div>
+    </div>
+    <div class="db-chart-card">
+      <div class="db-chart-card__head">
+        <div class="db-chart-card__head-text">
+          <h3>Top 5 EPS</h3>
+          <p>Entidades Promotoras de Salud más frecuentes</p>
+        </div>
+        <div class="db-chart-toggle" data-chart-toggle="eps">
+          <button type="button" class="db-chart-toggle__btn is-active" data-filter="all">Todos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="activo">Activos</button>
+          <button type="button" class="db-chart-toggle__btn" data-filter="retirado">Retirados</button>
+        </div>
+      </div>
+      <div id="db-chart-eps" class="db-chart-card__body"></div>
+    </div>
+  </div>
+
+  <!-- ╦══ Quick access (4 cards) ═══ -->
+  <div class="db-quick-access">
+    <h2 class="db-section-title"><i class="fas fa-bolt"></i> Acceso rápido</h2>
+    <div id="db-quick-access-grid" class="db-quick-access-grid"></div>
+  </div>
+</div>
+

@@ -24,7 +24,7 @@ portalContainer.id = 'copasst-portal-container';
 this.container.appendChild(portalContainer);
 
 try {
-const response = await fetch('./modules/recursos/copasst/copasst-home.html');
+const response = await fetch('./modules/recursos/copasst/copasst-home.html?v=COPASST-20260915-v1-premium');
 if (response.ok) {
 const html = await response.text();
 portalContainer.innerHTML = html;
@@ -43,7 +43,7 @@ window.copasstPortalContainer = portalContainer;
 window.copasstPortalComponent = this;
 
 const script = document.createElement('script');
-script.src = './modules/recursos/copasst/copasst-home.js';
+script.src = './modules/recursos/copasst/copasst-home.js?v=COPASST-20260915-v1-premium';
 this.portalScript = script;
 
 script.onload = () => {
@@ -101,6 +101,19 @@ this.render();
 
 _handleIframeMessage(event) {
 if (!event.data || !event.data.type) return;
+
+// 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+if (event.data.type === 'open-file-viewer-modal') {
+    const filePath = event.data.filePath;
+    if (!filePath) return;
+    if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+        window.kairFV.openWithFileViewerFromPath(filePath);
+    } else {
+        console.warn('[CopasstPortal] kairFV.openWithFileViewerFromPath no disponible');
+    }
+    return;
+}
+
 if (event.data.type.endsWith('-request')) {
 const action = event.data.type.replace('-request', '');
     if (action === 'back-to-module') {
@@ -109,7 +122,11 @@ const action = event.data.type.replace('-request', '');
         this.iframeMessageHandler = null;
         this.backToPortal();
 } else {
-this._handleStandardRequest(event, this._getApiMap()[action]);
+    const apiMap = this._getApiMap();
+    const apiName = apiMap[action];
+    if (apiName) {
+        window.KairDocPreview.handleRequest(event, apiName);
+    }
 }
 }
 }

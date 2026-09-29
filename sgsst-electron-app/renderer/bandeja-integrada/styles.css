@@ -1,0 +1,6023 @@
+﻿/* F4-fix — Este CSS NO usa Tailwind (vanilla JS con tokens propios).
+   Los imports de Tailwind fueron eliminados porque el proyecto no tiene
+   tailwindcss como dependencia (causaba ERR_FILE_NOT_FOUND en consola). */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============================================
+   K+AIR DESIGN TOKENS (Sistema Visual Oficial)
+   ============================================ */
+:root {
+  --radius: 0.375rem;
+
+  /* ============================================
+     EMAIL DESIGN TOKENS (Gmail-style)
+     ============================================ */
+  --email-bg: #ffffff;
+  --email-bg-read: #f2f6fc;
+  --email-border: #e0e0e0;
+  --email-text-primary: #202124;
+  --email-text-secondary: #5f6368;
+  --email-accent: #1a73e8;
+  --email-row-height-min: 48px;
+  --email-row-padding-v: 12px;
+  --email-quote-border: #cccccc;
+
+  /* K+AIR Official Colors */
+  --kair-primary: #174ea6;
+  --kair-primary-hover: #185abd;
+  --kair-success: #28a745;
+  --kair-warning: #ffc107;
+  --kair-danger: #dc3545;
+  --kair-info: #6c757d;
+
+  /* K+AIR Backgrounds */
+  --kair-bg-app: #f8f9fa;
+  --kair-bg-card: #ffffff;
+  --kair-bg-hover: #f1f3f5;
+  --kair-bg-soft: #e8f0fe;
+  --kair-border: #dee2e6;
+  --kair-border-soft: #e9ecef;
+
+  /* K+AIR Text */
+  --kair-text-strong: #1a1a2e;
+  --kair-text-body: #3a3f51;
+  --kair-text-muted: #5a6378;
+  --kair-text-light: #8a92a6;
+
+  /* Shadow */
+  --kair-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --kair-shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Spacing scale (4px base) */
+  --kair-space-1: 4px;
+  --kair-space-2: 8px;
+  --kair-space-3: 12px;
+  --kair-space-4: 16px;
+  --kair-space-5: 20px;
+  --kair-space-6: 24px;
+  --kair-space-8: 32px;
+
+  /* shadcn fallbacks (kept for components) */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #174ea6;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #1a1a2e;
+  --muted: #f8f9fa;
+  --muted-foreground: #5a6378;
+  --accent: #e8f0fe;
+  --accent-foreground: #174ea6;
+  --destructive: #dc3545;
+  --destructive-foreground: #ffffff;
+  --border: #dee2e6;
+  --input: #dee2e6;
+  --ring: #174ea6;
+  --chart-1: #174ea6;
+  --chart-2: #28a745;
+  --chart-3: #ffc107;
+  --chart-4: #dc3545;
+  --chart-5: #6c757d;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #174ea6;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: #e8f0fe;
+  --sidebar-accent-foreground: #174ea6;
+  --sidebar-border: #dee2e6;
+  --sidebar-ring: #174ea6;
+}
+
+* {
+  border-color: var(--kair-border);
+}
+
+html,
+body {
+  background: var(--kair-bg-app);
+  color: var(--kair-text-body);
+  font-family: "Segoe UI", "Roboto", "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 📦605 (paso 1) — Forzar altura del viewport y bloquear scroll de página.
+     El scroll se hace DENTRO de cada panel (sidebar, lista, detalle, calendar)
+     no en la página completa. Asi no se pierde de vista nada al scrollear. */
+  height: 100%;
+  overflow: hidden;
+}
+
+/* F1.5 — Layout root (header sticky + main scrollable + footer fijo)
+   Sin estas reglas el position:sticky del .kair-header falla y el
+   header/footer desaparecen al hacer scroll dentro del iframe. */
+.kair-app {
+  display: flex;
+  flex-direction: column;
+  /* 📦605 (paso 1) — height:100% para que el contenido (header+layout+footer)
+     quepa en el viewport. min-height:100vh mantiene el minimo si el contenido
+     es menor al viewport. */
+  height: 100%;
+  min-height: 100vh;
+  background: var(--kair-bg-app);
+}
+
+/* F4-fix — El iframe arranca DEBAJO del header de la app principal
+   (renderer.js posiciona el iframe con top: 45px). El header interno
+   del iframe se oculta para no duplicarlo. */
+.kair-header {
+  display: none !important;
+}
+
+/* 📦607 — Botón flotante "Volver" (kair-bandeja-fab-back) ELIMINADO.
+   Ya hay 2 formas de volver de la Bandeja Integrada:
+   (1) Tecla ESC
+   (2) Botón X de cerrar del header de la app principal
+   El botón flotante era redundante y ocupaba la esquina superior izquierda. */
+
+/* Loop 45 — FAB flotante "Toggle empresas" (espejo del FAB de Volver).
+   El header interno del iframe está oculto (display:none) para no duplicar
+   el de la app principal, pero eso escondía el toggle de "Todas las empresas".
+   Solución: FAB flotante arriba a la derecha, con el mismo estilo pill del
+   FAB de Volver pero espejado. El switch (track + thumb) hereda los estilos
+   de .kair-toggle (líneas 1686-1735) — solo necesitamos el wrapper. */
+.kair-bandeja-fab-companies {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--kair-text-body, #202124);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.kair-bandeja-fab-companies:hover {
+  background: var(--kair-bg-hover, #f8fafc);
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.kair-bandeja-fab-companies .kair-toggle__label {
+  white-space: nowrap;
+}
+
+.kair-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 16px 0;
+  gap: 12px;
+  overflow: auto;
+}
+
+.kair-footer {
+  /* 📦701-fix9 — Footer oculto para ganar espacio vertical.
+     El JS sigue actualizando el DOM (#footer-events-count, #footer-company, #footer-view)
+     pero el usuario no lo ve. Si querés recuperarlo, comentá la línea display:none. */
+  display: none !important;
+}
+
+.kair-footer__left,
+.kair-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kair-footer strong {
+  color: var(--kair-text-body);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Header System v2.0 (BEM aislado)
+   ============================================ */
+.kair-header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--kair-border);
+  /* F1.5-fix: position sticky con flex container en iframe es inestable.
+     Usamos relative + flex-shrink:0 para que el header SIEMPRE esté visible
+     arriba y NUNCA se comprima (independiente del scroll del main). */
+  position: relative;
+  flex-shrink: 0;
+  z-index: 30;
+  width: 100%;
+}
+
+.kair-header__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-3);
+  min-height: 52px;
+  padding: 8px 20px;
+}
+
+.kair-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-2);
+  flex-shrink: 0;
+}
+
+.kair-header__center {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-2);
+  flex-shrink: 0;
+}
+
+.kair-header__back {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.kair-header__back:hover {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+
+.kair-header__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.kair-header__subtitle {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--kair-text-muted);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.kair-header__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.kair-header__breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kair-header__breadcrumb a {
+  color: var(--kair-text-muted);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.kair-header__breadcrumb a:hover {
+  color: var(--kair-primary);
+}
+.kair-header__breadcrumb li:last-child a,
+.kair-header__breadcrumb li:last-child span {
+  color: var(--kair-text-strong);
+  font-weight: 500;
+}
+.kair-header__breadcrumb .sep {
+  color: var(--kair-text-light);
+  font-size: 0.7rem;
+}
+
+.kair-header__pill--section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+.kair-header__action--primary,
+.kair-header__action--success,
+.kair-header__action--secondary,
+.kair-header__action--ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.kair-header__action--primary {
+  background: var(--kair-primary);
+  color: #fff;
+  border-color: var(--kair-primary);
+}
+.kair-header__action--primary:hover {
+  background: var(--kair-primary-hover);
+  border-color: var(--kair-primary-hover);
+}
+
+.kair-header__action--success {
+  background: var(--kair-success);
+  color: #fff;
+  border-color: var(--kair-success);
+}
+.kair-header__action--success:hover {
+  filter: brightness(0.95);
+}
+
+.kair-header__action--secondary {
+  background: transparent;
+  color: var(--kair-primary);
+  border-color: var(--kair-primary);
+}
+.kair-header__action--secondary:hover {
+  background: var(--kair-bg-soft);
+}
+
+.kair-header__action--ghost {
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-color: transparent;
+}
+.kair-header__action--ghost:hover {
+  background: var(--kair-bg-hover);
+  color: var(--kair-text-strong);
+}
+
+/* F4-fix — Indicador Gmail (read-only) en el header. Muestra el estado de
+   conexión (verde/rojo) y el email del usuario. El switch de Conectar/Desconectar
+   está en Configuración > Gestión de Empresas. */
+.kair-header__indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid var(--kair-border, #e5e7eb);
+  font-size: 0.78rem;
+  color: var(--kair-text-muted);
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-header__indicator svg {
+  flex-shrink: 0;
+  color: var(--kair-text-muted);
+}
+.kair-header__indicator-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-header__indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.6);
+}
+.kair-header__indicator[data-connected="true"] {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+.kair-header__indicator[data-connected="true"] svg {
+  color: #15803d;
+}
+.kair-header__indicator[data-connected="true"] .kair-header__indicator-dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6);
+  animation: gmail-indicator-pulse 1.8s infinite;
+}
+.kair-header__indicator[data-connected="false"] {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.kair-header__indicator[data-connected="false"] svg {
+  color: #b91c1c;
+}
+.kair-header__indicator[data-connected="false"] .kair-header__indicator-dot {
+  background: #dc2626;
+}
+@keyframes gmail-indicator-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.kair-header__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #fff;
+  border-top: 1px solid var(--kair-border-soft);
+  padding: 0 20px;
+  overflow-x: auto;
+}
+
+.kair-header__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+.kair-header__tab:hover {
+  color: var(--kair-text-strong);
+}
+.kair-header__tab[data-active="true"] {
+  color: var(--kair-primary);
+  font-weight: 600;
+}
+.kair-header__tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--kair-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.kair-header__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+  border-radius: 999px;
+}
+.kair-header__tab[data-active="true"] .kair-header__tab-badge {
+  background: var(--kair-primary);
+  color: #fff;
+}
+
+.kair-header__company {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+}
+.kair-header__company strong {
+  color: var(--kair-text-strong);
+  font-weight: 600;
+}
+
+.kair-header__context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--kair-text-body);
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.kair-header__context:hover {
+  background: var(--kair-bg-hover);
+  border-color: var(--kair-text-light);
+}
+
+.kair-header__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--kair-border);
+  margin: 0 4px;
+}
+
+/* ============================================
+   K+AIR KPI Strip Enterprise v1.0
+   ============================================ */
+.kair-kpi-strip {
+  /* P0-KPI-STRIP (2026-09-07) — Quitada la "franja gris" visual (background,
+   border, padding, shadow). Los indicadores se siguen mostrando pero sin el
+   contenedor con caja blanca. Para revertir, restaurar las propiedades
+   originales (background, border, border-radius, padding, box-shadow). */
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: var(--kair-shadow-card);
+}
+
+.kair-kpi-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  flex: 1;
+  min-width: 0;
+}
+.kair-kpi-item:first-child {
+  padding-left: 0;
+}
+.kair-kpi-item:last-child {
+  padding-right: 0;
+}
+
+.kair-kpi-divider {
+  width: 1px;
+  background: var(--kair-border-soft);
+  align-self: stretch;
+}
+
+.kair-kpi__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.kair-kpi__icon--blue { background: #e8f0fe; color: #174ea6; }
+.kair-kpi__icon--green { background: #e6f7ec; color: #28a745; }
+.kair-kpi__icon--yellow { background: #fff8e1; color: #b8860b; }
+.kair-kpi__icon--red { background: #fdeaea; color: #dc3545; }
+.kair-kpi__icon--gray { background: #eef0f3; color: #6c757d; }
+
+.kair-kpi__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.kair-kpi__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--kair-text-muted);
+  font-weight: 600;
+}
+.kair-kpi__subdata {
+  font-size: 0.75rem;
+  color: var(--kair-text-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ============================================
+   K+AIR Cards & surfaces
+   ============================================ */
+.kair-card {
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  box-shadow: var(--kair-shadow-card);
+}
+
+.kair-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+.kair-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kair-card__body {
+  padding: 16px;
+}
+
+/* ============================================
+   K+AIR Email list — Gmail style
+   ============================================ */
+.kair-mail-row {
+  display: grid;
+  /* F1.A-refactor — Grid de 5 columnas: [check/dot] [avatar] [content] [date] [star] */
+  /* Loop 41 — Reducido el ancho de la columna de fecha de 90px a 64px (26px
+     recuperados) para dar más espacio al content. "11:27" o "ayer" entran
+     perfectamente en 64px. */
+  grid-template-columns: 24px 40px 1fr 64px 24px;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--email-row-height-min, 48px);
+  padding: var(--email-row-padding-v, 12px) 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+  position: relative;
+  background: #fff;
+}
+.kair-mail-row[data-unread="false"] {
+  background: var(--email-bg-read, #f2f6fc);
+}
+.kair-mail-row:hover {
+  background: rgba(26, 115, 232, 0.04);
+  box-shadow: inset 3px 0 0 var(--kair-primary, #1a73e8);
+  z-index: 1;
+}
+.kair-mail-row[data-selected="true"] {
+  background: #c2dbff;
+  box-shadow: inset 3px 0 0 var(--email-accent, #1a73e8);
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__sender,
+.kair-mail-row[data-unread="true"] .kair-mail-row__subject {
+  font-weight: 700;
+  color: var(--kair-text-strong);
+}
+/* F1.A — Dot azul de "no leído" estilo Gmail. Reemplaza el check cuando no leído.
+   El contenedor .kair-mail-row__select (24px) aloja check + dot superpuestos;
+   la celda del grid ya los posiciona. Se alinea con .email-row__* para evitar
+   reglas en conflicto. */
+.kair-mail-row__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+.kair-mail-row__unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--kair-primary, #174ea6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__unread-dot {
+  display: block;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check {
+  display: none;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check[data-checked="true"] {
+  display: flex;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check[data-checked="true"] + .kair-mail-row__unread-dot,
+.kair-mail-row__check[data-checked="true"] ~ .kair-mail-row__unread-dot {
+  display: none;
+}
+.kair-mail-row:hover .kair-mail-row__check {
+  display: flex;
+}
+.kair-mail-row:hover .kair-mail-row__unread-dot {
+  display: none;
+}
+
+.kair-mail-row__check {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--kair-text-light);
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.kair-mail-row__check:hover {
+  border-color: var(--kair-primary);
+}
+.kair-mail-row__check[data-checked="true"] {
+  background: var(--kair-primary);
+  border-color: var(--kair-primary);
+  display: flex;
+}
+.kair-mail-row__check[data-checked="true"]::after {
+  content: "✓";
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kair-mail-row__star {
+  cursor: pointer;
+  color: var(--kair-text-light);
+  transition: color 120ms ease, transform 120ms ease;
+}
+.kair-mail-row__star:hover {
+  transform: scale(1.15);
+}
+.kair-mail-row__star[data-active="true"] {
+  color: var(--kair-warning);
+}
+
+.kair-mail-row__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================
+   📧 Componente 1: Email row (.email-row) — BEM-style Gmail
+   Estados: unread / read / hover / selected.
+   Respeta --email-row-height-min (48px) y --email-row-padding-v (12px).
+   ============================================ */
+.email-row {
+  display: grid;
+  /* Loop 41 — Mismo ajuste: fecha de 90px a 64px (ver .kair-mail-row arriba). */
+  grid-template-columns: 24px 40px 1fr 64px 24px;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--email-row-height-min);
+  padding: var(--email-row-padding-v) 16px;
+  border-bottom: 1px solid var(--email-border);
+  cursor: pointer;
+  background: var(--email-bg);
+  position: relative;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.email-row[data-unread="true"] {
+  background: var(--email-bg);
+}
+.email-row[data-unread="false"] {
+  background: var(--email-bg-read);
+}
+.email-row:hover {
+  background: var(--email-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+.email-row[data-selected="true"] {
+  background: #c2dbff;
+  box-shadow: inset 3px 0 0 var(--email-accent);
+}
+.email-row__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+.email-row__check,
+.email-row__unread-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.email-row__check {
+  position: absolute;
+  inset: 0;
+}
+.email-row__unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--email-accent);
+}
+.email-row[data-unread="true"] .email-row__unread-dot {
+  display: block;
+}
+.email-row[data-unread="true"] .email-row__check {
+  display: none;
+}
+.email-row[data-unread="false"] .email-row__unread-dot {
+  display: none;
+}
+.email-row:hover .email-row__check {
+  display: flex;
+}
+.email-row:hover .email-row__unread-dot {
+  display: none;
+}
+.email-row__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.email-row__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.email-row__sender {
+  font-size: 0.875rem;
+  color: var(--email-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.email-row[data-unread="true"] .email-row__sender {
+  font-weight: 700;
+}
+/* Loop 41 — Sub-label del email cuando el sender es un nombre (no email).
+   Estilo Gmail: nombre en bold + email en gris claro más pequeño al lado.
+   Si el email es muy largo, se trunca con ellipsis. */
+.email-row__sender-name {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-row__sender-email {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--kair-text-light, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.email-row__subject-preview {
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-row__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+}
+.email-row__date {
+  white-space: nowrap;
+}
+.email-row__star {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--email-text-secondary);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.email-row:hover .email-row__star {
+  opacity: 1;
+}
+.email-row__star[data-active="true"] {
+  opacity: 1;
+  color: var(--kair-warning, #ffc107);
+}
+
+.kair-mail-row__sender {
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.kair-mail-row__subject {
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.kair-mail-row__subject-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* F1-Feature6 — Badge de cantidad de mensajes en el hilo (Gmail-style) */
+.kair-mail-row__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-right: 6px;
+  background: var(--email-bg-read, #f2f6fc);
+  color: var(--email-text-secondary, #5f6368);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.kair-mail-row__preview {
+  font-size: 0.75rem;
+  color: var(--kair-text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-row__time {
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  text-align: right;
+  transition: opacity 120ms ease;
+}
+/* Cuando se hace hover en la fila, los iconos de acción aparecen
+   (position absolute right: 14px) y la fecha debe ocultarse para
+   que no quede duplicada detrás. */
+.kair-mail-row:hover .kair-mail-row__time {
+  opacity: 0;
+}
+.kair-mail-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* F1.A — Hover actions estilo Gmail. Aparecen solo al pasar el mouse. */
+.kair-mail-row__hover-actions {
+  display: none;
+  gap: 2px;
+  align-items: center;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(to right, transparent, var(--kair-bg-hover, #f1f3f5) 30%, var(--kair-bg-hover, #f1f3f5) 100%);
+  padding-left: 20px;
+  height: 100%;
+}
+.kair-mail-row:hover .kair-mail-row__hover-actions {
+  display: flex;
+}
+.kair-mail-row__hover-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-light, #5f6368);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-row__hover-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-row__hover-btn[data-active="true"] {
+  color: var(--kair-warning, #ffc107);
+}
+
+.kair-mail-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-mail-tag--meeting { background: #e8f0fe; color: #174ea6; }
+.kair-mail-tag--urgent { background: #fdeaea; color: #dc3545; }
+
+/* ============================================
+   K+AIR Toolbar del Calendario
+   ============================================ */
+.kair-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.kair-cal-toolbar__create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--kair-success);
+  color: #fff;
+  border: 1px solid var(--kair-success);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 160ms ease;
+  box-shadow: 0 1px 2px rgba(40, 167, 69, 0.2);
+}
+.kair-cal-toolbar__create:hover {
+  filter: brightness(0.95);
+}
+
+.kair-cal-toolbar__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kair-cal-toolbar__month-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  min-width: 130px;
+  text-align: center;
+}
+
+/* Loop 45b — Divisor vertical en la toolbar (entre "Hoy" y el switch) */
+.kair-cal-toolbar__divider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--kair-border-soft, #e9ecef);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Loop 45b — Switch "Todas las empresas" en la toolbar del calendario.
+   Reutiliza las reglas globales de .kair-toggle (track verde con data-on=true,
+   thumb animado con transform). Solo agregamos ajustes de tamaño/padding para
+   que se vea proporcionado en la toolbar (más pequeño que el FAB original). */
+.kair-cal-toolbar .kair-toggle {
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  gap: 6px;
+}
+.kair-cal-toolbar .kair-toggle__track {
+  width: 30px;
+  height: 16px;
+}
+.kair-cal-toolbar .kair-toggle__thumb {
+  width: 12px;
+  height: 12px;
+}
+.kair-cal-toolbar .kair-toggle[data-on="true"] .kair-toggle__thumb {
+  transform: translateX(14px);
+}
+.kair-cal-toolbar .kair-toggle__label {
+  white-space: nowrap;
+  color: var(--kair-text-body);
+  font-weight: 500;
+}
+
+.kair-cal-toolbar__views {
+  display: inline-flex;
+  align-items: center;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.kair-cal-toolbar__view {
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  white-space: nowrap;
+}
+.kair-cal-toolbar__view:hover {
+  color: var(--kair-text-strong);
+}
+.kair-cal-toolbar__view[data-active="true"] {
+  background: #fff;
+  color: var(--kair-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ============================================
+   K+AIR Sidebar (Mini Calendario + Leyenda)
+   ============================================ */
+.kair-cal-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.kair-mini-cal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+}
+
+.kair-mini-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 0 8px 10px;
+}
+
+.kair-mini-cal__weekday {
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--kair-text-light);
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+
+.kair-mini-cal__day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  position: relative;
+  font-weight: 500;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 2px;
+}
+.kair-mini-cal__day:hover {
+  background: var(--kair-bg-hover);
+}
+.kair-mini-cal__day[data-out="true"] {
+  color: #cbd5e1;
+  opacity: 0.6;
+}
+.kair-mini-cal__day[data-out="true"]:hover {
+  opacity: 0.9;
+}
+.kair-mini-cal__day[data-today="true"] {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.18);
+}
+.kair-mini-cal__day[data-selected="true"] {
+  background: #dbeafe;
+  color: var(--kair-primary, #174ea6);
+  font-weight: 700;
+}
+.kair-mini-cal__day[data-today="true"][data-selected="true"] {
+  /* Combinado: today + selected = sigue siendo today (azul oscuro) */
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+}
+.kair-mini-cal__day[data-has-events="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--event-color, var(--kair-primary, #174ea6));
+  box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.06);
+}
+.kair-mini-cal__day[data-today="true"][data-has-events="true"]::after {
+  /* Puntito blanco sobre fondo azul oscuro del today */
+  background: #fff;
+  box-shadow: 0 0 0 1.5px var(--kair-primary, #174ea6);
+}
+/* F4 — Modal de detalle/crear/editar evento (K+AIR Bandeja Integrada) */
+/* Loop 46 — FIX CRÍTICO: el modal se renderizaba pero quedaba "pegado" abajo
+   del calendario en lugar de centrado. Causa: el z-index 300000 era igual
+   al de varios elementos del calendario (kair-cal-overlay también usa 300000
+   en algunos casos), entonces el modal quedaba detrás o mal posicionado.
+   Fix: z-index 500000 (más alto que cualquier elemento del calendario o del
+   Bandeja Integrada) + display:flex con !important para que el inline
+   style="display:flex" del JS siempre gane. */
+.kair-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 500000;
+  padding: 20px;
+}
+.kair-event-modal-overlay[style*="display: flex"],
+.kair-event-modal-overlay[style*="display:flex"] {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  animation: kair-modal-fade 160ms ease;
+}
+
+.kair-event-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kair-event-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  gap: 12px;
+}
+.kair-event-modal__header[style*="border-left"] {
+  /* Cuando tiene border-left inline (categoría), ajustar padding */
+  padding-left: 12px;
+}
+
+.kair-event-modal__category {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kair-event-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--kair-text-muted);
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.kair-event-modal__close:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+  color: var(--kair-text-body);
+}
+
+.kair-event-modal__body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.kair-event-modal__title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  color: var(--kair-text-strong);
+  font-weight: 600;
+}
+
+.kair-event-modal__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--kair-text-body);
+}
+.kair-event-modal__meta-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.kair-event-modal__meta-row strong {
+  color: var(--kair-text-muted);
+  font-weight: 600;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.kair-event-modal__description {
+  padding: 10px 12px;
+  background: var(--kair-bg-soft, #f8fafc);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: var(--kair-text-body);
+}
+
+.kair-event-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.kair-event-modal__field > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-event-modal__field input,
+.kair-event-modal__field textarea,
+.kair-event-modal__field select {
+  padding: 8px 10px;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--kair-text-body);
+  background: #fff;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.kair-event-modal__field input:focus,
+.kair-event-modal__field textarea:focus,
+.kair-event-modal__field select:focus {
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12);
+}
+
+.kair-event-modal__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .kair-event-modal__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kair-event-modal__actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.kair-event-modal__btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--kair-border);
+  background: #fff;
+  color: var(--kair-text-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.kair-event-modal__btn:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+}
+
+.kair-event-modal__btn--primary {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+.kair-event-modal__btn--primary:hover {
+  background: #154a8a;
+  border-color: #154a8a;
+}
+
+.kair-event-modal__btn--danger {
+  color: #dc3545;
+  border-color: #f5c2c7;
+  background: #fff;
+}
+.kair-event-modal__btn--danger:hover {
+  background: #fdeaea;
+  border-color: #dc3545;
+}
+
+/* 📦646-fix7 — Variante "danger solid" del botón para el confirmModal.
+   Antes el "Eliminar" usaba la variante --danger (outline rojo) que era
+   poco prominente para una acción destructiva. Esta variante es la misma
+   paleta pero con fondo rojo sólido + texto blanco, mucho más visible
+   para que el user no la accione por accidente. Hover: rojo más oscuro. */
+.kair-event-modal__btn--danger-solid {
+  background: var(--kair-danger, #dc2626);
+  color: #fff;
+  border-color: var(--kair-danger, #dc2626);
+}
+.kair-event-modal__btn--danger-solid:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.kair-event-modal__btn--danger-solid:focus-visible {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+}
+
+.kair-event-modal__btn--secondary {
+  color: var(--kair-text-muted);
+  background: transparent;
+}
+#btn-gmail[data-connected="true"] {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+#btn-gmail[data-connected="true"]:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+/* F4-fix: restaurar regla removida por edit anterior */
+.kair-mini-cal__day[data-today="true"][data-has-events="true"]::after {
+  background: var(--kair-primary, #174ea6);
+}
+
+/* 📦605 (paso 1) — Sidebar como flex column con altura limitada.
+   Mini-cal fijo arriba, leyenda flexible con scroll interno, integración fija abajo.
+   Asi el sidebar completo cabe en el viewport aunque la ventana sea chica. */
+.kair-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;     /* permite que el item flexible se encoja */
+  overflow: hidden;
+}
+
+/* 📦605 (paso 1) — Mini-cal: NO se encoje, queda fijo arriba del sidebar */
+.kair-mini-cal {
+  flex-shrink: 0;
+}
+
+.kair-legend {
+  padding: 12px;
+  border-top: 1px solid var(--kair-border-soft);
+  /* 📦605 (paso 1) — flex:1 para tomar el espacio restante del sidebar.
+     min-height:0 + overflow-y:auto → scroll INTERNO si los items no caben. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 📦605 (paso 1) — Integración correo: NO se encoje, queda fija al fondo del sidebar */
+.kair-sidebar-integ {
+  flex-shrink: 0;
+}
+
+.kair-legend__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.kair-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: opacity 120ms ease;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+}
+.kair-legend__item:hover {
+  opacity: 0.7;
+}
+.kair-legend__item[data-active="false"] {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+.kair-legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   K+AIR Vista Mensual
+   ============================================ */
+.kair-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--kair-border-soft);
+  gap: 1px;
+  flex: 1;
+  min-height: 0;
+}
+
+.kair-month-weekday {
+  background: #fafbfc;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+
+.kair-month-cell {
+  background: #fff;
+  padding: 4px 6px;
+  min-height: 100px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.kair-month-cell:hover {
+  background: #fafbfc;
+}
+.kair-month-cell[data-out="true"] {
+  background: #fbfbfc;
+}
+.kair-month-cell[data-out="true"] .kair-month-cell__day {
+  color: var(--kair-text-light);
+  opacity: 0.5;
+}
+.kair-month-cell[data-today="true"] {
+  background: var(--kair-bg-soft);
+}
+.kair-month-cell[data-droppable="true"]:hover {
+  background: var(--kair-bg-soft);
+}
+.kair-month-cell[data-drop-active="true"] {
+  background: var(--kair-bg-soft);
+  outline: 2px dashed var(--kair-primary);
+  outline-offset: -2px;
+}
+
+.kair-month-cell__day {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-body);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.kair-month-cell[data-today="true"] .kair-month-cell__day {
+  background: var(--kair-primary);
+  color: #fff;
+}
+
+/* 📦695-fix2 — Festivos colombianos: background sutil rosa/rojo + indicador 🇨🇴.
+   Aplica solo a celdas dentro del mes (no a días del mes anterior/siguiente).
+   El data-festivo del cell lo identifica (lo pone JS al renderizar). */
+.kair-month-cell.kair-month-cell--festivo {
+  background: linear-gradient(180deg, #fef2f2 0%, #fff5f5 100%);
+  border-top: 2px solid #fca5a5;
+}
+.kair-month-cell.kair-month-cell--festivo[data-today="true"] {
+  /* Si es festivo Y hoy, combinar ambos estilos (gradient + día actual) */
+  background: linear-gradient(180deg, #fee2e2 0%, #fef2f2 100%);
+  border-top: 2px solid #dc2626;
+}
+.kair-month-cell__festivo-flag {
+  display: inline-block;
+  font-size: 0.7rem;
+  margin-left: 2px;
+  line-height: 1;
+  filter: saturate(0.85);
+  vertical-align: middle;
+}
+.kair-month-cell--festivo .kair-month-cell__day {
+  color: #b91c1c;
+  font-weight: 700;
+}
+.kair-month-cell--festivo[data-today="true"] .kair-month-cell__day {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.kair-month-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: filter 120ms ease, transform 80ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.kair-month-event:hover {
+  filter: brightness(0.96);
+  transform: translateX(1px);
+}
+.kair-month-event__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kair-month-event__more {
+  font-size: 0.65rem;
+  color: var(--kair-text-muted);
+  font-weight: 600;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+.kair-month-event__more:hover {
+  color: var(--kair-primary);
+}
+
+/* ============================================
+   K+AIR Footer del Calendario
+   ============================================ */
+.kair-cal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kair-cal-footer__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kair-cal-footer__counter {
+  color: var(--kair-text-muted);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Toggle "Todas las empresas"
+   ============================================ */
+.kair-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* F4 — Track del switch (estilo iOS moderno) */
+.kair-toggle__track {
+  width: 36px;
+  height: 20px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  position: relative;
+  transition: background 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.kair-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 999px;
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.kair-toggle[data-on="true"] .kair-toggle__track {
+  background: #16a34a;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(22, 163, 74, 0.12);
+}
+.kair-toggle[data-on="true"] .kair-toggle__thumb {
+  transform: translateX(16px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(22, 163, 74, 0.3);
+}
+
+.kair-toggle:hover .kair-toggle__thumb {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.kair-toggle__label {
+  white-space: nowrap;
+}
+
+/* ============================================
+   K+AIR Búsqueda integrada en header
+   ============================================ */
+.kair-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+  width: 220px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.kair-search:focus-within {
+  border-color: var(--kair-primary);
+  background: #fff;
+}
+.kair-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  flex: 1;
+  min-width: 0;
+}
+.kair-search input::placeholder {
+  color: var(--kair-text-light);
+}
+
+/* ============================================
+   K+AIR Botón de flecha entre sidebar y área de contenido
+   ============================================ */
+.kair-panel-toggle {
+  position: relative;
+  width: 22px;
+  align-self: stretch;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-muted);
+  transition: background 160ms ease, color 160ms ease;
+  z-index: 5;
+  flex-shrink: 0;
+  margin-left: -1px;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.02);
+}
+.kair-panel-toggle:hover {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+.kair-panel-toggle:active {
+  background: var(--kair-bg-hover);
+}
+.kair-panel-toggle__icon {
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* data-calendar-visible="false" (default, correo visible): flecha apunta a la derecha (→)
+   indicando "abrir calendario".
+   data-calendar-visible="true" (calendario visible): flecha rota 180° apunta a la izquierda (←)
+   indicando "cerrar calendario". */
+.kair-panel-toggle[data-calendar-visible="true"] .kair-panel-toggle__icon {
+  transform: rotate(180deg);
+}
+
+/* ============================================
+   K+AIR Layout principal — sidebar + flecha + área de contenido
+   El correo SIEMPRE está visible (es la base).
+   El calendario grande es un OVERLAY que se desliza desde la izquierda
+   cubriendo el correo cuando se activa.
+   ============================================ */
+.kair-layout {
+  display: grid;
+  grid-template-columns: 240px 22px 1fr;
+  /* 📦605 (paso 1) — grid-template-rows: 1fr fuerza a la única fila a tomar
+     toda la altura disponible. Sin esto, los items de grid se ajustan al
+     contenido y el sidebar pierde altura limitada. */
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  /* 📦605 (paso 1) — Bloquear overflow del layout para que sus hijos
+     (sidebar, content-area) controlen su propio scroll interno. */
+  overflow: hidden;
+}
+
+@media (max-width: 1280px) {
+  .kair-layout {
+    grid-template-columns: 220px 22px 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .kair-layout {
+    grid-template-columns: 22px 1fr;
+  }
+  .kair-layout .kair-sidebar {
+    display: none;
+  }
+}
+
+/* Área de contenido: contiene el correo (base) + calendario (overlay deslizante) */
+.kair-content-area {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+}
+
+/* Correo: base layer (lista + detalle Gmail) */
+.kair-mail-stack {
+  display: grid;
+  /* Loop 41 — Aumentado de 340px a 420px (80px más) para que el sender y el
+     preview del cuerpo se vean sin truncar agresivamente. Antes quedaba solo
+     ~134px para content (sender + subject) y se veía "adm..." / "P...". */
+  grid-template-columns: 420px 1fr;
+  height: 100%;
+  gap: 0;
+  transition: opacity 240ms ease;
+}
+
+@media (max-width: 1280px) {
+  .kair-mail-stack {
+    grid-template-columns: 380px 1fr;
+  }
+}
+
+/* 📦605 (paso 2) — Lista de correos como flex column con altura limitada.
+   Header, buscador y filtros fijos arriba (flex-shrink:0).
+   Lista de items flexible con scroll INTERNO (flex:1 + min-height:0 + overflow-y:auto).
+   Asi la lista cabe en el viewport sin perder de vista el header ni los filtros. */
+.kair-mail-stack__list {
+  border-right: 1px solid var(--kair-border-soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 📦605 (paso 2) — Items fijos en la lista: NO se encojen.
+   Usamos selector universal porque los items son creados dinámicamente
+   sin una clase BEM común (header, search, filters no comparten clase). */
+.kair-mail-stack__list > .kair-mail-list-header,
+.kair-mail-stack__list > .kair-mail-search,
+.kair-mail-stack__list > .kair-mail-list-filters {
+  flex-shrink: 0;
+}
+
+/* 📦605 (paso 2) — El último hijo (la lista de items con clase .kair-scroll)
+   es el que scrollea internamente. Ya tiene overflow-y:auto en el JS,
+   solo necesitamos flex:1 para que tome el espacio restante. */
+.kair-mail-stack__list > .kair-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.kair-mail-stack__detail {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Cuando el calendario está visible, atenuamos el correo underneath (sigue renderizado) */
+.kair-content-area[data-calendar-visible="true"] .kair-mail-stack {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Calendario: overlay deslizante que entra desde la izquierda */
+.kair-calendar-slide {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  /* Hidden state: desplazado 100% hacia la izquierda (fuera del viewport) */
+  transform: translateX(-100%);
+  /* Animación suave: 320ms con easing Material Design */
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 320ms ease;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  /* Sin sombra cuando está oculto */
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* Visible state: se desliza a su posición (translateX(0)) y muestra sombra */
+.kair-calendar-slide[data-visible="true"] {
+  transform: translateX(0);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+}
+
+/* Animación de los paneles (legacy, se mantiene para compatibilidad) */
+.kair-layout__panel {
+  transition: opacity 200ms ease;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================================
+   K+AIR Toggle de vista (Calendar ↔ Mail)
+   ============================================ */
+.kair-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.kair-view-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  white-space: nowrap;
+}
+.kair-view-toggle__btn:hover {
+  color: var(--kair-text-strong);
+}
+.kair-view-toggle__btn[data-active="true"] {
+  background: #fff;
+  color: var(--kair-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   K+AIR Mail Detail — Gmail reading pane
+   ============================================ */
+
+/* Loop 42 — El scroll interno del detail (clase overflow-y-auto kair-scroll)
+   tiene que tomar todo el espacio vertical restante entre el header y el reply.
+   flex: 1 1 auto + min-height: 0 es el patrón estándar para que un hijo de
+   flex container haga scroll interno sin agrandar el padre. */
+.kair-mail-detail .overflow-y-auto {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.kair-mail-detail {
+  /* Loop 42 — Patrón "3 zonas" (header / content scroll / reply fijo al fondo).
+     - height: 100% toma toda la altura del container padre (.kair-mail-detail-container)
+     - display: flex + flex-direction: column apila los 3 hijos
+     - El scroll (hijo 2) tiene flex: 1 1 auto + min-height: 0 para que ocupe
+       todo el espacio restante y haga scroll INTERNO cuando el contenido es largo
+     - El reply (hijo 3) tiene flex-shrink: 0 para que NUNCA se comprima y
+       quede SIEMPRE al fondo del panel (estilo Gmail) */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.kair-mail-detail__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  flex-wrap: wrap;
+}
+
+.kair-mail-detail__toolbar-label {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  margin-right: 4px;
+}
+
+.kair-mail-detail__tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* FIX loop 36 — Eliminar BEM no usado (.thread-header, .quoted-thread, .message-block).
+   Estas clases se crearon en el refactor BEM incompleto del 📦563 pero el HTML
+   nunca se migró. El HTML sigue usando .kair-mail-detail__* y .kair-mail-message__*.
+   Eliminar ~220 líneas de CSS muerto. */
+
+.kair-mail-detail__sender-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.kair-mail-detail__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  font-family: "Segoe UI", "Roboto", "Inter", system-ui, sans-serif;
+}
+
+.kair-mail-detail__sender-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-mail-detail__sender-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  margin: 0;
+}
+
+.kair-mail-detail__sender-email {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  margin: 1px 0 0;
+}
+
+.kair-mail-detail__recipient {
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  margin-top: 4px;
+}
+
+.kair-mail-detail__time {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.kair-mail-detail__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--kair-text-body);
+  white-space: normal;
+  min-height: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+/* F1.A-fix2 — Links dentro del body del correo. Color primario + underline.
+   Loop 39f — Selector ampliado: aplica a <a> (legacy) y <span> (nuevo) con class
+   .kair-mail-link. Los <span> simulan links con role="link" + tabindex=0. */
+.kair-mail-detail__body a.kair-mail-link,
+.kair-mail-detail__body span.kair-mail-link,
+.kair-mail-message__body a.kair-mail-link,
+.kair-mail-message__body span.kair-mail-link {
+  color: var(--kair-primary, #174ea6);
+  text-decoration: underline;
+  word-break: break-all;
+  cursor: pointer;
+  outline: none;
+}
+.kair-mail-detail__body a.kair-mail-link:hover,
+.kair-mail-detail__body span.kair-mail-link:hover,
+.kair-mail-detail__body span.kair-mail-link:focus,
+.kair-mail-message__body a.kair-mail-link:hover,
+.kair-mail-message__body span.kair-mail-link:hover,
+.kair-mail-message__body span.kair-mail-link:focus {
+  color: var(--kair-primary-hover, #185abd);
+  text-decoration: none;
+}
+.kair-mail-detail__body span.kair-mail-link:focus,
+.kair-mail-message__body span.kair-mail-link:focus {
+  background-color: rgba(23, 78, 166, 0.08);
+  border-radius: 2px;
+}
+/* F1.A-fix2 — Quoted text (líneas con ">"). Bloque colapsable con <details> HTML5.
+   Por default colapsado, el user clickea "..." para expandir (estilo Gmail). */
+.kair-mail-quote {
+  margin: 12px 0;
+  /* FIX loop 31 — Borde izquierdo azul (4px) en lugar de gris (3px).
+     Distingue visualmente el quote del body normal y le da identidad. */
+  border-left: 4px solid var(--kair-primary, #1a73e8);
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.85em;
+  /* FIX loop 31 — Fondo con tinte azul (#f0f4f9) en lugar de gris
+     neutro (#f8f9fa). Más visible contra el fondo blanco del detail. */
+  background: #f0f4f9;
+  border-radius: 0 4px 4px 0;
+}
+.kair-mail-quote summary::before {
+  /* FIX loop 17 — Indicador ··· antes del label, más Gmail-style */
+  content: "··· ";
+  /* FIX loop 31 — Color azul del accent para el ··· (no gris muted) */
+  color: var(--kair-primary, #1a73e8);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.kair-mail-quote summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--kair-primary, #174ea6);
+  font-size: 0.8125rem;
+  /* FIX loop 31 — font-weight 600 (más bold que 500) para que el
+     label "N líneas citadas" sea más prominente. */
+  font-weight: 600;
+  list-style: none;
+}
+.kair-mail-quote summary:hover {
+  /* FIX loop 31 — Hover state más oscuro (#e8eef5) para feedback
+     visual claro al pasar el mouse. */
+  background: #e8eef5;
+}
+.kair-mail-quote summary::-webkit-details-marker {
+  display: none;
+}
+.kair-mail-quote__content {
+  padding: 0 12px 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* FIX 2026-07-19 (loop 12) — Header del quote ("El X escribió:" / "On X wrote:")
+   Se muestra en cursiva, color gris, antes del contenido del quote. */
+.kair-mail-quote__header {
+  padding: 0 12px 6px 12px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  font-style: italic;
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+/* ============================================
+   F1.B + BEM — Compose panel (.compose-panel)
+   Estilo Gmail: overlay oscuro + modal centrado,
+   con estado minimizable anclado a la esquina inferior derecha.
+   ============================================ */
+.compose-panel-overlay {
+  position: fixed;
+  inset: 0;
+  /* FIX 2026-07-19 (loop 13) — Gmail-style: NO oscurecer el fondo.
+     El compose modal en Gmail se ancla a bottom-right como una "ventana"
+     sin oscurecer el resto de la UI. */
+  background: transparent;
+  z-index: 400000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0;
+  /* Al minimizar, ocultamos el overlay completamente */
+  transition: opacity 160ms ease, visibility 160ms ease;
+  pointer-events: none;
+}
+.compose-panel {
+  background: #fff;
+  border-radius: 8px 8px 0 0;
+  /* 📦650-fix1 — width inicial más generoso (700px) para arrancar más ancho
+     tipo Gmail. El user lo puede resizear al tamaño que quiera. */
+  width: 700px;
+  max-width: calc(100vw - 48px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: max-height 200ms ease, box-shadow 200ms ease;
+  pointer-events: auto;
+  margin: 0 24px 0 0;
+  /* 📦650-fix1 — position: relative para que el .compose-panel__resize-grip
+     (position: absolute) se posicione relativo al PANEL, no al overlay.
+     SIN esto, el grip se va a top:0/left:0 del viewport (esquina superior
+     izquierda de la pantalla), no del panel. */
+  position: relative;
+  /* 📦650-fix1 — Resize libre del modal compose (custom, no nativo).
+     ANTES: usaba `resize: both` que pone el handle nativo en bottom-right.
+     AHORA: handle custom en top-left (per user request). Lógica de
+     resize en JS (mousedown/mousemove/mouseup en .compose-panel__resize-grip).
+     min-width/min-height via CSS, max via JS. */
+  min-width: 400px;
+  min-height: 360px;
+}
+/* 📦650-fix1 — Handle visual en la esquina SUPERIOR-IZQUIERDA para resize.
+   Patrón diagonal MUY sutil (2 rayitas finas tipo grip nativo de Windows),
+   sin caja blanca de fondo, baja opacidad para que no distraiga. El
+   cursor nwse-resize ya da la pista de que es interactivo.
+   Hover: leve aumento de opacidad para feedback. */
+.compose-panel__resize-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background-color: transparent;
+  background-image:
+    linear-gradient(135deg,
+      transparent 48%, rgba(60, 64, 67, 0.32) 48%, rgba(60, 64, 67, 0.32) 52%,
+      transparent 52%, transparent 70%,
+      rgba(60, 64, 67, 0.32) 70%, rgba(60, 64, 67, 0.32) 74%,
+      transparent 74%);
+  z-index: 99999;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 120ms ease;
+}
+.compose-panel__resize-grip:hover {
+  opacity: 1;
+}
+.compose-panel__autocomplete {
+  position: absolute;
+  left: 16px;
+  /* 📦650-fix2 — Ancho compacto (Gmail-style): NO estirado a todo el modal.
+     width: max-content se ajusta al contenido, max-width acota si el email
+     es muy largo. right: auto para que no se fuerce a estirarse. */
+  width: max-content;
+  max-width: 380px;
+  min-width: 240px;
+  background: #fff;
+  /* 📦652 — Borde + sombra más prominentes para destacar el rectángulo. */
+  border: 1px solid #c4c7c5;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(60, 64, 67, 0.18), 0 1px 3px rgba(60, 64, 67, 0.12);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin: 4px 0 0 0;
+  padding: 4px 0;
+}
+.compose-panel__autocomplete[hidden] { display: none !important; }
+.compose-panel__autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  /* 📦652 — Sin border-bottom, separador con margin. */
+  border-bottom: none;
+  margin: 0 4px;
+  border-radius: 6px;
+  transition: background 100ms ease;
+}
+.compose-panel__autocomplete-item + .compose-panel__autocomplete-item {
+  margin-top: 2px;
+}
+.compose-panel__autocomplete-item:last-child { border-bottom: none; }
+.compose-panel__autocomplete-item:hover,
+.compose-panel__autocomplete-item.active {
+  background: #e8f0fe;
+}
+.compose-panel__autocomplete-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--kair-primary, #1a73e8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.compose-panel__autocomplete-info {
+  flex: 1;
+  min-width: 0;
+}
+.compose-panel__autocomplete-name {
+  font-size: 0.9rem;
+  color: var(--kair-text-strong, #202124);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__autocomplete-email {
+  font-size: 0.78rem;
+  color: var(--kair-text-muted, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__autocomplete-count {
+  font-size: 0.72rem;
+  color: var(--kair-text-muted, #5f6368);
+  font-family: monospace;
+  flex-shrink: 0;
+  background: #f1f3f4;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 📦652 — Sistema de chips para destinatarios (Para / CC) estilo Gmail.
+   El input "Para" se reemplaza por un container flex con chips (uno por
+   destinatario seleccionado) + input al final para seguir tipeando. */
+.compose-panel__recipients {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  /* 📦652 — Padding unificado con .compose-panel__input para alinear texto
+     con el campo Asunto. Mismo font-size + line-height + color de placeholder. */
+  padding: 8px 0;
+  margin: 4px 0;
+  min-height: 24px;
+  position: relative;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.compose-panel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 4px;
+  background: #e8f0fe;
+  border: 1px solid #d2e3fc;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: var(--kair-text-strong, #202124);
+  max-width: 100%;
+  user-select: none;
+  line-height: 1.2;
+}
+.compose-panel__chip-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--kair-primary, #1a73e8);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+.compose-panel__chip-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 2px;
+}
+.compose-panel__chip-remove {
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  padding: 0 6px;
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 100ms ease;
+}
+.compose-panel__chip-remove:hover {
+  /* 📦652 — Solo cambio de color, sin fondo (sin look de botón redondo). */
+  color: var(--kair-primary, #1a73e8);
+}
+.compose-panel__chip-input {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 100px;
+  /* 📦652 — Unificado con .compose-panel__input (mismo font-size, color, padding) */
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--email-text-primary);
+  font-family: inherit;
+}
+.compose-panel__chip-input::placeholder {
+  /* 📦652 — Mismo color que .compose-panel__input::placeholder para que coincidan */
+  color: #cbd5e1;
+  font-weight: 400;
+}
+/* 📦652 — Cuando ya hay al menos 1 chip, el placeholder 'Para/CC' no debe
+   verse. Usamos :has() (soportado en Electron/Chromium moderno) + fallback
+   con clase .has-chips para mayor compatibilidad. */
+.compose-panel__recipients:has(> .compose-panel__chip) .compose-panel__chip-input::placeholder,
+.compose-panel__recipients.has-chips .compose-panel__chip-input::placeholder {
+  opacity: 0;
+}
+
+/* ---------- Estado MINIMIZADO (Gmail-style bottom-right) ---------- */
+.compose-panel--minimized + .compose-panel-overlay,
+.compose-panel-overlay:has(.compose-panel--minimized) {
+  /* El overlay se vuelve invisible cuando el panel está minimizado */
+  background: transparent;
+  pointer-events: none;
+}
+.compose-panel--minimized {
+  position: fixed;
+  bottom: 0;
+  right: 24px;
+  width: 320px;
+  max-width: 320px;
+  max-height: 48px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 8px 8px 0 0;
+  margin: 0 0 0 0;
+}
+.compose-panel--minimized .compose-panel__body,
+.compose-panel--minimized .compose-panel__toolbar,
+.compose-panel--minimized .compose-panel__footer {
+  display: none;
+}
+.compose-panel--minimized .compose-panel__titlebar {
+  border-bottom: none;
+  cursor: pointer;
+}
+.compose-panel--minimized .compose-panel__btn--minimize {
+  display: none;
+}
+.compose-panel--minimized .compose-panel__btn--maximize {
+  display: inline-flex;
+}
+
+/* ---------- Titlebar ---------- */
+/* Loop 37e — Titlebar más suave: fondo gris claro, texto gris medio.
+   Antes era fondo oscuro #404040 + texto blanco (muy prominente).
+   Ahora es fondo #f8f9fa + texto #6b7280 (más sutil, como el resto del modal). */
+.compose-panel__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 📦650-fix1 — padding-left 36px para que el título "Nuevo correo" no se solape
+     con el grip de resize (24x24) que está en top-left. */
+  padding: 12px 16px 12px 36px;
+  border-bottom: 1px solid var(--email-border-soft, #e5e7eb);
+  background: #f8f9fa;
+  color: #6b7280;
+}
+.compose-panel__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.compose-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.compose-panel__btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.compose-panel__btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1f2937;
+}
+.compose-panel__btn--maximize {
+  display: none;
+}
+
+/* ---------- Body / fields ---------- */
+.compose-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+}
+/* Loop 37e — Inputs full-width con label como placeholder (patrón Gmail).
+   Sin columna de label separada, sin flex row. Cada input es independiente
+   y ocupa todo el ancho del modal. */
+.compose-panel__field {
+  display: block;
+  border-bottom: none;
+  padding: 0;
+  margin: 0;
+}
+/* FIX 2026-07-19 (loop 14) — Campo "De:" más sutil, sin border-bottom fuerte
+   porque es de solo lectura y debe verse menos prominente que los demás */
+.compose-panel__field--from {
+  background: var(--email-bg-read, #f2f6fc);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.compose-panel__input--readonly {
+  color: var(--email-text-secondary) !important;
+  cursor: default;
+  font-style: italic;
+}
+.compose-panel__field--body {
+  border-bottom: none;
+  flex: 1;
+  min-height: 200px;
+  padding: 12px 0;
+  align-items: flex-start;
+}
+/* Loop 37e — Label CSS removido (ya no hay label separada, ahora es placeholder) */
+.compose-panel__input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--email-text-primary);
+  padding: 8px 0;
+  background: transparent;
+  font-family: inherit;
+  margin: 4px 0;
+}
+.compose-panel__input::placeholder {
+  color: #cbd5e1;
+  font-weight: 400;
+}
+.compose-panel__input:focus {
+  outline: none;
+}
+.compose-panel__textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--email-text-primary);
+  resize: vertical;
+  min-height: 120px;
+  padding: 6px 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* Loop 37c — Drop zone: invisible por defecto, aparece como overlay
+   SOLO cuando se arrastra un archivo. Cubre todo el body field. */
+.compose-panel__field--body {
+  position: relative;
+}
+.compose-panel__dropzone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 240, 254, 0.92);
+  border: 2px dashed var(--kair-primary, #1a73e8);
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 5;
+}
+.compose-panel__dropzone--active {
+  opacity: 1;
+}
+.compose-panel__dropzone-hint {
+  font-size: 0.9375rem;
+  color: var(--kair-primary, #1a73e8);
+  font-weight: 500;
+  text-align: center;
+  padding: 0 16px;
+}
+.compose-panel__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.compose-panel__attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--kair-bg-soft, #f1f3f5);
+  border: 1px solid var(--kair-border, #dee2e6);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+.compose-panel__attachment-icon {
+  flex-shrink: 0;
+}
+.compose-panel__attachment-name {
+  flex: 1;
+  color: var(--email-text-primary, #202124);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__attachment-size {
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.compose-panel__attachment-remove {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.compose-panel__attachment-remove:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--kair-danger, #dc3545);
+}
+.compose-panel__textarea:focus {
+  outline: none;
+}
+
+/* ---------- Quote del mensaje citado (estilo Gmail) ----------
+   Aparece ARRIBA del textarea cuando es reply/replyAll/forward.
+   Se renderiza como bloque visual (NO texto plano en el body).
+   Al enviar, el contenido se concatena en formato estándar al body. */
+.compose-panel__quote {
+  background: #f8f9fa;
+  border-left: 3px solid var(--email-accent);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.compose-panel__quote-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.compose-panel__quote-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.compose-panel__quote-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.compose-panel__quote-sender {
+  font-weight: 600;
+  color: var(--email-text-primary);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compose-panel__quote-email {
+  font-weight: 400;
+  color: var(--email-text-secondary);
+  font-size: 0.75rem;
+}
+.compose-panel__quote-date {
+  font-size: 0.7rem;
+  color: var(--email-text-secondary);
+}
+.compose-panel__quote-body {
+  margin: 0;
+  padding: 0 0 0 8px;
+  color: var(--email-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+/* FIX 2026-07-19 (loop 15) — Quote format Gmail-style (forward + reply) */
+.compose-panel__quote-separator {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+  font-weight: 500;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--email-border);
+  margin-bottom: 8px;
+}
+.compose-panel__quote-headers {
+  margin: 4px 0 8px 0;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+}
+.compose-panel__quote-header-row {
+  display: block;
+  padding: 1px 0;
+  line-height: 1.5;
+}
+.kair-mail-quote__label {
+  display: inline-block;
+  min-width: 60px;
+  font-weight: 600;
+  color: var(--email-text-primary);
+}
+
+/* ---------- Toolbar inferior (iconos) ---------- */
+.compose-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--email-border);
+  background: #fafbfc;
+}
+.compose-panel__toolbar__btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--email-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.compose-panel__toolbar__btn:hover:not(:disabled) {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--email-text-primary);
+}
+.compose-panel__toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.compose-panel__toolbar__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--email-border);
+  margin: 0 4px;
+}
+
+/* ---------- Footer / send row ---------- */
+.compose-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--email-border);
+  background: #f8f9fa;
+}
+.compose-panel__hint {
+  font-size: 0.7rem;
+  color: var(--email-text-secondary);
+}
+
+/* ============================================
+   F1-Feature4 — Modal de firma (.kair-signature-modal)
+   Mini modal para editar la firma de correo.
+   Se guarda en localStorage["kair.emailSignature"].
+   ============================================ */
+.kair-signature-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 450000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.kair-signature-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.kair-signature-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--email-border);
+  background: #404040;
+  color: #fff;
+}
+.kair-signature-modal__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.kair-signature-modal__close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-signature-modal__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.kair-signature-modal__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kair-signature-modal__hint {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+.kair-signature-modal__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-signature-modal__textarea {
+  width: 100%;
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--email-text-primary);
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.kair-signature-modal__textarea:focus {
+  outline: none;
+  border-color: var(--email-accent);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+.kair-signature-modal__preview-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 8px 0 0 0;
+}
+.kair-signature-modal__preview {
+  background: #f8f9fa;
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  color: var(--email-text-primary);
+  line-height: 1.5;
+  min-height: 60px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.kair-signature-modal__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--email-border);
+  background: #f8f9fa;
+}
+.kair-signature-modal__btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  border: 1px solid transparent;
+}
+.kair-signature-modal__btn--primary {
+  background: var(--email-accent);
+  color: #fff;
+  border-color: var(--email-accent);
+}
+.kair-signature-modal__btn--primary:hover {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.kair-signature-modal__btn--secondary {
+  background: transparent;
+  color: var(--email-text-secondary);
+  border-color: var(--email-border);
+}
+.kair-signature-modal__btn--secondary:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+}
+.compose-panel__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--email-accent);
+  color: #fff;
+  border: 1px solid var(--email-accent);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.compose-panel__send:hover:not(:disabled) {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.compose-panel__send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.compose-panel__cancel {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--email-text-secondary);
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.compose-panel__cancel:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+}
+.kair-mail-detail__body::-webkit-scrollbar {
+  width: 8px;
+}
+.kair-mail-detail__body::-webkit-scrollbar-thumb {
+  background: #cfd4dc;
+  border-radius: 8px;
+}
+
+.kair-mail-detail__attachments {
+  padding: 12px 20px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.kair-mail-detail__attachments-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  margin-right: 4px;
+}
+
+.kair-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  text-decoration: none;
+}
+.kair-attachment-chip:hover {
+  background: var(--kair-bg-soft);
+  border-color: var(--kair-primary);
+}
+/* 📦627 — Acciones Ver/Descargar que aparecen en hover (estilo Gmail).
+   Por defecto opacity: 0 para que no ocupen espacio visual hasta que el
+   user pase el mouse. En hover del chip aparecen con una transición suave. */
+.kair-attachment-chip__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  flex-shrink: 0;
+}
+.kair-attachment-chip:hover .kair-attachment-chip__actions,
+.kair-attachment-chip:focus-within .kair-attachment-chip__actions {
+  opacity: 1;
+}
+.kair-attachment-chip__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #fff;
+  color: var(--kair-text-body, #374151);
+  border: 1px solid var(--kair-border, #d1d5db);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.kair-attachment-chip__action:hover {
+  background: var(--kair-primary, #174ea6);
+  border-color: var(--kair-primary, #174ea6);
+  color: #fff;
+}
+.kair-attachment-chip__action svg {
+  flex-shrink: 0;
+}
+.kair-attachment-chip__icon {
+  width: 32px;
+  height: 32px;
+  background: transparent;  /* 📦625 — los SVGs tienen sus propios colores */
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.kair-attachment-chip__icon svg {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+.kair-attachment-chip__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kair-attachment-chip__name {
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.kair-attachment-chip__size {
+  font-size: 0.65rem;
+  color: var(--kair-text-light);
+}
+
+.kair-mail-detail__meeting-banner {
+  margin: 16px 20px;
+  border: 1px solid #c5d9f5;
+  border-radius: 8px;
+  background: var(--kair-bg-soft, #e8f0fe);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(23, 78, 166, 0.04);
+}
+.kair-mail-detail__meeting-banner:hover {
+  background: #e0eafc;
+}
+
+.kair-mail-detail__meeting-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(23, 78, 166, 0.15);
+}
+
+.kair-mail-detail__meeting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-mail-detail__meeting-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--kair-primary, #174ea6);
+  margin: 0 0 6px;
+  line-height: 1.3;
+}
+
+.kair-mail-detail__meeting-meta {
+  font-size: 0.75rem;
+  color: var(--kair-text-body, #3a3f51);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.5;
+}
+
+.kair-mail-detail__meeting-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.kair-mail-detail__reply {
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  padding: 12px 20px; /* FIX loop 16 — más compacto */
+  background: #fff;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  /* FIX loop 28 — Reply queda al final del detail sin anclar (loop 23
+     lo revirtió del scroll al detail). */
+  /* Loop 42 — flex-shrink: 0 para que NUNCA se comprima cuando el scroll
+     interno quiere expandirse. Garantiza que el reply quede SIEMPRE al fondo
+     del panel con su altura natural (~56px), aunque el body tenga mucho
+     contenido. */
+  flex-shrink: 0;
+  z-index: 2;  /* encima del scroll si hay overlap */
+}
+.kair-mail-detail__reply button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.kair-mail-detail__reply button svg {
+  flex-shrink: 0;
+}
+/* 📦626 — Modo compact del reply bar (cuando mide <720px). Ocultamos los
+   labels de los botones y dejamos solo los iconos. El ResizeObserver en
+   app.js togglea la clase .kair-mail-detail__reply--compact. Apariencia
+   más limpia en modo ventana de la app. */
+.kair-mail-detail__reply--compact .kair-mail-detail__reply-label {
+  display: none;
+}
+.kair-mail-detail__reply--compact .kair-header__action--ghost,
+.kair-mail-detail__reply--compact .kair-header__action--primary {
+  padding: 6px 8px;
+}
+
+.kair-mail-detail__reply-input {
+  flex: 1;
+  padding: 8px 14px;
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  background: var(--kair-bg-app);
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.kair-mail-detail__reply-input:focus {
+  border-color: var(--kair-primary);
+  background: #fff;
+}
+.kair-mail-detail__reply-input::placeholder {
+  color: var(--kair-text-light);
+}
+
+.kair-mail-detail__urgent-banner {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fdeaea;
+  border: 1px solid #f5c2c7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--kair-danger);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Mail list panel header (Gmail style)
+   ============================================ */
+
+/* Loop 37 — Botones del composeBar (Gmail-style, arriba de la lista).
+   Visible porque el header interno del iframe está oculto por CSS.
+   📦615 — 3 botones juntos: Redactar, Sincronizar, Recientes.
+   📦616 — Estilo unificado outline (como Responder/Reenviar del footer del
+   detalle), sin distinción primary/secondary.
+   📦617 — hover / active / focus comparten el mismo estilo (gris claro) para
+   que el botón "seleccionado" se vea igual que con el puntero encima. */
+.kair-mail-compose-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+.kair-mail-compose-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  /* Default — outline sutil como tabs inactivas (No leídos, Marcados) */
+  background: transparent;
+  color: var(--kair-text-body, #374151);
+  border: 1px solid var(--kair-border, #d1d5db);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.kair-mail-compose-bar__btn:hover,
+.kair-mail-compose-bar__btn:active,
+.kair-mail-compose-bar__btn:focus,
+.kair-mail-compose-bar__btn:focus-visible {
+  /* Hover/active/focus — el MISMO estilo gris claro. ANTES el active era
+     diferente y se "perdía" el feedback de selección. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  outline: none;
+}
+.kair-mail-compose-bar__btn[data-active="true"] {
+  /* Estado seleccionado persistente (ej: sort actual cuando NO es el default).
+     Se queda visible mientras el botón represente el estado activo, sin
+     depender de :hover o :focus. 📦619 — Sin border primary azul, solo gris
+     claro para que se vea "activo" pero sin competir con la tab azul de abajo. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-compose-bar__btn svg {
+  flex-shrink: 0;
+}
+
+.kair-mail-list-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.kair-mail-list-header__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kair-mail-list-header__count {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  background: var(--kair-bg-app);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* AUDITORIA 2026-07-18 — Botón de ordenamiento (estilo Gmail: "Reciente ▼") */
+.kair-mail-list-header__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--kair-border, #dee2e6);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--kair-text-muted, #5a6378);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-right: 4px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-list-header__sort:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
+}
+
+.kair-mail-list-header__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kair-mail-list-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  flex-wrap: wrap;
+}
+
+.kair-mail-list-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--kair-text-body, #374151);
+  background: transparent;
+  border: 1px solid var(--kair-border, #d1d5db);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.kair-mail-list-filter:hover {
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-list-filter[data-active="true"] {
+  /* 📦620 — Mismo patrón que el composeBar (sin primary azul). El active se
+     ve gris claro + border gris, como el hover pero persistente. El badge
+     primary sigue siendo el indicador del contador. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-list-filter__badge {
+  background: var(--kair-primary);
+  color: #fff;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+  line-height: 14px;
+}
+.kair-mail-list-filter[data-active="true"] .kair-mail-list-filter__badge {
+  background: var(--kair-primary);
+}
+
+/* ============================================
+   AUDITORÍA 2026-07-18 — Thread grouping Gmail-style COMPACTO
+   Formato: header 1 línea + mensajes 1 línea (colapsados) + body expandido
+   ============================================ */
+
+/* ---------- Thread header principal (header del detail) ---------- */
+.kair-mail-detail__header {
+  padding: 16px 20px 8px;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+}
+.kair-mail-detail__subject {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  margin: 0 0 14px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  letter-spacing: -0.018em;
+}
+
+/* FIX 2026-07-18 — Label de carpeta (Recibidos/Enviados) como chip removable (estilo Gmail) */
+.kair-mail-detail__folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  background: var(--email-bg-soft, #e8f0fe);
+  color: var(--email-accent, #1a73e8);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.kair-mail-detail__folder-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--email-accent, #1a73e8);
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.kair-mail-detail__folder-remove:hover {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+/* Sender row COMPACTO (estilo Gmail): avatar + sender info + actions todo en 1 línea */
+.kair-mail-detail__sender-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.kair-mail-detail__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.kair-mail-detail__sender-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kair-mail-detail__sender-name {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+  line-height: 1.2;
+}
+.kair-mail-detail__sender-email {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.kair-mail-detail__recipient {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #5f6368);
+  line-height: 1.2;
+}
+.kair-mail-detail__time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* FIX loop 26 — Recipients en el thread header (Gmail-style)
+   "Para: x@y.com" + "CC: z@y.com" debajo del sender name. */
+.kair-mail-detail__recipients {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+}
+.kair-mail-detail__recipient-row {
+  display: block;
+  margin: 1px 0;
+  line-height: 1.4;
+}
+.kair-mail-detail__recipient-label {
+  font-weight: 500;
+  color: var(--kair-text-strong, #202124);
+  margin-right: 4px;
+}
+.kair-mail-detail__show-details {
+  margin: 4px 0 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--kair-primary, #1a73e8);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  display: inline-block;
+}
+.kair-mail-detail__show-details:hover {
+  text-decoration: underline;
+}
+/* 📦647-fix1 — Panel expandible "Mostrar detalles" (estilo Gmail).
+   Aparece debajo del botón, dentro del sender-info. Fondo gris claro,
+   bordes redondeados, padding generoso. dl/dt/dd en 2 columnas:
+   label pequeño a la izquierda, valor a la derecha. Animación de
+   altura sutil al expandir/colapsar. */
+.kair-mail-detail__details-panel {
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border: 1px solid #e0e3e7;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text, #202124);
+  animation: kair-details-fade-in 180ms ease-out;
+}
+.kair-mail-detail__details-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+}
+.kair-mail-detail__details-list dt {
+  color: var(--kair-text-muted, #5f6368);
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.01em;
+  padding-top: 2px;
+}
+.kair-mail-detail__details-list dd {
+  margin: 0;
+  word-break: break-word;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__details-hint {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #e0e3e7;
+  font-size: 0.7rem;
+  color: var(--kair-text-muted, #5f6368);
+  font-style: italic;
+}
+@keyframes kair-details-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* 📦647-fix2 — Security pills (SPF/DKIM/DMARC/TLS) estilo Gmail.
+   Verde: pass. Amarillo: fail. Gris: none/unknown/sin info.
+   Border-radius generoso, padding pequeño, gap entre pills. */
+.kair-mail-detail__security-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: monospace;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.kair-mail-detail__security-pill--ok {
+  background: #e6f4ea;
+  color: #1e7c3a;
+  border-color: #b7e1c2;
+}
+.kair-mail-detail__security-pill--warn {
+  background: #fef7e0;
+  color: #8a6d00;
+  border-color: #fce8b2;
+}
+.kair-mail-detail__security-pill--unknown {
+  background: #f1f3f4;
+  color: #5f6368;
+  border-color: #dadce0;
+}
+.kair-mail-detail__security-unknown {
+  color: var(--kair-text-muted, #5f6368);
+  font-style: italic;
+}
+/* Dominios de "enviado por" / "firmado por" — monospace + leve emphasis */
+.kair-mail-detail__details-domain {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--kair-primary, #1a73e8);
+}
+.kair-mail-detail__time-main {
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__time-relative {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted, #5f6368);
+}
+
+/* FIX 2026-07-18 — Action icons al lado del último mensaje (estilo Gmail: star, emoji, reply, ⋮) */
+.kair-mail-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  margin-top: 8px;
+}
+.kair-mail-detail__actions-spacer {
+  flex: 1;
+}
+.kair-mail-detail__action-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-detail__action-btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__action-btn[data-active="true"] {
+  color: var(--kair-warning, #ffc107);
+}
+
+/* ---------- Message block (cada mensaje del hilo) ---------- */
+.kair-mail-message {
+  /* FIX loop 25 — display: flex con flex-wrap: wrap para que el details
+     baje al siguiente row (con flex: 0 0 100%). Más simple que el
+     refactor de 2 rows explícitos del loop 22. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  /* FIX loop 30 — Padding lateral 20px (antes 0) para alinear el avatar
+     de los mensajes con el avatar del thread header (que tiene
+     padding: 16px 20px 8px). Sin esto, los avatares de los mensajes
+     quedan pegados al borde izquierdo mientras el thread header tiene
+     espacio — inconsistencia visual. */
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+  cursor: pointer;
+  position: relative;
+  transition: background 120ms ease;
+}
+.kair-mail-message:hover {
+  background: var(--kair-bg-hover, #f8f9fa);
+}
+.kair-mail-message:last-child {
+  border-bottom: none;
+}
+
+/* Avatar del mensaje (consistente con el thread header 40x40 — FIX loop 16) */
+/* FIX loop 19 — Quitar position: sticky que causaba desalineación vertical
+   cuando el mensaje estaba expandido. El avatar ahora se queda en su
+   posición natural (align-items: flex-start del padre), alineado con
+   la primera línea del head. */
+.kair-mail-message__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-top: 0; /* FIX loop 19 — sin offset (antes 2px) */
+}
+
+/* Head del mensaje: sender + subject + fecha TODO en 1 línea horizontal */
+.kair-mail-message__head {
+  /* FIX loop 27 — flex: 0 0 (NO flex: 1 1) para que el head NO se comprima
+     cuando el msgDetails está visible. Antes: flex: 1 1 calc(...) hacía
+     que el head se "escondiera" en el flex layout. Ahora con flex: 0 0
+     el head mantiene su ancho exacto siempre. */
+  flex: 0 0 calc(100% - 40px - 12px);
+  min-width: 0;
+  min-height: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+.kair-mail-message__line {
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  width: 100%;
+  min-width: 0;
+}
+.kair-mail-message__sender {
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  max-width: 180px;
+  min-width: 60px;
+  overflow-wrap: anywhere; /* FIX 2026-07-19: email largo no se corta en "m" */
+}
+.kair-mail-message__subject {
+  color: var(--kair-text-muted, #5f6368);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: 4px;
+  overflow-wrap: anywhere; /* FIX 2026-07-19: subject largo no se corta */
+}
+.kair-mail-message__date {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* FIX 2026-07-18 — Snippet del body cuando colapsado (Gmail: primera línea del body) */
+.kair-mail-message__snippet {
+  font-size: 0.8125rem;
+  color: var(--kair-text-muted, #5f6368);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+/* FIX loop 29 — Ocultar el snippet cuando el mensaje está expandido.
+   El snippet y el body muestran el mismo texto (el snippet es la primera
+   línea del body). Cuando el mensaje está abierto, el body ya muestra
+   todo el contenido — el snippet es redundante y causa duplicación visual. */
+.kair-mail-message--expanded .kair-mail-message__snippet {
+  display: none;
+}
+
+/* FIX 2026-07-18 — "···" indicator (more content) */
+/* FIX 2026-07-19 — Centrado y con mejor espaciado (Gmail-style) */
+.kair-mail-message__more {
+  display: block;
+  text-align: center;
+  margin: 12px 0 4px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+}
+.kair-mail-message__more-dots {
+  display: inline-block;
+  font-size: 1rem;
+  color: #bdc1c6; /* FIX 2026-07-19: gris claro, no negro — más sutil */
+  letter-spacing: 0.3em;
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+.kair-mail-message__more:hover .kair-mail-message__more-dots {
+  color: var(--kair-text-strong, #202124);
+}
+
+/* Recipients colapsables (Para: jrf2011 ▼) */
+.kair-mail-message__recipients {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  margin: 8px 0 14px; /* FIX loop 19 — más espacio arriba (8px) y abajo (14px) */
+  cursor: pointer;
+  user-select: none;
+}
+.kair-mail-message__recipients:hover {
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-message__recipients-arrow {
+  display: inline-block;
+  transition: transform 150ms ease;
+  color: var(--kair-text-muted, #5f6368);
+  margin-left: 2px; /* FIX 2026-07-19: pequeño espacio entre label y chevron */
+}
+.kair-mail-message__recipients[open] .kair-mail-message__recipients-arrow {
+  transform: rotate(180deg);
+}
+.kair-mail-message__recipients-details {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: var(--kair-bg-soft, #f8f9fa);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  line-height: 1.5;
+}
+.kair-mail-message__recipients-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.kair-mail-message__recipients-label {
+  font-weight: 600;
+  min-width: 50px;
+}
+
+/* Detalles expandidos (recipients + body + actions) */
+.kair-mail-message__details {
+  /* FIX loop 28 — Movido de inline JS a CSS. El padding-left alinea
+     el contenido con el head (después del avatar de 40px + gap).
+     El flex 0 0 100% fuerza al details a ocupar todo el row
+     (debajo del head) en el flex-wrap layout del msgContainer. */
+  flex: 0 0 100%;
+  padding-left: 52px;
+  margin-top: 8px;
+}
+
+/* Body del mensaje (cuando expandido) */
+.kair-mail-message__body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--kair-text-body, #202124);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  margin-top: 12px;
+  /* FIX loop 28 — Indentación movida al details (no se duplica acá). */
+  /* FIX loop 26 — max-width 720px (Gmail-style reading). El body se
+     centra con margin-right: auto. */
+  max-width: 720px;
+  margin-right: auto;
+}
+.kair-mail-message__body p {
+  margin: 0 0 12px;
+}
+.kair-mail-message__body a {
+  color: var(--email-accent, #1a73e8);
+  text-decoration: none;
+}
+.kair-mail-message__body a:hover {
+  text-decoration: underline;
+}
+
+/* Loop 40 — Wrapper para HTML rico de Gmail (body_html).
+   El HTML viene sanitizado (sin scripts/iframes/handlers). El wrapper
+   le da estilos consistentes con el resto de la UI (max-width, fuentes,
+   colores) sin afectar el HTML interno. */
+.kair-mail-message__html {
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--kair-text-body, #202124);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  /* Gmail-style: el HTML puede tener su propio padding, no se lo quitamos */
+}
+.kair-mail-message__html p {
+  margin: 0 0 12px;
+}
+.kair-mail-message__html img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0;
+}
+.kair-mail-message__html table {
+  border-collapse: collapse;
+  max-width: 100%;
+  margin: 8px 0;
+}
+.kair-mail-message__html table td,
+.kair-mail-message__html table th {
+  padding: 4px 8px;
+}
+.kair-mail-message__html h1,
+.kair-mail-message__html h2,
+.kair-mail-message__html h3,
+.kair-mail-message__html h4,
+.kair-mail-message__html h5,
+.kair-mail-message__html h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  color: var(--kair-text-body, #202124);
+}
+.kair-mail-message__html hr {
+  border: none;
+  border-top: 1px solid var(--email-border, #e0e0e0);
+  margin: 16px 0;
+}
+.kair-mail-message__html blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--email-border, #e0e0e0);
+  color: var(--kair-text-light, #5f6368);
+}
+.kair-mail-message__html ul,
+.kair-mail-message__html ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+.kair-mail-message__html li {
+  margin: 4px 0;
+}
+/* Gmail-style: los links DENTRO del HTML de email también son azules.
+   Como el HTML está dentro de .kair-mail-message__body, estos selectores
+   se acumulan con los de .kair-mail-message__body a. */
+.kair-mail-message__html a {
+  color: var(--email-accent, #1a73e8);
+  text-decoration: none;
+}
+.kair-mail-message__html a:hover {
+  text-decoration: underline;
+}
+
+/* Action icons del MENSAJE (no del thread header) — FIX loop 15: siempre visibles */
+/* FIX loop 26 — Las acciones ahora están en el HEAD (Gmail-style) */
+.kair-mail-message__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  /* FIX loop 28 — Limpiar reglas redundantes (defaults del navegador). */
+}
+.kair-mail-message__action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.75rem;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-message__action-btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-search__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+.kair-mail-search__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  background: var(--email-bg-soft, #e8f0fe);
+  color: var(--email-accent, #1a73e8);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-search__chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.kair-mail-search__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--email-accent, #1a73e8);
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.kair-mail-search__chip-remove:hover {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+/* Empty state compacto */
+.kair-mail-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--kair-text-muted);
+}
+.kair-mail-empty__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--kair-bg-app);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.kair-mail-tag--normal { background: #eef0f3; color: #6c757d; }
+
+.kair-mail-flag {
+  width: 16px;
+  height: 16px;
+  color: var(--kair-warning);
+}
+
+/* ============================================
+   K+AIR Calendar
+   ============================================ */
+.kair-cal-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, 1fr);
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kair-cal-head {
+  background: #fafbfc;
+  border-bottom: 1px solid var(--kair-border);
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.kair-cal-head[data-today="true"] {
+  color: var(--kair-primary);
+}
+.kair-cal-head__day {
+  font-size: 1rem;
+  color: var(--kair-text-strong);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 2px;
+  display: block;
+}
+.kair-cal-head[data-today="true"] .kair-cal-head__day {
+  color: var(--kair-primary);
+}
+
+.kair-cal-time {
+  font-size: 0.65rem;
+  color: var(--kair-text-light);
+  padding: 4px 6px;
+  text-align: right;
+  border-right: 1px solid var(--kair-border-soft);
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+}
+
+.kair-cal-cell {
+  border-right: 1px solid var(--kair-border-soft);
+  border-bottom: 1px solid var(--kair-border-soft);
+  min-height: 48px;
+  position: relative;
+  padding: 2px;
+  transition: background 120ms ease;
+}
+.kair-cal-cell:last-child {
+  border-right: none;
+}
+.kair-cal-cell[data-droppable="true"]:hover {
+  background: var(--kair-bg-soft);
+}
+.kair-cal-cell[data-drop-active="true"] {
+  background: var(--kair-bg-soft);
+  outline: 2px dashed var(--kair-primary);
+  outline-offset: -2px;
+}
+
+.kair-cal-event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kair-cal-event:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+.kair-cal-event__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-cal-event__time {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+.kair-cal-event--primary { background: var(--kair-primary); }
+.kair-cal-event--success { background: var(--kair-success); }
+.kair-cal-event--warning { background: var(--kair-warning); color: #5a4500; }
+.kair-cal-event--danger { background: var(--kair-danger); }
+.kair-cal-event--gray { background: var(--kair-info); }
+
+.kair-cal-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--kair-danger);
+  z-index: 5;
+  pointer-events: none;
+}
+.kair-cal-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--kair-danger);
+  border-radius: 999px;
+}
+
+/* ============================================
+   K+AIR Modal (evento nuevo, edición, etc)
+   Loop 44 — CSS que faltaba para que el modal se vea bien.
+   Las clases (kair-modal__header/title/body/footer, kair-field, kair-input,
+   kair-select, kair-textarea, kair-chip-select, kair-duration-row) ya se
+   usaban en el JS (renderEventModal) pero no tenían reglas CSS.
+   Sin esto, todo se ve pegado.
+   ============================================ */
+
+/* Overlay (fondo oscuro semitransparente) — el contenedor full-screen */
+/* Loop 44b — FIX CRÍTICO: el modal estaba VISIBLE desde el inicio porque el CSS
+   ponía display: flex sin respetar el atributo `hidden` del HTML. Resultado: el
+   overlay tapaba toda la Bandeja Integrada y bloqueaba clicks. Fix: solo
+   aplicar display: flex cuando NO tiene `hidden`. */
+.kair-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 500000;       /* encima de todo, incluso del modal de compose */
+  padding: 16px;
+}
+.kair-modal-overlay:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kair-modal-fade 160ms ease;
+}
+@keyframes kair-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Header del modal — título a la izquierda, X a la derecha */
+.kair-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+  flex-shrink: 0;
+}
+.kair-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-modal__title svg {
+  color: var(--kair-primary, #174ea6);
+}
+
+/* Body del modal — contenido scrolleable */
+.kair-modal__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Footer del modal — botones alineados a la derecha */
+.kair-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  flex-shrink: 0;
+  background: var(--kair-bg-soft, #f8f9fa);
+}
+
+/* Field (label + input wrapper) — gap entre label y control */
+.kair-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.kair-field:last-child { margin-bottom: 0; }
+.kair-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted, #5f6368);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kair-field__label svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+/* Inputs base — text, date, time, select, textarea */
+.kair-input,
+.kair-select,
+.kair-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  box-sizing: border-box;
+}
+.kair-input:focus,
+.kair-select:focus,
+.kair-textarea:focus {
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+.kair-textarea {
+  resize: vertical;
+  min-height: 56px;
+  font-family: inherit;
+}
+
+/* Chip-select (Categoría) — botones de selección con dot de color */
+.kair-chip-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kair-chip-select__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: inherit;
+}
+.kair-chip-select__option:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  border-color: var(--kair-text-light, #9aa0a6);
+}
+.kair-chip-select__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* Duration row (Duración: 30 min | 1h | 1.5h | ...) */
+.kair-duration-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kair-duration-row__btn {
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: inherit;
+  min-width: 48px;
+}
+.kair-duration-row__btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  border-color: var(--kair-text-light, #9aa0a6);
+}
+.kair-duration-row__btn[data-active="true"] {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+
+/* Loop 44 — Fix del header del iframe que ocultaba el toggle de empresas.
+   El header del iframe (.kair-header) tenía overflow que recortaba el toggle
+   cuando se hacía estrecho. Ahora permitimos wrap del contenido del header
+   y dejamos que el toggle se vea siempre. */
+.kair-header {
+  overflow: visible !important;       /* deja que el toggle se vea */
+}
+.kair-header__bar {
+  flex-wrap: wrap;                    /* si no entra, se acomoda */
+  min-height: 48px;
+}
+.kair-header__right {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.kair-header__divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--kair-border, #d0d7de);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Scrollbars
+   ============================================ */
+.kair-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.kair-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kair-scroll::-webkit-scrollbar-thumb {
+  background: #cfd4dc;
+  border-radius: 8px;
+}
+.kair-scroll::-webkit-scrollbar-thumb:hover {
+  background: #aab1bd;
+}
+
+/* ============================================
+   Utilities
+   ============================================ */
+.kair-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.kair-icon-btn:hover {
+  background: var(--kair-bg-hover);
+  color: var(--kair-text-strong);
+}
+.kair-icon-btn[data-active="true"] {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+
+.kair-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--kair-bg-app);
+  color: var(--kair-text-muted);
+  border: 1px solid var(--kair-border-soft);
+}
+
+.kair-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--kair-primary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.kair-link-btn:hover {
+  background: var(--kair-bg-soft);
+}
+
+/* Custom scrollbar (shadcn ScrollArea alternative) */
+.kair-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: #cfd4dc transparent;
+}
+
+@keyframes kair-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.kair-pulse {
+  animation: kair-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 📦594 — Vistas Día / Semana / Programar (lista vertical estilo agenda) */
+.kair-agenda-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.kair-agenda-head__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--kair-text, #111);
+  text-transform: capitalize;
+}
+.kair-agenda-head__count {
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #6b7280);
+}
+.kair-agenda-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.kair-agenda-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--kair-text-light, #6b7280);
+  font-size: 0.875rem;
+}
+.kair-agenda-item {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.kair-agenda-item:hover { background: rgba(0,0,0,0.03); }
+.kair-agenda-item__time {
+  width: 56px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--kair-text, #111);
+  padding-top: 2px;
+}
+.kair-agenda-item__bar {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.kair-agenda-item__body { flex: 1; min-width: 0; }
+.kair-agenda-item__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--kair-text, #111);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-agenda-item__meta {
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #6b7280);
+}
+.kair-agenda-item__cat { font-weight: 600; }
+.kair-agenda-day-sep {
+  padding: 8px 16px 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--kair-text-light, #6b7280);
+  text-transform: capitalize;
+  background: #f3f4f6;
+  border-top: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+
+/* Vista semana: 7 columnas en grid */
+.kair-agenda-week {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow: auto;
+  align-content: start;
+}
+.kair-agenda-week__day {
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-radius: 6px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+.kair-agenda-week__day--today {
+  border-color: var(--kair-primary, #185abd);
+  border-width: 2px;
+}
+.kair-agenda-week__day--selected {
+  background: rgba(24,90,189,0.04);
+}
+.kair-agenda-week__day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  border-radius: 6px 6px 0 0;
+}
+.kair-agenda-week__dow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--kair-text-light, #6b7280);
+  font-weight: 600;
+}
+.kair-agenda-week__num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--kair-text, #111);
+}
+.kair-agenda-week__today-pill {
+  margin-left: auto;
+  font-size: 0.65rem;
+  background: var(--kair-primary, #185abd);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.kair-agenda-week__empty {
+  padding: 8px;
+  font-size: 0.7rem;
+  color: var(--kair-text-light, #9ca3af);
+  font-style: italic;
+}
+.kair-agenda-week__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.kair-agenda-week__item:hover { background: rgba(0,0,0,0.04); }
+.kair-agenda-week__time { color: var(--kair-text-light, #6b7280); font-weight: 500; }
+.kair-agenda-week__bar { width: 3px; height: 12px; border-radius: 1px; flex-shrink: 0; }
+.kair-agenda-week__title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 📦594 — Vista Día: grilla horaria estilo Google Calendar */
+.kair-day-grid-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  background: #f3f4f6;
+}
+.kair-day-grid {
+  display: flex;
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 600px;
+}
+.kair-day-hours {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+}
+.kair-day-hour-label {
+  height: 48px;
+  position: relative;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 8px;
+  box-sizing: border-box;
+}
+.kair-day-hour-label__text {
+  background: #fafbfc;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  color: var(--kair-text-light, #6b7280);
+  line-height: 1;
+  /* 📦594 — El texto sobresale 7px arriba de la celda para que su centro
+     vertical quede sobre la línea horizontal de la hora (que está en
+     el border-bottom de la celda anterior, equivalente a top:0 de esta). */
+  margin-top: -7px;
+  position: relative;
+  z-index: 1;
+}
+.kair-day-hour-label__text--first {
+  margin-top: 2px;
+}
+.kair-day-events {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+.kair-day-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--kair-border-soft, #e5e7eb);
+}
+.kair-day-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #dc3545;
+  z-index: 5;
+}
+.kair-day-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  background: #dc3545;
+  border-radius: 50%;
+}
+.kair-day-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--kair-text-light, #6b7280);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+.kair-day-event {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.kair-day-event:hover {
+  transform: scale(1.01);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 3;
+}
+.kair-day-event__time {
+  font-weight: 600;
+  font-size: 0.7rem;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+.kair-day-event__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-day-event__cat {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 📦594 — Vista Semana: grilla horaria 7 columnas estilo Google Calendar */
+.kair-week-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+.kair-week-corner {
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+}
+.kair-week-day-head {
+  padding: 6px 4px;
+  text-align: center;
+  border-left: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  position: relative;
+}
+.kair-week-day-head--today {
+  background: rgba(24,90,189,0.08);
+  border-top: 2px solid var(--kair-primary, #185abd);
+}
+.kair-week-day-head--selected {
+  background: rgba(24,90,189,0.12);
+}
+.kair-week-dow {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--kair-text-light, #6b7280);
+  font-weight: 600;
+}
+.kair-week-num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--kair-text, #111);
+  line-height: 1.2;
+}
+.kair-week-today-pill {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.55rem;
+  background: var(--kair-primary, #185abd);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.kair-week-body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+}
+.kair-week-hours {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  position: relative;
+}
+.kair-week-hour-label {
+  height: 40px;
+  position: relative;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 6px;
+  box-sizing: border-box;
+}
+.kair-week-hour-label__text {
+  background: #fafbfc;
+  padding: 0 3px;
+  font-size: 0.65rem;
+  color: var(--kair-text-light, #6b7280);
+  line-height: 1;
+  margin-top: -6px;
+  position: relative;
+  z-index: 1;
+}
+.kair-week-hour-label__text--first {
+  margin-top: 2px;
+}
+.kair-week-col {
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+  border-left: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+.kair-week-col--today {
+  background: rgba(24,90,189,0.03);
+}
+.kair-week-col--selected {
+  background: rgba(24,90,189,0.06);
+}
+.kair-week-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--kair-border-soft, #e5e7eb);
+}
+.kair-week-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #dc3545;
+  z-index: 5;
+}
+.kair-week-now-line::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  background: #dc3545;
+  border-radius: 50%;
+}
+.kair-week-event {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.kair-week-event:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  z-index: 3;
+}
+.kair-week-event__time {
+  font-weight: 600;
+  font-size: 0.6rem;
+  opacity: 0.85;
+  margin-bottom: 1px;
+}
+.kair-week-event__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-week-event__cat {
+  font-size: 0.55rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 📦594 — Eventos "todo el día" (00:00-23:59) en banner arriba */
+.kair-allday-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+/* 📦694-fix6 — Estado "cumplido" para los chips custom del Bandeja Integrada.
+   El componente KairCalendar del shared/ ya tiene su propio estilo .kair-cal-event-chip--cumplido,
+   pero el Bandeja Integrada usa sus propios chips y necesitan su propio styling. */
+.kair-month-event--cumplido,
+.kair-allday-chip--cumplido,
+.kair-week-allday-chip--cumplido {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.kair-month-event--cumplido .kair-month-event__title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.kair-allday-chip--cumplido,
+.kair-week-allday-chip--cumplido {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.kair-allday-chip {
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+  transition: opacity 0.15s;
+}
+.kair-allday-chip:hover { opacity: 0.85; }
+
+/* Vista semana: chips all-day dentro del header de columna */
+.kair-week-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 60px;
+}
+.kair-week-day-head__allday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.kair-week-allday-chip {
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+}
+.kair-week-allday-chip:hover { opacity: 0.85; }
+
+/* 📦598 — Modal de detalle de evento v3: minimal/profesional
+   - Sin overlay oscuro (background transparente)
+   - Sin emojis (texto plano)
+   - Paleta neutra con línea de color de categoría arriba
+   - Anclado al elemento clickeado, no centrado
+*/
+.kair-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: none;
+  z-index: 500000;
+}
+.kair-event-modal-overlay[style*="display: block"],
+.kair-event-modal-overlay[style*="display:block"] {
+  display: block !important;
+}
+.kair-event-modal {
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+  overflow: hidden;
+  animation: kair-modal-slide 140ms ease-out;
+}
+@keyframes kair-modal-slide {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.kair-event-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+.kair-event-modal__category {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.kair-event-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.kair-event-modal__close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.kair-event-modal__body {
+  padding: 14px 16px 12px;
+  overflow-y: auto;
+}
+.kair-event-modal__title {
+  margin: 0 0 12px 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.kair-event-modal__dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  font-size: 0.85rem;
+}
+.kair-event-modal__dl dt {
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  padding-top: 2px;
+}
+.kair-event-modal__dl dd {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+.kair-event-modal__sub {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+.kair-event-modal__attendees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.kair-event-modal__attendee {
+  display: inline-block;
+  background: #f3f4f6;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: #374151;
+  line-height: 1.5;
+}
+.kair-event-modal__notes {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  color: #374151;
+  background: #fafafa;
+  border-left: 2px solid #d1d5db;
+  padding: 6px 10px;
+  border-radius: 0 3px 3px 0;
+}
+.kair-event-modal__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+.kair-event-modal__source {
+  letter-spacing: 0.02em;
+}
+.kair-event-modal__cumplido {
+  color: #15803d;
+  font-weight: 500;
+}
+
+.kair-event-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+.kair-event-modal__btn {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kair-event-modal__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-event-modal__btn--primary {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-event-modal__btn--primary:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+/* 📦694-fix7 — Botón "Desmarcar cumplido" con borde verde sutil para reforzar
+   visualmente que el evento YA está cumplido (y la acción es desmarcar, no marcar). */
+.kair-event-modal__btn--cumplido {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.kair-event-modal__btn--cumplido:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+.kair-event-modal__btn--danger-text {
+  background: transparent;
+  border-color: transparent;
+  color: #b91c1c;
+}
+.kair-event-modal__btn--danger-text:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* 📦600 — RSVP buttons (Asistiré / Tal vez / No asistiré) en modal de detalle */
+.kair-event-modal__rsvp {
+  padding: 10px 16px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+.kair-event-modal__rsvp-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+.kair-event-modal__rsvp-label strong {
+  color: #111827;
+  font-weight: 600;
+}
+.kair-event-modal__rsvp-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.kair-event-modal__rsvp-btn {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 7px 10px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kair-event-modal__rsvp-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-event-modal__rsvp-btn--active-accept {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-event-modal__rsvp-btn--active-accept:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+.kair-event-modal__rsvp-btn--active-tentative {
+  background: #b8860b;
+  color: #ffffff;
+  border-color: #b8860b;
+}
+.kair-event-modal__rsvp-btn--active-tentative:hover {
+  background: #936c08;
+  border-color: #936c08;
+}
+.kair-event-modal__rsvp-btn--active-decline {
+  background: #b91c1c;
+  color: #ffffff;
+  border-color: #b91c1c;
+}
+.kair-event-modal__rsvp-btn--active-decline:hover {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+/* 📦602 — Banner de invitación de Calendar dentro del email viewer (estilo Gmail) */
+.kair-cal-invitation {
+  background: #f0f9ff;
+  border: 1px solid #d1e3f3;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.kair-cal-invitation__head {
+  padding: 14px 16px 12px;
+  background: #f0f9ff;
+  border-bottom: 1px solid #d1e3f3;
+}
+.kair-cal-invitation__date {
+  font-size: 0.78rem;
+  color: #185abd;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.kair-cal-invitation__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.kair-cal-invitation__org {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+.kair-cal-invitation__org-label {
+  color: #9ca3af;
+  font-size: 0.7rem;
+}
+.kair-cal-invitation__body {
+  padding: 14px 16px;
+  background: #ffffff;
+}
+.kair-cal-invitation__btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.kair-cal-invitation__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 18px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  min-width: 56px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kair-cal-invitation__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-cal-invitation__btn--active {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-cal-invitation__btn--active:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+.kair-cal-invitation__location {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+.kair-cal-invitation__description {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+/* 📦602 — Botón "Proponer otro horario" del banner de invitación */
+.kair-cal-invitation__btn--propose {
+  background: transparent;
+  color: #185abd;
+  border-color: #d1d5db;
+  font-weight: 400;
+}
+.kair-cal-invitation__btn--propose:hover {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+}
+.kair-cal-invitation__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.kair-cal-invitation__footer-label {
+  margin-right: 4px;
+}
+.kair-cal-invitation__vote {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  filter: grayscale(0.5);
+}
+.kair-cal-invitation__vote:hover {
+  background: #f3f4f6;
+  filter: grayscale(0);
+}
+.kair-cal-invitation__vote--active {
+  background: #e0e7ff;
+  filter: grayscale(0);
+}
+
+/* 📦602 — Sección "Según este correo electrónico" + footer Responder/Reenviar */
+.kair-mail-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 12px;
+  padding: 16px 20px 0;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.kair-mail-divider__left { color: #4b5563; }
+.kair-mail-divider__right { display: flex; gap: 12px; align-items: center; }
+.kair-mail-divider__feedback { display: flex; align-items: center; gap: 4px; }
+.kair-mail-divider__vote-btn {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  filter: grayscale(0.5);
+  transition: background 0.15s, filter 0.15s;
+}
+.kair-mail-divider__vote-btn:hover {
+  background: #f3f4f6;
+  filter: grayscale(0);
+}
+.kair-mail-divider__vote-btn--active {
+  background: #e0e7ff;
+  filter: grayscale(0);
+}
+.kair-mail-reply-footer {
+  display: flex;
+  gap: 8px;
+  padding: 16px 20px;
+  margin-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+.kair-mail-reply-footer__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 18px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kair-mail-reply-footer__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-mail-reply-footer__btn--primary {
+  background: #ffffff;
+  color: #3c4043;
+  border-color: #dadce0;
+}
+.kair-mail-reply-footer__btn--primary:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+}
+
+/* 📦602 — Banner de traducción (placeholder visual) */
+.kair-mail-translate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 12px 0;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #1e40af;
+}
+.kair-mail-translate__icon {
+  font-size: 1rem;
+}
+.kair-mail-translate__btn {
+  background: transparent;
+  border: 0;
+  color: #185abd;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+.kair-mail-translate__btn:hover {
+  text-decoration: underline;
+}
+.kair-mail-translate__close {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* 📦602 — Header de adjuntos estilo Gmail ("X archivo(s) adjunto(s) · Analizado por Gmail") */
+.kair-attachment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 8px 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+.kair-attachment-header__count {
+  font-weight: 500;
+}
+.kair-attachment-header__info {
+  color: #6b7280;
+}
+.kair-attachment-header__icon {
+  font-size: 0.9rem;
+  /* 📦625 — el icono ahora es un SVG inline, no un emoji. Lo centramos y le
+     damos color del texto muted (hereda de currentColor). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-muted, #5f6368);
+}
+.kair-attachment-header__icon svg {
+  display: block;
+}
+
+/* 📦602-fix2 — Container del banner ICS (entre header del correo y mensajes, estilo Gmail) */
+.kair-ics-banner-container {
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  padding: 0 20px;  /* se alinea con el padding del header (avatar a la izquierda, fecha a la derecha) */
+}
+.kair-ics-banner-container:empty {
+  display: none;
+}
+
+/* 📦602-fix — Banner de invitación más prominente, full-width, estilo Gmail */
+.kair-cal-invitation {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin: 12px 0 20px 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.05);
+}
+.kair-cal-invitation__head {
+  padding: 18px 24px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.kair-cal-invitation__head-content {
+  flex: 1;
+  min-width: 0;
+}
+.kair-cal-invitation__head-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.kair-cal-invitation__date {
+  font-size: 0.85rem;
+  color: #5f6368;
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.kair-cal-invitation__title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 8px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.kair-cal-invitation__org {
+  font-size: 0.875rem;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kair-cal-invitation__org-label {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  margin-left: 4px;
+}
+.kair-cal-invitation__body {
+  padding: 18px 24px 16px;
+  background: #ffffff;
+}
+.kair-cal-invitation__btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  align-items: center;
+}
+.kair-cal-invitation__btn {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 9px 22px;
+  border-radius: 20px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  min-width: 64px;
+  text-align: center;
+}
+.kair-cal-invitation__btn:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.1);
+}
+.kair-cal-invitation__btn--active {
+  background: #1a73e8;
+  color: #ffffff;
+  border-color: #1a73e8;
+}
+.kair-cal-invitation__btn--active:hover {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.kair-cal-invitation__btn--propose {
+  background: transparent;
+  color: #1a73e8;
+  border-color: #dadce0;
+  font-weight: 500;
+}
+.kair-cal-invitation__btn--propose:hover {
+  background: #f1f8ff;
+  border-color: #a8c7fa;
+}
+
+/* 📦602-fix2 — Location/description del banner (texto secundario) */
+.kair-cal-invitation__location {
+  font-size: 0.85rem;
+  color: #5f6368;
+  margin-top: 6px;
+  font-style: italic;
+}
+.kair-cal-invitation__description {
+  font-size: 0.875rem;
+  color: #3c4043;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* 📦602-fix2 — Botón ⋮ adicional estilo Gmail (junto a "Proponer otro horario") */
+.kair-cal-invitation__more {
+  background: transparent;
+  border: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #5f6368;
+  transition: background 0.15s;
+  margin-left: 2px;
+}
+.kair-cal-invitation__more:hover {
+  background: #f1f3f4;
+}
+
+/* =============================================================================
+   📦608 — @file-viewer modal (preview nativo de Office / PDF / imágenes / etc)
+   - Full-screen overlay con header (nombre + extensión + tamaño + cerrar)
+   - Body con el <flyfish-file-viewer> ocupando todo el espacio
+   - Spinner y mensaje de error consistentes con el resto de K+AIR
+   ============================================================================= */
+.kair-fv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(15, 23, 42, 0.72);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 24px;
+  animation: kair-fv-fade-in 0.15s ease-out;
+}
+.kair-fv-overlay[hidden] { display: none; }
+
+@keyframes kair-fv-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.kair-fv-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--kair-surface, #ffffff);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--kair-border, #e0e3e7);
+}
+
+.kair-fv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--kair-surface-2, #f7f9fb);
+  border-bottom: 1px solid var(--kair-border, #e0e3e7);
+  flex-shrink: 0;
+  min-height: 56px;
+}
+
+.kair-fv-header__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.kair-fv-header__ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  background: var(--kair-primary, #1a73e8);
+  border-radius: 6px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.kair-fv-header__ext[data-ext="pdf"]  { background: #c62828; }
+.kair-fv-header__ext[data-ext="pptx"],
+.kair-fv-header__ext[data-ext="ppt"]  { background: #d84315; }
+.kair-fv-header__ext[data-ext="docx"],
+.kair-fv-header__ext[data-ext="doc"]  { background: #1565c0; }
+.kair-fv-header__ext[data-ext="xlsx"],
+.kair-fv-header__ext[data-ext="xls"]  { background: #2e7d32; }
+
+.kair-fv-header__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--kair-text, #1f2937);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.kair-fv-header__meta {
+  font-size: 12px;
+  color: var(--kair-text-light, #6b7280);
+  flex-shrink: 0;
+}
+
+.kair-fv-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.kair-fv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--kair-text, #1f2937);
+  background: transparent;
+  border: 1px solid var(--kair-border, #d1d5db);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.kair-fv-btn:hover {
+  background: var(--kair-surface-3, #f3f4f6);
+  border-color: var(--kair-text-light, #9ca3af);
+}
+
+.kair-fv-body {
+  flex: 1 1 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;        /* permite que el viewer scrollee si hace falta */
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.kair-fv-loading,
+.kair-fv-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  z-index: 2;
+}
+.kair-fv-error {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.96);
+}
+.kair-fv-error p {
+  max-width: 600px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kair-fv-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--kair-surface-3, #e5e7eb);
+  border-top-color: var(--kair-primary, #1a73e8);
+  border-radius: 50%;
+  animation: kair-fv-spin 0.9s linear infinite;
+}
+@keyframes kair-fv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* El custom element <flyfish-file-viewer> ocupa todo el body del modal.
+   Patrón copiado del submódulo 1.1.1 (responsable-sg): flex: 1 1 0% (no height:100%)
+   para que el viewer TOME el alto disponible en vez del alto del contenido. */
+.kair-fv-body flyfish-file-viewer {
+  display: block;
+  width: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}

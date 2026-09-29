@@ -1,0 +1,535 @@
+/* modules/gestion-humana/carpetas/index.css
+ * I-AUDIT-2026-09-11 (Carpetas v0.2.0) · Design tokens + componentes BEM
+ * Réplica del prototipo HTML (kair-documentos-contratacion.pdf) adaptado a K+AIR.
+ * Patrón: mismas clases BEM que el PDF, scoped a este módulo para no colisionar
+ * con otros estilos del shell GH (kair-*, gh-*).
+ */
+
+.carp-scope {
+  --kair-primary: #174ea6;
+  --kair-primary-hover: #185abd;
+  --kair-primary-light: #e8f0fe;
+  --kair-success: #28a745;
+  --kair-success-light: #e6f4ea;
+  --kair-success-text: #1e7e34;
+  --kair-warning: #ffc107;
+  --kair-warning-light: #fff8e1;
+  --kair-warning-text: #8a6d00;
+  --kair-danger: #dc3545;
+  --kair-danger-light: #fdecea;
+  --kair-danger-text: #b02a37;
+  --kair-info: #6c757d;
+  --kair-info-light: #f1f3f5;
+  --kair-bg: #f8f9fa;
+  --kair-surface: #ffffff;
+  --kair-border: #dee2e6;
+  --kair-text: #1a1a2e;
+  --kair-text-muted: #5a6378;
+  --kair-text-light: #6c757d;
+  --kair-track: #e9edf2;
+  --kair-radius-sm: 6px;
+  --kair-radius-md: 10px;
+  --kair-shadow-card: 0 1px 2px rgba(0,0,0,0.04);
+  --kair-shadow-overlay: 0 12px 32px rgba(26,26,46,0.18);
+  --kair-transition: 160ms ease;
+}
+
+/* ========== UTILIDADES ========== */
+.carp-scope .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+
+/* ========== BOTONES ========== */
+.carp-scope .kair-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--kair-radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--kair-transition), color var(--kair-transition), border-color var(--kair-transition);
+  font-family: inherit;
+}
+.carp-scope .kair-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.carp-scope .kair-btn--primary { background: var(--kair-primary); color: #fff; }
+.carp-scope .kair-btn--primary:hover:not(:disabled) { background: var(--kair-primary-hover); }
+.carp-scope .kair-btn--outline { background: var(--kair-surface); color: var(--kair-text-muted); border-color: var(--kair-border); }
+.carp-scope .kair-btn--outline:hover:not(:disabled) { border-color: var(--kair-primary); color: var(--kair-primary); background: var(--kair-primary-light); }
+.carp-scope .kair-btn--ghost { background: transparent; color: var(--kair-text-muted); }
+.carp-scope .kair-btn--ghost:hover:not(:disabled) { background: var(--kair-info-light); color: var(--kair-text); }
+
+.carp-scope .kair-icon-btn {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--kair-radius-sm);
+  background: transparent; border: none; cursor: pointer; color: var(--kair-text-muted);
+  transition: background var(--kair-transition), color var(--kair-transition);
+}
+.carp-scope .kair-icon-btn:hover { background: var(--kair-primary-light); color: var(--kair-primary); }
+.carp-scope .kair-icon-btn--danger:hover { background: var(--kair-danger-light); color: var(--kair-danger); }
+
+/* ========== BADGES ========== */
+.carp-scope .kair-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--kair-radius-sm);
+  font-size: 0.75rem; font-weight: 500;
+  width: fit-content;
+}
+.carp-scope .kair-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.carp-scope .kair-badge--success { background: var(--kair-success-light); color: var(--kair-success-text); }
+.carp-scope .kair-badge--warning { background: var(--kair-warning-light); color: var(--kair-warning-text); }
+.carp-scope .kair-badge--danger { background: var(--kair-danger-light);  color: var(--kair-danger-text); }
+.carp-scope .kair-badge--primary { background: var(--kair-primary-light); color: var(--kair-primary); }
+.carp-scope .kair-badge--info { background: var(--kair-info-light);    color: var(--kair-text-muted); }
+
+/* ========== AVATAR ========== */
+.carp-scope .kair-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--kair-primary-light);
+  color: var(--kair-primary);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8125rem; font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.carp-scope .kair-avatar--lg { width: 56px; height: 56px; font-size: 1.125rem; }
+
+/* ========== KPI STRIP ========== */
+.carp-scope .kair-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 20px;
+  box-shadow: var(--kair-shadow-card);
+  margin-bottom: 1rem;
+}
+.carp-scope .kair-kpi-item {
+  display: flex; align-items: center; gap: 0.875rem;
+  padding: 0 1rem;
+  border-left: 1px solid var(--kair-border);
+}
+.carp-scope .kair-kpi-item:first-child { border-left: none; padding-left: 0; }
+.carp-scope .kair-kpi-item:last-child { padding-right: 0; }
+.carp-scope .kair-kpi-item__icon {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+.carp-scope .kair-kpi-item__icon--primary { background: var(--kair-primary-light); color: var(--kair-primary); }
+.carp-scope .kair-kpi-item__icon--success { background: var(--kair-success-light); color: var(--kair-success); }
+.carp-scope .kair-kpi-item__icon--warning { background: var(--kair-warning-light); color: var(--kair-warning-text); }
+.carp-scope .kair-kpi-item__icon--info { background: var(--kair-info-light); color: var(--kair-text-muted); }
+.carp-scope .kair-kpi-item__body { flex: 1; min-width: 0; }
+.carp-scope .kair-kpi-item__value { font-size: 1.75rem; font-weight: 700; color: var(--kair-text); line-height: 1; }
+.carp-scope .kair-kpi-item__label { font-size: 0.75rem; text-transform: uppercase; color: var(--kair-text-muted); letter-spacing: 0.05em; margin-top: 0.25rem; }
+.carp-scope .kair-kpi-item__subdata { font-size: 0.75rem; color: var(--kair-text-light); margin-top: 0.125rem; }
+.carp-scope .kair-kpi-item__subdata--success { color: var(--kair-success-text); }
+.carp-scope .kair-kpi-item__subdata--warning { color: var(--kair-warning-text); }
+
+/* ========== TOOLBAR ========== */
+/* 📦743 · Los estilos críticos (display:grid + columns) están inline en el JS
+ * para sortear un override del shell de K+AIR. Este CSS provee el resto del styling
+ * (background, border, padding, hover) y los estilos de los hijos. */
+.carp-scope .kair-toolbar {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.carp-scope .kair-search { position: relative; min-width: 0; }
+.carp-scope .kair-search input { width: 100%; }
+.carp-scope .kair-select { min-width: 140px; }
+.carp-scope .kair-toolbar__count {
+  color: var(--kair-text-muted);
+  font-size: 0.8125rem;
+  justify-self: end;
+  white-space: nowrap;
+}
+.carp-scope .kair-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--kair-text-muted); font-size: 0.875rem; }
+.carp-scope .kair-search input {
+  width: 100%; padding: 8px 12px 8px 38px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  font-family: inherit; font-size: 0.875rem; color: var(--kair-text);
+  background: var(--kair-surface);
+  box-sizing: border-box;
+}
+.carp-scope .kair-search input:focus {
+  outline: none;
+  border-color: var(--kair-primary);
+  /* box-shadow removido: generaba repintado raro dentro del border del toolbar */
+}
+.carp-scope .kair-select {
+  height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  background: var(--kair-surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235a6378'><path d='M7 10l5 5 5-5z'/></svg>") no-repeat right 8px center / 16px;
+  appearance: none; -webkit-appearance: none;
+  font-family: inherit; font-size: 0.8125rem; color: var(--kair-text);
+  cursor: pointer;
+}
+.carp-scope .kair-select:focus { outline: none; border-color: var(--kair-primary); box-shadow: 0 0 0 3px var(--kair-primary-light); }
+.carp-scope .kair-toolbar__count { color: var(--kair-text-muted); font-size: 0.8125rem; margin-left: auto; }
+
+/* ========== TABLA ========== */
+.carp-scope .kair-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  font-size: 0.875rem;
+}
+.carp-scope .kair-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--kair-text-muted);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+}
+.carp-scope .kair-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--kair-info-light);
+  vertical-align: middle;
+}
+.carp-scope .kair-table tbody tr:hover { background: var(--kair-bg); }
+.carp-scope .kair-table tbody tr:last-child td { border-bottom: none; }
+.carp-scope .col--actions { text-align: right; }
+
+.carp-scope .kair-emp { display: flex; align-items: center; gap: 0.75rem; }
+.carp-scope .kair-emp__name { font-weight: 500; color: var(--kair-text); }
+.carp-scope .kair-emp__doc { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+
+/* ========== BARRA DE PROGRESO ========== */
+.carp-scope .kair-progress { display: flex; align-items: center; gap: 0.5rem; }
+.carp-scope .kair-progress__track {
+  width: 92px; height: 6px;
+  background: var(--kair-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.carp-scope .kair-progress__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--kair-primary);
+  transition: width var(--kair-transition);
+}
+.carp-scope .kair-progress__fill--success { background: var(--kair-success); }
+.carp-scope .kair-progress__fill--warning { background: var(--kair-warning); }
+.carp-scope .kair-progress__fill--danger { background: var(--kair-danger); }
+.carp-scope .kair-progress__label { font-size: 0.75rem; font-weight: 500; color: var(--kair-text-muted); }
+
+/* ========== PAGINACIÓN ========== */
+.carp-scope .kair-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--kair-info-light);
+  font-size: 0.8125rem; color: var(--kair-text-muted);
+  flex-wrap: wrap; gap: 0.5rem;
+}
+.carp-scope .kair-pagination__info { color: var(--kair-text-muted); }
+.carp-scope .kair-pagination__page { font-weight: 600; color: var(--kair-text); }
+.carp-scope .kair-pager-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-sm);
+  background: var(--kair-surface);
+  cursor: pointer; color: var(--kair-text-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.carp-scope .kair-pager-btn:hover:not(:disabled) { border-color: var(--kair-primary); color: var(--kair-primary); }
+.carp-scope .kair-pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ========== ESTADO VACÍO ========== */
+.carp-scope .kair-empty {
+  padding: 2.5rem 1.5rem; text-align: center;
+  color: var(--kair-text-muted);
+}
+.carp-scope .kair-empty > i { font-size: 2.5rem; color: var(--kair-text-light); margin-bottom: 0.75rem; }
+.carp-scope .kair-empty__title { font-size: 0.9375rem; font-weight: 600; color: var(--kair-text); margin-bottom: 0.375rem; }
+.carp-scope .kair-empty__msg { font-size: 0.875rem; max-width: 420px; margin: 0 auto 1rem; }
+
+/* ========== INFO CARD (detalle expediente) ========== */
+.carp-scope .kair-info-card {
+  display: flex; gap: 1.5rem;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border); border-radius: var(--kair-radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--kair-shadow-card);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.carp-scope .kair-info-card__body { flex: 1; min-width: 280px; }
+.carp-scope .kair-info-card__name { font-size: 1.25rem; font-weight: 600; color: var(--kair-text); }
+.carp-scope .kair-info-card__role { color: var(--kair-text-muted); font-size: 0.875rem; margin-top: 0.125rem; }
+.carp-scope .kair-info-card__meta { display: flex; gap: 1.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.carp-scope .kair-info-card__meta-label { font-size: 0.7rem; text-transform: uppercase; color: var(--kair-text-muted); letter-spacing: 0.05em; }
+.carp-scope .kair-info-card__meta-value { font-weight: 500; color: var(--kair-text); margin-top: 0.125rem; }
+.carp-scope .kair-info-card__side { min-width: 230px; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
+.carp-scope .kair-completitud__head { display: flex; gap: 0.5rem; align-items: center; width: 100%; justify-content: space-between; font-size: 0.8125rem; color: var(--kair-text-muted); }
+.carp-scope .kair-completitud__head strong { color: var(--kair-text); font-size: 0.9375rem; }
+
+/* ========== GRID DE CATEGORÍAS ========== */
+.carp-scope .kair-detail-grid {
+  display: grid;
+  /* 📦747 · Grid responsivo (auto-fill + minmax) — patrón del shell GH.
+   * Se adapta al ancho disponible: 6 cols en pantallas wide, 4 en laptop
+   * normal (1366-1700px), 2 en pantallas chicas. Mantiene min 280px por
+   * card para legibilidad de nombres largos de categoría y archivo. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.carp-scope .kair-cat-card {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  overflow: hidden;
+  box-shadow: var(--kair-shadow-card);
+}
+.carp-scope .kair-cat-card__head {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--kair-info-light);
+}
+.carp-scope .kair-cat-card__icon {
+  width: 34px; height: 34px;
+  background: var(--kair-primary-light); color: var(--kair-primary);
+  border-radius: var(--kair-radius-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.carp-scope .kair-cat-card__title { font-size: 0.9375rem; font-weight: 600; color: var(--kair-text); }
+.carp-scope .kair-cat-card__count { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.carp-scope .kair-cat-card__body { padding: 0.75rem; }
+
+/* ========== FILA DE ARCHIVO ========== */
+.carp-scope .kair-file-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--kair-info-light); border-radius: var(--kair-radius-sm);
+  margin-bottom: 0.5rem;
+}
+.carp-scope .kair-file-row:last-child { margin-bottom: 0; }
+/* 📦743 · Documento importado del flujo de Contratación (read-only) */
+.carp-scope .kair-file-row--imported {
+  border-color: var(--kair-primary-light);
+  background: linear-gradient(0deg, var(--kair-primary-light) 0%, transparent 100%);
+}
+.carp-scope .kair-file-row__icon {
+  width: 30px; height: 30px;
+  background: var(--kair-info-light); color: var(--kair-text-muted);
+  border-radius: var(--kair-radius-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.carp-scope .kair-file-row__body { flex: 1; min-width: 0; }
+.carp-scope .kair-file-row__name {
+  font-weight: 500; color: var(--kair-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.carp-scope .kair-file-row__meta { font-size: 0.75rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.carp-scope .kair-file-row__actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+
+/* ========== SLOT VACÍO ========== */
+.carp-scope .kair-file-empty {
+  border: 2px dashed var(--kair-border);
+  border-radius: var(--kair-radius-md);
+  padding: 1.25rem; text-align: center;
+  color: var(--kair-text-muted); font-size: 0.875rem;
+}
+.carp-scope .kair-file-empty > i { font-size: 1.75rem; color: var(--kair-text-light); margin-bottom: 0.5rem; display: block; }
+.carp-scope .kair-file-empty > div { margin-bottom: 0.625rem; }
+
+/* ========== MODAL ========== */
+.carp-scope .kair-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(26,26,46,0.45);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.carp-scope .kair-modal {
+  background: var(--kair-surface);
+  border-radius: var(--kair-radius-md);
+  width: min(560px, 100%);
+  max-height: min(88vh, 760px);
+  box-shadow: var(--kair-shadow-overlay);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.carp-scope .kair-modal__head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--kair-info-light);
+  gap: 1rem;
+}
+.carp-scope .kair-modal__title { font-size: 1.0625rem; font-weight: 600; color: var(--kair-text); }
+.carp-scope .kair-modal__subtitle { font-size: 0.8125rem; color: var(--kair-text-muted); margin-top: 0.125rem; }
+.carp-scope .kair-modal__body { padding: 1rem 1.25rem; overflow-y: auto; flex: 1; }
+.carp-scope .kair-modal__foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--kair-info-light);
+  flex-wrap: wrap;
+}
+.carp-scope .kair-modal__hint { font-size: 0.75rem; color: var(--kair-text-muted); }
+
+/* ========== FORM FIELDS ========== */
+.carp-scope .kair-field { margin-bottom: 0.875rem; }
+.carp-scope .kair-field__label {
+  display: block;
+  font-size: 0.8125rem; font-weight: 600;
+  color: var(--kair-text);
+  margin-bottom: 0.375rem;
+}
+
+/* ========== DROPZONE ========== */
+.carp-scope .kair-dropzone {
+  border: 2px dashed var(--kair-border);
+  background: var(--kair-bg);
+  border-radius: var(--kair-radius-md);
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--kair-transition), background var(--kair-transition);
+}
+.carp-scope .kair-dropzone:hover,
+.carp-scope .kair-dropzone.is-dragover {
+  border-color: var(--kair-primary);
+  background: var(--kair-primary-light);
+}
+.carp-scope .kair-dropzone > i {
+  font-size: 2rem; color: var(--kair-text-muted); margin-bottom: 0.5rem; display: block;
+}
+.carp-scope .kair-dropzone__title { font-size: 0.9375rem; color: var(--kair-text); }
+.carp-scope .kair-dropzone__title a { color: var(--kair-primary); text-decoration: none; font-weight: 500; }
+.carp-scope .kair-dropzone__title a:hover { text-decoration: underline; }
+.carp-scope .kair-dropzone__hint { font-size: 0.8125rem; color: var(--kair-text-muted); margin-top: 0.375rem; }
+
+/* ========== LISTA DE ARCHIVOS (vacía por ahora — el dialog del SO lo maneja) ========== */
+.carp-scope .kair-uplist { margin-top: 0.75rem; }
+
+/* ========== SKELETON ========== */
+.carp-scope .kair-skel {
+  background: var(--kair-track);
+  border-radius: 4px;
+  animation: kair-shimmer 1.4s linear infinite;
+  background-image: linear-gradient(90deg, var(--kair-track) 0%, rgba(255,255,255,0.65) 50%, var(--kair-track) 100%);
+  background-size: 200% 100%;
+}
+@keyframes kair-shimmer{
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========== GHOST BUTTONS (en header de sección) ========== */
+.carp-scope .gh-btn {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+}
+.carp-scope .gh-btn--outline {
+  background: white;
+  border-color: #dee2e6;
+  color: #495057;
+}
+.carp-scope .gh-btn--outline:hover { background: var(--kair-primary-light); color: var(--kair-primary); border-color: var(--kair-primary); }
+
+/* ========== WRAPPER (patrón del shell GH, ver 📦770) ==========
+ * Igual que .doc-wrapper, .db-wrapper, .af-wrapper, etc.
+ * El shell provee .gh-content con overflow:hidden, así que CADA módulo
+ * envuelve su contenido en un wrapper con overflow-y:auto para hacer
+ * scroll interno. Sin este wrapper, las 4+ categorías del detail view
+ * se desbordan y se cortan visualmente.
+ */
+.carp-scope .carp-wrapper {
+  padding: 1.5rem;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--kair-bg);
+  box-sizing: border-box;
+}
+.carp-scope .carp-wrapper::-webkit-scrollbar { width: 10px; }
+.carp-scope .carp-wrapper::-webkit-scrollbar-track { background: transparent; }
+.carp-scope .carp-wrapper::-webkit-scrollbar-thumb { background: #c1c8d0; border-radius: 5px; border: 2px solid #f8f9fa; }
+.carp-scope .carp-wrapper::-webkit-scrollbar-thumb:hover { background: #9aa3ad; }
+.carp-scope .carp-wrapper { scrollbar-width: thin; scrollbar-color: #c1c8d0 transparent; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1100px){
+  .carp-scope .kair-kpi-strip { grid-template-columns: 1fr 1fr; row-gap: 1.25rem; }
+  .carp-scope .kair-kpi-item { border-left: none !important; padding: 0 0.5rem; }
+  .carp-scope .kair-kpi-item:nth-child(odd) { border-right: 1px solid var(--kair-border); padding-right: 1rem; }
+}
+@media (max-width: 880px){
+  .carp-scope .kair-detail-grid { grid-template-columns: 1fr; }
+  .carp-scope .kair-info-card__side { align-items: flex-start; min-width: 0; }
+}
+@media (max-width: 640px){
+  .carp-scope .kair-kpi-strip { grid-template-columns: 1fr; padding: 12px 16px; }
+  .carp-scope .kair-kpi-item { border-bottom: 1px solid var(--kair-border); padding-bottom: 0.875rem; }
+  .carp-scope .kair-kpi-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .carp-scope .kair-toolbar__count { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦810 · MODO OSCURO DE CARPETAS
+   Esta vista es token-based: en oscuro se REDECLARAN los tokens del scope
+   (los nombres --kair-* propios de Carpetas, no los del DS global) apuntando
+   a los tokens de styles.css que ya tienen los dos temas, más los tintes
+   semánticos en versión translúcida. Debajo queda el overlay automático para
+   el color suelto que quedaba escrito a mano.
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .carp-scope,
+[data-theme="dark-legacy"] .carp-scope {
+  --kair-primary: var(--primary-color);
+  --kair-primary-hover: var(--primary-hover-color);
+  --kair-primary-light: rgba(77,166,255,0.15);
+  --kair-success: var(--success-color);
+  --kair-success-light: rgba(92,184,92,0.16);
+  --kair-success-text: var(--success-color);
+  --kair-warning: var(--warning-color);
+  --kair-warning-light: rgba(240,173,78,0.16);
+  --kair-warning-text: var(--warning-color);
+  --kair-danger: var(--danger-color);
+  --kair-danger-light: rgba(217,83,79,0.18);
+  --kair-danger-text: var(--danger-color);
+  --kair-info: var(--text-light-color);
+  --kair-info-light: var(--bg-color);
+  --kair-bg: var(--bg-color);
+  --kair-surface: var(--widget-bg-color);
+  --kair-border: var(--border-color);
+  --kair-text: var(--text-color);
+  --kair-text-muted: var(--text-light-color);
+  --kair-text-light: var(--text-lighter-color);
+  --kair-track: var(--border-color);
+  --kair-shadow-card: var(--box-shadow);
+  --kair-shadow-overlay: var(--box-shadow-lg);
+}
+
+[data-theme="dark"] .carp-scope .gh-btn--outline,
+[data-theme="dark-legacy"] .carp-scope .gh-btn--outline { background: var(--widget-bg-color); border-color: var(--border-color); color: var(--text-light-color); }
+
+/* La .kair-card de Carpetas hereda de la hoja GLOBAL (shared/kair-components.css),
+   que usa --kair-card = #ffffff y no tiene variante oscura; se oscurece aquí. */
+[data-theme="dark"] .carp-scope .kair-card,
+[data-theme="dark-legacy"] .carp-scope .kair-card { background: var(--widget-bg-color); border-color: var(--border-color); color: var(--text-color); }

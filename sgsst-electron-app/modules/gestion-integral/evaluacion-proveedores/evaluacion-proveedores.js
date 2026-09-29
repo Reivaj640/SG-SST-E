@@ -356,814 +356,724 @@
         }
 
         /**
-         * Renderiza la estructura HTML principal
+         * Escapa HTML para inyección segura de texto
          */
-        renderUI() {
-            // Contenedor principal para la vista de lista
-            const mainLayout = document.createElement('div');
-            mainLayout.className = 'ep-module-container';
-            mainLayout.id = 'ep-list-view-container';
-
- mainLayout.innerHTML = `
-<!-- 1. Encabezado — Card Pattern (k-section-card) -->
-<div class="k-section-card" style="padding:0; margin-bottom:0;">
-  <!-- Fila 1: contenido principal -->
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="bi bi-box-seam" style="color:#174ea6; font-size:1.25rem;"></i>
-      <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Identificación y Evaluación de Bienes y Servicios</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de proveedores y evaluación de bienes y servicios SG-SST.</p>
-      </div>
-    </div>
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <span class="k-section-card__company">
-        <i class="bi bi-building"></i>
-        <span id="ep-header-company">${this.companyName || ''}</span>
-      </span>
-      <div class="k-section-card__divider"></div>
-      <button class="header-back-btn" id="ep-btn-back-module" title="Volver al módulo principal">
-        <i class="fas fa-arrow-left"></i> Volver
-      </button>
-      <button class="header-action--ghost" id="ep-btn-export-header" title="Exportar">
-        <i class="bi bi-file-earmark-excel"></i> Exportar
-      </button>
-      <button class="header-action--ghost" id="ep-btn-new-provider-header" title="Nuevo Proveedor">
-        <i class="bi bi-plus-lg"></i> Nuevo
-      </button>
-    </div>
-  </div>
-</div>
-
-<div class="ep-content-scroll">
-<!-- 2. Métricas — Stats Ribbon -->
-<div class="k-stats-ribbon">
-  <div class="k-stats-ribbon__item">
-    <span class="k-stats-ribbon__icon primary"><i class="bi bi-box-seam"></i></span>
-    <div class="k-stats-ribbon__data">
-      <span class="k-stats-ribbon__value" id="ep-total-suppliers">0</span>
-      <span class="k-stats-ribbon__label">Total Evaluados</span>
-    </div>
-  </div>
-  <div class="k-stats-ribbon__divider"></div>
-  <div class="k-stats-ribbon__item">
-    <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
-    <div class="k-stats-ribbon__data">
-      <span class="k-stats-ribbon__value" id="ep-approved-suppliers">0</span>
-      <span class="k-stats-ribbon__label">Aprobados</span>
-    </div>
-  </div>
-  <div class="k-stats-ribbon__divider"></div>
-  <div class="k-stats-ribbon__item">
-    <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
-    <div class="k-stats-ribbon__data">
-      <span class="k-stats-ribbon__value" id="ep-pending-suppliers">0</span>
-      <span class="k-stats-ribbon__label">Pendientes</span>
-    </div>
-  </div>
-  <div class="k-stats-ribbon__divider"></div>
-  <div class="k-stats-ribbon__item">
-    <span class="k-stats-ribbon__icon muted"><i class="bi bi-x-circle"></i></span>
-    <div class="k-stats-ribbon__data">
-      <span class="k-stats-ribbon__value" id="ep-rejected-suppliers">0</span>
-      <span class="k-stats-ribbon__label">Rechazados</span>
-    </div>
-  </div>
-</div>
-
-<!-- 3. Barra de Herramientas -->
-<div class="ep-toolbar">
-<div class="ep-search-box">
-<input type="text" class="ep-form-control" placeholder="Buscar proveedor..." id="ep-search-input" style="width: 300px;">
-<select class="ep-form-control" id="ep-filter-status">
-<option value="all">Todos</option>
-<option value="Aprobado">Aprobado</option>
-<option value="Pendiente">Pendiente</option>
-<option value="Rechazado">Rechazado</option>
-</select>
-</div>
-<div style="display: flex; gap: 0.5rem; align-items: center;">
-<button class="ep-btn ep-btn-outline" id="ep-btn-criteria">
-<i class="bi bi-bar-chart"></i> Ver Escala
-</button>
-<button class="ep-btn ep-btn-outline" id="ep-btn-export">
-<i class="bi bi-file-earmark-excel"></i> Exportar
-</button>
-<button class="ep-btn ep-btn-primary" id="ep-btn-new-provider">
-<i class="bi bi-plus-lg"></i> Nuevo Proveedor
-</button>
-</div>
-</div>
-
-<!-- 4. Tabla Principal -->
-<div class="ep-data-table-container">
-<table class="ep-data-table">
-<thead>
-<tr>
-<th>Proveedor</th>
-<th>Tipo</th>
-<th>Objeto</th>
-<th>NIT</th>
-<th>Fecha</th>
-<th>Puntaje</th>
-<th>Estado</th>
-<th>Evidencias</th>
-<th style="text-align: right;">Acciones</th>
-</tr>
-</thead>
-<tbody id="ep-suppliers-table-body">
-</tbody>
-</table>
-</div>
-</div><!-- fin .ep-content-scroll -->
-
-<!-- MODAL DE EVALUACIÓN -->
-<div class="ep-modal-overlay" id="ep-eval-modal">
-                    <div class="ep-modal-content">
-                        <div class="ep-modal-header">
-                            <div>
-                                <h3 class="ep-modal-title">Evaluación de Proveedores</h3>
-                                <p class="ep-modal-subtitle">Criterios Decreto 1072 / Res. 0312</p>
-                            </div>
-                            <button class="ep-btn ep-btn-outline ep-btn-sm" id="ep-btn-close-modal">
-                                <i class="bi bi-x-lg"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="ep-modal-body">
-                            <div class="ep-form-grid">
-                                <!-- Izquierda: Datos -->
-                                <div>
-                                    <h4 style="margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; color: var(--ep-primary);">
-                                        Información del Proveedor
-                                    </h4>
-                                    
-                                    <div class="ep-eval-section">
-                                        <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 500;">Razón Social</label>
-                                        <input type="text" class="ep-form-control" id="ep-modal-name" placeholder="Nombre de la empresa" style="width: 100%;">
-                                    </div>
-
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                        <div>
-                                            <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 500;">NIT</label>
-                                            <input type="text" class="ep-form-control" id="ep-modal-nit" placeholder="900.000.000" style="width: 100%;">
-                                        </div>
-                                        <div>
-                                            <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 500;">Tipo</label>
-                                            <select class="ep-form-control" id="ep-modal-type" style="width: 100%;">
-                                                <option value="Bien">Bien</option>
-                                                <option value="Servicio">Servicio</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="ep-eval-section">
-                                        <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 500;">Objeto</label>
-                                        <input type="text" class="ep-form-control" id="ep-modal-object" placeholder="Descripción del servicio" style="width: 100%;">
-                                    </div>
-
-                                    <div class="ep-eval-section" style="margin-top: 2rem;">
-                                        <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem; font-weight: 500;">Observaciones</label>
-                                        <textarea class="ep-form-control" id="ep-modal-observations" rows="3" placeholder="Justificaciones..." style="width: 100%;"></textarea>
-                                    </div>
-                                </div>
-
-                                <!-- Derecha: Checklist -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                        <h4 style="margin: 0; color: var(--ep-primary);">Verificación</h4>
-                                        <div class="ep-score-display" style="padding: 0.4rem 0.8rem; border-radius: 4px;">
-                                            <div class="ep-score-label">CALIFICACIÓN</div>
-                                            <div class="ep-score-number" id="ep-total-score">0%</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="ep-progress-bar">
-                                        <div class="ep-progress-fill" id="ep-score-bar"></div>
-                                    </div>
-
-                                    <div class="ep-eval-section" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>1. ARL y Seguridad Social</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="1">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>2. Política de SST</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="2">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>3. Matriz de Peligros</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="3">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>4. Plan de Trabajo Anual</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="4">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>5. Registro Capacitaciones</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="5">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>6. Entrega de EPP</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="6">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>7. Estadísticas SST</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="7">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>8. Cláusula SST</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="8">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>9. Mecanismo Reporte</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="9">
-                                        </div>
-                                        <div class="ep-eval-row">
-                                            <div style="font-size:0.9rem;"><strong>10. Investigación Accidentes</strong></div>
-                                            <input type="checkbox" class="ep-eval-check" data-criterion="10">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- EVIDENCIAS -->
-                                <div class="ep-evidence-section">
-                                    <h4 style="color: var(--ep-primary); margin-bottom: 0.5rem;">
-                                        <i class="bi bi-paperclip"></i> Gestión de Evidencias
-                                    </h4>
-                                    <div style="margin-bottom: 0.5rem;">
-                                        <span style="font-size: 0.8rem; color: var(--ep-gray-600);">Ruta:</span><br>
-                                        <span class="ep-path-preview">/Proveedores/<span id="ep-preview-folder-name">[NOMBRE]</span>/</span>
-                                    </div>
-
-                                    <div class="ep-drop-zone" id="ep-drop-zone">
-                                        <div style="font-size: 2rem; color: var(--ep-primary); margin-bottom: 0.5rem;">
-                                            <i class="bi bi-cloud-upload"></i>
-                                        </div>
-                                        <p style="font-weight: 500; margin: 0;">Arrastrar archivos o clic aquí</p>
-                                        <input type="file" id="ep-evidence-input" multiple style="display: none;">
-                                    </div>
-
-                                    <div id="ep-file-list-container" style="display: none;">
-                                        <ul id="ep-file-list" class="ep-file-list"></ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="ep-modal-footer">
-                            <button class="ep-btn ep-btn-outline" id="ep-btn-cancel-modal">Cancelar</button>
-                            <button class="ep-btn ep-btn-primary" id="ep-btn-save-modal">Guardar y Archivar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PANEL LATERAL -->
-                <div class="ep-criteria-panel" id="ep-criteria-panel">
-                    <div class="ep-panel-header">
-                        <div>
-                            <div class="ep-panel-title">Escala de Calificación</div>
-                            <div class="ep-panel-subtitle">Interpretación de Resultados</div>
-                        </div>
-                        <button class="ep-panel-close" id="ep-btn-close-panel">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="ep-panel-body">
-                        <p style="margin-bottom: 1.5rem; color: var(--ep-gray-600); font-size: 0.9rem;">
-                            Escala basada en 10 ítems obligatorios. Define la habilitación contractual.
-                        </p>
-
-                        <div class="ep-formula-box">
-                            <div class="ep-formula-label">FÓRMULA</div>
-                            <div class="ep-formula-text">PUNTAJE = (Ítems / 10) x 100</div>
-                        </div>
-
-                        <h3 style="font-family: var(--ep-font-heading); margin-bottom: 1rem; border-bottom: 2px solid var(--ep-gray-200); padding-bottom: 0.5rem;">
-                            Niveles
-                        </h3>
-
-                        <!-- 0-49 -->
-                        <div class="ep-scale-card ep-scale-danger">
-                            <div class="ep-scale-title">
-                                <h4 style="color: var(--ep-danger); margin: 0;">0% - 49%: NO CUMPLE</h4>
-                                <span class="ep-scale-badge">ALTO RIESGO</span>
-                            </div>
-                            <div class="ep-scale-result">
-                                <strong>Resultado:</strong> <span style="color: var(--ep-danger); font-weight: bold;">INHABILITADO.</span> No se puede contratar.
-                            </div>
-                        </div>
-
-                        <!-- 50-79 -->
-                        <div class="ep-scale-card ep-scale-warning">
-                            <div class="ep-scale-title">
-                                <h4 style="color: #b68b00; margin: 0;">50% - 79%: PARCIAL</h4>
-                                <span class="ep-scale-badge">MEDIO</span>
-                            </div>
-                            <div class="ep-scale-result" style="background: rgba(255, 193, 7, 0.1);">
-                                <strong>Resultado:</strong> <span style="color: #b68b00; font-weight: bold;">CONDICIONAL.</span> Requiere Plan de Mejora.
-                            </div>
-                        </div>
-
-                        <!-- 80-100 -->
-                        <div class="ep-scale-card ep-scale-success">
-                            <div class="ep-scale-title">
-                                <h4 style="color: var(--ep-success); margin: 0;">80% - 100%: CUMPLE</h4>
-                                <span class="ep-scale-badge">BAJO</span>
-                            </div>
-                            <div class="ep-scale-result" style="background: rgba(40, 167, 69, 0.1);">
-                                <strong>Resultado:</strong> <span style="color: var(--ep-success); font-weight: bold;">HOMOLOGADO.</span> Aprobación inmediata.
-                            </div>
-                        </div>
-                        
-                        <div class="ep-legal-note">
-                            <strong>Nota Legal:</strong> La calificación debe ser respaldada por las evidencias adjuntas.
-                        </div>
-                    </div>
-                    
-                    <div class="ep-panel-footer">
-                        <button class="ep-btn ep-btn-outline ep-btn-sm" id="ep-btn-print-scale">
-                            <i class="bi bi-printer"></i> Imprimir
-                        </button>
-                        <button class="ep-btn ep-btn-primary ep-btn-sm" id="ep-btn-copy-scale">
-                            <i class="bi bi-clipboard"></i> Copiar
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            this.container.appendChild(mainLayout);
-
-            // Contenedor separado para la vista de detalle (FUERA del mainLayout)
-            const detailContainer = document.createElement('div');
-            detailContainer.id = 'ep-detail-view';
-            detailContainer.className = 'ep-detail-view';
-            detailContainer.innerHTML = `
-                <!-- Botón Volver -->
-                <button class="ep-btn-back" id="ep-btn-back-to-list">
-                    <i class="bi bi-arrow-left"></i> Volver a la Lista
-                </button>
-
-                <!-- Encabezado -->
-                <div class="ep-detail-header">
-                    <div class="ep-detail-title-group">
-                        <h1 id="ep-detail-name">Nombre del Proveedor</h1>
-                        <div class="ep-detail-meta">
-                            <span id="ep-detail-nit">NIT: 900.000.000-1</span>
-                            <span id="ep-detail-date">Evaluado: 01/01/2024</span>
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 1rem; align-items: center;">
-                        <div class="ep-detail-score-badge" id="ep-detail-score-badge" style="color: var(--ep-success);">
-                            <span id="ep-detail-score">85</span>%
-                        </div>
-                        <span class="ep-status-badge ep-status-approved" id="ep-detail-status">Aprobado</span>
-                    </div>
-                </div>
-
-                <!-- Grid de Contenido -->
-                <div class="ep-detail-grid">
-                    <!-- Columna Izquierda -->
-                    <div>
-                        <!-- Información General -->
-                        <div class="ep-detail-card">
-                            <h3><i class="bi bi-building"></i> Información General</h3>
-                            <div class="ep-info-row">
-                                <span class="ep-info-label">Razón Social:</span>
-                                <span class="ep-info-value" id="ep-detail-full-name">-</span>
-                            </div>
-                            <div class="ep-info-row">
-                                <span class="ep-info-label">NIT:</span>
-                                <span class="ep-info-value" id="ep-detail-nit-full">-</span>
-                            </div>
-                            <div class="ep-info-row">
-                                <span class="ep-info-label">Tipo:</span>
-                                <span class="ep-info-value" id="ep-detail-type">-</span>
-                            </div>
-                            <div class="ep-info-row">
-                                <span class="ep-info-label">Objeto Contractual:</span>
-                                <span class="ep-info-value" id="ep-detail-object">-</span>
-                            </div>
-                            <div class="ep-info-row">
-                                <span class="ep-info-label">Fecha Evaluación:</span>
-                                <span class="ep-info-value" id="ep-detail-eval-date">-</span>
-                            </div>
-                        </div>
-
-                        <!-- Observaciones -->
-                        <div class="ep-detail-card">
-                            <h3><i class="bi bi-chat-left-text"></i> Observaciones</h3>
-                            <div class="ep-observations-box" id="ep-detail-observations">
-                                Sin observaciones registradas.
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Columna Derecha -->
-                    <div>
-                        <!-- Matriz de Cumplimiento -->
-                        <div class="ep-detail-card">
-                            <h3><i class="bi bi-check2-square"></i> Matriz de Cumplimiento SST</h3>
-                            <div class="ep-compliance-grid" id="ep-detail-checklist">
-                                <!-- Se llena dinámicamente -->
-                            </div>
-                        </div>
-
-                        <!-- Evidencias -->
-                        <div class="ep-detail-card">
-                            <h3><i class="bi bi-folder2-open"></i> Evidencias Documentales</h3>
-                            <div style="margin-bottom: 0.75rem;">
-                                <span style="font-size: 0.8rem; color: var(--ep-gray-600);">Ruta:</span><br>
-                                <span class="ep-path-preview" id="ep-detail-path">/Proveedores/</span>
-                            </div>
-                            <div class="ep-no-files-msg" id="ep-no-files-msg" style="display: none;">
-                                <i class="bi bi-inbox"></i>
-                                <p>No hay archivos de evidencia archivados</p>
-                            </div>
-                            <ul class="ep-file-list-display" id="ep-detail-file-list" style="display: none;">
-                                <!-- Se llena dinámicamente -->
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            this.container.appendChild(detailContainer);
-
-            // Guardar referencias
-            this.modal = document.getElementById('ep-eval-modal');
-            this.panel = document.getElementById('ep-criteria-panel');
-            this.dropZone = document.getElementById('ep-drop-zone');
-            this.fileInput = document.getElementById('ep-evidence-input');
-            this.detailView = document.getElementById('ep-detail-view');
-            this.listView = document.getElementById('ep-list-view-container');
+        escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         /**
-         * Inicializa todos los event listeners
+         * Iniciales del proveedor para el avatar
          */
- initEventListeners() {
- // Botones principales
- document.getElementById('ep-btn-new-provider').addEventListener('click', () => this.openModal('new'));
- document.getElementById('ep-btn-criteria').addEventListener('click', () => this.togglePanel());
+        iniciales(name) {
+            const clean = String(name || '?').trim();
+            const parts = clean.split(/\s+/).filter(Boolean);
+            if (parts.length === 0) return '?';
+            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
 
- // Header ghost buttons
- document.getElementById('ep-btn-new-provider-header').addEventListener('click', () => this.openModal('new'));
- document.getElementById('ep-btn-export-header').addEventListener('click', () => this.exportToExcel());
-            
-            // Botón Volver al Módulo Principal
+        /**
+         * Nivel de calificación según puntaje (Res. 0312 / Decreto 1072)
+         */
+        nivelDe(score) {
+            if (score >= 80) return { nivel: 'CUMPLE', resultado: 'HOMOLOGADO', texto: 'Aprobación inmediata del proveedor.', cls: 'ok', riesgo: 'Bajo', frase: 'Nivel: CUMPLE - HOMOLOGADO — Aprobación inmediata.' };
+            if (score >= 50) return { nivel: 'PARCIAL', resultado: 'CONDICIONAL', texto: 'Requiere Plan de Mejora antes de contratar.', cls: 'warn', riesgo: 'Medio', frase: 'Nivel: PARCIAL - CONDICIONAL — Requiere Plan de Mejora.' };
+            return { nivel: 'NO CUMPLE', resultado: 'INHABILITADO', texto: 'No se puede contratar con el proveedor.', cls: 'danger', riesgo: 'Alto riesgo', frase: 'Nivel: NO CUMPLE - INHABILITADO — No se puede contratar.' };
+        }
+
+        /**
+         * Criterios de evaluación (matriz de 10 ítems SG-SST)
+         */
+        criteriosLista() {
+            return [
+                { key: 'arl', label: 'ARL y Seguridad Social', desc: 'Afiliación y vigencia del sistema de seguridad social' },
+                { key: 'politica', label: 'Política de SST', desc: 'Política firmada, difundida y con fecha' },
+                { key: 'iperc', label: 'Matriz de Peligros', desc: 'IPERC actualizado por cargo y proceso' },
+                { key: 'pta', label: 'Plan de Trabajo Anual', desc: 'PTA con cronograma y avance' },
+                { key: 'capacitacion', label: 'Registro Capacitaciones', desc: 'Evidencias de formación en SST' },
+                { key: 'epp', label: 'Entrega de EPP', desc: 'Listados de entrega con firma' },
+                { key: 'estadisticas', label: 'Estadísticas SST', desc: 'Indicadores del año anterior' },
+                { key: 'clausula', label: 'Cláusula SST', desc: 'Obligatoriedad contractual de SST' },
+                { key: 'reporte', label: 'Mecanismo Reporte', desc: 'Procedimiento de reporte de eventos' },
+                { key: 'investigacion', label: 'Investigación Accidentes', desc: 'Metodología de investigación vigente' }
+            ];
+        }
+
+        /**
+         * Formatea fecha ISO o DD/MM/AAAA a DD/MM/AAAA
+         */
+        fmtFecha(d) {
+            if (!d) return '—';
+            const s = String(d).trim();
+            const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return m[3] + '/' + m[2] + '/' + m[1];
+            return s;
+        }
+
+        /**
+         * Fecha comparable para ordenamiento
+         */
+        fechaTS(d) {
+            const s = String(d || '').trim();
+            let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+            m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+            return 0;
+        }
+
+        /**
+         * Renderiza la estructura HTML principal (premium v2)
+         */
+        renderUI() {
+            const checklistHtml = this.criteriosLista().map((c, i) => `
+                <label class="ep-check">
+                    <input type="checkbox" class="ep-eval-check" data-criterion="${i + 1}">
+                    <span class="ep-check__box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                    <span class="ep-check__num">${i + 1}</span>
+                    <span class="ep-check__txt"><b>${c.label}</b><small>${c.desc}</small></span>
+                </label>
+            `).join('');
+
+            this.container.innerHTML = `
+            <div class="ep-root">
+                <header class="ep-header">
+                    <div class="ep-header__bar">
+                        <div class="ep-header__id">
+                            <span class="ep-header__icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                            </span>
+                            <div>
+                                <h1 class="ep-header__title">Identificación y Evaluación de Bienes y Servicios</h1>
+                                <p class="ep-header__sub">Gestión de proveedores y evaluación de bienes y servicios SG-SST</p>
+                            </div>
+                        </div>
+                        <div class="ep-header__actions">
+                            <button type="button" class="ep-btn ep-btn--outline" id="ep-btn-back-module">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+                                Volver
+                            </button>
+                            <button type="button" class="ep-btn ep-btn--outline" id="ep-btn-criteria">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                                Ver Escala
+                            </button>
+                            <button type="button" class="ep-btn ep-btn--primary" id="ep-btn-new-provider-header">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                Nueva Evaluación
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="ep-content-scroll" id="ep-list-view">
+                    <div class="ep-page">
+                        <div class="ep-kpis">
+                            <div class="ep-kpi">
+                                <span class="ep-kpi__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+                                <div class="ep-kpi__txt"><b id="ep-kpi-total">0</b><span>Total Evaluados</span></div>
+                            </div>
+                            <div class="ep-kpi">
+                                <span class="ep-kpi__ic ep-kpi__ic--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+                                <div class="ep-kpi__txt"><b id="ep-kpi-approved">0</b><span>Aprobados</span></div>
+                            </div>
+                            <div class="ep-kpi">
+                                <span class="ep-kpi__ic ep-kpi__ic--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+                                <div class="ep-kpi__txt"><b id="ep-kpi-pending">0</b><span>Pendientes</span></div>
+                            </div>
+                            <div class="ep-kpi">
+                                <span class="ep-kpi__ic ep-kpi__ic--red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+                                <div class="ep-kpi__txt"><b id="ep-kpi-rejected">0</b><span>Rechazados</span></div>
+                            </div>
+                        </div>
+
+                        <div class="ep-card">
+                            <div class="ep-toolbar">
+                                <div class="ep-search">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                    <input type="text" id="ep-search-input" placeholder="Buscar proveedor por nombre o NIT...">
+                                </div>
+                                <select id="ep-filter-type" class="ep-select">
+                                    <option value="all">Tipo · Todos</option>
+                                    <option value="Bien">Bien</option>
+                                    <option value="Servicio">Servicio</option>
+                                </select>
+                                <select id="ep-filter-status" class="ep-select">
+                                    <option value="all">Estado · Todos</option>
+                                    <option value="Aprobado">Aprobados</option>
+                                    <option value="Pendiente">Pendientes</option>
+                                    <option value="Rechazado">Rechazados</option>
+                                </select>
+                                <div class="ep-toolbar__right">
+                                    <span class="ep-count" id="ep-count">0 proveedores</span>
+                                    <button type="button" class="ep-btn ep-btn--outline" id="ep-btn-export">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+                                        Exportar CSV
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="ep-tablewrap">
+                                <table class="ep-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Proveedor</th>
+                                            <th>Tipo</th>
+                                            <th>Objeto</th>
+                                            <th class="ep-th-sort" id="ep-th-fecha">Fecha <span class="ep-sort-ic" id="ep-sort-icon">▼</span></th>
+                                            <th>Puntaje</th>
+                                            <th>Estado</th>
+                                            <th>Evidencias</th>
+                                            <th class="ep-th-actions">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ep-suppliers-table-body"></tbody>
+                                </table>
+                                <div class="ep-empty" id="ep-empty" hidden>
+                                    <span class="ep-empty__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+                                    <b>Sin resultados</b>
+                                    <p>Ningún proveedor coincide con la búsqueda o los filtros activos.</p>
+                                    <small>Ajusta los criterios o registra una nueva evaluación.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ep-detail" id="ep-detail-view" hidden>
+                    <div class="ep-page">
+                        <button type="button" class="ep-btn ep-btn--outline ep-btn--sm" id="ep-btn-back-to-list">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+                            Volver a la Lista
+                        </button>
+                        <div class="ep-dcard">
+                            <div class="ep-dcard__id">
+                                <span class="ep-avatar ep-avatar--lg" id="ep-detail-avatar">—</span>
+                                <div>
+                                    <div class="ep-dcard__name" id="ep-detail-name">—</div>
+                                    <div class="ep-dcard__meta">
+                                        <span id="ep-detail-nit">NIT: —</span>
+                                        <span class="ep-pill ep-pill--blue" id="ep-detail-type-chip">—</span>
+                                        <span id="ep-detail-date">Evaluado: —</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ep-dcard__score">
+                                <div class="ep-dcard__pct"><b id="ep-detail-score">0</b><span>%</span><label>PUNTAJE</label></div>
+                                <span class="ep-pill ep-pill--amber" id="ep-detail-status">Pendiente</span>
+                                <button type="button" class="ep-btn ep-btn--primary" id="ep-detail-reevaluate">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+                                    Re-evaluar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ep-dgrid">
+                            <div class="ep-dgrid__col">
+                                <div class="ep-card">
+                                    <div class="ep-card__title">
+                                        <span class="ep-card__tic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+                                        Información General
+                                    </div>
+                                    <dl class="ep-deflist">
+                                        <div><dt>Razón Social</dt><dd id="ep-detail-full-name">—</dd></div>
+                                        <div><dt>NIT</dt><dd id="ep-detail-nit-full">—</dd></div>
+                                        <div><dt>Tipo</dt><dd id="ep-detail-type">—</dd></div>
+                                        <div><dt>Objeto Contractual</dt><dd id="ep-detail-object">—</dd></div>
+                                        <div><dt>Fecha Evaluación</dt><dd id="ep-detail-eval-date">—</dd></div>
+                                        <div><dt>Ítems Verificados</dt><dd id="ep-detail-items">—</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="ep-card">
+                                    <div class="ep-card__title">
+                                        <span class="ep-card__tic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                                        Observaciones
+                                    </div>
+                                    <div class="ep-obs" id="ep-detail-observations">Sin observaciones registradas.</div>
+                                </div>
+                                <div class="ep-card">
+                                    <div class="ep-card__title">
+                                        <span class="ep-card__tic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 0 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+                                        Evidencias Archivadas
+                                    </div>
+                                    <div class="ep-evpath">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                                        /Proveedores/<b id="ep-detail-path">—</b>/
+                                    </div>
+                                    <ul class="ep-evlist" id="ep-detail-file-list"></ul>
+                                    <div class="ep-evnone" id="ep-no-files-msg" hidden>
+                                        <p>Sin archivos en la carpeta del proveedor.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ep-card">
+                                <div class="ep-card__title">
+                                    <span class="ep-card__tic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                                    Matriz de Cumplimiento SST · Decreto 1072 / Res. 0312
+                                </div>
+                                <div class="ep-matrix" id="ep-detail-checklist"></div>
+                                <div class="ep-matrix__foot">
+                                    <span class="ep-pill ep-pill--slate" id="ep-detail-matrix-count">0/10 ítems</span>
+                                    <span id="ep-detail-matrix-nivel">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ep-modal" id="ep-modal" role="dialog" aria-modal="true">
+                    <div class="ep-modal__box">
+                        <div class="ep-modal__head">
+                            <div>
+                                <h2 id="ep-modal-title">Nueva Evaluación de Proveedor</h2>
+                                <p>Criterios Decreto 1072 de 2015 / Resolución 0312 de 2019</p>
+                            </div>
+                            <button type="button" class="ep-iconbtn" id="ep-btn-close-modal" title="Cerrar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="ep-modal__body">
+                            <div class="ep-modal__col">
+                                <h3>Información del Proveedor</h3>
+                                <label class="ep-field"><span>Razón Social *</span><input type="text" id="ep-modal-name" class="ep-input" placeholder="Nombre de la empresa" autocomplete="off"></label>
+                                <div class="ep-fieldrow">
+                                    <label class="ep-field"><span>NIT *</span><input type="text" id="ep-modal-nit" class="ep-input" placeholder="900.000.000" autocomplete="off"></label>
+                                    <label class="ep-field"><span>Tipo</span>
+                                        <select id="ep-modal-type" class="ep-input"><option>Bien</option><option>Servicio</option></select>
+                                    </label>
+                                </div>
+                                <label class="ep-field"><span>Objeto</span><input type="text" id="ep-modal-object" class="ep-input" placeholder="Descripción del bien o servicio" autocomplete="off"></label>
+                                <label class="ep-field"><span>Observaciones</span><textarea id="ep-modal-observations" class="ep-input" rows="3" placeholder="Justificaciones, compromisos del plan de mejora..."></textarea></label>
+                                <h3>Gestión de Evidencias</h3>
+                                <div class="ep-dropzone" id="ep-dropzone" role="button" tabindex="0">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+                                    <b>Arrastra los archivos aquí</b>
+                                    <small>o haz clic para seleccionar · se archivan en la carpeta del proveedor</small>
+                                </div>
+                                <div class="ep-ruta">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                                    /Proveedores/<b id="ep-preview-folder-name">NOMBRE</b>/
+                                </div>
+                                <div id="ep-file-list-container" class="ep-filelist" hidden>
+                                    <ul id="ep-file-list"></ul>
+                                </div>
+                                <input type="file" id="ep-file-input" multiple hidden>
+                            </div>
+                            <div class="ep-modal__col">
+                                <h3>Verificación · Documentos SG-SST</h3>
+                                <div class="ep-scorebox" id="ep-scorebox">
+                                    <span class="ep-scorebox__lbl">CALIFICACIÓN</span>
+                                    <b id="ep-total-score">0%</b>
+                                    <div class="ep-scorebar"><i id="ep-score-bar"></i></div>
+                                    <small id="ep-score-label">SIN ÍTEMS</small>
+                                </div>
+                                <div class="ep-checklist">${checklistHtml}</div>
+                            </div>
+                        </div>
+                        <div class="ep-modal__foot">
+                            <button type="button" class="ep-btn ep-btn--outline" id="ep-btn-cancel-modal">Cancelar</button>
+                            <button type="button" class="ep-btn ep-btn--primary" id="ep-btn-save-modal">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h11L19.5 8v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 20V5A1.5 1.5 0 0 1 5 3.5Z"/><path d="M8 3.5V8h7V3.5"/><path d="M7.5 13.5h9M7.5 17h6"/></svg>
+                                Guardar y Archivar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ep-drawerwrap" id="ep-drawer" hidden>
+                    <div class="ep-drawerwrap__backdrop" id="ep-drawer-backdrop"></div>
+                    <aside class="ep-drawer">
+                        <div class="ep-drawer__head">
+                            <div>
+                                <h2>Escala de Calificación</h2>
+                                <p>Interpretación de resultados · Habilitación contractual</p>
+                            </div>
+                            <button type="button" class="ep-iconbtn" id="ep-btn-close-panel" title="Cerrar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="ep-drawer__body">
+                            <div class="ep-formula"><span>FÓRMULA</span><b>PUNTAJE = (Ítems / 10) × 100</b></div>
+                            <h3>Niveles</h3>
+                            <div class="ep-nivel ep-nivel--danger">
+                                <div class="ep-nivel__head"><b>0% – 49%: NO CUMPLE</b><span class="ep-pill ep-pill--red">Alto riesgo</span></div>
+                                <p><b>Resultado: INHABILITADO.</b> No se puede contratar con el proveedor.</p>
+                            </div>
+                            <div class="ep-nivel ep-nivel--warn">
+                                <div class="ep-nivel__head"><b>50% – 79%: PARCIAL</b><span class="ep-pill ep-pill--amber">Medio</span></div>
+                                <p><b>Resultado: CONDICIONAL.</b> Requiere Plan de Mejora antes de contratar.</p>
+                            </div>
+                            <div class="ep-nivel ep-nivel--ok">
+                                <div class="ep-nivel__head"><b>80% – 100%: CUMPLE</b><span class="ep-pill ep-pill--green">Bajo</span></div>
+                                <p><b>Resultado: HOMOLOGADO.</b> Aprobación inmediata del proveedor.</p>
+                            </div>
+                            <div class="ep-note"><b>Nota legal:</b> la calificación debe estar respaldada por las evidencias adjuntas en la carpeta del proveedor (Decreto 1072 de 2015, art. 2.2.4.1.2.5 y Resolución 0312 de 2019).</div>
+                        </div>
+                        <div class="ep-drawer__foot">
+                            <button type="button" class="ep-btn ep-btn--outline" id="ep-btn-print-scale">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8V3.5h10V8"/><path d="M7 17H4.5c-.8 0-1.5-.7-1.5-1.5v-5C3 9.7 3.7 9 4.5 9h15c.8 0 1.5.7 1.5 1.5v5c0 .8-.7 1.5-1.5 1.5H17"/><rect x="7" y="14" width="10" height="6.5" rx="1"/></svg>
+                                Imprimir
+                            </button>
+                            <button type="button" class="ep-btn ep-btn--primary" id="ep-btn-copy-scale">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                Copiar
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+            `;
+
+            this.modal = document.getElementById('ep-modal');
+            this.panel = document.getElementById('ep-drawer');
+            this.dropZone = document.getElementById('ep-dropzone');
+            this.fileInput = document.getElementById('ep-file-input');
+        }
+
+
+        /**
+         * Datos filtrados por búsqueda + filtros activos
+         */
+        getFiltered() {
+            const term = (document.getElementById('ep-search-input')?.value || '').toLowerCase().trim();
+            const fType = document.getElementById('ep-filter-type')?.value || 'all';
+            const fStatus = document.getElementById('ep-filter-status')?.value || 'all';
+
+            let data = this.suppliersData.slice();
+            if (term) {
+                data = data.filter(s =>
+                    String(s.name || '').toLowerCase().includes(term) ||
+                    String(s.nit || '').toLowerCase().includes(term) ||
+                    String(s.object || '').toLowerCase().includes(term)
+                );
+            }
+            if (fType !== 'all') data = data.filter(s => s.type === fType);
+            if (fStatus !== 'all') data = data.filter(s => s.status === fStatus);
+            return data;
+        }
+
+        /**
+         * Inicializa los eventos de la interfaz
+         */
+        initEventListeners() {
+            // Botones principales
+            document.getElementById('ep-btn-new-provider-header').addEventListener('click', () => this.openModal('new'));
+            document.getElementById('ep-btn-criteria').addEventListener('click', () => this.abrirEscala());
+
+            // Volver al Módulo Principal
             document.getElementById('ep-btn-back-module').addEventListener('click', () => {
-                if (this.backToModuleCallback) {
-                    this.backToModuleCallback();
-                }
+                if (this.backToModuleCallback) this.backToModuleCallback();
             });
 
-            // Botón Volver a la Lista (Vista de Detalle)
+            // Volver a la Lista (Vista de Detalle)
             document.getElementById('ep-btn-back-to-list').addEventListener('click', () => this.showListView());
 
             // Cerrar Modal
             document.getElementById('ep-btn-close-modal').addEventListener('click', () => this.closeModal());
             document.getElementById('ep-btn-cancel-modal').addEventListener('click', () => this.closeModal());
-            
-            // Cerrar Panel
-            document.getElementById('ep-btn-close-panel').addEventListener('click', () => this.closePanel());
+
+            // Cerrar Drawer Escala
+            document.getElementById('ep-btn-close-panel').addEventListener('click', () => this.cerrarEscala());
+            document.getElementById('ep-drawer-backdrop').addEventListener('click', () => this.cerrarEscala());
 
             // Guardar Modal
             document.getElementById('ep-btn-save-modal').addEventListener('click', () => this.saveEvaluation());
 
-            // Input Nombre (Live Preview)
+            // Re-evaluar desde detalle
+            document.getElementById('ep-detail-reevaluate').addEventListener('click', () => {
+                if (this.currentSupplier) this.openModal(this.currentSupplier.id);
+            });
+
+            // Input Nombre (Live Preview de ruta)
             document.getElementById('ep-modal-name').addEventListener('input', () => this.updatePathPreview());
 
             // Eventos Checkboxes
-            document.querySelectorAll('.ep-eval-check').forEach(cb => {
+            this.container.querySelectorAll('.ep-eval-check').forEach(cb => {
                 cb.addEventListener('change', () => this.calculateScore());
             });
 
             // Eventos Drag & Drop
             this.dropZone.addEventListener('click', () => this.fileInput.click());
-            this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
-            
+            this.fileInput.addEventListener('change', (e) => {
+                this.handleFileSelect(e.target.files);
+                this.fileInput.value = '';
+            });
             this.dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 this.dropZone.classList.add('dragover');
             });
-            
             this.dropZone.addEventListener('dragleave', () => this.dropZone.classList.remove('dragover'));
-            
             this.dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 this.dropZone.classList.remove('dragover');
                 this.handleFileSelect(e.dataTransfer.files);
             });
 
-            // Búsqueda
-            document.getElementById('ep-search-input').addEventListener('keyup', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = this.suppliersData.filter(s =>
-                    s.name.toLowerCase().includes(term) ||
-                    s.object.toLowerCase().includes(term)
-                );
-                this.renderTable(filtered);
+            // Búsqueda y filtros
+            document.getElementById('ep-search-input').addEventListener('input', () => this.renderTable(this.getFiltered()));
+            document.getElementById('ep-filter-type').addEventListener('change', () => this.renderTable(this.getFiltered()));
+            document.getElementById('ep-filter-status').addEventListener('change', () => this.renderTable(this.getFiltered()));
+
+            // Ordenamiento por fecha
+            this._sortDir = 'desc';
+            document.getElementById('ep-th-fecha').addEventListener('click', () => {
+                this._sortDir = this._sortDir === 'desc' ? 'asc' : 'desc';
+                document.getElementById('ep-sort-icon').textContent = this._sortDir === 'desc' ? '▼' : '▲';
+                this.renderTable(this.getFiltered());
             });
 
-            // Filtro por estado
-            document.getElementById('ep-filter-status').addEventListener('change', (e) => {
-                const status = e.target.value;
-                if (status === 'all') {
-                    this.renderTable(this.suppliersData);
-                } else {
-                    const filtered = this.suppliersData.filter(s => s.status === status);
-                    this.renderTable(filtered);
-                }
-            });
+            // Exportar CSV
+            document.getElementById('ep-btn-export').addEventListener('click', () => this.exportCSV());
 
-            // Botones del panel
+            // Botones del drawer escala
             document.getElementById('ep-btn-print-scale').addEventListener('click', () => {
                 this.showNotification('Función imprimir en desarrollo', 'info');
             });
-            
             document.getElementById('ep-btn-copy-scale').addEventListener('click', () => {
-                this.showNotification('Función copiar en desarrollo', 'info');
-            });
-
-            document.getElementById('ep-btn-export').addEventListener('click', () => {
-                this.exportToExcel();
-            });
-
-            // Cerrar modal con Escape
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    this.closeModal();
-                    this.closePanel();
+                const texto = 'ESCALA DE CALIFICACIÓN — PROVEEDORES SG-SST\n' +
+                    'Fórmula: PUNTAJE = (Ítems / 10) × 100\n\n' +
+                    '0% – 49%: NO CUMPLE — INHABILITADO (alto riesgo). No se puede contratar con el proveedor.\n' +
+                    '50% – 79%: PARCIAL — CONDICIONAL (medio). Requiere Plan de Mejora antes de contratar.\n' +
+                    '80% – 100%: CUMPLE — HOMOLOGADO (bajo). Aprobación inmediata del proveedor.\n\n' +
+                    'Nota legal: la calificación debe estar respaldada por las evidencias adjuntas en la carpeta del proveedor (Decreto 1072 de 2015, art. 2.2.4.1.2.5 y Resolución 0312 de 2019).';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(texto).then(() => {
+                        this.showNotification('Escala copiada al portapapeles', 'success');
+                    }).catch(() => {
+                        this.showNotification('No se pudo copiar al portapapeles', 'error');
+                    });
+                } else {
+                    this.showNotification('Portapapeles no disponible', 'error');
                 }
             });
+
+            // Cerrar modal / drawer con Escape (un solo listener por instancia)
+            this._escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    this.closeModal();
+                    this.cerrarEscala();
+                }
+            };
+            document.addEventListener('keydown', this._escHandler);
 
             // Cerrar modal al hacer clic fuera
             this.modal.addEventListener('click', (e) => {
-                if (e.target === this.modal) {
-                    this.closeModal();
-                }
+                if (e.target === this.modal) this.closeModal();
             });
         }
 
         /**
-         * Renderiza la tabla de proveedores
+         * Renderiza la tabla de proveedores (premium v2)
          */
         renderTable(data) {
             const tbody = document.getElementById('ep-suppliers-table-body');
             if (!tbody) return;
 
+            const token = (this._renderToken = (this._renderToken || 0) + 1);
             tbody.innerHTML = '';
-            
-            if (data.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 2rem; color: var(--ep-gray-600);">
-                            <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
-                            No hay proveedores registrados
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
+
+            // Ordenamiento por fecha
+            data = data.slice().sort((a, b) => {
+                const diff = this.fechaTS(a.date) - this.fechaTS(b.date);
+                return this._sortDir === 'desc' ? -diff : diff;
+            });
+
+            document.getElementById('ep-count').textContent = data.length + (data.length === 1 ? ' proveedor' : ' proveedores');
+            document.getElementById('ep-empty').hidden = data.length !== 0;
+
+            const pillEstado = s => s === 'Aprobado' ? 'ep-pill--green' : (s === 'Rechazado' ? 'ep-pill--red' : 'ep-pill--amber');
+            const clsBarra = sc => sc >= 80 ? 'is-ok' : (sc >= 50 ? 'is-warn' : 'is-danger');
 
             data.forEach(item => {
                 const tr = document.createElement('tr');
-                let statusClass = item.status === 'Aprobado' ? 'ep-status-approved' :
-                                 (item.status === 'Rechazado' ? 'ep-status-rejected' : 'ep-status-pending');
-
                 tr.innerHTML = `
-                    <td><div style="font-weight: 500;">${item.name}</div></td>
-                    <td><span style="background: rgba(23, 78, 166, 0.1); color: var(--ep-primary); padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">${item.type}</span></td>
-                    <td>${item.object}</td>
-                    <td style="font-family: monospace;">${item.nit}</td>
-                    <td>${item.date}</td>
-                    <td style="font-weight: bold;">${item.score}%</td>
-                    <td><span class="ep-status-badge ${statusClass}">${item.status}</span></td>
-                    <td>${item.evidence ? '<span style="color:var(--ep-success);"><i class="bi bi-check-circle"></i> Archivado</span>' : '<span style="color:var(--ep-gray-600);">-</span>'}</td>
-                    <td style="text-align: right;">
-                        <button class="ep-btn ep-btn-outline ep-btn-sm action-view-detail" data-id="${item.id}" style="margin-right: 0.5rem;">
-                            <i class="bi bi-eye"></i> Ver
-                        </button>
-                        <button class="ep-btn ep-btn-outline ep-btn-sm action-edit" data-id="${item.id}">
-                            <i class="bi bi-pencil"></i> Evaluar
-                        </button>
+                    <td>
+                        <div class="ep-prov">
+                            <span class="ep-avatar">${this.escapeHtml(this.iniciales(item.name))}</span>
+                            <div class="ep-prov__txt"><b>${this.escapeHtml(item.name)}</b><small>NIT ${this.escapeHtml(item.nit || '—')}</small></div>
+                        </div>
+                    </td>
+                    <td><span class="ep-pill ep-pill--blue">${this.escapeHtml(item.type || 'Servicio')}</span></td>
+                    <td class="ep-obj" title="${this.escapeHtml(item.object || '')}">${this.escapeHtml(item.object || '—')}</td>
+                    <td class="ep-nowrap">${this.escapeHtml(this.fmtFecha(item.date))}</td>
+                    <td>
+                        <div class="ep-pt">
+                            <b>${item.score}%</b>
+                            <div class="ep-pt__bar"><i class="${clsBarra(item.score)}" style="width:${Math.max(0, Math.min(100, item.score))}%"></i></div>
+                        </div>
+                    </td>
+                    <td><span class="ep-pill ${pillEstado(item.status)}">${this.escapeHtml(item.status)}</span></td>
+                    <td data-ep-evidcell="${this.escapeHtml(String(item.id))}">
+                        ${item.evidence
+                            ? '<span class="ep-pill ep-pill--green">Archivado</span>'
+                            : '<span class="ep-pill ep-pill--slate">Sin evidencias</span>'}
+                    </td>
+                    <td>
+                        <div class="ep-rowactions">
+                            <button type="button" class="ep-btn ep-btn--ghost ep-btn--sm" data-ver="${this.escapeHtml(String(item.id))}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Ver
+                            </button>
+                            <button type="button" class="ep-btn ep-btn--ghost ep-btn--sm" data-reev="${this.escapeHtml(String(item.id))}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+                                Re-evaluar
+                            </button>
+                        </div>
                     </td>
                 `;
-                
-                // Agregar evento al botón de ver detalle
-                tr.querySelector('.action-view-detail').addEventListener('click', () => this.showDetailView(item.id));
-                // Agregar evento al botón de editar
-                tr.querySelector('.action-edit').addEventListener('click', () => this.openModal(item.id));
                 tbody.appendChild(tr);
             });
+
+            // Acciones de fila (delegación)
+            tbody.querySelectorAll('[data-ver]').forEach(btn => {
+                btn.addEventListener('click', () => this.showDetailView(btn.getAttribute('data-ver')));
+            });
+            tbody.querySelectorAll('[data-reev]').forEach(btn => {
+                btn.addEventListener('click', () => this.openModal(btn.getAttribute('data-reev')));
+            });
+
+            // Conteo real de evidencias por proveedor (async, sin bloquear)
+            this.loadEvidenceCounts(token);
 
             this.updateMetrics();
         }
 
         /**
-         * Muestra la vista de detalle (Ficha Técnica) - AHORA ASÍNCRONA
+         * Actualiza el conteo de archivos en las pastillas de evidencias
+         */
+        async loadEvidenceCounts(token) {
+            if (!this.submodulePath || !window.electronAPI || !window.electronAPI.listProviderFiles) return;
+            const basePath = this.submodulePath.replace(/\\/g, '/');
+            const jobs = this.suppliersData.filter(s => s.evidence && s.folder).map(async (s) => {
+                try {
+                    const res = await window.electronAPI.listProviderFiles(basePath + '/' + s.folder);
+                    if (token !== this._renderToken) return;
+                    const cell = document.querySelector(`[data-ep-evidcell="${CSS.escape(String(s.id))}"]`);
+                    if (!cell) return;
+                    const n = (res.success && res.files) ? res.files.length : 0;
+                    cell.innerHTML = n > 0
+                        ? `<span class="ep-pill ep-pill--green">Archivado · ${n}</span>`
+                        : '<span class="ep-pill ep-pill--slate">Sin evidencias</span>';
+                } catch (e) { /* mantener pastilla por defecto */ }
+            });
+            await Promise.all(jobs);
+        }
+
+        /**
+         * Muestra la vista de detalle (premium v2)
          */
         async showDetailView(id) {
             try {
-                const supplier = this.suppliersData.find(s => s.id === id);
+                const supplier = this.suppliersData.find(s => String(s.id) === String(id));
                 if (!supplier) {
                     console.error('[2.9.1][ERROR] Proveedor no encontrado con ID:', id);
                     return;
                 }
+                this.currentSupplier = supplier;
+                console.log('[2.9.1][DETAIL] Mostrando detalle de:', supplier.name);
 
-                console.log('[2.9.1][DETAIL] Mostrando vista de detalle para:', supplier.name);
-
- // Ocultar elementos de la vista de lista
-  const contentScroll = this.container.querySelector('.ep-content-scroll');
-  if (contentScroll) contentScroll.style.display = 'none';
-
-  // Actualizar breadcrumb
-  const breadcrumbActive = this.container.querySelector('#ep-breadcrumb-active');
-  if (breadcrumbActive) breadcrumbActive.textContent = 'Ficha Técnica';
-
-  // Mostrar la vista de detalle
+                document.getElementById('ep-list-view').hidden = true;
                 const detailView = document.getElementById('ep-detail-view');
-                if (detailView) {
-                    detailView.style.display = 'block';
-                    console.log('[2.9.1][DETAIL] Vista de detalle mostrada');
-                } else {
-                    console.error('[2.9.1][ERROR] No se encontró el elemento ep-detail-view');
-                    return;
-                }
+                detailView.hidden = false;
 
-                // --- POBLAR DATOS ENCABEZADO ---
-                const nameEl = document.getElementById('ep-detail-name');
-                const nitEl = document.getElementById('ep-detail-nit');
-                const dateEl = document.getElementById('ep-detail-date');
-                
-                if (nameEl) nameEl.innerText = supplier.name;
-                if (nitEl) nitEl.innerText = "NIT: " + supplier.nit;
-                if (dateEl) dateEl.innerText = "Evaluado: " + supplier.date;
+                // Encabezado de ficha
+                document.getElementById('ep-detail-avatar').textContent = this.iniciales(supplier.name);
+                document.getElementById('ep-detail-name').textContent = supplier.name;
+                document.getElementById('ep-detail-nit').textContent = 'NIT: ' + (supplier.nit || '—');
+                document.getElementById('ep-detail-type-chip').textContent = supplier.type || 'Servicio';
+                document.getElementById('ep-detail-date').textContent = 'Evaluado: ' + this.fmtFecha(supplier.date);
 
+                const score = Math.max(0, Math.min(100, parseInt(supplier.score, 10) || 0));
                 const scoreEl = document.getElementById('ep-detail-score');
-                if (scoreEl) scoreEl.innerText = supplier.score;
-
-                const scoreBadge = document.getElementById('ep-detail-score-badge');
-                if (scoreBadge) {
-                    if (supplier.score >= 80) {
-                        scoreBadge.style.color = 'var(--ep-success)';
-                    } else if (supplier.score < 50) {
-                        scoreBadge.style.color = 'var(--ep-danger)';
-                    } else {
-                        scoreBadge.style.color = '#b68b00';
-                    }
-                }
+                scoreEl.textContent = score;
+                scoreEl.className = score >= 80 ? 'is-ok' : (score >= 50 ? 'is-warn' : 'is-danger');
 
                 const badge = document.getElementById('ep-detail-status');
-                if (badge) {
-                    badge.className = `ep-status-badge ${supplier.status === 'Aprobado' ? 'ep-status-approved' : (supplier.status === 'Rechazado' ? 'ep-status-rejected' : 'ep-status-pending')}`;
-                    badge.innerText = supplier.status;
-                }
+                const nivel = this.nivelDe(score);
+                badge.textContent = (supplier.status || 'Pendiente') + ' · ' + nivel.nivel;
+                badge.className = 'ep-pill ' + (supplier.status === 'Aprobado' ? 'ep-pill--green' : (supplier.status === 'Rechazado' ? 'ep-pill--red' : 'ep-pill--amber'));
 
-                // --- POBLAR DATOS GENERALES ---
-                const fullNameEl = document.getElementById('ep-detail-full-name');
-                const nitFullEl = document.getElementById('ep-detail-nit-full');
-                const typeEl = document.getElementById('ep-detail-type');
-                const objectEl = document.getElementById('ep-detail-object');
-                const evalDateEl = document.getElementById('ep-detail-eval-date');
-                
-                if (fullNameEl) fullNameEl.innerText = supplier.name;
-                if (nitFullEl) nitFullEl.innerText = supplier.nit;
-                if (typeEl) typeEl.innerText = supplier.type;
-                if (objectEl) objectEl.innerText = supplier.object;
-                if (evalDateEl) evalDateEl.innerText = supplier.date;
+                // Información general
+                document.getElementById('ep-detail-full-name').textContent = supplier.name;
+                document.getElementById('ep-detail-nit-full').textContent = supplier.nit || '—';
+                document.getElementById('ep-detail-type').textContent = supplier.type || '—';
+                document.getElementById('ep-detail-object').textContent = supplier.object || '—';
+                document.getElementById('ep-detail-eval-date').textContent = this.fmtFecha(supplier.date);
 
-                // --- POBLAR OBSERVACIONES ---
-                const obsEl = document.getElementById('ep-detail-observations');
-                if (obsEl) {
-                    if (supplier.observations && supplier.observations.trim() !== '') {
-                        obsEl.innerText = supplier.observations;
-                    } else {
-                        obsEl.innerText = 'Sin observaciones registradas.';
-                    }
-                }
+                const criteria = supplier.criteria || {};
+                const itemsOk = this.criteriosLista().filter(c => !!criteria[c.key]).length;
+                document.getElementById('ep-detail-items').textContent = itemsOk + ' de 10';
 
-                // --- POBLAR MATRIZ DE CUMPLIMIENTO ---
-                const checklistContainer = document.getElementById('ep-detail-checklist');
-                if (checklistContainer) {
-                    checklistContainer.innerHTML = '';
+                // Observaciones
+                document.getElementById('ep-detail-observations').textContent =
+                    (supplier.observations && supplier.observations.trim() !== '') ? supplier.observations : 'Sin observaciones registradas.';
 
-                    const checklistLabels = [
-                        "1. Vigencia ARL / Seguridad Social",
-                        "2. Política de SST",
-                        "3. Matriz de Peligros (IPERC)",
-                        "4. Plan de Trabajo Anual (PTA)",
-                        "5. Registro Capacitaciones",
-                        "6. Entrega de EPP",
-                        "7. Estadísticas SST (Año anterior)",
-                        "8. Cláusula SST en Contrato",
-                        "9. Mecanismo Reporte Condiciones",
-                        "10. Investigación Accidentes"
-                    ];
+                // Matriz de cumplimiento
+                const matrix = document.getElementById('ep-detail-checklist');
+                matrix.innerHTML = this.criteriosLista().map((c, i) => {
+                    const ok = !!criteria[c.key];
+                    return `
+                        <div class="ep-mx ${ok ? 'is-ok' : 'is-danger'}">
+                            <span class="ep-mx__ic">
+                                ${ok
+                                    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+                                    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'}
+                            </span>
+                            <span class="ep-mx__num">${i + 1}</span>
+                            <span class="ep-mx__txt"><b>${c.label}</b><small>${c.desc}</small></span>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('ep-detail-matrix-count').textContent = itemsOk + '/10 ítems';
+                document.getElementById('ep-detail-matrix-nivel').textContent = nivel.frase;
 
-                    // Usar criterios del proveedor
-                    const criteria = supplier.criteria || {};
-                    const criteriaKeys = ['arl', 'politica', 'iperc', 'pta', 'capacitacion', 'epp', 'estadisticas', 'clausula', 'reporte', 'investigacion'];
-
-                    criteriaKeys.forEach((key, index) => {
-                        const isCompliant = criteria[key] === true;
-                        const div = document.createElement('div');
-                        div.className = 'ep-compliance-item';
-                        div.innerHTML = `
-                            <div class="ep-compliance-status-icon ${isCompliant ? 'ep-status-compliant' : 'ep-status-non-compliant'}">
-                                ${isCompliant ? '✔' : '✕'}
-                            </div>
-                            <div class="ep-compliance-text"><strong>${checklistLabels[index]}</strong></div>
-                        `;
-                        checklistContainer.appendChild(div);
-                    });
-                }
-
-                // --- POBLAR EVIDENCIAS ---
+                // Evidencias
                 const fileList = document.getElementById('ep-detail-file-list');
                 const noFilesMsg = document.getElementById('ep-no-files-msg');
-                const pathSpan = document.getElementById('ep-detail-path');
+                const pathB = document.getElementById('ep-detail-path');
+                fileList.innerHTML = '';
 
-                if (fileList && noFilesMsg && pathSpan) {
-                    if (supplier.evidence && supplier.folder) {
-                        noFilesMsg.style.display = 'none';
-                        fileList.style.display = 'block';
-                        fileList.innerHTML = '';
-
-                        const folderName = supplier.folder;
-                        const basePath = this.submodulePath.replace(/\\/g, '/');
-                        const folderPath = basePath + '/' + folderName;
-                        
-                        pathSpan.innerText = `/Proveedores/${folderName}/`;
-
-                        try {
-                            // Leer archivos reales de la carpeta usando IPC
-                            console.log('[2.9.1][DETAIL] Leyendo archivos de:', folderPath);
-                            const listResult = await window.electronAPI.listProviderFiles(folderPath);
-                            
-                            if (listResult.success && listResult.files && listResult.files.length > 0) {
-                                console.log('[2.9.1][DETAIL] Archivos encontrados:', listResult.files.length);
-                                
-                                listResult.files.forEach(file => {
-                                    const li = document.createElement('li');
-                                    
-                                    // Formatear tamaño del archivo
-                                    let fileSize = file.size;
-                                    if (file.size > 1024 * 1024) {
-                                        fileSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
-                                    } else if (file.size > 1024) {
-                                        fileSize = (file.size / 1024).toFixed(1) + ' KB';
-                                    } else {
-                                        fileSize = file.size + ' B';
-                                    }
-                                    
-                                    // Determinar ícono según extensión
-                                    const ext = file.name.split('.').pop().toLowerCase();
-                                    let fileIcon = '📄';
-                                    if (['pdf'].includes(ext)) fileIcon = '📕';
-                                    else if (['xlsx', 'xls'].includes(ext)) fileIcon = '📗';
-                                    else if (['docx', 'doc'].includes(ext)) fileIcon = '📘';
-                                    else if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) fileIcon = '🖼️';
-                                    
-                                    li.innerHTML = `
-                                        <span class="ep-file-icon">${fileIcon}</span>
-                                        <span class="ep-file-name">${file.name}</span>
-                                        <span class="ep-file-size">${fileSize}</span>
-                                    `;
-                                    
-                                    // Agregar evento para abrir archivo al hacer clic
-                                    li.style.cursor = 'pointer';
-                                    li.addEventListener('click', () => {
-                                        window.electronAPI.openPath(folderPath + '/' + file.name);
-                                    });
-                                    
-                                    fileList.appendChild(li);
+                if (supplier.evidence && supplier.folder && this.submodulePath) {
+                    pathB.textContent = supplier.folder;
+                    noFilesMsg.hidden = true;
+                    const folderPath = this.submodulePath.replace(/\\/g, '/') + '/' + supplier.folder;
+                    try {
+                        const listResult = await window.electronAPI.listProviderFiles(folderPath);
+                        if (listResult.success && listResult.files && listResult.files.length > 0) {
+                            listResult.files.forEach(file => {
+                                let fileSize = file.size;
+                                if (file.size > 1024 * 1024) fileSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                                else if (file.size > 1024) fileSize = (file.size / 1024).toFixed(1) + ' KB';
+                                else fileSize = file.size + ' B';
+                                const li = document.createElement('li');
+                                li.innerHTML = `
+                                    <span class="ep-evlist__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></span>
+                                    <span class="ep-evlist__name">${this.escapeHtml(file.name)}</span>
+                                    <span class="ep-evlist__size">${fileSize}</span>
+                                `;
+                                li.style.cursor = 'pointer';
+                                li.title = 'Abrir archivo';
+                                li.addEventListener('click', () => {
+                                    window.electronAPI.openPath(folderPath + '/' + file.name);
                                 });
-                            } else {
-                                // No hay archivos en la carpeta
-                                noFilesMsg.style.display = 'block';
-                                fileList.style.display = 'none';
-                                console.log('[2.9.1][DETAIL] No hay archivos en la carpeta');
-                            }
-                        } catch (error) {
-                            console.error('[2.9.1][DETAIL] Error leyendo archivos:', error);
-                            noFilesMsg.style.display = 'block';
-                            fileList.style.display = 'none';
-                            noFilesMsg.querySelector('p').textContent = 'Error al cargar archivos: ' + error.message;
+                                fileList.appendChild(li);
+                            });
+                        } else {
+                            noFilesMsg.hidden = false;
                         }
-                    } else {
-                        noFilesMsg.style.display = 'block';
-                        fileList.style.display = 'none';
-                        pathSpan.innerText = "Sin ruta asignada";
+                    } catch (error) {
+                        console.error('[2.9.1][DETAIL] Error leyendo archivos:', error);
+                        noFilesMsg.hidden = false;
                     }
+                } else {
+                    pathB.textContent = supplier.folder || '—';
+                    noFilesMsg.hidden = false;
                 }
 
-                // Scroll al inicio
-                window.scrollTo(0, 0);
-
-                console.log('[2.9.1][DETAIL] Ficha técnica poblada correctamente');
+                const scroll = this.container.querySelector('.ep-content-scroll');
+                if (scroll) scroll.scrollTop = 0;
+                window.scrollTo && window.scrollTo(0, 0);
+                console.log('[2.9.1][DETAIL] Detalle poblado correctamente');
             } catch (error) {
                 console.error('[2.9.1][ERROR] Error en showDetailView:', error);
                 this.showNotification('Error al mostrar el detalle: ' + error.message, 'error');
@@ -1173,19 +1083,16 @@
         /**
          * Vuelve a la vista de lista
          */
- showListView() {
-  const contentScroll = this.container.querySelector('.ep-content-scroll');
-  const detailView = document.getElementById('ep-detail-view');
-
-  if (detailView) detailView.style.display = 'none';
-  if (contentScroll) contentScroll.style.display = 'block';
-
-  const breadcrumbActive = this.container.querySelector('#ep-breadcrumb-active');
-  if (breadcrumbActive) breadcrumbActive.textContent = 'Proveedores';
- }
+        showListView() {
+            document.getElementById('ep-detail-view').hidden = true;
+            document.getElementById('ep-list-view').hidden = false;
+            this.currentSupplier = null;
+            const scroll = this.container.querySelector('.ep-content-scroll');
+            if (scroll) scroll.scrollTop = 0;
+        }
 
         /**
-         * Actualiza las métricas del dashboard
+         * Actualiza las tarjetas KPI
          */
         updateMetrics() {
             const total = this.suppliersData.length;
@@ -1193,10 +1100,11 @@
             const pending = this.suppliersData.filter(s => s.status === 'Pendiente').length;
             const rejected = this.suppliersData.filter(s => s.status === 'Rechazado').length;
 
-            document.getElementById('ep-total-suppliers').innerText = total;
-            document.getElementById('ep-approved-suppliers').innerText = approved;
-            document.getElementById('ep-pending-suppliers').innerText = pending;
-            document.getElementById('ep-rejected-suppliers').innerText = rejected;
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            set('ep-kpi-total', total);
+            set('ep-kpi-approved', approved);
+            set('ep-kpi-pending', pending);
+            set('ep-kpi-rejected', rejected);
         }
 
         /**
@@ -1209,30 +1117,42 @@
             document.getElementById('ep-modal-type').value = 'Bien';
             document.getElementById('ep-modal-object').value = '';
             document.getElementById('ep-modal-observations').value = '';
-            
+            document.getElementById('ep-modal-title').textContent = 'Nueva Evaluación de Proveedor';
+
             // Limpiar checkboxes
-            document.querySelectorAll('.ep-eval-check').forEach(c => c.checked = false);
-            
+            this.container.querySelectorAll('.ep-eval-check').forEach(c => { c.checked = false; });
+
             // Limpiar archivos
             document.getElementById('ep-file-list').innerHTML = '';
-            document.getElementById('ep-file-list-container').style.display = 'none';
+            document.getElementById('ep-file-list-container').hidden = true;
             this.selectedFiles = [];
-            
-            // Resetear score
+
+            // Resetear score y ruta
             this.calculateScore();
             this.updatePathPreview();
 
             // Mostrar modal
             this.modal.classList.add('active');
-            
-            // Cargar datos si es edición
+
+            // Cargar datos si es edición / re-evaluación
             if (id !== 'new') {
-                const data = this.suppliersData.find(s => s.id === id);
+                const data = this.suppliersData.find(s => String(s.id) === String(id));
                 if (data) {
                     this.currentSupplier = data;
-                    document.getElementById('ep-modal-name').value = data.name;
-                    document.getElementById('ep-modal-nit').value = data.nit;
-                    // TODO: Cargar datos restantes
+                    document.getElementById('ep-modal-name').value = data.name || '';
+                    document.getElementById('ep-modal-nit').value = data.nit || '';
+                    document.getElementById('ep-modal-type').value = data.type || 'Bien';
+                    document.getElementById('ep-modal-object').value = data.object || '';
+                    document.getElementById('ep-modal-observations').value = data.observations || '';
+                    document.getElementById('ep-modal-title').textContent = 'Re-evaluar: ' + (data.name || 'Proveedor');
+
+                    const criteria = data.criteria || {};
+                    const lista = this.criteriosLista();
+                    this.container.querySelectorAll('.ep-eval-check').forEach((cb, i) => {
+                        if (lista[i]) cb.checked = !!criteria[lista[i].key];
+                    });
+                    this.calculateScore();
+                    this.updatePathPreview();
                 }
             } else {
                 this.currentSupplier = null;
@@ -1243,31 +1163,35 @@
          * Cierra el modal
          */
         closeModal() {
-            console.log('[2.9.1][MODAL] Cerrando modal...');
+            if (!this.modal) return;
             this.modal.classList.remove('active');
             this.currentSupplier = null;
-            console.log('[2.9.1][MODAL] Modal cerrado, clase active removida');
         }
 
         /**
-         * Abre/cierra el panel lateral
+         * Abre el drawer de la escala de calificación
          */
-        togglePanel() {
-            this.panel.classList.toggle('open');
+        abrirEscala() {
+            if (this.panel) {
+                this.panel.hidden = false;
+                requestAnimationFrame(() => this.panel.classList.add('open'));
+            }
         }
 
         /**
-         * Cierra el panel lateral
+         * Cierra el drawer de la escala
          */
-        closePanel() {
+        cerrarEscala() {
+            if (!this.panel) return;
             this.panel.classList.remove('open');
+            setTimeout(() => { if (this.panel) this.panel.hidden = true; }, 200);
         }
 
         /**
          * Actualiza la vista previa de la ruta
          */
         updatePathPreview() {
-            const name = document.getElementById('ep-modal-name').value || "[NOMBRE]";
+            const name = document.getElementById('ep-modal-name').value || '[NOMBRE]';
             const cleanName = name.replace(/\s+/g, '_').replace(/[^\w]/g, '');
             document.getElementById('ep-preview-folder-name').innerText = cleanName;
         }
@@ -1278,31 +1202,27 @@
         handleFileSelect(files) {
             const list = document.getElementById('ep-file-list');
             const container = document.getElementById('ep-file-list-container');
-            container.style.display = 'block';
-            
+            container.hidden = false;
+
             Array.from(files).forEach(file => {
                 this.selectedFiles.push(file);
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <span style="display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="bi bi-file-earmark"></i> ${file.name} 
-                        <small style="color: var(--ep-gray-600);">(${(file.size/1024).toFixed(1)} KB)</small>
+                    <span class="ep-filelist__name">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                        ${this.escapeHtml(file.name)}
+                        <small>(${(file.size / 1024).toFixed(1)} KB)</small>
                     </span>
-                    <button class="ep-file-remove-btn" data-name="${file.name}">
-                        <i class="bi bi-x-lg"></i>
+                    <button type="button" class="ep-filelist__rm" data-name="${this.escapeHtml(file.name)}" title="Quitar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                     </button>
                 `;
-                
-                // Agregar evento al botón de eliminar
-                li.querySelector('.ep-file-remove-btn').addEventListener('click', function() {
+                li.querySelector('.ep-filelist__rm').addEventListener('click', function () {
                     const fileName = this.getAttribute('data-name');
                     this.closest('li').remove();
                     this.selectedFiles = this.selectedFiles.filter(f => f.name !== fileName);
-                    if (this.selectedFiles.length === 0) {
-                        container.style.display = 'none';
-                    }
+                    if (this.selectedFiles.length === 0) container.hidden = true;
                 }.bind(this));
-                
                 list.appendChild(li);
             });
         }
@@ -1311,29 +1231,23 @@
          * Calcula el puntaje de evaluación
          */
         calculateScore() {
-            const checkboxes = document.querySelectorAll('.ep-eval-check');
+            const checkboxes = this.container.querySelectorAll('.ep-eval-check');
             const total = checkboxes.length;
             const checked = Array.from(checkboxes).filter(c => c.checked).length;
-            const percentage = Math.round((checked / total) * 100);
-            
+            const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
+
             const scoreDisplay = document.getElementById('ep-total-score');
             const progressBar = document.getElementById('ep-score-bar');
-            
+            const scoreLabel = document.getElementById('ep-score-label');
+            const scoreBox = document.getElementById('ep-scorebox');
+
             scoreDisplay.innerText = percentage + '%';
             progressBar.style.width = percentage + '%';
-            
-            // Cambiar color según puntaje
-            if (percentage < 50) {
-                scoreDisplay.style.color = 'var(--ep-danger)';
-                progressBar.style.backgroundColor = 'var(--ep-danger)';
-            } else if (percentage < 80) {
-                scoreDisplay.style.color = 'var(--ep-warning)';
-                progressBar.style.backgroundColor = 'var(--ep-warning)';
-            } else {
-                scoreDisplay.style.color = 'var(--ep-success)';
-                progressBar.style.backgroundColor = 'var(--ep-success)';
-            }
-            
+            scoreLabel.innerText = checked === 0 ? 'SIN ÍTEMS' : this.nivelDe(percentage).nivel + ' · ' + this.nivelDe(percentage).resultado;
+
+            scoreBox.classList.remove('is-ok', 'is-warn', 'is-danger');
+            scoreBox.classList.add(this.nivelDe(percentage).cls);
+
             return percentage;
         }
 
@@ -1382,6 +1296,8 @@
                 }
             }
         }
+
+
 
         /**
          * Procesa las evidencias (archivos) - IMPLEMENTACIÓN REAL
@@ -1655,6 +1571,48 @@
             }
         }
 
+
+
+
+        /**
+         * Exporta la tabla visible a CSV (descarga directa)
+         */
+        exportCSV() {
+            const data = this.getFiltered();
+            if (data.length === 0) {
+                this.showNotification('No hay datos para exportar', 'warning');
+                return;
+            }
+
+            try {
+                const esc = v => {
+                    const s = String(v == null ? '' : v);
+                    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                };
+                const header = ['Proveedor', 'NIT', 'Tipo', 'Objeto', 'Fecha', 'Puntaje (%)', 'Estado', 'Evidencias'];
+                const lines = data.map(s => [
+                    s.name, s.nit, s.type, s.object, this.fmtFecha(s.date), s.score, s.status,
+                    s.evidence ? 'Sí' : 'No'
+                ].map(esc).join(','));
+                const csv = '\uFEFF' + header.map(esc).join(',') + '\n' + lines.join('\n');
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'proveedores-evaluacion-' + new Date().toISOString().split('T')[0] + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+                this.showNotification('CSV exportado (' + data.length + ' registros)', 'success');
+            } catch (error) {
+                console.error('[2.9.1][ERROR] Error exportando CSV:', error);
+                this.showNotification('Error exportando CSV', 'error');
+            }
+        }
+
         /**
          * Exporta a Excel
          */
@@ -1707,6 +1665,8 @@
                 this.showNotification('Error exportando datos', 'error');
             }
         }
+
+
 
         /**
          * Muestra notificación tipo Toast moderna

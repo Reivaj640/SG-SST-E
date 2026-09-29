@@ -275,3 +275,105 @@
     gap: 1rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PREMIUM v1 (2026-09-15) — Portal sin caja gigante, header
+   breadcrumb, tarjetas con acabado premium (mismo paquete que
+   COPASST, Capacitación y Presupuesto).
+   ═══════════════════════════════════════════════════════════ */
+
+.cc-portal {
+  align-items: stretch;
+  padding: clamp(16px, 2vw, 28px);
+  background: var(--kair-canvas, #fbfcfb);
+}
+
+/* Header premium */
+.cc-portal__top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: clamp(18px, 2.2vw, 30px);
+  width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto;
+  box-sizing: border-box;
+}
+.cc-portal__top-left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+.cc-portal__top-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: #e3ecfb; color: var(--kair-blue, #2057b8);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; flex-shrink: 0;
+}
+.cc-portal__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+.cc-portal__crumb span { padding: 0 4px; }
+.cc-portal__title {
+  margin: 0; font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Lexend');
+  letter-spacing: -0.04em; color: var(--kair-ink, #14213d);
+}
+.cc-portal__sub {
+  color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px);
+  margin: 5px 0 0 0; max-width: 640px; line-height: 1.55;
+}
+.cc-portal__top-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.cc-portal__pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+  background: #e4f7f0; color: #16805f; white-space: nowrap;
+}
+.cc-portal__back {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+  font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
+  border-radius: 10px; transition: all 0.18s; background: #fff;
+  border: 1px solid var(--kair-line, #e8ebee); text-decoration: none;
+}
+.cc-portal__back:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+
+/* Ancho completo para las secciones (antes limitadas por la tarjeta) */
+.cc-portal > .cc-portal__main-actions,
+.cc-portal > .cc-portal__quick-actions {
+  width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto;
+  box-sizing: border-box;
+}
+
+/* Tarjetas de acceso principal — premium */
+.cc-portal__main-action {
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: var(--kair-radius-card, 20px);
+  box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+}
+.cc-portal__main-action:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
+  border-color: #c8d7ef;
+}
+.cc-portal__main-action--primary {
+  background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
+  border-color: transparent;
+}
+.cc-portal__main-action--primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
+
+/* Sección de herramientas */
+.cc-portal__quick-actions { margin-top: clamp(22px, 2.6vw, 36px); }
+.cc-portal__quick-actions-title {
+  font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'Lexend');
+  letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
+  border-bottom: 0; padding-bottom: 0;
+  margin-bottom: clamp(12px, 1.3vw, 18px); display: block;
+}
+.cc-portal__action-card {
+  background: var(--kair-card, #fff);
+  border: 1px solid var(--kair-line, #e8ebee);
+  border-radius: 16px;
+  box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04);
+}
+.cc-portal__action-card:hover {
+  border-color: #c8d7ef; background: #fff;
+  box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07);
+  transform: translateY(-3px);
+}
+.cc-portal__action-icon {
+  border-radius: 10px; background: var(--kair-soft, #f3f6f6); box-shadow: none;
+}
+.cc-portal__action-title { color: var(--kair-ink, #14213d); }
+
+@media (max-width: 768px) {
+  .cc-portal__top { flex-direction: column; }
+}

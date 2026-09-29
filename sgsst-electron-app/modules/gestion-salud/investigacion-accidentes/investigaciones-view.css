@@ -4,36 +4,65 @@ Sistema Visual K+AIR — Faithful prototype, isolated .inv-* namespace
 ============================================================================ */
 
 :root {
---inv-primary: #174ea6;
---inv-primary-hover: #185abd;
---inv-primary-light: #e8f0fe;
---inv-primary-dark: #0d3a7a;
---inv-primary-bg: rgba(23, 78, 166, 0.04);
---inv-success: #28a745;
---inv-success-light: #d4edda;
---inv-warning: #ffc107;
---inv-warning-light: #fff3cd;
---inv-danger: #dc3545;
---inv-danger-light: #f8d7da;
---inv-info: #17a2b8;
---inv-text-primary: #1a1a2e;
---inv-text-secondary: #4a5568;
---inv-text-muted: #718096;
---inv-bg-body: #f5f6fa;
+/* 📦780 — Tokens alineados a la paleta premium canónica (shared/kair-design-tokens.css). */
+--inv-primary: #2057b8;
+--inv-primary-hover: #1a4a9e;
+--inv-primary-light: #eaf1fb;
+--inv-primary-dark: #172c4c;
+--inv-primary-bg: rgba(32, 87, 184, 0.04);
+--inv-success: #1bb888;
+--inv-success-light: #e6f5ef;
+--inv-warning: #e7a224;
+--inv-warning-light: #fbf0db;
+--inv-danger: #da5563;
+--inv-danger-light: #fae6e9;
+--inv-info: #2057b8;
+--inv-text-primary: #14213d;
+--inv-text-secondary: #4d5b75;
+--inv-text-muted: #98a2b3;
+--inv-bg-body: #fbfcfb;
 --inv-bg-card: #ffffff;
---inv-bg-surface: #f8f9fb;
---inv-border: #dee2e6;
---inv-border-light: #e9ecef;
---inv-radius: 0.5rem;
---inv-radius-lg: 0.75rem;
---inv-radius-xl: 1rem;
---inv-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
---inv-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
---inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
---inv-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.12);
---inv-transition: all 0.2s ease;
---inv-font-display: 'Lexend', 'Inter', sans-serif;
---inv-font-body: 'Inter', 'Roboto', 'Segoe UI', sans-serif;
+--inv-bg-surface: #f3f6f6;
+--inv-border: #e8ebee;
+--inv-border-light: #eef0f1;
+--inv-radius: 12px;
+--inv-radius-lg: 16px;
+--inv-radius-xl: 20px;
+--inv-shadow-sm: 0 1px 2px rgba(37, 56, 82, 0.05);
+--inv-shadow-md: 0 2px 7px rgba(37, 56, 82, 0.08);
+--inv-shadow-lg: 0 8px 18px rgba(37, 56, 82, 0.12);
+--inv-shadow-xl: 0 16px 40px rgba(37, 56, 82, 0.14);
+--inv-transition: all 0.18s ease-out;
+--inv-font-display: 'Manrope', 'DM Sans', sans-serif;
+--inv-font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Dark Mode — [data-theme^="dark"] cubre dark Y dark-legacy ── */
+[data-theme^="dark"] {
+--inv-primary: #6ea8fe;
+--inv-primary-hover: #8ab4f8;
+--inv-primary-light: rgba(110, 168, 254, 0.15);
+--inv-primary-dark: #172c4c;
+--inv-primary-bg: rgba(110, 168, 254, 0.06);
+--inv-success: #3ecf9a;
+--inv-success-light: rgba(62, 207, 154, 0.15);
+--inv-warning: #f0b45a;
+--inv-warning-light: rgba(240, 180, 90, 0.15);
+--inv-danger: #e56a76;
+--inv-danger-light: rgba(229, 106, 118, 0.15);
+--inv-info: #6ea8fe;
+--inv-text-primary: #e8edf5;
+--inv-text-secondary: #a9b4c6;
+--inv-text-muted: #a9b4c6;
+--inv-bg-body: #0f172a;
+--inv-bg-card: #1a2334;
+--inv-bg-surface: #1a2334;
+--inv-border: #2f3d55;
+--inv-border-light: #263349;
+--inv-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+--inv-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+--inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+--inv-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.55);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -142,15 +171,24 @@ overflow: hidden;
 }
 
 /* Dark Theme */
-[data-theme="dark"] .inv-layout .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
-[data-theme="dark"] .inv-layout .k-section-card h3 { color: #e0e0e0; }
-[data-theme="dark"] .inv-layout .k-section-card p { color: #9e9e9e; }
-[data-theme="dark"] .inv-layout .k-section-card__company { color: #9e9e9e; }
-[data-theme="dark"] .inv-layout .k-section-card__divider { background: #3a3a4d; }
-[data-theme="dark"] .inv-layout .header-back-btn { color: #9e9e9e; }
-[data-theme="dark"] .inv-layout .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
-[data-theme="dark"] .inv-layout .header-action--ghost { color: #9e9e9e; }
-[data-theme="dark"] .inv-layout .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
+[data-theme^="dark"] .inv-layout .k-section-card,
+[data-theme="dark-legacy"] .inv-layout .k-section-card { background: #1a2334; border-color: #2f3d55; }
+[data-theme^="dark"] .inv-layout .k-section-card h3,
+[data-theme="dark-legacy"] .inv-layout .k-section-card h3 { color: #e8edf5; }
+[data-theme^="dark"] .inv-layout .k-section-card p,
+[data-theme="dark-legacy"] .inv-layout .k-section-card p { color: #a9b4c6; }
+[data-theme^="dark"] .inv-layout .k-section-card__company,
+[data-theme="dark-legacy"] .inv-layout .k-section-card__company { color: #a9b4c6; }
+[data-theme^="dark"] .inv-layout .k-section-card__divider,
+[data-theme="dark-legacy"] .inv-layout .k-section-card__divider { background: #2f3d55; }
+[data-theme^="dark"] .inv-layout .header-back-btn,
+[data-theme="dark-legacy"] .inv-layout .header-back-btn { color: #a9b4c6; }
+[data-theme^="dark"] .inv-layout .header-back-btn:hover,
+[data-theme="dark-legacy"] .inv-layout .header-back-btn:hover { background: #24314a; color: #8ab4f8; }
+[data-theme^="dark"] .inv-layout .header-action--ghost,
+[data-theme="dark-legacy"] .inv-layout .header-action--ghost { color: #a9b4c6; }
+[data-theme^="dark"] .inv-layout .header-action--ghost:hover:not(:disabled),
+[data-theme="dark-legacy"] .inv-layout .header-action--ghost:hover:not(:disabled) { background: #24314a; color: #e8edf5; }
 
 /* ============================================================================
 BODY — Scrollable content area
@@ -160,10 +198,13 @@ BODY — Scrollable content area
 flex: 1;
 overflow-y: auto;
 overflow-x: hidden;
-padding: 1.5rem;
-max-width: 1200px;
+/* 📦781 — aprovechar TODO el ancho en maximizada: antes `max-width:1200px` +
+   `margin:0 auto` dejaba ~350px vacíos por lado a 1900px de ventana. El aire
+   lateral pasa a ser proporcional (clamp). */
+padding: clamp(14px, 1.6vw, 26px) clamp(14px, 1.8vw, 34px) 32px;
+max-width: none;
 width: 100%;
-margin: 0 auto;
+margin: 0;
 }
 
 .inv-body::-webkit-scrollbar { width: 6px; }
@@ -611,6 +652,9 @@ margin-left: 0.125rem;
 position: relative;
 flex: 1;
 min-width: 0;
+/* 📦781 — tope razonable: con el layout a todo el ancho, `flex:1` estiraba el
+   buscador a ~1300px en maximizada. */
+max-width: clamp(340px, 30vw, 640px);
 }
 
 .inv-search-icon {
@@ -720,6 +764,8 @@ cursor: pointer;
 transition: var(--inv-transition);
 font-size: 0.8125rem;
 flex-shrink: 0;
+/* 📦781 — al extremo derecho de la barra (aprovecha el ancho en maximizada) */
+margin-left: auto;
 }
 
 .inv-view-toggle:hover {
@@ -1823,29 +1869,8 @@ flex-shrink: 0;
 .inv-toast__close:hover { color: var(--inv-text-primary); }
 
 /* ============================================================================
-LOADING & EMPTY STATES
+EMPTY STATES
 ============================================================================ */
-
-.inv-loading {
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-padding: 3rem 1rem;
-color: var(--inv-text-muted);
-gap: 1rem;
-}
-
-.inv-spinner {
-width: 2.5rem;
-height: 2.5rem;
-border: 3px solid var(--inv-border-light);
-border-radius: 50%;
-border-top-color: var(--inv-primary);
-animation: inv-spin 0.8s linear infinite;
-}
-
-@keyframes inv-spin { to { transform: rotate(360deg); } }
 
 .inv-empty {
 text-align: center;
@@ -1898,6 +1923,35 @@ align-items: center;
 justify-content: space-between;
 min-width: 0;
 width: 100%;
+}
+
+/* ============================================================================
+LISTA EN DOS COLUMNAS — SOLO en maximizada (>= 1360px)
+En maximizada las tarjetas de la vista de LISTA quedaban a todo el ancho (~1900px)
+con muchísimo espacio vacío. Acá la lista pasa a 2 columnas.
+NO aplica a la vista de CUADRÍCULA (.inv-cards-grid), que conserva su auto-fill.
+Si el umbral no coincide con tu pantalla, cambiá el 1360px de la media query.
+============================================================================ */
+
+@media (min-width: 1360px) {
+.inv-cards-list:not(.inv-cards-grid) {
+display: grid;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 0.75rem 1rem;
+align-items: start;
+}
+
+.inv-cards-list:not(.inv-cards-grid) .inv-card {
+margin-bottom: 0;
+}
+}
+
+/* El estado vacío y el esqueleto ocupan TODAS las columnas (no media tarjeta).
+Vale para la lista de 2 columnas y para la cuadrícula; en la lista normal
+(display:block) la propiedad se ignora. */
+.inv-cards-list > .inv-empty,
+.inv-cards-list > .ks-list {
+grid-column: 1 / -1;
 }
 
 /* ============================================================================
@@ -2001,3 +2055,98 @@ PULSE BORDER FOR PENDING CARDS
 .inv-card--pending.inv-card--pulse {
 animation: inv-pulse-border 2s ease-in-out infinite;
 }
+
+/* 📦608-fix10: file-viewer inline dentro del modal de preview */
+.inv-preview { min-height: 0; overflow: hidden; }
+.inv-preview-iframe-container:has(flyfish-file-viewer) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 0%;
+}
+.inv-preview-iframe-container:has(flyfish-file-viewer) flyfish-file-viewer {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: block;
+}
+.inv-preview-iframe-container > div[style*="min-height"] { min-height: 0 !important; }
+
+/* 📦608: Botón "Ver completo" (outline style) */
+.inv-preview-modal__expand.kair-preview__action--primary {
+    width: auto;
+    height: 30px;
+    padding: 0 10px;
+    gap: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: transparent;
+    color: var(--inv-primary, #174ea6);
+    border: 1px solid var(--inv-border, #dee2e6);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    cursor: pointer;
+    margin-right: 4px;
+}
+.inv-preview-modal__expand.kair-preview__action--primary:hover:not(:disabled) {
+    background: var(--inv-primary-light, #e8f0fe);
+    border-color: var(--inv-primary, #174ea6);
+}
+
+/* ============================================================================
+   📦780 — HEADER SYSTEM v2 (premium). Breadcrumb + icon chip + título Manrope
+   + subtítulo + acciones. Transparente sobre el canvas.
+   ============================================================================ */
+.inv-header-v2 {
+  flex-shrink: 0;
+  padding: 16px clamp(14px, 1.6vw, 24px) 0;
+  background: transparent;
+}
+.inv-breadcrumb {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  font-size: 12.5px; color: var(--inv-text-muted); margin-bottom: 12px;
+}
+.inv-breadcrumb strong { color: var(--inv-text-primary); font-weight: 700; }
+.inv-breadcrumb .inv-sep { opacity: .7; }
+.inv-header-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--inv-border);
+}
+.inv-header-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.inv-header-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--inv-primary-light); color: var(--inv-primary);
+}
+.inv-header-icon svg { width: 22px; height: 22px; }
+.inv-header-titles { min-width: 0; }
+.inv-title {
+  font-family: var(--inv-font-display); font-size: 19px; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1.2; margin: 0; color: var(--inv-text-primary);
+}
+.inv-sub { font-size: 12.5px; color: var(--inv-text-muted); margin: 3px 0 0; }
+.inv-header-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap; }
+.inv-company {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--inv-text-secondary); white-space: nowrap;
+}
+.inv-company svg { width: 15px; height: 15px; }
+.inv-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  border-radius: 10px; border: 1px solid var(--inv-border);
+  background: var(--inv-bg-card); color: var(--inv-text-secondary);
+  cursor: pointer; transition: var(--inv-transition);
+}
+.inv-btn svg { width: 15px; height: 15px; }
+.inv-btn:hover:not(:disabled) { background: var(--inv-primary-light); border-color: var(--inv-primary); color: var(--inv-primary); }
+.inv-btn:disabled { opacity: .55; cursor: not-allowed; }
+.inv-btn--primary { background: var(--inv-primary); border-color: var(--inv-primary); color: #fff; }
+.inv-btn--primary:hover:not(:disabled) { background: var(--inv-primary-hover); color: #fff; }
+/* El botón Actualizar rota su SVG con la clase .fa-spin que agrega el JS */
+.inv-header-actions svg.fa-spin { animation: inv-btn-spin 900ms linear infinite; }
+@keyframes inv-btn-spin { to { transform: rotate(360deg); } }

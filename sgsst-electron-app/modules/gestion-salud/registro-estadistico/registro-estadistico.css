@@ -4,35 +4,40 @@
    y Enfermedades Laborales
    ============================================================ */
 
+/* Los NOMBRES de token se conservan (--k-*) porque el JS los escribe en
+   estilos en línea (var(--k-text-muted), etc.). Solo cambian los VALORES,
+   remapeados a la paleta canónica de shared/kair-design-tokens.css. */
 .kair-s323 {
-  --k-primary: #174ea6;
-  --k-primary-hover: #185abd;
-  --k-primary-light: rgba(23,78,166,0.08);
-  --k-primary-lighter: rgba(23,78,166,0.04);
-  --k-success: #28a745;
-  --k-success-light: rgba(40,167,69,0.1);
-  --k-warning: #ffc107;
-  --k-warning-light: rgba(255,193,7,0.12);
-  --k-danger: #dc3545;
-  --k-danger-light: rgba(220,53,69,0.1);
-  --k-info: #17a2b8;
-  --k-info-light: rgba(23,162,184,0.1);
-  --k-purple: #6f42c1;
-  --k-purple-light: rgba(111,66,193,0.1);
-  --k-bg-app: #f8f9fa;
+  --k-primary: #2057b8;
+  --k-primary-hover: #1a4a9e;
+  --k-primary-light: #eaf1fb;
+  --k-primary-lighter: #f4f8fd;
+  --k-success: #1bb888;
+  --k-success-light: #e6f5ef;
+  --k-warning: #e7a224;
+  --k-warning-light: #fbf0db;
+  --k-danger: #da5563;
+  --k-danger-light: #fae6e9;
+  --k-info: #3f7fbf;
+  --k-info-light: #eaf1fb;
+  --k-purple: #6d5bb8;
+  --k-purple-light: #efeaf9;
+  --k-bg-app: #fbfcfb;
   --k-bg-card: #ffffff;
-  --k-border: #dee2e6;
-  --k-border-light: #e9ecef;
-  --k-text-dark: #212529;
-  --k-text-muted: #6c757d;
-  --k-text-light: #495057;
+  --k-border: #e8ebee;
+  --k-border-light: #eef0f1;
+  --k-text-dark: #14213d;
+  --k-text-muted: #748096;
+  --k-text-light: #4d5b75;
   --k-text-white: #ffffff;
-  --k-radius: 0.375rem;
-  --k-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  --k-shadow-md: 0 4px 12px rgba(0,0,0,0.1);
-  --k-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-  --k-font: 'Segoe UI', Roboto, Arial, sans-serif;
-  --k-transition: all 0.2s ease;
+  --k-radius: 12px;
+  --k-radius-card: 20px;
+  --k-shadow: 0 2px 7px rgba(37,56,82,0.08);
+  --k-shadow-md: 0 4px 14px rgba(37,56,82,0.10);
+  --k-shadow-lg: 0 12px 32px rgba(20,33,61,0.18);
+  --k-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --k-font-display: 'Manrope', 'DM Sans', sans-serif;
+  --k-transition: 180ms ease-out;
 }
 
 .kair-s323 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,117 +54,144 @@
   overflow: hidden;
 }
 
-/* ---- Header System — Card Pattern (k-section-card) ---- */
-
-/* Card container */
-.kair-s323 .k-section-card {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.375rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+/* ---- Header System v2 (premium) ----
+   Antes el header era una .k-section-card (clase GLOBAL compartida con ~20
+   módulos). Ahora es propio y transparente sobre el canvas, así el CSS del
+   módulo no define NINGUNA clase genérica de otro módulo. */
+.kair-s323-header-v2 {
   flex-shrink: 0;
+  background: transparent;
+  padding: 16px clamp(16px, 1.8vw, 28px) 0;
 }
+.kair-s323-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--k-text-muted);
+}
+.kair-s323-breadcrumb strong { color: var(--k-text-dark); font-weight: 700; }
+.kair-s323-breadcrumb .kair-s323-sep { opacity: .7; }
 
-/* Back button */
-.kair-s323 .header-back-btn {
+.kair-s323-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 0 14px;
+}
+.kair-s323-header-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.kair-s323-header-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--k-radius);
+  background: var(--k-primary-light);
+  color: var(--k-primary);
+}
+.kair-s323-header-icon svg { width: 22px; height: 22px; }
+.kair-s323-title {
+  font-family: var(--k-font-display);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--k-text-dark);
+}
+.kair-s323-sub { font-size: 12.5px; color: var(--k-text-muted); margin: 3px 0 0; }
+
+.kair-s323-header-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap; }
+.kair-s323-company {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #5a6378;
-  background: transparent;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  font-family: inherit;
-}
-
-.kair-s323 .header-back-btn:hover {
-  background: #e8f0fe;
-  color: #174ea6;
-}
-
-/* Company & divider inside card */
-.kair-s323 .k-section-card__company {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: #5a6378;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--k-text-muted);
   white-space: nowrap;
+  background: var(--k-bg-card);
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius);
 }
-
-.kair-s323 .k-section-card__company i {
-  font-size: 0.875rem;
+.kair-s323-company svg { width: 15px; height: 15px; flex-shrink: 0; }
+.kair-s323-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius);
+  background: var(--k-bg-card);
+  color: var(--k-text-dark);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--k-font);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--k-transition);
 }
-
-.kair-s323 .k-section-card__divider {
-  width: 1px;
-  height: 24px;
-  background: #dee2e6;
-  flex-shrink: 0;
+.kair-s323-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.kair-s323-btn:hover:not(:disabled) {
+  background: var(--k-primary-light);
+  border-color: var(--k-primary);
+  color: var(--k-primary);
 }
+.kair-s323-btn--primary { background: var(--k-primary); border-color: var(--k-primary); color: #fff; }
+.kair-s323-btn--primary:hover:not(:disabled) { background: var(--k-primary-hover); color: #fff; }
 
-/* Dark Theme */
-[data-theme="dark"] .kair-s323 .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
-[data-theme="dark"] .kair-s323 .k-section-card h3 { color: #e0e0e0; }
-[data-theme="dark"] .kair-s323 .k-section-card p { color: #9e9e9e; }
-[data-theme="dark"] .kair-s323 .k-section-card__company { color: #9e9e9e; }
-[data-theme="dark"] .kair-s323 .k-section-card__divider { background: #3a3a4d; }
-[data-theme="dark"] .kair-s323 .header-back-btn { color: #9e9e9e; }
-[data-theme="dark"] .kair-s323 .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
-
-/* ---- Tabs ---- */
+/* ---- Tabs (patrón premium: línea gris 1px + subrayado azul 2px) ---- */
 .kair-s323-tabs {
   display: flex;
+  flex-wrap: wrap;
   background: transparent;
-  border-bottom: 2px solid var(--k-border);
-  padding: 0 24px;
+  border-bottom: 1px solid var(--k-border);
+  padding: 0;
   gap: 0;
 }
 .kair-s323-tab {
-  padding: 12px 24px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: var(--k-font);
   color: var(--k-text-muted);
   cursor: pointer;
   border: none;
   background: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   transition: var(--k-transition);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 .kair-s323-tab:hover { color: var(--k-primary); }
 .kair-s323-tab.active {
   color: var(--k-primary);
   border-bottom-color: var(--k-primary);
-  font-weight: 600;
+  font-weight: 700;
 }
 .kair-s323-tab svg { width: 16px; height: 16px; }
 
 /* ---- Panels ---- */
-.kair-s323-panel { 
-  display: none; 
-  padding: 20px 24px; 
+.kair-s323-panel {
+  display: none;
+  padding: 18px clamp(16px, 1.8vw, 28px) 28px;
   flex: 1;
   overflow-y: auto;
 }
-.kair-s323-panel.active { 
-  display: block; 
+.kair-s323-panel.active {
+  display: block;
 }
 
 /* ---- Card ---- */
 .kair-s323-card {
   background: var(--k-bg-card);
   border: 1px solid var(--k-border);
-  border-radius: var(--k-radius);
+  border-radius: var(--k-radius-card);
   box-shadow: var(--k-shadow);
   margin-bottom: 20px;
   overflow: hidden;
@@ -167,7 +199,8 @@
 .kair-s323-card-header {
   padding: 14px 18px;
   border-bottom: 1px solid var(--k-border-light);
-  font-weight: 600;
+  font-family: var(--k-font-display);
+  font-weight: 700;
   font-size: 0.92rem;
   color: var(--k-text-dark);
   display: flex;
@@ -187,7 +220,7 @@
   padding: 14px 18px;
   background: var(--k-bg-card);
   border: 1px solid var(--k-border);
-  border-radius: var(--k-radius);
+  border-radius: var(--k-radius-card);
   margin-bottom: 16px;
 }
 .kair-s323-toolbar .k-search-wrap {
@@ -216,7 +249,7 @@
 .kair-s323-toolbar .k-search-wrap input:focus {
   outline: none;
   border-color: var(--k-primary);
-  box-shadow: 0 0 0 3px rgba(23,78,166,0.15);
+  box-shadow: 0 0 0 3px rgba(32,87,184,0.15);
 }
 .kair-s323-toolbar select,
 .kair-s323-dash-filter select {
@@ -235,14 +268,14 @@
 .kair-s323-dash-filter select:focus {
   outline: none;
   border-color: var(--k-primary);
-  box-shadow: 0 0 0 3px rgba(23,78,166,0.15);
+  box-shadow: 0 0 0 3px rgba(32,87,184,0.15);
 }
 
 /* ---- Table ---- */
 .kair-s323-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--k-border);
-  border-radius: var(--k-radius);
+  border-radius: var(--k-radius-card);
   background: var(--k-bg-card);
 }
 .kair-s323-table {
@@ -263,7 +296,7 @@
   transition: var(--k-transition);
   white-space: nowrap;
 }
-.kair-s323-table th:hover { background: rgba(23,78,166,0.14); }
+.kair-s323-table th:hover { background: rgba(32,87,184,0.14); }
 .kair-s323-table th .k-sort-icon { font-size: 0.7rem; margin-left: 4px; color: var(--k-text-muted); }
 .kair-s323-table th.sorted .k-sort-icon { color: var(--k-primary); }
 .kair-s323-table td {
@@ -275,31 +308,34 @@
   text-overflow: ellipsis;
 }
 .kair-s323-table tbody tr:hover { background: var(--k-primary-lighter); }
-.kair-s323-table tbody tr:nth-child(even) { background: #fafbfc; }
+.kair-s323-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--k-text-muted) 5%, var(--k-bg-card)); }
 .kair-s323-table tbody tr:nth-child(even):hover { background: var(--k-primary-lighter); }
 
-/* ---- Badges ---- */
+/* ---- Badges ----
+   El fondo se DERIVA del color de texto con color-mix: funciona igual en
+   claro y en oscuro sin duplicar 13 reglas en el bloque oscuro. */
 .kair-s323-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 2px 9px;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
-.kair-s323-badge-at { background: var(--k-primary-light); color: var(--k-primary); }
-.kair-s323-badge-ep { background: var(--k-purple-light); color: var(--k-purple); }
-.kair-s323-badge-hombre { background: #e3f2fd; color: #1565c0; }
-.kair-s323-badge-mujer { background: #fce4ec; color: #c62828; }
-.kair-s323-badge-muy-leve { background: var(--k-success-light); color: var(--k-success); }
-.kair-s323-badge-alta { background: var(--k-warning-light); color: #e67e00; }
-.kair-s323-badge-leve { background: var(--k-info-light); color: var(--k-info); }
-.kair-s323-badge-severo { background: var(--k-danger-light); color: var(--k-danger); }
-.kair-s323-badge-ep-sev { background: var(--k-purple-light); color: var(--k-purple); }
-.kair-s323-badge-cerrado { background: var(--k-success-light); color: var(--k-success); }
-.kair-s323-badge-abierto { background: var(--k-warning-light); color: #e67e00; }
-.kair-s323-badge-deportivo { background: #fff3e0; color: #e65100; }
-.kair-s323-badge-laboral { background: #e8f5e9; color: #2e7d32; }
+.kair-s323-badge-at { color: var(--k-primary); }
+.kair-s323-badge-ep { color: var(--k-purple); }
+.kair-s323-badge-hombre { color: var(--k-info); }
+.kair-s323-badge-mujer { color: #c0506a; }
+.kair-s323-badge-muy-leve { color: var(--k-success); }
+.kair-s323-badge-alta { color: #b07c1a; }
+.kair-s323-badge-leve { color: var(--k-info); }
+.kair-s323-badge-severo { color: var(--k-danger); }
+.kair-s323-badge-ep-sev { color: var(--k-purple); }
+.kair-s323-badge-cerrado { color: var(--k-success); }
+.kair-s323-badge-abierto { color: #b07c1a; }
+.kair-s323-badge-deportivo { color: #c26a2b; }
+.kair-s323-badge-laboral { color: var(--k-success); }
 
 /* ---- Pagination ---- */
 .kair-s323-pagination {
@@ -352,7 +388,7 @@
   padding: 14px 18px;
   background: var(--k-bg-card);
   border: 1px solid var(--k-border);
-  border-radius: var(--k-radius);
+  border-radius: var(--k-radius-card);
   margin-bottom: 20px;
 }
 .kair-s323-dash-filter label {
@@ -408,15 +444,15 @@
 @media (max-width: 600px) { .kair-s323-kpi-grid { grid-template-columns: 1fr; } }
 
 @media (max-width: 720px) {
-  .kair-s323 .k-section-card > div:first-child { padding: 1rem !important; }
-  .kair-s323 .k-section-card__company { display: none; }
+  .kair-s323-header-v2 { padding-left: 16px; padding-right: 16px; }
+  .kair-s323-company { display: none; }
 }
 
 .kair-s323-kpi-card {
   background: var(--k-bg-card);
   border: 1px solid var(--k-border);
-  border-radius: var(--k-radius);
-  padding: 16px;
+  border-radius: var(--k-radius-card);
+  padding: 18px;
   box-shadow: var(--k-shadow);
   transition: var(--k-transition);
   position: relative;
@@ -500,13 +536,14 @@
   display: inline-block;
   margin-top: 8px;
   padding: 3px 12px;
-  border-radius: 12px;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
-.kair-s323-sgsst-green { background: #e8f5e9; color: #2e7d32; }
-.kair-s323-sgsst-yellow { background: #fff8e1; color: #f57f17; }
-.kair-s323-sgsst-red { background: #ffebee; color: #c62828; }
+.kair-s323-sgsst-green { color: var(--k-success); }
+.kair-s323-sgsst-yellow { color: #b07c1a; }
+.kair-s323-sgsst-red { color: var(--k-danger); }
 
 /* ---- Alert Panel ---- */
 .kair-s323-alert-list { display: flex; flex-direction: column; gap: 10px; }
@@ -524,10 +561,14 @@
 .kair-s323-alert-item .k-alert-content { flex: 1; }
 .kair-s323-alert-item .k-alert-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 3px; }
 .kair-s323-alert-item .k-alert-desc { font-size: 0.8rem; color: var(--k-text-muted); }
-.kair-s323-alert-red { border-left-color: var(--k-danger) !important; background: #fff5f5; }
-.kair-s323-alert-orange { border-left-color: #e67e00 !important; background: #fff8f0; }
-.kair-s323-alert-yellow { border-left-color: var(--k-warning) !important; background: #fffef5; }
-.kair-s323-alert-blue { border-left-color: var(--k-info) !important; background: #f0f9ff; }
+.kair-s323-alert-red { border-left-color: var(--k-danger) !important; background: color-mix(in srgb, var(--k-danger) 6%, var(--k-bg-card)); }
+.kair-s323-alert-orange { border-left-color: #e08a2e !important; background: color-mix(in srgb, #e08a2e 6%, var(--k-bg-card)); }
+.kair-s323-alert-yellow { border-left-color: var(--k-warning) !important; background: color-mix(in srgb, var(--k-warning) 8%, var(--k-bg-card)); }
+.kair-s323-alert-blue { border-left-color: var(--k-info) !important; background: color-mix(in srgb, var(--k-info) 6%, var(--k-bg-card)); }
+.kair-s323-alert-red .k-alert-icon { color: var(--k-danger); }
+.kair-s323-alert-orange .k-alert-icon { color: #e08a2e; }
+.kair-s323-alert-yellow .k-alert-icon { color: var(--k-warning); }
+.kair-s323-alert-blue .k-alert-icon { color: var(--k-info); }
 
 /* ---- Charts Grid ---- */
 .kair-s323-charts-grid {
@@ -630,7 +671,7 @@
 .kair-s323-text-muted { color: var(--k-text-muted); }
 .kair-s323-text-success { color: var(--k-success); }
 .kair-s323-text-danger { color: var(--k-danger); }
-.kair-s323-text-warning { color: #e67e00; }
+.kair-s323-text-warning { color: #b07c1a; }
 .kair-s323-text-sm { font-size: 0.82rem; }
 .kair-s323-mb-0 { margin-bottom: 0 !important; }
 .kair-s323-mt-4 { margin-top: 16px; }
@@ -670,15 +711,15 @@
   gap: 16px;
   font-size: 0.9rem;
 }
-.k-spinner {
+.kair-s323 .k-spinner {
   width: 40px;
   height: 40px;
   border: 3px solid var(--k-border);
   border-top-color: var(--k-primary);
   border-radius: 50%;
-  animation: kSpinnerRotate 0.75s linear infinite;
+  animation: kairS323Spinner 0.75s linear infinite;
 }
-@keyframes kSpinnerRotate { to { transform: rotate(360deg); } }
+@keyframes kairS323Spinner { to { transform: rotate(360deg); } }
 
 /* ---- Empty State ---- */
 .kair-s323-empty {
@@ -694,7 +735,7 @@
 .kair-s323-empty svg { opacity: 0.2; color: var(--k-text-muted); }
 .kair-s323-empty h3 { font-size: 1.05rem; font-weight: 600; color: var(--k-text-dark); margin-top: 4px; }
 .kair-s323-empty p { font-size: 0.87rem; max-width: 380px; line-height: 1.6; }
-.k-btn-sample {
+.kair-s323 .k-btn-sample {
   margin-top: 8px;
   padding: 8px 22px;
   border: 1px dashed var(--k-primary);
@@ -707,16 +748,16 @@
   transition: var(--k-transition);
   font-weight: 500;
 }
-.k-btn-sample:hover { background: var(--k-primary); color: var(--k-text-white); border-style: solid; }
+.kair-s323 .k-btn-sample:hover { background: var(--k-primary); color: var(--k-text-white); border-style: solid; }
 
 /* ---- Action Buttons ---- */
-.k-action-btns {
+.kair-s323 .k-action-btns {
   display: flex;
   gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
 }
-.k-btn-action {
+.kair-s323 .k-btn-action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -732,13 +773,13 @@
   transition: var(--k-transition);
   white-space: nowrap;
 }
-.k-btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
-.k-btn-action:hover {
+.kair-s323 .k-btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
+.kair-s323 .k-btn-action:hover {
   background: var(--k-primary);
   color: var(--k-text-white);
   border-color: var(--k-primary);
 }
-.k-dash-actions {
+.kair-s323 .k-dash-actions {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
@@ -759,9 +800,9 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: kFadeIn 0.15s ease;
+  animation: kairS323FadeIn 0.15s ease;
 }
-@keyframes kFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kairS323FadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .kair-s323-modal {
   background: var(--k-bg-card);
@@ -772,9 +813,9 @@
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  animation: kSlideUp 0.2s ease;
+  animation: kairS323SlideUp 0.2s ease;
 }
-@keyframes kSlideUp {
+@keyframes kairS323SlideUp {
   from { transform: translateY(16px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
@@ -847,11 +888,11 @@
 
 /* ---- Print Styles ---- */
 @media print {
-  .k-section-card,
+  .kair-s323-header-v2,
   .kair-s323-tabs,
   .kair-s323-panel#panelDatos,
   .kair-s323-modal-backdrop,
-  .k-dash-actions,
+  .kair-s323 .k-dash-actions,
   .kair-s323-dash-filter { display: none !important; }
 
   .kair-s323-panel#panelTablero {
@@ -870,3 +911,61 @@
   .kair-s323-kpi-grid { grid-template-columns: repeat(4, 1fr); }
   .kair-s323-sgsst-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ============================================================
+   MODO OSCURO
+   Cubre LOS DOS atributos que aplica la app (scripts/theme-manager.js):
+   data-theme="dark" (tema Sistema con el SO oscuro) y
+   data-theme="dark-legacy" (Oscuro elegido a mano).
+   El selector ^="dark" matchea los dos con una sola regla.
+   ============================================================ */
+
+[data-theme^="dark"] .kair-s323 {
+  --k-primary: #6ea8fe;
+  --k-primary-hover: #8ab8ff;
+  --k-primary-light: #1b2a44;
+  --k-primary-lighter: #16233a;
+  --k-success: #3ecf9a;
+  --k-success-light: #12302a;
+  --k-warning: #f0b45a;
+  --k-warning-light: #33280f;
+  --k-danger: #e56a76;
+  --k-danger-light: #33191d;
+  --k-info: #6ea8fe;
+  --k-info-light: #1b2a44;
+  --k-purple: #a794e8;
+  --k-purple-light: #241f38;
+  --k-bg-app: #0f172a;
+  --k-bg-card: #1a2334;
+  --k-border: #2f3d55;
+  --k-border-light: #26334a;
+  --k-text-dark: #e8edf5;
+  --k-text-muted: #98a6bf;
+  --k-text-light: #c3cddf;
+  --k-shadow: 0 2px 7px rgba(0,0,0,0.35);
+  --k-shadow-md: 0 4px 14px rgba(0,0,0,0.45);
+  --k-shadow-lg: 0 12px 32px rgba(0,0,0,0.55);
+}
+
+/* Las superficies que usan --k-primary como FONDO necesitan un azul oscuro:
+   con el azul claro del tema oscuro, el texto blanco no se leería. */
+[data-theme^="dark"] .kair-s323 .kair-s323-btn--primary,
+[data-theme^="dark"] .kair-s323 .kair-s323-modal-header,
+[data-theme^="dark"] .kair-s323 .kair-s323-dash-filter .k-period-badge,
+[data-theme^="dark"] .kair-s323 .kair-s323-pagination .k-page-btn.active,
+[data-theme^="dark"] .kair-s323 .kair-s323-pagination .k-page-btn:hover:not(:disabled),
+[data-theme^="dark"] .kair-s323 .kair-s323-recs-list li::before,
+[data-theme^="dark"] .kair-s323 .k-btn-action:hover,
+[data-theme^="dark"] .kair-s323 .k-btn-sample:hover,
+[data-theme^="dark"] .kair-s323 .kair-s323-modal-close {
+  background: #2f5fa8;
+  border-color: #2f5fa8;
+  color: #ffffff;
+}
+
+[data-theme^="dark"] .kair-s323 .kair-s323-modal-close:hover { background: #3d6fbb; }
+[data-theme^="dark"] .kair-s323 .kair-s323-modal-backdrop { background: rgba(0,0,0,0.65); }
+[data-theme^="dark"] .kair-s323 ::-webkit-scrollbar-track { background: var(--k-bg-card); }
+[data-theme^="dark"] .kair-s323 ::-webkit-scrollbar-thumb { background: #3a4a66; }
+[data-theme^="dark"] .kair-s323 ::-webkit-scrollbar-thumb:hover { background: #4a5c7d; }
+[data-theme^="dark"] .kair-s323 .kair-s323-empty svg { opacity: 0.35; }

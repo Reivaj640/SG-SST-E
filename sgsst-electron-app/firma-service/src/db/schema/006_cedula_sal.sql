@@ -1,0 +1,48 @@
+-- =============================================================================
+-- Migración 006: identificacion_numero_sal en sign requests (Bloque P1-2)
+-- =============================================================================
+-- Esta migración es ADITIVA (no breaking para datos existentes).
+--
+-- Cambios:
+--   1. Agrega columna identificacion_numero_sal TEXT a gh_firmas_electronicas.
+--      Es la sal aleatoria por sign request que se usa para hashear la
+--      cédula del trabajador.
+--
+--      Sin sal, una cédula hasheada con SHA-256 es identificable mediante
+--      rainbow table (50M de cédulas colombianas, ~10MB de tabla).
+--      Con sal aleatoria por sign request, el costo de cracking se vuelve
+--      prohibitivo.
+--
+--      La relación con P1-2 (Habeas Data, Ley 1581/2012):
+--      - Antes: identificacion_numero_hash = SHA-256(numero_documento)
+--      - Después: identificacion_numero_hash = SHA-256(sal || numero_documento)
+--      - Legacy: sign requests sin sal (pre-migración) usan SHA-256(numero_documento)
+--
+--   2. Backfill: ninguno. Los sign requests existentes quedan con
+--      identificacion_numero_sal = NULL. identify() usa sha256(raw) como
+--      fallback. K+AIR puede migrar gradualmente (opcional) enviando
+--      identificacion_numero_sal en sign requests nuevos.
+--
+--   3. K+AIR (cliente) debe:
+--      - Generar sal aleatoria de 32 bytes hex (64 chars) por sign request
+--      - Calcular hash = SHA-256(sal || numero_documento)
+--      - Enviar ambos campos en POST /internal/sign-requests
+--
+-- Tests:
+--   - tests/migration-006.test.js verifica que la migración aplica sin
+--     romper sign requests legacy (sin sal) que ya están firmados.
+--   - tests/services/signRequest.test.js (extendido) verifica que:
+--     - Si K+AIR envía sal → se persiste, hash se calcula con sal
+--     - Si K+AIR NO envía sal → se genera automáticamente (server-side)
+--   - tests/routes/public.test.js (extendido) verifica que:
+--     - identify() con sal válida → match OK
+--     - identify() con sal legacy (NULL) → match OK usando sha256(raw)
+--     - identify() con sal incorrecta → falla
+-- =============================================================================
+
+-- 1. Nueva columna en sign requests
+ALTER TABLE gh_firmas_electronicas
+  ADD COLUMN identificacion_numero_sal TEXT;
+
+-- 2. Comentario para documentar el contrato
+-- (SQLite no soporta comentarios en columnas, pero podemos documentar en DATA_MODEL.md)

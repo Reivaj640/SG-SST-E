@@ -19,7 +19,7 @@ class AccionesPcComponent {
         iframe.style.height = '100%';
         iframe.style.border = 'none';
 
-        const viewerUrl = `modules/mejoramiento/acciones-preventivas-correctivas/acciones-pc-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        const viewerUrl = `modules/mejoramiento/acciones-preventivas-correctivas/acciones-pc-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=APC-20260921-v2-scroll`;
         iframe.src = viewerUrl;
 
         this.container.appendChild(iframe);
