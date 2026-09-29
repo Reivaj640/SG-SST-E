@@ -184,6 +184,44 @@
 | `.kair-chart` + `.kair-legend` | Chart SVG nativo | — |
 | `.kair-task` + `.kair-task-icon` | Item de lista con icono circular | — |
 | `.kair-module` + `.kair-module-grid` | Card de submódulo con flecha | — |
+| `.kair-block` | Bloque de contenido + su separación vertical (📦824-ui) | — |
+| `.kair-block__head` | Fila del encabezado de bloque (flex, `gap: 10px`) | — |
+| `.kair-block__chip` | Chip de 30px del encabezado | por color (la pantalla define el suyo) |
+| `.kair-block__text` / `__title` / `__sub` | Caja, título y bajada del encabezado | — |
+| `.kair-block__panel` | **El marco**: fondo, borde, radio, sombra, padding `16px 18px 18px` | — |
+| `.kair-block__grid` | Grid base del panel (`auto-fit`, `gap: clamp(12px, 1.3vw, 18px)`) | la pantalla pone el `minmax` |
+
+**Patrón "bloque con marco" (📦824-ui):** encabezado **fuera** + panel **dentro**. Hoy lo usan
+`presupuesto-home.html` y `presupuesto-selector.html`.
+
+```html
+<div class="kair-block">
+  <div class="kair-block__head">
+    <div class="kair-block__chip"><i class="fas fa-…"></i></div>
+    <div class="kair-block__text">
+      <div class="kair-block__title">Título</div>
+      <div class="kair-block__sub">Bajada en una línea</div>
+    </div>
+    <span class="…__count">2 cargados</span>   <!-- opcional, lo de cada pantalla -->
+  </div>
+  <div class="kair-block__panel">
+    <div class="kair-block__grid"> … </div>
+  </div>
+</div>
+```
+
+**Tres reglas que sostienen el patrón:**
+
+1. **El marco no se re-declara por pantalla.** Si una pantalla vuelve a escribir el fondo, el
+   borde, el radio, la sombra o el padding, el marco vuelve a poder quedar distinto en cada una
+   (pasó: selector y home tenían cada uno su copia y se veían iguales por casualidad).
+2. **`.kair-panel` NO es este marco.** Ese nombre lo usa
+   `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css` como panel de layout
+   con hijos `.fijo`/`.scroll`. Antes de crear cualquier clase `kair-*`, grepear el repo.
+3. **El grid del panel es `auto-fit`, nunca `auto-fill`.** `auto-fill` reserva columnas vacías y
+   les asigna ancho: con pocos elementos el sobrante no desaparece, se muda al **interior** del
+   marco. Y nada de `max-width: 1400px` en la columna de la página: ese tope deja lienzo vacío a
+   los lados en ventanas anchas.
 
 ### 4.3 Botones — cuándo usar cuál
 

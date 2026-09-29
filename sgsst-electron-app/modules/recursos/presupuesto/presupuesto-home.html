@@ -56,93 +56,18 @@
             padding: 3rem 2rem; /* Más espacio arriba y abajo */
         }
 
-        .portal-card {
-            background: white;
-            width: 100%;
-            max-width: 1100px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-lg);
-            padding: 3rem;
-            text-align: center;
-            animation: fadeIn 0.5s ease-out;
-            margin-bottom: 2rem; /* Margen de seguridad al final */
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .portal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid #f1f3f5;
-        }
-
-        .portal-logo {
-            font-family: 'Lexend', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .back-btn-internal {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s;
-            background: #f8f9fa;
-            border: 1px solid var(--border);
-        }
-
-        .back-btn-internal:hover {
-            color: var(--primary);
-            background: var(--primary-light);
-            border-color: var(--primary);
-        }
-
-        .hero-title {
-            font-family: 'Lexend', sans-serif;
-            font-size: 2.5rem;
-            color: var(--text-dark);
-            margin-bottom: 0.5rem;
-        }
-        
-        .hero-subtitle {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            max-width: 650px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-        
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 18px;
-            border-radius: 20px;
-            background: #e8f0fe;
-            color: var(--primary);
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 2rem;
-        }
+        /* 📦824-wide — Se eliminó el CSS muerto del v1 (`.portal-card`,
+           `.portal-header`, `.portal-logo`, `.back-btn-internal`,
+           `.hero-title`, `.hero-subtitle`, `.status-pill`, `fadeIn` y el
+           breakpoint de 768px). Ninguno lo referenciaba ni el HTML ni
+           `presupuesto-home.js`: fueron reemplazados por el header premium
+           (`.pres-home__*`), que vive más abajo. Un selector que no aplica
+           nada engaña a quien lea el archivo después, y el breakpoint además
+           competía con los grids `auto-fit`, que ya se adaptan solos. */
 
         .main-actions {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -193,20 +118,11 @@
             flex-shrink: 0;
         }
 
-        .quick-actions {
-            margin-top: 3.5rem;
-            text-align: left;
-        }
-        
-        .quick-actions-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            color: var(--text-dark);
-            border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 0.5rem;
-            display: inline-block;
-        }
+        /* 📦824-wide — `.quick-actions` y `.quick-actions-title` murieron: el
+           bloque de herramientas ahora es un `.kair-block` más y su separación
+           la pone el margin del bloque compartido. La clase genérica
+           `quick-actions` además está usada por otros módulos con otro
+           significado; aquí ya no hacía falta. */
 
         .actions-grid {
             display: grid;
@@ -376,11 +292,10 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        @media (max-width: 768px) {
-            .main-actions { grid-template-columns: 1fr; }
-            .hero-title { font-size: 1.8rem; }
-            .portal-card { padding: 2rem 1.5rem; }
-        }
+        /* 📦824-wide — El breakpoint de 768px se eliminó: los grids usan
+           `auto-fit` + `minmax`, así que ya se adaptan al ancho sin él. Y en
+           una app Electron de escritorio un breakpoint así casi nunca se
+           alcanza, mientras que sí confunde a quien lea el archivo. */
 
         /* ═══════════════════════════════════════════════════════════
            PREMIUM v1 (2026-09-15) — Portal sin caja gigante, header
@@ -389,7 +304,10 @@
            ═══════════════════════════════════════════════════════════ */
         body { background: var(--kair-canvas, #fbfcfb); }
 
-        .pres-home { width: 100%; max-width: 1400px; margin: 0 auto; box-sizing: border-box; }
+        /* 📦824-wide — A todo el ancho. Estaba topeada a 1400px y centrada, así
+           que en pantallas anchas quedaban ~280px de lienzo vacío a cada lado:
+           el mismo vacío que había reportado en el selector. */
+        .pres-home { width: 100%; max-width: none; margin: 0; box-sizing: border-box; }
         /* El contenedor legacy centra sus hijos (align-items:center) y trae
            padding propio; con el layout full-width premium necesitamos hijos
            a todo el ancho y un padding acorde al nuevo diseño. */
@@ -426,13 +344,7 @@
         .main-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10); border-color: #c8d7ef; }
         .main-action-card.primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
 
-        /* Sección de herramientas */
-        .quick-actions { margin-top: clamp(22px, 2.6vw, 36px); }
-        .quick-actions-title {
-            font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'Lexend');
-            letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
-            border-bottom: 0; padding-bottom: 0; margin-bottom: clamp(12px, 1.3vw, 18px); display: block;
-        }
+        /* Sección de herramientas: sin CSS propio, la separa `.kair-block`. */
         .action-card {
             background: var(--kair-card, #fff); border: 1px solid var(--kair-line, #e8ebee);
             border-radius: 16px; box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04);
@@ -440,6 +352,33 @@
         .action-card:hover { border-color: #c8d7ef; background: #fff; box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07); transform: translateY(-3px); }
         .action-icon { border-radius: 10px; background: var(--kair-soft, #f3f6f6); box-shadow: none; }
         .action-title { color: var(--kair-ink, #14213d); font-size: 0.9rem; }
+
+        /* ═══════════════════════════════════════════════════════════
+           📦824-wide — Los dos bloques del home con marco, igual que
+           en el selector. El marco y el encabezado de bloque NO se
+           redefinen acá: vienen de `shared/kair-components.css`
+           (`.kair-block__panel` + `.kair-block`), que es donde viven para
+           que home, selector y gestión compartan una sola medida.
+
+           Solo queda lo que sí es de esta pantalla: el piso de ancho
+           de cada grid y el relleno de la flecha de las cards
+           grandes, que se estiran a todo el ancho y sin ella
+           quedarían con un vacío al lado.
+           ═══════════════════════════════════════════════════════════ */
+        .pres-home__grid--actions { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+        .pres-home__grid--tools { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+        .main-action-card { position: relative; padding-right: 3.25rem; }
+        .main-action-card::after {
+            content: '';
+            position: absolute; right: 22px; top: 50%;
+            width: 9px; height: 9px;
+            border-top: 2px solid #b9c2d0; border-right: 2px solid #b9c2d0;
+            transform: translateY(-50%) rotate(45deg);
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .main-action-card:hover::after { border-color: #fff; transform: translateY(-50%) translateX(3px) rotate(45deg); }
+        .main-action-card.primary::after { border-color: rgba(255, 255, 255, 0.75); }
     </style>
 </head>
 <body>
@@ -465,29 +404,41 @@
             </div>
         </div>
 
-        <div class="main-actions">
-                
-                <div class="main-action-card primary" onclick="enterBudget()">
-                    <div class="main-action-icon">
-                        <i class="fas fa-chart-line" id="main-action-icon-gestionar"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title" id="main-action-title-gestionar">Gestionar Presupuesto</div>
-                        <div class="action-desc" id="main-action-desc-gestionar">Ver y editar el presupuesto del año actual con detalle de partidas y ejecución.</div>
-                    </div>
+        <div class="kair-block">
+            <div class="kair-block__head">
+                <div class="kair-block__chip"><i class="fas fa-compass"></i></div>
+                <div class="kair-block__text">
+                    <div class="kair-block__title">Gestionar e histórico</div>
+                    <div class="kair-block__sub">Abra el presupuesto vigente o consulte años anteriores.</div>
                 </div>
-
-                <div class="main-action-card" onclick="openSelector()">
-                    <div class="main-action-icon" style="background: #fff3e0; color: #ff9800;">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title">Histórico de Años</div>
-                        <div class="action-desc">Consultar o abrir presupuestos de años fiscales anteriores almacenados.</div>
-                    </div>
-                </div>
-
             </div>
+
+            <div class="kair-block__panel">
+                <div class="main-actions kair-block__grid pres-home__grid--actions">
+
+                        <div class="main-action-card primary" onclick="enterBudget()">
+                            <div class="main-action-icon">
+                                <i class="fas fa-chart-line" id="main-action-icon-gestionar"></i>
+                            </div>
+                            <div class="main-action-content">
+                                <div class="action-title" id="main-action-title-gestionar">Gestionar Presupuesto</div>
+                                <div class="action-desc" id="main-action-desc-gestionar">Ver y editar el presupuesto del año actual con detalle de partidas y ejecución.</div>
+                            </div>
+                        </div>
+
+                        <div class="main-action-card" onclick="openSelector()">
+                            <div class="main-action-icon" style="background: #fff3e0; color: #ff9800;">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <div class="main-action-content">
+                                <div class="action-title">Histórico de Años</div>
+                                <div class="action-desc">Consultar o abrir presupuestos de años fiscales anteriores almacenados.</div>
+                            </div>
+                        </div>
+
+                    </div>
+            </div>
+        </div>
 
             <!-- 📦708 (Fase 3.5) — Sección "Base de Datos Local" OCULTA del home.
                  Ahora se accede desde el botón "📊 Info BD" en el header de la gestion view.
@@ -543,35 +494,43 @@
                 </div>
             </div>
 
-            <div class="quick-actions">
-                <div class="quick-actions-title">Herramientas Presupuestales</div>
-                
-                <div class="actions-grid">
-                    
-                    <div class="action-card" onclick="exportBudget()">
-                        <div class="action-icon success"><i class="fas fa-file-invoice-dollar"></i></div>
-                        <div class="action-title">Informe Financiero</div>
-                        <div class="action-desc">Generar reporte consolidado de ejecución presupuestal en PDF.</div>
+            <div class="kair-block">
+                <div class="kair-block__head">
+                    <div class="kair-block__chip" style="background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);"><i class="fas fa-tools"></i></div>
+                    <div class="kair-block__text">
+                        <div class="kair-block__title">Herramientas presupuestales</div>
+                        <div class="kair-block__sub">Acciones rápidas sobre el presupuesto del período.</div>
                     </div>
+                </div>
 
-                    <div class="action-card" onclick="cloneBudget()">
-                        <div class="action-icon info"><i class="fas fa-copy"></i></div>
-                        <div class="action-title">Clonar para Próximo Año</div>
-                        <div class="action-desc">Proyectar el presupuesto del siguiente año basado en el actual.</div>
+                <div class="kair-block__panel">
+                    <div class="actions-grid kair-block__grid pres-home__grid--tools">
+
+                        <div class="action-card" onclick="exportBudget()">
+                            <div class="action-icon success"><i class="fas fa-file-invoice-dollar"></i></div>
+                            <div class="action-title">Informe Financiero</div>
+                            <div class="action-desc">Generar reporte consolidado de ejecución presupuestal en PDF.</div>
+                        </div>
+
+                        <div class="action-card" onclick="cloneBudget()">
+                            <div class="action-icon info"><i class="fas fa-copy"></i></div>
+                            <div class="action-title">Clonar para Próximo Año</div>
+                            <div class="action-desc">Proyectar el presupuesto del siguiente año basado en el actual.</div>
+                        </div>
+
+                        <div class="action-card" onclick="importExpenses()">
+                            <div class="action-icon warning"><i class="fas fa-file-import"></i></div>
+                            <div class="action-title">Importar Gastos</div>
+                            <div class="action-desc">Cargar registros de ejecución desde archivos externos de contabilidad.</div>
+                        </div>
+
+                        <div class="action-card" onclick="configItems()">
+                            <div class="action-icon danger"><i class="fas fa-cogs"></i></div>
+                            <div class="action-title">Configurar Partidas</div>
+                            <div class="action-desc">Ajustar rubros, categorías y límites de gasto del sistema.</div>
+                        </div>
+
                     </div>
-
-                    <div class="action-card" onclick="importExpenses()">
-                        <div class="action-icon warning"><i class="fas fa-file-import"></i></div>
-                        <div class="action-title">Importar Gastos</div>
-                        <div class="action-desc">Cargar registros de ejecución desde archivos externos de contabilidad.</div>
-                    </div>
-
-                    <div class="action-card" onclick="configItems()">
-                        <div class="action-icon danger"><i class="fas fa-cogs"></i></div>
-                        <div class="action-title">Configurar Partidas</div>
-                        <div class="action-desc">Ajustar rubros, categorías y límites de gasto del sistema.</div>
-                    </div>
-
                 </div>
             </div>
 

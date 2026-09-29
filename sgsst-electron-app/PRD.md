@@ -1,7 +1,7 @@
 # PRD — K+AIR (Sistema de Gestión SG-SST)
 
 > **Para:** sesiones de AI que continúen el proyecto + Javier Robles F. (owner) como referencia.
-> **Versión del doc:** 0.1.223 (29 sept 2026) — sincronizada con `package.json` y commit `📦824`.
+> **Versión del doc:** 0.1.224 (29 sept 2026) — sincronizada con `package.json` y commit `📦824-ui`.
 > **Estado:** Producto en desarrollo activo. **NO release oficial** desde v0.1.205 (los siguientes son commits de desarrollo).
 
 ---
@@ -294,6 +294,55 @@ hacía que cualquier guardado destruyera lo que la grilla no viajaba.
 - La fila `TOTAL AÑO` de los archivos de Tempoactiva trae la fórmula **duplicada** (declara el
   doble del asignado y ×1,71 del ejecutado). Se usa la **suma real** de las partidas y los
   declarados se guardan aparte como **avisos** de importación, para que el owner vea qué encontró.
+
+### 6.9 Presupuesto SG-SST — capa visual de bloques (`📦824-ui`)
+
+**Requisitos del owner (29 sept 2026, en tres iteraciones sobre la UI):**
+
+| # | Requisito | Estado |
+|---|---|---|
+| 1 | Los períodos cargados dentro de un contenedor visual propio, como los archivos de Drive | ✅ |
+| 2 | Que la interfaz **use todo el espacio disponible** (sin vacíos a los lados) | ✅ |
+| 3 | Los mismos contenedores en el home: accesos (gestionar + histórico) y herramientas | ✅ |
+| 4 | Que no quede la "notificación oculta" asomando en el borde inferior | ✅ |
+
+**El bloque con marco es un componente compartido, no una convención por pantalla:**
+
+| Clase | Qué es |
+|---|---|
+| `.kair-block` | bloque + su separación vertical |
+| `.kair-block__head` | fila del encabezado (flex) |
+| `.kair-block__chip` / `__text` / `__title` / `__sub` | chip, caja, título y bajada |
+| `.kair-block__panel` | el marco (fondo, borde, radio, sombra, padding) |
+| `.kair-block__grid` | grid base del panel (`auto-fit`, gap `clamp(12px, 1.3vw, 18px)`) |
+
+Vive **una sola vez** en `shared/kair-components.css` y lo consumen `presupuesto-home.html` y
+`presupuesto-selector.html`. Cada pantalla declara solo lo suyo: el `minmax` de su grid y su layout
+local. **Regla: el nombre `.kair-panel` está tomado** por
+`modules/verificacion/revision-alta-direccion/revision-alta-direccion.css` (panel de layout con
+hijos `.fijo`/`.scroll`) y por la documentación de AGENTS.md; `kair-` no es un namespace libre.
+
+**Criterios de layout (transversales a cualquier pantalla con bloques):**
+
+- **Ancho completo**: nada de `max-width: 1400px` + `margin: 0 auto` en pantallas anchas.
+- **`auto-fit`, nunca `auto-fill`**, en un grid dentro de un panel: `auto-fill` reserva columnas
+  vacías y el espacio sobrante se muda al **interior** del recuadro, que es peor que el margen.
+- **Reacomodo sin media queries**: `flex-wrap` + `flex-basis` para que una card pase de apilada a
+  dos columnas según el espacio. En una app Electron, un breakpoint menor al ancho mínimo de
+  ventana es código muerto — el home quedó sin un solo `@media`.
+- **Ojo con `align-items: center` en la card base**: encoge cada hijo a su contenido; si la card
+  debe ocupar su ancho, la variante necesita `align-items: stretch`.
+
+**Bug de CSS corregido:** el toast "oculto" asomaba ~4px en el borde inferior.
+`transform: translateY(150%)` es un porcentaje de la **altura propia** del elemento, no de la
+distancia a cubrir; con `bottom: 2rem` quedaba a `32px − 0,5×alto` del borde. Patrón correcto:
+`translateY(calc(100% + <offset>))` + `opacity: 0`. Copiado (en archivo muerto) en
+`modules/gestion-integral/politica/politica-view-temp.html`.
+
+**Verificación de UI:** con `BrowserWindow({ show: false })` Chromium no produce frames → las
+transiciones no avanzan y `getComputedStyle()` devuelve el valor anterior al cambio de clase. Para
+medir un estado animado, inyectar `* { transition: none !important; animation: none !important }`
+o mostrar la ventana. Validador propio de 40 checks + suite de Presupuesto 473/473.
 
 ---
 

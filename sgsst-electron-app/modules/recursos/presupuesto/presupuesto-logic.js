@@ -27,10 +27,10 @@ class PresupuestoGestionComponent {
 
         switch (this.currentView) {
             case 'home':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRE-20260915-v2-fix-script', 'home');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRESUP-20260929-824-home-blocks', 'home');
                 break;
             case 'selector':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html?v=PRE-20260915-v2-fix-script', 'selector');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html?v=PRESUP-20260929-824-shared-block', 'selector');
                 break;
             case 'gestion':
                 this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html?v=PRE-20260915-v2-fix-script', 'gestion');

@@ -83,10 +83,15 @@ HEADER ACTION BUTTONS
             box-sizing: border-box;
         }
 
-        /* Grid de Años */
+        /* Grid de Años
+           📦824-wide — Era `repeat(auto-fill, minmax(300px, 1fr))` porque antes
+           las cards de período eran hijas directas. Ahora cada hijo (encabezado
+           de bloque y panel) ocupa la fila entera con `grid-column: 1/-1`, así
+           que una sola columna describe bien el layout y no quedan columnas
+           vacías reservadas. */
         .year-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: 1fr;
             gap: 1.5rem;
         }
 
@@ -133,12 +138,6 @@ HEADER ACTION BUTTONS
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--k-text-main);
-        }
-
-        .year-meta {
-            font-size: 0.8rem;
-            color: var(--k-text-muted);
-            margin-top: 0.25rem;
         }
 
         /* Panel de Detalles (Contextual) */
@@ -218,16 +217,25 @@ HEADER ACTION BUTTONS
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* Toast */
+        /* 📦824 — El toast "oculto" asomaba una franja en el borde inferior.
+           `translateY(150%)` es un porcentaje de la ALTURA PROPIA del toast, no
+           del espacio que hay que bajar: como el toast está a `bottom: 2rem`,
+           bajar solo 1.5 alturas lo dejaba a `32px - 0.5*alto` del borde, o sea
+           ~4px de franja blanca con su filete azul siempre visibles (en ventana
+           ancha, con 2 períodos, quedaba abajo a la derecha). Se corrige
+           bajando la altura completa más el margen, y con `opacity: 0` para que
+           un toast de varias líneas tampoco pueda asomar. */
         .k-toast {
             position: fixed; bottom: 2rem; right: 2rem;
             background: white; padding: 1rem 1.5rem;
             border-radius: var(--k-radius-lg);
             box-shadow: 0 8px 16px rgba(0,0,0,0.12);
             display: flex; align-items: center; gap: 0.75rem;
-            transform: translateY(150%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateY(calc(100% + 2rem)); opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s;
             z-index: 2000; border-left: 4px solid var(--k-primary); font-weight: 500;
         }
-        .k-toast.show { transform: translateY(0); }
+        .k-toast.show { transform: translateY(0); opacity: 1; }
         .k-toast.success { border-left-color: var(--k-success); }
         .k-toast.error { border-left-color: var(--k-danger); }
 
@@ -237,7 +245,13 @@ HEADER ACTION BUTTONS
            (patrón aprobado en Capacitación).
            ═══════════════════════════════════════════════════════════ */
         body { background: var(--kair-canvas, #fbfcfb); }
-        .content-area { max-width: 1400px; gap: clamp(18px, 2vw, 28px); }
+        /* 📦824-wide — La columna ocupa todo el ancho de la ventana. Estaba
+           topeada a 1400px y centrada, así que en pantallas anchas quedaban
+           ~280px de lienzo vacío a cada lado. Los grids de abajo usan `auto-fit`
+           y no `auto-fill`: `auto-fill` reserva columnas vacías, y con 2
+           períodos cargados el hueco reaparecía DENTRO del recuadro — el mismo
+           vacío, solo que mudado de lugar. */
+        .content-area { max-width: none; gap: clamp(18px, 2vw, 28px); }
 
         .pres-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
         .pres-header__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
@@ -262,52 +276,196 @@ HEADER ACTION BUTTONS
         .year-icon { color: var(--kair-blue, #2057b8); opacity: 1; }
         .year-number { font-family: var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; }
 
-        /* 📦824 — Cards de período (BD) vs. de archivo (Drive, sin importar).
-           Mismo componente, distinto acento: la de BD lleva cifras y acciones,
-           la de Drive es solo una invitación a importar. */
+        /* ══════════════════════════════════════════════════════════════
+           📦824-modern — Premium v2: selección de período.
+           Mismo lenguaje visual del home del módulo (main-action-card
+           gradient 135°, pres-home__pill y las progress bars de las metric
+           cards de Gestión Humana). La diferencia clave con la v1: el %
+           de ejecución deja de ser un número suelto y pasa a barra.
 
-        .selector-section-title {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.05em; color: var(--kair-muted, #64748b);
-            margin: 10px 0 2px;
+           Este bloque REEMPLAZA al diseño v1 de las cards (`.year-meta*`,
+           `.year-stats`, `.year-btn*`, `.year-card--pendiente`,
+           `.selector-section-title`), que quedó sin uso y se eliminó: un
+           selector de estilos muerto engaña a quien lea el archivo después
+           (y arrastraba una referencia colgante a `--kair-warning`, token
+           que NO existe en kair-design-tokens.css — el color de aviso real
+           es `--kair-amber-text`).
+           ══════════════════════════════════════════════════════════════ */
+
+        /* — Encabezado de sección: chip + título + contador a la derecha —
+           📦824-wide — El chip, el texto, el título y la bajada ya no se
+           definen acá: son `.kair-block__chip/__text/__title/__sub` de
+           `shared/kair-components.css`, los mismos que usa el home. Lo único
+           propio del selector es el `grid-column` (el encabezado ocupa la fila
+           entera del grid) y el contador de la derecha. */
+        .sel-section { grid-column: 1 / -1; }
+        .sel-section__chip--drive { background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096); }
+        .sel-section__chip--warn { background: var(--kair-amber-soft, #fbf0db); color: var(--kair-amber-text, #b07c1a); }
+        .sel-section__count {
+            margin-left: auto; flex-shrink: 0;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+            padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
         }
+        .sel-section__count--bd { background: var(--kair-blue-soft, #eaf1fb); color: var(--kair-blue-text, #2057b8); }
+        .sel-section__count--warn { background: var(--kair-amber-soft, #fbf0db); color: var(--kair-amber-text, #b07c1a); }
 
-        .year-card--bd { border-left: 3px solid var(--kair-blue, #2057b8); }
-        .year-card--pendiente { border-left: 3px solid var(--kair-line, #e8ebee); background: var(--kair-soft, #f8fafc); }
-        .year-card--pendiente .year-icon { color: var(--kair-muted, #94a3b8); }
-
-        .year-meta--cargado {
-            display: inline-block; margin-top: 4px; padding: 2px 9px;
-            background: #e8f0fc; color: var(--kair-blue, #2057b8);
-            border-radius: 999px; font-size: 0.7rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.04em;
-        }
-        .year-meta--small { font-size: 0.72rem; margin-top: 4px; opacity: 0.85; }
-        .year-meta--warn { color: var(--kair-warning, #b45309); font-size: 0.72rem; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
-
-        .year-stats {
-            display: flex; flex-direction: column; gap: 3px;
-            margin-top: 10px; padding-top: 9px;
-            border-top: 1px dashed var(--kair-line, #e8ebee);
-            font-size: 0.78rem;
-        }
-        .year-stats > div { display: flex; justify-content: space-between; gap: 10px; }
-        .year-stats span { color: var(--kair-muted, #64748b); }
-        .year-stats b { font-variant-numeric: tabular-nums; color: var(--kair-ink, #1e293b); }
-
-        .year-actions { display: flex; gap: 7px; margin-top: 12px; }
-        .year-btn {
-            flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 8px 10px; border-radius: 10px; cursor: pointer;
+        /* — Card de período en BD — */
+        .year-card--bd {
             border: 1px solid var(--kair-line, #e8ebee);
-            background: #fff; color: #536177; font-weight: 600; font-size: 0.8rem;
-            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            border-radius: var(--kair-radius-card, 20px);
+            box-shadow: var(--kair-shadow-card, 0 2px 7px rgba(37, 56, 82, 0.08));
+            background: var(--kair-card, #fff);
+            padding: 20px 22px 18px;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            /* La card base centra sus hijos (`align-items: center`), y con el
+               contenido justo de ancho eso no se notaba. Al ensancharse, cada
+               bloque se encogía a su contenido y todo quedaba amontonado en el
+               centro en vez de repartir la card. `stretch` devuelve el control
+               al ancho real de la card. */
+            align-items: stretch;
+            justify-content: flex-start;
         }
-        .year-btn:hover { background: var(--kair-soft, #f3f6f6); }
-        .year-btn:active { transform: scale(0.98); }
-        .year-btn--primary { background: var(--kair-blue, #2057b8); border-color: var(--kair-blue, #2057b8); color: #fff; }
-        .year-btn--primary:hover { background: #17408a; }
+        /* Sin filete de acento: se probó el ::before con gradient de 3px (el
+           recurso de la card .primary del home) y en una card con tantas cifras
+           cortaba la lectura — el peso visual lo aporta el año en display y la
+           barra de ejecución, no una línea decorativa. */
+        .year-card--bd:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
+            border-color: #c8d7ef;
+        }
+
+        .pdb__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .pdb__year {
+            font: 800 clamp(26px, 2.4vw, 34px)/1 var(--kair-font-display, 'Manrope');
+            letter-spacing: -0.045em; color: var(--kair-ink, #14213d);
+            font-variant-numeric: tabular-nums;
+        }
+        .pdb__pill {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+            padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+            background: var(--kair-blue-soft, #eaf1fb); color: var(--kair-blue-text, #2057b8);
+        }
+        .pdb__pill--warn { background: var(--kair-amber-soft, #fbf0db); color: var(--kair-amber-text, #b07c1a); }
+
+        /* 📦824-wide — Cuerpo en dos zonas que se reacomodan solas, sin media
+           query. En una card angosta (4+ años en pantalla) NO cabe una zona al
+           lado de la otra y se apilan, igual que antes; cuando sobra ancho (pocos
+           períodos, ventana grande) las cifras quedan a la izquierda y la
+           ejecución + acciones a la derecha, en vez de estirar un solo bloque a
+           lo largo y dejar la card descompensada. */
+        .pdb__body { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+        .pdb__figs { flex: 1 1 260px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
+        .pdb__side { flex: 1 1 240px; min-width: 220px; display: flex; flex-direction: column; }
+        .pdb__fig {
+            background: var(--kair-soft, #f3f6f6); border-radius: 12px; padding: 10px 12px; min-width: 0;
+            /* Contenido centrado en la vertical: en una card angosta el alto es
+               justo el del contenido y no cambia nada; en una ancha, donde la
+               zona de la derecha es más alta, el tile deja de verse medio vacío. */
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .pdb__fig-label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--kair-muted, #748096);
+        }
+        .pdb__fig-value {
+            margin-top: 3px; font: 700 clamp(14px, 1.25vw, 17px)/1.15 var(--kair-font-display, 'Manrope');
+            letter-spacing: -0.025em; color: var(--kair-ink, #14213d);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* Barra de ejecución — patrón de las metric cards de Gestión Humana.
+           `flex: 1` + centrado: dentro de la zona derecha ocupa la altura que
+           sobre y deja la barra alineada con el centro de las cifras. */
+        .pdb__exec { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .pdb__exec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .pdb__exec-label { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; font-size: 10px; color: var(--kair-muted, #748096); }
+        .pdb__exec-value { font: 800 clamp(15px, 1.35vw, 19px)/1 var(--kair-font-display, 'Manrope'); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+        .pdb__bar { margin-top: 7px; height: 7px; border-radius: 999px; background: var(--kair-soft, #f3f6f6); overflow: hidden; }
+        .pdb__bar-fill { height: 100%; border-radius: 999px; transition: width 0.35s ease; }
+        .pdb__bar-fill--ok { background: linear-gradient(90deg, #1bb888 0%, #16a37b 100%); }
+        .pdb__bar-fill--warn { background: linear-gradient(90deg, #e7a224 0%, #c9890f 100%); }
+        .pdb__bar-fill--over { background: linear-gradient(90deg, #d0453c 0%, #a52f28 100%); }
+
+        /* Chips informativos */
+        .pdb__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+        .pdb__chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
+        }
+        .pdb__chip--warn { background: var(--kair-amber-soft, #fbf0db); color: var(--kair-amber-text, #b07c1a); }
+        .pdb__chip i { font-size: 0.68rem; }
+
+        .pdb__actions { display: flex; gap: 8px; margin-top: 16px; }
+        .pdb__btn {
+            flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 10px 14px; border-radius: var(--kair-radius-control, 12px);
+            font: 700 0.83rem var(--kair-font-ui, 'DM Sans'); cursor: pointer;
+            border: 1px solid var(--kair-line, #e8ebee);
+            background: #fff; color: var(--kair-ink, #14213d);
+            transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+        }
+        .pdb__btn:hover { background: var(--kair-soft, #f3f6f6); }
+        .pdb__btn:active { transform: scale(0.98); }
+        .pdb__btn--primary {
+            background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
+            border-color: transparent; color: #fff;
+            box-shadow: var(--kair-shadow-soft, 0 8px 18px rgba(32, 87, 184, 0.15));
+        }
+        .pdb__btn--primary:hover { background: linear-gradient(135deg, #1a4ba0 0%, #12233f 100%); }
+        .pdb__btn--icon { flex: 0 0 auto; padding: 10px 13px; }
+
+        /* — Marco contenedor de cada bloque —
+           📦824-wide — Los períodos cargados y los años de Drive son dos
+           bloques hermanos y ambos van dentro de un marco, para que la
+           pantalla se lea igual que el home.
+
+           El marco (fondo, borde, radio, sombra, padding) y el grid base ya
+           no se definen acá: vienen de `shared/kair-components.css`
+           (`.kair-block__panel` + `.kair-block__grid`), los mismos que usa el home.
+           Antes el selector traía su propia copia y el home otra: dos medidas
+           para el mismo marco, que es justo como se rompe la homogeneidad
+           entre pantallas.
+
+           Lo que sí es propio del selector queda aquí: `grid-column` (cada
+           bloque ocupa la fila entera) y el `minmax` de cada grid, porque una
+           card de período y un tile de Drive no usan el mismo piso de ancho.
+           Y el contenedor NO rediseña la card: `.year-card--bd` conserva su
+           padding, tipografía, cifras y barra tal cual. */
+        .sel-bd,
+        .sel-drive {
+            grid-column: 1 / -1;
+        }
+        .sel-bd__grid { margin-top: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        /* Años de Drive: tiles compactos agrupados, no 6 cards repetidas. */
+        .sel-drive__grid { margin-top: 14px; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); }
+        .sel-tile {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 12px; border-radius: var(--kair-radius-control, 12px);
+            background: var(--kair-soft, #f3f6f6); border: 1px solid transparent;
+            transition: background 0.15s, border-color 0.15s, transform 0.12s;
+        }
+        .sel-tile:hover { background: #fff; border-color: #c8d7ef; transform: translateY(-2px); }
+        .sel-tile__icon {
+            width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: #fff; color: #1bb888; font-size: 0.95rem;
+        }
+        .sel-tile__text { min-width: 0; flex: 1; }
+        .sel-tile__year { font: 800 0.98rem/1.1 var(--kair-font-display, 'Manrope'); letter-spacing: -0.02em; color: var(--kair-ink, #14213d); font-variant-numeric: tabular-nums; }
+        .sel-tile__file { font-size: 10.5px; color: var(--kair-muted, #748096); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sel-tile__btn {
+            flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            border: none; cursor: pointer; font-size: 0.82rem;
+            background: var(--kair-blue, #2057b8); color: #fff;
+            transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
+        }
+        .sel-tile__btn:hover { background: #17408a; box-shadow: 0 6px 14px rgba(32, 87, 184, 0.28); }
+        .sel-tile__btn:active { transform: scale(0.94); }
 
         /* Panel de archivo — premium */
         .file-context-panel {
@@ -346,9 +504,10 @@ HEADER ACTION BUTTONS
     </button>
   </div>
 </div>
-        <!-- Grid Container -->
+        <!-- Grid Container — cada bloque se rotula con su propio encabezado
+             premium v2 (chip + título + contador), así que el h3 suelto
+             "Seleccione Año Fiscal" solo competía por la jerarquía visual. -->
         <div>
-            <h3 class="section-title">Seleccione Año Fiscal</h3>
             <div class="year-grid" id="yearOptions">
                 <!-- Inyectado por JS -->
             </div>
@@ -540,15 +699,27 @@ HEADER ACTION BUTTONS
 
             // ── Años que YA están en la BD ──────────────────────────────
             if (periodos.length) {
-                const titulo = document.createElement('div');
-                titulo.className = 'selector-section-title';
-                titulo.style.gridColumn = '1/-1';
-                titulo.innerHTML = '<i class="fas fa-database"></i> Períodos en la base de datos';
-                container.appendChild(titulo);
-
+                container.appendChild(buildSeccion({
+                    chip: 'fa-database', chipMod: '',
+                    titulo: 'Períodos en la base de datos',
+                    sub: 'Datos ya cargados. Ábralos para editar o reimporte desde Drive.',
+                    count: periodos.length + ' ' + (periodos.length === 1 ? 'cargado' : 'cargados'),
+                    countMod: '--bd'
+                }));
+                // 📦824-modern — Las cards viven dentro de su propio marco (`.sel-bd`),
+                // igual que los tiles de Drive (`.sel-drive`). Antes iban sueltas
+                // sobre el canvas, que rompía la simetría: un bloque con recuadro y
+                // otro sin él. El marco es el MISMO para los dos (reglas agrupadas en
+                // el CSS) y no toca la card por dentro.
+                const panel = document.createElement('div');
+                panel.className = 'sel-bd kair-block__panel';
+                const grid = document.createElement('div');
+                grid.className = 'sel-bd__grid kair-block__grid';
                 periodos.sort((a, b) => b.anio - a.anio).forEach(p => {
-                    container.appendChild(buildPeriodoCard(p));
+                    grid.appendChild(buildPeriodoCard(p));
                 });
+                panel.appendChild(grid);
+                container.appendChild(panel);
             }
 
             // ── Años que solo existen en Drive (aún no importados) ──────
@@ -565,25 +736,51 @@ HEADER ACTION BUTTONS
                 .sort((a, b) => b.localeCompare(a));
 
             if (aniosPendientes.length) {
-                const titulo2 = document.createElement('div');
-                titulo2.className = 'selector-section-title';
-                titulo2.style.gridColumn = '1/-1';
-                titulo2.innerHTML = '<i class="fas fa-file-excel"></i> En Drive, sin importar todavía';
-                container.appendChild(titulo2);
-
-                aniosPendientes.forEach(year => {
-                    container.appendChild(buildPendienteCard(year, porAnio[year]));
-                });
+                // 📦824-modern — Un solo panel con tiles, en vez de una card
+                // por año. Antes eran 6 cards idénticas con el mismo ícono de
+                // Excel que ocupaban una fila entera y no aportaban jerarquía.
+                container.appendChild(buildSeccion({
+                    chip: 'fa-file-excel', chipMod: 'sel-section__chip--drive',
+                    titulo: 'En Drive, sin importar',
+                    sub: 'Estos años existen en Drive pero todavía no están en la app.',
+                    count: aniosPendientes.length + ' ' + (aniosPendientes.length === 1 ? 'disponible' : 'disponibles'),
+                    countMod: ''
+                }));
+                const panel = document.createElement('div');
+                panel.className = 'sel-drive kair-block__panel';
+                const grid = document.createElement('div');
+                grid.className = 'sel-drive__grid kair-block__grid';
+                aniosPendientes.forEach(year => grid.appendChild(buildPendienteTile(year, porAnio[year])));
+                panel.appendChild(grid);
+                container.appendChild(panel);
             }
 
             if (errorArchivos) {
-                const aviso = document.createElement('div');
-                aviso.className = 'selector-section-title';
-                aviso.style.gridColumn = '1/-1';
-                aviso.style.color = 'var(--ks-warning, #b45309)';
-                aviso.innerHTML = '<i class="fas fa-triangle-exclamation"></i> No se pudieron leer los archivos de Drive: ' + _esc(errorArchivos);
-                container.appendChild(aviso);
+                container.appendChild(buildSeccion({
+                    chip: 'fa-triangle-exclamation', chipMod: 'sel-section__chip--warn',
+                    titulo: 'No se pudieron leer los archivos de Drive',
+                    sub: _esc(errorArchivos),
+                    count: 'revisar', countMod: '--warn'
+                }));
             }
+        }
+
+        /** Encabezado de sección premium v2: chip + título + contador.
+            📦824-wide — chip/texto/título/bajada son las clases compartidas
+            `.kair-block__*` (las mismas del home); lo propio del selector es
+            solo el contador de la derecha y los modificadores de color. */
+        function buildSeccion(o) {
+            const el = document.createElement('div');
+            el.className = 'sel-section kair-block__head';
+            el.innerHTML = `
+                <div class="kair-block__chip ${o.chipMod || ''}"><i class="fas ${o.chip}"></i></div>
+                <div class="kair-block__text">
+                    <div class="kair-block__title">${_esc(o.titulo)}</div>
+                    <div class="kair-block__sub">${o.sub || ''}</div>
+                </div>
+                <span class="sel-section__count ${o.countMod || ''}">${_esc(o.count || '')}</span>
+            `;
+            return el;
         }
 
         function _esc(s) {
@@ -600,27 +797,52 @@ HEADER ACTION BUTTONS
             const card = document.createElement('div');
             card.className = 'year-card year-card--bd';
             const pct = Number(p.porcentaje) || 0;
-            const tono = pct > 100 ? 'var(--ks-danger, #b91c1c)' : pct > 90 ? 'var(--ks-warning, #b45309)' : 'var(--ks-success, #15803d)';
+            const nivel = pct > 100 ? 'over' : pct > 90 ? 'warn' : 'ok';
+            const colorPct = nivel === 'over' ? '#d0453c' : nivel === 'warn' ? '#b07c1a' : '#1bb888';
             const avisos = Array.isArray(p.avisos) ? p.avisos.length : 0;
+            const anchoBarra = Math.max(0, Math.min(100, pct));
 
             card.innerHTML = `
-                <i class="fas fa-calendar-alt year-icon"></i>
-                <div class="year-number">${p.anio}</div>
-                <div class="year-meta year-meta--cargado">Cargado en BD</div>
-                <div class="year-stats">
-                    <div><span>Asignado</span><b>$${_fmt(p.totalAsignado)}</b></div>
-                    <div><span>Ejecutado</span><b>$${_fmt(p.totalEjecutado)}</b></div>
-                    <div><span>Ejecución</span><b style="color:${tono}">${pct.toFixed(0)}%</b></div>
+                <div class="pdb__head">
+                    <div class="pdb__year">${p.anio}</div>
+                    <span class="pdb__pill">Cargado</span>
                 </div>
-                ${p.ipc ? `<div class="year-meta year-meta--small">IPC: ${(p.ipc * 100).toFixed(1).replace('.', ',')}%</div>` : ''}
-                ${avisos ? `<div class="year-meta year-meta--warn"><i class="fas fa-triangle-exclamation"></i> ${avisos} aviso(s) al importar</div>` : ''}
-                <div class="year-actions">
-                    <button class="year-btn year-btn--primary" data-accion="abrir">
-                        <i class="fas fa-table"></i> Abrir
-                    </button>
-                    <button class="year-btn" data-accion="actualizar" title="Reimportar el Excel de este año (reemplaza los datos)">
-                        <i class="fas fa-rotate"></i> Actualizar
-                    </button>
+
+                <div class="pdb__body">
+                    <div class="pdb__figs">
+                        <div class="pdb__fig">
+                            <div class="pdb__fig-label">Asignado</div>
+                            <div class="pdb__fig-value">$${_fmt(p.totalAsignado)}</div>
+                        </div>
+                        <div class="pdb__fig">
+                            <div class="pdb__fig-label">Ejecutado</div>
+                            <div class="pdb__fig-value">$${_fmt(p.totalEjecutado)}</div>
+                        </div>
+                    </div>
+
+                    <div class="pdb__side">
+                        <div class="pdb__exec">
+                            <div class="pdb__exec-head">
+                                <span class="pdb__exec-label">Ejecución</span>
+                                <span class="pdb__exec-value" style="color:${colorPct}">${pct.toFixed(0)}%</span>
+                            </div>
+                            <div class="pdb__bar"><div class="pdb__bar-fill pdb__bar-fill--${nivel}" style="width:${anchoBarra}%"></div></div>
+                        </div>
+
+                        <div class="pdb__chips">
+                            ${p.ipc ? `<span class="pdb__chip"><i class="fas fa-arrow-trend-up"></i> IPC ${(p.ipc * 100).toFixed(1).replace('.', ',')}%</span>` : ''}
+                            ${avisos ? `<span class="pdb__chip pdb__chip--warn" title="${_esc((p.avisos || []).join(' · '))}"><i class="fas fa-triangle-exclamation"></i> ${avisos} aviso(s)</span>` : ''}
+                        </div>
+
+                        <div class="pdb__actions">
+                            <button class="pdb__btn pdb__btn--primary" data-accion="abrir">
+                                <i class="fas fa-table"></i> Abrir
+                            </button>
+                            <button class="pdb__btn pdb__btn--icon" data-accion="actualizar" title="Reimportar el Excel de este año (reemplaza los datos)">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             `;
 
@@ -665,23 +887,26 @@ HEADER ACTION BUTTONS
             return card;
         }
 
-        /** Card de un año que está en Drive pero NO en la BD. */
-        function buildPendienteCard(year, files) {
-            const card = document.createElement('div');
-            card.className = 'year-card year-card--pendiente';
+        /**
+         * 📦824-modern — Tile compacto de un año que está en Drive pero NO en la
+         * BD. Reemplaza la card completa: la información real es solo "el año y
+         * el archivo", y 6 cards con el mismo ícono ocupaban una fila entera.
+         */
+        function buildPendienteTile(year, files) {
+            const tile = document.createElement('div');
+            tile.className = 'sel-tile';
             const f = files[0];
-            card.innerHTML = `
-                <i class="fas fa-file-excel year-icon"></i>
-                <div class="year-number">${year}</div>
-                <div class="year-meta">En Drive, sin importar</div>
-                <div class="year-meta year-meta--small">${_esc(f.name || '')}</div>
-                <div class="year-actions">
-                    <button class="year-btn year-btn--primary" data-accion="importar">
-                        <i class="fas fa-download"></i> Importar
-                    </button>
+            tile.innerHTML = `
+                <div class="sel-tile__icon"><i class="fas fa-file-excel"></i></div>
+                <div class="sel-tile__text">
+                    <div class="sel-tile__year">${year}</div>
+                    <div class="sel-tile__file">${_esc(f.name || '')}</div>
                 </div>
+                <button class="sel-tile__btn" data-accion="importar" title="Importar ${year} a la base de datos">
+                    <i class="fas fa-download"></i>
+                </button>
             `;
-            card.querySelector('[data-accion="importar"]').onclick = async () => {
+            tile.querySelector('[data-accion="importar"]').onclick = async () => {
                 const ok = await _confirmDialog().confirm({
                     title: '¿Importar ' + year + ' a la base de datos?',
                     message: 'Se crea el período ' + year + ' con los datos del Excel.',
@@ -699,7 +924,7 @@ HEADER ACTION BUTTONS
                     overwrite: false
                 }, '*');
             };
-            return card;
+            return tile;
         }
 
         /** Busca el .xlsx de un año en la lista de Drive. */

@@ -1,4 +1,36 @@
-# K+AIR v0.1.223
+# K+AIR v0.1.224
+
+## 🎨 Presupuesto: pantallas llenas, bloques parejos y sin la franja misteriosa (📦824-ui)
+
+Los datos de tu presupuesto ya no se perdían (eso fue lo anterior). Esta vez fue la **interfaz**: tres cosas que se veían raras y que ahora están corregidas.
+
+### (a) Los años cargados también iban en su recuadro
+
+Los archivos que tenías en Drive para importar salían dentro de una caja, pero los años que ya estaban cargados en la app iban **sueltos sobre el fondo**, sin caja. Se veía desparejo: un bloque enmarcado y otro no.
+
+Ahora los dos van dentro del mismo tipo de caja, con el mismo borde, la misma esquinas y la misma sombra.
+
+### (b) La pantalla usaba todo el ancho
+
+Tu ventana es ancha, pero la aplicación se quedaba en el medio como una columna angosta y dejaba **espacio vacío a los dos lados**. Además, dentro de las cajas ese vacío volvía a aparecer en el lado derecho cuando había pocos años cargados.
+
+**Ahora:** la pantalla ocupa todo el ancho disponible, y los años y las herramientas reparten ese ancho. Cuando hay muchos años, cada tarjeta es pequeña como siempre; cuando hay pocos, se agrandan y la información se reparte en dos columnas en vez de quedar estirada.
+
+**La flechita** que aparece a la derecha de "Gestionar Presupuesto" y "Histórico de Años" es para que se note que son botones y que hay algo al otro lado.
+
+### (c) La franja del borde inferior
+
+Viste una franja blanca muy delgada abajo. No era una falla de la imagen ni un resto de una ventana: era **la caja de los avisos "oculto" asomando unos 4 píxeles**. Cuando se escondía, bajaba 1,5 veces su propia altura, y eso no alcanzaba sacarla de la pantalla.
+
+Ya no puede asomar. Y los avisos **sí siguen apareciendo** cuando corresponde, con su animación.
+
+### (d) Limpieza interna
+
+- El recuadro estaba escrito **dos veces** (una en cada pantalla) y se veían iguales por casualidad. Ahora está escrito **una sola vez** en el archivo de estilos compartidos, así que ya no pueden quedar distintos entre pantallas.
+- Se borraron estilos del home que ya no se usaban y un ajuste de tamaño de pantalla que nunca se activaba.
+- Se documentaron en el manual del proyecto las 5 reglas que explican estos cambios, para que no se repitan.
+
+**Sin cambios en los datos:** importar, exportar, guardar y el historial del presupuesto siguen exactamente igual que antes.
 
 ## 💰 Presupuesto SG-SST: los datos ya no se pierden, y las columnas muestran lo real (📦824)
 

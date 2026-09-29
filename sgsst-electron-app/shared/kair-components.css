@@ -16,6 +16,46 @@
 body { font-family: var(--kair-font-ui); color: var(--kair-ink); background: var(--kair-canvas); }
 h1, h2, h3, h4 { font-family: var(--kair-font-display); letter-spacing: -0.5px; }
 
+/* =====================================================
+   📦824 · Bloque con marco (panel + encabezado de bloque)
+   =====================================================
+   Patrón usado hoy por el selector de presupuestos y por
+   el home de recursos: un encabezado (chip + título + bajada)
+   FUERA y, debajo, un panel blanco que agrupa el contenido.
+
+   Vive aquí y no en cada pantalla a propósito: el home, el
+   selector y la gestión deben leerse como pantallas hermanas,
+   y para que eso se sostenga en el tiempo la medida tiene que
+   estar escrita una sola vez. Si se cambia un borde o un radio
+   acá, cambia en todos lados y no puede reaparecer la
+   asimetría de un bloque con marco y otro sin marco.
+
+   `grid-column: 1/-1` NO va acá: es layout del selector, no del
+   panel. Quien lo necesite lo declara en su propia pantalla.
+   ===================================================== */
+.kair-block { margin-top: clamp(18px, 2.2vw, 28px); }
+.kair-block__head { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
+.kair-block__text { min-width: 0; }
+.kair-block__chip {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 0.82rem;
+  background: var(--kair-blue-soft); color: var(--kair-blue-text);
+}
+.kair-block__title { font: 800 clamp(13px, 1.15vw, 15px)/1.2 var(--kair-font-display); letter-spacing: -0.02em; color: var(--kair-ink); }
+.kair-block__sub { font-size: 0.76rem; color: var(--kair-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.kair-block__panel {
+  background: var(--kair-card); border: 1px solid var(--kair-line);
+  border-radius: var(--kair-radius-card); box-shadow: var(--kair-shadow-card);
+  padding: 16px 18px 18px;
+}
+/* `auto-fit`, no `auto-fill`: `auto-fill` reserva columnas vacías y el
+   espacio sobrante se queda DENTRO del marco. Con `auto-fit` las
+   columnas sin contenido se colapsan y las que lo tienen reparten
+   todo el ancho disponible. El `minmax` lo define cada pantalla
+   (una card grande y un tile chico no usan el mismo piso). */
+.kair-block__grid { display: grid; gap: clamp(12px, 1.3vw, 18px); }
+
 /* ------- Breadcrumb ------- */
 .kair-breadcrumb { font-size: clamp(11px, 0.85vw, 12px); color: var(--kair-muted); margin-bottom: clamp(7px, 0.8vw, 11px); }
 .kair-breadcrumb span { color: var(--kair-faint); padding: 0 6px; }

@@ -4460,3 +4460,126 @@ const isFromSelf = event.source === window;   // "Allow messages from the window
 Así que cuando una vista se inyecta en el mismo documento (vía `loadModuleViewInContentArea()`, que monta el HTML en `contentArea > .main-canvas` **sin iframe** y re-ejecuta los scripts), `window.postMessage({ type: 'back-to-module-request' }, '*')` es un camino válido — mucho más seguro que adivinar a qué función global llamar.
 
 **Referencia**: `modules/gestion-salud/ausentismo/informe-pri-builder.html` → `closeReportBuilder()` (📦820-822), con las 3 ramas de contexto, el guard anti-doble-clic y la red de seguridad en cascada.
+
+---
+
+## 🎨 UI: el bloque con marco es COMPARTIDO, no se re-declara por pantalla (📦824, 2026-09-29)
+
+### La regla
+
+El patrón "encabezado de bloque (chip + título + bajada) **fuera**, panel blanco **dentro**" que usan
+el home de recursos y el selector de presupuestos está definido **una sola vez** en
+`shared/kair-components.css`:
+
+| Clase | Qué es |
+|---|---|
+| `.kair-block` | bloque + su separación vertical |
+| `.kair-block__head` | fila del encabezado (flex) |
+| `.kair-block__chip` / `__text` / `__title` / `__sub` | chip, caja, título y bajada |
+| `.kair-block__panel` | el marco (fondo, borde, radio, sombra, padding) |
+| `.kair-block__grid` | grid base del panel (`auto-fit`, gap `clamp(12px, 1.3vw, 18px)`) |
+
+**Cada pantalla declara solo lo suyo**: el `minmax` de su grid (una card de período y un tile de
+Drive no usan el mismo piso de ancho) y lo que sea layout local (`grid-column` en el selector,
+flecha en las tarjetas grandes del home). Si una pantalla vuelve a declarar el marco, el marco
+vuelve a poder quedar distinto en cada una.
+
+### ⚠️ NO reutilizar el nombre `.kair-panel`
+
+Ya está tomado con **otro significado**: `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css`
+lo usa como panel de layout con hijos `.fijo` / `.scroll`, y está documentado más abajo en este
+archivo como "cualquier panel (sidebar, lista, detalle, calendar)". Por eso el marco del bloque se
+llama `.kair-block__panel`.
+
+**Antes de crear una clase `kair-*` nueva, grepear el repo**: `kair-` no es un namespace libre.
+
+### Por qué importa
+
+El selector tenía su propia copia del marco y el home la suya. Las dos se veían iguales **por
+casualidad**, no por construcción: al cambiar el borde en una, la otra se quedaba vieja. Con la
+definición compartida, home, selector y gestión se leen como pantallas hermanas por diseño.
+
+---
+
+## ⚠️ `auto-fill` reserva columnas vacías: el espacio sobrante se mete DENTRO del marco (📦824)
+
+`repeat(auto-fill, ...)` crea las columnas aunque no haya contenido y les asigna ancho; `auto-fit`
+colapsa las vacías y reparte su ancho entre las que sí tienen elementos.
+
+Con pocos elementos y `auto-fill`, el hueco no desaparece: **se muda de lugar** — de los márgenes
+laterales al interior del recuadro, que se ve peor porque el marco lo delata.
+
+**Regla**: en un grid dentro de un panel, `auto-fit`. Y si además la pantalla estaba topeada
+(`max-width: 1400px` + `margin: 0 auto`), quitar el tope: los dos efectos se suman y el usuario
+reporta "espacios vacíos a los lados".
+
+Caso real: selector con 2 períodos cargados en una ventana de 1913px.
+
+### Card que se estira: cuidado con `align-items: center` de la base
+
+`.year-card` (base compartida) es `display: flex; flex-direction: column; align-items: center`, así
+que **cada hijo se encoge a su contenido**. Con una card angosta no se nota porque el contenido ya
+llena; al ensancharse, todo se amontonaba en el centro. Para una card que debe ocupar su ancho:
+`align-items: stretch` en la variante.
+
+### Reacomodar sin media query
+
+Con `auto-fit` + `minmax`, un panel de contenido ancho se reparte solo. Para que una card interna
+pase de apilada a dos columnas según el espacio, usar `flex-wrap` con `flex-basis` (no `@media`):
+si no caben las dos zonas, se apilan y el diseño angosto queda idéntico al anterior.
+
+En una app Electron de escritorio los breakpoints menores al ancho mínimo de ventana son código
+muerto. El home NO tiene ningún `@media` y se adapta solo por `auto-fit`.
+
+---
+
+## ⚠️ Toast oculto: `translateY(150%)` NO lo esconde (📦824)
+
+`transform: translateY(150%)` es un porcentaje de **la altura propia del elemento**, no de la
+distancia que hay que cubrir. Un toast a `bottom: 2rem` con 53px de alto, bajado 1,5 alturas,
+queda a `32px − 0,5×alto` del borde: ~4px de franja blanca **siempre visible** (con su filete de
+color, el único indicio en pantalla).
+
+```css
+/* mal: asoma una franja */
+.k-toast { bottom: 2rem; transform: translateY(150%); }
+/* bien: baja la altura completa + el margen, y opacity evita el asomo */
+.k-toast { bottom: 2rem; transform: translateY(calc(100% + 2rem)); opacity: 0; }
+.k-toast.show { transform: translateY(0); opacity: 1; }
+```
+
+Mismo patrón copiado en `modules/gestion-integral/politica/politica-view-temp.html` (archivo
+**muerto**: el módulo carga `politica-view.html`). No tocar salvo que se reviva ese archivo.
+
+---
+
+## ⚠️ Verificar UI con ventana Electron OCULTA: el reloj de animaciones está congelado (📦824)
+
+Al verificar una vista con un arnés de Electron (`new BrowserWindow({ show: false })` +
+`capturePage()`), **Chromium no produce frames**, así que:
+
+- las transiciones CSS no avanzan (el reloj de animación está congelado);
+- `getComputedStyle()` devuelve el valor **anterior** al cambio de clase, con un paso de atraso;
+- `capturePage()` puede devolver un frame viejo.
+
+El síntoma es desconcertante: el elemento tiene la clase de "visible", el DOM confirma que la
+clase está puesta, y aun así la captura muestra el estado escondido. **Casi hace "arreglar" CSS
+que estaba bien.**
+
+**Cómo verificar bien**: inyectar `* { transition: none !important; animation: none !important }`
+para medir el estado final al que la animación *debería* llegar, o mostrar la ventana. Con eso el
+estilo computado y la captura coinciden con lo que verá el usuario.
+
+---
+
+## ⚠️ No construir texto con acentos en PowerShell (📦824)
+
+`[char]0xED` y las concatenaciones `+` dentro de un arreglo de líneas **parten la cadena en varios
+elementos**: el archivo quedó con `Ajustar rubros, categor` en una línea y `í`, `as y l`, `í`,
+`mites de gasto del sistema.</div>` en las siguientes, y el HTML se rompió de paso.
+
+**Regla**: para texto con acentos, escribir el bloque con la herramienta de escritura (UTF-8
+correcto) en un archivo auxiliar y empalmarlo por PowerShell leyendo ese archivo
+(`[System.IO.File]::ReadAllLines` + `WriteAllText` con `UTF8Encoding($false)`), nunca armando el
+texto en la consola. Después de empalmar, **contar `<div>` abiertos vs cerrados**: un
+`RemoveRange` mal calculado deja `div` huérfanos que el navegador compensa silenciosamente.

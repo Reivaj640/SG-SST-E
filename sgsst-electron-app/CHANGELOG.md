@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.224] - 2026-09-29
+
+### 📦824-ui — Presupuesto: los bloques con marco, a todo el ancho, y sin la franja fantasma
+
+**Resumen:** El submódulo 1.1.3 ya guardaba bien los datos (📦824), pero la **interfaz** seguía teniendo tres defectos que el owner reportó uno por uno: los períodos cargados iban sueltos sobre el lienzo mientras los archivos de Drive sí tenían recuadro (asimetría), las pantallas estaban topeadas a 1400px y dejaban ~280px de lienzo vacío a cada lado en ventanas anchas, y una franja blanca asomaba en el borde inferior. Todo reordenado alrededor de un bloque con marco compartido.
+
+#### (a) El bloque con marco pasa a ser COMPARTIDO
+
+El patrón "encabezado de bloque (chip + título + bajada) **fuera** + panel blanco **dentro**" estaba escrito **dos veces**: una copia en el selector y otra en el home. Se veían iguales por casualidad, no por construcción — al cambiar un borde en una, la otra se quedaba vieja.
+
+Ahora vive **una sola vez** en `shared/kair-components.css`:
+
+| Clase | Qué es |
+|---|---|
+| `.kair-block` | bloque + su separación vertical |
+| `.kair-block__head` | fila del encabezado (flex) |
+| `.kair-block__chip` / `__text` / `__title` / `__sub` | chip, caja, título y bajada |
+| `.kair-block__panel` | el marco (fondo, borde, radio, sombra, padding) |
+| `.kair-block__grid` | grid base del panel (`auto-fit`, gap `clamp(12px, 1.3vw, 18px)`) |
+
+Cada pantalla declara solo lo suyo: el `minmax` de su grid (una card de período y un tile de Drive no usan el mismo piso de ancho) y su layout local (`grid-column` en el selector, la flecha de las tarjetas grandes en el home).
+
+**Colisión de nombres evitada:** el marco se iba a llamar `.kair-panel`, pero ese nombre ya lo usa `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css` como panel de layout con hijos `.fijo`/`.scroll`, y está documentado en AGENTS.md con otro significado. De ahí el prefijo `.kair-block__`. **Regla: antes de crear una clase `kair-*`, grepear el repo — `kair-` no es un namespace libre.**
+
+#### (b) Los dos bloques del home llevan marco
+
+- **"Gestionar Presupuesto" + "Histórico de Años"** → panel con encabezado propio ("Gestionar e histórico").
+- **"Herramientas presupuestales"** → panel con encabezado propio; el título suelto `.quick-actions-title` murió (lo pone ahora `.kair-block__title`, igual que en el selector).
+- Las 2 tarjetas grandes de acceso reciben una **flecha `::after` a la derecha**: al ocupar todo el ancho quedaban con un vacío lateral que se leía como contenido faltante.
+
+Se eliminó además el **CSS muerto del v1** del home (`.portal-card`, `.portal-header`, `.portal-logo`, `.back-btn-internal`, `.hero-title`, `.hero-subtitle`, `.status-pill`, `fadeIn`) y el **breakpoint de 768px**: lo reemplazó el header premium, y los grids se adaptan solos por `auto-fit`. El home queda **sin un solo `@media`**.
+
+#### (c) Pantalla a todo el ancho: `auto-fit`, no `auto-fill`
+
+El vacío era **doble**, y por eso quitar solo una cosa no lo resolvía:
+
+1. `.content-area` / `.pres-home` estaban topeados a `max-width: 1400px` + `margin: 0 auto` → ~280px de lienzo a cada lado.
+2. Los grids usaban `repeat(auto-fill, ...)`, que **crea las columnas aunque estén vacías y les asigna ancho**. Con pocos elementos el hueco no desaparece: **se muda de lugar**, de los márgenes exteriores al interior del recuadro, que se ve peor porque el marco lo delata.
+
+Solución: `max-width: none` + `repeat(auto-fit, minmax(Npx, 1fr))` en los 4 grids (accesos, herramientas, períodos, tiles de Drive). El `minmax` lo declara cada pantalla porque una card de período y un tile de Drive no usan el mismo piso.
+
+Consecuencia: con pocos años las cards se ensanchan. Para que no se vieran estiradas, la card de período **se reacomoda sola sin media query** (`flex-wrap` + `flex-basis`): angosta (4+ años en pantalla) se apila **exactamente** como el diseño aprobado; ancha reparte en dos zonas (cifras a la izquierda, ejecución + acciones a la derecha).
+
+Tres ajustes que hicieron falta para eso:
+
+- **`align-items: stretch` en `.year-card--bd`**: la base `.year-card` es `display: flex; flex-direction: column; align-items: center`, o sea **cada hijo se encoge a su contenido**. Con una card angosta no se nota porque el contenido ya llena; al ensancharse, todo se amontonaba en el centro.
+- **`.pdb__fig` centra su contenido en la vertical**: en una card ancha la zona derecha es más alta y el tile quedaba medio vacío.
+- El grid exterior del selector pasó de `auto-fill minmax(300px,1fr)` a **una sola columna**: todos sus hijos ocupan la fila entera (`grid-column: 1/-1`), así que la definición de columnas ya no describía nada.
+
+#### (d) La franja fantasma del borde inferior era el toast "oculto"
+
+Lo que se veía abajo a la derecha era el **toast de notificaciones asomando ~4px**: su barra blanca con el filete azul. `transform: translateY(150%)` es un porcentaje de **la altura propia del elemento**, no de la distancia que hay que cubrir; con el toast a `bottom: 2rem` y 53px de alto, bajarlo 1,5 alturas lo dejaba a `32px − 0,5×alto` del borde — siempre visible.
+
+```css
+.k-toast { bottom: 2rem; transform: translateY(calc(100% + 2rem)); opacity: 0; }
+.k-toast.show { transform: translateY(0); opacity: 1; }
+```
+
+El mismo patrón está copiado en `modules/gestion-integral/politica/politica-view-temp.html`, archivo **muerto** (el módulo carga `politica-view.html`): se reporta, no se toca.
+
+#### (e) Verificación
+
+Validador propio de 40 checks (clases compartidas definidas y usadas, sin CSS muerto, sin `auto-fill`, sin colisión de nombres, divs balanceados, sin CJK/mojibake/BOM), `node -c` limpio, y la suite de Presupuesto **473/473**. Renderizado con un arnés de Electron a 1913×1022 (ventana real del owner) en 4 escenarios: home, selector con 2 períodos, selector con 4 períodos y el toast visible.
+
+**Gotcha del arnés (documentado en AGENTS.md):** con `BrowserWindow({ show: false })` **Chromium no produce frames**, así que las transiciones CSS no avanzan y `getComputedStyle()` devuelve el valor **anterior** al cambio de clase, con un paso de atraso. Casi hace "arreglar" CSS que estaba bien. Para medir un estado animado hay que inyectar `* { transition: none !important; animation: none !important }` o mostrar la ventana.
+
+**AGENTS.md +123 líneas** con 5 reglas nuevas: el bloque con marco es compartido y no se re-declara por pantalla (y `.kair-panel` está tomado), `auto-fill` vs `auto-fit`, el toast y `translateY(150%)`, la trampa de la ventana oculta, y que no se arme texto con acentos en PowerShell (`[char]0xED` + `+` parte la cadena en varios elementos: el HTML quedó partido y con `div` huérfanos).
+
+Sin cambios de comportamiento: import, export, `bulk-save`, IPC y esquema intactos.
+
+Bump 0.1.223 → 0.1.224.
+
 ## [0.1.223] - 2026-09-29
 
 ### 📦824 — Presupuesto SG-SST: la BD es la fuente de verdad y el Excel la plantilla
