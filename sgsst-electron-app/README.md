@@ -537,12 +537,12 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 2.12.1 | Equipos y Herramientas         | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
 | 2.13.1 | Elementos de Protección Personal | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
 
-### Módulo 3: Gestión de la Salud (18 submódulos — 13 implementados + 5 en roadmap)
+### Módulo 3: Gestión de la Salud (18 submódulos — 13 implementados + 1 en esqueleto + 4 en roadmap)
 
 | Código | Submódulo                    | Estado | Archivos Principales                                   |
 |--------|------------------------------|--------|--------------------------------------------------------|
 | 3.1.1  | Descripción Sociodemográfica y Diagnóstico de Salud | ✅ | `sociodemografica-component.js`, `viewer.js` |
-| 3.1.2  | Actividades de medicina preventiva y promoción de la salud | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |
+| 3.1.2  | Actividades de medicina preventiva y promoción de la salud | 🚧 Esqueleto con gestión de programas (📦825) | `medicina-preventiva/*` — home con SVE / DME / Promoción; crea programas desde plantilla y progreso por secciones (`main/medprev-programas-bridge.js`); interfaces operativas de cada sección en roadmap |
 | 3.1.3  | Perfil de Cargo y Profesiograma | ✅  | `perfiles-cargo-profesiograma/*` (4 archivos, premium v2) |
 | 3.1.4  | Evaluaciones Médicas         | ✅     | `evaluaciones-medicas-logic.js`, `component.js`        |
 | 3.1.5  | Custodia médica ocupacional  | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |

@@ -379,6 +379,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   presupuestoDuplicarPeriodo: (payload) => ipcRenderer.invoke('presupuesto:duplicar-periodo', payload),
   presupuestoDiag: (payload) => ipcRenderer.invoke('presupuesto:diag', payload),
 
+  // 📦825 (2026-09-29) — Programas del 3.1.2 (Medicina Preventiva: SVE/DME/Promoción)
+  // Canales del bridge main/medprev-programas-bridge.js. Mutaciones exigen
+  // token de sesión válido (auth dura); lecturas lo validan si llega.
+  medprevProgramasGetPlantillas: (payload) => ipcRenderer.invoke('medprev:programas:plantillas', payload),
+  medprevProgramasList: (payload) => ipcRenderer.invoke('medprev:programas:list', payload),
+  medprevProgramasGet: (payload) => ipcRenderer.invoke('medprev:programas:get', payload),
+  medprevProgramasCreate: (payload) => ipcRenderer.invoke('medprev:programas:create', payload),
+  medprevProgramasUpdate: (payload) => ipcRenderer.invoke('medprev:programas:update', payload),
+  medprevProgramasDelete: (payload) => ipcRenderer.invoke('medprev:programas:delete', payload),
+  medprevProgramasSetSeccionEstado: (payload) => ipcRenderer.invoke('medprev:programas:seccion-estado', payload),
+
   // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level) · FASE 0
   // 16 canales: 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 1 diag
   // Plan: docs/plans/2026-08-15-gestion-humana-design.md

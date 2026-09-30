@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.225] - 2026-09-29
+
+### 📦825 — Medicina Preventiva 3.1.2: esqueleto de gestión de programas (SVE / DME / Promoción)
+
+**Resumen:** El submódulo 3.1.2 pasó de un home con tres tarjetas mudas ("interfaz por construir") a un **esqueleto funcional de administración de programas**: al hacer clic en una línea (SVE, DME o Programas de promoción y prevención) la app ofrece crear un programa — solo o **desde una plantilla con sus secciones ya definidas** (la de SVE según la Documentación Técnica SVE: Dashboard, Casos, Alertas, Reportes, Administración y Auditoría) — y cada programa queda persistido en SQLite con **progreso marcable por sección** (Pendiente / En curso / Completo). Varios programas por línea y por empresa. Las interfaces operativas de cada sección llegan en fases siguientes; el esqueleto deja el terreno, la plantilla y el ciclo de vida listos.
+
+#### (a) Capa de datos nueva (patrón presupuesto-824)
+
+- `main/medprev-programas-schema-sql.js`: 2 tablas idempotentes — `mp_programas` (id texto, empresa, tipo, nombre, estado, periodo, plantilla; `UNIQUE(empresa_id, tipo, nombre)`) y `mp_programa_secciones` (secciones sembradas de la plantilla, con estado de progreso). Arrays `ALTERS`/`MIGRATIONS` listos para fases siguientes.
+- `main/medprev-programas-bridge.js`: 7 canales `medprev:programas:*` (`plantillas`, `list`, `get`, `create`, `update`, `delete`, `seccion-estado`). `create` siembra las secciones de la plantilla dentro de una transacción; `delete` es soft (`estado='eliminado'`). Multi-empresa resuelta server-side (`_getCompanyByName`).
+- 🔒 **Auth dura en mutaciones**: `create/update/delete/seccion-estado` exigen token de sesión válido (`validateSession`) — decisión tomada de la auditoría de seguridad 2026-09-29 (hallazgo GH-1: el soft-auth de GH es un no-op). Todo el SQL con prepared statements.
+- Plantillas exportadas: SVE (6 secciones de la spec), DME (4), Promoción (5). Registrado en `main.js` (require + schema en `initDbOnce` + registro junto a los demás bridges) y expuesto en `preload.js`.
+
+#### (b) UI: vista de programa con wizard de 2 pasos
+
+- `medicina-preventiva-programa.html/.js` (nuevos): una vista con dos modos por query param — **lista** (tarjetas de programa con estado, periodo y barra de avance; empty-state con CTA) y **detalle** (resumen con progreso, acciones pausar/reanudar/cerrar/eliminar con `KairConfirm`, y navegación de secciones con estado marcable y placeholder "fase 2").
+- **Wizard de creación**: paso 1 datos (nombre único, descripción, periodo), paso 2 plantilla (estándar con preview de las secciones que se crearán / en blanco). Toasts `KAIRToast`.
+- Mismo lenguaje visual del home 3.1.2: marco `.kair-block*` compartido, clases locales `mp-pg-*`, tokens, `auto-fit`, sin media queries.
+
+#### (c) Navegación y home
+
+- `medicina-preventiva-logic.js`: vistas `programa-lista` y `programa-detalle` en el switch de `render()`; `handleMessage` ahora resuelve `open-program` (ir a la lista), `open-program-id` (detalle), `backToHome` y `backToSubmodules`. La empresa viaja por query param del iframe.
+- `medicina-preventiva-home.js/.html`: las tarjetas dejan el tag estático "Interfaz por construir" y muestran **conteos reales** por línea ("Sin programas — crear" / "N programas activos"); el pill "En construcción" del header se retiró. La tercera tarjeta pasó del alias `programas` al tipo canónico `promocion`.
+
+#### (d) Tests
+
+- `main/test-medprev-programas-bridge.js` (nuevo, funcional con better-sqlite3 en memoria; correr con `ELECTRON_RUN_AS_NODE=1 electron.exe`): 49 checks — auth dura, siembra de plantilla, UNIQUE por empresa/tipo/nombre, aislamiento multi-empresa, soft-delete, progreso.
+- `main/test-medprev-3-1-2.js` (extendido): 43 checks — contrato postMessage de la vista nueva, onclicks estáticos y dinámicos, reglas CSS del AGENTS.md para el HTML nuevo, iconos FA 6.4 re-sondeados (36 vivos, script `Temp/probe-fa-icons-825.js`), cache-bust concatenado y consistente entre logic.js e index.html.
+- Convención: al sondear iconos nuevos, correr `Temp/probe-fa-icons-825.js` y sumar el resultado a `ICONOS_VERIFICADOS`.
+
+#### (e) Verificación
+
+- `node main/test-medprev-3-1-2.js` → 43/43 OK.
+- `ELECTRON_RUN_AS_NODE=1 ./node_modules/electron/dist/electron.exe main/test-medprev-programas-bridge.js` → 49/49 OK.
+- Sintaxis verificada (vm.Script) de main.js, preload.js y los 5 archivos del submódulo.
+- Flujo E2E en la app: home → tarjeta SVE → wizard (2 pasos) → detalle con secciones → progreso → volver. Capturas en docs de la entrega.
+
 ## [0.1.224] - 2026-09-29
 
 ### 📦824-ui — Presupuesto: los bloques con marco, a todo el ancho, y sin la franja fantasma

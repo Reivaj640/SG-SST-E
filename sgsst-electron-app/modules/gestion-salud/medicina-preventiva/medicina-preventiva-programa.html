@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Programa 3.1.2</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
+
+    <style>
+        /* =====================================================================
+           3.1.2 — Vista de programa (lista / detalle) del submódulo
+           Actividades de medicina preventiva y promoción de la salud.
+           📦825 — Esqueleto de gestión de programas.
+
+           Mismo lenguaje que medicina-preventiva-home.html: header premium,
+           bloques con marco `.kair-block*` de shared/kair-components.css y
+           clases locales `mp-pg-*` con tokens.
+
+           REGLAS (AGENTS.md):
+           - El marco y el encabezado de bloque NO se redefinen aquí.
+           - Grids con `auto-fit` + `minmax`, nunca `auto-fill`.
+           - Columna de página a todo el ancho (max-width: none).
+           - SIN media queries (auto-fit se adapta solo).
+           ===================================================================== */
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: var(--kair-canvas, #fbfcfb);
+            color: var(--kair-ink, #14213d);
+            font-size: 1rem;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .mp-pg {
+            width: 100%;
+            max-width: none;
+            box-sizing: border-box;
+            padding: clamp(16px, 2vw, 28px);
+        }
+
+        /* ---------- Header premium (mismo del home 3.1.2) ---------- */
+        .mp-pg__header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 1rem; flex-wrap: wrap; margin-bottom: clamp(18px, 2.2vw, 30px);
+        }
+        .mp-pg__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+        .mp-pg__icon {
+            width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        }
+        .mp-pg__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .mp-pg__crumb span { padding: 0 4px; }
+        .mp-pg__title {
+            margin: 0;
+            font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Lexend');
+            letter-spacing: -0.04em; color: var(--kair-ink, #14213d);
+        }
+        .mp-pg__sub {
+            color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px);
+            margin: 5px 0 0 0; max-width: 640px; line-height: 1.55;
+        }
+        .mp-pg__actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .mp-pg__btn {
+            display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+            font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
+            border-radius: 10px; transition: all 0.18s; background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee); font-family: inherit;
+        }
+        .mp-pg__btn:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+        .mp-pg__btn--primary {
+            background: var(--kair-blue, #2057b8); color: #fff; border-color: transparent;
+        }
+        .mp-pg__btn--primary:hover { background: var(--kair-blue-ink, #172c4c); color: #fff; }
+        .mp-pg__btn--danger { color: var(--kair-red, #da5563); }
+        .mp-pg__btn--danger:hover { background: #fbeef0; color: var(--kair-red, #da5563); }
+
+        /* ---------- Grid de programas (modo lista) ---------- */
+        .mp-pg__grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+        .mp-pg__card {
+            position: relative;
+            padding: 1.4rem 2.6rem 1.4rem 1.4rem;
+            background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: var(--kair-radius-card, 20px);
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        .mp-pg__card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
+            border-color: #c8d7ef;
+        }
+        .mp-pg__card::after {
+            content: '';
+            position: absolute; right: 20px; top: 50%;
+            width: 9px; height: 9px;
+            border-top: 2px solid #b9c2d0; border-right: 2px solid #b9c2d0;
+            transform: translateY(-50%) rotate(45deg);
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .mp-pg__card:hover::after { border-color: var(--kair-blue, #2057b8); transform: translateY(-50%) translateX(3px) rotate(45deg); }
+
+        .mp-pg__card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.45rem; }
+        .mp-pg__card-name {
+            font-weight: 700; font-size: 0.95rem; color: var(--kair-ink, #14213d);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mp-pg__chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 0.66rem; font-weight: 700; letter-spacing: 0.4px;
+            text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+        }
+        .mp-pg__chip--activo   { background: #e8f6ef; color: #14805a; }
+        .mp-pg__chip--pausado  { background: #fdf3dd; color: #a06b00; }
+        .mp-pg__chip--cerrado  { background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096); }
+        .mp-pg__chip--pendiente { background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096); }
+        .mp-pg__chip--en_curso { background: #e3ecfb; color: var(--kair-blue, #2057b8); }
+        .mp-pg__chip--completo { background: #e8f6ef; color: #14805a; }
+
+        .mp-pg__card-desc {
+            font-size: 0.78rem; color: var(--kair-muted, #748096); line-height: 1.45;
+            margin-bottom: 0.7rem; min-height: 2.2em;
+        }
+        .mp-pg__card-meta {
+            display: flex; align-items: center; gap: 0.8rem;
+            font-size: 0.72rem; color: var(--kair-faint, #aab1bd); margin-bottom: 0.55rem;
+        }
+        .mp-pg__bar { height: 6px; border-radius: 999px; background: var(--kair-soft, #f3f6f6); overflow: hidden; }
+        .mp-pg__bar-fill { height: 100%; border-radius: 999px; background: var(--kair-mint, #1bb888); transition: width 0.4s; }
+        .mp-pg__bar-label { font-size: 0.7rem; color: var(--kair-muted, #748096); margin-top: 5px; }
+
+        /* ---------- Empty state (lista vacía) ---------- */
+        .mp-pg__empty { text-align: center; padding: clamp(28px, 4vw, 56px) 1rem; }
+        .mp-pg__empty-icon {
+            width: 64px; height: 64px; margin: 0 auto 1rem; border-radius: 18px;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+        }
+        .mp-pg__empty-title { font: 700 1.05rem/1.3 var(--kair-font-display, 'Lexend'); color: var(--kair-ink, #14213d); margin-bottom: 0.4rem; }
+        .mp-pg__empty-sub { color: var(--kair-muted, #748096); font-size: 0.85rem; max-width: 480px; margin: 0 auto 1.4rem; line-height: 1.55; }
+
+        /* ---------- Detalle: resumen del programa ---------- */
+        .mp-pg__resumen { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .mp-pg__resumen-name { font: 700 1.15rem/1.2 var(--kair-font-display, 'Lexend'); color: var(--kair-ink, #14213d); margin-bottom: 0.35rem; }
+        .mp-pg__resumen-desc { color: var(--kair-muted, #748096); font-size: 0.82rem; line-height: 1.5; max-width: 560px; margin-bottom: 0.6rem; }
+        .mp-pg__resumen-meta { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--kair-faint, #aab1bd); }
+        .mp-pg__resumen-side { min-width: 220px; }
+        .mp-pg__resumen-pct { font: 800 1.7rem/1 var(--kair-font-display, 'Lexend'); color: var(--kair-blue, #2057b8); margin-bottom: 0.4rem; }
+        .mp-pg__resumen-bar { width: 220px; max-width: 100%; }
+
+        /* ---------- Detalle: secciones (tabs + panel) ---------- */
+        .mp-pg__tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .mp-pg__tab {
+            display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+            font-size: 0.78rem; font-weight: 600; color: var(--kair-muted, #748096);
+            background: #fff; border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: 999px; cursor: pointer; transition: all 0.18s; font-family: inherit;
+        }
+        .mp-pg__tab:hover { border-color: #c8d7ef; color: var(--kair-blue, #2057b8); }
+        .mp-pg__tab--active {
+            background: var(--kair-blue-ink, #172c4c); border-color: transparent; color: #fff;
+        }
+        .mp-pg__tab-num {
+            width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.62rem; font-weight: 700;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
+        }
+        .mp-pg__tab--active .mp-pg__tab-num { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        .mp-pg__dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .mp-pg__dot--pendiente { background: #c3cbd6; }
+        .mp-pg__dot--en_curso  { background: var(--kair-amber, #e7a224); }
+        .mp-pg__dot--completo  { background: var(--kair-mint, #1bb888); }
+
+        .mp-pg__panel-sec { padding: clamp(16px, 2vw, 26px); }
+        .mp-pg__sec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+        .mp-pg__sec-title { font: 700 1.02rem/1.3 var(--kair-font-display, 'Lexend'); color: var(--kair-ink, #14213d); margin-bottom: 0.25rem; }
+        .mp-pg__sec-desc { color: var(--kair-muted, #748096); font-size: 0.82rem; line-height: 1.5; max-width: 560px; }
+        .mp-pg__seg { display: inline-flex; background: var(--kair-soft, #f3f6f6); border-radius: 12px; padding: 4px; gap: 2px; }
+        .mp-pg__seg-btn {
+            border: none; background: transparent; cursor: pointer;
+            font-size: 0.72rem; font-weight: 700; color: var(--kair-muted, #748096);
+            padding: 7px 14px; border-radius: 9px; transition: all 0.18s; font-family: inherit;
+        }
+        .mp-pg__seg-btn:hover { color: var(--kair-blue, #2057b8); }
+        .mp-pg__seg-btn--active { background: #fff; color: var(--kair-ink, #14213d); box-shadow: 0 1px 4px rgba(37, 56, 82, 0.12); }
+
+        .mp-pg__placeholder {
+            border: 1.5px dashed #c9d5e8; border-radius: 14px;
+            padding: clamp(22px, 3vw, 42px) 1.5rem; text-align: center;
+            background: #f7fafd;
+        }
+        .mp-pg__placeholder-icon {
+            width: 52px; height: 52px; margin: 0 auto 0.8rem; border-radius: 14px;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+        }
+        .mp-pg__placeholder-title { font: 700 0.92rem/1.3 var(--kair-font-display, 'Lexend'); color: var(--kair-ink, #14213d); margin-bottom: 0.3rem; }
+        .mp-pg__placeholder-sub { color: var(--kair-muted, #748096); font-size: 0.8rem; line-height: 1.5; max-width: 460px; margin: 0 auto; }
+
+        /* ---------- Wizard de creación (modal 2 pasos) ---------- */
+        .mp-pg__overlay {
+            position: fixed; inset: 0; z-index: 900;
+            background: rgba(16, 27, 45, 0.5);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1.5rem;
+        }
+        .mp-pg__modal {
+            width: min(640px, 100%); max-height: 92vh; overflow-y: auto;
+            background: #fff; border-radius: var(--kair-radius-modal, 22px);
+            box-shadow: 0 24px 60px rgba(16, 27, 45, 0.3);
+        }
+        .mp-pg__modal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1.2rem 1.4rem; border-bottom: 1px solid var(--kair-line, #e8ebee);
+        }
+        .mp-pg__modal-title { font: 700 1rem/1.2 var(--kair-font-display, 'Lexend'); color: var(--kair-ink, #14213d); }
+        .mp-pg__modal-close {
+            border: none; background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
+            width: 30px; height: 30px; border-radius: 9px; cursor: pointer; font-size: 0.85rem;
+            transition: all 0.18s;
+        }
+        .mp-pg__modal-close:hover { background: #fbeef0; color: var(--kair-red, #da5563); }
+        .mp-pg__stepper {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 1rem 1.4rem; border-bottom: 1px solid var(--kair-line, #e8ebee);
+        }
+        .mp-pg__wstep { display: inline-flex; align-items: center; gap: 7px; font-size: 0.76rem; font-weight: 600; color: var(--kair-faint, #aab1bd); }
+        .mp-pg__wstep-num {
+            width: 20px; height: 20px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.66rem; font-weight: 700;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
+        }
+        .mp-pg__wstep--active { color: var(--kair-ink, #14213d); }
+        .mp-pg__wstep--active .mp-pg__wstep-num { background: var(--kair-blue, #2057b8); color: #fff; }
+        .mp-pg__wstep-sep { flex: 1; height: 1px; background: var(--kair-line, #e8ebee); }
+        .mp-pg__modal-body { padding: 1.3rem 1.4rem; }
+        .mp-pg__modal-foot {
+            display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem;
+            padding: 1.1rem 1.4rem; border-top: 1px solid var(--kair-line, #e8ebee);
+        }
+
+        .mp-pg__field { margin-bottom: 1rem; }
+        .mp-pg__label { display: block; font-size: 0.76rem; font-weight: 700; color: var(--kair-ink, #14213d); margin-bottom: 0.35rem; }
+        .mp-pg__label-req { color: var(--kair-red, #da5563); }
+        .mp-pg__input, .mp-pg__textarea {
+            width: 100%; padding: 10px 12px; font-size: 0.85rem; color: var(--kair-ink, #14213d);
+            background: #fff; border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: 12px; font-family: inherit; transition: border-color 0.18s;
+        }
+        .mp-pg__input:focus, .mp-pg__textarea:focus { border-color: var(--kair-blue, #2057b8); }
+        .mp-pg__textarea { resize: vertical; min-height: 72px; }
+        .mp-pg__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
+        .mp-pg__hint { font-size: 0.72rem; color: var(--kair-faint, #aab1bd); margin-top: 0.3rem; }
+
+        .mp-pg__opcion {
+            display: flex; align-items: flex-start; gap: 0.9rem;
+            padding: 1rem 1.1rem; margin-bottom: 0.7rem;
+            border: 1.5px solid var(--kair-line, #e8ebee); border-radius: 14px;
+            cursor: pointer; transition: all 0.18s; background: #fff;
+        }
+        .mp-pg__opcion:hover { border-color: #c8d7ef; }
+        .mp-pg__opcion--active { border-color: var(--kair-blue, #2057b8); background: #f7fafd; }
+        .mp-pg__opcion-icon {
+            width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+        }
+        .mp-pg__opcion-title { font-weight: 700; font-size: 0.85rem; color: var(--kair-ink, #14213d); margin-bottom: 0.2rem; }
+        .mp-pg__opcion-sub { font-size: 0.76rem; color: var(--kair-muted, #748096); line-height: 1.45; }
+        .mp-pg__preview {
+            margin-top: 0.9rem; padding: 0.9rem 1rem;
+            background: var(--kair-soft, #f3f6f6); border-radius: 12px;
+        }
+        .mp-pg__preview-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--kair-muted, #748096); margin-bottom: 0.55rem; }
+        .mp-pg__preview-item { display: flex; align-items: center; gap: 0.55rem; font-size: 0.8rem; color: var(--kair-ink, #14213d); padding: 0.22rem 0; }
+        .mp-pg__preview-item i { color: var(--kair-mint, #1bb888); font-size: 0.72rem; }
+    </style>
+</head>
+<body>
+
+    <div class="mp-pg">
+
+        <!-- ═══ Header premium ═══ -->
+        <div class="mp-pg__header">
+            <div class="mp-pg__left">
+                <div class="mp-pg__icon" id="pg-line-icon"><i class="fas fa-user-doctor"></i></div>
+                <div>
+                    <div class="mp-pg__crumb">Gestion de la Salud<span>/</span>Medicina preventiva<span id="pg-crumb-line">/<b>SVE</b></span></div>
+                    <h1 class="mp-pg__title" id="pg-title">Programas</h1>
+                    <p class="mp-pg__sub" id="pg-sub">Cargando...</p>
+                </div>
+            </div>
+            <div class="mp-pg__actions">
+                <a class="mp-pg__btn" onclick="volverAlHome()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Home 3.1.2</span>
+                </a>
+                <button class="mp-pg__btn mp-pg__btn--primary" id="pg-btn-nuevo" onclick="abrirWizard()">
+                    <i class="fas fa-plus"></i>
+                    <span>Nuevo programa</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ═══ Cuerpo: lo dibuja medicina-preventiva-programa.js ═══ -->
+        <div id="pg-body"></div>
+
+    </div>
+
+    <script src="../../../assets/js/kair-toast.js"></script>
+    <script src="../../../assets/js/kair-confirm.js"></script>
+    <script src="medicina-preventiva-programa.js"></script>
+</body>
+</html>

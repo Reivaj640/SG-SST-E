@@ -163,6 +163,13 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['2.12.1 equipos y herramientas', 'gestion-integral.plan-trabajo'],
   ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
   ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
+  // 3.1.2activities de medicina y preventiva y promocion de la salud →
+  // `salud.sociodemografica` a propósito. Antes caía al mensaje de "en
+  // desarrollo"; ahora tiene submódulo propio, pero el recurso NO se cambió:
+  // `isSubmoduleAllowed` oculta el submódulo si el rol no tiene el recurso, así
+  // que inventar `salud.medicina-preventiva` lo desaparecería para los roles
+  // restringidos (gerencia, gestión humana). Cuando se quiera permiso propio,
+  // se registra el recurso en la BD de roles y solo ahí se separa del 3.1.1.
   ['3.1.2 actividades de medicina y preventiva y promocion de la salud', 'salud.sociodemografica'],
   ['3.1.3 perfil de cargo y profesiograma', 'salud.perfiles-cargo-profesiograma'],
   ['3.1.4 evaluaciones medicas', 'salud.evaluaciones-medicas'],
@@ -5488,6 +5495,22 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
         sociodemograficaComponent.render();
       } else {
         console.error('❌ SociodemograficaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+    } else if (submoduleName === "3.1.2 Actividades de medicina y preventiva y promoción de la salud") {
+      // Esqueleto visual: por ahora solo el home con los tres programas
+      // (SVE, DME, Programas). Las interfaces de cada uno llegan después.
+      if (window.MedicinaPreventivaComponent) {
+        const medicinaPreventivaComponent = new window.MedicinaPreventivaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        medicinaPreventivaComponent.render();
+      } else {
+        console.error('❌ MedicinaPreventivaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
     } else if (submoduleName === "3.1.3 Perfil de cargo y profesiograma") {

@@ -130,6 +130,10 @@ const { registerFuratHandlers } = require('./main/furat-bridge');
 // Excel. El bridge NO está expuesto en preload.js — los canales existen pero
 // nada los llama hasta Fase 1. Plan: docs/plans/presupuesto-bd-migration.md
 const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, SCHEMA_ALTERS: PRESUPUESTO_SCHEMA_ALTERS, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL, MIGRATION_IDS: PRESUPUESTO_MIGRATION_IDS } = require('./main/presupuesto-bridge');
+// 📦825 (2026-09-29) — Programas del 3.1.2 (Medicina Preventiva: SVE / DME / Promoción)
+// Schema con 2 tablas (mp_programas + mp_programa_secciones) y bridge con 7
+// canales `medprev:programas:*`. Mutaciones con auth dura (validateSession).
+const { registerMedprevProgramasHandlers, SCHEMA_SQL: MEDPREV_PROGRAMAS_SCHEMA_SQL, SCHEMA_ALTERS: MEDPREV_PROGRAMAS_SCHEMA_ALTERS, MIGRATIONS_SQL: MEDPREV_PROGRAMAS_MIGRATIONS_SQL, MIGRATION_IDS: MEDPREV_PROGRAMAS_MIGRATION_IDS } = require('./main/medprev-programas-bridge');
 // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level: Base de Personal + Contratación)
 // FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
 // no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
@@ -759,6 +763,54 @@ function initDbOnce() {
       }
     } catch (presErr) {
       console.error('[DB] 📦708 · Error creando schema de presupuesto:', presErr.message);
+    }
+
+    // 📦825 (2026-09-29) — Schema Programas 3.1.2 (Medicina Preventiva).
+    // 2 tablas: mp_programas + mp_programa_secciones. Mismo patrón que
+    // presupuesto: ALTERS con try/catch por sentencia, migraciones con IDs.
+    try {
+      db.exec(MEDPREV_PROGRAMAS_SCHEMA_SQL);
+      console.log('[DB] 📦825 · Tablas de programas 3.1.2 (mp_programas / mp_programa_secciones) creadas/verificadas');
+
+      var mpAltersOk = 0, mpAltersNew = 0;
+      if (Array.isArray(MEDPREV_PROGRAMAS_SCHEMA_ALTERS)) {
+        for (var ma = 0; ma < MEDPREV_PROGRAMAS_SCHEMA_ALTERS.length; ma++) {
+          try {
+            db.exec(MEDPREV_PROGRAMAS_SCHEMA_ALTERS[ma]);
+            mpAltersNew++;
+          } catch (maErr) {
+            mpAltersOk++;   // "duplicate column name" = ya existía
+          }
+        }
+      }
+      if (MEDPREV_PROGRAMAS_SCHEMA_ALTERS.length > 0) {
+        console.log('[DB] 📦825 · ' + MEDPREV_PROGRAMAS_SCHEMA_ALTERS.length + ' columnas de programas 3.1.2 verificadas (' + mpAltersNew + ' nuevas, ' + mpAltersOk + ' ya existentes)');
+      }
+
+      if (Array.isArray(MEDPREV_PROGRAMAS_MIGRATIONS_SQL) && MEDPREV_PROGRAMAS_MIGRATIONS_SQL.length > 0) {
+        db.exec('CREATE TABLE IF NOT EXISTS _medprev_programas_migrations (id TEXT PRIMARY KEY, aplicada_en TEXT NOT NULL)');
+        var mpYaAplicadas = {};
+        try {
+          var mpFilasMig = db.prepare('SELECT id FROM _medprev_programas_migrations').all();
+          for (var mfm = 0; mfm < mpFilasMig.length; mfm++) mpYaAplicadas[mpFilasMig[mfm].id] = true;
+        } catch (mpReadMigErr) { /* tabla recién creada */ }
+
+        var mpAplicadas = 0;
+        for (var mmi = 0; mmi < MEDPREV_PROGRAMAS_MIGRATIONS_SQL.length; mmi++) {
+          var mpMigId = (MEDPREV_PROGRAMAS_MIGRATION_IDS && MEDPREV_PROGRAMAS_MIGRATION_IDS[mmi]) || ('medprev-mig-' + mmi);
+          if (mpYaAplicadas[mpMigId]) continue;
+          try {
+            db.exec(MEDPREV_PROGRAMAS_MIGRATIONS_SQL[mmi]);
+            db.prepare('INSERT OR IGNORE INTO _medprev_programas_migrations (id, aplicada_en) VALUES (?, ?)').run(mpMigId, new Date().toISOString());
+            mpAplicadas++;
+          } catch (mpMigErr) {
+            console.error('[DB] 📦825 · migración de programas 3.1.2 "' + mpMigId + '" falló:', mpMigErr.message);
+          }
+        }
+        if (mpAplicadas > 0) console.log('[DB] 📦825 · ' + mpAplicadas + ' migraciones de programas 3.1.2 aplicadas de ' + MEDPREV_PROGRAMAS_MIGRATIONS_SQL.length);
+      }
+    } catch (mpSchemaErr) {
+      console.error('[DB] 📦825 · Error creando schema de programas 3.1.2:', mpSchemaErr.message);
     }
     // 📦709 (2026-08-15) — Schema Gestión Humana (nuevo módulo: Base de Personal + Contratación)
     // 3 tablas: contrataciones + base_personal + gh_sedes. Sin migrations en v1.
@@ -10281,6 +10333,10 @@ try {
   // FASE 0: 15 canales registrados (14 stubs + 1 diag). Ninguno expuesto en
   // preload.js todavía. La UI sigue usando el flujo viejo (Excel) intacto.
   registerPresupuestoHandlers(app, { getDb, validateSession });
+  // 📦825 (2026-09-29) — Handlers IPC de los programas del 3.1.2 (Medicina
+  // Preventiva): 7 canales `medprev:programas:*`. Mutaciones con auth dura
+  // (validateSession) — lección de la auditoría 2026-09-29 (GH-1 soft-auth).
+  registerMedprevProgramasHandlers(app, { getDb, validateSession });
   // 📦709 (2026-08-15) — Handlers IPC del módulo Gestión Humana (nuevo top-level).
   // FASE 0: 16 canales registrados (15 stubs + 1 diag). Ninguno expuesto en
   // preload.js todavía. La UI no existe aún — viene en Fases 4-6.

@@ -507,7 +507,7 @@ Los 16 submódulos marcados como 🚧 Roadmap son:
 - 2.8.1 Mecanismos de comunicaciones
 - 2.12.1 Equipos y Herramientas
 - 2.13.1 Elementos de Protección Personal
-- 3.1.2 Actividades de medicina preventiva
+- 3.1.2 Actividades de medicina preventiva (esqueleto con gestión de programas SVE/DME/Promoción desde plantilla — 📦825; interfaces operativas de las secciones siguen en roadmap)
 - 3.1.5 Custodia médica ocupacional
 - 3.1.7 Estilos de Vida Saludables
 - 3.1.8 Servicios de Higiene

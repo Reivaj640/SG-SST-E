@@ -1,3 +1,25 @@
+# K+AIR v0.1.225
+
+## 🩺 Medicina Preventiva: tus programas SVE, DME y de promoción ya se crean y se gestionan (📦825)
+
+El home de **Actividades de medicina preventiva y promoción de la salud** ya no es un anuncio: ahora administra programas de verdad.
+
+### (a) Crea un programa en dos pasos
+
+Haz clic en **SVE**, **DME** o **Programas**. Si la línea está vacía, la app te propone **crear tu primer programa**. El asistente te pide los datos (nombre, descripción y periodo) y luego te deja elegir: **usar la plantilla estándar** — con las secciones ya definidas, por ejemplo la del SVE según su documentación técnica: Dashboard, Gestión de casos, Centro de alertas, Reportes, Administración y Auditoría — o **empezar en blanco**.
+
+Puedes tener **varios programas por línea** (por ejemplo "SVE COVID-19" y "SVE Psicosocial"), cada uno con su propio periodo y avance.
+
+### (b) Avance por secciones
+
+Cada programa muestra sus secciones con un estado que puedes marcar: **Pendiente → En curso → Completo**, con barra de progreso general. Las interfaces operativas de cada sección (los formularios, indicadores y reportes) llegan en las próximas fases; por ahora el esqueleto te deja organizar el programa y registrar su avance.
+
+### (c) Ciclo de vida completo
+
+Pausa, reanuda, cierra o elimina un programa con confirmación. Todo queda guardado por empresa, así que los programas de cada organización son independientes.
+
+---
+
 # K+AIR v0.1.224
 
 ## 🎨 Presupuesto: pantallas llenas, bloques parejos y sin la franja misteriosa (📦824-ui)
