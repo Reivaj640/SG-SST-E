@@ -32,7 +32,12 @@ var PG = {
     programa: null,
     plantillas: null,
     seccionActivaId: null,
-    wizard: { paso: 1, usarPlantilla: true }
+    // 📦825-fix — Los datos del formulario viven en PG.wizard, NO solo en el
+    // DOM: al pasar al paso 2 el cuerpo del modal se re-renderiza y los inputs
+    // del paso 1 desaparecen. Si crearPrograma leyera el DOM, siempre
+    // encontraría nombre vacío (bug reportado: toast + regreso al paso 1
+    // borrando lo tecleado).
+    wizard: { paso: 1, usarPlantilla: true, nombre: '', descripcion: '', fechaInicio: '', fechaFin: '' }
 };
 
 var PG_LINEAS = {
@@ -457,7 +462,9 @@ async function eliminarPrograma() {
 // ---------- wizard de creación (2 pasos) ----------
 function abrirWizard() {
     if (document.getElementById('pg-wizard')) return;
-    PG.wizard = { paso: 1, usarPlantilla: true };
+    // Cada apertura arranca limpio; los valores del usuario viven en PG.wizard
+    // y se restauran en el DOM cada vez que se repinta el paso 1.
+    PG.wizard = { paso: 1, usarPlantilla: true, nombre: '', descripcion: '', fechaInicio: '', fechaFin: '' };
 
     var overlay = document.createElement('div');
     overlay.className = 'mp-pg__overlay';
@@ -465,6 +472,9 @@ function abrirWizard() {
     overlay.innerHTML = _pgHtmlWizard();
     document.body.appendChild(overlay);
     _pgRepintarWizard();
+    // Foco directo al primer campo: el usuario puede escribir sin clic extra.
+    var primero = document.getElementById('pg-wz-nombre');
+    if (primero) primero.focus();
 }
 
 function _pgHtmlWizard() {
@@ -513,6 +523,22 @@ function _pgRepintarWizard() {
                     '<input class="mp-pg__input" id="pg-wz-fin" type="date">' +
                 '</div>' +
             '</div>';
+        // 📦825-fix — restaurar lo que el usuario ya había escrito (volver
+        // desde el paso 2 o regreso tras un fallo): nunca se pierde tecleo.
+        var inNombre = document.getElementById('pg-wz-nombre');
+        var inDesc = document.getElementById('pg-wz-desc');
+        var inIni = document.getElementById('pg-wz-ini');
+        var inFin = document.getElementById('pg-wz-fin');
+        if (inNombre) inNombre.value = PG.wizard.nombre;
+        if (inDesc) inDesc.value = PG.wizard.descripcion;
+        if (inIni) inIni.value = PG.wizard.fechaInicio;
+        if (inFin) inFin.value = PG.wizard.fechaFin;
+        if (inNombre) {
+            inNombre.focus();
+            inNombre.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') { ev.preventDefault(); irPaso(2); }
+            });
+        }
         pie.innerHTML = '' +
             '<button class="mp-pg__btn" onclick="cerrarWizard()">Cancelar</button>' +
             '<button class="mp-pg__btn mp-pg__btn--primary" onclick="irPaso(2)"><span>Siguiente</span><i class="fas fa-chevron-right"></i></button>';
@@ -549,13 +575,31 @@ function _pgRepintarWizard() {
     }
 }
 
+// 📦825-fix — Guarda los valores del DOM en PG.wizard antes de cualquier
+// cambio de paso o re-render: los inputs del paso 1 dejan de existir al
+// repintar, y el dato vive en estado, no en el árbol.
+function _pgWizardGuardarDesdeDom() {
+    var inNombre = document.getElementById('pg-wz-nombre');
+    var inDesc = document.getElementById('pg-wz-desc');
+    var inIni = document.getElementById('pg-wz-ini');
+    var inFin = document.getElementById('pg-wz-fin');
+    if (inNombre) PG.wizard.nombre = inNombre.value.trim();
+    if (inDesc) PG.wizard.descripcion = inDesc.value.trim();
+    if (inIni) PG.wizard.fechaInicio = inIni.value;
+    if (inFin) PG.wizard.fechaFin = inFin.value;
+}
+
 function irPaso(n) {
     if (n === 2) {
-        var nombre = document.getElementById('pg-wz-nombre');
-        if (!nombre) return;
-        if (!nombre.value || !nombre.value.trim()) {
-            _pgToast('El nombre del programa es obligatorio.', 'warning');
-            nombre.focus();
+        _pgWizardGuardarDesdeDom();
+        if (!PG.wizard.nombre) {
+            _pgToast('Escribe el nombre del programa para continuar.', 'warning');
+            var inNombre = document.getElementById('pg-wz-nombre');
+            if (inNombre) inNombre.focus();
+            return;
+        }
+        if (PG.wizard.fechaInicio && PG.wizard.fechaFin && PG.wizard.fechaFin < PG.wizard.fechaInicio) {
+            _pgToast('La fecha de fin no puede ser anterior a la de inicio.', 'warning');
             return;
         }
     }
@@ -579,15 +623,19 @@ async function crearPrograma() {
         _pgToast('El puente de datos no esta disponible.', 'error');
         return;
     }
-    var nombre = document.getElementById('pg-wz-nombre') ? document.getElementById('pg-wz-nombre').value.trim() : '';
+    // 📦825-fix — leer SIEMPRE de PG.wizard: en el paso 2 los inputs del paso 1
+    // ya no existen en el DOM (por eso el wizard original nunca completaba).
+    var nombre = PG.wizard.nombre;
     if (!nombre) {
-        _pgToast('El nombre del programa es obligatorio.', 'warning');
+        // Red de seguridad: si por alguna ruta llegamos al paso 2 sin nombre,
+        // regresar sin borrar nada y pedir el dato.
+        _pgToast('Escribe el nombre del programa para continuar.', 'warning');
         irPaso(1);
         return;
     }
-    var descripcion = document.getElementById('pg-wz-desc') ? document.getElementById('pg-wz-desc').value.trim() : '';
-    var fechaInicio = document.getElementById('pg-wz-ini') ? document.getElementById('pg-wz-ini').value : '';
-    var fechaFin = document.getElementById('pg-wz-fin') ? document.getElementById('pg-wz-fin').value : '';
+    var descripcion = PG.wizard.descripcion;
+    var fechaInicio = PG.wizard.fechaInicio;
+    var fechaFin = PG.wizard.fechaFin;
 
     var btnCrear = document.getElementById('pg-wz-crear');
     if (btnCrear) { btnCrear.disabled = true; btnCrear.style.opacity = '0.6'; }

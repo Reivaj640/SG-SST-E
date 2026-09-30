@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.225] - 2026-09-29
 
+### 📦825-fix — El asistente de programas nunca completaba: el paso 2 no veía lo tecleado en el paso 1
+
+**Resumen:** Reporte del owner: al avanzar el wizard aparecía "El nombre del programa es obligatorio" y no se podía crear. Causa raíz: `crearPrograma()` leía el nombre desde el DOM (`#pg-wz-nombre`), pero al llegar al paso 2 el cuerpo del modal se re-renderiza y ese input **ya no existe** — el nombre siempre llegaba vacío, saltaba el toast y el asistente rebotaba al paso 1 borrando lo tecleado. El flujo era incompletable desde la interfaz (los tests funcionales no lo agarraron porque inyectaban los valores por IPC, no por UI).
+
+- Los datos del formulario ahora viven en `PG.wizard` (estado JS): `irPaso(2)` los guarda del DOM antes de validar, `crearPrograma()` lee del estado, y el paso 1 **restaura** lo tecleado al volver — no se pierde nada en ningún camino.
+- `irPaso(2)` también valida fechas cruzadas antes de avanzar (antes solo lo hacía el bridge).
+- Enter en el campo nombre avanza al paso 2; el campo recibe foco al abrir el asistente.
+- Verificado con tecleo real de teclado E2E: escribir → Siguiente → Crear programa → detalle con nombre/fechas/secciones correctos → eliminar con confirmación → lista vacía. Cache-bust `-programas-3`.
+
 ### 📦825 — Medicina Preventiva 3.1.2: esqueleto de gestión de programas (SVE / DME / Promoción)
 
 **Resumen:** El submódulo 3.1.2 pasó de un home con tres tarjetas mudas ("interfaz por construir") a un **esqueleto funcional de administración de programas**: al hacer clic en una línea (SVE, DME o Programas de promoción y prevención) la app ofrece crear un programa — solo o **desde una plantilla con sus secciones ya definidas** (la de SVE según la Documentación Técnica SVE: Dashboard, Casos, Alertas, Reportes, Administración y Auditoría) — y cada programa queda persistido en SQLite con **progreso marcable por sección** (Pendiente / En curso / Completo). Varios programas por línea y por empresa. Las interfaces operativas de cada sección llegan en fases siguientes; el esqueleto deja el terreno, la plantilla y el ciclo de vida listos.
