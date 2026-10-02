@@ -74,6 +74,19 @@
 .kair-premium .kair-seg button.is-active .kair-seg__n{background:#EDF3FC;color:#2057B8}
 
 /* Hero */
+/* 📦840 · Hero y KPIs comparten fila, pero NO siempre con el hero a la vista.
+   En modo ventana (que es como abre la app, 1200px) el hero se esconde y las
+   4 tarjetas se reparten el ancho TODO en 4 columnas: se gana ~150px por
+   tarjeta y ademas se evita el remiendo de 2x2 que quedaba en 1200px.
+   El hero reaparece solo con ancho de sobra (>=1400px). */
+.kair-premium .kair-dash-top{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px;align-items:stretch}
+.kair-premium .kair-dash-top>.kair-hero{display:none}
+.kair-premium .kair-dash-top>.kair-grid-kpis{margin-top:0}
+/* El hero entra por el breakpoint MINIMO, no por el del modo ventana. */
+@media (min-width:1400px){
+  .kair-premium .kair-dash-top{grid-template-columns:minmax(300px,1fr) 2.15fr}
+  .kair-premium .kair-dash-top>.kair-hero{display:flex;margin-top:0;min-height:0}
+}
 .kair-premium .kair-grid-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
 .kair-premium .kair-hero{position:relative;overflow:hidden;background:#14213D;border-radius:22px;padding:22px 26px;color:#fff;display:flex;flex-direction:column;min-height:168px;margin-top:16px}
 .kair-premium .kair-hero::before{content:'';position:absolute;right:-70px;top:-90px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle at 35% 40%,rgba(32,87,184,.38),rgba(32,87,184,0) 65%)}
@@ -184,6 +197,7 @@
 .kair-premium .kair-boot__row2 .kair-skel{height:330px;border-radius:20px}
 
 /* Responsive */
+/* 📦840 · En ventana chica el hero sigue oculto y las 4 cards pasan a 2x2. */
 @media (max-width:1100px){
   .kair-premium .kair-grid-kpis{grid-template-columns:1fr 1fr}
   .kair-premium .kair-boot__hero{grid-template-columns:repeat(2,1fr)}

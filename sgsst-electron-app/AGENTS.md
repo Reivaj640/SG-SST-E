@@ -1216,17 +1216,17 @@ El HTML y el JS no se tocaron — el DOM se sigue actualizando (`#footer-events-
 
 ## 🆕 Release flow automatizado (📦585, v0.1.131+)
 
-A partir de **v0.1.131+** el流程 de release está automatizado. Antes había que acordarse de hacer `git tag` + `git push origin <tag>` antes de correr `electron-builder --publish=always`, y si se olvidaba, GitHub devolvía **422 "Published releases must have a valid tag"** y el release quedaba roto con assets huérfanos.
+A partir de **v0.1.131+** el flujo de release está automatizado. Antes había que acordarse de hacer `git tag` + `git push origin <tag>` antes de correr `electron-builder --publish=always`, y si se olvidaba, GitHub devolvía **422 "Published releases must have a valid tag"** y el release quedaba roto con assets huérfanos.
 
 ### `scripts/release.ps1` (7.6 KB)
 
-Ejecuta el流程 completo de release en 7 pasos. **El paso crítico es el 5: `git push origin v<version>` ANTES del build** — eso es lo que evita el 422.
+Ejecuta el flujo completo de release en 7 pasos. **El paso crítico es el 5: `git push origin v<version>` ANTES del build** — eso es lo que evita el 422.
 
 ```powershell
-#流程 completo (con tests):
+# flujo completo (con tests):
 .\scripts\release.ps1
 
-#流程 sin tests:
+# flujo sin tests:
 .\scripts\release.ps1 -SkipTests
 ```
 
@@ -2003,7 +2003,7 @@ El rechazo es **atómico**: si llega un campo protegido junto a campos válidos 
 
 1. **Bridge (`main/gestion-humana-bridge.js`)**: autoridad. Rechaza en backend.
 2. **Frontend (`modules/gestion-humana/base-personal/index.js`)**: UX. `_saveDetailEdit` filtra `PROTECTED_FIELDS`. Tab "Datos Laborales" muestra los 3 campos como read-only.
-3. **Import (`gh:import-personal`)**:的政策 estricta CASE WHEN. No pisa `fecha_retiro` ni `estado retirado` de bp existente.
+3. **Import (`gh:import-personal`)**: la politica estricta CASE WHEN. No pisa `fecha_retiro` ni `estado retirado` de bp existente.
 
 ### Reglas de import (crítico, fácil de romper)
 
@@ -2174,8 +2174,12 @@ El **Panel de Control** (dashboard de empresa, `renderDashboard` en `renderer.js
   .kair-page
     nav > .kair-breadcrumb
     .kair-topbar           ← .kair-module-id (icono + "Panel de Control") + acciones (chip empresa + Actualizar)
-    .kair-hero             ← Estado General: #hero-title, #hero-sub, #hero-pct, #hero-meter
-    .kair-grid-kpis #kpi-slot      ← 4 .kair-kpi (render JS)
+    .kair-dash-top          ← 📦840 wrapper. En ventana el hero esta OCULTO y las 4 cards
+                              toman todo el ancho en 4 columnas; desde 1400px el hero
+                              aparece al lado (1fr / 2.15fr). CSS no puede detectar
+                              "maximizado", solo el ancho.
+      .kair-hero            ← Estado General: #hero-title, #hero-sub, #hero-pct, #hero-meter
+      .kair-grid-kpis #kpi-slot      ← 4 .kair-kpi (render JS)
     .kair-card .kair-mod-grid #mod-grid   ← 7 .kair-mod (render JS)
     .kair-card #sec-radar
       #tasks-panel-header  ← título + .kair-seg #seg-filtros (Todos/Críticos/Hoy)
@@ -2185,9 +2189,11 @@ El **Panel de Control** (dashboard de empresa, `renderDashboard` en `renderer.js
 ```
 
 ### CSS
-Todo el CSS vive en **`styles.css`** (bloque `📦748 · DASHBOARD PREMIUM v2`), **scoped bajo `.kair-dashboard`** para no filtrar al resto de la app (lección de la cascada CSS). Los tokens `--kair-*` vienen de `shared/kair-design-tokens.css`.
+Todo el CSS vive en **`shared/kair-premium.css`**, **scoped bajo `.kair-premium`** para no filtrar al resto de la app (lección de la cascada CSS). Los tokens `--kair-*` vienen de `shared/kair-design-tokens.css`.
 
-**Regla**: nunca agregar reglas `.kair-hero`, `.kair-kpi`, `.kair-mod`, `.kair-task`, `.kair-seg` sin el prefijo `.kair-dashboard`.
+> ⚠️ Antes este bloque decía `styles.css` + scope `.kair-dashboard`. Eso quedó obsoleto: `styles.css` ya no contiene reglas de dashboard y el scope real es `.kair-premium`. Verificado el 2026-10-02 contra `shared/kair-premium.css` y el `<link>` de `index.html`.
+
+**Regla**: nunca agregar reglas `.kair-hero`, `.kair-kpi`, `.kair-mod`, `.kair-task`, `.kair-seg` sin el prefijo `.kair-premium`.
 
 ### Funciones JS (top-level en `renderer.js`)
 | Función | Rol |
@@ -2264,7 +2270,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 ### Checklist de migración
 
 1. **Agregar `kair-premium`** al wrapper raíz (junto a la clase del módulo).
-2. **Estructura**: breadcrumb → topbar → hero → `.kair-grid-kpis` → `.kair-card` (módulos) → `.kair-card` (tareas) → toasts.
+2. **Estructura**: breadcrumb → topbar → `.kair-dash-top` (hero + `.kair-grid-kpis` en la misma fila) → `.kair-card` (módulos) → `.kair-card` (tareas) → toasts.
 3. **Datos**: mantener el IPC/selector existente; solo cambia el render.
 4. **Scopear** cualquier clase NUEVA específica del módulo bajo el wrapper (nunca global).
 5. **Eliminar** las copias locales de las clases del dialecto (`.kair-hero`, `.kair-kpi`, `.kair-chip`, `.kair-task`, `.kair-mod`, `.kair-seg`) — ya están en el shared.

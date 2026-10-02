@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.226] - 2026-10-01
 
+### 📦840 — El panel de pendientes decía una cosa y pintaba otra, y el hero se comía una fila
+
+**Resumen:** Gestión Integral ya reportaba sus pendientes al dashboard (📦838), pero al filtrar por el módulo el encabezado, los contadores y las tarjetas contaban listas **distintas**. Además aparecía un pendiente falso de rendición de cuentas, los críticos se ordenaban de últimos, y el hero del Inicio ocupaba una banda completa para sí solo. Tres bugs reales y un ajuste de espacio.
+
+- **Pendiente fantasma de rendición de cuentas**: `calculateRendicionCuentasStats` devuelve el objeto **siempre**, aunque no encuentre la carpeta de la empresa, así que la guarda `giRendicion && actas === 0` era cierta para toda empresa que aún no tuviera "2.6 Rendición de cuentas". Ahora la función declara `disponible` (como ya hacían Evaluación Inicial y Gestión del Cambio) y las dos guardas lo exigen.
+- **Los 3 tabs contaban listas diferentes**: `MODULE_TASK_MAP` estaba declarado **dentro** de `filterDashboardTasksByModule`, así que el manejador de los tabs y los contadores del encabezado no lo alcanzaban y armaban su propia lista con todas las tareas. Se veía "Todos 4 · Críticos 7" y al pulsar "Críticos" se perdía el filtro a medias. El mapa subió a nivel de módulo y todo el panel pasa por `tareasDelFiltroActual()`.
+- **El primer clic no filtraba**: el filtro se leía **antes** de asignarse, así que el primer clic devolvía las 24 tareas de todos los módulos con el encabezado diciendo "4 punto(s)". Era intermitente (el segundo clic sí funcionaba) y por eso los tests no lo veían. Se invirtió el orden.
+- **Los críticos quedaban al final**: el sort usaba `(priority_map[p] || 3)` y el peso de `critical` es `0`; en JavaScript `0` es falso, así que `0 || 3` daba `3` y las tarjetas rojas se dibujaban debajo de las "Atención". Ahora hay un `pesoPrioridad()` que respeta el 0.
+- **Espacio recuperado en el Inicio**: el hero y las 4 tarjetas eran hermanos sueltos de `.kair-page`, así que no había forma de alinearlos. Ahora cuelgan de un wrapper `.kair-dash-top`. Además **en modo ventana el hero se oculta** y las 4 tarjetas toman todo el ancho en 4 columnas (a 1200px cada una queda en ~201px en vez de ~427px del 2×2); el hero reaparece desde 1400px de ancho.
+- **Textos del hero resumidos** (el owner lo autorizó): el título pasó de "Tu sistema requiere atención: N frentes críticos por gestionar" a "N frentes críticos por gestionar", y el subtítulo de 3 frases a "Plan X% · N documentos vencidos · N accidentes en el año". **La estructura interna del hero no se tocó**: mismos 10 elementos, mismo orden, aside a la derecha.
+- **Tests nuevos**: `test-radar-gi-829.js` (24 checks), `test-tabs-dashboard-829.js` (18), `test-orden-tareas-829.js` (13), `test-hero-fila-840.js` (35). **23/23 mutaciones detectadas** en total: se rompió el código a propósito 23 veces y las 23 cayeron. Suite completa: **99 tests, 81 verdes**; los 18 que fallan se probaron contra `HEAD` limpio (stash + pop + comparación del parche byte a byte) y ya fallaban antes de este trabajo.
+- **Bugs de los tests que aparecieron en el camino**: `test-kair-motion` ataba el orden de una llamada con sus argumentos literales y fijaba el token de cache-bust a una fecha concreta — se rompía solo en cada bumpe. Ambos ahora validan la propiedad, no la forma. `test-dashboard-tareas-gi` buscaba el mapa por su nombre viejo. `Temp/run-all-tests.js` (nuevo) corre los 99 tests: antes no había forma de ver la suite completa.
+- **AGENTS.md**: el diagrama de estructura se actualizó, y se corrigió una afirmación vieja que decía que el CSS del dashboard vivía en `styles.css` con scope `.kair-dashboard` (hace rato está en `shared/kair-premium.css` con `.kair-premium`). De paso, 5 typos de traducción con ideogramas chinos.
+
+### 📦838 — El overlay post-login congelaba la barra + Gestión Integral con permisos propios y tareas en el dashboard
+
+**Resumen:** El segundo login (tras cerrar sesión) dejaba la barra de progreso clavada en 0% porque `KairLoadingController._getElements()` cacheaba los nodos del overlay anterior y escribía sobre nodos ya borrados del DOM. En paralelo, Gestión Integral recibió clave de permiso propia por submódulo,Tasks en el dashboard y badge.
+
+- `KairLoadingController._getElements()` deja de cachear los nodos del overlay anterior: cada login re-quiere los suyos. Test nuevo `main/test-kair-loading-bar.js`.
+- Permisos de Gestión Integral con clave propia por submódulo: 9 de 13 compartían `gestion-integral.plan-trabajo`, así que abrir el Plan de Trabajo abría los otros ocho sin querer. El módulo ahora exporta todas sus carpetas.
+- El dashboard de Gestión Integral calcula tareas, `module_status` y badge (`gestion_integral_alerts`) con los mismos datos que ya consume el home. La navegación de tareas GI apunta a Gestión Integral en vez de caer en un módulo inexistente.
+- `test-evaluacion-inicial-v2.js` se mueve de `main/` a `tools/lab/`.
+
+### 📦837 — Pulido de UI: contraste AA, sin shimmer ni glow, header que colapsa por grid
+
+- Side-tabs de 3px a 1px (`.kair-task`, `.gh-metric`, `.ep-dcard`).
+- Contraste AA: `#6c757d` → `#5f6771` y `#94a3b8` → `#64748b` (4.55:1 sobre `#f8fafc`).
+- Sin shimmer en `.progress-fill` ni `.kair-skel`; sin glow infinito del título de login (conserva el fade-in).
+- Borrados dots muertos, 6 partículas del splash y el `<img>` `#header-logo` sin uso.
+- El header colapsa por `grid-template-rows: 1fr↔0fr` en vez de animar márgenes.
+- Excepción documentada: el `repeating-gradient` de `.kair-chart` es la cuadrícula de fondo funcional, no un efecto.
+
+### 📦836 — Anime.js v4.5.0 vendorizado + wrapper KairMotion
+
+- `vendor/anime.umd.min.js` (MIT, local) + `assets/js/kair-motion.js` con API `available()` / `reduced()` / `staggerIn()` / `countTo()` / `dashboard()`, y respaldos que dejan `opacity` en 1 si anime falta o falla.
+- Hook en `loadDashboardData` alineado al final del render, para que la animación arranque después del repintado.
+- `test-kair-motion.js`: 44/44 con jsdom.
+
+### 📦835 — Skill "impeccable" + PRODUCT.md
+
+
+### 📦834 — SVE: paleta azul K+AIR y pulido de animaciones
+
 ### 📦833 — Análisis por periodos: ahora se pueden AGREGAR análisis nuevos
 
 **Resumen:** La tarjeta "Análisis de indicadores por periodos" del programa SVE solo mostraba los 2 análisis que trae la plantilla y permitía editarlos, pero no había ninguna forma de agregar un periodo más desde la interfaz. Ahora la tarjeta tiene botón **"Nuevo período"** con su formulario, validaciones y persistencia en SQLite.

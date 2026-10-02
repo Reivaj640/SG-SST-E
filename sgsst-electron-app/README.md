@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.226 (desarrollo) — último publicado v0.1.205 · 📦826-833 Medicina Preventiva SVE: interfaces completas, análisis por periodo editables, indicadores editables y datos que viajan en el sync
-**Última actualización:** 1 de octubre de 2026
+**Versión:** 0.1.226 (desarrollo) — último publicado v0.1.205 · `📦826-833` Medicina Preventiva SVE completa (3.1.2) · `📦840` Gestión Integral en el dashboard: las tareas, los badges y el "En tu radar" cuentan lo mismo; en modo ventana el hero del Inicio se oculta y las 4 tarjetas toman todo el ancho.
+**Última actualización:** 2 de octubre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -11,6 +11,8 @@
 **K+AIR** es una aplicación empresarial Electron que implementa un Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) completo, diseñado para cumplir con la normativa colombiana (Resolución 0312 de 2019).
 
 ### Características Principales
+
+- ✅ **Panel de pendientes honesto + Inicio sin banda desperdiciada** 🆕 (v0.1.226, `📦840`): Filtrar por un módulo ya no mente — el encabezado, los tres contadores (Todos / Críticos / Hoy) y las tarjetas vienen de la misma lista. Desapareció el pendiente falso de rendición de cuentas, los críticos se ordenan primero y el hero del Inicio deja de ocupar una fila sola en modo ventana.
 
 - ✅ **Medicina Preventiva · Programa SVE completo (3.1.2)** 🆕 (v0.1.226, `📦826-833`): El programa SVE pasa de esqueleto a interfaz usable de verdad. **📦826**: carpeta nueva `modules/gestion-salud/medicina-preventiva/sve/` (vistas, seed, core, app, CSS, fuentes, `vendor/lucide` + `vendor/xlsx`) con carga perezosa por sección, plantilla SVE v2 de 5 secciones reales (Dashboard, Casos, Plan PHVA, Indicadores, Áreas expuestas) + migración `20260930-sve-template-v2`, y **dataset por programa** (`STORAGE_KEY` con sufijo `window.SVE_PROGRAMA_KEY` — dos programas SVE no se pisan). **📦827**: los datos salen de `localStorage` a SQLite — 8 tablas `mp_sve_*`, 13 canales `medprev:sve:*` con auth dura en mutaciones, migración única `medprev:sve:migrar`, y las 8 tablas entran al `.kairsync` (viajan entre PCs; antes no). **📦827-fix/fix-2**: PK compuesta `(programa_id, id)` + "espina" `anios_json`/`medidas_json` con relleno (sin ella el Dashboard reventaba) + aplicador de migraciones único con `foreign_keys` apagado (medido: 32 filas de `mp_sve_plan_meses` → 0 sin esto). **📦828/829**: `kair-confirm` (barrido de velos huérfanos + retiro en el realm del padre, `pointer-events:none` al cerrar) y `kair-toast` (timers y X delegados al `KAIRToast` de la ventana que sobrevive — el iframe que navegaba mataba el timer y el toast quedaba pegado). **📦830/831**: edición completa de indicadores (valores por año, años, meta, definición) con columna `extra_json` en las 3 partes del schema (CREATE + ALTER idempotente + migración v2) y adaptadores `_extraDe`/`_extraHacia`; fix de raíz de `U.el` (camelCase vs kebab-case descartaba estilos en silencio), rejilla 2 columnas, errores inline por campo. **📦832**: "Registros de morbilidad" → **"Casos SVE por año"** agrupando seguimientos por año. **📦833**: botón **"Nuevo período"** en la tarjeta de Análisis con modal, validación vacío/duplicado (conserva lo tecleado) y persistencia vía `addAnalisis`. **Tests 512/512** (9 archivos) + verificación visual E2E con capturas en `docs/capturas/833-analisis/`.
 
@@ -1326,6 +1328,21 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 ---
 
 ## 📝 Cambios Recientes
+
+### v0.1.226 - 2 Oct 2026 🆕
+
+#### 📦840 · Gestión Integral en el dashboard + el hero del Inicio
+
+Gestión Integral ya empujaba sus pendientes al panel de Inicio, pero al filtrar por el módulo el rótulo, los contadores y las tarjetas contaban listas distintas: se veía "Todos 4 · Críticos 7" y al pulsar "Críticos" salían las de todos los módulos con el encabezado diciendo que seguías filtrado. También aparecía un pendiente falso de rendición de cuentas en empresas que nunca registraron esa carpeta, y los críticos quedaban ordenados de últimos.
+
+- **Un dato ausente ya no se confunde con un cero real** (`disponible` en rendición de cuentas).
+- **Los tres tabs y los tres contadores salen de la misma función** (`tareasDelFiltroActual()`).
+- **El primer clic sí filtra** (antes leía el filtro antes de asignarlo).
+- **Los críticos van primero** (el `|| 3` se comía el peso 0 de `critical`).
+- **El hero se oculta en modo ventana** y las 4 tarjetas toman todo el ancho; vuelve desde 1400px.
+- **23/23 mutaciones detectadas** y suite de 99 tests corrida completa (no había runner).
+
+> CSS no puede detectar "maximizado", solo el ancho: maximizada en un portátil de 1366 el hero sigue oculto.
 
 ### v0.1.222 - 28 Sep 2026 🆕
 
