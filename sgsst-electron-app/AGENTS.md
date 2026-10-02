@@ -4589,3 +4589,69 @@ correcto) en un archivo auxiliar y empalmarlo por PowerShell leyendo ese archivo
 (`[System.IO.File]::ReadAllLines` + `WriteAllText` con `UTF8Encoding($false)`), nunca armando el
 texto en la consola. Después de empalmar, **contar `<div>` abiertos vs cerrados**: un
 `RemoveRange` mal calculado deja `div` huérfanos que el navegador compensa silenciosamente.
+## ⚠️ Un sidebar que descarta clics en silencio es peor que uno roto (📦843, 2026-10-02)
+
+### El síntoma
+
+Un clic en el sidebar no hacía nada: sin error, sin alerta, sin cambio en pantalla. El motivo estaba a la vista en el código:
+
+```js
+if (currentSubmodule && currentModule !== item.name) {
+  console.log(`Ignorando click en "${item.name}" porque estamos en submódulo`);
+  return;
+}
+```
+
+Y había un **segundo** candado más abajo, en `showModuleContent`, rotulado `✅ SOLUCIÓN TEMPORAL`:
+
+```js
+if (currentSubmodule) {
+  console.warn(`...bloqueado...`);
+  return;            // <-- se cuela 10 líneas ANTES de esto:
+}
+...
+currentSubmodule = null;   // la limpieza ya estaba en la función
+```
+
+### Las tres reglas
+
+1. **Un candado con `return` y sin efecto visible en pantalla es un bug, no una validación.** Si el usuario no puede entender por qué no pasa nada, el comportamiento está mal. Un candado legítimo avisa o explica con un texto en pantalla.
+2. **Al navegar hay que hacer teardown, no solo limpiar estado.** La teardown vive en `_salirDeSubmodulo()`: destruye `currentActiveComponent` y recién después limpia `currentSubmodule`. Sin el `destroy()` quedan vivos los watchers, los modales al `body` y el CSS inyectado en el `<head>`.
+3. **El orden importa y hay que testearlo.** Si se llama a `showModuleContent()` *antes* de limpiar el estado, el candado vuelve a tragarse la navegación: el código "se ve bien" y el sidebar sigue mudo. `test-sidebar-nav-843.js` tiene un check dedicado a ese orden.
+
+> El candado de `showModuleContent` **se conserva** a propósito. Con el sidebar ya limpiando el estado nunca se dispara desde ahí, pero sigue protegiendo a los iframes y a las tareas del dashboard. Quitar la única red sin reemplazarla es peor que dejarla.
+
+### El bug espejo que salió al arreglar este
+
+Había **dos** callbacks de "Volver": la "normal" y la "segura". La normal **nunca destruía el componente**, solo limpiaba el estado. Existía la segura por esa razón, y estaba duplicada. Cuando dos caminos resuelven lo mismo, el que no tiene el `try/catch` es el que nadie revisa.
+
+## ⚠️ El `padding` de un hijo NO colapsa con la fila del grid (📦842, 2026-10-02)
+
+### El síntoma
+
+Un header con `grid-template-rows: 1fr → 0fr` se colapsaba a **8px** en vez de 0: quedaba una franja blanca abajo.
+
+### Por qué
+
+- `min-height: 0` sí deja llegar el **content box** del hijo a 0.
+- Pero el `padding` vive **fuera** del content box. Un `border-box` nunca puede medir menos que su padding.
+- Con `padding: 4px 16px` la fila `0fr` se detiene en **4 + 4 = 8px**, y el header se queda con esa franja.
+
+### La trampa
+
+El comentario que había en el código decía lo contrario de lo que hacía: *"el padding se mueve al hijo para que el colapso no deje resto de padding"*. **Moverlo al hijo fue justo lo que creó el resto.**
+
+```css
+#app-header.app-header-collapsed .header-content {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.header-content { transition: padding 0.4s ease-in-out; }
+```
+
+### Y: medir una transición sin esperar da un falso positivo
+
+La primera medición de este bug dio **48px** colapsado, o sea "el colapso no funciona en absoluto". Era falso: se aplicó la clase y se midió en el acto, con la transición de 0.4s a medias, así que se leyó el valor de partida.
+
+**Regla:** para medir un estado que tiene `transition`, esperar a que termine. Un test que mide sin esperar puede dar verde con el bug presente, o rojo con el código sano.
+

@@ -1,7 +1,7 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 1 de octubre de 2026
-**Versión actual:** 0.1.226 (desarrollo) — último publicado v0.1.205
+**Versión actual:** 0.1.228 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
@@ -189,7 +189,7 @@
 | Archivo | Líneas | Propósito |
 |---|---|---|
 | `main.js` | 21,643 | Backend Electron, handlers IPC |
-| `renderer.js` | 7,270 | Lógica de UI principal, navegación |
+| `renderer.js` | 7,527 | Lógica de UI principal, navegación |
 | `preload.js` | 1,138 | Contratos IPC (electronAPI) |
 | `package.json` | 178 | Configuración npm + electron-builder |
 | `index.html` | 508 | Punto de entrada HTML |

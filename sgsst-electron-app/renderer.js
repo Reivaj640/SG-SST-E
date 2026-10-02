@@ -513,7 +513,44 @@ const LOG_BUFFER_MAX_SIZE = 500; // Límite para evitar memory leak en sesiones 
 let logBuffer = []; // Búfer para almacenar los logs
 let logTextareaCached = null; // Cache del textarea para evitar querySelector en cada log
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
-let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
+let currentActiveComponent = null;
+
+/**
+ * 📦843 · Salir de un submódulo hacia donde sea que uno vaya.
+ *
+ * El sidebar tiene que poder llevarte a un módulo principal estés donde
+ * estés. Antes no podía: el clic se descartaba en silencio y
+ * showModuleContent tenía un candado que lo bloqueaba igual.
+ *
+ * Lo que faltaba no era permiso, era la TEARDOWN: al salir hay que
+ * destruir el componente activo, o sus watchers, sus modales y el CSS
+ * que inyectó en el <head> global quedan vivos y se cuelgan sobre el
+ * módulo siguiente.
+ *
+ * No recuerda en qué submódulo estabas: si el usuario elige un módulo
+ * principal, quiere el módulo (decisión del owner).
+ *
+ * @param {string} [motivo] solo para el log.
+ */
+function _salirDeSubmodulo(motivo) {
+  if (currentActiveComponent && typeof currentActiveComponent.destroy === 'function') {
+    try {
+      currentActiveComponent.destroy();
+      if (typeof console !== 'undefined' && console.info) {
+        console.log('[NAV] Componente de submódulo destruido al salir' +
+          (motivo ? ' (' + motivo + ')' : ''));
+      }
+    } catch (e) {
+      // Un destroy() que revienta no puede dejar trancada la navegación:
+      // se avisa y se sigue igual, que es justo lo que hacía la variante
+      // "safe" del botón Volver y la que NO hacía la normal.
+      console.warn('[NAV] Error al destruir el componente activo al salir:', e);
+    } finally {
+      currentActiveComponent = null;
+    }
+  }
+  currentSubmodule = null;
+} // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
 // 📦507 — Cuando el usuario actualiza el programa anual de inspecciones
 // (cambia una P/C, agrega actividad, etc.) el bridge emite
@@ -3701,11 +3738,11 @@ function createSidebarButtons(activeModules = null) {
 
     card.addEventListener('click', () => {
       if (currentCompany) {
-        // ✅ Validación: No cambiar módulo si estamos en un submódulo
-        if (currentSubmodule && currentModule !== item.name) {
-          console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
-          return;
-        }
+        // 📦843 · Antes: si había un submódulo activo, el clic en otro
+        // módulo se descartaba en silencio (solo un console.log). El
+        // sidebar no servía para navegar, que es lo único que un
+        // sidebar tiene que hacer. Ahora se sale del submódulo y se va.
+        _salirDeSubmodulo('sidebar → ' + item.name);
         setActiveSidebarButton(card);
         showModuleContent(item.name);
       } else {
@@ -5239,23 +5276,20 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
   try {
     // --- Callback genérico para volver al módulo limpiando el estado ---
     const backToModuleCallback = () => {
-        currentSubmodule = null; // Limpiar estado
+        // 📦843 · Antes solo limpiaba el estado y NUNCA destruía el
+        // componente: el watcher, el modal o el CSS global del submódulo
+        // quedaban vivos sobre el módulo. Ahora usa la misma teardown que
+        // el sidebar.
+        _salirDeSubmodulo('boton Volver');
         showModuleContent(moduleName);
     };
 
     // --- Callback SEGURO para componentes que se portan mal ---
+    // 📦843 · Era la única que hacía la teardown completa; ahora es la
+    // misma función que la normal, porque la diferencia era justamente
+    // el try/catch del destroy(), que vive adentro de _salirDeSubmodulo.
     const safeBackToModuleCallback = () => {
-        console.log('[safeBackToModuleCallback] Retorno seguro al home del módulo.');
-        if (currentActiveComponent && typeof currentActiveComponent.destroy === 'function') {
-          try {
-            currentActiveComponent.destroy();
-          } catch (e) {
-            console.warn('Error al destruir componente activo en retorno:', e);
-          } finally {
-            currentActiveComponent = null;
-          }
-        }
-        currentSubmodule = null;
+        _salirDeSubmodulo('boton Volver (seguro)');
         showModuleContent(moduleName);
     };
 

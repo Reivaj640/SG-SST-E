@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.228] - 2026-10-02
+
+### 📦843 — El sidebar no te llevaba a ningún lado si estabas en un submódulo
+
+**Resumen:** Un sidebar existe para navegar. Este no cumplía su trabajo: si estabas dentro de un submódulo (Capacitaciones 3.2.1, Plan de Trabajo, Política…) y hacías clic en otro módulo del sidebar, el clic se descartaba **en silencio**. Sin aviso, sin alerta, sin nada en pantalla. Para llegar había que hacer un rodeo de dos clics: primero el módulo en el que ya estabas, después el que querías.
+
+- **Había dos candados, no uno.** El del clic del sidebar (`createSidebarButtons`) y otro en `showModuleContent` rotulado **"✅ SOLUCIÓN TEMPORAL"**, que lleva así desde hace tiempo. El `return` de ese segundo se colaba 10 líneas **antes** del `currentSubmodule = null` que la propia función ya tenía: la corrección estaba dentro de la función, inalcanzable.
+- **Lo que faltaba no era permiso, era teardown.** Al salir de un submódulo hay que **destruir el componente activo**, o sus watchers, sus modales y el CSS que inyectó en el `<head>` global quedan vivos y se cuelgan sobre el módulo siguiente — la clase de bug que 📦771/774/783/784 vinieron tapando uno por uno.
+- **Nuevo `_salirDeSubmodulo()`** en `renderer.js`, usada por los tres caminos que salen de un submódulo: el clic del sidebar y las **dos** variantes del botón "Volver".
+- **Bug extra que salió en el camino:** `backToModuleCallback` (la variante "normal" del botón Volver, la que usa la mayoría de submódulos) **nunca destruía el componente**: solo limpiaba el estado. Por eso existía la variante "segura" que sí lo hacía, duplicada. Ahora las dos son la misma función.
+- **La red de seguridad se queda.** El candado de `showModuleContent` no se tocó: como el sidebar ya limpia el estado antes de navegar, nunca se dispara desde ahí, pero sigue protegiendo a los iframes y a las tareas del dashboard. Quitarlo sería eliminar la única protección sin reemplazarla.
+- **Decisión del owner:** perder la posición dentro del submódulo está bien. Si el usuario elige un módulo principal en el sidebar, quiere el módulo.
+- **Tests**: `main/test-sidebar-nav-843.js` (14 checks) — la teardown se **ejecuta de verdad** en una VM, incluido el caso en que `destroy()` revienta. **6/6 mutaciones detectadas**; la más importante invierte el orden de las llamadas, que deja el sidebar igual de mudo con el código aparentemente correcto.
+
+### 📦842 — El header se quedaba con una franja de 8px al ocultarse
+
+**Resumen:** Al hacer scroll, el header se colapsa para liberar la pantalla. Se quedaba una franja blanca de 8px abajo: no se ocultaba del todo.
+
+- **Medido en Electron, no supuesto:** expandido **49px**, colapsado **8px**. Los 8px eran exactamente el `padding` de `.header-content` (4px arriba + 4px abajo).
+- **Por qué:** `min-height: 0` (📦837) sí deja llegar el *content box* a 0, pero **el padding vive fuera del content box**: un `border-box` nunca puede medir menos que su padding. La fila `0fr` se detenía en 8px.
+- **La paradoja:** el comentario de 📦837 en el código dice *"el padding se mueve al hijo para que el colapso no deje resto de padding"*. Hizo lo contrario: al moverlo al hijo, el padding pasó a ser parte de la caja que tiene que colapsar.
+- **Fix:** al colapsar, el padding del hijo va a 0 y se interpola en 0.4s para que baje junto con el alto y no dé un salto. Resultado medido: **0px**.
+- **Lo que NO se tocó:** el logo tiene `transform: scale(1.6)` sobre 48px y se sospechó que desbordaba el `max-height: 70px`. Medido: dibuja a **46px**. No había desborde, no se tocó.
+- **Tests**: `main/test-header-colapso-842.js` (7 checks) — **mide**, no lee texto: lanza Electron como subproceso y lee el `getBoundingClientRect()`. Un guard estático sobre el CSS sería decorado, porque la franja no viene de una regla ausente sino del layout real. **2/2 mutaciones detectadas**.
+
+### Continuidad de 📦841 (v0.1.227) — sigue pendiente de validación visual
+
+- El desvanecido al cambiar de módulo y al entrar/salir del Inicio está implementado y verificado (27 checks, 22/22 mutaciones), pero **el owner todavía no lo ha validado en la app**.
+
 ## [0.1.227] - 2026-10-02
 
 ### 📦841 — Al cambiar de módulo la pantalla saltaba de golpe

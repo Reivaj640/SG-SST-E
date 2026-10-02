@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.226 (desarrollo) — último publicado v0.1.205 · `📦826-833` Medicina Preventiva SVE completa (3.1.2) · `📦840` Gestión Integral en el dashboard: las tareas, los badges y el "En tu radar" cuentan lo mismo; en modo ventana el hero del Inicio se oculta y las 4 tarjetas toman todo el ancho.
+**Versión:** 0.1.228 (desarrollo) — último publicado v0.1.205 · `📦843` El sidebar navega desde cualquier submódulo (antes el clic se descartaba en silencio) · `📦842` El header se oculta del todo al encogerse · `📦841` Desvanecido al cambiar de módulo y al entrar/salir del Inicio · `📦840` Gestión Integral en el dashboard: las tareas, los badges y el "En tu radar" cuentan lo mismo; en modo ventana el hero del Inicio se oculta y las 4 tarjetas toman todo el ancho.
 **Última actualización:** 2 de octubre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -11,6 +11,10 @@
 **K+AIR** es una aplicación empresarial Electron que implementa un Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) completo, diseñado para cumplir con la normativa colombiana (Resolución 0312 de 2019).
 
 ### Características Principales
+
+- ✅ **El sidebar navega desde cualquier submódulo + el header se oculta del todo** 🆕 (v0.1.228, `📦843` + `📦842`): El menú lateral descartaba el clic en silencio si estabas dentro de un submódulo, así que para cambiar de módulo había que hacer un rodeo de dos clics. Ahora un clic y llegas, y al salir se destruye el componente del submódulo para que no queden modales ni contenido colgados. El header superior ya no deja una franja de 8px al encogerse.
+
+- ✅ **La pantalla se desvanece al cambiar de módulo** 🆕 (v0.1.227, `📦841`): El contenido se desvanece y vuelve a aparecer, también al entrar y salir del Inicio. **Pendiente de revisión en la app.**
 
 - ✅ **Panel de pendientes honesto + Inicio sin banda desperdiciada** 🆕 (v0.1.226, `📦840`): Filtrar por un módulo ya no mente — el encabezado, los tres contadores (Todos / Críticos / Hoy) y las tarjetas vienen de la misma lista. Desapareció el pendiente falso de rendición de cuentas, los críticos se ordenan primero y el hero del Inicio deja de ocupar una fila sola en modo ventana.
 
@@ -1187,10 +1191,10 @@ La aplicación se publica en GitHub Releases:
 **Flujo de release automatizado (v0.1.131+):**
 
 ```powershell
-#流程 completo (con tests):
+# flujo completo (con tests):
 .\scripts\release.ps1
 
-#流程 sin tests:
+# flujo sin tests:
 .\scripts\release.ps1 -SkipTests
 ```
 
@@ -1328,6 +1332,31 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 ---
 
 ## 📝 Cambios Recientes
+
+### v0.1.228 - 2 Oct 2026 🆕
+
+#### 📦843 · El sidebar navega desde cualquier submódulo
+
+Un sidebar existe para navegar, y este no cumplía: si estabas dentro de un submódulo y hacías clic en otro módulo del menú lateral, el clic se descartaba **en silencio**. Sin aviso, sin alerta. El rodeo era clic en el módulo actual primero, después en el que querías.
+
+- **Había dos candados**, no uno. El del clic y otro en el cambio de contenido, rotulado *"solución temporal"*, que lleva así desde hace tiempo. La corrección ya estaba dentro de esa función, pero el candado se colaba 10 líneas antes.
+- **Lo que faltaba no era permiso, era limpieza.** Al salir hay que destruir el componente del submódulo, o su vigilante, sus modales y su CSS quedan vivos sobre el módulo siguiente.
+- **Bug extra que salió en el camino:** el botón "Volver" normal nunca destruía nada; por eso existía una segunda versión "segura" duplicada.
+- **La protección interna se conserva** para los iframes y las tareas del dashboard.
+- **14/14 checks** (la función se ejecuta de verdad, incluido el caso en que falla) y **6/6 mutaciones detectadas**.
+
+#### 📦842 · El header se oculta del todo
+
+El header superior se encoge al desplazarse, pero se quedaba una franja blanca de 8 píxeles abajo.
+
+- **Medido, no supuesto:** 49px abierto, 8px cerrado. Los 8px eran el relleno interno de la caja.
+- **El relleno no puede colapsar:** vive por fuera del área de contenido, así que la fila del grid nunca llegaba a 0.
+- **Ahora mide 0px**, y el relleno baja junto con el alto para no dar un salto.
+- **7/7 checks** que miden la pantalla real, y **2/2 mutaciones detectadas**.
+
+#### 📦841 · La pantalla se desvanece al cambiar de módulo
+
+Cambiar de módulo ya no salta de golpe: el contenido viejo se desvanece y el nuevo aparece. Lo mismo al entrar y salir del Inicio. **Pendiente de que lo revises en la app.**
 
 ### v0.1.226 - 2 Oct 2026 🆕
 

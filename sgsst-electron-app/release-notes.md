@@ -1,3 +1,21 @@
+# K+AIR v0.1.228
+
+## 🧭 El sidebar ahora sí te lleva a donde quieras ir
+
+Si estabas trabajando dentro de un submódulo —Capacitaciones, el Plan de Trabajo, la Política de Seguridad— y hacías clic en otro módulo del menú lateral, **no pasaba nada**. El programa ignoraba el clic sin avisarte. Para llegar tenías que hacer un rodeo: primero volver al módulo en el que ya estabas, después cambiar al que querías.
+
+Ahora un clic y llegas, estés donde estés.
+
+De paso se corrigió una fuga: al salir de un submódulo se quedaban vivos el vigilante de la pantalla y los modales abiertos, y podían quedar flotando sobre el módulo siguiente.
+
+## 🧹 El header ahora se oculta del todo
+
+Al desplazarte, el header superior se encoge para dejarte la pantalla completa. Se quedaba una franja blanca de 8 píxeles pegada abajo. Ya no.
+
+## Las dos cosas de la versión anterior, resumidas
+
+- **Al cambiar de módulo la pantalla ya se desvanece** en vez de saltar de golpe, y también al entrar y salir del Inicio. **Está pendiente de que lo revises en la app.**
+
 # K+AIR v0.1.226
 
 ## 🩺 Medicina Preventiva · SVE: el programa 3.1.2 ya es usable de verdad (📦826-833)
