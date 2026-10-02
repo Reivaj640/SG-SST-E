@@ -369,7 +369,11 @@ class GestionIntegralHome {
         }
 
         var rendicion = stats.rendicion_cuentas || {};
-        if ((rendicion.actas_realizadas || 0) === 0) {
+        // 📦829 — El dato tiene que existir, no solo el objeto.
+        // calculateRendicionCuentasStats devuelve el objeto SIEMPRE, aun cuando
+        // no encuentra la carpeta: comparar el 0 a secas le decia "Rendicion sin
+        // actas" a una empresa que jamas la registro. La guarda mira disponible.
+        if (rendicion.disponible && rendicion.actas_realizadas === 0) {
             _push({
                 icon: '◷', bg: '#eff7f5', color: '#178666', critica: false,
                 title: 'Rendición de cuentas',

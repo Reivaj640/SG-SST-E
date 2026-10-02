@@ -72,20 +72,34 @@ const tareas = [];
 ok('0) se encontraron las tareas del dashboard', tareas.length >= 20, tareas.length + ' tareas');
 
 // ══ 1) Toda etiqueta conocida por el filtro de tarjetas ══
+// El mapa se llama MODULE_TASK_MAP y vive a NIVEL DE MÓDULO (📦829-fix): antes
+// estaba declarado dentro de filterDashboardTasksByModule(), así que el filtro
+// de los tabs y los contadores del encabezado no lo alcanzaban y contaban
+// sobre la lista global ("Todos 4 · Críticos 7" en pantalla).
 const mapaFiltro = {};
+let mapaEncontrado = false;
 {
-  const blk = renderer.split('const moduleTaskMap')[1] || '';
-  const re = /'([^']+)':\s*\[([^\]]*)\]/g;
-  let m;
-  while ((m = re.exec(blk))) {
-    mapaFiltro[m[1]] = (m[2].match(/'[\w-]+'/g) || []).map(s => s.replace(/'/g, ''));
+  const iMapa = renderer.indexOf('const MODULE_TASK_MAP = {');
+  if (iMapa >= 0) {
+    mapaEncontrado = true;
+    const blk = renderer.slice(iMapa, renderer.indexOf('};', iMapa));
+    const re = /'([^']+)':\s*\[([^\]]*)\]/g;
+    let m;
+    while ((m = re.exec(blk))) {
+      mapaFiltro[m[1]] = (m[2].match(/'[\w-]+'/g) || []).map(s => s.replace(/'/g, ''));
+    }
   }
 }
+// Si el mapa no aparece, el bloque siguiente daría "todas son huérfanas", que
+// es un mensaje confuso. Se avisa del problema real.
+ok('1a) se encontró el mapa de tareas del filtro de tarjetas',
+  mapaEncontrado && Object.keys(mapaFiltro).length >= 7,
+  mapaEncontrado ? Object.keys(mapaFiltro).length + ' módulos' : 'NO se encontró MODULE_TASK_MAP');
 const tiposConocidos = new Set();
 Object.keys(mapaFiltro).forEach(k => mapaFiltro[k].forEach(t => tiposConocidos.add(t)));
 const huerfanos = tareas.filter(t => !tiposConocidos.has(t.module));
-ok('1) TODA etiqueta module: de una tarea existe en algún moduleTaskMap',
-  huerfanos.length === 0,
+ok('1) TODA etiqueta module: de una tarea existe en algún mapa de tarjetas',
+  mapaEncontrado && huerfanos.length === 0,
   huerfanos.length
     ? huerfanos.map(t => t.module + ' ("' + t.submodule + '")').join(' | ')
     : tareas.length + ' etiquetas todas conocidas');

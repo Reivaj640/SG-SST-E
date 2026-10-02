@@ -3716,7 +3716,7 @@ async function getDashboardAlertas(rootPath, companyName) {
     }
 
     // 2.6.1 Rendición de cuentas
-    if (giRendicion && (giRendicion.actas_realizadas || 0) === 0) {
+    if (giRendicion && giRendicion.disponible && giRendicion.actas_realizadas === 0) {
       _giPush({
         title: 'Rendición de cuentas sin actas registradas',
         desc: giRendicion.proxima_fecha
@@ -3756,7 +3756,15 @@ async function getDashboardAlertas(rootPath, companyName) {
   // ORDENAR TAREAS POR PRIORIDAD
   // ========================================================================
   const priority_map = { 'critical': 0, 'warning': 1, 'info': 2 };
-  dashboard_data.tasks.sort((a, b) => (priority_map[a.priority] || 3) - (priority_map[b.priority] || 3));
+  // 📦829-fix2 · Esto era (priority_map[a.priority] || 3). El problema es que
+  // el peso de "critical" es 0 y en JavaScript 0 es FALSO: `0 || 3` daba 3,
+  // así que los críticos se ordenaban de ÚLTIMOS, debajo de los "Atención".
+  // Ahora lo desconocido vale 3 y el 0 se respeta.
+  const pesoPrioridad = (t) => {
+    const p = priority_map[t.priority];
+    return p === undefined ? 3 : p;
+  };
+  dashboard_data.tasks.sort((a, b) => pesoPrioridad(a) - pesoPrioridad(b));
 
   // ========================================================================
   // ACTUALIZAR ESTADO GENERAL
@@ -8998,7 +9006,7 @@ ipcMain.handle('get-word-preview', async (event, rawFilePath) => {
 
 // Manejador para obtener contenido editable de un documento
 ipcMain.handle('get-editable-content', async (event, payload) => {
-  //兼容 payload como objeto o como string directo
+  // Acepta el payload como objeto o como string directo
   const rawFilePath = typeof payload === 'string' ? payload : (payload?.filePath || '');
   
   sendLog(`[MAIN][get-editable-content] Solicitud recibida para: ${rawFilePath}`, 'INFO');
@@ -9050,7 +9058,7 @@ ipcMain.handle('get-editable-content', async (event, payload) => {
 
 // Manejador para guardar documento editado
 ipcMain.handle('save-edited-document', async (event, payload) => {
-  //兼容 payload como objeto o como propiedades directas
+  // Acepta el payload como objeto o con las propiedades sueltas
   const rawFilePath = payload?.filePath || '';
   const content = payload?.content || '';
   
@@ -17873,6 +17881,7 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
  */
 async function calculateRendicionCuentasStats(basePath) {
   const stats = {
+    disponible: false,
     actas_realizadas: 0,
     proxima_fecha: null,
     ultima_fecha: null
@@ -17914,6 +17923,7 @@ async function calculateRendicionCuentasStats(basePath) {
     );
 
     stats.actas_realizadas = actasFiles.length;
+    stats.disponible = true;   // la carpeta SI existe: ahora el 0 es un cero real
 
     // Obtener fecha de la última acta
     if (actasFiles.length > 0) {

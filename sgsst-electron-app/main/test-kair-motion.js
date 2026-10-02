@@ -43,8 +43,13 @@ ok('index.html: tag de kair-motion.js con cache-bust', lineKm >= 0);
 ok('index.html: tag de renderer.js con cache-bust', lineRnd >= 0);
 ok('index.html: orden anime → kair-motion → renderer.js',
   lineAnime >= 0 && lineKm > lineAnime && lineRnd > lineKm);
-ok('index.html: renderer.js con token 20261002-dashboard-motion',
-  /renderer\.js\?v=20261002-dashboard-motion/.test(idxSrc));
+// El token NO se fija a una fecha: se bumpea en cada cambio y una guarda con
+// la fecha literal se rompe sola la proxima vez que se bumpee (pasó con 📦840).
+// Lo que importa es que el tag traiga un token de cache-bust bien formado.
+const mToken = /renderer\.js\?v=(\d{8}-[a-z0-9-]+)/.exec(idxSrc);
+ok('index.html: renderer.js con token de cache-bust con formato de fecha',
+  !!mToken,
+  mToken ? 'token=' + mToken[1] : 'no se encontro ?v=AAAA-MM-DD');
 
 // ── 3. Wrapper kair-motion.js ──────────────────────────────────────
 ok('wrapper: existe assets/js/kair-motion.js', fs.existsSync(kmPath));
@@ -63,12 +68,19 @@ ok('wrapper: sintaxis valida (node --check / new Function)', (function () {
 })());
 
 // ── 4. Hook en renderer.js ─────────────────────────────────────────
+// 📦829-fix · El ancla se acota a loadDashboardData(). Antes buscaba la llamada
+// con sus argumentos LITERALES ('updateFilterUI(null, (data.tasks || []).length)')
+// y se rompía con cualquier cambio de firma, aunque el orden se conservara.
+// Lo que importa es que el hook corra DESPUÉS de repintar, no qué recibe.
 const hookIdx = rndSrc.indexOf('window.KairMotion.dashboard(data)');
-const filterIdx = rndSrc.indexOf('updateFilterUI(null, (data.tasks || []).length)');
+const inicioLoad = rndSrc.indexOf('async function loadDashboardData()');
+const filterIdx = inicioLoad >= 0 ? rndSrc.indexOf('updateFilterUI(', inicioLoad) : -1;
 ok('renderer.js: hook KairMotion.dashboard(data) presente', hookIdx >= 0);
 ok('renderer.js: hook con guarda typeof window.KairMotion',
   /typeof window\.KairMotion !== 'undefined'/.test(rndSrc));
-ok('renderer.js: hook despues de updateFilterUI (tras repintar)', hookIdx > filterIdx && filterIdx >= 0);
+ok('renderer.js: hook despues de updateFilterUI (tras repintar)',
+  hookIdx > filterIdx && filterIdx > inicioLoad && inicioLoad >= 0,
+  'load@' + inicioLoad + ' filtro@' + filterIdx + ' hook@' + hookIdx);
 ok('renderer.js: sintaxis valida', (function () {
   try { new Function(rndSrc); return true; } catch (e) { return false; }
 })());

@@ -4254,6 +4254,13 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     '</div>';
   dashPage.appendChild(dashTopbar);
 
+  // --- Hero + KPIs en la MISMA fila (📦840) ---
+  // El wrapper es lo que los alinea: antes eran hermanos sueltos de
+  // .kair-page y por eso el hero se comia una fila entera.
+  const dashTop = document.createElement('div');
+  dashTop.className = 'kair-dash-top';
+  dashPage.appendChild(dashTop);
+
   // --- Hero ---
   const dashHero = document.createElement('article');
   dashHero.className = 'kair-hero';
@@ -4273,14 +4280,14 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
         '<span class="kair-hero__meter" aria-hidden="true"><span class="kair-hero__meter-fill" id="hero-meter"></span></span>' +
       '</div>' +
     '</div>';
-  dashPage.appendChild(dashHero);
+  dashTop.appendChild(dashHero);
 
   // --- KPIs (render JS) ---
   const dashKpiSlot = document.createElement('section');
   dashKpiSlot.className = 'kair-grid-kpis';
   dashKpiSlot.id = 'kpi-slot';
   dashKpiSlot.setAttribute('aria-label', 'Indicadores prioritarios');
-  dashPage.appendChild(dashKpiSlot);
+  dashTop.appendChild(dashKpiSlot);
 
   // --- Módulos del Sistema ---
   const dashModsSection = document.createElement('section');
@@ -4353,8 +4360,12 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     if (f === 'todos') { clearFilter(); }
-    else if (currentDashboardData) {
-      var list = currentDashboardData.tasks || [];
+    else {
+      // 📦829 · Se parte de la lista YA filtrada por módulo. Antes usaba
+      // currentDashboardData.tasks completo: al pulsar "Críticos" con Gestión
+      // Integral activo salían las críticas de los otros módulos, mientras el
+      // encabezado seguía diciendo que el filtro estaba puesto.
+      var list = tareasDelFiltroActual();
       if (f === 'criticos') list = list.filter(function (t) { return (t.priority || '').toLowerCase() === 'critical'; });
       if (f === 'hoy') list = list.filter(function (t) { return t.hoy === true; });
       renderTasks(list);
@@ -4388,7 +4399,7 @@ async function loadDashboardData() {
       renderDashModules(data);
       renderTasks(data.tasks || []);
       updateModuleBadges(data.module_status || {}, data.kpis?.recursos_alerts || 0, data.kpis?.gestion_salud_alerts || 0, data.kpis?.gestion_integral_alerts || 0);
-      updateFilterUI(null, (data.tasks || []).length);
+      updateFilterUI(null);
       if (typeof window.KairMotion !== 'undefined') { window.KairMotion.dashboard(data); }
       console.log('[DASHBOARD] loadDashboardData COMPLETADO');
     } else {
@@ -4434,14 +4445,16 @@ function renderDashHero(data) {
   var subEl = document.getElementById('hero-sub');
   var pctEl = document.getElementById('hero-pct');
   var meterEl = document.getElementById('hero-meter');
+  // 📦840 — Textos cortos a proposito: el hero ahora ocupa ~1/3 del ancho en
+  // vez de la fila entera, y los textos anteriores se partian en 4 lineas.
+  // Se mantiene el dato, se quita el relleno.
   if (titleEl) titleEl.textContent = crit > 0
-    ? 'Tu sistema requiere atención: ' + crit + ' frentes críticos por gestionar'
-    : 'Tu sistema va por buen camino: no hay frentes críticos abiertos';
+    ? crit + ' frentes críticos por gestionar'
+    : 'Sin frentes críticos abiertos';
   if (subEl) {
-    var sub = docs + ' documentos vencidos y ' + acc + (acc === 1 ? ' accidente reportado' : ' accidentes reportados') +
-      ' en el año. El plan de trabajo lleva ' + plan + '% de ejecución.';
-    if (crit > 0) { sub += ' Prioriza los ' + crit + ' frentes críticos para mantener la conformidad.'; }
-    subEl.textContent = sub;
+    subEl.textContent = 'Plan ' + plan + '% · ' + docs +
+      (docs === 1 ? ' documento vencido' : ' documentos vencidos') + ' · ' + acc +
+      (acc === 1 ? ' accidente' : ' accidentes') + ' en el año';
   }
   if (pctEl) pctEl.textContent = String(crit);
   if (meterEl) {
@@ -4509,6 +4522,36 @@ function renderDashModules(data) {
 let currentDashboardData = null;
 let currentFilterModule = null;
 
+// 📦829 · El mapa de módulos vive acá arriba, y no dentro del filtro. Antes
+// estaba declarado en filterDashboardTasksByModule(), así que el manejador de
+// los tabs y los contadores del encabezado no lo alcanzaban y armaban su propia
+// lista con TODAS las tareas. Se veía "Todos 4 · Críticos 7" con un filtro de
+// módulo activo, y al pulsar "Críticos" se perdía el filtro a medias.
+const MODULE_TASK_MAP = {
+  'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto', 'afiliacion', 'inducciones'],
+  'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric', 'inducciones'],
+  // plan-trabajo, rendicion y politica ya estaban pero NO los empujaba ninguna
+  // tarea (por eso el panel decía 0). Sumados los otros tres que ahora reporta
+  // getDashboardAlertas().
+  'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica', 'objetivos', 'evaluacion-inicial', 'cambio'],
+  'Peligros': ['iperc', 'controles'],
+  'Amenazas': ['emergencias'],
+  'Verificación': ['auditorias'],
+  'Mejoramiento': ['acciones-correctivas', 'acciones-preventivas']
+};
+
+/**
+ * Las tareas que corresponden al filtro de módulo activo. Única fuente del
+ * panel: los tres tabs pintan desde acá y los tres contadores se cuentan
+ * desde acá, así que no tienen forma de contradecirse.
+ */
+function tareasDelFiltroActual() {
+  const todas = (currentDashboardData && currentDashboardData.tasks) || [];
+  if (!currentFilterModule) return todas;
+  const tipos = MODULE_TASK_MAP[currentFilterModule] || [];
+  return todas.filter(t => tipos.includes(t.module));
+}
+
 /**
  * Filtra las tareas del dashboard por módulo
  */
@@ -4520,32 +4563,16 @@ function filterDashboardTasksByModule(moduleName) {
     return;
   }
 
-  // Mapeo de módulos a tipos de tareas
-  const moduleTaskMap = {
-    'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto', 'afiliacion', 'inducciones'],
-    'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric', 'inducciones'],
-    // 📦829 — 'plan-trabajo', 'rendicion' y 'politica' ya estaban pero NO los
-    // empujaba ninguna tarea (por eso el panel decía 0). Sumados los otros tres
-    // que ahora reporta getDashboardAlertas().
-    'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica', 'objetivos', 'evaluacion-inicial', 'cambio'],
-    'Peligros': ['iperc', 'controles'],
-    'Amenazas': ['emergencias'],
-    'Verificación': ['auditorias'],
-    'Mejoramiento': ['acciones-correctivas', 'acciones-preventivas']
-  };
-
-  const taskTypes = moduleTaskMap[moduleName] || [];
-
-  // Filtrar tareas actuales
-  const filteredTasks = currentDashboardData.tasks.filter(task =>
-    taskTypes.includes(task.module)
-  );
-
-  // Guardar filtro actual
+  // OJO con el ORDEN: primero se guarda el filtro y DESPUÉS se lee la lista.
+  // tareasDelFiltroActual() lee currentFilterModule, así que si se llama
+  // antes de asignarlo el primer clic devuelve TODAS las tareas (el filtro
+  // todavía era null) y el encabezado mentía. Era un bug intermitente: el
+  // segundo clic sí funcionaba.
   currentFilterModule = moduleName;
+  const filteredTasks = tareasDelFiltroActual();
 
   // Actualizar UI del header
-  updateFilterUI(moduleName, filteredTasks.length);
+  updateFilterUI(moduleName);
   
   // ✅ ACTUALIZAR VISUALMENTE EL MÓDULO SELECCIONADO
   updateModuleSelection(moduleName);
@@ -4578,7 +4605,7 @@ function clearFilter() {
   currentFilterModule = null;
 
   // Actualizar UI del header
-  updateFilterUI(null, currentDashboardData?.tasks?.length || 0);
+  updateFilterUI(null);
   
   // ✅ LIMPIAR SELECCIÓN DE MÓDULO
   updateModuleSelection(null);
@@ -4594,7 +4621,7 @@ window.clearFilter = clearFilter;
 /**
  * Actualiza la UI del header para mostrar filtro activo
  */
-function updateFilterUI(moduleName, taskCount) {
+function updateFilterUI(moduleName) {
   const seg = document.getElementById('seg-filtros');
   const radarSub = document.getElementById('radar-sub');
   if (seg) {
@@ -4603,18 +4630,21 @@ function updateFilterUI(moduleName, taskCount) {
       btns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-f') === 'todos'); });
     }
   }
-  const all = currentDashboardData && currentDashboardData.tasks ? currentDashboardData.tasks : [];
+  // 📦829 · Los tres contadores se cuentan sobre la MISMA lista que se pintó.
+  // Antes "Todos" contaba la lista filtrada por módulo y los otros dos la
+  // global: de ahí el "Todos 4 · Críticos 7" que se veía en pantalla.
+  const all = tareasDelFiltroActual();
   const crit = all.filter(function (t) { return (t.priority || '').toLowerCase() === 'critical'; }).length;
   const hoy = all.filter(function (t) { return t.hoy === true; }).length;
   const nT = document.getElementById('n-todos');
   const nC = document.getElementById('n-criticos');
   const nH = document.getElementById('n-hoy');
-  if (nT) nT.textContent = moduleName ? taskCount : all.length;
+  if (nT) nT.textContent = all.length;
   if (nC) nC.textContent = crit;
   if (nH) nH.textContent = hoy;
   if (radarSub) {
     radarSub.textContent = moduleName
-      ? 'Filtrando por ' + moduleName + ' · ' + taskCount + ' punto(s) por gestionar.'
+      ? 'Filtrando por ' + moduleName + ' · ' + all.length + ' punto(s) por gestionar.'
       : all.length + ' puntos por gestionar · ' + crit + ' críticos · ' + hoy + ' con vencimiento hoy.';
   }
 }
