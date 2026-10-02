@@ -149,19 +149,25 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['1.2.2 induccion y reinduccion', 'recursos.inducciones'],
   ['1.2.3 curso virtual 50 horas', 'recursos.curso-virtual'],
   ['1.2.4 manual de sst para proveedores y contratistas', 'recursos.manual-proveedores'],
+  // 📦828-T0 — Gestión Integral: cada submódulo tiene su PROPIA clave de permiso.
+  // Antes nueve de los trece apuntaban a `gestion-integral.plan-trabajo`, así que
+  // darle permiso del Plan de Trabajo abría los otros ocho sin querer. Esto NO
+  // cambia el acceso de nadie hoy: `gerencia` usa el comodín `gestion-integral.*`
+  // y los roles con allowAll no se restringen. Lo que cambia es que ya se puede
+  // afinar el permiso submódulo por submódulo.
   ['2.1.1 politica del sg-sst', 'gestion-integral.politica'],
   ['2.2.1 objetivos sst', 'gestion-integral.objetivos'],
-  ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.evaluacion-inicial'],
   ['2.4.1 plan de trabajo anual', 'gestion-integral.plan-trabajo'],
   ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.archivo-retencion'],
   ['2.6.1 rendicion de cuentas', 'gestion-integral.rendicion'],
-  ['2.7.1 matriz de requisitos legales', 'gestion-integral.plan-trabajo'],
-  ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.plan-trabajo'],
-  ['2.9.1 identificacion y evaluacion para la adquisicion de bienes y servicios', 'gestion-integral.plan-trabajo'],
-  ['2.10.1 evaluacion y seleccion de proveedores y contratistas', 'gestion-integral.plan-trabajo'],
-  ['2.11.1 gestion del cambio', 'gestion-integral.plan-trabajo'],
-  ['2.12.1 equipos y herramientas', 'gestion-integral.plan-trabajo'],
-  ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
+  ['2.7.1 matriz de requisitos legales', 'gestion-integral.matriz-legal'],
+  ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.comunicaciones'],
+  ['2.9.1 identificacion y evaluacion para la adquisicion de bienes y servicios', 'gestion-integral.bienes-servicios'],
+  ['2.10.1 evaluacion y seleccion de proveedores y contratistas', 'gestion-integral.proveedores'],
+  ['2.11.1 gestion del cambio', 'gestion-integral.gestion-del-cambio'],
+  ['2.12.1 equipos y herramientas', 'gestion-integral.equipos'],
+  ['2.13.1 elementos de proteccion personal', 'gestion-integral.epp'],
   ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
   // 3.1.2activities de medicina y preventiva y promocion de la salud →
   // `salud.sociodemografica` a propósito. Antes caía al mensaje de "en
@@ -2936,12 +2942,10 @@ class KairLoadingController {
   }
 
   _getElements() {
-    if (!this.messageEl) {
-      this.messageEl = document.querySelector('.loading-message');
-      this.submessageEl = document.querySelector('.loading-submessage');
-      this.progressFill = document.querySelector('.progress-fill');
-      this.progressPercent = document.querySelector('.loading-progress-percent');
-    }
+    this.messageEl = document.querySelector('.loading-message');
+    this.submessageEl = document.querySelector('.loading-submessage');
+    this.progressFill = document.querySelector('.progress-fill');
+    this.progressPercent = document.querySelector('.loading-progress-percent');
     return { messageEl: this.messageEl, submessageEl: this.submessageEl, progressFill: this.progressFill, progressPercent: this.progressPercent };
   }
 
@@ -4383,7 +4387,7 @@ async function loadDashboardData() {
       renderDashKpis(data);
       renderDashModules(data);
       renderTasks(data.tasks || []);
-      updateModuleBadges(data.module_status || {}, data.kpis?.recursos_alerts || 0, data.kpis?.gestion_salud_alerts || 0);
+      updateModuleBadges(data.module_status || {}, data.kpis?.recursos_alerts || 0, data.kpis?.gestion_salud_alerts || 0, data.kpis?.gestion_integral_alerts || 0);
       updateFilterUI(null, (data.tasks || []).length);
       if (typeof window.KairMotion !== 'undefined') { window.KairMotion.dashboard(data); }
       console.log('[DASHBOARD] loadDashboardData COMPLETADO');
@@ -4520,7 +4524,10 @@ function filterDashboardTasksByModule(moduleName) {
   const moduleTaskMap = {
     'Recursos': ['capacitaciones', 'epp', 'copasst', 'comite_convivencia', 'presupuesto', 'afiliacion', 'inducciones'],
     'Gestión de la Salud': ['ausentismo', 'investigacion', 'pric', 'inducciones'],
-    'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica'],
+    // 📦829 — 'plan-trabajo', 'rendicion' y 'politica' ya estaban pero NO los
+    // empujaba ninguna tarea (por eso el panel decía 0). Sumados los otros tres
+    // que ahora reporta getDashboardAlertas().
+    'Gestión Integral': ['plan-trabajo', 'rendicion', 'politica', 'objetivos', 'evaluacion-inicial', 'cambio'],
     'Peligros': ['iperc', 'controles'],
     'Amenazas': ['emergencias'],
     'Verificación': ['auditorias'],
@@ -4665,7 +4672,21 @@ function navigateToModule(taskModule, taskSubmodule) {
     'copasst': 'Recursos',
     'comite_convivencia': 'Recursos',
     'inducciones': 'Recursos',
-    'auditorias': 'Verificación'
+    'auditorias': 'Verificación',
+    // 📦829 — Esta faltaba: la tarea de Afiliación (1.1.4) salía en el panel
+    // desde hacía tiempo, pero el clic pedía el módulo 'afiliacion', que no
+    // existe. Lo encontró la guarda del test, no una prueba manual.
+    'afiliacion': 'Recursos',
+    // 📦829 — Sin estas entradas, una tarea de Gestión Integral caía en
+    // `moduleMap[taskModule] || taskModule` y terminaba pidiendo el módulo
+    // 'plan-trabajo', que no existe: la tarea se veía pero el clic no
+    // llevaba a ningún lado.
+    'politica': 'Gestión Integral',
+    'objetivos': 'Gestión Integral',
+    'evaluacion-inicial': 'Gestión Integral',
+    'plan-trabajo': 'Gestión Integral',
+    'rendicion': 'Gestión Integral',
+    'cambio': 'Gestión Integral',
   };
 
   const targetModule = moduleMap[taskModule] || taskModule;
@@ -4760,7 +4781,9 @@ const MODULE_KEY_TO_BADGE_ID = {
 };
 
 // Función para actualizar badges de módulos
-function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts = 0) {
+// 📦829 — gestionIntegralAlerts es el cuarto: sin él la tarjeta de Gestión
+// Integral solo podía mostrar Alerta/Pendiente/OK, nunca cuántas había.
+function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts = 0, gestionIntegralAlerts = 0) {
   for (const [moduleName, status] of Object.entries(moduleStatus)) {
     const badgeId = MODULE_KEY_TO_BADGE_ID[moduleName];
     const badgeEl = document.getElementById(badgeId);
@@ -4771,6 +4794,9 @@ function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts
       badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
     } else if (moduleName === 'gestion-salud' && gestionSaludAlerts > 0) {
       badgeEl.textContent = gestionSaludAlerts + ' alertas';
+      badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
+    } else if (moduleName === 'gestion-integral' && gestionIntegralAlerts > 0) {
+      badgeEl.textContent = gestionIntegralAlerts + ' alertas';
       badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
     } else {
       const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');

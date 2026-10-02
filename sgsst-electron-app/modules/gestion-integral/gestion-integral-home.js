@@ -316,43 +316,95 @@ class GestionIntegralHome {
     buildRadarTasks() {
         var stats = this.gestionIntegralStats || {};
         var tareas = [];
+        var _push = function (t) { t.critica = !!t.critica; tareas.push(t); };
+
+        // 📦829 — Estas SEIS señales son las mismas que empuja
+        // getDashboardAlertas() (main.js) para el panel "Pendientes y Tareas"
+        // del Inicio. Antes el home miraba tres y el dashboard ninguna, así que
+        // los dos paneles se contradecían: el home decía "2 pendientes" y el
+        // Inicio decía "0 punto(s) por gestionar" con el mismo filtro.
+        // Si se agrega una señal acá hay que agregarla allá: lo comprueba
+        // main/test-dashboard-tareas-gi.js.
         var politica = stats.politica || {};
         if (politica.actualizada === false) {
-            tareas.push({
-                icon: '◷', bg: '#fff5e6', color: '#c28316',
+            _push({
+                icon: '◷', bg: '#fff5e6', color: '#c28316', critica: false,
                 title: 'Política del SG-SST',
                 sub: 'Pendiente de actualización',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
             });
         }
+
+        var objetivos = stats.objetivos || {};
+        if ((objetivos.total || 0) > 0 && (objetivos.cumplidos || 0) < objetivos.total) {
+            _push({
+                icon: '◷', bg: '#eef3ff', color: '#2057b8',
+                critica: (objetivos.porcentaje || 0) < 50,
+                title: 'Objetivos SST',
+                sub: (objetivos.total - objetivos.cumplidos) + ' de ' + objetivos.total
+                    + ' sin cumplir (' + (objetivos.porcentaje || 0) + '%)',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+
+        var ei = (stats.evaluacion_inicial || {}).combinado || {};
+        if ((ei.hallazgosCriticos || 0) > 0) {
+            _push({
+                icon: '◷', bg: '#fdecec', color: '#c0392b', critica: true,
+                title: 'Evaluación inicial',
+                sub: ei.hallazgosCriticos + ' hallazgos críticos sin cerrar',
+                status: 'Crítico', statusClass: 'kair-status-pill--danger'
+            });
+        }
+
+        var plan = stats.plan_trabajo || {};
+        if ((plan.actividadesPendientes || 0) > 0) {
+            _push({
+                icon: '◷', bg: '#eef7ee', color: '#2e7d32', critica: false,
+                title: 'Plan de Trabajo',
+                sub: plan.actividadesPendientes + ' actividades pendientes ('
+                    + (plan.porcentajeAvance || 0) + '% de avance)',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+
         var rendicion = stats.rendicion_cuentas || {};
         if ((rendicion.actas_realizadas || 0) === 0) {
-            tareas.push({
-                icon: '◷', bg: '#eff7f5', color: '#178666',
+            _push({
+                icon: '◷', bg: '#eff7f5', color: '#178666', critica: false,
                 title: 'Rendición de cuentas',
                 sub: 'Aún no hay actas registradas',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
             });
         }
+
         var cambios = stats.cambios || {};
         if ((cambios.pending || 0) > 0) {
-            tareas.push({
-                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+            _push({
+                icon: '◷', bg: '#f0eaff', color: '#6b3fb8', critica: false,
                 title: 'Gestión del Cambio',
                 sub: cambios.pending + ' solicitudes en pipeline',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
             });
         }
+
         if (tareas.length === 0) {
             tareas.push({
-                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                icon: '✓', bg: '#e9f3ff', color: '#2057b8', critica: false,
                 title: 'Sistema estable',
                 sub: 'Sin alertas pendientes este mes',
                 status: 'Al día', statusClass: 'kair-status-pill--ok'
             });
         }
+
+        // Las críticas van primero: el radar muestra 3, así que el orden decide
+        // cuál se ve. Antes el orden era el de escritura y una crítica podía
+        // quedar fuera de la pantalla.
+        tareas.sort(function (a, b) { return (b.critica ? 1 : 0) - (a.critica ? 1 : 0); });
+
         var html = '';
-        for (var i = 0; i < tareas.length && i < 3; i++) {
+        var LIMITE = 3;
+        for (var i = 0; i < tareas.length && i < LIMITE; i++) {
             var t = tareas[i];
             html += ''
                 + '<div class="kair-task">'
@@ -363,6 +415,13 @@ class GestionIntegralHome {
                 + '  </div>'
                 + '  <span class="kair-status-pill ' + t.statusClass + '">' + t.status + '</span>'
                 + '</div>';
+        }
+        // Si hay más de las que caben, se avisa en vez de cortar en silencio.
+        if (tareas.length > LIMITE) {
+            var restan = tareas.length - LIMITE;
+            html += '<div class="kair-task" style="justify-content:center">'
+                + '  <small>' + restan + ' pendiente(s) más en el panel de Inicio</small>' +
+                '</div>';
         }
         return html;
     }

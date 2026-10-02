@@ -11,6 +11,12 @@ const rendicionCuentas = require('./rendicion-cuentas');
 const objetivosSST = require('./objetivos-sst');
 const evaluacionInicialSgSst = require('./evaluacion-inicial-sg-sst');
 const gestionDelCambio = require('./gestion-del-cambio');
+// 📦828-T0 — Estas tres carpetas YA existian y ya tenian dispatch en el dashboard,
+// pero el index no las exportaba: el punto de entrada del modulo moria antes de
+// ellas. Agregadas para que las 9 carpetas queden parecidas.
+const archivoRetencion = require('./archivo-retencion');
+const evaluacionProveedores = require('./evaluacion-proveedores');
+const evaluacionSeleccion = require('./evaluacion-seleccion');
 
 module.exports = {
   planTrabajo,
@@ -18,5 +24,8 @@ module.exports = {
   rendicionCuentas,
   objetivosSST,
   evaluacionInicialSgSst,
-  gestionDelCambio
+  gestionDelCambio,
+  archivoRetencion,
+  evaluacionProveedores,
+  evaluacionSeleccion
 };

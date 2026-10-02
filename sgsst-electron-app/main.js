@@ -2964,7 +2964,10 @@ async function getDashboardAlertas(rootPath, companyName) {
       overdue_docs: 0,
       compliance: 0,
       recursos_alerts: 0,
-      gestion_salud_alerts: 0
+      gestion_salud_alerts: 0,
+      // 📦829 · Gestión Integral tambien cuenta sus pendientes, para que la
+      // tarjeta del modulo no quede fija en "ok" como estaba antes.
+      gestion_integral_alerts: 0
     },
     tasks: [],
     module_status: {
@@ -3621,6 +3624,129 @@ async function getDashboardAlertas(rootPath, companyName) {
       console.log(`[DASHBOARD] ⚠️ [COMITÉ CONVIVENCIA] Carpeta NO existe: ${convivenciaPath}`);
     }
 
+
+    // ========================================================================
+    // 📦829 · GESTIÓN INTEGRAL — este módulo nunca reportaba pendientes al
+    // dashboard. El mapa del renderer aceptaba las etiquetas "plan-trabajo",
+    // "rendicion" y "politica", pero NINGUNA tarea las usaba: por eso el panel
+    // decía "0 punto(s) por gestionar" al filtrar por Gestión Integral, y la
+    // tarjeta decía "OK" porque module_status estaba fijo en "ok" y nadie lo
+    // calculaba. Acá se usan los MISMOS datos que ya consume el home del módulo
+    // (get-gestion-integral-stats): son las mismas seis funciones calculateXxx,
+    // así que el home y el dashboard no se contradicen.
+    //
+    // Cada tarea se empuja SOLO si hay algo pendiente, igual que hace Recursos.
+    // El patrón es el de siempre: el número se pregunta primero, y la tarea se
+    // arma con title / desc / priority / module / submodule.
+    //
+    // OJO con el submódulo: navigateToModule() saca el código con un regex
+    // ("2.1.1 Política del SG-SST" -> "2.1.1") y lo busca en el maestro. Por eso
+    // el string tiene que llevar el código correcto, no un título suelto.
+    // ========================================================================
+    let giPendientes = 0;
+    let giCriticas = 0;
+    const _giPush = (tarea) => {
+      dashboard_data.tasks.push(tarea);
+      giPendientes++;
+      if (tarea.priority === 'critical') giCriticas++;
+    };
+
+    // planTrabajoStats ya se calculo mas arriba (seccion 1b): se reusa en vez
+    // de volver a leer el Excel del plan.
+    const [giPolitica, giObjetivos, giRendicion, giEvalInicial, giCambios] = await Promise.all([
+      calculatePoliticaStats(rootPath),
+      calculateObjetivosStats(rootPath, companyName),
+      calculateRendicionCuentasStats(rootPath),
+      calculateEvaluacionInicialStats(rootPath),
+      calculateCambioStats(companyName)
+    ]);
+
+    // 2.1.1 Política del SG-SST
+    if (giPolitica && giPolitica.actualizada === false) {
+      _giPush({
+        title: 'Política del SG-SST sin actualizar',
+        desc: giPolitica.documento_encontrado
+          ? 'El documento está en la carpeta pero no tiene fecha de actualización registrada.'
+          : 'No se encontró el documento de política en la carpeta de la empresa.',
+        priority: 'warning',
+        module: 'politica',
+        icon: 'fas fa-file-contract',
+        submodule: '2.1.1 Politica del SG-SST'
+      });
+    }
+
+    // 2.2.1 Objetivos SST
+    const objTotal = (giObjetivos && giObjetivos.total) || 0;
+    const objCumplidos = (giObjetivos && giObjetivos.cumplidos) || 0;
+    if (objTotal > 0 && objCumplidos < objTotal) {
+      _giPush({
+        title: `${objTotal - objCumplidos} de ${objTotal} objetivos sin cumplir`,
+        desc: `Cumplimiento actual: ${giObjetivos.porcentaje}% (umbral del 70%).`,
+        priority: giObjetivos.porcentaje < 50 ? 'critical' : 'warning',
+        module: 'objetivos',
+        icon: 'fas fa-bullseye',
+        submodule: '2.2.1 Objetivos SST'
+      });
+    }
+
+    // 2.3.1 Evaluación inicial del SG-SST
+    const ei = (giEvalInicial && giEvalInicial.combinado) || {};
+    if ((ei.hallazgosCriticos || 0) > 0) {
+      _giPush({
+        title: `${ei.hallazgosCriticos} hallazgos críticos sin cerrar`,
+        desc: `Cumplimiento combinado: ${ei.cumplimiento}% de ${ei.totalHallazgos} hallazgos evaluados.`,
+        priority: 'critical',
+        module: 'evaluacion-inicial',
+        icon: 'fas fa-clipboard-check',
+        submodule: '2.3.1 Evaluación inicial del SG-SST'
+      });
+    }
+
+    // 2.4.1 Plan de Trabajo Anual (reusa planTrabajoStats, ya calculado)
+    const giPlanPend = (planTrabajoStats && planTrabajoStats.actividadesPendientes) || 0;
+    if (giPlanPend > 0) {
+      _giPush({
+        title: `${giPlanPend} actividades del Plan de Trabajo pendientes`,
+        desc: `Avance ${planTrabajoStats.porcentajeAvance}% · ${planTrabajoStats.actividadesEjecutadas} de ${planTrabajoStats.totalActividades} ejecutadas.`,
+        priority: (planTrabajoStats.porcentajeAvance || 0) < 50 ? 'warning' : 'info',
+        module: 'plan-trabajo',
+        icon: 'fas fa-calendar-day',
+        submodule: '2.4.1 Plan de Trabajo Anual'
+      });
+    }
+
+    // 2.6.1 Rendición de cuentas
+    if (giRendicion && (giRendicion.actas_realizadas || 0) === 0) {
+      _giPush({
+        title: 'Rendición de cuentas sin actas registradas',
+        desc: giRendicion.proxima_fecha
+          ? `No hay actas. Próxima fecha programada: ${giRendicion.proxima_fecha}.`
+          : 'No hay actas de rendición de cuentas registradas.',
+        priority: 'warning',
+        module: 'rendicion',
+        icon: 'fas fa-clipboard-list',
+        submodule: '2.6.1 Rendición de cuentas'
+      });
+    }
+
+    // 2.11.1 Gestión del Cambio
+    if (giCambios && (giCambios.pending || 0) > 0) {
+      _giPush({
+        title: `${giCambios.pending} solicitudes de cambio en pipeline`,
+        desc: `Solicitudes sin cerrar de ${giCambios.total || giCambios.pending} registradas. Requieren seguimiento.`,
+        priority: 'info',
+        module: 'cambio',
+        icon: 'fas fa-code-branch',
+        submodule: '2.11.1 Gestión del Cambio'
+      });
+    }
+
+    // La tarjeta del módulo: antes decía "ok" siempre, sin mirar nada.
+    dashboard_data.kpis.gestion_integral_alerts = giPendientes;
+    dashboard_data.module_status["gestion-integral"] =
+      giCriticas > 0 ? "danger" : (giPendientes > 0 ? "warning" : "ok");
+    sendLog(`[DASHBOARD] 📊 Gestión Integral: ${giPendientes} pendientes ` +
+      `(${giCriticas} críticos) · estado=${dashboard_data.module_status["gestion-integral"]}`, 'INFO');
   } catch (error) {
     console.error(`[DASHBOARD ALERTAS] Error calculando alertas: ${error.message}`);
     sendLog(`[DASHBOARD ALERTAS] Error: ${error.message}`, 'ERROR');
