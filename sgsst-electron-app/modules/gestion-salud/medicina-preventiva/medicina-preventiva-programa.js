@@ -64,6 +64,123 @@ var PG_LINEAS = {
 var PG_ESTADO_ETIQUETA = { activo: 'Activo', pausado: 'Pausado', cerrado: 'Cerrado', eliminado: 'Eliminado' };
 var PG_SECCION_ETIQUETA = { pendiente: 'Pendiente', en_curso: 'En curso', completo: 'Completo' };
 
+// 📦826 — Mapeo clave de sección del programa → ruta hash del prototipo SVE.
+// Solo aplica a programas tipo 'sve'; las secciones sin ruta siguen con el
+// placeholder "en construcción".
+var PG_SVE_RUTAS = {
+    dashboard: 'dashboard',
+    casos: 'seguimiento',
+    plan: 'plan',
+    indicadores: 'indicadores',
+    areas: 'areas'
+};
+
+// ---------- cargador del prototipo SVE (📦826) ----------
+// Inyecta una sola vez los scripts del módulo SVE (orden obligatorio, ver
+// README-INTEGRACION del prototipo) dentro de ESTE iframe, con cache-bust.
+// El storage del prototipo queda namespaced por programa vía
+// window.SVE_PROGRAMA_KEY (leído por sve-app.js al evaluarse).
+var PG_SVE_CARGADOS = false;
+var PG_SVE_PROMESA = null;
+
+function _pgSveCargar() {
+    if (PG_SVE_CARGADOS) return Promise.resolve(true);
+    if (PG_SVE_PROMESA) return PG_SVE_PROMESA;
+
+    var base = 'sve/';
+    var v = '?v=' + ((window.parent && window.parent.MEDPREV_V) || 'sve-1');
+    var archivos = [
+        base + 'vendor/lucide.min.js' + v,
+        base + 'vendor/xlsx.full.min.js' + v,
+        base + 'sve-seed.js' + v,
+        base + 'sve-core.js' + v,
+        base + 'sve-views.js' + v
+    ];
+
+    if (!document.getElementById('pg-sve-css')) {
+        var link = document.createElement('link');
+        link.id = 'pg-sve-css';
+        link.rel = 'stylesheet';
+        link.href = base + 'sve.css' + v;
+        document.head.appendChild(link);
+    }
+
+    PG_SVE_PROMESA = new Promise(function (resolve) {
+        var i = 0;
+        function siguiente() {
+            if (i >= archivos.length) {
+                // Antes de sve-app.js: clave de storage por programa y empresa real.
+                window.SVE_PROGRAMA_KEY = PG.id || 'default';
+                try {
+                    if (window.SveSeed && PG.empresa) window.SveSeed.meta.empresa = PG.empresa;
+                } catch (e) { /* noop */ }
+                var app = document.createElement('script');
+                app.src = base + 'sve-persistencia.js' + v;
+                // 📦827 — sve-persistencia.js va ANTES de sve-app.js: es la capa
+                // que habla con SQLite y el store la busca en window al hidratar.
+                // Si no carga, se sigue igual: el store degrada a localStorage.
+                app.onload = function () {
+                    var app2 = document.createElement('script');
+                    app2.src = base + 'sve-app.js' + v;
+                    app2.onload = function () { PG_SVE_CARGADOS = true; resolve(true); };
+                    app2.onerror = function () { PG_SVE_PROMESA = null; resolve(false); };
+                    document.head.appendChild(app2);
+                };
+                app.onerror = function () {
+                    var app3 = document.createElement('script');
+                    app3.src = base + 'sve-app.js' + v;
+                    app3.onload = function () { PG_SVE_CARGADOS = true; resolve(true); };
+                    app3.onerror = function () { PG_SVE_PROMESA = null; resolve(false); };
+                    document.head.appendChild(app3);
+                };
+                document.head.appendChild(app);
+                return;
+            }
+            var src = archivos[i++];
+            var el = document.createElement('script');
+            el.src = src;
+            el.onload = siguiente;
+            el.onerror = function () { PG_SVE_PROMESA = null; resolve(false); };
+            document.head.appendChild(el);
+        }
+        siguiente();
+    });
+    return PG_SVE_PROMESA;
+}
+
+function _pgSveMontar(clave) {
+    var ruta = PG_SVE_RUTAS[clave];
+    if (!ruta) return;
+    _pgSveCargar().then(function (ok) {
+        var host = document.getElementById('pg-sve-host');
+        if (!ok || !host) {
+            if (host) host.innerHTML = '<div class="mp-pg__sve-error">No se pudo cargar la interfaz SVE (sve-*.js). Revisa la instalacion del modulo.</div>';
+            return;
+        }
+        // El host puede haber sido re-renderizado mientras cargaba: solo
+        // montamos si la sección visible sigue siendo la que pidió el montaje.
+        if (PG.sveHostClave !== clave) return;
+        try {
+            /* 📦827 — init() es ASÍNCRONO: hidrata el programa desde SQLite
+               (o migra el localStorage viejo) antes de arrancar el router.
+               Hay que esperar su promesa antes de navegar, o las vistas se
+               pintarían contra un store todavía vacío. */
+            var p = window.SveApp.init(host, {});
+            if (p && typeof p.then === 'function') {
+                p.then(function (r) {
+                    if (!r.ok) return;   // la vista ya pintó el error de base
+                    if (PG.sveHostClave !== clave) return;
+                    window.SveApp.go({ name: ruta });
+                });
+                return;
+            }
+            window.SveApp.go({ name: ruta });
+        } catch (e) {
+            host.innerHTML = '<div class="mp-pg__sve-error">Error montando la interfaz SVE: ' + _pgEsc(e.message) + '</div>';
+        }
+    });
+}
+
 // ---------- utilidades ----------
 function _pgParams() {
     return new URLSearchParams(window.location.search);
@@ -133,6 +250,24 @@ function _pgRenderHeader() {
     document.querySelector('#pg-line-icon i').className = 'fas ' + linea.icono;
     var btnNuevo = document.getElementById('pg-btn-nuevo');
     if (PG.modo === 'detalle') btnNuevo.style.display = 'none';
+
+    // 📦826 — "Atrás" cambia de destino según dónde estés. Dentro de un programa
+    // el salto natural es a la LISTA de la línea (¿qué otros programas hay de
+    // SVE?), no al home del 3.1.2: desde un detalle largo como el Dashboard del
+    // prototipo, volver al home tira al usuario dos niveles y pierde el programa
+    // que estaba mirando. En la lista sí tiene sentido ir al home del 3.1.2,
+    // porque la lista es el último escalón antes de las tres líneas.
+    var btnVolver = document.getElementById('pg-btn-volver');
+    var txtVolver = document.getElementById('pg-btn-volver-txt');
+    if (btnVolver && txtVolver) {
+        if (PG.modo === 'detalle') {
+            btnVolver.setAttribute('onclick', 'volverALista()');
+            txtVolver.textContent = 'Programas ' + linea.etiqueta;
+        } else {
+            btnVolver.setAttribute('onclick', 'volverAlHome()');
+            txtVolver.textContent = 'Home 3.1.2';
+        }
+    }
 }
 
 async function _pgCargarPlantillas() {
@@ -291,6 +426,30 @@ function _pgRenderDetalle() {
             return '<button class="mp-pg__seg-btn' + (activo ? ' mp-pg__seg-btn--active' : '') + '" onclick="marcarEstado(\'' + est + '\')">' +
                 _pgEsc(PG_SECCION_ETIQUETA[est]) + '</button>';
         }).join('');
+
+        // 📦826 — Sección con interfaz real del prototipo SVE: el panel monta
+        // la vista correspondiente; el placeholder queda solo para secciones
+        // que todavía no tienen interfaz.
+        var rutaSve = PG.tipo === 'sve' ? PG_SVE_RUTAS[seccionActiva.clave] : null;
+        var contenidoSeccion;
+        if (rutaSve) {
+            PG.sveHostClave = seccionActiva.clave;
+            // `kair-app-sve` es la raíz de tema del prototipo: es lo que le da
+            // su tipografía (Inter 14px), el reset de `box-sizing: border-box` y
+            // los scrollbars. Montado dentro del 3.1.2 el prototipo ya no está
+            // bajo esa clase, así que sin ella heredaba Roboto del shell K+AIR y
+            // —peor— sus `width: 100%` con padding medían 40px más que el panel
+            // y se recortaba contenido por la derecha.
+            contenidoSeccion = '<div id="pg-sve-host" class="mp-pg__sve-host kair-app-sve"><div class="mp-pg__sve-cargando">Cargando interfaz SVE...</div></div>';
+        } else {
+            contenidoSeccion = '' +
+                '<div class="mp-pg__placeholder">' +
+                    '<div class="mp-pg__placeholder-icon"><i class="fas fa-hammer"></i></div>' +
+                    '<div class="mp-pg__placeholder-title">Interfaz de "' + _pgEsc(seccionActiva.nombre) + '" en construccion</div>' +
+                    '<div class="mp-pg__placeholder-sub">Esta seccion pertenece al esqueleto del programa. Su interfaz operativa (formularios, indicadores y reportes) llega en la fase 2 del desarrollo del 3.1.2.</div>' +
+                '</div>';
+        }
+
         panelSeccion = '' +
             '<div class="mp-pg__panel-sec">' +
                 '<div class="mp-pg__sec-head">' +
@@ -300,11 +459,7 @@ function _pgRenderDetalle() {
                     '</div>' +
                     '<div class="mp-pg__seg">' + segmento + '</div>' +
                 '</div>' +
-                '<div class="mp-pg__placeholder">' +
-                    '<div class="mp-pg__placeholder-icon"><i class="fas fa-hammer"></i></div>' +
-                    '<div class="mp-pg__placeholder-title">Interfaz de "' + _pgEsc(seccionActiva.nombre) + '" en construccion</div>' +
-                    '<div class="mp-pg__placeholder-sub">Esta seccion pertenece al esqueleto del programa. Su interfaz operativa (formularios, indicadores y reportes) llega en la fase 2 del desarrollo del 3.1.2.</div>' +
-                '</div>' +
+                contenidoSeccion +
             '</div>';
     } else {
         panelSeccion = '' +
@@ -325,15 +480,27 @@ function _pgRenderDetalle() {
     if (p.estado !== 'cerrado') {
         acciones += '<button class="mp-pg__btn" onclick="cambiarEstadoPrograma(\'cerrado\')"><i class="fas fa-flag-checkered"></i><span>Cerrar programa</span></button>';
     }
-    acciones += '<button class="mp-pg__btn mp-pg__btn--danger" onclick="eliminarPrograma()"><i class="fas fa-trash-can"></i><span>Eliminar</span></button>';
+    // 📦827-fix — Dos acciones distintas, porque "eliminar" significaba dos
+    // cosas: dejar de usar el programa (se archiva y queda el registro) o
+    // quitarlo con todo lo capturado. Un solo botón obligaba a adivinar, y
+    // detrás hacía una sola cosa: marcar 'eliminado' y dejar los datos.
+    acciones += '<button class="mp-pg__btn" onclick="archivarPrograma()"><i class="fas fa-box-archive"></i><span>Archivar</span></button>';
+    acciones += '<button class="mp-pg__btn mp-pg__btn--danger" onclick="eliminarPrograma()"><i class="fas fa-trash-can"></i><span>Eliminar de verdad</span></button>';
 
     _pgBody().innerHTML = '' +
-        '<div class="kair-block">' +
-            '<div class="kair-block__head">' +
+        // 📦826 — Los dos bloques del detalle van SOLO con título. El subtítulo
+        // repetía lo que ya se ve a 2 cm: la barra de progreso, los botones de
+        // ciclo de vida y las tabs. Además empujaba la "sección activa" fuera de
+        // pantalla, y con el Dashboard del prototipo (que ocupa toda la
+        // pantalla) había que subir para ver las dos cosas a la vez. Sin
+        // subtítulo los bloques quedan cerca sin pegarse: los separa el
+        // chip + título, que es justo la separación que se pidió.
+        '<div class="mp-pg__detalle">' +
+        '<div class="kair-block mp-pg__bloque">' +
+            '<div class="kair-block__head mp-pg__head">' +
                 '<div class="kair-block__chip"><i class="fas fa-clipboard-list"></i></div>' +
                 '<div class="kair-block__text">' +
                     '<div class="kair-block__title">Resumen del programa</div>' +
-                    '<div class="kair-block__sub">Ciclo de vida y progreso general.</div>' +
                 '</div>' +
             '</div>' +
             '<div class="kair-block__panel">' +
@@ -354,21 +521,32 @@ function _pgRenderDetalle() {
                     '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:1.1rem;">' + acciones + '</div>' +
+                // 📦826 — La navegación entre secciones vive DENTRO del panel de
+                // resumen: nombre, estado, progreso, acciones y secciones son
+                // una sola tarjeta. Antes las tabs tenía su propio bloque
+                // ("Secciones del programa") y quedaban separadas del programa
+                // al que pertenecen, que es justo lo que se pierde de vista al
+                // bajar a una vista larga como el Dashboard del prototipo.
+                (tabs ? '<div class="mp-pg__tabs mp-pg__tabs--resumen">' + tabs + '</div>' : '') +
             '</div>' +
         '</div>' +
-        '<div class="kair-block">' +
-            '<div class="kair-block__head">' +
+        '<div class="kair-block mp-pg__bloque">' +
+            '<div class="kair-block__head mp-pg__head">' +
                 '<div class="kair-block__chip"><i class="fas fa-list-check"></i></div>' +
                 '<div class="kair-block__text">' +
-                    '<div class="kair-block__title">Secciones del programa</div>' +
-                    '<div class="kair-block__sub">Marca el avance de cada seccion; su interfaz operativa llega en la fase 2.</div>' +
+                    '<div class="kair-block__title">Seccion activa</div>' +
                 '</div>' +
             '</div>' +
             '<div class="kair-block__panel">' +
-                (p.secciones.length > 0 ? '<div class="mp-pg__tabs" style="padding:1rem 1rem 0 1rem;">' + tabs + '</div>' : '') +
                 panelSeccion +
             '</div>' +
+        '</div>' +
         '</div>';
+
+    // 📦826 — Tras repintar, montar la vista del prototipo SVE si toca.
+    if (PG.tipo === 'sve' && seccionActiva && PG_SVE_RUTAS[seccionActiva.clave]) {
+        _pgSveMontar(seccionActiva.clave);
+    }
 }
 
 // ---------- acciones del detalle ----------
@@ -431,25 +609,60 @@ async function cambiarEstadoPrograma(nuevoEstado) {
     }
 }
 
+async function archivarPrograma() {
+    var api = _pgApi();
+    if (!api || !api.medprevProgramasDelete || !PG.programa) return;
+    var seguir = true;
+    if (window.KairConfirm && typeof window.KairConfirm.confirm === 'function') {
+        seguir = await window.KairConfirm.confirm({
+            title: 'Archivar programa',
+            message: 'El programa "' + PG.programa.nombre + '" deja de aparecer en la lista, pero se QUEDA guardado ' +
+                'con todo lo que capturaste (casos, plan, indicadores). Solo afecta este equipo: los demas equipos no se enteran. ' +
+                'Usalo cuando el programa dejo de aplicar y su historia importa.',
+            confirmText: 'Archivar', cancelText: 'Cancelar'
+        });
+    }
+    if (!seguir) return;
+    try {
+        var r = await api.medprevProgramasDelete({
+            companyName: PG.empresa, programaId: PG.programa.id, token: _pgToken(), modo: 'archivar'
+        });
+        if (r && r.success) {
+            _pgToast('Programa archivado. Los datos quedaron guardados en este equipo.', 'success');
+            volverALista();
+        } else {
+            _pgToast((r && r.error && r.error.message) || 'No se pudo archivar el programa.', 'error');
+        }
+    } catch (e) {
+        _pgToast('Error archivando el programa: ' + e.message, 'error');
+    }
+}
+
 async function eliminarPrograma() {
     var api = _pgApi();
     if (!api || !api.medprevProgramasDelete || !PG.programa) return;
     var seguir = true;
     if (window.KairConfirm && typeof window.KairConfirm.confirm === 'function') {
         seguir = await window.KairConfirm.confirm({
-            title: 'Eliminar programa',
-            message: 'Se eliminara el programa "' + PG.programa.nombre + '" con sus ' +
-                (PG.programa.secciones ? PG.programa.secciones.length : 0) + ' secciones. Esta accion no se puede deshacer desde la interfaz.',
-            confirmText: 'Eliminar', cancelText: 'Cancelar', type: 'danger'
+            title: 'Eliminar de verdad',
+            message: 'Se borra el programa "' + PG.programa.nombre + '" Y TODO lo que tiene dentro: los casos de ' +
+                'seguimiento con nombre, documento y telefono, el plan PHVA, los indicadores y los analisis. ' +
+                'Tambien se borra en los demas equipos cuando se sincronice. No se puede deshacer.',
+            confirmText: 'Si, eliminar todo', cancelText: 'Cancelar', type: 'danger'
         });
     }
     if (!seguir) return;
     try {
+        // `confirmacion` es la guarda del bridge: sin ella el modo destructivo
+        // se rechaza, para que un clic perdido no borre la historia de un
+        // programa entero.
         var r = await api.medprevProgramasDelete({
-            companyName: PG.empresa, programaId: PG.programa.id, token: _pgToken()
+            companyName: PG.empresa, programaId: PG.programa.id, token: _pgToken(),
+            modo: 'eliminar', confirmacion: 'eliminar'
         });
         if (r && r.success) {
-            _pgToast('Programa eliminado.', 'success');
+            var b = r.data && r.data.borrados;
+            _pgToast('Programa eliminado' + (b ? ' (' + (b.sve || 0) + ' registros de datos)' : '') + '. Se propagara a los demas equipos.', 'success');
             volverALista();
         } else {
             _pgToast((r && r.error && r.error.message) || 'No se pudo eliminar el programa.', 'error');

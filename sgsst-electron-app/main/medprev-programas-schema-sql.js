@@ -62,6 +62,38 @@ const MP_PROGRAMAS_SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_mp_secciones_programa ON mp_programa_secciones(programa_id);
+
+  -- 📦827-fix — BAJAS de programa ("tombstones").
+  --
+  -- El soft-delete (estado='eliminado') NO viaja: el serializer manda la lista
+  -- de programas que NO están eliminados, así que al archivar uno en la PC A el
+  -- programa simplemente falta en el .kairsync y la PC B lo sigue teniendo
+  -- vivo, con todos sus datos. Las dos máquinas quedan distintas sin que nada
+  -- lo señale. Probado con dos bases y el serializer real.
+  --
+  -- Para que la baja se propague, el otro equipo necesita un HECHO explícito
+  -- ("este programa se eliminó el día tal"), no la simple ausencia del
+  -- registro. Eso es lo que se guarda acá. La fila sobrevive al borrado del
+  -- programa justamente por eso: si se borrara con él, no habría forma de
+  -- contar la baja.
+  --
+  -- Se conservan los datos NO personales del programa (nombre, tipo, fechas)
+  -- para poder explicarle al usuario qué se eliminó y cuándo. Los datos del
+  -- SVE (casos con nombre, documento y teléfono) NO van aquí: se borran.
+  CREATE TABLE IF NOT EXISTS mp_programas_bajas (
+    programa_id     TEXT NOT NULL,
+    empresa_id      TEXT NOT NULL,
+    tipo            TEXT,
+    nombre          TEXT,
+    fecha_inicio    TEXT,
+    fecha_fin       TEXT,
+    eliminado_en    TEXT NOT NULL,                -- ISO 8601
+    eliminado_por   TEXT,                         -- id del usuario
+    origen          TEXT NOT NULL DEFAULT 'eliminar', -- eliminar | archivo
+    PRIMARY KEY (programa_id, empresa_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_mp_programas_bajas_empresa ON mp_programas_bajas(empresa_id, eliminado_en);
 `;
 
 // 📦825 — DDL de columnas nuevas para bases YA CREADAS por la v1.
@@ -70,10 +102,58 @@ const MP_PROGRAMAS_SCHEMA_SQL = `
 // fase siguiente solo agregue una línea aquí (ver presupuesto-schema-sql.js).
 const MP_PROGRAMAS_SCHEMA_ALTERS = [];
 
-// 📦825 — Migraciones de datos para bases YA CREADAS por la v1: ninguna.
-const MP_PROGRAMAS_MIGRATIONS_SQL = [];
+// 📦826 — Migración de datos: plantilla SVE v2.
+// Los programas sve creados con la plantilla v1 (📦825: dashboard, casos,
+// alertas, reportes, admin, auditoria) se ajustan a la plantilla v2 (📦826:
+// dashboard, casos, plan, indicadores, areas), que es la que tiene interfaz
+// real (prototipo sve/). Solo toca programas tipo 'sve'.
+const MP_PROGRAMAS_MIGRATIONS_SQL = [
+  `DELETE FROM mp_programa_secciones
+    WHERE clave IN ('alertas','reportes','admin','auditoria')
+      AND programa_id IN (SELECT id FROM mp_programas WHERE tipo = 'sve')`,
 
-const MP_PROGRAMAS_MIGRATION_IDS = [];
+  `UPDATE mp_programa_secciones
+      SET nombre = 'Dashboard ejecutivo',
+          descripcion = 'KPIs del año, cumplimiento del Plan PHVA, seguimientos por mes y últimos casos.',
+          orden = 1
+    WHERE clave = 'dashboard'
+      AND programa_id IN (SELECT id FROM mp_programas WHERE tipo = 'sve')`,
+
+  `UPDATE mp_programa_secciones
+      SET nombre = 'Gestión de casos',
+          descripcion = 'Seguimiento epidemiológico: lista con filtros, ficha del caso y formulario de 4 secciones.',
+          orden = 2
+    WHERE clave = 'casos'
+      AND programa_id IN (SELECT id FROM mp_programas WHERE tipo = 'sve')`,
+
+  `INSERT INTO mp_programa_secciones (id, programa_id, clave, nombre, descripcion, orden, estado, actualizado_en)
+    SELECT 'mps-sve-plan-' || p.id, p.id, 'plan', 'Plan PHVA',
+           '19 actividades × 12 meses con programación (AP) y ejecución (AE) y cumplimiento por trimestre.',
+           3, 'pendiente', strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      FROM mp_programas p
+     WHERE p.tipo = 'sve'
+       AND NOT EXISTS (SELECT 1 FROM mp_programa_secciones s WHERE s.programa_id = p.id AND s.clave = 'plan')`,
+
+  `INSERT INTO mp_programa_secciones (id, programa_id, clave, nombre, descripcion, orden, estado, actualizado_en)
+    SELECT 'mps-sve-indicadores-' || p.id, p.id, 'indicadores', 'Indicadores epidemiológicos',
+           'Prevalencia, incidencia, ausentismo y eficacia 2020-2024 con metas y análisis por periodos.',
+           4, 'pendiente', strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      FROM mp_programas p
+     WHERE p.tipo = 'sve'
+       AND NOT EXISTS (SELECT 1 FROM mp_programa_secciones s WHERE s.programa_id = p.id AND s.clave = 'indicadores')`,
+
+  `INSERT INTO mp_programa_secciones (id, programa_id, clave, nombre, descripcion, orden, estado, actualizado_en)
+    SELECT 'mps-sve-areas-' || p.id, p.id, 'areas', 'Áreas expuestas',
+           'Distribución del riesgo por área y pivote Cargo × Área.',
+           5, 'pendiente', strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      FROM mp_programas p
+     WHERE p.tipo = 'sve'
+       AND NOT EXISTS (SELECT 1 FROM mp_programa_secciones s WHERE s.programa_id = p.id AND s.clave = 'areas')`
+];
+
+const MP_PROGRAMAS_MIGRATION_IDS = [
+  '20260930-sve-template-v2'
+];
 
 module.exports = {
   MP_PROGRAMAS_SCHEMA_SQL,

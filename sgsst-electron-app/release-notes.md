@@ -1,3 +1,39 @@
+# K+AIR v0.1.226
+
+## 🩺 Medicina Preventiva · SVE: el programa 3.1.2 ya es usable de verdad (📦826-833)
+
+Tu programa de Salud en el Trabajo (SVE) dejó de ser un esqueleto con casilleros. Ahora se abre con pantallas completas, se puede escribir, editar y guardar, y lo que cargas **viaja entre computadoras**.
+
+### (a) Cada sección abre su pantalla completa
+
+Al crear un programa SVE se arma con las 5 secciones reales del módulo: **Dashboard ejecutivo**, **Seguimiento de casos** (con su ficha de 31 campos), **Plan PHVA** (metas mensuales por área), **Indicadores epidemiológicos** (años 2020-2024) y **Áreas expuestas**. Cada programa tiene su propio juego de datos: dos programas SVE no se pisan.
+
+### (b) Ya se pueden crear análisis por periodo
+
+La tarjeta "Análisis de indicadores por periodos" ahora tiene botón **"Nuevo período"**: abrís el formulario, cargás periodo, hallazgos, propuestas y responsable, y listo. Si el periodo está vacío o ya existe, te avisa sin perder lo que escribiste. Los análisis quedan guardados y siguen ahí al volver a entrar.
+
+### (c) Indicadores editables de verdad
+
+Los valores por año, los años de la serie, la meta y la definición de cada indicador se editan con el botón **"Editar"** de su tarjeta (nombre, meta, periodicidad, formulación, umbral), con los campos ordenados en dos columnas y avisos si algo falta.
+
+### (d) "Casos SVE por año"
+
+La tarjeta de morbilidad ahora se llama **"Casos SVE por año"** y resume tus seguimientos contándolos por el año de cada uno, que es lo que la pantalla de casos realmente muestra.
+
+### (e) Tus datos viajan entre computadoras
+
+Antes, casi todo lo del programa SVE vivía solo en la computadora donde lo escribiste: **no entraba en la copia de respaldo que se sincroniza, y se perdía al reinstalar**. Ahora los casos, el plan PHVA, los indicadores, la morbilidad y los análisis se guardan en la base de datos de la app y salen en la sincronización. Los programas y su avance ya viajaban; ahora viaja el trabajo de contenido.
+
+### (f) Arreglos de ventana y avisos
+
+- **Los avisos (toast) ya no se quedan pegados**: si cambiás de pantalla justo cuando aparece uno, ahora se cierra solo igual que siempre.
+- **Los diálogos de confirmación ya no dejan la app muda**: en algunos casos quedaba una capa invisible que absorbía todos los clics y había que reiniciar. Ya no puede quedar.
+- Correcciones internas de migración para que las bases existentes se actualicen sin perder filas.
+
+**Verificación:** 512/512 pruebas automáticas en verde y prueba visual completa del alta de análisis en la app real.
+
+---
+
 # K+AIR v0.1.225
 
 ## 🩺 Medicina Preventiva: tus programas SVE, DME y de promoción ya se crean y se gestionan (📦825)

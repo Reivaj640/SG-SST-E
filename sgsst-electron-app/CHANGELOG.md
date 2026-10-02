@@ -5,6 +5,100 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.226] - 2026-10-01
+
+### 📦833 — Análisis por periodos: ahora se pueden AGREGAR análisis nuevos
+
+**Resumen:** La tarjeta "Análisis de indicadores por periodos" del programa SVE solo mostraba los 2 análisis que trae la plantilla y permitía editarlos, pero no había ninguna forma de agregar un periodo más desde la interfaz. Ahora la tarjeta tiene botón **"Nuevo período"** con su formulario, validaciones y persistencia en SQLite.
+
+- `sve-views.js`: botón "Nuevo período" en la cabecera de la tarjeta `cardAn` + modal "Nuevo análisis por periodo" (periodo, hallazgos, propuestas, responsable) con foco automático al primer campo.
+- Validación en dos niveles: **vacío** ("el periodo no puede quedar vacío") y **duplicado** ("ya existe un análisis para el periodo \"…\"" — conserva lo tecleado y muestra el hint "Ese periodo ya existe: edita el existente en su tarjeta."). Ambos casos reabren el formulario con los datos preservados.
+- `sve-app.js`: acción `addAnalisis(datos)` que agrega al store, recalcula el orden y dispara el guardado; la persistencia entra por el canal existente `medprev:sve:analisis:guardar` (borra y reinserta la lista completa en `mp_sve_analisis` dentro de una transacción).
+- `main/test-sve-analisis-agregar.js` (nuevo): **40 checks** estáticos sobre la cadena completa (vista, store, bridge, schema, cache-bust). Sintaxis `node --check` OK sobre vistas y app.
+- Verificación E2E real en la app (Playwright): tarjeta con botón → modal → validación vacío → validación duplicado → alta correcta ("Análisis creado — El periodo … se agregó a la lista.") → persistencia tras recargar y volver a entrar. 5 capturas en `docs/capturas/833-analisis/`. Cache-bust `MEDPREV-20260930-3-1-2-indicadores-edit-17`.
+
+### 📦832 — "Registros de morbilidad" pasó a "Casos SVE por año"
+
+**Resumen:** La tarjeta de morbilidad mostraba un conteo que no correspondía a lo que el programa registraba. Ahora se llama **"Casos SVE por año"** y resume LOS SEGUIMIENTOS del programa agrupados por el año exacto de cada seguimiento (`cuenta()` agrupa por `anio`), que es lo que la vista de casos realmente tiene.
+
+- `sve-views.js`: tarjeta renombrada + conteo por año desde los seguimientos.
+- `main/test-sve-casos-covid.js` ampliado a **24 checks** (nombre de la tarjeta, agrupación por año, y los 20 checks previos del flujo de casos).
+
+### 📦831 — Pulido del editor de indicadores + residuos de Playwright al .gitignore
+
+**Resumen:** Segunda pasada de UI/UX sobre el editor que abrió 📦830, más higiene de repositorio.
+
+- **Fix de raíz de los estilos descartados en silencio**: `U.el` se invocaba con claves camelCase y el helper espera kebab-case → los atributos se caían sin avisar. Corregido en el editor.
+- Rejilla de 2 columnas del formulario en CSS (antes apilado), **errores inline por campo** con foco automático al primero, y la serie anual en rejilla con scroll horizontal (no se corta en pantallas angostas).
+- `.gitignore`: residuos de sesión del `electron-playwright-cli` (`/sgsst-electron-app/.playwright-cli/`, `/sgsst-electron-app/.playwright/`), dependencias locales `Temp/pw-deps/` (12.6 MB) y planes del agente `/.zcode/`.
+
+### 📦830 — Edición completa de los indicadores del programa SVE/COVID
+
+**Resumen:** Los valores por año, los años de la serie, la meta y la definición de cada indicador (nombre, meta corta, periodicidad, formulación, umbral) se editan desde un botón **"Editar"** por tarjeta (mismo patrón que "Análisis por periodos") y lo editado se persiste en la columna nueva `extra_json`.
+
+- **Schema**: `extra_json` en las TRES partes donde tiene que estar — `CREATE` de BD nueva, `ALTER` idempotente para BD viejas y la reconstrucción de la migración v2 (la trampa clásica: `CREATE TABLE IF NOT EXISTS` no altera tablas existentes).
+- **Bridge**: adaptadores `_extraDe`/`_extraHacia`; guardan y siembran escriben la columna (si el seed no la escribe, el dato se pierde en cada re-siembra).
+- **Store**: `updateIndicador(clave, patch)` mergea y persiste. **Seed**: los 4 indicadores traen metaCorta/umbral (ausentismo en `null`, que es lo que mantiene su semáforo en verde).
+- **Vista**: helpers del semáforo con defaults retrocompatibles con BD vieja, botón Editar en AMBAS ramas de la tarjeta, validaciones (años, umbral) y reapertura conservando lo escrito.
+- `main/test-sve-indicadores-edit.js` (nuevo): **71 checks** estáticos.
+
+### 📦829 — Fix KAIRToast: el toast se quedaba pegado cuando el iframe que lo mostró moría
+
+**Resumen:** En el 3.1.2, mostrar "Programa eliminado" y volver a la lista destruye el iframe (`container.innerHTML=''`); los timers (auto-cierre y retiro del nodo) y el clic de la X vivían en el realm del iframe, morían con él y el toast quedaba en pantalla para siempre.
+
+- `_instanciaQueSobrevive()`: sube por `window.parent` hasta encontrar el `KAIRToast` de la ventana principal (la que `index.html` carga siempre) y ahí se crean el nodo, los timers y el handler — ninguno depende del iframe. Cross-origin → se usa la instancia local.
+- Reproducción del bug en `Temp/probe-toast-829.js`. Cache-bust `?v=TOAST-20260930-realm-fix` en `index.html` + vistas (`reportes-accidentes`, `presupuesto`) y `?v=…-toast-realm-fix` en sus logic.
+
+### 📦828 — Fix KairConfirm: el velo huérfano dejaba la app muda ante los clics
+
+**Resumen:** Si el iframe se destruía antes del timer de cierre del diálogo, el backdrop quedaba colgado (invisible, `opacity 0` pero `pointer-events: auto`) y tapaba TODA la app: la pantalla quedaba "congelada".
+
+- **Barrido anti-huérfanos**: al abrir un diálogo nuevo se borran primero los `.kair-confirm-backdrop` colgados del contenedor (excepto el activo).
+- **Retiro en el realm del PADRE**: el nodo vive en el documento padre, así que el timer que lo retira se delega a `window.parent.KairConfirm`. Medido: `window.parent.setTimeout(cb, …)` invocado desde el iframe **nunca** ejecuta el callback (queda en la cola del iframe); la delegación sí funciona.
+- `styles.css`: el velo lleva `pointer-events: none` mientras se va, así deja de bloquear al instante aunque el iframe muera antes del timer.
+
+### 📦827-fix-2 — Las migraciones reconstruían tablas con las claves foráneas encendidas
+
+**Resumen:** Con `foreign_keys` activo, el `DROP TABLE` de la tabla padre dispara el `ON DELETE CASCADE` de la hija: los meses del plan desaparecían ANTES de que su propia migración los copiara. Medido sobre la base real: **32 filas de `mp_sve_plan_meses` → 0**.
+
+- Nuevo `aplicarMigracionesMedprevSve(db)` (único camino; lo usan `main.js` y el test): apaga las claves foráneas, corre las 4 migraciones y las vuelve a encender, sin depender del estado en que el llamador deje la base.
+
+### 📦827-fix — PK compuesta y "espina" de años/medidas en los indicadores
+
+- **PK compuesta `(programa_id, id)`** en `mp_sve_casos` y `mp_sve_plan_actividades`, `UNIQUE(programa_id, actividad_id, mes)` + FK compuesta en `mp_sve_plan_meses` — con varios programas, los mismos ids conviven sin pisarse (migraciones `20260930-sve-pk-compuesta-*`).
+- **`anios_json` / `medidas_json` con RELLENO** desde `mp_sve_indicadores_valores` (`20260930-sve-ind-espina-json`): reconstrucción en vez de `ALTER` (SQLite no tiene `ADD COLUMN IF NOT EXISTS` y la migración tiene que poder re-correr). Sin el relleno, la serie quedaba sin espina y el Dashboard reventaba con "Cannot read properties of undefined" **hasta que se guardara de nuevo**.
+
+### 📦827 — Los datos del programa SVE pasan de localStorage a SQLite (viajan en el .kairsync)
+
+**Resumen:** Casos, plan PHVA, indicadores, morbilidad, análisis y el encabezado del documento vivían en `localStorage` del renderer: **no entraban al `.kairsync`, no viajaban entre máquinas y se perdían al reinstalar**. Ahora van a SQLite y de ahí al sync.
+
+- `main/medprev-sve-datos-schema-sql.js`: **8 tablas `mp_sve_*`** idempotentes (casos, plan actividades + meses, indicadores + valores, morbilidad, análisis, meta del documento) con `ALTERS` y `MIGRATIONS` con control de versión.
+- `main/medprev-sve-datos-bridge.js`: **13 canales `medprev:sve:*`** (datos:get, casos crear/actualizar/eliminar, plan actividad crear/guardar/eliminar, plan celda, meta, indicadores, morbilidad, análisis, migrar). Todo SQL con prepared statements y filtro `empresa_id + programa_id`.
+- 🔒 **Auth dura**: las mutaciones exigen token de sesión válido (`validateSession`, sin bypass); las lecturas validan el token si llega y lo rechazan si es inválido. Decisión tomada de la auditoría de seguridad 2026-09-29.
+- **Migración única** `medprev:sve:migrar`: vuelca el `localStorage` del prototipo a SQLite; idempotente por diseño (si la base ya tiene contenido no toca nada), se puede llamar en cada arranque.
+- `main/sync-serializer.js`: las 8 tablas `mp_sve_*` entran al `.kairsync` (los hijos se reescriben igual, merge last-write-wins por id — ids de texto, no enteros, para que 2 PCs no se pisen en silencio).
+- `main.js` (require + schema en `initDbOnce`) y `preload.js` (13 métodos `medprevSve*`).
+
+### 📦826 — La interfaz real del prototipo SVE se monta por sección dentro del programa 3.1.2
+
+**Resumen:** Un programa SVE del esqueleto 📦825 mostraba placeholders ("fase 2"). Ahora cada sección monta la vista real del prototipo (Dashboard ejecutivo, Seguimiento de casos con ficha de 31 campos, Plan PHVA editable, Indicadores 2020-2024 y Áreas expuestas), conservando el marco K+AIR (resumen + secciones con progreso marcable).
+
+- **`modules/gestion-salud/medicina-preventiva/sve/`** (nuevo): `sve-views.js`, `sve-app.js`, `sve-core.js`, `sve-seed.js`, `sve-persistencia.js`, `sve.css` + fuentes Inter/Plus Jakarta (`fonts/`) + `vendor/lucide.min.js` y `vendor/xlsx.full.min.js`. Parches mínimos documentados en el archivo: `@font-face` con ruta relativa (`./fonts/`, el absoluto no resuelve en `file://`) y `STORAGE_KEY` con sufijo por programa (`window.SVE_PROGRAMA_KEY`) → **cada programa SVE tiene su propio dataset**.
+- **Carga perezosa** por sección (solo la primera vez que se abre) en orden obligatorio (lucide → xlsx → seed → core → views → app, todos con `?v=`); `SveSeed.meta.empresa` toma la empresa real del programa. El header del prototipo se oculta con CSS del host para no duplicar las tabs; sus toasts, modales y savebar se conservan. Navegación interna (ver/editar/crear caso, volver) por el router de hash del propio prototipo dentro del panel.
+- **Plantilla SVE v2**: 5 secciones reales (Dashboard, Casos, Plan PHVA, Indicadores epidemiológicos, Áreas expuestas) en lugar de las 6 especulativas de 📦825 (alertas/reportes/admin/auditoría vuelvan cuando existan esas interfaces), + migración `20260930-sve-template-v2` que actualiza los programas existentes al abrirlos.
+- `main/test-medprev-programas-bridge.js` ampliado a **72 checks** (migración de plantilla + plantilla v2).
+
+### 📚 docs — Informe de auditoría de seguridad 2026-09-29
+
+- `docs/auditorias/INFORME-SEGURIDAD-20260929.md` (32 KB): auditoría ofensiva-defensiva pre-deploy sobre 0.1.224 (main.js, preload.js con 564 canales, renderer, bridges, empaquetado, git/dependencias). Veredicto **NO LISTO PARA DEPLOY** con 5 vulnerabilidades críticas (incluye contraseñas públicas en GitHub). Sus hallazgos originaron las decisiones de auth dura de 📦825/📦827.
+
+### ✅ Verificación (0.1.226)
+
+- **Suite SVE/Medprev completa: 512/512 OK, 0 FAIL** (9 tests, corridos con `ELECTRON_RUN_AS_NODE=1 electron.exe`):
+  `test-sve-casos-covid` 24 · `test-sve-indicadores-edit` 71 · `test-sve-schema-migracion` 20 · `test-sve-store-827` 37 · `test-medprev-3-1-2` 142 · `test-medprev-programas-bridge` 72 · `test-medprev-sve-datos-bridge` 71 · `test-medprev-sync-roundtrip` 35 · `test-sve-analisis-agregar` 40.
+- Verificación visual E2E del 📦833 en la app real con 5 capturas (`docs/capturas/833-analisis/`) y consola sin errores nuevos.
+- `node --check` OK sobre vistas, app y tests.
+
 ## [0.1.225] - 2026-09-29
 
 ### 📦825-fix — El asistente de programas nunca completaba: el paso 2 no veía lo tecleado en el paso 1

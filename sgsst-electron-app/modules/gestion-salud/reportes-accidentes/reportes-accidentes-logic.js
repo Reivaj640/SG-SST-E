@@ -30,7 +30,7 @@ class ReportesAccidentesComponent {
 
         // Construir la URL con parámetros de la empresa y módulo
         // 📦773 — ?v= cache-bust: sin esto un rediseño no se ve hasta limpiar la caché
-        const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=FURAT-20260918-premium-fix2`;
+        const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=FURAT-20260930-toast-realm-fix`;
         viewerFrame.src = viewerUrl;
 
         // Limpiar contenedor y agregar iframe

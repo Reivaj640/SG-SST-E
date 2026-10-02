@@ -1,7 +1,7 @@
 # PRD — K+AIR (Sistema de Gestión SG-SST)
 
 > **Para:** sesiones de AI que continúen el proyecto + Javier Robles F. (owner) como referencia.
-> **Versión del doc:** 0.1.224 (29 sept 2026) — sincronizada con `package.json` y commit `📦824-ui`.
+> **Versión del doc:** 0.1.226 (1 oct 2026) — sincronizada con `package.json` y commit `📦826-833`.
 > **Estado:** Producto en desarrollo activo. **NO release oficial** desde v0.1.205 (los siguientes son commits de desarrollo).
 
 ---
@@ -14,7 +14,7 @@ El producto es **usado en producción** por al menos 1 cliente (despliegue opera
 
 **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 **Última versión publicada:** v0.1.205 (instaladores de release)
-**Última versión de desarrollo:** v0.1.222 (HEAD en `origin/Dev-Pc`)
+**Última versión de desarrollo:** v0.1.226 (HEAD en `origin/Dev-Pc`)
 
 ---
 
@@ -93,7 +93,7 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 │  index.html (508 líneas, entry point con cache-busts)       │
 │  ├── renderer.js (~7,270 líneas, lógica UI + navegación)    │
 │  ├── styles.css (legacy + premium v2)                        │
-│  ├── modules/ (9 módulos, 51 submódulos con UI)              │
+│  ├── modules/ (9 módulos, 52 submódulos con UI)              │
 │  ├── shared/ (kair-alerts, kair-skeleton, kair-design-…)     │
 │  ├── assets/js/ (update-notifications, kair-…)              │
 │  ├── renderer/bandeja-integrada/ (iframe Gmail-look)         │
@@ -130,7 +130,7 @@ Reglas críticas que TODO archivo nuevo debe respetar:
 
 ## 5. Módulos y submódulos
 
-**Total declarado en sidebar oficial: 67 entradas** (51 con UI real + 16 placeholder en roadmap normativo).
+**Total declarado en sidebar oficial: 67 entradas** (52 con UI real + 15 placeholder en roadmap normativo).
 
 ### 5.1 Módulos top-level (9)
 
@@ -368,7 +368,7 @@ sgsst-electron-app/
 │   ├── KIAR256.ico           # Ícono splash/header
 │   └── js/
 │       └── update-notifications.js  # Adaptado para toasts persistentes
-├── modules/                  # 9 módulos, 51 submódulos con UI + 16 placeholder
+├── modules/                  # 9 módulos, 52 submódulos con UI + 15 placeholder
 │   ├── recursos/             # Módulo 1
 │   ├── gestion-integral/     # Módulo 2
 │   ├── gestion-salud/        # Módulo 3
@@ -458,7 +458,7 @@ sgsst-electron-app/
 
 | Métrica | Valor actual |
 |---|---|
-| Versión de desarrollo | 0.1.216 (HEAD: `6ff11999 📦816` → 📦817) |
+| Versión de desarrollo | 0.1.226 (HEAD: `211f7997 📦825-fix` → 📦826-833) |
 | Versión publicada | v0.1.205 |
 | Total archivos JS | 962 |
 | Total archivos CSS | 90 |
@@ -502,12 +502,11 @@ sgsst-electron-app/
 
 ### 10.4 Backlog normativo (placeholders en sidebar)
 
-Los 16 submódulos marcados como 🚧 Roadmap son:
+Los 15 submódulos marcados como 🚧 Roadmap son:
 - 2.7.1 Matriz de requisitos legales
 - 2.8.1 Mecanismos de comunicaciones
 - 2.12.1 Equipos y Herramientas
 - 2.13.1 Elementos de Protección Personal
-- 3.1.2 Actividades de medicina preventiva (esqueleto con gestión de programas SVE/DME/Promoción desde plantilla — 📦825; interfaces operativas de las secciones siguen en roadmap)
 - 3.1.5 Custodia médica ocupacional
 - 3.1.7 Estilos de Vida Saludables
 - 3.1.8 Servicios de Higiene
@@ -517,6 +516,8 @@ Los 16 submódulos marcados como 🚧 Roadmap son:
 - 4.2.1, 4.2.2, 4.2.3 (medidas de prevención)
 - 4.2.6 Entrega de EPP
 - 6.1.4 Planificación de la Auditoría
+
+> **Nota:** dentro de 3.1.2 (Medicina Preventiva) el programa **SVE** está implementado desde 📦826-833; las líneas **DME** y **Promoción de la salud** siguen sin interfaz propia (usan el esqueleto de plantilla del 📦825).
 
 ---
 

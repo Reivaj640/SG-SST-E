@@ -55,6 +55,17 @@ try {
   process.exit(1);
 }
 
+// 📦827-fix — Se crea el schema del SVE también. Sin esto, "eliminar borra el
+// contenido" se probaría contra tablas que no existen: `contarSve()` daría 0
+// antes y después, y la aserción pasaría sin comprobar nada.
+try {
+  db.exec(require('./medprev-sve-datos-schema-sql').MP_SVE_SCHEMA_SQL);
+  ok('1) el schema de SVE tambien se crea (sin el, el borrado se prueba contra nada)', true);
+} catch (e) {
+  console.error('FAIL SCHEMA SVE:', e.message);
+  process.exit(1);
+}
+
 // Empresas mínimas para _getCompanyByName (companies del main.js real).
 db.exec("CREATE TABLE companies (id TEXT PRIMARY KEY, company_key TEXT NOT NULL, display_name TEXT NOT NULL)");
 db.prepare("INSERT INTO companies (id, company_key, display_name) VALUES ('c1','tempoactiva','Tempoactiva Est SAS')").run();
@@ -84,11 +95,16 @@ const H = handlers;
   // ---------- 3) Plantillas ----------
   const pl = await H['medprev:programas:plantillas']({}, { token: 'tok-ok' });
   ok('3) plantillas ok', pl.success === true);
-  ok('3) SVE tiene 6 secciones (spec PDF)', pl.data.plantillas.sve.secciones.length === 6, pl.data.plantillas.sve.secciones.length);
+  // 📦826 — plantilla SVE v2: 5 secciones alineadas con la interfaz real.
+  ok('3) SVE tiene 5 secciones (v2, interfaz del prototipo)', pl.data.plantillas.sve.secciones.length === 5, pl.data.plantillas.sve.secciones.length);
   ok('3) DME tiene 4 secciones', pl.data.plantillas.dme.secciones.length === 4, pl.data.plantillas.dme.secciones.length);
   ok('3) Promoción tiene 5 secciones', pl.data.plantillas.promocion.secciones.length === 5, pl.data.plantillas.promocion.secciones.length);
-  ok('3) plantilla SVE trae dashboard/casos/alertas/reportes/admin/auditoria',
-    ['dashboard', 'casos', 'alertas', 'reportes', 'admin', 'auditoria'].every(function (c) {
+  ok('3) plantilla SVE v2 trae dashboard/casos/plan/indicadores/areas',
+    ['dashboard', 'casos', 'plan', 'indicadores', 'areas'].every(function (c) {
+      return pl.data.plantillas.sve.secciones.some(function (s) { return s.clave === c; });
+    }));
+  ok('3) plantilla SVE v2 ya NO trae alertas/reportes/admin/auditoria',
+    !['alertas', 'reportes', 'admin', 'auditoria'].some(function (c) {
       return pl.data.plantillas.sve.secciones.some(function (s) { return s.clave === c; });
     }));
 
@@ -122,10 +138,44 @@ const H = handlers;
   });
   ok('5) create con plantilla ok', created.success === true, created.error && created.error.message);
   ok('5) programa queda activo con plantilla estandar', created.data.programa.estado === 'activo' && created.data.programa.plantilla === 'estandar');
-  ok('5) siembra 6 secciones pendientes',
-    created.data.programa.secciones.length === 6 && created.data.programa.secciones.every(function (s) { return s.estado === 'pendiente'; }));
+  ok('5) siembra 5 secciones pendientes (plantilla v2)',
+    created.data.programa.secciones.length === 5 && created.data.programa.secciones.every(function (s) { return s.estado === 'pendiente'; }));
   ok('5) progreso inicial 0%', created.data.programa.progreso.pct === 0);
   const sveId = created.data.programa.id;
+
+  // ---------- 3b) Migración 20260930-sve-template-v2 ----------
+  // Simular un programa sve con la plantilla v1 (alertas/reportes/admin/auditoria,
+  // sin plan/indicadores/areas), aplicar MIGRATIONS_SQL como hace initDbOnce,
+  // y verificar que queda con las 5 secciones de la plantilla v2.
+  db.prepare("DELETE FROM mp_programa_secciones WHERE programa_id = ?").run(sveId);
+  const stmtV1 = db.prepare("INSERT INTO mp_programa_secciones (id, programa_id, clave, nombre, descripcion, orden, estado, actualizado_en) VALUES (?,?,?,?,?,?,?,?)");
+  ['dashboard', 'casos', 'alertas', 'reportes', 'admin', 'auditoria'].forEach(function (c, i) {
+    stmtV1.run('mps-v1-' + i, sveId, c, c, '', i + 1, 'pendiente', '2026-09-29T00:00:00.000Z');
+  });
+  // Estado marcado en dashboard debe SOBREVIVIR a la migración.
+  db.prepare("UPDATE mp_programa_secciones SET estado = 'completo' WHERE programa_id = ? AND clave = 'dashboard'").run(sveId);
+
+  db.exec('CREATE TABLE IF NOT EXISTS _medprev_programas_migrations (id TEXT PRIMARY KEY, aplicada_en TEXT NOT NULL)');
+  bridge.MIGRATIONS_SQL.forEach(function (sql, i) {
+    db.exec(sql);
+    db.prepare('INSERT OR IGNORE INTO _medprev_programas_migrations (id, aplicada_en) VALUES (?, ?)').run(bridge.MIGRATION_IDS[i] || ('mig-' + i), '2026-09-30T00:00:00.000Z');
+  });
+
+  const trasMig = db.prepare("SELECT clave, nombre, orden, estado FROM mp_programa_secciones WHERE programa_id = ? ORDER BY orden ASC").all(sveId);
+  ok('3b) migración v2: quedan 5 secciones', trasMig.length === 5, JSON.stringify(trasMig.map(s => s.clave)));
+  ok('3b) migración v2: claves correctas en orden',
+    JSON.stringify(trasMig.map(s => s.clave)) === JSON.stringify(['dashboard', 'casos', 'plan', 'indicadores', 'areas']),
+    trasMig.map(s => s.clave).join(','));
+  ok('3b) migración v2: secciones obsoletas eliminadas',
+    !trasMig.some(s => ['alertas', 'reportes', 'admin', 'auditoria'].indexOf(s.clave) !== -1));
+  ok('3b) migración v2: el progreso marcado sobrevive (dashboard completo)',
+    trasMig[0].estado === 'completo');
+  ok('3b) migración v2: idempotente (segunda pasada no duplica)', (function () {
+    bridge.MIGRATIONS_SQL.forEach(function (sql) { db.exec(sql); });
+    return db.prepare("SELECT COUNT(*) c FROM mp_programa_secciones WHERE programa_id = ?").get(sveId).c === 5;
+  })());
+  // Reinsertar las secciones estándar para no afectar los checks siguientes
+  // (el programa sve queda con la plantilla v2 aplicada — igual que en prod).
 
   const blanco = await H['medprev:programas:create']({}, {
     companyName: empresaA, tipo: 'promocion', nombre: 'Seguridad Vial 2026', usarPlantilla: false, token: 'tok-ok'
@@ -158,7 +208,7 @@ const H = handlers;
   const cruce = await H['medprev:programas:update']({}, { companyName: empresaA, programaId: sveId, cambios: { fechaFin: '2025-01-01' }, token: 'tok-ok' });
   ok('8) update con fechas cruzadas → VALIDATION', cruce.success === false && cruce.error.code === 'VALIDATION');
   const get1 = await H['medprev:programas:get']({}, { companyName: empresaA, programaId: sveId, token: 'tok-ok' });
-  ok('8) get devuelve programa actualizado', get1.success === true && get1.data.programa.nombre === 'SVE COVID-19 2026' && get1.data.programa.secciones.length === 6);
+  ok('8) get devuelve programa actualizado', get1.success === true && get1.data.programa.nombre === 'SVE COVID-19 2026' && get1.data.programa.secciones.length === 5);
   const getNulo = await H['medprev:programas:get']({}, { companyName: empresaA, programaId: 'mpp-inexistente' });
   ok('8) get inexistente → NOT_FOUND', getNulo.success === false && getNulo.error.code === 'NOT_FOUND');
 
@@ -169,7 +219,7 @@ const H = handlers;
   const enCurso = await H['medprev:programas:seccion-estado']({}, { companyName: empresaA, programaId: sveId, seccionId: seccionDashboard.id, estado: 'en_curso', token: 'tok-ok' });
   ok('9) marcar en_curso ok', enCurso.success === true && enCurso.data.seccion.estado === 'en_curso' && enCurso.data.progreso.enCurso === 1);
   const completa = await H['medprev:programas:seccion-estado']({}, { companyName: empresaA, programaId: sveId, seccionId: seccionDashboard.id, estado: 'completo', token: 'tok-ok' });
-  ok('9) marcar completo actualiza progreso (1/6 ≈ 17%)', completa.success === true && completa.data.progreso.completas === 1 && completa.data.progreso.pct === 17, JSON.stringify(completa.data.progreso));
+  ok('9) marcar completo actualiza progreso (1/5 = 20%)', completa.success === true && completa.data.progreso.completas === 1 && completa.data.progreso.pct === 20, JSON.stringify(completa.data.progreso));
   const secAjena = await H['medprev:programas:seccion-estado']({}, { companyName: empresaA, programaId: promocionId, seccionId: seccionDashboard.id, estado: 'completo', token: 'tok-ok' });
   ok('9) sección de otro programa → NOT_FOUND', secAjena.success === false && secAjena.error.code === 'NOT_FOUND');
 
@@ -191,6 +241,89 @@ const H = handlers;
   ok('11) misma línea+nombre en OTRA empresa → permitido', b.success === true, b.error && b.error.message);
   const listaA = await H['medprev:programas:list']({}, { companyName: empresaA, tipo: 'sve' });
   ok('11) list de A no trae programas de B', listaA.data.programas.length === 1 && listaA.data.programas[0].empresaId === 'tempoactiva');
+
+  // ---------- 12) 📦827-fix — Archivar vs eliminar de verdad ----------
+  // Un solo botón "Eliminar" obligaba a adivinar qué quedaba guardado. Ahora
+  // son dos intenciones distintas y esta es la diferencia observable.
+  const SVE_TABLAS = ['mp_sve_casos', 'mp_sve_plan_actividades', 'mp_sve_plan_meses', 'mp_sve_meta',
+    'mp_sve_indicadores', 'mp_sve_indicadores_valores', 'mp_sve_morbilidad', 'mp_sve_analisis'];
+
+  function existeTabla(t) {
+    try { return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(t); }
+    catch (e) { return false; }
+  }
+  function sembrarSve(pid) {
+    SVE_TABLAS.filter(existeTabla).forEach(t => { try { db.prepare('DELETE FROM ' + t + ' WHERE programa_id = ?').run(pid); } catch (e) { /* */ } });
+    if (!existeTabla('mp_sve_casos')) return;
+    db.prepare("INSERT INTO mp_sve_casos (id, programa_id, empresa_id, orden, trabajador, documento, creado_en, actualizado_en) VALUES ('c1',?,'tempoactiva',1,'JUAN','111','2024-01-01T00:00:00.000Z','2024-01-01T00:00:00.000Z')").run(pid);
+    db.prepare("INSERT INTO mp_sve_plan_actividades (id, programa_id, empresa_id, fase, actividad, responsable, orden, creado_en, actualizado_en) VALUES ('act-1',?,'tempoactiva','planear','A1','X',1,'2024-01-01T00:00:00.000Z','2024-01-01T00:00:00.000Z')").run(pid);
+    db.prepare("INSERT INTO mp_sve_plan_meses (actividad_id, programa_id, mes, ap, ae) VALUES ('act-1',?,1,1,0)").run(pid);
+    db.prepare("INSERT INTO mp_sve_meta (programa_id, empresa_id, meta_json, actualizado_en) VALUES (?,'tempoactiva','{}','2024-01-01T00:00:00.000Z')").run(pid);
+    db.prepare("INSERT INTO mp_sve_analisis (id, programa_id, empresa_id, periodo, hallazgos, propuestas, responsable, orden, actualizado_en) VALUES (?,?,'tempoactiva','1','h','p','r',0,'2024-01-01T00:00:00.000Z')").run('an-' + pid, pid);
+    db.prepare("INSERT INTO mp_sve_morbilidad (programa_id, empresa_id, tipo, anio, casos, dias_it) VALUES (?,'tempoactiva','Accidentes',2024,1,2)").run(pid);
+  }
+  function contarSve(pid) {
+    let n = 0;
+    SVE_TABLAS.filter(existeTabla).forEach(t => {
+      try { n += db.prepare('SELECT COUNT(*) AS n FROM ' + t + ' WHERE programa_id = ?').get(pid).n; } catch (e) { /* */ }
+    });
+    return n;
+  }
+  const bajas = (pid) => {
+    if (!existeTabla('mp_programas_bajas')) return null;
+    return db.prepare('SELECT * FROM mp_programas_bajas WHERE programa_id = ?').get(pid);
+  };
+
+  const nuevo1 = await H['medprev:programas:create']({}, { companyName: empresaA, tipo: 'sve', nombre: 'Para archivar', token: 'tok-ok' });
+  const pidArchivar = nuevo1.data.programa.id;
+  sembrarSve(pidArchivar);
+  const archivar = await H['medprev:programas:delete']({}, { token: 'tok-ok', companyName: empresaA, programaId: pidArchivar, modo: 'archivar' });
+  ok('12) archivar responde ok y dice el modo', archivar.success === true && archivar.data.modo === 'archivar',
+    JSON.stringify(archivar.data || archivar.error));
+  ok('12) archivar deja el programa en la base con estado eliminado (no lo borra)',
+    db.prepare('SELECT estado FROM mp_programas WHERE id = ?').get(pidArchivar).estado === 'eliminado');
+  ok('12) archivar NO borra los datos del SVE (siguen recuperables)', contarSve(pidArchivar) > 0, contarSve(pidArchivar) + ' filas');
+  ok('12) archivar deja constancia con origen "archivo"', bajas(pidArchivar) && bajas(pidArchivar).origen === 'archivo',
+    JSON.stringify(bajas(pidArchivar) || 'sin fila'));
+  ok('12) un programa archivado no sale de la lista',
+    (await H['medprev:programas:list']({}, { token: 'tok-ok', companyName: empresaA, tipo: 'sve' }))
+      .data.programas.every(p => p.id !== pidArchivar));
+
+  const nuevo2 = await H['medprev:programas:create']({}, { companyName: empresaA, tipo: 'sve', nombre: 'Para borrar', token: 'tok-ok' });
+  const pidBorrar = nuevo2.data.programa.id;
+  sembrarSve(pidBorrar);
+  const sinConfirmar = await H['medprev:programas:delete']({}, { token: 'tok-ok', companyName: empresaA, programaId: pidBorrar, modo: 'eliminar' });
+  ok('12) eliminar SIN confirmacion explicita se rechaza (guarda contra el clic perdido)',
+    sinConfirmar.success === false, JSON.stringify(sinConfirmar.error || {}));
+  ok('12) y el programa sigue intacto tras el rechazo',
+    !!db.prepare('SELECT id FROM mp_programas WHERE id = ?').get(pidBorrar) && contarSve(pidBorrar) > 0);
+
+  const antesBorrar = contarSve(pidBorrar);
+  const borrar = await H['medprev:programas:delete']({}, {
+    token: 'tok-ok', companyName: empresaA, programaId: pidBorrar, modo: 'eliminar', confirmacion: 'eliminar'
+  });
+  ok('12) eliminar de verdad responde ok y dice el modo', borrar.success === true && borrar.data.modo === 'eliminar',
+    JSON.stringify(borrar.data || borrar.error));
+  ok('12) eliminar borra la fila del programa', !db.prepare('SELECT id FROM mp_programas WHERE id = ?').get(pidBorrar));
+  ok('12) eliminar borra TODO el contenido del SVE (datos personales incluidos)',
+    contarSve(pidBorrar) === 0, 'antes=' + antesBorrar + ' despues=' + contarSve(pidBorrar));
+  ok('12) eliminar deja la baja registrada para que viaje al sync',
+    bajas(pidBorrar) && bajas(pidBorrar).origen === 'eliminar' && !!bajas(pidBorrar).eliminado_en,
+    JSON.stringify(bajas(pidBorrar) || 'sin fila'));
+  ok('12) la baja NO guarda datos personales (solo metadatos del programa)',
+    !bajas(pidBorrar) || Object.keys(bajas(pidBorrar)).every(c =>
+      ['programa_id', 'empresa_id', 'tipo', 'nombre', 'fecha_inicio', 'fecha_fin', 'eliminado_en', 'eliminado_por', 'origen'].indexOf(c) !== -1),
+    bajas(pidBorrar) ? Object.keys(bajas(pidBorrar)).join(',') : 'sin fila');
+  ok('12) eliminar sin token se rechaza igual que archivar',
+    (await H['medprev:programas:delete']({}, { companyName: empresaA, programaId: pidArchivar, modo: 'eliminar', confirmacion: 'eliminar' })).success === false);
+  ok('12) un programa ya borrado no se puede volver a eliminar',
+    (await H['medprev:programas:delete']({}, { token: 'tok-ok', companyName: empresaA, programaId: pidBorrar, modo: 'eliminar', confirmacion: 'eliminar' })).success === false);
+  const nuevo3 = await H['medprev:programas:create']({}, { companyName: empresaA, tipo: 'sve', nombre: 'Modo por defecto', token: 'tok-ok' });
+  const porDefecto = await H['medprev:programas:delete']({}, { token: 'tok-ok', companyName: empresaA, programaId: nuevo3.data.programa.id });
+  ok('12) el modo por defecto (sin `modo`) sigue siendo archivar, no borrar',
+    porDefecto.success === true && porDefecto.data.modo === 'archivar', JSON.stringify(porDefecto.data || porDefecto.error));
+  ok('12) y archivar por defecto tampoco borra los datos',
+    !!db.prepare('SELECT id FROM mp_programas WHERE id = ?').get(nuevo3.data.programa.id));
 
   // ---------- Resultado ----------
   let failed = 0;

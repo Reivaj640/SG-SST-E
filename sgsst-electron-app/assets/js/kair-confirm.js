@@ -213,6 +213,16 @@ class KairConfirm {
 
   _render(opts) {
     var self = this;
+    // 📦828 — barrido anti-huérfanos: si un backdrop quedó colgado en el
+    // contenedor (iframe destruido antes de su timer de cierre), se borra
+    // AQUÍ antes de abrir uno nuevo. Sin esto, un velo invisible
+    // (opacity 0 + pointer-events auto) deja la app muda ante los clics.
+    if (self.container) {
+      var colgados = self.container.querySelectorAll('.kair-confirm-backdrop');
+      for (var i = 0; i < colgados.length; i++) {
+        if (colgados[i] !== self._activeDialog) colgados[i].remove();
+      }
+    }
     // Cerrar cualquier dialog activo
     self._close();
 
@@ -324,9 +334,6 @@ class KairConfirm {
 
   _close() {
     if (this._activeDialog) {
-      var self = this;
-      this._activeDialog.classList.remove('kair-confirm-show');
-      this._activeDialog.classList.add('kair-confirm-hide');
       var isInIframe = (typeof window !== 'undefined' && window.parent && window.parent !== window);
       var doc = isInIframe ? window.parent.document : document;
       if (this._escHandler) {
@@ -334,11 +341,40 @@ class KairConfirm {
         this._escHandler = null;
       }
       var dialog = this._activeDialog;
-      setTimeout(function () {
-        if (dialog && dialog.parentNode) dialog.remove();
-      }, 250);
-      this._activeDialog = null;
+      this._activeDialog.classList.remove('kair-confirm-show');
+      this._activeDialog.classList.add('kair-confirm-hide');
+      // 📦828 — el nodo vive en el documento del PADRE, así que el timer que lo
+      // retira tiene que correr en el realm del PADRE: si se agenda en ESTE
+      // contexto (el del iframe) y el iframe navega/destruye antes (p. ej. ir a
+      // la lista tras eliminar un programa), el timer muere con él y el velo
+      // queda huérfano. Medido: `window.parent.setTimeout(cb, ...)` invocado
+      // desde el iframe NUNCA ejecuta el callback (queda en la cola del iframe).
+      // La delegación sí: `_retiroDiferido` es código del padre, su setTimeout
+      // resuelve al global del padre y el callback vive en su realm.
+      var delegado = false;
+      if (isInIframe) {
+        try {
+          var padre = window.parent.KairConfirm;
+          if (padre && typeof padre._retiroDiferido === 'function') {
+            padre._retiroDiferido(dialog);
+            delegado = true;
+          }
+        } catch (e) { delegado = false; }
+      }
+      if (!delegado) {
+        // Fallback: timer en el realm propio (sirve mientras el iframe siga vivo).
+        setTimeout(function () {
+          if (dialog && dialog.parentNode) dialog.remove();
+        }, 250);
+      }
     }
+  }
+
+  // 📦828 — retiro diferido programado DESDE el realm del padre (ver _close).
+  _retiroDiferido(dialogo) {
+    setTimeout(function () {
+      if (dialogo && dialogo.parentNode) dialogo.remove();
+    }, 250);
   }
 
   _escapeHtml(s) {
@@ -350,3 +386,6 @@ class KairConfirm {
 }
 
 window.KairConfirm = new KairConfirm();
+// 📦828 — marca de build para que los arneses de prueba puedan verificar
+// que el renderer cargó ESTA versión (y no una cacheada).
+window.KAIR_CONFIRM_BUILD = '20260930-confirm-hide-fix';

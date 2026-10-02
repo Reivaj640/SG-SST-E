@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.224 (desarrollo) — último publicado v0.1.205 · 📦824-ui Presupuesto: bloques con marco compartido, pantallas a todo el ancho y sin la franja del toast
-**Última actualización:** 29 de septiembre de 2026
+**Versión:** 0.1.226 (desarrollo) — último publicado v0.1.205 · 📦826-833 Medicina Preventiva SVE: interfaces completas, análisis por periodo editables, indicadores editables y datos que viajan en el sync
+**Última actualización:** 1 de octubre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -11,6 +11,8 @@
 **K+AIR** es una aplicación empresarial Electron que implementa un Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) completo, diseñado para cumplir con la normativa colombiana (Resolución 0312 de 2019).
 
 ### Características Principales
+
+- ✅ **Medicina Preventiva · Programa SVE completo (3.1.2)** 🆕 (v0.1.226, `📦826-833`): El programa SVE pasa de esqueleto a interfaz usable de verdad. **📦826**: carpeta nueva `modules/gestion-salud/medicina-preventiva/sve/` (vistas, seed, core, app, CSS, fuentes, `vendor/lucide` + `vendor/xlsx`) con carga perezosa por sección, plantilla SVE v2 de 5 secciones reales (Dashboard, Casos, Plan PHVA, Indicadores, Áreas expuestas) + migración `20260930-sve-template-v2`, y **dataset por programa** (`STORAGE_KEY` con sufijo `window.SVE_PROGRAMA_KEY` — dos programas SVE no se pisan). **📦827**: los datos salen de `localStorage` a SQLite — 8 tablas `mp_sve_*`, 13 canales `medprev:sve:*` con auth dura en mutaciones, migración única `medprev:sve:migrar`, y las 8 tablas entran al `.kairsync` (viajan entre PCs; antes no). **📦827-fix/fix-2**: PK compuesta `(programa_id, id)` + "espina" `anios_json`/`medidas_json` con relleno (sin ella el Dashboard reventaba) + aplicador de migraciones único con `foreign_keys` apagado (medido: 32 filas de `mp_sve_plan_meses` → 0 sin esto). **📦828/829**: `kair-confirm` (barrido de velos huérfanos + retiro en el realm del padre, `pointer-events:none` al cerrar) y `kair-toast` (timers y X delegados al `KAIRToast` de la ventana que sobrevive — el iframe que navegaba mataba el timer y el toast quedaba pegado). **📦830/831**: edición completa de indicadores (valores por año, años, meta, definición) con columna `extra_json` en las 3 partes del schema (CREATE + ALTER idempotente + migración v2) y adaptadores `_extraDe`/`_extraHacia`; fix de raíz de `U.el` (camelCase vs kebab-case descartaba estilos en silencio), rejilla 2 columnas, errores inline por campo. **📦832**: "Registros de morbilidad" → **"Casos SVE por año"** agrupando seguimientos por año. **📦833**: botón **"Nuevo período"** en la tarjeta de Análisis con modal, validación vacío/duplicado (conserva lo tecleado) y persistencia vía `addAnalisis`. **Tests 512/512** (9 archivos) + verificación visual E2E con capturas en `docs/capturas/833-analisis/`.
 
 - ✅ **Presupuesto SG-SST: bloque con marco compartido y pantallas a todo el ancho** 🆕 (v0.1.224, `📦824-ui`): El patrón "encabezado de bloque + panel blanco" que usan el home de recursos y el selector de presupuestos se define **una sola vez** en `shared/kair-components.css` (`.kair-block__panel`, `.kair-block__grid`, `.kair-block__head`), así que ambas pantallas se leen como hermanas por construcción y no por casualidad. Se eliminó el tope de 1400px y todos los grids pasaron de `auto-fill` a **`auto-fit`** (con `auto-fill` las columnas vacías se reservan y el espacio sobrante se muda al interior del recuadro). La card de período se reacomoda sola por `flex-wrap` sin media queries: angosta se apila como el diseño aprobado, ancha reparte en dos columnas. Arreglado el **toast "oculto" que asomaba ~4px** en el borde inferior (`translateY(150%)` es un % de la altura propia, no de la distancia a cubrir → `translateY(calc(100% + 2rem))` + `opacity: 0`). El home quedó sin CSS muerto del v1 y sin breakpoints. Sin cambios de comportamiento (import/export/`bulk-save`/IPC intactos), tests 473/473.
 
@@ -26,7 +28,7 @@
 - ✅ **Release flow automatizado** 🆕 (v0.1.131+, `📦585`): Scripts `scripts/release.ps1` (flujo completo: push branch → tag → push tag → build) y `scripts/fix-release.ps1` (fallback con curl si electron-builder falla). Evitan el error 422 de "Published releases must have a valid tag". Ver `AGENTS.md` (sección "🆕 Release flow automatizado") para el detalle.
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
-- ✅ **9 Módulos Principales + 51 Submódulos con UI propia** 🆕 (v0.1.211): Recursos (12), Gestión Integral (9 implementados + 4 placeholder en roadmap), Gestión de la Salud (13 implementados + 5 placeholder), Gestión de Peligros y Riesgos (4 implementados + 7 placeholder), Gestión de Amenazas (2), Verificación (3 implementados + 1 placeholder), Mejoramiento (4 vistas), **Gestión Humana (12 — módulo top-level nuevo en v0.1.191)**, más `helpers` y `shared`. Total declarado en sidebar oficial: **67 entradas** (51 con UI real + 16 placeholder en roadmap normativo).
+- ✅ **9 Módulos Principales + 52 Submódulos con UI propia** 🆕 (v0.1.211): Recursos (12), Gestión Integral (9 implementados + 4 placeholder en roadmap), Gestión de la Salud (14 implementados + 4 placeholder), Gestión de Peligros y Riesgos (4 implementados + 7 placeholder), Gestión de Amenazas (2), Verificación (3 implementados + 1 placeholder), Mejoramiento (4 vistas), **Gestión Humana (12 — módulo top-level nuevo en v0.1.191)**, más `helpers` y `shared`. Total declarado en sidebar oficial: **67 entradas** (52 con UI real + 15 placeholder en roadmap normativo).
 - ✅ **IA Integrada**: Análisis de accidentes con LLM local (Qwen GGUF vía Ollama)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -537,12 +539,12 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 2.12.1 | Equipos y Herramientas         | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
 | 2.13.1 | Elementos de Protección Personal | 🚧 Roadmap | Placeholder en sidebar; se mapea a `plan-trabajo`  |
 
-### Módulo 3: Gestión de la Salud (18 submódulos — 13 implementados + 1 en esqueleto + 4 en roadmap)
+### Módulo 3: Gestión de la Salud (18 submódulos — 14 implementados + 4 en roadmap)
 
 | Código | Submódulo                    | Estado | Archivos Principales                                   |
 |--------|------------------------------|--------|--------------------------------------------------------|
 | 3.1.1  | Descripción Sociodemográfica y Diagnóstico de Salud | ✅ | `sociodemografica-component.js`, `viewer.js` |
-| 3.1.2  | Actividades de medicina preventiva y promoción de la salud | 🚧 Esqueleto con gestión de programas (📦825) | `medicina-preventiva/*` — home con SVE / DME / Promoción; crea programas desde plantilla y progreso por secciones (`main/medprev-programas-bridge.js`); interfaces operativas de cada sección en roadmap |
+| 3.1.2  | Actividades de medicina preventiva y promoción de la salud | ✅ SVE (📦826-833) | `medicina-preventiva/*` — home con SVE / DME / Promoción; programas con plantilla SVE v2 (5 secciones) + `sve/` (dashboard, casos, plan PHVA, indicadores, áreas expuestas) con alta de análisis por periodo y edición de indicadores; datos en SQLite `mp_sve_*` que viajan en el sync (`main/medprev-sve-datos-bridge.js`) |
 | 3.1.3  | Perfil de Cargo y Profesiograma | ✅  | `perfiles-cargo-profesiograma/*` (4 archivos, premium v2) |
 | 3.1.4  | Evaluaciones Médicas         | ✅     | `evaluaciones-medicas-logic.js`, `component.js`        |
 | 3.1.5  | Custodia médica ocupacional  | 🚧 Roadmap | Placeholder en sidebar; se mapea a `sociodemografica` |

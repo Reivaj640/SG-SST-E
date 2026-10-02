@@ -134,6 +134,13 @@ const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, SCHEMA_
 // Schema con 2 tablas (mp_programas + mp_programa_secciones) y bridge con 7
 // canales `medprev:programas:*`. Mutaciones con auth dura (validateSession).
 const { registerMedprevProgramasHandlers, SCHEMA_SQL: MEDPREV_PROGRAMAS_SCHEMA_SQL, SCHEMA_ALTERS: MEDPREV_PROGRAMAS_SCHEMA_ALTERS, MIGRATIONS_SQL: MEDPREV_PROGRAMAS_MIGRATIONS_SQL, MIGRATION_IDS: MEDPREV_PROGRAMAS_MIGRATION_IDS } = require('./main/medprev-programas-bridge');
+// 📦827 (2026-09-30) — DATOS del programa SVE del 3.1.2.
+// Schema con 8 tablas (mp_sve_*) y bridge con 13 canales `medprev:sve:*`.
+// Hasta acá el contenido del SVE (casos, plan PHVA, indicadores) vivía en
+// localStorage del renderer: no entraba al .kairsync, no viajaba entre máquinas
+// y se perdía al reinstalar. Mutaciones con auth dura (validateSession).
+const { registerMedprevSveDatosHandlers, SCHEMA_SQL: MEDPREV_SVE_SCHEMA_SQL, SCHEMA_ALTERS: MEDPREV_SVE_SCHEMA_ALTERS, MIGRATIONS_SQL: MEDPREV_SVE_MIGRATIONS_SQL, MIGRATION_IDS: MEDPREV_SVE_MIGRATION_IDS } = require('./main/medprev-sve-datos-bridge');
+const { aplicarMigracionesMedprevSve } = require('./main/medprev-sve-datos-schema-sql');
 // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level: Base de Personal + Contratación)
 // FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
 // no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
@@ -811,6 +818,47 @@ function initDbOnce() {
       }
     } catch (mpSchemaErr) {
       console.error('[DB] 📦825 · Error creando schema de programas 3.1.2:', mpSchemaErr.message);
+    }
+
+    // 📦827 (2026-09-30) — Schema de DATOS del programa SVE (3.1.2).
+    // 8 tablas mp_sve_*: casos, plan (actividades + meses), indicadores
+    // (definición + valores), morbilidad, análisis y el encabezado del
+    // documento. Mismo patrón que 📦825: ALTERS con try/catch por sentencia y
+    // migraciones con control de versión. La migración de CONTENIDO (volcar el
+    // localStorage) NO es SQL: la dispara el renderer vía `medprev:sve:migrar`.
+    try {
+      db.exec(MEDPREV_SVE_SCHEMA_SQL);
+      console.log('[DB] 📦827 · Tablas de datos SVE (mp_sve_*) creadas/verificadas');
+
+      var sveAltersOk = 0, sveAltersNew = 0;
+      if (Array.isArray(MEDPREV_SVE_SCHEMA_ALTERS)) {
+        for (var sa = 0; sa < MEDPREV_SVE_SCHEMA_ALTERS.length; sa++) {
+          try {
+            db.exec(MEDPREV_SVE_SCHEMA_ALTERS[sa]);
+            sveAltersNew++;
+          } catch (saErr) {
+            sveAltersOk++;   // "duplicate column name" = ya existía
+          }
+        }
+      }
+      if (MEDPREV_SVE_SCHEMA_ALTERS.length > 0) {
+        console.log('[DB] 📦827 · ' + MEDPREV_SVE_SCHEMA_ALTERS.length + ' columnas de datos SVE verificadas (' + sveAltersNew + ' nuevas, ' + sveAltersOk + ' ya existentes)');
+      }
+
+      if (Array.isArray(MEDPREV_SVE_MIGRATIONS_SQL) && MEDPREV_SVE_MIGRATIONS_SQL.length > 0) {
+        /* 📦827-fix-2 — El apagado de claves foráneas va DENTRO de la función
+           compartida, no suelto acá: estas migraciones reconstruyen tablas y con
+           foreign_keys activo el DROP TABLE de la tabla padre borra en cascada
+           los meses del plan antes de que su propia migración los copie (32
+           filas quedaron en 0 en la base real). Que el test corra la MISMA
+           función es lo que hace que esto sea una guarda y no una costumbre. */
+        var sveMigRes = aplicarMigracionesMedprevSve(db, {
+          log: function (msg) { console.error('[DB] 📦827 · ' + msg); }
+        });
+        if (sveMigRes.aplicadas > 0) console.log('[DB] 📦827 · ' + sveMigRes.aplicadas + ' migraciones de datos SVE aplicadas de ' + MEDPREV_SVE_MIGRATIONS_SQL.length);
+      }
+    } catch (sveSchemaErr) {
+      console.error('[DB] 📦827 · Error creando schema de datos SVE:', sveSchemaErr.message);
     }
     // 📦709 (2026-08-15) — Schema Gestión Humana (nuevo módulo: Base de Personal + Contratación)
     // 3 tablas: contrataciones + base_personal + gh_sedes. Sin migrations en v1.
@@ -10337,6 +10385,11 @@ try {
   // Preventiva): 7 canales `medprev:programas:*`. Mutaciones con auth dura
   // (validateSession) — lección de la auditoría 2026-09-29 (GH-1 soft-auth).
   registerMedprevProgramasHandlers(app, { getDb, validateSession });
+  // 📦827 (2026-09-30) — Handlers IPC de los DATOS del programa SVE del 3.1.2:
+  // 13 canales `medprev:sve:*`. Acá es donde el contenido del SVE pasa de
+  // localStorage (que no viajaba entre máquinas) a SQLite (que sí viaja por el
+  // .kairsync, vía main/sync-serializer.js). Mutaciones con auth dura.
+  registerMedprevSveDatosHandlers(app, { getDb, validateSession });
   // 📦709 (2026-08-15) — Handlers IPC del módulo Gestión Humana (nuevo top-level).
   // FASE 0: 16 canales registrados (15 stubs + 1 diag). Ninguno expuesto en
   // preload.js todavía. La UI no existe aún — viene en Fases 4-6.

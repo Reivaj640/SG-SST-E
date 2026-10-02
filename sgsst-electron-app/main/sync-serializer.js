@@ -1,16 +1,26 @@
 /**
  * main/sync-serializer.js
  *
- * Serializer/Deserializer para el sync multipc de K+AIR (📦536).
+ * Serializer/Deserializer para el sync multipc de K+AIR (??536).
  * Convierte los datos sincronizables de una empresa entre la BD local
  * (SQLite) y un archivo .kairsync (JSON) con last-write-wins por registro.
  *
  * Tablas sincronizables (lo que SI va al hub):
  *   - evaluacion_action_plans   (planes de acción 2.3.1, incluye seguimientos+responsables)
- *   - gestaciones + seguimiento_gestacion_mensual   (📦466, Salud Materna)
+ *   - gestaciones + seguimiento_gestacion_mensual   (??466, Salud Materna)
  *   - eventos_cumplidos
  *   - eventos_rapidos
- *   - ausentismo                 (vía IPC de medición ausentismo — ver 📦538)
+ *   - roles_responsabilidades_*  (??705/706, estandar 1.1.2)
+ *   - medprev_programas          (??827, 3.1.2) — y TODO su contenido anidado:
+ *       secciones, meta, casos, plan PHVA (actividades + meses), indicadores
+ *       (definición + valores), morbilidad y análisis.
+ *
+ * ??827 — AVISO DE ALCANCE, porque es una sorpresa fea: el sync NO es "la base
+ * completa". Es una lista explícita de entidades. Lo que no esté en esa lista
+ * se queda en la PC donde se capturó, aunque esté en SQLite. Hoy (2026-09-30)
+ * PRESUPUESTO (1.1.3) y GESTIÓN HUMANA siguen FUERA: sus tablas no viajan.
+ * Cuando se agreguen, el cambio es acá y en el `entities` de
+ * `serializeEmpresaToSync` + el contador de `deserializeSyncToDb`.
  *
  * Tablas NO sincronizables (quedan locales por PC):
  *   - users, roles, companies, user_company_roles, sessions
@@ -29,7 +39,7 @@
  *
  * Este módulo NO se conecta a Electron ni abre archivos del hub por su cuenta.
  * Solo exporta funciones puras de transformacion BD <-> JSON. La lectura/
- * escritura del archivo .kairsync la hace el SyncService (📦537).
+ * escritura del archivo .kairsync la hace el SyncService (??537).
  */
 'use strict';
 
@@ -75,17 +85,268 @@ function serializeEmpresaToSync(db, companyKey, pcId, userName, appVersion) {
       gestaciones: _serializeGestaciones(db, companyKey),
       eventos_cumplidos: _serializeEventosCumplidos(db, companyKey),
       eventos_rapidos: _serializeEventosRapidos(db, companyKey),
-      // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2).
+      // ??705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2).
       // El catálogo NO se sincroniza (es el mismo para todas las empresas),
       // solo las tablas de asignaciones y divulgaciones por empresa.
       roles_responsabilidades_asignacion: _serializeRolesResponsabilidadesAsignacion(db, companyKey),
       roles_responsabilidades_divulgacion: _serializeRolesResponsabilidadesDivulgacion(db, companyKey),
-      // 📦706 (2026-08-14) — Multi-documento: sync de los PDFs por divulgación
-      roles_responsabilidades_divulgacion_documento: _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey)
-      // ausentismo: lo agregamos en 📦538 cuando veamos la estructura
+      // ??706 (2026-08-14) — Multi-documento: sync de los PDFs por divulgación
+      roles_responsabilidades_divulgacion_documento: _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey),
+      // ??827 (2026-09-30) — Programas de Medicina Preventiva del 3.1.2.
+      // El programa es la RAÍZ DEL AGREGADO: su shell (secciones) y TODO su
+      // contenido (meta, casos, plan PHVA, indicadores, morbilidad, análisis)
+      // van anidados dentro de un solo registro. Se anida en vez de mandar
+      // tablas sueltas porque:
+      //   - los hijos (meses del plan, valores de indicador) no existen sin su
+      //     padre, así que el orden de escritura queda garantizado;
+      //   - si la otra PC no tiene el programa, no quedan casos huérfanos;
+      //   - al archivar un programa, el archivo entero se va con él.
+      medprev_programas: _serializeMedprevProgramas(db, companyKey),
+      // ??827-fix — Las BAJAS viajan aparte. Un programa eliminado ya no está
+      // en `medprev_programas` (el soft-delete lo saca del listado), así que
+      // su baja es el único hecho que hay que comunicar. Sin esta lista,
+      // eliminar un programa en una máquina no producía ningún efecto en las
+      // demás: se probó con dos bases y el serializer real.
+      medprev_programas_bajas: _serializeMedprevBajas(db, companyKey)
+      // ausentismo: lo agregamos en ??538 cuando veamos la estructura
       // real del bridge de medición ausentismo
     }
   };
+}
+
+// =====================================================================
+// ??827 — Programas del 3.1.2 (raíz: mp_programas, con todo su contenido)
+// =====================================================================
+
+/** Si la tabla existe. Si no, la parte se omite sin romper el sync. */
+function _existeTabla(db, nombre) {
+  try {
+    return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(nombre);
+  } catch (e) { return false; }
+}
+
+function _filas(db, sql, params) {
+  var m = sql.match(/FROM\s+(\w+)/i);
+  if (!m || !_existeTabla(db, m[1])) return [];
+  try { return db.prepare(sql).all(params || []); } catch (e) { return []; }
+}
+
+function _serializeMedprevProgramas(db, companyKey) {
+  if (!_existeTabla(db, 'mp_programas')) return [];
+  try {
+    var programas = db.prepare(
+      "SELECT * FROM mp_programas WHERE empresa_id = ? AND estado != 'eliminado' ORDER BY actualizado_en DESC"
+    ).all(companyKey);
+
+    return programas.map(function (p) {
+      // --- contenido SVE: todo opcional, se omite si la tabla no existe ---
+      var datos = {};
+      var meta = _filas(db, 'SELECT * FROM mp_sve_meta WHERE programa_id = ?', [p.id])[0];
+      if (meta) {
+        var metaJson = null;
+        try { metaJson = JSON.parse(meta.meta_json); } catch (e) { metaJson = null; }
+        datos.meta = metaJson;
+      }
+
+      datos.casos = _filas(db,
+        'SELECT * FROM mp_sve_casos WHERE programa_id = ? AND eliminado_en IS NULL ORDER BY orden, creado_en', [p.id]);
+
+      datos.plan = _filas(db, 'SELECT * FROM mp_sve_plan_actividades WHERE programa_id = ? ORDER BY orden, id', [p.id])
+        .map(function (a) {
+          return {
+            actividad: a,
+            // El % de cumplimiento NO viaja: se calcula. Solo ap/ae.
+            meses: _filas(db, 'SELECT mes, ap, ae FROM mp_sve_plan_meses WHERE actividad_id = ? ORDER BY mes', [a.id])
+          };
+        });
+
+      datos.indicadores = _filas(db, 'SELECT * FROM mp_sve_indicadores WHERE programa_id = ? ORDER BY clave', [p.id])
+        .map(function (i) {
+          return {
+            indicador: i,
+            valores: _filas(db, 'SELECT anio, medida, valor FROM mp_sve_indicadores_valores WHERE indicador_id = ? ORDER BY anio, medida', [i.id])
+          };
+        });
+
+      datos.morbilidad = _filas(db, 'SELECT * FROM mp_sve_morbilidad WHERE programa_id = ? ORDER BY tipo, anio', [p.id]);
+      datos.analisis = _filas(db, 'SELECT * FROM mp_sve_analisis WHERE programa_id = ? ORDER BY orden, periodo', [p.id]);
+
+      return {
+        id: p.id,
+        programa: p,
+        secciones: _filas(db, 'SELECT * FROM mp_programa_secciones WHERE programa_id = ? ORDER BY orden', [p.id]),
+        datos: datos,
+        updatedAt: p.actualizado_en || p.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando medprev_programas:', e.message);
+    return [];
+  }
+}
+
+/**
+ * ??827-fix — BAJAS de programas (tombstones).
+ *
+ * El soft-delete (estado='eliminado') no se enteraba nadie: el serializer manda
+ * la lista de programas que NO están eliminados, así que al archivar uno en la
+ * PC A el programa simplemente no viaja, y la PC B —que solo procesa lo que
+ * llega— lo sigue teniendo vivo con todos sus datos. Probado con dos bases y el
+ * serializer real.
+ *
+ * Para que la baja se propague, el otro equipo necesita un HECHO explícito
+ * ("este programa se eliminó el día tal"), no la simple ausencia del registro.
+ *
+ * `origen` distingue las dos intenciones y decide si el receptor borra datos:
+ *   'eliminar' -> borra el programa Y su contenido (datos personales incluidos)
+ *   'archivo'  -> solo lo marca; el contenido queda intacto
+ * Archivar es local a propósito: es la opción para un programa que dejó de
+ * aplicar y cuya historia importa.
+ */
+function _serializeMedprevBajas(db, companyKey) {
+  if (!_existeTabla(db, 'mp_programas_bajas')) return [];
+  try {
+    return db.prepare(
+      'SELECT * FROM mp_programas_bajas WHERE empresa_id = ? ORDER BY eliminado_en DESC'
+    ).all(companyKey);
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando mp_programas_bajas:', e.message);
+    return [];
+  }
+}
+
+function _deserializeMedprevBajas(db, bajas, companyKey, result) {
+  if (!_existeTabla(db, 'mp_programas_bajas') || !bajas || !bajas.length) return;
+  var counter = result.byEntity.medprev_programas_bajas;
+  for (var i = 0; i < bajas.length; i++) {
+    var baja = bajas[i];
+    if (!baja || !baja.programa_id) continue;
+    // Nunca se toca un programa de OTRA empresa.
+    if (baja.empresa_id && baja.empresa_id !== companyKey) { counter.skipped++; result.skipped++; continue; }
+    var destructiva = baja.origen !== 'archivo';
+    try {
+      db.transaction(function () {
+        if (destructiva) {
+          ['mp_sve_plan_meses', 'mp_sve_plan_actividades', 'mp_sve_casos', 'mp_sve_meta',
+            'mp_sve_indicadores_valores', 'mp_sve_indicadores', 'mp_sve_morbilidad', 'mp_sve_analisis',
+            'mp_programa_secciones'].forEach(function (t) {
+            if (_existeTabla(db, t)) db.prepare('DELETE FROM ' + t + ' WHERE programa_id = ?').run(baja.programa_id);
+          });
+          db.prepare('DELETE FROM mp_programas WHERE id = ? AND empresa_id = ?').run(baja.programa_id, companyKey);
+        } else {
+          db.prepare("UPDATE mp_programas SET estado = 'eliminado' WHERE id = ? AND empresa_id = ? AND estado != 'eliminado'")
+            .run(baja.programa_id, companyKey);
+        }
+        db.prepare(
+          'INSERT OR REPLACE INTO mp_programas_bajas (programa_id, empresa_id, tipo, nombre, fecha_inicio, fecha_fin, eliminado_en, eliminado_por, origen) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(baja.programa_id, companyKey, baja.tipo || null, baja.nombre || null,
+          baja.fecha_inicio || null, baja.fecha_fin || null,
+          baja.eliminado_en || new Date().toISOString(), baja.eliminado_por || null,
+          baja.origen || 'eliminar');
+      })();
+      counter.applied++;
+      result.applied++;
+    } catch (e) {
+      console.error('[' + MOD + '] Error aplicando baja del programa ' + baja.programa_id + ':', e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+/**
+ * Reescribe un bloque de filas hijas: las borra y las reinserta dentro de la
+ * transacción del padre. Son un detalle SIN identidad propia (un mes del plan,
+ * un valor de indicador), así que borrarlas evita que algo que se eliminó en
+ * una PC sobreviva en la otra. Devuelve nada; traga su propio error para no
+ * tumbar el merge entero.
+ */
+function _reinsertarHijo(db, tabla, filas, padreId, empresaKey) {
+  if (!_existeTabla(db, tabla)) return;
+  /* El BORRADO va PRIMERO. Al revés, el DELETE por programa_id se lleva por
+     delante lo que se acaba de insertar y el bloque queda vacío — que es
+     justo lo contrario de lo que se quiere sincronizar. */
+  db.prepare('DELETE FROM ' + tabla + ' WHERE programa_id = ?').run(padreId);
+  if (filas && filas.length) {
+    var cols = Object.keys(filas[0]);
+    if (empresaKey && cols.indexOf('empresa_id') < 0) cols.push('empresa_id');
+    var stmt = db.prepare(
+      'INSERT OR REPLACE INTO ' + tabla + ' (' + cols.join(', ') + ') VALUES (' + cols.map(function () { return '?'; }).join(', ') + ')'
+    );
+    filas.forEach(function (f) {
+      var v = cols.map(function (k) {
+        if (k === 'empresa_id' && f.empresa_id === undefined) return empresaKey;
+        return f[k] === undefined ? null : f[k];
+      });
+      stmt.run.apply(stmt, v);
+    });
+  }
+}
+
+function _deserializeMedprevProgramas(db, remoteRecords, companyKey, result, conflictLog) {
+  var counter = result.byEntity.medprev_programas;
+  if (!_existeTabla(db, 'mp_programas')) {
+    console.warn('[' + MOD + '] Tabla mp_programas no existe, saltando merge de programas 3.1.2');
+    return;
+  }
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote || !remote.id || !remote.programa) { counter.skipped++; result.skipped++; continue; }
+    var p = remote.programa;
+    // Nunca se pisa un programa local de OTRA empresa.
+    if (p.empresa_id && p.empresa_id !== companyKey) { counter.skipped++; result.skipped++; continue; }
+
+    try {
+      db.transaction(function () {
+        var local = db.prepare('SELECT id, actualizado_en FROM mp_programas WHERE id = ?').get(remote.id);
+        if (!local) {
+          var cols = Object.keys(p);
+          var vals = cols.map(function (k) { return p[k] === undefined ? null : p[k]; });
+          var ins = db.prepare('INSERT OR REPLACE INTO mp_programas (' + cols.join(', ') + ') VALUES (' + cols.map(function () { return '?'; }).join(', ') + ')');
+          ins.run.apply(ins, vals);
+        } else if (remote.updatedAt > (local.actualizado_en || '')) {
+          // Solo las columnas que vienen, para no pisar con nulls ausentes.
+          var c = Object.keys(p).filter(function (k) { return k !== 'id'; });
+          var upd = db.prepare('UPDATE mp_programas SET ' + c.map(function (k) { return k + ' = ?'; }).join(', ') + ' WHERE id = ?');
+          upd.run.apply(upd, c.map(function (k) { return p[k] === undefined ? null : p[k]; }).concat([remote.id]));
+        }
+        // Los hijos se reescriben igual aunque el programa no se haya
+        // actualizado: son el DETALLE, y "stale" no es mejor que "faltante".
+
+        _reinsertarHijo(db, 'mp_programa_secciones', remote.secciones, remote.id, null);
+        if (!_existeTabla(db, 'mp_sve_casos') && !_existeTabla(db, 'mp_sve_plan_actividades')) return;
+
+        var d = remote.datos || {};
+        if (d.meta && _existeTabla(db, 'mp_sve_meta')) {
+          db.prepare('INSERT OR REPLACE INTO mp_sve_meta (programa_id, empresa_id, meta_json, actualizado_en) VALUES (?, ?, ?, ?)')
+            .run(remote.id, companyKey, JSON.stringify(d.meta), remote.updatedAt);
+        }
+        _reinsertarHijo(db, 'mp_sve_casos', d.casos, remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_plan_actividades', (d.plan || []).map(function (x) { return x.actividad; }), remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_plan_meses', (d.plan || []).reduce(function (acc, x) {
+          return acc.concat((x.meses || []).map(function (m) {
+            return { actividad_id: x.actividad.id, programa_id: remote.id, mes: m.mes, ap: m.ap, ae: m.ae };
+          }));
+        }, []), remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_indicadores', (d.indicadores || []).map(function (x) { return x.indicador; }), remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_indicadores_valores', (d.indicadores || []).reduce(function (acc, x) {
+          return acc.concat((x.valores || []).map(function (v) {
+            return { indicador_id: x.indicador.id, programa_id: remote.id, anio: v.anio, medida: v.medida, valor: v.valor };
+          }));
+        }, []), remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_morbilidad', d.morbilidad, remote.id, null);
+        _reinsertarHijo(db, 'mp_sve_analisis', d.analisis, remote.id, null);
+      })();
+
+      counter.applied++;
+      result.applied++;
+    } catch (e) {
+      console.error('[' + MOD + '] Error aplicando programa ' + remote.id + ':', e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
 }
 
 function _serializePlanesAccion(db, companyKey) {
@@ -163,7 +424,7 @@ function _serializeEventosCumplidos(db, companyKey) {
     ).get();
     if (!tableExists) return [];
 
-    // 📦694-fix3 — El schema real usa (evento_id PK, empresa_id, cumplido_en, nota)
+    // ??694-fix3 — El schema real usa (evento_id PK, empresa_id, cumplido_en, nota)
     // NO tiene columna `updated_at` ni `id`. Usar `cumplido_en` como "updatedAt"
     // proxy y `evento_id` como id para que el sync multipc tenga last-write-wins.
     var rows = db.prepare(
@@ -184,7 +445,7 @@ function _serializeEventosCumplidos(db, companyKey) {
   }
 }
 
-// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación)
+// ??705 (2026-08-13) — Roles y Responsabilidades (asignación)
 function _serializeRolesResponsabilidadesAsignacion(db, companyKey) {
   try {
     var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
@@ -216,8 +477,8 @@ function _serializeRolesResponsabilidadesAsignacion(db, companyKey) {
   }
 }
 
-// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación)
-// 📦706-fix18 (2026-08-14) — Sincroniza también las columnas nuevas:
+// ??705 (2026-08-13) — Roles y Responsabilidades (divulgación)
+// ??706-fix18 (2026-08-14) — Sincroniza también las columnas nuevas:
 // periodo, es_nueva_contratacion, fecha_vigencia_hasta (necesarias para
 // que el cambio de "1 fila por persona" funcione entre PCs).
 function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
@@ -243,7 +504,7 @@ function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
         user_agent: r.user_agent,
         documento_soporte_path: r.documento_soporte_path,
         creado_en: r.creado_en,
-        // 📦706-fix18 — Columnas nuevas del multi-documento
+        // ??706-fix18 — Columnas nuevas del multi-documento
         periodo: r.periodo,
         es_nueva_contratacion: r.es_nueva_contratacion,
         fecha_vigencia_hasta: r.fecha_vigencia_hasta,
@@ -263,7 +524,7 @@ function _serializeEventosRapidos(db, companyKey) {
     ).get();
     if (!tableExists) return [];
 
-    // 📦694-fix3 — El schema real de eventos_rapidos NO tiene columna `empresa_id`.
+    // ??694-fix3 — El schema real de eventos_rapidos NO tiene columna `empresa_id`.
     // Filtramos por todas las PCs sincronizan TODOS los rapidos (subóptimo pero
     // no rompe). Cuando se agregue empresa_id a eventos_rapidos (issue separado),
     // este filtro se actualiza.
@@ -325,11 +586,16 @@ function deserializeSyncToDb(db, syncData, options) {
       gestaciones: { applied: 0, conflicts: 0, skipped: 0 },
       eventos_cumplidos: { applied: 0, conflicts: 0, skipped: 0 },
       eventos_rapidos: { applied: 0, conflicts: 0, skipped: 0 },
-      // 📦705 (2026-08-13) — Roles y Responsabilidades
+      // ??705 (2026-08-13) — Roles y Responsabilidades
       roles_responsabilidades_asignacion: { applied: 0, conflicts: 0, skipped: 0 },
       roles_responsabilidades_divulgacion: { applied: 0, conflicts: 0, skipped: 0 },
-      // 📦706 (2026-08-14) — Multi-documento
-      roles_responsabilidades_divulgacion_documento: { applied: 0, conflicts: 0, skipped: 0 }
+      // ??706 (2026-08-14) — Multi-documento
+      roles_responsabilidades_divulgacion_documento: { applied: 0, conflicts: 0, skipped: 0 },
+      // ??827 (2026-09-30) — Programas del 3.1.2 con todo su contenido
+      medprev_programas: { applied: 0, conflicts: 0, skipped: 0 },
+      // ??827-fix — Bajas de programas (tombstones): el hecho de que un
+      // programa ya no está, que es lo que el soft-delete no comunicaba.
+      medprev_programas_bajas: { applied: 0, conflicts: 0, skipped: 0 }
     }
   };
 
@@ -346,16 +612,27 @@ function deserializeSyncToDb(db, syncData, options) {
   if (entities.eventos_rapidos) {
     _deserializeEventosRapidos(db, entities.eventos_rapidos, syncData.companyKey, result, conflictLog);
   }
-  // 📦705 (2026-08-13) — Roles y Responsabilidades
+  // ??705 (2026-08-13) — Roles y Responsabilidades
   if (entities.roles_responsabilidades_asignacion) {
     _deserializeRolesResponsabilidadesAsignacion(db, entities.roles_responsabilidades_asignacion, syncData.companyKey, result, conflictLog);
   }
   if (entities.roles_responsabilidades_divulgacion) {
     _deserializeRolesResponsabilidadesDivulgacion(db, entities.roles_responsabilidades_divulgacion, syncData.companyKey, result, conflictLog);
   }
-  // 📦706 (2026-08-14) — Multi-documento
+  // ??706 (2026-08-14) — Multi-documento
   if (entities.roles_responsabilidades_divulgacion_documento) {
     _deserializeRolesResponsabilidadesDivulgacionDocumento(db, entities.roles_responsabilidades_divulgacion_documento, syncData.companyKey, result, conflictLog);
+  }
+  // ??827 (2026-09-30) — Programas del 3.1.2 (con su contenido SVE anidado)
+  if (entities.medprev_programas) {
+    _deserializeMedprevProgramas(db, entities.medprev_programas, syncData.companyKey, result, conflictLog);
+  }
+  // ??827-fix — Bajas de programas. Van DESPUÉS de los programas a propósito:
+  // un programa puede llegar vivo en el payload y con su baja en el mismo
+  // archivo (por ejemplo si dos maquinas trabajaron en paralelo). La
+  // baja es el hecho más reciente y gana.
+  if (entities.medprev_programas_bajas) {
+    _deserializeMedprevBajas(db, entities.medprev_programas_bajas, syncData.companyKey, result);
   }
 
   return result;
@@ -568,7 +845,7 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
     return;
   }
 
-  // 📦694-fix3 — Ajustar al schema real: PK = evento_id, sin updated_at,
+  // ??694-fix3 — Ajustar al schema real: PK = evento_id, sin updated_at,
   // timestamp es cumplido_en. Usamos evento_id en lugar de id y cumplido_en
   // para comparar last-write-wins.
   var counter = result.byEntity.eventos_cumplidos;
@@ -621,7 +898,7 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
   }
 }
 
-// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación) — deserialización
+// ??705 (2026-08-13) — Roles y Responsabilidades (asignación) — deserialización
 function _deserializeRolesResponsabilidadesAsignacion(db, remoteRecords, companyKey, result, conflictLog) {
   var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
   if (!tableExists) {
@@ -674,8 +951,8 @@ function _deserializeRolesResponsabilidadesAsignacion(db, remoteRecords, company
   }
 }
 
-// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación) — deserialización
-// 📦706-fix18 (2026-08-14) — INSERT/UPDATE incluyen periodo, es_nueva_contratacion,
+// ??705 (2026-08-13) — Roles y Responsabilidades (divulgación) — deserialización
+// ??706-fix18 (2026-08-14) — INSERT/UPDATE incluyen periodo, es_nueva_contratacion,
 // fecha_vigencia_hasta para que el sync respete la regla "1 fila por persona".
 function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, companyKey, result, conflictLog) {
   var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
@@ -692,7 +969,7 @@ function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, compan
         'SELECT id, creado_en FROM roles_responsabilidades_divulgacion WHERE id = ? AND empresa_id = ?'
       ).get(remote.id, companyKey);
       if (!local) {
-        // 📦706-fix18 — 16 columnas (3 nuevas: periodo, es_nueva_contratacion, fecha_vigencia_hasta)
+        // ??706-fix18 — 16 columnas (3 nuevas: periodo, es_nueva_contratacion, fecha_vigencia_hasta)
         db.prepare(`
           INSERT INTO roles_responsabilidades_divulgacion
             (empresa_id, persona_cedula, persona_nombre, persona_cargo,
@@ -709,7 +986,7 @@ function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, compan
         counter.applied++;
         result.applied++;
       } else {
-        // 📦706-fix18 — UPDATE incluye las 3 columnas nuevas para mantener consistencia
+        // ??706-fix18 — UPDATE incluye las 3 columnas nuevas para mantener consistencia
         db.prepare(`
           UPDATE roles_responsabilidades_divulgacion
           SET persona_nombre = ?, persona_cargo = ?, estado = ?,
@@ -736,7 +1013,7 @@ function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, compan
   }
 }
 
-// 📦706 (2026-08-14) — Multi-documento: serialización de los PDFs por
+// ??706 (2026-08-14) — Multi-documento: serialización de los PDFs por
 // divulgación. Append-only: cada documento es 1 fila. Sincronizamos por
 // empresa_id y por divulgacion_id (los IDs son globales pero filtramos
 // por empresa para que cada PC solo sincronice sus docs).
@@ -774,7 +1051,7 @@ function _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey) {
   }
 }
 
-// 📦706 (2026-08-14) — Multi-documento: deserialización. INSERT OR IGNORE
+// ??706 (2026-08-14) — Multi-documento: deserialización. INSERT OR IGNORE
 // por id (PK). Si la divulgacion padre no existe en el destino, el doc
 // queda "huérfano" pero la siguiente divulgación-sync los traerá. Logueamos
 // warning si pasa.
@@ -822,7 +1099,7 @@ function _deserializeRolesResponsabilidadesDivulgacionDocumento(db, remoteRecord
 }
 
 function _deserializeEventosRapidos(db, remoteRecords, companyKey, result, conflictLog) {
-  // 📦694-fix3 — Implementar merge real de eventos_rapidos.
+  // ??694-fix3 — Implementar merge real de eventos_rapidos.
   // La tabla tiene id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion,
   // google_event_id, attendees, created_at, updated_at. No tiene empresa_id
   // (sincronizamos todos, filtrado futuro). Usamos last-write-wins por updated_at.
@@ -924,7 +1201,7 @@ async function writeSyncFile(hubPath, syncData) {
 /**
  * Lee <hubPath>/empresa.kairsync.
  * Devuelve null si no existe (normal en primer arranque).
- * Devuelve null si está corrupto (mover a .bak lo hace el SyncService 📦537).
+ * Devuelve null si está corrupto (mover a .bak lo hace el SyncService ??537).
  */
 async function readSyncFile(hubPath) {
   if (!hubPath) throw new Error('[' + MOD + '] hubPath requerido');

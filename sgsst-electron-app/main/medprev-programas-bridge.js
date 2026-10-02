@@ -111,6 +111,31 @@ function _nuevoId(prefixo) {
   return prefixo + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 }
 
+/** Si la tabla existe. Para bases viejas, que pueden no tener las mp_sve_*. */
+function _existeTabla(db, nombre) {
+  try {
+    return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(nombre);
+  } catch (e) { return false; }
+}
+
+/**
+ * Deja constancia de una baja de programa para que VIAJE por el .kairsync.
+ * El serializer manda estas filas en la entidad medprev_programas, y el otro
+ * equipo al recibirlas borra su copia.
+ *
+ * Guarda solo lo NO personal (nombre, tipo, fechas): los casos del SVE, que si
+ * llevan nombre, documento y telefono del trabajador, se borran de verdad.
+ */
+function _registrarBaja(db, row, companyKey, cuando, usuario, origen) {
+  if (!_existeTabla(db, 'mp_programas_bajas')) return false;
+  db.prepare(
+    'INSERT OR REPLACE INTO mp_programas_bajas (programa_id, empresa_id, tipo, nombre, fecha_inicio, fecha_fin, eliminado_en, eliminado_por, origen) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(row.id, companyKey, row.tipo || null, row.nombre || null,
+    row.fecha_inicio || null, row.fecha_fin || null, cuando, usuario || null, origen);
+  return true;
+}
+
 var RE_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 function _validarFechaOpcional(valor, campo) {
@@ -185,20 +210,26 @@ function _progresoDe(secciones) {
 // Documentación Técnica SVE (módulos funcionales de la plataforma).
 // DME y Promoción usan la estructura estándar de un programa SG-SST de su
 // tipo. La plantilla se instancia al crear el programa (no se guarda en BD).
+//
+// 📦826 — Plantilla SVE v2: se alinea con la INTERFAZ REAL del prototipo
+// (módulo sve/ montado por sección): Dashboard, Gestión de casos (seguimiento),
+// Plan PHVA, Indicadores y Áreas expuestas. Las secciones "Centro de alertas",
+// "Reportes", "Administración" y "Auditoría" del PDF vuelven cuando existan
+// sus interfaces. Migración 20260930-sve-template-v2 actualiza los programas
+// sve ya creados con la plantilla v1.
 const MEDPREV_TIPOS = ['sve', 'dme', 'promocion'];
 
 const MEDPREV_PLANTILLAS = {
   sve: {
     clave: 'sve',
     nombre: 'SVE — Sistema de Vigilancia Epidemiológica',
-    descripcion: 'Estructura de la Documentación Técnica SVE: ciclo de captura, clasificación, análisis y respuesta.',
+    descripcion: 'Interfaz del prototipo SVE: dashboard con KPIs y anillo PHVA, seguimiento de casos con ficha completa, plan PHVA editable, indicadores 2020-2024 y áreas expuestas.',
     secciones: [
-      { clave: 'dashboard',  nombre: 'Dashboard ejecutivo',    descripcion: 'Indicadores, curva epidémica y distribución del riesgo.' },
-      { clave: 'casos',      nombre: 'Gestión de casos',       descripcion: 'Registro, clasificación y cierre de casos con ficha epidemiológica.' },
-      { clave: 'alertas',    nombre: 'Centro de alertas',      descripcion: 'Detección, priorización y atención de alertas por reglas.' },
-      { clave: 'reportes',   nombre: 'Reportes y análisis',    descripcion: 'Reportes oficiales y analíticos exportables (CSV/PDF).' },
-      { clave: 'admin',      nombre: 'Administración',         descripcion: 'Eventos de vigilancia, unidades notificantes y parámetros.' },
-      { clave: 'auditoria',  nombre: 'Auditoría y trazabilidad', descripcion: 'Bitácora append-only de las operaciones del programa.' }
+      { clave: 'dashboard',    nombre: 'Dashboard ejecutivo',         descripcion: 'KPIs del año, cumplimiento del Plan PHVA, seguimientos por mes y últimos casos.' },
+      { clave: 'casos',        nombre: 'Gestión de casos',            descripcion: 'Seguimiento epidemiológico: lista con filtros, ficha del caso y formulario de 4 secciones.' },
+      { clave: 'plan',         nombre: 'Plan PHVA',                   descripcion: '19 actividades × 12 meses con programación (AP) y ejecución (AE) y cumplimiento por trimestre.' },
+      { clave: 'indicadores',  nombre: 'Indicadores epidemiológicos', descripcion: 'Prevalencia, incidencia, ausentismo y eficacia 2020-2024 con metas y análisis por periodos.' },
+      { clave: 'areas',        nombre: 'Áreas expuestas',             descripcion: 'Distribución del riesgo por área y pivote Cargo × Área.' }
     ]
   },
   dme: {
@@ -469,7 +500,25 @@ function registerMedprevProgramasHandlers(app, deps) {
     }
   });
 
-  // ── delete — soft-delete (estado='eliminado'), recuperable desde BD ──
+  // ── delete — dos modos, porque "eliminar" significaba dos cosas distintas ──
+  //
+  //   modo 'archivar' (default, lo que hacía antes este handler)
+  //     UPDATE estado='eliminado'. NO se borra nada, NO viaja por el sync.
+  //     Sirve para un programa que dejó de aplicar y cuya historia importa.
+  //
+  //   modo 'eliminar'
+  //     Borra el programa, sus secciones y TODO su contenido de SVE (casos con
+  //     nombre/documento/teléfono, plan, indicadores, morbilidad, análisis), y
+  //     deja una fila en mp_programas_bajas para que la baja VIAJE al resto de
+  //     equipos. Sirve para un programa creado por error, o cuando lo que se
+  //     quiere es que los datos personales no queden en ninguna máquina.
+  //
+  // El borrado es explícito y en transacción: si algo falla a mitad, no queda
+  // un programa sin contenido ni contenido sin programa.
+  //
+  // 🔒 Requiere token válido (auth dura) en los dos modos, y además exige
+  // `confirmacion: 'eliminar'` en el modo destructivo: es una guarda contra
+  // que un clic perdido borre la historia de un programa entero.
   ipcMain.handle('medprev:programas:delete', function (event, payload) {
     try {
       var auth = _requireAuth(payload && payload.token);
@@ -485,12 +534,58 @@ function registerMedprevProgramasHandlers(app, deps) {
       ).get(String(payload.programaId), company.company_key);
       if (!row) return _err('NOT_FOUND', 'Programa no encontrado');
 
-      localDb.prepare(
-        "UPDATE mp_programas SET estado = 'eliminado', actualizado_en = ? WHERE id = ?"
-      ).run(new Date().toISOString(), row.id);
+      var modo = (payload.modo === 'eliminar') ? 'eliminar' : 'archivar';
+      var ahora = new Date().toISOString();
+      var usuario = (auth.user && auth.user.id) || null;
 
-      console.log('[' + MOD + '][delete] Programa "' + row.nombre + '" (' + row.id + ') eliminado (soft)');
-      return _ok({ id: row.id, estado: 'eliminado' });
+      if (modo === 'archivar') {
+        localDb.prepare(
+          "UPDATE mp_programas SET estado = 'eliminado', actualizado_en = ? WHERE id = ?"
+        ).run(ahora, row.id);
+        // La baja se REGISTRA igual, para poder informar "esto se archivó en
+        // tal equipo el tal día" si alguien pregunta. No se propaga al sync
+        // (ver el filtro del serializer): archivar es local a propósito.
+        _registrarBaja(localDb, row, company.company_key, ahora, usuario, 'archivo');
+        console.log('[' + MOD + '][delete:archivar] "' + row.nombre + '" (' + row.id + ') archivado (soft, recuperable desde BD)');
+        return _ok({ id: row.id, estado: 'eliminado', modo: 'archivar' });
+      }
+
+      if (payload.confirmacion !== 'eliminar') {
+        return _err('VALIDATION',
+          'Eliminar de verdad requiere confirmacion explicita. Archiva el programa si solo queres dejar de usarlo.');
+      }
+
+      // Tablas de contenido del programa. Se listan una por una (y no con
+      // "DELETE FROM <tabla> WHERE programa_id" calculado) porque el nombre va
+      // concatenado en el SQL: tiene que ser una constante de este archivo.
+      var HIJOS = [
+        'mp_sve_plan_meses', 'mp_sve_plan_actividades', 'mp_sve_casos', 'mp_sve_meta',
+        'mp_sve_indicadores_valores', 'mp_sve_indicadores', 'mp_sve_morbilidad', 'mp_sve_analisis',
+        'mp_programa_secciones'
+      ];
+      var borrados = { secciones: 0, sve: 0 };
+      try {
+        localDb.transaction(function () {
+          HIJOS.forEach(function (t) {
+            if (!_existeTabla(localDb, t)) return;
+            if (t === 'mp_programa_secciones') {
+              borrados.secciones = localDb.prepare('DELETE FROM ' + t + ' WHERE programa_id = ?').run(row.id).changes;
+            } else {
+              // Estas solo existen si el programa es SVE; si no, no hay nada.
+              borrados.sve += localDb.prepare('DELETE FROM ' + t + ' WHERE programa_id = ?').run(row.id).changes;
+            }
+          });
+          _registrarBaja(localDb, row, company.company_key, ahora, usuario, 'eliminar');
+          localDb.prepare('DELETE FROM mp_programas WHERE id = ? AND empresa_id = ?').run(row.id, company.company_key);
+        })();
+      } catch (e) {
+        console.error('[' + MOD + '][delete:eliminar]', e.message);
+        return _err('INTERNAL', 'No se pudo eliminar el programa: ' + e.message);
+      }
+
+      console.log('[' + MOD + '][delete:eliminar] "' + row.nombre + '" (' + row.id + ') eliminado. ' +
+        'secciones=' + borrados.secciones + ' filas de SVE=' + borrados.sve + '. Baja registrada (viaja por el sync).');
+      return _ok({ id: row.id, estado: 'eliminado', modo: 'eliminar', borrados: borrados, bajaRegistrada: true });
     } catch (e) {
       console.error('[' + MOD + '][delete]', e.message);
       return _err('INTERNAL', e.message);

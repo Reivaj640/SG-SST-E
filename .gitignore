@@ -59,3 +59,14 @@ backups/
 # Cualquier cosa en .trash/ está pendiente de limpieza manual o ya no se necesita.
 # NO va al repo.
 .trash/
+
+# 📦831 · Residuos de sesión del electron-playwright-cli (pruebas visuales en Chromium).
+# Snapshots YAML, outputs de evaluate y screenshots se regeneran en cada sesión.
+/sgsst-electron-app/.playwright-cli/
+/sgsst-electron-app/.playwright/
+
+# 📦831 · Dependencias locales del CLI de Playwright (12.6 MB, se reinstalan con npm).
+/sgsst-electron-app/Temp/pw-deps/
+
+# 📦831 · Planes del agente (directorio de trabajo de la herramienta, no del repo).
+/.zcode/

@@ -6,7 +6,6 @@
     <title>K+AIR | Actividades de medicina preventiva y promocion de la salud</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
     <link rel="stylesheet" href="../../../shared/kair-components.css">
@@ -37,7 +36,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
 
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: var(--kair-font-ui, 'DM Sans', system-ui, -apple-system, sans-serif);
             background: var(--kair-canvas, #fbfcfb);
             color: var(--kair-ink, #14213d);
             font-size: 1rem;
@@ -64,20 +63,20 @@
             background: #e3ecfb; color: var(--kair-blue, #2057b8);
             display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
         }
-        .mp-home__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .mp-home__crumb { font-size: 0.6875rem; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
         .mp-home__crumb span { padding: 0 4px; }
         .mp-home__title {
             margin: 0;
-            font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Lexend');
-            letter-spacing: -0.04em; color: var(--kair-ink, #14213d);
+            font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Manrope', 'DM Sans', sans-serif);
+            letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
         }
         .mp-home__sub {
-            color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px);
+            color: var(--kair-muted, #748096); font-size: clamp(0.75rem, 1vw, 0.875rem);
             margin: 5px 0 0 0; max-width: 640px; line-height: 1.55;
         }
         .mp-home__header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
         .mp-home__pill {
-            font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+            font-size: 0.6875rem; font-weight: 700; padding: 8px 14px; border-radius: 10px;
             background: #e3ecfb; color: var(--kair-blue, #2057b8); white-space: nowrap;
         }
         .mp-home__back {
@@ -125,8 +124,8 @@
             display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
         }
         .mp-card__body { min-width: 0; }
-        .mp-card__title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; color: var(--kair-ink, #14213d); }
-        .mp-card__desc { font-size: 0.8rem; color: var(--kair-muted, #748096); line-height: 1.4; }
+        .mp-card__title { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.25rem; color: var(--kair-ink, #14213d); }
+        .mp-card__desc { font-size: 0.8125rem; color: var(--kair-muted, #748096); line-height: 1.4; }
 
         /* Flecha de "entrar": las tarjetas grandes se estiran a todo el ancho y
            sin ella quedarian con un vacio al lado. Se posiciona con el relleno
@@ -145,7 +144,7 @@
         /* ---------- Etiqueta de estado del esqueleto ---------- */
         .mp-tag {
             display: inline-block; margin-top: 0.4rem;
-            font-size: 0.66rem; font-weight: 700; letter-spacing: 0.4px;
+            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em;
             text-transform: uppercase; padding: 3px 8px; border-radius: 6px;
             background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
         }
@@ -220,7 +219,7 @@
 
     </div>
 
-    <script src="../../../assets/js/kair-toast.js"></script>
+    <script src="../../../assets/js/kair-toast.js?v=TOAST-20260930-realm-fix"></script>
     <script src="medicina-preventiva-home.js"></script>
 </body>
 </html>

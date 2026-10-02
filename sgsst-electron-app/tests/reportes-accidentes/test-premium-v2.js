@@ -131,8 +131,8 @@ check('Layout: el contenedor NO scrollea (height 100% + overflow hidden, no auto
   !/this\.container\.style\.height = 'auto';/.test(logic));
 
 // ══════════════ F. COMPONENTE (IFRAME) ══════════════
-check('Componente: el iframe lleva ?v=FURAT-20260918-premium-fix2',
-  logic.includes('&v=FURAT-20260918-premium-fix2'));
+check('Componente: el iframe lleva ?v=FURAT-20260930-toast-realm-fix',
+  logic.includes('&v=FURAT-20260930-toast-realm-fix'));
 check('Componente: un render repetido no duplica el listener (remove antes de add)',
   /if \(this\._messageHandler\) \{\s*\n\s*window\.removeEventListener\('message', this\._messageHandler\);\s*\n\s*\}/.test(logic));
 check('Componente: destroy() remueve el listener',
@@ -157,8 +157,8 @@ check('Cache-bust: el <link> del CSS lleva ?v=FURAT-20260918-premium-fix2',
   html.includes('reportes-accidentes-view.css?v=FURAT-20260918-premium-fix2'));
 check('Cache-bust: el <script> del viewer lleva ?v=FURAT-20260918-premium-fix2',
   html.includes('reportes-accidentes-viewer.js?v=FURAT-20260918-premium-fix2'));
-check('Cache-bust: index.html carga logic.js con ?v=FURAT-20260918-premium-fix2',
-  indexHtml.includes('reportes-accidentes-logic.js?v=FURAT-20260918-premium-fix2'));
+check('Cache-bust: index.html carga logic.js con ?v=FURAT-20260930-toast-realm-fix',
+  indexHtml.includes('reportes-accidentes-logic.js?v=FURAT-20260930-toast-realm-fix'));
 check('Fuentes: Manrope + DM Sans en el link de Google Fonts',
   html.includes('family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800'));
 check('CDN: se quitó Bootstrap Icons (no se usaba)',

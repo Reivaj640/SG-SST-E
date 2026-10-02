@@ -24,7 +24,7 @@
 // =====================================================================
 
 // Cache-bust de las vistas del submodulo (subir cuando se toque HTML/JS).
-var MEDPREV_V = 'MEDPREV-20260929-3-1-2-programas-3';
+var MEDPREV_V = 'MEDPREV-20260930-3-1-2-indicadores-edit-17';
 
 class MedicinaPreventivaComponent {
     /**

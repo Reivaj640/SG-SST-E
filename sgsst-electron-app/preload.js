@@ -390,6 +390,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   medprevProgramasDelete: (payload) => ipcRenderer.invoke('medprev:programas:delete', payload),
   medprevProgramasSetSeccionEstado: (payload) => ipcRenderer.invoke('medprev:programas:seccion-estado', payload),
 
+  // 📦827 (2026-09-30) — DATOS del programa SVE del 3.1.2 (main/medprev-sve-datos-bridge.js).
+  // 13 canales. Hasta acá estos datos vivían en localStorage del renderer, que
+  // NO entra en el archivo .kairsync: no viajaban entre máquinas. Ahora van a
+  // SQLite y de ahí al sync. Mutaciones exigen token de sesión válido.
+  // Lectura
+  medprevSveDatosGet: (payload) => ipcRenderer.invoke('medprev:sve:datos:get', payload),
+  // Casos de seguimiento
+  medprevSveCasosCrear: (payload) => ipcRenderer.invoke('medprev:sve:casos:crear', payload),
+  medprevSveCasosActualizar: (payload) => ipcRenderer.invoke('medprev:sve:casos:actualizar', payload),
+  medprevSveCasosEliminar: (payload) => ipcRenderer.invoke('medprev:sve:casos:eliminar', payload),
+  // Plan PHVA
+  medprevSvePlanActividadCrear: (payload) => ipcRenderer.invoke('medprev:sve:plan:actividad:crear', payload),
+  medprevSvePlanActividadGuardar: (payload) => ipcRenderer.invoke('medprev:sve:plan:actividad:guardar', payload),
+  medprevSvePlanActividadEliminar: (payload) => ipcRenderer.invoke('medprev:sve:plan:actividad:eliminar', payload),
+  medprevSvePlanCeldaGuardar: (payload) => ipcRenderer.invoke('medprev:sve:plan:celda:guardar', payload),
+  // Bloques de reporte y encabezado
+  medprevSveMetaGuardar: (payload) => ipcRenderer.invoke('medprev:sve:meta:guardar', payload),
+  medprevSveIndicadoresGuardar: (payload) => ipcRenderer.invoke('medprev:sve:indicadores:guardar', payload),
+  medprevSveMorbilidadGuardar: (payload) => ipcRenderer.invoke('medprev:sve:morbilidad:guardar', payload),
+  medprevSveAnalisisGuardar: (payload) => ipcRenderer.invoke('medprev:sve:analisis:guardar', payload),
+  // Migración única: vuelca el localStorage del prototipo a SQLite (idempotente)
+  medprevSveMigrar: (payload) => ipcRenderer.invoke('medprev:sve:migrar', payload),
+
   // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level) · FASE 0
   // 16 canales: 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 1 diag
   // Plan: docs/plans/2026-08-15-gestion-humana-design.md

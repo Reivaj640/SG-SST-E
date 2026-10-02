@@ -3829,6 +3829,11 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 .kair-confirm-backdrop.kair-confirm-hide {
     opacity: 0;
     transition: opacity 0.2s ease;
+    /* 📦828 — el velo NUNCA puede seguir atrapando clics mientras se va:
+       si el iframe se destruye antes del timer de _close(), el nodo queda
+       huérfano (invisible, opacity 0) tapando toda la app = pantalla
+       "congelada". Con pointer-events:none deja de bloquear al instante. */
+    pointer-events: none;
 }
 
 .kair-confirm-dialog {
