@@ -881,6 +881,9 @@ select.form-control {
   align-items: center;
   width: 100%;
   gap: 0;
+  /* 📦842 — accompany the collapse: the height animates 400ms, and the
+     padding of this box has to follow at the same pace. */
+  transition: padding 0.4s ease-in-out;
   /* 📦837 — padding que vivía en #app-header: se mueve al hijo para que el
      colapso por grid no deje resto de padding (y para que el hijo pueda llegar a 0). */
   padding: calc(var(--spacer-sm) * 0.5) var(--spacer);
@@ -6079,6 +6082,16 @@ html {
   grid-template-rows: 0fr;
   border-bottom: none;
   box-shadow: none;
+}
+
+/* 📦842 — La fila ya llega a 0fr, pero .header-content arrastra 4px de
+   padding arriba y 4px abajo. El padding vive FUERA del content box, asi
+   que min-height:0 no lo puede colapsar: un border-box nunca mide menos que
+   su padding. Resultado medido: el header se quedaba en 8px en vez de 0.
+   Aqui se lo quita al colapsar. */
+#app-header.app-header-collapsed .header-content {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 #app-header.app-header-hovering {
