@@ -4391,6 +4391,7 @@ async function loadDashboardData() {
       renderTasks(data.tasks || []);
       updateModuleBadges(data.module_status || {}, data.kpis?.recursos_alerts || 0, data.kpis?.gestion_salud_alerts || 0);
       updateFilterUI(null, (data.tasks || []).length);
+      if (typeof window.KairMotion !== 'undefined') { window.KairMotion.dashboard(data); }
       console.log('[DASHBOARD] loadDashboardData COMPLETADO');
     } else {
       console.error('[DASHBOARD] Error en respuesta:', response.error);
