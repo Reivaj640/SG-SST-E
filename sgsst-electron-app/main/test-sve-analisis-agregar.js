@@ -19,8 +19,9 @@
 //      DELETE + reinserta por índice (`orden`), que es lo que permite que el
 //      arreglo nuevo viaje entero.
 //   5. Seed: el contrato de 4 campos de cada análisis sigue vigente.
-//   6. Cache-bust: MEDPREV_V subió a -17 en logic.js y coincide con
-//      index.html (sin esto, el botón nuevo no se ve hasta limpiar la caché).
+//   6. Cache-bust: MEDPREV_V subió a la variante vigente (paleta-azul) en
+//      logic.js y coincide con index.html (sin esto, el botón nuevo no se ve
+//      hasta limpiar la caché).
 //
 // Uso: node main/test-sve-analisis-agregar.js
 
@@ -147,7 +148,7 @@ ok('6) logic.js declara MEDPREV_V', !!mLogic);
 ok('6) index.html versiona el script de logic.js', !!mIndex);
 ok('6) los dos tokens coinciden', mLogic && mIndex && mLogic[1] === mIndex[1],
   mLogic && mIndex ? (mLogic[1] + ' vs ' + mIndex[1]) : 'faltan');
-ok('6) MEDPREV_V subió a -17', !!mLogic && /-17$/.test(mLogic[1]), mLogic && mLogic[1]);
+ok('6) MEDPREV_V subió a paleta-azul', !!mLogic && /paleta-azul$/.test(mLogic[1]), mLogic && mLogic[1]);
 
 /* ============ 7) Integridad de sintaxis básica ============ */
 ok('7) la vista sigue exportando V.Indicadores',

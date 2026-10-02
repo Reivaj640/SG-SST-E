@@ -643,7 +643,7 @@
       fn(currentRoot, r.params);
     } catch (e) {
       console.error('[SVE] Error renderizando vista "' + r.name + '":', e);
-      currentRoot.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#46585c">' +
+      currentRoot.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#475569">' +
         '<h2 style="font-size:16px">Error al cargar la vista</h2><p style="font-size:13px">' + String(e && e.message || e) + '</p></div>';
     }
     if (global.SveUI) global.SveUI.refreshIcons();

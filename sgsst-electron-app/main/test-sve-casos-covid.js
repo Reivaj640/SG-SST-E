@@ -22,7 +22,7 @@
 //      (misma tabla que el resto de la pantalla) + icono del set lucide.
 //   4. Datos de morbilidad NO se borraron: seed, store, bridge y preload
 //      siguen con su cadena completa (solo dejó de pintarse).
-//   5. Cache-bust: MEDPREV_V subió a -16 (luego a -17 con 📦833) y coincide con index.html
+//   5. Cache-bust: MEDPREV_V subió (-16, luego -17, hoy paleta-azul) y coincide con index.html
 //      (sin esto, la tarjeta nueva no se ve hasta limpiar la caché).
 //
 // Uso: node main/test-sve-casos-covid.js
@@ -122,7 +122,7 @@ ok('4) el preload sigue exponiendo el canal',
 /* ============ 5) Cache-bust (dos niveles: index → logic → vistas) ============ */
 const vLogic = (logicSrc.match(/MEDPREV_V = '([^']+)'/) || [])[1] || '';
 const vIndex = (indexSrc.match(/medicina-preventiva-logic\.js\?v=([^"']+)/) || [])[1] || '';
-ok('5) MEDPREV_V subió a la variante -17', /-17$/.test(vLogic), vLogic);
+ok('5) MEDPREV_V subió a la variante paleta-azul', /paleta-azul$/.test(vLogic), vLogic);
 ok('5) index.html pide exactamente el mismo ?v= que define logic',
   vLogic && vLogic === vIndex, 'logic=' + vLogic + ' index=' + vIndex);
 

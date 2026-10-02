@@ -280,7 +280,7 @@ ok('8) los cajones vacíos muestran placeholder y los labels llevan el texto com
   /textContent: txtM, title: txtM/.test(indSrc));
 ok('8) la barra de scroll horizontal es fina y con tokens del módulo',
   /\.sve-serie::-webkit-scrollbar \{ height: 9px/.test(cssSrc) &&
-  /\.sve-serie::-webkit-scrollbar-thumb \{[^}]*rgba\(15, 118, 110/.test(cssSrc));
+  /\.sve-serie::-webkit-scrollbar-thumb \{[^}]*rgba\(23, 78, 166/.test(cssSrc));
 ok('8) los inputs de la serie traen nombre accesible (aria-label)',
   /"aria-label": "Año " \+ \(i \+ 1\)/.test(indSrc) &&
   /"aria-label": txtM \+ \(y \? " · año " \+ y/.test(indSrc));

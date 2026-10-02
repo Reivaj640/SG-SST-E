@@ -3566,7 +3566,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     flex-direction: column;
     transform: translateX(120%);
     opacity: 0;
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid rgba(0,0,0,0.03);
 }
 
@@ -3908,11 +3908,12 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease,
+        border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     font-family: inherit;
     min-width: 100px;
 }
-.kair-btn:focus {
+.kair-btn:focus-visible {
     outline: 2px solid #174ea6;
     outline-offset: 2px;
 }
@@ -3982,6 +3983,18 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     color: white;
 }
 .kair-btn-success:hover { background: #218838; }
+
+/* Feedback de pulsación (mismo lenguaje que los botones del SVE) */
+.kair-btn:active { transform: translateY(1px); }
+
+/* ♿ prefers-reduced-motion — botones globales, toast y confirm */
+@media (prefers-reduced-motion: reduce) {
+    .kair-btn { transition: none; }
+    .kair-btn-primary:hover { transform: none; }
+    .kair-btn:active { transform: none; }
+    .toast-card { transition: none; }
+    .kair-confirm-backdrop, .kair-confirm-dialog { transition: none; }
+}
 
 /* Tema oscuro */
 [data-theme="dark"] .kair-confirm-dialog,

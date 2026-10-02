@@ -17,7 +17,7 @@
   /* ---------- Plan de trabajo (hoja "SVE covid", filas 25-47) ---------- */
   /* meses: arreglo de 12 pares [AP, AE] con 0/1; null = no aplica */
   var PHASES = [
-    { id: "planear", n: 1, name: "PLANEAR", color: "#0d9488" },
+    { id: "planear", n: 1, name: "PLANEAR", color: "#174ea6" },
     { id: "hacer", n: 2, name: "HACER", color: "#2f6fd6" },
     { id: "verificar", n: 3, name: "VERIFICAR", color: "#b45309" },
     { id: "actuar", n: 4, name: "ACTUAR", color: "#7c3aed" }

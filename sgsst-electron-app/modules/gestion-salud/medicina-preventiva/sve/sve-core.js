@@ -203,7 +203,7 @@
     svg.setAttribute("viewBox", "0 0 120 120");
     svg.innerHTML =
       '<defs><linearGradient id="sveRingGrad" x1="0" y1="0" x2="1" y2="1">' +
-      '<stop offset="0%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></linearGradient></defs>' +
+      '<stop offset="0%" stop-color="#8ab8ff"/><stop offset="100%" stop-color="#4da6ff"/></linearGradient></defs>' +
       '<circle class="sve-ring__track" cx="60" cy="60" r="' + r + '" stroke-width="9"/>' +
       '<circle class="sve-ring__fill" cx="60" cy="60" r="' + r + '" stroke-width="9" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + (c * (1 - p)).toFixed(1) + '"/>';
     wrap.appendChild(svg);

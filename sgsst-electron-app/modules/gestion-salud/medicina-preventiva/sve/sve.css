@@ -1,8 +1,8 @@
 /* ============================================================================
    K+AIR · SVE — Sistema de Vigilancia Epidemiológica COVID-19 — PREMIUM
-   Sistema de diseño "K+AIR Premium" (identidad sanitaria teal):
+   Sistema de diseño "K+AIR Premium" (identidad K+AIR, azul #174ea6):
    · Tokens compartidos con el módulo de Inspecciones (Inter + Plus Jakarta Sans)
-   · Identidad propia: teal clínico + semáforo epidemiológico (confirmado/sospechoso/alta)
+   · Identidad propia: azul de la app + semáforo epidemiológico (verde éxito / ámbar / rojo)
    · Header sticky con blur, tabs segmentadas, KPI strip, tablas sticky
    · Grilla PHVA AP/AE animada, modales con blur, toasts, responsive
    ========================================================================== */
@@ -44,41 +44,41 @@
   --sve-t-xs:     0.75rem;   /* 12px  etiquetas */
   --sve-t-micro:  0.6875rem; /* 11px  piso: ninguna etiqueta baja de aquí */
 
-  --sve-bg: #eef3f2;
+  --sve-bg: #eef2f7;
   --sve-surface: #ffffff;
-  --sve-surface-2: #f5f9f8;
-  --sve-border: #e2eae8;
-  --sve-border-strong: #cfdcd9;
+  --sve-surface-2: #f6f9fc;
+  --sve-border: #e3eaf2;
+  --sve-border-strong: #cfd8e3;
 
-  --sve-text: #0d1b1e;
-  --sve-text-2: #46585c;
-  --sve-muted: #7e9297;
+  --sve-text: #0f172a;
+  --sve-text-2: #475569;
+  --sve-muted: #748096;
 
-  --sve-primary: #0f766e;
-  --sve-primary-strong: #0b5a54;
-  --sve-primary-soft: #e4f4f2;
-  --sve-grad-brand: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-  --sve-grad-hero: linear-gradient(120deg, #032724 0%, #0b5a54 55%, #0f766e 100%);
-  --sve-grad-hero-2: linear-gradient(150deg, rgba(20,184,166,0.22) 0%, rgba(20,184,166,0) 55%);
+  --sve-primary: #174ea6;
+  --sve-primary-strong: #10356e;
+  --sve-primary-soft: #e7edfa;
+  --sve-grad-brand: linear-gradient(135deg, #174ea6 0%, #4da6ff 100%);
+  --sve-grad-hero: linear-gradient(120deg, #071b3e 0%, #10356e 55%, #174ea6 100%);
+  --sve-grad-hero-2: linear-gradient(150deg, rgba(77,166,255,0.22) 0%, rgba(77,166,255,0) 55%);
 
-  --sve-success: #15803d;
-  --sve-success-soft: #e5f6eb;
+  --sve-success: #28a745;
+  --sve-success-soft: #eaf7ee;
   --sve-warning: #b45309;
   --sve-warning-soft: #fdf3e0;
   --sve-danger: #dc2626;
   --sve-danger-soft: #fdecec;
   --sve-info: #7c3aed;
   --sve-info-soft: #f1eafd;
-  --sve-teal: #0d9488;
-  --sve-teal-soft: #e0f2f0;
+  --sve-teal: #185abd;
+  --sve-teal-soft: #e3ebfa;
 
   --sve-radius-lg: 18px;
   --sve-radius: 12px;
   --sve-radius-sm: 9px;
 
-  --sve-shadow-sm: 0 1px 2px rgba(13, 27, 30, 0.05);
-  --sve-shadow-md: 0 2px 4px rgba(13, 27, 30, 0.04), 0 10px 24px -8px rgba(13, 27, 30, 0.10);
-  --sve-shadow-lg: 0 4px 8px rgba(13, 27, 30, 0.06), 0 18px 40px -12px rgba(13, 27, 30, 0.18);
+  --sve-shadow-sm: 0 1px 2px rgba(20, 33, 61, 0.05);
+  --sve-shadow-md: 0 2px 4px rgba(20, 33, 61, 0.04), 0 10px 24px -8px rgba(20, 33, 61, 0.10);
+  --sve-shadow-lg: 0 4px 8px rgba(20, 33, 61, 0.06), 0 18px 40px -12px rgba(20, 33, 61, 0.18);
 
   --sve-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --sve-header-h: 62px;
@@ -98,11 +98,11 @@
 .kair-app-sve *, .kair-app-sve *::before, .kair-app-sve *::after { box-sizing: border-box; }
 .kair-app-sve button { font-family: inherit; }
 .kair-app-sve svg { flex-shrink: 0; }
-.kair-app-sve ::selection { background: rgba(15, 118, 110, 0.18); }
+.kair-app-sve ::selection { background: rgba(23, 78, 166, 0.18); }
 .kair-app-sve ::-webkit-scrollbar { width: 10px; height: 10px; }
 .kair-app-sve ::-webkit-scrollbar-track { background: transparent; }
-.kair-app-sve ::-webkit-scrollbar-thumb { background: #bfd0cd; border-radius: 999px; border: 2px solid var(--sve-bg); }
-.kair-app-sve ::-webkit-scrollbar-thumb:hover { background: #a2b8b4; }
+.kair-app-sve ::-webkit-scrollbar-thumb { background: #c8d2de; border-radius: 999px; border: 2px solid var(--sve-bg); }
+.kair-app-sve ::-webkit-scrollbar-thumb:hover { background: #adb9c7; }
 
 /* ---------- Header ---------- */
 .sve-header {
@@ -121,7 +121,7 @@
   width: 38px; height: 38px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   background: var(--sve-grad-brand); color: #fff;
-  box-shadow: 0 6px 14px -6px rgba(15, 118, 110, 0.55);
+  box-shadow: 0 6px 14px -6px rgba(23, 78, 166, 0.55);
 }
 .sve-header__titles { min-width: 0; display: flex; flex-direction: column; }
 .sve-header__title {
@@ -144,7 +144,7 @@
 .sve-header__crumb:hover { border-color: var(--sve-border-strong); color: var(--sve-text); cursor: pointer; }
 .sve-header__right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .sve-sync { display: inline-flex; align-items: center; gap: 6px; font-size: var(--sve-t-micro); font-weight: 600; color: var(--sve-muted); }
-.sve-sync__dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15); }
+.sve-sync__dot { width: 7px; height: 7px; border-radius: 50%; background: #28a745; box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15); }
 /* 📦827 — El punto verde dice "esto se sincroniza". Cuando el chip es el de
    "Solo en este equipo" (prototipo fuera de la app) tiene que ámbar: un punto
    verde junto a un texto que dice lo contrario es peor que no poner ninguno. */
@@ -157,9 +157,9 @@
   display: inline-flex; align-items: center; gap: 7px;
   padding: 8px 14px; border-radius: 999px;
   font-size: var(--sve-t-xs); font-weight: 700; color: var(--sve-text-2);
-  transition: all 0.18s var(--sve-ease); white-space: nowrap;
+  transition: color 0.18s var(--sve-ease), background-color 0.18s var(--sve-ease), box-shadow 0.18s var(--sve-ease); white-space: nowrap;
 }
-.sve-tab:hover { color: var(--sve-text); background: rgba(15, 118, 110, 0.06); }
+.sve-tab:hover { color: var(--sve-text); background: rgba(23, 78, 166, 0.06); }
 .sve-tab.is-active {
   background: var(--sve-surface); color: var(--sve-primary);
   box-shadow: var(--sve-shadow-sm), inset 0 0 0 1px var(--sve-border);
@@ -170,20 +170,31 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   border-radius: var(--sve-radius-sm); border: 1px solid transparent;
   padding: 9px 16px; font-size: var(--sve-t-sm); font-weight: 700; cursor: pointer;
-  transition: all 0.18s var(--sve-ease); white-space: nowrap;
+  transition: background-color 0.18s var(--sve-ease), border-color 0.18s var(--sve-ease),
+    color 0.18s var(--sve-ease), box-shadow 0.18s var(--sve-ease), filter 0.18s var(--sve-ease),
+    transform 0.18s var(--sve-ease), opacity 0.18s var(--sve-ease);
+  white-space: nowrap;
 }
 .sve-btn:active { transform: translateY(1px); }
-.sve-btn--primary { background: var(--sve-grad-brand); color: #fff; box-shadow: 0 6px 14px -6px rgba(15, 118, 110, 0.55); }
-.sve-btn--primary:hover { filter: brightness(1.06); box-shadow: 0 8px 18px -6px rgba(15, 118, 110, 0.6); }
+.sve-btn--primary { background: var(--sve-grad-brand); color: #fff; box-shadow: 0 6px 14px -6px rgba(23, 78, 166, 0.55); }
+.sve-btn--primary:hover { filter: brightness(1.06); box-shadow: 0 8px 18px -6px rgba(23, 78, 166, 0.6); }
 .sve-btn--ghost { background: var(--sve-surface); border-color: var(--sve-border-strong); color: var(--sve-text-2); }
 .sve-btn--ghost:hover { border-color: var(--sve-primary); color: var(--sve-primary); background: var(--sve-primary-soft); }
 .sve-btn--soft { background: var(--sve-primary-soft); color: var(--sve-primary-strong); }
-.sve-btn--soft:hover { background: #d6ecea; }
+.sve-btn--soft:hover { background: #dce7f9; }
 .sve-btn--danger { background: var(--sve-danger-soft); color: var(--sve-danger); }
 .sve-btn--danger:hover { background: #fbdcdc; }
 .sve-btn--sm { padding: 6px 11px; font-size: var(--sve-t-xs); border-radius: 8px; }
 .sve-btn--icon { padding: 7px; width: 32px; height: 32px; }
 .sve-btn[disabled] { opacity: 0.5; pointer-events: none; }
+
+/* Foco de teclado visible (tab, seg, yn, xbtn, celdas PHVA) — el foco de los
+   inputs ya existe; los controles sin esto eran invisibles al navegar con Tab. */
+.sve-btn:focus-visible, .sve-tab:focus-visible, .sve-seg__btn:focus-visible,
+.sve-yn__btn:focus-visible, .sve-xbtn:focus-visible {
+  outline: 2px solid var(--sve-primary); outline-offset: 2px;
+}
+.sve-cell:focus-visible { outline: 2px solid rgba(23, 78, 166, 0.85); outline-offset: -2px; }
 
 /* ---------- Page / body ---------- */
 .sve-page { min-height: 100vh; display: flex; flex-direction: column; }
@@ -215,14 +226,14 @@
 }
 .sve-hero::after {
   content: ""; position: absolute; right: -80px; top: -110px; width: 320px; height: 320px;
-  border-radius: 50%; background: radial-gradient(closest-side, rgba(20, 184, 166, 0.35), rgba(20, 184, 166, 0));
+  border-radius: 50%; background: radial-gradient(closest-side, rgba(77, 166, 255, 0.35), rgba(77, 166, 255, 0));
   pointer-events: none;
 }
 .sve-hero__grid { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 28px; flex-wrap: wrap; }
 .sve-hero__eyebrow {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: var(--sve-t-micro); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  color: #5eead4; margin-bottom: 8px;
+  color: #8ab8ff; margin-bottom: 8px;
 }
 .sve-hero__title { font-family: var(--sve-font-display); font-size: var(--sve-t-hero); font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
 .sve-hero__desc { margin-top: 6px; max-width: 560px; font-size: var(--sve-t-sm); line-height: 1.55; color: rgba(255, 255, 255, 0.72); }
@@ -236,7 +247,7 @@
 .sve-ring { position: relative; width: 128px; height: 128px; }
 .sve-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .sve-ring__track { fill: none; stroke: rgba(255, 255, 255, 0.14); }
-.sve-ring__fill { fill: none; stroke: #2dd4bf; stroke-linecap: round; transition: stroke-dashoffset 0.9s var(--sve-ease); }
+.sve-ring__fill { fill: none; stroke: #4da6ff; stroke-linecap: round; transition: stroke-dashoffset 0.9s var(--sve-ease); }
 .sve-ring__center {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
@@ -288,7 +299,7 @@
 /* ---------- Barras de progreso ---------- */
 .sve-pbar { height: 7px; background: var(--sve-surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--sve-border); }
 .sve-pbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--sve-grad-brand); transition: width 0.7s var(--sve-ease); }
-.sve-pbar__fill.is-good { background: linear-gradient(90deg, #15803d, #22c55e); }
+.sve-pbar__fill.is-good { background: linear-gradient(90deg, #218838, #28a745); }
 .sve-pbar__fill.is-warn { background: linear-gradient(90deg, #b45309, #f59e0b); }
 .sve-pbar__fill.is-bad { background: linear-gradient(90deg, #b91c1c, #ef4444); }
 
@@ -355,14 +366,14 @@
   width: 100%; height: 38px; border: 0; background: transparent; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--sve-font-display); font-size: var(--sve-t-xs); font-weight: 800;
-  transition: all 0.14s var(--sve-ease); position: relative;
+  transition: color 0.14s var(--sve-ease), background-color 0.14s var(--sve-ease), box-shadow 0.14s var(--sve-ease), outline-color 0.14s var(--sve-ease); position: relative;
 }
-.sve-cell:hover { outline: 2px solid rgba(15, 118, 110, 0.4); outline-offset: -2px; }
-.sve-cell--0 { color: #c6d2d0; font-weight: 600; }
+.sve-cell:hover { outline: 2px solid rgba(23, 78, 166, 0.4); outline-offset: -2px; }
+.sve-cell--0 { color: #c3ccda; font-weight: 600; }
 .sve-cell--0:hover { color: var(--sve-muted); }
-.sve-cell--1 { color: #fff; background: linear-gradient(135deg, #0d9488, #14b8a6); }
-.sve-cell--2 { color: #fff; background: linear-gradient(135deg, #15803d, #22c55e); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
-.sve-cell--na { color: #d5dedd; background: repeating-linear-gradient(45deg, transparent 0 5px, rgba(13, 27, 30, 0.028) 5px 10px); cursor: not-allowed; }
+.sve-cell--1 { color: #fff; background: linear-gradient(135deg, #185abd, #4da6ff); }
+.sve-cell--2 { color: #fff; background: linear-gradient(135deg, #218838, #28a745); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
+.sve-cell--na { color: #d3dae4; background: repeating-linear-gradient(45deg, transparent 0 5px, rgba(20, 33, 61, 0.028) 5px 10px); cursor: not-allowed; }
 .sve-cell.is-pending { background: var(--sve-warning-soft); color: var(--sve-warning); }
 .sve-cell.is-pending:hover { outline-color: rgba(180, 83, 9, 0.5); }
 .sve-mgrid__cumpl {
@@ -391,18 +402,18 @@
 .sve-inp-celda:hover { border-color: var(--sve-border-strong); }
 .sve-inp-celda:focus {
   outline: none; background: var(--sve-surface); border-color: var(--sve-primary);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.14);
 }
 .sve-inp-celda--resp { font-weight: 500; font-size: var(--sve-t-xs); color: var(--sve-text-2); }
 .sve-rowdel {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 6px; background: transparent; color: var(--sve-muted);
-  cursor: pointer; opacity: 0; transition: all .14s var(--sve-ease);
+  cursor: pointer; opacity: 0; transition: color .14s var(--sve-ease), background-color .14s var(--sve-ease), opacity .14s var(--sve-ease);
 }
 .sve-mgrid tbody tr:hover .sve-rowdel { opacity: 1; }
 /* Sin hover no hay forma de llegar con teclado: el foco lo deja visible. */
-.sve-rowdel:focus, .sve-rowdel:focus-visible { opacity: 1; outline: none; }
+.sve-rowdel:focus, .sve-rowdel:focus-visible { opacity: 1; outline: 2px solid var(--sve-danger); outline-offset: 1px; }
 .sve-rowdel:hover { background: var(--sve-danger-soft); color: var(--sve-danger); }
 .sve-phase-row__head { display: flex; align-items: center; gap: 9px; }
 .sve-phase-row__head .sve-btn--xs { margin-left: 12px; }
@@ -421,7 +432,7 @@
 }
 .sve-bars__bar--red { background: linear-gradient(180deg, #ef4444, #dc2626); }
 .sve-bars__bar--amber { background: linear-gradient(180deg, #f59e0b, #d97706); }
-.sve-bars__bar--teal { background: linear-gradient(180deg, #2dd4bf, #0d9488); }
+.sve-bars__bar--teal { background: linear-gradient(180deg, #4da6ff, #185abd); }
 .sve-bars__lbl { font-size: var(--sve-t-micro); font-weight: 700; color: var(--sve-muted); text-transform: capitalize; }
 
 /* hbar horizontal */
@@ -442,10 +453,10 @@
   width: 250px; padding: 9px 12px 9px 34px;
   border: 1px solid var(--sve-border-strong); border-radius: var(--sve-radius-sm);
   background: var(--sve-surface); font-family: inherit; font-size: var(--sve-t-sm); color: var(--sve-text);
-  transition: all 0.16s var(--sve-ease);
+  transition: border-color 0.16s var(--sve-ease), box-shadow 0.16s var(--sve-ease);
 }
 .sve-search input::placeholder { color: var(--sve-muted); }
-.sve-search input:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14); }
+.sve-search input:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.14); }
 .sve-select {
   padding: 8.5px 32px 8.5px 12px; border: 1px solid var(--sve-border-strong); border-radius: var(--sve-radius-sm);
   background-color: var(--sve-surface); font-family: inherit; font-size: var(--sve-t-sm); font-weight: 600; color: var(--sve-text);
@@ -455,7 +466,7 @@
   transition: border-color 0.16s var(--sve-ease), box-shadow 0.16s var(--sve-ease);
 }
 .sve-select:hover { border-color: var(--sve-primary); }
-.sve-select:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14); }
+.sve-select:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.14); }
 
 /* segmented control */
 .sve-seg { display: inline-flex; padding: 3px; background: var(--sve-surface-2); border: 1px solid var(--sve-border); border-radius: 9px; gap: 2px; }
@@ -463,7 +474,7 @@
   border: 0; background: transparent; cursor: pointer;
   padding: 5.5px 12px; border-radius: 7px;
   font-size: var(--sve-t-xs); font-weight: 700; color: var(--sve-text-2);
-  transition: all 0.15s var(--sve-ease);
+  transition: color 0.15s var(--sve-ease), background-color 0.15s var(--sve-ease), box-shadow 0.15s var(--sve-ease);
 }
 .sve-seg__btn:hover { color: var(--sve-text); }
 .sve-seg__btn.is-active { background: var(--sve-surface); color: var(--sve-primary); box-shadow: var(--sve-shadow-sm); }
@@ -495,7 +506,7 @@
   background: var(--sve-surface); font-family: inherit; font-size: var(--sve-t-sm); color: var(--sve-text);
   transition: border-color 0.16s var(--sve-ease), box-shadow 0.16s var(--sve-ease);
 }
-.sve-input:focus, .sve-textarea:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14); }
+.sve-input:focus, .sve-textarea:focus { outline: none; border-color: var(--sve-primary); box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.14); }
 .sve-input[readonly] { background: var(--sve-surface-2); color: var(--sve-muted); }
 .sve-textarea { resize: vertical; min-height: 74px; }
 .sve-field__err { font-size: var(--sve-t-micro); color: var(--sve-danger); font-weight: 600; display: none; }
@@ -508,10 +519,10 @@
   border: 0; background: transparent; cursor: pointer; min-width: 58px;
   padding: 6px 12px; border-radius: 7px;
   font-size: var(--sve-t-xs); font-weight: 800; color: var(--sve-muted);
-  transition: all 0.15s var(--sve-ease);
+  transition: color 0.15s var(--sve-ease), background-color 0.15s var(--sve-ease), box-shadow 0.15s var(--sve-ease);
 }
 .sve-yn__btn.is-yes { background: var(--sve-success-soft); color: var(--sve-success); box-shadow: var(--sve-shadow-sm); }
-.sve-yn__btn.is-no { background: #eef1f3; color: var(--sve-text-2); box-shadow: var(--sve-shadow-sm); }
+.sve-yn__btn.is-no { background: #eef1f6; color: var(--sve-text-2); box-shadow: var(--sve-shadow-sm); }
 
 /* barra de guardado */
 .sve-savebar {
@@ -552,11 +563,11 @@
 .sve-tl__dot {
   position: absolute; left: -24px; top: 3px; width: 16px; height: 16px; border-radius: 50%;
   background: var(--sve-surface); border: 3px solid var(--sve-teal);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
 }
 .sve-tl__dot--red { border-color: var(--sve-danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }
 .sve-tl__dot--amber { border-color: var(--sve-warning); box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.12); }
-.sve-tl__dot--green { border-color: var(--sve-success); box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12); }
+.sve-tl__dot--green { border-color: var(--sve-success); box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.12); }
 .sve-tl__date { font-size: var(--sve-t-micro); font-weight: 800; color: var(--sve-muted); letter-spacing: 0.06em; text-transform: uppercase; }
 .sve-tl__txt { font-size: var(--sve-t-sm); font-weight: 600; color: var(--sve-text); margin-top: 2px; }
 .sve-tl__sub { font-size: var(--sve-t-xs); color: var(--sve-text-2); margin-top: 2px; }
@@ -584,7 +595,7 @@
   width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--sve-border);
   background: var(--sve-surface); cursor: pointer; color: var(--sve-muted);
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s var(--sve-ease); flex-shrink: 0;
+  transition: color 0.15s var(--sve-ease), border-color 0.15s var(--sve-ease), background-color 0.15s var(--sve-ease); flex-shrink: 0;
 }
 .sve-xbtn:hover { color: var(--sve-danger); border-color: var(--sve-danger-soft); background: var(--sve-danger-soft); }
 
@@ -652,7 +663,7 @@
 .sve-phva__item {
   padding: 14px 16px; border-radius: var(--sve-radius);
   border: 1px solid var(--sve-border); background: var(--sve-surface);
-  transition: all 0.18s var(--sve-ease); cursor: pointer;
+  transition: border-color 0.18s var(--sve-ease), box-shadow 0.18s var(--sve-ease), transform 0.18s var(--sve-ease); cursor: pointer;
 }
 .sve-phva__item:hover { border-color: var(--sve-primary); box-shadow: var(--sve-shadow-md); transform: translateY(-2px); }
 .sve-phva__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -670,7 +681,7 @@
 .sve-areacard {
   padding: 15px 16px; border-radius: var(--sve-radius);
   background: var(--sve-surface); border: 1px solid var(--sve-border);
-  box-shadow: var(--sve-shadow-sm); transition: all 0.18s var(--sve-ease);
+  box-shadow: var(--sve-shadow-sm); transition: box-shadow 0.18s var(--sve-ease), transform 0.18s var(--sve-ease);
 }
 .sve-areacard:hover { transform: translateY(-2px); box-shadow: var(--sve-shadow-md); }
 .sve-areacard__name { font-size: var(--sve-t-xs); font-weight: 800; color: var(--sve-text-2); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -752,8 +763,8 @@
    mide ~15px y se comía la última columna de la captura). */
 .sve-serie::-webkit-scrollbar { height: 9px; }
 .sve-serie::-webkit-scrollbar-track { background: var(--sve-surface-2); border-radius: 999px; }
-.sve-serie::-webkit-scrollbar-thumb { background: rgba(15, 118, 110, 0.35); border-radius: 999px; border: 2px solid var(--sve-surface-2); }
-.sve-serie::-webkit-scrollbar-thumb:hover { background: rgba(15, 118, 110, 0.55); }
+.sve-serie::-webkit-scrollbar-thumb { background: rgba(23, 78, 166, 0.35); border-radius: 999px; border: 2px solid var(--sve-surface-2); }
+.sve-serie::-webkit-scrollbar-thumb:hover { background: rgba(23, 78, 166, 0.55); }
 
 /* Fila de años = cabecera de la tabla: tinte, línea de cierre y label en el
    color del módulo. El fondo del label coincide con el de la fila para que,
@@ -778,3 +789,16 @@
 .sve-serie__cell--anio .sve-serie__inp { padding-right: 28px; }
 .sve-serie__inp::placeholder { color: var(--sve-muted); opacity: 0.75; }
 .sve-serie__row--head .sve-serie__inp::placeholder { color: var(--sve-primary); opacity: 0.55; }
+
+/* ---------- ♿ prefers-reduced-motion (accesibilidad) ----------
+   Neutraliza las entradas (sve-up/sve-fade/sve-toast-in), los hover con
+   desplazamiento y las transiciones de controles. El spinner de carga
+   (sve-spin) se conserva: comunica estado, no es decoración. */
+@media (prefers-reduced-motion: reduce) {
+  .sve-kpi, .sve-card, .sve-modal-overlay, .sve-modal, .sve-toast { animation: none; }
+  .sve-tab, .sve-btn, .sve-seg__btn, .sve-yn__btn, .sve-xbtn, .sve-cell,
+  .sve-rowdel, .sve-search input, .sve-phva__item, .sve-areacard, .sve-kpi {
+    transition: none;
+  }
+  .sve-kpi:hover, .sve-phva__item:hover, .sve-areacard:hover, .sve-btn:active { transform: none; }
+}

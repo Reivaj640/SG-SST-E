@@ -1189,8 +1189,8 @@
 
     var toolbar = el("div", { className: "sve-toolbar" }, [
       el("div", { className: "sve-toolbar__left" }, el("div", { className: "sve-legend" }, [
-        el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "linear-gradient(135deg,#0d9488,#14b8a6)" } }), "Programado (AP)"]),
-        el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "linear-gradient(135deg,#15803d,#22c55e)" } }), "Ejecutado (AE)"]),
+        el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "linear-gradient(135deg,#185abd,#4da6ff)" } }), "Programado (AP)"]),
+        el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "linear-gradient(135deg,#218838,#28a745)" } }), "Ejecutado (AE)"]),
         el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "var(--sve-warning-soft)" } }), "Pendiente"]),
         el("span", {}, [el("span", { className: "sve-legend__swatch", style: { background: "var(--sve-surface-2)", border: "1px solid var(--sve-border)" } }), "No programado"])
       ])),
@@ -1883,7 +1883,7 @@
     var cardGen = el("div", { className: "sve-card" }, [
       el("div", { className: "sve-card__head" }, el("div", { className: "sve-card__title" }, [icon("users", 15), "Distribución por género"])),
       el("div", { className: "sve-card__body" }, genero.map(function (g) {
-        return U.hbar(g.name, g.n, maxG, g.name === "Femenino" ? "linear-gradient(90deg,#c026d3,#e879f9)" : "linear-gradient(90deg,#0d9488,#2dd4bf)");
+        return U.hbar(g.name, g.n, maxG, g.name === "Femenino" ? "linear-gradient(90deg,#c026d3,#e879f9)" : "linear-gradient(90deg,#174ea6,#4da6ff)");
       }))
     ]);
 

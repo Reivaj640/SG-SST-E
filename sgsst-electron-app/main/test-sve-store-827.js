@@ -33,7 +33,7 @@ const tick = () => new Promise(r => setImmediate(r));
 function seed() {
   return {
     meta: { empresa: 'Acme', anio: 2026, objetivo: 'OBJ' },
-    fases: [{ id: 'planear', n: 1, name: 'PLANEAR', color: '#0d9488' }],
+    fases: [{ id: 'planear', n: 1, name: 'PLANEAR', color: '#174ea6' }],
     plan: [
       { id: 'act-1', fase: 'planear', actividad: 'A1', responsable: 'R1', meses: [[1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]] },
       { id: 'act-2', fase: 'hacer', actividad: 'A2', responsable: 'R2', meses: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]] }
