@@ -285,7 +285,7 @@
 .kair-rr-modal__head h3 { font-size: 16px; font-weight: 600; }
 .kair-rr-modal__close {
     background: none; border: none; font-size: 24px;
-    color: #94a3b8; cursor: pointer; padding: 0; width: 28px; height: 28px;
+    color: #64748b; cursor: pointer; padding: 0; width: 28px; height: 28px;
 }
 .kair-rr-modal__body { padding: 20px; }
 .kair-rr-modal__body label {
@@ -361,7 +361,7 @@
 }
 .kair-rr-dropzone i {
     font-size: 28px;
-    color: #94a3b8;
+    color: #64748b;
     display: block;
     margin-bottom: 4px;
 }
@@ -372,7 +372,7 @@
 }
 .kair-rr-dropzone__subtext {
     font-size: 11px;
-    color: #94a3b8;
+    color: #64748b;
     margin-top: 2px;
 }
 .kair-rr-dropzone:hover,
@@ -441,10 +441,10 @@
     border-style: dashed;
 }
 .kair-rr-chip[data-empty="true"] i {
-    color: #94a3b8;
+    color: #64748b;
 }
 .kair-rr-chip[data-empty="true"] .kair-rr-chip__name {
-    color: #94a3b8;
+    color: #64748b;
     font-weight: 500;
     font-style: italic;
 }
@@ -496,7 +496,7 @@
     padding: 12px 14px;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-left: 4px solid #94a3b8;  /* default: gris (anterior) */
+    border-left: 4px solid #64748b;  /* default: gris (anterior) */
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
@@ -525,7 +525,7 @@
     border-color: #f59e0b;
 }
 .kair-rr-doc-card--anterior {
-    border-left-color: #94a3b8;  /* gris */
+    border-left-color: #64748b;  /* gris */
     background: #f8fafc;
     opacity: 0.85;
 }
@@ -569,7 +569,7 @@
 }
 .kair-rr-doc-card__meta i {
     margin-right: 3px;
-    color: #94a3b8;
+    color: #64748b;
 }
 .kair-rr-doc-card__obs {
     font-size: 11px;
@@ -599,7 +599,7 @@
     flex-shrink: 0;
 }
 .kair-rr-doc-state--vigente { background: #10b981; color: #ffffff; }
-.kair-rr-doc-state--anterior { background: #94a3b8; color: #ffffff; }
+.kair-rr-doc-state--anterior { background: #64748b; color: #ffffff; }
 .kair-rr-doc-state--correccion { background: #f59e0b; color: #ffffff; }
 
 /* 📦706 (2026-08-14) — Modal Subir: campos extra de divulgacion */

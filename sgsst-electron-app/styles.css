@@ -866,7 +866,6 @@ select.form-control {
   box-sizing: border-box;
   background-color: var(--white-color);
   border-bottom: 1px solid var(--border-color);
-  padding: calc(var(--spacer-sm) * 0.5) var(--spacer);
   box-shadow: var(--box-shadow);
   /* 📦547 — Subido a 100000 y agregado isolation:isolate para escapar el
      stacking context que crea Vanta.js (Three.js canvas con transform/filter).
@@ -882,6 +881,10 @@ select.form-control {
   align-items: center;
   width: 100%;
   gap: 0;
+  /* 📦837 — padding que vivía en #app-header: se mueve al hijo para que el
+     colapso por grid no deje resto de padding (y para que el hijo pueda llegar a 0). */
+  padding: calc(var(--spacer-sm) * 0.5) var(--spacer);
+  min-height: 0; /* 📦837 — permite que la fila 0fr del grid colapse del todo */
   position: relative; /* 📦529 — FIX: ancla para .header-update-panel (position:absolute) */
 }
 
@@ -1177,7 +1180,6 @@ select.form-control {
   padding: var(--spacer);
   background-color: var(--bg-color);
   overflow-y: auto;
-  transition: margin-left var(--transition-normal); /* Sincroniza con la animación del sidebar */
 }
 
 #content-area {
@@ -1908,7 +1910,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 .control-remisiones-empty {
   text-align: center;
   padding: 3rem 1.5rem;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 .control-remisiones-empty i {
@@ -1951,14 +1953,14 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 .control-remisiones-error p {
   margin: 0.5rem 0 1rem;
   font-size: 0.875rem;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 /* Mensaje de carga */
 .loading-msg {
   text-align: center;
   padding: 2rem;
-  color: #6c757d;
+  color: #5f6771;
   font-style: italic;
 }
 
@@ -2026,7 +2028,8 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 /* 2026-06-27: cuando el sidebar colapsa, el #main-content se expande a la izquierda
    para ocupar todo el ancho del lienzo (incluyendo los 30px del margin-left).
    Usa :has() para reaccionar al estado del sidebar sin tocar JS.
-   El transition del #main-content (definido arriba) hace que el movimiento sea suave. */
+   📦837 — se quitó el transition de margin-left (propiedad de layout): el ajuste
+   de 30px ahora es instantáneo y no compite con el pintado (impeccable). */
 .main-container:has(#sidebar.sidebar-collapsed) #main-content {
   margin-left: 0;
 }
@@ -4124,11 +4127,6 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   50% { transform: scale(1.02); }
 }
 
-@keyframes kair-auth-title-glow {
-  0%, 100% { text-shadow: 0 0 0 transparent; }
-  50% { text-shadow: 0 0 20px rgba(23, 78, 166, 0.3); }
-}
-
 @keyframes kair-auth-spinner {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -4236,8 +4234,8 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     margin-bottom: 0.25rem;
     text-align: center;
     opacity: 0;
-    animation: kair-auth-fade-in 0.5s ease forwards, kair-auth-title-glow 3s ease-in-out infinite;
-    animation-delay: 0.15s, 0.15s;
+    animation: kair-auth-fade-in 0.5s ease forwards;
+    animation-delay: 0.15s;
 }
 
 .kair-auth-subtitle {
@@ -4872,12 +4870,6 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   100% { transform: rotate(360deg); }
 }
 
-@keyframes kair-transition-dots {
-  0%, 20% { opacity: 0; transform: translateY(0); }
-  40% { opacity: 1; transform: translateY(-5px); }
-  60%, 100% { opacity: 0; transform: translateY(0); }
-}
-
 @keyframes kair-transition-progress {
   0% { width: 0%; }
   100% { width: 100%; }
@@ -5007,7 +4999,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-transition-logo-tagline {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: #5f6771;
   letter-spacing: 1px;
   margin-top: 4px;
 }
@@ -5065,33 +5057,10 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-transition-submessage {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: #5f6771;
   text-align: center;
   margin-bottom: 1.2rem;
 }
-
-.kair-transition-dots {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: 2px;
-}
-
-.kair-transition-dots span {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  background: #174ea6;
-  border-radius: 50%;
-  animation: kair-transition-dots 1.4s ease-in-out infinite;
-}
-
-[data-theme="dark"] .kair-transition-dots span {
-  background: #4da6ff;
-}
-
-.kair-transition-dots span:nth-child(1) { animation-delay: 0s; }
-.kair-transition-dots span:nth-child(2) { animation-delay: 0.2s; }
-.kair-transition-dots span:nth-child(3) { animation-delay: 0.4s; }
 
 /* Progreso */
 .kair-transition-progress-container {
@@ -5196,7 +5165,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-transition-welcome-user {
   font-size: 1rem;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5216,11 +5185,6 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 @keyframes particle-orbit {
   0% { transform: translateX(0) scale(1); opacity: 0.8; }
   100% { transform: translateX(60px) scale(0.3); opacity: 0; }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
 }
 
 @keyframes logo-float {
@@ -5320,7 +5284,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .loading-logo-tagline {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: #5f6771;
   letter-spacing: 0.5px;
   margin-top: 3px;
 }
@@ -5372,7 +5336,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .loading-submessage {
   font-size: 0.85rem;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 .loading-progress-section {
@@ -5401,17 +5365,6 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
      y evita el efecto de "barra reiniciándose" que el usuario veía. */
   position: relative;
   overflow: hidden;
-}
-
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 .loading-particles {
@@ -5464,7 +5417,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .loading-progress-percent {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: #5f6771;
   text-align: center;
   margin-top: 0.4rem;
   font-weight: 500;
@@ -5746,7 +5699,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .loading-welcome-user {
   font-size: 1rem;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5769,7 +5722,6 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   .kair-transition-overlay,
   .kair-transition-logo,
   .kair-transition-spinner,
-  .kair-transition-dots,
   .kair-transition-ripple {
     animation: none !important;
     opacity: 1 !important;
@@ -6061,23 +6013,6 @@ html {
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
 
-/* Partículas flotantes */
-.kair-splash-particle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  animation: kair-particle-float 6s ease-in-out infinite;
-}
-
-.kair-splash-particle:nth-of-type(1) { top: 20%; left: 30%; animation-delay: 0s; }
-.kair-splash-particle:nth-of-type(2) { top: 40%; left: 70%; animation-delay: -1s; }
-.kair-splash-particle:nth-of-type(3) { top: 70%; left: 40%; animation-delay: -2s; }
-.kair-splash-particle:nth-of-type(4) { top: 30%; left: 80%; animation-delay: -3s; }
-.kair-splash-particle:nth-of-type(5) { top: 80%; left: 60%; animation-delay: -4s; }
-.kair-splash-particle:nth-of-type(6) { top: 50%; left: 20%; animation-delay: -5s; }
-
 /* Keyframes */
 @keyframes kair-float {
   0%, 100% { transform: translateY(0px); }
@@ -6098,11 +6033,6 @@ html {
 @keyframes kair-polygon-rotate {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-@keyframes kair-particle-float {
-  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
-  50% { transform: translate(10px, -20px); opacity: 0.8; }
 }
 
 /* Transición del formulario de login */
@@ -6138,34 +6068,30 @@ html {
 }
 
 #app-header {
+  display: grid;
+  grid-template-rows: 1fr;
   max-height: 70px;
   overflow: hidden;
-  transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out, border-bottom 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
+  transition: grid-template-rows 0.4s ease-in-out, border-bottom 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
 }
 
 #app-header.app-header-collapsed {
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+  grid-template-rows: 0fr;
   border-bottom: none;
   box-shadow: none;
 }
 
 #app-header.app-header-hovering {
-max-height: 70px !important;
-padding-top: calc(var(--spacer-sm) * 0.5) !important;
-padding-bottom: calc(var(--spacer-sm) * 0.5) !important;
+grid-template-rows: 1fr !important;
 border-bottom: 1px solid var(--border-color) !important;
 box-shadow: var(--box-shadow) !important;
 }
 
 /* 📦 Alertas calendario — Header pinned (forzado a visible cuando hay pendientes).
-   Sobreescribe app-header-collapsed. Mismo padding/border que el modo hovering
+   Sobreescribe app-header-collapsed. Mismo border que el modo hovering
    para coherencia visual cuando hay alertas. */
 #app-header.app-header-pinned {
-  max-height: 70px !important;
-  padding-top: calc(var(--spacer-sm) * 0.5) !important;
-  padding-bottom: calc(var(--spacer-sm) * 0.5) !important;
+  grid-template-rows: 1fr !important;
   border-bottom: 1px solid var(--border-color) !important;
   box-shadow: var(--box-shadow) !important;
 }
@@ -7245,7 +7171,7 @@ position: relative;
 
 .k-stats-ribbon__icon.muted {
   background: #f0f2f5;
-  color: #6c757d;
+  color: #5f6771;
 }
 
 .k-stats-ribbon__data {
@@ -8097,7 +8023,7 @@ position: relative;
   color: #1f2937;
   /* 📦581 (Loop 1.8) — Border-radius más generoso (12px) para esquinas suaves */
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   border: 1px solid #e5e7eb;
   font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;

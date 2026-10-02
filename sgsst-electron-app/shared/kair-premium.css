@@ -135,7 +135,7 @@
 /* Pendientes / tareas */
 .kair-premium .kair-task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:13px}
 .kair-premium .kair-task{position:relative;display:flex;flex-direction:column;gap:10px;text-align:left;background:#FFFFFF;border:1px solid #E8EBEE;border-radius:16px;padding:14px 16px 15px;overflow:hidden;transition:transform var(--kair-transition),border-color var(--kair-transition),box-shadow var(--kair-transition);cursor:pointer}
-.kair-premium .kair-task::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#5B6B8C}
+.kair-premium .kair-task::before{content:'';position:absolute;left:0;top:0;bottom:0;width:1px;background:#5B6B8C}
 .kair-premium .kair-task--critical::before{background:#DA5563}
 .kair-premium .kair-task--warn::before{background:#E7A224}
 .kair-premium .kair-task--info::before{background:#2057B8}
@@ -177,8 +177,6 @@
 /* Skeleton */
 .kair-premium .kair-boot{position:absolute;inset:0;z-index:150;background:var(--kair-canvas,#FBFCFB);display:flex;flex-direction:column;gap:16px;padding:22px 28px;overflow:hidden}
 .kair-premium .kair-skel{position:relative;overflow:hidden;background:#EEF1F5;border-radius:20px}
-.kair-premium .kair-skel::after{content:'';position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.65),rgba(255,255,255,0));animation:kair-dash-shimmer 1.15s infinite}
-@keyframes kair-dash-shimmer{to{transform:translateX(100%)}}
 .kair-premium .kair-boot__top .kair-skel{height:148px;border-radius:22px;background:#E7EBF2}
 .kair-premium .kair-boot__hero{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .kair-premium .kair-boot__hero .kair-skel{height:172px}

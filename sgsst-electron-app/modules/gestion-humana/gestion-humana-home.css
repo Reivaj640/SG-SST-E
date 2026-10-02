@@ -266,11 +266,11 @@
   display: flex;
   flex-direction: column;
 }
-/* Acento tonal (3px barra izquierda) — complementario al bar de progreso horizontal */
+/* Acento tonal (1px barra izquierda) — complementario al bar de progreso horizontal */
 .gh-metric::before {
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
-  width: 3px; background: var(--gh-m-tone, var(--gh-accent));
+  width: 1px; background: var(--gh-m-tone, var(--gh-accent));
 }
 .gh-metric--warn { --gh-m-tone: var(--gh-amber); }
 .gh-metric--ok { --gh-m-tone: var(--gh-mint); }

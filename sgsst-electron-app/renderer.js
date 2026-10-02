@@ -3357,12 +3357,6 @@ contentArea.innerHTML = '';
       <div class="kair-splash-orb kair-splash-orb-3"></div>
       <div class="kair-splash-polygon kair-splash-polygon-1"></div>
       <div class="kair-splash-polygon kair-splash-polygon-2"></div>
-      <div class="kair-splash-particle"></div>
-      <div class="kair-splash-particle"></div>
-      <div class="kair-splash-particle"></div>
-      <div class="kair-splash-particle"></div>
-      <div class="kair-splash-particle"></div>
-      <div class="kair-splash-particle"></div>
       <div class="kair-splash-logo-container" id="kair-splash-logo-btn">
         <img class="kair-splash-logo" src="assets/KIAR256.ico" alt="K+AIR" />
         <div class="kair-splash-logo-text">K+AIR</div>
