@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.227] - 2026-10-02
+
+### 📦841 — Al cambiar de módulo la pantalla saltaba de golpe
+
+**Resumen:** Cambiar de módulo en el sidebar borraba el contenido viejo de un golpe y pintaba el nuevo, sin ninguna transición. Ahora el contenido se desvanece y vuelve a aparecer. El piloto arranca en el cambio de módulo del sidebar, que es lo que más se repite en el día.
+
+- **`KairMotion.swapView(el, construir, opts)`** (nuevo): desvanece lo que hay (**110ms**), construye lo nuevo y lo funde de entrada (**160ms**). Solo mueve `opacity`, con curva `cubic-bezier(0, 0, 0.2, 1)` y transición CSS en línea. Total ~270ms, dentro del techo de 300ms.
+- **Es secuencial a propósito, no un crossfade solapado**: hay **45 iframes** en los módulos y solapar dejaría dos contenidos vivos a la vez; si algo se interrumpe, el viejo se queda pegado en pantalla. Secuencial, si algo falla, se nota de una y el contenido nuevo entra igual.
+- **Interrumpible**: dos clics seguidos **no** encolan, se reorienta — se construye solo el último. Si construyeran los dos se vería un destello del módulo intermedio, que es justo lo que el usuario pidió evitar al pedirlo rápido.
+- **El cerrojo no se espera**: la construcción se pasa como callback y `showModuleContent` **no** hace `await`, para que `_showModuleContentLock` se suelte en su microtask. Con `await` el cerrojo quedaría tomado los ~270ms del fade y el segundo clic se perdería en silencio.
+- **Red de seguridad**: pase lo que pase se limpia el estilo en línea y hay temporizador de respaldo. **Nunca queda un `opacity:0` pegado** (pantalla en blanco). En `renderer.js`, `_swapContenido()` es tolerante: si el wrapper no cargó, construye igual — el desvanecido es adorno, nunca un requisito.
+- **`prefers-reduced-motion`**: sin fade de salida y sin espera; solo el de entrada, y corto. La opacidad no produce mareo, así que no se quita (el skill pide "gentler, not zero").
+- **El Inicio también se desvanece** (`showHomePage`). Quedaba como único salto seco de la app: se entraba con fade pero al Inicio no. El cromo (ocultar el sidebar y `.vanta-fullscreen`) se resuelve **fuera** del desvanecido a propósito: si se moviera dentro, el sidebar se quedaría 110ms en pantalla con el contenido ya desvanecido.
+- **Guarda de carrera en el Inicio** (`_showHomeToken`): `showHomePage()` es `async` y su construcción ocurre **después** de un `await loadConfig()`. Con el fade, esa espera abre una ventana de ~110ms en la que un módulo abierto por el usuario se puede pisar con un home construido tarde — pantalla en la sección equivocada y sin error en consola. `showModuleContent` invalida el token al abrirse y el callback tardío se retira sin construir nada. Esa carrera existía antes con una ventana de ~5ms; el fade la habría hecho visible y no se introdujo knowingly.
+- **Cache-bust** de `kair-motion.js` bumpeado: sin esto Electron sirve la copia vieja, `swapView` llega `undefined` y el fade no aparece.
+- **Tests**: `main/test-swapview-841.js` (27 checks). **22/22 mutaciones detectadas** (16 del wrapper y el cableado del módulo, 6 del Inicio) — se rompió el código a propósito 22 veces y las 22 cayeron; 2 se clasificaron como **mutantes equivalentes** (la defensa está en capas y quitar una no cambia el comportamiento, no es un hueco del test). Suite completa: **100 tests, 82 verdes**; los 18 que fallan son los mismos de antes de este trabajo (z-index de CSS, cache-bust de `styles.css` y el `no such column: actualizado_en` del sync).
+- **Bugs encontrados al probar**: el temporizador de entrada dejaba su id guardado cuando ya había disparado (el campo mentía), y el test daba por bueno que dos clics construyeran los dos módulos — se corrigió la expectativa, no el código.
+
 ## [0.1.226] - 2026-10-01
 
 ### 📦840 — El panel de pendientes decía una cosa y pintaba otra, y el hero se comía una fila
@@ -2834,7 +2852,7 @@ Regenerando solo el multires, el logo de la ventana/taskbar/shortcut crece sin t
   - **Fase 2 (UI)**: Viewer con 6 vistas (home + Matriz + Pruebas + Recomendaciones + Vacunación + Alturas) en iframe autocontenido. Header con breadcrumb, tabs de navegación, dialog genérico para CRUD, búsqueda en la matriz, KPIs con skeleton y badges. Botón "Importar Excel" en el header que abre file picker filtrado (.xlsx/.xls) y dispara la importación. Botón "Volver" usa `postMessage` para regresar al home del módulo. CSS custom (no Bootstrap) con design system K+AIR (--primary #174ea6, --success, --warning, etc.).
   - **Fase 3 (parser Excel)**: Fix de bugs detectados al ejecutar contra el archivo real `GI-FO-047 Profesiograma Tempoactiva.xlsx` (175 KB, 8 hojas). El parser ahora detecta la fila de headers buscando "GRUPO OCUPACIONAL" en col 0, lee las categorías desde fila 7 (EVALUACIÓN MÉDICA / PRUEBAS COMPLEMENTARIAS / LABORATORIO), e importa las vacunas desde la hoja "ESQUEMA INMUNIZACION" (no desde "VACUNACIÓN TRABAJADORES" cuya estructura es de cruce cargo×vacuna). Resultado: 5 grupos, 21 cargos, 20 tipos examen, 105 relaciones cargo-examen, 10 descripciones de prueba, 8 recomendaciones, 2 requisitos de altura, 4 vacunas.
   - **Fase 4 (tests)**: 2 scripts de test (`test-profesiograma-import.js` + `test-profesiograma-handlers.js`) con mock de DB que ejecuta el import real + valida los 9 handlers de list + CRUD básico. **20/20 tests OK**. Los 161 tests existentes (`main/test-fixes-loop48.js`) siguen pasando.
-- **🚀 `scripts/release.ps1` — flujo automatizado de release** — Script PowerShell que ejecuta el流程 completo en 7 pasos: (1) verifica pre-requisitos (`GH_TOKEN` + branch `Dev-Pc` + working tree), (2) corre tests (`-SkipTests` para saltar), (3) `git push origin Dev-Pc`, (4) crea el tag `v<version>` local, (5) **`git push origin v<version>` — el paso crítico que evita el 422 de "Published releases must have a valid tag"**, (6) verifica que GitHub ve el tag, (7) corre `electron-builder --win --publish=always`. Si el build falla, llama automáticamente a `fix-release.ps1` como fallback. Mensajes claros en cada paso, detección de versión automática desde `package.json`, y rollback del tag si ya existe.
+- **🚀 `scripts/release.ps1` — flujo automatizado de release** — Script PowerShell que ejecuta el flujo completo en 7 pasos: (1) verifica pre-requisitos (`GH_TOKEN` + branch `Dev-Pc` + working tree), (2) corre tests (`-SkipTests` para saltar), (3) `git push origin Dev-Pc`, (4) crea el tag `v<version>` local, (5) **`git push origin v<version>` — el paso crítico que evita el 422 de "Published releases must have a valid tag"**, (6) verifica que GitHub ve el tag, (7) corre `electron-builder --win --publish=always`. Si el build falla, llama automáticamente a `fix-release.ps1` como fallback. Mensajes claros en cada paso, detección de versión automática desde `package.json`, y rollback del tag si ya existe.
 - **🛟 `scripts/fix-release.ps1` — fallback cuando electron-builder falla al subir** — Versión reutilizable del workaround manual que aplicamos para v0.1.131/132/133. En 6 pasos: (1) verifica que el `.exe` y `.blockmap` existen localmente, (2) calcula el SHA512 real y regenera `latest.yml`, (3) obtiene o crea el release via API de GitHub, (4) borra assets huérfanos con nombre viejo (`sgsst-electron-app-setup-*`), (5) sube `.exe` + `.blockmap` + `latest.yml` con `curl` directo a `uploads.github.com`, (6) PATCH el name + body del release. Tiene los 2 fixes de bugs descubiertos en intentos manuales: regex correcta `\{[^}]*\}` (no se come el `}`) y delimitación `${uploadBase}` (PowerShell no trata `?` como wildcard).
 
 ### Removed
@@ -2842,7 +2860,7 @@ Regenerando solo el multires, el logo de la ventana/taskbar/shortcut crece sin t
 - **🗑️ ~60 archivos firmados con signtool innecesariamente** — El `.bak` se firmaba en cada build (accelerate.exe, transformers.exe, torchrun.exe, huggingface-cli.exe, etc.). Ahora se saltan, ahorrando 1-2 min de firma.
 
 ### Build & Tooling
-- **📦585 — Commit de tooling** (este commit). Cero cambios funcionales, solo自动化 del流程 de release y limpieza de dead weight.
+- **📦585 — Commit de tooling** (este commit). Cero cambios funcionales, solo automatización del flujo de release y limpieza de dead weight.
 
 ## [0.1.131] - 2026-07-22
 

@@ -3777,6 +3777,9 @@ function setActiveSidebarButton(buttonElement) {
 }
 
 async function showHomePage(overrideCompanies = null) {
+  // 📦841b · Si otro Inicio o un modulo se abren mientras esperamos el
+  // loadConfig(), esta construccion se retira en vez de pisar la pantalla nueva.
+  const _miToken = ++_showHomeToken;
   // ✅ LIMPIAR ESTADO
   currentSubmodule = null;
   // ✅ Pasar contentArea a hideCalendar
@@ -3828,115 +3831,122 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
     console.log('👑 Usuario ADMIN: mostrando todas las empresas:', dynamicCompanies.length);
   }
 
-  // Limpiar el área de contenido
-  contentArea.innerHTML = '';
+  // 📦841b · El desvanecido va SOLO sobre la construccion del contenido.
+  // El sidebar y el fondo (.vanta-fullscreen) se resuelven arriba, sin
+  // esperar: si tambien se movieran aqui, el sidebar se quedaria visible
+  // 110ms con la pantalla ya desvanecida.
+  _swapContenido(contentArea, function () {
+    if (_miToken !== _showHomeToken) return;   // otro Inicio o un modulo se cayeron antes
+    // Limpiar el área de contenido
+    contentArea.innerHTML = '';
 
-  // Crear contenedor principal
-  const homePageDiv = document.createElement('div');
-  homePageDiv.id = 'home-page';
-  homePageDiv.style.position = 'relative';
-  homePageDiv.style.width = '100%';
-  homePageDiv.style.height = '100%';
-  homePageDiv.style.overflow = 'hidden'; // Asegurar que la animación no se salga del contenedor
-  console.log('Created homePageDiv:', homePageDiv);
+    // Crear contenedor principal
+    const homePageDiv = document.createElement('div');
+    homePageDiv.id = 'home-page';
+    homePageDiv.style.position = 'relative';
+    homePageDiv.style.width = '100%';
+    homePageDiv.style.height = '100%';
+    homePageDiv.style.overflow = 'hidden'; // Asegurar que la animación no se salga del contenedor
+    console.log('Created homePageDiv:', homePageDiv);
 
-  // Aplicar la animación de Vanta al contenedor principal
-  // Usar setTimeout para asegurar que el elemento esté en el DOM antes de aplicar la animación
-  setTimeout(() => {
-    if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
-      // Asegurar que no haya animaciones previas
-      if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
-        window.vantaEffect.destroy();
-      }
-      window.vantaEffect = VANTA.WAVES({
-        el: homePageDiv,
-        mouseControls: true,
-        touchControls: true,
-        gyroControls: false,
-        minHeight: 200.00,
-        minWidth: 200.00,
-        scale: 1.00,
-        scaleMobile: 1.00,
-        color: 0x6a7f9b,
-        shininess: 36.00,
-        waveHeight: 16.00,
-        waveSpeed: 1.20,
-        zoom: 0.68
-      });
-
-      // Función para actualizar la animación cuando cambia el tamaño
-      window.updateVantaEffect = function() {
-        if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
-          window.vantaEffect.resize();
+    // Aplicar la animación de Vanta al contenedor principal
+    // Usar setTimeout para asegurar que el elemento esté en el DOM antes de aplicar la animación
+    setTimeout(() => {
+      if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
+        // Asegurar que no haya animaciones previas
+        if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
+          window.vantaEffect.destroy();
         }
-      };
+        window.vantaEffect = VANTA.WAVES({
+          el: homePageDiv,
+          mouseControls: true,
+          touchControls: true,
+          gyroControls: false,
+          minHeight: 200.00,
+          minWidth: 200.00,
+          scale: 1.00,
+          scaleMobile: 1.00,
+          color: 0x6a7f9b,
+          shininess: 36.00,
+          waveHeight: 16.00,
+          waveSpeed: 1.20,
+          zoom: 0.68
+        });
 
-      // Escuchar cambios de tamaño en la ventana
-      window.addEventListener('resize', window.updateVantaEffect);
+        // Función para actualizar la animación cuando cambia el tamaño
+        window.updateVantaEffect = function() {
+          if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
+            window.vantaEffect.resize();
+          }
+        };
 
-      console.log('Animación de Vanta aplicada correctamente');
+        // Escuchar cambios de tamaño en la ventana
+        window.addEventListener('resize', window.updateVantaEffect);
+
+        console.log('Animación de Vanta aplicada correctamente');
+      } else {
+        console.error('VANTA no está disponible. Puede que los scripts no se hayan cargado correctamente.');
+      }
+    }, 100); // Pequeño retraso para asegurar que el elemento esté en el DOM
+
+    // Crear contenedor para los elementos de UI con posición absoluta encima de la animación
+    const uiContainer = document.createElement('div');
+    uiContainer.style.position = 'absolute';
+    uiContainer.style.top = '0';
+    uiContainer.style.left = '0';
+    uiContainer.style.width = '100%';
+    uiContainer.style.height = '100%';
+    uiContainer.style.display = 'flex';
+    uiContainer.style.flexDirection = 'column';
+    uiContainer.style.justifyContent = 'center';
+    uiContainer.style.alignItems = 'center';
+    uiContainer.style.zIndex = '10'; // Asegurar que esté encima de la animación
+
+    // Placeholder para la imagen de bienvenida
+    // En una implementación completa, se cargaría una imagen real
+    const welcomePlaceholder = document.createElement('div');
+    welcomePlaceholder.id = 'welcome-placeholder';
+    welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
+    welcomePlaceholder.style.color = 'white';
+    welcomePlaceholder.style.fontSize = '24px';
+    welcomePlaceholder.style.textAlign = 'center';
+    welcomePlaceholder.style.marginBottom = '20px';
+    welcomePlaceholder.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+    uiContainer.appendChild(welcomePlaceholder);
+
+    // Contenedor para los botones de selección de empresa
+    const companySelectionDiv = document.createElement('div');
+    companySelectionDiv.id = 'company-selection';
+    companySelectionDiv.style.textAlign = 'center';
+
+    // Mostrar mensaje si no hay empresas registradas
+    if (dynamicCompanies.length === 0) {
+      const noCompaniesMessage = document.createElement('p');
+      noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
+        ? 'No tienes empresas asignadas. Contacta a administración.'
+        : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+      noCompaniesMessage.style.color = 'white';
+      noCompaniesMessage.style.fontSize = '18px';
+      noCompaniesMessage.style.textAlign = 'center';
+      noCompaniesMessage.style.marginBottom = '20px';
+      noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+      uiContainer.appendChild(noCompaniesMessage);
     } else {
-      console.error('VANTA no está disponible. Puede que los scripts no se hayan cargado correctamente.');
+      dynamicCompanies.forEach(companyName => {
+        const button = document.createElement('button');
+        button.className = 'company-select-button';
+        button.textContent = companyName;
+        button.style.margin = '5px';
+        button.addEventListener('click', () => selectCompany(companyName, button));
+        companySelectionDiv.appendChild(button);
+      });
     }
-  }, 100); // Pequeño retraso para asegurar que el elemento esté en el DOM
 
-  // Crear contenedor para los elementos de UI con posición absoluta encima de la animación
-  const uiContainer = document.createElement('div');
-  uiContainer.style.position = 'absolute';
-  uiContainer.style.top = '0';
-  uiContainer.style.left = '0';
-  uiContainer.style.width = '100%';
-  uiContainer.style.height = '100%';
-  uiContainer.style.display = 'flex';
-  uiContainer.style.flexDirection = 'column';
-  uiContainer.style.justifyContent = 'center';
-  uiContainer.style.alignItems = 'center';
-  uiContainer.style.zIndex = '10'; // Asegurar que esté encima de la animación
+    uiContainer.appendChild(companySelectionDiv);
+    homePageDiv.appendChild(uiContainer);
 
-  // Placeholder para la imagen de bienvenida
-  // En una implementación completa, se cargaría una imagen real
-  const welcomePlaceholder = document.createElement('div');
-  welcomePlaceholder.id = 'welcome-placeholder';
-  welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
-  welcomePlaceholder.style.color = 'white';
-  welcomePlaceholder.style.fontSize = '24px';
-  welcomePlaceholder.style.textAlign = 'center';
-  welcomePlaceholder.style.marginBottom = '20px';
-  welcomePlaceholder.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-  uiContainer.appendChild(welcomePlaceholder);
-
-  // Contenedor para los botones de selección de empresa
-  const companySelectionDiv = document.createElement('div');
-  companySelectionDiv.id = 'company-selection';
-  companySelectionDiv.style.textAlign = 'center';
-
-  // Mostrar mensaje si no hay empresas registradas
-  if (dynamicCompanies.length === 0) {
-    const noCompaniesMessage = document.createElement('p');
-    noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
-      ? 'No tienes empresas asignadas. Contacta a administración.'
-      : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
-    noCompaniesMessage.style.color = 'white';
-    noCompaniesMessage.style.fontSize = '18px';
-    noCompaniesMessage.style.textAlign = 'center';
-    noCompaniesMessage.style.marginBottom = '20px';
-    noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-    uiContainer.appendChild(noCompaniesMessage);
-  } else {
-    dynamicCompanies.forEach(companyName => {
-      const button = document.createElement('button');
-      button.className = 'company-select-button';
-      button.textContent = companyName;
-      button.style.margin = '5px';
-      button.addEventListener('click', () => selectCompany(companyName, button));
-      companySelectionDiv.appendChild(button);
-    });
-  }
-
-  uiContainer.appendChild(companySelectionDiv);
-  homePageDiv.appendChild(uiContainer);
-
-  contentArea.appendChild(homePageDiv);
+    contentArea.appendChild(homePageDiv);
+  });
   console.log('Added home page to contentArea');
 }
 
@@ -4841,7 +4851,34 @@ function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts
 
 let _showModuleContentLock = false;
 
+/**
+ * 📦841b · Generacion de la pantalla de Inicio. showHomePage() es async:
+ * su construccion ocurre DESPUES de un await, y con el desvanecido
+ * quedan ~110ms de ventana en la que un modulo abierto por el usuario se
+ * puede pisar con un home construido tarde. El token lo invalida.
+ */
+let _showHomeToken = 0;
+
+/**
+ * 📦841 · Envuelve un cambio de contenido con el desvanecido de
+ * KairMotion.swapView(). Si el wrapper no estuviera cargado (o fallara),
+ * construye igual: el desvanecido es adorno, nunca un requisito.
+ */
+function _swapContenido(el, construir) {
+  try {
+    if (window.KairMotion && typeof window.KairMotion.swapView === 'function') {
+      return window.KairMotion.swapView(el, construir);
+    }
+  } catch (e) {
+    console.warn('[RENDERER] swapView no disponible, se construye sin desvanecido:', e);
+  }
+  construir();
+  return false;
+}
+
 function showModuleContent(moduleName) {
+// 📦841b · Abrir un modulo invalida cualquier Inicio que este por construir.
+_showHomeToken++;
 // ✅ GUARD: Prevenir llamadas duplicadas desde handlers de mensajes solapados
 if (_showModuleContentLock) {
 console.warn(`[showModuleContent] BLOCKED duplicate call for "${moduleName}" (lock active)`);
@@ -4876,46 +4913,52 @@ currentModule = moduleName;
     return;
   }
 
-  contentArea.innerHTML = ''; // Limpiar contenido anterior
+  // 📦841 · El desvanecido vive en KairMotion.swapView(). La construcción se
+  // pasa como callback y NO se espera a propósito: la función tiene que
+  // devolver el control en el mismo tick para que el cerrojo de arriba se
+  // suelte, y así el segundo clic del usuario no se pierde en silencio.
+  _swapContenido(contentArea, function () {
+    contentArea.innerHTML = ''; // Limpiar contenido anterior
 
-  // Crear el contenedor principal del canvas
-  const mainCanvas = document.createElement('div');
+    // Crear el contenedor principal del canvas
+    const mainCanvas = document.createElement('div');
 
-  // **LA CORRECCIÓN:**
-  // 1. Añadir el contenedor al DOM ANTES de llenarlo.
-  contentArea.appendChild(mainCanvas);
+    // **LA CORRECCIÓN:**
+    // 1. Añadir el contenedor al DOM ANTES de llenarlo.
+    contentArea.appendChild(mainCanvas);
 
-  // 2. Llenar el contenedor (que ya está en el DOM).
-  const submodules = RESOURCES_SUBMODULES[moduleName];
+    // 2. Llenar el contenedor (que ya está en el DOM).
+    const submodules = RESOURCES_SUBMODULES[moduleName];
 
-  if (submodules && submodules.length > 0) {
-    // Mostrar directamente el home del módulo, que asignará la clase a mainCanvas
-    showModuleHome(mainCanvas, moduleName);
-  } else {
-    // Mostrar contenido genérico si no hay submódulos definidos
-    mainCanvas.className = 'main-canvas'; // Asignar clase aquí si no se va a showModuleHome
-    const moduleDiv = document.createElement('div');
-    moduleDiv.className = 'module-content';
+    if (submodules && submodules.length > 0) {
+      // Mostrar directamente el home del módulo, que asignará la clase a mainCanvas
+      showModuleHome(mainCanvas, moduleName);
+    } else {
+      // Mostrar contenido genérico si no hay submódulos definidos
+      mainCanvas.className = 'main-canvas'; // Asignar clase aquí si no se va a showModuleHome
+      const moduleDiv = document.createElement('div');
+      moduleDiv.className = 'module-content';
 
-    const title = document.createElement('h2');
-    title.textContent = `Módulo: ${moduleName}`;
-    moduleDiv.appendChild(title);
+      const title = document.createElement('h2');
+      title.textContent = `Módulo: ${moduleName}`;
+      moduleDiv.appendChild(title);
 
-    const info = document.createElement('p');
-    info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
-    moduleDiv.appendChild(info);
+      const info = document.createElement('p');
+      info.textContent = `Contenido del módulo "${moduleName}" se cargará aquí.`;
+      moduleDiv.appendChild(info);
 
-    // Placeholder para funcionalidades futuras
-    const placeholderCard = document.createElement('div');
-    placeholderCard.className = 'card';
-    placeholderCard.innerHTML = `
-      <h3>Funcionalidad en Desarrollo</h3>
-      <p>Esta sección está en construcción.</p>
-    `;
-    moduleDiv.appendChild(placeholderCard);
+      // Placeholder para funcionalidades futuras
+      const placeholderCard = document.createElement('div');
+      placeholderCard.className = 'card';
+      placeholderCard.innerHTML = `
+        <h3>Funcionalidad en Desarrollo</h3>
+        <p>Esta sección está en construcción.</p>
+      `;
+      moduleDiv.appendChild(placeholderCard);
 
-    mainCanvas.appendChild(moduleDiv);
-  }
+      mainCanvas.appendChild(moduleDiv);
+    }
+  });
 }
 
 function showModuleWelcomeScreen(container, moduleName) {

@@ -185,12 +185,102 @@ var KairMotion = (function () {
     }
   }
 
+
+  // 📦841 · Cambio de contenido con desvanecido. Ver la nota del commit: es
+  // secuencial a propósito (no un crossfade solapado) y usa transición CSS
+  // en línea en vez de anime.js, porque así se RETARGETEA si el usuario
+  // vuelve a hacer clic en vez de reiniciar desde cero.
+  //
+  // Red de seguridad, igual que el resto del wrapper: pase lo que pase, el
+  // contenido se construye y los estilos en línea se limpian. Nunca queda
+  // un opacity:0 pegado.
+  function swapView(el, construir, opts) {
+    opts = opts || {};
+    if (!el || typeof construir !== 'function') return false;
+
+    var salida = opts.out == null ? 110 : opts.out;
+    var entrada = opts['in'] == null ? 160 : opts['in'];
+
+    // Un swap anterior en vuelo se cancela: si el usuario hizo clic dos
+    // veces seguidas no queremos dos temporizadores peleando por el mismo
+    // nodo. El que quedó a media faded se quita y se construye de una.
+    if (el._kairSwapTimer) {
+      clearTimeout(el._kairSwapTimer);
+      el._kairSwapTimer = 0;
+    }
+    var haySalidaPendiente = !!el._kairSwapActivo;
+    el._kairSwapActivo = false;
+
+    function limpiar() {
+      try {
+        el.style.opacity = '';
+        el.style.transition = '';
+      } catch (e) { /* noop */ }
+    }
+
+    function construirYa() {
+      try { construir(); }
+      catch (err) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[KairMotion] swapView:', err);
+        }
+      }
+      limpiar();
+    }
+
+    function fundirEntrada() {
+      if (reduced()) { limpiar(); return; }
+      try {
+        el.style.opacity = '0';
+        el.style.transition = 'none';
+        void el.offsetHeight;   // fuerza el reflow: sin esto el 0 no se
+        // registra y la transición no arranca (se salta de golpe)
+        el.style.transition = 'opacity ' + entrada + 'ms cubic-bezier(0, 0, 0.2, 1)';
+        el.style.opacity = '1';
+        // El id se borra en el mismo callback: si se dejara, el campo
+        // seguiria diciendo 'hay algo en vuelo' cuando ya no lo hay.
+        el._kairSwapTimer = setTimeout(function () {
+          el._kairSwapTimer = 0;
+          limpiar();
+        }, entrada + 40);
+      } catch (e) { limpiar(); }
+    }
+
+    // Con reduced-motion NO se espera: solo el fade de entrada, y corto. La
+    // opacidad no produce mareo, asi que el skill pide conservarla
+    // ("gentler, not zero"); lo que se cae es la espera y el fade de salida.
+    if (reduced() || !salida || haySalidaPendiente) {
+      construirYa();
+      fundirEntrada();
+      return true;
+    }
+
+    // 1) desvanecer lo que hay
+    try {
+      el.style.transition = 'opacity ' + salida + 'ms cubic-bezier(0, 0, 0.2, 1)';
+      el.style.opacity = '0';
+    } catch (e) { limpiar(); }
+
+    // 2) cuando termina, construir lo nuevo y fundirlo
+    el._kairSwapActivo = true;
+    el._kairSwapTimer = setTimeout(function () {
+      el._kairSwapTimer = 0;
+      if (!el._kairSwapActivo) return;   // cancelado por un clic nuevo
+      el._kairSwapActivo = false;
+      try { el.style.opacity = ''; } catch (e) { /* noop */ }
+      construirYa();
+      fundirEntrada();
+    }, salida);
+
+    return true;
+  }
   return {
     available: available,
     reduced: reduced,
     staggerIn: staggerIn,
     countTo: countTo,
-    dashboard: dashboard
+    dashboard: dashboard,
+    swapView: swapView
   };
 })();
 
