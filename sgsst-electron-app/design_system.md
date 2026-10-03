@@ -1,5 +1,9 @@
 # K+AIR · Design System (Premium v2)
 
+> **Este es el sistema visual y su fuente de verdad.** Las reglas de proceso, los
+> diagnósticos y las trampas están en [`PROMPT.md`](../PROMPT.md). Si un token de acá
+> contradice al código, **manda el código** y hay que corregir este documento.
+
 > **Estado:** v0.1.212 (22 sept 2026) — sincronizado con `shared/kair-design-tokens.css`, `kair-components.css`, `kair-premium.css`, `kair-sidebar.css`, `kair-calendar.css`.
 > **Para:** sesiones de AI que implementen UI + owner como referencia para consistencia visual.
 > **Convención del doc:** cada patrón viene con su archivo de implementación, ejemplos de uso, y trampas conocidas.

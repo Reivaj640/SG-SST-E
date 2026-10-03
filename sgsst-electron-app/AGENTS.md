@@ -1,5 +1,25 @@
 # Instrucciones Globales - OpenCode
 
+> ## 🚦 Arranque — leé esto primero
+>
+> Este archivo tiene **4 800+ líneas y es 89 % bitácora de bugs**. No lo leas entero: buscá con grep.
+>
+> | Leé esto | Para qué |
+> |---|---|
+> | **`../PROMPT.md`** | El prompt operacional. Rol, reglas de proceso, convenciones, trampas activas |
+> | **`../Historial.md`** | **Dónde quedó el trabajo y qué falta.** Estado de cierre + cola acordada |
+>
+> Empezá por esos dos. Recién después volvés a buscar acá el "por qué" de algo puntual.
+>
+> ⚠️ **Este archivo contiene secciones que quedaron viejas.** Si contradice al código, **manda el
+> código** y hay que corregir la sección. Las trampas conocidas están en `PROMPT.md` §9.
+>
+> 🔴 **Y una advertencia sobre este archivo en particular:** nada de lo que dice acá es una regla
+> sin verificar. Hubo reglas "OBLIGATORIAS" que mandaban llamar funciones que **no existen**
+> (`KairUI.esc()`, `KairHelpers.formatDate()`), una convención de commits con 270 versiones de atraso,
+> y una referencia a un archivo CSS inexistente. **Grepeá antes de aplicar lo que leas acá.**
+> La regla completa está en `../PROMPT.md` §5.9.
+
 ## Skills Disponibles
 
 Todos los skills se activan con `skill({ name: "<nombre>" })`. El modelo decide cuando cargarlos segun la tarea.
@@ -108,11 +128,17 @@ Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta boot
 
 ### Convencion de Commits (OBLIGATORIO)
 
-El usuario usa su propio formato de commits con versionado incremental. **NO usar conventional commits (`feat:`, `fix:`, `docs:`, `style:`)** — usar SIEMPRE:
+El usuario usa su propio formato de commits con versionado incremental. El formato vigente es un **híbrido**: el número de paquete delante y conventional commits después.
 
 ```
-📦<numero> # <descripcion en espanol, tono casual>
+📦<numero| rango>[-fix] # <tipo>(<scope>): <descripcion en espanol, tono casual, sin punto>
 ```
+
+Ejemplos reales (`git log`): `📦850-851 # feat(bandeja): columna lateral plegable y sin etiqueta de fecha`
+
+> 📌 **Corregido 2026-10-03.** Esta línea decía antes "**NO** usar conventional commits" y definía
+> `📦<numero> # <descripcion>`. El equipo migró al formato híbrido y esta sección quedó vieja.
+> **Verificá con `git log -15` antes de cada commit**: la convención de este repo cambió varias veces.
 
 - El emoji 📦 es literal (no es un placeholder).
 - `<numero>` es secuencial e incremental (último conocido: 579 → siguiente 580 al 2026-07-21).
@@ -232,14 +258,23 @@ window.NombreVista = NombreVista;  // SIEMPRE exportar a window
 - Exports a `window.X = X` SIEMPRE al final del archivo
 
 ### Clases CSS canónicas (NO crear nuevas)
-Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonical.css`:
-- Header: `kair-header`, `kair-header__bar`, `kair-header__left/center/right`, `kair-header__tab`, `kair-header__tab-badge`, `kair-header__action--{primary|secondary|ghost|success}`, `kair-header__back`, `kair-header__company`, `kair-header__breadcrumb`
-- KPIs: `kair-kpi-strip`, `kair-kpi-item`, `kair-kpi-item__icon/value/label/subdata`
-- Cards: `kair-card`, `kair-hub-card`, `kair-hub-card__icon/title/desc/meta`
-- Tables: `kair-table-wrap`, `kair-table`
-- Forms: `kair-field`, `kair-field__label/input/textarea/select`, `kair-field__input-wrap`
-- Badges: `kair-badge`, `kair-badge--{primary|success|warning|danger|info|neutral}`, `kair-dot`
-- Empty states: `kair-empty`, `kair-empty__icon/title/desc`
+> ⚠️ **Corregido 2026-10-03.** Esta sección decía que estas clases están definidas en
+> `kair-canonical.css`. **Ese archivo NO EXISTE en el repo** (verificado con glob: 0 coincidencias).
+> Esa línea es la fuente probable del `PROMPT.md` v1, que quedó obsoleto.
+>
+> **Fuente real del sistema visual:** `design_system.md` + `shared/kair-design-tokens.css`
+> + `shared/kair-components.css`. Antes de crear cualquier clase `kair-*`, grepeá el repo.
+
+**No todas estas clases existen todavía, y varias están en conflicto.** Antes de usarlas:
+
+| Clase | Estado real |
+|---|---|
+| `kair-header*` | Solo dentro de algunos submódulos, **no en el shell**. El shell usa `<header id="app-header">` con `.header-content` |
+| `kair-header__tab` | **Muerta** — migrada a `.em-tab` |
+| `kair-kpi-strip` / `kair-kpi-item*` | Retirada del sistema en 📦849; el owner pidió no volver a mostrar eventos críticos |
+| `kair-card`, `kair-table-wrap`, `kair-table` | Vivas y canónicas |
+| `kair-panel` | ⚠️ **Colisión**: ese nombre lo usa `revision-alta-direccion.css` como panel de layout. El marco canónico es `.kair-block__panel` |
+| `k-section-card` | Legacy peligroso, no usar en código nuevo (choca con `kair-card`) |
 - Buttons: clases `kair-header__action--*` (NO usar shadcn-style buttons)
 - Section cards: `kair-rad-section-card`, `kair-rad-section-card__head/title/body`
 - Progress: `kair-progress`, `kair-progress__bar`, `kair-progress__bar.is-{success|warning|danger}`
@@ -1420,17 +1455,37 @@ process.exit(failed === 0 ? 0 : 1);
 ```
 
 ### Cómo correr los tests antes de commitear
-```bash
+```powershell
 cd sgsst-electron-app
-for ($i=1; $i -le 8; $i++) { node main/test-fixes-loop$i.js }
-node main/test-compose-bem.js
+node Temp/run-all-tests.js            # la suite completa: 111 tests
+node Temp/run-all-tests.js sidebar    # filtro por substring
+node main/test-bandeja-sidebar-850.js  # uno solo
 ```
+> 📌 **Corregido 2026-10-03.** Esta sección mandaba correr `test-fixes-loop$i.js`, que ya no existen.
+> El runner real es `Temp/run-all-tests.js`: descubre por **regex de nombre** `/^test-.*\.js$/` y solo
+> en `main/`. Los 30 tests de `tests/` **no los ve nadie**.
+>
+> ⚠️ El runner parsea el `N/M OK` del stdout por regex. Si un test no lo imprime, lo cuenta como verde.
+> Por eso el formato de salida no es opcional.
 
 ### Reglas
 - **SIEMPRE** agregar un test nuevo cuando se implemente una feature (incrementar el contador)
 - **SIEMPRE** correr los tests antes de commitear
 - **NO** commitear si algún test falla (investigar y arreglar primero)
-- Los tests son **smoke tests** (validan estructura, no funcionalidad completa). Para tests de integración usar herramientas más pesadas (no implementadas aún).
+- **Nombre:** `test-<slug>-<paquete>.js`. El número al final, `test-` al principio (obligatorio para el discovery).
+- Los tests son **estructurales** (validan invariantes leyendo el código), no de GUI. **No hay tests de
+  Playwright ni de Electron real**; lo más parecido es levantar un contexto `vm` con DOM mínimo.
+- **Para trabajo de UI, el patrón `checks[]` no alcanza.** Casi todo lo que se rompe es un texto que dejó
+  de estar, y eso es trivial de "probar". El estándar de UI es factorizar como
+  `evaluar(htm, css, js) -> {f, n}` y llamarlo con **mutaciones en memoria**, con tres guards:
+  normalizar a LF antes de mutar, contar los **mutantes vacíos** por separado, y verificar
+  `mut(x) !== x` antes de culpar a un check. Ejemplos canónicos: `main/test-bandeja-sidebar-850.js`
+  (48 checks, 20 mutantes) y `main/test-bandeja-chip-851.js` (16 checks, 10 mutantes).
+  Reglas completas en `PROMPT.md` §7.2 y en las lecciones de mutation testing al final de este archivo.
+- **Cuando borras algo, invierte los checks que lo afirman; no los borre.** Un check borrado es un hueco.
+  Si varios checks lo afirman, invierte **todos**: si no, reintroducir el código sin el markup pasa verde.
+- **No hay lista de tests preexistentes en código.** Para afirmar que un fallo es preexistente hay que
+  **probar que también falla en HEAD limpio** y decirlo con esas palabras.
 
 ---
 

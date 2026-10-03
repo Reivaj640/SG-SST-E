@@ -1,11 +1,38 @@
 # Changelog
 
+> Registro de cambios **por versión publicada**. El estado del trabajo en curso —qué se
+> está haciendo, qué quedó pendiente— está en [`Historial.md`](../Historial.md), que se
+> actualiza al cerrar cada jornada, no al commitear. Para las reglas de trabajo, ver
+> [`PROMPT.md`](../PROMPT.md).
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.234] - 2026-10-03
+
+### 📦852 · Documentación: la fuente de verdad era falsa y nadie lo había comprobado
+
+**Resumen:** Se auditó toda la documentación contra el código y se encontraron reglas "OBLIGATORIAS" que mandaban llamar funciones que **no existen**. Con la auditoría de por medio se construyó la puerta de entrada para cualquier modelo que retome el trabajo, y una regla nueva que prohíbe tomar por cierto lo que dice un documento.
+
+- **Reglas que eran falsas y se eliminaron.** `CONTEXT.md` decía "SIEMPRE escapar HTML con `KairUI.esc()`" y "SIEMPRE formatear fechas con `KairHelpers.formatDate()`". **Búsqueda sobre todo el código: 0 archivos.** Un modelo que hubiera seguido la regla al pie de la letra habría escrito una llamada a una función inexistente y la vista se habría caído con `ReferenceError`. También se cayó el "`var~, no `let/const`" (`main.js` tiene 2 608 `const`) y el "último paquete es 📦579" cuando van 850+.
+- **La causa de que existieran: `AGENTS.md:235` referenciaba `kair-canonical.css` como fuente de las clases BEM. Ese archivo nunca estuvo en el repo** — comprobado sobre los 1 244 commits de todas las ramas, no solo sobre el árbol actual. Esa línea es la fuente probable del prompt viejo, que quedó obsoleto.
+- **~PROMPT.md~ v2.0 (nuevo).** Un `índice`, no una fuente: dice dónde está cada cosa en vez de copiar la paleta y los tokens. La versión anterior los duplicaba, y por eso quedó vieja. Documenta las **tres islas de paleta** que tiene el sistema visual (shell / Bandeja / calendario), que es lo que más confunde a un modelo nuevo.
+- **~Historial.md~ (nuevo).** Responde "¿dónde quedó el trabajo y qué falta?". Arriba un bloque de estado de cierre; abajo la bitácora por jornada, los bloqueantes con su ubicación exacta y la cola acordada.
+- **~CLAUDE.md~ (nuevo).** Puerta de entrada de 50 líneas para las herramientas que leen un archivo de arranque. Los seis documentos que ya describían el proyecto (`README`, `CONTEXT`, `design_system`, `CHANGELOG`, `release-notes` y `PRODUCT.md`) ganaron un puntero de arranque, y cada uno aclara su propio rol para que no se pisen entre sí.
+- **🔴 Regla nueva: cero presunciones.** Un documento que diga "X" no es evidencia de que X sea verdad. Hay que verificar que exista, que siga vigente, que el valor sea el de hoy y que aplique al caso. **Y aplicársela a las propias afirmaciones del prompt.**
+- **La regla se aplicó a sí misma en el momento:** al medir el ~PROMPT.md~ recién escrito, **dos de sus propias cifras estaban mal** (27 bridges en vez de 30, y un conteo de tests mal hecho por no bajar a los subdirectorios). Ambas corregidas con el número medido.
+- **~CONTEXT.md~ reformateado, no borrado.** Iba a eliminarse un bloque de 94 KB por ser "un changelog duplicado". Al verificar, se vio que contiene el **análisis de causa-raíz** que el CHANGELOG no tiene (el CHANGELOG dice "se arregló"; ese bloque dice por qué se rompió y por qué ningún test lo cazó). Se partió: 68 líneas gigantes de hasta 5 621 caracteres pasaron a 1 318 líneas legibles, con **md5 del contenido idéntico antes y después**. No se perdió un solo carácter.
+- **Dos bloqueantes verificados y registrados en ~Historial.md~:**
+  - El bridge `gestion-humana` acepta `estado`, `fechaIngreso` y `fechaRetiro` en `_handlerUpdatePersonal`, que el renderer declara protegidos en `PROTECTED_FIELDS`. La protección es solo de UI. Marcado crítico desde v0.1.212 y sigue abierto.
+  - `styles.css` usa 6 tokens premium que **nadie define** en el shell; 4 sin respaldo quedan sin estilo (`.kair-pendientes-popover`).
+- `PRODUCT.md` corregido: paleta, tipografía, selector de dark mode, y las afirmaciones falsas de que "no hay README" y "512 checks".
+- **3 trampas internas de ~AGENTS.md~ corregidas:** la referencia al CSS inexistente, la convención de commits (decía "NO conventional", ya van 850+ paquetes) y la sección de tests (mandaba correr scripts que ya no existen).
+- Suite completa sin cambios: 111 tests, 93 verdes, 18 preexistentes.
+
 ## [0.1.233] - 2026-10-03
+
 
 ### 📦850 · La columna lateral se pliega y el correo toma su espacio
 

@@ -2,6 +2,10 @@
 
 <!-- impeccable:product-schema 1 -->
 
+> **Para trabajar sobre la aplicación**, leer [`PROMPT.md`](PROMPT.md) (reglas de proceso,
+> convenciones y trampas activas) y [`Historial.md`](Historial.md) (dónde quedó el trabajo).
+> Este documento responde "¿qué es K+AIR y para quién?", no "cómo se modifica".
+
 ## Platform
 
 web
@@ -30,22 +34,22 @@ Cumplimiento SG-SST en un solo lugar: todos los módulos del sistema de gestión
 ## Capabilities and Constraints
 
 - Aplicación de escritorio Electron (ventana propia, actualización automática vía electron-updater, instalador .exe para Windows); la interfaz es web corriendo en Chromium.
-- **Stack confirmado por el usuario:** Electron + JavaScript vanilla, sin frameworks frontend. Regla del repo: CSS plano BEM con prefijo `kair-`, iconos Lucide en SVG inline, backend por IPC (`window.electronAPI.*`).
+- **Stack confirmado por el usuario:** Electron + JavaScript vanilla, sin frameworks frontend. Regla del repo: CSS plano BEM con prefijo `kair-`, iconos Lucide en SVG inline, backend por IPC (`window.electronAPI.<namespace>.<metodo>()`, con namespaces anidados sobre un único `contextBridge` en `preload.js`).
 - Módulos existentes: Evaluación Inicial/EMO, Incapacidades (SQLite), Reportes de Accidentes (FURAT), Investigación de Accidentes con análisis de 5 Porqués (servidor Python local), Remisiones/Restricciones, Gestión Humana, Bandeja Integrada (Gmail), Medicina Preventiva/SVE (sección 3.1.2), Configuración multi-empresa.
 - Los datos locales en SQLite son la fuente de verdad; la sincronización viaja como archivo de intercambio entre equipos.
 - Hechos abiertos (sin decidir): alcance fuera de Colombia/i18n, estrategia de precios o licenciamiento, soporte fuera de Windows.
 
 ## Brand Commitments
 
-- Identidad visual **K+AIR** existente en el código: paleta con azul de marca `#174ea6` y verde `#28a745`, componentes con prefijo `kair-`, tema oscuro `[data-theme="dark"]`, tipografía Inter/Plus Jakarta Sans. (Evidencia del repositorio; en esta sesión el usuario no fijó compromisos visuales nuevos.)
+- **Identidad visual K+AIR** en el código, y documentada en `sgsst-electron-app/design_system.md` (fuente de verdad del sistema visual). Paleta: `--kair-blue #2057b8` (primario), `--kair-mint #1bb888` (éxito), `--kair-amber #e7a224` (advertencia), `--kair-red #da5563` (riesgo), sobre `--kair-canvas #fbfcfb`. Componentes con prefijo `kair-`. Tipografía **DM Sans** (texto) + **Manrope** (títulos). Tema oscuro con `[data-theme^="dark"]` — nunca `[data-theme="dark"]`, que deja sin estilo al tema `dark-legacy`. ⚠️ El sistema visual tiene **tres islas de paleta** (shell / Bandeja Integrada / calendario) y conviven; ver `PROMPT.md` §4.
 
 ## Evidence on Hand
 
-- `sgsst-electron-app/AGENTS.md` (~4.600 líneas): convenciones del repo, historia por lotes `📦n`, reglas sagradas de trabajo.
-- Suites de regresión `main/test-*.js` y `tests/test-*.js` (512 checks) como scripts sueltos de node/Electron, sin framework de tests.
-- Prototipos aprobados por el usuario replicados desde archivos `.tar` (patrón de vistas "replica XxxView.tsx").
-- `llm_server.py` + `dataset_v5_final.jsonl` para el análisis de 5 Porqués (calidad validada contra dataset de entrenamiento).
-- Ausencias que no deben inventarse: no hay README, DESIGN.md previo, testimonios, clientes, benchmarks ni precios.
+- `sgsst-electron-app/AGENTS.md` (~4.800 líneas): convenciones del repo, historia por lotes `📦n`, reglas sagradas de trabajo. **Es 89 % bitácora de bugs**: para reglas de proceso leer las secciones de proceso, no la cronología.
+- `sgsst-electron-app/design_system.md`: sistema visual (tokens, componentes, trampas de CSS). `PROMPT.md` (raíz del repo): índice y reglas de proceso.
+- Suites de regresión en `sgsst-electron-app/main/test-*.js`, scripts sueltos de node/Electron sin framework. El runner `Temp/run-all-tests.js` descubre **111** por regex de nombre; la carpeta `tests/` tiene 30 más que **el runner no ve**. Hoy: 93 en verde, 18 fallos preexistentes documentados en prosa (no hay lista en código).
+- Módulos de la app por número normativo (1.x a 7.x) registrados en `ALL_SUBMODULES` (`renderer.js`).
+- Ausencias que no deben inventarse: no hay testimonios, clientes, benchmarks ni precios. **Sí hay README, CHANGELOG, CONTEXT, release-notes, PRD y design_system**; en versiones anteriores de este documento se afirmó que no existían y estaba mal.
 
 ## Product Principles
 

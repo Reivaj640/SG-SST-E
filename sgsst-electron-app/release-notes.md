@@ -1,4 +1,35 @@
+# K+AIR v0.1.234
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## 🧾 La documentación del programa por fin dice la verdad
+
+Esta versión **no cambia ni un botón** de la aplicación. Es mantenimiento de la documentación
+interna, que es invisible para quien usa el programa. Pero al revisarla aparecieron **reglas que
+el programa nunca tuvo**: decían, textualmente, "siempre escapar el texto con tal función" y
+"siempre formatear la fecha con esta otra" — y **ninguna de las dos funciones existe en el
+código**. Llevaban meses escritas con la palabra "SIEMPRE" en mayúsculas.
+
+Un asistente que las hubiera seguido al pie de la letra habría escrito una llamada a algo que no
+existe, y la pantalla se habría caído. Esa es toda la razón de esta tanda: que la próxima persona,
+o el próximo asistente, no se tropiegue con las mismas reglas inventadas.
+
+**Qué cambió**
+
+- Se revisó toda la documentación contra el código y se corrigió lo que no cuadraba.
+- Se escribieron tres documentos nuevos para que quien retome el trabajo sepa por dónde arrancar,
+  aunque nunca haya visto este proyecto.
+- Quedó escrito que **nada es una regla hasta comprobarlo en el código**: no por pesimismo, sino
+  porque este programa acaba de demostrar que hace falta.
+
+En la app no se toca nada. Lo que gana quien la usa a diario es que las próximas mejoras salgan
+más rápido y con menos ganas de romper algo que ya funcionaba.
+
 # K+AIR v0.1.233
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
 
 ## 🙈 La columna de la izquierda ahora se quita de en medio
 
