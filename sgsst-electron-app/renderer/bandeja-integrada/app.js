@@ -2225,6 +2225,12 @@
     // F4 — Día seleccionado inicial = today (el user puede cambiarlo haciendo click)
     state.selectedDate = D.MONTH_VIEW.todayIso;
 
+    // 📦850 · Preferencia de la columna lateral. Se lee antes de
+    // bindHeader() porque es el que la aplica. Se compara con "1" y no se
+    // usa como boolean: localStorage guarda texto, y "0" es truthy.
+    try { sidebarColapsado = localStorage.getItem(SIDEBAR_KEY) === "1"; }
+    catch (e) { sidebarColapsado = false; }
+
     bindHeader();
     render();
 
@@ -3057,6 +3063,13 @@
     var tabCorreo = $("#tab-correo");
     if (tabAgenda) tabAgenda.addEventListener("click", function () { setCalendarVisible(true); });
     if (tabCorreo) tabCorreo.addEventListener("click", function () { setCalendarVisible(false); });
+    // 📦850 · Botón del borde de la columna lateral. Se enlaza una sola vez
+    // acá y no se re-enlaza en render(): el botón es hermano del <aside>, así
+    // que renderSidebar() no lo destruye. aplicarSidebar() corre antes del
+    // primer render() para que la columna abra ya en el estado guardado.
+    aplicarSidebar();
+    var btnSideToggle = $("#btn-side-toggle");
+    if (btnSideToggle) btnSideToggle.addEventListener("click", toggleSidebar);
     // Loop 45c — Toggle "Todas las empresas" ahora se renderiza dentro de la
     // toolbar del calendario grande, no del header oculto. El handler se
     // re-adjunta en el bloque de bindings de la toolbar (después de appendChild)
@@ -3177,10 +3190,6 @@
     if (tabAgenda) tabAgenda.setAttribute("aria-selected", state.calendarVisible ? "true" : "false");
     if (tabCorreo) tabCorreo.setAttribute("aria-selected", state.calendarVisible ? "false" : "true");
 
-    // Chip de fecha: mes visible de la agenda, como en el diseño objetivo.
-    var chipFecha = $("#chip-fecha");
-    if (chipFecha) chipFecha.textContent = state.viewMonthLabel || D.MONTH_VIEW.label;
-
     // Área de contenido: actualiza data-calendar-visible para atenuar el correo
     const contentArea = $("#content-area");
     if (contentArea) {
@@ -3249,6 +3258,43 @@
 
     // 3. Calendario overlay: SIEMPRE renderizado (la visibilidad se controla por CSS data-visible)
     renderBigCalendar($("#calendar-slide"));
+  }
+
+  // ====== 📦850 · Columna lateral plegable ======
+  // El <aside> (mini-calendar + tipos de evento + Tu día) se pliega a 0 de
+  // ancho y el correo/calendario toman ese espacio. El botón vive en el HTML
+  // FUERA del <aside>, dentro de .kair-layout, así que renderSidebar() no se
+  // lo lleva y su listener se enlaza UNA sola vez, en bindHeader().
+  //
+  // Decisión de diseño: toggleSidebar NO llama a render(). El ancho lo
+  // resuelve el CSS; un render() reconstruye la lista de correo entera
+  // para cambiar un ancho. Lo único que hay que hacer a mano es cerrar el
+  // popup del mini (📦846), que vive en document.body y se quedaría
+  // flotando sobre el hueco si no.
+  const SIDEBAR_KEY = "kair-bandeja.sidebarColapsado";
+  let sidebarColapsado = false;
+
+  // Pinta el estado en el DOM. No toca nada más: el ancho, el desplazamiento
+  // y la rotación del chevron son 100% CSS a partir de data-sidebar.
+  function aplicarSidebar() {
+    const layout = $("#kair-layout");
+    const btn = $("#btn-side-toggle");
+    const off = !!sidebarColapsado;
+    if (layout) layout.setAttribute("data-sidebar", off ? "off" : "on");
+    if (btn) {
+      const label = off ? "Mostrar la columna lateral" : "Ocultar la columna lateral";
+      btn.setAttribute("aria-expanded", off ? "false" : "true");
+      btn.setAttribute("aria-label", label);
+      btn.title = label;
+    }
+  }
+
+  function toggleSidebar() {
+    sidebarColapsado = !sidebarColapsado;
+    try { localStorage.setItem(SIDEBAR_KEY, sidebarColapsado ? "1" : "0"); }
+    catch (e) { /* modo privado: se pierde la preferencia, no la app */ }
+    aplicarSidebar();
+    ocultarPopupDia();
   }
 
   // ====== Sidebar ======

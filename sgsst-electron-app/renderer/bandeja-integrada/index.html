@@ -8,7 +8,7 @@
        `premium.css` es la capa premium que se carga DESPUÉS y remapea los tokens
        legacy a la paleta premium v2 (mismo dialecto que Dashboard/Configuración). -->
   <link rel="stylesheet" href="styles.css?v=20260917-premium" />
-  <link rel="stylesheet" href="premium.css?v=20261002-tu-dia" />
+  <link rel="stylesheet" href="premium.css?v=20261003-side-toggle" />
   <!-- F2 — K+AIR Calendar CSS (compartido con el calendario viejo del header) -->
   <link rel="stylesheet" href="../../shared/kair-calendar.css?v=545" />
   <!--
@@ -56,11 +56,6 @@
         </div>
 
         <span class="kair-top__sp"></span>
-
-        <span class="kair-chip-date" title="Mes visible en la agenda">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
-          <span id="chip-fecha">—</span>
-        </span>
 
         <div class="kair-top__actions">
           <button class="kair-icon-btn" id="btn-refresh" title="Sincronizar correos y eventos" aria-label="Sincronizar">
@@ -116,9 +111,24 @@
            El área de contenido contiene:
              - Correo (base layer, SIEMPRE renderizado): lista + detalle Gmail
              - Calendario (overlay deslizante): entra desde la izquierda -->
-      <div class="kair-layout" id="kair-layout">
+      <div class="kair-layout" id="kair-layout" data-sidebar="on">
         <!-- 1. Sidebar izquierdo: SIEMPRE visible (mini-cal + tipos + integración) -->
         <aside class="kair-sidebar" id="sidebar"></aside>
+
+        <!-- 📦850 · Botón del borde para plegar la columna lateral.
+             Va FUERA del <aside> a propósito: si viviera adentro se iría
+             con él al plegarse y no quedaría forma de volver a abrirlo.
+             Es hermano dentro de .kair-layout (position: relative), así
+             sobrevive a cada render(): renderSidebar() vacía el <aside>,
+             no el layout. El chevron rota 180° con el estado; el markup
+             no cambia. data-sidebar="on" es el estado por defecto para
+             que no haya un frame de la columna abierta antes de que el
+             JS lea la preferencia guardada. -->
+        <button class="kair-side-toggle" id="btn-side-toggle" type="button"
+                aria-controls="sidebar" aria-expanded="true"
+                title="Ocultar la columna lateral" aria-label="Ocultar la columna lateral">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
 
         <!-- 2. Área de contenido: correo (base) + calendario (overlay deslizante) -->
         <div class="kair-content-area" id="content-area" data-calendar-visible="true">
@@ -198,7 +208,7 @@
        de app.js para que `window.ColombiaFestivos` esté disponible al init. -->
   <script src="../../shared/colombia-festivos.js"></script>
   <!-- K+AIR Bandeja Integrada — Lógica principal (monolith) -->
-  <script src="app.js?v=20261002-tu-dia"></script>
+  <script src="app.js?v=20261003-side-toggle"></script>
   <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
        Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
        CON todos los renderers adentro. La versión "web" sin -full no incluye

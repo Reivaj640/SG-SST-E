@@ -1,3 +1,23 @@
+# K+AIR v0.1.233
+
+## 🙈 La columna de la izquierda ahora se quita de en medio
+
+La columna con el mini-calendar, los tipos de evento y "Tu día" estaba siempre ahí, ocupando un quinto de la pantalla, larieras o no la nesitaras. Si estabas leyendo correos no te hacía falta, pero no había forma de quitarla.
+
+Ahora hay un botón chiquito en el borde. Un clic y la columna se pliega: el correo —o el calendario— toma ese ancho de una vez. Otro clic y vuelve.
+
+Tres cosas para que funcione como debe:
+
+- **Nunca te quedás sin poder abrirla.** El botón está en el borde, no dentro de la columna. Si estuviera adentro, se plieguearía con ella y no habría forma de recuperarla.
+- **No pierde nada de lo que escribiste.** Al plegarse la columna no se borra: es la misma columna, escondida.
+- **Se acuerda.** La próxima vez que abras la app está como la dejaste, así que no la tenés que plegar otra vez cada mañana.
+
+## 🧹 El encabezado dejó de decir el mes dos veces
+
+En el encabezado había una etiqueta con "Octubre 2026" al lado del título. El calendario grande ya tiene el mes arriba, y el mini-calendar también. Era el mismo dato dos veces en pantalla, y empujaba los botones hacia la derecha.
+
+Ahora esa etiqueta no está, y el espacio lo usan los botones de verdad.
+
 # K+AIR v0.1.232
 
 ## 🗓️ El calendario de la izquierda por fin se deja entender

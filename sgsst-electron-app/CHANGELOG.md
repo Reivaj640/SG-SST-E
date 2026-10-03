@@ -5,7 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
-## [0.1.232] - 2026-10-02
+## [0.1.233] - 2026-10-03
+
+### 📦850 · La columna lateral se pliega y el correo toma su espacio
+
+**Resumen:** El sidebar (mini-calendar + Tipos de evento + Tu día) ocupa 250px fijos. Un botón chiquito en el borde lo pliega y el correo o el calendario toman ese ancho. El botón se acuerda del estado entre sesiones.
+
+- **El botón vive FUERA del `<aside>`, en el `.kair-layout`, como hermano.** No es una preferencia de estilo: si estuviera adentro se iría con la columna al plegarse y no quedaría forma de volver a abrirla, que es justo el requisito. Como hermano, `renderSidebar()` no lo destruye (ese vacía el `<aside>`, no el layout) y su listener se enlaza **una sola vez** en `bindHeader()`.
+- **El ancho sale de una variable, `--side-w`, no de un número.** El `<aside>` mide `width: var(--side-w)` y el grid quedó en `auto 1fr` en vez de `250px 1fr`. Animar el track del grid depende de que el navegador lo interpole; animar el `width` de una caja es confiable en todas partes. Y como el grid es `auto`, el contenido crece con el sidebar en vez de esperar a que la transición termine.
+- **Al plegar se quita el `column-gap` también**, no solo el ancho. Con el gap puesto quedaban 16px de franja muerta entre el borde y el correo, el tipo de detalle que hace que un layout se vea "casi bien" sin saber por qué.
+- **`overflow: hidden` en el sidebar.** Sin el recorte, durante los 240ms de la transición las tres cartas se derramaban sobre el correo.
+- **`pointer-events: none` al plegar.** Un día del mini que sigue cogiendo el mouse de forma invisible lanzaría el popup de 📦846 sobre el hueco, y el popup se quedaría flotando ahí sin nada debajo.
+- **El clic NO llama a `render()`, solo cambia un atributo.** Un `render()` reconstruye la lista de correo entera para cambiar un ancho. Lo único que se hace a mano es `ocultarPopupDia()`, porque ese popup vive en `document.body` y no se va solo.
+- **El botón se ancla a la variable, no a un número**: `left: calc(var(--side-pad) - 13px)` y se desplaza en X con `translateX(var(--side-w))`. El ancho de la columna y la posición del botón salen de las **mismas** variables, así que cambiar un breakpoint no puede descuadrarlos.
+- **`z-index: 10000`**: por encima del popup del mini (9999), que se dibuja a la derecha del día y lo cruzaba, y muy por debajo de los modales (500000) y la firma (450000).
+- **A 1080px el botón se oculta con el sidebar.** A ese ancho la regla preexistente ya esconde el `<aside>`; sin esta, quedaba un botón flotando sin nada que plegar.
+- **Se acuerda en `localStorage`** (`kair-bandeja.sidebarColapsado`), leído con `=== "1"` y no como truthy: `localStorage` guarda texto y la cadena `"0"` es truthy, así que un `if (getItem(...))` abriría la columna aunque el owner la hubiera dejado plegada.
+- `main/test-bandeja-sidebar-850.js` (48 checks) — **20/20 mutaciones detectadas**. El test se armó como `evaluar(htm, css, js) -> {f, n}` para poder mutar en memoria sin tocar los archivos reales.
+
+### 📦851 · Se fue la etiqueta con el mes del encabezado
+
+**Resumen:** El chip "Octubre 2026" del topbar mostraba el mismo dato dos veces: el calendario grande ya lo pone en su toolbar y el mini-calendar muestra el mes actual. Se eliminó de punta a punta.
+
+- **Eliminación completa, en los 3 archivos**: el `<span class="kair-chip-date">` del HTML, los 14 renglones de su regla CSS y las 3 líneas de JS que lo llenaban en cada render. No quedó código muerto: reintroducir solo el JS habría llenado un chip inexistente.
+- **`state.viewMonthLabel` NO quedó huérfano.** Antes tenía dos consumidores (el chip y el toolbar del calendario grande) y conserva el que importa. El riesgo real no era que algo se rompiera al quitar el chip, sino que alguien se llevara el mes **por error** y el toolbar quedara en blanco sin que nadie lo notara.
+- **El toolbar tiene dos caminos para el mes y se necesitan los dos**: al pintarse (el `${`} del template) y al actualizarse (la rama `else` de day/week/schedule). Un solo check que buscara el texto en todo el archivo pasaría con uno de los dos faltando, y con el otro ausente el toolbar queda con el texto viejo al cambiar a vista Mes. Por eso hay dos checks, uno por camino.
+- **Dos checks de `test-bandeja-premium-v2.js` afirmaban el chip**, uno mirando el HTML y otro el JS. Se **invirtieron los dos**, no uno: si se hubiera borrado solo el del HTML, reintroducir el código sin el markup pasaba verde.
+
+
 
 ### 📦849 — Los 3 indicadores bajan al sidebar y "Eventos críticos" desaparece
 

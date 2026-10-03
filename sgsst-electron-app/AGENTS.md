@@ -4752,3 +4752,81 @@ La primera medición de este bug dio **48px** colapsado, o sea "el colapso no fu
 
 **Regla:** para medir un estado que tiene `transition`, esperar a que termine. Un test que mide sin esperar puede dar verde con el bug presente, o rojo con el código sano.
 
+## 📦850-851 · Botón que pliega su propia columna, y checks que se auto-disimulan
+
+### 1. Un botón que PLEGA la columna que lo contiene no puede vivir dentro de ella
+
+La regla más obvia del mundo y la que más se rompe. El botón del 📦850 pliega el `<aside class="kair-sidebar">`. Si el `<button>` estuviera dentro de ese `<aside>`, se iría con él y no quedaría forma de volver a abrir la columna: el requisito explícito del owner era "que sea claro para mostrar esta sección".
+
+Vivió entonces como hermano, dentro de `.kair-layout`. Eso además trajo una propiedad gratis: `renderSidebar()` hace `container.innerHTML = ""` sobre el `<aside>`, no sobre el layout, así que el botón sobrevive a cada `render()` y su listener se enlaza **una sola vez** en `bindHeader()` en vez de en cada render.
+
+**Regla:** antes de poner un control dentro de una región plegable, preguntate dónde se va ese control cuando la región se pliega. Si la respuesta es "con ella", el control va afuera.
+
+### 2. Para que el contenido CREZCA hay que animar un ancho, y el ancho del track del grid no es confiable
+
+La regla de la casa dice "animaciones GPU-only (transform/opacity)". Aquí no se podía cumplir, y estaba bien: para que el correo **gane** espacio hay que animar un ancho. La pregunta es cuál.
+
+| Opción | Qué pasó |
+|---|---|
+| `grid-template-columns: 250px 1fr` → `0px 1fr` con `transition` | Depende de que el navegador interpole el track. Chromium 138 lo hace, pero es una capacidad, no una garantía. |
+| `grid-template-columns: auto 1fr` + `width` en el hijo | `width` se anima en todas partes, y `auto` hace que la columna mida lo que mida el hijo. **Esta** |
+
+Con la segunda, además, el contenido crece **durante** la transición en vez de saltar al final, que es lo que se ve bien.
+
+La parte que sí se compone (la que el ojo sigue) queda en `transform`/`opacity`: el sidebar se desliza y se apaga, y el botón se mueve con `translateX`. El `width` afecta una sola caja, no la pantalla.
+
+### 3. El ancho de una columna y la posición de un botón anclado a su borde salen de la MISMA variable
+
+El botón del 📦850 se ancla al punto exacto donde la columna termina y el contenido empieza, en dos ventanas distintas (250px y 224px) porque hay un breakpoint a 1280px. Con dos números sueltos, cambiar un breakpoint descuadraba el botón del borde sin que nada fallara.
+
+Por eso `--side-w` y `--side-pad`: el `<aside>` mide `var(--side-w)` y el botón usa `calc(var(--side-pad) - 13px)` más `translateX(var(--side-w))`.
+
+**Regla:** si un valor depende de otro, que los dos lean de la misma variable. Un número repetido en dos lugares es un bug esperando el próximo breakpoint.
+
+### 4. Un mutante vacío SIEMPRE "pasa", y se reporta como "el check no muerde"
+
+Tres mutaciones de `app.js` en el test de 📦850 estaban escritas con `"\n"` mientras el archivo está en **CRLF**. El `String.replace` no encontraba nada, devolvía el archivo idéntico, y el check pasaba siempre.
+
+El reporte decía "3 checks no muerden", pero los checks estaban bien: **nunca se habían probado**. Peor: esas mismas 3 mutaciones se habían reportado como detectadas en la corrida anterior, cuando el check estaba mal escrito y fallaba por otro motivo. El bug del check tapaba al mutante vacío.
+
+**Dos guards, ambos obligatorios:**
+
+1. Normalizar a LF antes de mutar: `raw.replace(/\r\n/g, '\n')`. El EOL se verifica aparte contra el crudo, porque normalizar para evaluar no debe perder la señal de "este archivo está en CRLF".
+2. Contar los mutantes vacíos **por separado** y hacerlos fallar.
+
+**Cómo se distinguen las dos fallas.** "Check mal escrito" y "mutante vacío" se ven IGUAL en el reporte —el check pasa cuando debería fallar—:
+
+| | El archivo | Diagnóstico |
+|---|---|---|
+| Mutante vacío | **no cambió** (`mut(h) === h`) | La mutación está mal escrita |
+| Check mal escrito | **sí cambió** | El check no mira lo que dice mirar |
+
+**Regla:** antes de culpar a un check, verificá `mut(x) !== x`. Siempre.
+
+### 5. Un regex con rango fijo se rompe cuando agregás un comentario
+
+Un check usaba `/\.kair-layout[\s\S]{0,300}flex:\s*1/`. Al agregar el comentario que documenta `--side-w`, el `flex: 1` se empujó fuera de la ventana y el check se puso rojo **sin que el layout hubiera cambiado**.
+
+Se arregló acotando a la misma llave:
+
+`.kair-layout { /* comentario largo... */ grid-template-columns: auto 1fr; ... flex: 1; }`
+
+`/\.kair-layout\s*\{[^}]*flex:\s*1[^}]*\}/`
+
+**No prefixes el rango a ciegas.** Estirarlo para "que no falle" destruye el check: si el `flex: 1` estuviera en otra regla, dejaría de detectarlo, y eso es justo de lo que trata.
+
+### 6. Un check que busca un texto en TODO el archivo pasa con la mitad del código
+
+El riesgo real de borrar el chip de fecha (📦851) no era que algo se rompiera: era que alguien se llevara el mes **por error** y el toolbar del calendario quedara en blanco sin que nadie lo notara.
+
+El toolbar tiene **dos** caminos para el mes: al pintarse (el `${`}` del template) y al actualizarse (la rama `else` de day/week/schedule). Un check `/state\.viewMonthLabel/.test(codigo)` pasaba con cualquiera de los dos, e incluso con ninguno si el texto aparecía en otro lado. Son dos checks distintos, uno por camino.
+
+**Regla:** un check de "este texto tiene que estar" solo vale si además dice **dónde**. Si no, no sabe distinguir el código bueno del código roto que lo contiene.
+
+### 7. Cuando eliminas algo que dos checks afirman, invierte los DOS
+
+El chip de fecha era afirmado por dos checks de `test-bandeja-premium-v2.js`: uno mirando el HTML (`id="chip-fecha"`) y otro el JS (`chipFecha.textContent = ...`). Invertir uno y borrar el otro deja un agujero: reintroducir el **código sin el markup** pasa verde, porque el check del HTML sigue conforme.
+
+**Regla:** cuando borras algo, busca cuántos checks lo afirman. Un check borrado es un hueco; uno invertido sigue protegiendo. Y si son varios, se invierten todos.
+
+

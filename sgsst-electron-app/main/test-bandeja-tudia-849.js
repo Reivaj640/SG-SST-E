@@ -37,10 +37,21 @@ chk('ya NO existe renderKpiStrip (pintaba las tarjetas)',
   appCod.indexOf('renderKpiStrip') < 0);
 chk('el HTML ya NO tiene la <section class="kpis">',
   htm.indexOf('<section class="kpis"') < 0 && htm.indexOf('id="kpi-strip"') < 0);
+// 📦850 · Este regex exigía el div de apertura EXACTO, y al agregarle
+// `data-sidebar="on"` (el estado inicial de la columna plegable) dejó de casar.
+// El comportamiento que protege —el correo sube y gana el alto que dejaron las
+// tarjetas— sigue igual, así que se toleran los atributos extra en vez de
+// borrarse. Un check borrado es un hueco; uno tolerancia a los atributos sigue
+// Protectiendo lo mismo.
 chk('el layout principal sube solo (el correo gana el alto de las tarjetas)',
-  /<div class="kair-layout" id="kair-layout">/.test(htm)
-  && /\.kair-main[\s\S]{0,400}display:\s*flex/.test(css)
-  && /\.kair-layout[\s\S]{0,300}flex:\s*1/.test(css));
+  /<div class="kair-layout" id="kair-layout"[^>]*>/.test(htm)
+  && /\.kair-main\s*\{[^}]*display:\s*flex/.test(css)
+  // 📦850 · El rango {0,300} se rompió solo: el comentario que documenta
+  // --side-w/-pad empujó el `flex: 1` fuera de la ventana y el check se puso
+  // rojo sin que el layout hubiera cambiado. Se acota a la MISMA llave del CSS
+  // en vez de alargar el rango a ciegas: si `flex: 1` está en otra regla, el
+  // check tiene que notarlo, porque de eso es de lo que trata.
+  && /\.kair-layout\s*\{[^}]*flex:\s*1[^}]*\}/.test(css));
 
 // ══ 2) calcularIndicadores es la fuente única ══
 chk('existe calcularIndicadores()', calc.length > 400, calc.length + ' chars');
@@ -197,8 +208,15 @@ chk('sin CJK/mojibake', (t.match(RANGO) || []).length + (css.match(RANGO) || [])
   + (htm.match(RANGO) || []).length === 0);
 const crlf = (t.match(/\r\n/g) || []).length, lf = (t.match(/\n/g) || []).length;
 chk('EOL consistente en app.js', crlf === lf || crlf === 0, crlf + '/' + lf);
+// 📦850 · Este check se desató del nombre del paquete. Antes pedía literally
+// "-tu-dia", o sea que CADA bump tenía que editar este test o quedaba rojo
+// por un motivo que no era un bug. Ahora valida lo que de verdad importa: que
+// el token tenga forma de token y que los dos archivos lleven el MISMO.
+const tokCss = (htm.match(/premium\.css\?v=([\w-]+)/) || [])[1] || '';
+const tokJs = (htm.match(/app\.js\?v=([\w-]+)/) || [])[1] || '';
 chk('cache-bust de app.js y premium.css actualizado',
-  /app\.js\?v=2026\d+-tu-dia/.test(htm) && /premium\.css\?v=2026\d+-tu-dia/.test(htm));
+  /^\d{8}-[\w-]+$/.test(tokCss) && tokCss === tokJs,
+  'premium=' + tokCss + ' app=' + tokJs);
 
 let fail = 0;
 console.log('\n=======================================');

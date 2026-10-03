@@ -201,21 +201,6 @@ html, body {
    toolbar del correo. */
 .kair-top__actions .kair-header__action--primary { padding: 8px 11px; }
 
-/* Chip de fecha (mes visible) */
-.kair-chip-date {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--kair-text-2);
-  background: var(--kair-surface);
-  border: 1px solid var(--kair-border);
-  border-radius: 999px;
-  padding: 7px 14px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  white-space: nowrap;
-}
-
 /* Control segmentado (Agenda / Correo · vistas del calendario) */
 .kair-seg {
   display: flex;
@@ -391,8 +376,15 @@ html, body {
    Se conserva `align-items: stretch` + `grid-template-rows: 1fr` del legacy —
    de eso depende la cadena de alturas para el scroll interno. */
 .kair-layout {
+  /* 📦850 · `--side-w` es el ancho de la columna lateral y `--side-pad` el
+     padding izquierdo del layout (o sea, dónde arranca la columna). Son
+     variables y no números sueltos porque la necesitan DOS cosas: el ancho
+     del <aside> y la posición en X del botón del borde. Con dos números
+     sueltos, cambiar un breakpoint descuadraba el botón del borde. */
+  --side-w: 250px;
+  --side-pad: 28px;
   display: grid;
-  grid-template-columns: 250px 1fr;
+  grid-template-columns: auto 1fr;
   grid-template-rows: 1fr;
   align-items: stretch;
   gap: 16px;
@@ -401,6 +393,7 @@ html, body {
   min-height: 0;
   overflow: hidden;
   position: relative;
+  transition: column-gap 240ms cubic-bezier(.4, 0, .2, 1);
 }
 
 .kair-card {
@@ -411,19 +404,95 @@ html, body {
 }
 
 /* El sidebar pasa a ser un contenedor transparente: cada bloque interno
-   (mini-calendario, tipos de evento, integración) es su propia tarjeta. */
+   (mini-calendario, tipos de evento, Tu día) es su propia tarjeta.
+   📦850 · `overflow: hidden` + `width: var(--side-w)`: el ancho es lo que
+   se pliega, y sin el recorte las tarjetas se derramarían sobre el correo
+   durante los 240ms de la transición. */
 .kair-sidebar {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 0;
   min-width: 0;
-  overflow: visible;
+  width: var(--side-w);
+  overflow: hidden;
   background: transparent;
   border: none;
   box-shadow: none;
   border-radius: 0;
   padding: 0;
+  transition: width 240ms cubic-bezier(.4, 0, .2, 1),
+              opacity 160ms ease-out,
+              transform 240ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* 📦850 · Estado PLEGADO de la columna lateral.
+   El <aside> se va a 0 de ancho y el gap también, para que el correo y el
+   calendario tomen los 250px + 16px completos y no dejen una franja
+   muerta. El transform y el opacity son la parte que se compone (GPU);
+   el width es inevitable —para que el contenido CREZCA hay que animar un
+   ancho— y por eso solo afecta a una caja, no a la pantalla entera.
+   `pointer-events: none` evita que un día del mini siga cogiendo el mouse
+   invisiblemente y disparando el popup de 📦846 sobre el hueco. */
+.kair-layout[data-sidebar="off"] {
+  column-gap: 0px;
+}
+.kair-layout[data-sidebar="off"] .kair-sidebar {
+  width: 0px;
+  opacity: 0;
+  transform: translateX(-14px);
+  pointer-events: none;
+}
+
+/* 📦850 · Botón del borde. Anclado al punto donde la columna termina y el
+   contenido empieza: `left` fijo en el borde del padding, y en X lo mueve
+   `--side-w` con transform (compuesta, no de layout). Así el botón queda
+   SIEMPRE visible, plegada o no, que es justo el requisito: nunca te
+   quedás sin forma de volver a abrir la columna.
+   `z-index: 10000` lo pone por encima del popup del mini (9999): el popup
+   se dibuja a la derecha del día y lo cruzaría. Sigue muy por debajo de
+   los modales (500000) y de la firma (450000). */
+.kair-side-toggle {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--side-pad) - 13px);
+  width: 26px;
+  height: 26px;
+  margin-top: -13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--kair-border);
+  border-radius: 50%;
+  background: var(--kair-surface);
+  color: var(--kair-text-3);
+  box-shadow: var(--kair-sh-sm);
+  cursor: pointer;
+  z-index: 10000;
+  transition: transform 240ms cubic-bezier(.4, 0, .2, 1),
+              background 160ms ease-out,
+              border-color 160ms ease-out,
+              color 160ms ease-out;
+}
+.kair-side-toggle:hover {
+  background: var(--kair-blue-soft);
+  border-color: var(--kair-blue-soft);
+  color: var(--kair-blue);
+}
+.kair-side-toggle:focus-visible {
+  outline: 2px solid var(--kair-blue);
+  outline-offset: 2px;
+}
+.kair-side-toggle svg {
+  transition: transform 200ms cubic-bezier(.34, 1.4, .5, 1);
+}
+.kair-layout[data-sidebar="on"] .kair-side-toggle {
+  transform: translateX(var(--side-w));
+}
+/* El chevron apunta a la izquierda (plegar) y gira 180° al plegarse. */
+.kair-layout[data-sidebar="off"] .kair-side-toggle svg {
+  transform: rotate(180deg);
 }
 
 /* Tarjetas del sidebar */
@@ -2191,7 +2260,7 @@ html, body {
 
 /* ══════════ 12. RESPONSIVE ══════════ */
 @media (max-width: 1280px) {
-  .kair-layout { grid-template-columns: 224px 1fr; padding: 14px 20px 18px; }
+  .kair-layout { --side-w: 224px; --side-pad: 20px; padding: 14px 20px 18px; }
   .kair-mail-stack { grid-template-columns: 330px 1fr; }
   .kpis { padding: 14px 20px 4px; }
   .kair-top { padding: 16px 20px 0; }
@@ -2200,6 +2269,9 @@ html, body {
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .kair-layout { grid-template-columns: 1fr; }
   .kair-layout .kair-sidebar { display: none; }
+  /* 📦850 · A 1080px el sidebar ya no existe, así que el botón tampoco:
+     no hay columna que plegar ni que abrir. */
+  .kair-side-toggle { display: none; }
   .kair-mail-stack { grid-template-columns: 1fr; }
   .kair-mail-stack__list { border-right: none; border-bottom: 1px solid var(--kair-border); }
 }

@@ -36,15 +36,27 @@ const appCodigo = soloCodigo(app);
 
 check('HTML: breadcrumb "Inicio > Bandeja integrada"', /kair-top__crumb[\s\S]*?Inicio[\s\S]*?Bandeja integrada/.test(html));
 check('HTML: icono + H1 + subtítulo del módulo', /kair-top__icon/.test(html) && /kair-top__h1">Bandeja integrada</.test(html) && /kair-top__sub">/.test(html));
-check('HTML: chip de fecha (#chip-fecha)', /id="chip-fecha"/.test(html));
+// 📦851 · Este check exigía el chip de fecha del topbar. Se eliminó: era el mismo
+// dato dos veces en pantalla (el toolbar del calendario grande ya muestra el mes
+// y el mini-calendar muestra el mes actual). El check se INVIERTE, no se borra:
+// uno borrado es un hueco, uno invertido sigue impidiendo que reaparezca.
+check('HTML: el chip de fecha redundante NO esta (#chip-fecha / .kair-chip-date)',
+  !/id="chip-fecha"/.test(html) && !/kair-chip-date/.test(html));
+// Que el toolbar del calendario grande conserve SU mes es otra cosa, y la
+// comprueba test-bandeja-chip-851.js con mutation testing. No se alarga aqui
+// un check que no puede morder.
 check('HTML: segmentado Agenda/Correo', /class="kair-seg"/.test(html) && /id="tab-agenda"/.test(html) && /id="tab-correo"/.test(html));
 // 📦849 · Los indicadores ya no son tarjetas arriba: viven en el sidebar
 // ("Tu día"). La <section class="kpis"> se quitó para que la lista de
 // correo use ese alto.
 check('HTML: ya NO hay tira de tarjetas de indicadores (se movieron al sidebar)',
   !/<section class="kpis"/.test(html) && html.indexOf('id="kpi-strip"') < 0);
+// 📦850 · El div de apertura ya no es idéntico: lleva `data-sidebar="on"` (el
+// estado inicial de la columna plegable). Se toleran los atributos extra en vez
+// de borrar el check — lo que protege es que el layout esté DENTRO de .kair-main,
+// y eso sigue igual.
 check('HTML: el layout principal sube directo al shell',
-  /<div class="kair-layout" id="kair-layout">/.test(html));
+  /<div class="kair-layout" id="kair-layout"[^>]*>/.test(html));
 check('HTML: sidebar sin tarjeta propia (cada bloque es card)', /<aside class="kair-sidebar" id="sidebar">/.test(html));
 check('HTML: se eliminó el botón-flecha (#panel-toggle)', !/id="panel-toggle"/.test(html));
 
@@ -90,7 +102,11 @@ check('JS: "Tipos de evento" premium con contador', /class: "kair-card tipos"/.t
 check('JS: la sección "Tu día" reemplaza a la tarjeta de Integración correo (mira CODIGO)',
   /class: "kair-card tuday"/.test(app) && appCodigo.indexOf('btn-abrir-bandeja') < 0
   && appCodigo.indexOf('sidecard') < 0 && appCodigo.indexOf('Integración correo') < 0);
-check('JS: chip de fecha actualizado en renderHeaderState', /chipFecha\.textContent = state\.viewMonthLabel/.test(app));
+// 📦851 · Segundo check que exigía el chip (este miraba el JS, no el HTML).
+// Los dos se invierten juntos: uno invertido protege que no vuelva, y dejar el
+// otro afirmándolo significaba que reintroducir el chip a medias —el markup
+// sí, el JS no— pasara verde.
+check('JS: el codigo del chip de fecha tambien se elimino', appCodigo.indexOf('chipFecha') < 0);
 check('JS: segmentado pintado por aria-selected', /tabAgenda\.setAttribute\("aria-selected"/.test(app));
 
 // ── 4. Capa CSS premium ──────────────────────────────────────────
@@ -129,7 +145,20 @@ check('Cache-bust: premium.css con ?v= en index.html', /premium\.css\?v=/.test(h
 //     Al retirar el botón-flecha, esa columna debe desaparecer: si queda, el
 //     contenido se comprime en un carril de 26px y la bandeja se ve vacía.
 const layoutBase = (premium.match(/\.kair-layout\s*\{[^}]*\}/) || [''])[0];
-check('LAYOUT: .kair-layout declara 2 columnas (sidebar + contenido)', /grid-template-columns:\s*250px 1fr;/.test(layoutBase));
+// 📦850 · Este check afirmaba el ancho LITERAL ("250px 1fr"). Con la columna
+// lateral plegable el primer track pasó a ser "auto": lo mide el <aside>, que es
+// lo que permite animarlo a 0. El comportamiento que este check protege NO es el
+// número — es que haya EXACTAMENTE 2 columnas y que la segunda sea 1fr. Por eso se
+// reescribió en vez de borrarse: un check borrado es un hueco, uno actualizado
+// sigue siendo una red, y ahora cubre también el caso plegado.
+const gridTracks = (layoutBase.match(/grid-template-columns:\s*([^;]+);/) || [, ''])[1]
+  .trim().split(/\s+(?![^(]*\))/);
+check('LAYOUT: .kair-layout declara 2 columnas (sidebar + contenido)',
+  gridTracks.length === 2 && gridTracks[1] === '1fr' && gridTracks[0] !== '26px',
+  'tracks=' + JSON.stringify(gridTracks));
+check('LAYOUT: la columna lateral se mide con var(--side-w), no con un ancho fijo',
+  /--side-w:\s*\d+px/.test(layoutBase) && /grid-template-columns:\s*(auto|var\(--side-w\))\s+1fr/.test(layoutBase),
+  (layoutBase.match(/grid-template-columns:[^;]*/) || [''])[0].trim());
 check('LAYOUT: no quedaron columnas del botón-flecha retirado', !/grid-template-columns:\s*(250px|224px)\s+26px\s+1fr/.test(premium) && !/grid-template-columns:\s*22px\s+1fr/.test(premium));
 // 6.b El modal vive en el HTML con el atributo `hidden`; quien lo oculta es la
 //     regla del navegador. Si la regla base declara `display`, el overlay queda
