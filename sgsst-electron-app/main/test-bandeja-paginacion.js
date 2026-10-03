@@ -180,11 +180,26 @@ check('CSS: el botón tiene estado deshabilitado (mientras carga)',
   /\.kair-mail-pager__btn\[disabled\]/.test(premium));
 
 // ── 10. Cache-bust ───────────────────────────────────────────────
+// 📦846-fix · Este check vivia con una lista blanca de tokens
+// ("/premium\.css\?v=20260918-paginacion-correos/"), asi que cada vez que
+// advanced un paquete el test se caia sin que hubiera nada roto. Un guard
+// que obliga a tocar el test en cada bump no guarda el cache-bust: guarda la
+// fecha del ultimo bump. Ahora se valida que el token EXISTA y tenga la forma
+// YYYYMMDD-algo, que es lo que de verdad importa para que el renderer no
+// sirva un archivo viejo.
 const iframeV = parseInt((rendererJs.match(/bandeja-integrada\/index\.html\?v=(\d+)/) || [0, 0])[1], 10);
 check('Cache-bust: iframe ?v= >= 695 (actual: ' + iframeV + ')', iframeV >= 695);
-check('Cache-bust: premium.css y app.js con ?v= nuevo',
-  /premium\.css\?v=20260918-paginacion-correos/.test(html) &&
-  /app\.js\?v=20260918-paginacion-correos/.test(html));
+const premiumV = (html.match(/premium\.css\?v=([\w.-]+)/) || [])[1] || '';
+const appV2 = (html.match(/app\.js\?v=([\w.-]+)/) || [])[1] || '';
+check('Cache-bust: premium.css con token de fecha (actual: ' + premiumV + ')',
+  /^\d{8}-/.test(premiumV));
+check('Cache-bust: app.js con token de fecha (actual: ' + appV2 + ')',
+  /^\d{8}-/.test(appV2));
+// 📦846 · Los dos archivos carga el mismo render: si uno se bumpea y el otro
+// no, el navegador puede servir el JS nuevo con el CSS viejo (o al reves) y
+// el popup aparece sin estilos o al reves. Se exige que coincidan.
+check('Cache-bust: premium.css y app.js comparten token (si no, se sirven desparejos)',
+  premiumV !== '' && premiumV === appV2, premiumV + ' vs ' + appV2);
 
 // ── Reporte ──────────────────────────────────────────────────────
 let failed = 0;

@@ -1,3 +1,45 @@
+# K+AIR v0.1.232
+
+## 🗓️ El calendario de la izquierda por fin se deja entender
+
+La Bandeja Integrada tenía el calendario chiquito pidiendo ayuda: un tooltip del sistema tapaba el calendario, las horas salían mal y varios eventos aparecían como si duraran todo el día. Y los tres indicadores vivían arriba, robándole espacio al correo.
+
+Todo eso quedó arreglado en esta tanda (📦844-849).
+
+### El mini-calendario se queda en el mes de hoy
+
+Antes tenías flechas para saltar de mes, y a mitad de la noche se quedaba pensando que "hoy" era el día anterior. Ahora el chiquito muestra siempre el mes en curso, sin flechas —para eso está el calendario grande— y se actualiza solo al cruzar la medianoche.
+
+### Doble clic y te lleva a ese día
+
+Un doble clic sobre cualquier fecha abre el calendario grande directamente en la vista Día de ese día. Un clic normal sigue moviendo el calendario grande sin ninguna consecuencia rara, así que no se siente lento ni trabado.
+
+### Al pasar el mouse ves qué hay, agrupado
+
+Los días con eventos muestran un cartel con los eventos del día **agrupados por categoría** (Reuniones, Entregas, Soporte, etc.), con máximo 8 para que no se vuelva una torre. Ese cartel es del programa, no del sistema: se ve parejo con el resto, es estático —nada de parpadeo ni saltos— y se oculta solo al mover la rueda o redibujar.
+
+### Se fue el cartel feo que tapaba todo
+
+El navegador ponía su propio rótulo negro sobre el día y ese se dibujaba encima del calendario sin que el programa lo pudiera controlar. Ese duplicado desapareció: ahora la única información es el cartel de categorías.
+
+### Las horas ya son las de verdad
+
+El cartel usaba su propia forma de leer la hora y por eso mostraba 00:00 para eventos que empezaban a las 10:00. Ahora usa los mismos datos que la rejilla del día, así que lo que lees en el cartel es lo mismo que vas a ver al abrir el día.
+
+### "Todo el día" solo cuando es todo el día
+
+Cinco cosas del programa (copias de seguridad, mantPcUbas, entre otras) se generan con el día completo marcado, pero la rejilla las pintaba como si fueran de 9:00 a 11:00 y el cartel decía "Todo el día" para todo. Ahora la regla es una sola para los dos lados: si es de día completo, se dice día completo; si no, se muestra la hora real.
+
+### Los tres indicadores bajaron al sidebar: "Tu día"
+
+En la columna izquierda, donde estaba "Integración correo", ahora hay una sección llamada **"Tu día"** con los tres indicadores que quedaban: correos pendientes, reuniones de hoy e invitaciones. No son tarjetas: son filas limpias, con el número grande, el nombre debajo y la fila completa clicable que hace exactamente lo que hacía antes —correo a la bandeja, reuniones al día de hoy en vista Día, invitaciones a su filtro—.
+
+Cuando el número es cero no se oculta: sale un guion y la fila se apaga un poco, para que sepas que lo revisaste.
+
+### Fuera "Eventos críticos", y el correo respira
+
+La tarjeta de eventos críticos se eliminó completa —de la pantalla, del cálculo y del código—, para que no vuelva a aparecer. Ese espacio libre lo ganó la lista de correo, que ahora arranca más arriba y muestra más mensajes sin rascar.
+
 # K+AIR v0.1.228
 
 ## 🧭 El sidebar ahora sí te lleva a donde quieras ir

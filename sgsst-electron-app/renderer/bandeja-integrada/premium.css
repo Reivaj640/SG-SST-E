@@ -378,83 +378,10 @@ html, body {
    Si en el futuro se porta markup del prototipo, reintroducir acá las variantes
    `--p` (primario), `--g` (ghost) y `--d` (peligro). */
 
-/* ══════════ 5. KPI STRIP ══════════ */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  padding: 16px 28px 4px;
-  flex: none;
-}
-.kair-kpi {
-  background: var(--kair-surface);
-  border: 1px solid var(--kair-border);
-  border-radius: var(--kair-r-md);
-  padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-  transition: var(--kair-t);
-  box-shadow: var(--kair-sh-sm);
-  cursor: pointer;
-  font-family: inherit;
-  color: inherit;
-}
-.kair-kpi:hover {
-  border-color: var(--kair-blue-soft2);
-  box-shadow: var(--kair-sh-md);
-  transform: translateY(-1px);
-}
-.kair-kpi__ico {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--kair-r-sm);
-  background: var(--kair-blue-soft);
-  color: var(--kair-blue);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-.kair-kpi__ico.is-green { background: var(--kair-green-soft); color: var(--kair-green-d); }
-.kair-kpi__ico.is-amber { background: var(--kair-amber-soft); color: var(--kair-amber-d); }
-.kair-kpi__ico.is-red { background: var(--kair-red-soft); color: var(--kair-red-d); }
-.kair-kpi__n {
-  display: block;
-  font-family: var(--kair-font-t);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -.02em;
-  line-height: 1.1;
-  color: var(--kair-text);
-}
-.kair-kpi__l {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--kair-text-2);
-  margin-top: 3px;
-}
-.kair-kpi__s {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--kair-text-3);
-  margin-top: 1px;
-}
-.kair-kpi__chip {
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 2px 9px;
-}
-.kair-kpi__chip.is-green { background: var(--kair-green-soft); color: var(--kair-green-d); }
-.kair-kpi__chip.is-amber { background: var(--kair-amber-soft); color: var(--kair-amber-d); }
-.kair-kpi__chip.is-blue { background: var(--kair-blue-soft); color: var(--kair-blue); }
+/* 📦849 — La seccion "5. KPI STRIP" se retiro: las tarjetas de indicadores
+   se movieron al sidebar ("Tu dia") y los estilos .kair-kpi* quedaron sin
+   usar. El .kpis tambien salio del HTML; sin el, .kair-main (columna flex)
+   sube el .kair-layout y la lista de correo gana ese alto. */
 
 /* ══════════ 6. SHELL: SIDEBAR + CONTENIDO ══════════ */
 /* Shell: sidebar (250px) + área de contenido.
@@ -606,39 +533,83 @@ html, body {
 .tipos__hint { font-size: 11px; color: var(--kair-text-3); margin-top: 8px; padding: 0 8px; display: none; }
 .tipos.has-off .tipos__hint { display: block; }
 
-.sidecard { padding: 14px; background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFE 100%); }
-.sidecard__h {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* 📦849 — "Tu dia": los tres indicadores que vivian en las tarjetas de
+   arriba, ahora como filas en el sidebar. Mismo esqueleto que
+   "Tipos de evento" (icono + nombre + contador) con el subtexto DEBAJO.
+   El tile del icono conserva el color por indicador, para que se lea de
+   un vistazo cual es cual sin leer la etiqueta. */
+.tuday { padding: 14px; }
+.tuday__t {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .07em;
   text-transform: uppercase;
-  color: var(--kair-blue);
-  margin-bottom: 8px;
+  color: var(--kair-text-3);
+  margin-bottom: 6px;
 }
-.sidecard__p { font-size: 12px; color: var(--kair-text-2); line-height: 1.55; }
-.sidecard__p b { color: var(--kair-text); font-weight: 600; }
-.sidecard__btn {
-  margin-top: 10px;
+.tuday__i {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
+  padding: 8px;
+  border: none;
+  background: none;
+  border-radius: var(--kair-r-xs);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: var(--kair-t);
+}
+.tuday__i + .tuday__i { border-top: 1px solid var(--kair-border-soft); border-radius: var(--kair-r-xs); }
+.tuday__i:hover { background: var(--kair-bg); }
+.tuday__ico {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 8px 12px;
-  border-radius: var(--kair-r-xs);
-  border: 1px solid var(--kair-border-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--kair-blue);
-  background: var(--kair-surface);
-  transition: var(--kair-t);
-  cursor: pointer;
-  font-family: inherit;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 9px;
 }
-.sidecard__btn:hover { background: var(--kair-blue-soft); border-color: var(--kair-blue-soft2); }
+.tuday__ico--blue { background: var(--kair-blue-soft); color: var(--kair-blue); }
+.tuday__ico--green { background: var(--kair-green-soft); color: var(--kair-success); }
+.tuday__ico--amber { background: var(--kair-amber-soft); color: var(--kair-amber-d); }
+.tuday__body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.tuday__top { display: flex; align-items: baseline; gap: 8px; }
+.tuday__n {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--kair-text-2);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tuday__c {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--kair-text);
+  font-variant-numeric: tabular-nums;
+}
+.tuday__s {
+  font-size: 11px;
+  color: var(--kair-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Valor 0: el guion ya lo dice, pero la fila completa se apaga para que
+   "no hay nada" se lea de un vistazo y no haya que interpretar el guion. */
+.tuday__i.is-vacio { opacity: .45; }
+.tuday__i.is-vacio .tuday__c { font-weight: 600; color: var(--kair-text-3); }
+
+
+/* 📦849 — La tarjeta "Integración correo" (.sidecard*) se retiro: su
+   espacio lo ocupa ahora "Tu dia". El texto de arrastrar correo y el
+   botón "Abrir bandeja" eran redundantes con el indicador de Correos
+   no leídos, que ya lleva a la bandeja. */
 
 /* NOTA (📦752) — El botón-flecha (`#panel-toggle`) que separaba el sidebar del
    contenido se eliminó: lo reemplaza el segmentado Agenda/Correo del topbar.
@@ -2245,3 +2216,113 @@ html, body {
     transition-duration: .01ms !important;
   }
 }
+
+  /* 📦846 — Popup de categorias del mini-calendar.
+     pointer-events:none NO es cosmetico: si el popup aceptara el mouse,
+     al entrar en el dispararia el mouseleave del dia (parpadeo) y ademas
+     se comeria el segundo clic del doble clic de 845. Es informativo,
+     nunca interactivo. La transicion usa solo opacity y transform, y el
+     prefers-reduced-motion global del final de este archivo la apaga. */
+  .mini-pop {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    min-width: 220px;
+    max-width: 320px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--kair-border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity .12s cubic-bezier(0, 0, .2, 1),
+                transform .12s cubic-bezier(0, 0, .2, 1),
+                visibility .12s;
+  }
+  .mini-pop.is-on {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  .mini-pop__day {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--kair-text-3);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+  }
+  .mini-pop__cat {
+    border-top: 1px solid var(--kair-border-soft);
+    margin-top: 7px;
+    padding-top: 7px;
+  }
+  .mini-pop__cat:first-of-type {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  .mini-pop__cat-h {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--kair-text);
+  }
+  .mini-pop__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 8px;
+  }
+  .mini-pop__n {
+    margin-left: auto;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--kair-text-3);
+    background: var(--kair-blue-soft);
+    border-radius: 20px;
+    padding: 1px 6px;
+  }
+  .mini-pop__row {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+  .mini-pop__h {
+    /* min-width y NO flex: 0 0 <px>. Con un ancho fijo la franja se
+       desbordaba de su caja y empujaba el titulo del evento. El
+       min-width deja que "09:00–10:00" y "Todo el día" quepan sin
+       recortar la hora, que es justo el dato que se viene a leer. */
+    flex: 0 0 auto;
+    min-width: 66px;
+    white-space: nowrap;
+    color: var(--kair-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .mini-pop__t {
+    color: var(--kair-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mini-pop__hint {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--kair-border-soft);
+    font-size: 10.5px;
+    color: var(--kair-text-3);
+    text-align: right;
+  }
+  .mini-pop__more {
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid var(--kair-border-soft);
+    font-size: 11px;
+    color: var(--kair-text-3);
+  }

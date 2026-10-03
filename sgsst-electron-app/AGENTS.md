@@ -4627,6 +4627,103 @@ Había **dos** callbacks de "Volver": la "normal" y la "segura". La normal **nun
 
 ## ⚠️ El `padding` de un hijo NO colapsa con la fila del grid (📦842, 2026-10-02)
 
+## ⚠️ Un `title` nativo se dibuja ENCIMA de tu popup, y no hay z-index que lo baje (📦847, 2026-10-02)
+
+### El síntoma
+
+Un popup propio y el `title` del botón se muestran a la vez, con el del navegador flotando encima.
+
+### Por qué
+
+El `title` lo dibuja el navegador en una **capa del sistema, fuera del documento**. Ningún `z-index`, `overflow` ni `position` de la página lo afecta: no es un elemento, es una ventana del sistema operativo.
+
+### La regla
+
+Si un elemento ya muestra su propia información al hover, **no le pongas `title`**. Es la misma información dos veces, y la del navegador se queda encima. Si el `title` hacía falta como pista, muévela al popup.
+
+### Y si el `title` es el único aviso
+
+Déjalo, pero solo donde no compita con nada: en los días **sin** eventos el `title` es la única pista y no hay popup que lo estorbe. Un elemento puede tener `title` en unos casos y no en otros.
+
+### Trampa al escribirlo
+
+El helper `el()` hace `setAttribute` sin mirar el valor, así que `title:undefined` deja `title="undefined"` en el DOM. Si la condición va dentro del objeto de atributos, hay que **sacarla afuera** y asignarla aparte.
+
+## ⚠️ "Mismo dato" en el popup y en la grilla exige la MISMA función (📦848, 2026-10-02)
+
+### El síntoma
+
+El popup dice "Todo el día" de un evento que la grilla dibuja de 9:00 a 11:00.
+
+### Por qué
+
+Inventé un criterio propio —"si el rango es 00:00-23:59 es de todo el día"— y resultó falso: **5 generadores en `main.js` crean eventos con exactamente ese rango** (recordatorios, inspecciones). La grilla no los trata como todo el día, pero el popup sí.
+
+### La regla
+
+Antes de escribir un criterio para "qué es un evento de todo el día", **busca si la app ya tiene uno**. Aquí era `isAllDayEvent()`, y `renderDayView` ya la usaba para partir los eventos en dos grupos. El fix fue que el popup llamara **la misma función**, no una segunda regla.
+
+El criterio general: **si dos lugares muestran el mismo dato, no pueden tener dos reglas.** Con una función compartida no pueden discrepar ni en el futuro.
+
+### Y el que se traga al test
+
+Mi test pasó con el bug porque sus datos de prueba usaban la forma de los **mocks** (`startHour` numérico) y el bug solo afectaba a la forma real (`start`/`end` como texto). Cuando el test valida un contrato, **los datos tienen que ser del mundo real**, no los que facilita el código.
+
+## ⚠️ Un guard que matchea tu propio comentario no guarda nada (📦849, 2026-10-02)
+
+### El síntoma
+
+Un check que busca "esto ya no está" falla, porque un comentario explica que se eliminó y menciona el nombre.
+
+```
+// 📦849 — "Tu día". Reemplaza la tarjeta "Integración correo"...
+check("no queda Integración correo", app.indexOf("Integración correo") < 0);   // FALLA
+```
+
+### La regla
+
+Los guards de "lo que ya no está" tienen que mirar **código**, no el archivo entero. Por eso los tests del repo usan `soloCodigo()` antes de grepear:
+
+```js
+function soloCodigo(x) {
+  return x.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+}
+```
+
+Un comentario que explica **por qué** se quitó algo es valioso y hay que conservarlo. El problema no es el comentario, es el guard.
+
+## ⚠️ Un `title` de caché escrito a mano se rompe en cada bump (📦849, 2026-10-02)
+
+### El síntoma
+
+Un test de la bandeja se cae en cada paquete, y el arreglo "es editar el test".
+
+### Por qué
+
+El check era `/premium\.css\?v=20260918-paginacion-correos/`: una **lista blanca del token del día**. Cada bump obligaba a editar el test, así que el test dejó de proteger nada y pasó a ser un trámite.
+
+### La regla
+
+Un guard de caché valida la **forma**, no el valor:
+
+```js
+/^\d{8}-/.test(token)   // existe y tiene forma de fecha
+```
+
+Y además, si dos archivos se cargan juntos, sus tokens deben **coincidir**:
+
+```js
+check("premium.css y app.js comparten token",
+  premiumV !== "" && premiumV === appV);
+```
+
+Si difieren, el navegador puede servir el JS nuevo con el CSS viejo, y la pantalla queda a medias sin que nada falle visiblemente.
+
+### Apareció 3 veces en esta tanda
+
+En `test-bandeja-paginacion`, `test-bandeja-toolbar-compacta` y `test-minical-hover-846`. Cuando un mismo defecto se repite, el defecto no es del test: es del patrón que todos copiaron.
+
+
 ### El síntoma
 
 Un header con `grid-template-rows: 1fr → 0fr` se colapsaba a **8px** en vez de 0: quedaba una franja blanca abajo.

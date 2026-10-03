@@ -3161,7 +3161,8 @@
   // ====== Render principal ======
   function render() {
     renderHeaderState();
-    renderKpiStrip();
+    // 📦849 · Los indicadores ya no se pintan aca: renderSidebar() los
+    // dibuja en la seccion "Tu dia" con calcularIndicadores().
     renderLayout();
     renderFooter();
   }
@@ -3193,11 +3194,20 @@
     }
   }
 
-  function renderKpiStrip() {
+  // 📦849 · Los indicadores ya no son tarjetas arriba: viven en la seccion
+  // "Tu dia" del sidebar. Esta funcion paso de PINTAR a CALCULAR: es la
+  // unica fuente de los tres datos, y el sidebar la usa para dibujarlos.
+  // Un solo calculo, un solo dato, un solo lugar donde puede estar mal.
+  //
+  // Se elimino "Eventos criticos": solo contaba eventos de la categoria
+  // `critico` y, sin eventos cargados de esa categoria, mostraba siempre
+  // un guion con el chip "Todo al dia". Cero informacion y un cuarto de la
+  // pantalla. Se fueron tambien sus calculos (critical, criticalThisMonth,
+  // criticalSub), que ya no usa nadie mas.
+  function calcularIndicadores() {
     const unread = state.mails.filter((m) => m.unread).length;
     const todayEvents = state.events.filter((e) => e.date === D.MONTH_VIEW.todayIso).length;
     const pending = state.mails.filter((m) => m.meetingSuggestion && m.unread).length;
-    const critical = state.events.filter((e) => e.category === "critico").length;
 
     // F4 — Calcular "Próxima reunión" dinámicamente desde state.events
     var nextMeeting = null;
@@ -3211,52 +3221,22 @@
     }
     var nextSub = nextMeeting ? "Próxima: " + (nextMeeting.start || "00:00") : "Sin eventos próximos";
 
-    // F4 — Calcular eventos críticos que vencen este mes
-    var monthPrefix = D.MONTH_VIEW.year + "-" + String(D.MONTH_VIEW.month + 1).padStart(2, "0");
-    var criticalThisMonth = state.events.filter(function (e) {
-      return e.category === "critico" && e.date && e.date.indexOf(monthPrefix) === 0;
-    }).length;
-    var criticalSub = criticalThisMonth > 0 ? "Vencen este mes" : "Todo al día";
-
     // F4 — Helper para mostrar "—" en vez de 0 cuando es 0
     function kpiValue(v) {
       return v > 0 ? v : "—";
     }
 
-    // 📦752 — KPI cards premium v2: tarjeta blanca, tile de icono con fondo
-    // suave, número grande en Manrope, etiqueta en versalitas y subtexto.
-    // Cada tarjeta navega a la vista que representa (igual que el diseño objetivo).
-    const items = [
-      { id: "kpi-correos", icon: D.ICONS.mail, tone: "", value: kpiValue(unread), label: "Correos no leídos", sub: state.mails.length + " totales",
+    return [
+      { id: "kpi-correos", icon: D.ICONS.mail, tone: "is-blue",
+        value: kpiValue(unread), n: unread, label: "Correos no leídos", sub: state.mails.length + " totales",
         go: function () { setCalendarVisible(false); } },
-      { id: "kpi-reuniones", icon: D.ICONS.calendarPlus, tone: "is-green", value: kpiValue(todayEvents), label: "Reuniones hoy", sub: nextSub,
+      { id: "kpi-reuniones", icon: D.ICONS.calendarPlus, tone: "is-green",
+        value: kpiValue(todayEvents), n: todayEvents, label: "Reuniones hoy", sub: nextSub,
         go: function () { state.selectedDate = D.MONTH_VIEW.todayIso; state.calView = "day"; setCalendarVisible(true); } },
-      { id: "kpi-invitaciones", icon: D.ICONS.link, tone: "is-amber", value: kpiValue(pending), label: "Invitaciones pendientes", sub: "Requieren confirmar",
+      { id: "kpi-invitaciones", icon: D.ICONS.link, tone: "is-amber",
+        value: kpiValue(pending), n: pending, label: "Invitaciones pendientes", sub: "Requieren confirmar",
         go: function () { state.mailFilter = "meeting"; state._resetMailListScroll = true; setCalendarVisible(false); } },
-      { id: "kpi-criticos", icon: D.ICONS.checkCircle, tone: "is-red", value: kpiValue(critical), label: "Eventos críticos", sub: criticalSub,
-        chip: criticalThisMonth === 0,
-        go: function () { state.calView = "schedule"; setCalendarVisible(true); } },
     ];
-
-    const strip = $("#kpi-strip");
-    strip.innerHTML = "";
-    items.forEach((it) => {
-      const card = el("button", { class: "kair-kpi", id: it.id, type: "button", title: it.label });
-      // Los iconos del set vienen en 13/14px: se escalan a 19px como el diseño.
-      const icon = it.icon.replace(/width="\d+" height="\d+"/, 'width="19" height="19"');
-      const subHtml = it.chip
-        ? '<span class="kair-kpi__chip is-green">' + it.sub + '</span>'
-        : it.sub;
-      card.innerHTML =
-        '<span class="kair-kpi__ico ' + it.tone + '">' + icon + '</span>' +
-        '<span>' +
-          '<span class="kair-kpi__n">' + it.value + '</span>' +
-          '<span class="kair-kpi__l">' + it.label + '</span>' +
-          '<span class="kair-kpi__s">' + subHtml + '</span>' +
-        '</span>';
-      card.addEventListener("click", it.go);
-      strip.appendChild(card);
-    });
   }
 
   function renderLayout() {
@@ -3272,33 +3252,199 @@
   }
 
   // ====== Sidebar ======
+  // 📦845 · Doble clic en un dia del mini-calendar.
+  //
+  // NO se usa el evento dblclick del navegador a proposito: el clic simple
+  // ya llama a render(), que RECONSTRUYE el DOM del sidebar. El segundo
+  // clic cae entonces sobre un elemento NUEVO y el navegador nunca
+  // dispara dblclick, que exige los dos clics sobre el MISMO elemento. Un
+  // addEventListener("dblclick") se veria correcto y no haria nada.
+  //
+  // En vez de eso los dos clics se detectan por fecha. Frente al patron
+  // clasico de "retrasar el clic simple 250 ms a ver si viene otro", este
+  // no retrasa NADA: el clic simple se siente instantaneo.
+  var _miniDiaIso = null;
+  var _miniDiaT = 0;
+  const MINI_DOBLE_MS = 350;
+
+  /**
+   * Lleva el calendario grande a un dia. Con irAVistaDia ademas lo pasa a
+   * la vista Dia, que es la franja horaria con los eventos de ese dia (o
+   * la franja vacia si no tiene ninguno, que tambien es una respuesta).
+   */
+  function seleccionarDiaDelMini(iso, irAVistaDia) {
+    state.selectedDate = iso;
+    const d = new Date(iso + "T00:00:00");
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    if (state.viewYear !== y || state.viewMonth !== m) {
+      state.viewYear = y;
+      state.viewMonth = m;
+      state.viewMonthLabel = D.buildMonthLabel(y, m);
+    }
+    if (irAVistaDia) state.calView = "day";
+    render();
+  }
+
+  // 📦846 · Popup de categorias al pasar el mouse por un dia con eventos.
+  var _miniPop = null;
+  var _miniPopListo = false;
+  const MINI_POP_MAX = 8;   // eventos listados antes de resumir en "+N mas"
+
+  function _miniPopEl() {
+    if (_miniPop && _miniPop.isConnected) return _miniPop;
+    _miniPop = el("div", { class: "mini-pop" });
+    _miniPop.setAttribute("role", "tooltip");
+    document.body.appendChild(_miniPop);
+    if (!_miniPopListo) {
+      _miniPopListo = true;
+      window.addEventListener("scroll", ocultarPopupDia, { passive: true, capture: true });
+      window.addEventListener("resize", ocultarPopupDia, { passive: true });
+    }
+    return _miniPop;
+  }
+
+  function ocultarPopupDia() {
+    if (_miniPop) _miniPop.classList.remove("is-on");
+  }
+
+  function _hhmm(h) {
+    var v = Number(h) || 0;
+    return String(Math.floor(v)).padStart(2, "0") + ":"
+      + String(Math.round((v % 1) * 60)).padStart(2, "0");
+  }
+
+  // 📦848 · La franja de un evento. La regla es UNA SOLA y es la de la app:
+  // la de renderDayView, que separa en dos grupos con isAllDayEvent (L3641)
+  // y pone el resto en la franja con getEventStartHour.
+  //
+  // 847 usaba _isPlaceholderTime (rango 00:00-23:59) para decir "Todo el día",
+  // y eso fue un error: hay 5 generadores en main.js que crean eventos con ese
+  // rango y un flag propio `allDay: true`, entre ellos los recordatorios de
+  // presupuesto y las inspecciones programadas. El popup los declaraba
+  // "Todo el día" mientras la grilla los pintaba de 9:00 a 11:00.
+  //
+  // Si renderDayView lo pone en la franja, el popup dice la hora de esa franja.
+  // Si lo pone en el banner de todo el día, el popup dice "Todo el día". Popup y
+  // grilla usan la MISMA funcion, asi que no pueden discrepar.
+  function _franja(ev) {
+    if (isAllDayEvent(ev)) return "Todo el día";
+    var ini = getEventStartHour(ev);
+    var dur = getEventDuration(ev);
+    return dur > 0 ? _hhmm(ini) + "\u2013" + _hhmm(ini + dur) : _hhmm(ini);
+  }
+
+  // Dia de la semana al estilo del calendario. D.WEEKDAY_LABELS arranca en
+  // lunes y getDay() en domingo: sin rotar, un domingo se anunciaba "Lun".
+  function _etiquetaDia(iso) {
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return iso;
+    var dow = (d.getDay() - D.MONTH_VIEW.firstDayOfWeek + 7) % 7;
+    return D.WEEKDAY_LABELS[dow] + " " + d.getDate() + " de "
+      + D.MONTH_LABELS_ES[d.getMonth()].toLowerCase();
+  }
+
+  function mostrarPopupDia(iso, eventos, ancla) {
+    var evs = (eventos || []).filter(function (e) { return e && e.date === iso; });
+    if (!evs.length) { ocultarPopupDia(); return; }
+
+    // Agrupar por categoria en el orden de EVENT_CATEGORIES, no en el orden
+    // en que aparecen los eventos: asi la lista es estable entre renders.
+    var porCat = new Map();
+    evs.forEach(function (ev) {
+      var id = ev.category || "otro";
+      if (!porCat.has(id)) porCat.set(id, []);
+      porCat.get(id).push(ev);
+    });
+    var cats = Object.keys(D.EVENT_CATEGORIES).filter(function (k) { return porCat.has(k); });
+    porCat.forEach(function (v, k) { if (cats.indexOf(k) < 0) cats.push(k); });
+
+    var html = '<div class="mini-pop__day">' + escapeHtml(_etiquetaDia(iso)) + "</div>";
+    var mostrados = 0;
+    for (var i = 0; i < cats.length; i++) {
+      var id = cats[i];
+      var cat = D.EVENT_CATEGORIES[id] || { label: id, color: "#888" };
+      var lista = porCat.get(id) || [];
+      // Cuantas filas caben de esta categoria con el tope que queda. Si no
+      // cabe ninguna, se omite el bloque entero: una cabecera con contador y
+      // sin eventos debajo se lee como un error.
+      var caben = Math.min(lista.length, MINI_POP_MAX - mostrados);
+      if (caben <= 0) break;
+      html += '<div class="mini-pop__cat">';
+      html += '<div class="mini-pop__cat-h">'
+        + '<span class="mini-pop__dot" style="background:' + escapeHtml(cat.color) + '"></span>'
+        + escapeHtml(cat.label)
+        + '<span class="mini-pop__n">' + lista.length + "</span></div>";
+      for (var j = 0; j < caben; j++) {
+        mostrados++;
+        html += '<div class="mini-pop__row"><span class="mini-pop__h">'
+          + escapeHtml(_franja(lista[j]))
+          + '</span><span class="mini-pop__t">'
+          + escapeHtml(lista[j].title || "Sin titulo")
+          + "</span></div>";
+      }
+      html += "</div>";
+    }
+    var sobran = evs.length - mostrados;
+    if (sobran > 0) {
+      html += '<div class="mini-pop__more">+' + sobran + " mas</div>";
+    }
+    // 📦847 · Antes esta pista vivia en el title del boton. Como el title se
+    // fue (tapaba el popup), el doble clic de 845 quedaria sin descubrir.
+    html += '<div class="mini-pop__hint">Doble clic para ver el día</div>';
+
+    var pop = _miniPopEl();
+    pop.innerHTML = html;
+    pop.classList.add("is-on");
+
+    // A la derecha del dia; si no cabe, a la izquierda. Se recorta contra
+    // la ventana para no salirse por arriba ni por abajo.
+    var r = ancla.getBoundingClientRect();
+    var pr = pop.getBoundingClientRect();
+    var top = r.top - 6;
+    if (top + pr.height > window.innerHeight - 8) top = window.innerHeight - pr.height - 8;
+    if (top < 8) top = 8;
+    var left = r.right + 10;
+    if (left + pr.width > window.innerWidth - 8) left = Math.max(8, r.left - pr.width - 10);
+    pop.style.top = top + "px";
+    pop.style.left = left + "px";
+  }
   function renderSidebar(container) {
     container.innerHTML = "";
     const visibleEvents = state.events.filter((e) => state.activeCategories.has(e.category));
+    // 📦846 · El popup vive fuera del sidebar, asi que sobrevive a los
+    // re-renders. Si el dia que estaba hoverado desaparece, su mouseleave
+    // no se dispara y el popup se quedaria pegado.
+    ocultarPopupDia();
     const eventDates = new Set(visibleEvents.map((e) => e.date));
 
     // Mini-calendario
     // 📦752 — Mini-calendario premium: cabecera con mes + navegación, grilla de
     // 7 columnas y hasta 3 puntitos de color por día (categorías con eventos).
+    // 📦844 · El mini se dibuja SIEMPRE con la fecha de HOY, nunca con
+    // state.viewYear/viewMonth. Consecuencia buena: si la app queda abierta
+    // y pasa la medianoche del último día del mes, el mini ya muestra el
+    // mes nuevo en la siguiente pasada de render().
+    const hoy = new Date();
+    const miniYear = hoy.getFullYear();
+    const miniMonth = hoy.getMonth();
+
     const mini = el("div", { class: "kair-card mini" });
     mini.innerHTML = `
       <div class="mini__head">
-        <span class="mini__m">${state.viewMonthLabel}</span>
-        <span class="mini__nav">
-          <button class="mini__nb" type="button" title="Mes anterior" aria-label="Mes anterior" id="mini-prev">${D.ICONS.chevronLeft}</button>
-          <button class="mini__nb" type="button" title="Mes siguiente" aria-label="Mes siguiente" id="mini-next">${D.ICONS.chevronRight}</button>
-        </span>
+        <span class="mini__m">${D.buildMonthLabel(miniYear, miniMonth)}</span>
       </div>
       <div class="mini__grid" id="mini-grid"></div>
     `;
     container.appendChild(mini);
 
-    // F4 — Handlers de los chevron para navegar entre meses
-    $("#mini-prev", mini).addEventListener("click", () => changeMonth(-1));
-    $("#mini-next", mini).addEventListener("click", () => changeMonth(1));
+    // 📦844 — Se quitaron los chevron del mini. Llamaban a changeMonth(),
+    // la MISMA funcion que usan los botones del calendario grande, y
+    // escribian en el mismo estado: mover el mini movia el grande y al
+    // reventre los dos quedaban en meses distintos. El calendario grande
+    // conserva su propia navegacion (y su boton "Hoy"), sin tocar.
 
-    // F4 — Generar la grilla del mes visible dinámicamente
-    const monthGrid = D.buildMonthGrid(state.viewYear, state.viewMonth);
+    const monthGrid = D.buildMonthGrid(miniYear, miniMonth);
     // F4 — Mapa de colores por categoría para los puntitos de eventos
     const categoryColor = {};
     Object.values(D.EVENT_CATEGORIES).forEach((c) => { categoryColor[c.id] = c.color; });
@@ -3324,18 +3470,38 @@
       const dots = dayDots[c.iso] || [];
       const isSelected = state.selectedDate === c.iso && !c.isToday;
       const cls = "mini__d" + (!c.inMonth ? " is-out" : "") + (c.isToday ? " is-today" : "") + (isSelected ? " is-sel" : "");
+      // 📦847 · El title SOLO va en los dias SIN eventos. En los que tienen,
+      // el popup de 846 ya dice cuanto hay y de que tipo, y el title del
+      // navegador se sumaba encima: dos notificaciones a la vez, con la del
+      // sistema flotando sobre la nuestra. Esa capa esta fuera del document,
+      // asi que no se arregla con z-index: se quita el atributo.
       const btn = el("button", {
         class: cls,
         type: "button",
         "data-d": c.iso,
-        title: dots.length ? `${c.day} — Hay eventos` : `${c.day} — Sin eventos`,
       });
+      if (!dots.length) {
+        btn.title = `${c.day} — Sin eventos · doble clic para ver el día`;
+      }
       btn.innerHTML = String(c.day) + (dots.length
         ? '<span class="mini__dots">' + dots.map((col) => '<span class="mini__dot" style="background:' + col + '"></span>').join("") + '</span>'
         : "");
+      // 📦846 · Los eventos de ESE dia: con esto el popup puede decir
+      // cuantas categorias hay y cuales son, no solo que hay algo.
+      const eventosDelDia = visibleEvents.filter((ev) => ev && ev.date === c.iso);
+      if (eventosDelDia.length) {
+        btn.addEventListener("mouseenter", () => mostrarPopupDia(c.iso, eventosDelDia, btn));
+        btn.addEventListener("mouseleave", ocultarPopupDia);
+      }
+
       btn.addEventListener("click", () => {
-        state.selectedDate = c.iso;
-        render();
+        const ahora = Date.now();
+        // 📦845 · Dos clics sobre el MISMO dia dentro de la ventana = doble
+        // clic: el calendario grande pasa a la vista Dia de ese dia.
+        const esDoble = _miniDiaIso === c.iso && (ahora - _miniDiaT) < MINI_DOBLE_MS;
+        _miniDiaIso = c.iso;
+        _miniDiaT = ahora;
+        seleccionarDiaDelMini(c.iso, esDoble);
       });
       grid.appendChild(btn);
     });
@@ -3366,23 +3532,43 @@
     });
     container.appendChild(legend);
 
-    // 📦752 — Tarjeta "Integración correo" premium, con el botón "Abrir bandeja"
-    // que cambia al modo Correo (antes era solo texto informativo).
-    const integ = el("div", { class: "kair-card sidecard" });
-    integ.innerHTML = `
-      <div class="sidecard__h">
-        ${D.ICONS.mail.replace(/width="\d+" height="\d+"/, 'width="14" height="14"')}
-        Integración correo
-      </div>
-      <p class="sidecard__p"><b>Arrastra un correo</b> desde la bandeja hacia cualquier día del calendario para crear un evento rápido.</p>
-      <button class="sidecard__btn" id="btn-abrir-bandeja" type="button">
-        Abrir bandeja
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </button>
-    `;
-    container.appendChild(integ);
-    const abrirBandeja = $("#btn-abrir-bandeja", integ);
-    if (abrirBandeja) abrirBandeja.addEventListener("click", () => setCalendarVisible(false));
+    // 📦849 — "Tu día". Reemplaza la tarjeta "Integración correo": los tres
+    // indicadores de la tira de arriba se pintan acá, con el esqueleto de
+    // "Tipos de evento" (icono + nombre + contador) y el subtexto DEBAJO en
+    // vez de al lado. En una fila de 250px el subtexto al lado aplastaba el
+    // numero, que es el dato que se viene a leer.
+    //
+    // El texto de "Arrastra un correo" y el botón "Abrir bandeja" se fueron:
+    // el propio indicador de Correos no leídos lleva a la bandeja, así que
+    // el botón repetía lo mismo.
+    const tuDia = el("div", { class: "kair-card tuday" });
+    tuDia.innerHTML = '<div class="tuday__t">Tu día</div><div class="tuday__list" id="tuday-list"></div>';
+    const tudayList = $("#tuday-list", tuDia);
+    calcularIndicadores().forEach((it) => {
+      // n === 0 -> la fila se atenua. El guion ya lo dice, pero sin atenuar
+      // un cero se lee igual que un dato y obliga a leer el guion para saber
+      // que no hay nada.
+      const vacio = !it.n;
+      const item = el("button", {
+        class: "tuday__i" + (vacio ? " is-vacio" : ""),
+        type: "button",
+        id: it.id,
+        title: it.label + " — " + it.sub,
+      });
+      const icon = it.icon.replace(/width="\d+" height="\d+"/, 'width="15" height="15"');
+      item.innerHTML =
+        '<span class="tuday__ico tuday__ico--' + it.tone.replace("is-", "") + '">' + icon + "</span>" +
+        '<span class="tuday__body">' +
+          '<span class="tuday__top">' +
+            '<span class="tuday__n">' + it.label + "</span>" +
+            '<span class="tuday__c' + (vacio ? " is-zero" : "") + '">' + it.value + "</span>" +
+          "</span>" +
+          '<span class="tuday__s">' + it.sub + "</span>" +
+        "</span>";
+      item.addEventListener("click", it.go);
+      tudayList.appendChild(item);
+    });
+    container.appendChild(tuDia);
   }
 
   function toggleCategory(catId) {

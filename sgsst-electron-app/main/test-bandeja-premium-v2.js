@@ -25,18 +25,33 @@ function check(name, ok) { checks.push({ name: name, ok: !!ok }); }
 
 // ── 1. Shell premium (index.html) ────────────────────────────────
 check('HTML: topbar premium .kair-top presente', /<header class="kair-top">/.test(html));
+// 📦849 · Los guards de "lo que YA NO esta" tienen que mirar CODIGO, no
+// comentarios: los comentarios de 849 nombran justamente lo eliminado
+// (criticalThisMonth, "Integración correo"). Un guard que matchea su
+// propio comentario de cambio no protege nada.
+function soloCodigo(x) {
+  return x.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+}
+const appCodigo = soloCodigo(app);
+
 check('HTML: breadcrumb "Inicio > Bandeja integrada"', /kair-top__crumb[\s\S]*?Inicio[\s\S]*?Bandeja integrada/.test(html));
 check('HTML: icono + H1 + subtítulo del módulo', /kair-top__icon/.test(html) && /kair-top__h1">Bandeja integrada</.test(html) && /kair-top__sub">/.test(html));
 check('HTML: chip de fecha (#chip-fecha)', /id="chip-fecha"/.test(html));
 check('HTML: segmentado Agenda/Correo', /class="kair-seg"/.test(html) && /id="tab-agenda"/.test(html) && /id="tab-correo"/.test(html));
-check('HTML: KPI strip usa .kpis (tarjetas premium)', /<section class="kpis" id="kpi-strip"/.test(html));
+// 📦849 · Los indicadores ya no son tarjetas arriba: viven en el sidebar
+// ("Tu día"). La <section class="kpis"> se quitó para que la lista de
+// correo use ese alto.
+check('HTML: ya NO hay tira de tarjetas de indicadores (se movieron al sidebar)',
+  !/<section class="kpis"/.test(html) && html.indexOf('id="kpi-strip"') < 0);
+check('HTML: el layout principal sube directo al shell',
+  /<div class="kair-layout" id="kair-layout">/.test(html));
 check('HTML: sidebar sin tarjeta propia (cada bloque es card)', /<aside class="kair-sidebar" id="sidebar">/.test(html));
 check('HTML: se eliminó el botón-flecha (#panel-toggle)', !/id="panel-toggle"/.test(html));
 
 // ── 2. Contrato DOM crítico intacto ──────────────────────────────
 const requiredIds = [
   'btn-back', 'btn-refresh', 'refresh-icon', 'btn-compose', 'btn-signature',
-  'gmail-indicator', 'gmail-indicator-text', 'kpi-strip', 'sidebar',
+  'gmail-indicator', 'gmail-indicator-text', 'sidebar',
   'content-area', 'mail-list-container', 'mail-detail-container',
   'calendar-slide', 'footer-events-count', 'footer-company', 'footer-view',
   'modal-overlay', 'event-modal', 'toast-container', 'fv-overlay', 'fv-body',
@@ -49,13 +64,32 @@ check('JS: NO quedan referencias sin guard a #panel-toggle', app.indexOf('$("#pa
 check('JS: el segmentado fija el estado (setCalendarVisible)', /function setCalendarVisible\(visible\)/.test(app) && /tabAgenda\.addEventListener\("click", function \(\) \{ setCalendarVisible\(true\)/.test(app));
 
 // ── 3. Render premium en app.js ──────────────────────────────────
-check('JS: KPI cards premium (.kair-kpi + __ico/__n/__l/__s)', /class: "kair-kpi", id: it\.id/.test(app) && /kair-kpi__ico/.test(app) && /kair-kpi__n/.test(app));
+// 📦849 · Los indicadores se pintan como filas (.tuday__i) en la sección
+// "Tu día" del sidebar, no como tarjetas. calcularIndicadores() es la
+// única fuente de los 3 datos.
+check('JS: "Tu día" en el sidebar (tuday__i + tuday__n/tuday__c/tuday__s)',
+  /class: "kair-card tuday"/.test(app) && /tuday__i/.test(app)
+  && /tuday__n/.test(app) && /tuday__c/.test(app) && /tuday__s/.test(app));
 check('JS: se retiró el markup legacy .kair-kpi-item', !/class: "kair-kpi-item"/.test(app));
-check('JS: KPI cards navegan (kpi-correos/reuniones/invitaciones/criticos)', /id: "kpi-correos"/.test(app) && /id: "kpi-reuniones"/.test(app) && /id: "kpi-invitaciones"/.test(app) && /id: "kpi-criticos"/.test(app));
+check('JS: los 3 indicadores navegan (correos/reuniones/invitaciones)',
+  /id: "kpi-correos"/.test(app) && /id: "kpi-reuniones"/.test(app) && /id: "kpi-invitaciones"/.test(app));
+check('JS: calcularIndicadores() es la fuente única de los 3 datos',
+  /function calcularIndicadores\(\)/.test(app) && /calcularIndicadores\(\)\.forEach/.test(app)
+  && app.indexOf('renderKpiStrip') < 0);
+check('JS: se retiró "Eventos críticos" y su código muerto (mira CODIGO, no comentarios)',
+  appCodigo.indexOf('kpi-criticos') < 0 && appCodigo.indexOf('Eventos críticos') < 0
+  && !/criticalThisMonth/.test(appCodigo) && !/criticalSub/.test(appCodigo)
+  && !/critical = state\.events\.filter/.test(appCodigo)
+  && !/kair-kpi__chip/.test(appCodigo));
+check('JS: se retiró la tarjeta "Integración correo" (la reemplaza "Tu día")',
+  app.indexOf('btn-abrir-bandeja') < 0 && app.indexOf('kair-card sidecard') < 0);
 check('JS: mini-calendario premium (.mini__head/.mini__grid/.mini__d)', /class: "kair-card mini"/.test(app) && /mini__head/.test(app) && /mini__wd/.test(app) && /"mini__d"/.test(app));
 check('JS: mini-calendario con hasta 3 puntos por día', /dayDots/.test(app) && /mini__dot/.test(app));
 check('JS: "Tipos de evento" premium con contador', /class: "kair-card tipos"/.test(app) && /tipos__c/.test(app) && /tipos__hint/.test(app));
-check('JS: tarjeta Integración correo con botón "Abrir bandeja"', /class: "kair-card sidecard"/.test(app) && /btn-abrir-bandeja/.test(app));
+// 📦849 · La tarjeta "Integración correo" fue reemplazada por "Tu día".
+check('JS: la sección "Tu día" reemplaza a la tarjeta de Integración correo (mira CODIGO)',
+  /class: "kair-card tuday"/.test(app) && appCodigo.indexOf('btn-abrir-bandeja') < 0
+  && appCodigo.indexOf('sidecard') < 0 && appCodigo.indexOf('Integración correo') < 0);
 check('JS: chip de fecha actualizado en renderHeaderState', /chipFecha\.textContent = state\.viewMonthLabel/.test(app));
 check('JS: segmentado pintado por aria-selected', /tabAgenda\.setAttribute\("aria-selected"/.test(app));
 
@@ -67,8 +101,15 @@ check('CSS: tokens premium v2 definidos (surface/blue/amber/sh)', /--kair-surfac
 check('CSS: remapeo de tokens legacy a premium', /--kair-primary: var\(--kair-blue\)/.test(premium) && /--kair-bg-card: var\(--kair-surface\)/.test(premium) && /--kair-text-muted: var\(--kair-text-2\)/.test(premium));
 check('CSS: tipografía premium (Manrope + Inter)', /@import url\(/.test(premium) && /Manrope/.test(premium) && /Inter/.test(premium));
 check('CSS: topbar y segmentado', /\.kair-top__crumb/.test(premium) && /\.kair-seg__b\[aria-selected="true"\]/.test(premium));
-check('CSS: KPI cards', /\.kair-kpi__ico\.is-green/.test(premium) && /\.kair-kpi__n/.test(premium) && /\.kair-kpi__l/.test(premium));
-check('CSS: sidebar (mini/tipos/sidecard)', /\.mini__d\.is-today/.test(premium) && /\.tipos__i\.is-off/.test(premium) && /\.sidecard__btn/.test(premium));
+check('CSS: "Tu día" (tuday__i + tiles por color + fila vacía atenuada)',
+  /\.tuday__i \{/.test(premium) && /\.tuday__ico--blue/.test(premium)
+  && /\.tuday__ico--green/.test(premium) && /\.tuday__ico--amber/.test(premium)
+  && /\.tuday__i\.is-vacio/.test(premium));
+// 📦849 · Los estilos .kair-kpi* y .sidecard* se quitaron del CSS. Se
+// comprueba sobre el ARCHIVO COMPLETO, no sobre un bloque.
+check('CSS: se retiraron los estilos muertos (.kair-kpi* y .sidecard*)',
+  !/^\s*\.kair-kpi/m.test(premium) && !/^\s*\.sidecard/m.test(premium));
+check('CSS: sidebar (mini/tipos)', /\.mini__d\.is-today/.test(premium) && /\.tipos__i\.is-off/.test(premium));
 check('CSS: correo (filas, carpetas, lector, reply)', /\.kair-mail-list-filter\[data-active="true"\]/.test(premium) && /\.kair-mail-row\[data-unread="true"\]/.test(premium) && /\.kair-mail-detail__reply-input/.test(premium));
 check('CSS: fila con 3 columnas de contenido + barra de selección', /grid-template-columns: 20px 36px 1fr 62px 22px/.test(premium) && /\.kair-mail-row\[data-selected="true"\]::before/.test(premium));
 check('CSS: agenda (toolbar, mes, semana/día, agenda, footer)', /\.kair-cal-toolbar__view\[data-active="true"\]/.test(premium) && /\.kair-month-cell\[data-today="true"\]/.test(premium) && /\.kair-agenda-item/.test(premium) && /\.kair-cal-footer/.test(premium));

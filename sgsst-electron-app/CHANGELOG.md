@@ -5,6 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.232] - 2026-10-02
+
+### 📦849 — Los 3 indicadores bajan al sidebar y "Eventos críticos" desaparece
+
+**Resumen:** La franja de 4 tarjetas blancas que ocupaba el ancho de la pantalla se eliminó. Tres de sus indicadores bajaron al sidebar, en el lugar que ocupaba la tarjeta "Integración correo", con el mismo esqueleto que "Tipos de evento" pero con el subtexto debajo. El cuarto se fue con todo su código. El espacio liberado lo toma la lista de correo.
+
+- **"Eventos críticos" eliminado completo:** la tarjeta, sus cálculos (`criticalThisMonth`, `criticalSub`) y su chip verde. Solo contaba eventos de la categoría `critico`, que hoy no se cargan: mostraba siempre "—" con el sello "Todo al día". Cero información en un cuarto de la pantalla.
+- **La tarjeta "Integración correo" también se fue**, y con ella el texto de "arrastra un correo" y el botón "Abrir bandeja". Ese botón repetía lo que ya hace el indicador de Correos no leídos, que abre la bandeja.
+- **El espacio lo gana el correo, no se deja hueco.** `.kair-main` es una columna flex (`.kpis` en `flex:none`, `.kair-layout` en `flex:1`), así que al quitar la `<section>` el layout sube solo. No hizo falta CSS nuevo para el espacio.
+- **"Tu día" es la sección nueva.** Mismo esqueleto que "Tipos de evento" (ícono + nombre + contador) con dos mejoras: el subtexto va **debajo** del nombre, porque en una fila de 250px al lado aplastaba el número, que es el dato que se viene a leer; y la fila **se apaga cuando el valor es 0**, porque un "—" sin atenuar se lee igual que un dato.
+- **Cada fila navega a lo mismo que antes**, verificado con un test que ejecuta las tres: correos → la bandeja, reuniones → vista Día de hoy, invitaciones → el filtro de reuniones.
+- **Una sola fuente de datos.** `renderKpiStrip()` (pintaba las tarjetas) pasó a ser `calcularIndicadores()`, que solo calcula y devuelve los 3. El sidebar los dibuja. Un solo cálculo, un solo lugar donde puede estar mal.
+- **Tests afectados, actualizados no borrados:** `test-bandeja-premium-v2.js` afirmaba el diseño viejo en 5 checks (la `<section class="kpis">`, `.kair-kpi`, los 4 ids, la tarjeta de integración). Se **invirtieron**: ahora exigen el diseño nuevo y la ausencia del viejo. Un check borrado es un hueco; uno invertido es una red.
+- `main/test-bandeja-tudia-849.js` (47 checks) — incluye el conteo con datos reales y la navegación de las 3. **10/10 mutaciones detectadas** y los 3 tests de la bandeja detectan el diseño viejo si alguien lo restaura.
+
+### 📦848 — El popup decía "Todo el día" para todos los eventos
+
+**Resumen:** Reportado por el owner tras el fix anterior. Los eventos mostraban "Todo el día" aunque tuvieran hora.
+
+- **La causa fue un criterio que me inventé.** El fix de 📦847 decía "si el rango de horas es 00:00–23:59, es un evento de todo el día". Pero hay **5 generadores en `main.js`** que crean eventos con exactamente ese rango: los recordatorios de presupuesto (`main.js:5613`, con `allDay: true`), las inspecciones programadas y otros tres. No son eventos de todo el día: la grilla los dibuja de 9:00 a 11:00.
+- **La verdad ya existía y la usaba la vista Día.** `renderDayView` separa en dos grupos con `isAllDayEvent` (`app.js:3641`): los que son todo el día van al banner, el resto a la franja con `getEventStartHour`. El popup ahora usa **la misma función**, así que no puede discrepar de la grilla. No se cambió el calendario para tapar un popup: se cambió el popup para decir lo que el calendario ya decía.
+- **Diagnóstico con la BD real:** `%APPDATA%\sgsst-electron-app\kair.db`, porque la del userData de Electron de prueba es otra. Los eventos de la tabla `eventos_rapidos` traen `hora_inicio`/`hora_fin` ("08:00"/"12:00") — un tercer nombre de campo, junto a `startHour` (mocks) y `start`/`end` (IPC).
+- **El test de 📦847 afirmaba el bug como correcto.** Tenía 3 checks diciendo "el evento 00:00-23:59 se declara Todo el día", y pasaban porque yo había escrito el código así. No se borraron: se **invirtieron** para exigir el comportamiento correcto.
+- `main/test-minical-allday-848.js` (22 checks) — 8 casos que preguntan a la vez qué decide la grilla y qué dice el popup, y los comparan. **El bug lo detectan los 3 tests** del mini.
+
+### 📦847 — Dos notificaciones por evento, y todas las horas en 00:00
+
+**Resumen:** Al pasar el mouse por un día con eventos se veían dos cuadros, y los eventos salían sin hora.
+
+- **Las dos notificaciones:** el popup (nuestro) y el `title` nativo del navegador, que se dibuja **encima**, en una capa del sistema fuera del documento. Ningún `z-index` lo tapa: se quita el atributo. El `title` queda solo en los días **sin** eventos, donde es la única pista y no hay popup que lo estorbe. Como el `title` era lo que anunciaba el doble clic, esa pista pasó al pie del popup.
+- **Las horas en 00:00:** el popup leía `ev.startHour`, pero los eventos reales llegan con `start`/`end` como **texto** ("09:00"). Los mocks de `data.js` usan `startHour` numérico, así que el test pasaba con el bug. El popup ahora usa `getEventStartHour()` y `getEventDuration()`, los helpers que la app ya tenía.
+- **El andamiaje de un test también estaba mal:** el test de 📦846 corría `_franja` en una VM sin esos helpers y reventó al cambiar la firma. Se reparó **extrayendo los helpers del propio `app.js`**, no copiándolos: si mañana cambian, el test usa el nuevo.
+- `main/test-minical-hora-847.js` (23 checks) — **2/2 bugs detectados al revertir el fix** y 8/8 guards que muerden.
+
+### 📦846 — Popup de categorías al pasar el mouse por un día con eventos
+
+**Resumen:** Al hacer hover sobre un día con eventos del mini-calendar, aparece un cuadro con las categorías de ese día, el color de cada una, su contador y los eventos con hora y título.
+
+- **Agrupado por categoría** en el orden de `EVENT_CATEGORIES`, no en el de aparición: la lista queda estable entre renders.
+- **Tope de 8 eventos**; lo que sobra sale como "+N más". Si una categoría no cabe, **no se imprime su título**: es preferible ver 2 categorías completas que una tercera con contador y nada debajo.
+- **Un solo elemento reutilizado** en `document.body`, no uno por día. Se oculta al empezar cada render, al hacer scroll y al redimensionar: vive fuera del sidebar, así que sobrevive a los re-renders y se despegaba de su celda.
+- `pointer-events: none` **no es cosmético**: si el popup aceptara el mouse, al entrar dispararía el `mouseleave` del día (parpadeo) y se comería el segundo clic del doble clic de 📦845. Es informativo, nunca interactivo.
+- **3 bugs encontrados en el propio script antes de aplicar nada:** `WEEKDAY_LABELS` es lunes-primero y el script indexaba con `getDay()` (domingo=0) — un domingo habría dicho "Lun"; la variable CSS `--kair-text-1` no existe en el tema; y la hora tiraba los minutos.
+- `main/test-minical-hover-846.js` (49 checks) — **12/12 mutaciones detectadas**.
+
+### 📦845 — Doble clic en un día del mini abre la vista Día del calendario grande
+
+**Resumen:** Doble clic en cualquier día del mini-calendar lleva el calendario grande a ese día y lo cambia a vista Día, con su franja horaria. Funciona con días con eventos y sin ellos.
+
+- **No se usa `addEventListener("dblclick")`, y no es una manía:** el clic simple llama a `render()`, que **reconstruye el DOM del sidebar**. El segundo clic cae sobre un elemento nuevo y el navegador nunca dispara `dblclick`, que exige los dos clics sobre el *mismo* elemento. Un `dblclick` bien escrito se vería correcto y no haría nada.
+- **Se detecta por fecha:** mismo ISO dos veces dentro de 350ms. Frente al patrón de "retrasar el clic 250ms a ver si viene otro", **el clic simple no espera nada** — se siente instantáneo.
+- 24 checks, **7/7 mutaciones detectadas**.
+
+### 📦844 — El mini-calendar se queda fijo en el mes actual
+
+**Resumen:** El mini-calendar ya no navega meses. Se dibuja siempre con la fecha de hoy y perdió las flechas.
+
+- **El bug de fondo:** el mini y el calendario grande **compartían estado** (`viewYear`/`viewMonth`) y **ambos llamaban la misma función `changeMonth()`**, así que mover el mini movía el grande y al revés quedaban en meses distintos. Arreglarlo con flechas era parar el síntoma; se quitaron las flechas porque el mini no es un navegador.
+- **El calendario grande conserva su navegación** y su botón "Hoy", sin tocar.
+- **Bug encontrado preguntando:** el "¿no se congela en octubre?". `MONTH_VIEW` se construye **una sola vez** al cargar `data.js`, y `buildMonthGrid` marcaba "hoy" desde esa constante. Con la app abierta al pasar la medianoche, el mes se actualizaba pero "hoy" se quedaba en el día anterior. Ahora se calcula en cada llamada.
+- **El clic del día mueve el calendario grande** a ese mes. Al fijar el mini se perdía una garantía: antes el clic siempre caía en un mes visible.
+- **Hallazgo de paso:** `render-sidebar.js` y `render-calendar.js` **no se cargan**; son código muerto de un refactor. Lo vivo es `renderSidebar()` dentro de `app.js`. Hay 8 archivos muertos en esa carpeta.
+- 4 tests (27 + 29 + 24 + 49 checks), **cobertura cruzada comprobada**: 4 mutaciones que un test no ve las caza otro, y vice versa.
+
+### Tests y housekeeping de esta tanda
+
+- **3 guards de cache-bust reescritos** (`test-bandeja-paginacion`, `test-bandeja-toolbar-compacta`, `test-minical-hover-846`). Tenían el token **escrito a mano**, así que se caían en cada paquete y obligaban a editar el test para que pasara. Un guard así no protege el caché: protege la fecha del último bump. Ahora validan la **forma** del token, y además que `premium.css` y `app.js` **compartan** token: si difieren, el navegador sirve el JS nuevo con el CSS viejo.
+- **Suite: 91/109 en verde**, los mismos 18 fallos preexistentes (firma, sync, z-index), **cero regresiones**.
+- CJK/mojibake: 0. `Temp/` limpio de artefactos de trabajo.
+
 ## [0.1.228] - 2026-10-02
 
 ### 📦843 — El sidebar no te llevaba a ningún lado si estabas en un submódulo

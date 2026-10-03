@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.228 (desarrollo) — último publicado v0.1.205 · `📦843` El sidebar navega desde cualquier submódulo (antes el clic se descartaba en silencio) · `📦842` El header se oculta del todo al encogerse · `📦841` Desvanecido al cambiar de módulo y al entrar/salir del Inicio · `📦840` Gestión Integral en el dashboard: las tareas, los badges y el "En tu radar" cuentan lo mismo; en modo ventana el hero del Inicio se oculta y las 4 tarjetas toman todo el ancho.
+**Versión:** 0.1.232 (desarrollo) — último publicado v0.1.205 · `📦849` Los indicadores bajaron al sidebar y "Eventos críticos" se fuequier submódulo (antes el clic se descartaba en silencio) · `📦842` El header se oculta del todo al encogerse · `📦841` Desvanecido al cambiar de módulo y al entrar/salir del Inicio · `📦840` Gestión Integral en el dashboard: las tareas, los badges y el "En tu radar" cuentan lo mismo; en modo ventana el hero del Inicio se oculta y las 4 tarjetas toman todo el ancho.
 **Última actualización:** 2 de octubre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -12,6 +12,7 @@
 
 ### Características Principales
 
+- ✅ **Los 3 indicadores bajaron al sidebar y el correo ocupa su espacio** 🆕 (v0.1.232, `📦849`): La franja de 4 tarjetas se eliminó; Correos no leídos, Reuniones hoy e Invitaciones pendientes viven ahora en "Tu día", en el sidebar, con el subtexto debajo. "Eventos críticos" se fue con todo su código. El espacio lo gana la lista de correo. La misma tanda renueva el mini-calendar: `📦844` deja de navegar meses, `📦845` doble clic abre la vista Día, `📦846` popup de categorías al hover, `📦847` y `📦848` corrigen lo que se reportaba de esos dos últimos.
 - ✅ **El sidebar navega desde cualquier submódulo + el header se oculta del todo** 🆕 (v0.1.228, `📦843` + `📦842`): El menú lateral descartaba el clic en silencio si estabas dentro de un submódulo, así que para cambiar de módulo había que hacer un rodeo de dos clics. Ahora un clic y llegas, y al salir se destruye el componente del submódulo para que no queden modales ni contenido colgados. El header superior ya no deja una franja de 8px al encogerse.
 
 - ✅ **La pantalla se desvanece al cambiar de módulo** 🆕 (v0.1.227, `📦841`): El contenido se desvanece y vuelve a aparecer, también al entrar y salir del Inicio. **Pendiente de revisión en la app.**

@@ -145,17 +145,24 @@ check('DOM: la lista conserva .kair-scroll (el buscador hace querySelectorAll de
   /class: "kair-scroll/.test(app) && /querySelectorAll\("\.kair-mail-row"\)/.test(app));
 
 // ── 9. Cache-bust ────────────────────────────────────────────────
-// (El valor exacto avanza con cada cambio; acá solo se valida que sea >= fix7
-//  o el tag posterior de paginación, para no romper el test en cada bump.)
+// 📦846-fix · Mismo problema que test-bandeja-paginacion: la lista blanca
+// ("toolbar-compacta-fix7|paginacion-correos") obliga a editar el test en cada
+// bump de token. Se valida la FORMA del token, que es lo que evita que el
+// renderer sirva un archivo cacheado viejo.
 const iframeMatch = rendererJs.match(/bandeja-integrada\/index\.html\?v=(\d+)/);
 const iframeV = iframeMatch ? parseInt(iframeMatch[1], 10) : 0;
 check('Cache-bust: iframe ?v= >= 693 (actual: ' + iframeV + ')', iframeV >= 693);
 const premiumV = (html.match(/premium\.css\?v=([\w.-]+)/) || [])[1] || '';
-check('Cache-bust: premium.css con ?v= (actual: ' + premiumV + ')',
-  /toolbar-compacta-fix7|paginacion-correos/.test(premiumV));
+check('Cache-bust: premium.css con token de fecha (actual: ' + premiumV + ')',
+  /^\d{8}-/.test(premiumV));
 const appV = (html.match(/app\.js\?v=([\w.-]+)/) || [])[1] || '';
-check('Cache-bust: app.js con ?v= (actual: ' + appV + ')',
-  /toolbar-compacta-fix7|paginacion-correos/.test(appV));
+check('Cache-bust: app.js con token de fecha (actual: ' + appV + ')',
+  /^\d{8}-/.test(appV));
+// 📦846 · premium.css y app.js se sirven juntos: si los tokens difieren, el
+// navegador puede pintar el JS nuevo con el CSS viejo y la pantalla queda a
+// medias sin que nada falle de forma visible.
+check('Cache-bust: premium.css y app.js comparten token',
+  premiumV !== '' && premiumV === appV, premiumV + ' vs ' + appV);
 
 // ── Reporte ──────────────────────────────────────────────────────
 let failed = 0;

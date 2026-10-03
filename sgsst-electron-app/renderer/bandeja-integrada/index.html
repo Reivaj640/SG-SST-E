@@ -8,7 +8,7 @@
        `premium.css` es la capa premium que se carga DESPUÉS y remapea los tokens
        legacy a la paleta premium v2 (mismo dialecto que Dashboard/Configuración). -->
   <link rel="stylesheet" href="styles.css?v=20260917-premium" />
-  <link rel="stylesheet" href="premium.css?v=20260918-paginacion-correos-fix2" />
+  <link rel="stylesheet" href="premium.css?v=20261002-tu-dia" />
   <!-- F2 — K+AIR Calendar CSS (compartido con el calendario viejo del header) -->
   <link rel="stylesheet" href="../../shared/kair-calendar.css?v=545" />
   <!--
@@ -107,8 +107,9 @@
 
     <!-- ============== MAIN ============== -->
     <main class="kair-main" id="kair-main">
-      <!-- KPI Strip Enterprise (tarjetas premium) -->
-      <section class="kpis" id="kpi-strip" aria-label="Indicadores de la bandeja integrada"></section>
+      <!-- 📦849 · La tira de tarjetas de indicadores se fue al sidebar ("Tu día").
+           Al quitar esta <section>, .kair-main (columna flex) sube el
+           .kair-layout y la lista de correo gana ese alto. -->
 
       <!-- Layout principal: 2 columnas
            [sidebar: mini-cal + tipos de evento + integración] [área de contenido]
@@ -197,7 +198,7 @@
        de app.js para que `window.ColombiaFestivos` esté disponible al init. -->
   <script src="../../shared/colombia-festivos.js"></script>
   <!-- K+AIR Bandeja Integrada — Lógica principal (monolith) -->
-  <script src="app.js?v=20260918-paginacion-correos-fix2"></script>
+  <script src="app.js?v=20261002-tu-dia"></script>
   <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
        Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
        CON todos los renderers adentro. La versión "web" sin -full no incluye

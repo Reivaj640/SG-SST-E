@@ -56,6 +56,16 @@ window.KairData = (function () {
     var daysInMonth = new Date(y, m + 1, 0).getDate();
     var daysInPrevMonth = new Date(y, m, 0).getDate();
 
+    // 📦844-fix — La fecha de HOY se calcula AQUI, en cada llamada, y no
+    // desde MONTH_VIEW.todayIso: ese objeto se construye una sola vez al
+    // cargar data.js, asi que con la app abierta y pasando la medianoche
+    // el mes se actualizaba pero "hoy" se quedaba en el dia anterior (o
+    // en ninguno, si habia cambiado de mes).
+    var _ahora = new Date();
+    var _hoyIso = _ahora.getFullYear() + "-" +
+      String(_ahora.getMonth() + 1).padStart(2, "0") + "-" +
+      String(_ahora.getDate()).padStart(2, "0");
+
     var cells = [];
     for (var i = startWeekday - 1; i >= 0; i--) {
       var d = daysInPrevMonth - i;
@@ -65,7 +75,7 @@ window.KairData = (function () {
     }
     for (var dd = 1; dd <= daysInMonth; dd++) {
       var iso = isoDate(y, m, dd);
-      cells.push({ iso: iso, day: dd, inMonth: true, isToday: iso === MONTH_VIEW.todayIso });
+      cells.push({ iso: iso, day: dd, inMonth: true, isToday: iso === _hoyIso });
     }
     var nextDay = 1;
     while (cells.length < 42) {
