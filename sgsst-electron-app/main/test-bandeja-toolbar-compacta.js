@@ -55,8 +55,13 @@ check('JS: updateOperatorChips encuentra el wrapper por clase (con fallback)',
   /querySelector\("\.kair-mail-search__wrap"\) \|\| container\.querySelector\("div\[style\*='position: relative'\]"\)/.test(app));
 
 // ── 3. Fila de carpetas: Recibidos + Enviados + menú "Más" ───────
-check('JS: a la vista solo quedan Recibidos y Enviados',
-  /const PRIMARY_FILTERS = \["all", "sent"\]/.test(app));
+// 📦853 · Este check se INVIERTIÓ, no se borró. "No leídos" estaba en el menú
+// "Más" y su única forma de activarse era el indicador de "Tu día", que solo
+// cambiaba de vista sin aplicar el filtro: la condición existía en el código
+// pero era inalcanzable desde la pantalla. Subió a la barra visible.
+check('JS: 📦853 a la vista quedan Recibidos, No leídos y Enviados',
+  /const PRIMARY_FILTERS = \["all", "unread", "sent"\]/.test(app),
+  'sin "unread" el filtro vuelve a quedar escondido en "Más"');
 check('JS: el filtro de carpeta se extrajo a applyFilter()', /const applyFilter = \(f\) => \{/.test(app));
 check('JS: applyFilter lo usan los chips y el menú "Más"',
   (app.match(/applyFilter\(f\)/g) || []).length >= 2);

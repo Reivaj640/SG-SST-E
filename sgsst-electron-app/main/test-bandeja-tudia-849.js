@@ -32,6 +32,28 @@ const calc = soloCodigo(cuerpoDe('calcularIndicadores'));
 const side = soloCodigo(cuerpoDe('renderSidebar'));
 const appCod = soloCodigo(t);
 
+// 📦853 · calcularIndicadores ahora depende de los helpers de novedad (línea
+// base en localStorage) y, desde 📦854, de `_marcarNotifsCorreoLeidas` que su
+// go() invoca. El sandbox de abajo corre la funcion tal cual, asi que hay que
+// traer los helpers REALES desde app.js — no stubearlos: un stub que
+// devolviera 0 siempre haria pasar el calculo de "nuevo" sin comprobar nada,
+// que es justo el bug que estos checks tienen que cazar.
+const HELPERS = ['_leerVistos', '_marcarVisto', '_sembrarVistos', '_marcarNotifsCorreoLeidas']
+  .map((n) => soloCodigo(cuerpoDe(n))).join('\n');
+const CLAVES = ['TUDIA_VISTOS']
+  .map((n) => { const m = t.match(new RegExp('const ' + n + ' = [^;]+;')); return m ? soloCodigo(m[0]) : ''; })
+  .join('\n');
+const PRELUDEO = CLAVES + '\n' + HELPERS;
+// localStorage mínimo: guarda en memoria. Si devolviera siempre null, la linea
+// base nunca existiria y "nuevo" seria 0 siempre — otra forma de no comprobar.
+function storageVacio() {
+  const d = {};
+  return {
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null; },
+    setItem: function (k, v) { d[k] = String(v); },
+  };
+}
+
 // ══ 1) El strip de arriba desaparece ══
 chk('ya NO existe renderKpiStrip (pintaba las tarjetas)',
   appCod.indexOf('renderKpiStrip') < 0);
@@ -57,18 +79,36 @@ chk('el layout principal sube solo (el correo gana el alto de las tarjetas)',
 chk('existe calcularIndicadores()', calc.length > 400, calc.length + ' chars');
 chk('la sidebar la usa para pintar las filas',
   /calcularIndicadores\(\)\.forEach/.test(side));
-chk('calcula los 3: correos, reuniones, invitaciones',
-  /unread = state\.mails/.test(calc) && /todayEvents = state\.events/.test(calc)
-  && /pending = state\.mails/.test(calc));
+// 📦853 · Los 4 checks siguientes se INVIERTIERON, no se borraron. El contrato
+// paso de 3 indicadores a 2 porque "Invitaciones pendientes" contaba un campo
+// que ningun camino del correo real escribe. Borrar el check habria dejado de
+// avisar si alguien vuelve a poner la fila con el mismo defecto.
+chk('📦853 · calcula los 2 que quedan: correos y reuniones',
+  /unread = state\.mails/.test(calc) && /todayEvents = state\.events/.test(calc));
+chk('📦853 · ya NO calcula invitaciones (nadie escribe meetingSuggestion)',
+  !/pending = state\.mails/.test(calc),
+  'vuelve a contar un campo que solo existe en los datos de ejemplo');
 chk('cada item trae value Y n (el n es el que decide si la fila se apaga)',
-  (calc.match(/\bn: /g) || []).length === 3, (calc.match(/\bn: /g) || []).length + '');
+  (calc.match(/\bn: /g) || []).length === 2, (calc.match(/\bn: /g) || []).length + '');
 chk('cada item trae su go() de navegación',
-  (calc.match(/go: function \(\)/g) || []).length === 3,
+  (calc.match(/go: function \(\)/g) || []).length === 2,
   (calc.match(/go: function \(\)/g) || []).length + '');
-chk('y los ids siguen siendo los de siempre (correo→bandeja, reuniones→día, invitaciones→filtro)',
-  /id: "kpi-correos"[\s\S]{0,200}setCalendarVisible\(false\)/.test(calc)
-  && /id: "kpi-reuniones"[\s\S]{0,240}calView = "day"/.test(calc)
-  && /id: "kpi-invitaciones"[\s\S]{0,240}mailFilter = "meeting"/.test(calc));
+// 📦853 · Este check se INVIERTIÓ, no se borró: ahora además de cambiar de
+// vista, el clic de Correos tiene que APLICAR el filtro "unread".
+// El rango se acota al OBJETO de kpi-correos, terminado donde empieza el
+// siguiente. Prefijar `{0,600}` "para que no falle" haría que el regex pudiera
+// matchear dentro de kpi-reuniones, que es justo lo que este check tiene que
+// distinguir. Un rango enorme no arregla un check: le quita el diente.
+const OBJ_CORREOS = (/id: "kpi-correos"[\s\S]*?(?=id: "kpi-reuniones")/).exec(calc);
+const OBJ_REUNIONES = (/id: "kpi-reuniones"[\s\S]*?(?=id: "kpi-invitaciones"|\]\s*;)/).exec(calc);
+const objCorreos = OBJ_CORREOS ? OBJ_CORREOS[0] : '';
+const objReuniones = OBJ_REUNIONES ? OBJ_REUNIONES[0] : '';
+chk('📦853 · los ids son los de siempre y el de correo además filtra',
+  /mailFilter = "unread"/.test(objCorreos) && /setCalendarVisible\(false\)/.test(objCorreos)
+  && /calView = "day"/.test(objReuniones)
+  && !/id: "kpi-invitaciones"/.test(calc),
+  'correo tiene que aplicar el filtro ademas de cambiar de vista; correos=' + JSON.stringify(objCorreos)
+  + ' reuniones=' + JSON.stringify(objReuniones));
 
 // ══ 3) Eventos críticos eliminado ══
 chk('se fue el id kpi-criticos', appCod.indexOf('kpi-criticos') < 0);
@@ -130,11 +170,17 @@ chk('todas las variables que usa existen de verdad',
       state: { mails: mails, events: events },
       D: { MONTH_VIEW: { todayIso: hoy }, ICONS: { mail: '<i/>', calendarPlus: '<i/>', link: '<i/>' } },
       setCalendarVisible() { },
+      // 📦854 — El go() de Correos invoca este helper. Sin bridge de
+      // notificaciones sale por `getElectronAPI() === null` y no rompe nada:
+      // lo que se prueba acá es la navegación, no el marcado.
+      getElectronAPI() { return null; },
+      window: null,
+      localStorage: storageVacio(),
       String: String, Number: Number, parseInt: parseInt, parseFloat: parseFloat,
     };
     c.globalThis = c;
     vm.createContext(c);
-    vm.runInContext(calc + '\nres = calcularIndicadores().map(function (x) {'
+    vm.runInContext(PRELUDEO + '\n' + calc + '\nres = calcularIndicadores().map(function (x) {'
       + ' return { id: x.id, n: x.n, value: String(x.value), label: x.label, sub: x.sub, tone: x.tone }; });', c);
     return c.res;
   }
@@ -149,18 +195,25 @@ chk('todas las variables que usa existen de verdad',
     HOY);
   chk('correos: cuenta los no leídos (3 de 4)', r[0].n === 3, r[0].n + '');
   chk('reuniones: cuenta los eventos de HOY (3, no los de otros días)', r[1].n === 3, r[1].n + '');
-  chk('invitaciones: solo las no leidas que sugieren reunion (1)', r[2].n === 1, r[2].n + '');
+  // 📦853 · El indicador de "Invitaciones pendientes" se RETIRO. El check no
+  // se borro: se INVERTIO. Antes afirmaba que las invitaciones contaban bien;
+  // ahora afirma que la fila no existe, que es el contrato nuevo. Un check
+  // borrado no avisaria si alguien la vuelve a poner con un campo que otra vez
+  // nadie escribe.
+  chk('📦853 · quedan 2 indicadores: invitaciones ya no está',
+    r.length === 2 && !r.some((x) => x.id === 'kpi-invitaciones'),
+    'n=' + r.length + ' ids=' + r.map((x) => x.id).join(','));
   chk('cada uno trae su etiqueta y su subtexto',
     r[0].label === 'Correos no leídos' && r[0].sub === '4 totales'
-    && r[1].label === 'Reuniones hoy' && r[2].label === 'Invitaciones pendientes',
+    && r[1].label === 'Reuniones hoy',
     JSON.stringify(r.map(x => x.sub)));
   chk('"Próxima reunión" toma la más cercana de hoy', /Próxima: 09:00/.test(r[1].sub), r[1].sub);
 
   // Todo en cero: guion, no 0. Y la fila se apaga (n === 0 -> !n).
   r = correr([], [], HOY);
-  chk('sin nada: los 3 muestran guion, no cero',
+  chk('sin nada: los 2 muestran guion, no cero',
     r.every(x => x.value === '—'), r.map(x => x.value).join(','));
-  chk('sin nada: los 3 tienen n = 0 (la fila se apaga sola)',
+  chk('sin nada: los 2 tienen n = 0 (la fila se apaga sola)',
     r.every(x => x.n === 0), r.map(x => x.n).join(','));
   chk('y el subtexto lo dice sin inventar hora', r[1].sub === 'Sin eventos próximos', r[1].sub);
 
@@ -169,15 +222,18 @@ chk('todas las variables que usa existen de verdad',
   // guarda el valor en otro lado hace invisible justo el efecto que se quiere
   // comprobar, y el check pasa/falla por el motivo equivocado.
   const navs = {};
-  ['kpi-correos', 'kpi-reuniones', 'kpi-invitaciones'].forEach((id) => {
+  ['kpi-correos', 'kpi-reuniones'].forEach((id) => {
     const c = { res: null, __nav: {},
       D: { MONTH_VIEW: { todayIso: HOY }, ICONS: { mail: '<i/>', calendarPlus: '<i/>', link: '<i/>' } },
       setCalendarVisible: function (v) { c.state.calendarVisible = v; },
+      getElectronAPI() { return null; },
+      window: null,
+      localStorage: storageVacio(),
       String: String, Number: Number, parseInt: parseInt, parseFloat: parseFloat };
     c.state = { mails: [], events: [], calendarVisible: true, selectedDate: null, calView: 'month', mailFilter: 'all' };
     c.globalThis = c;
     vm.createContext(c);
-    vm.runInContext(calc + '\ncalcularIndicadores().forEach(function (x) {'
+    vm.runInContext(PRELUDEO + '\n' + calc + '\ncalcularIndicadores().forEach(function (x) {'
       + ' x.go();'
       + ' __nav[x.id] = { visible: state.calendarVisible, calView: state.calView, mailFilter: state.mailFilter };'
       + ' state.calendarVisible = true; state.calView = "month"; state.mailFilter = "all"; });'
@@ -186,17 +242,26 @@ chk('todas las variables que usa existen de verdad',
   });
   chk('correos lleva a la BANDEJA (oculta el calendario)',
     navs['kpi-correos'].visible === false, JSON.stringify(navs['kpi-correos']));
+  // 📦853 · Este check se INVERTIÓ, no se borró. Antes afirmaba solo que el
+  // clic llegaba a la vista de correo — y eso pasaba aunque no filtrara nada,
+  // que era el bug reportado. Ahora además exige el filtro "unread", que es
+  // lo que el owner dijo que quería.
+  chk('📦853 · correos además APLICA el filtro de no leídos (invertido)',
+    navs['kpi-correos'].mailFilter === 'unread', JSON.stringify(navs['kpi-correos']));
   chk('reuniones abre el CALENDARIO en vista Día',
     navs['kpi-reuniones'].visible === true && navs['kpi-reuniones'].calView === 'day',
     JSON.stringify(navs['kpi-reuniones']));
-  chk('invitaciones filtra el correo por reuniones',
-    navs['kpi-invitaciones'].mailFilter === 'meeting', JSON.stringify(navs['kpi-invitaciones']));
-  // Las tres tienen que ser DISTINTAS. Es el invariante de fondo: si dos
-  // apuntaran a lo mismo, el sidebar mostraria tres filas que hacen lo mismo.
-  chk('las 3 van a sitios distintos (correo oculta, día abre, invitaciones filtra)',
+  chk('📦853 · invitaciones ya no navega a ninguna parte',
+    !Object.prototype.hasOwnProperty.call(navs, 'kpi-invitaciones'),
+    'volvió una fila que cuenta un campo que nadie escribe');
+  // Las dos que quedan tienen que ser DISTINTAS. Es el invariante de fondo: si
+  // las dos apuntaran a lo mismo, el sidebar mostraria dos filas que hacen lo
+  // mismo. Y ahora además una filtra por lectura y la otra cambia de vista.
+  chk('las 2 van a sitios distintos (correo+unread oculta, día abre)',
     navs['kpi-correos'].visible === false
+    && navs['kpi-correos'].mailFilter === 'unread'
     && navs['kpi-reuniones'].calView === 'day'
-    && navs['kpi-invitaciones'].mailFilter === 'meeting');
+    && navs['kpi-reuniones'].mailFilter === 'all');
 })();
 
 // ══ 8) Higiene ══

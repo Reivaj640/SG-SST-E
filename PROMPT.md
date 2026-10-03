@@ -282,13 +282,86 @@ lo que se **publica** (`CHANGELOG`, `README`, `release-notes`) va en el commit.
 **Qué NO va en `Historial.md`:** el detalle técnico de una línea. Eso va en el comentario `📦n` del
 código y en `AGENTS.md`. `Historial.md` es el "dónde quedé", no el "cómo lo hice".
 
+### 5.11 🔴 Un ancla de reemplazo tiene que reponer todo lo que tape
+
+**Aplica a cualquier script que edite un archivo con `String.replace`**, sobre todo los documentos
+y los archivos grandes.
+
+**La trampa:** insertar "antes de X" pasando `[X, textoNuevo]`. El texto nuevo **no vuelve a
+contener X**, así que X desaparece. Si X es un encabezado de sección, no se pierde una línea: queda
+**huérfano todo lo que venía después**, absorbido dentro de la sección nueva. El script reporta `OK`.
+
+Pasó de verdad en 📦852: el par `['## [0.1.233] - FECHA', '<sección 0.1.234 completa>']` iba a dejar
+las entradas 📦850 y 📦851 sin encabezado dentro del CHANGELOG.
+
+**Reglas:**
+
+1. **El ancla lleva el contexto que la rodea**, no solo la primera línea. Un archivo con un
+   blockquote entre el título y el subtítulo hace que un ancla "título + subtítulo" no exista.
+2. **El texto de reemplazo termina reponiendo el ancla completo.**
+3. **Exigir exactamente 1 coincidencia antes de reemplazar.** Sin esto, un `replace` que no
+   encuentra nada devuelve el archivo intacto y el script reporta éxito:
+
+   ```js
+   const n = s.split(from).length - 1;
+   if (n !== 1) throw new Error('se esperaba 1, halladas ' + n);
+   ```
+
+4. **Respaldar antes de correr.** Un script que escribe archivo por archivo no es atómico: si el
+   primero sale bien y el segundo falla, quedan estados mezclados.
+5. **"El script dijo OK" no es verificación.** Comprobar por **estructura**: dónde caen los
+   encabezados, debajo de cuál versión quedaron las entradas.
+
+```js
+// Verificación por estructura, no por "el script terminó sin error"
+Select-String -Path CHANGELOG.md -Pattern '^## \[0\.1\.2(3[0-9])\]' | Select-Object -First 5
+```
+
+### 5.12 🔴 Comprobar el valor no basta: hay que comprobar la transición
+
+**Aplica a cualquier contador, badge, aviso de novedad o "sin leer"**: todo lo que dependa de un
+valor guardado de la corrida anterior.
+
+**La trampa:** un test que afirma una propiedad **en un instante** pasa aunque la transición esté
+rota. Pasó de verdad en 📦853/854. El aviso de "Correos no leídos" se calculaba como
+`nuevo = actual - visto`, con `visto` guardado en `localStorage`. El test comprobaba:
+
+> *"si baja de la línea base el aviso es 0, nunca negativo"*
+
+Pasaba, y estaba **justo a un paso del bug**. `max(0, actual - visto)` da 0 cuando `actual` cae
+por debajo — correcto en ese instante. Lo que **no** preguntaba era qué venía después: la base
+guardada seguía congelada en su máximo histórico, así que el próximo correo nuevo daba
+`max(0, 1 - 4) = 0`. El aviso no volvía a prender hasta juntar 5 sin leídos. Y leer el correo
+fuera de la app es lo que hace el owner todos los días, así que el camino normal estaba roto.
+
+**Reglas:**
+
+1. **Cada `f(x)` va seguido de `f(lo que viene después de x)`.** Si el valor inicial es correcto,
+   el test pasa; la transición es la que muerde.
+2. **Un valor guardado es un ancla, no un hecho.** Si la realidad puede quedar **por debajo** de lo
+   guardado, hay que **reanclar**: si `actual < visto`, ya no hay nada pendiente y la base debe
+   volver a `actual`. Una base que solo sube se congela y silencia el aviso para siempre.
+3. **Es el mismo patrón del mutante vacío** (§7): test verde sobre un caso que nunca se ejerce.
+   La pregunta no es "¿el test pasa?" sino "¿qué caso NO estoy ejercitando?".
+4. **Antes de tocar la aritmética, auditar el test que la vigila.** El test es donde se ve el
+   punto ciego: si se detiene en un valor y no sigue, ahí está el hueco.
+
+```js
+// ❌ Solo el instante: pasa, y la transición está rota
+chk('si baja de la linea base es 0', ver(sb)[0] === 0);
+// ✅ El instante Y lo que viene después
+chk('si baja de la linea base es 0', ver(sb)[0] === 0);
+sb.state.mails = [{ unread: true }];
+chk('y un correo nuevo vuelve a marcar 1', ver(sb)[0] === 1);
+```
+
 ---
 
 ## 6. Convenciones de código
 
 ### 6.1 Backend — bridges
 
-Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 27 en `main/`.
+Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
 
 ```js
 // main.js — registro con require directo + destructuring

@@ -24,20 +24,27 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-03 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | `47779352` — 📦850-851 · **sin pushear** |
-| **Commits sin pushear** | 1 |
-| **Versión** | `0.1.233` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 111 tests · 93 verdes · 18 preexistentes · **0 regresiones** |
-| **Árbol de trabajo** | Con cambios sin commitear: `PROMPT.md` (nuevo), `PRODUCT.md`, `sgsst-electron-app/AGENTS.md` |
+| **Último commit** | 📦853-854 · el aviso de correo de "Tu día" comparte sistema con el 99+ |
+| **Commits sin pushear** | 0 — esta tanda sube completa: 📦850-851, 📦852 y 📦853-854 |
+| **Versión** | `0.1.235` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 112 tests · 94 verdes · 18 preexistentes · **0 regresiones** |
+| **Árbol de trabajo** | Limpio |
+| **Validaciones visuales abiertas** | 📦853/854 **nunca se miraron en la app** (y 📦850/851 tampoco) |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
-1. **Push pendiente.** Hay 1 commit sin subir (`47779352`) y este trabajo sin commitear.
+1. **Push pendiente.** Hay 2 commits sin subir: `47779352` (📦850-851) y `2926b8ea` (📦852).
    Push solo con autorización del owner y con `git push --force-with-lease`.
-2. **Owner tiene que validar visualmente** el botón del borde de la columna lateral (📦850) y
-   el encabezado sin la etiqueta de fecha (📦851). Los dos están implementados y probados, pero
-   **nunca se miraron en la app**.
-3. **Decidir sobre el bug de `styles.css`** (ver más abajo, bloqueantes).
+2. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
+   fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
+   que baja el 99+. Todo probado con tests, **nunca mirado en la app**. Ojo: hay que **cerrar y
+   reabrir** la app primero, para que se siembre la línea base con el estado actual.
+3. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
+   que sigue abierto, y lleva desde v0.1.212.
+4. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
+   12 JS huérfanos de la Bandeja (bloqueante #4). Editar código que no se carga es trabajo perdido.
+5. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
+   pendientes se queda así y no se le toca.
 
 ### 🔴 Bloqueantes y deudas conocidas
 
@@ -50,7 +57,8 @@
 | 5 | 4 archivos `.bak-*` en la raíz del app | `main.js.bak-*`, `renderer.js.bak-*`, `preload.js.bak-*`, `index.html.bak-*` | Ruido. Candidatos a borrar, **pero no sin autorización** |
 | 6 | 30 tests en `tests/` que el runner no ejecuta | `sgsst-electron-app/tests/` (en subdirectorios por módulo) | Cobertura que parece existir y no corre. El runner solo mira `main/` |
 | 7 | `CHANGELOG.md` afirma 22/22 mutaciones en `test-swapview-841.js`, pero ese archivo no tiene array `MUT` | `CHANGELOG.md` | O el mutation se perdió en un refactor, o el CHANGELOG describe un estado intermedio |
-| 8 | 2 validaciones visuales que CONTEXT.md dejó abiertas | `CONTEXT.md` v0.1.214 (confetti del splash) y v0.1.215 (home de Capacitaciones) | **No verificables desde el código.** Hay que preguntárselo al owner |
+| 8 | ~~2 validaciones visuales abiertas~~ — **CERRADO 2026-10-03** | `CONTEXT.md` v0.1.214 (confetti del splash) y v0.1.215 (home de Capacitaciones) | El owner las revisó en la app y no registró observaciones. Ya no bloquean. Las dos referencias en `CONTEXT.md` quedaron actualizadas |
+| 9 | 📦850 y 📦851 implementados y probados, pero nunca vistos en la app — **CERRADO 2026-10-03** | Botón del borde y encabezado sin etiqueta de fecha | El owner los revisó. Con esto **no queda ninguna validación visual abierta** |
 
 ### 📋 Cola de trabajo acordada
 
@@ -61,8 +69,7 @@
 | 3 | 🔴 Cerrar el bypass de `gh:update-personal` (bloqueante #2) | Pendiente, abierto desde v0.1.212 |
 | 4 | Arreglar los tokens faltantes de `styles.css` (bloqueante #1) | Pendiente, sin autorizar |
 | 5 | Migración de `actualizado_en` para BDs previas (bloqueante #3) | Pendiente |
-| 6 | Preguntar al owner por las 2 validaciones visuales abiertas (bloqueante #8) | **Pregunta pendiente** |
-| 7 | Limpiar código muerto de la Bandeja | Pendiente, esperando decisión |
+| 6 | Limpiar código muerto de la Bandeja (bloqueantes #4 y #5) | Pendiente, esperando autorización de borrado |
 
 ### 🧠 Lo que la regla de cero presunciones evitó hoy
 
@@ -90,6 +97,18 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Un check de "este texto tiene que estar" **solo vale si además dice dónde**.
 - Cuando se borra algo, **invertir los checks que lo afirman**, y si son varios, todos.
 - Un botón que **pliega la columna que lo contiene** no puede vivir dentro de ella.
+- Un **ancla de reemplazo** tiene que llevar el contexto que la rodea, no solo la primera línea. Al
+  insertar "antes de X", el texto nuevo debe **reponer X completo**. Si X es un encabezado de
+  sección, perderlo no es perder una línea: deja huérfano todo lo que venía después.
+- **"El script dijo OK" no es verificación.** Un script que hace `replace` y reporta éxito puede
+  haber matcheado 0 veces y dejado el archivo intacto. El guard que salva es exigir exactamente
+  1 coincidencia, y después comprobar por estructura dónde cayó cada cosa.
+- Un script que **escribe archivo por archivo no es atómico**: si el CHANGELOG sale bien y el README
+  falla, quedan estados mezclados. **Respaldar antes de correr.**
+- Un verificador de "inglés colado" con listas largas produce falsos positivos tan molestos como los
+  typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
+- Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
+  `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
 ---
 
@@ -180,7 +199,255 @@ sgsst-electron-app/main/test-minical-*.js         (nuevos)
 | Hash | Paquete | Push |
 |---|---|---|
 | `42cce42e` | 📦844-849 | Sí |
-| `47779352` | 📦850-851 | **No** |
+| `47779352` | 📦850-851 | Sí |
+| `2926b8ea` | 📦852 documentación | Sí |
+| (este commit) | 📦853-854 aviso de correo en "Tu día" | Sí |
+
+---
+
+### 2026-10-03 · Alertas de "Tu día" (📦853)
+
+**Qué se hizo**
+
+| Qué | Detalle |
+|---|---|
+| Clic de "Correos no leídos" | Antes solo cambiaba de vista; ahora aplica `mailFilter = "unread"` y marca lo visto |
+| Filtro "No leídos" | Subió del menú "Más" a la barra visible: `PRIMARY_FILTERS = ["all","unread","sent"]` |
+| Aviso de novedad | **Réplica exacta del 99+** del shell, colgada de la esquina de la fila |
+| Al hacer clic | Marca las notificaciones de **correo** como leídas → **baja el pillón y el 99+** |
+| "Invitaciones pendientes" | **Retirada** |
+
+**Por qué** — El owner pidió que "Tu día" avisara lo que llega "como se ve arriba en el icono de la
+Bandeja Integrada", y al hacer clic en los no leídos se mostrara esa lista y no la bandeja completa.
+
+**📦854 · Lo que cambió cuando el owner mandó a investigar de verdad**
+
+Las dos primeras versiones del aviso se hicieron "a ojo", copiando lo que se veía en la captura. El
+owner las rechazó y dijo: *"investigá cómo está construido ese sistema y replicálo"*. Al investigar:
+
+- **El 99+ no es un badge, es un servicio.** `main/notifications-service.js` corre cada 60s;
+  `main/notifications-email.js` busca `email_threads WHERE has_unread = 1` e inserta filas en la
+  tabla `notificaciones` con `dedupe_key` única; emite `notificaciones:changed`; el `renderer.js`
+  pinta el badge y el toast. El número viene de esa tabla, no de Gmail.
+- **Lo que yo había hecho era un contador paralelo.** Usaba `localStorage` sobre `state.mails`: no
+  tocaba la tabla, no hablaba con el 99+, y mostraba un número distinto al de arriba. Con lo cual
+  el aviso de "Tu día" y el del botón **no podían bajar juntos**, porque eran dos cosas sin relación.
+
+**La réplica quedó en tres piezas:**
+
+| Pieza | Qué hace |
+|---|---|
+| El pillón | Cuelga de la **esquina de la fila** (como el 99+ del botón) con los **9 valores** copiados de `.kair-cal-badge` |
+| El clic | `_marcarNotifsCorreoLeidas()` lista con `soloNoLeidas` + `limit: 50` (el mismo payload de `kair-alerts.js:206-212`), filtra `tipo === "correo"` y marca por `notificaciones:marcarLeida` |
+| El refresco | `KA.refresh()` después de marcar, para que el 99+ baje ya y no al próximo tick de 60s |
+
+**A propósito NO se usa `marcarTodas`**: taparía también los eventos, y mirar el correo no es lo
+mismo que decir "ya vi los eventos". El número grande sigue viniendo de **Gmail**, independiente del
+servicio de notificaciones (decisión del owner).
+
+**El bug de fondo que destapó la investigación** — la tabla `notificaciones` tenía:
+
+| | |
+|---|---|
+| Filas | 78 |
+| Sin leer | **77** — de las cuales **61 correos** |
+| Marcadas como leídas | **1 en toda la historia** |
+
+**El 99+ no podía bajar nunca**, porque nada marcaba esas filas. Ahora "Tu día" es donde se marcan.
+
+**Corrección de rumbo** — La primera implementación metió un **switch** para encender/apagar las
+alertas. El owner lo rechazó: *"no quiero un switch, quiero este tipo de alerta visual"* (con la
+captura del pillón 99+). Se quitó el switch completo —botón, `role="switch"`, `aria-checked`, clave
+`TUDIA_ALERTAS`, helpers `_alertasTuDiaOn`/`_setAlertasTuDia` y sus reglas CSS— y se puso el pillón.
+La **línea base de lo visto** (`kair-bandeja.tuDiaVistos`) sí se conservó: es lo que hace que el
+número sea "cuántos son nuevos" y no "cuántos hay en total".
+
+**El pillón se ve igual que el 99+ del shell a propósito.** Copió de `.kair-cal-badge`
+(`styles.css:6121`): mismo rojo `#dc3545`, misma proporción de radio, misma sombra
+`0 1px 3px rgba(0,0,0,.25)`, mismo número blanco bold, y tope 99+. El owner ya reconoce ese rojo
+como "llegó algo"; uno nuevo habría tenido que aprenderlo. Va dentro de un envoltorio con
+`position: relative` porque si se anclara a la fila quedaría en la esquina de las 250px del sidebar
+en vez de encima del ícono, que es donde el ojo ya está mirando.
+
+**Diagnóstico hecho ANTES de codear** (esto es lo que sostuvo el trabajo)
+
+1. `render-mail-list.js` **ya tenía** un filtro "No leídos" escrito — y **no está cargado** en
+   `index.html`. Es uno de los 12 JS huérfanos (bloqueante #4). La lógica buena existía en dos
+   lugares: la muerta y la viva.
+2. `PRIMARY_FILTERS = ["all", "sent"]` era lo que escondía el filtro. El filtro estaba en
+   `filterDefs` y la lista lo respetaba; lo que faltaba era un camino desde la pantalla.
+3. **"Invitaciones pendientes" nunca pudo tener dato.** `meetingSuggestion` se lee en 4 lugares y
+   **no se escribe en ninguno**: solo existe en los correos de ejemplo de `data.js`.
+4. **La BD real no tiene eventos de hoy.** Se consultaron las **76 tablas** de `kair.db`: 0 filas
+   con la fecha de hoy. `eventos_rapidos` tiene 5 filas, la última del 12 de agosto. Los eventos
+   del calendario vienen de **Google Calendar**.
+5. **Bomba armada en `app.js:1286`:** si el adaptador local devuelve 0 eventos, hace
+   `return D.EVENTS.slice()` — los **datos de ejemplo de julio** — y nunca llega a consultar
+   Google. No se dispara hoy, pero si la BD queda vacía el calendario muestra mails de ejemplo.
+
+**Bugs que salieron de los tests, no de mirar la pantalla**
+
+1. La animación del badge quedó en **420ms**, violando la regla del repo de "<300ms". El check lo
+   detectó y se bajó a 240ms.
+2. **3 regresiones** al cambiar el contrato: `test-bandeja-tudia-849.js`,
+   `test-bandeja-premium-v2.js` y `test-bandeja-toolbar-compacta.js` afirmaban "los 3 indicadores"
+   y "solo Recibidos y Enviados". Los 3 se **invirtieron**, no se borraron.
+3. `test-bandeja-tudia-849.js` crasheó: corre `calcularIndicadores` en un sandbox y la función pasó
+   a depender de 4 helpers nuevos. Se traen los **helpers reales** desde `app.js` en vez de
+   stubearlos: un stub que devolviera 0 siempre haría pasar el cálculo de "nuevo" sin comprobarlo.
+4. Un check de "detiene la propagación" **no miraba `stopPropagation`**: miraba que
+   `_setAlertasTuDia` siguiera a `renderSidebar`. Existía y nunca comprobó lo que decía comprobar.
+   Lo detectó la mutación que saca el `stopPropagation`.
+5. Un check **constante-falso**: se escribió `\bspill\b` cuando la variable se llama `pill`. Como
+   nunca matcheaba, fallaba siempre — y las mutaciones se reportaban como "detectadas" aunque el
+   check no comprobaba nada. Se vio porque el test quedó rojo sobre el código **correcto**.
+
+**El bug que solo apareció probando la app** (y que los tests NO cazaron)
+
+El owner lo probó y el pillón **no apareció** al llegar un correo. La causa era de diseño:
+
+- La línea base de "lo visto" **solo se escribía al hacer clic** en el indicador.
+- Un owner que nunca hace clic se queda **sin línea base para siempre**.
+- Sin línea base, `nuevo` da 0 siempre → el aviso era indistinguible de "no hay nada".
+- Los tests estaban en verde porque **todos sembraban el `localStorage` antes de mirar el
+  resultado**: probaban el caso fácil y dejaban el difícil sin ver.
+
+**La solución tiene dos partes, y la segunda es la que faltaba:**
+
+1. `init()` siembra la línea base con el número actual, **después** de cargar correos y eventos
+   (sembrarla antes leería un `state.mails` vacío y guardaría 0, con lo cual todo lo que el owner
+   ya tenía se le contaría como nuevo al abrir).
+2. Un **escenario funcional** que arranca de un `localStorage` **vacío**, siembra, simula la
+   llegada de un correo y exige que marque 1. Más un check que ata la siembra a `init()`, porque el
+   bloque funcional llama a `_sembrarVistos()` a mano y por sí solo no comprueba que nadie la
+   invoque en el arranque.
+
+**El segundo bug que solo apareció probando la app** (este NO era lógica, era visual)
+
+El owner volvió a probar y dijo: *"se actualiza correctamente mostrando los nuevos correos, pero no
+se refleja lo deseado... muestre el contador 2, 3, 4 y el efecto rojo"*. O sea: el número llega
+bien, **pero no se ve**.
+
+- La primera versión tenía **una sola capa de aviso**: el número, a 9.5px, sobre un ícono de fondo
+  azul clarito, sin sombra que lo despegara.
+- Con una sola capa hace falta que el ojo **ya esté en esa fila**. Y "Tu día" se mira de reojo.
+- El badge del shell que el owner señaló como referencia es 18px de alto, con sombra fuerte y
+  tipografía pesada. Lo que hace que se note no es el número, es el **peso visual** del bloque.
+
+**Ahora hay tres capas**, y con que se vea una sola ya se nota:
+
+| Capa | Qué hace |
+|---|---|
+| 1 | La **fila completa** se tiñe de `--kair-red-soft` con una barra roja de 3px a la izquierda |
+| 2 | El **ícono** se tiñe más fuerte (`#f8d3d8` con glifo `#a3212f`) |
+| 3 | El **pillón**: 22×19px, `font-size: 11px`, `font-weight: 800`, **anillo blanco de 2px** |
+
+El **anillo blanco** fue la pieza que faltaba: un rojo sobre un azul clarito se pierde, y el blanco
+es lo que lo despega del fondo. La barra roja va inset (`top/bottom: 4px`) con radio de un solo
+lado, porque pegada a los bordes asomaba por las esquinas redondeadas de la fila. Y la fila con
+novedad conserva su feedback de hover, que el fondo rojo tapaba.
+
+**La lección**: "el número está bien" y "se ve" son dos cosas distintas, y ningún test de lógica
+distingue entre ellas. Un aviso que solo cambia un texto de 9.5px puede ser **correcto y
+perceptualmente invisible**. La prueba de un aviso visual es que el owner lo vea, y la primera
+prueba manual es la que lo destapó.
+
+**La lección**: un test que siembra el estado antes de arrancar prueba el camino feliz por
+construcción. El escenario que hay que probar es el que empieza **sin nada**.
+
+**La segunda corrección del mismo bug: la línea base solo subía**
+
+La primera corrección (sembrarla en `init()`) era necesaria pero no alcanzaba. Quedaba esta: el aviso
+marcaba bien mientras el número **subiera**, y se apagaba en cuanto bajaba. La causa era que la
+línea base guardada nunca se ajustaba hacia abajo.
+
+| Momento | Sin leídos | Línea base | `nuevo` | Lo que veía el owner |
+|---|---|---|---|---|
+| Hizo clic | 4 | 4 | 0 | normal |
+| Leyó en el celular | 0 | **4** (congelada) | 0 | normal |
+| Llegó un correo nuevo | 1 | **4** | `max(0, 1-4)` = **0** | **no avisaba** |
+
+Tenía que juntar **5 sin leídos** para que el aviso volviera a prender. Y despachar el correo
+fuera de la app es exactamente como el owner lo hace: no era un caso raro, era el camino de todos
+los días. El arreglo son dos líneas: cuando `actual < visto`, la base se reancla a `actual`, porque
+si el número actual cayó por debajo de lo visto, ya no hay nada pendiente de su lado.
+
+**Cómo se destapó, que es la parte importante**: el test ya tenía la comprobación *"si baja de la
+línea base el aviso es 0, nunca negativo"*, y pasaba. El bug estaba **después** de ese `0`: la
+comprobación miraba el valor instantáneo y se detenía ahí, sin preguntar qué pasaba en el paso
+siguiente. Un test que afirma una propiedad en un instante no dice nada sobre la transición.
+
+**La lección general**: cuando un contador o un aviso dependa de un valor previo, comprobar `f(x)`
+no basta — hay que comprobar `f(x)` **y** `f(lo que viene después de x)`. El valor en sí puede ser
+correcto y la transición estar rota. Es el mismo patrón del "mutante vacío": el test verde sobre
+un caso que nunca se ejerce.
+
+**Decisiones del owner** (no volver a preguntar)
+
+- El toggle es un **switch que enciende/apaga las alertas**, no un filtro.
+  → **CORREGIDO en la revisión siguiente**: el owner rechazó el switch y pidió el pillón.
+- **"Invitaciones pendientes" se oculta** hasta que tenga fuente real (parseo del `.ics`).
+- El aviso es el **PILLÓN rojo, no un switch**. La primera versión con switch fue rechazada.
+- El **número grande sigue viniendo de Gmail**, independiente del servicio de notificaciones
+  (*"este es independiente de las notificaciones, es para el correo"*).
+- Al hacer clic se **marcan como leídas, y el 99+ también baja**.
+- Cuando un aviso **parezca** a otro, hay que **investigar cómo está construido el otro**, no copiar
+  lo que se ve. Tres versiones seguidas salieron de "copiar la captura" y las tres quedaron mal; la
+  cuarta salió de leer el servicio.
+- Se preguntó antes de codear y se procedió a ejecutar después del OK.
+- **El aviso es el PILLÓN rojo, no un switch.** La primera versión con switch fue rechazada.
+
+**Tests**
+
+| Archivo | Checks | Mutation |
+|---|---|---|
+| `test-bandeja-tudia-853.js` | 75/75 | **35/35** |
+| `test-bandeja-tudia-849.js` | 49/49 | — (checks invertidos + sandbox con el helper de 📦854) |
+| `test-bandeja-premium-v2.js` | 48/48 | — (check invertido) |
+| `test-bandeja-toolbar-compacta.js` | 51/51 | — (check invertido) |
+
+Suite completa: 112 tests, 94 verdes, 18 preexistentes, **0 regresiones**.
+
+---
+
+### 2026-10-03 · Documentación (📦852)
+
+**Qué se hizo** — tanda de mantenimiento documental puro. **Cero cambios en la app.**
+
+| Qué | Detalle |
+|---|---|
+| Auditoría completa | Toda la documentación contrastada contra el código real |
+| Reglas falsas eliminadas | `KairUI.esc()`, `KairHelpers.formatDate()`, "var no let/const", "último 📦579" |
+| `PROMPT.md` v2.0 | Índice que referencia en vez de duplicar; documenta las 3 islas de paleta |
+| `Historial.md` y `CLAUDE.md` | Nuevos, en la raíz del repo |
+| `CONTEXT.md` | 68 líneas gigantes → 1 318 legibles, **md5 idéntico**, 0 caracteres perdidos |
+| 3 trampas de `AGENTS.md` | Corregidas, incluida la del CSS que nunca existió |
+| `PRODUCT.md` | Paleta, tipografía, dark mode y 2 afirmaciones falsas |
+| Bump | `0.1.233` → `0.1.234` |
+
+**Por qué** — la documentación era la fuente de verdad y mentía. Un modelo que siguiera sus reglas
+al pie de la letra escribía llamadas a funciones inexistentes y la vista se caía.
+
+**Bugs encontrados** — ninguno estaba en el código, todos los encontró la verificación:
+
+1. **Un script de documentación iba a destruir el CHANGELOG.** Reemplazaba el encabezado
+   `## [0.1.233]` sin reponerlo: las entradas 📦850 y 📦851 quedaban sin encabezado, absorbidas
+   dentro de 0.1.234, y el script reportaba `OK`. Un encabezado no es una línea más — perderlo
+   deja huérfano todo lo que viene después.
+2. **La afirmación "ese CSS nunca estuvo en el repo" se verificó contra los 1 244 commits** de
+   todas las ramas, no solo contra el árbol actual. Sin eso habría sido una presunción.
+3. **Mi propio verificador mintió**: marcó "FALTA" a 3 documentos que sí existían, porque los
+   buscó en `sgsst-electron-app/` y están en la raíz del repo.
+4. **Dos palabras pegadas y dos términos en inglés** que casi van al CHANGELOG público.
+
+**Decisiones del owner** (no volver a preguntar)
+
+- Las **validaciones visuales** de v0.1.214, v0.1.215, 📦850 y 📦851 **ya fueron revisadas** y no
+  tienen observaciones registradas. **No queda ninguna abierta.**
+- Documentos nuevos en la **raíz del repo**, versionados junto a `PRODUCT.md`.
+- "Nada es una regla hasta comprobarlo en el código" — regla de primer orden, no opcional.
+
+**Tests** — ninguno nuevo. Suite sin cambios: 111 tests, 93 verdes, 18 preexistentes.
 
 ---
 

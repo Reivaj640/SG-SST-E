@@ -2177,6 +2177,11 @@
     }
     // F2 — Eventos del IPC (con fallback a mocks)
     state.events = await loadEventsFromIPC();
+    // 📦853 — Ya hay datos reales: sembrar la línea base de "lo visto" UNA vez.
+    // Va después de cargar correos y eventos, porque sembrarla antes leería un
+    // `state.mails` todavía vacío y guardaría 0 como línea base, con lo cual
+    // TODO lo que ya tenía el owner se le contaría como nuevo al abrir.
+    _sembrarVistos();
     console.log("[BandejaIntegrada][INIT] state.events.length=" + state.events.length + ", state.mails.length=" + state.mails.length + ", primera ev: " + (state.events[0] ? JSON.stringify({id: state.events[0].id, title: state.events[0].title, date: state.events[0].date, category: state.events[0].category}) : "none"));
     // 📦595 — Notificación in-app: si hay eventos en las próximas 24h, mostrar toast.
     setTimeout(function () {
@@ -3213,10 +3218,95 @@
   // un guion con el chip "Todo al dia". Cero informacion y un cuarto de la
   // pantalla. Se fueron tambien sus calculos (critical, criticalThisMonth,
   // criticalSub), que ya no usa nadie mas.
+  // 📦853 — Estado de novedades de "Tu día", persistido entre sesiones.
+  //
+  // El badge NO puede ser "el número actual": apenas hay un correo sin leer
+  // marcaría todo como nuevo y el pillón no diría nada. Lo que significa
+  // "nuevo" es la DIFERENCIA contra el último número que el owner llegó a
+  // mirar. Sin una línea base guardada no hay nada que avisar.
+  const TUDIA_VISTOS = "kair-bandeja.tuDiaVistos";
+
+  function _leerVistos() {
+    try {
+      const v = JSON.parse(localStorage.getItem(TUDIA_VISTOS) || "{}");
+      return v && typeof v === "object" ? v : {};
+    } catch (e) { return {}; }
+  }
+
+  // 📦853 — Marcar como visto. Se llama al hacer clic en el indicador: hacer
+  // clic ES mirar, así que el pillón de ese indicador baja a 0 en el acto.
+  function _marcarVisto(key, n) {
+    const v = _leerVistos();
+    v[key] = n;
+    try { localStorage.setItem(TUDIA_VISTOS, JSON.stringify(v)); } catch (e) { /* sin persistencia */ }
+  }
+
+  // 📦853 — Sembrar la línea base la PRIMERA vez que hay datos reales.
+  //
+  // Sin esto el pillón NUNCA aparecía, y era un bug de diseño, no de lógica:
+  // la línea base solo se escribía al hacer clic en el indicador. Un owner que
+  // nunca hacía clic se quedaba sin línea base para siempre, `nuevo` daba 0
+  // siempre, y el aviso era indistinguible de "no hay nada nuevo". Los tests
+  // no lo cazaron porque todos sembraban el localStorage antes de comprobar
+  // el resultado, o sea: probaban el caso fácil y dejaban el difícil sin ver.
+  //
+  // Se siembra con el número ACTUAL como visto, no con 0: los correos que ya
+  // tenía antes de abrir la app son conocidos, no son novedades. Lo que llega
+  // después sí se cuenta.
+  function _sembrarVistos() {
+    const v = _leerVistos();
+    const actuales = {
+      correos: state.mails.filter((m) => m.unread).length,
+      reuniones: state.events.filter((e) => e.date === D.MONTH_VIEW.todayIso).length,
+    };
+    let cambio = false;
+    Object.keys(actuales).forEach((k) => {
+      if (!Object.prototype.hasOwnProperty.call(v, k)) { v[k] = actuales[k]; cambio = true; }
+    });
+    if (cambio) {
+      try { localStorage.setItem(TUDIA_VISTOS, JSON.stringify(v)); } catch (e) { /* sin persistencia */ }
+    }
+    return v;
+  }
+
+  // 📦854 — Marcar como leídas las notificaciones de CORREO.
+  //
+  // Esto es lo que baja el "99+" del shell: son las MISMAS filas de la tabla
+  // `notificaciones`, no un contador paralelo inventado acá. Por eso el badge
+  // de arriba y el pillón de "Tu día" hablan de lo mismo.
+  //
+  // Solo las de tipo "correo" a propósito: `marcarTodas` taparía también las de
+  // evento, y mirar el correo no es lo mismo que decir "ya vi los eventos".
+  // El listado se pide con `soloNoLeidas` y `limit: 50`, el mismo payload que
+  // usa `shared/kair-alerts.js:206-212`.
+  function _marcarNotifsCorreoLeidas() {
+    try {
+      const api = getElectronAPI();
+      if (!api || !api.notifications || !api.notifications.marcarLeida) return;
+      const token = localStorage.getItem("kair-auth-token");
+      if (!token) return;
+      api.notifications.listar({ token: token, soloNoLeidas: true, limit: 50 })
+        .then(function (r) {
+          if (!r || !r.success || !Array.isArray(r.data)) return null;
+          const ids = r.data
+            .filter(function (n) { return n && n.tipo === "correo" && n.id > 0; })
+            .map(function (n) { return n.id; });
+          if (!ids.length) return null;
+          return api.notifications.marcarLeida({ token: token, ids: ids });
+        })
+        .then(function () {
+          // Sin esto el 99+ se queda en el numero viejo hasta el proximo tick
+          // del servicio (60s). Con esto baja en el acto.
+          const KA = (window.KairAlerts) || (window.parent && window.parent.KairAlerts);
+          if (KA && typeof KA.refresh === "function") KA.refresh();
+        })
+        .catch(function () { /* no critico: el aviso local ya se apago */ });
+    } catch (e) { /* no critico */ }
+  }
+
   function calcularIndicadores() {
     const unread = state.mails.filter((m) => m.unread).length;
     const todayEvents = state.events.filter((e) => e.date === D.MONTH_VIEW.todayIso).length;
-    const pending = state.mails.filter((m) => m.meetingSuggestion && m.unread).length;
 
     // F4 — Calcular "Próxima reunión" dinámicamente desde state.events
     var nextMeeting = null;
@@ -3235,16 +3325,55 @@
       return v > 0 ? v : "—";
     }
 
+    // 📦853 — Cuántos hay por encima de lo que el owner ya miró. Sin línea
+    // base guardada NO hay "nuevo" que marcar: la primera vez que se abre la
+    // app no se pinta nada, porque todavía no vio nada.
+    const vistos = _leerVistos();
+    function nuevoDe(key, actual) {
+      const visto = Number(vistos[key]);
+      if (!isFinite(visto) || visto < 0) return 0;
+      // 📦853-fix — La línea base tiene que BAJAR junto con el número.
+      //
+      // Si `actual` cae por debajo de lo visto, el owner ya se desahogó (leyó
+      // en el celular, en Gmail, en el celular otro día): no le queda nada
+      // pendiente, así que la base se reancla al valor actual y arranca 0.
+      //
+      // Sin este bloque la base se quedaba congelada en su máximo histórico y
+      // el próximo correo nuevo daba `max(0, 1 - 4) = 0`: el aviso se apagaba
+      // para siempre y no volvía a prender hasta acumular 5 sin leer. Y leer
+      // el correo fuera de la app es exactamente como el owner lo despacha,
+      // o sea que no era un caso raro: era el camino de todos los días.
+      if (actual < visto) { _marcarVisto(key, actual); return 0; }
+      return actual - visto;
+    }
+
     return [
-      { id: "kpi-correos", icon: D.ICONS.mail, tone: "is-blue",
-        value: kpiValue(unread), n: unread, label: "Correos no leídos", sub: state.mails.length + " totales",
-        go: function () { setCalendarVisible(false); } },
-      { id: "kpi-reuniones", icon: D.ICONS.calendarPlus, tone: "is-green",
-        value: kpiValue(todayEvents), n: todayEvents, label: "Reuniones hoy", sub: nextSub,
-        go: function () { state.selectedDate = D.MONTH_VIEW.todayIso; state.calView = "day"; setCalendarVisible(true); } },
-      { id: "kpi-invitaciones", icon: D.ICONS.link, tone: "is-amber",
-        value: kpiValue(pending), n: pending, label: "Invitaciones pendientes", sub: "Requieren confirmar",
-        go: function () { state.mailFilter = "meeting"; state._resetMailListScroll = true; setCalendarVisible(false); } },
+      { id: "kpi-correos", key: "correos", icon: D.ICONS.mail, tone: "is-blue",
+        value: kpiValue(unread), n: unread, nuevo: nuevoDe("correos", unread),
+        label: "Correos no leídos", sub: state.mails.length + " totales",
+        // 📦853 — Antes esto solo cambiaba de vista: llegaba a la bandeja
+        // completa. Ahora además APLICA el filtro de no leídos y marca lo
+        // visto, que es lo mismo que hizo clic.
+        go: function () {
+          _marcarVisto("correos", unread);
+          // 📦854 — Bajar el 99+ del shell es parte de "mirar el correo".
+          _marcarNotifsCorreoLeidas();
+          state.mailFilter = "unread";
+          state._resetMailListScroll = true;
+          setCalendarVisible(false);
+        } },
+      { id: "kpi-reuniones", key: "reuniones", icon: D.ICONS.calendarPlus, tone: "is-green",
+        value: kpiValue(todayEvents), n: todayEvents, nuevo: nuevoDe("reuniones", todayEvents),
+        label: "Reuniones hoy", sub: nextSub,
+        go: function () {
+          _marcarVisto("reuniones", todayEvents);
+          state.selectedDate = D.MONTH_VIEW.todayIso; state.calView = "day"; setCalendarVisible(true);
+        } },
+      // 📦853 — "Invitaciones pendientes" se RETIRÓ. Contaba
+      // `m.meetingSuggestion`, y ese campo solo existe en los correos de
+      // ejemplo de data.js: ningún camino del correo real lo escribe. La fila
+      // mostraba "—" para siempre, que se lee como un dato y no lo es. Vuelve
+      // cuando exista una fuente real (parseo del .ics del adjunto).
     ];
   }
 
@@ -3587,6 +3716,12 @@
     // El texto de "Arrastra un correo" y el botón "Abrir bandeja" se fueron:
     // el propio indicador de Correos no leídos lleva a la bandeja, así que
     // el botón repetía lo mismo.
+    // 📦854 — El aviso es un PILLÓN arriba a la derecha de la fila, con la
+    // misma pinta del "99+" que va arriba a la derecha del botón de la Bandeja:
+    // mismo rojo, mismo alto, mismo radio, misma sombra y el mismo tope 99+.
+    // Esa es la diferencia que el owner señaló: el 99+ cuelga de la esquina
+    // del elemento, no del ícono. Pegado al ícono se leía como una etiqueta
+    // suelta y no como "el mismo aviso que ves arriba".
     const tuDia = el("div", { class: "kair-card tuday" });
     tuDia.innerHTML = '<div class="tuday__t">Tu día</div><div class="tuday__list" id="tuday-list"></div>';
     const tudayList = $("#tuday-list", tuDia);
@@ -3595,13 +3730,20 @@
       // un cero se lee igual que un dato y obliga a leer el guion para saber
       // que no hay nada.
       const vacio = !it.n;
+      // 📦853 — `nuevo` viene de `calcularIndicadores`; el pillón solo se pinta
+      // si hay algo por encima de lo que el owner ya miró.
+      const hayNuevo = it.nuevo > 0;
       const item = el("button", {
-        class: "tuday__i" + (vacio ? " is-vacio" : ""),
+        class: "tuday__i" + (vacio ? " is-vacio" : "") + (hayNuevo ? " is-new" : ""),
         type: "button",
         id: it.id,
         title: it.label + " — " + it.sub,
       });
       const icon = it.icon.replace(/width="\d+" height="\d+"/, 'width="15" height="15"');
+      // Tope 99+ como el del shell: un número de 4 dígitos desbordaría el ancho.
+      const pill = hayNuevo
+        ? '<span class="tuday__badge" data-n="' + it.nuevo + '">' + (it.nuevo > 99 ? "99+" : it.nuevo) + "</span>"
+        : "";
       item.innerHTML =
         '<span class="tuday__ico tuday__ico--' + it.tone.replace("is-", "") + '">' + icon + "</span>" +
         '<span class="tuday__body">' +
@@ -3610,7 +3752,8 @@
             '<span class="tuday__c' + (vacio ? " is-zero" : "") + '">' + it.value + "</span>" +
           "</span>" +
           '<span class="tuday__s">' + it.sub + "</span>" +
-        "</span>";
+        "</span>" +
+        pill;
       item.addEventListener("click", it.go);
       tudayList.appendChild(item);
     });
@@ -4691,7 +4834,12 @@
     // vistas rápidas + las 6 carpetas de Gmail) vive en el menú "Más". Así la fila de
     // carpetas es UNA sola línea (Recibidos · Enviados · Más) y la bandeja queda en
     // 2 líneas de controles, sin chips cortados ni escondidos.
-    const PRIMARY_FILTERS = ["all", "sent"];
+    // 📦853 — "No leídos" subió de acá a la barra visible. Estaba en el menú
+    // "Más" y su única forma de activarse era el indicador de "Tu día", que solo
+    // cambiaba de vista y NO aplicaba el filtro. Es decir: la condición
+    // "no leídos" existía en el código pero era inalcanzable desde la UI.
+    // La barra queda en 3 botones, que siguen siendo UNA línea en 250px.
+    const PRIMARY_FILTERS = ["all", "unread", "sent"];
     filterDefs
       .filter((f) => PRIMARY_FILTERS.indexOf(f.id) >= 0)
       .forEach((f) => filters.appendChild(makeFilterBtn(f)));

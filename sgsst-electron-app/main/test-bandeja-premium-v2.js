@@ -83,9 +83,15 @@ check('JS: "Tu día" en el sidebar (tuday__i + tuday__n/tuday__c/tuday__s)',
   /class: "kair-card tuday"/.test(app) && /tuday__i/.test(app)
   && /tuday__n/.test(app) && /tuday__c/.test(app) && /tuday__s/.test(app));
 check('JS: se retiró el markup legacy .kair-kpi-item', !/class: "kair-kpi-item"/.test(app));
-check('JS: los 3 indicadores navegan (correos/reuniones/invitaciones)',
-  /id: "kpi-correos"/.test(app) && /id: "kpi-reuniones"/.test(app) && /id: "kpi-invitaciones"/.test(app));
-check('JS: calcularIndicadores() es la fuente única de los 3 datos',
+// 📦853 · Este check se INVIERTIÓ, no se borró. "Invitaciones pendientes"
+// contaba m.meetingSuggestion, y ese campo solo existe en los correos de
+// ejemplo de data.js: ningún camino del correo real lo escribe, así que la
+// fila mostraba "—" para siempre. Borrar el check no avisaría si alguien la
+// vuelve a poner con el mismo defecto.
+check('JS: 📦853 los 2 indicadores que quedan navegan, e invitaciones ya no está',
+  /id: "kpi-correos"/.test(app) && /id: "kpi-reuniones"/.test(app)
+  && !/id: "kpi-invitaciones"/.test(appCodigo));
+check('JS: calcularIndicadores() es la fuente única de los datos',
   /function calcularIndicadores\(\)/.test(app) && /calcularIndicadores\(\)\.forEach/.test(app)
   && app.indexOf('renderKpiStrip') < 0);
 check('JS: se retiró "Eventos críticos" y su código muerto (mira CODIGO, no comentarios)',

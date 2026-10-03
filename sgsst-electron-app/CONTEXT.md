@@ -5,7 +5,7 @@
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
 **Última actualización:** 3 de octubre de 2026
-**Versión actual:** 0.1.234 (desarrollo) — último publicado v0.1.205
+**Versión actual:** 0.1.235 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
@@ -270,7 +270,8 @@
 > omitido por error.
 > **E2E nuevo**: `tests/cap-home-e2e.js` con jsdom (validación estructural sin display): 18/18 DOM + 15/15 CSS
 > + 9/9 tokens + 11/11 estilos + callbacks `enterCronograma()` + `cloneCronograma()` + `goBackToModule()` OK.
-> Pendiente validación visual por Javier al reiniciar la app. Bump 0.1.214 → 0.1.215.
+> Bump 0.1.214 → 0.1.215. Validación visual **revisada por el owner el 2026-10-03**, sin observaciones
+> registradas. Dejó de estar pendiente.
 
 > **🆕 v0.1.214 (📦815 — feat(splash): confetti estilo Stripe para el check de bienvenida):** Reemplaza el
 > check verde Bootstrap hardcoded (`#28a745`) del `loading-success-icon` por SVG con gradiente
@@ -283,7 +284,8 @@
 > Si el user pide cambiar colores,
 > NO hardcodear — exponer como tokens `--kair-X` en `:root` y consumirlos desde el `stroke`/`fill` del SVG y desde los keyframes CSS.
 > Cache-bust `styles.css?v=20260926-confetti-success` + bump 0.1.213 → 0.1.214.
-> Validación visual pendiente por Javier al reiniciar la app.
+> Validación visual **revisada por el owner el 2026-10-03**, sin observaciones registradas.
+> Dejó de estar pendiente.
 
 > **🆕 v0.1.213 (📦814 — feat(inv-ia): prompts del 5 Porqués alineados al dataset v5):** Migración metodología vertical por columna (cada M explica la causa de la MISMA M del nivel anterior).
 > Reglas: HERENCIA DE N/A, DETENCIÓN POR CAUSA RAÍZ, CERO CRUCES.

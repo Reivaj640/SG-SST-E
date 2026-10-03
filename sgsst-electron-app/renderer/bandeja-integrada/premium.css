@@ -674,6 +674,65 @@ html, body {
 .tuday__i.is-vacio { opacity: .45; }
 .tuday__i.is-vacio .tuday__c { font-weight: 600; color: var(--kair-text-3); }
 
+/* 📦854 · Aviso de novedad. Réplica del "99+" del shell
+   (`.kair-cal-badge`, styles.css:6121-6157). Mismos valores y misma posición:
+     top 2px / right 2px de un contenedor `position: relative`
+     min-width 18px · height 18px · padding 0 5px · border-radius 9px
+     background #dc3545 · color #fff · 10px/700 · line-height 18px
+     box-shadow 0 1px 3px rgba(0,0,0,.25)
+   Iguales a propósito: el owner reconoce ese bloque rojo como "llegó algo", y
+   si el de "Tu día" se ve distinto se lee como OTRO aviso, no como el mismo.
+
+   El ancla es la FILA, no el ícono. El 99+ cuelga de la esquina de su botón y
+   ahí tiene que colgar este: pegado al ícono se veía como una etiqueta suelta.
+   Por eso el pillón va de último hijo de la fila y no dentro del ícono. */
+.tuday__i.is-new { position: relative; background: var(--kair-red-soft); }
+.tuday__i.is-new:hover { background: #f6dbe0; }
+.tuday__i.is-new::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #dc3545;
+}
+.tuday__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  pointer-events: none;
+  user-select: none;
+}
+/* Aviso, no alarma: tres pulsos y se queda quieto. Un loop infinito en una
+   tarjeta que vive siempre a la vista se vuelve ruido y deja de leerse — el
+   badge del shell lo hace, pero ese está en un botón que se mira al entrar.
+   240ms por ciclo (el repo exige menos de 300ms), solo `transform` (GPU), y
+   `prefers-reduced-motion` lo anula. */
+.tuday__badge { animation: tuday-pulse 240ms ease-in-out 3; }
+@keyframes tuday-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tuday__badge { animation: none; }
+}
+
 
 /* 📦849 — La tarjeta "Integración correo" (.sidecard*) se retiro: su
    espacio lo ocupa ahora "Tu dia". El texto de arrastrar correo y el

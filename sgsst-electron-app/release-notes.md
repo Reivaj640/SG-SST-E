@@ -1,3 +1,40 @@
+# K+AIR v0.1.235
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Tu día avisa lo que llega, y de paso se le apaga el 99+
+
+Cuando tenías correos sin leer, el número grande de **Tu día** era correcto... pero el programa
+no te avisaba de nada. Ahora sí: la fila **Correos no leídos** se pone roja y lleva un globo con
+el número de lo que te llegó desde la última vez que la miraste.
+
+El globo rojo es el mismo del botón **Bandeja Integrada** de arriba, con el mismo color, el mismo
+tamaño y la misma sombra. No es un dibujo parecido: es el mismo aviso, del mismo servicio.
+
+**Qué cambió**
+
+- Al hacer clic en **Correos no leídos** ahora se abre la lista filtrada por no leídos. Antes solo
+  cambiaba de vista y te dejaba viendo toda la bandeja.
+- Ese clic también marca los correos como vistos, así que **el 99+ de arriba baja**.
+- **No leídos** salió del menú **Más** y quedó en la barra, donde se ve sin buscarlo.
+- Desapareció la fila **Invitaciones pendientes**: mostraba un guion que parecía un dato y no
+  lo era nunca. Vuelve cuando tenga una fuente real.
+- Se destapó un problema de fondo: el programa tenía **77 avisos guardados que nunca se marcaban
+  como vistos**, por eso el 99+ no bajaba nunca.
+
+**Un detalle para que no confunda**
+
+El número grande y el globo rojo son dos cosas distintas, y se ven parecido. El número grande es
+cuántos correos sin leídos tenés **ahora**. El globo es cuántos te **llegaron desde la última vez
+que miraste esa fila**. Si tenés cuatro sin leer de fondo y te llega uno, vas a ver un 4 arriba y
+un 1 en el globo. No es una contradicción: uno es el total y el otro es la novedad.
+
+Para que la primera vez salga bien, **cerrá y abrí la aplicación**: así el programa toma nota de
+cuántos tenías y empieza a contarte solo lo nuevo.
+
+---
+
 # K+AIR v0.1.234
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
