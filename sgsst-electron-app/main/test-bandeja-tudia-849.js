@@ -38,7 +38,12 @@ const appCod = soloCodigo(t);
 // traer los helpers REALES desde app.js — no stubearlos: un stub que
 // devolviera 0 siempre haria pasar el calculo de "nuevo" sin comprobar nada,
 // que es justo el bug que estos checks tienen que cazar.
-const HELPERS = ['_leerVistos', '_marcarVisto', '_sembrarVistos', '_marcarNotifsCorreoLeidas']
+// 📦855 — `mailPasaFiltroActual` y `setMailFilter` tambien entran: el go() de
+// kpi-correos ahora cambia el filtro por `setMailFilter`, no asignando a mano.
+// Sin ellos el escenario muere con "setMailFilter is not defined" y no prueba
+// nada del go() que este test quiere vigilar.
+const HELPERS = ['_leerVistos', '_marcarVisto', '_sembrarVistos', '_marcarNotifsCorreoLeidas',
+  'mailPasaFiltroActual', 'setMailFilter']
   .map((n) => soloCodigo(cuerpoDe(n))).join('\n');
 const CLAVES = ['TUDIA_VISTOS']
   .map((n) => { const m = t.match(new RegExp('const ' + n + ' = [^;]+;')); return m ? soloCodigo(m[0]) : ''; })
@@ -103,12 +108,18 @@ const OBJ_CORREOS = (/id: "kpi-correos"[\s\S]*?(?=id: "kpi-reuniones")/).exec(ca
 const OBJ_REUNIONES = (/id: "kpi-reuniones"[\s\S]*?(?=id: "kpi-invitaciones"|\]\s*;)/).exec(calc);
 const objCorreos = OBJ_CORREOS ? OBJ_CORREOS[0] : '';
 const objReuniones = OBJ_REUNIONES ? OBJ_REUNIONES[0] : '';
+// 📦855 — El go() ya no asigna el filtro: llama a setMailFilter, que además de
+// aplicarlo suelta la selección que la lista nueva no muestra. Check invertido
+// (no borrado): lo que se vigila es que el clic siga pasando por ese camino.
 chk('📦853 · los ids son los de siempre y el de correo además filtra',
-  /mailFilter = "unread"/.test(objCorreos) && /setCalendarVisible\(false\)/.test(objCorreos)
+  /setMailFilter\("unread"\)/.test(objCorreos) && /setCalendarVisible\(false\)/.test(objCorreos)
   && /calView = "day"/.test(objReuniones)
   && !/id: "kpi-invitaciones"/.test(calc),
   'correo tiene que aplicar el filtro ademas de cambiar de vista; correos=' + JSON.stringify(objCorreos)
   + ' reuniones=' + JSON.stringify(objReuniones));
+chk('📦855 · el go() de correo no asigna el filtro a mano',
+  !/state\.mailFilter = /.test(objCorreos),
+  'una asignacion directa se saltaria la validacion de la seleccion');
 
 // ══ 3) Eventos críticos eliminado ══
 chk('se fue el id kpi-criticos', appCod.indexOf('kpi-criticos') < 0);
@@ -227,6 +238,7 @@ chk('todas las variables que usa existen de verdad',
       D: { MONTH_VIEW: { todayIso: HOY }, ICONS: { mail: '<i/>', calendarPlus: '<i/>', link: '<i/>' } },
       setCalendarVisible: function (v) { c.state.calendarVisible = v; },
       getElectronAPI() { return null; },
+      isThreadSnoozed() { return false; },
       window: null,
       localStorage: storageVacio(),
       String: String, Number: Number, parseInt: parseInt, parseFloat: parseFloat };

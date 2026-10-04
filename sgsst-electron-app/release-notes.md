@@ -1,3 +1,34 @@
+# K+AIR v0.1.236
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## La bandeja ya no abre un correo que no elegiste
+
+Abrías la bandeja y ya había un mensaje abierto en el panel de la derecha, sin que vos hubieras
+tocado nada. Pasa más de lo que parece, porque ese mensaje invisible también contaba:
+
+- **Se abría solo el primer correo de la lista.** No el más reciente, el primero que traía el
+  servidor.
+- **Y marcaba ese correo como leído.** Abrir el programa metía un correo a "leídos" sin que
+  nadie lo abriera.
+- Si llegabas por **No leídos**, el panel te mostraba un correo que esa lista ni siquiera
+  tenía: el filtro cambiaba la lista, pero el panel no se enteraba.
+
+**Qué cambió**
+
+- La bandeja abre **en blanco**, con el aviso "Seleccione un mensaje para leerlo". Nada se abre
+  hasta que vos hagas clic.
+- **Abrir un correo sigue marcándolo como leído.** Eso no cambió: lo raro era que pasara sin que
+  lo abrieras.
+- Si cambiás de filtro y el correo que tenías abierto **no está en la lista nueva**, el panel se
+  limpia solo. No te deja leyendo un correo que ya no ves.
+
+Lo primero es lo que más se nota. Lo segundo es un detalle chico, pero es el que hace que la
+bandeja no se sienta como si estuviera decidiendo por vos.
+
+---
+
 # K+AIR v0.1.235
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

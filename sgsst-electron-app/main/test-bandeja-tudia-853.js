@@ -206,9 +206,16 @@ function evaluar(htm, css, js) {
   // "para que no falle" dejaria que el regex matcheara dentro de kpi-reuniones.
   const objCorreos = (/id: "kpi-correos"[\s\S]*?(?=id: "kpi-reuniones")/).exec(js);
   const oc = objCorreos ? objCorreos[0] : '';
-  chk('el clic de Correos pone mailFilter = "unread"',
-    /state\.mailFilter = "unread"/.test(oc),
+  // 📦855 — El clic ya no ASIGNA el filtro: llama a setMailFilter, que ademas
+  // suelta una seleccion que la lista nueva ya no muestra. El check se invierte
+  // (no se borra): lo que se vigila ya no es la asignacion en linea, es que el
+  // clic siga pasando por el unico camino que cambia el filtro.
+  chk('el clic de Correos aplica el filtro por setMailFilter',
+    /setMailFilter\("unread"\)/.test(oc),
     'sin esto el clic llega a la bandeja completa, que es lo que se reporto');
+  chk('el clic de Correos NO asigna el filtro a mano',
+    !/state\.mailFilter = /.test(oc),
+    'una asignacion directa se saltaria la validacion de la seleccion');
   chk('el clic de Correos pide ir al top de la lista',
     /state\._resetMailListScroll = true/.test(oc));
   chk('el clic de Correos cambia a la vista de correo',
@@ -221,7 +228,7 @@ function evaluar(htm, css, js) {
   chk('el filtro "unread" sigue existiendo en la definicion',
     /\{ id: "unread", label: "No le/.test(cod));
   chk('la logica de la lista sigue respetando mailFilter === "unread"',
-    /if \(state\.mailFilter === "unread"\) return m\.unread;/.test(cod),
+    /if \(state\.mailFilter === "unread"\) return !!m\.unread;/.test(cod),
     'sino el boton se pinta pero no filtra nada');
 
   // ══ 7) "Invitaciones pendientes" se retiro ══
@@ -305,8 +312,13 @@ function funcionalEscenario(realJs) {
   // `_marcarNotifsCorreoLeidas` va included porque `calcularIndicadores` la
   // llama desde su go(): sin ella en el sandbox el escenario revienta con
   // ReferenceError y no prueba nada.
+  // 📦855 — `setMailFilter` y `mailPasaFiltroActual` tambien van: el go() de
+  // kpi-correos ahora cambia el filtro por `setMailFilter`, que llama al
+  // predicado compartido. Sin los dos, el escenario revienta con
+  // "setMailFilter is not defined" y no prueba nada.
   const partes = ['_leerVistos', '_marcarVisto', '_sembrarVistos',
-    '_marcarNotifsCorreoLeidas', 'calcularIndicadores']
+    '_marcarNotifsCorreoLeidas', 'calcularIndicadores',
+    'mailPasaFiltroActual', 'setMailFilter']
     .map((nm) => cuerpoDe(realJs, nm));
 
   chk('las funciones de novedad se extraen del codigo real',
@@ -447,12 +459,16 @@ const MUT = [
   ['la siembra sobrescribe siempre (el aviso se apaga solo en cada arranque)',
     j => j.replace('if (!Object.prototype.hasOwnProperty.call(v, k)) { v[k] = actuales[k]; cambio = true; }',
       'v[k] = actuales[k]; cambio = true;')],
+  // 📦855 — Estas dos apuntaban a `state.mailFilter = "unread";`, que ya no
+  // existe (ahora es setMailFilter). Un replace que no encuentra nada devuelve
+  // el archivo IDENTICO, la mutacion queda vacia y el check "pasa" siempre: se
+  // reportaba como mutante vacio, que es la senal de que el check no morderia.
   ['el clic de Correos deja de aplicar el filtro (vuelve el bug reportado)',
-    j => j.replace(/state\.mailFilter = "unread";\s*state\._resetMailListScroll = true;/,
-      'state.mailFilter = "all";\n          state._resetMailListScroll = true;')],
+    j => j.replace(/setMailFilter\("unread"\);\s*state\._resetMailListScroll = true;/,
+      'setMailFilter("all");\n          state._resetMailListScroll = true;')],
   ['el clic de Correos no cambia a la vista de correo',
-    j => j.replace('state.mailFilter = "unread";\n          state._resetMailListScroll = true;\n          setCalendarVisible(false);',
-      'state.mailFilter = "unread";\n          state._resetMailListScroll = true;')],
+    j => j.replace('setMailFilter("unread");\n          state._resetMailListScroll = true;\n          setCalendarVisible(false);',
+      'setMailFilter("unread");\n          state._resetMailListScroll = true;')],
   ['"No leidos" vuelve al menu "Mas"',
     j => j.replace('const PRIMARY_FILTERS = ["all", "unread", "sent"];',
       'const PRIMARY_FILTERS = ["all", "sent"];')],

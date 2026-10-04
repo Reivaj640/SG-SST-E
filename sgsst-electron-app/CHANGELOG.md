@@ -10,6 +10,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.236] - 2026-10-03
+
+### 📦855 · La bandeja abre en blanco, no con un correo que no elegiste
+
+**Resumen:** el owner reportó que al abrir la bandeja de correo ya aparecía un mensaje abierto en el
+panel derecho sin haberlo seleccionado, tanto entrando por "Correos no leídos" como por Recibidos o
+Enviados. La captura lo dejó claro: el panel mostraba "Prueba 5" mientras la lista mostraba otros
+cuatro correos, y "Prueba 5" no estaba en la lista.
+
+**Eran dos bugs, no uno**
+
+1. **La app elegía un correo por el owner.** `init()` hacía `selectMail(state.mails[0].id)`. Eso
+   auto-seleccionaba el primer mensaje de la lista. Peor: `selectMail` marca como leído
+   (`if (mail) mail.unread = false`), así que **abrir la aplicación metía un correo a "leídos" sin
+   que nadie lo abriera**, y no era el más reciente sino `mails[0]`, el primero que devolvía Gmail.
+   El respaldo era `state.selectedMailId = "m1"`, un id de mock: sin correos, la app arrancaba
+   apuntando a un mensaje inexistente.
+2. **El panel derecho miraba la lista sin mirar el filtro.** `renderMailList` filtra por el chip
+   activo; `renderMailDetail` buscaba el seleccionado en `state.mails` **crudo, sin filtro**. Por eso
+   podía mostrar un correo que la lista ya no enseñaba. Es el bug de la captura, textualmente.
+
+**Qué cambió**
+
+- `init()` arranca con `state.selectedMailId = null`. La bandeja abre en blanco y el detalle
+  muestra su estado vacío, "Seleccione un mensaje para leerlo". Abrir un correo es una decisión del
+  owner, no un efecto secundario del arranque.
+- El predicado del filtro se extrajo a `mailPasaFiltroActual(m)`, en **un solo lugar y al mismo
+  nivel que sus usuarios**. Lista y detalle ahora pueden hacer la misma pregunta.
+- `setMailFilter(f)` centraliza los **tres** caminos que cambiaban el filtro: los chips, el
+  desplegable de orden y el clic de "Correos no leídos" en "Tu día". Antes había tres asignaciones
+  sueltas a `state.mailFilter`; queda una sola, dentro de esa función.
+- Si al cambiar de filtro el mensaje abierto no pasa el filtro nuevo, se suelta la selección y el
+  panel vuelve a su estado vacío.
+
+**La validación va en el cambio de filtro, no en el render — y por qué**
+
+Si la validación estuviera dentro de `renderMailDetail`, al hacer clic en un no leído —que al
+abrirse marca como leído— el correo se borraría de la pantalla en el mismo clic en que el owner lo
+está leyendo. Por eso `setMailFilter` valida en la transición, y hay un check que impide que alguien
+la mueva de lugar.
+
+**Un error propio que casi rompe la app**
+
+El predicado se declaró primero **dentro** de `renderMailList`, y `setMailFilter` vive en otro
+nivel. Es sintácticamente válido y se ve bien al leerlo, pero al tocar un chip de filtro saltaba un
+`ReferenceError` y la bandeja se congelaba. Lo detectó el test al no poder armar su sandbox. Quedó
+al nivel de función, con un check que falla si alguien vuelve a anidarlo. **Un error de alcance es
+invisible a los ojos y no lo caza ningún `node --check`.**
+
+**Checks que eran frágiles**
+
+Dos checks de 📦853 buscaban el texto exacto `state.mailFilter = "unread";`. Si alguien
+reintrodujera el auto-selección con otra redacción, el check pasaba igual. Se reemplazaron por uno
+que pregunta la pregunta de verdad: *¿la selección se deriva alguna vez de `state.mails`?*. Es la
+diferencia entre reconocer la redacción de un bug y verificar el comportamiento.
+
+**Tests**
+
+- `main/test-bandeja-seleccion-855.js` — **25 checks, 10/10 mutaciones detectadas**. Incluye el
+  escenario exacto de la captura: con un mensaje abierto que el filtro activo no muestra, al aplicar
+  el filtro la selección se suelta. Y el reverso: una selección que **sí** pasa el filtro se
+  conserva, y sin selección previa no se inventa ninguna.
+- `test-bandeja-tudia-853.js` — 76/76, 35/35 mutaciones. 3 checks de contrato viejo **invertidos**
+  y 2 mutaciones que habían quedado vacías reparadas (apuntaban al string que este paquete cambió).
+- `test-bandeja-tudia-849.js` — 50/50. Check invertido, igual que arriba.
+- Suite completa: 113 tests, 95 verdes, 18 preexistentes, **0 regresiones**.
+
 ## [0.1.235] - 2026-10-03
 
 ### 📦853 · "Tu día" avisa lo que llegó, y el filtro de no leídos es alcanzable

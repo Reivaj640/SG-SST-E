@@ -24,21 +24,24 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-03 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦853-854 · el aviso de correo de "Tu día" comparte sistema con el 99+ |
-| **Commits sin pushear** | 0 — esta tanda sube completa: 📦850-851, 📦852 y 📦853-854 |
-| **Versión** | `0.1.235` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 112 tests · 94 verdes · 18 preexistentes · **0 regresiones** |
+| **Último commit** | 📦855 · la bandeja abre en blanco, no con un correo que no elegiste |
+| **Commits sin pushear** | 0 — esta tanda sube completa |
+| **Versión** | `0.1.236` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 113 tests · 95 verdes · 18 preexistentes · **0 regresiones** |
 | **Árbol de trabajo** | Limpio |
-| **Validaciones visuales abiertas** | 📦853/854 **nunca se miraron en la app** (y 📦850/851 tampoco) |
+| **Validaciones visuales abiertas** | 📦855, 📦853/854 y 📦850/851 **nunca se miraron en la app** |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
-1. **Push pendiente.** Hay 2 commits sin subir: `47779352` (📦850-851) y `2926b8ea` (📦852).
-   Push solo con autorización del owner y con `git push --force-with-lease`.
+1. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
+   abierto), que al hacer clic abra y marque leído, y que al cambiar de filtro con un correo
+   abierto que no está en la lista nueva, el panel se limpie. Todo probado con tests, **nunca
+   mirado en la app**.
 2. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
    fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
-   que baja el 99+. Todo probado con tests, **nunca mirado en la app**. Ojo: hay que **cerrar y
-   reabrir** la app primero, para que se siembre la línea base con el estado actual.
+   que baja el 99+. Ojo: hay que **cerrar y reabrir** la app primero, para que se siembre la línea
+   base con el estado actual. En la captura de 📦855 el aviso rojo **no aparecía**, y era lo
+   correcto: la línea base se había sembrado con lo que ya había y no había llegado nada nuevo.
 3. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
    que sigue abierto, y lleva desde v0.1.212.
 4. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
@@ -201,7 +204,61 @@ sgsst-electron-app/main/test-minical-*.js         (nuevos)
 | `42cce42e` | 📦844-849 | Sí |
 | `47779352` | 📦850-851 | Sí |
 | `2926b8ea` | 📦852 documentación | Sí |
-| (este commit) | 📦853-854 aviso de correo en "Tu día" | Sí |
+| (36dcc1eb) | 📦853-854 aviso de correo en "Tu día" | Sí |
+| (este commit) | 📦855 la bandeja abre en blanco | Sí |
+
+---
+
+### 2026-10-03 · La bandeja abre en blanco (📦855)
+
+**Qué se hizo**
+
+| Qué | Detalle |
+|---|---|
+| `init()` | Ya no hace `selectMail(state.mails[0].id)`. Arranca con `selectedMailId = null` |
+| Respaldo `"m1"` | Fuera. Era un id de mock: sin correos la app apuntaba a un mensaje inexistente |
+| Filtro | El predicado vive en `mailPasaFiltroActual(m)`, en un solo lugar y al nivel correcto |
+| Cambio de filtro | `setMailFilter(f)` centraliza los 3 caminos; suelta la selección que quedó fuera |
+
+**Los dos bugs que lo causaban**
+
+1. `init()` elegía el primer correo y `selectMail` lo marcaba como leído: **abrir la app metía un
+   correo a leídos sin que nadie lo abriera**, y no era el más reciente sino `mails[0]`.
+2. `renderMailDetail` buscaba el seleccionado en `state.mails` **sin mirar el filtro**, mientras la
+   lista sí lo miraba. De ahí que el panel mostrara un correo que la lista ya no enseñaba — literal,
+   la captura: "Prueba 5" abierta con otros cuatro en la lista.
+
+**La lección — un error de alcance no lo caza `node --check`**
+
+El predicado se declaró primero **dentro** de `renderMailList`, y `setMailFilter` vive en otro
+nivel. Sintácticamente válido, se ve bien al leerlo… y al tocar un chip de filtro saltaba un
+`ReferenceError` que congelaba la bandeja. Lo detectó el test, al no poder armar su sandbox. Quedó
+un check que falla si alguien vuelve a anidarlo.
+
+**La lección — un check que reconoce la redacción de un bug no verifica el comportamiento**
+
+Dos checks de 📦853 buscaban el texto exacto `state.mailFilter = "unread";`. Si alguien
+reintrodujera el auto-selección con otra redacción, el check pasaba igual. Se reemplazaron por uno
+que pregunta *"¿la selección se deriva alguna vez de `state.mails`?"*, que no depende de cómo esté
+escrito.
+
+**Ojo con esto al retomar**: la validación de la selección vive en `setMailFilter`, **no** en
+`renderMailDetail`, a propósito. Si se mueve al render, al hacer clic en un no leído —que al
+abrirse marca leído— el correo se borra de la pantalla en el mismo clic en que se lo está leyendo.
+Hay un check que lo impide.
+
+**Tests**
+
+| Archivo | Checks | Mutation |
+|---|---|---|
+| `test-bandeja-seleccion-855.js` | 25/25 | **10/10** |
+| `test-bandeja-tudia-853.js` | 76/76 | **35/35** |
+| `test-bandeja-tudia-849.js` | 50/50 | — (check invertido) |
+| `test-bandeja-premium-v2.js` | 48/48 | — |
+| `test-bandeja-toolbar-compacta.js` | 51/51 | — |
+| `test-bandeja-chip-851.js` | 16/16 | 9/9 |
+
+Suite completa: 113 tests, 95 verdes, 18 preexistentes, **0 regresiones**.
 
 ---
 
@@ -211,7 +268,7 @@ sgsst-electron-app/main/test-minical-*.js         (nuevos)
 
 | Qué | Detalle |
 |---|---|
-| Clic de "Correos no leídos" | Antes solo cambiaba de vista; ahora aplica `mailFilter = "unread"` y marca lo visto |
+| Clic de "Correos no leídos" | Antes solo cambiaba de vista; ahora aplica `setMailFilter("unread")` y marca lo visto |
 | Filtro "No leídos" | Subió del menú "Más" a la barra visible: `PRIMARY_FILTERS = ["all","unread","sent"]` |
 | Aviso de novedad | **Réplica exacta del 99+** del shell, colgada de la esquina de la fila |
 | Al hacer clic | Marca las notificaciones de **correo** como leídas → **baja el pillón y el 99+** |

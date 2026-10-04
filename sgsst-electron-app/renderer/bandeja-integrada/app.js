@@ -2195,13 +2195,20 @@
       }
       refreshKairAlerts();
     }, 1500);
-    // F4-fix — Llamar selectMail (en vez de solo setear selectedMailId) para
-    // que se dispare el lazy load del body desde email_messages.
-    if (state.mails[0]) {
-      selectMail(state.mails[0].id);
-    } else {
-      state.selectedMailId = "m1";
-    }
+    // 📦855 — ANTES: `if (state.mails[0]) selectMail(state.mails[0].id); else
+    // state.selectedMailId = "m1";` Eso abría la bandeja con un mensaje ya
+    // abierto que el owner no había pedido. Peor: `selectMail` marca como leído
+    // (`if (mail) mail.unread = false`), así que abrir la aplicación metía un
+    // correo a "leídos" sin que nadie lo abriera, y era SIEMPRE `mails[0]`, no
+    // el más reciente. Y el `"m1"` de respaldo es un id de mock: si no había
+    // correos, la app arrancaba apuntando a un mensaje inexistente.
+    //
+    // Ahora la bandeja arranca en blanco y el detalle muestra su estado vacío
+    // ("Seleccione un mensaje para leerlo"). Abrir un correo es una decisión
+    // del owner, no un efecto secundario del arranque. El lazy load del body no
+    // se pierde: `renderMailDetail` lo dispara igual cuando el owner sí hace
+    // clic (ver el bloque 📦603-fix más abajo).
+    state.selectedMailId = null;
     state.selectedDate = D.MONTH_VIEW.todayIso;
     // F2 — Inicializar activeCategories con las 6 oficiales de K+AIR
     // Y agregar también las categorías únicas encontradas en los eventos del IPC
@@ -3358,7 +3365,7 @@
           _marcarVisto("correos", unread);
           // 📦854 — Bajar el 99+ del shell es parte de "mirar el correo".
           _marcarNotifsCorreoLeidas();
-          state.mailFilter = "unread";
+          setMailFilter("unread");
           state._resetMailListScroll = true;
           setCalendarVisible(false);
         } },
@@ -4433,17 +4440,7 @@
 
     container.innerHTML = "";
 
-    const filtered = state.mails.filter((m) => {
-      // FIX loop 35 — Ocultar mails snoozed de la lista INBOX
-      // (los snoozed tienen wakeTime > now y se devuelven automáticamente
-      // cuando vence el snooze via getSnoozedMap() que limpia los vencidos)
-      if (state.mailFilter !== "sent" && isThreadSnoozed(m.id)) return false;
-      if (state.mailFilter === "unread") return m.unread;
-      if (state.mailFilter === "flagged") return m.flagged;
-      if (state.mailFilter === "meeting") return m.category === "meeting";
-      if (state.mailFilter === "sent") return true;  // Enviados: ya viene filtrado de Gmail (folder=SENT)
-      return true;
-    }).filter((m) => {
+    const filtered = state.mails.filter(mailPasaFiltroActual).filter((m) => {
       if (!state.searchQuery) return true;
       const q = state.searchQuery.toLowerCase();
       // 📦657 — Búsqueda incluye también los destinatarios (importante para Enviados)
@@ -4547,11 +4544,11 @@
           } else if (state.mailSortBy === "oldest") {
             state.mailSortBy = "unread";
             // Cuando el user selecciona "No leídos" en el sort, también activamos el filter
-            state.mailFilter = "unread";
+            setMailFilter("unread");
           } else {
             state.mailSortBy = "recent";
             // Volver al filter "Todos" cuando se sale del modo unread
-            state.mailFilter = "all";
+            setMailFilter("all");
           }
           // 📦691 — El sort cambia el orden de la lista, queremos ir al top
           state._resetMailListScroll = true;
@@ -4793,7 +4790,7 @@
     // 📦755 — Al cambiar de carpeta se reinicia la paginación (volvemos a la
     // página 1), si no la lista arrancaría mostrando lo cargado de la OTRA carpeta.
     const applyFilter = (f) => {
-      state.mailFilter = f.id;
+      setMailFilter(f.id);
       // 📦691 — El filter cambia la lista, queremos ir al top
       state._resetMailListScroll = true;
       // F1.B-fix — Si el filtro cambia de folder (Enviados), re-cargar mails desde SENT
@@ -6346,6 +6343,50 @@
   }
 
   // ====== Acciones de correo ======
+
+  // 📦855 — El predicado de visibilidad del filtro, en UN solo lugar y al
+  // mismo nivel que sus usuarios.
+  //
+  // Antes vivía en línea dentro de `renderMailList` y en ningún otro punto,
+  // así que nadie más podía preguntar "¿esto sigue visible?". Eso dejó un
+  // agujero: el panel de detalle buscaba el mensaje seleccionado en
+  // `state.mails` SIN mirar el filtro, así que podía mostrar un correo que la
+  // lista ya no mostraba.
+  //
+  // OJO con dónde se declara: si vive DENTRO de `renderMailList`,
+  // `setMailFilter` (que es de otro nivel) lo ve como indefinido y revienta
+  // con ReferenceError en cuanto se toca un chip de filtro. Por eso está acá,
+  // afuera, junto a las acciones.
+  function mailPasaFiltroActual(m) {
+    // FIX loop 35 — Ocultar mails snoozed de la lista INBOX
+    // (los snoozed tienen wakeTime > now y se devuelven automáticamente
+    // cuando vence el snooze via getSnoozedMap() que limpia los vencidos)
+    if (state.mailFilter !== "sent" && isThreadSnoozed(m.id)) return false;
+    if (state.mailFilter === "unread") return !!m.unread;
+    if (state.mailFilter === "flagged") return !!m.flagged;
+    if (state.mailFilter === "meeting") return m.category === "meeting";
+    // "sent" ya viene filtrado de Gmail (folder=SENT), y "all" no filtra.
+    return true;
+  }
+
+  // 📦855 — Cambiar de filtro es cambiar de lista. Si el mensaje que estaba
+  // abierto no pertenece a la lista nueva, dejarlo abierto hace que el panel
+  // derecho muestre un correo que el owner no ve en pantalla ni puede volver a
+  // elegir: el mismo susto del que se queja, pero al revés. Se suelta la
+  // selección y el panel vuelve a su estado vacío.
+  //
+  // Se valida AQUÍ, en el cambio de filtro, y no dentro de `renderMailDetail`,
+  // por una razón concreta: al hacer clic en un no leído, `selectMail` lo marca
+  // como leído y deja de pasar el filtro "unread". Si la validación viviera en
+  // el render, el correo abierto se borraría de la pantalla en el mismo clic
+  // en que el owner lo está leyendo.
+  function setMailFilter(f) {
+    state.mailFilter = f;
+    if (state.selectedMailId == null) return;
+    const sel = state.mails.find(function (m) { return m.id === state.selectedMailId; });
+    if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;
+  }
+
   function selectMail(id) {
     state.selectedMailId = id;
     const mail = state.mails.find((m) => m.id === id);

@@ -355,6 +355,72 @@ sb.state.mails = [{ unread: true }];
 chk('y un correo nuevo vuelve a marcar 1', ver(sb)[0] === 1);
 ```
 
+### 5.13 🔴 `node --check` no caza un error de alcance
+
+**Aplica a todo JavaScript grande**: `renderer/bandeja-integrada/app.js` tiene 6 800+ líneas dentro
+de un IIFE, y `main.js` más de 10 000.
+
+**La trampa:** declarar una función **dentro de** otra la deja local a esa otra. Si su consumidor vive
+fuera, la llamada falla con `ReferenceError` **en tiempo de ejecución**, no al parsear.
+
+Pasó de verdad en 📦855. El predicado de filtro se declaró dentro de `renderMailList` y su consumidor,
+`setMailFilter`, quedó en el nivel de arriba:
+
+```js
+function renderMailList(container) {        // nivel 1
+  function mailPasaFiltroActual(m) { ... }  // NIVEL 2: local a renderMailList
+  const filtered = state.mails.filter(mailPasaFiltroActual);
+}
+
+function setMailFilter(f) {                 // nivel 1, fuera
+  mailPasaFiltroActual(sel);                // ReferenceError en cuanto se toca un chip
+}
+```
+
+`node --check` lo da por bueno: es JavaScript válido. Leerlo lo da por bueno: la declaración está
+ahí, con el nombre correcto. **Solo falla cuando el owner toca el filtro**, o sea, en producción.
+
+**Reglas:**
+
+1. **Un helper compartido va al nivel de sus usuarios**, nunca anidado por conveniencia. Si lo usan
+   dos funciones de niveles distintos, su nivel es el de la menos anidada.
+2. **Indentar es información.** `^  function nombre` (2 espacios) es de nivel superior;
+   `^    function nombre` (4) está anidada. Vale la pena grepear la indentación cuando se mueve código.
+3. **El escenario de un sandbox es el detector barato.** Cuando un test arma un sandbox trayendo
+   solo las funciones que necesita, si una quedó anidada en el archivo real el test no la puede
+   extraer y falla. Ese fallo **es** la señal, no un estorbo del test.
+4. **Un check que lo vigile.** En `test-bandeja-seleccion-855.js` la extracción exige
+   `^  function NOMBRE(` a propósito, para que re-anidar la función reviente el test.
+
+```bash
+# Ver si algo quedo anidado por error: cuenta y compara
+grep -n "^  function renderMailList" renderer/bandeja-integrada/app.js
+grep -n "^    function mailPasaFiltroActual" renderer/bandeja-integrada/app.js   # 4 = MAL
+```
+
+### 5.14 🔴 Un check que reconoce la redacción de un bug no verifica el comportamiento
+
+**Un check escrito contra el texto exacto del bug pasado solo reconhece ESA redacción.** Si el mismo
+bug vuelve con otra forma, el check pasa en verde y el bug está de vuelta.
+
+Pasó en 📦855 con dos checks de 📦853 que buscaban `state.mailFilter = "unread";`. La mutación que
+reintroducía el bug usaba otra forma… y el check aun así **pasaba**, porque buscaba la cadena
+anterior, que ya no estaba. Peor: la mutación también quedaba **vacía** (el `replace` no encontraba
+nada), y eso se reportaba como "el check no muerde" cuando en realidad el check ni se estaba probando.
+
+**Reglas:**
+
+1. **Preguntar la pregunta de verdad, no la redacción.** En vez de `!/if (state.mails[0]) { selectMail/`
+   —que solo reconoce esa forma—: `!/state\.selectedMailId = [^;]*state\.mails/`. La segunda dice
+   *"la selección nunca se deriva de la lista"*, y es cierto para cualquier redacción del bug.
+2. **Un check de texto es un check de contrato de implementación.** Úsalo cuando la forma ES el
+   contrato (un id de IPC, un nombre de clase). Si lo que importa es el comportamiento, prefiero un
+   escenario en sandbox.
+3. **Si una mutación queda vacía, el check no se está probando.** Es la señal de que el check apuntaba
+   a algo que cambió, no de que el check sea débil.
+4. **Al cambiar un contrato, los checks viejos se INVIERTEN, no se borran** (§7). Un check invertido
+   dice "esto ya no debe pasar por acá" y sigue morando si alguien lo deshace.
+
 ---
 
 ## 6. Convenciones de código
