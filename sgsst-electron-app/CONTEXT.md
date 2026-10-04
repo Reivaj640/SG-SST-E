@@ -5,7 +5,7 @@
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
 **Última actualización:** 3 de octubre de 2026
-**Versión actual:** 0.1.236 (desarrollo) — último publicado v0.1.205
+**Versión actual:** 0.1.237 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 

@@ -24,29 +24,35 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-03 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦855 · la bandeja abre en blanco, no con un correo que no elegiste |
+| **Último commit** | 📦856-857 · "Tipos de evento" cuenta lo que se ve y "Tu día" no desaparece |
 | **Commits sin pushear** | 0 — esta tanda sube completa |
-| **Versión** | `0.1.236` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 113 tests · 95 verdes · 18 preexistentes · **0 regresiones** |
+| **Versión** | `0.1.237` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 115 tests · 97 verdes · 18 preexistentes · **0 regresiones** |
 | **Árbol de trabajo** | Limpio |
-| **Validaciones visuales abiertas** | 📦855, 📦853/854 y 📦850/851 **nunca se miraron en la app** |
+| **Validaciones visuales abiertas** | 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron en la app** |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
-1. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
+1. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
+   **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
+   sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir
+   visible** abajo con la lista larga. Todo probado con tests, **nunca mirado en la app**.
+2. **Decisión pendiente del owner**: el mini-calendario sigue congelado en el mes real (decisión de
+   📦844) mientras el grande se navega. Si se navega el grande a septiembre, la sección cuenta
+   septiembre pero el mini sigue mostrando octubre. ¿Se resincronizan, o se deja así?
+3. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
    abierto), que al hacer clic abra y marque leído, y que al cambiar de filtro con un correo
-   abierto que no está en la lista nueva, el panel se limpie. Todo probado con tests, **nunca
-   mirado en la app**.
-2. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
+   abierto que no está en la lista nueva, el panel se limpie.
+4. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
    fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
    que baja el 99+. Ojo: hay que **cerrar y reabrir** la app primero, para que se siembre la línea
    base con el estado actual. En la captura de 📦855 el aviso rojo **no aparecía**, y era lo
    correcto: la línea base se había sembrado con lo que ya había y no había llegado nada nuevo.
-3. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
+5. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
    que sigue abierto, y lleva desde v0.1.212.
-4. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
+6. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
    12 JS huérfanos de la Bandeja (bloqueante #4). Editar código que no se carga es trabajo perdido.
-5. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
+7. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
    pendientes se queda así y no se le toca.
 
 ### 🔴 Bloqueantes y deudas conocidas
@@ -205,7 +211,97 @@ sgsst-electron-app/main/test-minical-*.js         (nuevos)
 | `47779352` | 📦850-851 | Sí |
 | `2926b8ea` | 📦852 documentación | Sí |
 | (36dcc1eb) | 📦853-854 aviso de correo en "Tu día" | Sí |
-| (este commit) | 📦855 la bandeja abre en blanco | Sí |
+| (c953462b) | 📦855 la bandeja abre en blanco | Sí |
+| (este commit) | 📦856-857 "Tipos de evento" cuenta lo que se ve | Sí |
+
+---
+
+### 2026-10-03 · "Tipos de evento" cuenta lo que se está mirando (📦856-857)
+
+**El bug reportado (📦856)**
+
+Las seis categorías marcaban 0, siempre. **No faltaban datos**: el panel iteraba sobre
+`D.EVENT_CATEGORIES` y comparaba `e.category === cat.id`, pero las dos únicas fuentes de eventos
+devuelven `rapido`:
+
+| Fuente | Devuelve | Archivo |
+|---|---|---|
+| Eventos rápidos | `type: row.tipo \|\| 'rapido'` | `main/eventos-rapidos-bridge.js:101` |
+| Google Calendar | `category: kairCategory \|\| 'rapido'` | `shared/google-calendar.js:107` |
+
+**Verificado contra las 75 tablas de la BD real: ninguna guarda las 6 categorías oficiales.** La
+única tabla de eventos tiene `tipo='rapido'` y 5 filas de julio-agosto.
+
+Pista extra en la captura: **todos los puntitos del mini eran del mismo azul**, que es
+`categoryColor[ev.category] || "#2057B8"` — el color de respaldo de "no reconocí esta categoría".
+
+**No-op silencioso encontrado de paso**
+
+El mini hacía `if (D.FALLBACK_CATEGORIES)`, pero **`D.FALLBACK_CATEGORIES` no existe**: es una `const`
+local de `app.js`. El `if` protegía un crash y dejaba el bloque vacío, así que las categorías no
+oficiales nunca entraban al mapa de colores.
+
+**Lo que pidió el owner después (📦857)**
+
+Mostrar solo los tipos con eventos, contar el mes en vista Mes, el día al elegirlo en el mini, y que
+**las tres secciones existan siempre**.
+
+**El footer del calendario también mentía**: decía "224 evento(s) en el rango visible" y eran 224
+del **año entero**. La suma de los contadores daba exactamente 224: panel y footer coincidían, y los
+dos estaban mal.
+
+**El alcance ahora sigue a la vista** (`alcanceFechas`, pura): Mes usa las celdas de la grilla
+**incluidos los días en gris del mes vecino** (porque están en pantalla); Día y Programar usan el día
+seleccionado; Semana usa los 7 días desde el lunes; y un clic en el mini fija ese día aunque la vista
+siga en Mes.
+
+**Por qué `alcanceTipos` es un estado aparte de `selectedDate`**
+
+`selectedDate` **siempre** tiene valor (init lo pone en hoy): no distingue "hoy por defecto" de "el
+owner eligió este día". Y un clic simple en el mini **no** cambia `calView`, así que sin la bandera
+no había forma de saber que señaló un día. Se fija en `seleccionarDiaDelMini` y en el "+N más"; se
+suelta al navegar de mes, con "Hoy", al cambiar de vista, o con el botón emergente **"Ver el mes
+completo"**.
+
+**"Tu día" desaparecía por dos motivos de layout**
+
+1. `.kair-sidebar` con `overflow: hidden` → la tercera tarjeta se salía **recortada, sin scroll**.
+2. Sin `min-height: 0`, un hijo flexible no baja de su altura mínima y el padre se desborda.
+
+Reparto final: `.mini` y `.tuday` con `flex: none` (altura fija), `.tipos` con `flex: 1 1 auto` +
+`min-height: 0` y su lista scrolleando por dentro. El `overflow-x: hidden` del sidebar **se conserva**
+(📦850: evita el derrame de tarjetas durante los 240ms del plegado); el `overflow-y` pasó a `auto`.
+
+**Bug propio que casi revirtió 📦844**
+
+Metí `buildMonthGrid(state.viewYear, ...)` **dentro** de `renderSidebar`, que es exactamente el
+acoplamiento que 844 eliminó (el mini está congelado en el mes real). Lo detectó
+`test-minical-844` (26/27) y está en su razón de ser. El cálculo se movió a `celdasDelMesVisible()`,
+**fuera** de `renderSidebar`.
+
+**Código muerto que se borró**: `calcularTiposEvento` quedó huérfana al reemplazarla 857. El repo
+arrastra 12 JS huérfanos; no se suma otro.
+
+**La lección del paquete: un check que se satisface a sí mismo**
+
+El comentario que explica el arreglo en el CSS dice literalmente `` `overflow-y: auto` ``, y el check
+buscaba ese texto sobre el CSS crudo: **se encontraba a sí mismo en la nota al lado** y pasaba
+aunque la declaración real estuviera rota. Lo delató una mutación que decía "no muerde". Documentado
+en `PROMPT.md` §5.15.
+
+**Tests**
+
+| Archivo | Checks | Mutation |
+|---|---|---|
+| `test-tipos-evento-857.js` | 37/37 | **14/14** (4 de CSS: el layout es media parte del bug) |
+| `test-tipos-evento-856.js` | 32/32 | **10/10** |
+| `test-bandeja-sidebar-850.js` | 49/49 | **21/21** (check de overflow invertido) |
+| `test-minical-844.js` | 27/27 | — sin cambios |
+| Los otros 6 de bandeja | todos verdes | — |
+
+Suite completa: 115 tests, 97 verdes, 18 preexistentes, **0 regresiones**.
+
+---
 
 ---
 

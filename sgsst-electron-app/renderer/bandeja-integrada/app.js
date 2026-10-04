@@ -52,6 +52,16 @@
     userEmail: null,           // 📦600 — email del usuario autenticado (para RSVP)
     activeCategories: new Set(),
     calView: "month",          // "day" | "week" | "month" | "schedule"
+    // 📦857 — A qué rango cuenta "Tipos de evento".
+    //   null  → manda la vista: mes muestra el mes, día muestra el día.
+    //   "dia" → fijado al día que el owner tocó en el mini-calendario.
+    //
+    // Hace falta aparte de `selectedDate` porque ese campo SIEMPRE tiene valor
+    // (init() lo pone en hoy), así que no distingue "hoy por defecto" de "el
+    // owner eligió este día". Y un clic simple en el mini NO cambia calView
+    // (solo el doble clic lo hace), así que sin esta bandera no había forma
+    // de saber que el owner señaló un día concreto.
+    alcanceTipos: null,
     // F4 — Mes visible en el mini-cal (navegable con chevron)
     viewYear: null,            // se inicializa en init() desde D.MONTH_VIEW
     viewMonth: null,           // 0-indexed (0=enero, 6=julio)
@@ -111,6 +121,150 @@
     cumplido:                  { color: "#28a745", bg: "#e6f7ec", border: "#b8e6c5" }
   };
   const DEFAULT_CATEGORY_STYLE = { color: "#6c757d", bg: "#eef0f3", border: "#d6dae0", label: "Otro" };
+
+  // 📦856 — Etiqueta y color de una categoría, de una sola fuente.
+  //
+  // Antes estas dos cosas se hacían en tres lugares distintos y con dos
+  // vocabularios distintos: la leyenda de "Tipos de evento" solo miraba
+  // D.EVENT_CATEGORIES, el calendario grande mergeaba las oficiales con
+  // FALLBACK_CATEGORIES, y el mini-calendario intentaba `D.FALLBACK_CATEGORIES`
+  // —que no existe, es una const local—, de modo que ese `if` era un no-op
+  // silencioso y todos los puntitos caían al azul por defecto. Con un solo
+  // helper, el punto de la leyenda, el del calendario y el color de fondo
+  // no pueden separarse.
+  const ETIQUETA_CATEGORIA = {
+    rapido: "Rápido",
+    rapido_vencido: "Rápido vencido",
+    gestion: "Gestión",
+    mantenimiento_programado: "Mantenimiento programado",
+    inspeccion: "Inspección",
+    inspeccion_vencida: "Inspección vencida",
+    recordatorio_copasst: "Recordatorio COPASST",
+    recordatorio_convivencia: "Recordatorio convivencia",
+    recordatorio_presupuesto: "Recordatorio presupuesto",
+    recordatorio_afiliacion: "Recordatorio afiliación",
+    recordatorio_inducciones: "Recordatorio inducciones",
+    cumplido: "Cumplido",
+  };
+
+  // 📦857 — Qué rango de fechas está mostrando el calendario ahora mismo.
+  //
+  // La idea es simple: el contador de "Tipos de evento" tiene que contar
+  // EXACTAMENTE lo que hay pintado al lado. Antes contaba todo el año —de hecho
+  // el footer decía "N evento(s) en el rango visible" y mentía igual: eran N
+  // del año entero, 224—, así que los números no describían nada de lo que el
+  // owner estaba viendo.
+  //
+  // Devuelve el conjunto de fechas y una etiqueta para mostrarle de dónde sale
+  // el número. Puro, sin DOM ni state, para poder probarlo con datos reales.
+  function alcanceFechas(op) {
+    const hoy = op.hoyIso;
+    const sel = op.selectedDate || hoy;
+    const modoForzado = op.alcanceTipos;
+
+    // Día fijado por el owner (clic en el mini o en una celda del mes).
+    if (modoForzado === "dia") {
+      return { modo: "dia", fechas: [sel], etiqueta: etiquetaDia(sel) };
+    }
+
+    if (op.calView === "day" || op.calView === "schedule") {
+      return { modo: "dia", fechas: [sel], etiqueta: etiquetaDia(sel) };
+    }
+
+    if (op.calView === "week") {
+      const ref = new Date(sel + "T00:00:00");
+      const dow = ref.getDay();                       // 0=dom, 1=lun
+      const lunes = new Date(ref);
+      lunes.setDate(ref.getDate() + (dow === 0 ? -6 : 1 - dow));
+      const fechas = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(lunes);
+        d.setDate(lunes.getDate() + i);
+        fechas.push(isoDe(d));
+      }
+      return { modo: "semana", fechas: fechas, etiqueta: "Semana del " + etiquetaDia(fechas[0]) };
+    }
+
+    // Mes: se usan las MISMAS celdas que pinta la grilla, incluyendo los días
+    // del mes vecino que salen en gris. Si se filtrara solo por `inMonth`, el
+    // contador no cuadraría con lo que hay en pantalla: en la grilla de
+    // octubre se ven el 28, 29 y 30 de septiembre, y esos eventos cuentan.
+    const fechas = (op.celdasMes || []).map(function (c) { return c; });
+    return {
+      modo: "mes",
+      fechas: fechas,
+      etiqueta: op.etiquetaMes || "Este mes",
+      total: fechas.length,
+    };
+  }
+
+  function isoDe(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // 📦857 — Las celdas del mes que está viendo el calendario GRANDE.
+  //
+  // Vive FUERA de `renderSidebar` a propósito: 📦844 decidió que el mini-
+  // calendario se queda congelado en el mes real y NO sigue a `state.viewYear`,
+  // porque cuando lo seguían, mover uno movía el otro y al reventre quedaban
+  // en meses distintos. El contador de "Tipos de evento", en cambio, sí tiene
+  // que seguir al calendario grande, que es lo que el owner tiene al lado.
+  // Son dos cosas distintas y por eso son dos llamadas distintas.
+  function celdasDelMesVisible() {
+    const y = state.viewYear || D.MONTH_VIEW.year;
+    const m = state.viewMonth == null ? D.MONTH_VIEW.month : state.viewMonth;
+    return D.buildMonthGrid(y, m).flat().map(function (c) { return c.iso; });
+  }
+
+  function etiquetaDia(iso) {
+    if (!iso) return "";
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("es-CO", { day: "numeric", month: "long" });
+  }
+
+  // 📦857 — Cuenta por categoría SOLO de lo que está en pantalla, y devuelve la
+  // lista de categorías a mostrar YA filtrada y YA ordenada. Puro, sin DOM ni
+  // state, para poder probarlo contra la forma real que devuelven las fuentes.
+  //
+  // Las categorías en cero NO entran: una fila con 0 no informa nada y hace
+  // creer que la sección está dañada, que es lo que reportó el owner. Como
+  // `activeCategories` arranca con las 6 oficiales prendidas, listarlas siempre
+  // las traía de vuelta en pantalla en cero.
+  function contarTipos(events, categoriasOficiales) {
+    const conteo = {};
+    (events || []).forEach(function (e) {
+      const c = e && e.category;
+      if (c) conteo[c] = (conteo[c] || 0) + 1;
+    });
+    // Orden estable: primero las oficiales en su orden declarado, después las
+    // demás alfabéticas, para que la lista no salte de lugar entre renders.
+    const orden = Object.keys(categoriasOficiales || {});
+    const ids = Object.keys(conteo)
+      .filter(function (id) { return conteo[id] > 0; })
+      .sort(function (a, b) {
+        const ia = orden.indexOf(a), ib = orden.indexOf(b);
+        if (ia !== -1 && ib !== -1) return ia - ib;
+        if (ia !== -1) return -1;
+        if (ib !== -1) return 1;
+        return a.localeCompare(b, "es");
+      });
+    return { conteo: conteo, ids: ids };
+  }
+
+  function colorCategoria(id) {
+    if (D.EVENT_CATEGORIES[id]) return D.EVENT_CATEGORIES[id].color;
+    if (FALLBACK_CATEGORIES[id]) return FALLBACK_CATEGORIES[id].color;
+    return "#2057B8";
+  }
+
+  function etiquetaCategoria(id) {
+    if (D.EVENT_CATEGORIES[id]) return D.EVENT_CATEGORIES[id].label;
+    if (ETIQUETA_CATEGORIA[id]) return ETIQUETA_CATEGORIA[id];
+    // Sin nombre conocido: no inventar. Se muestra el id crudo para que el
+    // dato sea rastreable en vez de embellecido con una etiqueta inventada.
+    return id;
+  }
 
   function getCategoryStyle(cat) {
     if (!cat) return DEFAULT_CATEGORY_STYLE;
@@ -3456,6 +3610,11 @@
    */
   function seleccionarDiaDelMini(iso, irAVistaDia) {
     state.selectedDate = iso;
+    // 📦857 — Un clic en un día del mini FIJA "Tipos de evento" a ese día,
+    // aunque el calendario grande siga en vista Mes. Sin esto el clic solo
+    // resaltaba el día y el contador seguía mostrando el mes entero, que es
+    // justo lo que el owner pidió que no pasara.
+    state.alcanceTipos = "dia";
     const d = new Date(iso + "T00:00:00");
     const y = d.getFullYear();
     const m = d.getMonth();
@@ -3627,14 +3786,20 @@
     // conserva su propia navegacion (y su boton "Hoy"), sin tocar.
 
     const monthGrid = D.buildMonthGrid(miniYear, miniMonth);
-    // F4 — Mapa de colores por categoría para los puntitos de eventos
+    // F4 — Mapa de colores por categoría para los puntitos de eventos.
+    //
+    // 📦856 — Antes era `if (D.FALLBACK_CATEGORIES) { Object.keys(D.FALLBACK_CATEGORIES)... }`.
+    // `D.FALLBACK_CATEGORIES` NO EXISTE: FALLBACK_CATEGORIES es una const local
+    // de este archivo, no una propiedad de D (data.js no la tiene; se verificó).
+    // El `if` protegía el crash pero convertía el bloque en un no-op silencioso:
+    // las categorías que no son oficiales nunca entraban al mapa y TODOS los
+    // puntitos caían al `#2057B8` de respaldo. Ahora usa la const real, y el
+    // respaldo vive en colorCategoria().
     const categoryColor = {};
     Object.values(D.EVENT_CATEGORIES).forEach((c) => { categoryColor[c.id] = c.color; });
-    if (D.FALLBACK_CATEGORIES) {
-      Object.keys(D.FALLBACK_CATEGORIES).forEach((k) => {
-        if (!categoryColor[k]) categoryColor[k] = D.FALLBACK_CATEGORIES[k].color;
-      });
-    }
+    Object.keys(FALLBACK_CATEGORIES).forEach((k) => {
+      if (!categoryColor[k]) categoryColor[k] = FALLBACK_CATEGORIES[k].color;
+    });
     // 📦752 — Hasta 3 puntitos por día (categorías distintas con eventos), como
     // el diseño objetivo. Antes se pintaba UN punto con el color del primer evento.
     const dayDots = {};
@@ -3691,15 +3856,56 @@
     // 📦752 — "Tipos de evento" premium: punto de color + nombre + contador de
     // eventos, con estado apagado cuando la categoría está oculta. Reemplaza a
     // la leyenda legacy (`.kair-legend`) del rediseño anterior.
-    const categorias = Object.values(D.EVENT_CATEGORIES);
+    // 📦857 — La sección cuenta SOLO lo que el calendario está mostrando.
+    //
+    // El alcance sale de `alcanceFechas`, que devuelve las mismas celdas que
+    // pinta la grilla del mes (incluidos los días en gris del mes vecino) o el
+    // día/semana según la vista. Antes contaba todo el año, así que los números
+    // no describían nada de lo que el owner tenía en pantalla.
+    const alcance = alcanceFechas({
+      calView: state.calView,
+      selectedDate: state.selectedDate,
+      alcanceTipos: state.alcanceTipos,
+      hoyIso: D.MONTH_VIEW.todayIso,
+      celdasMes: celdasDelMesVisible(),
+      etiquetaMes: state.viewMonthLabel || D.MONTH_VIEW.label,
+    });
+    const enAlcance = {};
+    alcance.fechas.forEach(function (f) { enAlcance[f] = true; });
+    // Una sola función pura decide qué se muestra y en qué orden. El render
+    // solo pinta: si el filtro o el orden vivieran acá, serían una segunda
+    // verdad que se separa de la que prueban los tests.
+    const tipos = contarTipos(
+      visibleEvents.filter(function (e) { return e && e.date && enAlcance[e.date]; }),
+      D.EVENT_CATEGORIES
+    );
+    const conteoCat = tipos.conteo;
+
+    const categorias = tipos.ids.map(function (id) {
+      return { id: id, label: etiquetaCategoria(id), color: colorCategoria(id) };
+    });
     const hayOcultos = categorias.some((cat) => !state.activeCategories.has(cat.id));
+    // 📦857 — El rótulo del encabezado DICE de dónde sale el número. Sin esto
+    // el owner no tiene forma de saber si está viendo el mes o un día, y una
+    // lista de cifras sin contexto no informa nada.
+    const fijado = alcance.modo === "dia" && state.alcanceTipos === "dia";
     const legend = el("div", { class: "kair-card tipos" + (hayOcultos ? " has-off" : "") });
-    legend.innerHTML = '<div class="tipos__t">Tipos de evento</div><div id="tipos-list"></div>' +
-      '<div class="tipos__hint">Hay tipos ocultos. Haz clic para volver a mostrarlos.</div>';
+    legend.innerHTML = '<div class="tipos__head">' +
+        '<span class="tipos__t">Tipos de evento</span>' +
+        '<span class="tipos__alcance" data-modo="' + alcance.modo + '">' + alcance.etiqueta + '</span>' +
+      '</div>' +
+      '<div id="tipos-list"></div>' +
+      (fijado ? '<button type="button" class="tipos__volver" id="tipos-ver-mes">Ver el mes completo</button>' : '') +
+      (hayOcultos ? '<div class="tipos__hint">Hay tipos ocultos. Haz clic para volver a mostrarlos.</div>' : '');
     const tiposList = $("#tipos-list", legend);
+    if (categorias.length === 0) {
+      const vacio = el("div", { class: "tipos__vacio" },
+        alcance.modo === "dia" ? "Sin eventos ese día." : "Sin eventos en este mes.");
+      tiposList.appendChild(vacio);
+    }
     categorias.forEach((cat) => {
       const isActive = state.activeCategories.has(cat.id);
-      const count = state.events.filter((e) => e.category === cat.id).length;
+      const count = conteoCat[cat.id] || 0;
       const item = el("button", {
         class: "tipos__i" + (isActive ? "" : " is-off"),
         type: "button",
@@ -3712,6 +3918,14 @@
       item.addEventListener("click", () => toggleCategory(cat.id));
       tiposList.appendChild(item);
     });
+    // 📦857 — Salir del día fijado y volver al mes, sin tocar el calendario.
+    const verMes = $("#tipos-ver-mes", legend);
+    if (verMes) {
+      verMes.addEventListener("click", function () {
+        state.alcanceTipos = null;
+        render();
+      });
+    }
     container.appendChild(legend);
 
     // 📦849 — "Tu día". Reemplaza la tarjeta "Integración correo": los tres
@@ -3814,6 +4028,9 @@
     state.viewMonth = m;
     state.viewYear = y;
     state.viewMonthLabel = D.buildMonthLabel(y, m);
+    // 📦857 — Navegar a otro mes suelta el día fijado: si no, el contador
+    // seguiría clavado en un día del mes que ya no se está viendo.
+    state.alcanceTipos = null;
     render();
   }
 
@@ -4176,9 +4393,11 @@
 
     // Bindings toolbar
     toolbar.querySelector("#btn-create-event").addEventListener("click", () => openCreateEventModal(state.selectedDate || D.MONTH_VIEW.todayIso, 9));
-    toolbar.querySelector("#btn-today").addEventListener("click", () => { state.selectedDate = D.MONTH_VIEW.todayIso; render(); });
+    // 📦857 — "Hoy" y el cambio de vista sueltan el día fijado: el alcance pasa
+    // a ser el de la vista, que es lo que el owner está viendo.
+    toolbar.querySelector("#btn-today").addEventListener("click", () => { state.selectedDate = D.MONTH_VIEW.todayIso; state.alcanceTipos = null; render(); });
     toolbar.querySelectorAll(".kair-cal-toolbar__view").forEach((b) => {
-      b.addEventListener("click", () => { state.calView = b.getAttribute("data-view"); render(); });
+      b.addEventListener("click", () => { state.calView = b.getAttribute("data-view"); state.alcanceTipos = null; render(); });
     });
     // Loop 45c — Handler del toggle "Todas las empresas" re-adjuntado acá
     // (no en los bindings iniciales) porque la toolbar se re-crea con
@@ -4367,6 +4586,8 @@
           e.stopPropagation();
           state.selectedDate = cell.iso;
           state.calView = "day";
+          // 📦857 — "más" en una celda del mes también es elegir ese día.
+          state.alcanceTipos = "dia";
           render();
         });
         cellEl.appendChild(more);

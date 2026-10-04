@@ -29,7 +29,15 @@ function cuerpoDe(src, nombre) {
   }
   return LL.slice(i, fin + 1).join('\n');
 }
-// Regla CSS por selector, sin depender de donde este escrita ni del orden.
+// 📦857 — Antes de matchear una DECLARACION hay que sacar los comentarios.
+// El comentario que explica el arreglo dice literalmente `overflow-y: auto`,
+// así que un check `/overflow-y:\s*auto/` sobre el CSS crudo se pasaba a sí
+// mismo: la mutacion cambiaba la declaración a `hidden` y el check seguía
+// encontrando la palabra en la nota al lado. Un check que se satisface a sí
+// mismo no está vigilando nada.
+function sinComentarios(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
 function regla(css, sel) {
   const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = css.match(new RegExp('(^|\\n)[^\\n{}]*' + esc + '\\s*\\{([\\s\\S]*?)\\n\\}'));
@@ -84,14 +92,24 @@ function evaluar(htm, css, js) {
   chk('.kair-layout tiene position: relative (ancla del botón)',
     /position:\s*relative/.test(lay));
 
-  const side = regla(css, '.kair-sidebar');
+  const side = sinComentarios(regla(css, '.kair-sidebar'));
   chk('.kair-sidebar mide var(--side-w)',
     /width:\s*var\(--side-w\)/.test(side),
     (side.match(/width:[^;]*/) || [''])[0].trim());
   chk('.kair-sidebar NO tiene width fijo (rompería el plegado)',
     !/width:\s*\d+px/.test(side));
-  chk('.kair-sidebar recorta con overflow: hidden (si no, las cartas se derraman)',
-    /overflow:\s*hidden/.test(side) && !/overflow:\s*visible/.test(side));
+  // 📦857 — Check INVERTIDO (no borrado). Era `overflow: hidden`, shorthand que
+  // recorta en los DOS ejes. Se separó porque en el eje vertical el recorte
+  // era justo lo que hacía desaparecer "Tu día": con muchas categorías, la
+  // tercera tarjeta se salía del alto y quedaba cortada sin forma de llegar.
+  // Ahora es `overflow-y: auto` + `overflow-x: hidden`. Lo que este paquete NO
+  // puede perder es el recorte HORIZONTAL: es el que evita que las tarjetas se
+  // derramen sobre el correo durante los 240ms del plegado. Eso se sigue
+  // exigiendo, pero por su parte, no por el shorthand.
+  chk('.kair-sidebar recorta en X (si no, las cartas se derraman al plegar)',
+    /overflow-x:\s*hidden/.test(side) && !/overflow:\s*visible/.test(side));
+  chk('.kair-sidebar permite scroll en Y (si no, "Tu día" se recorta y se va)',
+    /overflow-y:\s*auto/.test(side));
   chk('.kair-sidebar se transiciona en width, opacity y transform',
     /transition:[^;]*width[^;]*/.test(side)
     && /transition:[^;]*opacity/.test(side)
@@ -262,9 +280,16 @@ const MUT = [
     c => c.replace('grid-template-columns: auto 1fr;', 'grid-template-columns: 250px 1fr;')],
   ['el sidebar mide 250px fijo en vez de la variable',
     c => c.replace('width: var(--side-w);', 'width: 250px;')],
-  ['el sidebar deja de recortar (overflow: visible)',
-    c => c.replace('  min-width: 0;\n  width: var(--side-w);\n  overflow: hidden;',
-      '  min-width: 0;\n  width: var(--side-w);\n  overflow: visible;')],
+  // 📦857 — Ancladas al bloque `.kair-sidebar`. Sin el ancla, `replace` cambia
+  // la PRIMERA ocurrencia del archivo y hay 5 reglas con `overflow-y: auto`:
+  // la mutacion tocaba otra regla, el sidebar quedaba igual y el check pasaba
+  // sin que nadie lo notara. Es la trampa de PROMPT.md 5.11.
+  ['el sidebar deja de recortar en X (las cartas se derraman sobre el correo al plegar)',
+    c => c.replace('  overflow-x: hidden;\n  background: transparent;',
+      '  overflow-x: visible;\n  background: transparent;')],
+  ['el sidebar deja de permitir scroll en Y ("Tu día" se recorta y desaparece)',
+    c => c.replace('  overflow-y: auto;\n  overflow-x: hidden;',
+      '  overflow-y: hidden;\n  overflow-x: hidden;')],
   ['al plegar queda el gap de 16px (franja muerta)',
     c => c.replace('.kair-layout[data-sidebar="off"] {\n  column-gap: 0px;\n}',
       '.kair-layout[data-sidebar="off"] {\n  color: red;\n}')],

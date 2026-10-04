@@ -10,6 +10,128 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.237] - 2026-10-03
+
+### 📦856 · "Tipos de evento" mostraba 0 en las seis categorías, siempre
+
+**Resumen:** el owner reportó que la sección de tipos de evento del calendario no mostraba
+información. Al mirarla, las seis filas marcaban 0.
+
+**No faltaban datos. Los contadores contaban un vocabulario que ningún evento usa.**
+
+La leyenda iteraba sobre las 6 categorías oficiales de `D.EVENT_CATEGORIES` —`plan`,
+`capacitacion`, `auditoria`, `actualizacion`, `formacion`, `critico`— y comparaba
+`e.category === cat.id`. Pero el calendario de la Bandeja solo lee **dos fuentes**, y las dos
+hablan otro idioma:
+
+| Fuente | Qué devuelve | Archivo |
+|---|---|---|
+| Eventos rápidos (BD) | `type: row.tipo \|\| 'rapido'` | `main/eventos-rapidos-bridge.js:101` |
+| Google Calendar | `category: kairCategory \|\| 'rapido'` | `shared/google-calendar.js:107` |
+
+`rapido` no es ninguna de las 6. Verificado contra las **75 tablas** de la base real: **ninguna
+guarda las 6 categorías oficiales**, y la única tabla de eventos (`eventos_rapidos`, 5 filas) tiene
+`tipo='rapido'`, con fechas de julio-agosto.
+
+**Una segunda pista en la captura:** todos los puntitos del mini-calendario eran del mismo azul, que
+es exactamente el color de respaldo `#2057B8` de `categoryColor[ev.category] || "#2057B8"`.
+
+**Qué cambió**
+
+- `calcularTiposEvento` → `contarTipos(events, categoriasOficiales)`: función pura que cuenta,
+  **filtra las categorías en cero** y devuelve la lista ya ordenada. Las de 0 no aparecen, porque
+  una fila con 0 no informa nada y hace creer que la sección está dañada.
+- Se corrigió un **no-op silencioso**: el mini-calendario hacía `if (D.FALLBACK_CATEGORIES)`, pero
+  **`D.FALLBACK_CATEGORIES` no existe** — es una `const` local de `app.js`, no una propiedad de `D`
+  (`data.js` no la tiene; se verificó). El `if` protegía un crash y dejaba el bloque vacío, así que
+  las categorías no oficiales nunca entraban al mapa de colores y todos los puntitos caían al azul
+  genérico.
+- `colorCategoria(id)` y `etiquetaCategoria(id)`: una sola fuente de color y nombre, compartida por
+  la leyenda, el mini-calendario y el calendario grande. Una categoría sin nombre conocido devuelve
+  su `id` crudo, no una etiqueta inventada.
+- Estado vacío (`tipos__vacio`) en vez de una tarjeta con solo el título, que se lee como algo roto.
+
+### 📦857 · El contador ahora cuenta lo que estás mirando, y "Tu día" no desaparece
+
+**Resumen:** el owner vio que la lista era larga, pidió que se dinamizara: mostrar solo los tipos
+con eventos, contar **el mes** en vista Mes, **el día** al elegir un día en el mini, y garantizar
+que las tres secciones del sidebar existan siempre.
+
+**El footer del calendario también mentía**
+
+Decía "224 evento(s) en el rango visible" y esos 224 eran **del año entero**, no del mes visible.
+`visibleEvents` en `renderBigCalendar` filtra solo por categoría activa, sin fecha. La suma exacta de
+los contadores de la leyenda daba 224, o sea que panel y footer coincidían — y los dos estaban mal.
+
+**El alcance ahora sigue a la vista** (`alcanceFechas(op)`, pura):
+
+| Vista | Qué cuenta |
+|---|---|
+| Mes | Las celdas de la grilla, **incluidos los días en gris** del mes vecino |
+| Día / Programar | El día seleccionado |
+| Semana | Los 7 días desde el lunes |
+| Clic en el mini | Ese día, aunque la vista siga en Mes |
+
+Los días en gris cuentan porque **están en pantalla**. Si se filtrara por `inMonth`, el contador no
+cuadraría con lo que hay al lado.
+
+**El estado `alcanceTipos` es aparte de `selectedDate` a propósito**
+
+`selectedDate` **siempre** tiene valor (init lo pone en hoy), así que no distingue "hoy por
+defecto" de "el owner eligió este día". Y un clic simple en el mini **no** cambia `calView` (solo el
+doble clic), así que sin esa bandera no había forma de saber que el owner señaló un día concreto.
+Se fija en `seleccionarDiaDelMini` y en el "+N más" de una celda, y se suelta al navegar de mes,
+con "Hoy", al cambiar de vista, o con el botón **"Ver el mes completo"** —que es emergente, aparece
+solo cuando estás viendo un día—.
+
+**"Tu día" desaparecía por dos motivos, ambos de layout**
+
+1. `.kair-sidebar` tenía `overflow: hidden`: la tercera tarjeta se salía del alto y quedaba
+   **recortada, sin scroll posible**.
+2. En una columna flex, un hijo con contenido flexible no baja de su altura mínima si no se le
+   pone `min-height: 0`. Sin eso el padre se desborda.
+
+Ahora: mini-calendario y "Tu día" son `flex: none` (altura fija, nunca se encogen ni se van), y
+"Tipos de evento" es la única que cede espacio, por dentro, con su lista scrolleable. El
+`overflow-y` del sidebar pasó a `auto` y el `overflow-x` sigue en `hidden` — ese recorte en X es lo
+que evita que las tarjetas se derramen sobre el correo durante los 240ms del plegado (decisión de
+📦850, que se conserva).
+
+**Un bug propio que casi revierte una decisión de 📦844**
+
+Para calcular el mes visible metí `D.buildMonthGrid(state.viewYear, ...)` **dentro** de
+`renderSidebar`. Eso es exactamente el acoplamiento que 844 eliminó: el mini-calendario está
+congelado en el mes real y no sigue al calendario grande, porque cuando lo seguían, mover uno movía
+el otro. El `test-minical-844` lo detectó (`26/27`) y está en la razón de ser. El cálculo se movió
+a `celdasDelMesVisible()`, **fuera** de `renderSidebar`: son dos cosas distintas y ahora son dos
+llamadas distintas.
+
+**Y `calcularTiposEvento` quedó como código muerto**
+
+857 la reemplazó y nadie la borró. Este repo ya arrastra 12 JS huérfanos; no se suma otro.
+
+**Tres cosas que los tests encontraron y que hay que decir**
+
+1. **Un check que se satisfacía a sí mismo.** El comentario que explica el arreglo en el CSS dice
+   literalmente `` `overflow-y: auto` ``, y el check buscaba ese texto sobre el CSS crudo: se
+   encontraba a sí mismo en la nota al lado y pasaba aunque la declaración real estuviera rota. Se
+   detectó porque una mutación que cambiaba justamente esa línea "no mordía". Ahora los checks quitan
+   comentarios antes de verificar. Documentado en `PROMPT.md` §5.15.
+2. **Un regex con ventana de rango** (`[\s\S]{0,160}`) alcanzaba el `flex: 1 1 auto` del bloque
+   SIGUIENTE y pasaba aunque el anterior hubiera cambiado. Anclado con `[^}]*`.
+3. **Una mutación sin ancla** cambiaba la primera de las 5 ocurrencias de `overflow-y: auto;` del
+   archivo, o sea otra regla, y el sidebar quedaba igual: el check pasaba sin que nadie lo notara.
+
+**Tests**
+
+- `main/test-tipos-evento-857.js` — **37 checks, 14/14 mutaciones** (incluye 4 de CSS, porque el
+  layout es media parte del bug).
+- `main/test-tipos-evento-856.js` — **32 checks, 10/10 mutaciones**.
+- `main/test-bandeja-sidebar-850.js` — 49/49, 21/21. Check de `overflow` **invertido** (no borrado):
+  ahora exige el recorte en X por separado y el scroll en Y.
+- `main/test-minical-844.js` — 27/27, sin cambios: la garantía de que el mini sigue congelado.
+- Suite completa: 115 tests, 97 verdes, 18 preexistentes, **0 regresiones**.
+
 ## [0.1.236] - 2026-10-03
 
 ### 📦855 · La bandeja abre en blanco, no con un correo que no elegiste

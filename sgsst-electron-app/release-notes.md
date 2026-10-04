@@ -1,3 +1,38 @@
+# K+AIR v0.1.237
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## «Tipos de evento» por fin cuenta algo real
+
+La lista de tipos de evento de la agenda mostraba **0 en las seis categorías**, siempre. No era
+que te faltaran datos: esas seis categorías (Plan de Trabajo, Capacitación, Auditoría,
+Actualización, Formación y Crítico) viven en otros módulos, y el calendario de la agenda nunca
+trae los eventos de esos módulos. Estaba contando un tipo de evento que nunca llega.
+
+Ahora la lista muestra **solo los tipos que de verdad tenés**, con su número.
+
+**El número también ahora es el correcto**
+
+Antes contaba los eventos de **todo el año**, aunque en pantalla solo estabas viendo un
+mes. Hasta el contador del pie del calendario —el que decía «N eventos en el rango visible»—
+contaba el año entero. Los dos mostraban lo mismo, y los dos estaban mal.
+
+- En **vista Mes** cuenta los eventos **de ese mes**.
+- En **vista Día** cuenta los de **ese día**.
+- En **vista Semana** cuenta los de esa semana.
+- Si tocás un día en el **mini-calendario**, la lista pasa a mostrar **ese día** y aparece un botón
+  **«Ver el mes completo»** para volver atrás. Ese botón solo aparece cuando estás viendo un día.
+
+**Y «Tu día» ya no desaparece**
+
+Cuando la lista de tipos crecía, la sección **Tu día** se salía de la pantalla y desaparecía,
+sin forma de recuperarla. Ahora las tres secciones de la columna (mini-calendario, Tipos de
+evento y Tu día) están siempre: las que no son la lista de tipos no se encogen nunca, y la lista
+de tipos se desplaza dentro de su propio espacio.
+
+---
+
 # K+AIR v0.1.236
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

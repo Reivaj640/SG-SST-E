@@ -415,7 +415,14 @@ html, body {
   min-height: 0;
   min-width: 0;
   width: var(--side-w);
-  overflow: hidden;
+  /* 📦857 — `overflow-y: auto` y no `hidden`. Con `hidden` la TERCERA tarjeta
+     ("Tu día") se salía del alto y quedaba recortada sin scroll posible: el
+     owner reportó que la sección desaparecía cuando "Tipos de evento" crecía
+     con muchas categorías. Ahora el overflow es de la columna; además la lista
+     de tipos scrollea por dentro (abajo), así que en el caso normal ni
+     siquiera hace falta llegar acá. */
+  overflow-y: auto;
+  overflow-x: hidden;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -496,6 +503,32 @@ html, body {
 }
 
 /* Tarjetas del sidebar */
+/* 📦857 · Las tres secciones (mini-calendario, Tipos de evento, Tu día) tienen
+   que estar SIEMPRE presentes: el owner reportó que "Tu día" desaparecía cuando
+   la lista de tipos crecía. El reparto es:
+     - .mini  → `flex: none`, altura fija, nunca se encoge ni se va.
+     - .tipos → `flex: 1 1 auto` + `min-height: 0`: es la ÚNICA que cede espacio,
+                y cede por dentro (su lista scrollea), no desapareciendo.
+     - .tuday → `flex: none`, altura fija, nunca se encoge ni se va.
+   Sin `min-height: 0` en .tipos, un hijo con contenido flexible no baja de su
+   altura mínima de contenido y el padre se desborda: ese es el mecanismo
+   exacto por el que "Tu día" se salía. */
+.kair-sidebar > .mini,
+.kair-sidebar > .tuday { flex: none; }
+.kair-sidebar > .tipos {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tipos > #tipos-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
 .mini { padding: 14px; }
 .mini__head {
   display: flex;
@@ -601,6 +634,56 @@ html, body {
 .tipos__i.is-off .tipos__dot { background: var(--kair-border-2) !important; }
 .tipos__hint { font-size: 11px; color: var(--kair-text-3); margin-top: 8px; padding: 0 8px; display: none; }
 .tipos.has-off .tipos__hint { display: block; }
+/* 📦856 — Estado vacío de "Tipos de evento": cuando no hay ningún evento con
+   categoría reconocible. Sin esto la tarjeta quedaba con solo el título, que
+   se lee como una sección que se rompió en vez de "no hay nada que contar". */
+.tipos__vacio {
+  font-size: 11.5px;
+  color: var(--kair-text-3);
+  padding: 2px 2px 0;
+}
+
+/* 📦857 — Encabezado con el rótulo del alcance: dice de dónde sale el número.
+   Sin esto el owner no tiene forma de saber si está viendo el mes o un día, y
+   una columna de cifras sin contexto no informa nada. */
+.tipos__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.tipos__t { flex: none; }
+.tipos__alcance {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--kair-text-3);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tipos__alcance[data-modo="dia"] { color: var(--kair-blue); font-weight: 600; }
+
+/* 📦857 — Salir del día fijado y volver al mes completo. Solo aparece cuando
+   está fijado a un día (emergente, no permanente), igual que pidió el owner. */
+.tipos__volver {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+  border: 1px solid var(--kair-blue-soft);
+  border-radius: var(--kair-r-xs);
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.tipos__volver:hover { background: var(--kair-blue); color: #fff; border-color: var(--kair-blue); }
+.tipos__volver:focus-visible { outline: 2px solid var(--kair-blue); outline-offset: 2px; }
 
 /* 📦849 — "Tu dia": los tres indicadores que vivian en las tarjetas de
    arriba, ahora como filas en el sidebar. Mismo esqueleto que

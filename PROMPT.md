@@ -421,6 +421,60 @@ nada), y eso se reportaba como "el check no muerde" cuando en realidad el check 
 4. **Al cambiar un contrato, los checks viejos se INVIERTEN, no se borran** (§7). Un check invertido
    dice "esto ya no debe pasar por acá" y sigue morando si alguien lo deshace.
 
+### 5.15 🔴 Un check que se satisface con su propio comentario
+
+**El peor tipo de check: uno que pasa porque el texto que busca está en la NOTA al lado.**
+
+Pasó de verdad en 📦857. El CSS lleva este comentario:
+
+```css
+/* 📦857 — `overflow-y: auto` y no `hidden`. Con `hidden` la TERCERA tarjeta... */
+  overflow-y: auto;
+```
+
+Y el check hacía `/overflow-y:\s*auto/.test(css)` **sobre el CSS crudo**. Encontraba la palabra en el
+comentario, no en la declaración: la mutación que cambiaba la línea real a `hidden` pasaba
+igualmente. El check era verde, la declaración estaba rota, y nadie lo notó.
+
+**La regla es simple: los comentarios se quitan ANTES de verificar una declaración.**
+
+```js
+function sinComentarios(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+const side = sinComentarios(regla(css, '.kair-sidebar'));
+chk('.kair-sidebar permite scroll en Y', /overflow-y:\s*auto/.test(side));
+```
+
+Esto ya lo hacíamos con el código JS (`soloCodigo()` quita comentarios y líneas `//`). **Se estaba
+aplicando al JS y no al CSS**, y ahí es donde aparece el problema, porque en este repo los
+comentarios del CSS son largos y describen el arreglo.
+
+**Cómo se delata sola**: una mutación que toca justo la línea que el check vigila y reporta **"no
+morde"**. Esa señal es la que hay que perseguir, no el check verde.
+
+**Los tres siblings de esta lección, todos vistos el mismo día:**
+
+| Trampa | Síntoma | Se arregla con |
+|---|---|---|
+| Check satisfecho por su comentario | la mutación "no muerde" | quitar comentarios antes de verificar |
+| Regex con ventana `[\s\S]{0,160}` | alcanza la declaración del bloque SIGUIENTE | `[^}]*` anclado a la misma llave |
+| Mutación sin ancla | `replace` cambia la **primera** de las 5 ocurrencias del archivo | ancla que incluya el contexto |
+
+Y el cuarto, que es el mismo mal de todos: **una copia de la lógica dentro del test**. Una copia es
+una segunda verdad; las mutaciones del archivo no la tocan y el test pasa sin estar probando nada.
+Por eso la lógica tiene que vivir en una **función pura en el archivo real** (`alcanceFechas`,
+`contarTipos`) y el test la extrae tal cual.
+
+### 5.16 🔴 Cuidado con reescribir un archivo entero para borrar un bloque
+
+`fs.writeFileSync` con el contenido reconstruido reescribe el archivo **completo**. Si el EOL del
+repo es CRLF y el string quedó con LF, se rompe el diff entero y los tests que verifican el EOL
+fallan. En `app.js` (CRLF) borrar un bloque muerto con `ReadAllText` + `Remove` + `WriteAllText`
+funcionó solo porque las saltos de línea se preservan como caracteres del string — pero es
+fragilidad gratis. **Después de reescribir un archivo, verificar el EOL contra lo que el test del
+repo exige**, antes de seguir.
+
 ---
 
 ## 6. Convenciones de código
