@@ -74,13 +74,45 @@ ok('2b) y el encabezado NO lee el mes del calendario grande',
 ok('3) el mini NO llama changeMonth() (no mueve el calendario grande)',
   !/changeMonth\(/.test(mini));
 
-ok('4) el mini ya NO tiene flechas de mes',
-  !/mini-prev|mini-next|chevronLeft|chevronRight/.test(mini));
+// 📦858 — Checks 4 y 5 INVERTIDOS, no borrados.
+//
+// 844 congeló el mini al mes real y le quitó las flechas porque compartían
+// `changeMonth()` con el calendario grande: mover el mini movía el grande y al
+// reventrar quedaban en meses distintos. Ese problema sigue resuelto: el mini
+// de correo mueve `state.miniMes`, NO llama a `changeMonth()` (el check 3, que
+// no se invirtió, sigue verde por eso).
+//
+// Lo que cambió es que en la pestaña CORREO el mini es un selector de día y
+// necesita ir hacia atrás: de los 131 correos de la entrada, 106 no están
+// cargados y la mayoría son viejos. Entonces la regla nueva es:
+//
+//   En Agenda → congelado al mes real, sin flechas.   (lo de 844, intacto)
+//   En Correo → navegable, arrancando en el mes real. (lo de 858)
+//
+// Los checks miran el CÓDIGO, no una captura: que exista la rama deCorreo no
+// significa que la de Agenda se haya relajado.
 
-ok('5) el mini se dibuja con la fecha de HOY, no con el estado compartido',
+ok('4) 📦858-INVERTIDO: las flechas existen SOLO en la rama de Correo',
+  /modoCorreo[\s\S]{0,320}mini-prev/.test(miniBruto)
+  && /modoCorreo[\s\S]{0,320}mini-next/.test(miniBruto)
+  // Y la condición tiene que ser la de modo correo, no un "siempre".
+  && /if\s*\(\s*modoCorreo\s*\)/.test(miniBruto));
+
+ok('4b) 📦858: el boton de mes anterior usa el icono chevronLeft que YA existe',
+  /mini-prev[\s\S]{0,220}chevronLeft/.test(miniBruto));
+
+ok('5) 📦858-INVERTIDO: en Agenda el mes sale de HOY; en Correo, de miniMes',
   /const\s+hoy\s*=\s*new Date\(\)/.test(mini)
-  && /miniYear\s*=\s*hoy\.getFullYear\(\)/.test(mini)
-  && /miniMonth\s*=\s*hoy\.getMonth\(\)/.test(mini));
+  // La decisión vive en la función pura, NO en el render: así se puede
+  // verificar sin montar la vista (y mutar sin reventar el DOM).
+  && /mesDelMini\(\s*state\.calendarVisible\s*,\s*state\.miniMes\s*,\s*hoy\s*\)/.test(mini)
+  && /miniYear\s*=\s*miniVisible\.y/.test(mini)
+  && /miniMonth\s*=\s*miniVisible\.m/.test(mini));
+
+ok('5b) 📦858: el mes navegable NO toca el estado del calendario grande',
+  // El bug original de 844 era compartir estado. `miniMes` es propio.
+  /state\.miniMes\s*=\s*mesDesplazado\(/.test(miniBruto)
+  && !/miniMes[\s\S]{0,200}state\.viewMonth\s*=/.test(miniBruto));
 
 ok('6) su template literal sigue abre y cerrando bien',
   (miniBruto.match(/mini\.innerHTML\s*=\s*`/g) || []).length === 1);

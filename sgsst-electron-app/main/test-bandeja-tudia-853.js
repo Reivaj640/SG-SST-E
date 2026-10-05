@@ -228,7 +228,13 @@ function evaluar(htm, css, js) {
   chk('el filtro "unread" sigue existiendo en la definicion',
     /\{ id: "unread", label: "No le/.test(cod));
   chk('la logica de la lista sigue respetando mailFilter === "unread"',
-    /if \(state\.mailFilter === "unread"\) return !!m\.unread;/.test(cod),
+    // 📦858-INVERTIDO — la forma cambió, la regla no.
+  // Antes el chip hacía `return !!m.unread`, y esa salida temprana se comía el
+  // filtro por día del mini-calendario: con "No leídos" activo, la función
+  // salía antes de comparar la fecha. Ahora el chip DECIDE y el día se le
+  // suma encima. Lo que este check protege sigue igual: la lista respeta el
+  // filtro de no leídos. Solo cambió cómo se escribe.
+  /if \(state\.mailFilter === "unread"\) pasa = !!m\.unread;/.test(cod),
     'sino el boton se pinta pero no filtra nada');
 
   // ══ 7) "Invitaciones pendientes" se retiro ══

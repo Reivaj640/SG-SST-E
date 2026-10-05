@@ -62,6 +62,26 @@
     // (solo el doble clic lo hace), así que sin esta bandera no había forma
     // de saber que el owner señaló un día concreto.
     alcanceTipos: null,
+    // 📦858 — Filtro por DÍA de la bandeja, activo SOLO en la pestaña Correo.
+    //
+    // Es un EJE y no un filtro más de `mailFilter`: `mailFilter` es un enum de
+    // un solo valor con 12 chips, así que si el día fuera un chip, "no leídos
+    // del 3 de octubre" sería imposible (o no leídos, o día). Con un campo
+    // aparte compone solo con el chip, la búsqueda y los labels, y ninguno de
+    // esos caminos necesita cambiar. Precedente: `alcanceTipos` de 📦857.
+    //
+    // Se limpia al salir a la pestaña Agenda (ver `setCalendarVisible`).
+    mailDia: null,              // "2026-10-03" | null
+    // 📦858 — Clave de lo que ya se trajo a memoria para el día filtrado:
+    // "CARPETA|ISO". Si no coincide con la carpeta y el día actuales, hay que
+    // volver a pedir: los correos del día NO siempre están en `state.mails`
+    // (la app carga 25 de 131 y hay días con 12 que no están cargados).
+    mailDiaCargado: null,
+    // 📦858 — Mes que muestra el mini en la pestaña Correo, navegable con las
+    // flechas. `null` = el mes presente. En la pestaña Agenda el mini NO usa
+    // esto: 📦844 lo dejó congelado al mes real a propósito, porque las
+    // flechas llamaban a `changeMonth()` y movían el calendario grande.
+    miniMes: null,              // { y: 2026, m: 9 } | null (m es 0-indexed)
     // F4 — Mes visible en el mini-cal (navegable con chevron)
     viewYear: null,            // se inicializa en init() desde D.MONTH_VIEW
     viewMonth: null,           // 0-indexed (0=enero, 6=julio)
@@ -200,6 +220,69 @@
 
   function isoDe(d) {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // 📦858 — El día local (YYYY-MM-DD) de un correo.
+  //
+  // `mail.date` NO es una fecha ISO: la BD guarda epoch en MILISEGUNDOS
+  // (1791068562000, 13 dígitos). Un `SUBSTR(1, 10)` agruparía por los
+  // primeros 10 dígitos del número, no por el día. Se convierte de verdad, y
+  // con la MISMA `isoDe` que arma las celdas del mini: así el día de un
+  // correo y el día de una celda son el mismo string por construcción, y no
+  // hay dos definiciones de "día" que se puedan separar en silencio.
+  //
+  // Devuelve null (no un ISO inventado) cuando la fecha no es utilizable, para
+  // que el llamador pueda distinguir "no tiene fecha" de "es otro día".
+  function mailDiaDe(m) {
+    var ms = m && m.date;
+    if (typeof ms !== "number" || !isFinite(ms)) return null;
+    var d = new Date(ms);
+    if (isNaN(d.getTime())) return null;
+    return isoDe(d);
+  }
+
+  // 📦858 — Los límites de un día en epoch ms, para pedirlo a la caché.
+  //
+  // `new Date(iso + "T00:00:00")` SIN "Z" se parsea en hora LOCAL, así que acá
+  // `from` es la medianoche local de ese día. El rango es [from, to) para que
+  // dos días contiguos no se pisen en la medianoche.
+  //
+  // Colombia es UTC-5 todo el año (sin horario de verano desde 1992), así que
+  // sumar 24h cae exacto en la medianoche siguiente. Aun así, un día con
+  // horario de verano haría que esto se corra una hora: por eso se calcula con
+  // un Date local y no con aritmética sobre el ISO.
+  function rangoDiaMs(iso) {
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d.getTime())) return null;
+    var desde = d.getTime();
+    return { from: desde, to: desde + 86400000 };
+  }
+
+  // 📦858 — ¿De qué mes se dibuja el mini-calendario?
+  //
+  // En la pestaña Agenda es SIEMPRE el mes real: 📦844 lo congeló a propósito
+  // porque las flechas llamaban a `changeMonth()` y movían el calendario
+  // grande, así que al reventre los dos quedaban en meses distintos.
+  //
+  // En la pestaña Correo el mini es un selector de día, y ahí sí tiene que
+  // poder ir hacia atrás: la mayoría del correo es viejo (de los 131 hilos de
+  // entrada, 106 no están ni cargados en memoria). Por eso `miniMes` existe
+  // solo para ese modo, y `null` significa "el mes presente".
+  //
+  // La decisión vive en una función pura y no en el render para que el test
+  // la verifique sin montar la vista entera.
+  function mesDelMini(calendarVisible, miniMes, hoy) {
+    var base = hoy instanceof Date && !isNaN(hoy.getTime()) ? hoy : new Date();
+    if (calendarVisible || !miniMes) return { y: base.getFullYear(), m: base.getMonth() };
+    return { y: miniMes.y, m: miniMes.m };
+  }
+
+  // 📦858 — Mueve el mes del mini un paso. No toca `viewYear`/`viewMonth`: el
+  // calendario grande tiene su propia navegación y no se debe mover con esto.
+  // Devuelve el mes ya normalizing el cambio de año.
+  function mesDesplazado(mes, delta) {
+    var total = mes.y * 12 + mes.m + delta;
+    return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 };
   }
 
   // 📦857 — Las celdas del mes que está viendo el calendario GRANDE.
@@ -1627,6 +1710,16 @@
           });
         } else {
           state.mails = cacheResult.data.map(threadToMail);
+        }
+        // 📦858 — `state.mails` se REEMPLAZÓ, así que los correos del día que
+        // se habían agregado quedan fuera de la lista. Con el filtro puesto,
+        // eso se ve como una bandeja vacía hasta que se vuelvan a pedir, y no
+        // se vuelven a pedir solos: la clave dice "ya lo cargué" y la clave es
+        // cierta, la lista es la que cambió. Por eso se invalida acá y se
+        // vuelve a pedir abajo.
+        if (state.mailDia) {
+          state.mailDiaCargado = null;
+          asegurarCorreosDelDia();
         }
         if (forceSync) {
           // Cambio de folder: mostrar YA el cache actual + sync en background para refrescar
@@ -3277,13 +3370,36 @@
       return;
     }
     state.calendarVisible = visible;
+    // 📦858 — El filtro por día pertenece a la bandeja. Al salir a la pestaña
+    // Agenda se limpia: en el calendario el mini vuelve a ser el de eventos, y
+    // un filtro de correo colgado en la pestaña equivocada se lee como un
+    // error — más todavía porque "Tipos de evento" (📦857) ya no respondería
+    // al clic del mini.
+    //
+    // El mes también vuelve al presente. Así, al reentrar a Correo el mini
+    // arranca en el mes actual, que es lo que el owner pidió: el mes presente
+    // es el punto de partida, y hacia atrás se llega a propósito.
+    limpiarFiltroDia();
+    state.miniMes = null;
     render();
   }
 
+  // 📦858 — Quita el filtro por día. No toca `mailDiaCargado`: ese registro
+  // dice qué se trajo a memoria y sigue siendo cierto; lo que se borra es la
+  // condición que hace la lista más corta.
+  function limpiarFiltroDia() {
+    if (state.mailDia === null) return false;
+    state.mailDia = null;
+    return true;
+  }
+
   // Alterna la visibilidad del overlay deslizante del calendario
+  //
+  // 📦858 — Pasa por `setCalendarVisible` y no por una asignación directa: la
+  // limpieza del filtro por día vive ahí, y un segundo camino para cambiar de
+  // pestaña es un segundo sitio donde olvidarse de hacerlo.
   function toggleCalendar() {
-    state.calendarVisible = !state.calendarVisible;
-    render();
+    setCalendarVisible(!state.calendarVisible);
   }
 
   function refresh() {
@@ -3766,14 +3882,33 @@
     // state.viewYear/viewMonth. Consecuencia buena: si la app queda abierta
     // y pasa la medianoche del último día del mes, el mini ya muestra el
     // mes nuevo en la siguiente pasada de render().
+    //
+    // 📦858 · EXCEPTO en la pestaña Correo, donde el mini es un selector de día
+    // y necesita poder ir hacia atrás: de los 131 correos de la entrada, 106
+    // no están ni cargados en memoria y la mayoría son viejos. `mesDelMini`
+    // decide: en Agenda devuelve el mes real (📦844 intacto), en Correo el mes
+    // navegable. Que la decisión esté en una función pura es lo que permite
+    // verificarla sin montar la vista.
     const hoy = new Date();
-    const miniYear = hoy.getFullYear();
-    const miniMonth = hoy.getMonth();
+    const miniVisible = mesDelMini(state.calendarVisible, state.miniMes, hoy);
+    const miniYear = miniVisible.y;
+    const miniMonth = miniVisible.m;
+    // En Correo el mini filtra la bandeja; en Agenda muestra eventos. El
+    // render lee este booleano y no vuelve a preguntar por la pestaña.
+    const modoCorreo = !state.calendarVisible;
 
-    const mini = el("div", { class: "kair-card mini" });
+    const mini = el("div", { class: "kair-card mini" + (modoCorreo ? " mini--correo" : "") });
     mini.innerHTML = `
       <div class="mini__head">
+        ${modoCorreo
+          ? '<button type="button" class="mini__nb" id="mini-prev" aria-label="Mes anterior"'
+            + ' title="Mes anterior">' + D.ICONS.chevronLeft + "</button>"
+          : ""}
         <span class="mini__m">${D.buildMonthLabel(miniYear, miniMonth)}</span>
+        ${modoCorreo
+          ? '<button type="button" class="mini__nb" id="mini-next" aria-label="Mes siguiente"'
+            + ' title="Mes siguiente">' + D.ICONS.chevronRight + "</button>"
+          : ""}
       </div>
       <div class="mini__grid" id="mini-grid"></div>
     `;
@@ -3814,8 +3949,14 @@
       grid.appendChild(el("div", { class: "mini__wd" }, w.slice(0, 1)));
     });
     monthGrid.flat().forEach((c) => {
-      const dots = dayDots[c.iso] || [];
-      const isSelected = state.selectedDate === c.iso && !c.isToday;
+      // 📦858 — En Correo el mini NO lleva puntitos: los puntitos son de
+      // eventos, y en la pestaña de correo no son una señal de nada. El owner
+      // lo pidió explícitamente. Solo los días, y el que esté filtrando queda
+      // resaltado.
+      const dots = modoCorreo ? [] : (dayDots[c.iso] || []);
+      const isSelected = modoCorreo
+        ? state.mailDia === c.iso
+        : (state.selectedDate === c.iso && !c.isToday);
       const cls = "mini__d" + (!c.inMonth ? " is-out" : "") + (c.isToday ? " is-today" : "") + (isSelected ? " is-sel" : "");
       // 📦847 · El title SOLO va en los dias SIN eventos. En los que tienen,
       // el popup de 846 ya dice cuanto hay y de que tipo, y el title del
@@ -3828,20 +3969,34 @@
         "data-d": c.iso,
       });
       if (!dots.length) {
-        btn.title = `${c.day} — Sin eventos · doble clic para ver el día`;
+        // 📦858 — En Correo el title anuncia el otro comportamiento del clic,
+        // no el de eventos: acá no hay doble clic que abra la vista Día.
+        btn.title = modoCorreo
+          ? `${c.day} — Ver los correos de este día`
+          : `${c.day} — Sin eventos · doble clic para ver el día`;
       }
       btn.innerHTML = String(c.day) + (dots.length
         ? '<span class="mini__dots">' + dots.map((col) => '<span class="mini__dot" style="background:' + col + '"></span>').join("") + '</span>'
         : "");
       // 📦846 · Los eventos de ESE dia: con esto el popup puede decir
       // cuantas categorias hay y cuales son, no solo que hay algo.
-      const eventosDelDia = visibleEvents.filter((ev) => ev && ev.date === c.iso);
+      // 📦858 — Solo en Agenda. En Correo no hay eventos que mostrar y un
+      // popup con el calendario a la vista sería una respuesta a otra
+      // pregunta.
+      const eventosDelDia = modoCorreo ? [] : visibleEvents.filter((ev) => ev && ev.date === c.iso);
       if (eventosDelDia.length) {
         btn.addEventListener("mouseenter", () => mostrarPopupDia(c.iso, eventosDelDia, btn));
         btn.addEventListener("mouseleave", ocultarPopupDia);
       }
 
       btn.addEventListener("click", () => {
+        // 📦858 — En Correo el clic filtra la bandeja y nada más. No pasa por
+        // `seleccionarDiaDelMini`: esa función mueve el calendario grande y
+        // fija el alcance de "Tipos de evento" (📦857), y al volver a la
+        // pestaña Agenda el calendario quedaría corrido a un día que nadie
+        // eligió desde ahí. El doble clic tampoco aplica acá: filtrar dos
+        // veces el mismo día es un no-op, no un "ir a la vista Día".
+        if (modoCorreo) { filtrarBandejaPorDia(c.iso); return; }
         const ahora = Date.now();
         // 📦845 · Dos clics sobre el MISMO dia dentro de la ventana = doble
         // clic: el calendario grande pasa a la vista Dia de ese dia.
@@ -3852,6 +4007,66 @@
       });
       grid.appendChild(btn);
     });
+
+    // 📦858 — Flechas de mes, SOLO en la pestaña Correo.
+    //
+    // 📦844 las quitó porque llamaban a `changeMonth()`, la misma función del
+    // calendario grande, y escribían en el mismo estado: mover el mini movía el
+    // grande y al reventrar quedaban en meses distintos. acá NO se llama a
+    // `changeMonth()`: se mueve `state.miniMes`, que es un estado propio del
+    // mini de correo y no toca `viewYear`/`viewMonth`. Por eso el calendario
+    // grande no se mueve, que era el problema original de 844.
+    if (modoCorreo) {
+      const btnPrev = $("#mini-prev", mini);
+      const btnNext = $("#mini-next", mini);
+      if (btnPrev) {
+        btnPrev.addEventListener("click", function () {
+          // Arrancar en el mes actual la primera vez: `miniMes` es null hasta
+          // que el owner toca una flecha, y desplazar desde null no tiene
+          // punto de partida.
+          if (!state.miniMes) state.miniMes = { y: miniYear, m: miniMonth };
+          state.miniMes = mesDesplazado(state.miniMes, -1);
+          render();
+        });
+      }
+      if (btnNext) {
+        btnNext.addEventListener("click", function () {
+          if (!state.miniMes) state.miniMes = { y: miniYear, m: miniMonth };
+          state.miniMes = mesDesplazado(state.miniMes, 1);
+          render();
+        });
+      }
+    }
+
+    // 📦858 — Fila del filtro por día. Aparece SOLO cuando hay un día
+    // elegido, no como una sección permanente: en la pestaña Correo sin filtro
+    // no hay nada que decir, y una franja vacía ahí ocupa espacio y distrae de
+    // la bandeja.
+    if (modoCorreo && state.mailDia) {
+      const delDia = state.mails.filter(mailPasaFiltroActual).length;
+      const fila = el("div", { class: "mini-filtro" });
+      // El encabezado va primero y el número va en la pastilla, no al revés:
+      // "Correos del 3 de octubre" con un 0 al final se lee como un contador
+      // roto. Con cero correos la pastilla se pone gris y el texto lo dice.
+      fila.innerHTML =
+        '<span class="mini-filtro__t">' + escapeHtml(_etiquetaDia(state.mailDia))
+        + (delDia === 0 ? " · sin correos" : "") + "</span>"
+        + '<span class="mini-filtro__n" data-vacio="' + (delDia === 0 ? "1" : "0") + '">' + delDia + "</span>"
+        + '<button type="button" class="mini-filtro__x" id="mini-filtro-x"'
+        + ' aria-label="Quitar el filtro de día" title="Quitar el filtro de día">'
+        // 📦858 — `D.ICONS.x`, que es la llave que YA usa el repo para el botón
+        // de cerrar (modal de evento). `D.ICONS.close` no existe: se verificó.
+        + (D.ICONS.x || "×") + "</button>";
+      container.appendChild(fila);
+      const btnX = $("#mini-filtro-x", fila);
+      if (btnX) {
+        btnX.addEventListener("click", function () {
+          limpiarFiltroDia();
+          state._resetMailListScroll = true;
+          render();
+        });
+      }
+    }
 
     // 📦752 — "Tipos de evento" premium: punto de color + nombre + contador de
     // eventos, con estado apagado cuando la categoría está oculta. Reemplaza a
@@ -6578,16 +6793,128 @@
   // `setMailFilter` (que es de otro nivel) lo ve como indefinido y revienta
   // con ReferenceError en cuanto se toca un chip de filtro. Por eso está acá,
   // afuera, junto a las acciones.
+  // 📦858 — Pide a la caché local los correos del día filtrado y los AGREGA a
+  // la lista, sin reemplazarla.
+  //
+  // Por qué hace falta: la app carga 25 correos (`PAGE_SIZE`) de los 131 que
+  // hay en la carpeta de entrada, y los otros llegan con scroll infinito. El
+  // 14 de septiembre tiene 12 correos y ninguno está en memoria. Si el filtro
+  // se quedara solo con `state.mails`, elegir ese día mostraría "sin correos
+  // ese día" teniendo 12, que es peor que no tener la función.
+  //
+  // Se pide por rango a SQLite y no a Gmail: la caché es local, así que esto
+  // no consume red ni cuota de sincronización. Por eso NO se sube el
+  // `PAGE_SIZE`, que sí tendría consequences (📦755) sobre la paginación.
+  //
+  // Es idempotente: la clave `CARPETA|ISO` evita volver a pedir lo mismo, y el
+  // `catch` deja la lista como estaba si la caché falla. Un fallo acá degrada
+  // a "no se agregaron los del día", nunca a una pantalla en blanco.
+  function asegurarCorreosDelDia() {
+    var iso = state.mailDia;
+    var carpeta = state.mailFolder;
+    if (!iso || !carpeta) return Promise.resolve(0);
+    if (state.calendarVisible) return Promise.resolve(0);   // en Agenda el filtro no aplica
+    var clave = carpeta + "|" + iso;
+    if (state.mailDiaCargado === clave) return Promise.resolve(0);
+    var rango = rangoDiaMs(iso);
+    if (!rango) return Promise.resolve(0);
+    var api = getElectronAPI();
+    if (!api || !api.emailCache || !api.emailCache.getThreads) return Promise.resolve(0);
+
+    // Se marca ANTES de esperar, no después: sin esto, dos clics rápidos en el
+    // mismo día abren dos pedidos y el segundo vuelve a agregar lo mismo.
+    state.mailDiaCargado = clave;
+    return api.emailCache.getThreads({
+      folder: carpeta,
+      dateFrom: rango.from,
+      dateTo: rango.to,
+      maxResults: 200
+    })
+      .then(function (res) {
+        if (!res || !res.success || !Array.isArray(res.data) || !res.data.length) return 0;
+        // Si el owner cambió de día o de pestaña mientras esperábamos, lo que
+        // llegó no corresponde a lo que está en pantalla: se descarta.
+        if (state.mailDia !== iso || state.calendarVisible) return 0;
+        var vistos = new Set(state.mails.map(function (m) { return m.id; }));
+        var agregados = 0;
+        res.data.forEach(function (thread) {
+          var mail = threadToMail(thread);
+          if (vistos.has(mail.id)) return;
+          // Preservar lo que el owner ya hizo en esta sesión (leído / destacado).
+          var viejo = state.mails.find(function (m) { return m.id === mail.id; });
+          if (viejo) {
+            if (viejo.unread === false) mail.unread = false;
+            if (viejo.flagged === true) mail.flagged = true;
+          }
+          state.mails.push(mail);
+          vistos.add(mail.id);
+          agregados++;
+        });
+        if (agregados) render();
+        return agregados;
+      })
+      .catch(function (e) {
+        console.warn("[BandejaIntegrada] No se pudieron traer los correos del dia", iso, e);
+        // Se libera la clave para que un reintento (o cambiar de día y volver)
+        // vuelva a intentarlo en vez de quedarse con un vacío sin explicación.
+        if (state.mailDiaCargado === clave) state.mailDiaCargado = null;
+        return 0;
+      });
+  }
+
+  // 📦858 — El owner tocó un día del mini en la pestaña Correo.
+  //
+  // NO pasa por `seleccionarDiaDelMini`: esa función mueve el calendario
+  // grande y fija el alcance de "Tipos de evento" (📦857), y en la pestaña de
+  // Correo el calendario no es lo que se está mirando. Si se reutilizara, al
+  // volver a Agenda el calendario grande quedaría corrido a un día que nadie
+  // eligió desde ahí.
+  function filtrarBandejaPorDia(iso) {
+    if (!iso) return;
+    // Segundo clic sobre el mismo día = no-op. Así el doble clic no enciende
+    // y apaga el filtro: con MINI_DOBLE_MS los dos clics llegan seguidos.
+    if (state.mailDia === iso) return;
+    state.mailDia = iso;
+    // 📦855 — El mismo cuidado que al cambiar de chip: si el mensaje abierto no
+    // pertenece a la lista nueva, se suelta la selección. Va en el CAMBIO de
+    // filtro y no en el render, porque al abrir un no leído se marca leído y
+    // dejaría de pasar el filtro en el mismo clic en que se está leyendo.
+    if (state.selectedMailId != null) {
+      var sel = state.mails.find(function (m) { return m.id === state.selectedMailId; });
+      if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;
+    }
+    state._resetMailListScroll = true;
+    render();
+    asegurarCorreosDelDia();
+  }
+
   function mailPasaFiltroActual(m) {
     // FIX loop 35 — Ocultar mails snoozed de la lista INBOX
     // (los snoozed tienen wakeTime > now y se devuelven automáticamente
     // cuando vence el snooze via getSnoozedMap() que limpia los vencidos)
     if (state.mailFilter !== "sent" && isThreadSnoozed(m.id)) return false;
-    if (state.mailFilter === "unread") return !!m.unread;
-    if (state.mailFilter === "flagged") return !!m.flagged;
-    if (state.mailFilter === "meeting") return m.category === "meeting";
+
+    // 📦858 — El chip decide PRIMERO y el día se le suma encima. Antes cada
+    // chip hacía `return` directo, y eso se tragaba el filtro por día:
+    // con "No leídos" activo, `return !!m.unread` salía antes de llegar a la
+    // comparación de fecha y "no leídos del 3 de octubre" devolvía los no
+    // leídos de todo el mes. Los dos ejes tienen que ser un AND, no una
+    // cadena de salidas tempranas.
+    var pasa = true;
+    if (state.mailFilter === "unread") pasa = !!m.unread;
+    else if (state.mailFilter === "flagged") pasa = !!m.flagged;
+    else if (state.mailFilter === "meeting") pasa = m.category === "meeting";
     // "sent" ya viene filtrado de Gmail (folder=SENT), y "all" no filtra.
-    return true;
+
+    // 📦858 — Y el día se compone encima, sin reemplazarlo. El
+    // `!state.calendarVisible` es una segunda barrera a propósito: aunque el
+    // filtro se quedara puesto por un cambio de pestaña, en Agenda no acorta
+    // la lista. La invariante no depende de que otro camino se acuerde de
+    // limpiarlo.
+    if (pasa && state.mailDia && !state.calendarVisible) {
+      pasa = mailDiaDe(m) === state.mailDia;
+    }
+    return pasa;
   }
 
   // 📦855 — Cambiar de filtro es cambiar de lista. Si el mensaje que estaba
@@ -6885,10 +7212,74 @@
   // F1.B — Abre el modal de compose para Reply / Reply all / Forward.
   // @param {string} mode - 'reply' | 'replyAll' | 'forward' | 'new'
   // @param {Object} [mail] - mail al que responde/reenvía. Si mode='new' puede ser null.
+
+  // 📦859 · Registro de redactores abiertos.
+  //
+  // El bug reportado NO era de estado: cada ventana ya era independiente, con
+  // sus handlers, sus destinatarios, sus adjuntos y su propio `closeModal`, y
+  // ESC solo afectaba a la enfocada. Lo que pasaba era puramente de posición:
+  // el overlay es `align-items: flex-end; justify-content: flex-end` sin
+  // cascada, así que TODAS las ventanas se dibujaban en la misma esquina y la
+  // segunda caía exactamente encima de la primera.
+  //
+  // Este registro es lo que da la posición. Cada ventana abierta recibe un
+  // índice y el CSS lo traduce a un desplazamiento. `zBase` sube con cada
+  // apertura, así que la más reciente queda delante sin tocar el orden del DOM.
+  //
+  // Los índices NO se reacomodan al cerrar: si no, al cerrar la ventana de
+  // encima las de atrás darían un salto, que se lee como un glitch. Cerrar
+  // simplemente deja el hueco, que es lo que hace Gmail.
+  //
+  // Los PULSOS de la cascada (26px) y de la pila de minimizados (52px) NO son
+  // constantes acá: viven solo en el CSS, que es donde se usan. Declararlas
+  // también en JS haría dos verdades del mismo número que se pueden separar
+  // con el tiempo, y la que no se lee al cambiar el CSS es la que gana.
+  var COMPOSE_MAX = 6;          // tope de ventanas simultáneas, como Gmail
+  var _composeAbiertos = [];
+  var _composeZ = 400000;
+
+  // Trae una ventana al frente. Se llama al abrir y en cada mousedown dentro
+  // de ella: en Gmail, hacer clic en un redactor tapado lo saca a la vista.
+  function componerAlFrente(modal) {
+    _composeZ += 1;
+    modal.style.zIndex = String(_composeZ);
+  }
+
+  // Recalcula la pila de minimizados. Cada uno sube `COMPOSE_MINI_ALTO` px por
+  // encima del que tenga debajo, así que con tres abiertos se ven las tres
+  // barritas y cada una conserva su propio botón de restaurar y cerrar.
+  function reacomodarMinimizados() {
+    var nivel = 0;
+    for (var i = 0; i < _composeAbiertos.length; i++) {
+      var c = _composeAbiertos[i];
+      if (!c.minimizado) continue;
+      c.panel.style.setProperty("--compose-m", String(nivel));
+      nivel++;
+    }
+  }
+
+  // 📦859 — Título de la ventana, para que las minimizadas no se vean todas
+  // igual. Sin esto, cinco barritas apiladas dicen lo mismo y no se sabe cuál
+  // es cuál.
+  function componerTitulo(isReply, isForward) {
+    if (isForward) return "Reenviar";
+    if (isReply) return "Mensaje nuevo";
+    return "Nuevo correo";
+  }
+
   function openComposeModal(mode, mail) {
     mail = mail || null;
     var isReply = mode === 'reply' || mode === 'replyAll';
     var isForward = mode === 'forward';
+
+    // 📦859 — Tope de ventanas simultáneas. Sin tope se pueden abrir veinte y
+    // la cascada los va empujando fuera de la pantalla sin que uno se entere
+    // de cuántos hay. Con el tope, avisamos en vez de dejar que se pierdan.
+    if (_composeAbiertos.length >= COMPOSE_MAX) {
+      toast("Ya hay " + COMPOSE_MAX + " redactores abiertos",
+        "Cerrá o enviá alguno para abrir otro", "warning");
+      return;
+    }
 
     // 1) Construir el HTML del quote (se renderiza ARRIBA del textarea, NO como texto plano).
     // FIX 2026-07-19 (loop 15) — Formato Gmail-style:
@@ -6965,7 +7356,17 @@
     }
 
     // 4) Crear el modal
+    // 📦859 — `--compose-n` es el índice de la pila. Crece con cada apertura y
+    // el CSS lo traduce a un desplazamiento SOLO vertical: las ventanas quedan
+    // alineadas en una columna, una sobre otra, con el paso justo para que la
+    // de abajo deje ver su barra de título.
+    //
+    // El tope es 5, no 6 ni 8. Cada paso son 40px y el panel llega a 80vh, así
+    // que seis escalones lo sacarían por arriba de la pantalla en una ventana
+    // baja: la sexta ventana ya no tendría barra de título visible y no habría
+    // forma de volver a ella. Con 5 el tope queda en 200px, que entra siempre.
     var modal = el("div", { class: "compose-panel-overlay" });
+    modal.style.setProperty("--compose-n", String(Math.min(_composeAbiertos.length, 5)));
     modal.innerHTML = `
       <div class="compose-panel" role="dialog" aria-modal="true" aria-labelledby="compose-panel-title">
         <!-- 📦650-fix1 — Grip visual en la esquina SUPERIOR-IZQUIERDA para resize.
@@ -6974,7 +7375,7 @@
              Drag desde este grip redimensiona el modal. -->
         <div class="compose-panel__resize-grip" aria-label="Redimensionar" title="Arrastrá para redimensionar"></div>
         <div class="compose-panel__titlebar">
-          <h3 class="compose-panel__title" id="compose-panel-title">${isReply ? (mode === 'replyAll' ? 'Responder a todos' : 'Responder') : isForward ? 'Reenviar' : 'Nuevo correo'}</h3>
+          <h3 class="compose-panel__title" id="compose-panel-title">${componerTitulo(isReply, isForward)}</h3>
           <div class="compose-panel__actions">
             <button class="compose-panel__btn compose-panel__btn--minimize" type="button" aria-label="Minimizar" title="Minimizar">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -7055,15 +7456,39 @@
 
     document.body.appendChild(modal);
 
-    // 5) Wire up eventos
-    var closeModal = function () {
-      if (modal.parentNode) modal.parentNode.removeChild(modal);
-    };
     var panel = modal.querySelector(".compose-panel");
     var minimizeBtn = modal.querySelector(".compose-panel__btn--minimize");
     var maximizeBtn = modal.querySelector(".compose-panel__btn--maximize");
     var closeBtn = modal.querySelector(".compose-panel__btn--close");
     var titlebar = modal.querySelector(".compose-panel__titlebar");
+
+    // 📦859 — Alta en el registro. Va DESPUÉS de sacar el `panel` real, porque
+    // la pila de minimizados lo necesita. `minimizado` arranca en false y lo
+    // mantiene `setMinimized`; `n` es el índice de cascada ya calculado arriba
+    // y no se vuelve a tocar: al cerrar una ventana, las demás se quedan donde
+    // están en vez de dar un salto.
+    var ficha = {
+      el: modal,
+      panel: panel,
+      minimizado: false,
+      n: Math.min(_composeAbiertos.length, 5),
+    };
+    _composeAbiertos.push(ficha);
+    componerAlFrente(modal);
+
+    // 5) Wire up eventos
+    var closeModal = function () {
+      // 📦859 — Sacarla del registro ANTES de quitar el nodo. Si el cierre
+      // viniera por `sendComposedMail` con `opts.closeModal`, o por el botón
+      // X, o por ESC, o por el click en el fondo, todos pasan por acá: es el
+      // único lugar donde se baja la ventana del conteo. Dejar una ficha
+      // colgando haría que el tope de 6 empezara a contar fantasmas y que
+      // `reacomodarMinimizados` escribiera en un panel que ya no existe.
+      var i = _composeAbiertos.indexOf(ficha);
+      if (i >= 0) _composeAbiertos.splice(i, 1);
+      reacomodarMinimizados();
+      if (modal.parentNode) modal.parentNode.removeChild(modal);
+    };
 
     // 📦650-fix1 — Resize custom del modal (drag desde el grip top-left).
     // ANTES: `resize: both` nativo del browser ponía el handle en bottom-right.
@@ -7116,17 +7541,39 @@
     })();
 
     // Toggle minimizado/maximizado
+    //
+    // 📦859 — ANTES agregaba `compose-panel-overlay--hidden`, una clase que NO
+    // EXISTE en ninguna hoja de estilos (se verificó en `styles.css` y en
+    // `premium.css`). Era un no-op: el panel se encogía, pero el overlay no
+    // ocultaba nada. Es el mismo tipo de cosa que el `D.FALLBACK_CATEGORIES`
+    // de 📦856 — el código aparenta hacer algo y no hace nada.
+    //
+    // Ahora lo que hace falta al minimizar es lo CONTRARIO de ocultar el
+    // overlay: el overlay tiene que dejar de transformar, porque la ventana
+    // minimizada es `position: fixed` y un ancestro con `transform` se
+    // convierte en su bloque contenedor. Si el overlay siguiera desplazado
+    // por la cascada, la barrita "fija" se movería con él.
     var setMinimized = function (minimized) {
       if (minimized) {
         panel.classList.add("compose-panel--minimized");
-        modal.classList.add("compose-panel-overlay--hidden");
+        modal.classList.add("compose-panel-overlay--mini");
+        ficha.minimizado = true;
         // Al minimizar, perder foco del body para que no quede en un campo invisible
         if (document.activeElement && panel.contains(document.activeElement)) {
           document.activeElement.blur();
         }
+        reacomodarMinimizados();
       } else {
         panel.classList.remove("compose-panel--minimized");
-        modal.classList.remove("compose-panel-overlay--hidden");
+        modal.classList.remove("compose-panel-overlay--mini");
+        ficha.minimizado = false;
+        // 📦859 — Al restaurar, la ventana vuelve a la posición que tenía antes
+        // de minimizarse. Sin esto se quedaba con el desplazamiento de la
+        // barra mínima y la ventana abría corrida.
+        modal.style.setProperty("--compose-dx", "0px");
+        modal.style.setProperty("--compose-dy", "0px");
+        componerAlFrente(modal);
+        reacomodarMinimizados();
         // Restaurar foco al body
         setTimeout(function () {
           var bodyEl = modal.querySelector("#compose-body");
@@ -7151,6 +7598,58 @@
       if (panel.classList.contains("compose-panel--minimized") && !e.target.closest(".compose-panel__btn")) {
         setMinimized(false);
       }
+    });
+
+    // 📦859 — Arrastre desde la barra de título.
+    //
+    // No existía: solo había grip de redimensionar. Sin esto, la cascada era la
+    // única forma de separar dos ventanas, y con varias la que quedaba detrás
+    // no se podía alcanzar.
+    //
+    // El desplazamiento va al overlay como `--compose-dx/dy` y se SUMA a la
+    // cascada en el CSS, así que al arrastrar la ventana conserva su lugar en
+    // la pila en vez de salirse de ella.
+    //
+    // El tope usa el rect ACTUAL, que ya incluye el desplazamiento anterior:
+    // eso permite mover en cualquier dirección y garantiza que siempre queden
+    // 24px de ventana a la vista, sin dejar la barra de título fuera de la
+    // pantalla (que es como se pierde una ventana sin poder recuperarla).
+    titlebar.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      // Los botones de la barra se manejan solos.
+      if (e.target.closest(".compose-panel__btn")) return;
+      // Minimizada, el titlebar es el botón de restaurar: no arrastra.
+      if (panel.classList.contains("compose-panel--minimized")) return;
+      e.preventDefault();
+      componerAlFrente(modal);
+      var x0 = e.clientX;
+      var y0 = e.clientY;
+      function mover(ev) {
+        var r = panel.getBoundingClientRect();
+        var nuevoDx = ev.clientX - x0;
+        var nuevoDy = ev.clientY - y0;
+        var minDx = 24 - r.left;
+        var maxDx = (window.innerWidth - 24) - r.right;
+        var minDy = 24 - r.top;
+        var maxDy = (window.innerHeight - 24) - r.bottom;
+        modal.style.setProperty("--compose-dx",
+          Math.min(Math.max(nuevoDx, minDx), maxDx) + "px");
+        modal.style.setProperty("--compose-dy",
+          Math.min(Math.max(nuevoDy, minDy), maxDy) + "px");
+      }
+      function soltar() {
+        document.removeEventListener("mousemove", mover);
+        document.removeEventListener("mouseup", soltar);
+      }
+      document.addEventListener("mousemove", mover);
+      document.addEventListener("mouseup", soltar);
+    });
+
+    // 📦859 — Traer al frente con un clic en cualquier parte de la ventana. Sin
+    // esto, la ventana de atrás nunca vuelve a verse: todas comparten el mismo
+    // z-index y gana la última del DOM.
+    modal.addEventListener("mousedown", function () {
+      componerAlFrente(modal);
     });
 
     modal.addEventListener("click", function (e) {
@@ -8143,9 +8642,10 @@
   function selectEvent(ev, clickEv) {
     if (ev.linkedMailId) {
       state.selectedMailId = ev.linkedMailId;
-      // Ocultamos el calendario overlay para revelar el correo vinculado
-      state.calendarVisible = false;
-      render();
+      // Ocultamos el calendario overlay para revelar el correo vinculado.
+      // 📦858 — Por `setCalendarVisible`, no por asignación directa: este también
+      // es un cambio de pestaña y tiene que limpiar el filtro por día.
+      setCalendarVisible(false);
       toast("Evento vinculado con correo", "Abriste el correo que originó este evento.", "info");
     } else {
       // Loop 46b — Antes solo mostraba un toast con info básica. Ahora también
@@ -8404,8 +8904,8 @@
       state.events.push(newEvent);
       closeEventModal();
       toast("Evento guardado (sin persistir)", `${newEvent.title} · ${newEvent.date}`, "warning");
-      state.calendarVisible = false;
-      render();
+      // 📦858 — Por `setCalendarVisible` para que también limpie el filtro por día.
+      setCalendarVisible(false);
       return;
     }
 

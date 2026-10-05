@@ -22,37 +22,43 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-03 |
+| **Fecha de cierre** | 2026-10-04 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦856-857 · "Tipos de evento" cuenta lo que se ve y "Tu día" no desaparece |
-| **Commits sin pushear** | 0 — esta tanda sube completa |
-| **Versión** | `0.1.237` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 115 tests · 97 verdes · 18 preexistentes · **0 regresiones** |
-| **Árbol de trabajo** | Limpio |
-| **Validaciones visuales abiertas** | 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron en la app** |
+| **Último commit** | 📦858-859 · mini-calendario con filtro por día + compositor en pila |
+| **Commits sin pushear** | 1 — este commit. **Nada fue pusheado: el owner no dio la palabra de push** |
+| **Versión** | `0.1.238` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 117 tests · 99 verdes · 18 preexistentes · **0 regresiones** |
+| **Validaciones visuales abiertas** | 📦859 **sí se miró en la app** (3 idas y venidas del owner con capturas). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
+| **Jornada** | Cerrada el 2026-10-04. Dos paquetes: 📦858 y 📦859 |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
-1. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
+1. **Owner tiene que validar visualmente 📦858**: en la pestaña Correo, el mini debe dejar ir a
+   septiembre con las flechas, y al elegir el **14 de septiembre tiene que mostrar los 12 correos**
+   (no "sin correos ese día": de los 131 de la carpeta, solo 25 están en memoria, y ese día no está
+   cargado). También: que funcione con Enviados y con No leídos, que al pasar a Agenda se limpie el
+   filtro, y que la fila con la X se vea bien con el sidebar plegado.
+2. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
+   📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
+   cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
+   pidió.
+3. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
    **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
    sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir
    visible** abajo con la lista larga. Todo probado con tests, **nunca mirado en la app**.
-2. **Decisión pendiente del owner**: el mini-calendario sigue congelado en el mes real (decisión de
-   📦844) mientras el grande se navega. Si se navega el grande a septiembre, la sección cuenta
-   septiembre pero el mini sigue mostrando octubre. ¿Se resincronizan, o se deja así?
-3. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
+4. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
    abierto), que al hacer clic abra y marque leído, y que al cambiar de filtro con un correo
    abierto que no está en la lista nueva, el panel se limpie.
-4. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
+5. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
    fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
    que baja el 99+. Ojo: hay que **cerrar y reabrir** la app primero, para que se siembre la línea
    base con el estado actual. En la captura de 📦855 el aviso rojo **no aparecía**, y era lo
    correcto: la línea base se había sembrado con lo que ya había y no había llegado nada nuevo.
-5. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
+6. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
    que sigue abierto, y lleva desde v0.1.212.
-6. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
+7. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
    12 JS huérfanos de la Bandeja (bloqueante #4). Editar código que no se carga es trabajo perdido.
-7. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
+8. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
    pendientes se queda así y no se le toca.
 
 ### 🔴 Bloqueantes y deudas conocidas
@@ -67,7 +73,8 @@
 | 6 | 30 tests en `tests/` que el runner no ejecuta | `sgsst-electron-app/tests/` (en subdirectorios por módulo) | Cobertura que parece existir y no corre. El runner solo mira `main/` |
 | 7 | `CHANGELOG.md` afirma 22/22 mutaciones en `test-swapview-841.js`, pero ese archivo no tiene array `MUT` | `CHANGELOG.md` | O el mutation se perdió en un refactor, o el CHANGELOG describe un estado intermedio |
 | 8 | ~~2 validaciones visuales abiertas~~ — **CERRADO 2026-10-03** | `CONTEXT.md` v0.1.214 (confetti del splash) y v0.1.215 (home de Capacitaciones) | El owner las revisó en la app y no registró observaciones. Ya no bloquean. Las dos referencias en `CONTEXT.md` quedaron actualizadas |
-| 9 | 📦850 y 📦851 implementados y probados, pero nunca vistos en la app — **CERRADO 2026-10-03** | Botón del borde y encabezado sin etiqueta de fecha | El owner los revisó. Con esto **no queda ninguna validación visual abierta** |
+| 9 | 📦850 y 📦851 implementados y probados, pero nunca vistos en la app — **CERRADO 2026-10-03** | Botón del borde y encabezado sin etiqueta de fecha | El owner los revisó |
+| 10 | 🔴 **La bandeja solo tiene 25 correos en memoria de los 131 de INBOX** (`PAGE_SIZE = 25`), y se agrandan con scroll infinito. Cualquier filtro que mire `state.mails` da "vacío" en **25 días que sí tienen correo** (el 14 de septiembre tiene 12 y ninguno está cargado) | `app.js` `PAGE_SIZE`, `loadMailsFromCache` | 📦858 lo resolvió con un rango de fechas en la caché local. **El mismo riesgo queda para cualquier filtro nuevo que se escriba sin eso** |
 
 ### 📋 Cola de trabajo acordada
 

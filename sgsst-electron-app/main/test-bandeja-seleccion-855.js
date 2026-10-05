@@ -61,12 +61,25 @@ function evaluar(htm, css, js) {
   chk('existe el predicado compartido mailPasaFiltroActual',
     /function mailPasaFiltroActual\(m\)/.test(cod),
     'sin el, el detalle no puede preguntar si el mensaje sigue visible');
+  // 📦858 — El ancla se especifica en `const filtered = ...`, no en la expresión
+  // suelta. 858 añadió un segundo uso legitimo del predicado compartido (el
+  // contador de la fila del filtro por dia), y con el ancla suelta este check
+  // seguia encontrandolo ahi: el mutante rompia la lista y el check pasaba.
   chk('la lista se construye con el predicado compartido',
-    /state\.mails\.filter\(mailPasaFiltroActual\)/.test(cod),
+    /const filtered = state\.mails\.filter\(mailPasaFiltroActual\)/.test(cod),
     'si la lista usa un filtro propio, el detalle ya no puede compararse con ella');
+  // 📦858-INVERTIDO — el patrón perdió el `return` y el sentido no cambió.
+  // La regla que este check protege es "el filtro de no leídos está escrito
+  // en UN solo lugar": si aparece dos veces, las dos copias se pueden separar
+  // con el tiempo y la lista y el detalle dejan de coincidir. Lo que cambió
+  // es la FORMA, porque un `return` por chip se tragaba el filtro por día del
+  // mini-calendario (ver 📦858): ahora el chip asigna y el día se suma encima.
   chk('el filtro "unread" no queda escrito dos veces',
-    (cod.match(/mailFilter === "unread"\) return/g) || []).length === 1,
+    (cod.match(/mailFilter === "unread"\)/g) || []).length === 1,
     'dos copias del filtro = dos verdades que se pueden separar con el tiempo');
+  chk('📦858 · y el chip NO usa return temprano (si no, se come el filtro por día)',
+    !/mailFilter === "(unread|flagged|meeting)"\)\s*return/.test(cod),
+    'un return por chip saca la funcion antes de comparar la fecha: "no leidos del 3 de octubre" saldria como "no leidos del mes"');
   // El snooze se queda en el predicado compartido. El escenario no lo puede
   // cubrir (su `isThreadSnoozed` devuelve siempre false), asi que sin este
   // check la mutacion que lo borra pasaria sin que nadie la note.
@@ -223,19 +236,30 @@ const MUT = [
     j => j.replace('state.selectedMailId = null;', 'state.selectedMailId = state.mails[0] ? state.mails[0].id : "m1";')],
   ['vuelve el id de mock "m1" como respaldo',
     j => j.replace('state.selectedMailId = null;', 'state.selectedMailId = state.mails.length ? null : "m1";')],
+  // 📦858 — Estas tres anclas perdieron singularidad: 858 añadió código con la
+  // MISMA línea y `String.replace` con string cambia SOLO la primera
+  // ocurrencia. El mutante rompía la copia nueva de 📦858 y dejaba intacta la
+  // de 855, así que el mutante pasaba sin que nadie lo notara. El ancla va con
+  // el CONTEXTO que la distingue (el `const` de 4 espacios de `setMailFilter`,
+  // el `const filtered =` de `renderMailList`), no con la línea sola.
   ['setMailFilter deja de soltar la seleccion que quedo fuera (vuelve el bug)',
-    j => j.replace('if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;', '')],
+    j => j.replace('    const sel = state.mails.find(function (m) { return m.id === state.selectedMailId; });\n'
+      + '    if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;', '')],
   ['setMailFilter suelta la seleccion SIEMPRE, aunque siga visible (rompe abrir correos)',
-    j => j.replace('if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;',
-      'state.selectedMailId = null;')],
+    j => j.replace('    if (sel && !mailPasaFiltroActual(sel)) state.selectedMailId = null;\n  }',
+      '    state.selectedMailId = null;\n  }')],
   ['setMailFilter no cambia el filtro, solo suelta la seleccion',
     j => j.replace('  function setMailFilter(f) {\n    state.mailFilter = f;', '  function setMailFilter(f) {')],
   ['la lista deja de usar el predicado compartido (vuelven dos verdades)',
-    j => j.replace('state.mails.filter(mailPasaFiltroActual)',
-      'state.mails.filter(function (m) { return state.mailFilter === "unread" ? m.unread : true; })')],
+    j => j.replace('const filtered = state.mails.filter(mailPasaFiltroActual).filter((m) => {',
+      'const filtered = state.mails.filter(function (m) { return state.mailFilter === "unread" ? m.unread : true; }).filter((m) => {')],
+  // 📦858 — el ancla sigue a la forma nueva. Con la forma vieja este
+  // mutante salía VACÍO (el `replace` no encontraba nada), y un mutante vacío
+  // se reporta como "el check no muerde": parece que el check es flojo cuando
+  // en realidad nadie lo probó.
   ['el filtro "unread" del predicado compartido se invierte',
-    j => j.replace('if (state.mailFilter === "unread") return !!m.unread;',
-      'if (state.mailFilter === "unread") return !m.unread;')],
+    j => j.replace('if (state.mailFilter === "unread") pasa = !!m.unread;',
+      'if (state.mailFilter === "unread") pasa = !m.unread;')],
   ['un filtro deja de aplicar el snooze',
     j => j.replace('if (state.mailFilter !== "sent" && isThreadSnoozed(m.id)) return false;', '')],
   ['selectMail deja de marcar como leido (el clic deja de contar como abrir)',

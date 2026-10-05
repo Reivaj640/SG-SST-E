@@ -117,12 +117,22 @@ for (const f of FECHAS) {
 
 // ══ 3) El mini se arma con el reloj VIVO ══
 const L = app.split(/\r?\n/);
-const i = L.findIndex(s => /const mini = el\("div", \{ class: "kair-card mini" \}\)/.test(s));
-const bloque = L.slice(Math.max(0, i - 12), i + 2).join('\n');
+// 📦858 — el `class` del mini ahora lleva un sufijo condicional, asi que el
+// localizador tiene que seguir aceptando esa forma. Con el patron viejo
+// `findIndex` devuelva -1, `i - 12` daba un corte negativo y `bloque` quedaba
+// con una sola linea: el check fallaba por la ventana, no por el codigo.
+const i = L.findIndex(s => /const mini = el\("div", \{ class: "kair-card mini"/.test(s));
+const bloque = L.slice(Math.max(0, i - 14), i + 2).join('\n');
+// 📦858-INVERTIDO — la regla sigue siendo la misma: el mini NO lee
+// MONTH_VIEW, se dibuja con la fecha de HOY. Lo que cambió es por dónde
+// llega: hoy la decisión vive en la función pura `mesDelMini()`, que recibe
+// `new Date()` y devuelve el mes. El check apunta a las dos capas: que se
+// siga calculando HOY en cada render, y que ese HOY llegue a la decisión.
 ok('el mini usa new Date() en cada render, no MONTH_VIEW',
   /const\s+hoy\s*=\s*new Date\(\)/.test(bloque)
-  && /miniYear\s*=\s*hoy\.getFullYear\(\)/.test(bloque)
-  && /miniMonth\s*=\s*hoy\.getMonth\(\)/.test(bloque));
+  && /mesDelMini\(\s*state\.calendarVisible\s*,\s*state\.miniMes\s*,\s*hoy\s*\)/.test(bloque)
+  && /miniYear\s*=\s*miniVisible\.y/.test(bloque)
+  && /miniMonth\s*=\s*miniVisible\.m/.test(bloque));
 ok('y el codigo no vuelve a leer MONTH_VIEW.year/month para el rotulo',
   !/buildMonthLabel\(\s*state\./.test(bloque) && !/buildMonthGrid\(\s*state\./.test(bloque));
 

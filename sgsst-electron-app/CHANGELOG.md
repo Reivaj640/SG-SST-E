@@ -10,6 +10,89 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.238] - 2026-10-04
+
+### 📦858 · El mini-calendario tiene dos comportamientos según la pestaña
+
+**Resumen:** el owner pidió que el mini-calendario se adaptara a la pestaña activa. En
+**Agenda** sigue haciendo lo de siempre (puntitos de eventos, popup, doble clic). En **Correo**
+funciona como **filtro por día**: al elegir una fecha del mes, la bandeja muestra los correos de
+ese día. Y el mini tiene que **poder ir hacia atrás de mes**, porque la mayor parte del correo es
+viejo.
+
+**Lo primero que apareció en la investigación: la fecha del correo no es una fecha.**
+
+`mail.date` no venía como ISO sino como **epoch en milisegundos** (13 dígitos: `1791068562000`),
+que es lo que guarda `email_threads.last_message_date`. Un filtro ingenuo con `SUBSTR(1, 10)`
+agruparía por los primeros 10 dígitos del número, no por el día. La conversión se hace con
+`isoDe(new Date(ms))`, la **misma** función que arma las celdas de la grilla, así que el día de
+un correo y el día de una celda son el mismo string por construcción.
+
+**Lo segundo, y era el que hacía mentir la función:** la app solo tiene 25 correos en memoria de
+los 131 que hay en la carpeta de entrada.
+
+| Día | Correos en la BD | En memoria | Lo que se habría visto |
+|---|---|---|---|
+| 14 sept | **12** | 0 | "Sin correos ese día" |
+| 9 sept | **6** | 0 | "Sin correos ese día" |
+| 28 sept | 6 | 6 | correcto |
+
+25 días con correo habrían salido mintiendo, y eran justo los días viejos, que es lo que el owner
+pedía poder buscar. Se resolvió **agregando un rango de fechas a la consulta de la caché**
+(`buildThreadsWhere`), que es SQLite local: no consume red ni cuota de Gmail y no toca la
+paginación de 📦755.
+
+**Qué cambió**
+
+- El día es un **eje**, no un filtro más: `state.mailDia` se compone con el chip activo, la
+  búsqueda y los labels. "No leídos **del** 3 de octubre" existe. Precedente: `alcanceTipos` de 📦857.
+- En Correo el mini **no lleva puntitos** (lo pidió el owner: los puntitos son de eventos) y
+  **navega de mes** con su propio estado, que no mueve el calendario grande.
+- Al cambiar a la pestaña Agenda, el filtro **se limpia** y el mes vuelve al presente.
+- Fila emergente bajo el mini con el día, la cantidad y una X para quitarlo.
+
+**El bug que casi se va:** los chips de filtro hacían `return !!m.unread`, y esa salida temprana
+se comía el filtro por día — con "No leídos" activo, la función salía antes de comparar la fecha.
+Se reescribió como un "y" entre los dos ejes. Hay check y mutación dedicados a que no vuelva.
+
+**Tests:** `test-minical-correo-858.js`, 65 checks y 15 mutaciones. Se invirtieron (no se borraron)
+los checks 4 y 5 de `test-minical-844.js` y los afectados de 846, 853, 855 y reloj-844.
+
+### 📦859 · El compositor se apilaba encima de sí mismo y "minimizar" no minimizaba
+
+**Resumen:** el owner reportó, con capturas de Gmail de referencia, que (1) minimizar no funcionaba
+bien y (2) al darle "Redactar" varias veces, cada ventana caía encima de la anterior.
+
+**Ninguno de los dos era un bug de estado.** Cada ventana ya era independiente — su `closeModal`,
+sus destinatarios, sus adjuntos, y ESC solo afecta a la enfocada. Todo era **posición**:
+
+- El overlay es `align-items: flex-end; justify-content: flex-end` **sin cascada**: todas las
+  ventanas se dibujaban en la misma esquina.
+- `.compose-panel--minimized` era `bottom: 0; right: 24px`: todas caían en el mismo píxel.
+- `setMinimized` agregaba `compose-panel-overlay--hidden`, **clase que no existe en ninguna hoja**
+  (verificado en las dos). Un no-op silencioso, el mismo tipo de cosa que el `D.FALLBACK_CATEGORIES`
+  de 📦856.
+
+**Qué cambió**
+
+- **Pila vertical alineada:** cada ventana sube 40px — el alto exacto de la barra de título — sin
+  desplazamiento lateral, así la de abajo deja ver la suya completa. Tope de 5 escalones: con 6 la
+  ventana de arriba se salía de la pantalla en una ventana baja y perdía su barra de título.
+- **Arrastre** desde la barra de título, con tope que nunca deja salir 24px de la ventana.
+- **Traer al frente** al hacer clic, para que la de atrás vuelva a ser alcanzable.
+- **Minimizadas** abajo a la derecha, apiladas 52px, cada una con sus botones.
+- **Tope de 6 ventanas** simultáneas, que avisa en vez de acumular.
+
+**El bug que se vio en pantalla y los tests no:** `.compose-panel` declara `min-width: 400px;
+min-height: 360px` (📦650) y **en CSS, cuando `min-*` es mayor que `max-*`, gana el `min-*`**. El
+`max-height: 48px` no hacía nada: la ventana se quedaba de 360px de alto y, con el cuerpo ya en
+`display: none`, ese alto sobrante se veía como **un bloque blanco vacío** bajo la barrita. El
+arreglo es anular los dos `min-*` explícitamente en el estado minimizado, sin tocar los de la base.
+
+**Tests:** `test-compose-cascada-859.js`, 53 checks y 21 mutaciones. Se subió el cache-bust de
+`styles.css`, que seguía en la versión del 17 de septiembre y hacía que la app sirviera una hoja
+vieja desde caché.
+
 ## [0.1.237] - 2026-10-03
 
 ### 📦856 · "Tipos de evento" mostraba 0 en las seis categorías, siempre

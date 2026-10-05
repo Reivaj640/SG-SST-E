@@ -69,8 +69,12 @@ chk('existe _franja(ev)', fran.length > 50);
 chk('existe ocultarPopupDia()', /function ocultarPopupDia\(\)/.test(t));
 
 // ══ 2) El cableado en la celda ══
-chk('la celda calcula los eventos de ESE dia',
-  /const eventosDelDia = visibleEvents\.filter\(\(ev\) => ev && ev\.date === c\.iso\)/.test(mini));
+// 📦858-INVERTIDO — la celda calcula los eventos SOLO en la pestaña Agenda.
+// En Correo el popup no se engancha: el mini es un selector de día y un popup
+// con el calendario a la vista respondería a otra pregunta. La cuenta de
+// eventos se sigue haciendo igual, solo que detrás de la rama.
+chk('📦858 · la celda calcula los eventos de ESE dia, solo en Agenda',
+  /const eventosDelDia = modoCorreo \? \[\] : visibleEvents\.filter\(\(ev\) => ev && ev\.date === c\.iso\)/.test(mini));
 chk('y solo engancha el hover si ese dia tiene eventos',
   /if \(eventosDelDia\.length\) \{[\s\S]{0,200}mouseenter/.test(mini));
 chk('mouseenter muestra el popup de ese dia y esa celda',

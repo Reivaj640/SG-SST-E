@@ -2344,10 +2344,28 @@ body {
   align-items: flex-end;
   justify-content: flex-end;
   padding: 0;
-  /* Al minimizar, ocultamos el overlay completamente */
   transition: opacity 160ms ease, visibility 160ms ease;
   pointer-events: none;
+  /* 📦859 — PILA VERTICAL. Antes cada ventana se separaba 26px a la izquierda
+     Y 26px arriba, en diagonal. El owner lo pidió distinto: alineadas, una
+     debajo de otra, todas en la misma columna. Solo se desplaza en Y, y el
+     paso es de 40px, que es el alto de la barra de título: así la ventana de
+     abajo deja ver la suya completa y sigue siendo alcanzable.
+     `--compose-dx/dy` son el arrastre y se suman.
+     Solo `transform`: es GPU, no recalcula layout, y entra en el budget de
+     300 ms junto con la transición de abajo. */
+  transform: translate(
+    var(--compose-dx, 0px),
+    calc(var(--compose-dy, 0px) - var(--compose-n, 0) * 40px)
+  );
+  transition: transform 200ms cubic-bezier(0.2, 0, 0.2, 1),
+              opacity 160ms ease, visibility 160ms ease;
 }
+/* 📦859 — Al minimizar, el overlay DEJA de transformar.
+   El panel minimizado es `position: fixed`, y un ancestro con `transform` se
+   convierte en su bloque contenedor: sin esto la barrita que se supone fija se
+   movería con el desplazamiento de la cascada. */
+.compose-panel-overlay--mini { transform: none; }
 .compose-panel {
   background: #fff;
   border-radius: 8px 8px 0 0;
@@ -2591,14 +2609,39 @@ body {
 }
 .compose-panel--minimized {
   position: fixed;
-  bottom: 0;
+  /* 📦859 — ABAJO A LA DERECHA, una encima de otra.
+     El owner lo pidió así: la primera versión de 859 las puso abajo a la
+     izquierda, como Gmail, y pidió el lado contrario. Todas en la misma
+     columna vertical, sin desplazamiento lateral.
+     ANTES: `bottom: 0; right: 24px` sin más: todas caían en el MISMO píxel, así
+     que con dos o más solo se veía y se podía tocar la última. */
   right: 24px;
+  left: auto;
+  bottom: 0;
   width: 320px;
+  /* 📦859 — ESTAS DOS LÍNEAS SON EL ARREGLO DEL "no se minimiza".
+     `.compose-panel` declara `min-width: 400px; min-height: 360px` (L2395-2396)
+     para que la ventana abierta tenga un tamaño mínimo cómodo. Y en CSS, cuando
+     `min-*` es MAYOR que `max-*`, GANA EL `min-*` — el `max-height: 48px` de más
+     abajo no hacía nada y el panel seguía de 360px de alto.
+     Como el cuerpo ya está en `display: none`, ese alto sobrante se veía como un
+     bloque blanco vacío bajo la barrita. Por eso "minimizar" no minimizaba: solo
+     cambiaban los botones.
+     Hay que anular los dos `min-*` explícitamente, no confiar en que el
+     `max-*` gane. */
+  min-width: 0;
+  min-height: 0;
   max-width: 320px;
   max-height: 48px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
   border-radius: 8px 8px 0 0;
   margin: 0 0 0 0;
+  /* `--compose-m` lo recalcula `reacomodarMinimizados()` cada vez que una
+     ventana se minimiza, se restaura o se cierra. El 52px vive acá y no en el
+     JS: dos copias del mismo número se separan con el tiempo, y la que no se
+     lee al cambiar el CSS es la que gana. */
+  transform: translateY(calc(var(--compose-m, 0) * -52px));
+  transition: transform 200ms cubic-bezier(0.2, 0, 0.2, 1);
 }
 .compose-panel--minimized .compose-panel__body,
 .compose-panel--minimized .compose-panel__toolbar,
@@ -2630,6 +2673,14 @@ body {
   border-bottom: 1px solid var(--email-border-soft, #e5e7eb);
   background: #f8f9fa;
   color: #6b7280;
+  /* 📦859 — La barra es la zona de arrastre. Sin el cursor, la ventana parece
+     que no se puede mover y la función queda oculta.
+     `user-select: none` evita que al arrastrar se seleccione el título entero.
+     El estado minimizado pisa el cursor a `pointer` con
+     `.compose-panel--minimized .compose-panel__titlebar`, que es más
+     específico y gana. */
+  cursor: move;
+  user-select: none;
 }
 .compose-panel__title {
   margin: 0;

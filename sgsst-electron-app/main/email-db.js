@@ -271,6 +271,29 @@ function buildThreadsWhere(options) {
     params.after = new Date(searchTokens.after).getTime();
   }
 
+  // 📦858 — Rango de DÍA, para el filtro por fecha del mini-calendario.
+  //
+  // Los límites NO se calculan acá: llegan en epoch ms desde el renderer, que
+  // ya sabe qué celda es cada día y cómo se dibuja la medianoche local. Si se
+  // calcularan en este proceso, el día se definiría dos veces y un cambio de
+  // zona horaria los separaría en silencio.
+  //
+  // Existe porque la app solo tiene 25 correos en memoria de los 131 que hay
+  // en la carpeta. El 14 de septiembre tiene 12 correos y ninguno está
+  // cargado: sin este WHERE, filtrar la lista en memoria respondería "sin
+  // correos ese día" teniendo 12. La condición es semiabierta [from, to) para
+  // que dos días contiguos no repitan el correo de la medianoche.
+  if (options.dateFrom != null && options.dateFrom !== '') {
+    where += ' AND last_message_date >= @dateFrom';
+    params.dateFrom = Number(options.dateFrom);
+    if (!isFinite(params.dateFrom)) throw new Error('dateFrom no es un numero: ' + options.dateFrom);
+  }
+  if (options.dateTo != null && options.dateTo !== '') {
+    where += ' AND last_message_date < @dateTo';
+    params.dateTo = Number(options.dateTo);
+    if (!isFinite(params.dateTo)) throw new Error('dateTo no es un numero: ' + options.dateTo);
+  }
+
   return { where: where, params: params };
 }
 

@@ -9,7 +9,7 @@
 **No es** para prototipar ni reinventar. La arquitectura, los contratos y los patrones ya existen.
 
 **Rama de trabajo:** `Dev-Pc`. El remoto por defecto es `Dev`.
-**Versión al escribir:** `0.1.233` · commit `47779352`.
+**Versión al escribir:** `0.1.238` · 📦858-859 (mini-calendario con filtro por día, compositor en pila).
 
 ---
 
@@ -630,6 +630,52 @@ viven documentadas en prosa.
 Para afirmar que un fallo es preexistente hay que **probar que también falla en HEAD limpio** y decirlo
 con esas palabras. Un test rojo nuevo es un test rojo nuevo.
 
+### 7.5 La polaridad del análisis de mutaciones (el error que más repetí)
+
+La mutación **rompe** la forma buena. El check real **exige** la forma buena. Así que el detector del
+mutante tiene que marcar cuando la buena **dejó de estar**:
+
+```js
+// MAL: el mutante rompe la llamada, la buena ya no está, y esto no marca nada
+if (/laBuenaForma/.test(mutado)) fallo = true;     // ❌ nunca se cumple
+
+// BIEN
+if (!/laBuenaForma/.test(mutado)) fallo = true;    // ✅
+```
+
+**Lo cometí al revés 5 veces en una sola tarde** (📦858 y 📦859) y en los cinco casos el mutante
+**pasó sin que la suite dijera nada**: todo verde, 12/15 mutaciones, y el número "bajó" respecto de
+la corrida anterior sin explicar por qué.
+
+**La regla que evita el bouncing:** un detector de mutación se escribe como la **negación del check**,
+y si tiene ramas por clave, se escribe **una sola vez** la regla de polaridad arriba y se aplica en
+todas. No rama por rama. Escribirla en cada rama es exactamente cómo se cuelan los errores.
+
+**Y el hermano de esto: un ancla sin singularidad desactiva mutaciones sin avisar.** `replace` con
+**string** cambia solo la primera ocurrencia. Si el código nuevo **copió** una línea que ya usaba una
+mutación como ancla, el mutante rompe la copia nueva y deja intacta la que el check vigila. Pasa, y
+el conteo de mutaciones baja sin ruido. Cuando un mutante que antes mordía deja de morder después de
+un cambio de producción, la hipótesis por defecto es **"el ancla perdió singularidad"**, no "el
+check se puso flojo". Contá las ocurrencias antes de culpar al check: `split(de).length - 1`. Si da
+más de 1, ahí está. Para volver a morder, `replace` con **regex** y `/g`.
+
+### 7.6 CSS: cuando `min-*` es mayor que `max-*`, gana el `min-*`
+
+**Este sí se ve en pantalla y los tests lo dejaron pasar.** `.compose-panel` declara
+`min-width: 400px; min-height: 360px` (📦650). El estado minimizado pedía `max-width: 320px;
+max-height: 48px`, y en CSS **el `min-*` gana**: el `max-*` no hace nada. La ventana se quedaba de
+360px de alto y, con el cuerpo ya en `display: none`, el alto sobrante se veía como **un bloque
+blanco vacío** bajo la barrita. El owner lo reportó con una captura; los 50 checks de 📦859 estaban
+en verde.
+
+**Regla:** en este repo, `min-width` / `min-height` viven en `.compose-panel` como tamaño mínimo
+cómodo. **Cualquier estado alterno tiene que anularlos explícitamente** (`min-width: 0;
+min-height: 0;`), no confiar en que su `max-*` gane. Un `min-*` que no mirás te gana.
+
+**Y el Beware del cache-bust:** `styles.css?v=…` seguía en la versión del 17 de septiembre. El
+archivo en disco estaba bien y la app servía la hoja vieja de la caché. **Cualquier cambio en CSS
+tiene que subir el `?v=` de `index.html` y el del iframe en `renderer.js`.**
+
 ---
 
 ## 8. Reglas de comunicación
@@ -654,7 +700,7 @@ Pregunta solo lo que no se puede deducir del código.
 
 ---
 
-## 9. Trampas activas en el repo (verificadas 2026-10-03)
+## 9. Trampas activas en el repo (verificadas 2026-10-04)
 
 No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si no las conoce.
 
@@ -669,6 +715,8 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 7 | 🟡 **`kair-bandeja.sidebarColapsado` y los otros `localStorage` guardan `"1"`/`"0"`, no booleanos.** `"0"` es *truthy* | varios | Comparación estricta: `=== "1"` |
 | 8 | 🟢 El sync falla con `no such column: actualizado_en` en BDs instaladas **antes** de la migración. El schema sí declara la columna: no es un typo del serializer, es una migración que falta | `sync-serializer.js:138,302,391,734` + `medprev-programas-schema-sql.js:37` | Al tocar migraciones, agregá el patrón `PRAGMA table_info` + `ALTER TABLE` |
 | 9 | 🟢 4 archivos `.bak-*` en la raíz del app | `main.js.bak-*`, `renderer.js.bak-*`, `preload.js.bak-*`, `index.html.bak-*` | Candidatos a borrar, pero **no sin autorización** |
+| 10 | 🔴 **El cache-bust de `styles.css` y el del iframe de la bandeja se sube a mano.** Quedaron en septiembre mientras se editaba la hoja | `bandeja-integrada/index.html`, `renderer.js:1269` | **Todo cambio en CSS sube los dos `?v=`**. La app sirve la hoja vieja de la caché y te hace perseguir un bug que ya está arreglado (§7.6) |
+| 11 | 🟡 **La app tiene 25 correos en memoria de los 131 de la carpeta** (`PAGE_SIZE = 25`), y se agrandan con scroll | `app.js` `PAGE_SIZE` | Cualquier cosa que filtre la bandeja tiene que traer lo que falta de la caché. Filtrar `state.mails` da "vacío" en 25 días que sí tienen correo |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 
