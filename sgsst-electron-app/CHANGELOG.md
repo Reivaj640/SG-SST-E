@@ -10,6 +10,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.239] - 2026-10-04
+
+### 📦860 · La fila del correo muestra la fecha ENCIMA de la hora
+
+**Resumen:** el owner mandó una captura de la bandeja y ahí se veía el problema: en la lista de
+correos solo aparecia la hora ("18:02", "17:54"). Con la bandeja mezclando correos de varios dias
+no habia forma de saber de cuando era cada uno. Pidio la fecha **sobre** la hora, y que aplicara
+tambien a Enviados y al resto.
+
+**Aplica a todas las carpetas sin codigo duplicado.** La lista es una sola para Recibidos,
+Enviados, No leidos y el resto, asi que cambiar el render de la fila las cubre a todas. No se hizo
+un caso por carpeta: habria sido la forma rapida de meterse un dia y que Enviados quedara viejo.
+
+**El ano solo sale si es distinto al actual**, como en Gmail. La columna del grid es angosta
+(`64px`) y "4 oct 2026" ocupa el doble que "4 oct" sin informar nada que "4 oct" no diga.
+
+**La zona horaria era el riesgo real, no el formato.** `fechaFila` usa los getters **locales**
+(`getDate()`, `getMonth()`), igual que `isoDe` y `mailDiaDe` de 858. Si hubiera usado
+`toISOString()` —que es UTC— un correo de las 21:00 en Colombia caeria en el dia siguiente y la
+fila diria una fecha que no es. En la base hay correos en esa franja, asi que no era teorico.
+
+**Los meses cortos quedaron en una sola fuente.** Antes habia **dos** copias del mismo array en
+`app.js` (una en `formatGmailDate` y otra en `formatGmailLongDate`) y la de 860 habria sido la
+tercera. Dos copias del mismo dato se separan con el tiempo, y la que nadie recuerda al corregir la
+otra es la que gana. Los meses LARGOS no se tocan: tienen otra capitalizacion y no son el mismo
+dato.
+
+**Lo que ya estaba hecho y habia que respetar:** la columna `__meta` ya era
+`flex-direction: column` (lo remapea `premium.css`), asi que la linea de fecha entra sin tocar
+el layout. Y el hover, que antes ocultaba solo la hora, ocultaba **las dos**: los iconos de accion
+de la fila son `position: absolute` en `right: 14px`, asi que con la fecha visible los botones
+quedaban medio tapados por el texto. Un selector que lista una de dos cosas iguales se rompe en
+silencio cuando le agregas la segunda.
+
+**Que cambió**
+
+- `fechaFila(m, hoy)` en `app.js`: funcion pura que recibe `hoy` por parametro para poder
+  probarla sin congelar el reloj. Devuelve `""` si no hay fecha utilizable, y entonces la fila se
+  queda con la hora sola en vez de dejar un hueco.
+- La linea de fecha se agrega **antes** de la de la hora, dentro de `if (filaFecha)`.
+- `.kair-mail-row__fecha` en `styles.css`: mas chica (0.65rem) y mas apagada (opacidad 0.85) que
+  la hora, porque la hora es el dato que se mira de recho al elegir un correo y la fecha es la que
+  se lee cuando uno se detiene.
+- Los tres tokens de cache-bust (`styles.css`, `app.js`, `premium.css`) suben a
+  `20261004-fecha860`, y el `index.html` del iframe a `?v=697`.
+
+**La verificacion que si hacia falta: contra la base de datos real, no de laboratorio.**
+
+Los 34 checks del test pasaban en verde **con la columna de fecha vacia en pantalla**, y no habria
+habido forma de verlo. `fechaFila` exige `typeof ms === "number"` a proposito, asi que si
+`email_threads.last_message_date` devolviera el numero como texto, las 150 filas darian `""` y
+la fecha no se dibujaria en ninguna. Ningun test de este repo abre la base de datos.
+
+Se escribio un verificador que extrae la funcion **del archivo real** y la corre sobre los 150
+hilos de la base del owner: `last_message_date` es `INTEGER` y llega como `number` en las 150,
+**0 filas sin fecha**, rango real del 31 de julio al 3 de octubre de 2026.
+
+**Las tres trampas que el test se encontro a si mismo**
+
+1. **Polaridad invertida.** El check de CSS reportaba el fallo cuando la regla de estilo
+   *existia*, asi que el mutante que la borraba pasaba. La mutacion ROMPE la forma buena y el check
+   la EXIGE presente: se marca cuando la buena **dejo de estar**. Quinta vez que se comete.
+2. **Las dos guardas de fecha invalida eran redundantes.** `new Date(n)` nunca da fecha invalida
+   para un numero finito, asi que la segunda guarda solo repetia a la primera y el mutante que
+   quitaba una no moria. Un mutante que no muerde no siempre es un check flojo: a veces esta
+   delatando que la linea vigilada no hacia falta, o que hacia falta la de al lado.
+3. **El token de cache-bust es compartido.** `app.js` y `premium.css` llevan el **mismo** `?v=&`
+   a proposito: si difieren se sirven desparejos. Subir solo el que se toco deja la pagina con dos
+   versiones distintas, y asi se cayeron dos tests de la suite (849 y 846) hasta arreglarlo.
+
+**Tests:** `test-mail-fecha-860.js`, 34 checks y 10 mutaciones, todas cazadas. El ancla de cada
+mutante ahora se cuenta antes de aplicarla (`split(de).length - 1`), porque `String.replace` con
+texto cambia solo la primera coincidencia y un ancla repetida hace que el mutante rompa la copia
+que no importa.
+
+Suite completa: **118 tests, 100 en verde, 18 con fallos** — los 18 preexistentes, cero regresiones.
+
 ## [0.1.238] - 2026-10-04
 
 ### 📦858 · El mini-calendario tiene dos comportamientos según la pestaña

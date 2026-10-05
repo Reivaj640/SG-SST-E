@@ -24,12 +24,12 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-04 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦858-859 · mini-calendario con filtro por día + compositor en pila |
-| **Commits sin pushear** | 1 — este commit. **Nada fue pusheado: el owner no dio la palabra de push** |
-| **Versión** | `0.1.238` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 117 tests · 99 verdes · 18 preexistentes · **0 regresiones** |
-| **Validaciones visuales abiertas** | 📦859 **sí se miró en la app** (3 idas y venidas del owner con capturas). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | Cerrada el 2026-10-04. Dos paquetes: 📦858 y 📦859 |
+| **Último commit** | 📦860 · la fila del correo muestra la fecha encima de la hora |
+| **Commits sin pushear** | 0 — el owner autorizó commit y push el 2026-10-04 ("actualiza la documentación y realiza el commit y push") |
+| **Versión** | `0.1.239` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 118 tests · 100 verdes · 18 preexistentes · **0 regresiones** |
+| **Validaciones visuales abiertas** | 📦860 **aprobado por el owner** ("ok perfecto" el 2026-10-04, aunque no consta que lo haya abierto en la app). 📦859 sí se miró. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
+| **Jornada** | Cerrada el 2026-10-04. Tres paquetes: 📦858, 📦859 y 📦860 |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
@@ -37,28 +37,32 @@
    septiembre con las flechas, y al elegir el **14 de septiembre tiene que mostrar los 12 correos**
    (no "sin correos ese día": de los 131 de la carpeta, solo 25 están en memoria, y ese día no está
    cargado). También: que funcione con Enviados y con No leídos, que al pasar a Agenda se limpie el
-   filtro, y que la fila con la X se vea bien con el sidebar plegado.
-2. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
+   filtro, y que la fila con la X se vea bien con el sidebar plegado. **Es la validación más
+   valiosa que queda abierta**, porque 📦858 nunca se ha mirado en la app.
+2. **Owner tiene que confirmar 📦860 en pantalla**: la fecha arriba de la hora en la fila del
+   correo, en **todas** las carpetas, y que al pasar el mouse sobre la fila las dos líneas se
+   oculten y solo queden los botones de acción. Lo aprobado por texto, no por vista.
+3. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
    📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
    cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
    pidió.
-3. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
+4. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
    **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
    sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir
    visible** abajo con la lista larga. Todo probado con tests, **nunca mirado en la app**.
-4. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
+5. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
    abierto), que al hacer clic abra y marque leído, y que al cambiar de filtro con un correo
    abierto que no está en la lista nueva, el panel se limpie.
-5. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
+6. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
    fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
    que baja el 99+. Ojo: hay que **cerrar y reabrir** la app primero, para que se siembre la línea
    base con el estado actual. En la captura de 📦855 el aviso rojo **no aparecía**, y era lo
    correcto: la línea base se había sembrado con lo que ya había y no había llegado nada nuevo.
-6. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
+7. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
    que sigue abierto, y lleva desde v0.1.212.
-7. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
+8. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
    12 JS huérfanos de la Bandeja (bloqueante #4). Editar código que no se carga es trabajo perdido.
-8. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
+9. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
    pendientes se queda así y no se le toca.
 
 ### 🔴 Bloqueantes y deudas conocidas
@@ -75,6 +79,7 @@
 | 8 | ~~2 validaciones visuales abiertas~~ — **CERRADO 2026-10-03** | `CONTEXT.md` v0.1.214 (confetti del splash) y v0.1.215 (home de Capacitaciones) | El owner las revisó en la app y no registró observaciones. Ya no bloquean. Las dos referencias en `CONTEXT.md` quedaron actualizadas |
 | 9 | 📦850 y 📦851 implementados y probados, pero nunca vistos en la app — **CERRADO 2026-10-03** | Botón del borde y encabezado sin etiqueta de fecha | El owner los revisó |
 | 10 | 🔴 **La bandeja solo tiene 25 correos en memoria de los 131 de INBOX** (`PAGE_SIZE = 25`), y se agrandan con scroll infinito. Cualquier filtro que mire `state.mails` da "vacío" en **25 días que sí tienen correo** (el 14 de septiembre tiene 12 y ninguno está cargado) | `app.js` `PAGE_SIZE`, `loadMailsFromCache` | 📦858 lo resolvió con un rango de fechas en la caché local. **El mismo riesgo queda para cualquier filtro nuevo que se escriba sin eso** |
+| 11 | 🔴 **Ningún test del repo abre la base de datos.** 📦860 tenía 34 checks en verde y el feature podía no dibujar nada en pantalla, según qué tipo devolviera la BD para `last_message_date` | `main/test-*.js` | Verificado a mano contra la BD real (`Temp/verif-fecha-bd-860.js`: 150 filas, 0 sin fecha, `INTEGER` y llega como `number`). **La brecha sigue abierta**: todo feature de datos necesita ese paso a mano hasta que la suite tenga un juego de datos de prueba |
 
 ### 📋 Cola de trabajo acordada
 

@@ -457,6 +457,40 @@
     return d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   };
 
+  // 📦860 — Los meses cortos en UNA sola fuente.
+  //
+  // Antes había dos copias del mismo array en este archivo (una en
+  // `formatGmailDate` y otra en `formatGmailLongDate`), y la de 📦860 sería la
+  // tercera. Dos copias del mismo dato se separan con el tiempo, y la que nadie
+  // recuerda al corregir la otra es la que gana. No se tocan los meses LARGOS:
+  // esos tienen otra capitalización y no son el mismo dato.
+  var MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun",
+                      "jul", "ago", "sep", "oct", "nov", "dic"];
+
+  // 📦860 — La fecha de un correo para la fila de la lista.
+  //
+  // Antes la fila solo pintaba la hora, y con la bandeja mezclando días no había
+  // forma de saber de cuándo era cada correo. Esta da la línea de arriba.
+  //
+  // El año SOLO aparece si es distinto al actual, como en Gmail: la columna es
+  // angosta y "4 oct 2026" ocupa el doble que "4 oct" sin informar nada más.
+  //
+  // Usa los getters LOCALES, igual que `isoDe` y `mailDiaDe` de 📦858. Si usara
+  // `toISOString()` (que es UTC), un correo de las 21:00 en Colombia caería en
+  // el día siguiente y la fila diría una fecha que no es.
+  //
+  // Es pura y recibe `hoy` por parámetro para poder probarla sin congelar el
+  // reloj. Sin fecha utilizable devuelve "" y la fila queda con la hora sola.
+  function fechaFila(m, hoy) {
+    var ms = m && m.date;
+    if (typeof ms !== "number" || !isFinite(ms)) return "";
+    var d = new Date(ms);
+    if (isNaN(d.getTime())) return "";
+    var base = (hoy instanceof Date && !isNaN(hoy.getTime())) ? hoy : new Date();
+    var txt = d.getDate() + " " + MESES_CORTOS[d.getMonth()];
+    return d.getFullYear() === base.getFullYear() ? txt : txt + " " + d.getFullYear();
+  }
+
   // F4 — Formatea la fecha de un correo de Gmail (RFC 2822 o ISO).
   // Por defecto muestra "17 jul 2026, 22:00". Si onlyTime=true, solo la hora "22:00".
   function formatGmailDate(dateStr, onlyTime) {
@@ -479,9 +513,9 @@
         return hh + ":" + mm;
       }
       // Formato "17 jul 2026, 22:00" — construido a mano, no depende de locale
-      var months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+      // 📦860 — el array de meses ahora es `MESES_CORTOS`, la fuente única.
       var day = d.getDate();
-      var mon = months[d.getMonth()];
+      var mon = MESES_CORTOS[d.getMonth()];
       var year = d.getFullYear();
       var hour = d.getHours().toString().padStart(2, "0");
       var min = d.getMinutes().toString().padStart(2, "0");
@@ -5520,8 +5554,22 @@
         }
         row.appendChild(content);
 
-        // Columna 4 — Meta: fecha (derecha) + acciones inline de adjunto/sugerencia.
+        // Columna 4 — Meta: fecha ARRIBA y hora ABAJO (derecha).
+        //
+        // 📦860 — La columna ya era `flex-direction: column` (premium.css), así
+        // que la línea de fecha entra sin tocar el layout. Va PRIMERO porque el
+        // owner la pidió sobre la hora.
+        //
+        // La fecha usa el MISMO render que todas las carpetas — la lista es una
+        // sola para Recibidos, Enviados, No leídos y el resto—, así que con este
+        // cambio queda en todas, no solo en la bandeja de entrada.
         const meta = el("div", { class: "email-row__meta kair-mail-row__meta" });
+        const filaFecha = fechaFila(m);
+        if (filaFecha) {
+          meta.appendChild(el("div", {
+            class: "email-row__fecha kair-mail-row__fecha",
+          }, filaFecha));
+        }
         meta.appendChild(el("div", {
           class: "email-row__date kair-mail-row__time",
         }, m.time || "—"));

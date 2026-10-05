@@ -168,6 +168,15 @@ Electron cachea agresivo. **Todo CSS o JS de UI que toques, bumpea su `?v=`** en
 de ese documento, y el token nuevo **no** puede ser igual al anterior. Formato: `?v=AAAAMMDD-descripcion`.
 No dejes el token a mano: se te olvida y el CSS viejo sigue sirviéndose.
 
+🔴 **En la bandeja, `app.js` y `premium.css` llevan el MISMO token, a propósito.** No es
+uniformidad estética: si difieren, la página se sirve con dos versiones distintas de la misma release.
+`test-bandeja-tudia-849.js` lo verifica y **se cayó dos veces** en 📦860 porque subí solo el `?v=`
+del `app.js` que había tocado y dejé el `premium.css` en el token anterior. Los dos archivos se
+suben juntos aunque no los hayas tocado a los dos.
+
+Y subir el token de `styles.css` **no** basta: hay que subir también el del iframe en
+`renderer.js` (`bandejaIntegradaFrame.src`, contador que sube de uno en uno).
+
 ### 5.4 EOL — mixto por diseño, y lo fija el test
 
 No hay `.gitattributes`. Cada archivo tiene su EOL y **cambiarlo rompe el diff entero**
@@ -643,9 +652,10 @@ if (/laBuenaForma/.test(mutado)) fallo = true;     // ❌ nunca se cumple
 if (!/laBuenaForma/.test(mutado)) fallo = true;    // ✅
 ```
 
-**Lo cometí al revés 5 veces en una sola tarde** (📦858 y 📦859) y en los cinco casos el mutante
-**pasó sin que la suite dijera nada**: todo verde, 12/15 mutaciones, y el número "bajó" respecto de
-la corrida anterior sin explicar por qué.
+**Lo cometí al revés 6 veces** (📦858, 📦859 y 📦860). En 📦860 el caso fue el más discreto de todos:
+el detector decía `if (reglaFechaDe(c) !== '') fallo = true` sobre un mutante que **borra** la regla
+de estilo, así que marcaba el fallo precisamente cuando el CSS estaba **bien**. El mutante pasaba y
+el conteo bajaba de 9/10 a 8/10 sin que nada se pusiera rojo.
 
 **La regla que evita el bouncing:** un detector de mutación se escribe como la **negación del check**,
 y si tiene ramas por clave, se escribe **una sola vez** la regla de polaridad arriba y se aplica en
@@ -657,7 +667,31 @@ mutación como ancla, el mutante rompe la copia nueva y deja intacta la que el c
 el conteo de mutaciones baja sin ruido. Cuando un mutante que antes mordía deja de morder después de
 un cambio de producción, la hipótesis por defecto es **"el ancla perdió singularidad"**, no "el
 check se puso flojo". Contá las ocurrencias antes de culpar al check: `split(de).length - 1`. Si da
-más de 1, ahí está. Para volver a morder, `replace` con **regex** y `/g`.
+más de 1, ahí está. Para volver a morder, `replace` con **regex** y `/g`. Y mejor todavía: **contar
+las ocurrencias en el propio runner y reportarlo como error**, para que un ancla repetida se vea al
+momento de escribirla y no tres paquetes después.
+
+### 7.5b Un mutante que no muerde NO siempre es un check flojo
+
+Cuando un mutante no muerde, la primera hipótesis es "el check está flojo". A veces es al revés: **la
+línea vigilada es redundante con la de al lado, y no hacía falta**.
+
+En 📦860 `fechaFila` tiene dos guardas de fecha inválida:
+
+```js
+if (typeof ms !== "number" || !isFinite(ms)) return "";   // guarda 1
+var d = new Date(ms);
+if (isNaN(d.getTime())) return "";                          // guarda 2
+```
+
+Quitar **cualquiera de las dos** no cambia nada que el check mire, porque `new Date(n)` **nunca** da
+fecha inválida para un número finito. Los dos mutantes pasaban y el conteo se quedaba en 8/10.
+
+**La hipótesis correcta era la tercera: "estas dos líneas se solapan"**, y la arreglo fue un solo
+mutante que quita las dos. Regla: antes de culpar al check, preguntate **qué haría que el mutante
+cambiara el comportamiento**. Si la respuesta es "nada, porque la otra guarda ya lo cubre", el
+problema está en el código, no en el test — y el arreglo es **fusionar la guarda**, no ablandar el
+check. Un mutante que no muerde es información sobre el código, no solo sobre el test.
 
 ### 7.6 CSS: cuando `min-*` es mayor que `max-*`, gana el `min-*`
 
@@ -674,7 +708,39 @@ min-height: 0;`), no confiar en que su `max-*` gane. Un `min-*` que no mirás te
 
 **Y el Beware del cache-bust:** `styles.css?v=…` seguía en la versión del 17 de septiembre. El
 archivo en disco estaba bien y la app servía la hoja vieja de la caché. **Cualquier cambio en CSS
-tiene que subir el `?v=` de `index.html` y el del iframe en `renderer.js`.**
+tiene que subir el `?v=` de `index.html` y el del iframe en `renderer.js`.** Y ojo que el token es
+**compartido** entre `app.js` y `premium.css` (§5.3): subir solo el que tocaste se sirve desparejo.
+
+### 7.7 🔴 Ningún test de este repo abre la base de datos
+
+**Los 34 checks de 📦860 podían pasar en verde con la columna de fecha VACÍA en pantalla, y no
+habría habido forma de verlo.** `fechaFila` exige `typeof ms === "number"` a propósito, así que si
+`email_threads.last_message_date` devolviera el número como **texto**, las 150 filas darían `""` y
+**la fecha no se dibujaría en ninguna**. Todos los checks seguían en verde, porque ninguno mira la
+base: extraen la función del archivo y la prueban con fechas que el test inventó.
+
+Este es el hermano mayor de §5.9. La hipótesis "el dato llega como número" **no estaba verificada
+contra nada**; era una suposición razonable, y si fuera falsa el feature entero no funcionaba.
+
+**Cuando un feature dependa de un dato que viene de la BD, verificalo contra la BD real** antes de
+decir que está terminado. El patrón que sirve es corto y no va en la suite (depende de la base
+local del developer, y los tests tienen que correr sin ella): un script en `Temp/` que **extrae la
+función real del archivo real** y la corre sobre las filas de verdad.
+
+```js
+// 1) la función del archivo, no una copia
+const fn = soloCodigo(appJs).match(/^  function NOMBRE\([\s\S]*?\n  \}/m);
+const F = new Function(fn[0] + '\nreturn NOMBRE;')();
+// 2) contra la base, con node:sqlite (el nativo de Node 24; better-sqlite3 NO)
+const db = new DatabaseSync('…\\kair.db', { readOnly: true });
+// 3) el resultado que importa no es "el formato es correcto" sino CUÁNTAS filas quedan sin dato
+console.log('filas sin fecha: ' + sinFecha + ' de ' + total);
+process.exit(sinFecha === 0 ? 0 : 1);
+```
+
+En 📦860: `last_message_date` es `INTEGER` y llega como `number` en las **150** filas, 0 sin fecha.
+**Eso no lo sabía ningún check: se supo abriendo la base.** Antes de cerrar un feature de datos,
+contá las filas reales que quedan sin el dato nuevo y dejá ese número a la vista.
 
 ---
 
@@ -717,6 +783,8 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 9 | 🟢 4 archivos `.bak-*` en la raíz del app | `main.js.bak-*`, `renderer.js.bak-*`, `preload.js.bak-*`, `index.html.bak-*` | Candidatos a borrar, pero **no sin autorización** |
 | 10 | 🔴 **El cache-bust de `styles.css` y el del iframe de la bandeja se sube a mano.** Quedaron en septiembre mientras se editaba la hoja | `bandeja-integrada/index.html`, `renderer.js:1269` | **Todo cambio en CSS sube los dos `?v=`**. La app sirve la hoja vieja de la caché y te hace perseguir un bug que ya está arreglado (§7.6) |
 | 11 | 🟡 **La app tiene 25 correos en memoria de los 131 de la carpeta** (`PAGE_SIZE = 25`), y se agrandan con scroll | `app.js` `PAGE_SIZE` | Cualquier cosa que filtre la bandeja tiene que traer lo que falta de la caché. Filtrar `state.mails` da "vacío" en 25 días que sí tienen correo |
+| 12 | 🔴 **En la bandeja, `app.js` y `premium.css` comparten el token de `?v=` a propósito.** Subir solo el que tocaste deja la página con dos versiones distintas | `bandeja-integrada/index.html`, verificado por `test-bandeja-tudia-849.js` | Los dos se suben juntos, aunque no hayas tocado los dos (§5.3) |
+| 13 | 🔴 **Ningún test del repo abre la base de datos.** Un feature que dependa de un tipo de dato de la BD puede tener 34 checks en verde y no dibujar nada en pantalla | `main/test-*.js` (ninguno abre SQLite) | Antes de dar por terminado un feature de datos, correr un script en `Temp/` con la función **real** contra la **base real** y contar cuántas filas quedan sin el dato (§7.7) |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

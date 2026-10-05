@@ -1058,10 +1058,29 @@ body {
   text-align: right;
   transition: opacity 120ms ease;
 }
+/* 📦860 — Línea de la fecha, ARRIBA de la hora. Va más chica y más apagada a
+   propósito: la hora es el dato que se mira de reojo al elegir un correo, y la
+   fecha es la que se lee cuando uno se detiene. */
+.kair-mail-row__fecha {
+  font-size: 0.65rem;
+  color: var(--kair-text-light);
+  text-align: right;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
 /* Cuando se hace hover en la fila, los iconos de acción aparecen
    (position absolute right: 14px) y la fecha debe ocultarse para
-   que no quede duplicada detrás. */
-.kair-mail-row:hover .kair-mail-row__time {
+   que no quede duplicada detrás.
+
+   📦860 — Ahora ocultan las DOS líneas. La regla solo nombraba `__time`, así
+   que al agregar la fecha arriba quedó visible en el hover y se metió DEBAJO de
+   los iconos, que son absolutos: los botones quedaban medio tapados por el
+   texto. Un selector que lista una de dos cosas iguales se rompe en silencio
+   cuando le agregas la segunda. */
+.kair-mail-row:hover .kair-mail-row__time,
+.kair-mail-row:hover .kair-mail-row__fecha {
   opacity: 0;
 }
 .kair-mail-row__actions {
