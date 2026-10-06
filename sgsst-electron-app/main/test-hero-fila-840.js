@@ -143,8 +143,12 @@ ok('4) el porcentaje y el meter se siguen pintando',
   /meterEl\.style\.width/.test(cuerpo));
 
 // ══ 5) Cache-bust ══
+// 🔴 Estaba anclado al literal `20261002-hero-oculto`: hoy pasa, pero se cae con CADA
+// bump legítimo de ese archivo — y ya cayó una vez (subió el `?v=` de 📦862 y hubo que
+// tocar el literal a mano). Se pregunta lo de verdad, igual que el check de al lado y que
+// `test-config-premium-v2.js:72`.
 ok('5) kair-premium.css tiene el ?v= nuevo en index.html',
-  /kair-premium\.css\?v=20261002-hero-oculto/.test(html));
+  /kair-premium\.css\?v=\d{8}-/.test(html));
 ok('5) renderer.js tiene el ?v= nuevo en index.html',
   /renderer\.js\?v=\d{8}-/.test(html));
 
