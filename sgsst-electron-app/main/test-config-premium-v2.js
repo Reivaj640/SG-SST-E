@@ -66,7 +66,10 @@ check('HTML: un solo </head>', (html.match(/<\/head>/g) || []).length === 1);
 check('HTML: un solo </html>', (html.match(/<\/html>/g) || []).length === 1);
 
 // --- Cache-bust del iframe ---
-check('renderer.js: iframe con cache-bust HF', /components\/config\/config-viewer\.html\?v=20260925-prompt-verbatim/.test(renderer));
+// Mismo criterio que el tripwire de `test-hero-fila-840`: se valida el FORMATO
+// del token, no su valor exacto. Fijar el valor hacía que cada bump de
+// cache-bust —que es routine— rompiera este test sin que nada estuviera mal.
+check('renderer.js: iframe con cache-bust HF', /components\/config\/config-viewer\.html\?v=\d{8}-[\w-]+/.test(renderer));
 check('renderer.js: ya no queda el src sin token', !/'components\/config\/config-viewer\.html';/.test(renderer));
 
 // --- Sección HuggingFace (Fase 2 · Tarea 4) ---

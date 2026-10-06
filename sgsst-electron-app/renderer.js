@@ -6906,7 +6906,11 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
 
     // Crear un iframe para cargar la nueva interfaz de configuraciones
     const iframe = document.createElement('iframe');
-    iframe.src = 'components/config/config-viewer.html?v=20260925-prompt-verbatim';
+    // 📦868 — Bump de cache-bust: este iframe carga la vista de Configuración, y se
+// le cambió la sección de correo (botón que no se ofrece si la instalación no
+// puede iniciar Google, y mensajes sin jerga técnica). Sin el bump, el
+// navegador puede seguir mostrando la versión anterior.
+iframe.src = 'components/config/config-viewer.html?v=20261006-oauth-embebido';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';

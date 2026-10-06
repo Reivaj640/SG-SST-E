@@ -10,6 +10,163 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.247] - 2026-10-06
+
+### 📦868 · Conectar Gmail: las credenciales son de la app, no del usuario — y ahora funciona en cualquier instalación
+
+**Resumen:** en una PC sin `.env`, pulsar "Conectar Gmail" abría el navegador con `client_id=`
+**vacío** y Google respondía con una pantalla de "Acceso bloqueado — Missing required parameter:
+client_id — Error 400" que no menciona K+AIR. Y lo peor: el servidor de callback quedaba
+esperando, así que el siguiente intento decía "Ya hay un flow de autorización activo".
+
+**La causa de fondo no era el mensaje: era dónde vivían las credenciales.**
+`shared/google-auth.js:66` las leía **solo** de `process.env.GOOGLE_OAUTH_CLIENT_ID`, y el
+`.env` **no viaja con el instalador** (está ignorado por git, que es lo correcto). Por eso
+funcionaba en el portátil del owner —donde alguien había creado el archivo— y en cualquier
+otra máquina, no. Es decir: la app no tenía correo para sus clientes, y el único síntoma era
+un error de Google.
+
+**El arreglo de producto: que la app traiga las credenciales encima.**
+No son secretos. El `client_id` de una app instalada es un identificador **público** —Google
+lo publica en el manifiesto de verificación del sitio— y el `client_secret` es para apps web:
+para *Desktop app* con PKCE, que es lo que usa este flujo, Google lo marca como opcional.
+Verificado el 2026-10-06 contra `googleapis`: la URL de autorización que se arma es
+**idéntica** con y sin secret.
+
+| | Antes | Ahora |
+|---|---|---|
+| ¿Dónde viven las credenciales | solo en `.env`, que no se distribuye | en `shared/google-oauth-config.js`, que **se versiona** |
+| `.env` | obligatorio | override opcional de desarrollo (lo que esté ahí gana) |
+| ¿El usuario tiene que hacer algo | sí: crear y editar un `.env` | **nada** |
+| Si falta config | error de Google en pantalla | la opción de correo no se ofrece, y el detalle va al log |
+
+**Cómo queda para el usuario final:** abre Configuración, toca "Conectar Gmail", autoriza su
+cuenta y listo. Igual que vos. Sin credenciales, sin archivo, sin Configuración previa.
+
+**Qué se cambió:**
+
+- **NUEVO** `shared/google-oauth-config.js`: credenciales de la app + `available` derivado de que
+  exista el `client_id` (no es un flag manual, así que no puede mentir).
+- `shared/google-auth.js`: usa ese config; el `.env` queda como override de desarrollo.
+- `shared/google-auth.js`: el canje usa `clientAuthentication = 'None'` cuando no hay secreto
+  (cliente público con PKCE) y le pasa cadena vacía en vez de `undefined`, que se serializaba
+  como el texto `"undefined"`. Verificado en `google-auth-library`: solo manda `client_secret`
+  si la autenticación es `ClientSecretPost` o `ClientSecretBasic`.
+- `shared/google-auth.js`: el aviso de "faltan credenciales" juzgaba con
+  `!CLIENT_ID || !CLIENT_SECRET`, o sea que **gritaba en el log aunque `available` dijera que
+  todo estaba bien**. Un aviso que se contradice con el estado real hace que el que lee el log
+  deje de creer al que dice la verdad: ahora usa el mismo criterio que `available` y hay 2 checks
+  y 2 mutaciones que lo vigilan.
+- `main.js:2492`: corta **antes** de `startAuth()` si `!googleAuth.available`, y manda el detalle
+  técnico a `sendLog`, no al usuario.
+- `main.js` `google-oauth:status`: expone `available`.
+- `config-viewer.html`: consulta `available` y **no ofrece el botón** si no puede funcionar; y
+  los tres caminos de error muestran un mensaje corto, en humano. Se sacaron del `alert` el
+  error crudo de Google, la palabra "tokens" y la palabra "instalación".
+- `renderer.js`: bump del cache-bust del iframe de Configuración.
+- `.env.example`: reescrito — antes decía "copiá esto y completá los valores"; ahora explica
+  que ya no es obligatorio y que la fuente real es el config embebido.
+- `main/test-config-premium-v2.js`: su check fijaba el token del iframe a un valor literal, así
+  que cada bump lo rompía. Se cambió para validar el **formato** del token —el mismo criterio
+  con el que el owner arregló el tripwire de `test-hero-fila-840`.
+
+**Cómo se validó:** `node --check` en los 6 archivos · test nuevo
+`main/test-google-oauth-868.js` **48/48**, con **17 mutaciones** que confirman que muerden
+(volver a leer solo de `process.env`, quitar el override, quitar `available`, `available` como
+flag manual, guard movido después de `startAuth()`, sin `sendLog`, botónofferto igual, jerga
+técnica de vuelta, error crudo de vuelta, `available` fuera del status, `.env.example` diciendo
+que es obligatorio, el aviso del log pidiendo de nuevo el secret) · **prueba funcional de la
+cadena completa (15/15)** y, con el `client_id` real ya embebido, **cadena real (22/22)**:
+`accounts.google.com/o/oauth2/v2/auth` con `client_id` con valor, `redirect_uri` exacto,
+PKCE S256, `access_type=offline` y el secret no aparece en la URL · con
+`process.env` vacío y `.env` ausente, interceptando el config embebido, `startAuth()` arma una
+URL con `client_id` **con valor**, `redirect_uri` correcto, PKCE S256 y `access_type=offline` ·
+`test-config-premium-v2.js` 44/44 · `test-hero-fila-840.js` 35/35.
+
+**El tropiezo de esta jornada.** El paquete empezó tocando también
+`renderer/bandeja-integrada/calendar-operations.js`, que llama `google.start()` y se traga el
+error en silencio. Se le puso un toast de error... y se comprobó que **no lo carga ningún
+`<script src>` del proyecto**: está muerto, y `AGENTS.md:2549` lo tenía anotado desde antes
+("12 archivos JS huérfanos... `app.js` es el único contrato vivo"). Se revirtió: tocar código
+muerto no arregla nada, hace que el test dé verde por algo que no ocurre, y engaña a quien lea
+el commit después. El test ahora lee el grafo de carga real (140 scripts) y vigila que ese
+archivo siga muerto.
+
+**Y el error de diseño que el owner ALZÓ en el primer intento:** el guard inicial explicaba
+el `.env` al usuario final con todo detalle. Es un mensaje de desarrollador —un cliente de
+K+AIR no va a editar un archivo que no sabe qué es— y por eso la solución real no fue "avisar
+mejor", sino "que no haya nada que avisar": que la app venga con las credenciales.
+
+**El `client_id` y el `client_secret` ya están cargados y la conexión funciona** (proyecto
+"KAIR Calendar Sync", app de escritorio). **Probado de punta a punta contra Google:** el owner
+autorizó con su cuenta real y la bandeja conectó.
+
+### 🚨 La creencia que casi pierde el paquete: "el `client_secret` es opcional"
+
+Se llegó a esa conclusión leyendo `google-auth-library`: tiene un enum
+`ClientAuthentication.None` que, activado, hace que la librería **no mande** el `client_secret`
+en el body. Todo cuadraba en el código. **Pero leer la librería no es verificar el servicio.**
+
+El día que se probó la autorización real, Google aceptó los 5 permisos y el canje devolvió:
+
+```
+{"error":"invalid_request","error_description":"client_secret is missing."}
+```
+
+El síntoma era el **peor posible**: el navegador decía "Autorización exitosa", el cliente había
+autorizado todo, y al final **se perdía la conexión**. Media conexión: con el botón todavía
+visible y el flujo entero aparentemente funcionando hasta el último paso.
+
+**Lo que lo dejó invisible:** los handlers de OAuth (`start`, `await-callback`, `exchange`)
+usaban `console.error`, que **no escribe en `main.log`**. El fallo no dejaba rastro en ningún
+lado — hubo que reproducir la petición a mano (un canje con un código falso revela el error
+del endpoint) para verlo. Ahora los tres escriben en `sendLog` y hay un check que lo vigila.
+
+**Consecuencias del arreglo:**
+
+- `available` ahora exige **las dos** credenciales. Antes, con el secret vacío, daba `true`, la
+  app ofrecía el botón y rompía a mitad de camino. Ahora no lo ofrece hasta que puede
+  completarse de verdad — que es exactamente lo que se ve en pantalla.
+- `clientAuthentication = 'None'` **eliminado**: con ese modo la librería omite el secreto y
+  Google lo rechaza.
+- 8 checks del test 868 **invertidos** (§7.3: invertir, no borrar) para que fijen que el
+  secret es necesario y nadie vuelva a la creencia vieja. Total: 17 mutaciones, todas muerden.
+
+Que Google entregue un secreto "de escritorio" no lo vuelve secreto: la app es un binario que
+cualquiera puede abrir, y el mismo Google lo baja junto con su `client_secret_*.json`. El
+problema nunca fue la seguridad del valor, sino que **faltaba y la app fingía que no**.
+
+### 🚨 Por qué las credenciales NO van en el archivo versionado
+
+Al commitear, **GitHub rechazó el push**: `GH013 — Push cannot contain secrets`, detectando el
+`client_id` y el `client_secret` en `shared/google-oauth-config.js`. El repo es **público**, y
+eso no se arregla volviendo el repo privado:
+
+`package.json` declara `publish: {provider: "github"}` y electron-updater pega a la API de
+releases de GitHub **sin token**. En un repo privado esa API devuelve **404** y **todos los
+clientes dejarían de recibir actualizaciones** — incluido el differential download que está
+optimizado para clientes con internet lento.
+
+Así que: repo público ⇒ el `client_secret` no puede estar en el historial. La solución:
+
+- `shared/google-oauth-config.js` se versiona **vacío**, y su cabecera explica por qué.
+- Las credenciales viven en `sgsst-electron-app/.env`, que está en `.gitignore`.
+- **electron-builder NO excluye `.env`** de los archivos del app (verificado: 0 reglas de
+  `build.files` lo filtran), así que un `.env` presente en la máquina que compila **viaja dentro
+  del instalador** y le llega al cliente sin que configure nada. El objetivo de producto se
+  mantiene: el usuario final no tiene que hacer nada.
+- **NUEVO** `main/_verificar-credenciales-build.js`, enganchado como `prebuild` / `prebuild:win` /
+  `prebuild:mac` / `prebuild:linux`: si faltan las dos credenciales, **corta el build con exit 1**
+  diciendo dónde pegarlas. Es preferible que el build falle ahí a que salga un instalador donde el
+  correo no conecta — que es justamente el bug que costó toda la jornada. Si existen pero el
+  formato es raro, avisa sin cortar.
+- Los 5 scopes declarados en Google coinciden con los que pide el código: `calendar`,
+  `gmail.readonly`, `gmail.send`, `gmail.modify`, `gmail.compose`.
+
+**Pendiente (no es código):** Google expira la autorización a los 7 días si el proyecto queda
+en modo "Testing": pasarlo a "Production" exige una URL de política de privacidad pública, que
+todavía no existe.
+
 ## [0.1.246] - 2026-10-06
 
 ### 📦867 · Fase 4 del mapeo de estructura: la pantalla deja de mentir y dice cuánto se lleva

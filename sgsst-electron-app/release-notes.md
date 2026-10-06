@@ -1,3 +1,41 @@
+# K+AIR v0.1.247
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Conectar tu correo ahora funciona sin que tengas que configurar nada
+
+Si tocabas "Conectar Gmail" y aparecía un error de Google que decía algo como
+*"Missing required parameter: client_id"*, no era tu cuenta ni tu PC: era un problema de la
+aplicación, que no estaba trayendo las claves de conexión consigo misma.
+
+**Ahora está arreglado y no hay nada que hacer.** Abrís Configuración, tocás "Conectar Gmail",
+Google te pide permiso, y tu correo queda conectado. Nada de archivos, nada de pasos extra.
+
+Si aun así no se pudiera conectar, la aplicación no te va a mostrar un error técnico: te va a
+decir que contactes al administrador. Y el detalle queda guardado en el registro interno, que es
+donde tiene que estar.
+
+---
+
+## Para quien instala K+AIR: cada cliente conecta SU PROPIA cuenta
+
+Esto es lo importante y a menudo se confunde:
+
+- Las claves de conexión son **de la aplicación K+AIR**, no del usuario. Son públicas.
+- **Todos los usuarios comparten la misma clave.** Cada uno abre "Conectar Gmail" y autoriza
+  su propia cuenta con un clic.
+- **El cliente no tiene que pedirle ni traer credenciales**, ni configurar nada por su cuenta.
+
+Es exactamente el mismo modelo que "Iniciar sesión con Google" de cualquier sitio: la
+aplicación se identifica una vez y cada persona da permiso sobre lo suyo.
+
+Lo único que hay que hacer es **una vez, al preparar un instalador nuevo**: pegar las claves
+de la aplicación en un archivo del código, en lugar de dejarlas en un archivo aparte que se
+perdía al cambiar de máquina.
+
+---
+
 # K+AIR v0.1.246
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

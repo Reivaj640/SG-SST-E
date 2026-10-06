@@ -24,11 +24,11 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-06 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦863-867 · el mapeo de estructura deja de tardar 760 s, de fallar siempre y de mentir el progreso (`33d40d90`, pusheado). Antes, `8f5decc1` · el check del cache-bust de `test-hero-fila-840` deja de depender del token literal (pusheado; **cambio del owner**, commiteado aparte) |
+| **Último commit de código** | 📦863-867 · el mapeo de estructura deja de tardar 760 s, de fallar siempre y de mentir el progreso (`33d40d90`, pusheado). Antes, `8f5decc1` · el check del cache-bust de `test-hero-fila-840` deja de depender del token literal (pusheado; **cambio del owner**). **📦868 (Conectar Gmail avisa cuando faltan las credenciales) está en el árbol de trabajo SIN commitear** |
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` |
-| **Versión** | `0.1.246` (desarrollo) · último publicado `v0.1.205` |
+| **Versión** | `0.1.247` (desarrollo) · último publicado `v0.1.205` |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | 124 tests · **106 verdes** · 18 con fallos — **los mismos 18 preexistentes**, cero regresiones. Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) además de `test-admin-empresas-862.js` (17/17) |
+| **Suite (escritorio)** | 125 tests · **107 verdes** · 18 con fallos — **los mismos 18 preexistentes**, cero regresiones. Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
 | **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 **pendiente**: no se ha abierto la app todavía. 📦867 **pendiente**: es el primer paquete del mapeo con cambios visibles (el overlay del escaneo), y mirarlo exige una empresa registrada. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
@@ -80,10 +80,58 @@
       de `main.js` contra un fixture de 2.500 archivos (15/15): el progreso llegó a los 81 ms y
       114 ms, antes de que el proceso terminara (125 ms), o sea en vivo y no bufferizado.
       **Queda consultado al owner:** ¿esa prueba entra al repo como test?
-    - ✅ **El plan de 5 fases está completo.** 📦868 (backlog) queda sin arrancar a propósito:
-      ya no hay tarea viva que espere, y arrancar otra fase sería inventar trabajo.
-     Regla: **agregar** checks al test por fase, nunca editar los viejos; si una fase hace fallar
-     el test de Fase 0, la fase rompió el contrato, no el test.
+    - ✅ **El plan de 5 fases está completo.**
+    - 🔴 **📦868 — Conectar Gmail: ARREGLADO DE FONDO. Las credenciales son de la APP, no
+      del usuario.**
+      **El bug real:** las credenciales vivían solo en un `.env`, que **no viaja con el
+      instalador**. Por eso el portátil del owner funcionaba y cualquier otra máquina no —
+      la app no tenía correo para sus clientes, y el único síntoma era un error de Google
+      ("Missing required parameter: client_id") que no menciona K+AIR, más un flow de
+      autorización que quedaba colgado.
+      **El arreglo:** que la app traiga las credenciales encima. El `client_id` de una app
+      instalada es un identificador público. El `client_secret` también viaja embebido,
+      pero no porque sea secreto: K+AIR es un binario que cualquiera puede abrir y el mismo
+      Google lo entrega aparte en su `client_secret_*.json` de escritorio. Ahora viven en
+      `shared/google-oauth-config.js`, que se versiona; el `.env` quedó como override de
+      desarrollo. **El usuario final no tiene que hacer nada:** cada persona y cada cliente
+      autoriza su PROPIA cuenta con el mismo `client_id`, como cualquier botón "iniciar
+      sesión con Google".
+      **El `client_id` y el `client_secret` ya están cargados y la conexión funciona**
+      (proyecto "KAIR Calendar Sync", credencial de escritorio). **Probado de punta a punta
+      contra Google:** el owner autorizó con su cuenta real y la bandeja conectó.
+      U0001F6A8 **La creencia que casi pierde el paquete: "el `client_secret` es opcional".**
+      Se concluyó leyendo `google-auth-library`: tiene `ClientAuthentication.None`, que hace
+      que la librería NO mande el secreto. Todo cuadraba en el código — **pero leer la
+      librería no es verificar el servicio.** Al probarlo de verdad, Google aceptó los 5
+      permisos y el canje devolvió `client_secret is missing`. El síntoma era el peor: el
+      navegador decía "Autorización exitosa" y la conexión se perdía igual. Media
+      conexión. Un enum que existe en el código no significa que el endpoint lo acepte.
+      U0001F6A8 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`,
+      que no escribe en `main.log`, así que el fallo no dejaba rastro en ningún lado —
+      hubo que reproducir la petición a mano con un código falso para verlo. Ahora los tres
+      escriben en `sendLog` y hay un check que lo vigila.
+      U0001F6A8 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config
+      versionado.** Al commitear, GitHub rechazó el push: `GH013 — Push cannot contain
+      secrets`. Hacerlo privado NO era la salida: `package.json` declara
+      `publish: {provider: "github"}` y electron-updater pega a la API de releases de GitHub
+      **sin token**, así que en un repo privado esa API devuelve 404 y **todos los clientes
+      dejarían de recibir actualizaciones**. Repo público ⇒ el secret no puede estar en el
+      historial. Solución: `shared/google-oauth-config.js` se versiona **vacío** y las
+      credenciales viven en `sgsst-electron-app/.env` (en `.gitignore`). Verificado que
+      electron-builder **no excluye `.env`** de los archivos del app: un `.env` en la máquina
+      que compila **viaja dentro del instalador** y le llega al cliente sin que configure nada.
+      **NUEVO** `main/_verificar-credenciales-build.js` como hook `prebuild`/`prebuild:win`/
+      `prebuild:mac`/`prebuild:linux`: si faltan las dos credenciales **corta el build con
+      exit 1**. Mejor que el build falle ahí a que salga un instalador donde el correo no
+      conecta — que es exactamente el bug que costó la jornada.
+      **Trampa del día:** el owner pegó el `client_id` **sin** el sufijo
+      `.apps.googleusercontent.com` (creyó que era decorativo). Google devuelve 400 igual,
+      así que el síntoma se habría repetido en la app. Al pegar una credencial hay que
+      validar el **formato entero**, no que no esté vacía.
+      **Pendiente:** el proyecto sigue en modo "Testing", así que la autorización vence a
+      los 7 días y el cliente reconecta cada semana. Pasarlo a "Production" exige una **URL
+      de política de privacidad pública**, que todavía no existe. Los 5 scopes ya están
+      declarados en Google y coinciden con los que pide el código.
 
 1. **Owner tiene que validar visualmente 📦858**: en la pestaña Correo, el mini debe dejar ir a
    septiembre con las flechas, y al elegir el **14 de septiembre tiene que mostrar los 12 correos**

@@ -2494,6 +2494,22 @@ ipcMain.handle('google-oauth:start', async () => {
     if (googleAuthFlowState) {
       return { success: false, error: 'Ya hay un flow de autorización activo. Esperá o cancelá.' };
     }
+
+    // 📦868 — Las credenciales de Google son de la APLICACIÓN, no del usuario: viven
+    // embebidas en `shared/google-oauth-config.js` y llegan hasta acá por
+    // `googleAuth.available`. Cada persona y cada cliente conecta su PROPIA cuenta
+    // con ese mismo par, como cualquier botón "iniciar sesión con Google".
+    //
+    // Este guard NO debería dispararse nunca en una instalación normal. Queda para
+    // que, si la app se construyó sin las credenciales pegadas, el usuario no vea
+    // un error técnico de Google: la vista consulta `available` y ni siquiera
+    // muestra el botón. El detalle va al log, que es donde lo lee quien administra.
+    if (!googleAuth.available) {
+      console.error('[GoogleOAuth] Esta instalación se construyó sin credenciales de Google. Pegá el client_id en shared/google-oauth-config.js y reconstruí el instalador.');
+      sendLog('[GoogleOAuth] Instalación sin credenciales de Google (ver shared/google-oauth-config.js)', 'ERROR');
+      return { success: false, error: 'No pudimos conectar tu correo en este momento. Contactá al administrador de K+AIR.', faltaConfig: true };
+    }
+
     const flow = googleAuth.startAuth();
     const callbackServer = googleAuth.createCallbackServer(flow.port);
 
@@ -2513,6 +2529,7 @@ ipcMain.handle('google-oauth:start', async () => {
       }
     };
   } catch (e) {
+    sendLog('[GoogleOAuth] Error en start: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en start:', e);
     return { success: false, error: e.message || 'Error iniciando OAuth' };
   }
@@ -2535,6 +2552,7 @@ ipcMain.handle('google-oauth:await-callback', async () => {
     }
     return { success: true, data: { code, state } };
   } catch (e) {
+    sendLog('[GoogleOAuth] Error en await-callback: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en await-callback:', e);
     return { success: false, error: e.message };
   }
@@ -2558,6 +2576,9 @@ ipcMain.handle('google-oauth:exchange', async (event, payload) => {
     googleAuthFlowState = null;
     return result;
   } catch (e) {
+    // 📦868 — `console.error` NO alcanza: el log de archivo es lo único que sobrevive
+    // al cierre de la app, y sin esto un fallo de canje no deja rastro en ningún lado.
+    sendLog('[GoogleOAuth] Error en exchange: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en exchange:', e);
     return { success: false, error: e.message };
   }
@@ -2598,6 +2619,10 @@ ipcMain.handle('google-oauth:status', async () => {
     data: {
       connected: hasTokens,
       tokenValid: tokenValid,
+      // 📦868 — ¿esta instalación puede iniciar el flujo de Google? La vista lo
+      // usa para no mostrar un botón "Conectar Gmail" que no puede funcionar.
+      // Con las credenciales embebidas da true siempre.
+      available: !!googleAuth.available,
       hasRefreshToken: !!(tokens && tokens.refresh_token),
       expiryDate: tokens ? tokens.expiry_date : null,
       savedAt: tokens ? tokens.savedAt : null,

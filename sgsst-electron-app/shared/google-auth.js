@@ -60,13 +60,27 @@ function loadDotEnv() {
 loadDotEnv();
 
 // CREDENCIALES — Proyecto "KAIR Calendar Sync" en Google Cloud
-// FIX v0.1.121 (cleanup): leídas SOLO de process.env (.env file).
-// NO hay fallback hardcoded — si falta .env, la app muestra error claro.
-// Para configurar: copiá .env.example a .env y completá con tus credenciales.
-var CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
-var CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-var REDIRECT_PORT = parseInt(process.env.GOOGLE_OAUTH_REDIRECT_PORT || '42813', 10);
-var REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || ('http://127.0.0.1:' + REDIRECT_PORT + '/oauth2callback');
+//
+// 📦868 — Estas credenciales son de la APLICACIÓN, no del usuario. Cada persona
+// y cada cliente conecta SU PROPIA cuenta de Gmail con este mismo par (es el
+// modelo estándar de "iniciar sesión con Google"). Como no son secretas —el
+// `client_id` de una app instalada es un identificador público, y Google marca el
+// `client_secret` como opcional para Desktop apps con PKCE, que es lo que usa
+// este flujo— van embebidas en `google-oauth-config.js`, que SÍ va versionado.
+//
+// Antes vivían solo en un `.env`, y eso rompía a cualquier cliente: el `.env` no
+// viaja con el instalador, así que sin él la app abría el navegador con
+// `client_id=` vacío y Google respondía "Missing required parameter: client_id".
+//
+// El `.env` sigue funcionando, pero solo como override para DESARROLLO: lo que
+// esté ahí gana sobre el archivo embebido, para probar credenciales de prueba sin
+// tocar el repo. En una instalación normal el `.env` no existe y no hace falta.
+var oauthConfig = require('./google-oauth-config');
+
+var CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || oauthConfig.clientId;
+var CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || oauthConfig.clientSecret;
+var REDIRECT_PORT = parseInt(process.env.GOOGLE_OAUTH_REDIRECT_PORT || oauthConfig.redirectPort, 10);
+var REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || oauthConfig.redirectUri;
 
 // Validar que las credenciales NO son placeholders
 if (CLIENT_ID === 'TU_NUEVO_CLIENT_ID.apps.googleusercontent.com' || CLIENT_SECRET === 'TU_NUEVO_CLIENT_SECRET') {
@@ -74,9 +88,23 @@ if (CLIENT_ID === 'TU_NUEVO_CLIENT_ID.apps.googleusercontent.com' || CLIENT_SECR
   CLIENT_ID = undefined;
   CLIENT_SECRET = undefined;
 }
+// 📦868 — El criterio tiene que ser el MISMO que `available` de google-oauth-config,
+// o sea LAS DOS credenciales. Un aviso que se contradice con el estado real hace que
+// el que lee el log deje de creerle al que dice la verdad.
+//
+// Y corregido el 2026-10-06: el `client_secret` SÍ hace falta. Se había creed que no
+// por lo que dice la librería, y el resultado fue que el flujo entero se completaba
+// en el navegador y se perdía en el último paso.
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error('[google-auth] ❌ Credenciales OAuth faltantes. Configurá GOOGLE_OAUTH_CLIENT_ID y GOOGLE_OAUTH_CLIENT_SECRET en .env');
-  console.error('[google-auth]    Ver .env.example para la estructura. Sin credenciales, el flujo OAuth fallará.');
+  // 📦868 — Esto ya NO es un problema del usuario: es que la app se construyó sin
+  // credenciales embebidas. El mensaje técnico va al log para el que administra
+  // la instalación; el usuario final nunca ve esto (la vista consulta
+  // `available` y muestra la opción de correo como no disponible).
+  console.error('[google-auth] Hacen falta LAS DOS credenciales: sin client_secret el canje falla con "client_secret is missing".');
+  const falta = [];
+  if (!CLIENT_ID) falta.push('client_id');
+  if (!CLIENT_SECRET) falta.push('client_secret');
+  console.error('[google-auth] ❌ Falta ' + falta.join(' y ') + ' de la aplicación. Van en shared/google-oauth-config.js (se versiona y viaja con el instalador).');
 }
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
@@ -106,9 +134,29 @@ function generatePKCE() {
 /**
  * Construye un OAuth2 client con las credenciales del proyecto.
  * No requiere que haya tokens aún — se pueden setear después.
+ *
+ * 📦868 — CORREGIDO el 2026-10-06 después de probarlo de verdad: el
+ * `client_secret` NO es opcional. Este comentario decía que sí, y estaba mal:
+ * se dedujo leyendo `google-auth-library` (que con `ClientAuthentication.None`
+ * omite el secreto del body) sin preguntarle al servidor de Google. El endpoint
+ * de canje responde:
+ *     {"error":"invalid_request","error_description":"client_secret is missing."}
+ *
+ * El síntoma era el peor posible: el navegador se abría, el cliente autorizaba
+ * los 5 permisos, y al final la conexión se perdía. Media conexión.
+ *
+ * La lección que queda: leer la librería NO es verificar el comportamiento del
+ * servicio. Un enum que existe en el código no significa que el endpoint lo
+ * acepte — hay que preguntárselo al servidor.
+ *
+ * Que Google entregue un secreto "de escritorio" no lo vuelve secreto: la app
+ * es un binario que cualquiera puede abrir. Se embebe a propósito, que es
+ * exactamente lo que hace Google con su `client_secret_*.json`.
  */
 function createOAuth2Client() {
-  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+  // `|| ''` y no `undefined`: el refresco de token manda `client_secret` en el body,
+  // y una cadena vacía es mucho más benigna que el texto literal "undefined".
+  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET || '', REDIRECT_URI);
 }
 
 /**
@@ -363,6 +411,14 @@ function createCallbackServer(port) {
 module.exports = {
   CLIENT_ID,
   CLIENT_SECRET,
+  // 📦868 — ¿esta instalación puede iniciar el flujo de Google? Lo consulta la
+  // vista para no ofrecer un botón que no puede funcionar.
+  //
+  // 📦868 — Corregido: hacen falta LAS DOS. Con solo el `client_id` el flujo se
+  // completaba en el navegador y se perdía al canje ("client_secret is missing").
+  // Que `available` sea la verdad es lo que hace que la vista no ofrezca un botón
+  // que después se rompe a mitad de camino.
+  available: !!(CLIENT_ID && CLIENT_SECRET),
   SCOPES,
   REDIRECT_URI,
   REDIRECT_PORT,

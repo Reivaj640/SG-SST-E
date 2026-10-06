@@ -5,10 +5,71 @@
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
 **Última actualización:** 6 de octubre de 2026
-**Versión actual:** 0.1.246 (desarrollo) — último publicado v0.1.205
+**Versión actual:** 0.1.247 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**
+> Google respondía "Acceso bloqueado — Missing required parameter: client_id / Error 400",
+> una pantalla que no menciona K+AIR; peor, el servidor de callback quedaba esperando y el
+> siguiente intento daba "Ya hay un flow de autorización activo". **La causa de fondo:**
+> `shared/google-auth.js:66` leía las credenciales **solo** de `process.env`, y el `.env`
+> **no viaja con el instalador** (ignorado por git, que es lo correcto). Por eso funcionaba
+> en el portátil del owner y en cualquier otra máquina no: la app no tenía correo para sus
+> clientes, y el único síntoma era un error de Google.
+> **Arreglo de producto: que la app traiga las credenciales encima, y que la app no sea
+> dueña de que el usuario configure nada.** Cada persona y cada cliente autoriza su PROPIA
+> cuenta con el mismo `client_id`, como cualquier botón "iniciar sesión con Google".
+> **Probado de punta a punta contra Google:** el owner autorizó con su cuenta real y la bandeja
+> conectó. El flujo completo funciona.
+> `main.js:2492` corta antes de `startAuth()` si `!googleAuth.available`, mandando el detalle a
+> `sendLog`; `google-oauth:status` expone `available`; `config-viewer.html` **no ofrece el
+> botón** si no puede completar el flujo y muestra mensajes cortos en humano (del `alert` se
+> sacaron el error crudo de Google, "tokens" e "instalación"); `.env.example` reescrito.
+> **El error de diseño que el owner recibió:** el primer arreglo era un guard que le
+> explicaba el `.env` al usuario final con todo detalle. Eso es un mensaje de desarrollador —un
+> cliente de K+AIR no va a editar un archivo que no sabe qué es— y la solución real no fue
+> "avisar mejor", sino "que no haya nada que avisar".
+> 🚨 **La creencia que casi costó el paquete, y cómo se detectó:** se concluyó que el
+> `client_secret` era opcional porque así lo documenta la librería: `google-auth-library` tiene
+> `ClientAuthentication.None` y con ese modo **omite** el secreto del body. Todo cuadraba en el
+> código. **Pero leer la librería no es verificar el servicio.** Al probarlo de verdad, Google
+> aceptó los 5 permisos y el canje devolvió
+>     {"error":"invalid_request","error_description":"client_secret is missing."}
+> El síntoma era el peor: el navegador decía "Autorización exitosa", el cliente había
+> autorizado todo, y al final se perdía la conexión. Media conexión. Un enum que existe en
+> el código no significa que el endpoint lo acepte: hay que preguntárselo al servidor.
+> 🚨 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`, que **no
+> escribe en `main.log`**. El fallo no dejaba rastro en ningún lado; hubo que reproducir la
+> petición a mano (un canje con un código falso revela el error del endpoint) para verlo.
+> Ahora los tres escriben en `sendLog` y hay un check que lo vigila.
+> 🚨 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config versionado.**
+> Al commitear, GitHub rechazó el push: `GH013 — Push cannot contain secrets`. Hacerlo privado
+> NO es la salida: `package.json` declara `publish: {provider: "github"}` y electron-updater
+> pega a la API de releases **sin token**; en un repo privado esa API devuelve **404** y
+> **todos los clientes dejarían de recibir actualizaciones**. Repo público ⇒ el secret no
+> puede estar en el historial. Solución: `shared/google-oauth-config.js` se versiona **vacío** y
+> las credenciales viven en `sgsst-electron-app/.env` (en `.gitignore`). Verificado que
+> electron-builder **no excluye `.env`** de los archivos del app, así que un `.env` en la
+> máquina que compila **viaja dentro del instalador** y le llega al cliente sin que configure
+> nada — el objetivo de producto se mantiene.
+> **NUEVO** `main/_verificar-credenciales-build.js` como hook `prebuild` / `prebuild:win` /
+> `prebuild:mac` / `prebuild:linux`: si faltan las dos credenciales, **corta el build con exit 1**
+> diciendo dónde pegarlas. Mejor que el build falle ahí a que salga un instalador donde el
+> correo no conecta, que es justamente el bug que costó la jornada.
+> 🚨 **Trampa al pegar credenciales:** el `client_id` se pegó **sin** el sufijo
+> `.apps.googleusercontent.com`, que parece decorativo y no lo es: Google contesta 400 igual
+> que si estuviera vacío. Al pegar una credencial hay que validar el **formato entero**, no
+> que no esté vacía.
+> Validado: `main/test-google-oauth-868.js` **57/57** con **21 mutaciones que muerden** (varias
+> invertidas: fijan que el secret es necesario, que el repo no puede ser privado y que las
+> credenciales no van en el archivo versionado); `test-config-premium-v2.js` 44/44 ·
+> `test-hero-fila-840.js` 35/35 · suite 125 · 107 verdes · 18 preexistentes (0 regresiones).
+> **Pendiente:** el proyecto sigue en modo "Testing", así que la autorización vence a los
+> 7 días. Pasarlo a "Production" exige una **URL de política de privacidad pública**, que
+> todavía no existe. Los 5 scopes ya están declarados y coinciden con los del código.
+>
+>> **Anterior · v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
 > **🆕 v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
 > Quinta y última etapa del plan de 5 fases, y la primera con cambios visibles. El overlay del
 > mapeo **muestra los archivos y las carpetas contados de verdad** mientras el escáner corre, y

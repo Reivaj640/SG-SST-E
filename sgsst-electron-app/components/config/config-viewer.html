@@ -7641,7 +7641,14 @@ en lugar de afirmar una condición específica no verificada.**`;
     var gmailSectionState = {
       connected: false,
       email: '',
-      loading: false
+      loading: false,
+      // 📦868 — ¿esta instalación puede iniciar el flujo de Google? Lo consulta
+      // `google.status()`. Con las credenciales de la app embebidas da true
+      // siempre; solo da false si K+AIR se construyó sin ellas, y en ese caso no
+      // se ofrece el botón (es un problema de la instalación, no del usuario).
+      // `undefined` = todavía no se consultó: se trata como disponible para no
+      // dejar el botón oculto mientras carga.
+      available: undefined
     };
 
     async function initializeGmailSection() {
@@ -7696,6 +7703,12 @@ en lugar de afirmar una condición específica no verificada.**`;
         var statusRes = await window.electronAPI.google.status();
         var d = (statusRes && statusRes.success && statusRes.data) || {};
 
+        // 📦868 — ¿esta instalación puede iniciar el flujo de Google? Se consulta una
+        // sola vez acá y todos los caminos de render usan el mismo valor. Con las
+        // credenciales de la app embebidas da true siempre; `undefined` (main viejo)
+        // se trata como true para no dejar el botón oculto sin motivo.
+        gmailSectionState.available = d.available !== false;
+
         // 📦748 — Si hay cuenta vinculada pero los tokens ya no sirven (refresh
         // token revocado/expirado), avisar claramente y ofrecer reconectar en vez
         // de mostrar "Conectado" (que engañaba al usuario).
@@ -7711,6 +7724,21 @@ en lugar de afirmar una condición específica no verificada.**`;
         }
 
         if (!d.connected) {
+          // 📦868 — `gmailSectionState.available` ya quedó resuelto arriba. Si esta
+          // instalación no puede iniciar el flujo de Google, es porque se construyó
+          // sin las credenciales embebidas: NO es un problema del usuario ni algo que
+          // él pueda resolver. Se lo dice en una línea, sin detalle técnico, y no se
+          // le ofrece un botón que solo lo va a hacer fallar.
+          if (!gmailSectionState.available) {
+            if (statusText) statusText.textContent = 'Conectá tu correo con el administrador de K+AIR';
+            if (statusText) statusText.classList.remove('connected');
+            if (statusDot) statusDot.style.display = 'none';
+            gmailSectionState.connected = false;
+            gmailSectionState.email = '';
+            renderGmailButtons(false);
+            gmailSectionState.loading = false;
+            return;
+          }
           if (statusText) statusText.textContent = 'Gmail desconectado · click para conectar';
           if (statusText) statusText.classList.remove('connected');
           if (statusDot) statusDot.style.display = 'none';
@@ -7756,6 +7784,14 @@ en lugar de afirmar una condición específica no verificada.**`;
         btnConnect.style.display = 'none';
         btnRefresh.style.display = 'inline-flex';
         btnDisconnect.style.display = 'inline-flex';
+      } else if (gmailSectionState.available === false) {
+        // 📦868 — Esta instalación no puede iniciar el flujo de Google (se
+        // construyó sin las credenciales embebidas). No se ofrece el botón: es un
+        // problema de la instalación, no de la cuenta del usuario, y el detalle
+        // técnico está en el log del proceso main.
+        btnConnect.style.display = 'none';
+        btnRefresh.style.display = 'none';
+        btnDisconnect.style.display = 'none';
       } else {
         btnConnect.style.display = 'inline-flex';
         btnRefresh.style.display = 'none';
@@ -7769,7 +7805,16 @@ en lugar de afirmar una condición específica no verificada.**`;
       try {
         var startRes = await window.electronAPI.google.start();
         if (!startRes || !startRes.success) {
-          alert('No se pudo iniciar el flow OAuth: ' + (startRes && startRes.error || 'error desconocido'));
+          // 📦868 — El mensaje que ve el usuario NO lleva detalle técnico. Si la
+          // instalación no puede iniciar el flujo, eso se debe a que se construyó
+          // sin las credenciales de Google embebidas: lo primero que tiene que
+          // hacer el usuario es hablar con quien le instaló K+AIR, no editar un
+          // archivo. El motivo real queda en el log del proceso main.
+          var detalle = (startRes && startRes.faltaConfig)
+            ? 'No pudimos conectar tu correo en este momento. Contactá al administrador de K+AIR.'
+            : 'No pudimos conectar tu correo. Probá de nuevo en un momento.';
+          alert(detalle);
+          console.error('[GmailSection] google.start() fallo:', startRes && startRes.error);
           return;
         }
         // Abrir el browser externo con la URL de autorización
@@ -7780,21 +7825,26 @@ en lugar de afirmar una condición específica no verificada.**`;
         // falla al toque si el puerto está ocupado — ver google-auth.js)
         var cbRes = await window.electronAPI.google.awaitCallback();
         if (!cbRes || !cbRes.success || !cbRes.data || !cbRes.data.code) {
-          var cbErr = (cbRes && cbRes.error) || 'No se recibió el código de autorización';
-          alert('No se pudo completar la conexión con Gmail:\n\n' + cbErr);
+          // 📦868 — El error crudo de Google tampoco va al mensaje: puede ser
+          // "invalid_grant", un 400 con JSON, o un timeout. Va al log; al usuario
+          // se le dice, en una línea, que no se completó y qué hacer.
+          console.error('[GmailSection] awaitCallback fallo:', (cbRes && cbRes.error) || 'sin codigo');
+          alert('No se completó la conexión con tu correo. Es posible que hayas cerrado la ventana del navegador sin autorizar. Probá de nuevo.');
           return;
         }
         // Intercambiar el code por tokens
         var exRes = await window.electronAPI.google.exchange({ code: cbRes.data.code });
         if (!exRes || !exRes.success) {
-          alert('No se pudieron guardar los tokens: ' + (exRes && exRes.error || 'error desconocido'));
+          // Ídem: ni "tokens" ni el error crudo de Google en pantalla.
+          console.error('[GmailSection] exchange fallo:', exRes && exRes.error);
+          alert('No pudimos guardar tu conexión con el correo. Probá de nuevo en un momento.');
           return;
         }
         // Refrescar el estado para mostrar el email
         await refreshGmailSectionState();
       } catch (e) {
         console.error('[GmailSection] Error en connect:', e);
-        alert('Error: ' + (e.message || e));
+        alert('No pudimos conectar tu correo. Probá de nuevo en un momento.');
       } finally {
         if (btn) {
           btn.disabled = false;
