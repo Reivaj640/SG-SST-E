@@ -9,6 +9,10 @@ class RegistrarAusentismoComponent {
         this.submoduleName = submoduleName;
         this.onBack = onBack;
         this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`);
+        /* 📦443 (2026-06-25) — Loading tracker para spinners de carga de datos.
+           Permite asociar un token de loading al toast de progreso para poder
+           cerrarlo/actualizarlo cuando termina la operación asíncrona. */
+        this._loadingToastId = null;
     }
 
     render() {
@@ -32,26 +36,10 @@ class RegistrarAusentismoComponent {
         });
         mainContainer.appendChild(header);
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification';
-        notificationDiv.className = 'notification-toast';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContainer.appendChild(notificationDiv);
+        // 📦443 (2026-06-25) — Sistema de notificaciones migrado a window.updateNotifier
+        // (estándar del proyecto, mismo que 6.1.3). Ya no creamos un notificationDiv
+        // propio: las notificaciones se gestionan vía window.updateNotifier.show()
+        // con posición fija, animaciones consistentes y soporte para progress bar.
 
         // Contenedor del formulario modernizado
         const formContainer = document.createElement('div');
@@ -282,13 +270,13 @@ class RegistrarAusentismoComponent {
         const submitButton = document.getElementById('registrar-btn');
         submitButton.addEventListener('click', (e) => {
             e.preventDefault();
-            this.handleSubmit(notificationDiv);
+            this.handleSubmit();
         });
 
         const limpiarButton = document.getElementById('limpiar-btn');
         limpiarButton.addEventListener('click', () => {
             document.getElementById('registrar-ausentismo-form').reset();
-            this.showNotification(notificationDiv, 'Formulario limpiado.', 'info');
+            this.showNotification('Formulario limpiado.', '', 'info');
         });
 
         this.container.appendChild(mainContainer);
@@ -319,17 +307,80 @@ class RegistrarAusentismoComponent {
         return button;
     }
 
-    showNotification(notificationDiv, message, type = 'success') {
-        notificationDiv.textContent = message;
-        notificationDiv.style.borderLeftColor = type === 'error' ? '#dc3545' : '#28a745';
-        notificationDiv.style.transform = 'translateX(0)';
+    /* 📦443 (2026-06-25) — showNotification migrado al estándar del proyecto.
+       Usa window.updateNotifier.show() con API consistente:
+       - type: 'success' | 'info' | 'warning' | 'error'
+       - title: encabezado principal
+       - subtitle: descripción secundaria (opcional)
+       - autoClose: ms antes de cerrar (0 = no cierra, útil para loading)
+       - progress: { percent: 0..100 } muestra barra de progreso
+       API idéntica a la usada en 6.1.3 (revision-alta-direccion), 6.1.2 (auditoria-anual)
+       y el resto de submódulos actualizados del proyecto.
 
-        setTimeout(() => {
-            notificationDiv.style.transform = 'translateX(120%)';
-        }, 3000);
+       📦443 (2026-06-25) — Fix iframe: este componente se ejecuta dentro de un iframe,
+       donde window.updateNotifier está en el documento PADRE. Usamos window.parent.updateNotifier
+       con fallback a window.updateNotifier para que funcione tanto dentro como fuera del iframe. */
+    showNotification(notificationDivOrTitle, message, type = 'success') {
+        var title, subtitle;
+        if (typeof notificationDivOrTitle === 'string') {
+            title = notificationDivOrTitle;
+            subtitle = message;
+            type = type || 'success';
+        } else {
+            title = message || 'Notificación';
+            subtitle = '';
+            type = type || 'success';
+        }
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier && typeof notifier.show === 'function') {
+            notifier.show({
+                type: type,
+                title: title,
+                subtitle: subtitle,
+                autoClose: type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000
+            });
+        }
     }
 
-    handleSubmit(notificationDiv) {
+    /* 📦443 — showLoadingToast: muestra un toast con progress bar que NO se cierra
+       automáticamente. Retorna el id para poder cerrarlo/actualizarlo después. */
+    showLoadingToast(title, subtitle) {
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier && typeof notifier.show === 'function') {
+            var id = notifier.show({
+                type: 'info',
+                title: title,
+                subtitle: subtitle || '',
+                autoClose: 0,
+                progress: { percent: 0 }
+            });
+            this._loadingToastId = id;
+            return id;
+        }
+        return null;
+    }
+
+    /* 📦443 — updateLoadingProgress: actualiza la barra de progreso del toast activo. */
+    updateLoadingProgress(percent, subtitle) {
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (this._loadingToastId && notifier && typeof notifier.update === 'function') {
+            notifier.update(this._loadingToastId, {
+                progress: { percent: Math.max(0, Math.min(100, percent)) },
+                subtitle: subtitle
+            });
+        }
+    }
+
+    /* 📦443 — hideLoadingToast: cierra el toast de loading activo. */
+    hideLoadingToast() {
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (this._loadingToastId && notifier && typeof notifier.remove === 'function') {
+            notifier.remove(this._loadingToastId);
+            this._loadingToastId = null;
+        }
+    }
+
+    handleSubmit() {
         // Obtener los valores del formulario
         const formData = {
             cedula: document.getElementById('cedula').value.trim(),
@@ -348,13 +399,13 @@ class RegistrarAusentismoComponent {
 
         // Validar campos requeridos
         if (!formData.cedula || !formData.nombre || !formData.fechaInicio || !formData.fechaFin) {
-            this.showNotification(notificationDiv, 'Por favor complete los campos obligatorios.', 'error');
+            this.showNotification('Por favor complete los campos obligatorios.', 'Complete los campos marcados con *', 'error');
             return;
         }
 
         // Validar fechas
         if (new Date(formData.fechaInicio) > new Date(formData.fechaFin)) {
-            this.showNotification(notificationDiv, 'La fecha de inicio no puede ser posterior a la fecha de finalización.', 'error');
+            this.showNotification('Fechas inválidas', 'La fecha de inicio no puede ser posterior a la fecha de finalización', 'error');
             return;
         }
 
@@ -375,28 +426,40 @@ class RegistrarAusentismoComponent {
         // Simular el registro de la incapacidad
         this.logMessage(`Registrando incapacidad para ${formData.nombre} (${formData.cedula})`, 'info');
 
+        // 📦443 — Mostrar toast con progress bar mientras se guarda
+        this.showLoadingToast('Registrando incapacidad', `Cédula ${formData.cedula} · ${formData.nombre}`);
+
         // Guardar incapacidad
-        this.guardarIncapacidad(formData, notificationDiv)
+        this.guardarIncapacidad(formData)
             .then(() => {
-                this.showNotification(notificationDiv, '¡Incapacidad registrada correctamente!', 'success');
+                this.hideLoadingToast();
+                this.showNotification('¡Incapacidad registrada!', `${formData.nombre} · ${formData.diasIncapacidad} días`, 'success');
                 document.getElementById('registrar-ausentismo-form').reset();
             })
             .catch(error => {
+                this.hideLoadingToast();
                 console.error('Error al registrar incapacidad:', error);
-                this.showNotification(notificationDiv, `Error: ${error.message}`, 'error');
+                this.showNotification('Error al guardar', error.message || 'Error desconocido', 'error');
             });
     }
 
-    async guardarIncapacidad(datos, notificationDiv) {
-        try {
-            this.showNotification(notificationDiv, 'Registrando incapacidad...', 'info');
+    async guardarIncapacidad(datos) {
+        // 📦443 — Animación de progreso simulada mientras se procesa
+        this.updateLoadingProgress(15, 'Validando datos...');
+        await new Promise(r => setTimeout(r, 120));
 
+        this.updateLoadingProgress(40, 'Guardando en base de datos...');
+
+        try {
             // Llamar al backend usando el contrato existente (procesarAusentismo)
             if (window.electronAPI && window.electronAPI.procesarAusentismo) {
+                this.updateLoadingProgress(70, 'Procesando incapacidad...');
                 const result = await window.electronAPI.procesarAusentismo(
                     this.currentCompany,
                     datos
                 );
+
+                this.updateLoadingProgress(100, 'Completado');
 
                 if (result && result.success) {
                     this.logMessage('Incapacidad guardada exitosamente', 'success');
@@ -406,10 +469,12 @@ class RegistrarAusentismoComponent {
                 }
             } else {
                 // Modo simulación si no hay backend disponible
+                this.updateLoadingProgress(100, 'Modo simulación');
                 this.logMessage('Modo simulación: incapacidad guardada', 'success');
                 return { success: true, data: datos };
             }
         } catch (error) {
+            this.updateLoadingProgress(100, 'Error');
             this.logMessage(`Error al guardar incapacidad: ${error.message}`, 'error');
             throw error;
         }

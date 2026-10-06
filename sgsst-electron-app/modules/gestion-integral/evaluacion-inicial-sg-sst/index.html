@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K+AIR SG-SST — Evaluación Inicial del SG-SST</title>
+  <!--
+    ═══════════════════════════════════════════════════════════════════
+    K+AIR · MÓDULO EVALUACIÓN INICIAL DEL SG-SST (submódulo 2.3.1)
+    Sistema visual premium v2 · Manrope + Inter · tokens --kair-*
+    ═══════════════════════════════════════════════════════════════════
+    OJO — ESTE ARCHIVO NO ES LA VISTA QUE SE MONTA EN LA APP.
+
+    El componente NO se carga por iframe: `renderer.js` le pasa un contenedor
+    del documento principal y el componente **inyecta su propio marcado** desde
+    `evaluacion-inicial-view.js` (función `marcadoVista()`). El marcado vive ahí,
+    embebido, para que exista UNA sola fuente de verdad.
+
+    Este HTML queda como envoltorio para abrir la vista suelta durante el
+    desarrollo: carga la hoja, el componente y lo monta a pantalla completa.
+
+    Los estilos están en `evaluacion-inicial-view.css`, todos bajo `.ev-scope`.
+    ═══════════════════════════════════════════════════════════════════
+  -->
+  <link rel="stylesheet" href="evaluacion-inicial-view.css?v=EVAL-20260918-v2c-toast-strip">
+  <style>
+    html, body { margin: 0; height: 100%; background: #FBFCFB; }
+    [data-theme="dark"] body,
+    [data-theme="dark-legacy"] body { background: #131824; }
+    #standalone-host {
+      height: 100%; width: 100%;
+      display: flex; flex-direction: column; overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="standalone-host"></div>
+  <script src="evaluacion-inicial-view.js?v=EVAL-20260918-v2b-fix-overlays"></script>
+  <script>
+    // Montaje SOLO para abrir esta página suelta. Dentro de la app el componente
+    // lo instancia `renderer.js`, y este bloque no hace nada.
+    (function () {
+      'use strict';
+      if (!window.EvaluacionInicialView) return;
+      if (document.getElementById('app') || document.getElementById('main-canvas')) return;
+      var host = document.getElementById('standalone-host');
+      if (!host) return;
+      var inst = new window.EvaluacionInicialView(host, 'Gestión Integral',
+        '2.3.1 Evaluación inicial del SG-SST', function () { history.back(); });
+      window.__evalInicialStandalone = inst;
+      Promise.resolve(inst.render()).catch(function (e) {
+        console.error('[K+AIREVAL][MODULO][INIT][ERR]', e && e.message);
+      });
+    })();
+  </script>
+</body>
+</html>

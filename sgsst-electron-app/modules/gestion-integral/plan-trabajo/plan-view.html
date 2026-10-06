@@ -1,270 +1,2038 @@
 <!DOCTYPE html>
+<!--
+  ============================================================================
+  K+AIR — Plan de Trabajo Anual SST (Visual Renderer · Premium v2 · Integración real v3)
+  Modernización premium del módulo "Plan de Trabajo Anual" (Dashboard de
+  Avance + Cronograma Gantt + modales), aplicando el sistema visual aprobado
+  en Capacitaciones / Dashboard / Inducción / Acceso.
+  ---------------------------------------------------------------------------
+  - HTML/CSS/JS autocontenido, portable al renderer Electron (sin dependencias)
+  - Sistema visual premium v2: tokens --kair-* (Manrope + Inter, neutros
+  cálidos, azul institucional #2057B8, semánticos solo para estados:
+  verde=ejecutadas/realizadas, ámbar=planificadas/pendientes, rojo=vencidas)
+  - 2 pestañas en un solo archivo:
+      1. Dashboard de Avance → Hero Estado General + 4 KPIs + 6 gráficas SVG
+         runtime (estados, avance mensual, trimestral, mes×estado, categorías,
+         radar anual) + "En tu radar"
+      2. Cronograma → árbol de actividades + Gantt Ene-Dic (chips C/P) +
+         panel de detalle (responsable, estado por mes editable, evidencias,
+         observaciones, eliminar)
+  - Modales premium: Seleccione Periodo (2026/2025 + clonar) y Crear Nueva
+    Actividad + Confirmar eliminación.
+  - DATASET COHERENTE: un solo dataset mensual (E/P por mes) reproduce los
+    KPIs exactos de la captura (254 programadas, 119 realizadas, 135
+    pendientes, 41 vencidas, 47%) y deriva las gráficas de avance, trimestral,
+    mes×estado y radar. La gráfica "Actividades por Estado" conserva los
+    valores literales de la app original (15/135/119).
+  - Textos originales preservados 1:1 (títulos, KPIs, "Árbol de Actividades",
+    "Seleccione Periodo", "Clonar Plan Actual a Nuevo Año", "Crear Nueva
+    Actividad", "Abrir Carpeta de Evidencias", "Eliminar Actividad", árbol de
+    actividades de la captura con sus patrones C/P, Tempoactiva, Responsable
+    SST, 2026/2025).
+  - INTEGRACIÓN FUTURA (solo Renderer, sin cambios de contratos existentes):
+      window.electronAPI.getPlanTrabajo({ anio })
+        → { success, data: { kpis, porMes, categorias, arbol } }
+      window.electronAPI.setEstadoActividad({ id, mes, estado })   // 'C'|'P'|null
+      window.electronAPI.crearActividad({ nombre, grupo, responsable })
+      window.electronAPI.eliminarActividad(id)
+      window.electronAPI.clonarPlan({ anioOrigen, anioDestino })
+      window.electronAPI.abrirCarpetaEvidencias(id)
+    Puntos marcados con "PUNTO DE INTEGRACIÓN" en el JS.
+  - Logging estructurado: [K+AIRPLAN][MODULO][ACCION][STATUS]
+  ============================================================================
+-->
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Plan de Trabajo Anual SST</title>
-  <!-- Iconos -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="plan-view.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR · Plan de Trabajo Anual SST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ================= 1. DESIGN TOKENS · PREMIUM v2 ================= */
+:root{
+  --kair-bg:#FBFCFB;
+  --kair-surface:#FFFFFF;
+  --kair-text:#14213D;
+  --kair-text-2:#748096;
+  --kair-text-3:#9AA4B8;
+  --kair-border:#E8EBEE;
+  --kair-border-soft:#F0F2F4;
+  --kair-hover:#F7F9FB;
+  --kair-track:#EEF1F4;
+  --kair-blue:#2057B8;
+  --kair-blue-hover:#1A4A9E;
+  --kair-blue-soft:#EDF3FC;
+  --kair-blue-text:#1D4FA6;
+  --kair-blue-light:#A9C6F2;
+  --kair-green:#1BB888;      --kair-green-soft:#E4F7F0; --kair-green-text:#0E8A63;
+  --kair-amber:#E7A224;      --kair-amber-soft:#FBF1DD; --kair-amber-text:#9A6B0F;
+  --kair-red:#DA5563;        --kair-red-soft:#FBEAEC;   --kair-red-text:#B23A48;
+  --kair-slate:#5B6B8C;      --kair-slate-soft:#EEF1F6;
+  --kair-navy:#14213D;
+  --kair-radius-lg:22px;
+  --kair-radius-md:12px;
+  --kair-radius-sm:10px;
+  --kair-shadow:0 1px 2px rgba(20,33,61,.03);
+  --kair-shadow-pop:0 16px 40px rgba(20,33,61,.16);
+  --kair-t:180ms cubic-bezier(.4,0,.2,1);
+  --kair-font-title:'Manrope','Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --kair-font-ui:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+}
+
+/* ================= 2. BASE ================= */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--kair-font-ui);
+  background:var(--kair-bg);color:var(--kair-text);
+  font-size:14px;font-weight:400;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:var(--kair-text)}
+ul,ol{list-style:none}
+[hidden]{display:none!important}
+.is-hidden{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+:focus-visible{outline:2px solid var(--kair-blue);outline-offset:2px;border-radius:4px}
+svg{display:block;flex-shrink:0}
+::selection{background:var(--kair-blue-soft)}
+
+/* ================= 3. PÁGINA ================= */
+.kair-page{max-width:none;margin:0 auto;padding:22px 28px 56px}
+
+/* ================= 4. TOPBAR DEL MÓDULO ================= */
+.kair-topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.kair-module-id{display:flex;align-items:center;gap:14px;min-width:0}
+.kair-module-id__icon{width:44px;height:44px;border-radius:13px;background:var(--kair-blue-soft);color:var(--kair-blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kair-module-id__title{font-family:var(--kair-font-title);font-size:25px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--kair-text)}
+.kair-module-id__desc{font-size:13px;color:var(--kair-text-2);margin-top:3px}
+.kair-topbar__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ================= 5. CHIPS Y BOTONES ================= */
+.kair-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:var(--kair-slate-soft);color:var(--kair-slate);font-size:12px;font-weight:600;white-space:nowrap}
+.kair-chip svg{opacity:.7}
+.kair-chip--blue{background:var(--kair-blue-soft);color:var(--kair-blue-text)}
+.kair-chip--soft-green{background:var(--kair-green-soft);color:var(--kair-green-text)}
+.kair-chip--soft-amber{background:var(--kair-amber-soft);color:var(--kair-amber-text)}
+.kair-chip--soft-red{background:var(--kair-red-soft);color:var(--kair-red-text)}
+.kair-chip--sm{height:22px;padding:0 9px;font-size:10.5px;gap:4px}
+.kair-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 15px;border-radius:var(--kair-radius-sm);font-size:13px;font-weight:600;white-space:nowrap;transition:background var(--kair-t),color var(--kair-t),border-color var(--kair-t),box-shadow var(--kair-t),transform var(--kair-t)}
+.kair-btn:active{transform:translateY(.5px)}
+.kair-btn--ghost{color:var(--kair-text-2)}
+.kair-btn--ghost:hover{background:#F1F4F8;color:var(--kair-text)}
+.kair-btn--outline{background:var(--kair-surface);border:1px solid var(--kair-border);color:var(--kair-text)}
+.kair-btn--outline:hover{border-color:#D5DBE2;background:var(--kair-hover)}
+.kair-btn--primary{background:var(--kair-blue);color:#fff}
+.kair-btn--primary:hover{background:var(--kair-blue-hover)}
+.kair-btn--primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(32,87,184,.25)}
+.kair-btn--danger-outline{background:var(--kair-surface);border:1px solid var(--kair-red);color:var(--kair-red-text)}
+.kair-btn--danger-outline:hover{background:var(--kair-red-soft)}
+
+/* ================= 6. TABS ================= */
+.kair-tabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--kair-border)}
+.kair-tab{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;font-size:13.5px;font-weight:600;color:var(--kair-text-2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--kair-t),border-color var(--kair-t)}
+.kair-tab svg{opacity:.75}
+.kair-tab:hover{color:var(--kair-text)}
+.kair-tab.is-active{color:var(--kair-blue);border-bottom-color:var(--kair-blue)}
+.kair-tab.is-active svg{opacity:1}
+
+/* ================= 7. HERO · ESTADO GENERAL ================= */
+.kair-hero{
+  margin-top:20px;border-radius:var(--kair-radius-lg);
+  background:linear-gradient(140deg,#1A2B50 0%,#14213D 58%,#101A33 100%);
+  color:#fff;padding:26px 28px;display:flex;gap:28px;align-items:stretch;justify-content:space-between;
+  position:relative;overflow:hidden;
+}
+.kair-hero::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(520px 300px at 92% -20%, rgba(32,87,184,.4), transparent 62%);
+}
+.kair-hero__main{position:relative;flex:1;min-width:0}
+.kair-hero__eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.kair-hero__title{margin-top:10px;font-family:var(--kair-font-title);font-weight:800;font-size:23px;letter-spacing:-.015em;line-height:1.3;max-width:640px}
+.kair-hero__title em{font-style:normal;color:#A9C6F2}
+.kair-hero__bar-wrap{margin-top:18px;max-width:560px}
+.kair-hero__bar{position:relative;height:8px;border-radius:999px;background:rgba(255,255,255,.14);overflow:visible}
+.kair-hero__fill{height:100%;border-radius:999px;background:var(--kair-green);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.kair-hero__fill--amber{position:absolute;top:0;left:var(--w-green);right:0;border-radius:0 999px 999px 0;background:rgba(231,162,36,.75)}
+.kair-hero__tick{position:absolute;top:-3px;left:var(--pos);width:2px;height:14px;border-radius:2px;background:var(--kair-red)}
+.kair-hero__legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:rgba(255,255,255,.66)}
+.kair-hero__legend span{display:inline-flex;align-items:center;gap:6px}
+.kair-hero__legend i{width:7px;height:7px;border-radius:50%}
+.kair-hero__aside{position:relative;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:8px;flex-shrink:0}
+.kair-hero__pct{font-family:var(--kair-font-title);font-weight:800;font-size:44px;letter-spacing:-.03em;line-height:1}
+.kair-hero__pct small{font-size:20px;font-weight:700;color:rgba(255,255,255,.6)}
+.kair-hero__pct-label{font-size:11.5px;color:rgba(255,255,255,.6);margin-top:-2px}
+.kair-hero__cta{
+  display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;margin-top:6px;
+  border-radius:var(--kair-radius-sm);background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);
+  color:#fff;font-size:12.5px;font-weight:600;transition:background var(--kair-t);
+}
+.kair-hero__cta:hover{background:rgba(255,255,255,.18)}
+
+/* ================= 8. KPI CARDS ================= */
+.kair-kpis{margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kair-kpi{
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-lg);
+  padding:18px 20px;display:flex;align-items:center;gap:14px;min-width:0;
+  transition:box-shadow var(--kair-t),transform var(--kair-t);
+}
+.kair-kpi:hover{box-shadow:0 10px 26px rgba(20,33,61,.06);transform:translateY(-1px)}
+.kair-kpi__icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kair-kpi__icon--blue{background:var(--kair-blue-soft);color:var(--kair-blue)}
+.kair-kpi__icon--green{background:var(--kair-green-soft);color:var(--kair-green)}
+.kair-kpi__icon--amber{background:var(--kair-amber-soft);color:var(--kair-amber)}
+.kair-kpi__icon--red{background:var(--kair-red-soft);color:var(--kair-red)}
+.kair-kpi__num{font-family:var(--kair-font-title);font-weight:800;font-size:26px;letter-spacing:-.02em;line-height:1.1}
+.kair-kpi__label{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--kair-text-2);margin-top:3px}
+.kair-kpi__chip{margin-left:auto;flex-shrink:1;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+/* ================= 9. GRID DE GRÁFICAS ================= */
+.kair-charts{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kair-card{
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-lg);
+  padding:20px 20px 16px;min-width:0;display:flex;flex-direction:column;
+}
+.kair-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
+.kair-card__title{font-family:var(--kair-font-title);font-size:15.5px;font-weight:700;letter-spacing:-.01em;color:var(--kair-text)}
+.kair-card__sub{font-size:11.5px;color:var(--kair-text-3);margin-top:2px}
+.kair-card__legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.kair-card__legend span{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--kair-text-2)}
+.kair-card__legend i{width:8px;height:8px;border-radius:3px}
+.kair-chart-body{position:relative;flex:1;min-height:218px}
+.kair-chart-body svg{width:100%;height:100%;display:block;overflow:visible}
+.kair-tip{
+  position:absolute;pointer-events:none;z-index:5;opacity:0;transform:translateY(4px);
+  background:var(--kair-navy);color:#fff;border-radius:9px;padding:7px 10px;
+  font-size:11px;font-weight:500;line-height:1.45;white-space:nowrap;
+  box-shadow:var(--kair-shadow-pop);transition:opacity var(--kair-t),transform var(--kair-t);
+}
+.kair-tip.is-on{opacity:1;transform:none}
+.kair-tip b{font-family:var(--kair-font-title);font-weight:700}
+.kair-tip .row{display:flex;align-items:center;gap:6px}
+.kair-tip .dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+
+/* Barras animadas */
+.kair-bar-anim{transform-origin:bottom;animation:kair-grow .5s cubic-bezier(.4,0,.2,1) backwards}
+@keyframes kair-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.kair-hbar-anim{animation:kair-wgrow .55s cubic-bezier(.4,0,.2,1) backwards;transform-origin:left}
+@keyframes kair-wgrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.kair-line-anim{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:kair-draw 1.1s .15s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes kair-draw{to{stroke-dashoffset:0}}
+.kair-poly-anim{opacity:0;animation:kair-fadein .6s .3s ease forwards}
+@keyframes kair-fadein{to{opacity:1}}
+
+/* ================= 10. EN TU RADAR ================= */
+.kair-radar-zone{margin-top:24px}
+.kair-zone-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.kair-zone-head h2{font-family:var(--kair-font-title);font-size:18px;font-weight:800;letter-spacing:-.015em}
+.kair-zone-head p{font-size:12px;color:var(--kair-text-2);margin-left:auto}
+.kair-radar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kair-radar-card{
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-lg);
+  padding:18px 20px;display:flex;gap:14px;align-items:flex-start;cursor:pointer;text-align:left;
+  transition:box-shadow var(--kair-t),transform var(--kair-t),border-color var(--kair-t);width:100%;
+}
+.kair-radar-card:hover{box-shadow:0 10px 26px rgba(20,33,61,.06);transform:translateY(-1px);border-color:#DDE4EA}
+.kair-radar-card__stripe{width:3px;border-radius:3px;align-self:stretch;flex-shrink:0}
+.kair-radar-card__body{min-width:0}
+.kair-radar-card__top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kair-radar-card__title{font-family:var(--kair-font-title);font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+.kair-radar-card__desc{font-size:12.5px;color:var(--kair-text-2);margin-top:5px;line-height:1.5}
+
+/* ================= 11. CRONOGRAMA ================= */
+.kair-cron{margin-top:20px;display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:14px;align-items:start}
+.kair-gantt{
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-lg);
+  overflow:hidden;display:flex;flex-direction:column;
+}
+.kair-gantt__bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--kair-border-soft)}
+.kair-gantt__bar h3{font-family:var(--kair-font-title);font-size:15px;font-weight:700;letter-spacing:-.01em}
+.kair-gantt__hint{font-size:11px;color:var(--kair-text-3);display:inline-flex;align-items:center;gap:10px;padding-left:6px}
+.kair-gantt__hint i.k{display:inline-block;width:22px;height:12px;border-radius:4px;background:var(--kair-green);vertical-align:middle;margin-right:4px}
+.kair-gantt__hint i.p{display:inline-block;width:22px;height:12px;border-radius:4px;background:var(--kair-amber);vertical-align:middle;margin-right:4px}
+.kair-gantt__scroll{overflow:auto;max-height:560px}
+.kair-gantt__table{min-width:920px}
+.kair-grow{display:grid;grid-template-columns:264px repeat(12,minmax(72px,1fr));align-items:stretch}
+.kair-grow--head{position:sticky;top:0;z-index:6;background:var(--kair-surface);border-bottom:1px solid var(--kair-border)}
+.kair-gcell{display:flex;align-items:center;padding:0 10px;min-height:40px;border-left:1px solid var(--kair-border-soft);font-size:11.5px;font-weight:600;color:var(--kair-text-2);justify-content:center}
+.kair-grow--head .kair-gcell{min-height:38px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--kair-text-2)}
+.kair-glabel{position:sticky;left:0;z-index:4;background:var(--kair-surface);display:flex;align-items:center;gap:8px;padding:0 12px 0 14px;min-width:0;border-right:1px solid var(--kair-border-soft)}
+.kair-grow--head .kair-glabel{z-index:7;font-size:12px;font-weight:700;color:var(--kair-text);justify-content:flex-start}
+.kair-grow--folder .kair-glabel,.kair-grow--folder .kair-gcell{background:#F6F8FA}
+.kair-grow--folder .kair-glabel{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--kair-text);cursor:pointer;min-height:38px}
+.kair-grow--folder .kair-glabel .chev{transition:transform var(--kair-t);color:var(--kair-text-3)}
+.kair-grow--folder.is-closed .kair-glabel .chev{transform:rotate(-90deg)}
+.kair-grow--sub .kair-glabel{padding-left:30px;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--kair-slate);min-height:32px}
+.kair-grow--sub .kair-glabel svg{color:var(--kair-text-3)}
+.kair-grow--act{cursor:pointer}
+.kair-grow--act .kair-glabel{min-height:40px;font-size:12.5px;font-weight:500;color:var(--kair-text);transition:background var(--kair-t)}
+.kair-grow--act:hover .kair-glabel{background:var(--kair-hover)}
+.kair-grow--act .kair-glabel span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kair-grow--act .kair-glabel .ric{color:var(--kair-text-3)}
+.kair-grow--act.is-sel .kair-glabel{background:var(--kair-blue-soft);color:var(--kair-blue-text);font-weight:600;box-shadow:inset 3px 0 0 var(--kair-blue)}
+.kair-gchip{
+  width:46px;height:22px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;color:#fff;font-family:var(--kair-font-title);
+}
+.kair-gchip--c{background:var(--kair-green)}
+.kair-gchip--p{background:var(--kair-amber)}
+.kair-grow--closed-hijos{display:none}
+
+/* Panel de detalle */
+.kair-detail{
+  background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:var(--kair-radius-lg);
+  padding:20px;display:flex;flex-direction:column;gap:16px;position:sticky;top:16px;
+}
+.kair-detail__close{display:none;position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:9px;align-items:center;justify-content:center;color:var(--kair-text-2)}
+.kair-detail__close:hover{background:#F1F4F8}
+.kair-detail__id{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--kair-text-3)}
+.kair-detail__title{font-family:var(--kair-font-title);font-weight:800;font-size:19px;letter-spacing:-.015em;line-height:1.25;margin-top:4px}
+.kair-detail__lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--kair-text-2);margin-bottom:6px}
+.kair-select{
+  width:100%;height:40px;border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);
+  background:var(--kair-surface);padding:0 12px;font-size:13px;font-weight:500;
+  transition:border-color var(--kair-t),box-shadow var(--kair-t);
+}
+.kair-select:hover{border-color:#D8DEE5}
+.kair-select:focus{outline:none;border-color:var(--kair-blue);box-shadow:0 0 0 3px rgba(32,87,184,.13)}
+.kair-periodo{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:var(--kair-blue-soft);color:var(--kair-blue-text);border-radius:var(--kair-radius-sm);
+  padding:9px 12px;font-size:13px;font-weight:700;
+}
+.kair-periodo small{font-size:10.5px;font-weight:600;color:var(--kair-blue-text);opacity:.7;text-transform:uppercase;letter-spacing:.06em}
+.kair-mesgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.kair-mesbtn{
+  height:38px;border-radius:9px;border:1px solid var(--kair-border);background:var(--kair-surface);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:10.5px;font-weight:700;color:var(--kair-text-2);
+  transition:border-color var(--kair-t),background var(--kair-t),color var(--kair-t),box-shadow var(--kair-t);
+}
+.kair-mesbtn small{font-size:9px;font-weight:600;color:var(--kair-text-3)}
+.kair-mesbtn:hover{border-color:#C9D4E4}
+.kair-mesbtn.is-c{background:var(--kair-green);border-color:var(--kair-green);color:#fff}
+.kair-mesbtn.is-c small{color:rgba(255,255,255,.75)}
+.kair-mesbtn.is-p{background:var(--kair-amber);border-color:var(--kair-amber);color:#fff}
+.kair-mesbtn.is-p small{color:rgba(255,255,255,.75)}
+.kair-detail__actions{display:flex;flex-direction:column;gap:9px;border-top:1px solid var(--kair-border-soft);padding-top:14px}
+.kair-textarea{
+  width:100%;min-height:64px;border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);
+  padding:9px 12px;font-size:13px;resize:vertical;transition:border-color var(--kair-t),box-shadow var(--kair-t);
+  background:var(--kair-surface);
+}
+.kair-textarea::placeholder{color:var(--kair-text-3)}
+.kair-textarea:focus{outline:none;border-color:var(--kair-blue);box-shadow:0 0 0 3px rgba(32,87,184,.13)}
+
+/* ================= 12. MODALES ================= */
+.kair-overlay{
+  position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  background:rgba(20,33,61,.42);backdrop-filter:blur(3px);
+  opacity:0;pointer-events:none;transition:opacity .18s ease;padding:20px;
+}
+.kair-overlay.is-open{opacity:1;pointer-events:auto}
+.kair-modal{
+  width:100%;max-width:440px;background:var(--kair-surface);border-radius:var(--kair-radius-lg);
+  padding:26px 26px 22px;box-shadow:var(--kair-shadow-pop);position:relative;
+  transform:translateY(8px) scale(.98);transition:transform .18s cubic-bezier(.4,0,.2,1);
+  max-height:calc(100vh - 40px);overflow:auto;
+}
+.kair-overlay.is-open .kair-modal{transform:none}
+.kair-modal--danger{border-top:3px solid var(--kair-red)}
+.kair-modal__x{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--kair-text-2);transition:background var(--kair-t)}
+.kair-modal__x:hover{background:#F1F4F8}
+.kair-modal h3{font-family:var(--kair-font-title);font-size:19px;font-weight:800;letter-spacing:-.015em}
+.kair-modal__sub{font-size:13px;color:var(--kair-text-2);margin-top:5px}
+.kair-years{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.kair-year{
+  border:1px solid var(--kair-border);border-radius:var(--kair-radius-md);background:var(--kair-surface);
+  padding:18px 14px;display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;
+  transition:border-color var(--kair-t),background var(--kair-t),box-shadow var(--kair-t);
+}
+.kair-year:hover{border-color:#C9D4E4}
+.kair-year.is-sel{border-color:var(--kair-blue);background:#F7FAFE;box-shadow:0 0 0 1px var(--kair-blue)}
+.kair-year__ico{width:38px;height:38px;border-radius:11px;background:var(--kair-green-soft);color:var(--kair-green-text);display:flex;align-items:center;justify-content:center}
+.kair-year b{font-family:var(--kair-font-title);font-size:20px;font-weight:800;letter-spacing:-.01em}
+.kair-year__check{
+  position:absolute;top:9px;right:9px;width:19px;height:19px;border-radius:50%;
+  background:var(--kair-blue);color:#fff;display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.5);transition:opacity var(--kair-t),transform var(--kair-t);
+}
+.kair-year.is-sel .kair-year__check{opacity:1;transform:scale(1)}
+.kair-modal__note{text-align:center;font-size:11.5px;color:var(--kair-text-3);margin-top:10px}
+.kair-field{margin-top:16px}
+.kair-field:first-of-type{margin-top:20px}
+.kair-err{display:none;margin-top:6px;font-size:12px;font-weight:500;color:var(--kair-red-text);align-items:center;gap:5px}
+.kair-field.is-error .kair-err{display:flex}
+.kair-field.is-error .kair-input,.kair-field.is-error .kair-select{border-color:var(--kair-red);box-shadow:0 0 0 3px rgba(218,85,99,.11)}
+.kair-input{
+  width:100%;height:44px;border:1px solid var(--kair-border);border-radius:var(--kair-radius-sm);
+  background:var(--kair-surface);padding:0 13px;font-size:13.5px;font-weight:500;
+  transition:border-color var(--kair-t),box-shadow var(--kair-t);
+}
+.kair-input::placeholder{color:var(--kair-text-3);font-weight:400}
+.kair-input:hover,.kair-select:hover{border-color:#D8DEE5}
+.kair-input:focus{outline:none;border-color:var(--kair-blue);box-shadow:0 0 0 3px rgba(32,87,184,.13)}
+.kair-modal__foot{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
+.kair-modal__foot--center{justify-content:center}
+.kair-btn--danger-solid{background:var(--kair-red);color:#fff}
+.kair-btn--danger-solid:hover{background:#C64655}
+.kair-btn--full{width:100%;height:44px;border-radius:var(--kair-radius-md);font-size:14px}
+
+/* ================= 13. TOASTS ================= */
+.kair-toast-zone{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.kair-toast{
+  display:flex;align-items:center;gap:9px;max-width:min(92vw,500px);
+  background:var(--kair-navy);color:#fff;font-size:13px;font-weight:500;line-height:1.4;
+  padding:11px 16px;border-radius:var(--kair-radius-md);box-shadow:0 16px 40px rgba(20,33,61,.25);
+  animation:kair-toast-in .22s cubic-bezier(.4,0,.2,1);
+}
+.kair-toast svg{color:#8FB8F0}
+.kair-toast.is-ok svg{color:#5EDDB4}
+.kair-toast.is-warn svg{color:#F0C36B}
+@keyframes kair-toast-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.kair-toast.is-out{animation:kair-toast-out .2s forwards}
+@keyframes kair-toast-out{to{opacity:0;transform:translateY(6px)}}
+
+/* ================= 14. RESPONSIVE ================= */
+@media (max-width:1120px){
+  .kair-charts{grid-template-columns:repeat(2,1fr)}
+  .kair-radar-grid{grid-template-columns:1fr}
+  .kair-cron{grid-template-columns:1fr}
+  .kair-detail{position:fixed;top:0;right:0;bottom:0;z-index:70;width:min(340px,92vw);border-radius:0;transform:translateX(102%);transition:transform .22s cubic-bezier(.4,0,.2,1);overflow:auto}
+  .kair-detail.is-open{transform:none;box-shadow:var(--kair-shadow-pop)}
+  .kair-detail__close{display:flex}
+}
+@media (max-width:760px){
+  .kair-page{padding:16px 14px 48px}
+  .kair-charts{grid-template-columns:1fr}
+  .kair-kpis{grid-template-columns:repeat(2,1fr)}
+  .kair-hero{flex-direction:column;gap:18px;padding:22px 20px}
+  .kair-hero__aside{align-items:flex-start}
+  .kair-module-id__title{font-size:20px}
+  .kair-tab span{display:none}
+  .kair-tab{padding:0 10px}
+}
+@media (max-width:560px){
+  .kair-kpis{grid-template-columns:1fr}
+  .kair-years{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  .kair-bar-anim,.kair-hbar-anim,.kair-line-anim,.kair-poly-anim{animation:none;stroke-dashoffset:0;opacity:1;transform:none}
+}
+</style>
 </head>
 <body>
+<div class="kair-page">
 
-  <div class="app-container">
-<!-- HEADER — Card k-section-card (tabs integrados) -->
-<div class="k-section-card" style="padding:0; margin-bottom:0; flex-shrink:0; flex-grow:0;">
-  <!-- Fila 1: contenido principal -->
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="fas fa-tasks" style="color:#174ea6; font-size:1.25rem;"></i>
+  <!-- ================= TOPBAR ================= -->
+  <header class="kair-topbar">
+    <div class="kair-module-id">
+      <span class="kair-module-id__icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10"/><path d="M9 9h10"/><path d="M9 14h10"/><path d="M9 19h10"/><path d="M4 4h.01"/><path d="M4 9h.01"/><path d="M4 14h.01"/><path d="M4 19h.01"/></svg>
+      </span>
       <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Plan de Trabajo Anual SST</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión y seguimiento del plan de trabajo anual SG-SST.</p>
+        <h1 class="kair-module-id__title">Plan de Trabajo Anual SST</h1>
+        <p class="kair-module-id__desc">Gestión y seguimiento del plan de trabajo anual SG-SST.</p>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-      <div class="tabs-header__company">
-        <i class="bi bi-building"></i>
-        <span id="companyName">...</span>
-      </div>
-      <span class="tabs-header__role" id="userRole">Responsable SST</span>
-      <div style="width:1px; height:24px; background:#dee2e6;"></div>
-      <button class="btn-period" onclick="showPeriodSelector()">
-        <i class="bi bi-calendar3"></i>
-        <span id="currentPeriodLabel">2026</span>
-        <i class="bi bi-chevron-down"></i>
+    <div class="kair-topbar__actions">
+      <span class="kair-chip kair-chip--blue">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h6"/></svg>
+        <span id="topbar-company">—</span>
+      </span>
+      <span class="kair-chip">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg>
+        Responsable SST
+      </span>
+      <button type="button" class="kair-btn kair-btn--outline" id="btn-anio">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/></svg>
+        <span id="lbl-anio">2026</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
-      <div style="width:1px; height:24px; background:#dee2e6;"></div>
-      <button class="header-back-btn" id="backBtn" title="Volver">
-        <i class="fas fa-arrow-left"></i> Volver
+      <button type="button" class="kair-btn kair-btn--ghost" id="btn-volver">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+        Volver
       </button>
     </div>
-  </div>
+  </header>
 
-  <!-- Fila 2: tabs (dentro del card) -->
-  <div class="plan-tabs">
-    <button class="plan-tab" onclick="switchMainView('dashboard')">
-      <i class="fas fa-chart-pie"></i> Dashboard de Avance
+  <!-- ================= TABS ================= -->
+  <nav class="kair-tabs" role="tablist" aria-label="Secciones del plan">
+    <button type="button" class="kair-tab is-active" id="tab-dash" role="tab" aria-selected="true" aria-controls="view-dash">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.5"/></svg>
+      <span>Dashboard de Avance</span>
     </button>
-    <button class="plan-tab active" onclick="switchMainView('plan')">
-      <i class="fas fa-stream"></i> Cronograma
+    <button type="button" class="kair-tab" id="tab-cron" role="tab" aria-selected="false" aria-controls="view-cron">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><path d="M4 12h16"/><path d="M4 18h7"/></svg>
+      <span>Cronograma</span>
     </button>
-  </div>
-</div>
+  </nav>
 
-<!-- VIEW 1: DASHBOARD -->
-<div id="view-dashboard" class="dashboard-view">
-  <div class="k-stats-ribbon">
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon primary"><i class="bi bi-calendar-check"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-total">0</span>
-        <span class="k-stats-ribbon__label">Programadas</span>
-      </div>
-      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-completed">0</span>
-        <span class="k-stats-ribbon__label">Realizadas</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-pending">0</span>
-        <span class="k-stats-ribbon__label">Pendientes</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-overdue">0</span>
-        <span class="k-stats-ribbon__label">Vencidas</span>
-      </div>
-    </div>
-  </div>
+  <!-- ============================================================
+       VISTA 1 · DASHBOARD DE AVANCE
+       ============================================================ -->
+  <section id="view-dash" role="tabpanel" aria-label="Dashboard de avance">
 
-  <!-- GRÁFICOS DEL DASHBOARD — 3x2 -->
-  <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="fas fa-chart-bar"></i> Actividades por Estado</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartStatus"></canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="fas fa-chart-line"></i> Avance Mensual</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartMonthlyProgress"></canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="fas fa-chart-column"></i> Cumplimiento Trimestral</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartQuarterly"></canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="fas fa-chart-area"></i> Actividades por Mes y Estado</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartMonthlyStatus"></canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="bi bi-list-columns-reverse"></i> Cumplimiento por Categoría</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartByCategory"></canvas>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-header">
-        <h3><i class="bi bi-compass"></i> Distribución Anual</h3>
-      </div>
-      <div class="chart-body">
-        <canvas id="chartAnnualRadar"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
-        <!-- VIEW 2: TREE VIEW + WATERFALL -->
-        <div id="view-plan" class="plan-view active">
-            <div class="plan-layout">
-                
-                <!-- PANEL 1: TREE VIEW (LEFT) -->
-                <div class="panel-tree" id="leftPanel">
-                    <div class="panel-header">
-                        <span>Árbol de Actividades</span>
-                        <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCreateModal()">
-                            <i class="fas fa-plus"></i> Nueva
-                        </button>
-                    </div>
-                    <div class="tree-content" id="treeContainer">
-                        <!-- Generated by JS -->
-                    </div>
-                </div>
-
-                <!-- RESIZER HANDLER -->
-                <div class="resizer" id="dragMe"></div>
-
-                <!-- PANEL 2: WATERFALL / GANTT (CENTER) -->
-                <div class="panel-gantt">
-                    <div class="gantt-header-scroll" id="ganttHeaderScroll">
-                        <div class="gantt-months">
-                            <div class="month-label">Ene</div><div class="month-label">Feb</div><div class="month-label">Mar</div>
-                            <div class="month-label">Abr</div><div class="month-label">May</div><div class="month-label">Jun</div>
-                            <div class="month-label">Jul</div><div class="month-label">Ago</div><div class="month-label">Sep</div>
-                            <div class="month-label">Oct</div><div class="month-label">Nov</div><div class="month-label">Dic</div>
-                        </div>
-                    </div>
-                    <div class="gantt-body-scroll" id="ganttBodyScroll">
-                        <div class="gantt-rows" id="ganttRows">
-                            <!-- Generated by JS -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PANEL 3: INSPECTOR (RIGHT) -->
-                <div class="panel-inspector">
-                    <div class="detail-header" id="inspectorContent">
-                        <div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
-                            <i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
-                            <p>Seleccione una actividad.</p>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+    <!-- Hero Estado General -->
+    <div class="kair-hero">
+      <div class="kair-hero__main">
+        <span class="kair-hero__eyebrow" id="hero-eyebrow">Estado General</span>
+        <h2 class="kair-hero__title" id="hero-title"></h2>
+        <div class="kair-hero__bar-wrap">
+          <div class="kair-hero__bar">
+            <div class="kair-hero__fill" id="hero-green"></div>
+            <div class="kair-hero__fill--amber" id="hero-amber"></div>
+            <div class="kair-hero__tick" id="hero-tick" title="Vencidas"></div>
+          </div>
+          <div class="kair-hero__legend">
+            <span><i style="background:var(--kair-green)"></i>Realizadas · <b id="leg-e"></b></span>
+            <span><i style="background:rgba(231,162,36,.85)"></i>Pendientes · <b id="leg-p"></b></span>
+            <span><i style="background:var(--kair-red)"></i>Vencidas · <b id="leg-v"></b></span>
+          </div>
         </div>
-    </div>
-</div>
-
-<!-- OVERLAY SELECTOR DE PERIODO -->
-<div id="periodSelector" onclick="if(event.target===this)hidePeriodSelector()">
-  <div class="period-card">
-    <button class="period-card__close" onclick="hidePeriodSelector()" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>
-    <h2 style="font-family: 'Lexend', sans-serif; margin-bottom: 0.5rem;">Seleccione Periodo</h2>
-        <p style="color: var(--text-muted);">Escoja el año del Plan de Trabajo que desea gestionar.</p>
-        
-        <div class="period-grid" id="periodGrid">
-            <!-- JS genera los botones -->
-        </div>
-
-        <button class="btn btn-success" onclick="clonePeriod()">
-            <i class="fas fa-copy"></i> Clonar Plan Actual a Nuevo Año
+      </div>
+      <div class="kair-hero__aside">
+        <span class="kair-hero__pct" id="hero-pct">47<small>%</small></span>
+        <span class="kair-hero__pct-label">del plan ejecutado</span>
+        <button type="button" class="kair-hero__cta" id="btn-ver-vencidas">
+          Ver vencidas en el cronograma
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </button>
-        <p style="margin-top: 10px; font-size: 0.8rem; color: #888;">Esto creará una copia del plan actual con el año siguiente.</p>
+      </div>
     </div>
+
+    <!-- KPIs -->
+    <div class="kair-kpis">
+      <div class="kair-kpi">
+        <span class="kair-kpi__icon kair-kpi__icon--blue">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/></svg>
+        </span>
+        <div>
+          <div class="kair-kpi__num" id="kpi-num-prog">0</div>
+          <div class="kair-kpi__label">Programadas</div>
+        </div>
+        <span class="kair-chip kair-chip--sm kair-chip--blue kair-kpi__chip" id="kpi-chip-anio">Año —</span>
+      </div>
+      <div class="kair-kpi">
+        <span class="kair-kpi__icon kair-kpi__icon--green">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.8-4.8"/></svg>
+        </span>
+        <div>
+          <div class="kair-kpi__num" id="kpi-num-real">0</div>
+          <div class="kair-kpi__label">Realizadas</div>
+        </div>
+        <span class="kair-chip kair-chip--sm kair-chip--soft-green kair-kpi__chip" id="kpi-chip-pct">—</span>
+      </div>
+      <div class="kair-kpi">
+        <span class="kair-kpi__icon kair-kpi__icon--amber">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+        </span>
+        <div>
+          <div class="kair-kpi__num" id="kpi-num-pend">0</div>
+          <div class="kair-kpi__label">Pendientes</div>
+        </div>
+        <span class="kair-chip kair-chip--sm kair-chip--soft-amber kair-kpi__chip" id="kpi-chip-rest">—</span>
+      </div>
+      <div class="kair-kpi">
+        <span class="kair-kpi__icon kair-kpi__icon--red">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 19.5H3Z"/><path d="M12 10v4"/><path d="M12 16.8h.01"/></svg>
+        </span>
+        <div>
+          <div class="kair-kpi__num" id="kpi-num-venc">0</div>
+          <div class="kair-kpi__label">Vencidas</div>
+        </div>
+        <span class="kair-chip kair-chip--sm kair-chip--soft-red kair-kpi__chip" id="kpi-chip-venc">Requieren acción</span>
+      </div>
+    </div>
+
+    <!-- 6 gráficas -->
+    <div class="kair-charts">
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Actividades por Estado</h3>
+            <p class="kair-card__sub">Situación actual del plan</p>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-estado"></div>
+      </div>
+
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Avance Mensual</h3>
+            <p class="kair-card__sub">% de actividades ejecutadas por mes</p>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-avance"></div>
+      </div>
+
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Cumplimiento Trimestral</h3>
+            <p class="kair-card__sub">Programadas vs ejecutadas por trimestre</p>
+          </div>
+          <div class="kair-card__legend">
+            <span><i style="background:var(--kair-amber)"></i>Programadas</span>
+            <span><i style="background:var(--kair-green)"></i>Ejecutadas</span>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-trim"></div>
+      </div>
+
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Actividades por Mes y Estado</h3>
+            <p class="kair-card__sub">Ejecutadas sobre el total programado</p>
+          </div>
+          <div class="kair-card__legend">
+            <span><i style="background:var(--kair-green)"></i>Ejecutadas</span>
+            <span><i style="background:var(--kair-amber)"></i>Planificadas</span>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-mes"></div>
+      </div>
+
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Cumplimiento por Categoría</h3>
+            <p class="kair-card__sub">Ejecutadas y programadas por línea del plan</p>
+          </div>
+          <div class="kair-card__legend">
+            <span><i style="background:var(--kair-green)"></i>Ejecutadas</span>
+            <span><i style="background:var(--kair-amber)"></i>Programadas</span>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-cat"></div>
+      </div>
+
+      <div class="kair-card">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Distribución Anual</h3>
+            <p class="kair-card__sub">Carga por mes · ejecutado vs programado</p>
+          </div>
+          <div class="kair-card__legend">
+            <span><i style="background:var(--kair-green)"></i>Ejecutadas</span>
+            <span><i style="background:var(--kair-amber)"></i>Programadas</span>
+          </div>
+        </div>
+        <div class="kair-chart-body" id="ch-radar"></div>
+      </div>
+    </div>
+
+    <!-- En tu radar -->
+    <div class="kair-radar-zone">
+      <div class="kair-zone-head">
+        <h2>En tu radar</h2>
+        <p id="radar-sub">Derivado del plan</p>
+      </div>
+      <div class="kair-radar-grid">
+        <button type="button" class="kair-radar-card" id="radar-1">
+          <span class="kair-radar-card__stripe" style="background:var(--kair-red)"></span>
+          <span class="kair-radar-card__body">
+            <span class="kair-radar-card__top">
+              <span class="kair-chip kair-chip--sm kair-chip--soft-red" id="radar-chip-1">0 vencidas</span>
+            </span>
+            <span class="kair-radar-card__title" style="display:block;margin-top:8px">Actividades vencidas por recuperar</span>
+            <span class="kair-radar-card__desc" id="radar-desc-1" style="display:block">—</span>
+          </span>
+        </button>
+        <button type="button" class="kair-radar-card" id="radar-2">
+          <span class="kair-radar-card__stripe" style="background:var(--kair-amber)"></span>
+          <span class="kair-radar-card__body">
+            <span class="kair-radar-card__top">
+              <span class="kair-chip kair-chip--sm kair-chip--soft-amber" id="radar-chip-2">Q4 · 0 programadas</span>
+            </span>
+            <span class="kair-radar-card__title" style="display:block;margin-top:8px">El último trimestre concentra la carga</span>
+            <span class="kair-radar-card__desc" id="radar-desc-2" style="display:block">—</span>
+          </span>
+        </button>
+        <button type="button" class="kair-radar-card" id="radar-3">
+          <span class="kair-radar-card__stripe" style="background:var(--kair-blue)"></span>
+          <span class="kair-radar-card__body">
+            <span class="kair-radar-card__top">
+              <span class="kair-chip kair-chip--sm kair-chip--blue" id="radar-chip-3">—</span>
+            </span>
+            <span class="kair-radar-card__title" style="display:block;margin-top:8px">Categoría con menor avance</span>
+            <span class="kair-radar-card__desc" id="radar-desc-3" style="display:block">—</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       VISTA 2 · CRONOGRAMA
+       ============================================================ -->
+  <section id="view-cron" role="tabpanel" aria-label="Cronograma de actividades" hidden>
+    <div class="kair-cron">
+
+      <div class="kair-gantt">
+        <div class="kair-gantt__bar">
+          <h3>Árbol de Actividades</h3>
+          <button type="button" class="kair-btn kair-btn--primary" id="btn-nueva" style="height:34px;padding:0 13px;font-size:12.5px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Nueva
+          </button>
+        </div>
+        <div class="kair-gantt__bar" style="padding-top:10px;padding-bottom:10px">
+          <span class="kair-gantt__hint"><span><i class="k"></i>Cumplida (C)</span><span><i class="p"></i>Planificada (P)</span></span>
+          <span class="kair-gantt__hint" style="padding-left:0">Selecciona una actividad para editarla</span>
+        </div>
+        <div class="kair-gantt__scroll" id="gantt-scroll">
+          <div class="kair-gantt__table" id="gantt-table"></div>
+        </div>
+      </div>
+
+      <aside class="kair-detail" id="detail-panel" aria-label="Detalle de la actividad">
+        <button type="button" class="kair-detail__close" id="detail-close" aria-label="Cerrar detalle">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+        <div>
+          <span class="kair-detail__id" id="d-id">Actividad ID: 4</span>
+          <h3 class="kair-detail__title" id="d-title">Actualización de profesigrama</h3>
+        </div>
+        <div>
+          <label class="kair-detail__lbl" for="d-resp">Responsable</label>
+          <select class="kair-select" id="d-resp">
+            <option>Profesional SST</option>
+            <option>Coordinador SST</option>
+            <option>Sin asignar</option>
+          </select>
+        </div>
+        <div>
+          <span class="kair-detail__lbl">Periodo (Visualizado)</span>
+          <div class="kair-periodo"><small>Mes</small><b id="d-periodo">Mar</b></div>
+        </div>
+        <div>
+          <span class="kair-detail__lbl">Estado por Mes <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--kair-text-3)">(Click para editar)</span></span>
+          <div class="kair-mesgrid" id="d-mesgrid"></div>
+        </div>
+        <div>
+          <span class="kair-detail__lbl">Evidencias</span>
+          <button type="button" class="kair-btn kair-btn--outline" id="btn-evidencias" style="width:100%;height:40px;color:var(--kair-blue-text);border-color:#CBD9F0">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5c0-1.1.9-2 2-2h4l2 2.5h7c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2h-13c-1.1 0-2-.9-2-2Z"/></svg>
+            Abrir Carpeta de Evidencias
+          </button>
+        </div>
+        <div>
+          <label class="kair-detail__lbl" for="d-obs">Observaciones</label>
+          <textarea class="kair-textarea" id="d-obs" placeholder="Agregar observaciones..."></textarea>
+        </div>
+        <div class="kair-detail__actions">
+          <button type="button" class="kair-btn kair-btn--danger-outline" id="btn-eliminar" style="width:100%">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5.5c0-.8.7-1.5 1.5-1.5h3c.8 0 1.5.7 1.5 1.5V7"/><path d="M6.5 7l.8 12c.1.8.7 1.5 1.5 1.5h6.4c.8 0 1.4-.7 1.5-1.5l.8-12"/></svg>
+            Eliminar Actividad
+          </button>
+        </div>
+      </aside>
+    </div>
+  </section>
 </div>
 
-<!-- MODAL CREAR ACTIVIDAD -->
-<div class="modal-overlay" id="createModal">
-    <div class="modal">
-        <h3>Crear Nueva Actividad</h3>
-        <div class="form-group">
-            <label>Nombre de la Actividad</label>
-            <input type="text" id="newActName" class="form-control" placeholder="Ej: Revisión de extintores">
-        </div>
-        <div class="form-group">
-            <label>Grupo Padre (Ubicación)</label>
-            <select id="newActParent" class="form-control">
-                <!-- JS Options -->
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Responsable</label>
-            <select id="newActResp" class="form-control">
-                <option value="">Seleccionar responsable...</option>
-                <option value="Profesional SST">Profesional SST</option>
-                <option value="Coordinador SST">Coordinador SST</option>
-                <option value="Jefe de Seguridad">Jefe de Seguridad</option>
-                <option value="Encargado Ambiental">Encargado Ambiental</option>
-            </select>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button class="btn btn-outline" onclick="closeCreateModal()">Cancelar</button>
-            <button class="btn btn-primary" onclick="saveNewActivity()">Crear</button>
-        </div>
+<!-- ================= MODAL · SELECCIONE PERIODO ================= -->
+<div class="kair-overlay" id="ov-periodo" role="dialog" aria-modal="true" aria-labelledby="t-periodo">
+  <div class="kair-modal">
+    <button type="button" class="kair-modal__x" data-close="ov-periodo" aria-label="Cerrar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <h3 id="t-periodo">Seleccione Periodo</h3>
+    <p class="kair-modal__sub">Escoja el año del Plan de Trabajo que desea gestionar.</p>
+    <div class="kair-years" id="kair-years"></div>
+    <div class="kair-modal__foot kair-modal__foot--center" style="flex-direction:column;align-items:center">
+      <button type="button" class="kair-btn kair-btn--primary kair-btn--full" id="btn-clonar" style="max-width:300px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M5 15.5H4.5c-.8 0-1.5-.7-1.5-1.5V4.5C3 3.7 3.7 3 4.5 3h9.5c.8 0 1.5.7 1.5 1.5V5"/></svg>
+        Clonar Plan Actual a Nuevo Año
+      </button>
+      <p class="kair-modal__note">Esto creará una copia del plan actual con el año siguiente.</p>
     </div>
+  </div>
 </div>
 
-<!-- MODAL CONFIRMAR ELIMINAR -->
-<div class="modal-overlay" id="deleteModal">
-    <div class="modal">
-        <h3 style="color: var(--danger);">¿Eliminar Actividad?</h3>
-        <p style="margin-bottom: 1.5rem;">Esta acción no se puede deshacer. ¿Está seguro de que desea eliminar esta actividad del plan?</p>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button class="btn btn-outline" onclick="closeDeleteModal()">Cancelar</button>
-            <button class="btn btn-danger" onclick="confirmDelete()" style="background:var(--danger); color:white; border:none;">Sí, Eliminar</button>
-        </div>
-    </div>
+<!-- ================= MODAL · CREAR NUEVA ACTIVIDAD ================= -->
+<div class="kair-overlay" id="ov-nueva" role="dialog" aria-modal="true" aria-labelledby="t-nueva">
+  <div class="kair-modal">
+    <h3 id="t-nueva">Crear Nueva Actividad</h3>
+    <form id="form-nueva" novalidate>
+      <div class="kair-field" id="fld-nombre">
+        <label class="kair-detail__lbl" for="n-nombre" style="margin-bottom:6px">Nombre de la Actividad</label>
+        <input class="kair-input" id="n-nombre" type="text" placeholder="Ej: Revisión de extintores">
+        <p class="kair-err"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5"/><path d="M12 16h.01"/></svg>Ingresa el nombre de la actividad.</p>
+      </div>
+      <div class="kair-field">
+        <label class="kair-detail__lbl" for="n-grupo" style="margin-bottom:6px">Grupo Padre (Ubicación)</label>
+        <select class="kair-select" id="n-grupo"></select>
+      </div>
+      <div class="kair-field">
+        <label class="kair-detail__lbl" for="n-resp" style="margin-bottom:6px">Responsable</label>
+        <select class="kair-select" id="n-resp">
+          <option value="">Seleccionar responsable...</option>
+          <option>Profesional SST</option>
+          <option>Coordinador SST</option>
+          <option>Sin asignar</option>
+        </select>
+      </div>
+      <div class="kair-modal__foot">
+        <button type="button" class="kair-btn kair-btn--ghost" data-close="ov-nueva">Cancelar</button>
+        <button type="submit" class="kair-btn kair-btn--primary" style="padding:0 22px">Crear</button>
+      </div>
+    </form>
+  </div>
 </div>
 
-<script src="plan-viewer.js"></script>
+<!-- ================= MODAL · CONFIRMAR ELIMINACIÓN ================= -->
+<div class="kair-overlay" id="ov-eliminar" role="dialog" aria-modal="true" aria-labelledby="t-eliminar">
+  <div class="kair-modal kair-modal--danger">
+    <h3 id="t-eliminar">Eliminar Actividad</h3>
+    <p class="kair-modal__sub">¿Seguro que deseas eliminar <b id="elim-nombre">esta actividad</b>? Esta acción no se puede deshacer en el prototipo.</p>
+    <div class="kair-modal__foot">
+      <button type="button" class="kair-btn kair-btn--ghost" data-close="ov-eliminar">Cancelar</button>
+      <button type="button" class="kair-btn kair-btn--danger-solid" id="btn-eliminar-confirm" style="padding:0 20px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5.5c0-.8.7-1.5 1.5-1.5h3c.8 0 1.5.7 1.5 1.5V7"/><path d="M6.5 7l.8 12c.1.8.7 1.5 1.5 1.5h6.4c.8 0 1.4-.7 1.5-1.5l.8-12"/></svg>
+        Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="kair-toast-zone" id="toast-zone" aria-live="polite"></div>
+
+<script>
+/* ============================================================================
+   K+AIR · Plan de Trabajo Anual SST — Datos demo coherentes + gráficas SVG
+   Logging: [K+AIRPLAN][MODULO][ACCION][STATUS]
+   Dataset mensual único (E = ejecutadas, P = planificadas/pendientes):
+     reproduce EXACTAMENTE los KPIs de la captura:
+       Programadas 254 = Σ(E+P) · Realizadas 119 = ΣE · Pendientes 135 = ΣP
+       % ejecutado = 119/254 = 47% · Vencidas 41 (dato literal del KPI)
+   y deriva: Avance Mensual (E/(E+P) por mes), Cumplimiento Trimestral,
+   Actividades por Mes y Estado y el Radar Anual.
+   "Actividades por Estado" conserva los valores literales de la app original
+   (15 sin iniciar / 135 planificadas / 119 ejecutadas).
+   ========================================================================== */
+(function(){
+'use strict';
+
+var LOG = '[K+AIRPLAN]';
+function log(mod, acc, st, detail){
+  var line = LOG + '[' + mod + '][' + acc + '][' + st + ']';
+  if (detail) line += ' ' + detail;
+  console.log(line);
+}
+function $(s, c){ return (c || document).querySelector(s); }
+function $all(s, c){ return Array.prototype.slice.call((c || document).querySelectorAll(s)); }
+
+/* ---------------- Datos + adaptador de integraci\u00f3n real (v3) ----------------
+   El archivo habla con el proceso principal por mensajes (mismo contrato que el
+   viewer hist\u00f3rico plan-viewer.js). Si no hay ventana padre (previsualizaci\u00f3n
+   aut\u00f3noma), se activa el juego de datos de muestra. */
+var MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+/* Estructuras activas: se llenan desde el Excel real del plan (o demo si no hay padre) */
+var POR_MES = [];
+var ESTADOS_BARRAS = [
+  {n:'Sin Iniciar', v:0, t:'slate'},
+  {n:'Planificadas', v:0, t:'amber'},
+  {n:'Ejecutadas',   v:0, t:'green'}
+];
+var CATEGORIAS = [];
+var KPI = { programadas:0, realizadas:0, pendientes:0, vencidas:0, pct:0 };
+var ARBOL = [];
+var ANIOS = [];
+var anioSel = new Date().getFullYear();
+var actSel = null;
+var mesVisualizado = new Date().getMonth() + 1;
+var proximoId = 1;
+
+/* ------- Datos demo (fallback aut\u00f3nomo / previsualizaci\u00f3n) ------- */
+var DEMO_POR_MES = [ /* e: ejecutadas \u00b7 p: planificadas (pendientes) */
+  {e:15,p:1},{e:22,p:1},{e:24,p:0},{e:19,p:0},{e:18,p:2},{e:9,p:13},
+  {e:10,p:9},{e:2,p:19},{e:0,p:21},{e:0,p:21},{e:0,p:24},{e:0,p:24}
+];
+var DEMO_ESTADOS_BARRAS = [
+  {n:'Sin Iniciar',  v:15,  t:'slate'},
+  {n:'Planificadas', v:135, t:'amber'},
+  {n:'Ejecutadas',   v:119, t:'green'}
+];
+var DEMO_CATEGORIAS = [
+  {n:'Medicina Preventiva y del Trabajo', e:95, p:110},
+  {n:'Seguridad Industrial',              e:20, p:15},
+  {n:'Higiene Industrial',                e:1,  p:3},
+  {n:'Verificaci\u00f3n y Mejoramiento',      e:3,  p:7}
+];
+var DEMO_KPI = { programadas:254, realizadas:119, pendientes:135, vencidas:41, pct:47 };
+var DEMO_ARBOL = [
+  { tipo:'folder', nombre:'Medicina Preventiva y del Trabajo', abierto:true, hijos:[
+    { id:1,  nombre:'Revisi\u00f3n y actualizaci\u00f3n de procedimientos', resp:'Profesional SST', obs:'', est:{2:'C',4:'C'} },
+    { id:2,  nombre:'Actualizaci\u00f3n de formatos de gesti\u00f3n',       resp:'Profesional SST', obs:'', est:{3:'C'} },
+    { id:4,  nombre:'Actualizaci\u00f3n de profesigrama',              resp:'Profesional SST', obs:'', est:{3:'C'} },
+    { id:5,  nombre:'Actualizaci\u00f3n de matriz de ausentismo',      resp:'Profesional SST', obs:'', est:{1:'C',2:'C',3:'C',4:'C',5:'C',6:'C',7:'C',8:'C',9:'P',10:'P',11:'P',12:'P'} },
+    { id:6,  nombre:'Actualizaci\u00f3n de pol\u00edtica de seguridad',     resp:'Profesional SST', obs:'', est:{1:'C'} },
+    { id:7,  nombre:'Actualizaci\u00f3n de programa de seguridad',     resp:'Profesional SST', obs:'', est:{5:'C'} },
+    { id:8,  nombre:'Aplicaci\u00f3n y tabulaci\u00f3n de pruebas',         resp:'Profesional SST', obs:'', est:{11:'P'} },
+    { id:9,  nombre:'Ejecuci\u00f3n de planes de acci\u00f3n',              resp:'Profesional SST', obs:'', est:{10:'P'} },
+    { id:10, nombre:'Divulgaci\u00f3n de la pol\u00edtica de seguridad',    resp:'Profesional SST', obs:'', est:{1:'C',2:'C',3:'C',4:'C',5:'C',6:'C',7:'C',8:'C',9:'P',10:'P',11:'P',12:'P'} }
+  ]},
+  { tipo:'folder', nombre:'SVE - Desorden M\u00fasculo Esquel\u00e9tico', abierto:true, grupos:[
+    { nombre:'PLANEAR', hijos:[
+      { id:11, nombre:'Revisi\u00f3n de resultados de ex\u00e1menes m\u00e9dicos', resp:'Profesional SST', obs:'', est:{1:'C',2:'C',3:'C',4:'C',5:'C',6:'C',7:'C',8:'C',9:'P',10:'P',11:'P',12:'P'} },
+      { id:12, nombre:'An\u00e1lisis de estad\u00edsticas de morbilidad',     resp:'Profesional SST', obs:'', est:{1:'C',2:'C',3:'C',4:'C',5:'C',6:'C',7:'C',8:'C',9:'P',10:'P',11:'P',12:'P'} },
+      { id:13, nombre:'Revisi\u00f3n de matriz de peligros y riesgos',   resp:'Profesional SST', obs:'', est:{6:'P'} },
+      { id:14, nombre:'Revisi\u00f3n de diagn\u00f3stico de salud',           resp:'Profesional SST', obs:'', est:{3:'C'} },
+      { id:15, nombre:'Actualizaci\u00f3n de base de personal',          resp:'Profesional SST', obs:'', est:{1:'C',2:'C',3:'C',4:'C',5:'C',6:'C',7:'C',8:'C',9:'P',10:'P',11:'P',12:'P'} },
+      { id:16, nombre:'Reuniones con grupo asesor para el SVE',          resp:'Profesional SST', obs:'', est:{3:'C',5:'C',7:'C',9:'P',11:'P'} }
+    ]},
+    { nombre:'HACER', hijos:[
+      { id:17, nombre:'Realizar el diagn\u00f3stico del Sistema de gesti\u00f3n', resp:'Profesional SST', obs:'', est:{9:'P'} }
+    ]}
+  ]}
+];
+var DEMO_ANIOS = [2026, 2025];
+
+/* ------- Estado de integraci\u00f3n real ------- */
+var REAL = {
+  company: '',
+  submodulePath: null,
+  periodsData: {},
+  availableFilesMap: {},
+  isSaving: false,
+  saveTimer: null,
+  demo: false
+};
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ------- Comunicaci\u00f3n con el proceso principal (mismo contrato que plan-viewer.js) ------- */
+function callParentAPI(type, payload){
+  return new Promise(function(resolve, reject){
+    var requestId = 'req-' + Date.now() + '-' + Math.random();
+    function handleResponse(event){
+      if (event.origin !== 'file://' || event.source !== window.parent) return;
+      var response = event.data;
+      if (response && response.type === type + '-response' && response.requestId === requestId){
+        window.removeEventListener('message', handleResponse);
+        if (response.payload && response.payload.success) resolve(response.payload);
+        else reject(new Error((response.payload && response.payload.error) || 'Error desde el proceso principal'));
+      }
+    }
+    window.addEventListener('message', handleResponse);
+    window.parent.postMessage({ type: type + '-request', payload: payload, requestId: requestId }, 'file://');
+  });
+}
+
+async function detectarPeriodos(){
+  var sub = await callParentAPI('find-submodule-path', {
+    company: REAL.company,
+    module: 'Gesti\u00f3n Integral',
+    submodule: '2.4.1 Plan de Trabajo Anual'
+  });
+  if (!sub.success) throw new Error('No se encontr\u00f3 la carpeta del subm\u00f3dulo');
+  REAL.submodulePath = sub.path;
+  var result = await callParentAPI('get-documents-in-folder', sub.path);
+  REAL.availableFilesMap = {};
+  if (result.success && result.files && Array.isArray(result.files)){
+    var exts = ['.xls', '.xlsx', '.xlsm'];
+    result.files.forEach(function(item){
+      var ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
+      if (exts.indexOf(ext) !== -1 && item.name.indexOf('~$') !== 0){
+        var m = item.name.match(/20\d{2}/);
+        if (m) REAL.availableFilesMap[m[0]] = item.name;
+      }
+    });
+  }
+  ANIOS = Object.keys(REAL.availableFilesMap).sort(function(a, b){ return b - a; })
+    .map(function(y){ return parseInt(y, 10); });
+}
+
+async function processExcelBuffer(buffer, year){
+  try {
+    if (buffer && buffer.length > 0){
+      var result = await callParentAPI('process-excel-data', { buffer: buffer, company: REAL.company, period: year });
+      if (result.success){
+        var out = {};
+        out[year] = (result.data && result.data[year]) || [];
+        return out;
+      }
+    }
+  } catch(e){ console.warn('[PLAN] process-excel-data:', e.message); }
+  return {};
+}
+
+async function cargarAnio(year){
+  var fileName = REAL.availableFilesMap[year];
+  if (fileName){
+    var fp = await callParentAPI('get-file-path', { directory: REAL.submodulePath, fileName: fileName });
+    if (!fp.success) throw new Error('No se encontr\u00f3 el archivo del plan ' + year);
+    try {
+      var repair = await callParentAPI('repair-plan-trabajo-excel', { filePath: fp.path });
+      if (repair.success && (repair.unmergedCount > 0 || repair.restoredCount > 0)){
+        console.log('[PLAN] Auto-repair: ' + repair.unmergedCount + ' merges, ' + repair.restoredCount + ' valores restaurados');
+      }
+    } catch(e){ console.warn('[PLAN] Auto-repair omitido:', e.message); }
+    var result = await callParentAPI('read-excel-file', { filePath: fp.path });
+    if (!result.success) throw new Error('No se pudo leer el archivo del plan ' + year);
+    var processed = await processExcelBuffer(result.data, year);
+    REAL.periodsData[year] = processed[year] || [];
+  } else {
+    REAL.periodsData[year] = [
+      { id: Date.now(), name: 'PLAN ANUAL ' + year, level: 1, type: 'header', expanded: true, months: [], responsible: 'Profesional SST' }
+    ];
+  }
+  rebuildFromData(year);
+}
+
+/* ------- Modelo de datos: jerarqu\u00eda real (niveles 1-4) -> \u00e1rbol de carpetas ------- */
+function buildArbol(items){
+  var arbol = [], folder = null, grupo = null;
+  (items || []).forEach(function(it){
+    if (it.type === 'activity' || it.level === 4){
+      var act = { id: it.id, nombre: esc(it.name), resp: it.responsible || '', obs: it.observations || '', est: {}, _ref: it };
+      (it.months || []).forEach(function(v, i){ if (v === 'C' || v === 'P') act.est[i + 1] = v; });
+      if (grupo) grupo.hijos.push(act);
+      else if (folder) (folder.hijos = folder.hijos || []).push(act);
+      return;
+    }
+    if (it.level === 1){
+      folder = { tipo: 'folder', nombre: esc(it.name), abierto: it.expanded !== false, _ref: it, grupos: [] };
+      grupo = null;
+      arbol.push(folder);
+      return;
+    }
+    if (folder){
+      grupo = { nombre: esc(it.name), _ref: it, hijos: [] };
+      folder.grupos.push(grupo);
+    }
+  });
+  arbol.forEach(function(f){ if (f.grupos && f.grupos.length === 0) delete f.grupos; });
+  return arbol;
+}
+
+/* ------- Indicadores y gr\u00e1ficas derivadas de los datos reales ------- */
+function computeDerived(){
+  var year = String(anioSel);
+  var acts = (REAL.periodsData[year] || []).filter(function(i){ return i.type === 'activity'; });
+  var now = new Date();
+  var useOverdue = parseInt(year, 10) === now.getFullYear();
+  var completed = 0, pending = 0, overdue = 0, marked = 0, notStarted = 0;
+  POR_MES = MESES.map(function(){ return { e: 0, p: 0 }; });
+  CATEGORIAS = [];
+  ARBOL.forEach(function(f){
+    var ce = 0, cp = 0;
+    function countAct(a){
+      var any = false;
+      Object.keys(a.est).forEach(function(k){
+        var v = a.est[k], idx = parseInt(k, 10) - 1;
+        if (idx < 0 || idx > 11) return;
+        if (v === 'C'){ completed++; marked++; POR_MES[idx].e++; ce++; any = true; }
+        else if (v === 'P'){
+          pending++; marked++; POR_MES[idx].p++; cp++; any = true;
+          if (useOverdue && idx < now.getMonth()) overdue++;
+        }
+      });
+      if (!any) notStarted++;
+    }
+    (f.hijos || []).forEach(countAct);
+    (f.grupos || []).forEach(function(g){ g.hijos.forEach(countAct); });
+    CATEGORIAS.push({ n: f.nombre, e: ce, p: cp });
+  });
+  KPI = {
+    programadas: marked,
+    realizadas: completed,
+    pendientes: pending,
+    vencidas: overdue,
+    pct: marked > 0 ? Math.round(completed / marked * 100) : 0
+  };
+  ESTADOS_BARRAS = [
+    { n: 'Sin Iniciar', v: notStarted, t: 'slate' },
+    { n: 'Planificadas', v: pending, t: 'amber' },
+    { n: 'Ejecutadas', v: completed, t: 'green' }
+  ];
+}
+
+function refreshRadarCards(){
+  var q4 = 0;
+  [9, 10, 11].forEach(function(i){ q4 += POR_MES[i] ? POR_MES[i].p : 0; });
+  var worst = null;
+  CATEGORIAS.forEach(function(c){
+    var total = c.e + c.p;
+    if (total > 0){
+      var pctC = c.e / total;
+      if (!worst || pctC < worst.pct) worst = { c: c, pct: pctC };
+    }
+  });
+  function setTxt(id, txt){ var x = document.getElementById(id); if (x) x.textContent = txt; }
+  setTxt('radar-chip-1', KPI.vencidas + ' vencidas');
+  setTxt('radar-chip-2', 'Q4 \u00b7 ' + q4 + ' programadas');
+  setTxt('radar-chip-3', worst ? worst.c.n : 'Sin categor\u00edas');
+  var d1 = document.getElementById('radar-desc-1');
+  if (d1) d1.textContent = 'Concentra la replanificaci\u00f3n de las actividades marcadas en meses pasados para no comprometer el cumplimiento anual.';
+  var d2 = document.getElementById('radar-desc-2');
+  if (d2) d2.textContent = q4 + ' ejecuciones programadas entre Oct y Dic. Distribuye anticipadamente responsables para evitar la acumulaci\u00f3n.';
+  var d3 = document.getElementById('radar-desc-3');
+  if (d3 && worst){
+    var total = worst.c.e + worst.c.p;
+    d3.textContent = worst.c.e + ' de ' + total + ' ejecuciones realizadas. Revisa el cronograma de esta l\u00ednea para destrabar su ejecuci\u00f3n.';
+  }
+}
+
+function refreshDashboard(){
+  if (!REAL.demo) computeDerived();
+  renderHero();
+  function setNum(id, v){ var x = document.getElementById(id); if (x) x.textContent = String(v); }
+  setNum('kpi-num-prog', KPI.programadas);
+  setNum('kpi-num-real', KPI.realizadas);
+  setNum('kpi-num-pend', KPI.pendientes);
+  setNum('kpi-num-venc', KPI.vencidas);
+  var hp = document.getElementById('hero-pct');
+  if (hp) hp.innerHTML = KPI.pct + '<small>%</small>';
+  setNum('kpi-chip-anio', 'A\u00f1o ' + anioSel);
+  setNum('kpi-chip-pct', KPI.pct + '% del plan');
+  setNum('kpi-chip-rest', (100 - KPI.pct) + '% restante');
+  var eyebrow = document.getElementById('hero-eyebrow');
+  if (eyebrow) eyebrow.textContent = 'Estado General \u00b7 ' + anioSel;
+  var radarSub = document.getElementById('radar-sub');
+  if (radarSub) radarSub.textContent = 'Derivado del plan ' + anioSel;
+  refreshRadarCards();
+  renderCharts();
+}
+
+function rebuildFromData(year){
+  var prevId = actSel ? actSel.id : null;
+  ARBOL = buildArbol(REAL.periodsData[year] || []);
+  actSel = null;
+  refreshDashboard();
+  renderGantt();
+  if (prevId != null && findAct(prevId)) selectAct(prevId, false);
+  else {
+    var first = allActs()[0];
+    if (first) selectAct(first.act.id, false);
+    else {
+      var t = document.getElementById('d-title'); if (t) t.textContent = '\u2014';
+      var mg = document.getElementById('d-mesgrid'); if (mg) mg.innerHTML = '';
+      var dp = document.getElementById('detail-panel'); if (dp) dp.classList.remove('is-open');
+    }
+  }
+}
+
+/* ------- Guardado en el Excel real (mismo flujo hist\u00f3rico, con re-lectura) ------- */
+async function saveToExcel(){
+  if (REAL.demo) return { success: true };
+  var year = String(anioSel);
+  if (REAL.isSaving){
+    if (REAL.saveTimer) clearTimeout(REAL.saveTimer);
+    return new Promise(function(resolve){
+      REAL.saveTimer = setTimeout(function(){ saveToExcel().then(resolve, resolve); }, 300);
+    });
+  }
+  REAL.isSaving = true;
+  try {
+    var result = await callParentAPI('update-plan-trabajo-excel', {
+      filePath: REAL.submodulePath + '/GI-FO-045 PLAN DE TRABAJO ANUAL ' + year + ' SST.xlsx',
+      periodsData: REAL.periodsData,
+      period: year
+    });
+    if (result.success && result.updatedRowIndices){
+      Object.keys(result.updatedRowIndices).forEach(function(actId){
+        var idx = (REAL.periodsData[year] || []).findIndex(function(i){ return String(i.id) === actId; });
+        if (idx !== -1) REAL.periodsData[year][idx].rowIndex = result.updatedRowIndices[actId];
+      });
+    }
+    if (result.success){
+      var fileName = REAL.availableFilesMap[year];
+      if (fileName){
+        try {
+          var fp = await callParentAPI('get-file-path', { directory: REAL.submodulePath, fileName: fileName });
+          if (fp.success){
+            var rr = await callParentAPI('read-excel-file', { filePath: fp.path });
+            if (rr.success){
+              var fresh = await processExcelBuffer(rr.data, year);
+              var freshItems = fresh[year];
+              if (freshItems && freshItems !== REAL.periodsData[year]){
+                var oldData = REAL.periodsData[year];
+                var rowMap = {};
+                oldData.forEach(function(it){ if (it.rowIndex) rowMap[it.rowIndex] = it.id; });
+                freshItems.forEach(function(it){
+                  if (rowMap[it.rowIndex]) it.id = rowMap[it.rowIndex];
+                  var oldItem = oldData.filter(function(o){ return o.rowIndex === it.rowIndex; })[0];
+                  if (oldItem && oldItem.name && (!it.name || it.name.length < 2)) it.name = oldItem.name;
+                });
+                REAL.periodsData[year] = freshItems;
+                rebuildFromData(year);
+              }
+            }
+          }
+        } catch(reErr){ console.warn('[PLAN] Re-lectura post-guardado omitida:', reErr.message); }
+      }
+    }
+    return result;
+  } finally {
+    REAL.isSaving = false;
+  }
+}
+
+/* ------- Persistencias puntuales ------- */
+async function persistEstadoMes(act, mesNum, next){
+  if (!act || !act._ref) return;
+  if (!act._ref.months || act._ref.months.length !== 12) act._ref.months = new Array(12).fill('');
+  act._ref.months[mesNum - 1] = next || '';
+  var result = await saveToExcel();
+  if (!result || !result.success) toast('Error al guardar los cambios. Intente nuevamente.', 'warn');
+}
+
+function persistResponsable(act, value){
+  if (!act || !act._ref) return;
+  act._ref.responsible = value;
+  act.resp = value;
+  saveToExcel();
+}
+
+var _obsTimer = null;
+function persistObservacion(act, value){
+  if (!act || !act._ref) return;
+  act._ref.observations = value;
+  act.obs = value;
+  if (_obsTimer) clearTimeout(_obsTimer);
+  _obsTimer = setTimeout(function(){ saveToExcel(); }, 800);
+}
+
+function syncRespSelect(resp){
+  var sel = document.getElementById('d-resp');
+  if (!sel) return;
+  var val = resp || 'Profesional SST';
+  var exists = Array.prototype.slice.call(sel.options).some(function(o){ return o.value === val; });
+  if (!exists){
+    var o = document.createElement('option');
+    o.value = val;
+    o.textContent = val;
+    sel.appendChild(o);
+  }
+  sel.value = val;
+}
+
+/* ------- Crear / eliminar actividades (sobre el modelo real) ------- */
+async function createActivityReal(nombre, grupoNombre, resp){
+  var year = String(anioSel);
+  var items = REAL.periodsData[year] || [];
+  var parentIdx = -1;
+  for (var i = 0; i < ARBOL.length; i++){
+    if (ARBOL[i].nombre === grupoNombre && ARBOL[i]._ref){ parentIdx = items.indexOf(ARBOL[i]._ref); break; }
+  }
+  if (parentIdx === -1){ toast('No se encontr\u00f3 el grupo seleccionado.', 'warn'); return null; }
+  var parent = items[parentIdx];
+  var newAct = {
+    id: Date.now(),
+    rowIndex: parent.rowIndex ? parent.rowIndex + 1 : null,
+    name: nombre,
+    level: 4,
+    type: 'activity',
+    responsible: resp,
+    months: new Array(12).fill(''),
+    observations: ''
+  };
+  items.splice(parentIdx + 1, 0, newAct);
+  var result = await saveToExcel();
+  if (result && result.success){
+    rebuildFromData(year);
+    toast('Actividad "' + nombre + '" creada en ' + grupoNombre + '.', 'ok');
+    return newAct.id;
+  }
+  toast('Error al guardar la nueva actividad.', 'warn');
+  return null;
+}
+
+async function crearActividadReal(nombre, grupoNombre, resp){
+  if (REAL.demo){
+    var nueva = { id: proximoId++, nombre: esc(nombre), resp: resp, obs: '', est: {} };
+    var folder = ARBOL.filter(function(f){ return f.nombre === grupoNombre; })[0];
+    if (folder){
+      if (folder.hijos) folder.hijos.push(nueva);
+      else if (folder.grupos) folder.grupos[0].hijos.push(nueva);
+    }
+    renderGantt();
+    selectAct(nueva.id, false);
+    toast('Actividad "' + nombre + '" creada en ' + grupoNombre + '.', 'ok');
+    return;
+  }
+  var id = await createActivityReal(nombre, grupoNombre, resp);
+  if (id != null && findAct(id)) selectAct(id, true);
+}
+
+async function deleteActivityReal(act){
+  if (!act || !act._ref) return;
+  var year = String(anioSel);
+  var nombre = act.nombre;
+  REAL.periodsData[year] = (REAL.periodsData[year] || []).filter(function(i){ return i !== act._ref; });
+  actSel = null;
+  var result = await saveToExcel();
+  rebuildFromData(year);
+  if (result && result.success) toast('Actividad "' + nombre + '" eliminada.', 'warn');
+}
+
+/* ------- Cambio de a\u00f1o + clonaci\u00f3n ------- */
+function renderYearsUI(){
+  var wrap = document.getElementById('kair-years');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  ANIOS.forEach(function(y){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'kair-year' + (y === anioSel ? ' is-sel' : '');
+    b.setAttribute('data-anio', String(y));
+    b.innerHTML = '<span class="kair-year__ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9.5L19 8v12.5H5Z"/><path d="M14 3.5V8h4.5"/><path d="M8.5 12.5h7M8.5 16h7"/></svg></span><b>' + y + '</b>' +
+      '<span class="kair-year__check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>';
+    b.addEventListener('click', function(){ cambiarAnio(y); });
+    wrap.appendChild(b);
+  });
+  var lbl = document.getElementById('lbl-anio');
+  if (lbl) lbl.textContent = String(anioSel);
+}
+
+async function cambiarAnio(y){
+  if (REAL.demo){
+    anioSel = y;
+    renderYearsUI();
+    refreshDashboard();
+    closeOv('ov-periodo');
+    toast('A\u00f1o ' + y + ' seleccionado (datos de muestra).', 'info');
+    return;
+  }
+  try {
+    anioSel = parseInt(y, 10);
+    renderYearsUI();
+    await cargarAnio(String(anioSel));
+    closeOv('ov-periodo');
+    toast('Plan ' + anioSel + ' cargado.', 'ok');
+    log('PERIODO', 'YEAR_SELECT', 'OK', String(anioSel));
+  } catch(e){
+    console.error('[PLAN] Error cargando a\u00f1o', y, e);
+    toast('No se pudo cargar el plan ' + y + '.', 'warn');
+  }
+}
+
+var _cloneArmado = false;
+async function clonarPlanReal(){
+  if (REAL.demo){ toast('La clonaci\u00f3n estar\u00e1 disponible con tus archivos reales.', 'info'); return; }
+  var btn = document.getElementById('btn-clonar');
+  if (!_cloneArmado){
+    _cloneArmado = true;
+    btn.dataset.labelOriginal = btn.innerHTML;
+    btn.innerHTML = '\u00bfClonar plan ' + anioSel + ' \u2192 ' + (anioSel + 1) + '? Confirma con otro clic';
+    setTimeout(function(){
+      if (_cloneArmado){ _cloneArmado = false; btn.innerHTML = btn.dataset.labelOriginal; }
+    }, 6000);
+    return;
+  }
+  _cloneArmado = false;
+  if (btn.dataset.labelOriginal) btn.innerHTML = btn.dataset.labelOriginal;
+  var sourceYear = String(anioSel);
+  var newYear = String(anioSel + 1);
+  if (REAL.availableFilesMap[newYear]){
+    toast('Ya existe un archivo para el a\u00f1o ' + newYear + '.', 'warn');
+    return;
+  }
+  var sourceFileName = REAL.availableFilesMap[sourceYear];
+  if (!sourceFileName){
+    toast('No se encontr\u00f3 el archivo origen del plan ' + sourceYear + '.', 'warn');
+    return;
+  }
+  try {
+    var fp = await callParentAPI('get-file-path', { directory: REAL.submodulePath, fileName: sourceFileName });
+    if (!fp.success) throw new Error('No se encontr\u00f3 la ruta del archivo origen.');
+    var cloneResult = await callParentAPI('duplicate-budget-file', { currentFilePath: fp.path, newYear: newYear });
+    if (cloneResult.success){
+      toast('Plan clonado: se cre\u00f3 ' + cloneResult.newFileName, 'ok');
+      await detectarPeriodos();
+      renderYearsUI();
+      closeOv('ov-periodo');
+    } else {
+      toast('Error al clonar: ' + cloneResult.error, 'warn');
+    }
+  } catch(e){
+    console.error('[PLAN] Error clonando:', e);
+    toast('Ocurri\u00f3 un error inesperado al clonar.', 'warn');
+  }
+}
+
+/* ------- Datos demo (fallback) ------- */
+function applyDemoFallback(){
+  REAL.demo = true;
+  POR_MES = DEMO_POR_MES.map(function(d){ return { e: d.e, p: d.p }; });
+  ESTADOS_BARRAS = DEMO_ESTADOS_BARRAS.map(function(d){ return { n: d.n, v: d.v, t: d.t }; });
+  CATEGORIAS = DEMO_CATEGORIAS.map(function(d){ return { n: d.n, e: d.e, p: d.p }; });
+  KPI = { programadas: DEMO_KPI.programadas, realizadas: DEMO_KPI.realizadas, pendientes: DEMO_KPI.pendientes, vencidas: DEMO_KPI.vencidas, pct: DEMO_KPI.pct };
+  ARBOL = DEMO_ARBOL;
+  ANIOS = DEMO_ANIOS.slice();
+  anioSel = ANIOS[0];
+  REAL.periodsData[String(anioSel)] = [];
+}
+
+/* ------- Arranque ------- */
+async function boot(){
+  var urlParams = new URLSearchParams(window.location.search);
+  REAL.company = urlParams.get('company') || 'Empresa';
+  var companyChip = document.getElementById('topbar-company');
+  if (companyChip) companyChip.textContent = REAL.company;
+
+  try {
+    if (window.parent && window.parent !== window){
+      await detectarPeriodos();
+    } else {
+      throw new Error('Sin ventana padre');
+    }
+  } catch(e){
+    console.warn('[PLAN] Modo demostraci\u00f3n (sin datos reales):', e.message);
+    applyDemoFallback();
+  }
+
+  if (!REAL.demo){
+    if (ANIOS.length === 0){
+      var cy = new Date().getFullYear();
+      ANIOS = [cy];
+    }
+    anioSel = ANIOS[0];
+    var lbl0 = document.getElementById('lbl-anio');
+    if (lbl0) lbl0.textContent = String(anioSel);
+    try {
+      await cargarAnio(String(anioSel));
+    } catch(e){
+      console.error('[PLAN] Error cargando el plan:', e);
+      REAL.periodsData[String(anioSel)] = [];
+      rebuildFromData(String(anioSel));
+      toast('No se pudo cargar el plan ' + anioSel + '.', 'warn');
+    }
+  }
+
+  renderYearsUI();
+  refreshDashboard();
+  renderGantt();
+  log('PLAN', 'INIT', 'OK', 'KPIs ' + KPI.programadas + '/' + KPI.realizadas + '/' + KPI.pendientes + '/' + KPI.vencidas + ' \u00b7 ' + KPI.pct + '%');
+  var first = allActs()[0];
+  if (first) selectAct(first.act.id, false);
+}
+
+/* ---------------- Utilidades SVG ---------------- */
+var NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent){
+  var n = document.createElementNS(NS, tag);
+  for (var k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function fmt(n){ return String(n); }
+
+/* Tooltip compartido dentro de un .kair-chart-body */
+function makeTip(body){
+  var tip = document.createElement('div');
+  tip.className = 'kair-tip';
+  body.appendChild(tip);
+  return {
+    show: function(html, x, y){
+      tip.innerHTML = html;
+      tip.classList.add('is-on');
+      var w = body.clientWidth, h = body.clientHeight;
+      var tx = Math.max(6, Math.min(x + 12, w - 150));
+      var ty = Math.max(6, y - 14);
+      tip.style.left = tx + 'px';
+      tip.style.top = ty + 'px';
+    },
+    hide: function(){ tip.classList.remove('is-on'); }
+  };
+}
+function rowHtml(color, label, val){
+  return '<div class="row"><span class="dot" style="background:' + color + '"></span>' + label + ' <b>' + val + '</b></div>';
+}
+
+/* ================= 1 · ACTIVIDADES POR ESTADO (columnas) ================= */
+function renderEstado(){
+  var body = $('#ch-estado');
+  var W = body.clientWidth || 340, H = 218;
+  var padL = 30, padR = 10, padT = 22, padB = 34;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var maxRaw = Math.max.apply(null, ESTADOS_BARRAS.map(function(d){ return d.v; }).concat([1]));
+  var step = Math.max(10, Math.ceil(maxRaw / 6 / 10) * 10);
+  var max = step * 6;
+  for (var g = 0; g <= max; g += step){
+    var y = padT + ih - (g / max) * ih;
+    el('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: '#F0F2F4', 'stroke-width': 1 }, svg);
+    el('text', { x: padL - 7, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = g;
+  }
+  var colors = { slate: '#9AA4B8', amber: '#E7A224', green: '#1BB888' };
+  var bw = 52, gap = (iw - bw * 3) / 4;
+  ESTADOS_BARRAS.forEach(function(d, i){
+    var x = padL + gap + i * (bw + gap);
+    var h = Math.max(3, (d.v / max) * ih);
+    var y = padT + ih - h;
+    var r = el('rect', { x: x, y: y, width: bw, height: h, rx: 8, fill: colors[d.t], 'class': 'kair-bar-anim' }, svg);
+    r.style.animationDelay = (i * 90) + 'ms';
+    el('text', { x: x + bw / 2, y: y - 7, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 700, fill: '#14213D', 'font-family': 'Manrope,Inter,sans-serif' }, svg).textContent = d.v;
+    el('text', { x: x + bw / 2, y: H - 12, 'text-anchor': 'middle', 'font-size': 10.5, fill: '#748096' }, svg).textContent = d.n;
+  });
+}
+
+/* ================= 2 · AVANCE MENSUAL (línea + área) ================= */
+function renderAvance(){
+  var body = $('#ch-avance');
+  var W = body.clientWidth || 340, H = 218;
+  var padL = 34, padR = 12, padT = 16, padB = 30;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var pct = POR_MES.map(function(d){ return d.e + d.p ? Math.round(d.e / (d.e + d.p) * 100) : 0; });
+  var X = function(i){ return padL + (i / 11) * iw; };
+  var Y = function(v){ return padT + ih - (v / 100) * ih; };
+  for (var g = 0; g <= 100; g += 25){
+    var y = Y(g);
+    el('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: '#F0F2F4', 'stroke-width': 1 }, svg);
+    el('text', { x: padL - 6, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = g + '%';
+  }
+  var pts = pct.map(function(v, i){ return [X(i), Y(v)]; });
+  var dLine = pts.map(function(p, i){ return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+  var dArea = dLine + ' L ' + pts[11][0].toFixed(1) + ' ' + Y(0) + ' L ' + pts[0][0].toFixed(1) + ' ' + Y(0) + ' Z';
+  el('path', { d: dArea, fill: 'rgba(32,87,184,.09)' }, svg);
+  var line = el('path', { d: dLine, fill: 'none', stroke: '#2057B8', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+  var len = line.getTotalLength ? line.getTotalLength() : 600;
+  line.style.setProperty('--len', len);
+  line.classList.add('kair-line-anim');
+  pts.forEach(function(p, i){
+    el('circle', { cx: p[0], cy: p[1], r: 3.2, fill: '#fff', stroke: '#2057B8', 'stroke-width': 2, 'class': 'kair-poly-anim', style: 'animation-delay:' + (150 + i * 55) + 'ms' }, svg);
+  });
+  MESES.forEach(function(m, i){
+    el('text', { x: X(i), y: H - 10, 'text-anchor': 'middle', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = m;
+  });
+  var tip = makeTip(body);
+  var hit = el('rect', { x: padL, y: padT, width: iw, height: ih, fill: 'transparent' }, svg);
+  hit.addEventListener('mousemove', function(ev){
+    var r = body.getBoundingClientRect();
+    var i = Math.max(0, Math.min(11, Math.round((ev.clientX - r.left - padL) / iw * 11)));
+    var p = pts[i];
+    tip.show('<b>' + MESES[i] + '</b> · ' + pct[i] + '%<br>' + rowHtml('#1BB888', 'Ejecutadas', POR_MES[i].e) + rowHtml('#E7A224', 'Planificadas', POR_MES[i].p), p[0], p[1]);
+  });
+  hit.addEventListener('mouseleave', tip.hide);
+}
+
+/* ================= 3 · CUMPLIMIENTO TRIMESTRAL (columnas agrupadas) ================= */
+function renderTrim(){
+  var body = $('#ch-trim');
+  var W = body.clientWidth || 340, H = 218;
+  var padL = 30, padR = 10, padT = 22, padB = 34;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var Q = [0,1,2,3].map(function(q){
+    var e = 0, p = 0;
+    for (var m = q * 3; m < q * 3 + 3; m++){ e += POR_MES[m].e; p += POR_MES[m].p; }
+    return { n: 'Q' + (q + 1), e: e, p: p };
+  });
+  var max = 72, step = 8;
+  for (var g = 0; g <= max; g += step){
+    var y = padT + ih - (g / max) * ih;
+    el('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: '#F0F2F4', 'stroke-width': 1 }, svg);
+    el('text', { x: padL - 7, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = g;
+  }
+  var bw = 24, groupW = bw * 2 + 8;
+  var gap = (iw - groupW * 4) / 5;
+  var tip = makeTip(body);
+  Q.forEach(function(d, i){
+    var gx = padL + gap + i * (groupW + gap);
+    [['p', d.p, '#E7A224', 0], ['e', d.e, '#1BB888', bw + 8]].forEach(function(cfg){
+      var h = Math.max(3, (cfg[1] / max) * ih);
+      var r = el('rect', { x: gx + cfg[3], y: padT + ih - h, width: bw, height: h, rx: 7, fill: cfg[2], 'class': 'kair-bar-anim' }, svg);
+      r.style.animationDelay = (i * 80 + (cfg[0] === 'e' ? 60 : 0)) + 'ms';
+      el('text', { x: gx + cfg[3] + bw / 2, y: padT + ih - h - 6, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#14213D', 'font-family': 'Manrope,Inter,sans-serif' }, svg).textContent = cfg[1];
+      r.addEventListener('mousemove', function(ev){
+        var rb = body.getBoundingClientRect();
+        tip.show('<b>' + d.n + '</b><br>' + rowHtml('#E7A224', 'Programadas', d.p) + rowHtml('#1BB888', 'Ejecutadas', d.e), ev.clientX - rb.left, ev.clientY - rb.top);
+      });
+      r.addEventListener('mouseleave', tip.hide);
+    });
+    el('text', { x: gx + groupW / 2, y: H - 12, 'text-anchor': 'middle', 'font-size': 10.5, fill: '#748096' }, svg).textContent = d.n;
+  });
+}
+
+/* ================= 4 · ACTIVIDADES POR MES Y ESTADO (apiladas) ================= */
+function renderMes(){
+  var body = $('#ch-mes');
+  var W = body.clientWidth || 340, H = 218;
+  var padL = 28, padR = 10, padT = 18, padB = 30;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var max = 30, step = 10;
+  for (var g = 0; g <= max; g += step){
+    var y = padT + ih - (g / max) * ih;
+    el('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: '#F0F2F4', 'stroke-width': 1 }, svg);
+    el('text', { x: padL - 6, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = g;
+  }
+  var slot = iw / 12, bw = Math.min(26, slot * 0.56);
+  var tip = makeTip(body);
+  POR_MES.forEach(function(d, i){
+    var tot = d.e + d.p;
+    var cx = padL + slot * i + slot / 2;
+    var he = (d.e / max) * ih;
+    var hp = (d.p / max) * ih;
+    if (d.e > 0){
+      var re = el('rect', { x: cx - bw / 2, y: padT + ih - he, width: bw, height: Math.max(2, he), rx: Math.min(7, bw / 2.4), fill: '#1BB888', 'class': 'kair-bar-anim' }, svg);
+      re.style.animationDelay = (i * 55) + 'ms';
+    }
+    if (d.p > 0){
+      var rp = el('rect', { x: cx - bw / 2, y: padT + ih - he - hp, width: bw, height: Math.max(2, hp), rx: Math.min(7, bw / 2.4), fill: 'rgba(231,162,36,.8)', 'class': 'kair-bar-anim' }, svg);
+      rp.style.animationDelay = (i * 55 + 40) + 'ms';
+    }
+    el('text', { x: cx, y: H - 10, 'text-anchor': 'middle', 'font-size': 9.5, fill: '#9AA4B8' }, svg).textContent = MESES[i];
+    var hit = el('rect', { x: padL + slot * i, y: padT, width: slot, height: ih, fill: 'transparent' }, svg);
+    hit.addEventListener('mousemove', function(ev){
+      var rb = body.getBoundingClientRect();
+      tip.show('<b>' + MESES[i] + '</b> · ' + tot + ' actividades<br>' + rowHtml('#1BB888', 'Ejecutadas', d.e) + rowHtml('#E7A224', 'Planificadas', d.p), cx, ev.clientY - rb.top);
+    });
+    hit.addEventListener('mouseleave', tip.hide);
+  });
+}
+
+/* ================= 5 · CUMPLIMIENTO POR CATEGORÍA (barras horizontales) ================= */
+function renderCat(){
+  var body = $('#ch-cat');
+  var W = body.clientWidth || 340, H = 218;
+  var padL = 158, padR = 40, padT = 10, padB = 8;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var max = 120;
+  for (var g = 0; g <= max; g += 20){
+    var x = padL + (g / max) * iw;
+    el('line', { x1: x, y1: padT, x2: x, y2: padT + ih, stroke: '#F0F2F4', 'stroke-width': 1 }, svg);
+    el('text', { x: x, y: H - 0.5, 'text-anchor': 'middle', 'font-size': 8.5, fill: '#9AA4B8' }, svg).textContent = g;
+  }
+  var rowH = ih / CATEGORIAS.length;
+  var bh = Math.min(11, rowH * 0.26);
+  CATEGORIAS.forEach(function(d, i){
+    var cy = padT + rowH * i + rowH / 2;
+    el('text', { x: padL - 10, y: cy - bh / 2 - 2, 'text-anchor': 'end', 'font-size': 9.3, 'font-weight': 600, fill: '#748096' }, svg).textContent = d.n.length > 30 ? d.n.slice(0, 29) + '…' : d.n;
+    [['e', d.e, '#1BB888', -1], ['p', d.p, '#E7A224', 1]].forEach(function(cfg, j){
+      var w = Math.max(3, (cfg[1] / max) * iw);
+      var y = cy + (cfg[3] < 0 ? -bh - 2.5 : 2.5);
+      var r = el('rect', { x: padL, y: y, width: w, height: bh, rx: 5.5, fill: cfg[2], 'class': 'kair-hbar-anim' }, svg);
+      r.style.animationDelay = (i * 90 + j * 45) + 'ms';
+      el('text', { x: padL + w + 6, y: y + bh / 2 + 3, 'font-size': 9.5, 'font-weight': 700, fill: '#14213D', 'font-family': 'Manrope,Inter,sans-serif' }, svg).textContent = cfg[1];
+    });
+  });
+}
+
+/* ================= 6 · DISTRIBUCIÓN ANUAL (radar) ================= */
+function renderRadar(){
+  var body = $('#ch-radar');
+  var W = body.clientWidth || 340, H = 218;
+  var cx = W / 2, cy = H / 2 + 4, R = Math.min(W, H) / 2 - 34;
+  var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H });
+  body.appendChild(svg);
+  var max = 30;
+  function pt(i, v){
+    var a = -Math.PI / 2 + i * 2 * Math.PI / 12;
+    var r = (v / max) * R;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  [10, 20, 30].forEach(function(v){
+    var d = '';
+    for (var i = 0; i < 12; i++){
+      var p = pt(i, v);
+      d += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+    }
+    el('path', { d: d + 'Z', fill: 'none', stroke: '#EDF1F5', 'stroke-width': 1 }, svg);
+  });
+  for (var i = 0; i < 12; i++){
+    var pe = pt(i, 30), pc = pt(i, 0);
+    el('line', { x1: pc[0], y1: pc[1], x2: pe[0], y2: pe[1], stroke: '#EDF1F5', 'stroke-width': 1 }, svg);
+  }
+  function poly(getVal, color, fill, animDelay){
+    var d = '';
+    for (var i = 0; i < 12; i++){
+      var p = pt(i, getVal(i));
+      d += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+    }
+    el('path', { d: d + 'Z', fill: fill, stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'class': 'kair-poly-anim', style: 'animation-delay:' + animDelay + 'ms' }, svg);
+    for (var j = 0; j < 12; j++){
+      var q = pt(j, getVal(j));
+      el('circle', { cx: q[0], cy: q[1], r: 2.4, fill: '#fff', stroke: color, 'stroke-width': 1.6 }, svg);
+    }
+  }
+  poly(function(i){ return POR_MES[i].p; }, '#E7A224', 'rgba(231,162,36,.16)', 260);
+  poly(function(i){ return POR_MES[i].e; }, '#1BB888', 'rgba(27,184,136,.18)', 380);
+  MESES.forEach(function(m, i){
+    var p = pt(i, 30), d = pt(i, 36);
+    el('text', { x: d[0], y: d[1] + 3, 'text-anchor': p[0] > cx + 6 ? 'start' : (p[0] < cx - 6 ? 'end' : 'middle'), 'font-size': 9.3, fill: '#748096' }, svg).textContent = m;
+  });
+  var tip = makeTip(body);
+  svg.addEventListener('mousemove', function(ev){
+    var r = body.getBoundingClientRect();
+    var vx = ev.clientX - r.left - cx, vy = ev.clientY - r.top - cy;
+    var ang = Math.atan2(vy, vx) + Math.PI / 2;
+    if (ang < 0) ang += Math.PI * 2;
+    var i = Math.round(ang / (2 * Math.PI / 12)) % 12;
+    var p = pt(i, POR_MES[i].e + POR_MES[i].p ? (POR_MES[i].e + POR_MES[i].p) / 2 : 14);
+    tip.show('<b>' + MESES[i] + '</b><br>' + rowHtml('#1BB888', 'Ejecutadas', POR_MES[i].e) + rowHtml('#E7A224', 'Programadas', POR_MES[i].p), p[0], p[1]);
+  });
+  svg.addEventListener('mouseleave', tip.hide);
+}
+
+/* ============================================================================
+   K+AIR · Plan de Trabajo — Hero, pestañas, cronograma, detalle y modales
+   ========================================================================== */
+
+/* ---------------- Toasts (prototype honesto) ---------------- */
+var ICONS = {
+  ok:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.2 2.4 2.4 4.8-4.8"/></svg>',
+  info: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>',
+  warn: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 19.5H3Z"/><path d="M12 10v4"/><path d="M12 16.8h.01"/></svg>'
+};
+function toast(msg, kind){
+  var zone = $('#toast-zone');
+  var el2 = document.createElement('div');
+  el2.className = 'kair-toast' + (kind ? ' is-' + kind : '');
+  el2.innerHTML = (ICONS[kind] || ICONS.info) + '<span></span>';
+  el2.querySelector('span').textContent = msg;
+  zone.appendChild(el2);
+  log('UI', 'TOAST', 'OK', (kind || 'info') + ' · ' + msg);
+  setTimeout(function(){
+    el2.classList.add('is-out');
+    setTimeout(function(){ el2.remove(); }, 220);
+  }, 3200);
+}
+
+/* ---------------- Hero Estado General (derivado del dataset) ---------------- */
+function renderHero(){
+  var pct = KPI.pct;
+  var msg;
+  if (pct >= 70)      msg = 'El plan avanza a buen ritmo: <em>la mayoría de las actividades ya están ejecutadas.</em>';
+  else if (pct >= 45) msg = 'El plan va por la mitad: <em>buena ejecución del primer semestre,</em> con retos concentrados en lo que resta del año.';
+  else                msg = 'El plan requiere impulso: <em>la ejecución va rezagada</em> frente a lo programado.';
+  $('#hero-title').innerHTML = msg;
+  $('#leg-e').textContent = KPI.realizadas;
+  $('#leg-p').textContent = KPI.pendientes;
+  $('#leg-v').textContent = KPI.vencidas;
+  var wGreen = (KPI.programadas > 0 ? KPI.realizadas / KPI.programadas * 100 : 0).toFixed(1);
+  $('#hero-green').style.width = wGreen + '%';
+  $('#hero-amber').style.setProperty('--w-green', wGreen + '%');
+  $('#hero-tick').style.setProperty('--pos', (KPI.programadas > 0 ? KPI.vencidas / KPI.programadas * 100 : 0).toFixed(1) + '%');
+}
+
+/* ---------------- Pestañas ---------------- */
+var tabDash = $('#tab-dash'), tabCron = $('#tab-cron');
+var viewDash = $('#view-dash'), viewCron = $('#view-cron');
+function switchTab(which){
+  var isDash = which === 'dash';
+  tabDash.classList.toggle('is-active', isDash);
+  tabCron.classList.toggle('is-active', !isDash);
+  tabDash.setAttribute('aria-selected', String(isDash));
+  tabCron.setAttribute('aria-selected', String(!isDash));
+  viewDash.hidden = !isDash;
+  viewCron.hidden = isDash;
+  log('FLOW', 'TAB_SHOWN', 'OK', isDash ? 'dashboard' : 'cronograma');
+}
+tabDash.addEventListener('click', function(){ switchTab('dash'); });
+tabCron.addEventListener('click', function(){ switchTab('cron'); });
+
+$('#btn-ver-vencidas').addEventListener('click', function(){
+  switchTab('cron');
+  toast('El filtro de vencidas (41) se activará al integrar con los datos reales.', 'info');
+});
+$('#btn-volver').addEventListener('click', function(){
+  if (window.parent && window.parent !== window && window.parent.postMessage){
+    window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+  }
+});
+['radar-1', 'radar-2', 'radar-3'].forEach(function(id, i){
+  $('#' + id).addEventListener('click', function(){
+    switchTab('cron');
+    var msgs = [
+      KPI.vencidas + ' actividades vencidas: revisa sus meses en el panel de detalle.',
+      'La carga del último trimestre se revisa en "Actividades por Mes y Estado".',
+      'Revisa la categoría con menor avance en "Cumplimiento por Categoría".'
+    ];
+    toast(msgs[i], 'info');
+  });
+});
+
+/* ---------------- Render de gráficas al cargar ---------------- */
+function renderCharts(){
+  $('#ch-estado').innerHTML = '';
+  $('#ch-avance').innerHTML = '';
+  $('#ch-trim').innerHTML = '';
+  $('#ch-mes').innerHTML = '';
+  $('#ch-cat').innerHTML = '';
+  $('#ch-radar').innerHTML = '';
+  renderEstado();
+  renderAvance();
+  renderTrim();
+  renderMes();
+  renderCat();
+  renderRadar();
+}
+
+/* ---------------- Cronograma · Gantt ---------------- */
+function findAct(id){
+  var found = null;
+  ARBOL.forEach(function(f){
+    (f.hijos || []).forEach(function(a){ if (a.id === id) found = a; });
+    (f.grupos || []).forEach(function(g){
+      g.hijos.forEach(function(a){ if (a.id === id) found = a; });
+    });
+  });
+  return found;
+}
+function allActs(){
+  var out = [];
+  ARBOL.forEach(function(f){
+    (f.hijos || []).forEach(function(a){ out.push({ act: a, folder: f.nombre, sub: null }); });
+    (f.grupos || []).forEach(function(g){
+      g.hijos.forEach(function(a){ out.push({ act: a, folder: f.nombre, sub: g.nombre }); });
+    });
+  });
+  return out;
+}
+
+function renderGantt(){
+  var table = $('#gantt-table');
+  table.innerHTML = '';
+  /* Cabecera de meses */
+  var head = document.createElement('div');
+  head.className = 'kair-grow kair-grow--head';
+  head.innerHTML = '<div class="kair-glabel">Actividad</div>';
+  MESES.forEach(function(m){
+    var c = document.createElement('div');
+    c.className = 'kair-gcell';
+    c.textContent = m;
+    head.appendChild(c);
+  });
+  table.appendChild(head);
+
+  ARBOL.forEach(function(folder){
+    var fr = document.createElement('div');
+    fr.className = 'kair-grow kair-grow--folder' + (folder.abierto ? '' : ' is-closed');
+    fr.setAttribute('data-folder', folder.nombre);
+    var lbl = document.createElement('div');
+    lbl.className = 'kair-glabel';
+    lbl.setAttribute('role', 'button');
+    lbl.setAttribute('tabindex', '0');
+    lbl.innerHTML = '<svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55"><path d="M3.5 7.5c0-1.1.9-2 2-2h4l2 2.5h7c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2h-13c-1.1 0-2-.9-2-2Z"/></svg>' +
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + folder.nombre + '</span>';
+    function toggle(){ folder.abierto = !folder.abierto; if (folder._ref) folder._ref.expanded = folder.abierto; fr.classList.toggle('is-closed', !folder.abierto); log('GANTT', 'FOLDER_TOGGLE', 'OK', folder.nombre + ' → ' + (folder.abierto ? 'abierto' : 'cerrado')); }
+    lbl.addEventListener('click', toggle);
+    lbl.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    fr.appendChild(lbl);
+    for (var i = 0; i < 12; i++){
+      var c = document.createElement('div');
+      c.className = 'kair-gcell';
+      fr.appendChild(c);
+    }
+    table.appendChild(fr);
+
+    function actRow(a){
+      var row = document.createElement('div');
+      row.className = 'kair-grow kair-grow--act' + (actSel && actSel.id === a.id ? ' is-sel' : '');
+      row.setAttribute('data-act', a.id);
+      var gl = document.createElement('div');
+      gl.className = 'kair-glabel';
+      gl.innerHTML = '<svg class="ric" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M4.5 6h.01"/><path d="M4.5 12h.01"/><path d="M4.5 18h.01"/></svg><span>' + a.nombre + '</span>';
+      row.appendChild(gl);
+      for (var m = 1; m <= 12; m++){
+        var cell = document.createElement('div');
+        cell.className = 'kair-gcell';
+        var st = a.est[m];
+        if (st){
+          var chip = document.createElement('span');
+          chip.className = 'kair-gchip ' + (st === 'C' ? 'kair-gchip--c' : 'kair-gchip--p');
+          chip.textContent = st;
+          cell.appendChild(chip);
+        }
+        row.appendChild(cell);
+      }
+      row.addEventListener('click', function(){ selectAct(a.id, true); });
+      return row;
+    }
+
+    if (folder.abierto){
+      (folder.hijos || []).forEach(function(a){ table.appendChild(actRow(a)); });
+      (folder.grupos || []).forEach(function(g){
+        var sr = document.createElement('div');
+        sr.className = 'kair-grow kair-grow--sub';
+        var gl = document.createElement('div');
+        gl.className = 'kair-glabel';
+        gl.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span>' + g.nombre + '</span>';
+        sr.appendChild(gl);
+        for (var k = 0; k < 12; k++){
+          var c2 = document.createElement('div');
+          c2.className = 'kair-gcell';
+          sr.appendChild(c2);
+        }
+        table.appendChild(sr);
+        g.hijos.forEach(function(a){ table.appendChild(actRow(a)); });
+      });
+    }
+  });
+}
+
+/* ---------------- Panel de detalle ---------------- */
+function renderMesGrid(){
+  var grid = $('#d-mesgrid');
+  grid.innerHTML = '';
+  if (!actSel) return;
+  MESES.forEach(function(m, i){
+    var n = i + 1;
+    var st = actSel.est[n];
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'kair-mesbtn' + (st === 'C' ? ' is-c' : st === 'P' ? ' is-p' : '');
+    b.innerHTML = '<span>' + m + '</span><small>' + (st || '·') + '</small>';
+    if (n === mesVisualizado) b.style.boxShadow = '0 0 0 2px rgba(32,87,184,.35)';
+    b.addEventListener('click', function(){
+      /* Ciclo: ninguno → C → P → ninguno  (PUNTO DE INTEGRACIÓN: setEstadoActividad) */
+      var next = !st ? 'C' : (st === 'C' ? 'P' : null);
+      if (next) actSel.est[n] = next; else delete actSel.est[n];
+      persistEstadoMes(actSel, n, next);
+      mesVisualizado = n;
+      $('#d-periodo').textContent = MESES[n - 1];
+      log('ACTIVIDAD', 'ESTADO_SET', 'OK', 'id=' + actSel.id + ' · ' + MESES[n - 1] + '=' + (next || 'ninguno'));
+      renderGantt();
+      renderMesGrid();
+      refreshDashboard();
+    });
+    grid.appendChild(b);
+  });
+}
+
+function selectAct(id, fromUser){
+  var a = findAct(id);
+  if (!a) return;
+  actSel = a;
+  $('#d-id').textContent = 'Actividad ID: ' + a.id;
+  $('#d-title').textContent = a.nombre;
+  syncRespSelect(a.resp);
+  $('#d-obs').value = a.obs || '';
+  $('#d-periodo').textContent = MESES[mesVisualizado - 1];
+  renderGantt();
+  renderMesGrid();
+  if (fromUser){
+    $('#detail-panel').classList.add('is-open');
+    log('ACTIVIDAD', 'SELECT', 'OK', 'id=' + a.id + ' · ' + a.nombre);
+  }
+}
+
+$('#d-resp').addEventListener('change', function(){
+  if (actSel){ persistResponsable(actSel, this.value); log('ACTIVIDAD', 'RESP_SET', 'OK', 'id=' + actSel.id + ' · ' + this.value); }
+});
+$('#d-obs').addEventListener('input', function(){
+  if (actSel){ persistObservacion(actSel, this.value); }
+});
+$('#btn-evidencias').addEventListener('click', function(){
+  /* PUNTO DE INTEGRACIÓN: window.electronAPI.abrirCarpetaEvidencias(actSel.id) */
+  toast('La carpeta de evidencias se abrirá al integrar con el sistema de archivos.', 'info');
+});
+$('#detail-close').addEventListener('click', function(){
+  $('#detail-panel').classList.remove('is-open');
+});
+
+/* ---------------- Modales (genérico) ---------------- */
+function openOv(id){
+  $('#' + id).classList.add('is-open');
+  log('MODAL', 'OPEN', 'OK', id);
+}
+function closeOv(id){
+  $('#' + id).classList.remove('is-open');
+  log('MODAL', 'CLOSE', 'OK', id);
+}
+$all('[data-close]').forEach(function(b){
+  b.addEventListener('click', function(){ closeOv(b.getAttribute('data-close')); });
+});
+$all('.kair-overlay').forEach(function(ov){
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.classList.remove('is-open'); });
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') $all('.kair-overlay.is-open').forEach(function(ov){ ov.classList.remove('is-open'); });
+});
+
+/* Seleccione Periodo */
+$('#btn-anio').addEventListener('click', function(){ openOv('ov-periodo'); });
+renderYearsUI();
+$('#btn-clonar').addEventListener('click', function(){
+  clonarPlanReal();
+});
+
+/* Crear Nueva Actividad */
+$('#btn-nueva').addEventListener('click', function(){
+  var sel = $('#n-grupo');
+  sel.innerHTML = '';
+  ARBOL.forEach(function(f){
+    var o = document.createElement('option');
+    o.value = f.nombre;
+    o.textContent = f.nombre;
+    sel.appendChild(o);
+  });
+  $('#n-nombre').value = '';
+  $('#n-resp').value = '';
+  $('#fld-nombre').classList.remove('is-error');
+  openOv('ov-nueva');
+  setTimeout(function(){ $('#n-nombre').focus(); }, 120);
+});
+$('#n-nombre').addEventListener('input', function(){ $('#fld-nombre').classList.remove('is-error'); });
+$('#form-nueva').addEventListener('submit', function(e){
+  e.preventDefault();
+  var nombre = $('#n-nombre').value.trim();
+  if (!nombre){
+    $('#fld-nombre').classList.add('is-error');
+    log('ACTIVIDAD', 'CREATE', 'FAIL', 'sin nombre');
+    return;
+  }
+  var grupo = $('#n-grupo').value;
+  var resp = $('#n-resp').value || 'Sin asignar';
+  closeOv('ov-nueva');
+  crearActividadReal(nombre, grupo, resp);
+  log('ACTIVIDAD', 'CREATE', 'OK', nombre + ' · ' + grupo);
+});
+
+/* Eliminar Actividad */
+$('#btn-eliminar').addEventListener('click', function(){
+  if (!actSel) return;
+  $('#elim-nombre').textContent = '"' + actSel.nombre + '"';
+  openOv('ov-eliminar');
+});
+$('#btn-eliminar-confirm').addEventListener('click', function(){
+  if (!actSel) return;
+  var act = actSel;
+  var id = act.id, nombre = act.nombre;
+  ARBOL.forEach(function(f){
+    if (f.hijos) f.hijos = f.hijos.filter(function(a){ return a.id !== id; });
+    if (f.grupos) f.grupos.forEach(function(g){ g.hijos = g.hijos.filter(function(a){ return a.id !== id; }); });
+  });
+  closeOv('ov-eliminar');
+  actSel = null;
+  var first = allActs()[0];
+  if (first) selectAct(first.act.id, false); else { renderGantt(); $('#d-title').textContent = '—'; $('#d-mesgrid').innerHTML = ''; }
+  deleteActivityReal(act);
+  log('ACTIVIDAD', 'DELETE', 'OK', 'id=' + id);
+});
+
+/* ---------------- Arranque ---------------- */
+window.addEventListener('resize', function(){
+  clearTimeout(window.__kairPlanRt);
+  window.__kairPlanRt = setTimeout(renderCharts, 180);
+});
+boot();
+})();
+</script>
 </body>
 </html>

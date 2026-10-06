@@ -1,92 +1,72 @@
-<link rel="stylesheet" href="./modules/recursos/capacitaciones/cap-home.css">
+<link rel="stylesheet" href="./modules/recursos/capacitaciones/cap-home.css?v=20260927-cap-home-premium-v2">
+<link rel="stylesheet" href="./shared/kair-design-tokens.css?v=20260927-cap-home-premium-v2">
+<link rel="stylesheet" href="./shared/kair-components.css?v=20260927-cap-home-premium-v2">
 
-<div class="cap-portal">
-  <div class="cap-portal__card">
+<div class="portal-container cap-home">
 
-    <div class="cap-portal__header">
-      <div class="cap-portal__logo">K+<span>AIR</span></div>
-      <a class="cap-portal__back-btn" onclick="goBackToModule()">
-        <i class="bi bi-arrow-left"></i>
+  <!-- HEADER PREMIUM — breadcrumb + icono + título + pill + volver -->
+  <div class="cap-home__header">
+    <div class="cap-home__left">
+      <div class="cap-home__icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+          <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="cap-home__crumb">Recursos<span>/</span>Capacitaciones</div>
+        <h1 class="cap-home__title">Capacitaciones</h1>
+        <p class="cap-home__sub">Programa Anual de Capacitación en Seguridad y Salud en el Trabajo: cronograma vigente, registro de asistencia y gestión de la matriz de formación del SG-SST.</p>
+      </div>
+    </div>
+    <div class="cap-home__header-right">
+      <span class="cap-home__pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Año Activo: <span id="activeYear">2025</span>
+      </span>
+      <a class="cap-home__back" onclick="goBackToModule()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
         <span>Volver al Menú</span>
       </a>
     </div>
+  </div>
 
-    <div class="cap-portal__status-pill">
-      <i class="bi bi-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
+  <!-- MAIN ACTIONS — 2 cards: primaria gradient + secundaria blanca -->
+  <div class="cap-home__main-actions">
+
+    <div class="main-action-card primary" onclick="enterCronograma()">
+      <div class="main-action-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <div class="main-action-content">
+        <div class="action-title">Ver Cronograma de Capacitaciones</div>
+        <div class="action-desc">Abrir el cronograma del año activo con detalle de actividades programadas y ejecutadas, asistencia e instructores.</div>
+      </div>
     </div>
 
-    <h1 class="cap-portal__hero-title">Programa de Capacitaciones Anual SST</h1>
-    <p class="cap-portal__hero-subtitle">
-      Bienvenido al módulo de gestión de capacitaciones. Desde aquí puedes acceder al cronograma de capacitaciones, gestionar la matriz de formación, generar informes de cumplimiento y administrar los registros del programa de formación del SG-SST.
-    </p>
-
-    <div class="cap-portal__main-actions">
-
-      <div class="cap-portal__main-action cap-portal__main-action--primary" onclick="enterCronograma()">
-        <div class="cap-portal__main-action-icon">
-          <i class="bi bi-calendar-event"></i>
-        </div>
-        <div class="cap-portal__main-action-content">
-          <div class="cap-portal__action-title">Ver Cronograma de Capacitaciones</div>
-          <div class="cap-portal__action-desc">Acceder al listado completo de capacitaciones programadas y ejecutadas.</div>
-        </div>
+    <div class="main-action-card" onclick="cloneCronograma()">
+      <div class="main-action-icon" style="background:#fff3e0;color:#ff9800;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
       </div>
-
-      <div class="cap-portal__main-action" onclick="importFromExcel()">
-        <div class="cap-portal__main-action-icon cap-portal__main-action-icon--success">
-          <i class="bi bi-file-earmark-spreadsheet"></i>
-        </div>
-        <div class="cap-portal__main-action-content">
-          <div class="cap-portal__action-title">Importar desde Excel</div>
-          <div class="cap-portal__action-desc">Cargar el cronograma de capacitaciones desde archivo Excel compatible.</div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="cap-portal__quick-actions">
-      <div class="cap-portal__quick-actions-title">Gestión y Configuración</div>
-
-      <div class="cap-portal__actions-grid">
-
-        <div class="cap-portal__action-card" onclick="exportCronograma()">
-          <div class="cap-portal__action-icon cap-portal__action-icon--success"><i class="bi bi-box-arrow-up"></i></div>
-          <div class="cap-portal__action-title">Exportar Cronograma</div>
-          <div class="cap-portal__action-desc">Generar archivo Excel o PDF del cronograma de capacitaciones.</div>
-        </div>
-
-        <div class="cap-portal__action-card" onclick="openMatrizFormacion()">
-          <div class="cap-portal__action-icon cap-portal__action-icon--warning"><i class="bi bi-easel"></i></div>
-          <div class="cap-portal__action-title">Matriz de Formación</div>
-          <div class="cap-portal__action-desc">Gestionar la matriz de formación por cargos y áreas.</div>
-        </div>
-
-        <div class="cap-portal__action-card" onclick="cloneCronograma()">
-          <div class="cap-portal__action-icon"><i class="bi bi-clipboard"></i></div>
-          <div class="cap-portal__action-title">Clonar Cronograma</div>
-          <div class="cap-portal__action-desc">Crear un nuevo año tomando como base el cronograma actual.</div>
-        </div>
-
-        <div class="cap-portal__action-card" onclick="openRegistroAsistencia()">
-          <div class="cap-portal__action-icon cap-portal__action-icon--info"><i class="bi bi-clipboard-check"></i></div>
-          <div class="cap-portal__action-title">Registro de Asistencia</div>
-          <div class="cap-portal__action-desc">Gestionar listas de asistencia y seguimiento de participantes.</div>
-        </div>
-
-        <div class="cap-portal__action-card" onclick="generateInformeCumplimiento()">
-          <div class="cap-portal__action-icon cap-portal__action-icon--danger"><i class="bi bi-file-earmark-pdf"></i></div>
-          <div class="cap-portal__action-title">Informe de Cumplimiento</div>
-          <div class="cap-portal__action-desc">Descargar reporte ejecutivo de cumplimiento del programa.</div>
-        </div>
-
-        <div class="cap-portal__action-card" onclick="openCertificados()">
-          <div class="cap-portal__action-icon cap-portal__action-icon--muted"><i class="bi bi-award"></i></div>
-          <div class="cap-portal__action-title">Certificados</div>
-          <div class="cap-portal__action-desc">Generar y gestionar certificados de capacitación.</div>
-        </div>
-
+      <div class="main-action-content">
+        <div class="action-title">Clonar Cronograma</div>
+        <div class="action-desc">Crear la hoja del próximo año (Año Activo + 1) tomando como base el cronograma vigente, conservando actividades e instructores.</div>
       </div>
     </div>
 
   </div>
+
 </div>

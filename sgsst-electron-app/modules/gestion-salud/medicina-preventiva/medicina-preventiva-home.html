@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Actividades de medicina preventiva y promocion de la salud</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
+
+    <style>
+        /* =====================================================================
+           3.1.2 — Actividades de medicina preventiva y promocion de la salud
+           ESQUELETO VISUAL (sin conexion a datos todavia).
+
+           Replica del home de Asignacion de Recursos (1.1.3,
+           `modules/recursos/presupuesto/presupuesto-home.html`): mismo header
+           premium, mismos bloques con marco, mismas tarjetas grandes con flecha
+           y mismos tokens. Lo que cambia es el CONTENIDO: aqui las tarjetas son
+           los tres programas del 3.1.2 (SVE, DME, Programas) y todavia no
+           llevan a ninguna parte.
+
+           REGLAS que este archivo respeta a proposito (ver AGENTS.md):
+           - El marco y el encabezado de bloque NO se redefinen aqui: vienen de
+             `shared/kair-components.css` (`.kair-block*`). Solo se declara el
+             piso de ancho del grid y el relleno de la flecha.
+           - Grids con `auto-fit` + `minmax`, nunca `auto-fill`.
+           - Pantalla a todo el ancho: nada de `max-width` en columnas de pagina.
+           - SIN media queries: en Electron los breakpoints menores al ancho
+             minimo de la ventana son codigo muerto, y los grids `auto-fit` ya
+             se adaptan solos.
+           ===================================================================== */
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: var(--kair-font-ui, 'DM Sans', system-ui, -apple-system, sans-serif);
+            background: var(--kair-canvas, #fbfcfb);
+            color: var(--kair-ink, #14213d);
+            font-size: 1rem;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .mp-home {
+            width: 100%;
+            max-width: none;
+            box-sizing: border-box;
+            padding: clamp(16px, 2vw, 28px);
+        }
+
+        /* ---------- Header premium (mismo del 1.1.3) ---------- */
+        .mp-home__header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 1rem; flex-wrap: wrap; margin-bottom: clamp(18px, 2.2vw, 30px);
+        }
+        .mp-home__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+        .mp-home__icon {
+            width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        }
+        .mp-home__crumb { font-size: 0.6875rem; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .mp-home__crumb span { padding: 0 4px; }
+        .mp-home__title {
+            margin: 0;
+            font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Manrope', 'DM Sans', sans-serif);
+            letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
+        }
+        .mp-home__sub {
+            color: var(--kair-muted, #748096); font-size: clamp(0.75rem, 1vw, 0.875rem);
+            margin: 5px 0 0 0; max-width: 640px; line-height: 1.55;
+        }
+        .mp-home__header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .mp-home__pill {
+            font-size: 0.6875rem; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8); white-space: nowrap;
+        }
+        .mp-home__back {
+            display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+            font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
+            border-radius: 10px; transition: all 0.18s; background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee);
+        }
+        .mp-home__back:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+
+        /* ---------- Tarjetas de programa (mismas del 1.1.3) ---------- */
+        .mp-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+        .mp-card {
+            position: relative;
+            padding: 2rem 3.25rem 2rem 2rem;
+            background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: var(--kair-radius-card, 20px);
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex; align-items: center; gap: 1.25rem; text-align: left;
+        }
+        .mp-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
+            border-color: #c8d7ef;
+        }
+
+        .mp-card--primary {
+            background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
+            border-color: transparent;
+        }
+        .mp-card--primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
+        .mp-card--primary .mp-card__title,
+        .mp-card--primary .mp-card__desc { color: #fff; }
+        .mp-card--primary .mp-card__desc { opacity: 0.82; }
+        .mp-card--primary .mp-card__icon { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+        .mp-card__icon {
+            width: 50px; height: 50px; border-radius: 10px; flex-shrink: 0;
+            background: var(--kair-soft, #f3f6f6);
+            color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+        }
+        .mp-card__body { min-width: 0; }
+        .mp-card__title { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.25rem; color: var(--kair-ink, #14213d); }
+        .mp-card__desc { font-size: 0.8125rem; color: var(--kair-muted, #748096); line-height: 1.4; }
+
+        /* Flecha de "entrar": las tarjetas grandes se estiran a todo el ancho y
+           sin ella quedarian con un vacio al lado. Se posiciona con el relleno
+           derecho de la tarjeta, no con una columna extra en el grid. */
+        .mp-card::after {
+            content: '';
+            position: absolute; right: 22px; top: 50%;
+            width: 9px; height: 9px;
+            border-top: 2px solid #b9c2d0; border-right: 2px solid #b9c2d0;
+            transform: translateY(-50%) rotate(45deg);
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .mp-card:hover::after { border-color: #fff; transform: translateY(-50%) translateX(3px) rotate(45deg); }
+        .mp-card--primary::after { border-color: rgba(255, 255, 255, 0.75); }
+
+        /* ---------- Etiqueta de estado del esqueleto ---------- */
+        .mp-tag {
+            display: inline-block; margin-top: 0.4rem;
+            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em;
+            text-transform: uppercase; padding: 3px 8px; border-radius: 6px;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-muted, #748096);
+        }
+        .mp-card--primary .mp-tag { background: rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.92); }
+    </style>
+</head>
+<body>
+
+    <div class="mp-home">
+
+        <!-- ═══ Header premium: breadcrumb + titulo, sin caja ═══ -->
+        <div class="mp-home__header">
+            <div class="mp-home__left">
+                <div class="mp-home__icon"><i class="fas fa-heart-pulse"></i></div>
+                <div>
+                    <div class="mp-home__crumb">Gestion de la Salud<span>/</span>Medicina preventiva</div>
+                    <h1 class="mp-home__title">Actividades de medicina preventiva y promocion de la salud</h1>
+                    <p class="mp-home__sub">Vigilancia en salud, diagnostico de condiciones de salud y programas de promocion y prevencion del SG-SST.</p>
+                </div>
+            </div>
+            <div class="mp-home__header-right">
+                <a class="mp-home__back" onclick="goBackToModule()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver al Menu</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- ═══ Bloque 1: los tres programas ═══ -->
+        <div class="kair-block">
+            <div class="kair-block__head">
+                <div class="kair-block__chip"><i class="fas fa-compass"></i></div>
+                <div class="kair-block__text">
+                    <div class="kair-block__title">Programas</div>
+                    <div class="kair-block__sub">Administra y gestiona los programas de las tres lineas de trabajo del 3.1.2. Cada programa parte de una plantilla con sus secciones.</div>
+                </div>
+            </div>
+
+            <div class="kair-block__panel">
+                <div class="kair-block__grid mp-grid">
+
+                    <div class="mp-card mp-card--primary" onclick="abrirPrograma('sve')">
+                        <div class="mp-card__icon"><i class="fas fa-user-doctor"></i></div>
+                        <div class="mp-card__body">
+                            <div class="mp-card__title">SVE</div>
+                            <div class="mp-card__desc">Sistema de Vigilancia Epidemiologica: psicosocial, COVID-19 y salud ocupacional. Baterias, mediciones e informes periodicos.</div>
+                            <span class="mp-tag" id="mp-tag-sve">Cargando...</span>
+                        </div>
+                    </div>
+
+                    <div class="mp-card" onclick="abrirPrograma('dme')">
+                        <div class="mp-card__icon" style="background:#fff3e0; color:#e07b00;"><i class="fas fa-stethoscope"></i></div>
+                        <div class="mp-card__body">
+                            <div class="mp-card__title">DME</div>
+                            <div class="mp-card__desc">Diagnostico Medico Epidemiologico: caracterizacion de las condiciones de salud del personal y plan de accion resultante.</div>
+                            <span class="mp-tag" id="mp-tag-dme">Cargando...</span>
+                        </div>
+                    </div>
+
+                    <div class="mp-card" onclick="abrirPrograma('promocion')">
+                        <div class="mp-card__icon" style="background:#e8f6ef; color:#1a7f4b;"><i class="fas fa-user-group"></i></div>
+                        <div class="mp-card__body">
+                            <div class="mp-card__title">Programas</div>
+                            <div class="mp-card__desc">Programas de promocion y prevencion: seguridad vial, protocolo de bioseguridad, estilos de vida saludables y demas.</div>
+                            <span class="mp-tag" id="mp-tag-promocion">Cargando...</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="../../../assets/js/kair-toast.js?v=TOAST-20260930-realm-fix"></script>
+    <script src="medicina-preventiva-home.js"></script>
+</body>
+</html>

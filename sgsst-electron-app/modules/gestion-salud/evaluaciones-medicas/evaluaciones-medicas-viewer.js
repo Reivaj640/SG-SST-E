@@ -5,6 +5,14 @@
 // ═══════════════════════════════════════════════════════
 // VARIABLES DE ESTADO
 // ═══════════════════════════════════════════════════════
+
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 let currentDocument = null;
 let currentZoom = 'auto';
 let currentOrientation = 'vertical';
@@ -147,6 +155,14 @@ function setupEventListeners() {
     document.getElementById('previewDownloadBtn').addEventListener('click', () => {
         if (currentDocument) downloadDocumentByPath(currentDocument.path);
     });
+    // 📦608: botón "Ver completo" → abrir en modal file-viewer global del parent
+    const previewExpandBtn = document.getElementById('previewExpandBtn');
+    if (previewExpandBtn) {
+        previewExpandBtn.addEventListener('click', () => {
+            const filePath = previewExpandBtn.dataset.filePath || (currentDocument && currentDocument.path);
+            if (filePath) _expandFileViewer(filePath);
+        });
+    }
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closePreviewModal();
     });
@@ -327,16 +343,8 @@ async function loadLibrary() {
 }
 
 function showLibraryLoading() {
-    document.getElementById('folderList').innerHTML = `
-        <div class="em-loading">
-            <div class="em-spinner"></div>
-            <p>Cargando biblioteca...</p>
-        </div>`;
-    document.getElementById('documentList').innerHTML = `
-        <div class="em-empty-state em-empty-state--large">
-            <i class="fas fa-folder-open"></i>
-            <h3>Cargando biblioteca...</h3>
-        </div>`;
+    document.getElementById('folderList').innerHTML = KairSkeleton.list(5);
+    document.getElementById('documentList').innerHTML = KairSkeleton.list(6);
 }
 
 function showLibraryError(message) {
@@ -494,7 +502,7 @@ async function openPreviewModal(filePath) {
                      : 'fas fa-file-medical';
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="em-loading"><div class="em-spinner"></div><p>Cargando evaluación...</p></div>';
+    body.innerHTML = KairSkeleton.detail(6);
 
     try {
         let result;
@@ -508,30 +516,11 @@ async function openPreviewModal(filePath) {
             throw new Error(`Tipo de archivo .${extension} no soportado para previsualización`);
         }
 
-        if (result.success && result.data) {
+        if (result && result.success) {
             body.innerHTML = '';
-            const iframe = document.createElement('iframe');
-
-            // Convertir base64 a Blob URL para evitar bloqueo del visor PDF por sandbox
-            const binary = atob(result.data);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            const blob = new Blob([bytes], { type: 'application/pdf' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            iframe.src = blobUrl;
-            iframe.style.cssText = 'width:100%;height:100%;border:none;';
-            // Sin sandbox: permite que el visor PDF nativo del navegador funcione
-            body.appendChild(iframe);
-
-            // Limpiar blob URL al cerrar el modal
-            const cleanup = () => { URL.revokeObjectURL(blobUrl); };
-            document.getElementById('previewOverlay')?.addEventListener('click', cleanup, { once: true });
-            document.getElementById('closePreviewBtn')?.addEventListener('click', cleanup, { once: true });
+            _renderPreview(body, result, filePath);
         } else {
-            throw new Error(result.error || 'Error al cargar el documento');
+            throw new Error((result && result.error) || 'Error al cargar el documento');
         }
     } catch (error) {
         console.error('[EMO] Error loading document:', error);
@@ -593,6 +582,9 @@ function showModalError(body, message, filePath) {
 function closePreviewModal() {
     document.getElementById('previewModal').classList.add('hidden');
     document.getElementById('previewBody').innerHTML = '';
+    // 📦608: ocultar botón "Ver completo" al cerrar
+    const expandBtn = document.getElementById('previewExpandBtn');
+    if (expandBtn) expandBtn.style.display = 'none';
 }
 
 function displayDocument(data) {
@@ -607,6 +599,77 @@ function displayDocument(data) {
         </iframe>`;
 
     applyViewerZoom();
+}
+
+// ═══════════════════════════════════════════════════════
+// 📦608: file-viewer nativo + switch modo Office (208 formatos) vs PDF iframe
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Renderiza un preview (file-viewer nativo o iframe PDF legacy) según el modo
+ * del resultado. También muestra/oculta el botón "Ver completo" si el modo
+ * es file-viewer (que tiene más espacio para ver).
+ */
+function _renderPreview(container, result, filePath) {
+    if (!container) return;
+    container.innerHTML = '';
+    const expandBtn = document.getElementById('previewExpandBtn');
+
+    if (result && result.mode === 'file-viewer' && result.data && result.data.bytes) {
+        // Office nativo: el bundle inyecta el viewer en el container
+        if (window.KairDocPreview && typeof window.KairDocPreview.mountInContainer === 'function') {
+            window.KairDocPreview.mountInContainer(container, result);
+        } else if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+            window.kairFV.mountInContainer(container, result.data);
+        } else {
+            container.innerHTML = '<div style="padding:20px;color:#b91c1c;">file-viewer no disponible</div>';
+            return;
+        }
+        if (expandBtn) {
+            expandBtn.style.display = '';
+            expandBtn.dataset.filePath = filePath || '';
+        }
+    } else if (result && result.data) {
+        // PDF legacy: iframe con base64
+        let base64 = (typeof result.data === 'string') ? result.data : result.data.base64Data || result.base64Data;
+        if (!base64) {
+            container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+            return;
+        }
+        try {
+            const binary = atob(base64);
+            const bytes  = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const blob    = new Blob([bytes], { type: 'application/pdf' });
+            const blobUrl = URL.createObjectURL(blob);
+            const iframe  = document.createElement('iframe');
+            iframe.src    = blobUrl;
+            iframe.style.cssText = 'width:100%;height:100%;border:none;';
+            container.appendChild(iframe);
+            const cleanup = () => URL.revokeObjectURL(blobUrl);
+            document.getElementById('previewOverlay')?.addEventListener('click', cleanup, { once: true });
+            document.getElementById('closePreviewBtn')?.addEventListener('click', cleanup, { once: true });
+        } catch (e) {
+            container.innerHTML = `<div style="padding:20px;color:#b91c1c;">Error: ${e.message}</div>`;
+        }
+        if (expandBtn) expandBtn.style.display = 'none';
+    } else {
+        container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+        if (expandBtn) expandBtn.style.display = 'none';
+    }
+}
+
+/**
+ * Pide al parent que abra el archivo en el modal file-viewer global.
+ * El parent (logic.js) tiene acceso a electronAPI.readFileBytes.
+ */
+function _expandFileViewer(filePath) {
+    if (!filePath) return;
+    try {
+        window.top.postMessage({ type: 'open-file-viewer-modal', filePath, source: 'evaluaciones-medicas' }, '*');
+    } catch (e) {
+        console.error('[EMO] Error enviando postMessage al parent:', e);
+    }
 }
 
 function applyViewerZoom() {

@@ -320,12 +320,13 @@ var AuditoriaHubView = (function () {
         '</main>' +
       '</div>';
 
-    /* F11 (2026-06-20): bind UNA SOLA VEZ por instancia.
-       Si re-bindamos, los listeners se acumulan y 1 click dispara N handlers. */
-    if (!_clickBound) {
-      _bindClick(container);
-      _clickBound = true;
-    }
+    /* F11 (2026-06-20): bind click + store subscribe UNA SOLA VEZ por instancia.
+       FIX (2026-09-21): el guard `_clickBound` impedía re-bindear tras destroy+re-render,
+       dejando el container nuevo sin listener (botón "Nueva auditoría" dejaba de funcionar
+       al re-entrar al módulo). El handler tiene su propio guard `view !== 'hub'`, así
+       que listeners duplicados NO causan doble ejecución (solo consumen un poco de
+       memoria que se libera al destruir el container). Se bindea en CADA render. */
+    _bindClick(container);
     if (!_storeBound) {
       _bindStoreSubscribe();
       _storeBound = true;
@@ -334,6 +335,15 @@ var AuditoriaHubView = (function () {
 
   function _bindClick(container) {
     container.addEventListener('click', function (e) {
+      /* F17 (2026-06-20): GUARD CRÍTICO.
+         El listener del HUB se bindea en CADA render (FIX 2026-09-21) y NUNCA se desactiva
+         solo. Si no validamos view === 'hub', este listener captura clicks de OTRAS
+         vistas (list, hallazgos, cronograma, informes, editor) y ejecuta
+         backToModuleCallback(), regresando al módulo Verificación en lugar
+         de quedarse en el HUB del submódulo. */
+      var currentView = window.KairStore && window.KairStore.getState ? window.KairStore.getState().view : 'hub';
+      if (currentView !== 'hub') return;
+
       /* F11 (2026-06-20): botones del header estándar (Volver + Nueva auditoría + breadcrumb) */
       var headerBack = e.target.closest('#kair-aud-back, .header-back-btn');
       if (headerBack) {
@@ -343,10 +353,21 @@ var AuditoriaHubView = (function () {
         }
         return;
       }
+      /* F17 (2026-06-20): breadcrumb con data-back-module → también al módulo padre */
+      var backModuleH = e.target.closest('[data-back-module]');
+      if (backModuleH) {
+        var instBM = window.__kairAudInstance;
+        if (instBM && typeof instBM.backToModuleCallback === 'function') {
+          instBM.backToModuleCallback();
+        }
+        return;
+      }
       var headerCtaNew = e.target.closest('#kair-aud-cta-new');
       if (headerCtaNew) {
         if (window.kairAuditoriaAnual && typeof window.kairAuditoriaAnual.openAuditoriaForm === 'function') {
           window.kairAuditoriaAnual.openAuditoriaForm();
+        } else {
+          console.warn('[K+AIRSST][6.1.2] kairAuditoriaAnual.openAuditoriaForm no disponible desde hub');
         }
         return;
       }
@@ -370,8 +391,8 @@ var AuditoriaHubView = (function () {
                                     key === 'hallazgos' ? 'Hallazgos' :
                                     key === 'cronograma' ? 'Cronograma' :
                                     key === 'informes' ? 'Informes' : '')]();
-        if (typeof Sileo !== 'undefined') {
-          Sileo.info({ title: 'Navegando a ' + card.querySelector('.kair-v3-hub-card__title').textContent });
+        if (window.updateNotifier) {
+          window.updateNotifier.show({ type: 'info', title: 'Navegando a ' + card.querySelector('.kair-v3-hub-card__title').textContent });
         }
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();

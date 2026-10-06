@@ -50,7 +50,10 @@ class ArchivoRetencionComponent {
       this.iframe.id = 'archivo-retencion-iframe';
       this.iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
 
-      const viewerUrl = `modules/gestion-integral/archivo-retencion/index.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+      // 📦760 — `v=` obligatorio: sin cache-bust, un rediseño del submódulo no se ve
+      // hasta que el usuario limpia la caché. Bumpear junto con los ?v= internos
+      // (archivo-retencion-view.css / .js) en index.html.
+      const viewerUrl = `modules/gestion-integral/archivo-retencion/index.html?v=ARCHIVO-20260918-premium&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
       this.iframe.src = viewerUrl;
 
       console.log('[ArchivoRetencionComponent] 📄 iframe creado con URL:', viewerUrl.substring(0, 100) + '...');
@@ -252,7 +255,7 @@ class ArchivoRetencionComponent {
     // Iframe del dashboard
     const iframe = document.createElement('iframe');
     iframe.style.cssText = 'width:100%;height:calc(100vh - 60px);border:none;';
-    iframe.src = `modules/gestion-integral/archivo-retencion/archivo-retencion-dashboard.html?company=${encodeURIComponent(this.companyName)}`;
+    iframe.src = `modules/gestion-integral/archivo-retencion/archivo-retencion-dashboard.html?v=ARCHIVO-20260918-premium&company=${encodeURIComponent(this.companyName)}`;
     this.container.appendChild(iframe);
   }
 

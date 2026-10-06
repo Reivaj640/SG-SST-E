@@ -1,0 +1,83 @@
+{
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "source": {
+    "include": [
+      "./main.js",
+      "./preload.js",
+      "./renderer.js",
+      "./gestion-amenazas-home.js",
+      "./gestion-integral-home.js",
+      "./gestion-peligros-home.js",
+      "./gestion-salud-home.js",
+      "./medicion-ausentismo.js",
+      "./mejoramiento-home.js",
+      "./modules/gestion-salud/evaluaciones-medicas/evaluaciones-component.js",
+      "./modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-logic.js",
+      "./modules/gestion-salud/evaluaciones-medicas/evaluaciones-viewer.js",
+      "./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js",
+      "./modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-main.js",
+      "./modules/gestion-salud/investigacion-accidentes/investigaciones-viewer.js",
+      "./modules/gestion-salud/investigacion-accidentes/investigacion-home.js",
+      "./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js",
+      "./modules/gestion-salud/reportes-accidentes/reportes-accidentes-logic.js",
+      "./modules/gestion-salud/reportes-accidentes/reportes-accidentes-viewer.js",
+      "./modules/gestion-salud/restricciones-medicas/restricciones-medicas-logic.js",
+      "./modules/gestion-salud/sociodemografica/sociodemografica-component.js",
+      "./modules/gestion-salud/sociodemografica/sociodemografica-viewer.js",
+      "./modules/gestion-salud/ausentismo/ver-ausentismo-logic.js",
+      "./modules/recursos/responsable-sg/responsable-sg-logic.js",
+      "./modules/recursos/responsable-sg/responsable-sg-viewer.js",
+      "./modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js",
+      "./modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js",
+      "./modules/recursos/afiliacion/afiliacion-logic.js",
+      "./modules/recursos/afiliacion/afiliacion-viewer.js",
+      "./modules/recursos/copasst/copasst-logic.js",
+      "./modules/recursos/copasst/copasst-viewer.js",
+      "./modules/recursos/capacitacion-copasst/capacitacion-copasst-logic.js",
+      "./modules/recursos/capacitacion-copasst/capacitacion-copasst-viewer.js",
+      "./modules/recursos/comite-convivencia/comite-convivencia-logic.js",
+      "./modules/recursos/comite-convivencia/comite-convivencia-viewer.js",
+      "./modules/recursos/curso-virtual/curso-virtual-logic.js",
+      "./modules/recursos/curso-virtual/curso-virtual-viewer.js",
+      "./modules/recursos/presupuesto/presupuesto-logic.js",
+      "./modules/gestion-integral/politica/politica-logic.js",
+      "./modules/gestion-integral/politica/politica-viewer.js",
+      "./modules/recursos/trabajo-alto-riesgo/trabajo-alto-riesgo-logic.js",
+      "./modules/recursos/trabajo-alto-riesgo/trabajo-alto-riesgo-viewer.js",
+      "./modules/recursos/capacitaciones/capacitaciones-logic.js",
+      "./modules/recursos/capacitaciones/capacitaciones-viewer.js",
+      "./modules/recursos/inducciones/inducciones-logic.js",
+      "./modules/recursos/inducciones/inducciones-viewer.js",
+      "./modules/gestion-integral/objetivos-sst/objetivos-sst-logic.js",
+      "./modules/gestion-integral/objetivos-sst/objetivos-sst-viewer.js",
+      "./modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst-logic.js",
+      "./modules/gestion-integral/plan-trabajo/plan-trabajo-logic.js",
+      "./modules/gestion-integral/rendicion-cuentas/rendicion-logic.js",
+      "./modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js",
+      "./verificacion-home.js",
+      "./utils/ausentismoUtils.js",
+      "./utils/remisionUtils.js",
+      "./utils/evaluacionPdfParser.js",
+      "./components/config/normativa-utils.js",
+      "./scripts/theme-manager.js"
+    ],
+    "includePattern": ".+\\.js(doc|x)?$",
+    "excludePattern": "(^|\\/|\\\\)_"
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "opts": {
+    "destination": "./docs/api/",
+    "encoding": "utf8",
+    "private": false,
+    "recurse": true
+  }
+}

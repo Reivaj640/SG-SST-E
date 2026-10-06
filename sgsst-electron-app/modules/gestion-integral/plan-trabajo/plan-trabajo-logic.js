@@ -25,7 +25,7 @@ class PlanTrabajoComponent {
 
         // Cargar el HTML del portal
         try {
-            const response = await fetch(`./modules/gestion-integral/plan-trabajo/plan-home.html`);
+            const response = await fetch(`./modules/gestion-integral/plan-trabajo/plan-home.html?v=PLAN-20260916-v2-fullwidth`);
             if (response.ok) {
                 const html = await response.text();
                 portalContainer.innerHTML = html;
@@ -49,7 +49,7 @@ class PlanTrabajoComponent {
 
     // Cargar el JS del portal dinámicamente
     const script = document.createElement('script');
-    script.src = './modules/gestion-integral/plan-trabajo/plan-home.js';
+    script.src = './modules/gestion-integral/plan-trabajo/plan-home.js?v=PLAN-20260915-v1-premium';
     script.onload = () => {
       console.log('[PlanTrabajoComponent] plan-home.js cargado');
     };
@@ -74,7 +74,7 @@ class PlanTrabajoComponent {
     iframe.style.height = '100vh';
     iframe.style.border = 'none';
 
-    const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?v=PLAN-20260916-v3-fullwidth&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
     iframe.src = viewerUrl;
 
     this.container.appendChild(iframe);

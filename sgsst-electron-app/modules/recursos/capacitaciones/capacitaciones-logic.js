@@ -16,10 +16,164 @@ class CapacitacionesComponent {
         this.availableSheets = [];
         this.chartInstance = null;
     this.typeChartInstance = null;
+    this.planChartInstance = null;
  this._modalInBody = null;
+ this._periodModalInBody = null;
  this._confirmCallback = null;
  this._confirmModalInBody = null;
  this._isSaving = false;
+ // 📄 Paginación cliente del listado (8 filas por página)
+ this._currentPage = 1;
+ this.PAGE_SIZE = 8;
+ this._evidenciaCap = null;
+ this._evidenciaFiles = [];
+ this._evidenciasCache = new Map();
+ this._evidenciaUploading = false;
+ // Ubicaciones (NO viene del Excel, solo de la app) — persistidas en localStorage
+ this._ubicaciones = this._loadUbicaciones();
+ // 🆕 Horas (mismo patrón que ubicaciones) — persistidas en localStorage
+ this._horas = this._loadHoras();
+ // 📦 Fase 2 — Exponer el mapa de horas al global para que el adapter del
+ // calendario (kair-calendar-adapter.js) pueda incluirlo como sidecar en
+ // cada llamada a api.capacitaciones.getEvents. Mismo patrón que
+ // `window.currentCapacitacionesComponent` (línea 81) y `window.kairDocPreview`.
+ // Mantenemos un getter para que cambios en this._horas se reflejen en el
+ // adapter sin re-asignar manualmente el global.
+ Object.defineProperty(window, 'kairCapHoras', {
+     get: () => this._horas,
+     configurable: true
+ });
+    }
+
+    /**
+     * Carga el mapa {nombreCapacitacion: ubicacion} desde localStorage.
+     * La key es estable: el nombre de la capacitación es único por hoja del Excel.
+     */
+    _loadUbicaciones() {
+        try {
+            const raw = localStorage.getItem('kair-cap-ubicaciones');
+            const parsed = raw ? JSON.parse(raw) : {};
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) {
+            console.warn('[CAP] Error cargando ubicaciones de localStorage:', e);
+            return {};
+        }
+    }
+
+    /**
+     * Persiste el mapa de ubicaciones en localStorage.
+     */
+    _saveUbicaciones() {
+        try {
+            localStorage.setItem('kair-cap-ubicaciones', JSON.stringify(this._ubicaciones || {}));
+        } catch (e) {
+            console.warn('[CAP] Error guardando ubicaciones en localStorage:', e);
+        }
+    }
+
+    /**
+     * Devuelve la ubicación guardada para una capacitación (por nombre).
+     */
+    _getUbicacion(nombre) {
+        if (!nombre) return '';
+        return (this._ubicaciones && this._ubicaciones[nombre]) || '';
+    }
+
+    /**
+     * Guarda la ubicación de una capacitación (por nombre).
+     */
+    _setUbicacion(nombre, ubicacion) {
+        if (!nombre) return;
+        const val = (ubicacion || '').trim();
+        if (val) {
+            this._ubicaciones[nombre] = val;
+        } else {
+            delete this._ubicaciones[nombre];
+        }
+        this._saveUbicaciones();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 🆕 HORAS (Fase 1) — Mismo patrón que ubicaciones
+    // Mapa {nombreCapacitacion: 'HH:MM'} persistido en localStorage.
+    // ════════════════════════════════════════════════════════════════════
+    _loadHoras() {
+        try {
+            const raw = localStorage.getItem('kair-cap-horas');
+            const parsed = raw ? JSON.parse(raw) : {};
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) {
+            console.warn('[CAP] Error cargando horas de localStorage:', e);
+            return {};
+        }
+    }
+
+    _saveHoras() {
+        try {
+            localStorage.setItem('kair-cap-horas', JSON.stringify(this._horas || {}));
+        } catch (e) {
+            console.warn('[CAP] Error guardando horas en localStorage:', e);
+        }
+    }
+
+    _getHora(nombre) {
+        if (!nombre) return '';
+        return (this._horas && this._horas[nombre]) || '';
+    }
+
+    _setHora(nombre, hora) {
+        if (!nombre) return;
+        const val = (hora || '').trim();
+        if (val) {
+            this._horas[nombre] = val;
+        } else {
+            delete this._horas[nombre];
+        }
+        this._saveHoras();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 📦 Fase 3 — CONFLICT DETECTION
+    // Detecta solapamientos de horario entre capacitaciones del mismo
+    // día/empresa. No compara entre empresas (scope='all' puede mostrar
+    // eventos simultáneos de distintas empresas, eso NO es conflicto).
+    // ════════════════════════════════════════════════════════════════════
+    _horaToMinutes(hora) {
+        if (!hora || !/^\d{2}:\d{2}$/.test(hora)) return null;
+        const [h, m] = hora.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    /**
+     * Devuelve array de capacitaciones (excluyendo excludeId) que se
+     * solapan con la fecha+hora+duración dadas. Las que no tienen
+     * `hora` no se cuentan (backward compat con legacy data).
+     */
+    _detectConflicts(fecha, hora, duracionHoras, excludeId = null) {
+        if (!fecha || !hora) return [];
+        const startMin = this._horaToMinutes(hora);
+        if (startMin === null) return [];
+        const durH = parseFloat(duracionHoras) || 0;
+        const endMin = startMin + Math.round(durH * 60);
+
+        return this.capacitaciones.filter(c => {
+            if (excludeId && c.id === excludeId) return false;
+            if (c.fechaProgramada !== fecha) return false;
+            if (!c.hora) return false;
+            const cStart = this._horaToMinutes(c.hora);
+            if (cStart === null) return false;
+            const cEnd = cStart + Math.round((parseFloat(c.duracion) || 0) * 60);
+            // Solapan si los rangos [start, end) se cruzan
+            return startMin < cEnd && cStart < endMin;
+        });
+    }
+
+    /**
+     * Devuelve las capacitaciones que NO tienen hora persistida.
+     * Es la fuente del banner "X sin hora" que se muestra al cargar.
+     */
+    _getCapacitacionesSinHora() {
+        return this.capacitaciones.filter(c => !c.hora);
     }
 
     render() {
@@ -27,10 +181,17 @@ class CapacitacionesComponent {
         window.currentCapacitacionesComponent = this;
         this.container.classList.add('capacitaciones-container');
 
-        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html')
+        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20260915-v11-periodo-stretch')
             .then(response => response.text())
             .then(html => {
                 this.container.innerHTML = html;
+                // 🔒 Cache-bust en runtime del CSS del submódulo: forzar una
+                // carga fresca del archivo de estilos cada vez que se abre,
+                // para evitar que la app sirva el estilo viejo desde caché.
+                var _cssLink = this.container.querySelector('link[href*="capacitaciones-view.css"]');
+                if (_cssLink) {
+                    _cssLink.href = _cssLink.href + (/\?/.test(_cssLink.href) ? '&' : '?') + 'r=' + Date.now();
+                }
                 setTimeout(() => {
                     this.updateHeaderContext();
                     this.initializeEventListeners();
@@ -100,7 +261,32 @@ class CapacitacionesComponent {
    document.body.appendChild(confirmModal);
   }
 
+  // 🆕 Modal "Nuevo período" — mismo patrón: montar en body + variables CSS
+  const periodModal = document.getElementById('periodModal');
+  if (periodModal) {
+   cssVars.forEach(varName => {
+    const value = computed.getPropertyValue(varName).trim();
+    if (value) periodModal.style.setProperty(varName, value);
+   });
+   this._periodModalInBody = periodModal;
+   document.body.appendChild(periodModal);
+  }
+
         console.log('[CapacitacionesComponent] Modal montado en document.body.');
+
+        // 🆕 Wire-up del botón "Limpiar hora" (clearTrainingHora) — al hacer click,
+        // vacía el input #trainingHora. Al guardar, el `_setHora(name, '')` borra la
+        // key del sidecar de localStorage y la cap deja de aparecer en el calendario.
+        const clearHoraBtn = document.getElementById('clearTrainingHora');
+        if (clearHoraBtn) {
+            clearHoraBtn.addEventListener('click', () => {
+                const horaInput = document.getElementById('trainingHora');
+                if (horaInput) {
+                    horaInput.value = '';
+                    horaInput.focus();
+                }
+            });
+        }
     }
 
   updateHeaderContext() {
@@ -135,6 +321,10 @@ class CapacitacionesComponent {
   if (this.typeChartInstance) {
     this.typeChartInstance.destroy();
   }
+  if (this.planChartInstance) {
+    this.planChartInstance.destroy();
+    this.planChartInstance = null;
+  }
         // ✏️ NUEVO — remover modal del body al destruir el componente
         // evita que quede huérfano en el DOM si el usuario navega a otro módulo
  if (this._modalInBody && this._modalInBody.parentNode === document.body) {
@@ -145,6 +335,18 @@ class CapacitacionesComponent {
   document.body.removeChild(this._confirmModalInBody);
   this._confirmModalInBody = null;
  }
+ if (this._periodModalInBody && this._periodModalInBody.parentNode === document.body) {
+  document.body.removeChild(this._periodModalInBody);
+  this._periodModalInBody = null;
+ }
+ // Evidencias: cerrar modal y limpiar cache
+ const evModal = document.getElementById('evidenciaModal');
+ if (evModal && evModal.parentNode === document.body) {
+   document.body.removeChild(evModal);
+ }
+ this._evidenciaCap = null;
+ this._evidenciaFiles = [];
+ this._evidenciasCache = new Map();
     }
 
     initializeEventListeners() {
@@ -172,8 +374,17 @@ class CapacitacionesComponent {
         document.getElementById('btn-clear-filters')?.addEventListener('click', () => this.clearFilters());
 
   // Botones de Acción del Dashboard
-  document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
   document.getElementById('btn-create-period-header')?.addEventListener('click', () => this.createNewPeriod());
+
+  // Radar → ir al listado completo
+  document.getElementById('link-ver-listado')?.addEventListener('click', () => this.switchView('trainings'));
+
+  // Modal "Nuevo período": crear + actualizar placeholder del nombre al cambiar vigencia
+  document.getElementById('btn-period-create')?.addEventListener('click', () => this._confirmCreatePeriod());
+  document.getElementById('period-year')?.addEventListener('change', (e) => {
+    const nameInput = document.getElementById('period-name');
+    if (nameInput) nameInput.placeholder = `Plan ${e.target.value}`;
+  });
 
   // Abrir modal en modo agregar
   const openAddModal = () => this.openModal('add');
@@ -192,6 +403,8 @@ class CapacitacionesComponent {
 
         // Guardar (crea o actualiza según el estado del modal)
         document.getElementById('btn-save-training')?.addEventListener('click', () => this.saveTraining());
+
+ this.setupEvidenciaModal();
 
  this.setupConfirmModal();
     }
@@ -250,6 +463,8 @@ class CapacitacionesComponent {
             document.getElementById('trainingDate').value         = cap.fechaProgramada;
             document.getElementById('trainingDuration').value     = parseFloat(cap.duracion) || 2;
             document.getElementById('trainingInstructor').value   = cap.instructor;
+            document.getElementById('trainingUbicacion').value   = cap.ubicacion || '';
+            document.getElementById('trainingHora').value        = cap.hora      || '';
             document.getElementById('trainingParticipants').value = cap.participantes || 0;
         }
 
@@ -281,7 +496,7 @@ class CapacitacionesComponent {
 
  showConfirmModal({ title, message, warning, acceptLabel, acceptIcon, onAccept }) {
   const modal = document.getElementById('confirmModal');
-  if (!modal) return;
+  if (!modal) return Promise.resolve(false);
 
   const titleEl = document.getElementById('confirm-title');
   const iconEl = document.getElementById('confirm-icon');
@@ -306,15 +521,27 @@ class CapacitacionesComponent {
    if (iconInBtn) iconInBtn.className = `bi ${acceptIcon}`;
   }
 
-  this._confirmCallback = onAccept || null;
-  modal.classList.add('open');
-  if (cancelBtn) cancelBtn.focus();
+  // 📦 Fase 3 — Devuelve Promise<boolean> (true=acepta, false=cancela)
+  return new Promise((resolve) => {
+      this._confirmCallback = () => {
+          if (onAccept) onAccept();
+          resolve(true);
+      };
+      this._confirmCancelCallback = () => resolve(false);
+      modal.classList.add('open');
+      if (cancelBtn) cancelBtn.focus();
+  });
  }
 
  hideConfirmModal() {
   const modal = document.getElementById('confirmModal');
   if (modal) modal.classList.remove('open');
+  // 📦 Fase 3 — Resolver la promise pendiente con false
+  if (this._confirmCancelCallback) {
+      this._confirmCancelCallback();
+  }
   this._confirmCallback = null;
+  this._confirmCancelCallback = null;
  }
 
  acceptConfirm() {
@@ -442,7 +669,35 @@ class CapacitacionesComponent {
 
             const { processedData, headers } = excelResult.data;
             this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
+            // Enriquecer cada capacitación con su ubicación persistida en localStorage
+            // (NO viene del Excel, es metadata local de la app)
+            this.capacitaciones.forEach(cap => {
+                if (cap && cap.nombre) {
+                    cap.ubicacion = this._getUbicacion(cap.nombre);
+                    cap.hora = this._getHora(cap.nombre);
+                }
+            });
             this.applyFilters();
+
+            // 📦 Fase 3 — Banner de "capacitaciones sin hora" (legacy data).
+            // Solo se muestra UNA VEZ al cargar el año. Es no-bloqueante.
+            const sinHora = this._getCapacitacionesSinHora();
+            if (sinHora.length > 0) {
+                window.KAIRToast.show(
+                    `${sinHora.length} capacitación(es) sin hora asignada. Editá cada una para que se vean correctamente en el calendario.`,
+                    'warning',
+                    { duration: 8000 }
+                );
+            }
+
+            // Cargar el cache de evidencias en background (no bloquea la UI)
+            this._loadAllEvidenciaCounts().then(() => {
+              if (this.currentView === 'trainings') this.renderTable();
+              this.renderRecentList();  // refresca la fila "Evidencias pendientes" del radar
+            }).catch(err => {
+              console.warn('[EVIDENCIA] No se pudo pre-cargar cache de evidencias:', err);
+            });
+
             window.KAIRToast.show(`Datos del ${year} cargados.`, 'success');
 
         } catch (error) {
@@ -620,6 +875,8 @@ class CapacitacionesComponent {
         });
 
     this.filteredCapacitaciones = filtered;
+    // 📄 La paginación se resetea al cambiar filtros (vuelve a la página 1)
+    this._currentPage = 1;
     this.updateDashboardStats();
     this.updateTabBadge();
     if (this.currentView === 'trainings') this.renderTable();
@@ -638,18 +895,94 @@ class CapacitacionesComponent {
 
     // --- RENDERIZADO UI ---
 
+  /**
+   * Actualiza el HERO + las 3 metric cards del dashboard premium.
+   * Usa filteredCapacitaciones (consistente con las gráficas: los filtros
+   * del listado también se reflejan aquí).
+   */
   updateDashboardStats() {
-    const total = this.filteredCapacitaciones.length;
+    const total     = this.filteredCapacitaciones.length;
     const completed = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
-    const pending = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
-    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const pending   = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
+    const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const year      = this.currentYear || new Date().getFullYear();
 
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-completed').textContent = completed;
-    document.getElementById('stat-pending').textContent = pending;
-    document.getElementById('stat-participants').textContent = 'N/D';
-    const progressEl = document.getElementById('stat-progress-text');
-    if (progressEl) progressEl.textContent = `${progress}%`;
+    // --- HERO ---
+    const eyebrowEl = document.getElementById('hero-eyebrow');
+    if (eyebrowEl) eyebrowEl.textContent = `ESTADO GENERAL · PLAN ${year}`;
+
+    const titleEl = document.getElementById('hero-title');
+    if (titleEl) {
+      let title;
+      if (total === 0) {
+        title = 'No hay actividades registradas en este período.';
+      } else if (progress < 50) {
+        title = `El plan necesita impulso: ${pending} de ${total} actividades siguen pendientes.`;
+      } else if (progress < 80) {
+        title = `El plan avanza: ${pending} de ${total} actividades siguen pendientes.`;
+      } else {
+        title = `El plan va en buen camino: quedan ${pending} de ${total} actividades.`;
+      }
+      titleEl.textContent = title;
+    }
+
+    // Próxima actividad: primera pendiente con fecha válida desde hoy (fallback: la más cercana)
+    const msgEl = document.getElementById('hero-msg');
+    if (msgEl) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const withDate = this.filteredCapacitaciones
+        .filter(c => c.estado === 'pending')
+        .map(c => ({ cap: c, d: new Date(String(c.fechaProgramada).replace(/-/g, '/')) }))
+        .filter(x => !isNaN(x.d.getTime()))
+        .sort((a, b) => a.d - b.d);
+      const next = withDate.find(x => x.d >= today) || withDate[0];
+      msgEl.textContent = next
+        ? `${completed} actividades ejecutadas · próxima: ${this.formatDate(next.cap.fechaProgramada)} · ${next.cap.nombre}`
+        : `${completed} actividades ejecutadas · sin actividades pendientes próximas`;
+    }
+
+    const scoreEl = document.getElementById('hero-score');
+    if (scoreEl) scoreEl.textContent = `${progress}%`;
+    const heroBar = document.getElementById('hero-progress-bar');
+    if (heroBar) heroBar.style.width = `${progress}%`;
+
+    // --- METRIC CARDS ---
+    const compEl = document.getElementById('metric-comp');
+    if (compEl) compEl.textContent = completed;
+    const totEl = document.getElementById('metric-total');
+    if (totEl) totEl.textContent = total;
+    const compBar = document.getElementById('metric-comp-bar');
+    if (compBar) compBar.style.width = `${progress}%`;
+
+    const pendEl = document.getElementById('metric-pend');
+    if (pendEl) pendEl.textContent = pending;
+    const pendBar = document.getElementById('metric-pend-bar');
+    if (pendBar) pendBar.style.width = total > 0 ? `${Math.round((pending / total) * 100)}%` : '0%';
+
+    // Asistencia: si hay participantes registrados, mostrar promedio; si no, N/D
+    const asistEl     = document.getElementById('metric-asist');
+    const asistDescEl = document.getElementById('metric-asist-desc');
+    const asistBar    = document.getElementById('metric-asist-bar');
+    const withParts   = this.filteredCapacitaciones.filter(c => (parseInt(c.participantes) || 0) > 0);
+    if (withParts.length > 0) {
+      const avg = Math.round(withParts.reduce((a, c) => a + (parseInt(c.participantes) || 0), 0) / withParts.length);
+      if (asistEl) asistEl.textContent = `~${avg}`;
+      if (asistDescEl) asistDescEl.textContent = 'Promedio de participantes por actividad';
+      if (asistBar) asistBar.style.width = `${Math.round((withParts.length / Math.max(1, total)) * 100)}%`;
+    } else {
+      if (asistEl) asistEl.textContent = 'N/D';
+      if (asistDescEl) asistDescEl.textContent = 'Sin datos de asistencia';
+      if (asistBar) asistBar.style.width = '0%';
+    }
+
+    this._updatePeriodBadge();
+  }
+
+  /** Badge "Período activo · {año}" del header */
+  _updatePeriodBadge() {
+    const badge = document.getElementById('badge-periodo-activo');
+    if (badge) badge.textContent = this.currentYear || '—';
   }
 
     renderTable() {
@@ -657,41 +990,78 @@ class CapacitacionesComponent {
         if (!tbody) return;
         tbody.innerHTML = '';
 
-        if (this.filteredCapacitaciones.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+        const total = this.filteredCapacitaciones.length;
+        const totalPages = Math.max(1, Math.ceil(total / this.PAGE_SIZE));
+        if (!this._currentPage || this._currentPage < 1) this._currentPage = 1;
+        if (this._currentPage > totalPages) this._currentPage = totalPages;
+
+        if (total === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+            this._renderPagination(0, 0, 0, 1);
             return;
         }
 
-        this.filteredCapacitaciones.forEach(item => {
+        const start = (this._currentPage - 1) * this.PAGE_SIZE;
+        const pageItems = this.filteredCapacitaciones.slice(start, start + this.PAGE_SIZE);
+
+        pageItems.forEach(item => {
             const tr = document.createElement('tr');
-            const badgeClass = item.estado === 'completed' ? 'k-badge-success' : 'k-badge-warning';
-            const statusText = item.estado === 'completed' ? 'Completada' : 'Pendiente';
-            const typeBadge  = item.tipo === 'sst' ? 'k-badge-primary' : 'k-badge-info';
+            const evCount    = this._evidenciasCache.get(item.id) || 0;
+            const hasEv      = evCount > 0;
+            const evTooltip  = hasEv ? `${evCount} archivo${evCount === 1 ? '' : 's'} de evidencia` : 'Sin evidencia';
+
+            // 📦 Fase 3 — Detectar conflicto de horario (mismo día + solapamiento)
+            const conflicts = this._detectConflicts(
+                item.fechaProgramada, item.hora,
+                parseFloat(String(item.duracion || '').replace(/[^\d.]/g, '')) || 0,
+                item.id  // excluir a sí mismo
+            );
+            const hasConflict = conflicts.length > 0;
+            if (hasConflict) tr.classList.add('k-row-conflict');
+            const conflictTitle = hasConflict
+                ? `Conflicto con: ${conflicts.map(c => `"${c.nombre}" (${c.hora})`).join(', ')}`
+                : '';
+
+            const isSst = item.tipo === 'sst';
+            const typePill = isSst
+                ? '<span class="k-pill k-pill--sst"><i class="k-pill__dot"></i>SST</span>'
+                : '<span class="k-pill k-pill--pyp"><i class="k-pill__dot"></i>PYP</span>';
+            const statusPill = item.estado === 'completed'
+                ? '<span class="k-pill k-pill--success"><i class="k-pill__dot"></i>Realizada</span>'
+                : '<span class="k-pill k-pill--warning"><i class="k-pill__dot"></i>Pendiente</span>';
 
             tr.innerHTML = `
-                <td><strong>${item.nombre}</strong></td>
-                <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
+                <td><span class="k-cell-name"${hasConflict ? ` title="${conflictTitle}"` : ''}>${this._esc(item.nombre)}</span></td>
+                <td>${typePill}</td>
 			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
-                <td>${item.instructor}</td>
-                <td>${item.duracion}</td>
-                <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
+                <td>${this._esc(item.instructor)}</td>
+                <td>${this._esc(item.ubicacion || '')}</td>
+                <td>${this._esc(item.duracion)}</td>
+                <td>${item.hora || '—'}</td>
+                <td>${statusPill}</td>
+                <td class="text-center">
+                  <button class="k-evidencia-btn ${hasEv ? 'has-files' : ''}"
+                          data-id="${item.id}"
+                          title="${evTooltip}"
+                          aria-label="${evTooltip}">
+                    <i class="bi bi-paperclip"></i>
+                    ${hasEv ? `<span class="k-evidencia-btn-count">${evCount}</span>` : ''}
+                  </button>
+                </td>
 			<td class="text-right k-cell-actions"><div class="k-cell-actions__inner">
-          <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
+          <button class="k-action-btn edit-btn" data-id="${item.id}" title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
           ${item.estado === 'pending' ? `
-          <button class="k-btn k-btn-outline k-btn-icon complete-btn"
-            style="color:var(--k-success);border-color:var(--k-success);"
+          <button class="k-action-btn k-action-btn--success complete-btn"
             data-id="${item.id}" title="Marcar como Realizada">
             <i class="bi bi-check-lg"></i>
           </button>` : `
-          <button class="k-btn k-btn-outline k-btn-icon revert-btn"
-            style="color:var(--k-warning,#ffc107);border-color:var(--k-warning,#ffc107);"
+          <button class="k-action-btn k-action-btn--warning revert-btn"
             data-id="${item.id}" title="Revertir a Pendiente">
             <i class="bi bi-arrow-counterclockwise"></i>
           </button>`}
-          <button class="k-btn k-btn-outline k-btn-icon delete-btn"
-            style="color:var(--k-danger);border-color:var(--k-danger);"
+          <button class="k-action-btn k-action-btn--danger delete-btn"
             data-id="${item.id}" title="Eliminar">
             <i class="bi bi-trash"></i>
           </button>
@@ -713,10 +1083,90 @@ class CapacitacionesComponent {
     tbody.querySelectorAll('.delete-btn').forEach(btn =>
       btn.addEventListener('click', () => this.deleteTraining(parseInt(btn.dataset.id)))
     );
+    tbody.querySelectorAll('.k-evidencia-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.openEvidenciaModal(parseInt(btn.dataset.id)))
+    );
+
+        this._renderPagination(start, pageItems.length, total, totalPages);
     }
 
+    /** Escapa texto de usuario antes de inyectarlo como HTML */
+    _esc(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Footer de paginación: "Mostrando 1–8 de N actividades" + páginas numeradas.
+     * Ventana de páginas alrededor de la actual con ellipsis.
+     */
+    _renderPagination(start, count, total, totalPages) {
+        const wrap  = document.getElementById('pagination-wrap');
+        const info  = document.getElementById('pagination-info');
+        const pages = document.getElementById('pagination-pages');
+        if (!wrap || !info || !pages) return;
+
+        if (total === 0) {
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+
+        info.textContent = `Mostrando ${start + 1}–${start + count} de ${total} actividades`;
+
+        pages.innerHTML = '';
+
+        const mkBtn = (label, page, opts = {}) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'k-page-btn' + (opts.active ? ' is-active' : '');
+            btn.innerHTML = label;
+            if (opts.disabled) btn.disabled = true;
+            if (opts.title) btn.title = opts.title;
+            if (!opts.disabled && !opts.active) {
+                btn.addEventListener('click', () => {
+                    this._currentPage = page;
+                    this.renderTable();
+                });
+            }
+            return btn;
+        };
+
+        pages.appendChild(mkBtn('‹', this._currentPage - 1, { disabled: this._currentPage <= 1, title: 'Página anterior' }));
+
+        // Ventana de páginas: 1 … c-1 c c+1 … N
+        const nums = new Set([1, totalPages]);
+        for (let p = this._currentPage - 1; p <= this._currentPage + 1; p++) {
+            if (p >= 1 && p <= totalPages) nums.add(p);
+        }
+        const sorted = [...nums].sort((a, b) => a - b);
+        let prev = 0;
+        sorted.forEach(p => {
+            if (prev && p - prev > 1) {
+                const ell = document.createElement('span');
+                ell.className = 'k-page-ellipsis';
+                ell.textContent = '…';
+                pages.appendChild(ell);
+            }
+            pages.appendChild(mkBtn(String(p), p, { active: p === this._currentPage }));
+            prev = p;
+        });
+
+        pages.appendChild(mkBtn('›', this._currentPage + 1, { disabled: this._currentPage >= totalPages, title: 'Página siguiente' }));
+    }
+
+    /**
+     * Panel "En tu radar" del dashboard premium:
+     * - Hasta 3 próximas pendientes (reloj, fecha + nombre, meta tipo · ubicación, pill Programada)
+     * - Fila de evidencias pendientes (usa _evidenciasCache)
+     * El link "Ver listado completo →" vive en el HTML (id link-ver-listado).
+     */
     renderRecentList() {
-        const container = document.getElementById('recent-list');
+        const container = document.getElementById('radar-list');
         if (!container) return;
 
         const upcoming = this.filteredCapacitaciones
@@ -727,75 +1177,140 @@ class CapacitacionesComponent {
         container.innerHTML = '';
 
         if (upcoming.length === 0) {
-            container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--k-text-muted);">No hay capacitaciones próximas</div>';
-            return;
+            container.innerHTML = '<div class="cap-radar-empty">No hay capacitaciones próximas pendientes</div>';
+        } else {
+            upcoming.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'cap-radar-item';
+                const meta = `${item.tipo.toUpperCase()}${item.ubicacion ? ' · ' + item.ubicacion : ''}`;
+                div.innerHTML = `
+                    <div class="cap-radar-item__icon"><i class="bi bi-clock"></i></div>
+                    <div class="cap-radar-item__body">
+                        <div class="cap-radar-item__name">${this._esc(this.formatDate(item.fechaProgramada))} · ${this._esc(item.nombre)}</div>
+                        <div class="cap-radar-item__meta">${this._esc(meta)}</div>
+                    </div>
+                    <span class="cap-radar-pill"><i class="cap-radar-pill__dot"></i>Programada</span>
+                `;
+                container.appendChild(div);
+            });
         }
 
-        upcoming.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'k-recent-item';
-            div.innerHTML = `
-                <div>
-                    <div class="k-recent-item-title">${item.nombre}</div>
-                    <div class="k-recent-item-meta"><i class="bi bi-calendar3 me-1"></i>${this.formatDate(item.fechaProgramada)}</div>
-                </div>
-                <span class="k-badge k-badge-warning">Programada</span>
-            `;
-            container.appendChild(div);
-        });
+        // Fila "Evidencias pendientes": ejecutadas sin soporte cargado
+        const evRow   = document.getElementById('radar-evidencias');
+        const evCount = document.getElementById('radar-evidencias-count');
+        if (evRow && evCount) {
+            const sinSoporte = this.filteredCapacitaciones.filter(c =>
+                c.estado === 'completed' && (this._evidenciasCache.get(c.id) || 0) === 0
+            ).length;
+            // Solo mostrar cuando el cache ya se cargó (si no, los counts son 0 falsos)
+            const cacheLoaded = this._evidenciasCache && this._evidenciasCache.size > 0;
+            if (cacheLoaded && sinSoporte > 0) {
+                evCount.textContent = sinSoporte;
+                evRow.style.display = '';
+            } else {
+                evRow.style.display = 'none';
+            }
+        }
     }
 
     // --- ACCIONES DE ESCRITURA EN EXCEL ---
 
+    /**
+     * Abre el modal "Nuevo período de capacitación" (reemplaza el confirm simple).
+     * El nombre del período es cosmético/informativo: la hoja del Excel se
+     * nombra por año (la API duplicateCapacitacionesSheet no soporta nombre).
+     */
     async createNewPeriod() {
         if (!this.excelFilePath) {
             window.KAIRToast.show('Error: No hay archivo cargado.', 'warning');
             return;
         }
 
-        const nextYear  = Math.max(...this.availableSheets.map(s => {
+        const modal     = document.getElementById('periodModal');
+        const yearSel   = document.getElementById('period-year');
+        const nameInput = document.getElementById('period-name');
+        if (!modal || !yearSel) return;
+
+        const maxYear = Math.max(...this.availableSheets.map(s => {
             const m = s.match(/\d{4}/);
             return m ? parseInt(m[0]) : 0;
-        })) + 1;
+        }));
+        const nextYear = maxYear + 1;
 
- const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString())) || this.availableSheets[0];
+        // Años ya existentes en el Excel (no se pueden duplicar)
+        const existingYears = new Set(this.availableSheets.map(s => {
+            const m = s.match(/\d{4}/);
+            return m ? parseInt(m[0]) : null;
+        }).filter(y => y !== null));
 
-  this.showConfirmModal({
-   title: 'Crear Nuevo Periodo',
-   message: `¿Crear periodo ${nextYear} duplicando la hoja "${baseSheet}"?`,
-   warning: 'Se creará una nueva hoja en el archivo Excel.',
-   acceptLabel: 'Crear Periodo',
-   acceptIcon: 'bi-calendar-plus',
-   onAccept: async () => {
-    window.KAIRToast.show(`Creando periodo ${nextYear}...`, 'info');
-    try {
-     const result = await window.electronAPI.duplicateCapacitacionesSheet({
-      filePath: this.excelFilePath,
-      currentSheetName: baseSheet,
-      newYear: nextYear
-     });
+        // Opciones de vigencia: los próximos 4 años sin hoja existente
+        yearSel.innerHTML = '';
+        let firstAvailable = null;
+        for (let y = nextYear; y <= nextYear + 4; y++) {
+            if (existingYears.has(y)) continue;
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSel.appendChild(opt);
+            if (firstAvailable === null) firstAvailable = y;
+        }
 
-     if (!result?.success) throw new Error(result?.error || 'Error desconocido');
+        if (firstAvailable === null) {
+            window.KAIRToast.show('Ya existen hojas para los próximos años.', 'info');
+            return;
+        }
+        yearSel.value = firstAvailable;
+        if (nameInput) {
+            nameInput.value = '';
+            nameInput.placeholder = `Plan ${firstAvailable}`;
+        }
 
-     window.KAIRToast.show(`Periodo ${nextYear} creado.`, 'success');
-
-     const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
-     if (sheetsResult.success) {
-      this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
-      await this._populateYearFilterFromSheets();
-      const yearFilter = document.getElementById('yearFilter');
-      if (yearFilter) {
-       yearFilter.value = nextYear;
-       yearFilter.dispatchEvent(new Event('change'));
-      }
-     }
-    } catch (error) {
-     console.error('Error creating period:', error);
-     window.KAIRToast.show(`Error: ${error.message}`, 'danger');
+        modal.classList.add('open');
+        if (nameInput) nameInput.focus();
     }
-   }
-  });
-  return;
+
+    /** Ejecuta la creación del período con la vigencia elegida en el modal */
+    async _confirmCreatePeriod() {
+        const yearSel   = document.getElementById('period-year');
+        const nameInput = document.getElementById('period-name');
+        if (!yearSel || !yearSel.value) return;
+
+        const nextYear  = parseInt(yearSel.value);
+        const periodName = (nameInput?.value || '').trim() || `Plan ${nextYear}`;
+
+        // Hoja base: la del año anterior a la vigencia elegida, o la primera disponible
+        const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString()))
+            || this.availableSheets[0];
+
+        const modal = document.getElementById('periodModal');
+        if (modal) modal.classList.remove('open');
+
+        window.KAIRToast.show(`Creando "${periodName}" (${nextYear})...`, 'info');
+        try {
+            const result = await window.electronAPI.duplicateCapacitacionesSheet({
+                filePath: this.excelFilePath,
+                currentSheetName: baseSheet,
+                newYear: nextYear
+            });
+
+            if (!result?.success) throw new Error(result?.error || 'Error desconocido');
+
+            window.KAIRToast.show(`Periodo ${nextYear} creado.`, 'success');
+
+            const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
+            if (sheetsResult.success) {
+                this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
+                await this._populateYearFilterFromSheets();
+                const yearFilter = document.getElementById('yearFilter');
+                if (yearFilter) {
+                    yearFilter.value = nextYear;
+                    yearFilter.dispatchEvent(new Event('change'));
+                }
+            }
+        } catch (error) {
+            console.error('Error creating period:', error);
+            window.KAIRToast.show(`Error: ${error.message}`, 'danger');
+        }
     }
 
     async saveTraining() {
@@ -811,11 +1326,25 @@ class CapacitacionesComponent {
         const newDate      = document.getElementById('trainingDate').value;
         const type         = document.getElementById('trainingType').value;
         const instructor   = document.getElementById('trainingInstructor').value;
+        const ubicacion    = document.getElementById('trainingUbicacion').value;
+        const hora         = document.getElementById('trainingHora').value;
         const duration     = document.getElementById('trainingDuration').value;
         const participants = parseInt(document.getElementById('trainingParticipants').value) || 0;
 
         if (!name || !newDate) {
             window.KAIRToast.show('Nombre y Fecha son obligatorios.', 'warning');
+            return;
+        }
+        if (!hora) {
+            window.KAIRToast.show('La hora es obligatoria.', 'warning');
+            return;
+        }
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+            window.KAIRToast.show('Formato de hora inválido (HH:MM).', 'warning');
+            return;
+        }
+        if (hora < '06:00' || hora > '20:00') {
+            window.KAIRToast.show('La hora debe estar entre 06:00 y 20:00.', 'warning');
             return;
         }
 
@@ -835,10 +1364,30 @@ class CapacitacionesComponent {
             tipo:          type,
             fechaProgramada,
             instructor,
+            ubicacion:     ubicacion,
+            hora:          hora,
             duracion:      `${duration} Horas`,
             participantes: participants,
             estado:        'pending'
         };
+
+        this._setUbicacion(name, ubicacion);
+        this._setHora(name, hora);
+
+        // 📦 Fase 3 — Detectar conflictos ANTES de persistir. Si hay solapamiento,
+        // mostrar modal de confirmación. Si el user cancela, abortamos el guardado.
+        const conflicts = this._detectConflicts(fechaProgramada, hora, parseFloat(duration) || 2);
+        if (conflicts.length > 0) {
+            const names = conflicts.map(c => `"${c.nombre}" (${c.hora})`).join(', ');
+            const proceed = await this.showConfirmModal({
+                title: 'Conflicto de horario',
+                message: `Esta capacitación se solapa con: ${names}`,
+                warning: '¿Deseás guardarla de todas formas?',
+                acceptLabel: 'Guardar igual',
+                acceptIcon: 'bi-exclamation-triangle',
+            });
+            if (!proceed) return;  // user canceló
+        }
 
         this.capacitaciones.push(newTraining);
         this.closeModals();
@@ -867,15 +1416,45 @@ class CapacitacionesComponent {
       ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`
       : date;
 
+    const oldNombre = this.capacitaciones[index].nombre;
+    const newUbicacion = document.getElementById('trainingUbicacion').value;
+    const newHora      = document.getElementById('trainingHora').value;
     this.capacitaciones[index] = {
       ...this.capacitaciones[index],
       nombre: name,
       tipo: document.getElementById('trainingType').value,
       fechaProgramada: normalizedDate,
       instructor: document.getElementById('trainingInstructor').value,
+      ubicacion: newUbicacion,
+      hora: newHora,
       duracion: `${document.getElementById('trainingDuration').value} Horas`,
       participantes: parseInt(document.getElementById('trainingParticipants').value) || 0
     };
+    // Si el nombre cambió, la key de la ubicación y hora también — migrar el valor
+    if (oldNombre && oldNombre !== name) {
+        this._setUbicacion(oldNombre, '');   // borrar la key vieja
+        this._setHora(oldNombre, '');
+    }
+    this._setUbicacion(name, newUbicacion);   // guardar con la key nueva
+    this._setHora(name, newHora);
+
+    // 📦 Fase 3 — Detectar conflictos al editar (excluyendo esta misma capacitación)
+    const conflictsUpdate = this._detectConflicts(
+        normalizedDate, newHora,
+        parseFloat(document.getElementById('trainingDuration').value) || 2,
+        id
+    );
+    if (conflictsUpdate.length > 0) {
+        const namesUpdate = conflictsUpdate.map(c => `"${c.nombre}" (${c.hora})`).join(', ');
+        const proceedUpdate = await this.showConfirmModal({
+            title: 'Conflicto de horario',
+            message: `Esta capacitación se solapa con: ${namesUpdate}`,
+            warning: '¿Deseás guardar los cambios de todas formas?',
+            acceptLabel: 'Guardar igual',
+            acceptIcon: 'bi-exclamation-triangle',
+        });
+        if (!proceedUpdate) return;  // user canceló
+    }
 
         this.closeModals();
         await this._saveDataToExcel();
@@ -913,6 +1492,8 @@ class CapacitacionesComponent {
    acceptIcon: 'bi-trash',
    onAccept: async () => {
     this.capacitaciones.splice(index, 1);
+    this._setUbicacion(cap.nombre, '');  // limpiar ubicación persistida
+    this._setHora(cap.nombre, '');       // limpiar hora persistida
     await this._saveDataToExcel();
     this.applyFilters();
     window.KAIRToast.show('Capacitación eliminada', 'success', { subtitle: `"${cap.nombre}" eliminada del registro` });
@@ -965,6 +1546,66 @@ class CapacitacionesComponent {
 
     this.initializeTypeChart(isDark, textColor);
     this.initializeBarChart(isDark, textColor, gridColor);
+    this.initializePlanChart(isDark, textColor, gridColor);
+  }
+
+  /**
+   * NUEVO — Line chart "Ejecución del plan": acumulado mensual.
+   * Serie azul sólida = ejecutado real; serie gris dashed = planeado.
+   */
+  initializePlanChart(isDark, textColor, gridColor) {
+    const ctx = document.getElementById('planLineChart');
+    if (!ctx) { console.warn('[CHART] planLineChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.planChartInstance) this.planChartInstance.destroy();
+
+    this.planChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        datasets: [
+          {
+            label: 'Ejecutado real',
+            data: Array(12).fill(0),
+            borderColor: '#2057b8',
+            backgroundColor: '#2057b8',
+            fill: false,
+            tension: 0.4,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointBackgroundColor: '#2057b8',
+            pointBorderColor: '#2057b8'
+          },
+          {
+            label: 'Planeado',
+            data: Array(12).fill(0),
+            borderColor: isDark ? '#7d8798' : '#b6bfcc',
+            borderDash: [6, 6],
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 2,
+            pointBackgroundColor: isDark ? '#7d8798' : '#b6bfcc'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        scales: {
+          y: {
+            beginAtZero: true,
+            suggestedMax: 20,
+            grid: { display: false },
+            ticks: { color: textColor, precision: 0, stepSize: 5 }
+          },
+          x: { grid: { display: false }, ticks: { color: textColor } }
+        },
+        plugins: { legend: { display: false } }  // leyenda custom en el HTML
+      }
+    });
   }
 
   initializeBarChart(isDark, textColor, gridColor) {
@@ -979,8 +1620,8 @@ class CapacitacionesComponent {
       data: {
         labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
         datasets: [
-          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
-          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
+          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4, barPercentage: 0.55, categoryPercentage: 0.7 },
+          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#f6d9a0', borderRadius: 4, barPercentage: 0.55, categoryPercentage: 0.7 }
         ]
       },
       options: {
@@ -988,10 +1629,10 @@ class CapacitacionesComponent {
         maintainAspectRatio: false,
         resizeDelay: 200,
         scales: {
-          y: { beginAtZero: true, grid: { display: true, color: gridColor }, ticks: { color: textColor } },
+          y: { beginAtZero: true, grid: { display: false }, ticks: { color: textColor, precision: 0, stepSize: 3 } },
           x: { grid: { display: false }, ticks: { color: textColor } }
         },
-        plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+        plugins: { legend: { display: false } }  // leyenda custom en el HTML
       }
     });
   }
@@ -1003,8 +1644,31 @@ class CapacitacionesComponent {
 
     if (this.typeChartInstance) this.typeChartInstance.destroy();
 
-    const sstColor = '#174ea6';
-    const pypColor = '#17a2b8';
+    const sstColor = '#1e4ed8';
+    const pypColor = '#b7c8ea';
+
+    // Plugin inline: número grande al centro de la dona ("{total}" + "actividades")
+    const centerTextPlugin = {
+      id: 'capCenterText',
+      afterDraw: (chart) => {
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return;
+        const data = chart.data.datasets[0].data || [];
+        const total = data.reduce((a, b) => a + b, 0);
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        c.save();
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.font = "800 26px Manrope, 'DM Sans', sans-serif";
+        c.fillStyle = isDark ? '#e9ecef' : '#14213d';
+        c.fillText(String(total), centerX, centerY - 8);
+        c.font = "500 11px 'DM Sans', sans-serif";
+        c.fillStyle = isDark ? '#adb5bd' : '#748096';
+        c.fillText('actividades', centerX, centerY + 12);
+        c.restore();
+      }
+    };
 
     this.typeChartInstance = new Chart(ctx, {
       type: 'doughnut',
@@ -1022,10 +1686,7 @@ class CapacitacionesComponent {
         maintainAspectRatio: false,
         cutout: '65%',
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 10 }
-          },
+          legend: { display: false },  // leyenda lateral custom en el HTML (#donut-legend)
           tooltip: {
             callbacks: {
               label: function(context) {
@@ -1037,27 +1698,42 @@ class CapacitacionesComponent {
             }
           }
         }
-      }
+      },
+      plugins: [centerTextPlugin]
     });
   }
 
   updateCharts() {
+    // Acumulados mensuales (para el line chart) y por-mes (para el bar chart)
+    const completedData = Array(12).fill(0);
+    const pendingData = Array(12).fill(0);
+    const totalPerMonth = Array(12).fill(0);
+
+    this.filteredCapacitaciones.forEach(cap => {
+      const date = new Date(cap.fechaProgramada);
+      if (!isNaN(date.getTime())) {
+        const month = date.getMonth();
+        totalPerMonth[month]++;
+        if (cap.estado === 'completed') completedData[month]++;
+        else pendingData[month]++;
+      }
+    });
+
     if (this.chartInstance) {
-      const completedData = Array(12).fill(0);
-      const pendingData = Array(12).fill(0);
-
-      this.filteredCapacitaciones.forEach(cap => {
-        const date = new Date(cap.fechaProgramada);
-        if (!isNaN(date.getTime())) {
-          const month = date.getMonth();
-          if (cap.estado === 'completed') completedData[month]++;
-          else pendingData[month]++;
-        }
-      });
-
       this.chartInstance.data.datasets[0].data = completedData;
       this.chartInstance.data.datasets[1].data = pendingData;
       this.chartInstance.update();
+    }
+
+    // Line chart: series acumuladas (ejecutado real vs planeado)
+    if (this.planChartInstance) {
+      const cum = (arr) => {
+        let acc = 0;
+        return arr.map(v => (acc += v));
+      };
+      this.planChartInstance.data.datasets[0].data = cum(completedData);
+      this.planChartInstance.data.datasets[1].data = cum(totalPerMonth);
+      this.planChartInstance.update();
     }
 
     this.updateTypeChart();
@@ -1068,17 +1744,565 @@ class CapacitacionesComponent {
 
     const sstCount = this.filteredCapacitaciones.filter(c => c.tipo === 'sst').length;
     const pypCount = this.filteredCapacitaciones.filter(c => c.tipo === 'pyp').length;
+    const total = sstCount + pypCount;
 
     this.typeChartInstance.data.datasets[0].data = [sstCount, pypCount];
-        this.typeChartInstance.update();
+    this.typeChartInstance.update();
+
+    // Leyenda DEBAJO de la dona: filas "● SST ....... 12 · 63%" con separador
+    const legend = document.getElementById('donut-legend');
+    if (legend) {
+      const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+      legend.innerHTML = `
+        <div class="cap-donut-legend__row">
+          <span class="cap-donut-legend__name"><i class="cap-donut-legend__dot" style="background:#1e4ed8"></i>SST</span>
+          <span class="cap-donut-legend__pct">${sstCount} · ${pct(sstCount)}%</span>
+        </div>
+        <div class="cap-donut-legend__row">
+          <span class="cap-donut-legend__name"><i class="cap-donut-legend__dot" style="background:#b7c8ea"></i>PYP</span>
+          <span class="cap-donut-legend__pct">${pypCount} · ${pct(pypCount)}%</span>
+        </div>
+      `;
     }
+  }
 
   // --- UTILIDADES ---
+
+  // ===== GESTIÓN DE EVIDENCIAS =====
+
+  setupEvidenciaModal() {
+    // Cerrar modal
+    document.querySelectorAll('[data-close-evidencia]').forEach(btn => {
+      btn.addEventListener('click', () => this.closeEvidenciaModal());
+    });
+
+    // Click fuera del overlay cierra
+    const overlay = document.getElementById('evidenciaModal');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) this.closeEvidenciaModal();
+      });
+    }
+
+    // Esc cierra
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('evidenciaModal');
+      if (e.key === 'Escape' && modal && modal.classList.contains('open')) {
+        this.closeEvidenciaModal();
+      }
+    });
+
+    // File input change
+    const fileInput = document.getElementById('evidenciaFileInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length > 0 && this._evidenciaCap) {
+          this._uploadEvidenciaFiles(this._evidenciaCap, files);
+        }
+        e.target.value = '';
+      });
+    }
+
+    // Drag & drop
+    const dropzone = document.getElementById('evidenciaDropzone');
+    if (dropzone) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('is-dragging');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(evt => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('is-dragging');
+        });
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer?.files || []);
+        if (files.length > 0 && this._evidenciaCap) {
+          this._uploadEvidenciaFiles(this._evidenciaCap, files);
+        }
+      });
+    }
+  }
+
+  /**
+   * Ruta de la carpeta del submódulo (donde está el Excel y donde vivirá
+   * la carpeta de evidencias como hermana). Devuelve null si todavía no
+   * hay archivo de Excel cargado.
+   */
+  _getEvidenciaSubmodulePath() {
+    if (!this.excelFilePath) return null;
+    const sep = this.excelFilePath.includes('\\') ? '\\' : '/';
+    const lastSep = this.excelFilePath.lastIndexOf(sep);
+    if (lastSep === -1) return null;
+    return this.excelFilePath.substring(0, lastSep);
+  }
+
+  /**
+   * Genera un nombre de carpeta estable para una capacitación:
+   * cap-<id>-<slug-del-nombre>
+   */
+  _getCapFolderName(cap) {
+    const slug = this._slugify(cap.nombre || `cap-${cap.id}`);
+    return `cap-${cap.id}-${slug}`.substring(0, 60);
+  }
+
+  /**
+   * Construye la ruta completa de la carpeta de evidencia de una cap
+   * SIN crearla en disco. Usar _ensureEvidenciaFolders() antes de subir.
+   */
+  _getEvidenciaFolder(cap) {
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) return null;
+    const sep = submodule.includes('\\') ? '\\' : '/';
+    return submodule + sep + 'evidencias-capacitaciones' + sep + this._getCapFolderName(cap);
+  }
+
+  /**
+   * Crea (si no existe) la carpeta `evidencias-capacitaciones/` y dentro la
+   * carpeta de la cap. Devuelve la ruta final. Es idempotente: si las
+   * carpetas ya existen, el backend responde success:true sin error.
+   */
+  async _ensureEvidenciaFolders(cap) {
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) throw new Error('No hay ruta del submódulo cargada');
+
+    const submoduleFwd = submodule.replace(/\\/g, '/');
+
+    // Nivel 1: evidencias-capacitaciones
+    const baseResult = await window.electronAPI.createProviderFolder(
+      submoduleFwd, 'evidencias-capacitaciones'
+    );
+    if (!baseResult || !baseResult.success) {
+      throw new Error(`No se pudo crear carpeta base de evidencias: ${baseResult?.error || 'unknown'}`);
+    }
+
+    const basePath = (baseResult.path || '').replace(/\\/g, '/');
+
+    // Nivel 2: evidencias-capacitaciones/<cap-X-...>
+    const capResult = await window.electronAPI.createProviderFolder(
+      basePath, this._getCapFolderName(cap)
+    );
+    if (!capResult || !capResult.success) {
+      throw new Error(`No se pudo crear carpeta de la capacitación: ${capResult?.error || 'unknown'}`);
+    }
+
+    return capResult.path;
+  }
+
+  /**
+   * Normaliza un string para usar como nombre de carpeta:
+   * lowercase, sin acentos, sin caracteres especiales, kebab-case, max 40 chars.
+   */
+  _slugify(text) {
+    return (text || '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 40) || 'cap';
+  }
+
+  _evidenciaIconClass(fileName) {
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') return 'is-pdf bi-file-earmark-pdf-fill';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'is-image bi-file-earmark-image';
+    if (['doc', 'docx'].includes(ext)) return 'is-doc bi-file-earmark-word-fill';
+    return 'bi-file-earmark';
+  }
+
+  _formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let v = bytes;
+    let i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + units[i];
+  }
+
+  /**
+   * Cuenta archivos para TODAS las capacitaciones del año actual.
+   * Cachea los resultados en this._evidenciasCache (id → count).
+   * Si una carpeta no existe, cuenta 0.
+   */
+  async _loadAllEvidenciaCounts() {
+    this._evidenciasCache = new Map();
+
+    if (!this.excelFilePath) return;
+
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) return;
+
+    const base = submodule + (submodule.includes('\\') ? '\\' : '/') + 'evidencias-capacitaciones';
+    const sep = base.includes('\\') ? '\\' : '/';
+
+    for (const cap of this.capacitaciones) {
+      const folderName = this._getCapFolderName(cap);
+      const folderPath = base + sep + folderName;
+
+      try {
+        const result = await window.electronAPI.listProviderFiles(folderPath);
+        if (result && result.success && Array.isArray(result.files)) {
+          this._evidenciasCache.set(cap.id, result.files.length);
+        } else {
+          this._evidenciasCache.set(cap.id, 0);
+        }
+      } catch (e) {
+        this._evidenciasCache.set(cap.id, 0);
+      }
+    }
+  }
+
+  async openEvidenciaModal(capId) {
+    const cap = this.capacitaciones.find(c => c.id === capId);
+    if (!cap) {
+      window.KAIRToast.show('Capacitación no encontrada', 'warning');
+      return;
+    }
+    if (!this.excelFilePath) {
+      window.KAIRToast.show('No hay archivo de Excel cargado', 'warning');
+      return;
+    }
+
+    this._evidenciaCap = cap;
+    this._evidenciaFiles = [];
+
+    const modal = document.getElementById('evidenciaModal');
+    const nameEl = document.getElementById('evidencia-cap-name');
+    const countEl = document.getElementById('evidenciaCount');
+    const listEl = document.getElementById('evidenciaList');
+
+    if (!modal || !nameEl || !listEl) return;
+
+    nameEl.textContent = cap.nombre;
+    if (countEl) countEl.textContent = '...';
+
+    listEl.innerHTML = `
+      <div class="k-evidencia-empty">
+        <i class="bi bi-hourglass-split"></i>
+        Cargando archivos…
+      </div>
+    `;
+
+    // Mover el modal al body para escapar de scope CSS (igual que trainingModal)
+    if (modal.parentNode !== document.body) {
+      const computed = getComputedStyle(this.container);
+      const cssVars = [
+        '--k-primary', '--k-primary-hover', '--k-primary-light',
+        '--k-success', '--k-success-light',
+        '--k-warning', '--k-warning-light',
+        '--k-danger',  '--k-danger-light',
+        '--k-info',    '--k-info-light',
+        '--k-bg-app',  '--k-bg-card', '--k-border',
+        '--k-text-main', '--k-text-muted',
+        '--k-radius-md', '--k-radius-lg'
+      ];
+      cssVars.forEach(v => {
+        const val = computed.getPropertyValue(v).trim();
+        if (val) modal.style.setProperty(v, val);
+      });
+      document.body.appendChild(modal);
+    }
+
+    modal.classList.add('open');
+
+    await this._loadEvidenciaFiles(cap);
+  }
+
+  closeEvidenciaModal() {
+    const modal = document.getElementById('evidenciaModal');
+    if (modal) modal.classList.remove('open');
+    this._evidenciaCap = null;
+    this._evidenciaFiles = [];
+  }
+
+  async _loadEvidenciaFiles(cap) {
+    const folder = this._getEvidenciaFolder(cap);
+    const listEl = document.getElementById('evidenciaList');
+    const countEl = document.getElementById('evidenciaCount');
+    if (!folder || !listEl) return;
+
+    try {
+      const result = await window.electronAPI.listProviderFiles(folder);
+      const files = (result && result.success) ? result.files : [];
+
+      this._evidenciaFiles = files;
+      this._evidenciasCache.set(cap.id, files.length);
+
+      if (countEl) countEl.textContent = files.length;
+
+      if (files.length === 0) {
+        listEl.innerHTML = `
+          <div class="k-evidencia-empty">
+            <i class="bi bi-inbox"></i>
+            No hay archivos cargados todavía. Arrastrá un PDF o hacé clic en la zona de arriba.
+          </div>
+        `;
+      } else {
+        listEl.innerHTML = '';
+        files.forEach(file => listEl.appendChild(this._renderEvidenciaItem(file, cap)));
+      }
+
+      // Si la tabla está visible, refrescar el badge
+      if (this.currentView === 'trainings') this.renderTable();
+    } catch (error) {
+      console.error('[EVIDENCIA] Error listando archivos:', error);
+      listEl.innerHTML = `
+        <div class="k-evidencia-empty">
+          <i class="bi bi-exclamation-triangle"></i>
+          Error al listar los archivos.
+        </div>
+      `;
+    }
+  }
+
+  _renderEvidenciaItem(file, cap) {
+    const div = document.createElement('div');
+    div.className = 'k-evidencia-item';
+
+    const iconClass = this._evidenciaIconClass(file.name);
+    const [cls, iconName] = iconClass.split(' ');
+
+    const safeName = file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const size = this._formatBytes(file.size);
+    const modified = file.modified ? new Date(file.modified).toLocaleString('es-ES') : '';
+
+    div.innerHTML = `
+      <div class="k-evidencia-item-icon ${cls}">
+        <i class="bi ${iconName}"></i>
+      </div>
+      <div class="k-evidencia-item-info">
+        <div class="k-evidencia-item-name" title="${safeName}">${safeName}</div>
+        <div class="k-evidencia-item-meta">${size}${modified ? ' · ' + modified : ''}</div>
+      </div>
+      <div class="k-evidencia-item-actions">
+        <button class="k-btn k-btn-outline k-btn-icon ev-open-btn"
+                data-name="${safeName.replace(/"/g, '&quot;')}"
+                title="Abrir archivo">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </button>
+        <button class="k-btn k-btn-outline k-btn-icon ev-delete-btn"
+                style="color:var(--k-danger);border-color:var(--k-danger);"
+                data-name="${safeName.replace(/"/g, '&quot;')}"
+                title="Eliminar archivo (a papelera)">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    div.querySelector('.ev-open-btn').addEventListener('click', () => {
+      this._openEvidenciaFile(cap, file.name);
+    });
+
+    div.querySelector('.ev-delete-btn').addEventListener('click', () => {
+      this._confirmDeleteEvidencia(cap, file.name);
+    });
+
+    return div;
+  }
+
+  _confirmDeleteEvidencia(cap, fileName) {
+    this.showConfirmModal({
+      title: 'Eliminar evidencia',
+      message: `¿Eliminar "${fileName}"?`,
+      warning: 'El archivo se moverá a la Papelera de Reciclaje de Windows (recuperable).',
+      acceptLabel: 'Eliminar',
+      acceptIcon: 'bi-trash',
+      onAccept: () => this._removeEvidenciaFile(cap, fileName)
+    });
+  }
+
+  async _uploadEvidenciaFiles(cap, files) {
+    if (this._evidenciaUploading) {
+      window.KAIRToast.show('Hay una subida en curso, esperá unos segundos', 'warning');
+      return;
+    }
+
+    // Validar tipos MIME / extensiones
+    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'webp', 'bmp'];
+    const validFiles = files.filter(f => {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      return allowedExts.includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      window.KAIRToast.show('Ningún archivo tiene un formato permitido', 'warning');
+      return;
+    }
+    if (validFiles.length !== files.length) {
+      window.KAIRToast.show(`${files.length - validFiles.length} archivo(s) ignorado(s) por formato`, 'info');
+    }
+
+    let folder;
+    try {
+      // ✏️ FIX: el backend `copy-file-to-provider-folder` NO crea carpetas,
+      // solo escribe. Hay que asegurar la existencia de la ruta primero.
+      folder = await this._ensureEvidenciaFolders(cap);
+    } catch (err) {
+      console.error('[EVIDENCIA] Error creando carpetas:', err);
+      window.KAIRToast.show(`No se pudo preparar la carpeta: ${err.message}`, 'danger');
+      return;
+    }
+
+    if (!folder) {
+      window.KAIRToast.show('No se pudo determinar la carpeta de evidencias', 'danger');
+      return;
+    }
+
+    this._evidenciaUploading = true;
+    const total = validFiles.length;
+    let success = 0;
+    let errors = 0;
+
+    window.KAIRToast.show(`Subiendo ${total} archivo(s)…`, 'info');
+
+    try {
+      for (let i = 0; i < total; i++) {
+        const file = validFiles[i];
+        try {
+          // Asegurar unicidad del nombre
+          const finalName = await this._ensureUniqueName(folder, file.name);
+
+          // Convertir a base64 (sin prefijo data:...)
+          const base64 = await this._fileToBase64(file);
+
+          const res = await window.electronAPI.copyFileToProviderFolder(
+            base64, folder, finalName, file.type || ''
+          );
+
+          if (res && res.success) success++;
+          else {
+            errors++;
+            console.error('[EVIDENCIA] Backend rechazó el archivo', file.name, res?.error);
+          }
+        } catch (err) {
+          console.error('[EVIDENCIA] Error subiendo', file.name, err);
+          errors++;
+        }
+      }
+
+      if (success > 0) {
+        window.KAIRToast.show(`${success} archivo(s) subido(s)${errors ? `, ${errors} con error` : ''}`, success === total ? 'success' : 'warning');
+      } else if (errors > 0) {
+        window.KAIRToast.show('No se pudo subir ningún archivo', 'danger');
+      }
+
+      await this._loadEvidenciaFiles(cap);
+    } finally {
+      this._evidenciaUploading = false;
+    }
+  }
+
+  /**
+   * Si ya existe `name` en `folder`, devuelve `name (2).ext`, `name (3).ext`, etc.
+   */
+  async _ensureUniqueName(folder, name) {
+    try {
+      const res = await window.electronAPI.listProviderFiles(folder);
+      const existing = (res && res.success) ? new Set((res.files || []).map(f => f.name)) : new Set();
+      if (!existing.has(name)) return name;
+
+      const lastDot = name.lastIndexOf('.');
+      const base = lastDot > 0 ? name.substring(0, lastDot) : name;
+      const ext  = lastDot > 0 ? name.substring(lastDot) : '';
+
+      let counter = 2;
+      let candidate = `${base} (${counter})${ext}`;
+      while (existing.has(candidate) && counter < 1000) {
+        counter++;
+        candidate = `${base} (${counter})${ext}`;
+      }
+      return candidate;
+    } catch (e) {
+      return name;
+    }
+  }
+
+  _fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      // Mismo patrón que evaluacion-proveedores: arrayBuffer → bytes → btoa
+      // (más robusto con archivos grandes que FileReader.readAsDataURL)
+      file.arrayBuffer()
+        .then(arrayBuffer => {
+          try {
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            resolve(btoa(binary));
+          } catch (err) {
+            reject(err);
+          }
+        })
+        .catch(reject);
+    });
+  }
+
+  async _removeEvidenciaFile(cap, fileName) {
+    const folder = this._getEvidenciaFolder(cap);
+    if (!folder) return;
+
+    const sep = folder.includes('\\') ? '\\' : '/';
+    const fullPath = folder + sep + fileName;
+
+    window.KAIRToast.show('Eliminando archivo…', 'info');
+
+    try {
+      // Reusar delete-document del main (usa shell.trashItem, amigable con Google Drive)
+      const res = await window.electronAPI.deleteDocument(fullPath);
+      if (res && res.success) {
+        window.KAIRToast.show(`"${fileName}" movido a papelera`, 'success');
+        await this._loadEvidenciaFiles(cap);
+      } else {
+        window.KAIRToast.show(`Error al eliminar: ${res?.error || 'desconocido'}`, 'danger');
+      }
+    } catch (err) {
+      console.error('[EVIDENCIA] Error eliminando', fileName, err);
+      window.KAIRToast.show('Error inesperado al eliminar', 'danger');
+    }
+  }
+
+  async _openEvidenciaFile(cap, fileName) {
+    const folder = this._getEvidenciaFolder(cap);
+    if (!folder) return;
+    const sep = folder.includes('\\') ? '\\' : '/';
+    const fullPath = folder + sep + fileName;
+
+    try {
+      const res = await window.electronAPI.openFile(fullPath);
+      if (res && !res.success) {
+        window.KAIRToast.show(`No se pudo abrir: ${res.error || 'desconocido'}`, 'danger');
+      }
+    } catch (err) {
+      console.error('[EVIDENCIA] Error abriendo', fileName, err);
+      window.KAIRToast.show('Error al abrir el archivo', 'danger');
+    }
+  }
+
+  // ===== FIN GESTIÓN DE EVIDENCIAS =====
 
   formatDate(dateString) {
         if (!dateString || dateString === 'No especificada') return '-';
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+        // "20 feb 2026" → "20 Feb 2026" (mes capitalizado, formato corto premium)
+        const s = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+        const parts = s.replace(/\./g, '').split(' ');
+        if (parts.length >= 3) parts[1] = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+        return parts.join(' ');
     }
 }
 

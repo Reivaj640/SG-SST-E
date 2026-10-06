@@ -9,7 +9,7 @@
 
 const path = require('path');
 const fs   = require('fs');
-const pdf  = require('pdf-parse');
+const pdf  = require('./pdfjs-shim');
 const XLSX = require('xlsx');
 
 class RemisionUtils {

@@ -33,7 +33,14 @@ class EvaluacionesMedicasComponent {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const html = await response.text();
-            portalContainer.innerHTML = html;
+            // 📦766 — blindaje contra fugas al documento principal: el fragmento se
+            // inyecta con innerHTML dentro del DOM global, así que cualquier <link>
+            // del head cargaría su hoja para TODA la app. Se eliminan antes de
+            // inyectar (el <style> del portal ya viene acotado a #em-portal-container
+            // en evaluaciones-medicas-home.html). El <script> del final del HTML no
+            // se ejecuta vía innerHTML; initPortalJS() lo vuelve a agregar limpio.
+            const safeHtml = html.replace(/<link[^>]*>/gi, '');
+            portalContainer.innerHTML = safeHtml;
             this.initPortalJS();
         } catch (error) {
             console.error('[EvaluacionesMedicasComponent] Error cargando portal:', error);
@@ -100,6 +107,16 @@ class EvaluacionesMedicasComponent {
             return;
         }
 
+        // 📦608-fix13: el iframe pide abrir un archivo en el modal file-viewer global
+        if (data.type === 'open-file-viewer-modal' && data.filePath) {
+            if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                window.kairFV.openWithFileViewerFromPath(data.filePath);
+            } else {
+                console.warn('[EMO] kairFV.openWithFileViewerFromPath no disponible');
+            }
+            return;
+        }
+
         // Router de solicitudes API desde el iframe
         if (data.type.endsWith('-request')) {
             await this._handleAPIRequest(data, event);
@@ -112,6 +129,34 @@ class EvaluacionesMedicasComponent {
         const payload    = data.payload;
 
         console.log(`[EMO][Logic] API Request: ${requestType}`, payload);
+
+        // 📦608-fix15: para previews Office, el helper hace el switch a readFileBytes
+        // y ya postea la respuesta con `mode: 'file-viewer'`. No posteamos dos veces.
+        if (requestType === 'get-pdf-preview' || requestType === 'get-excel-preview' || requestType === 'get-word-preview') {
+            const apiName = requestType === 'get-pdf-preview' ? 'getPDFPreview'
+                          : requestType === 'get-excel-preview' ? 'getExcelPreview'
+                          : 'getWordPreview';
+            if (window.KairDocPreview && typeof window.KairDocPreview.handleRequest === 'function') {
+                await window.KairDocPreview.handleRequest(event, apiName);
+            } else {
+                // Fallback al flujo viejo si el helper no está cargado
+                try {
+                    const result = await window.electronAPI[apiName](payload.filePath);
+                    event.source.postMessage({
+                        type: `${requestType}-response`,
+                        requestId,
+                        payload: result
+                    }, event.origin || '*');
+                } catch (err) {
+                    event.source.postMessage({
+                        type: `${requestType}-response`,
+                        requestId,
+                        payload: { success: false, error: err.message }
+                    }, event.origin || '*');
+                }
+            }
+            return;
+        }
 
         try {
             let result;
@@ -127,16 +172,6 @@ class EvaluacionesMedicasComponent {
                     result = await this._getLibraryData(payload);
                     break;
 
-                // Contratos IPC existentes (sin cambio)
-                case 'get-pdf-preview':
-                    result = await window.electronAPI.getPDFPreview(payload.filePath);
-                    break;
-                case 'get-excel-preview':
-                    result = await window.electronAPI.getExcelPreview(payload.filePath);
-                    break;
-                case 'get-word-preview':
-                    result = await window.electronAPI.getWordPreview(payload.filePath);
-                    break;
                 case 'download-document':
                     result = await window.electronAPI.downloadDocument(payload);
                     break;

@@ -400,12 +400,21 @@ async function loadSpecificYearFile(fileName) {
 
       if (filePathResult.success) {
         // Auto-repair B:C merge corruption BEFORE reading data
-        // This prevents displaying corrupted activity names
-        const repairResult = await callParentAPI('repair-plan-trabajo-excel', {
-          filePath: filePathResult.path
-        });
-        if (repairResult.success && (repairResult.unmergedCount > 0 || repairResult.restoredCount > 0)) {
-          console.log(`[loadSpecificYearFile] Auto-repair: ${repairResult.unmergedCount} merges removed, ${repairResult.restoredCount} values restored`);
+        // 📦698 · FIX: el repair es best-effort. Si falla (ej: template .xls no
+        // tiene la hoja esperada, o no se encuentra el template), NO debemos
+        // abortar la carga. Sin esto, un error de repair deja el dashboard en
+        // blanco (0/0/0/0, charts vacíos) aunque el Excel se pueda leer normal.
+        try {
+          const repairResult = await callParentAPI('repair-plan-trabajo-excel', {
+            filePath: filePathResult.path
+          });
+          if (repairResult.success && (repairResult.unmergedCount > 0 || repairResult.restoredCount > 0)) {
+            console.log(`[loadSpecificYearFile] Auto-repair: ${repairResult.unmergedCount} merges removed, ${repairResult.restoredCount} values restored`);
+          } else if (!repairResult.success) {
+            console.warn(`[loadSpecificYearFile] Auto-repair omitido: ${repairResult.error || 'sin detalle'}. Continuando con lectura normal.`);
+          }
+        } catch (repairErr) {
+          console.warn(`[loadSpecificYearFile] Auto-repair lanzó excepción: ${repairErr.message}. Continuando con lectura normal.`);
         }
 
         const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
@@ -950,36 +959,57 @@ const K_COLORS = {
 };
 
 // Actualizar KPIs
+// 📦698 · FIX: contar CELDAS (no actividades) para Programadas/Realizadas/Pendientes/Vencidas.
+//   - Programadas: total de CELDAS con marca (C o P) en el plan.
+//   - Realizadas: CELDAS marcadas 'C' (subset de Programadas).
+//   - Pendientes: CELDAS marcadas 'P' (subset de Programadas).
+//   - Vencidas: CELDAS marcadas 'P' en un mes ya pasado (subset de Pendientes).
+// El bug original eran 0 vencidas siempre (variable nunca incrementada). Con este
+// fix las 4 métricas son celdas y suman coherentemente:
+//   Programadas = Realizadas + Pendientes (en celdas)
+//   Vencidas ≤ Pendientes
 function updateKPIs() {
 const data = periodsData[currentPeriod];
 const activities = data.filter(item => item.type === 'activity');
 
-let totalMonths = 0;
-let completedMonths = 0;
-let scheduledCount = 0;
-let overdueCount = 0;
+// Mes actual (0-11). Una celda está "vencida" si está marcada 'P' en un mes
+// ANTERIOR al actual y el plan corresponde al año vigente. El mes vigente NO
+// cuenta como vencido (todavía hay tiempo dentro del mes para completarla).
+const currentMonthIdx = new Date().getMonth();
+const currentYear = new Date().getFullYear();
+const periodYear = parseInt(currentPeriod, 10);
+const useOverdueLogic = periodYear === currentYear;
+
+let completedCells = 0;      // CELDAS 'C'
+let pendingCells = 0;        // CELDAS 'P'
+let overdueCells = 0;        // CELDAS 'P' en mes pasado
+let totalMarkedCells = 0;    // CELDAS con C o P (Programadas en celdas)
 
 activities.forEach(activity => {
-activity.months.forEach(month => {
-if (month) {
-totalMonths++;
+activity.months.forEach((month, idx) => {
 if (month === 'C') {
-completedMonths++;
+completedCells++;
+totalMarkedCells++;
 } else if (month === 'P') {
-scheduledCount++;
+pendingCells++;
+totalMarkedCells++;
+if (useOverdueLogic && idx < currentMonthIdx) {
+overdueCells++;
 }
 }
 });
 });
 
-const progressPercentage = totalMonths > 0 ? Math.round((completedMonths / totalMonths) * 100) : 0;
-const pendingCount = scheduledCount;
+const progressPercentage = totalMarkedCells > 0 ? Math.round((completedCells / totalMarkedCells) * 100) : 0;
 
-document.getElementById('stat-total').textContent = activities.length;
+document.getElementById('stat-total').textContent = totalMarkedCells;
 document.getElementById('stat-progress-text').textContent = `${progressPercentage}%`;
-document.getElementById('stat-completed').textContent = completedMonths;
-document.getElementById('stat-pending').textContent = pendingCount;
-document.getElementById('stat-overdue').textContent = overdueCount;
+document.getElementById('stat-completed').textContent = completedCells;
+document.getElementById('stat-pending').textContent = pendingCells;
+document.getElementById('stat-overdue').textContent = overdueCells;
+
+// Sanity log: en celdas, Programadas = Realizadas + Pendientes
+console.log(`[updateKPIs] Celdas: Programadas=${totalMarkedCells} | Realizadas=${completedCells} | Pendientes=${pendingCells} | Vencidas=${overdueCells} | Avance=${progressPercentage}% | Actividades únicas=${activities.length}`);
 
 updateCharts();
 }
@@ -1008,26 +1038,22 @@ function renderChartStatus() {
     const data = periodsData[currentPeriod];
     const activities = data.filter(item => item.type === 'activity');
 
-    // Contar actividades por estado
+    // 📦698 · FIX: contar CELDAS por estado (no actividades). Cada celda cuenta
+    // exactamente una vez en su categoría. Esto es coherente con la cinta superior
+    // (Programadas=actividades, Realizadas/Pendientes/Vencidas=celdas).
     let plannedCount = 0;
     let completedCount = 0;
-    let notStartedCount = 0; // Actividades sin estado definido
+    let notStartedCount = 0;
 
     activities.forEach(activity => {
-        let hasStatus = false;
+        let hasC = false;
+        let hasAnyP = false;
+        let hasAnyMark = false;
         activity.months.forEach(month => {
-            if (month === 'P') {
-                plannedCount++;
-                hasStatus = true;
-            }
-            else if (month === 'C') {
-                completedCount++;
-                hasStatus = true;
-            }
+            if (month === 'C') { hasC = true; hasAnyMark = true; completedCount++; }
+            else if (month === 'P') { hasAnyP = true; hasAnyMark = true; plannedCount++; }
         });
-        if (!hasStatus) {
-            notStartedCount++; // Contar actividades sin meses programados
-        }
+        if (!hasAnyMark) notStartedCount++;
     });
 
     chartStatus = new Chart(ctx, {
@@ -1186,6 +1212,9 @@ const quarters = [
 const planned = [];
 const executed = [];
 
+// 📦698 · FIX: contar CELDAS por trimestre (no actividades).
+//   - Programada en Qx → cantidad de celdas 'P' en los meses de Qx
+//   - Ejecutada en Qx  → cantidad de celdas 'C' en los meses de Qx
 quarters.forEach(q => {
 let qPlanned = 0;
 let qExecuted = 0;
@@ -1357,12 +1386,15 @@ if (data[i].level <= group.level) break;
 if (data[i].type === 'activity') childActivities.push(data[i]);
 }
 
+// 📦698 · FIX: contar CELDAS por categoría (no actividades).
+//   - Programada en categoría → cantidad de celdas 'P' en la categoría
+//   - Ejecutada en categoría  → cantidad de celdas 'C' en la categoría
 let planned = 0;
 let completed = 0;
 childActivities.forEach(activity => {
 activity.months.forEach(month => {
-if (month === 'P') planned++;
-else if (month === 'C') completed++;
+if (month === 'C') completed++;
+else if (month === 'P') planned++;
 });
 });
 

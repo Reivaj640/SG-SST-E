@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Reportes de Seguimiento de Gestación</title>
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           📦471 (2026-07-04) — Reportes de Seguimiento de Gestación
+           Vista que renderiza los 3 tipos de informe (Resumen Ejecutivo /
+           Detallado / Individual) sobre los datos pre-calculados por
+           gestacionCalcularReporte (📦469).
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --v3-primary: #174ea6;
+            --v3-primary-hover: #185abd;
+            --v3-primary-soft: #e8f0fe;
+            --v3-success: #28a745;
+            --v3-success-soft: rgba(40, 167, 69, 0.1);
+            --v3-warning: #ffc107;
+            --v3-warning-soft: rgba(255, 193, 7, 0.1);
+            --v3-destructive: #dc3545;
+            --v3-destructive-soft: rgba(220, 53, 69, 0.1);
+            --v3-foreground: #212529;
+            --v3-muted-foreground: #6c757d;
+            --v3-card: #ffffff;
+            --v3-border: #dee2e6;
+            --v3-muted: #f8f9fa;
+            --v3-radius-lg: 0.625rem;
+            --v3-radius-md: 0.5rem;
+            --v3-font-sans: "Segoe UI", Roboto, sans-serif;
+
+            /* Acento del módulo de Gestación */
+            --rosa: #be185d;
+            --rosa-light: #fce7f3;
+            --rosa-bg: #fdf2f8;
+            --bg-body: #f0f2f5;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        /* 📦480 — Estrategia nueva: dejar que el BODY scrollee (no .gr-main).
+           Esto elimina problemas de cadena de alturas en iframes anidados
+           y garantiza que la scrollbar nativa del navegador esté disponible. */
+        html, body {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow-y: auto !important;
+            overflow-x: hidden;
+        }
+        body {
+            font-family: var(--v3-font-sans);
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 14px;
+            display: block !important;  /* ← antes flex column, ahora block para scroll natural */
+        }
+
+        /* ─── Header estándar K+AIR · Patrón 6.1.3 ─── */
+        .k-module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            height: 64px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--v3-border);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            position: sticky;        /* 📦480 — sticky para que el header se mantenga visible al scrollear */
+            top: 0;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .k-header-left { display: flex; align-items: center; gap: 1rem; min-width: 0; flex: 1; }
+        .k-header-title-group { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+        .k-header-main-title {
+            font-size: 1.05rem; font-weight: 600; color: var(--v3-foreground);
+            display: flex; align-items: center; gap: 0.5rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+        }
+        .k-header-main-title i { color: var(--v3-primary); font-size: 1.1rem; flex-shrink: 0; }
+        .k-header-breadcrumb { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--v3-muted-foreground); flex-wrap: wrap; }
+        .k-header-breadcrumb button { background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+        .k-header-breadcrumb button:hover { color: var(--v3-primary); }
+        .k-breadcrumb-item.active { color: var(--v3-primary); font-weight: 500; }
+
+        .k-header-right { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+        .k-sync-badge {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            padding: 0.3rem 0.6rem; font-size: 0.7rem; font-weight: 600;
+            border-radius: 2rem; white-space: nowrap;
+        }
+        .k-sync-synced  { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+        .k-sync-saving  { background: rgba(255, 193, 7, 0.1); color: #856404; }
+        .k-sync-error   { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+
+        .k-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 500; font-family: var(--v3-font-sans);
+            border: none; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .k-btn-primary  { background: var(--v3-primary); color: #fff; }
+        .k-btn-primary:hover  { background: var(--v3-primary-hover); }
+        .k-btn-sm       { padding: 0.35rem 0.75rem; font-size: 0.72rem; }
+        .k-btn-ghost    { background: transparent; color: var(--v3-muted-foreground); border: 1px solid var(--v3-border); }
+        .k-btn-ghost:hover { background: var(--v3-muted); color: var(--v3-foreground); }
+
+        /* 📦481-iconos — Patrón del CALENDARIO (no del header principal):
+           SVGs inline con stroke="currentColor", outline estilo Feather/Lucide.
+           Coincide con los SVGs que usa KairCalendar en shared/kair-calendar.js */
+        .icon-placeholder {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 6px;
+            color: currentColor;
+            line-height: 1;
+        }
+        .icon-placeholder svg {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .k-btn .icon-placeholder { margin-right: 5px; }
+        .k-header-main-title .icon-placeholder svg { width: 20px; height: 20px; color: var(--v3-primary); }
+        .gr-tipo__icon .icon-placeholder svg { width: 22px; height: 22px; color: var(--v3-primary); }
+        .gr-filtros__title .icon-placeholder svg { width: 16px; height: 16px; color: var(--v3-primary); }
+        .k-sync-badge .icon-placeholder svg { width: 14px; height: 14px; }
+
+        .header-back-btn {
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.375rem 0.75rem; font: 500 0.8125rem/1.2 var(--v3-font-sans);
+            color: #5a6378; background: transparent; border: 1px solid var(--v3-border);
+            border-radius: 0.5rem; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+        }
+        .header-back-btn:hover { background: var(--v3-primary-soft); color: var(--v3-primary); border-color: var(--v3-primary); }
+        .header-back-btn i { font-size: 0.875rem; }
+
+        /* ─── Contenedor raíz 📦480 ─── */
+        .kair-v3-hub {
+            display: block !important;
+            min-height: 100vh;
+            padding-bottom: 40px;  /* espacio al final */
+        }
+
+        /* ─── Main scroll 📦480 — estrategia nueva ─── */
+        /* El BODY scrollea (no .gr-main). .gr-main es solo un wrapper que NO scrollea. */
+        .gr-main {
+            display: block !important;
+            flex: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;  /* CRÍTICO — deja que el body scrollee */
+            padding: 16px 20px;
+            position: relative;
+        }
+        /* Scrollbar clásica visible (cross-browser) */
+        html, body { scrollbar-width: thin; scrollbar-color: #94a3b8 #f1f3f5; }
+        html::-webkit-scrollbar, body::-webkit-scrollbar {
+            width: 16px !important;
+            -webkit-appearance: none !important;
+            background: #f1f3f5;
+        }
+        html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
+            background: #f1f3f5 !important;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb {
+            background: #6c757d !important;
+            border-radius: 8px;
+            border: 2px solid #f1f3f5;
+            min-height: 30px;
+        }
+        html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover { background: #495057 !important; }
+        html::-webkit-scrollbar-thumb:active, body::-webkit-scrollbar-thumb:active { background: #212529 !important; }
+        /* 📦479 — Scrollbar clásica visible (NO overlay auto-hide de Win11) */
+        .gr-main::-webkit-scrollbar {
+            width: 16px !important;
+            height: 16px;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            background: #f1f3f5;
+        }
+        .gr-main::-webkit-scrollbar-track {
+            background: #f1f3f5 !important;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .gr-main::-webkit-scrollbar-thumb {
+            background: #6c757d !important;
+            border-radius: 8px;
+            border: 2px solid #f1f3f5;
+            min-height: 30px;
+        }
+        .gr-main::-webkit-scrollbar-thumb:hover { background: #495057 !important; }
+        .gr-main::-webkit-scrollbar-thumb:active { background: #212529 !important; }
+        .gr-main::-webkit-scrollbar-corner { background: #f1f3f5; }
+
+        /* 📦479 — Gradient mask que indica "hay más contenido abajo"
+           cuando el reporte excede el viewport. Se muestra via JS agregando
+           clase .gr-main--has-more cuando hay scroll pendiente. */
+        .gr-main--has-more::after {
+            content: '';
+            position: sticky;
+            left: 0; right: 0; bottom: 0;
+            height: 60px;
+            margin-top: -60px;
+            pointer-events: none;
+            background: linear-gradient(to bottom,
+                rgba(240, 242, 245, 0) 0%,
+                rgba(240, 242, 245, 0.85) 60%,
+                rgba(240, 242, 245, 1) 100%);
+            display: block;
+        }
+
+        /* ─── Selector de tipo de reporte (3 cards grandes) ─── */
+        .gr-tipo-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .gr-tipo {
+            background: white;
+            border: 2px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+        .gr-tipo:hover { border-color: var(--v3-primary); background: var(--v3-primary-soft); }
+        .gr-tipo.active {
+            border-color: var(--v3-primary);
+            background: var(--v3-primary-soft);
+            box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+        }
+        .gr-tipo__icon {
+            width: 44px; height: 44px;
+            border-radius: var(--v3-radius-md);
+            display: flex; align-items: center; justify-content: center;
+            background: white; color: var(--v3-primary); font-size: 1.25rem; flex-shrink: 0;
+        }
+        .gr-tipo__title { font-size: 0.95rem; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; }
+        .gr-tipo__desc  { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
+
+        /* ─── Filtros ─── */
+        .gr-filtros {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+        }
+        .gr-filtros__title {
+            font-size: 0.78rem; font-weight: 700; color: var(--v3-primary);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            display: flex; align-items: center; gap: 6px; margin-bottom: 12px;
+        }
+        .gr-filtros__grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            align-items: end;
+        }
+        .gr-field { display: flex; flex-direction: column; gap: 4px; }
+        .gr-field__label { font-size: 0.78rem; font-weight: 600; color: var(--text-dark); }
+        .gr-field__input, .gr-field__select {
+            padding: 7px 10px;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.4rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: white;
+            color: var(--text-dark);
+        }
+        .gr-field__input:focus, .gr-field__select:focus {
+            outline: none;
+            border-color: var(--v3-primary);
+            box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+        }
+        .gr-field__hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+        .gr-risk-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .gr-risk-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border: 1px solid var(--v3-border);
+            background: white; border-radius: 999px; cursor: pointer;
+            font-size: 0.82rem; transition: all 0.15s;
+        }
+        .gr-risk-chip:hover { border-color: var(--v3-primary); }
+        .gr-risk-chip.active.bajo { background: var(--v3-success-soft); border-color: var(--v3-success); color: #155724; }
+        .gr-risk-chip.active.alto { background: var(--v3-warning-soft); border-color: #f59e0b; color: #856404; }
+        .gr-risk-chip.active.muy-alto { background: var(--v3-destructive-soft); border-color: var(--v3-destructive); color: #721c24; }
+        .gr-risk-chip .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .gr-risk-chip.bajo .dot { background: var(--v3-success); }
+        .gr-risk-chip.alto .dot { background: #f59e0b; }
+        .gr-risk-chip.muy-alto .dot { background: var(--v3-destructive); }
+
+        /* ─── Contenedor del reporte ─── */
+        .gr-reporte {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            box-shadow: var(--shadow-sm);
+            padding: 20px;            /* 📦479 — 24→20 */
+        }
+        .gr-reporte__placeholder {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .gr-reporte__placeholder i {
+            font-size: 3rem;
+            color: #d1d5db;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .gr-reporte__placeholder h3 {
+            font-size: 1.05rem;
+            color: var(--text-dark);
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .gr-reporte__placeholder p {
+            font-size: 0.88rem;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .gr-reporte__loading {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .gr-reporte__loading i {
+            font-size: 2rem;
+            color: var(--v3-primary);
+            display: block;
+            margin-bottom: 12px;
+            animation: gr-spin 1s linear infinite;
+        }
+        @keyframes gr-spin { to { transform: rotate(360deg); } }
+
+        /* ─── 📦472 — Contenedores de charts ─── */
+        .gr-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .gr-chart-grid--single { grid-template-columns: 1fr; }
+        .gr-chart-card {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            padding: 16px 18px;
+            box-shadow: var(--shadow-sm);
+        }
+        .gr-chart-card__title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--v3-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .gr-chart-card__title i { font-size: 0.95rem; }
+        .gr-chart-canvas-wrap {
+            position: relative;
+            width: 100%;
+            height: 240px;
+        }
+        .gr-chart-canvas-wrap--tall { height: 300px; }
+        .gr-chart-canvas-wrap canvas { max-width: 100%; max-height: 100%; }
+        .gr-chart-legend {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 18px;
+            font-size: 0.78rem;
+            color: var(--text-dark);
+        }
+        .gr-chart-legend__item { display: inline-flex; align-items: center; gap: 6px; }
+        .gr-chart-legend__dot {
+            width: 10px; height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+        .gr-chart-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+        }
+        .gr-chart-center__value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            line-height: 1.1;
+        }
+        .gr-chart-center__label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        @media (max-width: 900px) {
+            .gr-chart-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ─── 📦473 — Reporte Detallado (estilos del informe) ─── */
+        .gr-rep {
+            font-family: var(--v3-font-sans);
+            color: var(--text-dark);
+        }
+        /* Header del documento — 📦479 compacto */
+        .gr-rep__doc-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;          /* 📦479 — 16→10 */
+            border-bottom: 2px solid var(--v3-primary);
+            margin-bottom: 12px;      /* 📦479 — 16→12 */
+        }
+        .gr-rep__doc-icon {
+            width: 36px; height: 36px;  /* 📦479 — 48→36 */
+            background: var(--v3-primary);
+            color: white;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;            /* 📦479 — 1.3→1 */
+            flex-shrink: 0;
+        }
+        .gr-rep__doc-title { font-size: 1rem; font-weight: 700; color: var(--v3-primary); }
+        .gr-rep__doc-subtitle { font-size: 0.78rem; color: var(--text-muted); margin-top: 1px; }
+        .gr-rep__doc-fecha { text-align: right; margin-left: auto; }
+        .gr-rep__doc-fecha-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .gr-rep__doc-fecha-value { font-size: 0.85rem; font-weight: 600; color: var(--text-dark); margin-top: 1px; }
+
+        /* Resumen de metadata — 📦479 compacto */
+        .gr-rep__meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 10px 14px;       /* 📦479 — 14/16 → 10/14 */
+            background: var(--v3-muted);
+            border-radius: 8px;
+            margin-bottom: 14px;      /* 📦479 — 20→14 */
+            font-size: 0.8rem;        /* 📦479 — 0.82→0.8 */
+        }
+        .gr-rep__meta-item { display: flex; align-items: flex-start; gap: 8px; }
+        .gr-rep__meta-item i { color: var(--v3-primary); margin-top: 2px; }
+        .gr-rep__meta-label { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .gr-rep__meta-value { font-weight: 500; color: var(--text-dark); margin-top: 1px; }
+
+        /* Banner confidencialidad — 📦479 compacto */
+        .gr-rep__confidential {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 10px 14px;       /* 📦479 — 12/16 → 10/14 */
+            margin-bottom: 14px;      /* 📦479 — 20→14 */
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: #78350f;
+            line-height: 1.4;
+        }
+        .gr-rep__confidential i { color: #f59e0b; font-size: 1rem; flex-shrink: 0; }
+        .gr-rep__confidential strong { font-weight: 700; }
+
+        /* KPIs principales — 📦479 más compactos */
+        .gr-rep__kpis {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;      /* 📦479 — 24→16 */
+        }
+        .gr-rep__kpi {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 10px 12px;       /* 📦479 — 14/16 → 10/12 */
+            text-align: center;
+        }
+        .gr-rep__kpi-value { font-size: 1.35rem; font-weight: 700; color: var(--text-dark); line-height: 1.1; }
+        .gr-rep__kpi-value.success { color: var(--v3-success); }
+        .gr-rep__kpi-value.warning { color: #b45309; }
+        .gr-rep__kpi-value.danger { color: var(--v3-destructive); }
+        .gr-rep__kpi-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .gr-rep__kpi-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; }
+
+        /* Secciones */
+        .gr-rep__section {
+            margin-bottom: 18px;      /* 📦479 — 22→18 */
+        }
+        .gr-rep__section-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--v3-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--v3-primary-soft);
+        }
+
+        /* Resumen narrativo */
+        .gr-rep__narrative {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 12px 14px;       /* 📦479 — 16/18 → 12/14 */
+            line-height: 1.5;         /* 📦479 — 1.6→1.5 */
+            font-size: 0.85rem;
+            color: var(--text-dark);
+        }
+        .gr-rep__narrative strong { color: var(--v3-primary); }
+        .gr-rep__narrative .crit { color: var(--v3-destructive); font-weight: 600; }
+
+        /* Tabla detalle — 📦479 más compacta */
+        .gr-rep__table-wrap {
+            overflow-x: auto;
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+        }
+        .gr-rep__table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.76rem;
+        }
+        .gr-rep__table th {
+            background: var(--v3-muted);
+            color: var(--v3-muted-foreground);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 8px 10px;         /* 📦479 — 10/12 → 8/10 */
+            text-align: left;
+            border-bottom: 1px solid var(--v3-border);
+            white-space: nowrap;
+        }
+        .gr-rep__table td {
+            padding: 7px 10px;         /* 📦479 — 9/12 → 7/10 */
+            border-bottom: 1px solid #f1f3f5;
+            color: var(--text-dark);
+            vertical-align: middle;
+        }
+        .gr-rep__table tr:last-child td { border-bottom: none; }
+        .gr-rep__table tr:hover { background: var(--v3-muted); }
+
+        /* Badges en la tabla */
+        .gr-rep__badge {
+            display: inline-block;
+            padding: 1px 7px;           /* 📦479 — 2/8 → 1/7 */
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .gr-rep__badge.bajo { background: var(--v3-success-soft); color: #155724; }
+        .gr-rep__badge.alto { background: var(--v3-warning-soft); color: #856404; }
+        .gr-rep__badge.muy-alto { background: var(--v3-destructive-soft); color: #721c24; }
+        .gr-rep__badge.completado { background: var(--v3-success-soft); color: #155724; }
+        .gr-rep__badge.vencido { background: var(--v3-destructive-soft); color: #721c24; }
+
+        /* Alertas */
+        .gr-rep__alerta {
+            background: var(--v3-destructive-soft);
+            border-left: 3px solid var(--v3-destructive);
+            padding: 8px 12px;          /* 📦479 — 10/14 → 8/12 */
+            margin-bottom: 6px;
+            border-radius: 4px;
+            font-size: 0.82rem;
+        }
+        .gr-rep__alerta strong { color: var(--v3-destructive); }
+        .gr-rep__alerta small { color: var(--text-muted); font-size: 0.72rem; }
+
+        /* Acciones frecuentes - tarjetas pequeñas */
+        .gr-rep__totales-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .gr-rep__total-card {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 8px 10px;          /* 📦479 — 10/12 → 8/10 */
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gr-rep__total-card i {
+            width: 28px; height: 28px;   /* 📦479 — 32→28 */
+            background: var(--v3-primary-soft);
+            color: var(--v3-primary);
+            border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem;
+        }
+        .gr-rep__total-card-value { font-size: 1rem; font-weight: 700; color: var(--text-dark); line-height: 1; }
+        .gr-rep__total-card-label { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+
+        /* Firma */
+        .gr-rep__firma {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 14px 0;           /* 📦479 — 20→14 */
+            border-top: 2px solid var(--v3-border);
+            margin-top: 18px;          /* 📦479 — 24→18 */
+        }
+        .gr-rep__firma-block {
+            padding: 10px 14px;        /* 📦479 — 14/16 → 10/14 */
+            background: var(--v3-muted);
+            border-radius: 8px;
+        }
+        .gr-rep__firma-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .gr-rep__firma-nombre { font-size: 0.95rem; font-weight: 700; color: var(--text-dark); margin-top: 24px; }
+        .gr-rep__firma-cargo { font-size: 0.78rem; color: var(--text-muted); margin-top: 1px; }
+
+        @media (max-width: 1100px) {
+            .gr-rep__kpis { grid-template-columns: repeat(3, 1fr); }
+            .gr-rep__totales-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 700px) {
+            .gr-rep__kpis { grid-template-columns: repeat(2, 1fr); }
+            .gr-rep__meta { grid-template-columns: 1fr; }
+            .gr-rep__firma { grid-template-columns: 1fr; }
+        }
+
+        /* Print rules — aplicado también a PDF */
+        @media print {
+            body { background: white; }
+            .gr-rep { page-break-inside: auto; }
+            .gr-rep__section { page-break-inside: avoid; }
+            .gr-rep__kpis { page-break-inside: avoid; }
+            .gr-rep__table-wrap { page-break-inside: auto; }
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 1100px) {
+            .gr-filtros__grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .k-module-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 1rem; height: auto; }
+            .k-header-right { justify-content: flex-end; }
+            .gr-tipo-row { grid-template-columns: 1fr; }
+            .gr-filtros__grid { grid-template-columns: 1fr; }
+            .gr-main { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="kair-v3-hub">
+
+    <!-- ═══════════ HEADER ESTÁNDAR K+AIR ═══════════ -->
+    <header class="k-module-header" id="kair-gr-header-card">
+        <div class="k-header-left">
+            <div class="k-header-title-group">
+                <div class="k-header-main-title">
+                    <span class="icon-placeholder" id="kair-gr-title-icon"></span>
+                    Reportes de Seguimiento
+                </div>
+                <div class="k-header-breadcrumb">
+                    <span id="kair-gr-bc-company">Empresa</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <button type="button" data-bc="salud">Gestión de la Salud</button>
+                    <i class="bi bi-chevron-right"></i>
+                    <button type="button" data-bc="seguimiento">Seguimiento de Gestación</button>
+                    <i class="bi bi-chevron-right"></i>
+                    <span class="k-breadcrumb-item active">Reportes de Seguimiento</span>
+                </div>
+            </div>
+        </div>
+        <div class="k-header-right">
+            <span class="k-sync-badge k-sync-synced" id="kair-gr-sync" title="Datos cargados">
+                <span class="icon-placeholder" id="kair-gr-sync-icon"></span> Sincronizado
+            </span>
+            <button type="button" class="header-back-btn" id="kair-gr-back" title="Volver al listado">
+                <span class="icon-placeholder" id="kair-gr-back-icon"></span> Volver
+            </button>
+            <!-- 📦476 — Exportación Excel + Imprimir/PDF -->
+            <button type="button" class="k-btn k-btn-ghost k-btn-sm" id="kair-gr-export-excel" title="Exportar a Excel" disabled>
+                <span class="icon-placeholder" id="kair-gr-export-icon"></span> Exportar Excel
+            </button>
+            <button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-gr-print" title="Imprimir o guardar como PDF" disabled>
+                <span class="icon-placeholder" id="kair-gr-print-icon"></span> Imprimir / PDF
+            </button>
+        </div>
+    </header>
+
+    <main class="gr-main">
+
+        <!-- ═══════════ SELECTOR DE TIPO DE REPORTE ═══════════ -->
+        <section class="gr-tipo-row" id="grTipoRow">
+            <div class="gr-tipo active" data-tipo="ejecutivo" onclick="seleccionarTipoReporte('ejecutivo', this)">
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="ejecutivo"></span></div>
+                <div>
+                    <div class="gr-tipo__title">Resumen Ejecutivo</div>
+                    <div class="gr-tipo__desc">Visión consolidada para gerencia: KPIs, tendencias y alertas críticas.</div>
+                </div>
+            </div>
+            <div class="gr-tipo" data-tipo="detallado" onclick="seleccionarTipoReporte('detallado', this)">
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="detallado"></span></div>
+                <div>
+                    <div class="gr-tipo__title">Reporte Detallado</div>
+                    <div class="gr-tipo__desc">Reporte completo para cliente/auditoría: incluye tabla de todos los seguimientos.</div>
+                </div>
+            </div>
+            <div class="gr-tipo" data-tipo="individual" onclick="seleccionarTipoReporte('individual', this)">
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="individual"></span></div>
+                <div>
+                    <div class="gr-tipo__title">Reporte Individual</div>
+                    <div class="gr-tipo__desc">Historial completo de una trabajadora específica.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════ FILTROS ═══════════ -->
+        <section class="gr-filtros">
+            <div class="gr-filtros__title">
+                <span class="icon-placeholder" id="kair-gr-filter-icon"></span> Filtros
+            </div>
+            <div class="gr-filtros__grid">
+                <div class="gr-field">
+                    <label class="gr-field__label" for="grPeriodo">Periodo</label>
+                    <select class="gr-field__select" id="grPeriodo" onchange="aplicarFiltrosReportes()">
+                        <option value="ultimoTrimestre">Último Trimestre</option>
+                        <option value="ultimoMes">Últimos 30 días</option>
+                        <option value="mesActual">Mes Actual</option>
+                        <option value="mesAnterior">Mes Anterior</option>
+                        <option value="custom">Personalizado…</option>
+                    </select>
+                </div>
+                <div class="gr-field" id="grFechaDesdeField" style="display:none;">
+                    <label class="gr-field__label" for="grFechaDesde">Fecha Desde</label>
+                    <input type="date" class="gr-field__input" id="grFechaDesde" onchange="aplicarFiltrosReportes()" />
+                </div>
+                <div class="gr-field" id="grFechaHastaField" style="display:none;">
+                    <label class="gr-field__label" for="grFechaHasta">Fecha Hasta</label>
+                    <input type="date" class="gr-field__input" id="grFechaHasta" onchange="aplicarFiltrosReportes()" />
+                </div>
+                <div class="gr-field">
+                    <label class="gr-field__label">Clasificación de Riesgo</label>
+                    <div class="gr-risk-chips" id="grRiesgoChips">
+                        <button type="button" class="gr-risk-chip bajo active" data-riesgo="bajo" onclick="toggleRiesgo('bajo', this)">
+                            <span class="dot"></span> Bajo Riesgo
+                        </button>
+                        <button type="button" class="gr-risk-chip alto active" data-riesgo="alto" onclick="toggleRiesgo('alto', this)">
+                            <span class="dot"></span> Alto Riesgo
+                        </button>
+                        <button type="button" class="gr-risk-chip muy-alto active" data-riesgo="muy-alto" onclick="toggleRiesgo('muy-alto', this)">
+                            <span class="dot"></span> Muy Alto Riesgo
+                        </button>
+                    </div>
+                    <div class="gr-field__hint">Click para mostrar/ocultar. Vacío = todos.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════ SELECTOR DE GESTANTE (solo Individual) ═══════════ -->
+        <section class="gr-filtros" id="grGestanteField" style="display:none;">
+            <div class="gr-filtros__title">
+                <span class="icon-placeholder" id="kair-gr-user-icon"></span> Trabajadora
+            </div>
+            <div class="gr-filtros__grid" style="grid-template-columns: 1fr;">
+                <div class="gr-field">
+                    <label class="gr-field__label" for="grGestanteSelect">Seleccione una gestante</label>
+                    <select class="gr-field__select" id="grGestanteSelect" onchange="aplicarFiltrosReportes()">
+                        <option value="">— Elija una gestante —</option>
+                    </select>
+                    <div class="gr-field__hint">Solo se muestran gestantes con seguimiento en el periodo seleccionado.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════ CONTENEDOR DEL REPORTE ═══════════ -->
+        <section class="gr-reporte" id="grReporteContainer">
+            <!-- Render dinámico según tipo + filtros -->
+        </section>
+
+    </main>
+
+</div>
+
+<!-- 📦472 — Chart.js v4 vía CDN (jsdelivr) — visualizaciones de los reportes -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- 📦481-iconos — SVGs inline al estilo del calendario (KairCalendar) -->
+<script>
+    // SVGs copiados del mismo estilo de shared/kair-calendar.js
+    const SVG_CHEVRON_LEFT  = '<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>';
+    const SVG_CHEVRON_RIGHT = '<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>';
+    const SVG_REPORT       = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+    const SVG_GRID          = '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>';
+    const SVG_PRINTER       = '<svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    const SVG_CHECK         = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+    const SVG_REFRESH       = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    const SVG_ALERT         = '<svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    const SVG_CLIPBOARD     = '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>';
+    const SVG_DOCUMENT      = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+    const SVG_USER          = '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    const SVG_FILTER        = '<svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
+    const SVG_HEART         = '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+    // Función helper para inyectar el icono según el estado
+    window._iconSync = function(state) {
+        if (state === 'saving') return '<span class="icon-placeholder">' + SVG_REFRESH + '</span>';
+        if (state === 'error') return '<span class="icon-placeholder">' + SVG_ALERT + '</span>';
+        return '<span class="icon-placeholder">' + SVG_CHECK + '</span>';
+    };
+</script>
+
+<script src="gestacion-reportes.js"></script>
+</body>
+</html>

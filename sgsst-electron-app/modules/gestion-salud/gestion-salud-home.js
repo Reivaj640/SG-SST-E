@@ -1,20 +1,35 @@
 // gestion-salud-home.js - Componente para el home del módulo "Gestión de la Salud"
+// 📦754 · Rediseño premium visual (header minimal + hero + 3 metric cards + chart + radar + grid).
 
-// Caché global para persistencia entre navegaciones de la misma sesión
-if (!window._saludHomeState) {
-    window._saludHomeState = {
-        cache: new Map(), // companyName -> data
-        lastUpdate: new Map() // companyName -> timestamp
-    };
-}
+/* ─────────────────────────────────────────────────────────────────────────────
+   📦763 — MEMORIA DE SESIÓN DEL HOME DE SALUD (faltaba por completo)
+
+   `refreshStats()` y el primer `renderMainArea` usaban `window._saludHomeState`
+   (`.cache` y `.lastUpdate`, dos Map por empresa) pero **ese objeto nunca se creaba
+   en ningún archivo**. La consecuencia era un error en consola al abrir el módulo:
+
+     [SALUD] Error refrescando estadísticas:
+     TypeError: Cannot read properties of undefined (reading 'cache')
+
+   y, como el `throw` cortaba la función ANTES de guardar, `this.saludStats` tampoco
+   se asignaba: el home quedaba sin datos y el hero mostraba 0 %.
+
+   Se define acá, una sola vez, al cargar el archivo. Es idempotente: si por algún
+   motivo ya existiera (otra versión cargada antes), se respeta.
+   ───────────────────────────────────────────────────────────────────────────── */
+window._saludHomeState = window._saludHomeState || {
+    cache: new Map(),        // empresa -> datos normalizados del home
+    lastUpdate: new Map()    // empresa -> marca de tiempo de la última carga
+};
 
 class GestionSaludHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        this.currentCompany = this.getCurrentCompany();
-        this.widgets = {}; // Referencias a elementos de widgets para actualización reactiva
+        // 📦748 · Aceptar currentCompany como parámetro del shell (misma forma que Recursos).
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
+        this.saludStats = null;
     }
 
     getCurrentCompany() {
@@ -36,20 +51,19 @@ class GestionSaludHome {
         // 2. Layout
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
 
-        // Header
+        // Header (📦754 — minimal: solo breadcrumb + H1, escala fluido)
         const header = document.createElement('header');
-        header.className = 'k-module-header';
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <i class="bi bi-heart-pulse me-2" style="color: #212529;"></i>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Gestión de la Salud</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Gestión de la Salud
-                    </span>
+            <div class="kair-page-title-block">
+                <div class="kair-breadcrumb">
+                    <span>Inicio</span><span>/</span>
+                    <span>Gestión</span><span>/</span>
+                    <span>Salud</span>
                 </div>
+                <h1>Gestión de la Salud</h1>
             </div>
         `;
         layout.appendChild(header);
@@ -64,19 +78,44 @@ class GestionSaludHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        // Renderizar contenido
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan las estadísticas de Gestión Salud
+                // 📦756 — Esqueleto del home con las MISMAS clases y espacios que el contenido real
+        // (hero + 3 metricas + 2 tarjetas + grilla de submodulos). Antes era
+        // KairSkeleton.kpiStrip(N) [+ chartBars], que dibujaba 4 tarjetas genéricas de otra
+        // forma/radio/alto: al llegar los datos TODO saltaba de lugar.
+        mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 });
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // 3. Lanzar actualización en segundo plano (main.js ya tiene su propia caché de disco)
-        this.refreshStats();
+        // 200ms para que el browser pinte el skeleton
+        await new Promise(r => setTimeout(r, 200));
+
+        // 3. Cargar estadísticas reales
+        await this.refreshStats();
+
+        // 4. Renderizar contenido premium (limpia el skeleton)
+        await this.renderMainArea(mainArea);
+
+        // 📦754 · El rediseño premium usa SVG (renderChartSalud) en vez de Chart.js.
+        // renderAccidentesChart ya no aplica al home — los canvases Chart.js no existen en el nuevo layout.
+        // El método queda vivo por si se necesita en otros submódulos.
     }
 
     /**
      * Refresca las estadísticas en segundo plano y actualiza los widgets existentes.
+     *
+     * 📦763 · Dos correcciones acá:
+     *   1. `this.saludStats` NUNCA se asignaba. El render activo (`renderMainArea`,
+     *      el de la línea ~1036) lee `this.saludStats`, así que quedaba siempre en
+     *      `null` y el home mostraba todo en 0. Los datos se guardaban solo en la
+     *      caché de sesión, que nadie leía.
+     *   2. Se pasa cada respuesta por `_adaptarRespuestasSalud()` porque el backend
+     *      usa OTROS nombres de campo que el render (ver el comentario del helper).
+     *      Sin el adaptador, la misma función que arregla el error habría dejado el
+     *      panel mostrando 0 donde el backend SÍ tiene datos (ej.: ausentismo tiene
+     *      5 casos y el render esperaba `totalTrabajadores`).
      */
     async refreshStats() {
         const company = this.currentCompany;
@@ -94,19 +133,27 @@ class GestionSaludHome {
         window.electronAPI.getIndicadoresSaludStats(company)
       ]);
 
-      const newData = {
-        inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
-        ausentismo: ausResult.success ? ausResult.data : null,
-        accidentes: accResult.success ? accResult.data : null,
-        examenes: examResult.success ? examResult.data : null,
-        seguimientos: segResult.success ? segResult.data : null,
-        remisiones: remResult.success ? remResult.data : null,
-        indicadores: indicadoresResult.success ? indicadoresResult.data : null
-      };
+      const newData = this._adaptarRespuestasSalud({
+        recursos: recursosResult,
+        ausentismo: ausResult,
+        accidentes: accResult,
+        examenes: examResult,
+        seguimientos: segResult,
+        remisiones: remResult,
+        indicadores: indicadoresResult
+      });
 
-            // Guardar en caché de sesión
+            // 📦763 · Guardar en la memoria de sesión, DEFENSIVO:
+            // si por lo que sea no estuviera definida, se crea acá en vez de tirar
+            // un TypeError que corta toda la carga (era el error de consola).
+            if (!window._saludHomeState) {
+                window._saludHomeState = { cache: new Map(), lastUpdate: new Map() };
+            }
             window._saludHomeState.cache.set(company, newData);
             window._saludHomeState.lastUpdate.set(company, Date.now());
+
+            // 📦763 · Asignar al estado del componente: es lo que LEE el render.
+            this.saludStats = newData;
 
             // Actualizar widgets si el componente sigue montado
             this.updateWidgetsUI(newData);
@@ -116,8 +163,110 @@ class GestionSaludHome {
         }
     }
 
+    /**
+     * 📦763 — Adaptador de nombres: BACKEND → RENDER.
+     *
+     * Los manejadores de `main.js` devuelven nombres de campo DISTINTOS a los que lee
+     * `renderMainArea`. Verificado midiendo las 7 respuestas con la empresa real:
+     *
+     *   ausentismo   -> { pendientes, activos, cerrados, total }   (el render lee tasaAusentismo / totalTrabajadores)
+     *   accidentes   -> { totalYear, mesActual, mensual[12] }      (el render lee total / investigados / pendientes)
+     *   examenes     -> { totalYear, mesActual }                   (el render lee totalExamenes / realizados / pendientes)
+     *   seguimientos -> { totalAnio, realizadosAnio }              (el render lee total / completados / pendientes)
+     *
+     * Mapeo aplicado (evidencia, no suposición):
+     *   accidentes.total        <- totalYear      (accidentes del año en curso)
+     *   accidentes.pendientes   <- totalYear      (el backend NO distingue investigados:
+     *                                              se asume pendiente, como hacía el widget
+     *                                              original de este mismo archivo)
+     *   examenes.totalExamenes  <- totalYear
+     *   examenes.realizados     <- mesActual
+     *   seguimientos.total      <- totalAnio
+     *   seguimientos.completados<- realizadosAnio
+     *   seguimientos.pendientes <- totalAnio - realizadosAnio
+     *   ausentismo.totalCasos   <- total          (dato NUEVO y correcto que antes se perdía;
+     *                                              NO se inventa `totalTrabajadores` porque el
+     *                                              backend no lo informa: se deja 0 para que el
+     *                                              render no calcule una tasa falsa)
+     *
+     * Los campos que el backend no informa quedan en 0 en vez de `undefined`: así el
+     * render no propaga `NaN` a los porcentajes ni al gráfico.
+     */
+    _adaptarRespuestasSalud(r) {
+        /* A prueba de fallos: si llega sin argumento (por ejemplo porque una consulta
+           falló antes de armar el objeto), se sigue con un objeto vacío en vez de
+           romper. Devuelve todo en 0 / null, que es exactamente lo que el render
+           espera para una empresa sin datos. */
+        r = r || {};
+        const datos = (res) => (res && res.success !== false)
+            ? (res.data !== undefined ? res.data : (res.stats !== undefined ? res.stats : null))
+            : null;
+        const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : 0;
+
+        const aus = datos(r.ausentismo) || {};
+        const acc = datos(r.accidentes) || {};
+        const exa = datos(r.examenes) || {};
+        const seg = datos(r.seguimientos) || {};
+        const rec = datos(r.recursos) || {};
+        const rem = datos(r.remisiones) || {};
+        const ind = datos(r.indicadores) || {};
+
+        const accTotal = num(acc.totalYear);
+        const exaTotal = num(exa.totalYear);
+        const segTotal = num(seg.totalAnio);
+        const segHechos = num(seg.realizadosAnio);
+
+        return {
+            // `recursos.stats` puede venir en null (empresa sin datos): no hay que romper
+            inducciones: (rec && rec.inducciones) ? rec.inducciones : null,
+            ausentismo: {
+                totalCasos: num(aus.total),
+                pendientes: num(aus.pendientes),
+                activos: num(aus.activos),
+                cerrados: num(aus.cerrados),
+                // El backend no informa trabajadores ni tasa: se dejan en 0 para que el
+                // render no arme una tasa con datos que no existen.
+                totalTrabajadores: 0,
+                tasaAusentismo: 0,
+                diasPerdidos: 0
+            },
+            accidentes: {
+                total: accTotal,
+                pendientes: accTotal,
+                investigados: 0,
+                mensual: Array.isArray(acc.mensual) ? acc.mensual : []
+            },
+            examenes: {
+                totalExamenes: exaTotal,
+                realizados: num(exa.mesActual),
+                pendientes: Math.max(0, exaTotal - num(exa.mesActual))
+            },
+            seguimientos: {
+                total: segTotal,
+                completados: segHechos,
+                pendientes: Math.max(0, segTotal - segHechos)
+            },
+            remisiones: rem && typeof rem === 'object' ? rem : {},
+            indicadores: ind && typeof ind === 'object' ? ind : {}
+        };
+    }
+
     updateWidgetsUI(data) {
         if (!data) return;
+
+        /* 📦763 — ORIGEN DEL ERROR DE CONSOLA.
+           Esta función es del sistema de WIDGETS viejo (`this.widgets.*`), que el
+           rediseño premium dejó sin usar: `this.widgets` **nunca se inicializa** (no
+           hay `this.widgets = {}` en el constructor ni en ningún lado del archivo) y
+           los `create*Widget()` son código muerto. Las guardas de cada línea eran
+           `if (data.X && this.widgets.X)`: la segunda mitad lanzaba
+           `TypeError: Cannot read properties of undefined (reading 'ausentismo')`
+           —el nombre de la propiedad es el que se estaba leyendo— y ese `throw` lo
+           atrapaba el catch de `refreshStats`, que lo mostraba como
+           "[SALUD] Error refrescando estadísticas". El error NO era de la caché: era
+           esta línea, y la caché era un problema aparte (también corregido arriba).
+           Se sale temprano si no hay widgets en vez de tocar propiedades de undefined. */
+        if (!this.widgets) return;
 
         // Actualizar Inducciones
         if (data.inducciones && this.widgets.inducciones) {
@@ -148,7 +297,11 @@ if (data.accidentes) {
 this.renderAccidentesChart(data.accidentes);
 }
 if (data.indicadores) {
-this.renderIndicesChart(data.indicadores);
+    // 📦763 · Guarda de existencia: si el método no estuviera definido, esto lanzaba
+    // otro TypeError que el catch de refreshStats reportaba igual que el anterior.
+    if (typeof this.renderIndicesChart === 'function') {
+        this.renderIndicesChart(data.indicadores);
+    }
 }
     }
 
@@ -175,20 +328,27 @@ this.renderIndicesChart(data.indicadores);
         if (existingChart) existingChart.destroy();
 
         new Chart(canvas, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Accidentes',
                     data: monthlyData,
-                    backgroundColor: barColors,
-                    borderColor: borderColors,
-                    borderWidth: 1
+                    borderColor: '#174ea6',
+                    backgroundColor: 'rgba(23, 78, 166, 0.08)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: barColors,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 1,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -200,8 +360,13 @@ this.renderIndicesChart(data.indicadores);
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 1, precision: 0 },
-                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                        suggestedMax: 5,
+                        ticks: { stepSize: 1, precision: 0, maxTicksLimit: 6 },
+                        title: { display: true, text: 'Cantidad', font: { size: 10 } },
+                        grid: { display: false }
+                    },
+                    x: {
+                        grid: { display: false }
                     }
                 }
             }
@@ -319,7 +484,7 @@ new Chart(canvas, {
   plugins: [metaPlugin],
   options: {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     interaction: {
       mode: 'index',
       intersect: false
@@ -357,7 +522,8 @@ new Chart(canvas, {
           text: 'Índice (IF / IS)',
           font: { size: 10 }
         },
-        ticks: { font: { size: 9 } }
+        ticks: { font: { size: 9 } },
+        grid: { display: false }
       },
       y1: {
         type: 'linear',
@@ -373,9 +539,10 @@ new Chart(canvas, {
           precision: 0,
           font: { size: 9 }
         },
-        grid: {
-          drawOnChartArea: false
-        }
+        grid: { display: false }
+      },
+      x: {
+        grid: { display: false }
       }
     }
   }
@@ -383,11 +550,19 @@ new Chart(canvas, {
 }
 
 renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
         // Obtener datos iniciales del caché de sesión si existen
-        const cachedData = window._saludHomeState.cache.get(this.currentCompany) || {};
+        // 📦763 · Defensivo: si la memoria de sesión no estuviera disponible, se sigue
+        // con un objeto vacío en vez de tirar un TypeError (misma causa raíz del error
+        // de consola que se corrigió en refreshStats).
+        const cachedData = (window._saludHomeState && window._saludHomeState.cache)
+            ? (window._saludHomeState.cache.get(this.currentCompany) || {})
+            : {};
 
         // Crear widgets pasando datos cacheados para renderizado instantáneo
         const examenesWidget = this.createExamenesWidget(cachedData.examenes);
@@ -414,7 +589,7 @@ chartContainer.className = 'chart-container';
 chartContainer.innerHTML = `
 <h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
 <div class="chart-placeholder" style="padding: 0.5rem 0;">
-<canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
+<canvas id="saludAccidentesChart"></canvas>
 </div>
 `;
 chartsGrid.appendChild(chartContainer);
@@ -424,7 +599,7 @@ indicesChartContainer.className = 'chart-container';
 indicesChartContainer.innerHTML = `
 <h3>Índices de Accidentalidad — ${new Date().getFullYear()}</h3>
 <div class="chart-placeholder" style="padding: 0.5rem 0;">
-<canvas id="saludIndicesChart" style="max-height: 180px;"></canvas>
+<canvas id="saludIndicesChart"></canvas>
 </div>
 `;
 chartsGrid.appendChild(indicesChartContainer);
@@ -754,7 +929,9 @@ Control de remisiones y recomendaciones
 Trabajadores con inducción al día
                 </div>
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%"></div>
+                    <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>
@@ -803,76 +980,345 @@ Trabajadores con inducción al día
     }
 
     injectStyles() {
-        const styleId = 'k-salud-home-optimized-styles';
-        if (document.getElementById(styleId)) return;
+        const styleId = 'k-air-gestion-salud-styles-v2';
+        const oldStyle = document.getElementById(styleId);
+        if (oldStyle) oldStyle.remove();
 
         const style = document.createElement('style');
         style.id = styleId;
         style.textContent = `
-.gestion-salud-home {
---k-primary: #174ea6;
---k-primary-light: #e8f0fe;
---k-primary-hover: #1450a1;
---k-success: #28a745;
---k-danger: #dc3545;
---k-bg-card: #ffffff;
---k-bg-app: #f8f9fa;
---k-border: #dee2e6;
---k-text-main: #212529;
---k-text-muted: #6c757d;
---k-radius-md: 0.375rem;
---k-radius-lg: 0.5rem;
---k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
---k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
---k-header-height: 60px;
---k-font-family: inherit;
-padding: 1.5rem;
-background: var(--k-bg-app);
-height: 100%;
-overflow-y: auto;
-}
-            .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 0 !important; }
-            .widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 120px; transition: transform 0.2s ease; } .widget:hover { transform: translateY(-3px); box-shadow: var(--k-shadow-md); } .widget h4 { margin: 0 0 0.5rem 0; font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; } .widget-value { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; } .widget-description { font-size: 0.65rem; color: var(--k-text-muted); }
-            .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-            .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
-            .k-budget-card .bg-success { background: var(--k-success) !important; }
-            .k-budget-card .bg-danger { background: var(--k-danger) !important; }
-            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
-            .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
-            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
-            .kb-exec { color: var(--k-success); }
-            .kb-rem { color: var(--k-primary); }
-            
-.kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
-.kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
+            /* =========================================
+               1. SISTEMA VISUAL K+AIR (OFICIAL — GESTIÓN SALUD)
+               ========================================= */
+            .gestion-salud-home {
+                /* Scope vars legacy (compatibilidad con widgets individuales) */
+                --k-primary: #174ea6;
+                --k-primary-hover: #185abd;
+                --k-primary-light: rgba(23, 78, 166, 0.1);
+                --k-success: #28a745;
+                --k-success-light: rgba(40, 167, 69, 0.1);
+                --k-warning: #ffc107;
+                --k-warning-light: rgba(255, 193, 7, 0.1);
+                --k-danger: #dc3545;
+                --k-danger-light: rgba(220, 53, 69, 0.1);
+                --k-bg-card: #ffffff;
+                --k-border: #e9ecef;
+                --k-text-main: #212529;
+                --k-text-muted: #6c757d;
+                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 
-            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
-.ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
-.ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
-
-            .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-.submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: #fcfcfc; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); transition: all 0.2s ease; }
-.submodule-item:hover { background-color: var(--k-primary-light); border-color: var(--k-primary); transform: translateX(5px); }
-.btn-ingresar { background-color: var(--k-primary); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: var(--k-radius-md); font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-.btn-ingresar:hover { background-color: var(--k-primary-hover); }
-            
-            .main-area { display: flex; flex-direction: column; gap: 1rem; }
-.submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }
-.submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
-            .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }
-.chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
-.charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
-
-/* ANULAR ESTILOS GLOBALES (styles.css) */
-.gestion-salud-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
-.gestion-salud-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
-.gestion-salud-home .charts-grid-salud { margin-top: 0 !important; }
-`;
+                /* Scroll interno (mismo patrón que Recursos/Gestión Integral) */
+                height: 100%;
+                overflow: hidden auto;
+                background: #f8f9fa;
+                padding: clamp(15px, 1.8vw, 22px);
+                box-sizing: border-box;
+            }
+            .gestion-salud-home .main-area {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+            }
+        `;
         document.head.appendChild(style);
     }
+
+    renderMetricCard(opts) {
+        var label = opts.label;
+        var valueHTML = opts.valueHTML;
+        var desc = opts.desc;
+        var progressPct = opts.progressPct;
+        var variant = opts.variant;
+        var card = document.createElement('article');
+        card.className = 'kair-metric-card' + (variant && variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+        card.innerHTML = ''
+            + '<span class="kair-metric-head">' + label + '</span>'
+            + '<div class="kair-metric-value">' + valueHTML + '</div>'
+            + '<p class="kair-metric-desc">' + desc + '</p>'
+            + '<div class="kair-progress"><i style="width:' + Math.min(100, progressPct) + '%"></i></div>';
+        return card;
+    }
+
+    buildRadarTasks() {
+        var stats = this.saludStats || {};
+        var tareas = [];
+        var examenes = stats.examenes || {};
+        if ((examenes.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#fff5e6', color: '#c28316',
+                title: 'Evaluaciones médicas',
+                sub: examenes.pendientes + ' exámenes pendientes',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var seguimientos = stats.seguimientos || {};
+        if ((seguimientos.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+                title: 'Seguimientos de salud',
+                sub: seguimientos.pendientes + ' seguimientos sin cerrar',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var accidentes = stats.accidentes || {};
+        if ((accidentes.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#ffe9e9', color: '#a83a48',
+                title: 'Investigación de accidentes',
+                sub: accidentes.pendientes + ' accidentes sin investigar',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        if (tareas.length === 0) {
+            tareas.push({
+                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                title: 'Sistema estable',
+                sub: 'Sin alertas pendientes este mes',
+                status: 'Al día', statusClass: 'kair-status-pill--ok'
+            });
+        }
+        var html = '';
+        for (var i = 0; i < tareas.length && i < 3; i++) {
+            var t = tareas[i];
+            html += ''
+                + '<div class="kair-task">'
+                + '  <div class="kair-task-icon" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + '</div>'
+                + '  <div>'
+                + '    <strong>' + t.title + '</strong>'
+                + '    <small>' + t.sub + '</small>'
+                + '  </div>'
+                + '  <span class="kair-status-pill ' + t.statusClass + '">' + t.status + '</span>'
+                + '</div>';
+        }
+        return html;
+    }
+
+    renderChartSalud(indicadores) {
+        var el = document.getElementById('kair-chart-salud');
+        if (!el) return;
+
+        // 📦758 · Barras HTML (no SVG). El `<svg>` con `preserveAspectRatio="none"` dentro de
+        // una caja de alto fijo se estiraba sin conservar proporción y el texto se deformaba
+        // y se montaba. Una barra es una caja: con HTML se dibuja exacta y nunca se sale.
+        //
+        // 📦791 — BUG: el backend (`excel-bridge.leerIndicadores`) NO devuelve `frecuencia`,
+        // `severidad`, `prevalencia` ni `incidencia` como escalares: devuelve
+        // `frecuenciaMensual`/`severidadMensual` (con `indiceFrecuencia`/`indiceSeveridad` por
+        // mes) y `config.prevalenciaEL`/`config.incidenciaEL` (suma anual). El gráfico leía los
+        // 4 campos inexistentes y `Number(undefined) || 0` daba 0.00 en las 4 barras.
+        // Ahora se derivan de los datos reales (y se sigue aceptando el escalar si algún día
+        // el backend lo agrega).
+        var fM = Array.isArray(indicadores.frecuenciaMensual) ? indicadores.frecuenciaMensual : [];
+        var sM = Array.isArray(indicadores.severidadMensual) ? indicadores.severidadMensual : [];
+        var fNZ = fM.filter(function (m) { return Number(m.indiceFrecuencia) > 0; });
+        var sNZ = sM.filter(function (m) { return Number(m.indiceSeveridad) > 0; });
+        var cfg = indicadores.config || {};
+
+        // Frecuencia y severidad: promedio de los meses con valor (mismo criterio que el KPI
+        // del módulo 3.3.1, que promedia solo los meses no-cero).
+        var frecuencia = Number(indicadores.frecuencia);
+        if (!frecuencia) {
+            frecuencia = fNZ.length
+                ? fNZ.reduce(function (s, m) { return s + Number(m.indiceFrecuencia); }, 0) / fNZ.length
+                : 0;
+        }
+        var severidad = Number(indicadores.severidad);
+        if (!severidad) {
+            severidad = sNZ.length
+                ? sNZ.reduce(function (s, m) { return s + Number(m.indiceSeveridad); }, 0) / sNZ.length
+                : 0;
+        }
+
+        // Prevalencia e incidencia: el backend las entrega sumadas en `config`.
+        var prevalencia = Number(indicadores.prevalencia) || Number(cfg.prevalenciaEL) || 0;
+        var incidencia = Number(indicadores.incidencia) || Number(cfg.incidenciaEL) || 0;
+
+        var items = [
+            { label: 'Frecuencia', value: frecuencia, color: 'var(--kair-blue, #2057b8)' },
+            { label: 'Severidad', value: severidad, color: 'var(--kair-mint, #1bb888)' },
+            { label: 'Prevalencia', value: prevalencia, color: 'var(--kair-amber, #e7a224)' },
+            { label: 'Incidencia', value: incidencia, color: 'var(--kair-red, #da5563)' }
+        ];
+
+        var maxVal = 1;
+        for (var k = 0; k < items.length; k++) { if (items[k].value > maxVal) maxVal = items[k].value; }
+
+        var html = '<div class="kair-bar-chart">';
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var w = Math.max(0, Math.min(100, (item.value / maxVal) * 100));
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + item.label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + w.toFixed(1) + '%;background:' + item.color + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + item.value.toFixed(2) + '</span>'
+                + '</div>';
+        }
+        html += '</div>';
+
+        el.innerHTML = html;
+    }
+
+    renderSubmodulesGrid() {
+        var grid = document.getElementById('kair-submodules-grid');
+        if (!grid) return;
+        var items = this.submodules || [];
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var name = items[i];
+            var m = name.match(/^(\d+\.\d+\.\d+)/);
+            var codeStr = m ? m[1] : String(i + 1);
+            var cleanName = name.replace(/^\d+\.\d+\.\d+\s*/, '');
+            html += ''
+                + '<div class="kair-module" data-submodule="' + name + '">'
+                + '  <span class="kair-module-n">' + codeStr + '</span>'
+                + '  <strong>' + cleanName + '</strong>'
+                + '  <small>Gestión y control</small>'
+                + '  <span class="kair-module-arrow">→</span>'
+                + '</div>';
+        }
+        grid.innerHTML = html;
+        var els = grid.querySelectorAll('.kair-module');
+        var self = this;
+        for (var j = 0; j < els.length; j++) {
+            (function (el) {
+                el.onclick = function () { self.handleSubmoduleClick(el.dataset.submodule); };
+            })(els[j]);
+        }
+    }
+
+    handleSubmoduleClick(submoduleName) {
+        console.log('Navegando a submódulo:', submoduleName);
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+            window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+        } else {
+            alert('Navegando a ' + submoduleName);
+        }
+    }
+
+    async renderMainArea(container) {
+        // 📦754 · Renderizar contenido premium del módulo Gestión de la Salud.
+        container.innerHTML = '';
+
+        const stats = this.saludStats || {};
+        const inducciones = stats.inducciones || { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 };
+        const ausentismo = stats.ausentismo || { diasPerdidos: 0, totalTrabajadores: 0, tasaAusentismo: 0 };
+        const examenes = stats.examenes || { totalExamenes: 0, realizados: 0, pendientes: 0 };
+        const seguimientos = stats.seguimientos || { total: 0, completados: 0, pendientes: 0 };
+        const accidentes = stats.accidentes || { total: 0, investigados: 0, pendientes: 0 };
+        const indicadores = stats.indicadores || { frecuencia: 0, severidad: 0, prevalencia: 0, incidencia: 0 };
+
+        // 📦754 · cumplimientoGeneral: score compuesto del módulo.
+        const cumplimientoInducciones = inducciones.totalTrabajadores > 0 ? inducciones.porcentajeCompletado : null;
+        const cumplimientoExamenes = examenes.totalExamenes > 0 ? Math.round(((examenes.realizados || 0) / examenes.totalExamenes) * 100) : null;
+        const cumplimientoSeguimientos = seguimientos.total > 0 ? Math.round(((seguimientos.completados || 0) / seguimientos.total) * 100) : null;
+        const accidentesOk = accidentes.total === 0 ? 100 : (accidentes.investigados >= accidentes.total ? 100 : 0);
+        const tasaAusentismoBaja = ausentismo.totalTrabajadores > 0 ? Math.max(0, 100 - Math.round(ausentismo.tasaAusentismo || 0)) : null;
+        const compGeneralArr = [cumplimientoInducciones, cumplimientoExamenes, cumplimientoSeguimientos, accidentesOk, tasaAusentismoBaja].filter(function (v) { return v !== null; });
+        const cumplimientoGeneral = compGeneralArr.length > 0
+            ? Math.round(compGeneralArr.reduce(function (a, b) { return a + b; }, 0) / compGeneralArr.length)
+            : 0;
+
+        // 1) HERO STRIP
+        const health = document.createElement('section');
+        health.className = 'kair-health';
+
+        const hero = document.createElement('article');
+        hero.className = 'kair-hero-card';
+        const heroMsg = cumplimientoGeneral >= 80
+            ? 'Tu sistema va por buen camino.'
+            : cumplimientoGeneral >= 50
+                ? 'Hay áreas que necesitan atención este mes.'
+                : 'Atención: hay actividades críticas pendientes.';
+        const tareasPendientes = (inducciones.pendientes || 0) +
+            (examenes.pendientes || 0) +
+            (seguimientos.pendientes || 0) +
+            (accidentes.pendientes || 0);
+        hero.innerHTML = ''
+            + '<div class="kair-hero-eyebrow">Estado general</div>'
+            + '<h2>' + heroMsg + '</h2>'
+            + '<p class="kair-hero-msg">Hay ' + tareasPendientes + ' actividades que necesitan atención este mes.</p>'
+            + '<div class="kair-hero-score">' + cumplimientoGeneral + '%<span>cumplimiento</span></div>';
+        health.appendChild(hero);
+
+        const induccionesPct = cumplimientoInducciones || 0;
+        const examenesPct = cumplimientoExamenes || 0;
+        const seguimientosPct = cumplimientoSeguimientos || 0;
+        health.appendChild(this.renderMetricCard({
+            label: 'Inducciones',
+            valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
+            desc: 'Personal con inducción al día',
+            progressPct: induccionesPct,
+            variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Evaluaciones médicas',
+            valueHTML: (examenes.realizados || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (examenes.totalExamenes || 0) + '</small>',
+            desc: 'Exámenes realizados',
+            progressPct: examenesPct,
+            variant: examenesPct >= 70 ? 'ok' : examenesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Seguimientos',
+            valueHTML: (seguimientos.completados || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (seguimientos.total || 0) + '</small>',
+            desc: 'Seguimientos completados',
+            progressPct: seguimientosPct,
+            variant: seguimientosPct >= 70 ? 'ok' : seguimientosPct >= 40 ? 'warning' : 'danger'
+        }));
+        container.appendChild(health);
+
+        // 2) CONTENT GRID: chart + radar
+        const content = document.createElement('section');
+        content.className = 'kair-content';
+
+        const chartCard = document.createElement('article');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Indicadores de Salud</h3>'
+            + '    <div class="kair-card-hint">Frecuencia · Severidad · Prevalencia · Incidencia</div>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="kair-chart kair-chart--flow" id="kair-chart-salud"></div>';
+        content.appendChild(chartCard);
+
+        const radarCard = document.createElement('article');
+        radarCard.className = 'kair-card';
+        radarCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>En tu radar</h3>'
+            + '    <div class="kair-card-hint">Requieren gestión este mes</div>'
+            + '  </div>'
+            + '</div>'
+            + this.buildRadarTasks();
+        content.appendChild(radarCard);
+
+        container.appendChild(content);
+
+        // 3) GRID: módulos
+        const modules = document.createElement('section');
+        modules.className = 'kair-modules';
+        const modulesCard = document.createElement('article');
+        modulesCard.className = 'kair-card';
+        modulesCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Explorar submódulos</h3>'
+            + '    <div class="kair-card-hint">Gestiona la documentación y evidencias de tu sistema.</div>'
+            + '  </div>'
+            + '  <button class="kair-btn kair-btn-ghost">Ver todos</button>'
+            + '</div>'
+            + '<div class="kair-module-grid" id="kair-submodules-grid"></div>';
+        modules.appendChild(modulesCard);
+        container.appendChild(modules);
+
+        this.renderChartSalud(indicadores);
+        this.renderSubmodulesGrid();
+    }
+
+
 }
 
 // Hacer la clase disponible globalmente

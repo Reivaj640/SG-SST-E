@@ -1,11 +1,23 @@
 // mejoramiento-home.js - Componente para el home del módulo "Mejoramiento"
 
+// F21.49 (2026-06-21) — Mejoramiento ahora SOLO tiene 7.1.1.
+// 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos — sus interfaces quedan reservadas
+// en modules/ pero NO se les crea UI porque la normativa (ALL_SUBMODULES en renderer.js)
+// solo incluye 7.1.1 en el módulo "Mejoramiento".
+
+
 class MejoramientoHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
-        this.submodules = submodules || [];
-        this.currentCompany = null;
+        /* this.submodules viene de RESOURCES_SUBMODULES[moduleName] en renderer.js,
+           que ya está filtrado por la normativa. Para Mejoramiento ahora solo trae
+           7.1.1. Si por algún motivo el array viene vacío, fallback a 7.1.1. */
+        this.submodules = (submodules && submodules.length > 0) ? submodules : [
+          '7.1.1 Acciones Preventivas y Correctivas'
+        ];
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
         this._unsubscribe = null;
     }
@@ -23,386 +35,156 @@ class MejoramientoHome {
         this.container.innerHTML = '';
         this.currentCompany = this.getCurrentCompany();
 
+        // 1. Inyectar estilos (mínimo — usa design system compartido)
         this.injectStyles();
 
+        // 2. Layout principal
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
+        this.container.appendChild(layout);
 
-        const header = document.createElement('header');
-        header.className = 'k-module-header';
+        // 3. Header minimal
+        const header = document.createElement('div');
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <i class="bi bi-arrow-up-right-circle-fill me-2" style="color: #212529;"></i>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Mejoramiento</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Mejoramiento
-                    </span>
-                </div>
+            <div class="kair-breadcrumb">
+                Inicio <span>›</span> Mejoramiento
+            </div>
+            <div class="kair-page-title-block">
+                <h1>Mejoramiento Continuo</h1>
             </div>
         `;
         layout.appendChild(header);
 
-        const contentContainer = document.createElement('div');
-        contentContainer.className = 'gestion-integral-home';
-        contentContainer.id = 'app-container';
-
+        // 4. Skeleton mientras cargan stats
         const mainArea = document.createElement('div');
-        mainArea.className = 'main-area';
-        mainArea.style.flex = '1';
+        mainArea.id = 'app-container';
+        mainArea.className = 'mejoramiento-home';
+        mainArea.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem; box-sizing: border-box;';
+                // 📦756 — Esqueleto del home con las MISMAS clases y espacios que el contenido real
+        // (hero + 3 metricas + 2 tarjetas + grilla de submodulos). Antes era
+        // KairSkeleton.kpiStrip(N) [+ chartBars], que dibujaba 4 tarjetas genéricas de otra
+        // forma/radio/alto: al llegar los datos TODO saltaba de lugar.
+        mainArea.innerHTML = KairSkeleton.home({ metrics: 3, rows: 4, modules: 6 });
+        layout.appendChild(mainArea);
 
-        this.renderMainArea(mainArea);
-
-        contentContainer.appendChild(mainArea);
-        layout.appendChild(contentContainer);
-        this.container.appendChild(layout);
-
-        if (window.MejoramientoStore) {
-            this._unsubscribe = window.MejoramientoStore.subscribe((stats) => {
-                this.updateWidgetsUI(stats);
-            });
-            const initialStats = window.MejoramientoStore.getStats();
-            this.updateWidgetsUI(initialStats);
-        }
+        // 5. Pintar contenido premium (lee MejoramientoStore si está disponible)
+        await this.renderMainArea(mainArea);
     }
 
-    renderMainArea(container) {
-        const widgetsContainer = document.createElement('div');
-        widgetsContainer.className = 'widgets-container';
 
-        const cachedStats = window.MejoramientoStore ? window.MejoramientoStore.getStats() : {};
+    injectStyles() {
+        /* 📦737 · Usar design system compartido de shared/kair-components.css.
+           Sin CSS legacy hardcoded en este módulo — todo proviene de los tokens. */
+    }
 
-        widgetsContainer.appendChild(this.createSubmoduleWidget('711', 'Acciones Preventivas y Correctivas', 'bg-success', cachedStats['711']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('712', 'Acciones de Mejora (Gerencia)', 'bg-primary', cachedStats['712']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('713', 'Acciones de Mejora (AT y EL)', 'bg-warning', cachedStats['713']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('714', 'Planes de Mejoramiento', 'bg-danger', cachedStats['714']));
-        widgetsContainer.appendChild(this.createEficaciaWidget(cachedStats._global));
-        widgetsContainer.appendChild(this.createVencidasWidget(cachedStats._global));
 
-        container.appendChild(widgetsContainer);
+    /**
+     * Construye hero + 3 metric cards + chart SVG + radar + grid de submódulos.
+     * Patrón premium K+AIR (igual que Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación).
+     * Lee stats desde MejoramientoStore (mismo objeto que consume el viewer 7.1.1).
+     */
+    async renderMainArea(container) {
+        container.innerHTML = '';
 
-        const chartsGrid = document.createElement('div');
-        chartsGrid.className = 'charts-grid-mejoramiento';
+        // Stats: objeto único con los 5 KPIs del viewer 7.1.1
+        const stats = (window.MejoramientoStore && typeof window.MejoramientoStore.getStats === 'function')
+            ? window.MejoramientoStore.getStats()
+            : {};
 
-        const chartAcciones = document.createElement('div');
-        chartAcciones.className = 'chart-container';
-        chartAcciones.innerHTML = `
-            <h3>Acciones por Mes — ${new Date().getFullYear()}</h3>
-            <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="mejAccionesChart" style="max-height: 180px;"></canvas>
-            </div>
+        const total = stats.total || 0;
+        const abiertas = stats.abiertas || 0;
+        const enProceso = stats.enProceso || 0;
+        const cerradas = stats.cerradas || 0;
+        const vencidas = stats.vencidas || 0;
+        const cumplimiento = stats.cumplimiento || (total > 0 ? Math.round((cerradas / total) * 100) : 0);
+
+        // ── 1. Hero strip (hero card + 3 metric cards) ──────────────
+        const health = document.createElement('div');
+        health.className = 'kair-health';
+
+        const heroMsg = cumplimiento >= 80
+            ? 'El ciclo de mejora continua está cumpliendo las metas.'
+            : cumplimiento >= 50
+                ? 'Buen avance en el ciclo de mejora. Quedan ' + (total - cerradas) + ' acciones por cerrar.'
+                : cumplimiento >= 25
+                    ? 'Hay ' + (total - cerradas) + ' acciones abiertas. Prioriza las vencidas.'
+                    : 'Sin acciones registradas o cumplimiento muy bajo.';
+
+        const heroCard = document.createElement('div');
+        heroCard.className = 'kair-hero-card';
+        heroCard.innerHTML = `
+            <div class="kair-hero-eyebrow">CICLO DE MEJORA CONTINUA</div>
+            <h2>${cerradas}/${total} acciones cerradas</h2>
+            <p class="kair-hero-msg">${heroMsg}</p>
+            <div class="kair-hero-score">${cumplimiento}%<span>cumplimiento</span></div>
         `;
-        chartsGrid.appendChild(chartAcciones);
+        health.appendChild(heroCard);
 
-        const chartEficacia = document.createElement('div');
-        chartEficacia.className = 'chart-container';
-        chartEficacia.innerHTML = `
-            <h3>Eficacia por Submódulo — ${new Date().getFullYear()}</h3>
-            <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="mejEficaciaChart" style="max-height: 180px;"></canvas>
+        health.appendChild(this.renderMetricCard({
+            title: 'Total Acciones',
+            value: total,
+            desc: 'Acciones Preventivas y Correctivas',
+            progress: total > 0 ? 100 : 0,
+            state: ''
+        }));
+        health.appendChild(this.renderMetricCard({
+            title: 'En Proceso',
+            value: enProceso,
+            desc: abiertas + ' abiertas · ' + cerradas + ' cerradas',
+            progress: total > 0 ? Math.round((enProceso / total) * 100) : 0,
+            state: enProceso > 0 ? 'warning' : ''
+        }));
+        health.appendChild(this.renderMetricCard({
+            title: 'Vencidas',
+            value: vencidas,
+            desc: 'Requieren atención inmediata',
+            progress: total > 0 ? Math.round((vencidas / total) * 100) : 0,
+            state: vencidas > 0 ? 'danger' : ''
+        }));
+
+        container.appendChild(health);
+
+        // ── 2. Content grid (chart SVG + radar panel) ───────────────
+        const content = document.createElement('div');
+        content.className = 'kair-content';
+
+        const chartCard = document.createElement('div');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = `
+            <div class="kair-row-title">
+                <div>
+                    <h3>Distribución por estado — 7.1.1</h3>
+                    <div class="kair-card-hint">Cantidad de acciones en cada estado del ciclo</div>
+                </div>
             </div>
+            <div class="kair-chart kair-chart--flow">${this.renderChartMejoramiento(abiertas, enProceso, cerradas, vencidas)}</div>
         `;
-        chartsGrid.appendChild(chartEficacia);
+        content.appendChild(chartCard);
 
-        container.appendChild(chartsGrid);
+        const radarCard = document.createElement('div');
+        radarCard.className = 'kair-card';
+        radarCard.innerHTML = `
+            <div class="kair-row-title">
+                <div>
+                    <h3>En tu radar</h3>
+                    <div class="kair-card-hint">Alertas del ciclo de mejora</div>
+                </div>
+            </div>
+            ${this.buildRadarTasks({ abiertas, enProceso, cerradas, vencidas, cumplimiento, total })}
+        `;
+        content.appendChild(radarCard);
 
-        setTimeout(() => {
-            this.renderAccionesChart(cachedStats);
-            this.renderEficaciaChart(cachedStats);
-        }, 50);
+        container.appendChild(content);
 
-        const submodulesContainer = document.createElement('div');
-        submodulesContainer.className = 'submodules-container';
-        submodulesContainer.innerHTML = `<h3>Submódulos</h3>`;
-
-        const submodulesList = document.createElement('div');
-        submodulesList.className = 'submodules-list';
-
-        if (this.submodules && this.submodules.length > 0) {
-            this.submodules.forEach(submodule => {
-                submodulesList.appendChild(this.renderSubmoduleItem(submodule));
-            });
-        } else {
-            submodulesList.innerHTML = `<div style="padding: 1rem; color: var(--k-text-muted); font-style: italic;">No hay submódulos configurados aún.</div>`;
-        }
-
-        submodulesContainer.appendChild(submodulesList);
-        container.appendChild(submodulesContainer);
+        // ── 3. Grid de submódulos ─────────────────────────────────────
+        const modules = document.createElement('div');
+        modules.className = 'kair-modules';
+        modules.appendChild(this.renderSubmodulesGrid());
+        container.appendChild(modules);
     }
 
-    createSubmoduleWidget(code, title, badgeClass, initialData) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-        let data = initialData;
-
-        const render = () => {
-            const d = data || { total: 0, pendientes: 0, enProceso: 0, implementadas: 0, vencidas: 0, mesActual: 0, year: '—', mes: '—' };
-            const value = currentMode === 'year' ? d.total : d.mesActual;
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">${title}</span>
-                    <span class="kb-badge ${badgeClass}">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${value}</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Acciones registradas
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Pendientes</div>
-                        <div class="kb-value kb-exec">${d.pendientes}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Implementadas</div>
-                        <div class="kb-value kb-rem">${d.implementadas}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets[code] = {
-            update: (newData) => { data = newData; render(); }
-        };
-
-        render();
-        return widget;
-    }
-
-    createEficaciaWidget(initialData) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-        let data = initialData;
-
-        const render = () => {
-            const d = data || { eficacia: 0, implementadas: 0, total: 0, year: '—', mes: '—' };
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Eficacia de Acciones</span>
-                    <span class="kb-badge bg-success">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.eficacia}%</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Implementadas / Total
-                </div>
-                <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${d.eficacia}%"></div>
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Implementadas</div>
-                        <div class="kb-value kb-exec">${d.implementadas}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Total</div>
-                        <div class="kb-value kb-rem">${d.total}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets._eficacia = {
-            update: (newData) => { data = newData; render(); }
-        };
-
-        render();
-        return widget;
-    }
-
-    createVencidasWidget(initialData) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-        let data = initialData;
-
-        const render = () => {
-            const d = data || { vencidas: 0, pendientes: 0, enProceso: 0, year: '—', mes: '—' };
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Acciones Vencidas</span>
-                    <span class="kb-badge bg-danger">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.vencidas}</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Requieren atención inmediata
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Pendientes</div>
-                        <div class="kb-value kb-exec">${d.pendientes}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">En Proceso</div>
-                        <div class="kb-value kb-rem">${d.enProceso}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets._vencidas = {
-            update: (newData) => { data = newData; render(); }
-        };
-
-        render();
-        return widget;
-    }
-
-    updateWidgetsUI(stats) {
-        if (!stats) return;
-
-        if (stats['711'] && this.widgets['711']) this.widgets['711'].update(stats['711']);
-        if (stats['712'] && this.widgets['712']) this.widgets['712'].update(stats['712']);
-        if (stats['713'] && this.widgets['713']) this.widgets['713'].update(stats['713']);
-        if (stats['714'] && this.widgets['714']) this.widgets['714'].update(stats['714']);
-        if (stats._global && this.widgets._eficacia) this.widgets._eficacia.update(stats._global);
-        if (stats._global && this.widgets._vencidas) this.widgets._vencidas.update(stats._global);
-
-        if (stats._global) {
-            this.renderAccionesChart(stats);
-            this.renderEficaciaChart(stats);
-        }
-    }
-
-    renderAccionesChart(stats) {
-        if (typeof Chart === 'undefined') return;
-        const canvas = document.getElementById('mejAccionesChart');
-        if (!canvas) return;
-
-        const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const currentMonth = new Date().getMonth();
-
-        const ds711 = stats['711'] ? stats['711'].byMonth : Array(12).fill(0);
-        const ds712 = stats['712'] ? stats['712'].byMonth : Array(12).fill(0);
-        const ds713 = stats['713'] ? stats['713'].byMonth : Array(12).fill(0);
-        const ds714 = stats['714'] ? stats['714'].byMonth : Array(12).fill(0);
-
-        const existingChart = Chart.getChart(canvas);
-        if (existingChart) existingChart.destroy();
-
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: '7.1.1', data: ds711, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: '#28a745', borderWidth: 1 },
-                    { label: '7.1.2', data: ds712, backgroundColor: 'rgba(23, 78, 166, 0.7)', borderColor: '#174ea6', borderWidth: 1 },
-                    { label: '7.1.3', data: ds713, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: '#ffc107', borderWidth: 1 },
-                    { label: '7.1.4', data: ds714, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: '#dc3545', borderWidth: 1 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} acción${ctx.raw !== 1 ? 'es' : ''}`
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true },
-                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, title: { display: true, text: 'Cantidad', font: { size: 10 } } }
-                }
-            }
-        });
-    }
-
-    renderEficaciaChart(stats) {
-        if (typeof Chart === 'undefined') return;
-        const canvas = document.getElementById('mejEficaciaChart');
-        if (!canvas) return;
-
-        const codes = ['711', '712', '713', '714'];
-        const labels = ['7.1.1', '7.1.2', '7.1.3', '7.1.4'];
-        const colors = ['#28a745', '#174ea6', '#ffc107', '#dc3545'];
-
-        const eficaciaData = codes.map(code => {
-            const d = stats[code];
-            if (!d || d.total === 0) return 0;
-            const impl = d.implementadas + d.verificadas + d.cerradas;
-            return Math.round((impl / d.total) * 100);
-        });
-
-        const existingChart = Chart.getChart(canvas);
-        if (existingChart) existingChart.destroy();
-
-        new Chart(canvas, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: eficaciaData,
-                    backgroundColor: colors.map(c => c + 'cc'),
-                    borderColor: colors,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${ctx.raw}% eficacia`
-                        }
-                    }
-                }
-            }
-        });
-    }
 
     renderSubmoduleItem(name) {
         const submoduleItem = document.createElement('div');
@@ -418,219 +200,154 @@ class MejoramientoHome {
         return submoduleItem;
     }
 
-    injectStyles() {
-        const styleId = 'k-air-mejoramiento-styles-v2';
-        const oldStyle = document.getElementById(styleId);
-        if (oldStyle) oldStyle.remove();
-        const oldV1 = document.getElementById('k-air-mejoramiento-styles-v1');
-        if (oldV1) oldV1.remove();
-
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            .gestion-integral-home {
-                --k-primary: #174ea6;
-                --k-primary-hover: #185abd;
-                --k-primary-light: rgba(23, 78, 166, 0.1);
-                --k-success: #28a745;
-                --k-success-light: rgba(40, 167, 69, 0.1);
-                --k-warning: #ffc107;
-                --k-warning-light: rgba(255, 193, 7, 0.1);
-                --k-danger: #dc3545;
-                --k-danger-light: rgba(220, 53, 69, 0.1);
-                --k-bg-app: #f8f9fa;
-                --k-bg-card: #ffffff;
-                --k-border: #dee2e6;
-                --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-                --k-text-main: #212529;
-                --k-text-muted: #6c757d;
-                --k-radius-md: 0.375rem;
-                --k-radius-lg: 0.5rem;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-                --k-header-height: 60px;
-
-                font-family: var(--k-font-family);
-                color: var(--k-text-main);
-                background-color: var(--k-bg-app);
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                padding: 1.5rem;
-                overflow: hidden;
-            }
-
-            .k-module-header {
-                background-color: var(--k-bg-card);
-                border-bottom: 1px solid var(--k-border);
-                padding: 0 1.5rem;
-                height: var(--k-header-height);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-shrink: 0;
-            }
-
-            .k-module-title {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .main-area {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-                overflow-y: auto;
-                padding-right: 0.5rem;
-                width: 100%;
-            }
-
-            .widgets-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 1rem;
-                margin-bottom: 0 !important;
-            }
-
-            .widget {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1rem;
-                box-shadow: var(--k-shadow-sm);
-                display: flex;
-                flex-direction: column;
-                min-height: 120px;
-                transition: transform 0.2s ease;
-            }
-            .widget:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--k-shadow-md);
-            }
-
-            .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-            .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
-            .k-budget-card .bg-success { background: var(--k-success) !important; }
-            .k-budget-card .bg-danger { background: var(--k-danger) !important; }
-            .k-budget-card .bg-primary { background: var(--k-primary) !important; }
-            .k-budget-card .bg-warning { background: var(--k-warning) !important; color: #212529 !important; }
-            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
-            .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
-            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
-            .kb-exec { color: var(--k-success); }
-            .kb-rem { color: var(--k-primary); }
-
-            .kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
-            .kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
-
-            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
-            .ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
-            .ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
-
-            .chart-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                min-height: 280px;
-                display: flex;
-                flex-direction: column;
-            }
-            .chart-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            .charts-grid-mejoramiento { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-            @media (max-width: 992px) { .charts-grid-mejoramiento { grid-template-columns: 1fr; } }
-
-            .submodules-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                margin-top: 0 !important;
-            }
-            .submodules-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                padding-bottom: 1rem;
-                border-bottom: 1px solid var(--k-border);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-            .submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: #fcfcfc; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); transition: all 0.2s ease; }
-            .submodule-item:hover { background-color: var(--k-primary-light); border-color: var(--k-primary); transform: translateX(5px); }
-            .submodule-info { flex: 1; margin-right: 1rem; }
-            .submodule-name { font-weight: 600; color: var(--k-text-main); font-size: 0.95rem; }
-            .submodule-meta { font-size: 0.8rem; color: var(--k-text-muted); margin-top: 0.2rem; }
-            .btn-ingresar { background-color: var(--k-primary); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: var(--k-radius-md); font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-            .btn-ingresar:hover { background-color: var(--k-primary-hover); }
-
-            .gestion-integral-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
-            .gestion-integral-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
-            .gestion-integral-home .charts-grid-mejoramiento { margin-top: 0 !important; }
-
-            [data-theme="dark"] .gestion-integral-home {
-                --k-primary: #4da6ff;
-                --k-primary-hover: #66b3ff;
-                --k-primary-light: rgba(77, 166, 255, 0.15);
-                --k-success: #5cb85c;
-                --k-success-light: rgba(92, 184, 92, 0.15);
-                --k-warning: #f0ad4e;
-                --k-warning-light: rgba(240, 173, 78, 0.15);
-                --k-danger: #d9534f;
-                --k-danger-light: rgba(217, 83, 79, 0.15);
-                --k-bg-app: #1a202c;
-                --k-bg-card: #2d3748;
-                --k-border: #4a5568;
-                --k-text-main: #e9ecef;
-                --k-text-muted: #adb5bd;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-            }
-            [data-theme="dark"] .ausentismo-toggle.active { background: #2d3748; }
-            [data-theme="dark"] .ausentismo-toggles { background: #1a202c; }
-
-            [data-theme="dark-legacy"] .gestion-integral-home {
-                --k-primary: #9e9e9e;
-                --k-primary-hover: #bdbdbd;
-                --k-primary-light: rgba(158, 158, 158, 0.15);
-                --k-success: #4caf50;
-                --k-success-light: rgba(76, 175, 80, 0.15);
-                --k-warning: #ff9800;
-                --k-warning-light: rgba(255, 152, 0, 0.15);
-                --k-danger: #f44336;
-                --k-danger-light: rgba(244, 67, 54, 0.15);
-                --k-bg-app: #121212;
-                --k-bg-card: #1e1e1e;
-                --k-border: #404040;
-                --k-text-main: #e0e0e0;
-                --k-text-muted: #a0a0a0;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
-            }
-            [data-theme="dark-legacy"] .ausentismo-toggle.active { background: #1e1e1e; }
-            [data-theme="dark-legacy"] .ausentismo-toggles { background: #121212; }
+    /**
+     * Construye una métrica del hero strip (3 unidades).
+     */
+    renderMetricCard({ title, value, desc, progress, state }) {
+        const card = document.createElement('div');
+        const stateClass = state ? ` kair-metric-card--${state}` : '';
+        card.className = `kair-metric-card${stateClass}`;
+        card.innerHTML = `
+            <div class="kair-metric-head">${title}</div>
+            <div class="kair-metric-value">${value}</div>
+            <div class="kair-metric-desc">${desc}</div>
+            <div class="kair-progress"><i style="width: ${progress}%"></i></div>
         `;
-        document.head.appendChild(style);
+        return card;
     }
+
+    /**
+     * Construye las 3 alertas condicionales del panel "En tu radar".
+     */
+    buildRadarTasks(stats) {
+        const tasks = [];
+        const { abiertas, enProceso, cerradas, vencidas, cumplimiento, total } = stats;
+
+        // 1. Acciones vencidas (las más críticas)
+        if (vencidas > 0) {
+            tasks.push({
+                icon: '⚠️',
+                color: 'danger',
+                title: 'Acciones vencidas',
+                desc: vencidas + ' acción(es) requieren atención inmediata'
+            });
+        }
+
+        // 2. Cumplimiento bajo
+        if (cumplimiento < 80 && total > 0) {
+            tasks.push({
+                icon: '📉',
+                color: 'warn',
+                title: 'Cumplimiento bajo',
+                desc: 'Ciclo al ' + cumplimiento + '% — meta mínima 80%'
+            });
+        }
+
+        // 3. Acciones sin iniciar (abiertas)
+        if (abiertas >= 2) {
+            tasks.push({
+                icon: '📋',
+                color: 'warn',
+                title: 'Acciones sin iniciar',
+                desc: abiertas + ' acción(es) aún no han comenzado'
+            });
+        }
+
+        if (tasks.length === 0) {
+            return '<div style="padding: 16px 0; color: var(--kair-muted); font-size: 13px;">✓ Sin alertas. El ciclo de mejora continua está al día.</div>';
+        }
+
+        return tasks.slice(0, 3).map(t => {
+            const colorVar = t.color === 'ok' ? 'var(--kair-mint)' :
+                              t.color === 'warn' ? 'var(--kair-amber)' :
+                              'var(--kair-red)';
+            return `
+                <div class="kair-task">
+                    <div class="kair-task-icon" style="background: var(--kair-soft); color: ${colorVar};">${t.icon}</div>
+                    <div>
+                        <strong>${t.title}</strong>
+                        <small>${t.desc}</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Renderiza el gráfico de acciones por estado con BARRAS HTML (no SVG).
+     * 📦758 · Antes se dibujaba con `<svg viewBox="0 0 400 200">`: al estirarse al ancho
+     * real de la tarjeta, el texto se aplastaba y se encimaba. Una barra es una caja:
+     * con HTML se dibuja exacta y el alto lo pone el contenido.
+     */
+    renderChartMejoramiento(abiertas, enProceso, cerradas, vencidas) {
+        const estados = [
+            { label: 'Abiertas',    value: abiertas,   color: 'var(--kair-blue, #2057b8)' },
+            { label: 'En proceso',  value: enProceso,  color: 'var(--kair-amber, #e7a224)' },
+            { label: 'Cerradas',    value: cerradas,   color: 'var(--kair-mint, #1bb888)' },
+            { label: 'Vencidas',    value: vencidas,   color: 'var(--kair-red, #da5563)' }
+        ];
+
+        const total = estados.reduce((sum, e) => sum + e.value, 0);
+        const maxVal = Math.max(...estados.map(e => e.value), 1);
+
+        let html = '<div class="kair-bar-chart">';
+        estados.forEach(e => {
+            const value = e.value || 0;
+            const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+            const width = value > 0 ? Math.max(6, (value / maxVal) * 100) : 0;
+            const fillColor = value === 0 ? 'var(--kair-line, #e8ebee)' : e.color;
+
+            html += '<div class="kair-bar-chart__row">'
+                + '<span class="kair-bar-chart__label">' + e.label + '</span>'
+                + '<span class="kair-bar-chart__track"><i class="kair-bar-chart__fill" style="width:' + width.toFixed(1) + '%;background:' + fillColor + '"></i></span>'
+                + '<span class="kair-bar-chart__value">' + value + ' <small>(' + pct + '%)</small></span>'
+                + '</div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Construye el grid responsivo de submódulos (cards con flecha).
+     */
+    renderSubmodulesGrid() {
+        const grid = document.createElement('div');
+        grid.className = 'kair-module-grid';
+
+        this.submodules.forEach(sub => {
+            const codeMatch = sub.match(/^(\d+\.\d+\.\d+)/);
+            const code = codeMatch ? codeMatch[1] : sub;
+            const name = sub.replace(/^\d+\.\d+\.\d+\s*/, '');
+
+            const card = document.createElement('div');
+            card.className = 'kair-module';
+            card.addEventListener('click', () => this.handleSubmoduleClick(sub));
+            card.innerHTML = `
+                <div class="kair-module-n">${code}</div>
+                <strong>${name}</strong>
+                <small>Ciclo de Mejora Continua</small>
+                <span class="kair-module-arrow">→</span>
+            `;
+            grid.appendChild(card);
+        });
+
+        return grid;
+    }
+
+    /**
+     * Handler para click en card de submódulo.
+     */
+    handleSubmoduleClick(submoduleName) {
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+            window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+        } else {
+            alert('Navegando a ' + submoduleName);
+        }
+    }
+
+
 }
+
 
 window.MejoramientoHome = MejoramientoHome;

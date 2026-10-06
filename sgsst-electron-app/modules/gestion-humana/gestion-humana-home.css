@@ -1,0 +1,435 @@
+/* modules/gestion-humana/gestion-humana-home.css
+   📦811 · Shell + Home de Gestión Humana — MIGRACIÓN PREMIUM (v0.3.0)
+   Patrón: el mismo que aprobó el usuario en Evaluación Inicial / EMO / 2.9.1:
+   header con badge de ícono + título + subtítulo, tabs con subrayado y SVG
+   inline (adiós Font Awesome en el shell), home con hero + métricas + grid de
+   áreas clicables, TODO el ancho disponible (sin max-width centrado).
+   Temas: las superficies usan los tokens de styles.css (--widget-bg-color,
+   --bg-color, --border-color, --text-*), que ya traen LOS DOS modos oscuros;
+   los acentos de marca viven en --gh-* sobre .gh-shell con su bloque oscuro.
+   Clases históricas conservadas (gh-shell/gh-header/gh-tabs/gh-tab/gh-content/
+   gh-bell-*) para no romper el JS que las referencia. */
+
+.gh-shell {
+  /* tokens de marca del shell (claro) */
+  --gh-accent: #2057b8;
+  --gh-accent-strong: #1a48a0;
+  --gh-accent-soft: #edf3fc;
+  --gh-accent-ink: #172c4c;
+  --gh-mint: #1bb888;
+  --gh-amber: #e7a224;
+  --gh-red: #da5563;
+  --gh-radius: 20px;
+  --gh-radius-ctl: 12px;
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-color);
+  font-family: 'Manrope', 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  z-index: 1;
+  overflow: hidden;
+}
+.gh-shell *, .gh-shell *::before, .gh-shell *::after { box-sizing: border-box; }
+
+[data-theme="dark"] .gh-shell,
+[data-theme="dark-legacy"] .gh-shell {
+  --gh-accent: #6aa5ff;
+  --gh-accent-strong: #9cc2ff;
+  --gh-accent-soft: rgba(77,166,255,0.15);
+  --gh-accent-ink: #101b2e;
+  --gh-mint: #4ed3a1;
+  --gh-amber: #f0ad4e;
+  --gh-red: #e8848f;
+}
+
+/* ═══ HEADER (breadcrumb + badge + título + subtítulo / pill) ═══ */
+.gh-header {
+  background: var(--bg-color);
+  border-bottom: none;
+  padding: clamp(10px, 1.2vw, 18px) clamp(16px, 2vw, 28px) clamp(12px, 1.4vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 0.9vw, 14px);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.gh-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-lighter-color, #8a93a3);
+  line-height: 1;
+}
+.gh-breadcrumb > span { white-space: nowrap; }
+.gh-breadcrumb__sep {
+  color: var(--text-lighter-color, #8a93a3);
+  opacity: 0.55;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.gh-breadcrumb__current {
+  color: var(--gh-accent);
+  font-weight: 700;
+}
+
+.gh-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.gh-header__left { flex: 1; min-width: 0; display: flex; }
+.gh-header__id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.gh-header__badge {
+  width: 44px; height: 44px; flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--gh-accent-soft);
+  color: var(--gh-accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.gh-header__badge svg { width: 24px; height: 24px; }
+.gh-header__text { min-width: 0; }
+.gh-header__title {
+  margin: 0;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-color);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.gh-header__subtitle {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-light-color);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.gh-header__right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+
+/* Pill "Empresa activa · <nombre>" — estilo premium v2 (consistente con cap-home__pill) */
+.gh-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: var(--gh-accent-soft);
+  color: var(--gh-accent);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gh-pill svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+.gh-pill strong {
+  color: var(--text-color);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* ═══ TABS ═══ */
+.gh-tabs {
+  background: var(--bg-color);
+  border-bottom: none;
+  display: flex; align-items: stretch;
+  padding: 0 clamp(8px, 1vw, 16px);
+  overflow-x: auto; overflow-y: hidden;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+.gh-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px clamp(12px, 1.2vw, 18px);
+  color: var(--text-light-color);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 13px; font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-bottom: -1px;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.gh-tab:hover { color: var(--gh-accent); background: var(--gh-accent-soft); }
+.gh-tab--active { color: var(--gh-accent); border-bottom-color: var(--gh-accent); font-weight: 700; }
+.gh-tab__icon { display: inline-flex; width: 17px; height: 17px; }
+.gh-tab__icon svg { width: 17px; height: 17px; }
+
+/* ═══ CONTENIDO (las vistas de trabajo manejan su propio scroll) ═══ */
+.gh-content {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-color);
+  position: relative;
+  /* padding conservado del shell viejo (las vistas contadas con él),
+     ahora fluido con clamp (📦811) */
+  padding: clamp(16px, 2vw, 28px);
+}
+/* el home (Resumen) scrollea en su propio wrapper interno */
+.gh-home-scroll {
+  height: 100%;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ═══ HOME: HERO + MÉTRICAS (4 cards en una sola fila en maximizado) ═══ */
+.gh-hero-row {
+  display: grid;
+  grid-template-columns: 1fr 3fr;        /* hero izquierda 1/4, metrics derecha 3/4 */
+  gap: clamp(10px, 1.2vw, 16px);
+  margin-bottom: clamp(16px, 2vw, 26px);
+  align-items: stretch;
+}
+
+/* ═══ HOME: HERO (ahora 1/4 del row, columna izquierda) ═══ */
+.gh-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--gh-accent-ink) 0%, var(--gh-accent-strong) 58%, var(--gh-accent) 100%);
+  border-radius: var(--gh-radius);
+  padding: clamp(14px, 1.5vw, 20px) clamp(18px, 2vw, 26px);
+  color: #f2f6ff;
+  display: flex; flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+.gh-hero::after {
+  content: '';
+  position: absolute; right: -70px; top: -90px;
+  width: 260px; height: 260px; border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  pointer-events: none;
+}
+.gh-hero__main { min-width: 0; flex: 1; }
+.gh-hero__eyebrow {
+  display: inline-block;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(242,246,255,0.75);
+  margin-bottom: 6px;
+}
+.gh-hero__title {
+  margin: 0;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: clamp(16px, 1.4vw, 19px);
+  font-weight: 800; letter-spacing: -0.01em; line-height: 1.18;
+}
+.gh-hero__sub { display: none; }  /* 📦818-fix: subtítulo removido (redundante con el título) */
+.gh-hero__stat { text-align: right; position: relative; z-index: 1; margin-top: auto; }
+.gh-hero__value {
+  display: block;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: clamp(28px, 2.6vw, 36px); font-weight: 800; line-height: 1;
+}
+.gh-hero__label { display: block; font-size: 12px; font-weight: 600; color: rgba(242,246,255,0.9); margin-top: 4px; }
+.gh-hero__foot { display: block; font-size: 11px; color: rgba(242,246,255,0.65); margin-top: 2px; }
+
+/* ═══ HOME: MÉTRICAS (grid interno de 3 cols en la columna derecha) ═══ */
+.gh-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(10px, 1.2vw, 16px);
+  margin: 0;  /* el margin-bottom vive en .gh-hero-row */
+}
+.gh-metric {
+  background: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--gh-radius);
+  padding: 16px 18px 18px;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+/* Acento tonal (1px barra izquierda) — complementario al bar de progreso horizontal */
+.gh-metric::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 1px; background: var(--gh-m-tone, var(--gh-accent));
+}
+.gh-metric--warn { --gh-m-tone: var(--gh-amber); }
+.gh-metric--ok { --gh-m-tone: var(--gh-mint); }
+.gh-metric--neutral { --gh-m-tone: var(--text-lighter-color); }
+
+/* Label upper, primero */
+.gh-metric__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  color: var(--text-light-color);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* Número grande + fraction pequeña en línea */
+.gh-metric__value {
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: clamp(22px, 1.9vw, 28px);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-color);
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.gh-metric__total,
+.gh-metric__pctsign {
+  font-size: 0.62em;
+  font-weight: 700;
+  color: var(--text-lighter-color);
+}
+
+/* Description */
+.gh-metric__sub {
+  font-size: 12px;
+  color: var(--text-lighter-color);
+  margin-top: 4px;
+}
+
+/* Bar de progreso horizontal al fondo (empuja con margin-top:auto) */
+.gh-metric__progress {
+  margin-top: auto;
+  padding-top: 14px;
+  height: 6px;
+  background: var(--bg-color);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.gh-metric__bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--gh-m-tone, var(--gh-accent));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.gh-metric--neutral .gh-metric__bar { background: var(--text-lighter-color); }
+.gh-metric--warn .gh-metric__bar { background: var(--gh-amber); }
+.gh-metric--ok .gh-metric__bar { background: var(--gh-mint); }
+
+/* ═══ HOME: GRID DE ÁREAS ═══ */
+.gh-modwrap__head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-bottom: clamp(10px, 1.2vw, 14px);
+}
+.gh-modwrap__head h3 {
+  margin: 0;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-light-color);
+}
+.gh-modwrap__count { font-size: 11.5px; color: var(--text-lighter-color); }
+.gh-modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: clamp(12px, 1.4vw, 18px);
+}
+.gh-mod {
+  display: flex; align-items: flex-start; gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--gh-radius);
+  padding: 18px clamp(16px, 1.6vw, 22px);
+  cursor: pointer;
+  font-family: inherit; color: inherit;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.gh-mod:hover {
+  border-color: var(--gh-mod-accent, var(--gh-accent));
+  box-shadow: var(--box-shadow);
+  transform: translateY(-2px);
+}
+.gh-mod__tile {
+  width: 42px; height: 42px; flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--gh-mod-tint, var(--gh-accent-soft));
+  color: var(--gh-mod-accent, var(--gh-accent));
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.gh-mod__tile svg { width: 21px; height: 21px; }
+.gh-mod__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gh-mod__title { font-size: 14.5px; font-weight: 700; color: var(--text-color); letter-spacing: -0.005em; }
+.gh-mod__sub { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--gh-mod-accent, var(--gh-accent)); }
+.gh-mod__desc { font-size: 12.5px; line-height: 1.45; color: var(--text-light-color); margin-top: 4px; }
+.gh-mod__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.gh-mod__chip {
+  font-size: 10.5px; font-weight: 600;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--bg-color);
+  color: var(--text-light-color);
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.gh-mod__chip strong { color: var(--text-color); font-weight: 800; }
+.gh-mod__go {
+  align-self: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-lighter-color);
+  transition: background .15s ease, color .15s ease;
+}
+.gh-mod:hover .gh-mod__go { background: var(--gh-mod-tint, var(--gh-accent-soft)); color: var(--gh-mod-accent, var(--gh-accent)); }
+.gh-mod__go svg { width: 15px; height: 15px; }
+
+/* ═══ PLACEHOLDER (vista desconocida) ═══ */
+.gh-placeholder {
+  background: var(--widget-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--gh-radius);
+  padding: 48px 32px; text-align: center;
+  max-width: 560px; margin: 32px auto;
+}
+.gh-placeholder__icon {
+  width: 58px; height: 58px; margin: 0 auto 14px;
+  border-radius: 16px;
+  background: var(--gh-accent-soft); color: var(--gh-accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.gh-placeholder__icon svg { width: 26px; height: 26px; }
+.gh-placeholder h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; color: var(--text-color); font-family: 'Manrope', 'DM Sans', sans-serif; }
+.gh-placeholder p { margin: 0; color: var(--text-light-color); font-size: 13px; line-height: 1.55; }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 900px) {
+  .gh-hero-row { grid-template-columns: 1fr; }
+  .gh-metrics { grid-template-columns: 1fr; }
+  .gh-hero { flex-direction: column; align-items: flex-start; }
+  .gh-hero__stat { text-align: left; width: 100%; }
+}
+@media (max-width: 640px) {
+  .gh-header { padding: 12px 16px; }
+  .gh-breadcrumb { font-size: 10.5px; }
+  .gh-header__row { gap: 0.75rem; flex-wrap: wrap; }
+  .gh-header__badge { width: 38px; height: 38px; border-radius: 10px; }
+  .gh-header__badge svg { width: 20px; height: 20px; }
+  .gh-header__title { font-size: 17px; }
+  .gh-header__subtitle { font-size: 11.5px; }
+  .gh-pill { font-size: 10.5px; padding: 6px 10px; }
+}
