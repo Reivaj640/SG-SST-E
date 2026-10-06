@@ -23,11 +23,13 @@
 | Campo | Valor |
 |---|---|
 | **Fecha de cierre** | 2026-10-05 |
-| **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦861 · el explorador de archivos deja de mentir cuando algo falla |
-| **Commits sin pushear** | 0 — el owner autorizó commit y push el 2026-10-05 |
+| **Rama** | `Dev` — `Dev-Pc` fue **fusionada en `Dev`** (commit `e6a98d98`) y ya contiene 📦861. El remoto por defecto es `Dev` |
+| **Último commit de código** | 📦861 · el explorador de archivos deja de mentir cuando algo falla |
+| **Commits sin pushear** | 0 |
 | **Versión** | `0.1.240` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
+| **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
+| **Suite (escritorio recién formateado)** | 119 tests · **98 verdes** · 21 con fallos. **No comparable**: esa máquina no tiene `kair.db` ni `.env`, así que 5 tests no pueden correr y 4 fallan por BD vacía. Ver "Puesta a punto" más abajo |
+| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real |
 | **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura** (el botón verde y el PDF con el visor del navegador los reportó él). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
 | **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860 |
 
@@ -143,6 +145,95 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-05 (tarde) · Escritorio recién formateado: puesta a punto (sin paquete de código)
+
+**Qué se hizo** — esta sesión **no cambió una línea de la app**. El árbol quedó idéntico a `HEAD`
+(`e6a98d98`). Lo que se hizo fue dejar un escritorio recién formateado capaz de correr y probar el
+proyecto, y dejar escrito lo aprendido.
+
+| Qué | Resultado |
+|---|---|
+| Fusionar `Dev-Pc` en `Dev` | El owner lo hizo a mano. `Dev` quedó en `e6a98d98`, que ya contiene 📦861 |
+| `node_modules` | 913 paquetes. `npm install` normal **falla y revierte todo**: compila `better-sqlite3` contra Node 26 y revienta |
+| Electron 37.10.3 | Extraído a mano. El `install.js` oficial salió con código 0 tres veces sin extraer nada |
+| `better-sqlite3` | Compilado para **Electron** (`--runtime=electron --target=37.10.3`), verificado con un `SELECT` real: `OK 37.10.3, sqlite 3.49.2` |
+| **`core.autocrlf`** | **El hallazgo grande.** 2277 archivos en CRLF y `git status` diciendo "limpio" |
+| `setup-file-viewer.js` | Corrió, pero **borró 2624 archivos versionados**. Revertido: es paso de packaging, no de desarrollo |
+
+**Por qué** — el owner formateó el PC y pidió validar que no le faltara nada para probar la app.
+
+**El problema de fondo: `autocrlf`**
+
+El instalador de Git for Windows dejó `core.autocrlf=true` en `C:\Program Files\Git\etc\gitconfig`.
+Es config de **sistema**, así que `git config --global` sale **vacío** y parece que no hay nada
+configurado. Ese `true` convierte LF→CRLF en el checkout, y como el repo guarda en LF a propósito
+`main.js`, `preload.js`, `index.html`, `main/*-bridge.js`, `shared/*.css` y `premium.css` (los tests
+lo verifican uno por uno), el clon dejó **2277 archivos en CRLF**.
+
+Lo peligroso: **`git status` dice que el árbol está limpio**. Miente por dos razones que se refuerzan
+— el stat-cache ya registró los tamaños convertidos, y al commitear Git normaliza CRLF→LF. El
+archivo está mal en disco y Git no lo ve. El próximo `git add` sube CRLF y aparece el diff de ~7000
+líneas.
+
+Cinco tests fallaban con el mismo mensaje (`premium.css sigue en LF [CRLF, esperado LF]`) — un solo
+síntoma repetido, que es la firma de un problema de entorno y no de UI.
+
+**El fix que costó encontrar.** `git config --local core.autocrlf false` no alcanza por sí solo:
+
+| Comando | Resultado |
+|---|---|
+| `git checkout-index -a -f` | 0 cambios. No reescribe |
+| `git update-index --really-refresh` | 0 cambios. No reescribe |
+| `git read-tree --reset -u HEAD` | 0 cambios. No reescribe |
+| **`git reset` + `git checkout -- .`** | **Funciona.** El `reset` rehace el índice sin stat-cache; recién ahí Git ve los 2277 |
+
+Renormalizar **no** uniforma: **restaura**. `main.js` quedó en LF y `app.js` quedó en CRLF, que es lo
+que el repo pide. **De 88 a 98 tests en verde sobre 119**; los 10 recuperados eran todos de EOL.
+
+**Segundo problema: `better-sqlite3` se compiló contra el Node equivocado.** La app nunca corre con
+Node 26 — corre dentro de Electron 37.10.3, que usa Node 22.21.1 y ABI 136. `npm install` corrió
+`node-gyp` contra Node 26 y falló con APIs de V8 eliminadas (`"GetIsolate": no es un miembro de
+"v8::Context"`). No faltaba el compilador: `cl.exe` estaba instalado. Al fallar, npm **revirtió el
+install entero** (913 paquetes → 2). El orden que funciona está en `PROMPT.md` §5.17 y §9.
+
+**Un tercer defecto del repo, no del entorno:** `CONTEXT.md` tiene separadores **CR CR CR LF** (tres
+CR) en 1337 de sus 1354 líneas. Viene así del repo. Cualquiera que lo edite con `Edit` o lo reescriba
+con `ReadAllText` rompe el diff entero. Por eso la sección nueva se insertó con un script que **detecta
+el separador real** en vez de suponerlo, y se verificó por estructura: 40 adiciones, 0 eliminaciones.
+
+**Tests** — 119 corridos en el escritorio: 98 verdes, 21 con fallos, **no comparables** con los del
+portátil (101 verdes). Las 21 se reparten en:
+
+| Grupo | Cuántas | Por qué |
+|---|---|---|
+| Requieren Electron con ventana | 5 | Hacen `require('electron').app.whenReady()`, que no existe con `ELECTRON_RUN_AS_NODE=1` |
+| Requieren `kair.db` | 4 | La BD vive en `%APPDATA%`, fuera del repo. Esta máquina no la tiene |
+| Aserciones reales contra el código commiteado | ~12 | `header-zindex`, `compose-bem`, `skeleton-encaje`, `auditoria-visual`. **No se verificó si también fallan en el portátil** — no hay acceso a esa máquina |
+
+**Decisiones del owner**
+
+- Ante el hallazgo del upgrade a Electron 44 sin commitear, eligió **revertir a Electron 37** y dejar
+  el escritorio funcionando, en vez de subir `better-sqlite3` a 13.x. El patch quedó en
+  `backups/electron44-upgrade-2026-10-05.patch` (10.4 KB, gitignored) por si lo retoma.
+- Autorizó commit y push el 2026-10-05.
+
+**Commits**
+
+| Hash | Qué | Pusheado |
+|---|---|---|
+| `e6a98d98` | `Merge branch 'Dev-Pc' into Dev` (lo hizo el owner) | sí, ya estaba en `origin/Dev` |
+| este | Documentación de la puesta a punto + 4 trampas nuevas | sí |
+
+**Lo que sigue pendiente en este escritorio**
+
+1. **Datos:** copiar un backup a `%APPDATA%\sgsst-electron-app\kair.db`. Sin eso la app abre vacía.
+2. **Google Calendar:** `Copy-Item .env.example .env` y completar `GOOGLE_OAUTH_CLIENT_ID` /
+   `_SECRET`. Credenciales del owner, no inventables.
+3. **Python:** está en 3.14.8 y el README pide 3.10–3.12. Afecta 5 Porqués y análisis de accidentes,
+   no el arranque (hay fallback al Python del sistema).
+
+---
 
 ### 2026-10-03 · Bandeja Integrada (📦844-851) + Prompt operacional v2.0
 

@@ -191,6 +191,10 @@ No hay `.gitattributes`. Cada archivo tiene su EOL y **cambiarlo rompe el diff e
 Para editar un CRLF sin romperlo, usa reemplazos de texto que no toquen los finales de línea, y verifica
 que `git diff --numstat` sigue dando pocas líneas.
 
+🔴 **En una PC recién formateada, el `autocrlf` del instalador de Git convierte todo a CRLF en el
+checkout y `git status` sigue diciendo que está limpio.** Ver §5.17 — es el escenario donde esta tabla
+se viola sola, sin que nadie edite nada.
+
 ### 5.5 Prohibido CJK y mojibake
 
 Ningún carácter de CJK, kana, cirílico o hangul en el código ni en la documentación.
@@ -538,6 +542,54 @@ funcionó solo porque las saltos de línea se preservan como caracteres del stri
 fragilidad gratis. **Después de reescribir un archivo, verificar el EOL contra lo que el test del
 repo exige**, antes de seguir.
 
+### 5.17 🔴 En una PC nueva, `core.autocrlf` rompe el repo entero (2277 archivos)
+
+Descubierto el 2026-10-05 al validar un escritorio recién formateado.
+
+**Qué pasa.** El instalador de Git for Windows deja `core.autocrlf=true` en
+`C:\Program Files\Git\etc\gitconfig` — es **config de sistema, no del repo**, así que
+`git config --global core.autocrlf` sale **vacío** y parece que no hay nada configurado.
+
+Ese `true` convierte **LF → CRLF al hacer checkout**. Como este repo guarda `main.js`,
+`preload.js`, `index.html`, `main/*-bridge.js`, `shared/*.css` y `premium.css` en **LF** a
+propósito (§5.4), un clon en una PC nueva deja **2277 archivos en CRLF** en disco.
+
+**Lo peligroso es que `git status` dice que todo está limpio.** Miente por dos motivos: el stat-cache
+del índice registra los tamaños ya convertidos, y al commitear Git normaliza CRLF→LF. El archivo en
+disco está mal, Git no lo ve, y el día que alguien haga `git add` sube **CRLF** y produce el diff de
+~7000 líneas que §5.4 advierte. Los tests de EOL sí lo detectan (`premium.css sigue en LF
+[CRLF, esperado LF]`), pero solo cuando corren.
+
+**Cómo se comprueba** (no confiar en `git status`):
+
+```powershell
+git config --show-origin --get-all core.autocrlf   # la de sistema NO aparece en --global
+$b = [System.IO.File]::ReadAllBytes('sgsst-electron-app/main.js')
+# contar 0x0A precedido de 0x0D  -> si hay, el archivo está en CRLF
+```
+
+**El arreglo, y el que cuesta encontrar:**
+
+```powershell
+git config --local core.autocrlf false             # lo local le gana a la de sistema
+```
+
+Con eso, `git checkout-index -a -f`, `git update-index --really-refresh` y
+`git read-tree --reset -u HEAD` **NO reescriben nada** — los tres reportan 0 cambios porque el
+stat-cache sigue diciendo que todo coincide. Lo único que funciona es **reconstruir el índice**:
+
+```powershell
+git reset          # rehace el índice desde HEAD, sin stat-cache: ahora sí ve los 2277
+git checkout -- .  # los restaura byte a byte desde el índice -> LF donde el repo dice LF
+```
+
+Después: `git status` limpio, `main.js` con LF, `app.js` con CRLF, los 5 tests de EOL en verde. De
+88 a 98 tests en verde sobre 119.
+
+**Regla:** en una máquina nueva, **antes de tocar código**, poner `core.autocrlf=false` a nivel de
+repo y renormalizar. El `README.md` dice que el EOL lo fija el test, y es cierto — pero el test solo
+avisa, no corrige.
+
 ---
 
 ## 6. Convenciones de código
@@ -839,6 +891,9 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 11 | 🟡 **La app tiene 25 correos en memoria de los 131 de la carpeta** (`PAGE_SIZE = 25`), y se agrandan con scroll | `app.js` `PAGE_SIZE` | Cualquier cosa que filtre la bandeja tiene que traer lo que falta de la caché. Filtrar `state.mails` da "vacío" en 25 días que sí tienen correo |
 | 12 | 🔴 **En la bandeja, `app.js` y `premium.css` comparten el token de `?v=` a propósito.** Subir solo el que tocaste deja la página con dos versiones distintas | `bandeja-integrada/index.html`, verificado por `test-bandeja-tudia-849.js` | Los dos se suben juntos, aunque no hayas tocado los dos (§5.3) |
 | 13 | 🔴 **Ningún test del repo abre la base de datos.** Un feature que dependa de un tipo de dato de la BD puede tener 34 checks en verde y no dibujar nada en pantalla | `main/test-*.js` (ninguno abre SQLite) | Antes de dar por terminado un feature de datos, correr un script en `Temp/` con la función **real** contra la **base real** y contar cuántas filas quedan sin el dato (§7.7) |
+| 14 | 🔴 **`core.autocrlf=true` del instalador de Git rompe 2277 archivos y `git status` miente.** En una PC nueva, todo lo que el repo guarda en LF queda en CRLF en disco, y Git no lo ve porque normaliza al commitear | `C:\Program Files\Git\etc\gitconfig` (config de **sistema**, invisible desde `--global`) | `git config --local core.autocrlf false`, y renormalizar con `git reset` + `git checkout -- .` (§5.17). **Verificar los bytes, no `git status`** |
+| 15 | 🔴 **`better-sqlite3` está atado a la versión de Electron, y `npm install` lo compila contra el Node del sistema, no contra Electron.** Con Node 26 falla (`error C2039: "GetIsolate": no es un miembro de "v8::Context"`) y revierte el install entero | `node_modules/better-sqlite3` · el repo usa el runtime de Electron (`node 22.21.1`, ABI **136**) | `npm install --ignore-scripts`, extraer el binario de Electron a mano, y recién entonces `npm rebuild better-sqlite3 --runtime=electron --target=<version instalada> --disturl=https://electronjs.org/headers`. Verificar con un `SELECT` real dentro de Electron (§7.7) |
+| 16 | 🔴 **`CONTEXT.md` tiene separadores de línea **CR CR CR LF** (tres CR), no CRLF.** 1337 de sus 1354 líneas. Viene así del repo, no es de una edición | `CONTEXT.md` (todo el archivo) | **Nunca lo abras con `Edit` ni lo reescribas con `ReadAllText`/`WriteAllText`**: un CRLF "correcto" en el medio de eso rompe el diff entero. Si hay que tocarlo, buscar el ancla con una regex que tolere `\r*\n` y **armar el texto nuevo con el separador que ya usa el archivo**, verificado leyendo los bytes del ancla |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

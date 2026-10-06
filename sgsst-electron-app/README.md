@@ -230,7 +230,7 @@ modules/
 
 | Componente          | Versión Mínima | Recomendada     | Crítico |
 |---------------------|----------------|-----------------|---------|
-| **Node.js**         | 18.x           | 20.x            | ✅ Sí - Para desarrollo |
+| **Node.js**         | 18.x           | 20.x            | ✅ Sí - Para desarrollo. **Node 25+ no sirve**: `better-sqlite3` no compila contra esas cabeceras de V8 |
 | **Python**          | 3.10           | 3.11-3.12       | ⚠️ **Incluido en installer** |
 | **Microsoft Office**| 2016+          | 365             | ⚠️ Solo Word para convertir DOCX→PDF |
 | **RAM**             | 8 GB           | 16 GB           | ✅ Sí |
@@ -260,9 +260,10 @@ cd SG-SST-E
 # 2. Instalar dependencias Node.js
 npm install
 
-# 2.1. Recompilar better-sqlite3 si hay error NODE_MODULE_VERSION
-# (solo si aparece el mensaje en consola)
-npm rebuild better-sqlite3 --runtime=electron --target=37.3.0 --disturl=https://electronjs.org/headers
+# 2.1. Recompilar better-sqlite3 para el runtime de ELECTRON (no el de Node)
+# SIEMPRE: `npm install` compila el módulo nativo contra el Node del sistema y falla,
+# porque la app corre DENTRO de Electron, que usa otro Node y otro ABI.
+npm rebuild better-sqlite3 --runtime=electron --target=37.10.3 --disturl=https://electronjs.org/headers
 
 # 3. Configurar entorno virtual Python
 cd Portear

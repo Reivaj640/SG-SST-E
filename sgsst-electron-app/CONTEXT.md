@@ -1317,6 +1317,46 @@ npm run debug
 
 ---
 
+## 🧰 Puesta a punto desde una PC nueva (verificado 2026-10-05)
+
+Un clon recién hecho **no** arranca sin esto. Ninguno de los tres pasos es opcional.
+
+| Paso | Por qué |
+|---|---|
+| `git config --local core.autocrlf false` y renormalizar | El instalador de Git deja `core.autocrlf=true` en config de **sistema** y convierte a CRLF los **2277** archivos que el repo guarda en LF. `git status` **no lo detecta** |
+| `npm install --ignore-scripts` | `better-sqlite3` es nativo y se compila contra el Node del sistema, que **no es** el runtime de la app |
+| `npm rebuild better-sqlite3 --runtime=electron --target=37.10.3 --disturl=https://electronjs.org/headers` | La app corre dentro de Electron 37.10.3 → Node 22.21.1, **ABI 136** |
+
+**Renormalizar** — el paso que casi nadie hace, y sin el cual los tres anteriores no alcanzan:
+
+```powershell
+git reset          # sin stat-cache: recién ahora Git ve los 2277 distintos
+git checkout -- .  # restaura byte a byte el EOL que el repo pide
+```
+
+`git checkout-index -a -f`, `git update-index --really-refresh` y `git read-tree --reset -u` **no
+reparan nada**: los tres reportan 0 cambios porque el stat-cache sigue diciendo que todo coincide.
+
+**Verificar de verdad** — `npm install` salir con 0 no significa que la app abra la base:
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE = "1"
+.\node_modules\electron\dist\electron.exe -e "const D=require('better-sqlite3');const db=new D(':memory:');console.log('OK',process.versions.electron,db.prepare('select sqlite_version() v').get().v)"
+```
+
+Esperado: `OK 37.10.3 3.49.2`.
+
+### 🔑 Lo que no viaja con el repo
+
+| Falta | Dónde vive | Qué pasa si no está |
+|---|---|---|
+| `kair.db` | `%APPDATA%\sgsst-electron-app\` (**fuera** del repo, se crea sola la primera vez) | La app abre pero **vacía**. Los datos no se recuperan del repo: hay que copiar un backup |
+| `.env` | `sgsst-electron-app\.env` (gitignored) | Solo falla el OAuth de Google Calendar. El resto de la app arranca |
+| `python-embed/` | `Portear/` (no se sube al repo) | Hay fallback al Python del sistema (`main.js` → `findPython`). Afecta el análisis de 5 Porqués y accidentes |
+| `INTERNAL_API_KEY` | variable de entorno del `firma-service` | Los tests de firma fallan al levantarse |
+
+---
+
 ## 🔐 Seguridad — credenciales
 
 **NUNCA** commitear credenciales. Todas en `.env` (local, no en repo):

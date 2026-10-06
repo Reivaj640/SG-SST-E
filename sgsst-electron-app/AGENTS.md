@@ -5059,3 +5059,105 @@ variantes hay. Si hay más de una, el módulo de referencia se arregla solo y se
 impresión vacío y `_log('PRINT_DOC', 'SUCCESS')` igual. El navegador tampoco sabe
 imprimir un `.docx`; eso hay que decirlo, no dejarlo imprimir en blanco.
 
+### 🔴 Una PC recién formateada rompió 2277 archivos y `git status` no lo dijo (2026-10-05)
+
+No es un bug del código. Es el que se repite cada vez que alguien clonea el repo en una máquina
+nueva, y por eso vale más que los otros.
+
+**El síntoma:** en un escritorio recién formateado, la app no arrancaba y **cinco tests de EOL
+fallaban con el mismo mensaje**:
+
+```
+premium.css sigue en LF  [CRLF, esperado LF]
+mutaciones: 15/15 mordieron, 0 vacíos
+```
+
+Un solo mensaje, cinco tests, todos igual. Eso no es una regresión de UI: es el archivo.
+
+**Por qué se rompió.** El instalador de Git for Windows escribe `core.autocrlf=true` en
+`C:\Program Files\Git\etc\gitconfig`. Es **config de sistema**, así que:
+
+- `git config --global core.autocrlf` devuelve **vacío** y parece que no hay nada configurado.
+- Solo aparece con `git config --show-origin --get-all core.autocrlf`.
+- Ese `true` convierte LF→CRLF **en el checkout**. Como este repo guarda en LF a propósito
+  `main.js`, `preload.js`, `index.html`, `main/*-bridge.js`, `shared/*.css` y `premium.css`
+  (los tests lo verifican uno por uno), el clon dejó **2277 archivos en CRLF** en disco.
+
+**Lo que lo hace peligroso — y el motivo de esta entrada — es que `git status` dice que el árbol
+está limpio.** Por dos razones que se refuerzan: el stat-cache del índice ya registró los tamaños de
+los archivos convertidos, y al commitear Git normaliza CRLF→LF. El archivo está mal en disco y Git
+no lo ve. El día del próximo `git add` se suben CRLF y aparece el diff de ~7000 líneas.
+
+**El fix que costó encontrar.** Poner `core.autocrlf=false` a nivel de repo no alcanza:
+
+```
+git config --local core.autocrlf false
+git checkout-index -a -f              ->  0 cambios. No reescribe.
+git update-index --really-refresh     ->  0 cambios. No reescribe.
+git read-tree --reset -u HEAD         ->  0 cambios. No reescribe.
+```
+
+Los tres reportan cero porque el stat-cache sigue afirmando que todo coincide con el índice. **La
+única vía que funciona es reconstruir el índice**, para que se vea la diferencia de bytes:
+
+```powershell
+git reset            # rehace el índice desde HEAD, sin stat-cache: ahora sí ve los 2277
+git checkout -- .    # restaura byte a byte -> LF donde el repo dice LF, CRLF donde dice CRLF
+```
+
+**Cómo se comprueba, sin creerse a `git status`:** contar bytes `0x0D 0x0A` en el archivo.
+
+```powershell
+$b = [System.IO.File]::ReadAllBytes('sgsst-electron-app/main.js')
+$crlf = 0; $lf = 0
+for ($i=0; $i -lt $b.Length; $i++) { if ($b[$i] -eq 10) { $lf++; if ($b[$i-1] -eq 13) { $crlf++ } } }
+```
+
+Antes: `main.js` 22295 de 22295 en CRLF. Después: 0. `app.js` quedó en CRLF — porque el repo lo
+guarda en CRLF (`PROMPT.md` §5.4), y ese es el punto: renormalizar **no** uniforma, **restaura**.
+
+**Resultado:** de 88 a 98 tests en verde sobre 119. Los 10 recuperados eran todos de EOL.
+
+**Regla:** en una máquina nueva, antes de tocar código, `git config --local core.autocrlf false` y
+renormalizar. Un clon nuevo no es una copia neutra del repo: llega con una convención de EOL que
+Git no te va a señalar como cambio.
+
+### 🔴 `better-sqlite3` se compila contra el Node equivocado (2026-10-05)
+
+Segundo problema del mismo día, y de la misma familia: **el entorno no es una caja neutral**.
+
+`npm install` corrió `node-gyp` contra **Node 26.10.0**, el Node del sistema. El módulo es nativo y
+la app nunca corre con ese Node — corre **dentro de Electron 37.10.3, que usa Node 22.21.1 y ABI
+136**. Los errores fueron:
+
+```
+error C2039: "GetIsolate": no es un miembro de "v8::Context"
+error C2660: 'v8::External::Value': la función no acepta 0 argumentos
+```
+
+Son APIs de V8 **eliminadas** en versiones nuevas: no es que falte el compilador — `cl.exe` estaba
+instalado. Y lo peor: al fallar, **npm revirtió el install entero** (913 paquetes → 2).
+
+**El orden que funciona:**
+
+```powershell
+npm install --ignore-scripts                        # sin compilar nada todavía
+node node_modules/electron/install.js               # el postinstall quedó sin ejecutar
+npm rebuild better-sqlite3 --runtime=electron --target=37.10.3 --disturl=https://electronjs.org/headers
+```
+
+Y **verificar con un `SELECT` de verdad dentro de Electron**, porque compilar no es que funcione
+(§7.7: ningún test de este repo abre la base):
+
+```
+DB OK -> electron 37.10.3, sqlite 3.49.2
+```
+
+Un dato aparte que salió del mismo trabajo: el `install.js` de Electron salió con código **0** tres
+veces seguidas sin extraer nada, porque el zip de la caché había desaparecido y el proceso moría
+sin error. Cuando `install.js` no hace nada, **verificar que `dist/electron.exe` exista**; el
+código de salida no alcanza. Salió bien descargando el zip a mano y extrayéndolo.
+
+**Regla:** `npm install` no compila el módulo nativo para el runtime correcto. En este repo eso es
+siempre Electron, nunca el Node del sistema.
+
