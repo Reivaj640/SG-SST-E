@@ -6,8 +6,8 @@
 body.em-viewer-scope {
     --em-primary: #174ea6;
     --em-primary-hover: #185abd;
-    --em-primary-light: rgba(23, 78, 166, 0.08);
-    --em-primary-subtle: rgba(23, 78, 166, 0.04);
+    --em-primary-light: rgba(32, 87, 184,  0.08);
+    --em-primary-subtle: rgba(32, 87, 184,  0.04);
     --em-primary-rgb: 23, 78, 166;
     --em-success: #28a745;
     --em-success-light: rgba(40, 167, 69, 0.08);

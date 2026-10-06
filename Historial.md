@@ -22,14 +22,14 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-04 |
+| **Fecha de cierre** | 2026-10-05 |
 | **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦860 · la fila del correo muestra la fecha encima de la hora |
-| **Commits sin pushear** | 0 — el owner autorizó commit y push el 2026-10-04 ("actualiza la documentación y realiza el commit y push") |
-| **Versión** | `0.1.239` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 118 tests · 100 verdes · 18 preexistentes · **0 regresiones** |
-| **Validaciones visuales abiertas** | 📦860 **aprobado por el owner** ("ok perfecto" el 2026-10-04, aunque no consta que lo haya abierto en la app). 📦859 sí se miró. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | Cerrada el 2026-10-04. Tres paquetes: 📦858, 📦859 y 📦860 |
+| **Último commit** | 📦861 · el explorador de archivos deja de mentir cuando algo falla |
+| **Commits sin pushear** | 0 — el owner autorizó commit y push el 2026-10-05 |
+| **Versión** | `0.1.240` (desarrollo) · último publicado `v0.1.205` |
+| **Suite** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura** (el botón verde y el PDF con el visor del navegador los reportó él). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
+| **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860 |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
@@ -39,9 +39,17 @@
    cargado). También: que funcione con Enviados y con No leídos, que al pasar a Agenda se limpie el
    filtro, y que la fila con la X se vea bien con el sidebar plegado. **Es la validación más
    valiosa que queda abierta**, porque 📦858 nunca se ha mirado en la app.
-2. **Owner tiene que confirmar 📦860 en pantalla**: la fecha arriba de la hora en la fila del
-   correo, en **todas** las carpetas, y que al pasar el mouse sobre la fila las dos líneas se
-   oculten y solo queden los botones de acción. Lo aprobado por texto, no por vista.
+2. **Owner tiene que confirmar 📦861 en pantalla**: en el 1.1.1, que el botón **Subir** ya
+   sale azul como la barra superior, que el **PDF** se abre con el visor de K+AIR (barra
+   clara, no la oscura del navegador) y que **"Ver completo"** aparece en el PDF. Y que
+   arrastrar un archivo al **centro** de la pantalla lo suba a la carpeta que está viendo.
+   Ojo: estos módulos **no llevan token de caché**, así que si no cambia hay que cerrar y
+   abrir la app.
+3. **Owner tiene que validar el estado de error de 📦861**: borrar o renombrar la carpeta
+   base desde el Explorador de Windows con la app abierta y hacer clic en otra carpeta.
+   Antes quedaban bloques grises para siempre; ahora debe salir "No se pudo leer esta
+   carpeta" con botón **Reintentar**, y "Carpeta vacía" solo cuando la carpeta está
+   realmente vacía.
 3. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
    📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
    cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
@@ -80,6 +88,7 @@
 | 9 | 📦850 y 📦851 implementados y probados, pero nunca vistos en la app — **CERRADO 2026-10-03** | Botón del borde y encabezado sin etiqueta de fecha | El owner los revisó |
 | 10 | 🔴 **La bandeja solo tiene 25 correos en memoria de los 131 de INBOX** (`PAGE_SIZE = 25`), y se agrandan con scroll infinito. Cualquier filtro que mire `state.mails` da "vacío" en **25 días que sí tienen correo** (el 14 de septiembre tiene 12 y ninguno está cargado) | `app.js` `PAGE_SIZE`, `loadMailsFromCache` | 📦858 lo resolvió con un rango de fechas en la caché local. **El mismo riesgo queda para cualquier filtro nuevo que se escriba sin eso** |
 | 11 | 🔴 **Ningún test del repo abre la base de datos.** 📦860 tenía 34 checks en verde y el feature podía no dibujar nada en pantalla, según qué tipo devolviera la BD para `last_message_date` | `main/test-*.js` | Verificado a mano contra la BD real (`Temp/verif-fecha-bd-860.js`: 150 filas, 0 sin fecha, `INTEGER` y llega como `number`). **La brecha sigue abierta**: todo feature de datos necesita ese paso a mano hasta que la suite tenga un juego de datos de prueba |
+| 12 | 🔴 **Los 15 exploradores de archivos NO comparten la arquitectura del preview.** Hay **4 variantes** de `_loadPDF` y **3 formas** de enrutar el PDF en el archivo de conexión; 3 módulos no tienen archivo de conexión | `modules/**/*-viewer.js`, `*-logic.js` | 📦861 arregló el PDF **solo en el 1.1.1**. Replicar sin abrir la app sería cambiar 15 módulos a ciegas, y el PDF es lo que más se nota si se rompe. **Pendiente: Owner valida el 1.1.1 y se replican los otros 14** |
 
 ### 📋 Cola de trabajo acordada
 

@@ -43,6 +43,8 @@ var ResponsableSgViewer = (function () {
         basePath: '',
         pathHistory: [],
         documents: [],          // Cache de documentos en carpeta actual
+        listStatus: 'idle',     // 📦861 'idle' | 'loading' | 'ready' | 'error'
+        listErrorDetail: '',    // 📦861 detalle técnico del último fallo
         folders: [],            // Cache de carpetas en carpeta actual
         searchQuery: '',
         sortBy: 'name-asc',
@@ -513,6 +515,19 @@ var ResponsableSgViewer = (function () {
         var docCount = document.getElementById('docCount');
         if (!fileList) return;
 
+        // 📦861 · Si la carga falló, la lista pinta el error con su botón de
+        // reintentar. Antes esto no existía: el catch solo mostraba un toast que
+        // se iba, y el skeleton se quedaba en pantalla para siempre.
+        if (_state.listStatus === 'error') {
+            if (docCount) docCount.textContent = '0';
+            fileList.innerHTML = _htmlErrorLista();
+            var retryBtn = document.getElementById('retryLoadBtn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', function () { _loadDocumentsForCurrent(); });
+            }
+            return;
+        }
+
         // Aplicar vista mode
         fileList.setAttribute('data-view', _state.viewMode);
 
@@ -721,7 +736,10 @@ var ResponsableSgViewer = (function () {
             _state.currentFolderPath = result.basePath;
             _state.pathHistory = [];
             _state.folders = result.folders || [];
-            _state.documents = result.files || [];
+            var normRaiz = _normalizarLista(result);
+            _state.documents = normRaiz.files;
+            _state.listStatus = normRaiz.ok ? 'ready' : 'error';
+            _state.listErrorDetail = normRaiz.ok ? '' : 'La carga inicial no devolvió la lista de archivos.';
 
             _renderBreadcrumb();
             _renderFolders();
@@ -738,20 +756,122 @@ var ResponsableSgViewer = (function () {
         });
     }
 
+    /* ═══════════════════════════════════════════════════════════════
+       📦861 · LA LISTA DISTINGUE "VACÍA" DE "NO SE PUDO LEER"
+       ═══════════════════════════════════════════════════════════════ */
+
+    // Antes: `result.files || []` convertía CUALQUIER respuesta inesperada en
+    // "Carpeta vacía". El usuario veía que sus archivos habían desaparecido
+    // cuando en realidad nadie los había leído. Ahora la decisión es explícita
+    // y vive en UNA función, que además se puede probar sola.
+    function _normalizarLista(result) {
+        if (!result || !Array.isArray(result.files)) {
+            return {
+                ok: false,
+                files: [],
+                mensaje: 'No se pudo leer esta carpeta'
+            };
+        }
+        return { ok: true, files: result.files, mensaje: '' };
+    }
+
+    // El texto del error. Devuelve el HTML en vez de escribirlo, para poder
+    // probarlo sin DOM.
+    function _htmlErrorLista() {
+        var detalle = _state.listErrorDetail
+            ? '<span class="kair-empty__detail">' + _esc(_state.listErrorDetail) + '</span>'
+            : '';
+        return '<div class="kair-empty kair-empty--error">'
+            + '<div class="kair-empty__icon"><i class="bi bi-exclamation-triangle"></i></div>'
+            + '<h3 class="kair-empty__title">No se pudo leer esta carpeta</h3>'
+            + '<p class="kair-empty__desc">Revisá los permisos de la carpeta o intentá de nuevo. '
+            + 'Si el problema sigue, los archivos NO se perdieron: no se pudieron leer.</p>'
+            + detalle
+            + '<button class="kair-empty__retry" type="button" id="retryLoadBtn">'
+            + '<i class="bi bi-arrow-clockwise"></i> Reintentar</button>'
+            + '</div>';
+    }
+
+    // 📦861 · El estado vacío dice "Arrastra archivos aquí", pero el único `drop`
+    // del módulo estaba sobre las carpetas de la izquierda: el usuario arrastraba
+    // donde el texto le decía y no pasaba nada, en silencio. Este engancha el
+    // panel central y sube a la carpeta que se está viendo, no a una fija.
+    function _setupMainDropTarget() {
+        var docsMain = document.getElementById('docsMain');
+        if (!docsMain) return;
+        var dragCounter = 0;
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
+            docsMain.addEventListener(eventName, _preventDefaults, false);
+        });
+
+        docsMain.addEventListener('dragenter', function () {
+            dragCounter++;
+            if (dragCounter === 1) {
+                docsMain.classList.add('is-drag-over');
+                _log('DRAG_ENTER', 'START', { zona: 'panel-central' });
+            }
+        }, false);
+
+        docsMain.addEventListener('dragleave', function () {
+            dragCounter--;
+            if (dragCounter === 0) {
+                docsMain.classList.remove('is-drag-over');
+            }
+        }, false);
+
+        docsMain.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dragCounter = 0;
+            docsMain.classList.remove('is-drag-over');
+
+            var files = e.dataTransfer.files;
+            if (!files || files.length === 0) {
+                _showToast('No se detectaron archivos', 'warning');
+                return;
+            }
+            if (!_state.currentFolderPath) {
+                _showToast('No hay una carpeta seleccionada', 'warning');
+                return;
+            }
+
+            _log('DROP', 'START', { count: files.length, folder: _state.currentFolderPath, zona: 'panel-central' });
+            Array.from(files).forEach(function (file) {
+                _uploadFile(file, _state.currentFolderPath);
+            });
+        }, false);
+    }
+
     function _loadDocumentsForCurrent() {
         _log('LOAD_DOCS', 'START', { path: _state.currentFolderPath });
         _showLoading('Cargando documentos...');
         _renderSkeletons();
 
         _callParentAPI('get-documents-in-folder', _state.currentFolderPath).then(function (result) {
-            _state.documents = result.files || [];
+            var norm = _normalizarLista(result);
+            if (!norm.ok) {
+                _state.listStatus = 'error';
+                _state.listErrorDetail = '';
+                _renderDocuments();
+                _showToast(norm.mensaje + '. Podés reintentar con el botón.', 'error', 6000);
+                return;
+            }
+            _state.documents = norm.files;
+            _state.listStatus = 'ready';
+            _state.listErrorDetail = '';
             _renderBreadcrumb();
             _renderFolders();
             _renderDocuments();
             _log('LOAD_DOCS', 'SUCCESS', { count: _state.documents.length });
         }).catch(function (error) {
             _err('LOAD_DOCS', error);
-            _showToast('Error al cargar documentos: ' + error.message, 'error', 5000);
+            // 📦861 · Antes solo se mostraba un toast de 5 s y NO se redibujaba
+            // nada: el skeleton se quedaba congelado para siempre y el único
+            // camino era recargar la app a mano.
+            _state.listStatus = 'error';
+            _state.listErrorDetail = (error && error.message) ? error.message : '';
+            _renderDocuments();
+            _showToast('No se pudo leer esta carpeta. Usá Reintentar.', 'error', 6000);
         }).finally(function () {
             _hideLoading();
         });
@@ -805,8 +925,11 @@ var ResponsableSgViewer = (function () {
     }
 
     function _loadPDF(filePath) {
-        _callParentAPI('get-pdf-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data);
+        // 📦861 · Mismo camino que Excel y Word: si el padre responde
+        // `mode: 'file-viewer'`, se monta el visor de K+AIR. `get-pdf-preview`
+        // (base64) queda como respaldo por si un padre no lo soporta.
+        _callParentAPI('get-pdf-for-viewer', { filePath: filePath }).then(function (result) {
+            _handlePreviewResult(result, 'PDF');
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar PDF: ' + error.message);
         });
@@ -1114,7 +1237,20 @@ var ResponsableSgViewer = (function () {
         if (ext.indexOf('xls') !== -1) apiType = 'get-excel-preview';
         if (ext.indexOf('doc') !== -1) apiType = 'get-word-preview';
 
+        // 📦861 · Con el visor unificado, Office ya no llega convertido a PDF por
+        // LibreOffice: llegan los bytes crudos, y el navegador no sabe imprimir un
+        // .docx. Antes el código metía el OBJETO dentro del data URI de PDF, así
+        // que abría un diálogo EN BLANCO y decía que todo salió bien.
+        if (apiType !== 'get-pdf-preview') {
+            _showToast('La impresión no está disponible para archivos de ' + ext.toUpperCase()
+                + '. Podés guardá el archivo o usar "Ver completo".', 'warning', 7000);
+            return;
+        }
         _callParentAPI(apiType, { filePath: filePath }).then(function (result) {
+            if (!result || typeof result.data !== 'string' || !result.data.length) {
+                _showToast('No se pudo preparar la impresión: el archivo no llegó como PDF.', 'error', 6000);
+                return;
+            }
             var printWindow = window.open('', '_blank');
             if (!printWindow) {
                 _showToast('Bloqueador de popups activo. Permite popups para imprimir.', 'warning', 5000);
@@ -1489,6 +1625,9 @@ var ResponsableSgViewer = (function () {
        BIND EVENTS
        ═══════════════════════════════════════════════════════════════ */
     function _bindEvents() {
+        // 📦861 · Zona de arrastre del panel central (donde el texto dice)
+        _setupMainDropTarget();
+
         // Header
         var backBtn = document.getElementById('backToModuleBtn');
         if (backBtn) backBtn.addEventListener('click', _backToModule);

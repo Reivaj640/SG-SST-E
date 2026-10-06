@@ -10,6 +10,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.240] - 2026-10-05
+
+### 📦861 · El explorador de archivos deja de mentir cuando algo falla
+
+**Resumen:** una auditoría del módulo 1.1.1 (Responsable del SG) encontró tres cosas que
+hacían que el explorador **no dijera la verdad**, más una incoherencia de color que el owner
+reportó con una captura. Lo importante del hallazgo no es que el 1.1.1 fallara: es que
+**ese módulo está replicado 15 veces**. Cada bug se paga 15 veces.
+
+**1 · Un error de carga congelaba la lista para siempre.** El `catch` mostraba un toast de
+5 s —que se iba— y **nunca volvía a dibujar**. Lo que quedaba eran bloques grises mudos,
+sin mensaje y sin forma de reintentar. Ahora la lista muestra **"No se pudo leer esta
+carpeta"** con botón **Reintentar**, y el toast queda como refuerzo, no como único canal.
+
+**2 · Un fallo se veía exactamente igual que una carpeta vacía.** El código hacía
+`result.files || []`, que convierte **cualquier** respuesta inesperada en lista vacía. El
+usuario veía "No hay archivos en esta carpeta" y concluía que sus archivos se habían
+perdido, cuando en realidad nunca se leyeron. **Un sistema no puede dejar que "no pude
+leer" se vea igual que "no hay".** Ahora la decisión vive en una función pura,
+`_normalizarLista()`, que devuelve `{ok, files, mensaje}` y se puede probar sola.
+
+**3 · La pantalla prometía una interacción que no existía.** El estado vacío decía
+"Arrastra archivos aquí", pero el único `drop` del módulo estaba sobre las carpetas de la
+columna izquierda: el usuario arrastraba donde le decían y no pasaba nada, en silencio.
+Ahora el panel central acepta el arrastre, sube a **la carpeta que se está viendo** y
+muestra un recuadro punteado mientras lo sostiene.
+
+**4 · El botón "Subir" era verde.** El owner lo reportó con una captura: *"ese botón de
+color verde no va a lugar, desentona completamente"*. Y era la misma cosa que la auditoría
+ya había marcado: en K+AIR el verde significa "cumplido / éxito", no "acción principal".
+Un botón verde de la acción principal compite con los avisos de éxito, que es donde el
+verde sí tiene que estar. Ahora usa **el azul de la barra superior** (`#2057b8`), con el
+que el owner rigidityó. El estilo azul ya existía en los CSS y no lo usaba nadie.
+
+**Lo que el azul arrastraba:** el color primario estaba **escrito a mano en 7 lugares** de
+cada archivo —los `rgba()` del focus ring y de dos sombras—. Cambiar solo el token dejaba
+el borde del botón del azul viejo al pasar el mouse. Se cambiaron los 7.
+
+**5 · El PDF se veía con otro visor que Word y Excel.** También reportado por el owner con
+captura. El PDF se abría con el **visor nativo del navegador** (la barra oscura con "1/2" y
+"96%"), mientras Word y Excel usaban el visor de K+AIR. Dos herramientas para la misma
+tarea. La causa estaba escrita en el código: el archivo de conexión excluía el PDF a
+propósito con `fileExt !== 'pdf'`. Ahora los tres formatos pasan por el mismo camino, y el
+botón **"Ver completo"** que estaba deshabilitado para PDF vuelve a aparecer.
+
+**6 · Imprimir salía en blanco y decía que salía bien.** El código concatenaba un **objeto**
+dentro de una dirección de PDF, abría un diálogo vacío y registraba
+`PRINT_DOC SUCCESS`. Para PDF ahora funciona de verdad; para Word/Excel avisa que el
+navegador no puede imprimirlos, en vez de sacar una hoja en blanco.
+
+**Alcance, y es importante:** el azul se aplicó a los **15** exploradores. El PDF, **solo al
+1.1.1**. El inventario mostró que los 15 **no comparten la arquitectura del preview**: hay
+**4 variantes** de la función que carga el PDF, y los archivos de conexión lo enrutan de
+**3 maneras distintas**; tres módulos ni siquiera tienen archivo de conexión. Replicar eso
+sin poder abrir la app sería cambiar 15 módulos a ciegas. Los otros 14 quedan para cuando
+el 1.1.1 esté validado.
+
+**Tests:** `test-explorador-estado-861.js`, **614 checks y 9 mutaciones**, todas cazadas.
+El test se escribió **antes** del arreglo: fallaba en 151 de 259 checks, y los tres bugs
+estaban en los 15. Después agarró un error mío —un `rgba` del azul viejo que se me había
+pasado en una opacidad distinta—, que por el camino terminó corrigiéndose.
+
+Suite completa: **119 tests, 101 en verde, 18 con fallos** — los 18 preexistentes, cero
+regresiones.
+
 ## [0.1.239] - 2026-10-04
 
 ### 📦860 · La fila del correo muestra la fecha ENCIMA de la hora

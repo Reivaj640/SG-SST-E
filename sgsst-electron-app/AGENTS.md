@@ -4884,4 +4884,178 @@ El chip de fecha era afirmado por dos checks de `test-bandeja-premium-v2.js`: un
 
 **Regla:** cuando borras algo, busca cuántos checks lo afirman. Un check borrado es un hueco; uno invertido sigue protegiendo. Y si son varios, se invierten todos.
 
+## 📦858-860 · El día como eje, la pila de redactores, y la fecha que faltaba
+
+### 1. Un filtro que se compone con otro filtro no puede salir temprano
+
+En 📦858 el día elegido en el mini-calendario se compone con el chip activo, la búsqueda y los
+labels. El filtro de la bandeja hacía esto:
+
+`B`js
+if (sel === "unread" && !m.unread) return false;
+if (sel === "starred" && !m.flagged) return false;
+// …y acá venía la comparación de fecha
+`B`
+
+Con **"No leídos"** activo, la función salía en la primera línea y **nunca llegaba a mirar la
+fecha**: el filtro por día se ignoraba en silencio y la bandeja respondía "no hay correos ese
+día" sobre un día que sí tenía 12. Un filtro compuesto es un **y**, y un "y" escrito como una
+cadena de salidas tempranas deja de ser un "y" en cuanto agregás una condición.
+
+**Regla:** un filtro que ya compone dos ejes tiene que seguir la forma booleana única
+(`return a && b && c`) aunque sea menos legible. La versión "un return por chip" se rompe
+con el primer eje que se agregue, y se rompe **sin error**: la consulta sale vacía y parece un
+bug de datos. Hay check y mutación dedicados a que no vuelva.
+
+### 2. El día vive en su propio estado, y el mes también
+
+El mini-calendario tenía `viewYear` / `viewMonth`, que son del calendario grande. 📦858 le
+dio `state.miniMes` y `state.mailDia` aparte. No por purismo: si el mini hubiera escrito
+en `viewMonth`, cambiar de mes en Correo habría movido el calendario grande que está detrás,
+y volver a Agenda lo habría dejado descolocado.
+
+### 3. Un estado alterno tiene que anular los `min-*` de la base, uno por uno
+
+Ya está en `PROMPT.md` §7.6 y en el changelog de 📦859. Lo que se lleva para otro lado es el
+método: **el bug no se huntó leyendo el CSS del estado alterno**, se huntó midiendo la caja en
+la app. `max-height: 48px` se veía correcto en el archivo y en la pantalla no pasaba nada.
+Cuando un estado alterno "no hace nada", el culpable es casi siempre un `min-*` heredado que
+el estado no está anulando.
+
+### 4. Un selector de CSS puede hacer que un check se satisfaga con la regla equivocada
+
+El hover de la fila de correo es un selector partido:
+
+`B`css
+.kair-mail-row:hover .kair-mail-row__time,
+.kair-mail-row:hover .kair-mail-row__fecha { opacity: 0; }
+`B`
+
+Un check que buscara la cadena `.kair-mail-row__fecha {` —para verificar que la fecha tiene
+estilo— encuentra **la del hover**, no la de `.kair-mail-row__fecha {`. O sea: el check pasa
+aunque la regla de estilo **no exista**, porque encuentra la palabra en otra regla.
+
+**Regla:** un check de CSS tiene que anclar a **la regla que le importa**, no a "cualquier
+mención del selector". Si la palabra puede aparecer en dos reglas, el check necesita exigir
+algo que solo la regla buena tiene: una declaración propia, el selector pelado, el orden.
+
+### 5. Ningún test del repo abre la base de datos, y eso se notó en 📦860
+
+El detalle completo está en `PROMPT.md` §7.7. Lo que va a la bitácora: la fecha de la fila
+(📦860) tenía 34 checks en verde y podía **no dibujar nada en pantalla**, porque `fechaFila`
+exige `typeof ms === "number"` y la hipótesis "la columna viene como número" no estaba
+verificada contra nada. Se verificó a mano contra `kair.db`: es `INTEGER`, llega como
+`number` en las 150 filas, 0 sin fecha.
+
+**Regla:** un feature que dependa de la forma de un dato de la base **no está terminado**
+hasta que alguien lo corrió contra la base. El script va en `Temp/` y **no** en la suite,
+porque la suite tiene que correr en la máquina de cualquiera.
+
+## 📦861 · Un módulo replicado 15 veces, y un bug que se paga 15 veces
+
+### 1. El 1.1.1 no es un módulo: es el original de quince
+
+La auditoría del 1.1.1 (Responsable del SG) encontró tres bugs. Antes de arreglar nada se
+contó: hay **15 exploradores de archivos** en `modules/`, y el 1.1.1 es el **original** del
+que se copiaron los otros catorce (los catorce usan exactamente 86 espaciados de la misma
+escala `--kair-space-*` y pesan ~52 KB). Un bug en el 1.1.1 es **quince bugs**.
+
+Corolario de diseño: cuando un módulo es una copia, arreglarlo **uno solo** deja al módulo
+rarísimo al lado de sus catorce gemelos. O se arreglan los quince, o se arregla ninguno.
+
+### 2. Comparar archivos por BLOQUE, nunca por posición
+
+Al principio comparé los viewers línea por línea y el informe salió "1593 líneas
+distintas" entre dos archivos que son casi idénticos. **Era falso**: los archivos tienen
+distinto número de líneas, así que al desalinearse todo se ve distinto.
+
+La comparación útil es **por función**, extrayendo el bloque por llaves balanceadas y
+comparando su hash. Así se vio la verdad: **14 son idénticos y uno (`evaluaciones`) es
+variante**, con 1 524 líneas en LF contra 1 580-1 700 en CRLF.
+
+**Regla:** dos archivos con tamaños distintos no se comparan por índice de línea. Se
+compara la unidad que importa (la función, el bloque) y se cuenta cuántos valores distintos
+sale.
+
+### 3. Verificar que el resultado COMPILE, no solo que las llaves balanceen
+
+El script que aplicó los cambios validaba **llaves balanceadas** y no más. Con una cadena sin
+cerrar, el conteo de llaves da **cero igual**: el archivo pasaba la verificación y quedaba
+roto. Revienta al cargar el módulo en la app — donde nadie lo ve, porque **ningún test de
+este repo abre la app**.
+
+**Regla:** antes de escribir un archivo generado, `node --check` sobre el resultado. Y
+contar llaves solo como filtro barato, nunca como prueba de que compila.
+
+### 4. Un ancla con la indentación equivocada da 0, y el mensaje miente
+
+El mensaje de error decía "el ancla no es única" cuando en realidad no existía: la línea
+buscada tenía **8 espacios** de indentación y el ancla pedía 20. **Un ancla que da 0
+apariciones parece un problema de unicidad y es un problema de escritura.**
+
+**Regla:** el guard de singularidad tiene que distinguir `x0` de `x2`. Hoy dice "aparece
+0 veces (0 = el ancla no existe)".
+
+### 5. Un regex para un color tiene que ser GENERAL
+
+El patrón que cambiaba el azul viejo a_WRITE`rgba(23, 78, 166, 0.12)` y
+`rgba(23, 78, 166, 0.35)`, hardcodeados. Quedó un **tercero con 0.08**, y el test lo
+agarró. Un color escrito a mano como `rgba(r, g, b, a)` tiene tantas variantes como
+opacidades existan: el patrón tiene que ser `rgba\(23,\s*78,\s*166,(\s*[\d.]+\s*)\)`.
+
+**Regla:** si el valor es una tupla, el patrón tiene que capturar la tupla, no sus
+ejemplos.
+
+### 6. Un script que busca sin filtro se pasa de alcance
+
+El limpiado de los `rgba` floated sobre **23 CSS** en vez de los 15 del grupo de
+exploradores, y cambió 7 módulos que nadie pidió (Objetivos SST, Plan de Trabajo,
+Investigación de Accidentes, Reportes de Accidentes, Capacitaciones, Roles y
+Responsabilidades, Investigaciones). Se revirtieron con `git checkout`.
+
+**Regla:** un script de cambio carries la lista explícita de archivos que puede tocar, o
+un filtro que no pueda salir del alcance. "Buscar todos los `*-view.css`" es un alcance
+distinto de "los 15 exploradores", aunque hoy coincidan.
+
+### 7. Y el guard de singularidad evitó el peor error posible
+
+La primera versión del fix usaba anclas literales de varias líneas sobre los 15. En **0 de
+15** coincidieron (cada archivo tiene su propia forma), y el script **no escribió nada** en
+ninguno. Sin ese guard, se habrían escrito 15 archivos con la mitad de los cambios.
+
+**Regla:** el guard no es burocracia. Es lo que separa "no hice nada" de "rompí quince
+módulos".
+
+### 8 · El PDF tenía DOS visores, y la causa estaba escrita en el código
+
+El owner lo reportó con una captura: el PDF se abría con el visor **nativo del navegador**
+(la barra oscura con "1/2" y "96%") y Word/Excel con el de K+AIR. La causa estaba en
+`responsable-sg-logic.js`:
+
+`B`js
+const isOfficeRequest = (apiFunctionName === 'getExcelPreview' || apiFunctionName === 'getWordPreview')
+    && fileExt && fileExt !== 'pdf';   // ← el PDF, excluido a propósito
+`B`
+
+Y el comentario de **arriba** de esa función decía `Office / PDF`. O sea: la exclusión fue
+un descuido, no una decisión. El IPC `read-file-bytes` de `main.js` también dice
+`Office / PDF` y tiene el PDF en su whitelist.
+
+**Lo que no se hizo, y por qué:** el fix del PDF quedó **solo en el 1.1.1**. El inventario
+mostró que los 15 **no comparten la arquitectura del preview**: hay **4 variantes** de
+`_loadPDF` (`_displayPDF`, `_renderPreview(result, filePath)`, `_renderPreview(result)`,
+y una casi igual) y los `logic.js` lo enrutan de **3 maneras** (switch, tabla de acciones,
+`if`); tres módulos no tienen `logic.js`. Replicarlo sin poder abrir la app sería cambiar
+quince módulos a ciegas, y el PDF es justo lo que más se nota si se rompe.
+
+**Regla:** "son copias" no significa "se arreglan igual". Antes de replicar, contar cuántas
+variantes hay. Si hay más de una, el módulo de referencia se arregla solo y se valida.
+
+### 9 · Imprimir salía en blanco y registraba éxito
+
+`_printConvertedDocument` concatenaba `result.data` dentro de
+`data:application/pdf;base64,`. Con Office, `result.data` es un **objeto** (del
+`mode: 'file-viewer'`), así que la URI quedaba `base64,[object Object]`: diálogo de
+impresión vacío y `_log('PRINT_DOC', 'SUCCESS')` igual. El navegador tampoco sabe
+imprimir un `.docx`; eso hay que decirlo, no dejarlo imprimir en blanco.
 

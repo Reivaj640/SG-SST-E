@@ -326,6 +326,60 @@ las entradas 📦850 y 📦851 sin encabezado dentro del CHANGELOG.
 Select-String -Path CHANGELOG.md -Pattern '^## \[0\.1\.2(3[0-9])\]' | Select-Object -First 5
 ```
 
+**Tres casos que el guard tiene que distinguir (📦861):**
+
+- **x0 es un ancla mal escrita, no una falta de singularidad.** La línea buscada tenía 8
+  espacios de indentación y el ancla pedía 20. El mensaje decía "no es única" y el
+  problema real era otro. `if (n !== 1)` cubre los dos casos pero el mensaje tiene que
+  decir cuántos, y `0` significa "no existe".
+- **Un color escrito como `rgba(r, g, b, a)` tiene tantas variantes como opacidades
+  existan.** El patrón `\b0\.12\b` cambiaba dos de tres y dejaba el tercero del azul viejo.
+  El patrón tiene que capturar la tupla: `/rgba\(23,\s*78,\s*166,(\s*[\d.]+\s*)\)/g`.
+- **Cambiar un token de color no cambia lo que está escrito a mano.** El primario estaba
+  en el token *y* en 7 `rgba()` horneados con su descomposición RGB. Cambiar solo el token
+  deja el focus ring y dos sombras del color viejo, y se nota al pasar el mouse. Buscá
+  el color descompuesto (`23, 78, 166`) antes de dar por hecha una migración.
+
+### 5.11b 🔴 "Son copias" NO significa "se arreglan igual"
+
+Antes de replicar un cambio en N archivos que se parecen, **contar cuántas variantes hay**.
+No porque sean copias, sino porque *lo parezcan*.
+
+En 📦861 los 15 exploradores de archivos parecían copias (el 1.1.1 es el original),
+pero:
+
+| Unidad | Cuántas variantes |
+|---|---|
+| `_loadPDF` | **4** (dos llaman `_displayPDF`, dos llaman `_renderPreview`, y con argumentos distintos) |
+| Enrutado del PDF en el archivo de conexión | **3** (switch, tabla de acciones, `if`) |
+| Módulos sin archivo de conexión | **3** de 15 |
+
+Y la comparación línea por línea dio **"1593 líneas distintas"** entre dos archivos casi
+idénticos, porque tienen distinto número de líneas y todo se desalinea. La comparación
+útil es **por bloque**: extraer la función por llaves balanceadas y comparar su hash. Ahí
+salió la verdad: **14 idénticos, uno variante** (y ese último en LF contra CRLF).
+
+**Regla:** el guard de singularidad es lo que separa "no hice nada" de "rompí N módulos".
+En 📦861 el primer intento casó en **0 de 15** anclas y **no escribió nada en ninguno**;
+sin el guard, se habrían escrito quince archivos con la mitad de los cambios.
+
+Y el otro riesgo es el opuesto: **un script que busca sin filtro se pasa de alcance.** La
+limpieza de un color flotó sobre **23 CSS** en vez de los 15 del grupo, y cambió 7 módulos
+que nadie había pedido. Se revirtieron con `git checkout`. Un script de cambio lleva la
+lista explícita de lo que puede tocar, o un filtro que no pueda salir del alcance.
+
+### 5.11c 🔴 Un archivo generado se verifica COMPILANDO, no contando llaves
+
+Contar llaves balanceadas **no dice que el archivo esté bien**. Una cadena sin cerrar deja
+el conteo en **cero igual**: la verificación pasa y el módulo revienta al cargarlo.
+
+En 📦861 el script que aplicaba los cambios validaba llaves y nada más; una cadena quedó sin
+cerrar, pasó la verificación y habría roto el 1.1.1 al abrirlo — donde nadie lo ve, porque
+**ningún test de este repo abre la app** (§7.7).
+
+**Regla:** antes de escribir un archivo generado, `node --check` sobre el **resultado**, con
+el EOL ya convertido. Contar llaves queda como filtro barato previo, nunca como prueba.
+
 ### 5.12 🔴 Comprobar el valor no basta: hay que comprobar la transición
 
 **Aplica a cualquier contador, badge, aviso de novedad o "sin leer"**: todo lo que dependa de un

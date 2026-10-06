@@ -1,4 +1,119 @@
-# K+AIR v0.1.237
+# K+AIR v0.1.240
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## El explorador de archivos ya no se queda mudo cuando algo falla
+
+Estos cambios son en el módulo **1.1.1 Responsable del SG** y en los otros 14
+exploradores de archivos del proyecto (Afiliación, COPASST, Sociodemográfica, y así).
+
+### Antes: si algo fallaba, la pantalla se quedaba gris
+
+Si una carpeta no se podía leer, la lista se quedaba **congelada en bloques grises**
+para siempre. Aparecía un aviso, pero se iba a los 5 segundos y no había forma de
+reintentar sin cerrar la aplicación.
+
+Ahora la lista dice **"No se pudo leer esta carpeta"** y trae un botón **Reintentar**.
+
+### Antes: un fallo parecía que tus archivos se habían perdido
+
+Si el sistema no lograba leer la carpeta, te mostraba **"Carpeta vacía"**. La misma
+palabra que aparece cuando de verdad no hay nada. Es fácil confundir un problema con
+una carpeta vacía, y el mensaje decía que tus archivos se habían perdido cuando
+nadie los había leído nunca.
+
+Ahora **"no pude leer" y "no hay archivos" son cosas distintas**, y el mensaje de error
+dice que los archivos no se perdieron: no se pudieron leer.
+
+### Antes: el texto pedía arrastrar archivos donde no se podía
+
+Cuando una carpeta estaba vacía, la pantalla decía *"Arrastra archivos aquí"*. Pero el
+arrastre solo funcionaba si soltabas el archivo **encima de una carpeta de la lista de
+la izquierda**. Si lo soltabas donde te decían —en el centro—, no pasaba nada y sin
+avisar.
+
+Ahora **el centro de la pantalla acepta los archivos**, los sube a la carpeta que
+estás viendo, y mientras los sostenés aparece un recuadro azul punteado que te dice
+"suéltalos acá".
+
+## El botón "Subir" cambió de color
+
+Era **verde**. En K+AIR el verde significa "cumplido" o "listo", y se usa en los avisos
+de éxito. Con el botón verde, la pantalla tenía dos focos y no se sabía cuál era el
+principal.
+
+Ahora usa **el mismo azul que el título del módulo**, arriba en la barra.
+
+## El PDF se abre con el mismo visor que Word y Excel
+
+El PDF se veía con el **visor del navegador** (la barra oscura con el "1/2" y el "96%"),
+mientras los Word y los Excel se veían con el visor de la aplicación. Dos herramientas
+para la misma tarea.
+
+Ahora **los tres se ven igual**, con el visor de la aplicación. Además, el botón
+**"Ver completo"** vuelve a aparecer en el PDF, como en los demás formatos.
+
+### Imprimir un Word o un Excel ya no saca una hoja en blanco
+
+El botón de imprimir se llevaba un archivo de Word o Excel a una hoja **en blanco** y
+decía que había salido bien.
+
+Ahora: el **PDF se imprime normal**, y para Word y Excel la aplicación te dice con
+claridad que el navegador no puede imprimirlos, y te sugiere guardar el archivo o usar
+"Ver completo".
+
+> Esto ya está andando en el **1.1.1 Responsable del SG**. En los otros 14 exploradores
+> el visor de PDF sigue como estaba: cada uno está construido de forma distinta y se
+> cambia después de confirmar que funciona bien acá.
+
+
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## El correo ahora dice de qué día es
+
+En la lista de la bandeja, cada correo mostraba **solo la hora** ("18:02", "17:54"). Con la
+bandeja mezclando correos de varios días, no había forma de saber de cuándo era cada uno:
+había que abrirlo para enterarte.
+
+Ahora la fecha va **encima de la hora**, en la misma columna.
+
+- Aparece en **todas** las carpetas: entrada, enviados y no leídos.
+- El año sale **solo cuando es distinto al actual**, como en Gmail. "4 oct" y no "4 oct 2026",
+  porque la columna es angosta y el año ahí no informaba nada más.
+- Al pasar el mouse sobre la fila, la fecha y la hora se ocultan y aparecen los botones de
+  acción, como antes.
+- Si algún correo no trae fecha, la línea no se agrega y queda la hora sola: no aparece un hueco.
+
+## El mini-calendario filtra los correos por día
+
+En la pestaña **Correo**, tocar una fecha del mini-calendario ahora muestra **los correos de ese
+día**, y podés ir hacia atrás de mes con las flechas — la mayor parte del correo es viejo, y no
+se podía llegar a él.
+
+- El filtro se combina con el chip activo, la búsqueda y las etiquetas: "no leídos **del** 3 de
+  octubre" existe.
+- Bajo el calendario aparece una barrita con el día y la cantidad de correos, con una X para
+  quitar el filtro.
+- Al pasar a la pestaña **Agenda**, el filtro se limpia solo y el mini vuelve a su comportamiento
+  de siempre.
+
+Esto arregla un caso que mentía: la app decía "sin correos ese día" para días que **sí** tenían
+correos.
+
+## Podés tener varios redactores de correo abiertos
+
+Antes se podía abrir **un** mensaje a la vez. Ahora podés abrir varios y quedan apilados abajo a
+la derecha:
+
+- Se apilan **en vertical**, como una pila de ventanas.
+- Cada uno se puede **arrastrar desde su barra de título** a donde quieras.
+- Se pueden **minimizar** (quedan como una barrita) y la pila los acomoda solo.
+- A partir del séptimo, la app avisa en vez de apilar más.
+
+
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
 > [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).

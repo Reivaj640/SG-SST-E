@@ -60,6 +60,12 @@ class ResponsableSgComponent {
                 case 'get-documents-in-folder':
                     this.handleStandardRequest(event, 'getDocumentsInFolder');
                     break;
+                // 📦861 · Preview del panel para el PDF, por el visor unificado.
+                // `get-pdf-preview` SE MANTIENE como estaba (devuelve base64) porque
+                // lo usa la impresión, que sí necesita el PDF crudo.
+                case 'get-pdf-for-viewer':
+                    this.handleStandardRequest(event, '__fileViewerBytes');
+                    break;
                 case 'get-pdf-preview':
                     this.handleStandardRequest(event, 'getPDFPreview');
                     break;
@@ -110,8 +116,13 @@ class ResponsableSgComponent {
             // detecta `mode: 'file-viewer'` y monta el Web Component en su DOM.
             const filePathStr = typeof apiArgs === 'string' ? apiArgs : (apiArgs?.filePath || '');
             const fileExt = (filePathStr.split('.').pop() || '').toLowerCase();
-            const isOfficeRequest = (apiFunctionName === 'getExcelPreview' || apiFunctionName === 'getWordPreview')
-                && fileExt && fileExt !== 'pdf';
+            // 📦861 · El PDF entra por acá: mismo visor que Office. Antes se excluía con
+            // `fileExt !== 'pdf'`, y por eso el PDF se veía con el visor NATIVO del
+            // navegador (la barra oscura) mientras Word y Excel usaban el de K+AIR.
+            const isOfficeRequest = (apiFunctionName === 'getExcelPreview'
+                || apiFunctionName === 'getWordPreview'
+                || apiFunctionName === '__fileViewerBytes')
+                && filePathStr;
 
             if (isOfficeRequest && window.electronAPI.readFileBytes) {
                 console.log(`[ResponsableLogic] 📦608: Office preview (${fileExt}) → readFileBytes`);
@@ -147,6 +158,14 @@ class ResponsableSgComponent {
                 return;
             }
 
+            if (apiFunctionName === '__fileViewerBytes') {
+                event.source.postMessage({
+                    type: `${event.data.type.replace('-request', '')}-response`,
+                    requestId,
+                    payload: { success: false, error: 'Ruteo del visor de archivos roto' }
+                }, '*');
+                return;
+            }
             const result = await window.electronAPI[apiFunctionName](apiArgs);
 
             event.source.postMessage({

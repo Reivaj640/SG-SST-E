@@ -11,8 +11,8 @@
 /* ─────────── DESIGN TOKENS (locales, sin tocar globales) ─────────── */
 :root {
     /* Colores oficiales K+AIR */
-    --kair-primary: #174ea6;
-    --kair-primary-hover: #185abd;
+    --kair-primary: #2057b8;
+    --kair-primary-hover: #1b4a9e;
     --kair-success: #28a745;
     --kair-warning: #ffc107;
     --kair-danger: #dc3545;
@@ -229,15 +229,6 @@
     white-space: nowrap;
 }
 
-.kair-header__action--success {
-    background: var(--kair-success);
-    color: #fff;
-}
-
-.kair-header__action--success:hover {
-    background: #218838;
-}
-
 .kair-header__action--primary {
     background: var(--kair-primary);
     color: #fff;
@@ -382,7 +373,7 @@
 
 .kair-search__input:focus {
     border-color: var(--kair-primary);
-    box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12);
+    box-shadow: 0 0 0 2px rgba(32, 87, 184, 0.12);
 }
 
 .kair-search__input::placeholder {
@@ -429,7 +420,7 @@
 .kair-sort__select:focus {
     outline: none;
     border-color: var(--kair-primary);
-    box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12);
+    box-shadow: 0 0 0 2px rgba(32, 87, 184, 0.12);
 }
 
 /* View toggle (segmented control: list | grid) — cuadrado, no pill */
@@ -576,7 +567,7 @@
     background: var(--kair-primary);
     border-color: var(--kair-primary);
     color: #fff;
-    box-shadow: 0 4px 8px rgba(23, 78, 166, 0.35);
+    box-shadow: 0 4px 8px rgba(32, 87, 184, 0.35);
     transform: scale(1.08);
 }
 
@@ -659,7 +650,7 @@
 .kair-folder__drag-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(23, 78, 166, 0.08);
+    background: rgba(32, 87, 184,  0.08);
     border: 2px dashed var(--kair-primary);
     border-radius: var(--kair-radius-sm);
     display: none;
@@ -964,7 +955,7 @@
     background: var(--kair-primary);
     border-color: var(--kair-primary);
     color: #fff;
-    box-shadow: 0 4px 8px rgba(23, 78, 166, 0.35);
+    box-shadow: 0 4px 8px rgba(32, 87, 184, 0.35);
     transform: translateY(-50%) scale(1.08);
 }
 
@@ -1667,11 +1658,11 @@
         --kair-sidebar-w: 200px;
     }
 
-    .kair-header__action--success span {
+    .kair-header__action--primary span {
         display: none;
     }
 
-    .kair-header__action--success {
+    .kair-header__action--primary {
         padding: var(--kair-space-2);
     }
 }
@@ -1735,4 +1726,52 @@
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦861 · FEEDBACK DE LA LISTA (estado de error + arrastre central)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* El arrastre central usa `outline` y no `border` a propósito: no toca el
+   layout, así que la lista no salta un pixel cuando el usuario arrastra encima. */
+.kair-main.is-drag-over {
+    outline: 2px dashed var(--kair-primary);
+    outline-offset: -6px;
+    background: var(--kair-bg-active);
+}
+
+.kair-empty--error .kair-empty__icon {
+    color: var(--kair-danger);
+}
+
+.kair-empty__detail {
+    display: block;
+    margin-top: var(--kair-space-1);
+    font-size: 0.75rem;
+    color: var(--kair-text-muted);
+    word-break: break-word;
+}
+
+.kair-empty__retry {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kair-space-1);
+    margin-top: var(--kair-space-3);
+    padding: var(--kair-space-2) var(--kair-space-4);
+    font-family: var(--kair-font);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--kair-primary);
+    border: none;
+    border-radius: var(--kair-radius-md);
+    cursor: pointer;
+    transition: background var(--kair-transition), transform var(--kair-transition);
+}
+.kair-empty__retry:hover { background: var(--kair-primary-hover); }
+.kair-empty__retry:active { transform: scale(0.97); }
+.kair-empty__retry:focus-visible {
+    outline: 2px solid var(--kair-primary);
+    outline-offset: 2px;
 }
