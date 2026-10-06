@@ -4,12 +4,86 @@
 > y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
-**Última actualización:** 5 de octubre de 2026
-**Versión actual:** 0.1.241 (desarrollo) — último publicado v0.1.205
-**Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
-**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
-
-> **🆕 v0.1.241 (📦862 — el admin deja de quedar sin salida):**
+**Última actualización:** 6 de octubre de 2026
+**Versión actual:** 0.1.246 (desarrollo) — último publicado v0.1.205
+**Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
+**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
+> Quinta y última etapa del plan de 5 fases, y la primera con cambios visibles. El overlay del
+> mapeo **muestra los archivos y las carpetas contados de verdad** mientras el escáner corre, y
+> desaparece el texto fijo "Tiempo estimado: 10-60 segundos" (`config-viewer.html:3128`), que
+> nunca se calculó y que en una carpeta de Drive quedaba corto por dos órdenes de magnitud
+> (medido: 1.241 s de reloj contra 4,45 s de CPU — 99,6 % esperando la red).
+> El avance viaja por **`stderr`**: `map_directory.py` emite `[PROGRESO] archivos=N carpetas=N`
+> con `_avisar_progreso()` (amortiguado a 250 ms con `time.monotonic()`, forzado al arrancar y al
+> cerrar), `main.js` engancha `child.stderr` y reenvía por el canal IPC `mapeo-progreso` con guard
+> de `event.sender.isDestroyed()`, `preload.js` expone `onMapDirectoryProgress(cb)` con su función
+> de baja, y `config-viewer.html` pinta el contador y suelta el listener en los **tres** caminos de
+> salida. **stdout queda con una sola línea de JSON puro** (contrato de 📦866): por eso el
+> progreso va por stderr y el test lo muerde con un bite test real. `execFilePromise` dejó de ser
+> un `promisify(execFile)` pelado —ahora es un wrapper que cuelga `.child` en la promesa— porque
+> la de promisify no expone el proceso hijo y no había dónde enganchar el stream; los otros call
+> sites no leen `.child` y no cambian de comportamiento. Validado: `py_compile` OK, `node --check`
+> OK, test nuevo `test-mapeo-estructura-867.js` **44/44** con **11 mutaciones que muerden**, tests
+> 863 **36/36** + 865 **15/15** + 866 **20/20**, suite **124 · 106 verdes · 18 preexistentes**
+> (0 regresiones). Cache-bust: `renderer.js?v=20261006-mapeo-fase4`.
+> Validación adicional fuera del repo: se extrajeron y ejecutaron el wrapper y la regex
+> **reales** de `main.js` contra un fixture de 2.500 archivos (15/15). Las muestras de progreso
+> llegaron a los 81 ms y 114 ms, antes de que el proceso terminara (125 ms) — el avance se
+> escucha en vivo, no bufferizado. Falta decidir si esa prueba entra como test al repo.
+>
+> **Anterior · v0.1.245 (📦866 — Fase 3 del mapeo de estructura, tamaño −97,8 %):**
+> Cuarta etapa del plan de 5 fases. `Portear/src/map_directory.py` **deja de emitir `files[]`,
+> `file_count`, `dir_count`, las entradas `errors` por nodo y el indentado `indent=2`**, y los
+> errores de lectura van a `stderr` (`print(..., file=sys.stderr)`) para no contaminar el stdout,
+> que debe seguir siendo **JSON puro en una sola línea** (la Fase 4 manda progreso por `stderr`).
+> Los consumidores totales se conservan: `total_files`/`total_folders` se llenan con un contador
+> de módulo (`_contador`, reiniciado en `map_directory()`) porque los leen `renderer.js:7158/7160`
+> y `main.js:4337/4338`; `formatStructureForLog` ya guardaba `if (node.files)`. También se quitó
+> el bloque por archivo (stat + extensión), que ya no tenía destino. Medido contra un fixture de
+> 2000 archivos: **934.437 bytes / 19.219 líneas / 2.941 ms → 20.877 bytes / 1 línea / 162 ms
+> (−97,8 % de tamaño)**. Validado: `py_compile` OK, tests 863 **36/36**, 865 **15/15** y el nuevo
+> `test-mapeo-estructura-866.js` **20/20** (8 checks de mordida que fallen con el código previo),
+> suite completa **123 · 105 green · 18 fallos preexistentes** (0 regresiones). Cache-bust:
+> `renderer.js?v=20261006-mapeo-fase3`.
+>
+> **Anterior · v0.1.244 (📦865 — Fase 2 del mapeo de estructura, velocidad sin SHA-256):**
+> Tercera etapa del plan de 5 fases. `Portear/src/map_directory.py` **elimina `hashlib`,
+> `_calculate_checksum` y el campo `checksum`** — el SHA-256 sobre 1,73 GB era ≈99,6 % de los
+> 760+ s y su resultado no lo consume nadie. El recorrido pasa a un solo pase con `os.scandir`,
+> `scan_date` sale real (`datetime.now().isoformat()`, antes `null`), los errores de lectura se
+> reportan (`size: None` + entrada en `errors`), y la semántica de symlink se conserva (atajo a
+> carpeta → nodo EMPTY, a archivo → archivo, roto → omitido). Validado: `py_compile`
+> OK, test de Fase 0 sigue 36/36, test nuevo `test-mapeo-estructura-865.js` **15/15** con prueba
+> de mordida (los 6 checks de cambio fallen con el código viejo), suite **122 · 104 green ·
+> 18 fallos preexistentes** (0 regresiones). Cache-bust: `renderer.js?v=20261006-mapeo-fase2`.
+>
+> **Anterior · v0.1.243 (📦864 — Fase 1 del mapeo de estructura, `maxBuffer`/`timeout`):**
+> Segunda etapa del plan de 5 fases. `execFilePromise` (`main.js:4311`) ahora pasa
+> `maxBuffer: 64 * 1024 * 1024` (64 MB) y `timeout: 30 * 60 * 1000` (30 min): el techo de
+> 1 MiB del `stdout` ya no corta el JSON de ~2,98 MB y `JSON.parse(stdout)` puede completarse.
+> Validado: `node --check main.js`, test de Fase 0 36/36, suite completa 121 · 103 green ·
+> 18 fallos preexistentes (baseline, 0 regresiones). Cache-bust:
+> `renderer.js?v=20261006-mapeo-fase1`.
+>
+> **Anterior · v0.1.242 (📦863 — Fase 0 del mapeo de estructura, contrato en pruebas):**
+> Arranca el plan aprobado de 5 fases para que "Mapeando Estructura de Documentos" termine.
+> Hoy tarda **760+ s** y **nunca completa**: `map_directory.py` hashea con SHA-256 los 1,73 GB
+> (≈99,6 % del tiempo) y el JSON de ~2,98 MB se pasa del tope de 1 MiB del `stdout` de
+> `execFile`, así que `JSON.parse(stdout)` (`main.js:4322`) revienta siempre al final.
+> Esta fase **no cambia código**: crea `main/test-mapeo-estructura-863.js` (36 checks) que fija
+> el contrato antes de optimizar — corrida real del script contra un fixture temporal (con
+> fallback si la máquina no tiene Python), `root`/`structure.path` absolutos,
+> `subdirectories` como dict, el pipeline completo (`map-directory` → `execFilePromise` →
+> `JSON.parse`) y las dos consumidoras extraídas y ejecutadas (`searchInStructure` y
+> `formatStructureForLog`). **Sin chequear** nada que las fases siguientes sacan: `checksum`
+> (Fase 2), `files[]`/`file_count`/indentado (Fase 3), `scan_date` (Fase 2).
+> Cola: Fase 1 `maxBuffer`/`timeout` (📦864) → Fase 2 velocidad sin SHA-256 (📦865) →
+> Fase 3 tamaño sin `files[]` (📦866) → Fase 4 progreso real stderr→IPC→UI (📦867) →
+> Fase 5 backlog (📦868).
+>
+> **🆕 v0.1.241 (📦862 — el admin deja de quedar sin salida):**
 > `showHomePage` filtraba las empresas por `Array.isArray(overrideCompanies)`, que es `true`
 > incluso para `[]`, y como `initializeApp()` **siempre** recibe un array (`renderer.js:3604`),
 > esa rama ganaba siempre y la del admin era **código muerto**. Un admin sin empresas asignadas

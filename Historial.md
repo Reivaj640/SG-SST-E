@@ -24,17 +24,69 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-06 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦862 · un administrador ya no queda encerrado en "contacta a administración" |
-| **Commits sin pushear** | 0 — 📦862 commiteado y pusheado |
-| **Versión** | `0.1.241` (desarrollo) · último publicado `v0.1.205` |
-| **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
-| **Suite (escritorio)** | 120 tests · **102 verdes** · 18 con fallos — **los 18 preexistentes**, cero regresiones de 📦862 (los 5 que leen archivos cambiados fueron probados en HEAD limpio, §7.4). Incluye el test nuevo `test-admin-empresas-862.js` (17/17) |
-| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real |
+| **Último commit de código** | 📦862 · un administrador ya no queda encerrado en "contacta a administración" (`f72ae306`, pusheado). **📦863 (Fase 0), 📦864 (Fase 1), 📦865 (Fase 2), 📦866 (Fase 3) y 📦867 (Fase 4 del mapeo) están en el árbol de trabajo SIN commitear** |
+| **Commits sin pushear** | 0 — el último commit es 📦862; el trabajo nuevo (📦863 + 📦864 + 📦865 + 📦866 + 📦867) todavía no se commiteó |
+| **Versión** | `0.1.246` (desarrollo) · último publicado `v0.1.205` |
+| **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
+| **Suite (escritorio)** | 124 tests · **106 verdes** · 18 con fallos — **los mismos 18 preexistentes**, cero regresiones. Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) además de `test-admin-empresas-862.js` (17/17) |
+| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 **pendiente**: no se ha abierto la app todavía. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | En curso (2026-10-06). Paquete: 📦862 |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 **pendiente**: no se ha abierto la app todavía. 📦863 no tiene cambios visibles (es solo un test). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
+| **Jornada** | En curso (2026-10-06). Paquetes en árbol: 📦863 (Fase 0) + 📦864 (Fase 1) + 📦865 (Fase 2) + 📦866 (Fase 3) + 📦867 (Fase 4 del mapeo de estructura). **Las 5 fases del plan están hechas** |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
+
+0. **🔴 TRABAJO ACTIVO: plan aprobado de 5 fases para que "Mapeando Estructura de Documentos"
+   termine** (760+ s por corrida y falla siempre: SHA-256 sobre 1,73 GB ≈ 99,6 % del tiempo, y el
+   JSON de ~2,98 MB se pasa del tope de 1 MiB del `stdout` de `execFile` → `JSON.parse` revienta
+   al final). Detalle completo en `AGENTS.md`, sección "Mapeando Estructura de Documentos".
+   - ✅ **Fase 0 (📦863) HECHA, en árbol de trabajo sin commitear**: `main/test-mapeo-estructura-863.js`
+     (36/36, corrida real de Python + fallback), docs §5.8 actualizados, versión 0.1.242,
+     `renderer.js?v=20261006-mapeo-fase0`.
+   - ✅ **Fase 1 (📦864) HECHA, en árbol de trabajo sin commitear**: `main.js:4311` con
+     `maxBuffer: 64 MB` + `timeout: 30 min` en `execFilePromise`; `node --check` OK,
+     test de Fase 0 **36/36**, suite **121 · 103 verdes · 18 preexistentes (0 regresiones)**,
+     docs §5.8 actualizados, versión 0.1.243, `renderer.js?v=20261006-mapeo-fase1`.
+     **Espera la palabra para commitear (junto con 📦863).**
+   - ✅ **Fase 2 (📦865) HECHA, en árbol de trabajo sin commitear**: `Portear/src/map_directory.py`
+     sin `hashlib`/`_calculate_checksum`/`checksum`, recorrido con `os.scandir` en un solo pase,
+     `scan_date` real, errores reportados, semántica de symlink conservada; `py_compile` OK,
+     test de Fase 0 **36/36**, test nuevo `main/test-mapeo-estructura-865.js` **15/15** con
+     prueba de mordida (los 6 checks de cambio fallan contra el código viejo), suite
+     **122 · 104 verdes · 18 preexistentes (0 regresiones)**, docs §5.8 actualizados,
+     versión 0.1.244, `renderer.js?v=20261006-mapeo-fase2`.
+     **Espera la palabra para commitear (junto con 📦863 + 📦864).**
+   - ✅ **Fase 3 (📦866) HECHA, en árbol de trabajo sin commitear**: `Portear/src/map_directory.py`
+     sin `files[]`, sin `file_count`/`dir_count`, sin `indent=2` y con los errores de lectura
+     saliendo por `file=sys.stderr` (el stdout queda **solo** JSON); los totales `total_files`/
+     `total_folders` **se conservan** porque los consumen `renderer.js:7158/7160` y
+     `main.js:4337/4338` (ahora se llenan con el contador global `_contador`); `py_compile` OK,
+     tests **863 36/36 + 865 15/15 + 866 20/20**; medición con fixture de 2000 archivos:
+     **934.437 bytes / 19.219 líneas / 2.941 ms → 20.877 bytes / 1 línea / 162 ms (−97,8 %)**;
+     suite **123 · 105 verdes · 18 preexistentes (0 regresiones)**, docs §5.8 actualizados,
+     versión 0.1.245, `renderer.js?v=20261006-mapeo-fase3`.
+     **Espera la palabra para commitear (junto con 📦863 + 📦864 + 📦865).**
+    - ✅ **Fase 4 (📦867) HECHA, en árbol de trabajo sin commitear**: progreso real de punta a punta.
+      `Portear/src/map_directory.py` suma `_avisar_progreso()` (stderr, amortiguado a 250 ms con
+      `time.monotonic()`, forzado al arrancar y al cerrar); `main.js` envuelve `execFilePromise`
+      para que cuelgue `.child` (la de `promisify` no expone el proceso), engancha `child.stderr`
+      y reenvía `mapeo-progreso` con guard de `isDestroyed()`; `preload.js` expone
+      `onMapDirectoryProgress(cb)` con su baja; `config-viewer.html` pinta el contador real,
+      suelta el listener en los **tres** caminos de salida y desaparece el "10-60 segundos"
+      (`:3128`). `py_compile` + `node --check` OK, test nuevo
+      `main/test-mapeo-estructura-867.js` **44/44** con **11 mutaciones que muerden**, tests
+      **863 36/36 + 865 15/15 + 866 20/20**, suite **124 · 106 verdes · 18 preexistentes
+      (0 regresiones)**, docs §5.8 actualizados, versión 0.1.246,
+      `renderer.js?v=20261006-mapeo-fase4`.
+      Además, una **prueba de integración fuera del repo** ejecutó el wrapper y la regex reales
+      de `main.js` contra un fixture de 2.500 archivos (15/15): el progreso llegó a los 81 ms y
+      114 ms, antes de que el proceso terminara (125 ms), o sea en vivo y no bufferizado.
+      **Queda consultado al owner:** ¿esa prueba entra al repo como test?
+      **Espera la palabra para commitear (junto con 📦863 + 📦864 + 📦865 + 📦866).**
+    - ✅ **El plan de 5 fases está completo.** 📦868 (backlog) queda sin arrancar a propósito:
+      ya no hay tarea viva que espere, y arrancar otra fase sería inventar trabajo.
+     Regla: **agregar** checks al test por fase, nunca editar los viejos; si una fase hace fallar
+     el test de Fase 0, la fase rompió el contrato, no el test.
 
 1. **Owner tiene que validar visualmente 📦858**: en la pestaña Correo, el mini debe dejar ir a
    septiembre con las flechas, y al elegir el **14 de septiembre tiene que mostrar los 12 correos**

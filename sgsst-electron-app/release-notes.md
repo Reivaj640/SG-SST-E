@@ -1,3 +1,100 @@
+# K+AIR v0.1.246
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## El mapeo de estructura: última etapa (la pantalla por fin dice la verdad)
+
+Esta es la **última de las cinco etapas** y la primera en que se ve un cambio en pantalla.
+
+Al vincular una empresa, la aplicación revisa la carpeta entera. Cuando esa carpeta está en la
+nube (Google Drive, OneDrive) la revisión es lenta — con la carpeta real llega a tardar más de
+doce minutos — y hasta ahora la ventana no decía absolutamente nada: un ícono que giraba, un
+reloj, y un texto que prometía **"10-60 segundos"** que ningún cálculo respaldaba.
+
+Ahora, mientras revisa, la ventana muestra **cuántos archivos y cuántas carpetas lleva leídos**,
+en vivo. Y el texto de la estimación desapareció: en su lugar dice que, si la carpeta está en la
+nube, puede tardar varios minutos.
+
+El reloj de tiempo transcurrido sigue ahí, porque ese sí era real.
+
+---
+
+## El mapeo de estructura: cuarta etapa (se achica el trabajo que queda por hacer)
+
+Esta versión **tampoco cambia nada visible**. Es la cuarta de cinco etapas para arreglar el
+mapeo de documentos.
+
+Antes, al terminar de recorrer la carpeta, el escáner armaba un informe enorme: aparte de
+las carpetas y los archivos, escribía **lista por lista el detalle de cada archivo dos veces
+y una pila de información que nadie usa**. Con la carpeta real ese informe pesaba casi
+3 megabytes, y era tan grande que no cabía en el conducto por el que viaja el resultado: el
+escáner se pasaba hora y media trabajando y **el informe se cortaba a la mitad**, así que el
+resultado no servía.
+
+Ahora el informe lleva solo lo que la aplicación de verdad consulta. Con eso baja a una
+fracción de su tamaño y siempre llega completo. Si algo no se pudo leer, el aviso sale por
+el conducto aparte de avisos, así que nunca estorba el resultado.
+
+Sigue sin verse ningún cambio en pantalla: la pantalla todavía muestra un contador falso y
+un tiempo inventado. **Eso es justamente lo que viene en la última etapa.**
+
+---
+
+## El mapeo de estructura: tercera etapa (sigue sin cambios en pantalla)
+
+Esta versión **tampoco cambia nada visible**. Es la tercera de cinco etapas para arreglar el
+mapeo de documentos.
+
+Hasta ahora el escáner pasaba casi toda su hora y media calculando la huella de cada archivo de la
+carpeta — un trabajo enorme que **no servía para nada**, porque el resultado de esas huellas no lo
+usa ninguna parte de la aplicación. Esta etapa lo quita: el escáner ahora solo mira qué carpetas y
+archivos hay, sin leer el contenido de cada archivo. Con eso el trabajo pesado desaparece.
+
+Además, la fecha con la que el escáner firma su resultado ahora sale con el día y la hora reales
+(antes quedaba vacía), y si algo no se puede leer, se avisa en vez de pasar por alto.
+
+El escáner todavía tarda un poco más de lo que debería y todavía no muestra progreso; eso viene en
+las próximas etapas.
+
+---
+
+## El mapeo de estructura: segunda etapa (sigue sin cambios en pantalla)
+
+Esta versión **tampoco cambia nada visible**. Es la segunda de cinco etapas para arreglar el
+mapeo de documentos ("Mapeando Estructura de Documentos").
+
+La primera etapa dejó escrito y probado cómo debe ser la respuesta correcta. Esta quita el
+obstáculo que la hacía imposible de recibir: la app esperaba el resultado del escaneo en una
+ventana angosta y el resultado no cabía — se cortaba a la mitad y el programa fallaba recién
+ahí, después de haber trabajado toda la hora y media. Ahora esa ventana es suficientemente
+amplia para el caso real, y además hay un tope de media hora: si el escaneo se cuelga, la app
+lo sabe y lo comunica en vez de quedarse esperando para siempre.
+
+El escaneo todavía tarda lo mismo y todavía no muestra progreso; eso viene en las próximas
+etapas.
+
+---
+
+## El mapeo de estructura: primera etapa (sin cambios en pantalla todavía)
+
+Esta versión **no cambia nada visible**. Es la primera de cinco etapas para arreglar el mapeo de
+documentos ("Mapeando Estructura de Documentos"), que hoy tarda más de 12 minutos y **siempre
+termina en error**: el escáner recorre toda la carpeta, calcula la huella de cada archivo (que es
+lo que más tarda) y al final devuelve una respuesta tan grande que la app no puede leerla — se
+pasa el trabajo entero y falla en el último paso.
+
+Antes de tocar el escáner, esta etapa deja **escrito y probado** cómo es la respuesta correcta:
+una prueba automática corre el escáner sobre una carpeta de ejemplo y verifica que la estructura
+salga con sus carpetas, sus rutas y su orden. Así, cuando en las próximas etapas se cambie el
+escáner para que sea rápido y liviano, cualquier cambio que rompa la estructura se detecta al
+instante en lugar de descubrirse cuando el usuario espere 12 minutos.
+
+**Próximas etapas (en orden):** límites de tamaño y tiempo en la lectura · quitar la huella de
+cada archivo (la causa de la lentitud) · achicar la respuesta · barra de progreso real en pantalla.
+
+---
+
 # K+AIR v0.1.241
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

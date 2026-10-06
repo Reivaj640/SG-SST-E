@@ -81,6 +81,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       });
   },
 
+  // 📦867 (Fase 4) — progreso del mapeo en vivo. Mismo patrón que onFullscreenChanged:
+  // se registra un listener propio y se devuelve la función que lo quita, para que la
+  // vista lo desuscriba al cerrar el overlay y no quede escuchando entre mapeos.
+  onMapDirectoryProgress: (callback) => {
+    const listener = (event, progreso) => callback(progreso);
+    ipcRenderer.on('mapeo-progreso', listener);
+    return () => ipcRenderer.removeListener('mapeo-progreso', listener);
+  },
+
   readDirectory: (directoryPath) => {
     log('DEBUG', `readDirectory llamado con: ${directoryPath}`);
     return ipcRenderer.invoke('read-directory', directoryPath)

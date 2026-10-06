@@ -262,7 +262,23 @@ if (!app.isPackaged) {
 // ------------------------------------
 
 const execPromise = promisify(exec);
-const execFilePromise = promisify(execFile);
+
+// 📦867 (Fase 4) — el mapeo necesita leer `stderr` EN VIVO para mandar progreso a la UI
+// mientras Python escanea; con promisify recién se veía cuando el proceso terminaba.
+// `promisify(execFile)` resuelve con {stdout, stderr} y NO expone el proceso hijo, así
+// que no hay dónde engancharse. Este wrapper devuelve la misma promesa —mismos argumentos,
+// mismos errores, mismo resultado— con `.child` colgado. Los demás call sites de
+// execFilePromise no leen `.child`, así que su comportamiento no cambia.
+const execFilePromise = (cmd, args, options) => {
+    let hijo = null;
+    const promesa = new Promise((resolve, reject) => {
+        hijo = execFile(cmd, args, options, (err, stdout, stderr) => {
+            if (err) reject(err); else resolve({ stdout, stderr });
+        });
+    });
+    promesa.child = hijo;
+    return promesa;
+};
 
 // --- Detección robusta de Python ---
 // EXPONER A GLOBAL PARA QUE LOS HANDLERS PUEDAN USARLO
@@ -4308,10 +4324,44 @@ ipcMain.handle('map-directory', async (event, directoryPath) => {
     console.log(`[MAPEO][MAIN] Script path: ${pythonScriptPath}`);
     console.log(`[MAPEO][MAIN] Ejecutando: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
 
-    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], {
+    // 📦864 — Fase 1 del plan de mapeo: el stdout venía SIN maxBuffer, así que Node
+    // cortaba la salida en 1 MiB (el default) y `JSON.parse(stdout)` revienta DESPUÉS
+    // de escanear todo (~2,98 MB de JSON en el directorio real). Con 64 MB el JSON
+    // completo entra holgado; el timeout evita que un escaneo colgado quede para
+    // siempre (30 min: cubre el escaneo actual de ~13 min con SHA-256, que la Fase 2
+    // va a eliminar).
+    const promesaMapeo = execFilePromise(pythonPath, [pythonScriptPath, directoryPath], {
       cwd: path.dirname(pythonScriptPath),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 30 * 60 * 1000
     });
+
+    // 📦867 (Fase 4) — stderr en vivo. Se leen las líneas `[PROGRESO] archivos=N carpetas=N`
+    // que escribe map_directory.py y se reenvían a la ventana, para que el overlay deje de
+    // mostrar una estimación fija mientras el proceso lleva 760 s. stderr SEGUYENTE
+    // acumulándose aparte (execFile lo entrega en su callback y vuelve en `log:` más
+    // abajo): este listener solo lo escucha en paralelo, no lo consume ni lo reemplaza.
+    let restoProgreso = '';
+    if (promesaMapeo.child && promesaMapeo.child.stderr) {
+      promesaMapeo.child.stderr.on('data', (chunk) => {
+        restoProgreso += chunk.toString('utf8');
+        const lineas = restoProgreso.split('\n');
+        restoProgreso = lineas.pop(); // el resto, que todavía no cerró con salto
+        for (const linea of lineas) {
+          const coincidencia = linea.match(/^\[PROGRESO\] archivos=(\d+) carpetas=(\d+)\s*$/);
+          if (!coincidencia) continue;
+          // La ventana pudo cerrarse mientras escaneaba: mandar ahí revienta el proceso.
+          if (event.sender.isDestroyed()) return;
+          event.sender.send('mapeo-progreso', {
+            archivos: parseInt(coincidencia[1], 10),
+            carpetas: parseInt(coincidencia[2], 10)
+          });
+        }
+      });
+    }
+
+    const { stdout, stderr } = await promesaMapeo;
 
     console.log(`[MAPEO][MAIN] stdout recibido (${stdout.length} bytes)`);
     console.log(`[MAPEO][MAIN] stderr: ${stderr || '(vacío)'}`);

@@ -3123,13 +3123,17 @@
             Analizando la estructura de carpetas...
         </p>
         <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
-                <i class="fas fa-info-circle"></i> 
-                <strong>Tiempo estimado:</strong> 10-60 segundos dependiendo del tamaño de la carpeta
+            <p id="mapping-progress" style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
+                <i class="fas fa-folder-open"></i>
+                <span>Esperando el inicio del recorrido...</span>
             </p>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">
                 <i class="fas fa-clock"></i> 
                 <span id="mapping-timer">Tiempo transcurrido: 0s</span>
+            </p>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">
+                <i class="fas fa-info-circle"></i>
+                <span>Si la carpeta está en la nube (Drive, OneDrive) puede tardar varios minutos.</span>
             </p>
         </div>
         <div id="mapping-details" style="margin-top: 1.5rem; text-align: left; max-height: 200px; overflow-y: auto; background: #1e293b; color: #10b981; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; display: none;">
@@ -6666,6 +6670,7 @@ en lugar de afirmar una condición específica no verificada.**`;
             const mappingOverlay = document.getElementById('mapping-overlay');
             const mappingMessage = document.getElementById('mapping-message');
             const mappingTimer = document.getElementById('mapping-timer');
+            const mappingProgress = document.getElementById('mapping-progress');
             const mappingDetails = document.getElementById('mapping-details');
             const btnSaveLink = document.getElementById('btn-save-link');
 
@@ -6682,6 +6687,29 @@ en lugar de afirmar una condición específica no verificada.**`;
                 seconds++;
                 mappingTimer.textContent = `Tiempo transcurrido: ${seconds}s`;
             }, 1000);
+
+            // 📦867 (Fase 4) — progreso REAL. El overlay antes mostraba "Tiempo estimado:
+            // 10-60 segundos" (copia fija, nunca calculada) y nada más: con la carpeta en
+            // Drive el proceso pasaba 760 s sin que la vista dijera absolutamente nada.
+            // Ahora se escucha 'mapeo-progreso', que main.js reenvía desde el stderr de
+            // Python. Se guarda la función de baja y se suelta en TODOS los caminos de
+            // salida: un listener sobreviviendo al overlay seguiría cobrando el IPC.
+            let quitarListenerProgreso = null;
+            if (electronAPI && typeof electronAPI.onMapDirectoryProgress === 'function') {
+                quitarListenerProgreso = electronAPI.onMapDirectoryProgress(function (progreso) {
+                    if (!progreso || !mappingProgress) return;
+                    mappingProgress.innerHTML = '<i class="fas fa-folder-open"></i> Recorriendo: ' +
+                        progreso.archivos + ' archivos y ' + progreso.carpetas + ' carpetas';
+                });
+            }
+
+            // Soltar la suscripción una sola vez, sin importar por dónde salga el guardado.
+            const soltarProgreso = function () {
+                if (typeof quitarListenerProgreso === 'function') {
+                    quitarListenerProgreso();
+                    quitarListenerProgreso = null;
+                }
+            };
 
             // Actualizar mensaje
             mappingMessage.innerHTML = `
@@ -6701,6 +6729,7 @@ en lugar de afirmar una condición específica no verificada.**`;
             if (!electronAPI.mapDirectory) {
                 console.error('[CONFIG][SAVE] ERROR: electronAPI.mapDirectory no está disponible');
                 clearInterval(timerInterval);
+                soltarProgreso();
                 mappingOverlay.style.display = 'none';
                 btnSaveLink.disabled = false;
                 btnSaveLink.textContent = 'Guardar y Vincular';
@@ -6743,6 +6772,13 @@ en lugar de afirmar una condición específica no verificada.**`;
 
                     if (!result.success || !result.structure) {
                         throw new Error('El mapeo no devolvió una estructura válida');
+                    }
+
+                    // El contador en vivo ya cumplió su función. Se congela con un estado final
+                    // en vez de dejar el último número: en una carpeta chica puede no
+                    // haber llegado NI UNA línea de progreso y quedaría diciendo "esperando".
+                    if (mappingProgress) {
+                        mappingProgress.innerHTML = '<i class="fas fa-check"></i> Recorrido completado';
                     }
 
                     // === SEGUNDO: CARGAR CONFIGURACIÓN Y ACTUALIZAR ===
@@ -6815,6 +6851,7 @@ en lugar de afirmar una condición específica no verificada.**`;
                 .then(() => {
                     console.log('[CONFIG][SAVE] Configuración guardada exitosamente');
                     clearInterval(timerInterval);
+                    soltarProgreso();
 
                     // Actualizar UI con éxito
                     mappingMessage.innerHTML = `
@@ -6840,6 +6877,7 @@ en lugar de afirmar una condición específica no verificada.**`;
                     console.error('[CONFIG][SAVE] Error al guardar la empresa:', error);
                     console.error('[CONFIG][SAVE] Stack:', error.stack);
                     clearInterval(timerInterval);
+                    soltarProgreso();
 
                     // Determinar el mensaje de error apropiado
                     let errorMessage = error.message;

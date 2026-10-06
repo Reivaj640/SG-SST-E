@@ -10,6 +10,226 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.246] - 2026-10-06
+
+### 📦867 · Fase 4 del mapeo de estructura: la pantalla deja de mentir y dice cuánto se lleva
+
+**Resumen:** quinta y última etapa del plan de 5 fases. **Primera fase del plan con cambios
+visibles en pantalla.** El overlay del mapeo muestra los archivos y las carpetas contados de a
+verdad mientras el escáner corre, y se elimina el "Tiempo estimado: 10-60 segundos" que era un
+texto fijo (nunca calculado) y que en una carpeta de Drive se quedaba corto por dos órdenes de
+magnitud.
+
+**El problema que motiva esta fase.** Con la carpeta real en Google Drive, `map_directory.py`
+pasaba más de 760 s (medidos: 1.241 s de reloj contra 4,45 s de CPU — el 99,6 % es esperar la red).
+Durante todo ese tiempo la ventana mostraba un spinner, un reloj y nada más: el usuario no tenía
+ni idea de si estaba avanzando o colgado, y el texto de "10-60 segundos" le decía que algo
+estaba roto cuando en realidad iba bien.
+
+**Qué se hizo — el progreso viaja de verdad, de punta a punta:**
+
+| Tramo | Qué hace |
+|---|---|
+| `map_directory.py` | `_avisar_progreso()` escribe `[PROGRESO] archivos=N carpetas=N` a **stderr**, amortiguado a 250 ms con `time.monotonic()`, con una línea forzada al arrancar y otra al cerrar |
+| `main.js` | Engancha `child.stderr` y reenvía cada línea por el canal IPC `mapeo-progreso`; `stderr` sigue acumulándose aparte para el campo `log:` |
+| `preload.js` | `onMapDirectoryProgress(cb)` devuelve la función que quita el listener |
+| `config-viewer.html` | Pinto el contador real y sueltan el listener en los **tres** caminos de salida |
+
+**Por qué stderr y no stdout:** stdout tiene que quedar con **una sola línea de JSON puro** (el
+contrato de 📦866). Mandar el avance por ahí lo rompía, y el test lo verifica con un bite test
+real: si el progreso vuelve a stdout, el `JSON.parse` deja de poder leer el resultado.
+
+**Lo que NO se tocó:** el contrato del escáner (`root`, `structure.name`/`path`, `subdirectories`
+como dict, `total_files`/`total_folders`), los límites `maxBuffer: 64 MB` y `timeout: 30 min` de
+la Fase 1, y el reloj de tiempo transcurrido (que sí era real; lo engañoso era la *estimación*).
+
+**Cómo se validó:** `py_compile` OK · `node --check` OK en `main.js` y `preload.js` · test nuevo
+`main/test-mapeo-estructura-867.js` **44/44**, con **11 mutaciones** que confirman que muerde
+(sin `.child`, sin guard de ventana destruida, progreso a stdout, sin `timeout`, sin `flush`, con
+`time.time()`, canal mal escrito, "10-60 segundos" de vuelta, listener sin soltar…) · tests 863
+**36/36**, 865 **15/15**, 866 **20/20** · suite **124 · 106 verdes · 18 preexistentes (0
+regresiones)**. Cache-bust: `renderer.js?v=20261006-mapeo-fase4`.
+
+**Validación de integración (fuera del repo, en `%TEMP%`):** se extrajeron y ejecutaron el
+wrapper y la expresión regular **reales** de `main.js` contra un fixture de 2.500 archivos —
+15/15. Las muestras de progreso llegaron a los 81 ms y 114 ms, **antes** de que el proceso
+terminara (125 ms): eso demuestra que el avance se escucha en vivo y no llega bufferizado al
+final, que era justamente el defecto que vino a corregir esta fase. Queda pendiente decidir si
+esa prueba entra al repo como test.
+
+## [0.1.245] - 2026-10-06
+
+### 📦866 · Fase 3 del mapeo de estructura: el resultado baja de ~3 MB a una fracción y siempre llega completo
+
+**Resumen:** cuarta etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete el
+escáner deja de armar un informe tres veces más grande del necesario: saca del resultado los datos
+que **nadie lee** (`files[]`, `file_count`, `dir_count`, `errors` y el indentado `indent=2`), sin
+tocar nada de lo que la app sí consulta.
+
+**El problema que motiva esta fase.** La Fase 1 agrandó el conducto de salida (1 MiB → 64 MB) y con
+eso el JSON dejó de cortarse… pero seguía pesando ~2,98 MB sobre el Drive real. Ese peso no es
+gratuito: cada archivo arrastraba una **lista de rutas repetida**, un recuento por carpeta, un
+listado de errores y sangría de dos espacios por nivel. Medido con un fixture de 2.000 archivos:
+**934.437 bytes / 19.219 líneas** contra **20.877 bytes / 1 línea** del código nuevo — **−97,8 %**.
+
+**Qué se sacó (0 consumidores verificado con grep en la Fase 0):**
+
+| Campo quitado | Por qué se pudo |
+|---|---|
+| `files[]` por nodo | Solo lo leía `formatStructureForLog`, que ya tolera nodos sin `files` |
+| `file_count` / `dir_count` | **No** se quitan: se conservan y ahora salen de un contador global (`_contador`) que se reinicia en cada corrida |
+| `errors[]` | Los avisos van a `stderr` (`print(..., file=sys.stderr)`), así el stdout queda JSON puro |
+| `indent=2` | Un solo renglón; el `JSON.parse` no distingue |
+| bloque por-archivo de `stat` + extensión | La Fase 2 ya no calcula checksum, y la extensión no la lee nadie |
+
+**Lo que NO se tocó:** el contrato completo (`root`/`structure.path` absolutos, `structure.name`,
+`subdirectories` como diccionario, `print(json.dumps(structure`, `map_directory(root_path)`),
+`total_files`/`total_folders` (**sí** los consume `renderer.js:7158/7160` y `main.js:4337/4338`)
+y la semántica de symlink/OSError de la Fase 2.
+
+**Tests:** `main/test-mapeo-estructura-866.js` (**20 checks**, nuevo). Escrito **antes** de tocar el
+código y probado contra la versión previa: **8 checks FALLAN** contra el código de Fase 2 (4
+estáticos: `files`, `file_count`/`dir_count` ausentes, `errors`, `indent=`; 4 de runtime: claves
+profundas presentes, stdout con 91 líneas) y **12 de preservación pasan en ambos**. Con el código
+nuevo: **20/20**. El test de Fase 0 sigue **36/36** y el de Fase 2 **15/15**.
+
+**Suite completa:** **123 tests · 105 en verde · 18 fallos** = línea base (122·104·18) + el test
+nuevo en verde. **0 regresiones**; los 18 fallos son los mismos preexistentes.
+
+**Verificación:** `python -m py_compile Portear/src/map_directory.py` OK · `node --check main.js` OK ·
+corrida real contra fixture (JSON parseable en **1 línea**, claves profundas inexistentes, totales
+contra un conteo independiente del disco).
+
+---
+
+## [0.1.244] - 2026-10-06
+
+### 📦865 · Fase 2 del mapeo de estructura: el escáner deja de tardar hora y media por nada
+
+**Resumen:** tercera etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete
+el mapeo quita de en medio lo que consumía casi todo el tiempo: calcular la huella (checksum) de
+cada archivo, un trabajo que nadie lee.
+
+**El problema que motiva esta fase.** El diagnóstico de la Fase 0 midió que el escáner tarda
+760+ segundos y que **~99,6 % de ese tiempo** se va en calcular la huella SHA-256 de cada uno de
+los 1,73 GB de la carpeta (`_calculate_checksum`, antes en `map_directory.py`). Recorrer las
+carpetas en sí es casi instantáneo. Y el resultado de tanto esfuerzo —el campo `checksum` de cada
+archivo— **no lo consume nadie**: 0 lecturas fuera del propio script.
+
+**Qué cambia en `Portear/src/map_directory.py`:**
+
+- **Se elimina `import hashlib`, la función `_calculate_checksum` y el campo `checksum`** de cada
+  archivo. Desaparece el cuello de botella completo.
+- **El recorrido pasa a un solo pase con `os.scandir`**: antes se abría cada directorio para
+  contarlo y después de nuevo para listar; ahora se lee una sola vez (`entries = list(scandir_it)`).
+- **`scan_date` deja de ser `null`** y sale con fecha y hora reales (`datetime.now().isoformat()`).
+- **Los errores de lectura ya no se tragan en silencio**: si un archivo no se puede leer, se lista
+  con `size: None` y se reporta.
+- **Semántica de atajos (symlink) conservada**: un atajo a una carpeta se lista como carpeta vacía
+  (igual que antes, sin descender), un atajo a un archivo se lista como archivo, y uno roto se omite.
+
+**Qué NO cambia todavía:** la forma de la respuesta sigue igual (`files[]`, `file_count`,
+`dir_count`, `errors` e indentado `indent=2` se van en la Fase 3) y no hay progreso visible
+(Fase 4). El pipeline de `main.js` no se toca.
+
+**Verificación:** `python -m py_compile Portear/src/map_directory.py` OK · test de Fase 0
+(`main/test-mapeo-estructura-863.js`) sigue **36/36** (los invariantes sobreviven) · test nuevo
+`main/test-mapeo-estructura-865.js` → **15/15 OK** (incluye corrida real contra fixture y
+búsqueda profunda de `checksum` en la salida) · **prueba de mordida**: los 6 checks de cambio
+aplicados al código viejo (HEAD) FALLAN y al nuevo PASAN, y las 3 guardias de preservación pasan
+en ambos · suite completa → **122 tests · 104 OK · 18 fallos preexistentes** (línea base + el
+test nuevo, 0 regresiones).
+
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase2`
+
+---
+
+## [0.1.243] - 2026-10-06
+
+### 📦864 · Fase 1 del mapeo de estructura: el escáner ya puede devolver su respuesta completa
+
+**Resumen:** segunda etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete
+el mapeo deja de estar condenado a fallar: el programa que dispara la app puede recibir el
+resultado entero en vez de recibirlo cortado a la mitad.
+
+**El problema que motiva esta fase.** En la Fase 0 se dejó escrito el diagnóstico: el escáner
+tarda 760+ segundos y el resultado **no llega nunca**. La app lanza un programa externo
+(`map_directory.py`) y lee lo que éste escribe en su salida; Node, por defecto, corta esa salida
+en **1 MB**. El árbol de una carpeta de 1,73 GB sale en un JSON de ~2,98 MB, así que la mitad
+del resultado se descarta y la lectura revienta **después** de la hora y media de escaneo.
+
+**Qué cambia.** El mismo punto de código (`main.js:4311`, la llamada `execFilePromise`) ahora
+recibe dos límites explícitos:
+
+- **`maxBuffer: 64 * 1024 * 1024` (64 MB)** — el techo de la salida pasa de 1 MB a 64 MB, ~21
+  veces el peso actual del JSON. Deja de ser la causa del fallo.
+- **`timeout: 30 * 60 * 1000` (30 minutos)** — si el escáner se cuelga, la llamada se corta y
+  devuelve un error claro en lugar de dejar la promesa pendiente para siempre (hoy no había
+  ningún tope: un proceso colgado bloqueaba el handler indefinidamente).
+
+**Qué NO cambia:** ni el script, ni la forma de la respuesta, ni la UI. Sigue sin haber progreso
+visible (Fase 4) y el escáner sigue siendo lento (Fase 2). Este paquete solo quita el techo que
+hacía imposible que el esfuerzo se tradujera en resultado.
+
+**Verificación:** `node --check main.js` OK · test de contrato de la Fase 0
+(`main/test-mapeo-estructura-863.js`) **36/36 OK** · suite completa `node Temp/run-all-tests.js`
+→ **121 tests · 103 OK · 18 fallos preexistentes** (mismo balance que en HEAD limpio: 0
+regresiones).
+
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase1`
+
+---
+
+## [0.1.242] - 2026-10-06
+
+### 📦863 · Fase 0 del mapeo de estructura: el contrato queda escrito en una prueba
+
+**Resumen:** primer paquete del plan de 5 fases para que "Mapeando Estructura de Documentos"
+termine. **Sin cambios visibles todavía** — esta fase solo pone el punto de control antes de
+tocar el escáner.
+
+**El problema que motiva el plan.** El mapeo tarda **760+ segundos** y **nunca termina bien**:
+`map_directory.py` recorre 1,73 GB (Google Drive), calcula SHA-256 de cada archivo —que es ~99,6 %
+del tiempo— y arma un JSON de ~2,98 MB. Ese JSON sale por `stdout` y `execFile` corta en **1 MiB**,
+así que `JSON.parse(stdout)` (`main.js:4322`) reventaba **siempre**, después de los 760 s. O sea:
+hora y media de escaneo para un error de parseo.
+
+**Qué hace esta fase.** Crea `main/test-mapeo-estructura-863.js` (36 checks) que fija el contrato
+antes de optimizar:
+
+1. **Corrida real** de `map_directory.py` contra un fixture temporal (carpeta + `sub` + `sub/interior`),
+   parseando el stdout completo. Si la máquina no tiene Python, ese bloque se omite con un check
+   aclarado en vez de romper la corrida.
+2. **La forma del contrato**: `root` absoluto igual al directorio pedido, `structure.name`,
+   `structure.path` absoluto y `structure.subdirectories` como **objeto** (no array), con las
+   carpetas del fixture apareciendo como claves, incluida la anidada.
+3. **El pipeline**: handler `map-directory`, `execFilePromise(pythonPath, [pythonScriptPath,
+   directoryPath])`, `JSON.parse(stdout)`, `getPython()`, el llamado desde `config-viewer` y el
+   `mapDirectory` del preload.
+4. **Las dos consumidoras extraídas del código real y ejecutadas**: `searchInStructure` (main.js,
+   devuelve la ruta; testea código exacto "2.4.1" sin matchear "4.2.4.1") y
+   `formatStructureForLog` (renderer.js, tolera nodos sin `files`).
+
+**Lo que este test NO chequea, a propósito:** `checksum`/SHA-256 (Fase 2 lo elimina), `files[]` /
+`file_count` / indentado (Fase 3) y el formato de `scan_date` (Fase 2 pasa de `null` a fecha real).
+Chequearlos ahora sería destruir la prueba en la fase siguiente.
+
+**Plan aprobado de 5 fases:** Fase 0 contrato (este paquete) → Fase 1 `maxBuffer`/`timeout` en el
+`execFile` (📦864) → Fase 2 velocidad: sin SHA-256, `os.scandir`, un solo pase, `scan_date` real
+(📦865) → Fase 3 tamaño: sin `files[]`/indentado (📦866) → Fase 4 progreso real por stderr→IPC→UI
+(📦867). Fase 5 (backlog, 📦868).
+
+**Fix colateral (mismo anti-patrón que 📦849):** el bump del `?v=` rompió el check 5 de
+`test-hero-fila-840.js`, que tenía el token `20261006-admin-empresas-2` escrito a mano — un test
+que hay que editar en cada bump dejó de proteger nada. Ahora valida la **forma**
+(`/renderer\.js\?v=\d{8}-/`), no el valor, siguiendo la regla de 📦849.
+
+**Tests:** `node main/test-mapeo-estructura-863.js` → **36/36 OK** (incluye la corrida real con
+Python 3.14.8).
+**Suite completa:** 121 tests, 103 en verde, 18 fallos preexistentes, 0 regresiones.
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase0` en `index.html`.
+**Versión:** 0.1.241 → 0.1.242
+
 ## [0.1.241] - 2026-10-06
 
 ### 📦862 · Un administrador ya no queda encerrado en "contacta a administración"
