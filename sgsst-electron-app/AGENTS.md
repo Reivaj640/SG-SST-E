@@ -535,9 +535,12 @@ async renderMainArea(container) {
   repo es privado: `publish: {provider: "github"}` + electron-updater sin token ⇒ 404 en la
   API de releases ⇒ todos los clientes dejan de actualizar. De ahí que las credenciales
   vivan en `.env` y no en el archivo versionado.
-- 📌 **El correo de soporte del sitio es PROVISORIO** (`soporte@k-air.com`, con aviso visible
-  en `sitio/soporte.html`). Google exige que el correo de asistencia sea alcanzable para
-  aprobar la app. No dar por cerrado sin resolverlo.
+- 📌 **El correo de soporte del sitio es `adminkair@gmail.com`** — ya NO es provisorio
+  (`e373fdce`). Si algún día cambia, va en **tres** lugares: `sitio/soporte.html`, el correo de
+  asistencia de Google Auth Platform y esta documentación; y después hay que regenerar
+  `gh-pages`. Ojo con `privacidad.html`: se corrigió una afirmación falsa que daba
+  `firma.k-air.com` por el servidor de firma, cuando la URL sale de `secrets.enc` y la
+  configura cada empresa (`main/firma-bridge.js:571-576`).
     CRLF y LF, usa separadores `\r\r\r\n` (CR CR CR LF) en los bloques de novedades. El editor
     los aplana a CRLF y el diff pasa de unas 40 líneas a **4.262**. Pasó dos veces en 📦868 y
     arruinó los cambios: el arreglo fue `git checkout --` y re-aplicar TODO con un script de

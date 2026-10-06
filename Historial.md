@@ -24,7 +24,7 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-06 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (sitio legal, `2ace3131`) |
+| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (sitio legal) y `e373fdce` (correo de soporte real) |
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
 | **Versión** | `0.1.247` (desarrollo) · último publicado `v0.1.205` |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
@@ -32,16 +32,18 @@
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
 | **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
-| **Jornada** | **Cerrada** (2026-10-06). **Commiteado y pusheado**: `3514af7f` (📦868) y `2ace3131` (sitio legal). El objetivo de la jornada —que cualquier persona conecte su correo sin configurar nada— **quedó cumplido y probado con una cuenta que nunca estuvo en la lista de usuarios de prueba** |
+| **Jornada** | **Cerrada** (2026-10-06). **Commiteado y pusheado**: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación) y `e373fdce` (correo de soporte real). El objetivo de la jornada —que cualquier persona conecte su correo sin configurar nada— **quedó cumplido y probado con una cuenta que nunca estuvo en la lista de usuarios de prueba** |
 
 
 ### 🛠️ Cola abierta al cerrar esta jornada (en orden de urgencia)
 
-1. **🔴 El correo de soporte del sitio legal es PROVISORIO y Google lo exige real.**
-   `sitio/soporte.html` tiene `soporte@k-air.com` con un aviso visible de "pendiente de
-   completar". La página de soporte tiene "Correo" y "Dirección física" en *pendiente*.
-   Google exige que el correo de asistencia sea alcanzable; sin eso, la revisión de la app
-   falla. **Decidir y actualizar `sitio/soporte.html`, luego regenerar `gh-pages`.**
+1. **✅ RESUELTO: el correo de soporte del sitio legal es `adminkair@gmail.com`, ya no
+   provisorio.** `sitio/soporte.html` (`e373fdce`) quitó el aviso de "pendiente de completar" y
+   todo *pendiente* de la tabla del responsable. Es el mismo correo declarado en Google
+   Auth Platform. `gh-pages` regenerada (`9c8fbfb7`) y verificada en vivo: responde 200 con
+   el correo nuevo y sin el viejo. De paso se corrigió una afirmación falsa de
+   `privacidad.html`, que daba `firma.k-air.com` por el servidor de firma cuando la URL sale
+   de `secrets.enc` y la configura cada empresa (`main/firma-bridge.js:571-576`).
 
 2. **🐇 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que
    regenerar la otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree`

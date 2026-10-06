@@ -199,8 +199,9 @@ código antes de escribirla:
 - `"sync-bridge"` no es un bridge de red: es IPC, y `sync-service.js` usa `fs` sobre una
   carpeta local.
 - Sin telemetria: no hay Sentry, PostHog ni Analytics; `electron-log` escribe solo en archivo.
-- El único canal propio es `firma.k-air.com`, que recibe PDFs a firmar — separado del
-  correo, y así queda declarado.
+- El único canal propio es el **servidor de firma que la empresa tenga configurado**, que
+  recibe PDFs a firmar — separado del correo. La URL sale de `secrets.enc`, así que
+  `firma.k-air.com` es el de una empresa concreta, no uno fijo.
 - Se declara la debilidad real: los tokens se guardan **sin cifrar**
   (`shared/google-tokens.js:29`).
 
@@ -218,8 +219,9 @@ del owner — se publica **solo** el sitio. Verificado: `/docs/`, `/Portear/` y
 
 ### Lo que sigue pendiente (detalle en `Historial.md`)
 
-1. **El correo de soporte del sitio es PROVISORIO** (`soporte@k-air.com`). Google exige que
-   sea alcanzable.
+1. **✅ El correo de soporte del sitio ya NO es provisorio**: es `adminkair@gmail.com`,
+   en `sitio/soporte.html` y en Google Auth Platform. De paso se corrigió una afirmación
+   falsa de `privacidad.html`, que daba `firma.k-air.com` por el servidor de firma.
 2. **`gh-pages` es una copia generada de `sitio/`**: si se edita una, hay que regenerar la otra.
 3. **Verificación de la app** (para sacar el aviso de "app no verificada"): ~10 días hábiles
    + Search Console + video de demostración. No corre prisa bajo 100 usuarios.
