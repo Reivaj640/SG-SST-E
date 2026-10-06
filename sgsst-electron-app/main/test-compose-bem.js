@@ -80,7 +80,12 @@ oldClasses.forEach(function (cls) {
 });
 
 // 5) Componentes 1-3 BEM también presentes (regression check)
-const c123 = ['.email-row', '.thread-header', '.quoted-thread', '.message-block', '.message-block--expanded'];
+// 🔴 `.message-block--expanded` salió de esta lista. No "se rompió": nunca existió en el
+// CSS del repo (AGENTS.md lo dice así). Este check pedía una clase de un diseño que no
+// llegó a aterrizar, así que se puede quitar sin dejar un hueco — invertirlo sería
+// inventar un contrato para algo que jamás existió (§7.3 no aplica aquí). Los otros cuatro
+// sí existen y siguen protegiendo.
+const c123 = ['.email-row', '.thread-header', '.quoted-thread', '.message-block'];
 c123.forEach(function (sel) {
   results.push({ check: 'CSS contains regression "' + sel + '"', ok: cssSrc.indexOf(sel) !== -1 });
 });

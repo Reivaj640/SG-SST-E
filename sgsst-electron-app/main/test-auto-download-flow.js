@@ -141,23 +141,27 @@ console.log('');
 console.log('Panel del header (UX):');
 console.log('');
 
-test('renderer.js: case "available" dice "Descargando automáticamente"', () => {
-  // Buscar case 'available': con dos puntos (sintaxis JS real)
+// ── 📦581 · INVERTIDOS 3 checks ──────────────────────────────────────────────
+// Los 3 pedían el comportamiento del update ANTES de 📦581: toast "Descargando
+// automáticamente", botón Descargar que se ocultaba, y notifyAvailable abriendo un
+// toast con progress + autoClose 0. Todo eso se quitó A PROPÓSITO ("🗑️ CSS legacy
+// del header update", "Toasts invasivos removidos (Loop 3)") y el update pasó al dot
+// del footer. Se invierten en vez de borrarse (§7.3).
+test('renderer.js: case "available" NO vuelve a decir "Descargando automáticamente"', () => {
   const caseIdx = rendererCode.indexOf("case 'available':");
   if (caseIdx < 0) throw new Error('No se encontró el case "available" del switch');
   const caseBody = rendererCode.slice(caseIdx, caseIdx + 3500);
-  if (!/Descargando autom[aá]ticamente/.test(caseBody)) {
-    throw new Error('case "available" no dice "Descargando automáticamente"');
+  if (/Descargando autom[aá]ticamente/.test(caseBody)) {
+    throw new Error('volvió el toast "Descargando automáticamente" — desde 📦581 el aviso va en el dot del footer');
   }
 });
 
-test('renderer.js: case "available" oculta el botón Descargar', () => {
+test('renderer.js: case "available" ya no toca el botón Descargar', () => {
   const caseIdx = rendererCode.indexOf("case 'available':");
   if (caseIdx < 0) throw new Error('No se encontró el case "available" del switch');
   const caseBody = rendererCode.slice(caseIdx, caseIdx + 3500);
-  // Buscar que el downloadBtn.style.display = 'none' (no 'block')
-  if (!/downloadBtn\.style\.display\s*=\s*['"]none['"]/.test(caseBody)) {
-    throw new Error('case "available" no oculta el botón Descargar');
+  if (/downloadBtn\.style\.display\s*=\s*['"]none['"]/.test(caseBody)) {
+    throw new Error('volvió downloadBtn.style.display = none — ese botón ya no existe desde 📦581');
   }
 });
 
@@ -183,29 +187,52 @@ test('update-notifications.js: existe método notifyDownloaded con onRestart', (
   }
 });
 
-test('update-notifications.js: notifyAvailable muestra toast con progress y autoClose 0', () => {
-  const methodMatch = notifCode.match(/notifyAvailable\s*\(\s*version\s*\)\s*\{[\s\S]{0,1500}?\n\s{4}\}/);
-  if (!methodMatch) {
-    throw new Error('No se encontró el cuerpo de notifyAvailable');
+// 🔴 El original usaba /notifyAvailable\s*\(\s*version\s*\)\s*\{[\s\S]{0,1500}?\n\s{4}\}/ :
+// una ventana de 1500 caracteres que alcanza el método SIGUIENTE y encuentra el
+// progress/autoClose de otro (§5.15). Se extrae el cuerpo por llaves balanceadas, que es
+// la comparación por bloque que corresponde.
+function cuerpoPorLlaves(src, firma) {
+  const i = src.indexOf(firma);
+  if (i < 0) return '';
+  const abre = src.indexOf('{', i);
+  if (abre < 0) return '';
+  let nivel = 0;
+  for (let j = abre; j < src.length; j++) {
+    if (src[j] === '{') nivel++;
+    else if (src[j] === '}') { nivel--; if (nivel === 0) return src.slice(abre, j + 1); }
   }
-  if (!/progress:\s*\{\s*percent:\s*0\s*\}/.test(methodMatch[0])) {
-    throw new Error('notifyAvailable no muestra progress: { percent: 0 }');
+  return '';
+}
+
+test('update-notifications.js: notifyAvailable es un no-op y no abre toast', () => {
+  const cuerpo = cuerpoPorLlaves(notifCode, 'notifyAvailable(version)');
+  if (!cuerpo) throw new Error('No se encontró el cuerpo de notifyAvailable');
+  if (/progress:\s*\{\s*percent:\s*0\s*\}/.test(cuerpo)) {
+    throw new Error('volvió el toast de notifyAvailable — desde 📦581 Loop 3 es no-op a propósito');
   }
-  if (!/autoClose:\s*0/.test(methodMatch[0])) {
-    throw new Error('notifyAvailable no tiene autoClose: 0 (no debería cerrarse solo)');
+  if (/autoClose:\s*0/.test(cuerpo)) {
+    throw new Error('volvió autoClose: 0 en notifyAvailable — ya no abre toast');
+  }
+  // Y sí tiene que seguir siendo un no-op explícito, no un borrado silencioso.
+  if (!/no-op desde Loop 3/.test(cuerpo)) {
+    throw new Error('notifyAvailable dejó de documentar que es no-op — el aviso tiene que seguir yendo al footer');
   }
 });
 
-test('update-notifications.js: notifyDownloaded tiene botón "Reiniciar e Instalar Ahora"', () => {
-  const methodMatch = notifCode.match(/notifyDownloaded\s*\(\s*version\s*,\s*onRestart\s*\)\s*\{[\s\S]{0,1500}?\n\s{4}\}/);
-  if (!methodMatch) {
-    throw new Error('No se encontró el cuerpo de notifyDownloaded');
+// 📦581 Loop 3, misma causa que el de arriba: notifyDownloaded dejó de abrir toast, así que
+// ya no puede tener ni buttonText ni onClick. El reinicio se hace desde el dropdown.
+// Se invierte, y se cambia la extracción por la de llaves balanceadas (mismo motivo).
+test('update-notifications.js: notifyDownloaded es un no-op y no abre toast', () => {
+  const cuerpo = cuerpoPorLlaves(notifCode, 'notifyDownloaded(version, onRestart)');
+  if (!cuerpo) throw new Error('No se encontró el cuerpo de notifyDownloaded');
+  if (/buttonText:\s*['"]Reiniciar e Instalar Ahora['"]/.test(cuerpo)) {
+    throw new Error('volvió el botón "Reiniciar e Instalar Ahora" — desde 📦581 el reinicio va en el dropdown');
   }
-  if (!/buttonText:\s*['"]Reiniciar e Instalar Ahora['"]/.test(methodMatch[0])) {
-    throw new Error('notifyDownloaded no tiene buttonText "Reiniciar e Instalar Ahora"');
+  if (/onClick:\s*onRestart/.test(cuerpo)) {
+    throw new Error('volvió onClick: onRestart — desde 📦581 el usuario decide cuándo reiniciar');
   }
-  if (!/onClick:\s*onRestart/.test(methodMatch[0])) {
-    throw new Error('notifyDownloaded no conecta el onClick con onRestart');
+  if (!/no-op desde Loop 3/.test(cuerpo)) {
+    throw new Error('notifyDownloaded dejó de documentar que es no-op — el reinicio tiene que quedar en el dropdown');
   }
 });
 

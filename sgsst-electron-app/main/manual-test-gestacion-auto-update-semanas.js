@@ -1,3 +1,7 @@
+// RENOMBRADO desde test-manual-test-gestacion-auto-update-semanas.js el 2026-10-06: este archivo usa electron.app.whenReady(), que no existe
+// bajo ELECTRON_RUN_AS_NODE=1. El runner lo descubria igual (/^test-.*\.js$/) y lo contaba
+// como fallo todos los dias. No es un test roto: es un test que no puede correr en la suite.
+// Correrlo a mano con la app viva: npx electron main/manual-test-gestacion-auto-update-semanas.js
 'use strict';
 // Test funcional del fix: auto-actualizar semanas_gestacion al guardar seguimiento
 const { app } = require('electron');

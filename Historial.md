@@ -28,7 +28,7 @@
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
 | **Versión** | `0.1.247` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | 125 tests · **108 verdes** · 17 con fallos — cero regresiones. **Remedido hoy 2026-10-06 con la corrida completa: `test-skeleton-encaje.js` salió de la lista de rojos (25/26 → 29/29) y los 17 restantes son idénticos a los de antes.** Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
+| **Suite (escritorio)** | **119 tests · 112 verdes · 7 con fallos · 1 sin resumen verificable.** Antes decía "125 · 108 · 17", y ese 17 no significaba nada: eran 6 problemas distintos y **10 de ellos NO eran fallos del producto** sino tests viejos contra código borrado a propósito (📦581 y 📦752). Detalle y tabla de los 7 en `PROMPT.md` §7.4 | `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados) y **`googleOAuth` está presente** (Gmail conectado). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** |
 | **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. **El ancho de la tarjeta de ingreso** (el punto 5 de la cola, sin número de paquete todavía) y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
@@ -46,15 +46,12 @@
    cambio nunca tuvo número: se le colgó el de otro por error, y el CHANGELOG llegó a
    afirmar que ya estaba commiteado. Le corresponde **📦869** cuando se commitee.
 
-2. **🔴 Quedan 4 tests con el mismo literal de cache-bust (minas latentes).** El de
-   `test-skeleton-encaje.js` ya se arregló, pero el barrido encontró la misma enfermedad en:
-   - `test-despliegue-estrategico-premium.js:88` — `despliegue-estrategico.js?v=20260921`
-   - `test-chart-overflow.js:157` — `kair-components.css?v=20260918-bar-chart-html`
-   - `test-identificacion-peligros.js:120,136,142` — `?v=20260921-premium-v7-volver` (×3)
-
-   Hoy pasan, pero se caen con el próximo bump legítimo de esos archivos. El fix es el mismo
-   patrón `\d{8}-` que ya usan `test-config-premium-v2.js:72` y `test-bandeja-paginacion.js:185`
-   — o sea, el repo ya pagó esta lección dos veces y el patrón correcto ya está escrito.
+2. **🔴 `PROMPT.md` §2 dice que `Temp/` "NO se commitea". Es falso: hay 13 archivos
+   versionados ahí, incluido `run-all-tests.js`.** El mapa del repo hay que corregirlo, y conviene
+   decidir si `Temp/` es realmente donde debe vivir el runner — un archivo que todos corren y del
+   que nadie se acuerda, en una carpeta con nombre de "temporal", es una forma de perderlo. Dos
+   caminos: moverlo a `sgsst-electron-app/tools/` y dejar `Temp/` de verdad scratch, o dejarlo y
+   arreglar la etiqueta. Lo que **no** conviene es seguir llamándolo temporal.
 
 3. **🧪 Validación visual del ancho de la tarjeta y de 📦867**: nunca se abrieron en la app.
    ✅ Ya no hay empresa de por medio (la BD tiene Tempoactiva y Temposum), así que la de 867
@@ -85,7 +82,7 @@
    Funciona, pero si K+AIR va a crecer conviene apuntar a un dominio propio (el servicio de
    firma ya usa `firma.k-air.com`) antes de pedir la verificación de la app.
 
-8. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~51 versiones sin publicar.** El
+8. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~52 versiones sin publicar.** El
    desarrollo va en `0.1.247`. Esta tabla decía "último publicado `v0.1.205`" y **ese tag no
    existe**. Corregido arriba, pero la decisión de liberar o no es del owner. Ojo con el 🐇 del
    punto 4: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
@@ -97,6 +94,11 @@
 10. **⚠️ "913 pacotes" en la fila de entorno es ambiguo.** El último `📦n` real es **868**.
     Casi seguro ahí se cuentan paquetes npm instalados y no paquetes del changelog, pero el
     texto no lo dice y se lee como lo segundo. Vale una línea aclaratoria.
+
+11. **🔴 `delete-personal` devuelve `undefined`** (`test-gestion-humana-bridge-write-extra.js`
+    lee `.retired` de un `undefined` y revienta). Es el **único** de los 7 fallos de la suite
+    que huele a defecto real y no a test viejo: los otros 6 son entorno, esquema del propio
+    test o expectativas que quedaron atrás de un fix documentado en el código.
 
 ### ✅ Cerrado en esta sesión (no hace falta para retomar)
 
@@ -113,9 +115,18 @@
   inejecutable. Ahora pregunta "¿tiene token?" (`\d{8}-`) y trae **3 mutaciones que muerden**.
   El test pasó de 25/26 a **29/29** y la suite de **107 verdes a 108**, con los 17 fallos
   restantes idénticos a los de antes: cero regresiones.
+- **Las 7 minas de cache-bust cerradas.** Convivían **19 formatos de resumen** y el runner solo
+  entendía `N/M OK`: lo que no casaba se contaba verde sin mirar sus checks. Ahora `leerResumen()`
+  los lee todos y los no verificables van a lista propia. Además, los 7 checks que anclaban un
+  literal de `?v=` pasaron a preguntar la forma (`\d{8}-`), y **ya no queda ninguno anclado** en
+  `main/` — un grep final solo encuentra menciones, todas dentro de comentarios que explican el
+  cambio. De paso se corrigió un **check duplicado exacto** en `test-identificacion-peligros.js`
+  (líneas 120 y 142, el mismo `INDEX.includes`), que ahora afirma algo distinto.
 - **La etiqueta falsa "📦862 = ancho de la tarjeta"**, quitada de la cola y del CHANGELOG.
 - **`PROMPT.md` §5.9**: el "0 archivos" sobre `KairUI.esc()` / `KairHelpers.formatDate()` era
   falso; corregido con el matiz real (existen, pero solo dentro de Auditoría Anual).
+- **`PROMPT.md` §2**: decía que `Temp/` no se commitea. Falso — hay 13 archivos versionados ahí,
+  incluido el runner.
 
 
 ### ▶️ Retomar desde acá — siguiente paso concreto

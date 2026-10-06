@@ -73,7 +73,7 @@ SG-SST-E/
     ├── shared/                ← tokens, componentes, calendario, alertas
     ├── renderer/
     │   └── bandeja-integrada/ ← la Bandeja Integrada (app monolítica propia)
-    ├── Temp/                  ← runner de tests + scripts one-shot (NO se commitea)
+    ├── Temp/                  ← runner de tests + scripts one-shot (los `.js` SÍ se versionan: hay 13)
     └── tests/                 ← 30 tests históricos — el runner NO los ve
 ```
 
@@ -676,8 +676,10 @@ console.log((checks.length - failed) + '/' + checks.length + ' OK');
 process.exit(failed === 0 ? 0 : 1);
 ```
 
-> El runner parsea ese `N/M OK` por **regex de stdout**. Si un test no lo imprime, el runner lo cuenta
-> como verde. No loieces el formato.
+> El runner parsea el resumen **con `leerResumen()`, que entiende 19 formatos** (`N/M OK`,
+> `N/M checks OK`, `N OK · M FAIL`, `Total: N | ✅ N | ❌ M`, TAP, texto pelado…). Antes buscaba
+> solo `N/M OK` y lo que no casaba lo contaba verde sin que nadie hubiera mirado sus checks — por
+> eso el runner tiene que **entender** el formato, no alcanza con que vos lo imprimas. Ver §7.4.
 
 ### 7.1 Guards — checks que sí muerden
 
@@ -747,14 +749,54 @@ que **NO** pase.
 checks —uno de HTML y otro de JS—. Invertir uno y borrar el otro deja el agujero de que
 reintroducir el código sin el markup pase verde.
 
-### 7.4 Fallos preexistentes
+### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-Hoy hay **18** y son los mismos de hace meses (z-index de CSS, cache-bust de `styles.css`, y el
-`no such column: actualizado_en` del sync). **No hay lista en código**: el runner no tiene tolerancias,
-viven documentadas en prosa.
+**Medido el 2026-10-06, con el runner arreglado:** **119 tests · 112 en verde · 7 con fallos ·
+1 sin resumen verificable.** Antes de este arreglo la misma suite decía "125 · 108 · 17", y ese 17
+no significaba nada: eran **seis problemas distintos** déguisados de uno. **No hay lista en código**:
+el runner no tiene tolerancias, viven documentadas acá en prosa.
 
-Para afirmar que un fallo es preexistente hay que **probar que también falla en HEAD limpio** y decirlo
-con esas palabras. Un test rojo nuevo es un test rojo nuevo.
+| # | Test | Qué necesita para pasar |
+|---|---|---|
+| 1 | `test-firma-bridge.js` | el servicio de firma vivo |
+| 2 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` — saca **83/83** y después falla por la variable |
+| 3 | `test-firma-tunnel-kit.js` | `cloudflared` y red (24/27) |
+| 4 | `test-gestion-humana-bridge-newtables.js` | su base temporal no tiene `ruta_archivo`. **En la BD real sí existe** (13 columnas) — no es un bug de la app |
+| 5 | `test-gestion-humana-bridge-write-extra.js` | `delete-personal` devuelve `undefined` y el test lee `.retired` |
+| 6 | `test-gestion-humana-bridge-write.js` | expectativas viejas: `paso_actual` pasó a "primer paso pendiente" (fix documentado en `gestion-humana-bridge.js:863`) y el test espera "último completado" (87/89) |
+| 7 | `test-sync-serializer.js` | `no such column: actualizado_en` |
+
+El **1 sin resumen** es `test-init-order-bug.js`: es un test de inspección estructural que imprime
+texto, no un `N/M`. Sale 0 y el runner lo cuenta verde, pero sin poder confirmar cuántos checks corrieron.
+
+**🔴 El hallazgo importante: de los 17 que había, 10 NO eran fallos del producto.** Eran tests
+viejos contra código que se cambió **a propósito**, y el runner los mezclaba con los fallos reales.
+Casi todos de dos causas:
+
+- **📦581 (el update pasó al footer del shell).** `test-header-zindex.js` exigía z-index de
+  `.header-update-panel`, que `CHANGELOG.md` ya decía haber borrado; `test-auto-download-flow.js`
+  exigía los toasts que el Loop 3 convirtió en no-ops documentados.
+- **📦752 (el rediseño premium de la Bandeja).** `test-auditoria-visual.js` exigía una toolbar
+  duplicada y un `setTimeout` que `app.js:6222` documenta como **código zombie eliminado en el loop 28**.
+
+**La regla que sale de ahí:** un check que pide algo que el código borró a propósito no se "arregla"
+doblando el código — se **invierte** (§7.3). Invertirlo convierte un rojo permanente en un guard que
+protege el borrado. Y **antes de llamar "preexistente" a un rojo, hay que preguntarse si el código
+tenía razón**: 10 de 17 la tenían, y ninguno era una regresión escondida.
+
+**Sobre el runner (`Temp/run-all-tests.js` — que SÍ está versionado, contra lo que dice §2):**
+
+1. `leerResumen()` entiende **19 formatos** de resumen. Antes buscaba solo `N/M OK`, que es lo que pide
+   §7, y **no lo cumple ni la mitad de los tests**: conviven `29/29 checks OK`, `87 OK · 2 FAIL`,
+   `Resultado: 3 OK / 2 FAIL`, `44/44 | pass: 44 | fail: 0`, `Total: 78 | ✅ 78 | ❌ 0`, TAP, y texto
+   pelado como `ALL CHECKS PASSED`. Los que no casaban caían en un `ok:true` **sin que nadie hubiera
+   mirado sus checks**. Por eso el bloque de arqueotipo de arriba dice `N/M OK` y no dice que el runner
+   lo exija: el runner lo tiene que **entender**, no solo ellos lo tienen que **imprimir**.
+2. Un test **sin resumen** va a su propia lista, no a la de fallos: no se sabe si el producto está roto,
+   y contarlo como fallo sería mentir en la dirección contraria.
+
+**Para afirmar que un fallo es preexistente hay que probarlo en HEAD limpio** y decirlo con esas
+palabras. Un test rojo nuevo es un test rojo nuevo.
 
 ### 7.5 La polaridad del análisis de mutaciones (el error que más repetí)
 

@@ -85,7 +85,12 @@ check('CSS tabla tiene td con padding 0.3rem', /\.kair-rad-table\s+tbody\s+td\s*
 section('9. Cache-bust en index.html');
 var indexHtml = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
 check('index.html tiene ?v= para despliegue-estrategico.js', /despliegue-estrategico\.js\?v=[\w-]+/.test(indexHtml));
-check('Cache-bust es reciente (>= 20260921)', /despliegue-estrategico\.js\?v=20260921/.test(indexHtml));
+// 🔴 Antes: /despliegue-estrategico\.js\?v=20260921/ — el nombre decía "es reciente (>= 20260921)"
+// pero el código fijaba una fecha. Un piso de recencia no es mantenible: en el primer bump
+// legítimo del archivo hay que tocar el literal, y el test se cae sin que nada esté roto. Mismo
+// arreglo que en ad25df49. El check de la línea de arriba ya pregunta lo de verdad (¿tiene token?);
+// este pasa a preguntar lo mismo sobre la FORMA del token.
+check('Cache-bust con la forma de fecha', /despliegue-estrategico\.js\?v=\d{8}-/.test(indexHtml));
 
 /* ─── Resumen ─── */
 console.log('\n══════════════════════════════════════════');
