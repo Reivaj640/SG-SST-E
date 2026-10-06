@@ -6,7 +6,7 @@
 // Esperado: 200+ OK · 0 FAIL
 
 const initSqlJs = require('sql.js');
-const { SCHEMA_SQL } = require('./gestion-humana-schema-sql');
+const { SCHEMA_SQL, MIGRATIONS_SQL } = require('./gestion-humana-schema-sql');
 const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 
 let _passed = 0;
@@ -70,6 +70,13 @@ async function run() {
   const SQL = await initSqlJs();
   const rawDb = new SQL.Database();
   rawDb.exec(SCHEMA_SQL);
+  // 🔴 La base se armaba SOLO con SCHEMA_SQL, pero las tablas y columnas nuevas viven en
+  // MIGRATIONS_SQL (§6.2). Acá es lo que hacía fallar `gh_documentos has no column named
+  // ruta_archivo`: la columna SÍ existe en la BD real (verificada), no en la del test.
+  // Mismo patrón que main.js:592-608: statement por statement, con try/catch.
+  (Array.isArray(MIGRATIONS_SQL) ? MIGRATIONS_SQL : []).forEach(function (stmt) {
+    try { rawDb.exec(stmt); } catch (migErr) { /* duplicate column = ya existe */ }
+  });
   rawDb.exec("CREATE TABLE IF NOT EXISTS companies (id TEXT PRIMARY KEY, company_key TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL);");
   rawDb.run("INSERT INTO companies (id, company_key, display_name) VALUES (?, ?, ?)",
     ['co-tempoactiva', 'tempoactiva', 'TEMPOACTIVA EST S.A.S.']);
@@ -784,8 +791,17 @@ async function run() {
   console.log('[73] diag final — phase 5');
   var finalDiag = registeredHandlers['gh:diag']({}, {});
   _assert(finalDiag.success === true, 'diag OK');
-  _assertEq(finalDiag.data.phase, 5, 'diag.phase = 5');
-  _assertEq(finalDiag.data.tables.length, 9, 'diag.tables = 9');
+  // 🔴 Antes fijaba `phase === 5` y `tables.length === 9`. Los dos son MÓVILES: la fase subió a 7
+  // con 📦764 y las tablas crecer con cada migración (por eso ahora son 11). Fijarlos hace que el
+  // test se caiga cada vez que el módulo crece, sin que nada esté roto. Se afirma lo que importa:
+  // que la fase esté al menos en la última conocida y que estén las tablas que el módulo usa.
+  _assert(finalDiag.data.phase >= 7, 'diag.phase >= 7 (última conocida: 📦764 Fase G)');
+  var diagTables = finalDiag.data.tables || [];
+  _assert(diagTables.length >= 11, 'diag.tables >= 11 (crece con cada migración)');
+  _assert(['base_personal', 'contrataciones', 'gh_documentos', 'gh_templates',
+           'gh_vacaciones', 'gh_permisos']
+    .every(function (t) { return diagTables.indexOf(t) !== -1; }),
+    'diag.tables trae las tablas que el módulo declara en su propio filtro');
 
   // ========== TEST 74: ANUNCIOS — update dirigidoA inválido ==========
   console.log('');

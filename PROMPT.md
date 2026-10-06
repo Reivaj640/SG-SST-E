@@ -635,6 +635,13 @@ if (typeof getDb !== 'function') throw new Error('[presup] requiere deps.getDb')
 - **No hay esquema central de migraciones.** Cada módulo exporta `MIGRATIONS_SQL` y `main.js` los aplica
   inline tras abrir la BD, con `try/catch` y **skip silencioso**. Sólo presupuesto tiene `MIGRATION_IDS`;
   no hay `PRAGMA user_version`.
+- 🔴 **Un test que arma su propia base tiene que correr las MIGRACIONES, no solo el esquema.**
+  El patrón de `main.js:592-608` es el que hay que copiar: statement por statement, con `try/catch`,
+  porque al re-ejecutar *"duplicate column name"* es esperado. Los tests de gestión humana lo
+  salteaban y por eso se comían `no such table: gh_eventos_personal` y
+  `gh_documentos has no column named ruta_archivo` — **columnas que sí existen en la BD real**.
+  Lo que falla así parece un bug de la app y no lo es: la columna está en `MIGRATIONS_SQL`, no en
+  `SCHEMA_SQL`. **Antes de culpar a la app por un "no such column" en un test, verificá en la BD real.**
 - Patrón para columna nueva: `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` idempotente.
   Motivo documentado en el código: *`CREATE TABLE IF NOT EXISTS` no agrega columnas a una tabla que ya existe*.
 - **`localStorage` solo para preferencias de UI** (tema, empresa activa, firma, filtro, sidebar).
@@ -751,7 +758,7 @@ reintroducir el código sin el markup pase verde.
 
 ### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-**Medido el 2026-10-06, con el runner arreglado:** **119 tests · 112 en verde · 7 con fallos ·
+**Medido el 2026-10-06, con el runner arreglado:** **119 tests · 114 en verde · 5 con fallos ·
 1 sin resumen verificable.** Antes de este arreglo la misma suite decía "125 · 108 · 17", y ese 17
 no significaba nada: eran **seis problemas distintos** déguisados de uno. **No hay lista en código**:
 el runner no tiene tolerancias, viven documentadas acá en prosa.
@@ -761,10 +768,21 @@ el runner no tiene tolerancias, viven documentadas acá en prosa.
 | 1 | `test-firma-bridge.js` | el servicio de firma vivo |
 | 2 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` — saca **83/83** y después falla por la variable |
 | 3 | `test-firma-tunnel-kit.js` | `cloudflared` y red (24/27) |
-| 4 | `test-gestion-humana-bridge-newtables.js` | su base temporal no tiene `ruta_archivo`. **En la BD real sí existe** (13 columnas) — no es un bug de la app |
-| 5 | `test-gestion-humana-bridge-write-extra.js` | `delete-personal` devuelve `undefined` y el test lee `.retired` |
-| 6 | `test-gestion-humana-bridge-write.js` | expectativas viejas: `paso_actual` pasó a "primer paso pendiente" (fix documentado en `gestion-humana-bridge.js:863`) y el test espera "último completado" (87/89) |
-| 7 | `test-sync-serializer.js` | `no such column: actualizado_en` |
+| 4 | `test-gestion-humana-bridge-write.js` | **88 OK · 1 FAIL.** `paso_actual` pasó a "primer paso pendiente" (fix documentado en `gestion-humana-bridge.js:863`). El test ya espera 6 donde corresponde, pero queda **un rojo deliberado**: `pasoActual = 1` da 2, y `L635` inserta `1` literal mientras `L95` mapea `row.paso_actual`. No se ha encontrado qué lo transforma, y **cambiar el esperado a 2 sin prueba sería doblar el test contra el código** |
+| 5 | `test-sync-serializer.js` | `no such column: actualizado_en` (43/44) |
+
+**✅ Los 2 que estaban aquí y ya se resolvieron** (eran fallos del test, no de la app):
+
+- `test-gestion-humana-bridge-newtables.js` y `test-gestion-humana-bridge-write-extra.js` **no
+  fallaban: reventaban.** Los tres tests de gestión humana arman su base con `SCHEMA_SQL` y nunca
+  corren `MIGRATIONS_SQL`, que es donde viven las tablas nuevas (§6.2). Por eso se comían
+  `no such table: gh_eventos_personal` y `gh_documentos has no column named ruta_archivo` —
+  **ambas existen en la BD real**, verificado. Ahora aplican las migraciones con el mismo patrón de
+  `main.js:592-608`. Resultado: **209 OK · 0 FAIL** y **72 OK · 0 FAIL**.
+- `delete-personal` **no devolvía `undefined` por un defecto**: el test lo invocaba sobre un bp
+  activo saltándose `gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
+  (`gestion-humana-bridge.js:1171`), y además leía `data.retired`, **un campo que el contrato no
+  tiene** (la respuesta real es `{personalId, activo, estado, fechaRetiro}`).
 
 El **1 sin resumen** es `test-init-order-bug.js`: es un test de inspección estructural que imprime
 texto, no un `N/M`. Sale 0 y el runner lo cuenta verde, pero sin poder confirmar cuántos checks corrieron.

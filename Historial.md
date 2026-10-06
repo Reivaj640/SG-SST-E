@@ -28,7 +28,7 @@
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
 | **Versión** | `0.1.247` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | **119 tests · 112 verdes · 7 con fallos · 1 sin resumen verificable.** Antes decía "125 · 108 · 17", y ese 17 no significaba nada: eran 6 problemas distintos y **10 de ellos NO eran fallos del producto** sino tests viejos contra código borrado a propósito (📦581 y 📦752). Detalle y tabla de los 7 en `PROMPT.md` §7.4 | `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
+| **Suite (escritorio)** | **119 tests · 114 verdes · 5 con fallos · 1 sin resumen verificable.** Antes decía "125 · 108 · 17", y ese 17 no significaba nada: eran 6 problemas distintos y **10 de ellos NO eran fallos del producto** sino tests viejos contra código borrado a propósito (📦581 y 📦752). Detalle y tabla de los 5 en `PROMPT.md` §7.4 | `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados) y **`googleOAuth` está presente** (Gmail conectado). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** |
 | **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. **El ancho de la tarjeta de ingreso** (el punto 5 de la cola, sin número de paquete todavía) y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
@@ -37,14 +37,14 @@
 
 ### 🛠️ Pendientes abiertos (renumerados el 2026-10-06, en orden de urgencia)
 
-1. **🔴 El ancho de la tarjeta de ingreso (340px → 260px): sin commitear y SIN número de
-   paquete.** Vive en `sgsst-electron-app/index.html` y `styles.css`, con el cache-bust
-   `?v=20261005-login-card-260`. Es trabajo del owner de una sesión anterior.
-   🔴 **NO es 📦862, aunque la cola lo decía.** `📦862` es el fix de admin empresas
-   ("Un administrador ya no queda encerrado en *contacta a administración*") y ese está
-   **commiteado y pusheado** (`CHANGELOG.md:457`, tabla de commits de la bitácora). Este
-   cambio nunca tuvo número: se le colgó el de otro por error, y el CHANGELOG llegó a
-   afirmar que ya estaba commiteado. Le corresponde **📦869** cuando se commitee.
+1. **🔴 `pasoActual = 1` da 2 y no se ha podido explicar** (`test-gestion-humana-bridge-write.js`,
+   88 OK · 1 FAIL). El `INSERT` de `create-contratacion` pone `paso_actual = 1` literal
+   (`gestion-humana-bridge.js:635`) y `get-contratacion` mapea `row.paso_actual` (`:95`) — pero el
+   test lee 2. El hermano (esperar 6 tras 5 pasos) **sí se corrigió**, porque ahí la semántica está
+   documentada en el fix de `:863` ("primer paso pendiente"). Este **se dejó en rojo a propósito**:
+   cambiar el esperado a 2 solo porque el código dice 2 sería doblar el test contra el código, que es
+   la trampa que este mismo paquete destapó en los otros 10. Alguien tiene que leer el flujo completo
+   de `create-contratacion` y decir por qué queda en 2.
 
 2. **🔴 `PROMPT.md` §2 dice que `Temp/` "NO se commitea". Es falso: hay 13 archivos
    versionados ahí, incluido `run-all-tests.js`.** El mapa del repo hay que corregirlo, y conviene
@@ -95,11 +95,6 @@
     Casi seguro ahí se cuentan paquetes npm instalados y no paquetes del changelog, pero el
     texto no lo dice y se lee como lo segundo. Vale una línea aclaratoria.
 
-11. **🔴 `delete-personal` devuelve `undefined`** (`test-gestion-humana-bridge-write-extra.js`
-    lee `.retired` de un `undefined` y revienta). Es el **único** de los 7 fallos de la suite
-    que huele a defecto real y no a test viejo: los otros 6 son entorno, esquema del propio
-    test o expectativas que quedaron atrás de un fix documentado en el código.
-
 ### ✅ Cerrado en esta sesión (no hace falta para retomar)
 
 - **Correo de soporte del sitio legal = `adminkair@gmail.com`**, ya no provisorio.
@@ -127,6 +122,20 @@
   falso; corregido con el matiz real (existen, pero solo dentro de Auditoría Anual).
 - **`PROMPT.md` §2**: decía que `Temp/` no se commitea. Falso — hay 13 archivos versionados ahí,
   incluido el runner.
+- **`delete-personal` NO era un defecto de la app** (esta sesión lo reportó como "el único
+  defecto real" y era falso: se afirmó sin leer el contrato). El test lo invocaba sobre un bp **activo**
+  saltándose `gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
+  (`gestion-humana-bridge.js:1171`), y leía `data.retired`, **un campo que el contrato no tiene**
+  (la respuesta real es `{personalId, activo, estado, fechaRetiro}`). Reescrito según el contrato, y
+  ahora **protege la regla**: un bp activo no se puede ocultar (`BP_NOT_RETIRED`). **72 OK · 0 FAIL**.
+- **Los 3 tests de gestión humana no corrían `MIGRATIONS_SQL`**, solo `SCHEMA_SQL`. Por eso
+  `test-gestion-humana-bridge-newtables.js` se comía `gh_documentos has no column named ruta_archivo`
+  y `write-extra` reventaba con `no such table: gh_eventos_personal` — **ambas existen en la BD real**,
+  verificado. Ahora aplican migraciones con el patrón de `main.js:592-608`. **209 OK · 0 FAIL**.
+- **El `diag` del bridge mentía sobre su propio conteo**: decía "10 tablas" con 11 en la lista. El
+  mensaje ahora se deriva del array, así que no puede volver a mentir solo.
+- **`test-gestion-humana-bridge-write-extra.js` esperaba `ALREADY_DELETED`** pero `delete-personal`
+  devuelve `BP_DELETED` (`:1193`): `ALREADY_DELETED` es el código de otras entidades del módulo.
 
 
 ### ▶️ Retomar desde acá — siguiente paso concreto

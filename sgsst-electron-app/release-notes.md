@@ -1,3 +1,20 @@
+# K+AIR v0.1.249
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Nada cambia para vos: esto es trabajo interno
+
+Esta versión no agrega ni cambia ninguna pantalla. Arregla pruebas internas que estaban
+fallando desde hacía meses y que, al hacerlo, oscurecían el estado real del proyecto: Informaba
+"17 fallos" cuando en realidad eran varios problemas distintos, y la mayoría no eran fallas de
+la aplicación sino pruebas que seguían pidiendo cosas que ya se habían cambiado a propósito.
+
+También se corrigió un detalle del diagnóstico interno: informaba un número de tablas que no
+coincidía con el que él mismo mostraba.
+
+---
+
 # K+AIR v0.1.248
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

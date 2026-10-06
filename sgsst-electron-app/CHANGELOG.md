@@ -10,6 +10,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.249] - 2026-10-06
+
+### 📦870 · La suite deja de mentir: 17 fallos que eran 6 problemas, y 10 que no eran fallos
+
+**Resumen:** la suite informaba "125 tests · 108 verdes · 17 con fallos". Ese 17 no significaba
+nada. Medido y corregido: **119 tests · 114 en verde · 5 con fallos · 1 sin resumen verificable.**
+
+**De los 17, 10 NO eran fallos del producto.** Eran tests anclados a código que se había borrado
+**a propósito**, y el runner los mezclaba con los fallos reales:
+
+- **📦581** (el update pasó del header al footer del shell). `test-header-zindex.js` exigía z-index
+  de `.header-update-panel`, que el propio CHANGELOG registra como borrado; `test-auto-download-flow.js`
+  exigía los toasts que el Loop 3 convirtió en no-ops documentados.
+- **📦752** (rediseño premium de la Bandeja). `test-auditoria-visual.js` exigía una toolbar duplicada
+  y un `setTimeout` que `app.js:6222` describe como **código zombie eliminado en el loop 28**.
+
+Esos checks se **invirtieron** en vez de "arreglarse": ahora exigen que el código muerto **no vuelva**.
+Doblar el código para satisfacerlos habría deshecho un rediseño a mano.
+
+**Un solo bug de fondo, y era del runner.** Parseaba solo `N/M OK`, que es el formato que pide el
+prompt pero no cumple ni la mitad de los tests: conviven al menos **19** (`29/29 checks OK`,
+`87 OK · 2 FAIL`, `Total: N | ✅ N | ❌ M`, TAP, `ALL CHECKS PASSED`…). Lo que no casaba se contaba
+**verde sin que nadie hubiera mirado sus checks** — 24 tests estaban en esa caja. Ahora
+`leerResumen()` los entiende y los no verificables van a una lista propia.
+
+**Causa raíz de dos fallos más: los tests de gestión humana no corrían `MIGRATIONS_SQL`**, solo
+`SCHEMA_SQL`. Por eso se comían `no such table: gh_eventos_personal` y `gh_documentos has no column
+named ruta_archivo` — **ambas columnas existen en la BD real**, verificado. Ahora aplican las
+migraciones con el mismo patrón de `main.js:592-608`. `newtables` pasó a **209 OK · 0 FAIL** y
+`write-extra` a **72 OK · 0 FAIL**.
+
+**Y `delete-personal` no estaba roto.** El test lo invocaba sobre un bp activo saltándose
+`gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
+(`gestion-humana-bridge.js:1171`), y leía `data.retired`, un campo que el contrato **no tiene**.
+Reescrito según el contrato; ahora además protege la regla.
+
+**Cambio en el bridge:** el endpoint `diag` informaba "10 tablas" con 11 en su propia lista. El
+mensaje ahora se deriva del array, así que no puede volver a mentir solo al agregar migraciones.
+
+**Sin regresiones.** Los 5 que quedan están uno por uno en `PROMPT.md` §7.4: tres piden entorno
+(`INTERNAL_API_KEY`, `cloudflared`, servicio de firma vivo), uno es `no such column: actualizado_en`
+del sync, y uno es **un rojo deliberado** que se dejó para que alguien lea el flujo de
+`create-contratacion` y explique por qué `paso_actual` queda en 2.
+
+---
+
 ## [0.1.248] - 2026-10-06
 
 ### 📦869 · La tarjeta de ingreso deja de verse ancha de más

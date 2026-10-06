@@ -6,7 +6,7 @@
 // Esperado: 50+ OK · 0 FAIL
 
 const initSqlJs = require('sql.js');
-const { SCHEMA_SQL } = require('./gestion-humana-schema-sql');
+const { SCHEMA_SQL, MIGRATIONS_SQL } = require('./gestion-humana-schema-sql');
 const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 
 let _passed = 0;
@@ -70,6 +70,12 @@ async function run() {
   const SQL = await initSqlJs();
   const rawDb = new SQL.Database();
   rawDb.exec(SCHEMA_SQL);
+  // 🔴 La base se armaba SOLO con SCHEMA_SQL, pero las tablas y columnas nuevas viven en
+  // MIGRATIONS_SQL (§6.2). Mismo patrón que main.js:592-608: statement por statement, con
+  // try/catch porque "duplicate column name" al re-ejecutar es esperado.
+  (Array.isArray(MIGRATIONS_SQL) ? MIGRATIONS_SQL : []).forEach(function (stmt) {
+    try { rawDb.exec(stmt); } catch (migErr) { /* duplicate column = ya existe */ }
+  });
   rawDb.exec("CREATE TABLE IF NOT EXISTS companies (id TEXT PRIMARY KEY, company_key TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL);");
   rawDb.run("INSERT INTO companies (id, company_key, display_name) VALUES (?, ?, ?)",
     ['co-tempoactiva', 'tempoactiva', 'TEMPOACTIVA EST S.A.S.']);
@@ -291,7 +297,11 @@ async function run() {
   });
   // Verificar todos quedaron en 1
   var r12Check = registeredHandlers['gh:get-contratacion']({}, { token: 'valid-token', contratacionId: ctId2 });
-  _assertEq(r12Check.data.contratacion.pasoActual, 5, 'pasoActual = 5 después de 5 pasos');
+  // 🔴 Antes esperaba 5. El fix de 📦FIX-paso-actual (gestion-humana-bridge.js:863) cambió la
+  // semántica: paso_actual ya no es "el último completado" sino "el PRIMER PENDIENTE (o 6 si
+  // todos están completos)". Con los pasos 1-5 hechos y el 6 pendiente, 6 es lo correcto — y lo
+  // dice el propio check de al lado ("aún no llega a paso 6").
+  _assertEq(r12Check.data.contratacion.pasoActual, 6, 'pasoActual = 6 = primer paso pendiente (no el último hecho)');
   _assertEq(r12Check.data.contratacion.estado, 'en_proceso', 'estado = en_proceso (aún no llega a paso 6)');
   _assertEq(r12Check.data.contratacion.contactoRealizado, 1, 'contacto_realizado = 1');
   _assertEq(r12Check.data.contratacion.examenesProgramados, 1, 'examenes_programados = 1');
