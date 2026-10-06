@@ -521,7 +521,7 @@ async renderMainArea(container) {
   o el sitio público queda desactualizado sin que nada avise. La rama se construyó con
   `git hash-object` + `mktree` + `commit-tree` + `update-ref`, **sin `git checkout --orphan`**:
   el checkout vacía el árbol de la rama actual y en el worktree del owner había cambios SIN
-  COMMITEAR (📦862, ancho de la tarjeta de ingreso). Ese camino no los tocaba.
+  COMMITEAR (el ancho de la tarjeta de ingreso, que no tenía número de paquete). Ese camino no los tocaba.
 - 🚨 **El sitio legal NO va en `docs/`.** `docs/` ya tenía contenido interno (protocolos SST,
   planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`). GitHub Pages desde
   la raíz o desde `docs/` publica **todo** como sitio web oficial; desde `gh-pages` publica

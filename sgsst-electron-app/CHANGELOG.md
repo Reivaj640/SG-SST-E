@@ -10,6 +10,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.248] - 2026-10-06
+
+### 📦869 · La tarjeta de ingreso deja de verse ancha de más
+
+**Resumen:** la tarjeta de la pantalla de ingreso tenía `max-width: 340px` y el owner la
+reportaba como demasiado ancha. Baja a `260px`: un 23,5 % menos que la original. El ancho
+útil de cada campo queda en ~202 px (260 − 2×28 de padding − 2×1 de borde, con
+`box-sizing: border-box`), suficiente para "Recordar mis datos" y el aviso de abajo.
+
+**Lo que no era el bug.** La sensación de "muy ancha" venía del **escalado de pantalla de
+Windows al 125 %**, no de que la regla no se aplicara. La regla sí mandaba, y baja porque el
+owner la pidió más angosta todavía.
+
+**Ojo con la otra regla que toca el mismo ancho.** Dentro de `@media (max-width: 480px)`
+(`styles.css:4584`) la tarjeta pasa a `max-width: 100%`. Es a propósito — en un teléfono
+tiene que ocupar el ancho — pero significa que esta regla solo manda por encima de 480 px.
+
+**Cache-bust.** `styles.css` sube a `?v=20261005-login-card-260`.
+
+**Corrección de bitácora.** Este paquete estuvo un tiempo en la cola como "📦862 (ancho de la
+tarjeta de ingreso)". **Eso era falso:** 📦862 es el fix de admin empresas ("Un administrador ya
+no queda encerrado en *contacta a administración*", v0.1.241), que ya estaba commiteado y
+pusheado. Este cambio nunca tuvo número. También se corrigió que la lista lo daba por
+commiteado cuando no lo estaba.
+
+---
+
 ## [0.1.247] - 2026-10-06
 
 ### 📦868 · Conectar Gmail: las credenciales son de la app, no del usuario — y ahora funciona en cualquier instalación
@@ -228,9 +255,11 @@ del owner — se publica **solo** el sitio. Verificado: `/docs/`, `/Portear/` y
 4. **⚠️ Tope de 100 usuarios, de por vida del proyecto y sin reset.** Si se quema,
    Google deshabilita el login.
 5. **Tokens sin cifrar** — deuda técnica, declarada en la política.
-6. **📦 862 (ancho de la tarjeta de ingreso) sigue SIN commitear** en
+6. **El ancho de la tarjeta de ingreso (340px → 260px) sigue SIN commitear**:
    `index.html` y `styles.css`: son cambios del owner de una sesión anterior que esta
-   jornada no tocó.
+   jornada no tocó. Antes esta lista lo llamaba "📦862", y eso era falso — 📦862 es el fix
+   de admin empresas, que ya está commiteado y pusheado más abajo. Este cambio no tiene
+   número todavía; le corresponde 📦869 cuando se commitee.
 
 ## [0.1.246] - 2026-10-06
 

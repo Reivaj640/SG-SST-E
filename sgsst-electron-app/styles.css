@@ -4165,7 +4165,17 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-auth-card {
     width: 100%;
-    max-width: 340px;
+    /* 📦869 — El owner reportó que la tarjeta de ingreso se veía demasiado ancha.
+       Iba de 340px → 300px (-11,8%) y a pedido del owner baja a 260px: un 13,3% más
+       angosta que 300 y un 23,5% menos que la original. El ancho útil de cada campo
+       queda en ~202px (260 - 2*28 de padding - 2*1 de borde, con box-sizing: border-box),
+       suficiente para "Recordar mis datos" y el aviso de abajo.
+       La sensación de "muy ancha" del reporte original venía del escalado de
+       pantalla de Windows al 125%, no de que la regla no se aplicara.
+       ⚠️ Hay OTRA regla que fija el ancho: dentro de `@media (max-width: 480px)`
+       (styles.css:4584) el card pasa a `max-width: 100%`. Es a propósito, pero esta
+       regla solo manda por encima de 480px. */
+    max-width: 260px;
     background: var(--widget-bg-color);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);

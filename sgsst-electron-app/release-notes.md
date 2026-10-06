@@ -1,3 +1,19 @@
+# K+AIR v0.1.248
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## La pantalla de ingreso ya no se ve ancha de más
+
+La tarjeta donde iniciás sesión era más ancha de lo necesario. Ahora es bastante más
+angosta: los campos quedan con el tamaño justo y "Recordar mis datos" y el aviso de abajo
+se ven completos, sin que la tarjeta ocupe media pantalla.
+
+Si tu pantalla está en 125 % o más de ampliación, se nota todavía más: parte de lo que se
+veía era la ampliación de Windows, no la tarjeta.
+
+---
+
 # K+AIR v0.1.247
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

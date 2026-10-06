@@ -24,62 +24,98 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-06 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (sitio legal) y `e373fdce` (correo de soporte real) |
+| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (política de privacidad), `e373fdce` (correo de soporte real), `b5515ebc` (cierre de documentación) y `92499684` (docs del correo de soporte) |
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
-| **Versión** | `0.1.247` (desarrollo) · último publicado `v0.1.205` |
+| **Versión** | `0.1.247` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | 125 tests · **107 verdes** · 18 con fallos — **los mismos 18 preexistentes**, cero regresiones. Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
+| **Suite (escritorio)** | 125 tests · **108 verdes** · 17 con fallos — cero regresiones. **Remedido hoy 2026-10-06 con la corrida completa: `test-skeleton-encaje.js` salió de la lista de rojos (25/26 → 29/29) y los 17 restantes son idénticos a los de antes.** Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
-| **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
+| **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados) y **`googleOAuth` está presente** (Gmail conectado). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. **El ancho de la tarjeta de ingreso** (el punto 5 de la cola, sin número de paquete todavía) y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
 | **Jornada** | **Cerrada** (2026-10-06). **Commiteado y pusheado**: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación) y `e373fdce` (correo de soporte real). El objetivo de la jornada —que cualquier persona conecte su correo sin configurar nada— **quedó cumplido y probado con una cuenta que nunca estuvo en la lista de usuarios de prueba** |
 
 
-### 🛠️ Cola abierta al cerrar esta jornada (en orden de urgencia)
+### 🛠️ Pendientes abiertos (renumerados el 2026-10-06, en orden de urgencia)
 
-1. **✅ RESUELTO: el correo de soporte del sitio legal es `adminkair@gmail.com`, ya no
-   provisorio.** `sitio/soporte.html` (`e373fdce`) quitó el aviso de "pendiente de completar" y
-   todo *pendiente* de la tabla del responsable. Es el mismo correo declarado en Google
-   Auth Platform. `gh-pages` regenerada (`9c8fbfb7`) y verificada en vivo: responde 200 con
-   el correo nuevo y sin el viejo. De paso se corrigió una afirmación falsa de
-   `privacidad.html`, que daba `firma.k-air.com` por el servidor de firma cuando la URL sale
-   de `secrets.enc` y la configura cada empresa (`main/firma-bridge.js:571-576`).
+1. **🔴 El ancho de la tarjeta de ingreso (340px → 260px): sin commitear y SIN número de
+   paquete.** Vive en `sgsst-electron-app/index.html` y `styles.css`, con el cache-bust
+   `?v=20261005-login-card-260`. Es trabajo del owner de una sesión anterior.
+   🔴 **NO es 📦862, aunque la cola lo decía.** `📦862` es el fix de admin empresas
+   ("Un administrador ya no queda encerrado en *contacta a administración*") y ese está
+   **commiteado y pusheado** (`CHANGELOG.md:457`, tabla de commits de la bitácora). Este
+   cambio nunca tuvo número: se le colgó el de otro por error, y el CHANGELOG llegó a
+   afirmar que ya estaba commiteado. Le corresponde **📦869** cuando se commitee.
 
-2. **🐇 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que
-   regenerar la otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree`
-   (sin checkout, para no tocar el árbol de trabajo). Regenerar es volver a correr ese
-   script sobre `sitio/` y hacer `git push --force origin gh-pages`.
-   Ojo: `sitio/` NO puede ir a `docs/`, porque `docs/` ya tiene contenido interno
-   (protocolos SST, planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`)
-   y publicarlo como sitio web oficial sería exponerlo.
+2. **🔴 Quedan 4 tests con el mismo literal de cache-bust (minas latentes).** El de
+   `test-skeleton-encaje.js` ya se arregló, pero el barrido encontró la misma enfermedad en:
+   - `test-despliegue-estrategico-premium.js:88` — `despliegue-estrategico.js?v=20260921`
+   - `test-chart-overflow.js:157` — `kair-components.css?v=20260918-bar-chart-html`
+   - `test-identificacion-peligros.js:120,136,142` — `?v=20260921-premium-v7-volver` (×3)
 
-3. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no
-   verificada"). Requiere: verificar el dominio en **Search Console**, un **video de
-   demostración** y justificación permiso por permiso. ~10 días hábiles.
-   No corre prisa: con menos de 100 usuarios y sin pasar los datos por servidores propios
-   está dentro de las excepciones de Google.
-   **⚠️ Ojo con el tope de 100 usuarios: es de por vida del proyecto y NO se resetea.**
+   Hoy pasan, pero se caen con el próximo bump legítimo de esos archivos. El fix es el mismo
+   patrón `\d{8}-` que ya usan `test-config-premium-v2.js:72` y `test-bandeja-paginacion.js:185`
+   — o sea, el repo ya pagó esta lección dos veces y el patrón correcto ya está escrito.
+
+3. **🧪 Validación visual del ancho de la tarjeta y de 📦867**: nunca se abrieron en la app.
+   ✅ Ya no hay empresa de por medio (la BD tiene Tempoactiva y Temposum), así que la de 867
+   ya se puede abrir sin preparar nada.
+
+4. **🐇 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
+   otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree` (sin checkout,
+   para no tocar el árbol de trabajo). Regenerar es volver a correr ese script sobre `sitio/`
+   y hacer `git push --force origin gh-pages`.
+   Ojo: `sitio/` NO puede ir a `docs/`, porque `docs/` ya tiene contenido interno (protocolos
+   SST, planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`) y publicarlo
+   como sitio web oficial sería exponerlo.
+
+5. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no verificada").
+   Requiere: verificar el dominio en **Search Console**, un **video de demostración** y
+   justificación permiso por permiso. ~10 días hábiles. No corre prisa: con menos de 100
+   usuarios y sin pasar los datos por servidores propios está dentro de las excepciones de
+   Google. **⚠️ Ojo con el tope de 100 usuarios: es de por vida del proyecto y NO se resetea.**
    Si se quema, Google deshabilita el login.
 
-4. **🔑 Los tokens de Google se guardan SIN cifrar** en
+6. **🔑 Los tokens de Google se guardan SIN cifrar** en
    `%APPDATA%/sgsst-electron-app/config.json` (`shared/google-tokens.js:29`,
    `fs.writeFileSync` en texto plano). `main/firma-bridge.js` y el modelo Sí usan
    `safeStorage`; el correo no. No es una fuga por red, pero cualquiera con acceso al perfil
    de Windows lee los tokens. **Deuda técnica declarada en la política de privacidad.**
 
-5. **📦 862 (ancho de la tarjeta de ingreso) está SIN commitear** en
-   `sgsst-electron-app/index.html` y `styles.css` (`max-width: 260px`). Son cambios del
-   owner de una sesión anterior; esta jornada NO los tocó ni los commiteó.
-   Commitearlos en su propio paquete.
-
-6. **El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
+7. **🌐 El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
    Funciona, pero si K+AIR va a crecer conviene apuntar a un dominio propio (el servicio de
    firma ya usa `firma.k-air.com`) antes de pedir la verificación de la app.
 
-7. **Validación visual de 📦 862 y 📦 867** sigue pendiente: nunca se abrieron
-   en la app. La de 867 exige además una empresa registrada (mirar el bloque de "Datos").
+8. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~51 versiones sin publicar.** El
+   desarrollo va en `0.1.247`. Esta tabla decía "último publicado `v0.1.205`" y **ese tag no
+   existe**. Corregido arriba, pero la decisión de liberar o no es del owner. Ojo con el 🐇 del
+   punto 4: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
 
-8. **Restaurar `kair.db` + `config.json` del portátil**: bloqueante de empresas en la app.
+9. **❓ ¿La prueba de integración de 📦867 entra al repo como test?** Sigue consultada y sin
+   respuesta: ejercitó el wrapper y las regex reales de `main.js` contra un fixture de 2.500
+   archivos, pero quedó fuera del repo.
+
+10. **⚠️ "913 pacotes" en la fila de entorno es ambiguo.** El último `📦n` real es **868**.
+    Casi seguro ahí se cuentan paquetes npm instalados y no paquetes del changelog, pero el
+    texto no lo dice y se lee como lo segundo. Vale una línea aclaratoria.
+
+### ✅ Cerrado en esta sesión (no hace falta para retomar)
+
+- **Correo de soporte del sitio legal = `adminkair@gmail.com`**, ya no provisorio.
+  `sitio/soporte.html` (`e373fdce`) quitó el aviso de "pendiente de completar"; `gh-pages`
+  regenerada (`9c8fbfb7`) y verificada en vivo: responde 200 con el correo nuevo y sin el
+  viejo. De paso se corrigió una afirmación falsa de `privacidad.html`, que daba
+  `firma.k-air.com` por el servidor de firma cuando la URL sale de `secrets.enc` y la
+  configura cada empresa (`main/firma-bridge.js:571-576`).
+- **Restaurados `kair.db` + `config.json`**: `companies` = 2, `user_company_roles` = 2 y
+  `companyPaths` con las dos empresas. El bloqueo de empresas en la app ya no existe.
+- **`test-skeleton-encaje.js:147` arreglado**: el check pedía el literal
+  `20260918-skeleton-encaje` y ningún token vigente podía satisfacerlo, así que el test era
+  inejecutable. Ahora pregunta "¿tiene token?" (`\d{8}-`) y trae **3 mutaciones que muerden**.
+  El test pasó de 25/26 a **29/29** y la suite de **107 verdes a 108**, con los 17 fallos
+  restantes idénticos a los de antes: cero regresiones.
+- **La etiqueta falsa "📦862 = ancho de la tarjeta"**, quitada de la cola y del CHANGELOG.
+- **`PROMPT.md` §5.9**: el "0 archivos" sobre `KairUI.esc()` / `KairHelpers.formatDate()` era
+  falso; corregido con el matiz real (existen, pero solo dentro de Auditoría Anual).
 
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
@@ -198,10 +234,10 @@
    Antes quedaban bloques grises para siempre; ahora debe salir "No se pudo leer esta
    carpeta" con botón **Reintentar**, y "Carpeta vacía" solo cuando la carpeta está
    realmente vacía.
-3. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
-   📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
-   cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
-   pidió.
+> ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04
+> por 📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
+> cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
+> pidió. (Va sin número a propósito: estaba como "3." duplicado y partía la serie.)
 4. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
    **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
    sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir

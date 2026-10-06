@@ -244,10 +244,21 @@ que algo es una regla porque está escrito.
 > - SIEMPRE escapar HTML con `KairUI.esc()` antes de inyectar texto del usuario
 > - SIEMPRE formatear fechas con `KairHelpers.formatDate()`
 
-**Ninguna de las dos funciones existe en el repo.** Búsqueda sobre todo el código: 0 archivos.
-Un modelo que hubiera seguido la regla al pie de la letra habría escrito una llamada a una función
-inexistente, y la vista se habría caído con `ReferenceError`. Dos reglas "OBLIGATORIAS" que
-habrían roto la app.
+🔴 **CORREGIDO el 2026-10-06: el "0 archivos" de este ejemplo era FALSO.** Las dos funciones
+**existen**, pero dentro de un solo módulo: `modules/verificacion/auditoria-anual/kair-ui.js:12`
+define `_esc`, que se exporta como `window.KairUI.esc` (línea 383), y `kair-helpers.js:11`
+define `formatDate`, exportada como `window.KairHelpers.formatDate` (línea 200). Hay 12+
+llamadas reales en los `*-view.js` de ese módulo.
+
+**El riesgo sigue siendo real, por un motivo más preciso: no están en el shell.** Se cargan
+con `loadScript` desde `auditoria-anual-component.js:52/54`, o sea únicamente al abrir
+Auditoría Anual. Un modelo que copie la regla al shell escribe `KairUI.esc(...)` contra un
+`window.KairUI` que no está, y la vista se cae con `ReferenceError`. Dos reglas
+"OBLIGATORIAS" que habrían roto la app.
+
+**La lección no cambia, y por eso el ejemplo corregido vale más que el original:** "no lo
+encontré" y "no existe" no son lo mismo que "no está disponible donde lo estabas mirando".
+Antes de declarar algo inexistente, **decí DÓNDE lo buscaste**.
 
 En la misma sección: `var` (no `let`/`const`) — falsos, `main.js` tiene 2 608 `const`. Y
 "el último número de paquete es `📦579`" cuando ya van 850+.
