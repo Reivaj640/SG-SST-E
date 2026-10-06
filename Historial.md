@@ -24,15 +24,61 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-06 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦863-867 · el mapeo de estructura deja de tardar 760 s, de fallar siempre y de mentir el progreso (`33d40d90`, pusheado). Antes, `8f5decc1` · el check del cache-bust de `test-hero-fila-840` deja de depender del token literal (pusheado; **cambio del owner**). **📦868 (Conectar Gmail avisa cuando faltan las credenciales) está en el árbol de trabajo SIN commitear** |
-| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` |
+| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (sitio legal, `2ace3131`) |
+| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
 | **Versión** | `0.1.247` (desarrollo) · último publicado `v0.1.205` |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
 | **Suite (escritorio)** | 125 tests · **107 verdes** · 18 con fallos — **los mismos 18 preexistentes**, cero regresiones. Incluye `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 **pendiente**: no se ha abierto la app todavía. 📦867 **pendiente**: es el primer paquete del mapeo con cambios visibles (el overlay del escaneo), y mirarlo exige una empresa registrada. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | En curso (2026-10-06). **Commiteado y pusheado**: 📦863-867 (las 5 fases del mapeo, `33d40d90`) y `8f5decc1` (tripwire de hero-fila-840, del owner). El árbol quedó limpio |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
+| **Jornada** | **Cerrada** (2026-10-06). **Commiteado y pusheado**: `3514af7f` (📦868) y `2ace3131` (sitio legal). El objetivo de la jornada —que cualquier persona conecte su correo sin configurar nada— **quedó cumplido y probado con una cuenta que nunca estuvo en la lista de usuarios de prueba** |
+
+
+### 🛠️ Cola abierta al cerrar esta jornada (en orden de urgencia)
+
+1. **🔴 El correo de soporte del sitio legal es PROVISORIO y Google lo exige real.**
+   `sitio/soporte.html` tiene `soporte@k-air.com` con un aviso visible de "pendiente de
+   completar". La página de soporte tiene "Correo" y "Dirección física" en *pendiente*.
+   Google exige que el correo de asistencia sea alcanzable; sin eso, la revisión de la app
+   falla. **Decidir y actualizar `sitio/soporte.html`, luego regenerar `gh-pages`.**
+
+2. **🐇 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que
+   regenerar la otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree`
+   (sin checkout, para no tocar el árbol de trabajo). Regenerar es volver a correr ese
+   script sobre `sitio/` y hacer `git push --force origin gh-pages`.
+   Ojo: `sitio/` NO puede ir a `docs/`, porque `docs/` ya tiene contenido interno
+   (protocolos SST, planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`)
+   y publicarlo como sitio web oficial sería exponerlo.
+
+3. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no
+   verificada"). Requiere: verificar el dominio en **Search Console**, un **video de
+   demostración** y justificación permiso por permiso. ~10 días hábiles.
+   No corre prisa: con menos de 100 usuarios y sin pasar los datos por servidores propios
+   está dentro de las excepciones de Google.
+   **⚠️ Ojo con el tope de 100 usuarios: es de por vida del proyecto y NO se resetea.**
+   Si se quema, Google deshabilita el login.
+
+4. **🔑 Los tokens de Google se guardan SIN cifrar** en
+   `%APPDATA%/sgsst-electron-app/config.json` (`shared/google-tokens.js:29`,
+   `fs.writeFileSync` en texto plano). `main/firma-bridge.js` y el modelo Sí usan
+   `safeStorage`; el correo no. No es una fuga por red, pero cualquiera con acceso al perfil
+   de Windows lee los tokens. **Deuda técnica declarada en la política de privacidad.**
+
+5. **📦 862 (ancho de la tarjeta de ingreso) está SIN commitear** en
+   `sgsst-electron-app/index.html` y `styles.css` (`max-width: 260px`). Son cambios del
+   owner de una sesión anterior; esta jornada NO los tocó ni los commiteó.
+   Commitearlos en su propio paquete.
+
+6. **El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
+   Funciona, pero si K+AIR va a crecer conviene apuntar a un dominio propio (el servicio de
+   firma ya usa `firma.k-air.com`) antes de pedir la verificación de la app.
+
+7. **Validación visual de 📦 862 y 📦 867** sigue pendiente: nunca se abrieron
+   en la app. La de 867 exige además una empresa registrada (mirar el bloque de "Datos").
+
+8. **Restaurar `kair.db` + `config.json` del portátil**: bloqueante de empresas en la app.
+
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
@@ -99,18 +145,18 @@
       **El `client_id` y el `client_secret` ya están cargados y la conexión funciona**
       (proyecto "KAIR Calendar Sync", credencial de escritorio). **Probado de punta a punta
       contra Google:** el owner autorizó con su cuenta real y la bandeja conectó.
-      U0001F6A8 **La creencia que casi pierde el paquete: "el `client_secret` es opcional".**
+      🚨 **La creencia que casi pierde el paquete: "el `client_secret` es opcional".**
       Se concluyó leyendo `google-auth-library`: tiene `ClientAuthentication.None`, que hace
       que la librería NO mande el secreto. Todo cuadraba en el código — **pero leer la
       librería no es verificar el servicio.** Al probarlo de verdad, Google aceptó los 5
       permisos y el canje devolvió `client_secret is missing`. El síntoma era el peor: el
       navegador decía "Autorización exitosa" y la conexión se perdía igual. Media
       conexión. Un enum que existe en el código no significa que el endpoint lo acepte.
-      U0001F6A8 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`,
+      🚨 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`,
       que no escribe en `main.log`, así que el fallo no dejaba rastro en ningún lado —
       hubo que reproducir la petición a mano con un código falso para verlo. Ahora los tres
       escriben en `sendLog` y hay un check que lo vigila.
-      U0001F6A8 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config
+      🚨 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config
       versionado.** Al commitear, GitHub rechazó el push: `GH013 — Push cannot contain
       secrets`. Hacerlo privado NO era la salida: `package.json` declara
       `publish: {provider: "github"}` y electron-updater pega a la API de releases de GitHub

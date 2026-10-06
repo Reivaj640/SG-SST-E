@@ -514,6 +514,30 @@ async renderMainArea(container) {
     finales de línea, verificando que el conteo de CRLF/LF quede igual. `git diff --numstat`
     tiene que dar pocas líneas.
   - 🚨 **`CONTEXT.md` es el peor caso: NUNCA usar `edit` ni `write` sobre él.** Además de mezclar
+
+- 🚨 **`sitio/` y la rama `gh-pages` son el MISMO contenido en dos lugares, y solo uno es la
+  fuente.** `sitio/` (en `Dev`) es la fuente real; `gh-pages` es una copia *generada* para que
+  GitHub Pages la sirva entera como raíz del sitio. Si editás una, hay que regenerar la otra
+  o el sitio público queda desactualizado sin que nada avise. La rama se construyó con
+  `git hash-object` + `mktree` + `commit-tree` + `update-ref`, **sin `git checkout --orphan`**:
+  el checkout vacía el árbol de la rama actual y en el worktree del owner había cambios SIN
+  COMMITEAR (📦862, ancho de la tarjeta de ingreso). Ese camino no los tocaba.
+- 🚨 **El sitio legal NO va en `docs/`.** `docs/` ya tenía contenido interno (protocolos SST,
+  planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`). GitHub Pages desde
+  la raíz o desde `docs/` publica **todo** como sitio web oficial; desde `gh-pages` publica
+  solo `sitio/`. Verificado: `/docs/`, `/Portear/` y `/sgsst-electron-app/` devuelven 404 en
+  `reivaj640.github.io/SG-SST-E/`.
+- 📌 **Estado de Google Auth Platform (2026-10-06):** el proyecto `KAIR Calendar Sync`
+  (`kair-calendar-sync`) está en **"En producción"**, con los 5 scopes declarados y coincidentes
+  con los que pide `google-auth.js`. La app sigue SIN verificar, así que cada persona ve el
+  aviso de "app no verificada" al autorizar (normal con scopes restringidos). Tope de **100
+  usuarios de por vida del proyecto, sin reset**. La app NO puede pasar a Production si el
+  repo es privado: `publish: {provider: "github"}` + electron-updater sin token ⇒ 404 en la
+  API de releases ⇒ todos los clientes dejan de actualizar. De ahí que las credenciales
+  vivan en `.env` y no en el archivo versionado.
+- 📌 **El correo de soporte del sitio es PROVISORIO** (`soporte@k-air.com`, con aviso visible
+  en `sitio/soporte.html`). Google exige que el correo de asistencia sea alcanzable para
+  aprobar la app. No dar por cerrado sin resolverlo.
     CRLF y LF, usa separadores `\r\r\r\n` (CR CR CR LF) en los bloques de novedades. El editor
     los aplana a CRLF y el diff pasa de unas 40 líneas a **4.262**. Pasó dos veces en 📦868 y
     arruinó los cambios: el arreglo fue `git checkout --` y re-aplicar TODO con un script de

@@ -163,9 +163,72 @@ Así que: repo público ⇒ el `client_secret` no puede estar en el historial. L
 - Los 5 scopes declarados en Google coinciden con los que pide el código: `calendar`,
   `gmail.readonly`, `gmail.send`, `gmail.modify`, `gmail.compose`.
 
-**Pendiente (no es código):** Google expira la autorización a los 7 días si el proyecto queda
-en modo "Testing": pasarlo a "Production" exige una URL de política de privacidad pública, que
-todavía no existe.
+### ✅ Cerrado: la app quedó en PRODUCTION, probada con una cuenta nueva
+
+El proyecto **KAIR Calendar Sync** ya está en **"En producción"** en Google Auth Platform.
+Eso cierra el problema de fondo:
+
+- **Cualquier cuenta de Google** puede autorizar, sin que haya que agregarla una por una a la
+  lista de usuarios de prueba.
+- **La autorización no vence a los 7 días.** Con Production el `refresh_token` no expira
+  por el modo de publicación.
+
+**Prueba de punta a punta, con el owner:** conectó Gmail, vió sus correos, verificó en
+`config.json` que quedaron el `access_token`, el `refresh_token` y los 5 scopes; desconectó
+(la clave `googleOAuth` desaparece del archivo y el resto de la configuración queda intacta);
+y **reconectó con una cuenta que nunca estuvo en la lista de usuarios de prueba** — esa
+es la prueba de que la publicación sirvió, porque en modo Prueba esa cuenta no habría
+podido autorizar.
+
+### El camino hasta Production, y por qué no era trivial
+
+Google tenía el botón de publicar **apagado**: la pantalla de Información de la marca
+exige nombre de app, correo de asistencia, URL de página principal y **URL de política de
+privacidad**, y las dos últimas no existías. Se creó el sitio con GitHub Pages:
+**https://reivaj640.github.io/SG-SST-E/**
+
+**La política de privacidad no es un placeholder.** Cada afirmación se verificó contra el
+código antes de escribirla:
+
+- El contenido de los correos **no sale de la máquina del cliente**:
+  `main/email-sync.js` lo baja de `gmail.googleapis.com` y lo escribe en SQLite local
+  (`emailDb.saveMessage/saveAttachment`).
+- El archivo de sincronización `.kairsync` **no incluye las tablas de correo**
+  (`main/sync-serializer.js`): `mp_programas`, `evaluacion_action_plans`, `gestaciones`,
+  `eventos_cumplidos`, `roles_responsabilidades_*`, `eventos_rapidos`.
+- `"sync-bridge"` no es un bridge de red: es IPC, y `sync-service.js` usa `fs` sobre una
+  carpeta local.
+- Sin telemetria: no hay Sentry, PostHog ni Analytics; `electron-log` escribe solo en archivo.
+- El único canal propio es `firma.k-air.com`, que recibe PDFs a firmar — separado del
+  correo, y así queda declarado.
+- Se declara la debilidad real: los tokens se guardan **sin cifrar**
+  (`shared/google-tokens.js:29`).
+
+Incluye la **Ley 1581 de 2012** (Colombia) en los derechos del titular, que es la norma que
+aplica y que Google valora ver referenciada.
+
+### 🛠️ El sitio va en `sitio/` + rama `gh-pages`, NO en `docs/`
+
+`docs/` ya existía con contenido interno (protocolos SST, planes de gestión y
+`investigacion-seguimiento-embarazo-sst-colombia.md`). Publicar Pages desde ahí habría
+puesto todo eso como sitio web oficial. Con la rama `gh-pages` —construida con
+`hash-object` + `mktree` + `commit-tree`, sin checkout, para no tocar el árbol de trabajo
+del owner — se publica **solo** el sitio. Verificado: `/docs/`, `/Portear/` y
+`/sgsst-electron-app/` devuelven **404** en el sitio publicado.
+
+### Lo que sigue pendiente (detalle en `Historial.md`)
+
+1. **El correo de soporte del sitio es PROVISORIO** (`soporte@k-air.com`). Google exige que
+   sea alcanzable.
+2. **`gh-pages` es una copia generada de `sitio/`**: si se edita una, hay que regenerar la otra.
+3. **Verificación de la app** (para sacar el aviso de "app no verificada"): ~10 días hábiles
+   + Search Console + video de demostración. No corre prisa bajo 100 usuarios.
+4. **⚠️ Tope de 100 usuarios, de por vida del proyecto y sin reset.** Si se quema,
+   Google deshabilita el login.
+5. **Tokens sin cifrar** — deuda técnica, declarada en la política.
+6. **📦 862 (ancho de la tarjeta de ingreso) sigue SIN commitear** en
+   `index.html` y `styles.css`: son cambios del owner de una sesión anterior que esta
+   jornada no tocó.
 
 ## [0.1.246] - 2026-10-06
 

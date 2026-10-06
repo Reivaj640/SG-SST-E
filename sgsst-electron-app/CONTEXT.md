@@ -69,6 +69,35 @@
 > 7 días. Pasarlo a "Production" exige una **URL de política de privacidad pública**, que
 > todavía no existe. Los 5 scopes ya están declarados y coinciden con los del código.
 >
+> **🛠️ Cierre de la jornada: la app quedó en PRODUCTION y probada con una cuenta nueva**
+> El proyecto **KAIR Calendar Sync** quedó en **"En producción"**. Cualquier cuenta de
+> Google puede autorizar sin ser agregada una por una, y el `refresh_token` ya no vence a
+> los 7 días. **Probar con una cuenta que nunca estuvo en la lista de prueba era el paso
+> decisivo**: en modo Prueba esa cuenta no podría autorizar, así que conectar Demonstró
+> que la publicación sirvió y no solo que quedó el cartel puesto.
+> El botón de publicar estaba apagado porque faltaban la página principal y la URL de
+> política de privacidad. Se creó el sitio en GitHub Pages:
+> **https://reivaj640.github.io/SG-SST-E/**
+> La política **no es un placeholder**: cada afirmación se verificó contra el código.
+> El contenido de los correos no sale de la máquina del cliente (`main/email-sync.js`
+> → SQLite local); el `.kairsync` de `main/sync-serializer.js` no incluye las tablas de
+> correo; `"sync-bridge"` es IPC y `sync-service.js` usa `fs` sobre una carpeta local; no hay
+> telemetria; el único canal propio es `firma.k-air.com` (PDFs a firmar, separado del
+> correo). Incluye la **Ley 1581 de 2012** de Colombia. Y declara la debilidad real: los
+> tokens se guardan sin cifrar.
+> **🛠️ El sitio vive en `sitio/` + la rama `gh-pages`, NO en `docs/`.** `docs/` ya
+> tenía contenido interno (protocolos SST, planes de gestión,
+> `investigacion-seguimiento-embarazo-sst-colombia.md`); publicar Pages desde ahí lo habría
+> puesto como sitio web oficial. Con la rama `gh-pages` solo se publica el sitio, y se
+> verificó que `/docs/`, `/Portear/` y `/sgsst-electron-app/` dan 404 allí.
+> `⚠️ La rama `gh-pages` es una COPIA generada de `sitio/`**: si se edita una hay que
+> regenerar la otra.
+> **Pendientes** (cola completa en `Historial.md`): el correo de soporte del sitio es
+> provisorio y Google lo exige alcanzable; la verificación de la app (~10 días hábiles,
+> con Search Console y video) para sacar el aviso de "app no verificada"; **tope de 100
+> usuarios de por vida del proyecto, sin reset**; tokens sin cifrar; y 📦862 (ancho de
+> la tarjeta de ingreso) que sigue **sin commitear** en `index.html` y `styles.css` — son
+> cambios del owner de una sesión anterior que esta jornada no tocó.
 >> **Anterior · v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
 > **🆕 v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
 > Quinta y última etapa del plan de 5 fases, y la primera con cambios visibles. El overlay del
