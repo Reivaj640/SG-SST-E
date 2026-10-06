@@ -3837,7 +3837,16 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
   
   // === FUNCIÓN AUXILIAR PARA VERIFICAR SI ES ADMIN ===
   function checkIsAdmin() {
-    if (!currentUser || !currentUser.companies) return false;
+    // 📦862 · El backend YA resolvió si sos administrador: `auth-login-v1`
+    // manda `user.isAdmin`, y `validateSession` (main.js:1021) cubre los casos
+    // globales (admin@kair.local y compañía) que NO dependen de tener empresas.
+    // Antes esta función solo miraba los roles de `currentUser.companies`, y con
+    // companies = [] eso da FALSE: un administrador sin empresas asignadas
+    // quedaba marcado como usuario normal, que es justo el caso que dispara
+    // este bloque. Por eso el mensaje era el equivocado.
+    if (!currentUser) return false;
+    if (currentUser.isAdmin === true) return true;
+    if (!Array.isArray(currentUser.companies)) return false;
     return currentUser.companies.some(c => {
       const role = (c.role || '').toLowerCase();
       return role === 'administrador' || role === 'administrador del sistema';
@@ -3845,15 +3854,17 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
   }
   
   // === FILTRAR EMPRESAS SEGÚN PERMISOS DEL USUARIO ===
-  if (Array.isArray(overrideCompanies)) {
-    // Si se proporcionan empresas específicas (ej: desde login), usarlas
-    dynamicCompanies = overrideCompanies;
-    console.log('📋 Mostrando empresas desde overrideCompanies:', dynamicCompanies.length);
-  } else if (assignedCompanies && assignedCompanies.length > 0 && !checkIsAdmin()) {
-    // === USUARIO NO-ADMIN: Solo mostrar empresas asignadas ===
-    dynamicCompanies = assignedCompanies;
-    console.log('👤 Usuario NO-ADMIN: mostrando solo empresas asignadas:', dynamicCompanies.length);
-  } else {
+  // 📦862 · El orden importa: se decide POR ROL primero.
+  // La primera rama era `Array.isArray(overrideCompanies)`, y como
+  // initializeApp() SIEMPRE recibe un array (renderer.js:3604), esa rama ganaba
+  // SIEMPRE y la de administrador quedaba muerta: código que no se ejecuta.
+  // Consecuencia real: un admin sin empresas asignadas caía en el mensaje de
+  // 'no tienes empresas asignadas, contacta a administración', que es el de un
+  // usuario normal, y lo dejaba sin salida.
+  // Ojo con 'arreglarlo' solo con `.length > 0`: un NO-admin sin empresas caeria
+  // en la rama de admin y veria TODAS. Por eso el rol se decide primero.
+  const esAdmin = checkIsAdmin();
+  if (esAdmin) {
     // === ADMINISTRADOR: Mostrar todas las empresas ===
     try {
       const config = await window.electronAPI.loadConfig();
@@ -3866,6 +3877,14 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
       dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
     }
     console.log('👑 Usuario ADMIN: mostrando todas las empresas:', dynamicCompanies.length);
+  } else if (Array.isArray(overrideCompanies) && overrideCompanies.length > 0) {
+    // === USUARIO NO-ADMIN: Solo mostrar las empresas del override ===
+    dynamicCompanies = overrideCompanies;
+    console.log('📋 No-admin con override: usando esas empresas:', dynamicCompanies.length);
+  } else {
+    // === USUARIO NO-ADMIN: Solo mostrar empresas asignadas ===
+    dynamicCompanies = assignedCompanies;
+    console.log('👤 Usuario NO-ADMIN: mostrando solo empresas asignadas:', dynamicCompanies.length);
   }
 
   // 📦841b · El desvanecido va SOLO sobre la construccion del contenido.
@@ -3959,15 +3978,34 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
     // Mostrar mensaje si no hay empresas registradas
     if (dynamicCompanies.length === 0) {
       const noCompaniesMessage = document.createElement('p');
-      noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
-        ? 'No tienes empresas asignadas. Contacta a administración.'
-        : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+      // 📦862 · El criterio es el ROL, no si vino un array. Un admin nunca debe
+      // ver 'contacta a administración': es el mensaje del usuario sin empresas
+      // asignadas, y a un admin lo deja sin salida.
+      noCompaniesMessage.textContent = esAdmin
+        ? 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.'
+        : 'No tienes empresas asignadas. Contacta a administración.';
       noCompaniesMessage.style.color = 'white';
       noCompaniesMessage.style.fontSize = '18px';
       noCompaniesMessage.style.textAlign = 'center';
       noCompaniesMessage.style.marginBottom = '20px';
       noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
       uiContainer.appendChild(noCompaniesMessage);
+
+      // 📦862 · El Inicio esconde el sidebar siempre, así que sin empresas
+      // registradas el admin se queda sin ninguna forma de llegar a la
+      // configuración. Este botón es la salida: sin él, el mensaje correcto
+      // no sirve de nada. Ojo: no citar aquí la clase CSS del sidebar, porque
+      // test-swapview-841 exige que nada de ese cromo entre en el desvanecido.
+      if (esAdmin) {
+        const goConfig = document.createElement('button');
+        goConfig.className = 'company-select-button';
+        goConfig.textContent = 'Ir a Configuración';
+        goConfig.style.margin = '10px';
+        goConfig.addEventListener('click', () => {
+          if (typeof showSettingsPage === 'function') showSettingsPage();
+        });
+        uiContainer.appendChild(goConfig);
+      }
     } else {
       dynamicCompanies.forEach(companyName => {
         const button = document.createElement('button');

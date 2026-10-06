@@ -10,6 +10,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.241] - 2026-10-06
+
+### 📦862 · Un administrador ya no queda encerrado en "contacta a administración"
+
+**Resumen:** si entrabas como administrador y no tenías ninguna empresa asignada, la app te
+decía **"No tienes empresas asignadas. Contacta a administración."** — el mensaje pensado para
+un usuario sin permisos, y además sin salida: no había forma de ver tus empresas.
+
+**Causa.** En `renderer.js`, `showHomePage` filtraba las empresas así:
+
+```js
+if (Array.isArray(overrideCompanies)) { ... }   // SIEMPRE true
+else if (assignedCompanies && ... && !checkIsAdmin()) { ... }
+else { /* ADMIN: todas, desde config */ }          // NUNCA se ejecutaba
+```
+
+`Array.isArray([])` es `true`, y `initializeApp()` se llama en un solo lugar (`renderer.js:3604`)
+pasando siempre `assignedCompanies`, que es un array. La primera rama ganaba **siempre**.
+
+Consecuencias, todas de la misma causa:
+
+- El admin sin empresas asignadas veía **cero** empresas y el mensaje de un usuario normal.
+- La rama del admin era **inalcanzable**, así que el fallback
+  `["Tempoactiva","Temposum","Aseplus","Asel"]` tampoco era código real.
+- `checkIsAdmin()` **nunca se consultaba**: su rama estaba detrás de código muerto.
+
+El backend sí estaba bien: `validateSession` (`main.js:1021`) reconoce `admin@kair.local` y
+devuelve `isAdmin: true`. El mensaje hacía creer que faltaban permisos.
+
+**Y había un segundo motivo, más profundo: `checkIsAdmin()` tampoco sabía quién era el admin.**
+Derivaba el rol **solo** de `currentUser.companies`, así que con `companies = []` —el caso del
+admin global, que por definición no tiene empresas asignadas— `[].some()` devolvía `false`. El
+backend ya mandaba `user.isAdmin` resuelto (`main.js:1628`) y el renderer lo ignoraba. Arreglar
+solo el orden de las ramas no bastaba: `esAdmin` seguía dando `false` y el mensaje seguía siendo
+el equivocado. Es lo que pasó en la primera vuelta: el mensaje siguió apareciendo después del fix.
+
+Ahora `checkIsAdmin()` respeta `currentUser.isAdmin` primero, y solo recalcula por `companies`
+cuando el backend no resolvió el caso global.
+
+**Y el admin quedaba además sin salida.** El Inicio oculta el sidebar siempre
+(`sidebar-hidden`), así que con cero empresas registradas no había forma de llegar a la
+configuración. Con el mensaje correcto y sin empresas, el admin seguía sin poder hacer nada. Se
+agrega un botón "Ir a Configuración" cuando es admin y la lista está vacía.
+
+**La trampa del arreglo obvio.** Agregar `&& overrideCompanies.length > 0` a la primera rama
+**abría una escalada de privilegios**: un usuario no-admin sin empresas caería en el `else`, que
+carga `config.companyPaths` completo, y vería **todas** las empresas.
+
+**El arreglo** es decidir por rol primero, no por la forma del argumento:
+
+```js
+const esAdmin = checkIsAdmin();
+if (esAdmin) { /* todas, desde config */ }
+else if (Array.isArray(overrideCompanies) && overrideCompanies.length > 0) { /* override */ }
+else { /* assignedCompanies */ }
+```
+
+Y el mensaje también pasa a decidir por rol: un administrador **nunca** debe ver la frase que lo
+remite a sí mismo.
+
+**Tests:** `main/test-admin-empresas-862.js`, 17 checks. Ejecuta `checkIsAdmin()` y el bloque de decisión de
+`renderer.js` y lo **ejecuta** con roles distintos en vez de buscar cadenas. Cubren los cinco
+combinarios de (admin, asignadas, override) y los dos del mensaje. Con el bug reintroducido sobre
+el código nuevo, fallan los dos checks de comportamiento — un detector de cadenas pasaría.
+
+**Cache-bust:** `renderer.js?v=20261006-admin-empresas-2` en `index.html`. Dos veces, porque la app
+ya había descargado el primer token: **un token repetido no sirve para nada** (§5.3).
+**Versión:** 0.1.240 → 0.1.241
 ## [0.1.240] - 2026-10-05
 
 ### 📦861 · El explorador de archivos deja de mentir cuando algo falla

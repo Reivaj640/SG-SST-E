@@ -22,16 +22,17 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-05 |
-| **Rama** | `Dev` — `Dev-Pc` fue **fusionada en `Dev`** (commit `e6a98d98`) y ya contiene 📦861. El remoto por defecto es `Dev` |
-| **Último commit de código** | 📦861 · el explorador de archivos deja de mentir cuando algo falla |
-| **Commits sin pushear** | 0 |
-| **Versión** | `0.1.240` (desarrollo) · último publicado `v0.1.205` |
+| **Fecha de cierre** | 2026-10-06 |
+| **Rama** | `Dev` (el remoto por defecto es `Dev`) |
+| **Último commit de código** | 📦862 · un administrador ya no queda encerrado en "contacta a administración" |
+| **Commits sin pushear** | 0 — 📦862 commiteado y pusheado |
+| **Versión** | `0.1.241` (desarrollo) · último publicado `v0.1.205` |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
-| **Suite (escritorio recién formateado)** | 119 tests · **98 verdes** · 21 con fallos. **No comparable**: esa máquina no tiene `kair.db` ni `.env`, así que 5 tests no pueden correr y 4 fallan por BD vacía. Ver "Puesta a punto" más abajo |
+| **Suite (escritorio)** | 120 tests · **102 verdes** · 18 con fallos — **los 18 preexistentes**, cero regresiones de 📦862 (los 5 que leen archivos cambiados fueron probados en HEAD limpio, §7.4). Incluye el test nuevo `test-admin-empresas-862.js` (17/17) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura** (el botón verde y el PDF con el visor del navegador los reportó él). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860 |
+| **Datos en el escritorio** | 🔴 **La BD no tiene empresas**: `companies` = 0 filas, `user_company_roles` = 0 filas, y `config.json` **no tiene `companyPaths`**. El usuario `admin@kair.local` existe y `isAdmin` sale `true`. Ver "Datos" más abajo |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. 📦862 **pendiente**: no se ha abierto la app todavía. 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
+| **Jornada** | En curso (2026-10-06). Paquete: 📦862 |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
@@ -145,6 +146,118 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-06 (madrugada) · El admin quedaba encerrado en "contacta a administración" (📦862)
+
+**Qué se hizo** — un bug de permisos en `renderer.js`, con su test y sus documentos. La app
+**no se abrió** en esta sesión: el owner autorizó editar y commitear por separado.
+
+| Qué | Resultado |
+|---|---|
+| Filtrado de empresas | Se decide **por rol primero**. Antes la rama del admin era código muerto |
+| Mensaje de "sin empresas" | Decide por rol: un admin nunca ve "contacta a administración" |
+| Test nuevo | `main/test-admin-empresas-862.js`, **17 checks**, con prueba de mutación |
+| Versionado | 0.1.240 → **0.1.241**, cache-bust `renderer.js?v=20261006-admin-empresas-2` |
+| Documentos | CHANGELOG + README + CONTEXT + release-notes + AGENTS (los 5, §5.8) |
+
+**Por qué** — el owner reportedó que al entrar le decía *"No tienes empresas asignadas. Contacta a
+administración"*, y él **es** administración. El mensaje lo hizo creer que era un tema de permisos
+y lo tuvo un rato agarrado.
+
+**El bug, en una línea.** `showHomePage` filtraba las empresas así:
+
+```js
+if (Array.isArray(overrideCompanies)) { ... }              // SIEMPRE true
+else if (assignedCompanies && ... && !checkIsAdmin()) { ... }
+else { /* ADMIN: todas las empresas */ }                     // NUNCA se ejecutaba
+```
+
+`Array.isArray([])` es **`true`**, y `initializeApp()` se llama en **un solo** sitio
+(`renderer.js:3604`) pasando siempre `assignedCompanies`, que es un array. La primera rama ganaba
+**siempre**. Verificado con grep: `initializeApp(` aparece una vez en `renderer.js` (el otro hit
+es una función homónima dentro de `seguimiento-incapacidades.html`).
+
+Arrastraba tres cosas: el admin sin empresas veía cero empresas y el mensaje de un usuario normal;
+el `else` del admin era inalcanzable, así que el fallback `["Tempoactiva","Temposum","Aseplus","Asel"]`
+tampoco era código real; y `checkIsAdmin()` **nunca se consultaba**.
+
+**La trampa del arreglo obvio.** Agregar `&& overrideCompanies.length > 0` **abre una escalada de
+privilegios**: un no-admin sin empresas caería en el `else`, que carga `config.companyPaths` entero,
+y vería **todas**. El bug visible se arregla y se crea uno peor. El arreglo correcto decide por rol
+primero, y el test cubre ese caso explícitamente.
+
+**El backend estaba bien.** `validateSession` (`main.js:1021`) reconoce `admin@kair.local` y
+devuelve `isAdmin: true`. El diagnóstico por la app daba la pista equivocada porque el mensaje
+**parecía** de permisos.
+
+**El primer fix no alcanzó, y el owner lo reportó con una captura.** Arreglé el orden de las
+ramas, subí la versión a 0.1.241 y el mensaje **seguía siendo el viejo**. La captura lo dejó
+claro: la app corría el código nuevo (el pie decía `v0.1.241`) pero `esAdmin` valía `false`.
+
+Había una segunda causa, más profunda: **`checkIsAdmin()` derivaba el rol solo de
+`currentUser.companies`**. Con `companies = []` —el caso del admin global, que por definición no
+tiene empresas asignadas— `[].some()` da `false`. El backend ya mandaba `user.isAdmin` resuelto
+(`main.js:1628`) y el renderer lo ignoraba. Ahora `checkIsAdmin()` respeta `currentUser.isAdmin`
+primero y solo recalcula por `companies` cuando el backend no resolvió el caso global.
+
+Y el admin quedaba **sin salida**: el Inicio oculta el sidebar siempre (`sidebar-hidden`), así que
+con cero empresas no había forma de llegar a la configuración. Se agregó un botón **Ir a
+Configuración** cuando es admin y la lista está vacía.
+
+**El cache-bust se bumpeó dos veces.** El primer token (`20261006-admin-empresas`) ya lo había
+descargado la app en ese arranque, así que la segunda vuelta necesitaba uno nuevo
+(`20261006-admin-empresas-2`). Es §5.3: **un token repetido no sirve para nada**.
+
+**Tests** — el nuevo test **extrae el bloque de decisión de `renderer.js` y lo ejecuta** con roles
+distintos, en vez de buscar cadenas: cubre los cinco combinatorios de (admin, asignadas, override)
+más los dos del mensaje. Lo que le da valor es la **mutación**: reintroduciendo el orden del bug
+**sobre el código nuevo** (conservando `const esAdmin`, para que el check estructural siga
+pasando) fallan los dos checks de comportamiento — `admin sin empresas recibió []` y
+`admin con override recibió ["Solo"]`. Un detector de cadenas habría pasado ese mutante.
+
+**Suite:** 120 tests · 99 verdes · 21 con fallos. Las 21 son **las mismas preexistentes**: cero
+regresiones. Repetida justo antes del commit: **120 tests · 102 verdes · 18 con fallos**. De esos
+18, los 5 que leen archivos tocados por 📦862 (`auditoria-visual`, `compose-bem`,
+`evaluacion-inicial-bootstrap`, `skeleton-encaje`, `auto-download-flow`) **fallan también en HEAD
+limpio** — stash, corrida, pop, árbol idéntico al de antes (§7.4) — y los otros 13 no leen ningún
+archivo que haya cambiado. Preexistencia probada, no supuesta.
+
+**Una fricción que encontró el suite.** `test-hero-fila-840` tiene el token de cache-bust
+**escrito a mano** (`renderer.js?v=20261002-hero-oculto`), así que **se cae con cada bump legítimo**.
+Falló al subir el `?v=` de 📦862 y hubo que actualizar el literal. No se rediseñó el check para que
+no se rompa: eso es decisión del owner, no un efecto colateral de este paquete.
+
+**Decisiones del owner**
+
+- Autorizó editar ("ok procede"). **No autorizó commit**: 📦862 queda en el working tree.
+- Confirmó que el rol lo tenía bien y que el problema era que no le aparecían las opciones.
+
+**Datos: por qué el fix solo no alcanza**
+
+El escritorio tiene la base creada (76 tablas) pero **sin empresas**:
+
+| Fuente | Estado |
+|---|---|
+| `companies` | 0 filas |
+| `user_company_roles` | 0 filas |
+| `config.json` → `companyPaths` | **no existe** |
+| `roles` | 5 filas (Administrador, SST, Auditoría, Gerencia, RRHH) |
+| `users` | 1: `admin@kair.local`, activo, `bandeja_integrada_enabled: 0` |
+
+Con 📦862 el admin ya **no** ve el mensaje equivocado: ve el correcto ("no hay empresas
+registradas, crea una en configuración"). Pero **sigue sin ver empresas**, porque no hay ninguna.
+Esto no se arregla con código: hay que restaurar el `kair.db` y el `config.json` del portátil.
+Y registrar empresas desde la UI ("Vincular Rutas de Archivos por Empresa",
+`config-viewer.html:6853`) **exige Python 3.10–3.12**, que esta máquina no tiene (tiene 3.14.8).
+
+**Commits**
+
+| Hash | Qué | Estado |
+|---|---|---|
+| `e2f6adaf` | docs(entorno): puesta a punto del escritorio | pusheado |
+| `📦862` | fix admin empresas + test + los 5 documentos | commiteado y pusheado |
+
+---
 
 ### 2026-10-05 (tarde) · Escritorio recién formateado: puesta a punto (sin paquete de código)
 

@@ -146,7 +146,7 @@ ok('4) el porcentaje y el meter se siguen pintando',
 ok('5) kair-premium.css tiene el ?v= nuevo en index.html',
   /kair-premium\.css\?v=20261002-hero-oculto/.test(html));
 ok('5) renderer.js tiene el ?v= nuevo en index.html',
-  /renderer\.js\?v=20261002-hero-oculto/.test(html));
+  /renderer\.js\?v=20261006-admin-empresas-2/.test(html));
 
 let failed = 0;
 console.log('\n=======================================');

@@ -5161,3 +5161,71 @@ código de salida no alcanza. Salió bien descargando el zip a mano y extrayénd
 **Regla:** `npm install` no compila el módulo nativo para el runtime correcto. En este repo eso es
 siempre Electron, nunca el Node del sistema.
 
+### 🔴 La rama del administrador era código muerto (📦862, v0.1.241)
+
+**El síntoma.** El owner entra con `admin@kair.local`, hace login bien, y la app le responde
+**"No tienes empresas asignadas. Contacta a administración."** — siendo él mismo administración.
+Un mensaje que además no tiene salida: no hay empresa a la que asignarse porque no hay ninguna
+registrada.
+
+**Por qué se rompió.** `showHomePage` en `renderer.js` filtraba las empresas así:
+
+```js
+if (Array.isArray(overrideCompanies)) {        // SIEMPRE true
+  dynamicCompanies = overrideCompanies;
+} else if (assignedCompanies && ... && !checkIsAdmin()) {
+  dynamicCompanies = assignedCompanies;
+} else {                                        // ADMIN — nunca se ejecutaba
+  const config = await window.electronAPI.loadConfig();
+  dynamicCompanies = Object.keys(config.companyPaths);
+}
+```
+
+`Array.isArray([])` es **`true`**, y `initializeApp()` se llama en **un solo** lugar
+(`renderer.js:3604`) pasando siempre `assignedCompanies`, que es un array. O sea: la primera
+rama ganaba **siempre**. Verificado con grep: `initializeApp(` aparece una vez en `renderer.js`
+(el otro hit es una función homónima definida dentro de `seguimiento-incapacidades.html`).
+
+Consecuencias, todas la misma causa:
+
+- Un **admin** sin empresas asignadas veía **cero** empresas y el mensaje de un usuario normal.
+- El `else` del admin era **inalcanzable**, así que el fallback
+  `["Tempoactiva","Temposum","Aseplus","Asel"]` tampoco era código real.
+- `checkIsAdmin()` **nunca se consultaba**: la rama que la usaba estaba detrás de código muerto.
+
+El backend sí estaba bien: `validateSession` (`main.js:1021`) reconoce `admin@kair.local` y
+devuelve `isAdmin: true`, y `auth-login-v1` lo reenvía. El diagnóstico desde la app dio la pista
+equivocida durante un rato porque el mensaje **parecía** de permisos.
+
+**Lo peligroso del arreglo obvio.** Agregar `&& overrideCompanies.length > 0` a la primera rama
+**abre una escalada de privilegios**: un usuario **no** admin sin empresas caería en el `else`,
+que carga `config.companyPaths` completo, y vería **todas** las empresas. El bug visible se
+arregla y se crea uno peor, invisible.
+
+**El arreglo correcto es decidir por rol primero**, no por forma del argumento:
+
+```js
+const esAdmin = checkIsAdmin();
+if (esAdmin) { /* todas, desde config */ }
+else if (Array.isArray(overrideCompanies) && overrideCompanies.length > 0) { /* override */ }
+else { /* assignedCompanies */ }
+```
+
+Y el mensaje también pasó a decidir por rol: `esAdmin ? 'No hay empresas registradas...' :
+'No tienes empresas asignadas. Contacta a administración.'`. Un administrador **nunca** debe ver
+la frase que lo remite a sí mismo.
+
+**El test (`main/test-admin-empresas-862.js`, 17 checks) ejecuta `checkIsAdmin()` y el bloque de decisión de
+`renderer.js` y lo ejecuta** con roles distintos, en vez de buscar cadenas. Cubre los cinco
+combinarios de (admin, asignadas, override) más los dos del mensaje.
+
+La prueba de mutación es lo que le da valor: reintroduciendo el orden del bug **sobre el código
+nuevo** (conservando `const esAdmin`, para que el check estructural siga pasando), fallan los
+dos checks de comportamiento — `admin sin empresas recibió []` y `admin con override recibió
+["Solo"]`. Un detector de cadenas habría pasado ese mutante.
+
+**Regla:** en un filtro de permisos, **el rol se decide antes que la forma del dato**. Y cuando
+la primera rama sea `typeof`/`Array.isArray` sobre un valor que el llamador siempre manda, hay
+que verificar **quién la ejecuta** antes de escribir código que dependa de la segunda: puede
+estar muerta y nadie se entera hasta que alguien queda encerrado sin salida.
+

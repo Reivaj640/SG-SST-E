@@ -5,11 +5,27 @@
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
 **Última actualización:** 5 de octubre de 2026
-**Versión actual:** 0.1.240 (desarrollo) — último publicado v0.1.205
+**Versión actual:** 0.1.241 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
-> **🆕 v0.1.240 (📦861 — el explorador de archivos deja de mentir):**
+> **🆕 v0.1.241 (📦862 — el admin deja de quedar sin salida):**
+> `showHomePage` filtraba las empresas por `Array.isArray(overrideCompanies)`, que es `true`
+> incluso para `[]`, y como `initializeApp()` **siempre** recibe un array (`renderer.js:3604`),
+> esa rama ganaba siempre y la del admin era **código muerto**. Un admin sin empresas asignadas
+> veía cero empresas y el mensaje "contacta a administración", que es el de un usuario normal.
+> Ahora se decide **por rol primero**: el admin ve todas las empresas registradas y un usuario
+> normal sigue viendo solo las suyas. El mensaje también decide por rol.
+> Ojo: arreglarlo solo con `.length > 0` habría dado a un no-admin **todas** las empresas.
+> **Había un segundo motivo:** `checkIsAdmin()` derivaba el rol **solo** de
+> `currentUser.companies`, así que con `companies = []` —el caso del admin global, que por
+> definición no tiene empresas asignadas— daba `false`. El backend ya mandaba `user.isAdmin`
+> resuelto (`main.js:1628`) y el renderer lo ignoraba. Arreglar solo el orden de las ramas no
+> bastaba: `esAdmin` seguía en `false` y el mensaje seguía siendo el equivocado.
+> Y el Inicio oculta el sidebar siempre, así que con cero empresas el admin no tenía forma de
+> llegar a la configuración: ahora recibe un botón **Ir a Configuración**.
+> Test `main/test-admin-empresas-862.js` (17 checks) que ejecuta `checkIsAdmin()` y el bloque
+>> **🆕 v0.1.240 (📦861 — el explorador de archivos deja de mentir):**
 > El módulo 1.1.1 (Responsable del SG) está **replicado 15 veces** en `modules/`: el 1.1.1 es el original y los otros
 > catorce son copias. Tres bugs del original eran quince bugs.
 > **Lista congelada**: el `catch` de la carga mostraba un toast de 5 s y **nunca redibujaba**, dejando

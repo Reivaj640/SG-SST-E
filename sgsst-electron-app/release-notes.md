@@ -1,3 +1,45 @@
+# K+AIR v0.1.241
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Si sos administrador, ya no te dicen que hables con administración
+
+### Antes: la app te cerraba la puerta aunministrando
+
+Si entrabas como administrador y no tenés ninguna empresa asignada, la app te mostraba
+**"No tienes empresas asignadas. Contacta a administración."**
+
+Ese mensaje es el de un usuario sin permisos. Y el problema es que **no tenía salida**:
+no había forma de ver tus empresas, porque la lista de empresas se armaba mirando primero
+"¿me pasaron una lista?" y como el inicio de sesión siempre pasa una —aunque esté vacía—
+esa pregunta siempre daba que sí. La parte del código que se encargaba del administrador
+**nunca se llegaba a ejecutar**.
+
+### Ahora: el administrador ve sus empresas, siempre
+
+La decisión ahora se toma por **rol**, no por la forma del dato:
+
+- **Administrador** → ve todas las empresas registradas.
+- **Usuario normal** → sigue viendo solo las empresas que tiene asignadas.
+
+Y si de verdad no hay ninguna empresa registrada, el administrador recibe el mensaje que le
+corresponde: que cree una desde la sección de configuración. Ya no se lo manda a hablar
+consigo mismo.
+
+Un detalle importante: un usuario normal **sigue sin ver empresas ajenas**. El arreglo del
+error anterior tenía una trampa: si solo se agregaba "y solo si la lista no está vacía", un
+usuario sin empresas terminaba viendo todas. Ese caso está cubierto por una prueba.
+
+### Y ahora, además, hay por dónde seguir
+
+Cuando de verdad no hay ninguna empresa registrada, al administrador le aparece un botón
+**Ir a Configuración** en la pantalla de inicio. Antes no lo tenía: esa pantalla oculta el menú
+lateral, así que sin empresas no había ninguna forma de llegar a ningún lado — te;message correcto
+y ninguna salida.
+
+---
+
 # K+AIR v0.1.240
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
