@@ -110,7 +110,7 @@
         <td>Para las funciones que pediste autorizar</td>
       </tr>
       <tr>
-        <td><code>firma.k-air.com</code> (servicio de firma electr&oacute;nica de JRFSoluciones)</td>
+        <td>Servidor de firma electr&oacute;nica configurado para tu empresa</td>
         <td>Los documentos PDF que solicitas firmar, y los datos de consentimiento y verificaci&oacute;n asociados</td>
         <td>Unicamente cuando usas la funcionalidad de firma electr&oacute;nica</td>
       </tr>
@@ -142,8 +142,12 @@
 
   <h2>6. Firma electr&oacute;nica</h2>
   <p>La funcionalidad de firma electr&oacute;nica es un servicio independiente del correo. Cuando la usas,
-  el documento que firmas y los datos de consentimiento se env&iacute;an cifrados al servidor de JRFSoluciones
-  (<code>firma.k-air.com</code>). Ese canal no transporta correos ni mensajes de Gmail.</p>
+  el documento que firmas y los datos de consentimiento se env&iacute;an cifrados al
+  <strong>servidor de firma electr&oacute;nica que tu empresa tenga configurado en K+AIR</strong>
+  (<code>main/firma-bridge.js</code> lo guarda cifrado con el mecanismo seguro del sistema
+  operativo, no como texto plano). Ese canal no transporta correos ni mensajes de Gmail.</p>
+  <p>Si tu empresa no usa la firma electr&oacute;nica, K+AIR no se comunica con ning&uacute;n servidor de
+  firma.</p>
 
   <h2>7. Conservaci&oacute;n y eliminaci&oacute;n</h2>
   <ul>
