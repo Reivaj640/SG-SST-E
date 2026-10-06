@@ -23,13 +23,16 @@
 | Campo | Valor |
 |---|---|
 | **Fecha de cierre** | 2026-10-05 |
-| **Rama** | `Dev-Pc` (el remoto por defecto es `Dev`) |
-| **Último commit** | 📦861 · el explorador de archivos deja de mentir cuando algo falla |
-| **Commits sin pushear** | 0 — el owner autorizó commit y push el 2026-10-05 |
+| **Rama de trabajo** | `Dev-Pc` · la de desarrollo diario |
+| **Rama por defecto de GitHub** | `Dev` · **ya sincronizada**: recibió los 567 commits de `Dev-Pc` el 2026-10-05 (`e6a98d98`) |
+| **Último commit de trabajo** | `Dev-Pc` → `6a81c163` · 📦861 · el explorador de archivos deja de mentir cuando algo falla |
+| **Commits sin pushear** | 0 — el owner autorizó commit, push y sincronización de ramas el 2026-10-05 |
+| **Estado de las ramas** | Las 4 ramas locales con remoto. Las 2 que solo existían en esta máquina (`backup-numeracion-2026-09-05` e `i-e2e-7-pdf-failure-paths`) **ya están publicadas en GitHub** |
+| **Respaldo del merge** | tag `respaldo-dev-antes-merge-861` → `13dfeeff`, el estado previo de `Dev`. Para volver: `git reset --hard respaldo-dev-antes-merge-861` |
 | **Versión** | `0.1.240` (desarrollo) · último publicado `v0.1.205` |
 | **Suite** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura** (el botón verde y el PDF con el visor del navegador los reportó él). 📦858 no. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **nunca se miraron** |
-| **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860 |
+| **Validaciones visuales abiertas** | 📦860 y 📦861 los **reportó el owner con captura** (el botón verde y el PDF abriendose en el visor del navegador fueron los síntomas que reportó) — **ya están corregidos y pusheados, falta que el owner los vuelva a mirar**. 📦858 **nunca se ha mirado**. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **tampoco** |
+| **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860. Al final se sincronizaron las 4 ramas |
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
@@ -50,27 +53,33 @@
    Antes quedaban bloques grises para siempre; ahora debe salir "No se pudo leer esta
    carpeta" con botón **Reintentar**, y "Carpeta vacía" solo cuando la carpeta está
    realmente vacía.
-3. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
+4. 🔴 **DESBLOQUEADO apenas el owner confirme el punto 2: replicar el PDF unificado a los
+   otros 14 exploradores.** Hoy el PDF con el visor de K+AIR está **solo en el 1.1.1**
+   (bloqueante #12). Los 15 tienen **4 variantes** de `_loadPDF` y **3 formas** de enrutar
+   el PDF en el archivo de conexión; 3 módulos ni siquiera tienen `*-logic.js`. Por eso no
+   se replicó a ciegas: hay que contar las variantes **antes** de escribir, no después
+   (`PROMPT.md` §5.11b).
+5. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
    📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
    cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
    pidió.
-4. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
+6. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
    **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
    sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir
    visible** abajo con la lista larga. Todo probado con tests, **nunca mirado en la app**.
-5. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
+7. **Owner tiene que validar visualmente 📦855**: que la bandeja abra **en blanco** (sin correo
    abierto), que al hacer clic abra y marque leído, y que al cambiar de filtro con un correo
    abierto que no está en la lista nueva, el panel se limpie.
-6. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
+8. **Owner tiene que validar visualmente 📦853/854**: el pillón rojo de novedad en la esquina de la
    fila "Correos no leídos", el tinte rojo de la fila, el filtro "No leídos" en la barra y el clic
    que baja el 99+. Ojo: hay que **cerrar y reabrir** la app primero, para que se siembre la línea
    base con el estado actual. En la captura de 📦855 el aviso rojo **no aparecía**, y era lo
    correcto: la línea base se había sembrado con lo que ya había y no había llegado nada nuevo.
-7. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
+9. **Cerrar el bypass de `gh:update-personal`** (bloqueante #2). Es el único de severidad crítica
    que sigue abierto, y lleva desde v0.1.212.
-8. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
+10. **Decidir sobre los borrados que necesitan autorización**: los 4 `.bak-*` (bloqueante #5) y los
    12 JS huérfanos de la Bandeja (bloqueante #4). Editar código que no se carga es trabajo perdido.
-9. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
+11. **Arreglar los tokens faltantes de `styles.css`** (bloqueante #1), o decidir que el panel de
    pendientes se queda así y no se le toca.
 
 ### 🔴 Bloqueantes y deudas conocidas
