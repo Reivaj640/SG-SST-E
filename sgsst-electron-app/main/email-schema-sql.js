@@ -21,6 +21,7 @@ const EMAIL_SCHEMA_SQL = `
     refresh_token TEXT,
     expires_at INTEGER,
     history_id TEXT,                          -- Gmail watch cursor (Fase 5)
+    is_active INTEGER NOT NULL DEFAULT 0,      -- 📦874 — la cuenta CONECTADA ahora
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -92,6 +93,8 @@ const EMAIL_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_messages_thread ON email_messages(thread_id);
   CREATE INDEX IF NOT EXISTS idx_messages_date ON email_messages(date DESC);
   CREATE INDEX IF NOT EXISTS idx_messages_from ON email_messages(from_email);
+  -- 📦874 — El filtro por conexión es el camino caliente de la bandeja.
+  CREATE INDEX IF NOT EXISTS idx_messages_connection ON email_messages(connection_id);
 
   -- 📦 Bandeja Integrada — Labels (cache local de Gmail labels)
   -- Permite ver colores y nombres de labels sin llamar al API.
@@ -131,13 +134,18 @@ const EMAIL_SCHEMA_SQL = `
   -- Guarda el nextPageToken que devuelve Gmail para poder pedir la PÁGINA
   -- SIGUIENTE cuando el user pide "cargar más correos" (o scrollea hasta el
   -- final de la lista). Sin esto no había forma de ver más de los primeros 25.
+  --
+  -- 📦874 — La clave primaria es COMPUESTA (folder, connection_id). Con solo
+  -- folder como PK, cambiar de cuenta Gmail sobrescribía el page_token de la
+  -- anterior: el "cargar más" de una cuenta salteaba o repetía mensajes de otra.
   CREATE TABLE IF NOT EXISTS email_sync_state (
-    folder TEXT PRIMARY KEY,
-    connection_id TEXT,
+    folder TEXT NOT NULL,
+    connection_id TEXT NOT NULL DEFAULT '',
     page_token TEXT,                          -- nextPageToken de Gmail (página siguiente)
     loaded_count INTEGER NOT NULL DEFAULT 0,  -- cuántos threads se trajeron en total
     pages_loaded INTEGER NOT NULL DEFAULT 0,  -- cuántas páginas se pidieron
-    updated_at INTEGER
+    updated_at INTEGER,
+    PRIMARY KEY (folder, connection_id)
   );
 `;
 
@@ -160,6 +168,36 @@ const EMAIL_MIGRATIONS_SQL = [
   // la imagen de firma aparecía listada como "1 archivo adjunto".
   'ALTER TABLE email_attachments ADD COLUMN content_id TEXT;',
   'ALTER TABLE email_attachments ADD COLUMN disposition TEXT;',
+  // 📦874 — Cuenta Gmail CONECTADA. Sin esto no hay forma de saber a quién pertenece
+  // cada fila del cache: `email_connections` acumulaba una fila por cuenta conectada
+  // y el camino de lectura no filtraba por ninguna, así que la bandeja mezclaba los
+  // correos de todas. El token OAuth es único (vive cifrado en google-tokens.enc), así
+  // que hay exactamente UNA cuenta activa a la vez.
+  'ALTER TABLE email_connections ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0;',
+
+  // 📦874 — Reconstruye email_sync_state con PK compuesta (folder, connection_id).
+  //
+  // SQLite NO permite cambiar una primary key con ALTER TABLE, así que hay que crear
+  // la tabla nueva, copiar, borrar la vieja y renombrar. Se ejecuta en cada arranque:
+  // es idempotente (mismo dato, misma forma) y son unas pocas filas.
+  // ⚠️ Si algún día se le AGREGA una columna a esta tabla, hay que añadirla también en
+  // el CREATE de abajo o el rebuild la perdería.
+  `DROP TABLE IF EXISTS email_sync_state_new;
+   CREATE TABLE email_sync_state_new (
+     folder TEXT NOT NULL,
+     connection_id TEXT NOT NULL DEFAULT '',
+     page_token TEXT,
+     loaded_count INTEGER NOT NULL DEFAULT 0,
+     pages_loaded INTEGER NOT NULL DEFAULT 0,
+     updated_at INTEGER,
+     PRIMARY KEY (folder, connection_id)
+   );
+   INSERT OR IGNORE INTO email_sync_state_new
+     (folder, connection_id, page_token, loaded_count, pages_loaded, updated_at)
+   SELECT folder, COALESCE(connection_id, ''), page_token, loaded_count, pages_loaded, updated_at
+     FROM email_sync_state;
+   DROP TABLE email_sync_state;
+   ALTER TABLE email_sync_state_new RENAME TO email_sync_state;`,
 ];
 
 module.exports = {

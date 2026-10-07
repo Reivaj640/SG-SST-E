@@ -507,6 +507,32 @@ function readConfigSync() {
   }
 }
 
+// 📦873 — Registro de aceptación de Términos y Condiciones / tratamiento de datos.
+// Una fila por aceptación (histórico completo, nunca se pisa): es la prueba del
+// consentimiento previo, expreso e informado (Ley 1581 de 2012, art. 5 y 8).
+const CONSENT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS consent_acceptance (
+  device_id            TEXT    NOT NULL,
+  app_version          TEXT    NOT NULL,
+  document_version     TEXT    NOT NULL,
+  usuario              TEXT,
+  email                TEXT,
+  nombres              TEXT,
+  acepta_terminos      INTEGER NOT NULL,
+  acepta_datos         INTEGER NOT NULL,
+  acepta_datos_sensibles INTEGER NOT NULL,
+  version_terminos     TEXT,
+  version_privacidad   TEXT,
+  texto_hash           TEXT,
+  ip_local             TEXT,
+  user_agent           TEXT,
+  aceptado_en          TEXT    NOT NULL,
+  created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_consent_device   ON consent_acceptance(device_id);
+CREATE INDEX IF NOT EXISTS idx_consent_aceptado ON consent_acceptance(aceptado_en);
+`;
+
 function initDbOnce() {
   if (dbInitialized) return;
   const dbPath = path.join(app.getPath('userData'), 'kair.db');
@@ -532,6 +558,14 @@ function initDbOnce() {
     // hijos huérfanos (de {}) falla o cascada donde antes no pasaba nada. Si
     // aparece algún "FOREIGN KEY constraint failed" nuevo, es por acá.
     db.pragma('foreign_keys = ON');
+
+    // 📦873 — Tabla de consentimientos (Términos y Condiciones + autorización de datos).
+    // Idempotente: CREATE TABLE IF NOT EXISTS, así las bases existentes la crean solas.
+    try {
+      db.exec(CONSENT_SCHEMA_SQL);
+    } catch (consentErr) {
+      console.error('[consent] Error creando tabla consent_acceptance:', consentErr.message);
+    }
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -1346,6 +1380,22 @@ const createWindow = () => {
       contextIsolation: true,
       webviewTag: true, // Habilitar webviews para OnlyOffice
     },
+  });
+
+  // 📦873 — Los enlaces http/https del renderer se abren en el navegador del sistema, NO
+  // en una ventana de Electron. Sin esto, todo `target="_blank"` abre un BrowserWindow
+  // propio: el usuario ve un 404 de GitHub Pages dentro de una ventana con su propio menú,
+  // y parece un fallo de la app en vez de una página que no existe.
+  //
+  // Solo se interceptan http/https. Los ~12 modulos de documentacion imprimen con
+  // `window.open('', '_blank')`, y el handler las deja pasar: si se negaran, la impresion
+  // se romperia en toda la app. Este es el unico lugar donde se decide eso.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url || '')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
   });
 
   // Manejar el evento de cierre para resetear el flag
@@ -2659,6 +2709,86 @@ ipcMain.handle('get-app-version', async () => {
     // string vacío para que el caller (renderer) decida cómo manejarlo.
     return '';
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 📦873 · Consentimiento de términos y datos personales (Ley 1581 de 2012)
+// Tres canales: estado (fail-open), registro (histórico, una fila por
+// aceptación) y salida (rechazo → cerrar la app). El estado devuelve null en
+// cualquier error de infraestructura para no bloquear el arranque.
+// ─────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('consent:estado', async () => {
+  try {
+    const cfg = readConfigSync();
+    const appV = app.getVersion();
+    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const aceptado = db.prepare(
+      'SELECT app_version, document_version FROM consent_acceptance ORDER BY aceptado_en DESC LIMIT 1'
+    ).get();
+    return {
+      appVersion: appV,
+      documentVersion: docV,
+      requiere: !aceptado || aceptado.app_version !== appV || aceptado.document_version !== docV
+    };
+  } catch (error) {
+    console.error('[consent] Error consultando estado:', error);
+    return null; // fail-open: no bloquear la app por un error de infraestructura
+  }
+});
+
+ipcMain.handle('consent:registrar', async (event, payload) => {
+  try {
+    const p = payload || {};
+    const cfg = readConfigSync() || {};
+
+    // validateSession devuelve { ok, session, user } — el email NO está en la raíz.
+    // Leer `sesion.email` sobre el objeto completo daba undefined SIEMPRE, y como
+    // `{ ok: false }` es truthy la guarda `!sesion` nunca disparaba: el gate respondsía
+    // SESION_INVALIDA aunque la sesión fuera válida y el consentimiento nunca se podía
+    // registrar. Misma forma que companies-sync-v1 y users-list-v1.
+    let sessionCheck = null;
+    try { sessionCheck = validateSession(p.token); } catch (e) { sessionCheck = null; }
+    if (!sessionCheck || !sessionCheck.ok || !sessionCheck.user || !sessionCheck.user.email) {
+      return { success: false, error: 'SESION_INVALIDA' };
+    }
+    const usuario = sessionCheck.user;
+    if (!p.aceptaTerminos || !p.aceptaDatos || !p.aceptaDatosSensibles) {
+      return { success: false, error: 'FALTA_AUTORIZACION' };
+    }
+    // device_id: identificador aleatorio persistido por instalación
+    let deviceId = cfg.consentDeviceId;
+    if (!deviceId) {
+      deviceId = 'dev-' + require('crypto').randomUUID();
+      cfg.consentDeviceId = deviceId;
+      try { fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2)); } catch (e) { /* best-effort */ }
+    }
+    const appV = app.getVersion();
+    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const ahora = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO consent_acceptance
+        (device_id, app_version, document_version, usuario, email, nombres,
+         acepta_terminos, acepta_datos, acepta_datos_sensibles,
+         version_terminos, version_privacidad, texto_hash, ip_local, user_agent,
+         aceptado_en, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      deviceId, appV, docV, usuario.email, usuario.email, usuario.full_name || '',
+      String(p.versionTerminos || ''), String(p.versionPrivacidad || ''),
+      String(p.textoHash || ''), '127.0.0.1',
+      String((event && event.sender && event.sender.getUserAgent && event.sender.getUserAgent()) || ''),
+      ahora, ahora
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('[consent] Error registrando aceptación:', error);
+    return { success: false, error: 'ERROR_INTERNO' };
+  }
+});
+
+ipcMain.handle('consent:rechazar', async () => {
+  setTimeout(() => { try { app.quit(); } catch (e) { /* noop */ } }, 250);
+  return { success: true };
 });
 
 // Manejar la verificación manual de actualizaciones desde configuraciones

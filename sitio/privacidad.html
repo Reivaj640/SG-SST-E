@@ -24,7 +24,7 @@
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
-  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 6 de octubre de 2026</p>
+  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 7 de octubre de 2026</p>
 
   <div class="destacado">
     <p><strong>Resumen en una l&iacute;nea:</strong> cuando conect&aacute;s tu cuenta de Google a K+AIR,
@@ -57,12 +57,8 @@
       </tr>
       <tr>
         <td><code>gmail.send</code></td>
-        <td>Enviar correos en tu nombre desde K+AIR (responder, reenviar, redactar y enviar).</td>
-        <td>Tu equipo &uacute;nicamente</td>
-      </tr>
-      <tr>
-        <td><code>gmail.compose</code></td>
-        <td>Crear y administrar borradores.</td>
+        <td>Enviar correos en tu nombre desde K+AIR (responder, reenviar, y enviar un borrador
+        que se redacta dentro de la aplicaci&oacute;n, sin que el borrador llegue a Gmail).</td>
         <td>Tu equipo &uacute;nicamente</td>
       </tr>
       <tr>
@@ -124,6 +120,14 @@
         <td>Tu direcci&oacute;n IP y User-Agent al cargar la interfaz</td>
         <td>Para cargar librer&iacute;as de interfaz</td>
       </tr>
+      <tr>
+        <td>Registro de consentimiento</td>
+        <td>Correo electr&oacute;nico del usuario, un identificador aleatorio del equipo, versi&oacute;n de la
+        aplicaci&oacute;n, versi&oacute;n del documento aceptado, marca de tiempo, y una huella digital del texto
+        legal que se mostr&oacute;</td>
+        <td>Para dejar constancia de que el tratamiento de datos sensibles se autoriz&oacute; de forma expresa
+        (Ley 1581 de 2012, art&iacute;culo 5)</td>
+      </tr>
     </tbody>
   </table>
   <p>No utilizamos herramientas de publicidad, perfiles de comportamiento ni an&aacute;lisis de
@@ -132,10 +136,16 @@
   <h2>5. Credenciales y tokens de acceso</h2>
   <div class="aviso">
     <p><strong>Punto de transparencia importante.</strong> Cuando conectas tu cuenta, K+AIR guarda un
-    token de acceso y un token de renovaci&oacute;n en un archivo de configuraci&oacute;n dentro de tu equipo.
-    A la fecha de esta pol&iacute;tica, ese archivo <strong>no est&aacute; cifrado</strong>: cualquier persona con
-    acceso a tu cuenta de usuario de Windows podr&iacute;a leerlo. Se trata de un riesgo local, no de una
-    fuga por red. Estamos trabajando en cifrarlo con el mecanismo seguro del sistema operativo.</p>
+    token de acceso y un token de renovaci&oacute;n <strong>cifrados</strong> en un archivo propio dentro de tu
+    equipo, usando el almacenamiento seguro del sistema operativo (en Windows, el cifrado de DPAPI, el
+    mismo que usa Windows para proteger sus propias credenciales).</p>
+    <p>El token de renovaci&oacute;n no caduca hasta que revoques el acceso desde tu cuenta de Google: es una
+    credencial de larga duraci&oacute;n, por eso se guarda cifrada. Si ya ten&iacute;as una versi&oacute;n anterior de K+AIR
+    instalada, al abrirla por primera vez la aplicaci&oacute;n cifra los tokens que ten&iacute;a guardados en claro y
+    borra la copia anterior de forma autom&aacute;tica. No tienes que volver a conectar tu correo.</p>
+    <p>El archivo de configuraci&oacute;n general (<code>config.json</code>) ya no contiene tokens. Aun as&iacute;, como
+    en cualquier sistema, una persona con acceso administrativo a tu equipo y a tu sesi&oacute;n de Windows
+    podr&iacute;a recuperar el token. Se trata de un riesgo local, no de una fuga por red.</p>
   </div>
   <p>Si necesitas proteger tu equipo, usa una cuenta de Windows con controles de acceso y BitLocker, y
   cierra sesi&oacute;n al terminar.</p>
@@ -154,6 +164,14 @@
     <li><strong>Correos:</strong> se guardan en tu equipo hasta que los borres, hasta que uses la opci&oacute;n de vaciar la bandeja dentro de K+AIR, o hasta que desinstales la aplicaci&oacute;n.</li>
     <li><strong>Conexi&oacute;n con Google:</strong> puedes revocarla en cualquier momento desde K+AIR (opci&oacute;n <em>Desconectar</em>) o desde la cuenta de Google. Al desconectar, K+AIR elimina el token almacenado en tu equipo.</li>
     <li><strong>Desinstalaci&oacute;n:</strong> al desinstalar K+AIR se elimina la carpeta de datos de la aplicaci&oacute;n, incluidos los correos descargados y los tokens.</li>
+    <li><strong>Registro de consentimiento:</strong> cada vez que aceptas los t&eacute;rminos se guarda una fila con
+    la fecha, tu correo, un identificador aleatorio del equipo, la versi&oacute;n de la aplicaci&oacute;n y una huella
+    del texto que le&iacute;ste. Las aceptaciones anteriores no se borran: forman el hist&oacute;rico de esa
+    prueba. Se eliminan al desinstalar la aplicaci&oacute;n, junto con el resto de sus datos.</li>
+    <li><strong>Revocar la autorizaci&oacute;n de datos sensibles:</strong> puedes retirar el consentimiento en
+    cualquier momento. Deja de tratarse la informaci&oacute;n nueva de salud, pero las anteriores no se borran
+    solas: escr&iacute;benos para solicitar su eliminaci&oacute;n, porque el registro de aceptaciones y los datos ya
+    tratados se conservan como respaldo de lo que ya ocurri&oacute;.</li>
   </ul>
 
   <h2>8. Tus derechos como titular</h2>

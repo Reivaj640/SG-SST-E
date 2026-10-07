@@ -10,6 +10,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.251] - 2026-10-07
+
+### 📦874 · La bandeja ya no mezcla los correos de dos cuentas de Gmail
+
+Conectar una segunda cuenta de Gmail en la misma máquina **mezclaba las dos bandejas**: al
+entrar con la nueva seguías viendo los correos de la anterior, con sus cuerpos completos.
+
+El cache local guarda los hilos y mensajes de **todas** las cuentas que se conectaron alguna
+vez, en la misma base. Escribirlos bien nunca fue el problema: `email_threads` y
+`email_messages` ya traían `connection_id` en cada fila. El problema era que **leerlos no
+usaba esa columna**. `buildThreadsWhere` —el WHERE que comparten la lista y su contador— solo
+filtraba por carpeta, no leídos, búsqueda y fechas. La conexión no entraba.
+
+Evidencia en la base de un equipo real: dos conexiones y 54 hilos en INBOX, de los cuales 26
+pertenecían a la cuenta activa y 28 a la anterior.
+
+El aislamiento ya estaba diseñado en unas funciones (`getCacheStats`, `getLabelsFromCache`,
+`deleteThreadsByFolder`) y faltaba justo en las que pintan la bandeja. Ahora las cinco
+lecturas acotan por cuenta: `buildThreadsWhere`, `getThreadFromCache`, `getMessagesFromCache`,
+`recomputeThreadUnread` y `propagateUnreadChange`.
+
+**Fail-closed a propósito:** si no se puede resolver la cuenta activa, el `WHERE` queda en
+`1 = 0` y no se lista nada. Acotar es lo seguro; devolver todo "para no romper la UI" es
+justo el fallo que se corrige.
+
+De paso se cerraron dos cosas que solo iban a fallar más adelante:
+
+- **El cursor de "cargar más" cruzaba cuentas.** `email_sync_state` tenía `folder` como clave
+  primaria, así que cambiar de cuenta sobrescribía el `pageToken` de la anterior. Ahora la
+  clave es `(folder, connection_id)`. SQLite no permite cambiar una PK con `ALTER`, así que
+  la migración reconstruye la tabla, copia y renombra.
+- **El barrido de huérfanos comparaba contra la cuenta equivocada.** El sync pedía los 5000
+  hilos más recientes *sin filtro de conexión* y los comparaba contra el Gmail de una sola
+  cuenta: los de la otra se marcaban como huérfanos y el borrado —que sí está acotado— no los
+  tocaba. Marcaba mal y no pasaba nada.
+
+**No se borró nada.** Los correos de la cuenta anterior siguen en el cache; simplemente ya no
+se muestran. Vuelven a estar disponibles cuando se reconecte esa cuenta.
+
+### 📦873 · Gate de consentimiento legal (Ley 1581 de 2012)
+
+K+AIR guarda historias clínicas. La Ley 1581 de 2012 (art. 5 y 8) y la Ley 1712 de 2014
+exigen que ese tratamiento sea lícito **solo con autorización previa, expresa e informada**, y
+que quede constancia de ella. Esta versión cierra el circuito: el gate ya no es un `await` a
+una función que no existía.
+
+Antes de esto el backend tenía los tres handlers y el call site estaba puesto, pero **nadie
+podía llamarlos**: faltaban el preload, el markup, los estilos y la función. Sin función,
+error en tiempo de ejecución.
+
+- **Overlay** con el texto legal, dos casillas **sin premarcar** —el consentimiento tiene que
+  ser expreso, no preseleccionado— y los botones "Acepto y continúo" / "No acepto".
+- **Fail-OPEN deliberado**, y es una decisión, no un descuido: si el preload no expone los
+  canales, la base no responde o el overlay no está en el DOM, el gate devuelve `true` y la
+  app carga. Lo contrario sería bloquear el acceso a una aplicación de gestión de salud
+  porque la tabla de consentimientos no arranca. Lo que **no** es fail-open es la decisión
+  del usuario: un fallo de infraestructura nunca se confunde con un "no", ni al revés.
+- **Escape no cierra.** El consentimiento no es descartable.
+- El hash SHA-256 del texto legal queda guardado como prueba de *qué* texto se leyó.
+
+**Dos bugs que solo aparecieron al probarlo de verdad:**
+
+1. El backend leía `sesion.email` sobre lo que devuelve `validateSession`, que es
+   `{ ok, session, user }`. Como `{ ok: false }` es *truthy*, la mitad `!sesion` de la guarda
+   nunca disparaba y `email` nunca existía ahí: **el consentimiento era imposible de
+   registrar**, siempre respondía `SESION_INVALIDA`. En el mismo bloque, `sesion.nombres` es
+   un campo que no existe (es `user.full_name`), así que el nombre se habría guardado vacío.
+2. El enlace a la política de privacidad apuntaba a `reivaj640.github.io/privacidad.html`
+   sin el path del repo: **404**. Y como `main.js` no tenía ningún `setWindowOpenHandler`, el
+   `target="_blank"` abría una ventana de Electron en vez del navegador del sistema.
+
+**Test: 48 checks.** El escape se saca del `renderer.js` real con `vm` y se corre contra un
+DOM y una API falsos, así que si alguien cambia la política ahí, el test la evalúa tal como
+quedó. Dos mutaciones a propósito para comprobar que los checks muerden: quitar el fail-open
+pone 1 rojo, y quitar la guarda de las casillas pone 5.
+
+> ⚠️ **Pendiente, y es de fondo:** el gate decide re-preguntar comparando `app_version` y un
+> `config.consentDocumentVersion` que **nadie escribe**, así que editar el texto legal no
+> vuelve a preguntar, y cada actualización de la app re-pregunta a todo el mundo. Además
+> `consent:estado` toma la última aceptación **de cualquier usuario** de la máquina, sin
+> filtrar por correo: en un equipo compartido, el primero que acepta silencia el gate para
+> los demás. Sin corregir, el registro sirve como prueba de que *alguien* aceptó, no de que
+> lo aceptó quien corresponde.
+
+### Corregido
+
+- Los enlaces `http/https` del renderer se abren en el navegador del sistema
+  (`setWindowOpenHandler` en `mainWindow`). Solo se interceptan `http/https`: los ~12 módulos
+  de documentación imprimen con `window.open('', '_blank')` y el handler las deja pasar.
+- La política de privacidad (`sitio/`) deja de anunciar `gmail.compose`, que ya no se pide, y
+  documenta que los tokens van cifrados y que existe registro de consentimiento.
 ## [0.1.250] - 2026-10-07
 
 ### 📦872 · Google: K+AIR pide un permiso menos

@@ -1,3 +1,55 @@
+# K+AIR v0.1.251
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Dos arreglos que no deberían haber existido
+
+### La bandeja ya no mezcla correos de dos cuentas
+
+Si conectaba una segunda cuenta de Gmail en el mismo computador, al entrar con la nueva
+**seguía viendo los correos de la anterior**, con sus textos completos. Eso no debería pasar
+nunca.
+
+El motivo era que K+AIR guarda en su base los correos de todas las cuentas que se hayan
+conectado, y al mostrar la bandeja no estaba revisando a qué cuenta pertenecía cada uno. Ya
+está corregido: usted solo ve los correos de la cuenta que tiene conectada.
+
+**No se borró nada.** Los correos de la cuenta anterior siguen guardados; simplemente no se
+muestran. Vuelven a aparecer cuando vuelva a conectar esa cuenta.
+
+### Ahora la app pide permiso antes de abrir sus datos de salud
+
+K+AIR registra historias clínicas, audiometrías y electrocardiogramas. Por la **Ley 1581 de
+2012** ese tratamiento solo es lícito si usted lo autoriza de forma previa, expresa e
+informada, y con constancia de que lo hizo.
+
+Desde esta versión, la primera vez que entra aparece una pantalla con el resumen del
+tratamiento y dos autorizaciones que usted tiene que marcar:
+
+1. Que leyó y acepta los Términos y Condiciones.
+2. Que autoriza el tratamiento de sus datos personales y de sus datos sensibles de salud.
+
+Las dos casillas **no vienen marcadas**. Si no marca alguna, la app no lo deja pasar.
+Si pulsa "No acepto", la app se cierra y no registra nada.
+
+Cada vez que acepta queda guardada la constancia: la fecha, su correo, un identificador
+aleatorio de su equipo, la versión de la aplicación y una huella del texto legal que leyó.
+Esa información nunca sale de su equipo.
+
+Si después quiere retirar su autorización, puede hacerlo; los datos que ya registró no se
+borran solos, escríbanos y los eliminamos.
+
+## Otros arreglos
+
+- Los enlaces dentro de la app (por ejemplo, el de la política de privacidad) ahora se abren
+  en **su navegador de verdad**, en vez de una ventana aparte dentro de K+AIR.
+- El enlace a la política de privacidad estaba mal escrito y daba error 404. Ya funciona.
+- La política de privacidad del sitio ya no anuncia un permiso de Google que K+AIR dejó de
+  pedir, y explica que las claves de acceso a su correo están cifradas y que ahora existe
+  registro de consentimiento.
+---
+
 # K+AIR v0.1.250
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

@@ -25,6 +25,12 @@ dbInstance.setDb(db);
 
 const emailDb = require('./email-db');
 
+// 📦874 — Desde este fix TODO lo que se lee se acota por la cuenta conectada, así que
+// la semilla tiene que registrar una. Sin esta fila getActiveConnectionId() devuelve
+// null, el WHERE queda en '1 = 0' y la lista sale vacía (a propósito: acotar es lo
+// seguro, devolver todo era el fallo).
+emailDb.saveConnection({ id: 'test@kair.co', email: 'test@kair.co', provider: 'gmail' });
+
 let failed = 0;
 function check(name, ok, extra) {
   if (ok) console.log('[OK  ] ' + name);
@@ -148,6 +154,75 @@ check('Con la ventana de fechas, la limpieza NO borra las páginas viejas',
 const orphansSinVentana = cached.filter(function (t) { return !fetchedIds.has(t.id); });
 check('Control: SIN ventana de fechas se habrían borrado 35 (el bug que evitamos)',
   orphansSinVentana.length === 35, 'serian=' + orphansSinVentana.length);
+
+// ── 5. AISLAMIENTO ENTRE CUENTAS (📦874) ─────────────────────────
+// Este es el fallo que se corrigió: dos cuentas Gmail conectadas en la misma máquina
+// comparten la base, y la bandeja mezclaba los correos de ambas. Se comprueba con
+// DATOS, no leyendo el código: se siembran 20 hilos de una segunda cuenta y se
+// verifica que no aparezcan.
+const OTRA = 'otro@kair.co';
+for (let i = 0; i < 20; i++) {
+  emailDb.saveThread({
+    id: 'ajeno-' + i,
+    connection_id: OTRA,
+    subject: 'PRIVADO ' + i,
+    snippet: 'no debe aparecer',
+    participants: [OTRA],
+    message_count: 1,
+    has_unread: 0,
+    has_attachment: 0,
+    is_starred: 0,
+    is_important: 0,
+    folder: 'INBOX',
+    label_ids: ['INBOX'],
+    last_message_date: now + i * 1000,
+    last_sender_email: 'remitente' + i + '@ajeno.com',
+    last_sender_name: 'Remitente ' + i
+  });
+}
+
+check('La bandeja NO muestra los correos de otra cuenta',
+  emailDb.getThreadsFromCache({ folder: 'INBOX', maxResults: 500 }).every(function (t) {
+    return t.connection_id === 'test@kair.co';
+  }));
+check('Y el contador tampoco los cuenta',
+  emailDb.countThreadsFromCache({ folder: 'INBOX' }) === 60,
+  'total=' + emailDb.countThreadsFromCache({ folder: 'INBOX' }));
+check('Control: los hilos ajenos SI existen en la base (no se borraron)',
+  (function () {
+    const n = db.prepare('SELECT COUNT(*) c FROM email_threads WHERE connection_id = ?').get(OTRA).c;
+    return n === 20;
+  })());
+check('getThreadFromCache NO abre un hilo de otra cuenta',
+  emailDb.getThreadFromCache('ajeno-0', 'test@kair.co') === null &&
+  emailDb.getThreadFromCache('inbox-0', 'test@kair.co') !== null);
+check('getMessagesFromCache NO abre mensajes de otra cuenta',
+  emailDb.getMessagesFromCache('ajeno-0', 'test@kair.co').length === 0);
+// Sin ninguna cuenta registrada no se puede saber de quién es cada fila, y devolver
+// todo "para no romper la UI" es el fallo original. Se comprueba vaciando la tabla de
+// conexiones: getActiveConnectionId() no debe tener el fallback por updated_at.
+db.prepare('DELETE FROM email_connections').run();
+check('getActiveConnectionId() devuelve null si no hay ninguna cuenta',
+  emailDb.getActiveConnectionId() === null);
+check('Y con eso la bandeja sale VACIA, no la mezcla entera',
+  emailDb.getThreadsFromCache({ folder: 'INBOX', maxResults: 500 }).length === 0,
+  'vistos=' + emailDb.getThreadsFromCache({ folder: 'INBOX', maxResults: 500 }).length);
+check('Y el contador tambien da 0',
+  emailDb.countThreadsFromCache({ folder: 'INBOX' }) === 0);
+// Se restaura la cuenta para que el resto del test siga teniendo contexto.
+emailDb.saveConnection({ id: 'test@kair.co', email: 'test@kair.co', provider: 'gmail' });
+check('Al volver a registrar la cuenta, la bandeja vuelve a llenarse',
+  emailDb.countThreadsFromCache({ folder: 'INBOX' }) === 60,
+  'total=' + emailDb.countThreadsFromCache({ folder: 'INBOX' }));
+check('getSyncState del estado de la otra cuenta es independiente',
+  (function () {
+    emailDb.saveSyncState({ folder: 'INBOX', connectionId: 'test@kair.co', pageToken: 'MIO', loadedCount: 60, pagesLoaded: 3 });
+    emailDb.saveSyncState({ folder: 'INBOX', connectionId: OTRA, pageToken: 'AJENO', loadedCount: 20, pagesLoaded: 1 });
+    const a = emailDb.getSyncState('INBOX', 'test@kair.co');
+    const b = emailDb.getSyncState('INBOX', OTRA);
+    return !!a && a.pageToken === 'MIO' && !!b && b.pageToken === 'AJENO';
+  })(),
+  'antes de este fix la PK era solo folder y una pisaba a la otra');
 
 // ── Reporte ──────────────────────────────────────────────────────
 console.log('\n' + (failed === 0 ? '✅' : '❌') + ' ' + (failed === 0 ? 'Paginación funcional OK' : failed + ' checks FALLARON'));

@@ -10,7 +10,7 @@
        propiedades que ellos no declaran (caso real 📦761: la clase `.modal` de
        Bootstrap rompía los modales de Evaluación Inicial). -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261005-login-card-260">
+  <link rel="stylesheet" href="styles.css?v=20261007-consent-gate">
   <link rel="stylesheet" href="development-styles.css">
   <!-- 📦761 — Evaluación Inicial del SG-SST: hoja única, todo bajo `.ev-scope`.
        Antes eran dos hojas (`--ei-*` + `--k-*`) más un bloque de CSS que el propio
@@ -243,6 +243,76 @@
           <button type="button" class="kair-update-modal__btn kair-update-modal__btn--primary" data-kair-update-action="modal-check">
             <span data-kair-modal-check-label>Buscar actualizaciones ahora</span>
           </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- 📦873 — Gate de consentimiento (Ley 1581 de 2012).
+         Se muestra DESPUÉS del login y ANTES de initializeApp(). Ninguno de los dos
+         checkboxes viene premarcado: el consentimiento tiene que ser expreso.
+         El texto legal es el de sitio/privacidad.html, que es el documento publicado. -->
+    <div id="kair-consent-overlay" class="kair-consent-overlay" hidden>
+      <div id="kair-consent" class="kair-consent" role="dialog" aria-modal="true" aria-labelledby="kair-consent-title">
+        <header class="kair-consent__header">
+          <div class="kair-consent__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 id="kair-consent-title" class="kair-consent__title">Términos y tratamiento de datos</h2>
+            <p class="kair-consent__subtitle">K+AIR · Ley 1581 de 2012 · Ley 1712 de 2014</p>
+          </div>
+        </header>
+
+        <div class="kair-consent__body">
+          <p class="kair-consent__intro">
+            K+AIR trata datos personales y, cuando usted los registra, datos sensibles de salud
+            (historias clínicas, audiometrías, electrocardiogramas). Por la Ley 1581 de 2012
+            ese tratamiento es lícito únicamente con su autorización previa, expresa e informada.
+          </p>
+
+          <ul class="kair-consent__list">
+            <li><strong>Responsable:</strong> la empresa que usa K+AIR. K+AIR es una aplicación
+              de escritorio y no actúa como usuario de sus datos.</li>
+            <li><strong>Dónde se procesan:</strong> en su equipo. Los correos de Gmail y los
+              documentos quedan en una base de datos local cifrada con el sistema operativo;
+              no hay servidor de K+AIR que los reciba.</li>
+            <li><strong>Transferencias:</strong> solo al conectar su cuenta de Google o al usar
+              firma electrónica, y solo hacia los servicios que su empresa configure.</li>
+            <li><strong>Sus derechos:</strong> puede acceder, rectificar, suprimir, limitar y
+              retirar esta autorización cuando quiera, y puede pedir la eliminación de los
+              datos ya registrados.</li>
+          </ul>
+
+          <p class="kair-consent__link-wrap">
+            <a class="kair-consent__link" href="https://reivaj640.github.io/SG-SST-E/privacidad.html"
+               target="_blank" rel="noopener">Leer la política de privacidad completa</a>
+          </p>
+
+          <div class="kair-consent__checks">
+            <label class="kair-consent__check">
+              <input type="checkbox" id="kair-consent-check-terminos">
+              <span>He leído y acepto los <strong>Términos y Condiciones</strong> de uso de K+AIR.</span>
+            </label>
+            <label class="kair-consent__check">
+              <input type="checkbox" id="kair-consent-check-datos">
+              <span>Autorizo el <strong>tratamiento de mis datos personales y de datos sensibles
+                de salud</strong>, y soy consciente de que esa autorización es facultativa y
+                revocable.</span>
+            </label>
+          </div>
+
+          <p class="kair-consent__error" data-consent-error hidden>
+            Debe marcar las dos autorizaciones para continuar.
+          </p>
+        </div>
+
+        <footer class="kair-consent__footer">
+          <button type="button" class="kair-consent__btn kair-consent__btn--ghost"
+                  data-consent-action="reject">No acepto</button>
+          <button type="button" class="kair-consent__btn kair-consent__btn--primary"
+                  data-consent-action="accept">Acepto y continúo</button>
         </footer>
       </div>
     </div>
@@ -508,7 +578,7 @@
   <script src="vendor/anime.umd.min.js?v=4.5.0"></script>
   <script src="assets/js/kair-motion.js?v=20261002-swapview-841"></script>
 
-  <script src="renderer.js?v=20261006-oauth-embebido"></script>
+  <script src="renderer.js?v=20261007-consent-gate"></script>
   
   <!-- Contenedor de Notificaciones (Toast Hub) -->
   <div id="notification-hub"></div>

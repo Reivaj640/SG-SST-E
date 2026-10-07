@@ -24,23 +24,55 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-07 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **870** (`dc9123ad`, commiteado y pusheado): los tests de gestión humana ahora aplican `MIGRATIONS_SQL`, no solo `SCHEMA_SQL`. Antes de eso, en la misma jornada, 📦869 (`95d42d8c`, tarjeta de ingreso a 260px), 📦868 (`3514af7f`, credenciales de Google dentro de la app) y el commit `df4fd9a7` de los 17 fallos que no eran fallos |
-| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` en `dc9123ad`. ⚠️ **Hay trabajo de la sesión del 2026-10-07 SIN commitear todavía** (ver "Sin commitear" más abajo): es lo primero que hay que commitear |
-| **Versión** | `0.1.250` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
+| **Último commit de código** | 📦 **872 + 871** (`4845756b`): `gmail.compose` fuera de los scopes y los tokens OAuth cifrados. Detrás, `b3d8abab` y `2d43b94e` (tests de presupuesto y dos tests viejos más el runner fuera de `Temp/`), `dc9123ad` (📦870), `95d42d8c` (📦869), `3514af7f` (📦868) y `df4fd9a7`. El trabajo de este mismo commit (📦873 + 📦874) se referencia por número, no por hash: un `--amend` cambia el hash y la referencia quedaría apuntando a un commit que ya no existe |
+| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev`. Nota: el hash del commit actual no se escribe dentro del propio commit por lo mismo que arriba; para saberlo, `git log --oneline -1` |
+| **Versión** | `0.1.251` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | **121 tests · 118 verdes · 3 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Los 3 que quedan son **todos de entorno**, ninguno de producto: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27]. Se resuelven prendiendo el PC viejo que sostiene el `firma-service`. Los 121 (antes 119) son por los 2 tests nuevos |
+| **Suite (escritorio)** | **122 tests · 119 verdes · 3 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Los 3 que quedan son **todos de entorno**, ninguno de producto: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27]. Se resuelven prendiendo el PC viejo que sostiene el `firma-service`. Los 122 (antes 121) son por el test nuevo del gate de consentimiento |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
 | **Validaciones visuales** | ✅ **Todo cerrado.** 📦860, 📦861 y 📦868 aprobados por el owner de punta a punta. 📦867 **validado por el owner** (era el punto 3 de la cola: "nunca se abrió en la app" — ya no aplica). **El ancho de la tarjeta de ingreso** (📦869) **también validado por el owner**. Los cuatro están probados por una persona, no por un test |
-| **Jornada** | **En curso** (2026-10-07). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. **De esta sesión todavía no hay commit**: hay 2 cambios de código de app (tokens cifrados 📦871 y un scope menos 📦872), 2 tests nuevos, 2 tests corregidos, el runner movido y la documentación al día. Todo eso está **sin commitear y sin pushear** |
+| **Jornada** | **En curso** (2026-10-07). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. **De esta sesión quedan commiteadas y pusheadas en este commit** las tres de hoy más este: `4845756b` (📦872 + 📦871), `2d43b94e` y `b3d8abab` (tests), más 📦874 (aislamiento de cuentas Gmail) y 📦873 (gate de consentimiento legal), con sus tests y la documentación al día. Versión `0.1.251` |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-07)
 
-1. **🔴 Commitear la sesión del 2026-10-07.** Todo lo de abajo quedó **hecho pero sin commitear**:
-   2 cambios de código de app, 2 tests nuevos, 2 tests corregidos, el runner movido de `Temp/`
-   a `tools/` y la documentación al día. Versión `0.1.250`. Es lo primero que hay que hacer.
+1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` decide
+   comparando `app_version` y un `config.consentDocumentVersion` que **nadie escribe** (se lee en
+   `main.js:2708` y `:2746`, siempre vale `'v1'`). Consecuencias: editar el texto legal **no**
+   vuelve a preguntar, y cada actualización de la app re-pregunta a todo el mundo. Las versiones
+   reales del texto (`CONSENT_VERSION_TERMINOS`) se guardan en la fila pero **nadie las vuelve a
+   leer** — `version_terminos` solo aparece en el CREATE y en el INSERT, nunca en un SELECT. El
+   `textoHash` tampoco protege nada porque no se compara contra nada.
 
+2. **🔴 El consentimiento es por EQUIPO, no por persona.** La consulta de `consent:estado` es
+   `SELECT ... FROM consent_acceptance ORDER BY aceptado_en DESC LIMIT 1` **sin `WHERE email = ?`**:
+   toma la aceptación más reciente de quien sea. En un equipo compartido, el primer usuario que
+   acepta silencia el gate para todos los demás — y K+AIR registra datos de salud de empleados
+   que no son quien está frente a la pantalla. El fix va junto con el anterior: `consent:estado`
+   tiene que recibir el token (hoy no recibe nada) y filtrar por correo.
+
+3. **🟡 "Recordar mis datos" del login.** El **guardado funciona** (las claves existen en el
+   leveldb con valores correctos: `admin@kair.local`) y la **lógica de relleno también**
+   (probado extrayéndola del `renderer.js` real y corriéndola: `email`, `password` y la casilla
+   quedan bien). Lo que NO se ha podido determinar es por qué en la app los campos salen vacíos.
+   Dos candidatos: (a) la rama `else` corre y borra lo guardado cuando la casilla llega sin
+   marcar — pasó al cambiar de correo hoy; (b) el controlador de autofill de Chromium sobrescribe
+   los valores porque los inputs llevan `autocomplete="username"` y `current-password`.
+   **Discrimina con esto**, en DevTools (Ctrl+Shift+I) → Consola:
+   `localStorage.getItem('kair_remembered_email')`. Si devuelve `null` es (a); si devuelve el
+   correo es (b).
+
+4. **🔴 La contraseña del login se guarda en TEXTO PLANO** en `localStorage`
+   (`renderer.js:3590`). Hoy los tokens OAuth van cifrados con DPAPI justamente para que nadie
+   con acceso al equipo los lea; dejar la clave de la cuenta de K+AIR en claro al lado es la
+   misma debilidad, y esa credencial abre todo lo demás. Recomendación: guardar **solo el
+   correo**. Decisión del owner pendiente.
+
+5. **🔴 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
+   otra**, y hacer `git push --force origin gh-pages`. Hoy el sitio publicado **contradice a la
+   app en dos puntos**: dice que los tokens "no está cifrado" (ya lo están) y anuncia
+   `gmail.compose`, que ya no se pide. `sitio/privacidad.html` ya está corregido; falta publicar.
 2. **🔴 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
    otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree` (sin checkout,
    para no tocar el árbol de trabajo). Regenerar es volver a correr ese script sobre `sitio/`

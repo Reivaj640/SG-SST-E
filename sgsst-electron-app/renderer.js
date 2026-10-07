@@ -3599,6 +3599,11 @@ contentArea.innerHTML = '';
       // Ejecutar transición visual
       await executeLoginTransition(userName);
 
+      // [GATE-CONSENT] Pantalla de consentimiento legal (Ley 1581/2012) — bloquea
+      // antes de cargar la app. Fail-open: si la infraestructura falla, procede.
+      const consentOk = await ensureConsentGate();
+      if (consentOk === false) return;   // el usuario rechazó → la app ya pidió el cierre
+
       // Continuar con la inicialización normal
       await window.electronAPI.companiesSyncV1({ token: authToken });
       initializeApp(assignedCompanies);
@@ -3641,6 +3646,173 @@ async function loadAssignedCompaniesFromSession(token) {
   return { success: true, companies: unique };
 }
 
+/**
+ * 📦873 — Gate de consentimiento (Ley 1581 de 2012, art. 5 y 8; Ley 1712 de 2014).
+ *
+ * Se invoca DESPUÉS del login y ANTES de initializeApp(). Devuelve:
+ *   true  → el usuario aceptó (o no hacía falta preguntar) → la app sigue cargando.
+ *   false → el usuario rechazó → el backend ya pidió el cierre, no se sigue.
+ *
+ * 🔴 FAIL-OPEN, y esto es una decisión, no un descuido.
+ * Si CUALQUIER cosa de la infraestructura falla (el preload no expone los canales, la BD
+ * no responde, el overlay no está en el DOM), esta función devuelve true y la app carga.
+ * La alternativa — bloquear el acceso a una aplicación de gestión de salud porque la tabla
+ * de consentimientos no arranca — deja al usuario sin poder trabajar. El backend ya está
+ * escrito con esa misma política: `consent:estado` devuelve null ante cualquier error.
+ *
+ * Lo que NO es fail-open es la decisión del usuario: si marca y acepta, queda registrado;
+ * si no acepta, la app no carga. Un error de infraestructura nunca se confunde con un
+ * "no", ni al revés.
+ *
+ * El hash del texto legal va en el registro como prueba de QUÉ texto se leyó en el momento
+ * de la aceptación. Si algún día se edita la política, ese hash deja de coincidir y se
+ * puede demostrar qué versión se aceptó, aunque habría que regenerarlo al cambiar.
+ */
+
+const CONSENT_VERSION_TERMINOS = '2026-10-07';
+const CONSENT_VERSION_PRIVACIDAD = '2026-10-07';
+
+/** SHA-256 del texto legal. Si crypto.subtle no existiera, un fallback no criptográfico. */
+async function _consentTextoHash(texto) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    let h = 0;
+    for (let i = 0; i < texto.length; i++) { h = ((h << 5) - h + texto.charCodeAt(i)) | 0; }
+    return 'fnv1a:' + (h >>> 0).toString(16);
+  }
+}
+
+async function ensureConsentGate() {
+  const api = window.electronAPI;
+  if (!api || typeof api.consentEstado !== 'function') {
+    console.warn('[consent] El preload no expone consentEstado; se continúa (fail-open).');
+    return true;
+  }
+
+  let estado = null;
+  try {
+    estado = await api.consentEstado();
+  } catch (e) {
+    console.warn('[consent] Error consultando el estado; se continúa (fail-open):', e);
+    return true;
+  }
+  if (!estado) return true;          // el backend devuelve null ante cualquier error suyo
+  if (!estado.requiere) return true;  // ya aceptó esta versión del documento
+
+  const overlay = document.getElementById('kair-consent-overlay');
+  if (!overlay) {
+    console.warn('[consent] #kair-consent-overlay no existe en el DOM; se continúa (fail-open).');
+    return true;
+  }
+
+  const chkTerminos = document.getElementById('kair-consent-check-terminos');
+  const chkDatos = document.getElementById('kair-consent-check-datos');
+  const errorBox = document.querySelector('[data-consent-error]');
+  const btnAceptar = document.querySelector('[data-consent-action="accept"]');
+  const btnRechazar = document.querySelector('[data-consent-action="reject"]');
+  const cuerpo = overlay.querySelector('.kair-consent__body');
+
+  overlay.hidden = false;
+  if (cuerpo) cuerpo.scrollTop = 0;
+
+  const textoLegal = cuerpo ? (cuerpo.innerText || '').trim() : '';
+
+  function mostrarError(msg) {
+    if (!errorBox) return;
+    if (msg) { errorBox.textContent = msg; errorBox.hidden = false; }
+    else { errorBox.hidden = true; }
+  }
+  function limpiarError() { mostrarError(''); }
+
+  if (chkTerminos) chkTerminos.addEventListener('change', limpiarError);
+  if (chkDatos) chkDatos.addEventListener('change', limpiarError);
+
+  return new Promise((resolve) => {
+    let cerrado = false;
+
+    function limpiar() {
+      if (cerrado) return;
+      cerrado = true;
+      if (btnAceptar) btnAceptar.removeEventListener('click', onAceptar);
+      if (btnRechazar) btnRechazar.removeEventListener('click', onRechazar);
+    }
+
+    async function onAceptar() {
+      const okTerminos = !!(chkTerminos && chkTerminos.checked);
+      const okDatos = !!(chkDatos && chkDatos.checked);
+
+      if (!okTerminos || !okDatos) {
+        mostrarError('Debe marcar las dos autorizaciones para continuar.');
+        return;
+      }
+
+      if (btnAceptar) btnAceptar.disabled = true;
+      mostrarError('');
+
+      // El checkbox de datos cubre LOS DOS flags: el backend exige aceptaDatos Y
+      // aceptaDatosSensibles por separado (main.js:2735). Mandar uno solo devuelve
+      // FALTA_AUTORIZACION y el usuario no entendería por qué.
+      const payload = {
+        token: (typeof authToken !== 'undefined' && authToken) ? authToken : null,
+        aceptaTerminos: okTerminos,
+        aceptaDatos: okDatos,
+        aceptaDatosSensibles: okDatos,
+        versionTerminos: CONSENT_VERSION_TERMINOS,
+        versionPrivacidad: CONSENT_VERSION_PRIVACIDAD,
+        textoHash: await _consentTextoHash(textoLegal)
+      };
+
+      let r = null;
+      try {
+        r = await api.consentRegistrar(payload);
+      } catch (e) {
+        console.error('[consent] Error registrando la aceptación:', e);
+      }
+
+      if (r && r.success === true) {
+        console.log('[consent] Aceptación registrada.');
+        overlay.hidden = true;
+        limpiar();
+        resolve(true);
+        return;
+      }
+
+      const codigo = (r && r.error) || 'DESCONOCIDO';
+      if (btnAceptar) btnAceptar.disabled = false;
+      if (codigo === 'SESION_INVALIDA') {
+        mostrarError('Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.');
+      } else if (codigo === 'FALTA_AUTORIZACION') {
+        mostrarError('Faltan autorizaciones por registrar. Revisa las dos casillas.');
+      } else {
+        mostrarError('No se pudo guardar el registro del consentimiento. Inténtalo de nuevo.');
+      }
+    }
+
+    async function onRechazar() {
+      if (btnRechazar) btnRechazar.disabled = true;
+      try {
+        if (typeof api.consentRechazar === 'function') await api.consentRechazar();
+      } catch (e) {
+        console.warn('[consent] Error al registrar el rechazo:', e);
+      }
+      overlay.hidden = true;
+      limpiar();
+      console.log('[consent] El usuario no aceptó los términos.');
+      resolve(false);
+    }
+
+    if (btnAceptar) btnAceptar.addEventListener('click', onAceptar);
+    if (btnRechazar) btnRechazar.addEventListener('click', onRechazar);
+
+    // Escape NO cierra: el consentimiento no es descartable, se responde Aceptar o No acepto.
+    const onKey = (e) => { if (e.key === 'Escape') e.preventDefault(); };
+    document.addEventListener('keydown', onKey, { once: true });
+
+    if (btnAceptar) btnAceptar.focus();
+  });
+}
 async function initializeAuthFlow() {
   authToken = null;
   currentUser = null;

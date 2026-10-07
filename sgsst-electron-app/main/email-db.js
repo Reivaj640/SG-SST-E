@@ -31,18 +31,19 @@ function db() {
 function saveConnection(conn) {
   const stmt = db().prepare(`
     INSERT INTO email_connections
-      (id, email, provider, access_token, refresh_token, expires_at, history_id, created_at, updated_at)
+      (id, email, provider, access_token, refresh_token, expires_at, history_id, is_active, created_at, updated_at)
     VALUES
-      (@id, @email, @provider, @access_token, @refresh_token, @expires_at, @history_id, @created_at, @updated_at)
+      (@id, @email, @provider, @access_token, @refresh_token, @expires_at, @history_id, @is_active, @created_at, @updated_at)
     ON CONFLICT(id) DO UPDATE SET
       access_token = excluded.access_token,
       refresh_token = excluded.refresh_token,
       expires_at = excluded.expires_at,
       history_id = excluded.history_id,
+      is_active = excluded.is_active,
       updated_at = excluded.updated_at
   `);
   const now = Date.now();
-  return stmt.run({
+  const res = stmt.run({
     id: conn.id,
     email: conn.email,
     provider: conn.provider || 'gmail',
@@ -50,9 +51,31 @@ function saveConnection(conn) {
     refresh_token: conn.refresh_token || null,
     expires_at: conn.expires_at || null,
     history_id: conn.history_id || null,
+    is_active: 1,
     created_at: conn.created_at || now,
     updated_at: now
   });
+  // Solo UNA cuenta puede estar activa a la vez: la que se acaba de sincronizar.
+  db().prepare('UPDATE email_connections SET is_active = 0 WHERE id != ?').run(conn.id);
+  return res;
+}
+
+/**
+ * ID de la cuenta Gmail conectada, o null si no hay ninguna.
+ *
+ * Hay un solo juego de tokens OAuth (vive cifrado en google-tokens.enc), asi que hay
+ * UNA sola cuenta activa a la vez, aunque email_connections conserve el historial de
+ * todas las que se conectaron alguna vez.
+ *
+ * `is_active` lo marca saveConnection(). El fallback por updated_at DESC existe para
+ * las bases que ya existian antes de esa columna: sin el, al agregarla todas las
+ * conexiones quedan en 0 y la bandeja apareceria vacia hasta el proximo sync.
+ */
+function getActiveConnectionId() {
+  const row = db().prepare('SELECT id FROM email_connections WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1').get();
+  if (row) return row.id;
+  const last = db().prepare('SELECT id FROM email_connections ORDER BY updated_at DESC LIMIT 1').get();
+  return last ? last.id : null;
 }
 
 function getConnection(email) {
@@ -170,10 +193,14 @@ function getThreadsFromCache(options) {
   const rows = db().prepare(`
     SELECT t.*,
            (SELECT to_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             WHERE thread_id = t.id AND connection_id = t.connection_id
+               AND date = (SELECT MAX(date) FROM email_messages
+                            WHERE thread_id = t.id AND connection_id = t.connection_id)
              LIMIT 1) AS last_to_list,
            (SELECT cc_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             WHERE thread_id = t.id AND connection_id = t.connection_id
+               AND date = (SELECT MAX(date) FROM email_messages
+                            WHERE thread_id = t.id AND connection_id = t.connection_id)
              LIMIT 1) AS last_cc_list
     FROM email_threads t
     WHERE ${built.where}
@@ -202,7 +229,9 @@ function countThreadsFromCache(options) {
     SELECT COUNT(*) AS c FROM (
       SELECT t.id,
              (SELECT to_list FROM email_messages
-               WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+               WHERE thread_id = t.id AND connection_id = t.connection_id
+                 AND date = (SELECT MAX(date) FROM email_messages
+                              WHERE thread_id = t.id AND connection_id = t.connection_id)
                LIMIT 1) AS last_to_list
       FROM email_threads t
       WHERE ${built.where}
@@ -226,9 +255,19 @@ function buildThreadsWhere(options) {
   // 📦 P2-4 fix: Parsear operadores de búsqueda
   const searchTokens = parseSearchQuery(rawSearchQuery);
 
+  // AISLAMIENTO POR CUENTA. El cache guarda los hilos y mensajes de CADA cuenta
+  // Gmail que se conecto alguna vez, y todas comparten la misma base. Sin este
+  // filtro, conectar una segunda cuenta mezclaba las dos bandejas y el usuario
+  // veia los correos de la anterior con la nueva conectada.
+  //
+  // Si no se puede resolver la cuenta activa NO se lista nada. Acotar es lo seguro;
+  // devolver todo "para no romper la UI" es justamente el fallo que se corrige aqui.
+  const connectionId = options.connectionId || getActiveConnectionId();
+  if (!connectionId) return { where: '1 = 0', params: { folder: folder } };
+
   // Construir WHERE clause
-  let where = 'folder = @folder';
-  const params = { folder: folder };
+  let where = 'folder = @folder AND connection_id = @connection_id';
+  const params = { folder: folder, connection_id: connectionId };
   if (onlyUnread) {
     where += ' AND has_unread = 1';
   }
@@ -297,18 +336,24 @@ function buildThreadsWhere(options) {
   return { where: where, params: params };
 }
 
-function getThreadFromCache(threadId) {
+function getThreadFromCache(threadId, connectionId) {
+  const conn = connectionId || getActiveConnectionId();
+  if (!conn) return null;
   const row = db().prepare(`
     SELECT t.*,
            (SELECT to_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             WHERE thread_id = t.id AND connection_id = t.connection_id
+               AND date = (SELECT MAX(date) FROM email_messages
+                            WHERE thread_id = t.id AND connection_id = t.connection_id)
              LIMIT 1) AS last_to_list,
            (SELECT cc_list FROM email_messages
-             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             WHERE thread_id = t.id AND connection_id = t.connection_id
+               AND date = (SELECT MAX(date) FROM email_messages
+                            WHERE thread_id = t.id AND connection_id = t.connection_id)
              LIMIT 1) AS last_cc_list
     FROM email_threads t
-    WHERE t.id = ? LIMIT 1
-  `).get(threadId);
+    WHERE t.id = ? AND t.connection_id = ? LIMIT 1
+  `).get(threadId, conn);
   return row ? deserializeThread(row) : null;
 }
 
@@ -447,7 +492,7 @@ function saveMessage(msg) {
   // Recalcular el flag del thread con los labels que se acaban de guardar.
   if (msg.thread_id) {
     try {
-      recomputeThreadUnread(msg.thread_id);
+      recomputeThreadUnread(msg.thread_id, msg.connection_id);
     } catch (e) {
       // No crítico: es un flag de UI
     }
@@ -467,28 +512,34 @@ function saveMessage(msg) {
  *
  * @param {string} threadId
  */
-function recomputeThreadUnread(threadId) {
+function recomputeThreadUnread(threadId, connectionId) {
   if (!threadId) return;
+  const conn = connectionId || getActiveConnectionId();
+  if (!conn) return;
   const row = db().prepare(`
     SELECT COUNT(*) AS unread_count FROM email_messages
     WHERE thread_id = ?
+      AND connection_id = ?
       AND is_sent = 0
       AND is_draft = 0
       AND label_ids LIKE '%"UNREAD"%'
-  `).get(threadId);
+  `).get(threadId, conn);
   const hasUnread = (row && row.unread_count > 0) ? 1 : 0;
-  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ?').run(hasUnread, threadId);
+  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ? AND connection_id = ?')
+    .run(hasUnread, threadId, conn);
 }
 
 /**
  * Lee todos los mensajes de un thread, ordenados por date ASC (más viejo primero).
  */
-function getMessagesFromCache(threadId) {
+function getMessagesFromCache(threadId, connectionId) {
+  const conn = connectionId || getActiveConnectionId();
+  if (!conn) return [];
   const rows = db().prepare(`
     SELECT * FROM email_messages
-    WHERE thread_id = ?
+    WHERE thread_id = ? AND connection_id = ?
     ORDER BY date ASC
-  `).all(threadId);
+  `).all(threadId, conn);
   return rows.map(deserializeMessage);
 }
 
@@ -512,15 +563,17 @@ function getMessagesFromCache(threadId) {
  * @param {string} messageOrThreadId - threadId (caso comun) o messageId
  * @param {boolean} add - true para agregar 'UNREAD', false para remover
  */
-function propagateUnreadChange(messageOrThreadId, add) {
+function propagateUnreadChange(messageOrThreadId, add, connectionId) {
+  const conn = connectionId || getActiveConnectionId();
+  if (!conn) return;
   // Resolver threadId: probar primero como threadId (mas probable desde renderer)
   let threadId = null;
-  const thread = db().prepare('SELECT id FROM email_threads WHERE id = ? LIMIT 1').get(messageOrThreadId);
+  const thread = db().prepare('SELECT id FROM email_threads WHERE id = ? AND connection_id = ? LIMIT 1').get(messageOrThreadId, conn);
   if (thread) {
     threadId = thread.id;
   } else {
     // Fallback: tratar como messageId y derivar el threadId
-    const msg = db().prepare('SELECT thread_id FROM email_messages WHERE id = ? LIMIT 1').get(messageOrThreadId);
+    const msg = db().prepare('SELECT thread_id FROM email_messages WHERE id = ? AND connection_id = ? LIMIT 1').get(messageOrThreadId, conn);
     if (msg) threadId = msg.thread_id;
   }
   if (!threadId) return;
@@ -528,10 +581,10 @@ function propagateUnreadChange(messageOrThreadId, add) {
   const now = Date.now();
 
   // 1. Actualizar has_unread del thread (esto es lo que ve el render)
-  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ?').run(add ? 1 : 0, threadId);
+  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ? AND connection_id = ?').run(add ? 1 : 0, threadId, conn);
 
   // 2. Actualizar label_ids de todos los messages del thread (sincronizacion completa)
-  const rows = db().prepare('SELECT id, label_ids FROM email_messages WHERE thread_id = ?').all(threadId);
+  const rows = db().prepare('SELECT id, label_ids FROM email_messages WHERE thread_id = ? AND connection_id = ?').all(threadId, conn);
   for (const row of rows) {
     let labels = safeJSON(row.label_ids, []);
     if (add) {
@@ -775,8 +828,7 @@ function saveSyncState(state) {
   const stmt = db().prepare(`
     INSERT INTO email_sync_state (folder, connection_id, page_token, loaded_count, pages_loaded, updated_at)
     VALUES (@folder, @connection_id, @page_token, @loaded_count, @pages_loaded, @updated_at)
-    ON CONFLICT(folder) DO UPDATE SET
-      connection_id = excluded.connection_id,
+    ON CONFLICT(folder, connection_id) DO UPDATE SET
       page_token = excluded.page_token,
       loaded_count = excluded.loaded_count,
       pages_loaded = excluded.pages_loaded,
@@ -784,7 +836,10 @@ function saveSyncState(state) {
   `);
   return stmt.run({
     folder: folder,
-    connection_id: state.connectionId || state.connection_id || null,
+    // Debe caer en la MISMA cuenta que getSyncState usa por defecto: si el save
+    // guarda bajo la cadena vacia y la lectura busca la cuenta activa, el estado
+    // se escribe y no se vuelve a encontrar.
+    connection_id: state.connectionId || state.connection_id || getActiveConnectionId() || '',
     page_token: state.pageToken !== undefined ? state.pageToken : null,
     loaded_count: state.loadedCount || 0,
     pages_loaded: state.pagesLoaded || 0,
@@ -795,8 +850,9 @@ function saveSyncState(state) {
 /**
  * Lee el estado de paginación de una carpeta. Devuelve null si nunca se sincronizó.
  */
-function getSyncState(folder) {
-  const row = db().prepare('SELECT * FROM email_sync_state WHERE folder = ? LIMIT 1').get(folder || 'INBOX');
+function getSyncState(folder, connectionId) {
+  const conn = connectionId || getActiveConnectionId() || '';
+  const row = db().prepare('SELECT * FROM email_sync_state WHERE folder = ? AND connection_id = ? LIMIT 1').get(folder || 'INBOX', conn);
   if (!row) return null;
   return {
     folder: row.folder,
@@ -815,13 +871,14 @@ function getSyncState(folder) {
  * Borra el estado de paginación de una carpeta (vuelve a la página 1).
  * Se usa cuando el sync completo reinicia la ventana de mensajes.
  */
-function resetSyncState(folder) {
-  return db().prepare('DELETE FROM email_sync_state WHERE folder = ?').run(folder || 'INBOX');
+function resetSyncState(folder, connectionId) {
+  const conn = connectionId || getActiveConnectionId() || '';
+  return db().prepare('DELETE FROM email_sync_state WHERE folder = ? AND connection_id = ?').run(folder || 'INBOX', conn);
 }
 
 module.exports = {
   // Conexiones
-  saveConnection, getConnection, getAllConnections,
+  saveConnection, getConnection, getAllConnections, getActiveConnectionId,
   // Threads
   saveThread, getThreadsFromCache, countThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
   // Mensajes
