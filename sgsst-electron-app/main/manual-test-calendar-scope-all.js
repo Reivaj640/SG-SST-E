@@ -1,5 +1,9 @@
+// RENOMBRADO desde test-manual-test-calendar-scope-all.js el 2026-10-06: este archivo usa electron.app.whenReady(), que no existe
+// bajo ELECTRON_RUN_AS_NODE=1. El runner lo descubria igual (/^test-.*\.js$/) y lo contaba
+// como fallo todos los dias. No es un test roto: es un test que no puede correr en la suite.
+// Correrlo a mano con la app viva: npx electron main/manual-test-calendar-scope-all.js
 /**
- * test-calendar-scope-all.js
+ * manual-test-calendar-scope-all.js
  *
  * Test end-to-end del feature "Todas las empresas" en el calendario.
  * Simula el flow completo:

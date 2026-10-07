@@ -262,7 +262,23 @@ if (!app.isPackaged) {
 // ------------------------------------
 
 const execPromise = promisify(exec);
-const execFilePromise = promisify(execFile);
+
+// 📦867 (Fase 4) — el mapeo necesita leer `stderr` EN VIVO para mandar progreso a la UI
+// mientras Python escanea; con promisify recién se veía cuando el proceso terminaba.
+// `promisify(execFile)` resuelve con {stdout, stderr} y NO expone el proceso hijo, así
+// que no hay dónde engancharse. Este wrapper devuelve la misma promesa —mismos argumentos,
+// mismos errores, mismo resultado— con `.child` colgado. Los demás call sites de
+// execFilePromise no leen `.child`, así que su comportamiento no cambia.
+const execFilePromise = (cmd, args, options) => {
+    let hijo = null;
+    const promesa = new Promise((resolve, reject) => {
+        hijo = execFile(cmd, args, options, (err, stdout, stderr) => {
+            if (err) reject(err); else resolve({ stdout, stderr });
+        });
+    });
+    promesa.child = hijo;
+    return promesa;
+};
 
 // --- Detección robusta de Python ---
 // EXPONER A GLOBAL PARA QUE LOS HANDLERS PUEDAN USARLO
@@ -491,6 +507,32 @@ function readConfigSync() {
   }
 }
 
+// 📦873 — Registro de aceptación de Términos y Condiciones / tratamiento de datos.
+// Una fila por aceptación (histórico completo, nunca se pisa): es la prueba del
+// consentimiento previo, expreso e informado (Ley 1581 de 2012, art. 5 y 8).
+const CONSENT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS consent_acceptance (
+  device_id            TEXT    NOT NULL,
+  app_version          TEXT    NOT NULL,
+  document_version     TEXT    NOT NULL,
+  usuario              TEXT,
+  email                TEXT,
+  nombres              TEXT,
+  acepta_terminos      INTEGER NOT NULL,
+  acepta_datos         INTEGER NOT NULL,
+  acepta_datos_sensibles INTEGER NOT NULL,
+  version_terminos     TEXT,
+  version_privacidad   TEXT,
+  texto_hash           TEXT,
+  ip_local             TEXT,
+  user_agent           TEXT,
+  aceptado_en          TEXT    NOT NULL,
+  created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_consent_device   ON consent_acceptance(device_id);
+CREATE INDEX IF NOT EXISTS idx_consent_aceptado ON consent_acceptance(aceptado_en);
+`;
+
 function initDbOnce() {
   if (dbInitialized) return;
   const dbPath = path.join(app.getPath('userData'), 'kair.db');
@@ -516,6 +558,14 @@ function initDbOnce() {
     // hijos huérfanos (de {}) falla o cascada donde antes no pasaba nada. Si
     // aparece algún "FOREIGN KEY constraint failed" nuevo, es por acá.
     db.pragma('foreign_keys = ON');
+
+    // 📦873 — Tabla de consentimientos (Términos y Condiciones + autorización de datos).
+    // Idempotente: CREATE TABLE IF NOT EXISTS, así las bases existentes la crean solas.
+    try {
+      db.exec(CONSENT_SCHEMA_SQL);
+    } catch (consentErr) {
+      console.error('[consent] Error creando tabla consent_acceptance:', consentErr.message);
+    }
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -1330,6 +1380,22 @@ const createWindow = () => {
       contextIsolation: true,
       webviewTag: true, // Habilitar webviews para OnlyOffice
     },
+  });
+
+  // 📦873 — Los enlaces http/https del renderer se abren en el navegador del sistema, NO
+  // en una ventana de Electron. Sin esto, todo `target="_blank"` abre un BrowserWindow
+  // propio: el usuario ve un 404 de GitHub Pages dentro de una ventana con su propio menú,
+  // y parece un fallo de la app en vez de una página que no existe.
+  //
+  // Solo se interceptan http/https. Los ~12 modulos de documentacion imprimen con
+  // `window.open('', '_blank')`, y el handler las deja pasar: si se negaran, la impresion
+  // se romperia en toda la app. Este es el unico lugar donde se decide eso.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url || '')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
   });
 
   // Manejar el evento de cierre para resetear el flag
@@ -2478,6 +2544,22 @@ ipcMain.handle('google-oauth:start', async () => {
     if (googleAuthFlowState) {
       return { success: false, error: 'Ya hay un flow de autorización activo. Esperá o cancelá.' };
     }
+
+    // 📦868 — Las credenciales de Google son de la APLICACIÓN, no del usuario: viven
+    // embebidas en `shared/google-oauth-config.js` y llegan hasta acá por
+    // `googleAuth.available`. Cada persona y cada cliente conecta su PROPIA cuenta
+    // con ese mismo par, como cualquier botón "iniciar sesión con Google".
+    //
+    // Este guard NO debería dispararse nunca en una instalación normal. Queda para
+    // que, si la app se construyó sin las credenciales pegadas, el usuario no vea
+    // un error técnico de Google: la vista consulta `available` y ni siquiera
+    // muestra el botón. El detalle va al log, que es donde lo lee quien administra.
+    if (!googleAuth.available) {
+      console.error('[GoogleOAuth] Esta instalación se construyó sin credenciales de Google. Pegá el client_id en shared/google-oauth-config.js y reconstruí el instalador.');
+      sendLog('[GoogleOAuth] Instalación sin credenciales de Google (ver shared/google-oauth-config.js)', 'ERROR');
+      return { success: false, error: 'No pudimos conectar tu correo en este momento. Contactá al administrador de K+AIR.', faltaConfig: true };
+    }
+
     const flow = googleAuth.startAuth();
     const callbackServer = googleAuth.createCallbackServer(flow.port);
 
@@ -2497,6 +2579,7 @@ ipcMain.handle('google-oauth:start', async () => {
       }
     };
   } catch (e) {
+    sendLog('[GoogleOAuth] Error en start: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en start:', e);
     return { success: false, error: e.message || 'Error iniciando OAuth' };
   }
@@ -2519,6 +2602,7 @@ ipcMain.handle('google-oauth:await-callback', async () => {
     }
     return { success: true, data: { code, state } };
   } catch (e) {
+    sendLog('[GoogleOAuth] Error en await-callback: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en await-callback:', e);
     return { success: false, error: e.message };
   }
@@ -2542,6 +2626,9 @@ ipcMain.handle('google-oauth:exchange', async (event, payload) => {
     googleAuthFlowState = null;
     return result;
   } catch (e) {
+    // 📦868 — `console.error` NO alcanza: el log de archivo es lo único que sobrevive
+    // al cierre de la app, y sin esto un fallo de canje no deja rastro en ningún lado.
+    sendLog('[GoogleOAuth] Error en exchange: ' + (e && e.message ? e.message : e), 'ERROR');
     console.error('[GoogleOAuth] Error en exchange:', e);
     return { success: false, error: e.message };
   }
@@ -2582,6 +2669,10 @@ ipcMain.handle('google-oauth:status', async () => {
     data: {
       connected: hasTokens,
       tokenValid: tokenValid,
+      // 📦868 — ¿esta instalación puede iniciar el flujo de Google? La vista lo
+      // usa para no mostrar un botón "Conectar Gmail" que no puede funcionar.
+      // Con las credenciales embebidas da true siempre.
+      available: !!googleAuth.available,
       hasRefreshToken: !!(tokens && tokens.refresh_token),
       expiryDate: tokens ? tokens.expiry_date : null,
       savedAt: tokens ? tokens.savedAt : null,
@@ -2595,6 +2686,51 @@ ipcMain.handle('google-oauth:disconnect', async () => {
   const configPath = getGoogleConfigPath();
   const ok = googleTokens.clearTokens(configPath);
   return { success: ok };
+});
+
+// 🔐 Credenciales del login recordadas ("Recordar mis datos").
+//
+// Antes iban a localStorage en TEXTO PLANO. Ahora van cifradas a auth-credentials.enc
+// con safeStorage, el mismo mecanismo de shared/google-tokens.js. La API del módulo
+// deriva la ruta del configPath, así que acá solo hace falta pasarle ese path.
+const authCredentials = require('./main/auth-credentials');
+
+function getAuthCredentialsPath() {
+  if (!app || !app.getPath) return null;
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+ipcMain.handle('auth-credentials:save', async (event, payload = {}) => {
+  try {
+    const ok = authCredentials.saveCredentials(getAuthCredentialsPath(), {
+      email: payload.email,
+      password: payload.password
+    });
+    // success:false NO es un error grave: significa que safeStorage no está disponible y
+    // por tanto no se guardó nada cifrado. El renderer debe avisar en vez de fingir.
+    return { success: !!ok, cifrado: ok };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:save]', error);
+    return { success: false, cifrado: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth-credentials:load', async () => {
+  try {
+    return { success: true, credentials: authCredentials.loadCredentials(getAuthCredentialsPath()) };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:load]', error);
+    return { success: false, credentials: null };
+  }
+});
+
+ipcMain.handle('auth-credentials:clear', async () => {
+  try {
+    return { success: authCredentials.clearCredentials(getAuthCredentialsPath()) };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:clear]', error);
+    return { success: false };
+  }
 });
 
 // F3.A — Abre una URL en el browser externo del usuario. Usado por el
@@ -2618,6 +2754,86 @@ ipcMain.handle('get-app-version', async () => {
     // string vacío para que el caller (renderer) decida cómo manejarlo.
     return '';
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 📦873 · Consentimiento de términos y datos personales (Ley 1581 de 2012)
+// Tres canales: estado (fail-open), registro (histórico, una fila por
+// aceptación) y salida (rechazo → cerrar la app). El estado devuelve null en
+// cualquier error de infraestructura para no bloquear el arranque.
+// ─────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('consent:estado', async () => {
+  try {
+    const cfg = readConfigSync();
+    const appV = app.getVersion();
+    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const aceptado = db.prepare(
+      'SELECT app_version, document_version FROM consent_acceptance ORDER BY aceptado_en DESC LIMIT 1'
+    ).get();
+    return {
+      appVersion: appV,
+      documentVersion: docV,
+      requiere: !aceptado || aceptado.app_version !== appV || aceptado.document_version !== docV
+    };
+  } catch (error) {
+    console.error('[consent] Error consultando estado:', error);
+    return null; // fail-open: no bloquear la app por un error de infraestructura
+  }
+});
+
+ipcMain.handle('consent:registrar', async (event, payload) => {
+  try {
+    const p = payload || {};
+    const cfg = readConfigSync() || {};
+
+    // validateSession devuelve { ok, session, user } — el email NO está en la raíz.
+    // Leer `sesion.email` sobre el objeto completo daba undefined SIEMPRE, y como
+    // `{ ok: false }` es truthy la guarda `!sesion` nunca disparaba: el gate respondsía
+    // SESION_INVALIDA aunque la sesión fuera válida y el consentimiento nunca se podía
+    // registrar. Misma forma que companies-sync-v1 y users-list-v1.
+    let sessionCheck = null;
+    try { sessionCheck = validateSession(p.token); } catch (e) { sessionCheck = null; }
+    if (!sessionCheck || !sessionCheck.ok || !sessionCheck.user || !sessionCheck.user.email) {
+      return { success: false, error: 'SESION_INVALIDA' };
+    }
+    const usuario = sessionCheck.user;
+    if (!p.aceptaTerminos || !p.aceptaDatos || !p.aceptaDatosSensibles) {
+      return { success: false, error: 'FALTA_AUTORIZACION' };
+    }
+    // device_id: identificador aleatorio persistido por instalación
+    let deviceId = cfg.consentDeviceId;
+    if (!deviceId) {
+      deviceId = 'dev-' + require('crypto').randomUUID();
+      cfg.consentDeviceId = deviceId;
+      try { fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2)); } catch (e) { /* best-effort */ }
+    }
+    const appV = app.getVersion();
+    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const ahora = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO consent_acceptance
+        (device_id, app_version, document_version, usuario, email, nombres,
+         acepta_terminos, acepta_datos, acepta_datos_sensibles,
+         version_terminos, version_privacidad, texto_hash, ip_local, user_agent,
+         aceptado_en, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      deviceId, appV, docV, usuario.email, usuario.email, usuario.full_name || '',
+      String(p.versionTerminos || ''), String(p.versionPrivacidad || ''),
+      String(p.textoHash || ''), '127.0.0.1',
+      String((event && event.sender && event.sender.getUserAgent && event.sender.getUserAgent()) || ''),
+      ahora, ahora
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('[consent] Error registrando aceptación:', error);
+    return { success: false, error: 'ERROR_INTERNO' };
+  }
+});
+
+ipcMain.handle('consent:rechazar', async () => {
+  setTimeout(() => { try { app.quit(); } catch (e) { /* noop */ } }, 250);
+  return { success: true };
 });
 
 // Manejar la verificación manual de actualizaciones desde configuraciones
@@ -4308,10 +4524,44 @@ ipcMain.handle('map-directory', async (event, directoryPath) => {
     console.log(`[MAPEO][MAIN] Script path: ${pythonScriptPath}`);
     console.log(`[MAPEO][MAIN] Ejecutando: ${pythonPath} "${pythonScriptPath}" "${directoryPath}"`);
 
-    const { stdout, stderr } = await execFilePromise(pythonPath, [pythonScriptPath, directoryPath], {
+    // 📦864 — Fase 1 del plan de mapeo: el stdout venía SIN maxBuffer, así que Node
+    // cortaba la salida en 1 MiB (el default) y `JSON.parse(stdout)` revienta DESPUÉS
+    // de escanear todo (~2,98 MB de JSON en el directorio real). Con 64 MB el JSON
+    // completo entra holgado; el timeout evita que un escaneo colgado quede para
+    // siempre (30 min: cubre el escaneo actual de ~13 min con SHA-256, que la Fase 2
+    // va a eliminar).
+    const promesaMapeo = execFilePromise(pythonPath, [pythonScriptPath, directoryPath], {
       cwd: path.dirname(pythonScriptPath),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 30 * 60 * 1000
     });
+
+    // 📦867 (Fase 4) — stderr en vivo. Se leen las líneas `[PROGRESO] archivos=N carpetas=N`
+    // que escribe map_directory.py y se reenvían a la ventana, para que el overlay deje de
+    // mostrar una estimación fija mientras el proceso lleva 760 s. stderr SEGUYENTE
+    // acumulándose aparte (execFile lo entrega en su callback y vuelve en `log:` más
+    // abajo): este listener solo lo escucha en paralelo, no lo consume ni lo reemplaza.
+    let restoProgreso = '';
+    if (promesaMapeo.child && promesaMapeo.child.stderr) {
+      promesaMapeo.child.stderr.on('data', (chunk) => {
+        restoProgreso += chunk.toString('utf8');
+        const lineas = restoProgreso.split('\n');
+        restoProgreso = lineas.pop(); // el resto, que todavía no cerró con salto
+        for (const linea of lineas) {
+          const coincidencia = linea.match(/^\[PROGRESO\] archivos=(\d+) carpetas=(\d+)\s*$/);
+          if (!coincidencia) continue;
+          // La ventana pudo cerrarse mientras escaneaba: mandar ahí revienta el proceso.
+          if (event.sender.isDestroyed()) return;
+          event.sender.send('mapeo-progreso', {
+            archivos: parseInt(coincidencia[1], 10),
+            carpetas: parseInt(coincidencia[2], 10)
+          });
+        }
+      });
+    }
+
+    const { stdout, stderr } = await promesaMapeo;
 
     console.log(`[MAPEO][MAIN] stdout recibido (${stdout.length} bytes)`);
     console.log(`[MAPEO][MAIN] stderr: ${stderr || '(vacío)'}`);

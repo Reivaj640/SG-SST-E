@@ -4165,7 +4165,17 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 
 .kair-auth-card {
     width: 100%;
-    max-width: 340px;
+    /* 📦869 — El owner reportó que la tarjeta de ingreso se veía demasiado ancha.
+       Iba de 340px → 300px (-11,8%) y a pedido del owner baja a 260px: un 13,3% más
+       angosta que 300 y un 23,5% menos que la original. El ancho útil de cada campo
+       queda en ~202px (260 - 2*28 de padding - 2*1 de borde, con box-sizing: border-box),
+       suficiente para "Recordar mis datos" y el aviso de abajo.
+       La sensación de "muy ancha" del reporte original venía del escalado de
+       pantalla de Windows al 125%, no de que la regla no se aplicara.
+       ⚠️ Hay OTRA regla que fija el ancho: dentro de `@media (max-width: 480px)`
+       (styles.css:4584) el card pasa a `max-width: 100%`. Es a propósito, pero esta
+       regla solo manda por encima de 480px. */
+    max-width: 260px;
     background: var(--widget-bg-color);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
@@ -8778,4 +8788,203 @@ position: relative;
    el mask respeta ese tamaño porque width/height = 1em */
 .kair-icon-building[style*="font-size"] {
   /* nothing extra — width/height: 1em ya respeta el font-size del style */
+}
+
+/* ============================================================
+   📦873 — Gate de consentimiento (Ley 1581 de 2012)
+   Mismo patrón que el modal de actualizaciones (arriba en este archivo):
+   overlay fixed + flex, y [hidden] con display:none !important porque el
+   atributo hidden pierde contra el display:flex del overlay.
+   ============================================================ */
+
+.kair-consent-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500020; /* encima del modal de actualizaciones (500010) */
+  animation: kair-consent-overlay-in 160ms ease-out;
+}
+
+.kair-consent-overlay[hidden] {
+  display: none !important;
+}
+
+/* --- Card --- */
+.kair-consent {
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 12px;
+  box-shadow:
+    0 24px 48px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+  width: min(620px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- Header --- */
+.kair-consent__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.kair-consent__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #e8f0fe;
+  color: #1a56db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kair-consent__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.kair-consent__subtitle {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* --- Body (con scroll: el texto legal no cabe en pantallas bajas) --- */
+.kair-consent__body {
+  padding: 18px 24px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.kair-consent__intro {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.kair-consent__list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.kair-consent__list li {
+  margin-bottom: 6px;
+}
+
+.kair-consent__link-wrap {
+  margin: 0 0 16px;
+}
+
+.kair-consent__link {
+  color: #1a56db;
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.kair-consent__link:hover {
+  text-decoration: underline;
+}
+
+/* --- Checkboxes --- */
+.kair-consent__checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.kair-consent__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.kair-consent__check input[type="checkbox"] {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #1a56db;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kair-consent__error {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+
+/* --- Footer --- */
+.kair-consent__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.kair-consent__btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.kair-consent__btn--ghost {
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.kair-consent__btn--ghost:hover {
+  background: #f3f4f6;
+}
+
+.kair-consent__btn--primary {
+  background: #1a56db;
+  color: #ffffff;
+}
+
+.kair-consent__btn--primary:hover {
+  background: #1743b0;
+}
+
+.kair-consent__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes kair-consent-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

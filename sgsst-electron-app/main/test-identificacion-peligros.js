@@ -117,7 +117,10 @@ check('index.html carga bootstrap-icons local', INDEX.includes('assets/css/boots
 check('renderer.js monta KairMatrizPeligros en 4.1.2', RENDERER.includes('submoduleName === "4.1.2 Identificación de Peligros"') && RENDERER.includes('window.KairMatrizPeligros'));
 check('index.html: 8 scripts del módulo incluidos',
   (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js/g) || []).length === 8);
-check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260921-premium-v7-volver'));
+// 🔴 Este check fijaba el literal `20260921-premium-v7-volver` (hoy vigente, así que pasaba) y se
+// caería con el próximo bump legítimo del CSS. Pregunta si TIENE token con la forma de fecha, como
+// en ad25df49.
+check('index.html: kair-matriz-peligros.css con cache-bust', /kair-matriz-peligros\.css\?v=\d{8}-/.test(INDEX));
 
 /* ── 9b. Header System v2 (miga de pan + card + tabs separadas) ── */
 check('header: miga de pan en el marcado', FILES.header.includes('km-header-card__breadcrumb'));
@@ -133,13 +136,19 @@ check('entry: _headerOpts con módulo y código', FILES.entry.includes('_headerO
 check('entry: escucha km:matriz-loaded para el badge', FILES.entry.includes('km:matriz-loaded') && FILES.entry.includes('updateBadge'));
 check('matriz: emite km:matriz-loaded con total', FILES.matriz.includes("km:matriz-loaded"));
 check('entry: render inicial monta AMBOS nodos (card + tabs)', FILES.entry.includes('while (headerEl.firstChild)'));
-check('index.html: 8 scripts del módulo con cache-bust v4', (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js\?v=20260921-premium-v7-volver/g) || []).length === 8);
+check('index.html: 8 scripts del módulo con cache-bust v4', (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js\?v=\d{8}-/g) || []).length === 8);
 check('header: SIN tarjeta y SIN empresa (Volver conservado)', !FILES.header.includes('km-header-card__company') && FILES.header.includes('data-action="back"'));
 check('header: subtítulo con código GI-FO-019', FILES.header.includes('(GI-FO-019)'));
 check('css: .km-header-card transparente', /\.km-wrapper \.km-header-card \{[^}]*background: transparent;/.test(CSS));
 check('css: dark mantiene header transparente', /\[data-theme\^="dark"\] \.km-wrapper \.km-header-card \{ background: transparent/.test(CSS));
 
-check('index.html: cache-bust v3-header', INDEX.includes('kair-matriz-peligros.css?v=20260921-premium-v7-volver'));
+// 🔴 Este era un DUPLICADO exacto del de la línea 120 (mismo `index.html.includes(...)` con el
+// mismo literal): dos checks idénticos no protegen el doble, solo hacen ruido. Y encima fijaba
+// `20260921-premium-v7-volver`. Ahora afirma lo que el otro no: que el CSS Y los 8 scripts del
+// módulo llevan token con forma de fecha.
+check('index.html: los 8 scripts del módulo también llevan cache-bust de fecha',
+  (INDEX.match(/identificacion-peligros\/kair-matriz-peligros[\w-]*\.js\?v=\d{8}-/g) || []).length === 8
+  && /kair-matriz-peligros\.css\?v=\d{8}-/.test(INDEX));
 
 /* ── 9c. Primera carga automática (📦794) ── */
 check('bridge: detecta primera carga (local vacío + Excel con datos)', BRIDGE.includes('var firstPopulate = mergeEmptyMode') && BRIDGE.includes('existing.sedes.length === 0'));

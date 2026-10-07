@@ -10,6 +10,738 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.251] - 2026-10-07
+
+### 📦874 · La bandeja ya no mezcla los correos de dos cuentas de Gmail
+
+Conectar una segunda cuenta de Gmail en la misma máquina **mezclaba las dos bandejas**: al
+entrar con la nueva seguías viendo los correos de la anterior, con sus cuerpos completos.
+
+El cache local guarda los hilos y mensajes de **todas** las cuentas que se conectaron alguna
+vez, en la misma base. Escribirlos bien nunca fue el problema: `email_threads` y
+`email_messages` ya traían `connection_id` en cada fila. El problema era que **leerlos no
+usaba esa columna**. `buildThreadsWhere` —el WHERE que comparten la lista y su contador— solo
+filtraba por carpeta, no leídos, búsqueda y fechas. La conexión no entraba.
+
+Evidencia en la base de un equipo real: dos conexiones y 54 hilos en INBOX, de los cuales 26
+pertenecían a la cuenta activa y 28 a la anterior.
+
+El aislamiento ya estaba diseñado en unas funciones (`getCacheStats`, `getLabelsFromCache`,
+`deleteThreadsByFolder`) y faltaba justo en las que pintan la bandeja. Ahora las cinco
+lecturas acotan por cuenta: `buildThreadsWhere`, `getThreadFromCache`, `getMessagesFromCache`,
+`recomputeThreadUnread` y `propagateUnreadChange`.
+
+**Fail-closed a propósito:** si no se puede resolver la cuenta activa, el `WHERE` queda en
+`1 = 0` y no se lista nada. Acotar es lo seguro; devolver todo "para no romper la UI" es
+justo el fallo que se corrige.
+
+De paso se cerraron dos cosas que solo iban a fallar más adelante:
+
+- **El cursor de "cargar más" cruzaba cuentas.** `email_sync_state` tenía `folder` como clave
+  primaria, así que cambiar de cuenta sobrescribía el `pageToken` de la anterior. Ahora la
+  clave es `(folder, connection_id)`. SQLite no permite cambiar una PK con `ALTER`, así que
+  la migración reconstruye la tabla, copia y renombra.
+- **El barrido de huérfanos comparaba contra la cuenta equivocada.** El sync pedía los 5000
+  hilos más recientes *sin filtro de conexión* y los comparaba contra el Gmail de una sola
+  cuenta: los de la otra se marcaban como huérfanos y el borrado —que sí está acotado— no los
+  tocaba. Marcaba mal y no pasaba nada.
+
+**No se borró nada.** Los correos de la cuenta anterior siguen en el cache; simplemente ya no
+se muestran. Vuelven a estar disponibles cuando se reconecte esa cuenta.
+
+### 📦873 · Gate de consentimiento legal (Ley 1581 de 2012)
+
+K+AIR guarda historias clínicas. La Ley 1581 de 2012 (art. 5 y 8) y la Ley 1712 de 2014
+exigen que ese tratamiento sea lícito **solo con autorización previa, expresa e informada**, y
+que quede constancia de ella. Esta versión cierra el circuito: el gate ya no es un `await` a
+una función que no existía.
+
+Antes de esto el backend tenía los tres handlers y el call site estaba puesto, pero **nadie
+podía llamarlos**: faltaban el preload, el markup, los estilos y la función. Sin función,
+error en tiempo de ejecución.
+
+- **Overlay** con el texto legal, dos casillas **sin premarcar** —el consentimiento tiene que
+  ser expreso, no preseleccionado— y los botones "Acepto y continúo" / "No acepto".
+- **Fail-OPEN deliberado**, y es una decisión, no un descuido: si el preload no expone los
+  canales, la base no responde o el overlay no está en el DOM, el gate devuelve `true` y la
+  app carga. Lo contrario sería bloquear el acceso a una aplicación de gestión de salud
+  porque la tabla de consentimientos no arranca. Lo que **no** es fail-open es la decisión
+  del usuario: un fallo de infraestructura nunca se confunde con un "no", ni al revés.
+- **Escape no cierra.** El consentimiento no es descartable.
+- El hash SHA-256 del texto legal queda guardado como prueba de *qué* texto se leyó.
+
+**Dos bugs que solo aparecieron al probarlo de verdad:**
+
+1. El backend leía `sesion.email` sobre lo que devuelve `validateSession`, que es
+   `{ ok, session, user }`. Como `{ ok: false }` es *truthy*, la mitad `!sesion` de la guarda
+   nunca disparaba y `email` nunca existía ahí: **el consentimiento era imposible de
+   registrar**, siempre respondía `SESION_INVALIDA`. En el mismo bloque, `sesion.nombres` es
+   un campo que no existe (es `user.full_name`), así que el nombre se habría guardado vacío.
+2. El enlace a la política de privacidad apuntaba a `reivaj640.github.io/privacidad.html`
+   sin el path del repo: **404**. Y como `main.js` no tenía ningún `setWindowOpenHandler`, el
+   `target="_blank"` abría una ventana de Electron en vez del navegador del sistema.
+
+**Test: 48 checks.** El escape se saca del `renderer.js` real con `vm` y se corre contra un
+DOM y una API falsos, así que si alguien cambia la política ahí, el test la evalúa tal como
+quedó. Dos mutaciones a propósito para comprobar que los checks muerden: quitar el fail-open
+pone 1 rojo, y quitar la guarda de las casillas pone 5.
+
+> ⚠️ **Pendiente, y es de fondo:** el gate decide re-preguntar comparando `app_version` y un
+> `config.consentDocumentVersion` que **nadie escribe**, así que editar el texto legal no
+> vuelve a preguntar, y cada actualización de la app re-pregunta a todo el mundo. Además
+> `consent:estado` toma la última aceptación **de cualquier usuario** de la máquina, sin
+> filtrar por correo: en un equipo compartido, el primero que acepta silencia el gate para
+> los demás. Sin corregir, el registro sirve como prueba de que *alguien* aceptó, no de que
+> lo aceptó quien corresponde.
+
+### Corregido
+
+- Los enlaces `http/https` del renderer se abren en el navegador del sistema
+  (`setWindowOpenHandler` en `mainWindow`). Solo se interceptan `http/https`: los ~12 módulos
+  de documentación imprimen con `window.open('', '_blank')` y el handler las deja pasar.
+- La política de privacidad (`sitio/`) deja de anunciar `gmail.compose`, que ya no se pide, y
+  documenta que los tokens van cifrados y que existe registro de consentimiento.
+## [0.1.250] - 2026-10-07
+
+### 📦872 · Google: K+AIR pide un permiso menos
+
+Se quitó `gmail.compose` de los scopes OAuth. **No lo usaba nadie.** Antes de tocarlo se
+verificó contra el código, no de memoria:
+
+- Cero llamadas `drafts.*` en todo el repositorio.
+- El redactor tiene **solo enviar**: la barra trae minimizar/maximizar/cerrar y el pie un
+  botón Enviar. No existe ningún "Guardar borrador".
+- La carpeta Borradores es una **vista de lectura** (`users.messages.list` + query
+  `in:drafts`), que ya cubre `gmail.readonly`.
+- `is_draft` en la base local lo escribe el sincronizador copiando lo que ya venía de
+  Gmail (`email-sync.js:177`). La app nunca crea el borrador.
+
+Pedirle a Google un permiso que no se ejercita es exactamente lo que dispara el rechazo
+por *minimum scope*, y hacía que la pantalla de consentimiento le prometiera al usuario
+algo que K+AIR no hace. **Quitarlo no baja la categoría de la revisión**: `gmail.readonly`
+y `gmail.modify` siguen siendo restringidos, así que la revisión restringida se paga igual.
+Fue higiene, no ahorro.
+
+**No rompe nada ni obliga a reconectar a nadie**: nada compara los scopes del token
+guardado contra la lista de `SCOPES` (`google-tokens.js` solo guarda `scope` como dato, y
+`main.js:2629` decide la re-autorización por la **vigencia** del token, no por los scopes).
+Quien ya había autorizado conserva su token y sigue funcionando.
+
+El motivo de quitarlo está escrito en el propio `google-auth.js`, para que nadie lo
+re-agregue creyendo que fue un olvido. Los textos de justificación para el formulario de
+Google quedaron en `docs/google-verificacion-scopes.md`.
+
+### 📦871 · Google: los tokens OAuth dejan de estar en texto plano en el disco
+
+`refresh_token` de Google **no caduca hasta que el usuario revoca el acceso** desde su
+cuenta: es una credencial de larga vida, y con ella sola se leen y se envían correos de la
+persona. Hasta ahora estaba en texto plano dentro de `config.json`, junto al resto de la
+configuración: un backup, un antivirus u otra app con acceso de lectura al archivo se
+llevaban la cuenta entera.
+
+Ahora van a un archivo aparte, `google-tokens.enc`, cifrado con `safeStorage` — el mismo
+mecanismo que ya usa `firma-bridge.js` para la api key.
+
+- **La API pública no cambia.** Sigue recibiendo `configPath`; la ruta del archivo cifrado
+  se deriva con `path.dirname`, así que ningún llamador de `main.js` se entera.
+- **Migración silenciosa.** Al leer, si encuentra tokens en texto plano en `config.json`,
+  los cifra, guarda en el archivo nuevo, borra la copia vieja y los devuelve. **El usuario
+  no tiene que re-autorizar** por actualizar.
+- **Sin degradación en silencio.** Si `safeStorage` no está disponible (Linux sin keyring),
+  el módulo **no** cae de vuelta a guardar en texto plano: no guarda y avisa. Antes de que
+  existiera este cambio eso no era una decisión; ahora sí.
+- Si el archivo cifrado no se puede descifrar (cambio de usuario de Windows o de keyring),
+  se borra y el usuario re-autoriza. Misma política que `secrets.enc`.
+
+Nuevo test `main/test-google-tokens-enc.js` (**32/32**), con el `safeStorage` mockeado
+mientras la lógica real corre: comprueba que el refresh_token no aparece en claro, que la
+migración no rompe la sesión, y que sin cifrado disponible **no** se escribe texto plano.
+
+## [0.1.249] - 2026-10-06
+
+### 📦870 · La suite deja de mentir: 17 fallos que eran 6 problemas, y 10 que no eran fallos
+
+**Resumen:** la suite informaba "125 tests · 108 verdes · 17 con fallos". Ese 17 no significaba
+nada. Medido y corregido: **119 tests · 114 en verde · 5 con fallos · 1 sin resumen verificable.**
+
+**De los 17, 10 NO eran fallos del producto.** Eran tests anclados a código que se había borrado
+**a propósito**, y el runner los mezclaba con los fallos reales:
+
+- **📦581** (el update pasó del header al footer del shell). `test-header-zindex.js` exigía z-index
+  de `.header-update-panel`, que el propio CHANGELOG registra como borrado; `test-auto-download-flow.js`
+  exigía los toasts que el Loop 3 convirtió en no-ops documentados.
+- **📦752** (rediseño premium de la Bandeja). `test-auditoria-visual.js` exigía una toolbar duplicada
+  y un `setTimeout` que `app.js:6222` describe como **código zombie eliminado en el loop 28**.
+
+Esos checks se **invirtieron** en vez de "arreglarse": ahora exigen que el código muerto **no vuelva**.
+Doblar el código para satisfacerlos habría deshecho un rediseño a mano.
+
+**Un solo bug de fondo, y era del runner.** Parseaba solo `N/M OK`, que es el formato que pide el
+prompt pero no cumple ni la mitad de los tests: conviven al menos **19** (`29/29 checks OK`,
+`87 OK · 2 FAIL`, `Total: N | ✅ N | ❌ M`, TAP, `ALL CHECKS PASSED`…). Lo que no casaba se contaba
+**verde sin que nadie hubiera mirado sus checks** — 24 tests estaban en esa caja. Ahora
+`leerResumen()` los entiende y los no verificables van a una lista propia.
+
+**Causa raíz de dos fallos más: los tests de gestión humana no corrían `MIGRATIONS_SQL`**, solo
+`SCHEMA_SQL`. Por eso se comían `no such table: gh_eventos_personal` y `gh_documentos has no column
+named ruta_archivo` — **ambas columnas existen en la BD real**, verificado. Ahora aplican las
+migraciones con el mismo patrón de `main.js:592-608`. `newtables` pasó a **209 OK · 0 FAIL** y
+`write-extra` a **72 OK · 0 FAIL**.
+
+**Y `delete-personal` no estaba roto.** El test lo invocaba sobre un bp activo saltándose
+`gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
+(`gestion-humana-bridge.js:1171`), y leía `data.retired`, un campo que el contrato **no tiene**.
+Reescrito según el contrato; ahora además protege la regla.
+
+**Cambio en el bridge:** el endpoint `diag` informaba "10 tablas" con 11 en su propia lista. El
+mensaje ahora se deriva del array, así que no puede volver a mentir solo al agregar migraciones.
+
+**Sin regresiones.** Los 5 que quedan están uno por uno en `PROMPT.md` §7.4: tres piden entorno
+(`INTERNAL_API_KEY`, `cloudflared`, servicio de firma vivo), uno es `no such column: actualizado_en`
+del sync, y uno es **un rojo deliberado** que se dejó para que alguien lea el flujo de
+`create-contratacion` y explique por qué `paso_actual` queda en 2.
+
+---
+
+## [0.1.248] - 2026-10-06
+
+### 📦869 · La tarjeta de ingreso deja de verse ancha de más
+
+**Resumen:** la tarjeta de la pantalla de ingreso tenía `max-width: 340px` y el owner la
+reportaba como demasiado ancha. Baja a `260px`: un 23,5 % menos que la original. El ancho
+útil de cada campo queda en ~202 px (260 − 2×28 de padding − 2×1 de borde, con
+`box-sizing: border-box`), suficiente para "Recordar mis datos" y el aviso de abajo.
+
+**Lo que no era el bug.** La sensación de "muy ancha" venía del **escalado de pantalla de
+Windows al 125 %**, no de que la regla no se aplicara. La regla sí mandaba, y baja porque el
+owner la pidió más angosta todavía.
+
+**Ojo con la otra regla que toca el mismo ancho.** Dentro de `@media (max-width: 480px)`
+(`styles.css:4584`) la tarjeta pasa a `max-width: 100%`. Es a propósito — en un teléfono
+tiene que ocupar el ancho — pero significa que esta regla solo manda por encima de 480 px.
+
+**Cache-bust.** `styles.css` sube a `?v=20261005-login-card-260`.
+
+**Corrección de bitácora.** Este paquete estuvo un tiempo en la cola como "📦862 (ancho de la
+tarjeta de ingreso)". **Eso era falso:** 📦862 es el fix de admin empresas ("Un administrador ya
+no queda encerrado en *contacta a administración*", v0.1.241), que ya estaba commiteado y
+pusheado. Este cambio nunca tuvo número. También se corrigió que la lista lo daba por
+commiteado cuando no lo estaba.
+
+---
+
+## [0.1.247] - 2026-10-06
+
+### 📦868 · Conectar Gmail: las credenciales son de la app, no del usuario — y ahora funciona en cualquier instalación
+
+**Resumen:** en una PC sin `.env`, pulsar "Conectar Gmail" abría el navegador con `client_id=`
+**vacío** y Google respondía con una pantalla de "Acceso bloqueado — Missing required parameter:
+client_id — Error 400" que no menciona K+AIR. Y lo peor: el servidor de callback quedaba
+esperando, así que el siguiente intento decía "Ya hay un flow de autorización activo".
+
+**La causa de fondo no era el mensaje: era dónde vivían las credenciales.**
+`shared/google-auth.js:66` las leía **solo** de `process.env.GOOGLE_OAUTH_CLIENT_ID`, y el
+`.env` **no viaja con el instalador** (está ignorado por git, que es lo correcto). Por eso
+funcionaba en el portátil del owner —donde alguien había creado el archivo— y en cualquier
+otra máquina, no. Es decir: la app no tenía correo para sus clientes, y el único síntoma era
+un error de Google.
+
+**El arreglo de producto: que la app traiga las credenciales encima.**
+No son secretos. El `client_id` de una app instalada es un identificador **público** —Google
+lo publica en el manifiesto de verificación del sitio— y el `client_secret` es para apps web:
+para *Desktop app* con PKCE, que es lo que usa este flujo, Google lo marca como opcional.
+Verificado el 2026-10-06 contra `googleapis`: la URL de autorización que se arma es
+**idéntica** con y sin secret.
+
+| | Antes | Ahora |
+|---|---|---|
+| ¿Dónde viven las credenciales | solo en `.env`, que no se distribuye | en `shared/google-oauth-config.js`, que **se versiona** |
+| `.env` | obligatorio | override opcional de desarrollo (lo que esté ahí gana) |
+| ¿El usuario tiene que hacer algo | sí: crear y editar un `.env` | **nada** |
+| Si falta config | error de Google en pantalla | la opción de correo no se ofrece, y el detalle va al log |
+
+**Cómo queda para el usuario final:** abre Configuración, toca "Conectar Gmail", autoriza su
+cuenta y listo. Igual que vos. Sin credenciales, sin archivo, sin Configuración previa.
+
+**Qué se cambió:**
+
+- **NUEVO** `shared/google-oauth-config.js`: credenciales de la app + `available` derivado de que
+  exista el `client_id` (no es un flag manual, así que no puede mentir).
+- `shared/google-auth.js`: usa ese config; el `.env` queda como override de desarrollo.
+- `shared/google-auth.js`: el canje usa `clientAuthentication = 'None'` cuando no hay secreto
+  (cliente público con PKCE) y le pasa cadena vacía en vez de `undefined`, que se serializaba
+  como el texto `"undefined"`. Verificado en `google-auth-library`: solo manda `client_secret`
+  si la autenticación es `ClientSecretPost` o `ClientSecretBasic`.
+- `shared/google-auth.js`: el aviso de "faltan credenciales" juzgaba con
+  `!CLIENT_ID || !CLIENT_SECRET`, o sea que **gritaba en el log aunque `available` dijera que
+  todo estaba bien**. Un aviso que se contradice con el estado real hace que el que lee el log
+  deje de creer al que dice la verdad: ahora usa el mismo criterio que `available` y hay 2 checks
+  y 2 mutaciones que lo vigilan.
+- `main.js:2492`: corta **antes** de `startAuth()` si `!googleAuth.available`, y manda el detalle
+  técnico a `sendLog`, no al usuario.
+- `main.js` `google-oauth:status`: expone `available`.
+- `config-viewer.html`: consulta `available` y **no ofrece el botón** si no puede funcionar; y
+  los tres caminos de error muestran un mensaje corto, en humano. Se sacaron del `alert` el
+  error crudo de Google, la palabra "tokens" y la palabra "instalación".
+- `renderer.js`: bump del cache-bust del iframe de Configuración.
+- `.env.example`: reescrito — antes decía "copiá esto y completá los valores"; ahora explica
+  que ya no es obligatorio y que la fuente real es el config embebido.
+- `main/test-config-premium-v2.js`: su check fijaba el token del iframe a un valor literal, así
+  que cada bump lo rompía. Se cambió para validar el **formato** del token —el mismo criterio
+  con el que el owner arregló el tripwire de `test-hero-fila-840`.
+
+**Cómo se validó:** `node --check` en los 6 archivos · test nuevo
+`main/test-google-oauth-868.js` **48/48**, con **17 mutaciones** que confirman que muerden
+(volver a leer solo de `process.env`, quitar el override, quitar `available`, `available` como
+flag manual, guard movido después de `startAuth()`, sin `sendLog`, botónofferto igual, jerga
+técnica de vuelta, error crudo de vuelta, `available` fuera del status, `.env.example` diciendo
+que es obligatorio, el aviso del log pidiendo de nuevo el secret) · **prueba funcional de la
+cadena completa (15/15)** y, con el `client_id` real ya embebido, **cadena real (22/22)**:
+`accounts.google.com/o/oauth2/v2/auth` con `client_id` con valor, `redirect_uri` exacto,
+PKCE S256, `access_type=offline` y el secret no aparece en la URL · con
+`process.env` vacío y `.env` ausente, interceptando el config embebido, `startAuth()` arma una
+URL con `client_id` **con valor**, `redirect_uri` correcto, PKCE S256 y `access_type=offline` ·
+`test-config-premium-v2.js` 44/44 · `test-hero-fila-840.js` 35/35.
+
+**El tropiezo de esta jornada.** El paquete empezó tocando también
+`renderer/bandeja-integrada/calendar-operations.js`, que llama `google.start()` y se traga el
+error en silencio. Se le puso un toast de error... y se comprobó que **no lo carga ningún
+`<script src>` del proyecto**: está muerto, y `AGENTS.md:2549` lo tenía anotado desde antes
+("12 archivos JS huérfanos... `app.js` es el único contrato vivo"). Se revirtió: tocar código
+muerto no arregla nada, hace que el test dé verde por algo que no ocurre, y engaña a quien lea
+el commit después. El test ahora lee el grafo de carga real (140 scripts) y vigila que ese
+archivo siga muerto.
+
+**Y el error de diseño que el owner ALZÓ en el primer intento:** el guard inicial explicaba
+el `.env` al usuario final con todo detalle. Es un mensaje de desarrollador —un cliente de
+K+AIR no va a editar un archivo que no sabe qué es— y por eso la solución real no fue "avisar
+mejor", sino "que no haya nada que avisar": que la app venga con las credenciales.
+
+**El `client_id` y el `client_secret` ya están cargados y la conexión funciona** (proyecto
+"KAIR Calendar Sync", app de escritorio). **Probado de punta a punta contra Google:** el owner
+autorizó con su cuenta real y la bandeja conectó.
+
+### 🚨 La creencia que casi pierde el paquete: "el `client_secret` es opcional"
+
+Se llegó a esa conclusión leyendo `google-auth-library`: tiene un enum
+`ClientAuthentication.None` que, activado, hace que la librería **no mande** el `client_secret`
+en el body. Todo cuadraba en el código. **Pero leer la librería no es verificar el servicio.**
+
+El día que se probó la autorización real, Google aceptó los 5 permisos y el canje devolvió:
+
+```
+{"error":"invalid_request","error_description":"client_secret is missing."}
+```
+
+El síntoma era el **peor posible**: el navegador decía "Autorización exitosa", el cliente había
+autorizado todo, y al final **se perdía la conexión**. Media conexión: con el botón todavía
+visible y el flujo entero aparentemente funcionando hasta el último paso.
+
+**Lo que lo dejó invisible:** los handlers de OAuth (`start`, `await-callback`, `exchange`)
+usaban `console.error`, que **no escribe en `main.log`**. El fallo no dejaba rastro en ningún
+lado — hubo que reproducir la petición a mano (un canje con un código falso revela el error
+del endpoint) para verlo. Ahora los tres escriben en `sendLog` y hay un check que lo vigila.
+
+**Consecuencias del arreglo:**
+
+- `available` ahora exige **las dos** credenciales. Antes, con el secret vacío, daba `true`, la
+  app ofrecía el botón y rompía a mitad de camino. Ahora no lo ofrece hasta que puede
+  completarse de verdad — que es exactamente lo que se ve en pantalla.
+- `clientAuthentication = 'None'` **eliminado**: con ese modo la librería omite el secreto y
+  Google lo rechaza.
+- 8 checks del test 868 **invertidos** (§7.3: invertir, no borrar) para que fijen que el
+  secret es necesario y nadie vuelva a la creencia vieja. Total: 17 mutaciones, todas muerden.
+
+Que Google entregue un secreto "de escritorio" no lo vuelve secreto: la app es un binario que
+cualquiera puede abrir, y el mismo Google lo baja junto con su `client_secret_*.json`. El
+problema nunca fue la seguridad del valor, sino que **faltaba y la app fingía que no**.
+
+### 🚨 Por qué las credenciales NO van en el archivo versionado
+
+Al commitear, **GitHub rechazó el push**: `GH013 — Push cannot contain secrets`, detectando el
+`client_id` y el `client_secret` en `shared/google-oauth-config.js`. El repo es **público**, y
+eso no se arregla volviendo el repo privado:
+
+`package.json` declara `publish: {provider: "github"}` y electron-updater pega a la API de
+releases de GitHub **sin token**. En un repo privado esa API devuelve **404** y **todos los
+clientes dejarían de recibir actualizaciones** — incluido el differential download que está
+optimizado para clientes con internet lento.
+
+Así que: repo público ⇒ el `client_secret` no puede estar en el historial. La solución:
+
+- `shared/google-oauth-config.js` se versiona **vacío**, y su cabecera explica por qué.
+- Las credenciales viven en `sgsst-electron-app/.env`, que está en `.gitignore`.
+- **electron-builder NO excluye `.env`** de los archivos del app (verificado: 0 reglas de
+  `build.files` lo filtran), así que un `.env` presente en la máquina que compila **viaja dentro
+  del instalador** y le llega al cliente sin que configure nada. El objetivo de producto se
+  mantiene: el usuario final no tiene que hacer nada.
+- **NUEVO** `main/_verificar-credenciales-build.js`, enganchado como `prebuild` / `prebuild:win` /
+  `prebuild:mac` / `prebuild:linux`: si faltan las dos credenciales, **corta el build con exit 1**
+  diciendo dónde pegarlas. Es preferible que el build falle ahí a que salga un instalador donde el
+  correo no conecta — que es justamente el bug que costó toda la jornada. Si existen pero el
+  formato es raro, avisa sin cortar.
+- Los 5 scopes declarados en Google coinciden con los que pide el código: `calendar`,
+  `gmail.readonly`, `gmail.send`, `gmail.modify`, `gmail.compose`.
+
+### ✅ Cerrado: la app quedó en PRODUCTION, probada con una cuenta nueva
+
+El proyecto **KAIR Calendar Sync** ya está en **"En producción"** en Google Auth Platform.
+Eso cierra el problema de fondo:
+
+- **Cualquier cuenta de Google** puede autorizar, sin que haya que agregarla una por una a la
+  lista de usuarios de prueba.
+- **La autorización no vence a los 7 días.** Con Production el `refresh_token` no expira
+  por el modo de publicación.
+
+**Prueba de punta a punta, con el owner:** conectó Gmail, vió sus correos, verificó en
+`config.json` que quedaron el `access_token`, el `refresh_token` y los 5 scopes; desconectó
+(la clave `googleOAuth` desaparece del archivo y el resto de la configuración queda intacta);
+y **reconectó con una cuenta que nunca estuvo en la lista de usuarios de prueba** — esa
+es la prueba de que la publicación sirvió, porque en modo Prueba esa cuenta no habría
+podido autorizar.
+
+### El camino hasta Production, y por qué no era trivial
+
+Google tenía el botón de publicar **apagado**: la pantalla de Información de la marca
+exige nombre de app, correo de asistencia, URL de página principal y **URL de política de
+privacidad**, y las dos últimas no existías. Se creó el sitio con GitHub Pages:
+**https://reivaj640.github.io/SG-SST-E/**
+
+**La política de privacidad no es un placeholder.** Cada afirmación se verificó contra el
+código antes de escribirla:
+
+- El contenido de los correos **no sale de la máquina del cliente**:
+  `main/email-sync.js` lo baja de `gmail.googleapis.com` y lo escribe en SQLite local
+  (`emailDb.saveMessage/saveAttachment`).
+- El archivo de sincronización `.kairsync` **no incluye las tablas de correo**
+  (`main/sync-serializer.js`): `mp_programas`, `evaluacion_action_plans`, `gestaciones`,
+  `eventos_cumplidos`, `roles_responsabilidades_*`, `eventos_rapidos`.
+- `"sync-bridge"` no es un bridge de red: es IPC, y `sync-service.js` usa `fs` sobre una
+  carpeta local.
+- Sin telemetria: no hay Sentry, PostHog ni Analytics; `electron-log` escribe solo en archivo.
+- El único canal propio es el **servidor de firma que la empresa tenga configurado**, que
+  recibe PDFs a firmar — separado del correo. La URL sale de `secrets.enc`, así que
+  `firma.k-air.com` es el de una empresa concreta, no uno fijo.
+- Se declara la debilidad real: los tokens se guardan **sin cifrar**
+  (`shared/google-tokens.js:29`).
+
+Incluye la **Ley 1581 de 2012** (Colombia) en los derechos del titular, que es la norma que
+aplica y que Google valora ver referenciada.
+
+### 🛠️ El sitio va en `sitio/` + rama `gh-pages`, NO en `docs/`
+
+`docs/` ya existía con contenido interno (protocolos SST, planes de gestión y
+`investigacion-seguimiento-embarazo-sst-colombia.md`). Publicar Pages desde ahí habría
+puesto todo eso como sitio web oficial. Con la rama `gh-pages` —construida con
+`hash-object` + `mktree` + `commit-tree`, sin checkout, para no tocar el árbol de trabajo
+del owner — se publica **solo** el sitio. Verificado: `/docs/`, `/Portear/` y
+`/sgsst-electron-app/` devuelven **404** en el sitio publicado.
+
+### Lo que sigue pendiente (detalle en `Historial.md`)
+
+1. **✅ El correo de soporte del sitio ya NO es provisorio**: es `adminkair@gmail.com`,
+   en `sitio/soporte.html` y en Google Auth Platform. De paso se corrigió una afirmación
+   falsa de `privacidad.html`, que daba `firma.k-air.com` por el servidor de firma.
+2. **`gh-pages` es una copia generada de `sitio/`**: si se edita una, hay que regenerar la otra.
+3. **Verificación de la app** (para sacar el aviso de "app no verificada"): ~10 días hábiles
+   + Search Console + video de demostración. No corre prisa bajo 100 usuarios.
+4. **⚠️ Tope de 100 usuarios, de por vida del proyecto y sin reset.** Si se quema,
+   Google deshabilita el login.
+5. **Tokens sin cifrar** — deuda técnica, declarada en la política.
+6. **El ancho de la tarjeta de ingreso (340px → 260px) sigue SIN commitear**:
+   `index.html` y `styles.css`: son cambios del owner de una sesión anterior que esta
+   jornada no tocó. Antes esta lista lo llamaba "📦862", y eso era falso — 📦862 es el fix
+   de admin empresas, que ya está commiteado y pusheado más abajo. Este cambio no tiene
+   número todavía; le corresponde 📦869 cuando se commitee.
+
+## [0.1.246] - 2026-10-06
+
+### 📦867 · Fase 4 del mapeo de estructura: la pantalla deja de mentir y dice cuánto se lleva
+
+**Resumen:** quinta y última etapa del plan de 5 fases. **Primera fase del plan con cambios
+visibles en pantalla.** El overlay del mapeo muestra los archivos y las carpetas contados de a
+verdad mientras el escáner corre, y se elimina el "Tiempo estimado: 10-60 segundos" que era un
+texto fijo (nunca calculado) y que en una carpeta de Drive se quedaba corto por dos órdenes de
+magnitud.
+
+**El problema que motiva esta fase.** Con la carpeta real en Google Drive, `map_directory.py`
+pasaba más de 760 s (medidos: 1.241 s de reloj contra 4,45 s de CPU — el 99,6 % es esperar la red).
+Durante todo ese tiempo la ventana mostraba un spinner, un reloj y nada más: el usuario no tenía
+ni idea de si estaba avanzando o colgado, y el texto de "10-60 segundos" le decía que algo
+estaba roto cuando en realidad iba bien.
+
+**Qué se hizo — el progreso viaja de verdad, de punta a punta:**
+
+| Tramo | Qué hace |
+|---|---|
+| `map_directory.py` | `_avisar_progreso()` escribe `[PROGRESO] archivos=N carpetas=N` a **stderr**, amortiguado a 250 ms con `time.monotonic()`, con una línea forzada al arrancar y otra al cerrar |
+| `main.js` | Engancha `child.stderr` y reenvía cada línea por el canal IPC `mapeo-progreso`; `stderr` sigue acumulándose aparte para el campo `log:` |
+| `preload.js` | `onMapDirectoryProgress(cb)` devuelve la función que quita el listener |
+| `config-viewer.html` | Pinto el contador real y sueltan el listener en los **tres** caminos de salida |
+
+**Por qué stderr y no stdout:** stdout tiene que quedar con **una sola línea de JSON puro** (el
+contrato de 📦866). Mandar el avance por ahí lo rompía, y el test lo verifica con un bite test
+real: si el progreso vuelve a stdout, el `JSON.parse` deja de poder leer el resultado.
+
+**Lo que NO se tocó:** el contrato del escáner (`root`, `structure.name`/`path`, `subdirectories`
+como dict, `total_files`/`total_folders`), los límites `maxBuffer: 64 MB` y `timeout: 30 min` de
+la Fase 1, y el reloj de tiempo transcurrido (que sí era real; lo engañoso era la *estimación*).
+
+**Cómo se validó:** `py_compile` OK · `node --check` OK en `main.js` y `preload.js` · test nuevo
+`main/test-mapeo-estructura-867.js` **44/44**, con **11 mutaciones** que confirman que muerde
+(sin `.child`, sin guard de ventana destruida, progreso a stdout, sin `timeout`, sin `flush`, con
+`time.time()`, canal mal escrito, "10-60 segundos" de vuelta, listener sin soltar…) · tests 863
+**36/36**, 865 **15/15**, 866 **20/20** · suite **124 · 106 verdes · 18 preexistentes (0
+regresiones)**. Cache-bust: `renderer.js?v=20261006-mapeo-fase4`.
+
+**Validación de integración (fuera del repo, en `%TEMP%`):** se extrajeron y ejecutaron el
+wrapper y la expresión regular **reales** de `main.js` contra un fixture de 2.500 archivos —
+15/15. Las muestras de progreso llegaron a los 81 ms y 114 ms, **antes** de que el proceso
+terminara (125 ms): eso demuestra que el avance se escucha en vivo y no llega bufferizado al
+final, que era justamente el defecto que vino a corregir esta fase. Queda pendiente decidir si
+esa prueba entra al repo como test.
+
+## [0.1.245] - 2026-10-06
+
+### 📦866 · Fase 3 del mapeo de estructura: el resultado baja de ~3 MB a una fracción y siempre llega completo
+
+**Resumen:** cuarta etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete el
+escáner deja de armar un informe tres veces más grande del necesario: saca del resultado los datos
+que **nadie lee** (`files[]`, `file_count`, `dir_count`, `errors` y el indentado `indent=2`), sin
+tocar nada de lo que la app sí consulta.
+
+**El problema que motiva esta fase.** La Fase 1 agrandó el conducto de salida (1 MiB → 64 MB) y con
+eso el JSON dejó de cortarse… pero seguía pesando ~2,98 MB sobre el Drive real. Ese peso no es
+gratuito: cada archivo arrastraba una **lista de rutas repetida**, un recuento por carpeta, un
+listado de errores y sangría de dos espacios por nivel. Medido con un fixture de 2.000 archivos:
+**934.437 bytes / 19.219 líneas** contra **20.877 bytes / 1 línea** del código nuevo — **−97,8 %**.
+
+**Qué se sacó (0 consumidores verificado con grep en la Fase 0):**
+
+| Campo quitado | Por qué se pudo |
+|---|---|
+| `files[]` por nodo | Solo lo leía `formatStructureForLog`, que ya tolera nodos sin `files` |
+| `file_count` / `dir_count` | **No** se quitan: se conservan y ahora salen de un contador global (`_contador`) que se reinicia en cada corrida |
+| `errors[]` | Los avisos van a `stderr` (`print(..., file=sys.stderr)`), así el stdout queda JSON puro |
+| `indent=2` | Un solo renglón; el `JSON.parse` no distingue |
+| bloque por-archivo de `stat` + extensión | La Fase 2 ya no calcula checksum, y la extensión no la lee nadie |
+
+**Lo que NO se tocó:** el contrato completo (`root`/`structure.path` absolutos, `structure.name`,
+`subdirectories` como diccionario, `print(json.dumps(structure`, `map_directory(root_path)`),
+`total_files`/`total_folders` (**sí** los consume `renderer.js:7158/7160` y `main.js:4337/4338`)
+y la semántica de symlink/OSError de la Fase 2.
+
+**Tests:** `main/test-mapeo-estructura-866.js` (**20 checks**, nuevo). Escrito **antes** de tocar el
+código y probado contra la versión previa: **8 checks FALLAN** contra el código de Fase 2 (4
+estáticos: `files`, `file_count`/`dir_count` ausentes, `errors`, `indent=`; 4 de runtime: claves
+profundas presentes, stdout con 91 líneas) y **12 de preservación pasan en ambos**. Con el código
+nuevo: **20/20**. El test de Fase 0 sigue **36/36** y el de Fase 2 **15/15**.
+
+**Suite completa:** **123 tests · 105 en verde · 18 fallos** = línea base (122·104·18) + el test
+nuevo en verde. **0 regresiones**; los 18 fallos son los mismos preexistentes.
+
+**Verificación:** `python -m py_compile Portear/src/map_directory.py` OK · `node --check main.js` OK ·
+corrida real contra fixture (JSON parseable en **1 línea**, claves profundas inexistentes, totales
+contra un conteo independiente del disco).
+
+---
+
+## [0.1.244] - 2026-10-06
+
+### 📦865 · Fase 2 del mapeo de estructura: el escáner deja de tardar hora y media por nada
+
+**Resumen:** tercera etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete
+el mapeo quita de en medio lo que consumía casi todo el tiempo: calcular la huella (checksum) de
+cada archivo, un trabajo que nadie lee.
+
+**El problema que motiva esta fase.** El diagnóstico de la Fase 0 midió que el escáner tarda
+760+ segundos y que **~99,6 % de ese tiempo** se va en calcular la huella SHA-256 de cada uno de
+los 1,73 GB de la carpeta (`_calculate_checksum`, antes en `map_directory.py`). Recorrer las
+carpetas en sí es casi instantáneo. Y el resultado de tanto esfuerzo —el campo `checksum` de cada
+archivo— **no lo consume nadie**: 0 lecturas fuera del propio script.
+
+**Qué cambia en `Portear/src/map_directory.py`:**
+
+- **Se elimina `import hashlib`, la función `_calculate_checksum` y el campo `checksum`** de cada
+  archivo. Desaparece el cuello de botella completo.
+- **El recorrido pasa a un solo pase con `os.scandir`**: antes se abría cada directorio para
+  contarlo y después de nuevo para listar; ahora se lee una sola vez (`entries = list(scandir_it)`).
+- **`scan_date` deja de ser `null`** y sale con fecha y hora reales (`datetime.now().isoformat()`).
+- **Los errores de lectura ya no se tragan en silencio**: si un archivo no se puede leer, se lista
+  con `size: None` y se reporta.
+- **Semántica de atajos (symlink) conservada**: un atajo a una carpeta se lista como carpeta vacía
+  (igual que antes, sin descender), un atajo a un archivo se lista como archivo, y uno roto se omite.
+
+**Qué NO cambia todavía:** la forma de la respuesta sigue igual (`files[]`, `file_count`,
+`dir_count`, `errors` e indentado `indent=2` se van en la Fase 3) y no hay progreso visible
+(Fase 4). El pipeline de `main.js` no se toca.
+
+**Verificación:** `python -m py_compile Portear/src/map_directory.py` OK · test de Fase 0
+(`main/test-mapeo-estructura-863.js`) sigue **36/36** (los invariantes sobreviven) · test nuevo
+`main/test-mapeo-estructura-865.js` → **15/15 OK** (incluye corrida real contra fixture y
+búsqueda profunda de `checksum` en la salida) · **prueba de mordida**: los 6 checks de cambio
+aplicados al código viejo (HEAD) FALLAN y al nuevo PASAN, y las 3 guardias de preservación pasan
+en ambos · suite completa → **122 tests · 104 OK · 18 fallos preexistentes** (línea base + el
+test nuevo, 0 regresiones).
+
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase2`
+
+---
+
+## [0.1.243] - 2026-10-06
+
+### 📦864 · Fase 1 del mapeo de estructura: el escáner ya puede devolver su respuesta completa
+
+**Resumen:** segunda etapa del plan de 5 fases. **Sin cambios visibles todavía.** Con este paquete
+el mapeo deja de estar condenado a fallar: el programa que dispara la app puede recibir el
+resultado entero en vez de recibirlo cortado a la mitad.
+
+**El problema que motiva esta fase.** En la Fase 0 se dejó escrito el diagnóstico: el escáner
+tarda 760+ segundos y el resultado **no llega nunca**. La app lanza un programa externo
+(`map_directory.py`) y lee lo que éste escribe en su salida; Node, por defecto, corta esa salida
+en **1 MB**. El árbol de una carpeta de 1,73 GB sale en un JSON de ~2,98 MB, así que la mitad
+del resultado se descarta y la lectura revienta **después** de la hora y media de escaneo.
+
+**Qué cambia.** El mismo punto de código (`main.js:4311`, la llamada `execFilePromise`) ahora
+recibe dos límites explícitos:
+
+- **`maxBuffer: 64 * 1024 * 1024` (64 MB)** — el techo de la salida pasa de 1 MB a 64 MB, ~21
+  veces el peso actual del JSON. Deja de ser la causa del fallo.
+- **`timeout: 30 * 60 * 1000` (30 minutos)** — si el escáner se cuelga, la llamada se corta y
+  devuelve un error claro en lugar de dejar la promesa pendiente para siempre (hoy no había
+  ningún tope: un proceso colgado bloqueaba el handler indefinidamente).
+
+**Qué NO cambia:** ni el script, ni la forma de la respuesta, ni la UI. Sigue sin haber progreso
+visible (Fase 4) y el escáner sigue siendo lento (Fase 2). Este paquete solo quita el techo que
+hacía imposible que el esfuerzo se tradujera en resultado.
+
+**Verificación:** `node --check main.js` OK · test de contrato de la Fase 0
+(`main/test-mapeo-estructura-863.js`) **36/36 OK** · suite completa `node Temp/run-all-tests.js`
+→ **121 tests · 103 OK · 18 fallos preexistentes** (mismo balance que en HEAD limpio: 0
+regresiones).
+
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase1`
+
+---
+
+## [0.1.242] - 2026-10-06
+
+### 📦863 · Fase 0 del mapeo de estructura: el contrato queda escrito en una prueba
+
+**Resumen:** primer paquete del plan de 5 fases para que "Mapeando Estructura de Documentos"
+termine. **Sin cambios visibles todavía** — esta fase solo pone el punto de control antes de
+tocar el escáner.
+
+**El problema que motiva el plan.** El mapeo tarda **760+ segundos** y **nunca termina bien**:
+`map_directory.py` recorre 1,73 GB (Google Drive), calcula SHA-256 de cada archivo —que es ~99,6 %
+del tiempo— y arma un JSON de ~2,98 MB. Ese JSON sale por `stdout` y `execFile` corta en **1 MiB**,
+así que `JSON.parse(stdout)` (`main.js:4322`) reventaba **siempre**, después de los 760 s. O sea:
+hora y media de escaneo para un error de parseo.
+
+**Qué hace esta fase.** Crea `main/test-mapeo-estructura-863.js` (36 checks) que fija el contrato
+antes de optimizar:
+
+1. **Corrida real** de `map_directory.py` contra un fixture temporal (carpeta + `sub` + `sub/interior`),
+   parseando el stdout completo. Si la máquina no tiene Python, ese bloque se omite con un check
+   aclarado en vez de romper la corrida.
+2. **La forma del contrato**: `root` absoluto igual al directorio pedido, `structure.name`,
+   `structure.path` absoluto y `structure.subdirectories` como **objeto** (no array), con las
+   carpetas del fixture apareciendo como claves, incluida la anidada.
+3. **El pipeline**: handler `map-directory`, `execFilePromise(pythonPath, [pythonScriptPath,
+   directoryPath])`, `JSON.parse(stdout)`, `getPython()`, el llamado desde `config-viewer` y el
+   `mapDirectory` del preload.
+4. **Las dos consumidoras extraídas del código real y ejecutadas**: `searchInStructure` (main.js,
+   devuelve la ruta; testea código exacto "2.4.1" sin matchear "4.2.4.1") y
+   `formatStructureForLog` (renderer.js, tolera nodos sin `files`).
+
+**Lo que este test NO chequea, a propósito:** `checksum`/SHA-256 (Fase 2 lo elimina), `files[]` /
+`file_count` / indentado (Fase 3) y el formato de `scan_date` (Fase 2 pasa de `null` a fecha real).
+Chequearlos ahora sería destruir la prueba en la fase siguiente.
+
+**Plan aprobado de 5 fases:** Fase 0 contrato (este paquete) → Fase 1 `maxBuffer`/`timeout` en el
+`execFile` (📦864) → Fase 2 velocidad: sin SHA-256, `os.scandir`, un solo pase, `scan_date` real
+(📦865) → Fase 3 tamaño: sin `files[]`/indentado (📦866) → Fase 4 progreso real por stderr→IPC→UI
+(📦867). Fase 5 (backlog, 📦868).
+
+**Fix colateral (mismo anti-patrón que 📦849):** el bump del `?v=` rompió el check 5 de
+`test-hero-fila-840.js`, que tenía el token `20261006-admin-empresas-2` escrito a mano — un test
+que hay que editar en cada bump dejó de proteger nada. Ahora valida la **forma**
+(`/renderer\.js\?v=\d{8}-/`), no el valor, siguiendo la regla de 📦849.
+
+**Tests:** `node main/test-mapeo-estructura-863.js` → **36/36 OK** (incluye la corrida real con
+Python 3.14.8).
+**Suite completa:** 121 tests, 103 en verde, 18 fallos preexistentes, 0 regresiones.
+**Cache-bust:** `renderer.js?v=20261006-mapeo-fase0` en `index.html`.
+**Versión:** 0.1.241 → 0.1.242
+
+## [0.1.241] - 2026-10-06
+
+### 📦862 · Un administrador ya no queda encerrado en "contacta a administración"
+
+**Resumen:** si entrabas como administrador y no tenías ninguna empresa asignada, la app te
+decía **"No tienes empresas asignadas. Contacta a administración."** — el mensaje pensado para
+un usuario sin permisos, y además sin salida: no había forma de ver tus empresas.
+
+**Causa.** En `renderer.js`, `showHomePage` filtraba las empresas así:
+
+```js
+if (Array.isArray(overrideCompanies)) { ... }   // SIEMPRE true
+else if (assignedCompanies && ... && !checkIsAdmin()) { ... }
+else { /* ADMIN: todas, desde config */ }          // NUNCA se ejecutaba
+```
+
+`Array.isArray([])` es `true`, y `initializeApp()` se llama en un solo lugar (`renderer.js:3604`)
+pasando siempre `assignedCompanies`, que es un array. La primera rama ganaba **siempre**.
+
+Consecuencias, todas de la misma causa:
+
+- El admin sin empresas asignadas veía **cero** empresas y el mensaje de un usuario normal.
+- La rama del admin era **inalcanzable**, así que el fallback
+  `["Tempoactiva","Temposum","Aseplus","Asel"]` tampoco era código real.
+- `checkIsAdmin()` **nunca se consultaba**: su rama estaba detrás de código muerto.
+
+El backend sí estaba bien: `validateSession` (`main.js:1021`) reconoce `admin@kair.local` y
+devuelve `isAdmin: true`. El mensaje hacía creer que faltaban permisos.
+
+**Y había un segundo motivo, más profundo: `checkIsAdmin()` tampoco sabía quién era el admin.**
+Derivaba el rol **solo** de `currentUser.companies`, así que con `companies = []` —el caso del
+admin global, que por definición no tiene empresas asignadas— `[].some()` devolvía `false`. El
+backend ya mandaba `user.isAdmin` resuelto (`main.js:1628`) y el renderer lo ignoraba. Arreglar
+solo el orden de las ramas no bastaba: `esAdmin` seguía dando `false` y el mensaje seguía siendo
+el equivocado. Es lo que pasó en la primera vuelta: el mensaje siguió apareciendo después del fix.
+
+Ahora `checkIsAdmin()` respeta `currentUser.isAdmin` primero, y solo recalcula por `companies`
+cuando el backend no resolvió el caso global.
+
+**Y el admin quedaba además sin salida.** El Inicio oculta el sidebar siempre
+(`sidebar-hidden`), así que con cero empresas registradas no había forma de llegar a la
+configuración. Con el mensaje correcto y sin empresas, el admin seguía sin poder hacer nada. Se
+agrega un botón "Ir a Configuración" cuando es admin y la lista está vacía.
+
+**La trampa del arreglo obvio.** Agregar `&& overrideCompanies.length > 0` a la primera rama
+**abría una escalada de privilegios**: un usuario no-admin sin empresas caería en el `else`, que
+carga `config.companyPaths` completo, y vería **todas** las empresas.
+
+**El arreglo** es decidir por rol primero, no por la forma del argumento:
+
+```js
+const esAdmin = checkIsAdmin();
+if (esAdmin) { /* todas, desde config */ }
+else if (Array.isArray(overrideCompanies) && overrideCompanies.length > 0) { /* override */ }
+else { /* assignedCompanies */ }
+```
+
+Y el mensaje también pasa a decidir por rol: un administrador **nunca** debe ver la frase que lo
+remite a sí mismo.
+
+**Tests:** `main/test-admin-empresas-862.js`, 17 checks. Ejecuta `checkIsAdmin()` y el bloque de decisión de
+`renderer.js` y lo **ejecuta** con roles distintos en vez de buscar cadenas. Cubren los cinco
+combinarios de (admin, asignadas, override) y los dos del mensaje. Con el bug reintroducido sobre
+el código nuevo, fallan los dos checks de comportamiento — un detector de cadenas pasaría.
+
+**Cache-bust:** `renderer.js?v=20261006-admin-empresas-2` en `index.html`. Dos veces, porque la app
+ya había descargado el primer token: **un token repetido no sirve para nada** (§5.3).
+**Versión:** 0.1.240 → 0.1.241
 ## [0.1.240] - 2026-10-05
 
 ### 📦861 · El explorador de archivos deja de mentir cuando algo falla

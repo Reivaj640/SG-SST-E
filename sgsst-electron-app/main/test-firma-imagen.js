@@ -192,13 +192,18 @@ check('JS: muestra placeholder mientras carga la imagen',
 const dbSrc = fs.readFileSync(path.join(__dirname, '..', 'main', 'email-db.js'), 'utf8');
 check('unread: saveMessage YA NO fuerza has_unread = 1',
   !/SET has_unread = 1 WHERE id = \?/.test(dbSrc));
-check('unread: existe recomputeThreadUnread()', /function recomputeThreadUnread\(threadId\)/.test(dbSrc));
+// 📦874 — La firma lleva connection_id porque el recálculo de no-leídos se acotó a la
+// cuenta conectada: marcar un hilo como leído no puede tocar los mensajes de otra.
+check('unread: existe recomputeThreadUnread() acotado por cuenta',
+  /function recomputeThreadUnread\(threadId, connectionId\)/.test(dbSrc));
 check('unread: recalcula desde el label UNREAD de los mensajes',
   /label_ids LIKE '%"UNREAD"%'/.test(dbSrc));
 check('unread: ignora los mensajes enviados y los borradores',
   /is_sent = 0[\s\S]{0,80}is_draft = 0/.test(dbSrc));
-check('unread: se recalcula DESPUÉS de guardar el mensaje',
-  /const result = stmt\.run\(\{[\s\S]*?\}\);\s*\n\s*\/\/ Recalcular[\s\S]{0,160}recomputeThreadUnread\(msg\.thread_id\)/.test(dbSrc));
+check('unread: el recálculo NO cuenta mensajes de otra cuenta',
+  /WHERE thread_id = \?\s*\n\s*AND connection_id = \?/.test(dbSrc));
+check('unread: se recalcula DESPUÉS de guardar el mensaje, con su cuenta',
+  /const result = stmt\.run\(\{[\s\S]*?\}\);\s*\n\s*\/\/ Recalcular[\s\S]{0,200}recomputeThreadUnread\(msg\.thread_id, msg\.connection_id\)/.test(dbSrc));
 check('unread: el recálculo está exportado', /recomputeThreadUnread,/.test(dbSrc));
 
 // ── 12. Respuesta rápida: el botón "Enviar" debe ENVIAR (📦753-fix3) ─────

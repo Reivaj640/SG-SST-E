@@ -6,7 +6,7 @@
 // Esperado: 50+ OK · 0 FAIL
 
 const initSqlJs = require('sql.js');
-const { SCHEMA_SQL } = require('./gestion-humana-schema-sql');
+const { SCHEMA_SQL, MIGRATIONS_SQL } = require('./gestion-humana-schema-sql');
 const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 
 let _passed = 0;
@@ -70,6 +70,12 @@ async function run() {
   const SQL = await initSqlJs();
   const rawDb = new SQL.Database();
   rawDb.exec(SCHEMA_SQL);
+  // 🔴 La base se armaba SOLO con SCHEMA_SQL, pero las tablas y columnas nuevas viven en
+  // MIGRATIONS_SQL (§6.2). Mismo patrón que main.js:592-608: statement por statement, con
+  // try/catch porque "duplicate column name" al re-ejecutar es esperado.
+  (Array.isArray(MIGRATIONS_SQL) ? MIGRATIONS_SQL : []).forEach(function (stmt) {
+    try { rawDb.exec(stmt); } catch (migErr) { /* duplicate column = ya existe */ }
+  });
   rawDb.exec("CREATE TABLE IF NOT EXISTS companies (id TEXT PRIMARY KEY, company_key TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL);");
   rawDb.run("INSERT INTO companies (id, company_key, display_name) VALUES (?, ?, ?)",
     ['co-tempoactiva', 'tempoactiva', 'TEMPOACTIVA EST S.A.S.']);
@@ -272,7 +278,16 @@ async function run() {
   _assertEq(r11Check.data.contratacion.memoRecibido, 1, 'memo_recibido = 1');
   _assertEq(r11Check.data.contratacion.memoFecha, '2026-08-20T10:00:00.000Z', 'memo_fecha correcta');
   _assertEq(r11Check.data.contratacion.memoNotas, 'Memo recibido de RRHH', 'memo_notas correcto');
-  _assertEq(r11Check.data.contratacion.pasoActual, 1, 'pasoActual = 1');
+  // 🔴 Antes esperaba 1. Mismo cambio de semántica que el check de más abajo (TEST 12), y por
+  // la misma razón: el fix de 📦FIX-paso-actual (gestion-humana-bridge.js:863) recalcula
+  // paso_actual al PRIMER paso NO completado. Al terminar el memo (paso 1), el primer pendiente
+  // es el 2, así que 2 es lo correcto. El "1" de este renglón era el residuo del mismo error
+  // conceptual que el check de TEST 12, que ya se había corregido.
+  //
+  // OJO con el check de ARRIBA (`r11.data.pasoActual`): ese NO está mal. Ese lee lo que
+  // devuelve `marcar-paso`, que reporta el paso que el usuario acaba de marcar (pasoInt), no el
+  // recalculado. Son dos cosas distintas: la respuesta del handler y lo que queda en la BD.
+  _assertEq(r11Check.data.contratacion.pasoActual, 2, 'pasoActual = 2 = primer pendiente tras cerrar el memo');
   _assertEq(r11Check.data.contratacion.estado, 'en_proceso', 'estado = en_proceso');
 
   // ========== TEST 12: marcar-paso — pasos 2, 3, 4, 5 secuenciales ==========
@@ -291,7 +306,11 @@ async function run() {
   });
   // Verificar todos quedaron en 1
   var r12Check = registeredHandlers['gh:get-contratacion']({}, { token: 'valid-token', contratacionId: ctId2 });
-  _assertEq(r12Check.data.contratacion.pasoActual, 5, 'pasoActual = 5 después de 5 pasos');
+  // 🔴 Antes esperaba 5. El fix de 📦FIX-paso-actual (gestion-humana-bridge.js:863) cambió la
+  // semántica: paso_actual ya no es "el último completado" sino "el PRIMER PENDIENTE (o 6 si
+  // todos están completos)". Con los pasos 1-5 hechos y el 6 pendiente, 6 es lo correcto — y lo
+  // dice el propio check de al lado ("aún no llega a paso 6").
+  _assertEq(r12Check.data.contratacion.pasoActual, 6, 'pasoActual = 6 = primer paso pendiente (no el último hecho)');
   _assertEq(r12Check.data.contratacion.estado, 'en_proceso', 'estado = en_proceso (aún no llega a paso 6)');
   _assertEq(r12Check.data.contratacion.contactoRealizado, 1, 'contacto_realizado = 1');
   _assertEq(r12Check.data.contratacion.examenesProgramados, 1, 'examenes_programados = 1');

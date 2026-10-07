@@ -470,7 +470,7 @@ async function syncInbox(options) {
         var dMs = dRaw ? new Date(dRaw).getTime() : NaN;
         if (!isNaN(dMs) && (cutoff === null || dMs < cutoff)) cutoff = dMs;
       }
-      var currentThreads = emailDb.getThreadsFromCache({ folder: folder, maxResults: 5000 });
+      var currentThreads = emailDb.getThreadsFromCache({ folder: folder, maxResults: 5000, connectionId: userEmail });
       var orphanIds = [];
       for (var ci = 0; ci < currentThreads.length; ci++) {
         var cthread = currentThreads[ci];
@@ -493,7 +493,7 @@ async function syncInbox(options) {
   // 8. 📦755 — Guardar el estado de paginación de esta carpeta: el token de la
   // página siguiente (lo usa "cargar más correos") y cuántos threads se trajeron.
   try {
-    var prevState = emailDb.getSyncState(folder);
+    var prevState = emailDb.getSyncState(folder, userEmail);
     emailDb.saveSyncState({
       folder: folder,
       connectionId: userEmail,

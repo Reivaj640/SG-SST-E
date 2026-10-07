@@ -6,7 +6,7 @@
 // Esperado: 60+ OK · 0 FAIL
 
 const initSqlJs = require('sql.js');
-const { SCHEMA_SQL } = require('./gestion-humana-schema-sql');
+const { SCHEMA_SQL, MIGRATIONS_SQL } = require('./gestion-humana-schema-sql');
 const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 
 let _passed = 0;
@@ -70,6 +70,15 @@ async function run() {
   const SQL = await initSqlJs();
   const rawDb = new SQL.Database();
   rawDb.exec(SCHEMA_SQL);
+  // 🔴 Esta base se armaba SOLO con SCHEMA_SQL. Pero las tablas y columnas nuevas viven en
+  // MIGRATIONS_SQL (PROMPT.md §6.2: no hay esquema central de migraciones; cada módulo exporta
+  // las suyas y main.js las aplica al abrir la BD). Por eso el test se comía
+  // "no such table: gh_eventos_personal" — la tabla existe en la BD real, verificada; no
+  // existía en la base del test. Mismo patrón que main.js:494-508, statement por statement y
+  // con try/catch, porque "duplicate column name" al re-ejecutar es esperado.
+  (Array.isArray(MIGRATIONS_SQL) ? MIGRATIONS_SQL : []).forEach(function (stmt) {
+    try { rawDb.exec(stmt); } catch (migErr) { /* duplicate column = ya existe */ }
+  });
   rawDb.exec("CREATE TABLE IF NOT EXISTS companies (id TEXT PRIMARY KEY, company_key TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL);");
   rawDb.run("INSERT INTO companies (id, company_key, display_name) VALUES (?, ?, ?)",
     ['co-tempoactiva', 'tempoactiva', 'TEMPOACTIVA EST S.A.S.']);
@@ -183,12 +192,40 @@ async function run() {
   });
   _assert(r6.success === false, 'update sin campos válidos → INVALID_INPUT');
 
-  // ========== TEST 7: delete-personal caso OK (retirar) ==========
+  // ========== TEST 7: delete-personal — arquitectura Activo → Retirado → [Ocultar] (📦767) ==========
+  // 🔴 Este test estaba escrito contra una versión ANTERIOR del handler, en la que
+  // delete-personal podía ocultarse un bp activo, lo dejaba en 'retirado' y devolvía
+  // `retired: true`. El contrato de hoy (gestion-humana-bridge.js:1171-1176) es otro:
+  //
+  //   "Regla arquitectónica: Activo → Retirado → [Ocultar]."
+  //   solo se puede ocultar un bp YA RETIRADO; un activo se rechaza con BP_NOT_RETIRED.
+  //   Soft delete PURO: solo pone activo=0, PRESERVA estado y fecha_retiro.
+  //   Devuelve { personalId, activo, estado, fechaRetiro } — no existe ningún `retired`.
+  //
+  // El test fallaba en `delete OK` (no en `retired`) porque venía un _err sin `data`, y al
+  // leer `r7.data.retired` reventaba con TypeError. No era un defecto de la app.
   console.log('');
-  console.log('[7] delete-personal — soft delete');
+  console.log('[7] delete-personal — solo oculta un bp YA retirado (📦767)');
+
+  // 7a. La regla que vale la pena proteger: un bp ACTIVO no se puede ocultar.
+  var r7a = registeredHandlers['gh:delete-personal']({}, { token: 'valid-token', personalId: bpId1 });
+  _assert(r7a.success === false, 'un bp activo NO se puede ocultar');
+  _assertEq(r7a.error.code, 'BP_NOT_RETIRED', 'rechazo con BP_NOT_RETIRED');
+  var r7aCheck = registeredHandlers['gh:get-personal']({}, { token: 'valid-token', personalId: bpId1 });
+  _assertEq(r7aCheck.data.personal.activo, 1, 'el bp activo sigue activo: el rechazo no tocó nada');
+
+  // 7b. Primero el ciclo laboral: gh:cambiar-estado lo pasa a 'retirado'.
+  var r7b = registeredHandlers['gh:cambiar-estado']({}, {
+    token: 'valid-token', personalId: bpId1, estado: 'retirado'
+  });
+  _assert(r7b.success === true, 'cambiar-estado a retirado OK');
+
+  // 7c. Recién ahí se oculta. Y el soft delete es PURO: no cambia estado ni fecha_retiro.
   var r7 = registeredHandlers['gh:delete-personal']({}, { token: 'valid-token', personalId: bpId1 });
   _assert(r7.success === true, 'delete OK');
-  _assertEq(r7.data.retired, true, 'retired = true');
+  _assertEq(r7.data.activo, 0, 'data.activo = 0 (no hay campo data.retired: el contrato no lo tiene)');
+  _assertEq(r7.data.estado, 'retirado', 'data.estado preservado');
+  _assertEq(r7.data.personalId, bpId1, 'data.personalId = bpId1');
   var r7Check = registeredHandlers['gh:get-personal']({}, { token: 'valid-token', personalId: bpId1 });
   _assertEq(r7Check.data.personal.activo, 0, 'activo = 0');
   _assertEq(r7Check.data.personal.estado, 'retirado', 'estado = retirado');
@@ -201,7 +238,11 @@ async function run() {
   console.log('[8] delete-personal — ya retirado');
   var r8 = registeredHandlers['gh:delete-personal']({}, { token: 'valid-token', personalId: bpId1 });
   _assert(r8.success === false, 'delete de retirado → success=false');
-  _assertEq(r8.error.code, 'ALREADY_DELETED', 'error.code = ALREADY_DELETED');
+  // 🔴 esperaba 'ALREADY_DELETED' pero delete-personal devuelve 'BP_DELETED' (L1193). No es un
+  // renombre arbitrario: ALREADY_DELETED es el código de otras entidades del módulo
+  // (contrataciones L768/821, vacación L1782); para bp ya ocultado el bridge usa BP_DELETED,
+  // igual que L1268. El test nunca coincidió con este handler.
+  _assertEq(r8.error.code, 'BP_DELETED', 'error.code = BP_DELETED');
 
   // ========== TEST 9: delete-personal — id inexistente ==========
   console.log('');

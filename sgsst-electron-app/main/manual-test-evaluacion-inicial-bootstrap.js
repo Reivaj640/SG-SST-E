@@ -1,3 +1,7 @@
+// RENOMBRADO desde test-manual-test-evaluacion-inicial-bootstrap.js el 2026-10-06: este archivo usa electron.app y ademas mide geometria contra una ventana real, que no existe
+// bajo ELECTRON_RUN_AS_NODE=1. El runner lo descubria igual (/^test-.*\.js$/) y lo contaba
+// como fallo todos los dias. No es un test roto: es un test que no puede correr en la suite.
+// Correrlo a mano con la app viva: npx electron main/manual-test-evaluacion-inicial-bootstrap.js
 /* ============================================================
  * K+AIR · Test — Evaluación Inicial: choque con Bootstrap (📦761)
  * ============================================================
@@ -14,7 +18,7 @@
  * `index.html`) y **mide la geometría de verdad** en una ventana de Electron.
  *
  * Correr:
- *   npx electron main/test-evaluacion-inicial-bootstrap.js
+ *   npx electron main/manual-test-evaluacion-inicial-bootstrap.js
  * Si falta la copia local de Bootstrap:
  *   npx electron main/_bajar-bootstrap.js     (una sola vez)
  * ============================================================ */

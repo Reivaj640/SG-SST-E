@@ -143,10 +143,34 @@ check('MNT: el override apunta a los 3 contenedores que reciben el esqueleto',
   (mntOverride.length > 0) || /#kair-mnt-resumen-content \.ks-kpi-strip/.test(mantCss));
 
 // ── 5. Cache-bust ────────────────────────────────────────────────
+// 🔴 Los dos checks de abajo estaban anclados al LITERAL `20260918-skeleton-encaje`, y por
+// eso el primero quedó MUERTO: el token de `styles.css` ya es `20261005-login-card-260`,
+// así que ningún token vigente podía satisfacerlo y el test era inejecutable, no verde.
+// La pregunta real es "¿tiene token?", no "¿es este token?". Mismo patrón y misma razón que
+// ya usa `test-config-premium-v2.js:72`.
 check('Cache-bust: styles.css con ?v= nuevo',
-  /styles\.css\?v=20260918-skeleton-encaje/.test(html));
+  /styles\.css\?v=\d{8}-/.test(html));
 check('Cache-bust: kair-skeleton.js ahora TIENE ?v= (antes se cargaba sin versión)',
-  /kair-skeleton\.js\?v=20260918-skeleton-encaje/.test(html));
+  /kair-skeleton\.js\?v=\d{8}-/.test(html));
+
+// ── 5b. Prueba de mordida ────────────────────────────────────────
+// Un check de cache-bust que nadie sabe si muerde es decorativo. Se muta el `index.html`
+// en memoria y se exige que los checks de arriba fallen. Guard de §7.2: mutante vacío a
+//parte, y polaridad correcta — se marca el fallo cuando la forma buena DEJÓ de estar.
+const norm = s => s.replace(/\r\n/g, '\n');
+const htmlLF = norm(html);
+const MUT = [
+  ['se saca el ?v= de styles.css', h => h.replace(/(styles\.css)\?v=[\w-]+/, '$1')],
+  ['se saca el ?v= de kair-skeleton.js', h => h.replace(/(kair-skeleton\.js)\?v=[\w-]+/, '$1')],
+  ['el token se queda sin la forma de fecha', h => h.replace(/(styles\.css)\?v=[\w-]+/, '$1?v=stale')],
+];
+const faltaStyles = h => !/styles\.css\?v=\d{8}-/.test(h);
+const faltaSkeleton = h => !/kair-skeleton\.js\?v=\d{8}-/.test(h);
+MUT.forEach(m => {
+  const mut = norm(m[1](htmlLF));
+  if (mut === htmlLF) { check('MORDE: ' + m[0], false); return; }
+  check('MORDE: ' + m[0], faltaStyles(mut) || faltaSkeleton(mut));
+});
 
 // ── Reporte ──────────────────────────────────────────────────────
 let failed = 0;

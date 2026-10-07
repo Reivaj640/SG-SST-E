@@ -47,7 +47,7 @@ Cumplimiento SG-SST en un solo lugar: todos los módulos del sistema de gestión
 
 - `sgsst-electron-app/AGENTS.md` (~4.800 líneas): convenciones del repo, historia por lotes `📦n`, reglas sagradas de trabajo. **Es 89 % bitácora de bugs**: para reglas de proceso leer las secciones de proceso, no la cronología.
 - `sgsst-electron-app/design_system.md`: sistema visual (tokens, componentes, trampas de CSS). `PROMPT.md` (raíz del repo): índice y reglas de proceso.
-- Suites de regresión en `sgsst-electron-app/main/test-*.js`, scripts sueltos de node/Electron sin framework. El runner `Temp/run-all-tests.js` descubre **111** por regex de nombre; la carpeta `tests/` tiene 30 más que **el runner no ve**. Hoy: 93 en verde, 18 fallos preexistentes documentados en prosa (no hay lista en código).
+- Suites de regresión en `sgsst-electron-app/main/test-*.js`, scripts sueltos de node/Electron sin framework. El runner `tools/run-all-tests.js` descubre **123** por regex de nombre; la carpeta `tests/` tiene 30 más que **el runner no ve**. Hoy (2026-10-07): **122 en verde, 1 con fallos, 1 sin resumen verificable** — el único rojo es `test-firma-constancia-consolidada.js`, que **depende del entorno** (`INTERNAL_API_KEY` del `firma-service`). Este documento antes decía "3 con fallos, todos de entorno" y **era falso**: dos de esos tres eran tests desactualizados, ya corregidos. Detalle en `PROMPT.md` §7.4.
 - Módulos de la app por número normativo (1.x a 7.x) registrados en `ALL_SUBMODULES` (`renderer.js`).
 - Ausencias que no deben inventarse: no hay testimonios, clientes, benchmarks ni precios. **Sí hay README, CHANGELOG, CONTEXT, release-notes, PRD y design_system**; en versiones anteriores de este documento se afirmó que no existían y estaba mal.
 

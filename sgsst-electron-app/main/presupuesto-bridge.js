@@ -1180,7 +1180,10 @@ function _handlerBulkSave(token, presupuestoId, data) {
     // handler borraba TODAS las partidas y las reinsertaba con `ejecutado = 0`
     // hardcodeado. Cada guardado de la UI ponía la ejecución real en cero —
     // por eso las 168 filas de la base de Tempoactiva están todas en 0, siendo
-    // que el Excel de origen declara 33.694.321,66 ejecutados.
+    // que el Excel de origen declara una ejecución de más de veinte millones.
+    // (La cifra exacta se reporta en el aviso de import; no se escribe acá
+    // porque el Excel lo edita el cliente y ese número ya quedó viejo dos
+    // veces. Ver PROMPT.md 7.5.)
     //
     // La UI nunca manda el ejecutado (viene de una tabla read-only), así que no
     // puede venir en `row`. La solución NO es confiar en la UI: es leer el valor
@@ -1464,7 +1467,7 @@ function _redondearMoneda(n) {
  * - "$1,234.56" → 1234.56
  * - "" o "-" → 0
  * - null/undefined → 0
- * - número → 그대로
+ * - número → se devuelve tal cual
  */
 function _toNumericValue(value) {
   if (value === null || value === undefined) return 0;
@@ -1664,9 +1667,17 @@ function _parsePresupuestoXLSX(filePath) {
 
   // 📦824 — Validación cruzada: el TOTAL AÑO declarado vs la suma real.
   //
-  // El Excel 2026 de Tempoactiva falla en LAS DOS columnas de esa fila:
-  //   - asignado: declara 55.638.568 cuando las 14 partidas suman 27.819.284 (×2)
-  //   - ejecutado: declara 33.694.321,66 cuando las partidas ejecutan 19.696.874,33 (×1,71)
+  // El Excel 2026 de Tempoactiva falla en LAS DOS columnas de esa fila: declara casi el doble
+  // de lo que realmente suman sus partidas (hoy ×2 en asignado y ×1,96 en ejecutado).
+  //
+  // 🐛2026-10-07 — Este comentario antes citaba las cifras exactas (55.638.568 vs 27.819.284,
+  // 33.694.321,66 vs 19.696.874,33). Se SACARON a propósito: el Excel lo edita el cliente, y
+  // cuando le agregaron septiembre a la fila de honorarios esos numeros quedaron viejos y
+  // este comentario paso a describir una realidad que ya no existia — sin que nadie se
+  // enterara. Es el mismo error que fazia fallar los tests, documentado en PROMPT.md 7.5:
+  // no se citan cifras de un archivo que el usuario edita. El factor exacto se reporta en
+  // runtime, en el aviso de import, que sale de los numeros del momento.
+  //
   // Las 3 filas con ejecución sí cuadran internamente (la suma de sus 12 meses
   // da exactamente su acumulado), así que el error está en la fila de resumen,
   // no en el detalle.

@@ -4876,7 +4876,9 @@ function registerGestionHumanaHandlers(app, deps) {
       has_getDb: !!_getDb,
       has_validateSession: !!_validateSession,
       tables: tables,
-      message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · 10 tablas) · LEGACY-SIGN-REMOVE 2026-08-20'
+      // 🔴 El mensaje decía "10 tablas" con 11 en la lista: un string que miente sobre su propio
+      // conteo se desactualiza solo en cada migración. Se deriva del array, no se escribe a mano.
+      message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · ' + tables.length + ' tablas) · LEGACY-SIGN-REMOVE 2026-08-20'
     });
   });
 

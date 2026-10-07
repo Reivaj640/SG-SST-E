@@ -22,19 +22,162 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-05 |
-| **Rama de trabajo** | `Dev-Pc` · la de desarrollo diario |
-| **Rama por defecto de GitHub** | `Dev` · **ya sincronizada**: recibió los 567 commits de `Dev-Pc` el 2026-10-05 (`e6a98d98`) |
-| **Último commit de trabajo** | `Dev-Pc` → `6a81c163` · 📦861 · el explorador de archivos deja de mentir cuando algo falla |
-| **Commits sin pushear** | 0 — el owner autorizó commit, push y sincronización de ramas el 2026-10-05 |
-| **Estado de las ramas** | Las 4 ramas locales con remoto. Las 2 que solo existían en esta máquina (`backup-numeracion-2026-09-05` e `i-e2e-7-pdf-failure-paths`) **ya están publicadas en GitHub** |
-| **Respaldo del merge** | tag `respaldo-dev-antes-merge-861` → `13dfeeff`, el estado previo de `Dev`. Para volver: `git reset --hard respaldo-dev-antes-merge-861` |
-| **Versión** | `0.1.240` (desarrollo) · último publicado `v0.1.205` |
-| **Suite** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 los **reportó el owner con captura** (el botón verde y el PDF abriendose en el visor del navegador fueron los síntomas que reportó) — **ya están corregidos y pusheados, falta que el owner los vuelva a mirar**. 📦858 **nunca se ha mirado**. 📦857, 📦856, 📦855, 📦853/854 y 📦850/851 **tampoco** |
-| **Jornada** | Cerrada el 2026-10-05. Paquetes: 📦861 y 📦860. Al final se sincronizaron las 4 ramas |
+| **Fecha de cierre** | 2026-10-07 |
+| **Rama** | `Dev` (el remoto por defecto es `Dev`) |
+| **Último commit de código** | 📦 **875** (`72c2deb9`): la contraseña recordada deja de estar en claro en `localStorage` y pasa a cifrarse con `safeStorage` en `auth-credentials.enc`. En la misma tanda, dos tests de firma corregidos **invirtiendo el check** (no tocando el código de producto), `Update-EnvPublicUrl` borrada y 3 CJK fuera. Detrás, `617190ea` (📦873 + 874), `4845756b` (📦872 + 📦871), `b3d8abab` y `2d43b94e` (tests), `dc9123ad` (📦870), `95d42d8c` (📦869), `3514af7f` (📦868) y `df4fd9a7`. **No hay trabajo sin commitear.** El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` en `72c2deb9`. `gh-pages` también está pusheado (`f142118c`, con `--force`), como es una copia generada de `sitio/` |
+| **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **se dejó quieta** (2 commits atrás; su único commit propio, `2d5cbb3d` 📦861, es solo `docs` ya reescrito en `Dev`). `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página |
+| **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
+| **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
+| **Suite (escritorio)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** 🔴 **Corrección importante**: hasta hace poco decía "3 con fallos, todos de entorno" y **eso estaba mal**. Al verificarlos uno por uno, solo **uno** es de entorno: `test-firma-constancia-consolidada.js` [83/83], cuyos 83 chequeos estáticos pasan y solo muere el bloque runtime por `INTERNAL_API_KEY` (necesita el `firma-service` del PC viejo). Los otros dos eran **tests desactualizados**, no fallos de entorno: `test-firma-bridge.js` exigía un `contentType` que el handler quitó a propósito al pasar a escribir el PDF en disco, y `test-firma-tunnel-kit.js` exigía el `cloudflared tunnel --url` de los quick tunnels que ya no se usan. Los dos se corrigieron **invirtiendo el check** (nunca tocando el código de producto) y ambos muerden, probado con mutación |
+| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
+| **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
+| **Validaciones visuales** | ✅ **Todo cerrado.** 📦860, 📦861 y 📦868 aprobados por el owner de punta a punta. 📦867 **validado por el owner** (era el punto 3 de la cola: "nunca se abrió en la app" — ya no aplica). **El ancho de la tarjeta de ingreso** (📦869) **también validado por el owner**. Los cuatro están probados por una persona, no por un test |
+| **Jornada** | **En curso** (2026-10-07). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. **De esta sesión quedan commiteadas y pusheadas en este commit** las tres de hoy más este: `4845756b` (📦872 + 📦871), `2d43b94e` y `b3d8abab` (tests), más 📦874 (aislamiento de cuentas Gmail) y 📦873 (gate de consentimiento legal), con sus tests y la documentación al día. Versión `0.1.251` |
+
+
+### 🛠️ Pendientes abiertos (al 2026-10-07, cierre 17:45)
+
+1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` compara
+   contra `app.getVersion()`, así que **cada bump de versión le repite el consentimiento a todos**,
+   aunque el texto legal no haya cambiado. Y al revés: editar la política **no** vuelve a preguntar,
+   porque `version_terminos` y `version_privacidad` se guardan pero **nadie los vuelve a leer** (solo
+   aparecen en el CREATE y en el INSERT). `config.consentDocumentVersion` se lee en dos lugares y
+   **nadie lo escribe**, así que siempre vale `'v1'`. El `texto_hash` tampoco protege nada: no se
+   compara contra nada. *Evidencia viva: el 2026-10-07 se aceptó dos veces con el mismo
+   `texto_hash` (`8bf9b25d43a1`), solo porque entre una y otra hubo un bump de versión.*
+
+2. **🔴 El consentimiento es por EQUIPO, no por persona.** La consulta es
+   `SELECT ... ORDER BY aceptado_en DESC LIMIT 1` **sin `WHERE email = ?`**: toma la aceptación más
+   reciente de quien sea. En un equipo compartido el primero que acepta silencia el gate para los
+   demás. Y hay un problema de fondo que **no se arregla con código**: quien marca las casillas es el
+   admin del SG-SST, y los datos que se registran son de sus subordinados, que nunca ven esa pantalla.
+   El registro prueba que *alguien* aceptó, no que lo aceptó el titular. **Esto necesita asesoría
+   jurídica**, no un parche.
+
+3. **🔴 Faltan los Términos y Condiciones de USO.** Hoy solo existe la política de privacidad.
+   Lo que falta: (a) condiciones de uso, (b) política de tratamiento de datos y límites de uso, con
+   **nombre del responsable del tratamiento** (hoy no se declara ninguno), (c) la base legal real,
+   que para seguimiento de incapacidades es **obligación legal** (Decreto 1072 / Res 0312), NO
+   consentimiento, y (d) la cláusula de alcance: K+AIR provee la herramienta, el responsable de que
+   la configuración cumpla la norma es la empresa. **Redacción jurídica: es trabajo del asesor.**
+
+4. **🟡 El gate pide autorización de "datos sensibles de salud" y el módulo sí los guarda.** La tabla
+   `seguimiento_incapacidad_caso` tiene CIE-10 (`codigo_cie10`, `cie10_dx2/3`), porcentajes de PCL,
+   resultados de examen médico y dictámenes medicolegales, junto con identificación completa del
+   trabajador. **Hoy tiene 0 filas**, pero el esquema dice lo que hará. Definir con el asesor si el
+   consentimiento es el instrumento correcto o si debe ser aviso de privacidad.
+
+5. **🟡 Validación visual del gate por CDP.** Se validó por evidencia en disco (creó
+   `auth-credentials.enc` cifrado de verdad, y el gate no reapareció porque correspondía), pero **no
+   quedaron capturas** del overlay ni del chequeo de Escape. El driver quedó en
+   `%TEMP%\validar-consent-cdp.js` y `playwright-core` ya se desinstaló.
+
+6. **🟡 `test-firma-constancia-consolidada.js`** — el único test que queda en rojo: 83/83 estáticos
+   verdes, solo el bloque runtime pide `INTERNAL_API_KEY`. Se resuelve prendiendo el PC viejo.
+
+7. **🟢 `Update-EnvPublicUrl`** ya se borró (código muerto tras el túnel con URL fija). Los checks
+   que dependían de él se invirtieron. Los 3 CJK de `firma-service/tests/logger.test.js` y
+   `tests/notificaciones-toast-e2e.js` también están fuera.
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
+
+0. **✅ TERMINADO: plan de 5 fases para que "Mapeando Estructura de Documentos" termine**
+   (760+ s por corrida y fallaba siempre: el SHA-256 sobre 1,73 GB era ≈99,6 % del tiempo, y el
+   JSON de ~2,98 MB se pasaba del tope de 1 MiB del `stdout` de `execFile`, así que `JSON.parse`
+   reventaba al final). **Commiteado en `33d40d90` y pusheado.** Detalle completo en `AGENTS.md`,
+   sección "Mapeando Estructura de Documentos".
+   - ✅ **Fase 0 (📦863) HECHA**: `main/test-mapeo-estructura-863.js`
+     (36/36, corrida real de Python + fallback), docs §5.8 actualizados, versión 0.1.242,
+     `renderer.js?v=20261006-mapeo-fase0`.
+   - ✅ **Fase 1 (📦864) HECHA**: `main.js:4311` con
+     `maxBuffer: 64 MB` + `timeout: 30 min` en `execFilePromise`; `node --check` OK,
+     test de Fase 0 **36/36**, suite **121 · 103 verdes · 18 preexistentes (0 regresiones)**,
+     docs §5.8 actualizados, versión 0.1.243, `renderer.js?v=20261006-mapeo-fase1`.
+   - ✅ **Fase 2 (📦865) HECHA**: `Portear/src/map_directory.py`
+     sin `hashlib`/`_calculate_checksum`/`checksum`, recorrido con `os.scandir` en un solo pase,
+     `scan_date` real, errores reportados, semántica de symlink conservada; `py_compile` OK,
+     test de Fase 0 **36/36**, test nuevo `main/test-mapeo-estructura-865.js` **15/15** con
+     prueba de mordida (los 6 checks de cambio fallan contra el código viejo), suite
+     **122 · 104 verdes · 18 preexistentes (0 regresiones)**, docs §5.8 actualizados,
+     versión 0.1.244, `renderer.js?v=20261006-mapeo-fase2`.
+   - ✅ **Fase 3 (📦866) HECHA**: `Portear/src/map_directory.py`
+     sin `files[]`, sin `file_count`/`dir_count`, sin `indent=2` y con los errores de lectura
+     saliendo por `file=sys.stderr` (el stdout queda **solo** JSON); los totales `total_files`/
+     `total_folders` **se conservan** porque los consumen `renderer.js:7158/7160` y
+     `main.js:4337/4338` (ahora se llenan con el contador global `_contador`); `py_compile` OK,
+     tests **863 36/36 + 865 15/15 + 866 20/20**; medición con fixture de 2000 archivos:
+     **934.437 bytes / 19.219 líneas / 2.941 ms → 20.877 bytes / 1 línea / 162 ms (−97,8 %)**;
+     suite **123 · 105 verdes · 18 preexistentes (0 regresiones)**, docs §5.8 actualizados,
+     versión 0.1.245, `renderer.js?v=20261006-mapeo-fase3`.
+    - ✅ **Fase 4 (📦867) HECHA**: progreso real de punta a punta.
+      `Portear/src/map_directory.py` suma `_avisar_progreso()` (stderr, amortiguado a 250 ms con
+      `time.monotonic()`, forzado al arrancar y al cerrar); `main.js` envuelve `execFilePromise`
+      para que cuelgue `.child` (la de `promisify` no expone el proceso), engancha `child.stderr`
+      y reenvía `mapeo-progreso` con guard de `isDestroyed()`; `preload.js` expone
+      `onMapDirectoryProgress(cb)` con su baja; `config-viewer.html` pinta el contador real,
+      suelta el listener en los **tres** caminos de salida y desaparece el "10-60 segundos"
+      (`:3128`). `py_compile` + `node --check` OK, test nuevo
+      `main/test-mapeo-estructura-867.js` **44/44** con **11 mutaciones que muerden**, tests
+      **863 36/36 + 865 15/15 + 866 20/20**, suite **124 · 106 verdes · 18 preexistentes
+      (0 regresiones)**, docs §5.8 actualizados, versión 0.1.246,
+      `renderer.js?v=20261006-mapeo-fase4`.
+      Además, una **prueba de integración fuera del repo** ejecutó el wrapper y la regex reales
+      de `main.js` contra un fixture de 2.500 archivos (15/15): el progreso llegó a los 81 ms y
+      114 ms, antes de que el proceso terminara (125 ms), o sea en vivo y no bufferizado.
+      **Queda consultado al owner:** ¿esa prueba entra al repo como test?
+    - ✅ **El plan de 5 fases está completo.**
+    - 🔴 **📦868 — Conectar Gmail: ARREGLADO DE FONDO. Las credenciales son de la APP, no
+      del usuario.**
+      **El bug real:** las credenciales vivían solo en un `.env`, que **no viaja con el
+      instalador**. Por eso el portátil del owner funcionaba y cualquier otra máquina no —
+      la app no tenía correo para sus clientes, y el único síntoma era un error de Google
+      ("Missing required parameter: client_id") que no menciona K+AIR, más un flow de
+      autorización que quedaba colgado.
+      **El arreglo:** que la app traiga las credenciales encima. El `client_id` de una app
+      instalada es un identificador público. El `client_secret` también viaja embebido,
+      pero no porque sea secreto: K+AIR es un binario que cualquiera puede abrir y el mismo
+      Google lo entrega aparte en su `client_secret_*.json` de escritorio. Ahora viven en
+      `shared/google-oauth-config.js`, que se versiona; el `.env` quedó como override de
+      desarrollo. **El usuario final no tiene que hacer nada:** cada persona y cada cliente
+      autoriza su PROPIA cuenta con el mismo `client_id`, como cualquier botón "iniciar
+      sesión con Google".
+      **El `client_id` y el `client_secret` ya están cargados y la conexión funciona**
+      (proyecto "KAIR Calendar Sync", credencial de escritorio). **Probado de punta a punta
+      contra Google:** el owner autorizó con su cuenta real y la bandeja conectó.
+      🚨 **La creencia que casi pierde el paquete: "el `client_secret` es opcional".**
+      Se concluyó leyendo `google-auth-library`: tiene `ClientAuthentication.None`, que hace
+      que la librería NO mande el secreto. Todo cuadraba en el código — **pero leer la
+      librería no es verificar el servicio.** Al probarlo de verdad, Google aceptó los 5
+      permisos y el canje devolvió `client_secret is missing`. El síntoma era el peor: el
+      navegador decía "Autorización exitosa" y la conexión se perdía igual. Media
+      conexión. Un enum que existe en el código no significa que el endpoint lo acepte.
+      🚨 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`,
+      que no escribe en `main.log`, así que el fallo no dejaba rastro en ningún lado —
+      hubo que reproducir la petición a mano con un código falso para verlo. Ahora los tres
+      escriben en `sendLog` y hay un check que lo vigila.
+      🚨 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config
+      versionado.** Al commitear, GitHub rechazó el push: `GH013 — Push cannot contain
+      secrets`. Hacerlo privado NO era la salida: `package.json` declara
+      `publish: {provider: "github"}` y electron-updater pega a la API de releases de GitHub
+      **sin token**, así que en un repo privado esa API devuelve 404 y **todos los clientes
+      dejarían de recibir actualizaciones**. Repo público ⇒ el secret no puede estar en el
+      historial. Solución: `shared/google-oauth-config.js` se versiona **vacío** y las
+      credenciales viven en `sgsst-electron-app/.env` (en `.gitignore`). Verificado que
+      electron-builder **no excluye `.env`** de los archivos del app: un `.env` en la máquina
+      que compila **viaja dentro del instalador** y le llega al cliente sin que configure nada.
+      **NUEVO** `main/_verificar-credenciales-build.js` como hook `prebuild`/`prebuild:win`/
+      `prebuild:mac`/`prebuild:linux`: si faltan las dos credenciales **corta el build con
+      exit 1**. Mejor que el build falle ahí a que salga un instalador donde el correo no
+      conecta — que es exactamente el bug que costó la jornada.
+      **Trampa del día:** el owner pegó el `client_id` **sin** el sufijo
+      `.apps.googleusercontent.com` (creyó que era decorativo). Google devuelve 400 igual,
+      así que el síntoma se habría repetido en la app. Al pegar una credencial hay que
+      validar el **formato entero**, no que no esté vacía.
+      **Pendiente:** el proyecto sigue en modo "Testing", así que la autorización vence a
+      los 7 días y el cliente reconecta cada semana. Pasarlo a "Production" exige una **URL
+      de política de privacidad pública**, que todavía no existe. Los 5 scopes ya están
+      declarados en Google y coinciden con los que pide el código.
 
 1. **Owner tiene que validar visualmente 📦858**: en la pestaña Correo, el mini debe dejar ir a
    septiembre con las flechas, y al elegir el **14 de septiembre tiene que mostrar los 12 correos**
@@ -53,17 +196,11 @@
    Antes quedaban bloques grises para siempre; ahora debe salir "No se pudo leer esta
    carpeta" con botón **Reintentar**, y "Carpeta vacía" solo cuando la carpeta está
    realmente vacía.
-4. 🔴 **DESBLOQUEADO apenas el owner confirme el punto 2: replicar el PDF unificado a los
-   otros 14 exploradores.** Hoy el PDF con el visor de K+AIR está **solo en el 1.1.1**
-   (bloqueante #12). Los 15 tienen **4 variantes** de `_loadPDF` y **3 formas** de enrutar
-   el PDF en el archivo de conexión; 3 módulos ni siquiera tienen `*-logic.js`. Por eso no
-   se replicó a ciegas: hay que contar las variantes **antes** de escribir, no después
-   (`PROMPT.md` §5.11b).
-5. ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04 por
-   📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
-   cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
-   pidió.
-6. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
+> ~~**Decisión pendiente del owner**: el mini congelado en el mes real~~ — **CERRADO 2026-10-04
+> por 📦858**. En Agenda sigue congelado (📦844 intacto); en Correo navegó con estado propio, y al
+> cambiar de pestaña vuelve al mes presente. Las dos behaviors quedan aisladas, que es lo que se
+> pidió. (Va sin número a propósito: estaba como "3." duplicado y partía la serie.)
+4. **Owner tiene que validar visualmente 📦856/857**: en vista Mes, "Tipos de evento" debe contar
    **octubre** (no el año) y **sin las seis filas en 0**. Al hacer clic en un día del mini, la
    sección debe pasar a ese día y salir el botón "Ver el mes completo". Y **"Tu día" debe seguir
    visible** abajo con la lista larga. Todo probado con tests, **nunca mirado en la app**.
@@ -152,6 +289,207 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-06 (madrugada) · El admin quedaba encerrado en "contacta a administración" (📦862)
+
+**Qué se hizo** — un bug de permisos en `renderer.js`, con su test y sus documentos. La app
+**no se abrió** en esta sesión: el owner autorizó editar y commitear por separado.
+
+| Qué | Resultado |
+|---|---|
+| Filtrado de empresas | Se decide **por rol primero**. Antes la rama del admin era código muerto |
+| Mensaje de "sin empresas" | Decide por rol: un admin nunca ve "contacta a administración" |
+| Test nuevo | `main/test-admin-empresas-862.js`, **17 checks**, con prueba de mutación |
+| Versionado | 0.1.240 → **0.1.241**, cache-bust `renderer.js?v=20261006-admin-empresas-2` |
+| Documentos | CHANGELOG + README + CONTEXT + release-notes + AGENTS (los 5, §5.8) |
+
+**Por qué** — el owner reportedó que al entrar le decía *"No tienes empresas asignadas. Contacta a
+administración"*, y él **es** administración. El mensaje lo hizo creer que era un tema de permisos
+y lo tuvo un rato agarrado.
+
+**El bug, en una línea.** `showHomePage` filtraba las empresas así:
+
+```js
+if (Array.isArray(overrideCompanies)) { ... }              // SIEMPRE true
+else if (assignedCompanies && ... && !checkIsAdmin()) { ... }
+else { /* ADMIN: todas las empresas */ }                     // NUNCA se ejecutaba
+```
+
+`Array.isArray([])` es **`true`**, y `initializeApp()` se llama en **un solo** sitio
+(`renderer.js:3604`) pasando siempre `assignedCompanies`, que es un array. La primera rama ganaba
+**siempre**. Verificado con grep: `initializeApp(` aparece una vez en `renderer.js` (el otro hit
+es una función homónima dentro de `seguimiento-incapacidades.html`).
+
+Arrastraba tres cosas: el admin sin empresas veía cero empresas y el mensaje de un usuario normal;
+el `else` del admin era inalcanzable, así que el fallback `["Tempoactiva","Temposum","Aseplus","Asel"]`
+tampoco era código real; y `checkIsAdmin()` **nunca se consultaba**.
+
+**La trampa del arreglo obvio.** Agregar `&& overrideCompanies.length > 0` **abre una escalada de
+privilegios**: un no-admin sin empresas caería en el `else`, que carga `config.companyPaths` entero,
+y vería **todas**. El bug visible se arregla y se crea uno peor. El arreglo correcto decide por rol
+primero, y el test cubre ese caso explícitamente.
+
+**El backend estaba bien.** `validateSession` (`main.js:1021`) reconoce `admin@kair.local` y
+devuelve `isAdmin: true`. El diagnóstico por la app daba la pista equivocada porque el mensaje
+**parecía** de permisos.
+
+**El primer fix no alcanzó, y el owner lo reportó con una captura.** Arreglé el orden de las
+ramas, subí la versión a 0.1.241 y el mensaje **seguía siendo el viejo**. La captura lo dejó
+claro: la app corría el código nuevo (el pie decía `v0.1.241`) pero `esAdmin` valía `false`.
+
+Había una segunda causa, más profunda: **`checkIsAdmin()` derivaba el rol solo de
+`currentUser.companies`**. Con `companies = []` —el caso del admin global, que por definición no
+tiene empresas asignadas— `[].some()` da `false`. El backend ya mandaba `user.isAdmin` resuelto
+(`main.js:1628`) y el renderer lo ignoraba. Ahora `checkIsAdmin()` respeta `currentUser.isAdmin`
+primero y solo recalcula por `companies` cuando el backend no resolvió el caso global.
+
+Y el admin quedaba **sin salida**: el Inicio oculta el sidebar siempre (`sidebar-hidden`), así que
+con cero empresas no había forma de llegar a la configuración. Se agregó un botón **Ir a
+Configuración** cuando es admin y la lista está vacía.
+
+**El cache-bust se bumpeó dos veces.** El primer token (`20261006-admin-empresas`) ya lo había
+descargado la app en ese arranque, así que la segunda vuelta necesitaba uno nuevo
+(`20261006-admin-empresas-2`). Es §5.3: **un token repetido no sirve para nada**.
+
+**Tests** — el nuevo test **extrae el bloque de decisión de `renderer.js` y lo ejecuta** con roles
+distintos, en vez de buscar cadenas: cubre los cinco combinatorios de (admin, asignadas, override)
+más los dos del mensaje. Lo que le da valor es la **mutación**: reintroduciendo el orden del bug
+**sobre el código nuevo** (conservando `const esAdmin`, para que el check estructural siga
+pasando) fallan los dos checks de comportamiento — `admin sin empresas recibió []` y
+`admin con override recibió ["Solo"]`. Un detector de cadenas habría pasado ese mutante.
+
+**Suite:** 120 tests · 99 verdes · 21 con fallos. Las 21 son **las mismas preexistentes**: cero
+regresiones. Repetida justo antes del commit: **120 tests · 102 verdes · 18 con fallos**. De esos
+18, los 5 que leen archivos tocados por 📦862 (`auditoria-visual`, `compose-bem`,
+`evaluacion-inicial-bootstrap`, `skeleton-encaje`, `auto-download-flow`) **fallan también en HEAD
+limpio** — stash, corrida, pop, árbol idéntico al de antes (§7.4) — y los otros 13 no leen ningún
+archivo que haya cambiado. Preexistencia probada, no supuesta.
+
+**Una fricción que encontró el suite.** `test-hero-fila-840` tiene el token de cache-bust
+**escrito a mano** (`renderer.js?v=20261002-hero-oculto`), así que **se cae con cada bump legítimo**.
+Falló al subir el `?v=` de 📦862 y hubo que actualizar el literal. No se rediseñó el check para que
+no se rompa: eso es decisión del owner, no un efecto colateral de este paquete.
+
+**Decisiones del owner**
+
+- Autorizó editar ("ok procede"). **No autorizó commit**: 📦862 queda en el working tree.
+- Confirmó que el rol lo tenía bien y que el problema era que no le aparecían las opciones.
+
+**Datos: por qué el fix solo no alcanza**
+
+El escritorio tiene la base creada (76 tablas) pero **sin empresas**:
+
+| Fuente | Estado |
+|---|---|
+| `companies` | 0 filas |
+| `user_company_roles` | 0 filas |
+| `config.json` → `companyPaths` | **no existe** |
+| `roles` | 5 filas (Administrador, SST, Auditoría, Gerencia, RRHH) |
+| `users` | 1: `admin@kair.local`, activo, `bandeja_integrada_enabled: 0` |
+
+Con 📦862 el admin ya **no** ve el mensaje equivocado: ve el correcto ("no hay empresas
+registradas, crea una en configuración"). Pero **sigue sin ver empresas**, porque no hay ninguna.
+Esto no se arregla con código: hay que restaurar el `kair.db` y el `config.json` del portátil.
+Y registrar empresas desde la UI ("Vincular Rutas de Archivos por Empresa",
+`config-viewer.html:6853`) **exige Python 3.10–3.12**, que esta máquina no tiene (tiene 3.14.8).
+
+**Commits**
+
+| Hash | Qué | Estado |
+|---|---|---|
+| `e2f6adaf` | docs(entorno): puesta a punto del escritorio | pusheado |
+| `📦862` | fix admin empresas + test + los 5 documentos | commiteado y pusheado |
+
+---
+
+### 2026-10-05 (tarde) · Escritorio recién formateado: puesta a punto (sin paquete de código)
+
+**Qué se hizo** — esta sesión **no cambió una línea de la app**. El árbol quedó idéntico a `HEAD`
+(`e6a98d98`). Lo que se hizo fue dejar un escritorio recién formateado capaz de correr y probar el
+proyecto, y dejar escrito lo aprendido.
+
+| Qué | Resultado |
+|---|---|
+| Fusionar `Dev-Pc` en `Dev` | El owner lo hizo a mano. `Dev` quedó en `e6a98d98`, que ya contiene 📦861 |
+| `node_modules` | 913 paquetes. `npm install` normal **falla y revierte todo**: compila `better-sqlite3` contra Node 26 y revienta |
+| Electron 37.10.3 | Extraído a mano. El `install.js` oficial salió con código 0 tres veces sin extraer nada |
+| `better-sqlite3` | Compilado para **Electron** (`--runtime=electron --target=37.10.3`), verificado con un `SELECT` real: `OK 37.10.3, sqlite 3.49.2` |
+| **`core.autocrlf`** | **El hallazgo grande.** 2277 archivos en CRLF y `git status` diciendo "limpio" |
+| `setup-file-viewer.js` | Corrió, pero **borró 2624 archivos versionados**. Revertido: es paso de packaging, no de desarrollo |
+
+**Por qué** — el owner formateó el PC y pidió validar que no le faltara nada para probar la app.
+
+**El problema de fondo: `autocrlf`**
+
+El instalador de Git for Windows dejó `core.autocrlf=true` en `C:\Program Files\Git\etc\gitconfig`.
+Es config de **sistema**, así que `git config --global` sale **vacío** y parece que no hay nada
+configurado. Ese `true` convierte LF→CRLF en el checkout, y como el repo guarda en LF a propósito
+`main.js`, `preload.js`, `index.html`, `main/*-bridge.js`, `shared/*.css` y `premium.css` (los tests
+lo verifican uno por uno), el clon dejó **2277 archivos en CRLF**.
+
+Lo peligroso: **`git status` dice que el árbol está limpio**. Miente por dos razones que se refuerzan
+— el stat-cache ya registró los tamaños convertidos, y al commitear Git normaliza CRLF→LF. El
+archivo está mal en disco y Git no lo ve. El próximo `git add` sube CRLF y aparece el diff de ~7000
+líneas.
+
+Cinco tests fallaban con el mismo mensaje (`premium.css sigue en LF [CRLF, esperado LF]`) — un solo
+síntoma repetido, que es la firma de un problema de entorno y no de UI.
+
+**El fix que costó encontrar.** `git config --local core.autocrlf false` no alcanza por sí solo:
+
+| Comando | Resultado |
+|---|---|
+| `git checkout-index -a -f` | 0 cambios. No reescribe |
+| `git update-index --really-refresh` | 0 cambios. No reescribe |
+| `git read-tree --reset -u HEAD` | 0 cambios. No reescribe |
+| **`git reset` + `git checkout -- .`** | **Funciona.** El `reset` rehace el índice sin stat-cache; recién ahí Git ve los 2277 |
+
+Renormalizar **no** uniforma: **restaura**. `main.js` quedó en LF y `app.js` quedó en CRLF, que es lo
+que el repo pide. **De 88 a 98 tests en verde sobre 119**; los 10 recuperados eran todos de EOL.
+
+**Segundo problema: `better-sqlite3` se compiló contra el Node equivocado.** La app nunca corre con
+Node 26 — corre dentro de Electron 37.10.3, que usa Node 22.21.1 y ABI 136. `npm install` corrió
+`node-gyp` contra Node 26 y falló con APIs de V8 eliminadas (`"GetIsolate": no es un miembro de
+"v8::Context"`). No faltaba el compilador: `cl.exe` estaba instalado. Al fallar, npm **revirtió el
+install entero** (913 paquetes → 2). El orden que funciona está en `PROMPT.md` §5.17 y §9.
+
+**Un tercer defecto del repo, no del entorno:** `CONTEXT.md` tiene separadores **CR CR CR LF** (tres
+CR) en 1337 de sus 1354 líneas. Viene así del repo. Cualquiera que lo edite con `Edit` o lo reescriba
+con `ReadAllText` rompe el diff entero. Por eso la sección nueva se insertó con un script que **detecta
+el separador real** en vez de suponerlo, y se verificó por estructura: 40 adiciones, 0 eliminaciones.
+
+**Tests** — 119 corridos en el escritorio: 98 verdes, 21 con fallos, **no comparables** con los del
+portátil (101 verdes). Las 21 se reparten en:
+
+| Grupo | Cuántas | Por qué |
+|---|---|---|
+| Requieren Electron con ventana | 5 | Hacen `require('electron').app.whenReady()`, que no existe con `ELECTRON_RUN_AS_NODE=1` |
+| Requieren `kair.db` | 4 | La BD vive en `%APPDATA%`, fuera del repo. Esta máquina no la tiene |
+| Aserciones reales contra el código commiteado | ~12 | `header-zindex`, `compose-bem`, `skeleton-encaje`, `auditoria-visual`. **No se verificó si también fallan en el portátil** — no hay acceso a esa máquina |
+
+**Decisiones del owner**
+
+- Ante el hallazgo del upgrade a Electron 44 sin commitear, eligió **revertir a Electron 37** y dejar
+  el escritorio funcionando, en vez de subir `better-sqlite3` a 13.x. El patch quedó en
+  `backups/electron44-upgrade-2026-10-05.patch` (10.4 KB, gitignored) por si lo retoma.
+- Autorizó commit y push el 2026-10-05.
+
+**Commits**
+
+| Hash | Qué | Pusheado |
+|---|---|---|
+| `e6a98d98` | `Merge branch 'Dev-Pc' into Dev` (lo hizo el owner) | sí, ya estaba en `origin/Dev` |
+| este | Documentación de la puesta a punto + 4 trampas nuevas | sí |
+
+**Lo que sigue pendiente en este escritorio**
+
+1. **Datos:** copiar un backup a `%APPDATA%\sgsst-electron-app\kair.db`. Sin eso la app abre vacía.
+2. **Google Calendar:** `Copy-Item .env.example .env` y completar `GOOGLE_OAUTH_CLIENT_ID` /
+   `_SECRET`. Credenciales del owner, no inventables.
+3. **Python:** está en 3.14.8 y el README pide 3.10–3.12. Afecta 5 Porqués y análisis de accidentes,
+   no el arranque (hay fallback al Python del sistema).
+
+---
 
 ### 2026-10-03 · Bandeja Integrada (📦844-851) + Prompt operacional v2.0
 

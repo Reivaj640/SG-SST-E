@@ -58,24 +58,34 @@ test('#app-header tiene isolation: isolate (escapa stacking context)', () => {
   }
 });
 
-test('.header-update-panel tiene z-index > z-index del #app-header', () => {
-  const headerMatch = css.match(/#app-header\s*\{[^}]*z-index:\s*(\d+)/);
-  const panelMatch = css.match(/\.header-update-panel\s*\{[^}]*z-index:\s*(\d+)/);
-  if (!headerMatch) throw new Error('No se encontró z-index del #app-header');
-  if (!panelMatch) throw new Error('No se encontró z-index del .header-update-panel');
-  const headerZ = parseInt(headerMatch[1], 10);
-  const panelZ = parseInt(panelMatch[1], 10);
-  if (panelZ <= headerZ) {
-    throw new Error(`Panel z-index (${panelZ}) debería ser MAYOR que header z-index (${headerZ}) — el panel debe renderizarse ENCIMA del header`);
+// ── 📦581 · INVERTIDOS los 2 checks de .header-update-panel ─────────────────
+// Pedían que `.header-update-panel` tuviera z-index. Ese panel se eliminó A
+// PROPÓSITO en 📦581 ("🗑️ CSS legacy del header update (200+ líneas)", CHANGELOG) y
+// el update pasó al dot del footer. Los checks se invierten en vez de borrarse
+// (§7.3): ahora exigen que el panel legacy NO vuelva.
+//
+// 🔴 Antes de verificar hay que quitar los comentarios (§5.15). En styles.css:891 el
+// nombre sobrevive DENTRO de un comentario —"ancla para .header-update-panel"— y un
+// check que leyera el CSS crudo lo encontraría ahí, daría verde, y el panel podría
+// haber vuelto sin que nadie lo notara.
+const cssSinComentarios = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+test('.header-update-panel NO vuelve al CSS (📦581 lo eliminó a propósito)', () => {
+  if (/\.header-update-panel\b/.test(cssSinComentarios)) {
+    throw new Error('volvió .header-update-panel al CSS — el update va en el dot del footer, no en un panel del header');
   }
 });
 
-test('.header-update-panel tiene z-index >= 100001', () => {
-  const panelMatch = css.match(/\.header-update-panel\s*\{[^}]*z-index:\s*(\d+)/);
-  if (!panelMatch) throw new Error('No se encontró z-index del .header-update-panel');
-  const value = parseInt(panelMatch[1], 10);
-  if (value < 100001) {
-    throw new Error(`z-index del .header-update-panel es ${value}, debería ser >= 100001`);
+test('el update vive en el footer, no en el header (📦581)', () => {
+  // La clase se estila en styles.css y el id vive en index.html: son las dos mitades.
+  // (La primera version de este check buscó `#footer-update-btn` en el CSS y daba rojo:
+  // el error era del check, no del código — el CSS usa la CLASE.)
+  if (!/\.footer-update-btn\b/.test(cssSinComentarios)) {
+    throw new Error('no está la clase .footer-update-btn en el CSS — el update de 📦581 vive en el footer');
+  }
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  if (html.indexOf('id="footer-update-btn"') === -1) {
+    throw new Error('index.html no declara #footer-update-btn — sin ese botón el update no se muestra');
   }
 });
 

@@ -40,6 +40,14 @@ async function main() {
     process.exit(0);
   }
 
+  // El "contra que" se lee del Excel, no está escrito en este archivo. Ver la nota larga de
+  // test-presupuesto-824-real.js: las constantes fijas de acá se pusieron viejas cuando le
+  // agregaron un mes a la fila de honorarios, y el rojo que tiraron se veía igual que un bug.
+  const verdad = require('./presup-excel-truth').leer(PLANTILLA);
+  const pesos = require('./presup-excel-truth').pesos;
+  console.log('\n[i] Excel leído: ' + verdad.cantidad + ' partidas · asignado ' +
+    pesos(verdad.sumaAsignado) + ' · ejecutado ' + pesos(verdad.sumaEjecutado));
+
   const Database = require('better-sqlite3');
   const schemaMod = require('./presupuesto-schema-sql');
   const bridge = require('./presupuesto-bridge');
@@ -81,10 +89,12 @@ async function main() {
   const conAsig = antes.filter(p => p.asignado_anual !== null && p.asignado_anual > 0).length;
   const conEje = antes.filter(p => p.ejecutado_acumulado !== null && p.ejecutado_acumulado > 0).length;
 
-  ok('1) el import trae 14 partidas', antes.length === 14, antes.length);
-  ok('1) el import trae las 14 categorías', catsAntes === 14, catsAntes + '/14');
-  ok('1) el asignado total cuadra (~27.8M)', Math.abs(totAntes.a - 27819284) < 2, Math.round(totAntes.a));
-  ok('1) el ejecutado total cuadra (~19.7M)', Math.abs(totAntes.e - 19696874) < 2, Math.round(totAntes.e));
+  ok('1) el import trae ' + verdad.cantidad + ' partidas', antes.length === verdad.cantidad, antes.length);
+  ok('1) el import trae todas las categorías', catsAntes === verdad.cantidad, catsAntes + '/' + verdad.cantidad);
+  ok('1) el asignado total cuadra (' + pesos(verdad.sumaAsignado) + ')',
+    Math.abs(totAntes.a - verdad.sumaAsignado) < 2, Math.round(totAntes.a));
+  ok('1) el ejecutado total cuadra (' + pesos(verdad.sumaEjecutado) + ')',
+    Math.abs(totAntes.e - verdad.sumaEjecutado) < 2, Math.round(totAntes.e));
 
   // ── 2) Guardar como lo haría el usuario al editar UNA celda ─────────
   //

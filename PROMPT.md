@@ -73,7 +73,7 @@ SG-SST-E/
     ├── shared/                ← tokens, componentes, calendario, alertas
     ├── renderer/
     │   └── bandeja-integrada/ ← la Bandeja Integrada (app monolítica propia)
-    ├── Temp/                  ← runner de tests + scripts one-shot (NO se commitea)
+    ├── Temp/                  ← runner de tests + scripts one-shot (los `.js` SÍ se versionan: hay 13)
     └── tests/                 ← 30 tests históricos — el runner NO los ve
 ```
 
@@ -152,15 +152,35 @@ Estas son las que el prompt v1 no tenía y son las que más cuestan cuando falta
 | "ok procede", "procede" | Editar. **NO commitear.** |
 | "dale", "OK", "perfecto", "commit" | Commitear. **NO pushear.** |
 | "pushea y procede con el release" | Push + tag + release |
+| "bumpea la versión", "prepara el release" | Bump de versión en los archivos del §5.2 |
 | "revierte" | `git reset --hard` o `git revert` inmediato |
 
 > "ok procede" es la trampa: **autoriza cambio, no commit.** Ante la duda, no commitees.
 > Pedir permiso nunca está de más; commitear sin permiso rompe la confianza.
 
-### 5.2 Siempre bumpear la versión, en el mismo commit
+### 5.2 La versión SOLO se bumpea cuando el owner lo dice
 
-`package.json` (`0.1.233`) + `CHANGELOG.md` + `AGENTS.md` + `README.md` + `CONTEXT.md` + `release-notes.md`.
-Nunca declares en el CHANGELOG una versión que `package.json` no tenga.
+**No bumpees por inercia.** El número de versión no es un contador de commits: está atado al
+**release**, y el release es una decisión del owner. Si el owner no lo dice explícitamente,
+la versión no se toca — por mucho que el commit traiga código de app.
+
+> **Decisión del owner (Javier Robles Fontalvo), 2026-10-07.** Antes esta regla decía
+> "siempre bumpear en el mismo commit". Se cambió porque el bump automático producía un
+> efecto visible y molesto: `consent:estado` compara contra `app.getVersion()`, así que
+> **cada bump hacía volver a aparecer la pantalla de consentimiento legal a todos los
+> usuarios**, aunque el texto legal no hubiera cambiado. Ese bug de versiones está pendiente de
+> arreglo, pero la regla ya no depende de él.
+
+**Cómo se bumpea (solo cuando lo pida):** `package.json` + `CHANGELOG.md` + `README.md` +
+`release-notes.md`. `CONTEXT.md` sigue prohibido por `AGENTS.md:516`. Nunca declares en el
+CHANGELOG una versión que `package.json` no tenga.
+
+**Frases que SÍ autorizan el bump** (y solo si además autorizan commit):
+"bumpea la versión", "sube la versión", "prepara el release", "haz el release".
+
+**Lo que NO lo autoriza:** "dale", "OK", "commit", "pushea", ni el hecho de que el trabajo
+sea "grande" o "de aplicación". Un commit con `package.json` en el diff sin que el owner lo
+pidiera es un error, aunque el resto del commit esté perfecto.
 
 ### 5.3 Cache-bust en `index.html`
 
@@ -190,6 +210,10 @@ No hay `.gitattributes`. Cada archivo tiene su EOL y **cambiarlo rompe el diff e
 **Regla:** el EOL de un archivo **queda fijado por su test**. No lo cambies sin actualizar el test.
 Para editar un CRLF sin romperlo, usa reemplazos de texto que no toquen los finales de línea, y verifica
 que `git diff --numstat` sigue dando pocas líneas.
+
+🔴 **En una PC recién formateada, el `autocrlf` del instalador de Git convierte todo a CRLF en el
+checkout y `git status` sigue diciendo que está limpio.** Ver §5.17 — es el escenario donde esta tabla
+se viola sola, sin que nadie edite nada.
 
 ### 5.5 Prohibido CJK y mojibake
 
@@ -240,10 +264,21 @@ que algo es una regla porque está escrito.
 > - SIEMPRE escapar HTML con `KairUI.esc()` antes de inyectar texto del usuario
 > - SIEMPRE formatear fechas con `KairHelpers.formatDate()`
 
-**Ninguna de las dos funciones existe en el repo.** Búsqueda sobre todo el código: 0 archivos.
-Un modelo que hubiera seguido la regla al pie de la letra habría escrito una llamada a una función
-inexistente, y la vista se habría caído con `ReferenceError`. Dos reglas "OBLIGATORIAS" que
-habrían roto la app.
+🔴 **CORREGIDO el 2026-10-06: el "0 archivos" de este ejemplo era FALSO.** Las dos funciones
+**existen**, pero dentro de un solo módulo: `modules/verificacion/auditoria-anual/kair-ui.js:12`
+define `_esc`, que se exporta como `window.KairUI.esc` (línea 383), y `kair-helpers.js:11`
+define `formatDate`, exportada como `window.KairHelpers.formatDate` (línea 200). Hay 12+
+llamadas reales en los `*-view.js` de ese módulo.
+
+**El riesgo sigue siendo real, por un motivo más preciso: no están en el shell.** Se cargan
+con `loadScript` desde `auditoria-anual-component.js:52/54`, o sea únicamente al abrir
+Auditoría Anual. Un modelo que copie la regla al shell escribe `KairUI.esc(...)` contra un
+`window.KairUI` que no está, y la vista se cae con `ReferenceError`. Dos reglas
+"OBLIGATORIAS" que habrían roto la app.
+
+**La lección no cambia, y por eso el ejemplo corregido vale más que el original:** "no lo
+encontré" y "no existe" no son lo mismo que "no está disponible donde lo estabas mirando".
+Antes de declarar algo inexistente, **decí DÓNDE lo buscaste**.
 
 En la misma sección: `var` (no `let`/`const`) — falsos, `main.js` tiene 2 608 `const`. Y
 "el último número de paquete es `📦579`" cuando ya van 850+.
@@ -583,6 +618,54 @@ funcionó solo porque las saltos de línea se preservan como caracteres del stri
 fragilidad gratis. **Después de reescribir un archivo, verificar el EOL contra lo que el test del
 repo exige**, antes de seguir.
 
+### 5.17 🔴 En una PC nueva, `core.autocrlf` rompe el repo entero (2277 archivos)
+
+Descubierto el 2026-10-05 al validar un escritorio recién formateado.
+
+**Qué pasa.** El instalador de Git for Windows deja `core.autocrlf=true` en
+`C:\Program Files\Git\etc\gitconfig` — es **config de sistema, no del repo**, así que
+`git config --global core.autocrlf` sale **vacío** y parece que no hay nada configurado.
+
+Ese `true` convierte **LF → CRLF al hacer checkout**. Como este repo guarda `main.js`,
+`preload.js`, `index.html`, `main/*-bridge.js`, `shared/*.css` y `premium.css` en **LF** a
+propósito (§5.4), un clon en una PC nueva deja **2277 archivos en CRLF** en disco.
+
+**Lo peligroso es que `git status` dice que todo está limpio.** Miente por dos motivos: el stat-cache
+del índice registra los tamaños ya convertidos, y al commitear Git normaliza CRLF→LF. El archivo en
+disco está mal, Git no lo ve, y el día que alguien haga `git add` sube **CRLF** y produce el diff de
+~7000 líneas que §5.4 advierte. Los tests de EOL sí lo detectan (`premium.css sigue en LF
+[CRLF, esperado LF]`), pero solo cuando corren.
+
+**Cómo se comprueba** (no confiar en `git status`):
+
+```powershell
+git config --show-origin --get-all core.autocrlf   # la de sistema NO aparece en --global
+$b = [System.IO.File]::ReadAllBytes('sgsst-electron-app/main.js')
+# contar 0x0A precedido de 0x0D  -> si hay, el archivo está en CRLF
+```
+
+**El arreglo, y el que cuesta encontrar:**
+
+```powershell
+git config --local core.autocrlf false             # lo local le gana a la de sistema
+```
+
+Con eso, `git checkout-index -a -f`, `git update-index --really-refresh` y
+`git read-tree --reset -u HEAD` **NO reescriben nada** — los tres reportan 0 cambios porque el
+stat-cache sigue diciendo que todo coincide. Lo único que funciona es **reconstruir el índice**:
+
+```powershell
+git reset          # rehace el índice desde HEAD, sin stat-cache: ahora sí ve los 2277
+git checkout -- .  # los restaura byte a byte desde el índice -> LF donde el repo dice LF
+```
+
+Después: `git status` limpio, `main.js` con LF, `app.js` con CRLF, los 5 tests de EOL en verde. De
+88 a 98 tests en verde sobre 119.
+
+**Regla:** en una máquina nueva, **antes de tocar código**, poner `core.autocrlf=false` a nivel de
+repo y renormalizar. El `README.md` dice que el EOL lo fija el test, y es cierto — pero el test solo
+avisa, no corrige.
+
 ---
 
 ## 6. Convenciones de código
@@ -617,6 +700,13 @@ if (typeof getDb !== 'function') throw new Error('[presup] requiere deps.getDb')
 - **No hay esquema central de migraciones.** Cada módulo exporta `MIGRATIONS_SQL` y `main.js` los aplica
   inline tras abrir la BD, con `try/catch` y **skip silencioso**. Sólo presupuesto tiene `MIGRATION_IDS`;
   no hay `PRAGMA user_version`.
+- 🔴 **Un test que arma su propia base tiene que correr las MIGRACIONES, no solo el esquema.**
+  El patrón de `main.js:592-608` es el que hay que copiar: statement por statement, con `try/catch`,
+  porque al re-ejecutar *"duplicate column name"* es esperado. Los tests de gestión humana lo
+  salteaban y por eso se comían `no such table: gh_eventos_personal` y
+  `gh_documentos has no column named ruta_archivo` — **columnas que sí existen en la BD real**.
+  Lo que falla así parece un bug de la app y no lo es: la columna está en `MIGRATIONS_SQL`, no en
+  `SCHEMA_SQL`. **Antes de culpar a la app por un "no such column" en un test, verificá en la BD real.**
 - Patrón para columna nueva: `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` idempotente.
   Motivo documentado en el código: *`CREATE TABLE IF NOT EXISTS` no agrega columnas a una tabla que ya existe*.
 - **`localStorage` solo para preferencias de UI** (tema, empresa activa, firma, filtro, sidebar).
@@ -642,7 +732,7 @@ if (typeof getDb !== 'function') throw new Error('[presup] requiere deps.getDb')
 
 **Discovery:** por nombre, `/^test-.*\.js$/`, solo en `main/`. Los **30** de `tests/` **no los ve
 nadie** — están en subdirectorios por módulo, y el runner no baja a buscarlos.
-**Runner:** `node Temp/run-all-tests.js` (filtra por substring: `… run-all-tests.js sidebar`).
+**Runner:** `node tools/run-all-tests.js` (filtra por substring: `… run-all-tests.js sidebar`).
 Corre cada test con el **Node de Electron** (`ELECTRON_RUN_AS_NODE=1`), no con node pelado.
 
 **Nombre:** `test-<slug>-<paquete>.js`. El número va **al final** y `test-` al principio
@@ -658,8 +748,10 @@ console.log((checks.length - failed) + '/' + checks.length + ' OK');
 process.exit(failed === 0 ? 0 : 1);
 ```
 
-> El runner parsea ese `N/M OK` por **regex de stdout**. Si un test no lo imprime, el runner lo cuenta
-> como verde. No loieces el formato.
+> El runner parsea el resumen **con `leerResumen()`, que entiende 19 formatos** (`N/M OK`,
+> `N/M checks OK`, `N OK · M FAIL`, `Total: N | ✅ N | ❌ M`, TAP, texto pelado…). Antes buscaba
+> solo `N/M OK` y lo que no casaba lo contaba verde sin que nadie hubiera mirado sus checks — por
+> eso el runner tiene que **entender** el formato, no alcanza con que vos lo imprimas. Ver §7.4.
 
 ### 7.1 Guards — checks que sí muerden
 
@@ -729,14 +821,125 @@ que **NO** pase.
 checks —uno de HTML y otro de JS—. Invertir uno y borrar el otro deja el agujero de que
 reintroducir el código sin el markup pase verde.
 
-### 7.4 Fallos preexistentes
+### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-Hoy hay **18** y son los mismos de hace meses (z-index de CSS, cache-bust de `styles.css`, y el
-`no such column: actualizado_en` del sync). **No hay lista en código**: el runner no tiene tolerancias,
-viven documentadas en prosa.
+**Medido el 2026-10-07:** **123 tests · 122 en verde · 1 con fallos · 1 sin resumen verificable.**
+**Cero regresiones.** **No hay lista en código**: el runner no tiene tolerancias, viven documentadas acá
+en prosa.
 
-Para afirmar que un fallo es preexistente hay que **probar que también falla en HEAD limpio** y decirlo
-con esas palabras. Un test rojo nuevo es un test rojo nuevo.
+| # | Test | Qué necesita para pasar |
+|---|---|---|
+| 1 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` del `firma-service` — saca **83/83** en los chequeos estáticos y después falla por la variable |
+
+Se resuelve prendiendo el PC viejo que sostiene el `firma-service`. **Hoy la suite no tiene ni un
+solo rojo de producto.**
+
+⚠️ **Este cuadro estuvo mal hasta el 2026-10-07 y decía otra cosa.** Decir "3 con fallos, **todos
+de entorno**" era falso: al verificar los tres uno por uno, **solo uno era de entorno**. Los otros
+dos eran **tests desactualizados**, no fallos del entorno:
+
+| Test que se reportaba mal | Por qué no era "de entorno" | Cómo se corrigió |
+|---|---|---|
+| `test-firma-bridge.js` (saca 0/0) | Exigía un `contentType` que el handler **quitó a propósito** al pasar a escribir el PDF en disco y a servirlo desde caché. El código estaba bien; el test describía el diseño anterior | Check **invertido**: ahora exige el diseño actual (PDF en disco + caché). **58/58** |
+| `test-firma-tunnel-kit.js` (24/27) | Exigía `cloudflared tunnel --url` de los *quick tunnels*, que **ya no se usan**: el kit ahora arranca un túnel nombrado | Checks **invertidos** al túnel nombrado. **25/25** |
+
+**La lección que sí queda:** "con fallos" y "de entorno" son cosas distintas, y un test viejo es
+un **defecto del test**, aunque parezca un fallo de entorno porque muere en runtime. Antes de
+reportar un rojo como "depende del entorno", hay que **leer el test y contrastarlo con el código**
+(§5.9) para saber cuál de las dos cosas es. Los dos checks invertidos **muerden**: se comprobó por
+mutación que pasan a rojo si el código vuelve al comportamiento viejo.
+
+**✅ También se resolvieron los 2 de presupuesto** (ver más abajo el por qué, que es la parte
+interesante): eran el mismo error de patrón dos veces.
+
+**✅ Los que estaban aquí y ya se resolvieron** (eran fallos del test, no de la app):
+
+- **`test-gestion-humana-bridge-write.js` (88/89 → 89/89).** El rojo deliberado de `pasoActual`
+  NO era un bug. `paso_actual` significa **primer paso pendiente**, no "último hecho": el fix
+  documentado en `gestion-humana-bridge.js:863` lo recalcula después de cada `marcar-paso`.
+  Cerrado el memo (paso 1), el primer pendiente es el 2, así que 2 era lo correcto y el test
+  estaba anclado a la semántica vieja — el mismo error conceptual que su hermano, el del 6 tras
+  5 pasos, que ya se había corregido.
+- **`test-sync-serializer.js` (43/44 → 45/45).** El fixture del test armaba `gestaciones` con
+  una columna `updated_at` **que no existe en la BD real** (la real es `actualizado_en`, declarada
+  en el `CREATE TABLE` desde el día uno, sin migración que la agregue). El serializer hace
+  `ORDER BY actualizado_en` (`sync-serializer.js:391`); en el fixture eso reventaba con
+  "no such column", caía al `catch` y devolvía `[]`. **En producción, una BD vieja sin esa
+  columna haría que las gestaciones nunca se sincronizaran, en silencio.** Al arreglarlo apareció
+  un segundo check que también estaba mal: `result5.applied` es el total de **todas** las
+  entidades, no el de planes, así que pasó de 1 a 2 al empezar a contar la gestación.
+- `test-gestion-humana-bridge-newtables.js` y `test-gestion-humana-bridge-write-extra.js` **no
+  fallaban: reventaban.** Los tres tests de gestión humana arman su base con `SCHEMA_SQL` y nunca
+  corren `MIGRATIONS_SQL`, que es donde viven las tablas nuevas (§6.2). Por eso se comían
+  `no such table: gh_eventos_personal` y `gh_documentos has no column named ruta_archivo` —
+  **ambas existen en la BD real**, verificado. Ahora aplican las migraciones con el mismo patrón de
+  `main.js:592-608`. Resultado: **209 OK · 0 FAIL** y **72 OK · 0 FAIL**.
+- `delete-personal` **no devolvía `undefined` por un defecto**: el test lo invocaba sobre un bp
+  activo saltándose `gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
+  (`gestion-humana-bridge.js:1171`), y además leía `data.retired`, **un campo que el contrato no
+  tiene** (la respuesta real es `{personalId, activo, estado, fechaRetiro}`).
+- **`test-presupuesto-824-real.js` (34/38 → 39/39) y `test-presupuesto-824-roundtrip.js` (20/21 →
+  21/21): el importador NO estaba roto.** Comparaban contra cifras escritas a mano en el test
+  (19.696.874,33, 6.209.816) que eran una foto del Excel deDrive en el día en que se escribieron.
+  Alguien le agregó septiembre a la fila de honorarios, el archivo pasó de 8 meses a 9, y los dos
+  tests se pusieron rojos reportando un bug de **$776.227 que no existía**. La app importaba bien:
+  la suma de la columna E del archivo da exactamente 20.473.101,33, que era lo que producía.
+
+### 7.5 Un test contra un archivo que el usuario edita no puede llevar cifras fijas
+
+Ese casi-costó caro: dos tests en rojo parecían un defecto de $776.227 en un número que se le
+muestra al usuario, y la tentación era reportarlo como bug. **El rojo era indistinguible de un
+bug real**, que es peor que no tener el test.
+
+La regla: **si el archivo de entrada es editable por el usuario, el esperado se lee del archivo
+en el momento de correr**, no se escribe a mano.
+
+En este repo el caso es el Excel de presupuesto (`G:`). Ahora las cifras salen de
+`main/presup-excel-truth.js`, que abre el archivo con SheetJS crudo y suma celda por celda —
+**un camino distinto al del importador**, que parsea con su propia lógica de celdas combinadas y
+bloques. Por eso no es una tautología: si el importador se le cae una columna, se le salta una
+fila o suma dos veces, la comparación lo detecta.
+
+Y **derivar el esperado no es excusa para dejar de morder**: el que fija el esperado tiene que
+comprobar que el check se pone rojo cuando el producto se rompe. Se verificó con una mutación
+(`val.ejecutado * 2` en `presupuesto-bridge.js`): los dos tests se pusieron rojos con
+40.946.202,66, exactamente el doble. Después se revirtió.
+
+**El riesgo que queda, dicho en voz alta**: con el esperado derivado, si alguien edita mal el
+Excel, el test no lo va a reclamar. Antes tampoco lo hacía, así que no se pierde cobertura; lo
+que se gana es que editar el archivo de un cliente no rompa la suite.
+
+El **1 sin resumen** es `test-init-order-bug.js`: es un test de inspección estructural que imprime
+texto, no un `N/M`. Sale 0 y el runner lo cuenta verde, pero sin poder confirmar cuántos checks corrieron.
+
+**🔴 El hallazgo importante: de los 17 que había, 10 NO eran fallos del producto.** Eran tests
+viejos contra código que se cambió **a propósito**, y el runner los mezclaba con los fallos reales.
+Casi todos de dos causas:
+
+- **📦581 (el update pasó al footer del shell).** `test-header-zindex.js` exigía z-index de
+  `.header-update-panel`, que `CHANGELOG.md` ya decía haber borrado; `test-auto-download-flow.js`
+  exigía los toasts que el Loop 3 convirtió en no-ops documentados.
+- **📦752 (el rediseño premium de la Bandeja).** `test-auditoria-visual.js` exigía una toolbar
+  duplicada y un `setTimeout` que `app.js:6222` documenta como **código zombie eliminado en el loop 28**.
+
+**La regla que sale de ahí:** un check que pide algo que el código borró a propósito no se "arregla"
+doblando el código — se **invierte** (§7.3). Invertirlo convierte un rojo permanente en un guard que
+protege el borrado. Y **antes de llamar "preexistente" a un rojo, hay que preguntarse si el código
+tenía razón**: 10 de 17 la tenían, y ninguno era una regresión escondida.
+
+**Sobre el runner (`tools/run-all-tests.js` — que SÍ está versionado, contra lo que dice §2):**
+
+1. `leerResumen()` entiende **19 formatos** de resumen. Antes buscaba solo `N/M OK`, que es lo que pide
+   §7, y **no lo cumple ni la mitad de los tests**: conviven `29/29 checks OK`, `87 OK · 2 FAIL`,
+   `Resultado: 3 OK / 2 FAIL`, `44/44 | pass: 44 | fail: 0`, `Total: 78 | ✅ 78 | ❌ 0`, TAP, y texto
+   pelado como `ALL CHECKS PASSED`. Los que no casaban caían en un `ok:true` **sin que nadie hubiera
+   mirado sus checks**. Por eso el bloque de arqueotipo de arriba dice `N/M OK` y no dice que el runner
+   lo exija: el runner lo tiene que **entender**, no solo ellos lo tienen que **imprimir**.
+2. Un test **sin resumen** va a su propia lista, no a la de fallos: no se sabe si el producto está roto,
+   y contarlo como fallo sería mentir en la dirección contraria.
+
+**Para afirmar que un fallo es preexistente hay que probarlo en HEAD limpio** y decirlo con esas
+palabras. Un test rojo nuevo es un test rojo nuevo.
 
 ### 7.5 La polaridad del análisis de mutaciones (el error que más repetí)
 
@@ -884,6 +1087,9 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 11 | 🟡 **La app tiene 25 correos en memoria de los 131 de la carpeta** (`PAGE_SIZE = 25`), y se agrandan con scroll | `app.js` `PAGE_SIZE` | Cualquier cosa que filtre la bandeja tiene que traer lo que falta de la caché. Filtrar `state.mails` da "vacío" en 25 días que sí tienen correo |
 | 12 | 🔴 **En la bandeja, `app.js` y `premium.css` comparten el token de `?v=` a propósito.** Subir solo el que tocaste deja la página con dos versiones distintas | `bandeja-integrada/index.html`, verificado por `test-bandeja-tudia-849.js` | Los dos se suben juntos, aunque no hayas tocado los dos (§5.3) |
 | 13 | 🔴 **Ningún test del repo abre la base de datos.** Un feature que dependa de un tipo de dato de la BD puede tener 34 checks en verde y no dibujar nada en pantalla | `main/test-*.js` (ninguno abre SQLite) | Antes de dar por terminado un feature de datos, correr un script en `Temp/` con la función **real** contra la **base real** y contar cuántas filas quedan sin el dato (§7.7) |
+| 14 | 🔴 **`core.autocrlf=true` del instalador de Git rompe 2277 archivos y `git status` miente.** En una PC nueva, todo lo que el repo guarda en LF queda en CRLF en disco, y Git no lo ve porque normaliza al commitear | `C:\Program Files\Git\etc\gitconfig` (config de **sistema**, invisible desde `--global`) | `git config --local core.autocrlf false`, y renormalizar con `git reset` + `git checkout -- .` (§5.17). **Verificar los bytes, no `git status`** |
+| 15 | 🔴 **`better-sqlite3` está atado a la versión de Electron, y `npm install` lo compila contra el Node del sistema, no contra Electron.** Con Node 26 falla (`error C2039: "GetIsolate": no es un miembro de "v8::Context"`) y revierte el install entero | `node_modules/better-sqlite3` · el repo usa el runtime de Electron (`node 22.21.1`, ABI **136**) | `npm install --ignore-scripts`, extraer el binario de Electron a mano, y recién entonces `npm rebuild better-sqlite3 --runtime=electron --target=<version instalada> --disturl=https://electronjs.org/headers`. Verificar con un `SELECT` real dentro de Electron (§7.7) |
+| 16 | 🔴 **`CONTEXT.md` tiene separadores de línea **CR CR CR LF** (tres CR), no CRLF.** 1337 de sus 1354 líneas. Viene así del repo, no es de una edición | `CONTEXT.md` (todo el archivo) | **Nunca lo abras con `Edit` ni lo reescribas con `ReadAllText`/`WriteAllText`**: un CRLF "correcto" en el medio de eso rompe el diff entero. Si hay que tocarlo, buscar el ancla con una regex que tolere `\r*\n` y **armar el texto nuevo con el separador que ya usa el archivo**, verificado leyendo los bytes del ancla |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

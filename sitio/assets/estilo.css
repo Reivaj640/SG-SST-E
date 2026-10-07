@@ -1,0 +1,125 @@
+/* Estilo compartido del sitio legal de K+AIR.
+ *
+ * Sin frameworks ni CDN: la idea es que estas páginas carguen siempre, incluso
+ * sin conexión a internet, y que no filtren la IP de quien las mira a un tercero.
+ * Eso último no es paranoia: es coherente con lo que la política de privacidad
+ * de K+AIR promete sobre los datos. */
+:root {
+  --azul: #1a3a5c;
+  --azul-claro: #2d6da3;
+  --gris: #4a5560;
+  --gris-claro: #e2e8ee;
+  --fondo: #f7f9fb;
+  --texto: #1f2933;
+  --max: 860px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.7;
+  color: var(--texto);
+  background: var(--fondo);
+  font-size: 16px;
+}
+
+.envoltura { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+.cabecera {
+  background: var(--azul);
+  color: #fff;
+  padding: 36px 0 30px;
+  margin-bottom: 40px;
+}
+.cabecera h1 { margin: 0 0 6px; font-size: 1.9rem; letter-spacing: -0.02em; }
+.cabecera .sub { margin: 0; opacity: 0.85; font-size: 0.95rem; }
+
+main { padding-bottom: 56px; }
+
+h2 {
+  font-size: 1.28rem;
+  color: var(--azul);
+  margin: 40px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gris-claro);
+}
+
+h3 { font-size: 1.05rem; color: var(--azul-claro); margin: 26px 0 8px; }
+
+p, li { color: var(--gris); }
+ul, ol { padding-left: 22px; }
+li { margin-bottom: 8px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  font-size: 0.93rem;
+}
+th, td {
+  text-align: left;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--gris-claro);
+  vertical-align: top;
+}
+th { background: #eef3f8; color: var(--azul); font-weight: 600; }
+
+.aviso {
+  background: #fff8e6;
+  border-left: 4px solid #d9a404;
+  padding: 16px 20px;
+  margin: 24px 0;
+  border-radius: 0 4px 4px 0;
+}
+.aviso strong { color: #8a6a00; }
+
+.destacado {
+  background: #eef6ee;
+  border-left: 4px solid #2f8f4e;
+  padding: 16px 20px;
+  margin: 24px 0;
+  border-radius: 0 4px 4px 0;
+}
+.destacado strong { color: #1f6b38; }
+
+.pie {
+  border-top: 1px solid var(--gris-claro);
+  padding: 26px 0 40px;
+  color: #7a8794;
+  font-size: 0.88rem;
+}
+
+nav.enlaces {
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+nav.enlaces li { margin: 0; }
+nav.enlaces a {
+  display: inline-block;
+  padding: 7px 15px;
+  background: #fff;
+  border: 1px solid var(--gris-claro);
+  border-radius: 999px;
+  color: var(--azul);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+nav.enlaces a:hover { border-color: var(--azul-claro); background: #eef3f8; }
+
+a { color: var(--azul-claro); }
+
+.fecha { color: #7a8794; font-size: 0.9rem; margin-top: 4px; }
+
+@media (max-width: 600px) {
+  .cabecera h1 { font-size: 1.5rem; }
+  body { font-size: 15px; }
+  table { font-size: 0.86rem; }
+  th, td { padding: 9px 8px; }
+}

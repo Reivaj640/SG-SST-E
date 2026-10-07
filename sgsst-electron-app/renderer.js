@@ -3510,15 +3510,41 @@ contentArea.innerHTML = '';
   const passwordInput = document.getElementById('kair-login-pass');
   const rememberCheckbox = document.getElementById('kair-remember-me');
 
-  const savedEmail = localStorage.getItem('kair_remembered_email');
-  const savedPassword = localStorage.getItem('kair_remembered_password');
-  if (savedEmail) {
-    emailInput.value = savedEmail;
-    if (savedPassword) {
-      passwordInput.value = savedPassword;
-      rememberCheckbox.checked = true;
-    }
-  }
+  // Las credenciales llegan CIFRADAS desde el main process (safeStorage); ya no queda
+  // nada en localStorage. Eso cierra un agujero de seguridad y de paso arregla un
+  // sintoma viejo: los inputs llevan autocomplete="username" y "current-password", y
+  // el controlador de autofill de Chromium REESCRIBE esos campos al cargar la pagina,
+  // pisando el valor recien asignado. Por eso el relleno se hace en dos pasadas: ahora,
+  // y otra vez despues de que la pagina termino de cargar.
+  (function prefillCredenciales() {
+    Promise.resolve()
+      .then(function () {
+        if (!window.electronAPI || typeof window.electronAPI.authCredentialsLoad !== 'function') return null;
+        return window.electronAPI.authCredentialsLoad();
+      })
+      .then(function (r) { return (r && r.success) ? r.credentials : null; })
+      .catch(function (e) {
+        console.warn('[login] No se pudieron leer las credenciales recordadas:', e && e.message);
+        return null;
+      })
+      .then(function (recordadas) {
+        // Limpia la copia en texto plano que dejaron las versiones anteriores.
+        try {
+          localStorage.removeItem('kair_remembered_password');
+          localStorage.removeItem('kair_remembered_email');
+        } catch (e2) { /* localStorage puede estar bloqueado */ }
+        if (!recordadas || !recordadas.email) return;
+        var aplicar = function () {
+          // Solo si el campo sigue vacio: no pisar lo que el usuario este escribiendo.
+          if (!emailInput.value) emailInput.value = recordadas.email;
+          if (recordadas.password && !passwordInput.value) passwordInput.value = recordadas.password;
+          rememberCheckbox.checked = true;
+        };
+        aplicar();
+        setTimeout(aplicar, 60);
+        window.addEventListener('load', function () { setTimeout(aplicar, 0); });
+      });
+  })();
 
   const passwordToggle = document.getElementById('kair-password-toggle');
   const passwordToggleIcon = passwordToggle.querySelector('i');
@@ -3585,12 +3611,21 @@ contentArea.innerHTML = '';
       });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
 
-      if (rememberCheckbox.checked) {
-        localStorage.setItem('kair_remembered_email', email);
-        localStorage.setItem('kair_remembered_password', password);
-      } else {
-        localStorage.removeItem('kair_remembered_email');
-        localStorage.removeItem('kair_remembered_password');
+      // La contrasena NO se guarda en localStorage: se cifra en el main process con
+      // safeStorage. Si no hay cifrado disponible NO se guarda nada y se avisa por
+      // consola; dejar una copia en claro "por si acaso" seria el mismo fallo que
+      // estamos cerrando.
+      try {
+        if (rememberCheckbox.checked) {
+          var rCred = await window.electronAPI.authCredentialsSave({ email: email, password: password });
+          if (!rCred || !rCred.cifrado) {
+            console.warn('[login] No se pudo cifrar la contrasena: "Recordar mis datos" NO queda activo.');
+          }
+        } else {
+          await window.electronAPI.authCredentialsClear();
+        }
+      } catch (eCred) {
+        console.warn('[login] No se pudieron guardar las credenciales recordadas:', eCred && eCred.message);
       }
 
       // Extraer nombre del usuario para la transición
@@ -3598,6 +3633,11 @@ contentArea.innerHTML = '';
 
       // Ejecutar transición visual
       await executeLoginTransition(userName);
+
+      // [GATE-CONSENT] Pantalla de consentimiento legal (Ley 1581/2012) — bloquea
+      // antes de cargar la app. Fail-open: si la infraestructura falla, procede.
+      const consentOk = await ensureConsentGate();
+      if (consentOk === false) return;   // el usuario rechazó → la app ya pidió el cierre
 
       // Continuar con la inicialización normal
       await window.electronAPI.companiesSyncV1({ token: authToken });
@@ -3641,6 +3681,173 @@ async function loadAssignedCompaniesFromSession(token) {
   return { success: true, companies: unique };
 }
 
+/**
+ * 📦873 — Gate de consentimiento (Ley 1581 de 2012, art. 5 y 8; Ley 1712 de 2014).
+ *
+ * Se invoca DESPUÉS del login y ANTES de initializeApp(). Devuelve:
+ *   true  → el usuario aceptó (o no hacía falta preguntar) → la app sigue cargando.
+ *   false → el usuario rechazó → el backend ya pidió el cierre, no se sigue.
+ *
+ * 🔴 FAIL-OPEN, y esto es una decisión, no un descuido.
+ * Si CUALQUIER cosa de la infraestructura falla (el preload no expone los canales, la BD
+ * no responde, el overlay no está en el DOM), esta función devuelve true y la app carga.
+ * La alternativa — bloquear el acceso a una aplicación de gestión de salud porque la tabla
+ * de consentimientos no arranca — deja al usuario sin poder trabajar. El backend ya está
+ * escrito con esa misma política: `consent:estado` devuelve null ante cualquier error.
+ *
+ * Lo que NO es fail-open es la decisión del usuario: si marca y acepta, queda registrado;
+ * si no acepta, la app no carga. Un error de infraestructura nunca se confunde con un
+ * "no", ni al revés.
+ *
+ * El hash del texto legal va en el registro como prueba de QUÉ texto se leyó en el momento
+ * de la aceptación. Si algún día se edita la política, ese hash deja de coincidir y se
+ * puede demostrar qué versión se aceptó, aunque habría que regenerarlo al cambiar.
+ */
+
+const CONSENT_VERSION_TERMINOS = '2026-10-07';
+const CONSENT_VERSION_PRIVACIDAD = '2026-10-07';
+
+/** SHA-256 del texto legal. Si crypto.subtle no existiera, un fallback no criptográfico. */
+async function _consentTextoHash(texto) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    let h = 0;
+    for (let i = 0; i < texto.length; i++) { h = ((h << 5) - h + texto.charCodeAt(i)) | 0; }
+    return 'fnv1a:' + (h >>> 0).toString(16);
+  }
+}
+
+async function ensureConsentGate() {
+  const api = window.electronAPI;
+  if (!api || typeof api.consentEstado !== 'function') {
+    console.warn('[consent] El preload no expone consentEstado; se continúa (fail-open).');
+    return true;
+  }
+
+  let estado = null;
+  try {
+    estado = await api.consentEstado();
+  } catch (e) {
+    console.warn('[consent] Error consultando el estado; se continúa (fail-open):', e);
+    return true;
+  }
+  if (!estado) return true;          // el backend devuelve null ante cualquier error suyo
+  if (!estado.requiere) return true;  // ya aceptó esta versión del documento
+
+  const overlay = document.getElementById('kair-consent-overlay');
+  if (!overlay) {
+    console.warn('[consent] #kair-consent-overlay no existe en el DOM; se continúa (fail-open).');
+    return true;
+  }
+
+  const chkTerminos = document.getElementById('kair-consent-check-terminos');
+  const chkDatos = document.getElementById('kair-consent-check-datos');
+  const errorBox = document.querySelector('[data-consent-error]');
+  const btnAceptar = document.querySelector('[data-consent-action="accept"]');
+  const btnRechazar = document.querySelector('[data-consent-action="reject"]');
+  const cuerpo = overlay.querySelector('.kair-consent__body');
+
+  overlay.hidden = false;
+  if (cuerpo) cuerpo.scrollTop = 0;
+
+  const textoLegal = cuerpo ? (cuerpo.innerText || '').trim() : '';
+
+  function mostrarError(msg) {
+    if (!errorBox) return;
+    if (msg) { errorBox.textContent = msg; errorBox.hidden = false; }
+    else { errorBox.hidden = true; }
+  }
+  function limpiarError() { mostrarError(''); }
+
+  if (chkTerminos) chkTerminos.addEventListener('change', limpiarError);
+  if (chkDatos) chkDatos.addEventListener('change', limpiarError);
+
+  return new Promise((resolve) => {
+    let cerrado = false;
+
+    function limpiar() {
+      if (cerrado) return;
+      cerrado = true;
+      if (btnAceptar) btnAceptar.removeEventListener('click', onAceptar);
+      if (btnRechazar) btnRechazar.removeEventListener('click', onRechazar);
+    }
+
+    async function onAceptar() {
+      const okTerminos = !!(chkTerminos && chkTerminos.checked);
+      const okDatos = !!(chkDatos && chkDatos.checked);
+
+      if (!okTerminos || !okDatos) {
+        mostrarError('Debe marcar las dos autorizaciones para continuar.');
+        return;
+      }
+
+      if (btnAceptar) btnAceptar.disabled = true;
+      mostrarError('');
+
+      // El checkbox de datos cubre LOS DOS flags: el backend exige aceptaDatos Y
+      // aceptaDatosSensibles por separado (main.js:2735). Mandar uno solo devuelve
+      // FALTA_AUTORIZACION y el usuario no entendería por qué.
+      const payload = {
+        token: (typeof authToken !== 'undefined' && authToken) ? authToken : null,
+        aceptaTerminos: okTerminos,
+        aceptaDatos: okDatos,
+        aceptaDatosSensibles: okDatos,
+        versionTerminos: CONSENT_VERSION_TERMINOS,
+        versionPrivacidad: CONSENT_VERSION_PRIVACIDAD,
+        textoHash: await _consentTextoHash(textoLegal)
+      };
+
+      let r = null;
+      try {
+        r = await api.consentRegistrar(payload);
+      } catch (e) {
+        console.error('[consent] Error registrando la aceptación:', e);
+      }
+
+      if (r && r.success === true) {
+        console.log('[consent] Aceptación registrada.');
+        overlay.hidden = true;
+        limpiar();
+        resolve(true);
+        return;
+      }
+
+      const codigo = (r && r.error) || 'DESCONOCIDO';
+      if (btnAceptar) btnAceptar.disabled = false;
+      if (codigo === 'SESION_INVALIDA') {
+        mostrarError('Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.');
+      } else if (codigo === 'FALTA_AUTORIZACION') {
+        mostrarError('Faltan autorizaciones por registrar. Revisa las dos casillas.');
+      } else {
+        mostrarError('No se pudo guardar el registro del consentimiento. Inténtalo de nuevo.');
+      }
+    }
+
+    async function onRechazar() {
+      if (btnRechazar) btnRechazar.disabled = true;
+      try {
+        if (typeof api.consentRechazar === 'function') await api.consentRechazar();
+      } catch (e) {
+        console.warn('[consent] Error al registrar el rechazo:', e);
+      }
+      overlay.hidden = true;
+      limpiar();
+      console.log('[consent] El usuario no aceptó los términos.');
+      resolve(false);
+    }
+
+    if (btnAceptar) btnAceptar.addEventListener('click', onAceptar);
+    if (btnRechazar) btnRechazar.addEventListener('click', onRechazar);
+
+    // Escape NO cierra: el consentimiento no es descartable, se responde Aceptar o No acepto.
+    const onKey = (e) => { if (e.key === 'Escape') e.preventDefault(); };
+    document.addEventListener('keydown', onKey, { once: true });
+
+    if (btnAceptar) btnAceptar.focus();
+  });
+}
 async function initializeAuthFlow() {
   authToken = null;
   currentUser = null;
@@ -3837,7 +4044,16 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
   
   // === FUNCIÓN AUXILIAR PARA VERIFICAR SI ES ADMIN ===
   function checkIsAdmin() {
-    if (!currentUser || !currentUser.companies) return false;
+    // 📦862 · El backend YA resolvió si sos administrador: `auth-login-v1`
+    // manda `user.isAdmin`, y `validateSession` (main.js:1021) cubre los casos
+    // globales (admin@kair.local y compañía) que NO dependen de tener empresas.
+    // Antes esta función solo miraba los roles de `currentUser.companies`, y con
+    // companies = [] eso da FALSE: un administrador sin empresas asignadas
+    // quedaba marcado como usuario normal, que es justo el caso que dispara
+    // este bloque. Por eso el mensaje era el equivocado.
+    if (!currentUser) return false;
+    if (currentUser.isAdmin === true) return true;
+    if (!Array.isArray(currentUser.companies)) return false;
     return currentUser.companies.some(c => {
       const role = (c.role || '').toLowerCase();
       return role === 'administrador' || role === 'administrador del sistema';
@@ -3845,15 +4061,17 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
   }
   
   // === FILTRAR EMPRESAS SEGÚN PERMISOS DEL USUARIO ===
-  if (Array.isArray(overrideCompanies)) {
-    // Si se proporcionan empresas específicas (ej: desde login), usarlas
-    dynamicCompanies = overrideCompanies;
-    console.log('📋 Mostrando empresas desde overrideCompanies:', dynamicCompanies.length);
-  } else if (assignedCompanies && assignedCompanies.length > 0 && !checkIsAdmin()) {
-    // === USUARIO NO-ADMIN: Solo mostrar empresas asignadas ===
-    dynamicCompanies = assignedCompanies;
-    console.log('👤 Usuario NO-ADMIN: mostrando solo empresas asignadas:', dynamicCompanies.length);
-  } else {
+  // 📦862 · El orden importa: se decide POR ROL primero.
+  // La primera rama era `Array.isArray(overrideCompanies)`, y como
+  // initializeApp() SIEMPRE recibe un array (renderer.js:3604), esa rama ganaba
+  // SIEMPRE y la de administrador quedaba muerta: código que no se ejecuta.
+  // Consecuencia real: un admin sin empresas asignadas caía en el mensaje de
+  // 'no tienes empresas asignadas, contacta a administración', que es el de un
+  // usuario normal, y lo dejaba sin salida.
+  // Ojo con 'arreglarlo' solo con `.length > 0`: un NO-admin sin empresas caeria
+  // en la rama de admin y veria TODAS. Por eso el rol se decide primero.
+  const esAdmin = checkIsAdmin();
+  if (esAdmin) {
     // === ADMINISTRADOR: Mostrar todas las empresas ===
     try {
       const config = await window.electronAPI.loadConfig();
@@ -3866,6 +4084,14 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
       dynamicCompanies = ["Tempoactiva", "Temposum", "Aseplus", "Asel"];
     }
     console.log('👑 Usuario ADMIN: mostrando todas las empresas:', dynamicCompanies.length);
+  } else if (Array.isArray(overrideCompanies) && overrideCompanies.length > 0) {
+    // === USUARIO NO-ADMIN: Solo mostrar las empresas del override ===
+    dynamicCompanies = overrideCompanies;
+    console.log('📋 No-admin con override: usando esas empresas:', dynamicCompanies.length);
+  } else {
+    // === USUARIO NO-ADMIN: Solo mostrar empresas asignadas ===
+    dynamicCompanies = assignedCompanies;
+    console.log('👤 Usuario NO-ADMIN: mostrando solo empresas asignadas:', dynamicCompanies.length);
   }
 
   // 📦841b · El desvanecido va SOLO sobre la construccion del contenido.
@@ -3959,15 +4185,34 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
     // Mostrar mensaje si no hay empresas registradas
     if (dynamicCompanies.length === 0) {
       const noCompaniesMessage = document.createElement('p');
-      noCompaniesMessage.textContent = Array.isArray(overrideCompanies)
-        ? 'No tienes empresas asignadas. Contacta a administración.'
-        : 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.';
+      // 📦862 · El criterio es el ROL, no si vino un array. Un admin nunca debe
+      // ver 'contacta a administración': es el mensaje del usuario sin empresas
+      // asignadas, y a un admin lo deja sin salida.
+      noCompaniesMessage.textContent = esAdmin
+        ? 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.'
+        : 'No tienes empresas asignadas. Contacta a administración.';
       noCompaniesMessage.style.color = 'white';
       noCompaniesMessage.style.fontSize = '18px';
       noCompaniesMessage.style.textAlign = 'center';
       noCompaniesMessage.style.marginBottom = '20px';
       noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
       uiContainer.appendChild(noCompaniesMessage);
+
+      // 📦862 · El Inicio esconde el sidebar siempre, así que sin empresas
+      // registradas el admin se queda sin ninguna forma de llegar a la
+      // configuración. Este botón es la salida: sin él, el mensaje correcto
+      // no sirve de nada. Ojo: no citar aquí la clase CSS del sidebar, porque
+      // test-swapview-841 exige que nada de ese cromo entre en el desvanecido.
+      if (esAdmin) {
+        const goConfig = document.createElement('button');
+        goConfig.className = 'company-select-button';
+        goConfig.textContent = 'Ir a Configuración';
+        goConfig.style.margin = '10px';
+        goConfig.addEventListener('click', () => {
+          if (typeof showSettingsPage === 'function') showSettingsPage();
+        });
+        uiContainer.appendChild(goConfig);
+      }
     } else {
       dynamicCompanies.forEach(companyName => {
         const button = document.createElement('button');
@@ -6868,7 +7113,11 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
 
     // Crear un iframe para cargar la nueva interfaz de configuraciones
     const iframe = document.createElement('iframe');
-    iframe.src = 'components/config/config-viewer.html?v=20260925-prompt-verbatim';
+    // 📦868 — Bump de cache-bust: este iframe carga la vista de Configuración, y se
+// le cambió la sección de correo (botón que no se ofrece si la instalación no
+// puede iniciar Google, y mensajes sin jerga técnica). Sin el bump, el
+// navegador puede seguir mostrando la versión anterior.
+iframe.src = 'components/config/config-viewer.html?v=20261006-oauth-embebido';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';

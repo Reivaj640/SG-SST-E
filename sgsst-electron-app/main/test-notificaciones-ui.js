@@ -55,11 +55,15 @@ ok('kair-alerts conmuta vista por tab', /action === 'tab'/.test(alerts));
 ok('styles.css estilos de tabs', /\.kair-alerts-popover__tab/.test(stylesCss));
 // 📦823 — el token sube a notifs-remitente (el toast muestra QUIÉN escribió).
 // Se acepta cualquier token vigente (no se fija una fecha que envejezca el test).
+// 🔴 El cuarto conjunct fijaba el literal `20260928-notifs-ver`: el comentario de arriba
+// decía "se acepta cualquier token vigente" y el código hacía lo contrario. Y además era
+// redundante — `/kair-alerts\.js\?v=/` es subcadena de `/shared\/kair-alerts\.js\?v=/`,
+// que el primer conjunct ya cubre con la forma correcta. Se quita el conjunct muerto, no
+// el check.
 ok('cache-bust actualizado en index.html',
   /shared\/kair-alerts\.js\?v=\d{8}-/.test(indexHtml) &&
   /renderer\.js\?v=\d{8}-/.test(indexHtml) &&
-  /styles\.css\?v=\d{8}-/.test(indexHtml) &&
-  /kair-alerts\.js\?v=20260928-notifs-ver/.test(indexHtml));
+  /styles\.css\?v=\d{8}-/.test(indexHtml));
 
 // ── 📦823 · Remitente visible en toast y en la lista ────────────────────
 ok('toast: subtitle "De: <remitente>"', /sub = 'De: '/.test(renderer));

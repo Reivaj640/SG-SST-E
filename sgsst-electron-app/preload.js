@@ -23,6 +23,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
   authLoginV1: (payload) => ipcRenderer.invoke('auth-login-v1', payload),
   authLogoutV1: (payload) => ipcRenderer.invoke('auth-logout-v1', payload),
+  // 🔐 "Recordar mis datos" del login. La contraseña NO va a localStorage: se cifra en el
+  // main process con safeStorage y se guarda en auth-credentials.enc.
+  // `cifrado:false` significa que safeStorage no estaba disponible y NO se guardó nada —
+  // el renderer debe avisar, no fingir que se recuerda.
+  authCredentialsSave: (payload) => ipcRenderer.invoke('auth-credentials:save', payload),
+  authCredentialsLoad: () => ipcRenderer.invoke('auth-credentials:load'),
+  authCredentialsClear: () => ipcRenderer.invoke('auth-credentials:clear'),
+  // 📦873 — Consentimiento de Términos y datos personales (Ley 1581 de 2012).
+  // `consentEstado` devuelve null si hay cualquier error de infraestructura: el gate
+  // tiene que interpretar eso como "seguí" y no como "bloqueá".
+  // `consentRegistrar` exige los TRES flags: aceptaTerminos, aceptaDatos y
+  // aceptaDatosSensibles. El UI muestra 2 checkboxes, y el segundo marca los dos
+  // últimos a la vez; si falta alguno, el handler responde FALTA_AUTORIZACION.
+  consentEstado: () => ipcRenderer.invoke('consent:estado'),
+  consentRegistrar: (payload) => ipcRenderer.invoke('consent:registrar', payload),
+  consentRechazar: () => ipcRenderer.invoke('consent:rechazar'),
   companiesSyncV1: (payload) => ipcRenderer.invoke('companies-sync-v1', payload),
   usersListV1: (payload) => ipcRenderer.invoke('users-list-v1', payload),
   usersCreateV1: (payload) => ipcRenderer.invoke('users-create-v1', payload),
@@ -79,6 +95,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.error(`[MAPEO][PRELOAD] Error en mapDirectory:`, error);
         throw error;
       });
+  },
+
+  // 📦867 (Fase 4) — progreso del mapeo en vivo. Mismo patrón que onFullscreenChanged:
+  // se registra un listener propio y se devuelve la función que lo quita, para que la
+  // vista lo desuscriba al cerrar el overlay y no quede escuchando entre mapeos.
+  onMapDirectoryProgress: (callback) => {
+    const listener = (event, progreso) => callback(progreso);
+    ipcRenderer.on('mapeo-progreso', listener);
+    return () => ipcRenderer.removeListener('mapeo-progreso', listener);
   },
 
   readDirectory: (directoryPath) => {

@@ -4,12 +4,195 @@
 > y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
-**Última actualización:** 5 de octubre de 2026
-**Versión actual:** 0.1.240 (desarrollo) — último publicado v0.1.205
-**Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
-**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
-
-> **🆕 v0.1.240 (📦861 — el explorador de archivos deja de mentir):**
+**Última actualización:** 6 de octubre de 2026
+**Versión actual:** 0.1.247 (desarrollo) — último publicado v0.1.205
+**Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
+**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**
+> Google respondía "Acceso bloqueado — Missing required parameter: client_id / Error 400",
+> una pantalla que no menciona K+AIR; peor, el servidor de callback quedaba esperando y el
+> siguiente intento daba "Ya hay un flow de autorización activo". **La causa de fondo:**
+> `shared/google-auth.js:66` leía las credenciales **solo** de `process.env`, y el `.env`
+> **no viaja con el instalador** (ignorado por git, que es lo correcto). Por eso funcionaba
+> en el portátil del owner y en cualquier otra máquina no: la app no tenía correo para sus
+> clientes, y el único síntoma era un error de Google.
+> **Arreglo de producto: que la app traiga las credenciales encima, y que la app no sea
+> dueña de que el usuario configure nada.** Cada persona y cada cliente autoriza su PROPIA
+> cuenta con el mismo `client_id`, como cualquier botón "iniciar sesión con Google".
+> **Probado de punta a punta contra Google:** el owner autorizó con su cuenta real y la bandeja
+> conectó. El flujo completo funciona.
+> `main.js:2492` corta antes de `startAuth()` si `!googleAuth.available`, mandando el detalle a
+> `sendLog`; `google-oauth:status` expone `available`; `config-viewer.html` **no ofrece el
+> botón** si no puede completar el flujo y muestra mensajes cortos en humano (del `alert` se
+> sacaron el error crudo de Google, "tokens" e "instalación"); `.env.example` reescrito.
+> **El error de diseño que el owner recibió:** el primer arreglo era un guard que le
+> explicaba el `.env` al usuario final con todo detalle. Eso es un mensaje de desarrollador —un
+> cliente de K+AIR no va a editar un archivo que no sabe qué es— y la solución real no fue
+> "avisar mejor", sino "que no haya nada que avisar".
+> 🚨 **La creencia que casi costó el paquete, y cómo se detectó:** se concluyó que el
+> `client_secret` era opcional porque así lo documenta la librería: `google-auth-library` tiene
+> `ClientAuthentication.None` y con ese modo **omite** el secreto del body. Todo cuadraba en el
+> código. **Pero leer la librería no es verificar el servicio.** Al probarlo de verdad, Google
+> aceptó los 5 permisos y el canje devolvió
+>     {"error":"invalid_request","error_description":"client_secret is missing."}
+> El síntoma era el peor: el navegador decía "Autorización exitosa", el cliente había
+> autorizado todo, y al final se perdía la conexión. Media conexión. Un enum que existe en
+> el código no significa que el endpoint lo acepte: hay que preguntárselo al servidor.
+> 🚨 **Y lo que lo dejó invisible:** los handlers de OAuth usaban `console.error`, que **no
+> escribe en `main.log`**. El fallo no dejaba rastro en ningún lado; hubo que reproducir la
+> petición a mano (un canje con un código falso revela el error del endpoint) para verlo.
+> Ahora los tres escriben en `sendLog` y hay un check que lo vigila.
+> 🚨 **Y el repo es PÚBLICO, así que el secret tampoco puede ir en el config versionado.**
+> Al commitear, GitHub rechazó el push: `GH013 — Push cannot contain secrets`. Hacerlo privado
+> NO es la salida: `package.json` declara `publish: {provider: "github"}` y electron-updater
+> pega a la API de releases **sin token**; en un repo privado esa API devuelve **404** y
+> **todos los clientes dejarían de recibir actualizaciones**. Repo público ⇒ el secret no
+> puede estar en el historial. Solución: `shared/google-oauth-config.js` se versiona **vacío** y
+> las credenciales viven en `sgsst-electron-app/.env` (en `.gitignore`). Verificado que
+> electron-builder **no excluye `.env`** de los archivos del app, así que un `.env` en la
+> máquina que compila **viaja dentro del instalador** y le llega al cliente sin que configure
+> nada — el objetivo de producto se mantiene.
+> **NUEVO** `main/_verificar-credenciales-build.js` como hook `prebuild` / `prebuild:win` /
+> `prebuild:mac` / `prebuild:linux`: si faltan las dos credenciales, **corta el build con exit 1**
+> diciendo dónde pegarlas. Mejor que el build falle ahí a que salga un instalador donde el
+> correo no conecta, que es justamente el bug que costó la jornada.
+> 🚨 **Trampa al pegar credenciales:** el `client_id` se pegó **sin** el sufijo
+> `.apps.googleusercontent.com`, que parece decorativo y no lo es: Google contesta 400 igual
+> que si estuviera vacío. Al pegar una credencial hay que validar el **formato entero**, no
+> que no esté vacía.
+> Validado: `main/test-google-oauth-868.js` **57/57** con **21 mutaciones que muerden** (varias
+> invertidas: fijan que el secret es necesario, que el repo no puede ser privado y que las
+> credenciales no van en el archivo versionado); `test-config-premium-v2.js` 44/44 ·
+> `test-hero-fila-840.js` 35/35 · suite 125 · 107 verdes · 18 preexistentes (0 regresiones).
+> **Pendiente:** el proyecto sigue en modo "Testing", así que la autorización vence a los
+> 7 días. Pasarlo a "Production" exige una **URL de política de privacidad pública**, que
+> todavía no existe. Los 5 scopes ya están declarados y coinciden con los del código.
+>
+> **🛠️ Cierre de la jornada: la app quedó en PRODUCTION y probada con una cuenta nueva**
+> El proyecto **KAIR Calendar Sync** quedó en **"En producción"**. Cualquier cuenta de
+> Google puede autorizar sin ser agregada una por una, y el `refresh_token` ya no vence a
+> los 7 días. **Probar con una cuenta que nunca estuvo en la lista de prueba era el paso
+> decisivo**: en modo Prueba esa cuenta no podría autorizar, así que conectar Demonstró
+> que la publicación sirvió y no solo que quedó el cartel puesto.
+> El botón de publicar estaba apagado porque faltaban la página principal y la URL de
+> política de privacidad. Se creó el sitio en GitHub Pages:
+> **https://reivaj640.github.io/SG-SST-E/**
+> La política **no es un placeholder**: cada afirmación se verificó contra el código.
+> El contenido de los correos no sale de la máquina del cliente (`main/email-sync.js`
+> → SQLite local); el `.kairsync` de `main/sync-serializer.js` no incluye las tablas de
+> correo; `"sync-bridge"` es IPC y `sync-service.js` usa `fs` sobre una carpeta local; no hay
+> telemetria; el único canal propio es el **servidor de firma que la empresa tenga
+> configurado** (PDFs a firmar, separado del correo; la URL sale de `secrets.enc`, así que
+> `firma.k-air.com` es el de una empresa concreta, no uno fijo). Incluye la **Ley 1581 de
+> 2012** de Colombia. Y declara la debilidad real: los
+> tokens se guardan sin cifrar.
+> **🛠️ El sitio vive en `sitio/` + la rama `gh-pages`, NO en `docs/`.** `docs/` ya
+> tenía contenido interno (protocolos SST, planes de gestión,
+> `investigacion-seguimiento-embarazo-sst-colombia.md`); publicar Pages desde ahí lo habría
+> puesto como sitio web oficial. Con la rama `gh-pages` solo se publica el sitio, y se
+> verificó que `/docs/`, `/Portear/` y `/sgsst-electron-app/` dan 404 allí.
+> `⚠️ La rama `gh-pages` es una COPIA generada de `sitio/`**: si se edita una hay que
+> regenerar la otra.
+> **Pendientes** (cola completa en `Historial.md`): la verificación de la app (~10 días hábiles,
+> con Search Console y video) para sacar el aviso de "app no verificada"; **tope de 100
+> usuarios de por vida del proyecto, sin reset**; tokens sin cifrar; y 📦862 (ancho de
+> la tarjeta de ingreso) que sigue **sin commitear** en `index.html` y `styles.css` — son
+> cambios del owner de una sesión anterior que esta jornada no tocó.
+> **Resuelto al cierre**: el correo de soporte del sitio ya no es provisorio, es
+> `adminkair@gmail.com` (`e373fdce`), y la rama `gh-pages` se regeneró en `9c8fbfb7`.
+>> **Anterior · v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
+> **🆕 v0.1.246 (📦867 — Fase 4 del mapeo de estructura, progreso real en pantalla):**
+> Quinta y última etapa del plan de 5 fases, y la primera con cambios visibles. El overlay del
+> mapeo **muestra los archivos y las carpetas contados de verdad** mientras el escáner corre, y
+> desaparece el texto fijo "Tiempo estimado: 10-60 segundos" (`config-viewer.html:3128`), que
+> nunca se calculó y que en una carpeta de Drive quedaba corto por dos órdenes de magnitud
+> (medido: 1.241 s de reloj contra 4,45 s de CPU — 99,6 % esperando la red).
+> El avance viaja por **`stderr`**: `map_directory.py` emite `[PROGRESO] archivos=N carpetas=N`
+> con `_avisar_progreso()` (amortiguado a 250 ms con `time.monotonic()`, forzado al arrancar y al
+> cerrar), `main.js` engancha `child.stderr` y reenvía por el canal IPC `mapeo-progreso` con guard
+> de `event.sender.isDestroyed()`, `preload.js` expone `onMapDirectoryProgress(cb)` con su función
+> de baja, y `config-viewer.html` pinta el contador y suelta el listener en los **tres** caminos de
+> salida. **stdout queda con una sola línea de JSON puro** (contrato de 📦866): por eso el
+> progreso va por stderr y el test lo muerde con un bite test real. `execFilePromise` dejó de ser
+> un `promisify(execFile)` pelado —ahora es un wrapper que cuelga `.child` en la promesa— porque
+> la de promisify no expone el proceso hijo y no había dónde enganchar el stream; los otros call
+> sites no leen `.child` y no cambian de comportamiento. Validado: `py_compile` OK, `node --check`
+> OK, test nuevo `test-mapeo-estructura-867.js` **44/44** con **11 mutaciones que muerden**, tests
+> 863 **36/36** + 865 **15/15** + 866 **20/20**, suite **124 · 106 verdes · 18 preexistentes**
+> (0 regresiones). Cache-bust: `renderer.js?v=20261006-mapeo-fase4`.
+> Validación adicional fuera del repo: se extrajeron y ejecutaron el wrapper y la regex
+> **reales** de `main.js` contra un fixture de 2.500 archivos (15/15). Las muestras de progreso
+> llegaron a los 81 ms y 114 ms, antes de que el proceso terminara (125 ms) — el avance se
+> escucha en vivo, no bufferizado. Falta decidir si esa prueba entra como test al repo.
+>
+> **Anterior · v0.1.245 (📦866 — Fase 3 del mapeo de estructura, tamaño −97,8 %):**
+> Cuarta etapa del plan de 5 fases. `Portear/src/map_directory.py` **deja de emitir `files[]`,
+> `file_count`, `dir_count`, las entradas `errors` por nodo y el indentado `indent=2`**, y los
+> errores de lectura van a `stderr` (`print(..., file=sys.stderr)`) para no contaminar el stdout,
+> que debe seguir siendo **JSON puro en una sola línea** (la Fase 4 manda progreso por `stderr`).
+> Los consumidores totales se conservan: `total_files`/`total_folders` se llenan con un contador
+> de módulo (`_contador`, reiniciado en `map_directory()`) porque los leen `renderer.js:7158/7160`
+> y `main.js:4337/4338`; `formatStructureForLog` ya guardaba `if (node.files)`. También se quitó
+> el bloque por archivo (stat + extensión), que ya no tenía destino. Medido contra un fixture de
+> 2000 archivos: **934.437 bytes / 19.219 líneas / 2.941 ms → 20.877 bytes / 1 línea / 162 ms
+> (−97,8 % de tamaño)**. Validado: `py_compile` OK, tests 863 **36/36**, 865 **15/15** y el nuevo
+> `test-mapeo-estructura-866.js` **20/20** (8 checks de mordida que fallen con el código previo),
+> suite completa **123 · 105 green · 18 fallos preexistentes** (0 regresiones). Cache-bust:
+> `renderer.js?v=20261006-mapeo-fase3`.
+>
+> **Anterior · v0.1.244 (📦865 — Fase 2 del mapeo de estructura, velocidad sin SHA-256):**
+> Tercera etapa del plan de 5 fases. `Portear/src/map_directory.py` **elimina `hashlib`,
+> `_calculate_checksum` y el campo `checksum`** — el SHA-256 sobre 1,73 GB era ≈99,6 % de los
+> 760+ s y su resultado no lo consume nadie. El recorrido pasa a un solo pase con `os.scandir`,
+> `scan_date` sale real (`datetime.now().isoformat()`, antes `null`), los errores de lectura se
+> reportan (`size: None` + entrada en `errors`), y la semántica de symlink se conserva (atajo a
+> carpeta → nodo EMPTY, a archivo → archivo, roto → omitido). Validado: `py_compile`
+> OK, test de Fase 0 sigue 36/36, test nuevo `test-mapeo-estructura-865.js` **15/15** con prueba
+> de mordida (los 6 checks de cambio fallen con el código viejo), suite **122 · 104 green ·
+> 18 fallos preexistentes** (0 regresiones). Cache-bust: `renderer.js?v=20261006-mapeo-fase2`.
+>
+> **Anterior · v0.1.243 (📦864 — Fase 1 del mapeo de estructura, `maxBuffer`/`timeout`):**
+> Segunda etapa del plan de 5 fases. `execFilePromise` (`main.js:4311`) ahora pasa
+> `maxBuffer: 64 * 1024 * 1024` (64 MB) y `timeout: 30 * 60 * 1000` (30 min): el techo de
+> 1 MiB del `stdout` ya no corta el JSON de ~2,98 MB y `JSON.parse(stdout)` puede completarse.
+> Validado: `node --check main.js`, test de Fase 0 36/36, suite completa 121 · 103 green ·
+> 18 fallos preexistentes (baseline, 0 regresiones). Cache-bust:
+> `renderer.js?v=20261006-mapeo-fase1`.
+>
+> **Anterior · v0.1.242 (📦863 — Fase 0 del mapeo de estructura, contrato en pruebas):**
+> Arranca el plan aprobado de 5 fases para que "Mapeando Estructura de Documentos" termine.
+> Hoy tarda **760+ s** y **nunca completa**: `map_directory.py` hashea con SHA-256 los 1,73 GB
+> (≈99,6 % del tiempo) y el JSON de ~2,98 MB se pasa del tope de 1 MiB del `stdout` de
+> `execFile`, así que `JSON.parse(stdout)` (`main.js:4322`) revienta siempre al final.
+> Esta fase **no cambia código**: crea `main/test-mapeo-estructura-863.js` (36 checks) que fija
+> el contrato antes de optimizar — corrida real del script contra un fixture temporal (con
+> fallback si la máquina no tiene Python), `root`/`structure.path` absolutos,
+> `subdirectories` como dict, el pipeline completo (`map-directory` → `execFilePromise` →
+> `JSON.parse`) y las dos consumidoras extraídas y ejecutadas (`searchInStructure` y
+> `formatStructureForLog`). **Sin chequear** nada que las fases siguientes sacan: `checksum`
+> (Fase 2), `files[]`/`file_count`/indentado (Fase 3), `scan_date` (Fase 2).
+> Cola: Fase 1 `maxBuffer`/`timeout` (📦864) → Fase 2 velocidad sin SHA-256 (📦865) →
+> Fase 3 tamaño sin `files[]` (📦866) → Fase 4 progreso real stderr→IPC→UI (📦867) →
+> Fase 5 backlog (📦868).
+>
+> **🆕 v0.1.241 (📦862 — el admin deja de quedar sin salida):**
+> `showHomePage` filtraba las empresas por `Array.isArray(overrideCompanies)`, que es `true`
+> incluso para `[]`, y como `initializeApp()` **siempre** recibe un array (`renderer.js:3604`),
+> esa rama ganaba siempre y la del admin era **código muerto**. Un admin sin empresas asignadas
+> veía cero empresas y el mensaje "contacta a administración", que es el de un usuario normal.
+> Ahora se decide **por rol primero**: el admin ve todas las empresas registradas y un usuario
+> normal sigue viendo solo las suyas. El mensaje también decide por rol.
+> Ojo: arreglarlo solo con `.length > 0` habría dado a un no-admin **todas** las empresas.
+> **Había un segundo motivo:** `checkIsAdmin()` derivaba el rol **solo** de
+> `currentUser.companies`, así que con `companies = []` —el caso del admin global, que por
+> definición no tiene empresas asignadas— daba `false`. El backend ya mandaba `user.isAdmin`
+> resuelto (`main.js:1628`) y el renderer lo ignoraba. Arreglar solo el orden de las ramas no
+> bastaba: `esAdmin` seguía en `false` y el mensaje seguía siendo el equivocado.
+> Y el Inicio oculta el sidebar siempre, así que con cero empresas el admin no tenía forma de
+> llegar a la configuración: ahora recibe un botón **Ir a Configuración**.
+> Test `main/test-admin-empresas-862.js` (17 checks) que ejecuta `checkIsAdmin()` y el bloque
+>> **🆕 v0.1.240 (📦861 — el explorador de archivos deja de mentir):**
 > El módulo 1.1.1 (Responsable del SG) está **replicado 15 veces** en `modules/`: el 1.1.1 es el original y los otros
 > catorce son copias. Tres bugs del original eran quince bugs.
 > **Lista congelada**: el `catch` de la carga mostraba un toast de 5 s y **nunca redibujaba**, dejando
@@ -1314,6 +1497,46 @@ npm run debug
 ⚠️ **PowerShell:** usar `npx.cmd` (no `npx`) para evitar bloqueos de execution policy.
 
 **Tiempos de build (v0.1.83+):** 8-12 min, ~450 MB.
+
+---
+
+## 🧰 Puesta a punto desde una PC nueva (verificado 2026-10-05)
+
+Un clon recién hecho **no** arranca sin esto. Ninguno de los tres pasos es opcional.
+
+| Paso | Por qué |
+|---|---|
+| `git config --local core.autocrlf false` y renormalizar | El instalador de Git deja `core.autocrlf=true` en config de **sistema** y convierte a CRLF los **2277** archivos que el repo guarda en LF. `git status` **no lo detecta** |
+| `npm install --ignore-scripts` | `better-sqlite3` es nativo y se compila contra el Node del sistema, que **no es** el runtime de la app |
+| `npm rebuild better-sqlite3 --runtime=electron --target=37.10.3 --disturl=https://electronjs.org/headers` | La app corre dentro de Electron 37.10.3 → Node 22.21.1, **ABI 136** |
+
+**Renormalizar** — el paso que casi nadie hace, y sin el cual los tres anteriores no alcanzan:
+
+```powershell
+git reset          # sin stat-cache: recién ahora Git ve los 2277 distintos
+git checkout -- .  # restaura byte a byte el EOL que el repo pide
+```
+
+`git checkout-index -a -f`, `git update-index --really-refresh` y `git read-tree --reset -u` **no
+reparan nada**: los tres reportan 0 cambios porque el stat-cache sigue diciendo que todo coincide.
+
+**Verificar de verdad** — `npm install` salir con 0 no significa que la app abra la base:
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE = "1"
+.\node_modules\electron\dist\electron.exe -e "const D=require('better-sqlite3');const db=new D(':memory:');console.log('OK',process.versions.electron,db.prepare('select sqlite_version() v').get().v)"
+```
+
+Esperado: `OK 37.10.3 3.49.2`.
+
+### 🔑 Lo que no viaja con el repo
+
+| Falta | Dónde vive | Qué pasa si no está |
+|---|---|---|
+| `kair.db` | `%APPDATA%\sgsst-electron-app\` (**fuera** del repo, se crea sola la primera vez) | La app abre pero **vacía**. Los datos no se recuperan del repo: hay que copiar un backup |
+| `.env` | `sgsst-electron-app\.env` (gitignored) | Solo falla el OAuth de Google Calendar. El resto de la app arranca |
+| `python-embed/` | `Portear/` (no se sube al repo) | Hay fallback al Python del sistema (`main.js` → `findPython`). Afecta el análisis de 5 Porqués y accidentes |
+| `INTERNAL_API_KEY` | variable de entorno del `firma-service` | Los tests de firma fallan al levantarse |
 
 ---
 

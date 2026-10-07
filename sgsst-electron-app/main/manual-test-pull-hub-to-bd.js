@@ -1,5 +1,9 @@
+// RENOMBRADO desde test-manual-test-pull-hub-to-bd.js el 2026-10-06: este archivo usa electron.app.whenReady(), que no existe
+// bajo ELECTRON_RUN_AS_NODE=1. El runner lo descubria igual (/^test-.*\.js$/) y lo contaba
+// como fallo todos los dias. No es un test roto: es un test que no puede correr en la suite.
+// Correrlo a mano con la app viva: npx electron main/manual-test-pull-hub-to-bd.js
 /**
- * test-pull-hub-to-bd.js
+ * manual-test-pull-hub-to-bd.js
  *
  * Simula lo que va a pasar cuando se reinicie la app con el fix:
  * 1. Lee el archivo .kairsync del hub

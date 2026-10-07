@@ -1,3 +1,296 @@
+# K+AIR v0.1.251
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Dos arreglos que no deberían haber existido
+
+### La bandeja ya no mezcla correos de dos cuentas
+
+Si conectaba una segunda cuenta de Gmail en el mismo computador, al entrar con la nueva
+**seguía viendo los correos de la anterior**, con sus textos completos. Eso no debería pasar
+nunca.
+
+El motivo era que K+AIR guarda en su base los correos de todas las cuentas que se hayan
+conectado, y al mostrar la bandeja no estaba revisando a qué cuenta pertenecía cada uno. Ya
+está corregido: usted solo ve los correos de la cuenta que tiene conectada.
+
+**No se borró nada.** Los correos de la cuenta anterior siguen guardados; simplemente no se
+muestran. Vuelven a aparecer cuando vuelva a conectar esa cuenta.
+
+### Ahora la app pide permiso antes de abrir sus datos de salud
+
+K+AIR registra historias clínicas, audiometrías y electrocardiogramas. Por la **Ley 1581 de
+2012** ese tratamiento solo es lícito si usted lo autoriza de forma previa, expresa e
+informada, y con constancia de que lo hizo.
+
+Desde esta versión, la primera vez que entra aparece una pantalla con el resumen del
+tratamiento y dos autorizaciones que usted tiene que marcar:
+
+1. Que leyó y acepta los Términos y Condiciones.
+2. Que autoriza el tratamiento de sus datos personales y de sus datos sensibles de salud.
+
+Las dos casillas **no vienen marcadas**. Si no marca alguna, la app no lo deja pasar.
+Si pulsa "No acepto", la app se cierra y no registra nada.
+
+Cada vez que acepta queda guardada la constancia: la fecha, su correo, un identificador
+aleatorio de su equipo, la versión de la aplicación y una huella del texto legal que leyó.
+Esa información nunca sale de su equipo.
+
+Si después quiere retirar su autorización, puede hacerlo; los datos que ya registró no se
+borran solos, escríbanos y los eliminamos.
+
+## Otros arreglos
+
+- Los enlaces dentro de la app (por ejemplo, el de la política de privacidad) ahora se abren
+  en **su navegador de verdad**, en vez de una ventana aparte dentro de K+AIR.
+- El enlace a la política de privacidad estaba mal escrito y daba error 404. Ya funciona.
+- La política de privacidad del sitio ya no anuncia un permiso de Google que K+AIR dejó de
+  pedir, y explica que las claves de acceso a su correo están cifradas y que ahora existe
+  registro de consentimiento.
+---
+
+# K+AIR v0.1.250
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Tu correo de Google queda mejor protegido, y K+AIR pide menos permisos
+
+Dos cambios que no cambian ninguna pantalla, pero que tocan directamente la seguridad de tu
+cuenta de correo.
+
+**Lo primero: la clave que permite leer y enviar tu correo ya no está escrita en el disco.**
+Hasta ahora, esa clave se guardaba en texto plano dentro de un archivo de configuración.
+Eso significa que cualquier programa que pudiera leer ese archivo —un antivirus, una copia de
+seguridad, otra aplicación— se podía llevar acceso a tu correo. A partir de ahora la clave
+se guarda cifrada con el mecanismo del propio sistema operativo (en Windows, el mismo
+cifrado que usa Windows para proteger sus contraseñas). Si tenías K+AIR instalado antes,
+**no tenés que volver a conectar nada**: al abrir la aplicación, la clave se cifra sola y la
+copia que estaba suelta se borra.
+
+**Lo segundo: K+AIR le pide a Google un permiso menos.** Google le pide a cada aplicación que
+explique, uno por uno, para qué quiere cada permiso. Al revisar los que K+AIR declara,
+apareció uno que la aplicación nunca usó: el permiso para crear borradores. K+AIR nunca crea
+borradores, así que no lo pide. Eso tiene dos efectos: es más fácil que Google apruebe la
+aplicación, y vos ves una lista de permisos más corta y más honesta la próxima vez que
+conectes tu cuenta.
+
+Si algún día se implementa guardar borradores, el permiso vuelve — pero con la función ya
+hecha.
+
+---
+
+# K+AIR v0.1.249
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Nada cambia para vos: esto es trabajo interno
+
+Esta versión no agrega ni cambia ninguna pantalla. Arregla pruebas internas que estaban
+fallando desde hacía meses y que, al hacerlo, oscurecían el estado real del proyecto: Informaba
+"17 fallos" cuando en realidad eran varios problemas distintos, y la mayoría no eran fallas de
+la aplicación sino pruebas que seguían pidiendo cosas que ya se habían cambiado a propósito.
+
+También se corrigió un detalle del diagnóstico interno: informaba un número de tablas que no
+coincidía con el que él mismo mostraba.
+
+---
+
+# K+AIR v0.1.248
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## La pantalla de ingreso ya no se ve ancha de más
+
+La tarjeta donde iniciás sesión era más ancha de lo necesario. Ahora es bastante más
+angosta: los campos quedan con el tamaño justo y "Recordar mis datos" y el aviso de abajo
+se ven completos, sin que la tarjeta ocupe media pantalla.
+
+Si tu pantalla está en 125 % o más de ampliación, se nota todavía más: parte de lo que se
+veía era la ampliación de Windows, no la tarjeta.
+
+---
+
+# K+AIR v0.1.247
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Conectar tu correo ahora funciona sin que tengas que configurar nada
+
+Si tocabas "Conectar Gmail" y aparecía un error de Google que decía algo como
+*"Missing required parameter: client_id"*, no era tu cuenta ni tu PC: era un problema de la
+aplicación, que no estaba trayendo las claves de conexión consigo misma.
+
+**Ahora está arreglado y no hay nada que hacer.** Abrís Configuración, tocás "Conectar Gmail",
+Google te pide permiso, y tu correo queda conectado. Nada de archivos, nada de pasos extra.
+
+Si aun así no se pudiera conectar, la aplicación no te va a mostrar un error técnico: te va a
+decir que contactes al administrador. Y el detalle queda guardado en el registro interno, que es
+donde tiene que estar.
+
+---
+
+## Para quien instala K+AIR: cada cliente conecta SU PROPIA cuenta
+
+Esto es lo importante y a menudo se confunde:
+
+- Las claves de conexión son **de la aplicación K+AIR**, no del usuario. Son públicas.
+- **Todos los usuarios comparten la misma clave.** Cada uno abre "Conectar Gmail" y autoriza
+  su propia cuenta con un clic.
+- **El cliente no tiene que pedirle ni traer credenciales**, ni configurar nada por su cuenta.
+
+Es exactamente el mismo modelo que "Iniciar sesión con Google" de cualquier sitio: la
+aplicación se identifica una vez y cada persona da permiso sobre lo suyo.
+
+Lo único que hay que hacer es **una vez, al preparar un instalador nuevo**: pegar las claves
+de la aplicación en un archivo del código, en lugar de dejarlas en un archivo aparte que se
+perdía al cambiar de máquina.
+
+---
+
+# K+AIR v0.1.246
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## El mapeo de estructura: última etapa (la pantalla por fin dice la verdad)
+
+Esta es la **última de las cinco etapas** y la primera en que se ve un cambio en pantalla.
+
+Al vincular una empresa, la aplicación revisa la carpeta entera. Cuando esa carpeta está en la
+nube (Google Drive, OneDrive) la revisión es lenta — con la carpeta real llega a tardar más de
+doce minutos — y hasta ahora la ventana no decía absolutamente nada: un ícono que giraba, un
+reloj, y un texto que prometía **"10-60 segundos"** que ningún cálculo respaldaba.
+
+Ahora, mientras revisa, la ventana muestra **cuántos archivos y cuántas carpetas lleva leídos**,
+en vivo. Y el texto de la estimación desapareció: en su lugar dice que, si la carpeta está en la
+nube, puede tardar varios minutos.
+
+El reloj de tiempo transcurrido sigue ahí, porque ese sí era real.
+
+---
+
+## El mapeo de estructura: cuarta etapa (se achica el trabajo que queda por hacer)
+
+Esta versión **tampoco cambia nada visible**. Es la cuarta de cinco etapas para arreglar el
+mapeo de documentos.
+
+Antes, al terminar de recorrer la carpeta, el escáner armaba un informe enorme: aparte de
+las carpetas y los archivos, escribía **lista por lista el detalle de cada archivo dos veces
+y una pila de información que nadie usa**. Con la carpeta real ese informe pesaba casi
+3 megabytes, y era tan grande que no cabía en el conducto por el que viaja el resultado: el
+escáner se pasaba hora y media trabajando y **el informe se cortaba a la mitad**, así que el
+resultado no servía.
+
+Ahora el informe lleva solo lo que la aplicación de verdad consulta. Con eso baja a una
+fracción de su tamaño y siempre llega completo. Si algo no se pudo leer, el aviso sale por
+el conducto aparte de avisos, así que nunca estorba el resultado.
+
+Sigue sin verse ningún cambio en pantalla: la pantalla todavía muestra un contador falso y
+un tiempo inventado. **Eso es justamente lo que viene en la última etapa.**
+
+---
+
+## El mapeo de estructura: tercera etapa (sigue sin cambios en pantalla)
+
+Esta versión **tampoco cambia nada visible**. Es la tercera de cinco etapas para arreglar el
+mapeo de documentos.
+
+Hasta ahora el escáner pasaba casi toda su hora y media calculando la huella de cada archivo de la
+carpeta — un trabajo enorme que **no servía para nada**, porque el resultado de esas huellas no lo
+usa ninguna parte de la aplicación. Esta etapa lo quita: el escáner ahora solo mira qué carpetas y
+archivos hay, sin leer el contenido de cada archivo. Con eso el trabajo pesado desaparece.
+
+Además, la fecha con la que el escáner firma su resultado ahora sale con el día y la hora reales
+(antes quedaba vacía), y si algo no se puede leer, se avisa en vez de pasar por alto.
+
+El escáner todavía tarda un poco más de lo que debería y todavía no muestra progreso; eso viene en
+las próximas etapas.
+
+---
+
+## El mapeo de estructura: segunda etapa (sigue sin cambios en pantalla)
+
+Esta versión **tampoco cambia nada visible**. Es la segunda de cinco etapas para arreglar el
+mapeo de documentos ("Mapeando Estructura de Documentos").
+
+La primera etapa dejó escrito y probado cómo debe ser la respuesta correcta. Esta quita el
+obstáculo que la hacía imposible de recibir: la app esperaba el resultado del escaneo en una
+ventana angosta y el resultado no cabía — se cortaba a la mitad y el programa fallaba recién
+ahí, después de haber trabajado toda la hora y media. Ahora esa ventana es suficientemente
+amplia para el caso real, y además hay un tope de media hora: si el escaneo se cuelga, la app
+lo sabe y lo comunica en vez de quedarse esperando para siempre.
+
+El escaneo todavía tarda lo mismo y todavía no muestra progreso; eso viene en las próximas
+etapas.
+
+---
+
+## El mapeo de estructura: primera etapa (sin cambios en pantalla todavía)
+
+Esta versión **no cambia nada visible**. Es la primera de cinco etapas para arreglar el mapeo de
+documentos ("Mapeando Estructura de Documentos"), que hoy tarda más de 12 minutos y **siempre
+termina en error**: el escáner recorre toda la carpeta, calcula la huella de cada archivo (que es
+lo que más tarda) y al final devuelve una respuesta tan grande que la app no puede leerla — se
+pasa el trabajo entero y falla en el último paso.
+
+Antes de tocar el escáner, esta etapa deja **escrito y probado** cómo es la respuesta correcta:
+una prueba automática corre el escáner sobre una carpeta de ejemplo y verifica que la estructura
+salga con sus carpetas, sus rutas y su orden. Así, cuando en las próximas etapas se cambie el
+escáner para que sea rápido y liviano, cualquier cambio que rompa la estructura se detecta al
+instante en lugar de descubrirse cuando el usuario espere 12 minutos.
+
+**Próximas etapas (en orden):** límites de tamaño y tiempo en la lectura · quitar la huella de
+cada archivo (la causa de la lentitud) · achicar la respuesta · barra de progreso real en pantalla.
+
+---
+
+# K+AIR v0.1.241
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Si sos administrador, ya no te dicen que hables con administración
+
+### Antes: la app te cerraba la puerta aunministrando
+
+Si entrabas como administrador y no tenés ninguna empresa asignada, la app te mostraba
+**"No tienes empresas asignadas. Contacta a administración."**
+
+Ese mensaje es el de un usuario sin permisos. Y el problema es que **no tenía salida**:
+no había forma de ver tus empresas, porque la lista de empresas se armaba mirando primero
+"¿me pasaron una lista?" y como el inicio de sesión siempre pasa una —aunque esté vacía—
+esa pregunta siempre daba que sí. La parte del código que se encargaba del administrador
+**nunca se llegaba a ejecutar**.
+
+### Ahora: el administrador ve sus empresas, siempre
+
+La decisión ahora se toma por **rol**, no por la forma del dato:
+
+- **Administrador** → ve todas las empresas registradas.
+- **Usuario normal** → sigue viendo solo las empresas que tiene asignadas.
+
+Y si de verdad no hay ninguna empresa registrada, el administrador recibe el mensaje que le
+corresponde: que cree una desde la sección de configuración. Ya no se lo manda a hablar
+consigo mismo.
+
+Un detalle importante: un usuario normal **sigue sin ver empresas ajenas**. El arreglo del
+error anterior tenía una trampa: si solo se agregaba "y solo si la lista no está vacía", un
+usuario sin empresas terminaba viendo todas. Ese caso está cubierto por una prueba.
+
+### Y ahora, además, hay por dónde seguir
+
+Cuando de verdad no hay ninguna empresa registrada, al administrador le aparece un botón
+**Ir a Configuración** en la pantalla de inicio. Antes no lo tenía: esa pantalla oculta el menú
+lateral, así que sin empresas no había ninguna forma de llegar a ningún lado — te;message correcto
+y ninguna salida.
+
+---
+
 # K+AIR v0.1.240
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

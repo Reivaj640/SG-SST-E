@@ -153,8 +153,10 @@ check('CSS: el SVG ocupa toda la caja del gráfico (100% x 100% + inset 0)',
   /position:\s*absolute/.test(chartSvg) && /inset:\s*0/.test(chartSvg));
 
 // ── 6. Cache-bust de TODO lo que cambió ─────────────────────────
-check('Cache-bust: kair-components.css con ?v= nuevo (📦758)',
-  /kair-components\.css\?v=20260918-bar-chart-html/.test(html));
+// 🔴 Estaba anclado al literal de 📦758 (`20260918-bar-chart-html`). Se cae con el próximo bump
+// legítimo de ese archivo. Se pregunta si TIENE token con la forma de fecha, como en ad25df49.
+check('Cache-bust: kair-components.css con ?v= de fecha (📦758)',
+  /kair-components\.css\?v=\d{8}-/.test(html));
 
 const homes = {
   'gestion-integral': 'GESTION-INTEGRAL-20260918-bar-chart-html',

@@ -382,14 +382,42 @@ test('sign-request:list: valida ids[]', async function () {
   teardown();
 });
 
-test('sign-request:document delega a client.getSignRequestDocument', async function () {
+test('sign-request:document guarda el PDF en disco y devuelve la ruta', async function () {
   setup();
   process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
   process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
   var r = await _call('firma:sign-request:document', { id: 'SIGN-1' });
   assert.equal(r.success, true);
-  assert.equal(r.data.contentType, 'application/pdf');
   assert.equal(_clientCallLog[0].m, 'getSignRequestDocument');
+  // El handler YA NO devuelve base64 ni contentType: decodifica y escribe el PDF en
+  // <userData>/firma-cache/<id>-firmado.pdf, y responde la ruta. El frontend consume
+  // ese campo (modules/gestion-humana/firma-electronica/index.js). Este check pedia el
+  // contentType que el refactor quito a proposito, asi que daba rojo sobre codigo sano.
+  assert.equal(r.data.contentType, undefined, 'ya no debe devolver contentType: el PDF va a disco');
+  assert.equal(r.data.desdeCache, false, 'primera peticion: no puede venir de cache');
+  assert.ok(r.data.rutaArchivo, 'debe devolver la ruta del archivo');
+  assert.ok(/SIGN-1-firmado\.pdf$/.test(r.data.rutaArchivo), r.data.rutaArchivo);
+  assert.ok(fs.existsSync(r.data.rutaArchivo), 'el PDF debe existir en disco');
+  assert.equal(fs.readFileSync(r.data.rutaArchivo, 'utf8'),
+    Buffer.from('BESE64', 'base64').toString(),
+    'lo que se escribe es el base64 DECODIFICADO, no la cadena en crudo');
+  teardown();
+});
+
+test('sign-request:document sirve desde cache sin volver a pegarle al backend', async function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  var r1 = await _call('firma:sign-request:document', { id: 'SIGN-CACHE' });
+  assert.equal(r1.success, true);
+  assert.equal(r1.data.desdeCache, false, 'la primera vez se descarga y se guarda');
+  var llamadasTrasPrimero = _clientCallLog.length;
+  var r2 = await _call('firma:sign-request:document', { id: 'SIGN-CACHE' });
+  assert.equal(r2.success, true);
+  assert.equal(r2.data.desdeCache, true, 'la segunda debe servirse de la cache local');
+  assert.equal(r2.data.rutaArchivo, r1.data.rutaArchivo, 'misma ruta');
+  assert.equal(_clientCallLog.length, llamadasTrasPrimero,
+    'con el PDF ya en disco no debe volver a llamar al backend');
   teardown();
 });
 

@@ -1,14 +1,18 @@
+// RENOMBRADO desde test-import-real-excel.js el 2026-10-06: esto no es un test, es una
+// HERRAMIENTA de linea de comandos que espera una ruta de Excel como argumento (process.argv).
+// El runner la lanzaba sin argumentos, imprimia su propio usage y salia con codigo 1: todos los
+// dias figuraba como un fallo del producto cuando no era un fallo de nada.
 // =====================================================================
 // 📦708 (2026-08-15) — Validador del importador con Excel REAL
 // Script para que puedas correr en tu máquina y validar que el importador
 // lee correctamente tu Excel real de Tempoactiva (o el de cualquier empresa).
 //
 // Uso:
-//   node test-import-real-excel.js "<ruta-al-excel>" [empresa] [anio]
+//   node tool-import-real-excel.js "<ruta-al-excel>" [empresa] [anio]
 //
 // Ejemplos:
-//   node test-import-real-excel.js "G:\Mi unidad\2. Trabajo\1. SG-SST\2. Temporales Comfa\1. Tempoactiva Est SAS\1. Recursos\1.1.3 Asignación de Recursos\ACT-FO-043 Presupuesto SG-SST 2026 Tempoactiva.xlsx"
-//   node test-import-real-excel.js "G:\...\presupuesto.xlsx" "Tempoactiva" 2026
+//   node tool-import-real-excel.js "G:\Mi unidad\2. Trabajo\1. SG-SST\2. Temporales Comfa\1. Tempoactiva Est SAS\1. Recursos\1.1.3 Asignación de Recursos\ACT-FO-043 Presupuesto SG-SST 2026 Tempoactiva.xlsx"
+//   node tool-import-real-excel.js "G:\...\presupuesto.xlsx" "Tempoactiva" 2026
 //
 // Qué hace:
 //   1. Lee el Excel con el parser del bridge (DRY-RUN, no toca BD)
@@ -45,10 +49,10 @@ for (var i = 0; i < args.length; i++) {
 
 if (!filePath) {
   console.log('Uso:');
-  console.log('  node test-import-real-excel.js "<ruta-al-excel>" [empresa] [anio]');
+  console.log('  node tool-import-real-excel.js "<ruta-al-excel>" [empresa] [anio]');
   console.log('');
   console.log('Ejemplo:');
-  console.log('  node test-import-real-excel.js "G:\\Mi unidad\\...\\presupuesto.xlsx" "Tempoactiva" 2026');
+  console.log('  node tool-import-real-excel.js "G:\\Mi unidad\\...\\presupuesto.xlsx" "Tempoactiva" 2026');
   console.log('');
   console.log('Flags:');
   console.log('  --import, -i   Ejecuta el import real a BD (requiere Electron corriendo)');
@@ -183,7 +187,7 @@ try {
     }
   } else {
     console.log('ℹ️  Para ejecutar el import REAL a BD, agregá --import al final:');
-    console.log('   node test-import-real-excel.js "<archivo>" --import');
+    console.log('   node tool-import-real-excel.js "<archivo>" --import');
     console.log('');
     console.log('   PERO el import real necesita la app Electron abierta. Sin la app,');
     console.log('   la BD no existe. Esperá a la Fase 2 (UI con botón "Importar").');

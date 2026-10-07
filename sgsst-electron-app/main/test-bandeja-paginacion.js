@@ -32,10 +32,13 @@ const checks = [];
 function check(name, ok) { checks.push({ name: name, ok: !!ok }); }
 
 // ── 1. Esquema: tabla de estado de paginación ────────────────────
-check('SCHEMA: tabla email_sync_state (page_token por carpeta)',
+// 📦874 — La clave primaria es (folder, connection_id), NO solo folder. Con folder
+// sola, cambiar de cuenta Gmail sobrescribía el page_token de la anterior y el
+// "cargar más" de una cuenta salteaba o repetía mensajes de la otra.
+check('SCHEMA: tabla email_sync_state (page_token por carpeta Y cuenta)',
   /CREATE TABLE IF NOT EXISTS email_sync_state/.test(schema) &&
   /page_token TEXT/.test(schema) &&
-  /folder TEXT PRIMARY KEY/.test(schema));
+  /PRIMARY KEY \(folder, connection_id\)/.test(schema));
 check('SCHEMA: la tabla es idempotente (IF NOT EXISTS)', /CREATE TABLE IF NOT EXISTS email_sync_state/.test(schema));
 
 // ── 2. DB: lectura paginada + contador ───────────────────────────
@@ -49,12 +52,36 @@ check('DB: el WHERE se extrajo a buildThreadsWhere() (lista y contador comparten
 check('DB: countThreadsFromCache existe y cuenta con el mismo WHERE',
   /function countThreadsFromCache\(options\)/.test(dbSrc) &&
   /SELECT COUNT\(\*\) AS c FROM \(/.test(dbSrc));
-check('DB: estado de paginación (save/get/reset)',
+check('DB: estado de paginación (save/get/reset), acotado por cuenta',
   /function saveSyncState\(state\)/.test(dbSrc) &&
-  /function getSyncState\(folder\)/.test(dbSrc) &&
-  /function resetSyncState\(folder\)/.test(dbSrc));
-check('DB: el upsert del estado usa ON CONFLICT(folder)',
-  /INSERT INTO email_sync_state[\s\S]{0,260}ON CONFLICT\(folder\) DO UPDATE/.test(dbSrc));
+  /function getSyncState\(folder, connectionId\)/.test(dbSrc) &&
+  /function resetSyncState\(folder, connectionId\)/.test(dbSrc));
+check('DB: el upsert del estado usa la PK compuesta',
+  /INSERT INTO email_sync_state[\s\S]{0,260}ON CONFLICT\(folder, connection_id\) DO UPDATE/.test(dbSrc));
+
+// 📦874 — AISLAMIENTO ENTRE CUENTAS GMAIL. Estas son las que impiden que el fallo
+// vuelva: el cache comparte base entre todas las cuentas conectadas y el camino de
+// lectura tiene que acotar SIEMPRE por connection_id. Un `getThreadsFromCache` sin
+// filtro mezclaba la bandeja actual con la de la cuenta anterior.
+check('DB: la lista se acota por connection_id',
+  /let where = 'folder = @folder AND connection_id = @connection_id'/.test(dbSrc));
+check('DB: sin cuenta activa NO se lista nada (acotar es lo seguro)',
+  /if \(!connectionId\) return \{ where: '1 = 0'/.test(dbSrc));
+check('DB: getThreadFromCache acota por cuenta',
+  /function getThreadFromCache\(threadId, connectionId\)/.test(dbSrc) &&
+  /WHERE t\.id = \? AND t\.connection_id = \? LIMIT 1/.test(dbSrc));
+check('DB: getMessagesFromCache acota por cuenta',
+  /function getMessagesFromCache\(threadId, connectionId\)/.test(dbSrc) &&
+  /WHERE thread_id = \? AND connection_id = \?/.test(dbSrc));
+check('DB: marcar leido/no leido acota por cuenta',
+  /function recomputeThreadUnread\(threadId, connectionId\)/.test(dbSrc) &&
+  /function propagateUnreadChange\(messageOrThreadId, add, connectionId\)/.test(dbSrc));
+check('DB: existe getActiveConnectionId() y se exporta',
+  /function getActiveConnectionId\(\)/.test(dbSrc) &&
+  /saveConnection, getConnection, getAllConnections, getActiveConnectionId/.test(dbSrc));
+check('SCHEMA: email_connections tiene is_active (que cuenta esta conectada)',
+  /is_active INTEGER NOT NULL DEFAULT 0/.test(schema) &&
+  /ALTER TABLE email_connections ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0;/.test(schema));
 check('DB: los nuevos helpers se exportan',
   /countThreadsFromCache, getThreadFromCache/.test(dbSrc) &&
   /saveSyncState, getSyncState, resetSyncState/.test(dbSrc));
@@ -80,12 +107,15 @@ check('SYNC: guarda el estado de paginación al terminar',
 // ── 4. La limpieza de huérfanos NO borra los correos ya cargados ──
 // Un sync normal trae SOLO la página 1; si considerara huérfano a todo lo que no
 // está en esa página, borraría las páginas viejas que el user pidió con "Cargar más".
-check('SYNC: la limpieza se salta en modo append', /if \(!append\) \{[\s\S]{0,900}deleteThreadsByIds/.test(syncSrc));
+check('SYNC: la limpieza se salta en modo append', /if \(!append\) \{[\s\S]{0,1200}deleteThreadsByIds/.test(syncSrc));
 check('SYNC: usa ventana de fechas (cutoff) para decidir huérfanos',
   /var cutoff = null;/.test(syncSrc) &&
   /cthread\.last_message_date < cutoff\) continue;/.test(syncSrc));
-check('SYNC: lee más de una página del cache para la limpieza (5000)',
-  /getThreadsFromCache\(\{ folder: folder, maxResults: 5000 \}\)/.test(syncSrc));
+// 📦874 — El barrido compara el cache CONTRA el Gmail de una sola cuenta. Sin acotar,
+// los hilos de la otra cuenta se marcaban huerfanos y el borrado (que si esta acotado
+// por conexion) no los tocaba: marcaba mal y no pasaba nada, todos los arranques.
+check('SYNC: lee más de una página del cache para la limpieza (5000), acotada a la cuenta',
+  /getThreadsFromCache\(\{ folder: folder, maxResults: 5000, connectionId: userEmail \}\)/.test(syncSrc));
 
 // ── 5. Gmail API: listInbox ya soporta paginación ────────────────
 check('GMAIL: listInbox acepta pageToken y devuelve nextPageToken',

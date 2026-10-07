@@ -283,11 +283,15 @@ const fParse = extraerModulo('parseSearchQuery');
 chk('se extrajo buildThreadsWhere del archivo real', fWhere !== null);
 chk('se extrajo parseSearchQuery del archivo real', fParse !== null);
 if (fWhere && fParse) {
-  const fnW = new Function(fParse + '\n' + fWhere + '\nreturn buildThreadsWhere;');
+  // 📦874 — buildThreadsWhere ahora acota por cuenta y llama a getActiveConnectionId().
+  // Este sandbox no tiene base de datos, así que se le inyecta esa dependencia con una
+  // cuenta fija. Si no, la función real revienta con ReferenceError al evaluarse.
+  const stubConn = '\nfunction getActiveConnectionId(){ return "kair.co"; }\n';
+  const fnW = new Function(fParse + '\n' + stubConn + fWhere + '\nreturn buildThreadsWhere;');
   const buildThreadsWhere = fnW();
 
   const mem = new DatabaseSync(':memory:');
-  mem.exec('CREATE TABLE email_threads (id TEXT, folder TEXT, last_message_date INTEGER, has_unread INTEGER, subject TEXT, snippet TEXT, last_sender_email TEXT, last_sender_name TEXT, is_starred INTEGER, is_important INTEGER, has_attachment INTEGER);');
+  mem.exec('CREATE TABLE email_threads (id TEXT, folder TEXT, connection_id TEXT, last_message_date INTEGER, has_unread INTEGER, subject TEXT, snippet TEXT, last_sender_email TEXT, last_sender_name TEXT, is_starred INTEGER, is_important INTEGER, has_attachment INTEGER);');
 
   // El rango se calcula ANTES de sembrar, porque los dos correos de BORDE
   // tienen que caer exactamente en `from` y en `to`. Sin ellos, cambiar `>=`
@@ -299,13 +303,15 @@ if (fWhere && fParse) {
   const D0 = Date.UTC(2026, 8, 14, 12, 0, 0);   // 14 sept, bien antes
   const D1 = Date.UTC(2026, 9, 3, 23, 2, 42);    // 3 oct, 18:02 Colombia
   const D2 = Date.UTC(2026, 9, 4, 2, 0, 0);      // 4 oct UTC = 21:00 DEL 3 en Colombia
-  const ins = mem.prepare('INSERT INTO email_threads VALUES (?,?,?,?,?,?,?,?,?,?,?)');
-  ins.run('a', 'INBOX', D0, 0, 'catorce', '', 'x@y.co', 'X', 0, 0, 0);
-  ins.run('b', 'INBOX', D1, 0, 'tres', '', 'x@y.co', 'X', 0, 0, 0);
-  ins.run('c', 'INBOX', D2, 0, 'medianoche', '', 'x@y.co', 'X', 0, 0, 0);
-  ins.run('d', 'SENT', D1, 0, 'enviado', '', 'x@y.co', 'X', 0, 0, 0);
-  ins.run('borde-ini', 'INBOX', rango.from, 0, 'justo al inicio', '', 'x@y.co', 'X', 0, 0, 0);
-  ins.run('borde-fin', 'INBOX', rango.to, 0, 'justo al final', '', 'x@y.co', 'X', 0, 0, 0);
+  const ins = mem.prepare('INSERT INTO email_threads VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
+  ins.run('a', 'INBOX', 'kair.co', D0, 0, 'catorce', '', 'x@y.co', 'X', 0, 0, 0);
+  ins.run('b', 'INBOX', 'kair.co', D1, 0, 'tres', '', 'x@y.co', 'X', 0, 0, 0);
+  ins.run('c', 'INBOX', 'kair.co', D2, 0, 'medianoche', '', 'x@y.co', 'X', 0, 0, 0);
+  ins.run('d', 'SENT', 'kair.co', D1, 0, 'enviado', '', 'x@y.co', 'X', 0, 0, 0);
+  ins.run('borde-ini', 'INBOX', 'kair.co', rango.from, 0, 'justo al inicio', '', 'x@y.co', 'X', 0, 0, 0);
+  ins.run('borde-fin', 'INBOX', 'kair.co', rango.to, 0, 'justo al final', '', 'x@y.co', 'X', 0, 0, 0);
+  // 📦874 — Un hilo de OTRA cuenta: el rango de dia no puede dejarlo entrar.
+  ins.run('ajeno', 'INBOX', 'otro@kair.co', D1, 0, 'otra cuenta', '', 'x@y.co', 'X', 0, 0, 0);
 
   const w = buildThreadsWhere({ folder: 'INBOX', dateFrom: rango.from, dateTo: rango.to });
   const filas = mem.prepare('SELECT id FROM email_threads t WHERE ' + w.where + ' ORDER BY t.last_message_date DESC').all(w.params);
@@ -338,6 +344,19 @@ if (fWhere && fParse) {
       const ws = buildThreadsWhere({ folder: 'INBOX' });
       return mem.prepare('SELECT id FROM email_threads t WHERE ' + ws.where).all(ws.params).length === 5;
     })(), 'una consulta sin dateFrom tiene que seguir funcionando igual que antes de 858 (5 hilos en INBOX)');
+  // 📦874 — En la tabla hay 6 filas INBOX (una es de otra cuenta). Este check vale por
+  // dos: el rango no se rompió Y el filtro por cuenta aguanta. Si alguien saca el
+  // `AND connection_id`, el 5 pasa a 6 y se pone rojo.
+  chk('el hilo de otra cuenta NO entra, ni con rango ni sin él',
+    (() => {
+      const w2 = buildThreadsWhere({ folder: 'INBOX' });
+      const ids2 = mem.prepare('SELECT id FROM email_threads t WHERE ' + w.where + ' ORDER BY t.last_message_date DESC').all(w.params).map((f) => f.id);
+      const sinRango = mem.prepare('SELECT id FROM email_threads t WHERE ' + w2.where).all(w2.params).map((f) => f.id);
+      return ids2.indexOf('ajeno') < 0 && sinRango.indexOf('ajeno') < 0;
+    })(),
+    'si "ajeno" aparece, el filtro por cuenta desaparecio');
+  chk('control: el hilo ajeno SI esta en la tabla (lo que se filtra es la lectura)',
+    mem.prepare('SELECT id FROM email_threads WHERE id = ?').get('ajeno') !== undefined);
   chk('un rango con una fecha que no es numero se queja, no devuelve basura',
     (() => { try { buildThreadsWhere({ folder: 'INBOX', dateFrom: 'ayer' }); return false; } catch (e) { return true; } })());
   mem.close();

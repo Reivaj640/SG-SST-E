@@ -38,7 +38,7 @@ test('P1-5: redact() puede tener falsos positivos en campos con secuencias larga
   // El regex de cédula es AGRESIVO. Captura cualquier secuencia de 6-10 dígitos
   // como si fuera cédula. Esto significa que un id_solicitud como
   // "SIGN-2026-000123" se redacta parcialmente (000123 -> [CEDULA]).
-  // Trade-off aceptado en el diseño: falso positivo >漏 PII real.
+  // Trade-off aceptado en el diseño: falso positivo > PII real.
   // (Si un atacante pone una cédula en un campo "inocente" como
   // user_agent, lo capturamos. Si un sign request ID tiene 6 dígitos,
   // se redacta "de más", pero la parte importante —el SIGN-2026-— se
@@ -99,7 +99,7 @@ test('P1-5: redactValue() NO afecta strings sin PII', () => {
   const { _redactValue: redactValue } = logger;
   assert.equal(redactValue('hello world'), 'hello world');
   // NOTA: SIGN-2026-000123 SÍ se redacta por el falso positivo (000123 = 6 dígitos = cédula).
-  // El design doc de C aceptó este trade-off: "falso positivo >漏 PII real".
+  // El design doc de C aceptó este trade-off: "falso positivo > PII real".
   // Test: un string SIN secuencias de 6+ dígitos se mantiene igual.
   assert.equal(redactValue('Código 42'), 'Código 42');
   // Strings con palabras y números cortos

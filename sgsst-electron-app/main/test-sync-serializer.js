@@ -63,7 +63,13 @@ console.log('Inicializando 2 BDs en memoria (simulando 2 PCs)...');
 var db1 = new Database(':memory:');
 var db2 = new Database(':memory:');
 
-// Crear las tablas necesarias en ambas BDs
+// La tabla gestaciones real tiene 24 columnas y su clave de orden es 'actualizado_en'
+// (main/gestion-bridge.js:69, TEXT NOT NULL), NO 'updated_at'. Este fixture tenía la columna
+// equivocada, y el serializer no lo delata con un error visible: hace
+// "SELECT * FROM gestaciones WHERE empresa_id = ? ORDER BY actualizado_en DESC"
+// (main/sync-serializer.js:391), el ORDER BY revienta con "no such column", cae al catch y
+// devuelve []. Por eso el test veía 0 gestaciones en vez de 1. Y en producción, una BD vieja sin
+// esa columna haría que las gestaciones NUNCA se sincronizaran, en silencio y sin log de error.
 function _setupSchema(db) {
   db.exec(`
     CREATE TABLE evaluacion_action_plans (
@@ -79,7 +85,7 @@ function _setupSchema(db) {
       empresa_id  TEXT NOT NULL,
       cedula      TEXT,
       nombre      TEXT,
-      updated_at  TEXT
+      actualizado_en TEXT
     );
     CREATE TABLE seguimiento_gestacion_mensual (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +115,7 @@ db1.prepare(`
        '2026-07-11T14:30:00.000Z');
 
 db1.prepare(`
-  INSERT INTO gestaciones (id, empresa_id, cedula, nombre, updated_at)
+  INSERT INTO gestaciones (id, empresa_id, cedula, nombre, actualizado_en)
   VALUES (?, ?, ?, ?, ?)
 `).run('gest-001', 'asel', '1234567890', 'Ana Lopez', '2026-07-09T09:00:00.000Z');
 
@@ -228,13 +234,21 @@ _section('Test 5: con timestamps iguales, merge es idempotente');
 //   - plan-001: misma fecha en ambas -> SKIP
 //   - plan-002: solo en PC1 -> INSERT en PC2
 //   - plan-003: misma fecha en ambas -> SKIP
-// Resultado: 1 applied (plan-002 que faltaba), 2 skipped.
+//   - gest-001: solo en PC1 -> INSERT en PC2
+// Resultado por entidad: 1 plan aplicado (plan-002), 2 planes skipped, 1 gestacion aplicada.
+//
+// 🔴 `result5.applied` es el TOTAL de todas las entidades, no el de planes solo.
+// Este renglón esperaba 1 y pasaba, pero por la razón equivocada: mientras el serializer
+// fallaba con "no such column: actualizado_en", las gestaciones salían como [] y nunca se
+// contaban. Al arreglar el fixture (columna actualizado_en) el total correcto es 2. Por eso la
+// aserción va por `byEntity` y no por el total.
 
 var syncData1After = serializer.serializeEmpresaToSync(db1, 'asel', 'escritorio-jrf', 'admin', '0.1.114');
 var result5 = serializer.deserializeSyncToDb(db2, syncData1After);
-_assertEq(result5.applied, 1, '1 plan aplicado (plan-002 que faltaba en PC2)');
+_assertEq(result5.applied, 2, 'total aplicado = 2 (1 plan + 1 gestacion)');
 _assertEq(result5.byEntity.planes_accion.applied, 1, 'contador byEntity.planes_accion.applied');
 _assertEq(result5.byEntity.planes_accion.skipped, 2, '2 planes skipped (mismo updatedAt)');
+_assertEq(result5.byEntity.gestaciones.applied, 1, '1 gestacion aplicada (gest-001 que faltaba en PC2)');
 
 // =====================================================================
 // Test 6: version mismatch del .kairsync
