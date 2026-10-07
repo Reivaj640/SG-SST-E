@@ -28,7 +28,7 @@
 | **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` en `dc9123ad`. ⚠️ **Hay trabajo de la sesión del 2026-10-07 SIN commitear todavía** (ver "Sin commitear" más abajo): es lo primero que hay que commitear |
 | **Versión** | `0.1.250` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | **121 tests · 116 verdes · 5 con fallos · 1 sin resumen verificable.** Los 5: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27] (los tres dependen del entorno: servicio vivo, `INTERNAL_API_KEY`, `cloudflared` + red), más `test-presupuesto-824-real.js` [34/38] y `test-presupuesto-824-roundtrip.js` [20/21], que son **preexistentes y ajenos a este trabajo** (ver punto 11 de la cola). **Cero regresiones.** La cifra subió de 119 a 121 porque se colgaron 2 tests nuevos |
+| **Suite (escritorio)** | **121 tests · 118 verdes · 3 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Los 3 que quedan son **todos de entorno**, ninguno de producto: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27]. Se resuelven prendiendo el PC viejo que sostiene el `firma-service`. Los 121 (antes 119) son por los 2 tests nuevos |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
 | **Validaciones visuales** | ✅ **Todo cerrado.** 📦860, 📦861 y 📦868 aprobados por el owner de punta a punta. 📦867 **validado por el owner** (era el punto 3 de la cola: "nunca se abrió en la app" — ya no aplica). **El ancho de la tarjeta de ingreso** (📦869) **también validado por el owner**. Los cuatro están probados por una persona, no por un test |
@@ -71,21 +71,18 @@
    desarrollo va en `0.1.250`. **Decisión del owner al 2026-10-07: todavía no, no es el momento.**
    Ojo con el 🐇 del punto 2: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
 
-6. **🔴 Nuevo: los tests de presupuesto no cuadran con el Excel.** Salió al correr la suite del
-   2026-10-07 y es **preexistente, no lo causó este trabajo** (ni el test ni el código de
-   presupuesto tienen cambios en el árbol, y el test falla igual standalone).
-   `test-presupuesto-824-real.js` [34/38] y `test-presupuesto-824-roundtrip.js` [20/21] fallan
-   por lo mismo: el import da un ejecutado de **$20.473.101,33** y el Excel del que se importa
-   dice **$19.696.874,33**. Diferencia: **$776.227**. O el importador está sumando algo que no
-   debe, o el total del Excel es un subtotal y no un gran total. **Nadie lo ha investigated.**
-
-7. **🧪 Tests que dependen del entorno, no del código** (se resuelven prendiendo el PC viejo que
+6. **🧪 Tests que dependen del entorno, no del código** (se resuelven prendiendo el PC viejo que
    sostiene el `firma-service`): `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js`
    [83/83] y `test-firma-tunnel-kit.js` [24/27]. Piden el servicio vivo, `INTERNAL_API_KEY` y
-   `cloudflared` con red.
+   `cloudflared` con red. **Son los 3 rojos que le quedan a la suite: ninguno es de producto.**
 
-8. **🔍 No se pueden verificar las Releases de GitHub** porque `gh` no está instalado en esta
+7. **🔍 No se pueden verificar las Releases de GitHub** porque `gh` no está instalado en esta
    máquina. Solo se ven los tags locales.
+
+8. **✅ Cerrado hoy: los tests de presupuesto.** Eran el mismo error dos veces — comparaban contra
+   cifras escritas a mano que eran una foto del Excel de Drive. Alguien le agregó septiembre a la
+   fila de honorarios y se pusieron rojos reportando un bug de $776.227 que no existía. Ahora las
+   cifras se leen del archivo al correr. Detalle en `PROMPT.md` §7.5.
   configura cada empresa (`main/firma-bridge.js:571-576`).
 - **Restaurados `kair.db` + `config.json`**: `companies` = 2, `user_company_roles` = 2 y
   `companyPaths` con las dos empresas. El bloqueo de empresas en la app ya no existe.

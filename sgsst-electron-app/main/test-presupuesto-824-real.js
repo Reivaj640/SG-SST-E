@@ -16,6 +16,13 @@
 //      partidas suman 27.819.284 (bug de fórmula en el archivo).
 //      → se comprueba que el import lo DETECTE y lo REPORTE, no que lo copie.
 //
+// Las cifras esperadas NO están escritas a mano: salen del Excel en el momento de correr,
+// con `presup-excel-truth.js`, que lo lee por un camino distinto al del importador. Antes
+// estaban fijas (19.696.874,33, 6.209.816, ...) y cuando le agregaron septiembre a la fila de
+// honorarios los tests se pusieron rojos reportando un bug de $776.227 que no existía: el
+// importador estaba bien. El rojo de acá es indistinguible de un bug real, y eso es peor que
+// un test que no existe.
+//
 // Uso:
 //   npx electron main/test-presupuesto-824-real.js
 // Requiere Google Drive montado en G: (el test se salta si no está).
@@ -57,6 +64,13 @@ function run() {
     console.log('    Ruta esperada: ' + XLSX_2026);
     process.exit(0);
   }
+
+  // El "contra que": las cifras se leen del archivo, no están escritas acá. Es lo que
+  // hace que editar el Excel no rompa el test, y que un rojo signifique algo real.
+  const verdad = require('./presup-excel-truth').leer(XLSX_2026);
+  const pesos = require('./presup-excel-truth').pesos;
+  console.log('\n[i] Excel leído: ' + verdad.cantidad + ' partidas · asignado ' +
+    pesos(verdad.sumaAsignado) + ' · ejecutado ' + pesos(verdad.sumaEjecutado));
 
   const Database = require('better-sqlite3');
   const schemaMod = require('./presupuesto-schema-sql');
@@ -107,12 +121,16 @@ function run() {
   ok('AVISA que el TOTAL AÑO no cuadra con la suma', (p.avisos || []).length > 0,
     'avisos=' + (p.avisos || []).length + ' :: ' + (p.avisos || [])[0]);
 
-  // El bug conocido del Excel 2026: declara el doble de la suma real.
-  const esperadoReal = 27819284;
-  ok('el total real es la suma de las 14 partidas ($27.819.284)',
-    Math.abs(p.totalAsignado - esperadoReal) < 2, 'total=' + p.totalAsignado);
-  ok('el Excel declara $55.638.568 (el doble, bug de fórmula)',
-    Math.abs(p.totalDeclarado - 55638568) < 2, 'declarado=' + p.totalDeclarado);
+  // El Excel declara un TOTAL AÑO que NO es la suma de sus partidas (bug de fórmula en el
+  // archivo). Las dos cifras salen del archivo; lo que se comprueba es que el import use la
+  // suma y avise de la diferencia, no que copie el número roto.
+  ok('el total real es la suma de las ' + verdad.cantidad + ' partidas (' + pesos(verdad.sumaAsignado) + ')',
+    Math.abs(p.totalAsignado - verdad.sumaAsignado) < 2, 'total=' + p.totalAsignado);
+  ok('el Excel declara ' + pesos(verdad.totalDeclaradoAsignado) + ', que NO es la suma (bug de fórmula)',
+    Math.abs(p.totalDeclarado - verdad.totalDeclaradoAsignado) < 2, 'declarado=' + p.totalDeclarado);
+  ok('el declarado y la suma difieren de verdad (si no, el aviso no significaría nada)',
+    Math.abs(verdad.totalDeclaradoAsignado - verdad.sumaAsignado) > 2,
+    'declarado=' + pesos(verdad.totalDeclaradoAsignado) + ' vs suma=' + pesos(verdad.sumaAsignado));
 
   console.log('\n[2] import real en :memory:');
   const imp = call('presupuesto:import-from-excel', {
@@ -122,15 +140,17 @@ function run() {
   ok('import responde ok', imp.success === true, JSON.stringify(imp.error || {}));
   if (!imp.success) return report();
 
-  ok('inserta 14 partidas', imp.data.inserted === 14, 'inserted=' + imp.data.inserted);
-  ok('inserta 168 valores mensuales', imp.data.valores === 168, 'valores=' + imp.data.valores);
+  ok('inserta ' + verdad.cantidad + ' partidas', imp.data.inserted === verdad.cantidad, 'inserted=' + imp.data.inserted);
+  ok('inserta ' + verdad.valoresMensuales + ' valores mensuales',
+    imp.data.valores === verdad.valoresMensuales, 'valores=' + imp.data.valores);
   ok('el import reporta los avisos del Excel', (imp.data.avisos || []).length > 0,
     'avisos=' + (imp.data.avisos || []).length);
 
   const pres = db.prepare("SELECT * FROM presupuestos WHERE anio = 2026").get();
   ok('guarda el archivo de origen', !!pres.archivo_origen, pres.archivo_origen);
   ok('guarda el nombre del archivo', /2026/.test(pres.archivo_nombre || ''), pres.archivo_nombre);
-  ok('guarda el total declarado', Math.abs(pres.total_declarado_asignado - 55638568) < 2, String(pres.total_declarado_asignado));
+  ok('guarda el total declarado', Math.abs(pres.total_declarado_asignado - verdad.totalDeclaradoAsignado) < 2,
+    String(pres.total_declarado_asignado));
   // El Excel pone 0,052 (IPC 5,2%) — no 0,05.
   ok('guarda el IPC (5,2%)', Math.abs(pres.ipc - 0.052) < 0.0001, String(pres.ipc));
   ok('guarda los avisos como JSON', typeof pres.avisos_importacion === 'string' && pres.avisos_importacion.indexOf('TOTAL') !== -1);
@@ -145,19 +165,21 @@ function run() {
     'b1=' + partidas[0].numero_excel + ' b2=' + partidas[1].numero_excel);
   ok('numero sigue siendo la posición de la partida (1..14)', partidas[13].numero === 14, 'numero14=' + partidas[13].numero);
 
-  ok('guarda asignado_anual (col D del Excel)', Math.abs(partidas[0].asignado_anual - 9314724) < 2, String(partidas[0].asignado_anual));
-  ok('guarda ejecutado_acumulado (col E del Excel)', Math.abs(partidas[0].ejecutado_acumulado - 6209816) < 2, String(partidas[0].ejecutado_acumulado));
+  ok('guarda asignado_anual (col D del Excel)', Math.abs(partidas[0].asignado_anual - verdad.primera.asignado) < 2,
+    String(partidas[0].asignado_anual));
+  ok('guarda ejecutado_acumulado (col E del Excel)', Math.abs(partidas[0].ejecutado_acumulado - verdad.primera.ejecutado) < 2,
+    String(partidas[0].ejecutado_acumulado));
   ok('guarda porcentaje_eje (col F del Excel)', partidas[0].porcentaje_eje !== null);
 
-  // El ejecutado mensual REAL del Excel 2026 son 19.696.874,33 (las 3 filas con
-  // ejecución: Honorarios 8 meses, Diagnóstico Psicosocial abril, Exámenes
-  // ene/feb/abr/jul). NO son los 33.694.321,66 de la fila TOTAL AÑO, que está mal.
+  // Estas dos son las que se pusieron viejas. El ejecutado real del Excel es la SUMA de la
+  // columna E de sus partidas, y esa suma cambia cada vez que se le llena un mes. Lo que no
+  // se copia es la fila TOTAL AÑO del archivo, que además de estar mal cambia sola.
   const totEjec = db.prepare("SELECT SUM(ejecutado) e FROM presupuesto_valores_mensuales").get().e;
-  ok('el ejecutado mensual se importa REAL del Excel ($19.696.874,33)',
-    Math.abs(totEjec - 19696874.33) < 2, 'ejecutado=' + totEjec);
-  ok('el ejecutado NO es 0 (ese era el bug del bulk-save)', totEjec > 19000000);
-  ok('el ejecutado acumulado de las partidas también se guarda ($19.696.874,33)',
-    Math.abs(partidas.reduce(function (a, x) { return a + (x.ejecutado_acumulado || 0); }, 0) - 19696874.33) < 2);
+  ok('el ejecutado mensual se importa REAL del Excel (' + pesos(verdad.sumaEjecutado) + ')',
+    Math.abs(totEjec - verdad.sumaEjecutado) < 2, 'ejecutado=' + totEjec);
+  ok('el ejecutado NO es 0 (ese era el bug del bulk-save)', totEjec > 0);
+  ok('el ejecutado acumulado de las partidas también se guarda (' + pesos(verdad.sumaEjecutado) + ')',
+    Math.abs(partidas.reduce(function (a, x) { return a + (x.ejecutado_acumulado || 0); }, 0) - verdad.sumaEjecutado) < 2);
 
   console.log('\n[3] bulk-save NO debe destruir el ejecutado');
   // Se re-manda lo mismo que la UI mandaría: sin ejecutado (viene de una
@@ -176,11 +198,12 @@ function run() {
 
   const totEjec2 = db.prepare("SELECT SUM(ejecutado) e FROM presupuesto_valores_mensuales").get().e;
   ok('EL EJECUTADO SIGUE VIVO tras guardar (el bug lo ponía en 0)',
-    Math.abs(totEjec2 - 19696874.33) < 2, 'ejecutado=' + totEjec2);
+    Math.abs(totEjec2 - verdad.sumaEjecutado) < 2, 'ejecutado=' + totEjec2);
 
   const p2 = db.prepare("SELECT * FROM presupuesto_partidas ORDER BY numero").all();
   ok('la categoría sobrevive al guardado', p2.every(function (x) { return !!x.descripcion; }));
-  ok('el asignado_anual sobrevive al guardado', Math.abs(p2[0].asignado_anual - 9314724) < 2, String(p2[0].asignado_anual));
+  ok('el asignado_anual sobrevive al guardado', Math.abs(p2[0].asignado_anual - verdad.primera.asignado) < 2,
+    String(p2[0].asignado_anual));
 
   console.log('\n[4] migraciones');
   ok('PRESUPUESTO_MIGRATIONS_SQL ya no está vacío',

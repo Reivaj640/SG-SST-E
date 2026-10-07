@@ -758,21 +758,22 @@ reintroducir el código sin el markup pase verde.
 
 ### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-**Medido el 2026-10-07:** **121 tests · 116 en verde · 5 con fallos · 1 sin resumen verificable.**
-Los 121 (antes 119) son porque se colgaron 2 tests nuevos. **Cero regresiones.** **No hay lista
-en código**: el runner no tiene tolerancias, viven documentadas acá en prosa.
+**Medido el 2026-10-07:** **121 tests · 118 en verde · 3 con fallos · 1 sin resumen verificable.**
+Los 121 (antes 119) son porque se colgaron 2 tests nuevos. **Cero regresiones.** Los 3 que
+quedan son **todos de entorno**, ninguno de producto. **No hay lista en código**: el runner no
+tiene tolerancias, viven documentadas acá en prosa.
 
 | # | Test | Qué necesita para pasar |
 |---|---|---|
 | 1 | `test-firma-bridge.js` | el servicio de firma vivo (saca 0/0) |
 | 2 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` — saca **83/83** y después falla por la variable |
 | 3 | `test-firma-tunnel-kit.js` | `cloudflared` y red (24/27) |
-| 4 | `test-presupuesto-824-real.js` | **34/38.** El import da un ejecutado de **$20.473.101,33** y el Excel del que se importa dice **$19.696.874,33**. O el importador suma algo que no debe, o ese total del Excel es un subtotal y no un gran total. **Nadie lo ha investigated** |
-| 5 | `test-presupuesto-824-roundtrip.js` | **20/21**, la misma diferencia de $776.227 del punto 4 |
 
-> Los tres primeros son de **entorno**, no de código: se resuelven prendiendo el PC viejo que
-> sostiene el `firma-service`. Los dos de presupuesto son de producto, son preexistentes y
-> **nadie los ha mirado**.
+Los tres se resuelven prendiendo el PC viejo que sostiene el `firma-service`. **Hoy la suite
+no tiene ni un solo rojo de producto.**
+
+**✅ También se resolvieron los 2 de presupuesto** (ver más abajo el por qué, que es la parte
+interesante): eran el mismo error de patrón dos veces.
 
 **✅ Los que estaban aquí y ya se resolvieron** (eran fallos del test, no de la app):
 
@@ -800,6 +801,36 @@ en código**: el runner no tiene tolerancias, viven documentadas acá en prosa.
   activo saltándose `gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
   (`gestion-humana-bridge.js:1171`), y además leía `data.retired`, **un campo que el contrato no
   tiene** (la respuesta real es `{personalId, activo, estado, fechaRetiro}`).
+- **`test-presupuesto-824-real.js` (34/38 → 39/39) y `test-presupuesto-824-roundtrip.js` (20/21 →
+  21/21): el importador NO estaba roto.** Comparaban contra cifras escritas a mano en el test
+  (19.696.874,33, 6.209.816) que eran una foto del Excel deDrive en el día en que se escribieron.
+  Alguien le agregó septiembre a la fila de honorarios, el archivo pasó de 8 meses a 9, y los dos
+  tests se pusieron rojos reportando un bug de **$776.227 que no existía**. La app importaba bien:
+  la suma de la columna E del archivo da exactamente 20.473.101,33, que era lo que producía.
+
+### 7.5 Un test contra un archivo que el usuario edita no puede llevar cifras fijas
+
+Ese casi-costó caro: dos tests en rojo parecían un defecto de $776.227 en un número que se le
+muestra al usuario, y la tentación era reportarlo como bug. **El rojo era indistinguible de un
+bug real**, que es peor que no tener el test.
+
+La regla: **si el archivo de entrada es editable por el usuario, el esperado se lee del archivo
+en el momento de correr**, no se escribe a mano.
+
+En este repo el caso es el Excel de presupuesto (`G:`). Ahora las cifras salen de
+`main/presup-excel-truth.js`, que abre el archivo con SheetJS crudo y suma celda por celda —
+**un camino distinto al del importador**, que parsea con su propia lógica de celdas combinadas y
+bloques. Por eso no es una tautología: si el importador se le cae una columna, se le salta una
+fila o suma dos veces, la comparación lo detecta.
+
+Y **derivar el esperado no es excusa para dejar de morder**: el que fija el esperado tiene que
+comprobar que el check se pone rojo cuando el producto se rompe. Se verificó con una mutación
+(`val.ejecutado * 2` en `presupuesto-bridge.js`): los dos tests se pusieron rojos con
+40.946.202,66, exactamente el doble. Después se revirtió.
+
+**El riesgo que queda, dicho en voz alta**: con el esperado derivado, si alguien edita mal el
+Excel, el test no lo va a reclamar. Antes tampoco lo hacía, así que no se pierde cobertura; lo
+que se gana es que editar el archivo de un cliente no rompa la suite.
 
 El **1 sin resumen** es `test-init-order-bug.js`: es un test de inspección estructural que imprime
 texto, no un `N/M`. Sale 0 y el runner lo cuenta verde, pero sin poder confirmar cuántos checks corrieron.
