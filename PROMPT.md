@@ -415,6 +415,51 @@ cerrar, pasó la verificación y habría roto el 1.1.1 al abrirlo — donde nadi
 **Regla:** antes de escribir un archivo generado, `node --check` sobre el **resultado**, con
 el EOL ya convertido. Contar llaves queda como filtro barato previo, nunca como prueba.
 
+### 5.11d 🔴 Un check que lee `git show HEAD:<archivo>` mide contra la referencia equivocada
+
+**Aplica a cualquier test que lea "lo que dice git"** para compararlo contra el archivo del disco:
+EOL, colores, versionado, cualquier cosa.
+
+**La trampa:** `HEAD` **no es "el código en el que estoy trabajando"**. Es un puntero a un commit.
+Cuando se ejecuta `git merge` **sin commitear**, `HEAD` sigue apuntando a la rama **destino**, con
+las versiones viejas, mientras el disco ya tiene las de la rama **origen**. El check compara dos
+cosas que no tienen por qué coincidir y reporta diferencias que no existen.
+
+Pasó de verdad el 2026-10-05 al mergear `Dev-Pc` → `Dev` (567 commits). El test de 861 pasó de
+**614/614 a 585/614**: 29 checks rojos, 15 de "los colores de estado NO se tocaron" y 14 de
+"conserva el EOL que tiene en git [ahora CRLF, en git LF]". La lectura obvia —"el merge corrompió
+los finales de línea"— era falsa. Los bytes crudos dieron:
+
+```
+afiliacion-viewer.js
+   disco          CRLF=1702  LF=0
+   Dev-Pc         CRLF=1702  LF=0   <-- IDENTICO al disco
+   Dev            CRLF=0     LF=998
+   MERGE_HEAD     CRLF=1702  LF=0   <-- IDENTICO al disco
+```
+
+Cero corrupción. Al commitear el merge, los mismos checks dieron **614/614**.
+
+**Reglas:**
+
+1. **Un check que mire git debe pasar la ref explícita**, nunca `HEAD` pelado. Si tiene que
+   sobrevivir a un checkout o a un merge, `HEAD` es una variable oculta.
+2. **Ante un check rojo en masse durante una operación de git**, la hipótesis por defecto es
+   **"el check mide contra la referencia equivocada"**, no "la operación destrozó archivos". Antes de
+   tocar un byte: comparar con `git cat-file -p <ref>:<archivo>`.
+3. **`git status` limpio y `git diff <otra-rama>` vacío NO prueban que el árbol esté sano**: git
+   compara contenido normalizado y el disco tiene los bytes.
+4. **Comparar bytes con Node**, nunca desde PowerShell:
+   ```js
+   execFileSync('git', ['cat-file','-p', ref+':'+rel])  // sin encoding: 'utf8'
+   ```
+   PowerShell con `($out = git ...) -join "\`n"` **normaliza los finales de línea** y produce una
+   medición que no corresponde al archivo. Es el mismo motivo por el que hay que usar scripts en
+   `Temp/` y nunca `node -e`.
+5. **Un merge sano termina en "árbol idéntico a la rama origen"**:
+   `git diff <rama-origen> --stat -- sgsst-electron-app` sin salida significa que el merge solo
+   trajo lo que la destino tenía propio.
+
 ### 5.12 🔴 Comprobar el valor no basta: hay que comprobar la transición
 
 **Aplica a cualquier contador, badge, aviso de novedad o "sin leer"**: todo lo que dependa de un
