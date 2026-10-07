@@ -10,6 +10,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.250] - 2026-10-07
+
+### 📦872 · Google: K+AIR pide un permiso menos
+
+Se quitó `gmail.compose` de los scopes OAuth. **No lo usaba nadie.** Antes de tocarlo se
+verificó contra el código, no de memoria:
+
+- Cero llamadas `drafts.*` en todo el repositorio.
+- El redactor tiene **solo enviar**: la barra trae minimizar/maximizar/cerrar y el pie un
+  botón Enviar. No existe ningún "Guardar borrador".
+- La carpeta Borradores es una **vista de lectura** (`users.messages.list` + query
+  `in:drafts`), que ya cubre `gmail.readonly`.
+- `is_draft` en la base local lo escribe el sincronizador copiando lo que ya venía de
+  Gmail (`email-sync.js:177`). La app nunca crea el borrador.
+
+Pedirle a Google un permiso que no se ejercita es exactamente lo que dispara el rechazo
+por *minimum scope*, y hacía que la pantalla de consentimiento le prometiera al usuario
+algo que K+AIR no hace. **Quitarlo no baja la categoría de la revisión**: `gmail.readonly`
+y `gmail.modify` siguen siendo restringidos, así que la revisión restringida se paga igual.
+Fue higiene, no ahorro.
+
+**No rompe nada ni obliga a reconectar a nadie**: nada compara los scopes del token
+guardado contra la lista de `SCOPES` (`google-tokens.js` solo guarda `scope` como dato, y
+`main.js:2629` decide la re-autorización por la **vigencia** del token, no por los scopes).
+Quien ya había autorizado conserva su token y sigue funcionando.
+
+El motivo de quitarlo está escrito en el propio `google-auth.js`, para que nadie lo
+re-agregue creyendo que fue un olvido. Los textos de justificación para el formulario de
+Google quedaron en `docs/google-verificacion-scopes.md`.
+
+### 📦871 · Google: los tokens OAuth dejan de estar en texto plano en el disco
+
+`refresh_token` de Google **no caduca hasta que el usuario revoca el acceso** desde su
+cuenta: es una credencial de larga vida, y con ella sola se leen y se envían correos de la
+persona. Hasta ahora estaba en texto plano dentro de `config.json`, junto al resto de la
+configuración: un backup, un antivirus u otra app con acceso de lectura al archivo se
+llevaban la cuenta entera.
+
+Ahora van a un archivo aparte, `google-tokens.enc`, cifrado con `safeStorage` — el mismo
+mecanismo que ya usa `firma-bridge.js` para la api key.
+
+- **La API pública no cambia.** Sigue recibiendo `configPath`; la ruta del archivo cifrado
+  se deriva con `path.dirname`, así que ningún llamador de `main.js` se entera.
+- **Migración silenciosa.** Al leer, si encuentra tokens en texto plano en `config.json`,
+  los cifra, guarda en el archivo nuevo, borra la copia vieja y los devuelve. **El usuario
+  no tiene que re-autorizar** por actualizar.
+- **Sin degradación en silencio.** Si `safeStorage` no está disponible (Linux sin keyring),
+  el módulo **no** cae de vuelta a guardar en texto plano: no guarda y avisa. Antes de que
+  existiera este cambio eso no era una decisión; ahora sí.
+- Si el archivo cifrado no se puede descifrar (cambio de usuario de Windows o de keyring),
+  se borra y el usuario re-autoriza. Misma política que `secrets.enc`.
+
+Nuevo test `main/test-google-tokens-enc.js` (**32/32**), con el `safeStorage` mockeado
+mientras la lógica real corre: comprueba que el refresh_token no aparece en claro, que la
+migración no rompe la sesión, y que sin cifrado disponible **no** se escribe texto plano.
+
 ## [0.1.249] - 2026-10-06
 
 ### 📦870 · La suite deja de mentir: 17 fallos que eran 6 problemas, y 10 que no eran fallos

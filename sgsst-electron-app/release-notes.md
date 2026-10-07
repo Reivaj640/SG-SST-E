@@ -1,3 +1,34 @@
+# K+AIR v0.1.250
+
+> Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver
+> [`PROMPT.md`](../PROMPT.md) y [`Historial.md`](../Historial.md).
+
+## Tu correo de Google queda mejor protegido, y K+AIR pide menos permisos
+
+Dos cambios que no cambian ninguna pantalla, pero que tocan directamente la seguridad de tu
+cuenta de correo.
+
+**Lo primero: la clave que permite leer y enviar tu correo ya no está escrita en el disco.**
+Hasta ahora, esa clave se guardaba en texto plano dentro de un archivo de configuración.
+Eso significa que cualquier programa que pudiera leer ese archivo —un antivirus, una copia de
+seguridad, otra aplicación— se podía llevar acceso a tu correo. A partir de ahora la clave
+se guarda cifrada con el mecanismo del propio sistema operativo (en Windows, el mismo
+cifrado que usa Windows para proteger sus contraseñas). Si tenías K+AIR instalado antes,
+**no tenés que volver a conectar nada**: al abrir la aplicación, la clave se cifra sola y la
+copia que estaba suelta se borra.
+
+**Lo segundo: K+AIR le pide a Google un permiso menos.** Google le pide a cada aplicación que
+explique, uno por uno, para qué quiere cada permiso. Al revisar los que K+AIR declara,
+apareció uno que la aplicación nunca usó: el permiso para crear borradores. K+AIR nunca crea
+borradores, así que no lo pide. Eso tiene dos efectos: es más fácil que Google apruebe la
+aplicación, y vos ves una lista de permisos más corta y más honesta la próxima vez que
+conectes tu cuenta.
+
+Si algún día se implementa guardar borradores, el permiso vuelve — pero con la función ya
+hecha.
+
+---
+
 # K+AIR v0.1.249
 
 > Esto es para el **usuario final**. Para trabajar sobre la aplicación, ver

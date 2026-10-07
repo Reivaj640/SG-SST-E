@@ -111,8 +111,6 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   // F1.B-fix — Scopes necesarios para ENVIAR correos (Reply / Reply all / Forward / Nuevo)
   'https://www.googleapis.com/auth/gmail.send',
-  // F1.B-fix — Para crear/editar/eliminar borradores (futuro: drafts)
-  'https://www.googleapis.com/auth/gmail.compose',
   // 🐛bug-fix — Scope NECESARIO para marcar correos como leídos/no-leídos
   // (users.messages.modify). Sin este scope, Gmail devuelve 403 "insufficient
   // authentication scopes" y el correo se queda como no-leído en Gmail aunque
@@ -120,6 +118,40 @@ const SCOPES = [
   // el cache con el estado de Gmail, revirtiendo el cambio.
   'https://www.googleapis.com/auth/gmail.modify'
 ];
+
+// 🐛audit-2026-10-07 — `gmail.compose` se SACÓ a propósito, no se olvidó.
+// Pedía `gmail.compose` desde F1.B-fix "para crear/editar/eliminar borradores
+// (futuro)", pero la app nunca lo usó. Lo que se verificó, no lo que se suponía:
+//
+//   · Cero llamadas `drafts.*` en todo el repo.
+//   · El redactor tiene SOLO enviar. La barra tiene minimizar/maximizar/cerrar y
+//     el pie un botón Enviar (`compose-modal.js:85-119`, `app.js:7427-7496`).
+//     `sendComposedMail()` va derecho a `googleGmail.sendMessage`.
+//   · La carpeta Borradores es una VISTA de lectura: se arma con
+//     `users.messages.list` + query `in:drafts` (`google-gmail.js:180-181`),
+//     que ya cubre `gmail.readonly`.
+//   · `is_draft` en la base local lo escribe el sincronizador copiando lo que
+//     venía de Gmail (`email-sync.js:177`). La app no crea el borrador.
+//
+// Por qué importa quitarlo:
+//   1. Google rechaza por *minimum scope* los permisos que no se ejercitan, y
+//      la justificación sería "todavía no está implementado".
+//   2. La pantalla de consentimiento le prometería al usuario que puede crear
+//      borradores, y K+AIR no lo hace.
+//   3. Quitarlo NO baja la categoría de la verificación: `gmail.compose`,
+//      `gmail.readonly` y `gmail.modify` son los tres RESTRINGIDOS. Es higiene,
+//      no ahorro.
+//
+// No rompe nada: nada compara los scopes del token guardado contra esta lista
+// (`google-tokens.js:49` solo guarda `scope` como dato, `main.js:2629` decide
+// reauth por VIGENCIA del token, no por scopes). Quien ya autorizó conserva su
+// token y sigue funcionando sin reconectar.
+//
+// Si algún día se implementa guardar borrador, el scope vuelve — pero con la
+// función hecha, no antes. Y hay que declararlo también en la consola de Google:
+// si el código y la consola difieren, a los usuarios les sale la pantalla de
+// "app no verificada" y consume cupo del tope de 100.
+// Ver `docs/google-verificacion-scopes.md`.
 
 /**
  * Genera un code_verifier + code_challenge para PKCE (recomendado por Google
@@ -224,7 +256,7 @@ async function exchangeCode(options) {
       codeVerifier: verifier
     });
 
-    // Persistir en config.json
+    // Persistir cifrado (google-tokens.enc vía safeStorage), NO en config.json.
     if (configPath) {
       tokensStore.saveTokens(configPath, tokens);
     }
