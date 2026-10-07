@@ -2688,6 +2688,51 @@ ipcMain.handle('google-oauth:disconnect', async () => {
   return { success: ok };
 });
 
+// 🔐 Credenciales del login recordadas ("Recordar mis datos").
+//
+// Antes iban a localStorage en TEXTO PLANO. Ahora van cifradas a auth-credentials.enc
+// con safeStorage, el mismo mecanismo de shared/google-tokens.js. La API del módulo
+// deriva la ruta del configPath, así que acá solo hace falta pasarle ese path.
+const authCredentials = require('./main/auth-credentials');
+
+function getAuthCredentialsPath() {
+  if (!app || !app.getPath) return null;
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+ipcMain.handle('auth-credentials:save', async (event, payload = {}) => {
+  try {
+    const ok = authCredentials.saveCredentials(getAuthCredentialsPath(), {
+      email: payload.email,
+      password: payload.password
+    });
+    // success:false NO es un error grave: significa que safeStorage no está disponible y
+    // por tanto no se guardó nada cifrado. El renderer debe avisar en vez de fingir.
+    return { success: !!ok, cifrado: ok };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:save]', error);
+    return { success: false, cifrado: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth-credentials:load', async () => {
+  try {
+    return { success: true, credentials: authCredentials.loadCredentials(getAuthCredentialsPath()) };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:load]', error);
+    return { success: false, credentials: null };
+  }
+});
+
+ipcMain.handle('auth-credentials:clear', async () => {
+  try {
+    return { success: authCredentials.clearCredentials(getAuthCredentialsPath()) };
+  } catch (error) {
+    console.error('[MAIN][auth-credentials:clear]', error);
+    return { success: false };
+  }
+});
+
 // F3.A — Abre una URL en el browser externo del usuario. Usado por el
 // flow OAuth de Gmail para mostrar la pantalla de consentimiento de Google.
 ipcMain.on('open-external-url', async (event, url) => {

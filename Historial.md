@@ -24,132 +24,60 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-07 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **872 + 871** (`4845756b`): `gmail.compose` fuera de los scopes y los tokens OAuth cifrados. Detrás, `b3d8abab` y `2d43b94e` (tests de presupuesto y dos tests viejos más el runner fuera de `Temp/`), `dc9123ad` (📦870), `95d42d8c` (📦869), `3514af7f` (📦868) y `df4fd9a7`. El trabajo de este mismo commit (📦873 + 📦874) se referencia por número, no por hash: un `--amend` cambia el hash y la referencia quedaría apuntando a un commit que ya no existe |
-| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev`. Nota: el hash del commit actual no se escribe dentro del propio commit por lo mismo que arriba; para saberlo, `git log --oneline -1` |
-| **Versión** | `0.1.251` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
+| **Último commit de código** | 📦 **873 + 874** (`617190ea`): la bandeja deja de mezclar los correos de dos cuentas de Gmail y el gate legal de la Ley 1581 deja de ser un `await` a una función que no existía. Detrás, `4845756b` (📦872 + 📦871), `b3d8abab` y `2d43b94e` (tests), `dc9123ad` (📦870), `95d42d8c` (📦869), `3514af7f` (📦868) y `df4fd9a7`. **Después de ese hay trabajo SIN COMMITEAR**: credenciales cifradas con safeStorage, dos tests de firma corregidos, código muerto borrado del script del túnel y los 3 CJK eliminados. El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` en `617190ea`. Lo único pendiente de publicar es `gh-pages`, que **ya se pusheó con `--force`** (`f142118c`), como es una copia generada de `sitio/` |
+| **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | **122 tests · 119 verdes · 3 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Los 3 que quedan son **todos de entorno**, ninguno de producto: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27]. Se resuelven prendiendo el PC viejo que sostiene el `firma-service`. Los 122 (antes 121) son por el test nuevo del gate de consentimiento |
+| **Suite (escritorio)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** 🔴 **Corrección importante**: hasta hace poco decía "3 con fallos, todos de entorno" y **eso estaba mal**. Al verificarlos uno por uno, solo **uno** es de entorno: `test-firma-constancia-consolidada.js` [83/83], cuyos 83 chequeos estáticos pasan y solo muere el bloque runtime por `INTERNAL_API_KEY` (necesita el `firma-service` del PC viejo). Los otros dos eran **tests desactualizados**, no fallos de entorno: `test-firma-bridge.js` exigía un `contentType` que el handler quitó a propósito al pasar a escribir el PDF en disco, y `test-firma-tunnel-kit.js` exigía el `cloudflared tunnel --url` de los quick tunnels que ya no se usan. Los dos se corrigieron **invirtiendo el check** (nunca tocando el código de producto) y ambos muerden, probado con mutación |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
 | **Validaciones visuales** | ✅ **Todo cerrado.** 📦860, 📦861 y 📦868 aprobados por el owner de punta a punta. 📦867 **validado por el owner** (era el punto 3 de la cola: "nunca se abrió en la app" — ya no aplica). **El ancho de la tarjeta de ingreso** (📦869) **también validado por el owner**. Los cuatro están probados por una persona, no por un test |
 | **Jornada** | **En curso** (2026-10-07). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. **De esta sesión quedan commiteadas y pusheadas en este commit** las tres de hoy más este: `4845756b` (📦872 + 📦871), `2d43b94e` y `b3d8abab` (tests), más 📦874 (aislamiento de cuentas Gmail) y 📦873 (gate de consentimiento legal), con sus tests y la documentación al día. Versión `0.1.251` |
 
 
-### 🛠️ Pendientes abiertos (al 2026-10-07)
+### 🛠️ Pendientes abiertos (al 2026-10-07, cierre 17:45)
 
-1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` decide
-   comparando `app_version` y un `config.consentDocumentVersion` que **nadie escribe** (se lee en
-   `main.js:2708` y `:2746`, siempre vale `'v1'`). Consecuencias: editar el texto legal **no**
-   vuelve a preguntar, y cada actualización de la app re-pregunta a todo el mundo. Las versiones
-   reales del texto (`CONSENT_VERSION_TERMINOS`) se guardan en la fila pero **nadie las vuelve a
-   leer** — `version_terminos` solo aparece en el CREATE y en el INSERT, nunca en un SELECT. El
-   `textoHash` tampoco protege nada porque no se compara contra nada.
+1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` compara
+   contra `app.getVersion()`, así que **cada bump de versión le repite el consentimiento a todos**,
+   aunque el texto legal no haya cambiado. Y al revés: editar la política **no** vuelve a preguntar,
+   porque `version_terminos` y `version_privacidad` se guardan pero **nadie los vuelve a leer** (solo
+   aparecen en el CREATE y en el INSERT). `config.consentDocumentVersion` se lee en dos lugares y
+   **nadie lo escribe**, así que siempre vale `'v1'`. El `texto_hash` tampoco protege nada: no se
+   compara contra nada. *Evidencia viva: el 2026-10-07 se aceptó dos veces con el mismo
+   `texto_hash` (`8bf9b25d43a1`), solo porque entre una y otra hubo un bump de versión.*
 
-2. **🔴 El consentimiento es por EQUIPO, no por persona.** La consulta de `consent:estado` es
-   `SELECT ... FROM consent_acceptance ORDER BY aceptado_en DESC LIMIT 1` **sin `WHERE email = ?`**:
-   toma la aceptación más reciente de quien sea. En un equipo compartido, el primer usuario que
-   acepta silencia el gate para todos los demás — y K+AIR registra datos de salud de empleados
-   que no son quien está frente a la pantalla. El fix va junto con el anterior: `consent:estado`
-   tiene que recibir el token (hoy no recibe nada) y filtrar por correo.
+2. **🔴 El consentimiento es por EQUIPO, no por persona.** La consulta es
+   `SELECT ... ORDER BY aceptado_en DESC LIMIT 1` **sin `WHERE email = ?`**: toma la aceptación más
+   reciente de quien sea. En un equipo compartido el primero que acepta silencia el gate para los
+   demás. Y hay un problema de fondo que **no se arregla con código**: quien marca las casillas es el
+   admin del SG-SST, y los datos que se registran son de sus subordinados, que nunca ven esa pantalla.
+   El registro prueba que *alguien* aceptó, no que lo aceptó el titular. **Esto necesita asesoría
+   jurídica**, no un parche.
 
-3. **🟡 "Recordar mis datos" del login.** El **guardado funciona** (las claves existen en el
-   leveldb con valores correctos: `admin@kair.local`) y la **lógica de relleno también**
-   (probado extrayéndola del `renderer.js` real y corriéndola: `email`, `password` y la casilla
-   quedan bien). Lo que NO se ha podido determinar es por qué en la app los campos salen vacíos.
-   Dos candidatos: (a) la rama `else` corre y borra lo guardado cuando la casilla llega sin
-   marcar — pasó al cambiar de correo hoy; (b) el controlador de autofill de Chromium sobrescribe
-   los valores porque los inputs llevan `autocomplete="username"` y `current-password`.
-   **Discrimina con esto**, en DevTools (Ctrl+Shift+I) → Consola:
-   `localStorage.getItem('kair_remembered_email')`. Si devuelve `null` es (a); si devuelve el
-   correo es (b).
+3. **🔴 Faltan los Términos y Condiciones de USO.** Hoy solo existe la política de privacidad.
+   Lo que falta: (a) condiciones de uso, (b) política de tratamiento de datos y límites de uso, con
+   **nombre del responsable del tratamiento** (hoy no se declara ninguno), (c) la base legal real,
+   que para seguimiento de incapacidades es **obligación legal** (Decreto 1072 / Res 0312), NO
+   consentimiento, y (d) la cláusula de alcance: K+AIR provee la herramienta, el responsable de que
+   la configuración cumpla la norma es la empresa. **Redacción jurídica: es trabajo del asesor.**
 
-4. **🔴 La contraseña del login se guarda en TEXTO PLANO** en `localStorage`
-   (`renderer.js:3590`). Hoy los tokens OAuth van cifrados con DPAPI justamente para que nadie
-   con acceso al equipo los lea; dejar la clave de la cuenta de K+AIR en claro al lado es la
-   misma debilidad, y esa credencial abre todo lo demás. Recomendación: guardar **solo el
-   correo**. Decisión del owner pendiente.
+4. **🟡 El gate pide autorización de "datos sensibles de salud" y el módulo sí los guarda.** La tabla
+   `seguimiento_incapacidad_caso` tiene CIE-10 (`codigo_cie10`, `cie10_dx2/3`), porcentajes de PCL,
+   resultados de examen médico y dictámenes medicolegales, junto con identificación completa del
+   trabajador. **Hoy tiene 0 filas**, pero el esquema dice lo que hará. Definir con el asesor si el
+   consentimiento es el instrumento correcto o si debe ser aviso de privacidad.
 
-5. **🔴 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
-   otra**, y hacer `git push --force origin gh-pages`. Hoy el sitio publicado **contradice a la
-   app en dos puntos**: dice que los tokens "no está cifrado" (ya lo están) y anuncia
-   `gmail.compose`, que ya no se pide. `sitio/privacidad.html` ya está corregido; falta publicar.
-2. **🔴 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
-   otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree` (sin checkout,
-   para no tocar el árbol de trabajo). Regenerar es volver a correr ese script sobre `sitio/`
-   y hacer `git push --force origin gh-pages`.
-   Ojo: `sitio/` NO puede ir a `docs/`, porque `docs/` ya tiene contenido interno (protocolos
-   SST, planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`) y publicarlo
-   como sitio web oficial sería exponerlo.
+5. **🟡 Validación visual del gate por CDP.** Se validó por evidencia en disco (creó
+   `auth-credentials.enc` cifrado de verdad, y el gate no reapareció porque correspondía), pero **no
+   quedaron capturas** del overlay ni del chequeo de Escape. El driver quedó en
+   `%TEMP%\validar-consent-cdp.js` y `playwright-core` ya se desinstaló.
 
-3. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no verificada").
-   **Lo que ya está hecho:** los 4 textos de justificación están escritos y revisados en
-   `sgsst-electron-app/docs/google-verificacion-scopes.md`, con la evidencia `archivo:línea` de
-   cada llamada. **Lo que falta:** mandarlos en la consola, hacer el **video de demostración**
-   y verificar el dominio en **Search Console**.
-   Ojo con dos cosas que se supieron después y cambian el plan:
-   - **Es revisión RESTRINGIDA** (2 de los 4 scopes lo son: `gmail.readonly` y `gmail.modify`),
-     así que son ~6 semanas, no los ~10 días hábiles de las sensitive, y pide video.
-   - **No hay que pagar la evaluación de seguridad** (~USD 500/año) porque K+AIR habla con
-     Google desde el proceso principal de Electron y no hay backend de correo. **Es una
-     condición, no una propiedad**: si el `firma-service` empieza a recibir correos, se cae.
-   **⚠️ El tope de 100 usuarios es de por vida del proyecto y NO se resetea.**
+6. **🟡 `test-firma-constancia-consolidada.js`** — el único test que queda en rojo: 83/83 estáticos
+   verdes, solo el bloque runtime pide `INTERNAL_API_KEY`. Se resuelve prendiendo el PC viejo.
 
-4. **🌐 El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
-   El owner está adquiriendo uno. Mientras tanto se sigue adelante: `reivaj640.github.io` se
-   puede verificar por meta tag, así que no bloquea el punto 3. Solo hay que rehacer la
-   verificación de propiedad si después cambia el dominio.
-
-5. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~54 versiones sin publicar.** El
-   desarrollo va en `0.1.250`. **Decisión del owner al 2026-10-07: todavía no, no es el momento.**
-   Ojo con el 🐇 del punto 2: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
-
-6. **🧪 Tests que dependen del entorno, no del código** (se resuelven prendiendo el PC viejo que
-   sostiene el `firma-service`): `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js`
-   [83/83] y `test-firma-tunnel-kit.js` [24/27]. Piden el servicio vivo, `INTERNAL_API_KEY` y
-   `cloudflared` con red. **Son los 3 rojos que le quedan a la suite: ninguno es de producto.**
-
-7. **🔍 No se pueden verificar las Releases de GitHub** porque `gh` no está instalado en esta
-   máquina. Solo se ven los tags locales.
-
-8. **✅ Cerrado hoy: los tests de presupuesto.** Eran el mismo error dos veces — comparaban contra
-   cifras escritas a mano que eran una foto del Excel de Drive. Alguien le agregó septiembre a la
-   fila de honorarios y se pusieron rojos reportando un bug de $776.227 que no existía. Ahora las
-   cifras se leen del archivo al correr. Detalle en `PROMPT.md` §7.5.
-  configura cada empresa (`main/firma-bridge.js:571-576`).
-- **Restaurados `kair.db` + `config.json`**: `companies` = 2, `user_company_roles` = 2 y
-  `companyPaths` con las dos empresas. El bloqueo de empresas en la app ya no existe.
-- **`test-skeleton-encaje.js:147` arreglado**: el check pedía el literal
-  `20260918-skeleton-encaje` y ningún token vigente podía satisfacerlo, así que el test era
-  inejecutable. Ahora pregunta "¿tiene token?" (`\d{8}-`) y trae **3 mutaciones que muerden**.
-  El test pasó de 25/26 a **29/29** y la suite de **107 verdes a 108**, con los 17 fallos
-  restantes idénticos a los de antes: cero regresiones.
-- **Las 7 minas de cache-bust cerradas.** Convivían **19 formatos de resumen** y el runner solo
-  entendía `N/M OK`: lo que no casaba se contaba verde sin mirar sus checks. Ahora `leerResumen()`
-  los lee todos y los no verificables van a lista propia. Además, los 7 checks que anclaban un
-  literal de `?v=` pasaron a preguntar la forma (`\d{8}-`), y **ya no queda ninguno anclado** en
-  `main/` — un grep final solo encuentra menciones, todas dentro de comentarios que explican el
-  cambio. De paso se corrigió un **check duplicado exacto** en `test-identificacion-peligros.js`
-  (líneas 120 y 142, el mismo `INDEX.includes`), que ahora afirma algo distinto.
-- **La etiqueta falsa "📦862 = ancho de la tarjeta"**, quitada de la cola y del CHANGELOG.
-- **`PROMPT.md` §5.9**: el "0 archivos" sobre `KairUI.esc()` / `KairHelpers.formatDate()` era
-  falso; corregido con el matiz real (existen, pero solo dentro de Auditoría Anual).
-- **`PROMPT.md` §2**: decía que `Temp/` no se commitea. Falso — hay 13 archivos versionados ahí,
-  incluido el runner.
-- **`delete-personal` NO era un defecto de la app** (esta sesión lo reportó como "el único
-  defecto real" y era falso: se afirmó sin leer el contrato). El test lo invocaba sobre un bp **activo**
-  saltándose `gh:cambiar-estado`, violando la regla *"Activo → Retirado → [Ocultar]"*
-  (`gestion-humana-bridge.js:1171`), y leía `data.retired`, **un campo que el contrato no tiene**
-  (la respuesta real es `{personalId, activo, estado, fechaRetiro}`). Reescrito según el contrato, y
-  ahora **protege la regla**: un bp activo no se puede ocultar (`BP_NOT_RETIRED`). **72 OK · 0 FAIL**.
-- **Los 3 tests de gestión humana no corrían `MIGRATIONS_SQL`**, solo `SCHEMA_SQL`. Por eso
-  `test-gestion-humana-bridge-newtables.js` se comía `gh_documentos has no column named ruta_archivo`
-  y `write-extra` reventaba con `no such table: gh_eventos_personal` — **ambas existen en la BD real**,
-  verificado. Ahora aplican migraciones con el patrón de `main.js:592-608`. **209 OK · 0 FAIL**.
-- **El `diag` del bridge mentía sobre su propio conteo**: decía "10 tablas" con 11 en la lista. El
-  mensaje ahora se deriva del array, así que no puede volver a mentir solo.
-- **`test-gestion-humana-bridge-write-extra.js` esperaba `ALREADY_DELETED`** pero `delete-personal`
-  devuelve `BP_DELETED` (`:1193`): `ALREADY_DELETED` es el código de otras entidades del módulo.
-
+7. **🟢 `Update-EnvPublicUrl`** ya se borró (código muerto tras el túnel con URL fija). Los checks
+   que dependían de él se invirtieron. Los 3 CJK de `firma-service/tests/logger.test.js` y
+   `tests/notificaciones-toast-e2e.js` también están fuera.
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 

@@ -23,6 +23,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
   authLoginV1: (payload) => ipcRenderer.invoke('auth-login-v1', payload),
   authLogoutV1: (payload) => ipcRenderer.invoke('auth-logout-v1', payload),
+  // 🔐 "Recordar mis datos" del login. La contraseña NO va a localStorage: se cifra en el
+  // main process con safeStorage y se guarda en auth-credentials.enc.
+  // `cifrado:false` significa que safeStorage no estaba disponible y NO se guardó nada —
+  // el renderer debe avisar, no fingir que se recuerda.
+  authCredentialsSave: (payload) => ipcRenderer.invoke('auth-credentials:save', payload),
+  authCredentialsLoad: () => ipcRenderer.invoke('auth-credentials:load'),
+  authCredentialsClear: () => ipcRenderer.invoke('auth-credentials:clear'),
   // 📦873 — Consentimiento de Términos y datos personales (Ley 1581 de 2012).
   // `consentEstado` devuelve null si hay cualquier error de infraestructura: el gate
   // tiene que interpretar eso como "seguí" y no como "bloqueá".

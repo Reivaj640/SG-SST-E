@@ -152,15 +152,35 @@ Estas son las que el prompt v1 no tenía y son las que más cuestan cuando falta
 | "ok procede", "procede" | Editar. **NO commitear.** |
 | "dale", "OK", "perfecto", "commit" | Commitear. **NO pushear.** |
 | "pushea y procede con el release" | Push + tag + release |
+| "bumpea la versión", "prepara el release" | Bump de versión en los archivos del §5.2 |
 | "revierte" | `git reset --hard` o `git revert` inmediato |
 
 > "ok procede" es la trampa: **autoriza cambio, no commit.** Ante la duda, no commitees.
 > Pedir permiso nunca está de más; commitear sin permiso rompe la confianza.
 
-### 5.2 Siempre bumpear la versión, en el mismo commit
+### 5.2 La versión SOLO se bumpea cuando el owner lo dice
 
-`package.json` (`0.1.233`) + `CHANGELOG.md` + `AGENTS.md` + `README.md` + `CONTEXT.md` + `release-notes.md`.
-Nunca declares en el CHANGELOG una versión que `package.json` no tenga.
+**No bumpees por inercia.** El número de versión no es un contador de commits: está atado al
+**release**, y el release es una decisión del owner. Si el owner no lo dice explícitamente,
+la versión no se toca — por mucho que el commit traiga código de app.
+
+> **Decisión del owner (Javier Robles Fontalvo), 2026-10-07.** Antes esta regla decía
+> "siempre bumpear en el mismo commit". Se cambió porque el bump automático producía un
+> efecto visible y molesto: `consent:estado` compara contra `app.getVersion()`, así que
+> **cada bump hacía volver a aparecer la pantalla de consentimiento legal a todos los
+> usuarios**, aunque el texto legal no hubiera cambiado. Ese bug de versiones está pendiente de
+> arreglo, pero la regla ya no depende de él.
+
+**Cómo se bumpea (solo cuando lo pida):** `package.json` + `CHANGELOG.md` + `README.md` +
+`release-notes.md`. `CONTEXT.md` sigue prohibido por `AGENTS.md:516`. Nunca declares en el
+CHANGELOG una versión que `package.json` no tenga.
+
+**Frases que SÍ autorizan el bump** (y solo si además autorizan commit):
+"bumpea la versión", "sube la versión", "prepara el release", "haz el release".
+
+**Lo que NO lo autoriza:** "dale", "OK", "commit", "pushea", ni el hecho de que el trabajo
+sea "grande" o "de aplicación". Un commit con `package.json` en el diff sin que el owner lo
+pidiera es un error, aunque el resto del commit esté perfecto.
 
 ### 5.3 Cache-bust en `index.html`
 
@@ -758,19 +778,31 @@ reintroducir el código sin el markup pase verde.
 
 ### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-**Medido el 2026-10-07:** **121 tests · 118 en verde · 3 con fallos · 1 sin resumen verificable.**
-Los 121 (antes 119) son porque se colgaron 2 tests nuevos. **Cero regresiones.** Los 3 que
-quedan son **todos de entorno**, ninguno de producto. **No hay lista en código**: el runner no
-tiene tolerancias, viven documentadas acá en prosa.
+**Medido el 2026-10-07:** **123 tests · 122 en verde · 1 con fallos · 1 sin resumen verificable.**
+**Cero regresiones.** **No hay lista en código**: el runner no tiene tolerancias, viven documentadas acá
+en prosa.
 
 | # | Test | Qué necesita para pasar |
 |---|---|---|
-| 1 | `test-firma-bridge.js` | el servicio de firma vivo (saca 0/0) |
-| 2 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` — saca **83/83** y después falla por la variable |
-| 3 | `test-firma-tunnel-kit.js` | `cloudflared` y red (24/27) |
+| 1 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` del `firma-service` — saca **83/83** en los chequeos estáticos y después falla por la variable |
 
-Los tres se resuelven prendiendo el PC viejo que sostiene el `firma-service`. **Hoy la suite
-no tiene ni un solo rojo de producto.**
+Se resuelve prendiendo el PC viejo que sostiene el `firma-service`. **Hoy la suite no tiene ni un
+solo rojo de producto.**
+
+⚠️ **Este cuadro estuvo mal hasta el 2026-10-07 y decía otra cosa.** Decir "3 con fallos, **todos
+de entorno**" era falso: al verificar los tres uno por uno, **solo uno era de entorno**. Los otros
+dos eran **tests desactualizados**, no fallos del entorno:
+
+| Test que se reportaba mal | Por qué no era "de entorno" | Cómo se corrigió |
+|---|---|---|
+| `test-firma-bridge.js` (saca 0/0) | Exigía un `contentType` que el handler **quitó a propósito** al pasar a escribir el PDF en disco y a servirlo desde caché. El código estaba bien; el test describía el diseño anterior | Check **invertido**: ahora exige el diseño actual (PDF en disco + caché). **58/58** |
+| `test-firma-tunnel-kit.js` (24/27) | Exigía `cloudflared tunnel --url` de los *quick tunnels*, que **ya no se usan**: el kit ahora arranca un túnel nombrado | Checks **invertidos** al túnel nombrado. **25/25** |
+
+**La lección que sí queda:** "con fallos" y "de entorno" son cosas distintas, y un test viejo es
+un **defecto del test**, aunque parezca un fallo de entorno porque muere en runtime. Antes de
+reportar un rojo como "depende del entorno", hay que **leer el test y contrastarlo con el código**
+(§5.9) para saber cuál de las dos cosas es. Los dos checks invertidos **muerden**: se comprobó por
+mutación que pasan a rojo si el código vuelve al comportamiento viejo.
 
 **✅ También se resolvieron los 2 de presupuesto** (ver más abajo el por qué, que es la parte
 interesante): eran el mismo error de patrón dos veces.

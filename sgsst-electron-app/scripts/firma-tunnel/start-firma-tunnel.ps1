@@ -155,32 +155,6 @@ function Wait-TunnelUrl {
   return $null
 }
 
-function Update-EnvPublicUrl {
-  param([string]$Url)
-  if (-not (Test-Path $EnvFile)) { throw "No existe $EnvFile" }
-  $bak = $EnvFile + '.bak-' + (Get-Date -Format 'yyyyMMddHHmmss')
-  Copy-Item $EnvFile $bak -Force
-  # Línea por línea (NO -Raw + -NoNewline: eso colapsa el .env a una sola
-  # línea y rompe el parser de dotenv — bug real encontrado en validación).
-  $lines = Get-Content $EnvFile
-  $keys = @('PUBLIC_URL','PUBLIC_URL_FIRMA')
-  $found = @{}
-  for ($i = 0; $i -lt $lines.Count; $i++) {
-    foreach ($key in $keys) {
-      if ($lines[$i] -match ("^" + [regex]::Escape($key) + "=")) {
-        $lines[$i] = "$key=$Url"
-        $found[$key] = $true
-      }
-    }
-  }
-  # Si alguna key no existía, se agrega al final (línea nueva propia)
-  foreach ($key in $keys) {
-    if (-not $found.ContainsKey($key)) { $lines += "$key=$Url" }
-  }
-  Set-Content $EnvFile -Value $lines -Encoding utf8
-  Write-Host "[firma-tunnel] .env actualizado → $Url (backup: $bak)"
-}
-
 function Start-Tunnel {
   if (Test-Path $TunnelLog) { Remove-Item $TunnelLog -Force }
   $tunnelErr = $TunnelLog + '.err'

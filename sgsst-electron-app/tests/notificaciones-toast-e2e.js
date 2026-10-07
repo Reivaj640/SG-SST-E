@@ -8,7 +8,7 @@
 //      reales (los mismos campos que arma notifications-email.js).
 //   4. Se hace clic REAL en el botón .btn-toast-action y se comprueba qué pasa.
 //
-// Los 3 comportamientos que se verifican (los que se보고 antes fallaban):
+// Los 3 comportamientos que se verifican (los que antes fallaban):
 //   A) el panel abre en la pestaña "notifs" (donde está el correo), no en
 //      "pendientes" (que es la de eventos y el default),
 //   B) si el panel ya estaba abierto, NO se cierra (no es un toggle),

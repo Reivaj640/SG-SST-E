@@ -3510,15 +3510,41 @@ contentArea.innerHTML = '';
   const passwordInput = document.getElementById('kair-login-pass');
   const rememberCheckbox = document.getElementById('kair-remember-me');
 
-  const savedEmail = localStorage.getItem('kair_remembered_email');
-  const savedPassword = localStorage.getItem('kair_remembered_password');
-  if (savedEmail) {
-    emailInput.value = savedEmail;
-    if (savedPassword) {
-      passwordInput.value = savedPassword;
-      rememberCheckbox.checked = true;
-    }
-  }
+  // Las credenciales llegan CIFRADAS desde el main process (safeStorage); ya no queda
+  // nada en localStorage. Eso cierra un agujero de seguridad y de paso arregla un
+  // sintoma viejo: los inputs llevan autocomplete="username" y "current-password", y
+  // el controlador de autofill de Chromium REESCRIBE esos campos al cargar la pagina,
+  // pisando el valor recien asignado. Por eso el relleno se hace en dos pasadas: ahora,
+  // y otra vez despues de que la pagina termino de cargar.
+  (function prefillCredenciales() {
+    Promise.resolve()
+      .then(function () {
+        if (!window.electronAPI || typeof window.electronAPI.authCredentialsLoad !== 'function') return null;
+        return window.electronAPI.authCredentialsLoad();
+      })
+      .then(function (r) { return (r && r.success) ? r.credentials : null; })
+      .catch(function (e) {
+        console.warn('[login] No se pudieron leer las credenciales recordadas:', e && e.message);
+        return null;
+      })
+      .then(function (recordadas) {
+        // Limpia la copia en texto plano que dejaron las versiones anteriores.
+        try {
+          localStorage.removeItem('kair_remembered_password');
+          localStorage.removeItem('kair_remembered_email');
+        } catch (e2) { /* localStorage puede estar bloqueado */ }
+        if (!recordadas || !recordadas.email) return;
+        var aplicar = function () {
+          // Solo si el campo sigue vacio: no pisar lo que el usuario este escribiendo.
+          if (!emailInput.value) emailInput.value = recordadas.email;
+          if (recordadas.password && !passwordInput.value) passwordInput.value = recordadas.password;
+          rememberCheckbox.checked = true;
+        };
+        aplicar();
+        setTimeout(aplicar, 60);
+        window.addEventListener('load', function () { setTimeout(aplicar, 0); });
+      });
+  })();
 
   const passwordToggle = document.getElementById('kair-password-toggle');
   const passwordToggleIcon = passwordToggle.querySelector('i');
@@ -3585,12 +3611,21 @@ contentArea.innerHTML = '';
       });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
 
-      if (rememberCheckbox.checked) {
-        localStorage.setItem('kair_remembered_email', email);
-        localStorage.setItem('kair_remembered_password', password);
-      } else {
-        localStorage.removeItem('kair_remembered_email');
-        localStorage.removeItem('kair_remembered_password');
+      // La contrasena NO se guarda en localStorage: se cifra en el main process con
+      // safeStorage. Si no hay cifrado disponible NO se guarda nada y se avisa por
+      // consola; dejar una copia en claro "por si acaso" seria el mismo fallo que
+      // estamos cerrando.
+      try {
+        if (rememberCheckbox.checked) {
+          var rCred = await window.electronAPI.authCredentialsSave({ email: email, password: password });
+          if (!rCred || !rCred.cifrado) {
+            console.warn('[login] No se pudo cifrar la contrasena: "Recordar mis datos" NO queda activo.');
+          }
+        } else {
+          await window.electronAPI.authCredentialsClear();
+        }
+      } catch (eCred) {
+        console.warn('[login] No se pudieron guardar las credenciales recordadas:', eCred && eCred.message);
       }
 
       // Extraer nombre del usuario para la transición
