@@ -22,42 +22,26 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-06 |
+| **Fecha de cierre** | 2026-10-07 |
 | **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **868 commiteado y pusheado** (`3514af7f`): el correo de Gmail/Calendar deja de romperse con `Missing required parameter: client_id` y queda funcionando para cualquier usuario. Despues, `2ace3131` (política de privacidad), `e373fdce` (correo de soporte real), `b5515ebc` (cierre de documentación) y `92499684` (docs del correo de soporte) |
-| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` (rama `gh-pages` también pusheada) |
-| **Versión** | `0.1.247` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
+| **Último commit de código** | 📦 **870** (`dc9123ad`, commiteado y pusheado): los tests de gestión humana ahora aplican `MIGRATIONS_SQL`, no solo `SCHEMA_SQL`. Antes de eso, en la misma jornada, 📦869 (`95d42d8c`, tarjeta de ingreso a 260px), 📦868 (`3514af7f`, credenciales de Google dentro de la app) y el commit `df4fd9a7` de los 17 fallos que no eran fallos |
+| **Commits sin pushear** | 0 — `Dev` sincronizado con `origin/Dev` en `dc9123ad`. ⚠️ **Hay trabajo de la sesión del 2026-10-07 SIN commitear todavía** (ver "Sin commitear" más abajo): es lo primero que hay que commitear |
+| **Versión** | `0.1.250` (desarrollo) · 🔴 **último tag real: `v0.1.196`, del 2026-09-10**. El "v0.1.205" que decía esta tabla **no existe**: `git tag --list 'v0.1.205'` sale vacío. No se pudieron verificar las Releases de GitHub porque `gh` no está instalado en esta máquina |
 | **Suite (portátil)** | 119 tests · 101 verdes · 18 preexistentes · **0 regresiones** (última medición en esa máquina, a 📦862; no hay acceso a ella desde acá, así que no se le corrieron los tests nuevos 863/865/866) |
-| **Suite (escritorio)** | **119 tests · 114 verdes · 5 con fallos · 1 sin resumen verificable.** Antes decía "125 · 108 · 17", y ese 17 no significaba nada: eran 6 problemas distintos y **10 de ellos NO eran fallos del producto** sino tests viejos contra código borrado a propósito (📦581 y 📦752). Detalle y tabla de los 5 en `PROMPT.md` §7.4 | `test-mapeo-estructura-863.js` (**36/36**, con corrida real de Python) + `test-mapeo-estructura-865.js` (**15/15**) + `test-mapeo-estructura-866.js` (**20/20**) + `test-mapeo-estructura-867.js` (**44/44**) + `test-google-oauth-868.js` (**57/57**, 21 mutaciones) además de `test-admin-empresas-862.js` (17/17) |
-| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ 913 paquetes · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
-| **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados) y **`googleOAuth` está presente** (Gmail conectado). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** |
-| **Validaciones visuales abiertas** | 📦860 y 📦861 **aprobados por el owner con captura**. **El ancho de la tarjeta de ingreso** (el punto 5 de la cola, sin número de paquete todavía) y 📦867 siguen pendientes: no se han abierto en la app. 📦868 **validado de punta a punta por el owner**: conecto Gmail, vio sus correos, desconecto (verificado: la clave `googleOAuth` desaparece de `config.json`) y reconecto con una cuenta distinta |
-| **Jornada** | **Cerrada** (2026-10-06). **Commiteado y pusheado**: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación) y `e373fdce` (correo de soporte real). El objetivo de la jornada —que cualquier persona conecte su correo sin configurar nada— **quedó cumplido y probado con una cuenta que nunca estuvo en la lista de usuarios de prueba** |
+| **Suite (escritorio)** | **121 tests · 116 verdes · 5 con fallos · 1 sin resumen verificable.** Los 5: `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js` [83/83] y `test-firma-tunnel-kit.js` [24/27] (los tres dependen del entorno: servicio vivo, `INTERNAL_API_KEY`, `cloudflared` + red), más `test-presupuesto-824-real.js` [34/38] y `test-presupuesto-824-roundtrip.js` [20/21], que son **preexistentes y ajenos a este trabajo** (ver punto 11 de la cola). **Cero regresiones.** La cifra subió de 119 a 121 porque se colgaron 2 tests nuevos |
+| **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
+| **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
+| **Validaciones visuales** | ✅ **Todo cerrado.** 📦860, 📦861 y 📦868 aprobados por el owner de punta a punta. 📦867 **validado por el owner** (era el punto 3 de la cola: "nunca se abrió en la app" — ya no aplica). **El ancho de la tarjeta de ingreso** (📦869) **también validado por el owner**. Los cuatro están probados por una persona, no por un test |
+| **Jornada** | **En curso** (2026-10-07). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. **De esta sesión todavía no hay commit**: hay 2 cambios de código de app (tokens cifrados 📦871 y un scope menos 📦872), 2 tests nuevos, 2 tests corregidos, el runner movido y la documentación al día. Todo eso está **sin commitear y sin pushear** |
 
 
-### 🛠️ Pendientes abiertos (renumerados el 2026-10-06, en orden de urgencia)
+### 🛠️ Pendientes abiertos (al 2026-10-07)
 
-1. **🔴 `pasoActual = 1` da 2 y no se ha podido explicar** (`test-gestion-humana-bridge-write.js`,
-   88 OK · 1 FAIL). El `INSERT` de `create-contratacion` pone `paso_actual = 1` literal
-   (`gestion-humana-bridge.js:635`) y `get-contratacion` mapea `row.paso_actual` (`:95`) — pero el
-   test lee 2. El hermano (esperar 6 tras 5 pasos) **sí se corrigió**, porque ahí la semántica está
-   documentada en el fix de `:863` ("primer paso pendiente"). Este **se dejó en rojo a propósito**:
-   cambiar el esperado a 2 solo porque el código dice 2 sería doblar el test contra el código, que es
-   la trampa que este mismo paquete destapó en los otros 10. Alguien tiene que leer el flujo completo
-   de `create-contratacion` y decir por qué queda en 2.
+1. **🔴 Commitear la sesión del 2026-10-07.** Todo lo de abajo quedó **hecho pero sin commitear**:
+   2 cambios de código de app, 2 tests nuevos, 2 tests corregidos, el runner movido de `Temp/`
+   a `tools/` y la documentación al día. Versión `0.1.250`. Es lo primero que hay que hacer.
 
-2. **🔴 `PROMPT.md` §2 dice que `Temp/` "NO se commitea". Es falso: hay 13 archivos
-   versionados ahí, incluido `run-all-tests.js`.** El mapa del repo hay que corregirlo, y conviene
-   decidir si `Temp/` es realmente donde debe vivir el runner — un archivo que todos corren y del
-   que nadie se acuerda, en una carpeta con nombre de "temporal", es una forma de perderlo. Dos
-   caminos: moverlo a `sgsst-electron-app/tools/` y dejar `Temp/` de verdad scratch, o dejarlo y
-   arreglar la etiqueta. Lo que **no** conviene es seguir llamándolo temporal.
-
-3. **🧪 Validación visual del ancho de la tarjeta y de 📦867**: nunca se abrieron en la app.
-   ✅ Ya no hay empresa de por medio (la BD tiene Tempoactiva y Temposum), así que la de 867
-   ya se puede abrir sin preparar nada.
-
-4. **🐇 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
+2. **🔴 `gh-pages` es una COPIA generada de `sitio/`. Si se edita una, hay que regenerar la
    otra.** La rama se construyó con `hash-object` + `mktree` + `commit-tree` (sin checkout,
    para no tocar el árbol de trabajo). Regenerar es volver a correr ese script sobre `sitio/`
    y hacer `git push --force origin gh-pages`.
@@ -65,43 +49,43 @@
    SST, planes de gestión, `investigacion-seguimiento-embarazo-sst-colombia.md`) y publicarlo
    como sitio web oficial sería exponerlo.
 
-5. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no verificada").
-   Requiere: verificar el dominio en **Search Console**, un **video de demostración** y
-   justificación permiso por permiso. ~10 días hábiles. No corre prisa: con menos de 100
-   usuarios y sin pasar los datos por servidores propios está dentro de las excepciones de
-   Google. **⚠️ Ojo con el tope de 100 usuarios: es de por vida del proyecto y NO se resetea.**
-   Si se quema, Google deshabilita el login.
+3. **🔑 Verificación de la app en Google** (para quitar la pantalla de "app no verificada").
+   **Lo que ya está hecho:** los 4 textos de justificación están escritos y revisados en
+   `sgsst-electron-app/docs/google-verificacion-scopes.md`, con la evidencia `archivo:línea` de
+   cada llamada. **Lo que falta:** mandarlos en la consola, hacer el **video de demostración**
+   y verificar el dominio en **Search Console**.
+   Ojo con dos cosas que se supieron después y cambian el plan:
+   - **Es revisión RESTRINGIDA** (2 de los 4 scopes lo son: `gmail.readonly` y `gmail.modify`),
+     así que son ~6 semanas, no los ~10 días hábiles de las sensitive, y pide video.
+   - **No hay que pagar la evaluación de seguridad** (~USD 500/año) porque K+AIR habla con
+     Google desde el proceso principal de Electron y no hay backend de correo. **Es una
+     condición, no una propiedad**: si el `firma-service` empieza a recibir correos, se cae.
+   **⚠️ El tope de 100 usuarios es de por vida del proyecto y NO se resetea.**
 
-6. **🔑 Los tokens de Google se guardan SIN cifrar** en
-   `%APPDATA%/sgsst-electron-app/config.json` (`shared/google-tokens.js:29`,
-   `fs.writeFileSync` en texto plano). `main/firma-bridge.js` y el modelo Sí usan
-   `safeStorage`; el correo no. No es una fuga por red, pero cualquiera con acceso al perfil
-   de Windows lee los tokens. **Deuda técnica declarada en la política de privacidad.**
+4. **🌐 El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
+   El owner está adquiriendo uno. Mientras tanto se sigue adelante: `reivaj640.github.io` se
+   puede verificar por meta tag, así que no bloquea el punto 3. Solo hay que rehacer la
+   verificación de propiedad si después cambia el dominio.
 
-7. **🌐 El dominio del sitio es `reivaj640.github.io`, que es de GitHub, no propio.**
-   Funciona, pero si K+AIR va a crecer conviene apuntar a un dominio propio (el servicio de
-   firma ya usa `firma.k-air.com`) antes de pedir la verificación de la app.
+5. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~54 versiones sin publicar.** El
+   desarrollo va en `0.1.250`. **Decisión del owner al 2026-10-07: todavía no, no es el momento.**
+   Ojo con el 🐇 del punto 2: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
 
-8. **📦 No hay release desde `v0.1.196` (2026-09-10): hay ~52 versiones sin publicar.** El
-   desarrollo va en `0.1.247`. Esta tabla decía "último publicado `v0.1.205`" y **ese tag no
-   existe**. Corregido arriba, pero la decisión de liberar o no es del owner. Ojo con el 🐇 del
-   punto 4: `gh-pages` se genera aparte, así que un tag no publica el sitio solo.
+6. **🔴 Nuevo: los tests de presupuesto no cuadran con el Excel.** Salió al correr la suite del
+   2026-10-07 y es **preexistente, no lo causó este trabajo** (ni el test ni el código de
+   presupuesto tienen cambios en el árbol, y el test falla igual standalone).
+   `test-presupuesto-824-real.js` [34/38] y `test-presupuesto-824-roundtrip.js` [20/21] fallan
+   por lo mismo: el import da un ejecutado de **$20.473.101,33** y el Excel del que se importa
+   dice **$19.696.874,33**. Diferencia: **$776.227**. O el importador está sumando algo que no
+   debe, o el total del Excel es un subtotal y no un gran total. **Nadie lo ha investigated.**
 
-9. **❓ ¿La prueba de integración de 📦867 entra al repo como test?** Sigue consultada y sin
-   respuesta: ejercitó el wrapper y las regex reales de `main.js` contra un fixture de 2.500
-   archivos, pero quedó fuera del repo.
+7. **🧪 Tests que dependen del entorno, no del código** (se resuelven prendiendo el PC viejo que
+   sostiene el `firma-service`): `test-firma-bridge.js` [0/0], `test-firma-constancia-consolidada.js`
+   [83/83] y `test-firma-tunnel-kit.js` [24/27]. Piden el servicio vivo, `INTERNAL_API_KEY` y
+   `cloudflared` con red.
 
-10. **⚠️ "913 pacotes" en la fila de entorno es ambiguo.** El último `📦n` real es **868**.
-    Casi seguro ahí se cuentan paquetes npm instalados y no paquetes del changelog, pero el
-    texto no lo dice y se lee como lo segundo. Vale una línea aclaratoria.
-
-### ✅ Cerrado en esta sesión (no hace falta para retomar)
-
-- **Correo de soporte del sitio legal = `adminkair@gmail.com`**, ya no provisorio.
-  `sitio/soporte.html` (`e373fdce`) quitó el aviso de "pendiente de completar"; `gh-pages`
-  regenerada (`9c8fbfb7`) y verificada en vivo: responde 200 con el correo nuevo y sin el
-  viejo. De paso se corrigió una afirmación falsa de `privacidad.html`, que daba
-  `firma.k-air.com` por el servidor de firma cuando la URL sale de `secrets.enc` y la
+8. **🔍 No se pueden verificar las Releases de GitHub** porque `gh` no está instalado en esta
+   máquina. Solo se ven los tags locales.
   configura cada empresa (`main/firma-bridge.js:571-576`).
 - **Restaurados `kair.db` + `config.json`**: `companies` = 2, `user_company_roles` = 2 y
   `companyPaths` con las dos empresas. El bloqueo de empresas en la app ya no existe.

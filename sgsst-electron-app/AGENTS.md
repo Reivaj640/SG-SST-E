@@ -1506,12 +1506,12 @@ process.exit(failed === 0 ? 0 : 1);
 ### Cómo correr los tests antes de commitear
 ```powershell
 cd sgsst-electron-app
-node Temp/run-all-tests.js            # la suite completa: 111 tests
-node Temp/run-all-tests.js sidebar    # filtro por substring
+node tools/run-all-tests.js            # la suite completa: 111 tests
+node tools/run-all-tests.js sidebar    # filtro por substring
 node main/test-bandeja-sidebar-850.js  # uno solo
 ```
 > 📌 **Corregido 2026-10-03.** Esta sección mandaba correr `test-fixes-loop$i.js`, que ya no existen.
-> El runner real es `Temp/run-all-tests.js`: descubre por **regex de nombre** `/^test-.*\.js$/` y solo
+> El runner real es `tools/run-all-tests.js`: descubre por **regex de nombre** `/^test-.*\.js$/` y solo
 > en `main/`. Los 30 tests de `tests/` **no los ve nadie**.
 >
 > ⚠️ El runner parsea el `N/M OK` del stdout por regex. Si un test no lo imprime, lo cuenta como verde.
@@ -6805,12 +6805,12 @@ process.exit(failed === 0 ? 0 : 1);
 ### Cómo correr los tests antes de commitear
 ```powershell
 cd sgsst-electron-app
-node Temp/run-all-tests.js            # la suite completa: 111 tests
-node Temp/run-all-tests.js sidebar    # filtro por substring
+node tools/run-all-tests.js            # la suite completa: 111 tests
+node tools/run-all-tests.js sidebar    # filtro por substring
 node main/test-bandeja-sidebar-850.js  # uno solo
 ```
 > 📌 **Corregido 2026-10-03.** Esta sección mandaba correr `test-fixes-loop$i.js`, que ya no existen.
-> El runner real es `Temp/run-all-tests.js`: descubre por **regex de nombre** `/^test-.*\.js$/` y solo
+> El runner real es `tools/run-all-tests.js`: descubre por **regex de nombre** `/^test-.*\.js$/` y solo
 > en `main/`. Los 30 tests de `tests/` **no los ve nadie**.
 >
 > ⚠️ El runner parsea el `N/M OK` del stdout por regex. Si un test no lo imprime, lo cuenta como verde.

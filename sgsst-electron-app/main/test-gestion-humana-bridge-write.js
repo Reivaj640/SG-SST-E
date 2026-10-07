@@ -278,7 +278,16 @@ async function run() {
   _assertEq(r11Check.data.contratacion.memoRecibido, 1, 'memo_recibido = 1');
   _assertEq(r11Check.data.contratacion.memoFecha, '2026-08-20T10:00:00.000Z', 'memo_fecha correcta');
   _assertEq(r11Check.data.contratacion.memoNotas, 'Memo recibido de RRHH', 'memo_notas correcto');
-  _assertEq(r11Check.data.contratacion.pasoActual, 1, 'pasoActual = 1');
+  // 🔴 Antes esperaba 1. Mismo cambio de semántica que el check de más abajo (TEST 12), y por
+  // la misma razón: el fix de 📦FIX-paso-actual (gestion-humana-bridge.js:863) recalcula
+  // paso_actual al PRIMER paso NO completado. Al terminar el memo (paso 1), el primer pendiente
+  // es el 2, así que 2 es lo correcto. El "1" de este renglón era el residuo del mismo error
+  // conceptual que el check de TEST 12, que ya se había corregido.
+  //
+  // OJO con el check de ARRIBA (`r11.data.pasoActual`): ese NO está mal. Ese lee lo que
+  // devuelve `marcar-paso`, que reporta el paso que el usuario acaba de marcar (pasoInt), no el
+  // recalculado. Son dos cosas distintas: la respuesta del handler y lo que queda en la BD.
+  _assertEq(r11Check.data.contratacion.pasoActual, 2, 'pasoActual = 2 = primer pendiente tras cerrar el memo');
   _assertEq(r11Check.data.contratacion.estado, 'en_proceso', 'estado = en_proceso');
 
   // ========== TEST 12: marcar-paso — pasos 2, 3, 4, 5 secuenciales ==========

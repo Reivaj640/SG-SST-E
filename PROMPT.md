@@ -667,7 +667,7 @@ if (typeof getDb !== 'function') throw new Error('[presup] requiere deps.getDb')
 
 **Discovery:** por nombre, `/^test-.*\.js$/`, solo en `main/`. Los **30** de `tests/` **no los ve
 nadie** — están en subdirectorios por módulo, y el runner no baja a buscarlos.
-**Runner:** `node Temp/run-all-tests.js` (filtra por substring: `… run-all-tests.js sidebar`).
+**Runner:** `node tools/run-all-tests.js` (filtra por substring: `… run-all-tests.js sidebar`).
 Corre cada test con el **Node de Electron** (`ELECTRON_RUN_AS_NODE=1`), no con node pelado.
 
 **Nombre:** `test-<slug>-<paquete>.js`. El número va **al final** y `test-` al principio
@@ -758,21 +758,38 @@ reintroducir el código sin el markup pase verde.
 
 ### 7.4 Fallos preexistentes — lo que la suite REALLY mide
 
-**Medido el 2026-10-06, con el runner arreglado:** **119 tests · 114 en verde · 5 con fallos ·
-1 sin resumen verificable.** Antes de este arreglo la misma suite decía "125 · 108 · 17", y ese 17
-no significaba nada: eran **seis problemas distintos** déguisados de uno. **No hay lista en código**:
-el runner no tiene tolerancias, viven documentadas acá en prosa.
+**Medido el 2026-10-07:** **121 tests · 116 en verde · 5 con fallos · 1 sin resumen verificable.**
+Los 121 (antes 119) son porque se colgaron 2 tests nuevos. **Cero regresiones.** **No hay lista
+en código**: el runner no tiene tolerancias, viven documentadas acá en prosa.
 
 | # | Test | Qué necesita para pasar |
 |---|---|---|
-| 1 | `test-firma-bridge.js` | el servicio de firma vivo |
+| 1 | `test-firma-bridge.js` | el servicio de firma vivo (saca 0/0) |
 | 2 | `test-firma-constancia-consolidada.js` | `INTERNAL_API_KEY` — saca **83/83** y después falla por la variable |
 | 3 | `test-firma-tunnel-kit.js` | `cloudflared` y red (24/27) |
-| 4 | `test-gestion-humana-bridge-write.js` | **88 OK · 1 FAIL.** `paso_actual` pasó a "primer paso pendiente" (fix documentado en `gestion-humana-bridge.js:863`). El test ya espera 6 donde corresponde, pero queda **un rojo deliberado**: `pasoActual = 1` da 2, y `L635` inserta `1` literal mientras `L95` mapea `row.paso_actual`. No se ha encontrado qué lo transforma, y **cambiar el esperado a 2 sin prueba sería doblar el test contra el código** |
-| 5 | `test-sync-serializer.js` | `no such column: actualizado_en` (43/44) |
+| 4 | `test-presupuesto-824-real.js` | **34/38.** El import da un ejecutado de **$20.473.101,33** y el Excel del que se importa dice **$19.696.874,33**. O el importador suma algo que no debe, o ese total del Excel es un subtotal y no un gran total. **Nadie lo ha investigated** |
+| 5 | `test-presupuesto-824-roundtrip.js` | **20/21**, la misma diferencia de $776.227 del punto 4 |
 
-**✅ Los 2 que estaban aquí y ya se resolvieron** (eran fallos del test, no de la app):
+> Los tres primeros son de **entorno**, no de código: se resuelven prendiendo el PC viejo que
+> sostiene el `firma-service`. Los dos de presupuesto son de producto, son preexistentes y
+> **nadie los ha mirado**.
 
+**✅ Los que estaban aquí y ya se resolvieron** (eran fallos del test, no de la app):
+
+- **`test-gestion-humana-bridge-write.js` (88/89 → 89/89).** El rojo deliberado de `pasoActual`
+  NO era un bug. `paso_actual` significa **primer paso pendiente**, no "último hecho": el fix
+  documentado en `gestion-humana-bridge.js:863` lo recalcula después de cada `marcar-paso`.
+  Cerrado el memo (paso 1), el primer pendiente es el 2, así que 2 era lo correcto y el test
+  estaba anclado a la semántica vieja — el mismo error conceptual que su hermano, el del 6 tras
+  5 pasos, que ya se había corregido.
+- **`test-sync-serializer.js` (43/44 → 45/45).** El fixture del test armaba `gestaciones` con
+  una columna `updated_at` **que no existe en la BD real** (la real es `actualizado_en`, declarada
+  en el `CREATE TABLE` desde el día uno, sin migración que la agregue). El serializer hace
+  `ORDER BY actualizado_en` (`sync-serializer.js:391`); en el fixture eso reventaba con
+  "no such column", caía al `catch` y devolvía `[]`. **En producción, una BD vieja sin esa
+  columna haría que las gestaciones nunca se sincronizaran, en silencio.** Al arreglarlo apareció
+  un segundo check que también estaba mal: `result5.applied` es el total de **todas** las
+  entidades, no el de planes, así que pasó de 1 a 2 al empezar a contar la gestación.
 - `test-gestion-humana-bridge-newtables.js` y `test-gestion-humana-bridge-write-extra.js` **no
   fallaban: reventaban.** Los tres tests de gestión humana arman su base con `SCHEMA_SQL` y nunca
   corren `MIGRATIONS_SQL`, que es donde viven las tablas nuevas (§6.2). Por eso se comían
@@ -802,7 +819,7 @@ doblando el código — se **invierte** (§7.3). Invertirlo convierte un rojo pe
 protege el borrado. Y **antes de llamar "preexistente" a un rojo, hay que preguntarse si el código
 tenía razón**: 10 de 17 la tenían, y ninguno era una regresión escondida.
 
-**Sobre el runner (`Temp/run-all-tests.js` — que SÍ está versionado, contra lo que dice §2):**
+**Sobre el runner (`tools/run-all-tests.js` — que SÍ está versionado, contra lo que dice §2):**
 
 1. `leerResumen()` entiende **19 formatos** de resumen. Antes buscaba solo `N/M OK`, que es lo que pide
    §7, y **no lo cumple ni la mitad de los tests**: conviven `29/29 checks OK`, `87 OK · 2 FAIL`,
