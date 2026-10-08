@@ -1793,6 +1793,10 @@ body {
 .kair-month-event__title {
   white-space: nowrap;
   overflow: hidden;
+  min-width: 0;
+  /* 📦880 — Mismo cambio que en premium.css (que es el que gana por orden de
+     carga): el "..." vuelve y el `mask-image` se va. La duplicación es a
+     propósito, para que las dos copias del selector no se contradigan. */
   text-overflow: ellipsis;
 }
 

@@ -1779,14 +1779,40 @@ html, body {
   transition: var(--kair-t);
   border: none;
   text-align: left;
+  /* 📦880 · `box-sizing: border-box` es lo que hace que el redondeo se vea en
+     los DOS extremos, no solo en el izquierdo.
+
+     La causa: `width: 100%` mide el CONTENT-BOX, y el chip además trae
+     `padding: 2.5px 7px`. Sin `border-box` el ancho total es el 100% de la
+     celda MÁS los 14px del padding horizontal: el chip se sale 14px hacia la
+     derecha (8px por fuera de la celda, que tiene `padding: 6px`), se mete en
+     la celda vecina y su `border-radius: 7px` derecho queda fuera de lo que se
+     ve. De ahí el aspecto que reportaba el owner: redondeado al inicio, plano
+     y pegado contra la línea del día al final.
+
+     Con `border-box` el 100% incluye el padding, el chip queda dentro del
+     content-box de la celda y los dos extremos redondeados se ven completos.
+     No cambia ni el ancho disponible para el texto ni el padding: cambia de
+     dónde se mide el 100%. Por eso el desvanecido de 880 sigue igual de bien
+     parado que antes. */
+  box-sizing: border-box;
   width: 100%;
 }
 .kair-month-event:hover { filter: brightness(.97); }
 .kair-month-event__title {
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
+  /* 📦880 — El "..." SE QUEDA. Se llego a probar el desvanecido en el borde (un
+     `mask-image` en vez del corte en seco) y en pantalla se leia como que el
+     titulo se estaba apagando, no como "hay mas". Asi que el degradado salio y
+     volvio el `text-overflow: ellipsis`.
+
+     Lo que si se arreglo en este commit es OTRO defecto del mismo chip, y ese si
+     era un bug de verdad: la pastilla se salia de la celda y por eso se veia
+     redondeada al inicio y PLANA al final, pegada contra la linea del dia.
+     Ver `.kair-month-event` mas abajo, en el `box-sizing: border-box`. */
+  text-overflow: ellipsis;
 }
 .kair-month-event--cumplido { opacity: .5; }
 .kair-month-event--cumplido .kair-month-event__title { text-decoration: line-through; }

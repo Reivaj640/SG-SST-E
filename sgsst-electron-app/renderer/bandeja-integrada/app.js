@@ -4846,7 +4846,18 @@
           mostrarPopupDia(ev.date, [ev], eventBtn, { hint: "Clic para ver el evento" }));
         eventBtn.addEventListener("mouseleave", ocultarPopupDia);
         eventBtn.innerHTML = `
-          <span class="truncate flex-1 text-left kair-month-event__title" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left;">${ev.cumplido ? '✓ ' : ''}${ev.title}</span>
+          <!-- 📦880 · SIN text-overflow:ellipsis en el style en línea. Estaba
+               ahí desde antes, y los estilos en línea ganan a CUALQUIER regla CSS
+               (salvo !important), así que quitarlo de premium.css no servía de
+               nada: los "..." seguían apareciendo y convivían con la máscara. El
+               resultado dependía de dónde cayera el "..." dentro de la zona
+               desvanecida, que es exactamente por qué unos chips mostraban
+               puntos y otros no. El corte ahora lo hace SOLO la máscara.
+
+               OJO: este comentario va DENTRO de un template literal. Un backtick
+               acá cierra el literal y el archivo deja de parsear. Ya pasó una
+               vez (PROMPT.md §5.6). -->
+          <span class="truncate flex-1 text-left kair-month-event__title" style="font-weight:600;overflow:hidden;white-space:nowrap;flex:1;text-align:left;">${ev.cumplido ? '✓ ' : ''}${ev.title}</span>
           ${ev.linkedMailId ? D.ICONS.mail.replace('width="13" height="13"', 'width="9" height="9"') : ""}
         `;
         eventBtn.addEventListener("click", (e) => {
