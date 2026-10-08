@@ -12,6 +12,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.251] - 2026-10-07
 
+### 📦878 · El calendario grande usa el mismo popup que el minicalendario
+
+Al pasar el mouse por un evento del calendario grande aparecía el tooltip gris del
+navegador, y decía **`NaN:NaN`**.
+
+No era solo cuestión de gusto. La vista Mes armaba la hora con `ev.startHour`, que no
+siempre es número, mientras Semana y Día usan `getEventStartHour()`, que sí valida. **El
+mismo evento se veía bien en dos vistas y roto en la tercera**, y no se notaba porque el
+tooltip nativo se lee un segundo y nadie lo amplía.
+
+Ahora las **cinco superficies** del calendario grande —el chip del mes, los bloques de la
+franja en Día y Semana, y los chips de todo el día de ambas— usan **el mismo popup del
+mini-calendario** de 📦846: la tarjeta con el día, el punto de color por categoría, la
+franja horaria y el contador. No es un estilo nuevo: es el que ya estaba hecho y ya gusta.
+
+La franja sale de `_franja()`, el mismo helper que usa el popup, así que la tarjeta y la
+grilla no pueden contradecirse.
+
+El popup del mini anuncia *"Doble clic para ver el día"*, y eso no aplica en el calendario
+grande, donde el clic abre el evento. El texto se pasa ahora desde el call site.
+
+De paso, la **lista de Agenda** tenía el mismo `NaN:NaN`: usaba
+`fmtHour(ev.startHour) || "—"`, pero `"NaN:NaN"` es *truthy*, así que el `||` nunca se
+disparaba.
+
+- `main/test-calendar-chip-hover-878.js` — **26 checks, 8/8 mutaciones detectadas**.
+
+### 📦877 · La app ya no pide aceptar unos Términos que no existían
+
+El gate de consentimiento obligaba a marcar *"He leído y acepto los **Términos y
+Condiciones** de uso de K+AIR"* y guardaba el hash del texto con fecha y versión. **Ese
+documento no existía**: ni en el repo ni en el sitio publicado. Quedaba constancia de que
+el usuario había aceptado algo que no podía leer en ninguna parte.
+
+Nuevo `sitio/terminos.html`, con 13 secciones: alcance y qué **no** es K+AIR, licencia,
+quién responde por los datos, obligaciones de la empresa, advertencia de datos sensibles,
+servicios de terceros, disponibilidad, limitación de responsabilidad, terminación,
+cambios, ley aplicable y contacto.
+
+Dos secciones dicen lo que el producto es y no un adorno: la **responsable del tratamiento
+es la empresa que usa K+AIR** (JRFSoluciones no accede a esos datos), y **K+AIR no verifica
+que exista la base legal** para registrar datos de salud.
+
+Enlazado en la página de inicio, en la navegación de privacidad y soporte, y en el propio
+gate de consentimiento. El texto que se hashea **no se tocó**, así que nadie tiene que volver
+a aceptar.
+
+También se corrigió una afirmación falsa que estaba publicada: `soporte.html` decía que los
+tokens de acceso *"se guardan sin cifrar en el equipo"*. Desde 📦872 van cifrados con
+`safeStorage`.
+
+### 📦876 · El guardia de build ahora sí está en el repo
+
+`main/_verificar-credenciales-build.js` es el hook `prebuild` de los cuatro scripts de
+empaquetado, y `test-google-oauth-868.js` exige que exista. **Nunca entró a git**: la regla
+`_*.js` de `.gitignore` (línea 80), que según su propio comentario era para scripts one-off
+de la raíz, sin ancla se aplica en cualquier directorio y también se comía `main/`.
+
+En cualquier clon —incluido el portátil— `npm run build` moría antes de arrancar
+electron-builder. En el escritorio no se notaba porque el archivo estaba en disco.
+
+Se agregó la excepción `!main/_verificar-credenciales-build.js`. **8/8 mutaciones.**
+
 ### 📦874 · La bandeja ya no mezcla los correos de dos cuentas de Gmail
 
 Conectar una segunda cuenta de Gmail en la misma máquina **mezclaba las dos bandejas**: al

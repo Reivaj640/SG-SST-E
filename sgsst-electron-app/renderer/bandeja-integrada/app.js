@@ -3835,7 +3835,8 @@
       + D.MONTH_LABELS_ES[d.getMonth()].toLowerCase();
   }
 
-  function mostrarPopupDia(iso, eventos, ancla) {
+  function mostrarPopupDia(iso, eventos, ancla, opciones) {
+    opciones = opciones || {};
     var evs = (eventos || []).filter(function (e) { return e && e.date === iso; });
     if (!evs.length) { ocultarPopupDia(); return; }
 
@@ -3882,7 +3883,11 @@
     }
     // 📦847 · Antes esta pista vivia en el title del boton. Como el title se
     // fue (tapaba el popup), el doble clic de 845 quedaria sin descubrir.
-    html += '<div class="mini-pop__hint">Doble clic para ver el día</div>';
+    // 📦878 · El texto por defecto anuncia el doble clic del mini-calendar. El
+    // calendario grande no tiene doble clic: ahi el clic abre el evento, asi que
+    // el call site pasa su propia pista. Si no, el popup mentiría.
+    html += '<div class="mini-pop__hint">'
+      + escapeHtml(opciones.hint || "Doble clic para ver el día") + "</div>";
 
     var pop = _miniPopEl();
     pop.innerHTML = html;
@@ -4326,7 +4331,12 @@
         chip.style.background = cat.bg || "#eef0f3";
         chip.style.borderLeftColor = cat.color || "#6c757d";
         chip.style.color = cat.color || "#333";
-        chip.title = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
+        // 📦878 · Fuera el `title` nativo también en los chips de todo el día:
+        // el tooltip gris del navegador queda en las cuatro superficies del
+        // calendario grande, no solo en las tres franjas.
+        chip.addEventListener("mouseenter", () =>
+          mostrarPopupDia(ev.date, [ev], chip, { hint: "Clic para ver el evento" }));
+        chip.addEventListener("mouseleave", ocultarPopupDia);
         chip.textContent = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
         chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         banner.appendChild(chip);
@@ -4395,7 +4405,10 @@
         block.style.background = cat.bg || "#eef0f3";
         block.style.borderLeftColor = cat.color || "#6c757d";
         block.style.color = cat.color || "#333";
-        block.title = (ev.title || "(sin título)") + " · " + fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        // 📦878 · Mismo cambio que en la vista Mes: fuera el `title` nativo.
+        block.addEventListener("mouseenter", () =>
+          mostrarPopupDia(ev.date, [ev], block, { hint: "Clic para ver el evento" }));
+        block.addEventListener("mouseleave", ocultarPopupDia);
         const timeStr = fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
         const catLabel = (D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || "";
         block.innerHTML = `
@@ -4485,7 +4498,10 @@
           chip.style.background = cat.bg || "#eef0f3";
           chip.style.borderLeftColor = cat.color || "#6c757d";
           chip.style.color = cat.color || "#333";
-          chip.title = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
+          // 📦878 · Y en los chips de todo el día de la vista Semana.
+          chip.addEventListener("mouseenter", () =>
+            mostrarPopupDia(ev.date, [ev], chip, { hint: "Clic para ver el evento" }));
+          chip.addEventListener("mouseleave", ocultarPopupDia);
           chip.textContent = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
           chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
           allDayWrap.appendChild(chip);
@@ -4543,7 +4559,10 @@
         block.style.background = cat.bg || "#eef0f3";
         block.style.borderLeftColor = cat.color || "#6c757d";
         block.style.color = cat.color || "#333";
-        block.title = (ev.title || "(sin título)") + " · " + fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        // 📦878 · Mismo cambio que en Mes y Día: fuera el `title` nativo.
+        block.addEventListener("mouseenter", () =>
+          mostrarPopupDia(ev.date, [ev], block, { hint: "Clic para ver el evento" }));
+        block.addEventListener("mouseleave", ocultarPopupDia);
         const timeStr = fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
         const catLabel = (D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || "";
         block.innerHTML = `
@@ -4588,7 +4607,7 @@
         const cat = getCategoryStyle(ev.category);
         const item = el("div", { class: "kair-agenda-item" });
         item.innerHTML = `
-          <div class="kair-agenda-item__time">${fmtHour(ev.startHour) || "—"}</div>
+          <div class="kair-agenda-item__time">${(typeof ev.startHour === "number" ? fmtHour(ev.startHour) : (isAllDayEvent(ev) ? "Todo el día" : "—"))}</div>
           <div class="kair-agenda-item__bar" style="background:${cat.color}"></div>
           <div class="kair-agenda-item__body">
             <div class="kair-agenda-item__title">${ev.title || "(sin título)"}</div>
@@ -4817,8 +4836,15 @@
         const eventBtn = el("div", {
           class: "kair-month-event" + cumplidoClass,
           style: { background: cat.bg, borderLeftColor: cat.color, color: cat.color },
-          title: `${ev.cumplido ? '✓ ' : ''}${ev.title} · ${fmtHour(ev.startHour)}`,
         });
+        // 📦878 · El `title` nativo sale: pintaba el tooltip gris del navegador y
+        // además decía "NaN:NaN", porque acá se leía `ev.startHour` (que no
+        // siempre es número) mientras la grilla usa `getEventStartHour`. Los mismos
+        // eventos se veían bien en Semana y Día. Ahora es el MISMO popup del
+        // mini-calendar (📦846): misma tarjeta, misma franja, mismo CSS.
+        eventBtn.addEventListener("mouseenter", () =>
+          mostrarPopupDia(ev.date, [ev], eventBtn, { hint: "Clic para ver el evento" }));
+        eventBtn.addEventListener("mouseleave", ocultarPopupDia);
         eventBtn.innerHTML = `
           <span class="truncate flex-1 text-left kair-month-event__title" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left;">${ev.cumplido ? '✓ ' : ''}${ev.title}</span>
           ${ev.linkedMailId ? D.ICONS.mail.replace('width="13" height="13"', 'width="9" height="9"') : ""}
