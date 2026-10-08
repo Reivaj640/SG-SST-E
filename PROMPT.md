@@ -995,6 +995,26 @@ cambiara el comportamiento**. Si la respuesta es "nada, porque la otra guarda ya
 problema está en el código, no en el test — y el arreglo es **fusionar la guarda**, no ablandar el
 check. Un mutante que no muerde es información sobre el código, no solo sobre el test.
 
+#### Una quinta hipótesis: el mutante y el check no miran lo mismo
+
+En 📦880 el mutante "ponle `border-radius: 0` a la pastilla del mes" **no mordía**, y la causa era
+doble, en dos capas que hubo que arreglar por separado:
+
+1. **El check era flojo de verdad.** `/border-radius\s*:\s*\d/` da por bueno un `border-radius: 0`,
+   porque el `0` también es un dígito. Acá sí era el check.
+2. **Y el mutante estaba mal escrito.** Cuando se endureció el check a comparar el **valor** contra
+   cero (`radios(chip).some(v => v > 0)`), la mutación seguía usando el regex viejo, así que **seguía
+   sin morder** — ahora por un motivo distinto y peor: parecía que el check ya era bueno.
+
+**Regla que sale de acá:** cuando endurezcas un check, **revisá que los mutaciones que dependían del
+check viejo usen la misma expresión.** Un mutante que sobrevive a un check ya endurecido está
+midiendo otra cosa, no el comportamiento. La pregunta que lo destapa: *¿el mutante y el check leen
+el mismo valor, con la misma función?* Si no, el mutante es el buggy.
+
+Y una de fondo, sobre CSS: **`border-radius: 0`, `padding: 0` y `margin: 0` son `0`, y el `0` es un
+dígito.** Cualquier check que verifique "tiene un valor numérico" en vez de "tiene un valor
+distinto de cero" está roto para la mitad de las mutaciones que debería cazar.
+
 ### 7.6 CSS: cuando `min-*` es mayor que `max-*`, gana el `min-*`
 
 **Este sí se ve en pantalla y los tests lo dejaron pasar.** `.compose-panel` declara
@@ -1013,7 +1033,7 @@ archivo en disco estaba bien y la app servía la hoja vieja de la caché. **Cual
 tiene que subir el `?v=` de `index.html` y el del iframe en `renderer.js`.** Y ojo que el token es
 **compartido** entre `app.js` y `premium.css` (§5.3): subir solo el que tocaste se sirve desparejo.
 
-### 7.7 🔴 Ningún test de este repo abre la base de datos
+### 7.7 🔴 Los tests que escribas NO abren la base de datos — pero ya hay 13 que sí, y no corren
 
 **Los 34 checks de 📦860 podían pasar en verde con la columna de fecha VACÍA en pantalla, y no
 habría habido forma de verlo.** `fechaFila` exige `typeof ms === "number"` a propósito, así que si
@@ -1043,6 +1063,26 @@ process.exit(sinFecha === 0 ? 0 : 1);
 En 📦860: `last_message_date` es `INTEGER` y llega como `number` en las **150** filas, 0 sin fecha.
 **Eso no lo sabía ningún check: se supo abriendo la base.** Antes de cerrar un feature de datos,
 contá las filas reales que quedan sin el dato nuevo y dejá ese número a la vista.
+
+#### 🔴 Corregido el 2026-10-07: el título de esta sección era demasiado absoluto
+
+**13 tests de la suite SÍ abren la base de datos**, y el 2026-10-07 se midió que **no llegan ni a
+arrancar**: mueren en `ERR_DLOPEN_FAILED` cargando
+`node_modules/better-sqlite3/build/Release/better_sqlite3.node`, que está compilado para **Electron
+37** mientras el `node` de la línea de comandos corre **v26.10.0**. El 14 es
+`test-firma-constancia-consolidada.js`, que muere esperando `INTERNAL_API_KEY`.
+
+La regla de esta sección sigue valiendo para lo que escribís — **los tests que escribas no abren la
+base**, porque tienen que correr en la máquina de cualquiera sin ella — pero el repositorio ya tiene
+tests que dependen de la local. **Consecuencia práctica al medir la suite: un `EXIT=1` no siempre es un
+test rojo.** Clasificá los fallos por causa antes de reportar, porque un runner ingenuo cuenta como
+verde lo que no se ejecutó, y se termina reportando "125 verdes" cuando en realidad lo que pasó es
+que 112 corrieron y 14 nunca arrancaron.
+
+Y ojo con el otro falso positivo del mismo día: `npm rebuild better-sqlite3` devolvió `EXIT=0`
+desde PowerShell **sin haber ejecutado nada** (la Execution Policy bloquea `npm.ps1`; hay que usar
+`npm.cmd`), y ese `0` era el exit de la tubería, no del npm. Un exit 0 sobre un comando que no corrió
+es el peor fallo posible porque no se nota.
 
 ---
 
