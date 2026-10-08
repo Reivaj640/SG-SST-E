@@ -6077,7 +6077,12 @@ html {
   left: 0;
   width: 100%;
   height: 8px;
-  z-index: 1001;
+  /* 📦879 — Por ENCIMA del iframe de la Bandeja Integrada (200001). Desde 879
+     ese iframe ocupa toda la ventana, así que con el z-index viejo (1001) la
+     franja quedaba tapada y el hover del header dejo de funcionar con la
+     Bandeja abierta. Va por encima del header (200002) para que el mouse entre
+     primero por la franja y no encima del header ya expandido. */
+  z-index: 200003;
 }
 
 #app-header {
@@ -6092,6 +6097,20 @@ html {
   grid-template-rows: 0fr;
   border-bottom: none;
   box-shadow: none;
+}
+
+/* 📦879 — El header visible tiene que quedar POR ENCIMA del iframe de la Bandeja
+   Integrada (200001), que desde 879 ocupa de 0 a 100vh. Antes ganaba la franja de
+   40px porque el iframe arrancaba abajo del header; ahora no, y sin esto el
+   header se despliega DETRÁS del iframe: el hover responde pero no se ve nada.
+
+   Solo cuando NO está colapsado, y ese es el punto: colapsado el header mide 0
+   (fila 0fr + overflow:hidden), así que no pinta nada y su z-index es
+   irrelevante. No se sube al colapsado para no pisar los overlays de 200000 que
+   hay en la app (`.kair-cal-modal-overlay`) sin motivo: mientras no se ve, no
+   tiene por qué estar arriba de nada. */
+#app-header:not(.app-header-collapsed) {
+  z-index: 200002;
 }
 
 /* 📦842 — La fila ya llega a 0fr, pero .header-content arrastra 4px de

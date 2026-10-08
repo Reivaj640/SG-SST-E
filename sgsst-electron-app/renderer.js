@@ -1267,16 +1267,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     bandejaIntegradaFrame = document.createElement('iframe');
     bandejaIntegradaFrame.id = 'bandeja-integrada-frame';
     bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=697';
-    // F4-fix — Usar el alto REAL del header de la app principal (no un valor fijo)
-    // para que el iframe arranque justo donde termina el header, sin solaparlo.
-    var mainHeader = document.getElementById('app-header');
-    var headerHeight = mainHeader ? Math.max(mainHeader.getBoundingClientRect().height, 40) : 48;
+    // 📦879 · El iframe ocupa TODA la ventana, de 0 a 100vh.
+    //
+    // Antes arrancaba en `top: headerHeight` con un piso duro de 40px (F4-fix, de
+    // 563, cuando el header de la app era una barra fija que NUNCA encogía). Ese
+    // header hoy se autocolapsa a ~0 cinco segundos después de abrir la app
+    // (renderer.js:2209), así que el piso dejaba 40px muertos arriba: la Bandeja
+    // Integrada no llegaba a cubrir el fondo y el "Panel de Control" del shell
+    // asomaba recortado detrás.
+    //
+    // No se pierde nada al taparlo: #app-header tiene z-index 100000 contra los
+    // 200001 del iframe, o sea que YA ESTABA DETRÁS. Esa franja no era "header
+    // visible", era header tapado a medias. Para salir de la Bandeja está el botón
+    // de volver, que manda 'bandeja-integrada-back'. Y la ventana principal no es
+    // frameless (main.js:1365, sin `frame: false`): usa la barra de título nativa de
+    // Windows, así que no hay zona de arrastre que este cambio pueda tapar.
+    //
+    // De paso se va el bug de la posición congelada: `headerHeight` solo se calculaba
+    // al CREAR el iframe, y al cerrar y reabrir la Bandeja se reutilizaba el `top`
+    // viejo aunque el header hubiera cambiado de estado en el medio.
     bandejaIntegradaFrame.style.cssText = [
       'position: fixed',
-      'top: ' + headerHeight + 'px',
+      'top: 0',
       'left: 0',
       'width: 100vw',
-      'height: calc(100vh - ' + headerHeight + 'px)',
+      'height: 100vh',
       'border: 0',
       // F1.5-fix2: el #app-header de la app principal tiene z-index 100000
       // con isolation:isolate. El iframe necesita estar por encima de eso,
@@ -1287,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       'display: block'
     ].join(';');
     document.body.appendChild(bandejaIntegradaFrame);
-    logMessage('Bandeja Integrada abierta (iframe creado). Header height: ' + headerHeight + 'px', 'INFO');
+    logMessage('Bandeja Integrada abierta (iframe a pantalla completa, 0 a 100vh).', 'INFO');
   }
 
   function hideBandejaIntegrada() {
