@@ -78,6 +78,10 @@ test-tmp-*.html
 # Patrones: __fix-test-*.js, __old-test-*.js, _*.js (inspección, scripts temporales)
 __*-*.js
 _*.js
+# Pero NO el guardia de build de 📦868: `_*.js` sin ancla se come `main/` también, y
+# ese script es código de producto. Sin él, `npm run build` muere en el hook `pre` en
+# cualquier clon, porque los cuatro `prebuild*` de package.json lo invocan (PROMPT.md §5.5).
+!main/_verificar-credenciales-build.js
 
 # 📦773 · Mensajes de commit temporales (raíz del repo)
 /commit-msg*.txt
