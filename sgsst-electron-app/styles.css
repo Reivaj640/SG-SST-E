@@ -8958,6 +8958,18 @@ position: relative;
   color: #b91c1c;
 }
 
+.kair-consent__aviso {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  color: #78350f;
+}
+
 /* --- Footer --- */
 .kair-consent__footer {
   display: flex;

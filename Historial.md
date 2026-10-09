@@ -22,10 +22,10 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-07 |
-| **Rama** | `Dev` (el remoto por defecto es `Dev`) |
-| **Último commit de código** | 📦 **880** (`81f9a462`): la pastilla de cada evento en la vista Mes se veía redondeada al inicio y **plana al final**, pegada contra la línea del día. No era el texto, era la caja: `.kair-month-event` juntaba `width: 100%` (que mide el *content-box*) con `padding: 2.5px 7px`, y sin `box-sizing: border-box` el ancho total era el 100% de la celda **más 14px**. El chip se salía de la celda, se metía en la de al lado y su `border-radius: 7px` derecho quedaba fuera de lo que se veía. De paso se sacó el `text-overflow: ellipsis` del **estilo en línea** del span, que competía con la hoja. Detrás, `8baf1b80` (📦879: el iframe de la Bandeja a pantalla completa, y el hover del header que ese cambio había roto) y `e0eccb5d` (📦878). **No hay trabajo sin commitear.** El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
-| **Commits sin pushear** | 0 — `Dev` sincronizada con `origin/Dev` en `81f9a462`. `gh-pages` en `f9088a89`, con `terminos.html` sirviendo 200 |
+| **Fecha de cierre** | 2026-10-09 |
+| **Rama** | `Dev-Pc`, que al cierre está **idéntica a `Dev`** (medido: 0 commits en cada dirección con `git rev-list`). El remoto por defecto sigue siendo `Dev` |
+| **Último commit de código** | 📦 **881** (este commit): el consentimiento de la app **nombraba datos que K+AIR no maneja** —decía "historias clínicas, audiometrías, electrocardiogramas"— y **no separaba los dos roles del artículo 25**. Ahora dice qué datos sí registra, distingue la autorización de datos personales (previa, expresa e informada) de la de sensibles (expresa e informada, art. 6) y aclara que **la empresa es responsable y K+AIR encargado**. En `sitio/` se publicaron dos documentos nuevos, **Anexo de Encargo** y **Autorización de Trabajadores**, ambos enlazados desde la barra de `privacidad.html` y `terminos.html`, y se reescribieron los párrafos de encargado de esos dos documentos. **Sin hash a propósito**: un `--amend` lo cambiaría y dejaría la referencia apuntando a un commit fantasma. Antes, 📦 **880** (`81f9a462`): la pastilla de cada evento en la vista Mes se veía redondeada al inicio y **plana al final**, pegada contra la línea del día. No era el texto, era la caja: `.kair-month-event` juntaba `width: 100%` (que mide el *content-box*) con `padding: 2.5px 7px`, y sin `box-sizing: border-box` el ancho total era el 100% de la celda **más 14px**. El chip se salía de la celda, se metía en la de al lado y su `border-radius: 7px` derecho quedaba fuera de lo que se veía. De paso se sacó el `text-overflow: ellipsis` del **estilo en línea** del span, que competía con la hoja. Detrás, `8baf1b80` (📦879: el iframe de la Bandeja a pantalla completa, y el hover del header que ese cambio había roto) y `e0eccb5d` (📦878). **No hay trabajo sin commitear.** El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Commits sin pushear** | 0 al cerrar. Este commit sale en `Dev-Pc`. 🔴 **Lo que falta es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medición real del 2026-10-07, **anterior a 📦876**. El rojo era `test-google-oauth-868.js` [54/57], que exige `main/_verificar-credenciales-build.js`, archivo que **no existía en ninguna rama**: lo tragaba la regla `_*.js` de `sgsst-electron-app/.gitignore:80`, que sin ancla se aplica en cualquier directorio y no solo en la raíz. **Ya está corregido en 📦876** y probado por mutación (54/57 sin el archivo, 57/57 con él). 🔴 **Falta volver a medir en el portátil**: no se afirma aquí que esté verde, solo que la causa identificada ya no existe. `test-init-order-bug.js` sigue sin resumen verificable |
@@ -33,7 +33,7 @@
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
 | **Validaciones visuales** | ✅ Cerrado lo anterior: 📦860, 📦861, 📦868, 📦867 y el ancho de la tarjeta de ingreso (📦869) están probados por una persona, no por un test. 🔴 **Pendiente de esta tanda: 📦879 y 📦880 NO tienen validación visual del resultado.** En 📦880 el owner reportó por captura que la pastilla quedaba plana a la derecha y eso destapó el `box-sizing`, pero **el arreglo todavía no se ha visto en pantalla**: es lo único del lote que un test no puede comprobar. En 📦879 tampoco se ha confirmado que el hover del header siga entrando con la Bandeja abierta, que es justo lo que ese commit vino a recuperar |
-| **Jornada** | **En curso** (2026-10-07). De hoy quedan commiteadas y pusheadas: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. Versión `0.1.251` |
+| **Jornada** | **En curso** (2026-10-07). De hoy quedan commiteadas y pusheadas: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. Del **2026-10-09**: el bloque legal de la Ley 1581 — consentimiento de la app, Anexo de Encargo y Autorización de Trabajadores. **Sin bump de versión**, por la regla del owner. Versión `0.1.251` |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-07, cierre 17:45)
@@ -1026,6 +1026,40 @@ al pie de la letra escribía llamadas a funciones inexistentes y la vista se ca�
 - "Nada es una regla hasta comprobarlo en el código" — regla de primer orden, no opcional.
 
 **Tests** — ninguno nuevo. Suite sin cambios: 111 tests, 93 verdes, 18 preexistentes.
+
+---
+
+### 2026-10-09 · 📦881 · Bloque legal de la Ley 1581 (sin bump de versión)
+
+**Qué se hizo** — una sola línea de trabajo con dos caras:
+
+| Zona | Qué |
+|---|---|
+| `sgsst-electron-app/index.html` | El texto del consentimiento decía tratar **"historias clínicas, audiometrías, electrocardiogramas"**. K+AIR no maneja esos datos. Reemplazado por los que sí registra: **seguimientos médicos, consultas y certificados de aptitud médica** |
+| `sgsst-electron-app/index.html` | Se separaron las dos autorizaciones del **art. 6**: datos personales → *previa*, expresa e informada; datos sensibles → *expresa e informada*. Antes decía que ambas eran "previas" |
+| `sgsst-electron-app/index.html` | Se declaró el **art. 25**: la empresa que usa K+AIR es **responsable**, K+AIR es **encargado** |
+| `sgsst-electron-app/styles.css` | Nueva clase `.kair-consent__aviso` (caja ámbar con borde izquierdo) |
+| `sitio/anexo-encargo.html` | **Nuevo.** Anexo de Encargo de Tratamiento de Datos Personales (Decreto 1377) |
+| `sitio/autorizacion-trabajadores.html` | **Nuevo.** Formato de autorización de trabajadores |
+| `sitio/privacidad.html` | +127/-: párrafos de encargado y enlaces a los dos documentos nuevos |
+| `sitio/terminos.html` | +85/-: párrafos de encargado y enlaces a los dos documentos nuevos |
+
+**Por qué** — el consentimiento describía una app que atiende historias clínicas y ECG, y K+AIR no es eso. Un texto legal que miente sobre el tratamiento de datos sensibles es peor que uno vago: es el que se puedecuestionar.
+
+**Verificaciones hechas antes de commitear** — ninguna asumida:
+
+1. Los dos documentos nuevos **no están huérfanos**: ambos aparecen en la barra de navegación de `privacidad.html` y `terminos.html` (líneas 25-26) y se enlazan entre sí.
+2. `sitio/index.html` **no** los enlaza. Aceptado: el par privacidad/términos actúa de hub, igual que ya pasaba con `soporte.html`.
+3. `Dev` y `Dev-Pc` están **idénticas** (`git rev-list --count` da 0 en cada dirección), así que commitear en `Dev-Pc` no genera divergencia.
+4. Local y remoto estaban sincronizados **antes** de tocar nada (0 y 0), lo que descarta que estos cambios vinieran de otra máquina.
+
+**🔴 Hallazgo pendiente — CSS muerto.** `.kair-consent__aviso` se define en `styles.css:8961` y **no se referencia en ningún archivo del repo** (`grep` sobre `sgsst-electron-app/` devuelve un solo resultado: su propia definición). La clase parece creada para una caja de aviso en el modal que **nunca se agregó al HTML**. Se decidió **no borrarla ni usarla** en este commit: borrarla sería interpretar una intención que no está escrita, y usarla sería meter UI nueva en un flujo legal sin consultar. **Decisión del owner pendiente:** ¿se agrega el aviso al modal o se quita la clase?
+
+**Tests** — ninguno nuevo. No hay suite que corra sobre `sitio/`, y la app solo cambió texto y una clase CSS sin uso. El estado de la suite sigue siendo el del 2026-10-07: **no se remedido**.
+
+**Decisiones del owner** — la versión **no se bumpea**: `0.1.251` sigue igual, por la regla del 2026-10-07 ("la versión SOLO se bumpea cuando él lo diga"). El CHANGELOG tampoco se tocó: registra **versiones publicadas**, y esto todavía no está publicado — igual que el commit legal anterior `2ace3131`, que solo tocó `sitio/`.
+
+**Commits** — uno solo, en `Dev-Pc`, con este mismo bloque de documentación.
 
 ---
 

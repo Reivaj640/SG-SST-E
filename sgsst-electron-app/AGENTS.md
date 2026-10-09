@@ -5325,6 +5325,42 @@ no el test. Y **agregar** un check nuevo por fase en vez de editar los viejos.
 independientes**: qué tarda (perfil de tiempo) y qué se pasa de tamaño (peso real de la salida).
 Arreglar solo una de las dos deja el mismo error.
 
+---
+
+## 🔴 El consentimiento decía tratar datos que K+AIR no maneja (2026-10-09)
+
+**El síntoma.** No era un bug de código. El modal de consentimiento de `index.html` declaraba que
+K+AIR trata *"historias clínicas, audiometrías, electrocardiogramas"*. **K+AIR no maneja ninguno de
+esos tres.** Registra seguimientos médicos, consultas y certificados de aptitud médica.
+
+**Por qué esto es más grave que un texto mal redactado.** Esos tres son, literalmente, los datos
+sensibles de salud que la Ley 1581 protege con más fuerza. Un consentimiento que declara tratar lo
+que no trata no es imprecisión: es una base que se puede impugnar.
+
+**Lo que estaba mal en el mismo párrafo, y no era visible:**
+
+1. La ley distingue **dos** autorizaciones y el texto las mezclaba. Datos personales requieren
+   autorización **previa**, expresa e informada; datos sensibles requieren autorización **expresa e
+   informada** (art. 6, sin "previa"). El texto decía "previa" para las dos.
+2. Faltaba el **art. 25**: la empresa que usa K+AIR es **responsable** y K+AIR es **encargado**. Sin
+   esa frase el rol del controlador queda indefinido, y el anexo de encargo se queda sin a quién
+   se le responde.
+
+**Regla general.** Cuando el documento legal de un producto se escribe una vez y queda congelado,
+la primera pregunta no es si está bien redactado, sino **qué datos maneja realmente el producto**.
+Esa respuesta está en el código, no en el documento: se verifica mirando qué se registra, no
+releyendo el texto. El consentimiento describe una app, y la app se puede haber movido.
+
+**Documentos que acompañan al cambio** (`sitio/`, fuera de la app): `anexo-encargo.html` y
+`autorizacion-trabajadores.html`, ambos enlazados desde la barra de `privacidad.html` y
+`terminos.html`, y referenciados entre sí.
+
+**🔴 Abierto.** La clase `.kair-consent__aviso` (`styles.css:8961`) se agregó en este mismo cambio
+pero **no se referencia en ningún archivo**: `grep` sobre `sgsst-electron-app/` devuelve un solo
+resultado, su propia definición. Parece creada para una caja de aviso en el modal que nunca llegó
+al HTML. Queda por decidir si se usa o se quita; no se tocó en el commit para no interpretar una
+intención que no está escrita.
+
 
 > ## 🚦 Arranque — leé esto primero
 >
