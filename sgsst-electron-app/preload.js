@@ -39,6 +39,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   consentEstado: () => ipcRenderer.invoke('consent:estado'),
   consentRegistrar: (payload) => ipcRenderer.invoke('consent:registrar', payload),
   consentRechazar: () => ipcRenderer.invoke('consent:rechazar'),
+  // 📦882 — Texto legal completo para leerlo DENTRO del gate, sin salir de la app.
+  // Recibe un NOMBRE de la lista blanca ('privacidad', 'terminos', 'anexo-encargo',
+  // 'autorizacion-trabajadores'), nunca una ruta: el main resuelve el archivo.
+  // Devuelve { success:true, nombre, html } con el HTML crudo, o
+  // { success:false, error }. Ante el error, el gate sigue con el resumen y los
+  // links externos (fail-open, igual que consentEstado).
+  consentDocumento: (nombre) => ipcRenderer.invoke('consent:documento', nombre),
   companiesSyncV1: (payload) => ipcRenderer.invoke('companies-sync-v1', payload),
   usersListV1: (payload) => ipcRenderer.invoke('users-list-v1', payload),
   usersCreateV1: (payload) => ipcRenderer.invoke('users-create-v1', payload),

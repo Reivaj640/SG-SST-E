@@ -22,21 +22,21 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-09 |
-| **Rama** | `Dev-Pc`, que al cierre está **idéntica a `Dev`** (medido: 0 commits en cada dirección con `git rev-list`). El remoto por defecto sigue siendo `Dev` |
-| **Último commit de código** | 📦 **881** (este commit): el consentimiento de la app **nombraba datos que K+AIR no maneja** —decía "historias clínicas, audiometrías, electrocardiogramas"— y **no separaba los dos roles del artículo 25**. Ahora dice qué datos sí registra, distingue la autorización de datos personales (previa, expresa e informada) de la de sensibles (expresa e informada, art. 6) y aclara que **la empresa es responsable y K+AIR encargado**. En `sitio/` se publicaron dos documentos nuevos, **Anexo de Encargo** y **Autorización de Trabajadores**, ambos enlazados desde la barra de `privacidad.html` y `terminos.html`, y se reescribieron los párrafos de encargado de esos dos documentos. **Sin hash a propósito**: un `--amend` lo cambiaría y dejaría la referencia apuntando a un commit fantasma. Antes, 📦 **880** (`81f9a462`): la pastilla de cada evento en la vista Mes se veía redondeada al inicio y **plana al final**, pegada contra la línea del día. No era el texto, era la caja: `.kair-month-event` juntaba `width: 100%` (que mide el *content-box*) con `padding: 2.5px 7px`, y sin `box-sizing: border-box` el ancho total era el 100% de la celda **más 14px**. El chip se salía de la celda, se metía en la de al lado y su `border-radius: 7px` derecho quedaba fuera de lo que se veía. De paso se sacó el `text-overflow: ellipsis` del **estilo en línea** del span, que competía con la hoja. Detrás, `8baf1b80` (📦879: el iframe de la Bandeja a pantalla completa, y el hover del header que ese cambio había roto) y `e0eccb5d` (📦878). **No hay trabajo sin commitear.** El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
-| **Commits sin pushear** | 0 al cerrar. Este commit sale en `Dev-Pc`. 🔴 **Lo que falta es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
+| **Fecha de cierre** | 2026-10-13 |
+| **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
+| **Último commit de código** | 📦 **882** (este commit): los cuatro textos legales se leen **dentro de la app**. El gate mostraba un resumen y dos links a la web, y eso no cumple el art. 8 de la Ley 1581 (autorización informada): el titular tiene que poder *leer* lo que acepta, no ver un resumen y un link que puede no abrir —más todavía sin internet. Ahora Política de Privacidad, Términos, Anexo de Encargo y Autorización de Trabajadores van completos dentro del modal, con barra de avance y **las dos casillas apareciendo al llegar al final**. "No acepto" nunca se bloquea. Los documentos viven en `sitio/`, que está **fuera** de lo que empaqueta electron-builder, así que la app lleva copia en `legal/` **byte a byte** y un test compara los SHA-256 de los dos lados: si se edita el texto en el sitio y no se copia, la suite se cae. El canal nuevo va por **lista blanca de cuatro nombres**, no por ruta. Antes, 📦 **881** (`80300147`): el texto del consentimiento nombraba datos que K+AIR no manejaba y no separaba los dos roles del art. 25; en `sitio/` se publicaron el Anexo de Encargo y la Autorización de Trabajadores. Antes, 📦 **880** (`81f9a462`, pastilla de la vista Mes) y 📦 **879** (`8baf1b80`, iframe de la Bandeja a pantalla completa). **No hay trabajo sin commitear.** El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Commits sin pushear** | **0**, verificado el 2026-10-11 contra GitHub. 🔴 **Lo que falta es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medición real del 2026-10-07, **anterior a 📦876**. El rojo era `test-google-oauth-868.js` [54/57], que exige `main/_verificar-credenciales-build.js`, archivo que **no existía en ninguna rama**: lo tragaba la regla `_*.js` de `sgsst-electron-app/.gitignore:80`, que sin ancla se aplica en cualquier directorio y no solo en la raíz. **Ya está corregido en 📦876** y probado por mutación (54/57 sin el archivo, 57/57 con él). 🔴 **Falta volver a medir en el portátil**: no se afirma aquí que esté verde, solo que la causa identificada ya no existe. `test-init-order-bug.js` sigue sin resumen verificable |
-| **Suite (escritorio)** | **126 tests · 112 verdes · 0 rojos por código · 14 que ni siquiera arrancan.** **Cero regresiones.** Medida a 📦880. 🔴 **Se corrige el conteo que se venía reportando, y es importante**: un runner anterior contaba como buenos 13 tests que en realidad no llegaban a ejecutarse, y por eso se venía diciendo "124 · 123 verdes". La verdad medida es que **14 tests no corren en esta máquina, y ninguno por el código de 📦879/880 — son todos de entorno**: 13 mueren en `ERR_DLOPEN_FAILED` al cargar `node_modules/better-sqlite3/build/Release/better_sqlite3.node`, que **fue compilado contra otro ABI de Node** (acá corre Node v26.10.0 y el binario está compilado para Electron 37), y el 14 es `test-firma-constancia-consolidada.js`, que saca 83/83 en los estáticos y muere esperando `INTERNAL_API_KEY`. Subió de 124 a 126 por `test-bandeja-iframe-879.js` (26 checks, 9/9 mutaciones) y `test-chip-mes-880.js` (18 checks, 10/10 mutaciones). 🔴 **El rebuild no es un comando de arreglo**: `npm rebuild better-sqlite3` deja el binario sirviendo para Node y **rompe Electron**, y viceversa — son excluyentes. Además **no hay prebuild para Node 26.10.0** en `better-sqlite3` 11.10.0, así que tocaría compilar desde fuente, y `package.json` **no tiene `electron-rebuild`**: hoy no existe forma de tener los dos. El intento del 2026-10-07 además falló con `EPERM` porque el `.node` estaba abierto por un proceso vivo (ver el pendiente abierto) |
+| **Suite (escritorio)** | **127 tests · 126 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medida el 2026-10-13, ya con 📦882. El único rojo es `test-firma-constancia-consolidada.js` [83/83 en lo estático], que muere esperando `INTERNAL_API_KEY`; `test-init-order-bug.js` sigue sin resumen verificable. 🔴 **Corrección importante: el bloqueo por ABI de `better-sqlite3` YA NO EXISTE.** Este bloque decía que 14 tests no arrancaban en esta máquina, 13 de ellos por `ERR_DLOPEN_FAILED` al cargar `better_sqlite3.node` (compilado para Electron 37 mientras el `node` pelado corre v26.10.0). **Hoy corren los 127**: el runner usa el Node de Electron (`ELECTRON_RUN_AS_NODE=1`), que es justamente el runtime para el que está compilado el binario. El diagnóstico viejo era correcto sobre el `node` pelado, pero **la medición se hacía por la vía equivocada**. El problema real sigue existiendo para quien abra la BD con el `node` de la línea de comandos, y ahí la solución de verdad siguen siendo **dos copias del binario** (rebuild no sirve: uno rompe Electron y el otro rompe Node). Subió de 126 a 127 por `test-consent-lectura-882.js` (71 checks, 18/18 mutaciones) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
-| **Validaciones visuales** | ✅ Cerrado lo anterior: 📦860, 📦861, 📦868, 📦867 y el ancho de la tarjeta de ingreso (📦869) están probados por una persona, no por un test. 🔴 **Pendiente de esta tanda: 📦879 y 📦880 NO tienen validación visual del resultado.** En 📦880 el owner reportó por captura que la pastilla quedaba plana a la derecha y eso destapó el `box-sizing`, pero **el arreglo todavía no se ha visto en pantalla**: es lo único del lote que un test no puede comprobar. En 📦879 tampoco se ha confirmado que el hover del header siga entrando con la Bandeja abierta, que es justo lo que ese commit vino a recuperar |
-| **Jornada** | **En curso** (2026-10-07). De hoy quedan commiteadas y pusheadas: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870. Del **2026-10-09**: el bloque legal de la Ley 1581 — consentimiento de la app, Anexo de Encargo y Autorización de Trabajadores. **Sin bump de versión**, por la regla del owner. Versión `0.1.251` |
+| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📦860, 📦861, 📦868, 📦867 y el ancho de la tarjeta de ingreso (📦869). 🔴 **Pendiente: 📦881 y 📦882 NO tienen validación visual en la app instalada**, y son los dos más delicados porque lo que cambia es **texto legal**. De 882 se revisó un **artefacto** (`%TEMP%\preview-consent-882.html`) que reproduce el gate, el scroll y el revelado de las casillas, y el owner lo aprobó; pero **el artefacto lleva los documentos incrustados y no ejecuta el IPC real**, así que lo único que no puede comprobar es que el bridge entregue los cuatro desde `legal/` en el build empaquetado. **Y el gate ni siquiera aparece hoy en la app del owner**, porque ya existe una aceptación con `document_version` en `v1`: para verlo hay que borrar esa fila o subir `consentDocumentVersion`. Ver el pendiente 14 |
+| **Jornada** | **En curso** (2026-10-13). Del **2026-10-13**: 📦882 — los cuatro textos legales legibles dentro del gate, con la copia verificada de `sitio/` en `legal/`, el canal `consent:documento` por lista blanca, el revelado de las casillas al final de la lectura, los tokens de `styles.css` y `renderer.js` subidos a `20261013-consent882` (lo que 881 dejó olvidado) y dos tests viejos reparados (`test-bandeja-iframe-879.js` y `test-consent-gate.js`). **Sin bump de versión**, por la regla del owner: sigue en `0.1.251`. Del **2026-10-11**: se integró 📦881 (que había quedado solo en `Dev-Pc`) y se arrancó la **iniciativa Hermes** en `kair-server` (ver el pendiente 13). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870 |
 
 
-### 🛠️ Pendientes abiertos (al 2026-10-07, cierre 17:45)
+### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
 
 1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` compara
    contra `app.getVersion()`, así que **cada bump de versión le repite el consentimiento a todos**,
@@ -136,6 +136,93 @@
     lo vio en pantalla y dijo que no lo quería: **se leía como que el título se estaba apagando, no
     como "hay más"**, y se volvió al "...". Queda escrito para que nadie lo reintente creyendo que es
     mejor. El `box-sizing` de la misma tanda **sí se quedó**, porque ese era un bug de verdad.
+
+13. **🟡 Iniciativa Hermes: el agente YA ESTÁ INSTALADO en `kair-server`; falta todo lo demás.** Empezó
+    el 2026-10-11. No toca K+AIR todavía: **no hay ni un commit de esta iniciativa**, y todo lo que
+    sigue son decisiones, no código.
+
+    *Servidor.* `kair-server` = Ubuntu 24.04.5 LTS, 2 núcleos **AMD C-70**, **3,5 GB de RAM**, 96 GB
+    libres, **sin GPU**. Panel: Cockpit en `http://192.168.1.11:9090` — **HTTP plano, sin cifrar**;
+    entrar ahí manda usuario y contraseña sin proteger. SSH abierto en el 22.
+
+    *Instalado.* Con `bash ~/hermes-install.sh --non-interactive --skip-browser`. Quedó Python 3.14.7,
+    uv 0.12.3, el comando en `~/.local/bin/hermes` y el PATH parcheado en `.bashrc`. `hermes doctor`
+    en verde salvo: 3 vulnerabilidades npm **upstream** (no se arreglan localmente, son de build-time,
+    y son de las herramientas de browser que ni se instalaron) y las API keys, que a propósito no se
+    configuraron. Herramientas activas: `file`, `terminal`, `memory`, `skills`, `cronjob`,
+    `code_execution`, `todo`, `web search`, entre otras 18.
+
+    *El modelo todavía NO se eligió* —quedó para el final, por decisión del owner— y **este servidor
+    no puede correr uno**: 3,5 GB de RAM no alcanzan para un 2B con el contexto de 64K que Hermes
+    exige. El KV cache de 64K solo se come la memoria. Un `Qwen3.5-0.8B` entra, pero con IFBench 21 y
+    BFCL-V4 25, y Qwen misma dice en su README que es para prototipos y fine-tuning. 🔴 **El propio
+    repo ya lo dejo demostrado con logs del 2026-09-24**: en `llm_server.py` esta escrito que el
+    modelo chico copia la plantilla literal, repite las mismas causas en los 5 niveles, genera "6, 10
+    o hasta 36 porqués", y que **el feedback no lo mueve**. La solución que implementaron fue
+    **sustituir la causa ellos mismos y dejarle al modelo un solo nivel**. Eso es el diseño a seguir.
+
+    *Decisiones tomadas, para no volver a discutirlas:*
+    - **Un número de WhatsApp por empresa (BYON)**, no uno central. Coherente con el art. 25 del 📦881
+      (la empresa es responsable, K+AIR encargado), evita perder el número de todos los clientes por
+      un error de uno, y el trabajador recibe del número de su propia empresa. El precio: cada cliente
+      verifica su negocio ante Meta y registra sus plantillas a su nombre.
+    - **El modelo razona en la nube y los datos sensibles no salen**: el script hace la mecánica y
+      Hermes solo recibe datos anonimizados.
+    - **El mensaje de WhatsApp NO debe hablar de la incapacidad**: texto genérico, y el detalle por
+      otro canal. Es el precio de no depender de una GPU.
+
+    *Lo que falta, en orden:*
+    - 🔴 **Acceso al servidor desde el escritorio.** SSH da `Permission denied (publickey,password)`
+      porque acá no hay clave privada, solo el rastro en `known_hosts`. Hay que generar un par de
+      claves o pegar salidas a mano. **La contraseña no se pide ni se manda por chat**, nunca.
+    - `hermes` **no es un servicio todavía**: se ejecutó desde una terminal y muere al cerrarla. Falta
+      el `systemd` service, y el `sudo loginctl enable-linger $USER` —que se le dio al owner pero
+      **no se confirmó que lo haya corrido**—.
+    - Falta `python-telegram-bot`, y el token de `@BotFather` (credencial: se pega solo en el servidor).
+    - Falta el proveedor del modelo (`hermes setup --portal` o la key de otro proveedor).
+    - 🔴 **Coexistencia de WhatsApp Business sin confirmar para Colombia.** Es la vía para usar en la
+      API el mismo número que ya está en la app del celular. Requiere 7+ días de actividad real en la
+      app y no está disponible en todos los países.
+
+    *Lo que ya está resuelto del lado de K+AIR, para cuando llegue el momento:*
+    - El submódulo de seguimiento es **`seguimiento-incapacidades`** (📦701): `main/seguimiento-incapacidad-bridge.js`
+      (968 líneas) y las tablas `seguimiento_incapacidad_caso` y `seguimiento_incapacidad_registro`.
+      El `_registro` ya es el histórico de seguimientos múltiples: es donde Hermes escribiría.
+    - `utils/whatsappSender.js` **NO es la API de WhatsApp Business**: abre `web.whatsapp.com/send`
+      con el mensaje copiado y el usuario tiene que hacer clic. Es el patrón "relay", no envío
+      automático. Lo que se quiere (envío programático) es trabajo nuevo.
+    - La app ya tiene el patrón app↔servidor por HTTP (`llm_server.py` en el 5555), pero **todo
+      servicio local nace hijo de la app y `cleanupProcesses()` lo mata con `taskkill` al cerrar**.
+      Hermes en el servidor **no debe seguir ese patrón**, y de hecho no lo sigue: al estar en otra
+      máquina, no depende de que la app esté abierta.
+    - Para avisar, se eligio **Telegram**; para hablar con Hermes, se eligió el **gateway de
+      mensajería**, no la app.
+
+14. **🔴 REVISIÓN PENDIENTE: 📦881 y 📦882 no se han visto en la app instalada. Es lo único
+    que falta de esta tanda, y es trabajo de una persona, no de un test.**
+    De 882 se revisó el artefacto `%TEMP%\preview-consent-882.html`, que reproduce el gate, el
+    scroll y el revelado de las casillas, y el owner lo aprobó. **Pero el artefacto lleva los
+    documentos incrustados y no ejecuta el IPC real**: no prueba que `consent:documento` entregue
+    los cuatro desde `legal/` en el build empaquetado, ni que el CSS llegue sin cache.
+
+    - **Por qué el gate no aparece hoy en la app del owner:** ya existe una fila en
+      `consent_acceptance` con `document_version` en `v1` y `app_version` igual a la actual, así
+      que `consent:estado` devuelve `requiere: false`. Para verlo hay que **borrar esa fila** o
+      subir `consentDocumentVersion` en `config.json`. **No se hizo ninguna de las dos**: tocar
+      `consentDocumentVersion` tiene el efecto colateral de que el texto legal cambie de verdad,
+      y eso es decisión del owner junto con el asesor.
+    - **Lo que hay que mirar, en orden:** (1) que los cuatro documentos aparezcan completos y en
+      ese orden; (2) que la barra llegue al final y las dos casillas aparezcan; (3) que *No
+      acepto* siga disponible en todo momento; (4) que los links entre documentos salten dentro
+      de la pantalla y que *Soporte* abra el navegador y no una ventana en blanco.
+    - **Ojo con el redimensionado:** el revelado depende de medir `scrollHeight` después de
+      inyectar, y se hace con doble `requestAnimationFrame`. En una pantalla muy alta el
+      contenido puede caber entero, y en ese caso las casillas deben aparecer **de una**, sin
+      scroll. Es la rama que el código toma (`recorrido <= 4`), pero conviene confirmarla con la
+      ventana maximizada.
+    - **Y sigue en pie lo de 881:** el texto exacto que el consentimiento muestra en pantalla, el
+      rol de responsable y encargado, y los dos documentos nuevos de `sitio/`. Que estén bien
+      escritos en el repo no significa que se vean bien en pantalla.
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 

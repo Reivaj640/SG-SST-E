@@ -3734,6 +3734,150 @@ async function _consentTextoHash(texto) {
   }
 }
 
+/**
+ * 📦882 — Los cuatro textos legales, completos, dentro del gate.
+ *
+ * El resumen del gate es un RESUMEN. Para que la autorización sea informada
+ * (art. 8, Ley 1581 de 2012) el usuario tiene que poder LEER lo que acepta,
+ * no solo ver un resumen y un link a una página que puede no abrir.
+ *
+ * El texto NO se reescribe aquí. Viene de `legal/*.html`, que es la copia
+ * BYTE A BYTE de `sitio/` verificada por `main/test-consent-lectura-882.js`.
+ * Esta función solo lo recorta a `<main>`, le quita la barra de navegación del
+ * sitio (que apunta a páginas que la app no trae) y lo monta.
+ *
+ * El orden NO es el de la lista blanca del backend: va primero lo que el
+ * usuario está aceptando en el resumen (Términos), después la política, y al
+ * final los dos documentos que le importan a la EMPRESA (el Anexo de Encargo
+ * y la Autorización de Trabajadores).
+ */
+const CONSENT_DOCUMENTOS = [
+  { nombre: 'terminos', archivo: 'terminos.html', titulo: 'Términos y Condiciones de Uso' },
+  { nombre: 'privacidad', archivo: 'privacidad.html', titulo: 'Política de Privacidad' },
+  { nombre: 'anexo-encargo', archivo: 'anexo-encargo.html', titulo: 'Anexo de Encargo de Tratamiento de Datos Personales' },
+  { nombre: 'autorizacion-trabajadores', archivo: 'autorizacion-trabajadores.html', titulo: 'Autorización de Trabajadores para el Tratamiento de Datos Personales' }
+];
+
+/**
+ * Dónde vive el sitio publicado. Se usa para los links del gate que NO son entre
+ * los cuatro documentos (Soporte, Inicio): dentro de la app esos archivos no
+ * existen, así que se abre el sitio real en el navegador del usuario.
+ */
+const CONSENT_BASE_SITIO = 'https://reivaj640.github.io/SG-SST-E/';
+
+/** Convierte un documento de sitio/ en una sección lista para el gate. */
+function _consentConstruirSeccion(doc, html) {
+  const parseado = new DOMParser().parseFromString(html, 'text/html');
+  const fuente = parseado.querySelector('main') || parseado.body;
+  if (!fuente) return null;
+
+  // La barra de navegación del sitio sale SIEMPRE. Ojo con el selector: no todos
+  // los documentos la usan igual — `privacidad`, `terminos` y `anexo-encargo` la
+  // traen como `<ul class="enlaces">` y `autorizacion-trabajadores` como
+  // `<nav class="enlaces">`. Buscando solo el `ul`, la del `nav` se quedaba
+  // dentro del gate con su link a `index.html`. Por eso se busca por clase.
+  const barras = fuente.querySelectorAll('.enlaces');
+  for (let i = 0; i < barras.length; i++) barras[i].remove();
+
+  // Los links ENTRE documentos del sitio (href="anexo-encargo.html") pasan a
+  // ser saltos dentro de esta misma pantalla: los cuatro ya están apilados
+  // arriba, así que el destino existe y el click no debe romper nada.
+  //
+  // Y lo que NO es uno de los cuatro —`soporte.html`, `index.html`— se manda al
+  // sitio publicado. Sin esto quedaban links rotos dentro del gate: al pincharlos
+  // la app intentaba cargar un archivo que electron-builder nunca empaqueta, y
+  // la ventana se quedaba en blanco. Con target="_blank" los resuelve
+  // `setWindowOpenHandler` de main.js y se abren en el navegador del usuario.
+  const enlaces = fuente.querySelectorAll('a[href]');
+  for (let i = 0; i < enlaces.length; i++) {
+    const href = enlaces[i].getAttribute('href') || '';
+    if (!/\.html$/i.test(href) || /^https?:/i.test(href)) continue;
+    const destino = href.replace(/^\.?\//, '').split('#')[0].split('?')[0];
+    const esLegal = CONSENT_DOCUMENTOS.some(function (d) { return d.archivo === destino; });
+    if (esLegal) {
+      enlaces[i].setAttribute('href', '#doc-' + destino.replace(/\.html$/, ''));
+    } else {
+      enlaces[i].setAttribute('href', CONSENT_BASE_SITIO + destino);
+      enlaces[i].setAttribute('target', '_blank');
+      enlaces[i].setAttribute('rel', 'noopener');
+    }
+  }
+
+  const seccion = document.createElement('section');
+  seccion.className = 'kair-legal-doc';
+  seccion.id = 'doc-' + doc.nombre;
+
+  const cabecera = document.createElement('div');
+  cabecera.className = 'kair-legal-doc__head';
+  const h = document.createElement('h3');
+  h.className = 'kair-legal-doc__title';
+  h.textContent = doc.titulo;          // textContent, no innerHTML: es el único dato
+  const meta = document.createElement('p');   // que no pasa por el HTML del archivo
+  meta.className = 'kair-legal-doc__meta';
+  meta.textContent = doc.archivo;
+  cabecera.appendChild(h);
+  cabecera.appendChild(meta);
+  seccion.appendChild(cabecera);
+
+  // Se MUEVE el contenido parseado al documento real (adoptNode lo quita del
+  // documento de origen). Los nodos ya vienen neutralizados por DOMParser:
+  // no ejecutan scripts y no traen manejadores.
+  while (fuente.firstChild) {
+    seccion.appendChild(document.adoptNode(fuente.firstChild));
+  }
+  return seccion;
+}
+
+/**
+ * Carga los cuatro documentos y los monta. NUNCA lanza: ante cualquier error
+ * devuelve cuántos entraron, y el gate decide. El fail-open es el mismo de
+ * siempre — un archivo que no se pudo leer no puede dejar al usuario sin poder
+ * trabajar ni sin poder rechazar.
+ */
+async function _consentCargarDocumentosLegales(api, contenedor, estado) {
+  const resultado = { cargados: 0, fallidos: [] };
+  if (!api || typeof api.consentDocumento !== 'function' || !contenedor) {
+    resultado.fallidos = CONSENT_DOCUMENTOS.map(function (d) { return d.nombre; });
+    return resultado;
+  }
+
+  const fragmentos = document.createDocumentFragment();
+  for (let i = 0; i < CONSENT_DOCUMENTOS.length; i++) {
+    const doc = CONSENT_DOCUMENTOS[i];
+    let respuesta = null;
+    try {
+      respuesta = await api.consentDocumento(doc.nombre);
+    } catch (e) {
+      console.warn('[consent] No se pudo pedir el documento ' + doc.nombre + ':', e);
+    }
+    if (!respuesta || respuesta.success !== true || typeof respuesta.html !== 'string') {
+      resultado.fallidos.push(doc.nombre);
+      continue;
+    }
+    let seccion = null;
+    try {
+      seccion = _consentConstruirSeccion(doc, respuesta.html);
+    } catch (e) {
+      console.warn('[consent] No se pudo montar el documento ' + doc.nombre + ':', e);
+    }
+    if (!seccion) { resultado.fallidos.push(doc.nombre); continue; }
+    fragmentos.appendChild(seccion);
+    resultado.cargados++;
+  }
+
+  if (resultado.cargados > 0) contenedor.appendChild(fragmentos);
+
+  // Si algo faltó, se DICE en pantalla. Un gate que finge queSolo cargaron dos
+  // de cuatro documentos no es informado: es engañoso.
+  if (estado && resultado.fallidos.length > 0) {
+    estado.hidden = false;
+    estado.textContent = resultado.fallidos.length === CONSENT_DOCUMENTOS.length
+      ? 'No se pudieron cargar los documentos legales desde la app. Los puede leer con los enlaces de arriba, y puede continuar aceptando o rechazando con normalidad.'
+      : 'No se pudo cargar esta parte del texto legal: ' + resultado.fallidos.join(', ') + '. Los demás documentos están completos abajo y el resto se puede leer con los enlaces de arriba.';
+  }
+  return resultado;
+}
+
 async function ensureConsentGate() {
   const api = window.electronAPI;
   if (!api || typeof api.consentEstado !== 'function') {
@@ -3765,9 +3909,92 @@ async function ensureConsentGate() {
   const cuerpo = overlay.querySelector('.kair-consent__body');
 
   overlay.hidden = false;
-  if (cuerpo) cuerpo.scrollTop = 0;
 
+  // 📦882 — El texto legal completo se monta ANTES de leer `cuerpo.innerText`,
+  // porque ese texto es el que se hashea y se guarda como prueba de QUÉ se leyó
+  // (payload.textoHash). Hashear el resumen solo dejaría constancia de un
+  // resumen: la prueba vale si cubre lo que el usuario realmente pudo leer.
+  const contenedorDocs = document.querySelector('[data-consent-documentos]');
+  const checksBox = document.querySelector('[data-consent-checks]');
+  const barra = document.querySelector('[data-consent-progress]');
+  const barraRelleno = document.querySelector('[data-consent-progress-fill]');
+  const barraEtiqueta = document.querySelector('[data-consent-progress-label]');
+  const estadoDocs = document.querySelector('[data-consent-doc-status]');
+
+  // Las casillas arrancan ocultas y "Acepto" deshabilitado. NO es una barrera
+  // inventada: el requisito legal es que la autorización sea informada, y eso
+  // exige que el texto esté a la vista. Lo que SÍ está siempre disponible es
+  // "No acepto", a un clic, en cualquier momento.
+  let lecturaCompleta = false;
+  let enviando = false;
+
+  function actualizarBotonAceptar() {
+    if (btnAceptar) btnAceptar.disabled = !lecturaCompleta || enviando;
+  }
+
+  function marcarLecturaCompleta() {
+    if (lecturaCompleta) return;
+    lecturaCompleta = true;
+    if (checksBox) checksBox.hidden = false;
+    if (barra) {
+      barra.setAttribute('data-consent-finito', '1');
+      barra.setAttribute('aria-valuenow', '100');
+    }
+    if (barraRelleno) barraRelleno.style.width = '100%';
+    if (barraEtiqueta) barraEtiqueta.textContent = 'Lectura completa';
+    actualizarBotonAceptar();
+    // Las casillas quedan justo debajo de los documentos: si no se trae la
+    // vista al final, el usuario termina de leer y no ve nada nuevo.
+    if (checksBox && checksBox.scrollIntoView) {
+      try { checksBox.scrollIntoView({ block: 'end', behavior: 'smooth' }); }
+      catch (e) { try { checksBox.scrollIntoView(); } catch (e2) { /* noop */ } }
+    }
+  }
+
+  function alDesplazar() {
+    if (lecturaCompleta) return;
+    if (!cuerpo) { marcarLecturaCompleta(); return; }
+    const recorrido = cuerpo.scrollHeight - cuerpo.clientHeight;
+    // No hay nada que recorrer (pantalla enorme, o documentos que no cargaron):
+    // el texto ya está a la vista, entonces la lectura ya está completa.
+    if (recorrido <= 4) { marcarLecturaCompleta(); return; }
+    const restante = recorrido - cuerpo.scrollTop;
+    if (restante <= 8) { marcarLecturaCompleta(); return; }
+    const avance = Math.max(0, Math.min(99, Math.round((cuerpo.scrollTop / recorrido) * 100)));
+    if (barraRelleno) barraRelleno.style.width = avance + '%';
+    if (barra) barra.setAttribute('aria-valuenow', String(avance));
+    if (barraEtiqueta) barraEtiqueta.textContent = avance + '% leído';
+  }
+
+  let cargaDocs = { cargados: 0, fallidos: [] };
+  if (checksBox) checksBox.hidden = true;
+  try {
+    cargaDocs = await _consentCargarDocumentosLegales(api, contenedorDocs, estadoDocs);
+  } catch (e) {
+    console.warn('[consent] Error cargando los documentos legales:', e);
+  }
+
+  if (cuerpo) cuerpo.scrollTop = 0;
   const textoLegal = cuerpo ? (cuerpo.innerText || '').trim() : '';
+
+  if (cuerpo) cuerpo.addEventListener('scroll', alDesplazar, { passive: true });
+  window.addEventListener('resize', alDesplazar);
+
+  // Si NO entró ningún documento, el cuerpo queda corto y no hay nada que
+  // recorrer: las casillas salen de una. Fail-open explícito — el gate nunca
+  // deja al usuario frente a una pantalla que no avanza y sin salida.
+  if (cargaDocs.cargados === 0) {
+    marcarLecturaCompleta();
+  } else {
+    // Doble rAF: en el primer frame el texto recién inyectado todavía puede no
+    // tener su alto definitivo, y se mediría un scrollHeight equivocado — que
+    // es justo lo que haría aparecer las casillas antes de tiempo.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(alDesplazar);
+    });
+  }
+
+  actualizarBotonAceptar();
 
   function mostrarError(msg) {
     if (!errorBox) return;
@@ -3787,6 +4014,12 @@ async function ensureConsentGate() {
       cerrado = true;
       if (btnAceptar) btnAceptar.removeEventListener('click', onAceptar);
       if (btnRechazar) btnRechazar.removeEventListener('click', onRechazar);
+      // 📦882 — Los listeners del lector se van con el overlay. El renderer vive
+      // toda la sesión de la app y el gate puede volver a mostrarse; sin esto,
+      // cada aparición dejaría un `scroll` y un `resize` apuntando a un
+      // overlay ya cerrado.
+      if (cuerpo) cuerpo.removeEventListener('scroll', alDesplazar);
+      window.removeEventListener('resize', alDesplazar);
     }
 
     async function onAceptar() {
@@ -3798,7 +4031,8 @@ async function ensureConsentGate() {
         return;
       }
 
-      if (btnAceptar) btnAceptar.disabled = true;
+      enviando = true;
+      actualizarBotonAceptar();
       mostrarError('');
 
       // El checkbox de datos cubre LOS DOS flags: el backend exige aceptaDatos Y
@@ -3830,7 +4064,8 @@ async function ensureConsentGate() {
       }
 
       const codigo = (r && r.error) || 'DESCONOCIDO';
-      if (btnAceptar) btnAceptar.disabled = false;
+      enviando = false;
+      actualizarBotonAceptar();
       if (codigo === 'SESION_INVALIDA') {
         mostrarError('Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.');
       } else if (codigo === 'FALTA_AUTORIZACION') {

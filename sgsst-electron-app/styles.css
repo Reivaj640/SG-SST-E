@@ -8840,7 +8840,11 @@ position: relative;
   box-shadow:
     0 24px 48px -12px rgba(15, 23, 42, 0.25),
     0 0 0 1px rgba(15, 23, 42, 0.05);
-  width: min(620px, calc(100vw - 48px));
+  /* 📦882 — De 620px a 720px. El gate pasó a tener que LEER cuatro documentos
+     completos, y a 620 las líneas quedan de ~55 caracteres: incomodo para leer
+     párrafos largos. 720 da ~72 sin que el modal se coma una pantalla de
+     portátil. El alto no cambió: sigue siendo `100vh - 64px` con scroll interno. */
+  width: min(720px, calc(100vw - 48px));
   max-height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
@@ -8933,6 +8937,15 @@ position: relative;
   border-radius: 10px;
 }
 
+/* 📦882 — Las casillas NACEN ocultas y aparecen al terminar de leer.
+   Este bloque NO es opcional: `.kair-consent__checks` es `display: flex`, y el
+   atributo `hidden` pierde contra ese display. Sin el `!important` de abajo, las
+   dos autorizaciones se verían desde el segundo cero y el "leer antes de marcar"
+   sería decorativo. Mismo tropiezo que el overlay, resuelto igual. */
+.kair-consent__checks[hidden] {
+  display: none !important;
+}
+
 .kair-consent__check {
   display: flex;
   align-items: flex-start;
@@ -9018,4 +9031,249 @@ position: relative;
 @keyframes kair-consent-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+
+/* ============================================================
+   📦882 — Lector del texto legal completo dentro del gate
+   ------------------------------------------------------------
+   Los cuatro documentos se inyectan dentro de `.kair-consent__documentos`
+   con su HTML original. El CSS del sitio (sitio/assets/estilo.css) NO viaja:
+   esta hoja vuelve a pintar las clases del documento (`.destacado`, `.aviso`,
+   `.fecha`) para que se lean dentro de la app.
+
+   Tokens PROPIOS y scopeados al lector, como manda design_system.md §"Modal con
+   tokens PROPIOS sobre sí mismo". El modal ya venía en la paleta #1a56db desde
+   📦873 y esta hoja NO lo repinta: repintar los botones de un gate ya validado
+   sería un cambio visual que nadie pidió. Lo nuevo se casa con lo que hay.
+   ============================================================ */
+
+.kair-consent__reader-head {
+  margin: 18px 0 14px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.kair-consent__reader-title {
+  margin: 0 0 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.kair-consent__reader-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+/* --- Barra de avance de lectura --- */
+.kair-consent__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.kair-consent__progress-track {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.kair-consent__progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #1a56db;
+  transition: width 140ms ease-out, background-color 140ms ease-out;
+}
+
+/* Al llegar al final la barra cambia de color: es la señal de que ya se puede
+   marcar, y se lee sin tener que interpretar el porcentaje. */
+.kair-consent__progress[data-consent-finito="1"] .kair-consent__progress-fill {
+  background: #1bb888;
+}
+
+.kair-consent__progress-label {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.kair-consent__progress[data-consent-finito="1"] .kair-consent__progress-label {
+  color: #0f7a5a;
+  font-weight: 600;
+}
+
+.kair-consent__reader-status {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #f59e0b;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #78350f;
+}
+
+.kair-consent__reader-status[hidden] {
+  display: none !important;
+}
+
+/* --- Los documentos --- */
+.kair-consent__documentos:empty {
+  display: none;
+}
+
+.kair-consent__documentos {
+  margin: 0 0 18px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* Cada documento arranca con su propio encabezado y una costura que separa
+   visualmente uno del otro: cuatro textos largos pegados son ilegibles. */
+.kair-legal-doc {
+  margin: 0 0 18px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.kair-legal-doc:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.kair-legal-doc__head {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #eef4fd;
+  border: 1px solid #d6e3f8;
+  border-radius: 8px;
+}
+
+.kair-legal-doc__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #172c4c;
+}
+
+.kair-legal-doc__meta {
+  margin: 4px 0 0;
+  font-size: 0.6875rem;
+  color: #6b7280;
+}
+
+/* --- Tipografía del documento inyectado --- */
+.kair-consent__documentos h2 {
+  margin: 20px 0 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #172c4c;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eef0f1;
+}
+
+.kair-consent__documentos h3 {
+  margin: 14px 0 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.kair-consent__documentos p {
+  margin: 0 0 9px;
+}
+
+.kair-consent__documentos ul,
+.kair-consent__documentos ol {
+  margin: 0 0 9px;
+  padding-left: 20px;
+}
+
+.kair-consent__documentos li {
+  margin-bottom: 5px;
+}
+
+.kair-consent__documentos a {
+  color: #1a56db;
+  text-decoration: underline;
+  word-break: break-word;
+}
+
+.kair-consent__documentos code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f3f5;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.kair-consent__documentos strong {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.kair-consent__documentos table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+}
+
+.kair-consent__documentos th,
+.kair-consent__documentos td {
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.kair-consent__documentos th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.kair-consent__documentos blockquote {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #d1d5db;
+  background: #f8fafc;
+  color: #4b5563;
+}
+
+/* Clases que traen los documentos de sitio/ y que aquí hay que reproducir:
+   el CSS del sitio no se carga dentro de la app. */
+.kair-consent__documentos .fecha {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.kair-consent__documentos .destacado {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: #eef4fd;
+  border-left: 3px solid #1a56db;
+  border-radius: 6px;
+}
+
+.kair-consent__documentos .aviso {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
 }

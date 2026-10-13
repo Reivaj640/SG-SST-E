@@ -208,8 +208,24 @@ function cargarGateCon(api, dom) {
   if (ini === -1 || fin === -1 || fin < ini) throw new Error('No se encontró el bloque del gate en renderer.js');
   const bloque = src.slice(ini, fin);
 
+  // 📦882 — `window` es el mismo objeto en el renderer que el que expone el
+  // preload, y TIENE los listeners igual que `document`. El stub era
+  // `{ electronAPI }` pelado, y el gate de 882 se registra en `resize`, así que
+  // acá reventaba con "window.addEventListener is not a function" y mataba todo
+  // el test por un API del navegador que el stub no modelaba.
+  let DOMParserRef = null;
+  try { DOMParserRef = require('jsdom').DOMParser; } catch (e) { DOMParserRef = null; }
+
   const sandbox = {
-    window: { electronAPI: api },
+    window: {
+      electronAPI: api,
+      addEventListener: function (ev, fn) { dom.addEventListener(ev, fn); },
+      removeEventListener: function (ev, fn) { dom.removeEventListener(ev, fn); }
+    },
+    DOMParser: DOMParserRef,
+    // Síncrono a propósito: el gate mide el scroll nada más montar, y con un
+    // rAF real este test tendría que esperar a un frame que nunca llega.
+    requestAnimationFrame: function (fn) { fn(); return 0; },
     document: dom,
     console: console,
     crypto: { subtle: { digest: function () { return Promise.resolve(new Uint8Array(32)); } } },

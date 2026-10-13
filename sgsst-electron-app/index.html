@@ -10,7 +10,7 @@
        propiedades que ellos no declaran (caso real 📦761: la clase `.modal` de
        Bootstrap rompía los modales de Evaluación Inicial). -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="styles.css?v=20261007-header879">
+  <link rel="stylesheet" href="styles.css?v=20261013-consent882">
   <link rel="stylesheet" href="development-styles.css">
   <!-- 📦761 — Evaluación Inicial del SG-SST: hoja única, todo bajo `.ev-scope`.
        Antes eran dos hojas (`--ei-*` + `--k-*`) más un bloque de CSS que el propio
@@ -296,7 +296,40 @@
                target="_blank" rel="noopener">Leer los Términos y Condiciones de uso</a>
           </p>
 
-          <div class="kair-consent__checks">
+          <!-- 📦882 — El texto legal COMPLETO, dentro de la app.
+               El resumen de arriba es un resumen: para que la autorización sea
+               informada (art. 8 Ley 1581) el usuario tiene que poder LEER los
+               documentos, no solo creer que existen. Los cuatro textos se inyectan
+               aquí desde legal/*.html —la copia verificada de sitio/— y se recorren
+               con la barra de desplazamiento del propio modal.
+
+               Las dos casillas NACEN ocultas (`hidden`) y aparecen cuando se llega
+               al final. No es una barrera artificial: es el requisito de que la
+               autorización sea previa e informada. El botón de rechazar nunca se
+               bloquea —rejectar siempre está a un clic— y si los documentos no se
+               pueden cargar, las casillas aparecen igual (fail-open). -->
+          <div class="kair-consent__reader-head">
+            <h3 class="kair-consent__reader-title">Texto completo de los documentos legales</h3>
+            <p class="kair-consent__reader-note">
+              Abajo están completos, con el mismo texto que usa el sitio —esta app lleva
+              una copia verificada, archivo por archivo—: la Política de Privacidad, los
+              Términos y Condiciones de Uso, el Anexo de Encargo de Tratamiento y la
+              Autorización de Trabajadores. Desplácese hasta el final para poder marcar
+              las autorizaciones.
+            </p>
+            <div class="kair-consent__progress" role="progressbar" aria-label="Avance de la lectura"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-consent-progress>
+              <div class="kair-consent__progress-track">
+                <div class="kair-consent__progress-fill" data-consent-progress-fill></div>
+              </div>
+              <span class="kair-consent__progress-label" data-consent-progress-label>Cargando los documentos…</span>
+            </div>
+            <p class="kair-consent__reader-status" data-consent-doc-status hidden></p>
+          </div>
+
+          <div id="kair-consent-documentos" class="kair-consent__documentos" data-consent-documentos></div>
+
+          <div class="kair-consent__checks" data-consent-checks hidden>
             <label class="kair-consent__check">
               <input type="checkbox" id="kair-consent-check-terminos">
               <span>He leído y acepto los <strong>Términos y Condiciones</strong> de uso de K+AIR.</span>
@@ -584,7 +617,7 @@
   <script src="vendor/anime.umd.min.js?v=4.5.0"></script>
   <script src="assets/js/kair-motion.js?v=20261002-swapview-841"></script>
 
-  <script src="renderer.js?v=20261007-iframe879"></script>
+  <script src="renderer.js?v=20261013-consent882"></script>
   
   <!-- Contenedor de Notificaciones (Toast Hub) -->
   <div id="notification-hub"></div>

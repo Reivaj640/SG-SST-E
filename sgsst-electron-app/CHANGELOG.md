@@ -12,6 +12,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.251] - 2026-10-07
 
+> 🔴 **Hueco sin documentar:** 📦879, 📦880 y 📦881 se commitearon y se pushearon, pero
+> **nunca entraron a este CHANGELOG**. El resumen de qué hizo cada uno está en
+> [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
+> documentarlos aquí.
+
+### 📦882 · Los cuatro textos legales se leen dentro de la app, no solo por un link
+
+El gate de consentimiento mostraba un **resumen** y dos links a la web. Eso no cumple el
+art. 8 de la Ley 1581: la autorización tiene que ser **informada**, y para eso el titular
+tiene que poder *leer* lo que acepta, no ver un resumen y un link a una página que puede no
+abrir —más todavía en un equipo que trabaja sin internet.
+
+Ahora los **cuatro documentos** van completos dentro del modal, en el orden en que se
+leen: los Términos, la Política de Privacidad, el Anexo de Encargo y la Autorización de
+Trabajadores. Se recorren con la barra de desplazamiento del propio modal, con una barra de
+avance que se pone verde al llegar al final; **ahí** aparecen las dos casillas y se habilita
+*Acepto y continúo*. **"No acepto" nunca se bloquea**: rechazar está siempre a un clic.
+
+Tres decisiones que importan:
+
+1. **Una sola fuente de verdad.** Los documentos viven en `sitio/`, que está **fuera** de la
+   carpeta que electron-builder empaqueta: por eso la app instalada no los tenía. Ahora la app
+   lleva su copia en `legal/`, **byte a byte**, y un test compara los SHA-256 de los dos
+   lados. Si se edita el texto en el sitio y no se copia, la suite se cae. Editás en un solo
+   lugar.
+2. **El texto no se reescribe.** Se inyecta el HTML original recortado a `<main>`. Las
+   clases del sitio (`.destacado`, `.aviso`, `.fecha`) las vuelve a pintar la hoja de la app.
+3. **Fail-open.** Si un documento no se puede cargar, el gate **lo dice en pantalla** y las
+   casillas aparecen igual. Un archivo que no se leyó no puede dejar al usuario sin poder
+   trabajar, y tampoco sin poder rechazar.
+
+`texto_hash` ahora se calcula **después** de montar los documentos: la prueba de qué se leyó
+es realmente lo que el usuario pudo leer, y no un resumen de veinte líneas.
+
+- `main/test-consent-lectura-882.js` — **71 checks, 18/18 mutaciones detectadas**, con una
+  fase funcional que ejecuta el recorte con jsdom contra los cuatro documentos reales. Esa
+  fase es la que encontró que `autorizacion-trabajadores.html` trae su navegación como
+  `<nav class="enlaces">` y no como `<ul>`: buscándola solo por etiqueta, la barra del sitio
+  quedaba viva dentro del gate.
+- Corregidos dos tests viejos que no probaban lo que decían: `test-bandeja-iframe-879.js`
+  tenía los tokens de cache-bust clavados a los de 879 (cualquier bumpeo futuro lo rompía
+  sin que nada estuviera roto), y el `window` falso de `test-consent-gate.js` no tenía
+  `addEventListener`.
+- **Sin bump de versión** (`0.1.251`), por la regla del owner.
+
 ### 📦878 · El calendario grande usa el mismo popup que el minicalendario
 
 Al pasar el mouse por un evento del calendario grande aparecía el tooltip gris del

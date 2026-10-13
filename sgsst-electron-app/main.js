@@ -2836,6 +2836,67 @@ ipcMain.handle('consent:rechazar', async () => {
   return { success: true };
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 📦882 · Texto legal completo DENTRO del gate (Ley 1581 de 2012, art. 8:
+// "la autorización debe ser previa, expresa, informada e inequívoca", y el
+// principio de transparencia exige que el titular pueda conocer el tratamiento).
+//
+// El resumen del gate es un RESUMEN: para que la autorización sea informada, el
+// usuario tiene que poder LEER el documento, no creer que existe. Por eso los
+// cuatro textos van dentro de la app y no solo como link a la web.
+//
+// 🔴 POR QUÉ UNA COPIA Y NO LEER `sitio/` DIRECTO.
+// `sitio/` vive FUERA de `sgsst-electron-app/`, y electron-builder solo empaqueta
+// esta carpeta (`build.files` es relativo al app dir, y ahí solo entran sus
+// archivos). Leyendo de `sitio/` la app instalada no tendría el archivo y el gate
+// se quedaría sin texto.
+// La copia de `legal/` es BYTE A BYTE de `sitio/`, y eso lo verifica un test
+// (`main/test-consent-lectura-882.js`) comparando los SHA-256 de los dos lados: si
+// el texto legal cambia en el sitio y nadie copia, el test se cae. La fuente única
+// sigue siendo `sitio/`; `legal/` es un espejo verificado, no una segunda redacción.
+//
+// 🔴 POR QUÉ UNA LISTA BLANCA Y NO UN PATH.
+// El renderer no puede mandar una ruta: solo uno de estos cuatro nombres, y el
+// archivo se resuelve con path.join sobre una carpeta fija. Así no hay forma de
+// leer `config.json`, `google-tokens.enc` ni nada fuera de `legal/`, aunque el
+// renderer esté comprometido. Lectura pura: nunca escribe.
+//
+// Devuelve el HTML CRUDO del archivo; el recorte a `<main>` lo hace el renderer con
+// DOMParser (no hay que mandar el `<head>` ni el CSS del sitio, que no viaja).
+// Ante cualquier error devuelve success:false con un código, y el renderer lo
+// trata como fail-open: el gate sigue funcionando con el resumen y los links.
+// ─────────────────────────────────────────────────────────────────────────────
+const LEGAL_DOCUMENTOS_PERMITIDOS = Object.freeze({
+  'privacidad': 'privacidad.html',
+  'terminos': 'terminos.html',
+  'anexo-encargo': 'anexo-encargo.html',
+  'autorizacion-trabajadores': 'autorizacion-trabajadores.html'
+});
+
+ipcMain.handle('consent:documento', async (event, nombre) => {
+  try {
+    const archivo = LEGAL_DOCUMENTOS_PERMITIDOS[String(nombre || '').trim()];
+    if (!archivo) {
+      return { success: false, error: 'DOCUMENTO_NO_PERMITIDO' };
+    }
+    const dirLegal = path.join(__dirname, 'legal');
+    const ruta = path.join(dirLegal, archivo);
+    // Defensa en profundidad: aunque `archivo` viene de la lista blanca, se
+    // verifica igual que la ruta resuelta siga dentro de la carpeta. Si alguien
+    // metiera un "../" en la lista, esto lo detiene igual.
+    const relativo = path.relative(dirLegal, ruta);
+    if (relativo.startsWith('..') || path.isAbsolute(relativo)) {
+      console.error('[legal] Ruta fuera de la carpeta legal:', ruta);
+      return { success: false, error: 'RUTA_INVALIDA' };
+    }
+    const html = fs.readFileSync(ruta, 'utf8');
+    return { success: true, nombre: String(nombre).trim(), html };
+  } catch (error) {
+    console.error('[legal] Error leyendo el documento legal:', error);
+    return { success: false, error: 'LECTURA_FALLIDA' };
+  }
+});
+
 // Manejar la verificación manual de actualizaciones desde configuraciones
 ipcMain.handle('check-for-updates-manual', async () => {
   try {

@@ -146,12 +146,23 @@ chk('y la franja queda por encima del header, para que entre el mouse primero',
   zHover > zNoCol, zHover + ' > ' + zNoCol);
 
 // ══ 5) Cache-bust, EOL, y limpieza ══
-chk('renderer.js tiene token de cache-bust propio (no el viejo del consent gate)',
-  /renderer\.js\?v=20261007-iframe879/.test(IDX0));
+// 📦882 — Estos checks NO pueden quedar con el token clavado. 879 los fijó a
+// `20261007-iframe879` y `20261007-header879`, así que CUALQUIER paquete posterior
+// que bumpeara un token los tiraba sin que hubiera roto nada: el test estaba
+// describiendo un estado pasado, no la invariante. Lo que 879 quería garantizar
+// es que cada hoja del shell lleve SU token, con formato, y que el viejo no
+// vuelva. Eso es lo que se comprueba acá. Los dos tokens del shell SI pueden
+// coincidir: a diferencia de la Bandeja, no hay una regla de emparejarlos, y
+// el navegador cachea por URL, no por el texto del token. (PROMPT.md §7.4: un
+// test viejo es defecto del test, no del producto.)
+const tokR = (/renderer\.js\?v=([^"'\s]+)/.exec(IDX0) || [])[1] || '';
+const tokS = (/styles\.css\?v=([^"'\s]+)/.exec(IDX0) || [])[1] || '';
+chk('renderer.js tiene token de cache-bust propio, en formato AAAAMMDD-descripcion',
+  /^\d{8}-[a-z0-9-]+$/.test(tokR), tokR);
+chk('styles.css tambien bumpea su token, en el mismo formato',
+  /^\d{8}-[a-z0-9-]+$/.test(tokS), tokS);
 chk('el token viejo ya no aparece en el index.html',
   !/renderer\.js\?v=20261007-consent-gate/.test(IDX0));
-chk('styles.css tambien bumpeo su token (se toco el CSS del header)',
-  /styles\.css\?v=20261007-header879/.test(IDX0));
 const raw = fs.readFileSync(RJS);
 let crlf = 0, lf = 0;
 for (let i = 0; i < raw.length; i++) {
