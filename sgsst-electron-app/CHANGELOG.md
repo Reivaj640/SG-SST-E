@@ -17,6 +17,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦883 · Las tabs de Configuración ya no dibujan barra vertical
+
+En la fila de pestañas de Configuración aparecía una barra de desplazamiento del lado derecho, con
+las flechitas de Windows, que no hacía falta para nada. Las pestañas se navegan en horizontal y no
+tienen nada que recorrer en vertical.
+
+**La causa no era un descuido de estilo, es una regla de CSS:** cuando un eje vale `visible` y el
+otro no, la especificación **obliga** a que el `visible` se convierta en `auto`. Las tabs declaraban
+solo `overflow-x: auto`, así que el navegador les calculaba scroll vertical también, y cualquier
+desborde de un píxel —el borde inferior, un tab que estira— bastaba para pintar la barra. Por eso el
+arreglo es **declarar `overflow-y: hidden` de forma explícita** y no "sacarle el overflow".
+
+Había además **dos reglas aplicando al mismo elemento** (`<nav class="cfg-tabs settings-top-nav">`),
+y la segunda gana por especificidad (0,0,2,0 contra 0,0,1,0). Arreglar una sola dejaba el bug vivo,
+apareciendo en unos sitios y no en otros sin razón aparente. Las dos quedaron corregidas.
+
+El `overflow-x: auto` **se conserva a propósito**: en una ventana angosta las seis pestañas no caben, y
+sin desplazamiento horizontal las últimas serían inalcanzables.
+
+- Token del iframe bumpeado a `20261014-cfg-tabs883`. Sin el bump, el navegador seguía mostrando la
+  versión anterior y el arreglo parecía no haber hecho nada.
+- `main/test-cfg-tabs-scroll-883.js` — **19 checks, 8/8 mutaciones detectadas**, con checks separados
+  para cada una de las dos reglas y para el token.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+- 🔴 **Pendiente de barrido:** el mismo patrón está en más de 100 reglas del repo. Casi ninguna
+  muestra barra porque no desbordan, pero **cuatro son barras de pestañas**
+  (`.kair-ind-tabs`, `.kair-rr-tabs`, `.kair-tabs` de inducciones y `.sve-tabs`), con el mismo riesgo.
+  Queda anotado en el pendiente 16.
+
 ### 📦882 · Los cuatro textos legales se leen dentro de la app, no solo por un link
 
 El gate de consentimiento mostraba un **resumen** y dos links a la web. Eso no cumple el

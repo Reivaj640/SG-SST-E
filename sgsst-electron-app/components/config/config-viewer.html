@@ -153,6 +153,17 @@
             gap: 2rem;
             flex-shrink: 0;
             overflow-x: auto;
+            /* 📦883 — `overflow-y: hidden` va EXPLÍCITO y no es redundante.
+               Cuando un eje vale `visible` y el otro no, CSS obliga al `visible`
+               a convertirse en `auto`. O sea: declarar solo `overflow-x: auto`
+               hace que esta barra ALSO se convierta en scroll vertical, y
+               cualquier desborde de un píxel —el borde inferior, un tab que
+               estira, un pseudo-elemento— dibujaba la barrita vertical de la
+               derecha. Las tabs no tienen contenido vertical que scrollear:
+               se navegan en horizontal, y en vertical no hay nada que ver.
+               El `overflow-x` se queda: en una ventana angosta las seis tabs
+               no caben y sin él no se podrían alcanzar. */
+            overflow-y: hidden;
         }
 
         .nav-tab {
@@ -1937,6 +1948,11 @@
             padding: 0;
             border-bottom: 1px solid var(--kair-line);
             overflow-x: auto;
+            /* 📦883 — Esta regla gana sobre `.settings-top-nav` por
+               especificidad (0,0,2,0 contra 0,0,1,0), así que el `overflow-y`
+               también tiene que estar aquí. Arreglar solo una de las dos deja
+               el bug vivo según cuál aplique. */
+            overflow-y: hidden;
         }
         .kair-config .cfg-tab.nav-tab {
             display: inline-flex;
