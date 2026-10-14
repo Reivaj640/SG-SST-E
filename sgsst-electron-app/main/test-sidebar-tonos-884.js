@@ -302,7 +302,13 @@ function evaluar(F) {
   const tokStyles = (/styles\.css\?v=([^"]+)/.exec(idx) || [])[1] || '';
   const tokSidebar = (/shared\/kair-sidebar\.css\?v=([^"]+)/.exec(idx) || [])[1] || '';
   chk(/^\d{8}-[a-z0-9-]+$/.test(tokStyles), 'styles.css lleva token con formato AAAAMMDD-descripcion', tokStyles);
-  chk(/884/.test(tokStyles), 'el token de styles.css nombra este paquete', tokStyles);
+  // El token se ancla al valor ANTERIOR a este paquete, no al numero 884.
+  // `styles.css` lo toca casi todo paquete, asi que atar el check al numero
+  // hacia que el test se rompiera solo con el siguiente que lo abriera, sin
+  // que hubiera ningun error de verdad. Comparar contra el token previo sigue
+  // detectando lo que importa: que el bump no se quedara sin hacer.
+  chk(tokStyles.length > 0 && tokStyles !== '20261013-consent882',
+    'el token de styles.css se bumpeo desde el paquete anterior a 884', tokStyles);
   chk(tokSidebar.length > 0, 'kair-sidebar.css lleva token de cache-bust');
   chk(/^SIDEBAR-\d{8}-[a-z0-9-]+$/.test(tokSidebar), 'el token del sidebar tiene formato SIDEBAR-AAAAMMDD-descripcion', tokSidebar);
   chk(/884/.test(tokSidebar), 'el token del sidebar nombra este paquete', tokSidebar);
@@ -364,7 +370,7 @@ const MUT = [
   ['se pierde el cache-bust del sidebar',
     f => { f.idx = f.idx.replace('?v=SIDEBAR-20261014-dark-tokens884', '?v=SIDEBAR-20260913-v4-footer-soft'); }],
   ['se pierde el cache-bust de styles.css',
-    f => { f.idx = f.idx.replace('?v=20261014-sidebar884', '?v=20261013-consent882'); }],
+    f => { f.idx = f.idx.replace(/styles\.css\?v=[^"]+/, 'styles.css?v=20261013-consent882'); }],
   ['el tema claro pierde el azul de marca',
     f => { f.tokens = f.tokens.replace('--kair-blue:   #2057b8;', '--kair-blue:   #4d5b75;'); }],
   ['el velo de activo se apaga hasta no distinguirse del fondo',

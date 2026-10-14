@@ -62,11 +62,11 @@
   /* Padding-right para que la scrollbar no tape el contenido */
   padding-right: 4px;
 }
-/* 📦753 · Scrollbar discreto en los charts (no llamar la atención) */
-.db-chart-card__body::-webkit-scrollbar { width: 6px; }
-.db-chart-card__body::-webkit-scrollbar-track { background: transparent; }
-.db-chart-card__body::-webkit-scrollbar-thumb { background: #d0d4d9; border-radius: 3px; }
-.db-chart-card__body::-webkit-scrollbar-thumb:hover { background: #adb3b8; }
+/* 📦886 · BORRADAS las 4 reglas `::-webkit-scrollbar` de `.db-chart-card__body`
+   que estaban aqui. No se dibujaban: con `scrollbar-color` presente en
+   styles.css, Chromium ignora todos los `::-webkit-scrollbar`, por especificidad
+   que tengan. Esta caja toma ahora su color del token `--kair-scrollbar-thumb`,
+   que si cambia con el tema. */
 .db-chart-empty {
   color: #5a6378;
   font-size: 0.8125rem;

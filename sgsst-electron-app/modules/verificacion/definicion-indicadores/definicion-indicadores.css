@@ -856,23 +856,6 @@
   .kair-ind-kpi-item { width: 100%; }
 }
 
-/* ─── SCROLLBAR ──────────────────────────────────────────────── */
-.kair-ind-table-wrapper::-webkit-scrollbar,
-.kair-ind-data-table-wrapper::-webkit-scrollbar,
-.kair-ind-modal__content::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.kair-ind-table-wrapper::-webkit-scrollbar-track,
-.kair-ind-data-table-wrapper::-webkit-scrollbar-track,
-.kair-ind-modal__content::-webkit-scrollbar-track { background: transparent; }
-.kair-ind-table-wrapper::-webkit-scrollbar-thumb,
-.kair-ind-data-table-wrapper::-webkit-scrollbar-thumb,
-.kair-ind-modal__content::-webkit-scrollbar-thumb { background: var(--kair-ind-border); border-radius: 3px; }
-.kair-ind-table-wrapper::-webkit-scrollbar-thumb:hover,
-.kair-ind-data-table-wrapper::-webkit-scrollbar-thumb:hover,
-.kair-ind-modal__content::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
-
 /* ─── HEADER PREMIUM v2 (kair-page-header · estándar K+AIR) ──── */
 .kair-ind-wrapper .kair-page-header {
   display: flex;

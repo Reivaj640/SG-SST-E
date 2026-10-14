@@ -600,26 +600,6 @@
     border-top: 2px solid #dee2e6;
 }
 
-/* Scroll personalizado para la tabla Excel */
-.excel-table-container::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.excel-table-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.excel-table-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-
-.excel-table-container::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
 /* Estilos responsivos */
 @media (max-width: 768px) {
   .module-cards,
@@ -1228,19 +1208,6 @@
   border-top-color: var(--border-color);
 }
 
-/* 10. Excel scrollbar - Ajustar tema */
-[data-theme="dark"] .excel-table-container::-webkit-scrollbar-track {
-  background: var(--widget-bg-color);
-}
-
-[data-theme="dark"] .excel-table-container::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-}
-
-[data-theme="dark"] .excel-table-container::-webkit-scrollbar-thumb:hover {
-  background: var(--text-light-color);
-}
-
 /* 11. Submodule item - Ajustes adicionales */
 [data-theme="dark"] .submodule-item {
   background-color: var(--widget-bg-color);
@@ -1433,4 +1400,3 @@
 [data-theme="dark"] #company-selection {
   color: var(--text-color);
 }
-

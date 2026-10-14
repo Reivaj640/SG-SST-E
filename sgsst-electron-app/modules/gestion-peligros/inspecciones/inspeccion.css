@@ -114,21 +114,6 @@
   outline-offset: 1px;
 }
 
-.kair-app ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.kair-app ::-webkit-scrollbar-track {
-  background: transparent;
-}
-.kair-app ::-webkit-scrollbar-thumb {
-  background-color: #ced4da;
-  border-radius: 4px;
-}
-.kair-app ::-webkit-scrollbar-thumb:hover {
-  background-color: #adb5bd;
-}
-
 /* ============================================================
  * HEADER PREMIUM v7 — clases kmi-* · chip 44 + título
  * Manrope 800 + migas + pestañas píldora · modo oscuro dark/dark-legacy
@@ -1811,7 +1796,6 @@
 [data-theme="dark"] .kair-app .kair-module-card__title,
 [data-theme="dark-legacy"] .kair-app .kair-module-card__title { color: #e8edf5; }
 
-
 /* ============================================================
  * 📦796 — DASHBOARD PREMIUM (hub alineado a la referencia 2026-09-21)
  * Hero del programa (azul oscuro + donut) · 4 KPIs · formatos
@@ -2262,7 +2246,6 @@
     justify-content: flex-end;
   }
 }
-
 
 /* ============================================================
  * 📦796 — Filas de nota dentro de tablas (detalle de inspección)

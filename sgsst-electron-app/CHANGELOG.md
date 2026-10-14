@@ -17,6 +17,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦886 · Las barras de desplazamiento ahora siguen el tema elegido
+
+La barra de desplazamiento se veía **blanca sobre el fondo oscuro** en los dos modos.
+
+**La causa no era que faltara una regla oscura: era que el color no tenía tema.** La regla global de
+`styles.css` traía el par `#c1c9d0 / #f8f9fa` fijo, sin variante, y ese par era el que se veía siempre.
+
+Lo que hacía el bug confuso es que **el repositorio sí parecía tener el arreglo**: había **44 reglas
+`::-webkit-scrollbar`** en los 7 CSS que carga `index.html`, tres de ellas con su bloque
+`[data-theme="dark"]` propio. **Ninguna se dibujaba**, y no por especificidad: **cuando existe
+`scrollbar-color`, Chromium ignora todos los pseudo-elementos `::-webkit-scrollbar`**. Se comprobó en
+el navegador: dos cajas idénticas salvo por tener, además del global, un thumb verde y una pista negra
+se vieron **iguales**. El `width: 8px` tampoco se aplicaba.
+
+Por eso se **borraron** esas 44 reglas en vez de corregirlas: no se dibujaban, y su `hover` y su
+`:active` no podían pasar de 2:1 de contraste.
+
+El color pasó a tokens con variante por tema, y el thumb de cada tema oscuro es su `--kair-faint` — el
+mismo gris que el 📦885 dejó como texto secundario. Contra la superficie **más clara** de cada tema,
+que es lo que importa (WCAG 1.4.11 pide 3:1 en componentes de interfaz):
+
+| Tema | Thumb | Peor superficie | Resto |
+|---|---|---|---|
+| Oscuro (Sistema) | `#9fb0c4` | **3.40** contra `--border-color` #4a5568 | 4.64 tarjeta #384151 · 5.41 área #2d3748 · 7.37 fondo #1a202c |
+| Oscuro (Negro/Gris) | `#9a9a9a` | **3.68** contra `--border-color` #404040 | 5.17 tarjeta #292929 · 5.92 área #1e1e1e · 6.66 fondo #121212 |
+
+Las tarjetas del Panel se miden **componiendo** el velo de blanco al 5 % sobre el fondo del área; sin
+componerlo, el número es falso. La **pista va transparente** en los dos oscuros: se ve la superficie real
+en vez de taparla con un rectángulo de color. **En tema claro no se cambió nada.**
+
+**Lo que se dejó quieto, y por qué** — borrar de más rompe páginas enteras. El inventario se rehízo
+**sin lista escrita a mano**: se recorren los 82 CSS y los 89 HTML del proyecto y cada CSS se clasifica
+según qué documento lo cargue y si ese documento trae `styles.css`.
+
+- **25 archivos con reglas vivas**: las vistas `*-view.css`. Se abren como página aparte, no se inyectan
+  en el shell, así que **no reciben `styles.css`** y ahí sus reglas sí pintan.
+- **5 huérfanos**: nadie los carga. Uno es `modules/gestion-humana/documentos/index.css`, y no es un
+  descuido: `index.html` lo dice en su propio comentario, 📦810 retiró esa vista.
+- **Bandeja integrada**: ventana propia con su propio CSS. Se verificó que su `href="styles.css"` es el
+  de **su** carpeta, no el de la raíz.
+- **iframe de Configuración**: fuera del alcance por decisión del owner.
+
+- `main/test-scrollbar-tema-886.js` — **88 checks, 16/16 mutaciones detectadas**. Recalcula el contraste
+  desde los tokens del archivo, **clasifica los 82 CSS solo** y exige que los que se pueden tocar queden
+  en cero **y que los que no, sigan con sus reglas**. También exige que el thumb oscuro **difiera** del
+  claro: con el thumb claro el ratio da 4.49 y un test que solo mirara contraste lo aprobaría, pero el
+  usuario seguiría viendo una barra clara. Contra el código anterior da 45/78.
+- Se reparó `main/test-sidebar-tonos-884.js`: su check exigía que el token de `styles.css` contuviera
+  "884". Como `styles.css` lo toca casi todo paquete, ese check se rompía solo con el siguiente que lo
+  abriera, sin que hubiera ningún error de verdad. Ahora se ancla al token **anterior** a ese paquete, que
+  sigue detectando un bump no hecho.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
+
 ### 📦885 · El Panel de Control ahora sigue el tema elegido
 
 En los modos **Oscuro** y **Sistema** el marco de la aplicación se ponía oscuro pero el Panel de

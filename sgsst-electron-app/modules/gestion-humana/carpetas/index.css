@@ -468,10 +468,6 @@
   background: var(--kair-bg);
   box-sizing: border-box;
 }
-.carp-scope .carp-wrapper::-webkit-scrollbar { width: 10px; }
-.carp-scope .carp-wrapper::-webkit-scrollbar-track { background: transparent; }
-.carp-scope .carp-wrapper::-webkit-scrollbar-thumb { background: #c1c8d0; border-radius: 5px; border: 2px solid #f8f9fa; }
-.carp-scope .carp-wrapper::-webkit-scrollbar-thumb:hover { background: #9aa3ad; }
 .carp-scope .carp-wrapper { scrollbar-width: thin; scrollbar-color: #c1c8d0 transparent; }
 
 /* ========== RESPONSIVE ========== */

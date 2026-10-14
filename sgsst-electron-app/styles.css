@@ -89,6 +89,13 @@
   --sidebar-hover-bg: rgba(23, 78, 166, 0.08);
   --sidebar-active-bg: rgba(23, 78, 166, 0.12);
   --sidebar-border-color: #e5e7eb;
+
+  /* 📦886 — Barras de desplazamiento, tema CLARO. Estos son los valores que ya
+     se usaban; la declaracion que los consume esta en la seccion SCROLLBARS mas
+     abajo. Los tokens viven aqui porque es lo que hace que la barra siga al
+     tema: la variante oscura se redefine en cada bloque `[data-theme]`. */
+  --kair-scrollbar-thumb: #c1c9d0;
+  --kair-scrollbar-track: #f8f9fa;
 }
 
 /* Variables de tema oscuro (Tema de Sistema) */
@@ -148,6 +155,19 @@
      `--kair-*` que redefine shared/kair-sidebar.css), pero sigue siendo la red
      de seguridad del menú. */
   --sidebar-text-color: #e6ebf2;  /* 13.62 sobre #1a202c */
+
+  /* 📦886 — Barras de desplazamiento. Los valores claros de `:root` (#c1c9d0
+     sobre #f8f9fa) dejaban la barra blanca sobre este fondo: eso era lo que el
+     owner reportaba. El thumb toma `--kair-faint` del 📦885, o sea el mismo gris
+     azulado que ya es texto secundario de este tema. Da **3.40** contra la
+     superficie mas clara (--border-color, #4a5568), **4.64** contra la tarjeta
+     del Panel (#384151), **5.41** contra el fondo del area (#2d3748) y **7.37**
+     contra el fondo de la pagina (#1a202c): pasa 3:1 en todo el rango
+     (WCAG 1.4.11).
+     La pista va transparente para que se vea la superficie real en vez de
+     taparla con un rectangulo de color. */
+  --kair-scrollbar-thumb: #9fb0c4;
+  --kair-scrollbar-track: transparent;
 }
 
 /* Variables de tema oscuro (Tema Oscuro - Paleta Negro/Gris) */
@@ -203,6 +223,13 @@
      tema se quedaba a ciegas por la misma razón: heredaba #1f2937 del tema
      claro, que sobre #0a0a0a da **1.24**. */
   --sidebar-text-color: #e8e8e8;  /* 15.66 sobre #0a0a0a */
+
+  /* 📦886 — Mismo motivo que en el bloque `dark`. `#9a9a9a` es el `--kair-faint`
+     de este tema: da **3.68** contra la superficie mas clara (#404040), **5.17**
+     contra la tarjeta del Panel (#292929) y **6.66** contra el fondo (#121212).
+     Pista transparente por la misma razon. */
+  --kair-scrollbar-thumb: #9a9a9a;
+  --kair-scrollbar-track: transparent;
 }
 
 /* Estilos generales */
@@ -1813,24 +1840,10 @@ select.form-control {
   border-radius: 0.375rem;
 }
 
-.control-remisiones-table-container::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.control-remisiones-table-container::-webkit-scrollbar-track {
-  background: #f1f3f5;
-  border-radius: 4px;
-}
-
-.control-remisiones-table-container::-webkit-scrollbar-thumb {
-  background: #adb5bd;
-  border-radius: 4px;
-}
-
-.control-remisiones-table-container::-webkit-scrollbar-thumb:hover {
-  background: #868e96;
-}
+/* 📦886 — BORRADAS aqui las 4 reglas `::-webkit-scrollbar` de
+   `.control-remisiones-table-container`. Estaban anuladas por el mismo motivo que
+   las globales: el `scrollbar-color` de la seccion SCROLLBARS manda sobre
+   cualquier `::-webkit-scrollbar`. Esta tabla ahora toma sus colores del token. */
 
 /* Tabla */
 table.control-remisiones-table {
@@ -5772,39 +5785,46 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
    SCROLLBARS PERSONALIZADOS - K+AIR Standard (GRIS/BLANCO)
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-/* Chrome, Edge, Safari - Scrollbar vertical y horizontal (Global GRIS) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* 📦886 — BORRADAS las 5 reglas `::-webkit-scrollbar` de aqui (global, track,
+   thumb, thumb:hover y thumb:active). No era un problema de estilo: estaban
+   ANULADAS, y no por especificidad.
 
-/* Fondo del track */
-::-webkit-scrollbar-track {
-  background: #f8f9fa;
-  border-radius: 4px;
-}
+   Cuando existe `scrollbar-color`, Chromium ignora TODOS los pseudo-elementos
+   `::-webkit-scrollbar`, sin importar su especificidad. Se comprobo en el
+   navegador con dos cajas identicas salvo por que una, ademas del global,
+   tenia thumb verde y pista negra: se vieron IGUALES. (El `width` que esas
+   reglas declaraban tampoco se aplicaba.)
 
-/* Barra desplazable (thumb) - Global GRIS */
-::-webkit-scrollbar-thumb {
-  background: #c1c9d0;
-  border-radius: 4px;
-  transition: background 0.2s ease-in-out;
-}
+   O sea que esas reglas jamas se dibujaron. Su unico efecto era mentir: el
+   hover y el :active quedaban por debajo de 2:1 de contraste, y el ancho
+   prometido no ocurria. Por eso se borraron en vez de arreglarse — aqui y en
+   los otros 6 CSS que index.html carga junto a este (development-styles.css,
+   definicion-indicadores, carpetas, dashboard, inspeccion y mantenimiento).
 
-/* Barra desplazable al pasar el mouse - Global */
-::-webkit-scrollbar-thumb:hover {
-  background: #adb5bd;
-}
+   Lo que sustituye esto son los tokens `--kair-scrollbar-*`, que si tienen
+   variante por tema. La perdida real del cambio es el hover y el :active: con
+   `scrollbar-color` no se pueden expresar, y como ya no se dibujaban, no quedan
+   menos que antes.
+   El grosor lo gobierna `scrollbar-width: thin`; el ancho exacto lo pone la
+   plataforma, y eso no es configurable por CSS. */
 
-/* Barra desplazable al hacer click - Global */
-::-webkit-scrollbar-thumb:active {
-  background: #6c757d;
-}
-
-/* Firefox - Scrollbar personalizado (Global GRIS) */
+/* Firefox, y Chromium tambien: cuando existe esto, manda sobre cualquier
+   `::-webkit-scrollbar`. Los colores salen de los tokens, que si cambian con el
+   tema. En tema CLARO queda #c1c9d0 sobre #f8f9fa, igual que antes de este
+   paquete. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c1c9d0 #f8f9fa;
+  scrollbar-color: var(--kair-scrollbar-thumb) var(--kair-scrollbar-track);
+}
+
+/* 📦886 — Este era el unico selector de modulo que le ganaba al global con su
+   propio `scrollbar-color` fijo (#c1c8d0) y por eso se quedaba claro en los dos
+   temas oscuros: `.carp-scope .carp-wrapper`, en
+   modules/gestion-humana/carpetas/index.css, especificidad (0,2,0). Este bloque
+   es (0,3,0), asi que gana en oscuro y no toca nada en claro, donde sigue
+   mandando el valor del modulo. */
+[data-theme^="dark"] .carp-scope .carp-wrapper {
+  scrollbar-color: var(--kair-scrollbar-thumb) transparent;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5886,7 +5906,10 @@ aside:has([data-module-list]) > [data-module-list],
   overflow-y: auto !important;
   overflow-x: hidden !important;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  /* 📦886 — Era `rgba(0, 0, 0, 0.25) transparent`: un gris al 25 %, que en los
+     dos temas oscuros se perdia contra el fondo. Ahora sale del token. La pista
+     se deja transparente, igual que estaba. */
+  scrollbar-color: var(--kair-scrollbar-thumb) transparent;
 }
 
 /* Scroll suave para todos los elementos con overflow */
