@@ -33,7 +33,7 @@
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
 | **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📦860, 📦861, 📦868, 📦867 y el ancho de la tarjeta de ingreso (📦869). 🔴 **Pendiente: 📦881 y 📦882 NO tienen validación visual en la app instalada**, y son los dos más delicados porque lo que cambia es **texto legal**. De 882 se revisó un **artefacto** (`%TEMP%\preview-consent-882.html`) que reproduce el gate, el scroll y el revelado de las casillas, y el owner lo aprobó; pero **el artefacto lleva los documentos incrustados y no ejecuta el IPC real**, así que lo único que no puede comprobar es que el bridge entregue los cuatro desde `legal/` en el build empaquetado. **Y el gate ni siquiera aparece hoy en la app del owner**, porque ya existe una aceptación con `document_version` en `v1`: para verlo hay que borrar esa fila o subir `consentDocumentVersion`. Ver el pendiente 14 |
-| **Jornada** | **En curso** (2026-10-13). Del **2026-10-13**: 📦882 — los cuatro textos legales legibles dentro del gate, con la copia verificada de `sitio/` en `legal/`, el canal `consent:documento` por lista blanca, el revelado de las casillas al final de la lectura, los tokens de `styles.css` y `renderer.js` subidos a `20261013-consent882` (lo que 881 dejó olvidado) y dos tests viejos reparados (`test-bandeja-iframe-879.js` y `test-consent-gate.js`). **Sin bump de versión**, por la regla del owner: sigue en `0.1.251`. Del **2026-10-11**: se integró 📦881 (que había quedado solo en `Dev-Pc`) y se arrancó la **iniciativa Hermes** en `kair-server` (ver el pendiente 13). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870 |
+| **Jornada** | **En curso** (2026-10-13). Del **2026-10-13, segunda parte**: se investigó el camino de **WhatsApp Business para los seguimientos** y se encontró que 🔴 **el MCP de Meta no se puede instalar en Hermes** (solo está en Claude, Codex y ChatGPT) y que **no entrega el token de producción**; que 🔴 **el bloqueo real es el webhook HTTPS público** — `kair-server` está en la LAN sin IP pública, y el molde ya existe en `scripts/firma-tunnel/`; y que **JRFSoluciones no puede verificar su negocio ante Meta** porque sigue sin legalizar (`privacidad.html:56`). El owner decidió que **el primer número es el suyo personal** → quedó como pendiente 15, con sus tres consecuencias anotadas. **Del 2026-10-13, primera parte**: 📦882 — los cuatro textos legales legibles dentro del gate (commit `857c701d`, pusheado a `origin/Dev`), la copia verificada de `sitio/` en `legal/`, el canal `consent:documento` por lista blanca, y dos tests viejos reparados. **Sin bump de versión** en toda la jornada: sigue en `0.1.251`. Del **2026-10-11**: se integró 📦881 y se completó la instalación de Hermes en `kair-server` (ver el pendiente 13). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870 |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
@@ -137,29 +137,41 @@
     como "hay más"**, y se volvió al "...". Queda escrito para que nadie lo reintente creyendo que es
     mejor. El `box-sizing` de la misma tanda **sí se quedó**, porque ese era un bug de verdad.
 
-13. **🟡 Iniciativa Hermes: el agente YA ESTÁ INSTALADO en `kair-server`; falta todo lo demás.** Empezó
-    el 2026-10-11. No toca K+AIR todavía: **no hay ni un commit de esta iniciativa**, y todo lo que
-    sigue son decisiones, no código.
+13. **🟢 Iniciativa Hermes: la instalación YA ESTÁ COMPLETA (verificada el 2026-10-11). Lo que
+    sigue son decisiones y trabajo nuevo.** Empezó el 2026-10-11. **No toca K+AIR todavía: no hay
+    ni un commit de esta iniciativa**, y todo lo que sigue son decisiones, no código.
 
     *Servidor.* `kair-server` = Ubuntu 24.04.5 LTS, 2 núcleos **AMD C-70**, **3,5 GB de RAM**, 96 GB
     libres, **sin GPU**. Panel: Cockpit en `http://192.168.1.11:9090` — **HTTP plano, sin cifrar**;
     entrar ahí manda usuario y contraseña sin proteger. SSH abierto en el 22.
 
-    *Instalado.* Con `bash ~/hermes-install.sh --non-interactive --skip-browser`. Quedó Python 3.14.7,
-    uv 0.12.3, el comando en `~/.local/bin/hermes` y el PATH parcheado en `.bashrc`. `hermes doctor`
-    en verde salvo: 3 vulnerabilidades npm **upstream** (no se arreglan localmente, son de build-time,
-    y son de las herramientas de browser que ni se instalaron) y las API keys, que a propósito no se
-    configuraron. Herramientas activas: `file`, `terminal`, `memory`, `skills`, `cronjob`,
-    `code_execution`, `todo`, `web search`, entre otras 18.
+    *✅ Instalado y funcionando.* `bash ~/hermes-install.sh --non-interactive --skip-browser`.
+    Python 3.14.7, uv 0.12.3, el comando en `~/.local/bin/hermes` y el PATH parcheado en `.bashrc`.
+    Herramientas activas: `file`, `terminal`, `memory`, `skills`, `cronjob`, `code_execution`,
+    `todo`, `web search`, entre otras 18.
 
-    *El modelo todavía NO se eligió* —quedó para el final, por decisión del owner— y **este servidor
-    no puede correr uno**: 3,5 GB de RAM no alcanzan para un 2B con el contexto de 64K que Hermes
-    exige. El KV cache de 64K solo se come la memoria. Un `Qwen3.5-0.8B` entra, pero con IFBench 21 y
-    BFCL-V4 25, y Qwen misma dice en su README que es para prototipos y fine-tuning. 🔴 **El propio
-    repo ya lo dejo demostrado con logs del 2026-09-24**: en `llm_server.py` esta escrito que el
-    modelo chico copia la plantilla literal, repite las mismas causas en los 5 niveles, genera "6, 10
-    o hasta 36 porqués", y que **el feedback no lo mueve**. La solución que implementaron fue
-    **sustituir la causa ellos mismos y dejarle al modelo un solo nivel**. Eso es el diseño a seguir.
+    *✅ Ya es un servicio, no una terminal.* `sudo loginctl enable-linger $USER` dado y
+    **confirmado** (`Linger=yes`), `hermes gateway install` + `start`. `hermes-gateway.service`
+    instalado como user service de systemd, `enabled` y `active (running)`. Logs:
+    `journalctl --user -u hermes-gateway -f`. **Por eso no sigue el patrón de K+AIR**: en la app
+    todo servicio local nace hijo y `cleanupProcesses()` lo mata con `taskkill` al cerrar; Hermes
+    está en otra máquina y sobrevive a que la app esté cerrada.
+
+    *✅ Telegram, restringido al owner.* Bot creado con `@BotFather`; el token se pegó
+    **directamente en el servidor y nunca debe compartirse por chat**. `TELEGRAM_ALLOWED_USERS`
+    quedó con el ID del owner. El error inicial `Chat not found` se resolvió cuando el owner
+    mandó `/start`; después Hermes avisó solo: *"Gateway online — Hermes is back and ready."*
+
+    *✅ Modelo elegido.* `nvidia/nemotron-3.5-lightning:free` vía **OpenRouter**, reasoning
+    `medium`. La API key se cargó en el servidor, no en el repo. El owner confirmó que el bot
+    respondió una pregunta real. **Ojo con por qué no es local**: 3,5 GB de RAM no alcanzan para
+    un 2B con el contexto de 64K que Hermes exige —el KV cache solo de 64K se come la memoria—, y
+    🔴 **el propio repo ya lo dejó demostrado con logs del 2026-09-24**: en `llm_server.py` está
+    escrito que el modelo chico copia la plantilla literal, repite las mismas causas en los 5
+    niveles, genera "6, 10 o hasta 36 porqués" y que **el feedback no lo mueve**. La solución que
+    implementaron fue **sustituir la causa ellos mismos y dejarle al modelo un solo nivel**. Ese
+    es el diseño a seguir: mecánica determinista en Python, modelo solo donde hay texto libre o
+    juicio.
 
     *Decisiones tomadas, para no volver a discutirlas:*
     - **Un número de WhatsApp por empresa (BYON)**, no uno central. Coherente con el art. 25 del 📦881
@@ -171,18 +183,135 @@
     - **El mensaje de WhatsApp NO debe hablar de la incapacidad**: texto genérico, y el detalle por
       otro canal. Es el precio de no depender de una GPU.
 
-    *Lo que falta, en orden:*
+    *Números, según el owner (2026-10-13):* administra el sistema para **4 empresas** y hoy hace
+    los seguimientos **a mano desde su cuenta personal**. De esas empresas, **2 tienen número de
+    teléfono propio** y 🔴 **los números ya están en la app de WhatsApp Business** (confirmado el
+    2026-10-13), que es requisito de Coexistence. Ver el **pendiente 15**, que tiene el estado
+    final de esa decisión.
+
+    *🔴 Hallazgos de la investigación del 2026-10-13 — verificados contra la documentación de Meta,
+    no de memoria. Cambian el orden del plan:*
+    - **El WhatsApp Business Tools MCP NO se puede instalar en Hermes.** Meta lo-annunció el
+      2026-09-15 en `https://mcp.facebook.com/whatsapp_business_tools` (Streamable HTTP + OAuth),
+      pero **solo está disponible en Claude, Codex y ChatGPT**. Es un cliente lo que se conecta, no
+      algo que se clone al servidor. **El MCP se usa desde el escritorio, en Claude Code.**
+    - **El MCP tampoco entrega el token de producción.** Lo dice la propia referencia de Meta: el
+      token lo genera el System User en Business Settings, a mano. El MCP acelera crear la WABA,
+      verificar el número y redactar plantillas; **el envío real es la Cloud API**.
+    - 🔴 **El webhook es el bloqueo de infraestructura, no el código.** Meta tiene que llamar a
+      `kair-server` para entregar "enviado / entregado / leído" y recibir respuestas. El servidor
+      está en `192.168.1.11`, en la LAN y **sin IP pública: Meta no puede alcanzarlo**. ✅ **Ya
+      está resuelto una vez en este repo y es el molde**: `scripts/firma-tunnel/start-firma-tunnel.ps1`
+      arranca un túnel **nominado** de cloudflared (`kair-firma`) con URL fija, y
+      `main/test-firma-tunnel-kit.js` lo vigila.
+    - 🔴 **JRFSoluciones NO puede verificar su negocio ante Meta todavía.** `sitio/privacidad.html:56`
+      sigue con el aviso de que **la razón social, el NIT y el domicilio están pendientes de
+      legalizar**, y Meta exige certificado de existencia y representación legal + RUT, con que el
+      **nombre legal, el domicilio y el dominio coincidan entre sí**. Para los clientes con RUT es
+      trámite rutinario; para el owner es un bloqueo.
+    - **Nivel sin verificar de negocio: 250 destinatarios únicos por 24 horas.** Para un SG-SST de
+      ~100-110 empleados por empresa alcanza de sobra y sirve para arrancar sin legalizar.
+    - **Meta ya no cobra solo plantillas.** Desde el **2026-10-01** también cobra las respuestas
+      libres dentro de la ventana de 24 horas (esto pasó hace dos semanas).
+    - **Ventana de 24 horas**: fuera de ella **solo salen plantillas aprobadas por Meta**, que se
+      revisan una por una, **hasta 24 h cada una, y pueden rechazarse**.
+    - La **On-Premises API expiró el 2025-10-23**: la única vía es Cloud API.
+    - 🔴 **UN número NO puede autenticarse en DOS empresas.** Un teléfono pertenece a **una sola
+      WABA**, en **un solo portafolio de negocio**. No es recomendación, es restricción, y trae
+      errores propios: `3441030` ("ya registrado en WhatsApp Business Platform"), `2655093` ("la
+      empresa ya está compartiendo esta cuenta con un partner") y el "este número está registrado en
+      una cuenta existente: desconéctelo primero". Braze lo dice literal: **"Un número de teléfono
+      no se puede compartir entre varias WABA."**
+    - ✅ **Un número SÍ puede mandar a trabajadores de empresas distintas.** La plataforma no valida
+      a quién le mandás: el destinatario solo tiene que haber dado su opt-in. Eso es lo que hace
+      viable "un número, 4 empresas" en la práctica — **pero solo en el envío, no en la cuenta.**
+
+    *🔴 Coexistence: qué exige de verdad (investigado el 2026-10-13). NO es el registro de número
+    de siempre:*
+    - 🔴 **La vía directa de Meta NO permite Coexistence. Hay que pasar por un BSP** (YCloud,
+      360Dialog, Twilio, Woztell…), que es un tercero. Y es un BSP que **no tiene API propia para
+      esta operación**: se conecta a mano por su plataforma. **Esto decide el camino entero.**
+    - El número tiene que estar en la **app de WhatsApp Business**, no en la personal.
+      Coexistence solo aplica a la app de empresas. ✅ **Cumplido**: los números ya están ahí.
+    - App **v2.24.17 o superior**, y el número **usado activamente al menos 7 días**.
+    - **Keep-alive**: hay que abrir la app **al menos una vez cada 13 días**. Si se pasa, la
+      coexistencia se cae.
+    - **Colombia NO está en la lista de países no soportados** (Australia, Japón, Nigeria, Filipinas,
+      Rusia, Corea del Sur, Sudáfrica, Turquía). Es lo único que sale bien de todo esto.
+    - Limitaciones: **5 mensajes por segundo** fijos (irrelevante acá), sin insignia azul, no se
+      puede migrar entre WABAs, **la Calling API no funciona**, y quedan fuera Edit/Undo, mensajes
+      efímeros, confirmaciones de lectura y ubicación en tiempo real.
+    - Al hacer el alta **se desconectan los dispositivos vinculados** y hay que revincular los
+      soportados; los que no lo son dejan de disparar webhook.
+    - **Los mensajes enviados desde la app siguen siendo gratis**; los de la API se cobran normal.
+    - **El precio de fondo: por Coexistence paga un tercero con los mensajes.** Como el mensaje de
+      WhatsApp no habla de la incapacidad, ese tercero vería "un recordatorio a este número", no un
+      diagnóstico — pero **la protección depende de que el texto siga siendo genérico**.
+
+    *🔴 Números físicos: la eSIM sí sirve, y por qué* (investigado el 2026-10-13).*
+    - La lista de números que WhatsApp **no** soporta es: **VoIP, toll-free (0800), premium,
+      centrales (UAN) y "personal numbers"**. Una **eSIM de operador móvil NO es ninguno de esos**:
+      es una SIM real con numeración móvil normal, y debería pasar el registro.
+    - ⚠️ La trampa: existen "números virtuales" por internet (Hushed, TextNow y similares). **Esos
+      SÍ son VoIP y Meta los rechaza** salvo que estén en la lista que mantiene el BSP. Si comprás
+      de **Claro, Tigo, Movistar o WOM**, es otra cosa.
+    - **Precios verificados en las páginas de los operadores (oct-2026):** la eSIM de **Claro es
+      gratis de activar**, pero **solo para pospago** y **se activa presencial** en un CAV, con
+      cédula y el celular. Pospago desde **$42.900/mes** (60 GB). **Tigo** vende la eSIM **directo
+      en la web**: prepago desde **$3.000** y pospago desde **$45.900/mes** (60 GB) o $69.900
+      (ilimitado). Un celular moderno admite varias eSIM a la vez: no hace falta un equipo por línea.
+    - 🔴 **El prepago se RECICLA.** Un número prepago sin recargas devuelve su numeración al pool y
+      se la reasignan. Si ese número ya estaba registrado en una WABA, **la cuenta queda apuntando
+      a un número que ya no es tuyo**, y no se nota hasta que otro recibe tus mensajes. **Por eso
+      pospago**: un plan pospago no se recicla porque la línea está activa.
+    - ✅ **Con eSIM nueva + vía directa se CAEN cuatro cosas**: Coexistence, el BSP entero, los 7
+      días de actividad y el keep-alive de 13 días. Queda solo verificación de negocio (documentos
+      que las empresas ya tienen), registro del número por SMS, display name y plantillas.
+
+    *Plantillas: dónde se redactan.* En el **WhatsApp Manager** de `business.facebook.com`, o por
+    API. Cada una lleva nombre interno (que el trabajador nunca ve), **categoría** (Utilidad,
+    Marketing o Autenticación), idioma `es-CO`, cuerpo con variables `{{1}}` y opcionalmente
+    encabezado, pie y botones. Se envían a revisión desde ahí mismo, y la página muestra los
+    errores de formato al instante. **El MCP de Meta sí sirve para redactar y editar plantillas:**
+    eso es lo útil del MCP para el owner. La aprobación sigue siendo de Meta.
+    🔴 **La trampa de la categoría:** si la plantilla dice Utilidad y el texto es promocional, **Meta
+    la reclasifica a Marketing** y te cobra distinto. Un recordatorio de trámite de SG-SST es
+    Utilidad porque continúa una gestión que el trabajador ya inició — pero eso lo define el asesor
+    jurídico con el texto, no el owner solo.
+
+    *🔴 El orden correcto, y por qué NO se compra la línea primero:*
+    - **Paso 0, hoy y gratis:** crear el portafolio de negocio y una app en `developers.facebook.com`
+      con el producto WhatsApp. **Meta crea automáticamente una WABA y un número de prueba**, y da un
+      token temporal de 24 h.
+    - **Paso 1, hoy y gratis:** mandar la plantilla `hello_world` ya aprobada al propio celular. Con
+      los activos de prueba **no se paga nada**. Queda probado el token, la plantilla y la entrega.
+      (El número de prueba solo deja escribir a **5 destinatarios verificados**: sirve para probar el
+      flujo, no para un piloto real.)
+    - **Paso 2, gratis:** redactar las plantillas reales y meterlas a revisión.
+    - **Paso 3, recién acá:** comprar **una** eSIM, registrar el número real y cambiar el token
+      temporal por el de System User.
+    - **Por qué este orden:** **las plantillas son lo que puede fallar, y ninguna SIM lo arregla.**
+      Así, cuando se llega a la tienda ya se sabe que el canal funciona, y el costo de aprender pasa
+      de "una línea por mes mientras se descubre qué falla" a "cero".
+    - 🔴 **Comprar 1 eSIM, probarla, y solo después la segunda.** El registro no cuesta nada; si el
+      rango del operador no pasa, con una sola se pierde una y no cuatro. Con prepago, confirmar
+      saldo para **recibir** SMS: sin saldo a veces se rechaza la verificación en silencio y Meta
+      marca el número como no verificado.
+
+    *Lo que falta, en orden — y el orden importa:*
+    - 🔴 **Decidir el remitente** (pendiente 15). Es lo único que bloquea todo lo demás de WhatsApp,
+      y es una decisión del owner, no de código.
+    - 🔴 **Túnel HTTPS público para el webhook.** No depende de Meta: se puede montar ya.
+    - 🔴 **El puente K+AIR → Hermes** (webhook firmado, mecánica determinista). **Tampoco depende de
+      Meta, y es el trabajo de fondo real.** La razón de empezar por acá y no por el MCP: si se arma
+      el puente contra el MCP y después Meta dice que producción va por la Cloud API —que es lo que
+      va a pasar—, se tocó todo dos veces.
+    - Alta de la WABA y del número **desde Claude Code con el MCP**, con **número de prueba**.
+    - System User + token permanente, y el webhook de estados.
+    - Plantillas: las redacta el asesor jurídico, las aprueba Meta.
     - 🔴 **Acceso al servidor desde el escritorio.** SSH da `Permission denied (publickey,password)`
       porque acá no hay clave privada, solo el rastro en `known_hosts`. Hay que generar un par de
       claves o pegar salidas a mano. **La contraseña no se pide ni se manda por chat**, nunca.
-    - `hermes` **no es un servicio todavía**: se ejecutó desde una terminal y muere al cerrarla. Falta
-      el `systemd` service, y el `sudo loginctl enable-linger $USER` —que se le dio al owner pero
-      **no se confirmó que lo haya corrido**—.
-    - Falta `python-telegram-bot`, y el token de `@BotFather` (credencial: se pega solo en el servidor).
-    - Falta el proveedor del modelo (`hermes setup --portal` o la key de otro proveedor).
-    - 🔴 **Coexistencia de WhatsApp Business sin confirmar para Colombia.** Es la vía para usar en la
-      API el mismo número que ya está en la app del celular. Requiere 7+ días de actividad real en la
-      app y no está disponible en todos los países.
 
     *Lo que ya está resuelto del lado de K+AIR, para cuando llegue el momento:*
     - El submódulo de seguimiento es **`seguimiento-incapacidades`** (📦701): `main/seguimiento-incapacidad-bridge.js`
@@ -223,6 +352,51 @@
     - **Y sigue en pie lo de 881:** el texto exacto que el consentimiento muestra en pantalla, el
       rol de responsable y encargado, y los dos documentos nuevos de `sitio/`. Que estén bien
       escritos en el repo no significa que se vean bien en pantalla.
+
+15. **🟡 DECISIÓN DEL OWNER EN PAUSA (2026-10-13): "lo dejamos para otro momento, ahora estoy
+    investigando y procesando la información". No hay nada que ejecutar hasta que la retome.**
+    Lo de abajo quedó investigado y documentado para no volver a tropezar con ello. Lo que sigue
+    NO es una tarea: es el estado del asunto.
+
+    *Lo que se sabe hoy, en corto:*
+    - El owner administra **4 empresas**, hoy hace los seguimientos **a mano desde su cuenta
+      personal**, **2 empresas ya tienen número** y **los números están en WhatsApp Business**.
+    - **Un número no puede estar en dos empresas** (una sola WABA por teléfono). En cambio **un
+      número sí puede mandar a trabajadores de varias empresas**, porque la plataforma no valida el
+      destinatario, solo que haya opt-in.
+    - 🔴 **La contradicción que hay que resolver cuando se retome:** si el número queda bajo
+      **JRFSoluciones**, las plantillas quedan a nombre de Javier y **JRFSoluciones trata esos datos
+      por cuenta propia**. Eso es **justo lo contrario de lo que firmaste en 📦881**, donde el Anexo
+      de Encargo dice que **la empresa cliente es responsable** y JRFSoluciones es encargado. Un
+      mensaje a un trabajador de la empresa B desde una cuenta de JRFSoluciones es a Javier tratando
+      datos de un tercero por su cuenta.
+    - **Y JRFSoluciones además no puede verificar su negocio ante Meta**, porque `privacidad.html:56`
+      sigue diciendo que la razón social, el NIT y el domicilio están **pendientes de legalizar**.
+
+    *Las dos salidas, que son excluyentes:*
+    1. **Legalizar JRFSoluciones** y quedarse con el rol de responsable del canal. Si el número es
+       suyo y las plantillas suyas, **los documentos legales de 📦881 hay que rehacerlos**, porque
+       hoy dicen lo contrario. Es trabajo del asesor, no de código.
+    2. **Cada empresa con su propio número** en su propio portafolio. Cada una responsable de lo
+       suyo, **los Anexos de Encargo de 📦881 se sostienen sin cambios**, y el mensaje sale "de la
+       empresa". Cuesta un trámite y una línea por empresa — y el owner ya tiene 2 de las 4.
+
+    *Lo que sobrevivió de la discusión anterior y sigue valiendo:*
+    - **Coexistence = un BSP de por medio**, porque la vía directa de Meta no lo permite. Con eSIM
+      nueva y vía directa **se cae el BSP entero** y con él los 7 días de actividad y el keep-alive.
+    - **Un solo número concentra el riesgo**: si Meta degrada la calidad del número porque alguien
+      bloquea un mensaje, caen los cuatro canales de golpe. Con números separados, el daño queda en
+      una empresa.
+    - **El display name es uno solo**: no podés poner "Empresa A" en un mensaje y "Empresa B" en
+      otro. Se resuelve escribiendo la empresa en el texto de la plantilla, que es el punto que ya
+      estaba pendiente desde 📦881 y que le toca al asesor jurídico.
+    - **Lo que sí sobrevivió de la idea de "usar mi número personal":** es legítimo y es como
+      trabaja mucha consultoría SG-SST, pero es un **producto distinto**, con su propia figura legal,
+      y no encaja con los Anexos de Encargo firmados. No es descartado: vive en otro carril.
+
+    **Lo que NO está en discusión y no se vuelve a preguntar:** los números de las 2 empresas con
+    línea propia se registran después, uno por uno, cada empresa verificando su negocio. No es un
+    trámite único de K+AIR: es un trámite por empresa, porque el responsable es cada una.
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
 
