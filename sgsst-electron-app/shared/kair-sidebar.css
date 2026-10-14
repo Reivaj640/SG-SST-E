@@ -178,3 +178,96 @@
     border-top: 1px solid var(--kair-line);
     margin-top: 16px;
 }
+
+/* ============================================================
+ * 📦884 — Tema oscuro del menú (Sistema y Oscuro)
+ * ============================================================
+ *
+ * Por qué este bloque existe y está AQUÍ.
+ *
+ * Este archivo usa tokens de `kair-design-tokens.css`, y ese archivo define
+ * la paleta ÚNICAMENTE en `:root`, sin ningún bloque de tema oscuro
+ * (el bloque `[data-theme^="dark"]` está documentado en design_system.md:335
+ * pero nunca se escribió en el CSS). Resultado: en los dos temas oscuros el
+ * menú seguía pintándose con los valores del tema claro.
+ *
+ * Contraste medido sobre el fondo real del menú (`--sidebar-bg-color`,
+ * `#1a202c` en Sistema y `#0a0a0a` en Oscuro), componiendo el rgba antes de
+ * medir:
+ *
+ *   sin este bloque            Sistema     Oscuro
+ *   título inactivo #14213d      1.02       1.24     ← casi negro sobre casi negro
+ *   subtítulo     #748096        4.10       4.97
+ *   título ACTIVO #2057b8        2.42       2.94     ← el azul que se veía
+ *   icono inactivo #172c4c       1.17       1.42
+ *   fondo activo  #f3f6f6     casi blanco   casi blanco  ← la "tarjeta blanca"
+ *
+ * `--kair-soft` es la otra mitad del bug: la usan tanto `:hover` como
+ * `--active`, y en claro es `#f3f6f6`, un casi blanco. Sobre un fondo oscuro
+ * eso pinta un bloque claro que parece una tarjeta ajena pegada encima.
+ *
+ * Se redefinen los TOKENS y no cada elemento, porque los tokens son la
+ * superficie real: parchear el síntoma lo deja reaparecer en el siguiente
+ * elemento nuevo. El alcance es `#sidebar`, no `:root`, porque estos mismos
+ * tokens se usan 287 veces en 27 archivos y muchos módulos traen su propia
+ * superficie blanca; cambiarlos globalmente pondría texto claro sobre tarjeta
+ * blanca. Cuando esos módulos migren a superficie oscura, este bloque puede
+ * subir a `:root` sin más.
+ *
+ * Un solo conjunto de valores para los dos temas: los dos fondos son oscuros
+ * y todo pasa con holgura en ambos (mínimos WCAG 2.1 AA: 4.5 texto normal,
+ * 3.0 texto grande; aquí el menor es 5.29). Las cifras van en orden
+ * `Sistema / Oscuro`:
+ *
+ *   título inactivo  #e6ebf2    13.62 / 16.53
+ *   subtítulo        #a7b6cc     7.93 /  9.62
+ *   header sección   #a7b6cc     7.93 /  9.62
+ *   auxiliar         #8494ab     5.29 /  6.42
+ *   icono inactivo   #b9c6da     9.44 / 11.46
+ *   título ACTIVO    #cdd9ea     7.90 / 10.46   (sobre el velo, no sobre el fondo)
+ *   subtítulo ACTIVO #a7b6cc     5.48 /  7.26
+ *
+ * El velo de `--kair-soft` es 12% de blanco y no 7%: medido, al 7% el ítem
+ * activo sobre el negro de `dark-legacy` apenas cambiaba la luminancia
+ * (delta 0.0079, practically indistinguible). Al 12% el delta es 0.0288 en
+ * Sistema y 0.0173 en Oscuro, y el contraste del título activo sigue en 7.90.
+ *
+ * `--kair-blue` deja de ser azul en oscuro por decisión del owner: el azul de
+ * marca se queda en el tema claro. La señal de "activo" la pasan el fondo y la
+ * jerarquía tipográfica, de abajo.
+ * ------------------------------------------------------------ */
+[data-theme^="dark"] #sidebar {
+    --kair-ink:       #e6ebf2;               /* título   13.62 / 16.53 */
+    --kair-muted:     #a7b6cc;               /* subtítulo y header de sección  7.93 / 9.62 */
+    --kair-faint:     #8494ab;               /* auxiliar  5.29 / 6.42 */
+    --kair-soft:      rgba(255, 255, 255, 0.12);  /* hover y activo: velo claro, no blanco */
+    --kair-blue:      #cdd9ea;               /* título e icono del ítem activo  7.90 */
+    --kair-blue-ink:  #b9c6da;               /* icono inactivo  9.44 */
+    --kair-line:      #2c3542;               /* separador del footer */
+}
+
+/* Jerarquía del estado activo en oscuro.
+ *
+ * En claro el azul de `--kair-blue` era lo que decía "estás aquí". Al quitarlo
+ * el activo queda marcado por dos cosas: la superficie (el mismo `--kair-soft`,
+ * que ya no es blanca) y el peso.
+ *
+ * Ojo con el peso: `.kair-nav-card__title` ya es 700 para TODOS los ítems, así
+ * que subir el activo a 700 no marcaría nada. Lo que sí diferencia es bajar el
+ * inactivo a 600 y dejar el activo en 700. DM Sans carga 400/500/600/700
+ * (Manrope es la que llega a 800), así que 600 es un peso real y no un 700
+ * sintetizado por el navegador.
+ *
+ * Lo que NO se hizo, y por qué: apacar el subtítulo del ítem activo con
+ * `opacity: 0.75`, que era la segunda mitad de la señal acordada. Bajado a 75%
+ * el subtítulo queda en #8a97aa y su contraste cae a **3.81**, por debajo del
+ * 4.5 que exige AA para texto de 12px. Un cambio de estado no puede dejar texto
+ * ilegible en el ítem que el usuario está mirando. La jerarquía la dan el peso
+ * y la superficie. */
+[data-theme^="dark"] .kair-nav-card__title {
+    font-weight: 600;
+}
+
+[data-theme^="dark"] .kair-nav-card--active .kair-nav-card__title {
+    font-weight: 700;
+}

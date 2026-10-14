@@ -139,6 +139,15 @@
   --header-bg-color: #2d3748;
   --content-area-bg: #2d3748;
   --home-page-bg: #1a202c;
+
+  /* 📦884 — Este token lo consume `#sidebar { color: ... }` (styles.css:1027) y
+     solo existía en `:root`, o sea con el valor del tema CLARO (#1f2937). Sobre
+     el fondo de este tema da **1.11**: casi negro sobre casi negro. Como es el
+     color HEREDADO del menú, cualquier texto sin color propio sale invisible.
+     Los títulos y subtítulos ya no dependen de él (los toma de los tokens
+     `--kair-*` que redefine shared/kair-sidebar.css), pero sigue siendo la red
+     de seguridad del menú. */
+  --sidebar-text-color: #e6ebf2;  /* 13.62 sobre #1a202c */
 }
 
 /* Variables de tema oscuro (Tema Oscuro - Paleta Negro/Gris) */
@@ -189,6 +198,11 @@
   --header-bg-color: #1e1e1e;
   --content-area-bg: #1e1e1e;
   --home-page-bg: #000000;
+
+  /* 📦884 — Mismo hueco y mismo motivo que en el bloque `dark` de arriba. Este
+     tema se quedaba a ciegas por la misma razón: heredaba #1f2937 del tema
+     claro, que sobre #0a0a0a da **1.24**. */
+  --sidebar-text-color: #e8e8e8;  /* 15.66 sobre #0a0a0a */
 }
 
 /* Estilos generales */

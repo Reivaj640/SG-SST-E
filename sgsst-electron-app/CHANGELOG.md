@@ -17,6 +17,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦884 · El menú lateral ya se lee en los dos modos oscuros
+
+En los modos **Oscuro** y **Sistema** los títulos del menú lateral salían casi negros
+sobre un fondo casi negro, y el módulo abierto salía en azul de marca sobre ese mismo fondo.
+Medido: el título quedaba en un contraste de **1.02** y **1.24** (donde 1.00 es lo más bajo
+posible), y el título activo en **2.42** y **2.94**. En una pantalla real eso es texto que no
+se lee.
+
+**La causa no eran los colores, eran los tokens.** `shared/kair-design-tokens.css` define la
+paleta **solo en `:root`**, sin ningún bloque de tema oscuro, así que en los dos temas
+oscuros el menº se pintaba con los valores del tema **claro**. El fondo sí cambiaba con el
+tema, porque viene de otro token que sí lo tiene: dos sistemas de tokens mezclados.
+
+Había además una segunda mitad del mismo bug: `--kair-soft`, el fondo del estado activo y
+del `hover`, era `#f3f6f6`, un casi blanco. Sobre un fondo oscuro se veía como **un bloque claro
+pegado encima del ítem**. Eso no era un elemento duplicado ni un error de dibujo: era el estado
+activo pintando el color equivocado.
+
+**Qué quedó:** los seis tokens que el componente usa, redefinidos para los dos temas
+oscuros con alcance en `#sidebar`, más la jerarquía tipográfica del estado activo.
+
+| | antes Sistema / Oscuro | después Sistema / Oscuro |
+|---|---|---|
+| título inactivo | 1.02 / 1.24 | **13.62 / 16.53** |
+| subtítulo y encabezado | 4.10 / 4.97 | **7.93 / 9.62** |
+| título activo | 2.42 / 2.94 | **7.90 / 10.46** |
+| icono inactivo | 1.17 / 1.42 | **9.44 / 11.46** |
+
+Todo por encima del mínimo de WCAG 2.1 AA, que es 4.5 para texto normal y 3 para texto
+grande. **El modo claro no se tocó**: conserva el azul de marca.
+
+Dos decisiones que conviene conocer:
+
+- El título **inactivo** baja a peso 600 y el activo queda en 700. Antes todos los títulos
+  eran 700, así que marcar solo el activo no habría dicho nada.
+- El subtítulo del ítem activo **no se apagó**. Medido, bajarlo al 75 % lo dejaba en
+  **3.81**, por debajo del 4.5 que AA exige a texto de 12 px. Un cambio de estado no puede dejar
+  ilegible el ítem que el usuario está mirando.
+
+- Token de `shared/kair-sidebar.css` bumpeado a `SIDEBAR-20261014-dark-tokens884`.
+- `main/test-sidebar-tonos-884.js` — **82 checks, 15/15 mutaciones detectadas**. Incluye un
+  check que comprueba que **toda clase que toca el bloque oscuro exista en el marcado real**, que
+  es justo el error que hizo que una primera versión de este arreglo no tuviera ningún
+  efecto en pantalla. Corriendo contra el código anterior, el test da 37/77.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
+
 ### 📦883 · Las tabs de Configuración ya no dibujan barra vertical
 
 En la fila de pestañas de Configuración aparecía una barra de desplazamiento del lado derecho, con
