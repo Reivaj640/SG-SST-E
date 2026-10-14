@@ -219,3 +219,144 @@
 @media (prefers-reduced-motion:reduce){
   .kair-premium *,.kair-premium *::before,.kair-premium *::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   📦885 · TEMA OSCURO DEL PANEL DE CONTROL
+   ══════════════════════════════════════════════════════════════════════
+   Por qué este bloque es necesario.
+
+   Este archivo tiene 30 colores literales en 120 lugares y, hasta ahora,
+   NI UNA regla de tema: cero `[data-theme]`, cero `prefers-color-scheme`.
+   `.kair-premium` usaba `var(--kair-canvas,#FBFCFB)` y `var(--kair-ink,#14213D)`,
+   pero `kair-design-tokens.css` define esos tokens SOLO en `:root`, o sea con
+   los valores del tema claro. El resultado era un marco oscuro rodeando
+   un panel completamente blanco: exactamente lo que se reportó.
+
+   Decisiones de diseño, todas medidas y no estimadas:
+
+   · EL FONDO usa el token del shell, `--content-area-bg`, en vez de un hex.
+     Así el panel se pega al chrome de su tema sin ningún valor duplicado.
+   · LAS SUPERFICIES se derivan de velos de blanco sobre ese fondo, no de
+     hex propios. Es el mismo truco que `--kair-soft` en 📦884: una sola
+     declaración sirve para los dos temas oscuros.
+   · MEDIO OCHENTA POR CIENTO BLANCO da #384151 en Sistema y #292929 en Oscuro.
+     La tarjeta se separa del fondo (delta de luminancia 0.0146 y 0.0092).
+     Con `--widget-bg-color` NO servía: en los dos temas oscuros es el MISMO
+     color que `--content-area-bg`, y la tarjeta se habría fundido con el fondo.
+   · EL TERCIARIO NO es `--text-lighter-color`. Ese token da 3.61 en Sistema y
+     2.65 en Oscuro: falla AA los dos. Se redefine `--kair-faint` por tema.
+   · LOS TINTES de los chips van al 8 %, no al 18 %. Al 18 % el fondo del chip
+     se levanta tanto que el texto del chip cae a 4.23-4.35 y deja de pasar.
+     Al 8 % el peor caso es 4.73.
+
+   Sin `!important` en ninguna regla: `[data-theme^="dark"] .kair-premium .x`
+   es (0,2,1) contra (0,2,0) de la regla clara, así que gana sola. Si algún día
+   hace falta un `!important` aquí, es señal de que se está parchear el síntoma.
+
+   `.kair-hero` NO se toca: su fondo es #14213D con texto blanco y ya funciona
+   en los tres temas.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Terciario, por tema. Es el único valor que no puede ser uno solo. */
+[data-theme="dark"] .kair-premium{--kair-faint:#9fb0c4}
+[data-theme="dark-legacy"] .kair-premium{--kair-faint:#9a9a9a}
+
+/* Base: fondo, color y superficies */
+[data-theme^="dark"] .kair-premium{background:var(--content-area-bg,#2d3748);color:var(--text-color,#e9ecef)}
+[data-theme^="dark"] .kair-premium .kair-boot{background:var(--content-area-bg,#2d3748)}
+
+/* Superficies y bordes de las tarjetas */
+[data-theme^="dark"] .kair-premium .kair-kpi,
+[data-theme^="dark"] .kair-premium .kair-card,
+[data-theme^="dark"] .kair-premium .kair-mod,
+[data-theme^="dark"] .kair-premium .kair-task,
+[data-theme^="dark"] .kair-premium .kair-toast{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.11);box-shadow:none}
+[data-theme^="dark"] .kair-premium .kair-mod:hover,
+[data-theme^="dark"] .kair-premium .kair-task:hover{border-color:rgba(255,255,255,.2);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+
+/* Textos */
+[data-theme^="dark"] .kair-premium .kair-module-id__title,
+[data-theme^="dark"] .kair-premium .kair-kpi__value,
+[data-theme^="dark"] .kair-premium .kair-card__title,
+[data-theme^="dark"] .kair-premium .kair-mod__name,
+[data-theme^="dark"] .kair-premium .kair-task__title,
+[data-theme^="dark"] .kair-premium .kair-empty__title,
+[data-theme^="dark"] .kair-premium .kair-toast__title,
+[data-theme^="dark"] .kair-premium .kair-seg button,
+[data-theme^="dark"] .kair-premium .kair-seg button:hover,
+[data-theme^="dark"] .kair-premium .kair-seg button.is-active,
+[data-theme^="dark"] .kair-premium .kair-btn--ghost:hover,
+[data-theme^="dark"] .kair-premium .kair-btn--outline,
+[data-theme^="dark"] .kair-premium .kair-toast__close:hover{color:var(--text-color,#e9ecef)}
+[data-theme^="dark"] .kair-premium .kair-module-id__desc,
+[data-theme^="dark"] .kair-premium .kair-kpi__label,
+[data-theme^="dark"] .kair-premium .kair-kpi__sub,
+[data-theme^="dark"] .kair-premium .kair-card__sub,
+[data-theme^="dark"] .kair-premium .kair-mod__sub,
+[data-theme^="dark"] .kair-premium .kair-task__desc,
+[data-theme^="dark"] .kair-premium .kair-empty__sub,
+[data-theme^="dark"] .kair-premium .kair-toast__msg,
+[data-theme^="dark"] .kair-premium .kair-btn--ghost,
+[data-theme^="dark"] .kair-premium .kair-seg button,
+[data-theme^="dark"] .kair-premium .kair-breadcrumb li[aria-current="page"]{color:var(--text-light-color,#adb5bd)}
+[data-theme^="dark"] .kair-premium .kair-breadcrumb li,
+[data-theme^="dark"] .kair-premium .kair-breadcrumb li a,
+[data-theme^="dark"] .kair-premium .kair-breadcrumb__sep,
+[data-theme^="dark"] .kair-premium .kair-seg__n,
+[data-theme^="dark"] .kair-premium .kair-card__title svg,
+[data-theme^="dark"] .kair-premium .kair-kpi__value small,
+[data-theme^="dark"] .kair-premium .kair-task__code,
+[data-theme^="dark"] .kair-premium .kair-empty__icon,
+[data-theme^="dark"] .kair-premium .kair-toast__close{color:var(--kair-faint,#9fb0c4)}
+
+/* Breadcrumb y acentos */
+[data-theme^="dark"] .kair-premium .kair-breadcrumb li a:hover{color:var(--primary-color,#4da6ff);background:rgba(77,166,255,.08)}
+[data-theme^="dark"] .kair-premium .kair-task__arrow{color:var(--primary-color,#4da6ff)}
+[data-theme^="dark"] .kair-premium .kair-mod.is-active{background:rgba(77,166,255,.08);border-color:rgba(77,166,255,.45)}
+
+/* Botones y control segmentado */
+[data-theme^="dark"] .kair-premium .kair-btn--ghost:hover,
+[data-theme^="dark"] .kair-premium .kair-toast__close:hover,
+[data-theme^="dark"] .kair-premium .kair-empty__icon{background:rgba(255,255,255,.08)}
+[data-theme^="dark"] .kair-premium .kair-btn--outline{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.14)}
+[data-theme^="dark"] .kair-premium .kair-btn--outline:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.24)}
+[data-theme^="dark"] .kair-premium .kair-seg{background:rgba(255,255,255,.06)}
+[data-theme^="dark"] .kair-premium .kair-seg button.is-active{background:rgba(255,255,255,.12);color:var(--text-color,#e9ecef);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+[data-theme^="dark"] .kair-premium .kair-seg__n{background:rgba(255,255,255,.1)}
+[data-theme^="dark"] .kair-premium .kair-seg button.is-active .kair-seg__n{background:rgba(77,166,255,.16);color:#8cc6ff}
+
+/* Barras y esqueletos de carga */
+[data-theme^="dark"] .kair-premium .kair-kpi__bar{background:rgba(255,255,255,.1)}
+[data-theme^="dark"] .kair-premium .kair-skel{background:rgba(255,255,255,.1)}
+[data-theme^="dark"] .kair-premium .kair-boot__top .kair-skel{background:rgba(255,255,255,.16)}
+
+/* Tintes de chips e iconos. Alfa 8 %: al 18 % el texto del chip baja de 4.5.
+   Textos medidos sobre el tiente compuesto en los DOS temas: peor caso 4.73. */
+[data-theme^="dark"] .kair-premium .kair-chip,
+[data-theme^="dark"] .kair-premium .kair-chip--soft-slate{background:rgba(255,255,255,.08);color:#b6c2d4}
+[data-theme^="dark"] .kair-premium .kair-chip--blue,
+[data-theme^="dark"] .kair-premium .kair-chip--soft-blue,
+[data-theme^="dark"] .kair-premium .kair-module-id__icon,
+[data-theme^="dark"] .kair-premium .kair-kpi__icon--blue,
+[data-theme^="dark"] .kair-premium .kair-mod__icon,
+[data-theme^="dark"] .kair-premium .kair-task__icon--blue{background:rgba(77,166,255,.08);color:#8cc6ff}
+[data-theme^="dark"] .kair-premium .kair-chip--soft-green,
+[data-theme^="dark"] .kair-premium .kair-kpi__icon--green{background:rgba(27,184,136,.08);color:#5fd3ab}
+[data-theme^="dark"] .kair-premium .kair-chip--soft-amber,
+[data-theme^="dark"] .kair-premium .kair-task__icon--amber{background:rgba(231,162,36,.08);color:#e8b957}
+[data-theme^="dark"] .kair-premium .kair-chip--soft-red,
+[data-theme^="dark"] .kair-premium .kair-kpi__icon--red,
+[data-theme^="dark"] .kair-premium .kair-task__icon--red{background:rgba(218,85,99,.08);color:#f0a0a8}
+[data-theme^="dark"] .kair-premium .kair-kpi__icon{background:rgba(255,255,255,.08);color:#b6c2d4}
+[data-theme^="dark"] .kair-premium .kair-toast--success .kair-toast__icon{background:rgba(27,184,136,.14);color:#5fd3ab}
+[data-theme^="dark"] .kair-premium .kair-toast--warn .kair-toast__icon{background:rgba(231,162,36,.14);color:#e8b957}
+[data-theme^="dark"] .kair-premium .kair-toast--info .kair-toast__icon{background:rgba(77,166,255,.14);color:#8cc6ff}
+[data-theme^="dark"] .kair-premium .kair-toast--error .kair-toast__icon{background:rgba(218,85,99,.14);color:#f0a0a8}
+
+/* El valor en rojo del KPI (#B23A48) es un tono oscuro pensado para fondo claro:
+   sobre tarjeta oscura no se lee. Se sube al mismo rosa del chip de rojo. */
+[data-theme^="dark"] .kair-premium .kair-kpi__value--red{color:#f0a0a8}
+
+/* El borde lateral de las tareas (#5B6B8C) es un gris medio: sobre fondo oscuro
+   se pierde. Se sube para que la franja siga marcando el estado. */
+[data-theme^="dark"] .kair-premium .kair-task::before{background:#8fa0b5}

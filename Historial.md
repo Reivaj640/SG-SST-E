@@ -24,16 +24,16 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-14 |
 | **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
-| **Último commit de código** | 📦 **884**: el menú lateral ya se lee en los dos modos oscuros. El arreglo anterior no se veía porque se aplicó sobre **clases que el menú no produce** (`.k-module-title`, `.sidebar-module-card`): el menú real usa `kair-nav-*` y se estiliza en `shared/kair-sidebar.css`. La causa de fondo: `shared/kair-design-tokens.css` define la paleta **solo en `:root`** — el bloque `[data-theme^="dark"]` que documenta `design_system.md:335` nunca se escribió — así que el fondo del menú cambiaba con el tema (viene de `--sidebar-bg-color`) pero los textos seguían siendo los del tema claro. Además `--kair-soft`, que pintan `:hover` y `--active`, valía `#f3f6f6`, un casi blanco: **esa era la "tarjeta blanca" que parecía un elemento duplicado**. Se redefinen los seis tokens que el componente consume, con alcance `#sidebar`. El título pasa de **1.02** a **13.62** en Sistema y de **1.24** a **16.53** en Oscuro. Antes, 📦 **883** (`770ad998`). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Último commit de código** | 📦 **885**: el Panel de Control deja de estar pintado con la paleta clara en los dos modos oscuros. `shared/kair-premium.css` tenía **30 colores literales en 120 lugares y ni una sola regla de tema**: cero `[data-theme]`, cero `prefers-color-scheme`. Las dos únicas reglas que usaban tokens los leían de `:root`, que solo tiene la paleta clara, mientras el shell de alrededor sí tenía 439 bloques de tema. De ahí el marco oscuro rodeando un panel blanco. El arreglo es un bloque `[data-theme^="dark"]` al final del archivo, **puramente aditivo**: el tema claro no se toca y `.kair-hero`, que ya era oscuro, tampoco. Tres cosas se corrigieron **midióndolas**: `--widget-bg-color` es el mismo color que `--content-area-bg` en oscuro (la tarjeta se fundía con el fondo, ahora va con velo de blanco al 5 %), `--text-lighter-color` no pasa AA (3.61 y 2.65) y los tintes de chip al 18 % bajaban el texto a 4.23 (ahora van al 8 %). **Sin `!important`**: las reglas ganan por especificidad. Antes, 📦 **884** (`6be6c4ec`). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
 | **Commits sin pushear** | **0**, verificado el 2026-10-14 contra GitHub: 📦883 y 📦884 quedaron pusheados a `Dev` y `Dev-Pc`. 🔴 **Lo que falta es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medición real del 2026-10-07, **anterior a 📦876**. El rojo era `test-google-oauth-868.js` [54/57], que exige `main/_verificar-credenciales-build.js`, archivo que **no existía en ninguna rama**: lo tragaba la regla `_*.js` de `sgsst-electron-app/.gitignore:80`, que sin ancla se aplica en cualquier directorio y no solo en la raíz. **Ya está corregido en 📦876** y probado por mutación (54/57 sin el archivo, 57/57 con él). 🔴 **Falta volver a medir en el portátil**: no se afirma aquí que esté verde, solo que la causa identificada ya no existe. `test-init-order-bug.js` sigue sin resumen verificable |
-| **Suite (escritorio)** | **129 tests · 128 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medida el 2026-10-14, ya con 📦884. El único rojo es `test-firma-constancia-consolidada.js` [83/83 en lo estático], que muere esperando `INTERNAL_API_KEY`; `test-init-order-bug.js` sigue sin resumen verificable. 🔴 **Corrección importante: el bloqueo por ABI de `better-sqlite3` YA NO EXISTE.** Este bloque decía que 14 tests no arrancaban en esta máquina, 13 de ellos por `ERR_DLOPEN_FAILED` al cargar `better_sqlite3.node` (compilado para Electron 37 mientras el `node` pelado corre v26.10.0). **Hoy corren los 129**: el runner usa el Node de Electron (`ELECTRON_RUN_AS_NODE=1`), que es justamente el runtime para el que está compilado el binario. El diagnóstico viejo era correcto sobre el `node` pelado, pero **la medición se hacía por la vía equivocada**. El problema real sigue existiendo para quien abra la BD con el `node` de la línea de comandos, y ahí la solución de verdad siguen siendo **dos copias del binario** (rebuild no sirve: uno rompe Electron y el otro rompe Node). Subió de 127 a 129 por `test-sidebar-tonos-884.js` (82 checks, 15/15 mutaciones) y `test-cfg-tabs-scroll-883.js` (19 checks, 8/8 mutaciones) |
+| **Suite (escritorio)** | **130 tests · 129 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medida el 2026-10-14, ya con 📦885. El único rojo es `test-firma-constancia-consolidada.js` [83/83 en lo estático], que muere esperando `INTERNAL_API_KEY`; `test-init-order-bug.js` sigue sin resumen verificable. 🔴 **Corrección importante: el bloqueo por ABI de `better-sqlite3` YA NO EXISTE.** Este bloque decía que 14 tests no arrancaban en esta máquina, 13 de ellos por `ERR_DLOPEN_FAILED` al cargar `better_sqlite3.node` (compilado para Electron 37 mientras el `node` pelado corre v26.10.0). **Hoy corren todos**: el runner usa el Node de Electron (`ELECTRON_RUN_AS_NODE=1`), que es justamente el runtime para el que está compilado el binario. El diagnóstico viejo era correcto sobre el `node` pelado, pero **la medición se hacía por la vía equivocada**. El problema real sigue existiendo para quien abra la BD con el `node` de la línea de comandos, y ahí la solución de verdad siguen siendo **dos copias del binario** (rebuild no sirve: uno rompe Electron y el otro rompe Node). Subió de 129 a 130 por `test-panel-tema-885.js` (54 checks, 15/15 mutaciones) |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
-| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📦860, 📦861, 📦868, 📦867 y el ancho de la tarjeta de ingreso (📦869). 🔴 **Pendiente: 📦881, 📦882, 📦883 y 📦884 NO tienen validación visual en la app instalada.** De 882 se revisó un artefacto que el owner aprobó, pero que **lleva los documentos incrustados y no ejecuta el IPC real**. De 884 el owner aprobó el artefacto, y ese preview **sí** usa el CSS y el marcado reales leídos del disco — pero tampoco corre el `renderer.js` de verdad. De 883 no hay revisión todavía: el fix está razonado sobre la especificación de CSS, **pero eso es un razonamiento, no haberlo visto**. Entrá a Configuración y confirmá que la barrita del extremo derecho ya no está, y revisá el menú lateral en Sistema y en Oscuro. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-14). Del **2026-10-14**: 📦884 — los tonos del menú lateral en los dos modos oscuros. El arreglo anterior fallaba porque se aplicó sobre `.k-module-title` y `.sidebar-module-card`, **clases que el menú no produce**; la causa de fondo es que `shared/kair-design-tokens.css` define la paleta **solo en `:root`**, sin bloque de tema oscuro, así que el texto se quedaba en los valores del tema claro mientras el fondo sí cambiaba. `--kair-soft` (el fondo de hover y activo) era `#f3f6f6`, y **esa era la "tarjeta blanca"** que el owner veía como duplicada. Test nuevo `test-sidebar-tonos-884.js` (82 checks, 15/15 mutaciones, y 37/77 contra el código viejo). Antes en el mismo día: 📦883 — la barra vertical del extremo derecho de las tabs de Configuración, que era consecuencia de `overflow-x: auto` sin declarar `overflow-y` (CSS convierte el `visible` del otro eje en `auto`). Corregidas **las dos** reglas que aplican al mismo `<nav class="cfg-tabs settings-top-nav">`, porque la segunda gana por especificidad y arreglar una sola dejaba el bug a medias. Token del iframe bumpeado a `20261014-cfg-tabs883`. Test nuevo `test-cfg-tabs-scroll-883.js` (19 checks, 8/8 mutaciones). **Sin bump de versión**: sigue en `0.1.251`. Del **2026-10-13**: 📦882 (commit `857c701d`) — los cuatro textos legales legibles dentro del gate, con la copia verificada de `sitio/` en `legal/`, el canal `consent:documento` por lista blanca y dos tests viejos reparados; y el commit `4dc20cd9` con la investigación de WhatsApp Business para los seguimientos (pendiente 15). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📦870 |
+| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📨860, 📨861, 📨868, 📨867 y el ancho de la tarjeta de ingreso (📨869). 🔴 **Pendiente en la app instalada: 📦881, 📦882, 📦883, 📦884 y 📦885.** De 882, 884 y 885 el owner aprobó artefactos, y los de 884 y 885 **sí** usan el CSS real leído del disco (con sus huellas SHA-256 en el pie), pero **ninguno corre el `renderer.js` de verdad ni el IPC**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, y Panel de Control oscuro en los dos. Ver los pendientes 16 y 17 |
+| **Jornada** | **En curso** (2026-10-14). Del **2026-10-14**: 📦885 — el Panel de Control sigue el tema elegido. `kair-premium.css` no tenía ni una regla de tema; se añadió un bloque `[data-theme^="dark"]` aditivo, con la paleta medida (tarjeta con velo de blanco al 5 %, terciario propio, tintes de chip al 8 %) y sin un solo `!important`. Test nuevo `test-panel-tema-885.js` (54 checks, 15/15 mutaciones) que además comprueba **cobertura**: toda clase que pinta en claro tiene contraparte oscura. También del **2026-10-14**: 📦884 — los tonos del menú lateral en los dos modos oscuros, cuyo arreglo anterior fallaba por aplicarse sobre `.k-module-title` y `.sidebar-module-card`, **clases que el menú no produce**; y `--kair-soft` (el fondo de hover y activo) era `#f3f6f6`, que era **la "tarjeta blanca"** que se veía como duplicada. Antes: 📦883 — la barra vertical del extremo derecho de las tabs de Configuración, que era consecuencia de `overflow-x: auto` sin declarar `overflow-y`. Corregidas **las dos** reglas que aplican al mismo `<nav class="cfg-tabs settings-top-nav">`, porque la segunda gana por especificidad y arreglar una sola dejaba el bug a medias. Test nuevo `test-cfg-tabs-scroll-883.js` (19 checks, 8/8 mutaciones). **Sin bump de versión**: sigue en `0.1.251`. Del **2026-10-13**: 📦882 (commit `857c701d`) — los cuatro textos legales legibles dentro del gate, con la copia verificada de `sitio/` en `legal/`, el canal `consent:documento` por lista blanca y dos tests viejos reparados; y el commit `4dc20cd9` con la investigación de WhatsApp Business para los seguimientos (pendiente 15). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874). La del 2026-10-06 quedó commiteada y pusheada: `3514af7f` (📦868), `2ace3131` (sitio legal), `b5515ebc` (cierre de documentación), `e373fdce` (correo de soporte real), más 📦869 y 📨870 |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
@@ -414,16 +414,14 @@
       - `modules/gestion-salud/medicina-preventiva/sve/sve.css:705` — `.sve-tabs`
       No se tocaron porque el owner pidió solo el de Configuración. **Cada una necesita `overflow-y:
       hidden`, no basta con una regla global**, porque las cuatro tienen su propio contexto.
-17. **🔴 PENDIENTE 17 (2026-10-14): el Panel de Control no sigue el tema elegido.**
-    - **Qué pasa:** con el shell en oscuro, al entrar al Panel de Control el contenido se queda en
-      claro: tarjetas blancas y texto oscuro. Lo reporta el owner con captura del 2026-10-14.
-    - **Por qué no se atacó en el mismo paquete:** 📦884 era el menú lateral. El Panel de Control lo
-      construye otro módulo y hay que medir cuál es el suyo antes de tocar nada. **Aplicar el mismo
-      arreglo a ciegas es exactamente el error que se acaba de corregir.**
-    - **Pista, todavía sin confirmar:** `shared/kair-design-tokens.css` no tiene bloque oscuro, y eso
-      lo consumen todos los que usan tokens `--kair-*`, no solo el menú. La misma causa raíz es la
-      hipótesis más probable, **pero es una hipótesis**: hay que contrastarla contra el código del
-      módulo antes de escribir nada.
+17. **✅ RESUELTO (2026-10-14): el Panel de Control ya sigue el tema elegido** (📦885).
+    - **Causa:** `shared/kair-premium.css` no tenía ni una regla de tema. Arreglado con un bloque
+      `[data-theme^="dark"]` aditivo al final del archivo.
+    - **Lo que queda:** **validarlo en la app instalada.** El owner aprobó el artefacto, que usa el CSS
+      real leído del disco, pero no corre el `renderer.js`. Entrá al Panel de Control en Sistema y en
+      Oscuro y confirmá que las tarjetas quedan oscuras.
+    - **Nota para el futuro:** `.kair-premium` como clase wrapper solo la usa `renderer.js:4766`. Si
+      algún día otro módulo la necesita, el bloque oscuro le sirve sin tocar nada.
 
 
 ### ▶️ Retomar desde acá — siguiente paso concreto
@@ -1349,6 +1347,77 @@ al pie de la letra escribía llamadas a funciones inexistentes y la vista se ca�
 **Decisiones del owner** — la versión **no se bumpea**: `0.1.251` sigue igual, por la regla del 2026-10-07 ("la versión SOLO se bumpea cuando él lo diga"). El CHANGELOG tampoco se tocó: registra **versiones publicadas**, y esto todavía no está publicado — igual que el commit legal anterior `2ace3131`, que solo tocó `sitio/`.
 
 **Commits** — uno solo, en `Dev-Pc`, con este mismo bloque de documentación.
+---
+
+### 2026-10-14 · 📦885 · El Panel de Control sigue el tema elegido (sin bump de versión)
+
+**Qué se hizo** — el Panel de Control deja de estar pintado con la paleta clara en los dos modos
+oscuros:
+
+| Zona | Qué |
+|---|---|
+| `shared/kair-premium.css` | Nuevo bloque `[data-theme^="dark"]` al final del archivo. **141 líneas, puramente aditivo** |
+| `index.html` | Cache-bust de `shared/kair-premium.css` a `20261014-panel885` |
+| `main/test-panel-tema-885.js` | Test nuevo, 54 checks base |
+
+**La causa, medida** — `shared/kair-premium.css` tenía **30 colores literales en 120 lugares y ni una
+sola regla de tema**: cero `[data-theme]`, cero `prefers-color-scheme`. Las dos únicas reglas que sí
+usaban tokens (`--kair-canvas` y `--kair-ink` en la raíz del bloque) los leían de `:root`, y
+`kair-design-tokens.css` define la paleta **solo en `:root`**. El shell de alrededor sí tenía **439
+bloques de tema** en `styles.css`: de ahí el marco oscuro rodeando un panel completamente blanco.
+
+**Alcance verificado, no supuesto.** `.kair-premium` como clase wrapper se usa en **un solo sitio** de
+todo el repo: `renderer.js:4766`. Los demás resultados del grep son `.kair-premium-strip`, que es otra
+clase en módulos que no tienen que ver. El radio de impacto es exactamente el Panel de Control.
+
+**Tres cosas que salieron mal al medirlas y quedaron corregidas.** No se escribió ningún color sin
+comprobarlo, y las tres correcciones cambiaron el resultado:
+
+1. **`--widget-bg-color` NO servía para la tarjeta.** En los dos temas oscuros es el **mismo color** que
+   `--content-area-bg`, así que la tarjeta se fundía con el fondo. Las superficies se derivan de un velo
+   de blanco al 5 % sobre el fondo del tema: da `#384151` en Sistema y `#292929` en Oscuro.
+2. **`--text-lighter-color` NO pasa AA**: 3.61 en Sistema y 2.65 en Oscuro. Se dejó de usarlo y se
+   redefinio `--kair-faint` por tema.
+3. **Los tintes de chip al 18 % no pasaban**: el texto del chip caía a 4.23-4.35. Bajados al **8 %**, el
+   peor caso es 4.73.
+
+**El fondo usa el token del shell, `--content-area-bg`**, y no un hex propio: así el panel se pega al
+chrome de su tema sin duplicar ningún valor.
+
+**Sin `!important` en ninguna regla del bloque.** `[data-theme^="dark"] .kair-premium .x` es (0,2,1) contra
+(0,2,0) de la regla clara, así que gana sola. El test falla si aparece uno.
+
+**El tema claro no se tocó** y el bloque es aditivo: un check lee la parte clara del archivo y falla si
+alguna vez declara una regla de tema. **`.kair-hero` tampoco**: su fondo es `#14213D` con texto blanco y
+ya funciona en los tres temas.
+
+**Contrastes medidos** (WCAG 2.1 AA, componiendo el `rgba()` antes de medir):
+
+| | Sistema / Oscuro |
+|---|---|
+| título sobre tarjeta | 8.67 / 11.02 |
+| subtítulo sobre tarjeta | 4.95 / 5.56 |
+| terciario sobre tarjeta | 4.64 / 5.17 |
+| acento sobre tarjeta | 4.02 / 5.43 |
+| chip rojo (el peor caso) | 4.73 / 6.53 |
+
+**Tests** — `test-panel-tema-885.js`: **54 checks base**, **15/15 mutaciones**, 0 vacías. El test no
+comprueba "existe el bloque": **extrae las 58 clases que declaran color en la parte clara y exige que
+cada una tenga contraparte oscura**, porque un check de existencia pasaría aunque se olvidara la mitad
+de las tarjetas. Suite completa: **130 tests · 129 verdes · 1 con fallos**, cero regresiones.
+
+**Artefacto** — `preview-panel-885.html` y `preview-panel-885-bajo.html`, generados por un script que lee
+los archivos del disco y saca los iconos SVG de `renderer.js`. Cuatro paneles: ANTES (con el CSS de
+HEAD), Sistema, Oscuro y Claro. El owner lo aprobó antes de commitear.
+
+**Decisiones del owner** — se llevó el oscuro **completo**: superficies, texto, bordes y también los
+tintes de los chips. Y se revisó **con artefacto antes de tocar el repo**, no directo en la app. La
+versión **no se bumpea**: `0.1.251` sigue igual.
+
+**Commits** — uno solo, con el código y la documentación juntos, en `Dev`. El hash no se escribe
+aquí dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un
+commit fantasma.
+
 ---
 
 ### 2026-10-14 · 📦884 · Los tonos del menú lateral en los dos modos oscuros (sin bump de versión)

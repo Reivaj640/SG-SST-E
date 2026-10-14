@@ -17,6 +17,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦885 · El Panel de Control ahora sigue el tema elegido
+
+En los modos **Oscuro** y **Sistema** el marco de la aplicación se ponía oscuro pero el Panel de
+Control se quedaba completamente blanco: tarjetas blancas, texto casi negro y chips pastel sobre un fondo
+oscuro.
+
+**La causa no eran los colores, era que el archivo no sabía que existían los temas.**
+`shared/kair-premium.css`, que es el que viste el panel, tenía **30 colores literales en 120 lugares y
+ni una sola regla de tema**: cero `[data-theme]`, cero `prefers-color-scheme`. Las dos únicas reglas
+que sí usaban tokens los leían de `:root`, y el archivo de tokens define la paleta solo ahí.
+Alrededor, el shell tenía **439 bloques de tema**. Por eso se veía el marco oscuro rodeando un
+panel blanco.
+
+**Qué quedó:** un bloque `[data-theme^="dark"]` al final del archivo, **puramente aditivo** — el
+tema claro no se toca. Tres cosas se corrigieron **midiéndolas**, no estimándolas:
+
+- **Las tarjetas se fundían con el fondo.** `--widget-bg-color` es, en los dos temas oscuros, el mismo
+  color que `--content-area-bg`. Las superficies ahora son un velo de blanco al 5 % sobre el fondo del
+  tema, que da `#384151` en Sistema y `#292929` en Oscuro.
+- **El texto terciario del shell no pasaba AA.** `--text-lighter-color` da 3.61 y 2.65. Se dejó de usarlo
+  y el panel definió su propio valor por tema.
+- **Los tintes de los chips al 18 % no pasaban**: el texto del chip caía a 4.23. Bajados al **8 %**, el
+  peor caso queda en 4.73.
+
+El fondo del panel usa el token del shell `--content-area-bg`, así que se pega al chrome de su tema sin
+duplicar ningún valor. **Ninguna regla nueva lleva `!important`**: `[data-theme^="dark"] .kair-premium .x`
+gana por especificidad. El hero, que ya era oscuro, quedó como estaba.
+
+- Token de `shared/kair-premium.css` bumpeado a `20261014-panel885`.
+- `main/test-panel-tema-885.js` — **54 checks base, 15/15 mutaciones detectadas**. Además de medir los
+  contrastes, comprueba **cobertura**: extrae las 58 clases que declaran color en la parte clara del
+  archivo y exige que cada una tenga contraparte oscura. Un test de "existe el bloque" habría pasado
+  aunque se olvidara la mitad de las tarjetas.
+- `.kair-premium` solo la usa `renderer.js:4766`, o sea el cambio no puede afectar otros módulos.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
+
 ### 📦884 · El menú lateral ya se lee en los dos modos oscuros
 
 En los modos **Oscuro** y **Sistema** los títulos del menú lateral salían casi negros
