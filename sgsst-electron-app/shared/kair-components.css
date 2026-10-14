@@ -209,3 +209,68 @@ h1, h2, h3, h4 { font-family: var(--kair-font-display); letter-spacing: -0.5px; 
 .kair-module strong { display: block; font: 700 clamp(12px, 1vw, 13px) var(--kair-font-display); margin-top: 7px; max-width: 160px; color: var(--kair-ink); }
 .kair-module small { color: var(--kair-muted); font-size: clamp(10px, 0.9vw, 11px); display: block; margin-top: 3px; }
 .kair-module-arrow { position: absolute; right: 14px; bottom: 13px; color: var(--kair-blue); font-size: 17px; line-height: 1; }
+
+
+/* =====================================================
+   📦887 · ADAPTES DE OSCURO PARA LOS COLORES ESCRITOS A MANO
+   ------------------------------------------------------------
+   Este archivo no tenia NI UNA regla de tema, y sus superficies y textos
+   estaban escritos a mano en vez de leidos de `--kair-*`. Por eso el modulo
+   Recursos se quedaba blanco en los dos modos oscuros aunque los tokens ya
+   tuvieran su valor oscuro: aqui no hay token que corregir, hay regla que
+   escribir.
+
+   Son once Selectores. Todos leen `--kair-*`, asi que el bloque NO repite la
+   paleta: los tokens de kair-design-tokens.css son la unica fuente y este
+   bloque solo decide "en oscuro esto va sobre `soft` y no sobre blanco".
+   Por eso `[data-theme^="dark"]` alcanza para los dos temas y no hace falta
+   duplicar el bloque.
+
+   El `:root` de arriba NO se toca: el tema claro queda igual.
+   ===================================================== */
+
+[data-theme^="dark"] .kair-btn-ghost {
+  background: var(--kair-soft);
+  color: var(--kair-ink);
+}
+[data-theme^="dark"] .kair-btn-primary:hover { background: #4a90e2; }
+
+[data-theme^="dark"] .kair-status-pill--ok {
+  background: var(--kair-green-soft);
+  color: var(--kair-green-text);
+}
+[data-theme^="dark"] .kair-status-pill--warn {
+  background: var(--kair-amber-soft);
+  color: var(--kair-amber-text);
+}
+[data-theme^="dark"] .kair-status-pill--danger {
+  background: var(--kair-red-soft);
+  color: var(--kair-red-text);
+}
+
+/* Este selector es el que hace ilegibles los rotulos "EJECUCION DEL PLAN",
+   "PENDIENTES" y "ASISTENCIA" sobre tarjeta blanca: en claro vale #637189 y en
+   oscuro no puede seguir siendo el mismo gris sobre el mismo blanco. */
+[data-theme^="dark"] .kair-metric-card .kair-metric-head { color: var(--kair-faint); }
+[data-theme^="dark"] .kair-metric-card .kair-metric-value small { color: var(--kair-text-3); }
+
+[data-theme^="dark"] .kair-progress,
+[data-theme^="dark"] .kair-progress-bar { background: var(--kair-track); }
+
+/* Las tabs: en claro el activo es blanco sobre gris; en oscuro tiene que ser la
+   tarjeta sobre `soft`, o al reves no se distingue de la guia. */
+[data-theme^="dark"] .kair-tabs { background: var(--kair-soft); }
+[data-theme^="dark"] .kair-tabs span.kair-tab-active {
+  background: var(--kair-card);
+  color: var(--kair-ink);
+}
+
+/* La rejilla del grafico va con dos colores literales dentro de un gradiente;
+   `repeating-linear-gradient` no lee tokens, asi que hay que reescribirlo. */
+[data-theme^="dark"] .kair-chart {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 43px, var(--kair-line-soft) 44px),
+    repeating-linear-gradient(90deg, transparent 0 75px, var(--kair-track) 76px);
+}
+
+[data-theme^="dark"] .kair-module:hover { border-color: var(--kair-blue); }

@@ -1420,6 +1420,157 @@ commit fantasma.
 
 ---
 
+### 2026-10-14 · 📦887 · El módulo Recursos también sigue el tema (sin bump de versión)
+
+**Qué se hizo** — el home de Recursos deja de quedar blanco en los dos modos oscuros, y con
+él todo lo que consume los tokens `--kair-*`:
+
+| Zona | Qué |
+|---|---|
+| `shared/kair-design-tokens.css` | **Dos bloques de tema nuevos**, `[data-theme="dark"]` y `[data-theme="dark-legacy"]`. **32 tokens de color, los dos.** Aditivos: `:root` no cambia |
+| `shared/kair-components.css` | **Bloque `[data-theme^="dark"]`** para los once selectores que tenían el color escrito a mano. Ese archivo no tenía ni una regla de tema |
+| `modules/recursos/recursos-home.js` | Ocho colores **inline** pasados a token. Un estilo en línea gana a cualquier hoja de estilo, así que por muchos tokens que se definan, esos ocho seguían grises sobre la tarjeta oscura |
+| `index.html` | Cache-bust de los tres a `20261014-recursos887` y `RECURSOS-20261014-tema887` |
+| `main/test-tokens-tema-887.js` | Test nuevo |
+
+**La causa, medida** — no faltaban estilos oscuros: **el color nunca se definía por tema**.
+`shared/kair-design-tokens.css` definía **treinta tokens de color en `:root` y cero
+variantes**, y `shared/kair-components.css`, donde viven 25 de las 46 clases del home,
+**no tenía ni una regla de tema**. Los dos archivos se cargan en `index.html` en las
+líneas 71 y 72, o sea que **el módulo Recursos no carga ni un CSS propio**: lo que se ve
+ahí viene entero de la base compartida.
+
+**LA CAUSA DE VERDAD: LA CASCADA (esto es lo que faltó en el primer diagnóstico)**
+— el diagnóstico de arriba es cierto pero **no era la razón de que las tarjetas salieran
+blancas**. Los tokens oscuros sí se estaban entregando. Lo que pasaba es que **dos CSS de
+módulo le ganaban la cascada**:
+
+| Archivo | Qué declara | Se carga en |
+|---|---|---|
+| `modules/gestion-peligros/inspecciones/inspeccion.css` | `:root { --kair-card:#ffffff; --kair-text:#1a1a2e; --kair-shadow-card:… }` | `index.html:552` |
+| `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css` | `:root { --kair-surface:#ffffff; --kair-text:#212529; … }` | `index.html:490` |
+
+`:root` y `[data-theme="dark"]` **empatan en especificidad (0,1,0)** y los dos matchean
+`<html>`, así que **gana el que se carga último**. Los tokens del 887 se cargan en la línea
+71; esos dos, en la 490 y la 552. Resultado: en los dos modos oscuros `--kair-card`
+resolvía a `#ffffff` y `--kair-text` a `#1a1a2e`. Por eso las tarjetas salían blancas
+**con el rótulo gris encima**: el `.kair-metric-head` sí tomaba `--kair-faint`, pero
+`#9fb0c4` sobre blanco es casi ilegible. Es exactamente lo que se vio en las capturas.
+
+Lo que lo责ueba es que el **preview se veía bien y la app no**, y la diferencia estaba en
+el preview: la primera versión armaba un bloque oscuro escrito a mano y **no cargaba el
+`<style>` que `recursos-home.js` inyecta en runtime**, ni los `:root` tardíos. Era media
+app. El artefacto se rehizo para usar los archivos reales en el orden real de `index.html`;
+con esa corrección, el panel "antes" reproduce la captura del owner y el "después" ya sale
+bien.
+
+**El arreglo** — los dos bloques oscuros de `shared/kair-design-tokens.css` llevan ahora
+también `:root[data-theme="dark"]` / `:root[data-theme="dark-legacy"]`, que valen **(0,2,0)**
+y ganan contra cualquier `:root` sin importar el orden de carga. Se conserva el selector
+pelado por si algún contenedor (y no `<html>`) lleva el atributo. El tema claro no se toca.
+
+> La fuga de scope es de esos dos módulos, no de los tokens: el propio encabezado de
+> `inspeccion.css` dice *"Scope en `.kair-app`"* y su bloque oscuro sí está scopado a
+> `.kair-app`; lo que se escapa es el `:root` **claro**. Se corrige del lado de los tokens
+> porque es el que no depende de ningún módulo.
+
+Del home: 46 clases, **31 sin contraparte oscura**. De esas, **17 leen tokens** — o sea que
+definir el token las arregla — y 6 tenían el color escrito a mano.
+
+**El hallazgo más grande, y es de otro submódulo** — `capacitaciones-view.css` tiene **47
+reglas de tema que no existen**. Apuntan a `.capacitaciones-container[data-theme="dark"]` y
+fallan por partida doble:
+
+1. El atributo `data-theme` se aplica a `document.documentElement` (`renderer.js`
+   líneas 756, 762, 812, 820, 1719 y 1726), o sea a **`<html>`**. Nunca al contenedor.
+2. La clase `.capacitaciones-container` **no existe** en el HTML de la vista.
+
+O sea que **alguien ya había escrito el arreglo oscuro completo y no aplicaba nada** —
+incluidos `--kair-card: #2d3748` y el `.kair-metric-head` que se ve gris sobre blanco. El
+mismo error aparece una vez en `objetivos-sst-view.css`. **48 reglas muertas en el repo.**
+
+En cambio **17 viewers sí hacen bien lo de poner el atributo en su contenedor**, y por eso
+10 de los 14 CSS de submódulos sí tienen tema y funcionan. Los cuatro que no:
+`copasst-home.css`, `comite-convivencia-home.css`, `inducciones-view.css` y
+`roles-responsabilidades-view.css` (este último con **147 colores literales y cero
+tokens**).
+
+**La paleta, medida** — el thumb, el texto y el terciario se Taking del 📦884 y el 📦885, que
+ya los midieron, para que el tema oscuro sea uno solo y no tres paletas parecidas. La
+tarjeta usa **el mismo velo de blanco al 5 % que el Panel de Control desde el 885**, así que
+el home y el panel se ven iguales. Contra la tarjeta real de cada tema:
+
+| Medida | Sistema | Negro/Gris | Mínimo |
+|---|---|---|---|
+| Texto principal | 8.67 | 11.02 | 4.5 |
+| Texto secundario | 4.95 | 5.56 | 4.5 |
+| Texto auxiliar | 4.64 | 5.17 | 4.5 |
+| Chip sobre su tinte | 7.34 | 7.34 | 4.5 |
+| Acento azul | 3.95 | 6.96 | 3 |
+
+Los bordes quedan por debajo de 3:1 (1.37 y 1.40) **a propósito**: WCAG 1.4.11 pide eso para
+componentes de interfaz y estados, y un borde decorativo de tarjeta no es ninguno de los
+dos. La separación la hace la propia superficie.
+
+**Sobre 884 y 885** — estos tokens son de alcance general y los dos paquetes anteriores pisan
+con selectores **más específicos** (`[data-theme^="dark"] #sidebar` y `[data-theme="dark"]
+.kair-premium`). Los dos siguen mandando en su scope. El test lo comprueba.
+
+**Un tropiezo propio, anotado para que no se repita** — al cambiar un color dentro de un
+`style="..."` de `recursos-home.js`, un Edit metió el comentario **dentro del string** y
+partió la línea de JavaScript en dos. Se detectó leyendo el diff, se restauró con
+`git checkout` y se rehizo con el valor solo. **`node --check` sobre el archivo es la
+verificación que faltaba** y ahora está en el flujo.
+
+**Un segundo test frágil, este ya venía del repo** — bumpear el token de `recursos-home.js`
+tumbó `test-chart-overflow.js` (19/20), porque su check tenía **el literal del token de los
+siete homes** escrito a mano. El mismo repo ya había detectado y arreglado ese defecto en el
+check vecino de `kair-components.css` — el comentario de las líneas 156-157 lo dice — pero no
+lo aplicó al de los homes. Se aplicó el mismo criterio: ahora se pregunta si el token **tiene
+forma** `PREFIJO-AAAAMMDD-descripcion`, no si es un valor concreto. Sigue detectando un home
+sin versionar, que es lo que importa, y ya no se cae con el próximo paquete que toque uno.
+
+**Tests** — `test-tokens-tema-887.js`: **100 checks base**, **22/22 mutaciones**, 0 vacías.
+Contra el código anterior da **30/69**: el test detecta el bug. Cuatro cosas que un check de
+"existe el bloque oscuro" no comprobaría:
+
+1. **Cobertura.** Extrae los 32 tokens de color de `:root` y exige que **cada uno** tenga
+   variante en los dos temas, y que **sea distinta** del claro. Si no, el bloque "existe" y
+   media pantalla sigue blanca. Este check encontró un hueco real: `--kair-mint` se había
+   quedado sin definir.
+2. **Que el tema claro no se tocara.** Verifica uno por uno los doce valores originales de
+   `:root`. Es un bloque aditivo y esto lo blinda.
+3. **Que el contraste siga pasando.** Recalculado contra la tarjeta real, componiendo el velo.
+4. **La cascada.** Exige que los dos bloques oscuros lleven `:root[data-theme=...]` (o sea,
+   (0,2,0)) y que el selector pelado se conserve. Hay dos mutaciones que lo desarman y las dos
+   muerden.
+
+**Artefacto** — `preview-recursos-887.html`, generado por un script que lee los archivos del
+disco y pone sus huellas SHA-256 en el pie. Cada tema en su propio `iframe` con `srcdoc`
+porque el atributo vive en `<html>` y poner dos temas en una página mostraría algo que la app
+nunca muestra. El owner lo aprobó antes de que se escribiera nada.
+
+> **El artefacto se rehizo después de ver la app.** La primera versión se veía bien y la app
+> no, y la diferencia estaba en el preview: armaba un bloque oscuro a mano y **no cargaba el
+> `<style>` que `recursos-home.js` inyecta en runtime**, ni los dos `:root` tardíos. Era media
+> app. El generador nuevo carga los archivos reales **en el orden real de `index.html`** y trae
+> la hoja inyectada del módulo tal cual (16 506 caracteres leídos del disco). Con eso, el panel
+> "antes" reproduce exactamente las capturas del owner y el "después" sale bien. Verificado en
+> el navegador.
+
+**Hallazgo colateral que NO se tocó** — en el **tema claro** hay texto que no pasa AA sobre
+tarjeta blanca: `--kair-muted` da 3.98:1, `--kair-faint` **2.16:1** y `--kair-text-3`
+2.58:1. El breadcrumb usa `--kair-faint`, o sea que hoy es casi ilegible en claro. Es
+preexistente y de otro alcance: este paquete solo define las variantes oscuras. En el tema
+Negro/Gris la tarjeta queda a **1.29:1** del fondo — es el mismo valor que ya aprobó el 885,
+así que se mantiene igual y queda anotado como mejora futura.
+
+**Commits** — uno solo, con el código y la documentación juntos, en `Dev`. El hash no se
+escribe aquí dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría
+apuntando a un commit fantasma.
+
+---
+
 ### 2026-10-14 · 📦886 · Las barras de desplazamiento siguen el tema elegido (sin bump de versión)
 
 **Qué se hizo** — la barra blanca sobre el fondo oscuro desaparece. La barra de

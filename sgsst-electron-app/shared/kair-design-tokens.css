@@ -73,6 +73,14 @@
     --kair-slate:      #748096;
     --kair-blue-light: #b5c8e3;       /* azul claro para barras de género */
 
+    /* 📦887 — Moreno. Lo consumen los iconos de las tareas del "En tu radar" del
+       home de Recursos, que los traia escritos a mano en el JS (#6b3fb8 sobre
+       #f0eaff). Los mismos valores de claro, pero ahora en token: sin esto, el
+       JS no puede cambiar de tema y el icono se queda con su fondo pastel en
+       oscuro. Es aditivo: ningún valor de `:root` cambia. */
+    --kair-violet:      #6b3fb8;
+    --kair-violet-soft: #f0eaff;
+
     /* === Jerarquía de texto detallada (entre ink y muted) === */
     --kair-text:    #14213d;         /* alias de --kair-ink */
     --kair-text-2:  #4d5b75;         /* texto secundario (entre ink y muted) */
@@ -86,4 +94,152 @@
     /* === Tipografía display + transition shorthand === */
     --kair-font-title: 'Manrope', 'DM Sans', sans-serif;  /* alias de --kair-font-display */
     --kair-t:         180ms ease-out;                     /* alias de --kair-transition */
+}
+
+
+/* =====================================================
+   📦887 · VARIANTES POR TEMA
+   ------------------------------------------------------------
+   Hasta acá este archivo DEFINÍA la paleta y nada más: treinta tokens de color
+   en `:root`, cero variantes. Ese era el motivo de que el módulo Recursos, su
+   home y todo lo que usa las clases `kair-*` se quedara blanco en los dos modos
+   oscuros: no faltaban estilos oscuros, el color nunca se definía por tema.
+
+   Los dos bloques siguientes solo se aplican en oscuro. El tema claro NO se toca:
+   sigue siendo el mismo `:root` de arriba, byte por byte.
+
+   Los valores de texto y de acento se Taking del 📦884 y el 📦885, que ya los
+   midieron, para que el tema oscuro sea uno solo y no tres paletas parecidas.
+   Los de superficie usan el mismo velo de blanco al 5 % que el Panel de Control
+   usa desde el 885, así que el home y el panel se ven iguales.
+
+   Sobre 884 y 885: estos tokens son de alcance general, y los dos paquetes
+   anteriores pisan con selectores MÁS específicos — `[data-theme^="dark"]
+   #sidebar` (0,1,1,0) y `[data-theme="dark"] .kair-premium` (0,2,0). Los dos
+   siguen mandando en su scope; esto solo completa lo que estaba sin definir.
+
+   POR QUÉ CADA BLOQUE LLEVA DOS SELECTORES Y NO UNO
+   -------------------------------------------------
+   `modules/gestion-peligros/inspecciones/inspeccion.css` (index.html:552) y
+   `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css`
+   (index.html:490) abren sus propios `:root` con la paleta CLARA y se cargan
+   DESPUÉS de este archivo. `:root` y `[data-theme="dark"]` empatan en
+   especificidad (0,1,0), así que ganaba el último: `--kair-card` resolvía a
+   `#ffffff` y a `--kair-text` a `#1a1a2e` también en oscuro. Por eso las
+   tarjetas de Recursos salían blancas con el rótulo gris encima, en los dos
+   modos. Ese `:root` tardío es una fuga de scope de esos dos módulos (el propio
+   archivo de Inspecciones dice en su encabezado que va todo bajo `.kair-app`).
+
+   La corrección va acá y no allá: se agrega `:root[data-theme=...]`, que vale
+   (0,2,0) y por eso gana contra cualquier `:root` sin importar el orden de
+   carga. Se conserva el selector `[data-theme="..."]` pelado para no romper el
+   caso de un contenedor que lleve el atributo en vez del `<html>`.
+
+   Contraste medido contra la tarjeta real de cada tema (#384151 Sistema,
+   #292929 Oscuro): texto principal 8.67 y 11.02, secundario 4.95 y 5.56,
+   auxiliar 4.64 y 5.17, chip de estado 7.34, acento 3.95 y 6.96. Todo por
+   encima de 4.5 para texto y de 3 para componente (WCAG 1.4.3 y 1.4.11).
+   Los bordes quedan por debajo de 3:1 a propósito: un borde decorativo de
+   tarjeta no es un componente de interfaz ni un estado, así que no le aplica
+   ese mínimo. La separación la hace la propia superficie de la tarjeta.
+   ===================================================== */
+
+[data-theme="dark"],
+:root[data-theme="dark"] {
+    /* Superficies. El fondo del área de contenido del shell es #2d3748; la
+       tarjeta lleva el velo del 5 % para no fundirse con él, igual que en 885. */
+    --kair-canvas: #1a202c;
+    --kair-card:   #384151;
+    --kair-surface:#384151;
+    --kair-soft:   #2f3a4d;     /* chips y divisores internos */
+    --kair-track:  #3a4356;     /* pista de las barras de progreso */
+
+    /* Texto. Los tres primeros son los del propio shell en oscuro. */
+    --kair-ink:    #e9ecef;
+    --kair-text:   #e9ecef;     /* alias de --kair-ink */
+    --kair-muted:  #adb5bd;
+    --kair-faint:  #9fb0c4;     /* el mismo terciario que definio el 885 */
+    --kair-text-2: #cbd5e1;
+    --kair-text-3: #aab4c4;
+
+    /* Bordes */
+    --kair-line:      #4a5568;
+    --kair-line-soft: #374253;
+
+    /* Acentos. El azul sube de tono porque #2057b8 sobre fondo oscuro no alcanza
+       para separar un control de su superficie. */
+    --kair-blue:      #5da2ff;
+    --kair-blue-text: #7db9ff;
+    --kair-blue-soft: #1e3a5f;
+    --kair-blue-ink:  #1e3a5f;
+    --kair-blue-light:#6b8fb5;   /* barra de genero: 3.05:1 contra la tarjeta */
+
+    --kair-slate:      #aab4c4;
+    --kair-slate-soft: #2f3a4d;
+    --kair-violet:      #b79ce8;   /* 6.43:1 sobre su propio tinte */
+    --kair-violet-soft: #2a2140;
+
+    /* Tintes de chip. El texto va sobre su propio tinte, no sobre la tarjeta. */
+    --kair-green:      #4ade9e;
+    --kair-mint:       #4ade9e;     /* alias de --kair-green, como en :root */
+    --kair-green-text: #5ee0a8;
+    --kair-green-soft: #12352a;
+    --kair-amber:      #f0b429;
+    --kair-amber-text: #f5c451;
+    --kair-amber-soft: #3a2f10;
+    --kair-red:        #f28b9b;
+    --kair-red-text:   #f79ca9;
+    --kair-red-soft:   #3a1f24;
+
+    /* Sombras: en oscuro la sombra casi no se ve, asi que suben de alfa para
+       que el relieve siga notandose. */
+    --kair-shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.45);
+    --kair-shadow-card: 0 2px 7px rgba(0, 0, 0, 0.35);
+    --kair-shadow:      0 4px 14px rgba(0, 0, 0, 0.40);
+}
+
+[data-theme="dark-legacy"],
+:root[data-theme="dark-legacy"] {
+    /* Superficies. Mismo velo del 5 % sobre el fondo del área (#1e1e1e). */
+    --kair-canvas: #121212;
+    --kair-card:   #292929;
+    --kair-surface:#292929;
+    --kair-soft:   #242424;
+    --kair-track:  #2f2f2f;
+
+    --kair-ink:    #e0e0e0;
+    --kair-text:   #e0e0e0;
+    --kair-muted:  #a0a0a0;
+    --kair-faint:  #9a9a9a;     /* el mismo terciario que definio el 885 */
+    --kair-text-2: #c4c4c4;
+    --kair-text-3: #9e9e9e;
+
+    --kair-line:      #404040;
+    --kair-line-soft: #333333;
+
+    --kair-blue:      #8ab4ff;
+    --kair-blue-text: #9cc3ff;
+    --kair-blue-soft: #1c2f4a;
+    --kair-blue-ink:  #1c2f4a;
+    --kair-blue-light:#7a8087;
+
+    --kair-slate:      #a0a0a0;
+    --kair-slate-soft: #242424;
+    --kair-violet:      #b79ce8;
+    --kair-violet-soft: #2a2140;
+
+    --kair-green:      #6ee7a8;
+    --kair-mint:       #6ee7a8;     /* alias de --kair-green, como en :root */
+    --kair-green-text: #7eeab0;
+    --kair-green-soft: #16301f;
+    --kair-amber:      #f0b429;
+    --kair-amber-text: #f5c451;
+    --kair-amber-soft: #332a10;
+    --kair-red:        #f28b9b;
+    --kair-red-text:   #f79ca9;
+    --kair-red-soft:   #3a1f24;
+
+    --kair-shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.55);
+    --kair-shadow-card: 0 2px 7px rgba(0, 0, 0, 0.45);
+    --kair-shadow:      0 4px 14px rgba(0, 0, 0, 0.50);
 }

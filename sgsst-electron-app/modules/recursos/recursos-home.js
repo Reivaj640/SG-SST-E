@@ -613,14 +613,14 @@ margin-bottom: 0.5rem;
         const capacitacionesPct = capacitaciones.porcentajeCumplimiento || 0;
         health.appendChild(this.renderMetricCard({
             label: 'Inducciones',
-            valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
+            valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:var(--kair-text-3)">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
             desc: 'Personal con inducción al día',
             progressPct: induccionesPct,
             variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger'
         }));
         health.appendChild(this.renderMetricCard({
             label: 'Plan de capacitación',
-            valueHTML: (capacitaciones.realizadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (capacitaciones.programadas || 0) + '</small>',
+            valueHTML: (capacitaciones.realizadas || 0) + ' <small style="font:500 15px DM Sans;color:var(--kair-text-3)">/ ' + (capacitaciones.programadas || 0) + '</small>',
             desc: 'Actividades ejecutadas',
             progressPct: capacitacionesPct,
             variant: capacitacionesPct >= 70 ? 'ok' : capacitacionesPct >= 40 ? 'warning' : 'danger'
@@ -650,7 +650,7 @@ margin-bottom: 0.5rem;
             + '<div class="kair-chart kair-chart--flow" id="kair-chart-presupuesto"></div>'
             + '<div class="kair-legend">'
             + '  <span><i class="kair-dot"></i>Ejecutado real</span>'
-            + '  <span><i class="kair-dot" style="background:#d4dae3"></i>Planeado</span>'
+            + '  <span><i class="kair-dot" style="background:var(--kair-slate)"></i>Planeado</span>'
             + '</div>';
         content.appendChild(chartCard);
 
@@ -711,7 +711,7 @@ margin-bottom: 0.5rem;
         var copasst = stats.copasst || {};
         if (copasst.estado === 'warn' || copasst.estado === 'danger') {
             tareas.push({
-                icon: '◷', bg: '#eff7f5', color: '#178666',
+                icon: '◷', bg: 'var(--kair-green-soft)', color: 'var(--kair-green-text)',
                 title: 'Actas COPASST',
                 sub: (copasst.actasAnio || 0) + ' de 12 reuniones registradas',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
@@ -720,7 +720,7 @@ margin-bottom: 0.5rem;
         var afiliacion = stats.afiliacion || {};
         if (afiliacion.estado === 'warn' || afiliacion.estado === 'danger') {
             tareas.push({
-                icon: '◷', bg: '#fff5e6', color: '#c28316',
+                icon: '◷', bg: 'var(--kair-amber-soft)', color: 'var(--kair-amber-text)',
                 title: 'Afiliación a SSSI',
                 sub: 'Aún no hay planillas cargadas',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
@@ -731,7 +731,7 @@ margin-bottom: 0.5rem;
         var comite = stats.comite_convivencia || {};
         if (comite.estado === 'warn' || comite.estado === 'danger') {
             tareas.push({
-                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+                icon: '◷', bg: 'var(--kair-violet-soft)', color: 'var(--kair-violet)',
                 title: 'Actas Comité de Convivencia',
                 sub: (comite.actasAnio || 0) + ' de 12 reuniones registradas',
                 status: 'Pendiente', statusClass: 'kair-status-pill--warn'
@@ -739,7 +739,7 @@ margin-bottom: 0.5rem;
         }
         if (tareas.length === 0) {
             tareas.push({
-                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                icon: '✓', bg: 'var(--kair-blue-soft)', color: 'var(--kair-blue-text)',
                 title: 'Sistema estable',
                 sub: 'Sin alertas pendientes este mes',
                 status: 'Al día', statusClass: 'kair-status-pill--ok'
@@ -804,13 +804,13 @@ margin-bottom: 0.5rem;
                 + '<svg viewBox="0 0 ' + W + ' ' + H + '">'
                 + '  <defs>'
                 + '    <linearGradient id="kair-grad" x1="0" x2="0" y1="0" y2="1">'
-                + '      <stop offset="0" stop-color="#2057b8" stop-opacity=".18"/>'
-                + '      <stop offset="1" stop-color="#2057b8" stop-opacity="0"/>'
+                + '      <stop offset="0" style="stop-color:var(--kair-blue)" stop-opacity=".22"/>'
+                + '      <stop offset="1" style="stop-color:var(--kair-blue)" stop-opacity="0"/>'
                 + '    </linearGradient>'
                 + '  </defs>'
-                + '  <path d="' + planeadoPath + '" fill="none" stroke="#d4dae3" stroke-width="3" stroke-dasharray="5 7"/>'
+                + '  <path d="' + planeadoPath + '" fill="none" style="stroke:var(--kair-slate)" stroke-width="3" stroke-dasharray="5 7"/>'
                 + '  <path d="' + areaPath + '" fill="url(#kair-grad)"/>'
-                + '  <path d="' + ejecutadoPath + '" fill="none" stroke="#2057b8" stroke-width="3.5"/>'
+                + '  <path d="' + ejecutadoPath + '" fill="none" style="stroke:var(--kair-blue)" stroke-width="3.5"/>'
                 + '</svg>'
                 + '<div class="kair-bar-chart__foot kair-bar-chart__months">'
                 + labels.map(function (m) { return '<span>' + m + '</span>'; }).join('')

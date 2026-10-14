@@ -158,23 +158,31 @@ check('CSS: el SVG ocupa toda la caja del gráfico (100% x 100% + inset 0)',
 check('Cache-bust: kair-components.css con ?v= de fecha (📦758)',
   /kair-components\.css\?v=\d{8}-/.test(html));
 
-const homes = {
-  'gestion-integral': 'GESTION-INTEGRAL-20260918-bar-chart-html',
-  // 📦799 — se bumpeó al arreglar los datos reales del home (la versión vieja era ...bar-chart-html).
-  'gestion-peligros': 'GESTION-PELIGROS-20260921-fix-home-datos',
-  // 📦763 — se bumpeó al corregir el error de consola del home (memoria de sesión
-  // faltante + `this.widgets` inexistente). La versión vieja era ...bar-chart-html.
-  'gestion-salud': 'GESTION-SALUD-20260918-fix-home-cache',
-  'recursos': 'RECURSOS-20260924-chart-alineacion',
-  'gestion-amenazas': 'GESTION-AMENAZAS-20260918-bar-chart-html',
-  'verificacion': 'VERIFICACION-20260918-bar-chart-html',
-  'mejoramiento': 'MEJORAMIENTO-20260918-bar-chart-html'
-};
+// 🔴 Este check estaba anclado al LITERAL del token de cada home. Con 📦887 el de
+// recursos se bumpeó y el test se cayó sin que hubiera ningún error de verdad:
+// cualquier paquete futuro que toque uno de estos home lo vuelve a romper. Se
+// arregló arriba, para kair-components.css, preguntando si TIENE token con
+// forma de fecha; acá se aplica lo mismo. Sigue detectando un home sin
+// versionar, que es lo que importa.
+const HOMES = [
+  'modules/gestion-integral/gestion-integral-home.js',
+  'modules/gestion-peligros/gestion-peligros-home.js',
+  'modules/gestion-salud/gestion-salud-home.js',
+  'modules/recursos/recursos-home.js',
+  'modules/gestion-amenazas/gestion-amenazas-home.js',
+  'modules/verificacion/verificacion-home.js',
+  'modules/mejoramiento/mejoramiento-home.js',
+];
 let sinBump = [];
-Object.keys(homes).forEach(function (mod) {
-  if (html.indexOf(homes[mod]) < 0) sinBump.push(mod);
+HOMES.forEach(function (ruta) {
+  const esc = ruta.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(esc + '\\?v=([A-Za-z0-9-]+)').exec(html);
+  // PREFIJO-AAAAMMDD-descripcion. El prefijo es el nombre del módulo en
+  // MAYÚSCULAS y lleva guion interno (GESTION-INTEGRAL), por eso `[A-Z-]*`
+  // y no `[A-Z]+`.
+  if (!m || !/^[A-Z][A-Z-]*-\d{8}-[a-z0-9-]+$/.test(m[1])) sinBump.push(ruta.split('/').pop());
 });
-check('Cache-bust: los 7 homes de módulo tienen ?v= actualizado (📦756 + 📦757 + 📦758)',
+check('Cache-bust: los 7 homes de módulo tienen ?v= con formato PREFIJO-AAAAMMDD-desc',
   sinBump.length === 0, sinBump.join(', '));
 check('Cache-bust: styles.css y kair-skeleton.js siguen versionados',
   /styles\.css\?v=[A-Za-z0-9-]+/.test(html) &&
