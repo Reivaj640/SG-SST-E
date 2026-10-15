@@ -1,0 +1,378 @@
+{
+  "errors": [],
+  "escstylesEnHead": 2,
+  "styleDelModuloEnContenedor": true,
+  "textoStyleOk": true,
+  "temaActual": "dark",
+  "conEstiloModulo": {
+    "label": "con-estilo-del-modulo",
+    "backgroundColor": "rgb(32, 87, 184)",
+    "color": "rgb(255, 255, 255)",
+    "opacity": "1",
+    "boxShadow": "rgba(32, 87, 184, 0.25) 0px 4px 12px 0px",
+    "vars": {
+      "--kair-blue": "#5da2ff",
+      "--kair-primary": "",
+      "--kair-surface": "#384151"
+    },
+    "pseudoBefore": {
+      "content": "none",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "pseudoAfter": {
+      "content": "none",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "ancestors": {
+      "kairPremium": false,
+      "carpScope": false,
+      "radModule": false,
+      "clases": [
+        "kair-btn kair-btn--primary",
+        "kair-topbar__actions",
+        "kair-topbar",
+        "kair-page",
+        "submodule-content"
+      ]
+    },
+    "reglas": [
+      {
+        "order": 0,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/styles.css?v=20261014-scrollbar886",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "initial"
+        }
+      },
+      {
+        "order": 1,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-components.css?v=20261014-recursos887",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "initial"
+        }
+      },
+      {
+        "order": 2,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "transparent"
+        }
+      },
+      {
+        "order": 3,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn--primary",
+        "decl": {
+          "background": "var(--kair-primary)",
+          "color": "rgb(255, 255, 255)",
+          "border-color": "var(--kair-primary)"
+        }
+      },
+      {
+        "order": 4,
+        "href": "inline:STYLE",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "background": "transparent",
+          "background-color": "transparent",
+          "color": "var(--kair-text-2)",
+          "border-color": "transparent"
+        }
+      },
+      {
+        "order": 5,
+        "href": "inline:STYLE",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn--primary",
+        "decl": {
+          "background": "rgb(32, 87, 184) !important",
+          "background-color": "rgb(32, 87, 184) !important",
+          "color": "rgb(255, 255, 255) !important",
+          "box-shadow": "rgba(32, 87, 184, 0.25) 0px 4px 12px"
+        }
+      }
+    ]
+  },
+  "sinEstiloModulo": {
+    "label": "sin-estilo-del-modulo",
+    "backgroundColor": "rgb(32, 87, 184)",
+    "color": "rgb(255, 255, 255)",
+    "opacity": "1",
+    "boxShadow": "rgba(32, 87, 184, 0.25) 0px 4px 12px 0px",
+    "vars": {
+      "--kair-blue": "#5da2ff",
+      "--kair-primary": "",
+      "--kair-surface": "#384151"
+    },
+    "pseudoBefore": {
+      "content": "none",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "pseudoAfter": {
+      "content": "none",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "ancestors": {
+      "kairPremium": false,
+      "carpScope": false,
+      "radModule": false,
+      "clases": [
+        "kair-btn kair-btn--primary",
+        "kair-topbar__actions",
+        "kair-topbar",
+        "kair-page",
+        "submodule-content"
+      ]
+    },
+    "reglas": [
+      {
+        "order": 6,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/styles.css?v=20261014-scrollbar886",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "initial"
+        }
+      },
+      {
+        "order": 7,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-components.css?v=20261014-recursos887",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "initial"
+        }
+      },
+      {
+        "order": 8,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn",
+        "decl": {
+          "border-color": "transparent"
+        }
+      },
+      {
+        "order": 9,
+        "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+        "media": null,
+        "activo": true,
+        "selector": ".kair-btn--primary",
+        "decl": {
+          "background": "var(--kair-primary)",
+          "color": "rgb(255, 255, 255)",
+          "border-color": "var(--kair-primary)"
+        }
+      }
+    ]
+  },
+  "sinEstiloEnOscuro": {
+    "dark": {
+      "label": "sin-estilo-dark",
+      "backgroundColor": "rgb(32, 87, 184)",
+      "color": "rgb(255, 255, 255)",
+      "opacity": "1",
+      "boxShadow": "rgba(32, 87, 184, 0.25) 0px 4px 12px 0px",
+      "vars": {
+        "--kair-blue": "#5da2ff",
+        "--kair-primary": "",
+        "--kair-surface": "#384151"
+      },
+      "pseudoBefore": {
+        "content": "none",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "pseudoAfter": {
+        "content": "none",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "ancestors": {
+        "kairPremium": false,
+        "carpScope": false,
+        "radModule": false,
+        "clases": [
+          "kair-btn kair-btn--primary",
+          "kair-topbar__actions",
+          "kair-topbar",
+          "kair-page",
+          "submodule-content"
+        ]
+      },
+      "reglas": [
+        {
+          "order": 10,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/styles.css?v=20261014-scrollbar886",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "initial"
+          }
+        },
+        {
+          "order": 11,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-components.css?v=20261014-recursos887",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "initial"
+          }
+        },
+        {
+          "order": 12,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "transparent"
+          }
+        },
+        {
+          "order": 13,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn--primary",
+          "decl": {
+            "background": "var(--kair-primary)",
+            "color": "rgb(255, 255, 255)",
+            "border-color": "var(--kair-primary)"
+          }
+        }
+      ]
+    },
+    "dark-legacy": {
+      "label": "sin-estilo-dark-legacy",
+      "backgroundColor": "rgb(32, 87, 184)",
+      "color": "rgb(255, 255, 255)",
+      "opacity": "1",
+      "boxShadow": "rgba(32, 87, 184, 0.25) 0px 4px 12px 0px",
+      "vars": {
+        "--kair-blue": "#8ab4ff",
+        "--kair-primary": "",
+        "--kair-surface": "#292929"
+      },
+      "pseudoBefore": {
+        "content": "none",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "pseudoAfter": {
+        "content": "none",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      "ancestors": {
+        "kairPremium": false,
+        "carpScope": false,
+        "radModule": false,
+        "clases": [
+          "kair-btn kair-btn--primary",
+          "kair-topbar__actions",
+          "kair-topbar",
+          "kair-page",
+          "submodule-content"
+        ]
+      },
+      "reglas": [
+        {
+          "order": 14,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/styles.css?v=20261014-scrollbar886",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "initial"
+          }
+        },
+        {
+          "order": 15,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-components.css?v=20261014-recursos887",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "initial"
+          }
+        },
+        {
+          "order": 16,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn",
+          "decl": {
+            "border-color": "transparent"
+          }
+        },
+        {
+          "order": 17,
+          "href": "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+          "media": null,
+          "activo": true,
+          "selector": ".kair-btn--primary",
+          "decl": {
+            "background": "var(--kair-primary)",
+            "color": "rgb(255, 255, 255)",
+            "border-color": "var(--kair-primary)"
+          }
+        }
+      ]
+    }
+  },
+  "hojasCargadas": [
+    "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/styles.css?v=20261014-scrollbar886",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/development-styles.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-view.css?v=EVAL-20260918-v2c-toast-strip",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-v2.css?v=EMO-20260918-v8-tabla-altura-fix-ancho-completo",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/assets/css/bootstrap-icons.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/gestion-humana-home.css?v=GH-20261002-impeccable-fix",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/shared/kpi-bar.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/base-personal/index.css?v=GH-20261002-impeccable-fix",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/dashboard/index.css?v=GH-20261014-scrollbar886",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/afiliaciones/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/firma-electronica/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/comunicacion/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/permisos/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/vacaciones/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/contratacion/index.css?v=GH-20260923-p0-dark-scopes",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-humana/carpetas/index.css?v=GH-20261014-scrollbar886",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/assets/css/google-fonts.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/assets/css/font-awesome.min.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-design-tokens.css?v=20261014-recursos887-fix1",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-components.css?v=20261014-recursos887",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-premium.css?v=20261015-empresa893",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/shared/kair-sidebar.css?v=SIDEBAR-20261014-dark-tokens884",
+    "inline:STYLE",
+    "inline:kfv-preview-btn-css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-salud/restricciones-medicas/enviar-remision-v2.css?v=REM-20260919-v2-flujo-completo",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-salud/restricciones-medicas/control-remisiones-v2.css?v=REM-20260919-v1-premium",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-salud/restricciones-medicas/estadisticas-remisiones-v2.css?v=REM-20260919-v3-estadisticas",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-integral/gestion-del-cambio/gestion-cambio-v2.css?v=GDC-20260918-v1-premium",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/definicion-indicadores/definicion-indicadores.css?v=20261014-scrollbar886",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion.css?v=20261014-tokens889-modulo",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/verificacion/revision-alta-direccion/revision-alta-direccion-v2.css",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores.css?v=PROV-20261002-impeccable-fix",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-v2.css?v=EVS-20260918-tabs-underline",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.css?v=20260921-premium-v7-volver",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-peligros/inspecciones/inspeccion.css?v=20261014-tokens889-card",
+    "file:///C:/Proyectos%20Programaci%C3%B3n/SG-SST-E/sgsst-electron-app/modules/gestion-peligros/mantenimiento/mantenimiento.css?v=20261014-scrollbar886"
+  ]
+}
