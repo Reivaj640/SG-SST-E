@@ -1173,6 +1173,23 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
   valores **leídos del shell** (`kair-design-tokens.css`), no escritos a mano. Un inventario de las
   reglas mostró que solo **tres** tenían superficie escrita a mano: el resto eran textos grises que se
   ven igual en las dos paletas. **Antes de dar por bueno un "ya sigue el tema", mirá los DOS temas** |
+| 33 | U0001F534 **El archivo que parece el dueño del módulo puede ser código muerto.**
+  `plan-viewer.js` tiene 1 604 líneas de `renderTree()`/`selectActivity()` y espera `#treeContainer`,
+  que **no existe en ningún parte del repo**. La pantalla la pinta el script inline de `plan-view.html`
+  | `modules/gestion-integral/plan-trabajo/` | Antes de parchear, `grep -r 'id="treeContainer"'`: si el
+  ID que el JS busca no aparece en ningún HTML, está muerto. Sus funciones hacen `if (!container)
+  return;`, así que **se ejecutan sin error y sin dejar aviso**. Comprobá que sea **alcanzable**, no
+  que el código exista |
+| 34 | U0001F534 **Un techo se cumple por construcción, no con un clamp.**
+  `scrollIntoView()` recorre TODOS los ancestros scrolleables, incluido el documento | `plan-view.html`
+  (📦895) | Si el techo pedido es "el contenido no sube de esta línea", lo que lo garantiza es la
+  **ausencia del código que lo movería**, no un número que alguien pueda aflojar. Se escribió solo
+  `sc.scrollTop` del contenedor, y el test cuenta las escrituras de `scrollTop` de todo el archivo y exige
+  que sean **una** |
+| 35 | U0001F534 **Un check que mira el texto se equivoca en las DOS direcciones.** El de "no uses
+  `scrollIntoView`" falló porque el propio comentario decía por qué no se usaba |
+  `main/test-plan-scroll-895.js` | Es la trampa 25 del 885 al revés: un comentario puede **hacer fallar** un
+  check en vez de satisfacerlo. **Sanear comentarios antes de verificar**, siempre, y en las dos mitades |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):

@@ -1915,6 +1915,33 @@ function renderMesGrid(){
   });
 }
 
+/* ---------------- Auto-scroll con techo (895) ----------------
+ * Mueve SOLO el contenedor #gantt-scroll. El documento nunca se toca: esa es
+ * la garantia del techo que pidio el owner (el titulo y las tabs no suben por
+ * encima de su linea). Por eso NO se usa scrollIntoView, que recorreria todos
+ * los ancestros scrolleables incluido el documento.
+ * Si la actividad esta dentro de una carpeta cerrada su fila no existe en el
+ * DOM, y en ese caso no se hace nada. */
+var SCROLL_MARGIN = 24;
+function scrollActIntoView(){
+  var sc = $('#gantt-scroll');
+  if (!sc || !actSel) return;
+  var row = sc.querySelector('[data-act="' + actSel.id + '"]');
+  if (!row) return;
+  var scR = sc.getBoundingClientRect();
+  var rowR = row.getBoundingClientRect();
+  var desired = sc.scrollTop;
+  if (rowR.top < scR.top){
+    desired = sc.scrollTop - (scR.top - rowR.top) - SCROLL_MARGIN;
+  } else if (rowR.bottom > scR.bottom){
+    desired = sc.scrollTop + (rowR.bottom - scR.bottom) + SCROLL_MARGIN;
+  }
+  if (desired < 0) desired = 0;
+  var max = sc.scrollHeight - sc.clientHeight;
+  if (max < 0) max = 0;
+  if (desired > max) desired = max;
+  if (desired !== sc.scrollTop) sc.scrollTop = desired;
+}
 function selectAct(id, fromUser){
   var a = findAct(id);
   if (!a) return;
@@ -1925,6 +1952,10 @@ function selectAct(id, fromUser){
   $('#d-obs').value = a.obs || '';
   $('#d-periodo').textContent = MESES[mesVisualizado - 1];
   renderGantt();
+  /* 895 · el orden importa: primero se reconstruye la tabla (eso deja el
+     scrollTop del contenedor en 0) y despues se devuelve la lista a la fila
+     seleccionada. Al reves, el scroll correria sobre una tabla vieja. */
+  scrollActIntoView();
   renderMesGrid();
   if (fromUser){
     $('#detail-panel').classList.add('is-open');

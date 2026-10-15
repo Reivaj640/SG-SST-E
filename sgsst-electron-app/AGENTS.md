@@ -10945,3 +10945,49 @@ la misma que usan el menú y el botón Volver, y te da de regalo el `try/finally
 `destroy()` con error tranque la navegación. Para el contraste, leer los tokens del CSS y medir, no escribir
 el ratio a mano. Y para el estado, un check que compruebe el **orden**: la teardown tiene que ir antes de que
 se borre `contentArea`, no da igual.
+
+## 📦895 · El archivo que parece eldueño del módulo puede no serlo
+
+El Plan de Trabajo tiene dos implementaciones en el disco. `plan-viewer.js` (1 604 líneas) se lee primero
+y parece el módulo: tiene `renderTree()`, `selectActivity()`, gestión de períodos y guardado a Excel.
+Es **código muerto**. Espera `#treeContainer` y `#ganttRows`, que **no existen en ninguna parte del
+repo**. La pantalla real la pinta el script inline de `plan-view.html`, un documento autocontenido con su
+propio `ARBOL`, su `findAct()` y su `selectAct()`.
+
+Lo peligroso no es que esté roto: es que **está bien escrito y ejecuta sin errores**. Sus funciones
+empiezan con `var container = document.getElementById('treeContainer'); if (!container) return;`, así que
+salen en la primera línea y no dejan ni un aviso en la consola.
+
+**Trampa 10 · Antes de parchear un archivo de un módulo, confirmá que su DOM existe.** El mótodo es
+una sola pregunta al grep: `grep -r 'id="treeContainer"'`. Si el ID que el JS busca no aparece en ningún
+HTML del repo, el archivo está muerto. **No verifiques que el código exista: verifica que sea
+alcanzable.** Es el mismo error de fondo del `__fileViewerBytes` del 892.
+
+**Trampa 11 · Un techo se cumple por construcción, no con un clamp.** El owner pidió que el contenido no
+subiera por encima de una línea. Un clamp sería un número que alguien puede aflojar; lo que de verdad
+lo garantiza es la **ausencia del código que lo movería**. `scrollIntoView()` recorre TODOS los
+ancestros scrolleables, incluido el documento, así que usarlo habría movido la página y escondido el
+encabezado. La solución fue escribir únicamente `sc.scrollTop` del contenedor. El test cuenta las
+escrituras de `scrollTop` de todo el archivo y exige que sean una.
+
+**Trampa 12 · Un check que mira el texto se puede equivocar en las DOS direcciones.** El de "no uses
+`scrollIntoView`" falló porque el propio **comentario** del código decía por qué no se usaba. El
+sintoma es el mismo de la trampa 25 del 885 pero al revés: un comentario puede **hacer fallar** un check
+en vez de satisfacerlo. Sanear comentarios antes de verificar, siempre.
+
+**Trampa 13 · El orden importa cuando algo se reconstruye.** `selectAct` llama a `renderGantt()`, que
+vacia el contenedor y manda el `scrollTop` a 0. Por eso el auto-scroll va **después**: al revés mide una
+tabla vieja y el elemento que midió ya no existe. Hay check del orden y mutación que lo invierte.
+
+**Trampa 14 · Si algo se construye condicionalmente, su ausencia es un caso normal, no un error.** Las
+filas solo se crean de las carpetas abiertas, así que la actividad seleccionada puede no estar en el DOM.
+Un `scrollIntoView` ingenuo no haría nada **y no avisaría**: el síntoma sería "a veces funciona".
+
+### El patron que sí funciona
+
+Un test con dos mitades: **mirar el código** para la forma, y **ejecutar la función real** extraía del
+archivo con `vm` contra un DOM simulado para la aritmética. Así se comprueba que al bajar se llega
+hasta `scrollHeight - clientHeight` y no a un número inventado. Y cuando el navegador se satura (el arnés
+con iframe del 895 dió tres timeouts), eso es una respuesta válida: se cambia de método y se dice qué
+queda sin verificar.
+

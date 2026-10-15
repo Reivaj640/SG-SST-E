@@ -92,9 +92,9 @@ temas por (sin espejo / con espejo). Las dos columnas "sin espejo" **reproducen 
 owner** — marco blanco con tarjetas oscuras — y las "con espejo" salen con el fondo oscuro y el texto legible.
 La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema claro. Sigue **sin ser la app
 instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
-shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul.
+shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul. U0001F534 **El 895 no se midió en ninguna parte**: el arnés con iframe saturó el navegador con tres timeouts (el mismo síntoma del 891) y se sustituyó por ejecutar la función real en Node con `vm`, que valida la lógica del scroll pero **no** el comportamiento en el navegador.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891, 📦892, 📦893 y 📦894.
+| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891, 📦892, 📦893, 📦894 y 📦895. **895**, el auto-scroll con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
 **894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
 en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
 funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
@@ -757,6 +757,39 @@ valores **leídos de `kair-design-tokens.css`** y no de una tabla escrita a mano
 superficies que el módulo escribe a mano. El test compara módulo contra shell: si la paleta del shell cambia,
 el módulo tiene que seguirla. Contraste de la paleta neutra: **5.56:1** a **14.19:1**, cero fallas. El test
 pasó de 42 a **63 checks** y de 16 a **22 mutaciones**.
+
+### 2026-10-15 (tarde 3) · La lista del Cronograma sigue a la actividad elegida, sin mover la página (📦895)
+
+**Qué se hizo** — por pedido del owner: el scroll del Cronograma del Plan de Trabajo se quedaba "hasta
+arriba del todo" y debería empezar desde la actividad ID seleccionada, con un **techo** marcado justo debajo
+de las tabs.
+
+**El hallazgo que habríA costado el trabajo:** `plan-viewer.js` es código muerto. Espera
+`#treeContainer` y `#ganttRows`, que **no existen en ninguna parte del repo**, y sus funciones salen en la
+primera línea con un `if (!container) return;`: se ejecutan sin error y sin dejar aviso. La pantalla real la
+pinta el script **inline de `plan-view.html`**. Parchear el archivo equivocado habríA dado un arreglo que no
+hace nada con el test en verde.
+
+**La causa:** `renderGantt()` vacíA `#gantt-table`, que está dentro de `#gantt-scroll`, y eso recorta el
+`scrollTop` del contenedor a 0. No habíA ninguna línea que lo devolviera.
+
+**El techo, por construcción.** `scrollIntoView()` recorre todos los ancestros scrolleables, incluido el
+documento, y habríA movido la página escondiendo el título y las tabs. Así que lo único que se escribe
+es `sc.scrollTop` del contenedor. El test cuenta las escrituras de `scrollTop` de todo el archivo y exige que
+sean **una**.
+
+**Un incidente de proceso que conviene saber:** a mitad de trabajo **un proceso externo revirtió
+`plan-view.html` a su estado original y borró tres scripts nuevos**, todos sin commitear. Se detectó porque
+el test de golpe pasó de 26/26 a 9/28. El 894 no se perdió porque ya estaba commiteado; el 895 sí, y se
+reconstruyó. Desde entonces el script de aplicación **verifica el resultado releyéndolo del disco en el
+mismo paso**. SeZYó el 894 como red: mientras algo esté sin commitear, está expuesto.
+
+**Tests** — `main/test-plan-scroll-895.js` (**31 checks, 17/17 mutaciones**). Tiene dos mitades: mira el
+código, y además **extrae la función real del archivo y la ejecuta con `vm`** contra un DOM simulado, para
+comprobar la aritmética y no solo la forma. Un check de texto no demuestra que el scroll calcule bien.
+
+**Sin bump de versión**: sigue en `0.1.251`.
+
 
 **Dos trampas que casi se caen por el camino**
 

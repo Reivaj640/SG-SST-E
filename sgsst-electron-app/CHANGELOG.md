@@ -187,6 +187,50 @@ el módulo la siga. Contraste de la paleta neutra: **5.56:1** a **14.19:1**, cer
   columna **Claro sale idéntica antes y después**: el arreglo no toca el tema claro. **No es la app instalada**
   (sin `electronAPI` ni IPC), así que falta la confirmación con la app abierta.
 - Batería 884–894 en verde, más `test-explorador-estado-861.js` con 614/614 y 9/9 mutaciones.
+
+### 📦895 · La lista del Cronograma sigue a la actividad elegida, sin mover la página
+
+El owner reportó que la barra de scrolling del Cronograma del Plan de Trabajo se quedaba "hasta arriba
+del todo" y debería empezar desde la actividad ID seleccionada, con un **techo** marcado justo debajo de
+las tabs: el contenido no puede subir por encima de esa línea.
+
+**Lo primero que salió fue un hallazgo que habría costado el trabajo entero.** `plan-viewer.js` es el
+archivo que se lee primero y parece eldueño del módulo: 1 604 líneas con `renderTree()` y
+`selectActivity()`. Es **código muerto**. Espera un DOM con `id="treeContainer"` y `id="ganttRows"`, y
+**esos IDs no existen en ninguna parte del repo**: un grep sobre todo el workspace no los encuentra. Sus
+funciones hacen `document.getElementById(...)` y salen en la primera línea. La pantalla real la pinta el
+script **inline dentro de `plan-view.html`**, que es un documento autocontenido con su propio `ARBOL` de
+datos, su `findAct()` y su `selectAct()`. Parchear el archivo equivocado habría dado un arreglo que no hace
+nada y un test en verde.
+
+**La causa real:** `renderGantt()` hace `table.innerHTML = ''` sobre `#gantt-table`, que está dentro de
+`#gantt-scroll`. Al vaciar el contenido, el `scrollTop` del contenedor se recorta a 0 y la lista salta
+arriba. No habíA ningún `scrollIntoView` en el archivo, o sea que nadie lo devolvía a su lugar.
+
+**El techo se cumple por construcción, no con un clamp.** `scrollIntoView()` recorre **todos** los
+ancestros scrolleables, incluido el documento. Como acá el contenedor externo es el documento entero
+(`.kair-page` no declara overflow), un `scrollIntoView` movería la página y escondería el título y
+las tabs justo por encima de la línea roja. Por eso lo único que se escribe es `sc.scrollTop`, con
+`sc = #gantt-scroll`: el documento no tiene forma de moverse porque no hay ninguna línea que lo mueva. El
+test cuenta las escrituras de `scrollTop` de todo el archivo y exige que sean **una**, la del contenedor.
+
+Va dentro de `selectAct` **después** de `renderGantt()`, porque es esa reconstrucción la que manda el
+`scrollTop` a cero; al revés el scroll mediría una tabla vieja. Y si la actividad está en una carpeta
+cerrada su fila **no existe** (solo se crean las de las carpetas abiertas): no se hace nada, decisión del
+owner.
+
+- `plan-view.html`: `scrollActIntoView()` y su llamada en `selectAct()`. 31 líneas, **sin CSS y sin tocar
+  `renderer.js`**.
+- Nuevo `main/test-plan-scroll-895.js`: **31 checks y 17/17 mutaciones**, con dos mitades: mira el código, y
+  además **extrae la función real del archivo y la ejecuta con `vm`** contra un DOM simulado para
+  comprobar la aritmetica (fila visible no se mueve, fila abajo baja lo justo + 24 px, la última se detiene en
+  el máximo, carpeta cerrada no lanza). Un check de texto no demuestra que el scroll calcule bien.
+- Batería 884–894 en verde; el 861 sigue en 614/614.
+- U0001F534 **No se midió en la app instalada.** El arnés de navegador cargaba la página real en un
+  iframe y saturó el navegador con tres timeouts, el mismo síntoma del 891. Se sustituyó por la
+  ejecución en Node, que valida la lógica del scroll pero **no** el cableado real en el navegador.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
 - Sin bump de versión (`0.1.251`), por la regla del owner.
 
 ### 📦889 · 1.1.2 Roles y Responsabilidades y 1.1.3 Asignación de Recursos sí siguen el tema
