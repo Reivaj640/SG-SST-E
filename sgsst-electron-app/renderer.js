@@ -6876,7 +6876,7 @@ function showRegistroEstadisticoContent(container, currentCompany, moduleName, s
   container.innerHTML = '<p>Cargando registro estadístico...</p>';
 
   const BASE = 'modules/gestion-salud/registro-estadistico/';
-  const TOKEN = 'RES-20260919-v1-premium';
+  const TOKEN = 'RES-20261015-v2-maximizada-50';
 
   if (!document.querySelector(`link[href="${BASE}registro-estadistico.css?v=${TOKEN}"]`)) {
     const cssLink = document.createElement('link');

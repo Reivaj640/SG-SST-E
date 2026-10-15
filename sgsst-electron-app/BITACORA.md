@@ -4860,3 +4860,55 @@ la confirmación del owner en la app instalada.
 **Pendiente de una decisión.** Quedan ~20 px entre el inicio de la barra y la tarjeta, por el
 `margin-top:20px` que ya traían los bloques de contenido. Quitarlo alinea exacto pero cierra el
 aire entre las pestañas y las tarjetas.
+
+---
+
+## 📦899 · 3.2.3: la tabla no aprovechaba la ventana maximizada
+
+**Lo que pidió el owner.** Con la ventana maximizada, la tabla de "Registro y Análisis Estadístico"
+seguía mostrando las mismas 15 filas: *"no aprovecha el modo maximizado, solo sigue mostrando las
+mismas 15"*. En la captura se veía exactamente eso — 85 registros, "Mostrando 1–15 de 85", 6 páginas
+y media pantalla en blanco debajo de la última fila.
+
+**La causa** no era de estilos: el tamaño de página era **un número fijo en el estado de la tabla**
+(`pageSize: 15` en `tState`) y nada lo volvía a mirar cuando cambiaba el tamaño de la ventana. El
+resto del módulo (columnas, filtros, scroll horizontal) sí era fluido, por eso el defecto se veía
+solo en la cantidad de filas.
+
+**La decisión de detección** la tomó el owner, y es doble: hay maximizada si el ancho es **≥ 1360 px**
+(el mismo umbral de "maximizada" que usan las media query del 3.3.1/3.3.2/3.3.3) **o** si el sistema
+reporta la ventana maximizada (`window.electronAPI.isMaximized()`). Lo segundo hace falta porque en
+un portátil de 1280 o 1366 maximizado el ancho no llega a 1360 y, con solo el umbral, seguiría en 15.
+`isMaximized()` es una consulta con respuesta diferida, así que se dispara con un respiro de 150 ms
+después del redimensionamiento (el ancho se aplica en el acto, el estado de la ventana después).
+
+**El candado que hizo falta, y por qué.** El script del módulo **se re-ejecuta cada vez que se abre
+la pantalla** (`renderer.js` agrega un `<script>` nuevo con el mismo `?v=`), y cada ejecución trae su
+propio estado con su tamaño de página y su página activa. Como la escucha de redimensionamiento se
+pegaba a `window` sin dar de baja la anterior, a la segunda apertura ya había dos: la vieja repintaba
+la tabla con su estado obsoleto y pisaba el pintado nuevo. Se registró **una sola escucha por
+módulo** (dar de baja la anterior al iniciar) y un identificador de sesión
+(`window.__kairS323Sesion`) que retarda la respuesta del IPC: si la consulta vuelve después de
+reabrir, la carga vieja no pinta. Sin ese candado el test lo muestra: el pie viejo
+("Mostrando 16–30") aparece sobre la tabla nueva.
+
+**Regla de diseño de este fix: nada de capas solapadas.** El primer intento puso el candado de sesión
+en tres lugares a la vez. La mutación "quitar el candado de `aplicarPageSize`" quedó **verde**, o sea
+que un check no mordía: los candados se cubrían mutuamente y quitar uno no se notaba. Se aplanó a dos
+capas con responsabilidades distintas — **dedupe al registrar** (escucha vieja) y **candado al
+responder el IPC** (promesa vieja) — y los dos quedan mordidos por un mutante.
+
+**Al achicar la ventana la página se recorta**, no se queda sin filas: si estabas en la página 6 con
+15 por página y pasás a 50, la página 6 no existe (77 registros → 2 páginas), así que va a la última
+posible. Sin eso, la tabla queda vacía y el pie escribe "Mostrando 251–77 de 77".
+
+**Verificación.** Test nuevo `tests/registro-estadistico/test-paginacion-maximizada.js` (**23/23**)
+que **ejecuta el JS real** con un DOM mínimo y dispara el redimensionamiento: 1100 → 15 filas,
+1904 → 50, vuelta a 1100 → 15, recorte de página, 1280 maximizada por el sistema → 50, apertura ya
+maximizada sin resize → 50, reapertura sin escuchas apiladas y sin pintado cruzado, y con la tabla
+fuera del documento no revienta. **6/6 mutantes matan al test**: tamaño fijo, sin escucha de resize,
+sin consulta al sistema, sin recorte de página, sin candado de sesión y sin dedupe. Además
+`test-premium.js` 24/24 y `test-chart-overflow.js` 20/20.
+
+**Cache-bust**: token de `renderer.js` a `RES-20261015-v2-maximizada-50` (1 línea, CRLF intacto: el
+archivo sigue con 8069 CRLF / 0 LF, verificado por bytes porque es el que más ruido provoca).

@@ -218,13 +218,60 @@
   /* ==========================================================
      TABLA DE DATOS (Vista de Datos)
      ========================================================== */
+  const PAGE_SIZE_VENTANA = 15;
+  const PAGE_SIZE_MAXIMIZADA = 50;
+  const ANCHO_MAXIMIZADO = 1360;  // mismo umbral de "maximizada" que usa el repo
+  const _sesion = {};             // identifica ESTA carga del módulo
+  let _ventanaMaximizada = false; // estado real de la ventana (se consulta a Electron, asíncrono)
+  let _timerResize = null;
+
   const tState = {
     search: '',
     filters: { anio: '', severidad: '', evento: '', ciudad: '' },
     sort: { col: -1, asc: true },
     page: 1,
-    pageSize: 15,
+    pageSize: PAGE_SIZE_VENTANA,
   };
+
+  /* ---- Paginación adaptativa: 15 filas en ventana, 50 maximizada ---- */
+  function esVentanaMaximizada() {
+    return _ventanaMaximizada === true || (window.innerWidth || 0) >= ANCHO_MAXIMIZADO;
+  }
+
+  // Ajusta el tamaño de página al estado de la ventana. Devuelve true si cambió.
+  function sincronizarPageSize() {
+    const nuevo = esVentanaMaximizada() ? PAGE_SIZE_MAXIMIZADA : PAGE_SIZE_VENTANA;
+    if (nuevo === tState.pageSize) return false;
+    tState.pageSize = nuevo;
+    // Al volver a 15 puede que la página actual ya no exista: se recorta al último posible
+    const paginas = Math.ceil(getFilteredData().length / tState.pageSize) || 1;
+    if (tState.page > paginas) tState.page = paginas;
+    return true;
+  }
+
+  function aplicarPageSize() {
+    if (!document.getElementById('kTableBody')) return; // el módulo ya no está montado
+    if (sincronizarPageSize()) renderTable();
+  }
+
+  function consultarVentanaMaximizada() {
+    const api = window.electronAPI;
+    // sin puente Electron (vista suelta) la decisión queda en el ancho, que sí se mide
+    if (!api || typeof api.isMaximized !== 'function') return;
+    api.isMaximized().then(function (m) {
+      if (window.__kairS323Sesion !== _sesion) return; // una carga vieja no pinta encima de la nueva
+      _ventanaMaximizada = m === true;
+      aplicarPageSize();
+    }).catch(function () {
+      console.debug('[3.2.3] no se pudo leer el estado de la ventana; se usa el ancho');
+    });
+  }
+
+  function alRedimensionar() {
+    aplicarPageSize();                                     // por ancho: síncrono, al instante
+    clearTimeout(_timerResize);
+    _timerResize = setTimeout(consultarVentanaMaximizada, 150); // por estado de la ventana
+  }
 
   function getFilteredData() {
     let rows = DATA.slice();
@@ -872,6 +919,14 @@
      INIT
      ========================================================== */
   function init() {
+    // Una sola escucha de resize por módulo: si el script se vuelve a ejecutar al
+    // reabrir la pantalla, el handler de la carga anterior se retira (su estado
+    // (tState) es viejo y pisaría el render nuevo).
+    window.__kairS323Sesion = _sesion;
+    if (window.__kairS323Resize) window.removeEventListener('resize', window.__kairS323Resize);
+    window.__kairS323Resize = alRedimensionar;
+    window.addEventListener('resize', window.__kairS323Resize);
+
     bindTableEvents();
     bindDashEvents();
     bindTabs();
@@ -924,7 +979,9 @@
       }
     });
 
+    sincronizarPageSize();   // la primera pintura ya sale con el tamaño correcto
     cargarDatosEmpresa();
+    consultarVentanaMaximizada(); // en pantallas chicas maximizadas manda el estado real de la ventana
   }
 
   init();
