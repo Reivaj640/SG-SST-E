@@ -1229,6 +1229,7 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
   `scrollIntoView`" falló porque el propio comentario decía por qué no se usaba |
   `main/test-plan-scroll-895.js` | Es la trampa 25 del 885 al revés: un comentario puede **hacer fallar** un
   check en vez de satisfacerlo. **Sanear comentarios antes de verificar**, siempre, y en las dos mitades |
+| 36 | 🟡 **Una cadena de alturas porcentuales sin un eslabón no acota nada.** `html{height:100%}` sin `body{height:100%}` deja al `height:100%` del hijo sin base: cae a `auto`, la columna flex no se acota y el contenedor con `overflow:auto` crece a la altura del contenido, **no tiene nada que scrollear y la barra desaparece** mientras `overflow:hidden` recorta | `plan-view.html:86-93` (patrón de app shell: `html` + `body` + contenedor + `flex:1` + `min-height:0`) | Antes de culpar al `overflow`, medí `scrollHeight` contra `clientHeight`. Un contenedor con `overflow:auto` que no muestra barra **no está roto: no tiene contenido que scrollear** |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):

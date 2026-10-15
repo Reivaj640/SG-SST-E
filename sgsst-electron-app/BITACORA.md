@@ -4795,3 +4795,68 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 7. **Splash de bienvenida con confetti estilo Stripe** (v0.1.214, 📦815): el check verde Bootstrap hardcoded (`#28a745`) del `loading-success-icon` se reemplazó por SVG con gradiente (`<defs><linearGradient id="kairSuccessGrad">` verde→azul), halo pulsante (`<circle r="52">` con `success-halo` 2s ease-out infinite), check con stroke gradiente (4.5px round caps) y 6 cuadrados confetti (`rect 6×6`) rotando ±180° mientras vuelan ±42px en 3 colores premium v2 (`--kair-blue`, `--kair-green`, `--kair-amber`). ViewBox 52→120 para que respire. Tokens nuevos: `--kair-blue`, `--kair-green`, `--kair-amber` (reutilizados, antes no existían). **Aplicado a AMBOS** overlays (`#kair-loading-success.active` activo + `.kair-transition-success` legado CSS huérfano) por consistencia si el componente se reactiva. Si el user pide cambiar colores, **NO** hardcodear — exponer como tokens `--kair-X` en `:root` y consumirlos desde el `stroke`/`fill` del SVG y desde los keyframes CSS. Cache-bust `styles.css?v=20260926-confetti-success`. Patrón completo en `design_system.md §15`.
 
 8. **URLs relativas en HTML inyectado vía `fetch + innerHTML` se resuelven desde el documento PADRE, no desde el archivo fetched** (v0.1.215, 📦816 — bug en refactor home de Capacitaciones): contraste directo con el patrón de Presupuesto que se carga en **iframe** (donde las URLs se resuelven desde el iframe). Cuando un componente hace `const html = await fetch('./modules/.../foo.html'); container.innerHTML = html`, todos los `<link>`, `<img>`, `<a href>` dentro del HTML inyectado resuelven sus paths relativas desde el BASE URI del documento padre (`index.html`), no desde el archivo fetched. **Síntoma**: la página sale sin estilos (los `<link>` no encuentran el CSS). **Fix**: usar paths relativas a `index.html` (`./shared/...`, `./modules/...`) y agregar `<link>` explícito al CSS del módulo (no se hereda del archivo fetched). Patrón de E2E sin display: `tests/cap-home-e2e.js` con jsdom lee los archivos del disco y los inyecta como `<style>` en un wrapper HTML, valida 18/18 DOM + 15/15 CSS + 9/9 tokens + 11/11 estilos + callbacks. Útil cuando no se puede ejecutar Electron con GUI.
+
+---
+
+## 📦898 · La cadena de alturas: un eslabón faltante hace desaparecer la barra de scroll
+
+**Lo que pidió el owner.** Que la barra vertical del costado derecho de la ventana empiece al mismo
+alto que la tarjeta "Actividad ID", que está a la derecha. Ese scroll era **el documento entero**, que
+no tenía `overflow` declarado, así que su barra arrancaba en el borde superior del visor, muy por
+encima del contenido.
+
+**El patrón que lo resuelve** es el de app shell: cabecera y pestañas fijas, y un contenedor interno
+que lleva el scroll.
+
+```css
+html{height:100%}
+body{height:100%;overflow:hidden}
+.kair-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.kair-topbar{flex:0 0 auto}
+.kair-tabs{flex:0 0 auto}
+.kair-plan-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+```
+
+**EL ERROR, Y POR QUÉ EL SCROLL DESAPARECIÓ.**
+
+La primera vez se puso `height:100%` en `html` y **no en `body`**. Con `body` de altura automática, el
+`height:100%` de `.kair-page` no tiene base definitiva: el porcentaje cae a `auto`, la columna flex no
+se acota, `.kair-plan-scroll` crece hasta la altura completa del contenido y por eso **nunca tiene
+desbordamiento que scrollear**. Mientras tanto `body` ya tenía `overflow:hidden`, así que el recorte no
+dejaba ver nada. Resultado: **la barra desaparece**. El owner lo reportó como *"quitaste por completo el
+auto scroll"*. No era el auto-scroll: era la barra del documento.
+
+**La regla.** Una cadena de alturas porcentuales no acota nada si le falta un eslabón. Si el padre
+directo no tiene altura definida, el `height:100%` del hijo no vale nada. Acá la cadena eran cuatro:
+`html` → `body` → `.kair-page` → `.kair-plan-scroll`, y faltaba `body`.
+
+**El síntoma que delata el error, y el orden para diagnosticarlo.** Un contenedor con `overflow:auto`
+que no muestra barra **no está roto: no tiene nada que scrollear**. Antes de culpar al `overflow`,
+medí `scrollHeight` contra `clientHeight`. En un diseño de app shell, el primer sospechoso de un
+scroll "que no existe" es que el contenedor **creció en vez de encogerse**, y casi siempre la causa es
+un eslabón faltante en la cadena de alturas.
+
+**El otro error del mismo turno: no preguntar cuál barra era.** El owner pidió cambiar "la barra del
+autoscroll" y se hicieron dos intentos antes de entenderlo. El primero movió la barra vertical del
+Gantt. El segundo desactivó el scroll del documento. Los dos estaban equivocados, y el segundo además
+rompió lo que funcionaba. Cuando por fin se preguntó, con las tres barras de la captura nombradas por
+posición, la respuesta fue la que menos se sospechaba: **la del costado derecho de la ventana**.
+
+La lección no es "preguntá más". Es que **"la barra de scroll" es ambigua en cuanto hay más de un
+contenedor scrolleable en pantalla**. Nombrarlas por posición —"la vertical del costado derecho de
+toda la ventana", "la horizontal al pie de la tabla"— desambigua en un mensaje, y listar las
+candidatas con lo que se ve de cada una evita dos ciclos de trabajo perdidos.
+
+**Lo que sí quedó verificado.** En navegador real: la barra aparece en el borde derecho con la punta
+superior justo debajo de las pestañas, y el pulgar ocupa menos de la mitad del carril, o sea que hay
+contenido real para scrollear. Estructuralmente, los 92 pares de `div` quedan balanceados y el CSS con
+las llaves en cero. Y el auto-scroll del 895 intacto: `scrollActIntoView()`, `SCROLL_MARGIN = 24` y
+`.kair-gantt__scroll{max-height:560px}` sin tocar.
+
+**Lo que no se pudo verificar.** La pestaña Cronograma dentro del contenedor nuevo: el navegador
+embebido se colgó dos veces con timeout de 275 s, el mismo síntoma del 891 y del 895. Queda pendiente
+la confirmación del owner en la app instalada.
+
+**Pendiente de una decisión.** Quedan ~20 px entre el inicio de la barra y la tarjeta, por el
+`margin-top:20px` que ya traían los bloques de contenido. Quitarlo alinea exacto pero cierra el
+aire entre las pestañas y las tarjetas.

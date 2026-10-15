@@ -83,12 +83,14 @@
 
 /* ================= 2. BASE ================= */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;height:100%}
 body{
   font-family:var(--kair-font-ui);
   background:var(--kair-bg);color:var(--kair-text);
   font-size:14px;font-weight:400;line-height:1.5;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  height:100%;   /* 898 · sin esto el height:100% de .kair-page no tiene base */
+  overflow:hidden;   /* 898 · el scroll lo lleva .kair-plan-scroll, no el documento */
 }
 button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;color:var(--kair-text)}
@@ -101,7 +103,7 @@ svg{display:block;flex-shrink:0}
 ::selection{background:var(--kair-blue-soft)}
 
 /* ================= 3. PÁGINA ================= */
-.kair-page{max-width:none;margin:0 auto;padding:22px 28px 56px}
+.kair-page{max-width:none;margin:0 auto;padding:22px 28px 0;height:100%;min-height:0;display:flex;flex-direction:column}
 
 /* ================= 4. TOPBAR DEL MÓDULO ================= */
 .kair-topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
@@ -133,6 +135,10 @@ svg{display:block;flex-shrink:0}
 
 /* ================= 6. TABS ================= */
 .kair-tabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--kair-border)}
+/* 898 · el techo del scroll: arranca debajo de las tabs, al nivel del panel de Actividad ID */
+.kair-topbar{flex:0 0 auto}
+.kair-tabs{flex:0 0 auto}
+.kair-plan-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:56px}
 .kair-tab{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;font-size:13.5px;font-weight:600;color:var(--kair-text-2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--kair-t),border-color var(--kair-t)}
 .kair-tab svg{opacity:.75}
 .kair-tab:hover{color:var(--kair-text)}
@@ -472,6 +478,8 @@ svg{display:block;flex-shrink:0}
     </button>
   </nav>
 
+  <div class="kair-plan-scroll" id="plan-scroll">
+
   <!-- ============================================================
        VISTA 1 · DASHBOARD DE AVANCE
        ============================================================ -->
@@ -736,6 +744,7 @@ svg{display:block;flex-shrink:0}
       </aside>
     </div>
   </section>
+  </div>
 </div>
 
 <!-- ================= MODAL · SELECCIONE PERIODO ================= -->
@@ -1916,10 +1925,11 @@ function renderMesGrid(){
 }
 
 /* ---------------- Auto-scroll con techo (895) ----------------
- * Mueve SOLO el contenedor #gantt-scroll. El documento nunca se toca: esa es
- * la garantia del techo que pidio el owner (el titulo y las tabs no suben por
- * encima de su linea). Por eso NO se usa scrollIntoView, que recorreria todos
- * los ancestros scrolleables incluido el documento.
+ * Mueve SOLO el contenedor #gantt-scroll. El documento no se toca, y desde el 898
+ * ni siquiera scrollea: su overflow es hidden y el scroll lo lleva #plan-scroll. Esa es
+ * la garantia del techo que pidio el owner (el titulo y las tabs no suben por encima
+ * de su linea). Por eso NO se usa scrollIntoView, que recorreria todos los ancestros
+ * scrolleables incluido el documento.
  * Si la actividad esta dentro de una carpeta cerrada su fila no existe en el
  * DOM, y en ese caso no se hace nada. */
 var SCROLL_MARGIN = 24;

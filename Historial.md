@@ -94,7 +94,7 @@ La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema
 instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
 shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul. U0001F534 **El 895 no se midió en ninguna parte**: el arnés con iframe saturó el navegador con tres timeouts (el mismo síntoma del 891) y se sustituyó por ejecutar la función real en Node con `vm`, que valida la lógica del scroll pero **no** el comportamiento en el navegador.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891 a 📦895, más 📦896 y 📦897 de documentación. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
+| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891 a 📦895, más 📦896, 📦897 y 📦898. **898**, la barra vertical del costado derecho de la ventana arrancaba en el borde superior del visor porque el scroll lo llevaba el documento entero; ahora un contenedor interno lo lleva y arranca debajo de las pestañas, al nivel de la tarjeta Actividad ID. El error del primer intento fue poner `height:100%` en `html` y no en `body`: el hijo perdía la base, la columna flex no se acotaba y el contenedor crecía hasta no tener nada que scrollear, así que la barra desaparecía. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
 **894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
 en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
 funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
@@ -704,6 +704,51 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-15 (tarde 5) · La barra del scroll arrancaba en el borde superior de la ventana (📦898)
+
+**Qué se hizo** — por pedido del owner: que la barra vertical del costado derecho de la ventana empiece
+al mismo alto que la tarjeta "Actividad ID", que está a la derecha. Ese scroll lo llevaba **el
+documento entero**, que no tenía `overflow` declarado, así que su barra arrancaba en el borde superior
+del visor, muy por encima del contenido.
+
+**El arreglo** es el patrón de app shell: `html` y `body` con `height:100%`, `body` con
+`overflow:hidden`, `.kair-page` como columna flex de altura completa con `min-height:0`, cabecera y
+pestañas con `flex:0 0 auto`, y un contenedor nuevo `#plan-scroll` con `flex:1 1 auto` y `overflow:auto`.
+Las dos vistas quedaron dentro; los modales, que ya estaban fuera, no se movieron.
+
+**ME EQUIVOCÉ DOS VECES ANTES DE ACERTAR, Y LAS DOS IMPORTAN.**
+
+La primera, de código: puse `height:100%` en `html` y **no en `body`**. Sin base definitiva en el padre
+directo, el `height:100%` de `.kair-page` cae a `auto`, la columna flex no se acota, el contenedor
+crece a la altura del contenido y **nunca scrollea**, mientras `overflow:hidden` recorta. La barra
+desapareció. El owner lo reportó como *"quitaste por completo el auto scroll"* — y el auto-scroll
+estaba intacto todo el tiempo. **La regla: una cadena de alturas porcentuales no acota nada si le falta
+un eslabón.** Y el síntoma que lo delata: un contenedor con `overflow:auto` que no muestra barra no
+está roto, no tiene nada que scrollear.
+
+La segunda, de comunicación: "la barra del autoscroll" era ambiguo. Hay **tres** barras scrolleables en
+esa pantalla —la del Gantt, la horizontal al pie de la tabla y la del borde de la ventana— y se trabajó
+sobre la equivocada dos veces. Cuando se preguntó nombrándolas por posición, la respuesta fue la que
+menos se sospechaba. **"La barra de scroll" no identifica una barra cuando hay más de un contenedor
+scrolleable en pantalla.**
+
+**Lo que sí quedó verificado**, en navegador real: la barra aparece en el borde derecho con la punta
+superior justo debajo de las pestañas, y el pulgar ocupa menos de la mitad del carril, así que hay
+contenido real para scrollear. Estructuralmente: 92 pares de `div` balanceados, llaves de CSS en cero,
+modales fuera del contenedor y en `position:fixed`. Y el auto-scroll del 895 intacto:
+`scrollActIntoView()`, `SCROLL_MARGIN = 24` y `.kair-gantt__scroll{max-height:560px}` sin tocar.
+
+**Lo que no se pudo verificar.** La pestaña Cronograma dentro del contenedor nuevo: el navegador
+embebido se colgó dos veces con timeout de 275 s, el mismo síntoma del 891 y del 895. Queda pendiente
+que el owner lo confirme en la app instalada.
+
+**Pendiente de decisión.** Quedan ~20 px entre el inicio de la barra y la tarjeta, por el
+`margin-top:20px` que ya traían los bloques de contenido. Quitarlo alinea exacto, pero cierra el aire
+entre las pestañas y las tarjetas.
+
+**Lección para el repo.** El detalle completo está en `BITACORA.md` § 📦898, y la trampa como fila 36
+de la tabla de `PROMPT.md` § 9.
 
 ### 2026-10-15 (tarde 4) · AGENTS.md dejó de ser un archivo de 11.000 líneas (📦896, 897)
 

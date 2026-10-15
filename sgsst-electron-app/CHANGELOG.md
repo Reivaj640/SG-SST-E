@@ -17,6 +17,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦898 · La barra del scroll arranca al nivel de la tarjeta Actividad ID
+
+**Qué cambió.** El scroll del `Plan de Trabajo Anual` lo llevaba **el documento entero**, sin
+`overflow` declarado, así que la barra vertical del costado derecho de la ventana arrancaba en el
+borde superior del visor, muy por encima del contenido. Ahora arranca **justo debajo de las
+pestañas**, que es donde empieza la tarjeta "Actividad ID".
+
+Es el patrón de app shell: cabecera y pestañas fijas, y un contenedor interno `#plan-scroll` que lleva
+el scroll. Las dos vistas quedan dentro de ese contenedor; los modales, que ya estaban fuera y son
+`position:fixed`, no se movieron.
+
+```css
+html{height:100%}
+body{height:100%;overflow:hidden}
+.kair-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.kair-topbar{flex:0 0 auto}
+.kair-tabs{flex:0 0 auto}
+.kair-plan-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+```
+
+**El error que costó el primer intento, y que ya está en la bitácora.** Poner `height:100%` en `html`
+pero **no** en `body` deja al `height:100%` de `.kair-page` sin base definitiva: el porcentaje cae a
+`auto`, la columna flex no se acota, `.kair-plan-scroll` crece a la altura del contenido y **nunca
+scrollea**, mientras `overflow:hidden` recorta. La barra desaparece y parece que se rompió el
+auto-scroll, cuando lo que se rompió fue el contenedor. El detalle completo está en
+`BITACORA.md` § 📦898.
+
+**El otro error fue de comunicación.** "La barra del autoscroll" resultó ambiguo: hay tres barras
+scrolleables en esa pantalla y se trabajó sobre la equivocada dos veces. La que quería el owner era la
+del **costado derecho de la ventana**, no la del Gantt.
+
+**Verificado:**
+
+| Comprobación | Resultado |
+|---|---|
+| Navegador real, barra del borde derecho | punta superior justo debajo de las pestañas |
+| El pulgar ocupa menos de la mitad del carril | hay contenido real para scrollear |
+| Pares de `div` del documento | 92 aperturas, 92 cierres, nivel final 0 |
+| Llaves del CSS | balanceadas |
+| Modales | siguen fuera del contenedor y en `position:fixed` |
+| Auto-scroll del 895 | `scrollActIntoView()`, `SCROLL_MARGIN = 24` y `.kair-gantt__scroll` sin tocar |
+
+**No verificado:** la pestaña Cronograma dentro del contenedor nuevo. El navegador embebido se colgó
+con timeout de 275 s al hacer clic, el mismo síntoma del 891 y el 895. El shell y el scroll sí se
+midieron en navegador real; el Gantt queda pendiente de confirmación en la app instalada.
+
+Sin bumpeo de versión: `0.1.251`, este paquete no toca lógica.
+
 ### 📦896 / 897 · AGENTS.md dejó de cargarse entero: la bitácora se va a BITACORA.md
 
 **Qué cambió.** `sgsst-electron-app/AGENTS.md` tenía **10.993 líneas** y su propio encabezado avisaba
