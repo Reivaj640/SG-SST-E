@@ -19,8 +19,10 @@ class ResponsableSgComponent {
         iframe.style.height = '100%';
         iframe.style.border = 'none';
         
-        // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `modules/recursos/responsable-sg/responsable-sg-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        // Pasar parámetros a la nueva interfaz a través de la URL.
+// El `&v=` es el tercer nivel del sello del 📦891: sin él Electron sirve el
+// HTML del viewer desde caché y el iframe abre con el JS viejo, sin tema.
+const viewerUrl = `modules/recursos/responsable-sg/responsable-sg-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}&v=RESPONSABLE-20261015-v1-dark891`;
         iframe.src = viewerUrl;
 
         this.container.appendChild(iframe);
@@ -98,7 +100,19 @@ class ResponsableSgComponent {
         console.log(`[ResponsableLogic] Solicitud: ${apiFunctionName}, ID: ${requestId}`);
 
         try {
-            if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
+            // 📦892 · `__fileViewerBytes` NO es una funcion de electronAPI: es un canal
+            // virtual que se rutea mas abajo hacia `readFileBytes`. Esta guarda lo
+            // mataba ANTES de llegar al ruteo, y por eso:
+            //   1) el preview de PDF fallaba siempre con "API function
+            //      __fileViewerBytes not found", y
+            //   2) las ~40 lineas del ruteo de bytes nunca se ejecutaron para el PDF.
+            // El bloque de abajo, que responde "Ruteo del visor de archivos roto",
+            // era la red de seguridad, pero tampoco se podia alcanzar: esta guarda
+            // lanzaba antes. Los dos mecanismos se contradecian y el test 861
+            // comprobaba el de abajo sin notar el de arriba.
+            const CANALES_VIRTUALES = ['__fileViewerBytes'];
+            const esCanalVirtual = CANALES_VIRTUALES.indexOf(apiFunctionName) !== -1;
+            if (!esCanalVirtual && (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function')) {
                 throw new Error(`API function ${apiFunctionName} not found`);
             }
 

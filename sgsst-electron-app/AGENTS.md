@@ -10776,3 +10776,48 @@ del CSS antes de tocarlo: los 23 coinciden. Es la forma de probar el "no toqué 
 WCAG 1.4.3 (4.5:1 para texto normal) encontró tres cosas que **una revisión visual no ve**: los botones de
 acento estaban en **2.56:1** y **1.75:1** con texto blanco en oscuro, y "+ Agregar tema" en **3.95:1**. En
 oscuro un azul que sube a `#5da2ff` necesita **texto oscuro encima**, no blanco.
+---
+
+## 📦891 / 892 · 1.1.1: el atributo que dispara el CSS, y el canal que no existe
+
+Dos fallos con la misma forma: **una pieza del contrato entre capas que nadie verifica**. En los dos, el
+código estaba escrito suponiendo algo del otro lado, y el otro lado hacía otra cosa.
+
+| # | Capa que dio por sentado algo falso | Dónde | Qué pasó |
+|---|---|---|---|
+| 1 | El viewer traducía `{theme, mode}`; `renderer.js` manda `{theme, effectiveTheme}` | `responsable-sg-viewer.js` vs `renderer.js:1755` | `mode` llegaba `undefined`, el fallback devolvía `null` en modo sistema, y el `postMessage` **borraba** el atributo que la escritura directa acababa de poner |
+| 2 | El padre rutaba por `__fileViewerBytes`; el preload expone `readFileBytes` | `responsable-sg-logic.js:69` vs `preload.js:285` | La guarda `typeof electronAPI[n] === 'function'` mató el canal **antes** del ruteo: el PDF fallaba siempre y ~40 líneas quedaron muertas |
+
+### Cinco trampas de este turno
+
+**Trampa 1 · Un canal virtual no es una función del preload.** `__fileViewerBytes` es una bandera para
+llegar al bloque que lee bytes. Si validás que exista como función **antes** de rutear, lo matás. Y si
+dejás una red de seguridad "por si falta algo", tiene que estar **después** de la guarda: comprobá que sea
+**alcanzable**, no que el código exista. El test 861 llevaba tiempo comprobando la red sin notar la guarda.
+
+**Trampa 2 · `dark-legacy` no es alias de `dark`, y `postMessage` es asíncrono.** Cuando el shell escribe
+directamente en `contentDocument` **y además** manda un mensaje, gana el mensaje. Quitar una de las dos
+rutas.
+
+**Trampa 3 · Un panel que no limpia el estado anterior miente sobre el documento actual.**
+`_showLoading()` solo encendía el overlay. El fallo de una carga pasada quedaba pintado debajo. Con un
+`.docx` en pantalla y un error de PDF encima, no había forma de saber cuál fallaba. Limpiá **antes** de
+pedir, y rescatá el `emptyState`: vive **dentro** del contenedor, así que al vaciarlo se pierde para siempre.
+
+**Trampa 4 · Leer `utf8` y escribir `latin1` destruye el archivo sin que se note.** Cada `═══`, `—` y `·`
+pasa a `P` o `?`. **Un CSS sigue funcionando con los comentarios convertidos en basura**, porque el
+navegador los ignora: nada falla en pantalla. Lo detectó un test al leer 0 tokens. **Todo script que
+escriba un archivo del repo tiene que abortar si el resultado contiene `U+FFFD`.**
+
+**Trampa 5 · Un check que compara posiciones de dos textos distintos da un fallo falso.** Para verificar
+que el `<script>` de tema va antes del primer `<link>`, hay que sanear los comentarios **antes de sacar
+los dos índices, y sobre el mismo texto**: el comentario del `<head>` documenta por qué algo va primero, y
+es más largo que el gap que se quiere medir. También: un check que cuenta usos con regex cuenta la
+definición de la función como un uso más, y una mutación que no encuentra su ancla es un **mutante
+vacío**, que es un fallo del test, no un detalle.
+
+### El patrón que sí funciona
+
+Un test de tema que **lee los tokens del CSS y calcula luminancia**, en vez de comparar contra una tabla
+escrita a mano. Si alguien cambia `--kair-primary`, el ratio se recalcula y el test falla porque el color
+sobre él ya no alcanza — no porque alguien se acuerde de actualizar la tabla.

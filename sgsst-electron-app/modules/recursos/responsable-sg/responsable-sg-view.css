@@ -67,6 +67,21 @@
     --kair-breadcrumb-h: 38px;
     --kair-toolbar-h: 48px;
     --kair-footer-h: 32px;
+
+    /* 📦891 · Texto SOBRE las superficies de acento.
+       El acento cambia de valor con el tema, asi que un #fff fijo deja de
+       contrastar en cuanto el tema cambia. Ratios calculados contra los
+       tokens de arriba, no estimados:
+
+         on-accent  sobre primary -> 6.74:1
+         on-danger  sobre danger  -> 4.53:1
+         on-warning sobre warning -> 7.23:1
+
+       OJO con on-warning: antes era #fff, que sobre el ambar daba 1.63:1.
+       Era ilegible ya en claro, no solo en oscuro. */
+    --kair-on-accent: #ffffff;
+    --kair-on-danger: #ffffff;
+    --kair-on-warning: #4a3400;
 }
 
 /* ─────────── RESET LOCAL (scoped a .kair-body) ─────────── */
@@ -231,7 +246,7 @@
 
 .kair-header__action--primary {
     background: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
 }
 
 .kair-header__action--primary:hover {
@@ -456,7 +471,7 @@
 
 .kair-view-toggle__btn.is-active {
     background: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
 }
 
 .kair-view-toggle__btn:focus-visible {
@@ -566,7 +581,7 @@
 .kair-sidebar__collapse:hover {
     background: var(--kair-primary);
     border-color: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
     box-shadow: 0 4px 8px rgba(32, 87, 184, 0.35);
     transform: scale(1.08);
 }
@@ -925,7 +940,7 @@
 /* Botón "Ver completo" — más prominente para indicar que abre el modal */
 .kair-preview__action--primary {
     background: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
     width: auto;
     padding: 0 12px;
     gap: 6px;
@@ -935,7 +950,7 @@
 
 .kair-preview__action--primary:hover:not(:disabled) {
     background: var(--kair-primary-hover);
-    color: #fff;
+    color: var(--kair-on-accent);
 }
 
 .kair-preview__action:hover:not(:disabled) {
@@ -971,7 +986,7 @@
 .kair-preview__collapse:hover {
     background: var(--kair-primary);
     border-color: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
     box-shadow: 0 4px 8px rgba(32, 87, 184, 0.35);
     transform: translateY(-50%) scale(1.08);
 }
@@ -1070,7 +1085,9 @@
     width: 100%;
     height: 100%;
     border: none;
-    background: #fff;
+    /* 📦891 — era #fff fijo: el marco blindingaba la vista al abrir un
+       documento. En claro el token vale #ffffff (identico byte a byte). */
+    background: var(--kair-bg-card);
     display: block;
 }
 
@@ -1093,7 +1110,10 @@
 }
 
 .kair-preview__body:has(flyfish-file-viewer) {
-    background: #fff;
+    /* 📦891 — era #fff fijo: al montar el visor de documentos el panel
+       entero se quedaba blanco en modo oscuro. Es el tema de sistema que
+       se veia solapado sobre el oscuro. */
+    background: var(--kair-bg-card);
     display: flex;
     flex-direction: column;
     min-height: 0;            /* permite que el body se encoja dentro del preview */
@@ -1366,7 +1386,7 @@
     height: 36px;
     border-radius: 50%;
     background: var(--kair-warning);
-    color: #fff;
+    color: var(--kair-on-warning);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1450,7 +1470,7 @@
 
 .kair-modal__btn--danger {
     background: var(--kair-danger);
-    color: #fff;
+    color: var(--kair-on-danger);
 }
 
 .kair-modal__btn--danger:hover {
@@ -1557,6 +1577,16 @@
     --kair-shadow-card: 0 1px 2px rgba(0,0,0,0.3);
     --kair-shadow-md: 0 2px 8px rgba(0,0,0,0.3);
     --kair-shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+
+    /* 📦891 · En oscuro el acento es un tono CLARO (#4da6ff), asi que el
+       texto encima tiene que ser oscuro. Con #fff quedaban, medido:
+         #ffffff sobre primary  #4da6ff -> 2.56:1  (el boton "Subir")
+         #ffffff sobre danger  #d9534f -> 3.96:1  (el boton "Eliminar")
+         #ffffff sobre warning #f0ad4e -> 1.95:1  (el icono del modal)
+       Con estos valores: 6.53:1, 4.96:1 y 7.31:1. */
+    --kair-on-accent: #0b1f33;
+    --kair-on-danger: #1a0506;
+    --kair-on-warning: #3d2600;
 }
 
 /* En dark mode, el SVG del chevron del select necesita color claro */
@@ -1619,7 +1649,7 @@
 [data-theme="dark"] .kair-view-toggle__btn.is-active,
 [data-theme="dark-legacy"] .kair-view-toggle__btn.is-active {
     background: var(--kair-primary);
-    color: #fff;
+    color: var(--kair-on-accent);
 }
 
 /* En dark mode, el loading overlay usa fondo oscuro semitransparente */
@@ -1820,7 +1850,7 @@
     font-family: var(--kair-font);
     font-size: 0.8125rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--kair-on-accent);
     background: var(--kair-primary);
     border: none;
     border-radius: var(--kair-radius-md);

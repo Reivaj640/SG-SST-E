@@ -201,6 +201,79 @@ CSS antes de tocarlo: los 23 coinciden. Y se midió WCAG 1.4.3 de verdad: los bo
   entero.
 - Sin bump de versión (`0.1.251`), por la regla del owner.
 
+### 📦891 · 1.1.1 Responsable del SG-SST sí sigue el tema elegido
+
+El submódulo se quedaba en claro en modo **sistema** con el sistema en oscuro, y el panel de vista
+previa se quedaba blanco encima del oscuro en cuanto se abría un documento.
+
+**El sincronizador leía una clave que el shell nunca manda.** `responsable-sg-viewer.js:240` traía su
+propia copia de la lógica de `scripts/theme-manager.js`, que no está cargado en el shell. Se notaba
+en el contrato: leía `event.data.mode`, y `renderer.js:1755` manda `theme` y `effectiveTheme`, no
+`mode`. Con `mode` siempre `undefined` caía en el fallback y devolvía `dark` en todos los casos, así
+que en modo sistema devolvía `null` y terminaba **borrando** el atributo que `renderer.js:1746`
+acaba de escribir. El postMessage es asíncrono: siempre gana el último en escribir.
+
+El CSS no tenía nada malo: 58 reglas oscuras, 29 para `dark` y 29 para `dark-legacy`, y 322 usos de
+tokens. El fallo era el atributo que dispara esas reglas, no las reglas.
+
+**El panel de vista previa quedaba blanco.** `.kair-preview__body:has(flyfish-file-viewer)` y
+`.kair-pdf-frame` tenían `background: #fff` sin contraparte oscura.
+
+**Contraste.** Diez sitios tenían `color: #fff` sobre superficies de acento. El botón "Subir" quedaba
+en **2.56:1** en modo oscuro. Se agregaron tres tokens (`--kair-on-accent`, `--kair-on-danger`,
+`--kair-on-warning`) con valor por tema; el botón pasó a **6.53:1**. El ícono de advertencia del modal
+usaba blanco sobre ámbar y daba **1.63:1 ya en claro**: era ilegible antes de este trabajo, no solo
+en oscuro.
+
+**Archivos:**
+- `responsable-sg-viewer.js` — borradas `_applyThemeToHtml`, `_resolveThemeValue`, el listener propio y
+  el `MutationObserver` que solo logueaba. `_setupThemeSync` verifica que el módulo compartido haya
+  cargado; `_teardownThemeSync` es no-op.
+- `responsable-sg-view.html` — `shared/kair-iframe-theme.js` en el `<head>`, antes de cualquier
+  `<link>` y sin `defer`, para que el tema esté puesto antes del primer pintado.
+- `responsable-sg-logic.js` — sello `?v=` en el `iframe.src`.
+- `responsable-sg-view.css` — 2 fondos a token, 3 tokens nuevos, 10 `color: #fff` a token.
+- `main/test-responsable-tema-891.js` — **58 checks, 20/20 mutaciones**. Los checks de contraste leen
+  los tokens reales del CSS y calculan luminancia: si alguien cambia `--kair-primary`, el test falla
+  de verdad, no porque alguien lo anotara en una tabla.
+
+**Trampa:** el `?v=` tiene **tres niveles**: el script dentro del iframe, el CSS del iframe, y el
+`iframe.src` en el padre. Falta cualquiera de los tres y Electron sirve del caché.
+
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
+### 📦892 · El visualizador de 1.1.1 volvió a abrir documentos
+
+Al hacer clic en un documento, el preview fallaba con `API function __fileViewerBytes not found`. El
+error además se quedaba pintado al seleccionar el archivo siguiente, con un `.docx` en pantalla y un
+error de PDF encima.
+
+**El canal virtual no existe en el preload.** El padre rutea el preview del PDF por `__fileViewerBytes`
+(`responsable-sg-logic.js:69`), pero ese nombre no es una función de `window.electronAPI`: es una
+bandera para llegar al bloque que lee bytes crudos con `readFileBytes`. El preload expone
+`readFileBytes`, `getPDFPreview` y `getWordPreview` — no `__fileViewerBytes`.
+
+`handleStandardRequest` validaba, antes de rutear, que `apiFunctionName` fuera una función real del
+preload. La guarda mataba el canal **antes** de que el ruteo pudiera correr. Dos consecuencias: el
+preview de PDF fallaba siempre, y unas 40 líneas de ruteo quedaron como código muerto. El bloque que
+responde *"Ruteo del visor de archivos roto"* era la red de seguridad, pero tampoco se alcanzaba: los
+dos mecanismos se contradecían, y el test 861 comprobaba el de abajo sin notar el de arriba.
+
+**El panel conservaba el error anterior.** `_showLoading()` solo encendía el overlay; no limpiaba
+`#viewerContainer`. El fallo de una carga pasada quedaba debajo del overlay, indistinguible de un
+fallo real del archivo actual.
+
+**Archivos:**
+- `responsable-sg-logic.js` — `CANALES_VIRTUALES` excluido de la guarda de existencia.
+- `responsable-sg-viewer.js` — `_clearPreviewPanel()` antes de cada petición: limpia el contenedor,
+  rescata el empty state (vive dentro del contenedor), desmonta el viewer anterior y borra los bytes
+  viejos. `_errorDeCarga()` nombra el archivo y su extensión.
+- `main/test-visor-carga-892.js` — **26 checks, 16/16 mutaciones**, incluido el check que faltaba en
+  el 861: que la red de seguridad sea **alcanzable**, comparando posiciones y no solo que el código
+  exista.
+
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
 ### 📦886 · Las barras de desplazamiento ahora siguen el tema elegido
 
 La barra de desplazamiento se veía **blanca sobre el fondo oscuro** en los dos modos.

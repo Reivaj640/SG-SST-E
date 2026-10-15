@@ -64,10 +64,7 @@ var ResponsableSgViewer = (function () {
         // 📦608-fix8 — Bytes del archivo actual (para expandir a modal sin
         // volver a pedirlos al IPC). Se setean en _renderFileViewerInPanel.
         currentFileBytes: null,
-        currentFileViewerMount: null,   // { el, url, unmount } devuelto por kairFV.mountInContainer
-        // Listeners de theme (para cleanup en destroy)
-        _themeMessageHandler: null,
-        _themeObserver: null
+        currentFileViewerMount: null    // { el, url, unmount } devuelto por kairFV.mountInContainer
     };
 
     /* ═══════════════════════════════════════════════════════════════
@@ -218,86 +215,54 @@ var ResponsableSgViewer = (function () {
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       THEME SYNC — Escucha cambios del padre y los aplica al iframe
-       El theme-manager del padre propaga el atributo data-theme al
-       iframe via contentDocument + postMessage('theme-changed').
+       THEME SYNC — Delegado en shared/kair-iframe-theme.js
+
+       QUE HACIA ESTE CODIGO Y POR QUE ESTABA MAL
+       Este bloque era una copia de la logica de `scripts/theme-manager.js`, que
+       NO esta cargado en el shell. Se notaba en el contrato: leia
+       `event.data.mode`, y renderer.js nunca manda esa clave. Lo que si manda,
+       en renderer.js:1755, es:
+
+           iframe.contentWindow.postMessage({
+               type: 'theme-changed',
+               theme: themeMode,          // PREFERENCIA: 'light' | 'dark' | 'system'
+               effectiveTheme: effectiveTheme
+           }, '*')
+
+       Con `mode` siempre undefined, `_resolveThemeValue` caia en su fallback y
+       devolvia siempre 'dark'. El resultado segun la preferencia del usuario:
+
+         oscuro MANUAL  -> 'dark'        (el shell usa 'dark-legacy': paletas
+                                          distintas, no es grave pero se nota)
+         modo SISTEMA   -> null           -> removeAttribute: SE BORRA el tema
+         claro          -> null           (correcto por casualidad)
+
+       O sea: en modo sistema la vista se quedaba en claro aunque el sistema
+       estuviera en oscuro, que es justo el sintoma reportado.
+
+       Y como renderer.js:1743-1759 escribe primero el atributo YA resuelto en
+       `contentDocument` y despues manda el postMessage, era peor: el mensaje
+       asincrono llegaba despues y BORRABA el 'dark' recien puesto.
+
+       QUE HAY AHORA
+       El modulo compartido se carga en el <head> de la vista y se auto-instala
+       (lee el tema del padre y queda escuchando los mensajes). Esta funcion solo
+       verifica que haya cargado. No se registra un segundo listener a proposito:
+       dos rutas escribiendo el mismo atributo se pisan, y la que gana es siempre
+       la ultima en ejecutar.
        ═══════════════════════════════════════════════════════════════ */
-    function _applyThemeToHtml(themeValue) {
-        // themeValue: 'dark-legacy' | 'dark' | null (light = sin atributo)
-        try {
-            var docEl = document.documentElement;
-            if (themeValue) {
-                docEl.setAttribute('data-theme', themeValue);
-            } else {
-                docEl.removeAttribute('data-theme');
-            }
-            _log('THEME', 'APPLIED', { value: themeValue });
-        } catch (e) {
-            _err('THEME_APPLY', e);
-        }
-    }
-
-    function _resolveThemeValue(theme, mode) {
-        // theme: 'light' | 'dark', mode: 'light' | 'dark' | 'system'
-        if (theme !== 'dark') return null; // light
-        // dark:
-        if (mode === 'dark') return 'dark-legacy';
-        if (mode === 'system') return 'dark';
-        return 'dark'; // fallback
-    }
-
     function _setupThemeSync() {
-        // 1) Leer tema actual del <html> del padre (si está disponible)
-        try {
-            if (window.parent && window.parent.document && window.parent.document.documentElement) {
-                var parentTheme = window.parent.document.documentElement.getAttribute('data-theme');
-                if (parentTheme) {
-                    _applyThemeToHtml(parentTheme);
-                }
-            }
-        } catch (e) {
-            // cross-origin, no se puede leer del padre
-            _log('THEME', 'PARENT_READ_BLOCKED');
-        }
-
-        // 2) Escuchar mensajes de cambio de tema del padre
-        _state._themeMessageHandler = function (event) {
-            if (!event.data || typeof event.data !== 'object') return;
-            if (event.data.type !== 'theme-changed') return;
-            var theme = event.data.theme;
-            var mode = event.data.mode;
-            var themeValue = _resolveThemeValue(theme, mode);
-            _applyThemeToHtml(themeValue);
-        };
-        window.addEventListener('message', _state._themeMessageHandler);
-
-        // 3) MutationObserver como defensa: si el theme-manager cambia
-        //    el atributo data-theme directamente en el iframe, sincronizamos
-        if (typeof MutationObserver !== 'undefined') {
-            _state._themeObserver = new MutationObserver(function (mutations) {
-                mutations.forEach(function (m) {
-                    if (m.type === 'attributes' && m.attributeName === 'data-theme') {
-                        var newVal = document.documentElement.getAttribute('data-theme');
-                        _log('THEME', 'OBSERVED_CHANGE', { value: newVal });
-                    }
-                });
-            });
-            _state._themeObserver.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['data-theme']
-            });
+        if (typeof window.kairIframeApplyTheme !== 'function') {
+            _err('THEME_MODULE_MISSING', new Error(
+                'shared/kair-iframe-theme.js no cargo: el <script> va en el <head> ' +
+                'de responsable-sg-view.html, antes de cualquier <link>'));
         }
     }
 
     function _teardownThemeSync() {
-        if (_state._themeMessageHandler) {
-            window.removeEventListener('message', _state._themeMessageHandler);
-            _state._themeMessageHandler = null;
-        }
-        if (_state._themeObserver) {
-            _state._themeObserver.disconnect();
-            _state._themeObserver = null;
-        }
+        // No-op a proposito. El listener vive en el modulo compartido, que dura
+        // lo que el documento. Antes se desmontaba un listener propio; ya no hay
+        // listener propio que desmontar.
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -909,6 +874,7 @@ var ResponsableSgViewer = (function () {
         if (emptyState) emptyState.style.display = 'none';
 
         _enableDocActions(true);
+        _clearPreviewPanel();
         _showLoading('Cargando vista previa...');
 
         var extension = (doc.extension || '').toLowerCase().replace('.', '');
@@ -924,6 +890,58 @@ var ResponsableSgViewer = (function () {
         }
     }
 
+    /**
+     * 📦892 · Limpia el panel de vista previa al empezar a cargar otro documento.
+     *
+     * Sin esto, un error de una carga anterior queda pintado debajo del overlay.
+     * Se selecciona un DOCX, la peticion va en camino, y el panel sigue
+     * mostrando "Error de carga: API function __fileViewerBytes not found" del
+     * PDF que se intento abrir antes. Es peor que un bug: hace creer que el
+     * documento que se esta viendo es el que fallo.
+     */
+    function _clearPreviewPanel() {
+        var viewerContainer = document.getElementById('viewerContainer');
+        if (viewerContainer) viewerContainer.innerHTML = '';
+
+        // El empty state vive DENTRO del contenedor: hay que rescatarlo antes de
+        // vaciarlo, o se pierde y no se puede volver a la vista inicial.
+        var emptyState = document.getElementById('emptyState');
+        if (viewerContainer && emptyState) {
+            viewerContainer.appendChild(emptyState);
+            emptyState.style.display = 'none';
+        }
+
+        if (_state.currentFileViewerMount && typeof _state.currentFileViewerMount.unmount === 'function') {
+            try { _state.currentFileViewerMount.unmount(); } catch (_) {}
+        }
+        _state.currentFileViewerMount = null;
+        _state.currentFileBytes = null;
+
+        var oldFrame = document.getElementById('docFrame');
+        if (oldFrame) oldFrame.remove();
+        var toolbar = document.getElementById('previewToolbar');
+        if (toolbar) toolbar.classList.remove('is-visible');
+    }
+
+    /**
+     * 📦892 · Error de carga que dice QUE archivo fallo.
+     *
+     * Antes el mensaje era "Error al cargar PDF: ..." sin decir de que archivo,
+     * y se escribia en el panel sin limpiar, asi que podia ser el error de un
+     * documento anterior. Con un DOCX en pantalla y un error de PDF, no habia
+     * forma de saber cual de los dos estaba roto.
+     */
+    function _errorDeCarga(error) {
+        var doc = _state.currentDocument || {};
+        var nombre = doc.name || '(desconocido)';
+        var ext = (doc.extension || '').toLowerCase().replace('.', '');
+        var detalle = (error && error.message) ? error.message : String(error);
+        _showErrorInViewer(
+            'No se pudo abrir <strong>' + _esc(nombre) + '</strong>' +
+            (ext ? ' (.' + _esc(ext) + ')' : '') + '. Detalle: ' + _esc(detalle)
+        );
+    }
+
     function _loadPDF(filePath) {
         // 📦861 · Mismo camino que Excel y Word: si el padre responde
         // `mode: 'file-viewer'`, se monta el visor de K+AIR. `get-pdf-preview`
@@ -931,7 +949,7 @@ var ResponsableSgViewer = (function () {
         _callParentAPI('get-pdf-for-viewer', { filePath: filePath }).then(function (result) {
             _handlePreviewResult(result, 'PDF');
         }).catch(function (error) {
-            _showErrorInViewer('Error al cargar PDF: ' + error.message);
+            _errorDeCarga(error);
         });
     }
 
@@ -939,7 +957,7 @@ var ResponsableSgViewer = (function () {
         _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
             _handlePreviewResult(result, 'Excel');
         }).catch(function (error) {
-            _showErrorInViewer('Error al cargar Excel: ' + error.message);
+            _errorDeCarga(error);
         });
     }
 
@@ -947,7 +965,7 @@ var ResponsableSgViewer = (function () {
         _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
             _handlePreviewResult(result, 'Word');
         }).catch(function (error) {
-            _showErrorInViewer('Error al cargar Word: ' + error.message);
+            _errorDeCarga(error);
         });
     }
 

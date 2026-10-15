@@ -1108,7 +1108,7 @@ Pregunta solo lo que no se puede deducir del código.
 
 ---
 
-## 9. Trampas activas en el repo (verificadas 2026-10-14)
+## 9. Trampas activas en el repo (verificadas 2026-10-15)
 
 No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si no las conoce.
 
@@ -1135,6 +1135,11 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 19 | 🔴 **Un `:root` dentro de un `<style>` inyectado escribe en TODO el shell**, no solo en el componente | `copasst-logic.js` lo hacía con `--widget-bg-color`, que `styles.css` usa en **44 lugares** | Un `<style>` que cuelga de un `div` sigue aplicando a todo el documento, y `:root` sigue siendo el `<html>`. Los tokens van en el **contenedor real**, nunca en `:root` |
 | 20 | 🔴 **La herramienta de edición normaliza a CRLF un archivo de EOL mixto.** `copasst-home.css` tiene el bloque legacy en CRLF y el premium del final en LF; editarlo lo convierte entero y el diff se vuelve ilegible | `modules/recursos/copasst/copasst-home.css` | Si un archivo es mixto, **`git checkout --` y rehacé el cambio por bytes** con un script que cuente las ocurrencias antes de escribir. Verificá los bytes, no `git status` |
 | 21 | 🔴 **Un arnés que muta `data-theme` en caliente mide el estado anterior.** Reportó 16 fallas que no existían | los arneses de 887/889/890 | Que el tema viaje en el HTML **desde el parseo**, antes del primer `<link>`. `void offsetHeight` no fuerza el recálculo. **La firma de que el arnés miente**: en un mismo elemento y en el mismo instante, la variable de tema oscura y el fondo claro |
+| 22 | 🔴 **Un canal virtual NO es una función del preload.** `responsable-sg-logic.js` rutea el preview del PDF por `__fileViewerBytes`, y ese nombre no existe en `window.electronAPI`: es una bandera para llegar al bloque que lee bytes con `readFileBytes` | `responsable-sg-logic.js:69`, `preload.js:285` | Si validás `typeof electronAPI[nombre] === 'function'` **antes** de rutear, matás el canal y dejás ~40 líneas de ruteo como código muerto. Y si hay una red de seguridad "por si falta algo", tiene que estar **después** de la guarda: si no, tampoco se alcanza. Comprobá que sea alcanzable, no que el código exista |
+| 23 | 🔴 **El panel de vista previa no limpia el estado anterior.** `_showLoading()` solo encendía el overlay; `#viewerContainer` conservaba el fallo de la carga pasada | `responsable-sg-viewer.js` | Con un `.docx` en pantalla y un error de PDF pintado encima, no hay forma de saber cuál falló. Limpiá **antes** de pedir, y rescatá el `emptyState`: vive **dentro** del contenedor, así que al vaciarlo se pierde para siempre |
+| 24 | 🔴 **Un archivo leído como `utf8` y escrito como `latin1` se destruye sin que se note.** Cada `═══`, `—` y `·` pasa a `P` o `?` | cualquiera con acentos o cajas de dibujo | **El CSS sigue "funcionando"**: el navegador ignora los comentarios, así que nada falla en pantalla. Solo se ve al leer el archivo. Lo detectó un test al encontrar 0 tokens. **Antes de escribir, abortá si el resultado tiene `U+FFFD`** |
+| 25 | 🔴 **Un check que compara posiciones de dos textos distintos da un fallo falso.** Medir el índice de un elemento sobre el archivo con comentarios y el de otro sobre el archivo sin ellos | checks de orden de carga en `<head>` | El comentario del `<head>` documenta *por qué* algo va primero, y es más largo que el gap que se quiere medir. Sanear los comentarios **antes de sacar los dos índices**, y sobre el mismo texto |
+
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

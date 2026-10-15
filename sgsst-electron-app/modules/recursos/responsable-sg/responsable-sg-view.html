@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>K+AIR · 1.1.1 Responsable del SG-SST · Visualizador</title>
+    <!-- 📦891 · Sincronizacion de tema del shell a este iframe.
+         Va PRIMERO, antes de cualquier <link>, y sin defer: tiene que poner
+         data-theme en el <html> antes de que se pinte el primer pixel, o la
+         vista arranca en claro y luego salta (el "flash" que se ve al abrir).
+         El `?v=` es obligatorio: Electron sirve el script desde cache y sin el
+         sello el fix no llega nunca a la vista. -->
+    <script src="../../../shared/kair-iframe-theme.js?v=RESPONSABLE-20261015-v1-dark891"></script>
     <!-- Iconos K+AIR (bootstrap-icons) -->
     <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
     <!-- Estilos del módulo (namespace canónico kair-*) -->
-    <link rel="stylesheet" href="responsable-sg-view.css">
+    <link rel="stylesheet" href="responsable-sg-view.css?v=RESPONSABLE-20261015-v1-dark891">
 </head>
 <body class="kair-body">
 
