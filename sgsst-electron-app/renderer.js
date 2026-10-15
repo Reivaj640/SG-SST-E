@@ -4402,35 +4402,31 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
       }
     }, 100); // Pequeño retraso para asegurar que el elemento esté en el DOM
 
-    // Crear contenedor para los elementos de UI con posición absoluta encima de la animación
+    /* 📦893 · Pantalla de selección de empresa en el dialecto premium.
+       El texto no puede leerse por `--kair-ink` como en el resto del premium:
+       aquí el fondo es la animación Vanta, que es siempre clara. Medido contra
+       su punto más claro (#a9bcd8), el blanco da 1.93:1; compuesto con el panel
+       de vidrio, 7.59:1. Por eso el texto va dentro de un panel.
+
+       El contenedor NO lleva la clase `kair-premium`: esa es el envoltorio de
+       PÁGINA del premium y pinta fondo, que es justo lo que taparía la
+       animación. El componente declara por su cuenta lo que necesita.
+
+       La clase `company-select-button` SE CONSERVA aunque ya no tenga estilos
+       propios: es el hook que usan selectCompany() y el cierre de sesión para
+       limpiar la marca `selected` con querySelectorAll. Perderla rompería el
+       resaltado al cambiar de empresa. */
     const uiContainer = document.createElement('div');
-    uiContainer.style.position = 'absolute';
-    uiContainer.style.top = '0';
-    uiContainer.style.left = '0';
-    uiContainer.style.width = '100%';
-    uiContainer.style.height = '100%';
-    uiContainer.style.display = 'flex';
-    uiContainer.style.flexDirection = 'column';
-    uiContainer.style.justifyContent = 'center';
-    uiContainer.style.alignItems = 'center';
-    uiContainer.style.zIndex = '10'; // Asegurar que esté encima de la animación
+    uiContainer.className = 'kair-company-select';
 
-    // Placeholder para la imagen de bienvenida
-    // En una implementación completa, se cargaría una imagen real
-    const welcomePlaceholder = document.createElement('div');
-    welcomePlaceholder.id = 'welcome-placeholder';
-    welcomePlaceholder.textContent = '¡Bienvenido al SG-SST! Selecciona una empresa para comenzar.';
-    welcomePlaceholder.style.color = 'white';
-    welcomePlaceholder.style.fontSize = '24px';
-    welcomePlaceholder.style.textAlign = 'center';
-    welcomePlaceholder.style.marginBottom = '20px';
-    welcomePlaceholder.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-    uiContainer.appendChild(welcomePlaceholder);
+    const panel = document.createElement('div');
+    panel.className = 'kair-company-select__panel';
+    uiContainer.appendChild(panel);
 
-    // Contenedor para los botones de selección de empresa
-    const companySelectionDiv = document.createElement('div');
-    companySelectionDiv.id = 'company-selection';
-    companySelectionDiv.style.textAlign = 'center';
+    const label = document.createElement('div');
+    label.className = 'kair-company-select__label';
+    label.textContent = 'SG-SST · sistema de gestión';
+    panel.appendChild(label);
 
     // Mostrar mensaje si no hay empresas registradas
     if (dynamicCompanies.length === 0) {
@@ -4438,15 +4434,11 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
       // 📦862 · El criterio es el ROL, no si vino un array. Un admin nunca debe
       // ver 'contacta a administración': es el mensaje del usuario sin empresas
       // asignadas, y a un admin lo deja sin salida.
+      noCompaniesMessage.className = 'kair-company-select__sub';
       noCompaniesMessage.textContent = esAdmin
         ? 'No hay empresas registradas. Por favor, crea una empresa en la sección de configuración.'
         : 'No tienes empresas asignadas. Contacta a administración.';
-      noCompaniesMessage.style.color = 'white';
-      noCompaniesMessage.style.fontSize = '18px';
-      noCompaniesMessage.style.textAlign = 'center';
-      noCompaniesMessage.style.marginBottom = '20px';
-      noCompaniesMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-      uiContainer.appendChild(noCompaniesMessage);
+      panel.appendChild(noCompaniesMessage);
 
       // 📦862 · El Inicio esconde el sidebar siempre, así que sin empresas
       // registradas el admin se queda sin ninguna forma de llegar a la
@@ -4455,26 +4447,62 @@ if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen')
       // test-swapview-841 exige que nada de ese cromo entre en el desvanecido.
       if (esAdmin) {
         const goConfig = document.createElement('button');
-        goConfig.className = 'company-select-button';
+        goConfig.className = 'kair-btn';
         goConfig.textContent = 'Ir a Configuración';
-        goConfig.style.margin = '10px';
+        goConfig.style.margin = '10px 0 0';
         goConfig.addEventListener('click', () => {
           if (typeof showSettingsPage === 'function') showSettingsPage();
         });
-        uiContainer.appendChild(goConfig);
+        panel.appendChild(goConfig);
       }
     } else {
+      const title = document.createElement('h2');
+      title.className = 'kair-company-select__title';
+      title.textContent = '¿Con qué empresa vas a trabajar?';
+      panel.appendChild(title);
+
+      const sub = document.createElement('p');
+      sub.className = 'kair-company-select__sub';
+      sub.textContent = 'Elegí una empresa para cargar su configuración, sus documentos y el histórico del SG-SST.';
+      panel.appendChild(sub);
+
+      const list = document.createElement('div');
+      list.id = 'company-selection';
+      list.className = 'kair-company-select__list';
+
       dynamicCompanies.forEach(companyName => {
         const button = document.createElement('button');
-        button.className = 'company-select-button';
-        button.textContent = companyName;
-        button.style.margin = '5px';
+        button.type = 'button';
+        button.className = 'kair-mod company-select-button';
+
+        const icon = document.createElement('span');
+        icon.className = 'kair-mod__icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+          + 'stroke-linecap="round" stroke-linejoin="round">'
+          + '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+          + '<polyline points="9 22 9 12 15 12 15 22"/></svg>';
+        button.appendChild(icon);
+
+        const text = document.createElement('span');
+        text.className = 'kair-mod__text';
+        const name = document.createElement('span');
+        name.className = 'kair-mod__name';
+        name.textContent = companyName;
+        const sub2 = document.createElement('span');
+        sub2.className = 'kair-mod__sub';
+        sub2.textContent = 'Empresa · seleccionar';
+        text.appendChild(name);
+        text.appendChild(sub2);
+        button.appendChild(text);
+
         button.addEventListener('click', () => selectCompany(companyName, button));
-        companySelectionDiv.appendChild(button);
+        list.appendChild(button);
       });
+
+      uiContainer.appendChild(list);
     }
 
-    uiContainer.appendChild(companySelectionDiv);
     homePageDiv.appendChild(uiContainer);
 
     contentArea.appendChild(homePageDiv);

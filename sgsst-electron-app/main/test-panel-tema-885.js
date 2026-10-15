@@ -268,7 +268,12 @@ function evaluar(F) {
   // ── 8 · CACHE-BUST ────────────────────────────────────────────────────
   const tok = (/shared\/kair-premium\.css\?v=([^"]+)/.exec(idx) || [])[1] || '';
   chk(/^\d{8}-[a-z0-9-]+$/.test(tok), 'kair-premium.css lleva token con formato AAAAMMDD-descripcion', tok);
-  chk(/885/.test(tok), 'el token nombra este paquete', tok);
+  // El token ya no tiene que nombrAR a este paquete: el 893 lo bumpeo a
+  // `20261015-empresa893`. Lo que no puede pasar es que retroceda a uno
+  // anterior, porque Electron seguiria sirviendo el CSS previo desde su cache.
+  // Asi que lo que se comprueba es la FECHA del sello, no su texto.
+  chk(parseInt(tok.slice(0, 8), 10) >= 20261014,
+      'el sello no retrocede antes del dia del 885', tok);
 
   return c;
 }
@@ -323,7 +328,7 @@ const MUT = [
   ['se borra el override del hero, que ya era oscuro',
     f => { f.premium = f.premium.replace('.kair-premium .kair-hero{position:relative;overflow:hidden;background:#14213D;', '.kair-premium .kair-hero{position:relative;overflow:hidden;background:#FFFFFF;'); }],
   ['se pierde el cache-bust del archivo',
-    f => { f.idx = f.idx.replace('?v=20261014-panel885', '?v=20261002-hero-oculto'); }],
+    f => { f.idx = f.idx.replace(/(shared\/kair-premium\.css\?v=)[^"]+/, '$120261002-hero-oculto'); }],
   ['la tarjeta se come el texto: el terciario vuelve a ser el del shell',
     f => { f.premium = f.premium.replace('[data-theme="dark-legacy"] .kair-premium{--kair-faint:#9a9a9a}', '[data-theme="dark-legacy"] .kair-premium{--kair-faint:#606060}'); }],
   ['renderer.js deja de aplicar la clase wrapper',

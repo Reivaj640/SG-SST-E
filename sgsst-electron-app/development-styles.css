@@ -19,45 +19,14 @@
   padding: 40px;
 }
 
-#welcome-placeholder {
-  font-size: 1.5rem;
-  color: #6c757d;
-  margin-bottom: 30px;
-}
-
-#company-selection {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-}
-
-.company-select-button {
-  min-width: 150px;
-  padding: 15px 20px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  border: 2px solid var(--border-color); /* Borde gris claro */
-  background-color: var(--white-color);
-  color: var(--dark-color); /* Texto oscuro */
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.company-select-button:hover {
-  background-color: var(--secondary-color); /* Fondo gris medio */
-  border-color: var(--secondary-color);
-  color: var(--white-color); /* Texto blanco */
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra neutra */
-}
-
-.company-select-button.selected {
-  background-color: var(--secondary-color); /* Fondo gris medio */
-  border-color: var(--secondary-color);
-  color: var(--white-color);
-}
+/* 📦893 · #welcome-placeholder, #company-selection y .company-select-button
+   se movieron al dialecto premium (shared/kair-premium.css, bloque
+   📦893). Motivo: aquí usaban los tokens viejos (--white-color,
+   --border-color...), que ya no son el dialecto del proyecto, y sus bloques
+   de tema eran [data-theme="dark"] a secas, sin su par dark-legacy: en el
+   oscuro manual los botones se quedaban con el aspecto del claro.
+   La clase `.company-select-button` SIGUE usándose en el JS como hook para
+   limpiar la marca `selected`; lo que se retiró son solo sus estilos. */
 
 /* Estilos para el home de la empresa seleccionada */
 .main-canvas.company-home-canvas {
@@ -608,10 +577,6 @@
     grid-template-columns: 1fr;
   }
 
-  #company-selection {
-    flex-direction: column;
-    align-items: center;
-  }
 
   .company-row {
     flex-direction: column;
@@ -1362,24 +1327,9 @@
   border-color: var(--primary-hover-color) !important;
 }
 
-/* 24. Company select button - Ajustar tema */
-[data-theme="dark"] .company-select-button {
-  background-color: var(--widget-bg-color);
-  border-color: var(--border-color);
-  color: var(--text-color);
-}
-
-[data-theme="dark"] .company-select-button:hover {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-  color: var(--white-color);
-}
-
-[data-theme="dark"] .company-select-button.selected {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-  color: var(--white-color);
-}
+/* 24 · Company select button. Sus variantes de tema se movieron al premium
+   (shared/kair-premium.css, bloque 📦893). No tenían par dark-legacy, que
+   es justo por lo que en el oscuro manual salían con el aspecto del claro. */
 
 /* 25. Main canvas company home - Ajustar tema */
 [data-theme="dark"] .main-canvas.company-home-canvas {
@@ -1391,12 +1341,3 @@
   color: var(--text-color);
 }
 
-/* 27. Welcome placeholder - Ajustar tema */
-[data-theme="dark"] #welcome-placeholder {
-  color: var(--text-light-color);
-}
-
-/* 28. Company selection - Ajustar tema */
-[data-theme="dark"] #company-selection {
-  color: var(--text-color);
-}

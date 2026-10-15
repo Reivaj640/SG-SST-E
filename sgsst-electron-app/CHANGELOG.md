@@ -633,6 +633,51 @@ pone 1 rojo, y quitar la guarda de las casillas pone 5.
   de documentación imprimen con `window.open('', '_blank')` y el handler las deja pasar.
 - La política de privacidad (`sitio/`) deja de anunciar `gmail.compose`, que ya no se pide, y
   documenta que los tokens van cifrados y que existe registro de consentimiento.
+### 📦893 · La pantalla de selección de empresa vuelve al dialecto premium
+
+La pantalla con la que arranca la app —la que pide elegir empresa— seguía montada a mano: doce
+estilos **en línea** desde el JS, los tokens viejos del shell (`--white-color`, `--border-color`,
+`--secondary-color`) y tres bloques de tema escritos como `[data-theme="dark"]` **a secas**.
+Como `dark-legacy` no es alias de `dark`, en el **oscuro manual** esos botones se quedaban con el
+aspecto del claro mientras el resto de la app ya estaba oscuro.
+
+El problema de fondo era otro: aquí no hay fondo de token, hay una animación Vanta a pantalla
+completa que es **siempre clara**. Medido contra su punto más claro (`#a9bcd8`), el texto blanco
+directo da **1.93:1**, que falla incluso como texto grande. Se leía a ojo porque el `text-shadow`
+compensaba, pero **WCAG no cuenta text-shadow**. Por eso el texto ahora va dentro de un panel de
+vidrio, que compuesto da **7.59:1**.
+
+**El defecto que de verdad importaba lo encontró el owner mirando la app, no un test.** El primer
+montaje usaba la clase `kair-premium` en el contenedor para no perder la fuente del premium. Pero
+`kair-premium` no es una clase de contenedor: es el **envoltorio de página** del premium, y por eso
+pinta fondo (`--kair-canvas` en claro, `#2d3748` en oscuro), fija `height:100%` y `overflow-y:auto`.
+Montada sobre la animación, la tapaba. Un `background:transparent` en la regla del 893 lo
+cancelaba y el CSS quedaba **correcto** — por eso ningún test cantaba nada, y tampoco lo habría
+cantado con la causa presente: es una defensa contra el síntoma. El arreglo fue dejar de usar la
+clase y **declarar en el componente lo que antes tomaba prestado**: la fuente, el `box-sizing` y las
+bases de la tarjeta. El diseño no cambió; cambió la dependencia.
+
+En el camino se perdió el centrado: al semar los estilos en línea se fue el `alignItems = 'center'`
+que traía la pantalla vieja, y un contenedor sin `align-items` sigue siendo un contenedor válido —
+llaves cuadradas, sin color prohibido, sin error de sintaxis. Solo se nota mirando.
+
+El resultado se midió en un navegador real con los CSS del disco y los tres temas a la vez: el Vanta
+se ve detrás, el panel y las tarjetas salen centrados, y las tarjetas cambian de superficie en
+claro (`#ffffff`), en `dark` (`#384151`) y en `dark-legacy` (`#292929`). **No es la app instalada**:
+no hay `electronAPI` ni IPC detrás, así que falta la confirmación con la app abierta.
+
+- `development-styles.css` pierde **81 líneas**: 6 reglas de la pantalla y los bloques 24, 27 y 28.
+  Los 25 y 26, que no son de esta pantalla, quedan intactos. La clase `.company-select-button`
+  **se conserva aunque ya no tenga estilos propios**: es el hook que usan `selectCompany()` y el
+  cierre de sesión para limpiar la marca `selected`.
+- Nuevo `main/test-empresa-893.js`: **72 checks y 26/26 mutaciones**, con el contraste leído de los
+  tokens reales y compuesto sobre el punto más claro de Vanta **antes** de medir.
+- Se reparó `main/test-panel-tema-885.js`: exigía que el sello de `kair-premium.css` contuviera
+  literalmente `panel885`, así que se rompió solo con este bumpeo. Ahora compara la **fecha** del
+  sello contra la del 885, que es lo que importa, y su mutación mueve el sello sea cual sea.
+- Batería 884–893 en verde (11 tests).
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
 ## [0.1.250] - 2026-10-07
 
 ### 📦872 · Google: K+AIR pide un permiso menos

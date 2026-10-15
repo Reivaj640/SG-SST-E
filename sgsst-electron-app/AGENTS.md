@@ -10821,3 +10821,53 @@ vacío**, que es un fallo del test, no un detalle.
 Un test de tema que **lee los tokens del CSS y calcula luminancia**, en vez de comparar contra una tabla
 escrita a mano. Si alguien cambia `--kair-primary`, el ratio se recalcula y el test falla porque el color
 sobre él ya no alcanza — no porque alguien se acuerde de actualizar la tabla.
+## 📦893 · La pantalla de selección de empresa: una clase de página no se monta en un overlay
+
+Después de 891 y 892, el owner pidió rediseñar la pantalla con la que arranca la app. Vanta se
+conserva, las tarjetas llevan borde redondeado de 20 px y el texto va sobre un panel de vidrio. Lo
+que se vej en pantalla no es lo queapproved, y ahí están las cinco lecciones.
+
+**Trampa 1 · `.kair-premium` es el ENVOLTORIO DE PÁGINA, no una clase de contenedor.**
+`shared/kair-premium.css:22` la define con `background:var(--kair-canvas,#FBFCFB)`,
+`height:100%`, `width:100%` y `overflow-y:auto`; la línea 265 le da su oscuro,
+`background:var(--content-area-bg,#2d3748)`. Montarla sobre el overlay tapaba la animación de
+Vanta con un bloque opaco. Compra dos cosas (la fuente del sistema y el color de texto) y arrastra
+tres que en un overlay sobran. **Un overlay se declara autosuficiente**: no alquila nada de la
+página. Por eso el bloque del 893 cuelga de `.kair-company-select` a secas y re-declara la fuente,
+el `box-sizing` y las bases de `.kair-mod`, que viven todas bajo `.kair-premium`.
+
+**Trampa 2 · Cancelar una cascada con `background:transparent` defiende el síntoma, no la causa.**
+La regla del overlay ganaba por especificidad y el bloque opaco desaparecía. El CSS quedaba
+**correcto**, y ningún test lo cantaba —ni lo cantaría con la causa presente, porque la causa no
+afectaba el resultado del check. Ese es el peor tipo de defensa: una que hace que todo parezca
+bien mientras el error de fondo sigue ahí. Cuando el síntoma se solve con una regla que compite,
+preguntate cuál es el error de diseño que la regla está tapando.
+
+**Trampa 3 · Un estilo en línea puede ser COMPORTAMIENTO, no decoración.**
+La pantalla vieja llevaba `uiContainer.style.alignItems = 'center'`. Al pasarla a clases, los doce
+estilos en línea se fueron, y con ellos el centrado. Un contenedor sin `align-items` sigue siendo
+un contenedor **válido**: llaves cuadradas, sin color prohibido, sin error de sintaxis, y el test
+en verde. **Ningún check de estructura lo ve; solo se nota mirando la pantalla.** Cuando saques
+estilos en línea, leé cada uno preguntándote qué se pierde si desaparece.
+
+**Trampa 4 · Un check que fija el `?v=` literal se rompe en el próximo bumpeo.**
+`test-panel-tema-885.js` exigía que el sello de `kair-premium.css` contuviera `panel885`. Cuando el
+893 lo bumpeó, el test falló **sin que hubiera ningún error de verdad**, y su mutación se volvió
+vacía porque el `replace()` ya no encontraba su ancla. Lo que ese check quiere asegurar es que
+Electron no sirva el CSS anterior desde su caché, y eso lo garantiza la **fecha** del sello, no su
+texto. **Anclá a la fecha mínima, nunca al literal del paquete.**
+
+**Trampa 5 · Cuando el CSS cambia de forma, las mutaciones se vuelven no-op en silencio.**
+Al rehacer el bloque del 893, seis mutaciones seguían apuntando a selectores que ya no existían.
+No fallaron: el arnés las reportó como `MUTANTE VACIO`, que es exactamente lo que un mutante
+vacío esconde. Después de cada rediseño, **re-anclá las mutaciones y exigí `mutaciones vacias: 0`**.
+Un mutante que no muerde es peor que no tener mutación, porque el arnés dice «todo bien» mientras no
+cubre nada.
+
+### El patrón que sí funciona
+
+Un check que **lee el atributo y el contexto donde vive**, no el atributo suelto. El test del 893
+exige que `renderer.js` cree el contenedor **sin** la clase de página y que ninguna regla del
+bloque cuelgue de ella. Con eso, el error de fondo no puede volver ni aunque alguien lo intente
+de nuevo. Y para el contraste: componer los `rgba` sobre el fondo real **antes** de medir, en vez
+de escribir el ratio a mano en un comentario.

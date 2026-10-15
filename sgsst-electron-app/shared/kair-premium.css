@@ -360,3 +360,78 @@
 /* El borde lateral de las tareas (#5B6B8C) es un gris medio: sobre fondo oscuro
    se pierde. Se sube para que la franja siga marcando el estado. */
 [data-theme^="dark"] .kair-premium .kair-task::before{background:#8fa0b5}
+
+/* ══════════════════════════════════════════════════════════════════════
+   📦893 · PANTALLA DE SELECCIÓN DE EMPRESA
+
+   EL CONTEXTO RARO DE ESTA PANTALLA
+   Ninguna otra superficie del premium tiene este problema: aquí no hay fondo
+   de token, hay una animación Vanta a pantalla completa que es SIEMPRE
+   clara. De ahí dos decisiones que ailleurs serían errores:
+
+     1. NO lleva la clase `kair-premium`. Esa clase es el ENVOLTORIO DE PÁGINA
+        del premium (línea 22) y pinta fondo: --kair-canvas en claro y
+        #2d3748 en oscuro (línea 265). Montarla sobre la animación la tapaba.
+        También trae height:100% y overflow-y:auto, que no significan nada en
+        un overlay. Por eso este bloque cuelga de `.kair-company-select` a
+        secas y declara por su cuenta lo que antes tomaba prestada de la
+        página: la fuente, el box-sizing y las bases de la tarjeta. Es lo que
+        la hace autosuficiente.
+     2. El texto no puede leerse por `--kair-ink` como en el resto del
+        premium, porque no hay fondo de token detrás: lleva panel de vidrio.
+
+   MEDIDO contra el punto MÁS CLARO que puede tener Vanta (el inicio del
+   degradado, #a9bcd8), porque ese es el que manda para WCAG:
+     texto blanco directo      1.93:1   falla incluso como texto grande
+     panel rgba(13,21,38,.62)  7.59:1   ok
+   El 1.93:1 es el de la pantalla que había: se leía a ojo porque el
+   `text-shadow` compensaba, pero WCAG no cuenta text-shadow.
+
+   `--kcs-shadow` existe porque el separador contra Vanta tiene que pesar
+   distinto en claro y en oscuro, y no hay token para eso.
+   ══════════════════════════════════════════════════════════════════════ */
+.kair-company-select{--kcs-shadow:0 8px 24px rgba(20,33,61,.16);position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:34px 32px;font-family:var(--kair-font-ui,'DM Sans',system-ui,sans-serif);color:#fff;-webkit-font-smoothing:antialiased}
+.kair-company-select *,.kair-company-select *::before,.kair-company-select *::after{box-sizing:border-box}
+.kair-company-select__panel{width:100%;max-width:640px;background:rgba(13,21,38,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:20px 24px;margin-bottom:18px}
+.kair-company-select__label{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.94);margin-bottom:8px}
+.kair-company-select__title{margin:0 0 6px;font-size:25px;font-weight:600;line-height:1.2;letter-spacing:-.01em;color:#fff}
+.kair-company-select__sub{margin:0;font-size:13.5px;line-height:1.55;color:rgba(255,255,255,.96)}
+.kair-company-select__list{width:100%;max-width:640px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+
+/* LA TARJETA. Antes heredaba su base de `.kair-premium .kair-mod` (column,
+   radio 14px, fondo #FFFFFF escrito a mano). Ahora se declara entera. El radio
+   es 20px = --kair-radius-card, el mismo que .kair-card y .kair-kpi.
+   El `font-family` estaba porque el elemento es un <button>, y un botón no
+   hereda la fuente del contenedor. */
+.kair-company-select .kair-mod{display:flex;flex-direction:row;align-items:flex-start;gap:13px;width:100%;text-align:left;padding:17px 18px;border-radius:20px;border:1px solid var(--kair-line,#E8EBEE);background:var(--kair-card,#FFFFFF);box-shadow:var(--kcs-shadow);cursor:pointer;transition:transform var(--kair-transition),border-color var(--kair-transition),box-shadow var(--kair-transition)}
+.kair-company-select .kair-mod:hover{transform:translateY(-2px);border-color:var(--kair-blue,#2057B8);box-shadow:0 12px 30px rgba(20,33,61,.22),var(--kcs-shadow)}
+[data-theme^="dark"] .kair-company-select .kair-mod:hover{border-color:var(--kair-blue,#5da2ff);box-shadow:0 12px 30px rgba(0,0,0,.44),var(--kcs-shadow)}
+.kair-company-select .kair-mod:active{transform:translateY(0)}
+.kair-company-select .kair-mod__icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#EDF3FC;color:#2057B8}
+.kair-company-select .kair-mod__icon svg{width:18px;height:18px;display:block}
+.kair-company-select .kair-mod__text{display:flex;flex-direction:column;min-width:0}
+.kair-company-select .kair-mod__name{display:block;font-family:var(--kair-font-display,'Manrope',sans-serif);font-size:14.5px;font-weight:600;line-height:1.3;letter-spacing:-.01em;margin-bottom:2px;color:var(--kair-ink,#14213D)}
+
+/* LA ÚNICA EXCEPCIÓN a "nada escrito a mano". `#66707f` en vez de
+   `--kair-muted` (#748096): ese da 3.98:1 sobre blanco y no alcanza. Este da
+   5.01:1 y sigue siendo el mismo gris azulado del sistema.
+   El `__name` sí va por token: `--kair-ink` cambia solo por tema, así que
+   las tres paletas quedan cubiertas con una sola regla. */
+.kair-company-select .kair-mod__sub{display:block;font-size:12px;line-height:1.35;color:#66707f}
+
+/* El hook `.company-select-button` sigue siendo el que usa el JS para
+   limpiar la marca `selected`. Aquí solo se le da la pinta de seleccionado. */
+.kair-company-select .kair-mod.company-select-button.selected{border-color:var(--kair-blue,#2057B8);box-shadow:0 0 0 2px rgba(32,87,184,.22),var(--kcs-shadow)}
+.kair-company-select .kair-mod:focus-visible{outline:2px solid var(--kair-blue,#2057B8);outline-offset:2px}
+
+/* Oscuros. `[data-theme^="dark"]` y NO `[data-theme="dark"]`: el oscuro manual
+   llega como `dark-legacy` y no es alias. Era el defecto de la pantalla vieja. */
+[data-theme^="dark"] .kair-company-select{--kcs-shadow:0 8px 24px rgba(0,0,0,.34)}
+[data-theme^="dark"] .kair-company-select .kair-mod__icon{background:rgba(77,166,255,.08);color:#8cc6ff}
+[data-theme^="dark"] .kair-company-select .kair-mod__sub{color:var(--kair-muted,#a0a0a0)}
+
+@media (max-width:760px){
+  .kair-company-select{padding:20px 16px}
+  .kair-company-select__panel,.kair-company-select__list{max-width:none}
+  .kair-company-select__title{font-size:21px}
+}
