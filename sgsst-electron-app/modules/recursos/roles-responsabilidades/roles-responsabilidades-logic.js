@@ -19,8 +19,11 @@ class RolesResponsabilidadesComponent {
         iframe.style.height = '100%';
         iframe.style.border = 'none';
 
-        // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        // Pasar parámetros a la nueva interfaz a través de la URL.
+        // El `v=` es de CACHE-BUST del propio documento: sin él el Electron
+        // puede servir el HTML viejo desde caché, y entonces el CSS y el JS
+        // nuevos que el HTML referencia nunca llegan a cargar.
+        const viewerUrl = `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html?v=20261014-889-theme&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
 
         // 📦705-fix2 (2026-08-14) — Inyectar el electronAPI al iframe cuando carga.

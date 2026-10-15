@@ -83,6 +83,124 @@ aparece una vez en `objetivos-sst-view.css`: **48 reglas muertas en el repo**.
   `--kair-faint`, o sea que hoy es casi ilegible en claro. Es preexistente y de otro alcance.
 - Sin bump de versión (`0.1.251`), por la regla del owner.
 
+### 📦889 · 1.1.2 Roles y Responsabilidades y 1.1.3 Asignación de Recursos sí siguen el tema
+
+Los dos submódulos se veían en claro dentro del shell oscuro.
+
+**La causa de fondo es la del 📦887: el color no tenía tema.** Pero acá el fallo era de otra
+especie y más silencioso: **las dos vistas son iframes**, y un iframe es otro documento. El
+atributo `data-theme` lo aplica el shell a **su** `<html>`; dentro del iframe no se ve ni por
+herencia ni por cascada, porque son dos árboles distintos. El CSS de cada vista puede estar
+perfecto y no aplicar nada. Es un fallo donde lo que falta es el atributo que lo dispara, y no
+hay ningún error en consola que lo delate.
+
+**La trampa que lo hace más difícil de ver:** el shell manda el tema resuelto por tres vías, y
+una de ellas trae el oscuro manual como `dark-legacy`, que **no** es un alias de `dark`. Un
+código que solo acepta `'dark'` lo da por claro y **le quita el atributo**, así que el modo manual
+queda sin pintar mientras el de sistema funciona: la mitad de las pruebas pasa y parece que el
+arreglo funcionó. Las tres formas que el shell manda de verdad:
+
+1. `get-theme-response` → `{theme: <ya resuelto>}` (`renderer.js:2006`)
+2. `theme-changed` → `{theme: <preferencia>, effectiveTheme: <resuelto>}` (`renderer.js:1756` y `7445`)
+3. escritura directa en `iframe.contentDocument.documentElement`, sin mensaje (`renderer.js:1746` y `7418`)
+
+Las que **no** llegan son las de `scripts/theme-manager.js`, que espera `{theme, mode}`: ese
+archivo existe en disco pero **no está cargado en el shell**.
+
+Se creó `shared/kair-iframe-theme.js`, un módulo compartido que maneja las tres formas reales
+distingue `dark` de `dark-legacy`, pide el tema al padre al cargar y tiene respaldo leyendo el
+`contentDocument` del padre. El handshake va **antes** de la pregunta, para que si la respuesta
+tarda la vista no quede en claro ni un instante.
+
+- **1.1.2** — `roles-responsabilidades-viewer.js` gana `rrApplyTheme()` y `rrInitThemeSync()`,
+  que se llama al inicio. Se corrigió además el botón sin variante de color, que heredaba el gris
+  claro del navegador; los `:not()` van explícitos uno por variante porque `--small` es un tamaño y
+  también tiene que pintarse.
+- **1.1.3** — las **tres** vistas de presupuesto (home, selector y gestión) montan su propio iframe y
+  ninguna tenía sincronización.
+
+**El sello `?v=` es obligatorio en los tres niveles**: documento del iframe, script, y el `iframe.src`
+en el padre. En 1.1.2 el `iframe.src` no tenía ninguno, así que el arreglo no llegaba a la vista.
+Esto ya costó dos intentos.
+
+- `main/test-alcance-tokens-889.js` — **37 checks base, 21/21 mutaciones**.
+
+**Y dos CSS de módulo se estaban llevando los tokens del shell por delante**, igual que en el 887
+pero por otra vía: `revision-alta-direccion.css` declaraba `.kair-module` **global sin scope** con
+`background: var(--kair-bg)`, e `inspeccion.css` declaraba `.kair-card` **global sin scope**. Los dos
+se cargan en `index.html` **después** de `kair-components.css` y ganaban a igual especificidad.
+`--kair-bg` además **no existe** en `kair-design-tokens.css`: lo pisa un `:root` global de
+`evaluacion-inicial-view.css`. La corrección fue **acotar, no borrar**: las reglas se movieron a
+`.kair-rad-module` y a `.kair-app`, que es donde de verdad aplican.
+
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
+### 📦890 · 1.1.5 Gestión del COPASST sí sigue el tema elegido
+
+Las dos pantallas que el owner reportó —el home y el Generador de Actas— se veían en claro, con el
+texto gris ilegible encima. Al revisarlas apareció una tercera, el Repositorio de Actas, que no se
+había reportado y estaba peor.
+
+**La causa de los síntomas reportados era la del 📦887: el color no tenía tema.** El portal y el
+formulario no tenían **ni una regla por tema**. No les faltaban estilos oscuros: les sobraban colores
+escritos a mano, y como su texto sí leía tokens (`--kair-ink`, que en oscuro es `#e9ecef`) mientras su
+fondo leía un blanco fijo, salía texto casi blanco sobre blanco.
+
+- El home: `.copasst-portal__main-action` tomaba el fondo de `--cp-bg-card`, un token local del portal
+  clavado en `#ffffff`. "Volver al Menú" tenía `background: #fff` literal.
+- El generador: `.acta-card`, los input, `.acta-btn-add` y el botón "Volver" tenían `background: white`
+  y `#fff` fijos.
+
+**El hallazgo grave: el generador estaba escribiendo en el shell entero.** `showRealizarActasInterface()`
+inyecta un `<style>` en el DOM del shell, y ese `<style>` abría un `:root` con
+`--widget-bg-color: #ffffff`. **Un `:root` que no está en el `<head>` sigue siendo el `<html>`**, así que
+ese valor se leía en los 44 lugares de `styles.css` que lo usan, y como la hoja entra después ganaba por
+orden contra `[data-theme="dark"]` (empate 0,1,0). Mientras el formulario estaba abierto, el shell
+completo se leía con superficies blancas. Se movió al contenedor real (`.copasst-actas-container`), por
+lo que la regla "acotar, nunca eliminar" se cumple.
+
+**El bloque oscuro del generador era código muerto.** Sus 13 selectores pedían
+`.copasst-actas-container[data-theme="dark"]`, pero ese atributo nunca se pone en ese elemento: vive en
+el `<html>`. Jamás se ejecutó. Y solo contemplaba `dark`, así que aunque hubiera matcheado el modo manual
+se habría quedado claro. Es el mismo error que el 📦887 encontró en `capacitaciones-view.css` (47 reglas
+muertas) y `objetivos-sst-view.css` (48.
+
+**El Repositorio de Actas, que nadie había reportado, borraba el tema.** Es un iframe con su propio
+sincronizador. `renderer.js:1743-1759` hace dos cosas en orden: primero escribe el atributo **ya
+resuelto** en el `contentDocument` del iframe, y **después** manda `theme-changed`. El sincronizador
+del visor traducía eso con la forma `{theme, mode}` de `theme-manager.js`, un archivo que no está
+cargado, así que `mode` siempre llegaba `undefined`, y con `theme: 'system'` devolvía `null` y terminaba
+en `removeAttribute`. Como el `postMessage` es asíncrono, **ganaba siempre el paso que rompía**: el
+paso 1 ponía `dark` y el paso 2 lo borraba. Con el sistema en oscuro, el visor se quedaba en claro. Ahora
+usa `shared/kair-iframe-theme.js`, el mismo módulo del 📦889, y el sincronizador viejo se retiró:
+conservar el que es el bug invita a reintroducirlo en silencio.
+
+**Sobre cómo se resolvió el color.** Los hardcodes que **sí** coincidían con un token de claro (`#ffffff`
+= `--kair-card`, `#f1f3f5` = `--kair-slate-soft`) se resolvieron por token, así el claro queda idéntico byte
+por byte. Los que no coincidían se dejaron como estaban y se pisaron en un bloque `[data-theme^="dark"]`,
+que cubre `dark` (sistema) y `dark-legacy` (manual) en una sola regla en vez de duplicarla. Además se
+prefijaron al contenedor los **18 selectores** que el `<style>` inyectado dejaba sueltos: una regla sin
+scope en algo inyectado en el shell es una regla global esperando que otro módulo la pise.
+
+Medido en el navegador con el código real montado, no con un parser:
+
+| Pantalla | Modo | Resultado |
+|---|---|---|
+| Portal + Generador | `dark` | 42 controles OK, 0 fallas |
+| Portal + Generador | `dark-legacy` | 42 controles OK, 0 fallas |
+| Portal + Generador | claro | 23 controles OK, 0 fallas |
+| Repositorio de Actas | `dark` | 10 controles OK, 0 fallas |
+
+El contraste del claro se comprueba contra los valores exactos que producía el archivo original, leídos del
+CSS antes de tocarlo: los 23 coinciden. Y se midió WCAG 1.4.3 de verdad: los botones de acento estaban en
+**2.56:1** y **1.75:1** con texto blanco en oscuro, y "+ Agregar tema" en **3.95:1**; los tres pasaron a 4.5:1.
+
+- `main/test-copasst-tema-890.js` — **47 checks, 23/23 mutaciones**. Entre otras cosas mide que el EOL de cada
+  archivo siga siendo el que tenía, e incluye dos mutaciones que normalizan el CSS del portal: ese archivo es
+  **mixto a propósito** (el bloque legacy es CRLF y el premium del final es LF) y normalizarlo sería un diff
+  entero.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
 ### 📦886 · Las barras de desplazamiento ahora siguen el tema elegido
 
 La barra de desplazamiento se veía **blanca sobre el fondo oscuro** en los dos modos.

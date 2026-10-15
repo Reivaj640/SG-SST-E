@@ -10,6 +10,10 @@
 <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
 <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
 <link rel="stylesheet" href="../../../shared/kair-components.css">
+<!-- 📦889 — Esta vista se carga en un iframe: sin este script su <html> no recibe
+     `data-theme` y los bloques oscuros de más abajo no casan nunca. El `?v=` es
+     obligatorio: sin él Electron lo sirve desde caché y el fix no llega. -->
+<script src="../../../shared/kair-iframe-theme.js?v=20261014-889-theme"></script>
 
     <style>
         /* =========================================
@@ -32,6 +36,28 @@
             --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
             --k-header-height: 60px;
             --k-font-family: 'Segoe UI', 'Roboto', sans-serif;
+
+            /* 📦889 — Semanticos. Los literales claros que estaban sueltos
+               (white, #f8f9fa, #e5e7eb, #e8f0fe...) no cambian con el tema,
+               asi que ninguna superficie podia oscurecerse. Cada una pasa
+               a tener nombre y una sola definicion por tema, al final. */
+            --surface-card: #ffffff;
+            --surface-hover: #f8f9fa;
+            --surface-sunken: #f1f3f4;
+            --surface-mute: #f4f4f4;
+            --surface-table-head: #fbfcfe;
+            --surface-row-hover: #f4f7fd;
+            --icon-plate: #e3ecfb;
+            --back-ink: #536177;
+            --divider: #e5e7eb;
+            --formula-ink: #777;
+            --thead-ink: #8791a1;
+            --hero-lbl: #9eafc6;
+            --tint-primary-bg: #e8f0fe;  --tint-primary-ink: #174ea6;
+            --tint-warn-bg: #fff3cd;      --tint-warn-ink: #856404;
+            --tint-ok-bg: #d4edda;        --tint-ok-ink: #28a745;
+            --tint-mute-bg: #f0f2f5;      --tint-mute-ink: #6c757d;
+            --tint-danger-bg: #f8d7da;    --tint-danger-ink: #721c24;
         }
 
         body {
@@ -92,22 +118,22 @@ HEADER ACTION BUTTONS
 .bd-modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .bd-modal-btn-primary { background: var(--k-primary); color: white; }
 .bd-modal-btn-primary:hover { background: var(--k-primary-hover); }
-.bd-modal-btn-secondary { background: white; color: var(--k-primary); border-color: var(--k-primary); }
+.bd-modal-btn-secondary { background: var(--surface-card); color: var(--k-primary); border-color: var(--k-primary); }
 .bd-modal-btn-secondary:hover { background: var(--k-primary-light); }
-.bd-modal-btn-warning { background: white; color: var(--k-warning); border-color: var(--k-warning); }
-.bd-modal-btn-warning:hover { background: #fff3cd; }
-.bd-modal-btn-danger { background: white; color: var(--k-danger); border-color: var(--k-danger); }
-.bd-modal-btn-danger:hover { background: #f8d7da; }
+.bd-modal-btn-warning { background: var(--surface-card); color: var(--k-warning); border-color: var(--k-warning); }
+.bd-modal-btn-warning:hover { background: var(--tint-warn-bg); }
+.bd-modal-btn-danger { background: var(--surface-card); color: var(--k-danger); border-color: var(--k-danger); }
+.bd-modal-btn-danger:hover { background: var(--tint-danger-bg); }
 
         /* BOTONES */
         .k-btn {
-            border: 1px solid var(--k-border); background: white;
+            border: 1px solid var(--k-border); background: var(--surface-card);
             color: var(--k-text-main); padding: 0.5rem 1rem;
             border-radius: var(--k-radius-md); font-size: 0.9rem; font-weight: 500;
             cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
             transition: all 0.2s;
         }
-        .k-btn:hover { background: #f8f9fa; border-color: var(--k-text-muted); }
+        .k-btn:hover { background: var(--surface-hover); border-color: var(--k-text-muted); }
 
         .k-btn-primary { background: var(--k-primary); color: white; border-color: var(--k-primary); }
         .k-btn-primary:hover { background: var(--k-primary-hover); }
@@ -154,10 +180,10 @@ HEADER ACTION BUTTONS
   font-size: 1rem;
   flex-shrink: 0;
 }
-.k-stats-ribbon__icon.primary { background: #e8f0fe; color: #174ea6; }
-.k-stats-ribbon__icon.warning { background: #fff3cd; color: #856404; }
-.k-stats-ribbon__icon.success { background: #d4edda; color: #28a745; }
-.k-stats-ribbon__icon.muted  { background: #f0f2f5; color: #6c757d; }
+.k-stats-ribbon__icon.primary { background: var(--tint-primary-bg); color: var(--tint-primary-ink); }
+.k-stats-ribbon__icon.warning { background: var(--tint-warn-bg); color: var(--tint-warn-ink); }
+.k-stats-ribbon__icon.success { background: var(--tint-ok-bg); color: var(--tint-ok-ink); }
+.k-stats-ribbon__icon.muted  { background: var(--tint-mute-bg); color: var(--tint-mute-ink); }
 .k-stats-ribbon__data {
   display: flex;
   flex-direction: column;
@@ -180,7 +206,7 @@ HEADER ACTION BUTTONS
 .k-stats-ribbon__divider {
   width: 1px;
   height: 36px;
-  background: #e5e7eb;
+  background: var(--divider);
   flex-shrink: 0;
 }
 .k-section-card {
@@ -237,9 +263,9 @@ HEADER ACTION BUTTONS
             font-family: inherit; font-size: inherit; color: inherit;
             transition: all 0.2s;
         }
-        .editable-cell-input:hover { background: #f1f3f4; }
+        .editable-cell-input:hover { background: var(--surface-sunken); }
         .editable-cell-input:focus {
-            background: white; border-color: var(--k-primary);
+            background: var(--surface-card); border-color: var(--k-primary);
             outline: none; box-shadow: 0 0 0 2px var(--k-primary-light);
         }
 
@@ -254,13 +280,13 @@ HEADER ACTION BUTTONS
         }
 
         .editable-cell:hover {
-            background-color: #f0f0f0;
+            background-color: var(--surface-sunken);
             color: var(--k-primary);
         }
 
         .formula-cell {
-            color: #777;
-            background-color: #f4f4f4;
+            color: var(--formula-ink);
+            background-color: var(--surface-mute);
             cursor: not-allowed;
             display: block;
             padding: 4px 8px;
@@ -311,7 +337,7 @@ body { background: var(--kair-canvas, #fbfcfb); }
 .pres-header__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
 .pres-header__icon {
   width: 44px; height: 44px; border-radius: 12px;
-  background: #e3ecfb; color: var(--kair-blue, #2057b8);
+  background: var(--icon-plate); color: var(--kair-blue, #2057b8);
   display: flex; align-items: center; justify-content: center;
   font-size: 1.1rem; flex-shrink: 0;
 }
@@ -331,8 +357,8 @@ body { background: var(--kair-canvas, #fbfcfb); }
 .header-back-btn, .header-action--info {
   padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600;
   cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
-  border: 1px solid var(--kair-line, #e8ebee); background: #fff;
-  color: #536177; transition: all 0.18s; white-space: nowrap;
+  border: 1px solid var(--kair-line, #e8ebee); background: var(--surface-card);
+  color: var(--back-ink); transition: all 0.18s; white-space: nowrap;
 }
 .header-back-btn:hover, .header-action--info:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
 .header-action--primary {
@@ -363,11 +389,11 @@ body { background: var(--kair-canvas, #fbfcfb); }
 /* Tabla — acabado premium */
 .k-section-card { border-color: var(--kair-line, #e8ebee); border-radius: var(--kair-radius-card, 16px); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05); }
 thead th {
-  background: #fbfcfe; font-size: 0.6875rem; text-transform: uppercase;
-  letter-spacing: 0.6px; color: #8791a1; border-bottom: 1px solid var(--kair-line, #e8ebee);
+  background: var(--surface-table-head); font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--thead-ink); border-bottom: 1px solid var(--kair-line, #e8ebee);
   box-shadow: none;
 }
-tbody tr:hover { background: #f4f7fd; }
+tbody tr:hover { background: var(--surface-row-hover); }
 
 @media (max-width: 1100px) {
   .kair-premium-strip { grid-template-columns: repeat(2, 1fr); }
@@ -376,6 +402,70 @@ tbody tr:hover { background: #f4f7fd; }
   .kair-premium-strip { grid-template-columns: 1fr; }
   .pres-header__company { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   📦889 — TEMA OSCURO. renderer.js propaga `data-theme` al
+   documentElement de este iframe (dark-legacy si el usuario eligio
+   Oscuro, dark si eligio Sistema con el SO en oscuro).
+   Los semanticos se apoyan en los tokens compartidos, que ya
+   distinguen dark de dark-legacy, asi que no se repite la paleta.
+   ═══════════════════════════════════════════════════════════ */
+[data-theme="dark"],
+[data-theme="dark-legacy"] {
+    --k-primary: var(--kair-blue, #5da2ff);
+    --k-primary-hover: var(--kair-blue-text, #7db9ff);
+    --k-primary-light: var(--kair-blue-soft, #1e3a5f);
+    --k-success: var(--kair-green, #4ade9e);
+    --k-warning: var(--kair-amber, #f0b429);
+    --k-danger: var(--kair-red, #f28b9b);
+    --k-bg-app: var(--kair-canvas, #1a202c);
+    --k-bg-card: var(--kair-card, #384151);
+    --k-border: var(--kair-line, #4a5568);
+    --k-text-main: var(--kair-ink, #e9ecef);
+    --k-text-muted: var(--kair-muted, #adb5bd);
+    --k-shadow-sm: var(--kair-shadow-card, 0 2px 7px rgba(0,0,0,0.35));
+
+    --surface-card: var(--kair-card, #384151);
+    --surface-hover: var(--kair-track, #3a4356);
+    --surface-sunken: var(--kair-soft, #2f3a4d);
+    --surface-mute: var(--kair-soft, #2f3a4d);
+    --surface-table-head: var(--kair-soft, #2f3a4d);
+    --surface-row-hover: var(--kair-soft, #2f3a4d);
+    --icon-plate: var(--kair-blue-soft, #1e3a5f);
+    --back-ink: var(--kair-muted, #adb5bd);
+    --divider: var(--kair-line-soft, #374253);
+    --formula-ink: var(--kair-muted, #adb5bd);
+    --thead-ink: var(--kair-muted, #adb5bd);
+    --hero-lbl: var(--kair-faint, #9fb0c4);
+
+    --tint-primary-bg: var(--kair-blue-soft, #1e3a5f); --tint-primary-ink: var(--kair-blue-text, #7db9ff);
+    --tint-warn-bg: var(--kair-amber-soft, #3a2f10);     --tint-warn-ink: var(--kair-amber-text, #f5c451);
+    --tint-ok-bg: var(--kair-green-soft, #12352a);       --tint-ok-ink: var(--kair-green-text, #5ee0a8);
+    --tint-mute-bg: var(--kair-soft, #2f3a4d);           --tint-mute-ink: var(--kair-muted, #adb5bd);
+    --tint-danger-bg: var(--kair-red-soft, #3a1f24);     --tint-danger-ink: var(--kair-red-text, #f79ca9);
+}
+
+/* En oscuro el azul sube de tono: la tinta blanca sobre #5da2ff no llegaria
+   a 4.5:1, asi que los botones primarios pasan a tinta oscura. */
+[data-theme="dark"] .k-btn-primary,
+[data-theme="dark-legacy"] .k-btn-primary,
+[data-theme="dark"] .bd-modal-btn-primary,
+[data-theme="dark-legacy"] .bd-modal-btn-primary,
+[data-theme="dark"] .header-action--primary,
+[data-theme="dark-legacy"] .header-action--primary { color: #10233f; }
+
+[data-theme="dark"] .header-action--success,
+[data-theme="dark-legacy"] .header-action--success { color: #06281d; }
+[data-theme="dark"] .header-action--success:hover,
+[data-theme="dark-legacy"] .header-action--success:hover { background: var(--kair-green, #4ade9e); }
+[data-theme="dark"] .header-action--primary:hover,
+[data-theme="dark-legacy"] .header-action--primary:hover { background: var(--kair-blue-text, #7db9ff); }
+[data-theme="dark"] .pres-hero-score .lbl,
+[data-theme="dark-legacy"] .pres-hero-score .lbl { color: var(--hero-lbl); }
+[data-theme="dark"] tbody tr:hover,
+[data-theme="dark-legacy"] tbody tr:hover { background: var(--kair-soft, #2f3a4d); }
+[data-theme="dark"] thead th,
+[data-theme="dark-legacy"] thead th { color: var(--thead-ink); }
 
     </style>
 </head>
@@ -876,15 +966,15 @@ function parseFormattedNumber(value) {
             overlay.className = 'bd-info-modal';
             overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 2rem;';
             overlay.innerHTML =
-                '<div style="background: white; border-radius: 12px; max-width: 800px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
-                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">' +
-                        '<h2 style="margin: 0; font-size: 1.25rem; color: #174ea6;">' +
-                            '<i class="fas fa-database" style="color: #17a2b8;"></i> Base de Datos Local (<span id="bd-modal-year">' + anio + '</span>)' +
+                '<div style="background: var(--surface-card); border-radius: 12px; max-width: 800px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
+                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid var(--k-border); display: flex; justify-content: space-between; align-items: center;">' +
+                        '<h2 style="margin: 0; font-size: 1.25rem; color: var(--k-primary);">' +
+                            '<i class="fas fa-database" style="color: var(--k-info, #17a2b8);"></i> Base de Datos Local (<span id="bd-modal-year">' + anio + '</span>)' +
                         '</h2>' +
-                        '<button id="bd-modal-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6c757d; padding: 0 0.5rem;">&times;</button>' +
+                        '<button id="bd-modal-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--k-text-muted); padding: 0 0.5rem;">&times;</button>' +
                     '</div>' +
                     '<div id="bd-modal-body" style="padding: 1.5rem 2rem;">' +
-                        '<div style="text-align: center; color: #6c757d; padding: 2rem;">' +
+                        '<div style="text-align: center; color: var(--k-text-muted); padding: 2rem;">' +
                             '<i class="fas fa-spinner fa-spin"></i> Verificando BD...' +
                         '</div>' +
                     '</div>' +
@@ -912,11 +1002,11 @@ function parseFormattedNumber(value) {
             var actionsHtml = '';
 
             if (data.error) {
-                statusHtml = '<div style="color: #721c24; background: #f8d7da; padding: 0.75rem; border-radius: 6px;">❌ Error: ' + _escHtml(data.error.message || 'desconocido') + '</div>';
-                actionsHtml = '<p style="font-size: 0.85rem; color: #6c757d; margin-top: 1rem;">Cerrá este modal y volvé a intentarlo.</p>';
+                statusHtml = '<div style="color: var(--tint-danger-ink); background: var(--tint-danger-bg); padding: 0.75rem; border-radius: 6px;">❌ Error: ' + _escHtml(data.error.message || 'desconocido') + '</div>';
+                actionsHtml = '<p style="font-size: 0.85rem; color: var(--k-text-muted); margin-top: 1rem;">Cerrá este modal y volvé a intentarlo.</p>';
             } else if (!data.exists) {
-                statusHtml = '<div style="color: #721c24; background: #f8d7da; padding: 0.75rem; border-radius: 6px;">❌ No hay presupuesto en la base de datos local para ' + anio + '.</div>';
-                actionsHtml = '<p style="font-size: 0.85rem; color: #6c757d; margin-top: 1rem;">Para empezar, volvé al home y usá <strong>"Importar Excel a BD"</strong> o creá uno nuevo desde <strong>"Histórico de Años"</strong>.</p>';
+                statusHtml = '<div style="color: var(--tint-danger-ink); background: var(--tint-danger-bg); padding: 0.75rem; border-radius: 6px;">❌ No hay presupuesto en la base de datos local para ' + anio + '.</div>';
+                actionsHtml = '<p style="font-size: 0.85rem; color: var(--k-text-muted); margin-top: 1rem;">Para empezar, volvé al home y usá <strong>"Importar Excel a BD"</strong> o creá uno nuevo desde <strong>"Histórico de Años"</strong>.</p>';
             } else {
                 _bdModalState.hasData = true;
                 _bdModalState.presupuesto = data.presupuesto;
@@ -925,31 +1015,31 @@ function parseFormattedNumber(value) {
                 var r = data.resumen || { partidasCount: 0, totalAsignado: 0, totalEjecutado: 0, porcentaje: 0 };
                 var updated = p.actualizadoEn ? new Date(p.actualizadoEn).toLocaleString('es-CO') : '—';
                 statusHtml =
-                    '<div style="background: #d4edda; color: #155724; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">' +
+                    '<div style="background: var(--tint-ok-bg); color: var(--tint-ok-ink); padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">' +
                         '✅ Presupuesto <strong>' + _escHtml(p.nombre || 'sin nombre') + '</strong> en BD' +
                         '<br><small>Última actualización: ' + updated + '</small>' +
                     '</div>' +
                     '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">' +
-                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Partidas</div>' +
+                        '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Partidas</div>' +
                             '<div style="font-size: 1.1rem; font-weight: 700;">' + (r.partidasCount || '—') + '</div>' +
                         '</div>' +
-                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Asignado</div>' +
-                            '<div style="font-size: 1.1rem; font-weight: 700; color: #174ea6;">' + (r.totalAsignado ? fmt.format(r.totalAsignado) : '—') + '</div>' +
+                        '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Asignado</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700; color: var(--k-primary);">' + (r.totalAsignado ? fmt.format(r.totalAsignado) : '—') + '</div>' +
                         '</div>' +
-                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Ejecutado</div>' +
-                            '<div style="font-size: 1.1rem; font-weight: 700; color: #28a745;">' + (r.totalEjecutado ? fmt.format(r.totalEjecutado) : '—') + '</div>' +
+                        '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Ejecutado</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700; color: var(--k-success);">' + (r.totalEjecutado ? fmt.format(r.totalEjecutado) : '—') + '</div>' +
                         '</div>' +
-                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">% Cumplimiento</div>' +
+                        '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">% Cumplimiento</div>' +
                             '<div style="font-size: 1.1rem; font-weight: 700;">' + (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—') + '</div>' +
                         '</div>' +
                     '</div>';
                 actionsHtml =
-                    '<div style="border-top: 1px solid #e9ecef; padding-top: 1rem;">' +
-                        '<p style="font-size: 0.75rem; color: #6c757d; margin: 0 0 0.75rem;">Acciones de Base de Datos</p>' +
+                    '<div style="border-top: 1px solid var(--k-border); padding-top: 1rem;">' +
+                        '<p style="font-size: 0.75rem; color: var(--k-text-muted); margin: 0 0 0.75rem;">Acciones de Base de Datos</p>' +
                         '<div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">' +
                             '<button class="bd-modal-btn bd-modal-btn-primary" onclick="bdModalAction(\'viewResumen\')">' +
                                 '<i class="fas fa-eye"></i> Ver resumen detallado' +
@@ -1071,16 +1161,19 @@ function parseFormattedNumber(value) {
 
             var rows = '';
             if (partidas.length === 0) {
-                rows = '<tr><td colspan="5" style="padding: 1rem; text-align: center; color: #6c757d;">No hay partidas.</td></tr>';
+                rows = '<tr><td colspan="5" style="padding: 1rem; text-align: center; color: var(--k-text-muted);">No hay partidas.</td></tr>';
             } else {
                 partidas.forEach(function(partida) {
                     var safeLabel = _escHtml(partida.concepto).replace(/'/g, "\\'");
-                    rows += '<tr style="border-bottom: 1px solid #f1f3f5;">' +
-                        '<td style="padding: 0.5rem 0.75rem; color: #6c757d;">' + partida.numero + '</td>' +
+                    var pctColor = partida.porcentaje >= 80
+                        ? 'var(--k-success)'
+                        : (partida.porcentaje >= 50 ? 'var(--k-warning)' : 'var(--k-danger)');
+                    rows += '<tr style="border-bottom: 1px solid var(--k-border);">' +
+                        '<td style="padding: 0.5rem 0.75rem; color: var(--k-text-muted);">' + partida.numero + '</td>' +
                         '<td style="padding: 0.5rem 0.75rem;">' + _escHtml(partida.concepto) + '</td>' +
                         '<td style="padding: 0.5rem 0.75rem; text-align: right;">' + fmt.format(partida.asignado) + '</td>' +
                         '<td style="padding: 0.5rem 0.75rem; text-align: right;">' +
-                            '<span style="color: ' + (partida.porcentaje >= 80 ? '#28a745' : (partida.porcentaje >= 50 ? '#ffc107' : '#dc3545')) + ';">' +
+                            '<span style="color: ' + pctColor + ';">' +
                             partida.porcentaje.toFixed(1) + '%</span>' +
                         '</td>' +
                         '<td style="padding: 0.5rem 0.75rem; text-align: center;">' +
@@ -1096,34 +1189,34 @@ function parseFormattedNumber(value) {
             overlay.id = 'bd-resumen-submodal';
             overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 2rem;';
             overlay.innerHTML =
-                '<div style="background: white; border-radius: 12px; max-width: 900px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
-                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">' +
-                        '<h2 style="margin: 0; font-size: 1.2rem; color: #174ea6;">' + _escHtml(p.nombre || 'Presupuesto') + ' (' + p.anio + ') — Resumen</h2>' +
-                        '<button id="bd-resumen-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6c757d; padding: 0 0.5rem;">&times;</button>' +
+                '<div style="background: var(--surface-card); border-radius: 12px; max-width: 900px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
+                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid var(--k-border); display: flex; justify-content: space-between; align-items: center;">' +
+                        '<h2 style="margin: 0; font-size: 1.2rem; color: var(--k-primary);">' + _escHtml(p.nombre || 'Presupuesto') + ' (' + p.anio + ') — Resumen</h2>' +
+                        '<button id="bd-resumen-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--k-text-muted); padding: 0 0.5rem;">&times;</button>' +
                     '</div>' +
                     '<div style="padding: 1.5rem 2rem;">' +
                         '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">' +
-                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Asignado</div>' +
-                                '<div style="font-size: 1.05rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.totalAsignado) + '</div>' +
+                            '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Asignado</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: var(--k-primary);">' + fmt.format(r.totalAsignado) + '</div>' +
                             '</div>' +
-                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Ejecutado</div>' +
-                                '<div style="font-size: 1.05rem; font-weight: 700; color: #28a745;">' + fmt.format(r.totalEjecutado) + '</div>' +
+                            '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Ejecutado</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: var(--k-success);">' + fmt.format(r.totalEjecutado) + '</div>' +
                             '</div>' +
-                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">% Cumplimiento</div>' +
+                            '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">% Cumplimiento</div>' +
                                 '<div style="font-size: 1.05rem; font-weight: 700;">' + r.porcentaje.toFixed(1) + '%</div>' +
                             '</div>' +
-                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Saldo</div>' +
-                                '<div style="font-size: 1.05rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.saldo) + '</div>' +
+                            '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: var(--k-text-muted);">Saldo</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: var(--k-primary);">' + fmt.format(r.saldo) + '</div>' +
                             '</div>' +
                         '</div>' +
                         '<div style="overflow-x: auto;">' +
                             '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">' +
                                 '<thead>' +
-                                    '<tr style="background: #f1f3f5;">' +
+                                    '<tr style="background: var(--surface-sunken);">' +
                                         '<th style="padding: 0.5rem 0.75rem; text-align: left;">#</th>' +
                                         '<th style="padding: 0.5rem 0.75rem; text-align: left;">Concepto</th>' +
                                         '<th style="padding: 0.5rem 0.75rem; text-align: right;">Asignado</th>' +

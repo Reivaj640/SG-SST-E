@@ -824,3 +824,372 @@
 .kair-rr-btn--danger:active {
     transform: scale(0.97);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * TEMA OSCURO — 📦887
+ * Esta vista carga SOLO su propio CSS (no importa
+ * shared/kair-design-tokens.css), asi que los tokens llegan por
+ * postMessage desde renderer.js sobre documentElement. Por eso los
+ * selectores son [data-theme="dark"] / [data-theme="dark-legacy"].
+ *
+ * Paleta: la misma del 887 aprobado.
+ *   superficie #2d3748 · fondo #1a202c · borde #4a5568
+ *   texto #e9ecef · texto atenuado #aab4c3 · acento #7fb0ff
+ *
+ * NOTA DE CONTRASTE: los bordes #4a5568 quedan en 1.59:1 contra la
+ * superficie #2d3748, por debajo del 3:1 de WCAG 1.4.11. Se conservan
+ * para no romper la equivalencia visual con el artefacto 887; en los
+ * controles de formulario (inputs, botones de icono) se sube el borde
+ * a #7d879c (3.29:1) porque si es un componente interactivo real.
+ * ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .kair-rr-body,
+[data-theme="dark-legacy"] .kair-rr-body {
+    background: #1a202c;
+    color: #e9ecef;
+}
+
+/* HEADER */
+[data-theme="dark"] .kair-rr-header-card.k-section-card,
+[data-theme="dark-legacy"] .kair-rr-header-card.k-section-card {
+    background: #2d3748;
+    border-color: #4a5568;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+[data-theme="dark"] .kair-rr-header-icon,
+[data-theme="dark-legacy"] .kair-rr-header-icon { color: #7fb0ff; }
+[data-theme="dark"] .kair-rr-header-title,
+[data-theme="dark-legacy"] .kair-rr-header-title { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-header-subtitle,
+[data-theme="dark-legacy"] .kair-rr-header-subtitle,
+[data-theme="dark"] .kair-rr-header-company,
+[data-theme="dark-legacy"] .kair-rr-header-company { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-header-divider,
+[data-theme="dark-legacy"] .kair-rr-header-divider { background: #4a5568; }
+[data-theme="dark"] .kair-rr-header-back,
+[data-theme="dark-legacy"] .kair-rr-header-back {
+    color: #aab4c3;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-header-back:hover,
+[data-theme="dark-legacy"] .kair-rr-header-back:hover {
+    background: #1e3a5f;
+    color: #7fb0ff;
+    border-color: #7fb0ff;
+}
+
+/* TABS */
+[data-theme="dark"] .kair-rr-tabs,
+[data-theme="dark-legacy"] .kair-rr-tabs { border-top-color: #4a5568; }
+[data-theme="dark"] .kair-rr-tab,
+[data-theme="dark-legacy"] .kair-rr-tab { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-tab:hover,
+[data-theme="dark-legacy"] .kair-rr-tab:hover { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-tab.is-active,
+[data-theme="dark-legacy"] .kair-rr-tab.is-active {
+    color: #7fb0ff;
+    border-bottom-color: #7fb0ff;
+}
+
+/* BANNER */
+[data-theme="dark"] .kair-rr-banner,
+[data-theme="dark-legacy"] .kair-rr-banner {
+    background: #2d3748;
+    border-color: #4a5568;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+[data-theme="dark"] .kair-rr-banner__title,
+[data-theme="dark-legacy"] .kair-rr-banner__title { color: #7fb0ff; }
+[data-theme="dark"] .kair-rr-banner__summary,
+[data-theme="dark-legacy"] .kair-rr-banner__summary { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-banner__progress,
+[data-theme="dark-legacy"] .kair-rr-banner__progress { background: #4a5568; }
+
+/* BUTTONS */
+[data-theme="dark"] .kair-rr-btn--ghost,
+[data-theme="dark-legacy"] .kair-rr-btn--ghost {
+    background: #2d3748;
+    color: #e9ecef;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-btn--ghost:hover,
+[data-theme="dark-legacy"] .kair-rr-btn--ghost:hover { background: #374151; }
+
+/* Botones SIN variante de color: "Añadir trabajador", "Subir", eliminar
+   (`kair-rr-btn kair-rr-btn--small` a secas). La clase base `.kair-rr-btn` solo
+   declara `border: none` y no define `background`, así que se ve el fondo por
+   defecto del navegador, `buttonface`, un gris claro. En claro pasaba
+   desapercibido sobre la tarjeta blanca; en oscuro quedaba como una pastilla
+   clara flotando sobre el fondo oscuro.
+
+   El `:not()` tiene que excluir SOLO las variantes de COLOR. Se podría usar el
+   comodín `[class*="kair-rr-btn--"]`, pero ese también matchea `--small`, que es
+   un modificador de tamaño y justamente uno de los casos que hay que pintar: con
+   el comodín el botón quedaba claro igual. Por eso la lista es explícita. */
+[data-theme="dark"] .kair-rr-btn:not([class*="--primary"]):not([class*="--ghost"]):not([class*="--danger"]):not([class*="--success"]),
+[data-theme="dark-legacy"] .kair-rr-btn:not([class*="--primary"]):not([class*="--ghost"]):not([class*="--danger"]):not([class*="--success"]) {
+    background: #2d3748;
+    color: #e9ecef;
+    border: 1px solid #7d879c;
+}
+[data-theme="dark"] .kair-rr-btn:not([class*="--primary"]):not([class*="--ghost"]):not([class*="--danger"]):not([class*="--success"]):hover,
+[data-theme="dark-legacy"] .kair-rr-btn:not([class*="--primary"]):not([class*="--ghost"]):not([class*="--danger"]):not([class*="--success"]):hover { background: #374151; }
+
+/* SECTIONS */
+[data-theme="dark"] .kair-rr-section,
+[data-theme="dark-legacy"] .kair-rr-section {
+    background: #2d3748;
+    border-color: #4a5568;
+}
+[data-theme="dark"] .kair-rr-section__title,
+[data-theme="dark-legacy"] .kair-rr-section__title { color: #e9ecef; }
+
+/* TABLE */
+[data-theme="dark"] .kair-rr-table th,
+[data-theme="dark-legacy"] .kair-rr-table th {
+    background: #242c3d;
+    border-bottom-color: #4a5568;
+    color: #aab4c3;
+}
+[data-theme="dark"] .kair-rr-table td,
+[data-theme="dark-legacy"] .kair-rr-table td {
+    border-bottom-color: #374151;
+    color: #e9ecef;
+}
+[data-theme="dark"] .kair-rr-table tr:hover td,
+[data-theme="dark-legacy"] .kair-rr-table tr:hover td { background: #374151; }
+[data-theme="dark"] .kair-rr-table .rol-codigo,
+[data-theme="dark-legacy"] .kair-rr-table .rol-codigo { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-help,
+[data-theme="dark-legacy"] .kair-rr-help { color: #aab4c3; }
+
+/* PILAS DE ESTADO */
+[data-theme="dark"] .kair-rr-state--vigente,
+[data-theme="dark-legacy"] .kair-rr-state--vigente,
+[data-theme="dark"] .kair-rr-state--aceptado,
+[data-theme="dark-legacy"] .kair-rr-state--aceptado {
+    background: #064e3b; color: #6ee7b7;
+}
+[data-theme="dark"] .kair-rr-state--pendiente,
+[data-theme="dark-legacy"] .kair-rr-state--pendiente {
+    background: #78350f; color: #fcd34d;
+}
+[data-theme="dark"] .kair-rr-state--rechazado,
+[data-theme="dark-legacy"] .kair-rr-state--rechazado {
+    background: #7f1d1d; color: #fca5a5;
+}
+[data-theme="dark"] .kair-rr-state--na,
+[data-theme="dark-legacy"] .kair-rr-state--na {
+    background: #374151; color: #aab4c3;
+}
+
+/* MODAL */
+[data-theme="dark"] .kair-rr-modal,
+[data-theme="dark-legacy"] .kair-rr-modal { background: #2d3748; }
+[data-theme="dark"] .kair-rr-modal__head,
+[data-theme="dark-legacy"] .kair-rr-modal__head {
+    border-bottom-color: #4a5568; color: #e9ecef;
+}
+[data-theme="dark"] .kair-rr-modal__foot,
+[data-theme="dark-legacy"] .kair-rr-modal__foot { border-top-color: #4a5568; }
+[data-theme="dark"] .kair-rr-modal__close,
+[data-theme="dark-legacy"] .kair-rr-modal__close { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-modal__close:hover,
+[data-theme="dark-legacy"] .kair-rr-modal__close:hover { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-modal__body label,
+[data-theme="dark-legacy"] .kair-rr-modal__body label { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-checkbox-label,
+[data-theme="dark-legacy"] .kair-rr-checkbox-label { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-modal__body label input,
+[data-theme="dark-legacy"] .kair-rr-modal__body label input,
+[data-theme="dark"] .kair-rr-date-input,
+[data-theme="dark-legacy"] .kair-rr-date-input {
+    background: #242c3d;
+    color: #e9ecef;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-date-input:focus,
+[data-theme="dark-legacy"] .kair-rr-date-input:focus,
+[data-theme="dark"] .kair-rr-modal__body label input:focus,
+[data-theme="dark-legacy"] .kair-rr-modal__body label input:focus {
+    outline: none;
+    border-color: #7fb0ff;
+    box-shadow: 0 0 0 3px rgba(127, 176, 255, 0.25);
+}
+[data-theme="dark"] .kair-rr-textarea,
+[data-theme="dark-legacy"] .kair-rr-textarea {
+    background: #242c3d;
+    color: #e9ecef;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-textarea:focus,
+[data-theme="dark-legacy"] .kair-rr-textarea:focus {
+    border-color: #7fb0ff;
+    box-shadow: 0 0 0 3px rgba(127, 176, 255, 0.25);
+}
+[data-theme="dark"] .kair-rr-textarea-wrap,
+[data-theme="dark-legacy"] .kair-rr-textarea-wrap {
+    background: #3b2f0b;
+    border-color: #a16207;
+}
+
+/* DROPZONE */
+[data-theme="dark"] .kair-rr-dropzone,
+[data-theme="dark-legacy"] .kair-rr-dropzone {
+    background: #242c3d;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-dropzone i,
+[data-theme="dark-legacy"] .kair-rr-dropzone i,
+[data-theme="dark"] .kair-rr-dropzone__subtext,
+[data-theme="dark-legacy"] .kair-rr-dropzone__subtext { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-dropzone__text,
+[data-theme="dark-legacy"] .kair-rr-dropzone__text { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-dropzone:hover,
+[data-theme="dark-legacy"] .kair-rr-dropzone:hover,
+[data-theme="dark"] .kair-rr-dropzone.is-dragover,
+[data-theme="dark-legacy"] .kair-rr-dropzone.is-dragover {
+    background: #1e3a5f;
+    border-color: #7fb0ff;
+}
+[data-theme="dark"] .kair-rr-dropzone:hover i,
+[data-theme="dark-legacy"] .kair-rr-dropzone:hover i,
+[data-theme="dark"] .kair-rr-dropzone.is-dragover i,
+[data-theme="dark-legacy"] .kair-rr-dropzone.is-dragover i { color: #7fb0ff; }
+[data-theme="dark"] .kair-rr-dropzone[data-state="has-folder"],
+[data-theme="dark-legacy"] .kair-rr-dropzone[data-state="has-folder"],
+[data-theme="dark"] .kair-rr-dropzone[data-state="has-file"],
+[data-theme="dark-legacy"] .kair-rr-dropzone[data-state="has-file"] {
+    background: #064e3b;
+    border-color: #16a34a;
+}
+[data-theme="dark"] .kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__text,
+[data-theme="dark-legacy"] .kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__text,
+[data-theme="dark"] .kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__text,
+[data-theme="dark-legacy"] .kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__text {
+    color: #6ee7b7;
+}
+
+/* CHIPS */
+[data-theme="dark"] .kair-rr-chip,
+[data-theme="dark-legacy"] .kair-rr-chip {
+    background: #064e3b;
+    border-color: #16a34a;
+}
+[data-theme="dark"] .kair-rr-chip i,
+[data-theme="dark-legacy"] .kair-rr-chip i { color: #6ee7b7; }
+[data-theme="dark"] .kair-rr-chip__name,
+[data-theme="dark-legacy"] .kair-rr-chip__name { color: #6ee7b7; }
+[data-theme="dark"] .kair-rr-chip__size,
+[data-theme="dark-legacy"] .kair-rr-chip__size { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-chip--folder,
+[data-theme="dark-legacy"] .kair-rr-chip--folder {
+    background: #1e3a5f;
+    border-color: #2563eb;
+}
+[data-theme="dark"] .kair-rr-chip--folder i,
+[data-theme="dark-legacy"] .kair-rr-chip--folder i,
+[data-theme="dark"] .kair-rr-chip--folder .kair-rr-chip__name,
+[data-theme="dark-legacy"] .kair-rr-chip--folder .kair-rr-chip__name { color: #93c5fd; }
+[data-theme="dark"] .kair-rr-chip[data-empty="true"],
+[data-theme="dark-legacy"] .kair-rr-chip[data-empty="true"] {
+    background: #242c3d;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-chip[data-empty="true"] i,
+[data-theme="dark-legacy"] .kair-rr-chip[data-empty="true"] i,
+[data-theme="dark"] .kair-rr-chip[data-empty="true"] .kair-rr-chip__name,
+[data-theme="dark-legacy"] .kair-rr-chip[data-empty="true"] .kair-rr-chip__name { color: #aab4c3; }
+
+/* BADGES */
+[data-theme="dark"] .kair-rr-anteriores-badge,
+[data-theme="dark-legacy"] .kair-rr-anteriores-badge {
+    background: #78350f; color: #fcd34d;
+}
+[data-theme="dark"] .kair-rr-anteriores-badge:hover,
+[data-theme="dark-legacy"] .kair-rr-anteriores-badge:hover { background: #92400e; }
+[data-theme="dark"] .kair-rr-count-badge,
+[data-theme="dark-legacy"] .kair-rr-count-badge {
+    background: #1e3a5f; color: #93c5fd;
+}
+[data-theme="dark"] .kair-rr-step-label,
+[data-theme="dark-legacy"] .kair-rr-step-label { color: #7fb0ff; }
+[data-theme="dark"] .kair-rr-doc-icon,
+[data-theme="dark-legacy"] .kair-rr-doc-icon {
+    background: #7f1d1d;
+    border-color: #b91c1c;
+    color: #fca5a5;
+}
+[data-theme="dark"] .kair-rr-doc-icon i,
+[data-theme="dark-legacy"] .kair-rr-doc-icon i { color: #f87171; }
+
+/* TARJETAS DE DOCUMENTO */
+[data-theme="dark"] .kair-rr-doc-card,
+[data-theme="dark-legacy"] .kair-rr-doc-card {
+    background: #242c3d;
+    border-color: #4a5568;
+    border-left-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-doc-card:hover,
+[data-theme="dark-legacy"] .kair-rr-doc-card:hover {
+    background: #374151;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-doc-card__name,
+[data-theme="dark-legacy"] .kair-rr-doc-card__name { color: #e9ecef; }
+[data-theme="dark"] .kair-rr-doc-card__meta,
+[data-theme="dark-legacy"] .kair-rr-doc-card__meta,
+[data-theme="dark"] .kair-rr-doc-card__meta i,
+[data-theme="dark-legacy"] .kair-rr-doc-card__meta i { color: #aab4c3; }
+[data-theme="dark"] .kair-rr-doc-card__obs,
+[data-theme="dark-legacy"] .kair-rr-doc-card__obs {
+    background: #374151; color: #e9ecef;
+}
+[data-theme="dark"] .kair-rr-doc-card--vigente,
+[data-theme="dark-legacy"] .kair-rr-doc-card--vigente {
+    background: #064e3b; border-left-color: #10b981;
+}
+[data-theme="dark"] .kair-rr-doc-card--vigente:hover,
+[data-theme="dark-legacy"] .kair-rr-doc-card--vigente:hover {
+    background: #065f46; border-color: #10b981;
+}
+[data-theme="dark"] .kair-rr-doc-card--correccion,
+[data-theme="dark-legacy"] .kair-rr-doc-card--correccion {
+    background: #78350f; border-left-color: #f59e0b;
+}
+[data-theme="dark"] .kair-rr-doc-card--correccion:hover,
+[data-theme="dark-legacy"] .kair-rr-doc-card--correccion:hover {
+    background: #92400e; border-color: #f59e0b;
+}
+[data-theme="dark"] .kair-rr-doc-card--anterior,
+[data-theme="dark-legacy"] .kair-rr-doc-card--anterior {
+    background: #242c3d; border-left-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-doc-card__icon,
+[data-theme="dark-legacy"] .kair-rr-doc-card__icon { color: #f87171; }
+
+/* BOTONES DE ICONO */
+[data-theme="dark"] .kair-rr-icon-btn,
+[data-theme="dark-legacy"] .kair-rr-icon-btn {
+    background: #2d3748;
+    color: #aab4c3;
+    border-color: #7d879c;
+}
+[data-theme="dark"] .kair-rr-icon-btn:hover,
+[data-theme="dark-legacy"] .kair-rr-icon-btn:hover {
+    background: #1e3a5f;
+    color: #7fb0ff;
+    border-color: #7fb0ff;
+}
+
+/* TOASTS */
+[data-theme="dark"] .kair-toast,
+[data-theme="dark-legacy"] .kair-toast {
+    background: #2d3748;
+    color: #e9ecef;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+[data-theme="dark"] .kair-toast__message code,
+[data-theme="dark-legacy"] .kair-toast__message code {
+    background: #242c3d;
+    color: #e9ecef;
+}

@@ -25,19 +25,22 @@ class PresupuestoGestionComponent {
         const mainContainer = document.createElement('div');
         mainContainer.className = 'submodule-content';
 
+        // 📦889 — Los sellos `?v=` suben porque las tres vistas cambiaron: ahora
+        // cargan `shared/kair-iframe-theme.js` y sin re-bustar el Electron
+        // seguiría sirviendo el HTML viejo desde caché.
         switch (this.currentView) {
             case 'home':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRESUP-20260929-824-home-blocks', 'home');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRESUP-20261014-889-theme', 'home');
                 break;
             case 'selector':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html?v=PRESUP-20260929-824-shared-block', 'selector');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-selector.html?v=PRESUP-20261014-889-theme', 'selector');
                 break;
             case 'gestion':
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html?v=PRE-20260930-toast-realm-fix', 'gestion');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-gestion.html?v=PRE-20261014-889-theme', 'gestion');
                 break;
             default:
                 this.log('WARN', `Vista desconocida: ${this.currentView}, usando home.`);
-                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRE-20260930-toast-realm-fix', 'home');
+                this.renderIframeView(mainContainer, 'modules/recursos/presupuesto/presupuesto-home.html?v=PRE-20261014-889-theme', 'home');
         }
 
         this.container.appendChild(mainContainer);

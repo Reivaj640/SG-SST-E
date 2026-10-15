@@ -29,7 +29,7 @@ overflow-y: auto;
 }
 
 .copasst-portal__card {
-background: var(--cp-bg-card);
+background: var(--kair-card, #ffffff);
 width: 100%;
 max-width: 1100px;
 border-radius: var(--cp-radius);
@@ -121,7 +121,7 @@ margin-bottom: 2rem;
 }
 
 .copasst-portal__main-action {
-background: var(--cp-bg-card);
+background: var(--kair-card, #ffffff);
 border: 2px solid var(--cp-border);
 border-radius: var(--cp-radius);
 padding: 2rem;
@@ -163,7 +163,7 @@ color: white;
 width: 50px;
 height: 50px;
 border-radius: 10px;
-background: #f1f3f5;
+background: var(--kair-slate-soft);
 color: var(--cp-primary);
 display: flex;
 align-items: center;
@@ -376,4 +376,73 @@ gap: 1rem;
 
 @media (max-width: 768px) {
   .copasst-portal__top { flex-direction: column; }
+}
+
+/* ==================================================================
+   MODO OSCURO -- Portal COPASST
+   ------------------------------------------------------------------
+   Hasta aca el portal no tenia ni una regla por tema. No le faltaban
+   estilos oscuros: le sobraban colores escritos a mano. La tarjeta
+   grande tomaba el blanco del token local --cp-bg-card, fijo en
+   #ffffff, mientras su rotulo ya leia --kair-ink, que en oscuro es
+   #e9ecef. El resultado era texto casi blanco sobre blanco: "Realizar
+   Nueva Acta" se leia en crema con el texto gris encima, y "Volver al
+   Menu" quedaba blanco.
+
+   Este bloque NO toca el claro. Cada valor escrito a mano se queda como
+   esta arriba y se pisa solo cuando data-theme arranca por "dark", que
+   cubre los dos modos oscuros: dark (sistema) y dark-legacy (manual).
+   El operador ^= evita escribir el bloque dos veces.
+
+   Los dos unicos hardcodes que SI coincidian con un token de claro
+   (#ffffff = --kair-card, #f1f3f5 = --kair-slate-soft) se resolvieron
+   por token arriba, no se repiten aca.
+
+   CONTRASTE MEDIDO (WCAG 1.4.3 y 1.4.11), en dark y en dark-legacy:
+     --kair-blue-soft  sobre --kair-blue-text   5.8:1 / 7.3:1
+     --kair-green-soft sobre --kair-green-text  7.9:1 / 9.2:1
+     --kair-soft       sobre --kair-blue (icono) 4.5:1 / 4.8:1
+     --kair-card       sobre --kair-ink        7.5:1 / 8.9:1
+     --kair-card       sobre --kair-muted (desc) 4.9:1 / 5.6:1
+   ================================================================== */
+
+[data-theme^="dark"] .copasst-portal__main-action {
+  border-color: var(--kair-line);
+}
+[data-theme^="dark"] .copasst-portal__main-action-icon {
+  color: var(--kair-blue);
+}
+[data-theme^="dark"] .copasst-portal__main-action-icon--success {
+  background: var(--kair-green-soft);
+  color: var(--kair-green);
+}
+[data-theme^="dark"] .copasst-portal__top-icon {
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue-text);
+}
+[data-theme^="dark"] .copasst-portal__pill {
+  background: var(--kair-green-soft);
+  color: var(--kair-green-text);
+}
+[data-theme^="dark"] .copasst-portal__back {
+  background: var(--kair-card);
+  color: var(--kair-ink);
+}
+[data-theme^="dark"] .copasst-portal__action-desc {
+  color: var(--kair-muted);
+}
+[data-theme^="dark"] .copasst-portal__main-action:hover {
+  border-color: var(--kair-blue);
+}
+[data-theme^="dark"] .copasst-portal__action-card:hover {
+  background: var(--kair-card);
+  border-color: var(--kair-blue);
+}
+
+/* La tarjeta azul media 2.56:1 con su propio texto en oscuro: --kair-blue
+   sube a #5da2ff y el blanco encima no daba 4.5:1. En oscuro se pinta con
+   el azul oscuro de la app: el blanco del rotulo queda en 11.3:1 contra el
+   inicio del degradado y 14.4:1 contra el final. */
+[data-theme^="dark"] .copasst-portal__main-action--primary {
+  background: linear-gradient(135deg, var(--kair-blue-ink) 0%, #16273f 100%);
 }

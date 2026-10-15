@@ -272,15 +272,27 @@ function evaluar(F) {
   }
 
   // ── 9 · Cache-bust de lo que se tocó.
+  // La lista fija el `?v=` LITERAL, y eso se rompe cada vez que el archivo se
+  // vuelve a tocar. Para los que llevan el sello del 886 y no se han movido en el
+  // 889, el literal sigue siendo la aserción correcta. Para los que el 889 volvió
+  // a tocar, lo que se vigila es el INVARIANTE —que lleven un `?v=`— y no el
+  // número: cambiar el número es justamente lo que hay que hacer para que el CSS
+  // llegue al navegador.
   for (const href of [
     'styles.css?v=20261014-scrollbar886',
     'modules/gestion-humana/dashboard/index.css?v=GH-20261014-scrollbar886',
     'modules/gestion-humana/carpetas/index.css?v=GH-20261014-scrollbar886',
     'modules/verificacion/definicion-indicadores/definicion-indicadores.css?v=20261014-scrollbar886',
-    'modules/gestion-peligros/inspecciones/inspeccion.css?v=20261014-scrollbar886',
     'modules/gestion-peligros/mantenimiento/mantenimiento.css?v=20261014-scrollbar886',
   ]) {
     chk(F.idx.includes('href="' + href + '"'), 'cache-bust de ' + href.split('?')[0]);
+  }
+  for (const rel of [
+    'modules/gestion-peligros/inspecciones/inspeccion.css',
+    'modules/verificacion/revision-alta-direccion/revision-alta-direccion.css',
+  ]) {
+    chk(new RegExp('href="' + rel.replace(/[/.]/g, '\\$&') + '\\?v=[^"]+"').test(F.idx),
+        'cache-bust de ' + rel);
   }
 
   // ── 10 · Sin alfabetos que este repo prohibe colarse por las rutas.

@@ -62,8 +62,6 @@ var CopasstViewer = (function () {
         moduleName: '',
         submoduleName: '',
         // Listeners de theme (para cleanup en destroy)
-        _themeMessageHandler: null,
-        _themeObserver: null
     };
 
     /* ═══════════════════════════════════════════════════════════════
@@ -214,86 +212,52 @@ var CopasstViewer = (function () {
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       THEME SYNC — Escucha cambios del padre y los aplica al iframe
-       El theme-manager del padre propaga el atributo data-theme al
-       iframe via contentDocument + postMessage('theme-changed').
+       TEMA -- 890
+       ----------------------------------------------------------------
+       Antes esta vista traia su propio sincronizador y estaba ROTO. No
+       por falta de CSS: `copasst-view.css` tiene su bloque oscuro para
+       `dark` y para `dark-legacy` completo. El fallo era de codigo.
+
+       renderer.js:1743-1759 hace dos cosas, en este orden:
+         1) escribe el atributo ya RESUELTO en `contentDocument.documentElement`
+            ('dark-legacy' en manual, 'dark' en sistema, lo quita en claro);
+         2) despues manda postMessage({type:'theme-changed', theme, effectiveTheme}).
+
+       El sincronizador viejo traducía eso con `_resolveThemeValue(theme, mode)`,
+       que esperaba la forma `{theme, mode}` de `scripts/theme-manager.js`. Ese
+       archivo NO esta cargado en el shell, asi que `mode` siempre llegaba
+       undefined y:
+
+         - theme 'system' con el sistema en oscuro -> `theme !== 'dark'` ->
+           null -> removeAttribute. BORRABA el 'dark' del paso 1. El iframe
+           se quedaba en claro mientras el shell estaba en oscuro.
+         - theme 'dark' (manual) -> caia al `return 'dark'` de fallback y
+           pisaba el 'dark-legacy' correcto con la paleta equivocada.
+
+       El postMessage es asincrono, asi que el paso 2 siempre ganaba.
+
+       Ahora la sincronizacion vive en `shared/kair-iframe-theme.js`, que
+       maneja las tres formas reales que renderer.js manda de verdad y
+       distingue `dark` de `dark-legacy`. Se deja UNA sola ruta a proposito:
+       las funciones viejas no se conservan porque son el bug, y volver a
+       usarlas lo reintroduce en silencio.
+
+       Este archivo se queda sin listener propio. Si el modulo compartido no
+       estuviera, el aviso lo dice en vez de dejar la vista a ciegas.
        ═══════════════════════════════════════════════════════════════ */
-    function _applyThemeToHtml(themeValue) {
-        // themeValue: 'dark-legacy' | 'dark' | null (light = sin atributo)
-        try {
-            var docEl = document.documentElement;
-            if (themeValue) {
-                docEl.setAttribute('data-theme', themeValue);
-            } else {
-                docEl.removeAttribute('data-theme');
-            }
-            _log('THEME', 'APPLIED', { value: themeValue });
-        } catch (e) {
-            _err('THEME_APPLY', e);
-        }
-    }
-
-    function _resolveThemeValue(theme, mode) {
-        // theme: 'light' | 'dark', mode: 'light' | 'dark' | 'system'
-        if (theme !== 'dark') return null; // light
-        // dark:
-        if (mode === 'dark') return 'dark-legacy';
-        if (mode === 'system') return 'dark';
-        return 'dark'; // fallback
-    }
-
     function _setupThemeSync() {
-        // 1) Leer tema actual del <html> del padre (si está disponible)
-        try {
-            if (window.parent && window.parent.document && window.parent.document.documentElement) {
-                var parentTheme = window.parent.document.documentElement.getAttribute('data-theme');
-                if (parentTheme) {
-                    _applyThemeToHtml(parentTheme);
-                }
-            }
-        } catch (e) {
-            // cross-origin, no se puede leer del padre
-            _log('THEME', 'PARENT_READ_BLOCKED');
+        if (typeof window.kairIframeApplyTheme !== 'function') {
+            _err('THEME', 'falta shared/kair-iframe-theme.js en el <head> de copasst-view.html');
         }
-
-        // 2) Escuchar mensajes de cambio de tema del padre
-        _state._themeMessageHandler = function (event) {
-            if (!event.data || typeof event.data !== 'object') return;
-            if (event.data.type !== 'theme-changed') return;
-            var theme = event.data.theme;
-            var mode = event.data.mode;
-            var themeValue = _resolveThemeValue(theme, mode);
-            _applyThemeToHtml(themeValue);
-        };
-        window.addEventListener('message', _state._themeMessageHandler);
-
-        // 3) MutationObserver como defensa: si el theme-manager cambia
-        //    el atributo data-theme directamente en el iframe, sincronizamos
-        if (typeof MutationObserver !== 'undefined') {
-            _state._themeObserver = new MutationObserver(function (mutations) {
-                mutations.forEach(function (m) {
-                    if (m.type === 'attributes' && m.attributeName === 'data-theme') {
-                        var newVal = document.documentElement.getAttribute('data-theme');
-                        _log('THEME', 'OBSERVED_CHANGE', { value: newVal });
-                    }
-                });
-            });
-            _state._themeObserver.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['data-theme']
-            });
-        }
+        _log('THEME', 'DELEGADO', { modulo: 'kair-iframe-theme' });
     }
 
+    // El modulo compartido no expone teardown: su listener vive lo que viva
+    // la vista, que es lo que se quiere. La funcion se conserva porque el
+    // punto de entrada la sigue llamando y asi el cambio queda acotado a un
+    // archivo en vez de tocar el ciclo de vida del visor.
     function _teardownThemeSync() {
-        if (_state._themeMessageHandler) {
-            window.removeEventListener('message', _state._themeMessageHandler);
-            _state._themeMessageHandler = null;
-        }
-        if (_state._themeObserver) {
-            _state._themeObserver.disconnect();
-            _state._themeObserver = null;
-        }
+        // sin limpieza que hacer: el tema no tiene estado propio que liberar.
     }
 
     /* ═══════════════════════════════════════════════════════════════

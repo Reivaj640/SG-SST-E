@@ -1108,7 +1108,7 @@ Pregunta solo lo que no se puede deducir del código.
 
 ---
 
-## 9. Trampas activas en el repo (verificadas 2026-10-04)
+## 9. Trampas activas en el repo (verificadas 2026-10-14)
 
 No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si no las conoce.
 
@@ -1130,6 +1130,11 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 14 | 🔴 **`core.autocrlf=true` del instalador de Git rompe 2277 archivos y `git status` miente.** En una PC nueva, todo lo que el repo guarda en LF queda en CRLF en disco, y Git no lo ve porque normaliza al commitear | `C:\Program Files\Git\etc\gitconfig` (config de **sistema**, invisible desde `--global`) | `git config --local core.autocrlf false`, y renormalizar con `git reset` + `git checkout -- .` (§5.17). **Verificar los bytes, no `git status`** |
 | 15 | 🔴 **`better-sqlite3` está atado a la versión de Electron, y `npm install` lo compila contra el Node del sistema, no contra Electron.** Con Node 26 falla (`error C2039: "GetIsolate": no es un miembro de "v8::Context"`) y revierte el install entero | `node_modules/better-sqlite3` · el repo usa el runtime de Electron (`node 22.21.1`, ABI **136**) | `npm install --ignore-scripts`, extraer el binario de Electron a mano, y recién entonces `npm rebuild better-sqlite3 --runtime=electron --target=<version instalada> --disturl=https://electronjs.org/headers`. Verificar con un `SELECT` real dentro de Electron (§7.7) |
 | 16 | 🔴 **`CONTEXT.md` tiene separadores de línea **CR CR CR LF** (tres CR), no CRLF.** 1337 de sus 1354 líneas. Viene así del repo, no es de una edición | `CONTEXT.md` (todo el archivo) | **Nunca lo abras con `Edit` ni lo reescribas con `ReadAllText`/`WriteAllText`**: un CRLF "correcto" en el medio de eso rompe el diff entero. Si hay que tocarlo, buscar el ancla con una regex que tolere `\r*\n` y **armar el texto nuevo con el separador que ya usa el archivo**, verificado leyendo los bytes del ancla |
+| 17 | 🔴 **`scripts/theme-manager.js` EXISTE en disco y NO está cargado en el shell.** Espera la forma de mensaje `{theme, mode}`, que el shell nunca manda | `scripts/theme-manager.js`, `renderer.js` | **Ninguna vista embebida puede depender de esa forma.** Usá `shared/kair-iframe-theme.js`, que maneja las tres que sí llegan |
+| 18 | 🔴 **`dark-legacy` NO es alias de `dark`.** El oscuro manual se propaga con ese nombre | `[data-theme="dark"]` no matchea `dark-legacy` | Usá `[data-theme^="dark"]`. Un código que solo acepta `'dark'` **quita el atributo** y el modo manual queda sin pintar mientras el de sistema funciona: la mitad de las pruebas pasa |
+| 19 | 🔴 **Un `:root` dentro de un `<style>` inyectado escribe en TODO el shell**, no solo en el componente | `copasst-logic.js` lo hacía con `--widget-bg-color`, que `styles.css` usa en **44 lugares** | Un `<style>` que cuelga de un `div` sigue aplicando a todo el documento, y `:root` sigue siendo el `<html>`. Los tokens van en el **contenedor real**, nunca en `:root` |
+| 20 | 🔴 **La herramienta de edición normaliza a CRLF un archivo de EOL mixto.** `copasst-home.css` tiene el bloque legacy en CRLF y el premium del final en LF; editarlo lo convierte entero y el diff se vuelve ilegible | `modules/recursos/copasst/copasst-home.css` | Si un archivo es mixto, **`git checkout --` y rehacé el cambio por bytes** con un script que cuente las ocurrencias antes de escribir. Verificá los bytes, no `git status` |
+| 21 | 🔴 **Un arnés que muta `data-theme` en caliente mide el estado anterior.** Reportó 16 fallas que no existían | los arneses de 887/889/890 | Que el tema viaje en el HTML **desde el parseo**, antes del primer `<link>`. `void offsetHeight` no fuerza el recálculo. **La firma de que el arnés miente**: en un mismo elemento y en el mismo instante, la variable de tema oscura y el fondo claro |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

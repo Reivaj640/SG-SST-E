@@ -27,7 +27,7 @@ class CopasstComponent {
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
-        const viewerUrl = `modules/recursos/copasst/copasst-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        const viewerUrl = `modules/recursos/copasst/copasst-view.html?v=COPASST-20261014-v4-dark890&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
         this.container.appendChild(iframe);
     }
@@ -121,7 +121,7 @@ class CopasstComponent {
 <!-- HEADER PREMIUM — sin tarjeta, breadcrumb + título (patrón aprobado) -->
 <div class="pres-header" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.35rem 0.2rem 1.2rem; flex-shrink:0; flex-wrap:wrap;">
   <div style="display:flex; align-items:center; gap:0.9rem; min-width:0;">
-    <div class="pres-header__icon" style="width:44px; height:44px; border-radius:12px; background:#e3ecfb; color:var(--kair-blue,#2057b8); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
+    <div class="pres-header__icon" style="width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
       <i class="fas fa-file-signature"></i>
     </div>
     <div>
@@ -156,10 +156,13 @@ class CopasstComponent {
         const style = document.createElement('style');
         style.textContent = `
 /* ═══ PREMIUM v1 (2026-09-15) — Header y formulario con acabado premium ═══ */
+.copasst-actas-container .pres-header__icon {
+  background: #e3ecfb; color: var(--kair-blue, #2057b8);
+}
 .copasst-actas-container .pres-header .header-back-btn {
   padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600;
   cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
-  border: 1px solid var(--kair-line, #e8ebee); background: #fff;
+  border: 1px solid var(--kair-line, #e8ebee); background: var(--kair-card, #ffffff);
   color: #536177; transition: all 0.18s; white-space: nowrap;
   font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
 }
@@ -201,48 +204,117 @@ class CopasstComponent {
 @keyframes kair-spin { to { transform: rotate(360deg); } }
 
 /* ─── Formulario del acta — acabado premium ─── */
-:root { --primary-color: var(--kair-blue, #2057b8); --primary-hover-color: #1a4ba0; --bg-color: var(--kair-canvas, #fbfcfb); --widget-bg-color: #ffffff; --border-color: var(--kair-line, #e8ebee); }
-.acta-form-wrapper { font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif); color: var(--kair-ink, #14213d); background: var(--bg-color); padding: 0.35rem 0.2rem 2rem; max-width: 1100px; margin: 0 auto; }
-.acta-card { background: white; border-radius: 16px; border: 1px solid var(--border-color); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05); padding: clamp(18px, 2vw, 28px); margin-bottom: clamp(14px, 1.6vw, 22px); }
-.acta-card-title { font: 700 clamp(15px, 1.4vw, 19px) var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; margin-top: 0; margin-bottom: 1.25rem; color: var(--kair-ink, #14213d); border-bottom: 0; padding-bottom: 0; display: flex; align-items: center; gap: 0.6rem; }
-.acta-card-title::before { content: ''; width: 4px; height: 18px; border-radius: 4px; background: var(--kair-blue, #2057b8); flex-shrink: 0; }
-.acta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.25rem; }
-.acta-form-group { display: flex; flex-direction: column; }
-.acta-form-group.full-width { grid-column: 1 / -1; }
-.acta-form-group label { font-size: 0.8125rem; font-weight: 600; color: var(--kair-muted, #748096); margin-bottom: 0.45rem; }
-.acta-form-group input, .acta-form-group textarea {
+.copasst-actas-container { --primary-color: var(--kair-blue, #2057b8); --primary-hover-color: #1a4ba0; --bg-color: var(--kair-canvas, #fbfcfb); --widget-bg-color: var(--kair-card, #ffffff); --border-color: var(--kair-line, #e8ebee); }
+.copasst-actas-container .acta-form-wrapper { font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif); color: var(--kair-ink, #14213d); background: var(--bg-color); padding: 0.35rem 0.2rem 2rem; max-width: 1100px; margin: 0 auto; }
+.copasst-actas-container .acta-card { background: var(--kair-card, #ffffff); border-radius: 16px; border: 1px solid var(--border-color); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05); padding: clamp(18px, 2vw, 28px); margin-bottom: clamp(14px, 1.6vw, 22px); }
+.copasst-actas-container .acta-card-title { font: 700 clamp(15px, 1.4vw, 19px) var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; margin-top: 0; margin-bottom: 1.25rem; color: var(--kair-ink, #14213d); border-bottom: 0; padding-bottom: 0; display: flex; align-items: center; gap: 0.6rem; }
+.copasst-actas-container .acta-card-title::before { content: ''; width: 4px; height: 18px; border-radius: 4px; background: var(--kair-blue, #2057b8); flex-shrink: 0; }
+.copasst-actas-container .acta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.25rem; }
+.copasst-actas-container .acta-form-group { display: flex; flex-direction: column; }
+.copasst-actas-container .acta-form-group.full-width { grid-column: 1 / -1; }
+.copasst-actas-container .acta-form-group label { font-size: 0.8125rem; font-weight: 600; color: var(--kair-muted, #748096); margin-bottom: 0.45rem; }
+.copasst-actas-container .acta-form-group input,
+.copasst-actas-container .acta-form-group textarea {
   padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: 10px;
   font-family: inherit; font-size: 0.875rem; color: var(--kair-ink, #14213d);
-  background: #fff; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: var(--kair-card, #ffffff); transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.acta-form-group input:focus, .acta-form-group textarea:focus {
+.copasst-actas-container .acta-form-group input:focus,
+.copasst-actas-container .acta-form-group textarea:focus {
   outline: none; border-color: var(--kair-blue, #2057b8);
   box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.10);
 }
-.acta-dynamic-item { background: var(--kair-soft, #f3f6f6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; position: relative; }
-.acta-btn-add { width: 100%; padding: 0.75rem; background: #fff; color: var(--kair-blue, #2057b8); border: 1px dashed #c8d7ef; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.18s; }
-.acta-btn-add:hover { background: #eef4fd; border-color: var(--kair-blue, #2057b8); }
-.acta-btn-remove { position: absolute; top: 10px; right: 10px; background: var(--kair-red, #da5563); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; transition: all 0.15s; }
-.acta-btn-remove:hover { transform: scale(1.08); }
+.copasst-actas-container .acta-dynamic-item { background: var(--kair-soft, #f3f6f6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; position: relative; }
+.copasst-actas-container .acta-btn-add { width: 100%; padding: 0.75rem; background: var(--kair-card, #ffffff); color: var(--kair-blue, #2057b8); border: 1px dashed #c8d7ef; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.18s; }
+.copasst-actas-container .acta-btn-add:hover { background: #eef4fd; border-color: var(--kair-blue, #2057b8); }
+.copasst-actas-container .acta-btn-remove { position: absolute; top: 10px; right: 10px; background: var(--kair-red, #da5563); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; transition: all 0.15s; }
+.copasst-actas-container .acta-btn-remove:hover { transform: scale(1.08); }
 
 @media (max-width: 768px) {
     .copasst-actas-container .pres-header { padding-bottom: 0.75rem; }
 }
 
-/* Modo oscuro — compatibilidad heredada */
-.copasst-actas-container[data-theme="dark"] .pres-header h1 { color: #e2e8f0; }
-.copasst-actas-container[data-theme="dark"] .pres-header__crumb { color: #8791a1; }
-.copasst-actas-container[data-theme="dark"] .pres-header p { color: #a0aec0; }
-.copasst-actas-container[data-theme="dark"] .pres-header .header-back-btn { color: #adb5bd; border-color: #4a5568; background: transparent; }
-.copasst-actas-container[data-theme="dark"] .pres-header .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: #4da6ff; }
-.copasst-actas-container[data-theme="dark"] .acta-form-wrapper { background: transparent; }
-.copasst-actas-container[data-theme="dark"] .acta-card { background: #2d3748; border-color: #4a5568; }
-.copasst-actas-container[data-theme="dark"] .acta-card-title { color: #e2e8f0; }
-.copasst-actas-container[data-theme="dark"] .acta-form-group label { color: #a0aec0; }
-.copasst-actas-container[data-theme="dark"] .acta-form-group input,
-.copasst-actas-container[data-theme="dark"] .acta-form-group textarea { background: #1a202c; border-color: #4a5568; color: #e2e8f0; }
-.copasst-actas-container[data-theme="dark"] .acta-dynamic-item { background: #1a202c; border-color: #4a5568; }
-.copasst-actas-container[data-theme="dark"] .acta-btn-add { background: transparent; color: #4da6ff; border-color: #4a5568; }
+/* ------------------------------------------------------------------
+   MODO OSCURO -- Generador de Actas COPASST
+   ------------------------------------------------------------------
+   El bloque que este reemplaza jamas se ejecuto. Sus 13 selectores
+   pedian .copasst-actas-container[data-theme="dark"], pero el atributo
+   nunca se pone en ese elemento: vive en el <html>. Ademas solo
+   contemplaba "dark", asi que el modo manual (dark-legacy) se habria
+   quedado claro igual.
+
+   El formulario NO es un iframe -- lo inyecta copasst-logic.js en el
+   DOM del shell -- asi que alcanza con leer el atributo de arriba. El
+   operador ^= cubre los dos modos oscuros en una sola regla.
+
+   La superficie ya no se declara aca: .acta-card, los input y
+   .acta-btn-add leen --kair-card, que en oscuro vale #384151 / #292929.
+   Antes eran "white" fijo, y su texto leia --kair-ink (#e9ecef): texto
+   casi blanco sobre blanco, justo lo que se veia en la pantalla.
+
+   CONTRASTE MEDIDO (WCAG 1.4.3), dark / dark-legacy:
+     --kair-card   sobre --kair-ink   7.5:1 / 8.9:1
+     --kair-card   sobre --kair-muted 4.9:1 / 5.6:1
+     --kair-blue-soft sobre --kair-blue-text 5.8:1 / 7.3:1
+     --kair-blue   sobre #0b1f33 (texto del boton) 6.5:1 / 8.4:1
+     --kair-mint   sobre #0a2a1c (texto del boton) 8.3:1 / 10.6:1
+     --kair-red-soft sobre --kair-red-text    5.5:1 / 5.5:1
+   ------------------------------------------------------------------ */
+
+/* El wrapper deja ver el fondo del shell en vez de pintar una banda
+   mas oscura encima: el shell ya aporta --bg-color del tema. */
+[data-theme^="dark"] .copasst-actas-container .acta-form-wrapper { background: transparent; }
+
+[data-theme^="dark"] .copasst-actas-container .pres-header__icon {
+  background: var(--kair-blue-soft); color: var(--kair-blue-text);
+}
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-back-btn {
+  color: var(--kair-ink); border-color: var(--kair-line);
+}
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-back-btn:hover {
+  color: var(--kair-blue-text);
+}
+
+/* Los botones de acento fillings cambian a texto oscuro en oscuro:
+   --kair-blue sube a #5da2ff y el blanco encima daba 2.56:1;
+   --kair-mint sube a #4ade9e y daba 1.75:1. Los dos estaban por
+   debajo del 4.5:1 que pide WCAG 1.4.3. */
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-action--primary {
+  color: #0b1f33; box-shadow: none;
+}
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-action--primary:hover {
+  background: var(--kair-blue-text); color: #06121f;
+}
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-action--success {
+  color: #0a2a1c;
+}
+[data-theme^="dark"] .copasst-actas-container .pres-header .header-action--success:hover {
+  background: var(--kair-green-text); color: #04160e;
+}
+
+/* "+ Agregar tema" es texto normal (0.85rem/700), asi que pide 4.5:1 y no
+   3:1. Con --kair-blue (#5da2ff en oscuro) daba 3.95:1 sobre la tarjeta
+   #384151. --kair-blue-text es el mismo tono, un paso mas claro:
+   5.02:1 en dark y 8.08:1 en dark-legacy. */
+[data-theme^="dark"] .copasst-actas-container .acta-btn-add {
+  color: var(--kair-blue-text);
+}
+
+/* El halo del focus era rgba(32,87,184,.10): un azul tan apagado que en
+   oscuro no se distinguia de la tarjeta. */
+[data-theme^="dark"] .copasst-actas-container .acta-form-group input:focus,
+[data-theme^="dark"] .copasst-actas-container .acta-form-group textarea:focus {
+  box-shadow: 0 0 0 3px rgba(93, 162, 255, 0.30);
+}
+
+[data-theme^="dark"] .copasst-actas-container .acta-btn-add:hover {  background: var(--kair-blue-soft); border-color: var(--kair-blue);
+}
+
+/* El boton de quitar es texto, no un componente de 3:1: la X sobre
+   --kair-red daba 2.6:1 con el blanco. Pasa a su propio tinte. */
+[data-theme^="dark"] .copasst-actas-container .acta-btn-remove {
+  background: var(--kair-red-soft); color: var(--kair-red-text);
+}
 `;
         wrapper.appendChild(style);
 

@@ -443,17 +443,20 @@ function handleBDResumenResponse(data) {
     // Construir tabla de partidas
     var rows = '';
     if (partidas.length === 0) {
-        rows = '<tr><td colspan="5" style="padding: 1rem; text-align: center; color: #6c757d;">No hay partidas.</td></tr>';
+        rows = '<tr><td colspan="5" style="padding: 1rem; text-align: center; color: var(--text-muted);">No hay partidas.</td></tr>';
     } else {
         partidas.forEach(function(partida) {
             // 📦708 (Fase 3.5) — Cada fila tiene un botón 🗑️ para eliminar (soft delete)
             var safeLabel = escapeHtml(partida.concepto).replace(/'/g, "\\'");
-            rows += '<tr style="border-bottom: 1px solid #f1f3f5;">' +
-                '<td style="padding: 0.5rem 0.75rem; color: #6c757d;">' + partida.numero + '</td>' +
+            var pctColor = partida.porcentaje >= 80
+                ? 'var(--success)'
+                : (partida.porcentaje >= 50 ? 'var(--warning)' : 'var(--danger)');
+            rows += '<tr style="border-bottom: 1px solid var(--border);">' +
+                '<td style="padding: 0.5rem 0.75rem; color: var(--text-muted);">' + partida.numero + '</td>' +
                 '<td style="padding: 0.5rem 0.75rem;">' + escapeHtml(partida.concepto) + '</td>' +
                 '<td style="padding: 0.5rem 0.75rem; text-align: right;">' + fmt.format(partida.asignado) + '</td>' +
                 '<td style="padding: 0.5rem 0.75rem; text-align: right;">' +
-                    '<span style="color: ' + (partida.porcentaje >= 80 ? '#28a745' : (partida.porcentaje >= 50 ? '#ffc107' : '#dc3545')) + ';">' +
+                    '<span style="color: ' + pctColor + ';">' +
                     partida.porcentaje.toFixed(1) + '%' +
                     '</span>' +
                 '</td>' +
@@ -473,9 +476,9 @@ function handleBDResumenResponse(data) {
     overlay.className = 'bd-resumen-modal';
     overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 2rem;';
     overlay.innerHTML =
-        '<div style="background: white; border-radius: 12px; max-width: 900px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
-            '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">' +
-                '<h2 style="margin: 0; font-size: 1.25rem; color: #174ea6;">' + escapeHtml(p.nombre || 'Presupuesto') + ' (' + p.anio + ')</h2>' +
+        '<div style="background: var(--surface-card); border-radius: 12px; max-width: 900px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
+            '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">' +
+                '<h2 style="margin: 0; font-size: 1.25rem; color: var(--primary);">' + escapeHtml(p.nombre || 'Presupuesto') + ' (' + p.anio + ')</h2>' +
                 '<div style="display: flex; gap: 0.5rem; align-items: center;">' +
                     '<button class="bd-btn bd-btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" onclick="updatePresupuestoMeta()" title="Editar nombre y notas">' +
                         '<i class="fas fa-edit"></i> Editar' +
@@ -483,32 +486,32 @@ function handleBDResumenResponse(data) {
                     '<button class="bd-btn bd-btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" onclick="addPartidaToBD()" title="Agregar partida">' +
                         '<i class="fas fa-plus"></i> + Partida' +
                     '</button>' +
-                    '<button id="modal-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6c757d; padding: 0 0.5rem;">&times;</button>' +
+                    '<button id="modal-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); padding: 0 0.5rem;">&times;</button>' +
                 '</div>' +
             '</div>' +
             '<div style="padding: 1.5rem 2rem;">' +
                 '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">' +
-                    '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: #6c757d;">Asignado</div>' +
-                        '<div style="font-size: 1.1rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.totalAsignado) + '</div>' +
+                    '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">Asignado</div>' +
+                        '<div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">' + fmt.format(r.totalAsignado) + '</div>' +
                     '</div>' +
-                    '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: #6c757d;">Ejecutado</div>' +
-                        '<div style="font-size: 1.1rem; font-weight: 700; color: #28a745;">' + fmt.format(r.totalEjecutado) + '</div>' +
+                    '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">Ejecutado</div>' +
+                        '<div style="font-size: 1.1rem; font-weight: 700; color: var(--success);">' + fmt.format(r.totalEjecutado) + '</div>' +
                     '</div>' +
-                    '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: #6c757d;">% Cumplimiento</div>' +
-                        '<div style="font-size: 1.1rem; font-weight: 700; color: ' + (r.porcentaje >= 80 ? '#28a745' : (r.porcentaje >= 50 ? '#ffc107' : '#dc3545')) + ';">' + r.porcentaje.toFixed(1) + '%</div>' +
+                    '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">% Cumplimiento</div>' +
+                        '<div style="font-size: 1.1rem; font-weight: 700; color: ' + (r.porcentaje >= 80 ? 'var(--success)' : (r.porcentaje >= 50 ? 'var(--warning)' : 'var(--danger)')) + ';">' + r.porcentaje.toFixed(1) + '%</div>' +
                     '</div>' +
-                    '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
-                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: #6c757d;">Saldo</div>' +
-                        '<div style="font-size: 1.1rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.saldo) + '</div>' +
+                    '<div style="background: var(--surface-hover); padding: 0.75rem; border-radius: 6px;">' +
+                        '<div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">Saldo</div>' +
+                        '<div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">' + fmt.format(r.saldo) + '</div>' +
                     '</div>' +
                 '</div>' +
                 '<div style="overflow-x: auto;">' +
                     '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">' +
                         '<thead>' +
-                            '<tr style="background: #f1f3f5;">' +
+                            '<tr style="background: var(--surface-soft);">' +
                                 '<th style="padding: 0.5rem 0.75rem; text-align: left;">#</th>' +
                                 '<th style="padding: 0.5rem 0.75rem; text-align: left;">Concepto</th>' +
                                 '<th style="padding: 0.5rem 0.75rem; text-align: right;">Asignado</th>' +
@@ -519,7 +522,7 @@ function handleBDResumenResponse(data) {
                         '<tbody>' + rows + '</tbody>' +
                     '</table>' +
                 '</div>' +
-                '<p style="margin-top: 1rem; font-size: 0.75rem; color: #6c757d;">' +
+                '<p style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">' +
                     '📦708 (Fase 3.5) · Datos leídos desde la base de datos local (presupuesto-bridge.js). ' +
                     'Podés agregar partidas con el botón <strong>+ Partida</strong>, editar nombre/notas con <strong>Editar</strong>, o eliminar con 🗑️ (soft delete).' +
                 '</p>' +

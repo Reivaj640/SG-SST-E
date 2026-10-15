@@ -10660,3 +10660,119 @@ no el test. Y **agregar** un check nuevo por fase en vez de editar los viejos.
 independientes**: qué tarda (perfil de tiempo) y qué se pasa de tamaño (peso real de la salida).
 Arreglar solo una de las dos deja el mismo error.
 
+---
+
+## 📦887 / 889 / 890 · El color no tenía tema — y tenía cuatro formas distintas de romperse
+
+Entre los tres paquetes se corrigió el modo oscuro de los submódulos del módulo **Recursos**: el home,
+1.1.2 Roles y Responsabilidades, 1.1.3 Asignación de Recursos y 1.1.5 Gestión del COPASST. Los cuatro se
+veían en claro con el shell oscuro alrededor, y **ninguno compartía la misma causa inmediata**. El
+subtítulo del paquete lo dice, pero conviene separarlas, porque son cuatro comprobaciones distintas y una
+sirve para diagnosticar a la otra.
+
+| # | Qué falta | Cómo se reconoce |
+|---|---|---|
+| 1 | **El CSS no tiene ninguna regla por tema** | Hay colores escritos a mano. Se ve texto claro sobre fondo blanco |
+| 2 | **Otro `:root` se lleva los tokens por delante** | Los tokens oscuros **sí** llegan, pero `--kair-card` resuelve a `#ffffff` |
+| 3 | **Es un iframe y el `data-theme` no cruza la frontera** | El CSS oscuro está perfecto y no aplica nada. **No hay error en consola** |
+| 4 | **Las reglas apuntan al contenedor, no a `<html>`** | `[data-theme="dark"] .algo[data-theme="dark"]` no matchea nunca |
+
+El 1 y el 2 se confundían con frecuencia: en el 887 el síntoma era "tarjetas blancas" y la causa era el
+2, porque dos CSS de módulo (`inspeccion.css` e `revision-alta-direccion.css`) abrían un `:root` con la
+paleta **clara** y se cargaban **después** de `shared/kair-design-tokens.css`. `:root` y
+`[data-theme="dark"]` empatan en (0,1,0) y los dos matchean `<html>`, así que ganaba el último.
+
+### Trampa 1 · `dark-legacy` no es alias de `dark`
+
+El shell manda el tema resuelto por tres vías, y una de ellas trae el **oscuro manual** como
+`dark-legacy`:
+
+1. `get-theme-response` → `{theme: <ya resuelto>}` — `renderer.js:2006`
+2. `theme-changed` → `{theme: <preferencia>, effectiveTheme: <resuelto>}` — `renderer.js:1756` y `7445`
+3. escritura directa en `iframe.contentDocument.documentElement` — `renderer.js:1746` y `7418`
+
+Un código que solo acepta `'dark'` recibe `'dark-legacy'`, lo da por claro y **le quita el atributo**. El
+modo manual queda sin pintar mientras el de sistema funciona: **la mitad de las pruebas pasa y parece que
+el arreglo funcionó.** Cualquier validación de tema tiene que probar los dos modos por separado.
+
+**Las que NO llegan** son las de `scripts/theme-manager.js`, que espera `{theme, mode}`. Ese archivo existe
+en disco y **no está cargado en el shell**. Código que dependa de su forma de mensaje está roto sin que
+nada lo indique. Por eso existe `shared/kair-iframe-theme.js`.
+
+### Trampa 2 · Un `:root` dentro de un `<style>` inyectado escribe en TODO el shell
+
+`showRealizarActasInterface()` (📦890) crea un `<style>` con `document.createElement('style')` y lo cuelga
+en un `div`. **Un `<style>` aplica a todo el documento sin importar dónde cuelgue, y un `:root` que no está
+en el `<head>` sigue siendo el `<html>`.** Ese `:root` traía `--widget-bg-color: #ffffff`, que `styles.css`
+usa en **44 lugares**. Como la hoja entra después, ganaba por orden contra `[data-theme="dark"]`: mientras
+el formulario estaba abierto, **el shell entero se leía con superficies blancas**, y no solo el formulario.
+
+**Regla:** un `<style>` inyectado por un componente **nunca** declara `:root`. Los tokens van en el
+contenedor real, que es `.copasst-actas-container`. Y todo selector de clase de ese `<style>` lleva el
+contenedor delante: una regla sin scope en algo inyectado en el shell es una regla global esperando que
+otro módulo la pise. En el 890 el primer pase dejó **tres** selectores sueltos (`.acta-form-group textarea`,
+`.acta-form-group textarea:focus` y `.acta-btn-remove:hover`) y **el test los encontró**.
+
+### Trampa 3 · El `postMessage` llega DESPUÉS de la escritura directa
+
+El Repositorio de Actas (📦890) se quedaba en claro con el sistema en oscuro, y el CSS estaba bien. La
+cadena, en orden:
+
+```js
+// renderer.js:1743-1759
+iframe.contentDocument.documentElement.setAttribute('data-theme', 'dark');  // 1. correcto
+iframe.contentWindow?.postMessage({ type: 'theme-changed',
+                                    theme: themeMode, effectiveTheme });     // 2. despues
+```
+
+El paso 2 llega **asíncrono**, así que siempre se procesa después. El sincronizador del visor traducía el
+mensaje con la forma `{theme, mode}` de `theme-manager.js`: con `theme: 'system'` devolvía `null` y
+terminaba en `removeAttribute`, **borrando lo que el paso 1 acababa de poner**. Ganaba siempre el paso que
+rompía.
+
+**Regla:** si un iframe recibe el tema por **escritura directa Y por mensaje**, hay que decidir cuál manda y
+**quitar el otro**. Conservar el sincronizador viejo "por si acaso" es lo peor: es el bug, y volver a usarlo
+lo reintroduce en silencio. Ahora solo queda `shared/kair-iframe-theme.js`.
+
+### Trampa 4 · El sello `?v=` va en los TRES niveles
+
+Documento del iframe, script, y **el `iframe.src` en el padre**. En 1.1.2 el `iframe.src` no tenía ninguno:
+el arreglo completo no llegaba a la vista, y sin él Electron sirve del caché. Esto ya costó dos intentos en
+esta sesión.
+
+### Trampa 5 · Un arnés que miente es peor que no tener arnés
+
+La primera versión del arnés mutaba `data-theme` con el DOM ya montado y medía con `getComputedStyle`.
+Reportaba **16 fallas que no existían**. Sin un ciclo de render entre el cambio y la lectura, el navegador
+devuelve el estilo del **estado anterior**.
+
+**La firma del arnés mintiendo** es una que no se puede explicar por el CSS: en un mismo elemento y en el
+mismo instante, la **variable de tema leída como oscura y el fondo leído como claro**. Si eso aparece, el
+que mide está mal.
+
+**Regla:** el tema viaja en el HTML **desde el parseo**, antes del primer `<link>`:
+
+```html
+<script>(function(){var m=/[?&]modo=([a-z-]+)/.exec(location.search);var x=m?m[1]:'dark';
+if(x!=='claro')document.documentElement.setAttribute('data-theme',x);})();</script>
+```
+
+Y `void documentElement.offsetHeight` no sirve: no fuerza el recálculo de estilo. Lo que funciona es que el
+navegador nunca haya visto otro estado.
+
+### Lo que sí se midió, y cómo
+
+Nada de esto se afirma por lectura de CSS. El contraste se **midió** en el navegador, componiendo el fondo
+real (subiendo por el árbol juntando capas con alfa) y contra la tarjeta real de cada tema:
+
+| Paquete | `dark` | `dark-legacy` | claro |
+|---|---|---|---|
+| 890 · Portal + Generador | 42/42 | 42/42 | 23/23 |
+| 890 · Repositorio de Actas | 10/10 | — | — |
+
+El contraste del claro se comprueba contra los **valores exactos que producía el archivo original**, leídos
+del CSS antes de tocarlo: los 23 coinciden. Es la forma de probar el "no toqué el claro" sin inventar.
+
+WCAG 1.4.3 (4.5:1 para texto normal) encontró tres cosas que **una revisión visual no ve**: los botones de
+acento estaban en **2.56:1** y **1.75:1** con texto blanco en oscuro, y "+ Agregar tema" en **3.95:1**. En
+oscuro un azul que sube a `#5da2ff` necesita **texto oscuro encima**, no blanco.

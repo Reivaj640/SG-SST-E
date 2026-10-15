@@ -9,6 +9,10 @@
     <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
     <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
     <link rel="stylesheet" href="../../../shared/kair-components.css">
+    <!-- 📦889 — Esta vista se carga en un iframe: sin este script su <html> no
+         recibe `data-theme` y los bloques oscuros de más abajo no casan nunca.
+         El `?v=` es obligatorio: sin él Electron lo sirve desde caché. -->
+    <script src="../../../shared/kair-iframe-theme.js?v=20261014-889-theme"></script>
     
     <style>
         /* =========================================
@@ -32,6 +36,18 @@
             --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
             --k-header-height: 60px;
             --k-font-family: 'Segoe UI', 'Roboto', sans-serif;
+
+            /* 📦889 — Semanticos: los literales claros sueltos no cambiaban
+               con el tema. Cada superficie tiene nombre y una sola
+               definicion por tema, al final del bloque. */
+            --surface-card: #ffffff;
+            --surface-hover: #f8f9fa;
+            --surface-hover-press: #e2e8f0;
+            --icon-plate: #e3ecfb;
+            --back-ink: #536177;
+            --hover-line: #c8d7ef;
+            --selected-bg: #eef4fd;
+            --excel-ink: #217346;
         }
 
         body {
@@ -52,12 +68,12 @@ HEADER ACTION BUTTONS
 .header-back-btn {
   padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem;
   font-weight: 500; cursor: pointer; display: inline-flex; align-items: center;
-  gap: 0.375rem; border: 1px solid var(--k-border); background-color: #f8f9fa;
+  gap: 0.375rem; border: 1px solid var(--k-border); background-color: var(--surface-hover);
   color: var(--k-text-muted); transition: all 0.2s; white-space: nowrap;
   font-family: var(--k-font-family);
 }
 .header-back-btn:hover {
-  background-color: #e2e8f0; color: var(--k-primary); border-color: var(--k-primary);
+  background-color: var(--surface-hover-press); color: var(--k-primary); border-color: var(--k-primary);
 }
 
 /* CARD CONTAINER */
@@ -165,7 +181,7 @@ HEADER ACTION BUTTONS
 
         .file-icon-lg {
             font-size: 2rem;
-            color: #217346; /* Excel Color */
+            color: var(--excel-ink); /* Excel Color */
         }
 
         .file-data h3 { margin: 0; font-size: 1.1rem; font-weight: 600; }
@@ -192,8 +208,8 @@ HEADER ACTION BUTTONS
         .k-btn-primary { background-color: var(--k-primary); color: white; box-shadow: 0 2px 4px rgba(23,78,166,0.3); }
         .k-btn-primary:hover { background-color: var(--k-primary-hover); transform: translateY(-1px); }
 
-        .k-btn-outline { background: white; border: 1px solid var(--k-border); color: var(--k-text-main); }
-        .k-btn-outline:hover { background: #f8f9fa; border-color: var(--k-text-muted); }
+        .k-btn-outline { background: var(--surface-card); border: 1px solid var(--k-border); color: var(--k-text-main); }
+        .k-btn-outline:hover { background: var(--surface-hover); border-color: var(--k-text-muted); }
 
         /* Estado Vacío */
         .empty-state {
@@ -227,7 +243,7 @@ HEADER ACTION BUTTONS
            un toast de varias líneas tampoco pueda asomar. */
         .k-toast {
             position: fixed; bottom: 2rem; right: 2rem;
-            background: white; padding: 1rem 1.5rem;
+            background: var(--surface-card); padding: 1rem 1.5rem;
             border-radius: var(--k-radius-lg);
             box-shadow: 0 8px 16px rgba(0,0,0,0.12);
             display: flex; align-items: center; gap: 0.75rem;
@@ -255,14 +271,14 @@ HEADER ACTION BUTTONS
 
         .pres-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
         .pres-header__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
-        .pres-header__icon { width: 44px; height: 44px; border-radius: 12px; background: #e3ecfb; color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .pres-header__icon { width: 44px; height: 44px; border-radius: 12px; background: var(--icon-plate); color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
         .pres-header__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
         .pres-header__crumb span { padding: 0 4px; }
         .pres-header__title { margin: 0; font: 800 clamp(17px, 1.7vw, 23px)/1.15 var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; color: var(--kair-ink, #14213d); }
         .pres-header__sub { font-size: 0.8125rem; color: var(--kair-muted, #748096); margin: 2px 0 0 0; }
         .pres-header__right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
         .pres-header__company { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--kair-muted, #748096); background: var(--kair-soft, #f3f6f6); border-radius: 999px; padding: 0.35rem 0.8rem; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .header-back-btn { padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600; border: 1px solid var(--kair-line, #e8ebee); background: #fff; color: #536177; }
+        .header-back-btn { padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600; border: 1px solid var(--kair-line, #e8ebee); background: var(--surface-card); color: var(--back-ink); }
         .header-back-btn:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
 
         /* Tarjetas de año — premium */
@@ -271,8 +287,8 @@ HEADER ACTION BUTTONS
             border: 1px solid var(--kair-line, #e8ebee); border-radius: var(--kair-radius-card, 20px);
             box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04); background: var(--kair-card, #fff);
         }
-        .year-card:hover { border-color: #c8d7ef; box-shadow: 0 10px 24px rgba(28, 49, 92, 0.08); transform: translateY(-3px); }
-        .year-card.selected { border: 2px solid var(--kair-blue, #2057b8); background: #eef4fd; }
+        .year-card:hover { border-color: var(--hover-line); box-shadow: 0 10px 24px rgba(28, 49, 92, 0.08); transform: translateY(-3px); }
+        .year-card.selected { border: 2px solid var(--kair-blue, #2057b8); background: var(--selected-bg); }
         .year-icon { color: var(--kair-blue, #2057b8); opacity: 1; }
         .year-number { font-family: var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; }
 
@@ -333,7 +349,7 @@ HEADER ACTION BUTTONS
         .year-card--bd:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
-            border-color: #c8d7ef;
+            border-color: var(--hover-line);
         }
 
         .pdb__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -405,7 +421,7 @@ HEADER ACTION BUTTONS
             padding: 10px 14px; border-radius: var(--kair-radius-control, 12px);
             font: 700 0.83rem var(--kair-font-ui, 'DM Sans'); cursor: pointer;
             border: 1px solid var(--kair-line, #e8ebee);
-            background: #fff; color: var(--kair-ink, #14213d);
+            background: var(--surface-card); color: var(--kair-ink, #14213d);
             transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
         }
         .pdb__btn:hover { background: var(--kair-soft, #f3f6f6); }
@@ -448,11 +464,11 @@ HEADER ACTION BUTTONS
             background: var(--kair-soft, #f3f6f6); border: 1px solid transparent;
             transition: background 0.15s, border-color 0.15s, transform 0.12s;
         }
-        .sel-tile:hover { background: #fff; border-color: #c8d7ef; transform: translateY(-2px); }
+        .sel-tile:hover { background: var(--surface-card); border-color: var(--hover-line); transform: translateY(-2px); }
         .sel-tile__icon {
             width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            background: #fff; color: #1bb888; font-size: 0.95rem;
+            background: var(--surface-card); color: var(--kair-mint, #1bb888); font-size: 0.95rem;
         }
         .sel-tile__text { min-width: 0; flex: 1; }
         .sel-tile__year { font: 800 0.98rem/1.1 var(--kair-font-display, 'Manrope'); letter-spacing: -0.02em; color: var(--kair-ink, #14213d); font-variant-numeric: tabular-nums; }
@@ -472,12 +488,60 @@ HEADER ACTION BUTTONS
             border: 1px solid var(--kair-line, #e8ebee); border-left: 4px solid var(--kair-blue, #2057b8);
             border-radius: var(--kair-radius-card, 20px); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
         }
-        .k-btn-outline { background: #fff; border: 1px solid var(--kair-line, #e8ebee); color: #536177; border-radius: 10px; font-weight: 600; font-size: 0.85rem; }
+        .k-btn-outline { background: var(--surface-card); border: 1px solid var(--kair-line, #e8ebee); color: var(--back-ink); border-radius: 10px; font-weight: 600; font-size: 0.85rem; }
         .k-btn-outline:hover { background: var(--kair-soft, #f3f6f6); border-color: var(--kair-line, #e8ebee); }
         .k-btn-primary { background: var(--kair-blue, #2057b8); border-radius: 10px; font-weight: 700; font-size: 0.85rem; box-shadow: 0 8px 18px rgba(32, 87, 184, 0.15); }
         .k-btn-primary:hover { background: #1a4ba0; }
 
         .section-title { font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; color: var(--kair-ink, #14213d); margin: 0 0 1rem; }
+
+        /* ═══════════════════════════════════════════════════════════
+           📦889 — TEMA OSCURO. renderer.js propaga `data-theme` al
+           documentElement de este iframe. Los semanticos se apoyan en
+           los tokens compartidos, que ya distinguen dark de dark-legacy.
+           ═══════════════════════════════════════════════════════════ */
+        [data-theme="dark"],
+        [data-theme="dark-legacy"] {
+            --k-primary: var(--kair-blue, #5da2ff);
+            --k-primary-hover: var(--kair-blue-text, #7db9ff);
+            --k-primary-light: var(--kair-blue-soft, #1e3a5f);
+            --k-success: var(--kair-green, #4ade9e);
+            --k-warning: var(--kair-amber, #f0b429);
+            --k-danger: var(--kair-red, #f28b9b);
+            --k-bg-app: var(--kair-canvas, #1a202c);
+            --k-bg-card: var(--kair-card, #384151);
+            --k-border: var(--kair-line, #4a5568);
+            --k-text-main: var(--kair-ink, #e9ecef);
+            --k-text-muted: var(--kair-muted, #adb5bd);
+            --k-shadow-sm: var(--kair-shadow-card, 0 2px 7px rgba(0,0,0,0.35));
+            --k-shadow-md: var(--kair-shadow, 0 4px 14px rgba(0,0,0,0.40));
+
+            --surface-card: var(--kair-card, #384151);
+            --surface-hover: var(--kair-track, #3a4356);
+            --surface-hover-press: var(--kair-blue-soft, #1e3a5f);
+            --icon-plate: var(--kair-blue-soft, #1e3a5f);
+            --back-ink: var(--kair-muted, #adb5bd);
+            --hover-line: var(--kair-blue-text, #7db9ff);
+            --selected-bg: var(--kair-blue-soft, #1e3a5f);
+            --excel-ink: var(--kair-green-text, #5ee0a8);
+        }
+
+        /* El azul sube de tono en oscuro: la tinta blanca sobre el no
+           llegaria a 4.5:1, asi que los botones primarios van en tinta oscura. */
+        [data-theme="dark"] .k-btn-primary,
+        [data-theme="dark-legacy"] .k-btn-primary { color: #10233f; }
+        [data-theme="dark"] .pdb__btn--primary,
+        [data-theme="dark-legacy"] .pdb__btn--primary { color: #10233f; }
+        [data-theme="dark"] .sel-tile__btn,
+        [data-theme="dark-legacy"] .sel-tile__btn { color: #10233f; }
+        [data-theme="dark"] .k-btn-primary:hover,
+        [data-theme="dark-legacy"] .k-btn-primary:hover { background: var(--kair-blue-text, #7db9ff); }
+        [data-theme="dark"] .sel-tile__btn:hover,
+        [data-theme="dark-legacy"] .sel-tile__btn:hover { background: var(--kair-blue-text, #7db9ff); }
+        [data-theme="dark"] .pdb__btn--primary:hover,
+        [data-theme="dark-legacy"] .pdb__btn--primary:hover {
+            background: linear-gradient(135deg, var(--kair-blue-text, #7db9ff) 0%, var(--kair-blue, #5da2ff) 100%);
+        }
     </style>
 </head>
 <body>

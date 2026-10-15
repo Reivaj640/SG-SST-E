@@ -6,8 +6,14 @@
     <title>K+AIR · 1.1.6 Conformación del COPASST · Visualizador</title>
     <!-- Iconos K+AIR (bootstrap-icons) -->
     <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <!-- El modulo compartido de tema para iframes. Va PRIMERO, antes de
+         cualquier <style> propio: al cargar se engancha al listener y lee el
+         atributo que el shell ya tiene puesto, asi que la vista nunca queda
+         en claro ni un instante. El ?v= es obligatorio: sin el, Electron
+         sirve el script del cache y el arreglo no llega. -->
+    <script src="../../../shared/kair-iframe-theme.js?v=COPASST-20261014-v4-dark890"></script>
     <!-- Estilos del módulo (namespace canónico kair-*) -->
-    <link rel="stylesheet" href="copasst-view.css">
+    <link rel="stylesheet" href="copasst-view.css?v=COPASST-20261014-v4-dark890">
 </head>
 <body class="kair-body">
 

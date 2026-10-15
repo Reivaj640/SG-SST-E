@@ -11,6 +11,11 @@
     <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
     <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
     <link rel="stylesheet" href="../../../shared/kair-components.css">
+    <!-- 📦889 — Esta vista se carga en un iframe: sin este script su <html> no
+         recibe `data-theme` y los bloques oscuros de más abajo no casan nunca.
+         Va en <head> y antes de los estilos propios para no pintar un destello
+         claro. El `?v=` es obligatorio: sin él Electron lo sirve desde caché. -->
+    <script src="../../../shared/kair-iframe-theme.js?v=20261014-889-theme"></script>
     
     <style>
         /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -31,6 +36,25 @@
             --border: #dee2e6;
             --radius: 0.5rem;
             --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+
+            /* 📦889 — Semanticos. Antes cada superficie iba con su literal
+               (white, #f8f9fa, #f1f3f5, #e3ecfb...), y eso impedia que el
+               tema oscuro las moviera: un literal no cambia con el tema.
+               Ahora cada una tiene un nombre y una sola definicion por tema,
+               al final del bloque de estilos. */
+            --surface-card: #ffffff;
+            --surface-hover: #ffffff;
+            --surface-sunken: #f8f9fa;
+            --surface-soft: #f1f3f5;
+            --icon-plate: #e3ecfb;
+            --arrow-ink: #b9c2d0;
+            --hover-line: #c8d7ef;
+            --back-ink: #536177;
+            --sunken-band: linear-gradient(135deg, #f8fbff 0%, #e8f0fe 100%);
+            --sunken-band-line: #d0e1f9;
+            --chip-ok-bg: #d4edda;    --chip-ok-ink: #155724;
+            --chip-bad-bg: #f8d7da;   --chip-bad-ink: #721c24;
+            --chip-load-bg: #e2e3e5;  --chip-load-ink: #383d41;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
@@ -73,7 +97,7 @@
         }
 
         .main-action-card {
-            background: white;
+            background: var(--surface-card);
             border: 2px solid var(--border);
             border-radius: var(--radius);
             padding: 2rem;
@@ -109,7 +133,7 @@
             width: 50px;
             height: 50px;
             border-radius: 10px;
-            background: #f1f3f5;
+            background: var(--surface-soft);
             color: var(--primary);
             display: flex;
             align-items: center;
@@ -131,7 +155,7 @@
         }
 
         .action-card {
-            background: #f8f9fa;
+            background: var(--surface-sunken);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 1.5rem;
@@ -145,7 +169,7 @@
         
         .action-card:hover {
             border-color: var(--primary);
-            background: white;
+            background: var(--surface-hover);
             box-shadow: 0 5px 15px rgba(0,0,0,0.08);
             transform: translateY(-3px);
         }
@@ -154,7 +178,7 @@
             width: 42px;
             height: 42px;
             border-radius: 8px;
-            background: white;
+            background: var(--surface-card);
             color: var(--primary);
             display: flex;
             align-items: center;
@@ -175,8 +199,8 @@
         /* 📦708 (Fase 2) — Sección "Estado Base de Datos" */
         .bd-section {
             margin-top: 2.5rem;
-            background: linear-gradient(135deg, #f8fbff 0%, #e8f0fe 100%);
-            border: 1px solid #d0e1f9;
+            background: var(--sunken-band);
+            border: 1px solid var(--sunken-band-line);
             border-radius: var(--radius);
             padding: 1.5rem;
             text-align: left;
@@ -201,9 +225,9 @@
             text-transform: uppercase;
             letter-spacing: 0.3px;
         }
-        .bd-section-header .badge.ok { background: #d4edda; color: #155724; }
-        .bd-section-header .badge.missing { background: #f8d7da; color: #721c24; }
-        .bd-section-header .badge.loading { background: #e2e3e5; color: #383d41; }
+        .bd-section-header .badge.ok { background: var(--chip-ok-bg); color: var(--chip-ok-ink); }
+        .bd-section-header .badge.missing { background: var(--chip-bad-bg); color: var(--chip-bad-ink); }
+        .bd-section-header .badge.loading { background: var(--chip-load-bg); color: var(--chip-load-ink); }
         .bd-status-text {
             font-size: 0.85rem;
             color: var(--text-dark);
@@ -259,17 +283,17 @@
             cursor: not-allowed;
         }
         .bd-btn-secondary {
-            background: white;
+            background: var(--surface-card);
             color: var(--primary);
             border-color: var(--primary);
         }
         .bd-btn-secondary:hover { background: var(--primary-light); }
         .bd-btn-danger {
-            background: white;
+            background: var(--surface-card);
             color: var(--danger);
             border-color: var(--danger);
         }
-        .bd-btn-danger:hover { background: #f8d7da; }
+        .bd-btn-danger:hover { background: var(--chip-bad-bg); }
         .bd-toast {
             position: fixed;
             top: 20px;
@@ -317,17 +341,17 @@
         /* Header premium */
         .pres-home__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: clamp(18px, 2.2vw, 30px); }
         .pres-home__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
-        .pres-home__icon { width: 44px; height: 44px; border-radius: 12px; background: #e3ecfb; color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .pres-home__icon { width: 44px; height: 44px; border-radius: 12px; background: var(--icon-plate); color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
         .pres-home__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
         .pres-home__crumb span { padding: 0 4px; }
         .pres-home__title { margin: 0; font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'Lexend'); letter-spacing: -0.04em; color: var(--kair-ink, #14213d); }
         .pres-home__sub { color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px); margin: 5px 0 0 0; max-width: 640px; line-height: 1.55; }
         .pres-home__header-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-        .pres-home__pill { font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px; background: #e3ecfb; color: var(--kair-blue, #2057b8); white-space: nowrap; }
+        .pres-home__pill { font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px; background: var(--icon-plate); color: var(--kair-blue, #2057b8); white-space: nowrap; }
         .pres-home__back {
             display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
-            font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
-            border-radius: 10px; transition: all 0.18s; background: #fff;
+            font-size: 0.8125rem; font-weight: 600; color: var(--back-ink); cursor: pointer;
+            border-radius: 10px; transition: all 0.18s; background: var(--surface-card);
             border: 1px solid var(--kair-line, #e8ebee);
         }
         .pres-home__back:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
@@ -341,7 +365,7 @@
             background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
             border-color: transparent;
         }
-        .main-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10); border-color: #c8d7ef; }
+        .main-action-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10); border-color: var(--hover-line); }
         .main-action-card.primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
 
         /* Sección de herramientas: sin CSS propio, la separa `.kair-block`. */
@@ -349,7 +373,7 @@
             background: var(--kair-card, #fff); border: 1px solid var(--kair-line, #e8ebee);
             border-radius: 16px; box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04);
         }
-        .action-card:hover { border-color: #c8d7ef; background: #fff; box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07); transform: translateY(-3px); }
+        .action-card:hover { border-color: var(--hover-line); background: var(--surface-hover); box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07); transform: translateY(-3px); }
         .action-icon { border-radius: 10px; background: var(--kair-soft, #f3f6f6); box-shadow: none; }
         .action-title { color: var(--kair-ink, #14213d); font-size: 0.9rem; }
 
@@ -373,12 +397,63 @@
             content: '';
             position: absolute; right: 22px; top: 50%;
             width: 9px; height: 9px;
-            border-top: 2px solid #b9c2d0; border-right: 2px solid #b9c2d0;
+            border-top: 2px solid var(--arrow-ink); border-right: 2px solid var(--arrow-ink);
             transform: translateY(-50%) rotate(45deg);
             transition: border-color 0.2s, transform 0.2s;
         }
-        .main-action-card:hover::after { border-color: #fff; transform: translateY(-50%) translateX(3px) rotate(45deg); }
+        .main-action-card:hover::after { border-color: var(--surface-card); transform: translateY(-50%) translateX(3px) rotate(45deg); }
         .main-action-card.primary::after { border-color: rgba(255, 255, 255, 0.75); }
+
+        /* ═══════════════════════════════════════════════════════════
+           📦889 — TEMA OSCURO. renderer.js propaga `data-theme` al
+           documentElement de este iframe (dark-legacy si el usuario eligio
+           Oscuro, dark si eligio Sistema y el SO esta en oscuro).
+           Cada semantico se apoya en los tokens compartidos, que ya
+           resuelven distinto en dark y en dark-legacy; por eso no se
+           escriben hex propios y los tres temas quedan alineados.
+           ═══════════════════════════════════════════════════════════ */
+        [data-theme="dark"],
+        [data-theme="dark-legacy"] {
+            --primary: var(--kair-blue, #5da2ff);
+            --primary-hover: var(--kair-blue-text, #7db9ff);
+            --primary-light: var(--kair-blue-soft, #1e3a5f);
+            --success: var(--kair-green, #4ade9e);
+            --warning: var(--kair-amber, #f0b429);
+            --danger: var(--kair-red, #f28b9b);
+            --info: var(--kair-blue-text, #7db9ff);
+            --text-dark: var(--kair-ink, #e9ecef);
+            --text-muted: var(--kair-muted, #adb5bd);
+            --bg-body: var(--kair-canvas, #1a202c);
+            --bg-card: var(--kair-card, #384151);
+            --border: var(--kair-line, #4a5568);
+            --shadow-lg: var(--kair-shadow, 0 4px 14px rgba(0,0,0,0.40));
+
+            --surface-card: var(--kair-card, #384151);
+            --surface-hover: var(--kair-track, #3a4356);
+            --surface-sunken: var(--kair-card, #384151);
+            --surface-soft: var(--kair-soft, #2f3a4d);
+            --icon-plate: var(--kair-blue-soft, #1e3a5f);
+            --arrow-ink: var(--kair-slate, #aab4c4);
+            --hover-line: var(--kair-blue-text, #7db9ff);
+            --back-ink: var(--kair-muted, #adb5bd);
+            --sunken-band: var(--kair-blue-soft, #1e3a5f);
+            --sunken-band-line: var(--kair-line, #4a5568);
+
+            --chip-ok-bg: var(--kair-green-soft, #12352a);   --chip-ok-ink: var(--kair-green-text, #5ee0a8);
+            --chip-bad-bg: var(--kair-red-soft, #3a1f24);    --chip-bad-ink: var(--kair-red-text, #f79ca9);
+            --chip-load-bg: var(--kair-soft, #2f3a4d);       --chip-load-ink: var(--kair-muted, #adb5bd);
+        }
+
+        /* En oscuro el boton primario lleva tinta clara sobre azul, no blanca. */
+        [data-theme="dark"] .bd-btn-primary,
+        [data-theme="dark-legacy"] .bd-btn-primary { color: #10233f; }
+        [data-theme="dark"] .bd-btn-primary:disabled,
+        [data-theme="dark-legacy"] .bd-btn-primary:disabled {
+            background: var(--kair-soft, #2f3a4d);
+            color: var(--kair-muted, #adb5bd);
+        }
+        [data-theme="dark"] .bd-toast.warn,
+        [data-theme="dark-legacy"] .bd-toast.warn { color: #10233f; }
     </style>
 </head>
 <body>

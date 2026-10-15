@@ -24,7 +24,7 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-14 |
 | **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
-| **Último commit de código** | 📦 **886**: las barras de desplazamiento siguen el tema elegido. La causa **no era que faltara una regla oscura: era que el color no tenía tema**. La regla global de `styles.css` traía el par `#c1c9d0 / #f8f9fa` fijo, y ese par era el que se veía en los tres temas. Lo confuso era que **el repo sí parecía tener el arreglo**: **44 reglas `::-webkit-scrollbar`** en los 7 CSS que carga `index.html`, tres con su bloque `[data-theme="dark"]` propio, y **ninguna se dibujaba**. No es un problema de especificidad: **cuando existe `scrollbar-color`, Chromium ignora todos los `::-webkit-scrollbar`**. Se comprobó en el navegador: dos cajas idénticas salvo por tener, además del global, un thumb verde y una pista negra se vieron **iguales**. Por eso se **borraron** y no se corrigieron; su `hover` y su `:active` no podían pasar de 2:1 de contraste. El color pasó a tokens por tema y el thumb de cada oscuro es su `--kair-faint`, o sea el gris que el 📦885 dejó como texto secundario: **3.40** contra la superficie más clara en Sistema y **3.68** en Oscuro (WCAG 1.4.11 pide 3:1), con las tarjetas del Panel medidas **componiendo** el velo del 5 %. La pista va **transparente** y **el tema claro no se tocó**. Antes, 📦 **885** (`ed59ba80`), y antes 📦 **884** (`6be6c4ec`). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
+| **Último commit de código** | 📦 **890**: 1.1.5 Gestión del COPASST sigue el tema elegido. La causa de los síntomas reportados era la del 887 —**el color no tenía tema**—, pero acá el módulo no tenía **ni una regla por tema**: le sobraban colores escritos a mano, y como su texto sí leía tokens (`--kair-ink` = `#e9ecef` en oscuro) mientras el fondo leía un blanco fijo, salía texto casi blanco sobre blanco. 🔴 **El hallazgo grave: el generador estaba escribiendo en el shell entero.** `showRealizarActasInterface()` inyecta un `<style>` que abría un `:root` con `--widget-bg-color: #ffffff`, y **un `:root` que no está en el `<head>` sigue siendo el `<html>`**: ese valor se leía en los 44 lugares de `styles.css` que lo usan y, como la hoja entra después, ganaba por orden contra `[data-theme="dark"]` (empate 0,1,0). Se movió al contenedor real, no se borró. **El bloque oscuro del generador era código muerto**: sus 13 selectores pedían `.copasst-actas-container[data-theme="dark"]` y ese atributo vive en el `<html>`, nunca en el contenedor. **Y el Repositorio de Actas, que nadie había reportado, BORRABA el tema**: su sincronizador traducía el `theme-changed` de `renderer.js:1743-1759` con la forma `{theme, mode}` de `theme-manager.js`, que **no está cargado en el shell**, así que `mode` llegaba `undefined` y con `theme:'system'` devolvía `null` → `removeAttribute`; como el `postMessage` es asíncrono, ganaba siempre el paso que rompía. Ahora usa `shared/kair-iframe-theme.js` y el sincronizador viejo se retiró. Medido en navegador con el código real montado, no con un parser: **42/42 en `dark`, 42/42 en `dark-legacy`, 23/23 en claro** (los 23 contra los valores exactos que producía el archivo original) y **10/10** en el Repositorio. Antes, 📦 **889** (1.1.2 y 1.1.3, los dos iframes) y antes 📦 **887** (el home de Recursos). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
 | **Commits sin pushear** | **0**, verificado el 2026-10-14 contra GitHub: 📦885 (`ed59ba80`) y 📦886 (`e5f95ae4`) quedaron **pusheados a `Dev` y `Dev-Pc`**, las dos en `e5f95ae4`. 🔴 Una nota de mecánica que salió en este push: **no existe rama local `Dev-Pc`** (solo `Dev` y `gh-pages`), así que `git push origin Dev-Pc` falla con "src refspec does not match any". La forma correcta es `git push origin Dev:Dev-Pc`, previa comprobación de que `origin/Dev-Pc` es ancestro de `Dev` para que sea fast-forward. 🔴 **Lo que sigue faltando es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
@@ -32,8 +32,8 @@
 | **Suite (escritorio)** | **131 tests · 130 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medida el 2026-10-14, ya con 📦886. El único rojo es `test-firma-constancia-consolidada.js` [83/83 en lo estático], que muere esperando `INTERNAL_API_KEY`; `test-init-order-bug.js` sigue sin resumen verificable. 🔴 **Corrección importante: el bloqueo por ABI de `better-sqlite3` YA NO EXISTE.** Este bloque decía que 14 tests no arrancaban en esta máquina, 13 de ellos por `ERR_DLOPEN_FAILED` al cargar `better_sqlite3.node` (compilado para Electron 37 mientras el `node` pelado corre v26.10.0). **Hoy corren todos**: el runner usa el Node de Electron (`ELECTRON_RUN_AS_NODE=1`), que es justamente el runtime para el que está compilado el binario. El diagnóstico viejo era correcto sobre el `node` pelado, pero **la medición se hacía por la vía equivocada**. Subió de 130 a 131 por `test-scrollbar-tema-886.js` (88 checks, 16/16 mutaciones). 🔴 **Durante este paquete se destapó una regresión propia y ya está corregida**: 📦886 bumpea el token de `styles.css`, y `test-sidebar-tonos-884.js` exigía que ese token contuviera "884", así que se rompió solo, sin que hubiera ningún error de verdad. Ese check quedó anclado al token **anterior** a su paquete |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
-| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📨860, 📨861, 📨868, 📨867 y el ancho de la tarjeta de ingreso (📨869). 🔴 **Pendiente en la app instalada: 📦881, 📦882, 📦883, 📦884, 📦885 y 📦886.** De 882, 884, 885 y 886 el owner aprobó artefactos, y los de 884, 885 y 886 **sí** usan el CSS real leído del disco (con sus huellas SHA-256 en el pie), pero **ninguno corre el `renderer.js` de verdad ni el IPC**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, y **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-14). Del **2026-10-14**: 📦886 — las barras de desplazamiento siguen el tema. La causa fue que el color **no tenía tema**: la regla global traía `#c1c9d0 / #f8f9fa` fijo. Y lo que la hacía confusa es que **el repo sí parecía tener el arreglo**: 44 reglas `::-webkit-scrollbar` en los 7 CSS alcanzables, tres con su bloque `[data-theme="dark"]`, y **ninguna se dibujaba**, porque cuando existe `scrollbar-color` Chromium las ignora todas (probado en el navegador, no supuesto). Se borraron y el color pasó a tokens; thumb = el `--kair-faint` de cada tema, con **3.40** y **3.68** contra la superficie más clara. El inventario se rehízo **sin lista escrita a mano** (82 CSS × 89 HTML), y quedó el inventario real: 7 borrables, **25 con reglas vivas** (vistas que se abren aparte, sin `styles.css`) y 5 huérfanos. Test nuevo `test-scrollbar-tema-886.js` (88 checks, 16/16 mutaciones, 45/78 contra el código viejo) que **clasifica los CSS solo** y recalcula el contraste componiendo el velo del Panel. Antes, del mismo día: 📦885 — el Panel de Control sigue el tema elegido (`kair-premium.css` sin ni una regla de tema; bloque `[data-theme^="dark"]` aditivo, paleta medida, sin un solo `!important`; `test-panel-tema-885.js`, 54 checks, 15/15 mutaciones). Antes: 📦884 — los tonos del menú lateral en los dos modos oscuros. Antes: 📦883 — la barra vertical del extremo derecho de las tabs de Configuración. **Sin bump de versión**: sigue en `0.1.251`. Del **2026-10-13**: 📦882 (commit `857c701d`) — los cuatro textos legales legibles dentro del gate; y el commit `4dc20cd9` con la investigación de WhatsApp Business (pendiente 15). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874) |
+| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📨860, 📨861, 📨868, 📨867 y el ancho de la tarjeta de ingreso (📨869). 🔴 **Pendiente en la app instalada: 📦881, 📦882, 📦883, 📦884, 📦885, 📦886, 📦887, 📦889 y 📦890.** De 882, 884, 885, 886, 889 y 890 el owner aprobó artefactos, y los de 884, 885 y 886 **sí** usan el CSS real leído del disco (con sus huellas SHA-256 en el pie), pero **ninguno corre el `renderer.js` de verdad ni el IPC**. **Los de 887, 889 y 890 sí se midieron en un navegador real**, pero contra un arnés que monta el CSS y el JS del disco por HTTP, **no contra la app instalada**: no hay `electronAPI` ni IPC detrás. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Ver los pendientes 16 y 17 |
+| **Jornada** | **En curso** (2026-10-14). Del **2026-10-14**: 📦890 — 1.1.5 Gestión del COPASST. Siguen el patrón del 887 y del 889, cada uno con su propia forma: **📦890 no tenía ninguna regla por tema** (le sobraban colores a mano, y texto por token sobre fondo fijo = texto casi blanco sobre blanco); **📦889 eran iframes**, donde el `data-theme` no cruza la frontera, y el shell manda el oscuro manual como `dark-legacy`, que no es alias de `dark`: un código que solo acepta `dark` **quita** el atributo y el modo manual queda sin pintar mientras el de sistema sí. Tres hallazgos que nadie había reportado y que eran peores que el síntoma: (a) el formulario inyectaba un **`:root` global** que pisaba `--widget-bg-color` de **todo** el shell, (b) su bloque oscuro eran **13 selectores muertos** que pedían el atributo en el contenedor cuando vive en el `<html>`, y (c) el **Repositorio de Actas borraba el tema**: el `postMessage` de `renderer.js` llega **después** de la escritura directa en `contentDocument`, y el sincronizador viejo traducía mal la forma del mensaje, así que ganaba el paso que lo borraba. Tests nuevos: `test-alcance-tokens-889.js` (37 checks, 21/21 mutaciones) y `test-copasst-tema-890.js` (47 checks, 23/23 mutaciones, con dos mutaciones que normalizan el EOL del CSS del portal porque es **mixto a propósito**). Batería 884–890 completa en verde. Antes, del mismo día: 📦886 (las barras de desplazamiento siguen el tema), 📦885 (el Panel de Control), 📦884 (los tonos del menú lateral), 📦883 (la barra vertical de las tabs de Configuración) y 📦887 (el home de Recursos: el color no tenía tema, y dos `:root` de módulo se llevaban los tokens del shell por delante). **Sin bump de versión**: sigue en `0.1.251`. Del **2026-10-13**: 📦882 (commit `857c701d`) — los cuatro textos legales legibles dentro del gate; y el commit `4dc20cd9` con la investigación de WhatsApp Business (pendiente 15). La del 2026-10-07 quedó commiteada y pusheada: `81f9a462` (📦880), `8baf1b80` (📦879), `e0eccb5d` (📦878), `1a2df59d` (📦877), `1303eaf0` (📦876), `72c2deb9` (📦875) y `617190ea` (📦873 + 874) |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
@@ -633,6 +633,74 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-14 (tarde) · Recursos: el home, 1.1.2, 1.1.3 y 1.1.5 siguen el tema (📦887, 889, 890)
+
+**Qué se hizo** — los submódulos del módulo Recursos, uno por uno y por pedido explícito del owner.
+Tres paquetes, y **cada uno resultó ser una forma distinta del mismo fallo de fondo: el color no tenía
+tema.** La app nunca se abrió en esta sesión.
+
+| Paquete | Qué | Forma del fallo |
+|---|---|---|
+| 📦887 | El home de Recursos | Dos `:root` de módulo se llevaban los tokens del shell por delante |
+| 📦889 | 1.1.2 Roles y 1.1.3 Asignación de Recursos | **Son iframes**: el `data-theme` no cruza la frontera |
+| 📦890 | 1.1.5 Gestión del COPASST | Cero reglas por tema, un `:root` global y **48 reglas muertas** |
+
+| Qué | Resultado |
+|---|---|
+| Test nuevo | `test-alcance-tokens-889.js` (37 checks, 21/21 mutaciones) y `test-copasst-tema-890.js` (47 checks, 23/23 mutaciones) |
+| Módulo nuevo | `shared/kair-iframe-theme.js`, el sync de tema para iframes |
+| Batería | 884–890 completa en verde; integridad OK |
+| Versión | Sin bump: sigue en `0.1.251` |
+
+**El detalle que más costó de ver: `dark-legacy`.** El shell manda el tema resuelto por tres vías, y una
+trae el **oscuro manual** como `dark-legacy`, que **no** es alias de `dark`. Un código que solo acepta
+`'dark'` lo da por claro y **le quita el atributo**: el modo manual queda sin pintar mientras el de sistema
+funciona. La mitad de las pruebas pasa y parece que el arreglo funcionó.
+
+**Las tres formas que el shell manda de verdad** (y las que **no** llegan, que son las que el código viejo
+esperaba):
+
+1. `get-theme-response` → `{theme: <ya resuelto>}` — `renderer.js:2006`
+2. `theme-changed` → `{theme: <preferencia>, effectiveTheme: <resuelto>}` — `renderer.js:1756` y `7445`
+3. escritura directa en `iframe.contentDocument.documentElement` — `renderer.js:1746` y `7418`
+
+Las que **no** llegan son las de `scripts/theme-manager.js`, que espera `{theme, mode}`: ese archivo existe
+en disco y **no está cargado en el shell**. Cualquier código que dependa de su forma de mensaje está roto,
+y no por poco.
+
+🔴 **Tres hallazgos del 📦890 que nadie había reportado, y que eran peores que el síntoma reportado:**
+
+1. **El formulario escribía en el shell entero.** `showRealizarActasInterface()` inyecta un `<style>` que
+   abría un `:root` con `--widget-bg-color: #ffffff`. **Un `:root` que no está en el `<head>` sigue siendo
+   el `<html>`**, así que ese valor se leía en los 44 lugares de `styles.css` que lo usan y, como la hoja
+   entra después, ganaba por orden contra `[data-theme="dark"]` (empate 0,1,0). Mientras el formulario
+   estaba abierto, el shell completo se leía con superficies blancas.
+2. **El bloque oscuro del formulario era código muerto.** Sus 13 selectores pedían
+   `.copasst-actas-container[data-theme="dark"]` y ese atributo vive en el `<html>`, nunca en el contenedor.
+   Nunca se ejecutó. Es el mismo error que el 887 encontró en `capacitaciones-view.css` (47 reglas) y
+   `objetivos-sst-view.css` (48).
+3. **El Repositorio de Actas BORRABA el tema.** `renderer.js:1743-1759` escribe el atributo **ya resuelto**
+   en el `contentDocument` y **después** manda `theme-changed`. El sincronizador del visor traducía eso con
+   la forma `{theme, mode}` equivocada, así que con `theme:'system'` devolvía `null` y hacía
+   `removeAttribute`. Como el `postMessage` es asíncrono, **ganaba siempre el paso que rompía**.
+
+**La lección del arnés, que se aplicó a sí mismo.** La primera versión del arnés mutaba `data-theme` con el
+DOM ya montado y medía con `getComputedStyle`: reportaba **16 fallas que no existían**, porque sin un ciclo
+de render la lectura devuelve el estilo del estado anterior. Se rehízo para que el tema viaje en el HTML
+**desde el parseo**. Antes de eso se persiguió una causa que era el arnés mintiendo: se llegó a leer, en un
+mismo elemento y en el mismo instante, la variable de tema ya oscura y el fondo todavía claro. **Eso solo
+significa que el que mide está mal, no que el CSS esté mal.**
+
+**Pendiente de decisión del owner:** 1.1.2 y 1.1.3 usan **paletas distintas** entre oscuro de sistema y oscuro
+manual. `dark` es azul K+AIR (`--kair-card: #384151`) y `dark-legacy` es gris neutro (`#292929`). 1.1.3 lee
+tokens, así que sigue esa diferencia; 1.1.2 usa su propia paleta explícita y sale azul en los dos. Hay que
+decidir en qué dirección alinear.
+
+**Lección operativa: `copasst-home.css` es de EOL mixto a propósito** (el bloque legacy es CRLF y el premium
+del final es LF). La herramienta de edición lo normalizó a CRLF entero la primera vez y hubo que restaurar
+desde git y rehacer el cambio por bytes. El test 890 lo vigila con dos mutaciones que lo normalizan a
+propósito.
 
 ### 2026-10-06 (madrugada) · El admin quedaba encerrado en "contacta a administración" (📦862)
 
@@ -1457,7 +1525,7 @@ resolvía a `#ffffff` y `--kair-text` a `#1a1a2e`. Por eso las tarjetas salían 
 **con el rótulo gris encima**: el `.kair-metric-head` sí tomaba `--kair-faint`, pero
 `#9fb0c4` sobre blanco es casi ilegible. Es exactamente lo que se vio en las capturas.
 
-Lo que lo责ueba es que el **preview se veía bien y la app no**, y la diferencia estaba en
+Lo que lo prueba es que el **preview se veía bien y la app no**, y la diferencia estaba en
 el preview: la primera versión armaba un bloque oscuro escrito a mano y **no cargaba el
 `<style>` que `recursos-home.js` inyecta en runtime**, ni los `:root` tardíos. Era media
 app. El artefacto se rehizo para usar los archivos reales en el orden real de `index.html`;

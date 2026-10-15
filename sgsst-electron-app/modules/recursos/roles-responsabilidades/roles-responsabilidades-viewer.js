@@ -27,6 +27,72 @@ var rrState = {
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 
+/* 📦889 — SYNC DE TEMA CON EL SHELL
+ * Esta vista es un IFRAME (`roles-responsabilidades-logic.js` la crea), así que
+ * tiene su propio documento y su propio <html>. El atributo `data-theme` lo
+ * aplica el shell a SU <html>: dentro del iframe no se ve por herencia ni por
+ * cascada, porque el iframe es un árbol distinto. Por eso el bloque
+ * `[data-theme="dark"]` del CSS nunca casaba y la vista se quedaba en claro con
+ * el shell en oscuro.
+ *
+ * ── LAS TRES FORMAS DE MENSAJE QUE MANDA LA APP REAL ──────────────────────
+ * OJO: NO es la de `scripts/theme-manager.js`, porque ese archivo NO está
+ * cargado en el shell. Las que llegan de verdad son:
+ *
+ *   1) `get-theme-response` -> { theme: <RESUELTO> }              renderer.js:2006
+ *      theme ya viene resuelto: 'dark' | 'dark-legacy' | 'light'. No trae
+ *      preferencia ni modo.
+ *   2) `theme-changed` -> { theme: <PREFERENCIA>, effectiveTheme: <resuelto> }
+ *      renderer.js:1756 y renderer.js:7445.
+ *   3) Escritura directa en `iframe.contentDocument.documentElement`
+ *      renderer.js:1746 y renderer.js:7418 (sin mensaje).
+ *
+ * La primera versión de este código asumía la forma `{theme, mode}` de
+ * theme-manager.js. Con el mensaje real del `get-theme-response`, el tema llega
+ * como 'dark-legacy' (oscuro MANUAL) y una comparación `theme !== 'dark'` lo
+ * daba por claro y le quitaba el atributo: el oscuro manual NO pintaba. El modo
+ * sistema sí funcionaba, y por eso la prueba rápida pasaba.
+ */
+function rrApplyTheme(d) {
+  var html = document.documentElement;
+  var pref = d.theme;          // 'system' | 'dark' | 'light', o ya el valor resuelto
+  var eff = d.effectiveTheme;  // solo viene en theme-changed
+  var valor = null;
+  if (eff) {
+    // theme-changed: theme es la PREFERENCIA y effectiveTheme el resultado.
+    if (eff === 'dark') valor = (pref === 'dark') ? 'dark-legacy' : 'dark';
+  } else if (pref === 'dark' || pref === 'dark-legacy') {
+    // get-theme-response: theme ya viene RESUELTO, se respeta tal cual.
+    valor = pref;
+  }
+  if (valor) html.setAttribute('data-theme', valor);
+  else html.removeAttribute('data-theme');
+}
+
+function rrInitThemeSync() {
+  window.addEventListener('message', function (event) {
+    var d = event.data || {};
+    if (d.type === 'theme-changed' || d.type === 'get-theme-response') {
+      rrApplyTheme(d);
+    }
+  });
+  try {
+    if (window.parent && window.parent !== window && window.parent.postMessage) {
+      window.parent.postMessage({ type: 'get-theme-request' }, '*');
+    }
+  } catch (e) { /* sin acceso al padre */ }
+  // Respaldo: el padre puede propagar por `contentDocument` en vez de por
+  // mensaje (renderer.js:1746). Se lee su atributo, que ya viene resuelto.
+  // Si el acceso está bloqueado, el handshake de arriba es el que resuelve.
+  try {
+    if (window.parent && window.parent !== window && window.parent.document) {
+      var padre = window.parent.document.documentElement.getAttribute('data-theme');
+      if (padre) { document.documentElement.setAttribute('data-theme', padre); }
+    }
+  } catch (e) { /* cross-origin */ }
+}
+rrInitThemeSync();
+
 // 📦706-fix21 (2026-08-14) — Toast notifications (mismo patrón que 6.1.2
 // Política). Reemplazan los `alert()` nativos con algo más profesional.
 // API: _showToast(message, type, duration)
