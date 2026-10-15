@@ -2,14 +2,16 @@
 
 > ## 🚦 Arranque — leé esto primero
 >
-> Este archivo tiene **4 800+ líneas y es 89 % bitácora de bugs**. No lo leas entero: buscá con grep.
+> Este archivo tiene **1099 líneas: reglas de proceso, tabla de Skills y la arquitectura
+> del proyecto.** Se lee entero, no con grep.
 >
 > | Leé esto | Para qué |
 > |---|---|
 > | **`../PROMPT.md`** | El prompt operacional. Rol, reglas de proceso, convenciones, trampas activas |
 > | **`../Historial.md`** | **Dónde quedó el trabajo y qué falta.** Estado de cierre + cola acordada |
+> | **`BITACORA.md`** | **Bitácora de bugs e incidentes, de `📦579` a `📦895`.** Buscar con `grep`, no leer entero |
 >
-> Empezá por esos dos. Recién después volvés a buscar acá el "por qué" de algo puntual.
+> Empezá por los dos primeros. `BITACORA.md` solo se abre cuando necesitás el "por qué" de algo puntual.
 >
 > ⚠️ **Este archivo contiene secciones que quedaron viejas.** Si contradice al código, **manda el
 > código** y hay que corregir la sección. Las trampas conocidas están en `PROMPT.md` §9.
@@ -17,7 +19,7 @@
 > 🔴 **Y una advertencia sobre este archivo en particular:** nada de lo que dice acá es una regla
 > sin verificar. Hubo reglas "OBLIGATORIAS" que mandaban llamar funciones que **no existen**
 > (`KairUI.esc()`, `KairHelpers.formatDate()`), una convención de commits con 270 versiones de atraso,
-> y una referencia a un archivo CSS inexistente. **Grepeá antes de aplicar lo que leas acá.**
+> y una referencia a un archivo CSS inexistente. **Grepeá antes de aplicar lo que leás acá.**
 > La regla completa está en `../PROMPT.md` §5.9.
 
 ## Skills Disponibles
@@ -281,6 +283,21 @@ window.NombreVista = NombreVista;  // SIEMPRE exportar a window
 - Dialog: `kair-dialog-overlay`, `kair-dialog`, `kair-dialog__header/body/footer/title`
 - Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
 - Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
+
+### Reglas CSS generales
+
+Reglas de layout que aplican a cualquier vista nueva. El relato de por qué se escribieron así está en
+`BITACORA.md` § Gotchas CSS del submódulo Investigación Accidentes.
+
+1. **Body debe ser `height:100vh + overflow:hidden`** (no `min-height`) cuando hay contenido scrollable interno. Si es `min-height`, el body crece si el contenido suma más que viewport y el iframe lo recorta (pierdes header y action bar).
+
+2. **`flex:1` en wrapper > `height: calc(100vh - Xpx)`**: el cálculo con números mágicos (ej. `53px` para header) es frágil. Mejor `flex:1; min-height:0` y dejar que flexbox calcule.
+
+3. **`overflow-y: auto` come 15px del padding** por el scrollbar vertical. Usar `scrollbar-gutter: stable` (Chrome 94+) para reservar ese espacio desde el inicio. Sin esto, los bordes laterales de las cards se cortan en ventanas estrechas.
+
+4. **`child_process.spawn()` sin `windowsHide: true`** abre una ventana de consola negra que parpadea al cerrarse. SIEMPRE pasar `{windowsHide: true}` en Windows. Aplica a TODOS los spawn de Python/VBS/cscript (16 lugares en main.js + investigacion_handlers.js).
+
+5. **NO agregar colores/accent decorativos** cuando el usuario reporta clipping o bordes cortados. Primero diagnosticar geometría (padding, overflow, scrollbars, container width). El usuario prefiere fixes mínimos sin color.
 
 ### K+AIR Premium Design System (v0.1.214 · 📦730-815)
 
@@ -1001,22 +1018,6 @@ Cuando un módulo home tiene >30KB con muchos métodos, usar SIEMPRE este patró
 7. **Validar JS** con `node -c archivo.tmp.js` (NO `archivo.tmp` — Node no reconoce `.tmp`).
 8. **Escribir atómicamente** con `os.replace(tmp, src)`.
 
-#### Bug histórico: cierre de clase faltante
-
-El primer script Python de Gestión de Amenazas (📦734) perdió el cierre de clase `}` porque `post_block = original_lines[740:]` saltaba la línea 740 (cierre). Síntoma: `SyntaxError: Unexpected token '.'` en `window.X = X;` (línea final). Fix: incluir el cierre como `class_closure = original_lines[739]` antes del `post_block`. Lección: SIEMPRE identificar la línea de cierre de clase explícitamente.
-
-#### Bug histórico: llamadas inválidas en `updateWidgetsUI`
-
-El primer script Python de Gestión de Amenazas (📦734) eliminó `renderArchivosChart`/`renderTiposChart` como "código muerto" pero `updateWidgetsUI` los invocaba desde `refreshStats`. Síntoma: `TypeError: this.renderArchivosChart is not a function` + skeleton infinito. Fix: antes de eliminar cualquier método, hacer `grep -c "nombreMetodo"` para confirmar 0 referencias activas. Lección: aplicar el grep SIEMPRE como paso previo a la eliminación en scripts futuros.
-
-#### Bug histórico: scroll interno faltante (📦735)
-
-El primer rediseño de Gestión de Amenazas (📦734) tenía `layout.style.height = '100%'` SIN la cadena flex. Sin `display: flex; flex-direction: column; min-height: 0`, el contenido se desbordaba sin scroll. Fix: usar `cssText` con todos los estilos de flex chain. Patrón ahora documentado arriba.
-
-#### Bug histórico pre-existente: clase CSS copiada
-
-4 módulos usaban clase `.gestion-integral-home` (copia literal del CSS de Gestión Integral): Verificación (📦736), Mejoramiento (📦737), Gestión Amenazas (📦734), Gestión Integral (📦731). Renombrados a sus clases correctas (`.<módulo>-home`) en cada rediseño.
-
 #### Sidebar premium (📦738 · v0.1.205)
 
 El sidebar lateral principal usa `.kair-nav-card` y derivados, definidos en **`shared/kair-sidebar.css`**.
@@ -1063,35 +1064,6 @@ Lección: cuando se diseña con feedback iterativo, **empezar minimalista** (sin
 
 ### Carga de dependencias (cascada)
 El componente carga sus dependencias con `loadCss()` + `loadScript()` en cascada anidada. NO usar ES modules ni require(). Ver `auditoria-anual-component.js` líneas 24-110 como referencia.
-
-### Gotchas CSS del submódulo Investigación Accidentes (lección 2026-06-27)
-Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista similar:
-
-1. **`.inv-layout` está roto**: muchas reglas están scoped a `.inv-layout` (ej. `.inv-layout .hidden { display:none !important }`) pero el body NUNCA tiene esa clase → la regla no aplica. Solución: usar selectores globales o aplicar `class="inv-layout"` al body. En este módulo se unificó la regla `.hidden` a global.
-
-2. **Body debe ser `height:100vh + overflow:hidden`** (no `min-height`) cuando hay contenido scrollable interno. Si es `min-height`, el body crece si el contenido suma más que viewport y el iframe lo recorta (pierdes header y action bar).
-
-3. **`flex:1` en wrapper > `height: calc(100vh - Xpx)`**: el cálculo con números mágicos (ej. `53px` para header) es frágil. Mejor `flex:1; min-height:0` y dejar que flexbox calcule.
-
-4. **`overflow-y: auto` come 15px del padding** por el scrollbar vertical. Usar `scrollbar-gutter: stable` (Chrome 94+) para reservar ese espacio desde el inicio. Sin esto, los bordes laterales de las cards se cortan en ventanas estrechas.
-
-5. **`child_process.spawn()` sin `windowsHide: true`** abre una ventana de consola negra que parpadea al cerrarse. SIEMPRE pasar `{windowsHide: true}` en Windows. Aplica a TODOS los spawn de Python/VBS/cscript (16 lugares en main.js + investigacion_handlers.js).
-
-6. **NO agregar colores/accent decorativos** cuando el usuario reporta clipping o bordes cortados. Primero diagnosticar geometría (padding, overflow, scrollbars, container width). El usuario prefiere fixes mínimos sin color.
-
-7. **`.emo-scope #emo-root` no coincide NUNCA** (submódulo Evaluaciones Médicas, sep 2026): `render()` le pone la clase `emo-scope` a la PROPIA caja raíz (`id="emo-root"`), así que un selector `.emo-scope #emo-root` exige un ancestro con esa clase que no existe → la regla queda muerta y el `display:flex` nunca aplica. La prueba de humo `CSS: TODOS los selectores están bajo .emo-scope` exige que cada selector EMPIECE con `.emo-scope`, así que la forma correcta es `.emo-scope#emo-root` (misma especificidad, mismo nodo, cumple la prueba). Síntoma: el arreglo "funciona" en un lab donde el `<body>` tiene clase `emo-scope` (el body actúa de ancestro) pero NO en la app real. Lección: validar los labs SIN clases auxiliares que la app real no tiene, y medir con `getComputedStyle` en la cadena real de contenedores (`.submodule-content` → `#emo-root` → `.emo-kair-main`) en vez de confiar en capturas.
-
-8. **Los 5 Porqués deben ser EXACTAMENTE 5 niveles — el modelo chiquito NO obedece el prompt** (sep 2026): Qwen3.5-0.8B llegó a generar 36 niveles a pesar de que el SYSTEM_PROMPT dice "EXACTAMENTE 5" y "Detente" (log `Portear/src/llm_server.log`, 14:59: `Post-procesamiento aplicado a 36 niveles`). El prompt NO es defensa suficiente; el tope vive en el código y hay que mantener TODAS las capas: (a) `llm_server.py` → `stop: ["6. ¿Por qué", ...]` en las options de analyze y regenerate; (b) `_strip_post_level5_content` corta el texto en el próximo encabezado `\d+. ¿Por qué` y toma el **máximo** `end` entre los patrones de categoría (si no, "Medio Ambiente", que va ANTES que "Material" en cada nivel, sobrescribe el fin de corte y se come la línea Material del nivel 5); (c) `parse_5_whys` / `parse_5_whys_alternative` descartan todo nivel fuera de 1-5;    (d) el render read-only de `investigacion-accidentes-main.js` filtra `n <= 5` + `.slice(0, 5)` (la variante editable ya acotaba `[1..5]`). Si quitas cualquiera de las 4, el bug vuelve. Regresiones: `tests/investigacion-accidentes/test-hf-llm-canales.js` (sección G) y `test-premium.js` (sección F). Ojo: `python-embed/` NO está en git, así que los tests del repo son solo de estructura — la verificación funcional del parser se corre aparte con `Portear\python-embed\python.exe`.
-
-9. **La cuantización Q4_K_M destruye un fine-tune LoRA sobre un modelo de 0.8B** (sep 2026): el modelo entrenado con Unsloth (`Reivaj640/qwen3.5-0.8b-ia-v2` + `dataset_v4_final.jsonl` — respuestas progresivas, preguntas sustituidas con causas reales, sin razonamiento previo) funcionaba PERFECTO en Unsloth (fp16/bf16) y salía DEGENERADO en Ollama con el GGUF Q4_K_M: copiaba la plantilla literal ("¿Por qué [causa principal del nivel 1]?") y repetía las mismas 5 causas en los 5 niveles — con el prompt del entrenamiento EXACTO, con parámetros del entrenamiento (`temp 0.1, top_p 0.8, top_k 20, min_p 0, rep_pen 1.15, presence 0`), con el system prompt byte-exacto, con `TEMPLATE {{ .Prompt }}` o con la plantilla nativa, con modelo limpio sin params, e incluso con una FILA VERBATIM del dataset (y además inventaba contenido ajeno, ej. "desenergizar" en un caso de lavado de cuchillos). Con razonamiento activo el Q4_K_M entraba en bucle "Wait..." infinito en inglés sin escribir jamás la respuesta (124k chars). **La versión BF16/F16 (1.6 GB, tag `hf-qwen3.5-0.8b.f16-qwen3.5-0.8b-ia-v3.1` o Q8_0) resuelve todo**: el análisis sale encadenado (intento 1 → 66 → feedback → intento 2 → score 90, 0 repeticiones, ~26s). Regla: para modelos fine-tuneados pequeños exportar SIEMPRE GGUF en `f16`/`q8_0` (`model.save_pretrained_gguf("model_out", tokenizer, quantization_method="f16")`), nunca Q4_K_M. Test de regresión: si la salida repite la misma causa en 2+ niveles consecutivos, sospechar primero del GGUF, no del prompt.
-
-10. **Cadena anti-repetición en `llm_server.py`** (misma época): el validador (`_validate_backward_chain`) detecta celdas que repiten textualmente nivel anterior (`_norm_cmp`, `repetition_cells`, gate 6+ → `valid=False`); si está estancado, `analyze_via_ollama` NO usa feedback retry (a 0.1 de temp el modelo lo ignora — probado: intento 2 salió con 19 repetidas tras feedback) sino **cadena iterativa** (`_analyze_iterative_chain`: multi-turn, el servidor sustituye la causa real en cada pregunta, anti-copia `_is_stagnant_vs` reintenta con temp 0.35, y el dedupe pasa a N/A cualquier categoría que repita el nivel anterior).    Regla de comparación: cuando hay estancamiento, **gana el candidato con MENOS `repetition_cells` aunque su score sea menor** (70 pts/20 repetidas single-shot vs 68 pts/10 repetidas iterativa → gana la iterativa; el overlap léxico premiaba lo idéntico). `_build_pregunta` extrae la pregunta real del modelo y, si copió el placeholder literal ("causa principal del nivel N"), la sintetiza con la causa real del nivel anterior. Regresiones en `test-hf-llm-canales.js` secciones H/I/J (142 checks).
-
-11. **Prompts del 5 Porqués = byte-exactos al dataset de entrenamiento (`dataset_v5_final.jsonl`)**: (a) `INSTRUCCIONES_PROMPT` en `llm_server.py` es la plantilla v5 VERBATIM — metodología VERTICAL "ANÁLISIS VERTICAL POR CATEGORÍA" (cadena causal INDEPENDIENTE por columna M: cada celda explica la causa de la MISMA M del nivel anterior) con las reglas HERENCIA DE N/A, DETENCIÓN POR CAUSA RAÍZ y CERO CRUCES — NO re-envolver párrafos, NO agregar salto inicial invisible (un `\n` al abrir el `"""` ya es divergencia), NO quitar líneas en blanco. (b) Las secciones del accidente van en TEXTO PLANO (el v5 eliminó los asteriscos que tenía el v4): `build_user_prompt` arma `\n\nDescripción del accidente:\n…\n\nContexto Adicional:\n…\n\nAnálisis de 5 Porqués:`. (c) El parser acepta los encabezados encadenados del v5 (`2. ¿Por qué ocurrieron las causas del Nivel 1?`) y `_build_pregunta` los extrae para la UI; la función `_uniform_preguntas` (forzaba el header constante "¿Por qué ocurrió el accidente?" en los 5 niveles) **existió 1 día y se eliminó** — chocaba con el formato del dataset v5. (d) `config.json` → `llmSystemPrompt` se sincroniza manual con la constante, y el botón "Restaurar por Defecto" de Configuración › IA lleva el MISMO texto — si uno cambia, cambiar los tres. **Aviso de calidad visible**: el servidor devolvía `validation_warning`/score y el frontend lo ignoraba; ahora `investigacion-accidentes-main.js` pinta un banner ámbar `.inv-quality-warn` si `validation_warning` o `score < 70` (`view.css`, con dark en `[data-theme^="dark"]`; cache-bust `INV-20260925-calidad-banner`).
-
-12. **Splash de bienvenida con confetti estilo Stripe** (v0.1.214, 📦815): el check verde Bootstrap hardcoded (`#28a745`) del `loading-success-icon` se reemplazó por SVG con gradiente (`<defs><linearGradient id="kairSuccessGrad">` verde→azul), halo pulsante (`<circle r="52">` con `success-halo` 2s ease-out infinite), check con stroke gradiente (4.5px round caps) y 6 cuadrados confetti (`rect 6×6`) rotando ±180° mientras vuelan ±42px en 3 colores premium v2 (`--kair-blue`, `--kair-green`, `--kair-amber`). ViewBox 52→120 para que respire. Tokens nuevos: `--kair-blue`, `--kair-green`, `--kair-amber` (reutilizados, antes no existían). **Aplicado a AMBOS** overlays (`#kair-loading-success.active` activo + `.kair-transition-success` legado CSS huérfano) por consistencia si el componente se reactiva. Si el user pide cambiar colores, **NO** hardcodear — exponer como tokens `--kair-X` en `:root` y consumirlos desde el `stroke`/`fill` del SVG y desde los keyframes CSS. Cache-bust `styles.css?v=20260926-confetti-success`. Patrón completo en `design_system.md §15`.
-
-13. **URLs relativas en HTML inyectado vía `fetch + innerHTML` se resuelven desde el documento PADRE, no desde el archivo fetched** (v0.1.215, 📦816 — bug en refactor home de Capacitaciones): contraste directo con el patrón de Presupuesto que se carga en **iframe** (donde las URLs se resuelven desde el iframe). Cuando un componente hace `const html = await fetch('./modules/.../foo.html'); container.innerHTML = html`, todos los `<link>`, `<img>`, `<a href>` dentro del HTML inyectado resuelven sus paths relativas desde el BASE URI del documento padre (`index.html`), no desde el archivo fetched. **Síntoma**: la página sale sin estilos (los `<link>` no encuentran el CSS). **Fix**: usar paths relativas a `index.html` (`./shared/...`, `./modules/...`) y agregar `<link>` explícito al CSS del módulo (no se hereda del archivo fetched). Patrón de E2E sin display: `tests/cap-home-e2e.js` con jsdom lee los archivos del disco y los inyecta como `<style>` en un wrapper HTML, valida 18/18 DOM + 15/15 CSS + 9/9 tokens + 11/11 estilos + callbacks. Útil cuando no se puede ejecutar Electron con GUI.
 
 ### Stores y estado
 - Cada módulo tiene un `kair-store.js` con patrón pub/sub: `getState()`, `setState()`, `subscribe(fn)`, `actions`

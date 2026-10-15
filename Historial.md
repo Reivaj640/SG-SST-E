@@ -9,7 +9,7 @@
 > |---|---|
 > | `PROMPT.md` | ¿Cómo se trabaja aquí? |
 > | `CHANGELOG.md` | ¿Qué cambió en cada versión publicada? |
-> | `AGENTS.md` | ¿Por qué el código es como es? (bitácora de bugs) |
+> | `BITACORA.md` | ¿Por qué el código es como es? (bitácora de bugs) |
 > | `CONTEXT.md` | ¿De qué va el proyecto? |
 > | **`Historial.md`** | **¿Dónde quedó el trabajo y qué falta?** ← este |
 
@@ -94,7 +94,7 @@ La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema
 instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
 shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul. U0001F534 **El 895 no se midió en ninguna parte**: el arnés con iframe saturó el navegador con tres timeouts (el mismo síntoma del 891) y se sustituyó por ejecutar la función real en Node con `vm`, que valida la lógica del scroll pero **no** el comportamiento en el navegador.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891, 📦892, 📦893, 📦894 y 📦895. **895**, el auto-scroll con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
+| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891 a 📦895, más 📦896 y 📦897 de documentación. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
 **894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
 en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
 funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
@@ -704,6 +704,71 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-15 (tarde 4) · AGENTS.md dejó de ser un archivo de 11.000 líneas (📦896, 897)
+
+**Qué se hizo** — por pedido del owner: el archivo que se carga al arrancar cada sesión tenía 10.993
+líneas y su propio encabezado avisaba que era "89 % bitácora de bugs". Todo ese peso se pagaba antes de
+empezar a trabajar. Se partió en dos **sin reescribir ni resumir**: copiar tal cual, solo mover de archivo.
+
+**El corte** cae en 1125/1127, exactamente donde termina la última sección operativa (el protocolo de
+autorización de commits) y arranca la primera entrada de bitácora (Menú nativo de Electron, 📦579).
+
+- `AGENTS.md` → **1.099 líneas**: arranque, tabla de Skills con sus seis subsecciones, convención de
+  commits, regla de comunicación y la arquitectura completa del proyecto.
+- `BITACORA.md` → **4.797 líneas**: snapshots, playbooks, releases, trampas y las entradas 📦579 a 📦895.
+
+Carga al arrancar: **−90 %** respecto al archivo original.
+
+**El archivo tenía 4.200 líneas duplicadas byte a byte.** No era una impresión: en el mapa de
+encabezados, las secciones 0-58 y 59-117 eran el mismo contenido repetido con offset constante de 5.335.
+Cada copia se comprobó con SHA-1 antes de borrar nada.
+
+**El duplicado estaba en dos capas, y la segunda se escapaba.** La primera (4.203 líneas) estaba entera
+dentro de BITACORA.md y se quitó con un diff línea por línea. La segunda no: **cruza el corte**, así que
+una copia quedó en AGENTS.md y la otra en BITACORA.md, donde ningún dedup por rango la ve. Era una segunda
+copia completa de "Arquitectura del Proyecto" (909 líneas). Un dedup por rango no la encuentra; hay que
+buscar el duplicado **por contenido**.
+
+**Una línea casi se pierde, y la comprobación la salvó.** La fila de la tabla de `test-google-oauth-868.js`
+existía en dos variantes. La de la copia duplicada era la versión **reducida**: a la que sobrevive le falta
+la cláusula *"y no hay forma de diagnosticarlo"*. El script abortó dos veces antes de dejarme borrar,
+y las dos veces tenía razón.
+
+**Dos invariantes que costaron escribir, y las dos importan:**
+
+- En un **dedup**, el conteo de cada línea tiene que BAJAR. La comprobación intuitiva ("nada desapareció")
+  aborta siempre. La correcta es `final = original − borrado`.
+- Una línea no es "contenido único" solo si no aparece como subcadena. Una versión **reducida** de otra es
+  redundante, y la superconjunta que sobrevive la contiene. Sin esa prueba, el borrado se negaba solo.
+
+**Lo que casi se va y no se va.** El arranque decía "no lo leas entero" para un archivo que ahora sí se
+lee entero, y quedaban 61 líneas de relato dentro de `AGENTS.md`. De esas 61 se movieron las que
+describen un bug con su resolución; **se quedó** la "Lección crítica: reescritura de archivos grandes con
+scripts Python" porque es un procedimiento activo de 8 pasos, no un relato. Y al revés: los puntos 2 a 6
+de los Gotchas CSS eran reglas generales escondidas en la bitácora, y el owner los promovió a sección
+propia `### Reglas CSS generales` en `AGENTS.md`.
+
+**Los 9 punteros.** `PROMPT.md`, `CLAUDE.md`, `PRODUCT.md` e `Historial.md` mandaban a buscar la bitácora
+en `AGENTS.md`. Sin arreglarlos la división no servía: el agente iba al archivo reducido y no encontraba
+lo que buscaba. Se cambiaron por `BITACORA.md` **sin números de línea escritos a mano** — esos conteos ya
+se pudrieron tres veces (4.800 → 10.993 → 9.873 → 5.706) y un número a mano es una mentira que a veces
+resulta cierta por accidente.
+
+**Verificación.** Cada paso releyendo del disco, nunca confiado en la memoria del proceso.
+
+| Comprobación | Resultado |
+|---|---|
+| Corte inicial: diferencia de multiconjuntos, línea por línea | 0 líneas perdidas |
+| Dedup interno: SHA-1 de ambas copias antes de borrar | idénticas, 4.203 líneas |
+| Dedup cruzado: cada renglón del bloque, normalizado | 0 renglones únicos |
+| Invariante global sobre los 4.220 textos distintos del original | 0 desaparecidos |
+| Los 18 renglones que no aparecen íntegros | 17 con otro nivel/numeración · 1 con versión mejor sobreviviendo |
+| EOL y caracteres prohibidos en los 2 archivos | LF, 0 CR, 0 CJK/cirílico/hangul |
+
+**Lo que sigue abierto.** El bloque de arranque y el `## Protocolo` de `AGENTS.md` no se tocaron más de lo
+acordado. Sigue en pie la deuda vieja: el botón "Recursos" encendido en Configuración, y la decisión de
+borrar o no `plan-viewer.js` (código muerto, 1.605 líneas).
 
 ### 2026-10-15 (tarde 2) · Capacitaciones aplicaba los temas a medias y el menú quedaba muerto (📦894)
 
@@ -2125,5 +2190,5 @@ Al owner le corresponde responder. Si dice que sí, se actualizan:
 | `Historial.md` | Bloque de estado + entrada de la jornada |
 | `PROMPT.md` | Si apareció una regla nueva de proceso o una trampa nueva |
 | `CONTEXT.md` | Si cambió el estado del proyecto o el foco |
-| `AGENTS.md` | La lección del bug, con su "por qué se rompió" |
+| `BITACORA.md` | La lección del bug, con su "por qué se rompió" |
 | `CHANGELOG.md` + `README.md` + `release-notes.md` | Al commitear, no al cerrar |

@@ -21,7 +21,7 @@ Antes de proponer cualquier cosa, lee el documento que corresponda. **No adivine
 |---|---|---|
 | Qué hace el producto, para quién, qué reglas tiene | `PRODUCT.md` (raíz) | Actualizado 2026-10-03 |
 | Paleta, tokens, componentes, trampas de CSS | `sgsst-electron-app/design_system.md` | **La fuente del sistema visual** |
-| Qué se decidió y por qué (bitácora) | `sgsst-electron-app/AGENTS.md` | 4 800+ líneas, 89 % lecciones de bugs |
+| Qué se decidió y por qué (bitácora) | `sgsst-electron-app/BITACORA.md` | Buscar con `grep`, no leer entero |
 | Qué se cambió y cuándo | `sgsst-electron-app/CHANGELOG.md` | Por paquete `📦n` |
 | Qué está en curso y qué está roto | `sgsst-electron-app/CONTEXT.md` | |
 | Cómo lo ve el usuario | `sgsst-electron-app/release-notes.md` | Un H1 por versión |
@@ -36,7 +36,7 @@ Antes de proponer cualquier cosa, lee el documento que corresponda. **No adivine
 |---|---|
 | **Cualquier cosa** (arrancás de cero) | Este archivo → `Historial.md` (estado de cierre) |
 | Tocar una vista, un componente o el CSS | Este archivo §4 → `design_system.md` |
-| Entender por qué una línea es así | `AGENTS.md`, **con grep** (4 800 líneas) |
+| Entender por qué una línea es así | `BITACORA.md`, **con grep**, no leer entero |
 | Escribir o revisar un test | Este archivo §7 |
 | Cambiar un bridge, la base de datos o el sync | Este archivo §6.2 |
 | Cambiar el header o el shell | Este archivo §9 trampa #3 |
@@ -244,6 +244,10 @@ a ciegas**: el error es la pista.
 `CHANGELOG` + `AGENTS` + `README` + `CONTEXT` + `release-notes`. Si falta uno, el próximo que lea el repo
 va a encontrar la app en un estado que no existe.
 
+**Desde el 📦896** la bitácora de bugs ya no está en `AGENTS.md`, está en `BITACORA.md`. Cuando toques
+una, tocá la otra: si cambiás una regla de proceso, va en `AGENTS.md`; si cambiás el relato de un bug,
+va en `BITACORA.md`. `PROMPT.md` y `Historial.md` se actualizan al **cerrar** la jornada, no al commitear.
+
 ### 5.9 🔴 Cero presunciones: nada es una regla hasta contrastarlo con el código
 
 **Un documento que diga "X" NO es evidencia de que X sea verdad.** Este repo tiene documentos de
@@ -317,14 +321,14 @@ Al owner le toca responder. Si dice que sí, se actualizan:
 | `Historial.md` | Bloque "estado al cierre" + entrada de la jornada en la bitácora |
 | `PROMPT.md` | Si apareció una **regla de proceso** nueva o una **trampa** nueva → §5 y §9 |
 | `CONTEXT.md` | Si cambió el estado del proyecto o el foco de trabajo |
-| `AGENTS.md` | La lección del bug, **con su "por qué se rompió"**, no solo el síntoma |
+| `BITACORA.md` | La lección del bug, **con su "por qué se rompió"**, no solo el síntoma |
 | `CHANGELOG` + `README` + `release-notes` | Al **commitear**, no al cerrar |
 
 **Distinguir las dos cosas:** el **registro de lo que se hizo** es en `Historial.md` y va siempre;
 lo que se **publica** (`CHANGELOG`, `README`, `release-notes`) va en el commit.
 
 **Qué NO va en `Historial.md`:** el detalle técnico de una línea. Eso va en el comentario `📦n` del
-código y en `AGENTS.md`. `Historial.md` es el "dónde quedé", no el "cómo lo hice".
+código y en `BITACORA.md`. `Historial.md` es el "dónde quedé", no el "cómo lo hice".
 
 ### 5.11 🔴 Un ancla de reemplazo tiene que reponer todo lo que tape
 
@@ -665,6 +669,41 @@ Después: `git status` limpio, `main.js` con LF, `app.js` con CRLF, los 5 tests 
 **Regla:** en una máquina nueva, **antes de tocar código**, poner `core.autocrlf=false` a nivel de
 repo y renormalizar. El `README.md` dice que el EOL lo fija el test, y es cierto — pero el test solo
 avisa, no corrige.
+
+### 5.18 🔴 Al partir un documento, el duplicado puede quedar repartido entre los dos nuevos
+
+**El caso.** `AGENTS.md` tenía 10.993 líneas y su propio encabezado decía que era "89 % bitácora de
+bugs". Se partió en `AGENTS.md` (operativo) + `BITACORA.md` (historia). El archivo tenía además
+**4.200 líneas duplicadas byte a byte**, con offset constante de 5.335.
+
+**El duplicado estaba en dos capas, y la segunda no se ve si solo mirás un archivo:**
+
+1. **Dentro de un archivo** — 4.203 líneas. Se detectan comparando rangos y se borran con un diff más
+   SHA-1 de cada copia antes de tocar nada.
+2. **Entre los dos archivos nuevos** — 909 líneas: una segunda copia completa de "Arquitectura del
+   Proyecto", con una mitad en cada archivo. **Un dedup por rango no la encuentra.** Solo aparece si
+   buscás el duplicado **por contenido**.
+
+**Regla:** después de partir un documento, buscá el duplicado por contenido en los **dos** archivos
+resultantes, no solo por rango dentro de uno.
+
+**Las tres invariantes que costaron escribir, y las tres importan:**
+
+- En un **dedup** el conteo de cada línea tiene que **bajar**. La comprobación intuitiva ("no desapareció
+  nada": `final >= original` texto por texto) **aborta siempre**, y parece prudencia cuando es un error.
+  La correcta es `final = original − borrado`.
+- Una línea no es contenido único solo si no aparece como **subcadena**. Una versión **reducida** de otra
+  es redundante, y la versión larga que sobrevive la contiene. La prueba: ¿se reconstruye `L` a partir de
+  `O` quitándole **un** tramo? Si sí, `O` es superconjunto y se conserva la larga.
+- La invariante global de una división es por **texto distinto**: cada texto del original tiene que
+  seguir existiendo en alguno de los dos archivos. Comparar líneas completas no sirve en cuanto se
+  promotiona un encabezado o se renumera una lista.
+
+**Y una de comunicación:** un conteo de líneas **escrito a mano en otro documento** es una mentira que se
+pudre. Este valor pasó 4.800 → 10.993 → 9.873 → 5.706 en una tarde. Escribí "se busca con `grep`" y dejá
+el número para el momento de escribirlo. Y si un documento **declara su propio tamaño**, que lo calcule el
+script que lo escribe y verifique que coincida —contando `\n` sobre el texto joined, **no** elementos de
+un array: un elemento con `\n` embebido cuenta una línea de menos y el número declarado queda viejo.
 
 ---
 
@@ -1119,7 +1158,7 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 3 | 🟡 **El header NO colapsa por scroll.** Se auto-colapsa a los 5 000 ms y responde a hover | `renderer.js:2209-2219` | Si tocás el header, el modelo mental correcto es hover + timer |
 | 4 | 🟡 **12 archivos JS muertos en `renderer/bandeja-integrada/`** — `render-sidebar`, `render-calendar`, `render-mail-list`, `render-mail-detail`, `event-modal`, `compose-modal`, `mail-operations`, `calendar-operations`, `state`, `handlers`, `init`, `helpers`. `index.html` solo carga `data.js`, `icons.js`, `app.js` | `renderer/bandeja-integrada/` | **No los edites**: no se ejecutan. `compose-modal.js` además tiene lógica duplicada viva en `app.js` |
 | 5 | 🟡 **El `error` del IPC no tiene un solo formato** | 4 bridges string, ~25 objeto | Copiá el del bridge que tocás |
-| 6 | 🟡 **La sección de tests de `AGENTS.md` quedó desactualizada** — no menciona el runner, ni `evaluar()`, ni los guards | `AGENTS.md:1404-1433` | Usá §7 de este archivo |
+| 6 | 🟡 **La sección de tests de `AGENTS.md` quedó desactualizada** — no menciona el runner, ni `evaluar()`, ni los guards | `BITACORA.md` (sección 🧪 Tests smoke) | Usá §7 de este archivo |
 | 7 | 🟡 **`kair-bandeja.sidebarColapsado` y los otros `localStorage` guardan `"1"`/`"0"`, no booleanos.** `"0"` es *truthy* | varios | Comparación estricta: `=== "1"` |
 | 8 | 🟢 El sync falla con `no such column: actualizado_en` en BDs instaladas **antes** de la migración. El schema sí declara la columna: no es un typo del serializer, es una migración que falta | `sync-serializer.js:138,302,391,734` + `medprev-programas-schema-sql.js:37` | Al tocar migraciones, agregá el patrón `PRAGMA table_info` + `ALTER TABLE` |
 | 9 | 🟢 4 archivos `.bak-*` en la raíz del app | `main.js.bak-*`, `renderer.js.bak-*`, `preload.js.bak-*`, `index.html.bak-*` | Candidatos a borrar, pero **no sin autorización** |

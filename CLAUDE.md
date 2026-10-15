@@ -18,7 +18,7 @@ Con eso dos ya tenés el contexto completo. No hace falta leer los demás antes 
 | Vas a… | Leé además |
 |---|---|
 | Tocar una vista o un componente | `sgsst-electron-app/design_system.md` |
-| Entender por qué el código es como es | `sgsst-electron-app/AGENTS.md` (buscá con grep, son 4 800+ líneas) |
+| Entender por qué el código es como es | `sgsst-electron-app/BITACORA.md` (buscá con grep, no lo leas entero) |
 | Escribir un test | `PROMPT.md` §7 |
 | Afirmar que algo es una regla del proyecto | `PROMPT.md` **§5.9** — verificar contra el código |
 | Cambiar un bridge o la base de datos | `PROMPT.md` §6 |

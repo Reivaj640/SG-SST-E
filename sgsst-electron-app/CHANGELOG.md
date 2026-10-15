@@ -17,6 +17,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦896 / 897 · AGENTS.md dejó de cargarse entero: la bitácora se va a BITACORA.md
+
+**Qué cambió.** `sgsst-electron-app/AGENTS.md` tenía **10.993 líneas** y su propio encabezado avisaba
+que era "89 % bitácora de bugs". Ese archivo se carga al arrancar cada sesión, así que todo ese peso se
+pagaba antes de empezar a trabajar. Se partió en dos, **sin reescribir ni resumir**: el contenido se copió
+tal cual y solo se movió de archivo.
+
+| Archivo | Antes | Ahora | Qué contiene |
+|---|---|---|---|
+| `AGENTS.md` | 10.993 | **1.099** | Arranque, tabla de Skills, convención de commits, regla de comunicación, arquitectura del proyecto |
+| `BITACORA.md` | — | **4.797** | Snapshots, playbooks, releases, trampas y las entradas 📦579 a 📦895 |
+
+Carga al arrancar: **−90 %**. `BITACORA.md` no se lee, se busca con `grep`.
+
+**El corte** cae en 1125/1127, donde termina la última sección operativa (el protocolo de autorización de
+commits) y arranca la primera entrada de bitácora (📦579, Menú nativo de Electron).
+
+**El archivo tenía 4.200 líneas duplicadas byte a byte**, con offset constante de 5.335. Se quitaron en
+dos capas, porque el duplicado no estaba todo en el mismo archivo:
+
+1. **4.203 líneas dentro de `BITACORA.md`**, comprobadas con SHA-1 de cada copia antes de borrar.
+2. **909 líneas que cruzaban el corte**: una segunda copia completa de "Arquitectura del Proyecto", con
+   una mitad en cada archivo. Un dedup por rango no la encuentra; hay que buscar el duplicado por contenido.
+
+**Nada se perdió.** Cada paso releyendo del disco:
+
+| Comprobación | Resultado |
+|---|---|
+| Corte inicial, por diferencia de multiconjuntos línea por línea | 0 líneas perdidas |
+| Dedup interno, SHA-1 de ambas copias | idénticas |
+| Dedup cruzado, cada renglón del bloque normalizado | 0 renglones únicos |
+| Invariante global sobre los 4.220 textos distintos del original | 0 desaparecidos |
+| Los 18 renglones que no aparecen íntegros | 17 con otro nivel de encabezado o número de lista; 1 con versión más completa sobreviviendo |
+| EOL y caracteres prohibidos | LF, 0 CR, 0 CJK/cirílico/hangul |
+
+**Una línea casi se pierde.** La fila de la tabla de `test-google-oauth-868.js` existía en dos variantes:
+la de la copia duplicada era la **reducida**. La que sobrevive incluye la cláusula que a la otra le
+faltaba. El script abortó dos veces antes de dejar borrar, y las dos veces tenía razón.
+
+**Reglas de proceso que salen de acá:**
+
+- En un **dedup**, el conteo de cada línea tiene que **bajar**. La comprobación intuitiva ("no desapareció
+  nada") aborta siempre. La invariante correcta es `final = original − borrado`.
+- Una línea no es contenido único solo si no aparece como subcadena: una versión **reducida** de otra es
+  redundante, y la versión larga que sobrevive la contiene.
+- Al partir un documento en dos, el duplicado puede quedar **repartido entre los dos archivos nuevos**, y
+  entonces un dedup por rango no lo ve.
+- Un bloque de narrativa **anidado bajo un encabezado operativo** es un síntoma de que la división quedó
+  a medias: un ### Bug historico colgado de ## Arquitectura.
+- Un conteo de líneas **escrito a mano en otro documento** es una mentira que se pudre. Se escribe "se
+  busca con `grep`" y el número se calcula en el momento, con verificación de que coincide.
+
+**Los 9 punteros.** `PROMPT.md` (5), `CLAUDE.md` (1), `PRODUCT.md` (1) e `Historial.md` (2) mandaban a
+buscar la bitácora en `AGENTS.md`; ahora apuntan a `BITACORA.md`. Sin eso la división no resolvía nada: el
+agente iba al archivo reducido y no encontraba lo que buscaba. Los que apuntan al `## Protocolo` o a
+líneas que siguen dentro de `AGENTS.md` se dejaron intactos.
+
+**Contenido que cambió de archivo además del corte:**
+
+- Cinco bloques de relato que estaban anidados en `AGENTS.md` (cuatro "Bug histórico" y los Gotchas CSS
+  del submódulo Investigación Accidentes) pasaron a `BITACORA.md` con su nivel de encabezado ajustado.
+- Se **quedó** la "Lección crítica: reescritura de archivos grandes con scripts Python" (📦730-737): es un
+  procedimiento activo de 8 pasos, no un relato.
+- Los puntos 2 a 6 de los Gotchas CSS eran **reglas generales** escondidas en la bitácora. Promovidos a
+  `### Reglas CSS generales` dentro de "Arquitectura del Proyecto" en `AGENTS.md`.
+- El bloque de arranque 🚦 se reescribió: ya no dice "no lo leas entero" para un archivo que sí se lee
+  entero, y su tamaño lo calcula el script que lo escribe, con verificación.
+
+**Sin bumpeo de versión.** Este paquete no toca código ejecutable.
+
 ### 📦887 · El módulo Recursos también sigue el tema elegido
 
 El home del módulo.Resources se quedaba completamente blanco en los dos modos oscuros, con el shell
