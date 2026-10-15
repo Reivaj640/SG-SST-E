@@ -43,7 +43,7 @@
     overflow: hidden;
 }
 
-.capacitaciones-container[data-theme="dark"] {
+.capacitaciones-container[data-theme^="dark"] {
     --k-primary: #4da6ff;
     --k-primary-hover: #66b3ff;
     --k-primary-light: rgba(77, 166, 255, 0.15);
@@ -209,60 +209,60 @@
 }
 
 /* Dark theme — Header v3.0 + Tabs */
-.capacitaciones-container[data-theme="dark"] .k-section-card {
+.capacitaciones-container[data-theme^="dark"] .k-section-card {
   background: var(--k-bg-card);
   border-color: var(--k-border);
 }
 
-.capacitaciones-container[data-theme="dark"] .header-back-btn {
+.capacitaciones-container[data-theme^="dark"] .header-back-btn {
   color: #adb5bd;
   border-color: var(--k-border);
 }
 
-.capacitaciones-container[data-theme="dark"] .header-back-btn:hover {
+.capacitaciones-container[data-theme^="dark"] .header-back-btn:hover {
   background: rgba(77, 166, 255, 0.15);
   color: var(--k-primary);
   border-color: var(--k-primary);
 }
 
-.capacitaciones-container[data-theme="dark"] .header-action--secondary {
+.capacitaciones-container[data-theme^="dark"] .header-action--secondary {
   color: var(--k-primary);
   border-color: var(--k-primary);
 }
 
-.capacitaciones-container[data-theme="dark"] .header-action--secondary:hover {
+.capacitaciones-container[data-theme^="dark"] .header-action--secondary:hover {
   background: var(--k-primary);
   color: #1a1a2e;
 }
 
-.capacitaciones-container[data-theme="dark"] .header-action--ghost {
+.capacitaciones-container[data-theme^="dark"] .header-action--ghost {
   color: #adb5bd;
 }
 
-.capacitaciones-container[data-theme="dark"] .header-action--ghost:hover {
+.capacitaciones-container[data-theme^="dark"] .header-action--ghost:hover {
   background: rgba(255,255,255,0.1);
   color: #e0e0e0;
 }
 
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tabs {
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tabs {
   border-top-color: var(--k-border);
 }
 
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tab {
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tab {
   color: #adb5bd;
 }
 
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tab:hover,
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tab.active {
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tab:hover,
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tab.active {
   color: var(--k-primary);
 }
 
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tab-badge {
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tab-badge {
   background: rgba(77, 166, 255, 0.15);
   color: var(--k-primary);
 }
 
-.capacitaciones-container[data-theme="dark"] .capacitaciones-tab.active .capacitaciones-tab-badge {
+.capacitaciones-container[data-theme^="dark"] .capacitaciones-tab.active .capacitaciones-tab-badge {
   background: var(--k-primary);
   color: #fff;
 }
@@ -733,7 +733,7 @@ select.k-form-control {
  color: #ffffff;
 }
 
-.capacitaciones-container[data-theme="dark"] .k-modal-warning {
+.capacitaciones-container[data-theme^="dark"] .k-modal-warning {
  color: #f0ad4e;
  background: rgba(240, 173, 78, 0.1);
 }
@@ -978,29 +978,29 @@ select.k-form-control {
 }
 
 /* Dark theme — Evidencias */
-.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-dropzone {
     background: var(--k-bg-card);
     border-color: var(--k-border);
 }
 
-.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone:hover,
-.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone.is-dragging {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-dropzone:hover,
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-dropzone.is-dragging {
     border-color: var(--k-primary);
     background: rgba(77, 166, 255, 0.15);
 }
 
-.capacitaciones-container[data-theme="dark"] .k-evidencia-item {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-item {
     background: var(--k-bg-card);
     border-color: var(--k-border);
 }
 
-.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-pdf {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-item-icon.is-pdf {
     background: rgba(217, 83, 79, 0.15);
 }
-.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-image {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-item-icon.is-image {
     background: rgba(92, 184, 92, 0.15);
 }
-.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-doc {
+.capacitaciones-container[data-theme^="dark"] .k-evidencia-item-icon.is-doc {
     background: rgba(77, 166, 255, 0.15);
 }
 
@@ -1021,10 +1021,10 @@ select.k-form-control {
     margin-right: 0.4rem;
     font-size: 0.85rem;
 }
-.capacitaciones-container[data-theme="dark"] tr.k-row-conflict {
+.capacitaciones-container[data-theme^="dark"] tr.k-row-conflict {
     background-color: rgba(220, 53, 69, 0.15);
 }
-.capacitaciones-container[data-theme="dark"] tr.k-row-conflict:hover {
+.capacitaciones-container[data-theme^="dark"] tr.k-row-conflict:hover {
     background-color: rgba(220, 53, 69, 0.22);
 }
 
@@ -1038,7 +1038,7 @@ select.k-form-control {
 
 /* ------- Dark theme: redefinir tokens kair para que los componentes
    compartidos (kair-card, kair-metric-card) hereden el tema oscuro ------- */
-.capacitaciones-container[data-theme="dark"] {
+.capacitaciones-container[data-theme^="dark"] {
     --kair-card: #2d3748;
     --kair-line: #4a5568;
     --kair-line-soft: #3a4356;
@@ -1050,13 +1050,13 @@ select.k-form-control {
 }
 
 /* Ajustes dark de colores hardcodeados en kair-components.css */
-.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-head { color: #9aa7ba; }
-.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-value { color: #e9ecef; }
-.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-metric-value small { color: #7d8798; }
-.capacitaciones-container[data-theme="dark"] .kair-metric-card .kair-progress,
-.capacitaciones-container[data-theme="dark"] .kair-progress-bar { background: #232b3a; }
-.capacitaciones-container[data-theme="dark"] .kair-card-head h3,
-.capacitaciones-container[data-theme="dark"] .kair-row-title h3 { color: #e9ecef; }
+.capacitaciones-container[data-theme^="dark"] .kair-metric-card .kair-metric-head { color: #9aa7ba; }
+.capacitaciones-container[data-theme^="dark"] .kair-metric-card .kair-metric-value { color: #e9ecef; }
+.capacitaciones-container[data-theme^="dark"] .kair-metric-card .kair-metric-value small { color: #7d8798; }
+.capacitaciones-container[data-theme^="dark"] .kair-metric-card .kair-progress,
+.capacitaciones-container[data-theme^="dark"] .kair-progress-bar { background: #232b3a; }
+.capacitaciones-container[data-theme^="dark"] .kair-card-head h3,
+.capacitaciones-container[data-theme^="dark"] .kair-row-title h3 { color: #e9ecef; }
 
 /* Variante info (barra azul) para metric cards — complementa --danger/--warning */
 .kair-metric-card--info .kair-progress i { background: var(--kair-blue, #2057b8); }
@@ -1559,8 +1559,8 @@ select.k-form-control {
 .k-pill--success { background: var(--k-success-light); color: var(--k-success); }
 .k-pill--warning { background: var(--k-warning-light); color: #856404; }
 
-.capacitaciones-container[data-theme="dark"] .k-pill--pyp { background: rgba(255,255,255,0.08); }
-.capacitaciones-container[data-theme="dark"] .k-pill--warning { color: #f0ad4e; }
+.capacitaciones-container[data-theme^="dark"] .k-pill--pyp { background: rgba(255,255,255,0.08); }
+.capacitaciones-container[data-theme^="dark"] .k-pill--warning { color: #f0ad4e; }
 
 /* Botones de acción sutiles (ghost, sin bordes de color) */
 .k-action-btn {
@@ -1582,7 +1582,7 @@ select.k-form-control {
 .k-action-btn--success:hover { background: var(--k-success-light); color: var(--k-success); }
 .k-action-btn--warning:hover { background: var(--k-warning-light); color: #856404; }
 .k-action-btn--danger:hover  { background: var(--k-danger-light);  color: var(--k-danger); }
-.capacitaciones-container[data-theme="dark"] .k-action-btn--warning:hover { color: #f0ad4e; }
+.capacitaciones-container[data-theme^="dark"] .k-action-btn--warning:hover { color: #f0ad4e; }
 
 /* Paginación cliente */
 .k-pagination {
@@ -1642,32 +1642,75 @@ select.k-form-control {
    DARK THEME — componentes premium cap-*
    ========================================= */
 
-.capacitaciones-container[data-theme="dark"] .cap-breadcrumb { color: #adb5bd; }
-.capacitaciones-container[data-theme="dark"] .cap-breadcrumb .is-current { color: #e9ecef; }
-.capacitaciones-container[data-theme="dark"] .cap-header-left h3 { color: #e9ecef; }
-.capacitaciones-container[data-theme="dark"] .cap-header-left p { color: #adb5bd; }
-.capacitaciones-container[data-theme="dark"] .cap-period-pill {
+.capacitaciones-container[data-theme^="dark"] .cap-breadcrumb { color: #adb5bd; }
+.capacitaciones-container[data-theme^="dark"] .cap-breadcrumb .is-current { color: #e9ecef; }
+.capacitaciones-container[data-theme^="dark"] .cap-header-left h3 { color: #e9ecef; }
+.capacitaciones-container[data-theme^="dark"] .cap-header-left p { color: #adb5bd; }
+.capacitaciones-container[data-theme^="dark"] .cap-period-pill {
     background: var(--k-bg-card);
     border-color: var(--k-border);
     color: #adb5bd;
 }
-.capacitaciones-container[data-theme="dark"] .cap-company {
+.capacitaciones-container[data-theme^="dark"] .cap-company {
     background: var(--k-bg-card);
     border-color: var(--k-border);
     color: #e9ecef;
 }
-.capacitaciones-container[data-theme="dark"] .cap-company i { color: #adb5bd; }
-.capacitaciones-container[data-theme="dark"] .cap-header-icon {
+.capacitaciones-container[data-theme^="dark"] .cap-company i { color: #adb5bd; }
+.capacitaciones-container[data-theme^="dark"] .cap-header-icon {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
-.capacitaciones-container[data-theme="dark"] .cap-radar-item { border-bottom-color: #3a4356; }
-.capacitaciones-container[data-theme="dark"] .cap-radar-evidencias { background: #232b3a; }
-.capacitaciones-container[data-theme="dark"] .k-filter-pill .k-form-select { background-color: var(--k-bg-card); }
-.capacitaciones-container[data-theme="dark"] .k-form-section { background: var(--k-bg-card); }
+.capacitaciones-container[data-theme^="dark"] .cap-radar-item { border-bottom-color: #3a4356; }
+.capacitaciones-container[data-theme^="dark"] .cap-radar-evidencias { background: #232b3a; }
+.capacitaciones-container[data-theme^="dark"] .k-filter-pill .k-form-select { background-color: var(--k-bg-card); }
+.capacitaciones-container[data-theme^="dark"] .k-form-section { background: var(--k-bg-card); }
 
 /* =========================================
    RESPONSIVE — premium
    ========================================= */
+
+/* =========================================
+   894 · PALETA DARK-LEGACY (gris neutro)
+   =========================================
+
+   El shell tiene DOS temas oscuros y no son el mismo color:
+     dark        canvas #1a202c · tarjeta #384151   (azul K+AIR)
+     dark-legacy canvas #121212 · tarjeta #292929   (gris neutro)
+
+   Los 47 bloques de este archivo usan el prefijo [data-theme^="dark"], asi que
+   apliquen a los dos, pero el que los declara solo trae los valores de `dark`.
+   Este bloque pone los de `dark-legacy` encima. Misma especificidad que el
+   prefijo, mas abajo en el archivo: gana por orden. Asi 1.2.1 sigue al shell
+   que la rodea, en vez de meter una pantalla azul dentro de un shell negro.
+
+   Los valores salen de shared/kair-design-tokens.css (bloque dark-legacy),
+   no de una tabla escrita a mano. Si ese archivo cambia, este hay que
+   tocarlo con el: el test 894 lo comprueba.
+   */
+.capacitaciones-container[data-theme="dark-legacy"] {
+    --k-text-main: #e0e0e0;
+    --k-text-muted: #a0a0a0;
+    --k-bg-app: #121212;
+    --k-bg-card: #292929;
+    --k-border: #404040;
+
+    --kair-card: #292929;
+    --kair-line: #404040;
+    --kair-line-soft: #333333;
+    --kair-ink: #e0e0e0;
+    --kair-muted: #a0a0a0;
+    --kair-faint: #9a9a9a;
+    --kair-canvas: #121212;
+    --kair-soft: #242424;
+}
+
+/* Las tres superficies que el modulo escribe a mano en vez de tomarlas de un
+   token. Son las unicas: el resto de colores literales de las reglas oscuras
+   son texto, gris casi neutro que se ve igual en las dos paletas. */
+.capacitaciones-container[data-theme="dark-legacy"] .kair-progress,
+.capacitaciones-container[data-theme="dark-legacy"] .kair-progress-bar { background: #242424; }
+.capacitaciones-container[data-theme="dark-legacy"] .cap-radar-item { border-bottom-color: #333333; }
+.capacitaciones-container[data-theme="dark-legacy"] .cap-radar-evidencias { background: #242424; }
 
 @media (max-width: 992px) {
     .cap-grid-2 { grid-template-columns: 1fr; }

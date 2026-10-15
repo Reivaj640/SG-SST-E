@@ -10871,3 +10871,77 @@ exige que `renderer.js` cree el contenedor **sin** la clase de página y que nin
 bloque cuelgue de ella. Con eso, el error de fondo no puede volver ni aunque alguien lo intente
 de nuevo. Y para el contraste: componer los `rgba` sobre el fondo real **antes** de medir, en vez
 de escribir el ratio a mano en un comentario.
+
+## 📦894 · Un submódulo montado en línea nunca recibe el tema
+
+El owner reportó dos cosas en un mismo mensaje: el submódulo 1.2.1 Programa de Capacitación Anual no
+aplicaba bien los temas Sistema y Oscuro, y en el mismo mensaje aparecíA un `console.warn` de "Cambio de
+módulo bloqueado". Su frase fue "no sé qué decisión tomar no quiero dañar nada de lo que ya funciona".
+Ni una decisión ni un código sin antes: primero el diagnóstico, luego el owner decidió, luego un test por
+cada arreglo.
+
+**Trampa 1 · El tema solo llega a `<html>` y a los iframes.** Ese es el contrato del shell, y es
+correcto. Lo que no estaba contemplado es el tercer caso: un submódulo cuyo contenido se inyecta **en
+línea** con `fetch` + `innerHTML`. Ahí no hay `contentDocument` al que escribirle y el contenedor nunca
+recibe el atributo. Una vista en línea tiene que **espejar** el atributo desde `document.documentElement`,
+o su CSS de tema es código muerto. Antes de asumir que un `[data-theme]` no calza, **contar las escrituras**:
+en capacitaciones había 0 `setAttribute` y 1 solo `getAttribute`.
+
+**Trampa 2 · Un `--kair-*` global SÍ hereda: por eso el defecto se ve a medias.** Las tarjetas del
+submódulo salían oscuras porque leen los tokens globales de `:root`, que el shell sí actualiza. Solo se
+rompían el fondo, el texto propio y los gráficos. El resultado es una pantalla "a medio tema" que hace
+pensar que el CSS está mal escrito, cuando el problema es que **nunca se ejecutó**.
+
+**Trampa 3 · Las "reglas muertas" suelen ser código correcto que no calza.** Las 47 reglas
+`[data-theme="dark"]` de `capacitaciones-view.css` estaban registradas como deuda desde antes. No eran
+basura: eran el tema entero del módulo, escrito bien yJamás ejecutado. Antes de borrar código muerto,
+preguntarse **qué lo haríA vivo** — porque casi siempre la respuesta es "un atributo que nadie escribe".
+
+**Trampa 4 · Recrear un gráfico para cambiarle el tema le borra los datos.** Los colores van horneados
+en el momento de crearlo, así que un cambio de tema obliga a recrearlo. Pero `initializeCharts()` deja las
+series en cero: sin el `updateCharts()` que va justo después, cambiar de tema deja los tres gráficos vacíos.
+Se arregla la legibilidad y se rompe el dato. Hay check dedicado al **orden** de esas dos llamadas, y una
+mutación que invierte ese orden.
+
+**Trampa 5 · Un espejo mal hecho es un bucle silencioso.** Si `_syncTheme()` leyera el atributo del
+propio contenedor en vez de `documentElement`, se realimentaría: primero null, luego null para siempre, y
+el defecto original volvería con código nuevo. El test exige que lea de `documentElement` **y** que no lea de
+`this.container` en el mismo método.
+
+**Trampa 6 · Registrar el estado es parte de tomar la vista.** `showSettingsPage()` monta un iframe sobre
+`contentArea` y no anotaba nada: `currentModule` seguía diciendo "Recursos" y `currentSubmodule` decía
+"1.2.1". El candado de `showModuleContent` veía ese valor truthy y se descartaba. El `console.warn` que lo
+delataba era **cosmético**: lo que pasaba es que el clic siguiente en el menú no hacíA nada, sin error y sin
+aviso. **Cuando una superficie reemplaza a la anterior, el estado anterior tiene que soltarse**, y antes de
+borrar el DOM, no después.
+
+**Trampa 7 · Arreglar el síntoma del estado destapa otro defecto.** Al quitar el bloqueo, el bloque de
+refresco de tema (que usa `currentModule` para recargar "el módulo visible") empezó a expulsar al usuario de
+Configuración hacia Recursos en cuanto tocara el selector de tema. Por eso `currentModule = null` va
+**explícitamente** en la misma línea lógica, y por eso el test exige que estén juntos.
+
+**Trampa 8 · Un candado que se habilita no se quita.** El candado de `showModuleContent` segue ahí:
+
+**Trampa 9 · `dark-legacy` no es "el mismo oscuro con otro nombre": es otra paleta.** El prefijo
+`[data-theme^="dark"]` hace que las reglas apliquen a las dos, **pero el bloque que las declara solo trae los
+valores de `dark`**. Resultado: una pantalla azul dentro de un shell gris, que es justo lo que el owner
+detectó mandando una captura del home de Recursos. **Habilitar un tema no es heredar su paleta.** Un
+bloque `[data-theme="dark-legacy"]` al final, con la misma especificidad, gana por orden. Y los valores se
+leen del shell (`kair-design-tokens.css`), no de una tabla escrita a mano, para que si la paleta del shell
+cambia el test avise.
+
+**El detalle fino:** el prefijo es lo que hace que las 47 reglas apliquen a las dos, así que el problema
+no es el selector sino **los valores del bloque**. Un `^=` bien puesto sobre un bloque que solo declara una
+paleta deja la mitad de la app teñida. Antes de dar por bueno un "ahora sí sigue el tema", mirá **los
+dos temas**, no solo el que fallaba.
+
+evita que una recarga espuria pierda el estado del submódulo. Hay check de que no desapareció, y otro de que
+siga avisando cuando bloquea.
+
+### El patron que sí funciona
+
+Reusar la teardown que el proyecto ya tiene en vez de inventar una nueva: `_salirDeSubmodulo()` (del 843) es
+la misma que usan el menú y el botón Volver, y te da de regalo el `try/finally` que impide que un
+`destroy()` con error tranque la navegación. Para el contraste, leer los tokens del CSS y medir, no escribir
+el ratio a mano. Y para el estado, un check que compruebe el **orden**: la teardown tiene que ir antes de que
+se borre `contentArea`, no da igual.

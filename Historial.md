@@ -24,7 +24,38 @@
 |---|---|
 | **Fecha de cierre** | 2026-10-15 |
 | **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
-| **Último commit de código** | 📦 **893**: la pantalla de selección de empresa vuelve al dialecto
+| **Último commit de código** | 📦 **894** (2026-10-15, commiteado desde `Dev` a fin de jornada, **sin push**): dos defectos
+que el owner reportó en un mismo mensaje. **(a) El submódulo 1.2.1 Programa de Capacitación Anual no aplicaba los
+temas**: no es un error de CSS, es que el contenedor **nunca recibió `data-theme`**. El shell lo escribe sobre `<html>` y
+sobre los iframes, pero capacitaciones se monta **en línea** con `fetch` + `innerHTML`, así que no hay
+`contentDocument` al que escribirle. En todo el módulo habíA **0 escrituras** del atributo y **1 sola lectura**
+(`capacitaciones-logic.js:1543`, la que decide el color de los gráficos), así que `isDark` daba `false` siempre. De
+ahí salían las **47 reglas `[data-theme="dark"]`** que ya estaban registradas como "reglas muertas" desde antes:
+no eran basura, eran el tema entero del módulo, escrito bien y **jamás ejecutado**. El defecto se veíA "a
+medias" porque las tarjetas **sí** salíAN oscuras: leen los tokens globales `--kair-*` de `:root`, que el shell
+sí actualiza; solo se rompían el fondo (leíA `--k-bg-app`, que solo cambia en el bloque muerto), el texto del
+cuerpo y los gráficos. Medido sobre los colores reales de las capturas: el número del donut daba **1.10:1** sobre
+`#292929` y **1.55:1** sobre `#384151`, y el texto de "En tu radar" **2.19:1**. Después del arreglo, **5.78:1** y
+**13.76:1**. Arreglo de dos piezas, **sin tocar el shell**: un espejo del atributo desde `documentElement` hacia el
+contenedor (con `MutationObserver` para cambios en vivo) y los 47 selectores a `[data-theme^="dark"]`, que es el
+prefijo y no la igualdad exacta porque **`dark-legacy` no es alias de `dark`**. Había un tercer defecto en la misma
+línea: `isDark` comparaba con `=== 'dark'`, así que ni con el atributo presente habríA reconocido
+`dark-legacy`. Y una trampa del repinte: los gráficos llevan el color horneado al crearse, así que hay que
+**recrearlos**, pero `initializeCharts()` los deja con los datos en cero — sin el `updateCharts()` que va justo
+después, cambiar de tema deja los gráficos vacíos. **(b) El `console.warn` de "Cambio de módulo bloqueado"**
+tapaba un botón muerto: `showSettingsPage()` monta su iframe sobre `contentArea` y **no registraba que tomó el
+control de la vista**, así que `currentModule` decíA "Recursos" y `currentSubmodule` "1.2.1", y el candado de
+`showModuleContent` descartaba todo cambio de módulo. El `warn` era cosmético; lo que pasaba es que el clic
+siguiente en el menú **no hacíA nada**, sin error. El arreglo registra la salida **antes** de borrar
+`contentArea`, reusando `_salirDeSubmodulo()` (la teardown del 📦843, con `try/finally`, la misma que usan el menú
+y el botón Volver) y anulando **`currentModule` también**: si solo se limpiara el submódulo, el bloque de
+refresco de tema lo usaría para recargar "el módulo visible" y **expulsaríA al usuario de Configuración al tocar
+el selector de tema**.  El owner detectó **una segunda mitad que yo no había visto**: mandó una captura del home de Recursos en `dark-legacy` y preguntó si tenía negros. Tenía: `dark-legacy` es el gris neutro (`#121212` / `#292929`, `kair-design-tokens.css:201`), no un alias de `dark`. Mi prefijo `^="dark"` hacía que las 47 reglas aplicaran a los dos temas, **pero el bloque que las declara solo trae los valores de `dark`**, que es la azul: 1.2.1 iba a quedar **azul dentro de un shell negro**. Se corrigió con un bloque `[data-theme="dark-legacy"]` al final (misma especificidad, gana por orden), leído del shell y no de una tabla escrita a mano, más las 3 únicas superficies que el módulo escribe a mano. El test **compara el módulo contra el shell**, así que si la paleta del shell cambia, el módulo tiene que seguirla.El candado **no se quita**: evita perder el estado del submódulo en una recarga espuria.
+**El owner llegó diciendo que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
+funciona**, así que no se tocó nada hasta terminar el diagnóstico y presentarle las dos opciones con la evidencia.
+Tests nuevos: `test-capacitaciones-tema-894.js` (**42 checks, 16/16 mutaciones**, con el contraste leído de los
+tokens que declara el propio CSS) y `test-guard-modulo-894.js` (**27 checks, 13/13 mutaciones**, con el check del
+**orden** de la teardown respecto al borrado). Batería 884–894 en verde y el 861 sigue en 614/614. Antes, 📦 **893**: la pantalla de selección de empresa vuelve al dialecto
 premium y **dejó de tapar la animación de Vanta**. El defecto lo encontró el owner mirando la app,
 no un test: el contenedor llevaba la clase `kair-premium`, que no es una clase de contenedor sino
 el **envoltorio de página** del premium, y por eso pinta fondo (`--kair-canvas` en claro,
@@ -51,13 +82,29 @@ Antes, 📦 **892**: el visualizador de 1.1.1 volvió a abrir documentos; antes,
 | **Suite (escritorio)** | **131 tests · 130 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medida el 2026-10-14, ya con 📦886. El único rojo es `test-firma-constancia-consolidada.js` [83/83 en lo estático], que muere esperando `INTERNAL_API_KEY`; `test-init-order-bug.js` sigue sin resumen verificable. 🔴 **Corrección importante: el bloqueo por ABI de `better-sqlite3` YA NO EXISTE.** Este bloque decía que 14 tests no arrancaban en esta máquina, 13 de ellos por `ERR_DLOPEN_FAILED` al cargar `better_sqlite3.node` (compilado para Electron 37 mientras el `node` pelado corre v26.10.0). **Hoy corren todos**: el runner usa el Node de Electron (`ELECTRON_RUN_AS_NODE=1`), que es justamente el runtime para el que está compilado el binario. El diagnóstico viejo era correcto sobre el `node` pelado, pero **la medición se hacía por la vía equivocada**. Subió de 130 a 131 por `test-scrollbar-tema-886.js` (88 checks, 16/16 mutaciones). 🔴 **Durante este paquete se destapó una regresión propia y ya está corregida**: 📦886 bumpea el token de `styles.css`, y `test-sidebar-tonos-884.js` exigía que ese token contuviera "884", así que se rompió solo, sin que hubiera ningún error de verdad. Ese check quedó anclado al token **anterior** a su paquete |
 | **Entorno del escritorio** | ✅ `core.autocrlf=false` + 2277 archivos renormalizados · ✅ **913 paquetes npm instalados** (Aclarado: NO son paquetes del changelog. El último `📦n` real es **872**, no 913 — la cifra se leía como si fueran lo mismo) · ✅ Electron 37.10.3 · ✅ `better-sqlite3` compilado para ABI 136 y verificado con un `SELECT` real · ✅ Python 3.14.8 en PATH (`python`, `py`, `python3` probados por el test) |
 | **Datos en el escritorio** | ✅ **La BD tiene las 2 empresas restauradas** (medido 2026-10-06 con `better-sqlite3` bajo el Node de Electron, que es la única forma de leerla — el `node` pelado pide ABI 147 y el módulo está en 136): `companies` = **2** filas (Tempoactiva, Temposum), `user_company_roles` = **2**, 76 tablas. `config.json` **sí tiene `companyPaths`** con las 2 empresas (`scan_date` real, sync activo, 110 y 90 empleados). El usuario `admin@kair.local` existe y `isAdmin` sale `true`. 🔴 **Este bloque antes decía "0 filas y sin `companyPaths`": era viejo y ya se corrigió.** 🔴 **Los tokens de Google ya NO están en `config.json`**: ahora viven cifrados en `google-tokens.enc`. Al leer por primera vez, la app los migra y borra la copia en texto plano sola |
-| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📨860, 📨861, 📨868, 📨867 y el ancho de la tarjeta de ingreso (📨869). 🔴 **Pendiente en la app instalada: 📦881, 📦882, 📦883, 📦884, 📦885, 📦886, 📦887, 📦889, 📦890, 📦891, 📦892 y 📦893.** De 882, 884, 885, 886, 889, 890, 891 y 892 el owner aprobó artefactos, y los de 884, 885 y 886 **sí** usan el CSS real leído del disco (con sus huellas SHA-256 en el pie), pero **ninguno corre el `renderer.js` de verdad ni el IPC**. **Los de 887, 889 y 890 sí se midieron en un navegador real**, pero contra un arnés que monta el CSS y el JS del disco por HTTP, **no contra la app instalada**: no hay `electronAPI` ni IPC detrás. 🟡 **El 893 SÍ se midió en un navegador real**, con los CSS leídos del disco y los tres
+| **Validaciones visuales** | ✅ **Cerrado por el owner:** 📦879, 📦880, 📨860, 📨861, 📨868, 📨867 y el ancho de la tarjeta de ingreso (📨869). 🔴 **Pendiente en la app instalada: 📦881, 📦882, 📦883, 📦884, 📦885, 📦886, 📦887, 📦889, 📦890, 📦891, 📦892 y 📦893.**, 📦894.** De 882, 884, 885, 886, 889, 890, 891 y 892 el owner aprobó artefactos, y los de 884, 885 y 886 **sí** usan el CSS real leído del disco (con sus huellas SHA-256 en el pie), pero **ninguno corre el `renderer.js` de verdad ni el IPC**. **Los de 887, 889 y 890 sí se midieron en un navegador real**, pero contra un arnés que monta el CSS y el JS del disco por HTTP, **no contra la app instalada**: no hay `electronAPI` ni IPC detrás. 🟡 **El 893 SÍ se midió en un navegador real**, con los CSS leídos del disco y los tres
 temas a la vez: el Vanta se ve detrás, panel y tarjetas centrados, y las tarjetas cambian de
 superficie en claro, `dark` y `dark-legacy`. **No es la app instalada**: es una página que monta
 los estilos reales sobre un degradado que representa el punto más claro de Vanta, sin
 `electronAPI` ni IPC. Alcanza para el diseño y para la cascada; **no alcanza para el shell**.
+📦 **El 894 Sí se midió en un navegador real**, con el CSS y el HTML **del disco**: seis paneles, tres
+temas por (sin espejo / con espejo). Las dos columnas "sin espejo" **reproducen exactamente las capturas del
+owner** — marco blanco con tarjetas oscuras — y las "con espejo" salen con el fondo oscuro y el texto legible.
+La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema claro. Sigue **sin ser la app
+instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
+shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891, 📦892 y 📦893. **893**, la pantalla de los dos sobre 1.1.1 Responsable del SG-SST. **891**, el tema: el sincronizador del viewer era una copia de la lógica de `scripts/theme-manager.js`, que **no está cargado**, y leía una clave (`mode`) que el shell nunca manda. El CSS estaba bien —58 reglas oscuras, 29 y 29—: lo que faltaba era el atributo que las dispara. En paralelo, el panel de vista previa tenía fondo blanco fijo y **diez** `color: #fff` sobre acentos, que en oscuro se quedaban en 2.56:1. Se resolvieron con tokens `on-acento` por tema, y los checks de contraste del test **leen los tokens reales del CSS y calculan luminancia**, para que un cambio de `--kair-primary` se note solo. **892**, la carga de documentos: el preview del PDF se rutea por `__fileViewerBytes`, que **no existe en el preload** porque es una bandera, no una función; la guarda de existencia lo mataba antes del ruteo, así que el PDF fallaba siempre y el bloque de ruteo era código muerto. Y el panel no limpiaba el estado anterior, de modo que el fallo de un archivo quedaba pintado sobre el siguiente. **Un incidente propio que quedó anotado:** un script mío leyó un CSS como UTF-8 y lo escribió como `latin1`, convirtiendo cada `═══` y `—` en basura: 64 caracteres de reemplazo y el archivo **seguía funcionando**, porque el navegador ignora los comentarios. Lo detectó un test al leer 0 tokens; se restauró desde git y se reaplicó con un script que **aborta si aparece `U+FFFD` antes de escribir**. Es la trampa 24 de `PROMPT.md`. Tests nuevos: `test-responsable-tema-891.js` (58 checks, 20/20 mutaciones) y `test-visor-carga-892.js` (26 checks, 16/16). Batería 884–892 en verde (10 tests); el 861 sigue en 614/614. Antes, del 2026-10-14: 📦890 (1.1.5), 📦889 (1.1.2 y 1.1.3), 📦887 (el home), 📦886, 📦885, 📦884 y 📦883. **Sin bump de versión**: sigue en `0.1.251` |
+| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891, 📦892, 📦893 y 📦894.
+**894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
+en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
+funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
+El hallazgo de fondo es que el tema **sí llega a `<html>` y a los iframes**, y como Capacitaciones se monta en
+línea con `fetch` + `innerHTML`, el contenedor nunca recibe el atributo: habíA **0 escrituras** y **1 lectura** en
+todo el módulo, y `isDark` daba `false` siempre. Las "47 reglas muertas" que estaban anotadas como deuda eran
+precisamente el tema del módulo, escrito bien y nunca ejecutado. El arreglo no tocó el shell: espejo del atributo
+en el contenedor y los 47 selectores a `^=`. El `console.warn` de "Cambio de módulo bloqueado" resultó ser
+**cosmético**: lo que pasaba es que el clic siguiente en "Recursos" no hacíA nada, porque
+`showSettingsPage()` no registraba que habíA tomado la vista. Antes, 📦891, 📦892 y 📦893. **893**, la pantalla de los dos sobre 1.1.1 Responsable del SG-SST. **891**, el tema: el sincronizador del viewer era una copia de la lógica de `scripts/theme-manager.js`, que **no está cargado**, y leía una clave (`mode`) que el shell nunca manda. El CSS estaba bien —58 reglas oscuras, 29 y 29—: lo que faltaba era el atributo que las dispara. En paralelo, el panel de vista previa tenía fondo blanco fijo y **diez** `color: #fff` sobre acentos, que en oscuro se quedaban en 2.56:1. Se resolvieron con tokens `on-acento` por tema, y los checks de contraste del test **leen los tokens reales del CSS y calculan luminancia**, para que un cambio de `--kair-primary` se note solo. **892**, la carga de documentos: el preview del PDF se rutea por `__fileViewerBytes`, que **no existe en el preload** porque es una bandera, no una función; la guarda de existencia lo mataba antes del ruteo, así que el PDF fallaba siempre y el bloque de ruteo era código muerto. Y el panel no limpiaba el estado anterior, de modo que el fallo de un archivo quedaba pintado sobre el siguiente. **Un incidente propio que quedó anotado:** un script mío leyó un CSS como UTF-8 y lo escribió como `latin1`, convirtiendo cada `═══` y `—` en basura: 64 caracteres de reemplazo y el archivo **seguía funcionando**, porque el navegador ignora los comentarios. Lo detectó un test al leer 0 tokens; se restauró desde git y se reaplicó con un script que **aborta si aparece `U+FFFD` antes de escribir**. Es la trampa 24 de `PROMPT.md`. Tests nuevos: `test-responsable-tema-891.js` (58 checks, 20/20 mutaciones) y `test-visor-carga-892.js` (26 checks, 16/16). Batería 884–892 en verde (10 tests); el 861 sigue en 614/614. Antes, del 2026-10-14: 📦890 (1.1.5), 📦889 (1.1.2 y 1.1.3), 📦887 (el home), 📦886, 📦885, 📦884 y 📦883. **Sin bump de versión**: sigue en `0.1.251` |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
@@ -657,6 +704,79 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-15 (tarde 2) · Capacitaciones aplicaba los temas a medias y el menú quedaba muerto (📦894)
+
+**Qué se hizo** — por pedido del owner, que reportó en un mismo mensaje dos cosas: que el submódulo
+1.2.1 Programa de Capacitación Anual no aplica bien los temas Sistema y Oscuro, y el `console.warn` de
+"Cambio de módulo bloqueado". Su frase textual: *"realmente no se aue ecicion tomar no quiero dañar nada de lo que ya
+funciona"*. Esa frase se tomó en serio: **no se tocó una línea** hasta terminar el diagnóstico y
+presentarle las opciones con la evidencia medida.
+
+**El diagnóstico** — el del tema resultó ser un solo defecto, no dos. El contenedor de capacitaciones
+**nunca recibíA `data-theme`**: el shell lo escribe sobre `<html>` y sobre los iframes, y capacitaciones se monta
+**en línea** con `fetch` + `innerHTML`, así que no hay `contentDocument` al que escribirle. En todo el
+módulo: **0 `setAttribute`** y **1 `getAttribute`**. De ahí salían tres síntomas que parecían bugs
+distintos — el fondo blanco, el texto gris y los gráficos con la paleta de tema claro — y que eran uno.
+
+Lo que lo hacíA confuso es que **las tarjetas sí salíAN oscuras**, porque leen los tokens globales
+`--kair-*` de `:root` y esos sí se actualizan. Solo se rompía lo que el módulo declara por su cuenta.
+Y la prueba de que era código muerto y no código malo: las **47 reglas `[data-theme="dark"]`** que ya
+estaban registradas como deuda. Estaban bien escritas. Nunca pudieron calzar.
+
+**Medido sobre los colores reales de las capturas del owner:**
+
+```
+donut "19 actividades"  #14213d sobre #292929 (dark-legacy)   1.10:1   FALLA
+donut "19 actividades"  #14213d sobre #384151 (dark)          1.55:1   FALLA
+"En tu radar"           #6c757d sobre #384151                 2.19:1   FALLA
+```
+
+El **1.10:1** es el número gris lost del centro de la dona. Después del arreglo: **5.78:1** y **13.76:1**.
+
+**El `console.warn`** resultó ser la punta de algo peor. `showSettingsPage()` monta su iframe sobre
+`contentArea` y no registraba que habíA tomado el control de la vista, así que el estado seguíA diciendo
+"Recursos / 1.2.1" mientras la pantalla ya era Configuración. El candado de `showModuleContent` veíA ese
+`currentSubmodule` truthy y se descartaba. El aviso era cosmético: **el clic siguiente en "Recursos" no
+hacíA nada**, en silencio. Bajar el `warn` a `info` lo dejaba igual de muerto.
+
+**Lo que se cambió**
+
+- `capacitaciones-view.css`: los 47 selectores a `[data-theme^="dark"]`. Cero literales exactos quedan.
+- `capacitaciones-logic.js`: `_syncTheme()` y `_watchTheme()`, la llamada en `render()` y la desconexión en
+  `destroy()`; `isDark` pasa a prefijo para reconocer `dark-legacy`.
+- `renderer.js`: **dos líneas** en `showSettingsPage()`. No se tocó la lógica de navegación, y el candado
+  de `showModuleContent` sigue en su sitio.
+
+**Una tercera, y esta la mostró una imagen.** El prefijo `^="dark"` hace que las 47 reglas apliquen a los
+dos temas oscuros, pero el bloque que las declara solo trae los **valores de `dark`**. El owner mandó una
+captura del home de Recursos en `dark-legacy` y preguntó si tenía negros: tenía, es el gris neutro
+`#121212` / `#292929`. Mi arreglo, sin esa segunda mitad, habríA dejado 1.2.1 **azul dentro de un shell
+negro**. Se añadió el bloque `dark-legacy` al final del CSS (misma especificidad, gana por orden), con los
+valores **leídos de `kair-design-tokens.css`** y no de una tabla escrita a mano, más las 3 únicas
+superficies que el módulo escribe a mano. El test compara módulo contra shell: si la paleta del shell cambia,
+el módulo tiene que seguirla. Contraste de la paleta neutra: **5.56:1** a **14.19:1**, cero fallas. El test
+pasó de 42 a **63 checks** y de 16 a **22 mutaciones**.
+
+**Dos trampas que casi se caen por el camino**
+
+1. El espejo quedó primero como `initializeCharts()` a secas, y eso **vacía los gráficos**: los colores van
+   horneados al crearlos, as­ que hay que recrearlos, pero recrearlos deja las series en cero. El orden
+   correcto es `initializeCharts()` **y después** `updateCharts()`. Hay check del orden y mutación que lo invierte.
+2. El espejo mal hecho se realimenta: si leyera el atributo del propio contenedor en vez de
+   `documentElement`, quedaría en `null` para siempre y el defecto volvería con código nuevo. El test exige
+   que lea de `documentElement` **y** que no lea de `this.container` en el mismo método.
+
+**Tests** — `test-capacitaciones-tema-894.js` (**42 checks, 16/16 mutaciones**) y
+`test-guard-modulo-894.js` (**27 checks, 13/13 mutaciones**). Batería 884–894 en verde; el 861 sigue en
+614/614 con 9/9 mutaciones.
+
+**Verificación visual** — navegador real con el CSS y el HTML del disco: seis paneles, tres temas por
+(sin espejo / con espejo). Las columnas "sin espejo" reproducen exactamente las capturas del owner; la columna
+**Claro sale idéntica antes y después**. No es la app instalada: sin `electronAPI` ni IPC, y sin gráficos
+(Chart.js y datos del Excel). Alcanza para la cascada y el contraste, **no para el shell**.
+
+**Sin bump de versión**: sigue en `0.1.251`.
 
 ### 2026-10-15 (tarde) · La pantalla de empresa vuelve al premium y deja de tapar Vanta (📦893)
 

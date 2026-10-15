@@ -1143,6 +1143,37 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 27 | 🔴 **Un estilo en línea puede ser COMPORTAMIENTO, no decoración.** La pantalla de empresa llevaba `style.alignItems = 'center'`; al pasarla a clases, el centrado se fue sin que nada fallara | `renderer.js`, pantalla de selección de empresa (📦893) | Un contenedor sin `align-items` sigue siendo **válido**: llaves cuadradas, sin color prohibido, sin error de sintaxis, test en verde. **Ningún check de estructura lo ve.** Al sacar estilos en línea, leé cada uno preguntándote qué se pierde si desaparece |
 | 28 | 🔴 **Un check que fija el `?v=` literal se rompe en el próximo bumpeo, y su mutación queda vacía sin avisar** | `main/test-panel-tema-885.js` | Lo que importa no es el texto del sello sino que **no retroceda** a uno anterior. Anclá a la **fecha mínima** del paquete, nunca al literal. Y después de cada cambio de forma en el CSS, re-anclá las mutaciones y exigí `mutaciones vacias: 0`: un mutante que no muerde es peor que no tenerlo |
 
+| 29 | 🔴 **El tema solo llega a `<html>` y a los iframes.** Un submódulo montado **en línea**
+  (`fetch` + `innerHTML`) no tiene `contentDocument` al que escribirle, así que su contenedor nunca recibe
+  `data-theme` y todo su CSS de tema es código muerto | `capacitaciones-logic.js` (📦894) | Es
+  un **tercer caso** del contrato del shell, no un bug de CSS. Antes de "arreglar" un `[data-theme]` que no
+  calza, **contá las escrituras**: en ese módulo habíA 0 `setAttribute` y 1 solo `getAttribute`, y por eso
+  sus 47 reglas `--k` jamás se ejecutaron. Una vista en línea tiene que **espejar** el atributo desde
+  `document.documentElement`. Ojo: `--kair-*` globales **sí heredan** por `:root`, así que el defecto se ve
+  "a medio tema" — tarjetas oscuras sobre fondo blanco — y parece un error de estilos |
+| 30 | 🔴 **Recrear un gráfico para cambiarle el tema le borra los datos.** Los colores van horneados al
+  crearlo, así que un cambio de tema obliga a recrearlo, y `initializeCharts()` deja las series en cero
+  | `capacitaciones-logic.js`, gráficos de Chart.js (📦894) | Siempre `initializeCharts()` **seguido** de
+  `updateCharts()`: el primero pone la paleta nueva y el segundo vuelve a volcar los datos desde
+  `this.filteredCapacitaciones`. Sin el segundo, cambiar de tema deja los gráficos **vacíos**: se arregla la
+  legibilidad y se rompe el dato. Poné un check del **orden** de las dos llamadas |
+| 31 | 🔴 **La superficie que reemplaza a la anterior tiene que soltar el estado ANTES de borrar el
+  DOM.** `showSettingsPage()` monta su iframe y no anotaba nada, as­ que `currentModule` decíA "Recursos" y
+  `currentSubmodule` "1.2.1": el candado de `showModuleContent` lo veíA truthy y descartaba el cambio de
+  módulo. El `console.warn` era cosmético; lo que pasaba es que el clic siguiente en el menú no hacíA
+  nada | `renderer.js`, `showSettingsPage()` (📦894) | Reusá `_salirDeSubmodulo()` (la teardown del 📦843,
+  con `try/finally`) y anulá **`currentModule` también**: si solo limpiás el submódulo, el bloque de refresco de
+  tema lo usa para recargar "el módulo visible" y **expulsa al usuario de Configuración al tocar el selector de
+  tema**. Bajar el `warn` a `info` deja el botón muerto igual: el defecto no es el ruido, es el estado viejo |
+| 32 | 🔴 **Habilitar un tema NO es heredar su paleta.** El prefijo `[data-theme^="dark"]` hace que las
+  reglas apliquen a `dark` y a `dark-legacy`, pero el bloque que las declara solo trae los **valores de
+  `dark`**: la pantalla queda azul dentro de un shell gris | `capacitaciones-view.css` (📦894) |
+  `dark-legacy` es el gris neutro (`#121212` / `#292929`), no un alias. hace falta un bloque
+  `[data-theme="dark-legacy"]` **al final**, con la misma especificidad, para que gane por orden, y sus
+  valores **leídos del shell** (`kair-design-tokens.css`), no escritos a mano. Un inventario de las
+  reglas mostró que solo **tres** tenían superficie escrita a mano: el resto eran textos grises que se
+  ven igual en las dos paletas. **Antes de dar por bueno un "ya sigue el tema", mirá los DOS temas** |
+
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

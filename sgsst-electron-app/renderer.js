@@ -7387,6 +7387,21 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
       }
     }
 
+    // 894 / aviso de consola · Configuracion TOMA el control de la vista, asi que
+    // tiene que dejarlo registrado. Antes no lo hacia y el estado se quedaba
+    // apuntando al modulo anterior con su submódulo: showModuleContent encuentra
+    // `currentSubmodule` truthy en su guard y se descarta. De ahi el aviso
+    // "[showModuleContent] Cambio de modulo bloqueado" al cambiar el tema desde
+    // aqui, y de ahi que luego el clic del sidebar en "Recursos" no hiciera nada.
+    //
+    // _salirDeSubmodulo es la teardown que ya usan el sidebar (4202) y el boton
+    // Volver (5806): destruye el componente activo y limpia currentSubmodule.
+    // currentModule se anula aparte porque el bloque de refresco de tema (1768)
+    // lo usa para recargar "el modulo visible": con el valor viejo, cambiar el
+    // tema desde Configuracion expulsaria al usuario hacia ese modulo.
+    _salirDeSubmodulo('configuracion');
+    currentModule = null;
+
     contentArea.innerHTML = ''; // Limpiar contenido anterior
 
     // Crear un iframe para cargar la nueva interfaz de configuraciones

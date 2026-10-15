@@ -15,6 +15,7 @@ class CapacitacionesComponent {
         this.handleFileChange = null;
         this.availableSheets = [];
         this.chartInstance = null;
+        this._themeObserver = null;
     this.typeChartInstance = null;
     this.planChartInstance = null;
  this._modalInBody = null;
@@ -180,6 +181,11 @@ class CapacitacionesComponent {
         this.container.innerHTML = '';
         window.currentCapacitacionesComponent = this;
         this.container.classList.add('capacitaciones-container');
+        // 894 · el shell escribe data-theme en <html> y en los iframes, pero este
+        // submódulo se monta en línea: sin este espejo sus reglas de tema y su
+        // isDark de los gráficos nunca se activan.
+        this._syncTheme();
+        this._watchTheme();
 
         fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20260915-v11-periodo-stretch')
             .then(response => response.text())
@@ -217,6 +223,42 @@ class CapacitacionesComponent {
                 console.error('Error al cargar la interfaz:', error);
                 this.container.innerHTML = `<div class="alert alert-danger">Error crítico: ${error.message}</div>`;
             });
+    }
+
+    /**
+     * 894 · Espeja en el contenedor el `data-theme` que el shell escribe en <html>.
+     * Devuelve el valor vigente ('dark', 'dark-legacy', 'light' o null).
+     */
+    _syncTheme() {
+        const theme = document.documentElement.getAttribute('data-theme');
+        if (theme) {
+            this.container.setAttribute('data-theme', theme);
+        } else {
+            this.container.removeAttribute('data-theme');
+        }
+        return theme || null;
+    }
+
+    /**
+     * 894 · Observa el atributo en <html> para que un cambio de tema en vivo
+     * repinte este submódulo sin necesidad de recargarlo.
+     */
+    _watchTheme() {
+        if (this._themeObserver || typeof MutationObserver === 'undefined') return;
+        this._themeObserver = new MutationObserver(() => {
+            const antes = this.container.getAttribute('data-theme');
+            this._syncTheme();
+            if (this.container.getAttribute('data-theme') === antes) return;
+            // Los gráficos llevan los colores horneados en el momento de crearse:
+            // hay que recrearlos y volver a volcar los datos, o se quedan vacíos.
+            if (!document.getElementById('planLineChart')) return;
+            this.initializeCharts();
+            this.updateCharts();
+        });
+        this._themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme']
+        });
     }
 
     // ✏️ NUEVO — monta el modal en document.body y copia las variables CSS del scope
@@ -314,6 +356,11 @@ class CapacitacionesComponent {
         }
         if (this.handleFileChange) {
             window.electronAPI.removeIpcMessageListener('capacitaciones-file-changed', this.handleFileChange);
+        }
+        // 894 · soltar el observador de tema al destruir el componente
+        if (this._themeObserver) {
+            this._themeObserver.disconnect();
+            this._themeObserver = null;
         }
   if (this.chartInstance) {
     this.chartInstance.destroy();
@@ -1540,7 +1587,8 @@ class CapacitacionesComponent {
   // --- GRÁFICOS ---
 
   initializeCharts() {
-    const isDark = this.container.getAttribute('data-theme') === 'dark';
+    // 894 · prefijo y no igualdad exacta: `dark-legacy` tambien es un tema oscuro.
+    const isDark = (this.container.getAttribute('data-theme') || '').startsWith('dark');
     const textColor = isDark ? '#adb5bd' : '#6c757d';
     const gridColor = isDark ? '#3a3a4a' : '#f0f0f0';
 

@@ -83,6 +83,112 @@ aparece una vez en `objetivos-sst-view.css`: **48 reglas muertas en el repo**.
   `--kair-faint`, o sea que hoy es casi ilegible en claro. Es preexistente y de otro alcance.
 - Sin bump de versión (`0.1.251`), por la regla del owner.
 
+### 📦894 · Capacitaciones aplicaba los temas a medias, y el botón del menú quedaba muerto
+
+Dos defectos distintos que el owner reportó en el mismo mensaje. El segundo decía "no sé qué decisión
+tomar no quiero dañar nada de lo que ya funciona", así que la respuesta no podía ser improvisada: primero
+investigación, después decisión del owner, después un test por cada uno.
+
+**El del tema: el submódulo nunca recibí3 el atributo `data-theme`.** El shell lo escribe sobre `<html>` y sobre
+los iframes. Capacitaciones **no es un iframe**: su contenido se inyecta en línea con `fetch` + `innerHTML`
+(`capacitaciones-logic.js:184`), y al contenedor solo se le añadía la clase. En todo el módulo había
+**cero escrituras** del atributo y **una sola lectura**, la que decide el color de los gráficos
+(`capacitaciones-logic.js:1543`). Esa lectura daba `false` siempre: el módulo creíA que estaba en tema claro.
+
+De ahí salían tres síntomas que parecían bugs distintos y eran uno:
+
+- Las **47 reglas** `[data-theme="dark"]` del CSS no podían calzar jams. Código correcto, escrito y nunca
+  ejecutado: eran las "47 reglas muertas" que ya estaba registradas como deuda sin saber qué eran.
+- El fondo de la página leíA `--k-bg-app` (`#f8f9fa`), que solo cambia dentro de ese bloque muerto: por eso
+  el marco se quedaba **blanco** en los dos temas oscuros.
+- Los gráficos se pintaban con la paleta de tema claro sobre tarjetas ya oscuras.
+
+Lo confuso es que **las tarjetas sí salíAN oscuras**: no leen los tokens del módulo, leen los globales
+`--kair-*` de `:root`, y esos sí se actualizan. Solo se rompían el fondo, el texto del cuerpo y los gráficos.
+Medido sobre los colores reales de las capturas del owner:
+
+```
+donut "19 actividades"  #14213d sobre #292929 (dark-legacy)   1.10:1   FALLA
+donut "19 actividades"  #14213d sobre #384151 (dark)          1.55:1   FALLA
+"En tu radar"           #6c757d sobre #384151                 2.19:1   FALLA
+```
+
+El **1.10:1** es el número gris lost del centro de la dona: prácticamente invisible. Después del arreglo, los
+mismos pares dan **5.78:1** y **13.76:1**.
+
+El arreglo fue de dos piezas y ninguna toca el shell: un **espejo** del atributo desde `<html>` hacia el
+contenedor (con `MutationObserver` para los cambios en vivo) y los 47 selectores pasados a
+`[data-theme^="dark"]`. Ese es el prefijo, no la igualdad exacta, porque `dark-legacy` **no es alias** de
+`dark`: es otra paleta. Es la regla que el proyecto ya tenia escrita y que este módulo incumplíA.
+
+HabíA un tercer defecto en la misma línea: `isDark` comparaba con `=== 'dark'`, así que ni con el atributo
+presente habríA reconocido `dark-legacy`. Ahora usa prefijo.
+
+**La trampa del repinte:** los gráficos llevan los colores horneados en el momento de crearse, así que un
+cambio de tema los tiene que **recrear** — pero `initializeCharts()` los deja con los datos en cero. Sin el
+`updateCharts()` que va justo después, cambiar de tema deja los tres gráficos vacíos: se arregla la
+legibilidad y se rompe el dato. Hay un check dedicado al **orden** de esas dos llamadas.
+
+El modal se oscuras solo: `_mountModalToBody()` ya copiaba las variables `--k-*` del contenedor, así que al
+contener el espejo oscuro se las lleva.
+
+**El del botón muerto, debajo del aviso de consola.** El `warn` decíA "Cambio de módulo bloqueado: hay
+submódulo activo 1.2.1", pero tapaba algo peor. `showSettingsPage()` monta su iframe sobre `contentArea` y
+**no registraba que tomó el control de la vista**: `currentModule` seguía diciendo "Recursos" y
+`currentSubmodule` seguía diciendo "1.2.1". El candado de `showModuleContent` veíA ese `currentSubmodule`
+truthy y se descartaba. De ahí el aviso al cambiar el tema desde Configuración — y de ahí que el siguiente
+clic del menú en "Recursos" **no hiciera nada**, en silencio y sin aviso.
+
+Bajar el `warn` a `info` lo dejaba igual de muerto, solo que más callado. La causa es que Configuración toma la
+vista y no lo anota. El arreglo registra la salida **antes** de borrar `contentArea`, reusando la teardown que
+el proyecto ya teníA desde el 843 (`_salirDeSubmodulo`, la misma que usan el menº y el botón Volver):
+
+```js
+_salirDeSubmodulo('configuracion');
+currentModule = null;
+```
+
+`currentModule` se anula aparte y por una razón distinta: el bloque de refresco de tema lo usa para recargar
+"el módulo visible", as­ que **arreglar solo el candado habríA expulsado al usuario de Configuración hacia
+Recursos en cuanto tocara el selector de tema**. Un fallo cambiado por otro.
+
+El candado **no se quita**: sigue en su sitio. Este arreglo habilita al usuario a cambiar de módulo, y el
+candado es lo que evita que una recarga espuria pierda el estado del submódulo. Hay check de que siga ahí.
+
+**La mitad que faltaba: `dark-legacy` es OTRO oscuro, no el mismo.** El prefijo hace que las 47 reglas
+apliquen a `dark` y a `dark-legacy`, pero el bloque que las declara solo trae los valores de `dark`, que
+es la **azul** de K+AIR (`#1a202c` / `#384151`). El owner lo detectó mandando una captura del **home de
+Recursos**, que en `dark-legacy` es **gris neutro** (`#121212` / `#292929`, según `kair-design-tokens.css:201`):
+con el arreglo a medias, 1.2.1 quedaba **azul dentro de un shell negro**. El defecto lo mostró una imagen,
+no un test.
+
+El arreglo es un bloque `[data-theme="dark-legacy"]` al final del CSS, que pone los valores neutros encima.
+Lleva la **misma especificidad** que el prefijo, así que gana **por orden**, y por eso está al final a
+propósito. Además, un inventario de las 47 reglas mostró que solo **tres** escriben una superficie a mano
+(`#232b3a` y `#3a4356`): los otros once colores literales son texto, gris casi neutro que se ve igual en las
+dos paletas. Se re-declaran esas tres y no se tocó ninguna regla mas. **El tema claro no se toca**: el bloque
+cuelga de `[data-theme="dark-legacy"]` exacto.
+
+Los valores no están escritos a mano: salen del bloque `dark-legacy` de `kair-design-tokens.css`, y el test
+**compara el módulo contra el shell**, así que si alguien cambia la paleta del shell el test falla hasta que
+el módulo la siga. Contraste de la paleta neutra: **5.56:1** a **14.19:1**, cero fallas.
+
+- `capacitaciones-view.css`: los 47 selectores pasan a `[data-theme^="dark"]`. Cero literales
+  `[data-theme="dark"]` quedan en el archivo.
+- `capacitaciones-logic.js`: `_syncTheme()` y `_watchTheme()`, la llamada en `render()` y la desconexión en
+  `destroy()`; `isDark` pasa a prefijo.
+- `renderer.js`: dos líneas en `showSettingsPage()`. **No se tocó la lógica de navegación.**
+- Nuevo `main/test-capacitaciones-tema-894.js`: **42 checks y 16/16 mutaciones**, con el contraste leído de los
+  tokens que declara el propio CSS.
+- Nuevo `main/test-guard-modulo-894.js`: **27 checks y 13/13 mutaciones**, incluidas la teardown antes del
+  borrado y el orden recrear-después-voltar-datos.
+- Verificación visual en navegador con los CSS y el HTML **del disco**: seis paneles, tres temas por
+  (sin espejo / con espejo). Las dos columnas "sin espejo" reproducen exactamente las capturas del owner, y la
+  columna **Claro sale idéntica antes y después**: el arreglo no toca el tema claro. **No es la app instalada**
+  (sin `electronAPI` ni IPC), así que falta la confirmación con la app abierta.
+- Batería 884–894 en verde, más `test-explorador-estado-861.js` con 614/614 y 9/9 mutaciones.
+- Sin bump de versión (`0.1.251`), por la regla del owner.
+
 ### 📦889 · 1.1.2 Roles y Responsabilidades y 1.1.3 Asignación de Recursos sí siguen el tema
 
 Los dos submódulos se veían en claro dentro del shell oscuro.
