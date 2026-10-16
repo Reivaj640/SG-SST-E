@@ -4476,7 +4476,7 @@ class MedicionAusentismoComponent {
                                         ${idx === 0 ? '<span style="padding: 2px 8px; background: #FEF3C7; color: #D97706; font-size: 10px; font-weight: 600; border-radius: 12px; text-transform: uppercase;">Más reciente</span>' : ''}
                                     </div>
                                     <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
-                                        ${caso.diagnostico || 'Sin diagnóstico'}
+                                        ${caso.descripcion_diagnostico || 'Sin diagnóstico'}
                                     </div>
                                 </div>
                                 <i class="fas fa-chevron-right" style="color: #94A3B8; font-size: 12px;"></i>
@@ -4690,7 +4690,7 @@ class MedicionAusentismoComponent {
 
             document.getElementById('sp-dias-acumulados').value = caso.dias_acumulados || '';
             document.getElementById('sp-codigo-cie10').value = caso.codigo_cie10 || '';
-            document.getElementById('sp-descripcion-diagnostico').value = caso.diagnostico || '';
+            document.getElementById('sp-descripcion-diagnostico').value = caso.descripcion_diagnostico || '';
 
             // 📦 Actualizar el banner PRI ahora que el campo sp-caso-ingresado-pric ya tiene valor.
             // (Este campo se setea arriba en líneas previas; banner refleja el estado real del caso).

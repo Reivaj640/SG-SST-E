@@ -6627,7 +6627,7 @@ function showControlRemisionesContent(container) {
   if (!document.querySelector('link[href*="bootstrap-icons"]')) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
+    link.href = 'assets/css/bootstrap-icons.css';
     document.head.appendChild(link);
   }
 
@@ -6907,7 +6907,7 @@ function showRegistroEstadisticoContent(container, currentCompany, moduleName, s
         loadModuleScript();
       } else {
         const chartScript = document.createElement('script');
-        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+        chartScript.src = 'assets/js/chart.umd.min.js';
         chartScript.onload = loadModuleScript;
         document.head.appendChild(chartScript);
       }
@@ -7062,7 +7062,7 @@ function showIndiceMortalidadContent(container, currentCompany, moduleName, subm
       // Cargar Chart.js si no está disponible
       if (typeof Chart === 'undefined') {
         var chartScript = document.createElement('script');
-        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        chartScript.src = 'assets/js/chart.umd.min.js';
         document.head.appendChild(chartScript);
       }
 
@@ -7116,7 +7116,7 @@ function showPrevalenciaContent(container, currentCompany, moduleName, submodule
       // Cargar Chart.js si no está disponible
       if (typeof Chart === 'undefined') {
         var chartScript = document.createElement('script');
-        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        chartScript.src = 'assets/js/chart.umd.min.js';
         document.head.appendChild(chartScript);
       }
 
@@ -7171,7 +7171,7 @@ function showIncidenciaContent(container, currentCompany, moduleName, submoduleN
       // Cargar Chart.js si no está disponible
       if (typeof Chart === 'undefined') {
         var chartScript = document.createElement('script');
-        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        chartScript.src = 'assets/js/chart.umd.min.js';
         document.head.appendChild(chartScript);
       }
 

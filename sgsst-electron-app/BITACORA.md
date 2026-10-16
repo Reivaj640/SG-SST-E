@@ -4860,3 +4860,168 @@ externos que el código realmente contacta, excluyendo `vendor/`, `node_modules/
 `.min.`, y contrastarlos uno por uno contra la tabla de la página. Los que estén en los test files
 y no en código que se distribuye **no cuentan** como destino — se declaran igual si el destino
 existe en la app real.
+
+## El CDN no era un detalle: 30 archivos vivos sacaban código de internet
+
+2026-10-16, trabajo sin commitear al momento de escribir esto. Arrancó como "una etiqueta de más"
+en un archivo de incapacidades y terminó siendo el hallazgo más grande de la jornada.
+
+**Cómo se descubrió la escala.** El subagente legal señaló cuatro `<script>` de CDN en
+`components/seguimiento/seguimiento-incapacidades.html`, que es el módulo que maneja CIE-10. El grep
+de su nombre en todo el código **no lo encontró en ningún `.js`**: lo único que la app carga de
+`components/` es `config-viewer.html` (`renderer.js:7414`). Ese archivo es **código muerto**. El
+script `medicion-ausentismo.js:462` construye esa vista con `document.createElement`, sin iframe.
+
+Buscar el CDN real abrió el tarro: **30 archivos vivos** sacando de `cdn.jsdelivr.net`,
+`cdnjs.cloudflare.com` y `fonts.googleapis.com`, de los cuales **5 ejecutan JavaScript de
+terceros**. El más importante es **`index.html`**, la ventana principal — la del modal de
+consentimiento. Abría la app y bajaba `three.js r134`, `vanta 0.5.24`, `chart.js` **sin versión
+fijada** y Bootstrap 5.3.0 desde internet.
+
+**La migración ya estaba empezada y documentada.** `assets/` tenía `chart.umd.min.js` (v4.5.1),
+`bootstrap-icons.css`, `font-awesome.min.css` y `google-fonts.css` con sus `.woff2`, y **28
+archivos ya los usaban**. `AGENTS.md:892` dice que el CDN duplicado de Font Awesome "se quitó";
+`AGENTS.md:773` marca `evaluaciones-medicas-view.html` como "deuda conocida". Los 30 archivos
+eran los que se quedaron atrás de una migración a medias.
+
+**Y ya había pasado antes.** `AGENTS.md:621` registra un incidente real: el modal de consentimiento
+salía "pegado arriba a la izquierda y estirado a todo el alto", y la causa anotada fue
+`index.html` cargando `bootstrap.min.css` desde el CDN. **La dependencia de CDN ya rompió la
+pantalla legal una vez.** Eso no es una hipótesis de riesgo; es historia del repo.
+
+**Lo que se hizo, en orden de riesgo:**
+
+1. **Las tres URLs sin versión fijada se apuntaron a la copia local.** Antes de hacerlo se verificó
+   qué versión estaba sirviendo el CDN sin fijar: **4.5.1, exactamente la misma que la copia local**.
+   O sea que el cambio fue neutro en comportamiento y quitó el "hoy te sirve una versión y mañana
+   otra".
+2. **`chart.js`, `bootstrap-icons` y `font-awesome` se apuntaron a sus copias locales** en 31
+   archivos (38 reemplazos). Cero descargas: todo ya estaba en el repo.
+3. **Las tipografías se descargaron** — 22 `.woff2` (839 KB) de Roboto, Lexend, Inter, Manrope y
+   DM Sans, y `google-fonts.css` se regeneró con 22 `@font-face` locales. **Segoe UI NO se bajó a
+   propósito**: es fuente de sistema de Microsoft, no existe en Google Fonts, y Windows ya la trae.
+4. **Dos iframes quedaron sin fuentes y hubo que repararlos** (ver más abajo).
+
+**Lo que casi sale mal — tres errores, todos por no verificar lo suficiente:**
+
+- **Se quitó `chart.js` de `gestacion-reportes.html` porque el HTML no tenía ni un `new Chart`.**
+  No se miró qué scripts carga ese documento: carga `gestacion-reportes.js`, y ese sí dibuja
+  gráficas (`new Chart` en las líneas 196, 250 y 308). **Las gráficas de ese módulo dejaron de
+  dibujarse.** Se detectó por una búsqueda posterior y se corrigió apuntando a la copia local.
+  *Regla: antes de borrar una etiqueta `<script>`, hay que leer los scripts que ese documento
+  carga. Un HTML puede no usar la librería y sí usarla su `.js` hermano.*
+- **El regex de repuntado se comió el sufijo de versión** y dejó rutas como
+  `chart.umd.min.js@4.4.1/dist/chart.umd.min.js`. Solo se vio porque se escribió un verificador que
+  comprueba que **cada** referencia a `assets/` resuelva a un archivo real en disco. Un path mal
+  calculado no da error: rompe en silencio.
+- **El script entró a `dist/win-unpacked/`** y modificó un artefacto de compilación. Está ignorado
+  por git (no entró al commit), pero la build hay que **reconstruirla**. Falta excluir `dist/`
+  además de `vendor/`, `node_modules/` y `renderer/file-viewer-assets/`.
+
+**Regla de la casa:** *un `<script>` o un `<link>` a CDN es una dependencia de tiempo de ejecución,
+no un detalle de estilo.* En una app que guarda datos sensibles de salud, el chequeo mínimo es
+listar los `<script src="https://…">` **de los archivos que el código realmente carga** — no de
+todos los que existen en el repo — y decidir por cada uno entre vendorizarlo o borrarlo.
+
+## ⚠️ `test-alcance-tokens-889.js` solo lee UNA regla por archivo CSS
+
+2026-10-16. Se descubrió al intentar quitar un `@import` de Google Fonts de
+`shared/kair-design-tokens.css` (ver la entrada anterior). Ese cambio legítimo, que no toca ni un
+token, puso el test en **31/37 con 0/21 mutaciones**. En HEAD da **37/37 y 21/21**.
+
+**La causa no era el `@import`.** El parser es:
+
+```js
+const re = /(^|})\s*([^{}@]+?)\s*\{([^}]*)\}/g;
+```
+
+Cuando consume el `}` de cierre de un bloque, el siguiente `exec` necesita **otro** `}` antes del
+próximo `{` — y el `{` se cruza primero. **El parser extrae como máximo una regla por archivo.**
+
+El test pasaba por casualidad: el `@import` del principio bloqueaba el match del primer bloque (su
+`@` no lo deja ser selector), así que el parser sacaba el **segundo** bloque, que era justamente el
+oscuro `[data-theme="dark"]`. La respuesta correcta por el motivo equivocado.
+
+Se intentó arreglar (quitar comentarios antes de parsear, desempate por posición dentro del
+archivo). Con eso el parseo queda correcto y aparece el problema de verdad: `resolver()` ordena
+ascendente y devuelve `candidatos[0]`, o sea **el primero**, mientras su propio comentario dice
+"gana el archivo más tardío". **El código contradecía al comentario.**
+
+**Se revirtió una vez, y fue la decisión correcta en su momento** — porque se intentó sin
+entender la causa y el test se puso peor. Rehecha con la causa entendida, sí se pudo: el parser
+se reemplazó por uno que **recorre las llaves con un contador de profundidad** (saltando
+comentarios y saltando los bloques `@media` completos, que no compiten por `<html>`), y `resolver`
+pasó a desempatar **descendente** —gana la última regla dentro del mismo archivo, como en un
+navegador—, que es lo que su propio comentario ya decía pero el código no hacía.
+
+**El arreglo destapó dos bugs más, y el orden mattered:**
+
+- `resolver()` ordenaba ascendente y devolvía `candidatos[0]`, o sea **el primero**, mientras su
+  comentario decía "gana el archivo más tardío". **El código contradecía al comentario**, y por eso
+  un `:root` de cabecera ganaba a un `[data-theme="dark"]` declarado más abajo en el MISMO archivo.
+- El parser nuevo, en su primera versión, dejaba el selector como `/* c */:root`: al saltar el
+  comentario de cabecera no movía el arranque del selector.
+
+**Y las comprobaciones nuevas no son decorativas.** Se agregaron tres checks al propio test
+(37 → 40). Uno de ellos —*`declaraciones()` ve TODAS las reglas, no solo la primera*— **detecta al
+parser viejo** (extrae 2 de 3 reglas, el test exige 3). Otro —*el texto de un comentario no se pega
+al selector*— **se puso rojo solo y así destapó el segundo bug antes de que llegara a producción**.
+
+Resultado: **40/40 checks base y 21/21 mutaciones**, y el `@import` de Google Fonts salió del
+archivo. K+AIR ya no pide ninguna fuente a internet.
+
+**Lo que sigue siendo cierto:** este test ahora simula la cascada mucho mejor, pero **seguir siendo
+una simulación**. La herramienta que la confirma de verdad ya existe en el repo: `AGENTS.md:901`
+describe `main/_audit-gh.js`, un arnés que **montó el shell en Electron real y midió** los tokens
+con `getComputedStyle`. Para una respuesta definitiva sobre la cascada, ese es el camino.
+
+**Regla de la casa:** *un test verde solo vale lo que vale su simulador.* Si un test se pone rojo
+por un cambio que no toca lo que dice medir, **el primer sospechoso es el test, no el código** —
+y antes de revertir, verificá cuánto del test es real: contá qué leería un parser roto.
+
+---
+
+## 🆕 "Sale todo en cero" no siempre es un bug: puede ser que nunca haya habido datos (2026-10-16)
+
+El owner revisó Incidencia y Prevalencia después del trabajo de CDN y reportó: **"sale todo sin
+datos"**. La primera hipótesis fue una regresión de Chart.js, porque las gráficas y las tablas
+se fueron a cero al mismo tiempo. **Era falsa.**
+
+**Lo que realmente pasaba.** Los dos módulos no leen de la base de datos: leen de un archivo
+`Indicadores*.xlsx` que debe estar en
+`<empresa>/3. Gestión de la Salud/3.3.x <submódulo>/`. Ese archivo **no existe**. Las carpetas
+están **vacías: 0 elementos**, recursivamente, en las 4 empresas de Drive (Tempoactiva, Temposum,
+Aseplus, Asel). Cootracom ni siquiera tiene la carpeta `3. Gestión de la Salud`.
+
+**Lo que lo hace peligroso es que no falla.** `leerIndicadoresIncidencia()`
+(`main/excel-bridge.js:890-906`) construye `emptyMonthly` — 12 meses en cero — y ante una ruta
+inexistente devuelve **`success: true`**. El renderer no tiene forma de distinguir "no hay datos" de
+"hay 0 casos". La pantalla entonces pinta una tabla completa, con su gráfica y su estado, que es
+**idéntica** a una tabla real en cero. Peor: con `meta = 0`, `getStatusBadge()` devuelve **CUMPLE**
+siempre (`incidencia-enfermedad-laboral.js:107-109`), o sea que muestra un sello verde de
+cumplimiento sobre datos que no existen.
+
+Y la otra mitad: **editar a mano tampoco funciona.** El número nuevo se ve un instante y después
+sale "Ruta de INDICADORES no configurada" (`excel-bridge.js:981-985`), porque intenta escribir en
+el archivo que no está.
+
+**El contraste que lo explica.** Ausentismo (3.3.6) **sí** está conectado a la base de datos, con su
+propio puente (`main/medprev-sve-datos-bridge.js`), y por eso calcula solo. Incidencia y Prevalencia
+nunca recibieron esa migración: quedaron esperando un Excel que nadie creó. Ausentismo también
+tiene archivos en Drive y los demás tienen carpetas vacías — la diferencia no es el disco, es si
+el módulo fue migrado.
+
+**Decisión del owner:** se deja como está y se anota. Hay que **crear las tablas en SQLite** y
+conectar las dos secciones, como se hizo con Ausentismo.
+
+### Tres reglas que salen de acá
+
+1. **`success: true` con datos de relleno es peor que un error.** Un módulo que no tiene datos tiene
+   que decirlo, no fabricar un objeto con la forma correcta. La señal de "vacío" necesita viajar
+   explícita hasta la pantalla.
+2. **Un estado verde sin fuente es una mentira.** `CUMPLE` cuando `meta = 0` no es un bug de
+   estilo: es una regla de negocio que nuncaاقشة qué significa "sin meta".
+3. **Para diagnosticar "no hay datos", el código no alcanza — hay que mirar el disco.** Toda esta
+   sección salió de recorrer las carpetas del Drive de las 4 empresas. El código decía `readdirSync`
+   y el disco respondió 0. Un `git diff` sobre los dos HTML involvenidos mostraba solo una línea de
+   CDN: la prueba de que no era una regresión del día.

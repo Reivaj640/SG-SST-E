@@ -62,20 +62,81 @@ function matcheaHtml(sel) {
 // el token parecería no estar definido.
 function declaraciones(css) {
   const out = [];
-  // Se parte por bloque de llaves de primer nivel, sin bajar a @media: las
-  // reglas dentro de media no compiten por el mismo elemento en este test.
-  const re = /(^|})\s*([^{}@]+?)\s*\{([^}]*)\}/g;
-  let m;
-  while ((m = re.exec(css))) {
-    const partes = m[2].split(',').map((s) => s.trim()).filter(Boolean);
-    const cuerpo = m[3];
-    const decl = /(--kair-[a-z0-9-]+)\s*:\s*([^;]+);/gi;
-    let d;
-    while ((d = decl.exec(cuerpo))) {
-      for (const sel of partes) {
-        out.push({ sel, token: d[1].toLowerCase(), valor: d[2].trim() });
-      }
+  const s = String(css);
+  const n = s.length;
+
+  // Se recorren las llaves con un contador de profundidad en vez de con un regex.
+  // El regex anterior `(^|})\s*([^{}@]+?)\s*\{([^}]*)\}` solo sacaba la PRIMERA
+  // regla de cada archivo: al consumir el `}` de un bloque, el siguiente match
+  // exigía otro `}` antes del próximo `{`, y el `{` se cruzaba primero. El test
+  // pasaba de casualidad — el `@import` de cabecera bloqueaba el primer match y
+  // el parser devolvía el bloque 2, que era justo el oscuro.
+  //
+  // Se saltan los comentarios (no son selectores) y los bloques `@media`/etc.
+  // completos: las reglas dentro de un media query no compiten por el mismo
+  // elemento en este test, que mira `<html data-theme="dark">`.
+  let i = 0, bloque = 0, prefijo = 0;
+  while (i < n) {
+    if (s.startsWith('/*', i)) {
+      const f = s.indexOf('*/', i + 2);
+      i = f === -1 ? n : f + 2;
+      // Un comentario de cabecera NO es parte del selector que viene después:
+      // hay que mover el arranque con él, o el selector queda pegado al texto.
+      prefijo = i;
+      continue;
     }
+    if (s[i] === '{') {
+      const sel = s.slice(prefijo, i).trim();
+      const ini = i + 1;
+      let depth = 1;
+      i = ini;
+      while (i < n && depth > 0) {
+        if (s.startsWith('/*', i)) {
+          const f = s.indexOf('*/', i + 2);
+          i = f === -1 ? n : f + 2;
+          continue;
+        }
+        if (s[i] === '{') depth++;
+        else if (s[i] === '}') depth--;
+        i++;
+      }
+      const cuerpo = s.slice(ini, i - 1);
+      if (sel) {
+        bloque++;
+        const partes = sel.split(',').map((x) => x.trim()).filter(Boolean);
+        const decl = /(--kair-[a-z0-9-]+)\s*:\s*([^;]+);/gi;
+        let d;
+        while ((d = decl.exec(cuerpo))) {
+          for (const p of partes) {
+            // `pos` es el orden de la REGLA dentro del archivo: a igual
+            // especificidad gana la última, que es lo que hace un navegador.
+            out.push({ sel: p, token: d[1].toLowerCase(), valor: d[2].trim(), pos: bloque });
+          }
+        }
+      }
+      prefijo = i;
+      continue;
+    }
+    if (s[i] === '@') {
+      // Regla at: saltar su nombre y su bloque entero.
+      const j = s.indexOf('{', i);
+      if (j === -1) break;
+      i = j + 1;
+      let depth = 1;
+      while (i < n && depth > 0) {
+        if (s.startsWith('/*', i)) {
+          const f = s.indexOf('*/', i + 2);
+          i = f === -1 ? n : f + 2;
+          continue;
+        }
+        if (s[i] === '{') depth++;
+        else if (s[i] === '}') depth--;
+        i++;
+      }
+      prefijo = i;
+      continue;
+    }
+    i++;
   }
   return out;
 }
@@ -176,11 +237,17 @@ function resolver(token) {
     }
   });
   if (!candidatos.length) return null;
-  // Mayor especificidad gana; si empata, gana el archivo más tardío.
+  // Mayor especificidad gana; si empata, gana el archivo más tardío y, dentro del
+  // mismo archivo, la ÚLTIMA regla — que es como resuelve un navegador. El
+  // desempate va en DESCENDENTE porque el ganador es `candidatos[0]`: antes
+  // ordenaba ascendente y devolvía el primero, contradiciendo este mismo
+  // comentario, y por eso un `:root` de cabecera ganaba a un `[data-theme="dark"]`
+  // declarado más abajo en el MISMO archivo.
   candidatos.sort((a, b) => {
     const sa = especificidad(a.sel), sb = especificidad(b.sel);
     if (sa !== sb) return sb - sa;
-    return a.orden - b.orden;
+    if (a.orden !== b.orden) return b.orden - a.orden;
+    return b.pos - a.pos;
   });
   return candidatos[0];
 }
@@ -200,6 +267,22 @@ for (const token of VIGILADOS) {
     g ? `gana "${g.valor}" desde "${g.sel}" en ${g.fuente}` : 'nadie lo define'
   );
 }
+
+// El parser se reescribió porque el anterior sacaba UNA sola regla por archivo.
+// Estas dos comprobaciones son las que impiden que esa clase de defecto vuelva
+// sin que nadie lo note (el test daba verde mientras el parser no veía nada).
+const CSS_TRES_REGLAS = '/* c */:root { --kair-card: #111111; } .a { --kair-ink: #222222; } :root[data-theme="dark"] { --kair-card: #333333; }';
+const declTres = declaraciones(CSS_TRES_REGLAS);
+chk('declaraciones() ve TODAS las reglas del archivo, no solo la primera',
+    declTres.length === 3, `${declTres.length} declaraciones de 3 reglas`);
+const declConComentarioFalso = declaraciones(
+  '/* :root[data-theme="dark"] { --kair-card: #ffffff; } */\n' + CSS_TRES_REGLAS);
+chk('declaraciones() ignora los bloques que viven dentro de un comentario',
+    declConComentarioFalso.length === declTres.length,
+    `${declConComentarioFalso.length} vs ${declTres.length} con un bloque falso dentro de un comentario`);
+chk('declaraciones() no pega el texto de un comentario al selector',
+    !!declTres[0] && declTres[0].sel === ':root',
+    `primer selector: ${JSON.stringify(declTres[0] && declTres[0].sel)}`);
 
 // El bug era que un CSS de módulo ganaba. Se comprueba explícitamente que el
 // ganador NO sea un archivo de submódulo.

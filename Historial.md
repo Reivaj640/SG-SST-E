@@ -650,6 +650,7 @@ en el contenedor y los 47 selectores a `^=`. El `console.warn` de "Cambio de mó
 | 10 | 🔴 **La bandeja solo tiene 25 correos en memoria de los 131 de INBOX** (`PAGE_SIZE = 25`), y se agrandan con scroll infinito. Cualquier filtro que mire `state.mails` da "vacío" en **25 días que sí tienen correo** (el 14 de septiembre tiene 12 y ninguno está cargado) | `app.js` `PAGE_SIZE`, `loadMailsFromCache` | 📦858 lo resolvió con un rango de fechas en la caché local. **El mismo riesgo queda para cualquier filtro nuevo que se escriba sin eso** |
 | 11 | 🔴 **Ningún test del repo abre la base de datos.** 📦860 tenía 34 checks en verde y el feature podía no dibujar nada en pantalla, según qué tipo devolviera la BD para `last_message_date` | `main/test-*.js` | Verificado a mano contra la BD real (`Temp/verif-fecha-bd-860.js`: 150 filas, 0 sin fecha, `INTEGER` y llega como `number`). **La brecha sigue abierta**: todo feature de datos necesita ese paso a mano hasta que la suite tenga un juego de datos de prueba |
 | 12 | 🔴 **Los 15 exploradores de archivos NO comparten la arquitectura del preview.** Hay **4 variantes** de `_loadPDF` y **3 formas** de enrutar el PDF en el archivo de conexión; 3 módulos no tienen archivo de conexión | `modules/**/*-viewer.js`, `*-logic.js` | 📦861 arregló el PDF **solo en el 1.1.1**. Replicar sin abrir la app sería cambiar 15 módulos a ciegas, y el PDF es lo que más se nota si se rompe. **Pendiente: Owner valida el 1.1.1 y se replican los otros 14** |
+| 13 | 🔴 **Incidencia (3.3.5) y Prevalencia (3.3.4) no tienen de dónde leer datos.** Esperan un Excel `Indicadores*.xlsx` dentro de la carpeta del submódulo, y esa carpeta está **vacía (0 elementos)** en las 4 empresas de Drive. Sin archivo, el backend **no avisa**: devuelve `success:true` con 12 meses en cero y `meta:0`, así que la pantalla pinta una tabla inventada que parece real, y la edición manual revienta con "Ruta de INDICADORES no configurada" | `main/excel-bridge.js:191,226,890-906,981-985` | La sección no muestra datos reales **ni permite cargarlos**. El owner decidió dejarlo así: hay que **crear las tablas en SQLite** y conectarlas, como ya se hizo con Ausentismo en `main/medprev-sve-datos-bridge.js` |
 
 ### 📋 Cola de trabajo acordada
 
@@ -661,6 +662,7 @@ en el contenedor y los 47 selectores a `^=`. El `console.warn` de "Cambio de mó
 | 4 | Arreglar los tokens faltantes de `styles.css` (bloqueante #1) | Pendiente, sin autorizar |
 | 5 | Migración de `actualizado_en` para BDs previas (bloqueante #3) | Pendiente |
 | 6 | Limpiar código muerto de la Bandeja (bloqueantes #4 y #5) | Pendiente, esperando autorización de borrado |
+| 7 | 🔴 **Crear las tablas SQLite de Incidencia (3.3.5) y Prevalencia (3.3.4)** para que la sección consulte la BD y deje de depender del Excel (bloqueante #13) | Pendiente. **Decidido por el owner el 2026-10-16**: se deja así por ahora, se anota y se sigue |
 
 ### 🧠 Lo que la regla de cero presunciones evitó hoy
 

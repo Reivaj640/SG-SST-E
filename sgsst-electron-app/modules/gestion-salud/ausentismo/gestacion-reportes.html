@@ -815,8 +815,10 @@
 
 </div>
 
-<!-- 📦472 — Chart.js v4 vía CDN (jsdelivr) — visualizaciones de los reportes -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- 📦472 — Chart.js local (v4.5.1). Este módulo SÍ dibuja gráficas: el script hermano
+     gestacion-reportes.js hace new Chart(...) en varios lugares. Antes venía de jsDelivr;
+     ahora sale de assets/js/ para no ejecutar código de terceros al abrir datos de salud. -->
+<script src="../../../assets/js/chart.umd.min.js"></script>
 <!-- 📦481-iconos — SVGs inline al estilo del calendario (KairCalendar) -->
 <script>
     // SVGs copiados del mismo estilo de shared/kair-calendar.js

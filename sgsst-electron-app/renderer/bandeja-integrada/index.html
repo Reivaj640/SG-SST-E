@@ -7,6 +7,10 @@
   <!-- 📦752 — Rediseño premium v2. `styles.css` es el CSS legacy (Gmail-style);
        `premium.css` es la capa premium que se carga DESPUÉS y remapea los tokens
        legacy a la paleta premium v2 (mismo dialecto que Dashboard/Configuración). -->
+  <!-- 📦752-tipografias — Este iframe es un documento aparte: no hereda las fuentes del
+       shell. premium.css declara --kair-font-t:'Manrope' y --kair-font-b:'Inter' (L74-75),
+       asi que la hoja local de fuentes tiene que cargarse aqui, no solo en index.html. -->
+  <link rel="stylesheet" href="../../assets/css/google-fonts.css" />
   <link rel="stylesheet" href="styles.css?v=20261007-chip-mes-880" />
   <link rel="stylesheet" href="premium.css?v=20261007-chip-mes-880" />
   <!-- F2 — K+AIR Calendar CSS (compartido con el calendario viejo del header) -->

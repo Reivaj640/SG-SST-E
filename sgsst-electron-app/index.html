@@ -9,7 +9,7 @@
        hojas propias de la app. Cargado al final le ganaba a los módulos en las
        propiedades que ellos no declaran (caso real 📦761: la clase `.modal` de
        Bootstrap rompía los modales de Evaluación Inicial). -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="assets/css/bootstrap.min.css">
   <link rel="stylesheet" href="styles.css?v=20261014-scrollbar886">
   <link rel="stylesheet" href="development-styles.css">
   <!-- 📦761 — Evaluación Inicial del SG-SST: hoja única, todo bajo `.ev-scope`.
@@ -26,9 +26,11 @@
        redundante y además FILTRABA a toda la app (traía `html, body {height:100vh;
        overflow:hidden}` y un `.k-section-card` sin scope). -->
 
-  <!-- Scripts para animación de fondo (Vanta.js) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.waves.min.js"></script>
+  <!-- Scripts para animación de fondo (Vanta.js). Locales: renderer.js los consulta con
+       `typeof VANTA !== 'undefined'`, así que si no llegan la app arranca igual y solo
+       se pierde la animación del login. -->
+  <script src="assets/js/three.min.js"></script>
+  <script src="assets/js/vanta.waves.min.js"></script>
 
   <!-- Font Awesome: SOLO la copia local (assets/css/font-awesome.min.css, más abajo).
        📦810 · Se quitó el CDN de cdnjs: misma hoja cargada dos veces y sin internet los
@@ -283,11 +285,13 @@
               no hay servidor de K+AIR que los reciba.</li>
             <li><strong>Transferencias:</strong> a Google (su correo y agenda, y el envío de remisiones
               si su empresa configura credenciales de correo), al servidor de firma electrónica de su
-              empresa, a WhatsApp si usted manda una remisión médica por ahí, y a los CDNs públicos
-              (IP y User-Agent) al abrir la interfaz. Son las únicas rutas externas.</li>
+              empresa, a WhatsApp si usted manda una remisión médica por ahí, a GitHub (únicamente para
+              comprobar si hay una versión actualizada de la aplicación) y a los CDN públicos (IP y
+              User-Agent) al abrir la interfaz. Por esas rutas no sale ningún dato de su empresa ni de
+              sus trabajadores: solo su dirección IP y el identificador del navegador o de la aplicación.</li>
             <li><strong>Sus derechos:</strong> puede acceder, rectificar, suprimir, limitar y
-              retirar esta autorización cuando quiera, y puede pedir la eliminación de los
-              datos ya registrados.</li>
+              retirar esta autorización cuando quiera. Si quiere que se eliminen datos ya registrados,
+              escríbanos: mientras la empresa siga usando K+AIR, la aplicación no borra nada por sí sola.</li>
           </ul>
 
           <p class="kair-consent__link-wrap">
@@ -401,8 +405,8 @@
   </div>
 
   <!-- Cargar bibliotecas externas -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/js/chart.umd.min.js"></script>
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
   <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
 
   <!-- Inicializar sistema modular -->

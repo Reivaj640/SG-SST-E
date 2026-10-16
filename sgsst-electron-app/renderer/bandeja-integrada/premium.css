@@ -23,7 +23,7 @@
 /* Mismo par tipográfico que el resto del premium (Manrope display + UI sans).
    El @import va antes de toda regla (requisito de CSS). Si no hay red, cae a
    las fuentes del sistema por el stack de fallback de cada token. */
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
 
 /* ══════════ 1. TOKENS PREMIUM v2 ══════════ */
 :root {

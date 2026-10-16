@@ -4,7 +4,9 @@
    Cargado desde index.html (alcance :root global)
    ===================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+/* Las tipografías ya NO se importan desde aquí: index.html carga
+   assets/css/google-fonts.css (local, sin CDN) ANTES de este archivo, y cada
+   iframe que use esta hoja carga esa misma hoja por su cuenta. */
 
 :root {
     /* Colores base — fondo y superficie */
