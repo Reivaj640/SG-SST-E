@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-15 |
-| **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
-| **Último commit de código** | 📦 **894** (2026-10-15, commiteado desde `Dev` a fin de jornada, **sin push**): dos defectos
+| **Fecha de cierre** | 2026-10-16 |
+| **Rama** | **`Dev-Pc`**, desde donde se commiteó y pusheó el 2026-10-16. 🔴 La rama local **`Dev` quedó 16 commits atrás** de `Dev-Pc`: medido con `git rev-list`, `Dev..Dev-Pc` = 16 y `Dev-Pc..Dev` = 0, o sea que **no tiene nada propio** y el merge a `Dev` es un fast-forward limpio. La rama por defecto del remoto sigue siendo `Dev` |
+| **Último commit de código** | 📦 **898** (2026-10-16, desde `Dev-Pc`, commiteado y pusheado): **el gate de consentimiento re-preguntaba por el motivo equivocado, al revés**. Decidía comparando `app_version` (o sea, cada release volvía a preguntar a todo el mundo aunque el texto legal no hubiera cambiado) contra `cfg.consentDocumentVersion`, una clave de `config.json` que **nadie escribía** y que siempre caía en `'v1'` (o sea, editar el texto legal no preguntaba nada). Y `version_terminos`, `version_privacidad` y `texto_hash` se guardaban en cada aceptación y **no los leía nadie**. La máquina estaba construida — el renderer ya enviaba la versión del documento y un SHA-256 real del texto leído (`renderer.js:4046-4048`) — y le faltaba un cable. Arreglo: una sola fuente de verdad, `CONSENT_DOCUMENT_VERSION` en `main.js`, usada por los dos canales, y `app_version` fuera del cálculo (se sigue guardando como evidencia de con qué build aceptó cada persona). Regresión: `main/test-consent-version-898.js`, **22 checks, verificado por mutación real**. Antes, 📦 **894** (2026-10-15, commiteado desde `Dev` a fin de jornada, **sin push**): dos defectos
 que el owner reportó en un mismo mensaje. **(a) El submódulo 1.2.1 Programa de Capacitación Anual no aplicaba los
 temas**: no es un error de CSS, es que el contenedor **nunca recibió `data-theme`**. El shell lo escribe sobre `<html>` y
 sobre los iframes, pero capacitaciones se monta **en línea** con `fetch` + `innerHTML`, así que no hay
@@ -75,7 +75,7 @@ mutaciones**, con el contraste leído de los tokens reales y compuesto sobre el 
 Vanta antes de medir. Se reparó `test-panel-tema-885.js`, que exigía el sello `panel885` literal y
 se rompió solo con este bumpeo: ahora ancla a la **fecha**. Batería 884–893 en verde (11 tests).
 Antes, 📦 **892**: el visualizador de 1.1.1 volvió a abrir documentos; antes, en el mismo turno, 📦 **891** hizo que 1.1.1 sí siga el tema elegido. **En el 891 el sincronizador era una copia de la lógica de `scripts/theme-manager.js`, que NO está cargado en el shell.** Se notaba en el contrato: leía `event.data.mode`, y `renderer.js:1755` manda `theme` y `effectiveTheme`, nunca `mode`. Con `mode` siempre `undefined` caía en el fallback y devolvía `dark` en todos los casos, así que en modo **sistema** devolvía `null` y terminaba **borrando** el atributo que `renderer.js:1746` acababa de escribir: el `postMessage` es asíncrono y siempre gana el último en escribir. El CSS de 1.1.1 estaba bien (58 reglas oscuras, 29 y 29, y 322 usos de tokens): el fallo era el atributo que las dispara, no las reglas. Además, el panel de vista previa tenía `background: #fff` sin contraparte oscura — **el panel blanco que se veía solapado sobre el oscuro** — y diez sitios con `color: #fff` sobre superficies de acento, con el botón "Subir" en **2.56:1** en oscuro. **En el 892 el padre rutea el preview del PDF por `__fileViewerBytes`, que NO es una función del preload** sino una bandera para llegar al bloque que lee bytes con `readFileBytes`. La guarda de existencia la mataba **antes** del ruteo: el PDF fallaba siempre con `API function __fileViewerBytes not found` y unas 40 líneas quedaron como código muerto. La red de seguridad de abajo tampoco se alcanzaba, y el test 861 comprobaba esa sin notar la de arriba. El panel tampoco limpiaba el estado anterior, así que el error de un archivo quedaba pintado sobre el siguiente: de ahí el "error de PDF" con un DOCX en pantalla. Tests nuevos: `test-responsable-tema-891.js` (58 checks, 20/20 mutaciones) y `test-visor-carga-892.js` (26 checks, 16/16 mutaciones, con el check que faltaba: que la red de seguridad sea **alcanzable**). Batería 884–892 en verde (10 tests) y el 861 sigue en 614/614. Antes, 📦 **890** (1.1.5), 📦 **889** (1.1.2 y 1.1.3) y 📦 **887** (el home de Recursos). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
-| **Commits sin pushear** | **0**, verificado el 2026-10-14 contra GitHub: 📦885 (`ed59ba80`) y 📦886 (`e5f95ae4`) quedaron **pusheados a `Dev` y `Dev-Pc`**, las dos en `e5f95ae4`. 🔴 Una nota de mecánica que salió en este push: **no existe rama local `Dev-Pc`** (solo `Dev` y `gh-pages`), así que `git push origin Dev-Pc` falla con "src refspec does not match any". La forma correcta es `git push origin Dev:Dev-Pc`, previa comprobación de que `origin/Dev-Pc` es ancestro de `Dev` para que sea fast-forward. 🔴 **Lo que sigue faltando es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
+| **Commits sin pushear** | **0** al cierre: 📦898 salió en `Dev-Pc` y está en GitHub. 🔴 **Pendiente real: `Dev` está 16 commits atrás** (fast-forward limpio, ver la fila de Rama). 🔴 **Y `sitio/` sigue sin publicar en `gh-pages`**: ver la entrada del 2026-10-16 — `anexo-encargo.html` y `autorizacion-trabajadores.html` llevan **8 días en 404** en producción, y ahora las dos páginas que sí están publicadas los enlazan. El aviso conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medición real del 2026-10-07, **anterior a 📦876**. El rojo era `test-google-oauth-868.js` [54/57], que exige `main/_verificar-credenciales-build.js`, archivo que **no existía en ninguna rama**: lo tragaba la regla `_*.js` de `sgsst-electron-app/.gitignore:80`, que sin ancla se aplica en cualquier directorio y no solo en la raíz. **Ya está corregido en 📦876** y probado por mutación (54/57 sin el archivo, 57/57 con él). 🔴 **Falta volver a medir en el portátil**: no se afirma aquí que esté verde, solo que la causa identificada ya no existe. `test-init-order-bug.js` sigue sin resumen verificable |
@@ -94,7 +94,7 @@ La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema
 instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
 shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul. U0001F534 **El 895 no se midió en ninguna parte**: el arnés con iframe saturó el navegador con tres timeouts (el mismo síntoma del 891) y se sustituyó por ejecutar la función real en Node con `vm`, que valida la lógica del scroll pero **no** el comportamiento en el navegador.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-15). Hoy: 📦891 a 📦895, más 📦896 y 📦897 de documentación. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
+| **Jornada** | **En curso** (2026-10-16). Hoy: 📦898. Arrancó con **15 commits de atraso** respecto de `origin/Dev-Pc` (el repo local venía del 9 de octubre), sincronizado con `git merge --ff-only`. El trabajo fue **legal, no de código de producto**: se encontró que el módulo Remisiones Médicas manda **datos personales y de salud a WhatsApp** (`web.whatsapp.com`) y que **el envío por correo sale automático** por SMTP de Gmail con credenciales guardadas — y que **ninguno de los dos estaba declarado** en el Anexo de Encargo ni en la Política de Privacidad, mientras el modal de consentimiento afirmaba que las transferencias eran solo a Google y a firma. Se declararon ambos en los tres documentos, se corrigió la viñeta del modal, se actualizaron las fechas de versión al 2026-10-16, y se arregló el gate para que pueda detectar el cambio (📦898). Antes, 📦891 a 📦897 (2026-10-15). **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
 **894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
 en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
 funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
@@ -700,6 +700,75 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
   typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
+
+---
+
+### 2026-10-16 · 📦898 · El consentimiento no declaraba lo que la app sí hace
+
+**El hallazgo.** El owner preguntó, antes de publicar los documentos legales, si
+**todo lo que la app muestra o envía aparecía ya en las páginas**. La respuesta fue **no**, y
+no por un detalle: **dos rutas de salida no estaban declaradas en ningún lado.**
+
+| Ruta | Qué sale | Dónde vive el código | ¿Declarado antes? |
+|---|---|---|---|
+| **WhatsApp** | nombre, cédula, cargo, fecha de atención y **evaluación ocupacional** | `enviar-remision-v2.js:602` → `whatsappSender.js:41` → `web.whatsapp.com/send?phone=…&text=…` | **No, en ningún documento** |
+| **Correo saliente** | destinatario, nombre, fecha y el **documento adjunto**, y sale **sin confirmación** | `main.js:21035` → `emailSender.js:178` (SMTP de Gmail con `user`/`password` guardados) | **A medias**: "Google" sí estaba, pero solo para *leer* el correo, no para *enviar* |
+
+Y lo peor: el modal de consentimiento decía, textualmente, *"Transferencias: solo al conectar su
+cuenta de Google o al usar firma electrónica"*. **Esa frase era falsa.**
+
+**Lo que sí estaba bien, verificado (no asumido):** Google, el servidor de firma, GitHub y los CDN
+coinciden con lo declarado. Las URLs `firma.kair.fyi` / `firma.k-air.com` que aparecen en el grep
+están **solo en archivos de test**, no en código que se distribuye. Y `doc.file-viewer.app` es un
+comentario de documentación, no una llamada de red.
+
+**Qué se cambió:**
+
+- `sitio/anexo-encargo.html` §5 — dos filas nuevas en la tabla de subencargos.
+- `sitio/privacidad.html` §4 — dos filas nuevas en "Transferencias a terceros".
+- `sitio/terminos.html` §7 — dos viñetas nuevas en "Servicios de terceros".
+- `sgsst-electron-app/index.html` — corregida la viñeta falsa del modal.
+- Fechas de versión de los tres documentos al **2026-10-16**, en las **tres** apariciones de cada
+  uno (encabezado, pie y la referencia interna que dice cuál es la vigente).
+
+**🔴 La incoherencia de fondo que destapó esto.** Corregir un texto legal no sirve si la app no
+puede avisar que cambió. Y no podía: `consent:estado` comparaba contra
+`cfg.consentDocumentVersion`, una clave de `config.json` **que nadie escribía** (siempre `'v1'`),
+mientras `version_terminos`, `version_privacidad` y `texto_hash` **se guardaban y no los leía
+nadie**. El renderer ya enviaba la versión del documento y un SHA-256 real del texto leído
+(`renderer.js:4046-4048`): **la máquina estaba construida y le faltaba un cable.**
+
+El defecto era doble y en direcciones opuestas: editar el texto legal **no** re-preguntaba, y cada
+bump de versión de la app **sí** re-preguntaba a todo el mundo. Como el bump solo pasa cuando el
+owner lo dice, publicar el texto nuevo no habría llegado a nadie.
+
+**Decisión de diseño: una sola fuente de verdad, no dos.** Se evaluaron dos caminos —
+(a) subir un número a mano y (b) comparar el `texto_hash` — y **hacer los dos se pisan**: dos
+mecanismos decidiendo lo mismo divergen solos. Se hizo (a) bien, con una constante en `main.js` en
+lugar de una clave de config que se puede perder, y (b) quedó aplazado: solo compra detectar
+ediciones que no bumpeen la versión, y el test de este commit ya cubre eso con un test rojo en vez
+de un reclamo de un cliente.
+
+**Tests** — `main/test-consent-version-898.js`, **22 checks**, con 5 mutaciones internas y
+**2 mutaciones reales verificadas**:
+
+| Mutación aplicada | Resultado |
+|---|---|
+| Renderer desincronizado a `2026-10-17` | 21/22, sale con código 1 |
+| Reintroducido `aceptado.app_version !== appV` en `requiere` | 20/22, 2 checks rojos |
+
+`test-consent-gate.js` (existente) queda **48/48**. `node --check` limpio en `main.js` y
+`renderer.js`. La suite completa **no se remedió**.
+
+**Lo que NO se arregló, y sigue pendiente:** el gate es **por equipo, no por persona**
+(`SELECT … LIMIT 1` sin `WHERE email = ?`): en un equipo compartido el primero que acepta silencia
+el gate para todos. Eso **necesita asesoría jurídica**, no un parche de código.
+
+**Decisiones del owner** — "procede" en dos momentos: el primero autorizó **editar, no commitear**;
+este autorizó **documentación, commit y push**. La versión **no se bumpea** (sigue `0.1.251`, por
+la regla del owner). El CHANGELOG no se toca: registra versiones publicadas y esto no lo está.
+
+**Commits** — uno solo, `898`, desde `Dev-Pc`.
 
 ---
 

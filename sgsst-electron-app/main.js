@@ -2761,19 +2761,34 @@ ipcMain.handle('get-app-version', async () => {
 // Tres canales: estado (fail-open), registro (histórico, una fila por
 // aceptación) y salida (rechazo → cerrar la app). El estado devuelve null en
 // cualquier error de infraestructura para no bloquear el arranque.
+// Versión del documento legal que la app está mostrando. Es la ÚNICA fuente de
+// verdad del gate: si cambia el texto legal, sube esto y el gate vuelve a
+// preguntar una vez a todo el mundo.
+//
+// Antes se leía `cfg.consentDocumentVersion`, una clave de config.json que NADIE
+// escribía: siempre caía en 'v1'. Con eso, editar el texto legal no re-preguntaba
+// nada, y en cambio cada bump de versión de la app sí lo hacía (comparando
+// `app_version`): exactamente al revés de lo que corresponde. Y `version_terminos`,
+// `version_privacidad` y `texto_hash` se guardaban en cada aceptación y NO LOS
+// LEÍA NADIE.
+//
+// `main/test-consent-version-898.js` ata esta constante a las del renderer y a la
+// "Versión" de sitio/terminos.html y sitio/privacidad.html: si se edita un texto
+// legal sin subir el número, el test falla acá y no en casa de un cliente.
+const CONSENT_DOCUMENT_VERSION = '2026-10-16';
+
 // ─────────────────────────────────────────────────────────────────────────────
 ipcMain.handle('consent:estado', async () => {
   try {
-    const cfg = readConfigSync();
     const appV = app.getVersion();
-    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const docV = CONSENT_DOCUMENT_VERSION;
     const aceptado = db.prepare(
       'SELECT app_version, document_version FROM consent_acceptance ORDER BY aceptado_en DESC LIMIT 1'
     ).get();
     return {
       appVersion: appV,
       documentVersion: docV,
-      requiere: !aceptado || aceptado.app_version !== appV || aceptado.document_version !== docV
+      requiere: !aceptado || aceptado.document_version !== docV
     };
   } catch (error) {
     console.error('[consent] Error consultando estado:', error);
@@ -2808,7 +2823,7 @@ ipcMain.handle('consent:registrar', async (event, payload) => {
       try { fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2)); } catch (e) { /* best-effort */ }
     }
     const appV = app.getVersion();
-    const docV = String((cfg && cfg.consentDocumentVersion) || 'v1');
+    const docV = CONSENT_DOCUMENT_VERSION;
     const ahora = new Date().toISOString();
     db.prepare(
       `INSERT INTO consent_acceptance

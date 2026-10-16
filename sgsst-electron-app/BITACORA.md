@@ -4795,3 +4795,68 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 7. **Splash de bienvenida con confetti estilo Stripe** (v0.1.214, 📦815): el check verde Bootstrap hardcoded (`#28a745`) del `loading-success-icon` se reemplazó por SVG con gradiente (`<defs><linearGradient id="kairSuccessGrad">` verde→azul), halo pulsante (`<circle r="52">` con `success-halo` 2s ease-out infinite), check con stroke gradiente (4.5px round caps) y 6 cuadrados confetti (`rect 6×6`) rotando ±180° mientras vuelan ±42px en 3 colores premium v2 (`--kair-blue`, `--kair-green`, `--kair-amber`). ViewBox 52→120 para que respire. Tokens nuevos: `--kair-blue`, `--kair-green`, `--kair-amber` (reutilizados, antes no existían). **Aplicado a AMBOS** overlays (`#kair-loading-success.active` activo + `.kair-transition-success` legado CSS huérfano) por consistencia si el componente se reactiva. Si el user pide cambiar colores, **NO** hardcodear — exponer como tokens `--kair-X` en `:root` y consumirlos desde el `stroke`/`fill` del SVG y desde los keyframes CSS. Cache-bust `styles.css?v=20260926-confetti-success`. Patrón completo en `design_system.md §15`.
 
 8. **URLs relativas en HTML inyectado vía `fetch + innerHTML` se resuelven desde el documento PADRE, no desde el archivo fetched** (v0.1.215, 📦816 — bug en refactor home de Capacitaciones): contraste directo con el patrón de Presupuesto que se carga en **iframe** (donde las URLs se resuelven desde el iframe). Cuando un componente hace `const html = await fetch('./modules/.../foo.html'); container.innerHTML = html`, todos los `<link>`, `<img>`, `<a href>` dentro del HTML inyectado resuelven sus paths relativas desde el BASE URI del documento padre (`index.html`), no desde el archivo fetched. **Síntoma**: la página sale sin estilos (los `<link>` no encuentran el CSS). **Fix**: usar paths relativas a `index.html` (`./shared/...`, `./modules/...`) y agregar `<link>` explícito al CSS del módulo (no se hereda del archivo fetched). Patrón de E2E sin display: `tests/cap-home-e2e.js` con jsdom lee los archivos del disco y los inyecta como `<style>` en un wrapper HTML, valida 18/18 DOM + 15/15 CSS + 9/9 tokens + 11/11 estilos + callbacks. Útil cuando no se puede ejecutar Electron con GUI.
+
+## ⚠️ Un gate que compara contra una clave que nadie escribe pregunta lo contrario a lo que debe (📦898, 2026-10-16)
+
+**El síntoma.** El gate de consentimiento de la Ley 1581 decide mal en las dos direcciones, y
+como los dos errores se cancelan, nadie lo reporta:
+
+- **Editar el texto legal no re-pregunta nada.** Nadie se entera de que los documentos
+  cambiaron. Se publicó en 2026 una versión que declara datos de salud enviados a WhatsApp, y
+  **sin el gate arreglado ese texto nuevo no habría llegado a ningún usuario existente**.
+- **Cada bump de versión de la app sí re-pregunta a todo el mundo**, aunque el texto legal sea
+  idéntico al que el usuario ya aceptó.
+
+**La causa raíz, en tres frases.** `consent:estado` comparaba contra
+`cfg.consentDocumentVersion`, una clave de `config.json` que **nadie escribía**, así que el
+`|| 'v1'` la dejaba siempre en `'v1'` y `document_version` siempre coincidía con eso. En paralelo
+comparaba `app_version`, que cambia en cada release. O sea: **el criterio era el build en vez del
+documento**, y el fallback era una constante inventada en vez de la versión real.
+
+**Lo que lo escondía.** El renderer **ya enviaba** la versión del documento y un SHA-256 real del
+texto que el usuario leyó (`renderer.js:4046-4048`), y el backend **ya lo guardaba** en cada
+aceptación. `version_terminos`, `version_privacidad` y `texto_hash` aparecían en el CREATE
+(`main.js:521-528`) y en el INSERT (`main.js:2814`), y **no los leía nadie**. La máquina estaba
+construida y le faltaba un cable.
+
+**La regla, y es la parte transferible:**
+
+1. **Un valor con fallback literal es una mentira con default.** `cfg.X || 'v1'` no es "una
+   versión por defecto": es un valor que nunca cambia. Si el fallback existe, el que lo lee tiene
+   que poder escribirlo, o el default **es** la respuesta.
+2. **El criterio de re-preguntar debe ser el documento, nunca el build.** Un release cambia todo
+   el tiempo; el documento cambia cuando su texto cambia. Un criterio que se dispara por algo que
+   no es lo que guarda la información se dispara siempre.
+3. **Un campo que se escribe y no se lee es un `TODO` disfrazado de evidencia.** `texto_hash`
+   "parecía" protección. No protegía nada porque nadie lo comparaba. Un mecanismo de registro que
+   nadie consulta no es un mecanismo.
+4. **Dos mecanismos que deciden lo mismo se pisan.** Se evaluó subir un número a mano *y* comparar
+   el hash; hacer ambos es crear dos fuentes de verdad que divergen solas. Se hizo uno, y el otro
+   quedó para cuando el número a mano sea un problema real.
+
+**Cómo se cierra para que no vuelva.** Una sola constante, `CONSENT_DOCUMENT_VERSION` en
+`main.js`, usada por los dos canales, **más un test que ata esa constante a las dos del renderer y
+a la `Versión` que se imprime en `sitio/terminos.html` y `sitio/privacidad.html`**
+(`main/test-consent-version-898.js`, 22 checks). Con eso, olvidar de subir el número deja la build
+**roja en la máquina de quien edita**, y no llega como un reclamo. Ese es el punto: elegir que el
+error se manifieste donde se puede corregir, y no donde no se puede.
+
+**Regla de la casa, en una línea:** *cuando un documento legal cambia, subí el número Y corré el
+test.* El número solo existe para eso; sin el test es un comentario que nadie lee.
+
+## ⚠️ Publicar un documento legal sin grep del código es publicar una afirmación sin fuente
+
+📦898, 2026-10-16. El owner preguntó, con buen tino, si todo lo que la app hace aparecía ya en
+las páginas. La respuesta fue no, y la encontró **un grep, no una lectura**: dos rutas de salida
+(`web.whatsapp.com` y el SMTP de `emailSender.js`) con datos personales y de salud, ausentes de
+las tres tablas de subencargos y de las dos viñetas del modal.
+
+El orden importa: **el grep se hizo ANTES de publicar**, no después de recibir un reclamo. Con las
+páginas ya en línea, el mismo hallazgo era "el sitio público afirma una lista de terceros a la que
+le falta uno" — y eso no se corrige, se legenda.
+
+**Chequeo mínimo cuando el texto legal describe qué sale de la aplicación:** listar los dominios
+externos que el código realmente contacta, excluyendo `vendor/`, `node_modules/`, `assets/` y los
+`.min.`, y contrastarlos uno por uno contra la tabla de la página. Los que estén en los test files
+y no en código que se distribuye **no cuentan** como destino — se declaran igual si el destino
+existe en la app real.
