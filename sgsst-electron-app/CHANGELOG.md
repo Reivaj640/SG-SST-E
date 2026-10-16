@@ -17,6 +17,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦901 · El servicio de firmas ya no se despliega en el portátil
+
+**Qué cambió.** El servicio de firma eléctrica dejó de correr en el portátil de trabajo y ahora
+vive en `kair-server` (Ubuntu Server 24.04.5), detrás de un túnel nombrado de Cloudflare que
+sirve `https://firma.kair.fyi`. El portátil ya no tiene que estar encendido.
+
+**El defecto que-cv.** `firma-service` escuchaba en **todas** las interfaces, no solo en loopback:
+`config.js` no leía variable de host y `server.js` llamaba `app.listen(port)` a secas. Con el
+servidor detrás de NAT no era explotable de inmediato, pero en cuanto el túnel —u cualquier otra
+cosa— expusiera el puerto, el servicio quedaba alcanzable desde la red local sin autenticación de
+transporte. El arreglo introduce `HOST` con default `127.0.0.1` en `config.js`, lo pasa a
+`app.listen`, lo imprime en el log de arranque, y lo documenta en
+`deploy/.env.production.example`. Verificado con `ss -tulpn | grep 3001`, que ahora devuelve
+`127.0.0.1:3001` y no `*:3001`.
+
+**Documentación.** La guía de despliegue anterior describía una VM de Oracle Cloud con Caddy y
+dominio `sslip.io`; ninguna de las tres cosas se usó. `docs/MIGRACION-SERVIDOR-FIRMA.md` se
+reescribió con la arquitectura real, las rutas del servidor, el procedimiento de rotación de token
+y la sección de operación diaria.
+
+**Cinco cosas que costó descubrir, documentadas para no repetirlas:**
+
+1. **Falta `config.yml` en el túnel.** El túnel `kair-firma` es *locally-managed*: sus rutas viven
+   en `/etc/cloudflared/config.yml`, no en Cloudflare. Sin ese archivo el túnel conecta, el panel
+   dice "Buen estado", `systemctl` dice `active`, y `curl` a la URL pública devuelve cuerpo
+   **vacío**.
+2. **Un token truncado da symptoms engañosos.** El token es base64, así que su largo **siempre es
+   múltiplo de 4**. Una copia a medias produce `Invalid tunnel secret`, que parece un problema de
+   credenciales y en realidad es de transporte.
+3. **`Type=notify` convierte un token inválido en un "timeout".** `TimeoutStartSec=15` con un
+   proceso que nunca envía `READY=1` reporta timeout, no el error real. Hay que correr
+   `cloudflared tunnel run --token-file` en primer plano para ver el log de verdad.
+4. **`GET /health` no prueba el correo.** En `src/routes/health.js` el check marca `ok` si la
+   variable `SMTP_PASS` existe; no abre conexión ni autentica.
+5. **Rotar el secret sí funciona, pero la UI cachea el comando viejo.** Hay que recargar con
+   `Ctrl+Shift+R` después de rotar.
+
+**Verificación.** 973 tests en el servidor (969 en verde, 2 fallos que no son bugs de código,
+analizados en el documento de migración), envío de correo real confirmado con `messageId` de
+Gmail, y `kair-firma` + `cloudflared` arrancando solos tras un reinicio del kernel.
+
 ### 📦898 · La barra del scroll arranca al nivel de la tarjeta Actividad ID
 
 **Qué cambió.** El scroll del `Plan de Trabajo Anual` lo llevaba **el documento entero**, sin

@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-15 |
+| **Fecha de cierre** | 2026-10-15 (sesion de migracion a `kair-server`, cerrada 20:00 hora Colombia) |
 | **Rama** | `Dev` en el escritorio, y `Dev`, `Dev-Pc` y GitHub estaban las tres en `80300147` al cierre del 2026-10-11. 📦882 se commiteó y pusheó desde `Dev` el 2026-10-13 |
-| **Último commit de código** | 📦 **894** (2026-10-15, commiteado desde `Dev` a fin de jornada, **sin push**): dos defectos
+| **Último commit de código** | 📦 **901** (2026-10-15, commiteado y **pusheado** a `Dev` en `d1e7a996`). La migracion de `firma-service` a `kair-server` quedo **desplegada y verificada en produccion**: `https://firma.kair.fyi` responde desde el servidor, ambos servicios arrancan solos tras un reinicio de kernel, y el correo salio con `messageId` de Gmail. Detalle completo en `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` y en la bitacora de esta jornada, al final del archivo. Detalle historico de 📦894, que queda como referencia del estado previo: dos defectos
 que el owner reportó en un mismo mensaje. **(a) El submódulo 1.2.1 Programa de Capacitación Anual no aplicaba los
 temas**: no es un error de CSS, es que el contenedor **nunca recibió `data-theme`**. El shell lo escribe sobre `<html>` y
 sobre los iframes, pero capacitaciones se monta **en línea** con `fetch` + `innerHTML`, así que no hay
@@ -75,7 +75,7 @@ mutaciones**, con el contraste leído de los tokens reales y compuesto sobre el 
 Vanta antes de medir. Se reparó `test-panel-tema-885.js`, que exigía el sello `panel885` literal y
 se rompió solo con este bumpeo: ahora ancla a la **fecha**. Batería 884–893 en verde (11 tests).
 Antes, 📦 **892**: el visualizador de 1.1.1 volvió a abrir documentos; antes, en el mismo turno, 📦 **891** hizo que 1.1.1 sí siga el tema elegido. **En el 891 el sincronizador era una copia de la lógica de `scripts/theme-manager.js`, que NO está cargado en el shell.** Se notaba en el contrato: leía `event.data.mode`, y `renderer.js:1755` manda `theme` y `effectiveTheme`, nunca `mode`. Con `mode` siempre `undefined` caía en el fallback y devolvía `dark` en todos los casos, así que en modo **sistema** devolvía `null` y terminaba **borrando** el atributo que `renderer.js:1746` acababa de escribir: el `postMessage` es asíncrono y siempre gana el último en escribir. El CSS de 1.1.1 estaba bien (58 reglas oscuras, 29 y 29, y 322 usos de tokens): el fallo era el atributo que las dispara, no las reglas. Además, el panel de vista previa tenía `background: #fff` sin contraparte oscura — **el panel blanco que se veía solapado sobre el oscuro** — y diez sitios con `color: #fff` sobre superficies de acento, con el botón "Subir" en **2.56:1** en oscuro. **En el 892 el padre rutea el preview del PDF por `__fileViewerBytes`, que NO es una función del preload** sino una bandera para llegar al bloque que lee bytes con `readFileBytes`. La guarda de existencia la mataba **antes** del ruteo: el PDF fallaba siempre con `API function __fileViewerBytes not found` y unas 40 líneas quedaron como código muerto. La red de seguridad de abajo tampoco se alcanzaba, y el test 861 comprobaba esa sin notar la de arriba. El panel tampoco limpiaba el estado anterior, así que el error de un archivo quedaba pintado sobre el siguiente: de ahí el "error de PDF" con un DOCX en pantalla. Tests nuevos: `test-responsable-tema-891.js` (58 checks, 20/20 mutaciones) y `test-visor-carga-892.js` (26 checks, 16/16 mutaciones, con el check que faltaba: que la red de seguridad sea **alcanzable**). Batería 884–892 en verde (10 tests) y el 861 sigue en 614/614. Antes, 📦 **890** (1.1.5), 📦 **889** (1.1.2 y 1.1.3) y 📦 **887** (el home de Recursos). El hash del commit actual no se escribe dentro del propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit fantasma |
-| **Commits sin pushear** | **0**, verificado el 2026-10-14 contra GitHub: 📦885 (`ed59ba80`) y 📦886 (`e5f95ae4`) quedaron **pusheados a `Dev` y `Dev-Pc`**, las dos en `e5f95ae4`. 🔴 Una nota de mecánica que salió en este push: **no existe rama local `Dev-Pc`** (solo `Dev` y `gh-pages`), así que `git push origin Dev-Pc` falla con "src refspec does not match any". La forma correcta es `git push origin Dev:Dev-Pc`, previa comprobación de que `origin/Dev-Pc` es ancestro de `Dev` para que sea fast-forward. 🔴 **Lo que sigue faltando es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
+| **Commits sin pushear** | **0** en `Dev`, verificado con `git fetch` el 2026-10-15: `HEAD` y `origin/Dev` estan los dos en `d1e7a996` (📦901). 🔴 `origin/Dev-Pc` quedo **4 commits atras**, en `875e58d2` (📦897): falta `git push origin Dev:Dev-Pc` (no existe rama local `Dev-Pc`, hay que empujar `Dev:Dev-Pc`). Antes de esta sesion: 📦885 (`ed59ba80`) y 📦886 (`e5f95ae4`) quedaron **pusheados a `Dev` y `Dev-Pc`**, las dos en `e5f95ae4`. 🔴 Una nota de mecánica que salió en este push: **no existe rama local `Dev-Pc`** (solo `Dev` y `gh-pages`), así que `git push origin Dev-Pc` falla con "src refspec does not match any". La forma correcta es `git push origin Dev:Dev-Pc`, previa comprobación de que `origin/Dev-Pc` es ancestro de `Dev` para que sea fast-forward. 🔴 **Lo que sigue faltando es publicar `sitio/` en `gh-pages`**: `anexo-encargo.html` y `autorizacion-trabajadores.html` **no están en línea** hasta que se regenere esa rama, y el aviso ya conocido sigue en pie: se copia **archivo por archivo**, nunca con `git add -A`, porque el árbol de trabajo tiene 45 743 archivos sin rastrear |
 | **Ramas remotas** | Quedan **4**: `Dev`, `Dev-Pc`, `backup-numeracion-2026-09-05` y `gh-pages`. 🔴 **El 2026-10-07 se borraron `feat/e2e-integration-25-tests` e `i-e2e-7-pdf-failure-paths`**, por decisión del owner, después de verificar que **no tenían ni un commit propio fuera de `Dev`** (medido con `git cherry`, o sea por *patch-id*, no por conteo). Antes de borrarlas se publicaron los tags `respaldo/feat-e2e-2026-10-07` (`61edb2c8`) y `respaldo/i-e2e-7-2026-10-07` (`aa6c41b0`), así que el borrado es reversible. **El conteo de commits mentía**: esas ramas parecían tener 302 commits sin integrar, y en realidad era historia duplicada de un trabajo que ya estaba mergeado. `Dev-Pc` **quedó absorbida**: el 2026-10-07 el portátil hizo `edf3d61d` (trajo los 22 commits del escritorio) y `77d1e98b` (la devolvió a `Dev`), así que tiene **0 commits propios fuera de `Dev`**. `backup-numeracion-2026-09-05` **no se toca**: es el respaldo. `gh-pages` **tampoco se mergea**: es el sitio web, se regenera copiando `sitio/`, y un merge de `Dev` ahí metería el código de la app en la página. 🔴 **Al regenerarla, nunca usar `git add -A`**: el árbol de trabajo tiene **45 743 archivos sin rastrear** (`node_modules`, `Temp/`, `backups/` y un `.env`), y un `add -A` publicaría el código de la app y las credenciales de Google en el sitio público. Agregar archivo por archivo |
 | **Versión** | `0.1.251` (desarrollo). 🔴 **Regla nueva del owner (2026-10-07): la versión SOLO se bumpea cuando él lo diga.** Antes decía "siempre bumpear en el mismo commit" y por eso este bumpProvocó que la pantalla de consentimiento reapareciera a todos los usuarios sin que el texto legal hubiera cambiado. Ver `PROMPT.md` §5.2 |
 | **Suite (portátil)** | **123 tests · 122 verdes · 1 con fallos · 1 sin resumen verificable.** **Cero regresiones.** Medición real del 2026-10-07, **anterior a 📦876**. El rojo era `test-google-oauth-868.js` [54/57], que exige `main/_verificar-credenciales-build.js`, archivo que **no existía en ninguna rama**: lo tragaba la regla `_*.js` de `sgsst-electron-app/.gitignore:80`, que sin ancla se aplica en cualquier directorio y no solo en la raíz. **Ya está corregido en 📦876** y probado por mutación (54/57 sin el archivo, 57/57 con él). 🔴 **Falta volver a medir en el portátil**: no se afirma aquí que esté verde, solo que la causa identificada ya no existe. `test-init-order-bug.js` sigue sin resumen verificable |
@@ -107,7 +107,43 @@ en el contenedor y los 47 selectores a `^=`. El `console.warn` de "Cambio de mó
 `showSettingsPage()` no registraba que habíA tomado la vista. Antes, 📦891, 📦892 y 📦893. **893**, la pantalla de los dos sobre 1.1.1 Responsable del SG-SST. **891**, el tema: el sincronizador del viewer era una copia de la lógica de `scripts/theme-manager.js`, que **no está cargado**, y leía una clave (`mode`) que el shell nunca manda. El CSS estaba bien —58 reglas oscuras, 29 y 29—: lo que faltaba era el atributo que las dispara. En paralelo, el panel de vista previa tenía fondo blanco fijo y **diez** `color: #fff` sobre acentos, que en oscuro se quedaban en 2.56:1. Se resolvieron con tokens `on-acento` por tema, y los checks de contraste del test **leen los tokens reales del CSS y calculan luminancia**, para que un cambio de `--kair-primary` se note solo. **892**, la carga de documentos: el preview del PDF se rutea por `__fileViewerBytes`, que **no existe en el preload** porque es una bandera, no una función; la guarda de existencia lo mataba antes del ruteo, así que el PDF fallaba siempre y el bloque de ruteo era código muerto. Y el panel no limpiaba el estado anterior, de modo que el fallo de un archivo quedaba pintado sobre el siguiente. **Un incidente propio que quedó anotado:** un script mío leyó un CSS como UTF-8 y lo escribió como `latin1`, convirtiendo cada `═══` y `—` en basura: 64 caracteres de reemplazo y el archivo **seguía funcionando**, porque el navegador ignora los comentarios. Lo detectó un test al leer 0 tokens; se restauró desde git y se reaplicó con un script que **aborta si aparece `U+FFFD` antes de escribir**. Es la trampa 24 de `PROMPT.md`. Tests nuevos: `test-responsable-tema-891.js` (58 checks, 20/20 mutaciones) y `test-visor-carga-892.js` (26 checks, 16/16). Batería 884–892 en verde (10 tests); el 861 sigue en 614/614. Antes, del 2026-10-14: 📦890 (1.1.5), 📦889 (1.1.2 y 1.1.3), 📦887 (el home), 📦886, 📦885, 📦884 y 📦883. **Sin bump de versión**: sigue en `0.1.251` |
 
 
-### 🛠️ Pendientes abiertos (al 2026-10-13, cierre 17:30)
+### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
+
+#### De la sesion del 2026-10-15 (migracion a kair-server)
+
+1. **🔴 Ningun equipo cliente le habla todavia al servidor.** El servicio esta desplegado y
+   respondiendo en `https://firma.kair.fyi`, pero **no hay ninguna empresa registrada en el backend**,
+   asi que todavia no se puede firmar de punta a punta. Falta, en cada equipo que firme, la secuencia
+   `firma:config:set-url` -> `firma:config:set-admin-key` -> `firma:empresa:create` ->
+   `firma:empresa:set-api-key`. El admin key esta en `/opt/kair-firma/admin-key.txt`. **No usar
+   `firma:config:set-api-key`**: esta deprecado (`main/firma-bridge.js:647`), guarda en
+   `empresas["__default__"]` por compatibilidad legacy y el propio codigo pide migrar al per-empresa,
+   que exige K+AIR v0.1.192 o superior.
+2. **🔴 No se ha probado una firma real de extremo a extremo.** Los 973 tests usaban `jsonTransport`,
+   que no envia correo. Se confirmo que el envio funciona (`messageId` de Gmail), pero **nadie ha
+   creado un sign request, recibido la invitacion, firmado desde el celular ni descargado la
+   constancia**.
+3. **🟡 La tarea `KairFirmaTunnel` del portatil quedo deshabilitada pero no borrada, y esta MUERTA.**
+   El script corre `cloudflared tunnel run kair-firma`, que lee `~/.cloudflared/config.yml`, y ese
+   directorio ya no existe en ninguna maquina (verificado en `C:\Users\Usuario\.cloudflared`,
+   `ProgramData` y `systemprofile`: ninguno existe). Ademas `scripts/firma-tunnel/` describe una
+   arquitectura que ya no es la vigente: conviene decidir si se borra o se archiva.
+4. **🟡 No hay backup automatico.** `/opt/kair-firma/backups` existe y hay una copia manual
+   (`firma-20261016-0250.sqlite`), pero no hay cron. La guia vieja (`deploy/README-DESPLIEGUE.md`,
+   paso 9) tiene el script que nunca se instalo.
+5. **🟡 No hay monitorizacion.** Nada avisa si el servidor se cae o si el tunnel se desconecta. El panel
+   de Cloudflare muestra el estado, pero no hay alerta activa.
+6. **🟡 6 vulnerabilidades de `npm audit`** sin revisar, reportadas al desplegar. No se corrio
+   `npm audit fix` a proposito.
+7. **🟡 Dos tests fallan en el servidor, ninguno por bug de codigo.** `idempotency-isolation` caso 2
+   falla porque su propio helper genera un PDF nuevo por llamada y pdf-lib escribe `CreationDate`,
+   asi que los dos requests llevan SHA-256 distinto y el `409` del servidor es lo correcto. El otro,
+   `pdfValidator` §6.2, mide un timeout de 200 ms y tarda 326 ms con 973 tests en serie sobre 2 vCPU;
+   el test busca detectar un hang (que seria >5 s). Ver `docs/MIGRACION-SERVIDOR-FIRMA.md` seccion 7.
+8. **🟡 `origin/Dev-Pc` quedo 4 commits atras** (`875e58d2`, 📦897). Falta
+   `git push origin Dev:Dev-Pc`; no existe rama local `Dev-Pc`.
+
+#### Del 2026-10-13 (siguen abiertos)
 
 1. **🔴 El gate de consentimiento re-pregunta por el motivo equivocado.** `consent:estado` compara
    contra `app.getVersion()`, así que **cada bump de versión le repite el consentimiento a todos**,
@@ -704,6 +740,70 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 ---
 
 ## 📅 Bitácora por jornada
+
+### 2026-10-15 (noche) · El servicio de firmas se mudó del portátil al servidor (📦901)
+
+**Objetivo de la sesión:** que `firma-service` funcione 24/7 sin depender del portátil de trabajo.
+
+**Lo que quedó:** `https://firma.kair.fyi` responde desde `kair-server` (Ubuntu Server 24.04.5, detrás
+de NAT, túnel nombrado de Cloudflare). Los dos servicios arrancan solos tras un reinicio de kernel.
+El correo sale con `messageId` de Gmail. **La migración está completa.**
+
+#### El commit 📦901
+
+`firma-service` escuchaba en todas las interfaces: `config.js` no leía variable de host y `server.js`
+hacía `app.listen(port)` a secas. Con el servidor detrás de NAT no era explotable de inmediato, pero
+en cuanto el túnel expusiera el puerto el servicio quedaba alcanzable desde la red local. El arreglo
+ mete `HOST=127.0.0.1` con default en `config.js`, lo pasa a `app.listen`, lo imprime en el log de
+arranque y lo documenta en `deploy/.env.production.example`. Verificado con
+`ss -tulpn | grep 3001`: devuelve `127.0.0.1:3001`, no `*:3001`.
+
+#### Los cinco hallazgos que costaron la tarde
+
+1. **Falta `/etc/cloudflared/config.yml` y el sintoma miente.** El túnel `kair-firma` es
+   *locally-managed*: sus rutas viven en el archivo local del servidor, no en Cloudflare. Sin ese
+   archivo el túnel conecta, el panel dice "Buen estado" con una réplica activa, `systemctl` dice
+   `active`, y `curl` a la URL pública devuelve cuerpo **vacío**. El log lo avisaba desde el primer
+   intento (`No ingress rules were defined... will return 503`), y pasó inadvertido. El archivo debe
+   terminar en `service: http_status:404`: cloudflared exige un catch-all.
+2. **Un token truncado se disfraza de problema de credenciales.** El token es base64, así que **su
+   largo siempre es múltiplo de 4**. Una copia a medias daba 180 bytes, que no es múltiplo de 4, y
+   el error era `Invalid tunnel secret` — que parece un secret roto en Cloudflare y en realidad era
+   transporte. El bueno mide 248 + salto de línea = 249.
+3. **`Type=notify` convierte un token invalido en un "timeout".** Con `TimeoutStartSec=15`, un proceso
+   que nunca manda `READY=1` produce `Job ... failed because a timeout was exceeded`, que esconde el
+   error real. Lo que sirvio fue correr `cloudflared tunnel run --token-file ...` en primer plano: ahi
+   si se vio `Unauthorized: Invalid tunnel secret`.
+4. **El botón "Rotar token" sí funciona, pero la UI cachea el comando.** El owner lo presionó varias
+   veces y el texto no cambiaba, lo que llevó a pensar que la rotación estaba rota. No lo estaba: el
+   comando queda cacheado en el DOM de la página. Con `Ctrl+Shift+R` (o saliendo y volviendo a entrar)
+   aparece el nuevo. Se rotó al final y el token expuesto quedó invalidado.
+5. **`GET /health` no prueba el correo.** En `src/routes/health.js` el check marca `ok` si `SMTP_PASS`
+   existe; no abre conexion ni autentica. Por eso `smtp: "configured"` aparecio en verde mientras el
+   `.env` todavia tenia el placeholder del ejemplo y `SMTP_HOST=localhost`. La prueba real es un
+   `verify()` de nodemailer, y la prueba de fuego un `sendMail()` con `messageId`.
+
+**Dos trampas de shell que tambien costaron tiempo:** `read -rs` en un bloque pegado de varias lineas
+se come la linea siguiente como entrada, asi que el archivo terminaba conteniendo un comando de bash
+en vez del token; y un `!` en el `node -e` dispara *history expansion* de bash (`!l.trim: event not
+found`), que se evita con `set +H`.
+
+**Verificacion de la suite en el servidor:** `npm test` → `tests 973 | pass 969 | fail 2 | skipped 2`.
+Para correrla hacen falta dos cosas que no viajan en el despliegue: copiar `tests/` al servidor, y
+`npm install --include=dev` porque `supertest` es devDependency. Sin eso fallan ~60 archivos con
+`Cannot find module 'supertest'`. Los dos que fallan **no son bugs**: uno es el helper del test que
+genera un PDF distinto por llamada (pdf-lib escribe `CreationDate`, y el fingerprint de idempotencia
+incluye el SHA-256 del PDF — el `409` del servidor es correcto); el otro mide un timeout de 200 ms
+contra 326 ms reales con la CPU saturada, y el objetivo del test es detectar un hang de mas de 5 s.
+
+**Por que los tests corren en el servidor y no en el portatil:** el `better-sqlite3` de alla esta
+compilado para Electron 37 (`NODE_MODULE_VERSION 136`) y el Node local es v26 (`147`), asi que no
+carga. En el servidor hay Node 20 limpio.
+
+**Documentacion actualizada:** `docs/MIGRACION-SERVIDOR-FIRMA.md` se reescribio completa con la
+arquitectura real (la anterior describia una VM de Oracle con Caddy y `sslip.io`, que no se uso).
+`CHANGELOG.md` tiene la entrada de 📦901 con los cinco hallazgos. `README-DESPLIEGUE.md` queda
+como guia historica y apunta al documento vigente.
 
 ### 2026-10-15 (tarde 5) · La barra del scroll arrancaba en el borde superior de la ventana (📦898)
 
