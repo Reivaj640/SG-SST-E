@@ -4796,6 +4796,125 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 
 8. **URLs relativas en HTML inyectado vía `fetch + innerHTML` se resuelven desde el documento PADRE, no desde el archivo fetched** (v0.1.215, 📦816 — bug en refactor home de Capacitaciones): contraste directo con el patrón de Presupuesto que se carga en **iframe** (donde las URLs se resuelven desde el iframe). Cuando un componente hace `const html = await fetch('./modules/.../foo.html'); container.innerHTML = html`, todos los `<link>`, `<img>`, `<a href>` dentro del HTML inyectado resuelven sus paths relativas desde el BASE URI del documento padre (`index.html`), no desde el archivo fetched. **Síntoma**: la página sale sin estilos (los `<link>` no encuentran el CSS). **Fix**: usar paths relativas a `index.html` (`./shared/...`, `./modules/...`) y agregar `<link>` explícito al CSS del módulo (no se hereda del archivo fetched). Patrón de E2E sin display: `tests/cap-home-e2e.js` con jsdom lee los archivos del disco y los inyecta como `<style>` en un wrapper HTML, valida 18/18 DOM + 15/15 CSS + 9/9 tokens + 11/11 estilos + callbacks. Útil cuando no se puede ejecutar Electron con GUI.
 
+---
+
+## 📦898 · La cadena de alturas: un eslabón faltante hace desaparecer la barra de scroll
+
+**Lo que pidió el owner.** Que la barra vertical del costado derecho de la ventana empiece al mismo
+alto que la tarjeta "Actividad ID", que está a la derecha. Ese scroll era **el documento entero**, que
+no tenía `overflow` declarado, así que su barra arrancaba en el borde superior del visor, muy por
+encima del contenido.
+
+**El patrón que lo resuelve** es el de app shell: cabecera y pestañas fijas, y un contenedor interno
+que lleva el scroll.
+
+```css
+html{height:100%}
+body{height:100%;overflow:hidden}
+.kair-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.kair-topbar{flex:0 0 auto}
+.kair-tabs{flex:0 0 auto}
+.kair-plan-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+```
+
+**EL ERROR, Y POR QUÉ EL SCROLL DESAPARECIÓ.**
+
+La primera vez se puso `height:100%` en `html` y **no en `body`**. Con `body` de altura automática, el
+`height:100%` de `.kair-page` no tiene base definitiva: el porcentaje cae a `auto`, la columna flex no
+se acota, `.kair-plan-scroll` crece hasta la altura completa del contenido y por eso **nunca tiene
+desbordamiento que scrollear**. Mientras tanto `body` ya tenía `overflow:hidden`, así que el recorte no
+dejaba ver nada. Resultado: **la barra desaparece**. El owner lo reportó como *"quitaste por completo el
+auto scroll"*. No era el auto-scroll: era la barra del documento.
+
+**La regla.** Una cadena de alturas porcentuales no acota nada si le falta un eslabón. Si el padre
+directo no tiene altura definida, el `height:100%` del hijo no vale nada. Acá la cadena eran cuatro:
+`html` → `body` → `.kair-page` → `.kair-plan-scroll`, y faltaba `body`.
+
+**El síntoma que delata el error, y el orden para diagnosticarlo.** Un contenedor con `overflow:auto`
+que no muestra barra **no está roto: no tiene nada que scrollear**. Antes de culpar al `overflow`,
+medí `scrollHeight` contra `clientHeight`. En un diseño de app shell, el primer sospechoso de un
+scroll "que no existe" es que el contenedor **creció en vez de encogerse**, y casi siempre la causa es
+un eslabón faltante en la cadena de alturas.
+
+**El otro error del mismo turno: no preguntar cuál barra era.** El owner pidió cambiar "la barra del
+autoscroll" y se hicieron dos intentos antes de entenderlo. El primero movió la barra vertical del
+Gantt. El segundo desactivó el scroll del documento. Los dos estaban equivocados, y el segundo además
+rompió lo que funcionaba. Cuando por fin se preguntó, con las tres barras de la captura nombradas por
+posición, la respuesta fue la que menos se sospechaba: **la del costado derecho de la ventana**.
+
+La lección no es "preguntá más". Es que **"la barra de scroll" es ambigua en cuanto hay más de un
+contenedor scrolleable en pantalla**. Nombrarlas por posición —"la vertical del costado derecho de
+toda la ventana", "la horizontal al pie de la tabla"— desambigua en un mensaje, y listar las
+candidatas con lo que se ve de cada una evita dos ciclos de trabajo perdidos.
+
+**Lo que sí quedó verificado.** En navegador real: la barra aparece en el borde derecho con la punta
+superior justo debajo de las pestañas, y el pulgar ocupa menos de la mitad del carril, o sea que hay
+contenido real para scrollear. Estructuralmente, los 92 pares de `div` quedan balanceados y el CSS con
+las llaves en cero. Y el auto-scroll del 895 intacto: `scrollActIntoView()`, `SCROLL_MARGIN = 24` y
+`.kair-gantt__scroll{max-height:560px}` sin tocar.
+
+**Lo que no se pudo verificar.** La pestaña Cronograma dentro del contenedor nuevo: el navegador
+embebido se colgó dos veces con timeout de 275 s, el mismo síntoma del 891 y del 895. Queda pendiente
+la confirmación del owner en la app instalada.
+
+**Pendiente de una decisión.** Quedan ~20 px entre el inicio de la barra y la tarjeta, por el
+`margin-top:20px` que ya traían los bloques de contenido. Quitarlo alinea exacto pero cierra el
+aire entre las pestañas y las tarjetas.
+
+---
+
+## 📦899 · 3.2.3: la tabla no aprovechaba la ventana maximizada
+
+**Lo que pidió el owner.** Con la ventana maximizada, la tabla de "Registro y Análisis Estadístico"
+seguía mostrando las mismas 15 filas: *"no aprovecha el modo maximizado, solo sigue mostrando las
+mismas 15"*. En la captura se veía exactamente eso — 85 registros, "Mostrando 1–15 de 85", 6 páginas
+y media pantalla en blanco debajo de la última fila.
+
+**La causa** no era de estilos: el tamaño de página era **un número fijo en el estado de la tabla**
+(`pageSize: 15` en `tState`) y nada lo volvía a mirar cuando cambiaba el tamaño de la ventana. El
+resto del módulo (columnas, filtros, scroll horizontal) sí era fluido, por eso el defecto se veía
+solo en la cantidad de filas.
+
+**La decisión de detección** la tomó el owner, y es doble: hay maximizada si el ancho es **≥ 1360 px**
+(el mismo umbral de "maximizada" que usan las media query del 3.3.1/3.3.2/3.3.3) **o** si el sistema
+reporta la ventana maximizada (`window.electronAPI.isMaximized()`). Lo segundo hace falta porque en
+un portátil de 1280 o 1366 maximizado el ancho no llega a 1360 y, con solo el umbral, seguiría en 15.
+`isMaximized()` es una consulta con respuesta diferida, así que se dispara con un respiro de 150 ms
+después del redimensionamiento (el ancho se aplica en el acto, el estado de la ventana después).
+
+**El candado que hizo falta, y por qué.** El script del módulo **se re-ejecuta cada vez que se abre
+la pantalla** (`renderer.js` agrega un `<script>` nuevo con el mismo `?v=`), y cada ejecución trae su
+propio estado con su tamaño de página y su página activa. Como la escucha de redimensionamiento se
+pegaba a `window` sin dar de baja la anterior, a la segunda apertura ya había dos: la vieja repintaba
+la tabla con su estado obsoleto y pisaba el pintado nuevo. Se registró **una sola escucha por
+módulo** (dar de baja la anterior al iniciar) y un identificador de sesión
+(`window.__kairS323Sesion`) que retarda la respuesta del IPC: si la consulta vuelve después de
+reabrir, la carga vieja no pinta. Sin ese candado el test lo muestra: el pie viejo
+("Mostrando 16–30") aparece sobre la tabla nueva.
+
+**Regla de diseño de este fix: nada de capas solapadas.** El primer intento puso el candado de sesión
+en tres lugares a la vez. La mutación "quitar el candado de `aplicarPageSize`" quedó **verde**, o sea
+que un check no mordía: los candados se cubrían mutuamente y quitar uno no se notaba. Se aplanó a dos
+capas con responsabilidades distintas — **dedupe al registrar** (escucha vieja) y **candado al
+responder el IPC** (promesa vieja) — y los dos quedan mordidos por un mutante.
+
+**Al achicar la ventana la página se recorta**, no se queda sin filas: si estabas en la página 6 con
+15 por página y pasás a 50, la página 6 no existe (77 registros → 2 páginas), así que va a la última
+posible. Sin eso, la tabla queda vacía y el pie escribe "Mostrando 251–77 de 77".
+
+**Verificación.** Test nuevo `tests/registro-estadistico/test-paginacion-maximizada.js` (**23/23**)
+que **ejecuta el JS real** con un DOM mínimo y dispara el redimensionamiento: 1100 → 15 filas,
+1904 → 50, vuelta a 1100 → 15, recorte de página, 1280 maximizada por el sistema → 50, apertura ya
+maximizada sin resize → 50, reapertura sin escuchas apiladas y sin pintado cruzado, y con la tabla
+fuera del documento no revienta. **6/6 mutantes matan al test**: tamaño fijo, sin escucha de resize,
+sin consulta al sistema, sin recorte de página, sin candado de sesión y sin dedupe. Además
+`test-premium.js` 24/24 y `test-chart-overflow.js` 20/20.
+
+**Cache-bust**: token de `renderer.js` a `RES-20261015-v2-maximizada-50` (1 línea, CRLF intacto: el
+archivo sigue con 8069 CRLF / 0 LF, verificado por bytes porque es el que más ruido provoca).
+
+---
+
 ## ⚠️ Un gate que compara contra una clave que nadie escribe pregunta lo contrario a lo que debe (📦898, 2026-10-16)
 
 **El síntoma.** El gate de consentimiento de la Ley 1581 decide mal en las dos direcciones, y

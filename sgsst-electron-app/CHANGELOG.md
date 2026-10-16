@@ -17,6 +17,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`Historial.md`](../Historial.md) y en los mensajes de commit. Queda pendiente
 > documentarlos aquí.
 
+### 📦901 · El servicio de firmas ya no se despliega en el portátil
+
+**Qué cambió.** El servicio de firma eléctrica dejó de correr en el portátil de trabajo y ahora
+vive en `kair-server` (Ubuntu Server 24.04.5), detrás de un túnel nombrado de Cloudflare que
+sirve `https://firma.kair.fyi`. El portátil ya no tiene que estar encendido.
+
+**El defecto que-cv.** `firma-service` escuchaba en **todas** las interfaces, no solo en loopback:
+`config.js` no leía variable de host y `server.js` llamaba `app.listen(port)` a secas. Con el
+servidor detrás de NAT no era explotable de inmediato, pero en cuanto el túnel —u cualquier otra
+cosa— expusiera el puerto, el servicio quedaba alcanzable desde la red local sin autenticación de
+transporte. El arreglo introduce `HOST` con default `127.0.0.1` en `config.js`, lo pasa a
+`app.listen`, lo imprime en el log de arranque, y lo documenta en
+`deploy/.env.production.example`. Verificado con `ss -tulpn | grep 3001`, que ahora devuelve
+`127.0.0.1:3001` y no `*:3001`.
+
+**Documentación.** La guía de despliegue anterior describía una VM de Oracle Cloud con Caddy y
+dominio `sslip.io`; ninguna de las tres cosas se usó. `docs/MIGRACION-SERVIDOR-FIRMA.md` se
+reescribió con la arquitectura real, las rutas del servidor, el procedimiento de rotación de token
+y la sección de operación diaria.
+
+**Cinco cosas que costó descubrir, documentadas para no repetirlas:**
+
+1. **Falta `config.yml` en el túnel.** El túnel `kair-firma` es *locally-managed*: sus rutas viven
+   en `/etc/cloudflared/config.yml`, no en Cloudflare. Sin ese archivo el túnel conecta, el panel
+   dice "Buen estado", `systemctl` dice `active`, y `curl` a la URL pública devuelve cuerpo
+   **vacío**.
+2. **Un token truncado da symptoms engañosos.** El token es base64, así que su largo **siempre es
+   múltiplo de 4**. Una copia a medias produce `Invalid tunnel secret`, que parece un problema de
+   credenciales y en realidad es de transporte.
+3. **`Type=notify` convierte un token inválido en un "timeout".** `TimeoutStartSec=15` con un
+   proceso que nunca envía `READY=1` reporta timeout, no el error real. Hay que correr
+   `cloudflared tunnel run --token-file` en primer plano para ver el log de verdad.
+4. **`GET /health` no prueba el correo.** En `src/routes/health.js` el check marca `ok` si la
+   variable `SMTP_PASS` existe; no abre conexión ni autentica.
+5. **Rotar el secret sí funciona, pero la UI cachea el comando viejo.** Hay que recargar con
+   `Ctrl+Shift+R` después de rotar.
+
+**Verificación.** 973 tests en el servidor (969 en verde, 2 fallos que no son bugs de código,
+analizados en el documento de migración), envío de correo real confirmado con `messageId` de
+Gmail, y `kair-firma` + `cloudflared` arrancando solos tras un reinicio del kernel.
+
+### 📦898 · La barra del scroll arranca al nivel de la tarjeta Actividad ID
+
+**Qué cambió.** El scroll del `Plan de Trabajo Anual` lo llevaba **el documento entero**, sin
+`overflow` declarado, así que la barra vertical del costado derecho de la ventana arrancaba en el
+borde superior del visor, muy por encima del contenido. Ahora arranca **justo debajo de las
+pestañas**, que es donde empieza la tarjeta "Actividad ID".
+
+Es el patrón de app shell: cabecera y pestañas fijas, y un contenedor interno `#plan-scroll` que lleva
+el scroll. Las dos vistas quedan dentro de ese contenedor; los modales, que ya estaban fuera y son
+`position:fixed`, no se movieron.
+
+```css
+html{height:100%}
+body{height:100%;overflow:hidden}
+.kair-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.kair-topbar{flex:0 0 auto}
+.kair-tabs{flex:0 0 auto}
+.kair-plan-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+```
+
+**El error que costó el primer intento, y que ya está en la bitácora.** Poner `height:100%` en `html`
+pero **no** en `body` deja al `height:100%` de `.kair-page` sin base definitiva: el porcentaje cae a
+`auto`, la columna flex no se acota, `.kair-plan-scroll` crece a la altura del contenido y **nunca
+scrollea**, mientras `overflow:hidden` recorta. La barra desaparece y parece que se rompió el
+auto-scroll, cuando lo que se rompió fue el contenedor. El detalle completo está en
+`BITACORA.md` § 📦898.
+
+**El otro error fue de comunicación.** "La barra del autoscroll" resultó ambiguo: hay tres barras
+scrolleables en esa pantalla y se trabajó sobre la equivocada dos veces. La que quería el owner era la
+del **costado derecho de la ventana**, no la del Gantt.
+
+**Verificado:**
+
+| Comprobación | Resultado |
+|---|---|
+| Navegador real, barra del borde derecho | punta superior justo debajo de las pestañas |
+| El pulgar ocupa menos de la mitad del carril | hay contenido real para scrollear |
+| Pares de `div` del documento | 92 aperturas, 92 cierres, nivel final 0 |
+| Llaves del CSS | balanceadas |
+| Modales | siguen fuera del contenedor y en `position:fixed` |
+| Auto-scroll del 895 | `scrollActIntoView()`, `SCROLL_MARGIN = 24` y `.kair-gantt__scroll` sin tocar |
+
+**No verificado:** la pestaña Cronograma dentro del contenedor nuevo. El navegador embebido se colgó
+con timeout de 275 s al hacer clic, el mismo síntoma del 891 y el 895. El shell y el scroll sí se
+midieron en navegador real; el Gantt queda pendiente de confirmación en la app instalada.
+
+Sin bumpeo de versión: `0.1.251`, este paquete no toca lógica.
+
 ### 📦896 / 897 · AGENTS.md dejó de cargarse entero: la bitácora se va a BITACORA.md
 
 **Qué cambió.** `sgsst-electron-app/AGENTS.md` tenía **10.993 líneas** y su propio encabezado avisaba

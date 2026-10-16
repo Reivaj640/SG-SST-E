@@ -1,4 +1,15 @@
-# Despliegue a producción — K+AIR Firma Electrónica (Fase 1, $0)
+# Despliegue a producción — K+AIR Firma Electrónica (guía histórica, NO vigente)
+
+> 🔴 **Esta guía NO describe el despliegue actual.** Habla de una VM de Oracle Cloud con Caddy y un
+> dominio `sslip.io`. **Ninguna de las tres cosas se usó**: el servidor es `kair-server` (Ubuntu
+> Server 24.04.5 en la red local, detrás de NAT), el proxy es un túnel nombrado de Cloudflare y el
+> dominio es propio (`kair.fyi`). El despliegue real quedó documentado en
+> [`docs/MIGRACION-SERVIDOR-FIRMA.md`](../../docs/MIGRACION-SERVIDOR-FIRMA.md), que es el documento
+> que hay que seguir.
+>
+> Se conserva porque sigue siendo útil para un escenario distinto: el día que se quiera una **IP
+> publica propia sin depender de Cloudflare**, los pasos de abajo (crear la VM, instalar Node,
+> usuario sin privilegios, systemd, backups) son válidos. Solo cambian el proxy y el dominio.
 
 > Guía paso a paso para poner el servicio de firmas en internet de forma
 > permanente **sin pagar nada**: VM gratis de Oracle Cloud, dominio gratis

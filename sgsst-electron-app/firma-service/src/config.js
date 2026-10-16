@@ -41,6 +41,12 @@ function resolvePath(p) {
 
 const config = {
   env: required('NODE_ENV', 'development'),
+  // Interfaz de escucha. Default loopback a proposito: sin esto, app.listen()
+  // sin host cae en 0.0.0.0 y el servicio queda alcanzable desde toda la red
+  // local (celulares, portatiles, Smart TV). El tunel de Cloudflare se conecta
+  // a 127.0.0.1, asi que loopback no estorba. Poner HOST=0.0.0.0 solo si el
+  // despliegue lo exige a proposito y hay firewall delante.
+  host: process.env.HOST || '127.0.0.1',
   port: int('PORT', 3001),
   publicUrl: required('PUBLIC_URL', 'http://localhost:3001'),
 
