@@ -94,7 +94,7 @@ La columna **Claro sale idéntica antes y después**: el arreglo no toca el tema
 instalada**: no hay `electronAPI` ni IPC. Alcanza para la cascada de estilos y el contraste; **no alcanza para el
 shell, ni para los gráficos**, que dependen de Chart.js y de los datos del Excel. La segunda ronda agregó la paleta `dark-legacy`: los seis paneles vuelven a salir con el panel 6 en gris neutro, igual que el home de Recursos de la captura del owner, y el panel 4 sigue azul. U0001F534 **El 895 no se midió en ninguna parte**: el arnés con iframe saturó el navegador con tres timeouts (el mismo síntoma del 891) y se sustituyó por ejecutar la función real en Node con `vm`, que valida la lógica del scroll pero **no** el comportamiento en el navegador.
 🔴 **Los de 891 y 892 NO se midieron en ningún navegador.** El arnés del 891 llegó a una conclusión útil —que el iframe no cargaba el módulo compartido— pero se colgó después por el `load` del iframe, que no dispara con el bundle del file-viewer montado, y el browser se saturó. Se cambió de método: **el 891 se verificó por análisis del código y el 892 íntegramente por test en Node**. De 883 no hay revisión: el fix está razonado sobre la especificación de CSS, **que es un razonamiento, no haberlo visto**. Al abrir la app: Configuración sin la barrita del extremo derecho, menú lateral legible en Sistema y Oscuro, Panel de Control oscuro en los dos, **la barra de desplazamiento del color del fondo y no blanca** en los dos modos oscuros, y en Recursos: el home sin tarjetas blancas, **1.1.2, 1.1.3 y 1.1.5 legibles en Sistema y en Oscuro**. Lo nuevo: **1.1.1 debe verse oscuro en modo Sistema**, y **abrir un PDF y un DOCX en 1.1.1 debe mostrar el documento**, no un error. Si algo falla, el mensaje ahora nombra el archivo y su extensión. Ver los pendientes 16 y 17 |
-| **Jornada** | **En curso** (2026-10-16). Hoy: 📦898. Arrancó con **15 commits de atraso** respecto de `origin/Dev-Pc` (el repo local venía del 9 de octubre), sincronizado con `git merge --ff-only`. El trabajo fue **legal, no de código de producto**: se encontró que el módulo Remisiones Médicas manda **datos personales y de salud a WhatsApp** (`web.whatsapp.com`) y que **el envío por correo sale automático** por SMTP de Gmail con credenciales guardadas — y que **ninguno de los dos estaba declarado** en el Anexo de Encargo ni en la Política de Privacidad, mientras el modal de consentimiento afirmaba que las transferencias eran solo a Google y a firma. Se declararon ambos en los tres documentos, se corrigió la viñeta del modal, se actualizaron las fechas de versión al 2026-10-16, y se arregló el gate para que pueda detectar el cambio (📦898). Antes, 📦891 a 📦897 (2026-10-15), y después se publicó `sitio/` en `gh-pages` (`8fe93985`), lo que cerró los dos 404 que llevaba 8 días. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
+| **Jornada** | **En curso** (2026-10-16). Hoy: 📦898 y 📦899 (tooling de asesoría legal como skill + agente). Arrancó con **15 commits de atraso** respecto de `origin/Dev-Pc` (el repo local venía del 9 de octubre), sincronizado con `git merge --ff-only`. El trabajo fue **legal, no de código de producto**: se encontró que el módulo Remisiones Médicas manda **datos personales y de salud a WhatsApp** (`web.whatsapp.com`) y que **el envío por correo sale automático** por SMTP de Gmail con credenciales guardadas — y que **ninguno de los dos estaba declarado** en el Anexo de Encargo ni en la Política de Privacidad, mientras el modal de consentimiento afirmaba que las transferencias eran solo a Google y a firma. Se declararon ambos en los tres documentos, se corrigió la viñeta del modal, se actualizaron las fechas de versión al 2026-10-16, y se arregló el gate para que pueda detectar el cambio (📦898). Antes, 📦891 a 📦897 (2026-10-15), y después se publicó `sitio/` en `gh-pages` (`8fe93985`), lo que cerró los dos 404 que llevaba 8 días. **896/897**, `AGENTS.md` se partió en `AGENTS.md` + `BITACORA.md`: 10.993 → 1.099 + 4.797 líneas, **−90 % de contexto al arrancar**. El archivo además tenía **4.200 líneas duplicadas byte a byte** (offset 5.335), y el dedup se hizo en dos capas porque la segunda cruzaba el corte y quedaba con una copia en cada archivo. Antes, 📦895: con techo de la lista del Cronograma: el owner marcó que la barra se quedaba arriba del todo y deberíA seguir a la actividad ID, con un techo justo debajo de las tabs. El hallazgo de fondo es que **el archivo que parece el dueño del módulo, `plan-viewer.js`, es código muerto**: espera `#treeContainer`, que no existe en ninguna parte del repo, y se ejecuta sin error ni aviso. La pantalla la pinta el script inline de `plan-view.html`. El techo se cumplió **por construcción**: no se usa `scrollIntoView` (recorre el documento y habríA escondido el encabezado) y se escribe únicamente el `scrollTop` del contenedor. Antes, 📦891, 📦892, 📦893 y 📦894.
 **894**, el submódulo 1.2.1 Capacitaciones y el botón muerto del menú. El owner reportó los dos defectos
 en un mismo mensaje y añadió que no sabíA qué decisión tomar porque no queríA dañar nada de lo que ya
 funciona: **se investigó antes de tocar nada** y se le presentaron las opciones con evidencia, no una propuesta.
@@ -800,6 +800,36 @@ no contra el repositorio.
 
 **Commits** — `8fe93985` en `gh-pages`. No lleva número de 📦: es una rama de despliegue, no un
 paquete de producto.
+
+### 2026-10-16 · 📦899 · Asesoría legal de K+AIR como skill portable y agente de OpenCode
+
+**Qué se hizo** — por pedido del owner, tooling para consultar normativa sin salir del entorno de
+desarrollo:
+
+- `.opencode/skills/asesoria-legal-sg-sst/SKILL.md` — **fuente única de verdad** del asesor legal:
+  alcance (SG-SST Colombia + normativa de software), jerarquía de fuentes, método obligatorio
+  (verificar en fuente oficial antes de afirmar; `⚠️ No verificado` antes que inventar), formato de
+  respuesta y descargo.
+- `.opencode/agents/legal-sg-sst.md` — agente modo `all` que **carga el skill**; sin `edit` ni `shell`
+  (`deny`), para que solo asesore.
+
+**Por qué skill y no solo agente.** El formato `SKILL.md` es portable: OpenCode lo descubre en
+`.opencode/skills/` y además lee `.claude/skills/` y `.agents/skills/` por compatibilidad; **MiniMax usa
+el mismo formato** (`name` debe coincidir con la carpeta, más `description`/`license`/`metadata`). El
+agente quedó como envoltorio para no tener dos copias del contenido que se desincronicen.
+
+**Alcance normativo:** Resolución 0312 de 2019 y Decreto 1072 de 2015 (SG-SST); Ley 1581 de 2012 y
+Decreto 1377 de 2013 (datos personales); Ley 527 de 1999 (comercio electrónico y firma digital);
+Ley 23 de 1982 y Ley 44 de 1993 (derechos de autor de software); Ley 1273 de 2009. Fuentes oficiales:
+Gestor Normativo, SUIN-Juriscol, MinTrabajo, MinSalud y SIC.
+
+**Regla dura:** no sustituye asesoría jurídica profesional.
+
+**Documentación:** la skill y el agente se registraron en `sgsst-electron-app/AGENTS.md` (sección
+"Skill del proyecto — Asesoría legal SG-SST"). **La versión no se bumpea** (sigue `0.1.251`): es tooling
+de desarrollo, no código de producto, así que el CHANGELOG no se toca.
+
+**Commits** — uno solo, `899`, desde `Dev-Pc`.
 
 ---
 

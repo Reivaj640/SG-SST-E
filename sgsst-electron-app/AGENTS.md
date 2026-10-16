@@ -89,6 +89,19 @@ Skills de `addyosmani/agent-skills` seleccionadas por complementar Superpowers s
 
 **Tests existentes del repo** (patron scripts sueltos con `node`, sin framework): `tests/test-*.js`, `main/test-*.js` — se corren con `node <ruta>`. Las skills de arriba son para tests E2E/formales de la app Electron completa.
 
+### Skill del proyecto — Asesoría legal SG-SST (`.opencode/skills/`)
+
+Skill propio del repo, no de un pack externo. Se activa con `skill({ name: "asesoria-legal-sg-sst" })` o `@asesoria-legal-sg-sst`.
+
+| Skill | Cuando usarlo | Activación |
+|-------|--------------|------------|
+| **asesoria-legal-sg-sst** | Consultas legales: SG-SST Colombia (Res. 0312/2019, Decreto 1072/2015 y afines) y normativa de software (datos Ley 1581, comercio electrónico Ley 527, derechos de autor, licenciamiento). Cita norma + artículo/numeral + fuente oficial; marca `⚠️ No verificado` si no puede confirmar | `skill({ name: "asesoria-legal-sg-sst" })` |
+
+- **Agente dedicado:** `legal-sg-sst` (`.opencode/agents/legal-sg-sst.md`, modo `all`). Es un envoltorio que carga el skill; es **solo consulta** (`edit` y `shell` en `deny`). Se invoca seleccionándolo como agente o delegándolo como subagente.
+- **Verificación:** el skill exige contrastar la norma en fuente oficial (Gestor Normativo, SUIN-Juriscol, MinTrabajo, MinSalud, SIC) antes de afirmar.
+- **Límite:** no sustituye asesoría jurídica profesional. La decisión final es del owner.
+- **Portabilidad:** el `SKILL.md` es el mismo formato que usa MiniMax; el agente solo existe en OpenCode.
+
 ### Skills de Superpowers (Plugin Global)
 
 Se activan con `skill({ name: "superpowers/<nombre>" })`. El plugin inyecta bootstrap context automaticamente en cada conversacion.
