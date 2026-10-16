@@ -181,8 +181,9 @@ function start() {
     migrate();
 
     const app = createApp();
-    const server = app.listen(config.port, () => {
+    const server = app.listen(config.port, config.host, () => {
       logger.info('Servicio de Firma escuchando', {
+        host: config.host,
         port: config.port,
         env: config.env,
         public_url: config.publicUrl,
