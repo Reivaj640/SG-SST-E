@@ -453,6 +453,23 @@
   display: none !important;
 }
 
+/* Los sub-modales (administrar templates, subir template, generar documento)
+   se abren DESDE DENTRO de otro modal. Todos los .fe-modal comparten z-index,
+   asi que cuando empatan el que gana el pintado es el que aparece mas tarde en
+   el DOM. En el markup de index.js el orden es: #fe-expediente-modal (238),
+   #fe-tpl-admin-modal (254), #fe-tpl-upload-modal (275), #fe-gen-modal (302).
+   Como #fe-gen-modal va de ultimo, quedaba encima: al pulsar "Subir template
+   ahora" desde el modal de Generar Documento el sub-modal SI se abria
+   (hidden=false) pero quedaba oculto bajo el overlay opaco del padre, con
+   cero error y cero toast. Este raise los pone por encima del modal de
+   expediente; entre admin y upload, upload ya va despues en el DOM, asi que
+   el orden interno se conserva. */
+#fe-gen-modal,
+#fe-tpl-admin-modal,
+#fe-tpl-upload-modal {
+  z-index: 10010;
+}
+
 .fe-modal__overlay {
   position: absolute;
   inset: 0;

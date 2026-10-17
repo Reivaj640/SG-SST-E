@@ -23,6 +23,7 @@ const { validateBody } = require('../middleware/validate');
 const { verifyLimiter } = require('../middleware/rateLimit');  // I-AUDIT-2026-09-10
 const publicFlow = require('../services/publicFlow');
 const signRequestService = require('../services/signRequest');
+const agreementService = require('../services/agreement');
 const storage = require('../services/storage');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
@@ -75,6 +76,43 @@ const rejectBody = z.object({
 });
 
 /**
+ * Resuelve el Acuerdo de uso que debe leer el firmante de ESTE sign request.
+ *
+ * Se busca por `agreement_version` (la version ligada a la solicitud), NO por la
+ * version activa. Razon: el consentimiento que se registra al marcar la casilla
+ * guarda `hash_texto_acuerdo` de esa version puntual. Si la version activa cambia
+ * entre que se creo la solicitud y que el firmante abre el enlace, mostrar el
+ * texto de la activa haria que el firmante leyera un documento cuyo hash no es
+ * el que queda archivado. Con getByVersion el texto mostrado y el hash
+ * registrado son siempre el mismo.
+ *
+ * Sign requests legacy (`agreement_version = null`, pre-Bloque A) no tienen
+ * version ligada: en ese caso se cae al acuerdo activo, que es lo que
+ * corresponde porque esos SR no se re-validan contra ninguna version.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {{version: string, texto: string, texto_hash: string}|null}
+ */
+function _resolverAcuerdoFirmante(signRequest) {
+  let acuerdo = null;
+  try {
+    acuerdo = signRequest.agreement_version
+      ? agreementService.getByVersion(signRequest.agreement_version)
+      : agreementService.getActive();
+  } catch (_) {
+    return null;
+  }
+  if (!acuerdo || typeof acuerdo.texto !== 'string' || acuerdo.texto.length === 0) {
+    return null;
+  }
+  return {
+    version: acuerdo.version,
+    texto: acuerdo.texto,
+    texto_hash: acuerdo.texto_hash,
+  };
+}
+
+/**
  * GET /s/:token
  *
  * Bifurcación por Accept:
@@ -120,6 +158,12 @@ router.get('/s/:token', (req, res, next) => {
       // La mini-app lo muestra como contexto ("Estás firmando un CONTRATO").
       // Puede ser null para sign requests legacy pre-migration 007.
       tipo_identificacion: signRequest.tipo_identificacion,
+      // Texto del Acuerdo de uso que la mini-app debe MOSTRAR antes de que el
+      // firmante marque la 3a casilla. Sin esto el backend archiva un
+      // hash_texto_acuerdo de un documento que el firmante nunca pudo leer:
+      // se registra una aceptacion sin que hubiera informacion. Ver
+      // _resolverAcuerdoFirmante.
+      acuerdo: _resolverAcuerdoFirmante(signRequest),
       // I-103.A1.6 · Correo enmascarado del firmante, para mostrar en la
       // pantalla OTP cuando el firmante re-abre el enlace y ya pasó por
       // identificación. Solo se expone si estado >= IDENTIFIED (después

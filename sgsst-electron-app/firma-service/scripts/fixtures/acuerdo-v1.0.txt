@@ -1,0 +1,604 @@
+ACUERDO SOBRE EL USO DEL MECANISMO DE FIRMA ELECTRÓNICA
+K+AIR
+
+Versión del Acuerdo: v1.0
+
+Alcance
+Este Acuerdo regula el uso del mecanismo de firma electrónica de K+AIR y aplica a
+todos los documentos que una Empresa envíe a firma de sus trabajadores por esa vía.
+No regula un documento en particular: el consentimiento sobre cada documento se
+manifiesta por separado, en los términos del Capítulo IX.
+
+Las partes identificadas en el Capítulo I hemos acordado lo siguiente.
+
+
+CAPÍTULO I. IDENTIFICACIÓN DE LAS PARTES
+
+1. IDENTIFICACIÓN DE LAS PARTES
+
+1.1. LA EMPRESA, en su calidad de empleador y de Responsable del Tratamiento de los
+datos personales a que se refiere el Capítulo X.
+
+Los datos de identificación de la Empresa (razón social, NIT, domicilio, representante
+legal, responsable interno del tratamiento de datos personales y canal de atención de
+peticiones, quejas, reclamos y solicitudes) NO forman parte de este Acuerdo, porque
+el Acuerdo es un documento único y compartido por todas las Empresas que usan K+AIR.
+Esos datos constan en la política de tratamiento de datos personales de la Empresa y
+en el Anexo de Transmisión de Datos Personales que la Empresa ha suscrito con K+AIR.
+El Firmante puede consultar ambos documentos antes de aceptar este Acuerdo y debe
+solicitar a la Empresa los datos que allí no figuren.
+
+1.2. EL TRABAJADOR, en su calidad de Titular de los datos personales y de Firmante.
+Sus datos de identificación los registra el propio Firmante al aceptar este Acuerdo,
+y quedan incorporados como evidencia de su manifestación de voluntad en los términos
+de los Capítulos IX y X.
+
+1.3. K+AIR, operada por JRFSoluciones, es el proveedor del mecanismo de firma
+electrónica descrito en el Capítulo III. K+AIR interviene como Encargado del
+Tratamiento de los datos personales a que se refiere el Capítulo X, por cuenta de la
+Empresa y únicamente dentro de los alcances, las finalidades y los plazos descritos en
+este Acuerdo. K+AIR no es parte de la relación laboral ni asume obligación alguna
+frente al Trabajador por dicha relación.
+
+
+CAPÍTULO II. OBJETO
+
+2. OBJETO
+
+2.1. Este Acuerdo es el acuerdo sobre el uso del mecanismo de firma electrónica por
+el cual las partes acuerdan el método que se utilizará para formar la firma
+electrónica, conforme a la definición del artículo 2.2.2.47.1, numeral 1, del Decreto
+1074 de 2015.
+
+2.2. Este Acuerdo se celebra al amparo del artículo 2.2.2.47.7 del Decreto 1074 de
+2015 y, cuando el documento que se firma sea el contrato individual de trabajo o sus
+adiciones, modificaciones o anexos, se rige por el artículo 2.2.1.1.13 del Decreto
+1072 de 2015, en los términos del parágrafo del artículo 2.2.1.1.9 de ese mismo
+Decreto.
+
+2.3. El contenido de este Acuerdo no sustituye ni modifica el documento que se firma.
+Las partes pueden pactar en el contrato mismo las condiciones adicionales que estimen
+procedentes, sin que ello altere las reglas mínimas previstas en la ley.
+
+
+CAPÍTULO III. MÉTODO DE FIRMA ELECTRÓNICA PACTADO
+
+3. MÉTODO DE FIRMA ELECTRÓNICA PACTADO
+
+3.1. El método pactado consiste en la generación de una firma electrónica por medio de
+un sistema de autenticación y verificación de identidad basado en un código de
+verificación de un solo uso, en adelante OTP, enviado al correo electrónico registrado
+por el Trabajador, previo enlace individual y de un solo uso remitido por la Empresa.
+
+3.2. La firma electrónica aquí pactada no es una firma digital criptográfica: es un
+mecanismo de verificación de identidad y de constancia de la expresión de voluntad del
+Firmante sobre un mensaje de datos concreto, conforme a las definiciones de los
+numerales 2, 3 y 4 del artículo 2.2.2.47.1 del Decreto 1074 de 2015.
+
+3.3. En este método, los datos de creación de la firma electrónica son el código OTP y
+el token de acceso de un solo uso. Ambos son únicos, personalísimos y permanecen bajo
+control exclusivo del Firmante.
+
+3.4. El flujo pactado es el siguiente:
+
+    a) La Empresa genera el documento objeto de la firma en formato PDF y lo remite a
+    K+AIR junto con la identificación del Trabajador.
+
+    b) K+AIR crea la solicitud de firma, le asigna un identificador único, calcula la
+    huella digital SHA-256 del PDF y remite al Trabajador, por correo electrónico, el
+    enlace de acceso a la solicitud.
+
+    c) El Trabajador abre el enlace recibido en el servicio de firma electrónica de
+    K+AIR. El enlace incorpora un token aleatorio, de un solo uso y de uso personal. En
+    la modalidad remota su vigencia es de setenta y dos (72) horas contadas desde su
+    emisión.
+
+    d) El Trabajador se identifica indicando el tipo y el número de su documento de
+    identidad. K+AIR compara el valor recibido con la información registrada por la
+    Empresa, mediante una comparación de huellas digitales con sal, y registra el
+    resultado de esa verificación.
+
+    e) Verificada la identificación, K+AIR envía al correo electrónico registrado un
+    código OTP de un solo uso, que expira a los seiscientos (600) segundos contados
+    desde su envío y admite un máximo de cinco (5) intentos de verificación. El código
+    nunca se almacena en texto claro: solo se conserva su huella digital con sal.
+
+    f) El Trabajador informa el código recibido y K+AIR verifica la coincidencia.
+
+    g) Superada la verificación, el Trabajador lee en pantalla el presente Acuerdo, en
+    la versión vigente, y lo acepta. Aceptarlo constituye una manifestación de voluntad
+    independiente, que K+AIR registra junto con la versión del Acuerdo, la huella
+    digital SHA-256 de su texto y la fecha y hora de aceptación. El Trabajador no puede
+    avanzar en el flujo sin leer y aceptar el Acuerdo.
+
+    h) El Trabajador visualiza y descarga el documento objeto de la firma.
+
+    i) El Trabajador procede a firmar. Inmediatamente después, K+AIR genera la
+    constancia de firma, con identificador único propio, y la incorpora al documento
+    firmado.
+
+3.5. Cuando corresponda la firma del representante legal de la Empresa, se repite el
+mismo flujo para éste, con su propio enlace, su propio código OTP, su propia
+verificación de identidad y su propia manifestación de aceptación de este Acuerdo. El
+representante legal de la Empresa no puede aceptar este Acuerdo por el Trabajador ni
+utilizar el código recibido por éste.
+
+3.6. Por cada firma se conservan los siguientes registros:
+
+    a) La huella digital SHA-256 del PDF original y la del PDF firmado.
+
+    b) La versión del Acuerdo aceptado y la huella digital SHA-256 de su texto.
+
+    c) Las fechas y horas de creación de la solicitud, de apertura del enlace, de
+    envío y de verificación del OTP, de aceptación del Acuerdo y de la firma.
+
+    d) El resultado de la verificación de identidad del Firmante.
+
+    e) El código OTP y el token de acceso, únicamente en forma de huella digital con sal
+    y nunca en texto claro.
+
+    f) La dirección IP y el agente de usuario desde los cuales el Firmante accede al
+    servicio.
+
+    g) El registro de auditoría de los eventos del proceso de firma, que no puede ser
+    alterado ni eliminado una vez registrado.
+
+    h) El documento firmado y la constancia de firma.
+
+3.7. Criterios de confiabilidad. Las partes declaran que el método pactado cumple,
+para el fin propio de cada documento firmado, con los dos criterios de confiabilidad
+exigidos por el artículo 2.2.2.47.4 del Decreto 1074 de 2015:
+
+    a) Los datos de creación de la firma, en el contexto en que son utilizados,
+    corresponden exclusivamente al Firmante. En efecto, el OTP y el token de acceso se
+    generan para una persona determinada, se remiten únicamente al medio de contacto
+    registrado por la Empresa para esa persona, tienen una vigencia breve y limitada,
+    admiten un número acotado de intentos y no pueden ser utilizados por un tercero.
+
+    b) Es posible detectar cualquier alteración no autorizada del mensaje de datos,
+    hecha después del momento de la firma. En efecto, el documento se identifica por su
+    huella digital SHA-256, la cual se registra y se conserva junto con la huella de su
+    versión final firmada; toda modificación del contenido altera su huella digital y es,
+    por tanto, detectable.
+
+3.8. Presunción y carga de demostrar. De conformidad con el artículo 2.2.2.47.7 del
+Decreto 1074 de 2015, salvo prueba en contrario se presume que los mecanismos o técnicas
+de identificación personal o autenticación electrónica acordados mediante este Acuerdo
+cumplen los requisitos de firma electrónica. La parte que provee el método, es decir la
+Empresa por medio del servicio contratado a K+AIR, debe asegurarse de que sus mecanismos
+son técnicamente seguros y confiables para el propósito de los mismos, y le corresponde
+demostrar estos requisitos en caso de que sea necesario. La Empresa conservará la
+evidencia técnica y los registros del proceso de firma mientras sean exigibles las
+obligaciones de conservación del Capítulo VIII.
+
+3.9. El uso del mecanismo no exime a la Empresa de las obligaciones de seguridad,
+confidencialidad y custodia que la ley y los reglamentos imponen sobre los documentos
+que remite a firma.
+
+
+CAPÍTULO IV. EFECTOS JURÍDICOS
+
+4. EFECTOS JURÍDICOS
+
+4.1. De conformidad con el artículo 2.2.2.47.5 del Decreto 1074 de 2015, la firma
+electrónica tiene la misma validez y efectos jurídicos que la firma, si cumple los
+requisitos establecidos en el artículo 2.2.2.47.3 de ese Decreto.
+
+4.2. De conformidad con el artículo 2.2.2.47.3 del Decreto 1074 de 2015, el requisito
+de firma de una persona queda cumplido en relación con un mensaje de datos cuando se
+utiliza una firma electrónica que, a la luz de todas las circunstancias del caso,
+incluido este Acuerdo, sea tan confiable como apropiada para los fines con los cuales
+se generó o comunicó ese mensaje.
+
+4.3. De conformidad con el parágrafo 2 del artículo 2.2.1.1.10 del Decreto 1072 de
+2015, la firma electrónica tiene los mismos efectos que la firma manuscrita si aquella
+cumple con los requisitos establecidos en el artículo 2.2.2.47.3 del Decreto 1074 de
+2015.
+
+4.4. De conformidad con el artículo 244 de la Ley 1564 de 2012, los documentos en forma
+de mensaje de datos se presumen auténticos.
+
+4.5. La validez, la eficacia y la fuerza probatoria de la firma realizada mediante este
+mecanismo no se afectan por la finalización de la relación laboral, conforme al numeral
+3 del artículo 2.2.1.1.13 del Decreto 1072 de 2015.
+
+
+CAPÍTULO V. DEBERES DEL FIRMANTE
+
+5. DEBERES DEL FIRMANTE
+
+5.1. El Firmante reconoce y acepta los deberes y obligaciones que el artículo
+2.2.2.47.6 del Decreto 1074 de 2015 impone a quien firma electrónicamente, y se
+compromete a cumplirlos:
+
+    a) Cumplir las condiciones y los usos previstos en este Acuerdo, en la legislación
+    aplicable y en las políticas de seguridad de la Empresa y de K+AIR.
+
+    b) Custodiar y mantener bajo su exclusivo control sus datos de creación de la firma,
+    esto es, el código OTP y el token de acceso, y no entregarlos, no compartirlos y no
+    permitir que un tercero los utilice.
+
+    c) Avisar de inmediato a la Empresa y a K+AIR cualquier situación que comprometa la
+    seguridad de sus datos de creación de la firma, tales como el acceso no autorizado a
+    su correo electrónico, la pérdida de control del dispositivo desde el que accede al
+    servicio o el conocimiento de que un tercero ha obtenido o ha utilizado su código de
+    verificación o su enlace de firma.
+
+5.2. El código OTP y el token de acceso son personales e intransferibles. El Firmante
+que los comparta o los entregue a un tercero responde por las firmas que se generen con
+su uso indebido.
+
+5.3. El Firmante se obliga a revisar el documento objeto de la firma antes de firmarlo y
+a firmar únicamente documentos cuyo contenido sea exacto, completo y corresponda a lo que
+la Empresa le ha informado.
+
+5.4. El Firmante puede imprimir o descargar copia de este Acuerdo y del documento
+firmado desde el propio enlace de firma, sin costo alguno.
+
+5.5. Lo dispuesto en este Capítulo no limita los deberes del Trabajador frente a la
+Empresa, ni sustituye las obligaciones derivadas del contrato de trabajo.
+
+
+CAPÍTULO VI. REGLAS DE USO
+
+6. REGLAS DE USO
+
+6.1. De conformidad con el artículo 2.2.1.1.13 del Decreto 1072 de 2015, para el uso de
+la firma electrónica se tienen en cuenta las siguientes reglas:
+
+    a) La vigencia de la firma corresponde a la misma del contrato y sus
+    correspondientes adiciones y modificaciones, en caso de que llegaren a convenirse
+    o requerirse.
+
+    b) El uso de la firma electrónica no tiene ningún costo para el Trabajador y
+    corresponde exclusivamente al empleador el pago de cualquier valor asociado que se
+    llegase a ocasionar.
+
+    c) Su uso entre Trabajador y empleador es exclusivo para la relación laboral, sin
+    que, a la finalización de ésta, el contrato de trabajo, sus adiciones y
+    modificaciones firmados electrónicamente pierdan su validez, eficacia y fuerza
+    probatoria.
+
+    d) El empleador garantiza que el mecanismo utilizado para la firma electrónica
+    cumple con las condiciones establecidas en el artículo 2.2.2.47.4 del Decreto 1074
+    de 2015.
+
+6.2. Las reglas del numeral anterior son de cumplimiento obligatorio para el contrato
+individual de trabajo y sus adiciones, modificaciones y anexos. Para los demás
+documentos de la relación laboral que la Empresa remita a firma mediante este
+mecanismo, la Empresa se obliga contractualmente a aplicar las mismas reglas. El
+incumplimiento de cualquiera de ellas es responsabilidad de la Empresa y no afecta al
+Firmante.
+
+
+CAPÍTULO VII. FIRMA AUTOGRÁFICA Y NO BARRERA DE ACCESO AL EMPLEO
+
+7. FIRMA AUTOGRÁFICA Y NO BARRERA DE ACCESO AL EMPLEO
+
+7.1. De conformidad con el artículo 2.2.1.1.11 del Decreto 1072 de 2015, la Empresa debe
+proveer al Trabajador de los medios necesarios para el uso de la firma electrónica,
+mediante desarrollos tecnológicos propios o contratados con terceros, siempre que
+cumplan con las condiciones previstas en el artículo 2.2.2.47.4 del Decreto 1074 de 2015.
+
+7.2. El Trabajador tiene derecho a que la Empresa le provea la firma de forma
+autográfica, sobre soporte papel, en todo momento y sin costo alguno, y a que el
+documento así firmado tenga la misma validez y efectos que el firmado
+electrónicamente.
+
+7.3. La imposibilidad de firmar electrónicamente un documento no será una barrera de
+acceso al empleo, no habilitará a la Empresa para iniciar procedimiento disciplinario
+alguno por el solo hecho de que el Trabajador no utilice este mecanismo, y no será causa
+de terminación de la relación laboral.
+
+
+CAPÍTULO VIII. SUMINISTRO DE COPIAS Y CONSERVACIÓN
+
+8. SUMINISTRO DE COPIAS Y CONSERVACIÓN
+
+8.1. De conformidad con el artículo 2.2.1.1.12 del Decreto 1072 de 2015, la Empresa
+conservará los documentos firmados electrónicamente mediante mecanismos técnicos que
+garanticen la autenticidad, la integridad y la disponibilidad de los documentos.
+
+8.2. El documento firmado, sus anexos y sus modificaciones serán suministrados siempre
+al Trabajador a través de un medio electrónico autorizado por el mismo. El Trabajador
+autoriza como medios electrónicos los siguientes: el correo electrónico registrado en su
+hoja de vida y el enlace de firma electrónica de K+AIR. El Trabajador puede modificar
+esta autorización en cualquier momento y sin costo alguno.
+
+8.3. Los documentos firmados electrónicamente se mantendrán disponibles para posterior
+consulta en el formato en que fueron creados.
+
+8.4. Cuando sea necesario, la Empresa suministrará a las autoridades judiciales y a las
+de inspección, vigilancia y control en asuntos laborales y administrativas los documentos
+firmados electrónicamente que sean requeridos.
+
+8.5. La Empresa reconocerá el término copia al documento firmado electrónicamente como
+un documento físico entregado al destinatario. El Trabajador tiene derecho a obtener de
+la Empresa, en cualquier momento y sin costo, una copia de su documento firmado.
+
+8.6. PLAZO DE CONSERVACIÓN. El plazo de conservación de los registros del proceso de
+firma se determina por la tabla de retención documental de la Empresa, la cual
+constituye la referencia vigente de esa Empresa y no se modifica por este Acuerdo. Este
+Acuerdo no fija un plazo propio porque la ley no lo fija. La Empresa debe comunicar al
+Trabajador, antes de solicitarle la firma, el plazo que le resulta aplicable al
+documento objeto de la firma y dónde puede ejercer, en cualquier momento, una solicitud
+de copia. Vencido ese plazo y sin que exista un deber legal o contractual de
+conservación, el dato se suprime.
+
+8.7. Si la conservación se efectúa mediante herramientas o sistemas externos, la Empresa
+responde por la integridad, disponibilidad y confidencialidad de la información a través
+de un contrato con el proveedor, en los términos del Capítulo X.
+
+
+CAPÍTULO IX. MANIFESTACIÓN DE VOLUNTAD Y VERSIONAMIENTO
+
+9. MANIFESTACIÓN DE VOLUNTAD Y VERSIONAMIENTO
+
+9.1. La aceptación de este Acuerdo es una manifestación de voluntad independiente de la
+manifestación de voluntad sobre cada documento. Aceptar el mecanismo no importa, ni
+sustituye, la aceptación del contenido del documento que se firma.
+
+9.2. El Trabajador puede leer este Acuerdo antes de firmar. El sistema muestra la versión
+vigente del Acuerdo en el momento mismo de la firma, habilita la casilla de aceptación
+sólo cuando el texto ha sido leído en su totalidad, y registra la aceptación con la huella
+digital del texto y la fecha y hora.
+
+9.3. Este Acuerdo se versiona. Cada versión tiene un identificador único y una huella
+digital SHA-256, que el sistema muestra junto al texto. El Trabajador puede solicitar a
+la Empresa copia de la versión del Acuerdo que aceptó y, a través de ésta, verificar su
+integridad.
+
+9.4. La modificación del contenido de este Acuerdo requiere la publicación de una versión
+nueva con su propia huella digital.
+
+9.5. Este Acuerdo es de aplicación desde su fecha de vigencia y no tiene efectos
+retroactivos. El Trabajador que haya aceptado una versión anterior se rige por esa versión
+respecto de las firmas ya realizadas. Para las firmas posteriores a la entrada en
+vigencia de una versión nueva, el Trabajador debe leer y aceptar esa versión nueva en el
+momento mismo de la firma.
+
+9.6. La constancia de firma identifica la versión del Acuerdo aceptada y la huella
+digital de su texto, de modo que la firma puede vincularse de manera verificable al texto
+vigente en el momento de la aceptación.
+
+
+CAPÍTULO X. TRATAMIENTO DE DATOS PERSONALES
+
+10. TRATAMIENTO DE DATOS PERSONALES
+
+10.1. Responsable y Encargado. La Empresa es el Responsable del Tratamiento y K+AIR es
+el Encargado, conforme a las definiciones de los literales d) y e) del artículo 3 de la
+Ley 1581 de 2012. K+AIR trata los datos únicamente por cuenta de la Empresa, dentro de
+los alcances, finalidades y plazos de este Acuerdo y conforme al contrato de
+transmisión de datos firmado entre las partes, en los términos del artículo 25 del
+Decreto 1377 de 2013.
+
+10.2. Datos que se tratan. Para la ejecución de este Acuerdo y del proceso de firma se
+tratan los siguientes datos personales del Titular:
+
+    a) Tipo y número del documento de identidad.
+
+    b) Dirección de correo electrónico.
+
+    c) Dirección IP desde la que accede al servicio.
+
+    d) Agente de usuario del dispositivo desde el que accede al servicio.
+
+    e) Fechas y horas de las distintas etapas del proceso de firma.
+
+    f) El documento que se firma y la constancia de firma.
+
+    g) Los datos de identificación laboral que la Empresa haya inscritos en la
+    solicitud de firma, como el identificador del trabajador, el identificador del
+    documento a firmar y la categoría de éste.
+
+    Este numeral no autoriza a la Empresa a enviar al servicio datos distintos de los
+    aquí relacionados. Cualquier dato adicional sobre el Titular requiere una
+    actualización previa de este Acuerdo.
+
+10.3. Finalidades. El tratamiento se realiza exclusivamente para las siguientes
+finalidades:
+
+    a) Crear y gestionar la solicitud de firma.
+
+    b) Enviar al Titular el enlace de acceso y el código OTP.
+
+    c) Verificar la identidad del Firmante.
+
+    d) Registrar y conservar su manifestación de aceptación de este Acuerdo.
+
+    e) Generar y entregar la constancia de firma.
+
+    f) Conservar la evidencia del proceso de firma por el tiempo indicado en el numeral
+    8.6.
+
+    g) Atender peticiones, quejas, reclamos y solicitudes relacionadas con el proceso de
+    firma.
+
+    h) Cumplir obligaciones legales, administrativas o judiciales que resulten aplicables.
+
+    No se tratará la información con ninguna otra finalidad. Los datos y la evidencia del
+    proceso de firma no se utilizarán para fines distintos de los aquí previstos ni se
+    compartirán con terceros distintos del Encargado, salvo autorización expresa del
+    Titular u obligación legal que lo exija.
+
+10.4. Base legal de cada finalidad.
+
+    a) La finalidad del numeral 10.3, literal f), se sustenta en el deber legal de
+    conservar evidencia suficiente de la manifestación de voluntad y del proceso de
+    firma, en los términos de los artículos 2.2.1.1.12 y 2.2.1.1.13 del Decreto 1072
+    de 2015 y 2.2.2.47.7 del Decreto 1074 de 2015, así como en el deber del Responsable
+    de conservar prueba de la autorización otorgada por el Titular. Esta base legal
+    opera sin perjuicio de la autorización del Titular.
+
+    b) Las demás finalidades se sustentan en la autorización expresa, informada y
+    separable otorgada por el Titular al aceptar este Acuerdo. Esa autorización es
+    independiente de la aceptación del mecanismo y puede revocarse en cualquier momento
+    en los términos del numeral 10.7.
+
+10.5. Forma de tratamiento y medidas de seguridad.
+
+    a) El número del documento de identidad se compara mediante huella digital con sal y
+    se conserva únicamente esa huella, no el número en texto claro.
+
+    b) El código OTP y el token de acceso se conservan únicamente en forma de huella
+    digital con sal.
+
+    c) El documento se identifica por su huella digital SHA-256 y toda modificación de su
+    contenido resulta detectable.
+
+    d) Los registros de auditoría no pueden alterarse ni eliminarse una vez escritos.
+
+    e) El acceso a la información está restringido al personal autorizado por la Empresa
+    y por K+AIR, conforme a la política de seguridad de cada uno.
+
+    f) Los operadores de infraestructura y de correo electrónico que intervengan en el
+    servicio actuarán como Encargados y tratarán los datos únicamente conforme a las
+    instrucciones de la Empresa y de K+AIR, en los términos del artículo 25 del Decreto
+    1377 de 2013.
+
+10.6. PLAZO DE CONSERVACIÓN POR CATEGORÍA DE DATO. Los plazos de conservación se
+determinan por categoría de dato en la tabla de retención documental de la Empresa, que
+es su referencia vigente. Vencido el plazo y sin que exista un deber legal o contractual
+de conservación, el dato se suprime conforme a la política de la Empresa. Los plazos
+para los archivos del sistema de gestión de seguridad y salud en el trabajo son los que
+establezca la normativa de dicho sistema y, en su defecto, los de la tabla de retención
+documental de la Empresa.
+
+10.7. Derechos del Titular y forma de ejercicio.
+
+    a) El Titular puede ejercer sus derechos de conocer, actualizar, rectificar, suprimir
+    y revocar la autorización, acceder a sus datos y presentar quejas ante la
+    Superintendencia de Industria y Comercio, en los términos de los artículos 8 y 15 de
+    la Ley 1581 de 2012.
+
+    b) Los derechos se ejercen ante la Empresa, en su calidad de Responsable del
+    Tratamiento, a través del canal de atención que la Empresa tenga publicado en su
+    política de tratamiento de datos personales. K+AIR, en su calidad de Encargado, no
+    recibe ni resuelve por su propia cuenta las solicitudes de los Titulares.
+
+    c) El Titular debe acreditar su identidad. El ejercicio de los derechos y el acceso a
+    los datos son gratuitos, al menos una vez al mes calendario y cada vez que existan
+    modificaciones sustanciales de la política de tratamiento.
+
+    d) La Empresa responde dentro de los plazos previstos en la ley. Si no fuere
+    posible, debe informar al Titular los motivos de la demora y la fecha en que se
+    atenderá su solicitud.
+
+    e) El Titular debe acudir primero a la Empresa. Sólo procede acudir a la
+    Superintendencia de Industria y Comercio una vez agotado el reclamo interno, de
+    conformidad con el artículo 15 de la Ley 1581 de 2012.
+
+    f) La solicitud de copia constituye un derecho de acceso y no implica por sí misma un
+    derecho de supresión. La supresión del dato y la revocatoria de la autorización no
+    procederán cuando el Titular tenga un deber legal o contractual de permanecer en la
+    base de datos, en los términos del artículo 9 del Decreto 1377 de 2013, compilado
+    en el artículo 2.2.2.25.2.6 del Decreto 1074 de 2015.
+
+    g) Las copias entregadas al Titular son copia fiel de los documentos registrados,
+    conservan su valor probatorio y no pueden alterarse. El Titular no debe modificar,
+    directa o indirectamente, un documento firmado ni su constancia.
+
+10.8. Documentos con información de salud.
+
+    a) Cuando un documento objeto de firma contenga información relativa a la salud, el
+    Titular debe ser informado de manera explícita y previa de que el dato es sensible,
+    de cuáles son los datos que serán objeto de tratamiento y de la finalidad de éste, y
+    debe otorgar su consentimiento expreso, en los términos del artículo 6 de la Ley
+    1581 de 2012 y del artículo 6 del Decreto 1377 de 2013, compilado en el artículo
+    2.2.2.25.2.3 del Decreto 1074 de 2015. En dicho evento debe informársele igualmente
+    que, por tratarse de datos sensibles, no está obligado a autorizar su tratamiento.
+
+    b) Ninguna actividad puede condicionarse a que el Titular suministre datos
+    personales sensibles.
+
+    c) BASE LEGAL. Para el tratamiento de la información de salud de que trata este
+    numeral, la base legal es la autorización expresa del Titular en los términos de la
+    literal anterior. Si la Empresa fundara el tratamiento en una base legal distinta,
+    debe informárselo al Titular de forma expresa y anticipada antes de recoger el dato, y
+    esa base debe constar en su política de tratamiento de datos personales.
+
+10.9. Responsabilidad. La Empresa responde por el cumplimiento de la normatividad de
+protección de datos personales en su relación con los Titulares. K+AIR responde por tratar
+los datos únicamente por cuenta de la Empresa y conforme a sus instrucciones.
+
+
+CAPÍTULO XI. NOTIFICACIONES
+
+11. NOTIFICACIONES
+
+11.1. Toda notificación se realiza por escrito, al correo electrónico registrado por el
+Trabajador o a la dirección física registrada ante la Empresa, o por los canales internos
+de comunicación que la Empresa utilice.
+
+11.2. Las notificaciones relativas al ejercicio de derechos del Titular se realizan por
+el canal de atención publicado por la Empresa en su política de tratamiento de datos
+personales.
+
+11.3. K+AIR puede comunicar al Firmante, mediante el propio enlace de firma y el correo
+electrónico registrado, los mensajes estrictamente necesarios para la ejecución del
+proceso de firma.
+
+
+CAPÍTULO XII. LEY APLICABLE Y DISPOSICIONES FINALES
+
+12. LEY APLICABLE Y DISPOSICIONES FINALES
+
+12.1. El presente Acuerdo se rige por la ley colombiana y, en particular, por las
+siguientes disposiciones: Ley 527 de 1999; Ley 1562 de 2012; Ley 1564 de 2012; Ley
+1581 de 2012; Decreto 1377 de 2013; Decreto 1072 de 2015; Decreto 1074 de 2015; y las
+normas que los modifiquen, complementen o sustituyan.
+
+12.2. La validez de la firma electrónica se determina conforme a las reglas del Capítulo
+IV. El régimen de protección de datos personales es el de la Ley 1581 de 2012 y el Decreto
+1377 de 2013.
+
+12.3. El régimen de los documentos del sistema de gestión de seguridad y salud en el
+trabajo se determina por la normativa de dicho sistema, por la Ley 1562 de 2012 y por la
+Resolución 0312 de 2019, en cuanto resulten aplicables. Para esos documentos las reglas
+del Capítulo VI no son de imposición legal directa, porque el artículo 2.2.1.1.13 del
+Decreto 1072 de 2015 está dirigido al contrato individual de trabajo, pero la Empresa se
+obliga contractualmente a aplicarlas en los mismos términos del numeral 6.2.
+
+12.4. La nulidad o invalidez de cualquiera de sus disposiciones no afecta a las demás.
+Este Acuerdo no contiene estipulaciones contrarias a la ley.
+
+12.5. Este Acuerdo se celebra por medios electrónicos y su aceptación electrónica por el
+Trabajador produce los mismos efectos que la suscripción autográfica.
+
+12.6. El Trabajador declara que ha leído, comprendido y aceptado de manera libre y
+voluntaria la totalidad de este Acuerdo, que ha tenido la oportunidad de solicitar
+aclaraciones a la Empresa y que no ha sido objeto de condición, presión o coacción
+alguna.
+
+12.7. La Empresa conserva la prueba de la aceptación de este Acuerdo por el Trabajador,
+junto con la versión aceptada, la huella digital de su texto, la fecha y hora y el
+identificador de la solicitud, de conformidad con el artículo 2.2.2.25.2.5 del Decreto
+1074 de 2015.
+
+
+MANIFESTACIÓN DE VOLUNTAD
+
+Yo, el Trabajador identificado en el Capítulo I, declaro que:
+
+1. He leído, comprendido y aceptado en su totalidad el Acuerdo sobre el uso del
+mecanismo de firma electrónica de K+AIR, versión v1.0, que se me ha presentado en
+pantalla.
+
+2. Acepto el uso del mecanismo de firma electrónica descrito en el Capítulo III para la
+firma de documentos en mi relación laboral.
+
+3. Autorizo de manera expresa, informada y separable el tratamiento de mis datos
+personales en los términos y con las finalidades del Capítulo X.
+
+4. Entiendo que esta aceptación es independiente de cada documento que firme y que puedo
+imprimir o descargar copia de este Acuerdo.
+
+5. Entiendo que la firma electrónica aquí pactada tiene la misma validez y efectos
+jurídicos que la firma manuscrita, y que puedo solicitar a la Empresa la firma
+autográfica sobre papel, sin costo alguno, en cualquier momento.
+
+Fecha y hora de aceptación: [registrada por el sistema]
+Versión del Acuerdo aceptada: [registrada por el sistema]
+Huella digital del texto: [registrada por el sistema]
+Firma del Trabajador: [registrada por el sistema]

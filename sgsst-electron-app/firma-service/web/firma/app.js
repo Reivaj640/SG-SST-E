@@ -446,6 +446,81 @@
   // 4. Pantalla: Documento (PDF + manifestación)
   // ============================================================
 
+  /**
+   * Pinta el Acuerdo de uso y controla la 3a casilla de aceptacion.
+   *
+   * Reglas:
+   *  - Sin acuerdo en el contexto -> error visible y casilla deshabilitada
+   *    de forma permanente. No hay forma de saltarse la lectura.
+   *  - Con acuerdo -> se pinta con textContent (NUNCA innerHTML: es contenido
+   *    que el firmante tiene que leer y poder copiar literal) y la casilla se
+   *    habilita solo cuando el texto quedo completo a la vista.
+   *  - Si el texto no desborda el recuadro ya esta completo a la vista: se
+   *    habilita de inmediato, sin exigir un scroll que no existe.
+   *
+   * El hash del texto se deja en data-hash a proposito: es publico y permite
+   * que el firmante o un tercero verifiquen que lo que leyo es exactamente lo
+   * que el backend archivo.
+   */
+  function renderAcuerdo(contexto) {
+    const panel = $('#acuerdo-panel');
+    const box = $('#acuerdo-texto');
+    const versionEl = $('#acuerdo-version');
+    const versionInline = $('#acuerdo-version-inline');
+    const nota = $('#acuerdo-nota');
+    const errorBox = $('#acuerdo-error');
+    const check = $('#consentimiento_aceptado');
+    if (!panel || !box || panel.dataset.rendered === '1') return;
+
+    const acuerdo = contexto && contexto.acuerdo;
+
+    if (!acuerdo || !acuerdo.texto) {
+      panel.dataset.rendered = '1';
+      if (errorBox) {
+        errorBox.textContent =
+          'No pudimos cargar el Acuerdo de uso que debes aceptar. ' +
+          'Contacta a tu empleador antes de firmar.';
+        errorBox.hidden = false;
+      }
+      panel.hidden = true;
+      if (check) {
+        check.disabled = true;
+        check.checked = false;
+      }
+      return;
+    }
+
+    panel.hidden = false;
+    box.textContent = acuerdo.texto;
+    box.dataset.hash = acuerdo.texto_hash || '';
+    if (versionEl) versionEl.textContent = acuerdo.version || '';
+    if (versionInline) {
+      versionInline.textContent = acuerdo.version
+        ? 'Acuerdo de uso ' + acuerdo.version
+        : 'Acuerdo de uso';
+    }
+
+    if (check) check.disabled = true;
+    const desborda = box.scrollHeight > box.clientHeight + 4;
+    if (!desborda) {
+      panel.dataset.rendered = '1';
+      if (check) check.disabled = false;
+      if (nota) nota.hidden = true;
+      return;
+    }
+
+    if (nota) nota.hidden = false;
+    const alLeerElFinal = function () {
+      if (box.scrollTop + box.clientHeight < box.scrollHeight - 8) return;
+      box.removeEventListener('scroll', alLeerElFinal);
+      panel.dataset.rendered = '1';
+      if (check) check.disabled = false;
+      if (nota) nota.hidden = true;
+    };
+    box.addEventListener('scroll', alLeerElFinal);
+    box.focus();
+  }
+
   function setupDocumentScreen() {
 
     const pdfViewer = $('#pdf-viewer');
@@ -505,6 +580,9 @@
     const check1 = $('#manifestacion_leido');
     const check2 = $('#manifestacion_voluntad');
     const check3 = $('#consentimiento_aceptado');   // Bloque E6.5: 3ª casilla
+
+    // El Acuerdo se pinta y la 3a casilla se habilita solo tras leerlo.
+    renderAcuerdo(state.contexto);
     const btnCommit = $('#btn-commit');
     const btnReject = $('#btn-reject');
 
@@ -739,13 +817,44 @@
 
   function renderVerifyContext(ctx) {
     // Status badge
+    //
+    // Este banner antes dependía SOLO de ctx.estado y decía "Firma verificada —
+    // documento íntegro" sin que nadie hubiera comprobado nada: el servidor solo
+    // devolvía el hash guardado. Ahora el servidor recalcula el SHA-256 del PDF
+    // firmado y devuelve integridad_documento. La UI distingue tres hechos que
+    // antes iban fundidos en uno solo:
+    //   1) la firma quedó registrada;
+    //   2) el servidor comprobó que su archivo sigue íntegro;
+    //   3) el usuario subió su copia y coincidió (eso lo muestra verify-pdf).
     var statusEl = $('#verify-status');
     if (statusEl) {
       var isSigned = (ctx.estado === 'SIGNED' || ctx.estado === 'DUAL_FIRMADO');
-      statusEl.className = 'alert ' + (isSigned ? 'alert-success' : 'alert-info');
-      statusEl.innerHTML = isSigned
-        ? '<h3>✅ Firma verificada — documento íntegro</h3>'
-        : '<h3>⏳ Documento aún no firmado</h3><p>Estado actual: ' + escHtml(ctx.estado) + '</p>';
+      var integ = ctx.integridad_documento || null;
+      var clase = 'alert ';
+      var html;
+      if (isSigned && integ && integ.verificado && integ.coincide) {
+        clase += 'alert-success';
+        html = '<h3>Firma registrada y documento íntegro</h3>' +
+          '<p>El servidor recalculó la huella del archivo que almacena y coincide ' +
+          'con la que quedó registrada en el momento de la firma. Abajo puedes ' +
+          'comprobar que <em>tu</em> copia es la misma.</p>';
+      } else if (isSigned && integ && integ.verificado && !integ.coincide) {
+        clase += 'alert-error';
+        html = '<h3>El archivo almacenado no coincide con la firma</h3>' +
+          '<p>' + escHtml(integ.motivo || 'El archivo fue alterado después de la firma.') +
+          ' <strong>No confíes en este documento y contacta a tu empleador.</strong></p>';
+      } else if (isSigned) {
+        clase += 'alert-info';
+        html = '<h3>Firma registrada, integridad no comprobada</h3>' +
+          '<p>' + escHtml(integ && integ.motivo
+            ? integ.motivo
+            : 'El servidor no pudo comprobar la integridad del archivo.') + '</p>';
+      } else {
+        clase += 'alert-info';
+        html = '<h3>Documento aún no firmado</h3><p>Estado actual: ' + escHtml(ctx.estado) + '</p>';
+      }
+      statusEl.className = clase;
+      statusEl.innerHTML = html;
       statusEl.hidden = false;
     }
 

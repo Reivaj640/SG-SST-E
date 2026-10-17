@@ -1813,6 +1813,61 @@ function getVerificationContext(token) {
     }
   }
 
+  // Verificación REAL de integridad del archivo firmado.
+  //
+  // Antes esta función solo devolvía el hash que quedó registrado al momento de
+  // la firma, y la mini-app lo pintaba como "documento íntegro" sin que nadie
+  // hubiera recalculado nada. Si el PDF almacenado se alteraba después de
+  // firmar, la pantalla seguía mostrando el banner verde y los hashes
+  // originales: afirmaba integridad sobre un archivo que no había comprobado.
+  //
+  // Ahora sí se recalcula el SHA-256 del PDF firmado en disco y se compara con
+  // el hash archivado. `verificado` distingue "no comprobamos" de "comprobamos
+  // y NO coincide", porque la UI no debe afirmar integridad cuando no hay nada
+  // que haya, ni quedarse callada cuando hay una discrepancia.
+  var integridad = { verificado: false, coincide: false, motivo: null };
+  // Firma dual (I-FIRMA-DUAL): el commit del representante marca DUAL_FIRMADO
+  // en el padre Y en el hijo (publicFlow.js, cierre de firma dual), pero el PDF
+  // firmado y su hash solo quedan en la fila del hijo. Si nos fijamos solo en
+  // esta fila, el padre se veria como "sin archivo firmado" aunque la firma sea
+  // valida. Cuando estamos en esa situacion resolvemos el hijo y verificamos
+  // contra SU archivo, que es el unico que existe.
+  var fila_para_verificar = signRequest;
+  if (
+    signRequest.estado === 'DUAL_FIRMADO' &&
+    !signRequest.pdf_firmado_path &&
+    signRequest.id_solicitud
+  ) {
+    try {
+      var hijoDual = db.prepare(
+        'SELECT pdf_firmado_path, document_hash_firmado FROM gh_firmas_electronicas WHERE parent_id_solicitud = ? AND pdf_firmado_path IS NOT NULL LIMIT 1'
+      ).get(signRequest.id_solicitud);
+      if (hijoDual) fila_para_verificar = hijoDual;
+    } catch (_) {
+      // Si la consulta falla seguimos con la fila original: peor no verificar
+      // que romper la pantalla de verificacion.
+    }
+  }
+  if (!fila_para_verificar.document_hash_firmado || !fila_para_verificar.pdf_firmado_path) {
+    integridad.motivo =
+      'Este documento no tiene un archivo firmado con hash asociado.';
+  } else {
+    var almacenado = storage.readPdfIfExists(fila_para_verificar.pdf_firmado_path);
+    if (!almacenado.found) {
+      integridad.motivo =
+        'No fue posible localizar el archivo firmado en el servidor.';
+    } else {
+      integridad.verificado = true;
+      integridad.coincide =
+        sha256(almacenado.buffer) === fila_para_verificar.document_hash_firmado;
+      if (!integridad.coincide) {
+        integridad.motivo =
+          'El archivo almacenado NO coincide con el hash registrado en la firma. ' +
+          'Fue alterado después de firmarse.';
+      }
+    }
+  }
+
   return {
     id_solicitud: signRequest.id_solicitud,
     id_documento: signRequest.id_documento,
@@ -1828,6 +1883,7 @@ function getVerificationContext(token) {
     document_hash_original: signRequest.document_hash_original,
     document_hash_firmado: signRequest.document_hash_firmado,
     evidence_hash: signRequest.evidence_hash,
+    integridad_documento: integridad,
     firmante: firmante,
     firmante_trabajador: firmanteTrabajador, // null para SRs no-duales
     version_kair: signRequest.version_kair,

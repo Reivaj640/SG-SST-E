@@ -89,6 +89,28 @@
         </iframe>
       </div>
       <form id="form-commit">
+        <!--
+          Acuerdo de uso. El texto llega en el contexto publico (GET /s/:token
+          -> campo `acuerdo`) y se pinta con textContent, nunca con innerHTML:
+          es contenido que el firmante debe leer y copiar literalmente.
+
+          La 3a casilla permanece deshabilitada hasta que el texto se haya
+          leído hasta el final. Antes el rotulo decia "v1.0" fijo y el texto
+          no se mostraba en ninguna parte, asi que el backend archivaba un
+          hash de un acuerdo que nadie habia leido.
+        -->
+        <section class="acuerdo" id="acuerdo-panel" aria-labelledby="acuerdo-titulo">
+          <h3 class="acuerdo__titulo" id="acuerdo-titulo">
+            Acuerdo sobre el uso del mecanismo de firma electrónica
+            <span class="acuerdo__version" id="acuerdo-version"></span>
+          </h3>
+          <div class="alert alert-error" id="acuerdo-error" hidden></div>
+          <div class="acuerdo__texto" id="acuerdo-texto" tabindex="0" role="region"
+               aria-label="Texto del acuerdo de uso"></div>
+          <p class="acuerdo__nota" id="acuerdo-nota" hidden>
+            Desplácese hasta el final del acuerdo para habilitar la casilla de aceptación.
+          </p>
+        </section>
         <div class="manifestacion">
           <label class="checkbox-label">
             <input type="checkbox" id="manifestacion_leido" required>
@@ -99,8 +121,10 @@
             <span>Manifiesto mi voluntad libre y consciente de firmar este documento electrónicamente mediante la verificación de mi correo (código OTP), conforme al art. 2.2.2.47.7 del Decreto 1074 de 2015. Acepto que mi identificación, dirección IP y datos del dispositivo queden registrados como evidencia de esta firma y autorizo su tratamiento conforme a la Ley 1581 de 2012.</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="consentimiento_aceptado" required>
-            <span>Acepto el Acuerdo de consentimiento v1.0 y autorizo el tratamiento de mis datos conforme a sus términos.</span>
+            <input type="checkbox" id="consentimiento_aceptado" required disabled>
+            <span>He leído y acepto el <strong id="acuerdo-version-inline">Acuerdo de uso</strong> que
+            aparece arriba, y autorizo el tratamiento de mis datos personales conforme a sus
+            términos.</span>
           </label>
         </div>
         <div id="commit-error" class="alert alert-error" hidden></div>

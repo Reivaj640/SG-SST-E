@@ -663,6 +663,24 @@
         .firma-btn-configured:hover {
             background: #d1fae5;
         }
+        /* 📦903 · Modo de configuración de firma: cada opción en su propia fila.
+           La clase se usaba en el markup —tanto en el HTML estático como en el
+           que inyecta el JS al abrir el modal— pero NO existía en ningún CSS:
+           los <label> caían en display:inline, así que los dos radios fluían
+           como texto corrido y el de la opción seleccionada quedaba pegado al
+           final de la línea anterior. El efecto era que no se veía cuál de los
+           dos modos estaba activo.
+           - display:flex + gap separa el radio de su texto y los alinea.
+           - El borde y el fondo del botón "Recuperar" NO van aquí: esa opción es
+             una acción primaria y lleva su propio tratamiento (design system,
+             principio 5: mínimo invasivo, sin caja ni sombra por defecto). */
+        .firma-mode-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0;
+            cursor: pointer;
+        }
         .firma-btn-configured .firma-btn-id {
             display: inline-block;
             margin-left: 0.4rem;
@@ -2441,11 +2459,11 @@
                     <!-- Bloque: modo (radio) para empresa SIN firma -->
                     <div id="firma-modal-mode-block" class="form-group" style="display:none;">
                         <label class="form-label">Modo de configuración</label>
-                        <label style="display:block; margin-bottom: 0.4rem;">
+                        <label class="firma-mode-option">
                             <input type="radio" name="firma-mode" value="create" checked>
                             <span>Crear nuevo cliente de firma (requiere adminApiKey)</span>
                         </label>
-                        <label style="display:block;">
+                        <label class="firma-mode-option">
                             <input type="radio" name="firma-mode" value="paste">
                             <span>Pegar API key pre-existente</span>
                         </label>
@@ -4451,8 +4469,8 @@
                         + '<div>Hash activo: <code>' + _escapeHtml(backendItem.api_key_hash_prefix || '—') + '</code></div>'
                         + '</div>'
                         + '</div>'
-                        + '<label class="firma-mode-option" style="display: block; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: #eff6ff; cursor: pointer;">'
-                        + '<input type="radio" name="firma-mode" value="recover" checked style="margin-right: 0.5rem;">'
+                        + '<label class="firma-mode-option" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: #eff6ff;">'
+                        + '<input type="radio" name="firma-mode" value="recover" checked>'
                         + '<strong>Recuperar configuración y generar nueva API key</strong>'
                         + '</label>'
                         + '<p style="font-size: 0.8125rem; color: #4b5563; margin: 0.5rem 0 0 1.5rem;">'
@@ -4988,14 +5006,22 @@
             var firmaRecreateBtn = document.getElementById('firma-modal-recreate-btn');
             if (firmaRecreateBtn) firmaRecreateBtn.onclick = recreateFirmaFromModal;
             // Cambio de modo (radio buttons) → muestra/oculta bloque de API key
-            var modeRadios = firmaModal.querySelectorAll('input[name="firma-mode"]');
-            for (var i = 0; i < modeRadios.length; i++) {
-                modeRadios[i].addEventListener('change', function (e) {
-                    if (e && e.target && e.target.value) {
-                        _setFirmaModalMode(e.target.value);
-                    }
-                });
-            }
+            // 📦903 · Un SOLO listener por delegación sobre el modal, no uno por
+            // radio. Antes se ataba directo a cada <input name="firma-mode">, pero
+            // al abrir el modal el JS reemplaza modeBlock.innerHTML (linea ~4526)
+            // con radios NUEVOS: los nodos viejos desaparecian del DOM y con
+            // ellos sus listeners. El síntoma era silencioso y confuso — el
+            // radio se movía de verdad (el navegador actualiza `checked` sin
+            // JS), pero _setFirmaModalMode() nunca corría, así que el campo de
+            // API key se quedaba en display:none y el modo "Pegar API key
+            // pre-existente" quedaba inutilizable. Delegar cubre los radios
+            // estáticos y los que inyecta el modal, en cualquier orden.
+            firmaModal.addEventListener('change', function (e) {
+                var t = e && e.target;
+                if (t && t.name === 'firma-mode' && t.value) {
+                    _setFirmaModalMode(t.value);
+                }
+            });
             // Click en el overlay (fuera del .modal-container) cierra
             firmaModal.addEventListener('click', function (e) {
                 if (e.target === firmaModal) closeFirmaModal();
