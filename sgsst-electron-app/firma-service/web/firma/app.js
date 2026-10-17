@@ -116,9 +116,29 @@
     window.scrollTo(0, 0);
   }
 
-  function showError(message) {
+  /**
+   * Muestra la pantalla de error.
+   *
+   * I-LINK-REABIERTO: por omisión se ofrece la salida hacia la verificación
+   * de autenticidad, porque casi todos los estados de error aquí llegan con un
+   * token válido que ya está firmado o vencido — y /verify no caduca. El
+   * llamador que sepa que NO hay nada que verificar (token inexistente, o ni
+   * siquiera un token en la URL) debe pasar allowVerify: false; ofrecer un
+   * botón que va a fallar es peor que no ofrecerlo.
+   *
+   * @param {string} message
+   * @param {{allowVerify?: boolean}} [opts]
+   */
+  function showError(message, opts) {
     const box = $('#error-message');
     if (box) box.textContent = message;
+
+    const canVerify = !(opts && opts.allowVerify === false);
+    const hint = $('#error-verify-hint');
+    const btn = $('#btn-error-go-verify');
+    if (hint) hint.hidden = !canVerify;
+    if (btn) btn.hidden = !canVerify;
+
     showScreen('error');
   }
 
@@ -217,9 +237,21 @@
   async function init() {
     const token = getTokenFromPath();
     if (!token) {
-      return showError('El enlace que usaste no es válido.');
+      return showError('El enlace que usaste no es válido.', { allowVerify: false });
     }
     state.token = token;
+
+    // I-LINK-REABIERTO · deep-link de verificación.
+    // /s/<token>?verificar=1 salta la máquina de estados y abre directo la
+    // pantalla de verificación. Es el destino al que apunta la pantalla de
+    // error y el botón de las páginas HTML del servidor, de modo que ese
+    // enlace se puede compartir y reabrir aunque el enlace de
+    // firma ya haya caducado o se haya usado. /verify usa
+    // skipExpirationCheck, así que nunca caduca.
+    if (isVerifyDeepLink()) {
+      return showVerifyScreen();
+    }
+
     showScreen('loading');
 
     try {
@@ -306,16 +338,33 @@
       // IDENTIFICATION_FAILED) → pantalla de identificación.
       showScreen('identify');
     } catch (err) {
-      if (err.status === 404) {
-        return showError('El enlace que usaste no es válido o ya no existe.');
+      // I-LINK-REABIERTO · copy por código en vez de por status genérico.
+      // Un 410 sin código discernible y un 404 no son el mismo problema para
+      // el firmante, y solo uno de los dos tiene verificación disponible.
+      if (err.code === 'TOKEN_NOT_FOUND' || err.status === 404) {
+        return showError(
+          'Este enlace no corresponde a ninguna solicitud de firma. Puede haberse copiado incompleto al reenviarlo.',
+          { allowVerify: false });
       }
-      if (err.status === 410) {
+      if (err.status === 410 || err.code === 'TOKEN_EXPIRED' || err.code === 'TOKEN_ALREADY_USED') {
         const msg = err.code === 'TOKEN_EXPIRED'
-          ? 'Este enlace ha expirado. Solicita uno nuevo a tu empleador.'
-          : 'Este enlace ya fue utilizado.';
+          ? 'Este enlace venció, pero eso no afecta lo que habías firmado: tu documento sigue aquí y puedes verificar su autenticidad.'
+          : 'Este enlace ya se usó, porque la firma ya se completó. Tu documento sigue aquí y puedes verificar su autenticidad.';
         return showError(msg);
       }
       return showError(err.message || 'No se pudo cargar la solicitud.');
+    }
+  }
+
+  /**
+   * I-LINK-REABIERTO · ¿la URL pide la pantalla de verificación?
+   * /s/<token>?verificar=1
+   */
+  function isVerifyDeepLink() {
+    try {
+      return new URLSearchParams(window.location.search).get('verificar') === '1';
+    } catch (_) {
+      return false;
     }
   }
 
@@ -943,10 +992,25 @@
       btnGo.addEventListener('click', function () { showVerifyScreen(); });
     }
 
-    // Botón "Volver" → regresa a screen-signed
+    // I-LINK-REABIERTO · misma salida desde la pantalla de error.
+    var btnErr = $('#btn-error-go-verify');
+    if (btnErr) {
+      btnErr.addEventListener('click', function () { showVerifyScreen(); });
+    }
+
+    // Botón "Volver" → re-despacha el estado REAL del enlace.
+    //
+    // Antes regresaba a screen-signed a ciegas, lo que mentía cuando se
+    // llegaba desde la pantalla de error o por el deep-link ?verificar=1:
+    // podía mostrar "✓ Documento firmado" sobre una solicitud nunca firmada.
+    // Reejecutar init() vuelve a consultar /s/<token> y deja que la máquina
+    // de estados ubique al usuario donde realmente está.
     var btnBack = $('#btn-back-to-signed');
     if (btnBack) {
-      btnBack.addEventListener('click', function () { showScreen('signed'); });
+      btnBack.addEventListener('click', function () {
+        state.contexto = null;
+        init();
+      });
     }
 
     // Form de upload de PDF

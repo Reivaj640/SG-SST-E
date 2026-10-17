@@ -20,12 +20,30 @@
       <p>Cargando solicitud...</p>
     </section>
 
-    <!-- Pantalla: error -->
+    <!-- Pantalla: error
+         I-LINK-REABIERTO · caso real y frecuente: el firmante vuelve a abrir
+         el enlace del correo después de ya haber firmado. Decir solo "no
+         disponible" deja al usuario sin salida y sin saber si su documento
+         sigue existiendo. Aquí se explica qué pasó y se ofrece la
+         verificación, que NO caduca (el endpoint usa skipExpirationCheck). -->
     <section id="screen-error" class="screen">
       <div class="alert alert-error" role="alert">
         <h2>Enlace no disponible</h2>
         <p id="error-message">El enlace que usaste no es válido o ha expirado.</p>
       </div>
+
+      <p class="instructions" id="error-verify-hint">
+        ¿Ya habías firmado este documento? La verificación sigue disponible
+        aunque el enlace ya no sirva.
+      </p>
+      <button type="button" class="btn btn-primary" id="btn-error-go-verify">
+        VERIFICAR MI DOCUMENTO
+      </button>
+
+      <p class="instructions" id="error-contact-hint">
+        Si no llegaste a firmar, o el enlace venció antes de que pudieras
+        hacerlo, pide uno nuevo al área de Recursos Humanos.
+      </p>
     </section>
 
     <!-- Pantalla: identificación -->

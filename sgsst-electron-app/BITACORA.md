@@ -5144,3 +5144,70 @@ conectar las dos secciones, como se hizo con Ausentismo.
    sección salió de recorrer las carpetas del Drive de las 4 empresas. El código decía `readdirSync`
    y el disco respondió 0. Un `git diff` sobre los dos HTML involvenidos mostraba solo una línea de
    CDN: la prueba de que no era una regresión del día.
+
+## 📦903 — Reabrir el enlace de firma: el callejón sin salida, y el caché que lo fingió
+
+**El defecto.** El enlace de firma es un **bearer token de un solo uso**: identifica al firmante y
+no se puede reutilizar. El flujo estaba diseñado para el camino feliz —abrir, identificar, OTP,
+firmar— y el camino de regreso se había dejado como un `catch` que decía "el enlace no es válido
+o expiró". Para el caso **más común de todos**, que es el del trabajador que ya firmó y vuelve a
+abrir el correo horas o días después, eso significaba tres cosas malas: una pantalla que dice
+"no disponible" sin decir **por qué**, sin decir si su documento corría riesgo, y sin **a dónde ir**.
+Cualquier estado que no fuera `SIGNED` caía al mismo texto: uno vencía, otro ya se había usado y
+otro ni siquiera existía.
+
+**Por qué la verificación siempre estuvo disponible.** `/api/sign/:token/verify` llama
+`resolveToken` con `skipExpirationCheck: true` a propósito: la consulta es de solo lectura, así que
+el endpoint responde igual después de `fecha_expiracion`. Ese endpoint ya existía y ya decía la
+verdad (estado, hashes, firmantes, integridad recalculada). Lo que no existía era **el camino de
+navegación** que lo llevara. El deep-link `?verificar=1` es eso: una URL compartible y reabrible
+que salta la máquina de estados, en vez de una función interna a la que solo se llegaba desde una
+pantalla que el usuario de un enlace en error nunca alcanzaba.
+
+**La lección sobre el botón "Volver".** Volvía a `screen-signed` a ciegas. El flujo nuevo permite
+llegar a la verificación desde la pantalla de error y desde el deep-link, y en ambos casos
+"volver" iba a mostrar "✓ Documento firmado" sobre una solicitud que nadie había firmado. El
+arreglo no fue condicionar el destino sino **reejecutar `init()`** y dejar que la máquina de estados
+decida. Un destino fijo es una mentira en cuanto aparecen dos caminos de entrada.
+
+**Lo que la prueba en producción destapó por debajo.** Con el enlace real ya firmado, el owner
+siguió viendo el JSON crudo y preguntó si el arreglo había funcionado. No: el backend devolvía la
+mini-app (comprobado con `curl` directo al origen) y el túnel tampoco intervenía (`HTTP=200
+tipo=text/html` por `https://firma.kair.fyi`). Era **el caché del navegador**, guardando el `410`
+anterior al despliegue. La causa era real y no un artefacto de la prueba: **la respuesta de error en
+JSON no llevaba `Cache-Control`**, así que un `404`/`410` de `/s/<token>` quedaba en disco — con el
+token adentro. La superficie del firmante responde ahora `no-store` en las dos ramas.
+
+**La regla que sale de ahí, y que aplica más allá de la firma:** *antes de decir que un despliegue
+no funcionó, probá la misma URL por dos caminos y en ventana privada.* Un caché del navegador
+convierte un fix desplegado y correcto en "no sirvió", y el diagnóstico se va hacia el lado
+equivocado — en este caso a rehacer el despliegue de algo que ya estaba bien.
+
+### El `npm install` que borró 2.624 archivos versionados
+
+Al intentar dejar correr la suite, `npm install` en `sgsst-electron-app` **borró 2.624 archivos y
+modificó 15 más** dentro de `renderer/file-viewer-assets/`, además de tocar `package-lock.json`.
+La causa es el `postinstall` de `@file-viewer/web` (`node ./scripts/copy-assets.mjs --postinstall`),
+que reconstruye ese directorio desde el paquete instalado. npm 11.19.1 avisó de los install
+scripts no cubiertos por `allowScripts` y aun así los dejó correr: **"up to date, audited 914
+packages"** y, tres segundos después, dos mil archivos fuera del árbol de trabajo.
+
+Todo se restauró con `git checkout` desde `HEAD`, que estaba limpio, más la carpeta nueva que el
+postinstall dejó sin trackear. Dos cosas que quedan como regla: **antes de cualquier
+`npm install` en este repo, `git status` tiene que estar limpio**, porque la restauración se hace
+desde `HEAD` y cualquier trabajo sin commitear se pierde; y **`node_modules` de `sgsst-electron-app`
+comparten con `firma-service`**, así que un `npm install` para un servicio toca los assets del otro.
+
+### La suite que no corre: el binario nativo es de otra versión de Node
+
+`better-sqlite3` estaba compilado para Node 22 (`NODE_MODULE_VERSION 136`) y el Node instalado es
+v26 (`147`), así que **los 973 tests no arrancan**: fallan en `tests/setup.js` al aplicar las
+migraciones, no al correr pruebas. No hay binario precompilado para Node 26, y la compilación con
+`npm rebuild better-sqlite3` falla con `EPERM` al no poder reemplazar el `.node`, porque Electron y
+otros procesos `node` lo tienen abierto. **La suite no puede correr con el Node que hay instalado**;
+las dos salidas sanas son recompilar con los procesos cerrados o trabajar sobre Node 22 LTS.
+
+Lo que sí se pudo verificar sin la base de datos: los 30 tests nuevos de esta jornada
+(`tests/middleware/errors.test.js`, 20, y `tests/web/miniapp-reabierto.test.js`, 10 con 9
+mutaciones). Los dos evitan `setup.js` a propósito — uno monta una app express mínima y el otro lee
+el HTML y el JS — así que corren aunque la suite entera no pueda.

@@ -1147,7 +1147,7 @@ Pregunta solo lo que no se puede deducir del código.
 
 ---
 
-## 9. Trampas activas en el repo (verificadas 2026-10-15)
+## 9. Trampas activas en el repo (verificadas 2026-10-16)
 
 No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si no las conoce.
 
@@ -1167,7 +1167,22 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
 | 12 | 🔴 **En la bandeja, `app.js` y `premium.css` comparten el token de `?v=` a propósito.** Subir solo el que tocaste deja la página con dos versiones distintas | `bandeja-integrada/index.html`, verificado por `test-bandeja-tudia-849.js` | Los dos se suben juntos, aunque no hayas tocado los dos (§5.3) |
 | 13 | 🔴 **Ningún test del repo abre la base de datos.** Un feature que dependa de un tipo de dato de la BD puede tener 34 checks en verde y no dibujar nada en pantalla | `main/test-*.js` (ninguno abre SQLite) | Antes de dar por terminado un feature de datos, correr un script en `Temp/` con la función **real** contra la **base real** y contar cuántas filas quedan sin el dato (§7.7) |
 | 14 | 🔴 **`core.autocrlf=true` del instalador de Git rompe 2277 archivos y `git status` miente.** En una PC nueva, todo lo que el repo guarda en LF queda en CRLF en disco, y Git no lo ve porque normaliza al commitear | `C:\Program Files\Git\etc\gitconfig` (config de **sistema**, invisible desde `--global`) | `git config --local core.autocrlf false`, y renormalizar con `git reset` + `git checkout -- .` (§5.17). **Verificar los bytes, no `git status`** |
-| 15 | 🔴 **`better-sqlite3` está atado a la versión de Electron, y `npm install` lo compila contra el Node del sistema, no contra Electron.** Con Node 26 falla (`error C2039: "GetIsolate": no es un miembro de "v8::Context"`) y revierte el install entero | `node_modules/better-sqlite3` · el repo usa el runtime de Electron (`node 22.21.1`, ABI **136**) | `npm install --ignore-scripts`, extraer el binario de Electron a mano, y recién entonces `npm rebuild better-sqlite3 --runtime=electron --target=<version instalada> --disturl=https://electronjs.org/headers`. Verificar con un `SELECT` real dentro de Electron (§7.7) |
+| 15 | 🔴 **`better-sqlite3` está atado a UNA versión de Node ABI, y acá hay dos en juego.** El binario quedó
+  compilado contra el runtime de Electron (`node 22.21.1`, ABI **136**) y el Node del sistema es el
+  **26** (ABI **147**). Con el Node 26 el `require` **lanza**: `was compiled against a different
+  Node.js version using NODE_MODULE_VERSION 136. This version requires 147` | `node_modules/better-sqlite3` |
+  **El síntoma aparece al CORRER la suite, no al instalar.** Falla en `tests/setup.js` al aplicar las
+  migraciones, y se lee como "[TEST SAFETY] No se pudieron aplicar las migraciones", que parece un
+  problema de datos. `npm install` dice **"up to date"** y no arregla nada: no hay binario precompilado
+  para Node 26, así que hay que compilar, y `npm rebuild better-sqlite3` falla con `EPERM` si Electron
+  o algún proceso `node` tiene el `.node` abierto. Las dos salidas sanas: **cerrar todo y
+  recompilar**, o trabajar sobre Node 22 LTS. Y un detalle que importa: **el mismo `better-sqlite3`
+  no puede servir a los dos consumidores.** La app Electron necesita el binario de Electron
+  (`npm rebuild better-sqlite3 --runtime=electron --target=22.21.1 --disturl=https://electronjs.org/headers`);
+  los tests de `firma-service` corren con el Node del sistema y necesitan el de ese Node. Compilá
+  para uno, no para los dos, y verificá con un `SELECT` real dentro de Electron (§7.7).
+  Mientras tanto, **un test que evite `setup.js` sí corre** — de ahí que los tests de middleware y de
+  UI del 📦903 no abran la base |
 | 16 | 🔴 **`CONTEXT.md` tiene separadores de línea **CR CR CR LF** (tres CR), no CRLF.** 1337 de sus 1354 líneas. Viene así del repo, no es de una edición | `CONTEXT.md` (todo el archivo) | **Nunca lo abras con `Edit` ni lo reescribas con `ReadAllText`/`WriteAllText`**: un CRLF "correcto" en el medio de eso rompe el diff entero. Si hay que tocarlo, buscar el ancla con una regex que tolere `\r*\n` y **armar el texto nuevo con el separador que ya usa el archivo**, verificado leyendo los bytes del ancla |
 | 17 | 🔴 **`scripts/theme-manager.js` EXISTE en disco y NO está cargado en el shell.** Espera la forma de mensaje `{theme, mode}`, que el shell nunca manda | `scripts/theme-manager.js`, `renderer.js` | **Ninguna vista embebida puede depender de esa forma.** Usá `shared/kair-iframe-theme.js`, que maneja las tres que sí llegan |
 | 18 | 🔴 **`dark-legacy` NO es alias de `dark`.** El oscuro manual se propaga con ese nombre | `[data-theme="dark"]` no matchea `dark-legacy` | Usá `[data-theme^="dark"]`. Un código que solo acepta `'dark'` **quita el atributo** y el modo manual queda sin pintar mientras el de sistema funciona: la mitad de las pruebas pasa |
@@ -1230,6 +1245,22 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
   `main/test-plan-scroll-895.js` | Es la trampa 25 del 885 al revés: un comentario puede **hacer fallar** un
   check en vez de satisfacerlo. **Sanear comentarios antes de verificar**, siempre, y en las dos mitades |
 | 36 | 🟡 **Una cadena de alturas porcentuales sin un eslabón no acota nada.** `html{height:100%}` sin `body{height:100%}` deja al `height:100%` del hijo sin base: cae a `auto`, la columna flex no se acota y el contenedor con `overflow:auto` crece a la altura del contenido, **no tiene nada que scrollear y la barra desaparece** mientras `overflow:hidden` recorta | `plan-view.html:86-93` (patrón de app shell: `html` + `body` + contenedor + `flex:1` + `min-height:0`) | Antes de culpar al `overflow`, medí `scrollHeight` contra `clientHeight`. Un contenedor con `overflow:auto` que no muestra barra **no está roto: no tiene contenido que scrollear** |
+| 37 | 🔴 **`npm install` en `sgsst-electron-app` BORRA 2.624 archivos versionados.** El `postinstall` de
+  `@file-viewer/web` (`node ./scripts/copy-assets.mjs --postinstall`) reconstruye
+  `renderer/file-viewer-assets/` desde el paquete instalado. npm 11.19.1 **avisa** de los install
+  scripts no cubiertos por `allowScripts` y aun así los deja correr: imprime "up to date, audited
+  914 packages" y tres segundos después el directorio está vacío | `renderer/file-viewer-assets/`,
+  `package-lock.json` | **Antes de cualquier `npm install`, `git status` tiene que estar limpio**,
+  porque la restauración se hace desde `HEAD` y el trabajo sin commitear se pierde. Y notá que
+  **`firma-service` comparte `node_modules` con la app**: un install para un servicio toca los assets
+  del otro. Si te avisaron "4 paquetes con install scripts no cubiertos", el aviso es real, no ruido |
+| 38 | 🔴 **Un caché del navegador hace que un fix desplegado parezca fallido.** Después de desplegar la
+  página de enlace reabierto, el owner volvió a abrir el enlace firmado y siguió viendo el JSON crudo
+  anterior: parecía que "no se había arreglado" | `firma-service/src/middleware/errors.js`, `/s/:token` |
+  El backend respondía bien (`curl` directo al origen, `text/html`) y el túnel tampoco: era el caché.
+  **Un `404`/`410` sin `Cache-Control` queda guardado en disco.** Antes de concluir que un despliegue
+  no surtió efecto, probá la **misma URL por dos caminos** (directo y por el proxy) y en **ventana
+  privada**. Y en una superficie con credenciales en la URL, `no-store` no es opcional |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):

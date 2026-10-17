@@ -58,6 +58,40 @@ y la sección de operación diaria.
 analizados en el documento de migración), envío de correo real confirmado con `messageId` de
 Gmail, y `kair-firma` + `cloudflared` arrancando solos tras un reinicio del kernel.
 
+### 📦903 · Reabrir el enlace de firma deja de ser un callejón sin salida
+
+**Qué cambió.** El trabajador que volvía a abrir el enlace del correo después de ya haber firmado
+se encontraba con `{"error":{"code":"TOKEN_ALREADY_USED", ...}}` o con una pantalla de error que
+decía "Enlace no disponible" y no ofrecía a dónde ir. Ahora, en los tres casos, la salida es la
+**verificación de autenticidad**: `/verify` corre con `skipExpirationCheck`, así que nunca caduca.
+
+1. **La pantalla de error explica qué pasó y ofrece verificar.** Tres copy distinguibles —"ya se
+   usó", "ya venció", "no encontramos este enlace"— y el botón solo aparece cuando hay algo que
+   verificar: con `TOKEN_NOT_FOUND` el botón se oculta, porque ofrecer una verificación que va a
+   fallar es peor que no ofrecerla.
+2. **Deep-link `/s/<token>?verificar=1`** que salta la máquina de estados y abre directo la
+   verificación. Es lo que hace que ese enlace se pueda compartir y reabrir.
+3. **`errorHandler` negocia contenido**, pero solo en la superficie del firmante (`/s/*` y
+   `/api/sign/*`): si el cliente prefiere HTML devuelve una página legible, autocontenida y con
+   la paleta de K+AIR. Fuera de ahí **siempre JSON**, porque K+AIR consume `/internal/*` con
+   fetch y un `Accept: */*` se llevaría HTML donde espera JSON.
+4. **Botón "Volver" que ya no miente.** Regresaba a `screen-signed` a ciegas y podía mostrar
+   "✓ Documento firmado" sobre una solicitud que nadie había firmado. Ahora reejecuta `init()` y
+   deja que la máquina de estados ubique al usuario donde está de verdad.
+
+**El defecto de fondo que destapó la prueba en producción.** El `410` de `/s/<token>` se quedaba
+**guardado en el caché del navegador**, porque la respuesta de error en JSON no llevaba
+`Cache-Control`: el mismo trabajador que firmó y volvió a abrir el enlace seguía viendo el JSON
+crudo aunque el servidor ya sirviera la mini-app. La URL lleva el token, que es una credencial de
+un solo uso, y no debería quedar en disco. La superficie del firmante responde ahora `no-store`
+en ambas ramas, HTML y JSON.
+
+**Verificación.** 30 tests nuevos: `tests/middleware/errors.test.js` (**20**, sin base de datos y
+sin `supertest`) y `tests/web/miniapp-reabierto.test.js` (**10**, con 9 mutaciones que se
+confirma que muerden). En producción, con el token real ya firmado: la cadena completa
+enlace → mensaje → botón → verificación con el banner de integridad, `SIGN-2026-269179`, los tres
+hashes SHA-256 y el firmante enmascarado. `/internal/*` verificado en JSON después del despliegue.
+
 ### 📦898 · La barra del scroll arranca al nivel de la tarjeta Actividad ID
 
 **Qué cambió.** El scroll del `Plan de Trabajo Anual` lo llevaba **el documento entero**, sin
