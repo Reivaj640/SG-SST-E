@@ -24,6 +24,7 @@ const { verifyLimiter } = require('../middleware/rateLimit');  // I-AUDIT-2026-0
 const publicFlow = require('../services/publicFlow');
 const signRequestService = require('../services/signRequest');
 const agreementService = require('../services/agreement');
+const empresaService = require('../services/empresa');
 const storage = require('../services/storage');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
@@ -164,6 +165,15 @@ router.get('/s/:token', (req, res, next) => {
       // se registra una aceptacion sin que hubiera informacion. Ver
       // _resolverAcuerdoFirmante.
       acuerdo: _resolverAcuerdoFirmante(signRequest),
+      // Identificación de la empresa que SOLICITA esta firma (migración 017).
+      // Se resuelve por signRequest.id_empresa, NUNCA por algo que mande el
+      // cliente: id_empresa viene de la API key autenticada y ya está
+      // guardado en la fila de la solicitud.
+      //
+      // null = la empresa no está dada de alta en gh_firma_empresas. La
+      // mini-app omite el bloque en ese caso, que es exactamente el
+      // comportamiento previo a la 017.
+      empresa: empresaService.publicViewFor(signRequest.id_empresa),
       // I-103.A1.6 · Correo enmascarado del firmante, para mostrar en la
       // pantalla OTP cuando el firmante re-abre el enlace y ya pasó por
       // identificación. Solo se expone si estado >= IDENTIFIED (después

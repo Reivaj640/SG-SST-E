@@ -30,6 +30,7 @@ const mailer = require('./mailer');
 const storage = require('./storage');
 const pdfGen = require('./pdfGen');
 const agreementService = require('./agreement');  // D2: re-validar Acuerdo en view/commit
+const empresaService = require('./empresa');        // num. 1.2: identificación mostrada al firmante
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const { withAppErrorWrapping, withAppErrorWrappingSync } = require('../utils/errorWrap');
@@ -449,7 +450,8 @@ function _getConsentResumen(consentId) {
   try {
     return db.prepare(`
       SELECT id, version_acuerdo, hash_texto_acuerdo, fecha_aceptacion,
-             rol_firmante, nombre_aceptante, cargo_aceptante
+             rol_firmante, nombre_aceptante, cargo_aceptante,
+             empresa_snapshot, empresa_hash
       FROM gh_consentimientos_firma
       WHERE id = ?
     `).get(consentId) || null;
@@ -785,6 +787,15 @@ async function commit(token, opts, ip, user_agent) {
     });
   }
 
+  // Identificación de la empresa tal como se le MOSTRÓ al firmante en el
+  // bloque del numeral 1.2 del Acuerdo. Se lee del snapshot archivado en el
+  // consentimiento, NO de gh_firma_empresas: la fila de la empresa es
+  // editable y hoy puede no ser la que el firmante vio. Sin esto, la
+  // constancia cumpliría con mostrar la identificación equivocada.
+  const empresaIdentificacion = consentResumen
+    ? empresaService.parseSnapshot(consentResumen.empresa_snapshot)
+    : null;
+
   const constanciaMetadata = {
     ...evidencia,
     evidence_hash,            // fix: el objeto evidencia no lo trae de fábrica
@@ -798,6 +809,8 @@ async function commit(token, opts, ip, user_agent) {
     hitos_firma: hitosFirma,
     consent_id: consentResumen ? consentResumen.id : null,
     fecha_aceptacion_acuerdo: consentResumen ? consentResumen.fecha_aceptacion : null,
+    empresa_identificacion: empresaIdentificacion,
+    empresa_hash: consentResumen ? consentResumen.empresa_hash : null,
     zona_horaria: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
     nivel_seguridad: 'Correo verificado + código temporal por correo + manifestación expresa',
     control_registro: {

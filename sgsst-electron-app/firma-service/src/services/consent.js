@@ -22,6 +22,7 @@ const config = require('../config');
 const { sha256, hashWithSalt, generateSalt } = require('../crypto/hash');
 const { generateOTP, verifyOTP, isLocked, isExpired } = require('../crypto/otp');
 const mailer = require('./mailer');
+const empresaService = require('./empresa');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -50,7 +51,8 @@ function getById(id) {
            fecha_aceptacion, fecha_otp_enviado, kair_version,
            manifestacion_aceptada, estado, created_at, updated_at,
            rol_firmante, nombre_aceptante, cargo_aceptante,
-           identificacion_aceptante
+           identificacion_aceptante,
+           empresa_snapshot, empresa_hash
     FROM gh_consentimientos_firma
     WHERE id = ?
     LIMIT 1
@@ -234,6 +236,14 @@ async function create({
   //    El estado default del schema es 'OTP_PENDING' (legacy, no se renombra
   //    en esta migración para evitar recreación de tabla; el significado
   //    actual es simplemente "pendiente de aceptación en la mini-app").
+  //
+  //    empresa_snapshot / empresa_hash (migración 018): se archiva una COPIA
+  //    de la identificación de la empresa que se le MOSTRÓ al firmante, con su
+  //    propia huella. Estos datos son editables en la tabla de empresas: sin
+  //    la copia, el archivo apuntaría a la fila de hoy y no a lo que el
+  //    firmante vio. Si la empresa no está dada de alta, quedan NULL, que
+  //    significa honestamente "no se le mostró identificación de empresa".
+  const empresaCols = empresaService.snapshotColumnsFor(id_empresa);
   const now = new Date().toISOString();
   const tx = db.transaction(() => {
     const result = db.prepare(`
@@ -242,8 +252,8 @@ async function create({
          hash_texto_acuerdo, correo_verificacion, correo_hash,
          otp_hash, otp_sal, otp_intentos, ip, user_agent,
          kair_version, manifestacion_aceptada, estado,
-         fecha_otp_enviado)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?)
+         fecha_otp_enviado, empresa_snapshot, empresa_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, ?)
     `).run(
       id_trabajador, id_empresa, version_acuerdo,
       hash_texto_acuerdo, correo_verificacion, correo_hash,
@@ -251,6 +261,7 @@ async function create({
       ip || null, user_agent || null,
       kair_version, ESTADO_PENDING,
       fecha_otp_enviado,
+      empresaCols.snapshot, empresaCols.hash,
     );
     return result.lastInsertRowid;
   });
@@ -332,6 +343,9 @@ function ensureRepConsent({
   }
   const now = new Date().toISOString();
   const correo_sal = generateSalt();
+  // Misma razón que en createConsent: se archiva la identificación de la
+  // empresa que se le mostró, con su huella propia.
+  const empresaCols = empresaService.snapshotColumnsFor(id_empresa);
   const result = db.prepare(`
     INSERT INTO gh_consentimientos_firma
       (id_trabajador, id_empresa, version_acuerdo,
@@ -340,8 +354,9 @@ function ensureRepConsent({
        kair_version, manifestacion_aceptada, estado,
        fecha_otp_enviado,
        rol_firmante, nombre_aceptante, cargo_aceptante,
-       identificacion_aceptante)
-    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?)
+       identificacion_aceptante,
+       empresa_snapshot, empresa_hash)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?, ?, ?)
   `).run(
     id_trabajador, id_empresa, version_acuerdo,
     hash_texto_acuerdo, rep.correo, hashWithSalt(rep.correo, correo_sal),
@@ -349,6 +364,7 @@ function ensureRepConsent({
     kair_version, ESTADO_PENDING,
     'EMPRESA', rep.nombre || null, rep.cargo || null,
     rep.numero_identificacion || null,
+    empresaCols.snapshot, empresaCols.hash,
   );
   const consent = getById(result.lastInsertRowid);
   logger.info('Consentimiento propio del representante creado', {

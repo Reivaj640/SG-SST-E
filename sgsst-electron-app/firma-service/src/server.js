@@ -34,6 +34,7 @@ const signRequestRouter = require('./routes/signRequest');
 const publicRouter = require('./routes/public');
 const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
+const adminEmpresasRouter = require('./routes/admin-empresas');
 const internalAuditRouter = require('./routes/internal-audit');
 const constanciaRouter = require('./routes/constancia');
 const { migrate } = require('./db/migrate');
@@ -156,6 +157,7 @@ function createApp() {
   // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
+  app.use('/internal/admin', adminEmpresasRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {

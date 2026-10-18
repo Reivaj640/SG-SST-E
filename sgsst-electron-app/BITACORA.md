@@ -4,6 +4,86 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 El bloque de la empresa que solicita la firma, y tres cosas que solo se ven probando (📦904)
+
+### 1. El hallazgo que justificaba todo el trabajo
+
+El Capítulo I del Acuerdo hablaba de «la Empresa» en genérico, y el flujo de firma le mostraba al
+trabajador un documento, un Acuerdo y tres casillas, **sin decir nunca en qué empresa estaba
+firmando**. El único identificador que viajaba era `id_empresa`, que en la práctica es el NIT: un
+código, no una identificación verificable.
+
+La solución no fue meter el nombre y el NIT dentro del texto del Acuerdo. Si el texto llevara los
+datos, cada empresa necesitaría su propia versión con su propia huella. La respuesta fue una tabla
+`gh_firma_empresas` (uno por empresa, no por clave de API, porque una empresa puede tener varias),
+un bloque en pantalla antes del PDF, y un **snapshot con huella propia** archivado en el
+consentimiento.
+
+El detalle que manda en todo el diseño: el bloque identifica a la **empresa que solicita la firma**,
+no a K+AIR ni a su operador. El operador ya aparece en el capítulo 1.4. Confundir los dos fue el
+error conceptual que casi se cometió, y se evitó porque el capítulo 1.4 ya existía.
+
+### 2. La trampa: tres caminos abren el mismo modal
+
+La primera versión del bloque se cableó en las dos funciones quePreparan el modal de
+Configuración de Empresa. El dueño abrió el modal por el **tercer** camino —el botón «Nueva
+Empresa»— y reportó que los botones de más y menos no hacían nada y que la caja de la vista previa
+salía vacía.
+
+Los dos síntomas eran el mismo bug: la función que ata los listeners es la misma que pinta la caja,
+y esa ruta nunca la llamaba. Tres llamadas a `openLinkModal()`, un solo enganche. La corrección fue
+mover el enganche **adentro de `openLinkModal()`**, que es el punto por donde pasan las tres rutas,
+y dejarlo idempotente con un flag en `dataset`.
+
+`_wireEscenarioUI()` tiene además un flag `stepperWired` justamente porque, al llamarla desde
+varios sitios, sin guarda cada clic sumaría varias veces y el campo se desbordaría.
+
+### 3. El bug más grave que salió de revisar el anterior
+
+`agregarNuevaEmpresa()` limpiaba los campos viejos del formulario pero **no** los datos de firma
+que ese mismo turno se habían agregado. Consecuencia: al crear una empresa nueva, el formulario
+conservaba el NIT, el domicilio y los canales de la empresa anterior y se los guardaba como si
+fueran suyos.
+
+Es la ironía exacta de lo que se estaba construyendo: la función agregada para que el trabajador
+viera con claridad quién le pedía firmar era la que filtraba la identidad de la empresa
+equivocada. Todo form de alta tiene que limpiar todo lo que hay debajo del botón guardar.
+
+### 4. El hueco en el propio chequeo de caracteres
+
+Se colaron **caracteres árabes** (`U+064A U+0631 U+0627`) en una cadena de la Constancia, donde
+debía decir «se le mostró». El barrido previo no los detectó porque solo buscaba CJK, cirílico y
+hangul. El rango se amplió a árabe, hebreo, devanagari, tailandés y Hangul, y se pasó sobre los
+20 archivos tocados: los 20 limpios.
+
+La lección no es el carácter concreto: es que **el filtro de verificación era más estrecho que el
+problema**. Un chequeo que solo mira tres scripts no es un chequeo.
+
+### 5. Dos archivos con el mismo nombre NO son el mismo archivo
+
+Al actualizar los documentos legales se vio que `sitio/anexo-encargo.html` y
+`sgsst-electron-app/legal/anexo-encargo.html` eran el mismo documento en dos carpetas. Se
+asumieron copias idénticas y se sobrescribió una con la otra: **15.651 bytes contra 14.420**.
+Se perdieron ~1.200 bytes de contenido de la copia de `legal/`.
+
+Se detectó comparando tamaños, se restauró con `git checkout` desde HEAD y se reaplicaron solo los
+cambios puntuales. El diff final quedó en 40 inserciones y 45 borrados, que es lo que debía ser.
+
+Antes de sincronizar dos archivos hay que **comparar su tamaño en HEAD**. Si difieren, no son
+copias: son dos documentos que comparten nombre.
+
+### 6. El nombre de la entidad
+
+El cambio de JRFSoluciones a **Gesstiar S.A.S.** (doble `s`) se aplicó a 78 lugares en los seis
+documentos legales y en el capítulo 1.4. El reemplazo textual dejó **puntos dobles**
+(`Gesstiar S.A.S..`) donde el nombre cerraba oración: 6 corregidos a mano.
+
+Los avisos de «pendiente de legalización» se sustituyeron por «por diligenciar». La diferencia no
+es de forma: la entidad existe, lo que falta son datos de contacto. Un aviso que dice que la
+empresa no está constituida, cuando sí lo está, es un aviso que hay que borrar.
+
+---
+
 ## 🆕 Menú nativo de Electron oculto (Loop 47b, 📦579, v0.1.130)
 
 La **Bandeja Integrada** (cliente Gmail integrado en K+AIR) sigue un patrón DIFERENTE al de las vistas de submódulos. En lugar de integrarse al sistema de vistas existentes, se carga como un **iframe aislado** dentro del header principal.
@@ -5139,7 +5219,7 @@ conectar las dos secciones, como se hizo con Ausentismo.
    que decirlo, no fabricar un objeto con la forma correcta. La señal de "vacío" necesita viajar
    explícita hasta la pantalla.
 2. **Un estado verde sin fuente es una mentira.** `CUMPLE` cuando `meta = 0` no es un bug de
-   estilo: es una regla de negocio que nuncaاقشة qué significa "sin meta".
+   estilo: es una regla de negocio que nunca debate qué significa "sin meta".
 3. **Para diagnosticar "no hay datos", el código no alcanza — hay que mirar el disco.** Toda esta
    sección salió de recorrer las carpetas del Drive de las 4 empresas. El código decía `readdirSync`
    y el disco respondió 0. Un `git diff` sobre los dos HTML involvenidos mostraba solo una línea de

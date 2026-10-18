@@ -286,6 +286,30 @@ async function generateConstanciaConsolidadaPdf(data) {
       campo('Correo (invitación)', doc.firmante_empresa.correo || '—');
     })();
 
+    // --- Identificación de la empresa mostrada al firmante (Acuerdo 1.2) ---
+    // Va por documento porque el snapshot se archivó en el momento de cada
+    // firma: si la empresa actualizó sus datos entre una firma y otra, cada
+    // documento debe mostrar lo que ese firmante vio, no el dato de hoy.
+    (function () {
+      var emp = doc.empresa_identificacion;
+      if (!emp) {
+        if (esFirmado(doc.estado)) {
+          seccion('Identificación de la empresa mostrada al firmante');
+          parrafo('No se archivó identificación de empresa para esta firma.', { size: 9 });
+        }
+        return;
+      }
+      seccion('Identificación de la empresa mostrada al firmante');
+      campo('Razón social', emp.razon_social || '—');
+      campo('NIT', emp.nit || '—');
+      campo('Domicilio', emp.domicilio || '—');
+      campo('Representante legal', emp.representante_legal || '—');
+      campo('Responsable del tratamiento', emp.responsable_tratamiento || '—');
+      campo('Canal de PQRS', emp.canal_pqrs || '—');
+      // Hash completo: es el valor que un tercero recalcula para verificar.
+      campo('Huella de esta identificación (SHA-256)', doc.empresa_hash || '—');
+    })();
+
     // --- Consentimiento ---
     if (doc.consent_id) {
       var esRep = doc.consent_rol === 'EMPRESA';

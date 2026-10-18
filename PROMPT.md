@@ -1255,6 +1255,9 @@ No son estilo. Son cosas que **ya están rotas** y que un modelo va a pisar si n
   **`firma-service` comparte `node_modules` con la app**: un install para un servicio toca los assets
   del otro. Si te avisaron "4 paquetes con install scripts no cubiertos", el aviso es real, no ruido |
 | 38 | 🔴 **Un caché del navegador hace que un fix desplegado parezca fallido.** Después de desplegar la
+| 39 | 🔴 **El chequeo de caracteres no latinos solo mira CJK, cirílico y hangul.** Se colaron **arábigos** (`U+064A U+0631 U+0627`) en la Constancia donde decía «se le mostró» | Cualquier string que escribas | El rango del grep debe cubrir `\u0600-\u06FF` (árabe), `\u0590-\u05FF` (hebreo), `\u0900-\u097F` (devanagari), `\u0E00-\u0E7F` (tailandés), más CJK y cirílico. **Un filtro más estrecho que el problema no es un filtro** |
+| 40 | 🔴 **Los modales se abren por tres caminos distintos y el cableado se pone en uno solo** | `config-viewer.html`: `agregarNuevaEmpresa`, `prepareLinkModal`, `viewCompanyDetails` | Cuando agregues comportamiento a un modal, **cablealo adentro de la función que lo abre** (`openLinkModal`), no en quien lo prepara. Y todo form de alta tiene que limpiar **todo** lo que hay debajo del botón guardar: forgot un bloque y los datos de la empresa anterior se le guardan a la nueva |
+| 41 | 🔴 **`sitio/` y `sgsst-electron-app/legal/` tienen el MISMO nombre de archivo pero NO son copias** | `anexo-encargo.html` pesaba 15.651 en uno y 14.420 en el otro | **Antes de sincronizar, compará el tamaño en HEAD.** Si difieren, son dos documentos que comparten nombre: editá los dos por separado. Sincronizar a ciegas borra contenido real |
   página de enlace reabierto, el owner volvió a abrir el enlace firmado y siguió viendo el JSON crudo
   anterior: parecía que "no se había arreglado" | `firma-service/src/middleware/errors.js`, `/s/:token` |
   El backend respondía bien (`curl` directo al origen, `text/html`) y el túnel tampoco: era el caché.

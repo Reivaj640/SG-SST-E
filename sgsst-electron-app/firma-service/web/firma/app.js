@@ -570,6 +570,138 @@
     box.focus();
   }
 
+  /**
+   * Pinta el bloque de identificacion de la Empresa que solicita la firma.
+   *
+   * Que se pinte o no depende de `contexto.empresa`, que el backend resuelve
+   * por id_empresa (la API key autenticada del cliente). Si viene null, la
+   * empresa no esta dada de alta y el bloque se oculta COMPLETO: es mejor
+   * no mostrar nada que mostrar medio bloque.
+   *
+   * Todo se pinta con textContent y nodos creados a mano, nunca con
+   * innerHTML: los datos de la empresa vienen de la base y no son codigo
+   * confiable. Una razon social con "<" no debe poder inyectar etiquetas.
+   *
+   * Los campos sin valor NO se omiten: salen como "Pendiente". Si la empresa
+   * registro la razon social pero no el NIT, el bloque tiene que decir que el
+   * NIT esta pendiente, porque un bloque que solo lista lo que alcanzo a
+   * diligenciar aparenta ser una identificacion completa y no lo es.
+   *
+   * @param {object} contexto - Contexto publico de GET /s/:token.
+   */
+  function renderEmpresa(contexto) {
+    const panel = $('#empresa-panel');
+    const lista = $('#empresa-datos');
+    if (!panel || !lista || panel.dataset.rendered === '1') return;
+
+    const empresa = contexto && contexto.empresa;
+    if (!empresa || !empresa.razon_social) {
+      panel.hidden = true;
+      panel.dataset.rendered = '1';
+      return;
+    }
+
+    const CAMPOS = [
+      ['Razon social', 'razon_social'],
+      ['NIT', 'nit'],
+      ['Domicilio', 'domicilio'],
+      ['Representante legal', 'representante_legal'],
+      ['Documento del representante', 'representante_legal_identificacion'],
+      ['Responsable del tratamiento', 'responsable_tratamiento'],
+      ['Correo de contacto', 'responsable_tratamiento_correo'],
+      ['Canal de PQRS', 'canal_pqrs'],
+      ['Canal de incidentes de seguridad', 'canal_incidentes'],
+    ];
+
+    // La politica de datos se pinta aparte, como enlace, porque es lo unico
+    // del bloque que el trabajador puede consultar por su cuenta.
+    lista.textContent = '';
+    CAMPOS.forEach(function (par) {
+      const valor = empresa[par[1]];
+      const fila = document.createElement('div');
+      fila.className = 'empresa__campo';
+
+      const dt = document.createElement('dt');
+      dt.textContent = par[0];
+      fila.appendChild(dt);
+
+      const dd = document.createElement('dd');
+      if (typeof valor === 'string' && valor.trim() !== '') {
+        dd.textContent = valor;
+      } else {
+        dd.textContent = 'Pendiente';
+        dd.className = 'empresa__pendiente';
+      }
+      fila.appendChild(dd);
+      lista.appendChild(fila);
+    });
+
+    // Politica de datos: enlace a la politica de la EMPRESA, que es la
+    // responsable de los datos del trabajador. K+AIR es la encargada y su
+    // politica esta en el sitio web, no aqui.
+    if (typeof empresa.politica_datos_url === 'string' && empresa.politica_datos_url !== '') {
+      const fila = document.createElement('div');
+      fila.className = 'empresa__campo';
+      const dt = document.createElement('dt');
+      dt.textContent = 'Politica de datos';
+      fila.appendChild(dt);
+      const dd = document.createElement('dd');
+      // El href se valida contra http(s) porque la URL la digita la empresa
+      // y este valor termina siendo un atributo href en el navegador del
+      // firmante. Sin esta validacion, un "javascript:alert(...)" guardado en
+      // la configuracion se ejecutaria al hacer clic.
+      let url = empresa.politica_datos_url;
+      let seguro = false;
+      try {
+        const parsed = new URL(url);
+        seguro = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        url = parsed.href;
+      } catch (_) {
+        seguro = false;
+      }
+      if (seguro) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.textContent = 'Ver la politica de datos';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        dd.appendChild(a);
+      } else {
+        dd.textContent = 'No disponible';
+        dd.className = 'empresa__pendiente';
+      }
+      fila.appendChild(dd);
+      lista.appendChild(fila);
+    }
+
+    // La huella de la identificacion mostrada. El backend archiva exactamente
+    // el mismo valor en el consentimiento: con el, un tercero puede verificar
+    // que los datos que el firmante vio son los que quedaron registrados.
+    if (typeof empresa.huella === 'string' && empresa.huella !== '') {
+      const huella = document.createElement('p');
+      huella.className = 'empresa__huella';
+      huella.textContent = 'Huella de esta identificacion: ' + empresa.huella;
+      panel.appendChild(huella);
+    }
+
+    // Cuando no hay politica de datos publicada NO se deja en blanco ni se
+    // inventa una: el Acuerdo que esta justo debajo ya explica el
+    // tratamiento y los derechos del titular. Es mejor eso que un
+    // "Pendiente" que parece un dato que se le olvido a la empresa.
+    if (!empresa.politica_datos_url) {
+      const nota = document.createElement('p');
+      nota.className = 'empresa__nota';
+      nota.textContent =
+        'Esta empresa no tiene una politica de datos publicada. ' +
+        ' Sus derechos y el tratamiento de tus datos estan explicados en el ' +
+        ' Capitulo X del Acuerdo de uso, mas abajo en esta pantalla.';
+      panel.appendChild(nota);
+    }
+
+    panel.hidden = false;
+    panel.dataset.rendered = '1';
+  }
+
   function setupDocumentScreen() {
 
     const pdfViewer = $('#pdf-viewer');
@@ -632,6 +764,13 @@
 
     // El Acuerdo se pinta y la 3a casilla se habilita solo tras leerlo.
     renderAcuerdo(state.contexto);
+
+    // El bloque de la Empresa va antes del PDF en el DOM; se pinta junto al
+    // Acuerdo. No habilita ni bloquea ninguna casilla: es informacion, no una
+    // manifestacion de voluntad. El unico efecto de que falte es que no se
+    // muestra.
+    renderEmpresa(state.contexto);
+
     const btnCommit = $('#btn-commit');
     const btnReject = $('#btn-reject');
 

@@ -2992,25 +2992,72 @@
                 <label class="form-label">Nombre de la Empresa</label>
                 <input type="text" class="form-control" placeholder="Ingrese el nombre de la empresa" id="selected-company">
             </div>
-            <div class="form-group">
-                <label class="form-label">Número de Empleados</label>
-                <input type="number" class="form-control" id="edit-employees" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Nivel de Riesgo</label>
-                <select class="form-control" id="edit-risk">
-                    <option value="">Seleccione...</option>
-                    <option value="I">I - Mínimo</option>
-                    <option value="II">II - Bajo</option>
-                    <option value="III">III - Medio</option>
-                    <option value="IV">IV - Alto</option>
-                    <option value="V">V - Muy Alto</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">
-                    <input type="checkbox" id="edit-agropecuaria"> ¿Es Agropecuaria?
+            <!-- 📦904 UX · Los tres campos anteriores (trabajadores, riesgo, agropecuaria) NO son
+                 datos sueltos: los tres juntos eligen el ESCENARIO NORMATIVO que le
+                 aplica a la empresa (que módulos del SG-SST hay que cumplir). Estaban
+                 sueltos y sin explicación, y por eso "¿Es Agropecuaria?" no significaba
+                 nada para el usuario.
+
+                 Por eso van agrupados, con el resultado a la vista mientras se edita.
+                 Si el escenario se cambia, se ve el efecto de inmediato en vez de
+                 descubrir meses después que el sistema leIAN otras reglas. -->
+            <div style="margin-top: 1rem; padding: 1.1rem; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius, 8px);">
+                <div style="font-weight: 600; font-size: 0.92rem; margin-bottom: 0.35rem; color: var(--text);">
+                    ¿Qué normativa le aplica a esta empresa?
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 1.1rem; line-height: 1.45;">
+                    K+AIR no aplica la misma normativa a todas las empresas. Estos tres datos juntos
+                    determinan a qué escenario le corresponde. Si se equivocan, el sistema le va a
+                    pedir requisitos que a usted no le aplican.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="edit-employees">Número de trabajadores</label>
+                        <div style="display: flex; gap: 0.4rem; align-items: stretch;">
+                            <button type="button" id="employees-minus"
+                                aria-label="Quitar un trabajador"
+                                style="width: 42px; flex: none; border: 1px solid var(--border-color); background: #fff; border-radius: var(--radius, 8px); font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--text);">&#8722;</button>
+                            <input type="number" class="form-control" id="edit-employees" min="0" step="1" value="0"
+                                style="text-align: center;">
+                            <button type="button" id="employees-plus"
+                                aria-label="Agregar un trabajador"
+                                style="width: 42px; flex: none; border: 1px solid var(--border-color); background: #fff; border-radius: var(--radius, 8px); font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--text);">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="edit-risk">Nivel de riesgo</label>
+                        <select class="form-control" id="edit-risk">
+                            <option value="">Seleccione...</option>
+                            <option value="I">I - Mínimo</option>
+                            <option value="II">II - Bajo</option>
+                            <option value="III">III - Medio</option>
+                            <option value="IV">IV - Alto</option>
+                            <option value="V">V - Muy Alto</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- El checkbox suelto no decía qué es "agropecuaria" ni para qué se
+                     pregunta. Ahora es una opción con su propia explicación. -->
+                <label style="display: flex; gap: 0.7rem; align-items: flex-start; margin-top: 1.1rem; padding: 0.8rem 0.9rem; background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius, 8px); cursor: pointer;">
+                    <input type="checkbox" id="edit-agropecuaria" style="margin-top: 2px; width: 16px; height: 16px; flex: none; accent-color: var(--primary);">
+                    <span style="display: block;">
+                        <span style="display: block; font-size: 0.87rem; font-weight: 600; color: var(--text);">
+                            Esta empresa es agropecuaria
+                        </span>
+                        <span style="display: block; font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin-top: 3px;">
+                            Es decir: su actividad principal es la agricultura o la ganadería
+                            (cultivos, livestock, poultry, forestry), no la industria, el comercio
+                            ni los servicios. Márquelo solo si ese es el caso.
+                        </span>
+                    </span>
                 </label>
+
+                <div id="escenario-preview" aria-live="polite"
+                     style="margin-top: 1rem; padding: 0.75rem 0.9rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius, 8px); font-size: 0.82rem; line-height: 1.45;">
+                    <!-- se llena con _refrescarEscenarioPreview() -->
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Ruta de Documentos</label>
@@ -3068,6 +3115,126 @@
                         <label class="form-label">Cargo</label>
                         <input type="text" class="form-control" id="empresa-rep-legal-cargo" placeholder="Representante Legal" autocomplete="off" />
                     </div>
+                </div>
+            </div>
+
+            <!-- 📦904 (2026-10-17) — Sección Datos para firma electrónica.
+                 Estos datos son los que se le MUESTRAN al trabajador en el bloque
+                 "Empresa que solicita tu firma", antes de que firme. No son
+                 configuración interna: son evidencia legal, y quedan archivados
+                 con la huella del momento de cada firma.
+
+                 La razón social NO se pide acá: es el campo "Nombre de la Empresa"
+                 de arriba, que ya guarda companies.display_name.
+
+                 Handlers IPC empresa-datos-firma:get / :upsert en
+                 main/empresa-datos-firma-bridge.js. -->
+            <div id="empresa-datos-firma-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h3 style="font-family: var(--font-heading); font-size: 1.05rem; color: var(--primary); margin-bottom: 0.5rem;">
+                    <i class="fas fa-file-signature"></i> Datos para firma electrónica
+                </h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
+                    Antes de firmar, el trabajador ve en qué empresa está firmando. Estos son esos datos.
+                    Se guardan junto a cada firma, así que corrígelos si cambian.
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">NIT</label>
+                        <input type="text" class="form-control" id="empresa-firma-nit" inputmode="numeric" placeholder="900123456" autocomplete="off" />
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Con la razón social, el trabajador puede verificar en la cámara de comercio.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Domicilio principal</label>
+                        <input type="text" class="form-control" id="empresa-firma-domicilio" placeholder="Calle 100 # 20-30" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Ciudad / municipio</label>
+                        <input type="text" class="form-control" id="empresa-firma-municipio" autocomplete="off" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Departamento</label>
+                        <input type="text" class="form-control" id="empresa-firma-departamento" autocomplete="off" />
+                    </div>
+                </div>
+
+                <h4 style="font-size: 0.9rem; color: var(--text); margin: 1.25rem 0 0.25rem; font-weight: 600;">
+                    Responsable del tratamiento de datos
+                </h4>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.4;">
+                    Puede ser el mismo representante legal. El rol es distinto: es quien responde ante el
+                    trabajador sobre sus datos personales.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Nombre</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" class="form-control" id="empresa-firma-resp-nombre" autocomplete="off" />
+                        <label style="font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; display: flex; align-items: center; gap: 0.3rem;">
+                            <input type="checkbox" id="empresa-firma-resp-mismo-rep" /> Igual al representante legal
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Cargo</label>
+                        <input type="text" class="form-control" id="empresa-firma-resp-cargo" placeholder="Responsable de datos personales" autocomplete="off" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Correo</label>
+                        <input type="email" class="form-control" id="empresa-firma-resp-correo" autocomplete="off" />
+                        <span id="empresa-firma-resp-correo-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
+                    </div>
+                </div>
+
+                <h4 style="font-size: 0.9rem; color: var(--text); margin: 1.25rem 0 0.25rem; font-weight: 600;">
+                    Canales de atención
+                </h4>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.4;">
+                    Un solo correo puede servir para los tres. Si es así, márcalo abajo y se completa solo.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Correo de contacto general</label>
+                    <input type="email" class="form-control" id="empresa-firma-canal-contacto" placeholder="contacto@empresa.co" autocomplete="off" />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Canal de PQRS</label>
+                        <input type="email" class="form-control" id="empresa-firma-canal-pqrs" placeholder="pqrs@empresa.co" autocomplete="off" />
+                        <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;">
+                            <input type="checkbox" id="empresa-firma-pqrs-mismo" /> Es el mismo correo de contacto
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Canal de incidentes de seguridad</label>
+                        <input type="email" class="form-control" id="empresa-firma-canal-incidentes" placeholder="seguridad@empresa.co" autocomplete="off" />
+                        <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;">
+                            <input type="checkbox" id="empresa-firma-incidentes-mismo" /> Es el mismo correo de contacto
+                        </label>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; margin: 0.25rem 0 1rem;">
+                    El canal de incidentes es por donde el trabajador reporta que le filtraron o perdieron sus datos.
+                    La Ley 1581 de 2012 obliga al responsable a tener ese procedimiento y a poder avisarle al afectado;
+                    no obliga a que sea un correo aparte, por eso puede ser el mismo.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Política de tratamiento de datos</label>
+                    <input type="url" class="form-control" id="empresa-firma-politica-url" placeholder="https://empresa.co/privacidad" autocomplete="off" />
+                    <span id="empresa-firma-politica-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.3rem; line-height: 1.4;">
+                        Debe ser la política de <strong>su</strong> empresa, no la de K+AIR: usted es responsable de los datos
+                        de sus trabajadores; K+AIR solo los trata por cuenta suya. Si no tiene una publicada, déjelo vacío:
+                        el trabajador verá los derechos en el Capítulo X del Acuerdo.
+                    </span>
                 </div>
             </div>
         </div>
@@ -5301,6 +5468,11 @@
         // (empresa nueva todavía no existe → no hay rep que cargar)
         _clearRepLegalForm();
 
+        // 📦904 — Limpiar también los datos de identificación para firma.
+        // Sin esto, al crear una empresa nueva el formulario conservaba los
+        // datos de la empresa anterior y se le guardaban como si fueran suyos.
+        _clearDatosFirmaForm();
+
         openLinkModal();
     }
 
@@ -5355,6 +5527,153 @@
             // Si no hay rep activo, los inputs quedan limpios (no es error)
         } catch (e) {
             console.warn('[CONFIG][REP-LEGAL] Error al cargar rep legal de', empresaKey, e);
+        }
+    }
+
+    // 📦904 (2026-10-17) — Carga/guarda de los datos de identificación que se
+    // le muestran al trabajador en el bloque "Empresa que solicita tu firma".
+    //
+    // Sigue el mismo patron que el representante legal: cargar al abrir el
+    // modal, guardar junto con el resto de la config, y NO abortar el guardado
+    // de la empresa si estos datos fallan (son opcionales: sin ellos la
+    // pantalla no muestra bloque, que es el comportamiento previo a la 017).
+
+    function _clearDatosFirmaForm() {
+        const ids = [
+            'empresa-firma-nit', 'empresa-firma-domicilio',
+            'empresa-firma-municipio', 'empresa-firma-departamento',
+            'empresa-firma-resp-nombre', 'empresa-firma-resp-cargo',
+            'empresa-firma-resp-correo', 'empresa-firma-canal-contacto',
+            'empresa-firma-canal-pqrs', 'empresa-firma-canal-incidentes',
+            'empresa-firma-politica-url'
+        ];
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const checks = [
+            'empresa-firma-resp-mismo-rep',
+            'empresa-firma-pqrs-mismo',
+            'empresa-firma-incidentes-mismo'
+        ];
+        checks.forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.checked = false;
+        });
+        ['empresa-firma-resp-correo-error', 'empresa-firma-politica-error'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = ''; el.style.display = 'none'; }
+        });
+    }
+
+    /**
+     * Detecta si un canal ya es igual al correo de contacto y marca el checkbox.
+     * Al cargar evita que el usuario tenga que marcar a mano lo que ya coincide.
+     */
+    function _syncMismoCheckbox(inputId, checkboxId, baseId) {
+        const base = document.getElementById(baseId);
+        const input = document.getElementById(inputId);
+        const chk = document.getElementById(checkboxId);
+        if (!base || !input || !chk) return;
+        const b = String(base.value || '').trim();
+        const i = String(input.value || '').trim();
+        chk.checked = b !== '' && b === i;
+    }
+
+    async function _loadDatosFirmaIntoForm(empresaKey) {
+        _clearDatosFirmaForm();
+        if (!empresaKey) return;
+        if (!electronAPI || typeof electronAPI.empresaDatosFirmaGet !== 'function') {
+            console.warn('[CONFIG][DATOS-FIRMA] electronAPI.empresaDatosFirmaGet no disponible, se omite carga');
+            return;
+        }
+        try {
+            const res = await electronAPI.empresaDatosFirmaGet(empresaKey);
+            if (!res || !res.success || !res.data || !res.data.datos) return;
+            const d = res.data.datos;
+            const set = function (id, v) {
+                const el = document.getElementById(id);
+                if (el) el.value = v || '';
+            };
+            set('empresa-firma-nit', d.nit);
+            set('empresa-firma-domicilio', d.domicilio);
+            set('empresa-firma-municipio', d.domicilioMunicipio);
+            set('empresa-firma-departamento', d.domicilioDepartamento);
+            set('empresa-firma-resp-nombre', d.responsableNombre);
+            set('empresa-firma-resp-cargo', d.responsableCargo);
+            set('empresa-firma-resp-correo', d.responsableCorreo);
+            set('empresa-firma-canal-contacto', d.canalContacto);
+            set('empresa-firma-canal-pqrs', d.canalPqrs);
+            set('empresa-firma-canal-incidentes', d.canalIncidentes);
+            set('empresa-firma-politica-url', d.politicaDatosUrl);
+            _syncMismoCheckbox('empresa-firma-canal-pqrs', 'empresa-firma-pqrs-mismo', 'empresa-firma-canal-contacto');
+            _syncMismoCheckbox('empresa-firma-canal-incidentes', 'empresa-firma-incidentes-mismo', 'empresa-firma-canal-contacto');
+        } catch (e) {
+            console.error('[CONFIG][DATOS-FIRMA] Error al cargar:', e);
+        }
+    }
+
+    async function _saveDatosFirmaForEmpresa(empresaKey) {
+        if (!empresaKey) return true;
+        if (!electronAPI || typeof electronAPI.empresaDatosFirmaUpsert !== 'function') {
+            console.warn('[CONFIG][DATOS-FIRMA] electronAPI.empresaDatosFirmaUpsert no disponible, se omite guardado');
+            return true;
+        }
+        const get = function (id) {
+            const el = document.getElementById(id);
+            return el ? String(el.value || '').trim() : '';
+        };
+        const checked = function (id) {
+            const el = document.getElementById(id);
+            return !!(el && el.checked);
+        };
+
+        const canalContacto = get('empresa-firma-canal-contacto');
+        // Si el canal quedó marcado como "el mismo", se toma el de contacto aunque
+        // el input del canal esté vacío (el usuario marcó y no escribió).
+        const canalPqrs = checked('empresa-firma-pqrs-mismo')
+            ? canalContacto : get('empresa-firma-canal-pqrs');
+        const canalIncidentes = checked('empresa-firma-incidentes-mismo')
+            ? canalContacto : get('empresa-firma-canal-incidentes');
+        const responsableNombre = checked('empresa-firma-resp-mismo-rep')
+            ? get('empresa-rep-legal-nombre') : get('empresa-firma-resp-nombre');
+
+        // Si no se digito nada, no se manda nada: no crear una fila vacia.
+        const tocasteAlgo = !!(get('empresa-firma-nit') || get('empresa-firma-domicilio')
+            || get('empresa-firma-municipio') || get('empresa-firma-departamento')
+            || get('empresa-firma-resp-nombre') || get('empresa-firma-resp-cargo')
+            || get('empresa-firma-resp-correo') || canalContacto
+            || get('empresa-firma-canal-pqrs') || get('empresa-firma-canal-incidentes')
+            || get('empresa-firma-politica-url') || responsableNombre);
+        if (!tocasteAlgo) return true;
+
+        const data = {
+            empresaId: empresaKey,
+            nit: get('empresa-firma-nit'),
+            domicilio: get('empresa-firma-domicilio'),
+            domicilioMunicipio: get('empresa-firma-municipio'),
+            domicilioDepartamento: get('empresa-firma-departamento'),
+            responsableNombre: responsableNombre,
+            responsableCargo: get('empresa-firma-resp-cargo'),
+            responsableCorreo: get('empresa-firma-resp-correo'),
+            canalContacto: canalContacto,
+            canalPqrs: canalPqrs,
+            canalIncidentes: canalIncidentes,
+            politicaDatosUrl: get('empresa-firma-politica-url')
+        };
+
+        try {
+            const res = await electronAPI.empresaDatosFirmaUpsert({ data: data });
+            if (res && res.success) {
+                console.log('[CONFIG][DATOS-FIRMA] Datos de firma guardados para', empresaKey);
+                return true;
+            }
+            const msg = (res && res.error && res.error.message) ? res.error.message : 'Error al guardar los datos de firma';
+            console.warn('[CONFIG][DATOS-FIRMA]', msg);
+            return false;
+        } catch (e) {
+            console.error('[CONFIG][DATOS-FIRMA] Error al guardar:', e);
+            return false;
         }
     }
 
@@ -5442,6 +5761,126 @@
         }
     }
 
+    // 📦904 UX — Escenario normativo en vivo.
+    //
+    // Los tres campos (trabajadores, riesgo, agropecuaria) no son datos sueltos:
+    // el motor de la Resolución 0312 de 2019 los usa JUNTOS para decidir qué
+    // módulos del SG-SST se activan (ver normativa-0312.json). Estaban sueltos
+    // y sin explicación, así que "¿Es Agropecuaria?" no le decía nada al usuario.
+    //
+    // Acá se llama a la MISMA función que usa el sistema para persistir
+    // (`determinarEscenarioNormativo`), no a una reimplementación: si el motor
+    // cambiara, este preview se actualiza solo y no puede quedar mintiendo.
+
+    const _ESCENARIO_NOMBRES = {
+        'SIMPLIFICADO_≤10_R1-3': 'Simplificado',
+        'INTERMEDIO_11-50_R1-3': 'Intermedio',
+        'COMPLETO_CAP_III': 'Completo'
+    };
+
+    function _leerEscenarioCampos() {
+        const empleados = document.getElementById('edit-employees');
+        const riesgo = document.getElementById('edit-risk');
+        const agro = document.getElementById('edit-agropecuaria');
+        return {
+            employees: parseInt(empleados && empleados.value, 10) || 0,
+            risk: (riesgo && riesgo.value) || '-',
+            isAgropecuaria: !!(agro && agro.checked)
+        };
+    }
+
+    function _refrescarEscenarioPreview() {
+        const caja = document.getElementById('escenario-preview');
+        if (!caja) return;
+        const d = _leerEscenarioCampos();
+
+        // Sin nivel de riesgo no se puede decidir nada: el motor devuelve el
+        // escenario COMPLETO por defecto y mostraria un resultado falso.
+        if (!d.risk || d.risk === '-') {
+            caja.innerHTML = '<span style="color:#6b7280">Seleccione el nivel de riesgo para ver a qué escenario le aplica esta empresa.</span>';
+            return;
+        }
+
+        let escenario = null;
+        try {
+            escenario = determinarEscenarioNormativo({
+                nombre: 'esta empresa',
+                name: 'esta empresa',
+                stats: { employees: d.employees, risk: d.risk, isAgropecuaria: d.isAgropecuaria }
+            });
+        } catch (e) {
+            console.warn('[CONFIG][ESCENARIO] No se pudo calcular:', e);
+            caja.innerHTML = '<span style="color:#6b7280">No se pudo calcular el escenario con estos datos.</span>';
+            return;
+        }
+        if (!escenario) {
+            caja.innerHTML = '<span style="color:#6b7280">No se pudo calcular el escenario con estos datos.</span>';
+            return;
+        }
+
+        const nombre = _ESCENARIO_NOMBRES[escenario] || escenario;
+
+        // La cantidad de modulos se lee del JSON normativo, no se codifica aca:
+        // asi esta caja nunca contradice al motor.
+        let modulos = null;
+        let observacionAgro = null;
+        try {
+            const esc = window.normativaData && window.normativaData.escenarios
+                ? window.normativaData.escenarios[escenario]
+                : null;
+            if (esc && esc.modulos && Array.isArray(esc.modulos.activar)) {
+                modulos = esc.modulos.activar.length;
+            }
+            if (esc && esc.agropecuaria && d.isAgropecuaria) {
+                observacionAgro = esc.agropecuaria.observacion || null;
+            }
+        } catch (e) { /* sin datos normativos: se omite el detalle */ }
+
+        let html = '<strong>Escenario: ' + nombre + '</strong>';
+        if (modulos !== null) {
+            html += ' &middot; le activan <strong>' + modulos + ' de los 7 módulos</strong> del SG-SST.';
+        } else {
+            html += '.';
+        }
+        if (observacionAgro) {
+            html += '<br><span style="color:#166534">Por ser agropecuaria: ' + observacionAgro + '.</span>';
+        }
+        caja.innerHTML = html;
+    }
+
+    // Botones de + / - para el número de trabajadores.
+    function _wireEscenarioUI() {
+        const input = document.getElementById('edit-employees');
+        const menos = document.getElementById('employees-minus');
+        const mas = document.getElementById('employees-plus');
+        const riesgo = document.getElementById('edit-risk');
+        const agro = document.getElementById('edit-agropecuaria');
+        if (!input || !menos || !mas) return;
+
+        function _setValor(n) {
+            const v = Math.max(0, Math.floor(n));
+            input.value = String(v);
+            _refrescarEscenarioPreview();
+        }
+        function _actual() {
+            return parseInt(input.value, 10) || 0;
+        }
+
+        // Se ata una sola vez: si se volviera a llamar, cada clic sumaria
+        // varias veces y el campo se desborda.
+        if (input.dataset.stepperWired !== '1') {
+            input.dataset.stepperWired = '1';
+            mas.addEventListener('click', function () { _setValor(_actual() + 1); });
+            menos.addEventListener('click', function () { _setValor(_actual() - 1); });
+            input.addEventListener('input', _refrescarEscenarioPreview);
+            input.addEventListener('change', _refrescarEscenarioPreview);
+            if (riesgo) riesgo.addEventListener('change', _refrescarEscenarioPreview);
+            if (agro) agro.addEventListener('change', _refrescarEscenarioPreview);
+        }
+
+        _refrescarEscenarioPreview();
+    }
+
     function getRiskColor(risk) {
         const map = { 'I': 'var(--success)', 'II': 'var(--info)', 'III': 'var(--warning)', 'IV': '#fd7e14', 'V': 'var(--danger)' };
         return map[risk] || '#666';
@@ -5481,6 +5920,12 @@
         // 📦 I-FIRMA-DUAL · v0.1.180 — Cargar Representante Legal de la empresa
         _loadRepLegalIntoForm(companyName);
 
+        // 📦904 (2026-10-17) — Cargar los datos de identificación para firma.
+        _loadDatosFirmaIntoForm(companyName);
+
+        // 📦904 UX — Escenario normativo: atar los botones +/- y pintar la vista previa.
+        _wireEscenarioUI();
+
         openLinkModal();
     }
 
@@ -5516,6 +5961,12 @@
 
         // 📦 I-FIRMA-DUAL · v0.1.180 — Cargar Representante Legal de la empresa
         _loadRepLegalIntoForm(companyName);
+
+        // 📦904 (2026-10-17) — Cargar los datos de identificación para firma.
+        _loadDatosFirmaIntoForm(companyName);
+
+        // 📦904 UX — Escenario normativo: atar los botones +/- y pintar la vista previa.
+        _wireEscenarioUI();
 
         // Abrir el modal
         openLinkModal();
@@ -6543,6 +6994,12 @@ en lugar de afirmar una condición específica no verificada.**`;
 
     function openLinkModal() {
         linkModal.classList.add('active');
+        // 📦904 UX — El escenario normativo se cablea AQUÍ y no en quien abre el
+        // modal, porque hay tres caminos que lo abren (agregarNuevaEmpresa,
+        // prepareLinkModal, viewCompanyDetails) y antes de centralizar aqui
+        // faltaba el primero: los botones +/- no hacian nada y la caja de la
+        // vista previa salia vacia. El enganche es idempotente (dataset).
+        _wireEscenarioUI();
     }
 
     function closeModal() {
@@ -6884,7 +7341,12 @@ en lugar de afirmar una condición específica no verificada.**`;
 
                         return Promise.all([
                             electronAPI.saveConfig(config),
-                            repSavePromise
+                            repSavePromise,
+                            // 📦904 (2026-10-17) — Datos de identificación para firma.
+                            // A diferencia del rep legal, un fallo acá NO aborta el
+                            // guardado: son datos opcionales. Peor caso: la pantalla
+                            // no muestra el bloque, que es el comportamiento previo.
+                            _saveDatosFirmaForEmpresa(targetKeyName)
                         ]).then(function (results) { return results[0]; });
                     });
                 })

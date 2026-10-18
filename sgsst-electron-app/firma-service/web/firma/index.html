@@ -100,6 +100,36 @@
       <p class="instructions">
         Lee el documento completo. Al final, confirma tu voluntad de firmarlo.
       </p>
+      <!--
+        Bloque de identificacion de la Empresa (migracion 017).
+
+        Va ANTES del PDF a proposito: el trabajador tiene que saber con quien
+        esta firmando antes de leer un documento que esa empresa le presenta
+        como propio. Despues ya no seria una informacion, seria una nota al
+        pie.
+
+        OJO con a quien identifica este bloque. NO es K+AIR ni su operador: es
+        la empresa que SOLICITO la firma. El operador de la plataforma ya
+        aparece identificado en el capitulo 1.4 del Acuerdo, mas abajo en esta
+        misma pantalla. Poner los datos del operador aqui seria mostrarle al
+        trabajador "la empresa que me pide firmar" y ensenarle a quien no le
+        esta pidiendo nada.
+
+        Los datos llegan en el contexto publico (GET /s/:token -> campo
+        `empresa`) resueltos por id_empresa, que viene de la API key
+        autenticada del cliente. Todo se pinta con textContent, nunca con
+        innerHTML. Si `empresa` llega en null (empresa no dada de alta), el
+        bloque se oculta completo: es el comportamiento previo a la 017.
+      -->
+      <section class="empresa" id="empresa-panel" aria-labelledby="empresa-titulo" hidden>
+        <h3 class="empresa__titulo" id="empresa-titulo">
+          Empresa que solicita tu firma
+        </h3>
+        <p class="empresa__nota">
+          Estos datos se muestran junto al Acuerdo y quedan registrados con tu firma.
+        </p>
+        <dl class="empresa__datos" id="empresa-datos"></dl>
+      </section>
       <div class="pdf-viewer" id="pdf-viewer-container">
         <iframe id="pdf-viewer" src="" aria-label="Documento a firmar" title="Documento a firmar">
           <p>Tu navegador no puede mostrar el PDF directamente.</p>

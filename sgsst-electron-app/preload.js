@@ -635,6 +635,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Output: { success, data: { id, updated: bool } } | { success: false, error }
   repLegalUpsert: (args) => ipcRenderer.invoke('rep-legal:upsert', args || {}),
 
+  // 📦904 (2026-10-17) — Datos de identificacion de la empresa para firma electronica.
+  // Bridge: main/empresa-datos-firma-bridge.js (canales 'empresa-datos-firma:*').
+  // Son los datos que la empresa declara como su identificacion y que despues se
+  // muestran al trabajador en el bloque "Empresa que solicita tu firma".
+  // NOTA: la razon social NO viaja por aqui; se toma de companies.display_name.
+  // Get:    (empresaId) -> { success, data: { datos: {...} | null } }
+  // Upsert: ({ data: { empresaId, nit, domicilio, ... } }) -> { success, data: { id, updated } }
+  empresaDatosFirmaGet: (empresaId) => ipcRenderer.invoke('empresa-datos-firma:get', { empresaId }),
+
+  empresaDatosFirmaUpsert: (args) => ipcRenderer.invoke('empresa-datos-firma:upsert', args || {}),
+
   // 📦101-extra (2026-08-20) — Per-empresa admin (I-010 per-company authz, AUD-04)
   // 7 canales: 6 firma:empresa:* + 1 firma:config:set-admin-key
   // DR-1..6 binding. Ver storage-backup/specs/kair-auth-spec.md §5.6/5.7

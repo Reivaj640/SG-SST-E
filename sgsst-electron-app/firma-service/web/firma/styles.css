@@ -1,4 +1,4 @@
-﻿/* K+AIR Mini-app de Firma Electrónica - estilos */
+/* K+AIR Mini-app de Firma Electrónica - estilos */
 :root {
   --color-primary: #1e40af;
   --color-primary-hover: #1d4ed8;
@@ -245,6 +245,69 @@ body {
   margin: 8px 0 0;
   font-size: 12px;
   color: #6b7280;
+}
+
+/* ═══ Bloque de identificacion de la Empresa (migracion 017) ═══
+   Va antes del PDF. El borde es solido y el fondo apenas tintado para que se
+   lea como "de quien es esto" y no como una nota mas del formulario.
+
+   Los campos pendientes (los que la empresa aun no registro) NO se ocultan ni
+   se inventan: se muestran con "Pendiente". Un bloque que dijera solo lo que
+   la empresa alcanzo a diligenciar seria peor que uno sin bloque, porque
+   pareceria una identificacion completa. */
+.empresa {
+  margin: 20px 0 0;
+  padding: 16px;
+  background: var(--color-info-bg, #eff6ff);
+  border: 1px solid #93c5fd;
+  border-radius: var(--radius, 8px);
+}
+.empresa__titulo {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--color-info-text, #1e40af);
+}
+.empresa__nota {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.empresa__datos {
+  margin: 0;
+}
+.empresa__campo {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13.5px;
+}
+.empresa__campo dt {
+  color: #6b7280;
+}
+.empresa__campo dd {
+  margin: 0;
+  color: var(--color-text, #1f2937);
+  word-break: break-word;
+}
+.empresa__campo dd.empresa__pendiente {
+  color: #92400e;
+  font-style: italic;
+}
+.empresa__huella {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+@media (max-width: 480px) {
+  .empresa__campo {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 
 .manifestacion {

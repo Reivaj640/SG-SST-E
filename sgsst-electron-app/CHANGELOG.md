@@ -58,6 +58,58 @@ y la sección de operación diaria.
 analizados en el documento de migración), envío de correo real confirmado con `messageId` de
 Gmail, y `kair-firma` + `cloudflared` arrancando solos tras un reinicio del kernel.
 
+### 📦904 · El trabajador ahora sabe en qué empresa está firmando
+
+**Qué cambió.** Antes de firmar, el flujo mostraba el documento, el Acuerdo y tres casillas, pero
+nunca decía **quién** le estaba pidiendo la firma. El único identificador de empresa que viajaba con
+la solicitud era `id_empresa` — en la práctica el NIT, un código que no le dice nada a un
+trabajador. Ahora hay un bloque **«Empresa que solicita tu firma»** en pantalla, antes del PDF, con
+la razón social, el NIT, el domicilio, el representante legal y los canales de atención.
+
+La distinción que sostiene todo: ese bloque identifica a la **empresa que solicita la firma**, no a
+K+AIR ni a su operador. El operador ya aparece en el capítulo 1.4 del Acuerdo; mostrarlo aquí sería
+enseñarle al trabajador «la empresa que me pide firmar» y mostrarle a quien no le está pidiendo
+nada. Los datos se resuelven por `id_empresa`, que viene de la API key autenticada: el cliente no
+puede declarar en nombre de otra empresa.
+
+1. **Tabla `gh_firma_empresas` (migración 017).** Uno por empresa, no por clave de API, porque una
+   empresa puede tener varias. Lleva los datos de identificación más `anexo_encargo_firmado_at`.
+
+2. **Snapshot con huella propia (migración 018).** Al crear el consentimiento se archiva una copia
+   de lo que se le mostró al firmante, con su SHA-256, en vez de apuntar a la fila de la empresa.
+   La fila es editable: si la empresa corrige su domicilio mañana, el archivo tiene que seguir
+   diciendo lo que el firmante vio. Cinco tests garantizan que la huella no se mueva por cambios
+   administrativos.
+
+3. **La Constancia incluye la identificación.** Sección nueva en la constancia individual y en la
+   consolidada del expediente, con el hash **completo** (no truncado) para que un tercero pueda
+   recalcularlo. Esto es lo que exigía el numeral 1.2 del Acuerdo, que hasta ahora el sistema
+   prometía sin cumplir.
+
+4. **Configuración en K+AIR.** Sección «Datos para firma electrónica» en Configuración de
+   Empresa. Un solo correo de contacto puede cubrir los tres canales mediante casillas de
+   «es el mismo», en vez de obligar a inventarse tres buzones.
+
+5. **UX del escenario normativo.** Número de trabajadores y nivel de riesgo en la misma fila, con
+   botones de más y menos visibles, y el checkbox de agropecuaria explicado. Antes los tres
+   campos aparecían sueltos sin decir para qué sirven: en realidad el motor de la Resolución
+   0312 de 2019 los usa juntos para decidir qué módulos del SG-SST se activan. Ahora la pantalla
+   lo dice y muestra el escenario resultante mientras se edita.
+
+**Corrección de nombre.** El operador del servicio cambia de JRFSoluciones a **Gesstiar S.A.S.**
+(misma entidad, nombre nuevo) en el capítulo 1.4 del Acuerdo y en los seis documentos legales
+publicados. Los avisos de «pendiente de legalización» se sustituyeron por «por diligenciar»: la
+empresa existe, lo que falta son datos de contacto.
+
+**Verificación.** 61 tests nuevos en verde (23 del snapshot, 38 de la mini-app, 4 de mutación
+confirmados que muerden). `node --check` en los 10 archivos JS. Barrido de caracteres no latinos
+en los 20 archivos tocados.
+
+**Pendiente.** Los datos hoy se cargan por el endpoint admin; falta el puente que los empuje
+desde cada PC. Y falta el NIT de Gesstiar S.A.S. para cerrar los avisos legales.
+
+---
+
 ### 📦903 · Reabrir el enlace de firma deja de ser un callejón sin salida
 
 **Qué cambió.** El trabajador que volvía a abrir el enlace del correo después de ya haber firmado

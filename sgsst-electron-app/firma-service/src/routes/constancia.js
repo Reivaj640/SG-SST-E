@@ -32,6 +32,7 @@ const crypto = require('crypto');
 const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const db = require('../db/connection');
 const publicFlow = require('../services/publicFlow');
+const empresaService = require('../services/empresa');  // num. 1.2: snapshot archivado
 const signRequestService = require('../services/signRequest');
 const pdfGenConsolidado = require('../services/pdfGenConsolidado');
 const config = require('../config');
@@ -224,6 +225,15 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
           consent_nombre_aceptante: (consentResumen && consentResumen.nombre_aceptante) || null,
           consent_regimen_anterior: sr.tipo_firmante === 'EMPRESA' &&
             !(consentResumen && consentResumen.rol_firmante === 'EMPRESA'),
+          // Identificación de la empresa MOSTRADA al firmante en esa firma
+          // concreta (numeral 1.2 del Acuerdo). Va por documento y no en el
+          // resumen general porque el snapshot se archivó en el momento de
+          // cada firma: si la empresa cambió sus datos entre una firma y otra,
+          // cada documento muestra lo que ese firmante vio en su momento.
+          empresa_identificacion: consentResumen
+            ? empresaService.parseSnapshot(consentResumen.empresa_snapshot)
+            : null,
+          empresa_hash: consentResumen ? consentResumen.empresa_hash : null,
           tipo_firmante: sr.tipo_firmante || 'TRABAJADOR',
           firmante_empresa: firmanteEmpresa,
           url_verificacion: urlVerificacion,

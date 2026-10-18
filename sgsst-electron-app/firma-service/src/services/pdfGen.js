@@ -552,6 +552,41 @@ async function generateConstanciaPdf(metadata) {
   campo('NIT / ID', metadata.id_empresa);
   campo('Correo de envío', metadata.correo_emisor);
 
+  // ═══ IDENTIFICACIÓN MOSTRADA AL FIRMANTE (numeral 1.2 del Acuerdo) ═══
+  // Esta sección NO es un duplicado de la anterior. La de arriba son los datos
+  // que la empresa declaró al solicitar la firma; esta es la identificación que
+  // se le MOSTRÓ al firmante en la pantalla, congelada en el momento de la
+  // firma con su propia huella.
+  //
+  // La distinción importa: si la empresa corrige su domicilio o cambia de
+  // representante DESPUES de firmar, la fila actual ya no dice lo que el
+  // firmante vio. El snapshot sí, porque se archivó con su hash.
+  const empresaId = metadata.empresa_identificacion || null;
+  seccion('Identificación mostrada al Firmante (Acuerdo 1.2)');
+  if (!empresaId) {
+    parrafo('No se archivó identificación de empresa para esta firma. O la empresa no '
+      + 'estaba dada de alta en el momento de la firma, o el consentimiento es anterior '
+      + 'a la migración que añadió este bloque.', { size: 9, color: C.texto });
+  } else {
+    campo('Razón social', empresaId.razon_social);
+    campo('NIT', empresaId.nit);
+    campo('Domicilio', empresaId.domicilio);
+    campo('Representante legal', empresaId.representante_legal);
+    campo('Documento del representante', empresaId.representante_legal_identificacion);
+    campo('Responsable del tratamiento', empresaId.responsable_tratamiento);
+    campo('Correo de contacto', empresaId.responsable_tratamiento_correo);
+    campo('Canal de PQRS', empresaId.canal_pqrs);
+    campo('Canal de incidentes', empresaId.canal_incidentes);
+    campo('Política de datos', empresaId.politica_datos_url);
+    // El hash va COMPLETO (no truncado como los demás) porque es el valor que
+    // un tercero tiene que recalcular para verificar esta constancia.
+    campo('Huella de esta identificación (SHA-256)', metadata.empresa_hash);
+    parrafo('Estos son los datos de la Empresa que se le mostraron al Firmante en el bloque '
+      + '«Identificación de la Empresa» antes de firmar, conforme al numeral 1.2 del '
+      + 'Acuerdo de uso. La huella permite verificar que la identificación archivada '
+      + 'es la misma que se le mostró.', { size: 8, color: C.grisClaro, lh: 11 });
+  }
+
   // ═══ VERIFICACIÓN CRIPTOGRÁFICA ═══
   seccion('Verificación criptográfica');
   campo('Hash doc. original (SHA-256)', truncHash(metadata.document_hash_original));

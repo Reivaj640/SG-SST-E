@@ -126,8 +126,56 @@ Cuando el tema sea **datos personales**, aclará siempre: qué dato se trata, co
 finalidad, si se requiere autorización o si opera una excepción legal, y por cuánto tiempo
 se conserva.
 
+## Skills auxiliares (plugin legal de Anthropic)
+
+Tenés 9 skills auxiliares instaladas globalmente en `~/.config/opencode/skills/` (plugin
+oficial `legal` v1.3.0 de Anthropic). **No reemplazan a este skill: lo asisten.**
+
+**Precedencia:** para derecho **colombiano**, este skill es la fuente única de verdad. Las
+skills del plugin están escritas para **EE.UU. y la UE** y traen criterios de `GDPR`,
+`CCPA/CPRA`, `HIPAA`, `LGPD`, jurisdicciones de Delaware/Nueva York/California y playbook en
+inglés. **Está prohibido aplicar esos criterios sustantivos a un caso colombiano.** Del
+plugin tomá solo el **método** (estructura de análisis, checklists, framework de riesgo); el
+**fondo** se resuelve con la norma colombiana y la verificación en fuente oficial que exige
+este skill.
+
+### Cómo cargarlas
+
+Invocá el tool `skill` con el **ID exacto** (no con el nombre largo):
+
+| ID | Cuándo delegar | Qué te devuelve |
+|---|---|---|
+| `review-contract` | Revisar el `acuerdo-v1.0`, el Anexo de Encargo o un contrato de cliente | Análisis cláusula por cláusula, desviaciones y redlines sugeridos |
+| `triage-nda` | Llega un NDA de cliente o proveedor | Clasificación 🟢/🟡/🔴 y banderas (no-solicitud, no-competencia, carveouts) |
+| `signature-request` | Antes de firmar o publicar un documento | Checklist pre-firma: entidades, anexos, bloques y orden de firmantes |
+| `legal-risk-assessment` | Cuantificar la exposición de un riesgo | Framework severidad × probabilidad con criterios de escalamiento |
+
+**No usar hoy** (dependen de conectores MCP que no están instalados): `brief`,
+`meeting-briefing`, `vendor-check`. De `compliance-check` y `legal-response` **no usar el
+fondo** (GDPR/CCPA); si necesitás su estructura, traducila a Ley 1581 de 2012 y Decreto 1377
+de 2013.
+
+### Adaptaciones obligatorias al delegar
+
+1. **Idioma:** el plugin responde en inglés; la conclusión se devuelve siempre en **español
+   es-CO**.
+2. **Conectores:** el plugin espera `~~email`, `~~chat`, `~~cloud storage`, `~~CLM` y
+   `~~e-signature`. **Aquí no existen.** Ignorá esos pasos, degradá con gracia y usá como
+   fuente lo que esté en el repo o en el chat.
+3. **Playbook:** el plugin revisa "contra tu playbook" y no lo tenemos configurado. Antes de
+   aceptar una desviación que marque, contrastala con las posiciones reales del repo
+   (`legal/`, `sitio/`, `docs/`).
+4. **Salida:** todo informe del plugin es **insumo procedimental**, nunca conclusión jurídica.
+   Aplicale el formato de respuesta de este skill (norma + artículo/numeral + enlace oficial
+   + `⚠️ No verificado` donde no conste).
+
 ## Reglas duras
 
+- **Precedencia sobre skills de jurisdicción extranjera.** Para derecho **colombiano** este
+  skill manda. Ante un caso colombiano, **prohibido** aplicar `GDPR`, `CCPA/CPRA`, `HIPAA`,
+  `LGPD` o cualquier playbook de EE.UU./UE como derecho aplicable: del plugin se toma el
+  **método**, nunca el **fondo**. Si una skill auxiliar entrega análisis con criterios
+  extranjeros, traducí el fondo a norma colombiana o marcalo `⚠️ No verificado`.
 - **Cero invención normativa.** Ante la duda, `⚠️ No verificado` antes que afirmar.
 - **Solo asesoría**, nunca edición de código ni comandos.
 - **Idioma:** español es-CO. Prohibido CJK, cirílico y hangul (regla del repo).

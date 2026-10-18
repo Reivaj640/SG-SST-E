@@ -157,6 +157,11 @@ const { registerFirmaHandlers } = require('./main/firma-bridge');
 // empresaId = company_key (mismo multi-tenant que gestion-humana). Plan: docs/kair-firma-dual/.
 const { registerRepLegalHandlers } = require('./main/empresa-representante-legal-bridge');
 const { SCHEMA_SQL: REPLEGAL_SCHEMA_SQL, MIGRATIONS_SQL: REPLEGAL_MIGRATIONS_SQL } = require('./main/empresa-representante-legal-schema-sql');
+// 📦904 (2026-10-17) — Identificacion de la empresa para firma electronica.
+// Datos que la empresa declara de si misma y que se muestran al trabajador en el
+// bloque "Empresa que solicita tu firma" del servicio de firma.
+const { registerEmpresaDatosFirmaHandlers } = require('./main/empresa-datos-firma-bridge');
+const { SCHEMA_SQL: EMPRESADATOSFIRMA_SCHEMA_SQL, MIGRATIONS_SQL: EMPRESADATOSFIRMA_MIGRATIONS_SQL } = require('./main/empresa-datos-firma-schema-sql');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -941,6 +946,21 @@ function initDbOnce() {
       }
     } catch (rlErr) {
       console.error('[DB] 📦2.1 · Error creando schema de representante legal:', rlErr.message);
+    }
+    // 📦904 (2026-10-17) — Schema de identificacion de la empresa para firma.
+    // 1 tabla: empresa_datos_firma. Mismo patron (try/catch + migrations idempotentes).
+    try {
+      db.exec(EMPRESADATOSFIRMA_SCHEMA_SQL);
+      console.log('[DB] 📦904 · Tabla de datos de firma (empresa_datos_firma) creada/verificada');
+      if (Array.isArray(EMPRESADATOSFIRMA_MIGRATIONS_SQL) && EMPRESADATOSFIRMA_MIGRATIONS_SQL.length > 0) {
+        for (var edfmi = 0; edfmi < EMPRESADATOSFIRMA_MIGRATIONS_SQL.length; edfmi++) {
+          try { db.exec(EMPRESADATOSFIRMA_MIGRATIONS_SQL[edfmi]); }
+          catch (edfmErr) { /* skip — duplicate column / index ya existe */ }
+        }
+        console.log('[DB] 📦904 · ' + EMPRESADATOSFIRMA_MIGRATIONS_SQL.length + ' migraciones de datos de firma aplicadas');
+      }
+    } catch (edfErr) {
+      console.error('[DB] 📦904 · Error creando schema de datos de firma:', edfErr.message);
     }
     // Migraciones idempotentes para email (mismo patrón que gestacion)
     if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
@@ -10867,6 +10887,10 @@ try {
   // Patrón .init(ipcMain) + register(app, { getDb, validateSession }) como GH.
   registerRepLegalHandlers.init(ipcMain);
   registerRepLegalHandlers(app, { getDb, validateSession });
+  // 📦904 (2026-10-17) — Handlers IPC de identificacion de la empresa para firma.
+  // 2 canales: empresa-datos-firma:get / empresa-datos-firma:upsert.
+  registerEmpresaDatosFirmaHandlers.init(ipcMain);
+  registerEmpresaDatosFirmaHandlers(app, { getDb, validateSession });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null

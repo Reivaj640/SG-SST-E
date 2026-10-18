@@ -19,26 +19,30 @@ CAPÍTULO I. IDENTIFICACIÓN DE LAS PARTES
 1.1. LA EMPRESA, en su calidad de empleador y de Responsable del Tratamiento de los
 datos personales a que se refiere el Capítulo X.
 
-Los datos de identificación de la Empresa (razón social, NIT, domicilio, representante
-legal, responsable interno del tratamiento de datos personales y canal de atención de
-peticiones, quejas, reclamos y solicitudes) NO forman parte de este Acuerdo, porque
-el Acuerdo es un documento único y compartido por todas las Empresas que usan K+AIR.
-Esos datos constan en la política de tratamiento de datos personales de la Empresa y
-en el Anexo de Transmisión de Datos Personales que la Empresa ha suscrito con K+AIR.
-El Firmante puede consultar ambos documentos antes de aceptar este Acuerdo y debe
-solicitar a la Empresa los datos que allí no figuren.
+1.2. IDENTIFICACIÓN DE LA EMPRESA. Los datos de identificación de la Empresa (razón
+social, NIT, domicilio, representante legal, responsable interno del tratamiento de
+datos personales y canal de atención de peticiones, quejas, reclamos y solicitudes) se
+muestran al Firmante en el bloque «Identificación de la Empresa», que se presenta junto
+con este Acuerdo en la pantalla de firma y se incorpora a la constancia de firma con su
+propia huella digital, sin alterar el texto ni la huella digital de este Acuerdo. El
+Firmante declara que conoce la identidad de la Empresa con la que se vincula por el
+documento que firma y que puede solicitar a la Empresa los datos que allí no figuren.
 
-1.2. EL TRABAJADOR, en su calidad de Titular de los datos personales y de Firmante.
+1.3. EL TRABAJADOR, en su calidad de Titular de los datos personales y de Firmante.
 Sus datos de identificación los registra el propio Firmante al aceptar este Acuerdo,
 y quedan incorporados como evidencia de su manifestación de voluntad en los términos
 de los Capítulos IX y X.
 
-1.3. K+AIR, operada por JRFSoluciones, es el proveedor del mecanismo de firma
+1.4. K+AIR, operada por Gesstiar S.A.S., es el proveedor del mecanismo de firma
 electrónica descrito en el Capítulo III. K+AIR interviene como Encargado del
 Tratamiento de los datos personales a que se refiere el Capítulo X, por cuenta de la
 Empresa y únicamente dentro de los alcances, las finalidades y los plazos descritos en
 este Acuerdo. K+AIR no es parte de la relación laboral ni asume obligación alguna
-frente al Trabajador por dicha relación.
+frente al Trabajador por dicha relación. La relación entre la Empresa, como Responsable,
+y K+AIR, como Encargado, se rige por el contrato de transmisión de datos personales que
+la Empresa suscribe con K+AIR, en los términos del artículo 25 del Decreto 1377 de 2013,
+compilado en el artículo 2.2.2.25.5.2 del Decreto 1074 de 2015 (Anexo de Encargo de
+Tratamiento de Datos Personales).
 
 
 CAPÍTULO II. OBJETO
@@ -368,10 +372,12 @@ CAPÍTULO X. TRATAMIENTO DE DATOS PERSONALES
 
 10.1. Responsable y Encargado. La Empresa es el Responsable del Tratamiento y K+AIR es
 el Encargado, conforme a las definiciones de los literales d) y e) del artículo 3 de la
-Ley 1581 de 2012. K+AIR trata los datos únicamente por cuenta de la Empresa, dentro de
-los alcances, finalidades y plazos de este Acuerdo y conforme al contrato de
-transmisión de datos firmado entre las partes, en los términos del artículo 25 del
-Decreto 1377 de 2013.
+Ley 1581 de 2012. La identificación de la Empresa como Responsable es la del bloque
+«Identificación de la Empresa» del numeral 1.2. K+AIR trata los datos únicamente por
+cuenta de la Empresa, dentro de los alcances, finalidades y plazos de este Acuerdo y
+conforme al contrato de transmisión de datos personales suscrito entre las partes, en
+los términos del artículo 25 del Decreto 1377 de 2013, compilado en el artículo
+2.2.2.25.5.2 del Decreto 1074 de 2015.
 
 10.2. Datos que se tratan. Para la ejecución de este Acuerdo y del proceso de firma se
 tratan los siguientes datos personales del Titular:
