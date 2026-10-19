@@ -74,6 +74,44 @@ function redact(key, value) {
   return redactValue(value);
 }
 
+// ---------------------------------------------------------------------------
+// Sink de salida (para tests)
+// ---------------------------------------------------------------------------
+//
+// Por defecto el logger escribe en stdout/stderr. Un test que necesite
+// inspeccionar lo que se registró puede instalar un sink y recibir la línea
+// ya serializada, en vez de parchear `process.stdout.write`.
+//
+// POR QUÉ NO PARCHEAR process.stdout
+// ----------------------------------
+// Parchear `process.stdout.write` para capturar la salida roba también la
+// salida del runner de pruebas: el runner escribe su reporte TAP y los
+// diagnosticos por el MISMO stream. Si una de esas lineas cae dentro de la
+// ventana de captura, se pierde, y el runner desalinea los resultados: el
+// fallo aparece en un test que en realidad pasó, de forma intermitente.
+//
+// El sink evita el problema de raiz: el logger entrega la linea a quien la
+// pida, sin tocar los streams del proceso.
+//
+// Uso:
+//
+//   logger._setSink((linea, nivel) => { capturadas.push({ linea, nivel }); });
+//   try { ... } finally { logger._resetSink(); }
+let sink = null;
+
+/**
+ * Instala un sink de salida. `fn(lineaJson, nivel)`.
+ * Pasar `null` es lo mismo que `_resetSink()`.
+ */
+function _setSink(fn) {
+  sink = typeof fn === 'function' ? fn : null;
+}
+
+/** Quita el sink: el logger vuelve a escribir en stdout/stderr. */
+function _resetSink() {
+  sink = null;
+}
+
 function log(level, message, meta) {
   const entry = {
     timestamp: new Date().toISOString(),
@@ -83,6 +121,11 @@ function log(level, message, meta) {
     ...redact('meta', meta || {}),
   };
   const line = JSON.stringify(entry);
+  // Si hay un sink instalado, la línea va solo ahi. Ver la nota de `_setSink`.
+  if (sink) {
+    sink(line, level);
+    return;
+  }
   if (level === 'error' || level === 'warn') {
     process.stderr.write(line + '\n');
   } else {
@@ -100,4 +143,6 @@ module.exports = {
   _redactValue: redactValue,
   _SENSITIVE_KEYS: SENSITIVE_KEYS,
   _PII_PATTERNS: PII_PATTERNS,
+  _setSink,
+  _resetSink,
 };

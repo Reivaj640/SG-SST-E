@@ -29,6 +29,7 @@ const crypto = require('crypto');
 const request = require('supertest');
 const { PDFDocument } = require('pdf-lib');
 const { sha256 } = require('../../src/crypto/hash');
+const { hmacHex } = require('../../src/crypto/hmac');
 const config = require('../../src/config');
 const db = require('../../src/db/connection');
 const {
@@ -121,11 +122,16 @@ test('POST /internal/sign-requests: token NO se almacena en plano en BD', async 
 
   const token = res.body.token;
 
-  // Verificar que el token_hash en BD es SHA-256(token), no el token
+  // Verificar que el token_hash en BD es el HMAC-SHA256(token), no el token.
+  //
+  // El numeral 3.6(e) del Acuerdo exige que el token de acceso se conserve
+  // "únicamente en forma de huella digital con sal". Con HMAC la huella se
+  // calcula con una clave que vive FUERA de la base de datos: quien lea la
+  // base no puede recomputarla ni verificar un candidato.
   const row = db.prepare('SELECT token_hash FROM gh_firmas_electronicas WHERE id = ?').get(res.body.id_interno);
-  const expected_hash = sha256(token);
-  assert.equal(row.token_hash, expected_hash);
+  assert.equal(row.token_hash, hmacHex('token', token));
   assert.notEqual(row.token_hash, token, 'Token NO debe quedar en plano en BD');
+  assert.notEqual(row.token_hash, sha256(token), 'tampoco debe quedar un hash pelado');
 });
 
 test('POST /internal/sign-requests: PDF guardado en storage', async () => {

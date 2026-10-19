@@ -61,6 +61,19 @@ if (!process.env.SMTP_PASS) {
 if (!process.env.SMTP_FROM_EMAIL) {
   process.env.SMTP_FROM_EMAIL = 'no-reply@example.com';
 }
+// 2d. Llave maestra de la capa cripto.
+//
+// TODO el servicio deriva sus claves (HMAC de identificación, de OTP, de
+// token, de seudónimo del trabajador) con HKDF desde esta variable. En
+// tests tiene que ser FIJA: si cambia entre procesos, los seudónimos ya
+// calculados dejan de coincidir y las búsquedas por id_trabajador — que es
+// la llave de unión del sistema — fallarían de forma confusa.
+//
+// En producción la variable es obligatoria y NO se puede rotar sin invalidar
+// los tokens cifrados y los seudónimos calculados.
+if (!process.env.TOKEN_ENCRYPTION_KEY) {
+  process.env.TOKEN_ENCRYPTION_KEY = '4a1f0c9d8e7b6a5f4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0';
+}
 
 // 3. BARRERA POST-ASIGNACION: verificar que DB_PATH realmente resuelve
 //    a la BD de tests y NUNCA a la de produccion.
@@ -111,3 +124,53 @@ if (process.env.KAIR_TEST_VERBOSE === '1') {
     '[tests/setup] BD de tests inicializada con esquema.\n'
   );
 }
+
+// =============================================================================
+// 7. EL ARNÉS HABLA EL IDIOMA DE LOS PROGRAMAS
+// =============================================================================
+//
+// La superficie pública (`/s/*`, `/api/sign/*`) sirve el error como PÁGINA
+// HTML cuando el cliente no pide JSON. Es lo correcto para el firmante que
+// reabre el enlace en el navegador, y es una trampa para cualquier otro
+// cliente: `curl` y `fetch` mandan `Accept: */*` por defecto, y se llevarían
+// una página donde esperaban un sobre JSON.
+//
+// Por eso las pruebas, que son programas, declaran que quieren JSON: sin
+// esto, una prueba que afirma `res.body.error.code` no está probando el
+// contrato que ve el integrador, está probando que un objeto vacío no tiene
+// la propiedad — y falla por el motivo equivocado.
+//
+// 47 pruebas fallaban exactamente por esto (ver la entrada 📦909 del
+// Historial.md). El default va aquí, en un solo lugar, y no en 47 `.set()`
+// dispersos que se olvidan.
+//
+// Los tests que necesitan la página HTML (la negociación de contenido) mandan
+// su propio `Accept` explícito, que pisa este default.
+(function patchSupertestDefaultAccept() {
+  let stPath;
+  try {
+    stPath = require.resolve('supertest');
+  } catch (e) {
+    return; // sin supertest instalado: no hay nada que parchear
+  }
+  const st = require(stPath);
+  const METODOS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+
+  function envolver(app) {
+    const t = st(app);
+    return new Proxy(t, {
+      get(target, prop) {
+        if (METODOS.includes(prop) && typeof target[prop] === 'function') {
+          return (...args) => target[prop](...args).set('Accept', 'application/json');
+        }
+        if (prop === 'agent' && typeof target[prop] === 'function') {
+          return (...args) => envolver(target[prop](...args));
+        }
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+  }
+
+  require.cache[stPath].exports = envolver;
+})();

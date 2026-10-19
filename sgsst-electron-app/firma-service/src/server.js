@@ -36,6 +36,7 @@ const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const adminEmpresasRouter = require('./routes/admin-empresas');
 const internalAuditRouter = require('./routes/internal-audit');
+const verificacionRouter = require('./routes/verificacion');
 const constanciaRouter = require('./routes/constancia');
 const { migrate } = require('./db/migrate');
 
@@ -150,6 +151,10 @@ function createApp() {
   app.use('/internal/sign-requests', signRequestLimiter);
   app.use('/internal', signRequestRouter);
   app.use('/internal', internalAuditRouter);
+  // Oráculo de verificación de identidad (Fase 3): la Empresa pregunta si
+  // el documento que registró es el mismo con el que firmó el trabajador,
+  // sin apartar el número en claro. Ver src/services/verificacion.js.
+  app.use('/internal', verificacionRouter);
   // Constancia general del expediente (generada al vuelo; sign_request:read).
   app.use('/internal', constanciaRouter);
   // Endpoints administrativos: protegidos por X-Admin-API-Key

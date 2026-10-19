@@ -40,9 +40,28 @@ const {
 } = require('../helpers');
 
 let _lastPdf = null;
+
+/**
+ * Fecha fija para el PDF de prueba.
+ *
+ * pdf-lib escribe `/CreationDate` y `/ModDate` con la hora del momento. Eso
+ * hace que el MISMO PDF tenga bytes distintos cada segundo, y como el
+ * fingerprint de idempotencia incluye el `pdf_sha256` server-computed, dos
+ * peticiones "con el mismo body" que caen en segundos distintos se ven como
+ * bodies distintos: la segunda recibía 409 IDEMPOTENCY_KEY_CONFLICT en vez de
+ * un REPLAY. Pasaba ~3% de las corridas, solo cuando las dos peticiones
+ * cruzaban la frontera de segundo.
+ *
+ * Fijando la fecha, el PDF es byte-estable y "mismo body" quiere decir lo
+ * mismo que quiere decir.
+ */
+const FECHA_PDF_FIJA = new Date('2020-01-01T00:00:00.000Z');
+
 async function makePdf() {
   const doc = await PDFDocument.create();
   doc.addPage([300, 200]);
+  doc.setCreationDate(FECHA_PDF_FIJA);
+  doc.setModificationDate(FECHA_PDF_FIJA);
   const buf = Buffer.from(await doc.save());
   _lastPdf = buf;
   return buf;

@@ -20,9 +20,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
-const { resetDb, seedActiveAgreement, makeApp, TEST_API_KEY } = require('../helpers');
+const { resetDb, seedActiveAgreement, makeApp, TEST_API_KEY,
+  assertJsonError,
+} = require('../helpers');
 const { hashToken, sha256Of } = (() => {
   // sha256Of helper inline (el módulo ../crypto/hash también lo expone,
   // pero acá lo importamos por nombre para evitar conflicto de identificadores)
@@ -305,7 +308,7 @@ test('POST /verify-pdf con archivo que no es PDF: 400', async () => {
     .send({ pdf_base64: Buffer.from('this is not a pdf').toString('base64') });
 
   assert.equal(res.status, 400);
-  assert.equal(res.body.error.code, 'NOT_A_PDF');
+  assertJsonError(res, 'NOT_A_PDF');
 });
 
 test('POST /verify-pdf sin campo pdf_base64: 400', async () => {
@@ -319,7 +322,7 @@ test('POST /verify-pdf sin campo pdf_base64: 400', async () => {
     .send({});
 
   assert.equal(res.status, 400);
-  assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
+  assertJsonError(res, 'INVALID_REQUEST_BODY');
 });
 
 test('POST /verify-pdf con base64 inválido: 400', async () => {

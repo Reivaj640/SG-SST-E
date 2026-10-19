@@ -607,10 +607,15 @@
       ['Domicilio', 'domicilio'],
       ['Representante legal', 'representante_legal'],
       ['Documento del representante', 'representante_legal_identificacion'],
-      ['Responsable del tratamiento', 'responsable_tratamiento'],
+      ['Responsable interno de datos personales', 'responsable_tratamiento'],
       ['Correo de contacto', 'responsable_tratamiento_correo'],
       ['Canal de PQRS', 'canal_pqrs'],
       ['Canal de incidentes de seguridad', 'canal_incidentes'],
+      // Numeral 8.6 del Acuerdo: la Empresa debe comunicarle al Trabajador
+      // el plazo de conservacion que le aplica al documento y donde puede
+      // pedir una copia, antes de solicitarle la firma.
+      ['Plazo de conservacion de tus datos', 'plazo_retencion'],
+      ['Donde pedir una copia de tu documento', 'canal_solicitud_copia'],
     ];
 
     // La politica de datos se pinta aparte, como enlace, porque es lo unico

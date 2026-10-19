@@ -29,13 +29,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const { hashToken } = require('../../src/crypto/token');
 const {
-  resetDb, makeApp, seedActiveAgreement,
-  createSignRequestWithIdentificacion, createPendingConsent, createAcceptedConsent,
-  TEST_API_KEY,
+  resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createPendingConsent, createAcceptedConsent, TEST_API_KEY,
+  assertJsonError,
 } = require('../helpers');
 
 const HEADERS = { 'X-Internal-API-Key': TEST_API_KEY };
@@ -240,7 +240,7 @@ test('POST /consent/accept: estado PENDING (sin identify) → 409 CONSENT_ACCEPT
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_ACCEPT_TOO_EARLY');
+  assertJsonError(res, 'CONSENT_ACCEPT_TOO_EARLY');
   assert.equal(res.body.error.details.current_state, 'PENDING');
   assert.deepEqual(res.body.error.details.required_states, ['OTP_VERIFIED', 'DOCUMENT_VIEWED']);
   assert.ok(res.body.error.details.id_solicitud, 'id_solicitud debe estar en details');
@@ -268,7 +268,7 @@ test('POST /consent/accept: estado OTP_SENT (post-identify, pre-verify-otp) → 
   // Intentar accept
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_ACCEPT_TOO_EARLY');
+  assertJsonError(res, 'CONSENT_ACCEPT_TOO_EARLY');
   assert.equal(res.body.error.details.current_state, 'OTP_SENT');
 });
 
@@ -286,7 +286,7 @@ test('POST /consent/accept: estado REJECTED (terminal) → 410 TOKEN_ALREADY_USE
   // Intentar accept
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
+  assertJsonError(res, 'TOKEN_ALREADY_USED');
 });
 
 // =========================================================================
@@ -310,7 +310,7 @@ test('POST /consent/accept: sign request sin consent_id (legacy) → 409 CONSENT
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_REQUIRED');
+  assertJsonError(res, 'CONSENT_REQUIRED');
 });
 
 // =========================================================================
@@ -341,7 +341,7 @@ test('POST /consent/accept: consent de otro version_acuerdo → 409 CONSENT_VERS
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_VERSION_MISMATCH');
+  assertJsonError(res, 'CONSENT_VERSION_MISMATCH');
 });
 
 test('POST /consent/accept: consent de otro trabajador → 409 CONSENT_WORKER_MISMATCH', async () => {
@@ -356,7 +356,7 @@ test('POST /consent/accept: consent de otro trabajador → 409 CONSENT_WORKER_MI
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_WORKER_MISMATCH');
+  assertJsonError(res, 'CONSENT_WORKER_MISMATCH');
 });
 
 test('POST /consent/accept: consent de otra empresa → 409 CONSENT_COMPANY_MISMATCH', async () => {
@@ -371,7 +371,7 @@ test('POST /consent/accept: consent de otra empresa → 409 CONSENT_COMPANY_MISM
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_COMPANY_MISMATCH');
+  assertJsonError(res, 'CONSENT_COMPANY_MISMATCH');
 });
 
 // =========================================================================
@@ -392,7 +392,7 @@ test('POST /consent/accept: consent en estado LOCKED → 409 CONSENT_LOCKED', as
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_LOCKED');
+  assertJsonError(res, 'CONSENT_LOCKED');
 
   // El estado del consent NO debe cambiarse
   const row = db.prepare(
@@ -418,7 +418,7 @@ test('POST /consent/accept: consent con estado inconsistente → 409 CONSENT_INC
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'CONSENT_INCONSISTENT_STATE');
+  assertJsonError(res, 'CONSENT_INCONSISTENT_STATE');
   assert.equal(res.body.error.details.manifestacion_aceptada, 1);
   assert.equal(res.body.error.details.estado, 'OTP_PENDING');
 });
@@ -434,7 +434,7 @@ test('POST /consent/accept: signRequest.consent_id apunta a consent inexistente 
   const res = await request(app).post(`/api/sign/${token}/consent/accept`);
 
   assert.equal(res.status, 404);
-  assert.equal(res.body.error.code, 'CONSENT_NOT_FOUND');
+  assertJsonError(res, 'CONSENT_NOT_FOUND');
 });
 
 // =========================================================================
@@ -447,5 +447,5 @@ test('POST /consent/accept: token inválido → 404 TOKEN_NOT_FOUND', async () =
   const res = await request(app).post('/api/sign/token_invalido_xxxxxxxxxxxxxx/consent/accept');
 
   assert.equal(res.status, 404);
-  assert.equal(res.body.error.code, 'TOKEN_NOT_FOUND');
+  assertJsonError(res, 'TOKEN_NOT_FOUND');
 });

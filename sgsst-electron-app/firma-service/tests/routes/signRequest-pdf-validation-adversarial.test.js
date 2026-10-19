@@ -32,7 +32,7 @@ const { computeFingerprint } = require('../../src/services/idempotency');
 const config = require('../../src/config');
 const db = require('../../src/db/connection');
 const {
-  resetDb, seedActiveAgreement, makeApp, TEST_API_KEY,
+  resetDb, seedActiveAgreement, makeApp, TEST_API_KEY, capturarLogs,
 } = require('../helpers');
 
 const HEADERS = { 'X-Internal-API-Key': TEST_API_KEY };
@@ -108,19 +108,15 @@ function buildPdfEncrypted() {
   return Buffer.from(body, 'latin1');
 }
 
+/**
+ * Captura lo que el logger registra mientras corre `fn` y devuelve el texto.
+ *
+ * NO se parchea process.stdout/stderr: hacerlo roba la salida del runner de
+ * pruebas y produce fallos intermitentes (ver src/utils/logger.js).
+ */
 async function captureLogs(fn) {
-  const captured = { stdout: [], stderr: [] };
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { captured.stdout.push(chunk.toString()); return true; };
-  process.stderr.write = (chunk) => { captured.stderr.push(chunk.toString()); return true; };
-  try {
-    await fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return (captured.stdout.join('') + captured.stderr.join(''));
+  const capturadas = await capturarLogs(fn);
+  return capturadas.texto;
 }
 
 // =====================================================================

@@ -10,4 +10,5 @@ module.exports = {
   ...require('./compare'),
   ...require('./token'),
   ...require('./otp'),
+  ...require('./hmac'),
 };

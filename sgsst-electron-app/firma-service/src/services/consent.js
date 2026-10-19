@@ -20,11 +20,18 @@
 const db = require('../db/connection');
 const config = require('../config');
 const { sha256, hashWithSalt, generateSalt } = require('../crypto/hash');
-const { generateOTP, verifyOTP, isLocked, isExpired } = require('../crypto/otp');
+const { generateOTP, verifyOTP, verifyOTPHmac, isLocked, isExpired } = require('../crypto/otp');
+const { hmacHex, algHmac, esAlgHmac } = require('../crypto/hmac');
+const {
+  pseudonimo, valorParaGuardar, candidatosBusqueda, mismoTrabajador,
+} = require('./trabajador');
 const mailer = require('./mailer');
 const empresaService = require('./empresa');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
+
+const PROPOSITO_CORREO = 'correo';
+const ALG_HMAC = 'hmac-sha256';
 
 const ESTADO_PENDING = 'OTP_PENDING';
 const ESTADO_ACCEPTED = 'ACCEPTED';
@@ -46,13 +53,14 @@ function getById(id) {
   if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) return null;
   return db.prepare(`
     SELECT id, id_trabajador, id_empresa, version_acuerdo,
-           hash_texto_acuerdo, correo_verificacion, correo_hash,
-           otp_hash, otp_sal, otp_intentos, ip, user_agent,
+           hash_texto_acuerdo, correo_verificacion, correo_hash, correo_alg,
+           otp_hash, otp_sal, otp_alg, otp_intentos, ip, user_agent,
            fecha_aceptacion, fecha_otp_enviado, kair_version,
            manifestacion_aceptada, estado, created_at, updated_at,
            rol_firmante, nombre_aceptante, cargo_aceptante,
-           identificacion_aceptante,
-           empresa_snapshot, empresa_hash
+           identificacion_aceptante, identificacion_aceptante_alg,
+           empresa_snapshot, empresa_hash,
+           id_trabajador_alg
     FROM gh_consentimientos_firma
     WHERE id = ?
     LIMIT 1
@@ -73,18 +81,26 @@ function getExisting({ id_trabajador, id_empresa, version_acuerdo, rol_firmante 
   // EXPIRED viejos y un OTP_PENDING nuevo. El branching posterior en create()
   // ya distingue EXPIRED/ACCEPTED/OTP_PENDING/OTP_LOCKED correctamente;
   // este ORDER BY solo garantiza que se inspeccione el registro correcto.
+  // La fila puede guardar el seudónimo del trabajador (migración 019) o el
+  // documento crudo (filas anteriores). Se buscan las dos cosas.
+  //
+  // El seudónimo se deriva con el ámbito de la empresa, que aquí siempre se
+  // conoce: el consentimiento es de (trabajador, empresa, versión).
+  const cands = candidatosBusqueda(id_trabajador, id_empresa);
+  if (cands.length === 0) return null;
+  const placeholders = cands.map(() => '?').join(',');
   return db.prepare(`
     SELECT id, id_trabajador, id_empresa, version_acuerdo,
            manifestacion_aceptada, estado, otp_intentos,
            fecha_aceptacion, fecha_otp_enviado, rol_firmante
     FROM gh_consentimientos_firma
-    WHERE id_trabajador = ?
+    WHERE id_trabajador IN (${placeholders})
       AND id_empresa = ?
       AND version_acuerdo = ?
       AND rol_firmante = ?
     ORDER BY id DESC
     LIMIT 1
-  `).get(id_trabajador, id_empresa, version_acuerdo, rol);
+  `).get(...cands, id_empresa, version_acuerdo, rol);
 }
 
 /**
@@ -208,8 +224,14 @@ async function create({
   //    El consent del Acuerdo ya no tiene OTP propio. La aceptación
   //    ocurre en la mini-app vía POST /api/sign/:token/consent/accept
   //    (3ª casilla "He leído y acepto el Acuerdo de Firma Electrónica v1.0").
-  const correo_sal = generateSalt();
-  const correo_hash = hashWithSalt(correo_verificacion, correo_sal);
+  //
+  //    El hash del correo es un HMAC con clave derivada de la llave maestra.
+  //    Antes se usaba "hash con sal" y la sal se GENERABA PERO NO SE
+  //    GUARDABA (la tabla no tiene columna correo_sal), así que el valor
+  //    archivado no servía ni para comparar. Con HMAC el valor sí es
+  //    verificable por quien tenga la llave, y sin ella no permite deducir
+  //    el correo.
+  const correo_hash = hmacHex(PROPOSITO_CORREO, correo_verificacion, id_empresa);
   const hash_texto_acuerdo = acuerdo.texto_hash;
 
   // I-AUDIT-2026-09-10: en TEST mode sí generamos OTP dummy (999999) y
@@ -222,11 +244,12 @@ async function create({
   // (verify-otp incorrecto, OTP_LOCKED, etc.). Con '999999' el helper
   // createAcceptedConsent usa este valor único y los tests legacy pueden
   // usar '000000' como "OTP incorrecto" sin conflicto.
-  let otp_hash = null, otp_sal = null, fecha_otp_enviado = null, devOtp = null;
+  let otp_hash = null, otp_sal = null, fecha_otp_enviado = null, devOtp = null, otp_alg = null;
   if (process.env.NODE_ENV === 'test') {
     devOtp = '999999';
-    otp_sal = generateSalt();
-    otp_hash = hashWithSalt(devOtp, otp_sal);
+    otp_hash = hmacHex('otp', devOtp, id_empresa);
+    otp_sal = null;
+    otp_alg = algHmac();
     fecha_otp_enviado = new Date().toISOString();
   }
 
@@ -245,6 +268,16 @@ async function create({
   //    significa honestamente "no se le mostró identificación de empresa".
   const empresaCols = empresaService.snapshotColumnsFor(id_empresa);
   const now = new Date().toISOString();
+  // Seudónimo del trabajador (migración 019): la fila no guarda la cédula
+  // en claro. El cliente sigue mandándola; el servicio la convierte.
+  // El ámbito de la derivación es la empresa (migración 022).
+  //
+  // `valorParaGuardar` deja el marcador en NULL cuando el valor que llega
+  // ya es un seudónimo (no lo calculamos aquí, así que no sabemos con qué
+  // versión de llave se hizo). Marcar la versión vigente sería mentir.
+  const { valor: id_trabajador_guardado, alg: id_trabajador_alg } =
+    valorParaGuardar(id_trabajador, id_empresa);
+  const correo_alg = algHmac();
   const tx = db.transaction(() => {
     const result = db.prepare(`
       INSERT INTO gh_consentimientos_firma
@@ -252,16 +285,20 @@ async function create({
          hash_texto_acuerdo, correo_verificacion, correo_hash,
          otp_hash, otp_sal, otp_intentos, ip, user_agent,
          kair_version, manifestacion_aceptada, estado,
-         fecha_otp_enviado, empresa_snapshot, empresa_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, ?)
+         fecha_otp_enviado, empresa_snapshot, empresa_hash,
+         otp_alg, id_trabajador_alg, correo_alg)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id_trabajador, id_empresa, version_acuerdo,
+      id_trabajador_guardado, id_empresa, version_acuerdo,
       hash_texto_acuerdo, correo_verificacion, correo_hash,
       otp_hash, otp_sal,
       ip || null, user_agent || null,
       kair_version, ESTADO_PENDING,
       fecha_otp_enviado,
       empresaCols.snapshot, empresaCols.hash,
+      otp_alg,
+      id_trabajador_alg,
+      correo_alg,
     );
     return result.lastInsertRowid;
   });
@@ -342,10 +379,26 @@ function ensureRepConsent({
     return { consent: getById(existing.id), reused: true };
   }
   const now = new Date().toISOString();
-  const correo_sal = generateSalt();
   // Misma razón que en createConsent: se archiva la identificación de la
   // empresa que se le mostró, con su huella propia.
   const empresaCols = empresaService.snapshotColumnsFor(id_empresa);
+  // Seudónimo del trabajador (migración 019), con el ámbito de la empresa
+  // (migración 022).
+  //
+  // Aquí el valor que llega es el del sign request padre, que ya es un
+  // seudónimo: se respeta tal cual (nunca se re-hashea) y el marcador queda
+  // en NULL, porque no lo calculamos aquí.
+  const { valor: id_trabajador_guardado, alg: id_trabajador_alg } =
+    valorParaGuardar(id_trabajador, id_empresa);
+  // El representante es OTRO firmante (numeral 3.5: repite el flujo completo,
+  // con su propia verificación de identidad y su propia aceptación). Su
+  // documento se trata igual que el del trabajador: se guarda el seudónimo,
+  // no el número. El número en claro del representante sigue en el snapshot
+  // de la empresa (numeral 1.2), que es el bloque «Empresa que solicita tu
+  // firma» y es dato público del registro mercantil.
+  const rep_identificacion_pseudo = rep.numero_identificacion
+    ? pseudonimo(rep.numero_identificacion, id_empresa)
+    : null;
   const result = db.prepare(`
     INSERT INTO gh_consentimientos_firma
       (id_trabajador, id_empresa, version_acuerdo,
@@ -355,16 +408,20 @@ function ensureRepConsent({
        fecha_otp_enviado,
        rol_firmante, nombre_aceptante, cargo_aceptante,
        identificacion_aceptante,
-       empresa_snapshot, empresa_hash)
-    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?, ?, ?)
+       empresa_snapshot, empresa_hash,
+       id_trabajador_alg, correo_alg, identificacion_aceptante_alg)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id_trabajador, id_empresa, version_acuerdo,
-    hash_texto_acuerdo, rep.correo, hashWithSalt(rep.correo, correo_sal),
+    id_trabajador_guardado, id_empresa, version_acuerdo,
+    hash_texto_acuerdo, rep.correo, hmacHex(PROPOSITO_CORREO, rep.correo, id_empresa),
     ip || null, user_agent || null,
     kair_version, ESTADO_PENDING,
     'EMPRESA', rep.nombre || null, rep.cargo || null,
-    rep.numero_identificacion || null,
+    rep_identificacion_pseudo || null,
     empresaCols.snapshot, empresaCols.hash,
+    id_trabajador_alg,
+    algHmac(),
+    rep_identificacion_pseudo ? algHmac() : null,
   );
   const consent = getById(result.lastInsertRowid);
   logger.info('Consentimiento propio del representante creado', {
@@ -449,7 +506,21 @@ function verifyOtp({ consentId, otp, kair_version }) {
   }
 
   // Verificar OTP
-  const result = verifyOTP(otp, consent.otp_hash, consent.otp_sal, consent.otp_intentos);
+  //
+  //    La fila guarda el HMAC del código (migración 019), con el ámbito de la
+  //    empresa y la versión de llave (migración 022). Las filas anteriores
+  //    guardan SHA-256(sal || otp) con la sal en la misma tabla: se verifican
+  //    con su algoritmo y, si coinciden, se reescriben con el HMAC.
+  //
+  //    `verifyOTPHmac` prueba todas las versiones del anillo de llaves y el
+  //    formato v1: una fila nunca puede quedar sin poder verificar.
+  let result;
+  if (esAlgHmac(consent.otp_alg)) {
+    const valido = verifyOTPHmac(otp, consent.otp_hash, consent.id_empresa);
+    result = { valid: valido, attempts: consent.otp_intentos + 1 };
+  } else {
+    result = verifyOTP(otp, consent.otp_hash, consent.otp_sal, consent.otp_intentos);
+  }
 
   if (result.valid) {
     // Aceptar
@@ -527,11 +598,20 @@ function verifyOtp({ consentId, otp, kair_version }) {
  *      → 409 CONSENT_ID_MISMATCH
  *      Defensa contra que un cliente envíe un consentId arbitrario.
  *
- *   3. El consentimiento es de OTRO trabajador
+ *   3. El consentimiento es de OTRA empresa
+ *      → 409 CONSENT_COMPANY_MISMATCH
+ *
+ *   4. El consentimiento es de OTRO trabajador
  *      → 409 CONSENT_WORKER_MISMATCH
  *
- *   4. El consentimiento es de OTRA empresa
- *      → 409 CONSENT_COMPANY_MISMATCH
+ * El orden (empresa antes que trabajador) NO es Cosmetico. El seudónimo del
+ * trabajador se deriva con el ámbito de la empresa, así que el del
+ * consentimiento de la empresa AAA y el del sign request de la empresa BBB
+ * son valores distintos aunque sea la misma persona: compararlos antes de
+ * confirmar la empresa es comparar dos espacios de nombres distintos. Y en
+ * ese orden inverso la respuesta se volvía un oráculo que le decía a la
+ * empresa que llama si aquel consent_id era de SU trabajador en otra
+ * empresa. Ver el comentario del paso 3.
  *
  *   5. El consentimiento es de OTRA versión del Acuerdo
  *      → 409 CONSENT_VERSION_MISMATCH
@@ -594,17 +674,47 @@ function accept(consentId, { signRequest } = {}) {
       });
   }
 
-  // 3. Cross-validate mismo trabajador
-  if (consent.id_trabajador !== signRequest.id_trabajador) {
-    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
-      'El consentimiento pertenece a otro trabajador',
-      { consent_id: consent.id });
-  }
-
-  // 4. Cross-validate misma empresa
+  // 3. Cross-validate misma empresa — PRIMERO.
+  //
+  //    El orden importa, y no por gusto. El seudónimo del trabajador se
+  //    deriva con el ÁMBITO de la empresa (migración 022), así que el
+  //    seudónimo de un consentimiento de la empresa AAA y el de un sign
+  //    request de la empresa BBB son valores de ESPACIOS DE NOMBRES
+  //    DISTINTOS: nunca coinciden, ni siquiera siendo la misma persona.
+  //
+  //    Comparar trabajadores antes de confirmar la empresa es comparar dos
+  //    marcas que no significan lo mismo. Además, el orden inverso dejaba
+  //    un oráculo: como el chequeo de trabajador se resolvía con el
+  //    seudónimo del sign request (ámbito de SU empresa), una fila heredada
+  //    que guardaba el documento crudo pasaba el chequeo y el de empresa
+  //    corría después. La diferencia entre "CONSENT_WORKER_MISMATCH" y
+  //    "CONSENT_COMPANY_MISMATCH" le decía a la empresa que llama si ese
+  //    consent_id era de SU trabajador en otra empresa: un enlace entre
+  //    empresas, que es justo lo que el ámbito del seudónimo existe para
+  //    impedir.
+  //
+  //    Con la empresa primero, un consentimiento de otra empresa SIEMPRE
+  //    da CONSENT_COMPANY_MISMATCH, y la respuesta ya no depende del
+  //    trabajador.
   if (consent.id_empresa !== signRequest.id_empresa) {
     throw new AppError(409, 'CONSENT_COMPANY_MISMATCH',
       'El consentimiento pertenece a otra empresa',
+      { consent_id: consent.id });
+  }
+
+  // 4. Cross-validate mismo trabajador — DESPUÉS de la empresa.
+  //
+  //    Ahora sí se puede comparar: los dos valores están en el mismo
+  //    ámbito (la empresa ya confirmada).
+  //
+  //    El consentimiento guarda el SEUDÓNIMO del trabajador (migración 019)
+  //    y el sign request también. Pero uno de los dos puede venir de una
+  //    fila heredada, que todavía guarda el documento crudo. La comparación
+  //    tiene que entender los dos formatos: `mismoTrabajador` es idempotente
+  //    con el seudónimo y compara el crudo con su seudónimo.
+  if (!mismoTrabajador(consent.id_trabajador, signRequest.id_trabajador, signRequest.id_empresa)) {
+    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
+      'El consentimiento pertenece a otro trabajador',
       { consent_id: consent.id });
   }
 
@@ -717,11 +827,21 @@ function accept(consentId, { signRequest } = {}) {
  *   4. El consentimiento NO está aceptado (manifestacion_aceptada != 1)
  *      → 409 CONSENT_NOT_ACCEPTED
  *
- *   5. El consentimiento es de OTRO trabajador
+ *   5. El consentimiento es de OTRA empresa
+ *      → 409 CONSENT_COMPANY_MISMATCH
+ *
+ *   6. El consentimiento es de OTRO trabajador
  *      → 409 CONSENT_WORKER_MISMATCH
  *
- *   6. El consentimiento es de OTRA empresa
- *      → 409 CONSENT_COMPANY_MISMATCH
+ * El orden (empresa antes que trabajador) NO es cosmético: el seudónimo del
+ * trabajador lleva el ámbito de la empresa, así que comparar trabajadores
+ * antes de confirmar la empresa es comparar dos espacios de nombres
+ * distintos, y además la respuesta se volvía un oráculo entre empresas.
+ * Ver el comentario del paso 5.
+ *
+ * Los identificadores de la contraparte (trabajador, empresa) NO van en el
+ * error que ve el cliente: quedan en el log del servidor. El camino de error
+ * también es tratamiento de datos.
  *
  *   7. El consentimiento es de OTRA versión del Acuerdo
  *      → 409 CONSENT_VERSION_MISMATCH
@@ -772,25 +892,64 @@ function validateForCommit(signRequest) {
       });
   }
 
-  // Paso 5: mismo trabajador
-  if (consent.id_trabajador !== signRequest.id_trabajador) {
-    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
-      'El consentimiento pertenece a otro trabajador',
-      {
-        consent_id: consent.id,
-        consent_id_trabajador: consent.id_trabajador,
-        sign_request_id_trabajador: signRequest.id_trabajador,
-      });
-  }
-
-  // Paso 6: misma empresa
+  // Paso 5: misma empresa — PRIMERO.
+  //
+  //   El orden importa. El seudónimo del trabajador lleva el ÁMBITO de la
+  //   empresa (migración 022), así que el seudónimo de un consentimiento de
+  //   la empresa AAA y el de un sign request de la empresa BBB son valores
+  //   de espacios de nombres distintos: nunca coinciden, ni siendo la misma
+  //   persona. Comparar trabajadores antes de confirmar la empresa es
+  //   comparar dos marcas que no significan lo mismo.
+  //
+  //   Y en el orden inverso la respuesta se volvía un oráculo: el chequeo
+  //   de trabajador se resolvía con el seudónimo del sign request (ámbito
+  //   de SU empresa), de modo que una fila heredada que guardaba el
+  //   documento crudo pasaba ese chequeo y el de empresa corría después.
+  //   La diferencia entre CONSENT_WORKER_MISMATCH y CONSENT_COMPANY_MISMATCH
+  //   le decía a la empresa que llama si ese consent_id era de SU
+  //   trabajador en otra empresa: un enlace entre empresas, que es
+  //   exactamente lo que el ámbito del seudónimo existe para impedir.
+  //
+  //   Con la empresa primero, un consentimiento de otra empresa SIEMPRE da
+  //   CONSENT_COMPANY_MISMATCH, y la respuesta ya no depende del
+  //   trabajador.
   if (consent.id_empresa !== signRequest.id_empresa) {
+    // Los identificadores de la contraparte NO van en el error público: son
+    // datos de otra empresa (y de otra persona) y el camino de error también
+    // es tratamiento de datos. Quedan en el log del servidor, que sí es el
+    // lugar de un dato de auditoría.
+    logger.warn('Consentimiento de otra empresa en la validación de commit', {
+      consent_id: consent.id,
+      consent_id_empresa: consent.id_empresa,
+      sign_request_id: signRequest.id,
+      sign_request_id_empresa: signRequest.id_empresa,
+    });
     throw new AppError(409, 'CONSENT_COMPANY_MISMATCH',
       'El consentimiento pertenece a otra empresa',
       {
         consent_id: consent.id,
-        consent_id_empresa: consent.id_empresa,
-        sign_request_id_empresa: signRequest.id_empresa,
+      });
+  }
+
+  // Paso 6: mismo trabajador — DESPUÉS de la empresa.
+  // (el consentimiento puede guardar el seudónimo o el documento crudo de
+  // una fila heredada; `mismoTrabajador` entiende los dos formatos. Ahora la
+  // comparación es válida: los dos valores están en el mismo ámbito.)
+  if (!mismoTrabajador(consent.id_trabajador, signRequest.id_trabajador, signRequest.id_empresa)) {
+    // Igual que arriba: los identificadores del trabajador de la contraparte
+    // se quedan en el log, no en el error que ve el cliente. Que el
+    // trabajador reciba el seudónimo de un colega en un aviso no aporta
+    // nada, y ese seudónimo es el que permite enlazar personas.
+    logger.warn('Consentimiento de otro trabajador en la validación de commit', {
+      consent_id: consent.id,
+      consent_id_trabajador: consent.id_trabajador,
+      sign_request_id: signRequest.id,
+      sign_request_id_trabajador: signRequest.id_trabajador,
+    });
+    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
+      'El consentimiento pertenece a otro trabajador',
+      {
+        consent_id: consent.id,
       });
   }
 

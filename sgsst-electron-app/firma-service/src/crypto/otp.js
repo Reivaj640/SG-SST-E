@@ -3,21 +3,38 @@
  *
  * - OTP numérico de 6 dígitos.
  * - Generado con crypto.randomInt (criptográficamente seguro).
- * - Almacenado como SHA-256(sal + otp), NUNCA en plano.
+ * - Almacenado como HMAC-SHA256 (clave derivada de la llave maestra),
+ *   NUNCA en plano.
  * - TTL configurable (default 600s = 10 min).
  * - Máximo de intentos configurable (default 5).
  *
- * Ver ARCHITECTURE.md §11.2 y SECURITY.md §S.1.
+ * HISTORIA DEL ALMACENAMIENTO
+ * ---------------------------
+ * Antes: SHA-256(sal + otp), con la sal guardada EN LA MISMA TABLA que el
+ * hash. Eso no protege nada: quien lee la base de datos tiene la sal y el
+ * hash y puede recomputar los 10^6 candidatos en segundos.
+ * Ahora: HMAC-SHA256 con clave derivada por HKDF de `TOKEN_ENCRYPTION_KEY`,
+ * que vive FUERA de la base de datos. Quien lee la base ya no puede
+ * recomputar ningún candidato.
+ *
+ * Se conserva `hashOTP` (sal en la misma tabla) SOLO para poder verificar
+ * los OTPs de las filas heredadas, que se reescriben con el algoritmo nuevo
+ * en el momento en que se verifican.
+ *
+ * Ver ARCHITECTURE.md §11.2, SECURITY.md §S.1 y el Capítulo III del
+ * Acuerdo de uso (3.4(e) y 3.6(e)).
  */
 'use strict';
 
 const crypto = require('crypto');
 const { sha256, generateSalt, hashWithSalt } = require('./hash');
 const { constantTimeEqual } = require('./compare');
+const { hmacHex, hmacV1Hex, listKeyVersions } = require('./hmac');
 
 const OTP_LENGTH = 6;
 const OTP_MIN = 0;
 const OTP_MAX = 999999;
+const PROPOSITO_OTP = 'otp';
 
 /**
  * Genera un OTP numérico de 6 dígitos.
@@ -31,6 +48,10 @@ function generateOTP() {
 /**
  * Hashea un OTP con una sal aleatoria.
  * Retorna { hash, salt } para guardar en BD.
+ *
+ * HEREDADO: la sal queda en la misma tabla que el hash, así que no protege
+ * nada. Se conserva únicamente para verificar filas antiguas. Para todo lo
+ * nuevo, usar `hashOTPHmac`.
  */
 function hashOTP(otp) {
   if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) {
@@ -39,6 +60,58 @@ function hashOTP(otp) {
   const salt = generateSalt();
   const hash = hashWithSalt(otp, salt);
   return { hash, salt };
+}
+
+/**
+ * Hashea un OTP con HMAC-SHA256 y clave derivada de la llave maestra.
+ * Retorna solo el hash: no hay sal que persistir.
+ *
+ * El ámbito es la Empresa: el OTP se genera para una solicitud de una
+ * empresa concreta, y con una sola llave para todo el servicio la misma
+ * secuencia de 6 dígitos daría la misma huella en todas.
+ *
+ * @param {string} otp - 6 dígitos
+ * @param {string} [id_empresa] - ámbito de la derivación
+ * @returns {string} 64 chars hex
+ */
+function hashOTPHmac(otp, id_empresa) {
+  if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) {
+    throw new Error('hashOTPHmac: OTP debe ser string de 6 dígitos');
+  }
+  return hmacHex(PROPOSITO_OTP, otp, id_empresa);
+}
+
+/**
+ * Verifica un OTP contra un hash HMAC almacenado.
+ * Usa constantTimeEqual para evitar timing attacks.
+ *
+ * Se prueban TODAS las versiones del anillo de llaves, no solo la vigente:
+ * una fila puede haberse calculado con una versión anterior, y esa fila no
+ * puede quedar sin poder verificar. También se prueba el formato v1 (sin
+ * ámbito), que usaba la primera implementación.
+ *
+ * @param {string} providedOTP
+ * @param {string} storedHash - hash HMAC de 64 chars
+ * @param {string} [id_empresa] - ámbito de la derivación
+ * @returns {boolean}
+ */
+function verifyOTPHmac(providedOTP, storedHash, id_empresa) {
+  if (typeof providedOTP !== 'string' || !/^\d{6}$/.test(providedOTP)) {
+    return false;
+  }
+  if (typeof storedHash !== 'string' || storedHash.length === 0) {
+    return false;
+  }
+  for (const version of listKeyVersions()) {
+    if (constantTimeEqual(hmacHex(PROPOSITO_OTP, providedOTP, id_empresa, version), storedHash)) {
+      return true;
+    }
+  }
+  // Formato v1 (ámbito global, llave maestra).
+  if (constantTimeEqual(hmacV1Hex(PROPOSITO_OTP, providedOTP), storedHash)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -116,8 +189,11 @@ function isExpired(sentAt, ttlSeconds, now) {
 module.exports = {
   generateOTP,
   hashOTP,
+  hashOTPHmac,
+  verifyOTPHmac,
   verifyOTP,
   isLocked,
   isExpired,
   OTP_LENGTH,
+  PROPOSITO_OTP,
 };

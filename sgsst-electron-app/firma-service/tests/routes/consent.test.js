@@ -27,6 +27,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('../../src/db/connection');
+const { sha256 } = require('../../src/crypto/hash');
+const { hmacHex, algHmac } = require('../../src/crypto/hmac');
 const {
   resetDb, seedActiveAgreement, makeApp, withApiKey, TEST_API_KEY,
 } = require('../helpers');
@@ -61,12 +63,20 @@ test('POST /internal/consentimientos: válido → 201 + OTP en mailer dev', asyn
   // En dev, el OTP se devuelve para tests
   assert.match(res.body.devOtp, /^\d{6}$/);
 
-  // Verificar que el OTP NO está en la BD en plano
-  const row = db.prepare('SELECT otp_hash, otp_sal FROM gh_consentimientos_firma WHERE id = ?').get(res.body.consent_id);
+  // Verificar que el OTP NO está en la BD en plano.
+  //
+  // Desde la migración 019 la huella es un HMAC-SHA256 con clave derivada de
+  // la llave maestra del servicio. No hay sal en la fila: una sal guardada
+  // al lado del hash no protege nada, porque quien lee la base tiene
+  // ambos. Sin la llave, el código no se puede recuperar probando los 10^6
+  // candidatos.
+  const row = db.prepare('SELECT otp_hash, otp_sal, otp_alg FROM gh_consentimientos_firma WHERE id = ?').get(res.body.consent_id);
   assert.ok(row.otp_hash);
-  assert.ok(row.otp_sal);
+  assert.equal(row.otp_alg, algHmac());
+  assert.equal(row.otp_sal, null, 'no debe quedar sal en la misma tabla');
   assert.equal(row.otp_hash.length, 64);
   assert.notEqual(row.otp_hash, res.body.devOtp, 'OTP NO debe quedar en plano en BD');
+  assert.notEqual(row.otp_hash, sha256(res.body.devOtp), 'tampoco un hash pelado');
 
   // Verificar que el mailer capturó el OTP
   const inbox = mailer.getDevInbox();

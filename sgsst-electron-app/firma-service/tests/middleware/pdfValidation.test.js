@@ -36,6 +36,7 @@ const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
 const pdfValidation = require('../../src/middleware/pdfValidation');
 const config = require('../../src/config');
+const { capturarLogs } = require('../helpers');
 
 // =====================================================================
 // Helpers
@@ -93,39 +94,14 @@ function buildPdfWithEncryptMarker() {
 }
 
 /**
- * Captura stdout+stderr mientras corre fn. El logger de la app escribe
- * a stdout (info) y stderr (warn/error). Devuelve el texto combinado.
+ * Captura lo que el logger registra durante una fn async.
+ *
+ * NO se parchea process.stdout/stderr: hacerlo roba la salida del runner de
+ * pruebas y produce fallos intermitentes (ver src/utils/logger.js).
  */
-function captureStdStreams(fn) {
-  let out = '';
-  let err = '';
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { out += chunk; return true; };
-  process.stderr.write = (chunk) => { err += chunk; return true; };
-  try {
-    fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { out, err, combined: out + err };
-}
-
 async function captureStdStreamsAsync(fn) {
-  let out = '';
-  let err = '';
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { out += chunk; return true; };
-  process.stderr.write = (chunk) => { err += chunk; return true; };
-  try {
-    await fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { out, err, combined: out + err };
+  const capturadas = await capturarLogs(fn);
+  return { out: capturadas.stdout, err: capturadas.stderr, combined: capturadas.texto };
 }
 
 /**
@@ -328,28 +304,28 @@ test('§2.3: log incluye request_id, sha256_prefix (8 chars), page_count, size_b
   const text = captured.combined;
   // 1. request_id presente
   assert.ok(text.includes('req-capture-test-001'),
-    'log debe incluir el request_id');
+    'log debe incluir el request_id. Capturado: ' + text);
   // 2. sha256_prefix (8 chars) presente: el prefijo se imprime como string en JSON,
   //    asi que verificamos que aparece. Tomamos el sha256 real para derivarlo.
   const { sha256 } = require('../../src/crypto/hash');
   const fullHash = sha256(buf);
   const prefix = fullHash.slice(0, 8);
   assert.ok(text.includes(`"sha256_prefix":"${prefix}"`),
-    `log debe incluir sha256_prefix="${prefix}"`);
+    `log debe incluir sha256_prefix="${prefix}". Capturado: ` + text);
   // 3. page_count presente
   assert.ok(text.includes('"page_count":1'),
-    'log debe incluir page_count:1');
+    'log debe incluir page_count:1. Capturado: ' + text);
   // 4. size_bytes presente
   assert.ok(text.includes(`"size_bytes":${buf.length}`),
-    `log debe incluir size_bytes:${buf.length}`);
+    `log debe incluir size_bytes:${buf.length}. Capturado: ` + text);
   // 5. NO incluye el sha256 completo (defense in depth)
   assert.ok(!text.includes(fullHash),
-    'log NO debe incluir el sha256 completo (PII defense)');
+    'log NO debe incluir el sha256 completo (PII defense). Capturado: ' + text);
   // 6. NO incluye "metadata" key (PII defense: Title/Author/Subject/Keywords)
   //    La string "metadata" podria aparecer en otras cosas; verificamos que
   //    NO esta la entrada JSON "metadata":{ o "metadata":"keys"
   assert.ok(!/"metadata":\s*["{]/.test(text),
-    'log NO debe incluir el objeto metadata del PDF');
+    'log NO debe incluir el objeto metadata del PDF. Capturado: ' + text);
 });
 
 // =====================================================================

@@ -99,6 +99,15 @@ const post = (pathname, accept) =>
   fetch(base + pathname, { method: 'POST', headers: { Accept: accept } })
     .then(async (res) => ({ status: res.status, headers: res.headers, text: await res.text() }));
 
+/** GET SIN header Accept (como un cliente que no dice nada). */
+async function getSinAccept(pathname) {
+  const res = await fetch(base + pathname);
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch (_) { /* no es JSON */ }
+  return { status: res.status, headers: res.headers, text: text, json: json };
+}
+
 // =============================================================================
 // 1. Superficie pública + navegador → página HTML
 // =============================================================================
@@ -254,6 +263,78 @@ test('/internal/* sigue respondiendo JSON aunque el cliente pida HTML', async ()
 
 test('/api/sign/* con navegador también negocia HTML', async () => {
   const r = await get('/api/sign/abc/identificar', BROWSER);
+  assert.match(r.headers.get('content-type'), /^text\/html/);
+});
+
+// =============================================================================
+// 4b. Superficie pública + cliente de PROGRAMA → JSON
+// =============================================================================
+//
+// La superficie pública sirve el error como página HTML para el navegador.
+// Para un cliente de programa tiene que ser JSON, y el caso más común es
+// el que no dice nada: `curl` y `fetch` mandan `Accept: */*` por defecto, y
+// muchos clientes ni siquiera mandan la cabecera.
+//
+// Antes, con la lista de tipos en el orden `['html', 'json']`, un `*/*` se
+// resolvía a HTML (el primero de la lista gana el desempate) y el cliente
+// se llevaba una página donde esperaba un sobre JSON: el parseo fallaba en
+// silencio y lejos de la causa real. 47 pruebas de la suite caían justo
+// ahí.
+//
+// Ahora el comodín se resuelve a JSON, y la página queda para quien la pide
+// explícitamente.
+
+test('la superficie pública con Accept comodín responde JSON, no la página', async () => {
+  const r = await get('/s/usado', '*/*');
+  assert.equal(r.status, 410);
+  assert.match(r.headers.get('content-type'), /application\/json/);
+  assert.equal(r.json.error.code, 'TOKEN_ALREADY_USED');
+});
+
+test('la superficie pública SIN header Accept responde JSON', async () => {
+  const r = await getSinAccept('/s/usado');
+  assert.equal(r.status, 410);
+  assert.match(r.headers.get('content-type'), /application\/json/);
+  assert.equal(r.json.error.code, 'TOKEN_ALREADY_USED');
+});
+
+test('/api/sign/* con Accept comodín responde JSON', async () => {
+  const r = await get('/api/sign/abc/identificar', '*/*');
+  assert.match(r.headers.get('content-type'), /application\/json/);
+});
+
+test('/api/sign/* SIN header Accept responde JSON', async () => {
+  const r = await getSinAccept('/api/sign/abc/identificar');
+  assert.match(r.headers.get('content-type'), /application\/json/);
+});
+
+test('MUTACION: si la lista vuelve a empezar por html, el comodín se lleva la pagina', async () => {
+  // Este test es el ancla del comportamiento: si alguien vuelve a poner
+  // 'html' primero, el `*/*` vuelve a resolverse a HTML y este falla.
+  const r = await get('/s/usado', '*/*');
+  assert.doesNotMatch(r.headers.get('content-type'), /^text\/html/,
+    'un cliente de programa no puede recibirse una pagina HTML');
+});
+
+// =============================================================================
+// 4c. La PÁGINA sigue saliendo para quien la pide explícitamente
+// =============================================================================
+//
+// El default de los tests es `Accept: application/json` (ver tests/setup.js),
+// así que el camino HTML ya no se ejerce por accidente. Estos dos tests lo
+// fijan para que la página del firmante no se rompa sin que nadie se entere:
+// si el HTML dejara de servirse, el navegador mostraría JSON crudo en vez de
+// una página, y ningún test de los de programa lo detectaría.
+
+test('la superficie pública con Accept: text/html explícito responde HTML', async () => {
+  const r = await get('/s/usado', 'text/html');
+  assert.equal(r.status, 410);
+  assert.match(r.headers.get('content-type'), /^text\/html/);
+  assert.doesNotMatch(r.text, /^\s*\{/, 'la respuesta no debe ser JSON');
+});
+
+test('/api/sign/* con Accept: text/html explícito responde HTML', async () => {
+  const r = await get('/api/sign/abc/identificar', 'text/html');
   assert.match(r.headers.get('content-type'), /^text\/html/);
 });
 

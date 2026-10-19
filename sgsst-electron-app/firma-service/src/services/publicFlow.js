@@ -20,10 +20,14 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db/connection');
 const config = require('../config');
-const { hashToken } = require('../crypto/token');
-const { generateOTP, hashOTP, verifyOTP, isLocked } = require('../crypto/otp');
+const { hashToken, hashTokenHmac, tokenHashCandidates } = require('../crypto/token');
+const { generateOTP, hashOTP, hashOTPHmac, verifyOTP, verifyOTPHmac, isLocked } = require('../crypto/otp');
 const { hashWithSalt, generateSalt, sha256, generateIdSolicitud: _ } = require('../crypto/hash');
 const { canonicalJSON } = require('../crypto/compare');
+const { algHmac, esAlgHmac } = require('../crypto/hmac');
+const identificacion = require('./identificacion');
+const ultimos4 = require('./ultimos4');
+const { candidatosBusqueda } = require('./trabajador');
 const signRequestService = require('./signRequest');
 const consentService = require('./consent');
 const mailer = require('./mailer');
@@ -69,8 +73,12 @@ function resolveToken(token, opts) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'Token no encontrado');
   }
 
-  const token_hash = hashToken(token);
-  const signRequest = signRequestService.getByTokenHash(token_hash);
+  // Las solicitudes anteriores a la migración 019 guardan SHA-256(token);
+  // las nuevas guardan HMAC-SHA256(token). El token es el mismo en ambos
+  // casos, así que se prueban todas las huellas candidatas: la fila se
+  // encuentra con la que tenga, sin importar cuándo se creó ni con qué
+  // versión de llave se calculó.
+  const signRequest = signRequestService.getByTokenHash(tokenHashCandidates(token));
 
   if (!signRequest) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'El token no existe');
@@ -233,23 +241,19 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
       { expected: signRequest.identificacion_tipo, provided: tipo_identificacion });
   }
 
-  // 5. Calcular hash de la cédula con sal (P1-2).
-  //    Si el sign request tiene sal → SHA-256(sal || numero_documento).
-  //    Si es legacy (sal = NULL) → SHA-256(numero_documento) (fallback).
-  //    Esto preserva compatibilidad con sign requests pre-migración 006.
-  const sal = signRequest.identificacion_numero_sal;
-  let provided_hash;
-  if (sal) {
-    // Con sal: SHA-256(sal_hex || numero_documento).
-    // Concatenamos los strings y hasheamos.
-    provided_hash = require('crypto').createHash('sha256')
-      .update(sal + numero_documento)
-      .digest('hex');
-  } else {
-    // Legacy sin sal.
-    provided_hash = sha256(numero_documento);
-  }
-  if (provided_hash !== signRequest.identificacion_numero_hash) {
+  // 5. Comparar la identificación.
+  //    La fila guarda un HMAC-SHA256 del hash previo del número de
+  //    documento, con clave derivada de la llave maestra del servicio
+  //    (migración 019). Quien lea la base de datos no puede recomputar
+  //    candidatos: la llave no está ahí.
+  //
+  //    Las filas anteriores a esa migración guardan el hash pelado (con o
+  //    sin sal). Se comparan con su propio algoritmo y, si coinciden, la
+  //    fila se reescribe con el HMAC. Así la migración es autosuficiente:
+  //    no hay que re-hashear nada a mano ni abrir una ventana de
+  //    mantenimiento, y las firmas en curso no se invalidan.
+  const verificacion = identificacion.verificar(numero_documento, signRequest);
+  if (!verificacion.ok) {
     // Incrementar intentos
     db.prepare(`
       UPDATE gh_firmas_electronicas
@@ -263,6 +267,22 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
       'La identificación no coincide con nuestros registros');
   }
 
+  // 5b. Apartar los últimos cuatro dígitos del documento, EN MEMORIA.
+  //
+  //     El documento en claro acaba de pasar por aquí y no se guarda en
+  //     ninguna parte: la fila solo tiene su huella. Pero la constancia
+  //     necesita poder mostrarle al firmante los últimos cuatro dígitos
+  //     para que confirme visualmente que el documento es el suyo.
+  //
+  //     Esos cuatro dígitos viajan en memoria hasta el commit y se
+  //     descartan ahí. Ver src/services/ultimos4.js para por qué NO van a
+  //     la base de datos (el 10.5(a) manda guardar únicamente la huella).
+  ultimos4.guardar(
+    signRequest.id,
+    numero_documento,
+    tipo_identificacion
+  );
+
   // 6+7+8. Identificación + generación OTP + guardado, TODO en una sola tx.
   //    P1-3: antes había 2 tx separadas (IDENTIFIED y OTP_SENT) con una
   //    ventana de 20-30ms donde el estado podía quedar en IDENTIFIED sin
@@ -273,8 +293,13 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
   //    preservamos (no sobrescribimos). El FAILED no persiste IP/UA
   //    porque un intento fallido puede venir de cualquier red.
   const otp = generateOTP();
-  const otp_sal = generateSalt();
-  const otp_hash = hashWithSalt(otp, otp_sal);
+  // HMAC-SHA256 con clave derivada de la llave maestra del servicio. La
+  // llave vive FUERA de la base de datos: quien lea la tabla no puede
+  // recuperar el OTP probando los 10^6 candidatos, que es lo que sí podía
+  // con la sal guardada al lado del hash. Es lo que pide el 3.4(e) y el
+  // 3.6(e) del Acuerdo de uso.
+  const otp_hash = hashOTPHmac(otp, signRequest.id_empresa);
+  const otp_sal = null;
   const now_iso = new Date().toISOString();
   const tx = db.transaction(() => {
     db.prepare(`
@@ -283,11 +308,22 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
           identificacion_coincidio = 1,
           ip_origen = COALESCE(?, ip_origen),
           user_agent = COALESCE(?, user_agent),
-          otp_hash = ?, otp_sal = ?,
+          otp_hash = ?, otp_sal = ?, otp_alg = ?,
           otp_intentos = 0, otp_bloqueado = 0,
           fecha_otp_enviado = ?
       WHERE id = ?
-    `).run(ip || null, user_agent || null, otp_hash, otp_sal, now_iso, signRequest.id);
+    `).run(ip || null, user_agent || null, otp_hash, otp_sal, algHmac(), now_iso, signRequest.id);
+
+    // Autoupgrade de la fila heredada: si la identificación se había
+    // verificado con el algoritmo viejo, ahora se reescribe con el HMAC.
+    // Es el momento seguro: la fila ya identificó al firmante.
+    if (verificacion.huellaNueva) {
+      db.prepare(`
+        UPDATE gh_firmas_electronicas
+        SET identificacion_numero_hash = ?, identificacion_numero_alg = ?
+        WHERE id = ?
+      `).run(verificacion.huellaNueva, algHmac(), signRequest.id);
+    }
     signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
       { tipo_identificacion }, 'trabajador', ip, user_agent);
   });
@@ -491,6 +527,13 @@ async function commit(token, opts, ip, user_agent) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
+  // 1b. Metadata archivada del sign request (la envía K+AIR): de ahí salen
+  //     los datos LEGIBLES del firmante (nombre) y de la empresa. Se lee
+  //     temprano porque el PDF firmado y la constancia los necesitan.
+  let _srMeta = {};
+  try { _srMeta = signRequest.metadata ? JSON.parse(signRequest.metadata) : {}; } catch (e) { _srMeta = {}; }
+  if (!_srMeta || typeof _srMeta !== 'object') _srMeta = {};
+
   // 📦 I-FIRMA-DUAL (v0.1.180): detectar si este commit es del representante
   // legal (sign request hijo con tipo_firmante='EMPRESA'). Si lo es, el PDF
   // generado lleva las 2 firmas (trabajador del padre + empresa del rep) y al
@@ -568,7 +611,10 @@ async function commit(token, opts, ip, user_agent) {
             tipo: 'TRABAJADOR',
             firmante: {
               id_trabajador: padreRow?.id_trabajador,
-              nombre: padreMeta.nombre_trabajador || padreRow?.id_trabajador,
+              // El nombre humano viene del metadata archivado del padre
+              // (`nombre_trabajador`). `id_trabajador` es el seudónimo: no
+              // sirve como nombre en el PDF.
+              nombre: padreMeta.nombre_trabajador || null,
               identificacion: (padreRow?.identificacion_tipo || '')
                 + ' '
                 + (padreRow?.identificacion_numero_hash?.substring(0, 6) || '***'),
@@ -615,16 +661,30 @@ async function commit(token, opts, ip, user_agent) {
         });
       } else {
         // Flujo legacy (1 firma del worker). Se pasa también `firmante_display`
-        // poblado con el id_trabajador para que addSelloPage lo use (el
-        // render visual es idéntico a v0.1.179 porque usa el id_trabajador
-        // como fallback).
+        // poblado con el nombre del firmante para que addSelloPage lo use.
+        // `id_trabajador` es el seudónimo del trabajador (migración 019): no
+        // es un nombre humano, así que no se usa como nombre en el PDF. Antes
+        // de la migración 019 ese campo era la cédula, y el PDF firmado
+        // mostraba la cédula completa del trabajador.
         return pdfGen.generateSignedPdf(pdfOriginal, {
           id_solicitud: signRequest.id_solicitud,
           id_documento: signRequest.id_documento,
           id_trabajador: signRequest.id_trabajador,
           agreement_version: signRequest.agreement_version,
           fecha_firma,
-          firmante_display: { id_trabajador: signRequest.id_trabajador, nombre: signRequest.id_trabajador },
+          nombre_trabajador: _srMeta.nombre_trabajador || null,
+          identificacion_enmascarada: identificacion.enmascarar(
+            signRequest.identificacion_tipo,
+            signRequest.identificacion_numero_hash
+          ),
+          firmante_display: {
+            id_trabajador: signRequest.id_trabajador,
+            nombre: _srMeta.nombre_trabajador || null,
+            identificacion: identificacion.enmascarar(
+              signRequest.identificacion_tipo,
+              signRequest.identificacion_numero_hash
+            ),
+          },
         });
       }
     },
@@ -698,8 +758,7 @@ async function commit(token, opts, ip, user_agent) {
   // (K+AIR los envía: nombre_empresa, nombre_trabajador). El correo del
   // firmante ya existe en correo_verificacion. evidence_hash se pasa aparte
   // para que NO salga "undefined" en el PDF.
-  let _srMeta = {};
-  try { _srMeta = signRequest.metadata ? JSON.parse(signRequest.metadata) : {}; } catch (e) { _srMeta = {}; }
+  // (`_srMeta` ya se leyó al inicio del commit.)
 
   // Fallback para SRs legacy (creados antes de que K+AIR enviara los nombres):
   // buscar en el consentimiento vinculado o en OTRO sign request del mismo
@@ -726,14 +785,20 @@ async function commit(token, opts, ip, user_agent) {
   // Fuente 3: otro sign request del mismo trabajador (misma empresa)
   if (!nombreEmpresa || !nombreTrabajador) {
     try {
-      const siblings = db.prepare(
-        "SELECT metadata FROM gh_firmas_electronicas WHERE id_trabajador = ? AND id_empresa = ? AND metadata IS NOT NULL AND metadata != '' ORDER BY fecha_creacion DESC LIMIT 5"
-      ).all(signRequest.id_trabajador, signRequest.id_empresa);
-      for (const sib of siblings) {
-        const sm = _parseMetaSafe(sib.metadata);
-        if (!nombreEmpresa && sm.nombre_empresa) nombreEmpresa = sm.nombre_empresa;
-        if (!nombreTrabajador && sm.nombre_trabajador) nombreTrabajador = sm.nombre_trabajador;
-        if (nombreEmpresa && nombreTrabajador) break;
+      // La fila puede guardar el seudónimo del trabajador (migración 019) o
+      // el documento crudo (filas anteriores). Se prueban las dos cosas.
+      const cands = candidatosBusqueda(signRequest.id_trabajador, signRequest.id_empresa);
+      if (cands.length) {
+        const ph = cands.map(() => '?').join(',');
+        const siblings = db.prepare(
+          "SELECT metadata FROM gh_firmas_electronicas WHERE id_trabajador IN (" + ph + ") AND id_empresa = ? AND metadata IS NOT NULL AND metadata != '' ORDER BY fecha_creacion DESC LIMIT 5"
+        ).all(...cands, signRequest.id_empresa);
+        for (const sib of siblings) {
+          const sm = _parseMetaSafe(sib.metadata);
+          if (!nombreEmpresa && sm.nombre_empresa) nombreEmpresa = sm.nombre_empresa;
+          if (!nombreTrabajador && sm.nombre_trabajador) nombreTrabajador = sm.nombre_trabajador;
+          if (nombreEmpresa && nombreTrabajador) break;
+        }
       }
     } catch (e) { /* noop */ }
   }
@@ -800,6 +865,25 @@ async function commit(token, opts, ip, user_agent) {
     ...evidencia,
     evidence_hash,            // fix: el objeto evidencia no lo trae de fábrica
     id_constancia,
+    // Referencia legible de la identificación del firmante: los primeros 6
+    // caracteres de la huella archivada (misma convención que la página de
+    // verificación pública y el PDF de firma dual). Antes se mostraban los
+    // últimos 4 dígitos del documento, que salía del `id_trabajador` en
+    // claro; con el seudónimo (migración 019) eso ya no es posible ni
+    // tiene sentido: la huella es lo que el servicio puede mostrar.
+    identificacion_enmascarada: identificacion.enmascarar(
+      signRequest.identificacion_tipo,
+      signRequest.identificacion_numero_hash
+    ),
+    // Últimos cuatro dígitos del documento, APARTADOS EN MEMORIA en el
+    // identify() (ver src/services/ultimos4.js). No vienen de la base: no
+    // están en la base. Si el proceso se reinició entre la identificación y
+    // la firma, esto viene null y la constancia sale solo con la referencia
+    // opaca, que es el comportamiento de siempre.
+    identificacion_ultimos4: (function () {
+      const u4 = ultimos4.obtener(signRequest.id);
+      return u4 ? u4.digitos : null;
+    })(),
     nombre_empresa: nombreEmpresa,
     nombre_trabajador: nombreTrabajador,
     correo_trabajador: correoConstancia || null,
@@ -1112,8 +1196,10 @@ function reject(token, motivo, ip, user_agent) {
   if (typeof token !== 'string' || token.length === 0) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'Token no encontrado');
   }
-  const token_hash = hashToken(token);
-  const signRequest = signRequestService.getByTokenHash(token_hash);
+  // Misma búsqueda que resolveToken: se prueban todas las huellas del token
+  // (SHA-256 en las filas viejas, HMAC en las nuevas, y cada versión de
+  // llave del anillo).
+  const signRequest = signRequestService.getByTokenHash(tokenHashCandidates(token));
   if (!signRequest) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'El token no existe');
   }
@@ -1291,11 +1377,27 @@ function verifyOtp(token, otp, ip, user_agent) {
   }
 
   // 4. Verificar OTP
-  if (!signRequest.otp_hash || !signRequest.otp_sal) {
+  //
+  //    La fila guarda el HMAC del código (migración 019). Las filas
+  //    anteriores guardan SHA-256(sal || otp) con la sal en la misma tabla:
+  //    se verifican con su algoritmo y, si coinciden, se reescriben con el
+  //    HMAC. La ventana de debilidad de esas filas es de 10 minutos (la
+  //    vigencia del OTP) y se cierra sola con cada verificación exitosa.
+  if (!signRequest.otp_hash) {
     throw new AppError(500, 'MISSING_OTP_DATA', 'No hay OTP almacenado para esta solicitud');
   }
 
-  const result = verifyOTP(otp, signRequest.otp_hash, signRequest.otp_sal, signRequest.otp_intentos);
+  const esHmac = esAlgHmac(signRequest.otp_alg);
+  let result;
+  if (esHmac) {
+    const valido = verifyOTPHmac(otp, signRequest.otp_hash, signRequest.id_empresa);
+    result = { valid: valido, attempts: signRequest.otp_intentos + 1 };
+  } else {
+    if (!signRequest.otp_sal) {
+      throw new AppError(500, 'MISSING_OTP_DATA', 'No hay OTP almacenado para esta solicitud');
+    }
+    result = verifyOTP(otp, signRequest.otp_hash, signRequest.otp_sal, signRequest.otp_intentos);
+  }
 
   if (result.valid) {
     // 5. OTP correcto
@@ -1307,6 +1409,16 @@ function verifyOtp(token, otp, ip, user_agent) {
             fecha_otp_verificado = ?
         WHERE id = ?
       `).run(result.attempts, new Date().toISOString(), signRequest.id);
+
+      // Autoupgrade: la fila heredada queda con el HMAC y sin sal.
+      if (!esHmac) {
+        db.prepare(`
+          UPDATE gh_firmas_electronicas
+          SET otp_hash = ?, otp_sal = NULL, otp_alg = ?
+          WHERE id = ?
+        `).run(hashOTPHmac(otp, signRequest.id_empresa), algHmac(), signRequest.id);
+      }
+
       signRequestService.registerEvent(signRequest.id, 'OTP_VERIFIED',
         { intentos: result.attempts }, 'trabajador', ip, user_agent);
     });
@@ -1456,13 +1568,19 @@ function consentAccept(token, ip, user_agent) {
     // Hash del acuerdo: el del consent del trabajador (misma versión) o la tabla.
     let hashAcuerdo = null;
     try {
-      const cTrab = db.prepare(
-        `SELECT hash_texto_acuerdo FROM gh_consentimientos_firma
-         WHERE id_trabajador = ? AND id_empresa = ? AND version_acuerdo = ?
-           AND (rol_firmante IS NULL OR rol_firmante = 'TRABAJADOR')
-         ORDER BY id DESC LIMIT 1`
-      ).get(signRequest.id_trabajador, signRequest.id_empresa, signRequest.agreement_version);
-      if (cTrab) hashAcuerdo = cTrab.hash_texto_acuerdo;
+      // La fila puede guardar el seudónimo (migración 019) o el documento
+      // crudo (filas anteriores): se prueban las dos cosas.
+      const cands = candidatosBusqueda(signRequest.id_trabajador, signRequest.id_empresa);
+      if (cands.length) {
+        const ph = cands.map(() => '?').join(',');
+        const cTrab = db.prepare(
+          `SELECT hash_texto_acuerdo FROM gh_consentimientos_firma
+           WHERE id_trabajador IN (${ph}) AND id_empresa = ? AND version_acuerdo = ?
+             AND (rol_firmante IS NULL OR rol_firmante = 'TRABAJADOR')
+           ORDER BY id DESC LIMIT 1`
+        ).get(...cands, signRequest.id_empresa, signRequest.agreement_version);
+        if (cTrab) hashAcuerdo = cTrab.hash_texto_acuerdo;
+      }
     } catch (e) { /* noop — fallback abajo */ }
     if (!hashAcuerdo) {
       const ac = db.prepare(
@@ -1616,9 +1734,10 @@ function resendOtp(token, ip, user_agent) {
   }
 
   // 4. Generar nuevo OTP
+  //    HMAC, no "hash con sal en la misma tabla" (migración 019).
   const otp = generateOTP();
-  const otp_sal = generateSalt();
-  const otp_hash = hashWithSalt(otp, otp_sal);
+  const otp_hash = hashOTPHmac(otp, signRequest.id_empresa);
+  const otp_sal = null;
   const now_iso = new Date().toISOString();
 
   // 5. Obtener correo
@@ -1652,12 +1771,12 @@ function resendOtp(token, ip, user_agent) {
     db.prepare(`
       UPDATE gh_firmas_electronicas
       SET estado = 'OTP_SENT',
-          otp_hash = ?, otp_sal = ?,
+          otp_hash = ?, otp_sal = ?, otp_alg = ?,
           otp_intentos = 0,
           otp_bloqueado = 0,
           fecha_otp_enviado = ?
       WHERE id = ?
-    `).run(otp_hash, otp_sal, now_iso, signRequest.id);
+    `).run(otp_hash, otp_sal, algHmac(), now_iso, signRequest.id);
 
     signRequestService.registerEvent(signRequest.id, 'OTP_RESENT', {
       canal: 'email',
@@ -1756,14 +1875,13 @@ function getVerificationContext(token) {
   // indefinidamente (es READ-ONLY, no permite firmar ni otras acciones).
   const { signRequest } = resolveToken(token, { skipExpirationCheck: true });
 
-  // Cédula enmascarada: primeros 6 chars del hash, mismo patrón que el PDF.
-  // El hash es determinístico (sha256(numeroIdentificacion)), por lo que dos
-  // personas que tengan la misma cédula ven la misma máscara.
-  function maskIdentificacion(tipo, hash) {
-    if (!hash) return null;
-    var prefix = (hash || '').substring(0, 6);
-    return (tipo || 'CC') + ' ' + (prefix || '***') + '…';
-  }
+  // Cédula enmascarada: primeros 6 chars de la huella archivada, mismo
+  // patrón que el PDF. La huella es determinística, así que dos personas
+  // que tengan la misma cédula ven la misma máscara.
+  // Desde la migración 019 la huella archivada es un HMAC con la llave del
+  // servicio: la máscara se calcula sobre ese HMAC. La propiedad se mantiene
+  // (valor derivado de la huella, no un fragmento del número de documento).
+  var maskIdentificacion = identificacion.enmascarar;
 
   // Firmante principal: leer del snapshot si hay representante legal (DUAL),
   // si no, del metadata legacy (campo id_trabajador no es nombre humano).
@@ -1787,11 +1905,14 @@ function getVerificationContext(token) {
       firmante = null;
     }
   } else {
-    // Firmante único (legacy). No tenemos nombre humano en metadata legacy,
-    // así que mostramos el id_trabajador como referencia.
+    // Firmante único (legacy). El nombre humano viaja en el metadata que
+    // envía K+AIR (`nombre_trabajador`); `id_trabajador` es el seudónimo y
+    // no debe mostrarse como si fuera un nombre.
+    var metaLegacy = {};
+    try { metaLegacy = JSON.parse(signRequest.metadata || '{}') || {}; } catch (e) { metaLegacy = {}; }
     firmante = {
       tipo: 'Trabajador',
-      nombre: signRequest.id_trabajador || null,
+      nombre: metaLegacy.nombre_trabajador || null,
       cargo: null,
       identificacion_enmascarada: maskIdentificacion(
         signRequest.identificacion_tipo,
@@ -1814,7 +1935,7 @@ function getVerificationContext(token) {
       try { nombreTrabajador = (JSON.parse(padreRow.metadata || '{}') || {}).nombre_trabajador; } catch (e) { /* noop */ }
       firmanteTrabajador = {
         tipo: 'Trabajador',
-        nombre: nombreTrabajador || padreRow.id_trabajador,
+        nombre: nombreTrabajador || null,
         cargo: null,
         identificacion_enmascarada: maskIdentificacion(
           padreRow.identificacion_tipo,

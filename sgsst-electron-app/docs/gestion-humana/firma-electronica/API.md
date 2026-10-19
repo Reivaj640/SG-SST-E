@@ -44,6 +44,8 @@
   - [6.9 `GET /internal/acuerdo-activo`](#69-get-internalacuerdo-activo--obtener-versión-activa-del-acuerdo)
   - [6.10 `POST /internal/consentimientos`](#610-post-internalconsentimientos--iniciar-consentimiento)
   - [6.11 `POST /internal/consentimientos/:id/verify-otp`](#611-post-internalconsentimientosidverify-otp--verificar-otp-y-aceptar)
+  - [6.12 `POST /internal/verificacion-identidad` — oráculo de identidad](#612-post-internalverificacion-identidad--oráculo-de-identidad)
+  - [6.13 Endpoints de administración de empresas — `/internal/admin/empresas`](#613-endpoints-de-administración-de-empresas--internaladminempresas)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -214,6 +216,8 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `POST /commit` por token | 3 requests | 1 min | (idem) |
 | `POST /reject` por token | 1 request | — | (idem) |
 | Endpoints internos por API key | 1000 requests | 1 min | (idem) |
+| Oráculo de identidad por empresa | 60 requests | 1 hora | `RateLimit-Policy`, `RateLimit` |
+| Oráculo de identidad por empresa (ráfaga) | 10 requests | 1 min | (idem) |
 
 Cuando se excede el rate limit, el Servicio retorna `429` con:
 
@@ -688,7 +692,6 @@ Content-Type: application/json
   "id_empresa": "emp-012",
   "tipo_firma": "presencial",
   "agreement_hash": "d4e5f6...",
-  "ttl_horas": 24,
   "metadata": {
     "origen": "kair-desktop",
     "usuario_rh": "user-001"
@@ -705,11 +708,11 @@ Content-Type: application/pdf
 | Campo (en metadata JSON) | Tipo | Requerido | Validación |
 |---|---|---|---|
 | `id_documento` | string | sí | ID existente en K+AIR. |
-| `id_trabajador` | string | sí | Cédula o ID de `base_personal`. |
+| `id_trabajador` | string | sí | Cédula o ID de `base_personal`. El servicio NO la guarda en claro: la convierte en un seudónimo (HMAC) y devuelve ese seudónimo en las respuestas. |
 | `id_empresa` | string | sí | NIT o ID de empresa. |
 | `tipo_firma` | string | sí | `presencial` o `remoto`. |
 | `agreement_hash` | string | sí | SHA-256 hex (64 chars). |
-| `ttl_horas` | int | no | Default 24 (presencial), 72 (remoto). |
+| `ttl_horas` | int | no | **IGNORADO por el servidor.** La vigencia del enlace la fija el servicio según la modalidad (remoto 72 h, presencial 24 h), porque el numeral 3.4(c) del Acuerdo la define. Si se envía, no cambia nada: la respuesta trae siempre `fecha_expiracion` con el valor real. |
 | `metadata` | object | no | Datos libres. |
 
 **Validación del PDF**:
@@ -1213,6 +1216,184 @@ consentimiento como aceptado.
 
 ---
 
+## 6.12 `POST /internal/verificacion-identidad` — oráculo de identidad
+
+Pregunta al Servicio si un documento de identidad es el mismo con el que
+firmó el trabajador de una solicitud concreta. La respuesta es un **sí o un
+no**.
+
+**Por qué existe**: el numeral 3.4(d) del Acuerdo de uso exige comparar
+"mediante una comparación de huellas digitales con sal" la información
+registrada por la Empresa con la del firmante. Hacerlo bien no significa
+apartar el número en claro —mandarlo por correo, pedirlo por teléfono,
+escribirlo en un formulario— sino preguntar al sistema que ya tiene la
+huella archivada. El documento nunca sale de esta llamada.
+
+**Auth**: header `X-Internal-API-Key` de la **empresa** (API key
+per-empresa, I-010). Requiere la operación `verificacion:identidad`: un
+cliente que no la tiene recibe `403 FORBIDDEN` sin poder intentarlo.
+
+**Rate limit propio**: 60/h por empresa y 10/min por empresa (más el
+límite genérico de `/internal/*`).
+
+**Request**:
+
+```json
+{
+  "id_solicitud": "SIGN-2026-269179",
+  "tipo_identificacion": "CC",
+  "numero_documento": "1234567890"
+}
+```
+
+| Campo | Tipo | Requerido | Validación |
+|---|---|---|---|
+| `id_solicitud` | string | sí | `SIGN-YYYY-NNNNNN`. |
+| `tipo_identificacion` | string | sí | `CC`, `CE`, `TI`, `PPT` o `PA`. |
+| `numero_documento` | string | sí | 4 a 32 caracteres, solo `[A-Za-z0-9.-]`. El body es estricto: campos extra se rechazan. |
+
+**Response exitosa — `200 OK`**:
+
+```json
+{
+  "ok": true,
+  "id_solicitud": "SIGN-2026-269179",
+  "coincide": true
+}
+```
+
+La respuesta es **un booleano y nada más**: ni el documento, ni la huella
+archivada, ni el estado de la firma, ni las fechas.
+
+**Errores**:
+
+| Código | Cuándo | Detalles |
+|---|---|---|
+| `400` | Body inválido | `INVALID_REQUEST_BODY` |
+| `401` | API key inválida | `INVALID_API_KEY` |
+| `403` | El cliente no tiene la operación | `FORBIDDEN` |
+| `403` | Llave legacy (sin empresa) | `EMPRESA_SCOPE_REQUIRED` |
+| `404` | La solicitud no es de esta empresa (o no existe) | `NOT_FOUND` |
+| `429` | Rate limit | `RATE_LIMIT_EXCEEDED` |
+
+El `404` es **silencioso**: una solicitud de otra empresa y una que no
+existe dan exactamente la misma respuesta. El oráculo no sirve para
+enumerar las firmas de otras empresas.
+
+**Side effects**:
+
+- INSERT evento `IDENTIDAD_VERIFICADA` en `gh_firma_eventos`, con el
+  resultado y el **fingerprint** del documento consultado. El documento no
+  se persiste en ninguna parte, y tampoco aparece en el log: el log
+  lleva el mismo fingerprint (un HMAC recortado), que sirve para detectar
+  anomalías sin poder recuperar el número.
+- La comparación de huellas es en **tiempo constante** y no sale
+  temprano: el tiempo de la respuesta no depende de si el documento
+  coincide.
+
+---
+
+## 6.13 Endpoints de administración de empresas — `/internal/admin/empresas`
+
+> **Autenticación:** header `X-Admin-API-Key`. **NO** se exponen a K+AIR:
+> son de operador humano con acceso físico al servidor. Una key interna de
+> empresa (`X-Internal-API-Key`) **no** sirve para estos endpoints.
+
+Estos endpoints guardan la **identificación de la Empresa**, que es la
+Responsable del tratamiento. K+AIR es el Encargado: guarda lo que la Empresa
+declara y lo transporta, pero no decide por ella.
+
+### 6.13.1 `plazo_retencion_dias` — la instrucción legal que dispara la purga
+
+El numeral **8.6** del Acuerdo de uso dice que el plazo de conservación "se
+determina por la tabla de retención documental de la Empresa" y que "este
+Acuerdo no fija un plazo propio porque la ley no lo fija". El **10.6** lo
+repite por categoría de dato.
+
+Por eso el plazo lo declara la **Empresa**, y hay dos campos distintos:
+
+| Campo | Qué es | Para qué |
+|---|---|---|
+| `plazo_retencion` | **Texto.** Lo que dice la tabla de retención de la Empresa. Puede fijar plazos distintos por categoría de dato (hojas de vida, contrataciones, accidentes). | Es lo que se le **muestra al firmante** y lo que queda en el snapshot de la empresa que se incorpora a la evidencia. |
+| `plazo_retencion_dias` | **Entero, en días.** El plazo computable para los registros del proceso de firma. | Es lo que usa el sistema para calcular la `fecha_conservacion` de cada firma, y con ella, la supresión del dato vencido. |
+
+**Sin `plazo_retencion_dias` no hay purga.** La firma no tiene fecha de
+conservación y nunca es elegible: el sistema no inventa plazos. Pero la
+retención indefinida **tampoco es cumplimiento**, así que:
+
+- el reporte `scripts/reporte-vencimientos.js` marca el "sin plazo declarado"
+  como **alerta de cumplimiento**, no como un no-op silencioso;
+- cada firma creada por una Empresa sin plazo declarado genera un log
+  `RETAIN_SIN_PLAZO` en el servidor.
+
+**Operativamente:** el plazo debe declararse **antes de la primera firma** de
+esa Empresa. Declararlo después no mueve las firmas ya hechas: la
+`fecha_conservacion` se congela en el momento de crear la firma, porque el
+8.6 habla del plazo "que le resulta aplicable" al firmante cuando se le pide
+la firma.
+
+**Tipo:** entero positivo, máximo 36500 (100 años). `null` o ausente = sin
+plazo declarado.
+
+### 6.13.2 Los seis endpoints
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/internal/admin/empresas` | Lista las empresas con lo que les falta para poder firmar. |
+| `GET` | `/internal/admin/empresas/:id_empresa` | Devuelve una empresa. |
+| `POST` | `/internal/admin/empresas` | Crea la empresa (identificación completa, incluido `plazo_retencion` y `plazo_retencion_dias`). |
+| `PUT` | `/internal/admin/empresas/:id_empresa` | Actualiza la identificación. |
+| `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado` | Registra la fecha de firma del Anexo de Encargo (art. 25 Decreto 1377/2013). Endpoint aparte: ese dato sustenta el cumplimiento legal y no debe cambiar en una actualización de rutina. |
+| `POST` | `/internal/admin/empresas/:id_empresa/estado` | Alta/baja lógica. Una empresa inactiva no muestra bloque en la mini-app, pero sus firmas históricas se conservan intactas. |
+
+**Body de `POST` / `PUT`** (los campos de identificación):
+
+```json
+{
+  "razon_social": "EMPRESA S.A.S.",
+  "nit": "900123456",
+  "domicilio": "Calle 1 # 2-3, Bogotá",
+  "representante_legal": "Nombre del representante",
+  "representante_legal_identificacion": "CC 12345678",
+  "responsable_tratamiento": "Nombre",
+  "responsable_tratamiento_correo": "privacidad@empresa.co",
+  "canal_pqrs": "pqrs@empresa.co",
+  "canal_incidentes": "seguridad@empresa.co",
+  "politica_datos_url": "https://empresa.co/privacidad",
+  "plazo_retencion": "5 años para expedientes laborales; 10 años para contrataciones",
+  "canal_solicitud_copia": "https://empresa.co/copia-expediente",
+  "plazo_retencion_dias": 1825
+}
+```
+
+`plazo_retencion` y `plazo_retencion_dias` son opcionales en el body, pero
+**declarar el plazo es condición para que las firmas de esa Empresa puedan
+suprimirse algún día**.
+
+### 6.13.3 El hold legal de conservación
+
+El **8.6** condiciona la supresión a que "no exista un deber legal o
+contractual de conservación". Ese deber se declara con:
+
+| Dato | Por qué |
+|---|---|
+| `actor` | Quién lo declara (la Empresa, o quien actúe por ella). |
+| `motivo` | Por qué: una reclamación, un proceso judicial, una investigación administrativa, un requerimiento de la SIC, la UGPP, el Ministerio de Trabajo o una ARL, una auditoría. |
+| `alcance` | Sobre qué: la materia, el expediente, la autoridad. |
+| `fecha` | Desde cuándo. |
+| liberación | Cuándo se levanta, por quién y por qué. |
+
+Mientras el hold está activo, **la base de datos se niega a suprimir la
+firma**, aunque haya ventana de purga y lote: es una condición del trigger de
+la migración 020, no un chequeo del código de aplicación.
+
+> **Nota de alcance.** Hoy la purga suprime **el registro de auditoría**
+> (los eventos). Los datos personales de la fila y los archivos (PDF,
+> constancia) **no** se suprimen: eso es la capa 5B, un paquete aparte. Hasta
+> que exista, esta capa **no** es cumplimiento del 8.6.
+
+---
+
 ## 7. Healthcheck
 
 ### `GET /health`
@@ -1278,7 +1459,7 @@ Content-Security-Policy:
 
 ### 8.3. Request ID
 
-Todas las requests，接受 y responden el header `X-Request-Id`:
+Todas las requests aceptan y responden el header `X-Request-Id`:
 
 ```
 X-Request-Id: req_a1b2c3d4e5f6g7h8

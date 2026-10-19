@@ -22,15 +22,15 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-18 (jornada del cierre del Capítulo I y auditoría del Capítulo II, cerrada 21:30 hora Colombia) |
+| **Fecha de cierre** | 2026-10-19 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado) |
 | **Rama** | `Dev`, nivelada con `origin/Dev`. |
 | **Último commit de código** | 📦 **905** (2026-10-18) — se escribe el hash al final de la jornada. |
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
-| **CAPÍTULO II: AUDITADO, redacción pendiente** | Las tres citas (2.2.2.47.1 num. 1, 2.2.2.47.7, parágrafo del 2.2.1.1.9 y 2.2.1.1.13) están **verificadas y son correctas**. Pendiente de redacción: desarrollar los tres requisitos del 2.2.1.1.13 que el 2.2 importa sin enumerar (costo cero para el trabajador, vigencia igual a la del contrato, no perder fuerza probatoria al terminar la relación) y aclarar el 2.3 (el sistema **sí** agrega una página de sello y cambia los metadatos XMP del PDF firmado; las páginas originales quedan intactas y se conservan los dos hashes). **El dueño pidió aplazar estos cambios de redacción.** |
-| **Pendiente crítico: CAPÍTULO III** | Sin auditar. Es donde está la deuda de seguridad: el texto promete **HMAC-SHA256 con clave secreta** en 3.4(d), 3.4(e) y 3.6(e), y `grep -r createHmac` en `firma-service/src` devuelve **cero**. Con solo leer la BD se recuperan la cédula del trabajador y el OTP. **Prioridad 0.** |
-| **Deuda técnica global** | Suite de 973 tests sin correr (binario nativo de otra versión de Node) · API key de Aseplus en texto plano en el escritorio · rótulo «vence en 24 horas» cuando el TTL real son 72 · sin puente que empuje los datos de empresa de cada PC al servidor (hoy se cargan a mano por admin) · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). |
+| **CAPÍTULO II: CERRADO** | Las tres citas (2.2.2.47.1 num. 1, 2.2.2.47.7, parágrafo del 2.2.1.1.9 y 2.2.1.1.13) están **verificadas y son correctas**. La redacción se aplicó el 19: el **2.2** ahora desarrolla los tres requisitos del 2.2.1.1.13 que importaba sin enumerar (a) vigencia de la firma igual a la del contrato y **declaración expresa de que el mecanismo no elimina el documento firmado ni la Constancia** ni por el tiempo ni por el fin de la relación, (b) costo cero para el Trabajador a cargo de la Empresa, (c) uso exclusivo para la relación laboral sin perder fuerza probatoria; y el **2.3** aclara que la copia firmada conserva íntegro el contenido, que solo se le agrega una página de sello y metadatos verificables, y que las huellas del original y de la copia firmada quedan registradas y son distintas. |
+| **CAPÍTULO III: AUDITADO E IMPLEMENTADO (19)** | **El texto no se toca: sus tres citas legales son exactas.** Y el diagnóstico que estaba escrito aquí era **falso**: el plan y este archivo decían que "el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)". El texto nunca lo dijo: siempre dijo **«huella digital con sal»** (`grep -r hmac` da cero en todo el service). La brecha real era de implementación: **la sal estaba en la misma fila que la huella** (equivale a un hash plano) y la **cédula se guardaba en texto claro**, en contra del propio 10.5(a). **Corregido el 19** con las migraciones **019** (columnas de algoritmo + HMAC) y **020** (`gh_firma_eventos` append-only con triggers), la capa `src/crypto/{keys,hmac}.js` y el seudónimo de `id_trabajador`. La llave maestra se deriva por HKDF de `TOKEN_ENCRYPTION_KEY` y vive **fuera** de la BD. Filas heredadas: se reescriben solas con el HMAC la primera vez que se usan. Efecto colateral que cierra una fuga: la mini-app exponía la cédula en claro en `GET /s/:token`; ahora expone el seudónimo. **Pendiente: solo el Anexo de Encargo (3.8) y la cláusula de custodia, que necesitan abogado.** El 19 se completó la **Fase 1 del carril de código** (📦 907): **clave HMAC por empresa** (ámbito = `id_empresa`), **versión de llave por fila** (marcador `hmac-sha256.v2.k1`) y **anillo de llaves** (`FIRMA_HMAC_KEYRING`), con la migración **022**. Rotar la llave dejó de invalidar la evidencia anterior. Corrección que salió de esa fase: **la búsqueda solo probaba la versión vigente**, así que al rotar las filas viejas se volvían invisibles; ahora prueba todas las del anillo. |
+| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1173 tests · 1171 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · API key de Aseplus en texto plano en el escritorio · sin puente que empuje los datos de empresa de cada PC al servidor (hoy se cargan a mano por admin) · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
@@ -664,6 +664,484 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
   typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
+
+### 2026-10-19 · 📦911 · La ventana de purga: el 3.6(g) y el 8.6 dejan de contradecirse
+
+**El problema, en dos frases del Acuerdo que no pueden ser ciertas a la vez.**
+
+El **3.6(g)**: *"El registro de auditoría de los eventos del proceso de firma,
+que no puede ser alterado ni eliminado una vez registrado."*
+
+El **8.6** y el **10.6**: *"Vencido ese plazo y sin que exista un deber legal o
+contractual de conservación, el dato se suprime."*
+
+Si la inalterabilidad es absoluta, el deber de supresión nunca se cumple. Si se
+abre una excepción, la promesa del 3.6(g) es falsa. Y la base de datos, que
+antes de esta fase **no tenía ninguna protección** sobre `gh_firma_eventos`
+—cualquier `DELETE` escrito a mano pasaba desapercibido—, no cumplía ninguna
+de las dos.
+
+**La salida no es aflojar la garantía: es una ventana.** Cinco condiciones, y
+las cinco las hace cumplir la **base de datos**, no el código de aplicación:
+
+1. Hay una **ventana abierta**, con actor, motivo y fecha de cierre. Se vence
+   sola, con tope de 4 horas: si el operador se cae a mitad del procedimiento,
+   la ventana se cierra sin que nadie tenga que hacer nada.
+2. La ventana **no está vencida**.
+3. La firma está en el **lote** habilitado para esa ventana, y el lote solo se
+   puede ampliar con la ventana abierta (trigger propio).
+4. La firma **venció su plazo** (`fecha_conservacion` en el pasado). Sin plazo
+   declarado no hay nada que suprimir.
+5. La firma **no tiene deber legal de conservación** (`hold_legal = 0`).
+
+Cada condición aborta con su propio mensaje, para que el operador sepa cuál
+falló.
+
+**El hold es la quinta condición, y la impone la base.** Si la comprobación
+viviera en el script, bastaría un `UPDATE` manual para esquivarla. El hold lo
+declara la **Empresa** (la Responsable del tratamiento) con **actor, motivo,
+alcance y fecha**, y se libera con su propio actor y motivo; el historial queda
+en `gh_firma_holds`. Es la forma operativa del "sin que exista un deber legal"
+del 8.6: una reclamación, un proceso judicial, un requerimiento de la SIC, la
+UGPP, el Ministerio de Trabajo, una ARL, una auditoría.
+
+**Las otras dos condiciones del 8.6, y de quién es cada una.** El plazo lo declara la
+**Empresa**, que es la Responsable del tratamiento; el 8.6 dice que "este
+Acuerdo no fija un plazo propio porque la ley no lo fija", y K+AIR es el
+Encargado: no puede inventar plazos. De ahí `plazo_retencion_dias`, en días
+(el texto libre `plazo_retencion` de la migración 021 es el que se le
+**muestra** al firmante, porque la tabla de retención puede fijar plazos
+distintos por categoría de dato). **Sin plazo declarado no hay fecha de
+conservación y nada se purga.** Y la retención indefinida tampoco es
+cumplimiento: por eso el reporte lo marca como **alerta**, no como un no-op
+silencioso, y cada firma de una Empresa sin plazo deja un log
+`RETAIN_SIN_PLAZO`.
+
+La fecha se **congela en el momento de crear la firma**, no después: el 8.6
+habla del plazo "que le resulta aplicable" al firmante cuando se le pide la
+firma, y que la Empresa cambie su política después no mueve lo ya firmado.
+
+**El recibo: la prueba de cumplimiento.** Cada firma purgada deja una fila en
+`gh_firma_purga_registro`: qué firma, qué empresa, cuándo, quién, por qué, en
+qué ventana, qué categorías se suprimieron y que se comprobó el hold. **Sin
+datos personales**: ni correo, ni huellas, ni manifestación, ni IP. El log de
+ventanas y purgas (`gh_firma_purga_log`) también es append-only y registra el
+conteo del chequeo de hold: si la supresión borrara su propio rastro, no
+habría forma de demostrar qué se suprimió.
+
+| Pieza | Qué hace |
+|---|---|
+| `020_eventos_append_only.sql` (enmendada) | Triggers append-only con la excepción de las cinco condiciones. Tablas de control, lote, log y recibo. Se puede enmendar porque **nunca se aplicó en ninguna base**. |
+| `023_conservacion.sql` (nueva) | `fecha_conservacion`, `hold_legal`, `motivo_hold`, `hold_actor`, `hold_alcance`, `hold_fecha`, `hold_liberado_at` en la firma; `plazo_retencion_dias` en la empresa; tabla `gh_firma_holds`. |
+| `src/services/conservacion.js` (nuevo) | Fecha, hold, reporte, ventana, lote, purga y recibo. |
+| `scripts/reporte-vencimientos.js` (nuevo) | Los cuatro grupos: próximos, vencidos elegibles, vencidos en hold, sin plazo declarado (este último como **alerta**). No borra nada. |
+| `scripts/purga-ventana.js` (nuevo) | Ejecutor. Sin `--ejecutar` simula; con `--ejecutar` exige `--actor` y `--motivo`. Avisa del alcance antes de hacer nada. |
+
+**EL ALCANCE, CON TODAS LAS LETRAS.** Esto es la **purga del registro de
+auditoría**, NO la purga completa. **No** suprime los datos personales de la
+fila (correo, huellas, manifestación de voluntad) ni los archivos (PDF
+original, PDF firmado, constancia): eso es la **capa 5B**, un paquete aparte. La
+operación completa, en orden, es *chequeo de hold → datos personales → eventos
+de auditoría → registro de purga*. Ejecutar solo esta capa deja el estado
+**inverso** al deseable: se destruye la prueba y se conservan los datos. **Hasta
+que exista la 5B, esta capa no puede presentarse como cumplimiento del 8.6**,
+y por eso el script lo dice en voz alta antes de hacer nada.
+
+**Números** — `1173 tests · 1171 verdes · 0 fallos · 2 omitidos`. Los 30 tests
+de `tests/conservacion-purga.test.js` prueban el trigger **contra el archivo
+real de la migración**, en una base de datos aislada: los triggers se quitan de
+la base compartida de tests, porque otros archivos borran eventos entre casos y
+abortarían. El 020 **no se prueba en la base compartida** (lleva
+`-- @skip-when-env test`): esa es una brecha de cobertura deliberada, y
+compensada en CI por el test aislado y en staging por la migración aplicada de
+verdad.
+
+**Lo que sigue** — Fase 6: servir el PDF firmado desde el enlace (5.4) y el
+orden (g)/(h) del Capítulo III, para que el firmante no vea el documento antes
+de aceptar el Acuerdo. Y la **5B** (datos personales) antes de operar la
+ventana como cumplimiento del 8.6.
+
+### 2026-10-19 · 📦910 · Los últimos cuatro dígitos: en memoria, y nunca en la base
+
+**Por qué** — El firmante necesita poder confirmar de un vistazo que el documento que está
+firmando es el suyo. La constancia le mostraba la referencia opaca (los primeros caracteres de la
+huella), que no le dice nada. La solución obvious —guardar los últimos cuatro dígitos del documento—
+choca de frente con el **10.5(a)**: *"del número de documento de identidad del Trabajador se conserva
+únicamente esa huella, no el número en texto claro"*. Cuatro dígitos **son** un dato identificable, y
+un truncamiento restringe el espacio de búsqueda de 10.000 millones a 10.000.
+
+**El arreglo: el dato viaja en memoria, no vive en la base.** El trabajador escribe su documento
+(el servicio lo recibe en claro y lo descarta de inmediato), el servicio aparta **cuatro** dígitos en
+un mapa de proceso, y al firmar los usa para la constancia. Después se descartan. No hay columna, no
+hay respaldo, no hay consulta posible: no es una base de datos paralela, es un área de trabajo.
+
+| Pieza | Qué hace |
+|---|---|
+| `src/services/ultimos4.js` | Mapa en memoria `firmaId → {digitos, tipo, expira}`. TTL de 6 h (cubre leer el Acuerdo, ver el documento y leer la constancia), tope de 5.000 entradas, el más antiguo se descarta. `guardar/obtener/olvidar/limpiar`. **No requiere la base de datos**: eso es lo que garantiza que no hay por dónde se escape a la persistencia. |
+| `identify()` | Tras la verificación exitosa, aparta los dígitos. Un intento fallido **no** aparta nada. |
+| `commit()` | Pasa `identificacion_ultimos4` en la metadata de la constancia. |
+| `pdfGen.js` | Campo *"Documento (últimos 4 dígitos)"* + la leyenda que explica que no se almacenan. |
+| `pdfGenConsolidado.js` | **No** los lleva: se genera después, desde la base, donde no están. Es la consecuencia asumida de no persistirlos, no un defecto. |
+
+**Degradación, no rotura.** Si el proceso se reinicia entre identificarse y firmar, el mapa se pierde
+y la constancia sale con la referencia opaca, que es el comportamiento de siempre. `identify()`
+admite la re-identificación hasta el estado `DOCUMENT_VIEWED`, así que volver a escribir el documento
+vuelve a dejar los dígitos disponibles. La firma nunca depende de ellos.
+
+**Lo que salió de validar la fase** (esto costó más que la fase):
+
+1. **Un lector de PDF roto en el arnés.** `pdfText()` en `tests/helpers.js` tomaba el hex con la
+   coincidencia entera y le quitaba los ángulos con un `replace` que no los quitaba: la clase de
+   caracteres solo come un carácter por vez, y `<` no va seguido de `Tj`. El hex quedaba desalineado
+   un byte y **todo** el texto salía como basura. Los tests de la constancia fallaban por un motivo que
+   no tenía que ver con lo que probaban. Corregido tomándolo con el grupo capturado.
+2. **Una constante equivocada en el test.** El documento de prueba era `1234567890` y se esperaba
+   `4789`; los últimos cuatro de ese número son `7890`. El código estaba bien, el test mentía.
+3. **Un fallo intermitente de la suite, de causa sistémica.** La suite falló una vez con un test
+   (`pdfValidation §2.3`) que en aislamiento pasaba 40 de 40. La causa: **ocho archivos de test
+   parcheaban `process.stdout.write` a nivel de proceso** para capturar el log. El runner de pruebas
+   escribe su reporte TAP por ese mismo stream: si una línea TAP caía dentro de la ventana de captura,
+   se perdía, y el runner desalineaba los resultados. Un test no debe robarle la salida al runner.
+   **Arreglo:** el logger ahora tiene un *sink* (`_setSink/_resetSink`) que entrega la línea ya
+   serializada a quien la pida, sin tocar los streams. Los ocho archivos migrados. Cero parches de
+   stdout quedan en el arnés.
+4. **pdf-lib mete la hora en el PDF.** `PDFDocument.create()` escribe `/CreationDate` y
+   `/ModDate` con el momento actual, así que "el mismo PDF" tiene bytes distintos cada segundo (y
+   hasta cambia de tamaño, 576 o 577 bytes). Como el *fingerprint* de idempotencia incluye el
+   `pdf_sha256` que calcula el servidor, dos peticiones que el test cree "con el mismo body" y
+   caen en segundos distintos se ven como bodies distintos: la segunda recibía **409
+   IDEMPOTENCY_KEY_CONFLICT** en vez del REPLAY. Pasaba en ~3% de las corridas, y solo cuando las
+   dos peticiones cruzaban la frontera de segundo. **Arreglo:** fecha fija en el PDF de prueba
+   (`setCreationDate` / `setModificationDate`), para que sea byte-estable y "mismo body" signifique
+   lo mismo que significa. Verificado con 40 corridas seguidas del archivo: 0 fallos (antes fallaba
+   ~1 de cada 25).
+
+**Números** — `1143 tests · 1141 verdes · 0 fallos · 2 omitidos` (los 2 omitidos son la migración
+020, saltada a propósito en test). **Tres corridas completas seguidas, idénticas**: el rojo
+intermitente no volvió. Barrido de caracteres no latinos limpio en los 61 archivos del diff. EOL y BOM
+de cada archivo modificado comparados byte a byte contra el blob de HEAD: **ninguno cambió**.
+
+**Lo que sigue** — Fase 5: la ventana de purga privilegiada en el trigger 020 (la 020 nunca se aplicó
+en ninguna base, así que se puede enmendar sin DROP/CREATE), fecha de conservación calculada con el
+plazo que declara la Empresa, `hold_legal` que bloquea siempre, y el reporte de vencimientos. La base
+textual está en el **8.6** y el **10.6**: *"Vencido ese plazo y sin que exista un deber legal o
+contractual de conservación, el dato se suprime."* Son dos condiciones, no una.
+
+### 2026-10-19 · 📦909 · Los 47 fallos de la línea base: dos causas raíz, cero rojos
+
+**Por qué** — La línea base de la suite eran 47 fallos que nadie había mirado. "Ya estaban" no es lo
+mismo que "está sano": una casa con 47 bombillos fundidos, y nadie sabe cuáles son de adorno y
+cuáles están en la puerta de la bodega. Este paquete los clasifica, los arregla, y deja la base
+en **cero**.
+
+**El hallazgo de fondo: no eran 47 problemas, eran 2.**
+
+| # | Causa raíz | Tests | Error literal (los 47) |
+|---|---|---|---|
+| 1 | El arnés de tests pedía el mensaje para personas y no lo solicitaba | 44 | `Cannot read properties of undefined (reading 'code')` |
+| 2 | Las validaciones de consentimiento comparaban al trabajador antes que a la empresa, y el test del caso 4 esperaba la cédula donde hoy hay un seudónimo | 3 | el mismo, más dos asserts con el valor viejo |
+
+**Causa raíz 1 — la negociación de contenido.** `src/middleware/errors.js` sirve el error como
+**página HTML** en la superficie pública (`/s/*`, `/api/sign/*`) cuando el cliente no pide JSON. La
+decisión usaba `req.accepts(['html', 'json'])`, y el ORDEN de esa lista decide: Express devuelve el
+primer tipo de la lista que el cliente acepte, desempatando por el orden cuando las calidades son
+iguales. Con `html` primero, un `Accept: */*` —lo que mandan `curl` y `fetch` por defecto— se
+llevaba HTML. Los tests usaban supertest sin header, recibían una página, `res.body` quedaba `{}` y
+la aserción reventaba antes de comparar nada: no estaban probando el contrato que ve el
+integrador, estaban probando que un objeto vacío no tiene la propiedad.
+
+Tres arreglos:
+
+- **Producción**: `prefersHtml` ahora resuelve `req.accepts(['json', 'html']) === 'html'`. El
+  navegador manda `text/html` con q=1 y sigue recibiendo la página; el comodín y la ausencia de
+  header dan JSON; el que pide JSON explícito recibe JSON. Comprobado con una sonda: sin header →
+  JSON, `*/*` → JSON, `application/json` → JSON, navegador → HTML.
+- **El arnés**: `tests/setup.js` pone `Accept: application/json` por defecto en supertest, en un
+  solo lugar, en vez de 44 `.set()` dispersos que se olvidan. Los tests que quieren la página
+  mandan su propio header.
+- **Las aserciones**: 62 sitios que afirmaban `res.body.error.code` ahora pasan por el helper
+  `assertJsonError`, que además **afirma el content-type**. Un test que afirma el sobre sin
+  afirmar el tipo puede pasar por el motivo equivocado; y si mañana se rompe la negociación, el
+  test falla diciendo la verdad.
+
+**Causa raíz 2 — el orden de las validaciones.** `src/services/consent.js` comparaba **trabajador
+antes que empresa**, y eso era peor de lo que parecía:
+
+- El seudónimo del trabajador se deriva con el **ámbito de la empresa** (migración 022). El
+  seudónimo de un consentimiento de la empresa AAA y el de un sign request de la empresa BBB son
+  valores de **espacios de nombres distintos**: nunca coinciden, ni siendo la misma persona.
+  Comparar trabajadores antes de confirmar la empresa es comparar dos marcas que no significan lo
+  mismo, y hace que `CONSENT_COMPANY_MISMATCH` fuera **inalcanzable** para el caso que dice
+  describir.
+- Y en ese orden la respuesta era un **oráculo**: el chequeo de trabajador se resolvía con el
+  seudónimo del sign request (ámbito de SU empresa), de modo que una fila heredada que guardaba el
+  documento crudo pasaba ese chequeo y el de empresa corría después. La diferencia entre
+  `CONSENT_WORKER_MISMATCH` y `CONSENT_COMPANY_MISMATCH` le decía a la empresa que llama si aquel
+  `consent_id` era de **su** trabajador en otra empresa: un enlace entre empresas, que es
+  exactamente lo que el ámbito del seudónimo existe para impedir.
+
+Se invirtió el orden en los dos sitios (`accept()` y `validateForCommit()`), y con él la razón
+quedó escrita en el código, que es donde se lee.
+
+**El aviso público ya no lleva los identificadores de la contraparte.** `validateForCommit()`
+metía en el `details` del error el seudónimo del trabajador del consentimiento, el del trabajador
+de la solicitud y los NIT de las dos empresas. Esos identificadores no los usa **ningún** cliente
+(0 coincidencias en la app y en la mini-app): solo los afirmaba el propio test. El camino de error
+también es tratamiento de datos, así que ahora van al **log del servidor** y el error público
+lleva solo el código y el `consent_id` que el llamador ya mandó. El test del caso 4 se actualizó
+para afirmar el código y la **ausencia** del documento en claro, en vez de "bendecir" la
+exposición.
+
+**Resultado**: **1124 tests · 1122 verdes · 0 fallos · 2 omitidos**. Los 47 son historia. La base
+de referencia era 47; ahora es 0.
+
+**Lo que NO se hizo, y por qué (queda propuesto)**
+
+- **Validar el consentimiento al CREAR el sign request** (`signRequest.js:622` inserta el
+  `consent_id` sin validarlo; hoy la validación es solo en `commit()`, por decisión documentada).
+  Es el corte de raíz del oráculo y el cliente no se rompe: K+AIR crea primero el consentimiento
+  y después la solicitud (`modules/gestion-humana/firma-electronica/index.js:2473` y `:2509`). No
+  se aplicó porque cambiaría el contrato de `POST /internal/sign-requests` (un `consent_id` ajeno
+  pasaría a fallar en la creación, no en el commit) y obligaría a reescribir **6 escenarios** del
+  bloque E6, que es justamente el bloque que existe para probar la validación en commit.
+- **404 silencioso cross-company para el consentimiento** (en vez de `CONSENT_COMPANY_MISMATCH`).
+  Cerraría también el bit de "este id existe en alguna empresa", pero cambia un código de error
+  documentado en `API.md`. Con el swap, ese bit es lo único que queda: la respuesta ya no
+  depende del trabajador.
+
+**Tests** — `tests/middleware/errors.test.js` + 5 (contrato de negociación: comodín, sin header y
+el ancla de mutación). Suite: **1124 · 1122 verdes · 0 fallos · 2 omitidos**. EOL y BOM verificados
+contra el blob de HEAD archivo por archivo (el BOM de `public.test.js` es **preexistente**, y se
+restauró el CRLF que la inserción automática había dejado MIXTO). Barrido de caracteres no latinos
+limpio en los 58 archivos con cambios.
+
+**Commits** — **ninguno todavía.** Falta el "dale" del owner (commit) y el "pushea" (push de `Dev`
+y de `gh-pages`, que tiene el commit local `9722537f` sin pushear).
+
+### 2026-10-19 · 📦908 · El oráculo de verificación: la Empresa pregunta sin apartar el documento
+
+**Por qué** — El abogado pidió un **canal de verificación** para que la Empresa pueda confirmar que
+el documento de identidad que registró es el mismo con el que firmó el trabajador, y lo pidió con
+cinco condiciones: **booleano puro**, **API key por empresa**, **rate limit**, **log sin la cédula
+en claro** y **respuesta en tiempo constante**.
+
+El problema de fondo: esa pregunta, contestada por email, se resolvía **apartando el documento en
+claro** — se lo mandaba al trabajador por correo, se lo pedía por teléfono, o se lo escribía en un
+formulario. Ese número terminaba en buzones, en chats y en cuadernos. Y si no se lo apartaba, la
+Empresa no podía cumplir el 3.4(d) del Acuerdo (comparar "mediante una comparación de huellas
+digitales con sal" la información registrada por la Empresa con la del firmante).
+
+El oráculo resuelve las dos cosas a la vez: la Empresa **no aparta el documento**. Se lo manda al
+servicio, que ya tiene la huella archivada, y recibe un sí o un no.
+
+**Qué se hizo**
+
+| Paquete | Qué |
+|---|---|
+| `src/services/verificacion.js` | La lógica: derivación de candidatos, comparación en tiempo constante, fingerprint de anomalía. |
+| `src/routes/verificacion.js` | `POST /internal/verificacion-identidad`. Auth per-empresa, validación estricta del body, 404 silencioso, evento de auditoría. |
+| `src/middleware/rateLimit.js` | `oracleLimiter`: 60/h por empresa + 10/min por empresa. |
+| `src/server.js` · `tests/helpers.js` | Montaje del router. |
+| `src/schemas/admin-clientes.js` | La operación `verificacion:identidad` entra al enum: un cliente que no la tiene recibe 403 sin poder intentarlo. |
+| `docs/.../API.md` | Sección 6.12 nueva, y los límites del oráculo en la tabla de rate limiting. |
+
+**Las cinco condiciones del abogado, y cómo se cumplen**
+
+1. **Booleano puro.** La respuesta es `{ ok, id_solicitud, coincide }`. Ni la huella, ni el estado
+   de la firma, ni las fechas, ni el nombre. Un canal que devuelve más de lo que pregunta es un
+   canal de fuga.
+2. **API key por empresa.** `requireEmpresaScopeAndLimit` con la operación `verificacion:identidad`.
+   El modo legacy (llave global, sin empresa) se rechaza con `403 EMPRESA_SCOPE_REQUIRED`: sin
+   empresa no hay ámbito con el que derivar la huella, y un 404 mentiria.
+3. **Rate limit.** El genérico de `/internal/*` es de 720/h por empresa, demasiado generoso para un
+   canal que devuelve sí/no sobre documentos. El oráculo tiene el suyo: 60/h y 10/min.
+4. **Log sin la cédula en claro.** El log lleva un **fingerprint**: un HMAC del documento con un
+   propósito propio, recortado a 16 hex. Permite detectar anomalías (alguien usando el oráculo como
+   oráculo de documentos) sin poder recuperar el número. El documento no se persiste en ninguna
+   parte: ni en la base, ni en el evento, ni en el log.
+5. **Tiempo constante.** La comparación recorre **todos** los candidatos sin salir en la primera
+   coincidencia, y el trabajo criptográfico se hace igual cuando la firma no existe. Un test
+   intercepta `constantTimeEqual` y cuenta las comparaciones: son las mismas coincida o no.
+
+**El 404 silencioso.** La consulta va filtrada por `id_empresa`, así que una firma de otra empresa
+no aparece: mismo 404, mismo cuerpo y mismo status que una que no existe. El test compara los dos
+cuerpos (normalizando el eco del id) y además verifica que el 404 no menciona el documento, ni la
+empresa dueña de la firma, ni ninguna palabra que delate que la fila existe.
+
+**Decisiones que se tomaron sin consultar (y por qué)**
+
+- **El oráculo deja un evento `IDENTIDAD_VERIFICADA`** en el registro append-only, con el resultado
+  y el fingerprint, y **sin el documento**. Sin eso, la Empresa no podría demostrar que consultó, y
+  el canal quedaría sin rastro auditable.
+- **El fingerprint va en el log y en el evento, pero el documento en ninguno de los dos.** El
+  fingerprint es un HMAC con la llave maestra (que vive fuera de la base): no es reversible, pero sí
+  permite correlacionar "se consultó el mismo documento dos veces".
+- **El tipo de documento también se compara**, aparte de la huella: la huella cubre el NÚMERO, y un
+  CC y una CE con el mismo número darían la misma huella. Si la fila no tiene tipo registrado
+  (fila heredada), no se impone ninguna restricción: no se puede afirmar una diferencia que el
+  registro no contiene.
+- **El oráculo no reescribe la fila**, ni siquiera cuando la fila usa un formato heredado. Es una
+  consulta, no una migración.
+
+**Tests** — `tests/verificacion-oraculo.test.js` (13, nuevo). Suite completa: **1119 tests · 1070
+verdes · 47 fallos = línea base exacta · 0 regresiones**. Barrido de caracteres no latinos limpio en
+los 46 archivos tocados; EOL y BOM verificados (LF, sin BOM).
+
+**Pendiente de despliegue** — la operación `verificacion:identidad` hay que **otorgarla** a la
+API key de cada empresa que la vaya a usar (`POST /internal/admin/clientes`); sin eso, el endpoint
+responde 403. Y el anillo de llaves (📦907) sigue sin activarse en producción: requiere
+`FIRMA_HMAC_KEYRING` y `FIRMA_HMAC_KEY_VERSION` en `/opt/kair-firma/.env`, y **no hay acceso SSH
+desde esta máquina**.
+
+**Commits** — **ninguno todavía.** Falta el "dale" del owner (commit) y el "pushea" (push de `Dev`
+y de `gh-pages`, que tiene el commit local `9722537f` sin pushear).
+
+### 2026-10-19 · 📦907 · La llave deja de ser única: clave por empresa, versión por fila y anillo
+
+**Por qué** — El abogado pidió dos cosas: que la clave HMAC fuera **por empresa** (para que una
+empresa no pueda enlazar al mismo trabajador de otra) y que **rotarla no invalidara la evidencia
+anterior**. La versión de 📦906 tenía una llave global y sin versión: las huellas no decían con qué
+llave se habían hecho, y rotar la llave mataba el 100 % de las firmas previas.
+
+**Qué se hizo**
+
+| Paquete | Qué |
+|---|---|
+| `src/crypto/keys.js` | **Anillo de llaves**: `FIRMA_HMAC_KEYRING='{"k1":"<hex>","k2":"<hex>"}'` + `FIRMA_HMAC_KEY_VERSION`. Sin ellas, el anillo es `{"k1": TOKEN_ENCRYPTION_KEY}` y el comportamiento no cambia. `getKeyRing()`, `listKeyVersions()`, `getKeyMaterial(v)`. |
+| `src/crypto/hmac.js` | `info = kair-firma/v2/<versión>/<ámbito>/<propósito>`. Marcador **`hmac-sha256.v2.k1`** (formato + versión). `hmacHexEnVersiones()` prueba todo el anillo. Se conservan el formato v1 (`hmacV1Hex`) y el pre-hash heredado, para que **ninguna fila quede sin poder verificar**. |
+| `src/crypto/otp.js` · `src/crypto/token.js` | OTP con **ámbito de empresa**; el token se queda **global** (es la credencial con la que se resuelve la solicitud). `tokenHashCandidates()` prueba anillo + v1 + sha256. |
+| `src/services/trabajador.js` · `src/services/identificacion.js` | Seudónimo y huella con **ámbito = empresa**; `candidatosHuella()` prueba todas las versiones; `verificar()` **reescribe** la fila heredada al formato vigente. |
+| `src/db/schema/022_clave_por_empresa.sql` | `correo_alg` en las dos tablas + `identificacion_aceptante_alg` en consentimientos. |
+| Servicios | `id_empresa` propagado a `signRequest.create`/`createForCompany`/`list`, `consent.create`/`ensureRepConsent`/`getExisting`/`verifyOtp`, `publicFlow.identify`/`verifyOtp`/`resendOtp`/`resolveToken` y los dos lookups duales, `routes/constancia.js`. |
+
+**Bugs encontrados que NO estaban en el código** (los cazó la suite, no la lectura)
+
+- **La BÚSQUEDA solo probaba la versión vigente.** La verificación probaba el anillo entero, pero
+  `candidatosBusqueda()` calculaba el seudónimo únicamente con la llave vigente. El efecto era
+  silencioso y grave: **en el momento de rotar la llave, las filas calculadas con la versión
+  anterior se volvían invisibles** — no fallaba la verificación, fallaba el
+  `SELECT ... WHERE id_trabajador IN (...)` — y las firmas en curso quedaban varadas sin que ningún
+  error lo explicara. Ahora `candidatosBusqueda()` y `mismoTrabajador()` calculan el seudónimo con
+  **cada versión del anillo**.
+- **`resendOtp` escribía el marcador viejo**: guardaba `otp_alg = 'hmac-sha256'` (formato v1) sobre
+  un valor que era el HMAC v2. El marcador mentía sobre el formato.
+- **`correo_hash` era un SHA-256 con la sal en la misma tabla**, y la migración 022 declaraba
+  `correo_alg` sin que nadie lo escribiera. Con la sal en la fila, el atacante tiene (sal, hash) y
+  puede probar candidatos: el espacio de correos es pequeño. Ahora es HMAC con ámbito, y la
+  columna se escribe.
+- **El marcador mentía cuando el valor ya era un seudónimo.** `valorParaGuardar()` deja `alg` en
+  NULL en ese caso, en vez de afirmar la versión vigente: una fila con el marcador equivocado
+  manda a reponer una llave que no es la que hace falta.
+- **`routes/constancia.js` buscaba el seudónimo sin ámbito.** Con el ámbito por empresa, esa
+  búsqueda ya no podía encontrar nada. Ahora usa el ámbito de la API key en modo cliente, y el de
+  todas las empresas con firmas en modo legacy.
+- **Tres tests se quedaron atrás del cambio de contrato**: derivaban el seudónimo sin empresa y
+  afirmaban el marcador v1.
+
+**Decisiones del owner** — *"creo que puedes proceder de esta forma que opinas"*: se ejecuta el
+carril de código en el orden acordado (clave por empresa → representante → oráculo → últimos 4 →
+purga → 5.4 y orden (g)/(h)). Invertirlo haría nacer el oráculo inválido.
+
+**Tests** — `tests/anillo-llaves.test.js` (8, nuevo) · `tests/hmac-identificacion.test.js` (19,
+reescrito al API con ámbito). Suite completa: **1106 tests · 1057 verdes · 47 fallos = línea base
+exacta · 0 regresiones**. La línea base se midió otra vez en el worktree `%TEMP%\kair-baseline`
+(**1054 tests · 1005 verdes · 47 fallos**) y la lista de fallos coincide **una por una**. Barrido de
+caracteres no latinos limpio en los 40 archivos tocados; EOL y BOM verificados — el BOM de
+`publicFlow.js` es **preexistente** (el blob de HEAD empieza igual, `EF BB BF`).
+
+**Pendiente de despliegue** — el anillo solo se activa si se definen `FIRMA_HMAC_KEYRING` y
+`FIRMA_HMAC_KEY_VERSION` en `/opt/kair-firma/.env`. Sin eso el comportamiento es el de siempre (una
+sola versión) y todo sigue funcionando, pero la rotación sigue siendo una operación que invalida la
+evidencia. **No hay acceso SSH desde esta máquina** para aplicarlo.
+
+**Commits** — **ninguno todavía.** Falta el "dale" del owner (commit) y el "pushea" (push de `Dev`
+y de `gh-pages`, que tiene el commit local `9722537f` sin pushear).
+
+---
+
+### 2026-10-19 · 📦906 · Auditoría del Capítulo III: el diagnóstico estaba mal y la implementación, peor
+
+**Por qué** — El owner encendió el servidor y autorizó: *"puedes proceder con las acciones del plan
+para resolver los hallazgos, recuerda siempre validar y contrastar después de cada acción
+realizada"*. El objeto era cerrar los hallazgos del Capítulo III **antes** de que firme un
+trabajador de una empresa real.
+
+**El hallazgo de fondo: el diagnóstico que estaba escrito era FALSO.** El plan y este archivo
+afirmaban que *"el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)"*.
+Verificado contra el texto: **el texto nunca lo dijo**. Siempre dijo **«huella digital con sal»**
+(3.4(d), 3.4(e), 3.6(e) y 10.5(a)-(b)), y `grep -r hmac` da **cero** en todo el `firma-service`.
+La redacción del Capítulo III es correcta y **no se toca**: sus tres citas legales son exactas.
+Lo que estaba mal era la implementación, y era peor de lo que decía el plan:
+
+| # | Hallazgo | Gravedad | Estado |
+|---|---|---|---|
+| 1 | La **cédula se guardaba en texto claro** en `gh_firmas_electronicas.id_trabajador` y en el JSON de `metadata` (contra el 10.5(a)) | P0 | **Corregido** |
+| 2 | Huella de identificación con **la sal en la misma fila** → equivale a un hash plano | P0 | **Corregido** |
+| 3 | **OTP con la sal en la misma tabla** → 10⁶ instantáneo | P0 | **Corregido** |
+| 4 | Token de acceso sin sal (incumple la letra del 3.6(e); riesgo nulo por entropía) | P1 | **Corregido** |
+| 5 | `gh_firma_eventos` sin triggers: el 3.6(g) promete inalterabilidad y la BD no la cumplía | P1 | **Corregido** |
+| 6 | La consola rotulaba *"vence en 24 horas"* con `tipo_firma: 'remoto'` (el servidor calcula 72 h) | P1 | **Corregido** |
+| 7 | El Anexo de Encargo permite borrar al desinstalar (choca con el 3.8 y el 8.6/8.7) | P1 | **Abierto: necesita abogado** |
+| 8 | 8.6/10.6 (comunicar el plazo de retención) sin implementar | P2 | **Corregido** |
+| 9 | El orden (g)/(h) no se respeta (`viewDocument` permitido en `OTP_VERIFIED`) | P3 | **Abierto, anotado** |
+
+**Qué se hizo**
+
+| Paquete | Qué |
+|---|---|
+| `src/crypto/keys.js` | Llave maestra **única**: `TOKEN_ENCRYPTION_KEY`, derivada por HKDF con un propósito por dato (`identificacion`, `otp`, `token`, `trabajador`, `correo`). En dev persiste en `data/.dev-master-key` (0600). Sin dependencia de `config`/`logger` al importar. |
+| `src/crypto/hmac.js` | HMAC-SHA256 con HKDF, `info = kair-firma/v1/<propósito>`. |
+| `src/services/trabajador.js` | Seudónimo de `id_trabajador` con marcador **`psn1_`**, idempotente. `mismoTrabajador()` compara seudónimo contra documento crudo. |
+| `src/services/identificacion.js` | `preHash`/`huella`/`verificar` + `enmascarar()` (la máscara `CC ce3a59…` que ya usaba el sitio). |
+| `src/db/schema/019` | Columnas de algoritmo: `identificacion_numero_alg`, `otp_alg`, `id_trabajador_alg`. |
+| `src/db/schema/020` | `gh_firma_eventos` **append-only**: triggers `BEFORE UPDATE/DELETE` → `RAISE(ABORT)`. Se salta en test con `@skip-when-env test` y **no** se registra como aplicada. |
+| `src/db/schema/021` | `plazo_retencion` y `canal_solicitud_copia` en `gh_firma_empresas` (8.6/10.6). |
+| Servicios | `signRequest`, `publicFlow`, `consent`, `constancia`: huella HMAC, OTP y token HMAC, seudónimo en lugar de cédula, **búsqueda dual** `[seudónimo, crudo]` para alcanzar las filas heredadas, y **reescritura automática** de la fila heredada con el HMAC la primera vez que se usa. |
+| Artefactos | La constancia y el PDF firmado ya **no muestran un seudónimo como si fuera un nombre ni sacan "dígitos" de un hex**: la referencia legible es la huella enmascarada, la misma convención del sitio. |
+| Cliente | Se quitó `ttl_horas: 24` y el rótulo se arma con la `fecha_expiracion` que devuelve el servidor. |
+| 8.6/10.6 | La Empresa declara su plazo de conservación y su canal de copia; se archivan en el **snapshot** (con su huella), se muestran en el bloque «Empresa que solicita tu firma» de la mini-app, salen en el **correo de invitación** (que es la comunicación previa a la firma) y quedan en la constancia. Si la Empresa no lo declara, el sistema **no inventa un plazo**. |
+
+**Bugs encontrados que NO estaban en el código** (los cazó la suite, no la lectura)
+
+- **`ensureRepConsent` guardaba un HMAC de un HMAC.** El consentimiento del representante se
+  crea con `signRequest.id_trabajador`, que ya es el seudónimo; si `pseudonimo()` no fuera
+  idempotente, la fila del rep quedaba con un valor que no coincidía con el del trabajador y
+  el commit fallaba con `CONSENT_WORKER_MISMATCH`. **Por eso el seudónimo lleva el marcador
+  `psn1_`**: hace la función idempotente y deja la base auto-explicativa.
+- **Un `?` de más en el INSERT de `ensureRepConsent`** (23 valores para 22 columnas): 500 en
+  toda firma dual.
+- **La copia firmada imprimía la cédula completa** en la línea "Firmante" (el `id_trabajador`
+  de la época era el documento) y la constancia sacaba los últimos 4 dígitos de ahí. Con el
+  seudónimo, eso hubiera pasado a imprimir un token opaco, o peor, **cuatro dígitos del hex
+  del HMAC** presentados como si fueran la identificación. Se corrigió en las dos Bandas.
+- **La mini-app exponía la cédula en claro** en `GET /s/:token`. Eso era una fuga y quedó
+  cerrada por el seudónimo.
+- **La línea base de la suite era 47 fallos, no 0.** La suite nunca había corrido (binario
+  nativo de otra versión de Node). Los 47 son preexistentes y **no se tocaron**.
+
+**Decisiones del owner**
+
+- *"Ya encendi el servidor, puedes proceder con las acciones del plan para resolver los
+  hallazgos, recuerda siempre validar y contrastar después de cada acción realizada"*: se
+  ejecutó capa por capa, validando contra la línea base después de cada bloque.
+- **El texto del Capítulo III no se toca.** Se verificó que sus tres citas legales son exactas.
+- La llave maestra **no se puede rotar**: invalidaría los tokens cifrados y los seudónimos ya
+  calculados. Queda documentado como restricción.
+
+**Tests** — `tests/crypto-hmac.test.js` (10) · `tests/hmac-identificacion.test.js` (17) ·
+`tests/eventos-append-only.test.js` (5) · `tests/plazo-retencion.test.js` (8). Suite completa:
+**1095 tests · 1046 verdes · 47 fallos (línea base) · 0 regresiones**. Barrido de caracteres no
+latinos limpio en los 35 archivos tocados; EOL y BOM verificados sin vuelcos.
+
+**Cómo se desbloqueó la suite** — `better-sqlite3` v11 no compila contra Node 26 (MSBuild
+falla) y el build del padre es de otro ABI. Se instaló `better-sqlite3@12.11.1` en
+`%TEMP%\fs-test-deps` y `%TEMP%\bs3-node26`, y se crearon **junctions** dentro de
+`firma-service/node_modules/` para que el service use **su propio** árbol (express 4), no el
+del app de escritorio (express 5). La copia recursiva y `Remove-Item` están bloqueados por la
+política: se usaron junctions. Worktree de línea base en `%TEMP%\kair-baseline`.
+
+**Commits** — **ninguno todavía.** Falta el "dale" del owner (commit) y el "pushea" (push de
+`Dev` y de `gh-pages`, que tiene un commit local `9722537f` sin pushear).
 
 ---
 

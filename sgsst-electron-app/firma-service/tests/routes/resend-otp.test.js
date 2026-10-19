@@ -18,7 +18,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('../../src/db/connection');
-const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent } = require('../helpers');
+const {
+  resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent,
+  assertJsonError,
+} = require('../helpers');
 const mailer = require('../../src/services/mailer');
 const publicFlow = require('../../src/services/publicFlow');
 const config = require('../../src/config');
@@ -101,7 +104,7 @@ test('resend-otp: OTP vigente (no expirado) → 400 OTP_NOT_EXPIRED', async () =
     .send({});
 
   assert.equal(res.status, 400);
-  assert.equal(res.body.error.code, 'OTP_NOT_EXPIRED');
+  assertJsonError(res, 'OTP_NOT_EXPIRED');
 });
 
 // ─── 3. OTP_LOCKED → desbloqueo + nuevo OTP ───
@@ -157,7 +160,7 @@ test('resend-otp: estado SIGNED → 410 (resolveToken)', async () => {
     .post(`/api/sign/${token}/resend-otp`)
     .send({});
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
+  assertJsonError(res, 'TOKEN_ALREADY_USED');
 });
 
 test('resend-otp: estado REVOKED → 410 (resolveToken)', async () => {
@@ -173,7 +176,7 @@ test('resend-otp: estado REVOKED → 410 (resolveToken)', async () => {
     .post(`/api/sign/${token}/resend-otp`)
     .send({});
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
+  assertJsonError(res, 'TOKEN_ALREADY_USED');
 });
 
 test('resend-otp: estado EXPIRED → 410 (resolveToken)', async () => {
@@ -189,7 +192,7 @@ test('resend-otp: estado EXPIRED → 410 (resolveToken)', async () => {
     .post(`/api/sign/${token}/resend-otp`)
     .send({});
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
+  assertJsonError(res, 'TOKEN_ALREADY_USED');
 });
 
 test('resend-otp: estado PENDING (sin identify) → 409', async () => {
@@ -204,7 +207,7 @@ test('resend-otp: estado PENDING (sin identify) → 409', async () => {
     .post(`/api/sign/${token}/resend-otp`)
     .send({});
   assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(res, 'INVALID_STATE_TRANSITION');
 });
 
 // ─── 5. Nuevo OTP invalida el anterior ───
@@ -232,7 +235,7 @@ test('resend-otp: nuevo OTP invalida el anterior', async () => {
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: '123456' });
   assert.equal(rVerify.status, 422);
-  assert.equal(rVerify.body.error.code, 'OTP_INVALID');
+  assertJsonError(rVerify, 'OTP_INVALID');
 });
 
 // ─── 6. Nuevo TTL = 600 segundos ───
@@ -342,7 +345,7 @@ test('resend-otp: rate limiting → 429 después de N reenvíos', async () => {
     .send({});
 
   assert.equal(res.status, 429);
-  assert.equal(res.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(res, 'RATE_LIMIT_EXCEEDED');
   assert.ok(res.body.error.details.retry_after_seconds > 0);
 });
 

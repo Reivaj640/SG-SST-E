@@ -34,6 +34,7 @@ const idempotency = require('../../src/services/idempotency');
 const requestIdMiddleware = require('../../src/middleware/requestId');
 const { requireIdempotencyKey } = require('../../src/middleware/idempotency');
 const { errorHandler } = require('../../src/middleware/errors');
+const logger = require('../../src/utils/logger');
 
 // =====================================================================
 // Constantes de test
@@ -139,41 +140,28 @@ function beforeEach() {
 }
 
 // =====================================================================
-// captureLogs — captura stdout/stderr para tests de PII en logs
+// captureLogs — captura lo que el logger registra, para tests de PII
 // =====================================================================
 //
-// El logger (src/utils/logger.js) escribe JSON a process.stdout (info)
-// y process.stderr (warn/error). Para tests de PII en logs, monkey-patch
-// los writers durante el test, capturar todas las líneas, y restaurarlos.
+// El logger (src/utils/logger.js) escribe JSON a stdout (info) y stderr
+// (warn/error). Para los tests de PII en logs se instala el SINK del logger:
+// la línea llega al test sin tocar los streams del proceso.
+//
+// NO se parchea process.stdout: parcheado roba la salida del runner de
+// pruebas y produce fallos intermitentes (ver src/utils/logger.js).
 
 function captureLogs() {
-  const captured = { stdout: [], stderr: [] };
-  const origStdout = process.stdout.write.bind(process.stdout);
-  const origStderr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => {
-    captured.stdout.push(chunk.toString());
-    return true;
-  };
-  process.stderr.write = (chunk) => {
-    captured.stderr.push(chunk.toString());
-    return true;
-  };
+  const lineas = [];
+  logger._setSink((linea, nivel) => { lineas.push({ linea, nivel }); });
   return {
-    captured,
     restore: () => {
-      process.stdout.write = origStdout;
-      process.stderr.write = origStderr;
+      logger._resetSink();
     },
-    parseLines: () => {
-      const all = [...captured.stdout, ...captured.stderr];
-      return all
-        .flatMap((s) => s.split('\n'))
-        .filter((l) => l.trim().length > 0)
-        .map((l) => {
-          try { return JSON.parse(l); } catch (_) { return null; }
-        })
-        .filter(Boolean);
-    },
+    parseLines: () => lineas
+      .map((l) => {
+        try { return JSON.parse(l.linea); } catch (_) { return null; }
+      })
+      .filter(Boolean),
   };
 }
 

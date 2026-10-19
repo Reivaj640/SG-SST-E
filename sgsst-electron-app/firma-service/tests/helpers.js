@@ -21,6 +21,7 @@ if (process.env.NODE_ENV !== 'test') {
 
 const path = require('path');
 const express = require('express');
+const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('../src/db/connection');
 const config = require('../src/config');
@@ -32,10 +33,12 @@ const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const internalAuditRouter = require('../src/routes/internal-audit');
 const constanciaRouter = require('../src/routes/constancia');
+const verificacionRouter = require('../src/routes/verificacion');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
 const storage = require('../src/services/storage');
+const logger = require('../src/utils/logger');
 
 // Mini-app estática (mismo directorio que server.js)
 const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
@@ -92,6 +95,19 @@ const TABLES = [
 ];
 
 function resetDb() {
+  // Tablas de la ventana de purga (migración 020) y de holds (migración 023).
+  // Se limpian PRIMERO, antes que las firmas, porque el lote tiene FK a
+  // gh_firmas_electronicas: borrarla con el lote lleno viola la FK. La
+  // migración 020 se salta en el ambiente de test, así que estas tablas
+  // pueden no existir: se limpian solo si están.
+  for (const t of ['gh_firma_purga_lote', 'gh_firma_purga_log', 'gh_firma_purga_registro', 'gh_firma_holds']) {
+    try { db.prepare(`DELETE FROM ${t}`).run(); } catch (e) { /* la tabla no existe */ }
+  }
+  try {
+    db.prepare(
+      "UPDATE gh_firma_purga_control SET ventana_activa = 0, cerrada_at = datetime('now') WHERE id = 1"
+    ).run();
+  } catch (e) { /* la tabla no existe */ }
   for (const t of TABLES) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
@@ -158,6 +174,8 @@ function makeApp() {
   app.use('/internal', signRequestRouter);
   app.use('/internal', constanciaRouter);
   app.use('/internal', internalAuditRouter);
+  // Oráculo de verificación de identidad (Fase 3).
+  app.use('/internal', verificacionRouter);
   // Endpoints administrativos: deben estar en makeApp para tests.
   // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).
   app.use('/internal/admin', adminRouter);
@@ -375,6 +393,10 @@ function seedTestClients() {
     'consent:create',
     'consent:verify',
     'audit:read',
+    // Fase 3: oráculo de verificación de identidad. Se incluye para que
+    // los tests puedan ejercitarlo; el cliente real tiene que pedir la
+    // operación explícitamente (ver src/routes/admin-clientes.js).
+    'verificacion:identidad',
   ].join(',');
   internalClient.createClient({
     id_empresa: TEST_EMPRESA_A,
@@ -390,6 +412,146 @@ function seedTestClients() {
   });
 }
 
+/**
+ * Afirma que una respuesta de error es el SOBRE JSON con el código esperado.
+ *
+ * Por qué no basta con `assert.equal(res.body.error.code, 'X')`:
+ *
+ * La superficie pública (`/s/*`, `/api/sign/*`) sirve el error como PÁGINA
+ * HTML cuando el cliente no pide JSON. Una prueba que solo afirma
+ * `res.body.error.code` no está probando el contrato que ve el integrador:
+ * si la respuesta llega HTML, `res.body` es un objeto vacío y la aserción
+ * revienta con "Cannot read properties of undefined" — un mensaje que no
+ * dice nada del problema real. 47 pruebas fallaban exactamente por esto.
+ *
+ * Este helper afirma LAS DOS COSAS: que la respuesta vino en JSON y que el
+ * código es el esperado. Si mañana alguien rompe la negociación, el test
+ * falla por el motivo correcto.
+ *
+ * @param {object} res - respuesta de supertest
+ * @param {string} expectedCode - código de error esperado
+ * @returns {object} el sobre `error`, por si el test necesita más campos
+ */
+function assertJsonError(res, expectedCode) {
+  const ct = (res && res.headers && res.headers['content-type']) || '';
+  assert.match(ct, /application\/json/,
+    'la respuesta de error debe ser JSON (content-type: ' + ct + '). ' +
+    'Si llegó HTML, la negociación de contenido se rompió.');
+  assert.ok(res && res.body && res.body.error,
+    'la respuesta de error debe traer el sobre { error: { code, ... } }');
+  assert.equal(res.body.error.code, expectedCode);
+  return res.body.error;
+}
+
+/**
+ * Igual que `assertJsonError` pero para las aserciones negativas
+ * (`assert.notEqual(res.body.error.code, 'X')`): solo comprueba que la
+ * respuesta vino en JSON, sin fijar un código.
+ *
+ * @param {object} res - respuesta de supertest
+ */
+function assertJsonResponse(res) {
+  const ct = (res && res.headers && res.headers['content-type']) || '';
+  assert.match(ct, /application\/json/,
+    'la respuesta de error debe ser JSON (content-type: ' + ct + '). ' +
+    'Si llegó HTML, la negociación de contenido se rompió.');
+}
+
+/**
+ * Extrae el texto de un PDF generado con pdf-lib.
+ *
+ * pdf-lib escribe los content streams comprimidos (FlateDecode) y el texto
+ * en forma HEX (`<4B2B414952> Tj`), no en la forma literal `(K+AIR) Tj`. Por
+ * eso no basta con buscar la cadena en el buffer: hay que descomprimir los
+ * streams y decodificar el hex.
+ *
+ * La decodificación es byte a byte (el PDF usa la codificación WinAnsi), así
+ * que los caracteres españoles se leen bien; los que no existen en latin1
+ * (guion largo, líneas de caja) salen como caracteres de control. Para las
+ * aserciones conviene usar texto ASCII o acentos que sí cruzan.
+ *
+ * TRAMPA: el hex se toma con el GRUPO CAPTURADO, nunca con la coincidencia
+ * entera. Si se hace `match.replace(/[<>\s]Tj/g, '')` los ángulos `<` y `>`
+ * se quedan en la cadena (la clase de caracteres solo se come un carácter
+ * cada vez, y `<` no va seguido de `Tj`), el hex queda desalineado un byte y
+ * TODO el texto sale como basura: los tests que buscan una palabra pasan a
+ * fallar por un motivo que no tiene que ver con lo que prueban.
+ *
+ * @param {Buffer} buffer - el PDF
+ * @returns {string} el texto, un fragmento por línea
+ */
+function pdfText(buffer) {
+  const zlib = require('zlib');
+  const raw = Buffer.from(buffer).toString('latin1');
+  let streams = '';
+  const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const chunk = Buffer.from(m[1], 'latin1');
+    let inflado;
+    try {
+      inflado = zlib.inflateSync(chunk).toString('latin1');
+    } catch (e) {
+      inflado = m[1];
+    }
+    streams += inflado;
+  }
+  const partes = [];
+  const reTj = /<([0-9A-Fa-f]*)>\s*Tj/g;
+  let t;
+  while ((t = reTj.exec(streams)) !== null) {
+    const hex = t[1];
+    let s = '';
+    for (let i = 0; i + 1 < hex.length; i += 2) {
+      s += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+    }
+    partes.push(s);
+  }
+  return partes.join('\n');
+}
+
+/**
+ * Captura lo que el LOGGER registra mientras corre `fn`.
+ *
+ * NO parchea `process.stdout`: hacerlo roba la salida del runner de pruebas
+ * (el runner escribe su TAP por el mismo stream), y esa linea se pierde en
+ * pleno vuelo. Ver la nota de `_setSink` en src/utils/logger.js.
+ *
+ * @param {Function} fn - función sincrónica o asincrónica
+ * @returns {Promise<{
+ *   resultado: any,
+ *   lineas: Array<{linea: string, nivel: string}>,
+ *   objetos: Array<object>,
+ *   texto: string,
+ *   stdout: string,
+ *   stderr: string
+ * }>}
+ */
+async function capturarLogs(fn) {
+  const lineas = [];
+  logger._setSink((linea, nivel) => { lineas.push({ linea, nivel }); });
+  try {
+    const resultado = await fn();
+    const objetos = lineas
+      .map((l) => {
+        try { return JSON.parse(l.linea); } catch (e) { return null; }
+      })
+      .filter(Boolean);
+    return {
+      resultado,
+      lineas,
+      objetos,
+      texto: lineas.map((l) => l.linea).join('\n'),
+      stdout: lineas.filter((l) => l.nivel === 'info' || l.nivel === 'debug')
+        .map((l) => l.linea).join('\n'),
+      stderr: lineas.filter((l) => l.nivel === 'warn' || l.nivel === 'error')
+        .map((l) => l.linea).join('\n'),
+    };
+  } finally {
+    logger._resetSink();
+  }
+}
+
 module.exports = {
   resetDb,
   seedActiveAgreement,
@@ -403,6 +565,10 @@ module.exports = {
   createSignRequestWithIdentificacion,
   createAcceptedConsent,
   createPendingConsent,
+  assertJsonError,
+  assertJsonResponse,
+  pdfText,
+  capturarLogs,
   TEST_API_KEY,
   TEST_ADMIN_API_KEY,
   TEST_API_KEY_CLIENT_A,

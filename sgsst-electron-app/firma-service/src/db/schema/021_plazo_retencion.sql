@@ -1,0 +1,65 @@
+-- =============================================================================
+-- Migración 021: plazo de conservación y canal de copia (numerales 8.6 y 10.6)
+-- =============================================================================
+-- Esta migración es ADITIVA (no breaking para datos existentes).
+--
+-- PROBLEMA QUE RESUELVE
+-- ---------------------
+-- El numeral 8.6 del Acuerdo de uso dice:
+--
+--   "La Empresa debe comunicar al Trabajador, antes de solicitarle la firma,
+--    el plazo que le resulta aplicable al documento objeto de la firma y dónde
+--    puede ejercer, en cualquier momento, una solicitud de copia."
+--
+-- Y el 10.6 fija que "los plazos de conservación se determinan por categoría
+-- de dato en la tabla de retención documental de la Empresa".
+--
+-- Ese plazo NO lo puede fijar K+AIR: el Acuerdo es explícito en que "no fija
+-- un plazo propio porque la ley no lo fija" y en que la referencia vigente es
+-- la tabla de retención documental de la EMPRESA. K+AIR es el Encargado
+-- (numeral 10.1), no el Responsable. Lo que sí le corresponde al sistema es
+-- TRANSPORTAR y MOSTRAR ese dato al firmante, y archivarlo junto con lo que
+-- el firmante vio.
+--
+-- DECISIÓN
+-- --------
+-- Dos campos de texto libre en `gh_firma_empresas`:
+--
+--   plazo_retencion        - el plazo que la Empresa declara, por categoría
+--                             de dato, según su propia tabla de retención.
+--   canal_solicitud_copia  - dónde puede el Trabajador pedir una copia en
+--                             cualquier momento.
+--
+-- Son de la EMPRESA, no de cada solicitud: la tabla de retención documental
+-- es una referencia de la Empresa, y el plazo aplicable al documento se
+-- deriva de ella. Guardarlos en la empresa y no en el sign request evita
+-- que K+AIR tenga que inventar (o adivinar) un plazo por documento.
+--
+-- Al ser parte de `SNAPSHOT_FIELDS` (ver src/services/empresa.js), el dato
+-- queda archivado en el consentimiento con su propia huella SHA-256, junto
+-- con el resto de la identificación que se le mostró al firmante. Eso
+-- importa: si la Empresa cambia su política de retención después, la firma
+-- sigue mostrando lo que el firmante vio en su momento.
+--
+-- Texto libre y no un número: la tabla de retención de la Empresa puede
+-- fijar plazos distintos por categoría de dato (hojas de vida,
+-- contrataciones, accidentes), y con un número entero el sistema no podría
+-- representarlos.
+--
+-- VALORES NULL
+-- ------------
+-- NULL = la Empresa no ha declarado su plazo. El sistema NO inventa uno:
+-- el bloque «Empresa que solicita tu firma» lo muestra como "Pendiente" y
+-- el correo de invitación lo omite. Es un dato que la Empresa es la única
+-- que puede dar.
+-- =============================================================================
+
+-- Plazo de conservación que la Empresa declara para los registros del
+-- proceso de firma (numeral 8.6 del Acuerdo).
+ALTER TABLE gh_firma_empresas
+  ADD COLUMN plazo_retencion TEXT;
+
+-- Dónde puede el Trabajador ejercer, en cualquier momento, una solicitud
+-- de copia de su documento firmado (numeral 8.6 del Acuerdo).
+ALTER TABLE gh_firma_empresas
+  ADD COLUMN canal_solicitud_copia TEXT;

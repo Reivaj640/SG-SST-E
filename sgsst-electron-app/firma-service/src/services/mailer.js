@@ -161,11 +161,15 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
  * @param {string} opts.id_solicitud - Identificador legible (SIGN-YYYY-NNNNNN)
  *                                     para que el firmante pueda referirse al doc.
  * @param {object} [opts.context] - Metadata adicional (NO se loggea en plaintext).
+ * @param {string} [opts.plazo_retencion] - Plazo de conservación que declara
+ *                                           la Empresa (numeral 8.6 del Acuerdo).
+ * @param {string} [opts.canal_solicitud_copia] - Dónde puede el Trabajador
+ *                                                  pedir una copia (numeral 8.6).
  *
  * @returns {Promise<{ok: true, messageId: string}>}
  * @throws Error si `to` no parece correo, o si falla el envío.
  */
-async function sendInvite({ to, url_publica, id_solicitud, context }) {
+async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retencion, canal_solicitud_copia }) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendInvite: `to` debe ser un correo válido');
   }
@@ -193,6 +197,24 @@ async function sendInvite({ to, url_publica, id_solicitud, context }) {
     'El enlace expira según la configuración del documento (típicamente 24-72h).',
     'Si no reconoces esta operación, contacta al área de RRHH de inmediato.',
     '',
+    // Numeral 8.6 del Acuerdo de uso: "La Empresa debe comunicar al
+    // Trabajador, antes de solicitarle la firma, el plazo que le resulta
+    // aplicable al documento objeto de la firma y dónde puede ejercer, en
+    // cualquier momento, una solicitud de copia."
+    //
+    // La invitación es ese momento: es la comunicación que sale ANTES de que
+    // el Trabajador firme. El plazo y el canal los declara la Empresa (que
+    // es el Responsable del tratamiento, numeral 10.1); K+AIR solo los
+    // transporta. Si la Empresa no los ha declarado, el correo NO inventa un
+    // plazo: simplemente no los incluye, y el bloque «Empresa que solicita
+    // tu firma» de la mini-app los muestra como pendientes.
+    ...(plazo_retencion
+      ? ['', 'Plazo de conservación de tus datos: ' + plazo_retencion]
+      : []),
+    ...(canal_solicitud_copia
+      ? ['Dónde puedes pedir una copia de tu documento: ' + canal_solicitud_copia]
+      : []),
+    ...(plazo_retencion || canal_solicitud_copia ? [''] : []),
     '— K+AIR',
   ].join('\n');
 

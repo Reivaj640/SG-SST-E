@@ -25,7 +25,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resetDb, seedActiveAgreement } = require('../helpers');
+const { resetDb, seedActiveAgreement, capturarLogs } = require('../helpers');
 const signRequestService = require('../../src/services/signRequest');
 const mailer = require('../../src/services/mailer');
 const db = require('../../src/db/connection');
@@ -142,33 +142,18 @@ test('notifyRemote: NO propaga el correo en plaintext al log', async () => {
   const acuerdo = seedActiveAgreement();
   const { signRequest } = await makeSignRequest(acuerdo);
 
-  // Capturar stderr (donde el logger escribe warn/error)
-  const stderrChunks = [];
-  const origWrite = process.stderr.write.bind(process.stderr);
-  process.stderr.write = function (chunk) {
-    stderrChunks.push(String(chunk));
-    return true;
-  };
-  // También stdout (info)
-  const stdoutChunks = [];
-  const origStdoutWrite = process.stdout.write.bind(process.stdout);
-  process.stdout.write = function (chunk) {
-    stdoutChunks.push(String(chunk));
-    return true;
-  };
-
-  try {
+  // Capturar lo que el logger registra (warn/error van a stderr, info a
+  // stdout). Se usa el SINK del logger y no un parche de process.stdout:
+  // parcheado roba la salida del runner de pruebas (ver src/utils/logger.js).
+  const capturadas = await capturarLogs(async () => {
     await signRequestService.notifyRemote(
       signRequest,
       'unique-marker-correo-juanito@example.com',
       {}
     );
-  } finally {
-    process.stderr.write = origWrite;
-    process.stdout.write = origStdoutWrite;
-  }
+  });
 
-  const allLogs = stderrChunks.concat(stdoutChunks).join('');
+  const allLogs = capturadas.texto;
   assert.equal(allLogs.includes('unique-marker-correo-juanito'), false,
     'El correo en plaintext NO debe aparecer en logs:\n' + allLogs);
 });

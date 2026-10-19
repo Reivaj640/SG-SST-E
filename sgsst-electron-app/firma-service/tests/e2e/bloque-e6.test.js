@@ -32,12 +32,12 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const fs = require('fs');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const {
-  resetDb, seedActiveAgreement, makeApp,
-  createSignRequestWithIdentificacion, createAcceptedConsent,
-  TEST_API_KEY,
+  resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion, createAcceptedConsent, TEST_API_KEY,
+  assertJsonError,
 } = require('../helpers');
 const { sha256 } = require('../../src/crypto/hash');
 const storage = require('../../src/services/storage');
@@ -186,7 +186,7 @@ test('E6 caso 2: consent_id inexistente → 409 CONSENT_NOT_FOUND', async () => 
     .send({ manifestacion_aceptada: true });
 
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'CONSENT_NOT_FOUND');
+  assertJsonError(r, 'CONSENT_NOT_FOUND');
   assert.equal(r.body.error.details.consent_id, 99999);
 
   // El sign request NO quedó en SIGNED
@@ -237,7 +237,7 @@ test('E6 caso 3: consent_id con manifestacion_aceptada=0 → 409 CONSENT_NOT_ACC
     .send({ manifestacion_aceptada: true });
 
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'CONSENT_NOT_ACCEPTED');
+  assertJsonError(r, 'CONSENT_NOT_ACCEPTED');
   assert.equal(r.body.error.details.consent_id, consentIdNoAceptado);
   assert.equal(r.body.error.details.manifestacion_aceptada, 0);
 
@@ -279,9 +279,25 @@ test('E6 caso 4: consent_id de otro trabajador → 409 CONSENT_WORKER_MISMATCH',
     .send({ manifestacion_aceptada: true });
 
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'CONSENT_WORKER_MISMATCH');
-  assert.equal(r.body.error.details.consent_id_trabajador, '11111111');
-  assert.equal(r.body.error.details.sign_request_id_trabajador, '22222222');
+  assertJsonError(r, 'CONSENT_WORKER_MISMATCH');
+  // El aviso público NO lleva los identificadores de la contraparte.
+  //
+  // Desde la migración 019 el `id_trabajador` de la fila es el SEUDÓNIMO
+  // del trabajador, y ese seudónimo lleva el ámbito de la empresa: es
+  // justamente lo que permite enlazar al mismo trabajador entre empresas.
+  // Ponerlo en un aviso que ve el cliente de la contraparte convertía el
+  // camino de error en un canal de correlación. Los identificadores quedan
+  // en el log del servidor, que es donde un dato de auditoría sirve.
+  //
+  // Y menos todavía puede aparecer el documento en claro.
+  assert.equal(r.body.error.details.consent_id_trabajador, undefined,
+    'el aviso no debe llevar el identificador del trabajador del consentimiento');
+  assert.equal(r.body.error.details.sign_request_id_trabajador, undefined,
+    'el aviso no debe llevar el identificador del trabajador de la solicitud');
+  assert.equal(JSON.stringify(r.body).includes('11111111'), false,
+    'el documento en claro del trabajador del consentimiento no puede aparecer');
+  assert.equal(JSON.stringify(r.body).includes('22222222'), false,
+    'el documento en claro del trabajador de la solicitud no puede aparecer');
 
   // El sign request NO quedó en SIGNED
   const row = db.prepare(
@@ -317,9 +333,19 @@ test('E6 caso 5: consent_id de otra empresa → 409 CONSENT_COMPANY_MISMATCH', a
     .send({ manifestacion_aceptada: true });
 
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'CONSENT_COMPANY_MISMATCH');
-  assert.equal(r.body.error.details.consent_id_empresa, 'AAA');
-  assert.equal(r.body.error.details.sign_request_id_empresa, 'BBB');
+  assertJsonError(r, 'CONSENT_COMPANY_MISMATCH');
+  // El aviso dice QUE no coincide, no de QUIÉN es el consentimiento: el NIT
+  // de otra empresa es dato de la contraparte, no del que pregunta. Lo que
+  // importa para el que llama es que el consentimiento no es suyo, y eso ya
+  // lo dice el código.
+  assert.equal(r.body.error.details.consent_id_empresa, undefined,
+    'el aviso no debe decir de qué empresa es el consentimiento');
+  assert.equal(r.body.error.details.sign_request_id_empresa, undefined,
+    'el aviso no debe repetir la empresa de la solicitud');
+  assert.equal(JSON.stringify(r.body).includes('AAA'), false,
+    'el identificador de la otra empresa no puede aparecer en el aviso');
+  assert.equal(JSON.stringify(r.body).includes('BBB'), false,
+    'el identificador de la empresa que pregunta no puede aparecer en el aviso');
 
   // El sign request NO quedó en SIGNED
   const row = db.prepare(
@@ -457,7 +483,7 @@ test('E6 caso 6: consent_id con otra agreement_version → 409 CONSENT_VERSION_M
     .send({ manifestacion_aceptada: true });
 
   assert.equal(rCommit.status, 409);
-  assert.equal(rCommit.body.error.code, 'CONSENT_VERSION_MISMATCH');
+  assertJsonError(rCommit, 'CONSENT_VERSION_MISMATCH');
   assert.equal(rCommit.body.error.details.consent_version_acuerdo, 'v9.9-different');
   assert.equal(rCommit.body.error.details.sign_request_agreement_version, 'v1.0');
 
@@ -526,8 +552,10 @@ test('E6 caso 7: sign request legacy (agreement_version=NULL) → salta validaci
   // (ej. pdfGen requiere Acuerdo activo). Lo crítico: NO debe fallar
   // con los códigos de E6 (consentimiento) ni con AGREEMENT_VERSION_NO_LONGER_ACTIVE.
   if (r.status === 409) {
+    assertJsonResponse(r);
     assert.notEqual(r.body.error.code, 'CONSENT_REQUIRED',
       'Sign request legacy NO debe pedir consent_id');
+    assertJsonResponse(r);
     assert.notEqual(r.body.error.code, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE',
       'Sign request legacy NO debe re-validar Acuerdo activo');
   }
@@ -554,7 +582,7 @@ test('E6 caso 8: sign request con agreement_version sin consent_id → 409 CONSE
     .send({ manifestacion_aceptada: true });
 
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'CONSENT_REQUIRED');
+  assertJsonError(r, 'CONSENT_REQUIRED');
   assert.equal(r.body.error.details.agreement_version, 'v1.0');
 
   // El sign request NO quedó en SIGNED
@@ -610,7 +638,7 @@ test('E6 schema: signRequestBody acepta consent_id opcional', async () => {
     .field('metadata', JSON.stringify(metaInvalido))
     .attach('documento', pdf, 'd.pdf');
   assert.equal(r3.status, 400);
-  assert.equal(r3.body.error.code, 'INVALID_REQUEST_BODY');
+  assertJsonError(r3, 'INVALID_REQUEST_BODY');
 });
 
 test('E6 schema: GET /internal/sign-requests/:id expone consent_id', async () => {

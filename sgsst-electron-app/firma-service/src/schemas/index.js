@@ -97,6 +97,13 @@ const signRequestBody = z.object({
   // de OTP. Optional por retrocompatibilidad (SRs legacy sin este campo
   // caen al fallback de metadata.correo / consent.correo_verificacion).
   correo_verificacion: z.string().email().max(254).optional(),
+  // `ttl_horas` se ACEPTA pero el servidor lo IGNORA: la vigencia del
+  // enlace la calcula el servicio según la modalidad (remoto 72 h,
+  // presencial 24 h), porque el numeral 3.4(c) del Acuerdo la fija. Antes
+  // K+AIR mandaba 24 en una firma remota y el rótulo de la consola decía
+  // "vence en 24 horas", en contradicción con la fila y con el Acuerdo.
+  // Se mantiene el campo en el esquema por compatibilidad con clientes
+  // viejos; el valor real llega en la respuesta, `fecha_expiracion`.
   ttl_horas: z.coerce.number().int().min(1).max(168).optional(),
   version_kair: z.string().min(1).max(32),
   identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),

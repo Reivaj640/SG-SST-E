@@ -52,16 +52,15 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const { sha256 } = require('../../src/crypto/hash');
 const { canonicalJSON } = require('../../src/crypto/compare');
 const signRequestService = require('../../src/services/signRequest');
 const {
-  resetDb, seedActiveAgreement, seedTestClients, makeApp,
-  withClientAApiKey,
-  TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A,
-  createAcceptedConsent,
+  resetDb, seedActiveAgreement, seedTestClients, makeApp, withClientAApiKey, TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A, createAcceptedConsent,
+  assertJsonError,
 } = require('../helpers');
 const storage = require('../../src/services/storage');
 
@@ -263,7 +262,7 @@ test('F6.1 commit con consent inválido (E6 caso 3) → atomicidad preservada', 
     .post(`/api/sign/${token}/commit`)
     .send({ manifestacion_aceptada: true });
   assert.equal(rCommit.status, 409);
-  assert.equal(rCommit.body.error.code, 'CONSENT_NOT_ACCEPTED');
+  assertJsonError(rCommit, 'CONSENT_NOT_ACCEPTED');
 
   // 4. (c) Campos BD: estado sigue DOCUMENT_VIEWED, todos los campos
   //    del commit son null.
@@ -373,7 +372,7 @@ test('F6.2 commit con writeFileAtomic fallando → atomicidad BD↔FS preservada
       patch.dispose();
     }
     assert.equal(resA.status, 500, `Sub-case (a) debe ser 500, obtuve ${resA.status}`);
-    assert.equal(resA.body.error.code, 'STORAGE_WRITE_FAILED');
+    assertJsonError(resA, 'STORAGE_WRITE_FAILED');
     assert.equal(patch.getCallCount(), 1,
       'Sub-case (a): patch debe haberse llamado exactamente 1 vez (primer write falló)');
 
@@ -405,7 +404,7 @@ test('F6.2 commit con writeFileAtomic fallando → atomicidad BD↔FS preservada
       patch.dispose();
     }
     assert.equal(resB.status, 500, `Sub-case (b) debe ser 500, obtuve ${resB.status}`);
-    assert.equal(resB.body.error.code, 'STORAGE_WRITE_FAILED');
+    assertJsonError(resB, 'STORAGE_WRITE_FAILED');
     assert.equal(patch.getCallCount(), 2,
       'Sub-case (b): patch debe haberse llamado exactamente 2 veces (1er OK, 2do falló)');
 
@@ -495,7 +494,7 @@ test('F6.3 commit con evento SIGN_COMMITTED fallando → tx rollback atómico', 
   assert.equal(res.status, 500, `Debe ser 500, obtuve ${res.status} ${JSON.stringify(res.body)}`);
   // I-008.4: el error específico ahora es EVENT_REGISTRATION_FAILED (cierra
   // HALLAZGO #2 con I-008.3). Antes era INTERNAL_ERROR genérico.
-  assert.equal(res.body.error.code, 'EVENT_REGISTRATION_FAILED');
+  assertJsonError(res, 'EVENT_REGISTRATION_FAILED');
   assert.equal(patch.getMatchingCalls(), 1,
     'El patch debe haberse llamado exactamente 1 vez (SIGN_COMMITTED)');
 

@@ -16,6 +16,27 @@ const logger = require('../utils/logger');
 
 const SCHEMA_DIR = path.join(__dirname, 'schema');
 
+// Directiva opcional en la cabecera de un .sql:
+//   -- @skip-when-env test
+// La migración NO se aplica (y NO se registra como aplicada) cuando
+// NODE_ENV coincide con el valor. Existe para las migraciones que chocan
+// con la limpieza de los tests: en vez de debilitar la garantía en
+// producción por comodidad, la garantía se salta solo en el ambiente que la
+// necesita. Ver src/db/schema/020_eventos_append_only.sql.
+const SKIP_DIRECTIVE_RE = /^\s*--\s*@skip-when-env\s+(\S+)/m;
+
+function readMigrationSql(filename) {
+  return fs.readFileSync(path.join(SCHEMA_DIR, filename), 'utf8');
+}
+
+/**
+ * Devuelve el valor de la directiva @skip-when-env, o null si no la tiene.
+ */
+function skipDirectiveFor(sql) {
+  const m = sql.match(SKIP_DIRECTIVE_RE);
+  return m ? m[1] : null;
+}
+
 function listMigrations() {
   if (!fs.existsSync(SCHEMA_DIR)) {
     throw new Error(`No existe el directorio de schema: ${SCHEMA_DIR}`);
@@ -41,10 +62,12 @@ function getAppliedMigrations() {
   );
 }
 
-function applyMigration(filename) {
+function applyMigration(filename, sql) {
   const version = filename.replace('.sql', '');
   const filepath = path.join(SCHEMA_DIR, filename);
-  const sql = fs.readFileSync(filepath, 'utf8');
+  if (sql === undefined) {
+    sql = readMigrationSql(filename);
+  }
 
   logger.info('Aplicando migración', { version, file: filename });
 
@@ -131,7 +154,16 @@ function migrate() {
       logger.debug('Migración ya aplicada, saltando', { version });
       continue;
     }
-    applyMigration(filename);
+    const sql = readMigrationSql(filename);
+    const skipEnv = skipDirectiveFor(sql);
+    if (skipEnv && process.env.NODE_ENV === skipEnv) {
+      // No se registra como aplicada a propósito: si el ambiente cambia
+      // después (p. ej. se corre la suite en otro NODE_ENV), la migración
+      // sigue disponible para aplicarse.
+      logger.info('Migración omitida por directiva de ambiente', { version, skipEnv });
+      continue;
+    }
+    applyMigration(filename, sql);
     newCount++;
   }
 

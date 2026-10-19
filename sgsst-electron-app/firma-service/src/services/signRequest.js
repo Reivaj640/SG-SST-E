@@ -22,13 +22,23 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db/connection');
 const config = require('../config');
-const { sha256, generateSalt, hashWithSalt } = require('../crypto/hash');
-const { generateToken, hashToken, generateIdSolicitud } = require('../crypto/token');
+const { sha256 } = require('../crypto/hash');
+const { generateToken, hashToken, hashTokenHmac, generateIdSolicitud } = require('../crypto/token');
+const { getMasterKey } = require('../crypto/keys');
+const { valorParaGuardar, candidatosBusquedaConAmbitos } = require('./trabajador');
+const { huellaDesdeHashPrevio } = require('./identificacion');
+const { algHmac, hmacHex } = require('../crypto/hmac');
 const storage = require('./storage');
 const agreementService = require('./agreement');
+const conservacion = require('./conservacion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const crypto = require('crypto');
+
+// Propósito de la derivación del hash del correo. Es el mismo en el
+// consentimiento y en el sign request: un correo es un correo, y la
+// separación de dominio se hace por empresa (ámbito), no por tabla.
+const PROPOSITO_CORREO = 'correo';
 
 // =============================================================================
 // I-013b (C-22): cifrado del token para recuperación.
@@ -45,25 +55,16 @@ const crypto = require('crypto');
 // En prod, se requiere la env var — falla al boot si no está.
 //
 // Ver docs/kair-firma-integration/READY-TO-IMPLEMENT.md §C.I-013b.
+//
+// La llave se toma de `src/crypto/keys.js`, que es la fuente ÚNICA de la
+// llave maestra del servicio: de ella se derivan por HKDF tanto la clave de
+// cifrado de tokens como las claves HMAC de identificación, de OTP y de
+// token de acceso. Así, rotar `TOKEN_ENCRYPTION_KEY` invalida todo junto.
 let _tokenEncryptionKey = null;
 function _getTokenEncryptionKey() {
   if (_tokenEncryptionKey) return _tokenEncryptionKey;
-  const fromEnv = process.env.TOKEN_ENCRYPTION_KEY;
-  if (typeof fromEnv === 'string' && /^[0-9a-fA-F]{64}$/.test(fromEnv)) {
-    _tokenEncryptionKey = Buffer.from(fromEnv, 'hex');
-    return _tokenEncryptionKey;
-  }
-  if (config.env === 'production') {
-    throw new Error(
-      'TOKEN_ENCRYPTION_KEY requerida en producción (32 bytes hex = 64 chars). ' +
-      'Generar con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
-    );
-  }
-  // Dev: generar y loguear warning para que el operador sepa.
-  _tokenEncryptionKey = crypto.randomBytes(32);
-  logger.warn('TOKEN_ENCRYPTION_KEY no seteada, usando key efímera (solo dev)', {
-    hint: 'Setea TOKEN_ENCRYPTION_KEY en .env para que el cifrado persista entre reinicios',
-  });
+  // `getMasterKey` ya valida: en producción lanza si la variable no está.
+  _tokenEncryptionKey = getMasterKey();
   return _tokenEncryptionKey;
 }
 
@@ -248,11 +249,36 @@ async function notifyRemote(signRequest, correo, opts = {}) {
   const mailer = require('./mailer');
   let sendResult;
   try {
+    // Numeral 8.6 del Acuerdo: la comunicación del plazo de conservación y
+    // del canal de copia sale con la INVITACIÓN, que es lo que el Trabajador
+    // recibe antes de firmar. Los declara la Empresa (migración 021); si no
+    // los tiene, el correo sale sin esas líneas (no se inventa un plazo).
+    let plazoRetencion = null;
+    let canalCopia = null;
+    try {
+      const empresaService = require('./empresa');
+      const emp = signRequest.id_empresa ? empresaService.getById(signRequest.id_empresa) : null;
+      if (emp) {
+        plazoRetencion = emp.plazo_retencion || null;
+        canalCopia = emp.canal_solicitud_copia || null;
+      }
+    } catch (e) {
+      // La empresa puede no existir (empresa borrada) o el snapshot no tener
+      // los campos. El correo sale igual: la comunicación del 8.6 es un
+      // requisito de la Empresa, y no puede bloquear la invitación.
+      logger.warn('notifyRemote: no se pudo leer el plazo de retención de la empresa', {
+        id_solicitud: signRequest.id_solicitud,
+        id_empresa: signRequest.id_empresa,
+        error: e.message,
+      });
+    }
     sendResult = await mailer.sendInvite({
       to: correo,
       url_publica: recovery.url_publica,
       id_solicitud: signRequest.id_solicitud,
       context: opts.context || null,
+      plazo_retencion: plazoRetencion,
+      canal_solicitud_copia: canalCopia,
     });
   } catch (e) {
     logger.error('notifyRemote: mailer.sendInvite falló', {
@@ -440,16 +466,47 @@ function create({
 
   // Generar token y IDs
   const token = generateToken();
-  const token_hash = hashToken(token);
+  const token_hash = hashTokenHmac(token);
   const id_solicitud = generateIdSolicitud();
   const sesion_id = require('crypto').randomUUID();
 
-  // P1-2: sal aleatoria para hashear la cédula del trabajador.
-  // Si K+AIR no la envía, sal es NULL (compatibilidad con tests legacy
-  // y con sign requests pre-migración 006). identify() usa sha256(raw)
-  // como fallback cuando sal es NULL.
-  // K+AIR DEBE migrar para enviar sal en nuevos sign requests (ver docs).
+  // ───────────────────────────────────────────────────────────────────────────
+  // Identificación del firmante: HMAC, no "hash con sal en la misma tabla"
+  // ───────────────────────────────────────────────────────────────────────────
+  // El cliente (K+AIR) envía el SHA-256 del número de documento. La fila
+  // guarda un HMAC-SHA256 de ese hash, con clave derivada por HKDF de la
+  // llave maestra del servicio, que vive FUERA de la base de datos. Quien
+  // lea la base ya no puede recomputar candidatos: el 3.4(d) del Acuerdo
+  // pide una huella con sal, y una sal guardada al lado del hash no es una
+  // sal.
+  //
+  // La sal del cliente se conserva (si la manda) porque el hash previo que
+  // él calculó la incluye (`sha256(sal || documento)`). Ya no es un
+  // secreto: sin la llave maestra no permite probar ningún candidato.
   const sal = identificacion_numero_sal || null;
+  const identificacion_hash_guardado = identificacion_numero_hash
+    ? huellaDesdeHashPrevio(identificacion_numero_hash, id_empresa)
+    : null;
+  const identificacion_alg = identificacion_numero_hash ? algHmac() : null;
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Seudónimo del trabajador
+  // ───────────────────────────────────────────────────────────────────────────
+  // `id_trabajador` es la llave de unión del sistema y por convención del
+  // proyecto es la cédula. A partir de ahora la fila guarda el seudónimo
+  // HMAC del documento: la cédula no queda en claro en la base del
+  // servicio, que es la base de un encargado (Capítulo X del Acuerdo).
+  //
+  // El cliente NO cambia: sigue mandando la cédula por el canal interno
+  // autenticado. Lo que cambia es lo que se guarda. Las búsquedas por
+  // `id_trabajador` prueban los dos valores (seudónimo y el crudo) para
+  // seguir encontrando las filas anteriores a este cambio.
+  //
+  // El seudónimo se deriva con el ÁMBITO de la empresa: el mismo trabajador
+  // que firma para dos empresas distintas tiene dos seudónimos, y quien lea
+  // la base no puede enlazar ambos.
+  const { valor: id_trabajador_guardado, alg: id_trabajador_alg } =
+    valorParaGuardar(id_trabajador, id_empresa);
 
   // TTL
   const ttl_horas = tipo_firma === 'presencial'
@@ -484,6 +541,12 @@ function create({
           : {};
         serverMeta.token_encrypted = tokenEncrypted;
         parsed._server_metadata = serverMeta;
+        // El metadata del cliente trae `id_trabajador` con la cédula en
+        // claro (convención del proyecto). Se reemplaza por el seudónimo
+        // para que la cédula no quede escrita dentro del JSON archivado.
+        if (parsed.id_trabajador !== undefined && id_trabajador_guardado) {
+          parsed.id_trabajador = id_trabajador_guardado;
+        }
         metadataToStore = JSON.stringify(parsed);
       } else {
         // metadata es un primitivo (raro, no debería pasar por zod) → wrappear
@@ -508,17 +571,24 @@ function create({
   // momento de crear el sign request. Se persiste en
   // gh_firmas_electronicas.correo_verificacion (columna directa) +
   // correo_hash (para búsqueda/comparación sin plaintext).
-  // El salt es por sign request (P1-2 patrón).
+  //
+  // El hash del correo es una HUELLA PERSISTENTE más, y por eso se calcula
+  // con HMAC: la llave vive FUERA de la base de datos. Antes era SHA-256 con
+  // sal en la misma tabla, que no protege nada — quien lee la base tiene la
+  // sal y el hash, y el espacio de correos es lo bastante pequeño para
+  // probarlos. Con el HMAC, el ámbito de la empresa (migración 022) y la
+  // versión de la llave, la fila no alcanza para deducir el correo.
+  //
   // Validación mínima: el string debe contener '@'. Validación completa
   // de email (RFC) la hace zod en el schema de la ruta; acá solo evitamos
   // persistir basura que pase la validación de zod pero no se parezca a email.
   let correo_persisted = null;
-  let correo_sal_persisted = null;
   let correo_hash_persisted = null;
+  let correo_alg_persisted = null;
   if (typeof correo_verificacion === 'string' && correo_verificacion.includes('@')) {
     correo_persisted = correo_verificacion;
-    correo_sal_persisted = generateSalt();
-    correo_hash_persisted = hashWithSalt(correo_verificacion, correo_sal_persisted);
+    correo_hash_persisted = hmacHex(PROPOSITO_CORREO, correo_verificacion, id_empresa);
+    correo_alg_persisted = algHmac();
   }
 
   // Insertar en BD + sesión en transacción.
@@ -537,14 +607,16 @@ function create({
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel, consent_id,
          tipo_identificacion,  -- I-002 (migration 007)
-         correo_verificacion, correo_hash,  -- I-103.A1.6.C · RF-FIRMA-CORREO-01
+         correo_verificacion, correo_hash, correo_alg,  -- I-103.A1.6.C · RF-FIRMA-CORREO-01 · 022
          requiere_firma_empresa, tipo_firmante,  -- I-FIRMA-DUAL (migration 013)
-         representante_legal_snapshot)  -- I-FIRMA-DUAL (migration 013)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         representante_legal_snapshot,  -- I-FIRMA-DUAL (migration 013)
+         identificacion_numero_alg,  -- migration 019 (HMAC)
+         id_trabajador_alg)  -- migration 019 (seudónimo) · 022 (ámbito y versión)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id_solicitud, id_documento, id_trabajador, id_empresa,
+      id_solicitud, id_documento, id_trabajador_guardado, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
-      token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
+      token_hash, sesion_id, identificacion_tipo || null, identificacion_hash_guardado,
       sal,  // P1-2: sal aleatoria por sign request
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadataToStore, 'email',
@@ -552,9 +624,12 @@ function create({
       tipo_identificacion || null,
       correo_persisted,
       correo_hash_persisted,
+      correo_alg_persisted,
       requiere_firma_empresa ? 1 : 0,  // I-FIRMA-DUAL: default 0 (legacy compat)
       'TRABAJADOR',  // I-FIRMA-DUAL: el padre siempre es TRABAJADOR
       representante_legal_snapshot ? JSON.stringify(representante_legal_snapshot) : null,
+      identificacion_alg,
+      id_trabajador_alg,
     );
     const firmaId = result.lastInsertRowid;
 
@@ -579,6 +654,36 @@ function create({
         tipo_identificacion: tipo_identificacion || null,  // I-002
       }),
     );
+
+    // Congelar la fecha de conservación (numeral 8.6). El plazo lo declara la
+    // Empresa; si no lo declaró, no hay fecha y esta firma nunca será elegible
+    // para supresión. Se congela acá y no después: el 8.6 habla del plazo
+    // "que le resulta aplicable" al firmante cuando se le pide la firma, y
+    // que la Empresa cambie su política después no mueve lo ya firmado.
+    try {
+      const fecha = conservacion.asignarFechaConservacion(firmaId, id_empresa, now.toISOString());
+      if (!fecha) {
+        // La Empresa no declaró plazo de conservación. Esta firma NO tendrá
+        // fecha de conservación y nunca podrá suprimirse. Retener de forma
+        // indefinida tampoco es cumplimiento del 8.6: es una alerta de
+        // onboarding, no un detalle operativo. El sistema no inventa plazos
+        // (el 8.6 dice que el Acuerdo no los fija porque la ley no los fija).
+        logger.warn('SignRequest: la Empresa no declaró plazo de conservación', {
+          id_solicitud,
+          id_empresa,
+          aviso: 'RETAIN_SIN_PLAZO',
+        });
+      }
+    } catch (e) {
+      // La conservación no puede tumbar la creación de la firma. Si la
+      // columna todavía no existe (migración 023 sin aplicar), la firma se
+      // crea igual y queda sin fecha de conservación: sin fecha, no hay
+      // purga. Es el lado seguro del fallo.
+      logger.warn('SignRequest: no se pudo fijar la fecha de conservación', {
+        id_solicitud,
+        error: e.message,
+      });
+    }
 
     return firmaId;
   });
@@ -688,7 +793,7 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     SELECT id_solicitud, id_empresa, id_documento, id_trabajador, version_kair,
            pdf_original_path, document_hash_original,
            agreement_version, agreement_hash, requiere_firma_empresa,
-           consent_id
+           consent_id, id_trabajador_alg
     FROM gh_firmas_electronicas
     WHERE id_solicitud = ?
   `).get(parent_id_solicitud);
@@ -719,7 +824,7 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
 
   // 5. Generar token + IDs
   const token = generateToken();
-  const token_hash = hashToken(token);
+  const token_hash = hashTokenHmac(token);
   const id_solicitud = generateIdSolicitud();
   const sesion_id = require('crypto').randomUUID();
 
@@ -745,7 +850,7 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
       id_solicitud, id_documento, id_empresa, id_trabajador,
       tipo_firma, agreement_version, agreement_hash, document_hash_original,
       pdf_original_path, fecha_creacion, fecha_expiracion, estado,
-      token_hash, sesion_id, correo_verificacion, metadata,
+      token_hash, sesion_id, correo_verificacion, correo_hash, correo_alg, metadata,
       version_kair,
       requiere_firma_empresa, tipo_firmante, parent_id_solicitud,
       representante_legal_snapshot, identificacion_tipo,
@@ -753,15 +858,21 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
                     -- el consentimiento PROPIO del rep en consentAccept()
                     -- (antes se heredaba el del trabajador: dato falso en
                     -- constancia). validateForCommit lo exige antes del commit.
-      identificacion_numero_hash  -- 📦 v0.1.180 (Task 1.14): pre-poblado del snapshot
+      identificacion_numero_hash,  -- 📦 v0.1.180 (Task 1.14): pre-poblado del snapshot
+      identificacion_numero_alg,  -- migration 019: HMAC · 022: ámbito y versión
+      id_trabajador_alg  -- migration 022: el hijo HEREDA el seudónimo del
+                          -- padre (ya es un seudónimo: no se re-hashea) y con
+                          -- él el marcador de algoritmo con que se calculó
     ) VALUES (
       ?, ?, ?, ?,
       'remoto', ?, ?, ?,
       ?, ?, ?, 'PENDING',
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?,
       0, 'EMPRESA', ?,
       ?, ?,
+      ?,
+      ?,
       ?,
       ?
     )
@@ -769,7 +880,12 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     id_solicitud, id_documento, id_empresa, padre.id_trabajador,
     padre.agreement_version, padre.agreement_hash, padre.document_hash_original,
     padre.pdf_original_path, now.toISOString(), fecha_expiracion,
-    token_hash, sesion_id, representante.correo, metadataToStore,
+    token_hash, sesion_id, representante.correo,
+    // Huella persistente del correo: HMAC con el ámbito de la empresa
+    // (migración 022), igual que en el padre y en el consentimiento.
+    hmacHex(PROPOSITO_CORREO, representante.correo, padre.id_empresa),
+    algHmac(),
+    metadataToStore,
     padre.version_kair,
     parent_id_solicitud,
     JSON.stringify(representante),
@@ -782,7 +898,19 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     // un CC distinto en el snapshot (numero_identificacion), el rep no
     // podrá identificarse — diseño conservador: el rep ES la persona del
     // snapshot, no cualquier persona que sepa la URL.
-    representante.numero_identificacion ? sha256(representante.numero_identificacion) : null
+    //
+    // migration 019: se archiva el HMAC de ese hash, no el hash pelado. Sin
+    // la llave maestra no se puede probar ningún candidato, así que la base
+    // de datos del encargado no permite deducir la cédula del representante.
+    // Sin sal: el pre-hash del representante es sha256(documento), igual que
+    // lo que publicFlow.identify() reconstruye para comparar.
+    representante.numero_identificacion
+      ? huellaDesdeHashPrevio(sha256(representante.numero_identificacion), padre.id_empresa)
+      : null,
+    representante.numero_identificacion ? algHmac() : null,
+    // El seudónimo del trabajador se hereda del padre tal cual (ya es un
+    // seudónimo) y con él el marcador del algoritmo con que se calculó.
+    padre.id_trabajador_alg || null
   );
   const childId = result.lastInsertRowid;
 
@@ -821,6 +949,19 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
         code: copyErr.code,
       });
     }
+  }
+
+  // 7.6 Congelar la fecha de conservación del hijo (numeral 8.6). Misma regla
+  //     que en el padre: el plazo lo declara la Empresa y, si no lo declaró,
+  //     no hay fecha y no hay purga. El hijo (firma del representante) es un
+  //     registro del proceso de firma y le aplica el mismo plazo.
+  try {
+    conservacion.asignarFechaConservacion(childId, padre.id_empresa, now.toISOString());
+  } catch (e) {
+    logger.warn('SignRequest: no se pudo fijar la fecha de conservación del hijo', {
+      id_solicitud,
+      error: e.message,
+    });
   }
 
   // 8. Notificar al representante legal (I-FIRMA-DUAL, v0.1.180).
@@ -1004,15 +1145,54 @@ function getByIdSolicitud(id_solicitud) {
 /**
  * Obtiene por token_hash. Usado para validar tokens al recibirlos.
  * NO retorna el token original (solo el hash está en BD).
+ *
+ * Acepta UN hash o una LISTA de candidatos. Las solicitudes viejas
+ * guardan SHA-256(token); las nuevas guardan HMAC(token). Como el token es
+ * el mismo en ambos casos, la búsqueda prueba las dos huellas: la fila se
+ * encuentra con la que tenga, sin importar cuándo se creó.
+ *
+ * @param {string|string[]} token_hash
  */
 function getByTokenHash(token_hash) {
-  if (typeof token_hash !== 'string' || token_hash.length === 0) return null;
+  const hashes = (Array.isArray(token_hash) ? token_hash : [token_hash])
+    .filter(h => typeof h === 'string' && h.length > 0);
+  if (hashes.length === 0) return null;
+  if (hashes.length === 1) {
+    return db.prepare(`
+      SELECT *
+      FROM gh_firmas_electronicas
+      WHERE token_hash = ?
+      LIMIT 1
+    `).get(hashes[0]);
+  }
+  const placeholders = hashes.map(() => '?').join(',');
   return db.prepare(`
     SELECT *
     FROM gh_firmas_electronicas
-    WHERE token_hash = ?
+    WHERE token_hash IN (${placeholders})
+    ORDER BY id DESC
     LIMIT 1
-  `).get(token_hash);
+  `).get(...hashes);
+}
+
+/**
+ * Las empresas que tienen al menos una firma.
+ *
+ * Se usa cuando una consulta filtra por `id_trabajador` pero NO por
+ * `id_empresa`: el seudónimo depende del ámbito (la empresa), así que sin
+ * saber la empresa hay que probar el de todas.
+ *
+ * @returns {string[]}
+ */
+function empresasConFirmas() {
+  try {
+    return db.prepare('SELECT DISTINCT id_empresa FROM gh_firmas_electronicas')
+      .all()
+      .map((r) => r.id_empresa)
+      .filter((e) => typeof e === 'string' && e.length > 0);
+  } catch (e) {
+    return [];
+  }
 }
 
 /**
@@ -1036,8 +1216,25 @@ function list({
     estados.forEach((e, i) => { params[`estado${i}`] = e; });
   }
   if (id_trabajador) {
-    where.push('id_trabajador = @id_trabajador');
-    params.id_trabajador = id_trabajador;
+    // El valor que llega del cliente es el documento crudo. La fila puede
+    // guardar el seudónimo (solicitudes nuevas) o el valor crudo (las
+    // anteriores a la migración 019), así que hay que buscar por los dos.
+    //
+    // El seudónimo se deriva con el ámbito de la empresa. Si la consulta no
+    // filtra por empresa, no se sabe con qué ámbito se calculó: se prueban
+    // los de todas las empresas con firmas (son pocas) más el valor crudo.
+    const ambitos = id_empresa ? [id_empresa] : empresasConFirmas();
+    const cands = candidatosBusquedaConAmbitos(id_trabajador, ambitos);
+    if (cands.length === 0) {
+      where.push('1 = 0');
+    } else if (cands.length === 1) {
+      where.push('id_trabajador = @id_trabajador');
+      params.id_trabajador = cands[0];
+    } else {
+      const placeholders = cands.map((_, i) => `@id_trabajador${i}`).join(',');
+      where.push(`id_trabajador IN (${placeholders})`);
+      cands.forEach((c, i) => { params[`id_trabajador${i}`] = c; });
+    }
   }
   if (id_documento) {
     where.push('id_documento = @id_documento');
@@ -1167,6 +1364,7 @@ module.exports = {
   getByIdSolicitud,
   getByTokenHash,
   getByIds,  // I-008: batch lookup
+  empresasConFirmas,
   list,
   registerEvent,
   getTokenForRecovery,  // I-013b: descifrar token de metadata

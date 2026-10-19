@@ -344,8 +344,19 @@ test('F-FINAL flujo dual completo: padre firma → trigger crea hijo → rep fir
   assert.equal(snap.tipo_identificacion, REP.tipo_identificacion,
     'snapshot.tipo_identificacion debe coincidir');
   // 📦 Schema design: id_trabajador se hereda del padre (es el mismo documento).
-  assert.equal(hijo.id_trabajador, WORKER_CC_PLAIN,
+  //
+  // Desde la migración 019 el valor guardado es el SEUDÓNIMO del trabajador
+  // (HMAC), no la cédula: la base del encargado no guarda el documento en
+  // claro. Lo que se verifica aquí es la INVARIANTE, no el formato:
+  //   1. el hijo hereda EXACTAMENTE el valor del padre, y
+  //   2. ese valor no es la cédula en claro.
+  const padreIdTrab = db.prepare(
+    'SELECT id_trabajador FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(padreId).id_trabajador;
+  assert.equal(hijo.id_trabajador, padreIdTrab,
     'hijo debe heredar el id_trabajador del padre');
+  assert.notEqual(hijo.id_trabajador, WORKER_CC_PLAIN,
+    'la cédula del trabajador NO debe quedar guardada en la base de datos');
   // Consentimiento PROPIO del rep: el hijo nace SIN consent heredado
   // (heredarlo generaba dato falso en constancia: ID/fecha del trabajador
   // como si fueran del rep). Se vincula el suyo en consentAccept().
@@ -445,6 +456,28 @@ test('F-FINAL flujo dual completo: padre firma → trigger crea hijo → rep fir
   assert.notEqual(consentRep.fecha_aceptacion, consentPadre.fecha_aceptacion,
     'las fechas de aceptación de rep y trabajador deben ser distintas ' +
     '(cada uno aceptó en su momento)');
+
+  // El documento del REPRESENTANTE tampoco se guarda en claro. El
+  // representante es otro firmante (numeral 3.5: repite el flujo completo),
+  // así que su número se trata como el del trabajador: en su consentimiento
+  // queda el SEUDÓNIMO y el número con el que se calculó, no el número.
+  //
+  // El número en claro del representante sí queda en el snapshot del 1.2
+  // (bloque «Empresa que solicita tu firma»), porque el 1.2 exige mostrarlo
+  // y es dato público del registro mercantil. Son dos cosas distintas, y
+  // esta aserción verifica que la fila del consentimiento NO sea la segunda.
+  const consentRepIdent = db.prepare(
+    'SELECT identificacion_aceptante, identificacion_aceptante_alg ' +
+    'FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(hijoPost.consent_id);
+  assert.notEqual(consentRepIdent.identificacion_aceptante, REP_CC_PLAIN,
+    'el documento del representante NO debe quedar guardado en la base de datos');
+  assert.match(consentRepIdent.identificacion_aceptante, /^psn1_[0-9a-f]{64}$/,
+    'el documento del representante debe guardarse como seudónimo');
+  assert.ok(consentRepIdent.identificacion_aceptante_alg,
+    'debe quedar registrado con qué algoritmo se calculó la huella del rep');
+  assert.notEqual(consentRepIdent.identificacion_aceptante, REP.numero_identificacion,
+    'el número en claro del rep solo puede estar en el snapshot del 1.2');
 
   // =========================================================================
   // STEP 8 — Verificar evento COMPANY_FIRMA_COMPLETADA en gh_firma_eventos

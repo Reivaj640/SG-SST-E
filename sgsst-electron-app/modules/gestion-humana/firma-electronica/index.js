@@ -406,7 +406,7 @@
       '          <input id="fe-success-url" class="fe-success-link__input" type="text" readonly />',
       '          <button id="fe-success-copy" class="fe-btn fe-btn--ghost" type="button">Copiar</button>',
       '        </div>',
-      '        <p class="fe-field__hint">El enlace vence en 24 horas.</p>',
+      '        <p id="fe-success-ttl" class="fe-field__hint">El enlace tiene vigencia limitada.</p>',
       '      </div>',
       '      <div class="fe-field">',
       '        <label class="fe-field__label">Correo del firmante</label>',
@@ -2498,7 +2498,14 @@
         agreement_hash: agreement.texto_hash,
         document_hash: documentHash,
         version_kair: '0.1.190',
-        ttl_horas: 24,
+        // NO se envía `ttl_horas`: el servidor lo calcula por modalidad
+        // (remoto = 72 h, presencial = 24 h) y lo IGNORA si viene, porque
+        // el numeral 3.4(c) del Acuerdo fija la vigencia del enlace. Antes
+        // se mandaba 24 en una firma remota: no cambiaba nada en el servidor
+        // (la fila siempre tuvo 72 h) pero el rótulo de la consola decía
+        // "vence en 24 horas", en contradicción con el Acuerdo y con la
+        // realidad. El rótulo ahora se arma con la `fecha_expiracion` que
+        // devuelve el servidor.
         consent_id: consentId,
         identificacion_tipo: 'CC',
         identificacion_numero_hash: self._bytesToHex(cedulaHash),
@@ -2606,9 +2613,36 @@
     var copyBtn = modal.querySelector('#fe-success-copy');
     var sendBtn = modal.querySelector('#fe-success-send');
     var feedbackEl = modal.querySelector('#fe-success-feedback');
+    var ttlEl = modal.querySelector('#fe-success-ttl');
     if (idEl) idEl.textContent = info.id_solicitud || '';
     if (urlEl) urlEl.value = info.url_publica || '';
     if (correoEl) correoEl.value = correo || '';
+    // Vigencia del enlace.
+    //
+    // El rótulo NO dice "24 horas" fijo: el servidor calcula el TTL por
+    // modalidad (remoto 72 h, presencial 24 h) y lo devuelve en
+    // `fecha_expiracion`. Mostrar un número fijo contradecía el numeral
+    // 3.4(c) del Acuerdo y la realidad de la fila. Aquí se muestra lo que
+    // el servidor calculó: las horas que faltan y el instante exacto.
+    if (ttlEl) {
+      var textoTtl = 'El enlace tiene vigencia limitada.';
+      if (info.fecha_expiracion) {
+        var exp = new Date(info.fecha_expiracion);
+        if (!isNaN(exp.getTime())) {
+          var horas = null;
+          if (info.fecha_creacion) {
+            var cre = new Date(info.fecha_creacion);
+            if (!isNaN(cre.getTime())) {
+              horas = Math.round((exp.getTime() - cre.getTime()) / 3600000);
+            }
+          }
+          textoTtl = horas && horas > 0
+            ? 'El enlace vence en ' + horas + ' horas (' + self._fmtFechaHora(info.fecha_expiracion) + ').'
+            : 'El enlace vence el ' + self._fmtFechaHora(info.fecha_expiracion) + '.';
+        }
+      }
+      ttlEl.textContent = textoTtl;
+    }
     // Banner de auto-invitación (reusa #fe-success-feedback, no agrega HTML).
     // autoInviteOk === true  → enviado automáticamente
     // autoInviteOk === false → fallo, usar botón manual

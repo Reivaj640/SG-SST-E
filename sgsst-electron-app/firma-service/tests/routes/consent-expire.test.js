@@ -27,6 +27,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('../../src/db/connection');
+const { sha256 } = require('../../src/crypto/hash');
+const { hmacHex, algHmac } = require('../../src/crypto/hmac');
+const { pseudonimo } = require('../../src/services/trabajador');
 const {
   resetDb, seedActiveAgreement, makeApp, TEST_API_KEY, TEST_ADMIN_API_KEY,
 } = require('../helpers');
@@ -513,10 +516,17 @@ test('FASE 2 · POST /internal/consentimientos: ACCEPTED → 200 already_accepte
   assert.equal(r3.body.already_accepted, true);
   assert.equal(r3.body.consent_id, consentId);
   assert.equal(r3.body.manifestacion_aceptada, true);
-  // Solo debe haber 1 fila en BD para esta key
+  // Solo debe haber 1 fila en BD para esta key.
+  // Desde la migración 019 la fila guarda el SEUDÓNIMO del trabajador (el
+  // HMAC del documento), no el documento crudo: el conteo va sobre el
+  // seudónimo. Si se buscara por el valor crudo daría 0 y el test no
+  // detectaría una fila duplicada.
+  // Desde la migración 022 el seudónimo depende del ÁMBITO (la empresa):
+  // hay que derivarlo con la misma empresa con la que se creó la fila, o
+  // el conteo da 0 y el test pasa sin comprobar nada.
   const rows = db.prepare(
-    "SELECT COUNT(*) as n FROM gh_consentimientos_firma WHERE id_trabajador='777' AND id_empresa='888' AND version_acuerdo='v1.0'"
-  ).get();
+    "SELECT COUNT(*) as n FROM gh_consentimientos_firma WHERE id_trabajador=? AND id_empresa='888' AND version_acuerdo='v1.0'"
+  ).get(pseudonimo('777', '888'));
   assert.equal(rows.n, 1);
 });
 
@@ -608,17 +618,32 @@ test('FASE 2 · POST /internal/consentimientos: PENDING + OTP vencido → 201 nu
   assert.equal(r2.body.estado, 'OTP_PENDING');
   assert.equal(r2.body.otp_ttl_seconds, 600);
   assert.match(r2.body.devOtp, /^\d{6}$/);
-  // I-AUDIT-2026-09-10 (v0.1.194): en test mode el devOtp es constante ('999999')
-  // para que tests legacy que envían '000000' como "incorrecto" funcionen. Por
-  // eso ya no podemos comparar devOtp (siempre igual); comparamos otp_hash que
-  // SÍ es único por consent (cada INSERT genera un otp_sal nuevo).
-  const otpHashViejo = db.prepare(
-    'SELECT otp_hash FROM gh_consentimientos_firma WHERE id = ?'
-  ).get(consentIdViejo).otp_hash;
-  const otpHashNuevo = db.prepare(
-    'SELECT otp_hash FROM gh_consentimientos_firma WHERE id = ?'
-  ).get(consentIdNuevo).otp_hash;
-  assert.notEqual(otpHashNuevo, otpHashViejo, 'OTP hash nuevo debe ser diferente (salt único por consent)');
+  // I-AUDIT-2026-09-10 (v0.1.194): en test mode el devOtp es constante
+  // ('999999') para que los tests legacy que envían '000000' como
+  // "incorrecto" funcionen.
+  //
+  // Desde la migración 019 la huella NO depende de una sal por consent: es
+  // un HMAC con la llave maestra del servicio. Como el código es el mismo,
+  // su HMAC también es el mismo — y eso es correcto, no un defecto: la
+  // huella protege el código, no la fila.
+  //
+  // Lo que sí se verifica es que la fila nueva archiva el OTP como HMAC
+  // (nunca en plano ni como hash pelado) y que tiene su propia ventana de
+  // vigencia.
+  const filaVieja = db.prepare(
+    'SELECT otp_hash, otp_alg, fecha_otp_enviado FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(consentIdViejo);
+  const filaNueva = db.prepare(
+    'SELECT otp_hash, otp_alg, fecha_otp_enviado FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(consentIdNuevo);
+  assert.equal(filaNueva.otp_alg, algHmac());
+  // Desde la migración 022 el HMAC tiene ÁMBITO: la misma empresa, el mismo
+  // ámbito con el que se calculó la huella.
+  assert.equal(filaNueva.otp_hash, hmacHex('otp', r2.body.devOtp, '900511178'));
+  assert.notEqual(filaNueva.otp_hash, r2.body.devOtp, 'el OTP NO debe quedar en plano');
+  assert.notEqual(filaNueva.otp_hash, sha256(r2.body.devOtp), 'tampoco un hash pelado');
+  assert.ok(filaNueva.fecha_otp_enviado, 'la fila nueva tiene su propia ventana de OTP');
+  assert.ok(filaVieja.fecha_otp_enviado);
 
   // 4. El consent viejo debe estar EXPIRED
   const viejo = db.prepare(

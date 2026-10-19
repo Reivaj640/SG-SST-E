@@ -35,6 +35,7 @@ const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const pdfValidator = require('../../src/services/pdfValidator');
 const config = require('../../src/config');
 const logger = require('../../src/utils/logger');
+const { capturarLogs } = require('../helpers');
 
 // =====================================================================
 // Helpers
@@ -140,44 +141,15 @@ async function buildModeratelyComplexPdf(n) {
 }
 
 /**
- * Captura stdout y stderr durante la ejecucion de una funcion. Devuelve
- * el texto completo escrito a ambos streams. Usado en §9 (PII en logs).
- */
-function captureStdStreams(fn) {
-  let out = '';
-  let err = '';
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { out += chunk; return true; };
-  process.stderr.write = (chunk) => { err += chunk; return true; };
-  try {
-    fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { out, err, combined: out + err };
-}
-
-/**
- * Wrapper async para captureStdStreams. Espera la promesa y captura
- * tambien logs asincronos (logger es sync, asi que normalmente ya
- * estan escritos al momento de catch, pero esto es defensivo).
+ * Captura lo que el logger registra durante la ejecucion de una funcion.
+ * Usado en §9 (PII en logs).
+ *
+ * NO se parchea process.stdout/stderr: hacerlo roba la salida del runner de
+ * pruebas y produce fallos intermitentes (ver src/utils/logger.js).
  */
 async function captureStdStreamsAsync(fn) {
-  let out = '';
-  let err = '';
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { out += chunk; return true; };
-  process.stderr.write = (chunk) => { err += chunk; return true; };
-  try {
-    await fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { out, err, combined: out + err };
+  const capturadas = await capturarLogs(fn);
+  return { out: capturadas.stdout, err: capturadas.stderr, combined: capturadas.texto };
 }
 
 // =====================================================================

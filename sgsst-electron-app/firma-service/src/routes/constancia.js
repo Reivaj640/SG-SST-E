@@ -12,8 +12,11 @@
  *  - Generación al vuelo (sin persistencia): la consolidada siempre refleja el
  *    estado actual del expediente; no contamina storage.PATHS.constancias
  *    (invariante BD↔FS 1:1 de la constancia individual).
- *  - Identificación del firmante COMPLETA (documento interno de la empresa;
- *    la constancia individual que recibe el firmante la enmascara).
+ *  - Identificación del firmante ENMASCARADA (misma convención que la
+ *    constancia individual y que la página de verificación pública: los
+ *    primeros 6 caracteres de la huella archivada). Antes se ponía aquí el
+ *    documento completo; desde la migración 019 `id_trabajador` es el
+ *    seudónimo del trabajador y el documento ya no está en la base de datos.
  *  - Aislamiento por empresa: en modo 'client' (API key per-empresa) se filtra
  *    por req.id_empresa y un expediente ajenos devuelve 404 silencioso, igual
  *    que el cross-company del endpoint individual. En modo legacy
@@ -34,6 +37,8 @@ const db = require('../db/connection');
 const publicFlow = require('../services/publicFlow');
 const empresaService = require('../services/empresa');  // num. 1.2: snapshot archivado
 const signRequestService = require('../services/signRequest');
+const { candidatosBusquedaConAmbitos } = require('../services/trabajador');
+const identificacion = require('../services/identificacion');
 const pdfGenConsolidado = require('../services/pdfGenConsolidado');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -61,33 +66,64 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
       }
 
       // 1. Todas las solicitudes del trabajador (scope por empresa en modo client)
+      //
+      //    El cliente manda el documento crudo del trabajador. La fila puede
+      //    guardar el seudónimo (migración 019) o el valor crudo (filas
+      //    anteriores), así que se buscan los dos: así el expediente
+      //    consolidado sigue incluyendo los documentos firmados antes del
+      //    cambio.
+      //
+      //    El seudónimo se deriva con el ÁMBITO de la empresa (migración 022),
+      //    así que hay que saber con qué ámbito se calculó para buscarlo:
+      //      - en modo 'client' la empresa viene de la API key: un solo
+      //        ámbito, y el filtro por `id_empresa` de la consulta hace el
+      //        resto (aislamiento cross-company).
+      //      - en modo legacy no hay empresa en el token: se prueban los
+      //        ámbitos de todas las empresas con firmas (son pocas) más el
+      //        valor crudo de las filas heredadas.
+      const ambitos = (req.authSource === 'client' && req.id_empresa)
+        ? [req.id_empresa]
+        : signRequestService.empresasConFirmas();
+      const cands = candidatosBusquedaConAmbitos(idTrabajador, ambitos);
+      if (cands.length === 0) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Expediente sin solicitudes de firma',
+            request_id: req.id,
+          },
+        });
+      }
+      const placeholders = cands.map(() => '?').join(',');
       let rows;
       if (req.authSource === 'client') {
         rows = db.prepare(`
           SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
                  estado, document_hash_original, document_hash_firmado,
-                 evidence_hash, identificacion_tipo, correo_verificacion,
+                 evidence_hash, identificacion_tipo, identificacion_numero_hash,
+                 correo_verificacion,
                  consent_id, id_constancia, metadata, fecha_creacion, fecha_firma,
                  tipo_firmante, parent_id_solicitud,
                  representante_legal_snapshot
           FROM gh_firmas_electronicas
-          WHERE id_trabajador = ? AND id_empresa = ?
+          WHERE id_trabajador IN (${placeholders}) AND id_empresa = ?
           ORDER BY fecha_creacion ASC, id ASC
-        `).all(idTrabajador, req.id_empresa);
+        `).all(...cands, req.id_empresa);
       } else {
         // Modo legacy: sin empresa en el token, mismo comportamiento que el
         // resto de rutas internas legacy (sin filtro por empresa).
         rows = db.prepare(`
           SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
                  estado, document_hash_original, document_hash_firmado,
-                 evidence_hash, identificacion_tipo, correo_verificacion,
+                 evidence_hash, identificacion_tipo, identificacion_numero_hash,
+                 correo_verificacion,
                  consent_id, id_constancia, metadata, fecha_creacion, fecha_firma,
                  tipo_firmante, parent_id_solicitud,
                  representante_legal_snapshot
           FROM gh_firmas_electronicas
-          WHERE id_trabajador = ?
+          WHERE id_trabajador IN (${placeholders})
           ORDER BY fecha_creacion ASC, id ASC
-        `).all(idTrabajador);
+        `).all(...cands);
       }
 
       if (!rows || rows.length === 0) {
@@ -257,7 +293,14 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
         trabajador: {
           nombre: nombreTrabajador,
           identificacion_tipo: rows[0].identificacion_tipo || 'CC',
-          identificacion: idTrabajador, // completa: documento interno
+          // Referencia enmascarada de la identificación: los primeros 6
+          // caracteres de la huella archivada. Antes se ponía aquí el
+          // documento COMPLETO (`id_trabajador`), que desde la migración
+          // 019 es el seudónimo del trabajador y ya no es el documento.
+          identificacion: identificacion.enmascarar(
+            rows[0].identificacion_tipo,
+            rows[0].identificacion_numero_hash
+          ) || '—',
           correo_invitacion: correoTrabajadorInvitacion,
         },
         zona_horaria: Intl.DateTimeFormat().resolvedOptions().timeZone || null,

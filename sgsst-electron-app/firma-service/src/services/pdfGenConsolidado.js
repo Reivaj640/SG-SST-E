@@ -70,7 +70,9 @@ function esFirmado(estado) {
  *   correo_empresa: string|null (correo corporativo del emisor, si está registrado)
  *   correo_emisor: string|null (desde el cual salen las invitaciones — smtp.fromEmail)
  *   trabajador: { nombre, identificacion_tipo, identificacion, correo_invitacion }
- *                 (identificación COMPLETA; correo al que salió la invitación)
+ *                 (identificación ENMASCARADA: 'CC ce3a59…', los primeros 6
+ *                  caracteres de la huella archivada; el documento completo
+ *                  no está en la base de datos desde la migración 019)
  *   zona_horaria: string|null
  *   generado_en: ISO string
  *   documentos: [ { nombre_documento, id_documento, asunto_documento, id_solicitud, estado,
@@ -187,8 +189,10 @@ async function generateConstanciaConsolidadaPdf(data) {
   campo('Correo del emisor (invitaciones)', data.correo_emisor || '—');
   campo('Trabajador', trabajador.nombre || '—');
   campo('Identificación',
-    (trabajador.identificacion_tipo ? trabajador.identificacion_tipo + ' ' : '')
-    + (trabajador.identificacion || '—'));
+    // `trabajador.identificacion` ya viene con el tipo incluido (p. ej.
+    // 'CC ce3a59…'): es la huella archivada, enmascarada. No se antepone
+    // otra vez el tipo.
+    (trabajador.identificacion || '—'));
   campo('Correo del trabajador (invitación)', trabajador.correo_invitacion || '—');
   campo('Documentos en el expediente', String(totales.documentos));
   campo('Firmados', String(totales.firmados), { color: totales.firmados > 0 ? C.verde : C.texto });
@@ -304,7 +308,7 @@ async function generateConstanciaConsolidadaPdf(data) {
       campo('NIT', emp.nit || '—');
       campo('Domicilio', emp.domicilio || '—');
       campo('Representante legal', emp.representante_legal || '—');
-      campo('Responsable del tratamiento', emp.responsable_tratamiento || '—');
+      campo('Responsable interno de datos personales', emp.responsable_tratamiento || '—');
       campo('Canal de PQRS', emp.canal_pqrs || '—');
       // Hash completo: es el valor que un tercero recalcula para verificar.
       campo('Huella de esta identificación (SHA-256)', doc.empresa_hash || '—');

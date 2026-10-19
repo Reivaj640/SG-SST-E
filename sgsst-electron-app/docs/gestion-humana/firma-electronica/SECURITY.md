@@ -65,9 +65,10 @@
   - [10.10. Amenazas cubiertas por I-003.4 (batería adversarial)](#1010-amenazas-cubiertas-por-i-0034-batería-adversarial)
   - [10.11. Lo que NO protege la idempotencia](#1011-lo-que-no-protege-la-idempotencia)
   - [10.12. HALLAZGO M5.4 — Edge case documentado](#1012-hallazgo-m54--edge-case-documentado)
-- [11. Pentesting post-implementación](#11-pentesting-post-implementación)
-- [12. Bug bounty (futuro)](#12-bug-bounty-futuro)
-- [13. Anexo: matriz de riesgos](#13-anexo-matriz-de-riesgos)
+- [11. PDF Security (I-012)](#11-pdf-security-i-012)
+- [12. Pentesting post-implementación](#12-pentesting-post-implementación)
+- [13. Bug bounty (futuro)](#13-bug-bounty-futuro)
+- [14. Anexo: matriz de riesgos](#14-anexo-matriz-de-riesgos)
 
 ---
 
@@ -201,8 +202,8 @@ del Servicio de Firma.
 | **Vector de ataque** | Acceso a la BD. |
 | **Probabilidad** | Baja. |
 | **Impacto** | 🟠 Alto (rompe la trazabilidad). |
-| **Mitigación implementada** | (1) Tabla `gh_firma_eventos` append-only a nivel de código (no hay método `update()` ni `delete()`). (2) Constraint en BD: `id_evento_anterior` debe ser referenciable. (3) Backups diarios inmutables. |
-| **Mitigación recomendada** | (a) Trigger SQL que rechace UPDATE/DELETE en `gh_firma_eventos`. (b) Hash chain: cada evento incluye hash del anterior. |
+| **Mitigación implementada** | (1) Tabla `gh_firma_eventos` append-only a nivel de código (no hay método `update()` ni `delete()`). (2) Constraint en BD: `id_evento_anterior` debe ser referenciable. (3) Backups diarios inmutables. (4) **Triggers de base de datos** (migración `020_eventos_append_only.sql`): `BEFORE UPDATE` y `BEFORE DELETE` sobre `gh_firma_eventos` abortan la operación con `RAISE(ABORT)`. La garantía vive en la base, no en el código de aplicación: un `DELETE` escrito a mano en un script de mantenimiento se rechaza. |
+| **Mitigación recomendada** | (a) Hash chain: cada evento incluye hash del anterior. (b) Revisar que la excepción de la ventana de purga (T.5) siga siendo la única. |
 | **Riesgo residual** | 🟢 Muy bajo. |
 
 #### T.3. Modificación de la base de datos SQLite
@@ -229,6 +230,21 @@ del Servicio de Firma.
 | **Impacto** | 🔴 Crítico. |
 | **Mitigación implementada** | (1) SQL parametrizado en todo el código (better-sqlite3 `prepare(...).get(...)`). (2) Validación con `zod` o `ajv` antes de cualquier query. (3) No concatenación de strings en SQL. |
 | **Mitigación recomendada** | (a) Code review obligatorio en PRs que toquen SQL. (b) Tests de fuzzing. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.5. La ventana de purga: la única vía por la que el registro de auditoría puede tocarse
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El numeral 3.6(g) promete que el registro de auditoría "no puede ser alterado ni eliminado una vez registrado". Los numerales 8.6 y 10.6 obligan a suprimir el dato una vez vencido su plazo y sin deber legal de conservación. Las dos promesas son incompatibles si la inalterabilidad es absoluta: o la base de datos miente, o el deber de supresión nunca se cumple. |
+| **Activos** | A9 (registro de auditoría), A10 (datos personales) |
+| **Vector de ataque** | Un `DELETE`/`UPDATE` sobre `gh_firma_eventos` ejecutado con acceso a la BD. |
+| **Probabilidad** | Baja. Requiere acceso a la BD **y** que haya una ventana abierta. |
+| **Impacto** | 🟠 Alto: borra el rastro de auditoría de las firmas del lote. |
+| **Mitigación implementada** | La inalterabilidad es el **piso**, y la excepción está acotada por **cinco condiciones que la base de datos hace cumplir, no el código**: (1) hay una **ventana abierta** con actor, motivo y fecha de cierre; (2) la ventana **no está vencida** (se vence sola, tope de 4 horas); (3) la firma está en el **lote** habilitado para esa ventana, y el lote solo se puede ampliar con la ventana abierta; (4) la firma **venció su plazo** (`fecha_conservacion` en el pasado; sin plazo declarado no hay nada que suprimir); (5) la firma **no tiene deber legal de conservación** (`hold_legal = 0`). Cada condición aborta con su propio mensaje, así que el operador sabe cuál falló. El hold lo declara la Empresa con **actor, motivo, alcance y fecha**, y se libera con su propio actor y motivo; el historial queda en `gh_firma_holds`. La ventana, el lote y la purga quedan en `gh_firma_purga_log` y el **recibo por firma** en `gh_firma_purga_registro`, ambos **append-only** y sin datos personales: si la supresión borrara su propio rastro, no habría forma de demostrar qué se suprimió. |
+| **Mitigación recomendada** | (a) Revisar la ventana y el lote antes de cada purga (el reporte `scripts/reporte-vencimientos.js` los lista). (b) Alcanzar el plazo con `plazo_retencion_dias` declarado por cada Empresa: sin plazo declarado no hay fecha de conservación y **nada** se purga — y la retención indefinida tampoco es cumplimiento, por eso el reporte lo marca como **alerta**. |
+| **Alcance (lo que esta capa NO es)** | Esto es la **purga del registro de auditoría**, no la purga completa. **No** suprime los datos personales de la fila (correo, huellas, manifestación de voluntad) ni los archivos (PDF original, PDF firmado, constancia): eso es la **capa 5B**, un paquete aparte. La operación completa, en orden, es *chequeo de hold → datos personales → eventos de auditoría → registro de purga*; ejecutar solo esta capa deja el estado inverso al deseable (se destruye la prueba y se conservan los datos). **Hasta que exista la 5B, esta capa no puede presentarse como cumplimiento del 8.6**, y el script de purga lo dice en voz alta. |
+| **Cobertura** | El trigger **no se prueba en la base de tests compartida**: la migración 020 lleva `-- @skip-when-env test` porque otros archivos de test borran eventos entre casos y abortarían. **Sí se prueba en CI**, de otra manera: `tests/conservacion-purga.test.js` aplica el **archivo real de la migración** en una base de datos aislada y ejercita las cinco condiciones, incluida la del hold y la del plazo. En **staging** la migración se aplica de verdad y el trigger queda activo sobre la base real. |
 | **Riesgo residual** | 🟢 Muy bajo. |
 
 ### 3.3. R — Repudiation (repudio)
@@ -311,6 +327,23 @@ del Servicio de Firma.
 | **Mitigación implementada** | (1) Permisos restrictivos en `/var/lib/kair-firma/pdfs/`. (2) URLs con token no enumerables. (3) Solo descarga con token válido. |
 | **Mitigación recomendada** | (a) Watermark en PDFs con identificación del solicitante. (b) Logs de descarga. |
 | **Riesgo residual** | 🟡 Bajo. |
+
+#### I.5. Confirmación de existencia de un consentimiento ajeno
+
+> **Riesgo residual ACEPTADO para el lanzamiento.** No es bloqueante legal. Su
+> remedio estructural queda propuesto como paquete aparte.
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un `consent_id` ajeno puede confirmarse como existente y de otra empresa a través del error de commit. No revela trabajador ni contenido. |
+| **Activos** | A2 (expediente del trabajador), A3 (registro de auditoría) |
+| **Vector de ataque** | La empresa que tiene una API key per-empresa crea una solicitud de firma con `consent_id` de otra empresa y lee el código del error. |
+| **Probabilidad** | Baja. Requiere una API key per-empresa válida y un `consent_id` adivinado (son enteros correlativos). |
+| **Impacto** | 🟢 Bajo. El error dice SOLO que el consentimiento no es de esta empresa. No dice de qué empresa es, ni de qué trabajador, ni qué contiene. |
+| **Mitigación implementada** | (1) Autenticación per-empresa (I-010) y rate limit por empresa (4 capas). (2) **Orden de validación corregido**: la empresa se compara ANTES que el trabajador, así que la respuesta ya no depende del trabajador. (3) **El aviso público no lleva identificadores de la contraparte**: ni el seudónimo del trabajador, ni los NIT. Solo el código y el `consent_id` que el llamador ya mandó. (4) Registro de auditoría de cada consulta. (5) El log del servidor sí conserva los identificadores: es un dato de auditoría, y por eso tiene acceso restringido y retención propia (§7.4). |
+| **Riesgo residual** | 🟢 Muy bajo. Lo que queda es distinguir "este id existe en alguna empresa" de "este id no existe". |
+| **Remedio estructural (propuesto, no aplicado)** | (a) Validar el consentimiento **en la creación** del sign request, no solo en el commit: corta el oráculo en la raíz. (b) **404 silencioso** cross-company, para que un consentimiento de otra empresa se comporte como inexistente. Ambas cosas cambian el contrato de errores de la API, así que van en un paquete propio, con su diseño, su documentación en `API.md` y la actualización del manejo de errores de K+AIR. |
+| **Por qué no se aplicó todavía** | El bloque E6, que es el que prueba la validación en el commit, acaba de quedar verde y es la base de la cadena de evidencia. Reescribirlo justo antes de las fases que tocan la constancia, el trigger de append-only y la ruta de entrega sería mover el piso de ese bloque. |
 
 ### 3.5. D — Denial of Service (denegación)
 
@@ -614,6 +647,15 @@ Antes de habilitar el Servicio en producción, verificar:
 - [ ] Rotación de logs configurada
 - [ ] Retención 90 días
 - [ ] Logs no se imprimen en stdout en producción
+- [ ] **Acceso al log restringido** al usuario del servicio y a root: desde la
+      corrección del orden de validaciones, el log del servidor registra los
+      identificadores de la contraparte (seudónimo del trabajador y NIT de la
+      empresa) en los rechazos de consentimiento, porque son datos de
+      auditoría. **El log no es una base de datos paralela**: su retención es
+      la de los logs (90 días), no la del expediente, y no se usa para
+      reconstruir evidencia que la base ya tiene.
+- [ ] Los logs de consulta del oráculo de verificación se revisan para
+      anomalías (el mismo documento consultado contra muchas firmas)
 
 ### 7.5. Seguridad operacional
 
@@ -1715,12 +1757,14 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 | T.2 | Modificación de eventos | Baja | Alto | 🟡 | Append-only + backups | 🟢 Muy bajo |
 | T.3 | Modificación de la BD | Baja | Crítico | 🟡 | Permisos + backups | 🟢 Muy bajo |
 | T.4 | Inyección SQL | Media | Crítico | 🟠 | SQL parametrizado + validación | 🟢 Muy bajo |
+| T.5 | Supresión del registro de auditoría fuera de regla | Baja | Alto | 🟡 | Trigger con ventana + lote + log append-only + deber legal | 🟢 Muy bajo |
 | R.1 | Repudio del trabajador | Media | Alto | 🟠 | Eventos + hashes + correo | 🟡 Bajo |
 | R.2 | Repudio del empleador | Baja | Medio | 🟢 | rh_user_id + logs | 🟢 Muy bajo |
 | I.1 | Filtración de tokens | Baja | Crítico | 🟡 | Solo hash en BD + redacción | 🟢 Muy bajo |
 | I.2 | Filtración de OTPs | Baja | Crítico | 🟡 | Hash + sal + TTL | 🟢 Muy bajo |
 | I.3 | Filtración de la BD | Baja | Alto | 🟡 | Backups encriptados | 🟡 Bajo |
 | I.4 | Filtración de PDFs | Baja | Medio | 🟢 | Permisos + token | 🟡 Bajo |
+| I.5 | Confirmación de existencia de un consentimiento ajeno | Baja | Bajo | 🟢 | Empresa antes que trabajador + aviso saneado + authz + rate limit | 🟢 Muy bajo |
 | D.1 | DoS por rate limit | Media | Medio | 🟡 | Rate limit + espacio | 🟢 Muy bajo |
 | D.2 | DoS por crecimiento de BD | Baja | Medio | 🟢 | Monitoreo + cuota | 🟢 Muy bajo |
 | D.3 | Caída del SMTP | Media | Alto | 🟠 | Reintentos + cola | 🟡 Bajo |
@@ -1736,7 +1780,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 - **5 amenazas** con riesgo 🟠 que requieren mitigación continua.
 - **9 amenazas** con riesgo 🟡 que son aceptables para v1.
-- **9 amenazas** con riesgo 🟢 que son residuales y aceptables.
+- **11 amenazas** con riesgo 🟢 que son residuales y aceptables.
 - **0 amenazas** sin mitigar.
 
 ### Plan de mitigación continua

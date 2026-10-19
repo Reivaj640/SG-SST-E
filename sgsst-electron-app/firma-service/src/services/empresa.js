@@ -70,6 +70,11 @@ const SNAPSHOT_FIELDS = [
   'canal_pqrs',
   'canal_incidentes',
   'politica_datos_url',
+  // Plazo de conservación y canal de copia (numerales 8.6 y 10.6 del
+  // Acuerdo). Van al final para no alterar el orden de los campos que ya
+  // estaban: el prefijo del snapshot conserva su serialización anterior.
+  'plazo_retencion',
+  'canal_solicitud_copia',
 ];
 
 /**
@@ -80,6 +85,7 @@ const SELECT_COLS = `
   representante_legal, representante_legal_identificacion,
   responsable_tratamiento, responsable_tratamiento_correo,
   canal_pqrs, canal_incidentes, politica_datos_url,
+  plazo_retencion, canal_solicitud_copia, plazo_retencion_dias,
   anexo_encargo_firmado_at, activo,
   created_at, updated_at
 `;
@@ -96,6 +102,8 @@ const _MAX_LEN = {
   canal_pqrs: 300,
   canal_incidentes: 300,
   politica_datos_url: 500,
+  plazo_retencion: 500,
+  canal_solicitud_copia: 300,
 };
 
 /**
@@ -120,6 +128,30 @@ function _norm(campo, valor) {
 }
 
 /**
+ * Normaliza un campo entero. Acepta número o cadena numérica; devuelve null
+ * si viene vacío. Lanza 400 si no es un entero positivo.
+ *
+ * El plazo de conservación en días (`plazo_retencion_dias`, migración 023) es
+ * un entero y no un texto: es el plazo COMPUTABLE que usa el 8.6. El texto
+ * libre `plazo_retencion` es el que se le muestra al firmante, porque la
+ * tabla de retención de la Empresa puede fijar plazos distintos por categoría
+ * de dato y K+AIR no puede representarlos con un entero.
+ */
+function _normEntero(campo, valor) {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      `${campo} debe ser un número entero de días mayor que cero`);
+  }
+  if (n > 36500) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      `${campo} no puede superar 36500 días (100 años)`);
+  }
+  return n;
+}
+
+/**
  * Convierte una fila de `gh_firma_empresas` al shape interno (sin los
  * metadatos de auditoría, que no forman parte de la identificación).
  */
@@ -130,6 +162,15 @@ function _toRowShape(row) {
     out[campo] = row[campo] === undefined ? null : row[campo];
   }
   out.anexo_encargo_firmado_at = row.anexo_encargo_firmado_at || null;
+  // Plazo computable de conservación (migración 023). NO va en el snapshot:
+  // el snapshot es la identificación que se le MOSTRÓ al firmante, y eso ya
+  // está en `plazo_retencion` (el texto que la Empresa declara y que el
+  // firmante puede leer). Este número es el valor computable que usa el
+  // sistema para calcular la fecha de conservación, no parte de lo que el
+  // firmante vio: no tiene por qué alterar la huella del snapshot.
+  out.plazo_retencion_dias = row.plazo_retencion_dias === undefined
+    ? null
+    : row.plazo_retencion_dias;
   out.activo = row.activo === 1;
   out.created_at = row.created_at || null;
   out.updated_at = row.updated_at || null;
@@ -236,6 +277,8 @@ function publicViewFor(id_empresa) {
     canal_pqrs: snap.datos.canal_pqrs,
     canal_incidentes: snap.datos.canal_incidentes,
     politica_datos_url: snap.datos.politica_datos_url,
+    plazo_retencion: snap.datos.plazo_retencion,
+    canal_solicitud_copia: snap.datos.canal_solicitud_copia,
     huella: snap.huella,
   };
 }
@@ -249,6 +292,7 @@ const EDITABLE_FIELDS = [
   'representante_legal', 'representante_legal_identificacion',
   'responsable_tratamiento', 'responsable_tratamiento_correo',
   'canal_pqrs', 'canal_incidentes', 'politica_datos_url',
+  'plazo_retencion', 'canal_solicitud_copia',
 ];
 
 /**
@@ -283,9 +327,13 @@ function create(datos) {
   }
 
   db.prepare(`
-    INSERT INTO gh_firma_empresas (id_empresa, ${EDITABLE_FIELDS.join(', ')})
-    VALUES (?, ${EDITABLE_FIELDS.map(() => '?').join(', ')})
-  `).run(id_empresa, ...EDITABLE_FIELDS.map((c) => valores[c]));
+    INSERT INTO gh_firma_empresas (id_empresa, ${EDITABLE_FIELDS.join(', ')}, plazo_retencion_dias)
+    VALUES (?, ${EDITABLE_FIELDS.map(() => '?').join(', ')}, ?)
+  `).run(
+    id_empresa,
+    ...EDITABLE_FIELDS.map((c) => valores[c]),
+    _normEntero('plazo_retencion_dias', datos.plazo_retencion_dias)
+  );
 
   logger.info('Empresa registrada', {
     id_empresa,
@@ -327,9 +375,14 @@ function update(id_empresa, datos) {
   db.prepare(`
     UPDATE gh_firma_empresas
     SET ${EDITABLE_FIELDS.map((c) => `${c} = ?`).join(', ')},
+        plazo_retencion_dias = ?,
         updated_at = datetime('now')
     WHERE id_empresa = ?
-  `).run(...EDITABLE_FIELDS.map((c) => valores[c]), id_empresa);
+  `).run(
+    ...EDITABLE_FIELDS.map((c) => valores[c]),
+    _normEntero('plazo_retencion_dias', datos.plazo_retencion_dias),
+    id_empresa
+  );
 
   logger.info('Empresa actualizada', {
     id_empresa,
@@ -423,6 +476,11 @@ function listConPendientes() {
       'representante_legal', 'responsable_tratamiento',
       'responsable_tratamiento_correo', 'canal_pqrs', 'canal_incidentes',
       'politica_datos_url',
+      // El numeral 8.6 obliga a la Empresa a comunicarle al Trabajador el
+      // plazo de conservación y el canal para pedir copia. Si faltan, la
+      // comunicación no se puede hacer: se listan entre los deseables para
+      // que la consola de empresas los muestre como pendientes.
+      'plazo_retencion', 'canal_solicitud_copia',
     ];
     const faltan_requeridos = requeridos.filter((c) => !e[c]);
     const faltan_deseables = deseables.filter((c) => !e[c]);

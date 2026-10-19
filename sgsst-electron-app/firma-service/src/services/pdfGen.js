@@ -12,6 +12,7 @@
 
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs');
+const { esPseudonimo } = require('./trabajador');
 
 // Texto legal compartido entre la página de sello y la Constancia.
 // Fuente de verdad normativa: Ley 527/1999 + Decreto 1074/2015 (Cap. 47,
@@ -99,7 +100,17 @@ function truncUA(ua, maxLen) {
 
 // Muestra la identificación sin exponer el número completo:
 // conserva el tipo y solo los últimos 4 dígitos del documento.
+//
+// AVISO (migración 019): `id_trabajador` es el seudónimo del trabajador, un
+// hex opaco. Sacar "los últimos 4 dígitos" de un hex produce una máscara
+// que no tiene ninguna relación con el documento y que se vería como la
+// identificación real. Por eso, cuando la referencia es un seudónimo, se
+// devuelve la rama protegida: el número no está en la base de datos, solo
+// su huella.
 function fmtIdentificacionParcial(tipo, referencia) {
+  if (esPseudonimo(referencia)) {
+    return (tipo ? tipo + ' ' : '') + '(número protegido — hash en evidencia)';
+  }
   const digits = String(referencia || '').replace(/\D/g, '');
   if (digits.length < 4) {
     return (tipo ? tipo + ' ' : '') + '(número protegido — hash en evidencia)';
@@ -151,10 +162,18 @@ async function addSelloPage(pdfDoc, metadata) {
   // (caso del commit del rep, que pasa el firmante actual), mostrarlo
   // en vez de `id_trabajador`. Esto evita que el PDF del rep diga
   // "Firmante: <id_trabajador del worker>" cuando quien está firmando
-  // AHORA es el representante legal. Si NO viene (legacy / 1 firma del
-  // worker), fallback idéntico a v0.1.179: muestra el id_trabajador.
+  // AHORA es el representante legal.
+  //
+  // Desde la migración 019, `id_trabajador` es el SEUDÓNIMO del trabajador
+  // (un token opaco), no un nombre humano ni un documento: usarlo como
+  // fallback imprimiría un token donde va el nombre. La cadena de fallback
+  // es: nombre -> identificacion enmascarada -> 'N/A'.
+  // (Antes de la migración 019 ese fallback imprimía la CÉDULA COMPLETA en
+  // el PDF firmado; hoy imprimiría el seudónimo. Ninguno de los dos sirve.)
   const displayFirmante = metadata.firmante_display
-    ? (metadata.firmante_display.nombre || metadata.firmante_display.id_trabajador || 'N/A')
+    ? (metadata.firmante_display.nombre
+      || metadata.firmante_display.identificacion
+      || 'N/A')
     : (metadata.id_trabajador || 'N/A');
   line(`Firmante:        ${displayFirmante}`, { bold: true });
   line(`Documento:       ${metadata.id_documento}`);
@@ -192,7 +211,12 @@ function buildLegacyFirmasFromMetadata(metadata) {
     tipo: 'TRABAJADOR',
     firmante: {
       id_trabajador: metadata.id_trabajador,
-      nombre: metadata.id_trabajador, // fallback al id si no hay nombre
+      // El nombre humano viene en el metadata que envía K+AIR
+      // (`nombre_trabajador`). `id_trabajador` es el seudónimo del
+      // trabajador (migración 019): no es un nombre y no debe imprimirse
+      // como si lo fuera.
+      nombre: metadata.nombre_trabajador || metadata.identificacion_enmascarada || 'N/A',
+      identificacion: metadata.identificacion_enmascarada || null,
     },
     fecha_firma: metadata.fecha_firma,
     id_solicitud_firmante: metadata.id_solicitud,
@@ -267,7 +291,7 @@ async function addConstanciaDualPage(pdfDoc, firmas) {
 
   for (let i = 0; i < firmas.length; i++) {
     const f = firmas[i];
-    const nombre = f.firmante?.nombre || f.firmante?.id_trabajador || 'N/A';
+    const nombre = f.firmante?.nombre || f.firmante?.identificacion || 'N/A';
     ops.push('0 -30 Td');
     ops.push('/F1 12 Tf');
     ops.push('(' + escapePdfLiteralString('Firma ' + (i + 1) + ': ' + f.tipo) + ') Tj');
@@ -542,7 +566,36 @@ async function generateConstanciaPdf(metadata) {
   // ═══ FIRMANTE ═══
   seccion('Firmante');
   campo('Nombre completo', metadata.nombre_trabajador);
-  campo('Identificación', fmtIdentificacionParcial(metadata.identificacion_tipo, metadata.id_trabajador));
+  // La identificación se muestra ENMASCARADA (misma convención que la página
+  // de verificación pública y que el PDF de firma dual): los primeros 6
+  // caracteres de la huella archivada.
+  //
+  // Antes se mostraban los últimos 4 dígitos del documento, extraídos del
+  // `id_trabajador` que el cliente mandaba en claro. Desde la migración 019
+  // `id_trabajador` es el seudónimo del trabajador (un hex opaco): sacar
+  // "dígitos" de ahí daría una máscara sin ningún relación con el documento
+  // — un dato que además se vería como la identificación real. Por eso la
+  // referencia legible es la huella archivada, no el seudónimo.
+  campo('Identificación', metadata.identificacion_enmascarada
+    || fmtIdentificacionParcial(metadata.identificacion_tipo, metadata.id_trabajador));
+  // Últimos cuatro dígitos del documento (Fase 4 del carril de código).
+  //
+  // El firmante necesita poder confirmar visualmente que el documento que
+  // está firmando es el suyo. Para eso la constancia muestra los últimos
+  // cuatro dígitos, y no el número completo.
+  //
+  // Esos cuatro dígitos NO vienen de la base de datos: no están en la base.
+  // Se apartaron EN MEMORIA durante la identificación y se descartan al
+  // firmar (ver src/services/ultimos4.js). El numeral 10.5(a) del Acuerdo
+  // manda conservar únicamente la huella del documento.
+  //
+  // Si no hay dígitos disponibles (el proceso se reinició entre la
+  // identificación y la firma), la constancia sale solo con la referencia
+  // opaca de arriba: es el comportamiento de siempre, no una falla.
+  if (metadata.identificacion_ultimos4) {
+    campo('Documento (últimos 4 dígitos)', '···· ' + metadata.identificacion_ultimos4);
+    parrafo('Los últimos cuatro dígitos se muestran para que el firmante confirme visualmente su documento de identidad. No se almacenan: se conservan únicamente en memoria durante la sesión de firma y se descartan al firmar.', { size: 7.5 });
+  }
   campo('Correo verificado', metadata.correo_trabajador);
   campo('Nivel de seguridad', metadata.nivel_seguridad || 'Correo verificado + código temporal por correo + manifestación expresa');
 
@@ -573,16 +626,21 @@ async function generateConstanciaPdf(metadata) {
     campo('Domicilio', empresaId.domicilio);
     campo('Representante legal', empresaId.representante_legal);
     campo('Documento del representante', empresaId.representante_legal_identificacion);
-    campo('Responsable del tratamiento', empresaId.responsable_tratamiento);
+    campo('Responsable interno de datos personales', empresaId.responsable_tratamiento);
     campo('Correo de contacto', empresaId.responsable_tratamiento_correo);
     campo('Canal de PQRS', empresaId.canal_pqrs);
     campo('Canal de incidentes', empresaId.canal_incidentes);
     campo('Política de datos', empresaId.politica_datos_url);
+    // Numeral 8.6 del Acuerdo: la Empresa debe comunicarle al Trabajador el
+    // plazo de conservación y dónde puede pedir una copia. La constancia
+    // deja constancia de lo que se le comunico.
+    campo('Plazo de conservación de sus datos', empresaId.plazo_retencion);
+    campo('Canal para solicitar copia', empresaId.canal_solicitud_copia);
     // El hash va COMPLETO (no truncado como los demás) porque es el valor que
     // un tercero tiene que recalcular para verificar esta constancia.
     campo('Huella de esta identificación (SHA-256)', metadata.empresa_hash);
     parrafo('Estos son los datos de la Empresa que se le mostraron al Firmante en el bloque '
-      + '«Identificación de la Empresa» antes de firmar, conforme al numeral 1.2 del '
+      + '«Empresa que solicita tu firma» antes de firmar, conforme al numeral 1.2 del '
       + 'Acuerdo de uso. La huella permite verificar que la identificación archivada '
       + 'es la misma que se le mostró.', { size: 8, color: C.grisClaro, lh: 11 });
   }

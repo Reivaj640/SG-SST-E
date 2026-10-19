@@ -218,6 +218,71 @@ const signRequestLimiter = rateLimit({
 });
 
 // =============================================================================
+// LIMITER DEL ORÁCULO DE VERIFICACIÓN (Fase 3 del carril de código)
+// =============================================================================
+//
+// El oráculo (`POST /internal/verificacion-identidad`) contesta sí o no
+// sobre un documento de identidad. Es MÁS SENSIBLE que el resto de
+// /internal/*: el límite genérico de la Capa 1 (720/h por empresa)
+// dejaría pasar 720 intentos de adivinar si un número corresponde a una
+// firma.
+//
+// Por eso tiene su propio límite, más corto:
+//   - 60/h por empresa
+//   - 10/min por empresa (ráfaga)
+//
+// El key es `empresa:<id_empresa>` en ambos casos: el límite es por
+// empresa, no por IP, porque es la empresa la que responde por sus
+// consultas. En modo legacy el oráculo no se puede usar (el ámbito de la
+// empresa es parte de la derivación de la huella), así que el fallback a
+// IP es puramente defensivo.
+//
+// El orden importa para los headers: corre primero el límite de la HORA y
+// después el de la RAFAGA. El que se dispara es el último en escribir los
+// headers `RateLimit-Policy` / `RateLimit`, así que el cliente ve siempre
+// el límite que realmente acababa de agotar.
+
+const ORACLE_EMPRESA_POR_HORA = _envInt('RATE_LIMIT_ORACLE_EMPRESA_PER_HOUR', 60);
+const ORACLE_EMPRESA_POR_MINUTO = _envInt('RATE_LIMIT_ORACLE_EMPRESA_PER_MINUTE', 10);
+
+function _oracleKey(req) {
+  if (req.id_empresa) return `empresa:${req.id_empresa}`;
+  return `legacy-ip:${ipKey(req)}`;
+}
+
+const oracleLimiterHora = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: ORACLE_EMPRESA_POR_HORA,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: _oracleKey,
+  handler: makeHandler('oracle-hora'),
+});
+
+const oracleLimiterRafaga = rateLimit({
+  windowMs: 60 * 1000,
+  limit: ORACLE_EMPRESA_POR_MINUTO,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: _oracleKey,
+  handler: makeHandler('oracle-rafaga'),
+});
+
+/**
+ * Middleware: rate limit propio del oráculo de verificación.
+ *
+ * @param {object} req
+ * @param {object} res
+ * @param {function} next
+ */
+function oracleLimiter(req, res, next) {
+  oracleLimiterHora(req, res, (err1) => {
+    if (err1) return next(err1);
+    oracleLimiterRafaga(req, res, next);
+  });
+}
+
+// =============================================================================
 // Limiters INTERNOS (I-008, C-20 v5) — 4 capas para /internal/*
 // =============================================================================
 //
@@ -431,6 +496,7 @@ module.exports = {
   signRequestLimiter,
   verifyLimiter,  // I-AUDIT-2026-09-10: para /verify y /verify-pdf
   internalServerLimiter,
+  oracleLimiter,  // Fase 3: oráculo de verificación de identidad
   // Exportados para tests
   _ipKey: ipKey,
   _ipAndTokenKey: ipAndTokenKey,
@@ -442,4 +508,6 @@ module.exports = {
   _instanceTracker,
   INSTANCE_ANOMALY_LIMIT,
   INSTANCE_ANOMALY_WINDOW_MS,
+  ORACLE_EMPRESA_POR_HORA,
+  ORACLE_EMPRESA_POR_MINUTO,
 };

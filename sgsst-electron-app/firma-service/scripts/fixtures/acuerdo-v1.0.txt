@@ -20,18 +20,18 @@ CAPÍTULO I. IDENTIFICACIÓN DE LAS PARTES
 datos personales a que se refiere el Capítulo X.
 
 1.2. IDENTIFICACIÓN DE LA EMPRESA. Los datos de identificación de la Empresa (razón
-social, NIT, domicilio, representante legal, responsable interno del tratamiento de
-datos personales y canal de atención de peticiones, quejas, reclamos y solicitudes) se
-muestran al Firmante en el bloque «Identificación de la Empresa», que se presenta junto
-con este Acuerdo en la pantalla de firma y se incorpora a la constancia de firma con su
-propia huella digital, sin alterar el texto ni la huella digital de este Acuerdo. El
-Firmante declara que conoce la identidad de la Empresa con la que se vincula por el
+social, NIT, domicilio, representante legal y su documento de identificación, responsable
+interno del tratamiento de datos personales, sus canales de atención y la política de
+tratamiento de datos) se muestran al Firmante en el bloque «Empresa que solicita tu firma»,
+que se presenta junto con este Acuerdo en la pantalla de firma y se incorpora a la constancia
+de firma con su propia huella digital, sin alterar el texto ni la huella digital de este
+Acuerdo. El Firmante declara que conoce la identidad de la Empresa con la que se vincula por el
 documento que firma y que puede solicitar a la Empresa los datos que allí no figuren.
 
 1.3. EL TRABAJADOR, en su calidad de Titular de los datos personales y de Firmante.
-Sus datos de identificación los registra el propio Firmante al aceptar este Acuerdo,
-y quedan incorporados como evidencia de su manifestación de voluntad en los términos
-de los Capítulos IX y X.
+Sus datos de identificación los registra el propio Firmante al identificarse ante el
+sistema, antes de revisar y aceptar este Acuerdo, y quedan incorporados como evidencia
+de su manifestación de voluntad en los términos de los Capítulos IX y X.
 
 1.4. K+AIR, operada por Gesstiar S.A.S., es el proveedor del mecanismo de firma
 electrónica descrito en el Capítulo III. K+AIR interviene como Encargado del
@@ -65,11 +65,33 @@ electrónica, conforme a la definición del artículo 2.2.2.47.1, numeral 1, del
 2015 y, cuando el documento que se firma sea el contrato individual de trabajo o sus
 adiciones, modificaciones o anexos, se rige por el artículo 2.2.1.1.13 del Decreto
 1072 de 2015, en los términos del parágrafo del artículo 2.2.1.1.9 de ese mismo
-Decreto.
+Decreto. Para el caso previsto en el parágrafo del artículo 2.2.1.1.13, las partes
+dejan constancia de lo siguiente:
+
+a) La vigencia de la firma corresponde a la vigencia del contrato y de sus adiciones,
+modificaciones o anexos. El mecanismo de firma electrónica no aplica al documento
+firmado ni a la Constancia de firma electrónica ninguna política de eliminación por
+el transcurso del tiempo ni por la finalización de la relación laboral. La Constancia
+identifica la versión de este Acuerdo aceptada y la huella digital de su texto,
+según lo previsto en el numeral 9.6.
+
+b) El uso del mecanismo de firma electrónica no tiene ningún costo para el Trabajador.
+Los costos asociados al mecanismo, si los hubiere, son de cargo exclusivo de la
+Empresa.
+
+c) El uso del mecanismo es exclusivo para la relación laboral, sin que el documento
+firmado por el Trabajador pierda su validez, eficacia ni fuerza probatoria por el
+mero hecho de que la relación laboral haya terminado.
 
 2.3. El contenido de este Acuerdo no sustituye ni modifica el documento que se firma.
-Las partes pueden pactar en el contrato mismo las condiciones adicionales que estimen
-procedentes, sin que ello altere las reglas mínimas previstas en la ley.
+La copia firmada conserva íntegro el contenido del documento recibido por K+AIR; lo
+único que se le agrega es una página de sello con la constancia de la firma y los
+metadatos técnicos que permiten verificarla. La huella digital del documento original
+y la de la copia firmada quedan registradas en la Constancia de firma electrónica y
+son distintas entre sí, de modo que cualquier modificación posterior de la copia
+firmada produce una huella distinta de la que consta en ella. Las partes pueden pactar
+en el contrato mismo las condiciones adicionales que estimen procedentes, sin que ello
+altere las reglas mínimas previstas en la ley.
 
 
 CAPÍTULO III. MÉTODO DE FIRMA ELECTRÓNICA PACTADO
@@ -380,7 +402,7 @@ CAPÍTULO X. TRATAMIENTO DE DATOS PERSONALES
 10.1. Responsable y Encargado. La Empresa es el Responsable del Tratamiento y K+AIR es
 el Encargado, conforme a las definiciones de los literales d) y e) del artículo 3 de la
 Ley 1581 de 2012. La identificación de la Empresa como Responsable es la del bloque
-«Identificación de la Empresa» del numeral 1.2. K+AIR trata los datos únicamente por
+«Empresa que solicita tu firma» del numeral 1.2. K+AIR trata los datos únicamente por
 cuenta de la Empresa, dentro de los alcances, finalidades y plazos de este Acuerdo y
 conforme al contrato de transmisión de datos personales suscrito entre las partes, en
 los términos del artículo 25 del Decreto 1377 de 2013, compilado en el artículo

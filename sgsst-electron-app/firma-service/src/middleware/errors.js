@@ -27,13 +27,13 @@ class AppError extends Error {
 // =============================================================================
 
 /**
- * Rutas donde el destinatario de la respuesta es un NAVEGADOR.
+ * Rutas donde el destinatario de la respuesta puede ser un NAVEGADOR.
  *
- * El criterio es deliberadamente estrecho. Fuera de /s y /api/sign viven los
- * endpoints que consume K+AIR con fetch (internal, health, constancia). Si
- * negociaran HTML, cualquier cliente que mande un Accept comodín — lo que
- * hacen curl y casi todo script por defecto — se llevaría HTML donde esperaba
- * JSON y fallaría al parsear, en silencio y lejos de la causa real.
+ * En estas rutas, un error se puede servir como una página legible (que es lo
+ * que necesita el firmante que reabre el enlace) o como el sobre JSON (que es
+ * lo que necesita cualquier programa).
+ *
+ * La elección la hace `prefersHtml`, que mira el `Accept`.
  *
  * @param {import('express').Request} req
  * @returns {boolean}
@@ -43,11 +43,35 @@ function isPublicSignerPath(req) {
   return path === '/s' || path.indexOf('/s/') === 0 || path.indexOf('/api/sign/') === 0;
 }
 
-/** @returns {boolean} true si el cliente acepta HTML antes que JSON. */
+/**
+ * ¿El cliente quiere la página HTML en vez del sobre JSON?
+ *
+ * EL ORDEN DE LA LISTA ES LA DECISIÓN
+ * ----------------------------------
+ * Express devuelve el primer tipo de la lista que el cliente acepte, y
+ * desempata por el orden cuando las calidades son iguales. Por eso el orden
+ * importa, y por eso la lista empieza por 'json':
+ *
+ *   - Un navegador manda `text/html,application/xhtml+xml,application/xml;q=0.9`
+ *     y un comodín con q=0.8. Para 'text/html' la calidad es 1; para
+ *     'application/json' el comodín da 0.8. Gana HTML: el firmante ve la
+ *     página. ✓
+ *   - Un cliente de programa manda un Accept comodín (lo que hacen curl y
+ *     fetch por defecto) o no manda nada. Para los dos tipos la calidad es
+ *     1, y el desempate es por orden: gana JSON. ✓
+ *   - Un cliente que pide `application/json` explícitamente recibe JSON. ✓
+ *
+ * Con la lista al revés ('html' primero) un Accept comodín se llevaba HTML
+ * donde esperaba JSON: el parseo fallaba en silencio y lejos de la causa
+ * real. La mini-app se salvaba porque ponía el header a mano, pero el
+ * siguiente cliente programático que no lo pusiera se comía una página.
+ *
+ * @returns {boolean} true si el cliente acepta HTML antes que JSON.
+ */
 function prefersHtml(req) {
   if (typeof req.accepts !== 'function') return false;
   try {
-    return req.accepts(['html', 'json']) === 'html';
+    return req.accepts(['json', 'html']) === 'html';
   } catch (_) {
     return false;
   }

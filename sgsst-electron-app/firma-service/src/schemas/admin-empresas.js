@@ -79,6 +79,21 @@ const createEmpresaBody = z.object({
   canal_pqrs: textoOpcional(300),
   canal_incidentes: textoOpcional(300),
   politica_datos_url: textoOpcional(500),
+  // Plazo de conservación que declara la Empresa y canal para pedir copia.
+  // Numeral 8.6 del Acuerdo: la Empresa debe comunicárselo al Trabajador
+  // antes de solicitarle la firma. K+AIR solo lo transporta y lo muestra.
+  plazo_retencion: textoOpcional(500),
+  canal_solicitud_copia: textoOpcional(300),
+  // El plazo COMPUTABLE, en días (migración 023). Es el número que permite
+  // calcular la fecha de conservación y, con ella, la supresión del dato
+  // vencido (8.6 y 10.6). Si la Empresa no lo declara, sus firmas no tienen
+  // fecha de conservación y no se suprimen: el sistema no inventa plazos.
+  plazo_retencion_dias: z
+    .number()
+    .int()
+    .positive()
+    .max(36500)
+    .nullish(),
 });
 
 /**
@@ -97,6 +112,14 @@ const updateEmpresaBody = z.object({
   canal_pqrs: textoOpcional(300),
   canal_incidentes: textoOpcional(300),
   politica_datos_url: textoOpcional(500),
+  plazo_retencion: textoOpcional(500),
+  canal_solicitud_copia: textoOpcional(300),
+  plazo_retencion_dias: z
+    .number()
+    .int()
+    .positive()
+    .max(36500)
+    .nullish(),
 });
 
 const setActivoBody = z.object({

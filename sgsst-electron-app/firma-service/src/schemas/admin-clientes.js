@@ -32,6 +32,11 @@ const ALLOWED_OPS = Object.freeze([
   'consent:create',
   'consent:verify',
   'audit:read',
+  // Fase 3: oráculo de verificación de identidad. Es una operación
+  // aparte a propósito: concede a la Empresa el derecho a PREGUNTAR si un
+  // documento es el que registró, y nada más. Un cliente que no la tiene
+  // no puede ni siquiera intentarlo (403 FORBIDDEN).
+  'verificacion:identidad',
 ]);
 
 /**

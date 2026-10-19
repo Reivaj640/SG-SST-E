@@ -28,6 +28,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const request = require('supertest');
+const { assertJsonError } = require('../helpers');
 const { rateLimit } = require('express-rate-limit');
 const { errorHandler } = require('../../src/middleware/errors');
 const {
@@ -98,7 +99,7 @@ test('globalLimiter: primeras 60 requests OK, la #61 retorna 429 RATE_LIMIT_EXCE
   }
   const r61 = await request(app).get('/ping');
   assert.equal(r61.status, 429, 'request #61 debería ser 429');
-  assert.equal(r61.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(r61, 'RATE_LIMIT_EXCEEDED');
   assert.equal(r61.body.error.details.limiter, 'global');
   assert.equal(r61.body.error.details.limit, 60);
 });
@@ -134,7 +135,7 @@ test('otpLimiter: primeras 10 requests OK, la #11 retorna 429 (mismo IP+token)',
     .set('X-Forwarded-For', '10.0.0.1')
     .send({ otp: '000000' });
   assert.equal(r11.status, 429, 'request #11 debería ser 429');
-  assert.equal(r11.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(r11, 'RATE_LIMIT_EXCEEDED');
   assert.equal(r11.body.error.details.limiter, 'otp');
   assert.equal(r11.body.error.details.limit, 10);
 });
@@ -157,7 +158,7 @@ test('commitLimiter: primeras 3 requests OK, la #4 retorna 429 (mismo IP+token)'
     .set('X-Forwarded-For', '10.0.0.2')
     .send({ commit: 'overflow' });
   assert.equal(r4.status, 429, 'request #4 debería ser 429');
-  assert.equal(r4.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(r4, 'RATE_LIMIT_EXCEEDED');
   assert.equal(r4.body.error.details.limiter, 'commit');
   assert.equal(r4.body.error.details.limit, 3);
 });
@@ -180,7 +181,7 @@ test('signRequestLimiter: primeras 30 requests OK, la #31 retorna 429', async ()
     .set('X-Forwarded-For', '10.0.0.3')
     .send({ n: 31 });
   assert.equal(r31.status, 429, 'request #31 debería ser 429');
-  assert.equal(r31.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(r31, 'RATE_LIMIT_EXCEEDED');
   assert.equal(r31.body.error.details.limiter, 'sign-request');
   assert.equal(r31.body.error.details.limit, 30);
 });

@@ -60,15 +60,14 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const { sha256 } = require('../../src/crypto/hash');
 const pdfGen = require('../../src/services/pdfGen');
 const {
-  resetDb, seedActiveAgreement, seedTestClients, makeApp,
-  withClientAApiKey,
-  TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A,
-  createAcceptedConsent,
+  resetDb, seedActiveAgreement, seedTestClients, makeApp, withClientAApiKey, TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A, createAcceptedConsent,
+  assertJsonError,
 } = require('../helpers');
 const storage = require('../../src/services/storage');
 
@@ -234,7 +233,7 @@ test('F5.1 PDF corrupto en POST → 422 PDF_INVALID + no-side-effects completos'
   );
 
   assert.equal(r1.status, 422, `debe ser 422, obtuve ${r1.status}: ${JSON.stringify(r1.body)}`);
-  assert.equal(r1.body.error.code, 'PDF_INVALID');
+  assertJsonError(r1, 'PDF_INVALID');
 
   // BD: 0 firmas, 0 eventos, 0 sesiones
   assert.equal(
@@ -290,7 +289,7 @@ test('F5.2 PDF cifrado en POST → 422 PDF_ENCRYPTED + no-side-effects completos
   );
 
   assert.equal(r1.status, 422, `debe ser 422, obtuve ${r1.status}: ${JSON.stringify(r1.body)}`);
-  assert.equal(r1.body.error.code, 'PDF_ENCRYPTED');
+  assertJsonError(r1, 'PDF_ENCRYPTED');
   assert.equal(
     r1.body.error.details && r1.body.error.details.reason,
     'encrypted_pdf_not_supported',
@@ -392,7 +391,7 @@ test('F5.3 pdfGen.generateSignedPdf falla durante commit → atomicidad preserva
     `debe ser 500, obtuve ${rCommit.status}: ${JSON.stringify(rCommit.body)}`);
   // I-008.4: el error específico ahora es PDF_GENERATION_FAILED (cierra
   // HALLAZGO #3 con I-008.3). Antes era INTERNAL_ERROR genérico.
-  assert.equal(rCommit.body.error.code, 'PDF_GENERATION_FAILED');
+  assertJsonError(rCommit, 'PDF_GENERATION_FAILED');
   // Patch fue invocado 1 vez
   assert.equal(callCount, 1, 'pdfGen.generateSignedPdf debe haberse llamado 1 vez');
 
@@ -508,7 +507,7 @@ test('F5.4 pdfGen.generateConstanciaPdf falla durante commit → atomicidad pres
     `debe ser 500, obtuve ${rCommit.status}: ${JSON.stringify(rCommit.body)}`);
   // I-008.4: el error específico ahora es PDF_GENERATION_FAILED (cierra
   // HALLAZGO #3 con I-008.3). Antes era INTERNAL_ERROR genérico.
-  assert.equal(rCommit.body.error.code, 'PDF_GENERATION_FAILED');
+  assertJsonError(rCommit, 'PDF_GENERATION_FAILED');
   assert.equal(constCallCount, 1, 'pdfGen.generateConstanciaPdf debe haberse llamado 1 vez');
 
   // BD: estado sigue DOCUMENT_VIEWED

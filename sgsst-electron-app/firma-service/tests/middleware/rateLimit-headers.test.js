@@ -31,6 +31,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const request = require('supertest');
+const { assertJsonError } = require('../helpers');
 const { errorHandler } = require('../../src/middleware/errors');
 const {
   globalLimiter,
@@ -108,7 +109,7 @@ function assertIetfHeaders(res, expectedLimit, expectedWindowSec) {
   const rateLimit = res.headers['ratelimit'];
 
   assert.equal(res.status, 429, 'status debe ser 429');
-  assert.equal(res.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(res, 'RATE_LIMIT_EXCEEDED');
 
   // RateLimit-Policy: <limit>;w=<windowSec>
   assert.ok(policy, 'header RateLimit-Policy debe estar presente');
@@ -123,7 +124,7 @@ function assertIetfHeaders(res, expectedLimit, expectedWindowSec) {
     `RateLimit debe ser "${expectedRateLimit}", recibido "${rateLimit}"`);
 
   // Sanity: el body sigue siendo el contrato estándar de error
-  assert.equal(res.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assertJsonError(res, 'RATE_LIMIT_EXCEEDED');
   assert.equal(res.body.error.details.limiter, res.body.error.details.limiter,
     'limiter en details debe estar presente');
 }

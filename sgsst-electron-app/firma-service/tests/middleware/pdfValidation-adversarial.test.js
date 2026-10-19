@@ -28,7 +28,6 @@
  *   - BD real (test.sqlite via tests/setup.js --require).
  *   - Helpers: buildSimplePdf (PDFDocument.create + addPage), runMiddleware
  *     (ejecuta el middleware directo contra req/res sinteticos).
- *   - captureStdStreams: monkey-patchea process.stdout/stderr.
  */
 'use strict';
 
@@ -82,25 +81,6 @@ async function buildPdfWithMetadata({ title, author, subject, keywords } = {}) {
   if (subject !== undefined) pdf.setSubject(subject);
   if (keywords !== undefined) pdf.setKeywords(keywords);
   return Buffer.from(await pdf.save());
-}
-
-/**
- * Captura stdout+stderr durante una fn async.
- */
-async function captureStdStreamsAsync(fn) {
-  let out = '';
-  let err = '';
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  process.stdout.write = (chunk) => { out += chunk; return true; };
-  process.stderr.write = (chunk) => { err += chunk; return true; };
-  try {
-    await fn();
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { out, err, combined: out + err };
 }
 
 /**

@@ -141,17 +141,17 @@ test('P1-5: PII_PATTERNS tiene regex para cédula, email y celular', () => {
 });
 
 test('P1-5: logger.info() emite JSON sin PII (id_trabajador)', () => {
-  // Capturar stdout.
-  let captured = '';
-  const originalWrite = process.stdout.write.bind(process.stdout);
-  process.stdout.write = (chunk) => { captured += chunk; return true; };
+  // Capturar la linea por el sink del logger. NO se parchea process.stdout:
+  // parcheado roba la salida del runner de pruebas (ver src/utils/logger.js).
+  const capturadas = [];
+  logger._setSink((linea) => { capturadas.push(linea); });
   try {
     logger.info('Test', { id_solicitud: 'SIGN-001', id_trabajador: '79123456' });
   } finally {
-    process.stdout.write = originalWrite;
+    logger._resetSink();
   }
   // Parsear la línea JSON.
-  const line = captured.trim();
+  const line = capturadas.join('\n').trim();
   const entry = JSON.parse(line);
   assert.equal(entry.id_solicitud, 'SIGN-001');
   assert.equal(entry.id_trabajador, '[REDACTED]');
@@ -159,18 +159,17 @@ test('P1-5: logger.info() emite JSON sin PII (id_trabajador)', () => {
 });
 
 test('P1-5: logger.warn() NO emite campos motivo en claro', () => {
-  let captured = '';
-  const originalWrite = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (chunk) => { captured += chunk; return true; };
+  const capturadas = [];
+  logger._setSink((linea) => { capturadas.push(linea); });
   try {
     logger.warn('Documento rechazado', {
       id_solicitud: 'SIGN-001',
       motivo: 'No firmo porque mi CC es 79123456 y ya no trabajo',
     });
   } finally {
-    process.stderr.write = originalWrite;
+    logger._resetSink();
   }
-  const line = captured.trim();
+  const line = capturadas.join('\n').trim();
   const entry = JSON.parse(line);
   assert.equal(entry.motivo, '[REDACTED]');
   // Aunque el campo fue redactado, la cédula embebida no debería estar.
@@ -179,17 +178,16 @@ test('P1-5: logger.warn() NO emite campos motivo en claro', () => {
 });
 
 test('P1-5: logger redacta PII en error.message (SMTP, etc.)', () => {
-  let captured = '';
-  const originalWrite = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (chunk) => { captured += chunk; return true; };
+  const capturadas = [];
+  logger._setSink((linea) => { capturadas.push(linea); });
   try {
     logger.error('Fallo SMTP', {
       error: 'Recipient juan@example.com rejected: mailbox full for CC 79123456',
     });
   } finally {
-    process.stderr.write = originalWrite;
+    logger._resetSink();
   }
-  const line = captured.trim();
+  const line = capturadas.join('\n').trim();
   // Aunque "error" no está en SENSITIVE_KEYS, la regex debe capturar email y cédula.
   assert.ok(!line.includes('juan@example.com'),
     'no debe aparecer el email');

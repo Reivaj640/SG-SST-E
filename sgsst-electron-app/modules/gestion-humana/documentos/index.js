@@ -1180,7 +1180,9 @@ class DocumentosComponent {
         agreement_hash: agreement.texto_hash,
         document_hash: documentHash,
         version_kair: '0.1.190',
-        ttl_horas: 24,
+        // NO se envía `ttl_horas`: el servidor lo calcula por modalidad
+        // (remoto = 72 h) y lo IGNORA si viene, porque el numeral 3.4(c)
+        // del Acuerdo fija la vigencia del enlace.
         // I-103.A1.5.3.1 (Bug 2 fix) · consent_id REQUERIDO cuando el sign
         // request tiene agreement_version. El Bloque E6 valida que el
         // consent esté ACEPTADO en el mismo (id_trabajador, id_empresa,

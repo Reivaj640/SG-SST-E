@@ -22,9 +22,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { PDFDocument } = require('pdf-lib');
+const {
+  PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
-const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent } = require('../helpers');
+const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent,
+  assertJsonError,
+} = require('../helpers');
 const mailer = require('../../src/services/mailer');
 
 /**
@@ -71,7 +74,7 @@ test('GET /s/:token: token inexistente → 404', async () => {
   const app = makeApp();
   const res = await request(app).get('/s/token_inexistente_1234567890ab').set('Accept', 'application/json');
   assert.equal(res.status, 404);
-  assert.equal(res.body.error.code, 'TOKEN_NOT_FOUND');
+  assertJsonError(res, 'TOKEN_NOT_FOUND');
 });
 
 test('GET /s/:token: token expirado → 410 + estado EXPIRED', async () => {
@@ -88,7 +91,7 @@ test('GET /s/:token: token expirado → 410 + estado EXPIRED', async () => {
   const app = makeApp();
   const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_EXPIRED');
+  assertJsonError(res, 'TOKEN_EXPIRED');
 
   // El estado debe haberse actualizado a EXPIRED
   const row = db.prepare('SELECT estado FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
@@ -103,7 +106,7 @@ test('GET /s/:token: estado SIGNED → 410', async () => {
   const app = makeApp();
   const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
+  assertJsonError(res, 'TOKEN_ALREADY_USED');
 });
 
 test('GET /s/:token: primer acceso registra evento OPENED y setea estado=OPENED (E8.1)', async () => {
@@ -182,7 +185,7 @@ test('POST /api/sign/:token/identify: cédula incorrecta → 422', async () => {
     .send({ tipo_identificacion: 'CC', numero_documento: '9999999999' });
 
   assert.equal(res.status, 422);
-  assert.equal(res.body.error.code, 'IDENTIFICATION_FAILED');
+  assertJsonError(res, 'IDENTIFICATION_FAILED');
 });
 
 test('POST /api/sign/:token/identify: tipo de doc incorrecto → 422', async () => {
@@ -194,7 +197,7 @@ test('POST /api/sign/:token/identify: tipo de doc incorrecto → 422', async () 
     .send({ tipo_identificacion: 'CE', numero_documento: '1234567890' });
 
   assert.equal(res.status, 422);
-  assert.equal(res.body.error.code, 'IDENTIFICATION_FAILED');
+  assertJsonError(res, 'IDENTIFICATION_FAILED');
   assert.equal(res.body.error.details.expected, 'CC');
 });
 
@@ -215,7 +218,7 @@ test('POST /api/sign/:token/identify: body inválido → 400', async () => {
     .post(`/api/sign/${token}/identify`)
     .send({ tipo_identificacion: 'INVALID', numero_documento: '123' });
   assert.equal(res.status, 400);
-  assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
+  assertJsonError(res, 'INVALID_REQUEST_BODY');
 });
 
 test('POST /api/sign/:token/identify: registra eventos IDENTIFICATION_COMPLETED y OTP_SENT', async () => {
@@ -273,7 +276,7 @@ test('POST /api/sign/:token/verify-otp: OTP incorrecto → 422 + attempts', asyn
     .send({ otp: '000000' });
 
   assert.equal(r.status, 422);
-  assert.equal(r.body.error.code, 'OTP_INVALID');
+  assertJsonError(r, 'OTP_INVALID');
   assert.equal(r.body.error.details.attempts, 1);
   assert.equal(r.body.error.details.max_attempts, 5);
 });
@@ -292,10 +295,10 @@ test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => 
       .send({ otp: '000000' });
     if (i < 4) {
       assert.equal(r.status, 422);
-      assert.equal(r.body.error.code, 'OTP_INVALID');
+      assertJsonError(r, 'OTP_INVALID');
     } else {
       assert.equal(r.status, 422);
-      assert.equal(r.body.error.code, 'OTP_LOCKED');
+      assertJsonError(r, 'OTP_LOCKED');
     }
   }
 
@@ -304,7 +307,7 @@ test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => 
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: '000000' });
   assert.equal(r6.status, 422);
-  assert.equal(r6.body.error.code, 'OTP_LOCKED');
+  assertJsonError(r6, 'OTP_LOCKED');
 });
 
 test('POST /api/sign/:token/verify-otp: formato inválido → 400', async () => {
@@ -319,7 +322,7 @@ test('POST /api/sign/:token/verify-otp: formato inválido → 400', async () => 
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: 'abc' });
   assert.equal(r.status, 400);
-  assert.equal(r.body.error.code, 'INVALID_REQUEST_BODY');
+  assertJsonError(r, 'INVALID_REQUEST_BODY');
 });
 
 test('POST /api/sign/:token/verify-otp: token inválido → 404', async () => {
@@ -340,7 +343,7 @@ test('POST /api/sign/:token/verify-otp: sin identify previo → 409', async () =
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: '123456' });
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(r, 'INVALID_STATE_TRANSITION');
 });
 
 // =========================================================================
@@ -395,7 +398,7 @@ test('POST /view-document: sin OTP verificado → 409', async () => {
     .post(`/api/sign/${token}/view-document`)
     .send({ scroll_al_final: true });
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(r, 'INVALID_STATE_TRANSITION');
 });
 
 test('POST /view-document: registra evento DOCUMENT_VIEWED', async () => {
@@ -447,7 +450,7 @@ test('GET /document.pdf: sin OTP verificado → 409', async () => {
   const app = makeApp();
   const r = await request(app).get(`/api/sign/${token}/document.pdf`);
   assert.equal(r.status, 409);
-  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(r, 'INVALID_STATE_TRANSITION');
 });
 
 // =========================================================================
@@ -536,7 +539,7 @@ test('POST /commit: sin manifestacion_aceptada → 400', async () => {
     .send({ manifestacion_aceptada: false });
   // Zod rechaza con 400 (literal value: expected true)
   assert.equal(r2.status, 400);
-  assert.equal(r2.body.error.code, 'INVALID_REQUEST_BODY');
+  assertJsonError(r2, 'INVALID_REQUEST_BODY');
 });
 
 test('POST /commit: sin view-document → 409', async () => {
@@ -561,7 +564,7 @@ test('POST /commit: sin view-document → 409', async () => {
     .post(`/api/sign/${token}/commit`)
     .send({ manifestacion_aceptada: true });
   assert.equal(r2.status, 409);
-  assert.equal(r2.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(r2, 'INVALID_STATE_TRANSITION');
 });
 
 test('POST /commit: registra eventos MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF_GENERATED, COPY_SENT', async () => {
@@ -727,7 +730,7 @@ test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONG
     .post(`/api/sign/${token}/view-document`)
     .send({ scroll_al_final: true });
   assert.equal(r2.status, 409);
-  assert.equal(r2.body.error.code, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
+  assertJsonError(r2, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
   assert.equal(r2.body.error.details.sign_request_version, 'v1.0');
   assert.equal(r2.body.error.details.active_version, 'v2.0');
 });
@@ -757,7 +760,7 @@ test('POST /commit: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTI
     .post(`/api/sign/${token}/commit`)
     .send({ manifestacion_aceptada: true });
   assert.equal(r2.status, 409);
-  assert.equal(r2.body.error.code, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
+  assertJsonError(r2, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
   assert.equal(r2.body.error.details.sign_request_version, 'v1.0');
   assert.equal(r2.body.error.details.active_version, 'v2.0');
 });
@@ -851,7 +854,7 @@ test('POST /reject: después de firmado → 409', async () => {
     .post(`/api/sign/${token}/reject`)
     .send({ motivo: 'cambio de opinión' });
   assert.equal(r2.status, 409);
-  assert.equal(r2.body.error.code, 'INVALID_STATE_TRANSITION');
+  assertJsonError(r2, 'INVALID_STATE_TRANSITION');
 });
 
 // =========================================================================
