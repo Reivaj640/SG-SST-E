@@ -4,6 +4,69 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 Cerrar el Capítulo I: lo que la norma NO exigía (📦905)
+
+### La pregunta que dio origen a todo
+
+El dueño preguntó si era obligatorio poner el domicilio de Gesstiar S.A.S. dentro del Acuerdo.
+La respuesta intuitiva es que sí, porque un acuerdo de voluntades identifica a las partes. La
+correcta resultó ser la contraria, y solo se encontró verificando.
+
+El artículo que supuestamente regularía el contenido del acuerdo es el **2.2.2.47.2** del Decreto
+1074 de 2015. Al buscarlo resultó ser **"NEUTRALIDAD TECNOLÓGICA E IGUALDAD DE TRATAMIENTO DE LAS
+TECNOLOGÍAS"**, no una lista de requisitos de contenido. Los artículos 2.2.2.47.1 a 47.8 regulan
+definiciones, neutralidad, requisitos de la firma, criterios de confiabilidad, elementos, atributos,
+presunción y grado de seguridad. **Ninguno dice qué debe contener el acuerdo.**
+
+Y aunque lo exigiera, poner el domicilio en el texto sería un error de diseño, no un cumplimiento:
+el Acuerdo tiene huella y no se modifica una vez publicado. **Cada cambio de dirección obligaría a
+publicar una versión nueva y a romper las firmas en curso con 409.** Congelar un dato que cambia en
+la dirección de una calle dentro de un documento inmutable es un problema esperando.
+
+La respuesta fue un numeral nuevo, el **1.5**, simétrico al 1.2: el 1.4 nombra al operador (dato fijo),
+el 1.5 dice dónde están sus datos volátiles y **explica por qué no están en el texto**. Sin esa
+explicación el numeral parece un hueco.
+
+### Lo que destapó la auditoría del Capítulo II
+
+Las tres citas del capítulo 2 están **correctas**, verificadas una por una en fuente oficial:
+2.2.2.47.1 numeral 1, 2.2.2.47.7, el parágrafo del 2.2.1.1.9 y el 2.2.1.1.13 (este último lo
+agregó el **Decreto 526 de 2021**, así que la referencia está al día).
+
+El problema no es una cita mala. Es que el numeral 2.2 dice que el Acuerdo "se rige por el artículo
+2.2.1.1.13" **sin enumerar los tres requisitos que ese artículo impone**:
+
+1. La vigencia de la firma corresponde a la del contrato.
+2. No tiene ningún costo para el trabajador.
+3. Al finalizar la relación laboral el contrato firmado no pierde validez ni fuerza probatoria.
+
+Los tres se cumplen hoy. Y esa es exactamente la parte incómoda: **se cumplen por inercia**. No hay
+código que borre los PDF firmados porque nunca se escribió, no porque alguien decidió conservarlos.
+Las únicas llamadas a `deletePdf()` están en el manejo de errores, limpiando PDF huérfanos cuando
+una transacción falla.
+
+Si mañana alguien agrega una "política de retención" y borra los contratos firmados al pasar cierto
+tiempo, rompe el numeral 3 sin que nadie se entere. Lo que hoy se cumple por casualidad es una
+obligación que nadie declaró. Por eso el capítulo II queda **auditado pero con redacción pendiente**:
+falta desarrollar los tres requisitos y declarar la conservación del documento firmado.
+
+El parágrafo del 2.2.1.1.13 apunta al **2.2.2.47.4**, que es el mismo de los dos criterios de
+confiabilidad que el Capítulo III declara cumplir. El Capítulo II importa esa deuda sin verla venir.
+
+### La corrección de proceso que vale más que los cambios
+
+El Historial cerraba la jornada anterior con tres pendientes, y uno era **"publicar la v1.1 del
+Acuerdo"**. El dueño lo corrigió: *no se puede publicar un texto que todavía se está revisando*.
+Publicar no es una tarea atrasada, es la **consecuencia** de terminar la auditoría. Anotarlo como
+deuda convertía una consecuencia natural en una culpa permanente, y hacía que el trabajo se
+midiera contra un entregable arbitrario en vez de contra el criterio de fondo.
+
+La lección para el Historial: una lista de pendientes que mezcla **acciones ejecutables** con
+**consecuencias automáticas** se vuelve un semillero de culpa falsa. Las acciones van con responsable;
+las consecuencias no.
+
+---
+
 ## 🐗 El bloque de la empresa que solicita la firma, y tres cosas que solo se ven probando (📦904)
 
 ### 1. El hallazgo que justificaba todo el trabajo

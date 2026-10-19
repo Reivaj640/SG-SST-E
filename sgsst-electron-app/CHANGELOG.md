@@ -58,6 +58,41 @@ y la sección de operación diaria.
 analizados en el documento de migración), envío de correo real confirmado con `messageId` de
 Gmail, y `kair-firma` + `cloudflared` arrancando solos tras un reinicio del kernel.
 
+### 📦905 · El Capítulo I del Acuerdo queda cerrado en revisión
+
+**Qué cambió.** Auditoría del Acuerdo de uso capítulo por capítulo, contrastando cada numeral
+contra el código y contra la norma en fuente oficial. El **Capítulo I queda cerrado**; el
+**Capítulo II queda auditado** con las tres citas verificadas.
+
+1. **Nuevo numeral 1.5 — Identificación del Operador.** Simétrico al 1.2. El 1.4 nombra a
+   Gesstiar S.A.S. (razón social, dato que no cambia); el 1.5 dice dónde están su domicilio y sus
+   canales, y explica por qué **no** están en el texto: porque son susceptibles de cambiar y el
+   Acuerdo, una vez publicado, no se modifica. Verificado que el Decreto 1074 **no prescribe el
+   contenido** del acuerdo — el 2.2.2.47.2 es "neutralidad tecnológica", no una lista de
+   requisitos de contenido—, así que la dirección tampoco era obligatoria.
+
+2. **Domicilio de Gesstiar S.A.S. diligenciado** (Calle 114 # 43B - 83, Barranquilla) en los seis
+   documentos legales. En el Anexo de Encargo se tocó **solo la ficha del Encargado**: la del
+   responsable la llena cada empresa cliente.
+
+3. **Capítulo II auditado.** Los tres numerales (2.1, 2.2, 2.3) tienen sus citas correctas:
+   2.2.2.47.1 numeral 1, 2.2.2.47.7, el parágrafo del 2.2.1.1.9 y el 2.2.1.1.13 (este último
+   agregado por el Decreto 526 de 2021). Hallazgo: el 2.2 importa tres requisitos del
+   2.2.1.1.13 que el Acuerdo nunca enuncia (costo cero para el trabajador, vigencia de la firma
+   igual a la del contrato, y no perder fuerza probatoria al terminar la relación). Los tres se
+   cumplen hoy, pero **por inercia**: no hay código que borre los PDF firmados, no porque alguien
+   decidió conservarlos. Su parágrafo apunta al 2.2.2.47.4, que es el mismo de los criterios de
+   confiabilidad que el Capítulo III dice que cumplimos.
+
+4. **Corrección de proceso: publicar la v1.1 dejó de registrarse como deuda.** No es una tarea
+   atrasada, es la consecuencia de terminar la auditoría. Mientras siga la revisión por capítulos,
+   la v1.1 no se publica.
+
+**Pendiente del Capítulo I:** ninguno en texto ni en código. Falta el NIT de Gesstiar S.A.S.,
+que solo corresponde a la ficha del Anexo de Encargo y no al Acuerdo.
+
+---
+
 ### 📦904 · El trabajador ahora sabe en qué empresa está firmando
 
 **Qué cambió.** Antes de firmar, el flujo mostraba el documento, el Acuerdo y tres casillas, pero
