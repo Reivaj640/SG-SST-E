@@ -4,6 +4,302 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 El endpoint que se colgaba y nadie lo había probado (📦918, 2026-10-20)
+
+### El router que no estaba montado
+
+`POST /internal/admin/empresas` (y sus hermanos) existían en el código, con su
+autenticación y su validación, y **no estaban en `makeApp()`**: el router de
+empresas no se montaba en la app de pruebas. Lo que pasaba es que el handler
+llamaba a `adminApiAuth` **sin invocarlo** (le faltaba el `()`), así que la
+petición se iba por `next()` sin autenticación y el endpoint respondía… nada:
+se quedaba colgado.
+
+Nadie lo notó en meses de operación. Y no era un bug de una línea: era **un
+router sin montar más un middleware sin llamar**, que se refuerzan. El test
+que lo habría encontrado no existía porque el router no estaba en la app de
+pruebas.
+
+### La regla
+
+**Un middleware que se usa sin invocar no es un middleware: es una línea
+muerta que finge proteger.** Y **un router que no está montado en la app de
+pruebas no se ejercita nunca**: no hay ningún rojo que lo delate, porque no
+hay ningún rojo.
+
+Las dos mitades se arreglan juntas: montar el router en `makeApp()` (y en
+`server.js`, que es donde vive de verdad) **y** fixear el `adminApiAuth()`. Con
+solo una de las dos, el otro defecto sigue ahí, invisible.
+
+### Y el aviso general
+
+El mismo día, el `GET /internal/admin/empresas` que sí estaba montado devolvió
+un `500` con un error de sintaxis SQL: la consulta tenía `SELECT` **después**
+del `WHERE`. Un `SELECT` que va después del `WHERE` no es un error de sintaxis
+visible en el editor: es una frase que se lee bien y no compila. Lo que lo
+delató fue un test que, por suerte, sí existía.
+
+## 🐗 La tabla que nadie limpiaba, y el test que dependía del orden (📦919, 2026-10-20)
+
+### El `resetDb()` que no conocía las tablas nuevas
+
+La 9A agregó dos tablas: `gh_firma_medios_trabajador` y
+`gh_firma_firmas_papel`. `resetDb()` limpia una lista **escrita a mano** de
+tablas, así que las dos nuevas quedaron fuera.
+
+El síntoma no fue un fallo: fue un **resultado falso**. El test pedía la firma
+en papel de una solicitud nueva, la ruta veía que ya existía una fila para ese
+`firma_id` y **devolvía la fila vieja** —la de un test anterior, con otra
+solicitud y otro `id_solicitud`— y el test pasaba mirando el resultado
+equivocado. La fila vieja tenía `estado: 'SOLICITADO'`, así que la aserción
+"pedí el papel" era cierta… para otra solicitud.
+
+Lo destapó el `UNIQUE (firma_id)` de la tabla de papel: la segunda llamada a
+`papel.solicitar()` en la misma corrida devolvió la fila que ya existía, y el
+`id_solicitud` de esa fila no era el de la prueba.
+
+### La regla
+
+**Cuando agregás una tabla, la limpieza entre tests es parte de la tabla.** La
+lista de `resetDb()` es un contrato implícito: si la tabla no está en la
+lista, el test que la usa hereda el estado del test anterior.
+
+Y el detalle que cuesta: **el `UNIQUE` convierte el aislamiento en un
+resultado incorrecto, no en un error**. Sin el `UNIQUE`, dos filas y el test
+pasaba igual de contento mirando la primera. Con el `UNIQUE`, la fila vieja se
+presenta como si fuera la nueva.
+
+El mismo día pasó con el `D-02`: los `medios` que la Empresa declara se
+registraban en la tabla de medios, que tampoco estaba en la lista de limpieza.
+
+## 🐗 La regla nueva que se comió la prioridad del reenvío (📦921, 2026-10-20)
+
+### El `resolveCorreoOtp` que decide por todos
+
+El D-02 cambió **de dónde** se resuelve el correo del OTP: antes salía de
+`resolveCorreo(signRequest)`, que prioriza la columna `correo_verificacion`;
+después, `resolveCorreoOtp` le suma la regla del medio declarado.
+
+El reenvío del OTP (`/api/sign/:token/resend-otp`) tenía su **propia**
+resolución, con otra prioridad: primero el `correo_verificacion` del
+**consentimiento**, y solo si no había, el de la fila. Ese orden estaba
+documentado y había un test que lo fijaba.
+
+El `resolveCorreoOtp` se aplicó encima y **lo sobrescribió**: el reenvío pasó
+a usar el correo de la columna, y el test que fijaba la prioridad del
+consentimiento se puso rojo.
+
+### La regla
+
+**Cuando cambiás de dónde se resuelve un dato, el que lo usaba con otra
+prioridad ahora resuelve otra cosa** — y no falla con un error, falla con un
+correo distinto. El síntoma es un test rojo de un flujo que nadie tocó, en una
+ruta que "no debería verse afectada".
+
+El arreglo fue el inverso del que se suele hacer: en vez de que el `resolve`
+nuevo le ganara al viejo, el viejo **le pasa su resultado** al nuevo
+(`resolveCorreoOtp(signRequest, null, correoBase)`). La regla del D-2 cambia
+**el destino**, no **la prioridad de resolución**: son dos cosas distintas, y
+mezclarlas hace que un cambio de destino se lleve por delante una regla que
+nada tenía que ver.
+
+## 🐗 El número que nadie cifraba, y el campo que se perdía en silencio (📦917, 2026-10-20)
+
+### El 10.5(a) se cumplía para el trabajador y no para el representante
+
+El numeral 10.5(a) dice que el número del documento de identidad "se conserva
+únicamente [como] esa huella, no el número en texto claro". Para el **trabajador**
+eso era cierto: el número se convertía en seudónimo y no se archivaba. Para el
+**representante legal**, no: su número de documento se guardaba **en texto
+claro** dentro de `representante_legal_snapshot`, y además la constancia
+consolidada lo imprimía completo.
+
+La primera reacción fue hashearlo, igual que al trabajador. Es la reacción
+equivocada, y el owner la corrigió: el número del representante es **prueba de
+la representación**. Puede necesitarse en una constancia o en un certificado de
+existencia y representación legal, y una huella no se puede presentar como
+prueba. **Se cifra, no se hashea**: AES-256-GCM, con la clave derivada por HKDF
+del anillo de llaves, con el ámbito de la Empresa, y con la **versión de llave
+dentro del sobre** para que rotar el anillo no vuelva ilegibles los números ya
+cifrados.
+
+### La ley de hierro que se rompió al cifrar: el hash se calculaba sobre el sobre
+
+Cifrar el snapshot rompió la firma dual en un punto que no se vio venir. La
+firma de la Empresa (el hijo) **se dispara al final del commit del
+trabajador**, y para entonces el snapshot del padre ya está cifrado. La huella
+de identificación del representante se calculaba con `sha256(numero)`, y el
+seudónimo de su consentimiento con el mismo número. Con el snapshot cifrado,
+ambos se habrían calculado **sobre el sobre**, no sobre el número: el
+representante no habría podido identificarse en la mini-app, y la fila de su
+consentimiento habría guardado la huella de un valor que no es el número de
+nadie.
+
+La regla que sale de ahí: **cuando se cifra algo que antes se hasheaba, hay que
+buscar todos los que leían ese valor, no solo el que lo archivaba.** Los dos
+lectores estaban a cuatro archivos de distancia del que escribía, y ninguno de
+los dos tenía un test que fallara: la firma dual solo se probaba de punta a
+punta, y el test no miraba la huella.
+
+### El campo que la app mandaba desde hace meses y que nunca llegó a la base
+
+`correo_empresa` es el canal de copia del **8.4**: sin él, la constancia sale
+sin el correo de la Empresa. La app lo mandaba desde hace meses y **zod lo
+eliminaba en silencio**: el esquema no lo declaraba, y un esquema sin `.strict()`
+descarta lo desconocido sin decir nada. El dato se perdía en cada firma, y
+nadie se enteró porque el contrato de la API lo daba por optional.
+
+Encontrarlo fue efecto secundario de otra cosa: la **lista blanca** de
+`metadata`. Con lista blanca, una clave que no está en la lista se **rechaza
+con 400 nombrándola**. Ahí se vio que `correo_empresa` llevaba meses viajando
+en el aire y cayendo al piso.
+
+La trampa de la trampa: al declararla, el esquema la rechazaba, porque la app
+manda `correo_empresa: ''` **siempre**, incluso cuando no hay correo. Con el
+`.strict()` encima, **cada firma del site B caía en 400**. Una cadena vacía es
+una ausencia de dato, no un dato inválido.
+
+### Lo que el sistema no debe hacer para "ser más listo"
+
+Para saber si un documento trae datos de salud, lo natural sería leerlo. Es
+justo lo que no se puede hacer: **escanear el PDF es tratar el dato sensible
+antes del consentimiento**. La inferencia es por **tipo de documento**, la
+Empresa puede **subir** la clasificación pero nunca bajarla, y el aviso queda
+**fijado al crear** (texto, hash y versión): si el aviso se compusiera en cada
+visita, un cambio de redacción cambiaría lo que el Titular "aceptó" sin que
+nadie lo notara.
+
+### Lo que NO se tocó, y por qué eso también es una decisión
+
+El bloque «Empresa que solicita tu firma» del **1.2** muestra la identificación
+del representante legal **completa**, y esa no se tocó. Porque ese dato no viene
+del snapshot de la firma: viene del **registro mercantil** que la Empresa cargó
+en `gh_firma_empresas`. Lo que se cifra es el snapshot, que es lo que el cliente
+declaró al pedir la firma. El texto legal aprobado manda, y cambiarlo es un
+asunto del abogado, no del código.
+
+Y una regla de proceso que sale de todo esto: **un dato que se deja de guardar
+no es un dato que se dejó de exponer.** Las filas anteriores a la 8B siguen
+guardando el número en claro. El script que las re-cifra existe y está probado,
+pero **no se ejecuta**: es una migración de datos y depende de la Compuerta 0.
+
+## 🐗 El token que el Acuerdo decía que no existía (📦916, 2026-10-19)
+
+### La promesa del 3.6(e) y la copia que la desmentía
+
+El numeral 3.6(e) del Acuerdo de uso dice que el token de acceso "se conserva
+únicamente en forma de huella digital". El código cumplía la mitad: guardaba el
+HMAC-SHA-256 con clave secreta (correcto) y además guardaba el token **cifrado**
+con AES-256-GCM en `metadata._server_metadata.token_encrypted`, con un endpoint
+interno que lo devolvía **en texto claro**.
+
+Cifrado no es lo mismo que "no recuperable": con la llave, el token se
+recuperaba. La promesa del Acuerdo era sobre la *forma* en que el dato existe,
+no sobre si alguien con la base podía reconstruirlo. Y quien tenía la base y
+la llave tenía un enlace de firma válido.
+
+### Por qué la salida no fue "una excepción"
+
+Había dos caminos y uno estaba descartado desde el principio: **declarar una
+excepción en el texto** ("el token se conserva cifrado para poder recuperarlo").
+Un Acuerdo es un documento con huella digital que no se modifica una vez
+publicado: cambiarlo obliga a publicar una versión nueva y a romper las firmas
+en curso. Un parche de texto que además dice "acá no cumplimos lo que dijimos
+dos párrafos antes" no era un parche: era una admitidencia.
+
+La salida fue un **mecanismo**: la rotación. Cuando la Empresa necesita el
+enlace otra vez —el caso real es "perdió la respuesta de creación"— se emite
+un token **nuevo**, se guarda su huella y se devuelve **una sola vez**. Los
+anteriores siguen valiendo hasta su vencimiento, con un tope de tres vivos por
+solicitud.
+
+La regla que salió de ahí, y que aplica más allá del firmador: **cuando un
+documento promete una propiedad del dato, el arreglo es un mecanismo que
+cumple la promesa, no una salvedad que la explica.**
+
+### Los tres consumidores que nadie había mirado
+
+`getTokenForRecovery()` tenía tres llamadores, y **dos no necesitaban el
+token**:
+
+| Consumidor | Para qué usaba el token |
+|---|---|
+| `GET /internal/sign-requests/:id/link` | devolverlo (el caso legítimo) |
+| `POST /internal/sign-requests/:id/resend-otp` | **encontrar** la solicitud, que ya tenía por id |
+| Invitación al representante (firma dual) | **encontrar** la solicitud que acababa de crear |
+
+Los dos últimos solo lo usaban como atajo para llegar a un registro que ya
+tenían en la mano. Se rompió el primero (ahora responde 410 con
+`rotacion_requerida`) y los otros dos se corrigieron por la vía que les
+correspondía: el `resend-otp` trabaja sobre la solicitud, y la invitación al
+representante usa el token que **está en memoria** en ese instante.
+
+**La lección:** al cambiar una credencial, hay que auditar a todos los que la
+leen, no solo al que la expone. Y hay que preguntarle a cada uno *qué necesita
+de verdad*: si necesita el registro, pásale el registro.
+
+### El tope de tres vivos, y por qué el sistema no revoca solo
+
+La primera versión del tope revocaba por su cuenta el token más viejo para
+poder emitir el cuarto. Es lo rápido, y es lo equivocado: **un enlace que
+alguien ya tiene en el teléfono no se le rompe a escondidas**, y el que revoca
+tiene que ser quien sabe que ese enlace se perdió.
+
+Quedó así: al llegar al tope, `409 TOKEN_LIMIT_REACHED` con las emisiones
+vivas, y `revocar_anteriores: true` para revocar y emitir en la misma
+operación. Revocar es una decisión, y las decisiones tienen autor.
+
+---
+
+## 🐗 La tabla que no se podía limpiar, y la suite que dependía del orden (📦915, 2026-10-19)
+
+### El síntoma
+
+La 5B (la supresión de los datos vencidos) añadió la tabla `gh_firma_purgadas`
+con triggers append-only: `UPDATE` y `DELETE` abortan, porque si la supresión
+borrara su propio rastro no habría forma de demostrar qué se suprimió.
+
+El efecto colateral: `resetDb()` —que borra las tablas entre tests para que
+cada uno arranque de cero— **no podía borrar la lápida**. Los tests veían
+lápidas de corridas anteriores y contaban de más.
+
+### El arreglo que NO era el arreglo
+
+El primer impulso era un `try/catch` alrededor del `DELETE` (el mismo patrón
+que ya usaban las tablas de la 020). Eso **esconde** el problema: el `DELETE`
+seguía fallando y la tabla seguía sin limpiarse, solo que sin quejarse.
+
+El arreglo real tenía dos partes, y las dos ya existían en el repo:
+
+1. **El trigger va en su propia migración** con `-- @skip-when-env test` —el
+   patrón de la 020, que existe exactamente por esto. En producción se
+   aplica; en el ambiente de test no, y por eso la limpieza sí funciona.
+2. **La garantía se prueba contra el archivo real**, en una base de datos
+   aislada, con un test de mutación que demuestra que **sin** el trigger la
+   lápida sí se podría alterar y borrar.
+
+### Lo que se estaba escondiendo debajo
+
+Al arreglar el `DELETE` apareció el problema de verdad: las tablas de la
+ventana de purga (migración 020) **no existen en el ambiente de test**, porque
+esa migración tampoco se aplica ahí. Los servicios de conservación y supresión
+las usan, así que los tests que los tocaban **dependían de que otro archivo de
+test las hubiera creado primero**, en su `before`.
+
+Eso significa que **reordenar los archivos de test rompía la suite**, sin que
+nadie hubiera tocado el código de producción. Un bug de la suite que se
+presentaba como un bug del servicio.
+
+La garantía se movió al `resetDb()` compartido (`asegurarTablasPurga()` en
+`tests/helpers.js`): ahora es idempotente, es barata (si la tabla existe no
+hace nada) y **no depende del orden**.
+
+**La lección:** cuando un ambiente salta una migración, las tablas que ella
+crea **no se crean solas**. Si un test depende de ellas, la dependencia tiene
+que estar en el helper compartido, no en el `before` de quien lo toque primero.
+
+---
+
 ## 🐗 Cerrar el Capítulo I: lo que la norma NO exigía (📦905)
 
 ### La pregunta que dio origen a todo

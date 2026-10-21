@@ -11,6 +11,8 @@ storage/pdfs/constancias/*
 !storage/pdfs/originales/.gitkeep
 !storage/pdfs/firmados/.gitkeep
 !storage/pdfs/constancias/.gitkeep
+# Entorno local desechable de la prueba manual (I-107 / 8B-C)
+storage/manual-8bc/
 
 # Logs
 logs/

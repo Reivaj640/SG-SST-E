@@ -20,6 +20,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const assert = require('node:assert/strict');
 const request = require('supertest');
@@ -31,6 +32,8 @@ const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
+const adminEmpresasRouter = require('../src/routes/admin-empresas');
+const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
 const internalAuditRouter = require('../src/routes/internal-audit');
 const constanciaRouter = require('../src/routes/constancia');
 const verificacionRouter = require('../src/routes/verificacion');
@@ -60,6 +63,67 @@ const TEST_EMPRESA_B = '900999999';
 config.auth.internalApiKey = TEST_API_KEY;
 config.auth.adminApiKey = TEST_ADMIN_API_KEY;
 
+// El ARCHIVO REAL de la migración 020 (la ventana de purga y sus triggers).
+// La migración lleva `@skip-when-env test`, así que en el ambiente de test no
+// se aplica: las tablas de la purga se crean acá, a mano, y SIN los triggers
+// (los tests limpian esas tablas entre casos). Es el mismo mecanismo de la 025
+// para la lápida: la garantía se salta SOLO en el ambiente que la necesita y
+// se prueba aparte, contra el archivo real.
+const SQL_020 = fs.readFileSync(
+  path.join(__dirname, '..', 'src', 'db', 'schema', '020_eventos_append_only.sql'),
+  'utf8'
+);
+
+/**
+ * Garantiza que existan las tablas de la ventana de purga (migración 020) y la
+ * de los holds (023), sin los triggers append-only.
+ *
+ * POR QUÉ ESTÁ ACÁ Y NO EN CADA ARCHIVO DE TEST
+ * ---------------------------------------------
+ * Los servicios de conservación y de supresión (la 5B) usan
+ * `gh_firma_purga_control` y `gh_firma_purga_lote`, que vienen de la 020. En el
+ * ambiente de test esa migración no se aplica, así que sin esto un test que
+ * usa esos servicios depende de que OTRO archivo de test haya creado las
+ * tablas primero: un orden de archivos distinto rompe la suite sin que nadie
+ * toque el código de producción.
+ *
+ * Es idempotente y barato: si la tabla ya existe, no hace nada.
+ */
+function asegurarTablasPurga() {
+  const existe = db.prepare(
+    "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'gh_firma_purga_control'"
+  ).get().n;
+  if (existe === 0) {
+    db.exec(SQL_020);
+  }
+
+  // Los triggers se quitan SIEMPRE (no solo cuando la tabla se acaba de
+  // crear): no pueden estar en la BD compartida porque los tests limpian esas
+  // tablas entre casos. Y si el archivo 020 se aplicó una vez con ellos, aquí
+  // searanteiza que no queden.
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_eventos_no_update');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_eventos_no_delete');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_lote_solo_ventana');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_log_no_update');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_log_no_delete');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_registro_no_update');
+  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_registro_no_delete');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS gh_firma_holds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firma_id INTEGER NOT NULL,
+      actor TEXT NOT NULL,
+      motivo TEXT NOT NULL,
+      alcance TEXT,
+      declarado_at TEXT NOT NULL DEFAULT (datetime('now')),
+      liberado_at TEXT,
+      liberado_por TEXT,
+      motivo_liberacion TEXT,
+      activo INTEGER NOT NULL DEFAULT 1
+    )
+  `);
+}
+
 const TABLES = [
   // FASE 3 (A1.5.4-B): gh_consentimientos_eventos debe borrarse ANTES de
   // gh_consentimientos_firma porque tiene FK a ella. Si se borrara al revés,
@@ -84,6 +148,18 @@ const TABLES = [
   // resetDb() sea completo y los tests del middleware no necesiten
   // duplicar la limpieza. Modificación mínima y aislada a tests/helpers.js.
   'gh_idempotency_keys',
+  // D-03: el DIRECTORIO DE EMPRESAS también se limpia entre tests.
+  //
+  // Antes no estaba, y eso dejaba empresas de un archivo de tests en el
+  // siguiente. Con el D-03 (la creación de una firma se bloquea si la
+  // empresa registrada no tiene Anexo firmado ni plazo declarado), una
+  // empresa filtrada de un test a otro bloqueaba firmas en archivos que no
+  // tienen nada que ver: el fallo aparece en el test equivocado.
+  'gh_firma_empresas',
+  // El 10.7(b): las solicitudes de los Titulares y su historial. Los
+  // eventos van PRIMERO: tienen FK a la solicitud.
+  'gh_solicitudes_titular_eventos',
+  'gh_solicitudes_titular',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
@@ -95,6 +171,11 @@ const TABLES = [
 ];
 
 function resetDb() {
+  // Las tablas de la ventana de purga (020) y de holds (023) tienen que
+  // existir antes de limpiar: en el ambiente de test la 020 no se aplica.
+  // Ver asegurarTablasPurga() — sin esto, un test que usa la conservación o
+  // la supresión depende del orden en que corran los archivos de test.
+  asegurarTablasPurga();
   // Tablas de la ventana de purga (migración 020) y de holds (migración 023).
   // Se limpian PRIMERO, antes que las firmas, porque el lote tiene FK a
   // gh_firmas_electronicas: borrarla con el lote lleno viola la FK. La
@@ -103,11 +184,23 @@ function resetDb() {
   for (const t of ['gh_firma_purga_lote', 'gh_firma_purga_log', 'gh_firma_purga_registro', 'gh_firma_holds']) {
     try { db.prepare(`DELETE FROM ${t}`).run(); } catch (e) { /* la tabla no existe */ }
   }
+  // 8A.2: la lápida de la supresión (migración 024). Se limpia entre tests
+  // para que cada uno vea solo la lápida que él acaba de escribir. El DELETE
+  // no choca con el trigger append-only porque ese trigger vive en la
+  // migración 025, que lleva `@skip-when-env test` (misma razón que la 020).
+  try { db.prepare('DELETE FROM gh_firma_purgadas').run(); } catch (e) { /* la tabla no existe */ }
   try {
     db.prepare(
       "UPDATE gh_firma_purga_control SET ventana_activa = 0, cerrada_at = datetime('now') WHERE id = 1"
     ).run();
   } catch (e) { /* la tabla no existe */ }
+  // 9A (migración 032): los medios autorizados y las firmas en papel.
+  // Se limpian por la misma razón que las demás: si no, un test ve los
+  // medios o el papel del test anterior (y el UNIQUE por firma_id hace
+  // que la peticion se resuelva con la fila vieja).
+  for (const t of ['gh_firma_medios_trabajador', 'gh_firma_firmas_papel']) {
+    try { db.prepare(`DELETE FROM ${t}`).run(); } catch (e) { /* la tabla no existe */ }
+  }
   for (const t of TABLES) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
@@ -123,7 +216,10 @@ function resetDb() {
         'gh_firma_eventos',
         'gh_firma_sesiones',
         'gh_firma_acuerdo_versiones',
-        'gh_consentimientos_eventos'
+        'gh_consentimientos_eventos',
+        'gh_firma_purgadas',
+        'gh_firma_medios_trabajador',
+        'gh_firma_firmas_papel'
       )
     `).run();
   } catch (e) { /* sqlite_sequence no existe en algunas BDs */ }
@@ -134,7 +230,7 @@ function resetDb() {
     require('../src/services/internalClient').clearCache();
   } catch (e) { /* ignore si internalClient no está cargado todavía */ }
   // Borrar PDFs del storage
-  for (const dir of [storage.PATHS.originales, storage.PATHS.firmados, storage.PATHS.constancias]) {
+  for (const dir of [storage.PATHS.originales, storage.PATHS.firmados, storage.PATHS.constancias, storage.PATHS.papel]) {
     try {
       const fs = require('fs');
       for (const f of fs.readdirSync(dir)) {
@@ -177,9 +273,17 @@ function makeApp() {
   // Oráculo de verificación de identidad (Fase 3).
   app.use('/internal', verificacionRouter);
   // Endpoints administrativos: deben estar en makeApp para tests.
-  // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).
+  // Hay 3 routers: el viejo (acuerdo-versiones), el de per-company clientes
+  // y el de identificación de empresas (migración 017).
+  //
+  // El de empresas estaba FUERA: como nadie lo montaba, sus endpoints
+  // nunca se ejercitaron y un error de wiring (el middleware de admin
+  // usado SIN invocar) pasó inadvertido. Montarlo aquí es lo que hace
+  // posible que los tests lo cubran.
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
+  app.use('/internal/admin', adminEmpresasRouter);
+  app.use('/internal/admin', adminSolicitudesRouter);
   app.use(errorHandler());
   return app;
 }
@@ -247,6 +351,68 @@ async function createAcceptedConsent({
   return { consent_id: consentId, id_trabajador, id_empresa, version_acuerdo };
 }
 
+/**
+ * Devuelve un consentimiento ACEPTADO para (empresa, trabajador), creándolo
+ * si hace falta.
+ *
+ * A diferencia de `createAcceptedConsent`, tolera que el consentimiento YA
+ * exista y esté aceptado. El endpoint /internal/consentimientos es
+ * idempotente por (empresa, trabajador): la segunda vez devuelve 200 con
+ * `already_accepted: true` en lugar de 201. Un test que crea varias
+ * solicitudes para el mismo trabajador (aislamiento por empresa, batches,
+ * reinicios) necesita ese camino.
+ *
+ * @returns {{consent_id: number}}
+ */
+async function obtenerConsentimientoAceptado({
+  id_trabajador = '1234567890',
+  id_empresa = '900123456',
+  version_acuerdo = 'v1.0',
+} = {}) {
+  const request = require('supertest');
+  const app = makeApp();
+  const apiKey = TEST_API_KEY;
+
+  const r1 = await request(app)
+    .post('/internal/consentimientos')
+    .set('X-Internal-API-Key', apiKey)
+    .send({
+      id_trabajador,
+      id_empresa,
+      version_acuerdo,
+      correo_verificacion: 'trabajador@example.com',
+      kair_version: '0.1.189-test',
+    });
+
+  if (r1.status !== 201 && r1.status !== 200) {
+    throw new Error(
+      `obtenerConsentimientoAceptado: no se pudo crear consentimiento ` +
+      `(status=${r1.status}, body=${JSON.stringify(r1.body)})`
+    );
+  }
+
+  const consentId = r1.body.consent_id;
+
+  // Si ya venía aceptado (idempotencia), no hay OTP que verificar.
+  if (r1.body.manifestacion_aceptada === true || r1.body.already_accepted === true) {
+    return { consent_id: consentId, id_trabajador, id_empresa, version_acuerdo };
+  }
+
+  const r2 = await request(app)
+    .post(`/internal/consentimientos/${consentId}/verify-otp`)
+    .set('X-Internal-API-Key', apiKey)
+    .send({ otp: r1.body.devOtp, kair_version: '0.1.189-test' });
+
+  if (r2.status !== 200 || r2.body.manifestacion_aceptada !== true) {
+    throw new Error(
+      `obtenerConsentimientoAceptado: no se pudo aceptar OTP ` +
+      `(status=${r2.status}, body=${JSON.stringify(r2.body)})`
+    );
+  }
+
+  return { consent_id: consentId, id_trabajador, id_empresa, version_acuerdo };
+}
+
 const { sha256 } = require('../src/crypto/hash');
 
 /**
@@ -257,6 +423,16 @@ const { sha256 } = require('../src/crypto/hash');
  * la validación 5-pasos de agreement_version obligatorio (Bloque A) pase.
  * Si el test quiere usar una versión o hash diferente, puede sobreescribirlo
  * con `agreement_version` o `agreement_hash` en overrides.
+ *
+ * FASE 6 · orden (g)/(h): si el test NO pasa `consent_id`, el helper crea y
+ * ACEPTA un consentimiento para esa misma (empresa, trabajador). Refleja lo
+ * que pasa en producción, donde la solicitud siempre está vinculada a un
+ * consentimiento, y es lo que hace falta para que el Firmante pueda ver el
+ * documento: el 3.4(g) va antes del (h), así que sin Acuerdo aceptado el
+ * documento no se sirve.
+ *
+ * Un test que quiera una solicitud SIN consentimiento lo pide explícito:
+ * `consent_id: null`.
  */
 async function createSignRequestWithIdentificacion({
   id_documento = 'doc-001',
@@ -275,6 +451,23 @@ async function createSignRequestWithIdentificacion({
   // El helper de tests/testAgreementFixture v1.0 usa texto fijo, así que el
   // texto_hash es estable entre llamadas que parten de BD limpia (resetDb).
   const acuerdo = agreementService.getActive() || seedActiveAgreement();
+
+  // FASE 6: consentimiento aceptado por defecto (ver la nota del encabezado).
+  let consent_id = overrides.consent_id;
+  if (consent_id === undefined) {
+    const consent = await obtenerConsentimientoAceptado({
+      id_trabajador,
+      id_empresa,
+      version_acuerdo: overrides.agreement_version || acuerdo.version,
+    });
+    consent_id = consent.consent_id;
+    // El OTP del consentimiento NO es lo que el test está mirando. Se limpia
+    // la bandeja de dev para que los conteos de correos sigan siendo los del
+    // flujo que se está probando (y no los del consentimiento de fábrica).
+    // Se limpia ANTES de crear la solicitud, para no borrar el correo de
+    // invitación que la propia solicitud pueda enviar.
+    mailer.clearDevInbox();
+  }
 
   const signRequestService = require('../src/services/signRequest');
   const { PDFDocument } = require('pdf-lib');
@@ -296,6 +489,9 @@ async function createSignRequestWithIdentificacion({
     tipo_identificacion,
     metadata,
     ...overrides,
+    // Va DESPUÉS del spread: si el test pasó `consent_id` explícito (incluso
+    // null), ese manda; si no, es el que se acaba de crear y aceptar.
+    consent_id,
   });
 }
 
@@ -554,8 +750,10 @@ async function capturarLogs(fn) {
 
 module.exports = {
   resetDb,
+  asegurarTablasPurga,
   seedActiveAgreement,
   makeApp,
+  obtenerConsentimientoAceptado,
   withApiKey,
   withAdminApiKey,
   withClientAApiKey,

@@ -39,6 +39,7 @@ const empresaService = require('../services/empresa');  // num. 1.2: snapshot ar
 const signRequestService = require('../services/signRequest');
 const { candidatosBusquedaConAmbitos } = require('../services/trabajador');
 const identificacion = require('../services/identificacion');
+const representanteService = require('../services/representante');  // 8B: número cifrado
 const pdfGenConsolidado = require('../services/pdfGenConsolidado');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -198,7 +199,13 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
               nombre: snap.nombre || null,
               cargo: snap.cargo || 'Representante Legal',
               tipo_identificacion: snap.tipo_identificacion || 'CC',
-              numero_identificacion: snap.numero_identificacion || null,
+              // 8B · El número del representante NO sale en claro (H23). En la
+              // base está cifrado (es prueba de la representación, así que no
+              // se hashea: se cifra con la llave del servicio, que vive fuera
+              // de la base) y acá se muestran solo los últimos 4, igual que
+              // se hace con el firmante.
+              numero_identificacion: null,
+              identificacion_enmascarada: representanteService.numeroEnmascarado(snap, sr.id_empresa),
               correo: snap.correo || null,
             };
           }
@@ -267,7 +274,11 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
           // cada firma: si la empresa cambió sus datos entre una firma y otra,
           // cada documento muestra lo que ese firmante vio en su momento.
           empresa_identificacion: consentResumen
-            ? empresaService.parseSnapshot(consentResumen.empresa_snapshot)
+            ? empresaService.parseSnapshotParaMostrar(
+              consentResumen.empresa_snapshot,
+              sr.id_empresa,
+              { hashEsperado: consentResumen.empresa_hash }
+            )
             : null,
           empresa_hash: consentResumen ? consentResumen.empresa_hash : null,
           tipo_firmante: sr.tipo_firmante || 'TRABAJADOR',

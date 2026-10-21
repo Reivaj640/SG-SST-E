@@ -15,6 +15,13 @@
 >   fila, cédula en texto claro, registro de auditoría sin protección) **quedó implementada**
 >   con las migraciones 019 y 020. Pendiente: la cláusula de custodia del Anexo de Encargo y
 >   la aclaración del 3.8, que necesitan abogado.
+> - **Capítulos IV y V: auditados el 2026-10-19** (📦913). El **Capítulo V** (deberes del
+>   Firmante) se contrastó contra el 2.2.2.47.6 en fuente oficial: **el texto no se toca**
+>   (dos propuestas van al abogado) y los **dos hallazgos de código quedaron implementados**
+>   (el 5.1(c) no tenía a quién avisar en K+AIR; el 5.3 no decía qué documento se firmaba).
+>   El **Capítulo IV**, que estaba dado por cerrado sin registro, se verificó numeral por
+>   numeral: el 4.3 y el 4.5 son fieles, el 4.1 y el 4.4 no resisten el cotejo y el 4.2 es
+>   una paráfrasis admisible. Detalle en los dos documentos de auditoría de la carpeta.
 >
 > Lo que sigue en este documento describe el plan original. Las prioridades 1 a 5 ya no
 > aplican tal como están escritas: se hicieron. Quedan **Prioridad 6 (igualar el fixture de
@@ -264,6 +271,7 @@ dígitos → purga → 5.4 y orden (g)/(h).
 | — | Los 47 fallos de la línea base (dos causas raíz) | `📦909` |
 | 4 | El firmante no podía confirmar de un vistazo que el documento era el suyo | `📦910` |
 | 5 | El 8.6 y el 10.6 obligaban a suprimir el dato vencido, y no había vía | `📦911` |
+| 6 | El 3.4(g)/(h) no se respetaba y el 5.4 no tenía por dónde | `📦912` |
 
 ### 5.1 Fase 5 — la ventana de purga (migraciones 020 y 023)
 
@@ -350,3 +358,108 @@ borran eventos entre casos y abortarían). **Sí se prueba en CI**, contra el
 (`tests/conservacion-purga.test.js`), ejercitando las cinco condiciones. En
 **staging** la migración se aplica de verdad y el trigger queda activo sobre la
 base real.
+
+### 5.2 Fase 6 — el orden (g)/(h) y el 5.4 (`📦912`)
+
+**El orden que estaba mal.** El 3.4 del Acuerdo de uso pacta la secuencia:
+(g) el Trabajador lee en pantalla el Acuerdo y lo acepta — "El Trabajador no
+puede avanzar en el flujo sin leer y aceptar el Acuerdo" — y (h) después
+visualiza y descarga el documento objeto de la firma. En el código, el
+documento se servía desde `OTP_VERIFIED`: el Firmante veía el PDF y la casilla
+del Acuerdo en la misma pantalla, y podía marcar las otras dos casillas y
+firmar sin haber aceptado nada. Quedaba registrada una aceptación sin que
+hubiera información.
+
+Ahora el **backend** exige el Acuerdo aceptado antes de servir el documento y
+antes de registrar su visualización (`publicFlow.exigirAcuerdoAceptado`), con
+las mismas condiciones de empresa y versión que ya exigía el commit. La regla
+no depende de la UI. El camino de error es **uno solo**
+(`CONSENT_NOT_ACCEPTED`) para todos los casos en que falta la aceptación: el
+Firmante solo necesita saber que tiene que leer y aceptar, y la respuesta no
+expone el id ni el estado del consentimiento. Del lado de la mini-app, el
+visor no carga hasta que la aceptación vuelve del servidor, y el contexto
+expone `acuerdo_aceptado` para que una recarga no vuelva a pedir lo ya
+aceptado.
+
+**El 5.4 que no tenía por dónde.** "El Firmante puede imprimir o descargar
+copia de este Acuerdo y del documento firmado desde el propio enlace de
+firma, sin costo alguno." El enlace entregaba el PDF **original** y, después
+de firmar, no entregaba nada. Ahora hay dos endpoints nuevos: el documento
+**firmado** (`signed-document.pdf`) y la copia del **Acuerdo** (`acuerdo.txt`,
+con su `SHA-256` en la cabecera, para que el Firmante pueda comprobar que es
+la que aceptó).
+
+La excepción está acotada y es deliberada: el enlace es de un solo uso
+(3.4(c)) y estas descargas **no reabren el flujo** — identificar, pedir OTP,
+aceptar el Acuerdo y firmar siguen cerrados en estado firmado. Lo único que
+hacen es bajar lo que ya está firmado, y solo mientras el enlace siga
+vigente. **El token solo no sirve el PDF firmado antes de la identidad**: en
+cualquier estado previo a la firma la respuesta es `409`.
+
+**Lo que la Fase 6 NO resuelve** (queda para la 5B y para el abogado): el
+comportamiento post-purga del enlace y del oráculo ("no disponible por
+vencimiento del plazo", no "inválido"), y la v1.1 del Capítulo X del
+representante y del bloque de manifestación.
+
+### 5.3 Fase 7 — el Capítulo V auditado, y de paso el Capítulo IV (`📦913`)
+
+**Qué se auditó.** El Capítulo V del Acuerdo de uso (los deberes del Firmante),
+numeral por numeral contra el artículo 2.2.2.47.6 del Decreto 1074 de 2015 y contra
+el código. El texto del Capítulo V se apoya en ese artículo, así que la auditoría
+del Capítulo V arrastró la verificación del **Capítulo IV**, que estaba dado por
+cerrado en el plan pero **no tenía registro** en el repositorio.
+
+**Los dos hallazgos de código del Capítulo V (corregidos).**
+
+El **5.1(c)** obliga al Firmante a "avisar de inmediato a la Empresa y a K+AIR"
+cuando su OTP o su enlace de firma puedan estar comprometidos. La mini-app solo
+mostraba los canales de la **Empresa** (`canal_pqrs`, `canal_incidentes`). De K+AIR
+no había ninguno en toda la pantalla: el deber no era cumplible. Ahora el canal de
+K+AIR (Gesstiar S.A.S.) está en un pie **fuera de las pantallas**, para que exista
+también en la de error, con el valor por defecto en el HTML (`adminkair@gmail.com`,
+el mismo que publica el Anexo de Encargo §9) y configurable por
+`FIRMA_CANAL_INCIDENCIAS`; un test exige que los dos no diverjan.
+
+El **5.3** obliga a "firmar únicamente documentos cuyo contenido sea exacto,
+completo y corresponda a lo que la Empresa le ha informado". El backend ya mandaba
+`tipo_identificacion` e `id_documento` en el contexto, pero **la mini-app nunca los
+pintaba** (el comentario del backend decía lo contrario y era falso). Ahora la
+pantalla del documento dice qué se está firmando: "Estás firmando un contrato.
+Referencia: ...".
+
+**Los dos hallazgos de texto (para el abogado; el fixture no se tocó).**
+
+El preámbulo del 5.1 afirma que a), b) y c) son los deberes del 47.6, y no lo son:
+el literal a) no está en el artículo, el deber 2 del artículo (actuar con
+diligencia) no tiene literal propio, y el deber 3 quedó reducido a "a la Empresa y
+a K+AIR", perdiendo "cualquier persona que posea, haya recibido o vaya a recibir" el
+documento firmado y los criterios de "en entredicho". Y el 5.1(a) obliga al Firmante
+a cumplir unas políticas de seguridad que nunca ve. Las dos redacciones propuestas
+están en `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md`.
+
+**El Capítulo IV, que no estaba auditado.** De sus cinco citas, **el 4.3 y el 4.5 son
+fieles**; el 4.2 es una paráfrasis admisible ("cualquier acuerdo aplicable" contra
+"este Acuerdo"); el 4.1 cita un artículo que el 47.5 no nombra, y el 4.4 parafrasea
+el 244 de la Ley 1564 sin su condición ("mientras no hayan sido tachados de falso o
+desconocidos"). El detalle, con el texto oficial de cada artículo, está en
+`auditoria-capitulo-iv-citas-normativas-2026-10-19.md`.
+
+**El hallazgo que trasciende los dos capítulos.** El Acuerdo **no cita el
+2.2.2.47.4 (CONFIABILIDAD)** en ningún punto, y ese artículo es el que contiene los
+dos requisitos materiales de la firma electrónica: que los datos de creación
+correspondan **exclusivamente** al firmante y que se pueda **detectar cualquier
+alteración no autorizada** del mensaje de datos después de la firma. Es el artículo al
+que apuntan el 2.2.1.1.11 y el parágrafo del 2.2.1.1.13 (obligación del **empleador**,
+no del Firmante). Y el mismo parágrafo del 2.2.1.1.13 es el que rompe el argumento
+si la Empresa tiene el OTP: por eso el `correo_verificacion` tiene que ser una
+dirección personal del trabajador.
+
+**Decisión de política que queda para el owner**: si la API debe **rechazar** un
+`correo_verificacion` cuyo dominio coincida con el de la Empresa, o si la regla queda
+solo documentada como onboarding. El rechazo es más seguro pero puede frenar
+clientes legítimos que usan correo corporativo único por trabajador; no hacerlo
+deja el riesgo en manos del proceso de alta.
+
+**Cómo se validó.** Cuatro pruebas nuevas
+(`tests/capitulo-v-deberes-firmante.test.js`) y la suite completa: **1185 tests ·
+1183 verdes · 0 fallos · 2 omitidos**.

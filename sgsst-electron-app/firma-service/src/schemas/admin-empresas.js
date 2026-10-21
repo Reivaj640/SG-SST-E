@@ -94,6 +94,16 @@ const createEmpresaBody = z.object({
     .positive()
     .max(36500)
     .nullish(),
+  // El deber legal de conservación SIN TÉRMINO (migración 029). Lo declara
+  // la EMPRESA, a nivel de empresa y no de documento: es una cualidad de la
+  // relación laboral, y el sistema no puede clasificar un PDF con acierto
+  // (el mismo argumento del 10.8). Con el flag en 1, las firmas de esa
+  // empresa no son elegibles para supresión automática (se levanta un hold
+  // legal automático) y el Trabajador recibe el aviso.
+  conservacion_por_deber_legal: z.boolean().nullish(),
+  // La norma que impone el deber (p. ej. "2.2.1.1.12 del Decreto 1072 de
+  // 2015"). Se comunica al Trabajador y se archiva con la solicitud.
+  norma_conservacion: textoOpcional(300),
 });
 
 /**
@@ -120,6 +130,11 @@ const updateEmpresaBody = z.object({
     .positive()
     .max(36500)
     .nullish(),
+  // El deber legal de conservación sin término (migración 029). Ver la nota
+  // del body de alta. OJO: si el campo NO viene, NO se toca (levantarlo es
+  // un acto, con actor y motivo); para levantarlo hay que mandar `false`.
+  conservacion_por_deber_legal: z.boolean().nullish(),
+  norma_conservacion: textoOpcional(300),
 });
 
 const setActivoBody = z.object({

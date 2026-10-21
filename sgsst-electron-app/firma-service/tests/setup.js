@@ -71,9 +71,27 @@ if (!process.env.SMTP_FROM_EMAIL) {
 //
 // En producción la variable es obligatoria y NO se puede rotar sin invalidar
 // los tokens cifrados y los seudónimos calculados.
-if (!process.env.TOKEN_ENCRYPTION_KEY) {
-  process.env.TOKEN_ENCRYPTION_KEY = '4a1f0c9d8e7b6a5f4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0';
-}
+//
+// Se fija SIEMPRE, sin importar qué haya en el entorno: con un
+// `if (!process.env...)` la suite dependía de la llave del shell o del `.env`
+// del desarrollador. Con una llave distinta, los seudónimos ya calculados
+// dejan de coincidir y las búsquedas por id_trabajador — que es la llave de
+// unión del sistema — fallarían de forma confusa.
+process.env.TOKEN_ENCRYPTION_KEY = '4a1f0c9d8e7b6a5f4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b';
+
+// 2f. El ANILLO DE LLAVES se desactiva en los tests.
+//
+// Con anillo configurado, la llave que manda es la del anillo y no la
+// maestra: el test "cambiar la llave maestra cambia todos los HMAC" falla
+// porque el HMAC no cambia. Y el `.env` local del desarrollador (que sí
+// define FIRMA_HMAC_KEYRING) se filtraba a la suite por el `dotenv` de
+// config.js. Estos tests tienen que depender del código, no de la máquina.
+//
+// Cadena vacía: dotenv NO sobrescribe variables ya presentes (aunque estén
+// vacías) y `keys.js` trata una cadena vacía como "sin anillo" (usa la
+// llave maestra como única versión).
+process.env.FIRMA_HMAC_KEYRING = '';
+process.env.FIRMA_HMAC_KEY_VERSION = '';
 
 // 3. BARRERA POST-ASIGNACION: verificar que DB_PATH realmente resuelve
 //    a la BD de tests y NUNCA a la de produccion.

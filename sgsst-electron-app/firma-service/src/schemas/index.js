@@ -132,21 +132,82 @@ const signRequestBody = z.object({
   // Opcional en v1: si K+AIR no lo envía, queda NULL (compatibilidad con
   // sign requests legacy pre-migration 007).
   tipo_identificacion: z.enum(TIPOS_IDENTIFICACION).optional(),
+  // 8B · El correo de la Empresa a donde se pide la copia del documento
+  // firmado (el canal de copia del 8.4/8.5).
+  //
+  // La app de escritorio YA lo mandaba (sites `documentos` y
+  // `firma-electronica`), pero el esquema no lo declaraba: zod lo eliminaba
+  // en silencio y nunca llegaba a la base. La constancia lo lee del metadata
+  // persistido (routes/constancia.js), así que el canal de copia salía
+  // vacío. Ese silencio ya costó datos una vez; por eso el esquema es
+  // `.strict()` (abajo) y lo desconocido se rechaza en vez de perderse.
+  //
+  // Se acepta la CADENA VACÍA a propósito: la app inicializa este campo en
+  // '' y lo reasigna al correo del representante cuando hay firma dual
+  // (`firma-electronica/index.js`). Con `z.string().email()` a secas, cada
+  // firma de ese site caería en un 400. El campo vacío significa "no hay
+  // canal de copia declarado" y la constancia cae al snapshot del
+  // representante (routes/constancia.js).
+  correo_empresa: z.union([z.literal(''), z.string().email().max(254)]).optional(),
+  // 8B · LA DECLARACIÓN DE LA EMPRESA SOBRE EL DATO SENSIBLE (numeral 10.8).
+  //
+  // `datos_sensibles`: la Empresa declara que el documento contiene
+  // información de salud. El sistema ADEMÁS lo infiere del tipo de documento
+  // (services/sensibles.js): la Empresa puede subir la clasificación, no
+  // bajarla. La razón está en el comentario de aquel archivo: el sistema no
+  // puede leer el PDF, y no declarar algo sensible es la forma habitual de
+  // que un dato sensible se trate sin base legal.
+  //
+  // `categorias_datos_sensibles`: de qué datos se trata, concretamente. El
+  // 10.8(a) exige informar de "cuáles son los datos". Si la Empresa no las
+  // declara, se usan las que el tipo implica.
+  //
+  // `base_legal_sensible`: 'autorizacion_expresa' (la del 10.8(c), que es la
+  // del sistema) u 'otra'. Con 'otra', la descripción es obligatoria: el
+  // 10.8(c) exige que la Empresa informe de la base ANTES de recoger el
+  // dato, y no se puede informar de una base sin decir cuál es.
+  //
+  // `finalidad_sensible`: la finalidad del tratamiento. El sistema conoce la
+  // suya (levantar la firma) y esta la puede precisar la Empresa.
+  //
+  // El booleano acepta 1 y 0 porque la app manda números en algunos campos
+  // (mismo criterio que `requiere_firma_empresa`).
+  datos_sensibles: z.union([z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  categorias_datos_sensibles: z.array(z.string().min(1).max(120)).max(12).optional(),
+  base_legal_sensible: z.enum(['autorizacion_expresa', 'otra']).optional(),
+  base_legal_sensible_descripcion: z.string().min(1).max(500).optional(),
+  finalidad_sensible: z.string().min(1).max(300).optional(),
   // I-FIRMA-DUAL (migration 013, v0.1.180): opt-in para que el commit()
   // del worker dispare automáticamente un sign request hijo (tipo_firmante='EMPRESA')
   // para que firme el representante legal. Si requiere_firma_empresa=1, el route
   // exige representante_legal_snapshot (validación inline en signRequest.js).
   // .optional() por compat: sign requests legacy NO pasan estos campos.
   requiere_firma_empresa: z.union([z.literal(0), z.literal(1)]).optional(),
+  // El snapshot del representante guarda datos de una persona (nombre,
+  // identificación, correo). Lo que no está declarado no se guarda: una
+  // clave desconocida aquí sería un dato personal extra archivado sin que
+  // nadie lo pidiera.
   representante_legal_snapshot: z.object({
     nombre: z.string().min(1),
     tipo_identificacion: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
     numero_identificacion: z.string().min(4).max(20),
     correo: z.string().email(),
     cargo: z.string().optional(),
-  }).optional(),
+  }).strict().optional(),
   metadata: signRequestMetadata,
-});
+  // 8B · `.strict()`: una clave desconocida se RECHAZA (400 con el nombre de
+  // la clave), no se elimina en silencio.
+  //
+  // Antes el esquema hacía strip: el cliente podía mandar campos que nadie
+  // leía y nadie se enteraba. `correo_empresa` es la prueba de que ese
+  // silencio cuesta datos (se perdió durante meses y la constancia salía
+  // sin el canal de copia). Rechazar es más ruidoso que perder el dato, y el
+  // error dice exactamente qué clave sobró.
+  //
+  // La lista blanca de lo que se PERSISTE (el metadata libre) es otra cosa
+  // y vive en routes/signRequest.js: el string JSON de `metadata` se parsea
+  // y se filtra antes de archivarse.
+}).strict();
 
 /**
  * Schema de query params para GET /internal/sign-requests.
@@ -184,6 +245,45 @@ const signRequestNotifyBody = z.object({
       { message: 'context tiene más de 20 keys' },
     )
     .optional(),
+  // 8C · El token que el cliente ya tenía (opcional).
+  //
+  // Si viene, la invitación se envía con ESE enlace: no se emite un token
+  // nuevo y no se gasta un cupo de rotación. Si no viene, el servicio emite
+  // uno nuevo (rotación) y lo manda en el correo.
+  //
+  // El token se valida contra la solicitud: si el que llega no es de esta
+  // solicitud, la respuesta es 409 TOKEN_MISMATCH. No se acepta un token de
+  // otra parte para construir el enlace de esta.
+  token: z.string().max(256).optional(),
+});
+
+/**
+ * Schema del body de POST /internal/sign-requests/:id/link/rotate (8C).
+ *
+ * `motivo` es lo que queda escrito en el registro del token emitido: por qué
+ * se emitió. `revocar_anteriores` revoca los tokens vivos antes de emitir el
+ * nuevo (el que se usa cuando la Empresa quiere que el enlace anterior deje
+ * de funcionar).
+ */
+const signRequestRotateBody = z.object({
+  motivo: z.string().max(200).optional(),
+  revocar_anteriores: z.boolean().optional(),
+});
+
+/**
+ * Schema del body de POST /internal/sign-requests/:id/suministro-autoridad
+ * (la 9A, el 8.4).
+ *
+ * El asiento del suministro a una autoridad judicial o de inspección,
+ * vigilancia y control tiene que decir QUIÉN lo pidió, a QUIÉN se le
+ * entregó y con qué radicado. Sin esos tres datos, el asiento no prueba
+ * nada.
+ */
+const suministroAutoridadBody = z.object({
+  autoridad: z.string().min(3).max(200),
+  radicado: z.string().max(120).optional(),
+  destinatario: z.string().max(200).optional(),
+  pdf_sha256: z.string().max(64).optional(),
 });
 
 /**
@@ -227,6 +327,17 @@ const signRequestIdsQuery = z.object({
  */
 const resendOtpBody = z.object({});
 
+/**
+ * Schema del body de POST /api/sign/:token/consent/sensible (8B).
+ *
+ * `autoriza` es lo que el Titular marcó en la casilla SEPARADA del aviso de
+ * dato sensible (el 10.8(a)). Puede ser `false`: el Titular NO está
+ * obligado a autorizar su tratamiento, y esa decisión también se registra.
+ */
+const consentSensibleBody = z.object({
+  autoriza: z.boolean(),
+});
+
 module.exports = {
   createConsentBody,
   verifyOtpBody,
@@ -235,5 +346,8 @@ module.exports = {
   signRequestListQuery,
   signRequestIdsQuery,  // I-008: batch query
   signRequestNotifyBody,  // I-103.A1.5.1: notify-remote
+  signRequestRotateBody,  // 8C: link/rotate
+  suministroAutoridadBody,  // 9A: el 8.4 (suministro a autoridades)
+  consentSensibleBody,  // 8B: consentimiento expreso del dato sensible (10.8)
   resendOtpBody,
 };

@@ -150,7 +150,7 @@ Código Sustantivo del Trabajo
 **Pendiente de validación**: confirmar que el conjunto
 (identificación + autenticación + voluntad + integridad +
 trazabilidad) es suficiente para ser considerado "firma
-electróпica" según el art. 28.
+electrónica" según el art. 28.
 
 ### 3.2. Decreto 2364 de 2012
 
@@ -210,15 +210,36 @@ según la ley**.
 **Art. 2.2.1.1.11**: el empleador debe proporcionar los medios
 para la firma electrónica, **sin que el costo pueda trasladarse
 al trabajador**. Los medios pueden ser desarrollos propios o
-contratados.
+contratados. La imposibilidad de firmar electrónicamente un
+contrato individual de trabajo **no puede ser barrera de acceso al
+empleo**.
 
 **Art. 2.2.1.1.12**: conservación de documentos firmados
 electrónicamente con **autenticidad, integridad y
 disponibilidad**. El empleador debe **suministrar copia al
 trabajador** cuando este lo solicite.
 
-**Art. 2.2.1.1.13**: la firma electrónica no excluye el uso de
-firma autógrafa si las partes lo acuerdan.
+**Art. 2.2.1.1.13** ("REGLAS PARA EL USO DE LA FIRMA ELECTRÓNICA",
+adicionado por el Decreto 526/2021): para el uso de la firma
+electrónica se tienen en cuenta tres requisitos:
+1. La vigencia de la firma corresponde a la del contrato y sus
+   adiciones o modificaciones.
+2. **No tiene ningún costo para el trabajador**: el pago de
+   cualquier valor asociado corresponde exclusivamente al
+   empleador.
+3. Su uso entre trabajador y empleador es **exclusivo para la
+   relación laboral**, sin que, a la finalización de esta, el
+   contrato firmado electrónicamente **pierda su validez,
+   eficacia y fuerza probatoria**.
+
+Su **parágrafo** pone una obligación en cabeza del empleador: "El
+empleador garantizará que el mecanismo utilizado para la firma
+electrónica cumple con las condiciones establecidas en el **artículo
+2.2.2.47.4** del Decreto 1074 de 2015". El 2.2.2.47.4 es el
+artículo de la **confiabilidad**: los datos de creación de la firma
+corresponden exclusivamente al firmante y se puede detectar
+cualquier alteración no autorizada del mensaje de datos después de
+la firma.
 
 **Cómo K+AIR intenta satisfacer cada artículo**:
 
@@ -227,9 +248,9 @@ firma autógrafa si las partes lo acuerdan.
 | 2.2.1.1.8 | Contrato se puede firmar vía web (no requiere papel). |
 | 2.2.1.1.9 | Cumplimiento de requisitos del art. 23 CST (datos del contrato). |
 | 2.2.1.1.10 | OTP = "código" del art. 2.2.1.1.10. Identificación vía cédula. |
-| 2.2.1.1.11 | K+AIR es desarrollo propio del empleador. Costo es del empleador. |
+| 2.2.1.1.11 | K+AIR es desarrollo propio del empleador. Costo es del empleador. La firma autógrafa queda como alternativa (firma física habilitada en el flujo). |
 | 2.2.1.1.12 | PDFs + Constancias conservados. Copia al trabajador por correo. |
-| 2.2.1.1.13 | Si el trabajador no puede firmar electrónicamente, K+AIR permite firma física. |
+| 2.2.1.1.13 | El flujo no cobra nada al trabajador; la firma conserva validez, eficacia y fuerza probatoria tras el fin de la relación. El 47.4 se satisface con la custodia del OTP y con la huella del PDF firmado. |
 
 **Pendiente de validación**:
 
@@ -475,6 +496,39 @@ Esta obligación se cumple en concordancia con el artículo
 - [ ] Marco normativo del "consentimiento" en la mini-app: el
       checkbox "He leído y acepto" + OTP al correo es suficiente
       para acreditar voluntad bajo el art. 28 Ley 527/1999.
+
+### 4.5. Pendiente de la auditoría por capítulos (2026-10-19)
+
+La auditoría del Capítulo V (deberes del Firmante) y la verificación de
+sus citas contra la compilación oficial. Todo lo que sigue está en dos
+documentos de la carpeta, con el texto oficial de cada artículo y las
+redacciones alternativas propuestas:
+
+- `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` — Capítulo V, numeral
+  por numeral contra el art. 2.2.2.47.6 del Decreto 1074 de 2015.
+  **Dos hallazgos de texto**: el preámbulo del 5.1 dice que a), b) y c)
+  son los deberes del artículo y no lo son (falta el deber 2, el deber 3
+  quedó reducido a "a la Empresa y a K+AIR" y el literal a) no está en el
+  artículo), y el 5.1(a) obliga al Firmante a cumplir unas políticas de
+  seguridad que nunca ve.
+- `auditoria-capitulo-iv-citas-normativas-2026-10-19.md` — Capítulo IV
+  (efectos jurídicos), sus cinco citas una por una. El 4.3 y el 4.5 son
+  fieles; el 4.2 es una paráfrasis admisible; el 4.1 cita un artículo que
+  el 47.5 no nombra (el 43.3 vigente es "PRESUPUESTO ANUAL" de las
+  Cámaras de Comercio: la remisión del propio decreto está caduca) y el 4.4
+  parafrasea el art. 244 de la Ley 1564 sin su condición.
+
+**Además, un hallazgo de estructura**: el Acuerdo **no cita el 2.2.2.47.4
+(CONFIABILIDAD)** en ningún punto, y es el artículo que contiene los dos
+requisitos materiales de la firma electrónica, al que apuntan el
+2.2.1.1.11 y el parágrafo del 2.2.1.1.13.
+
+**Decisión de política pendiente del owner** (no es texto legal): si la API
+debe rechazar un `correo_verificacion` cuyo dominio sea el de la Empresa, o
+si la regla queda solo documentada como onboarding. El OTP se envía al
+buzón que registra la Empresa; si ese buzón es compartido, la Empresa
+tiene los datos de creación de la firma y el 5.1(b), el 5.2 y el 47.4 se
+quedan sin poder de aplicación real.
 
 ---
 

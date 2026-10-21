@@ -27,6 +27,7 @@ const {
 } = require('./trabajador');
 const mailer = require('./mailer');
 const empresaService = require('./empresa');
+const representanteService = require('./representante');  // 8B: el número del rep va cifrado
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -264,8 +265,10 @@ async function create({
   //    de la identificación de la empresa que se le MOSTRÓ al firmante, con su
   //    propia huella. Estos datos son editables en la tabla de empresas: sin
   //    la copia, el archivo apuntaría a la fila de hoy y no a lo que el
-  //    firmante vio. Si la empresa no está dada de alta, quedan NULL, que
-  //    significa honestamente "no se le mostró identificación de empresa".
+  //    firmante vio. El documento del representante va CIFRADO (8B-C) y la
+  //    huella sigue calculándose sobre el JSON en claro. Si la empresa no está
+  //    dada de alta, quedan NULL, que significa honestamente "no se le mostró
+  //    identificación de empresa".
   const empresaCols = empresaService.snapshotColumnsFor(id_empresa);
   const now = new Date().toISOString();
   // Seudónimo del trabajador (migración 019): la fila no guarda la cédula
@@ -393,11 +396,18 @@ function ensureRepConsent({
   // El representante es OTRO firmante (numeral 3.5: repite el flujo completo,
   // con su propia verificación de identidad y su propia aceptación). Su
   // documento se trata igual que el del trabajador: se guarda el seudónimo,
-  // no el número. El número en claro del representante sigue en el snapshot
-  // de la empresa (numeral 1.2), que es el bloque «Empresa que solicita tu
-  // firma» y es dato público del registro mercantil.
-  const rep_identificacion_pseudo = rep.numero_identificacion
-    ? pseudonimo(rep.numero_identificacion, id_empresa)
+  // no el número. La copia de la identificación de la empresa que se archiva
+  // en `empresa_snapshot` (numeral 1.2) también lleva ese número CIFRADO
+  // desde 8B-C; no es una copia en claro.
+  //
+  // 8B · El snapshot del representante lleva el número CIFRADO (H23), así que
+  // para calcular el seudónimo hay que abrirlo primero. `numeroEnClaro`
+  // descifra los snapshots nuevos y devuelve tal cual los heredados (que lo
+  // guardan en claro). Si el seudónimo se calculara sobre el sobre cifrado,
+  // la fila guardaría la huella de un valor que no es el número de nadie.
+  const rep_numero = representanteService.numeroEnClaro(rep, id_empresa);
+  const rep_identificacion_pseudo = rep_numero
+    ? pseudonimo(rep_numero, id_empresa)
     : null;
   const result = db.prepare(`
     INSERT INTO gh_consentimientos_firma
@@ -768,6 +778,16 @@ function accept(consentId, { signRequest } = {}) {
   // 9. UPDATE atómico con WHERE para protección TOCTOU.
   //    El WHERE garantiza que si otra request aceptó mientras tanto,
   //    el UPDATE no haga nada y detectemos el race.
+  //
+  //    8A.2 · `id_solicitud`: el 12.7 del Acuerdo deja en cabeza de la
+  //    Empresa la conservación de "la prueba de la aceptación de este
+  //    Acuerdo por el Trabajador, junto con la versión aceptada, la huella
+  //    digital de su texto, la fecha y hora Y EL IDENTIFICADOR DE LA
+  //    SOLICITUD". Ese identificador no estaba: sin él, la prueba de la
+  //    aceptación no era completa. Se guarda aquí, y sobrevive a la
+  //    supresión de la firma (esta tabla no tiene llave foránea contra ella),
+  //    que es justo lo que hace falta para que el 12.7 siga siendo
+  //    verificable después del vencimiento del plazo.
   const fecha_aceptacion = new Date().toISOString();
   let wasIdempotent = false;
   const tx = db.transaction(() => {
@@ -776,9 +796,10 @@ function accept(consentId, { signRequest } = {}) {
       SET manifestacion_aceptada = 1,
           fecha_aceptacion = ?,
           estado = ?,
+          id_solicitud = COALESCE(id_solicitud, ?),
           updated_at = datetime('now')
       WHERE id = ? AND manifestacion_aceptada = 0 AND estado = ?
-    `).run(fecha_aceptacion, ESTADO_ACCEPTED, consentId, ESTADO_PENDING);
+    `).run(fecha_aceptacion, ESTADO_ACCEPTED, signRequest.id_solicitud, consentId, ESTADO_PENDING);
 
     if (updateResult.changes === 0) {
       // Otro request aceptó mientras tanto (TOCTOU race)

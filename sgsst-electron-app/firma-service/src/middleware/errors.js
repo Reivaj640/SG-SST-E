@@ -93,14 +93,26 @@ function escapeHtml(value) {
  * ("La solicitud está en estado terminal 'SIGNED'") que aquí NO se usan.
  *
  * `canVerify` indica si tiene sentido ofrecer la verificación de autenticidad.
- * El endpoint /verify usa skipExpirationCheck, así que sigue respondiendo
+ * El endpoint /verify usa `permitirHistorico`, así que sigue respondiendo
  * para enlaces vencidos o ya usados. Para TOKEN_NOT_FOUND no hay nada que
- * verificar y ofrecerlo sería una promesa falsa.
+ * verificar y ofrecerlo sería una promesa falsa; para CONSERVACION_VENCIDA
+ * la verificación responde lo mismo, así que ofrecerla también sería falso.
+ *
+ * 8A.1: se añadieron tres estados que el sistema antes mezclaba.
+ *
+ *   TOKEN_NOT_FOUND        No se confirma la existencia: la misma respuesta
+ *                          para un token que nunca existió y para uno que ya
+ *                          no se puede mostrar.
+ *   TOKEN_EXPIRED          Venció la VENTANA PARA FIRMAR. El documento que
+ *                          se firmó antes sigue verificable.
+ *   CONSERVACION_VENCIDA   Venció el PLAZO DE CONSERVACIÓN (numeral 10.6):
+ *                          el dato se debe suprimir y el sistema no puede
+ *                          seguir afirmando que la firma está vigente.
  */
 const PUBLIC_ERROR_COPY = {
   TOKEN_NOT_FOUND: {
-    title: 'No encontramos este enlace',
-    body: 'El enlace que abriste no corresponde a ninguna solicitud de firma. Es posible que se haya copiado incompleto al reenviarlo o al abrirlo desde el correo.',
+    title: 'No disponible',
+    body: 'Este enlace no está disponible. No se puede confirmar si corresponde a alguna solicitud de firma: puede que se haya copiado incompleto al reenviarlo o al abrirlo desde el correo.',
     hint: 'Revisa el enlace completo que llegó a tu correo o pide uno nuevo al área de Recursos Humanos.',
     canVerify: false,
   },
@@ -115,6 +127,12 @@ const PUBLIC_ERROR_COPY = {
     body: 'La firma asociada a este enlace ya se completó. Cada enlace de firma sirve para una sola vez.',
     hint: 'Puedes abrir la verificación del documento para confirmar su autenticidad. Si no fuiste tú quien firmó, comunícate con el área de Recursos Humanos.',
     canVerify: true,
+  },
+  CONSERVACION_VENCIDA: {
+    title: 'No disponible por vencimiento del plazo',
+    body: 'Venció el plazo de conservación que la empresa fijó para este documento, así que la evidencia de la firma ya no está disponible. El plazo lo declara la empresa y K+AIR lo respeta.',
+    hint: 'Si necesitas una copia de lo que firmaste, pídela al área de Recursos Humanos de la empresa: es quien conserva la información.',
+    canVerify: false,
   },
 };
 

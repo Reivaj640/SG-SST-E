@@ -144,9 +144,16 @@ test('enlace vencido ofrece verificar con URL relativa ?verificar=1', async () =
 test('enlace inexistente no ofrece verificar', async () => {
   // Con TOKEN_NOT_FOUND el endpoint /verify también da 404: prometer una
   // verificación que va a fallar es peor que no ofrecerla.
+  //
+  // 8A.1: el título ya no es "No encontramos este enlace" sino "No
+  // disponible". La respuesta no debe confirmar si el enlace existió: la
+  // misma respuesta para un token que nunca existió y para uno que ya no se
+  // puede mostrar (por ejemplo, después de una supresión por plazo).
   const r = await get('/s/loquesea', BROWSER);
   assert.equal(r.status, 404);
-  assert.ok(r.text.includes('No encontramos este enlace'));
+  assert.ok(r.text.includes('No disponible'));
+  assert.ok(!r.text.includes('No encontramos este enlace'),
+    'no debe afirmar que el enlace no existe: eso confirmaría la existencia');
   assert.ok(!r.text.includes('verificar=1'),
     'no debe ofrecer verificación cuando no hay documento');
 });

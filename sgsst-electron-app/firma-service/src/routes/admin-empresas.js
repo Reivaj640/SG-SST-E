@@ -61,7 +61,7 @@ function _parseId(req) {
 // Devuelve todas las empresas con el detalle de qué les falta, para que el
 // operador no de de alta una con la identificación a medias sin notarlo.
 // ============================================================================
-router.get('/empresas', adminApiAuth, (req, res, next) => {
+router.get('/empresas', adminApiAuth(), (req, res, next) => {
   try {
     res.json({ items: empresaService.listConPendientes() });
   } catch (err) {
@@ -72,7 +72,7 @@ router.get('/empresas', adminApiAuth, (req, res, next) => {
 // ============================================================================
 // GET /internal/admin/empresas/:id
 // ============================================================================
-router.get('/empresas/:id_empresa', adminApiAuth, (req, res, next) => {
+router.get('/empresas/:id_empresa', adminApiAuth(), (req, res, next) => {
   try {
     const id = _parseId(req);
     const empresa = empresaService.getById(id);
@@ -95,7 +95,7 @@ router.get('/empresas/:id_empresa', adminApiAuth, (req, res, next) => {
 // ============================================================================
 // POST /internal/admin/empresas
 // ============================================================================
-router.post('/empresas', adminApiAuth, validateBody(createEmpresaBody), (req, res, next) => {
+router.post('/empresas', adminApiAuth(), validateBody(createEmpresaBody), (req, res, next) => {
   try {
     const creada = empresaService.create(req.body);
     res.status(201).json(creada);
@@ -107,7 +107,7 @@ router.post('/empresas', adminApiAuth, validateBody(createEmpresaBody), (req, re
 // ============================================================================
 // PUT /internal/admin/empresas/:id_empresa
 // ============================================================================
-router.put('/empresas/:id_empresa', adminApiAuth, validateBody(updateEmpresaBody), (req, res, next) => {
+router.put('/empresas/:id_empresa', adminApiAuth(), validateBody(updateEmpresaBody), (req, res, next) => {
   try {
     const id = _parseId(req);
     const actualizada = empresaService.update(id, req.body);
@@ -123,7 +123,7 @@ router.put('/empresas/:id_empresa', adminApiAuth, validateBody(updateEmpresaBody
 // Endpoint separado para que ese dato, que sustenta el cumplimiento legal,
 // no se modifique en una actualización de rutina.
 // ============================================================================
-router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth, validateBody(anexoBody), (req, res, next) => {
+router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth(), validateBody(anexoBody), (req, res, next) => {
   try {
     const id = _parseId(req);
     const empresa = empresaService.marcarAnexoFirmado(id, req.body.fecha);
@@ -138,7 +138,7 @@ router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth, validateBody(an
 // Alta/baja lógica. Una empresa inactiva NO muestra bloque en la mini-app,
 // pero sus consentimientos y firmas históricas se conservan intactos.
 // ============================================================================
-router.post('/empresas/:id_empresa/estado', adminApiAuth, validateBody(setActivoBody), (req, res, next) => {
+router.post('/empresas/:id_empresa/estado', adminApiAuth(), validateBody(setActivoBody), (req, res, next) => {
   try {
     const id = _parseId(req);
     const empresa = empresaService.setActivo(id, req.body.activo);

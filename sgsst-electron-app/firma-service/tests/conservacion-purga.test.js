@@ -34,7 +34,7 @@ const Database = require('better-sqlite3');
 
 const db = require('../src/db/connection');
 const conservacion = require('../src/services/conservacion');
-const { resetDb } = require('./helpers');
+const { resetDb, asegurarTablasPurga } = require('./helpers');
 
 const SERVICE = path.resolve(__dirname, '..');
 const SQL_020 = fs.readFileSync(
@@ -51,34 +51,14 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  * compartida no pueden estar, porque otros archivos de test borran eventos
  * entre casos.
  *
+ * La implementación vive en tests/helpers.js (asegurarTablasPurga): la
+ * comparten este archivo y el de la 8A.2, para que ninguno dependa del orden
+ * en que corran los archivos de test.
+ *
  * `gh_firma_holds` viene de la migración 023 (que sí se aplica en test, con
  * ALTER TABLE, que no se puede reejecutar). Se crea acá si falta, con el
  * mismo DDL, para que el test no dependa del orden en que se regeneró la BD.
  */
-function asegurarTablasPurga() {
-  db.exec(SQL_020);
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_eventos_no_update');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_eventos_no_delete');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_lote_solo_ventana');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_log_no_update');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_log_no_delete');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_registro_no_update');
-  db.exec('DROP TRIGGER IF EXISTS trg_firma_purga_registro_no_delete');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS gh_firma_holds (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      firma_id INTEGER NOT NULL,
-      actor TEXT NOT NULL,
-      motivo TEXT NOT NULL,
-      alcance TEXT,
-      declarado_at TEXT NOT NULL DEFAULT (datetime('now')),
-      liberado_at TEXT,
-      liberado_por TEXT,
-      motivo_liberacion TEXT,
-      activo INTEGER NOT NULL DEFAULT 1
-    )
-  `);
-}
 
 /**
  * Declara (o no) el plazo de la Empresa, en días.

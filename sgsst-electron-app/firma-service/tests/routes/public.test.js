@@ -121,7 +121,11 @@ test('GET /s/:token: primer acceso registra evento OPENED y setea estado=OPENED 
   `).all(signRequest.id);
   // El primer evento es CREATED (del signRequestService.create)
   // El segundo debe ser OPENED
-  assert.equal(eventos[eventos.length - 1].evento, 'OPENED');
+  //
+  // NOTA (9A): la mini-app NO menciona la vía en papel, así que aquí no se
+  // asienta el `PAPER_OPTION_AVAILABLE`: ese asiento queda cuando la Empresa
+  // manda el correo de invitación (ver tests/n9a-medios-y-papel.test.js).
+  assert.equal(eventos[1].evento, 'OPENED');
 
   // E8.1 (fix bug): antes del fix, fecha_apertura se seteaba pero
   // estado quedaba en 'PENDING' (el estado OPENED del CHECK era zombie).
@@ -708,7 +712,11 @@ test('POST /commit: manifestacion_voluntad_hash se persiste (D1 fix)', async () 
 // Bloque D2 — Re-validar Acuerdo en view y commit
 // =================================================================
 
-test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE', async () => {
+test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_REACCEPT_REQUIRED', async () => {
+  // 10.4 (el camino positivo del 9.5): el documento NO se sirve bajo un
+  // Acuerdo que ya no es el vigente, pero el error ya no es un callejón sin
+  // salida: dice que hay que leer y aceptar la versión vigente, y al
+  // aceptarla la solicitud migra sola (ver tests/fase10-4-version-vigente.test.js).
   resetDb();
   seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   const { token } = await createSignRequestWithIdentificacion();
@@ -730,9 +738,10 @@ test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONG
     .post(`/api/sign/${token}/view-document`)
     .send({ scroll_al_final: true });
   assert.equal(r2.status, 409);
-  assertJsonError(r2, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
+  assertJsonError(r2, 'AGREEMENT_VERSION_REACCEPT_REQUIRED');
   assert.equal(r2.body.error.details.sign_request_version, 'v1.0');
   assert.equal(r2.body.error.details.active_version, 'v2.0');
+  assert.equal(r2.body.error.details.accion, 'reaceptar_version_vigente');
 });
 
 test('POST /commit: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE', async () => {

@@ -86,6 +86,55 @@ const config = {
     tokenHoursPresencial: int('TOKEN_TTL_HOURS_PRESENCIAL', 24),
   },
 
+  // Canal de incidentes de seguridad de K+AIR (Gesstiar S.A.S.).
+  //
+  // El 5.1(c) del Acuerdo de uso obliga al Firmante a "avisar de inmediato a
+  // la Empresa y a K+AIR" cualquier situación que comprometa la seguridad de
+  // sus datos de creación de la firma (el OTP y el enlace de firma).
+  //
+  // La mini-app muestra los canales de la EMPRESA (canal_pqrs,
+  // canal_incidentes), que son datos del cliente. Sin este canal de K+AIR el
+  // deber del 5.1(c) no sería cumplible: el Firmante no tendría a quién
+  // avisarle. Por eso va en la configuración y no enterrado en el código.
+  //
+  // El valor por defecto es el mismo que publica el Anexo de Encargo de
+  // Tratamiento de Datos Personales (§9, datos de contacto del Encargado).
+  canalIncidentes: required('FIRMA_CANAL_INCIDENCIAS', 'adminkair@gmail.com'),
+
+  // Canal de PROTECCIÓN DE DATOS de K+AIR (el 10.7(b) del Acuerdo).
+  //
+  // Es DISTINTO del canal de incidentes (el 5.1(c)): uno es para avisar que
+  // se comprometieron los datos de creación de la firma; el otro es para
+  // ejercer los derechos del Titular. Un solo canal con dos nombres es un
+  // punto ciego con otro nombre.
+  //
+  // K+AIR es el Encargado: NO resuelve las solicitudes (eso es de la
+  // Empresa, que es la Responsable), pero las recibe, las registra, las
+  // trasmite y da constancia. Ver el 10.7(b) y el 2.2.2.25.4.4.
+  //
+  // ⚠️ Antes de publicar la v1.1, este buzón tiene que existir y estar
+  // monitoreado: es la dirección que el Titular va a usar.
+  canalProteccionDatos: required('FIRMA_CANAL_PROTECCION_DATOS', 'privacidad@k-air.com'),
+
+  // El plazo de trasmisión a la Empresa, en días HÁBILES. Lo define la
+  // política, no el código: si el abogado pone otro número, se cambia acá.
+  //
+  // El 2 días hábiles es por simetría con el art. 15.1 de la Ley 1581
+  // (traslado a quien corresponda: dos días hábiles).
+  plazoTramiteDias: int('FIRMA_PLAZO_TRAMITE_DIAS', 2),
+
+  // D-2: el OTP (dato de creación de la firma) tiene que ir a un medio
+  // PERSONAL del Trabajador, no a un buzón que la Empresa pueda leer.
+  //
+  // **APAGADO por defecto.** Se enciende cuando exista la 9A (la firma en
+  // papel): sin esa salida, exigir un medio personal sería una barrera de
+  // acceso al empleo (el 2.2.1.1.11). Mientras esté apagado, los casos en
+  // los que el OTP cae en un buzón corporativo quedan en el log como WARN
+  // (código OTP_MEDIO_CORPORATIVO): de ahí sale el número del inventario.
+  exigirMedioPersonalOtp:
+    process.env.FIRMA_EXIGIR_MEDIO_PERSONAL_OTP === 'true',
+  // (fin de la configuracion de canales y plazos)
+
   rateLimit: {
     perMinute: int('RATE_LIMIT_PER_MINUTE', 60),
     otpPerHour: int('RATE_LIMIT_OTP_PER_HOUR', 10),
@@ -93,6 +142,29 @@ const config = {
     signRequestPerMinute: int('RATE_LIMIT_SIGN_REQUEST_PER_MINUTE', 30),
     resendOtpPerHour: int('RATE_LIMIT_RESEND_OTP_PER_HOUR', 5),
   },
+
+  // D-03: la Empresa tiene que estar HABILITADA para pedir firmas.
+  //
+  // El 1.4 del Acuerdo dice que la relación Empresa-K+AIR se rige por el
+  // Anexo de Encargo (art. 25 del Decreto 1377 / 2.2.2.25.5.2), y el 8.6
+  // obliga a la Empresa a comunicar el plazo de conservación ANTES de pedir
+  // la firma. Sin Anexo firmado ni plazo declarado, esas dos promesas no
+  // se pueden cumplir: por eso la creación de la solicitud se bloquea con
+  // un 409 que dice qué falta y dónde se resuelve.
+  //
+  // La bandera existe para la TRANSICIÓN, no para abrir una puerta trasera:
+  //
+  //   - true  (default): la firma sin habilitación NO se crea.
+  //   - false: se permite, pero cada caso queda en el log como WARN con
+  //             código. No es un default silencioso: es un default ruidoso,
+  //             y en producción se enciende después del inventario y del
+  //             aviso a las Empresas (scripts/inventario-empresas-no-habilitadas.js).
+  //
+  // OJO: el bloqueo solo aplica a las empresas REGISTRADAS en
+  // `gh_firma_empresas`. Una empresa que no está dada de alta es otro
+  // problema (identificación incompleta) y se atiende aparte.
+  exigirHabilitacionEmpresa:
+    process.env.FIRMA_EXIGIR_HABILITACION_EMPRESA !== 'false',
 
   email: {
     retryDelaysMin: required('EMAIL_RETRY_DELAYS_MIN', '5,30,120')

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Servicio de Flujo Público de firma.
  *
  * Maneja todas las operaciones que el trabajador hace desde la
@@ -20,13 +20,14 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db/connection');
 const config = require('../config');
-const { hashToken, hashTokenHmac, tokenHashCandidates } = require('../crypto/token');
+const { hashToken, hashTokenHmac, tokenHashCandidates, tokenTombstoneCandidates } = require('../crypto/token');
 const { generateOTP, hashOTP, hashOTPHmac, verifyOTP, verifyOTPHmac, isLocked } = require('../crypto/otp');
 const { hashWithSalt, generateSalt, sha256, generateIdSolicitud: _ } = require('../crypto/hash');
 const { canonicalJSON } = require('../crypto/compare');
 const { algHmac, esAlgHmac } = require('../crypto/hmac');
 const identificacion = require('./identificacion');
 const ultimos4 = require('./ultimos4');
+const sensibles = require('./sensibles');  // 8B: documentos con información de salud (10.8)
 const { candidatosBusqueda } = require('./trabajador');
 const signRequestService = require('./signRequest');
 const consentService = require('./consent');
@@ -34,7 +35,12 @@ const mailer = require('./mailer');
 const storage = require('./storage');
 const pdfGen = require('./pdfGen');
 const agreementService = require('./agreement');  // D2: re-validar Acuerdo en view/commit
-const empresaService = require('./empresa');        // num. 1.2: identificación mostrada al firmante
+const empresaService = require('./empresa');
+const mediosService = require('./medios');   // 9A: los medios autorizados (el 8.2)
+const papelService = require('./papel');   // 9A: la firma autográfica (el 7.1-7.3)
+const pdfGenPapel = require('./pdfGenPapel');   // 9A: el Registro de firma autográfica
+const conservacion = require('./conservacion');    // 8A.1: vencimiento del plazo (num. 10.6)
+const supresion = require('./supresion');        // 8A.2: lápida de la supresión de datos
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const { withAppErrorWrapping, withAppErrorWrappingSync } = require('../utils/errorWrap');
@@ -44,6 +50,12 @@ const { isExpired } = require('../crypto/otp');
 // Key: signRequest.id → array de timestamps (ms) de llamadas recientes.
 // Se limpia automáticamente cuando la ventana expira.
 const _resendOtpTimestamps = new Map();
+
+// Estados en los que la firma YA ocurrió. El 5.4 del Acuerdo de uso obliga
+// al Firmante a poder descargar copia del documento firmado desde el propio
+// enlace de firma, así que el enlace sigue sirviendo (solo para descargar)
+// en estos estados.
+const ESTADOS_FIRMADOS = ['SIGNED', 'DUAL_FIRMADO'];
 
 /**
  * Resultado de resolver un token.
@@ -60,17 +72,31 @@ function resolveTokenResult(ok, code, message, signRequest, estado) {
  *
  * Valida:
  * - El token existe (calculando token_hash y buscando en BD)
- * - La solicitud no ha expirado
+ * - La solicitud no ha vencido por CONSERVACIÓN (numeral 10.6)
+ * - La solicitud no ha expirado (ventana para firmar)
  * - El estado es adecuado (no terminal)
  *
  * Retorna un objeto con:
  *   { signRequest, estado } si todo OK
  *
  * Lanza AppError si hay algún problema (404 / 410 / 409).
+ *
+ * OPCIONES
+ * --------
+ *   permitirHistorico  Operación histórica autorizada (la verificación
+ *                      pública y la comparación del PDF firmado). Ignora el
+ *                      VENCIMIENTO DEL ENLACE, porque la ventana para firmar
+ *                      no debe impedir consultar lo que ya se firmó.
+ *                      NO ignora el vencimiento del plazo de conservación:
+ *                      ese no es un permiso, es el estado del dato.
+ *
+ *   permitirFirmado    Deja pasar una solicitud YA FIRMADA para las
+ *                      descargas de solo lectura (numeral 5.4). No reabre el
+ *                      flujo y no extiende el TTL.
  */
 function resolveToken(token, opts) {
   if (typeof token !== 'string' || token.length === 0) {
-    throw new AppError(404, 'TOKEN_NOT_FOUND', 'Token no encontrado');
+    throw new AppError(404, 'TOKEN_NOT_FOUND', 'No disponible');
   }
 
   // Las solicitudes anteriores a la migración 019 guardan SHA-256(token);
@@ -81,12 +107,43 @@ function resolveToken(token, opts) {
   const signRequest = signRequestService.getByTokenHash(tokenHashCandidates(token));
 
   if (!signRequest) {
-    throw new AppError(404, 'TOKEN_NOT_FOUND', 'El token no existe');
+    // 8A.2 · ¿Hay lápida? La fila ya no está porque su plazo de conservación
+    // venció y el dato se suprimió (numeral 10.6). Eso NO es lo mismo que un
+    // enlace que nunca existió: la respuesta honesta es "no disponible por
+    // vencimiento del plazo", no un 404 que no dice por qué.
+    const lapida = supresion.buscarLapidada(tokenTombstoneCandidates(token));
+    if (lapida) {
+      throw new AppError(410, 'CONSERVACION_VENCIDA', 'No disponible por vencimiento del plazo', {
+        fecha_conservacion: lapida.purgado_at,
+      });
+    }
+    // No se confirma la existencia: la misma respuesta para un token que
+    // nunca existió y para uno que ya no se puede mostrar.
+    throw new AppError(404, 'TOKEN_NOT_FOUND', 'No disponible');
   }
 
-  // I-VERIFICACION-PUBLICA: el endpoint /verify debe funcionar incluso
-  // después de la fecha_expiracion, porque la consulta es READ-ONLY.
-  if (opts && opts.skipExpirationCheck) {
+  // 8A.1 · VENCIMIENTO POR CONSERVACIÓN (numeral 10.6).
+  //
+  // `fecha_conservacion` = fecha_creacion + plazo_retencion_dias, que
+  // declara la Empresa. Vencida, el dato se debe suprimir (capa 5B). Mientras
+  // la supresión no se haya ejecutado, el sistema NO puede seguir
+  // afirmando que la firma está vigente: la respuesta honesta es "no
+  // disponible por vencimiento del plazo". Ni "inválido" (mentiría sobre el
+  // motivo) ni "firma válida" (afirmaría una vigencia que ya no existe).
+  //
+  // Este chequeo NO se omite en ningún caso, tampoco en la verificación
+  // histórica: omitirlo era justamente el defecto que esta fase cierra
+  // (antes bastaba `skipExpirationCheck` para saltárselo todo).
+  if (conservacion.vencidaPorConservacion(signRequest)) {
+    throw new AppError(410, 'CONSERVACION_VENCIDA', 'No disponible por vencimiento del plazo', {
+      fecha_conservacion: signRequest.fecha_conservacion,
+    });
+  }
+
+  // I-VERIFICACION-PUBLICA: la consulta histórica es READ-ONLY y debe
+  // funcionar incluso después de la fecha_expiracion (la ventana para
+  // firmar no debe impedir consultar lo que ya se firmó).
+  if (opts && opts.permitirHistorico) {
     return { signRequest, estado: signRequest.estado };
   }
 
@@ -94,13 +151,20 @@ function resolveToken(token, opts) {
   const now = Date.now();
   const expiresAt = new Date(signRequest.fecha_expiracion).getTime();
   if (now > expiresAt) {
-    // Marcar como expirado si aún no lo está (idempotente)
-    if (!['EXPIRED', 'SIGNED', 'REJECTED', 'REVOKED', 'CANCELLED'].includes(signRequest.estado)) {
+    // Marcar como expirado si aún no lo está (idempotente).
+    //
+    // DUAL_FIRMADO va en la lista de excluidos: es un estado FIRMADO (el
+    // trabajador y el representante ya firmaron). Antes no estaba, así que
+    // un enlace de firma dual que se abría después de su vencimiento
+    // BORRABA el estado de la firma dual y dejaba la fila en EXPIRED: la
+    // evidencia de una firma que sí ocurrió, perdida por un TTL. Un enlace
+    // vencido no puede reescribir lo que ya se firmó.
+    if (!['EXPIRED', 'SIGNED', 'DUAL_FIRMADO', 'REJECTED', 'REVOKED', 'CANCELLED'].includes(signRequest.estado)) {
       const tx = db.transaction(() => {
         db.prepare(`
           UPDATE gh_firmas_electronicas
           SET estado = 'EXPIRED'
-          WHERE id = ? AND estado NOT IN ('SIGNED', 'REJECTED', 'REVOKED', 'CANCELLED', 'EXPIRED')
+          WHERE id = ? AND estado NOT IN ('SIGNED', 'DUAL_FIRMADO', 'REJECTED', 'REVOKED', 'CANCELLED', 'EXPIRED')
         `).run(signRequest.id);
         signRequestService.registerEvent(signRequest.id, 'EXPIRED', null, 'sistema');
       });
@@ -111,8 +175,19 @@ function resolveToken(token, opts) {
     });
   }
 
-  // Estados terminales
+  // Estados terminales.
+  //
+  // Excepción acotada: `permitirFirmado` deja pasar una solicitud YA
+  // FIRMADA. No reabre el flujo —identificar, pedir OTP, aceptar el
+  // Acuerdo y firmar siguen cerrados en estado firmado—: solo permite
+  // descargar lo que ya está firmado, que es lo que pide el 5.4 del
+  // Acuerdo de uso ("descargar copia [...] del documento firmado desde el
+  // propio enlace de firma"). Los demás terminales (rechazada, revocada,
+  // cancelada, vencida) siguen muriendo con 410.
   if (['SIGNED', 'REJECTED', 'REVOKED', 'CANCELLED', 'EXPIRED'].includes(signRequest.estado)) {
+    if (opts && opts.permitirFirmado && ESTADOS_FIRMADOS.includes(signRequest.estado)) {
+      return { signRequest, estado: signRequest.estado };
+    }
     throw new AppError(410, 'TOKEN_ALREADY_USED',
       `La solicitud está en estado terminal '${signRequest.estado}'`);
   }
@@ -142,13 +217,571 @@ function validateAgreementStillActive(signRequest) {
   }
   const acuerdoActivo = agreementService.getActive();
   if (!acuerdoActivo || acuerdoActivo.version !== signRequest.agreement_version) {
+    // 10.4: este 409 ya NO es un callejón sin salida. La mini-app lo
+    // traduce a "leé y aceptá la versión vigente" y recarga el contexto; al
+    // aceptar, la solicitud migra (ver `migrarAVersionVigente`).
     throw new AppError(409, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE',
-      'La versión del Acuerdo de esta solicitud ya no está activa',
+      'El Acuerdo de uso cambió: leé y aceptá la versión vigente para firmar',
       {
         sign_request_version: signRequest.agreement_version,
         active_version: acuerdoActivo ? acuerdoActivo.version : null,
+        accion: 'reaceptar_version_vigente',
       });
   }
+}
+
+/**
+ * Resuelve el Acuerdo de uso que debe leer el firmante de ESTE sign request.
+ *
+ * Se busca por `agreement_version` (la version ligada a la solicitud), NO por
+ * la version activa. Razon: el consentimiento que se registra al marcar la
+ * casilla guarda `hash_texto_acuerdo` de esa version puntual. Si la version
+ * activa cambia entre que se creo la solicitud y que el firmante abre el
+ * enlace, mostrar el texto de la activa haria que el firmante leyera un
+ * documento cuyo hash no es el que queda archivado.
+ *
+ * Los sign requests legacy (`agreement_version = null`) no tienen version
+ * ligada: en ese caso se cae al acuerdo activo, que es lo que corresponde
+ * porque esos SR no se re-validan contra ninguna version.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {{version: string, texto: string, texto_hash: string}|null}
+ */
+/**
+ * 10.4 · EL CAMINO POSITIVO DEL 9.5: MIGRAR LA SOLICITUD A LA VERSIÓN
+ * VIGENTE DEL ACUERDO.
+ *
+ * EL PROBLEMA
+ * -----------
+ * Si se publica una versión nueva del Acuerdo mientras hay solicitudes
+ * pendientes, el firmante que llega tarde se encontraba con un 409 sin
+ * salida: la solicitud estaba ligada a la versión anterior, esa versión ya no
+ * era la vigente, y el sistema le decía que no podía firmar. Eso era
+ * IMPEDIR publicar la v1.1: cambiar el hash del Acuerdo sin este camino
+ * dejaba a los trabajadores con enlaces colgados.
+ *
+ * LA SOLUCIÓN
+ * -----------
+ * El 9.5 dice que "para las firmas posteriores a la entrada en vigencia de
+ * una versión nueva, el Trabajador debe leer y aceptar ESA versión nueva en
+ * el momento mismo de la firma". O sea: lo que hay que corregir no es el
+ * texto que se muestra, es la LIGACIÓN de la solicitud.
+ *
+ * Al aceptar, la solicitud MIGRA a la versión vigente:
+ *
+ *   1. Se busca (o se crea) el consentimiento de esa versión para el mismo
+ *      trabajador y la misma empresa.
+ *   2. La solicitud pasa a apuntar a ese consentimiento y a esa versión, con
+ *      su huella.
+ *   3. Se deja el evento `AGREEMENT_VERSION_MIGRATED`, con la versión
+ *      anterior y la nueva: el cambio de versión queda en la traza.
+ *
+ * Con eso, el texto que el firmante leyó y el texto que queda archivado (con
+ * su huella) SON EL MISMO. No hay dos verdades.
+ *
+ * Lo que NO se toca: los consentimientos ya aceptados de la versión
+ * anterior. Quedan como están: son la prueba de lo que ese trabajador aceptó
+ * en su momento. El 9.5 lo dice así ("el Trabajador que haya aceptado una
+ * versión anterior se rige por esa versión respecto de las firmas ya
+ * realizadas").
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas (se muta)
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {{version_anterior: string, version_nueva: string, consent_id: number}|null}
+ *   null si no hubo migración.
+ */
+async function migrarAVersionVigente(signRequest, ip, user_agent) {
+  // Los sign requests legacy (sin versión ligada) NO se migran: no tienen
+  // con qué compararse y su comportamiento histórico (validar el
+  // consentimiento como siempre) se conserva. Es el mismo criterio que
+  // `validateForCommit` y `validateAgreementStillActive`.
+  if (!signRequest.agreement_version) return null;
+
+  const vigente = agreementService.getActive();
+  if (!vigente) return null;
+
+  const versionAnterior = signRequest.agreement_version || null;
+  if (versionAnterior === vigente.version) return null;
+
+  // El consentimiento vigente: se reutiliza si ya existe (aceptado o
+  // pendiente); si no, se crea con el correo que ya tiene el actual.
+  let consentVigente = null;
+  try {
+    consentVigente = consentService.getExisting({
+      id_trabajador: signRequest.id_trabajador,
+      id_empresa: signRequest.id_empresa,
+      version_acuerdo: vigente.version,
+    });
+  } catch (e) {
+    consentVigente = null;
+  }
+
+  if (!consentVigente) {
+    const anterior = signRequest.consent_id
+      ? db.prepare(
+        'SELECT correo_verificacion FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(signRequest.consent_id)
+      : null;
+    const correo = (anterior && anterior.correo_verificacion) || null;
+    if (!correo) {
+      throw new AppError(409, 'CONSENT_MIGRATION_NO_CORREO',
+        'No se pudo migrar la solicitud a la versión vigente del Acuerdo: '
+        + 'falta el correo de verificación del trabajador',
+        { id_solicitud: signRequest.id_solicitud, version_vigente: vigente.version });
+    }
+    const creado = await consentService.create({
+      id_trabajador: signRequest.id_trabajador,
+      id_empresa: signRequest.id_empresa,
+      version_acuerdo: vigente.version,
+      correo_verificacion: correo,
+      kair_version: signRequest.version_kair,
+      ip: ip || null,
+      user_agent: user_agent || null,
+    });
+    consentVigente = creado.consent;
+  }
+
+  // La solicitud pasa a la versión vigente.
+  db.prepare(`
+    UPDATE gh_firmas_electronicas
+    SET agreement_version = ?, agreement_hash = ?, consent_id = ?
+    WHERE id = ?
+  `).run(vigente.version, vigente.texto_hash, consentVigente.id, signRequest.id);
+  signRequest.agreement_version = vigente.version;
+  signRequest.agreement_hash = vigente.texto_hash;
+  signRequest.consent_id = consentVigente.id;
+
+  signRequestService.registerEvent(signRequest.id, 'AGREEMENT_VERSION_MIGRATED', {
+    version_anterior: versionAnterior,
+    version_nueva: vigente.version,
+    texto_hash_nuevo: vigente.texto_hash,
+    id_consentimiento: consentVigente.id,
+    id_solicitud: signRequest.id_solicitud,
+  }, 'sistema', ip, user_agent);
+
+  logger.info('Solicitud migrada a la versión vigente del Acuerdo (10.4)', {
+    id_solicitud: signRequest.id_solicitud,
+    version_anterior: versionAnterior,
+    version_nueva: vigente.version,
+    id_consentimiento: consentVigente.id,
+  });
+
+  return {
+    version_anterior: versionAnterior,
+    version_nueva: vigente.version,
+    consent_id: consentVigente.id,
+  };
+}
+
+/**
+ * El Acuerdo que VE el firmante: la versión VIGENTE (la activa).
+ *
+ * 10.4 (el camino positivo del 9.5)
+ * ----------------------------------
+ * El 9.5 dice: "Para las firmas posteriores a la entrada en vigencia de una
+ * versión nueva, el Trabajador debe leer y aceptar ESA versión nueva en el
+ * momento mismo de la firma."
+ *
+ * Antes, el texto que se mostraba era el de la versión LIGADA a la
+ * solicitud, y si esa versión ya no era la activa, el flujo moría con un 409
+ * sin salida: el trabajador no podía firmar y no tenía a dónde ir. Ese 409
+ * era la razón por la que NO se podía publicar una v1.1 del Acuerdo.
+ *
+ * Ahora se muestra y se acepta la versión vigente, y la SOLICITUD MIGRA a
+ * esa versión en el momento de la aceptación (ver `consentAccept`). Así el
+ * texto que el firmante leyó y el texto que queda archivado (con su huella)
+ * son el MISMO: no hay dos verdades, hay una.
+ *
+ * Los sign requests legacy (`agreement_version = null`) no tienen versión
+ * ligada: se les muestra la activa, que es lo que corresponde (no se
+ * re-validan contra ninguna versión).
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {{version: string, texto: string, texto_hash: string,
+ *   version_ligada: string|null, requiere_aceptar_vigente: boolean}|null}
+ */
+function resolverAcuerdoVigente(signRequest) {
+  let acuerdo = null;
+  try {
+    acuerdo = agreementService.getActive()
+      || (signRequest.agreement_version
+        ? agreementService.getByVersion(signRequest.agreement_version)
+        : null);
+  } catch (_) {
+    return null;
+  }
+  if (!acuerdo || typeof acuerdo.texto !== 'string' || acuerdo.texto.length === 0) {
+    return null;
+  }
+  const versionLigada = signRequest.agreement_version || null;
+  return {
+    version: acuerdo.version,
+    texto: acuerdo.texto,
+    texto_hash: acuerdo.texto_hash,
+    version_ligada: versionLigada,
+    // `true` cuando lo que se muestra NO es lo que la solicitud tiene
+    // ligado: el firmante tiene que aceptarlo para poder seguir.
+    requiere_aceptar_vigente: !!versionLigada && versionLigada !== acuerdo.version,
+  };
+}
+
+/**
+ * El Acuerdo ARCHIVADO de esta solicitud: el de su versión ligada (que, tras
+ * la 10.4, es la vigente en el momento de la aceptación).
+ *
+ * Para la copia que baja el firmante (5.4) y para la constancia: lo que se
+ * archivó es lo que se le entregó.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {{version: string, texto: string, texto_hash: string}|null}
+ */
+function resolverAcuerdo(signRequest) {
+  let acuerdo = null;
+  try {
+    acuerdo = signRequest.agreement_version
+      ? agreementService.getByVersion(signRequest.agreement_version)
+      : agreementService.getActive();
+  } catch (_) {
+    return null;
+  }
+  if (!acuerdo || typeof acuerdo.texto !== 'string' || acuerdo.texto.length === 0) {
+    return null;
+  }
+  return {
+    version: acuerdo.version,
+    texto: acuerdo.texto,
+    texto_hash: acuerdo.texto_hash,
+  };
+}
+
+/**
+ * ¿El Firmante ya aceptó el Acuerdo de uso de esta solicitud?
+ *
+ * Versión LENIENTE: solo mira si el consentimiento vinculado quedó
+ * aceptado. Es la que usa la mini-app para saber si puede mostrar el
+ * documento; NO es una validación de seguridad y por eso no lanza.
+ *
+ * La versión ESTRICTA es `exigirAcuerdoAceptado`, que además valida la
+ * cadena completa (empresa, trabajador, version).
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {boolean}
+ */
+function acuerdoAceptado(signRequest) {
+  // Legacy sin Acuerdo versionado: no hay a qué exigirse (mismo criterio
+  // que validateForCommit).
+  if (!signRequest.agreement_version) return true;
+  if (!signRequest.consent_id) return false;
+  try {
+    const c = db.prepare(
+      'SELECT manifestacion_aceptada FROM gh_consentimientos_firma WHERE id = ?'
+    ).get(signRequest.consent_id);
+    return !!(c && c.manifestacion_aceptada === 1);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Exige que el Firmante ya haya leído y aceptado el Acuerdo de uso.
+ *
+ * El 3.4 del Acuerdo de uso pacta el orden del flujo:
+ *
+ *   (g) Superada la verificación, el Trabajador lee en pantalla el presente
+ *       Acuerdo, en la versión vigente, y lo acepta. [...] El Trabajador no
+ *       puede avanzar en el flujo sin leer y aceptar el Acuerdo.
+ *   (h) El Trabajador visualiza y descarga el documento objeto de la firma.
+ *
+ * Es decir: (g) va ANTES de (h). El documento no se sirve hasta que el
+ * Acuerdo está aceptado.
+ *
+ * **Una sola respuesta para todos los casos en que el Firmante todavía no
+ * aceptó**: no hay consentimiento vinculado, no existe, no está aceptado, o
+ * el dato es inconsistente (otra empresa, otra versión). El Firmante solo
+ * necesita saber que tiene que leer y aceptar el Acuerdo; el camino de error
+ * no dice nada de la estructura interna ni del consentimiento ajeno.
+ *
+ * El detalle fino (CONSENT_NOT_FOUND, CONSENT_WORKER_MISMATCH,
+ * CONSENT_COMPANY_MISMATCH, CONSENT_VERSION_MISMATCH) lo sigue dando
+ * `consentService.validateForCommit` en el commit: ahí el que pregunta es el
+ * propio flujo, y el dato inconsistente tiene que ser rastreable.
+ *
+ * Los sign requests legacy (sin `agreement_version`) se saltan el chequeo,
+ * igual que en el commit: no hay Acuerdo versionado al que exigirse.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @throws AppError 409 CONSENT_NOT_ACCEPTED
+ */
+function exigirAcuerdoAceptado(signRequest) {
+  if (!signRequest.agreement_version) return;
+
+  // 10.4 · La versión vigente tiene que ser la que el firmante aceptó.
+  //
+  //    Si se publicó una versión nueva DESPUÉS de la aceptación, el
+  //    firmante leyó un texto que ya no es el vigente. El documento no se le
+  //    muestra hasta que acepte la nueva: es lo que dice el 9.5 ("debe leer
+  //    y aceptar esa versión nueva en el momento mismo de la firma").
+  let vigente = null;
+  try {
+    vigente = agreementService.getActive();
+  } catch (_) {
+    vigente = null;
+  }
+  if (vigente && vigente.version !== signRequest.agreement_version) {
+    throw new AppError(409, 'AGREEMENT_VERSION_REACCEPT_REQUIRED',
+      'El Acuerdo de uso cambió: tenés que leer y aceptar la versión vigente '
+      + 'para continuar',
+      {
+        id_solicitud: signRequest.id_solicitud,
+        sign_request_version: signRequest.agreement_version,
+        active_version: vigente.version,
+        accion: 'reaceptar_version_vigente',
+      });
+  }
+
+  const consent = signRequest.consent_id
+    ? db.prepare(
+        'SELECT id_empresa, version_acuerdo, manifestacion_aceptada ' +
+        'FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(signRequest.consent_id)
+    : null;
+
+  const aceptado = !!consent
+    && consent.manifestacion_aceptada === 1
+    && consent.id_empresa === signRequest.id_empresa
+    && consent.version_acuerdo === signRequest.agreement_version;
+
+  if (!aceptado) {
+    throw new AppError(409, 'CONSENT_NOT_ACCEPTED',
+      'Primero debes leer y aceptar el Acuerdo de uso para ver el documento',
+      { id_solicitud: signRequest.id_solicitud });
+  }
+}
+
+/**
+ * 8B · EL DATO SENSIBLE (numeral 10.8)
+ * =============================================================================
+ *
+ * El 10.8(a) exige que el Titular sea informado de manera EXPRESA Y PREVIA de
+ * que el dato es sensible, de cuáles son los datos y de la finalidad, y que
+ * otorgue su CONSENTIMIENTO EXPRESO. El 10.8(b) recuerda que ninguna
+ * actividad puede condicionarse a que el Titular SUMINISTRE datos sensibles.
+ *
+ * El orden es el mismo del Acuerdo en general: el aviso va ANTES, y el
+ * documento no se sirve hasta que la autorización está registrada. Por eso
+ * la puerta está en `viewDocument` y `getPdfForToken`, igual que la del
+ * Acuerdo (3.4(g) antes de (h)).
+ */
+
+/**
+ * El aviso de dato sensible que la mini-app debe mostrar.
+ *
+ * El texto está FIJADO en la fila (con su huella y su versión): es
+ * exactamente el que se le mostró al Titular, y es el que se archiva con la
+ * prueba del consentimiento.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @returns {object|null} null si el documento no tiene dato sensible.
+ */
+function resolverDatoSensible(signRequest) {
+  if (!signRequest.datos_sensibles) return null;
+
+  let categorias = [];
+  try {
+    const parseado = JSON.parse(signRequest.categorias_sensibles || '[]');
+    if (Array.isArray(parseado)) categorias = parseado;
+  } catch (e) {
+    categorias = [];
+  }
+
+  const baseLegal = signRequest.base_legal_sensible || 'autorizacion_expresa';
+
+  return {
+    // El texto del aviso, tal cual se mostró.
+    texto: signRequest.aviso_sensible_texto || null,
+    hash: signRequest.aviso_sensible_hash || null,
+    version: signRequest.aviso_sensible_version || null,
+    // Los datos concretos que se tratan (el 10.8(a) exige informarlos).
+    categorias,
+    // La finalidad del tratamiento.
+    finalidad: signRequest.finalidad_sensible || null,
+    // La base legal. Con 'autorizacion_expresa' el Titular tiene que
+    // autorizar; con 'otra' la base la declaró la Empresa (10.8(c)) y ya
+    // está informada en el aviso.
+    base_legal: baseLegal,
+    // Si la base legal es la autorización expresa, hace falta la casilla
+    // separada. Si no, la mini-app solo muestra el aviso.
+    requiere_autorizacion: baseLegal === 'autorizacion_expresa',
+    // Si el Titular ya autorizó (o si no hacía falta), la mini-app no vuelve
+    // a preguntar.
+    autorizado: sensibleAutorizado(signRequest),
+  };
+}
+
+/**
+ * ¿Está registrado el consentimiento expreso del dato sensible?
+ *
+ * @param {object} signRequest
+ * @returns {boolean}
+ */
+function sensibleAutorizado(signRequest) {
+  // Con una base legal distinta a la autorización expresa no hay nada que
+  // otorgar: el 10.8(c) deja la base en la Empresa, que ya la informó.
+  if (signRequest.base_legal_sensible && signRequest.base_legal_sensible !== 'autorizacion_expresa') {
+    return true;
+  }
+  try {
+    const prueba = db.prepare(
+      'SELECT manifestacion_aceptada FROM gh_consentimientos_sensibles WHERE id_solicitud = ?'
+    ).get(signRequest.id_solicitud);
+    return !!(prueba && prueba.manifestacion_aceptada === 1);
+  } catch (e) {
+    // La tabla puede no existir (migración 027 sin aplicar): sin registro no
+    // hay autorización.
+    return false;
+  }
+}
+
+/**
+ * Exige el consentimiento expreso del dato sensible, si el documento lo es.
+ *
+ * Se apoya en `exigirAcuerdoAceptado`: una sola respuesta para todos los
+ * casos en que el Firmante todavía no ha autorizado. El detalle fino
+ * (sensibilidad, categorías) lo da el contexto, que es lo que la mini-app
+ * necesita para mostrar el aviso.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @throws AppError 409 SENSIBLE_CONSENT_NOT_ACCEPTED
+ */
+function exigirConsentimientoSensible(signRequest) {
+  if (!signRequest.datos_sensibles) return;
+  if (sensibleAutorizado(signRequest)) return;
+
+  throw new AppError(
+    409,
+    'SENSIBLE_CONSENT_NOT_ACCEPTED',
+    'Este documento contiene información de salud: primero debes leer el aviso y autorizar su tratamiento',
+    { id_solicitud: signRequest.id_solicitud }
+  );
+}
+
+/**
+ * Registra el consentimiento expreso del dato sensible.
+ *
+ * La autorización es un HECHO: se escribe una vez y no se reescribe. Si el
+ * Titular vuelve a abrir el enlace y autoriza otra vez, la respuesta es
+ * idempotente (no hay una segunda prueba).
+ *
+ * @param {string} token
+ * @param {object} opts
+ * @param {boolean} opts.autoriza - lo que el Titular marcó.
+ * @param {string} [opts.ip]
+ * @param {string} [opts.user_agent]
+ * @returns {object}
+ */
+function consentirDatoSensible(token, { autoriza, ip, user_agent } = {}) {
+  const { signRequest } = resolveToken(token);
+
+  if (!signRequest.datos_sensibles) {
+    throw new AppError(409, 'NOT_SENSITIVE_DOCUMENT',
+      'Este documento no contiene información de salud');
+  }
+
+  const aviso = resolverDatoSensible(signRequest);
+  const yaEsta = sensibleAutorizado(signRequest);
+
+  if (yaEsta) {
+    return { ok: true, idempotente: true, ya_autorizado: true, aviso };
+  }
+
+  // Sin la base legal de la autorización expresa no hay nada que otorgar:
+  // el 10.8(c) deja la base en la Empresa, que ya la informó en el aviso.
+  if (!aviso.requiere_autorizacion) {
+    throw new AppError(409, 'CONSENT_NOT_REQUIRED',
+      'Este documento se trata con una base legal declarada por la Empresa: no hay autorización que otorgar',
+      { base_legal: aviso.base_legal });
+  }
+
+  if (autoriza !== true) {
+    // No autorizar es el derecho del Titular (el 10.8(a) le informa de que
+    // no está obligado). Se registra la NO autorización, para que quede
+    // prueba de que se le informó y de que él decidió no autorizar.
+    const ya = db.prepare(
+      'SELECT id FROM gh_consentimientos_sensibles WHERE id_solicitud = ?'
+    ).get(signRequest.id_solicitud);
+    if (!ya) {
+      db.prepare(`
+        INSERT INTO gh_consentimientos_sensibles
+          (id_solicitud, id_empresa, id_trabajador, version_aviso, hash_aviso,
+           categorias, finalidad, base_legal, base_legal_descripcion,
+           manifestacion_aceptada, fecha_manifestacion)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+      `).run(
+        signRequest.id_solicitud,
+        signRequest.id_empresa,
+        signRequest.id_trabajador,
+        aviso.version || sensibles.VERSION_AVISO,
+        aviso.hash || '',
+        JSON.stringify(aviso.categorias || []),
+        aviso.finalidad || '',
+        aviso.base_legal,
+        null,
+        new Date().toISOString()
+      );
+    }
+    throw new AppError(409, 'SENSIBLE_CONSENT_NOT_ACCEPTED',
+      'Para firmar este documento por medios electrónicos debes autorizar el tratamiento de la información de salud',
+      {
+        id_solicitud: signRequest.id_solicitud,
+        via_alternativa: 'firma_en_papel',
+        fundamento: 'numeral 10.8(a) del Acuerdo de uso',
+      });
+  }
+
+  const ahora = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO gh_consentimientos_sensibles
+      (id_solicitud, id_empresa, id_trabajador, version_aviso, hash_aviso,
+       categorias, finalidad, base_legal, base_legal_descripcion,
+       manifestacion_aceptada, fecha_manifestacion, fecha_aceptacion)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `).run(
+    signRequest.id_solicitud,
+    signRequest.id_empresa,
+    signRequest.id_trabajador,
+    aviso.version || sensibles.VERSION_AVISO,
+    aviso.hash || '',
+    JSON.stringify(aviso.categorias || []),
+    aviso.finalidad || '',
+    aviso.base_legal,
+    null,
+    ahora,
+    ahora
+  );
+
+  try {
+    signRequestService.registerEvent(
+      signRequest.id,
+      'SENSIBLE_CONSENT_ACCEPTED',
+      {
+        version_aviso: aviso.version,
+        hash_aviso: aviso.hash,
+        categorias: aviso.categorias,
+        base_legal: aviso.base_legal,
+      },
+      'firmante',
+      ip || null,
+      user_agent || null
+    );
+  } catch (e) {
+    logger.warn('8B: no se pudo registrar el evento SENSIBLE_CONSENT_ACCEPTED', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e.message,
+    });
+  }
+
+  return { ok: true, idempotente: false, ya_autorizado: false, aviso };
 }
 
 /**
@@ -216,7 +849,7 @@ function registerOpenedIfFirst(signRequest, ip, user_agent) {
  * @param {string} user_agent
  * @returns {Promise<{ok: true, estado, otp_ttl_seconds, correo_destino_enmascarado, devOtp?}>}
  */
-async function identify(token, tipo_identificacion, numero_documento, ip, user_agent) {
+async function identify(token, tipo_identificacion, numero_documento, ip, user_agent, medioOtp) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
@@ -329,8 +962,14 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
   });
   tx();
 
-  // 9. Obtener correo desde consentimiento (fuente de verdad) o metadata (legacy)
-  const correo = resolveCorreo(signRequest);
+  // 9. D-2: el OTP (dato de creación) va al medio PERSONAL que declaró
+  //    el Trabajador; la invitación (token) sigue yendo al contacto
+  //    registrado por la Empresa. El medio declarado queda congelado en la fila.
+  if (medioOtp) {
+    declararMedioOtp(signRequest, medioOtp);
+  }
+  const destinoOtp = resolveCorreoOtp(signRequest, medioOtp);
+  const correo = destinoOtp.correo;
   if (!correo) {
     throw new AppError(400, 'MISSING_EMAIL',
       'No hay correo de verificación disponible para esta solicitud');
@@ -374,6 +1013,158 @@ function maskEmail(email) {
   if (!local || !domain) return email;
   const visible = local.slice(0, Math.min(4, local.length));
   return `${visible}${'*'.repeat(Math.max(0, local.length - visible.length))}@${domain}`;
+}
+
+/**
+ * D-2 · A DÓNDE VA EL OTP (y a dónde NO va la invitación).
+ *
+ * EL PROBLEMA
+ * -----------
+ * `correo_verificacion` cumple dos papeles: a dónde va la INVITACIÓN (con el
+ * token de acceso) y a dónde va el OTP (el dato de creación). Y la app de
+ * escritorio lo precarga con el correo del trabajador en el registro de la
+ * Empresa: en la práctica, el OTP le llega a un buzón que la Empresa puede
+ * leer.
+ *
+ * El 2.2.2.47.4 num. 1 dice que "los datos de creación de la firma, en el
+ * contexto en que son utilizados, corresponden exclusivamente al firmante".
+ * Un OTP entregado a un buzón de la Empresa rompe esa condición en el
+ * contexto en que se usa.
+ *
+ * LA DECISIÓN (owner, 2026-10-20)
+ * -------------------------------
+ * Separar los dos canales:
+ *
+ *   - La INVITACIÓN (el token) sigue yendo al contacto registrado por la
+ *     Empresa. En el contexto de uso no es un factor: sin el OTP no se
+ *     firma.
+ *   - El OTP va a un medio PERSONAL que declara el propio Trabajador.
+ *
+ * EL RECHAZO (D2) Y CUÁNDO SE ACTIVA
+ * ---------------------------------
+ * El rechazo (400 con el texto del 3.7(a) al lado) está en el código, pero
+ * **APAGADO** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`, default false). Se enciende
+ * cuando exista la 9A (la firma en papel): sin esa salida, exigir un medio
+ * personal sería una barrera de acceso al empleo (el 2.2.1.1.11).
+ *
+ * Mientras tanto, cada caso en el que el OTP va a (o pasaría por) un buzón
+ * corporativo queda en el log como WARN, que es de donde sale el número del
+ * inventario.
+ *
+ * @param {object} signRequest
+ * @param {string} [medioDeclarado] - el medio que declaró el Trabajador
+ * @returns {{correo: string|null, origen: string, riesgo_47_4: boolean}}
+ */
+/**
+ * Declara el medio personal del OTP desde la vápica pública (D-2).
+ *
+ * @param {string} token
+ * @param {string} medio
+ * @returns {{correo_otp: string, congelado: boolean}}
+ */
+function declararMedioPublico(token, medio) {
+  const { signRequest } = resolveToken(token);
+  return declararMedioOtp(signRequest, medio);
+}
+
+function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
+  // `correoBase` permite que quien ya resolvio el contacto (el reenvio de OTP
+  // usa el del consentimiento) lo conserve: la regla del D-2 cambia el
+  // DESTINO, no la prioridad de resolucion.
+  const contacto = correoBase || resolveCorreo(signRequest);
+  const declarado = (medioDeclarado || signRequest.correo_otp || '');
+  const medio = (typeof declarado === 'string' ? declarado.trim().toLowerCase() : '');
+
+  const evaluar = (correo, origen) => {
+    if (!correo) return { correo: null, origen, riesgo_47_4: false };
+    const corporativo = empresaService.esDominioCorporativo(correo, signRequest.id_empresa);
+    if (corporativo) {
+      if (config.exigirMedioPersonalOtp) {
+        // El mensaje NO manda a una puerta que no existe en el producto: la
+        // vía en papel no es un botón de la mini-app, es el canal de atención
+        // de la Empresa. Por eso el mensaje dice a quién le pedirlo.
+        const empresaDelCanal = empresaService.getById(signRequest.id_empresa);
+        const canalEmpresa = empresaDelCanal ? (empresaDelCanal.canal_pqrs || null) : null;
+        throw new AppError(400, 'MEDIO_OTP_CORPORATIVO',
+          'Ese buzón es del dominio de la Empresa. Si la Empresa puede leer ese '
+          + 'buzón, también puede leer el código de verificación, y entonces los '
+          + 'datos de creación de la firma no corresponderían exclusivamente al '
+          + 'Firmante (numeral 3.7(a) y 2.2.2.47.4 num. 1), con lo que la '
+          + 'garantía del 6.1(d) sería falsa. Usá un medio personal, o '
+          + 'pedile a tu Empresa la firma en papel (numeral 7.2 del Acuerdo): '
+          + 'es tu derecho y no tiene costo.',
+          {
+            id_solicitud: signRequest.id_solicitud,
+            origen,
+            dominio_corporativo: true,
+            canal_empresa: canalEmpresa,
+          });
+      }
+      logger.warn('El OTP va a un buzón que la Empresa puede leer: el 47.4 queda en riesgo', {
+        id_solicitud: signRequest.id_solicitud,
+        id_empresa: signRequest.id_empresa,
+        origen,
+        aviso: 'OTP_MEDIO_CORPORATIVO',
+      });
+    }
+    return { correo, origen, riesgo_47_4: corporativo };
+  };
+
+  // 1. El medio que declaró el Trabajador manda.
+  if (medio && medio.includes('@')) {
+    return evaluar(medio, 'declarado_por_el_trabajador');
+  }
+
+  // 2. Sin medio declarado: el contacto registrado de la Empresa.
+  return evaluar(contacto, 'contacto_registrado');
+}
+
+/**
+ * Declara (o congela) el medio personal del Trabajador para el OTP.
+ *
+ * Se congela: una vez que el OTP salió, el medio ya no se cambia (el código
+ * ya viaja). Antes de eso, se puede corregir.
+ *
+ * @param {object} signRequest
+ * @param {string} medio
+ * @returns {{correo_otp: string, congelado: boolean}}
+ */
+function declararMedioOtp(signRequest, medio) {
+  const correo = (typeof medio === 'string' ? medio.trim().toLowerCase() : '');
+  if (!correo || !correo.includes('@')) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'El medio para el código de verificación no parece un correo');
+  }
+
+  // Ya se envió un OTP: el medio queda congelado.
+  if (signRequest.correo_otp && signRequest.fecha_otp_enviado) {
+    return { correo_otp: signRequest.correo_otp, congelado: true };
+  }
+
+  db.prepare(
+    'UPDATE gh_firmas_electronicas SET correo_otp = ? WHERE id = ?'
+  ).run(correo, signRequest.id);
+  signRequest.correo_otp = correo;
+
+  // 9A (el 8.2): el medio declarado entra al REGISTRO de medios autorizados.
+  // Nace PENDIENTE: hasta que el Trabajador verifique el codigo no demostro
+  // que controla el buzon, y por ese medio no se le puede entregar una copia.
+  if (signRequest.id_trabajador) {
+    mediosService.registrar({
+      id_empresa: signRequest.id_empresa,
+      id_trabajador: signRequest.id_trabajador,
+      tipo: 'CORREO_OTP',
+      valor: correo,
+      origen: 'TRABAJADOR',
+      estado: 'PENDIENTE',
+    });
+  }
+
+  logger.info('Medio para el OTP declarado por el Trabajador', {
+    id_solicitud: signRequest.id_solicitud,
+    id_empresa: signRequest.id_empresa,
+  });
+  return { correo_otp: correo, congelado: false };
 }
 
 /**
@@ -520,7 +1311,9 @@ function _getConsentResumen(consentId) {
  * en el catch para no dejar PDFs huérfanos. BD↔FS 1:1.
  *
  * @param {string} token
- * @param {object} opts - { manifestacion_aceptada, firma_visual_png? }
+ * @param {object} opts - { manifestacion_aceptada }
+ *   (SOLO eso: la firma visual en PNG no se admite y el endpoint la rechaza
+ *   con un 400 que lo dice. Ver routes/public.js, `rechazarFirmaVisual`.)
  * @returns {Promise<{ok: true, estado, evidence_hash, fecha_firma, ...}>}
  */
 async function commit(token, opts, ip, user_agent) {
@@ -858,7 +1651,11 @@ async function commit(token, opts, ip, user_agent) {
   // editable y hoy puede no ser la que el firmante vio. Sin esto, la
   // constancia cumpliría con mostrar la identificación equivocada.
   const empresaIdentificacion = consentResumen
-    ? empresaService.parseSnapshot(consentResumen.empresa_snapshot)
+    ? empresaService.parseSnapshotParaMostrar(
+      consentResumen.empresa_snapshot,
+      signRequest.id_empresa,
+      { hashEsperado: consentResumen.empresa_hash }
+    )
     : null;
 
   const constanciaMetadata = {
@@ -998,6 +1795,11 @@ async function commit(token, opts, ip, user_agent) {
   //     (la firma es válida legalmente), pero se registra COPY_FAILED en
   //     la auditoría para que RH pueda intervenir (reenviar, escalar).
   //     El PDF y la Constancia se adjuntan al correo vía sendSignedCopy().
+  //
+  //     D-2: la copia va al CONTACTO REGISTRADO por la Empresa (el mismo
+  //     canal que la invitación), no al medio personal del OTP. Son dos
+  //     canales distintos: el OTP es el dato de creación; la copia es la
+  //     evidencia que la Empresa le debe a su trabajador.
   const correo = resolveCorreo(signRequest);
   if (!correo) {
     logger.warn('No hay correo para enviar copia firmada', {
@@ -1273,10 +2075,29 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
-  validateAgreementStillActive(signRequest);
+  // 2. Exigir el Acuerdo ACEPTADO (3.4(g) va antes de (h)).
+  //
+  //    El orden pactado es: (g) leer y aceptar el Acuerdo → (h) visualizar
+  //    y descargar el documento. El 3.4(g) lo dice sin rodeos: "El Trabajador
+  //    no puede avanzar en el flujo sin leer y aceptar el Acuerdo". Antes de
+  //    esta fase, con solo el OTP verificado (estado OTP_VERIFIED) ya se
+  //    podía pedir el documento y registrar su visualización: el Firmante
+  //    veía el documento y la casilla del Acuerdo al mismo tiempo, y podía
+  //    firmar sin haber aceptado.
+  exigirAcuerdoAceptado(signRequest);
 
-  // 3. Validar estado: debe estar al menos en OTP_VERIFIED
+  // 2.1. 8B · Exigir el consentimiento EXPRESO del dato sensible (10.8).
+  //
+  // Si el documento contiene información de salud, el Titular tiene que
+  // haber leído el aviso y autorizadoslo antes de ver el documento. Es el
+  // mismo orden que el Acuerdo (el aviso va antes que el documento) y la
+  // misma razón: el 10.8(a) pide que se le informe de manera expresa y
+  // PREVIA.
+  exigirConsentimientoSensible(signRequest);
+
+  // 3. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
+  validateAgreementStillActive(signRequest);
+  // 4. Validar estado: debe estar al menos en OTP_VERIFIED
   const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
@@ -1284,13 +2105,13 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
       { current_state: signRequest.estado });
   }
 
-  // 3. Validar que vio el documento hasta el final
+  // 5. Validar que vio el documento hasta el final
   if (!scrollAlFinal) {
     throw new AppError(422, 'INVALID_REQUEST_BODY',
       'Debe scrollear al final del documento antes de continuar');
   }
 
-  // 4. Transición de estado
+  // 6. Transición de estado
   const now = new Date().toISOString();
   const nuevoEstado = signRequest.estado === 'OTP_VERIFIED'
     ? 'DOCUMENT_VIEWED'  // primera vez: salta a VIEWED si trae scroll=true
@@ -1320,23 +2141,39 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
 }
 
 /**
- * Devuelve el PDF del documento para descarga/visualización.
+ * Devuelve el PDF del documento OBJETO DE LA FIRMA para descarga/visualización.
  *
- * Solo accesible en estados donde se ha verificado OTP.
+ * Esto es el paso (h) del 3.4: "El Trabajador visualiza y descarga el
+ * documento objeto de la firma". El documento firmado es otra cosa, y lo
+ * sirve `getSignedPdfForToken` (5.4).
+ *
+ * Solo accesible en estados donde se ha verificado el OTP **y** se ha
+ * aceptado el Acuerdo: el orden pactado es (g) Acuerdo → (h) documento.
  */
 function getPdfForToken(token) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Validar estado
-  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED', 'SIGNED'];
+  // 2. Exigir el Acuerdo ACEPTADO (3.4(g) va antes de (h)).
+  exigirAcuerdoAceptado(signRequest);
+
+  // 2.1. 8B · Y el consentimiento expreso del dato sensible, si lo hay
+  // (numeral 10.8). El PDF es el documento: si se sirve el PDF, el Titular
+  // ya tiene que haber sido informado.
+  exigirConsentimientoSensible(signRequest);
+
+  // 3. Validar estado
+  //
+  //    'SIGNED' no va aquí: en estado firmado el enlace entrega el documento
+  //    firmado por otra ruta (5.4), no el original.
+  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `El PDF no está disponible en estado '${signRequest.estado}'`,
       { current_state: signRequest.estado });
   }
 
-  // 3. Leer PDF
+  // 4. Leer PDF
   if (!signRequest.pdf_original_path) {
     throw new AppError(500, 'PDF_NOT_FOUND', 'No se encontró el PDF original');
   }
@@ -1345,6 +2182,81 @@ function getPdfForToken(token) {
   return {
     buffer: pdfBuffer,
     filename: `${signRequest.id_solicitud}.pdf`,
+  };
+}
+
+/**
+ * Devuelve el PDF FIRMADO de la solicitud (5.4 del Acuerdo de uso).
+ *
+ * "El Firmante puede imprimir o descargar copia de este Acuerdo y del
+ * documento firmado desde el propio enlace de firma, sin costo alguno."
+ *
+ * El enlace es de un solo uso (3.4(c)): esto NO reabre el flujo. Solo
+ * permite bajar lo que ya está firmado, y solo mientras el enlace siga
+ * vigente. Identificar, pedir OTP, aceptar el Acuerdo y firmar siguen
+ * cerrados en estado firmado.
+ *
+ * Regla que se cumple aquí: **el token solo no sirve el PDF firmado antes de
+ * la identidad**. Un enlace que no pasó por OTP y aceptación del Acuerdo no
+ * llega ni a este punto: el estado no es de firma y la respuesta es 409.
+ *
+ * @param {string} token
+ * @returns {{buffer: Buffer, filename: string}}
+ */
+function getSignedPdfForToken(token) {
+  // 1. Resolver token permitiendo el estado firmado (no los demás terminales:
+  //    una solicitud rechazada, revocada o cancelada no descarga nada).
+  const { signRequest } = resolveToken(token, { permitirFirmado: true });
+
+  // 2. Solo si la firma ya ocurrió.
+  if (!ESTADOS_FIRMADOS.includes(signRequest.estado)) {
+    throw new AppError(409, 'SIGNED_DOCUMENT_NOT_AVAILABLE',
+      'El documento firmado todavía no está disponible',
+      { current_state: signRequest.estado });
+  }
+
+  // 3. Leer el PDF firmado que dejó el commit().
+  if (!signRequest.pdf_firmado_path) {
+    throw new AppError(404, 'PDF_NOT_FOUND', 'No se encontró el documento firmado');
+  }
+
+  const pdfBuffer = storage.readPdf(signRequest.pdf_firmado_path);
+  return {
+    buffer: pdfBuffer,
+    filename: `${signRequest.id_solicitud}-firmado.pdf`,
+  };
+}
+
+/**
+ * Devuelve el TEXTO del Acuerdo de uso que el firmante aceptó (5.4).
+ *
+ * "descargar copia de este Acuerdo [...] desde el propio enlace de firma".
+ *
+ * Se devuelve el texto EXACTO de la versión ligada a la solicitud: es el
+ * mismo cuyo SHA-256 quedó archivado como `hash_texto_acuerdo` en el
+ * consentimiento. La respuesta lleva ese hash en la cabecera
+ * `X-Acuerdo-SHA256`, para que el firmante pueda comprobar que la copia es
+ * la que aceptó.
+ *
+ * @param {string} token
+ * @returns {{texto: string, version: string, texto_hash: string, filename: string}}
+ */
+function getAgreementCopyForToken(token) {
+  // 1. Resolver token (permitiendo el estado firmado: la copia del Acuerdo
+  //    se puede bajar también después de firmar).
+  const { signRequest } = resolveToken(token, { permitirFirmado: true });
+
+  // 2. Resolver el Acuerdo de esta solicitud.
+  const acuerdo = resolverAcuerdo(signRequest);
+  if (!acuerdo) {
+    throw new AppError(404, 'AGREEMENT_NOT_FOUND', 'No se encontró el Acuerdo de uso');
+  }
+
+  return {
+    texto: acuerdo.texto,
+    version: acuerdo.version,
+    texto_hash: acuerdo.texto_hash,
+    filename: `acuerdo-uso-${acuerdo.version}.txt`,
   };
 }
 
@@ -1421,6 +2333,19 @@ function verifyOtp(token, otp, ip, user_agent) {
 
       signRequestService.registerEvent(signRequest.id, 'OTP_VERIFIED',
         { intentos: result.attempts }, 'trabajador', ip, user_agent);
+
+      // 9A (el 8.2): verificado el codigo, el Trabajador demostro que
+      // controla el buzon que declaro. El medio pasa a ACTIVO: ya es un
+      // medio ELECTRONICO AUTORIZADO por el, y por ese buzon se le puede
+      // entregar la copia del documento.
+      if (signRequest.correo_otp && signRequest.id_trabajador) {
+        mediosService.activar(
+          signRequest.id_empresa,
+          signRequest.id_trabajador,
+          'CORREO_OTP',
+          signRequest.correo_otp
+        );
+      }
     });
     tx();
 
@@ -1522,7 +2447,7 @@ function verifyOtp(token, otp, ip, user_agent) {
  */
 const ESTADOS_PERMITIDOS_PARA_CONSENT = ['OTP_VERIFIED', 'DOCUMENT_VIEWED'];
 
-function consentAccept(token, ip, user_agent) {
+async function consentAccept(token, ip, user_agent) {
   // 1. Resolver token (404 / 410)
   const { signRequest } = resolveToken(token);
 
@@ -1536,6 +2461,25 @@ function consentAccept(token, ip, user_agent) {
         required_states: ESTADOS_PERMITIDOS_PARA_CONSENT,
         id_solicitud: signRequest.id_solicitud,
       });
+  }
+
+  // 3. 10.4 · EL CAMINO POSITIVO DEL 9.5.
+  //
+  //    Si la versión vigente del Acuerdo no es la que la solicitud tiene
+  //    ligada, la solicitud MIGRARA a la vigente: es la que el firmante está
+  //    leyendo en pantalla y es la que hay que dejar archivada con su huella.
+  //    Sin esto, publicar una v1.1 dejaría a los trabajadores con enlaces
+  //    colgados en un 409 sin salida.
+  const migracion = await migrarAVersionVigente(signRequest, ip, user_agent);
+  if (migracion) {
+    // La versión que se archivó cambió: el firmante tiene que leer y
+    // aceptar la nueva. El texto que se le muestra es la versión vigente
+    // (ver `resolverAcuerdoVigente`), así que lo que acepta es lo que se
+    // archiva.
+    logger.info('consentAccept: la solicitud se migró a la versión vigente', {
+      id_solicitud: signRequest.id_solicitud,
+      ...migracion,
+    });
   }
 
   // 3b. Rama EMPRESA (I-FIRMA-DUAL): el representante acepta SU consentimiento,
@@ -1692,6 +2636,40 @@ function consentAccept(token, ip, user_agent) {
 function resendOtp(token, ip, user_agent) {
   // 1. Resolver token (valida existencia, expiración, estados terminales)
   const { signRequest } = resolveToken(token);
+  return resendOtpDeSignRequest(signRequest, ip, user_agent);
+}
+
+/**
+ * El núcleo del reenvío de OTP, sin token.
+ *
+ * 8C: el endpoint interno `POST /internal/sign-requests/:id/resend-otp` ya
+ * tiene la solicitud (la resolvió por id), así que no necesita—and no debe
+ * necesitar— un token en texto claro. Antes lo recuperaba de la copia
+ * cifrada del metadata, que la 8C dejó de existir.
+ *
+ * Lo que NO se salta: la ventana para firmar. Un OTP para una solicitud
+ * vencida no sirve de nada, y es la misma respuesta que daba el flujo
+ * público (410 TOKEN_EXPIRED).
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas.
+ * @param {string} ip
+ * @param {string} user_agent
+ */
+function resendOtpDeSignRequest(signRequest, ip, user_agent) {
+  // 1.5. La ventana para firmar (el mismo chequeo que hace resolveToken).
+  if (Date.now() > new Date(signRequest.fecha_expiracion).getTime()) {
+    throw new AppError(410, 'TOKEN_EXPIRED', 'El token ha expirado', {
+      expired_at: signRequest.fecha_expiracion,
+    });
+  }
+
+  // 1.6. Estados terminales → 410. La misma respuesta que daba el flujo
+  // público: `resolveToken` rechazaba los terminales antes de llegar al
+  // chequeo de estados del reenvío.
+  if (['SIGNED', 'REJECTED', 'REVOKED', 'CANCELLED', 'EXPIRED'].includes(signRequest.estado)) {
+    throw new AppError(410, 'TOKEN_ALREADY_USED',
+      `La solicitud está en estado terminal '${signRequest.estado}'`);
+  }
 
   // 2. Validar estado actual
   const ESTADOS_RESEND_PERMITIDOS = ['OTP_SENT', 'OTP_LOCKED'];
@@ -1762,6 +2740,14 @@ function resendOtp(token, ip, user_agent) {
   if (!correo) {
     throw new AppError(400, 'MISSING_EMAIL',
       'No hay correo de verificación disponible para reenviar OTP');
+  }
+  // D-2: el reenvío del OTP va al MISMO destino que el OTP original (el
+  // medio personal declarado, o el contacto registrado si no se declaró
+  // nada). Un código que llega a un buzón distinto al del primero rompería
+  // la trazabilidad del 3.4(e).
+  const destinoOtp = resolveCorreoOtp(signRequest, null, correo);
+  if (destinoOtp.correo) {
+    correo = destinoOtp.correo;
   }
 
   // 6. Actualizar BD + registrar evento en transacción atómica
@@ -1871,9 +2857,12 @@ function _maskEmail(email) {
  * }}
  */
 function getVerificationContext(token) {
-  // skipExpirationCheck=true: la verificación pública debe funcionar
+  // permitirHistorico=true: la verificación pública debe funcionar
   // indefinidamente (es READ-ONLY, no permite firmar ni otras acciones).
-  const { signRequest } = resolveToken(token, { skipExpirationCheck: true });
+  // 8A.1: esto ignora el VENCIMIENTO DEL ENLACE, no el del plazo de
+  // conservación: si el 10.6 venció, el resolveToken lanza y aquí no se
+  // llega a afirmar que la firma está vigente.
+  const { signRequest } = resolveToken(token, { permitirHistorico: true });
 
   // Cédula enmascarada: primeros 6 chars de la huella archivada, mismo
   // patrón que el PDF. La huella es determinística, así que dos personas
@@ -2049,7 +3038,11 @@ function verifyPdfHash(token, pdfBuffer, ip, user_agent) {
     throw new AppError(400, 'NOT_A_PDF', 'El archivo no parece ser un PDF válido');
   }
 
-  const { signRequest } = resolveToken(token, { skipExpirationCheck: true });
+  // Operación histórica autorizada: comparar el PDF que el firmante tiene
+  // contra el que se firmó es una consulta de solo lectura, válida aunque
+  // la ventana para firmar ya haya vencido (8A.1). El vencimiento del plazo de
+  // conservación (10.6) no se salta.
+  const { signRequest } = resolveToken(token, { permitirHistorico: true });
   const computed = sha256(pdfBuffer);
   const stored = signRequest.document_hash_firmado;
   const matches = !!(stored && computed === stored);
@@ -2099,14 +3092,463 @@ function registerVerifyConsulted(signRequest, ip, user_agent) {
   }
 }
 
+// ===========================================================================
+// 9A · LA FIRMA EN PAPEL (el 7.1-7.3) Y LOS MEDIOS AUTORIZADOS (el 8.2)
+// ===========================================================================
+
+/**
+ * La Empresa registra el documento YA FIRMADO en papel (el 7.2).
+ *
+ * Lo que hace:
+ *   - guarda el PDF firmado (el que la Empresa escaneó) y calcula su huella
+ *     (la calcula el servidor, no el cliente);
+ *   - genera el "Registro de firma autográfica": la evidencia del acto
+ *     (en el sentido en que la Constancia lo es del acto electrónico);
+ *   - deja el asiento en la tabla de firmas en papel y el evento;
+ *   - le entrega la COPIA al Trabajador por un medio que él autorizó (el
+ *     8.2 y el 8.5).
+ *
+ * @param {string} id_solicitud
+ * @param {object} opts
+ * @param {Buffer} opts.pdfBuffer - el PDF firmado en papel
+ * @param {string} opts.pdfHash - el SHA-256 (lo calcula el servidor)
+ * @param {string} [opts.actor] - el operador de la Empresa
+ * @param {string} [opts.ip]
+ * @param {string} [opts.user_agent]
+ * @param {object} [opts.metadata]
+ * @returns {Promise<object>}
+ */
+async function registrarFirmaEnPapel(id_solicitud, opts) {
+  const opciones = opts || {};
+  const signRequest = signRequestService.getByIdSolicitud(id_solicitud);
+  if (!signRequest) {
+    throw new AppError(404, 'SIGN_REQUEST_NOT_FOUND', 'No existe la solicitud');
+  }
+
+  // La vía en papel la abre la EMPRESA: el Trabajador le pide el papel por
+  // el canal que la Empresa tenga (el de atención, el de PQRS, el que le
+  // muestre el Acuerdo) y la Empresa lo registra aquí. Si la vía no
+  // estaba abierta, se abre con el asiento `PAPER_TRACK_OPENED`, que guarda
+  // el canal por el que llegó la petición: eso es lo que prueba que la
+  // opción existía y era accesible (el 2.2.1.1.11 es un deber de medios,
+  // y los medios se prueban, no se declaran).
+  if (!papelService.obtenerPorSolicitud(id_solicitud)) {
+    papelService.abrir(signRequest, {
+      actor: opciones.actor || 'empresa',
+      canal: opciones.canal || null,
+      motivo: opciones.motivo || null,
+      ip: opciones.ip,
+      user_agent: opciones.user_agent,
+      registerEvent: signRequestService.registerEvent,
+    });
+  }
+
+  if (!Buffer.isBuffer(opciones.pdfBuffer)) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'No se recibió el PDF del documento firmado en papel');
+  }
+
+  // 1. El PDF firmado en papel.
+  const pdfPath = storage.savePapel(id_solicitud + '-firmado.pdf', opciones.pdfBuffer);
+
+  // 2. El Registro de firma autográfica (la evidencia del acto).
+  const empresa = empresaService.getById(signRequest.id_empresa);
+  const parcial = ultimos4.obtener(signRequest.id);
+  const ahora = new Date().toISOString();
+  const registroBuffer = await pdfGenPapel.generateRegistroFirmaAutografica({
+    id_solicitud: signRequest.id_solicitud,
+    id_documento: signRequest.id_documento,
+    razon_social: empresa ? empresa.razon_social : null,
+    nit: empresa ? empresa.nit : null,
+    identificacion_parcial: parcial
+      ? ((signRequest.identificacion_tipo || parcial.tipo || '') + ' \u2022\u2022\u2022\u2022 ' + parcial.digitos)
+      : null,
+    tipo_identificacion: signRequest.identificacion_tipo,
+    fecha_firma: ahora,
+    pdf_hash: opciones.pdfHash,
+    pdf_hash_original: signRequest.document_hash_original || null,
+    version_kair: signRequest.version_kair,
+    acuerdo_hash: signRequest.agreement_hash,
+    id_actor: opciones.actor || 'sistema',
+    fecha_registro: ahora,
+  });
+  const registroPath = storage.savePapel(id_solicitud + '-registro.pdf', registroBuffer);
+
+  // 3. El asiento y el evento.
+  // La metadata del asiento: la pareja de huellas (el documento original y
+  // el firmado en papel) es lo que ata el papel al documento que se envió
+  // a firma. El papel firmado NO puede tener la misma huella que el
+  // original (está firmado a mano), así que el vínculo tiene que ser
+  // expréso en la evidencia.
+  const metadataPapel = Object.assign({}, opciones.metadata || {}, {
+    id_documento: signRequest.id_documento,
+    document_hash_original: signRequest.document_hash_original || null,
+    pdf_hash: opciones.pdfHash,
+  });
+
+  const fila = papelService.registrarFirmado({
+    id_solicitud,
+    pdfPath,
+    pdfHash: opciones.pdfHash,
+    registroPath,
+    acuerdoHash: signRequest.agreement_hash,
+    actor: opciones.actor || 'sistema',
+    ip: opciones.ip,
+    user_agent: opciones.user_agent,
+    metadata: metadataPapel,
+    registerEvent: signRequestService.registerEvent,
+  });
+
+  // 4. La vía electrónica de esta solicitud queda CERRADA: el documento se
+  //    firmó a mano, no electrónicamente. Cerrarla es lo que impide la doble
+  //    firma (y el 2.2.2.47.2 exige que la salida en papel no prive de efecto a
+  //    la firma electrónica: aquí no se prive de nada, la electrónica nunca
+  //    se firma).
+  const txCierre = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firmas_electronicas SET estado = 'CANCELLED' WHERE id = ?
+    `).run(signRequest.id);
+    signRequestService.registerEvent(signRequest.id, 'ELECTRONIC_FLOW_CANCELLED', {
+      motivo: 'FIRMA_EN_PAPEL',
+      id_solicitud: signRequest.id_solicitud,
+    }, opciones.actor || 'empresa', opciones.ip, opciones.user_agent);
+  });
+  txCierre();
+
+  // 5. La copia al Trabajador, por un medio que él autorizó (el 8.2/8.5).
+  const destino = _destinoCopiaTrabajador(signRequest);
+  let copia = { enviada: false, motivo: 'sin_medio_autorizado' };
+  if (destino.correo) {
+    try {
+      await mailer.sendSignedCopy({
+        to: destino.correo,
+        pdfPath,
+        constanciaPath: registroPath,
+        context: {
+          id_solicitud: signRequest.id_solicitud,
+          id_constancia: 'REGISTRO-' + id_solicitud,
+        },
+        tipo: 'PAPEL',
+      });
+      copia = { enviada: true, medio: destino.medio, correo: destino.correo };
+    } catch (e) {
+      // La copia que NO se pudo enviar no invalida la firma: el documento
+      // firmado ya está. Queda el aviso para que la Empresa lo reintente.
+      logger.warn('9A: no se pudo enviar la copia de la firma en papel', {
+        id_solicitud,
+        error: e.message,
+      });
+      signRequestService.registerEvent(signRequest.id, 'PAPER_COPY_FAILED', {
+        id_solicitud,
+        error: e.message,
+      }, opciones.actor || 'sistema', opciones.ip, opciones.user_agent);
+      copia = { enviada: false, motivo: 'error_envio', error: e.message };
+    }
+  }
+
+  return {
+    ok: true,
+    id_solicitud: signRequest.id_solicitud,
+    estado_papel: fila.estado,
+    pdf_hash: opciones.pdfHash,
+    registro_path: registroPath,
+    copia,
+  };
+}
+
+/**
+ * A qué medio se le entrega la copia del documento firmado (el 8.2).
+ *
+ * El orden NO es arbitrario: primero el medio PERSONAL que el Trabajador
+ * declaró y verificó (el CORREO_OTP), después el correo registrado en la
+ * hoja de vida, y por último el correo de la solicitud (que es el de la
+ * Empresa: es el peor, pero es el que hay).
+ *
+ * @param {object} signRequest
+ * @returns {{correo: string|null, medio: string|null}}
+ */
+function _destinoCopiaTrabajador(signRequest) {
+  const activos = mediosService.listarActivos(
+    signRequest.id_empresa,
+    signRequest.id_trabajador
+  );
+  const porTipo = {};
+  for (const m of activos) porTipo[m.tipo] = m.valor;
+
+  if (porTipo.CORREO_OTP && String(porTipo.CORREO_OTP).includes('@')) {
+    return { correo: porTipo.CORREO_OTP, medio: 'CORREO_OTP' };
+  }
+  if (porTipo.EMAIL_HOJA_VIDA && String(porTipo.EMAIL_HOJA_VIDA).includes('@')) {
+    return { correo: porTipo.EMAIL_HOJA_VIDA, medio: 'EMAIL_HOJA_VIDA' };
+  }
+  if (signRequest.correo_verificacion
+      && String(signRequest.correo_verificacion).includes('@')) {
+    return { correo: signRequest.correo_verificacion, medio: 'CONTACTO_SOLICITUD' };
+  }
+  return { correo: null, medio: null };
+}
+
+/**
+ * 9A · LOS MEDIOS AUTORIZADOS DEL TRABAJADOR (el 8.2) — el servicio
+ * =====================================================================
+ *
+ * El 8.2 del Acuerdo: "El Trabajador puede modificar esta autorización en
+ * cualquier momento y sin costo alguno."
+ *
+ * Estas dos funciones son la vía por la que lo hace, desde la mini-app:
+ *
+ *   listarMediosTrabajador()   → lo que hay registrado y con qué estado.
+ *   gestionarMediosTrabajador() → agregar o retirar un medio.
+ *
+ * EL ESTADO `PENDIENTE` Y POR QUÉ
+ * --------------------------------
+ * Un medio agregado nace PENDIENTE y se activa SOLO cuando el Trabajador
+ * demuestra que lo controla: cuando el código de verificación llega a ese
+ * medio y lo verifica (la vía del D-2, la declaración del medio del OTP).
+ *
+ * El motivo es concreto: si un medio naciera ACTIVO, cualquiera que tuviera
+ * el enlace podría escribir un correo ajeno en el registro, y a partir de ahí
+ * la Empresa le entregaría la copia del documento a un desconocido. Con el
+ * medio en PENDIENTE, la copia solo se entrega por un buzón que el
+ * Trabajador demostró controlar.
+ *
+ * Tests: tests/n9a-medios-y-papel.test.js
+ */
+'use strict';
+
+/**
+ * Los estados en los que la vía de medios está habilitada.
+ * A partir de IDENTIFIED, el que llama ya demostró conocer el documento.
+ */
+const ESTADOS_CON_MEDIOS = [
+  'IDENTIFIED', 'OTP_SENT', 'OTP_VERIFIED', 'DOCUMENT_OPENED',
+  'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED',
+];
+
+/**
+ * Exige que la solicitud esté identificada.
+ * @param {object} signRequest
+ */
+function _exigirEstadoMedios(signRequest) {
+  if (ESTADOS_CON_MEDIOS.indexOf(signRequest.estado) === -1) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      'Para ver o modificar tus medios autorizados primero tenés que '
+      + 'identificarte en esta solicitud',
+      { current_state: signRequest.estado });
+  }
+}
+
+/**
+ * Los medios autorizados del Trabajador.
+ *
+ * @param {string} token
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {object}
+ */
+function listarMediosTrabajador(token, ip, user_agent) {
+  const { signRequest } = resolveToken(token);
+  _exigirEstadoMedios(signRequest);
+
+  const medios = mediosService.listarTodos(
+    signRequest.id_empresa,
+    signRequest.id_trabajador
+  );
+
+  return {
+    id_solicitud: signRequest.id_solicitud,
+    medios: medios.map((m) => ({
+      tipo: m.tipo,
+      valor: m.valor,
+      estado: m.estado,
+      origen: m.origen,
+      fecha_registro: m.fecha_registro,
+      fecha_modificacion: m.fecha_modificacion,
+    })),
+    aviso: 'Un medio nuevo queda pendiente hasta que lo verifiques: '
+      + 'te mandamos un código y, cuando lo recibas, queda activo para '
+      + 'entregarte las copias.',
+  };
+}
+
+/**
+ * Agrega o retira un medio autorizado (el 8.2).
+ *
+ * @param {string} token
+ * @param {object} body - {accion: 'ALTA'|'BAJA', tipo, correo}
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {object}
+ */
+function gestionarMediosTrabajador(token, body, ip, user_agent) {
+  const { signRequest } = resolveToken(token);
+  _exigirEstadoMedios(signRequest);
+
+  const datos = body || {};
+  const accion = datos.accion === 'BAJA' ? 'BAJA' : 'ALTA';
+  const tipo = datos.tipo || 'CORREO_OTP';
+  const correo = (datos.correo || '').trim().toLowerCase();
+
+  if (accion === 'BAJA') {
+    if (!correo) {
+      throw new AppError(400, 'INVALID_REQUEST_BODY',
+        'Falta el correo del medio que querés retirar');
+    }
+    const resultado = mediosService.darDeBaja({
+      id_empresa: signRequest.id_empresa,
+      id_trabajador: signRequest.id_trabajador,
+      tipo,
+      valor: correo,
+    });
+    signRequestService.registerEvent(signRequest.id, 'AUTHORIZED_MEDIA_REMOVED', {
+      tipo,
+      correo: _enmascarar(correo),
+    }, 'trabajador', ip, user_agent);
+    return {
+      ok: true,
+      accion: 'BAJA',
+      medio: { tipo, valor: correo, estado: 'BAJA' },
+      aviso: 'Listo: ese medio ya no te lo usamos para entregarte copias.',
+    };
+  }
+
+  if (!correo || !correo.includes('@')) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'El medio debe ser un correo electrónico válido');
+  }
+
+  const resultado = mediosService.registrar({
+    id_empresa: signRequest.id_empresa,
+    id_trabajador: signRequest.id_trabajador,
+    tipo,
+    valor: correo,
+    origen: 'TRABAJADOR',
+    estado: 'PENDIENTE',
+  });
+
+  signRequestService.registerEvent(signRequest.id, 'AUTHORIZED_MEDIA_ADDED', {
+    tipo,
+    correo: _enmascarar(correo),
+    estado: 'PENDIENTE',
+  }, 'trabajador', ip, user_agent);
+
+  return {
+    ok: true,
+    accion: 'ALTA',
+    medio: {
+      tipo,
+      valor: correo,
+      estado: 'PENDIENTE',
+    },
+    aviso: 'Lo agregamos. Queda pendiente hasta que lo verifiques: '
+      + 'te mandamos un código a ese correo y, cuando lo recibas, '
+      + 'queda activo para entregarte las copias.',
+  };
+}
+
+/**
+ * Enmascara un correo para el registro de eventos.
+ * @param {string} correo
+ * @returns {string}
+ */
+function _enmascarar(correo) {
+  if (typeof correo !== 'string' || !correo.includes('@')) return '—';
+  const [local, dominio] = correo.split('@');
+  const visible = local.slice(0, Math.min(3, local.length));
+  return visible + '***@' + dominio;
+}
+
+/**
+ * Deja constancia de que se le OFRECIÓ al Trabajador la vía en papel.
+ *
+ * POR QUÉ HAY DOS ASIENTOS Y NO UNO
+ * -------------------------------
+ *   - `PAPER_TRACK_OPENED`: la vía se ABRIÓ (la Empresa la registró, con
+ *     el canal por el que el Trabajador la pidió). Prueba que la vía
+ *     existía y era accesible.
+ *   - `PAPER_OPTION_AVAILABLE` (este): se le OFRECIÓ. Prueba que la
+ *     opción estuvo disponible y accesible. La oferta viaja en el CORREO de
+ *     invitación (lo manda la Empresa, que es quien tiene el deber del 7.2),
+ *     y la huella del cuerpo del correo es lo que queda archivado.
+ *
+ * El segundo es el que sostiene la posición de la Empresa frente a un
+ * Inspector del Trabajo (el 2.2.1.1.15) o frente a un reclamo del Titular:
+ * la pregunta que se hará es ¿cómo prueba la Empresa que la opción
+ * estaba ahí?, no solo que un trabajador la encontró.
+ *
+ * Se escribe UNA vez por solicitud (la primera vez que se le muestra la
+ * mini-app o que se le manda la invitación).
+ *
+ * MINIMIZACIÓN: no se guarda la IP ni el user-agent. Esto no es una
+ * manifestación del Trabajador: es la constancia de una oferta. Guardo
+ * la IP del QUE PIDIÓ (que sí es una manifestación) en el evento de
+ * la petición.
+ *
+ * @param {object} signRequest
+ * @param {string} [canal] - 'correo'
+ * @param {string} [hashOferta] - la huella del cuerpo del correo enviado
+ * @returns {boolean} true si se registró ahora
+ */
+function registrarOpcionPapelDisponible(signRequest, canal, hashOferta) {
+  const ya = db.prepare(
+    "SELECT id FROM gh_firma_eventos WHERE firma_id = ? AND evento = 'PAPER_OPTION_AVAILABLE' LIMIT 1"
+  ).get(signRequest.id);
+  if (ya) return false;
+
+  signRequestService.registerEvent(signRequest.id, 'PAPER_OPTION_AVAILABLE', {
+    id_solicitud: signRequest.id_solicitud,
+    id_empresa: signRequest.id_empresa,
+    version_kair: signRequest.version_kair || null,
+    // La huella de lo que se le mostró: el cuerpo del correo de invitación
+    // (la oferta de la vía en papel viaja en el correo de la Empresa, no
+    // en la mini-app: el 7.2 es un deber de la Empresa y el producto no puede
+    // prometer en su nombre).
+    hash_oferta: hashOferta || null,
+    canal: canal || 'mini_app',
+    // El numeral del Acuerdo que respalda la opción.
+    fundamento: '7.2 y 7.3 del Acuerdo de uso; 2.2.1.1.11 del Decreto 1072 de 2015',
+  }, 'sistema', null, null);
+
+  logger.info('Opción de firma en papel ofrecida', {
+    id_solicitud: signRequest.id_solicitud,
+    canal: canal || 'mini_app',
+  });
+  return true;
+}
+
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
   identify,
   verifyOtp,
   resendOtp,
+  resendOtpDeSignRequest,  // 8C: el endpoint interno no necesita un token
   viewDocument,
   getPdfForToken,
+  // FASE 6 · 5.4: el enlace de firma entrega el documento firmado y la copia
+  // del Acuerdo, sin reabrir el flujo.
+  getSignedPdfForToken,
+  getAgreementCopyForToken,
+  // FASE 6 · orden (g)/(h): resolución del Acuerdo de la solicitud y estado
+  // de aceptación. La versión estricta (exigirAcuerdoAceptado) es interna.
+  resolverAcuerdo,
+  resolverAcuerdoVigente,
+  resolveCorreoOtp,
+  declararMedioOtp,
+  declararMedioPublico,
+  // 9A: la firma en papel (el 7.1-7.3)
+  registrarFirmaEnPapel,
+  registrarOpcionPapelDisponible,
+  // 9A: los medios autorizados (el 8.2)
+  listarMediosTrabajador,
+  gestionarMediosTrabajador,
+  ESTADOS_CON_MEDIOS,
+  acuerdoAceptado,
+  // 8B · El dato sensible (10.8).
+  resolverDatoSensible,
+  sensibleAutorizado,
+  exigirConsentimientoSensible,
+  consentirDatoSensible,
   commit,
   reject,
   consentAccept,

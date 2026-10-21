@@ -7,7 +7,8 @@
  * - GET  /internal/sign-requests?ids=id1,id2,id3                 (I-008: batch, internalServerLimiter 4 capas)
  * - GET  /internal/sign-requests/:id/document.pdf                (I-103: PDF descargable autenticado)
  * - GET  /internal/sign-requests/:id/constancia.pdf              (I-104: Constancia descargable autenticada)
- * - GET  /internal/sign-requests/:id/link                        (I-013b: link recovery)
+ * - GET  /internal/sign-requests/:id/link                        (I-013b: link recovery, DEPRECADO en la 8C)
+ * - POST /internal/sign-requests/:id/link/rotate                 (8C: rotación del enlace)
  * - POST /internal/sign-requests/:id/resend-otp                  (I-103.A1.6.B: reenvío OTP desde K+AIR)
  *
  * Auth (I-010, D-13, I-008): los 7 endpoints usan `requireEmpresaScopeAndLimit`
@@ -29,13 +30,74 @@ const { validateBody } = require('../middleware/validate');
 const {
   signRequestBody, signRequestListQuery, signRequestIdsQuery,
   signRequestNotifyBody,  // I-103.A1.5.1
+  signRequestRotateBody,  // 8C: link/rotate
+  suministroAutoridadBody,  // 9A: el 8.4 (suministro a autoridades)
 } = require('../schemas');
 const signRequestService = require('../services/signRequest');
+const metadataService = require('../services/metadata');  // 8B: lista blanca de `metadata`
 const publicFlow = require('../services/publicFlow');
+const mediosService = require('../services/medios');   // 9A: los medios autorizados (el 8.2)
+const papelService = require('../services/papel');   // 9A: la firma autográfica (el 7.1-7.3)
 const storage = require('../services/storage');
 const { AppError } = require('../middleware/errors');
 const logger = require('../utils/logger');
 const config = require('../config');
+
+/**
+ * Resuelve la solicitud de una ruta interna y aplica el silencio
+ * cross-empresa.
+ *
+ * Devuelve null si YA respondió (400 o 404): el que llama tiene que
+ * salir en ese caso.
+ *
+ * @param {object} req
+ * @param {object} res
+ * @returns {object|null} la fila de la solicitud
+ */
+function _resolverInterno(req, res) {
+  const { id } = req.params;
+  let signRequest;
+  if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+    signRequest = signRequestService.getByIdSolicitud(id);
+  } else if (/^\d+$/.test(id)) {
+    signRequest = signRequestService.getById(parseInt(id, 10));
+  } else {
+    res.status(400).json({
+      error: {
+        code: 'INVALID_REQUEST_BODY',
+        message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+        request_id: req.id,
+      },
+    });
+    return null;
+  }
+
+  if (!signRequest) {
+    res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: `Solicitud ${id} no encontrada`,
+        request_id: req.id,
+      },
+    });
+    return null;
+  }
+
+  // Cross-company: 404 silencioso (no se confirma la existencia de una
+  // solicitud de otra empresa).
+  if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+    res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: `Solicitud ${id} no encontrada`,
+        request_id: req.id,
+      },
+    });
+    return null;
+  }
+
+  return signRequest;
+}
 
 /**
  * POST /internal/sign-requests
@@ -151,22 +213,55 @@ router.post('/sign-requests',
       });
     }
 
+    // 8B · LA LISTA BLANCA DE LO QUE SE ARCHIVA.
+    //
+    // El campo `metadata` es un string JSON libre (≤ 8192) y lo que va ahí
+    // queda archivado en la columna `metadata` de la fila. Lo que se
+    // archiva es DATO: puede ser PII y, en el peor caso, dato de salud (el
+    // 10.8 exige consentimiento expreso y el 10.6 exige suprimirlo).
+    //
+    // Antes se archivaba entero. `correo_empresa` es la prueba de que
+    // archivar lo que uno manda sin filtro cuesta datos: la app la mandaba
+    // desde hace meses, zod la eliminaba en silencio, nunca llegó a la base
+    // y la constancia salió sin el canal de copia del 8.4.
+    //
+    // Ahora lo desconocido se RECHAZA con un 400 que dice qué claves
+    // sobraron, en vez de perderse en silencio.
+    const filtrado = metadataService.filtrarMetadata(meta.metadata);
+    if (!filtrado.ok) {
+      if (filtrado.error) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: filtrado.error,
+            request_id: req.id,
+          },
+        });
+      }
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_BODY',
+          message: 'El metadata contiene claves que no se pueden archivar',
+          details: {
+            claves_no_permitidas: filtrado.desconocidas,
+            permitidas: metadataService.CLAVES_METADATA_PERMITIDAS,
+          },
+          request_id: req.id,
+        },
+      });
+    }
+
     // Los campos visibles de la Constancia no deben perderse: zod quita
     // campos desconocidos del body raíz, así que los guardamos explícitamente
     // dentro del metadata persistido del sign request.
-    let metadataExtra = {};
-    if (meta.metadata) {
-      try {
-        metadataExtra = JSON.parse(meta.metadata) || {};
-      } catch (e) {
-        metadataExtra = {};
-      }
-    }
+    const metadataExtra = Object.assign({}, filtrado.valor);
     if (meta.nombre_trabajador) metadataExtra.nombre_trabajador = meta.nombre_trabajador;
     if (meta.nombre_empresa) metadataExtra.nombre_empresa = meta.nombre_empresa;
+    // 8B: el canal de copia del 8.4. La app lo mandaba y se perdía.
+    if (meta.correo_empresa) metadataExtra.correo_empresa = meta.correo_empresa;
     const metadataToPersist = Object.keys(metadataExtra).length > 0
       ? JSON.stringify(metadataExtra)
-      : meta.metadata;
+      : null;
 
     const result = signRequestService.create({
       id_documento: meta.id_documento,
@@ -199,12 +294,22 @@ router.post('/sign-requests',
       // I-103.A1.6.C · El correo del firmante viaja top-level; si K+AIR no lo
       // envía, cae al fallback histórico de metadata.correo / consent.
       correo_verificacion: meta.correo_verificacion,
+      // D-2: el medio PERSONAL que la Empresa declara para el código de
+      // verificación (el dato de creación de la firma, el 47.4 num. 1).
+      correo_otp: meta.correo_otp,
       // I-FIRMA-DUAL (migration 013, v0.1.180): opt-in para que commit() del
       // worker cree automáticamente un sign request hijo (tipo_firmante='EMPRESA')
       // con el snapshot del representante legal. Si K+AIR no los envía, caen
       // al default 0/null (legacy compat).
       requiere_firma_empresa: meta.requiere_firma_empresa || 0,
       representante_legal_snapshot: meta.representante_legal_snapshot || null,
+      // 8B · La declaración de la Empresa sobre el dato sensible (10.8).
+      // El service la combina con lo que se infiere del tipo de documento.
+      datos_sensibles: meta.datos_sensibles,
+      categorias_datos_sensibles: meta.categorias_datos_sensibles || null,
+      base_legal_sensible: meta.base_legal_sensible || null,
+      base_legal_sensible_descripcion: meta.base_legal_sensible_descripcion || null,
+      finalidad_sensible: meta.finalidad_sensible || null,
       metadata: metadataToPersist,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,
@@ -300,6 +405,20 @@ router.get('/sign-requests/:id',
       version_kair: signRequest.version_kair,
       agreement_version: signRequest.agreement_version,
       consent_id: signRequest.consent_id,  // Bloque E6
+      // 9A (el 7.2): si la firma es en papel, el estado electrónico queda
+      // CANCELLED. Sin este dato, la Empresa vería "cancelada" y
+      // creería que no pasó nada: el estado de la vía en papel va aparte.
+      firma_papel: (() => {
+        const fila = papelService.obtenerPorSolicitud(signRequest.id_solicitud);
+        if (!fila) return null;
+        return {
+          estado: fila.estado,
+          fecha_solicitud: fila.fecha_solicitud,
+          fecha_entrega: fila.fecha_entrega,
+          fecha_firma: fila.fecha_firma,
+          pdf_hash: fila.pdf_hash,
+        };
+      })(),
       // I-002: categoría del documento firmado. Null para legacy pre-007.
       tipo_identificacion: signRequest.tipo_identificacion,
       // I-007: campos para UI. Se exponen en el response body pero el
@@ -400,6 +519,12 @@ router.get('/sign-requests',
           fecha_creacion: it.fecha_creacion,
           fecha_expiracion: it.fecha_expiracion,
           fecha_firma: it.fecha_firma,
+          // 9A: la vía en papel (el 7.2), cuando la hay.
+          firma_papel: (() => {
+            const fila = papelService.obtenerPorSolicitud(it.id_solicitud);
+            if (!fila) return null;
+            return { estado: fila.estado, fecha_solicitud: fila.fecha_solicitud };
+          })(),
         })),
       });
     } catch (err) {
@@ -564,7 +689,10 @@ router.get('/sign-requests/:id/document.pdf',
       }
 
       // Determinar qué PDF servir
-      const isSigned = signRequest.estado === 'SIGNED';
+      // 9A (el 8.3): el documento firmado se mantiene disponible para
+      // posterior consulta. `DUAL_FIRMADO` tambien esta firmado: servirle el
+      // ORIGINAL seria mostrarle a la Empresa un documento que nadie firmo.
+      const isSigned = ['SIGNED', 'DUAL_FIRMADO'].includes(signRequest.estado);
       const pathToServe = isSigned ? signRequest.pdf_firmado_path : signRequest.pdf_original_path;
       const fileLabel = isSigned ? 'firmado' : 'original';
 
@@ -707,21 +835,27 @@ router.get('/sign-requests/:id/constancia.pdf',
   });
 
 // =============================================================================
-// I-013b: GET /internal/sign-requests/:id/link (recuperación)
+// I-013b: GET /internal/sign-requests/:id/link (recuperación) — DEPRECADO (8C)
 // =============================================================================
-// Recupera el token perdido (C-22) para K+AIR. El token se almacena cifrado
-// con AES-256-GCM en `metadata._server_metadata.token_encrypted` (ver
-// signRequest.js create()). Solo accesible si el sign request NO está en
-// estado terminal.
+//
+// DEPRECADO desde la 8C. Recuperaba el token perdido (C-22) descifrándolo de
+// `metadata._server_metadata.token_encrypted`. La 8C dejó de guardar el token
+// de forma recuperable (el 3.6(e) promete que se conserva "únicamente en
+// forma de huella digital"), así que este endpoint solo sigue sirviendo para
+// las solicitudes ANTERIORES a la 8C, que conservan el token cifrado.
+//
+// Para las nuevas, la respuesta es 410 con `reason: 'rotacion_requerida'` y
+// el puntero al endpoint de rotación.
 //
 // Comportamiento:
 //   - 200 con { id_solicitud, token, url_publica, qr_payload,
-//     fecha_expiracion, estado } si se puede descifrar.
+//     fecha_expiracion, estado } si la solicitud es anterior a la 8C.
 //   - 410 GONE con code LINK_NOT_AVAILABLE si estado terminal.
-//   - 410 GONE con code LINK_NOT_AVAILABLE y reason='legacy_no_token_recovery'
-//     si el sign request es pre-I-013b (no tiene token cifrado).
+//   - 410 GONE con code LINK_NOT_AVAILABLE y reason='rotacion_requerida'
+//     si la solicitud es posterior a la 8C (no hay nada que recuperar).
 //   - 404 NOT_FOUND si no existe o cross-company (silent).
 //   - Registra evento LINK_RETRIEVED en gh_firma_eventos (auditoría Bloque E7).
+//   - Cabeceras Deprecation / Sunset / Link hacia el endpoint successor.
 
 router.get('/sign-requests/:id/link',
   requireEmpresaScopeAndLimit({
@@ -780,18 +914,45 @@ router.get('/sign-requests/:id/link',
         });
       }
 
-      // Intentar recuperar el token
+      // 8C · Deprecado. El token ya no se guarda de forma recuperable: la
+      // necesidad que cubría este endpoint ("la Empresa perdió la respuesta
+      // de creación") la cubre la ROTACIÓN
+      // (`POST /internal/sign-requests/:id/link/rotate`).
+      //
+      // Solo siguen funcionando las solicitudes ANTERIORES a la 8C, que
+      // todavía tienen el token cifrado en su metadata. Para las nuevas no
+      // hay nada que recuperar, y la respuesta dice cuál es el camino.
       const recovery = signRequestService.getTokenForRecovery(signRequest);
       if (!recovery.found) {
+        // 8C: sin token cifrado no hay nada que devolver, y la respuesta
+        // dice cuál es el camino.
+        //
+        // La razón se distingue solo cuando hay una anomalía real
+        // (`decrypt_failed`: el metadata tiene un token cifrado que no se
+        // puede descifrar, y eso hay que revisarlo). En los demás casos
+        // —una solicitud nueva, o una vieja sin token cifrado— la respuesta
+        // es la misma: no se recupera, se rota.
+        const reason = recovery.reason === 'decrypt_failed'
+          ? recovery.reason
+          : 'rotacion_requerida';
         return res.status(410).json({
           error: {
             code: 'LINK_NOT_AVAILABLE',
-            message: 'El link no se puede recuperar (sign request legacy o cifrado corrupto)',
-            details: { reason: recovery.reason },
+            message: 'El link ya no se recupera: use la rotación para emitir uno nuevo',
+            details: {
+              reason,
+              rotacion_endpoint: 'POST /internal/sign-requests/:id/link/rotate',
+            },
             request_id: req.id,
           },
         });
       }
+
+      // Cabeceras de deprecación: el endpoint se va a quitar cuando los
+      // clientes estén migrados a la rotación.
+      res.set('Deprecation', 'true');
+      res.set('Sunset', 'Wed, 30 Sep 2026 00:00:00 GMT');
+      res.set('Link', '</internal/sign-requests/:id/link/rotate>; rel="successor-version"');
 
       // Auditoría: registrar evento LINK_RETRIEVED
       try {
@@ -815,7 +976,7 @@ router.get('/sign-requests/:id/link',
         });
       }
 
-      logger.info('Link recuperado', {
+      logger.info('Link recuperado (endpoint deprecado)', {
         id_solicitud: signRequest.id_solicitud,
         actor: req.api_key_hash_prefix || 'system',
         ip: req.ip,
@@ -835,6 +996,159 @@ router.get('/sign-requests/:id/link',
   });
 
 // =============================================================================
+// 8C: POST /internal/sign-requests/:id/link/rotate (rotación del enlace)
+// =============================================================================
+//
+// Emite un token NUEVO para la solicitud y lo devuelve UNA SOLA VEZ.
+//
+// Es el mecanismo que reemplaza a la recuperación del token cifrado (el
+// endpoint GET /link, deprecado). El motivo es el 3.6(e) del Acuerdo de uso:
+// el token "se conserva únicamente en forma de huella digital". Con la
+// rotación, la necesidad operativa que cubría la recuperación —"la Empresa
+// perdió la respuesta de creación"— se cubre sin guardar el token en una
+// forma reversible.
+//
+// LO QUE NO SE INVALIDA
+// ----------------------
+// Los tokens anteriores siguen sirviendo hasta su vencimiento (la ventana de
+// la firma). La rotación no extiende el plazo: emite otro acceso al mismo
+// plazo. Un enlace que ya está en manos del trabajador no se rompe.
+//
+// EL TOPE
+// -------
+// 3 tokens vivos por solicitud. Al llegar al tope, la respuesta es 409
+// TOKEN_LIMIT_REACHED con las emisiones vivas: revocar es una decisión de
+// quien llama, no un efecto colateral. Con `revocar_anteriores: true` se
+// revocan los vivos y se emite el nuevo en la misma operación.
+//
+// Status codes:
+//   - 200: token emitido { id_solicitud, token, url_publica, qr_payload,
+//     emision, expira_en, fecha_expiracion, estado, tokens_activos,
+//     revocados }
+//   - 400: id malformado o body inválido (zod)
+//   - 401/403/429: middleware
+//   - 404 NOT_FOUND: no existe o cross-company (silent)
+//   - 409 TOKEN_LIMIT_REACHED: ya hay 3 tokens vivos
+//   - 410 LINK_NOT_AVAILABLE: la solicitud está en estado terminal
+//
+// Side effects:
+//   - INSERT en gh_firma_tokens (y UPDATE de revocación si se pidió)
+//   - INSERT en gh_firma_eventos (evento=LINK_ROTATED)
+
+router.post('/sign-requests/:id/link/rotate',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  validateBody(signRequestRotateBody),
+  (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404 (no revelar existencia de recurso cross-company).
+      if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      const actor = req.api_key_hash_prefix
+        ? `rh:${req.api_key_hash_prefix}`
+        : 'sistema';
+
+      // El service lanza AppError si la solicitud está terminal (410) o si ya
+      // hay 3 tokens vivos (409 TOKEN_LIMIT_REACHED).
+      const emitido = signRequestService.emitirToken({
+        firmaId: signRequest.id,
+        actor,
+        motivo: req.body.motivo || null,
+        origen: 'rotate',
+        revocarAnteriores: req.body.revocar_anteriores === true,
+      });
+
+      // Auditoría: la emisión de un token es un hecho que queda registrado.
+      try {
+        signRequestService.registerEvent(
+          signRequest.id,
+          'LINK_ROTATED',
+          {
+            emision: emitido.emision,
+            origen: 'rotate',
+            revoco_anteriores: req.body.revocar_anteriores === true,
+            revocados: emitido.revocados,
+            api_key_hash_prefix: req.api_key_hash_prefix || null,
+          },
+          actor,
+          req.ip,
+          req.get('User-Agent') || null,
+        );
+      } catch (e) {
+        // El token ya se emitió: la auditoría es best-effort (igual que
+        // LINK_RETRIEVED). El token queda registrado en gh_firma_tokens de
+        // todas formas, que es el registro que importa.
+        logger.warn('8C: no se pudo registrar el evento LINK_ROTATED', {
+          id_solicitud: signRequest.id_solicitud,
+          error: e.message,
+        });
+      }
+
+      logger.info('Enlace rotado', {
+        id_solicitud: signRequest.id_solicitud,
+        emision: emitido.emision,
+        actor,
+        ip: req.ip,
+      });
+
+      const activos = signRequestService.tokensActivosDe(signRequest.id);
+
+      res.json({
+        id_solicitud: signRequest.id_solicitud,
+        // El token en texto claro, UNA sola vez: no se guarda en ninguna
+        // forma recuperable.
+        token: emitido.token,
+        url_publica: emitido.url_publica,
+        qr_payload: emitido.url_publica,
+        emision: emitido.emision,
+        expira_en: emitido.expira_en,
+        fecha_expiracion: signRequest.fecha_expiracion,
+        estado: signRequest.estado,
+        tokens_activos: activos.length,
+        revocados: emitido.revocados,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// =============================================================================
 // I-103.A1.5.1: POST /internal/sign-requests/:id/notify-remote
 // =============================================================================
 // Envía (o re-envía) la invitación al firmante por correo. Es el "primer
@@ -844,7 +1158,11 @@ router.get('/sign-requests/:id/link',
 //
 // Auth: requireEmpresaScopeAndLimit con sign_request:read (mismo que /link).
 // Re-uso de operation porque semánticamente es "leer el sign request para
-// obtener su link cifrado y enviarlo". NO requiere nueva operation.
+// obtener su enlace y enviarlo". NO requiere nueva operation.
+//
+// 8C: el enlace sale de un token que el cliente aporta (`token` en el body) o
+// de uno nuevo que el service emite (rotación). Ya no se recupera de una
+// copia cifrada del metadata.
 //
 // Status codes:
 //   - 200: invitación enviada (con messageId + sent_at)
@@ -941,6 +1259,10 @@ router.post('/sign-requests/:id/notify-remote',
           ip: req.ip,
           user_agent: req.get('User-Agent') || null,
           context: req.body.context || null,
+          // 8C: si el cliente manda el token que ya tenía, la invitación sale
+          // con ESE enlace (no se emite otro y no se gasta un cupo de
+          // rotación). Si no, el service emite uno nuevo.
+          token: req.body.token || null,
         }
       );
 
@@ -1037,24 +1359,19 @@ router.post('/sign-requests/:id/resend-otp',
         });
       }
 
-      // 2. Recuperar el token (server-side, I-013b)
-      const recovery = signRequestService.getTokenForRecovery(signRequest);
-      if (!recovery.found) {
-        return res.status(410).json({
-          error: {
-            code: 'LINK_NOT_AVAILABLE',
-            message: 'No se puede recuperar el token para reenviar OTP',
-            details: { reason: recovery.reason },
-            request_id: req.id,
-          },
-        });
-      }
-
-      // 3. Delegar a publicFlow.resendOtp() (reutiliza 100% de la lógica:
-      //    estado, rate-limit, OTP_NOT_EXPIRED, generación, UPDATE atómico,
-      //    mailer, eventos de auditoría)
-      const result = publicFlow.resendOtp(
-        recovery.token,
+      // 2. 8C: ya no se recupera el token.
+      //
+      // Antes este endpoint descifraba el token del metadata para pasarlo a
+      // publicFlow.resendOtp(), que solo lo usaba para encontrar la solicitud.
+      // La 8C dejó de guardar el token de forma recuperable, así que el
+      // reenvío se hace sobre la solicitud que este endpoint ya resolvió por
+      // id: el token nunca hizo falta para reenviar un OTP.
+      //
+      // 3. Delegar a publicFlow.resendOtpDeSignRequest() (reutiliza 100% de
+      //    la lógica: estado, rate-limit, OTP_NOT_EXPIRED, generación, UPDATE
+      //    atómico, mailer, eventos de auditoría).
+      const result = publicFlow.resendOtpDeSignRequest(
+        signRequest,
         req.ip,
         req.get('User-Agent') || null,
       );
@@ -1082,5 +1399,233 @@ router.post('/sign-requests/:id/resend-otp',
     }
   }
 );
+
+// =============================================================================
+// 9A · LA FIRMA EN PAPEL, LOS MEDIOS Y EL SUMINISTRO A AUTORIDADES
+// =============================================================================
+// Rutas internas (las usa K+AIR, el cliente de escritorio).
+//
+// - POST /internal/sign-requests/:id/firma-papel     → la Empresa registra el
+//   documento ya firmado en papel (el 7.2).
+// - GET  /internal/sign-requests/:id/medios          → los medios autorizados
+//   del Trabajador (el 8.2): por dónde se le puede entregar la copia.
+// - POST /internal/sign-requests/:id/suministro-autoridad → el asiento del
+//   suministro del documento a una autoridad (el 8.4).
+// =============================================================================
+
+/**
+ * POST /internal/sign-requests/:id/firma-papel
+ *
+ * La Empresa entrega el documento en papel, el Trabajador lo firma y la
+ * Empresa registra aquí el documento ya firmado (el PDF escaneado).
+ *
+ * multipart/form-data:
+ *   - documento: el PDF del documento firmado en papel
+ *
+ * Qué hace el servicio (ver services/publicFlow.registrarFirmaEnPapel):
+ *   - guarda el PDF y le calcula la huella (la calcula el servidor);
+ *   - genera el "Registro de firma autográfica" (la evidencia del acto);
+ *   - deja el asiento y el evento;
+ *   - le entrega la copia al Trabajador por un medio que él autorizó.
+ *
+ * La vía en papel la abre la Empresa (el Trabajador le pide el papel por su
+ * canal de atención). Si no estaba abierta, se abre con el asiento
+ * `PAPER_TRACK_OPENED`, que guarda el canal por el que llegó la petición.
+ *
+ * La vía electrónica de la solicitud queda cerrada (CANCELLED): el documento
+ * se firmó a mano. Cerrarla es lo que impide la doble firma.
+ */
+router.post('/sign-requests/:id/firma-papel',
+  requireEmpresaScopeAndLimit({
+    // `sign_request:write` es la operación propia de esta ruta. Se acepta
+    // también `sign_request:create` para no dejar sin camino a los clientes
+    // que hoy solo tienen esa: el registro en papel ES la creación de la
+    // firma, del mismo modo que lo es la firma electrónica.
+    allowedOperations: ['sign_request:write', 'sign_request:create'],
+    rateLimit: { tier: 'standard' },
+  }),
+  uploadPdf(),
+  pdfValidation(),
+  async (req, res, next) => {
+    try {
+      const signRequest = _resolverInterno(req, res);
+      if (!signRequest) return;
+
+      // El `metadata` (multipart, JSON) es opcional: ahí va el canal por el
+      // que el Trabajador pidió el papel, que es lo que prueba que la vía
+      // existía y era accesible.
+      let meta = {};
+      if (typeof req.body.metadata === 'string' && req.body.metadata.length > 0) {
+        try {
+          meta = JSON.parse(req.body.metadata);
+        } catch (e) {
+          return res.status(400).json({
+            error: {
+              code: 'INVALID_REQUEST_BODY',
+              message: 'El campo "metadata" debe ser JSON válido',
+              request_id: req.id,
+            },
+          });
+        }
+      }
+
+      const resultado = await publicFlow.registrarFirmaEnPapel(
+        signRequest.id_solicitud,
+        {
+          pdfBuffer: req.file.buffer,
+          pdfHash: req.pdfValidation.sha256,
+          actor: (req.client && req.client.id_cliente) || 'empresa',
+          ip: req.ip,
+          user_agent: req.get('User-Agent'),
+          canal: meta.canal || null,
+          motivo: meta.nota || null,
+          metadata: {
+            nombre_archivo: req.file.originalname || null,
+          },
+        }
+      );
+      res.json(resultado);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+/**
+ * GET /internal/sign-requests/:id/medios
+ *
+ * Los medios electrónicos que el Trabajador autorizó (el 8.2).
+ *
+ * La Empresa lo necesita para entregar las copias: el 8.2 dice que el
+ * documento se suministra "siempre al Trabajador a través de un medio
+ * electrónico autorizado por el mismo". Sin esta vista, la Empresa no sabe
+ * a qué buzón puede entregarle la copia.
+ */
+router.get('/sign-requests/:id/medios',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      const signRequest = _resolverInterno(req, res);
+      if (!signRequest) return;
+
+      const medios = mediosService.listarTodos(
+        signRequest.id_empresa,
+        signRequest.id_trabajador
+      );
+      res.json({
+        id_solicitud: signRequest.id_solicitud,
+        id_trabajador: signRequest.id_trabajador,
+        medios: medios.map((m) => ({
+          tipo: m.tipo,
+          valor: m.valor,
+          estado: m.estado,
+          origen: m.origen,
+          fecha_registro: m.fecha_registro,
+        })),
+        // Solo por estos medios se entrega la copia (el 8.2).
+        medios_activos: medios
+          .filter((m) => m.estado === 'ACTIVO')
+          .map((m) => ({ tipo: m.tipo, valor: m.valor })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+/**
+ * POST /internal/sign-requests/:id/suministro-autoridad
+ *
+ * El 8.4: "Cuando sea necesario, la Empresa suministrará a las autoridades
+ * judiciales y a las de inspección, vigilancia y control en asuntos laborales
+ * y administrativas los documentos firmados electrónicamente que sean
+ * requeridos."
+ *
+ * Lo que el sistema hace es dejar el ASIENTO del suministro: quién lo pidió,
+ * a qué autoridad, con qué radicado y con qué huella del documento. El
+ * documento lo entrega la Empresa (es su deber, el 8.4 lo dice de ella).
+ *
+ * El asiento va al registro de eventos, que es append-only: el suministro a
+ * una autoridad es de las cosas que más se auditan.
+ */
+router.post('/sign-requests/:id/suministro-autoridad',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:write', 'sign_request:create'],
+    rateLimit: { tier: 'standard' },
+  }),
+  validateBody(suministroAutoridadBody),
+  (req, res, next) => {
+    try {
+      const signRequest = _resolverInterno(req, res);
+      if (!signRequest) return;
+
+      // El documento que se suministra: el firmado (o el de papel, si la
+      // firma fue autográfica).
+      const firmaPapel = papelService.obtenerPorSolicitud(signRequest.id_solicitud);
+      let ruta = null;
+      let etiqueta = null;
+      if (firmaPapel && firmaPapel.estado === papelService.ESTADOS.FIRMADO) {
+        ruta = firmaPapel.pdf_firmado_path;
+        etiqueta = 'firmado_en_papel';
+      } else if (signRequest.pdf_firmado_path) {
+        ruta = signRequest.pdf_firmado_path;
+        etiqueta = 'firmado';
+      } else {
+        return res.status(409).json({
+          error: {
+            code: 'DOCUMENT_NOT_SIGNED',
+            message: 'Esta solicitud todavía no tiene un documento firmado para suministrar',
+            request_id: req.id,
+          },
+        });
+      }
+
+      const archivo = storage.readPdfIfExists(ruta);
+      if (!archivo.found) {
+        return res.status(404).json({
+          error: {
+            code: 'PDF_NOT_FOUND',
+            message: 'El archivo del documento firmado no existe en disco',
+            request_id: req.id,
+          },
+        });
+      }
+
+      const actor = (req.client && req.client.id_cliente) || 'empresa';
+      const metadata = {
+        autoridad: req.body.autoridad,
+        radicado: req.body.radicado || null,
+        destinatario: req.body.destinatario || null,
+        tipo_documento_suministrado: etiqueta,
+        pdf_sha256: req.body.pdf_sha256 || null,
+        id_solicitud: signRequest.id_solicitud,
+      };
+      signRequestService.registerEvent(
+        signRequest.id,
+        'DOCUMENT_SUPPLIED_TO_AUTHORITY',
+        metadata,
+        actor,
+        req.ip,
+        req.get('User-Agent')
+      );
+
+      res.json({
+        ok: true,
+        id_solicitud: signRequest.id_solicitud,
+        documento: {
+          etiqueta,
+          nombre_archivo: signRequest.id_solicitud + '.pdf',
+          bytes: archivo.buffer.length,
+        },
+        asiento: metadata,
+        aviso: 'El suministro quedó asentado. Entregá el documento a la '
+          + 'autoridad por el canal que corresponda.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
 
 module.exports = router;

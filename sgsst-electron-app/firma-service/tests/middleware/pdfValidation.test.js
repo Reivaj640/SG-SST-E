@@ -44,9 +44,19 @@ const { capturarLogs } = require('../helpers');
 
 /**
  * Construye un PDF de 1 pagina valido (parseable por pdf-lib). Buffer.
+ *
+ * DETERMINISTA a proposito. pdf-lib mete la fecha de creacion y la de
+ * modificacion en el PDF, asi que dos PDFs "iguales" tienen bytes distintos y
+ * su sha256 cambia en cada corrida. El test §2.3 compara el log contra el
+ * hash de este buffer, y con un buffer cambiante ese test era INTERMITENTE:
+ * fallaba solo cuando el prefijo del hash caia en una forma que el logger
+ * redacta (ver §2.3). Con las fechas fijas, los bytes son siempre los mismos.
  */
 async function buildSimplePdf() {
   const pdf = await PDFDocument.create();
+  const fechaFija = new Date('2020-01-01T00:00:00.000Z');
+  pdf.setCreationDate(fechaFija);
+  pdf.setModificationDate(fechaFija);
   pdf.addPage([300, 200]);
   return Buffer.from(await pdf.save());
 }
@@ -295,8 +305,9 @@ test('§2.2: PDF de 3 paginas valido → req.pdfValidation.pageCount === 3', asy
 
 test('§2.3: log incluye request_id, sha256_prefix (8 chars), page_count, size_bytes — NO full sha256, NO metadata', async () => {
   const buf = await buildSimplePdf();
+  let r;
   const captured = await captureStdStreamsAsync(async () => {
-    await runMiddleware(
+    r = await runMiddleware(
       { originalname: 'logtest.pdf', buffer: buf },
       { requestId: 'req-capture-test-001' }
     );
@@ -307,11 +318,27 @@ test('§2.3: log incluye request_id, sha256_prefix (8 chars), page_count, size_b
     'log debe incluir el request_id. Capturado: ' + text);
   // 2. sha256_prefix (8 chars) presente: el prefijo se imprime como string en JSON,
   //    asi que verificamos que aparece. Tomamos el sha256 real para derivarlo.
+  //
+  //    OJO CON ESTO: el logger redacta por VALOR (no por nombre) cualquier
+  //    corrida de 6 a 10 digitos como si fuera una cedula (logger.js,
+  //    PII_PATTERNS). Un prefijo de sha256 puede caer entero en digitos y ser
+  //    redactado a "[CEDULA]". Eso NO es un defecto del middleware: es la
+  //    defensa de PII funcionando, y taparla seria desactivar la proteccion.
+  //    Por eso se compara contra lo que el LOGGER escribiria con ese valor
+  //    (`_redactValue`): si el middleware hubiera logueado OTRO hash, la
+  //    comparacion tambien fallaria.
   const { sha256 } = require('../../src/crypto/hash');
+  const logger = require('../../src/utils/logger');
   const fullHash = sha256(buf);
   const prefix = fullHash.slice(0, 8);
-  assert.ok(text.includes(`"sha256_prefix":"${prefix}"`),
-    `log debe incluir sha256_prefix="${prefix}". Capturado: ` + text);
+  const prefixEnElLog = logger._redactValue(prefix);
+  assert.ok(text.includes(`"sha256_prefix":"${prefixEnElLog}"`),
+    `log debe incluir sha256_prefix="${prefixEnElLog}" (prefijo real: ${prefix}). Capturado: ` + text);
+  // 2b. Ancla del log: el middleware SI calculo el hash del PDF que recibio.
+  //     Esto no depende de la redaccion y por eso el test sigue siendo
+  //     fuerte aunque el prefijo se haya tapado.
+  assert.equal(r.req.pdfValidation.sha256, fullHash,
+    'el middleware debe calcular el sha256 del PDF recibido');
   // 3. page_count presente
   assert.ok(text.includes('"page_count":1'),
     'log debe incluir page_count:1. Capturado: ' + text);

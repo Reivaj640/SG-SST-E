@@ -207,37 +207,34 @@ test('notifyRemote: context libre se persiste en metadata del evento', async () 
 // Errores
 // =====================================================================
 
-test('notifyRemote: sign request sin metadata (legacy) → 410 INVITE_NOT_AVAILABLE', async () => {
+test('notifyRemote: sin metadata (solicitud vieja) → la invitación sale con un token rotado (8C)', async () => {
   resetDb();
   const acuerdo = seedActiveAgreement();
   const { signRequest } = await makeSignRequest(acuerdo);
 
-  // Simular sign request legacy: vaciar el metadata directamente en BD.
+  // Simular sign request viejo: vaciar el metadata directamente en BD.
+  // 8C: el metadata ya no tiene el token cifrado, y no hace falta: si el
+  // cliente no trae un token, el service emite uno nuevo (rotación) y el
+  // correo sale con ese enlace. Antes esto era un 410.
   db.prepare('UPDATE gh_firmas_electronicas SET metadata = NULL WHERE id = ?')
     .run(signRequest.id);
   const legacy = signRequestService.getById(signRequest.id);
   assert.equal(legacy.metadata, null);
 
-  await assert.rejects(
-    () => signRequestService.notifyRemote(legacy, 'user@example.com', {}),
-    (err) => {
-      assert.equal(err.code, 'INVITE_NOT_AVAILABLE');
-      assert.equal(err.statusCode, 410);
-      assert.equal(err.details.reason, 'legacy_no_token_recovery');
-      return true;
-    }
-  );
+  const res = await signRequestService.notifyRemote(legacy, 'user@example.com', {});
 
-  // No se debe haber enviado correo
-  assert.equal(mailer.getDevInbox().length, 0);
-  // No se debe haber registrado evento
-  const evts = db.prepare(`
-    SELECT id FROM gh_firma_eventos WHERE evento = 'INVITE_SENT'
-  `).all();
-  assert.equal(evts.length, 0);
+  assert.equal(res.ok, true);
+  assert.equal(mailer.getDevInbox().length, 1, 'la invitación debe salir');
+
+  // El token emitido queda registrado como emisión 2.
+  const tokens = db.prepare(
+    'SELECT emision FROM gh_firma_tokens WHERE firma_id = ? ORDER BY emision'
+  ).all(signRequest.id);
+  assert.equal(tokens.length, 2);
+  assert.deepEqual(tokens.map(t => t.emision), [1, 2]);
 });
 
-test('notifyRemote: metadata corrupto (no es JSON) → 410 INVITE_NOT_AVAILABLE', async () => {
+test('notifyRemote: metadata corrupto (no es JSON) → la invitación sale igual (8C)', async () => {
   resetDb();
   const acuerdo = seedActiveAgreement();
   const { signRequest } = await makeSignRequest(acuerdo);
@@ -246,14 +243,11 @@ test('notifyRemote: metadata corrupto (no es JSON) → 410 INVITE_NOT_AVAILABLE'
     .run('esto no es JSON {', signRequest.id);
   const broken = signRequestService.getById(signRequest.id);
 
-  await assert.rejects(
-    () => signRequestService.notifyRemote(broken, 'user@example.com', {}),
-    (err) => {
-      assert.equal(err.code, 'INVITE_NOT_AVAILABLE');
-      assert.equal(err.details.reason, 'corrupt_metadata');
-      return true;
-    }
-  );
+  // 8C: el metadata ya no es la fuente del token, así que un metadata
+  // corrupto no impide enviar la invitación (se rota el token).
+  const res = await signRequestService.notifyRemote(broken, 'user@example.com', {});
+  assert.equal(res.ok, true);
+  assert.equal(mailer.getDevInbox().length, 1);
 });
 
 test('notifyRemote: correo inválido (sin @) → 400 INVALID_REQUEST_BODY', async () => {

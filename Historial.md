@@ -22,15 +22,17 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-19 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado) |
+| **Fecha de cierre** | 2026-10-20 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado; después, auditoría de los Capítulos IV y V y la Fase 7 de código; el 20, Fase 8B, y el cierre del código: el 8B-C, las tres decisiones del owner (1.1, 1.2, 1.3), la 10.4, el D-02 y la 9A) |
 | **Rama** | `Dev`, nivelada con `origin/Dev`. |
-| **Último commit de código** | 📦 **905** (2026-10-18) — se escribe el hash al final de la jornada. |
+| **Último commit de código** | 📦 **912-923** — el cierre del código de la firma electrónica: la **Fase 6** (912), la **Fase 7 / Capítulo V** (913), la **Fase 8A.1** (914), la **Fase 8A.2 / 5B** (915), la **Fase 8C** (916), la **Fase 8B** (917), el **8B-C** y el fix del endpoint de empresas (918), las **tres decisiones del owner** (919), la **10.4** (920), el **D-02** (921), la **9A** (922) y la **documentación del cierre** (923). Suite: **1377 tests · 1375 verdes · 0 fallos · 2 omitidos**. |
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
 | **CAPÍTULO II: CERRADO** | Las tres citas (2.2.2.47.1 num. 1, 2.2.2.47.7, parágrafo del 2.2.1.1.9 y 2.2.1.1.13) están **verificadas y son correctas**. La redacción se aplicó el 19: el **2.2** ahora desarrolla los tres requisitos del 2.2.1.1.13 que importaba sin enumerar (a) vigencia de la firma igual a la del contrato y **declaración expresa de que el mecanismo no elimina el documento firmado ni la Constancia** ni por el tiempo ni por el fin de la relación, (b) costo cero para el Trabajador a cargo de la Empresa, (c) uso exclusivo para la relación laboral sin perder fuerza probatoria; y el **2.3** aclara que la copia firmada conserva íntegro el contenido, que solo se le agrega una página de sello y metadatos verificables, y que las huellas del original y de la copia firmada quedan registradas y son distintas. |
 | **CAPÍTULO III: AUDITADO E IMPLEMENTADO (19)** | **El texto no se toca: sus tres citas legales son exactas.** Y el diagnóstico que estaba escrito aquí era **falso**: el plan y este archivo decían que "el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)". El texto nunca lo dijo: siempre dijo **«huella digital con sal»** (`grep -r hmac` da cero en todo el service). La brecha real era de implementación: **la sal estaba en la misma fila que la huella** (equivale a un hash plano) y la **cédula se guardaba en texto claro**, en contra del propio 10.5(a). **Corregido el 19** con las migraciones **019** (columnas de algoritmo + HMAC) y **020** (`gh_firma_eventos` append-only con triggers), la capa `src/crypto/{keys,hmac}.js` y el seudónimo de `id_trabajador`. La llave maestra se deriva por HKDF de `TOKEN_ENCRYPTION_KEY` y vive **fuera** de la BD. Filas heredadas: se reescriben solas con el HMAC la primera vez que se usan. Efecto colateral que cierra una fuga: la mini-app exponía la cédula en claro en `GET /s/:token`; ahora expone el seudónimo. **Pendiente: solo el Anexo de Encargo (3.8) y la cláusula de custodia, que necesitan abogado.** El 19 se completó la **Fase 1 del carril de código** (📦 907): **clave HMAC por empresa** (ámbito = `id_empresa`), **versión de llave por fila** (marcador `hmac-sha256.v2.k1`) y **anillo de llaves** (`FIRMA_HMAC_KEYRING`), con la migración **022**. Rotar la llave dejó de invalidar la evidencia anterior. Corrección que salió de esa fase: **la búsqueda solo probaba la versión vigente**, así que al rotar las filas viejas se volvían invisibles; ahora prueba todas las del anillo. |
-| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1173 tests · 1171 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · API key de Aseplus en texto plano en el escritorio · sin puente que empuje los datos de empresa de cada PC al servidor (hoy se cargan a mano por admin) · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
+| **CAPÍTULO IV: AUDITADO (19)** | **Sus cinco citas, verificadas una por una contra la compilación oficial.** El **4.3** (parágrafo 2 del 2.2.1.1.10 del Decreto 1072) y el **4.5** (numeral 3 del 2.2.1.1.13) son **fieles**. El **4.2** es una paráfrasis: el 47.3 dice "incluido **cualquier acuerdo aplicable**" y el Acuerdo dice "incluido este Acuerdo" (la sustancia no cambia: este Acuerdo es un acuerdo aplicable). El **4.1** cita un artículo que el 47.5 no nombra: el oficial remite al **2.2.2.43.3**, y el 43.3 vigente es "PRESUPUESTO ANUAL" de las Cámaras de Comercio, o sea que **la remisión del propio decreto está caduca**, heredada de la numeración anterior a la compilación de 2015. El **4.4** tampoco es transcripción: el artículo 244 de la Ley 1564 ("DOCUMENTO AUTÉNTICO") presume auténticos los documentos públicos y privados "mientras no hayan sido tachados de falso o desconocidos", y la frase "en forma de mensaje de datos" es del 243. **Hallazgo de fondo: el Acuerdo no cita el 2.2.2.47.4 (CONFIABILIDAD)** en ningún punto, y es el artículo que trae los dos requisitos materiales (los datos de creación son exclusivamente del firmante; se puede detectar la alteración no autorizada), al que apuntan el 2.2.1.1.11 y el parágrafo del 2.2.1.1.13. **El texto no se tocó**: las propuestas quedaron en `docs/gestion-humana/firma-electronica/auditoria-capitulo-iv-citas-normativas-2026-10-19.md`. |
+| **CAPÍTULO V: AUDITADO E IMPLEMENTADO (19)** | **Verificado el 2.2.2.47.6 contra la compilación oficial y auditado numeral por numeral (5.1 a 5.5).** El texto del Capítulo V tiene **dos hallazgos** que van al abogado y **no se tocaron**: el preámbulo del 5.1 dice que a), b) y c) son los deberes del 47.6 y no lo son (falta el deber 2, el deber 3 quedó reducido a "a la Empresa y a K+AIR" y el literal a) no está en el artículo), y el 5.1(a) obliga al Firmante a cumplir unas políticas de seguridad que nunca ve. El código tenía **dos roto**: el 5.1(c) no era cumplible (no había ningún canal de K+AIR en la mini-app) y el 5.3 no tenía apoyo en pantalla (el backend mandaba `tipo_identificacion` e `id_documento`, pero la mini-app no los pintaba, y el comentario que decía lo contrario era falso). **Corregidos el 19**: el canal de incidentes de K+AIR vive en las dos capas (valor por defecto en el HTML, para que exista también en la pantalla de error donde no hay contexto, y configurable con `FIRMA_CANAL_INCIDENCIAS`; un test exige que no divergan) en un pie fuera de las pantallas, y el bloque `#documento-identidad` muestra qué documento se firma ("Estás firmando un contrato. Referencia: ..."). **Decisión del owner (2026-10-20)**: la API **sí** rechaza el buzón corporativo para el OTP (el D-02, 📦921): el código va a un medio personal, y el rechazo queda **apagado** hasta que exista la 9A y se publique la v1.1. Detalle en `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` y en `plan-cierre-tc-y-decisiones-2026-10-20.md`. |
+| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1377 tests · 1375 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · API key de Aseplus en texto plano en el escritorio · sin puente que empuje los datos de empresa de cada PC al servidor (hoy se cargan a mano por admin) · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
@@ -665,6 +667,446 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
+### 2026-10-20 · 📦923 · La documentación del cierre: las auditorías, el plan y las tres consultas
+
+**Lo que se escribió (todo en `docs/gestion-humana/firma-electronica/`).**
+
+- `revision-tc-capitulos-2-12-2026-10-20.md`: la revisión de los Capítulos II a XII, numeral por numeral, con **19 hallazgos** (H-TC-01 a H-TC-19). Cada uno dice qué dice el texto, qué hace el código y qué hay que hacer.
+- `plan-cierre-tc-y-decisiones-2026-10-20.md`: el plan de cierre con las cinco decisiones abiertas, **la secuencia de publicación** (código → 9A → 11A → encender el rechazo) y el registro de lo que se hizo el 20.
+- `propuestas-texto-11A-2026-10-20.md`: los textos numerados para el abogado, con el fundamento de cada uno. Incluye la **redacción del 3.7(a) del owner** (2026-10-20) y la **pregunta afinada que se manda acompañada del texto** (no se espera la respuesta: el código es el mismo bajo las dos respuestas).
+- `consulta-legal-firma-en-papel-interfaz-2026-10-20.md`: la consulta sobre si la norma exige que el Acuerdo mencione la vía en papel o que exista un botón. **Respuesta: ninguna de las dos.** El 2.2.1.1.11 es una prohibición de condicionamiento, no una exigencia de interfaz; el botón es la evidencia de que el derecho es ejercitable.
+- `comparacion-mercado-firma-2026-10-20.md`: cómo lo hacen **Buk** (que no tiene vía en papel: su modal solo ofrece Cancelar/Rechazar/Firmar, y su propio artículo admite que sin el rechazo el documento se quedaba pendiente para siempre) y el mercado global (que resuelve el problema cambiando el dato de entrada, no separando los canales).
+
+### 2026-10-20 · 📦922 · La 9A: la firma en papel, los medios autorizados y el suministro a autoridades
+
+**Lo que promete el Acuerdo y no existía: el Capítulo VII (7.1-7.3) y el 8.2.**
+
+1. **La firma en papel (7.1-7.3).** La vía la abre la **Empresa** (el Trabajador le pide el papel por el canal de atención de la Empresa y la Empresa lo registra desde K+AIR). El sistema guarda el PDF con su huella, genera el **Registro de firma autográfica** (los hechos del acto, con la pareja de huellas: el documento original y el firmado a mano), le entrega la copia al Trabajador por un medio autorizado y **cierra la vía electrónica** (nada de doble firma).
+   - **La mini-app NO menciona el papel** (decisión del owner, 2026-10-20): el 7.2 es un deber de la **Empresa**, y si la pantalla dice «tu empresa te la va a entregar», K+AIR está prometiendo en nombre de la Empresa algo que no puede garantizar (veracidad, Ley 1581 art. 4(d)(e); D.1377 art. 4). La oferta viaja en el **correo de invitación** (lo manda la Empresa) y queda asentada con la huella del cuerpo enviado (`PAPER_OPTION_AVAILABLE`).
+2. **Los medios autorizados (8.2).** Registro real (`gh_firma_medios_trabajador`) con tres estados: lo declarado nace `PENDIENTE` y se activa cuando el Trabajador demuestra que controla el buzón. El Trabajador los ve y los cambia desde la mini-app («Mis medios autorizados»); la Empresa los ve por la API interna, que es por dónde le entrega las copias.
+3. **El suministro a autoridades (8.4).** El asiento queda en el registro de eventos (`DOCUMENT_SUPPLIED_TO_AUTHORITY`) con quién lo pidió, a qué autoridad y con qué radicado.
+4. **La copia permanente (8.3/8.5).** El documento firmado se consulta por la API interna (también en `DUAL_FIRMADO`, que antes servía el original) y la copia va al medio autorizado, no al buzón de la Empresa.
+
+Migración `032`, servicios `medios.js` / `papel.js` / `pdfGenPapel.js`, 6 endpoints y 12 tests nuevos.
+
+### 2026-10-20 · 📦921 · El D-02: el código de verificación a un medio personal
+
+**El reencuadre.** `correo_verificacion` cumplía dos papeles: a dónde va la invitación (el token) y a dónde va el OTP (el dato de creación). Y la app lo precargaba con el correo del trabajador en la ficha de la Empresa: en la práctica, **el código le llegaba a un buzón que la Empresa puede leer**. El 2.2.2.47.4 num. 1 dice que "los datos de creación de la firma, en el contexto en que son utilizados, corresponden exclusivamente al firmante".
+
+**La decisión (owner, 2026-10-20).** Separar los dos canales:
+
+| Canal | Destino | Quién lo define |
+|---|---|---|
+| Invitación (el token) y copia firmada | `correo_verificacion` | La Empresa |
+| **OTP** (dato de creación) | `correo_otp`: un medio personal que la Empresa no administra | **La Empresa** lo declara al crear la solicitud; si no lo tiene, el Trabajador lo declara en la mini-app |
+
+La alternativa de mover **los dos** canales no es imposible: es **peor** (obliga a la Empresa a conocer un dato nuevo, el trabajador tiene que estar pendiente de su correo personal para una invitación laboral, y la Empresa sabe dónde llegó el código). Eso es lo que va al abogado, no un «imposible».
+
+**Lo que quedó:** migración `031` (`correo_otp` + `dominios_corporativos`), `resolveCorreoOtp` con la regla de los dominios corporativos, `POST /api/sign/:token/medio`, el campo del modal de K+AIR, el inventario (`scripts/inventario-buzon-corporativo.js`) y **el rechazo apagado** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`, default false): se enciende **con la v1.1**, no antes.
+
+**El desacople (owner, 2026-10-20):** el inventario decide la bandera, no el texto. El 3.7(a) dice qué es el método; el número dice si el sistema lo exige o solo lo recomienda.
+
+### 2026-10-20 · 📦920 · La 10.4: la versión vigente del Acuerdo y la migración de la solicitud
+
+**El problema que resolvía.** Publicar la v1.1 con solicitudes pendientes dejaba al firmante que llegaba tarde con un **409 sin salida**: su solicitud estaba ligada a la versión anterior, que ya no era la vigente. Eso impedía publicar.
+
+**Cómo funciona ahora:** el firmante ve la **versión vigente** y, al aceptar, la solicitud **migra** a ella (evento `AGREEMENT_VERSION_MIGRATED`). El 409 pasa a ser accionable (`AGREEMENT_VERSION_REACCEPT_REQUIRED` con `details.accion`). Verificado en vivo. 5 tests nuevos.
+
+### 2026-10-20 · 📦919 · Las tres decisiones del owner (1.1, 1.2, 1.3)
+
+1. **1.1 · el deber legal de conservación sin término (2.2.1.1.12)**: se declara **a nivel de EMPRESA** (no por documento), con un **hold legal automático** (actor `sistema`, motivo `deber_legal_<norma>`). "Nunca se purga SOLO". El Trabajador se entera en la mini-app y en el correo. Migración `030`.
+2. **1.2 · la firma visual (PNG) se rechaza**: con un **400 explícito** que nombra la clave y la razón (`FIRMA_VISUAL_NO_ADMITIDA`), nunca en silencio.
+3. **1.3 · el segundo canal (10.7(b))**: K+AIR recibe, registra y **trasmite** las solicitudes del Titular a la Empresa (que es quien responde), con un **segundo canal** distinto del de incidentes, historial **append-only** y un plazo de trasmisión por configuración. Migraciones `028` y `029`.
+
+### 2026-10-20 · 📦918 · El 8B-C: el snapshot de la Empresa cifrado, y el endpoint que se colgaba
+
+- **El snapshot de la Empresa cifrado** (`enc:v2`, con AAD), la huella corregida (solo las claves presentes) y la **verificación de la huella en la presentación, con fallo cerrado**. El backfill endurecido: deja el evento `CONSENT_SNAPSHOT_RECIFRADO` en la misma transacción.
+- **Un bug real de operación:** `POST /internal/admin/empresas` **se colgaba** —el middleware de autenticación se usaba sin invocarlo— y el router no estaba montado en la app de pruebas, así que nadie lo había ejercitado. También se corrigió un `SELECT` después del `WHERE` en el `GET`.
+- **El aislamiento de los tests:** el `.env` local ya no filtra la suite y `resetDb()` limpia el directorio de empresas y las tablas de solicitudes.
+
+### 2026-10-20 · 📦917 · Fase 8B: el dato sensible, el `metadata` con lista blanca y el número del representante cifrado
+
+**Los tres textos que mandan.** El 10.8 (aviso previo y consentimiento expreso para el dato sensible), la última frase del 10.2 ("este numeral no autoriza a la Empresa a enviar al servicio datos distintos de los aquí relacionados") y el 10.5(a) (el número del documento de identidad se conserva únicamente como huella, no en texto claro).
+
+**Lo que estaba mal: tres hallazgos, uno por parte.**
+
+1. **H19 · el 10.8 era incumplible porque no existía la mecánica.** Ni la API podía marcar un documento como sensible, ni la mini-app tenía aviso previo ni casilla separada: un acta de salud se firmaba con el mismo consentimiento genérico que un formato de asistencia.
+2. **H20 y H21 · `metadata` era un canal libre.** JSON de hasta 8192 caracteres, archivado tal cual; y el esquema no era `.strict()`, así que un campo mal escrito pasaba como si estuviera bien.
+3. **H23 · el número del representante legal quedaba en texto claro** en `representante_legal_snapshot`, mientras el del trabajador solo se guardaba como huella.
+
+**Qué se implementó, en tres partes.**
+
+**A. La lista blanca de `metadata` y el `.strict()` del esquema.**
+
+- `src/services/metadata.js` (nuevo): `CLAVES_METADATA_PERMITIDAS` (`subtipo_identificacion`, `nombre_trabajador`, `nombre_empresa`, `correo_empresa`, `correo`) y `filtrarMetadata()`.
+- `signRequestBody` y `representante_legal_snapshot` ahora son `.strict()`: lo desconocido se **rechaza con un 400 que nombra la clave**, no se pierde en silencio.
+- El servicio vuelve a filtrar antes de escribir la fila: es el último punto y el que no se puede saltar por la vía del service.
+- **Bug real que salió de esto:** la app mandaba `correo_empresa` desde hace meses, zod lo eliminaba en silencio, nunca llegó a la base y la constancia salió sin el canal de copia del 8.4. Hoy `correo_empresa` está declarado, se persiste y llega al PDF de la constancia.
+- Trampa evitada: la app manda `correo_empresa: ''` siempre. El esquema acepta la cadena vacía; si no, **cada firma del site B caía en 400**.
+
+**B. La mecánica del dato sensible (10.8).**
+
+- Migración `027_datos_sensibles.sql`: `datos_sensibles`, `categorias_sensibles`, `finalidad_sensible`, `base_legal_sensible`, `aviso_sensible_texto/hash/version` en la fila de la firma, y la tabla `gh_consentimientos_sensibles` (sin FK contra la firma, para que sobreviva a la 5B).
+- `src/services/sensibles.js` (nuevo): `TIPOS_SENSIBLES_INFERIDOS` (ACTA, CERTIFICADO, CONSENTIMIENTO, AUTORIZACION), `clasificar()` —**la Empresa sube la clasificación, nunca la baja**—, `construirAviso()` y `avisoDe()` (el texto y su huella quedan **fijados al crear**: si el aviso se compusiera en cada visita, un cambio de redacción cambiaría lo que el Titular "aceptó" sin que nadie lo notara).
+- `publicFlow`: `exigirConsentimientoSensible()` bloquea `viewDocument` y `getPdfForToken` con `409 SENSIBLE_CONSENT_NOT_ACCEPTED`; `consentirDatoSensible()` registra también la NO autorización, con `via_alternativa: 'firma_en_papel'`.
+- Mini-app: el aviso va **antes** del visor (si el documento se viera primero, la información "previa" no lo sería) y la casilla es **separada** de la del Acuerdo.
+- Por qué el sistema no lee el PDF para saber si trae datos de salud: escanearlo sería tratar el dato sensible **antes** del consentimiento. La inferencia es por **tipo de documento**, y la Empresa puede corregir al alza.
+
+**C. El número del representante: cifrar, no hashear.**
+
+- El plan (§8.1) decía "hashear o seudonimizar"; el owner lo corrigió: el número del representante es **prueba de la representación** (puede necesitarse en una constancia o en un certificado de existencia y representación) y una huella no se puede presentar como prueba. **Se cifra.**
+- `src/crypto/cifrado.js` (nuevo): AES-256-GCM con clave derivada por HKDF (`derivedKey('cifrado-representante', id_empresa)`, con la versión de llave del anillo). El sobre declara su formato y **con qué versión de llave se cifró**: `enc:v1:<version>:<iv>:<tag>:<cifrado>`. GCM es AEAD: un sobre alterado no se abre.
+- `src/services/representante.js` (nuevo): el servicio del snapshot — cifra al guardar, abre cuando hace falta, enmascara para mostrar.
+- **Lo que se muestra son los últimos 4** (`****3456`), como con el firmante. El número completo queda cifrado en la base y se abre con la llave, que vive fuera de ella.
+- **Lo que NO cambia, y por qué:** el bloque «Empresa que solicita tu firma» del 1.2 muestra la identificación del representante legal **completa**, pero esa no viene del snapshot: viene del **registro mercantil** que la Empresa cargó en `gh_firma_empresas`. El 1.2 manda y no lo cambia el código.
+- `scripts/recifrar-representante.js` (nuevo): las filas creadas antes de esta fase guardan el número en claro. El script los re-cifra en **simulación por defecto** (`--actor` y `--motivo` obligatorios, nada se escribe sin `--ejecutar`, verifica cifra -> descifra -> compara antes de escribir, y deja un evento `REPRESENTANTE_RECIFRADO` por fila).
+
+**Cómo se validó.** 51 tests nuevos: 9 de la lista blanca (`tests/fase8b-metadata-lista-blanca.test.js`), 14 del dato sensible (`tests/fase8b-dato-sensible.test.js`), 22 del representante cifrado (`tests/fase8b-representante-cifrado.test.js`) y 6 del script (`tests/scripts/recifrar-representante.test.js`), con tests de mutación en los tres bloques. Suite completa: **1278 tests · 1276 verdes · 0 fallos · 2 omitidos**.
+
+**Bugs encontrados que no estaban en el código.**
+
+- El `correo_empresa` que se perdía en silencio (arriba).
+- **La firma dual no habría funcionado:** el hijo (firma de la Empresa) se dispara al final del commit del trabajador, y para entonces el snapshot del padre ya está cifrado. Si la huella de identificación se calculara sobre el sobre, el representante **no podría identificarse** en la mini-app. El código descifra antes de calcular.
+- Lo mismo con el seudónimo del consentimiento del representante: se calculaba sobre el número en claro; con el snapshot cifrado, se calcularía sobre el sobre y la fila guardaría la huella de un valor que no es el número de nadie.
+
+**Lo que sigue.** La 10.4 (aceptación positiva de la versión nueva, el 9.5), la 9A (firma en papel, copia permanente y medios autorizados), y después la 11A con el abogado. Y dos **migraciones de datos** deliberadamente no aplicadas, que dependen de la Compuerta 0: purgar el `token_encrypted` de las filas anteriores a la 8C, y re-cifrar las filas heredadas del representante.
+
+### 2026-10-19 · 📦916 · Fase 8C: la rotación del token — el enlace se emite, no se recupera
+
+**El texto que manda.** El 3.6(e): el token de acceso "se conserva únicamente en forma de huella digital".
+
+**Lo que estaba mal.** El código guardaba el token **cifrado** en `metadata._server_metadata.token_encrypted` y un endpoint interno (`GET /internal/sign-requests/:id/link`) lo devolvía **en texto claro**. Cifrado sigue siendo reversible con la llave: el token existía en la base en una forma que se podía recuperar. El 3.6(e) no se cumplía, y el endpoint que lo devolvía nunca estuvo documentado en API.md.
+
+**Qué se implementó.**
+
+1. `src/db/schema/026_tokens_rotacion.sql`: la tabla `gh_firma_tokens` — un registro por token emitido (la huella, la emisión, la expiración, la revocación y el origen). Con `ON DELETE CASCADE`: cuando la 5B borra la firma, sus tokens se van con ella.
+2. `create()` y `createForCompany()` ya **no** guardan el token cifrado, y el sub-objeto `_server_metadata` desaparece del metadata del cliente.
+3. `emitirToken()`: la rotación. Emite un token nuevo, guarda su HMAC-SHA-256 con clave secreta y devuelve el token **una sola vez**. Tope de **3 tokens vivos** por solicitud; al llegar al tope, `409 TOKEN_LIMIT_REACHED` — el sistema **no** revoca por su cuenta, porque revocar es una decisión de quien llama.
+4. `POST /internal/sign-requests/:id/link/rotate`: el endpoint nuevo. `GET .../link` queda **deprecado** (`Deprecation`, `Sunset`, `Link` al successor) y solo sigue sirviendo para las solicitudes anteriores a la 8C, que conservan el token cifrado: un token ya emitido sigue siendo válido (vive como huella), lo que dejó de existir es la recuperación de su texto claro.
+5. Los tokens anteriores **no se invalidan**: la rotación emite otro acceso al mismo plazo. Un enlace que el trabajador ya tiene en el teléfono no se le rompe a mitad de camino.
+6. `notify-remote` acepta un `token` opcional: si viene, se usa ese enlace y no se gasta un cupo de rotación; si no, rota. Si el token es de otra solicitud, `409 TOKEN_MISMATCH`.
+7. `resend-otp` interno ya no necesita recuperar el token: solo lo usaba para encontrar la solicitud que ya tenía por id. El núcleo del reenvío se separó (`resendOtpDeSignRequest`).
+8. La 5B ahora cubre **todos** los tokens de la firma (columna `token_tombstones`): un enlace rotado responde "no disponible por vencimiento del plazo" (410), no un 404 que dependa de por dónde se entre.
+
+**Cómo se validó.** 12 tests nuevos (`tests/fase8c-rotacion-token.test.js`): el token no queda guardado de forma recuperable (con un test de mutación que comprueba que el detector muerde), el registro de la huella, la emisión y el retorno una sola vez, el token anterior sigue funcionando, la auditoría (`LINK_ROTATED`), el tope de 3, la revocación explícita, la respuesta del endpoint deprecado, la 5B cubriendo el enlace rotado, el `TOKEN_MISMATCH` y el `notify-remote` sin cupo cuando el cliente trae su token. Suite completa: **1227 tests · 1225 verdes · 0 fallos · 2 omitidos**.
+
+**Correcciones de paso.** El flujo de firma dual tomaba el token del metadata cifrado para invitar al representante; ahora usa el token que está en memoria en ese instante. Y los seis tests de los endpoints afectados se actualizaron porque su comportamiento cambió a propósito (no por una falla).
+
+**Lo que sigue.** Queda pendiente la 8B (dato sensible y `metadata` con lista blanca), la 10.4, la 9A, y después la 11A con el abogado. Y queda una **migración de datos** deliberadamente no aplicada: purgar el `token_encrypted` de las filas anteriores a la 8C, que depende de la Compuerta 0 (si hay solicitudes en vuelo, borrarlas rompe a esos clientes).
+
+### 2026-10-19 · 📦915 · Fase 8A.2: la 5B — la supresión de los datos vencidos
+
+**El texto que manda.** El 10.6: "Vencido ese plazo y sin que exista un deber legal o
+contractual de conservación, el dato se suprime conforme a la política de la Empresa."
+
+**Lo que estaba mal.** La capa de conservación (migración 020) borraba el **registro de
+auditoría** de las firmas vencidas. Eso destruye la prueba y conserva el dato: exactamente
+al revés de lo que ordenan el 8.6 y el 10.6. El propio script de purga lo decía en voz
+alta: "HASTA QUE EXISTA LA 5B, ESTA OPERACIÓN NO CUMPLE EL 8.6". La 8A.1 (📦914) ya no
+afirmaba una vigencia falsa, pero tampoco suprimía: la capa de datos no existía.
+
+**Qué se implementó.**
+
+1. `src/services/supresion.js`: `simular()` (el modo por defecto; no borra nada) y
+   `suprimir()` (actor, motivo, ventana y lote obligatorios). Suprime la fila completa
+   de la firma y sus tres archivos (PDF original, PDF firmado y constancia), más las filas
+   hijas que la llave foránea exige. **Archivos primero, base después**, en transacción:
+   el archivo *es* el dato personal, y si la base falla después el reintento es seguro.
+   Es idempotente.
+2. `src/db/schema/024_purga_datos.sql`: la **lápida** (`gh_firma_purgadas`) — qué se
+   suprimió, por qué, por quién y cuándo, sin datos personales — y la columna
+   `id_solicitud` en la prueba de aceptación (el 12.7 la exige).
+3. `src/db/schema/025_purga_datos_append_only.sql`: los triggers que hacen la lápida
+   inalterable. Van en su propia migración con `-- @skip-when-env test`, **el mismo
+   mecanismo que la 020**: la garantía se salta solo en el ambiente que la necesita (los
+   tests limpian la tabla entre casos) y se prueba aparte contra el archivo real.
+4. `src/crypto/token.js`: la lápida **no guarda la credencial**. Guarda
+   `HMAC('tombstone-purga', token_hash)` — un hash de un hash, con propósito y llave
+   derivados — que no permite autenticarse ni resolver nada. Solo permite responder
+   "no disponible por vencimiento del plazo" (`410 CONSERVACION_VENCIDA`) en vez de un
+   404 que no dice por qué.
+5. `src/services/signRequest.js`: el `id_solicitud` se enlaza al crear la firma. El
+   consentimiento se acepta **antes** de que exista la firma (así es en el flujo de la
+   Empresa: crea el consentimiento, el trabajador lo acepta y después se emite el
+   enlace), así que en la vía OTP no había ningún identificador que escribir. Sin eso, la
+   prueba de la aceptación que sobrevive a la supresión quedaba incompleta para el 12.7.
+6. `scripts/purga-ventana.js`: ofrece las dos capas y **simula por defecto**. El titular
+   pasó de "PURGA DEL REGISTRO DE AUDITORÍA (8.6 / 10.6)" a "SUPRESIÓN DE DATOS
+   VENCIDOS (10.6 · el 8.6 es comunicar el plazo)": el 8.6 es comunicar el plazo; el 10.6
+   es conservarlo y suprimirlo.
+
+**Lo que sobrevive, y lo que no.** La fila de la firma se borra entera: es la lectura
+más fuerte del 10.6 y la única compatible con el esquema (el `CHECK` del estado
+impediría inventar un estado nuevo sin rehacer la tabla). La consecuencia es que **el
+evento de aceptación no puede sobrevivir** (llave foránea). Lo que sobrevive es la
+**prueba de aceptación** en `gh_consentimientos_firma`, que no tiene llave foránea
+contra la firma — y que es justo donde el 12.7 la sitúa.
+
+**Cómo se validó.** 16 tests nuevos (`tests/fase8a2-supresion-datos.test.js`): la
+simulación no borra nada; la supresión real borra la fila y los archivos; la
+idempotencia; el gobierno (actor, motivo, ventana, lote); el hold legal; la lápida sin
+credencial; la lápida sin datos personales; la lápida append-only (contra el archivo
+real de la 025, en una base aislada, con un test de mutación que demuestra que sin el
+trigger sí se podría alterar y borrar); el enlace suprimido responde `410`; y la prueba
+de la aceptación con su identificador de solicitud. Suite completa: **1214 tests · 1212
+verdes · 0 fallos · 2 omitidos**.
+
+**Bugs encontrados de paso (en la suite, no en el servicio).** Los triggers de la 020 se
+saltan en el ambiente de test, y los servicios de conservación y supresión dependen de
+las tablas que ella crea. Antes esas tablas existían solo porque
+`tests/conservacion-purga.test.js` las creaba en su `before`: un orden de archivos
+distinto rompía la suite sin tocar el código de producción. La garantía se movió a
+`tests/helpers.js` (`asegurarTablasPurga()`), que la ejecuta en cada `resetDb()`.
+
+**Lo que sigue.** El código está; la operación no. La supresión es irreversible y no se
+ejecuta contra producción hasta que la **Compuerta 0** esté en verde. Queda pendiente la
+8C (rotación de tokens), la 8B (dato sensible y `metadata`), la 10.4, la 9A, y después
+la 11A con el abogado.
+
+### 2026-10-19 · 📦914 · Fase 8A.1: el vencimiento del plazo de conservación (numeral 10.6)
+
+**El texto que manda.** El 10.6 dice: "Los plazos de conservación se determinan por
+categoría de dato en la tabla de retención documental de la Empresa [...] Vencido ese
+plazo y sin que exista un deber legal o contractual de conservación, el dato se
+suprime conforme a la política de la Empresa."
+
+**Lo que estaba mal.** La verificación pública resolvía el token con
+`skipExpirationCheck`, una bandera que se saltaba TODAS las comprobaciones de
+vencimiento. El efecto era invisible: vencido el plazo que declaró la empresa, el
+sistema seguía respondiendo "firma registrada y documento íntegro", recalculaba el
+SHA-256 del PDF en disco y pintaba el banner verde. Afirmaba una vigencia que ya no
+existía, y todo ello mientras el propio script de purga decía en voz alta que la capa
+de datos personales (la 5B) todavía no existía.
+
+**Qué se implementó.**
+
+1. `vencidaPorConservacion(fila)` en `src/services/conservacion.js`: pregunta de
+   CONSULTA ("¿venció?"), distinta de `esElegible` (que pregunta "¿se puede borrar?").
+   Mira el hold legal, porque el deber legal de conservación prima sobre el
+   vencimiento del plazo.
+2. `resolveToken` ya no tiene ninguna bandera que salte el vencimiento.
+   `permitirHistorico` ignora SOLO la ventana para firmar (consultar lo que ya se
+   firmó no puede depender de poder firmar) y NUNCA el plazo de conservación.
+3. El estado nuevo es `410 CONSERVACION_VENCIDA` ("No disponible por vencimiento del
+   plazo"), y aplica igual en `/verify`, en `/s/:token` y en `/verify-pdf`.
+4. El 404 ya no confirma la existencia: la misma respuesta ("No disponible") para un
+   token que nunca existió y para uno que ya no se puede mostrar.
+5. La mini-app distingue los cuatro casos del enlace y NO ofrece verificación cuando
+   el plazo venció: la verificación responde lo mismo, así que ofrecerla sería una
+   promesa falsa.
+
+**El detalle que importa: el hold legal prima.** Con deber legal de conservación (una
+reclamación, un proceso judicial, un requerimiento de la SIC), el dato NO se suprime:
+se conserva. En ese caso la evidencia sigue viva y la verificación debe seguir
+confirmando la integridad. Decir "no disponible" sería falso, porque el documento está
+ahí y además tiene que estar ahí. Hay un test que lo fija.
+
+**Cómo se validó.** 11 tests nuevos (`tests/fase8a-vencimiento-verificacion.test.js`):
+los cuatro estados del verify, el hold, la no-regresión, el 404 que no confirma, y dos
+checks de que el backend no se salta el vencimiento. Se actualizaron dos tests
+existentes por el cambio de copy: el del 404 del middleware y los checks del enlace
+reabierto de la mini-app, que pasaron de 12 a 14 checks con dos mutaciones nuevas
+(§7.2: un check que no muerde no es un check). Suite completa: **1198 tests · 1196
+verdes · 0 fallos · 2 omitidos**.
+
+**Lo que sigue.** Esta fase NO suprime nada: cambia lo que el sistema afirma. La
+supresión real es la **8A.2 (la 5B)**, que es la parte irreversible y por eso lleva la
+compuerta más estricta. Y queda comprobada una cosa antes de dar por buena esta fase:
+que las migraciones 021 y 023 estén aplicadas en el entorno donde corra esto. Sin
+`fecha_conservacion` calculada no hay vencimiento que comprobar, y el sistema no
+inventa plazos (el 8.6 dice que el Acuerdo no los fija porque la ley no los fija).
+
+**Aclaración sobre la compuerta 0.** Los 2 tests omitidos de la suite NO son de la
+migración 020: son un test de rate limit (720 requests, lento) y uno de esquema zod.
+El trigger append-only de la 020 sí tiene cobertura: `tests/conservacion-purga.test.js`
+aplica el archivo real de la migración en una base en memoria aislada y ejercita las
+cinco condiciones, incluido el hold. La 020 se salta en el entorno de test a
+propósito (directiva `-- @skip-when-env test`) porque varios tests limpian la tabla
+con DELETE; en staging se aplica de verdad y el trigger queda activo sobre la base
+real.
+
+### 2026-10-19 · 📦913 · Capítulo V: el deber de avisar a K+AIR y el deber de saber qué se firma
+
+**El texto que manda.** El Capítulo V del Acuerdo de uso es el de los deberes del
+Firmante, y se apoya en el artículo 2.2.2.47.6 del Decreto 1074 de 2015
+("OBLIGACIONES DEL FIRMANTE"): mantener control y custodia de los datos de creación;
+actuar con diligencia para evitar su utilización no autorizada; y dar aviso oportuno
+a cualquier persona que posea, haya recibido o vaya a recibir documentos o mensajes
+de datos firmados electrónicamente por el firmante, cuando sepa o sea previsible que
+los datos quedaron en entredicho.
+
+**Lo que estaba mal (dos cosas de código y dos de texto).**
+
+El **5.1(c)** obliga al Firmante a "avisar de inmediato a la Empresa y a K+AIR"
+cualquier situación que comprometa la seguridad de sus datos de creación. La mini-app
+solo mostraba los canales de la **Empresa** (`canal_pqrs`, `canal_incidentes`:
+`seguridad@empresa.co`). De K+AIR no había ni un canal en toda la pantalla: el deber
+no era cumplible, y el trabajador que sospechara de que le comprometieron el OTP o el
+enlace no tenía dónde reportarlo.
+
+El **5.3** obliga a "firmar únicamente documentos cuyo contenido sea exacto, completo
+y corresponda a lo que la Empresa le ha informado". El backend ya mandaba en el
+contexto `tipo_identificacion` (CONTRATO, ACTA, CERTIFICADO...) e `id_documento` (la
+referencia), pero **la mini-app nunca los pintaba**. El comentario del backend lo
+afirmaba en contra de lo que el código hacía (`src/routes/public.js:135`: "La mini-app
+lo muestra como contexto") y era falso. El Firmante firmaba sobre un PDF sin saber si
+era el contrato que esperaba: exactamente lo que el 5.3 le exige verificar.
+
+Del lado del texto, dos cosas van para el abogado **sin tocar el fixture**: el
+preámbulo del 5.1 dice que a), b) y c) son los deberes del 47.6, y no lo son (el
+literal a) no está en el artículo; el deber 2 del artículo —actuar con diligencia— no
+tiene literal propio; y el deber 3 quedó reducido a "a la Empresa y a K+AIR",
+perdiendo "cualquier persona que posea, haya recibido o vaya a recibir" el documento
+firmado y los criterios de "en entredicho" del parágrafo). Y el 5.1(a) obliga al
+Firmante a cumplir "las políticas de seguridad de la Empresa y de K+AIR", que el
+Firmante nunca ve: un deber que no se puede conocer no es exigible.
+
+**Qué se implementó.** El canal de incidentes de K+AIR vive en las dos capas: valor
+por defecto en el HTML estático (`adminkair@gmail.com`, el mismo que publica el
+Anexo de Encargo §9, datos de contacto del Encargado) para que exista también en la
+pantalla de error, donde no hay contexto que lo traiga, y configurable por
+`FIRMA_CANAL_INCIDENCIAS` en el contexto; un test exige que los dos no diverjan.
+Aparece en un pie `<footer class="pie-kair">` **fuera de las pantallas**, para que
+esté en todas, incluida la de error. Y el bloque `#documento-identidad` muestra, en
+la pantalla del documento, qué se está firmando ("Estás firmando un contrato.
+Referencia: ..."), con la categoría traducida a lenguaje llano.
+
+**Y el Capítulo IV, que estaba dado por cerrado y no tenía registro.** Al verificar
+las citas del Capítulo V se revisaron las del Capítulo IV, y dos de las cinco no
+resisten el cotejo. El **4.3** (parágrafo 2 del 2.2.1.1.10 del Decreto 1072) y el
+**4.5** (numeral 3 del 2.2.1.1.13) son **fieles**. El **4.2** es una paráfrasis: el
+47.3 dice "incluido **cualquier acuerdo aplicable**" y el Acuerdo dice "incluido este
+Acuerdo" (la sustancia no cambia: este Acuerdo es un acuerdo aplicable). El **4.1**
+cita un artículo que el 47.5 no nombra: el oficial remite al **2.2.2.43.3**, y el
+43.3 vigente es "PRESUPUESTO ANUAL" de las Cámaras de Comercio, o sea que **la
+remisión del propio decreto está caduca**, heredada de la numeración anterior a la
+compilación de 2015. El **4.4** tampoco es transcripción: el artículo 244 de la Ley
+1564 ("DOCUMENTO AUTÉNTICO") presume auténticos los documentos públicos y privados
+"mientras no hayan sido tachados de falso o desconocidos", y la frase "en forma de
+mensaje de datos" es del 243. Hallazgo de fondo: **el Acuerdo no cita el 2.2.2.47.4
+(CONFIABILIDAD)** en ningún punto, y es el artículo que trae los dos requisitos
+materiales (los datos de creación son exclusivamente del firmante; se puede detectar
+la alteración no autorizada del mensaje de datos), al que apuntan el 2.2.1.1.11 y el
+parágrafo del 2.2.1.1.13.
+
+**Cómo se validó.** Cuatro pruebas nuevas
+(`tests/capitulo-v-deberes-firmante.test.js`): el markup y el cableado del pie y del
+bloque de identidad, doce mutaciones que el evaluador tiene que detectar, la
+no-divergencia entre el canal del HTML y el de la configuración, y el contexto HTTP
+exponiendo `canal_incidentes_kair`, `tipo_identificacion` e `id_documento`. Suite
+completa: **1185 tests · 1183 verdes · 0 fallos · 2 omitidos**. Barrido de caracteres
+no latinos limpio y EOL y BOM sin cambios. **El barrido encontró una contaminación
+preexistente en `LEGAL.md`**: una letra cirílica (U+043F, la "pe" cirílica) donde iba una
+"n" dentro de la palabra "electrónica", en el §3.1, que venía de HEAD. Corregida, porque
+el proyecto prohíbe cirílico en documentación.
+
+**Lo que sigue.** El texto legal no se toca sin abogado: quedan las propuestas de
+redacción del 5.1 (preámbulo y literal a) y las del 4.1, 4.2 y 4.4, en
+`docs/gestion-humana/firma-electronica/auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` y
+`auditoria-capitulo-iv-citas-normativas-2026-10-19.md`. Si el abogado cambia el texto
+hay que **publicar la v1.1**: el hash archivado en los consentimientos ya aceptados no
+se toca. Queda una decisión de política del owner: si la API debe **rechazar** un
+`correo_verificacion` cuyo dominio sea el de la Empresa (hoy el OTP va al buzón que
+registra la Empresa, y si ese buzón es compartido la Empresa tiene los datos de
+creación de la firma, lo que rompe el 5.1(b), el 5.2 y el 47.4) o si la regla queda
+solo como onboarding. Y sigue pendiente la **5B** (datos personales) y el
+comportamiento post-purga del enlace y del oráculo.
+
+### 2026-10-19 · 📦912 · El orden (g)/(h) y el 5.4: el Firmante acepta el Acuerdo antes de ver el documento, y el enlace le entrega lo que firmó
+
+**El texto que manda.** El Capítulo III del Acuerdo de uso pacta la secuencia del
+proceso de firma:
+
+> (g) Superada la verificación, el Trabajador lee en pantalla el presente Acuerdo,
+> en la versión vigente, y lo acepta. [...] El Trabajador no puede avanzar en el
+> flujo sin leer y aceptar el Acuerdo.
+> (h) El Trabajador visualiza y descarga el documento objeto de la firma.
+
+Y el 5.4 del Capítulo V: *"El Firmante puede imprimir o descargar copia de este
+Acuerdo y del documento firmado desde el propio enlace de firma, sin costo
+alguno."*
+
+**Lo que estaba mal (dos cosas).**
+
+La primera: el código no respetaba el orden. El documento se servía desde
+`OTP_VERIFIED` — con el OTP verificado bastaba para pedir el PDF y para registrar
+su visualización. La mini-app cargaba el visor de entrada y ponía la casilla del
+Acuerdo en la misma pantalla: el Firmante veía el documento y la casilla a la
+vez, y podía marcar las otras dos casillas y firmar sin haber aceptado nada.
+Quedaba registrada una aceptación de Acuerdo sin que hubiera información previa,
+que es justo lo que el (g) prohíbe.
+
+La segunda: el 5.4 no tenía por dónde. El enlace entregaba el PDF **original** y,
+después de firmar, no entregaba nada: el documento firmado solo se podía bajar
+por el endpoint interno, que es de K+AIR, no del Firmante.
+
+**Qué se implementó.**
+
+El **backend** exige el Acuerdo aceptado antes de servir el documento y antes de
+registrar su visualización (`publicFlow.exigirAcuerdoAceptado`), con las mismas
+condiciones de empresa y versión que ya exigía el commit. La regla vive en el
+servidor, no en la UI. El camino de error es **uno solo**
+(`CONSENT_NOT_ACCEPTED`) para todos los casos en que falta la aceptación: el
+Firmante solo necesita saber que tiene que leer y aceptar, y la respuesta no
+expone ni el id ni el estado del consentimiento. El detalle fino
+(`CONSENT_NOT_FOUND`, `CONSENT_WORKER_MISMATCH`, `CONSENT_COMPANY_MISMATCH`,
+`CONSENT_VERSION_MISMATCH`) lo sigue dando el commit, donde el dato
+inconsistente tiene que ser rastreable.
+
+Del lado de la mini-app, el visor no carga hasta que la aceptación vuelve del
+servidor, y aparece un aviso explícito ("Para ver el documento, primero lee y
+acepta el Acuerdo de uso"). El contexto expone `acuerdo_aceptado`, para que
+quien recargue la página no tenga que volver a aceptar lo que ya aceptó.
+
+Y el 5.4: dos endpoints nuevos. `GET /api/sign/{token}/signed-document.pdf`
+entrega el PDF **firmado**, y `GET /api/sign/{token}/acuerdo.txt` entrega el
+**texto del Acuerdo** con su `SHA-256` en la cabecera `X-Acuerdo-SHA256`, para
+que el Firmante pueda comprobar que la copia es la que aceptó. La pantalla final
+ofrece los dos.
+
+**La excepción está acotada.** El enlace es de un solo uso (3.4(c)) y estas
+descargas **no reabren el flujo**: identificar, pedir OTP, aceptar el Acuerdo y
+firmar siguen cerrados en estado firmado. Lo único que hacen es bajar lo que ya
+está firmado, y solo mientras el enlace siga vigente (el TTL no se extiende).
+**El token solo no sirve el PDF firmado antes de la identidad**: en cualquier
+estado previo a la firma la respuesta es `409 SIGNED_DOCUMENT_NOT_AVAILABLE`.
+
+**Dos defectos que salieron de probarlo en el navegador.**
+
+El primero: el contexto JSON (`GET /s/:token` con `Accept: application/json`) no
+llevaba `Cache-Control`, así que el navegador lo guardaba y al volver a abrir el
+enlace entregaba **JSON crudo en vez de la mini-app**. Es el mismo síntoma que
+corrigió I-LINK-REABIERTO para el enlace ya firmado, y se repetía cada vez que
+el Firmante volvía al enlace. Ahora la respuesta lleva `no-store, no-cache,
+must-revalidate, private`.
+
+El segundo: `resolveToken` marcaba como `EXPIRED` una solicitud en estado
+`DUAL_FIRMADO` (firma doble) que se abría después de su vencimiento. Un enlace
+vencido no puede reescribir lo que ya se firmó: `DUAL_FIRMADO` quedó en la
+lista de estados excluidos, igual que `SIGNED`.
+
+**Cómo se validó.** Ocho pruebas nuevas
+(`tests/fase6-orden-acuerdo-5-4.test.js`): el documento no se sirve ni se
+registra su visualización sin aceptación; tras la aceptación sí; el error no
+filtra datos internos; la mini-app sabe si el Acuerdo ya está aceptado; el
+enlace entrega el documento firmado y no el original; la copia del Acuerdo
+hashea al valor archivado; el token solo no sirve el PDF firmado antes de la
+identidad; y el enlace firmado no reabre el flujo (firmar y pedir OTP dan
+`410`). **Y en el navegador**, contra un servidor local con su propia base:
+identificación → OTP → pantalla de documento **sin PDF y con el aviso** →
+marcar el Acuerdo (la red muestra `consent/accept` y después `view-document`, y
+**ninguna** petición al PDF antes) → el PDF carga → firmar → la pantalla final
+con las dos descargas, que responden `200` con el PDF firmado (`%PDF-`,
+`attachment`) y con el Acuerdo y su SHA-256.
+
+**Lo que sigue.** La **5B** (datos personales: fila, PDF, constancia, oráculo,
+verificador) y el comportamiento post-purga del enlace y del oráculo ("no
+disponible por vencimiento del plazo", no "inválido"): el advisor lo asignó a la
+5B o a la Fase 6, y la parte del enlace que depende de la supresión de los datos
+es 5B. Del lado del texto: falta la v1.1 del Capítulo X del representante y del
+bloque de manifestación, hay que mandar al abogado el Anexo §7 revisado contra la
+Fase 5, y resolver la contradicción §4/§8 de los T&C.
+
 ### 2026-10-19 · 📦911 · La ventana de purga: el 3.6(g) y el 8.6 dejan de contradecirse
 
 **El problema, en dos frases del Acuerdo que no pueden ser ciertas a la vez.**
@@ -756,10 +1198,9 @@ abortarían. El 020 **no se prueba en la base compartida** (lleva
 compensada en CI por el test aislado y en staging por la migración aplicada de
 verdad.
 
-**Lo que sigue** — Fase 6: servir el PDF firmado desde el enlace (5.4) y el
-orden (g)/(h) del Capítulo III, para que el firmante no vea el documento antes
-de aceptar el Acuerdo. Y la **5B** (datos personales) antes de operar la
-ventana como cumplimiento del 8.6.
+**Lo que sigue** — La **Fase 6** (orden (g)/(h) y 5.4) se implemento el 19: ver
+📦912. Y la **5B** (datos personales) antes de operar la ventana como
+cumplimiento del 8.6.
 
 ### 2026-10-19 · 📦910 · Los últimos cuatro dígitos: en memoria, y nunca en la base
 

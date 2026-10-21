@@ -35,6 +35,7 @@ const empresaService = require('../src/services/empresa');
 const signRequestService = require('../src/services/signRequest');
 const mailer = require('../src/services/mailer');
 const db = require('../src/db/connection');
+const config = require('../src/config');
 
 const PLAZO = '5 años para hoja de vida; 10 años para contrataciones.';
 const CANAL = 'RRHH por correo o en la sede de la empresa.';
@@ -50,14 +51,26 @@ const EMPRESA = {
 
 /** Crea la empresa con (o sin) el plazo declarado. */
 function _crearEmpresa(conPlazo = true) {
-  // `resetDb` no vacía gh_firma_empresas (no está en su lista de tablas),
+  // `resetDb` ahora vacía gh_firma_empresas (no está en su lista de tablas),
   // así que la empresa se borra explícitamente para que cada test arranque
   // desde cero.
   db.prepare('DELETE FROM gh_firma_empresas WHERE id_empresa = ?')
     .run(EMPRESA.id_empresa);
-  return empresaService.create(conPlazo
-    ? Object.assign({}, EMPRESA, { plazo_retencion: PLAZO, canal_solicitud_copia: CANAL })
+  const creada = empresaService.create(conPlazo
+    ? Object.assign({}, EMPRESA, {
+      plazo_retencion: PLAZO,
+      canal_solicitud_copia: CANAL,
+      // El plazo COMPUTABLE en días (migración 023). El D-03 lo exige: sin
+      // número de días no hay fecha de conservación y la firma se conserva
+      // de forma indefinida. El texto (PLAZO) es lo que lee el firmante.
+      plazo_retencion_dias: 1825,
+    })
     : EMPRESA);
+  // D-03: con el bloqueo activo, una empresa sin Anexo de Encargo firmado no
+  // puede pedir firmas. Estos tests no van de eso, así que la empresa de
+  // prueba queda habilitada (el Anexo) y lo que se variationa es el plazo.
+  empresaService.marcarAnexoFirmado(EMPRESA.id_empresa, '2026-10-20');
+  return creada;
 }
 
 // =====================================================================
@@ -152,13 +165,42 @@ test('el correo de invitacion comunica el plazo y el canal de copia', async () =
   assert.ok(cuerpo.includes(CANAL), 'el correo debe comunicar el canal para pedir copia');
 });
 
+test('D-03 · si la empresa no declara plazo, la firma NO se puede pedir', async () => {
+  // El 8.6 obliga a la Empresa a comunicar el plazo ANTES de pedir la firma.
+  // Sin plazo declarado, esa comunicación no se puede hacer y la firma se
+  // conservaría de forma indefinida (el 10.6 no tiene fecha). Con el D-03 la
+  // solicitud ni se crea: se rechaza con un 409 que dice qué falta.
+  resetDb();
+  _crearEmpresa(false);
+
+  await assert.rejects(
+    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA.id_empresa }),
+    (e) => {
+      assert.equal(e.statusCode, 409);
+      assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
+      return true;
+    }
+  );
+});
+
 test('si la empresa no declara plazo, el correo NO inventa uno', async () => {
+  // Con el bloqueo desactivado (la transición), la firma se puede pedir y el
+  // correo sigue sin inventar un plazo. Es el camino que queda mientras las
+  // Empresas se habilitan.
   resetDb();
   mailer.clearDevInbox();
   _crearEmpresa(false);
-  const { signRequest } = await createSignRequestWithIdentificacion({
-    id_empresa: EMPRESA.id_empresa,
-  });
+
+  const antes = config.exigirHabilitacionEmpresa;
+  config.exigirHabilitacionEmpresa = false;
+  let signRequest;
+  try {
+    ({ signRequest } = await createSignRequestWithIdentificacion({
+      id_empresa: EMPRESA.id_empresa,
+    }));
+  } finally {
+    config.exigirHabilitacionEmpresa = antes;
+  }
 
   await signRequestService.notifyRemote(signRequest, 'trabajador@example.com', {});
 

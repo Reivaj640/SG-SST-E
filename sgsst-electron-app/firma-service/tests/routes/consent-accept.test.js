@@ -90,19 +90,26 @@ async function setupOtpVerified({
   const { consent_id } = await createPendingConsent({
     id_trabajador, id_empresa,
   });
-  const { token } = await createSignRequestWithIdentificacion({
+  const { token, signRequest } = await createSignRequestWithIdentificacion({
     id_trabajador, id_empresa,
     identificacion_numero,
     consent_id,
   });
   await recorrerFlujo(token, identificacion_numero, 'OTP_VERIFIED');
-  return { token, consent_id };
+  return { token, consent_id, signRequest };
 }
 
 async function setupDocumentViewed(opts = {}) {
   const identificacion_numero = opts.identificacion_numero || '1234567890';
-  const { token, consent_id } = await setupOtpVerified({ ...opts, identificacion_numero });
-  await recorrerFlujo(token, identificacion_numero, 'DOCUMENT_VIEWED');
+  const { token, consent_id, signRequest } = await setupOtpVerified({ ...opts, identificacion_numero });
+  // FASE 6 · orden (g)/(h): el estado DOCUMENT_VIEWED se fuerza en la base a
+  // propósito. Con el orden pactado (g antes que h), un Firmante normal ya
+  // no llega a DOCUMENT_VIEWED sin haber aceptado el Acuerdo. Lo que este
+  // test quiere comprobar es que el endpoint de aceptación ADMITE ese
+  // estado, que es lo que hace falta para las solicitudes que ya lo tenían.
+  db.prepare(
+    "UPDATE gh_firmas_electronicas SET estado = 'DOCUMENT_VIEWED' WHERE id = ?"
+  ).run(signRequest.id);
   return { token, consent_id };
 }
 

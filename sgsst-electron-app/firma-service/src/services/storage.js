@@ -29,11 +29,14 @@ const PATHS = {
   originales: resolveUnderRoot(path.join(config.storage.pdfPath, 'originales')),
   firmados: resolveUnderRoot(path.join(config.storage.pdfPath, 'firmados')),
   constancias: resolveUnderRoot(path.join(config.storage.pdfPath, 'constancias')),
+  // 9A: la firma autografica (el 7.2). El PDF firmado en papel (el que
+  // escanea la Empresa) y el Registro de firma autografica que lo evidencia.
+  papel: resolveUnderRoot(path.join(config.storage.pdfPath, 'papel')),
 };
 
 // Asegurar que los directorios existen al cargar el módulo.
 function ensureDirs() {
-  for (const dir of [PATHS.pdfs, PATHS.originales, PATHS.firmados, PATHS.constancias]) {
+  for (const dir of [PATHS.pdfs, PATHS.originales, PATHS.firmados, PATHS.constancias, PATHS.papel]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
       logger.info('Directorio creado', { dir });
@@ -60,6 +63,27 @@ function saveOriginal(filename, buffer) {
   // Sanear filename: solo nombre, sin ../ ni caracteres raros
   const safe = path.basename(filename);
   const filepath = path.join(PATHS.originales, safe);
+  fs.writeFileSync(filepath, buffer);
+  return filepath;
+}
+
+/**
+ * Guarda un PDF de la via en PAPEL (9A): el documento firmado en papel o
+ * el Registro de firma autografica.
+ *
+ * @param {string} filename - Nombre del archivo (sin path).
+ * @param {Buffer} buffer - Bytes del PDF.
+ * @returns {string} Ruta absoluta al archivo guardado.
+ */
+function savePapel(filename, buffer) {
+  if (!Buffer.isBuffer(buffer)) {
+    throw new Error('savePapel: buffer debe ser un Buffer');
+  }
+  if (typeof filename !== 'string' || filename.length === 0) {
+    throw new Error('savePapel: filename requerido');
+  }
+  const safe = path.basename(filename);
+  const filepath = path.join(PATHS.papel, safe);
   fs.writeFileSync(filepath, buffer);
   return filepath;
 }
@@ -139,6 +163,7 @@ function size(filepath) {
 module.exports = {
   PATHS,
   saveOriginal,
+  savePapel,
   readPdf,
   readPdfIfExists,
   exists,

@@ -78,11 +78,26 @@ async function recorrerFlujoHastaViewed(token, identificacion_numero) {
   }
 
   // 3. View document
+  //
+  // FASE 6 · orden (g)/(h): el documento solo se sirve si el Firmante ya
+  // aceptó el Acuerdo (3.4(g) va antes de (h)). Los casos de esta suite que
+  // provacan un consentimiento roto (inexistente, sin aceptar, de otro
+  // trabajador, de otra empresa, sin consent_id) fallan AQUÍ, antes de
+  // llegar al commit.
+  //
+  // Eso no cambia lo que se prueba: el commit valida el consentimiento
+  // ANTES que el estado (publicFlow.commit, paso 2.5 antes del 3), así que
+  // sigue devolviendo el código específico que cada caso espera. Por eso el
+  // 409 de consentimiento se tolera en este paso y no aborta el recorrido.
   const r5 = await request(require('../helpers').makeApp())
     .post(`/api/sign/${token}/view-document`)
     .send({ segundos_en_pagina: 30, scroll_al_final: true });
   if (r5.status !== 200) {
-    throw new Error(`view-document falló: status=${r5.status} body=${JSON.stringify(r5.body)}`);
+    const code = r5.body && r5.body.error && r5.body.error.code;
+    if (code !== 'CONSENT_NOT_ACCEPTED') {
+      throw new Error(`view-document falló: status=${r5.status} body=${JSON.stringify(r5.body)}`);
+    }
+    return { estado_final: 'OTP_VERIFIED', documento_bloqueado: true };
   }
 
   return { estado_final: r5.body.estado };
@@ -194,7 +209,11 @@ test('E6 caso 2: consent_id inexistente → 409 CONSENT_NOT_FOUND', async () => 
     'SELECT estado FROM gh_firmas_electronicas WHERE id_solicitud = ?'
   ).get(id_solicitud);
   assert.notEqual(row.estado, 'SIGNED');
-  assert.equal(row.estado, 'DOCUMENT_VIEWED');
+  // FASE 6 · orden (g)/(h): con el consentimiento inexistente el documento
+  // ni siquiera se pudo ver (el 3.4(g) va antes del (h)), así que la
+  // solicitud se quedó en OTP_VERIFIED. Lo que importa es que NO quedó
+  // firmada.
+  assert.equal(row.estado, 'OTP_VERIFIED');
 });
 
 // =========================================================================

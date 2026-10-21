@@ -201,20 +201,25 @@ async function recorrerFlujoCompleto(app, token, identificacion = WORKER_CC_PLAI
   assert.equal(r2.status, 200,
     `verify-otp falló: status=${r2.status} body=${JSON.stringify(r2.body)}`);
 
-  // 3. View document
-  const r3 = await request(app)
-    .post(`/api/sign/${token}/view-document`)
-    .send({ segundos_en_pagina: 30, scroll_al_final: true });
-  assert.equal(r3.status, 200,
-    `view-document falló: status=${r3.status} body=${JSON.stringify(r3.body)}`);
-
-  // 3b. Aceptar Acuerdo (3ª casilla de la mini-app). El worker acepta su
+  // 3. Aceptar Acuerdo (3ª casilla de la mini-app). El worker acepta su
   // consentimiento; el rep acepta el SUYO propio (rama EMPRESA).
+  //
+  // FASE 6 · orden (g)/(h): la aceptación va ANTES de ver el documento. El
+  // 3.4(g) dice que el Trabajador no puede avanzar sin leer y aceptar el
+  // Acuerdo, y el (h) es "visualiza y descarga el documento". Por eso el
+  // view-document va después del consent/accept.
   const r35 = await request(app)
     .post(`/api/sign/${token}/consent/accept`)
     .send({});
   assert.equal(r35.status, 200,
     `consent/accept falló: status=${r35.status} body=${JSON.stringify(r35.body)}`);
+
+  // 3b. View document
+  const r3 = await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ segundos_en_pagina: 30, scroll_al_final: true });
+  assert.equal(r3.status, 200,
+    `view-document falló: status=${r3.status} body=${JSON.stringify(r3.body)}`);
 
   // 4. Commit
   const r4 = await request(app)

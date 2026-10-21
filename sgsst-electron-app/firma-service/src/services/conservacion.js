@@ -118,10 +118,52 @@ function plazoDeclarado(id_empresa) {
 }
 
 /**
+ * El deber legal de conservación SIN TÉRMINO que la Empresa declaró
+ * (migración 029).
+ *
+ * El artículo 2.2.1.1.12 del Decreto 1072 obliga a los empleadores a
+ * conservar los contratos de trabajo firmados electrónicamente, sin plazo. La
+ * decisión del owner (2026-10-20) es que esto se declara **a nivel de
+ * Empresa**: es una cualidad de la relación laboral, no del archivo, y el
+ * sistema no puede clasificar un PDF con acierto (el mismo argumento del
+ * 10.8: no se lee el documento antes del consentimiento).
+ *
+ * @param {string} id_empresa
+ * @returns {{activo: boolean, norma: string|null}}
+ */
+function deberLegalEmpresa(id_empresa) {
+  if (!id_empresa) return { activo: false, norma: null };
+  let row;
+  try {
+    row = db.prepare(
+      'SELECT conservacion_por_deber_legal, norma_conservacion FROM gh_firma_empresas WHERE id_empresa = ?'
+    ).get(id_empresa);
+  } catch (e) {
+    // La columna puede no existir todavía (migración 029 sin aplicar). Eso
+    // no puede tumbar la creación de la firma: sin el flag, el
+    // comportamiento es el de siempre.
+    return { activo: false, norma: null };
+  }
+  if (!row) return { activo: false, norma: null };
+  return {
+    activo: Boolean(row.conservacion_por_deber_legal),
+    norma: row.norma_conservacion || null,
+  };
+}
+
+/**
  * Congela la fecha de conservación de una firma, en el momento en que se
  * crea. Se congela a propósito: el 8.6 habla del plazo "que le resulta
  * aplicable" al firmante cuando se le solicita la firma. Si la Empresa cambia
  * su política después, las firmas ya hechas no se mueven.
+ *
+ * CON DEBER LEGAL SIN TÉRMINO: no hay fecha de supresión (el plazo de la
+ * tabla de retención no extingue un deber legal) y se levanta un HOLD
+ * automático, gobernado por `gh_firma_holds`: se libera con actor y motivo
+ * cuando la relación termina o el documento se sustituye.
+ *
+ * NO es "nunca se purga": es "nunca se purga SOLO". Esa es la diferencia entre
+ * un deber legal y un accidente.
  *
  * @param {number} idFirma
  * @param {string} id_empresa
@@ -129,6 +171,22 @@ function plazoDeclarado(id_empresa) {
  * @returns {string|null} la fecha calculada, o null si no hay plazo declarado
  */
 function asignarFechaConservacion(idFirma, id_empresa, fecha_creacion) {
+  const deber = deberLegalEmpresa(id_empresa);
+  if (deber.activo) {
+    const norma = deber.norma || '2.2.1.1.12 del Decreto 1072 de 2015';
+    ponerHold(idFirma, {
+      actor: 'sistema',
+      motivo: 'deber_legal_' + norma,
+      alcance: norma,
+    });
+    logger.warn('SignRequest: la Empresa tiene deber legal de conservacion sin termino', {
+      firma_id: idFirma,
+      id_empresa,
+      norma,
+      aviso: 'RETAIN_DEBER_LEGAL',
+    });
+    return null;
+  }
   const dias = plazoDeclarado(id_empresa);
   const fecha = calcularFechaConservacion(fecha_creacion, dias);
   if (!fecha) {
@@ -256,6 +314,47 @@ function esElegible(fila) {
   const t = new Date(fila.fecha_conservacion).getTime();
   if (Number.isNaN(t)) return false;
   return t <= Date.now();
+}
+
+/**
+ * ¿Venció el plazo de conservación de esta firma?
+ *
+ * 8A.1. `fecha_conservacion` se calcula al crear la firma (fecha_creacion +
+ * plazo_retencion_dias, que declara la Empresa). Vencida esa fecha, el
+ * numeral 10.6 del Acuerdo obliga a suprimir el dato.
+ *
+ * Mientras la supresión no se haya ejecutado (capa 5B, Fase 8A.2), el
+ * sistema NO debe seguir afirmando que la firma está vigente: la
+ * respuesta honesta es "no disponible por vencimiento del plazo", no
+ * "inválido" (mentiría sobre el motivo) ni "firma válida" (afirmaría una
+ * vigencia que ya no existe).
+ *
+ * EL HOLD LEGAL PRIMA. Si existe un deber legal o contractual de
+ * conservación (una reclamación, un proceso judicial, un requerimiento de la
+ * SIC), el dato NO se suprime: se conserva. En ese caso la evidencia sigue
+ * viva y la verificación debe seguir confirmando la integridad: decir "no
+ * disponible" sería falso, porque el documento está ahí y además tiene que
+ * estar ahí. Por eso esta función mira el hold.
+ *
+ * Diferencia con `esElegible`: las dos responden hoy lo mismo (tiene
+ * fecha, venció, no hay hold), pero `esElegible` pregunta "¿se puede
+ * borrar?" (supresión) y esta pregunta "¿el sistema debe seguir
+ * afirmando que está vigente?" (consulta). Se mantienen separadas para
+ * que la 5B y la 8A.1 no se confundan.
+ *
+ * Sin plazo declarado (`fecha_conservacion` NULL) no hay vencimiento: no
+ * se inventa nada.
+ *
+ * @param {object} fila - fila de gh_firmas_electronicas
+ * @returns {boolean}
+ */
+function vencidaPorConservacion(fila) {
+  if (!fila) return false;
+  if (!fila.fecha_conservacion) return false;
+  if (Number(fila.hold_legal) === 1) return false;
+  const t = new Date(fila.fecha_conservacion).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() > t;
 }
 
 /**
@@ -567,11 +666,13 @@ module.exports = {
   CATEGORIAS_AUDITORIA,
   calcularFechaConservacion,
   plazoDeclarado,
+  deberLegalEmpresa,
   asignarFechaConservacion,
   ponerHold,
   liberarHold,
   holdsDe,
   esElegible,
+  vencidaPorConservacion,
   vencimientos,
   ventanaVigente,
   abrirVentana,

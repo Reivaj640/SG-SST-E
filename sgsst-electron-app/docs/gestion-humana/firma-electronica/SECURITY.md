@@ -243,9 +243,98 @@ del Servicio de Firma.
 | **Impacto** | 🟠 Alto: borra el rastro de auditoría de las firmas del lote. |
 | **Mitigación implementada** | La inalterabilidad es el **piso**, y la excepción está acotada por **cinco condiciones que la base de datos hace cumplir, no el código**: (1) hay una **ventana abierta** con actor, motivo y fecha de cierre; (2) la ventana **no está vencida** (se vence sola, tope de 4 horas); (3) la firma está en el **lote** habilitado para esa ventana, y el lote solo se puede ampliar con la ventana abierta; (4) la firma **venció su plazo** (`fecha_conservacion` en el pasado; sin plazo declarado no hay nada que suprimir); (5) la firma **no tiene deber legal de conservación** (`hold_legal = 0`). Cada condición aborta con su propio mensaje, así que el operador sabe cuál falló. El hold lo declara la Empresa con **actor, motivo, alcance y fecha**, y se libera con su propio actor y motivo; el historial queda en `gh_firma_holds`. La ventana, el lote y la purga quedan en `gh_firma_purga_log` y el **recibo por firma** en `gh_firma_purga_registro`, ambos **append-only** y sin datos personales: si la supresión borrara su propio rastro, no habría forma de demostrar qué se suprimió. |
 | **Mitigación recomendada** | (a) Revisar la ventana y el lote antes de cada purga (el reporte `scripts/reporte-vencimientos.js` los lista). (b) Alcanzar el plazo con `plazo_retencion_dias` declarado por cada Empresa: sin plazo declarado no hay fecha de conservación y **nada** se purga — y la retención indefinida tampoco es cumplimiento, por eso el reporte lo marca como **alerta**. |
-| **Alcance (lo que esta capa NO es)** | Esto es la **purga del registro de auditoría**, no la purga completa. **No** suprime los datos personales de la fila (correo, huellas, manifestación de voluntad) ni los archivos (PDF original, PDF firmado, constancia): eso es la **capa 5B**, un paquete aparte. La operación completa, en orden, es *chequeo de hold → datos personales → eventos de auditoría → registro de purga*; ejecutar solo esta capa deja el estado inverso al deseable (se destruye la prueba y se conservan los datos). **Hasta que exista la 5B, esta capa no puede presentarse como cumplimiento del 8.6**, y el script de purga lo dice en voz alta. |
+| **Alcance (lo que esta capa NO es)** | Esto es la **purga del registro de auditoría**, no la purga completa. La capa que suprime los datos personales de la fila (correo, huellas, manifestación de voluntad) y los archivos (PDF original, PDF firmado, constancia) es la **5B**, que ya existe: se implementó en la 8A.2, con el mismo gobierno de ventana, lote y hold. La operación completa, en orden, es *chequeo de hold → datos personales → eventos de auditoría → registro de purga*. **Esta capa sola ya no puede presentarse como cumplimiento del 8.6**: se destruiría la prueba y se conservarían los datos. Ver T.8. |
 | **Cobertura** | El trigger **no se prueba en la base de tests compartida**: la migración 020 lleva `-- @skip-when-env test` porque otros archivos de test borran eventos entre casos y abortarían. **Sí se prueba en CI**, de otra manera: `tests/conservacion-purga.test.js` aplica el **archivo real de la migración** en una base de datos aislada y ejercita las cinco condiciones, incluida la del hold y la del plazo. En **staging** la migración se aplica de verdad y el trigger queda activo sobre la base real. |
 | **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.6. El orden (g)/(h) se salta: ver el documento sin aceptar el Acuerdo
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 3.4(g) obliga a que el Trabajador lea y acepte el Acuerdo **antes** de ver el documento (3.4(h)): "El Trabajador no puede avanzar en el flujo sin leer y aceptar el Acuerdo". Si el documento se sirve con solo el OTP verificado, el Firmante ve el documento y la casilla del Acuerdo al mismo tiempo, y puede marcar las otras dos casillas y firmar sin haber aceptado nada: quedaría registrada una aceptación sin que hubiera información. |
+| **Activos** | A9 (registro de auditoría), Legal |
+| **Vector de ataque** | El propio Firmante (o quien tenga el token) avanza el flujo sin pasar por `consent/accept`: pide `document.pdf` y `view-document` con el token, solo con el OTP verificado. |
+| **Probabilidad** | Media: es el comportamiento natural de la UI si el backend no lo impide. Antes de esta fase el visor cargaba el PDF de entrada y la casilla del Acuerdo estaba en la misma pantalla. |
+| **Impacto** | 🟠 Alto: una firma con una aceptación de Acuerdo sin información previa; el hash del texto archivado no corresponde a nada que el Firmante haya leído. |
+| **Mitigación implementada** | (1) El **backend** exige el Acuerdo ACEPTADO antes de servir el documento y antes de registrar su visualización (`publicFlow.exigirAcuerdoAceptado`), con las mismas condiciones de empresa y versión que ya exige el commit. La regla no depende de la UI. (2) Un **solo código público** (`CONSENT_NOT_ACCEPTED`) para todos los casos en que falta la aceptación: el camino de error no expone ni el id ni el estado del consentimiento. El detalle fino (`CONSENT_NOT_FOUND`, `CONSENT_WORKER_MISMATCH`, `CONSENT_COMPANY_MISMATCH`, `CONSENT_VERSION_MISMATCH`) lo sigue dando el commit, donde el dato inconsistente tiene que ser rastreable. (3) La mini-app **no carga el visor** hasta que la aceptación vuelve del servidor, y muestra un aviso explícito. (4) El contexto expone `acuerdo_aceptado` para que una recarga no vuelva a pedir lo ya aceptado. |
+| **Mitigación recomendada** | (a) Medir en producción cuántas firmas llegan al commit sin aceptación previa: debería ser 0, y el evento `CONSENT_ACCEPTED` deja rastro de cada aceptación. (b) En la **5B**, conservar el texto exacto del Acuerdo que se mostró junto con su hash. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.7. El enlace de firma sirve el documento firmado (5.4) y lo sirve a cualquiera que lo tenga
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 5.4 obliga a que el Firmante pueda descargar "copia de este Acuerdo y del documento firmado desde el propio enlace de firma". El enlace es un token de un solo uso (3.4(c)), pero para cumplir el 5.4 tiene que seguir sirviendo el documento firmado **después** de firmar. Quien se adelante al Firmante y obtenga ese token obtiene el PDF firmado. |
+| **Activos** | A5 (documento firmado) |
+| **Vector de ataque** | Obtener el token del enlace: correo interceptado, historial del navegador, enlace reenviado. |
+| **Probabilidad** | Baja: el token es aleatorio, se cifra en reposo y es de un solo uso; el Firmante ya tenía acceso al documento original (paso (h)) y además recibe una copia por correo. |
+| **Impacto** | 🟡 Medio: el PDF firmado de un documento que el Firmante ya podía ver. |
+| **Mitigación implementada** | (1) La descarga es de **solo lectura**: el enlace firmado **no reabre el flujo** (identificar, pedir OTP, aceptar el Acuerdo y firmar siguen cerrados en estado firmado). (2) **El token solo no sirve el PDF firmado antes de la identidad**: en cualquier estado previo a la firma la respuesta es `409 SIGNED_DOCUMENT_NOT_AVAILABLE`. (3) El TTL del token **no se extiende**: si el enlace venció, la descarga es `410`. (4) Se sirve el PDF firmado, no el original ni datos personales de la fila. (5) La copia del Acuerdo lleva su `SHA-256` en la cabecera `X-Acuerdo-SHA256`, para que el Firmante pueda comprobar que es la que aceptó. |
+| **Mitigación recomendada** | (a) Revisar, antes de la v1.1 del Acuerdo, si el 5.4 puede cumplirse con un enlace distinto (por ejemplo, uno de un solo uso que nazca al firmar) en vez de extender la vida del enlace de firma. (b) Definir en la **5B** el comportamiento post-firma del enlace y del oráculo. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+#### T.8. La 5B suprime de más: la fila, los archivos y la credencial
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | La 5B (8A.2) es la capa que cumple el 10.6: vencidos el plazo y sin deber legal de conservación, el dato **se suprime**. Es la única operación del servicio que **borra de verdad**, y no se puede deshacer: si borra la fila equivocada, no hay copia de la que volver. El riesgo no es que no suprima, sino que suprima lo que no debía. |
+| **Activos** | A10 (datos personales), A2 (`token_hash`), A9 (registro de auditoría) |
+| **Vector de ataque** | (a) Ejecutar la supresión con un lote mal armado o con el hold mal declarado. (b) Que la **lápida** que sobrevive a la supresión se convierta en una credencial utilizable. (c) Que la propia supresión borre el rastro de lo que suprimió. |
+| **Probabilidad** | (a) Media: es una operación manual, gobernada por ventana, lote y actor. (b) Baja, pero es la consecuencia de todo el diseño. (c) Baja. |
+| **Impacto** | (a) 🔴 Crítico: pérdida irreversible de evidencia de una firma válida. (b) 🟠 Alto: alguien con la base podría resolver enlaces ya vencidos. (c) 🟠 Alto: sin rastro no hay forma de demostrar qué se suprimió. |
+| **Mitigación implementada** | (1) **El mismo gobierno que la capa de auditoría**: ventana abierta (que se vence sola), lote armado, actor y motivo obligatorios, y revalidación del hold y del plazo **en el momento de suprimir**, no solo al armar el lote. (2) **El hold legal frena siempre**: con deber legal o contractual de conservación el dato no se toca, y la verificación sigue confirmando la integridad. (3) **La credencial no sobrevive**: la lápida guarda `HMAC('tombstone-purga', token_hash)` — un hash de un hash, con propósito y llave derivados — y **no** el `token_hash`. No permite autenticarse ni resolver nada: solo permite responder *"no disponible por vencimiento del plazo"* en vez de un 404 que no dice por qué. (4) **El rastro no se borra**: la lápida (`gh_firma_purgadas`) y el recibo (`gh_firma_purga_registro`) son **append-only**, con triggers de base de datos que abortan el UPDATE y el DELETE (migración 025). (5) **La lápida no lleva datos personales**: ni correo, ni número de documento, ni nombre. (6) **Los archivos primero, la base después**: el archivo es el dato; si la base falla después, el reintento es seguro. (7) **El dry-run es el modo por defecto** y la simulación no borra nada. (8) **Idempotencia**: correrla dos veces no rompe nada ni escribe una segunda lápida. (9) La **prueba de la aceptación sobrevive** a la supresión (vive en `gh_consentimientos_firma`, sin llave foránea contra la firma), con la versión, la huella del texto, la fecha y hora y el identificador de la solicitud: es lo que el 12.7 deja en cabeza de la Empresa. |
+| **Mitigación recomendada** | (a) **No ejecutar la supresión en producción hasta que la Compuerta 0 esté en verde**: copia verificada y restauración probada, y el servicio sin firmas reales de clientes o con re-autorización si ya las tiene. (b) Declarar en el **Anexo de Encargo** el plazo de eliminación en sistemas y respaldos, que esta capa no alcanza (aquí solo se borra lo que está en la base y en el disco del servicio). (c) Auditar el `gh_firma_purga_registro` periódicamente: es el asiento de cada supresión. |
+| **Cobertura** | 16 tests (`tests/fase8a2-supresion-datos.test.js`): la simulación no borra nada, la supresión real borra la fila y los archivos, la idempotencia, el gobierno (actor, motivo, ventana, lote), el hold, la lápida sin credencial, la lápida sin datos personales, el enlace suprimido responde `410 CONSERVACION_VENCIDA` y no `404`, y la prueba de la aceptación con su identificador de solicitud. El trigger de la 025 **tampoco se prueba en la base de tests compartida** (lleva `-- @skip-when-env test`, como la 020): se prueba aplicando el **archivo real de la migración** en una base aislada, con un test de mutación que demuestra que sin el trigger la lápida sí se podría alterar y borrar. |
+| **Riesgo residual** | 🟡 Bajo, condicionado a que la Compuerta 0 se respete. El riesgo residual es **operativo**, no técnico: que alguien ejecute la supresión sin copia verificada. |
+
+#### T.9. El token de acceso existe en la base en una forma recuperable
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 3.6(e) del Acuerdo de uso promete que el token de acceso "se conserva únicamente en forma de huella digital". El código no lo cumplía: además de la huella (HMAC con clave secreta), guardaba el token **cifrado con AES-256-GCM** en `metadata._server_metadata.token_encrypted`, y un endpoint interno lo devolvía **en texto claro**. Cifrado sigue siendo reversible con la llave: el token existía en la base en una forma que se podía recuperar, y quien tuviera la base y la llave podía volver a obtener un enlace válido. |
+| **Activos** | A2 (`token_hash`), A11 (el enlace de firma), A4 (la llave de cifrado) |
+| **Vector de ataque** | (a) Que alguien con acceso a la base **y** a la llave de cifrado descifre el token y lo use. (b) Que el endpoint de recuperación entregue el token a quien solo tenga la API key. (c) Que el token se reutilice indefinidamente, porque el enlace "recuperado" es el mismo de siempre y nadie sabe que hay otros. |
+| **Probabilidad** | (a) Baja: exige acceso simultáneo a la base y a la llave (que están en lugares distintos). (b) Media: la API key interna es de la Empresa, y quien la tiene ya puede rotar. (c) Media: era el comportamiento normal. |
+| **Impacto** | 🟠 Alto: un token filtrado da acceso al flujo de firma de un tercero. |
+| **Mitigación implementada** | (1) **El token no se guarda de forma recuperable**: `create()` ya no escribe `_server_metadata.token_encrypted`, y el sub-objeto se elimina del metadata del cliente. (2) **La rotación**: `POST /internal/sign-requests/{id}/link/rotate` emite un token nuevo y lo devuelve **una sola vez**; en la base solo queda su HMAC-SHA-256 con clave secreta. (3) **Los tokens anteriores siguen valiendo hasta su vencimiento**: la rotación no invalida de golpe el enlace que el trabajador ya tiene. (4) **Tope de 3 tokens vivos** por solicitud; al llegar al tope la respuesta es `409 TOKEN_LIMIT_REACHED` y **el sistema no revoca por su cuenta**: revocar es una decisión. (5) **Cada emisión queda auditada** (evento `LINK_ROTATED`, con emisión, motivo y actor). (6) **Una revocación explícita** (`revocar_anteriores: true`) deja el enlace muerto de verdad: un token revocado no resuelve. (7) **La 5B cubre todos los tokens**: tras la supresión, un enlace rotado también responde "no disponible por vencimiento del plazo" y no un 404 que depone lo que pasó. (8) El `GET /link` queda **deprecado** (`Deprecation`, `Sunset`, `Link` al successor) y solo sirve para las solicitudes anteriores a la 8C. |
+| **Mitigación recomendada** | (a) **Purgar el `token_encrypted` de las filas anteriores a la 8C** cuando todos los clientes hayan migrado a la rotación: es una migración de datos pendiente, deliberadamente NO aplicada en esta fase porque depende de la respuesta a la Compuerta 0 (¿ya hay solicitudes en vuelo?). (b) **No reusar `TOKEN_ENCRYPTION_KEY`**: la llave del cifrado viejo y la del HMAC son cosas distintas, y la primera ya no debería tener usos. (c) Vigilar el evento `LINK_ROTATED`: un volumen alto de rotaciones es una señal de que alguien está perdiendo enlaces (o de que hay un uso indebido). |
+| **Cobertura** | 12 tests (`tests/fase8c-rotacion-token.test.js`): el token no queda guardado de forma recuperable (con un test de mutación que comprueba que el detector muerde), el registro de la huella, la emisión y el retorno una sola vez, el token anterior sigue funcionando, la auditoría, el tope de 3, la revocación explícita, la respuesta del endpoint deprecado, la 5B cubriendo el enlace rotado, el `TOKEN_MISMATCH` y el `notify-remote` que no gasta cupo si el cliente trae su token. |
+| **Riesgo residual** | 🟡 Bajo. Queda el **token cifrado de las filas anteriores a la 8C**, que es una migración de datos pendiente y no un defecto del código nuevo. |
+
+#### T.10. El número del representante legal queda en texto claro en la base
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 10.5(a) ordena que el número del documento de identidad "se conserva únicamente [como] esa huella, no el número en texto claro". Para el **trabajador** eso ya se cumplía: el número se convertía en seudónimo y no se archivaba. Para el **representante legal** no: su número de documento se guardaba **en texto claro** dentro de `representante_legal_snapshot`, y además se imprimía **completo** en la constancia consolidada. |
+| **Activos** | A5 (la cédula del representante), A12 (la BD del Servicio), A8 (la constancia consolidada) |
+| **Vector de ataque** | (a) Que alguien con acceso al archivo de la base (o a una copia de respaldo) lea el número de identificación del representante legal de una empresa. (b) Que una copia de la constancia consolidada, que circula fuera del servicio, lleve el número completo. |
+| **Probabilidad** | Media: el archivo de la base es un activo que se respalda, se copia y se transfiere; un número en claro viaja con cada copia. |
+| **Impacto** | 🟠 Alto: es un dato personal de un tercero (el representante), y además identifica a la persona que subscribe en nombre de la Empresa. |
+| **Mitigación implementada** | (1) **El número se cifra, no se hashea** (decisión del owner al §8.1 del plan): AES-256-GCM con la clave derivada por HKDF del anillo de llaves, con el propósito `cifrado-representante` y el **ámbito de la Empresa**. Hashearlo habría sido incorrecto: el número del representante es **prueba de la representación** y una huella no se puede presentar como prueba. (2) **La llave vive fuera de la base**: quien tenga el archivo de la base, sin la llave, no abre nada. (3) **El sobre declara la versión de llave** (`enc:v2:<version>:<iv>:<tag>:<cifrado>`): rotar el anillo no vuelve ilegibles los números ya cifrados. El formato v2 liga el sobre a la Empresa y al campo con AAD (`["kair-firma-cifrado","v2",propósito,ámbito,campo]`); un sobre movido a otra Empresa o a otro campo no se abre. (4) **GCM es AEAD**: un sobre alterado en la base no se descifra y no puede presentarse como el original. (5) **Lo que se muestra son los últimos 4** (`****3456`), como con el firmante: la constancia consolidada ya no lleva el número completo. (6) **Las filas anteriores no se rompen**: se reconocen y se enmascaran igual; el formato `v1` se sigue leyendo sin AAD. (7) El re-cifrado de esas filas es un **script aparte, en simulación por defecto** (`scripts/recifrar-representante.js`), con `--actor` y `--motivo` obligatorios, verificación cifra -> descifra -> compara antes de escribir, y un evento `REPRESENTANTE_RECIFRADO` por fila. (8) **La copia de empresa que sobrevive a la supresión** (`gh_consentimientos_firma.empresa_snapshot`) también se cifra desde 8B-C: mismo AES-256-GCM y misma llave, con propósito `cifrado-empresa-snapshot` y campo `empresa_snapshot.representante_legal_identificacion`. La huella `empresa_hash` se sigue calculando sobre el JSON canónico **en claro**, no sobre el sobre, e incluye solo los campos presentes: un snapshot histórico de 11 campos conserva la huella que se calculó antes de la migración 021. (9) Esa copia histórica se re-cifra con `scripts/recifrar-empresa-snapshot.js`: simulación por defecto, `--actor`/`--motivo` obligatorios, `--backup` obligatorio antes de escribir, verificación de la huella sha256 del texto exacto y de la huella canónica fila por fila, `UPDATE` condicionado al valor original y recibo JSON sin el número completo. Un sobre que no se abre con la Empresa y el campo de esa fila no se salta como "ya cifrado": se reporta. No usa `gh_firma_eventos` porque esa tabla exige `firma_id` y el consentimiento no tiene una firma a la cual colgar el evento. |
+| **Mitigación recomendada** | (a) **Ejecutar el re-cifrado cuando la Compuerta 0 esté en verde**: es una migración de datos y, si hay solicitudes en vuelo, tocarlas es un riesgo que no se toma sin copia verificada. (b) **Reponer la llave vieja en `FIRMA_HMAC_KEYRING`** mientras haya números cifrados con ella: si sale del anillo, esos números quedan ilegibles (el error lo dice explícitamente). (c) Vigilar el evento `REPRESENTANTE_RECIFRADO`: un volumen alto es la señal de que hay filas heredadas que siguen en claro. (d) Para `empresa_snapshot`, correr primero `scripts/recifrar-empresa-snapshot.js` en simulación y revisar el recibo; después, con `--backup` y `--ejecutar`, y solo con la Compuerta 0 en verde. El script no toca filas con `empresa_hash` NULL o inconsistente, ni sobres que no se abren con la Empresa y el campo de la fila: esas se investigan, no se "arreglan" cifrándolas. |
+| **Alcance (lo que esta capa NO es)** | El bloque «Empresa que solicita tu firma» del **1.2** muestra la identificación del representante legal **completa**, y eso **no cambia**: esos datos vienen del **registro mercantil** que la Empresa cargó en `gh_firma_empresas`, no del snapshot de la firma. Lo que se cifra es el snapshot, que es lo que el cliente declaró al pedir la firma. Cambiar el 1.2 es un asunto del abogado, no del código. |
+| **Cobertura** | 22 tests (`tests/fase8b-representante-cifrado.test.js`): la ida y vuelta del sobre, el formato y la versión, dos cifrados del mismo número distintos, un sobre alterado que no se abre, un sobre de otra Empresa que no se abre, la versión de llave que salió del anillo con un error explicito, el servicio que cifra sin mutar el original, el enmascarado, la fila del padre y la del hijo sin el número en claro, la huella y el seudónimo del representante que siguen siendo los del número real, la constancia con los últimos 4 y sin el número completo, la fila heredada que se enmascara igual, el contexto público que no lo expone, y dos tests de mutación que comprueban que los detectores muerden. **Más 3 del D-18** (en el mismo archivo): `estadoEnmascarado` distingue "sin dato" de "falló el descifrado", un sobre que no se abre es un **error** y no una ausencia, y `numeroEnmascarado` deja de ser un `null` silencioso (log de nivel `error` con código `REPRESENTANTE_NO_DESCIFRABLE`). Más 19 de 8B-C (`tests/fase8bc-empresa-snapshot-cifrado.test.js`): AAD por Empresa/campo, ámbito vacío rechazado, sobre alterado que no se muestra, snapshot de empresa sin el número en claro, huella sobre claro (incluida la de un snapshot histórico de 11 campos), verificación de la huella en la presentación con fallo cerrado, PDF simple y consolidado sin `CC —`, y el consentimiento persistido. Más 6 del backfill de representante y 9 del de empresa (`tests/scripts/recifrar-representante.test.js`, `tests/scripts/recifrar-empresa-snapshot.test.js`): simulación, ejecución, idempotencia, huella inconsistente, snapshot ilegible, fila histórica de 11 campos, sobre de otra Empresa, rechazo sin backup y el evento `CONSENT_SNAPSHOT_RECIFRADO` por fila re-cifrada (con actor y motivo, y sin el número del representante). |
+| **Riesgo residual** | 🟡 Bajo. Quedan las **filas anteriores a la 8B/8B-C**, que guardan el número en claro: es una migración de datos pendiente, no un defecto del código nuevo. El re-cifrado de `empresa_snapshot` no se ejecutó en producción; requiere Compuerta 0, copia restaurada, hold legal y recibo. **La `empresa_hash` es un SHA-256 SIN sal del JSON canónico en claro**: no es un oráculo de la llave, y la constancia ya no afirma lo contrario (ver la nota del 2026-10-20 en la API, §6.16.4). |
+| **Lo nuevo del 2026-10-20 (1.1, 1.2 y 1.3 del dictamen legal)** | (a) **`conservacion_por_deber_legal`**: un flag POR EMPRESA (no por documento) para el deber legal de conservación sin término del 2.2.1.1.12. Con el flag en 1, la firma no recibe fecha de supresión y se levanta un **hold legal automático** (actor `sistema`), gobernado por `gh_firma_holds`; el Trabajador ve en la mini-app y en el correo que su documento no se borra. "Nunca se purga SOLO", no "nunca se purga". (b) **La firma visual (PNG) no se admite**: el commit la rechaza con `FIRMA_VISUAL_NO_ADMITIDA` en vez de ignorarla en silencio (antes el cliente creía que su rúbrica había quedado firmada). (c) **El canal de datos de K+AIR (10.7(b))**: un SEGUNDO canal, distinto del de incidentes, con su registro (`gh_solicitudes_titular`), su historial append-only que **no cuelga de la firma** (la 5B no lo alcanza) y el flujo RECIBIDA → TRASMITIDA → RESPONDIDA. K+AIR no resuelve: la respuesta es de la Empresa. |
+
+#### T.11. El documento con datos sensibles se sirve sin el aviso previo ni el consentimiento expreso
+
+> Es el gemelo del **T.6** (el orden (g)/(h) del Acuerdo) para el **10.8**. El
+> T.6 impedía ver el documento sin aceptar el Acuerdo; el T.11 impide verlo sin
+> haber sido informado de que trata datos de salud y haberlos autorizado de
+> forma expresa.
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 10.8 obliga a que, cuando el documento trate datos sensibles de salud, el Titular sea informado **de forma expresa y anticipada** de las categorías, la finalidad y la base legal, y consienta ese tratamiento **de forma expresa**. El código no tenía ninguna de las dos cosas: la API no podía marcar un documento como sensible, la mini-app no mostraba aviso previo, y la casilla era la misma del Acuerdo. Un acta de salud se firmaba con el mismo consentimiento genérico que un formato de asistencia. |
+| **Activos** | A6 (los PDF originales), A12 (la BD del Servicio) |
+| **Vector de ataque** | (a) Que una solicitud con un documento de salud llegue al visor sin que nadie haya informado al Titular de qué se trata. (b) Que la Empresa marque `datos_sensibles: false` para hacer de menos dato sensible un documento que sí lo es, y que el Titular firme sin saberlo. |
+| **Probabilidad** | (a) Alta: era el comportamiento normal, no un caso exceptional. (b) Media: el cliente es la Empresa, y el campo era libre. |
+| **Impacto** | 🟠 Alto: tratamiento de un dato sensible sin la base legal que lo autoriza, y con el Titular firmando sin la información que el 10.8 exige. |
+| **Mitigación implementada** | (1) **El backend exige el consentimiento**: `exigirConsentimientoSensible()` bloquea `view-document` y `document.pdf` con `409 SENSIBLE_CONSENT_NOT_ACCEPTED`. La regla no depende de la UI. (2) **La casilla es separada** de la del Acuerdo, y el **aviso va antes del visor**: si el documento se viera primero, la información "previa" no lo sería. (3) **El aviso queda fijado al crear** (texto, hash y versión): si se compusiera en cada visita, un cambio de redacción cambiaría lo que el Titular "aceptó" sin que nadie lo notara. (4) **La Empresa sube la clasificación, nunca la baja**: el servicio vuelve a inferir por tipo de documento (ACTA, CERTIFICADO, CONSENTIMIENTO, AUTORIZACION) y la Cliente no puede desactivar el aviso. (5) **El sistema no lee el PDF** para saber si trae datos de salud: escanearlo sería tratar el dato sensible **antes** del consentimiento. (6) El **rechazo se registra** y ofrece la vía alternativa del **8.5** (firmar en papel): el sistema no decide por el Titular. (7) El registro del consentimiento sensible vive en `gh_consentimientos_sensibles`, **sin FK** contra la firma, para que sobreviva a la 5B (como la aceptación del 12.7). |
+| **Mitigación recomendada** | (a) Revisar con la Empresa si los tipos inferidos se corresponden con lo que realmente envía: si manda ACTAS de todo tipo, el aviso se vuelve routine y deja de informar. (b) Medir en producción cuántas firmas sensibles hay y cuántas rechazan el consentimiento: el segundo número es un dato de droits del Titular que conviene conocer. |
+| **Cobertura** | 14 tests (`tests/fase8b-dato-sensible.test.js`): la inferencia por tipo, que la Empresa no pueda bajar la clasificación, el aviso fijado al crear (texto, hash y versión), el bloqueo del visor y del PDF, el registro del consentimiento y del rechazo, la vía alternativa, y tests de mutación que comprueban que los detectores muerden. |
+| **Riesgo residual** | 🟡 Bajo. Lo que queda es la **fidelidad de la inferencia** por tipo de documento, que depende de cómo la Empresa clasifique sus envíos. |
 
 ### 3.3. R — Repudiation (repudio)
 
@@ -344,6 +433,20 @@ del Servicio de Firma.
 | **Riesgo residual** | 🟢 Muy bajo. Lo que queda es distinguir "este id existe en alguna empresa" de "este id no existe". |
 | **Remedio estructural (propuesto, no aplicado)** | (a) Validar el consentimiento **en la creación** del sign request, no solo en el commit: corta el oráculo en la raíz. (b) **404 silencioso** cross-company, para que un consentimiento de otra empresa se comporte como inexistente. Ambas cosas cambian el contrato de errores de la API, así que van en un paquete propio, con su diseño, su documentación en `API.md` y la actualización del manejo de errores de K+AIR. |
 | **Por qué no se aplicó todavía** | El bloque E6, que es el que prueba la validación en el commit, acaba de quedar verde y es la base de la cadena de evidencia. Reescribirlo justo antes de las fases que tocan la constancia, el trigger de append-only y la ruta de entrega sería mover el piso de ese bloque. |
+
+#### I.6. `metadata` como canal libre para meter datos que el Acuerdo no autoriza
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El 10.2 cierra con que el Acuerdo "no autoriza a la Empresa a enviar al servicio datos distintos de los aquí relacionados". El código no lo exigía: `metadata` era un objeto libre de hasta 8192 caracteres, archivado **verbatim** en la fila de la firma. Con una lista blanca de 5 claves, la frase del 10.2 se vuelve exigible; sin ella, era una promesa sin mecanismo. |
+| **Activos** | A12 (la BD del Servicio), A13 (los logs, que también filtran el metadata) |
+| **Vector de ataque** | (a) Que la Empresa (o un atacante con su API key) archive en `metadata` datos personales que el Acuerdo no relaciona (historial médico, información de terceros, contenido del documento). (b) Que la app mande un campo **mal escrito** y que el dato se pierda en silencio, sin que nadie lo note: es lo que pasaba con `correo_empresa`, que la app mandaba desde hace meses y nunca llegó a la base. |
+| **Probabilidad** | (a) Media: la API key per-empresa es de la Empresa y se entrega sin más control. (b) Alta: ya estaba pasando, de forma silenciosa. |
+| **Impacto** | 🟠 Alto: dato personal archiving sin base legal, con un plazo de conservación que no se conoce (porque no está en la lista blanca, no hay de dónde sacarlo). |
+| **Mitigación implementada** | (1) **Lista blanca de `metadata`** (`src/services/metadata.js`): solo `subtipo_identificacion`, `nombre_trabajador`, `nombre_empresa`, `correo_empresa` y `correo`. (2) **El esquema es `.strict()`**: una clave desconocida produce un `400` que **la nombra**, en vez de eliminarla en silencio. (3) **El servicio vuelve a filtrar** antes de escribir la fila: es el último punto, y el que no se puede saltar por la vía del service. (4) La lista blanca está en **código**, no en configuración: no se puede ampliar sin un cambio versionado. |
+| **Mitigación recomendada** | (a) Revisar con la Empresa **qué claves necesita de verdad** y sacarlas de la lista si no aportan (principio de minimización: lo que no se usa, no se archiva). (b) Vigilar el `400` de clave desconocida: un volumen alto es la señal de que un cliente está mandando algo que el servicio ya no acepta. |
+| **Cobertura** | 9 tests (`tests/fase8b-metadata-lista-blanca.test.js`), con tests de mutación que comprueban que los detectores muerden (una clave de más se rechaza nombrándola; el filtro del servicio no deja pasar lo que la ruta no dejó). |
+| **Riesgo residual** | 🟢 Muy bajo. Lo que queda es la **calidad** de la lista, no su existencia. |
 
 ### 3.5. D — Denial of Service (denegación)
 
@@ -515,6 +618,56 @@ Atacante manipula el path para acceder a archivos del sistema.
 - **Validación**: code review + tests.
 
 ---
+
+### 4.8. La vía en papel y los medios autorizados (la 9A, el D-2)
+
+Las piezas nuevas abren tres superficies que no existían. Las tres
+están pensadas para que un atacante con el enlace (que es la credencial
+del flujo público) no pueda:
+
+**(a) desviar la copia del documento a un buzón ajeno.**
+
+- **Vector**: con solo el enlace, escribir un correo propio en el registro de
+  medios autorizados (el 8.2) y esperar que la Empresa entregue la copia allí.
+- **Quién declara el medio**: la **Empresa** (decisión del owner, 2026-10-20), en
+  K+AIR al crear la solicitud. Es la Empresa la que tiene la ficha del trabajador. Si
+  no lo tiene, el Trabajador lo declara en la mini-app (respaldo).
+- **Mitigación**: un medio nuevo nace **PENDIENTE** y solo se activa cuando
+  el Trabajador demuestra que lo controla (el código de verificación llega a
+  ese medio y lo verifica). La entrega de la copia solo se hace por medios
+  **ACTIVOS**. El registro de eventos deja la alta y la baja.
+- **Riesgo residual**: quien ya pasó la identificación (conoce el número de
+  documento) puede pedir la declaración de un medio, pero no puede
+  activarlo sin el código. La firma electrónica en sí no depende de
+  este registro: depende del OTP.
+
+**(b) registrar una firma en papel que nadie pidió.**
+
+- **Vector**: subir un PDF a una solicitud viva haciéndola pasar por una
+  firma autográfica.
+- **Mitigación**: `POST /internal/sign-requests/{id}/firma-papel` exige la
+  fila en `gh_firma_firmas_papel` (estado `SOLICITADO`): sin la petición del
+  Trabajador responde `409 PAPER_NOT_REQUESTED`. El PDF lo valida el
+  middleware (mismo camino que la creación) y su huella la calcula el
+  servidor, no el cliente.
+
+**(c) el 400 del D-02 que apunta a una puerta que no existe.**
+
+- **Vector**: el rechazo (`MEDIO_OTP_CORPORATIVO`) le dice al Trabajador «pedile a tu
+  Empresa la firma en papel»; si la Empresa no tiene canal de atención, esa puerta
+  no existe. El 400 seria un callejón sin salida, el mismo defecto que la 10.4 vino a
+  matar en el lado del Acuerdo.
+- **Mitigación**: el `canal_pqrs` es un **requisito de habilitación** de la Empresa
+  (junto al Anexo firmado y al plazo de conservación), con el override del D-03. Y el
+  400 lleva el canal en el `details.canal_empresa`.
+
+**(d) leer los medios de otro Trabajador.**
+
+- **Vector**: pedir los medios de una solicitud de otra empresa.
+- **Mitigación**: el mismo silencio cross-empresa del resto de los
+  endpoints internos (404, no 403: no se confirma la existencia). Los
+  documentos del papel y los registros de firma en papel viven en el
+  directorio de la Empresa, como el resto.
 
 ## 5. Defensa en profundidad
 
@@ -1758,6 +1911,13 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 | T.3 | Modificación de la BD | Baja | Crítico | 🟡 | Permisos + backups | 🟢 Muy bajo |
 | T.4 | Inyección SQL | Media | Crítico | 🟠 | SQL parametrizado + validación | 🟢 Muy bajo |
 | T.5 | Supresión del registro de auditoría fuera de regla | Baja | Alto | 🟡 | Trigger con ventana + lote + log append-only + deber legal | 🟢 Muy bajo |
+| T.6 | Ver el documento sin aceptar el Acuerdo (orden (g)/(h)) | Media | Alto | 🟠 | Gate en el backend + UI que no carga el visor | 🟢 Muy bajo |
+| T.7 | Acceso al PDF firmado por tener el enlace (5.4) | Baja | Medio | 🟡 | Solo lectura + 409 antes de firmar + TTL sin extender | 🟡 Bajo |
+| T.8 | La 5B suprime de más (fila, archivos, credencial) | Media | Crítico | 🟠 | Ventana + lote + actor/motivo + hold revalidado + dry-run por defecto + lápida sin credencial (HMAC de propósito propio) y append-only | 🟡 Bajo (condicionado a la Compuerta 0) |
+| T.9 | El token de acceso queda en la base en una forma recuperable | Baja | Alto | 🟠 | Solo la huella (HMAC con clave secreta) + rotación que devuelve el token una vez + tope de 3 vivos + auditoría por emisión | 🟡 Bajo (queda purgar el `token_encrypted` de las filas anteriores a la 8C) |
+| T.10 | El número del representante legal queda en texto claro en la base | Media | Alto | 🟠 | Cifrado AES-256-GCM con llave fuera de la base y ámbito por empresa + versión de llave en el sobre + últimos 4 en pantalla | 🟡 Bajo (queda re-cifrar las filas anteriores a la 8B) |
+| T.11 | El documento con datos sensibles se sirve sin el aviso previo ni el consentimiento expreso (10.8) | Alta | Alto | 🟠 | Gate en el backend (409) + casilla separada + aviso fijado al crear + la Empresa solo puede subir la clasificación | 🟡 Bajo |
+| I.6 | `metadata` como canal libre para meter datos que el Acuerdo no autoriza | Media | Alto | 🟠 | Lista blanca de 5 claves + `.strict()` que nombra la clave desconocida + filtro final en el servicio | 🟢 Muy bajo |
 | R.1 | Repudio del trabajador | Media | Alto | 🟠 | Eventos + hashes + correo | 🟡 Bajo |
 | R.2 | Repudio del empleador | Baja | Medio | 🟢 | rh_user_id + logs | 🟢 Muy bajo |
 | I.1 | Filtración de tokens | Baja | Crítico | 🟡 | Solo hash en BD + redacción | 🟢 Muy bajo |

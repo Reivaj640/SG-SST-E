@@ -13,6 +13,7 @@
 const config = require('../config');
 const logger = require('../utils/logger');
 const fs = require('fs');
+const crypto = require('crypto');
 
 let _transporter = null;
 let _devInbox = []; // solo en dev, contiene últimos envíos
@@ -62,7 +63,11 @@ function getTransporter() {
  * @returns {Promise<{ok: boolean, messageId: string}>}
  * @throws Error si los archivos no existen o falla el envío
  */
-async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
+async function sendSignedCopy({ to, pdfPath, constanciaPath, context, tipo }) {
+  // 9A (el 7.2): la firma en PAPEL tiene su propia constancia (el
+  // "Registro de firma autográfica"), y el correo no puede decir
+  // "Constancia de firma electrónica" cuando el documento se firmó a mano.
+  const esPapel = tipo === 'PAPEL';
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendSignedCopy: `to` debe ser un correo válido');
   }
@@ -73,7 +78,9 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
     throw new Error(`sendSignedCopy: Constancia no existe: ${constanciaPath}`);
   }
 
-  const subject = 'K+AIR — Copia de tu documento firmado';
+  const subject = esPapel
+    ? 'K+AIR — Copia de tu documento firmado en papel'
+    : 'K+AIR — Copia de tu documento firmado';
   const id_solicitud = (context && context.id_solicitud) || 'desconocido';
   const id_constancia = (context && context.id_constancia) || 'desconocido';
   const body = [
@@ -84,8 +91,10 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
     `ID de solicitud: ${id_solicitud}`,
     `ID de constancia: ${id_constancia}`,
     '',
-    'Adjuntamos el PDF firmado y la Constancia de firma electrónica.',
-    'Conserva ambos documentos como evidencia legal de la firma.',
+    esPapel
+      ? 'Adjuntamos el PDF del documento que firmaste en papel y el Registro de firma autográfica.'
+      : 'Adjuntamos el PDF firmado y la Constancia de firma electrónica.',
+    'Conserva ambos documentos como evidencia de la firma.',
     '',
     'Si no reconoces esta operación, contacta a RRHH de inmediato.',
     '',
@@ -165,11 +174,22 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
  *                                           la Empresa (numeral 8.6 del Acuerdo).
  * @param {string} [opts.canal_solicitud_copia] - Dónde puede el Trabajador
  *                                                  pedir una copia (numeral 8.6).
+ * @param {string} [opts.canal_proteccion_datos] - El canal de PROTECCIÓN DE
+ *   DATOS de K+AIR (el 10.7(b)): donde el Titular ejerce sus derechos. Es
+ *   DISTINTO del canal de incidentes.
+ * @param {object} [opts.deber_legal_conservacion] - { activo, norma }: si está
+ *   activo, el documento NO se borra automáticamente porque hay un deber legal
+ *   de conservación sin término (migración 029). El Trabajador tiene que
+ *   saberlo: el 8.6 obliga a comunicar el plazo y sus consecuencias.
  *
  * @returns {Promise<{ok: true, messageId: string}>}
  * @throws Error si `to` no parece correo, o si falla el envío.
  */
-async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retencion, canal_solicitud_copia }) {
+async function sendInvite({
+  to, url_publica, id_solicitud, context,
+  plazo_retencion, canal_solicitud_copia, deber_legal_conservacion,
+  canal_proteccion_datos,
+}) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendInvite: `to` debe ser un correo válido');
   }
@@ -195,6 +215,19 @@ async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retenc
     '4. Ingrésalo en la página para ver el documento y firmar.',
     '',
     'El enlace expira según la configuración del documento (típicamente 24-72h).',
+    //
+    // El 7.2 del Acuerdo: el Trabajador tiene derecho a la firma
+    // autográfica, sobre soporte papel, en todo momento y sin costo. Y el
+    // 7.3: que no firme por esta vía no puede perjudicarle.
+    //
+    // La invitación es el PRIMER contacto: es el mejor lugar para que la
+    // vía exista como opción y no como letra. No promete un plazo (la
+    // Empresa no declara ninguno en el sistema) ni un resultado: solo dice
+    // que la vía existe y que no tiene costo.
+    '',
+    'Si no querés firmar por esta vía, podés pedir la firma en papel:',
+    'es tu derecho, no tiene costo y no te perjudica en nada. Lo pedís desde',
+    'la misma página del enlace.',
     'Si no reconoces esta operación, contacta al área de RRHH de inmediato.',
     '',
     // Numeral 8.6 del Acuerdo de uso: "La Empresa debe comunicar al
@@ -214,7 +247,22 @@ async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retenc
     ...(canal_solicitud_copia
       ? ['Dónde puedes pedir una copia de tu documento: ' + canal_solicitud_copia]
       : []),
+    // El deber legal sin término: el documento NO se borra automáticamente.
+    // Es información que el Trabajador necesita (el 8.6 obliga a comunicar el
+    // plazo y sus consecuencias).
+    ...(deber_legal_conservacion && deber_legal_conservacion.activo
+      ? ['',
+        'Este documento no se borra automáticamente: la Empresa tiene un deber '
+        + 'legal de conservación sin término'
+        + (deber_legal_conservacion.norma
+          ? ' (' + deber_legal_conservacion.norma + ')' : '') + '.']
+      : []),
     ...(plazo_retencion || canal_solicitud_copia ? [''] : []),
+    // El canal de derechos del Titular (10.7(b)): K+AIR lo recibe, lo registra
+    // y lo trasmite a la Empresa, que es la que responde.
+    ...(canal_proteccion_datos
+      ? ['Derechos de tus datos: ' + canal_proteccion_datos + ' (K+AIR registra tu solicitud y la remite a tu empresa, que es quien debe responderte).']
+      : []),
     '— K+AIR',
   ].join('\n');
 
@@ -226,7 +274,13 @@ async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retenc
       subject,
       text: body,
     });
-    return { ok: true, messageId: info.messageId };
+    return {
+      ok: true,
+      messageId: info.messageId,
+      // La huella del cuerpo enviado: es la prueba de QUÉ se le ofreció (el
+      // 7.2-7.3). El evento `PAPER_OPTION_AVAILABLE` la guarda.
+      body_hash: crypto.createHash('sha256').update(body).digest('hex'),
+    };
   }
 
   // Dev: jsonTransport no envía, pero guardamos en inbox para tests.
@@ -244,7 +298,11 @@ async function sendInvite({ to, url_publica, id_solicitud, context, plazo_retenc
   _devInbox.push(entry);
   if (_devInbox.length > 50) _devInbox.shift();
 
-  return { ok: true, messageId: 'dev-invite-' + Date.now() };
+  return {
+    ok: true,
+    messageId: 'dev-invite-' + Date.now(),
+    body_hash: crypto.createHash('sha256').update(body).digest('hex'),
+  };
 }
 
 /**

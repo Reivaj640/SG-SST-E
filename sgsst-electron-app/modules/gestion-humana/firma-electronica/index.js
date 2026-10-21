@@ -346,8 +346,19 @@
       '        <div id="fe-firma-trab-summary" class="fe-firma-summary"></div>',
       '      </div>',
       '      <div class="fe-field">',
-      '        <label class="fe-field__label" for="fe-firma-correo">Correo del firmante <span class="fe-field__req">*</span></label>',
+      '        <label class="fe-field__label" for="fe-firma-correo-otp">Correo personal del trabajador (para el código de verificación)</label>',
+      '        <input id="fe-firma-correo-otp" class="fe-field__input" type="email" placeholder="correo.personal@ejemplo.net" />',
+      '        <p class="fe-field__hint">',
+      '          El código de verificación es el dato de creación de la firma: debe llegar a un buzón',
+      '          que la empresa no pueda leer (numeral 2.2.2.47.4). Opcional: si la empresa no tiene',
+      '          uno, el trabajador lo declara en la pantalla de firma.',
+      '        </p>',
+      '        <p class="fe-field__error" id="fe-firma-correo-otp-error" hidden></p>',
+      '      </div>',
+      '      <div class="fe-field">',
+      '        <label class="fe-field__label" for="fe-firma-correo">Correo para la invitación <span class="fe-field__req">*</span></label>',
       '        <input id="fe-firma-correo" class="fe-field__input" type="email" placeholder="correo@empresa.com" />',
+      '        <p class="fe-field__hint">A este correo llega el enlace de firma. El código de verificación va al medio personal que declare el firmante.</p>',
       '        <p class="fe-field__hint" id="fe-firma-correo-hint"></p>',
       '        <p class="fe-field__error" id="fe-firma-correo-error" hidden></p>',
       '      </div>',
@@ -409,7 +420,7 @@
       '        <p id="fe-success-ttl" class="fe-field__hint">El enlace tiene vigencia limitada.</p>',
       '      </div>',
       '      <div class="fe-field">',
-      '        <label class="fe-field__label">Correo del firmante</label>',
+      '        <label class="fe-field__label">Correo para la invitación</label>',
       '        <input id="fe-success-correo" class="fe-field__input" type="text" readonly />',
       '        <p id="fe-success-feedback" class="fe-field__hint" hidden></p>',
       '      </div>',
@@ -1515,7 +1526,15 @@
     REJECTED:             { label: 'Documento rechazado',           icon: 'fa-times-circle',     color: '#dc2626' },
     EXPIRED:              { label: 'Solicitud expirada',            icon: 'fa-hourglass-end',    color: '#9a3412' },
     CANCELLED:            { label: 'Solicitud cancelada',           icon: 'fa-ban',              color: '#9a3412' },
-    REVOKED:              { label: 'Solicitud revocada',            icon: 'fa-ban',              color: '#9a3412' }
+    REVOKED:              { label: 'Solicitud revocada',            icon: 'fa-ban',              color: '#9a3412' },
+    // 9A · la firma en papel (el 7.2-7.3) y los medios autorizados (el 8.2).
+    PAPER_SIGNATURE_REQUESTED:   { label: 'Firma en papel solicitada',    icon: 'fa-file-signature',   color: '#b45309' },
+    PAPER_DOCUMENT_DELIVERED:    { label: 'Documento en papel entregado', icon: 'fa-box-open',         color: '#b45309' },
+    PAPER_SIGNATURE_REGISTERED:  { label: 'Firma en papel registrada',    icon: 'fa-stamp',            color: '#065f46' },
+    PAPER_COPY_FAILED:           { label: 'No se pudo enviar la copia',   icon: 'fa-triangle-exclamation', color: '#dc2626' },
+    DOCUMENT_SUPPLIED_TO_AUTHORITY: { label: 'Documento a una autoridad', icon: 'fa-gavel',            color: '#7c3aed' },
+    AUTHORIZED_MEDIA_ADDED:      { label: 'Medio autorizado agregado',   icon: 'fa-envelope-open',    color: '#059669' },
+    AUTHORIZED_MEDIA_REMOVED:    { label: 'Medio autorizado retirado',   icon: 'fa-envelope-close',   color: '#6b7280' }
   };
 
   FirmaElectronicaComponent.prototype._renderExpedienteTrazabilidad = function (data) {
@@ -2367,11 +2386,20 @@
     }
     // Pre-fill email
     var correoInput = modal.querySelector('#fe-firma-correo');
+    // D-2: el medio PERSONAL que la EMPRESA declara para el código de
+    // verificación (el dato de creación de la firma, el 47.4 num. 1).
+    var correoOtpInput = modal.querySelector('#fe-firma-correo-otp');
+    var correoOtpErrorEl = modal.querySelector('#fe-firma-correo-otp-error');
     var hintEl = modal.querySelector('#fe-firma-correo-hint');
     var errorEl = modal.querySelector('#fe-firma-correo-error');
     var confirmarCheck = modal.querySelector('#fe-firma-confirmar');
     var enviarBtn = modal.querySelector('#fe-firma-enviar');
     if (correoInput) correoInput.value = (trab && trab.correo) || '';
+    // Pre-fill del medio personal: si la ficha del trabajador lo tiene, se
+    // ofrece; si no, el operador lo escribe (o lo declara el trabajador en
+    // la mini-app).
+    if (correoOtpInput) correoOtpInput.value = (trab && trab.correo_personal) || '';
+    if (correoOtpErrorEl) correoOtpErrorEl.hidden = true;
     if (hintEl) hintEl.textContent = (trab && trab.correo) ? 'Correo prellenado del trabajador.' : '';
     if (errorEl) errorEl.hidden = true;
     if (confirmarCheck) confirmarCheck.checked = false;
@@ -2427,13 +2455,16 @@
     // Wire send (sin pausa de OTP — el flujo es lineal)
     if (enviarBtn) {
       enviarBtn.onclick = function () {
-        self._enviarAFirma(modal, self._firmaCtx, correoInput.value.trim());
+        self._enviarAFirma(
+          modal, self._firmaCtx, correoInput.value.trim(),
+          (correoOtpInput && correoOtpInput.value.trim()) || ''
+        );
       };
     }
     modal.hidden = false;
   };
 
-  FirmaElectronicaComponent.prototype._enviarAFirma = async function (modal, ctx, correoFirmante) {
+  FirmaElectronicaComponent.prototype._enviarAFirma = async function (modal, ctx, correoFirmante, correoOtp) {
     // FASE 4 · A1.5.4-B · REDISEÑO DEL FLUJO:
     // 1. K+AIR crea consent (pendiente, sin OTP) + sign_request + notify_remote
     // 2. El único correo que sale es la invitación con la URL pública
@@ -2509,12 +2540,25 @@
         consent_id: consentId,
         identificacion_tipo: 'CC',
         identificacion_numero_hash: self._bytesToHex(cedulaHash),
-        // I-103.A1.6.C · RF-FIRMA-CORREO-01: correo del firmante persistido
-        // explícitamente en gh_firmas_electronicas.correo_verificacion al
-        // crear el SR. Es la fuente de verdad (prioridad 1) para INVITE,
-        // OTP inicial y reenvíos de OTP. Queda congelado al momento de
+        // I-103.A1.6.C - RF-FIRMA-CORREO-01: correo del firmante persistido
+        // explicitamente en gh_firmas_electronicas.correo_verificacion al
+        // crear el SR. Es la fuente de verdad (prioridad 1) para el INVITE
+        // (el enlace) y para la copia firmada. Queda congelado al momento de
         // crear el SR (no cambia aunque cambie el correo del consent).
+        //
+        // D-2 (2026-10-20): el OTP ya NO es este correo. El OTP (dato de
+        // creacion de la firma) va al medio PERSONAL que declara el propio
+        // firmante en la mini-app; este campo es el canal de la invitacion.
+        // D-2 (2026-10-20): el OTP ya NO es este correo. El OTP (dato de
+        // creacion de la firma) va al medio PERSONAL. Este campo es el canal
+        // de la invitacion.
+        //
+        // `correo_otp` es el medio personal que declara la EMPRESA (o, si no
+        // lo tiene, el propio firmante en la mini-app). Si ninguno lo declara,
+        // el OTP va al contacto registrado y el caso queda avisado en el log
+        // (el inventario del D-2 lo cuenta).
         correo_verificacion: correoFirmante,
+        correo_otp: correoOtp || '',
 // Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
       // no requieren migración de schema en firma-service).
       nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)

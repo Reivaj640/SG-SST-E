@@ -12,6 +12,7 @@
 
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs');
+const empresaService = require('./empresa');
 const { esPseudonimo } = require('./trabajador');
 
 // Texto legal compartido entre la página de sello y la Constancia.
@@ -625,7 +626,11 @@ async function generateConstanciaPdf(metadata) {
     campo('NIT', empresaId.nit);
     campo('Domicilio', empresaId.domicilio);
     campo('Representante legal', empresaId.representante_legal);
-    campo('Documento del representante', empresaId.representante_legal_identificacion);
+    // 8B-C · El documento del representante va cifrado en el snapshot. El PDF
+    // muestra solo los últimos 4 y, si no hay una versión enmascarada válida,
+    // dice "No disponible"; nunca imprime el número completo ni "CC —".
+    campo('Documento del representante',
+      empresaService.documentoRepresentanteParaMostrar(empresaId));
     campo('Responsable interno de datos personales', empresaId.responsable_tratamiento);
     campo('Correo de contacto', empresaId.responsable_tratamiento_correo);
     campo('Canal de PQRS', empresaId.canal_pqrs);
@@ -636,13 +641,24 @@ async function generateConstanciaPdf(metadata) {
     // deja constancia de lo que se le comunico.
     campo('Plazo de conservación de sus datos', empresaId.plazo_retencion);
     campo('Canal para solicitar copia', empresaId.canal_solicitud_copia);
-    // El hash va COMPLETO (no truncado como los demás) porque es el valor que
-    // un tercero tiene que recalcular para verificar esta constancia.
+    // El hash va COMPLETO (no truncado como los demás) porque es el valor de
+    // evidencia de la constancia. Se calcula sobre el snapshot EN CLARO.
+    //
+    // OJO con lo que dice el texto de abajo: la huella es un SHA-256 del JSON
+    // canónico EN CLARO, no un HMAC. Decir que "solo puede recalcularse con la
+    // llave del servicio" es FALSO (cualquiera con los mismos datos lo
+    // recalcula, sin llave) y una constancia no puede afirmar una propiedad
+    // criptográfica que no tiene. Lo que sí es cierto, y es lo que se dice:
+    // la huella cubre el documento COMPLETO del representante, que aquí no se
+    // imprime; sin conocer ese documento, la huella no se puede recalcular a
+    // partir de esta hoja.
     campo('Huella de esta identificación (SHA-256)', metadata.empresa_hash);
     parrafo('Estos son los datos de la Empresa que se le mostraron al Firmante en el bloque '
       + '«Empresa que solicita tu firma» antes de firmar, conforme al numeral 1.2 del '
-      + 'Acuerdo de uso. La huella permite verificar que la identificación archivada '
-      + 'es la misma que se le mostró.', { size: 8, color: C.grisClaro, lh: 11 });
+      + 'Acuerdo de uso. La huella (SHA-256) se calcula sobre la identificación de la '
+      + 'Empresa en claro, incluido el documento completo del representante legal, que no '
+      + 'se imprime en esta constancia: solo quien conozca esa identificación completa '
+      + 'puede recalcular la huella y compararla.', { size: 8, color: C.grisClaro, lh: 11 });
   }
 
   // ═══ VERIFICACIÓN CRIPTOGRÁFICA ═══

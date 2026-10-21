@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/connection');
+const mediosService = require('./medios');   // 9A: el alta automatica de medios (el 8.2)
 const config = require('../config');
 const { sha256 } = require('../crypto/hash');
 const { generateToken, hashToken, hashTokenHmac, generateIdSolicitud } = require('../crypto/token');
@@ -30,7 +31,11 @@ const { huellaDesdeHashPrevio } = require('./identificacion');
 const { algHmac, hmacHex } = require('../crypto/hmac');
 const storage = require('./storage');
 const agreementService = require('./agreement');
+const metadataService = require('./metadata');  // 8B: lista blanca de lo que se archiva
+const sensibles = require('./sensibles');  // 8B: documentos con información de salud (10.8)
+const representanteService = require('./representante');  // 8B: el número del representante va cifrado
 const conservacion = require('./conservacion');
+const empresaService = require('./empresa');  // D-03: habilitación de la Empresa (1.4 y 8.6)
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const crypto = require('crypto');
@@ -237,12 +242,36 @@ async function notifyRemote(signRequest, correo, opts = {}) {
     throw new AppError(400, 'INVALID_REQUEST_BODY', 'correo inválido');
   }
 
-  // 1) Recuperar el token cifrado (mismo helper que /link).
-  const recovery = getTokenForRecovery(signRequest);
-  if (!recovery.found) {
-    throw new AppError(410, 'INVITE_NOT_AVAILABLE',
-      'No se puede recuperar el link para enviar la invitación',
-      { reason: recovery.reason });
+  // 1) El token del enlace.
+  //
+  // 8C: el token ya no se recupera de la base (no hay copia reversible). Hay
+  // dos caminos:
+  //
+  //   a) El cliente trae el token que ya tenía (`opts.token`): se usa tal
+  //      cual. No se emite nada nuevo y no se gasta un cupo de rotación. Se
+  //      comprueba que el token sea de ESTA solicitud: si no, es un token de
+  //      otro lado y no se usa.
+  //   b) El cliente no lo tiene: se emite uno nuevo (rotación). El token
+  //      existe solo en memoria y en el correo que sale; en la base queda su
+  //      HMAC.
+  let urlPublica;
+  let emisionToken = null;
+  if (opts.token) {
+    if (!tokenPerteneceA(signRequest.id, opts.token)) {
+      throw new AppError(409, 'TOKEN_MISMATCH',
+        'El token enviado no pertenece a esta solicitud',
+        { reason: 'token_de_otra_solicitud' });
+    }
+    urlPublica = `${config.publicUrl}/s/${opts.token}`;
+  } else {
+    const emitido = emitirToken({
+      firmaId: signRequest.id,
+      actor: opts.actor || 'sistema',
+      motivo: opts.motivo || 'invitacion',
+      origen: 'notify',
+    });
+    urlPublica = emitido.url_publica;
+    emisionToken = emitido.emision;
   }
 
   // 2) Enviar el correo vía mailer.
@@ -255,12 +284,20 @@ async function notifyRemote(signRequest, correo, opts = {}) {
     // los tiene, el correo sale sin esas líneas (no se inventa un plazo).
     let plazoRetencion = null;
     let canalCopia = null;
+    // El deber legal de conservación sin término (migración 029). Si está
+    // activo, el documento NO se borra automáticamente y el Trabajador tiene
+    // que saberlo: el 8.6 obliga a comunicar el plazo y sus consecuencias.
+    let deberLegal = { activo: false, norma: null };
     try {
       const empresaService = require('./empresa');
       const emp = signRequest.id_empresa ? empresaService.getById(signRequest.id_empresa) : null;
       if (emp) {
         plazoRetencion = emp.plazo_retencion || null;
         canalCopia = emp.canal_solicitud_copia || null;
+        deberLegal = {
+          activo: Boolean(emp.conservacion_por_deber_legal),
+          norma: emp.norma_conservacion || null,
+        };
       }
     } catch (e) {
       // La empresa puede no existir (empresa borrada) o el snapshot no tener
@@ -274,11 +311,16 @@ async function notifyRemote(signRequest, correo, opts = {}) {
     }
     sendResult = await mailer.sendInvite({
       to: correo,
-      url_publica: recovery.url_publica,
+      url_publica: urlPublica,
       id_solicitud: signRequest.id_solicitud,
       context: opts.context || null,
       plazo_retencion: plazoRetencion,
       canal_solicitud_copia: canalCopia,
+      // El canal de derechos del Titular (10.7(b)). Es distinto del de
+      // incidentes: este es para ejercer derechos, aquel para avisar que
+      // se comprometieron los datos de creacion de la firma.
+      canal_proteccion_datos: require('../config').canalProteccionDatos,
+      deber_legal_conservacion: deberLegal,
     });
   } catch (e) {
     logger.error('notifyRemote: mailer.sendInvite falló', {
@@ -311,6 +353,25 @@ async function notifyRemote(signRequest, correo, opts = {}) {
       opts.ip || null,
       opts.user_agent || null,
     );
+    // 9A · el 7.2-7.3: el correo de invitación es el primer contacto y
+    // ya le ofrece al Trabajador la vía en papel. Queda asentado, con la
+    // huella de lo que se le mostró (la miní-app) para que la Empresa
+    // pueda demostrar que la opción estuvo disponible y accesible.
+    //
+    // La IP y el user-agent NO se guardan aquí: esto no es una manifestación
+    // del Trabajador, es la constancia de una oferta. Minimización (Ley
+    // 1581 art. 4(d), D.1377 art. 4).
+    try {
+      require('./publicFlow').registrarOpcionPapelDisponible(
+        signRequest, 'correo', sendResult.body_hash || null
+      );
+    } catch (e) {
+      logger.warn('notifyRemote: no se pudo registrar la oferta de la vía en papel', {
+        id_solicitud: signRequest.id_solicitud,
+        error: e.message,
+      });
+    }
+
     // Obtener el id del evento recién insertado (lastInsertRowid sobre la
     // misma tabla). registerEvent no retorna el id, pero como acabamos de
     // insertar, podemos leerlo de la conexión.
@@ -422,8 +483,24 @@ function create({
   tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
   consent_id,
   correo_verificacion,  // I-103.A1.6.C · RF-FIRMA-CORREO-01
+  // D-2 (2026-10-20, decisión del owner): el MEDIO PERSONAL que declara la
+  // EMPRESA para el código de verificación. Es el dato de creación de la
+  // firma (el 47.4 num. 1): no puede ir al buzón que la Empresa pueda leer.
+  // La Empresa lo declara porque es quien tiene la ficha del trabajador; si no
+  // lo declara, el Trabajador puede hacerlo en la mini-app (el campo de la
+  // pantalla de identificación).
+  correo_otp,
   requiere_firma_empresa,        // I-FIRMA-DUAL: opt-in para firma de empresa (v0.1.180)
   representante_legal_snapshot,  // I-FIRMA-DUAL: snapshot del representante legal al crear el padre
+  // 8B · La declaración de la Empresa sobre el dato sensible (numeral 10.8).
+  // La clasificación final la hace `sensibles.clasificar()`, que además
+  // INFIERE la sensibilidad del tipo de documento: la Empresa puede subir la
+  // clasificación, no bajarla.
+  datos_sensibles,
+  categorias_datos_sensibles,
+  base_legal_sensible,
+  base_legal_sensible_descripcion,
+  finalidad_sensible,
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -454,6 +531,38 @@ function create({
   // Esta validación se hace ANTES de generar token/ID para no consumir IDs
   // en solicitudes inválidas.
   validateAcuerdo(agreement_version, agreement_hash);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // D-03 · LA EMPRESA TIENE QUE ESTAR HABILITADA
+  // ───────────────────────────────────────────────────────────────────────────
+  //
+  // El 1.4 del Acuerdo hace depender de un Anexo de Encargo firmado la
+  // relación de K+AIR con la Empresa, y el 8.6 obliga a la Empresa a
+  // comunicar el plazo de conservación antes de pedir la firma. Sin las dos
+  // cosas, la firma se apoyaría en promesas que el sistema no puede cumplir:
+  // el 10.6 no tendría fecha, el 12.7 conservaría la prueba de una
+  // autorización que no está respaldada por un encargo.
+  //
+  // El bloqueo va AQUÍ (antes de generar token e identificadores) para que
+  // una solicitud rechazada no consuma identificadores ni tokens.
+  //
+  // La bandera `FIRMA_EXIGIR_HABILITACION_EMPRESA` existe para la
+  // transición: con ella apagada, la firma pasa pero queda un WARN con
+  // código. No hay default silencioso.
+  const habilitacion = empresaService.verificarHabilitacionFirma(id_empresa);
+  if (habilitacion.ok === false) {
+    if (config.exigirHabilitacionEmpresa) {
+      throw new AppError(409, 'EMPRESA_NO_HABILITADA', habilitacion.mensaje, {
+        id_empresa,
+        pendientes: habilitacion.pendientes,
+      });
+    }
+    logger.warn('SignRequest: la Empresa NO está habilitada y el bloqueo está desactivado', {
+      id_empresa,
+      pendientes: habilitacion.pendientes,
+      aviso: 'EMPRESA_NO_HABILITADA',
+    });
+  }
 
   // Validar tipo_identificacion si se proporciona (I-002).
   // Defensa contra bypass de zod (e.g. tests que llaman create() directo).
@@ -519,52 +628,54 @@ function create({
   const safe_filename = `${id_solicitud}.pdf`;
   const pdf_original_path = storage.saveOriginal(safe_filename, pdf_buffer);
 
-  // I-013b: cifrar el token para futura recuperación (C-22).
-  // Se guarda en `metadata._server_metadata.token_encrypted`. El prefijo
-  // underscore es convención: K+AIR no debería pisar esta sub-clave al
-  // enviar su propio metadata. Si la pisa, la recuperación se pierde para
-  // ese sign request (no es breaking: el sign request sigue funcionando,
-  // solo no se puede recuperar el link).
-  const tokenEncrypted = encryptToken(token);
-  // Merge con metadata del cliente: parseamos el metadata entrante (si es
-  // string JSON) y le inyectamos _server_metadata. Si ya viene
-  // _server_metadata, lo preservamos.
+  // 8C · EL TOKEN NO SE GUARDA DE FORMA RECUPERABLE.
+  //
+  // Antes se cifraba con AES-256-GCM y se guardaba en
+  // `metadata._server_metadata.token_encrypted`, y un endpoint interno lo
+  // devolvía en texto claro. Cifrado sigue siendo reversible con la llave:
+  // el token existía en la base en una forma que se podía recuperar, y eso
+  // rompe la letra del 3.6(e) ("se conserva únicamente en forma de huella
+  // digital").
+  //
+  // Ahora la única copia del token es su HMAC-SHA-256 con clave secreta
+  // (`gh_firma_tokens` y la columna `token_hash` de la fila). La necesidad
+  // operativa que cubría la recuperación —"la Empresa perdió la respuesta de
+  // creación"— la cubre la ROTACIÓN: se emite un token nuevo y se devuelve
+  // una sola vez. Ver `emitirToken()`.
+  //
+  // El metadata del cliente se conserva, pero pasa por la LISTA BLANCA (8B):
+  // lo que no está permitido no se archiva. Y sin el sub-objeto
+  // `_server_metadata`: esa clave es nuestra y se elimina para que ningún
+  // `token_encrypted` pueda quedar guardado por el camino del metadata (8C).
+  //
+  // Por qué una lista blanca y no "que cada cliente mande lo que quiera": lo
+  // que se archiva es DATO. El `metadata` libre es el cajón de sastre donde
+  // un cliente puede dejar PII o dato de salud sin que nadie lo pidiera, y el
+  // 10.8 exige consentimiento expreso para tratar el segundo. La ruta ya
+  // rechaza lo desconocido con un 400; acá, que es el último punto antes de
+  // escribir la fila, se descarta lo que se cuele por otro camino y queda
+  // rastro en el log.
+  //
+  // Antes se seudonimizaba el `id_trabajador` que venía dentro del blob. Ya
+  // no hace falta: la clave no está en la lista, así que se descarta entera
+  // y la cédula no llega a archivarse (ni seudonimizada).
   let metadataToStore = null;
   if (metadata && typeof metadata === 'string' && metadata.length > 0) {
-    try {
-      const parsed = JSON.parse(metadata);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        // Preservar _server_metadata entrante si existe (defensa), pero
-        // sobreescribir token_encrypted con el nuestro.
-        const serverMeta = (parsed._server_metadata && typeof parsed._server_metadata === 'object')
-          ? { ...parsed._server_metadata }
-          : {};
-        serverMeta.token_encrypted = tokenEncrypted;
-        parsed._server_metadata = serverMeta;
-        // El metadata del cliente trae `id_trabajador` con la cédula en
-        // claro (convención del proyecto). Se reemplaza por el seudónimo
-        // para que la cédula no quede escrita dentro del JSON archivado.
-        if (parsed.id_trabajador !== undefined && id_trabajador_guardado) {
-          parsed.id_trabajador = id_trabajador_guardado;
-        }
-        metadataToStore = JSON.stringify(parsed);
-      } else {
-        // metadata es un primitivo (raro, no debería pasar por zod) → wrappear
-        metadataToStore = JSON.stringify({
-          value: parsed,
-          _server_metadata: { token_encrypted: tokenEncrypted },
-        });
-      }
-    } catch {
-      // metadata corrupto (zod no lo aceptaría, pero defensa en profundidad)
-      metadataToStore = JSON.stringify({
-        _server_metadata: { token_encrypted: tokenEncrypted },
+    const filtrado = metadataService.filtrarMetadata(metadata);
+    if (filtrado.error) {
+      logger.warn('8B: metadata ilegible; se archiva sin metadata', {
+        id_solicitud,
+        error: filtrado.error,
+      });
+    } else if (!filtrado.ok) {
+      logger.warn('8B: metadata con claves no permitidas; se archiva solo la lista blanca', {
+        id_solicitud,
+        claves_no_permitidas: filtrado.desconocidas,
       });
     }
-  } else {
-    metadataToStore = JSON.stringify({
-      _server_metadata: { token_encrypted: tokenEncrypted },
-    });
+    if (filtrado.valor && Object.keys(filtrado.valor).length > 0) {
+      metadataToStore = JSON.stringify(filtrado.valor);
+    }
   }
 
   // I-103.A1.6.C · RF-FIRMA-CORREO-01: hashear el correo del firmante al
@@ -591,6 +702,36 @@ function create({
     correo_alg_persisted = algHmac();
   }
 
+  // 8B · LA CLASIFICACIÓN DEL DATO SENSIBLE (numeral 10.8).
+  //
+  // Lo que declaró la Empresa MÁS lo que se infiere del tipo de documento.
+  // La Empresa puede subir la clasificación, no bajarla: el sistema no puede
+  // leer el PDF, y no declarar algo sensible es la forma habitual de que un
+  // dato sensible se trate sin base legal. Ver services/sensibles.js.
+  const clasificacionSensible = sensibles.clasificar({
+    tipoIdentificacion: tipo_identificacion || null,
+    declarado: datos_sensibles === true || datos_sensibles === 1,
+    categoriasDeclaradas: categorias_datos_sensibles || null,
+    baseLegalDeclarada: base_legal_sensible || null,
+    baseLegalDescripcion: base_legal_sensible_descripcion || null,
+    finalidadDeclarada: finalidad_sensible || null,
+  });
+  // El aviso se fija al crear la solicitud (ver el INSERT).
+  let avisoSensible = { texto: null, hash: null, version: null };
+
+  if (clasificacionSensible.sensible) {
+    // El aviso que verá el Titular, fijado con su huella.
+    const aviso = sensibles.avisoDe(clasificacionSensible);
+    avisoSensible = aviso;
+    logger.info('8B: documento con información de salud', {
+      id_solicitud,
+      tipo_identificacion: tipo_identificacion || null,
+      origen: clasificacionSensible.origen,
+      base_legal: clasificacionSensible.base_legal,
+      categorias: clasificacionSensible.categorias.length,
+    });
+  }
+
   // Insertar en BD + sesión en transacción.
   // Si la tx falla (UNIQUE collision, FK fail, BD busy, etc.), el PDF ya
   // está escrito al disco. Sin cleanup, queda huérfano. Ver E9.2.
@@ -608,11 +749,15 @@ function create({
          verification_channel, consent_id,
          tipo_identificacion,  -- I-002 (migration 007)
          correo_verificacion, correo_hash, correo_alg,  -- I-103.A1.6.C · RF-FIRMA-CORREO-01 · 022
+         correo_otp,  -- D-2: el medio personal del código (declarado por la Empresa)
          requiere_firma_empresa, tipo_firmante,  -- I-FIRMA-DUAL (migration 013)
          representante_legal_snapshot,  -- I-FIRMA-DUAL (migration 013)
          identificacion_numero_alg,  -- migration 019 (HMAC)
-         id_trabajador_alg)  -- migration 019 (seudónimo) · 022 (ámbito y versión)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         id_trabajador_alg,  -- migration 019 (seudónimo) · 022 (ámbito y versión)
+         datos_sensibles, categorias_sensibles, finalidad_sensible,  -- 8B (migration 027)
+         base_legal_sensible, aviso_sensible_texto, aviso_sensible_hash,  -- 8B (migration 027)
+         aviso_sensible_version)  -- 8B (migration 027)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador_guardado, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
@@ -625,13 +770,81 @@ function create({
       correo_persisted,
       correo_hash_persisted,
       correo_alg_persisted,
+      // D-2: el medio personal declarado por la Empresa (vacío = null).
+      (typeof correo_otp === 'string' && correo_otp.includes('@'))
+        ? correo_otp.trim().toLowerCase()
+        : null,
       requiere_firma_empresa ? 1 : 0,  // I-FIRMA-DUAL: default 0 (legacy compat)
       'TRABAJADOR',  // I-FIRMA-DUAL: el padre siempre es TRABAJADOR
-      representante_legal_snapshot ? JSON.stringify(representante_legal_snapshot) : null,
+      // 8B · El número del representante legal se CIFRA antes de archivarse
+      // (H23). Es prueba de la representación, así que no se hashea: se
+      // cifra con la llave del servicio, que vive fuera de la base. Ver
+      // services/representante.js.
+      representanteService.snapshotParaGuardar(representante_legal_snapshot, id_empresa),
       identificacion_alg,
       id_trabajador_alg,
+      // 8B · El dato sensible (10.8). La clasificación ya viene resuelta:
+      // lo que declaró la Empresa MÁS lo que se infiere del tipo de
+      // documento.
+      //
+      // El AVISO se fija aquí, con su huella: es el texto exacto que verá el
+      // Titular, y la prueba del consentimiento tiene que poder demostrar
+      // QUÉ se le informó. Si se compusiera en cada visita, un cambio de
+      // redacción cambiaría lo que "aceptó" sin que se note.
+      clasificacionSensible.sensible ? 1 : 0,
+      clasificacionSensible.categorias.length > 0
+        ? JSON.stringify(clasificacionSensible.categorias)
+        : null,
+      clasificacionSensible.finalidad,
+      clasificacionSensible.base_legal,
+      clasificacionSensible.sensible ? avisoSensible.texto : null,
+      clasificacionSensible.sensible ? avisoSensible.hash : null,
+      clasificacionSensible.sensible ? avisoSensible.version : null,
     );
     const firmaId = result.lastInsertRowid;
+
+    // 8A.2 · 12.7: el identificador de la solicitud en la prueba de aceptación.
+    //
+    // El numeral 12.7 del Acuerdo deja en cabeza de la Empresa la conservación
+    // de "la prueba de la aceptación de este Acuerdo por el Trabajador, junto
+    // con la versión aceptada, la huella digital de su texto, la fecha y hora Y
+    // EL IDENTIFICADOR DE LA SOLICITUD".
+    //
+    // Hay dos caminos de aceptación y cada uno conoce el identificador en un
+    // momento distinto:
+    //
+    //   - La aceptación desde la mini-app (consent.js): la fila de la firma ya
+    //     existe, así que el identificador se escribe ahí mismo.
+    //   - La aceptación por OTP (consent.js, verifyOtp): el consentimiento se
+    //     acepta ANTES de que exista la firma — así es en el flujo de la
+    //     Empresa, que crea el consentimiento, el trabajador lo acepta y
+    //     después se emite el enlace. En ese momento no hay identificador de
+    //     solicitud que escribir.
+    //
+    // Por eso el enlace se cierra acá, que es donde la fila de la firma y el
+    // consentimiento quedan unidos. Con COALESCE: si ya estaba escrito (por la
+    // vía de la mini-app), no se pisa. El que se conserva es el primero, que
+    // es el que corresponde a la aceptación que se probó.
+    if (consent_id) {
+      db.prepare(`
+        UPDATE gh_consentimientos_firma
+           SET id_solicitud = COALESCE(id_solicitud, ?),
+               updated_at = datetime('now')
+         WHERE id = ?
+      `).run(id_solicitud, consent_id);
+    }
+
+    // 8C · El token, como huella digital y solo.
+    //
+    // Se registra en `gh_firma_tokens` (emisión 1: el token original). La
+    // columna `token_hash` de la fila guarda la misma huella: es la que
+    // usaban las firmas anteriores a esta tabla, y dejarla mantiene la
+    // compatibilidad sin duplicar credenciales.
+    db.prepare(`
+      INSERT INTO gh_firma_tokens
+        (firma_id, token_hash, emision, emitido_at, expira_en, origen)
+      VALUES (?, ?, 1, ?, ?, 'create')
+    `).run(firmaId, token_hash, now.toISOString(), fecha_expiracion);
 
     // Crear sesión
     db.prepare(`
@@ -663,16 +876,35 @@ function create({
     try {
       const fecha = conservacion.asignarFechaConservacion(firmaId, id_empresa, now.toISOString());
       if (!fecha) {
-        // La Empresa no declaró plazo de conservación. Esta firma NO tendrá
-        // fecha de conservación y nunca podrá suprimirse. Retener de forma
-        // indefinida tampoco es cumplimiento del 8.6: es una alerta de
-        // onboarding, no un detalle operativo. El sistema no inventa plazos
-        // (el 8.6 dice que el Acuerdo no los fija porque la ley no los fija).
-        logger.warn('SignRequest: la Empresa no declaró plazo de conservación', {
-          id_solicitud,
-          id_empresa,
-          aviso: 'RETAIN_SIN_PLAZO',
-        });
+        // Aquí hay DOS motivos distintos y la diferencia importa:
+        //
+        //  (a) La Empresa no declaró plazo de conservación. Esta firma NO
+        //      tendrá fecha y nunca podrá suprimirse. Retener de forma
+        //      indefinida tampoco es cumplimiento del 8.6: es una alerta de
+        //      onboarding, no un detalle operativo. El sistema no inventa
+        //      plazos (el 8.6 dice que el Acuerdo no los fija porque la ley
+        //      no los fija).
+        //
+        //  (b) La Empresa declaró un DEBER LEGAL de conservación sin término
+        //      (2.2.1.1.12 del Decreto 1072). Ahí NO hay fecha de supresión
+        //      porque el plazo de la tabla de retención no extingue ese deber,
+        //      y se levantó un hold automático. Es lo correcto, no una
+        //      alerta.
+        const deber = conservacion.deberLegalEmpresa(id_empresa);
+        if (deber.activo) {
+          logger.info('SignRequest: la Empresa tiene deber legal de conservacion sin termino', {
+            id_solicitud,
+            id_empresa,
+            norma: deber.norma,
+            aviso: 'RETAIN_DEBER_LEGAL',
+          });
+        } else {
+          logger.warn('SignRequest: la Empresa no declaro plazo de conservacion', {
+            id_solicitud,
+            id_empresa,
+            aviso: 'RETAIN_SIN_PLAZO',
+          });
+        }
       }
     } catch (e) {
       // La conservación no puede tumbar la creación de la firma. Si la
@@ -680,6 +912,33 @@ function create({
       // crea igual y queda sin fecha de conservación: sin fecha, no hay
       // purga. Es el lado seguro del fallo.
       logger.warn('SignRequest: no se pudo fijar la fecha de conservación', {
+        id_solicitud,
+        error: e.message,
+      });
+    }
+
+    // 9A (el 8.2): el alta automatica de los medios autorizados. El correo
+    // que la Empresa registro (el de la hoja de vida) y el enlace de K+AIR
+    // los autoriza el 8.2 de entrada: no espera a que el Trabajador haga
+    // nada.
+    try {
+      mediosService.registrarAltaPorSolicitud({
+        id_empresa,
+        id_trabajador: id_trabajador_guardado,
+        correo_verificacion: correo_persisted,
+        // D-2: el medio personal que la Empresa declara para el código.
+        // Nace PENDIENTE: hasta que el Trabajador no demuestre que lo
+        // controla (el código le llega y lo verifica), no es un medio
+        // verificado, y por él no se le entrega ninguna copia.
+        correo_otp: (typeof correo_otp === 'string' && correo_otp.includes('@'))
+          ? correo_otp.trim().toLowerCase()
+          : null,
+      });
+    } catch (e) {
+      // El registro de medios NO puede tumbar la creacion de la firma: es
+      // un dato de entrega, no de la firma. Sin el, la copia se entrega
+      // por el canal de siempre (el correo de la solicitud).
+      logger.warn('SignRequest: no se pudieron registrar los medios autorizados', {
         id_solicitud,
         error: e.message,
       });
@@ -834,16 +1093,26 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
   const fecha_expiracion = new Date(now.getTime() + ttl_horas * 3600 * 1000).toISOString();
 
   // 7. Insertar (reusando el PDF original del padre).
-  //    metadata contiene el token cifrado para futura recuperación del link
-  //    (mismo patrón I-013b que create()).
-  const tokenEncrypted = encryptToken(token);
+  //    8C: el metadata ya NO lleva el token cifrado (mismo criterio que
+  //    create()). Solo conserva la trazabilidad de la firma dual: de qué
+  //    solicitud viene y quién firma.
   const metadataToStore = JSON.stringify({
-    _server_metadata: {
-      token_encrypted: tokenEncrypted,
-      parent_id_solicitud,
-      tipo_firmante: 'EMPRESA',
-    },
+    parent_id_solicitud,
+    tipo_firmante: 'EMPRESA',
   });
+
+  // 8B · El número del representante en claro.
+  //
+  // Puede llegar de dos maneras y las dos tienen que funcionar:
+  // - desde la API (el cliente lo mandó en claro), o
+  // - desde el snapshot YA CIFRADO del padre, que es lo que pasa cuando el
+  //   hijo se dispara automáticamente al final del commit del trabajador.
+  //
+  // `numeroEnClaro` descifra si hace falta y devuelve el número tal cual si
+  // el snapshot es heredado (número en claro). Con esto, el pre-hash de la
+  // identificación es SIEMPRE del número real: si se calculara sobre el
+  // sobre cifrado, el representante no podría identificarse en la mini-app.
+  const numeroRep = representanteService.numeroEnClaro(representante, padre.id_empresa);
 
   const result = db.prepare(`
     INSERT INTO gh_firmas_electronicas (
@@ -888,7 +1157,8 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     metadataToStore,
     padre.version_kair,
     parent_id_solicitud,
-    JSON.stringify(representante),
+    // 8B: el snapshot del hijo también va con el número cifrado.
+    representanteService.snapshotParaGuardar(representante, padre.id_empresa),
     representante.tipo_identificacion || 'CC',
     null, // consent_id NULL: el rep acepta SU consentimiento propio en
            // consentAccept() (antes se heredaba el del trabajador).
@@ -904,8 +1174,13 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     // de datos del encargado no permite deducir la cédula del representante.
     // Sin sal: el pre-hash del representante es sha256(documento), igual que
     // lo que publicFlow.identify() reconstruye para comparar.
-    representante.numero_identificacion
-      ? huellaDesdeHashPrevio(sha256(representante.numero_identificacion), padre.id_empresa)
+    //
+    // 8B: se usa `numeroRep` (el número en claro, descifrado si el snapshot
+    // venía cifrado). Calcularlo sobre el sobre cifrado daría una huella
+    // distinta de la del número real, y el representante no podría
+    // identificarse en la mini-app.
+    numeroRep
+      ? huellaDesdeHashPrevio(sha256(numeroRep), padre.id_empresa)
       : null,
     representante.numero_identificacion ? algHmac() : null,
     // El seudónimo del trabajador se hereda del padre tal cual (ya es un
@@ -913,6 +1188,14 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     padre.id_trabajador_alg || null
   );
   const childId = result.lastInsertRowid;
+
+  // 8C · La firma de la Empresa también es un token más: se registra su
+  // huella (emisión 1) en `gh_firma_tokens`, sin copia recuperable.
+  db.prepare(`
+    INSERT INTO gh_firma_tokens
+      (firma_id, token_hash, emision, emitido_at, expira_en, origen)
+    VALUES (?, ?, 1, ?, ?, 'create')
+  `).run(childId, token_hash, now.toISOString(), fecha_expiracion);
 
   // 7.5 I-AUDIT-2026-09-10: copiar el PDF original del padre al path del hijo
   //     para que el hijo tenga su propia copia física en disco. ANTES el
@@ -967,8 +1250,10 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
   // 8. Notificar al representante legal (I-FIRMA-DUAL, v0.1.180).
   //    Se usa `mailer.sendInviteForCompany` (correo DIFERENCIADO al del
   //    worker) en vez de `notifyRemote` (que es el flujo del worker).
-  //    El token se recupera del metadata cifrado que acabamos de
-  //    persistir (mismo patrón I-013b que `create()` y `notifyRemote`).
+  //    8C: el token del hijo está EN MEMORIA (se acaba de generar), así que
+  //    no hay nada que recuperar de la base: el enlace se arma con ese token.
+  //    Es la diferencia con la recuperación del metadata cifrado, que la 8C
+  //    eliminó: el token existe en el momento de usarlo y en ningún otro.
   //    Fire-and-forget: la notificación NO bloquea el create. Si la
   //    notificación falla, se loguea error pero el create ya quedó
   //    persistido y se retorna exitosamente al caller.
@@ -977,32 +1262,21 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
   //    la firma de createForCompany a async (mantiene backward compat
   //    con callers que esperan retorno sync).
   const mailer = require('./mailer');
-  // Re-leer el signRequest del hijo (ahora tiene el metadata con token cifrado).
-  const hijoRow = db.prepare(
-    'SELECT id_solicitud, metadata FROM gh_firmas_electronicas WHERE id_solicitud = ?'
-  ).get(id_solicitud);
+  const urlHijo = `${config.publicUrl}/s/${token}`;
   (async () => {
     try {
-      const recovery = getTokenForRecovery(hijoRow);
-      if (recovery.found) {
-        await mailer.sendInviteForCompany({
-          to: representante.correo,
-          url_publica: recovery.url_publica,
-          id_solicitud: id_solicitud,
-          id_documento: id_documento,
-          rep_nombre: representante.nombre,
-          context: { parent_id_solicitud, tipo_firmante: 'EMPRESA' },
-        });
-        logger.info('firma-dual: invitación enviada al rep', {
-          id_solicitud,
-          rep_correo: representante.correo,
-        });
-      } else {
-        logger.error('firma-dual: no se pudo recuperar el token para notificar', {
-          id_solicitud,
-          reason: recovery.reason,
-        });
-      }
+      await mailer.sendInviteForCompany({
+        to: representante.correo,
+        url_publica: urlHijo,
+        id_solicitud: id_solicitud,
+        id_documento: id_documento,
+        rep_nombre: representante.nombre,
+        context: { parent_id_solicitud, tipo_firmante: 'EMPRESA' },
+      });
+      logger.info('firma-dual: invitación enviada al rep', {
+        id_solicitud,
+        rep_correo: representante.correo,
+      });
     } catch (err) {
       logger.error('firma-dual: notify falló', {
         id_solicitud,
@@ -1151,12 +1425,58 @@ function getByIdSolicitud(id_solicitud) {
  * el mismo en ambos casos, la búsqueda prueba las dos huellas: la fila se
  * encuentra con la que tenga, sin importar cuándo se creó.
  *
+ * 8C · ORDEN DE BÚSQUEDA
+ * -----------------------
+ * 1. `gh_firma_tokens`: es la fuente de verdad desde la 8C, porque una firma
+ *    puede tener varios tokens (el original y sus rotaciones). Si el token
+ *    está en la tabla y está REVOCADO, la función devuelve null: un token
+ *    revocado no resuelve, y es lo que distingue "este enlace se revocó" de
+ *    "este enlace nunca existió".
+ * 2. `gh_firmas_electronicas.token_hash`: el camino legado, para las firmas
+ *    anteriores a la tabla de tokens. Si el token está en la tabla (aunque
+ *    sea el backfill de una firma vieja), el paso 1 lo resuelve y este no
+ *    llega a ejecutarse.
+ *
  * @param {string|string[]} token_hash
  */
 function getByTokenHash(token_hash) {
   const hashes = (Array.isArray(token_hash) ? token_hash : [token_hash])
     .filter(h => typeof h === 'string' && h.length > 0);
   if (hashes.length === 0) return null;
+
+  const placeholders = hashes.map(() => '?').join(',');
+
+  // 1. La tabla de tokens (8C).
+  let tokenRow = null;
+  try {
+    tokenRow = db.prepare(`
+      SELECT firma_id, revocado_at
+      FROM gh_firma_tokens
+      WHERE token_hash IN (${placeholders})
+      LIMIT 1
+    `).get(...hashes);
+  } catch (e) {
+    // La tabla puede no existir si la migración 026 no está aplicada: en ese
+    // caso se sigue por el camino legado, que es el de siempre.
+    logger.warn('8C: gh_firma_tokens no disponible, se resuelve por la columna legada', {
+      error: e.message,
+    });
+  }
+  if (tokenRow) {
+    if (tokenRow.revocado_at) {
+      // Revocado: el enlace está muerto a propósito. No resuelve, y no se
+      // dice por qué (el 404 no confirma existencia).
+      return null;
+    }
+    return db.prepare(`
+      SELECT *
+      FROM gh_firmas_electronicas
+      WHERE id = ?
+      LIMIT 1
+    `).get(tokenRow.firma_id);
+  }
+
+  // 2. El camino legado: la huella en la fila de la firma.
   if (hashes.length === 1) {
     return db.prepare(`
       SELECT *
@@ -1165,7 +1485,6 @@ function getByTokenHash(token_hash) {
       LIMIT 1
     `).get(hashes[0]);
   }
-  const placeholders = hashes.map(() => '?').join(',');
   return db.prepare(`
     SELECT *
     FROM gh_firmas_electronicas
@@ -1173,6 +1492,264 @@ function getByTokenHash(token_hash) {
     ORDER BY id DESC
     LIMIT 1
   `).get(...hashes);
+}
+
+// =============================================================================
+// 8C · ROTACIÓN DE TOKENS (decisión D1)
+// =============================================================================
+
+/**
+ * Estados en los que la solicitud ya no admite un enlace nuevo.
+ * El endpoint de recuperación (`GET /link`) y el de rotación usan la misma
+ * lista: una solicitud terminal no se "reabre" por el hecho de pedir un
+ * enlace.
+ */
+const ESTADOS_TERMINALES = ['SIGNED', 'REJECTED', 'REVOKED', 'EXPIRED', 'CANCELLED'];
+
+/**
+ * Tope de tokens VIVOS por solicitud.
+ *
+ * Cada token es una credencial de acceso al flujo de firma. El tope acota
+ * cuántas hay vivas a la vez para una misma solicitud: con el original y dos
+ * rotaciones hay tres accesos, que es lo que hace falta para el caso real
+ * (la Empresa perdió la respuesta de creación, y reenvía la invitación).
+ *
+ * Cuando se llega al tope, el sistema NO emite un cuarto token ni revoca por
+ * su cuenta el más viejo: revocar es una decisión, y un enlace que ya está
+ * en manos del trabajador no se rompe a escondidas. Quien llama decide con
+ * `revocar_anteriores: true`.
+ */
+const MAX_TOKENS_ACTIVOS = 3;
+
+/**
+ * Los tokens emitidos de una firma (todos, revocados incluidos).
+ *
+ * @param {number} firmaId
+ * @returns {Array<object>}
+ */
+function tokensDe(firmaId) {
+  try {
+    return db.prepare(`
+      SELECT id, emision, emitido_at, expira_en, revocado_at, revocado_por,
+             motivo_revocacion, origen
+      FROM gh_firma_tokens
+      WHERE firma_id = ?
+      ORDER BY emision ASC
+    `).all(firmaId);
+  } catch (e) {
+    // La tabla puede no existir (migración 026 sin aplicar): no hay tokens
+    // que listar.
+    return [];
+  }
+}
+
+/**
+ * Emite un token nuevo para una firma: la ROTACIÓN.
+ *
+ * Es el mecanismo que reemplaza a la recuperación del token cifrado. El
+ * token en texto claro existe solo en el valor de retorno: la base guarda su
+ * HMAC-SHA-256 con clave secreta. El que lo recibe lo usa una vez y, si lo
+ * pierde, pide otra rotación.
+ *
+ * Los tokens anteriores NO se invalidan: siguen sirviendo hasta su
+ * vencimiento (la ventana de la firma). La rotación no extiende el plazo,
+ * solo emite otro acceso al mismo plazo.
+ *
+ * @param {object} opts
+ * @param {number} opts.firmaId
+ * @param {string} opts.actor - quién pide la rotación (queda en el registro).
+ * @param {string} [opts.motivo] - por qué (queda en el registro).
+ * @param {string} [opts.origen] - 'rotate' | 'notify'.
+ * @param {boolean} [opts.revocarAnteriores] - revoca los tokens vivos antes
+ *   de emitir el nuevo.
+ * @returns {{token: string, url_publica: string, emision: number, expira_en: string, revocados: number[]}}
+ */
+function emitirToken({ firmaId, actor, motivo, origen = 'rotate', revocarAnteriores = false }) {
+  const firma = db.prepare(`
+    SELECT id, id_solicitud, id_empresa, token_hash, fecha_creacion, fecha_expiracion, estado
+    FROM gh_firmas_electronicas
+    WHERE id = ?
+    LIMIT 1
+  `).get(firmaId);
+  if (!firma) {
+    throw new AppError(404, 'NOT_FOUND', 'Solicitud no encontrada');
+  }
+  if (ESTADOS_TERMINALES.includes(firma.estado)) {
+    throw new AppError(
+      410,
+      'LINK_NOT_AVAILABLE',
+      `El link no está disponible en estado terminal '${firma.estado}'`,
+      { current_state: firma.estado, reason: 'terminal_state' }
+    );
+  }
+
+  const ahora = new Date().toISOString();
+  const quien = actor || 'system';
+
+  const tx = db.transaction(() => {
+    // Backfill: si la firma todavía no tiene tokens en la tabla, su token
+    // original (el de la columna `token_hash`) entra como emisión 1. Así
+    // todos los tokens de la firma quedan registrados y se pueden revocar:
+    // una firma creada antes de la 8C no queda con un token fuera del
+    // control.
+    const cuantos = db.prepare(
+      'SELECT COUNT(*) AS n FROM gh_firma_tokens WHERE firma_id = ?'
+    ).get(firmaId).n;
+    if (cuantos === 0 && firma.token_hash) {
+      db.prepare(`
+        INSERT INTO gh_firma_tokens
+          (firma_id, token_hash, emision, emitido_at, expira_en, origen)
+        VALUES (?, ?, 1, ?, ?, 'legacy')
+      `).run(firmaId, firma.token_hash, firma.fecha_creacion || ahora, firma.fecha_expiracion);
+    }
+
+    // Revocación explícita de los anteriores.
+    const revocados = [];
+    if (revocarAnteriores) {
+      const previos = db.prepare(`
+        SELECT emision FROM gh_firma_tokens
+        WHERE firma_id = ? AND revocado_at IS NULL
+      `).all(firmaId);
+      db.prepare(`
+        UPDATE gh_firma_tokens
+           SET revocado_at = ?, revocado_por = ?, motivo_revocacion = ?
+         WHERE firma_id = ? AND revocado_at IS NULL
+      `).run(ahora, quien, motivo || 'rotacion_con_revocacion', firmaId);
+      revocados.push(...previos.map(p => p.emision));
+    }
+
+    // El tope de tokens vivos. Se comprueba DESPUÉS de la revocación
+    // explícita: revocar y emitir es una sola operación.
+    const activos = db.prepare(`
+      SELECT emision FROM gh_firma_tokens
+      WHERE firma_id = ? AND revocado_at IS NULL
+        AND (expira_en IS NULL OR expira_en > ?)
+      ORDER BY emision ASC
+    `).all(firmaId, ahora);
+    if (activos.length >= MAX_TOKENS_ACTIVOS) {
+      throw new AppError(
+        409,
+        'TOKEN_LIMIT_REACHED',
+        `La solicitud ya tiene ${activos.length} enlaces vigentes`,
+        {
+          max_tokens: MAX_TOKENS_ACTIVOS,
+          tokens_activos: activos.map(a => a.emision),
+          revocables: true,
+        }
+      );
+    }
+
+    const emision = (db.prepare(
+      'SELECT MAX(emision) AS m FROM gh_firma_tokens WHERE firma_id = ?'
+    ).get(firmaId).m || 0) + 1;
+
+    const token = generateToken();
+    const tokenHash = hashTokenHmac(token);
+    db.prepare(`
+      INSERT INTO gh_firma_tokens
+        (firma_id, token_hash, emision, emitido_at, expira_en, origen)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(firmaId, tokenHash, emision, ahora, firma.fecha_expiracion, origen);
+
+    return { token, emision, expira_en: firma.fecha_expiracion, revocados };
+  });
+
+  const resultado = tx();
+
+  logger.info('8C: token emitido (rotación)', {
+    id_solicitud: firma.id_solicitud,
+    emision: resultado.emision,
+    origen,
+    actor: quien,
+    revocados: resultado.revocados.length,
+    expira_en: resultado.expira_en,
+  });
+
+  return {
+    ...resultado,
+    url_publica: `${config.publicUrl}/s/${resultado.token}`,
+  };
+}
+
+/**
+ * Los tokens VIVOS de una firma (no revocados y no vencidos).
+ *
+ * @param {number} firmaId
+ * @returns {Array<object>}
+ */
+function tokensActivosDe(firmaId) {
+  const ahora = new Date().toISOString();
+  try {
+    return db.prepare(`
+      SELECT id, emision, emitido_at, expira_en, origen
+      FROM gh_firma_tokens
+      WHERE firma_id = ? AND revocado_at IS NULL
+        AND (expira_en IS NULL OR expira_en > ?)
+      ORDER BY emision ASC
+    `).all(firmaId, ahora);
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Revoca los tokens vivos de una firma (sin emitir uno nuevo).
+ *
+ * @param {object} opts
+ * @param {number} opts.firmaId
+ * @param {string} opts.actor
+ * @param {string} [opts.motivo]
+ * @returns {number[]} las emisiones revocadas.
+ */
+function revocarTokens({ firmaId, actor, motivo }) {
+  const ahora = new Date().toISOString();
+  const quien = actor || 'system';
+  const tx = db.transaction(() => {
+    const previos = db.prepare(`
+      SELECT emision FROM gh_firma_tokens
+      WHERE firma_id = ? AND revocado_at IS NULL
+    `).all(firmaId);
+    db.prepare(`
+      UPDATE gh_firma_tokens
+         SET revocado_at = ?, revocado_por = ?, motivo_revocacion = ?
+       WHERE firma_id = ? AND revocado_at IS NULL
+    `).run(ahora, quien, motivo || 'revocacion_explicita', firmaId);
+    return previos.map(p => p.emision);
+  });
+  const revocados = tx();
+  logger.info('8C: tokens revocados', {
+    firma_id: firmaId,
+    revocados,
+    actor: quien,
+  });
+  return revocados;
+}
+
+/**
+ * ¿El token (en texto claro) pertenece a esta firma?
+ *
+ * Se usa cuando el cliente manda un token que ya tenía (por ejemplo, para
+ * reenviar la invitación sin emitir otro). Comparar la huella evita que un
+ * token de otra solicitud se use para construir el enlace de esta.
+ *
+ * @param {number} firmaId
+ * @param {string} token
+ * @returns {boolean}
+ */
+function tokenPerteneceA(firmaId, token) {
+  if (typeof token !== 'string' || token.length === 0) return false;
+  const hash = hashTokenHmac(token);
+  const fila = db.prepare(`
+    SELECT id FROM gh_firma_tokens
+    WHERE firma_id = ? AND token_hash = ? AND revocado_at IS NULL
+    LIMIT 1
+  `).get(firmaId, hash);
+  if (fila) return true;
+  // Legado: la huella en la fila de la firma.
+  const legacy = db.prepare(
+    'SELECT id FROM gh_firmas_electronicas WHERE id = ? AND token_hash = ? LIMIT 1'
+  ).get(firmaId, hash);
+  return Boolean(legacy);
 }
 
 /**
@@ -1367,7 +1944,15 @@ module.exports = {
   empresasConFirmas,
   list,
   registerEvent,
-  getTokenForRecovery,  // I-013b: descifrar token de metadata
+  getTokenForRecovery,  // I-013b: descifrar token de metadata (LEGADO, 8C)
+  // 8C · la rotación reemplaza a la recuperación del token cifrado.
+  emitirToken,
+  revocarTokens,
+  tokensDe,
+  tokensActivosDe,
+  tokenPerteneceA,
+  MAX_TOKENS_ACTIVOS,
+  ESTADOS_TERMINALES,
   notifyRemote,  // I-103.A1.5.1: enviar invitación al firmante
   // Exports para tests
   _resetTokenEncryptionKey,  // I-013b

@@ -67,9 +67,22 @@
                  required inputmode="numeric" pattern="[0-9]{4,20}"
                  autocomplete="off" maxlength="20">
         </div>
+        <div class="form-group">
+          <label for="correo_otp">Correo personal para el código de verificación</label>
+          <input type="email" id="correo_otp" name="correo_otp"
+                 autocomplete="email" maxlength="254"
+                 placeholder="tu.correo.personal@ejemplo.net">
+          <p class="form-hint">
+            Opcional. El código de verificación es el dato de creación de tu
+            firma: por eso tiene que llegar a un buzón que tu empresa no pueda leer.
+            Si tu empresa ya registró un correo personal tuyo, déjalo aquí:
+            si no, te lo enviamos al correo que registró tu empresa.
+          </p>
+        </div>
         <div id="identify-error" class="alert alert-error" hidden></div>
         <button type="submit" class="btn btn-primary" id="btn-identify">CONTINUAR</button>
       </form>
+
     </section>
 
     <!-- Pantalla: verificación OTP -->
@@ -92,6 +105,44 @@
         <button type="submit" class="btn btn-primary" id="btn-otp">VERIFICAR</button>
       </form>
       <button type="button" class="btn-link" id="btn-back-identify">← Cambiar documento</button>
+      <!-- 9A (el 8.2): la vía para ver y cambiar los medios autorizados. -->
+      <button type="button" class="btn-link" id="btn-mis-medios">Mis medios autorizados</button>
+    </section>
+
+    <!--
+      9A · LOS MEDIOS AUTORIZADOS (el 8.2 del Acuerdo de uso).
+
+      El 8.2: el documento firmado se le suministra "siempre al Trabajador a
+      través de un medio electrónico autorizado por el mismo", y el
+      Trabajador puede modificar esa autorización "en cualquier momento y sin
+      costo alguno".
+
+      Esta pantalla es esa vía: agregar y retirar medios, sin costo y sin
+      pedirle permiso a nadie.
+    -->
+    <section id="screen-medios" class="screen">
+      <h2>Mis medios autorizados</h2>
+      <p class="instructions">
+        Estos son los correos por los que te podemos entregar una copia de
+        tus documentos. Podés cambiarlos cuando quieras y sin costo.
+      </p>
+      <div id="medios-lista"></div>
+      <p class="form-hint" id="medio-aviso"></p>
+      <form id="form-medios">
+        <div class="form-group">
+          <label for="medio_correo">Agregar un correo personal</label>
+          <input type="email" id="medio_correo" name="medio_correo"
+                 autocomplete="email" maxlength="254"
+                 placeholder="tu.correo.personal@ejemplo.net">
+        </div>
+        <div id="medios-error" class="alert alert-error" hidden></div>
+        <button type="submit" class="btn btn-primary" id="btn-medio-agregar">
+          AGREGAR
+        </button>
+      </form>
+      <button type="button" class="btn-link" id="btn-medios-volver">
+        ← Volver
+      </button>
     </section>
 
     <!-- Pantalla: documento -->
@@ -99,6 +150,21 @@
       <h2>3. Documento</h2>
       <p class="instructions">
         Lee el documento completo. Al final, confirma tu voluntad de firmarlo.
+      </p>
+      <!--
+        CAPÍTULO V · 5.3: el Firmante se obliga a "firmar únicamente documentos
+        cuyo contenido sea exacto, completo y corresponda a lo que la Empresa
+        le ha informado". Para poder cumplir eso tiene que saber QUE documento
+        tiene delante: la categoría (CONTRATO, ACTA, CERTIFICADO...) y su
+        referencia.
+
+        Los dos datos ya venían en el contexto público (`tipo_identificacion` e
+        `id_documento`), pero no se pintaban en ninguna parte: el comentario
+        del backend decía que la mini-app los mostraba y no era cierto.
+      -->
+      <p class="documento-identidad" id="documento-identidad" hidden>
+        <strong id="documento-categoria"></strong>
+        <span id="documento-referencia"></span>
       </p>
       <!--
         Bloque de identificacion de la Empresa (migracion 017).
@@ -129,6 +195,55 @@
           Estos datos se muestran junto al Acuerdo y quedan registrados con tu firma.
         </p>
         <dl class="empresa__datos" id="empresa-datos"></dl>
+      </section>
+      <!--
+        FASE 6 · orden (g)/(h) del 3.4.
+
+        (g) El Trabajador lee en pantalla el presente Acuerdo y lo acepta.
+            "El Trabajador no puede avanzar en el flujo sin leer y aceptar el
+            Acuerdo."
+        (h) El Trabajador visualiza y descarga el documento objeto de la firma.
+
+        O sea: el documento va DESPUES de la aceptación. Este aviso aparece
+        mientras el Acuerdo no está aceptado, y el visor del PDF se queda
+        vacío hasta entonces: el backend tampoco se lo sirve antes
+        (CONSENT_NOT_ACCEPTED).
+      -->
+      <div class="alert alert-info" id="documento-pendiente-acuerdo" hidden>
+        Para ver el documento, primero lee y acepta el Acuerdo de uso que
+        aparece más arriba.
+      </div>
+      <!--
+        8B · DATO SENSIBLE (numeral 10.8).
+
+        Este bloque va ANTES del visor del PDF, y no por razón de diseño: el
+        10.8(a) exige que el Titular sea informado de manera EXPRESA Y PREVIA
+        de que el dato es sensible, de cuáles son los datos y de la finalidad,
+        y que otorgue su consentimiento expreso. Si el documento se viera
+        antes, la información "previa" no lo sería.
+
+        La casilla es SEPARADA de la del Acuerdo: aceptar las reglas del
+        servicio y autorizar el tratamiento de un dato sensible son cosas
+        distintas, y la ley las separa (art. 6 de la Ley 1581).
+
+        El texto llega FIJADO en el contexto publico (GET /s/:token -> campo
+        `dato_sensible`), con su huella: es exactamente el que se archivará
+        con la prueba de la autorización.
+      -->
+      <section class="acuerdo" id="sensible-panel" hidden aria-labelledby="sensible-titulo">
+        <h3 class="acuerdo__titulo" id="sensible-titulo">
+          Aviso de tratamiento de datos personales sensibles
+          <span class="acuerdo__version" id="sensible-version"></span>
+        </h3>
+        <div class="alert alert-error" id="sensible-error" hidden></div>
+        <div class="acuerdo__texto" id="sensible-texto" tabindex="0" role="region"
+             aria-label="Aviso de tratamiento de datos personales sensibles"></div>
+        <label class="checkbox-label" id="sensible-check-label" hidden>
+          <input type="checkbox" id="consentimiento_sensible" required>
+          <span id="sensible-check-texto">Autorizo el tratamiento de la información de salud
+          contenida en este documento, de manera expresa, conforme al numeral 10.8 del
+          Acuerdo de uso. Entiendo que no estoy obligado a autorizarlo.</span>
+        </label>
       </section>
       <div class="pdf-viewer" id="pdf-viewer-container">
         <iframe id="pdf-viewer" src="" aria-label="Documento a firmar" title="Documento a firmar">
@@ -196,6 +311,19 @@
         <p id="signed-info">Se enviará una copia a tu correo.</p>
       </div>
       <a id="constancia-link" class="btn btn-secondary" target="_blank" rel="noopener">VER CONSTANCIA</a>
+      <!--
+        FASE 6 · 5.4 del Acuerdo de uso: "El Firmante puede imprimir o
+        descargar copia de este Acuerdo y del documento firmado desde el
+        propio enlace de firma, sin costo alguno."
+
+        Son descargas de solo lectura sobre lo que ya está firmado. El enlace
+        no reabre el flujo: no se puede identificar, pedir OTP ni firmar
+        desde acá.
+      -->
+      <div class="actions" id="signed-downloads" hidden>
+        <a id="signed-document-link" class="btn btn-secondary" href="#" download>DESCARGAR DOCUMENTO FIRMADO</a>
+        <a id="acuerdo-copy-link" class="btn btn-secondary" href="#" download>COPIA DEL ACUERDO DE USO</a>
+      </div>
       <!-- I-VERIFICACION-PUBLICA: botón adicional para abrir la vista de
            verificación (solo lectura, no permite acciones sobre el doc). -->
       <button type="button" class="btn-link" id="btn-go-verify">Verificar autenticidad de este documento →</button>
@@ -266,6 +394,43 @@
         </div>
       </div>
     </section>
+
+    <!--
+      CAPÍTULO V · 5.1(c): el Firmante debe "avisar de inmediato a la Empresa y
+      a K+AIR cualquier situación que comprometa la seguridad de sus datos de
+      creación de la firma" (el OTP y el enlace de firma).
+
+      El bloque "Empresa que solicita tu firma" da los canales DEL CLIENTE
+      (canal_pqrs, canal_incidentes). Este pie da el de K+AIR (Gesstiar S.A.S.),
+      que es a quien el Acuerdo obliga a avisar y que no aparecía en ninguna
+      otra parte de la mini-app: sin el, el deber del 5.1(c) no era
+      cumplible.
+
+      Vive FUERA de las pantallas para que esté disponible en todas, incluida
+      la de error, que es donde aterriza el firmante cuyo enlace no sirve. Por
+      eso el valor por defecto está en el HTML y no solo en el contexto: en la
+      pantalla de error no hay contexto que lo traiga. Si el servidor lo
+      configura distinto (FIRMA_CANAL_INCIDENCIAS), el contexto lo actualiza.
+    -->
+    <footer class="pie-kair" id="pie-kair">
+      <p class="pie-kair__linea">
+        <strong>K+AIR</strong> &middot; Gesstiar S.A.S. &middot;
+        <span id="pie-kair-canal">adminkair@gmail.com</span>
+      </p>
+      <p class="pie-kair__linea">
+        <strong>Derechos de tus datos</strong> &middot;
+        <span id="pie-kair-canal-datos">privacidad@k-air.com</span>
+      </p>
+      <p class="pie-kair__nota">
+        Si crees que tu código de verificación o tu enlace de firma pudieron
+        ser comprometidos, avisa a este canal y a tu empresa.
+      </p>
+      <p class="pie-kair__nota">
+        Para ejercer tus derechos de acceso, corrección, supresión o revocación
+        escríbenos: K+AIR registra tu solicitud y la remite a tu empresa, que
+        es quien debe responderte.
+      </p>
+    </footer>
   </main>
   <script src="app.js"></script>
 </body>

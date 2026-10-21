@@ -35,6 +35,7 @@ const publicRouter = require('./routes/public');
 const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const adminEmpresasRouter = require('./routes/admin-empresas');
+const adminSolicitudesRouter = require('./routes/admin-solicitudes');
 const internalAuditRouter = require('./routes/internal-audit');
 const verificacionRouter = require('./routes/verificacion');
 const constanciaRouter = require('./routes/constancia');
@@ -163,6 +164,7 @@ function createApp() {
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
   app.use('/internal/admin', adminEmpresasRouter);
+app.use('/internal/admin', adminSolicitudesRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {

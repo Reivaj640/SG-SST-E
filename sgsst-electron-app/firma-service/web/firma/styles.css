@@ -310,6 +310,45 @@ body {
   }
 }
 
+/* CAPÍTULO V · 5.3: qué documento se está firmando. */
+.documento-identidad {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 13.5px;
+}
+.documento-identidad strong {
+  color: var(--color-primary);
+}
+.documento-identidad span {
+  color: var(--color-text-muted);
+}
+
+/* CAPÍTULO V · 5.1(c): canal de incidentes de K+AIR. */
+.pie-kair {
+  margin: 32px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.pie-kair__linea {
+  margin: 0 0 4px;
+}
+.pie-kair__linea strong {
+  color: var(--color-primary);
+}
+.pie-kair__nota {
+  margin: 0;
+  line-height: 1.5;
+}
+.pie-kair a {
+  color: var(--color-primary);
+  word-break: break-all;
+}
+
 .manifestacion {
   margin: 24px 0;
   padding: 16px;
@@ -468,4 +507,53 @@ input[type=file] {
   .verify-info dd {
     margin-bottom: 0.4rem;
   }
+}
+
+/* =============================================================================
+   9A · LA FIRMA EN PAPEL (el 7.2) Y LOS MEDIOS AUTORIZADOS (el 8.2)
+   ========================================================================== */
+
+/* La lista de medios autorizados. */
+.medios-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+.medios-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.medios-list__valor {
+  font-weight: 600;
+  flex: 1 1 auto;
+  word-break: break-all;
+}
+
+.medios-list__tipo,
+.medios-list__estado {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.medios-list__item--pendiente {
+  border-color: #b45309;
+}
+
+.medios-list__item--retirado .medios-list__valor {
+  text-decoration: line-through;
+  opacity: .65;
+}
+
+.medios-list__quitar {
+  font-size: 13px;
 }

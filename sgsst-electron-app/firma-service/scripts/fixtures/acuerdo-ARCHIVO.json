@@ -1,0 +1,14 @@
+{
+  "versiones": {
+    "v1.0": {
+      "sha256": "52a490a4f4ce922109d42fa01ac45632cd62d5242bb82bf6e1967ede55710c04",
+      "chars": 32907,
+      "archivo": "scripts/fixtures/acuerdo-v1.0.txt",
+      "fecha_archivado": "2026-10-20T16:45:29.194Z",
+      "verificado_el": "2026-10-20T16:45:29.194Z",
+      "publicada_en_base": "2026-10-20T16:45:23.067Z",
+      "nota": "Version inmutable. Cambiar el texto exige publicar una version nueva con su propia huella; los consentimientos ya aceptados no se tocan."
+    }
+  },
+  "actualizado_el": "2026-10-20T16:45:29.194Z"
+}

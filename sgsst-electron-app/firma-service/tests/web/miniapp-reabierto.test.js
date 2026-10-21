@@ -78,11 +78,22 @@ function evaluar(htm, js) {
     !/btn-back-to-signed[\s\S]{0,200}?showScreen\('signed'\)/.test(js),
     'regresar a ciegas puede mostrar "documento firmado" sobre algo sin firmar');
 
-  check('los tres casos de enlace tienen copy distinguible',
+  check('los casos de enlace tienen copy distinguible',
     js.includes('Este enlace ya se usó') &&
     js.includes('Este enlace venció') &&
-    js.includes('no corresponde a ninguna solicitud de firma'),
+    js.includes('Este enlace no está disponible'),
     'un mismo texto para "vencido" y "ya usado" esconde el problema real');
+
+  check('el 404 no afirma que el enlace no existe',
+    !js.includes('no corresponde a ninguna solicitud de firma'),
+    'afirmar que no existe confirma la existencia: la misma respuesta debe servir '
+    + 'para un token que nunca existió y para uno que ya no se puede mostrar');
+
+  check('el vencimiento del plazo de conservación tiene su propio copy',
+    js.includes('CONSERVACION_VENCIDA') &&
+    js.includes('No está disponible por vencimiento del plazo'),
+    'vencido el plazo (num. 10.6) no es lo mismo que un enlace vencido: '
+    + 'el dato se suprime y no se puede ofrecer la verificación');
 
   check('reabrir el enlace no promete que el documento se perdió',
     js.includes('puedes verificar su autenticidad') || js.includes('Tu documento sigue aquí'),
@@ -91,7 +102,7 @@ function evaluar(htm, js) {
   return { f: fallos.length, n: CHECKS_TOTAL, fallos: fallos };
 }
 
-const CHECKS_TOTAL = 12;
+const CHECKS_TOTAL = 14;
 
 // =============================================================================
 // Los archivos reales pasan
@@ -148,6 +159,14 @@ const MUTANTES = [
   {
     nombre: 'se borra la salida a RRHH',
     htm: (h) => h.replace(/\s*<p class="instructions" id="error-contact-hint">[\s\S]*?<\/p>/, ''),
+  },
+  {
+    nombre: 'el 404 y el enlace ya usado comparten el mismo texto',
+    js: (j) => j.replace('Este enlace no está disponible', 'Este enlace ya se usó'),
+  },
+  {
+    nombre: 'se pierde el caso de vencimiento del plazo de conservación',
+    js: (j) => j.replace(/CONSERVACION_VENCIDA/g, 'OTRO_CODIGO'),
   },
 ];
 

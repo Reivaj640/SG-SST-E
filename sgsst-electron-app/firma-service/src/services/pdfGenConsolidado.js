@@ -286,7 +286,11 @@ async function generateConstanciaConsolidadaPdf(data) {
       seccion('Firmante empresa');
       campo('Nombre', doc.firmante_empresa.nombre || '—');
       campo('Cargo', doc.firmante_empresa.cargo || '—');
-      campo('Identificación', (doc.firmante_empresa.tipo_identificacion || 'CC') + ' ' + (doc.firmante_empresa.numero_identificacion || '—'));
+      // 8B · La identificación del representante sale ENMASCARADA (últimos 4),
+      // no en claro: el número completo queda cifrado en el snapshot y se
+      // abre con la llave del servicio, que vive fuera de la base. Es el
+      // mismo criterio que se aplica al firmante en este documento.
+      campo('Identificación', identificacionFirmanteEmpresa(doc.firmante_empresa));
       campo('Correo (invitación)', doc.firmante_empresa.correo || '—');
     })();
 
@@ -310,7 +314,9 @@ async function generateConstanciaConsolidadaPdf(data) {
       campo('Representante legal', emp.representante_legal || '—');
       campo('Responsable interno de datos personales', emp.responsable_tratamiento || '—');
       campo('Canal de PQRS', emp.canal_pqrs || '—');
-      // Hash completo: es el valor que un tercero recalcula para verificar.
+      // Hash completo: es el valor de evidencia. Se calcula sobre el snapshot
+      // EN CLARO; para recalcularlo hay que abrir el sobre con la llave del
+      // servicio.
       campo('Huella de esta identificación (SHA-256)', doc.empresa_hash || '—');
     })();
 
@@ -399,7 +405,35 @@ async function generateConstanciaConsolidadaPdf(data) {
   return Buffer.from(bytes);
 }
 
+/**
+ * Identificación del firmante empresa lista para imprimir.
+ *
+ * 8B-C · El número del representante no está en claro en la constancia: se usa
+ * la versión enmascarada (últimos 4). Si no hay una versión enmascarada válida,
+ * se dice "No disponible"; no se inventa un número ni se imprime "CC —".
+ *
+ * @param {object|null} firmante
+ * @returns {string}
+ */
+function identificacionFirmanteEmpresa(firmante) {
+  if (!firmante || typeof firmante !== 'object') return 'No disponible';
+
+  const enmascarada = firmante.identificacion_enmascarada;
+  if (typeof enmascarada === 'string' && enmascarada.startsWith('****')) {
+    return enmascarada;
+  }
+
+  // Defensa: si el llamador ya trae el número enmascarado en el campo crudo.
+  const numero = firmante.numero_identificacion;
+  if (typeof numero === 'string' && numero.startsWith('****')) {
+    return numero;
+  }
+
+  return 'No disponible';
+}
+
 module.exports = {
   generateConstanciaConsolidadaPdf,
+  identificacionFirmanteEmpresa,
   ESTADO_LABEL,
 };

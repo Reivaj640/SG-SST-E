@@ -31,6 +31,7 @@ const {
 } = require('../helpers');
 const storage = require('../../src/services/storage');
 const db = require('../../src/db/connection');
+const signRequestService = require('../../src/services/signRequest');
 
 const LEGACY_HEADERS = { 'X-Internal-API-Key': TEST_API_KEY };
 const CLIENT_A_HEADERS = { 'X-Internal-API-Key': TEST_API_KEY_CLIENT_A };
@@ -401,32 +402,72 @@ test('I-104: GET constancia.pdf con constancia_path null → 404 PDF_NOT_FOUND',
 // I-013b: GET /internal/sign-requests/:id/link
 // =============================================================================
 
-test('I-013b: GET /:id/link en PENDING → 200 con token + url_publica + qr_payload', async () => {
-  resetDb();
-  seedActiveAgreement();
-  const app = makeApp();
-  const { signRequest, token } = await createSignRequestWithIdentificacion({
-    id_empresa: '900123456',
-  });
-  const res = await request(app)
-    .get(`/internal/sign-requests/${signRequest.id_solicitud}/link`)
-    .set(LEGACY_HEADERS);
-  assert.equal(res.status, 200);
-  assert.equal(res.body.id_solicitud, signRequest.id_solicitud);
-  assert.equal(res.body.token, token, 'el token retornado debe coincidir con el del create');
-  assert.ok(res.body.url_publica.endsWith(`/s/${token}`));
-  assert.equal(res.body.qr_payload, res.body.url_publica);
-  assert.equal(res.body.estado, 'PENDING');
-  assert.ok(res.body.fecha_expiracion);
-});
-
-test('I-013b: GET /:id/link registra evento LINK_RETRIEVED en audit trail', async () => {
+test('I-013b: GET /:id/link en PENDING → 410 con rotacion_requerida (8C)', async () => {
   resetDb();
   seedActiveAgreement();
   const app = makeApp();
   const { signRequest } = await createSignRequestWithIdentificacion({
     id_empresa: '900123456',
   });
+  // 8C: el token ya no se guarda de forma recuperable, así que no hay nada
+  // que devolver. La respuesta dice cuál es el camino.
+  const res = await request(app)
+    .get(`/internal/sign-requests/${signRequest.id_solicitud}/link`)
+    .set(LEGACY_HEADERS);
+  assert.equal(res.status, 410);
+  assert.equal(res.body.error.code, 'LINK_NOT_AVAILABLE');
+  assert.equal(res.body.error.details.reason, 'rotacion_requerida');
+  assert.equal(
+    res.body.error.details.rotacion_endpoint,
+    'POST /internal/sign-requests/:id/link/rotate',
+    'la respuesta debe señalar el endpoint de rotación',
+  );
+});
+
+test('I-013b: GET /:id/link en una solicitud anterior a la 8C → 200 con cabeceras de deprecación', async () => {
+  resetDb();
+  seedActiveAgreement();
+  const app = makeApp();
+  const { signRequest, token } = await createSignRequestWithIdentificacion({
+    id_empresa: '900123456',
+  });
+  // Simular una solicitud anterior a la 8C: conserva el token cifrado en el
+  // metadata. Para esas, el endpoint deprecado sigue funcionando.
+  const encrypted = signRequestService.encryptToken(token);
+  db.prepare(`UPDATE gh_firmas_electronicas SET metadata = ? WHERE id = ?`)
+    .run(
+      JSON.stringify({ _server_metadata: { token_encrypted: encrypted } }),
+      signRequest.id,
+    );
+
+  const res = await request(app)
+    .get(`/internal/sign-requests/${signRequest.id_solicitud}/link`)
+    .set(LEGACY_HEADERS);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.token, token, 'el token retornado debe coincidir con el del create');
+  assert.ok(res.body.url_publica.endsWith(`/s/${token}`));
+  assert.equal(res.body.qr_payload, res.body.url_publica);
+  assert.equal(res.body.estado, 'PENDING');
+  // Cabeceras de deprecación: el endpoint se va a quitar.
+  assert.equal(res.headers.deprecation, 'true');
+  assert.ok(res.headers.sunset, 'debe anunciar la fecha de retiro');
+  assert.match(res.headers.link, /link\/rotate/);
+});
+
+test('I-013b: GET /:id/link en una solicitud anterior a la 8C registra LINK_RETRIEVED', async () => {
+  resetDb();
+  seedActiveAgreement();
+  const app = makeApp();
+  const { signRequest, token } = await createSignRequestWithIdentificacion({
+    id_empresa: '900123456',
+  });
+  const encrypted = signRequestService.encryptToken(token);
+  db.prepare(`UPDATE gh_firmas_electronicas SET metadata = ? WHERE id = ?`)
+    .run(
+      JSON.stringify({ _server_metadata: { token_encrypted: encrypted } }),
+      signRequest.id,
+    );
+
   const res = await request(app)
     .get(`/internal/sign-requests/${signRequest.id_solicitud}/link`)
     .set(LEGACY_HEADERS);
@@ -478,14 +519,18 @@ test('I-013b: GET /:id/link en estado REVOKED → 410 LINK_NOT_AVAILABLE', async
   assert.equal(res.body.error.details.current_state, 'REVOKED');
 });
 
-test('I-013b: GET /:id/link en sign request legacy (sin token cifrado) → 410 legacy', async () => {
+test('I-013b: GET /:id/link en sign request sin token cifrado → 410 rotacion_requerida (8C)', async () => {
   resetDb();
   seedActiveAgreement();
   const app = makeApp();
   const { signRequest } = await createSignRequestWithIdentificacion({
     id_empresa: '900123456',
   });
-  // Simular sign request legacy pisando metadata sin _server_metadata
+  // Simular una solicitud sin token cifrado en el metadata.
+  // 8C: la razón cambió porque el mecanismo cambió. Antes era
+  // 'legacy_no_token_recovery' ("esto es viejo y no hay token"); ahora es
+  // 'rotacion_requerida' ("no se recupera, se rota"), que es la respuesta
+  // honesta tanto para las solicitudes nuevas como para las viejas.
   db.prepare(`UPDATE gh_firmas_electronicas SET metadata = ? WHERE id = ?`)
     .run(JSON.stringify({ legacy: true, nota: 'sin token cifrado' }), signRequest.id);
 
@@ -494,7 +539,7 @@ test('I-013b: GET /:id/link en sign request legacy (sin token cifrado) → 410 l
     .set(LEGACY_HEADERS);
   assert.equal(res.status, 410);
   assert.equal(res.body.error.code, 'LINK_NOT_AVAILABLE');
-  assert.equal(res.body.error.details.reason, 'legacy_no_token_recovery');
+  assert.equal(res.body.error.details.reason, 'rotacion_requerida');
 });
 
 test('I-013b: GET /:id/link cross-company → 404 silent', async () => {

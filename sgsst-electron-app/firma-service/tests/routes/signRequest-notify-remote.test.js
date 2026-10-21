@@ -284,10 +284,13 @@ test('POST /notify-remote: estado EXPIRED → 410 INVITE_NOT_AVAILABLE', async (
   assert.equal(res.body.error.details.current_state, 'EXPIRED');
 });
 
-test('POST /notify-remote: sign request legacy (sin metadata cifrado) → 410', async () => {
+test('POST /notify-remote: sin token cifrado en el metadata → 200 con un token rotado (8C)', async () => {
   resetDb();
   const { signRequest } = await createSr();
-  // Vaciar metadata directamente en BD para simular legacy pre-I-013b
+  // Vaciar metadata directamente en BD: simula una solicitud vieja.
+  // 8C: ya no hace falta un token cifrado para enviar la invitación. Si el
+  // cliente no trae un token, el service emite uno nuevo (rotación) y el
+  // correo sale con ese enlace. Antes esto era un 410.
   db.prepare('UPDATE gh_firmas_electronicas SET metadata = NULL WHERE id = ?')
     .run(signRequest.id);
   const app = makeApp();
@@ -297,9 +300,16 @@ test('POST /notify-remote: sign request legacy (sin metadata cifrado) → 410', 
     .set(HEADERS)
     .send({ correo: 'user@example.com' });
 
-  assert.equal(res.status, 410);
-  assert.equal(res.body.error.code, 'INVITE_NOT_AVAILABLE');
-  assert.equal(res.body.error.details.reason, 'legacy_no_token_recovery');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(mailer.getDevInbox().length, 1, 'la invitación debe salir');
+
+  // Y el token emitido queda registrado como emisión 2 (la 1 es el original).
+  const tokens = db.prepare(
+    'SELECT emision FROM gh_firma_tokens WHERE firma_id = ? ORDER BY emision'
+  ).all(signRequest.id);
+  assert.equal(tokens.length, 2, 'debe haber el token original y el rotado');
+  assert.deepEqual(tokens.map(t => t.emision), [1, 2]);
 });
 
 test('POST /notify-remote: estado intermedio (OPENED, OTP_SENT) → 200 OK', async () => {

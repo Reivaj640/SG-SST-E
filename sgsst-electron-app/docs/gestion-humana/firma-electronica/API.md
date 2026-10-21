@@ -32,6 +32,11 @@
   - [5.5 `POST /api/sign/{token}/commit`](#55-post-apisigntokencommit)
   - [5.6 `POST /api/sign/{token}/reject`](#56-post-apisigntokenreject)
   - [5.7 `GET /api/sign/{token}/document.pdf`](#57-get-apisigntokendocumentpdf)
+  - [5.8 `GET /api/sign/{token}/signed-document.pdf`](#58-get-apisigntokensigned-documentpdf)
+  - [5.9 `GET /api/sign/{token}/acuerdo.txt`](#59-get-apisigntokenacuerdotxt)
+  - [5.10 `GET /api/sign/{token}/verify` — verificación pública](#510-get-apisigntokenverify--verificación-pública-de-una-firma)
+  - [5.11 `POST /api/sign/{token}/verify-pdf`](#511-post-apisigntokenverify-pdf--comparar-la-copia-del-firmante)
+  - [5.12 `POST /api/sign/{token}/consent/sensible`](#512-post-apisigntokenconsentsensible--el-consentimiento-del-dato-sensible)
 - [6. Endpoints internos (K+AIR)](#6-endpoint-internos-kair)
   - [6.1 `POST /internal/sign-requests` — crear](#61-post-internalsign-requests--crear)
   - [6.2 `GET /internal/sign-requests/{id}` — consultar estado](#62-get-internalsign-requestsid--consultar-estado)
@@ -46,6 +51,9 @@
   - [6.11 `POST /internal/consentimientos/:id/verify-otp`](#611-post-internalconsentimientosidverify-otp--verificar-otp-y-aceptar)
   - [6.12 `POST /internal/verificacion-identidad` — oráculo de identidad](#612-post-internalverificacion-identidad--oráculo-de-identidad)
   - [6.13 Endpoints de administración de empresas — `/internal/admin/empresas`](#613-endpoints-de-administración-de-empresas--internaladminempresas)
+  - [6.14 `POST /internal/sign-requests/{id}/link/rotate` — el enlace, otra vez](#614-post-internalsign-requestsidlinkrotate--el-enlace-otra-vez)
+  - [6.15 `GET /internal/sign-requests/{id}/link` — DEPRECADO](#615-get-internalsign-requestsidlink--deprecated)
+  - [6.16 Fase 8B — metadata con lista blanca, dato sensible y representante cifrado](#616-fase-8b--metadata-con-lista-blanca-dato-sensible-y-representante-cifrado)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -176,9 +184,14 @@ Todas las respuestas de error siguen el mismo formato JSON:
 
 | Código | Descripción |
 |---|---|
-| `TOKEN_NOT_FOUND` | El token no existe. |
-| `TOKEN_EXPIRED` | El token pasó su `fecha_expiracion`. |
+| `TOKEN_NOT_FOUND` | El enlace no está disponible. **No se confirma la existencia**: la misma respuesta para un token que nunca existió y para uno que ya no se puede mostrar. |
+| `TOKEN_EXPIRED` | El token pasó su `fecha_expiracion` (la ventana para firmar). |
+| `CONSERVACION_VENCIDA` | Venció el plazo de conservación que declaró la Empresa (numeral 10.6). El dato se debe suprimir: el sistema no afirma que la firma esté vigente. No aplica si hay deber legal de conservación (hold). |
 | `TOKEN_ALREADY_USED` | La solicitud está en estado terminal. |
+| `LINK_NOT_AVAILABLE` | El enlace no se puede entregar: la solicitud está en estado terminal, o el token no se puede recuperar (deprecated, ver §6.14). El `details.reason` dice cuál. |
+| `TOKEN_LIMIT_REACHED` | La solicitud ya tiene el tope de enlaces vivos (3). Hay que revocar uno explícitamente (`revocar_anteriores: true`) antes de emitir otro. |
+| `TOKEN_MISMATCH` | El token que vino en el body no pertenece a esta solicitud. |
+| `SENSIBLE_CONSENT_NOT_ACCEPTED` | El documento trata datos sensibles de salud (10.8) y el Titular no ha dado el consentimiento expreso. El visor y el PDF quedan bloqueados. Ver §5.12 y §6.16.2. |
 | `INVALID_STATE_TRANSITION` | Se intentó una transición de estado inválida. |
 | `IDENTIFICATION_FAILED` | La cédula no coincide con `base_personal`. |
 | `OTP_REQUIRED` | Se intentó avanzar sin OTP validado. |
@@ -191,7 +204,15 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `DOCUMENT_HASH_MISMATCH` | El PDF subido no coincide con el hash declarado. |
 | `ACUERDO_NOT_FOUND` | No hay versión activa del Acuerdo. |
 | `ALREADY_ACCEPTED` | El trabajador ya aceptó esta versión del Acuerdo. |
+| `AGREEMENT_VERSION_NO_LONGER_ACTIVE` | La versión del Acuerdo ligada a la solicitud ya no es la vigente. **Acción**: el firmante tiene que leer y aceptar la versión vigente (la solicitud migra sola al aceptar). `details.accion = "reaceptar_version_vigente"` |
+| `MEDIO_OTP_CORPORATIVO` | El OTP (dato de creación de la firma) iría a un buzón del dominio de la Empresa, que la Empresa puede leer. El mensaje cita el 3.7(a) y el 47.4, y ofrece la firma en papel (7.2). **Solo se activa con `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP=true`**, y solo cuando exista la 9A |
+| `AGREEMENT_VERSION_REACCEPT_REQUIRED` | Lo mismo, detectado en la puerta del documento: sin aceptar la versión vigente no se sirve el documento (el orden (g) → (h) del 3.4). `details.accion = "reaceptar_version_vigente"` |
 | `CONSENT_NOT_FOUND` | El `consent_id` no existe. |
+| `EMPRESA_NOT_FOUND` | La empresa no existe en el directorio de empresas. |
+| `EMPRESA_NO_HABILITADA` | La empresa registrada **no tiene Anexo de Encargo firmado**, **no ha declarado el plazo de conservación** (el 1.4 y el 8.6) o **no tiene canal de atención** (decisión del owner, 2026-10-20: sin canal, el derecho del 7.2-7.3 a la firma en papel no tiene puerta). La solicitud de firma **no se crea**. El `details.pendientes` dice qué falta (`anexo_encargo_firmado`, `plazo_retencion`, `canal_pqrs`) y el mensaje dice dónde se resuelve. El override es el del D-03 (la bandera + el WARN con código + el inventario). Ver §6.16.5. |
+| `PAPER_ALREADY_SIGNED` | La solicitud ya tiene una firma autográfica registrada (409). No se puede registrar dos veces |
+| `PAPER_REQUEST_NOT_FOUND` | No hay firma en papel para esa solicitud (404) |
+| `DOCUMENT_NOT_SIGNED` | Se pidió el suministro a una autoridad de un documento que todavía no está firmado (409) |
 | `INTERNAL_ERROR` | Error del servidor. |
 
 ---
@@ -298,6 +319,33 @@ Devuelve el HTML de la mini-app con:
 |---|---|---|
 | `404` | Token no existe | Mini-app muestra pantalla de error. |
 | `410` | Token expirado o estado terminal | Mini-app muestra pantalla "Este enlace ya no es válido". |
+
+**Variante JSON — el contexto que consume la mini-app (FASE 6)**:
+
+La mini-app pide este mismo endpoint con `Accept: application/json` y recibe
+el contexto en JSON (es lo que el `<script>` de la app lee a través de
+`fetch`).
+
+```
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-store, no-cache, must-revalidate, private
+Pragma: no-cache
+```
+
+El `no-store` no es cosmético: el contexto trae datos del Firmante
+(pseudónimo, correo enmascarado) y cambia en cada paso del flujo. Sin esas
+cabeceras el navegador guardaba la respuesta y al volver a abrir el enlace
+entregaba ese JSON crudo en vez de la mini-app — el mismo síntoma que
+corrigió I-LINK-REABIERTO para el enlace ya firmado, y repetido cada vez que
+el Firmante vuelve al enlace.
+
+Dos campos del contexto gobiernan el orden (g)/(h) del flujo:
+
+| Campo | Tipo | Qué es |
+|---|---|---|
+| `acuerdo` | object | El Acuerdo de uso de **esta** solicitud: `version`, `texto` y `texto_hash`. Se resuelve por `agreement_version`, no por la versión activa: el texto que el Firmante lee tiene que ser el mismo cuyo hash quedó archivado en el consentimiento. |
+| `acuerdo_aceptado` | bool | Si el Firmante ya aceptó el Acuerdo en una visita anterior. La mini-app lo usa para mostrar el documento (paso (h)) sin volver a pedir la aceptación (paso (g)). |
+| `dato_sensible` | object \| null | **Nuevo en la 8B.** Si el documento trata datos sensibles de salud, el aviso previo del **10.8** (categorías concretas, finalidad, base legal) y el estado del consentimiento. `null` cuando el documento no es sensible. La mini-app lo muestra **antes** del visor: si el documento se viera primero, la información "previa" no lo sería. Ver §5.12. |
 
 ---
 
@@ -482,7 +530,19 @@ el final). Es la antesala de la firma.
 | `404` | Token no existe | `TOKEN_NOT_FOUND` |
 | `410` | Estado terminal o expirado | `TOKEN_EXPIRED` |
 | `409` | Estado actual no permite view | `INVALID_STATE_TRANSITION` (debe ser `OTP_VERIFIED`) |
+| `409` | El Acuerdo todavía no está aceptado | `CONSENT_NOT_ACCEPTED` (FASE 6, ver abajo) |
 | `422` | No scrolleó al final | `INVALID_REQUEST_BODY` (con `scroll_al_final: false`) |
+
+**Precondición — el Acuerdo tiene que estar aceptado (FASE 6, orden (g)/(h))**:
+
+Este endpoint es el que registra que el Firmante vio el documento, o sea el
+paso (h). El 3.4 del Acuerdo de uso pone el (g) —leer y aceptar el
+Acuerdo— **antes** del (h): "El Trabajador no puede avanzar en el flujo sin
+leer y aceptar el Acuerdo." Por eso registrar la visualización exige que el
+consentimiento vinculado esté aceptado. Con el OTP verificado pero sin
+aceptación, la respuesta es `409 CONSENT_NOT_ACCEPTED` (un solo código para
+todos los casos en que falta la aceptación; no expone el id ni el estado del
+consentimiento).
 
 **Side effects**:
 
@@ -513,17 +573,22 @@ múltiples condiciones en orden:
 
 ```json
 {
-  "manifestacion_aceptada": true,
-  "firma_visual_png": "iVBORw0KGgoAAAANSUhEUgAA...base64...",  // opcional
-  "segundos_desde_view_document": 23
+  "manifestacion_aceptada": true
 }
 ```
 
 | Campo | Tipo | Requerido | Validación |
 |---|---|---|---|
 | `manifestacion_aceptada` | bool | sí | Debe ser `true`. |
-| `firma_visual_png` | string | no | Base64 PNG sin prefijo `data:image/png;base64,`. ≤500 KB. |
-| `segundos_desde_view_document` | int | no | Para auditoría. |
+
+El body es **estricto**: cualquier clave que no sea `manifestacion_aceptada` se
+rechaza con `400`. En particular, **`firma_visual_png` NO se admite** (código
+`FIRMA_VISUAL_NO_ADMITIDA`): el sistema no la conserva, el 10.2 del Acuerdo es
+una lista cerrada y la firma autográfica es un dato de carácter especial (art.
+5 de la Ley 1581) que exigiría aviso, consentimiento expreso y su propia
+categoría de retención. Antes el campo se aceptaba y se **ignoraba en
+silencio**: un cliente creía que su firma visual había quedado firmada. Si se
+necesita, el camino es la firma autográfica sobre papel (numeral 7.2).
 
 **Response exitosa — `200 OK`**:
 
@@ -544,11 +609,10 @@ múltiples condiciones en orden:
 
 | Código | Cuándo | Detalles |
 |---|---|---|
-| `400` | Body inválido o `manifestacion_aceptada: false` | `INVALID_REQUEST_BODY` |
+| `400` | Body inválido, `manifestacion_aceptada: false` o clave no admitida | `INVALID_REQUEST_BODY` o `FIRMA_VISUAL_NO_ADMITIDA` |
 | `404` | Token no existe | `TOKEN_NOT_FOUND` |
 | `410` | Estado terminal o expirado | `TOKEN_EXPIRED` o `TOKEN_ALREADY_USED` |
 | `409` | Estado actual no es `DOCUMENT_VIEWED` | `INVALID_STATE_TRANSITION` (race condition con otro firmante) |
-| `413` | Firma visual >500 KB | `INVALID_REQUEST_BODY` |
 | `422` | Hash no coincide | `DOCUMENT_HASH_MISMATCH` |
 | `429` | Rate limit | `RATE_LIMIT_EXCEEDED` |
 
@@ -624,11 +688,33 @@ trabajador.
 
 ### 5.7 `GET /api/sign/{token}/document.pdf`
 
-Devuelve el PDF original (congelado) para mostrar en el visor.
+Devuelve el PDF original (congelado) para mostrar en el visor. Es el paso
+**(h)** del 3.4 del Acuerdo de uso: "El Trabajador visualiza y descarga el
+documento objeto de la firma".
 
 **Auth**: ninguna (token en URL).
 
 **Rate limit**: 5 req/hora por token.
+
+**Precondición — el Acuerdo tiene que estar aceptado (FASE 6, orden (g)/(h))**:
+
+El 3.4(g) pacta el orden del flujo: primero el Trabajador lee y acepta el
+Acuerdo, después (h) ve el documento. "El Trabajador no puede avanzar en el
+flujo sin leer y aceptar el Acuerdo." Por eso este endpoint **exige que el
+consentimiento vinculado esté aceptado** (misma empresa, misma versión del
+Acuerdo). Con el OTP verificado pero sin aceptación, la respuesta es:
+
+```
+409 CONSENT_NOT_ACCEPTED
+```
+
+El camino de error es **uno solo** para todos los casos en que el Firmante
+todavía no aceptó (no hay consentimiento, no existe, no está aceptado, o el
+dato es inconsistente): el Firmante solo necesita saber que tiene que leer y
+aceptar el Acuerdo, y la respuesta no expone el id del consentimiento ni su
+estado. El detalle fino (`CONSENT_NOT_FOUND`, `CONSENT_WORKER_MISMATCH`,
+`CONSENT_COMPANY_MISMATCH`, `CONSENT_VERSION_MISMATCH`) lo sigue dando el
+commit, donde el dato inconsistente tiene que ser rastreable.
 
 **Response exitosa — `200 OK`**:
 
@@ -645,8 +731,8 @@ Cache-Control: no-store
 |---|---|
 | `404` | Token no existe |
 | `410` | Estado terminal o expirado |
-| `409` | Estado actual no permite ver el documento (ej. no
-  identificado aún) |
+| `409` | Estado actual no permite ver el documento (ej. no identificado aún) |
+| `409` | `CONSENT_NOT_ACCEPTED`: el Acuerdo todavía no está aceptado (falta el paso (g)) |
 
 **Headers de seguridad**:
 
@@ -655,6 +741,438 @@ X-Content-Type-Options: nosniff
 Content-Security-Policy: default-src 'none'
 X-Frame-Options: SAMEORIGIN
 ```
+
+---
+
+### 5.8 `GET /api/sign/{token}/signed-document.pdf`
+
+Devuelve el PDF **firmado**. Es el **5.4** del Acuerdo de uso: "El Firmante
+puede imprimir o descargar copia de este Acuerdo y del documento firmado
+desde el propio enlace de firma, sin costo alguno."
+
+**Auth**: ninguna (token en URL).
+
+**Rate limit**: 5 req/hora por token.
+
+**Qué es y qué no es**:
+
+- Es **de solo lectura**: el enlace es de un solo uso (3.4(c)) y esto **no
+  reabre el flujo**. Identificar, pedir OTP, aceptar el Acuerdo y firmar
+  siguen cerrados en estado firmado. Lo único que hace este endpoint es
+  bajar lo que ya está firmado.
+- **El token solo no sirve el PDF firmado antes de la identidad**: en
+  cualquier estado previo a la firma la respuesta es `409`. Un enlace que no
+  pasó por OTP y aceptación del Acuerdo no descarga nada.
+- Se sirve el PDF **firmado** (`pdf_firmado_path`), no el original. El
+  original es el paso (h) y va por `document.pdf`.
+- El enlace tiene que seguir vigente: si el token expiró, `410`.
+
+**Response exitosa — `200 OK`**:
+
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="SIGN-2026-000123-firmado.pdf"
+Content-Length: 261700
+Cache-Control: private, no-store
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | Token no existe, o la solicitud no tiene PDF firmado |
+| `409` | `SIGNED_DOCUMENT_NOT_AVAILABLE`: la firma todavía no ocurrió |
+| `410` | Token expirado (el enlace no da más) |
+
+---
+
+### 5.9 `GET /api/sign/{token}/acuerdo.txt`
+
+Devuelve el **texto del Acuerdo de uso** que el Firmante aceptó. Es la
+otra mitad del 5.4 ("descargar copia de este Acuerdo [...] desde el propio
+enlace de firma").
+
+**Auth**: ninguna (token en URL).
+
+**Rate limit**: 5 req/hora por token.
+
+**Qué es exactamente**:
+
+- El texto es el de la **versión ligada a la solicitud**
+  (`agreement_version`), no el de la versión activa. Razón: el
+  consentimiento que se registró al marcar la casilla guarda
+  `hash_texto_acuerdo` de esa versión puntual. Servir el texto de la activa
+  haría que el Firmante descargara un documento cuyo hash no es el que quedó
+  archivado.
+- La cabecera `X-Acuerdo-SHA256` lleva ese hash, para que el Firmante pueda
+  comprobar que la copia es la que aceptó.
+- El texto no lleva datos personales.
+
+**Response exitosa — `200 OK`**:
+
+```
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: attachment; filename="acuerdo-uso-v1.0.txt"
+X-Acuerdo-Version: v1.0
+X-Acuerdo-SHA256: c72fac89ade6087736c301763c92431b6d53452915c5bfa77596451e71f45734
+Cache-Control: private, no-store
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | Token no existe, o no se encontró el Acuerdo de esa versión |
+| `410` | Token expirado |
+
+---
+
+### 5.10 `GET /api/sign/{token}/verify` — verificación pública de una firma
+
+Devuelve los datos públicos de la firma para que un tercero pueda confirmar
+que el documento es el que se firmó y que su contenido no cambió.
+
+**Auth**: ninguna (token en URL). Es una operación **histórica**: se puede
+consultar aunque la ventana para firmar ya haya vencido.
+
+**Rate limit**: 30 req/min por IP+token.
+
+**Qué devuelve**:
+
+- `id_solicitud`, `estado`, `fecha_firma`.
+- Los tres hashes archivados: `document_hash_original`, `document_hash_firmado`,
+  `evidence_hash`.
+- `integridad_documento`: `{ verificado, coincide, motivo }`. El servidor
+  **recalcula** el SHA-256 del PDF firmado en disco y lo compara con el hash
+  archivado. `verificado` distingue "no comprobamos" de "comprobamos y NO
+  coincide": la pantalla nunca afirma integridad sin comprobar.
+- Los firmantes, con la identificación enmascarada y el correo enmascarado.
+
+**Reglas de estado** (Fase 8A.1):
+
+| Situación | Respuesta |
+|---|---|
+| Token válido, plazo de conservación vigente | `200` con los datos |
+| Token válido, **ventana para firmar vencida**, plazo vigente | `200` (consultar lo ya firmado no depende de poder firmar) |
+| Token válido, **plazo de conservación vencido** y sin deber legal de conservación | `410 CONSERVACION_VENCIDA` — "No disponible por vencimiento del plazo" |
+| Token válido, plazo vencido **pero con deber legal de conservación (hold)** | `200` (el dato se conserva: el deber legal prima) |
+| Token inexistente | `404 TOKEN_NOT_FOUND` con mensaje "No disponible" (no se confirma la existencia) |
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | Token no disponible (`TOKEN_NOT_FOUND`) |
+| `410` | Plazo de conservación vencido (`CONSERVACION_VENCIDA`) |
+
+---
+
+### 5.11 `POST /api/sign/{token}/verify-pdf` — comparar la copia del firmante
+
+Compara el PDF que el firmante tiene en su computador contra el que se
+almacenó firmado. No expone el contenido del PDF: solo los hashes.
+
+**Auth**: ninguna (token en URL).
+
+**Body**: `{ "pdf_base64": "<base64 del PDF>" }`, con el PDF de hasta 50 MB.
+Se validan los *magic bytes* (`%PDF-`).
+
+**Response exitosa — `200 OK`**:
+
+```json
+{
+  "matches": true,
+  "server_hash": "…",
+  "computed_hash": "…",
+  "message": "El archivo que subiste es exactamente el que se firmó."
+}
+```
+
+Registra el evento `PDF_VERIFIED` con el resultado, para auditoría.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `400` | Body inválido, no es un PDF, o el archivo no es decodificable |
+| `404` | Token no disponible (`TOKEN_NOT_FOUND`) |
+| `410` | Plazo de conservación vencido (`CONSERVACION_VENCIDA`) |
+
+---
+
+### 5.12 `POST /api/sign/{token}/consent/sensible` — el consentimiento del dato sensible
+
+> **Nuevo en la 8B.** Es el endpoint del **10.8**: cuando el documento trata
+> datos sensibles de salud, el Titular tiene que autorizar **de forma expresa**
+> ese tratamiento, en una casilla **separada** de la aceptación del Acuerdo.
+> Sin esa autorización, el visor y el PDF del documento **no se abren**.
+
+**Auth**: ninguna (token en URL).
+
+**Body**:
+
+```json
+{
+  "aceptado": true,
+  "categorias": ["SALUD_MENTAL", "HISTORIAL_CLINICO"],
+  "finalidad": "Constitucion y(actualizacion) del expediente laboral",
+  "base_legal": "Art. 10 Ley 1581 de 2012 (datos sensibles)"
+}
+```
+
+| Campo | Tipo | Requerido | Validación |
+|---|---|---|---|
+| `aceptado` | bool | sí | `true` autoriza; `false` **rechaza**. El rechazo también se registra. |
+| `categorias` | array de string | no | Las categorías que el Titular entendió. Se guardan con el consentimiento. |
+| `finalidad` | string | no | Para qué se usa el dato. |
+| `base_legal` | string | no | Base legal del tratamiento. |
+
+**Response exitosa — `200 OK`**:
+
+```json
+{
+  "id_solicitud": "SIGN-2026-000123",
+  "dato_sensible": true,
+  "consentimiento_registrado": true,
+  "aceptado": true,
+  "via_alternativa": null
+}
+```
+
+Cuando el Titular **rechaza** (`aceptado: false`), la respuesta trae
+`"via_alternativa": "firma_en_papel"`: el sistema no "decide" por el Titular, le
+ofrece la vía que el **7.2** del Acuerdo contempla (firmar en papel). El
+rechazo queda registrado con la misma trazabilidad que la aceptación.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `400` | Body inválido |
+| `404` | Token no disponible (`TOKEN_NOT_FOUND`) |
+| `410` | Plazo de conservación vencido (`CONSERVACION_VENCIDA`) |
+
+**Dónde se bloquea sin este consentimiento**:
+
+| Endpoint | Respuesta |
+|---|---|
+| `POST /api/sign/{token}/view-document` | `409 SENSIBLE_CONSENT_NOT_ACCEPTED` |
+| `GET /api/sign/{token}/document.pdf` | `409 SENSIBLE_CONSENT_NOT_ACCEPTED` |
+
+En ambos casos la respuesta trae `details.requiere_consentimiento_sensible:
+true` y el aviso previo (`details.aviso`), para que la mini-app pueda mostrar
+qué se está pidiendo en vez de un error seco.
+
+### 5.13 `POST /api/solicitudes` - el canal de datos de K+AIR (el 10.7(b))
+
+**Auth**: ninguna. Es el canal **público** por el que un Titular ejerce sus
+derechos ante K+AIR, que es el Encargado. No es el canal de la Empresa (que
+sigue siendo el del 10.7 literal b, `canal_pqrs`): K+AIR **no resuelve**, pero
+tampoco puede ser un punto ciego. Recibe, registra, trasmite y da constancia.
+
+**Request**:
+
+```json
+{
+  "tipo": "ACCESO",
+  "nombre": "Titular",
+  "correo": "titular@example.com",
+  "documento": "1234567890",
+  "contenido": "Solicito copia de mi constancia."
+}
+```
+
+| Campo | Tipo | Requerido | Validación |
+|---|---|---|---|
+| `tipo` | enum | sí | `ACCESO` \| `CORRECCION` \| `RECTIFICACION` \| `SUPRESION` \| `REVOCACION` \| `RECLAMO` \| `OTRO` |
+| `correo` | string | sí | Email válido. Es a donde se contesta |
+| `nombre` | string | no | ≤200 chars |
+| `documento` | string | no | Se guarda **como huella**, nunca en claro (el mismo principio de la 10.5(a)) |
+| `contenido` | string | no | ≤4000 chars |
+
+**Response — `201 Created`**:
+
+```json
+{
+  "folio": "SOL-20261020-7F3A9C21",
+  "id_solicitud": 12,
+  "estado": "RECIBIDA",
+  "plazo_tramite": "2026-10-22T15:00:00.000Z",
+  "mensaje": "Recibimos tu solicitud. K+AIR la registró y la va a trasmitir a la Empresa, que es quien debe responder. Puedes preguntar por ella con el folio SOL-20261020-7F3A9C21."
+}
+```
+
+El **plazo de trasmisión** son los días hábiles que fija la política
+(`FIRMA_PLAZO_TRAMITE_DIAS`, default 2). El fin de semana no cuenta.
+
+**Lo que NO hace**: K+AIR no resuelve. La respuesta es de la Empresa, que es
+la Responsable (10.7 literal d). El flujo completo (recibir → trasmitir →
+responder) se opera desde el API de administración (§6.14).
+
+**Errores**: `400` body inválido (`INVALID_REQUEST_BODY`), `429` rate limit
+(`RATE_LIMIT_EXCEEDED`).
+
+### 5.14 Los dos canales de K+AIR
+| Canal | Para qué | Config | Dónde se publica |
+|---|---|---|---|
+| **Incidentes** | Avisar que se comprometieron los datos de creación de la firma (OTP, enlace). El 5.1(c) | `FIRMA_CANAL_INCIDENCIAS` | Mini-app (pie) y correo de invitación |
+| **Protección de datos** | Ejercer los derechos del Titular. El 10.7(b) | `FIRMA_CANAL_PROTECCION_DATOS` | Mini-app (pie) y correo de invitación |
+
+Son **distintos**: un solo canal con dos nombres es un punto ciego con otro
+nombre. Los dos tienen que ser buzones reales y monitoreados antes de
+publicar la v1.1.
+
+### 5.14-bis El medio del OTP (D-2): el canal del código de verificación
+
+El `correo_verificacion` cumple **dos papeles**: a dónde va la **invitación**
+(con el token de acceso) y a dónde va el **OTP** (el dato de creación de la
+firma). La app de escritorio precarga ese campo con el correo del trabajador en el
+registro de la Empresa: en la práctica, el código le llega a un buzón que la
+Empresa puede leer, y eso rompe el 2.2.2.47.4 núm. 1 ("los datos de creación de la
+firma... corresponden exclusivamente al firmante").
+
+**Son dos canales distintos:**
+
+| Canal | Destino | Quién lo define |
+|---|---|---|
+| Invitación (token) y copia firmada | `correo_verificacion` (el contacto registrado por la Empresa) | La Empresa |
+| **OTP** (dato de creación) | `correo_otp`: el medio **personal** que la Empresa no administra | **La Empresa** lo declara al crear la solicitud (`correo_otp` en el metadata); si no lo tiene, el Trabajador lo declara en la mini-app |
+
+**Declarar el medio** (la Empresa lo declara al crear la solicitud; el Trabajador,
+si la Empresa no lo tiene, en la mini-app):
+
+```
+POST /api/sign/{token}/medio
+{ "correo": "mipersonal@ejemplo.net" }
+```
+
+El medio queda **congelado** en cuanto sale un código: después de eso, el código
+ya viajó y cambiar el destino rompería la trazabilidad del 3.4(e).
+
+**El rechazo (D2) está APAGADO** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`, default
+false). Se enciende cuando exista la 9A (la firma en papel): sin esa salida, exigir
+un medio personal sería una barrera de acceso al empleo (el 2.2.1.1.11).
+
+Mientras está apagado, cada caso en el que el OTP cae en un buzón corporativo
+queda en el log como `WARN` con el código `OTP_MEDIO_CORPORATIVO`: de ahí sale el
+número de `scripts/inventario-buzon-corporativo.js`.
+
+**Qué es un buzón corporativo**: un dominio en la lista explícita de la empresa
+(`dominios_corporativos`) o deducido de los correos que ya registró (canales de PQRS
+y de incidentes, responsable de tratamiento, canal para pedir copia).
+
+### 5.14-ter La firma en papel (la 9A, el 7.1-7.3)
+
+El 7.2 del Acuerdo: *"El Trabajador tiene derecho a que la Empresa le provea
+la firma de forma autográfica, sobre soporte papel, en todo momento y sin
+costo alguno, y a que el documento así firmado tenga la misma validez y
+efectos que el firmado electrónicamente."* Y el 7.3: la imposibilidad de
+firmar electrónicamente **no puede ser una barrera de acceso al empleo**.
+
+#### Dónde está la vía en papel: NO en la mini-app
+
+**Decisión del owner (2026-10-20): la mini-app no menciona el papel.**
+
+El motivo es jurídico y es el que la consulta legal dejó entrever: el 7.2 es un
+**deber de la Empresa** (proveer la firma autográfica), no una promesa del
+producto. Si la pantalla dice "tu empresa te la va a entregar", K+AIR está
+prometiendo en nombre de la Empresa algo que K+AIR no puede garantizar
+(veracidad y transparencia: Ley 1581 art. 4(d)(e); D.1377 art. 4: "No se podrán
+utilizar medios engañosos o fraudulentos"). Si la Empresa no entrega, el que
+queda mintiendo es el texto del producto.
+
+Así que la vía en papel queda así:
+
+| Dónde | Qué |
+|---|---|
+| El **Acuerdo** (Capítulo VII) | El derecho: los numerales 7.1-7.3, que son una condición más favorable al Trabajador, no un requisito de forma (la norma no exige contenido mínimo del Acuerdo) |
+| El **correo de invitación** | La comunicación de la Empresa: le dice que puede pedir el papel, que no tiene costo y que no le perjudica. Es el deber de la Empresa, ejercido por la Empresa |
+| El **canal de atención de la Empresa** | La puerta: el Trabajador pide el papel por ahí (el que la Empresa publica en su ficha y en el Acuerdo) |
+| **K+AIR (interno)** | El registro: la Empresa da de alta el documento firmado a mano, con su huella, su Registro de firma autográfica y la entrega de la copia |
+
+Lo que **no** hay: ninguna ruta pública para pedir el papel, ni botón, ni
+pantalla en la mini-app. No es que el derecho no exista: es que lo ejerce la
+Empresa, y el producto no le habla en nombre del Trabajador.
+
+#### El asiento de la OFERTA (`PAPER_OPTION_AVAILABLE`)
+
+La petición del Trabajador no prueba que la opción estuviera disponible; el
+asiento de la **oferta** sí lo prueba. Se escribe cuando la Empresa manda el
+correo de invitación, y guarda la **huella SHA-256 del cuerpo enviado**
+(`hash_oferta`): eso es lo que quedó archivado de lo que el Trabajador leyó.
+
+**No guarda IP ni user-agent**: no es una manifestación del Trabajador, es la
+constancia de una oferta (minimización, Ley 1581 art. 4(d)).
+
+#### Lo que hace la Empresa (interno)
+
+| Endpoint | Para qué |
+|---|---|
+| `POST /internal/sign-requests/{id}/firma-papel` | La Empresa registra el documento **ya firmado en papel** (multipart, campo `documento`; `metadata` opcional con `{canal, nota}`). Si la vía no estaba abierta, se abre con el asiento `PAPER_TRACK_OPENED` (que guarda el canal por el que llegó la petición). El sistema guarda el PDF, calcula su huella, genera el **Registro de firma autográfica** y le entrega la copia al Trabajador por un medio autorizado. La vía electrónica queda **cerrada** (nada de doble firma). Si la firma electrónica ya salió, responde `409 INVALID_STATE_TRANSITION` |
+| `GET /internal/sign-requests/{id}/medios` | Los medios autorizados y cuáles están activos: es por ahí por dónde la Empresa puede entregar la copia (el 8.2) |
+| `POST /internal/sign-requests/{id}/suministro-autoridad` | El asiento del suministro del documento a una autoridad judicial o de IVC (el 8.4): `{autoridad, radicado?, destinatario?, pdf_sha256?}`. Queda en el registro de eventos (`DOCUMENT_SUPPLIED_TO_AUTHORITY`) |
+
+#### `GET` y `POST /api/sign/{token}/medios`
+
+Los medios electrónicos autorizados por el Trabajador (el 8.2). El 8.2 los
+autoriza de entrada (el correo de la hoja de vida y el enlace de K+AIR) y le da
+el derecho a modificarlos *"en cualquier momento y sin costo alguno"*.
+
+| Método | Body | Requiere |
+|---|---|---|
+| `GET` | — | La solicitud identificada |
+| `POST` | `{accion: "ALTA"\|"BAJA", tipo: "CORREO_OTP", correo}` | La solicitud identificada |
+
+**Un medio nuevo nace `PENDIENTE`**: hasta que el Trabajador demuestra que lo
+controla (el código de verificación llega a ese medio y lo verifica), no
+sirve para entregar copias. Si un medio naciera activo, cualquiera que tuviera
+el enlace podría escribir un correo ajeno en el registro, y a partir de ahí
+la Empresa le entregaría la copia del documento a un desconocido.
+
+#### Lo que hace la Empresa (interno)
+
+| Endpoint | Para qué |
+|---|---|
+| `GET /internal/sign-requests/{id}/medios` | Los medios autorizados y cuáles están activos: es por ahí por dónde la Empresa puede entregar la copia (el 8.2) |
+| `POST /internal/sign-requests/{id}/suministro-autoridad` | El asiento del suministro del documento a una autoridad judicial o de IVC (el 8.4): `{autoridad, radicado?, destinatario?, pdf_sha256?}`. Queda en el registro de eventos (`DOCUMENT_SUPPLIED_TO_AUTHORITY`) |
+
+
+**El Registro de firma autográfica** es el equivalente del Registro de firma
+electrónica: registra los HECHOS del acto (quién, cuándo, con qué huella,
+contra qué versión del Acuerdo). **Cita** el 7.2 y el 7.3 del Acuerdo
+verbatim: no concluye nada que el Acuerdo no diga.
+
+### 5.15 La versión vigente del Acuerdo (la 10.4, el camino positivo del 9.5)
+
+El 9.5 dice: *"Para las firmas posteriores a la entrada en vigencia de una
+versión nueva, el Trabajador debe leer y aceptar esa versión nueva en el
+momento mismo de la firma."*
+
+**El problema que resuelve**: si se publica una v1.1 del Acuerdo mientras hay
+solicitudes pendientes, el firmante que llega tarde se encontraba con un **409
+sin salida** (la solicitud estaba ligada a la versión anterior, que ya no era
+la vigente). Eso impedía publicar la v1.1: cambiar el hash del Acuerdo dejaba
+a los trabajadores con enlaces colgados.
+
+**Cómo funciona ahora**:
+
+| Paso | Qué hace |
+|---|---|
+| `GET /s/{token}` | El firmante ve la **versión vigente** del Acuerdo, no la que tenía la solicitud. El contexto trae `acuerdo.requiere_aceptar_vigente` para que la pantalla lo diga |
+| `POST /api/sign/{token}/consent/accept` | Al aceptar, la solicitud **MIGRARA** a la versión vigente: se busca (o se crea) el consentimiento de esa versión, la solicitud pasa a apuntar a él y a su huella, y queda el evento `AGREEMENT_VERSION_MIGRATED` con la versión anterior y la nueva |
+| `POST /api/sign/{token}/view-document` | Si la versión vigente todavía no se aceptó, **no se sirve el documento** (`409 AGREEMENT_VERSION_REACCEPT_REQUIRED`): el orden (g) → (h) se respeta |
+| `POST /api/sign/{token}/commit` | Si la versión cambió después de la aceptación, la firma **no sale** (`409 AGREEMENT_VERSION_NO_LONGER_ACTIVE`) con `details.accion = "reaceptar_version_vigente"`: el firmante tiene que leer y aceptar la nueva |
+
+**Lo que NO se toca**: los consentimientos ya aceptados de la versión anterior.
+Quedan como están: son la prueba de lo que ese trabajador aceptó en su
+momento (el 9.5: *"el Trabajador que haya aceptado una versión anterior se
+rige por esa versión respecto de las firmas ya realizadas"*).
+
+**Con esto, el texto que el firmante leyó y el texto que queda archivado (con
+su huella) son el mismo.** No hay dos verdades.
+
+Los sign requests **legacy** (sin `agreement_version`) no se migran: no tienen
+con qué compararse y conservan su comportamiento histórico.
 
 ---
 
@@ -713,7 +1231,12 @@ Content-Type: application/pdf
 | `tipo_firma` | string | sí | `presencial` o `remoto`. |
 | `agreement_hash` | string | sí | SHA-256 hex (64 chars). |
 | `ttl_horas` | int | no | **IGNORADO por el servidor.** La vigencia del enlace la fija el servicio según la modalidad (remoto 72 h, presencial 24 h), porque el numeral 3.4(c) del Acuerdo la define. Si se envía, no cambia nada: la respuesta trae siempre `fecha_expiracion` con el valor real. |
-| `metadata` | object | no | Datos libres. |
+| `metadata` | object | no | **Desde la 8B no es un objeto libre:** solo se aceptan las claves de la lista blanca (`subtipo_identificacion`, `nombre_trabajador`, `nombre_empresa`, `correo_empresa`, `correo`). Cualquier otra clave se **rechaza con 400**, nombrándola. Ver §6.16. |
+| `datos_sensibles` | bool | no | **Nuevo en la 8B (10.8).** Marca el documento como sensible. El servicio lo **infiere** por tipo de documento (ACTA, CERTIFICADO, CONSENTIMIENTO, AUTORIZACION) si el cliente no lo dice. La Empresa puede **subir** la clasificación, nunca bajarla. |
+| `categorias_sensibles` | array de string | no | Las categorías de dato sensible que se tratan (p. ej. `SALUD_MENTAL`, `HISTORIAL_CLINICO`). Se muestran en el aviso previo. |
+| `finalidad_sensible` | string | no | Para qué se usa el dato sensible. Va en el aviso previo. |
+| `base_legal_sensible` | string | no | Base legal del tratamiento del dato sensible. Va en el aviso previo. |
+| `representante_legal_snapshot` | object | no | **Nuevo en la 8B.** Snapshot del representante legal, para la firma dual: `{ nombre, cargo, tipo_identificacion, numero_identificacion, correo }`. **El `numero_identificacion` se cifra antes de archivarse** (AES-256-GCM, llave fuera de la base): no queda en texto claro en la base ni en las respuestas. Ver §6.16. |
 
 **Validación del PDF**:
 
@@ -747,7 +1270,7 @@ Content-Type: application/pdf
 
 | Código | Cuándo |
 |---|---|
-| `400` | Body inválido, multipart malformado |
+| `400` | Body inválido, multipart malformado, **o una clave que no está en la lista blanca de `metadata`** (el mensaje nombra la clave) |
 | `401` | API key inválida |
 | `413` | PDF >10 MB |
 | `422` | Hash no coincide, datos del trabajador no encontrados |
@@ -812,18 +1335,32 @@ la solicitud con `tipo_firma: 'remoto'`.
 
 ```json
 {
+  "correo": "trabajador@ejemplo.com",
   "plantilla_correo": "default",  // futuro: "urgente", "recordatorio"
-  "remitente_personalizado": "rrhh@empresa.com"  // opcional
+  "remitente_personalizado": "rrhh@empresa.com",  // opcional
+  "token": "opcional"  // 8C: el enlace que ya tiene el cliente
 }
 ```
+
+**El campo `token` (8C).** El token ya no se guarda de forma recuperable
+(§6.14), así que la invitación necesita un enlace. Hay dos caminos:
+
+- **Sin `token`**: el servicio **emite uno nuevo** (rotación) y lo manda en el
+  correo. Es el comportamiento por defecto y el que cubre el caso real ("la
+  Empresa perdió la respuesta de creación").
+- **Con `token`**: se usa ese enlace y **no se emite nada nuevo**. El token se
+  valida contra la solicitud: si no es de esta, la respuesta es `409`
+  `TOKEN_MISMATCH`.
 
 **Response exitosa — `200 OK`**:
 
 ```json
 {
   "ok": true,
-  "correo_enviado_a": "juan.p****@ejemplo.com",
-  "fecha_envio": "2026-08-17T15:30:00.000000Z"
+  "id_solicitud": "SIGN-2026-000001",
+  "messageId": "<abc123@ejemplo.com>",
+  "sent_at": "2026-08-17T15:30:00.000000Z",
+  "evento_id": 91
 }
 ```
 
@@ -832,12 +1369,16 @@ la solicitud con `tipo_firma: 'remoto'`.
 | Código | Cuándo |
 |---|---|
 | `401` | API key inválida |
-| `404` | Solicitud no encontrada |
-| `409` | `tipo_firma !== 'remoto'` |
+| `404` | Solicitud no encontrada (o es de otra Empresa: 404 silencioso) |
+| `409` | `TOKEN_MISMATCH`: el token del body no es de esta solicitud. `TOKEN_LIMIT_REACHED`: ya hay 3 enlaces vivos. |
+| `410` | `INVITE_NOT_AVAILABLE`: la solicitud está en estado terminal. |
+| `502` | `INVITE_EMAIL_FAILED`: el SMTP falló. |
 
 **Side effects**:
 
 - Inserta evento `NOTIFICATION_SENT` con metadata del correo.
+- Si no vino `token`, inserta una emisión en `gh_firma_tokens` (el nuevo
+  enlace) y el evento `LINK_ROTATED`.
 
 ---
 
@@ -1387,10 +1928,391 @@ Mientras el hold está activo, **la base de datos se niega a suprimir la
 firma**, aunque haya ventana de purga y lote: es una condición del trigger de
 la migración 020, no un chequeo del código de aplicación.
 
-> **Nota de alcance.** Hoy la purga suprime **el registro de auditoría**
-> (los eventos). Los datos personales de la fila y los archivos (PDF,
-> constancia) **no** se suprimen: eso es la capa 5B, un paquete aparte. Hasta
-> que exista, esta capa **no** es cumplimiento del 8.6.
+> **Nota de alcance (actualizada en la 8A.2).** La purga tiene **dos capas**.
+> La primera suprime el **registro de auditoría** (los eventos). La segunda —
+> la **5B**, implementada en la 8A.2 — suprime la **fila completa de la firma
+> y sus archivos** (PDF original, PDF firmado y constancia). Las dos comparten
+> el mismo gobierno de ventana y lote, y las dos se saltan una firma con hold
+> legal. Ver §6.13.4.
+
+### 6.13.4 La 5B: la supresión de los datos personales vencidos
+
+El **10.6** ordena suprimir el dato cuando vence su plazo y no hay deber legal
+o contractual de conservación. La 5B es la capa que lo cumple.
+
+**Qué suprime** — la fila de la firma (`gh_firmas_electronicas`) y los tres
+archivos que la acompañaban: el PDF original, el PDF firmado y la constancia.
+También sus filas hijas: los eventos de auditoría, la sesión y la entrada del
+lote.
+
+**Qué sobrevive, y por qué** — tres cosas, y ninguna es el dato personal:
+
+| Sobrevive | Dónde | Por qué |
+|---|---|---|
+| La **prueba de la aceptación** | `gh_consentimientos_firma` (sin llave foránea contra la firma) | Es lo que el **12.7** deja en cabeza de la Empresa: la prueba de que el trabajador aceptó el Acuerdo, con la versión, la huella del texto, la fecha y hora **y el identificador de la solicitud**. |
+| La **lápida** | `gh_firma_purgadas` (append-only) | Qué se suprimió, por qué, por quién y cuándo. Sin datos personales y **sin la credencial**. |
+| El **recibo de purgas** | `gh_firma_purga_registro` (append-only) | El asiento de la operación de purga. |
+
+**El orden de las cosas: los archivos primero, la base después.** El archivo
+*es* el dato personal: el documento firmado y la constancia que lo acredita. Si
+la parte de base de datos falla después, el archivo ya no está —que es lo que
+se pedía— y la fila queda apuntando a un archivo inexistente. La reintento es
+segura porque borrar un archivo que no está no falla.
+
+**La credencial no sobrevive.** La lápida **no** guarda el `token_hash` (que es
+la credencial del enlace): guarda `HMAC('tombstone-purga', token_hash)`, un
+hash de un hash con propósito y llave derivados. No permite autenticarse ni
+resolver nada. Solo permite que el sistema responda *"No disponible por
+vencimiento del plazo"* (410 `CONSERVACION_VENCIDA`) en vez de un 404 que no
+dice por qué.
+
+**El dry-run es el modo por defecto.** `scripts/purga-ventana.js` **simula**
+salvo que se pase `--ejecutar`. La simulación no borra ni la fila ni los
+archivos, y no escribe ninguna lápida.
+
+**El gobierno es el mismo de la capa de auditoría.** La supresión exige:
+
+1. **actor** (quién suprime) y **motivo** (por qué), ambos obligatorios;
+2. una **ventana de purga abierta**;
+3. un **lote armado**;
+4. que la firma **no** tenga hold legal vigente.
+
+Es idempotente: correrla dos veces no rompe nada y no escribe una segunda
+lápida.
+
+**Lo que NO hace.** La 5B no suprime los datos personales de la **Empresa** ni
+los de otros titulares: el sistema no es el responsable de esos datos, y su
+supresión depende de la tabla de retención documental de cada Empresa (que es
+un proceso del cliente, no de este servicio). Tampoco toca la copia permanente
+del **8.5** —esa es la 9A— ni el **backups** —el Anexo de Encargo debe
+declarar el plazo de eliminación en sistemas y respaldos—.
+
+---
+
+### 6.13.5 `conservacion_por_deber_legal` - el deber legal SIN término (por Empresa)
+
+**Por qué es a nivel de EMPRESA y no de documento**: el artículo 2.2.1.1.12
+del Decreto 1072 obliga a los empleadores a conservar los contratos de trabajo
+firmados electrónicamente, **sin plazo**. Eso es una cualidad de la relación
+laboral, no del archivo. Y el sistema **no puede clasificar un PDF con
+acierto** — el mismo argumento del 10.8: no se lee el documento antes del
+consentimiento.
+
+| Campo | Tipo | Qué es |
+|---|---|---|
+| `conservacion_por_deber_legal` | bool | `true` cuando la Empresa tiene un deber legal de conservación sin término |
+| `norma_conservacion` | texto | La norma que impone el deber (p. ej. `2.2.1.1.12 del Decreto 1072 de 2015`) |
+
+**Qué hace el sistema cuando el flag está en 1**:
+
+1. La firma **no recibe fecha de supresión** (el plazo de la tabla de
+   retención no extingue un deber legal).
+2. Se levanta un **hold legal automático** (`actor` = `sistema`, `motivo` =
+   `deber_legal_<norma>`), gobernado por `gh_firma_holds`: se libera con actor
+   y motivo cuando la relación termina o el documento se sustituye. La base
+   (triggers de la 020) se niega a suprimir una firma con hold.
+3. El **Trabajador se entera**: la mini-app muestra "Supresión de este
+   documento: no se borra automáticamente…" y el correo de invitación lo dice.
+4. `fecha_conservacion` deja de ser una fecha de supresión: es un **piso**,
+   no un techo.
+
+**No es "nunca se purga": es "nunca se purga SOLO".** Esa es la diferencia
+entre un deber legal y un accidente.
+
+**El flag no se toca si el body no lo trae**: levantarlo es un acto, con
+actor y motivo; un `PUT` de rutina no puede dejar el deber legal en off por
+accidente. Para levantarlo hay que mandar `false` explícito.
+
+### 6.14 `POST /internal/sign-requests/{id}/link/rotate` - el enlace, otra vez
+
+> **Nuevo en la 8C.** Este endpoint y el `GET /internal/sign-requests/{id}/link`
+> (deprecado) no estaban documentados: el segundo existía desde el I-013b y
+> nunca se documentó. Aquí van los dos, con su estado real.
+
+Emite un **token nuevo** para la solicitud y lo devuelve **una sola vez**.
+
+**Por qué existe.** El numeral 3.6(e) del Acuerdo de uso promete que el token
+de acceso "se conserva únicamente en forma de huella digital". El código no lo
+cumplía: guardaba el token cifrado en el metadata y lo devolvía en texto claro.
+La salida no es una excepción declarada en el texto, sino un mecanismo: la
+**rotación**.
+
+**Lo que no se invalida.** Los tokens anteriores **siguen valiendo hasta su
+vencimiento** (la ventana de la firma). La rotación no extiende el plazo:
+emite otro acceso al mismo plazo. Un enlace que ya está en manos del
+trabajador no se rompe.
+
+**El tope.** Tres tokens vivos por solicitud. Al llegar al tope la respuesta
+es `409 TOKEN_LIMIT_REACHED`: el sistema **no** revoca por su cuenta el más
+viejo, porque revocar es una decisión de quien llama y un enlace que alguien
+ya tiene no se rompe a escondidas.
+
+**Request**:
+
+```json
+{
+  "motivo": "La Empresa perdió la respuesta de creación",  // opcional
+  "revocar_anteriores": false  // opcional
+}
+```
+
+**Response exitosa — `200 OK`**:
+
+```json
+{
+  "id_solicitud": "SIGN-2026-000001",
+  "token": "el-token-en-claro-una-sola-vez",
+  "url_publica": "https://firma.kair.fyi/s/el-token-en-claro-una-sola-vez",
+  "qr_payload": "https://firma.kair.fyi/s/el-token-en-claro-una-sola-vez",
+  "emision": 2,
+  "expira_en": "2026-08-18T15:30:00.000Z",
+  "fecha_expiracion": "2026-08-18T15:30:00.000Z",
+  "estado": "PENDING",
+  "tokens_activos": 2,
+  "revocados": []
+}
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `400` | `id` malformado o body inválido |
+| `401` / `403` | API key inválida o sin permiso |
+| `404` | Solicitud no encontrada (o es de otra Empresa: 404 silencioso) |
+| `409` | `TOKEN_LIMIT_REACHED`: ya hay 3 enlaces vivos. |
+| `410` | `LINK_NOT_AVAILABLE`: la solicitud está en estado terminal (`details.current_state`). |
+
+**Side effects**:
+
+- Inserta una fila en `gh_firma_tokens` (la huella del token nuevo).
+- Si viene `revocar_anteriores: true`, marca los tokens vivos como revocados
+  (con motivo, actor y fecha) y los devuelve en `revocados`.
+- Inserta el evento `LINK_ROTATED` en `gh_firma_eventos`.
+
+---
+
+### 6.15 `GET /internal/sign-requests/{id}/link` — **DEPRECADO**
+
+> **Deprecated desde la 8C.** Este endpoint devolvía el token **en texto
+> claro**, recuperándolo de una copia cifrada del metadata. Como el token ya
+> no se guarda de forma recuperable, **no se debe usar**: úsese
+> `POST /internal/sign-requests/{id}/link/rotate` (§6.14).
+
+**Comportamiento actual**:
+
+| Situación | Respuesta |
+|---|---|
+| Solicitud **anterior** a la 8C (conserva el token cifrado) | `200` con `{ id_solicitud, token, url_publica, qr_payload, fecha_expiracion, estado }`. Lleva cabeceras `Deprecation: true`, `Sunset` y `Link` hacia el endpoint successor. |
+| Solicitud **posterior** a la 8C | `410 LINK_NOT_AVAILABLE` con `details.reason: 'rotacion_requerida'` y `details.rotacion_endpoint`. |
+| Estado terminal | `410 LINK_NOT_AVAILABLE` con `details.reason: 'terminal_state'`. |
+| No existe o es de otra Empresa | `404 NOT_FOUND` (silencioso). |
+
+Las solicitudes anteriores a la 8C **siguen funcionando** en este endpoint
+precisamente para no romper a nadie de un día para otro: un token ya emitido
+sigue siendo válido (vive como huella), lo que dejó de existir es la
+**recuperación** de su texto claro. La fecha de retiro (`Sunset`) avisa a los
+clientes.
+
+---
+
+### 6.16 Fase 8B — metadata con lista blanca, dato sensible y representante cifrado
+
+> **Nuevo en la 8B.** Tres cambios que afectan lo que el cliente puede mandar y
+> lo que queda archivado. Ninguno cambia el texto legal: el 10.2, el 10.3, el
+> 10.5(a) y el 10.8 ya decían lo que había que cumplir; lo que la 8B hace es
+> dejar de incumplirlo.
+
+#### 6.16.1 `metadata` tiene lista blanca
+
+Antes, `metadata` era un objeto libre de hasta 8192 caracteres que se archivaba
+tal cual. La última frase del **10.2** dice que el Acuerdo "no autoriza a la
+Empresa a enviar al servicio datos distintos de los aquí relacionados": sin una
+lista blanca, esa frase no era exigible.
+
+| Clave admitida | Para qué |
+|---|---|
+| `subtipo_identificacion` | El subtipo del documento firmado. |
+| `nombre_trabajador` | Nombre del trabajador. |
+| `nombre_empresa` | Nombre de la Empresa. |
+| `correo_empresa` | Correo para el envío de la copia del **8.4**. |
+| `correo` | Correo de la persona. |
+
+**Lo que no se acepta, se rechaza**: una clave desconocida produce un `400` que
+**nombra la clave**. Antes el esquema la eliminaba en silencio, y el dato se
+perdía sin que nadie se enterara (justo lo que pasaba con `correo_empresa`: la
+app la mandaba desde hace meses y nunca llegó a la base).
+
+El servicio vuelve a filtrar antes de escribir la fila: es el último punto, y
+el que no se puede saltar por la vía del service.
+
+#### 6.16.2 El dato sensible (10.8)
+
+El `metadata` no es lo único que se valida. El body acepta además
+`datos_sensibles`, `categorias_sensibles`, `finalidad_sensible` y
+`base_legal_sensible` (§6.1).
+
+- **Inferencia por tipo de documento**: ACTA, CERTIFICADO, CONSENTIMIENTO y
+  AUTORIZACION se marcan como sensibles si el cliente no dice lo contrario.
+  El sistema **no lee el PDF** para averiguarlo: escanearlo sería tratar el
+  dato sensible **antes** del consentimiento.
+- **La Empresa sube la clasificación, nunca la baja.** Si el cliente dice
+  `datos_sensibles: false` para un ACTA, el servicio lo vuelve a marcar.
+- **El aviso queda fijado al crear** (texto, hash y versión). Si se compusiera
+  en cada visita, un cambio de redacción cambiaría lo que el Titular "aceptó"
+  sin que nadie lo notara.
+- **El bloqueo**: sin consentimiento del 10.8, `view-document` y `document.pdf`
+  responden `409 SENSIBLE_CONSENT_NOT_ACCEPTED`. Ver §5.12.
+
+#### 6.16.3 El número del representante legal va cifrado
+
+El **10.5(a)** dice que el número del documento "se conserva únicamente esa
+huella, no el número en texto claro". Para el **trabajador** eso ya era cierto.
+Para el **representante legal**, no: su número quedaba en texto claro en
+`representante_legal_snapshot`.
+
+No se hashea, y la razón es la que el owner fijó: el número del representante es
+**prueba de la representación** (puede necesitarse en una constancia o en un
+certificado de existencia y representación legal), y una huella no se puede
+presentar como prueba.
+
+| Aspecto | Cómo es |
+|---|---|
+| Algoritmo | AES-256-GCM (AEAD: un sobre alterado no se abre). |
+| Llave | Derivada por HKDF del anillo de llaves, con el propósito `cifrado-representante` y el **ámbito de la Empresa**. Vive fuera de la base. |
+| Formato del sobre | `enc:v2:<version>:<iv>:<tag>:<cifrado>`. La versión de llave viaja **dentro** del sobre: rotar la llave no vuelve ilegibles los números ya cifrados. |
+| AAD | El sobre v2 se liga a `["kair-firma-cifrado","v2",propósito,ámbito,campo]`. Un sobre movido a otra Empresa o a otro campo no se abre. El formato `v1` se sigue leyendo sin AAD. |
+| Lo que se muestra | Los **últimos 4** (`****3456`), como con el firmante. |
+| Filas anteriores | Las que guardan el número en claro **siguen funcionando** (se reconocen y se enmascaran). El re-cifrado es un script aparte, en simulación por defecto (`scripts/recifrar-representante.js`). |
+
+**Lo que no cambia**: el bloque «Empresa que solicita tu firma» del **1.2**
+muestra la identificación del representante legal **completa**, pero esa no viene
+del snapshot: viene del registro mercantil que la Empresa cargó en
+`gh_firma_empresas`. El texto legal aprobado manda.
+
+**Lo que sí cambia**: la constancia consolidada mostraba el número completo del
+representante. Ahora muestra los últimos 4, igual que hace con el firmante.
+
+#### 6.16.4 La copia de empresa en los consentimientos (8B-C)
+
+El consentimiento guarda una copia de la identificación de la Empresa que se le
+mostró al firmante (`gh_consentimientos_firma.empresa_snapshot`) y una huella
+(`empresa_hash`). Esa copia sobrevive a la supresión de la firma, así que el
+número del representante no puede quedar en claro ahí.
+
+- **Cifrado**: el campo `representante_legal_identificacion` del snapshot se
+  cifra con el mismo AES-256-GCM, propósito `cifrado-empresa-snapshot` y campo
+  `empresa_snapshot.representante_legal_identificacion`. Se guardan además los
+  últimos 4 como rastro, pero la presentación abre el sobre y verifica el GCM:
+  si no abre, muestra `No disponible`; nunca `CC —`. Cuando recibe la huella
+  archivada, también recalcula el hash sobre el claro y falla cerrado si no
+  cuadra.
+- **Huella**: `empresa_hash` se mantiene sobre el JSON canónico **en claro**.
+  No se hashea el sobre porque el IV es aleatorio y la huella cambiaría en cada
+  cifrado. Para verificar una fila hay que descifrarla y recalcular. La huella
+  cubre solo los campos presentes, en el orden de `SNAPSHOT_FIELDS`: un snapshot
+  histórico de 11 campos conserva la huella que se calculó sin
+  `plazo_retencion` ni `canal_solicitud_copia`; los nuevos de 13 campos sí los
+  incluyen.
+- **Filas históricas**: se re-cifran con `scripts/recifrar-empresa-snapshot.js`,
+  en simulación por defecto. Antes de escribir exige `--actor`, `--motivo`,
+  `--backup` y `--ejecutar`; verifica la huella sha256 del texto exacto y la
+  huella canónica fila por fila, y deja un recibo JSON sin el número completo.
+  No toca filas con `empresa_hash` NULL o inconsistente, ni se salta a ciegas un
+  sobre que no se abre con la Empresa y el campo de esa fila. En producción,
+  además, exige `--confirmo-produccion` y un `--recibo` explícito.
+- **Traza en la base**: cada fila re-cifrada deja un evento
+  `CONSENT_SNAPSHOT_RECIFRADO` en `gh_consentimientos_eventos`, escrito
+  **en la misma transacción** que el `UPDATE`: si el evento no se puede
+  escribir, la fila no se toca. El evento lleva el actor, el motivo, la huella
+  del JSON en claro y la versión de llave del sobre nuevo. **No** lleva el
+  número del representante.
+- **Lo que la huella NO es** (nota del 2026-10-20): `empresa_hash` es un
+  **SHA-256 sin sal** del JSON canónico en claro. No es un HMAC: **cualquiera
+  que tenga la identificación completa puede recalcularla**, sin la llave del
+  servicio. Por eso la constancia **no** dice que "solo puede recalcularse con
+  la llave del servicio" (decía eso y era falso): lo que dice es que la
+  huella cubre el documento completo del representante, que no se imprime en la
+  constancia, y que solo quien conozca esa identificación completa puede
+  recalcular la huella y compararla.
+
+#### 6.16.5 La Empresa tiene que estar habilitada para pedir firmas (D-03)
+
+Una empresa **registrada** en el directorio (`gh_firma_empresas`) necesita dos
+cosas antes de que K+AIR acepte una solicitud de firma:
+
+| Requisito | De dónde sale | Dónde se resuelve |
+|---|---|---|
+| **Anexo de Encargo firmado** | `anexo_encargo_firmado_at` | `POST /internal/admin/empresas/{id}/anexo-firmado` |
+| **Plazo de conservación declarado** | `plazo_retencion_dias` | `PUT /internal/admin/empresas/{id}` |
+
+Si falta cualquiera de las dos, la creación de la solicitud se rechaza con
+**`409 EMPRESA_NO_HABILITADA`** y el mensaje dice qué falta y dónde se
+resuelve. La comprobación se hace **antes** de generar el token y el
+identificador, así que una solicitud rechazada no consume nada.
+
+**Por qué**: el 1.4 del Acuerdo hace depender de un Anexo de Encargo firmado
+la relación entre la Empresa (Responsable) y K+AIR (Encargado), y el 8.6
+obliga a la Empresa a comunicar el plazo **antes** de pedir la firma. Sin
+plazo declarado no hay fecha de conservación (10.6) y la firma se conservaría
+de forma indefinida.
+
+**Una empresa que NO está registrada no se bloquea**: eso es otro problema
+(identificación incompleta) y se atiende por el alta.
+
+**La transición** (para no dejar clientes sin poder firmar):
+
+- `FIRMA_EXIGIR_HABILITACION_EMPRESA=false` desactiva el bloqueo. El default
+  es **bloquear**; con la bandera apagada, cada firma que pasa sin
+  habilitación queda en el log como `WARN` con el código
+  `EMPRESA_NO_HABILITADA`: no es un default silencioso, es un default ruidoso.
+- `scripts/inventario-empresas-no-habilitadas.js` lista, **sin escribir
+  nada**, qué empresas están en ese estado y cuántas firmas tiene cada una.
+  Es el paso previo: inventario → aviso a las Empresas → activar el bloqueo.
+
+### 6.17 Endpoints de las solicitudes de los Titulares - `/internal/admin/solicitudes`
+
+**Auth**: `X-Admin-API-Key` (operador humano). K+AIR **no** los usa desde la
+app: su rol es recibir, registrar y trasmitir; la respuesta es de la Empresa.
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET /internal/admin/solicitudes` | Lista. Filtro opcional `?estado=` y `?limit=` |
+| `GET /internal/admin/solicitudes/:id` | Una solicitud con su historial de eventos |
+| `POST /internal/admin/solicitudes/:id/trasmitir` | K+AIR la remite a la Empresa (la Responsable) |
+| `POST /internal/admin/solicitudes/:id/responder` | La Empresa responde; K+AIR devuelve la respuesta al Titular y archiva la evidencia |
+
+**Cuerpo del traspaso**:
+
+```json
+{
+  "actor": "kair:operador",
+  "id_empresa": "900123456",
+  "canal_empresa": "pqrs@empresa.com",
+  "evidencia": { "constancia": "firma-123.pdf" }
+}
+```
+
+**Cuerpo de la respuesta**:
+
+```json
+{
+  "actor": "empresa:rrhh",
+  "respuesta": "Adjuntamos la constancia.",
+  "evidencia": { "constancia": "firma-123.pdf" }
+}
+```
+
+**Los estados**: `RECIBIDA` → `TRASMITIDA` → `RESPONDIDA`.
+
+**El historial es append-only y NO cuelga de la firma**: la 5B (la supresión
+de datos personales) solo borra lo que cuelga de `gh_firmas_electronicas`, y
+esta tabla no cuelga de ninguna. Sus eventos tienen triggers de inalterabilidad
+(migración 029), probados aparte contra el archivo real.
+
+**Errores**: `401` sin llave (`INVALID_API_KEY`), `404` si no existe
+(`SOLICITUD_NOT_FOUND`), `409` si ya está respondida
+(`SOLICITUD_ESTADO_INVALIDO`), `400` body inválido (`INVALID_REQUEST_BODY`).
 
 ---
 

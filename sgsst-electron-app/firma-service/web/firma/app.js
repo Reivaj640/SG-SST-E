@@ -228,6 +228,12 @@
     viewDocumentAttempted: false, // para evitar reintentos
     consentAccepted: false,    // true después de POST /consent/accept exitoso (Bloque E6.5)
     consentAcceptInProgress: false, // evita doble POST al marcar/desmarcar rápido
+    // 8B · el dato sensible (10.8). `sensibleRequired` es true cuando el
+    // documento tiene información de salud y la base legal es la
+    // autorización expresa del Titular: hace falta su casilla separada.
+    sensitiveRequired: false,
+    sensitiveAccepted: false,
+    sensitiveAcceptInProgress: false, // evita doble POST al marcar/desmarcar rápido
   };
 
   // ============================================================
@@ -247,7 +253,8 @@
     // error y el botón de las páginas HTML del servidor, de modo que ese
     // enlace se puede compartir y reabrir aunque el enlace de
     // firma ya haya caducado o se haya usado. /verify usa
-    // skipExpirationCheck, así que nunca caduca.
+    // `permitirHistorico`, así que la ventana para firmar no le impide
+    // consultar lo ya firmado (8A.1).
     if (isVerifyDeepLink()) {
       return showVerifyScreen();
     }
@@ -292,13 +299,17 @@
 
       if (estado === 'SIGNED') {
         setSignedMessageVariant('single');
-        return showScreen('signed');
+        showScreen('signed');
+        wireSignedDownloads();
+        return;
       }
       if (estado === 'DUAL_FIRMADO') {
         // I-FIRMA-DUAL · diferenciar visualmente el caso de firma dual
         // (trabajador + representante legal) del caso de firma simple.
         setSignedMessageVariant('dual');
-        return showScreen('signed');
+        showScreen('signed');
+        wireSignedDownloads();
+        return;
       }
       if (estado === 'REJECTED') return showScreen('rejected');
 
@@ -343,7 +354,17 @@
       // el firmante, y solo uno de los dos tiene verificación disponible.
       if (err.code === 'TOKEN_NOT_FOUND' || err.status === 404) {
         return showError(
-          'Este enlace no corresponde a ninguna solicitud de firma. Puede haberse copiado incompleto al reenviarlo.',
+          'Este enlace no está disponible. No se puede confirmar si corresponde a alguna solicitud de firma: puede haberse copiado incompleto al reenviarlo.',
+          { allowVerify: false });
+      }
+      // 8A.1 · Vencimiento del plazo de conservación (numeral 10.6).
+      // No es lo mismo que un enlace vencido: acá lo que venció es el plazo
+      // de conservación que declaró la empresa, así que la evidencia de la
+      // firma ya no está disponible. NO se ofrece verificación porque la
+      // verificación responde lo mismo: ofrecerla sería una promesa falsa.
+      if (err.code === 'CONSERVACION_VENCIDA') {
+        return showError(
+          'No está disponible por vencimiento del plazo: la empresa fijó un plazo de conservación para este documento y ya venció, así que la evidencia de la firma ya no está disponible.',
           { allowVerify: false });
       }
       if (err.status === 410 || err.code === 'TOKEN_EXPIRED' || err.code === 'TOKEN_ALREADY_USED') {
@@ -389,9 +410,15 @@
 
       setButtonBusy(btn, 'VERIFICANDO...', 'CONTINUAR');
       try {
+        // D-2: el código de verificación (dato de creación de la firma)
+        // puede ir a un medio PERSONAL que declare el firmante. Si no declara
+        // nada, el servicio usa el contacto registrado por la empresa.
+        const correoOtp = ($('#correo_otp') && $('#correo_otp').value || '').trim();
+        const body = { tipo_identificacion: tipo_identificacion, numero_documento: numero_documento };
+        if (correoOtp) body.correo_otp = correoOtp;
         const result = await apiFetch('/api/sign/' + state.token + '/identify', {
           method: 'POST',
-          body: { tipo_identificacion: tipo_identificacion, numero_documento: numero_documento },
+          body: body,
         });
         state.correoEnmascarado = result.correo_destino_enmascarado;
         $('#correo-enmascarado').textContent = result.correo_destino_enmascarado;
@@ -589,6 +616,72 @@
    *
    * @param {object} contexto - Contexto publico de GET /s/:token.
    */
+  /**
+   * 8B · EL AVISO DE DATO SENSIBLE (numeral 10.8).
+   *
+   * El Titular tiene que ser informado de manera expresa y previa de que el
+   * dato es sensible, de cuáles son los datos y de la finalidad, y otorgar su
+   * consentimiento expreso en una casilla SEPARADA de la del Acuerdo.
+   *
+   * Dos estados del flujo:
+   *
+   *   - `requiere_autorizacion` es true: la base legal es la autorización
+   *     expresa del Titular (el 10.8(c)), así que hace falta su casilla.
+   *   - es false: la base legal la declaró la Empresa (el 10.8(c) también lo
+   *     permite). El aviso se muestra igual —el Titular tiene que estar
+   *     informado—, pero no hay nada que autorizar.
+   *
+   * El texto se pinta con textContent, nunca con innerHTML: es contenido que
+   * el firmante debe leer y que queda archivado con su huella.
+   */
+  function renderDatoSensible(contexto) {
+    const panel = $('#sensible-panel');
+    const box = $('#sensible-texto');
+    const versionEl = $('#sensible-version');
+    const errorBox = $('#sensible-error');
+    const check = $('#consentimiento_sensible');
+    const label = $('#sensible-check-label');
+
+    const d = contexto && contexto.dato_sensible;
+
+    // Sin dato sensible: no hay nada que pedir. Queda registrado igual, para
+    // que el boton de firmar no dependa de este bloque.
+    if (!d) {
+      state.sensibleRequired = false;
+      state.sensitiveAccepted = true;
+      if (panel) panel.hidden = true;
+      if (label) label.hidden = true;
+      return;
+    }
+
+    state.sensibleRequired = d.requiere_autorizacion === true && d.autorizado !== true;
+
+    if (panel) panel.hidden = false;
+    if (versionEl) versionEl.textContent = d.version || '';
+    if (box) box.textContent = d.texto || '';
+    if (errorBox) errorBox.hidden = true;
+
+    if (!d.requiere_autorizacion) {
+      // La base legal es la que declaró la Empresa: se informa, no se autoriza.
+      state.sensitiveAccepted = true;
+      if (label) label.hidden = true;
+      if (check) { check.checked = true; check.disabled = true; }
+      return;
+    }
+
+    if (label) label.hidden = false;
+
+    if (d.autorizado === true) {
+      // Ya se autorizó en una visita anterior: no se vuelve a pedir.
+      state.sensitiveAccepted = true;
+      if (check) { check.checked = true; check.disabled = true; }
+      return;
+    }
+
+    state.sensitiveAccepted = false;
+    if (check) { check.checked = false; check.disabled = false; }
+  }
+
   function renderEmpresa(contexto) {
     const panel = $('#empresa-panel');
     const lista = $('#empresa-datos');
@@ -640,6 +733,25 @@
       fila.appendChild(dd);
       lista.appendChild(fila);
     });
+
+    // El deber legal de conservacion SIN TERMINO (migracion 029). Si esta
+    // activo, el documento del Trabajador no se borra automaticamente. Es
+    // informacion que el 8.6 obliga a comunicar: el plazo y sus
+    // consecuencias. Se pinta solo cuando la Empresa lo declaro.
+    if (empresa.conservacion_por_deber_legal === true) {
+      const fila = document.createElement('div');
+      fila.className = 'empresa__campo';
+      const dt = document.createElement('dt');
+      dt.textContent = 'Supresion de este documento';
+      fila.appendChild(dt);
+      const dd = document.createElement('dd');
+      dd.textContent = 'No se borra automaticamente: la Empresa tiene un deber legal '
+        + 'de conservacion sin termino'
+        + (empresa.norma_conservacion ? ' (' + empresa.norma_conservacion + ')' : '')
+        + '.';
+      fila.appendChild(dd);
+      lista.appendChild(fila);
+    }
 
     // Politica de datos: enlace a la politica de la EMPRESA, que es la
     // responsable de los datos del trabajador. K+AIR es la encargada y su
@@ -707,11 +819,135 @@
     panel.dataset.rendered = '1';
   }
 
+  /**
+   * CAPÍTULO V · 5.3: muestra QUE documento se está firmando.
+   *
+   * El 5.3 obliga al Firmante a "firmar únicamente documentos cuyo contenido
+   * sea exacto, completo y corresponda a lo que la Empresa le ha informado".
+   * Para poder cumplir eso tiene que saber qué documento tiene delante: la
+   * categoría (CONTRATO, ACTA, CERTIFICADO...) y su referencia.
+   *
+   * Los dos datos ya venían en el contexto público (`tipo_identificacion` e
+   * `id_documento`), pero no se pintaban en ninguna parte: el comentario del
+   * backend decía que la mini-app los mostraba y no era cierto.
+   *
+   * @param {object} contexto - Contexto publico de GET /s/:token.
+   */
+  function renderDocumentoIdentidad(contexto) {
+    const bloque = $('#documento-identidad');
+    if (!bloque) return;
+
+    const tipo = contexto && contexto.tipo_identificacion;
+    const referencia = contexto && contexto.id_documento;
+    if (!tipo && !referencia) return;
+
+    setText('#documento-categoria', 'Estás firmando ' + etiquetaDocumento(tipo) + '.');
+    if (referencia) {
+      setText('#documento-referencia', ' Referencia: ' + referencia + '.');
+    }
+    bloque.hidden = false;
+  }
+
+  /**
+   * Etiqueta legible de la categoría del documento que se firma.
+   *
+   * Los valores son los de TIPOS_IDENTIFICACION (src/services/signRequest.js):
+   * CONTRATO, OTROSI, ACTA, CONSENTIMIENTO, AUTORIZACION, REGLAMENTO,
+   * POLITICA, CERTIFICADO, FORMATO, OTRO. Los que empiezan por vocal llevan
+   * "una" y los demas "un"; los que no dicen nada, dicen "un documento", que
+   * es lo unico que se puede afirmar sin inventar.
+   *
+   * @param {string} tipo
+   * @returns {string}
+   */
+  function etiquetaDocumento(tipo) {
+    switch (tipo) {
+      case 'CONTRATO': return 'un contrato';
+      case 'ACTA': return 'un acta';
+      case 'CONSENTIMIENTO': return 'un consentimiento';
+      case 'AUTORIZACION': return 'una autorización';
+      case 'REGLAMENTO': return 'un reglamento';
+      case 'POLITICA': return 'una política';
+      case 'CERTIFICADO': return 'un certificado';
+      case 'FORMATO': return 'un formato';
+      default: return 'un documento';
+    }
+  }
+
+  /**
+   * CAPÍTULO V · 5.1(c): el canal de incidentes de seguridad de K+AIR.
+   *
+   * El 5.1(c) obliga al Firmante a "avisar de inmediato a la Empresa y a
+   * K+AIR" si cree que sus datos de creación de la firma (el OTP y el
+   * enlace de firma) quedaron en entredicho. El bloque de la Empresa da los
+   * canales DEL CLIENTE; este da el de K+AIR.
+   *
+   * El HTML trae el valor por defecto (esta pantalla se ve también cuando no
+   * hay contexto, que es justo el caso de la pantalla de error). Si el
+   * servidor lo configuró distinto, el contexto lo actualiza.
+   *
+   * @param {object} contexto - Contexto publico de GET /s/:token.
+   */
+  function renderPieKair(contexto) {
+    const span = $('#pie-kair-canal');
+    if (!span) return;
+
+    const canal = contexto && contexto.canal_incidentes_kair;
+    if (typeof canal !== 'string' || canal.trim() === '') return;
+    const valor = canal.trim();
+
+    // El valor viene del servidor (la configuracion), pero se valida igual:
+    // se convierte en un href y un href con otro esquema podria ejecutar
+    // codigo en el navegador del firmante. Solo se acepta un correo; lo demas
+    // se muestra como texto plano.
+    if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(valor)) {
+      span.textContent = valor;
+      return;
+    }
+
+    const a = document.createElement('a');
+    a.textContent = valor;
+    a.setAttribute('href', 'mailto:' + valor);
+    a.setAttribute('rel', 'noopener noreferrer');
+    span.textContent = '';
+    span.appendChild(a);
+  }
+
+  /**
+   * El canal de PROTECCION DE DATOS de K+AIR (el 10.7(b)).
+   *
+   * Es DISTINTO del canal de incidentes: uno es para avisar que se
+   * comprometieron los datos de creacion de la firma (5.1(c)); el otro es
+   * para ejercer los derechos del Titular. Un solo canal con dos nombres es
+   * un punto ciego con otro nombre.
+   */
+  function renderPieKairDatos(contexto) {
+    const span = $('#pie-kair-canal-datos');
+    if (!span) return;
+
+    const canal = contexto && contexto.canal_proteccion_datos_kair;
+    if (typeof canal !== 'string' || canal.trim() === '') return;
+    const valor = canal.trim();
+
+    if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(valor)) {
+      span.textContent = valor;
+      return;
+    }
+
+    const a = document.createElement('a');
+    a.textContent = valor;
+    a.setAttribute('href', 'mailto:' + valor);
+    a.setAttribute('rel', 'noopener noreferrer');
+    span.textContent = '';
+    span.appendChild(a);
+  }
+
   function setupDocumentScreen() {
 
     const pdfViewer = $('#pdf-viewer');
     const pdfDownloadLink = $('#pdf-download-link');
     const pdfUrl = '/api/sign/' + state.token + '/document.pdf';
+    const avisoPendiente = $('#documento-pendiente-acuerdo');
 
 
     // I-103.A1.6 fix · CRÍTICO: declarar triggerChosen y callViewDocument
@@ -733,6 +969,17 @@
           state.pdfViewed = true;
         })
         .catch((err) => {
+          // Si el error es el cambio de versión del Acuerdo (10.4), NO se
+          // recarga: recargaría en bucle (el documento no se puede ver
+          // hasta que el firmante acepte la versión vigente, y la versión
+          // vigente cambia con la recarga). Lo que se hace es avisarle arriba,
+          // junto al Acuerdo, para que lo lea y lo acepte; al aceptar, la
+          // solicitud migra sola y el documento carga.
+          if (err && (err.code === 'AGREEMENT_VERSION_NO_LONGER_ACTIVE'
+            || err.code === 'AGREEMENT_VERSION_REACCEPT_REQUIRED')) {
+            avisarCambioDeVersion();
+            return;
+          }
           // Si falla, permitimos un reintento en el próximo commit
           state.viewDocumentAttempted = false;
           // eslint-disable-next-line no-console
@@ -745,22 +992,44 @@
     // después), el callback ya tiene la función disponible.
     pdfViewer.addEventListener('load', () => callViewDocument('object-load'), { once: true });
 
-    // Cargar PDF en el visor (ahora el listener ya está listo y la función
-    // callViewDocument ya está inicializada).
-    pdfViewer.setAttribute('src', pdfUrl);
-    // I-103.A1.6 fix · pdfDownloadLink es null porque el <a id="pdf-download-link">
-    // está DENTRO del iframe (línea 88 de index.html). Cuando el iframe carga
-    // el PDF, el navegador reemplaza su contenido y el <a> desaparece del DOM
-    // accesible desde el documento principal. Por eso necesitamos el null-check.
-    if (pdfDownloadLink) {
-      pdfDownloadLink.setAttribute('href', pdfUrl);
-    }
-
-    // Fallback si el evento load no dispara (navegadores sin visor PDF nativo,
-    // o si el usuario llegó a esta pantalla muy rápido)
-    setTimeout(() => {
-      if (!triggerChosen) callViewDocument('fallback-timeout');
-    }, 4000);
+    // FASE 6 · orden (g)/(h) del 3.4.
+    //
+    // (g) El Trabajador lee en pantalla el presente Acuerdo y lo acepta.
+    //     "El Trabajador no puede avanzar en el flujo sin leer y aceptar el
+    //     Acuerdo."
+    // (h) El Trabajador visualiza y descarga el documento objeto de la firma.
+    //
+    // El documento va DESPUÉS de la aceptación. El backend tampoco lo sirve
+    // antes (409 CONSENT_NOT_ACCEPTED), así que cargarlo aquí antes de
+    // tiempo solo dejaría un error en el visor.
+    let documentoCargado = false;
+    const cargarDocumento = function () {
+      if (documentoCargado) return;
+      // 8B · La puerta del 10.8: con dato sensible, el aviso y la
+      // autorización van ANTES del documento. El 10.8(a) exige que la
+      // información sea PREVIA; si el PDF apareciera antes, no lo sería.
+      // El backend tampoco lo sirve antes (409 SENSIBLE_CONSENT_NOT_ACCEPTED),
+      // así que cargarlo aqui solo dejaria un error en el visor.
+      if (!state.consentAccepted) return;
+      if (state.sensibleRequired && !state.sensitiveAccepted) return;
+      documentoCargado = true;
+      if (avisoPendiente) avisoPendiente.hidden = true;
+      // Cargar PDF en el visor (el listener ya está listo y la función
+      // callViewDocument ya está inicializada).
+      pdfViewer.setAttribute('src', pdfUrl);
+      // I-103.A1.6 fix · pdfDownloadLink es null porque el <a id="pdf-download-link">
+      // está DENTRO del iframe (línea 88 de index.html). Cuando el iframe carga
+      // el PDF, el navegador reemplaza su contenido y el <a> desaparece del DOM
+      // accesible desde el documento principal. Por eso necesitamos el null-check.
+      if (pdfDownloadLink) {
+        pdfDownloadLink.setAttribute('href', pdfUrl);
+      }
+      // Fallback si el evento load no dispara (navegadores sin visor PDF nativo,
+      // o si el usuario llegó a esta pantalla muy rápido)
+      setTimeout(() => {
+        if (!triggerChosen) callViewDocument('fallback-timeout');
+      }, 4000);
+    };
 
     // Habilitar botón FIRMAR solo cuando ambos checkboxes estén marcados
     const check1 = $('#manifestacion_leido');
@@ -770,11 +1039,22 @@
     // El Acuerdo se pinta y la 3a casilla se habilita solo tras leerlo.
     renderAcuerdo(state.contexto);
 
+    // 8B · El aviso de dato sensible (10.8). Se pinta junto al Acuerdo, pero
+    // el bloque esta ARRIBA del visor: la informacion tiene que ser previa.
+    renderDatoSensible(state.contexto);
+
     // El bloque de la Empresa va antes del PDF en el DOM; se pinta junto al
     // Acuerdo. No habilita ni bloquea ninguna casilla: es informacion, no una
     // manifestacion de voluntad. El unico efecto de que falte es que no se
     // muestra.
     renderEmpresa(state.contexto);
+
+    // CAPÍTULO V: qué documento se está firmando (5.3) y el canal de
+    // incidentes de K+AIR (5.1(c)). Los dos son información, no casillas: no
+    // habilitan ni bloquean nada.
+    renderDocumentoIdentidad(state.contexto);
+    renderPieKair(state.contexto);
+    renderPieKairDatos(state.contexto);
 
     const btnCommit = $('#btn-commit');
     const btnReject = $('#btn-reject');
@@ -787,9 +1067,14 @@
       // de aceptación en backend (state.consentAccepted), no del .checked.
       // Esto evita que un click rápido sin esperar el POST habilite el botón.
       const c3Accepted = state.consentAccepted === true;
+      // 8B: si el documento tiene informacion de salud, su autorizacion
+      // expresa es tan necesaria como la del Acuerdo para poder firmar.
+      const sensibleOk = state.sensitiveRequired
+        ? state.sensitiveAccepted === true
+        : true;
       // PDF debe haber sido visto (view-document exitoso).
       const pdfOk = state.pdfViewed === true;
-      const newDisabled = !(c1 && c2 && c3Accepted && pdfOk);
+      const newDisabled = !(c1 && c2 && c3Accepted && sensibleOk && pdfOk);
       btnCommit.disabled = newDisabled;
     };
     check1.addEventListener('change', () => {
@@ -826,6 +1111,10 @@
               { method: 'POST', body: {} }
             );
             state.consentAccepted = true;
+            // FASE 6 · orden (g)/(h): con el Acuerdo aceptado ya se puede
+            // mostrar el documento. Antes de esto el visor se queda vacío a
+            // propósito.
+            cargarDocumento();
           } catch (err) {
             // Revertir el checkbox a false (el consentimiento NO fue aceptado)
             check3.checked = false;
@@ -867,10 +1156,63 @@
       });
     }
 
+    // 8B · La casilla del dato sensible (10.8).
+    //
+    // Es SEPARADA de la del Acuerdo a proposito: una es "acepto las reglas
+    // del servicio" y la otra es "autorizo el tratamiento de mi informacion
+    // de salud". Al marcar, se registra la autorizacion; al desmarcar, no se
+    // toca el backend (la autorizacion ya dada es un hecho) y solo se
+    // resetea el estado local.
+    const check4 = $('#consentimiento_sensible');
+    if (check4) {
+      check4.addEventListener('change', async () => {
+        if (!check4.checked) {
+          state.sensitiveAccepted = false;
+          updateCommitButton();
+          return;
+        }
+        if (state.sensitiveAcceptInProgress) {
+          check4.checked = false;
+          return;
+        }
+        state.sensitiveAcceptInProgress = true;
+        hideFormError('commit-error');
+        try {
+          await apiFetch(
+            '/api/sign/' + state.token + '/consent/sensible',
+            { method: 'POST', body: { autoriza: true } }
+          );
+          state.sensitiveAccepted = true;
+          // Con la autorizacion registrada, el documento ya puede mostrarse.
+          cargarDocumento();
+        } catch (err) {
+          check4.checked = false;
+          state.sensitiveAccepted = false;
+          let msg;
+          if (err.code === 'SENSIBLE_CONSENT_NOT_ACCEPTED') {
+            msg = 'No se pudo registrar la autorizacion de los datos sensibles. '
+              + 'Contacta a tu empleador.';
+          } else if (err.code === 'CONSENT_NOT_REQUIRED') {
+            msg = 'Este documento se trata con una base legal declarada por la empresa. '
+              + 'Recarga la pagina para continuar.';
+          } else if (err.status === 410) {
+            return showError('Este enlace ha expirado o ya fue utilizado.');
+          } else if (err.status === 404) {
+            return showError('El enlace que usaste no es valido o ya no existe.');
+          } else {
+            msg = err.message || 'No se pudo registrar la autorizacion.';
+          }
+          showFormError('commit-error', msg);
+        } finally {
+          state.sensitiveAcceptInProgress = false;
+          updateCommitButton();
+        }
+      });
+    }
+
     check1.addEventListener('input', () => {
     });
-    check2.addEventListener('input', () => {
-    });
+    check2.addEventListener('input', () => {    });
     if (check3) {
       check3.addEventListener('input', () => {
       });
@@ -883,6 +1225,39 @@
       check3.addEventListener('click', () => {
       });
     }
+
+    // FASE 6 · orden (g)/(h): ¿el Firmante ya había aceptado el Acuerdo en
+    // una visita anterior? (recarga de la página, otro dispositivo). El
+    // backend lo dice en `acuerdo_aceptado`. Entonces el documento se
+    // muestra de una, sin volver a pedir la aceptación: el Acuerdo ya está
+    // aceptado en la base, y volver a marcarlo sería un POST idempotente.
+    if (state.contexto && state.contexto.acuerdo_aceptado === true) {
+      state.consentAccepted = true;
+      if (check3) {
+        check3.checked = true;
+        check3.disabled = true;
+      }
+      cargarDocumento();
+    }
+
+    // 8B: el aviso de "falta algo" se muestra si falta CUALQUIERA de los dos.
+    // Con dato sensible, el documento tampoco se puede ver sin su
+    // autorizacion (el 10.8(a) exige que la informacion sea previa), asi que
+    // el mensaje tiene que decirlo.
+    if (avisoPendiente) {
+      const faltaAcuerdo = !state.consentAccepted;
+      const faltaSensible = state.sensibleRequired && !state.sensitiveAccepted;
+      avisoPendiente.hidden = !(faltaAcuerdo || faltaSensible);
+      if (faltaSensible) {
+        avisoPendiente.textContent =
+          'Para ver el documento, primero autoriza el tratamiento de la informacion de salud '
+          + '(aviso de datos sensibles) y acepta el Acuerdo de uso.';
+      } else {
+        avisoPendiente.textContent =
+          'Para ver el documento, primero lee y acepta el Acuerdo de uso que aparece mas arriba.';
+      }
+    }
+
     updateCommitButton();
 
     // Confirmación explícita antes de rechazar
@@ -945,6 +1320,12 @@
       } catch (err) {
         if (err.status === 409 && err.code === 'INVALID_STATE_TRANSITION') {
           showFormError('commit-error', 'Esta solicitud ya no se puede firmar. Probablemente ha expirado o ya fue procesada.');
+        } else if (err.code === 'AGREEMENT_VERSION_NO_LONGER_ACTIVE'
+          || err.code === 'AGREEMENT_VERSION_REACCEPT_REQUIRED') {
+          // 10.4 · El Acuerdo cambió. No es un callejón sin salida: se
+          // recarga la pantalla para que el firmante lea y acepte la
+          // versión vigente, y la solicitud migra sola al aceptar.
+          return recargarPorCambioDeVersion(err);
         } else if (err.status === 410) {
           return showError('Este enlace ha expirado.');
         } else if (err.status === 422) {
@@ -960,6 +1341,46 @@
     });
   }
 
+  /**
+   * 10.4 · El Acuerdo de uso cambió mientras el firmante estaba en la
+   * pantalla.
+   *
+   * La solución NO es un error seco: se recarga la página, el contexto
+   * vuelve a traer la versión VIGENTE del Acuerdo, el firmante la lee y
+   * marca la casilla de aceptación, y en ese momento la solicitud migra a
+   * esa versión (el backend lo hace solo).
+   */
+  function recargarPorCambioDeVersion(err) {
+    const mensaje = 'El Acuerdo de uso cambió. Te vamos a mostrar la versión '
+      + 'vigente para que la leas y la aceptes antes de firmar.';
+    if (typeof showFormError === 'function') {
+      showFormError('commit-error', mensaje);
+    }
+    setTimeout(function () {
+      window.location.reload();
+    }, 1500);
+    return null;
+  }
+
+  /**
+   * 10.4 · El documento no se puede ver todavía porque el Acuerdo vigente
+   * todavía no se ha aceptado.
+   *
+   * NO se recarga: la recarga volvería a pedir el documento y a fallar
+   * (bucle). Se avisa arriba, junto al Acuerdo, y el firmante lo acepta;
+   * al aceptar, la solicitud migra y el documento carga.
+   */
+  function avisarCambioDeVersion() {
+    const aviso = document.getElementById('documento-pendiente-acuerdo');
+    if (aviso) {
+      aviso.hidden = false;
+      aviso.textContent = 'El Acuerdo de uso cambió: lee la versión vigente que '
+        + 'ves arriba y acepta la casilla para poder ver el documento.';
+    }
+    showFormError('commit-error', 'El Acuerdo de uso cambió. Lee la versión '
+      + 'vigente y acepta la casilla para continuar.');
+  }
+
   // ============================================================
   // 5. Pantalla: Firmado
   // ============================================================
@@ -971,6 +1392,29 @@
     // ocultamos el botón "VER CONSTANCIA" y mostramos el mensaje informativo.
     const link = $('#constancia-link');
     if (link) link.style.display = 'none';
+    wireSignedDownloads();
+  }
+
+  /**
+   * FASE 6 · 5.4: habilita las descargas desde el propio enlace de firma.
+   *
+   * "El Firmante puede imprimir o descargar copia de este Acuerdo y del
+   * documento firmado desde el propio enlace de firma, sin costo alguno."
+   *
+   * Son descargas de solo lectura sobre lo que ya está firmado. El enlace no
+   * reabre el flujo: desde acá no se puede identificar, pedir OTP ni firmar.
+   */
+  function wireSignedDownloads() {
+    const signedLink = $('#signed-document-link');
+    if (signedLink && state.token) {
+      signedLink.setAttribute('href', '/api/sign/' + state.token + '/signed-document.pdf');
+    }
+    const acuerdoLink = $('#acuerdo-copy-link');
+    if (acuerdoLink && state.token) {
+      acuerdoLink.setAttribute('href', '/api/sign/' + state.token + '/acuerdo.txt');
+    }
+    const descargas = $('#signed-downloads');
+    if (descargas) descargas.hidden = false;
   }
 
   // ============================================================
@@ -1004,6 +1448,14 @@
       .catch(function (err) {
         hideEl(loading);
         showEl(content);
+        // 8A.1 · Vencimiento del plazo de conservación (numeral 10.6).
+        // Antes, vencido el plazo, la verificación seguía respondiendo "firma
+        // registrada y documento íntegro". Ahora dice lo que corresponde: no
+        // está disponible porque venció el plazo que declaró la empresa.
+        if (err.code === 'CONSERVACION_VENCIDA') {
+          showVerifyError('No disponible por vencimiento del plazo. La empresa fijó un plazo de conservación para este documento y ya venció, así que la evidencia de la firma ya no está disponible. Si necesitas una copia de lo que firmaste, pídela al área de Recursos Humanos de la empresa.');
+          return;
+        }
         showVerifyError('No se pudo cargar la información de verificación: ' + (err.message || 'Error desconocido'));
       });
   }
@@ -1261,6 +1713,116 @@
   }
 
   // ============================================================
+  // 9A · LOS MEDIOS AUTORIZADOS (el 8.2)
+  // ============================================================
+
+  /**
+   * Los medios autorizados del Trabajador (el 8.2).
+   *
+   * El 8.2 le da el derecho a modificarlos "en cualquier momento y sin costo
+   * alguno". Esta pantalla es esa vía.
+   */
+  function setupMediosScreen() {
+    const btn = $('#btn-mis-medios');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        await cargarMedios();
+        showScreen('medios');
+      });
+    }
+
+    const form = $('#form-medios');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideFormError('medios-error');
+        const correo = ($('#medio_correo') && $('#medio_correo').value || '').trim();
+        if (!correo) {
+          return showFormError('medios-error', 'Escribe el correo que querés agregar.');
+        }
+        const btnAdd = $('#btn-medio-agregar');
+        setButtonBusy(btnAdd, 'AGREGANDO...', 'AGREGAR');
+        try {
+          const result = await apiFetch('/api/sign/' + state.token + '/medios', {
+            method: 'POST',
+            body: { accion: 'ALTA', tipo: 'CORREO_OTP', correo: correo },
+          });
+          $('#medio-aviso').textContent = result.aviso || '';
+          $('#medio_correo').value = '';
+          await cargarMedios();
+        } catch (err) {
+          showFormError('medios-error', err.message || 'No se pudo agregar el medio.');
+        } finally {
+          clearButtonBusy(btnAdd);
+        }
+      });
+    }
+
+    const btnVolver = $('#btn-medios-volver');
+    if (btnVolver) {
+      btnVolver.addEventListener('click', () => showScreen('otp'));
+    }
+  }
+
+  // Los tipos de medio, en palabras del Trabajador (no los nombres internos).
+  var _MEDIO_LABEL = {
+    EMAIL_HOJA_VIDA: 'El correo de tu hoja de vida',
+    CORREO_OTP: 'Tu correo personal para el c\u00f3digo',
+    LINK_KAIR: 'El enlace de firma de K+AIR',
+  };
+
+  async function cargarMedios() {
+    const cont = $('#medios-lista');
+    if (!cont) return;
+    try {
+      const result = await apiFetch('/api/sign/' + state.token + '/medios');
+      const aviso = $('#medio-aviso');
+      if (aviso && !aviso.textContent) aviso.textContent = result.aviso || '';
+      if (!result.medios || result.medios.length === 0) {
+        cont.innerHTML = '<p class="form-hint">Todav\u00eda no ten\u00e9s ning\u00fan medio autorizado.</p>';
+        return;
+      }
+      let html = '<ul class="medios-list">';
+      for (const m of result.medios) {
+        const estado = m.estado === 'ACTIVO'
+          ? 'activo'
+          : (m.estado === 'PENDIENTE' ? 'pendiente' : 'retirado');
+        html += '<li class="medios-list__item medios-list__item--' + estado + '">'
+          + '<span class="medios-list__valor">'
+          + escHtml(m.valor || (_MEDIO_LABEL[m.tipo] || m.tipo)) + '</span>'
+          + '<span class="medios-list__tipo">'
+          + escHtml(_MEDIO_LABEL[m.tipo] || m.tipo) + '</span>'
+          + '<span class="medios-list__estado">' + escHtml(estado) + '</span>';
+        if (m.estado !== 'BAJA' && m.tipo === 'CORREO_OTP') {
+          html += '<button type="button" class="btn-link medios-list__quitar" '
+            + 'data-retirar="' + escHtml(m.valor) + '">Retirar</button>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+      cont.innerHTML = html;
+
+      const botones = cont.querySelectorAll('[data-retirar]');
+      for (const b of botones) {
+        b.addEventListener('click', async () => {
+          const correo = b.getAttribute('data-retirar');
+          try {
+            await apiFetch('/api/sign/' + state.token + '/medios', {
+              method: 'POST',
+              body: { accion: 'BAJA', tipo: 'CORREO_OTP', correo: correo },
+            });
+            await cargarMedios();
+          } catch (err) {
+            showFormError('medios-error', err.message || 'No se pudo retirar el medio.');
+          }
+        });
+      }
+    } catch (err) {
+      cont.innerHTML = '<p class="form-hint">No se pudieron cargar tus medios.</p>';
+    }
+  }
+
+  // ============================================================
   // Inicialización (DOMContentLoaded)
   // ============================================================
 
@@ -1273,6 +1835,7 @@
   function startApp() {
     setupIdentifyForm();
     setupOtpForm();
+    setupMediosScreen();    // 9A: los medios autorizados (el 8.2)
     setupVerifyScreen();  // I-VERIFICACION-PUBLICA
     init();
   }
