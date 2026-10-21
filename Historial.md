@@ -667,6 +667,42 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
+### 2026-10-20 · 📦924 · El carril de producción: el plan de despliegue, la prueba de humo y los tres hallazgos que pararían el despliegue
+
+**Qué se hizo** — todo lo que se puede hacer sin entrar al servidor:
+
+- **El plan de despliegue** (`docs/gestion-humana/firma-electronica/PLAN-DESPLIEGUE-PRODUCCION-2026-10-20.md`): las cinco fases con los comandos exactos (copia verificada, `.env`, despliegue, verificación, prueba), la resolución del choque de versiones del Acuerdo, el rollback y lo que el despliegue NO enciende.
+- **La prueba de humo** (`firma-service/scripts/smoke-produccion.js`): por omisión solo lee (health, Acuerdo vigente comparado contra el manifiesto sellado, ruta interna); escribe únicamente si se le pide (`--canal-datos`, y `--e2e` exige además `--confirmar-e2e`).
+- **Dos ensayos de migración** sobre copias de bases con evidencia real: las 14 migraciones (019 → 032) aplican en modo producción, con los triggers append-only incluidos (las directivas `@skip-when-env test` NO se saltan), sin tocar filas y con `integrity_check: ok`.
+- **El fix de un hangul (U+B3CC)** que se había colado en `comparacion-mercado-firma-2026-10-20.md`.
+
+**Por qué** — el owner pidió validar el estado del repo y del Acuerdo para cambiarlo en producción y hacer una prueba. El acceso por SSH está denegado (`javier@192.168.1.11` → `Permission denied (publickey,password)`), así que la Fase 0 (la copia verificada de la base) la ejecuta el owner por la terminal web del servidor.
+
+**Los tres hallazgos que pararían el despliegue** — verificados contra el código, no supuestos:
+
+1. **El servicio NO arranca en producción sin `TOKEN_ENCRYPTION_KEY`.** `src/crypto/keys.js:108-113` la exige, y es **nueva** de `ab78ca92` (📦906-911): el código que hoy corre en producción no la usaba — el token era un SHA-256 pelado. Sin esa variable en `/opt/kair-firma/.env` el proceso muere al arrancar y `firma.kair.fyi` deja de responder. **Es el riesgo #1.**
+2. **`/health` no sirve como prueba de despliegue.** `src/routes/health.js:45` devuelve `'compatible-' + (env === 'production' ? '0.1.189' : 'dev')`: **la versión está fija en el código**, así que el health dice lo mismo antes y después del despliegue. La prueba real de que corrió el código nuevo es `POST /api/solicitudes` (el 1.3), que **hoy da 404** — verificado en vivo contra `https://firma.kair.fyi`.
+3. **`canal_pqrs` ya es requisito de habilitación** (`src/services/empresa.js:753`, nuevo de `b5c04f93`) y `FIRMA_EXIGIR_HABILITACION_EMPRESA` viene en `true` (`src/config.js:166-167`): al desplegar, una empresa registrada sin Anexo firmado, sin plazo declarado o sin canal PQRS recibe `409 EMPRESA_NO_HABILITADA` y no puede pedir firmas. Hay que correr `scripts/inventario-empresas-no-habilitadas.js` sobre la copia ANTES de desplegar.
+
+**Decisiones del owner** — commitear sin push; actualizar `Historial.md`, `PROMPT.md` y `BITACORA.md`; el acceso al servidor es por la terminal web de la plataforma (`https://192.168.1.11:9090`), no por SSH.
+
+**Tests** — `tests/scripts/smoke-produccion.test.js`, 12 tests nuevos. Las tres mutaciones (quitar el candado `--confirmar-e2e`, escribir siempre, imprimir la llave) **las detecta todas**. Suite completa del estado con los archivos nuevos: **1389 tests · 1387 verdes · 0 fallos · 2 omitidos**.
+
+**Bugs encontrados** — un test que parchea `process.stdout.write` **se come la salida del reporter de node:test**: en modo `--test` el runner solo veía 2 de 11 tests, y todos pasaban. El arreglo: que el script **inyecte** su sumidero de salida en vez de parchear la consola global. Es la trampa #49.
+
+**Archivos tocados**
+
+| Archivo | Qué |
+|---|---|
+| `docs/gestion-humana/firma-electronica/PLAN-DESPLIEGUE-PRODUCCION-2026-10-20.md` | nuevo — el plan de despliegue |
+| `firma-service/scripts/smoke-produccion.js` | nuevo — la prueba de humo |
+| `firma-service/tests/scripts/smoke-produccion.test.js` | nuevo — 12 tests |
+| `docs/gestion-humana/firma-electronica/comparacion-mercado-firma-2026-10-20.md` | el hangul (U+B3CC) corregido |
+| `PROMPT.md` | las trampas #47, #48 y #49 |
+| `sgsst-electron-app/BITACORA.md` | la lección del despliegue |
+
+**Commits** — 📦924 en `Dev`, sin push. El hash no se escribe dentro del propio commit.
+
 ### 2026-10-20 · 📦923 · La documentación del cierre: las auditorías, el plan y las tres consultas
 
 **Lo que se escribió (todo en `docs/gestion-humana/firma-electronica/`).**

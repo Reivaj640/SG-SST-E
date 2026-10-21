@@ -129,7 +129,7 @@ consentimiento; el patrón se desprende de sus páginas públicas.
    por eso **activar el rechazo del D-2 exige que la Empresa tenga declarado su
    canal de atención**.
 3. **El riesgo de ir por delante es operativo, no legal**: si el rechazo del D-2 se
-   enciende sin que la 9A esté comunicada y el inventario 돌 diga cuántas solicitudes
+   enciende sin que la 9A esté comunicada y el inventario diga cuántas solicitudes
    tienen el código en un buzón corporativo, se rompen flujos de clientes que hoy
    funcionan. Por eso la secuencia sigue siendo: **código → 9A → 11A (el texto) →
    encender el rechazo**.

@@ -5650,3 +5650,58 @@ Lo que sí se pudo verificar sin la base de datos: los 30 tests nuevos de esta j
 (`tests/middleware/errors.test.js`, 20, y `tests/web/miniapp-reabierto.test.js`, 10 con 9
 mutaciones). Los dos evitan `setup.js` a propósito — uno monta una app express mínima y el otro lee
 el HTML y el JS — así que corren aunque la suite entera no pueda.
+
+### El despliegue que casi se hace sin llave
+
+El owner pidió validar el repo y el Acuerdo para cambiar producción y hacer una prueba. SSH estaba
+denegado, así que el trabajo se volvió **preparar el despliegue y entrenarlo sin el servidor** — y
+ahí aparecieron tres cosas que, de no buscarlas, habrían sido un incidente y no un cambio de
+versión.
+
+**La primera: el servicio no habría arrancado.** `src/crypto/keys.js` exige `TOKEN_ENCRYPTION_KEY`
+en producción, y esa variable es **nueva** del commit `ab78ca92` (📦906-911). El código que estaba
+corriendo en el servidor —el anterior a ese commit— **no la usaba**: el token era un hash SHA-256
+pelado y el OTP un hash con sal en la misma fila. La variable no existía en `/opt/kair-firma/.env`.
+El despliegue, tal como estaba, habría dejado `firma.kair.fyi` sin responder, y el síntoma (el
+dominio caído) no señalaba la causa: habría parecido un fallo de las migraciones o del binario.
+La lección es de orden, no de fondo: **antes de desplegar, grep por las variables que el código
+*nuevo* exige y compáralas con el `.env` del servidor**. Una variable nueva es un requisito de
+arranque, y un requisito de arranque que no se cumple no se negocia en caliente.
+
+**La segunda: el health no dice la verdad.** `src/routes/health.js` arma la versión con una
+literal: `'compatible-' + (env === 'production' ? '0.1.189' : 'dev')`. El health respondía
+`compatible-0.1.189` y seguiría respondiendo exactamente lo mismo **después** del despliegue.
+Un health en verde no es evidencia de que el código nuevo esté corriendo: es evidencia de que el
+proceso está vivo. La prueba de verdad salió de leer las rutas: `POST /api/solicitudes` (el canal de
+datos del 1.3) **da 404 con el código viejo y 201 con el nuevo**. Una ruta que solo existe en la
+versión nueva es un detector de despliegue mejor que cualquier campo de versión, porque no depende
+de que alguien se acuerde de actualizarlo.
+
+**La tercera: el choque de versiones del Acuerdo no se resuelve con un `DELETE`.** La versión del
+Acuerdo **no es una etiqueta**: es la llave con la que el consentimiento apunta al texto que el
+firmante leyó y aceptó. `createVersion` rechaza con `409 ACUERDO_VERSION_EXISTS` publicar encima
+de una versión que ya existe, y por eso la legal no se puede poner encima de una v1.0 de pruebas.
+Pero borrar la fila tampoco es la salida: los consentimientos ya aceptados guardan su propia huella
+(`hash_texto_acuerdo`), así que si el texto que hay detrás de esa versión cambia, la copia que el
+firmante puede descargar deja de ser la que aceptó. La salida sana es **publicar la legal con un
+número nuevo** y dejar las dos versiones resolviéndose; la condición para decidir entre una cosa y
+la otra es una sola consulta: ¿hay consentimientos aceptados bajo esa versión?
+
+**Lo que sí se pudo hacer sin el servidor: ensayar las migraciones sobre bases con evidencia.**
+No alcanza con leer las migraciones y ver que son `ALTER TABLE ADD COLUMN`. Se copiaron dos bases
+reales —una con la v1.0 legal publicada y activa, otra con firmas, consentimientos y eventos— y se
+les aplicó el tramo pendiente **en modo producción**, que es lo que hace que los triggers
+append-only se creen (llevan la directiva `@skip-when-env test`, o sea que en la suite **nunca**
+se prueban). Resultado: las filas no se movieron, el Acuerdo publicado quedó intacto con su huella,
+`integrity_check` dio `ok`, y las filas viejas conservaron sus columnas de algoritmo en `NULL`
+—que es exactamente lo que dicen las migraciones: se reescriben solas al primer uso. Un ensayo
+así cuesta minutos y contesta la pregunta que un `git diff` de SQL no contesta.
+
+**Y un bug de la propia casa, que salió de escribir un test.** El test que verificaba que la llave
+interna no se imprimía capturaba la salida parcheando `process.stdout.write`. Resultado: en modo
+`--test`, el runner reportaba **2 de 11 tests** — y todos pasaban. El parche global interceptaba
+también lo que escribía el reporter del runner, así que el conteo de la suite mentía en silencio,
+sin un solo test en rojo. La forma sana: que el script **inyecte** su sumidero de salida
+(`main(argv, { sink })`) y el test lo capture por ahí. Un test que verifica algo sobre la salida de
+otro módulo no puede tocar la consola global: el que verifica es el que mide, y si mide la salida
+del runner, mide mal.
