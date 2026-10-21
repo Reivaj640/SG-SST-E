@@ -700,6 +700,12 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
     if (args.correo) {
       await notificarFn(args, internoKey, r.id_solicitud, pedirFn);
     }
+
+    // 5c. Y el token tiene que RESOLVER. Sin esta comprobacion el e2e puede
+    // dar verde con un servicio donde ningun enlace sirve: el alta dio 201,
+    // el correo salio, y el firmante abre un 404.
+    const token = r.token || (r.url_publica ? String(r.url_publica).split('/').pop() : null);
+    await comprobarTokenResuelve(args, token, pedirFn);
   } else if (res.status === 409) {
     const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
     if (codigo === 'EMPRESA_NO_HABILITADA') {
@@ -731,6 +737,67 @@ async function main(argv, opciones) {
   } finally {
     _sink = null;
   }
+}
+
+/**
+ * EL TOKEN RESUELVE: el enlace que el firmante va a abrir tiene que servir.
+ *
+ * ESTE CHECK FALTABA, Y SU AUSENCIA COSTÓ UNA JORNADA ENTERA
+ * -----------------------------------------------------------
+ * El 21 de octubre el e2e dio "RESULTADO: OK" con 13 comprobaciones mientras
+ * NINGUN token resolvia: el servicio contestaba 404 TOKEN_NOT_FOUND en todas
+ * las rutas de datos (`/api/sign/<token>/verify`, `/acuerdo.txt`, `/medios`,
+ * `/identify`) y el unico 200 era el HTML estatico de la mini-app. El correo
+ * si habia salido, el alta si habia dado 201, y el enlace seguia muerto.
+ *
+ * El hueco no era del codigo del servicio: era del CODIGO QUE COMPRUEBA.
+ * Una corrida de humo que no abre el enlace que ella misma creo no prueba
+ * que el firmante pueda firmar. Y un check que no muerde no es un check.
+ *
+ * La creacion devuelve el token en texto claro (es la unica vez que sale, por
+ * el 3.6(e)). Ese token es la credencial: si no resuelve, la firma es
+ * inalcanzable para el firmante, por mas que todo lo demas este en verde.
+ *
+ * @param {object} args
+ * @param {string} token - el token en texto claro de la creacion.
+ * @param {function} [pedirFn] - doble de `pedir` para los tests.
+ * @returns {Promise<{ok: boolean, codigo: string, detalle: string}>}
+ */
+async function comprobarTokenResuelve(args, token, pedirFn) {
+  const pedirReal = pedirFn || pedir;
+  titulo('5c. El token resuelve (sin esto el firmante no puede firmar)');
+  if (!token) {
+    fail('El token de la prueba resuelve', 'la creacion no devolvio token');
+    return { ok: false, codigo: 'SIN_TOKEN', detalle: '' };
+  }
+
+  let res;
+  try {
+    res = await pedirReal({
+      base: args.url,
+      path: '/api/sign/' + encodeURIComponent(token) + '/verify',
+      method: 'GET',
+    }, null, args.timeoutMs);
+  } catch (e) {
+    fail('El token de la prueba resuelve', 'no respondio: ' + e.message);
+    return { ok: false, codigo: 'SIN_RESPUESTA', detalle: e.message };
+  }
+
+  if (res.status === 200) {
+    const j = res.json || {};
+    ok('El token de la prueba resuelve',
+      'id_solicitud=' + (j.id_solicitud || '(sin id)'));
+    return { ok: true, codigo: 'OK', detalle: j.id_solicitud || '' };
+  }
+
+  const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
+  const texto = res.texto.slice(0, 300);
+  fail('El token de la prueba NO resuelve',
+    'HTTP ' + res.status + ' ' + codigo + ' :: ' + texto
+    + ' | Si es 404 TOKEN_NOT_FOUND, el servicio no esta resolviendo la credencial: '
+    + 'revisar que el proceso que corre sea el del codigo desplegado '
+    + '(un proceso con el codigo anterior escribe y lee con otro esquema).');
+  return { ok: false, codigo, detalle: texto };
 }
 
 /**
@@ -785,6 +852,7 @@ module.exports = {
   metadataSignRequest,
   comprobarE2e,
   notificarInvitacion,
+  comprobarTokenResuelve,
   resultados,
   // Exportadas para los tests.
   DEFAULT_URL,

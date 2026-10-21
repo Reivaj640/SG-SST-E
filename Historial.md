@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-20 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado; después, auditoría de los Capítulos IV y V y la Fase 7 de código; el 20, Fase 8B, y el cierre del código: el 8B-C, las tres decisiones del owner (1.1, 1.2, 1.3), la 10.4, el D-02 y la 9A) |
-| **Rama** | `Dev`, nivelada con `origin/Dev`. |
-| **Último commit de código** | 📦 **912-923** — el cierre del código de la firma electrónica: la **Fase 6** (912), la **Fase 7 / Capítulo V** (913), la **Fase 8A.1** (914), la **Fase 8A.2 / 5B** (915), la **Fase 8C** (916), la **Fase 8B** (917), el **8B-C** y el fix del endpoint de empresas (918), las **tres decisiones del owner** (919), la **10.4** (920), el **D-02** (921), la **9A** (922) y la **documentación del cierre** (923). Suite: **1377 tests · 1375 verdes · 0 fallos · 2 omitidos**. |
+| **Fecha de cierre** | 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza). Antes: 2026-10-20 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado; después, auditoría de los Capítulos IV y V y la Fase 7 de código; el 20, Fase 8B, y el cierre del código: el 8B-C, las tres decisiones del owner (1.1, 1.2, 1.3), la 10.4, el D-02 y la 9A) |
+| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦924, 📦925 y 📦926. |
+| **Último commit de código** | 📦 **924-926** — 📦924 (el plan de despliegue y la prueba de humo del servicio), 📦925 (los tres fixes del e2e: la notificación, la huella de identificación y el 422 vs 500; más los scripts de operación y la documentación) y 📦926 (el check que faltaba: el e2e abre el enlace que él mismo crea; el modo `--solo-firmas` de la purga; y el runbook del despliegue con el orden que no se negocia). Antes: 📦 **912-923**
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -667,6 +667,92 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
+### 2026-10-21 · 📦926 · El enlace que no resolvía: la causa raíz, el check que faltaba y la limpieza que el candado bloqueaba
+
+**El síntoma.** En producción ningún token de enlace resolvía: `404 TOKEN_NOT_FOUND` en
+`/api/sign/<token>/verify`, `/acuerdo.txt`, `/medios` e `/identify`. El único 200 era el HTML
+estático de la mini-app, y por eso el firmante veía una pantalla en vez de un error. El alta
+daba 201, el correo salía y el Acuerdo estaba publicado y sellado: todo en verde menos lo
+único que importa, que el firmante pueda abrir su enlace.
+
+**La causa raíz, en una frase.** El proceso que servía no era el del código copiado: acuñaba
+los tokens con el esquema viejo (`SHA-256(token)` pelado, sin HMAC — el `app.bak` del
+despliegue todavía lo tenía así) y el lector del código nuevo no reconocía esas filas.
+Reiniciar el servicio cargó el código desplegado y el token nuevo resolvió al primer intento:
+`200`, con la fila completa (`id_solicitud`, `id_trabajador` seudonimizado, `identificacion_tipo`).
+
+**Cómo se llegó hasta ahí: cinco diagnósticos que descartaron una causa cada vez.**
+
+1. **No hay dos `.env`.** `app/.env` no existe y `config.js:8` (dotenv sobre un archivo
+   inexistente) es inofensivo. Quedó descartada la hipótesis de la llave duplicada.
+2. **El que escribe y el que lee son la misma función.** `hashTokenHmac` es el primer
+   candidato de `tokenHashCandidates`, y `getByTokenHash` los prueba todos. No hay bug de
+   búsqueda ni de ámbito.
+3. **Una sola llave, un solo proceso, sin llave de desarrollo.** `NODE_ENV=production`, la
+   llave del proceso idéntica a la del `.env` (misma huella), `hex64=true`, sin
+   `FIRMA_HMAC_KEYRING`, sin `.dev-master-key` en disco. Quedaron descartadas la rotación de
+   llave, el `NODE_ENV` mal puesto y el proceso paralelo.
+4. **El `mtime` NO prueba qué código tiene el proceso en memoria.** Los archivos del servidor
+   tenían fecha del 19 y del 20 de octubre, anteriores al arranque, y eso parecía prueba de que
+   el proceso cargó esos archivos. Falso: **`tar` conserva las fechas originales**, así que un
+   archivo copiado a las 02:25 conserva la de hace semanas. La prueba real es el
+   `uptime_seconds` del `/health` (chico después de un reinicio) y el hash de lo que quedó
+   corriendo.
+5. **El token que probábamos estaba mal transcrito.** Al leerlo de una foto de terminal se coló
+   un `O` por un `0`. El `journalctl` conserva la ruta exacta que llegó al servidor, y al
+   compararla se vio la diferencia. Un `404 TOKEN_NOT_FOUND` dice lo mismo en los cinco casos:
+   no sirve para culpar a nadie sin leer el log.
+
+**Qué se cambió (📦925).** Los tres fixes del e2e que el ensayo contra el servicio real
+atrapó: que llame a `/notify-remote` (el correo nunca salía y el script declaraba haberlo
+mandado), que mande la huella de identificación (`identify()` exige `identificacion_tipo` +
+`identificacion_numero_hash` y respondía 500), y el 422 vs 500 de `MISSING_IDENTIFICATION_DATA`
+que el mini-app espera distinto al que el servidor manda.
+
+**Qué se cambió (📦926).**
+
+1. **El check que faltaba: el e2e abre el enlace que él mismo crea** (paso 5c de
+   `scripts/smoke-produccion.js`). Una corrida de humo que no abre el enlace que creó no
+   prueba que el firmante pueda firmar: el alta dio 201, el correo salió y el firmante abrió un
+   404. Tres tests nuevos, y el del fallo se verificó con mutación real.
+2. **El modo `--solo-firmas` del script de purga.** El candado del texto legal —que hizo bien su
+   trabajo— impedía limpiar las filas de prueba una vez que el legal ya estaba publicado: la
+   versión vigente ES el legal sellado. El modo nuevo borra firmas, eventos, sesiones, lotes,
+   tokens y archivos, **no toca ninguna versión**, deja recibo en las tablas append-only y
+   verifica al final que la versión vigente sigue ahí, activa y con su huella. Once tests
+   nuevos, con mutación verificada (si el modo degrada para borrar la versión, se caen).
+3. **El runbook del despliegue** (`docs/MIGRACION-SERVIDOR-FIRMA.md` §5.1 y §5.2): el orden que
+   no se negocia (parar → copiar → verificar el hash en disco → arrancar → verificar que el
+   proceso que corre es el nuevo), una tabla con **lo que NO es prueba** (el hash del disco, el
+   `mtime`, el `kair_version` del `/health`, que el alta dé 201) y la limpieza con recibo.
+
+**Decisiones del owner.** Autorizó en esta jornada: el **commit y el push** de 📦925 y 📦926,
+la **limpieza del rastro de prueba** en producción y el **reinicio del servicio** como paso del
+diagnóstico. La secuencia de trabajo sigue la acordada: `Gate 0 → 8A.1 → 8A.2 → 8C → 8B →
+10.4 → 9A → 11A → 9B → 10 → 11B`.
+
+**Bugs encontrados (cinco).** (1) El e2e no llamaba a `/notify-remote`: el correo nunca salía.
+(2) El e2e no mandaba la huella de identificación: `identify()` respondía 500.
+(3) `MISSING_IDENTIFICATION_DATA` con 500 donde el mini-app espera 422. (4) El e2e no comprobaba
+que el token resolviera —este costó la jornada y casi costó el despliegue—. (5) El despliegue
+dejó el **disco nuevo y el proceso viejo**: el `app.bak` conserva el esquema viejo del token.
+
+**Tests.** 11 nuevos del script de purga (con la base sembrada como la de producción: la versión
+vigente con la huella sellada) y 3 nuevos del check del token; los 22 del script de humo, con el
+e2e ahora haciendo dos llamadas (crear y verificar el token). Suite completa antes de commitear.
+Las dos mutaciones se verificaron con cambios reales de código, no de palabra.
+
+**Archivos tocados.** `scripts/smoke-produccion.js`, `scripts/limpiar-rastro-prueba.js`,
+`tests/scripts/smoke-produccion.test.js`, `tests/scripts/limpiar-rastro-prueba.test.js` (nuevo),
+`docs/MIGRACION-SERVIDOR-FIRMA.md`, `Historial.md`, `PROMPT.md` (trampas #55 a #58) y
+`sgsst-electron-app/BITACORA.md`.
+
+**Commits.** Dos: 📦925 (los siete archivos que ya estaban stageados: los tres fixes del e2e, los
+dos scripts de operación y la documentación) y 📦926 (el check del token, el modo
+`--solo-firmas` con sus tests, el runbook y la documentación). El hash no se escribe dentro del
+propio commit: un `--amend` lo cambiaría y la referencia quedaría apuntando a un commit
+fantasma. Los dos van pusheados a `origin/Dev` en la misma tanda.
+
 ### 2026-10-20 · 📦925 · El despliegue a producción: 16 migraciones, el Acuerdo legal vigente y la prueba de humo
 
 **Qué se hizo** — el despliegue de verdad, con el owner ejecutando los comandos en la terminal web de kair-server (Cockpit, `https://192.168.1.11:9090`), porque el acceso por SSH está denegado (`Permission denied (publickey,password)`):
@@ -730,7 +816,7 @@ El fix del `metadata` llegó a producción a mano (paquete por HTTP + `install`)
 | `PROMPT.md` | las trampas #50 a #53 |
 | `sgsst-electron-app/BITACORA.md` | la lección de los dos 400 y la del e2e que daba verde |
 
-**Commits** — 📦925 en `Dev`, sin push.
+**Commits** — 📦925 en `Dev`, pusheado a `origin/Dev` junto con 📦926.
 
 ---
 

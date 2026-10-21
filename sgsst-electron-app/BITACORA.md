@@ -5795,3 +5795,63 @@ el script usó para calcular la huella. El script ahora lo calcula, lo manda, **
 salida qué número escribir**, y tiene dos tests que muerden (verificados con mutación
 real). La lección es la misma de siempre y es la que más duele: un e2e que recorre la mitad
 del camino y sale verde es peor que uno que no corre, porque **se cree que probó**.
+
+### El enlace que el servicio no sabía resolver
+
+El 21 de octubre, en producción, ningún enlace de firma resolvía. Todos los tokens devolvían
+`404 TOKEN_NOT_FOUND` en las rutas de datos (`/api/sign/<token>/verify`, `/acuerdo.txt`,
+`/medios`, `/identify`); el único 200 era el HTML estático de la mini-app, que es lo que hace
+que el firmante vea una pantalla en vez de un error. El correo había salido, el alta había dado
+201, el Acuerdo estaba publicado y sellado. Todo en verde menos lo único que importa: que el
+firmante pueda abrir su enlace.
+
+**El primer diagnostico ربط mal la causa, y no fue casual.** El `journalctl` showed que el
+servicio contestaba `TOKEN_NOT_FOUND` y el hash archivado no coincidía con ninguno de los
+candidatos del token. La conclusión "la llave cambió" era correcta en su forma pero inútil:
+decía dónde mirar sin decir qué mirar. Hubo que construir un diagnóstico que separara cinco
+causas distintas —llave distinta, esquema de hash distinto, proceso con el código anterior,
+token mal transcrito y fila inexistente— y el que las separó fue comparar **el código que
+corría** contra **el código que estaba en disco**.
+
+**Lo que estaba en disco era el correcto.** Siete archivos de la capa cripto, byte a byte
+idénticos al repo. Y el proceso había arrancado a las 02:22:43, después de la copia. Todo
+cuadraba, y por eso la contradicción era real: el hash archivado no se reproducía con el
+código desplegado, la llave vigente ni con ámbito global ni por empresa, por firma ni por
+solicitud. La fila la había escrito el servicio treinta segundos antes.
+
+**El `mtime` no era la prueba que yo creí que era.** Los archivos del servidor tenían fecha
+del 19 y del 20 de octubre, anteriores al arranque del servicio, y yo leí eso como "el proceso
+cargó estos archivos". Falso: `tar` conserva las fechas originales, así que un archivo copiado
+a las 02:25 conserva la de hace semanas. **Un `mtime` nunca prueba qué código tiene un proceso
+en memoria.** La prueba es el `uptime_seconds` del `/health` (tiene que ser chico después de
+un reinicio) y el hash del archivo que quedó corriendo.
+
+**El token que copiamos estaba mal.** Al leer el token de la salida
+del script (de una foto de terminal, no de un pegado de texto) se coló una diferencia de un
+carácter: `O` por `0`. El `journalctl` conservaba la ruta exacta que había llegado al
+servidor, y al compararla se vio la diferencia. Un `404 TOKEN_NOT_FOUND` dice exactamente lo
+mismo en los cinco casos, así que no ayuda: hay que leer el token del log, no del recuerdo.
+
+**Lo que arregló el servicio fue reiniciarlo, y eso es lo que duele.** Con el proceso nuevo
+(código del disco, llave del `.env`, sin caches viejas), el token nuevo resolvió al primer
+intento: `200` con la fila completa. El proceso anterior escribía con el esquema de token
+viejo —el `app.bak` del despliegue todavía guardaba `token_hash = SHA-256(token)` sin HMAC— y
+el lector del código nuevo no reconocía esas filas. **El despliegue había dejado el disco
+nuevo y el proceso viejo**, y la única forma de saberlo es comparar el código que corre con
+el que está escrito.
+
+**El arreglo de fondo son dos checks que muerden.** El primero: el script de humo ahora abre
+el enlace que él mismo crea y exige que resuelva (paso 5c). Sin ese paso, una corrida da
+`RESULTADO: OK` con el servicio entero roto, y eso fue exactamente lo que pasó durante horas.
+El segundo: el runbook del despliegue ahora obliga a verificar el proceso que quedó
+corriendo, no el archivo del disco. Y el script de purga ganó un modo `--solo-firmas`,
+porque el candado que protege el texto legal —que hizo bien su trabajo— dejaba al sistema sin
+forma de limpiar sus propias filas de prueba una vez que el legal ya estaba publicado. La
+solución no fue aflojar el candado, fue **separar las dos cosas**: borrar las filas de prueba
+sin tocar ninguna versión del Acuerdo.
+
+**La moraleja es la de siempre, pero con un nombre nuevo: el hueco no estaba en el código que
+se probaba, estaba en el código que comprobaba.** Un e2e que recorre la mitad del camino y
+sale verde es peor que uno que no corre, porque se cree que probó. Y un despliegue se prueba
+con el hash de lo que quedó corriendo, no con el del archivo que se copió.
+

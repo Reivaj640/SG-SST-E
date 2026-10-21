@@ -52,10 +52,33 @@
  *
  * USO
  * ---
- *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por qué" \
+ *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por Qué" \
  *        --hasta=2026-10-18
- *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por qué" \
+ *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por Qué" \
  *        --hasta=2026-10-18 --version=v1.0 --ejecutar
+ *
+ *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por Qué" \
+ *        --hasta=2026-10-21 --solo-firmas --ejecutar
+ *
+ * EL MODO `--solo-firmas` (21-oct-2026)
+ * --------------------------------------
+ * El modo normal borra una PUBLICACIÓN DE PRUEBA COMPLETA: sus firmas y la
+ * versión del Acuerdo de prueba, para que el texto legal pueda publicarse
+ * después como la versión vigente. Ese modo ya no sirve para limpiar filas de
+ * prueba DESPUÉS de que el texto legal está publicado y sellado: la versión
+ * vigente ES el legal, y el candado (que está para que este script nunca
+ * borre el texto legal) se niega a borrarla.
+ *
+ * `--solo-firmas` es la respuesta: borra SOLO las filas de prueba (firmas,
+ * eventos, sesiones, lotes, tokens y archivos) y NO toca NINGUNA versión del
+ * Acuerdo. El candado del texto legal queda intacto porque en este modo no
+ * se borra ninguna versión, y la verificación final comprueba que la versión
+ * vigente SIGUE ahí.
+ *
+ * En este modo los consentimientos NO se borran: no cuelgan de una firma
+ * (son la prueba de aceptación del 12.7, con su propia vida) y borrarlos
+ * solo por estar en la ventana de tiempo sería borrarlos a ciegas. Si hay
+ * consentimientos en el rango, el plan los lista y los deja.
  *
  * Exit codes:
  *   0  operación exitosa (incluida la simulación)
@@ -82,10 +105,13 @@ const CATEGORIAS = ['PRUEBA_OPERATIVA'];
 function parseArgs(argv) {
   const opts = {
     actor: null, motivo: null, hasta: null, version: 'v1.0', ejecutar: false,
+    soloFirmas: false,
   };
   for (const arg of argv) {
     if (arg === '--ejecutar') {
       opts.ejecutar = true;
+    } else if (arg === '--solo-firmas') {
+      opts.soloFirmas = true;
     } else if (arg.startsWith('--actor=')) {
       opts.actor = arg.slice('--actor='.length).trim();
     } else if (arg.startsWith('--motivo=')) {
@@ -182,6 +208,15 @@ function armarPlan(opts) {
       FROM gh_firma_acuerdo_versiones WHERE version = ?
   `).get(opts.version);
 
+  // En el modo --solo-firmas NO se toca ninguna versión del Acuerdo: el
+  // texto legal ya está publicado y sellado, y este script no borra texto
+  // legal. Por eso `version` queda en null aunque la fila exista.
+  const versionABorrar = opts.soloFirmas ? null : version;
+
+  // Los consentimientos tampoco se borran en ese modo: no cuelgan de una
+  // firma, y se listan para que el operador vea que se quedan.
+  const consentimientosABorrar = opts.soloFirmas ? [] : consentimientosEnRango;
+
   // Archivos que acompañarían a las filas a borrar.
   const archivos = [];
   for (const f of enRango) {
@@ -194,9 +229,11 @@ function armarPlan(opts) {
     corte,
     firmas: enRango,
     firmasFueraDeRango: fueraDeRango,
-    consentimientos: consentimientosEnRango,
+    consentimientos: consentimientosABorrar,
+    consentimientosSeQuedan: opts.soloFirmas ? consentimientosEnRango : [],
     consentimientosFuera,
-    version,
+    version: versionABorrar,
+    versionSeQueda: opts.soloFirmas ? version : null,
     archivos,
   };
 }
@@ -208,16 +245,25 @@ function armarPlan(opts) {
 function verificar(plan, opts) {
   const problemas = [];
 
-  if (!plan.version) {
+  if (!opts.soloFirmas && !plan.version) {
     problemas.push(`No existe la versión ${opts.version} en la base.`);
+  }
+
+  // 0. En el modo --solo-firmas no se borra NINGUNA versión. Si el plan
+  //    trae una, es un error de este script: se para todo.
+  if (opts.soloFirmas && plan.version) {
+    problemas.push(
+      'El modo --solo-firmas no puede borrar una versión del Acuerdo. '
+      + 'Algo está mal en el plan: no se toca nada.');
   }
 
   // 1. La versión que se va a borrar NO puede ser el texto legal sellado.
   const sellada = huellaSellada(opts.version);
-  if (sellada && plan.version && plan.version.texto_hash === sellada) {
+  if (!opts.soloFirmas && sellada && plan.version && plan.version.texto_hash === sellada) {
     problemas.push(
       `La versión ${opts.version} de la base tiene la huella del texto legal sellado `
-      + `(${sellada.slice(0, 12)}). Este script NUNCA borra el texto legal.`);
+      + `(${sellada.slice(0, 12)}). Este script NUNCA borra el texto legal. `
+      + 'Si lo que se quiere es limpiar solo las filas de prueba, use --solo-firmas.');
   }
 
   // 2. Nada más nuevo que el corte se toca.
@@ -233,9 +279,10 @@ function verificar(plan, opts) {
   }
 
   // 3. Ninguna firma que quede viva puede depender de la versión que se borra.
+  //    (En --solo-firmas no se borra ninguna versión, así que no aplica.)
   const idsABorrar = new Set(plan.firmas.map(f => f.id));
   const vivas = plan.firmasFueraDeRango.filter(f => f.agreement_version === opts.version);
-  if (vivas.length) {
+  if (!opts.soloFirmas && vivas.length) {
     problemas.push(
       `Hay ${vivas.length} firma(s) que se quedan y que apuntan a la versión `
       + `${opts.version}. Borrarla las dejaría rotas.`);
@@ -251,6 +298,7 @@ function verificar(plan, opts) {
 
   // 5. Coherencia: los consentimientos que se borran deben apuntar a la
   //    versión que se borra, o no tocarlos.
+  //    (En --solo-firmas no se borra ningún consentimiento.)
   const consentimientosDeOtraVersion = plan.consentimientos
     .filter(c => c.version_acuerdo !== opts.version);
   if (consentimientosDeOtraVersion.length) {
@@ -272,6 +320,9 @@ function imprimirPlan(plan, opts) {
   console.log(`motivo: ${opts.motivo}`);
   console.log(`corte:  ${opts.hasta} (nada más nuevo se toca)`);
   console.log(`modo:   ${opts.ejecutar ? 'EJECUCIÓN' : 'SIMULACIÓN (nada se escribe)'}`);
+  console.log(`alcance: ${opts.soloFirmas
+    ? 'SOLO LAS FILAS DE PRUEBA (no se toca ninguna versión del Acuerdo)'
+    : 'filas de prueba + versión del Acuerdo ' + opts.version}`);
 
   console.log('\n--- Firmas a eliminar ---');
   if (!plan.firmas.length) {
@@ -291,9 +342,24 @@ function imprimirPlan(plan, opts) {
     console.log(`  id=${c.id} empresa=${c.id_empresa} `
       + `acuerdo=${c.version_acuerdo} aceptado=${c.fecha_aceptacion}`);
   }
+  if (plan.consentimientosSeQuedan && plan.consentimientosSeQuedan.length) {
+    console.log('  (se quedan, este modo no borra consentimientos):');
+    for (const c of plan.consentimientosSeQuedan) {
+      console.log(`    id=${c.id} empresa=${c.id_empresa} `
+        + `acuerdo=${c.version_acuerdo} aceptado=${c.fecha_aceptacion}`);
+    }
+  }
 
   console.log('\n--- Versión del Acuerdo a eliminar ---');
-  if (plan.version) {
+  if (opts.soloFirmas) {
+    if (plan.versionSeQueda) {
+      console.log(`  NO SE TOCA (modo --solo-firmas): ${plan.versionSeQueda.version} `
+        + `hash=${String(plan.versionSeQueda.texto_hash).slice(0, 12)} `
+        + `activa=${plan.versionSeQueda.activa}`);
+    } else {
+      console.log('  NO SE TOCA (modo --solo-firmas)');
+    }
+  } else if (plan.version) {
     console.log(`  ${plan.version.version} hash=${String(plan.version.texto_hash).slice(0, 12)} `
       + `activa=${plan.version.activa} chars=${plan.version.chars} `
       + `creada=${plan.version.fecha_creacion}`);
@@ -346,10 +412,19 @@ function aplicar(plan, opts) {
   let lotesBorrados = 0;
   let consentimientosBorrados = 0;
   let archivosBorrados = 0;
+  let tokensBorrados = 0;
+  const hayTokens = tablaExiste('gh_firma_tokens');
 
   try {
     const tx = db.transaction(() => {
       for (const f of plan.firmas) {
+        // Los tokens (migración 026) son credenciales: se borran con su
+        // firma. La FK los cascada, pero se borran explícitos para que el
+        // recibo diga cuantos credenciales se fueron.
+        if (hayTokens) {
+          const to = db.prepare('DELETE FROM gh_firma_tokens WHERE firma_id = ?').run(f.id);
+          tokensBorrados += to.changes;
+        }
         const ev = db.prepare('DELETE FROM gh_firma_eventos WHERE firma_id = ?').run(f.id);
         eventosBorrados += ev.changes;
         const se = db.prepare('DELETE FROM gh_firma_sesiones WHERE firma_id = ?').run(f.id);
@@ -399,27 +474,46 @@ function aplicar(plan, opts) {
       JSON.stringify(CATEGORIAS), eventosBorrados);
   }
 
-  db.prepare(`
-    INSERT INTO gh_firma_purga_log
-      (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
-       hold_revisados, hold_bloqueados)
-    VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_ACUERDO', ?, ?, 0, 0, 0, 0)
-  `).run(ahora, opts.actor,
-    `Se retiro la version ${opts.version} de prueba para publicar el texto legal `
-    + `como ${opts.version}. Motivo: ${opts.motivo}`);
+  if (opts.soloFirmas) {
+    // En este modo NO se retiró ninguna versión: el texto legal vigente
+    // (publicado y sellado) queda intacto, y el recibo lo deja dicho.
+    db.prepare(`
+      INSERT INTO gh_firma_purga_log
+        (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
+         hold_revisados, hold_bloqueados)
+      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_SOLO_FIRMAS', ?, ?, ?, ?, ?, 0)
+    `).run(ahora, opts.actor,
+      `Se retiraron solo las filas de prueba (firmas, eventos, sesiones, lotes, `
+      + `tokens y archivos). NO se toco ninguna version del Acuerdo: el texto legal `
+      + `vigente sigue publicado. Motivo: ${opts.motivo}`,
+      firmasBorradas, eventosBorrados, plan.firmas.length);
+  } else {
+    db.prepare(`
+      INSERT INTO gh_firma_purga_log
+        (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
+         hold_revisados, hold_bloqueados)
+      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_ACUERDO', ?, ?, 0, 0, 0, 0)
+    `).run(ahora, opts.actor,
+      `Se retiro la version ${opts.version} de prueba para publicar el texto legal `
+      + `como ${opts.version}. Motivo: ${opts.motivo}`);
+  }
 
   console.log('\n=== RESULTADO ===');
   console.log(`  firmas eliminadas:        ${firmasBorradas}`);
   console.log(`  eventos eliminados:       ${eventosBorrados}`);
   console.log(`  sesiones eliminadas:      ${sesionesBorradas}`);
   console.log(`  filas de lote eliminadas: ${lotesBorrados}`);
+  console.log(`  tokens eliminados:        ${tokensBorrados}`);
   console.log(`  consentimientos:          ${consentimientosBorrados}`);
   console.log(`  archivos eliminados:      ${archivosBorrados}`);
+  console.log(`  version del Acuerdo:     ${opts.soloFirmas
+    ? 'NO SE TOCO (modo --solo-firmas)' : 'eliminada (' + opts.version + ')'}`);
   console.log(`  recibo: ${firmasBorradas} fila(s) en gh_firma_purga_registro `
     + `y 2 en gh_firma_purga_log`);
 
   return {
     firmasBorradas, eventosBorrados, consentimientosBorrados, archivosBorrados,
+    tokensBorrados,
   };
 }
 
@@ -445,6 +539,24 @@ function verificarDespues(opts) {
   console.log(`  eventos:          ${eventos}`);
   console.log(`  consentimientos:  ${cons}`);
   console.log(`  version ${opts.version}: ${version}`);
+
+  // En el modo --solo-firmas el texto legal tiene que SEGUIR ahí. Si la
+  // versión vigente desaparecio, esta limpieza rompio el servicio.
+  if (opts.soloFirmas) {
+    const activa = db.prepare(
+      'SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones WHERE activa = 1'
+    ).get().n;
+    if (version !== 1) {
+      problemas.push(
+        `La version ${opts.version} ya no esta en la base: en el modo --solo-firmas `
+        + 'no se debia borrar ninguna version.');
+    }
+    if (activa !== 1) {
+      problemas.push(
+        `Hay ${activa} version(es) activa(s) del Acuerdo: deberia haber exactamente 1.`);
+    }
+    console.log(`  version activa:   ${activa}`);
+  }
 
   for (const nombre of TRIGGERS) {
     const t = db.prepare(
@@ -495,6 +607,13 @@ function main(argv) {
   const ok = verificarDespues(opts);
   if (!ok) return 3;
 
+  if (opts.soloFirmas) {
+    console.log('\nListo. Solo se retiraron las filas de prueba.');
+    console.log(`  (firmas: ${r.firmasBorradas}, eventos: ${r.eventosBorrados}, `
+      + `tokens: ${r.tokensBorrados}, archivos: ${r.archivosBorrados})`);
+    console.log(`  La version ${opts.version} del Acuerdo sigue publicada y sellada.`);
+    return 0;
+  }
   console.log(`\nListo. Ahora se puede publicar el texto legal como ${opts.version}.`);
   console.log(`  (firmas: ${r.firmasBorradas}, eventos: ${r.eventosBorrados}, `
     + `consentimientos: ${r.consentimientosBorrados}, archivos: ${r.archivosBorrados})`);
@@ -509,7 +628,8 @@ if (require.main === module) {
       console.error(e.message);
       console.error('');
       console.error('Uso: node scripts/limpiar-rastro-prueba.js --actor="Nombre" '
-        + '--motivo="Por qué" --hasta=YYYY-MM-DD [--version=v1.0] [--ejecutar]');
+        + '--motivo="Por qué" --hasta=YYYY-MM-DD [--version=v1.0] [--solo-firmas] '
+        + '[--ejecutar]');
       process.exit(2);
     }
     console.error('Error: ' + (e && e.stack ? e.stack : e));
@@ -517,4 +637,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseArgs, armarPlan, verificar, statementsDeTriggers };
+module.exports = { main, parseArgs, armarPlan, verificar, statementsDeTriggers };

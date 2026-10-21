@@ -179,6 +179,110 @@ espacios; **el servicio espera los 16 caracteres corridos**.
 
 ---
 
+## 5.1 Desplegar una versión nueva (el ORDEN importa)
+
+> El 2026-10-21 el servicio llevaba horas desplegando el código equivocado sin que
+> nadie lo notara: el alta daba 201, el correo salía, el Acuerdo estaba bien... y
+> **ningún enlace resolvía** (404 `TOKEN_NOT_FOUND`). El proceso que servía no
+> era el del código copiado.
+
+El orden que no se negocia:
+
+```bash
+# 1. Parar el servicio (que no atienda con el codigo viejo)
+sudo systemctl stop kair-firma
+
+# 2. Copiar el codigo nuevo al directorio de la app
+sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma/app
+
+# 3. VERIFICAR el hash de lo que quedo en disco (no del repo, no del tar)
+sha256sum /opt/kair-firma/app/src/crypto/token.js
+sha256sum /opt/kair-firma/app/src/services/signRequest.js
+
+# 4. Arrancar: el proceso nuevo carga lo que esta en disco
+sudo systemctl start kair-firma
+sleep 3
+systemctl is-active kair-firma
+
+# 5. VERIFICAR que el proceso que corre es el nuevo
+sudo systemctl show -p MainPID -p ActiveEnterTimestamp kair-firma
+curl -sS https://firma.kair.fyi/health
+```
+
+El paso 5 es el que falto. `uptime_seconds` tiene que ser **chico** (unos
+segundos): si el proceso lleva horas arriba, no es el que se acaba de instalar,
+por mas que los hashes del disco esten bien.
+
+### Lo que NO es prueba
+
+| Lo que se comprobó | Por qué no sirve |
+|---|---|
+| El hash del archivo **en disco** | El proceso puede tener en memoria otro código (copia después del arranque, despliegue a medias) |
+| El **mtime** de los archivos | `tar` conserva las fechas originales: un archivo copiado hoy puede marcar la fecha de hace semanas |
+| `GET /health` | `kair_version` es un valor fijo en `src/routes/health.js`: no dice qué código corre |
+| Que el alta dé **201** | El alta es de una fila, no del enlace que el firmante va a abrir |
+
+### La prueba que sí sirve
+
+La de humo, y en particular el paso **5c** (`scripts/smoke-produccion.js`):
+
+```bash
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/smoke-produccion.js --url=https://firma.kair.fyi \
+  --interno-file=/opt/kair-firma/internal-key.txt --e2e --confirmar-e2e \
+  --empresa=900829731 --trabajador=CC-PRUEBA-001 --numero-documento=PRUEBA-001 \
+  --correo=adminkair@gmail.com'
+```
+
+El paso 5c **abre el enlace que el propio script acaba de crear** y exige que
+resuelva. Sin esa comprobación, una corrida puede dar `RESULTADO: OK` con el
+servicio entero roto: el correo salió y el firmante abre un 404.
+
+Despues del despliegue, la fila que creo la prueba es rastro de prueba: se
+retira con `scripts/limpiar-rastro-prueba.js --solo-firmas` (ver §5.2).
+
+### Instalar UN archivo (scripts, sin tocar el resto)
+
+```bash
+# En el PC: servir el archivo por HTTP
+# En el servidor:
+curl -sS -o /tmp/smoke-produccion.js http://192.168.1.2:8765/smoke-produccion.js
+sha256sum /tmp/smoke-produccion.js
+sudo install -o kairfirma -g kairfirma -m 664 /tmp/smoke-produccion.js \
+  /opt/kair-firma/app/scripts/smoke-produccion.js
+sudo sha256sum /opt/kair-firma/app/scripts/smoke-produccion.js
+```
+
+El hash se comprueba **despues** de instalar, en el archivo final: "el comando
+no dio error" no es prueba de que el archivo quedo donde debia.
+
+---
+
+## 5.2 Retirar el rastro de prueba
+
+```bash
+# 1. Simular (no escribe nada)
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Rastro del e2e" \
+  --hasta=2026-10-21 --solo-firmas'
+
+# 2. Ejecutar
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Rastro del e2e" \
+  --hasta=2026-10-21 --solo-firmas --ejecutar'
+```
+
+`--solo-firmas` borra las filas de prueba (firmas, eventos, sesiones, lotes,
+tokens y archivos) y **NO toca ninguna version del Acuerdo**. El modo sin esa
+bandera borra tambien la version, y se niega a hacerlo si esa version es el
+texto legal sellado: por eso, cuando el legal ya esta publicado, la limpieza
+va con `--solo-firmas`.
+
+El recibo queda en `gh_firma_purga_log` y `gh_firma_purga_registro` (tablas
+append-only), y la base se verifica con `integrity_check` al final.
+
+---
+
 ## 6. Correr los tests en el servidor
 
 En el portatil **no corren**: el `better-sqlite3` de alla esta compilado para Electron 37

@@ -231,6 +231,13 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
   const llamadas = [];
   const pedirDoble = async (op, body) => {
     llamadas.push({ path: op.path, method: op.method, body });
+    if (op.path.indexOf('/verify') !== -1) {
+      return {
+        status: 200,
+        texto: '{"id_solicitud":"SIGN-2026-000001"}',
+        json: { id_solicitud: 'SIGN-2026-000001' },
+      };
+    }
     return {
       status: 201,
       texto: '{"id_solicitud":"SIGN-2026-000001"}',
@@ -257,8 +264,11 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
   assert.notEqual(notificado, null,
     'el e2e tiene que pedir la notificacion: sin ella el correo no sale');
   assert.equal(notificado.idSolicitud, 'SIGN-2026-000001');
-  assert.equal(llamadas.length, 1, 'la creacion es la unica llamada directa del e2e');
+  assert.equal(llamadas.length, 2,
+    'el e2e hace la creacion y la comprobacion del token: nada mas');
   assert.equal(llamadas[0].path, '/internal/sign-requests');
+  assert.equal(llamadas[1].path, '/api/sign/tok/verify',
+    'el e2e tiene que abrir el enlace que el mismo creo');
 });
 
 test('la notificacion va a /notify-remote con el correo del firmante', async () => {
@@ -335,4 +345,70 @@ test('sin --numero-documento se usa el --trabajador como numero de identificacio
   );
   assert.equal(meta.identificacion_numero_hash,
     require('crypto').createHash('sha256').update('CC-PRUEBA-001').digest('hex'));
+});
+
+// ----------------------------------------------------------------------
+// 14-16. El token tiene que RESOLVER
+// ----------------------------------------------------------------------
+//
+// ESTOS TRES SON EL CHECK QUE FALTABA. El 21-oct el e2e dio verde con 13
+// comprobaciones mientras NINGUN token resolvia (404 TOKEN_NOT_FOUND en
+// todas las rutas de datos): el alta daba 201, el correo salia, y el
+// firmante abria un enlace muerto. Un check que no muerde no es un check,
+// asi que estos tests tienen que FALLAR si el check se degrada.
+test('el token de la prueba se resuelve: el e2e abre el enlace que creo', async () => {
+  const pedidos = [];
+  const pedirDoble = async (op) => {
+    pedidos.push(op);
+    return {
+      status: 200,
+      texto: '{"id_solicitud":"SIGN-2026-873182"}',
+      json: { id_solicitud: 'SIGN-2026-873182' },
+    };
+  };
+
+  const r = await script.comprobarTokenResuelve(
+    { url: 'https://x', timeoutMs: 1000 },
+    'rrk73AtQ5PBeQLlhZhpJbgbMrBkGvsa-',
+    pedirDoble,
+  );
+
+  assert.equal(r.ok, true);
+  assert.equal(pedidos.length, 1);
+  assert.equal(pedidos[0].path, '/api/sign/rrk73AtQ5PBeQLlhZhpJbgbMrBkGvsa-/verify');
+  assert.equal(pedidos[0].method, 'GET');
+});
+
+test('si el token NO resuelve, el check FALLA (no puede quedar en verde)', async () => {
+  const pedirDoble = async () => ({
+    status: 404,
+    texto: '{"error":{"code":"TOKEN_NOT_FOUND","message":"No disponible"}}',
+    json: { error: { code: 'TOKEN_NOT_FOUND', message: 'No disponible' } },
+  });
+
+  const r = await script.comprobarTokenResuelve(
+    { url: 'https://x', timeoutMs: 1000 },
+    'tok-que-no-resuelve',
+    pedirDoble,
+  );
+
+  assert.equal(r.ok, false, 'un token que no resuelve NO puede salir como ok');
+  assert.equal(r.codigo, 'TOKEN_NOT_FOUND');
+
+  // Y en el resumen del script tiene que quedar como FALLA, para que el
+  // proceso salga con codigo 1 y no con "RESULTADO: OK".
+  const ultimo = script.resultados[script.resultados.length - 1];
+  assert.equal(ultimo.estado, 'FALLA',
+    'el token que no resuelve tiene que quedar como FALLA en el resumen');
+});
+
+test('el check del token no puede quedarse sin comprobar: si no hay token, FALLA', async () => {
+  const r = await script.comprobarTokenResuelve(
+    { url: 'https://x', timeoutMs: 1000 },
+    '',
+    async () => ({ status: 200, texto: '{}', json: {} }),
+  );
+
+  assert.equal(r.ok, false, 'sin token no hay nada que comprobar: eso es una FALLA');
+  assert.equal(r.codigo, 'SIN_TOKEN');
 });
