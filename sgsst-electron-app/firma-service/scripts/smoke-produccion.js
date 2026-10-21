@@ -30,9 +30,17 @@
  * prueba de que el despliegue quedo hecho, y se puede hacer desde afuera sin
  * ninguna llave. Crea una fila de prueba.
  *
- * Con `--e2e` ADEMAS crea una solicitud de firma de prueba (ESCRIBE en la base
- * y ENVIA un correo). Por eso exige `--confirmar-e2e` explicito: una prueba
- * que escribe tiene que decir que escribe.
+ * Con `--e2e` ADEMAS crea una solicitud de firma de prueba (ESCRIBE en la base)
+ * y MANDA LA INVITACION por correo, que es el primer contacto con el firmante.
+ * Por eso exige `--confirmar-e2e` explicito: una prueba que escribe tiene que
+ * decir que escribe.
+ *
+ * OJO CON EL e2e: crear la solicitud NO manda ningun correo. `POST
+ * /internal/sign-requests` devuelve el token y la URL y nada mas; el primer
+ * contacto con el firmante es un endpoint aparte, `POST
+ * /internal/sign-requests/:id/notify-remote`, que es el que llama a
+ * `mailer.sendInvite()`. Un e2e que solo crea la solicitud "pasa" sin haber
+ * probado el correo, que es justo lo que se quiere probar.
  *
  * USO
  * ---
@@ -45,6 +53,11 @@
  *        --interno-file=/ruta/a/internal-key.txt \
  *        --e2e --confirmar-e2e --empresa=EMP-001 --trabajador=CC-PRUEBA \
  *        --correo=prueba@example.com
+ *
+ * Con `--numero-documento=` se indica el numero de documento con el que el
+ * firmante se va a identificar en la mini-app (si no, se usa el
+ * `--trabajador`). El script calcula la huella con ese mismo numero, asi que
+ * tienen que coincidir: la mini-app pide tipo `CC` y ese numero.
  *
  * Las llaves se pueden pasar por archivo (`--interno-file`, `--admin-file`) o
  * por el ambiente (`FIRMA_SMOKE_INTERNAL_KEY`, `FIRMA_SMOKE_ADMIN_KEY`).
@@ -122,9 +135,12 @@ function parseArgs(argv) {
     e2e: false,
     confirmarE2e: false,
     canalDatos: false,
+    idempotencia: false,
     empresa: null,
     trabajador: null,
+    numeroDocumento: null,
     correo: null,
+    correoEmpresa: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     json: false,
     error: null,
@@ -134,6 +150,7 @@ function parseArgs(argv) {
     if (a === '--e2e') args.e2e = true;
     else if (a === '--confirmar-e2e') args.confirmarE2e = true;
     else if (a === '--canal-datos') args.canalDatos = true;
+    else if (a === '--idempotencia') args.idempotencia = true;
     else if (a === '--json') args.json = true;
     else if (a.startsWith('--url=')) args.url = a.split('=').slice(1).join('=');
     else if (a.startsWith('--interno=')) args.interno = a.split('=').slice(1).join('=');
@@ -142,7 +159,9 @@ function parseArgs(argv) {
     else if (a.startsWith('--admin-file=')) args.adminFile = a.split('=').slice(1).join('=');
     else if (a.startsWith('--empresa=')) args.empresa = a.split('=').slice(1).join('=');
     else if (a.startsWith('--trabajador=')) args.trabajador = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--numero-documento=')) args.numeroDocumento = a.split('=').slice(1).join('=');
     else if (a.startsWith('--correo=')) args.correo = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--correo-empresa=')) args.correoEmpresa = a.split('=').slice(1).join('=');
     else if (a.startsWith('--timeout-ms=')) args.timeoutMs = parseInt(a.split('=')[1], 10);
     else if (a === '--help' || a === '-h') {
       console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].replace(/^\/\*\*?/, ''));
@@ -398,6 +417,114 @@ async function comprobarRutaInterna(args, internoKey) {
   else warn('La ruta interna respondio raro', 'HTTP ' + res.status + ' :: ' + res.texto.slice(0, 200));
 }
 
+/**
+ * El número de documento de IDENTIFICACION del firmante.
+ *
+ * Es el número que el firmante tiene que escribir en la mini-app para
+ * identificarse. El script calcula la huella con el MISMO número, así que
+ * tienen que coincidir exactamente.
+ *
+ * Si no se pasa `--numero-documento`, se usa el `--trabajador` (que por
+ * convención del proyecto es la cédula del trabajador).
+ *
+ * @param {object} args
+ * @returns {string}
+ */
+function numeroDocumentoDe(args) {
+  return String(args.numeroDocumento || args.trabajador || '');
+}
+
+/**
+ * El objeto `metadata` de la solicitud de firma.
+ *
+ * El endpoint `POST /internal/sign-requests` NO recibe campos sueltos en el
+ * multipart: recibe UN campo `metadata` con un JSON string, y ese objeto se
+ * valida contra el schema `signRequestBody`, que es `.strict()`: una clave
+ * desconocida se RECHAZA (400 con el nombre de la clave).
+ *
+ * Adentro, el campo `metadata` de ese objeto es el blob libre que se archiva
+ * en la columna `metadata` de la fila, y ese sí tiene lista blanca (las cinco
+ * claves de `metadata.CLAVES_METADATA_PERMITIDAS`): lo desconocido ahí también
+ * se rechaza, pero con su propio mensaje.
+ *
+ * `tipo_identificacion` es la CATEGORÍA DEL DOCUMENTO que se firma (no el tipo
+ * de identificación del firmante, que va en `identificacion_tipo`). Los valores
+ * validos son los de `TIPOS_IDENTIFICACION`: CONTRATO, OTROSI, ACTA,
+ * CONSENTIMIENTO, AUTORIZACION, REGLAMENTO, POLITICA, CERTIFICADO...
+ * ("OTRO" no existe; el que existe es "OTROSI".)
+ *
+ * LA IDENTIFICACIÓN DEL FIRMANTE TAMBIÉN VA AQUÍ
+ * ---------------------------------------------
+ * `identificacion_tipo` (CC, CE, TI, PPT, PA) y `identificacion_numero_hash`
+ * son OBLIGATORIOS para que el firmante pueda identificarse: `identify()` los
+ * exige y, si faltan, responde 500 MISSING_IDENTIFICATION_DATA. El cliente
+ * (K+AIR) manda el SHA-256 del número, nunca el número en claro; el servicio lo
+ * convierte en un HMAC con su llave maestra.
+ *
+ * Con sal, el hash previo es `sha256(sal || numero)`; sin sal (lo que hace
+ * este script), es `sha256(numero)`. Por eso el firmante tiene que escribir
+ * EXACTAMENTE el mismo número que el script usó para calcular el hash.
+ *
+ * @param {object} args
+ * @param {object} acuerdoActivo
+ * @param {string} documentHash
+ * @returns {object}
+ */
+function metadataSignRequest(args, acuerdoActivo, documentHash) {
+  const numero = numeroDocumentoDe(args);
+  return {
+    id_documento: 'PRUEBA-HUMO-' + Date.now(),
+    id_trabajador: args.trabajador,
+    id_empresa: args.empresa,
+    tipo_firma: 'remoto',
+    agreement_version: acuerdoActivo.version,
+    agreement_hash: acuerdoActivo.texto_hash,
+    // La identificación del firmante: el TIPO (CC) y la huella del numero.
+    identificacion_tipo: 'CC',
+    identificacion_numero_hash: crypto.createHash('sha256').update(String(numero)).digest('hex'),
+    document_hash: documentHash,
+    version_kair: 'smoke-produccion',
+    correo_verificacion: args.correo || 'prueba@example.com',
+    tipo_identificacion: 'OTROSI',
+    nombre_trabajador: 'Trabajador de Prueba',
+    nombre_empresa: 'K+AIR PRUEBA S.A.S.',
+    correo_empresa: args.correoEmpresa || 'copia-prueba@example.com',
+    // OJO: el `metadata` de adentro es un STRING JSON, no un objeto: el schema
+    // lo declara como `z.string().max(8192)`. Mandarlo como objeto es un 400
+    // ("Expected string, received object").
+    metadata: JSON.stringify({ subtipo_identificacion: 'prueba-de-humo' }),
+  };
+}
+
+/**
+ * Las cabeceras de la creación de la solicitud de firma.
+ *
+ * OJO con el `Idempotency-Key`: el servicio lo RECHAZA en modo legacy (la
+ * llave interna `INTERNAL_API_KEY`), con un 400 explicito
+ * (`IDEMPOTENCY_LEGACY_NOT_SUPPORTED`). La razon esta en el propio codigo:
+ * la idempotencia exige `req.id_empresa`, y en modo legacy esa empresa es
+ * null por diseno (I-005/I-010). Con la llave por empresa si se puede usar.
+ *
+ * Por eso la llave de idempotencia SOLO se manda cuando se pide explicitamente
+ * con `--idempotencia`, y la documentacion lo dice: mandar el header en modo
+ * legacy no es un detalle, es un 400 que no dice nada util.
+ *
+ * @param {object} args
+ * @param {string} internoKey
+ * @param {string} contentType
+ * @returns {object}
+ */
+function cabecerasSignRequest(args, internoKey, contentType) {
+  const cabeceras = {
+    'X-Internal-API-Key': internoKey,
+    'Content-Type': contentType,
+  };
+  if (args.idempotencia) {
+    cabeceras['Idempotency-Key'] = 'smoke-' + crypto.randomBytes(8).toString('hex');
+  }
+  return cabeceras;
+}
+
 async function comprobarCodigoNuevo(args) {
   titulo('4. El codigo nuevo esta vivo (ESCRIBE una fila)');
   if (!args.canalDatos) {
@@ -441,7 +568,74 @@ async function comprobarCodigoNuevo(args) {
   }
 }
 
-async function comprobarE2e(args, internoKey, acuerdoActivo) {
+/**
+ * Manda la invitación por correo: el PRIMER CONTACTO con el firmante.
+ *
+ * OJO, esto no es un detalle: `POST /internal/sign-requests` CREA la solicitud
+ * y devuelve el token y la URL, pero NO manda ningún correo. El primer
+ * contacto es un endpoint aparte, `POST /internal/sign-requests/:id/notify-remote`,
+ * que es el que llama a `mailer.sendInvite()`. Sin esa llamada, el servicio
+ * responde 201, el firmante no se entera de nada y el e2e "pasa" sin haber
+ * probado el correo (que es justo lo que se quiere probar).
+ *
+ * Si el SMTP falla, la ruta responde 502 INVITE_EMAIL_FAILED y el error trae
+ * el motivo del servidor de correo: eso es un AVISO, no un fallo del servicio.
+ *
+ * @param {object} args
+ * @param {string} internoKey
+ * @param {string} idSolicitud
+ * @param {function} [pedirFn] - doble de `pedir` para los tests.
+ * @returns {Promise<{ok: boolean, codigo: string, detalle: string}>}
+ */
+async function notificarInvitacion(args, internoKey, idSolicitud, pedirFn) {
+  const pedirReal = pedirFn || pedir;
+  titulo('5b. La invitacion sale por correo (ESCRIBE)');
+  if (!idSolicitud) {
+    fail('POST /internal/sign-requests/:id/notify-remote',
+      'la creacion no devolvio id_solicitud');
+    return { ok: false, codigo: 'SIN_ID_SOLICITUD', detalle: '' };
+  }
+
+  let res;
+  try {
+    res = await pedirReal({
+      base: args.url,
+      path: '/internal/sign-requests/' + encodeURIComponent(idSolicitud) + '/notify-remote',
+      method: 'POST',
+      headers: {
+        'X-Internal-API-Key': internoKey,
+        'Content-Type': 'application/json',
+      },
+    }, JSON.stringify({ correo: args.correo }), args.timeoutMs);
+  } catch (e) {
+    fail('POST /internal/sign-requests/:id/notify-remote', 'no respondio: ' + e.message);
+    return { ok: false, codigo: 'SIN_RESPUESTA', detalle: e.message };
+  }
+
+  if (res.status === 200) {
+    const j = res.json || {};
+    ok('La invitacion salio por correo',
+      'destino=' + args.correo + ' :: messageId=' + (j.messageId || '(sin messageId)'));
+    warn('Se mando un correo real a ' + args.correo,
+      'si no lo pedia, la solicitud es de prueba: se puede cancelar desde la consola');
+    return { ok: true, codigo: 'OK', detalle: j.messageId || '' };
+  }
+
+  const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
+  const texto = res.texto.slice(0, 300);
+  if (codigo === 'INVITE_EMAIL_FAILED') {
+    warn('La invitacion NO salio: fallo el servidor de correo',
+      'HTTP ' + res.status + ' ' + codigo + ' :: ' + texto);
+  } else {
+    fail('POST /internal/sign-requests/:id/notify-remote',
+      'HTTP ' + res.status + ' ' + codigo + ' :: ' + texto);
+  }
+  return { ok: false, codigo, detalle: texto };
+}
+
+async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
+  const pedirFn = (deps && deps.pedir) || pedir;
+  const notificarFn = (deps && deps.notificar) || notificarInvitacion;
   titulo('5. Prueba de extremo a extremo (ESCRIBE)');
   if (!args.e2e) {
     emitir('  (omitida: sin --e2e)');
@@ -468,27 +662,14 @@ async function comprobarE2e(args, internoKey, acuerdoActivo) {
   const pdf = await pdfDePrueba();
   const documentHash = crypto.createHash('sha256').update(pdf).digest('hex');
   const { body, contentType } = multipart({
-    id_documento: 'PRUEBA-HUMO-' + Date.now(),
-    id_trabajador: args.trabajador,
-    id_empresa: args.empresa,
-    tipo_firma: 'remoto',
-    agreement_version: acuerdoActivo.version,
-    agreement_hash: acuerdoActivo.texto_hash,
-    document_hash: documentHash,
-    version_kair: 'smoke-produccion',
-    correo_verificacion: args.correo || 'prueba@example.com',
-    tipo_identificacion: 'OTRO',
+    metadata: JSON.stringify(metadataSignRequest(args, acuerdoActivo, documentHash)),
   }, { campo: 'documento', nombre: 'prueba-humo.pdf', contenido: pdf });
 
   let res;
   try {
-    res = await pedir({
+    res = await pedirFn({
       base: args.url, path: '/internal/sign-requests', method: 'POST',
-      headers: {
-        'X-Internal-API-Key': internoKey,
-        'Content-Type': contentType,
-        'Idempotency-Key': 'smoke-' + crypto.randomBytes(8).toString('hex'),
-      },
+      headers: cabecerasSignRequest(args, internoKey, contentType),
     }, body, args.timeoutMs);
   } catch (e) {
     fail('POST /internal/sign-requests', 'no respondio: ' + e.message);
@@ -510,10 +691,14 @@ async function comprobarE2e(args, internoKey, acuerdoActivo) {
     if (r.url_publica) {
       emitir('  URL de la prueba: ' + r.url_publica);
       emitir('  (NO se puede reutilizar el token: se devuelve una sola vez)');
+      emitir('  Para identificarte en la mini-app: tipo CC y numero '
+        + numeroDocumentoDe(args));
     }
+    // Crear la solicitud NO manda ningun correo: el primer contacto con el
+    // firmante es un endpoint aparte. Sin esta llamada, el e2e "pasa" sin
+    // haber probado que el correo sale.
     if (args.correo) {
-      warn('Se mando un correo real a ' + args.correo,
-        'si no lo pedia, la solicitud es de prueba: se puede cancelar desde la consola');
+      await notificarFn(args, internoKey, r.id_solicitud, pedirFn);
     }
   } else if (res.status === 409) {
     const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
@@ -596,6 +781,11 @@ module.exports = {
   modoEscritura,
   multipart,
   pdfDePrueba,
+  cabecerasSignRequest,
+  metadataSignRequest,
+  comprobarE2e,
+  notificarInvitacion,
+  resultados,
   // Exportadas para los tests.
   DEFAULT_URL,
   DEFAULT_TIMEOUT_MS,

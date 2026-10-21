@@ -5651,6 +5651,49 @@ Lo que sí se pudo verificar sin la base de datos: los 30 tests nuevos de esta j
 mutaciones). Los dos evitan `setup.js` a propósito — uno monta una app express mínima y el otro lee
 el HTML y el JS — así que corren aunque la suite entera no pueda.
 
+### Los dos 400 que casi cuestan una vuelta a producción
+
+El despliegue a producción del 20 de octubre salió bien: 16 migraciones aplicadas, el
+Acuerdo legal vigente con su huella sellada, la base íntegra. Pero la creación de la
+solicitud de firma falló **dos veces seguidas** con un 400, y las dos veces la culpa
+era del cliente de prueba, no del servicio.
+
+El primer 400: `Idempotency-Key no soportado en legacy mode`. El script mandaba esa
+cabecera y el servicio la rechaza cuando se autentica con la llave interna, porque la
+idempotencia exige `req.id_empresa` y en modo legacy esa empresa es `null` por diseño.
+El propio código lo explica con un 400 explícito, que es mejor que un 500 — pero
+tampoco ayuda: la lección es que **la incompatibilidad estaba documentada en el
+código y yo no la busqué antes de mandarla**.
+
+El segundo 400: `Falta el campo "metadata" en el form-data`. El endpoint no recibe
+campos sueltos en el multipart: recibe **un** campo `metadata` con un JSON string. Y
+adentro de ese objeto, el `metadata` anidado también es un **string** (`z.string()`),
+no un objeto. Cada uno de los dos errores era un 400 de una línea de diferencia.
+
+Lo que los dos errores tienen en común es que **los dos habrían costado una vuelta a
+producción** (descargar un script, subirlo, parar y arrancar el servicio) y lo que
+también tienen en común es que **los dos se habían atrapado en un ensayo de un
+minuto**.
+
+El ensayo: levantar el servicio real en el puerto 3099 con la base de tests,
+publicar el Acuerdo legal, registrar la Empresa con su Anexo, y correr el script
+contra `http://127.0.0.1:3099`. Es el mismo código que corre en producción, contra el
+mismo router y el mismo schema. El error sale exacto, en local, sin tocar nada. Y
+además deja ver lo que de verdad importa: qué ve el firmante cuando abre el enlace
+(`GET /api/sign/<token>/acuerdo.txt` → el texto legal, sus 32.907 caracteres, con la
+etiqueta "Versión del Acuerdo: v1.0" que ahora coincide con la del sistema).
+
+**La lección, en una línea**: un mock de la API te dice lo que vos creés que pedís; el
+servidor real te dice lo que espera. Y un ensayo local no es un lujo de la QA: es lo
+que evita que un 400 de contrato se descubra en el único entorno donde no se puede
+arreglar a tiempo.
+
+El patrón que quedó, y que conviene repetir: **toda comprobación que se pueda correr
+contra el servicio real, se corre contra el servicio real**. Eso incluye el ensayo de
+las migraciones sobre bases con evidencia, el ensayo del script de limpieza (con sus
+tres candados verificados uno por uno) y este. Los tres encontraron cosas que ningún
+test unitario habría visto.
+
 ### El despliegue que casi se hace sin llave
 
 El owner pidió validar el repo y el Acuerdo para cambiar producción y hacer una prueba. SSH estaba
@@ -5705,3 +5748,50 @@ sin un solo test en rojo. La forma sana: que el script **inyecte** su sumidero d
 (`main(argv, { sink })`) y el test lo capture por ahí. Un test que verifica algo sobre la salida de
 otro módulo no puede tocar la consola global: el que verifica es el que mide, y si mide la salida
 del runner, mide mal.
+
+### El e2e que daba verde sin probar el correo
+
+El script de humo de producciónCreation dio **OK con 12 comprobaciones** y el firmante nunca
+recibió nada. No era el correo: era el script.
+
+**El endpoint de creación no manda la invitación.** `POST /internal/sign-requests` crea la fila,
+devuelve el token y la URL y ya. El primer contacto con el firmante es un endpoint aparte,
+`POST /internal/sign-requests/:id/notify-remote`, que es el que llama a `mailer.sendInvite()`.
+El script solo llamaba al primero, así que su e2e probaba la mitad del recorrido: creaba la
+solicitud y declaraba haber hecho "el recorrido completo".
+
+**El aviso mentía.** La línea decía "[AVISO] Se mando un correo real a adminkair@gmail.com", y
+era el script imprimiendo su propio argumento. El servidor no había confirmado nada: no había
+evento `INVITE_SENT`, no había `messageId`, no había correo. Un aviso que no sale del
+servidor no es evidencia de nada.
+
+**La búsqueda del culpable fue al lado equivocado.** Cuando el correo no llegó, el primer
+sospechoso natural es el servidor de correo, y se montó una buena theory: "Gmail acepta con
+`250 OK` y después descarta, porque una cuenta que envía desde una IP de servidor está
+marcada". Se midió el SMTP, se probó un envío real, y **el correo de prueba llegó** a la
+bandeja. El SMTP estaba bien. El bug era nuestro, y estaba en el lado del que no se sospechó:
+el paso que el script no daba.
+
+**El señuelo que sirve.** El `sendInvite()` lanza si el envío falla, y el service lo convierte
+en `502 INVITE_EMAIL_FAILED`. Un `201` con la invitación no enviada solo es posible porque
+**nadie llamó al endpoint que envía**. El `201` de la creación no dice nada sobre el correo,
+igual que un `health` en verde no dice nada sobre el despliegue.
+
+**El arreglo y su check.** El script ahora llama a `/notify-remote` después de crear, y reporta
+lo que el servidor conteste: `OK` si salió, `AVISO` con el `502 INVITE_EMAIL_FAILED` si el
+correo no salió (el servicio está bien, el correo no). Tres tests nuevos, y el primero
+muerde: si se quita la llamada a la notificación, el test falla (se comprobó con una
+mutación real, no de palabra). El principio es el de siempre: **un check que no muerde no es un
+check** — y este llevaba dos días dando verde sin haber tocado el correo.
+
+**Y había un segundo hueco en el mismo recorrido.** `identify()` exige que la fila tenga
+`identificacion_tipo` y `identificacion_numero_hash`: sin ellos responde `500
+MISSING_IDENTIFICATION_DATA` y el firmante no puede ni identificarse. El script tampoco los
+mandaba. O sea, el e2e probaba tres de los cinco pasos del recorrido y no lo decía. El
+cliente (K+AIR) manda el SHA-256 del número de documento, nunca el número en claro, y el
+servicio lo convierte en un HMAC con su llave maestra; sin sal, el hash previo es
+`sha256(numero)`, así que el firmante tiene que escribir exactamente el mismo número que
+el script usó para calcular la huella. El script ahora lo calcula, lo manda, **te dice en la
+salida qué número escribir**, y tiene dos tests que muerden (verificados con mutación
+real). La lección es la misma de siempre y es la que más duele: un e2e que recorre la mitad
+del camino y sale verde es peor que uno que no corre, porque **se cree que probó**.

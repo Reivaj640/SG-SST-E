@@ -667,6 +667,73 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
+### 2026-10-20 · 📦925 · El despliegue a producción: 16 migraciones, el Acuerdo legal vigente y la prueba de humo
+
+**Qué se hizo** — el despliegue de verdad, con el owner ejecutando los comandos en la terminal web de kair-server (Cockpit, `https://192.168.1.11:9090`), porque el acceso por SSH está denegado (`Permission denied (publickey,password)`):
+
+- **El despliegue**: el código de `b5c04f93` (📦912-923) y `a69720ff` (📦924) quedó en `/opt/kair-firma/app` y aplicó **16 migraciones** (019 → 032). El log del servicio lo dice: `"Migraciones completadas","nuevas":16,"total":31`. No hubo cambios de dependencias: el `package.json` del servidor ya tenía las mismas nueve.
+- **El rastro de prueba eliminado**: 2 firmas, 27 eventos, 1 sesión, 1 consentimiento, 4 archivos y la v1.0 borrador (`37d755982b78`, 30.311 chars). Con recibo en `gh_firma_purga_log` y `gh_firma_purga_registro`, triggers append-only repuestos desde el archivo de la migración 020, e `integrity_check: ok`.
+- **El texto legal publicado como v1.0** (`52a490a4f4ce`, 32.907 chars) y verificado por el sello: `archivar-acuerdo.js --verificar` → **exit 0**.
+- **La Empresa 900829731** registrada con Anexo firmado, plazo de 1825 días y canal PQRS.
+- **Tres scripts nuevos**: `scripts/limpiar-rastro-prueba.js`, `scripts/publicar-acuerdo-legal.js` y `scripts/smoke-produccion.js` (con 17 tests).
+
+**Por qué** — el owner pidió validar el repo y el Acuerdo, cambiarlos en producción y hacer una prueba.
+
+**Lo que la prueba comprobó, en vivo**
+
+| Qué | Evidencia |
+|---|---|
+| El código nuevo corre | `POST /api/solicitudes` → **201** (antes 404) |
+| El Acuerdo vigente es el legal | `52a490a4f4ce`, y el texto que se sirve al firmante son los 32.907 chars del legal |
+| El sello cuadra con lo publicado | `exit_archivar=0` |
+| La base quedó íntegra | `integrity_check: ok` |
+| No hay ninguna Empresa registrada (Gate 0.5) | `{"items":[]}` |
+| El control de habilitación se puede probar en las dos direcciones | empresa registrada sin Anexo → **409**; con Anexo → **201** |
+| El e2e crea la solicitud de verdad | `SIGN-2026-211245`, ligada al Acuerdo vigente (`agreement_hash=52a490a4f4ce`) |
+| Al firmante le llega el correo | **NO**: el e2e solo creó la solicitud. La invitación la manda otro endpoint (`/notify-remote`) y el script no lo llamaba |
+| El script instalado es el del repo | `sha256` del servidor = `8095f8a6...` = el del repo, byte a byte |
+
+**Decisiones del owner** — commitear sin push; las 2 firmas y el consentimiento del 17 de octubre eran **pruebas suyas**: el servicio nunca operó con clientes reales. Eso autorizó a limpiar el rastro y a publicar el legal como v1.0 (no como v1.1), porque la v1.0 publicada era un borrador.
+
+**Hallazgos que quedan**
+
+1. **`/health` miente**: la versión está fija en el código (`routes/health.js:45`). La prueba de despliegue es `POST /api/solicitudes`, no el health.
+2. **`Idempotency-Key` es incompatible con la llave interna** (400 `IDEMPOTENCY_LEGACY_NOT_SUPPORTED`): el K+AIR de escritorio no puede usar idempotencia hasta migrar a la llave por empresa (I-010).
+3. **El alta de Empresa no tiene ruta de actualización**: se crea y ya, no hay `PUT`/`PATCH` ni borrado. Para el D-02 hace falta poder cambiar el canal de una Empresa ya registrada.
+4. El `id_trabajador` se **pseudonimiza** al guardarse (`psn1_<hash>`), no queda en claro en la fila.
+5. El `.env` de producción tiene un valor con espacio sin comillas (`SMTP_FROM_NAME`): systemd lo tolera, pero `source` en bash no (`Firma: command not found`).
+
+6. **El servidor puede quedar corriendo código que NO está en el repo.** El `scripts/smoke-produccion.js` que corría en producción no coincidía con ninguna versión del repo: ni con `HEAD` ni con el working tree, ni aunque se contaran todas las variantes de EOL y BOM. El tar que se descargó en el servidor **sí** era el correcto (sha256 verificado) y su contenido **sí** llevaba el fix, pero la extracción no surtió efecto — el bloque de comandos pegado en la terminal web se ejecutó a medias — y el 400 volvió a salir con el mismo texto. **La prueba de un despliegue no es "el comando no dio error": es el hash del archivo que quedó.**
+
+Resuelto así: el archivo se reinstaló con `install` (no con `tar`) y el hash del servidor pasó a coincidir con el del repo. El `.bak` dejó la evidencia: guardó la versión fantasma (`23c626fa...`), lo que prueba que el `cp` sí corrió y el `tar -xzf` nunca llegó a aplicarse — el bloque de cuatro comandos pegado en la terminal web se ejecutó a medias.
+
+7. **Crear la solicitud de firma NO manda ningún correo: el primer contacto con el firmante es otro endpoint.** `POST /internal/sign-requests` crea la fila, devuelve el token y la URL y no envía nada (`src/routes/signRequest.js:320`); la invitación la manda `POST /internal/sign-requests/:id/notify-remote`, que es el que llama a `mailer.sendInvite()`. El script de humo solo hacía lo primero, así que su "e2e" daba **OK con 12 comprobaciones sin haber probado el correo**: la invitación nunca salió y el firmante nunca supo de la solicitud. Dos cosas se falsearon en el camino y conviene que queden escritas: **(a)** el aviso del script "Se mando un correo real a ..." era el script imprimiendo su propio argumento, no la confirmación del servidor — un aviso que dice una cosa y prueba otra; **(b)** `smtp: configured` no prueba la entrega, pero tampoco era el problema: el SMTP de producción está bien (Gmail acepta con `250 2.0.0 OK`, `accepted=[adminkair@gmail.com]`, `rejected=[]`) y un correo de prueba enviado a mano **sí llegó** a la bandeja. El bug era nuestro: no llamáamos al endpoint que envía. **Un check que no muerde no es un check**: el e2e daba verde sin haber tocado el correo, y eso es justo lo que un check tiene que impedir.
+
+8. **El e2e tampoco probaba la identificación: `identify()` exige `identificacion_tipo` y `identificacion_numero_hash` en la fila.** Si faltan, responde `500 MISSING_IDENTIFICATION_DATA` y el firmante no puede avanzar. El script mandaba la solicitud sin esos dos campos, así que el recorrido se cortaba en el paso 3 de 5 (abrir el enlace, ver el Acuerdo, aceptar, identificarse, ver el documento, firmar). El cliente (K+AIR) manda el SHA-256 del número, nunca el número en claro; el servicio lo convierte en un HMAC con su llave maestra. Sin sal (que es lo que hace el script), el hash previo es `sha256(numero)`: por eso el firmante tiene que escribir **exactamente** el mismo número que el script usó para calcular la huella. El script ahora lo calcula, lo manda y **te dice en la salida qué número escribir**, con dos tests nuevos (ambos verificados con mutación real).
+
+9. **El mini-app espera un 422 y el servidor manda un 500 para el mismo caso.** Cuando a la solicitud le faltan los datos de identificación, `publicFlow.identify()` lanza `AppError(500, 'MISSING_IDENTIFICATION_DATA')`; el mini-app, en cambio, ramifica con `err.status === 422 && err.code === 'MISSING_IDENTIFICATION_DATA'` (`web/firma/app.js`). Los dos no coinciden, así que el firmante ve el error genérico en vez del mensaje claro que el frontend sabe mostrar. El código del error es el mismo, pero el status no: un `catch` por código sin el status se rompe en el momento en que uno de los dos lados cambia. **El contrato entre cliente y servidor es el mismo contrato**: si uno dice 422, el otro tiene que decir 422.
+
+**Tests** — suite completa: **1399 tests · 1397 verdes · 0 fallos · 2 omitidos**. Los tres candados del script de limpieza (firma más nueva que el corte, versión con la huella del legal sellado, firma con hold legal) **abortan sin tocar nada**, y eso está probado.
+
+**Bugs encontrados** — dos 400 míos que el **ensayo local contra el servicio real** atrapó antes de tocar producción: el multipart de `POST /internal/sign-requests` lleva un campo `metadata` con un JSON **string** (no campos sueltos) y su `metadata` anidado también es string (no objeto); y `tipo_identificacion: 'OTRO'` no existe (el valor es `OTROSI`).
+
+El fix del `metadata` llegó a producción a mano (paquete por HTTP + `install`), no por el despliegue: el tar se descargó bien pero la extracción no se aplicó. Lo detectó el propio script de humo, en el primer paso que escribe.
+
+**Archivos tocados**
+
+| Archivo | Qué |
+|---|---|
+| `firma-service/scripts/limpiar-rastro-prueba.js` | nuevo — la limpieza del rastro de prueba, con recibo |
+| `firma-service/scripts/publicar-acuerdo-legal.js` | nuevo — publica el texto legal desde el archivo sellado |
+| `firma-service/scripts/smoke-produccion.js` | nuevo — la prueba de humo (22 tests) |
+| `firma-service/tests/scripts/smoke-produccion.test.js` | nuevo — 22 tests |
+| `PROMPT.md` | las trampas #50 a #53 |
+| `sgsst-electron-app/BITACORA.md` | la lección de los dos 400 y la del e2e que daba verde |
+
+**Commits** — 📦925 en `Dev`, sin push.
+
+---
+
 ### 2026-10-20 · 📦924 · El carril de producción: el plan de despliegue, la prueba de humo y los tres hallazgos que pararían el despliegue
 
 **Qué se hizo** — todo lo que se puede hacer sin entrar al servidor:
