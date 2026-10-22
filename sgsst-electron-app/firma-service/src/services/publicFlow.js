@@ -862,8 +862,18 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
   }
 
   // 3. Validar que tenemos los datos de identificación guardados
+  //
+  // OJO CON EL STATUS: 422, no 500. Este es un error de VALIDACION (la
+  // solicitud no trae lo que el firmante tiene que escribir), igual que
+  // los dos IDENTIFICATION_FAILED de mas abajo. El mini-app ramifica con
+  // `err.status === 422 && err.code === 'MISSING_IDENTIFICATION_DATA'`
+  // (web/firma/app.js): con un 500 caia en la rama generica y el firmante
+  // veia "no se pudo verificar" en vez del mensaje que dice que la
+  // solicitud no tiene su identificacion registrada. El contrato entre
+  // cliente y servidor es el mismo contrato: si uno dice 422, el otro
+  // tiene que decir 422.
   if (!signRequest.identificacion_numero_hash || !signRequest.identificacion_tipo) {
-    throw new AppError(500, 'MISSING_IDENTIFICATION_DATA',
+    throw new AppError(422, 'MISSING_IDENTIFICATION_DATA',
       'La solicitud no tiene datos de identificación del trabajador');
   }
 

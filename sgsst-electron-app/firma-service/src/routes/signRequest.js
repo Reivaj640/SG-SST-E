@@ -291,6 +291,14 @@ router.post('/sign-requests',
       // route no propagaba este campo; zod lo validaba y el service lo
       // aceptaba, pero terminaba en `undefined` → `null` en BD silencioso.
       tipo_identificacion: meta.tipo_identificacion,
+      // 033 · Catálogo de retención por documento. La categoría decide el
+      // plazo (20 años desde el cese, contrato sin término, historia laboral
+      // 80-100 años) y la fecha de terminación es la base del cómputo. Si no
+      // vienen, el servidor deriva la categoría del tipo + subtipo, y si
+      // tampoco hay datos la solicitud queda legacy (tabla de la Empresa).
+      categoria_retencion: meta.categoria_retencion || null,
+      fecha_terminacion: meta.fecha_terminacion || null,
+      subtipo_identificacion: meta.subtipo_identificacion || null,
       // I-103.A1.6.C · El correo del firmante viaja top-level; si K+AIR no lo
       // envía, cae al fallback histórico de metadata.correo / consent.
       correo_verificacion: meta.correo_verificacion,
@@ -332,6 +340,10 @@ router.post('/sign-requests',
       // I-002: confirmamos al cliente que el campo fue persistido (o null
       // si no se envió, en sign requests legacy pre-007).
       tipo_identificacion: result.signRequest.tipo_identificacion,
+      // 033: la categoría de retención y la fecha de conservación ya
+      // calculada, para que el cliente pueda mostrarlas sin volver a preguntar.
+      categoria_retencion: result.signRequest.categoria_retencion || null,
+      fecha_conservacion: result.signRequest.fecha_conservacion || null,
     });
   } catch (err) {
     next(err);

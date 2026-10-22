@@ -7,6 +7,14 @@
 
 const { z } = require('zod');
 const { TIPOS_IDENTIFICACION } = require('../services/signRequest');  // I-002: single source of truth
+const { CATEGORIAS: CATALOGO_RETENCION } = require('../services/retencion');  // 033
+
+// Los ids del catálogo de retención por documento. Es la lista que la API
+// acepta: un id fuera de esta lista se rechaza con 400 (no se inventa un
+// plazo ni se cae a la tabla de la Empresa por un valor mal escrito).
+const CATEGORIAS_RETENCION = Object.freeze(
+  CATALOGO_RETENCION.map((c) => c.id)
+);
 
 /**
  * Schema del body de POST /internal/consentimientos.
@@ -97,6 +105,16 @@ const signRequestBody = z.object({
   // de OTP. Optional por retrocompatibilidad (SRs legacy sin este campo
   // caen al fallback de metadata.correo / consent.correo_verificacion).
   correo_verificacion: z.string().email().max(254).optional(),
+  // D-2 · El correo PERSONAL al que va el código de verificación (el dato de
+  // creación de la firma, 47.4 num. 1). La app de escritorio usa UN solo
+  // correo para la invitación y el OTP cuando la Empresa no tiene buzones
+  // corporativos; el trabajador puede corregirlo en la mini-app antes de que
+  // el código se envíe.
+  //
+  // Se acepta la cadena vacía por compatibilidad con versiones anteriores de
+  // la app que mandaban el campo sin diligenciar; el service la interpreta
+  // como "sin medio declarado" y cae al contacto registrado.
+  correo_otp: z.union([z.literal(''), z.string().email().max(254)]).optional(),
   // `ttl_horas` se ACEPTA pero el servidor lo IGNORA: la vigencia del
   // enlace la calcula el servicio según la modalidad (remoto 72 h,
   // presencial 24 h), porque el numeral 3.4(c) del Acuerdo la fija. Antes
@@ -132,6 +150,28 @@ const signRequestBody = z.object({
   // Opcional en v1: si K+AIR no lo envía, queda NULL (compatibilidad con
   // sign requests legacy pre-migration 007).
   tipo_identificacion: z.enum(TIPOS_IDENTIFICACION).optional(),
+  // 033 · CATÁLOGO DE RETENCIÓN POR DOCUMENTO.
+  //
+  // `categoria_retencion` dice de qué tipo de documento se trata, para que el
+  // plazo sea el que corresponde a ESE documento y no el único plazo de la
+  // tabla de la Empresa. Ejemplos: una inducción se conserva 20 años desde el
+  // cese (2.2.4.6.13 del Decreto 1072); un contrato electrónico se conserva
+  // sin término (2.2.1.1.12).
+  //
+  // Opcional: si no viene, el servidor lo deriva de `tipo_identificacion` +
+  // `subtipo_identificacion`, y si tampoco hay datos la solicitud queda como
+  // legacy (tabla de la Empresa, texto vivo).
+  categoria_retencion: z.enum(CATEGORIAS_RETENCION).optional(),
+  // `fecha_terminacion`: el cese de la relación laboral (SST) o el retiro
+  // (historia laboral). Es la base de los 20 y de los 100 años. Si falta, la
+  // fila queda PENDIENTE (sin fecha de supresión): no se inventa.
+  fecha_terminacion: z.union([
+    z.literal(''),
+    z.string().max(40),
+  ]).optional(),
+  // `subtipo_identificacion`: texto libre que ajuda a derivar la categoría
+  // cuando el cliente no manda la explícita (ej. "induccion").
+  subtipo_identificacion: z.string().min(1).max(120).optional(),
   // 8B · El correo de la Empresa a donde se pide la copia del documento
   // firmado (el canal de copia del 8.4/8.5).
   //

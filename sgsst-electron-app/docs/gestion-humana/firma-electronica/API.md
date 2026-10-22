@@ -209,7 +209,7 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `AGREEMENT_VERSION_REACCEPT_REQUIRED` | Lo mismo, detectado en la puerta del documento: sin aceptar la versión vigente no se sirve el documento (el orden (g) → (h) del 3.4). `details.accion = "reaceptar_version_vigente"` |
 | `CONSENT_NOT_FOUND` | El `consent_id` no existe. |
 | `EMPRESA_NOT_FOUND` | La empresa no existe en el directorio de empresas. |
-| `EMPRESA_NO_HABILITADA` | La empresa registrada **no tiene Anexo de Encargo firmado**, **no ha declarado el plazo de conservación** (el 1.4 y el 8.6) o **no tiene canal de atención** (decisión del owner, 2026-10-20: sin canal, el derecho del 7.2-7.3 a la firma en papel no tiene puerta). La solicitud de firma **no se crea**. El `details.pendientes` dice qué falta (`anexo_encargo_firmado`, `plazo_retencion`, `canal_pqrs`) y el mensaje dice dónde se resuelve. El override es el del D-03 (la bandera + el WARN con código + el inventario). Ver §6.16.5. |
+| `EMPRESA_NO_HABILITADA` | La empresa registrada **no tiene Anexo de Encargo firmado**, **no ha declarado el plazo de conservación** (el 1.4 y el 8.6) o **no tiene canal de atención** (decisión del owner, 2026-10-20: sin canal, el derecho del 7.2-7.3 a la firma en papel no tiene puerta). La solicitud de firma **no se crea**. El `details.pendientes` dice qué falta (`anexo_encargo_firmado`, `plazo_retencion`, `canal_pqrs`) y el mensaje dice dónde se resuelve. El override es el del D-03 (la bandera + el WARN con código + el inventario). Ver §6.16.5. **Excepción del catálogo por documento:** si la solicitud lleva una categoría con plazo legal propio (SST, contrato electrónico, historia laboral), la falta de `plazo_retencion_dias` **no** bloquea: el plazo lo fija la ley, no la tabla de la Empresa. Ver §6.13.6. |
 | `PAPER_ALREADY_SIGNED` | La solicitud ya tiene una firma autográfica registrada (409). No se puede registrar dos veces |
 | `PAPER_REQUEST_NOT_FOUND` | No hay firma en papel para esa solicitud (404) |
 | `DOCUMENT_NOT_SIGNED` | Se pidió el suministro a una autoridad de un documento que todavía no está firmado (409) |
@@ -1237,6 +1237,9 @@ Content-Type: application/pdf
 | `finalidad_sensible` | string | no | Para qué se usa el dato sensible. Va en el aviso previo. |
 | `base_legal_sensible` | string | no | Base legal del tratamiento del dato sensible. Va en el aviso previo. |
 | `representante_legal_snapshot` | object | no | **Nuevo en la 8B.** Snapshot del representante legal, para la firma dual: `{ nombre, cargo, tipo_identificacion, numero_identificacion, correo }`. **El `numero_identificacion` se cifra antes de archivarse** (AES-256-GCM, llave fuera de la base): no queda en texto claro en la base ni en las respuestas. Ver §6.16. |
+| `categoria_retencion` | string | no | **Nuevo en el catálogo por documento.** Id del catálogo de `src/services/retencion.js`: `SST_PERFIL_Y_CONCEPTOS_MEDICOS`, `SST_EXAMENES_ESPECIALIZADOS`, `SST_MONITOREO_AMBIENTAL`, `SST_CAPACITACION`, `SST_EPP`, `CONTRATO_TRABAJO`, `HISTORIA_LABORAL`, `ASPIRANTE`, `TABLA_EMPRESA`. Un id fuera de la lista se **rechaza con 400**. Ver §6.13.6. |
+| `fecha_terminacion` | string | no | **Nuevo en el catálogo por documento.** Fecha del **cese** de la relación laboral (SST) o del **retiro** (historia laboral). Es la base del cómputo de 20 y de 100 años. Si no viene, la fila queda con `fecha_conservacion` nula y un aviso: **no se inventa la fecha**. |
+| `subtipo_identificacion` | string | no | Subtipo libre del documento (p. ej. `induccion`). **Solo** sirve para derivar la categoría cuando el cliente no manda `categoria_retencion`. La categoría explícita siempre gana. |
 
 **Validación del PDF**:
 
@@ -1258,7 +1261,9 @@ Content-Type: application/pdf
   "document_hash_original": "9a73f8c7...",
   "fecha_creacion": "2026-08-17T15:30:00.000000Z",
   "fecha_expiracion": "2026-08-18T15:30:00.000000Z",
-  "estado": "PENDING"
+  "estado": "PENDING",
+  "categoria_retencion": "SST_CAPACITACION",
+  "fecha_conservacion": "2046-01-15T00:00:00.000Z"
 }
 ```
 
@@ -2022,6 +2027,72 @@ entre un deber legal y un accidente.
 **El flag no se toca si el body no lo trae**: levantarlo es un acto, con
 actor y motivo; un `PUT` de rutina no puede dejar el deber legal en off por
 accidente. Para levantarlo hay que mandar `false` explícito.
+
+### 6.13.6 El catálogo de retención por tipo de documento
+
+**Por qué existe.** `plazo_retencion_dias` es **un** plazo por Empresa y se
+cuenta desde la firma. Eso no puede representar los plazos que la ley fija
+por documento:
+
+- El artículo **2.2.4.6.13 del Decreto 1072 de 2015** ordena conservar por un
+  mínimo de **20 años, contados desde el cese de la relación laboral**, cinco
+  grupos de registros del SG-SST. Para los demás documentos, el mismo
+  artículo remite al sistema de archivo o retención documental de la Empresa.
+- El artículo **2.2.1.1.12** (adicionado por el Decreto 526 de 2021) obliga a
+  conservar los **contratos de trabajo firmados electrónicamente** con
+  autenticidad, integridad y disponibilidad, **sin fijar término**.
+- La **historia laboral y la nómina** tienen un deber de conservación ligado a
+  los derechos pensionales (Corte Constitucional T-470/2019). El Concepto
+  2-2017-01654 del Archivo General de la Nación sugiere un rango de **80 a 100
+  años desde el retiro**: el catálogo aplica el **máximo (100)**.
+
+**El catálogo** (`src/services/retencion.js`):
+
+| `categoria_retencion` | Regla | Base del cómputo | Texto que se comunica |
+|---|---|---|---|
+| `SST_PERFIL_Y_CONCEPTOS_MEDICOS` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
+| `SST_EXAMENES_ESPECIALIZADOS` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
+| `SST_MONITOREO_AMBIENTAL` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
+| `SST_CAPACITACION` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
+| `SST_EPP` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
+| `CONTRATO_TRABAJO` | `CONTRATO_ELECTRONICO` | sin fecha + **hold** | 2.2.1.1.12 |
+| `HISTORIA_LABORAL` | `HISTORIA_LABORAL` | retiro + 100 años | T-470/2019 · AGN 2-2017-01654 |
+| `ASPIRANTE` | `TABLA_EMPRESA` | la tabla de la Empresa | el de la Empresa |
+| `TABLA_EMPRESA` | `TABLA_EMPRESA` | la tabla de la Empresa | el de la Empresa |
+
+**Cómo se resuelve la categoría** (en este orden):
+
+1. `categoria_retencion` explícita → manda ella. Si el id no existe → **400**.
+2. Si no viene, se deriva de `tipo_identificacion` + `subtipo_identificacion`
+   (p. ej. `CONTRATO` → `CONTRATO_TRABAJO`; `FORMATO` + `induccion` →
+   `SST_CAPACITACION`).
+3. Si hay tipo pero no hay coincidencia → `TABLA_EMPRESA`.
+4. Si no hay ni tipo ni subtipo → la solicitud queda **legacy**: las cuatro
+   columnas nuevas quedan en `NULL` y se conserva el comportamiento anterior
+   (tabla de la Empresa con texto vivo). **No hay backfill.**
+
+**Columnas nuevas** (migración `033_retencion_por_documento`):
+
+| Columna | Qué guarda |
+|---|---|
+| `categoria_retencion` | El id del catálogo. `NULL` = legacy. |
+| `regla_retencion` | La regla aplicada (`SST_20_ANOS`, `CONTRATO_ELECTRONICO`, `HISTORIA_LABORAL`, `TABLA_EMPRESA`). `NULL` en las legacy. |
+| `fecha_terminacion` | El cese o el retiro. `NULL` si aún no se conoce. |
+| `plazo_retencion_aplicable` | El texto que se le comunica al Trabajador para **esta** solicitud. Congela el legal (y también el de la tabla de la Empresa cuando la categoría es explícita). |
+
+**Sin fecha de cese/retiro no se inventa nada**: la fila queda con
+`fecha_conservacion` nula y un aviso (`RETAIN_PENDIENTE_CESE` /
+`RETAIN_PENDIENTE_RETIRO`). Sin fecha no hay supresión.
+
+**La habilitación de la Empresa cambia con esto**: una solicitud de categoría
+`SST_*`, `CONTRATO_TRABAJO` o `HISTORIA_LABORAL` **no** exige que la Empresa
+haya declarado `plazo_retencion_dias` (el plazo lo fija la ley). La
+solicitud legacy, `TABLA_EMPRESA` y `ASPIRANTE` sí lo exigen. Ver
+§6.16.5 (`EMPRESA_NO_HABILITADA`).
+
+**La firma dual hereda**: el hijo (firma del representante) es el mismo
+documento, así que hereda la categoría, la regla, la fecha de terminación, el
+texto y la `fecha_conservacion` del padre, y el hold si el padre lo tiene.
 
 ### 6.14 `POST /internal/sign-requests/{id}/link/rotate` - el enlace, otra vez
 

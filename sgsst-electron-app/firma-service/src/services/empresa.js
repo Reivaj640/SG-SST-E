@@ -48,6 +48,7 @@ const db = require('../db/connection');
 const { sha256 } = require('../crypto/hash');
 const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
 const representanteService = require('./representante');
+const retencion = require('./retencion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -440,12 +441,31 @@ function snapshotColumnsFor(id_empresa) {
  * (`/verify`) sí se enmascara, porque ahí el lector no es el firmante.
  *
  * @param {string} id_empresa
+ * @param {object} [overrides] - Texto de retención propio de la solicitud
+ *   (catálogo por documento). Si no se pasa, se usa la Empresa viva, que es el
+ *   comportamiento de las solicitudes legacy.
  * @returns {object|null}
  */
-function publicViewFor(id_empresa) {
+function publicViewFor(id_empresa, overrides) {
   const snap = buildSnapshot(id_empresa);
   if (!snap) return null;
   const empresa = getActiva(id_empresa);
+  const extra = (overrides && typeof overrides === 'object') ? overrides : {};
+  const tiene = (campo) => Object.prototype.hasOwnProperty.call(extra, campo);
+
+  // El texto y el deber legal pueden venir de la fila de la solicitud (20 años
+  // desde el cese, contrato electrónico, historia laboral). Si no vienen, se
+  // conserva la Empresa viva: las solicitudes viejas no cambian de golpe.
+  const plazoRetencion = tiene('plazo_retencion')
+    ? extra.plazo_retencion
+    : snap.datos.plazo_retencion;
+  const deberLegal = tiene('conservacion_por_deber_legal')
+    ? Boolean(extra.conservacion_por_deber_legal)
+    : Boolean(empresa && empresa.conservacion_por_deber_legal);
+  const normaConservacion = tiene('norma_conservacion')
+    ? (extra.norma_conservacion || null)
+    : ((empresa && empresa.norma_conservacion) || null);
+
   return {
     id_empresa: snap.datos.id_empresa,
     razon_social: snap.datos.razon_social,
@@ -458,14 +478,14 @@ function publicViewFor(id_empresa) {
     canal_pqrs: snap.datos.canal_pqrs,
     canal_incidentes: snap.datos.canal_incidentes,
     politica_datos_url: snap.datos.politica_datos_url,
-    plazo_retencion: snap.datos.plazo_retencion,
+    plazo_retencion: plazoRetencion,
     canal_solicitud_copia: snap.datos.canal_solicitud_copia,
     // El deber legal de conservación sin término (migración 029). Va en la
     // vista pública porque el 8.6 obliga a COMUNICAR al Trabajador el plazo
     // y dónde pedir copia: si su documento no se borra, eso también se
     // comunica (y es mejor que el Trabajador lo sepa).
-    conservacion_por_deber_legal: Boolean(empresa && empresa.conservacion_por_deber_legal),
-    norma_conservacion: (empresa && empresa.norma_conservacion) || null,
+    conservacion_por_deber_legal: deberLegal,
+    norma_conservacion: normaConservacion,
     huella: snap.huella,
   };
 }
@@ -727,10 +747,15 @@ function listConPendientes() {
  * empresa. Este control es para las empresas que YA están en el registro.
  *
  * @param {string} id_empresa
+ * @param {object} [opciones]
+ * @param {string} [opciones.categoria_retencion] - Categoría del catálogo por
+ *   documento. Si la categoría trae un plazo legal propio (SST, contrato
+ *   electrónico, historia laboral), la Empresa NO necesita declarar
+ *   `plazo_retencion_dias`: el plazo lo fija la ley, no la tabla de la Empresa.
  * @returns {{ok: boolean, registrada: boolean, id_empresa: string,
  *   pendientes: string[], mensaje: string}}
  */
-function verificarHabilitacionFirma(id_empresa) {
+function verificarHabilitacionFirma(id_empresa, opciones) {
   const empresa = getById(id_empresa);
   if (!empresa) {
     return {
@@ -742,9 +767,18 @@ function verificarHabilitacionFirma(id_empresa) {
     };
   }
 
+  const categoria = opciones && opciones.categoria_retencion;
+  const regla = categoria ? retencion.reglaDe(categoria) : null;
+  // SST, contrato electrónico e historia laboral NO dependen de la tabla de la
+  // Empresa: el plazo (o el hold) lo fija la ley. `TABLA_EMPRESA` y `ASPIRANTE`
+  // sí la necesitan; una solicitud legacy también.
+  const tienePlazoLegalPropio = Boolean(regla && regla.id !== 'TABLA_EMPRESA');
+
   const pendientes = [];
   if (!empresa.anexo_encargo_firmado_at) pendientes.push('anexo_encargo_firmado');
-  if (!empresa.plazo_retencion_dias) pendientes.push('plazo_retencion');
+  if (!empresa.plazo_retencion_dias && !tienePlazoLegalPropio) {
+    pendientes.push('plazo_retencion');
+  }
   // El canal de atención (el 7.2-7.3): sin él, el derecho del Trabajador a la
   // firma autográfica no tiene puerta. Cuando el rechazo del D-2 esté
   // encendido, el 400 le dice al Trabajador «pedile a tu Empresa la firma en

@@ -1044,6 +1044,219 @@ test('adminCreateClient: api_key en response (DR-3) — el bridge NO debe propag
     });
 });
 
+// =====================================================================
+//  Suite: Admin endpoints de identidad de empresa (📦927)
+//  OJO: `empresas` es la identidad legal (gh_firma_empresas) y `clientes`
+//  es la credencial (gh_firma_clientes). Son endpoints y modelos distintos.
+// =====================================================================
+
+var EMPRESA_FIXTURE = {
+  id_empresa: '900123456',
+  razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+  nit: '900123456',
+  domicilio: 'Calle 100 # 20-30',
+  domicilio_municipio: 'Barranquilla',
+  domicilio_departamento: 'Atlántico',
+  representante_legal: 'ANA PEREZ',
+  representante_legal_identificacion: 'CC 123456789',
+  responsable_tratamiento: 'ANA PEREZ',
+  responsable_tratamiento_correo: 'ana@example.test',
+  canal_pqrs: 'pqrs@example.test',
+  canal_incidentes: 'seguridad@example.test',
+  politica_datos_url: 'https://example.test/privacidad',
+  plazo_retencion: '10 años',
+  plazo_retencion_dias: 3650,
+  canal_solicitud_copia: 'contacto@example.test',
+  conservacion_por_deber_legal: false,
+  norma_conservacion: null,
+  activo: true,
+  anexo_encargo_firmado_at: '2026-10-01T12:00:00.000Z',
+  created_at: '2026-09-01T12:00:00.000Z',
+  updated_at: '2026-10-01T12:00:00.000Z',
+  huella_snapshot: 'abc123'
+};
+
+test('adminGetEmpresa: hace GET /internal/admin/empresas/:id con X-Admin-API-Key', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, EMPRESA_FIXTURE, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminGetEmpresa('900123456').then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.id_empresa, '900123456');
+    assert.equal(r.data.razon_social, 'EMPRESA DE PRUEBA S.A.S.');
+    assert.equal(r.data.huella_snapshot, 'abc123');
+    assert.equal(mockFetch.calls.length, 1);
+    assert.equal(mockFetch.calls[0].opts.method, 'GET');
+    assert.ok(mockFetch.calls[0].url.indexOf('/internal/admin/empresas/900123456') !== -1);
+    assert.equal(mockFetch.calls[0].opts.headers['X-Admin-API-Key'], ADMIN_API_KEY);
+    assert.ok(!mockFetch.calls[0].opts.headers['X-Internal-API-Key']);
+    assert.equal(mockFetch.calls[0].opts.body, undefined);
+  });
+});
+
+test('adminGetEmpresa: 404 EMPRESA_NOT_FOUND se propaga sin inventar datos', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(404, {
+      error: {
+        code: 'EMPRESA_NOT_FOUND',
+        message: 'No existe la empresa 900000000',
+        details: { id_empresa: '900000000' },
+        request_id: 'req_emp_404'
+      }
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminGetEmpresa('900000000').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'EMPRESA_NOT_FOUND');
+    assert.equal(r.error.requestId, 'req_emp_404');
+  });
+});
+
+test('adminGetEmpresa: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED sin llamar fetch', function () {
+  var called = false;
+  var c = makeClient({ _fetch: function () { called = true; throw new Error('NO'); } });
+  return c.adminGetEmpresa('900123456').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+    assert.equal(called, false);
+  });
+});
+
+test('adminGetEmpresa: id vacío retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminGetEmpresa('').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+  });
+});
+
+test('adminUpdateEmpresa: hace PUT con body completo y id codificado', function () {
+  var body = {
+    razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+    nit: '900123456',
+    domicilio: 'Calle 100 # 20-30',
+    representante_legal: 'ANA PEREZ',
+    plazo_retencion_dias: 3650
+  };
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, Object.assign({}, EMPRESA_FIXTURE, body), 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminUpdateEmpresa('900.123/4', body).then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.nit, '900123456');
+    assert.equal(mockFetch.calls.length, 1);
+    assert.equal(mockFetch.calls[0].opts.method, 'PUT');
+    assert.ok(mockFetch.calls[0].url.indexOf('/internal/admin/empresas/900.123%2F4') !== -1,
+      'el id debe ir codificado en el path');
+    assert.deepEqual(JSON.parse(mockFetch.calls[0].opts.body), body);
+    assert.equal(mockFetch.calls[0].opts.headers['X-Admin-API-Key'], ADMIN_API_KEY);
+  });
+});
+
+test('adminUpdateEmpresa: sin id o sin body retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return Promise.all([
+    c.adminUpdateEmpresa('', { razon_social: 'X' }),
+    c.adminUpdateEmpresa('900123456', null),
+    c.adminUpdateEmpresa('900123456', [])
+  ]).then(function (results) {
+    results.forEach(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    });
+  });
+});
+
+test('adminUpdateEmpresa: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED', function () {
+  var c = makeClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminUpdateEmpresa('900123456', { razon_social: 'X' }).then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+  });
+});
+
+test('adminUpdateEmpresa: error de validación del backend se propaga', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(400, {
+      error: {
+        code: 'INVALID_REQUEST_BODY',
+        message: 'razon_social es requerido',
+        details: { issues: [{ path: 'razon_social', message: 'Required' }] },
+        request_id: 'req_emp_400'
+      }
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminUpdateEmpresa('900123456', { nit: '900123456' }).then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    assert.equal(r.error.details.issues[0].path, 'razon_social');
+  });
+});
+
+test('adminCreateEmpresa: hace POST /internal/admin/empresas con body', function () {
+  var body = {
+    id_empresa: '900123456',
+    razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+    nit: '900123456'
+  };
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(201, Object.assign({}, EMPRESA_FIXTURE, body), 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateEmpresa(body).then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.id_empresa, '900123456');
+    assert.equal(mockFetch.calls.length, 1);
+    assert.equal(mockFetch.calls[0].opts.method, 'POST');
+    assert.ok(mockFetch.calls[0].url.indexOf('/internal/admin/empresas') !== -1);
+    assert.deepEqual(JSON.parse(mockFetch.calls[0].opts.body), body);
+    assert.equal(mockFetch.calls[0].opts.headers['X-Admin-API-Key'], ADMIN_API_KEY);
+  });
+});
+
+test('adminCreateEmpresa: exige id_empresa y razon_social', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return Promise.all([
+    c.adminCreateEmpresa(null),
+    c.adminCreateEmpresa({ razon_social: 'X' }),
+    c.adminCreateEmpresa({ id_empresa: '900123456' })
+  ]).then(function (results) {
+    results.forEach(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    });
+  });
+});
+
+test('adminCreateEmpresa: 409 EMPRESA_ALREADY_EXISTS se propaga', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(409, {
+      error: {
+        code: 'EMPRESA_ALREADY_EXISTS',
+        message: 'Ya existe una empresa con id 900123456',
+        request_id: 'req_emp_409'
+      }
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateEmpresa({ id_empresa: '900123456', razon_social: 'X' })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'EMPRESA_ALREADY_EXISTS');
+    });
+});
+
+test('createFirmaClient: expone los 3 métodos admin de empresa', function () {
+  var c = makeAdminClient();
+  ['adminCreateEmpresa', 'adminGetEmpresa', 'adminUpdateEmpresa'].forEach(function (m) {
+    assert.equal(typeof c[m], 'function', m + ' debe estar expuesto');
+  });
+});
+
 test('adminListClients: omitir filtros no agrega query string', function () {
   var mockFetch = makeFetchMock(function () {
     return makeResponse(200, { total: 0, limit: 100, offset: 0, items: [] }, 'application/json');

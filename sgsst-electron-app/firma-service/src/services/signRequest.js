@@ -35,6 +35,7 @@ const metadataService = require('./metadata');  // 8B: lista blanca de lo que se
 const sensibles = require('./sensibles');  // 8B: documentos con información de salud (10.8)
 const representanteService = require('./representante');  // 8B: el número del representante va cifrado
 const conservacion = require('./conservacion');
+const retencion = require('./retencion');  // catálogo de retención por documento
 const empresaService = require('./empresa');  // D-03: habilitación de la Empresa (1.4 y 8.6)
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
@@ -309,6 +310,21 @@ async function notifyRemote(signRequest, correo, opts = {}) {
         error: e.message,
       });
     }
+    // 033 · CATÁLOGO POR DOCUMENTO.
+    //
+    // Si la solicitud tiene categoría propia, lo que se comunica es el plazo
+    // de ESE documento (20 años desde el cese, contrato sin término, historia
+    // laboral), no el de la tabla de la Empresa. Y si la fila tiene un hold,
+    // el Trabajador tiene que saber que su documento no se borra.
+    if (signRequest.plazo_retencion_aplicable) {
+      plazoRetencion = signRequest.plazo_retencion_aplicable;
+    }
+    if (signRequest.hold_legal === 1) {
+      const alcance = signRequest.motivo_hold
+        ? String(signRequest.motivo_hold).replace(/^deber_legal_/, '')
+        : null;
+      deberLegal = { activo: true, norma: alcance || deberLegal.norma || null };
+    }
     sendResult = await mailer.sendInvite({
       to: correo,
       url_publica: urlPublica,
@@ -468,6 +484,18 @@ const TIPOS_IDENTIFICACION = Object.freeze([
  *        documento de identificación del firmante. Ver TIPOS_IDENTIFICACION.
  *        Opcional en v1: si no se envía, queda NULL (sign requests legacy
  *        pre-migration 007).
+ * @param {string} [opts.categoria_retencion] - Categoría del catálogo de
+ *        retención por documento (services/retencion.js). Si no se envía, se
+ *        deriva de `tipo_identificacion` + `subtipo_identificacion`; si
+ *        tampoco hay datos, la solicitud es legacy y usa la tabla de la
+ *        Empresa. La categoría explícita siempre gana.
+ * @param {string} [opts.fecha_terminacion] - Fecha de cese de la relación
+ *        laboral (SST) o de retiro (historia laboral). Es la base de los 20 o
+ *        100 años. Si falta, la fecha de conservación queda NULL y la fila se
+ *        marca pendiente: no se inventa.
+ * @param {string} [opts.subtipo_identificacion] - Subtipo libre del documento
+ *        (ej. "induccion", "examen_especializado"). Solo se usa para derivar
+ *        la categoría cuando no viene explícita.
  * @param {number} [opts.consent_id] - id de gh_consentimientos_firma (Bloque E6).
  *        Se persiste en la fila; la validación contra manifestacion_aceptada
  *        y (id_trabajador, id_empresa, agreement_version) se hace en
@@ -481,6 +509,9 @@ function create({
   identificacion_tipo, identificacion_numero_hash,
   identificacion_numero_sal,  // P1-2: opcional, server genera si falta
   tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
+  categoria_retencion,  // catálogo por documento (SST, contrato, historia laboral)
+  fecha_terminacion,    // cese/retiro: base de los 20/100 años
+  subtipo_identificacion,  // libre: ayuda a derivar la categoría
   consent_id,
   correo_verificacion,  // I-103.A1.6.C · RF-FIRMA-CORREO-01
   // D-2 (2026-10-20, decisión del owner): el MEDIO PERSONAL que declara la
@@ -533,6 +564,42 @@ function create({
   validateAcuerdo(agreement_version, agreement_hash);
 
   // ───────────────────────────────────────────────────────────────────────────
+  // CATÁLOGO DE RETENCIÓN POR DOCUMENTO
+  // ───────────────────────────────────────────────────────────────────────────
+  //
+  // La categoría decide el plazo. Se resuelve ANTES de la habilitación porque
+  // una inducción o un contrato NO dependen de que la Empresa haya declarado
+  // `plazo_retencion_dias`: el plazo (o el hold) lo fija la ley. La categoría
+  // explícita gana; si no viene, se deriva del tipo + subtipo; si no hay datos,
+  // la solicitud es legacy y sigue con la tabla de la Empresa.
+  let categoriaResuelta = null;
+  try {
+    if (categoria_retencion != null) retencion.validarCategoria(categoria_retencion);
+    categoriaResuelta = retencion.resolverCategoria({
+      categoria_retencion,
+      tipo_identificacion,
+      subtipo_identificacion,
+      metadata,
+    });
+  } catch (e) {
+    if (e.code === 'CATEGORIA_RETENCION_INVALIDA') {
+      throw new AppError(400, 'INVALID_REQUEST_BODY', e.message, {
+        categorias: e.categorias,
+      });
+    }
+    throw e;
+  }
+
+  const fechaTerminacion = fecha_terminacion == null
+    ? null
+    : retencion.normalizarFecha(fecha_terminacion);
+  if (fecha_terminacion != null && !fechaTerminacion) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'fecha_terminacion debe ser una fecha válida (ISO o YYYY-MM-DD)',
+      { provided: fecha_terminacion });
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
   // D-03 · LA EMPRESA TIENE QUE ESTAR HABILITADA
   // ───────────────────────────────────────────────────────────────────────────
   //
@@ -549,7 +616,9 @@ function create({
   // La bandera `FIRMA_EXIGIR_HABILITACION_EMPRESA` existe para la
   // transición: con ella apagada, la firma pasa pero queda un WARN con
   // código. No hay default silencioso.
-  const habilitacion = empresaService.verificarHabilitacionFirma(id_empresa);
+  const habilitacion = empresaService.verificarHabilitacionFirma(id_empresa, {
+    categoria_retencion: categoriaResuelta,
+  });
   if (habilitacion.ok === false) {
     if (config.exigirHabilitacionEmpresa) {
       throw new AppError(409, 'EMPRESA_NO_HABILITADA', habilitacion.mensaje, {
@@ -623,6 +692,19 @@ function create({
     : config.ttl.tokenHoursRemote;
   const now = new Date();
   const fecha_expiracion = new Date(now.getTime() + ttl_horas * 3600 * 1000).toISOString();
+
+  // El plan de retención se calcula con la MISMA fecha de creación que se
+  // inserta. Solo para las categorías explícitas/derivadas: las legacy siguen
+  // por `asignarFechaConservacion`, que lee la Empresa viva.
+  let planRetencion = null;
+  if (categoriaResuelta) {
+    planRetencion = retencion.planificar({
+      categoria_retencion: categoriaResuelta,
+      fecha_creacion: now.toISOString(),
+      fecha_terminacion: fechaTerminacion,
+      empresa: empresaService.getById(id_empresa),
+    });
+  }
 
   // Guardar PDF
   const safe_filename = `${id_solicitud}.pdf`;
@@ -756,8 +838,10 @@ function create({
          id_trabajador_alg,  -- migration 019 (seudónimo) · 022 (ámbito y versión)
          datos_sensibles, categorias_sensibles, finalidad_sensible,  -- 8B (migration 027)
          base_legal_sensible, aviso_sensible_texto, aviso_sensible_hash,  -- 8B (migration 027)
-         aviso_sensible_version)  -- 8B (migration 027)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         aviso_sensible_version,  -- 8B (migration 027)
+         categoria_retencion, regla_retencion, fecha_terminacion,  -- 033
+         plazo_retencion_aplicable)  -- 033
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador_guardado, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
@@ -800,6 +884,13 @@ function create({
       clasificacionSensible.sensible ? avisoSensible.texto : null,
       clasificacionSensible.sensible ? avisoSensible.hash : null,
       clasificacionSensible.sensible ? avisoSensible.version : null,
+      // 033 · Retención por documento. `regla_retencion` y el texto quedan
+      // NULL en las solicitudes legacy: así la vista pública sigue leyendo la
+      // Empresa viva, como antes de este catálogo.
+      categoriaResuelta,
+      categoriaResuelta ? planRetencion.regla : null,
+      fechaTerminacion,
+      categoriaResuelta ? planRetencion.texto : null,
     );
     const firmaId = result.lastInsertRowid;
 
@@ -874,36 +965,46 @@ function create({
     // "que le resulta aplicable" al firmante cuando se le pide la firma, y
     // que la Empresa cambie su política después no mueve lo ya firmado.
     try {
-      const fecha = conservacion.asignarFechaConservacion(firmaId, id_empresa, now.toISOString());
-      if (!fecha) {
-        // Aquí hay DOS motivos distintos y la diferencia importa:
-        //
-        //  (a) La Empresa no declaró plazo de conservación. Esta firma NO
-        //      tendrá fecha y nunca podrá suprimirse. Retener de forma
-        //      indefinida tampoco es cumplimiento del 8.6: es una alerta de
-        //      onboarding, no un detalle operativo. El sistema no inventa
-        //      plazos (el 8.6 dice que el Acuerdo no los fija porque la ley
-        //      no los fija).
-        //
-        //  (b) La Empresa declaró un DEBER LEGAL de conservación sin término
-        //      (2.2.1.1.12 del Decreto 1072). Ahí NO hay fecha de supresión
-        //      porque el plazo de la tabla de retención no extingue ese deber,
-        //      y se levantó un hold automático. Es lo correcto, no una
-        //      alerta.
-        const deber = conservacion.deberLegalEmpresa(id_empresa);
-        if (deber.activo) {
-          logger.info('SignRequest: la Empresa tiene deber legal de conservacion sin termino', {
-            id_solicitud,
-            id_empresa,
-            norma: deber.norma,
-            aviso: 'RETAIN_DEBER_LEGAL',
-          });
-        } else {
-          logger.warn('SignRequest: la Empresa no declaro plazo de conservacion', {
-            id_solicitud,
-            id_empresa,
-            aviso: 'RETAIN_SIN_PLAZO',
-          });
+      if (planRetencion) {
+        // Camino nuevo: la categoría trae su propia regla (20 años desde el
+        // cese, hold del contrato, 100 años desde el retiro, o tabla de la
+        // Empresa). `aplicarPlanRetencion` fija la fecha y, si corresponde,
+        // levanta el hold automático.
+        conservacion.aplicarPlanRetencion(firmaId, planRetencion);
+      } else {
+        // Camino legacy: sin categoría, la tabla de la Empresa manda y el
+        // texto se sigue leyendo en vivo. No se toca el comportamiento.
+        const fecha = conservacion.asignarFechaConservacion(firmaId, id_empresa, now.toISOString());
+        if (!fecha) {
+          // Aquí hay DOS motivos distintos y la diferencia importa:
+          //
+          //  (a) La Empresa no declaró plazo de conservación. Esta firma NO
+          //      tendrá fecha y nunca podrá suprimirse. Retener de forma
+          //      indefinida tampoco es cumplimiento del 8.6: es una alerta de
+          //      onboarding, no un detalle operativo. El sistema no inventa
+          //      plazos (el 8.6 dice que el Acuerdo no los fija porque la ley
+          //      no los fija).
+          //
+          //  (b) La Empresa declaró un DEBER LEGAL de conservación sin término
+          //      (2.2.1.1.12 del Decreto 1072). Ahí NO hay fecha de supresión
+          //      porque el plazo de la tabla de retención no extingue ese deber,
+          //      y se levantó un hold automático. Es lo correcto, no una
+          //      alerta.
+          const deber = conservacion.deberLegalEmpresa(id_empresa);
+          if (deber.activo) {
+            logger.info('SignRequest: la Empresa tiene deber legal de conservacion sin termino', {
+              id_solicitud,
+              id_empresa,
+              norma: deber.norma,
+              aviso: 'RETAIN_DEBER_LEGAL',
+            });
+          } else {
+            logger.warn('SignRequest: la Empresa no declaro plazo de conservacion', {
+              id_solicitud,
+              id_empresa,
+              aviso: 'RETAIN_SIN_PLAZO',
+            });
+          }
         }
       }
     } catch (e) {
@@ -1052,7 +1153,10 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     SELECT id_solicitud, id_empresa, id_documento, id_trabajador, version_kair,
            pdf_original_path, document_hash_original,
            agreement_version, agreement_hash, requiere_firma_empresa,
-           consent_id, id_trabajador_alg
+           consent_id, id_trabajador_alg,
+           categoria_retencion, regla_retencion, fecha_terminacion,
+           plazo_retencion_aplicable, fecha_conservacion,
+           hold_legal, motivo_hold, hold_alcance
     FROM gh_firmas_electronicas
     WHERE id_solicitud = ?
   `).get(parent_id_solicitud);
@@ -1129,9 +1233,11 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
                     -- constancia). validateForCommit lo exige antes del commit.
       identificacion_numero_hash,  -- 📦 v0.1.180 (Task 1.14): pre-poblado del snapshot
       identificacion_numero_alg,  -- migration 019: HMAC · 022: ámbito y versión
-      id_trabajador_alg  -- migration 022: el hijo HEREDA el seudónimo del
+      id_trabajador_alg,  -- migration 022: el hijo HEREDA el seudónimo del
                           -- padre (ya es un seudónimo: no se re-hashea) y con
                           -- él el marcador de algoritmo con que se calculó
+      categoria_retencion, regla_retencion, fecha_terminacion,  -- 033: hereda
+      plazo_retencion_aplicable  -- la decisión de retención del padre
     ) VALUES (
       ?, ?, ?, ?,
       'remoto', ?, ?, ?,
@@ -1143,7 +1249,8 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
       ?,
       ?,
       ?,
-      ?
+      ?,
+      ?, ?, ?, ?
     )
   `).run(
     id_solicitud, id_documento, id_empresa, padre.id_trabajador,
@@ -1185,7 +1292,15 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     representante.numero_identificacion ? algHmac() : null,
     // El seudónimo del trabajador se hereda del padre tal cual (ya es un
     // seudónimo) y con él el marcador del algoritmo con que se calculó.
-    padre.id_trabajador_alg || null
+    padre.id_trabajador_alg || null,
+    // 033 · El hijo es el mismo documento: hereda la categoría, la regla, la
+    // fecha de terminación y el texto que se le comunicó al trabajador. La
+    // fecha de conservación NO se recalcula desde la creación del hijo: el
+    // documento nació con el padre.
+    padre.categoria_retencion || null,
+    padre.regla_retencion || null,
+    padre.fecha_terminacion || null,
+    padre.plazo_retencion_aplicable || null
   );
   const childId = result.lastInsertRowid;
 
@@ -1234,12 +1349,30 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     }
   }
 
-  // 7.6 Congelar la fecha de conservación del hijo (numeral 8.6). Misma regla
-  //     que en el padre: el plazo lo declara la Empresa y, si no lo declaró,
-  //     no hay fecha y no hay purga. El hijo (firma del representante) es un
-  //     registro del proceso de firma y le aplica el mismo plazo.
+  // 7.6 Congelar la fecha de conservación del hijo (numeral 8.6).
+  //
+  // Con categoría explícita, el hijo es el MISMO documento: hereda la fecha
+  // ya calculada para el padre (20 años desde el cese, 100 desde el retiro, o
+  // el hold del contrato). Recalcularla desde la creación del hijo correría el
+  // plazo por la firma del representante, que no es el hecho que la ley mira.
+  //
+  // Sin categoría, se mantiene el comportamiento legacy: la tabla de la
+  // Empresa y la fecha de creación del hijo.
   try {
-    conservacion.asignarFechaConservacion(childId, padre.id_empresa, now.toISOString());
+    if (padre.categoria_retencion) {
+      db.prepare(
+        'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
+      ).run(padre.fecha_conservacion || null, childId);
+      if (padre.hold_legal === 1) {
+        conservacion.ponerHold(childId, {
+          actor: 'sistema',
+          motivo: padre.motivo_hold,
+          alcance: padre.hold_alcance || null,
+        });
+      }
+    } else {
+      conservacion.asignarFechaConservacion(childId, padre.id_empresa, now.toISOString());
+    }
   } catch (e) {
     logger.warn('SignRequest: no se pudo fijar la fecha de conservación del hijo', {
       id_solicitud,
@@ -1294,6 +1427,7 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
 
   // 9. Retornar el hijo (sin token en claro)
   return {
+    id: childId,
     id_solicitud,
     id_documento,
     id_empresa,
@@ -1396,7 +1530,9 @@ function getById(id) {
            tipo_identificacion,  -- I-002 (migration 007)
            requiere_firma_empresa, tipo_firmante,  -- I-FIRMA-DUAL (migration 013)
            parent_id_solicitud,  -- I-FIRMA-DUAL (migration 013)
-           representante_legal_snapshot  -- I-FIRMA-DUAL (migration 013)
+           representante_legal_snapshot,  -- I-FIRMA-DUAL (migration 013)
+           categoria_retencion, regla_retencion, fecha_terminacion,  -- 033
+           plazo_retencion_aplicable, fecha_conservacion, hold_legal, motivo_hold  -- 023/033
     FROM gh_firmas_electronicas
     WHERE id = ?
     LIMIT 1

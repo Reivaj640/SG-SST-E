@@ -114,7 +114,7 @@ const config = {
   //
   // ⚠️ Antes de publicar la v1.1, este buzón tiene que existir y estar
   // monitoreado: es la dirección que el Titular va a usar.
-  canalProteccionDatos: required('FIRMA_CANAL_PROTECCION_DATOS', 'privacidad@k-air.com'),
+  canalProteccionDatos: required('FIRMA_CANAL_PROTECCION_DATOS', 'privacidad.kair@gmail.com'),
 
   // El plazo de trasmisión a la Empresa, en días HÁBILES. Lo define la
   // política, no el código: si el abogado pone otro número, se cambia acá.

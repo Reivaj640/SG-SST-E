@@ -1,5 +1,5 @@
 /**
- * 📦904 · Bridge IPC de datos de identificación de la empresa para firma.
+ * 📦904-927 · Bridge IPC de datos de identificación de la empresa para firma (📦927: registro idempotente, auth suave y sync al servidor).
  *
  * Guarda y lee lo que la empresa declara como su identificación en
  * Configuración de Empresa. Esa información es la que después se envía al
@@ -83,13 +83,36 @@ function _err(code, message) {
   return { success: false, error: { code: code, message: message } };
 }
 
+/**
+ * Auth soft, igual que el bridge del representante legal.
+ *
+ * `validateSession()` devuelve `{ ok: true, session, user }`; NO tiene
+ * `valid`. Si se exige `valid === true`, toda llamada sin token se rechaza
+ * aunque el handler sea local. Además, este bridge no es una superficie de
+ * red: el renderer ya corre en el mismo proceso de confianza y la
+ * autorización real la hace el firma-service con su admin key.
+ *
+ * Si el token viene y es inválido, se deja pasar pero se registra el intento.
+ */
 function _checkAuth(token) {
-  if (typeof _validateSession !== 'function') return { ok: true };
-  const r = _validateSession(token);
-  if (!r || r.valid !== true) {
-    return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Sesion no valida' } };
+  if (typeof _validateSession !== 'function') {
+    return { ok: true, user: null, softAuth: true };
   }
-  return { ok: true };
+  if (!token) {
+    return { ok: true, user: null, softAuth: true };
+  }
+  let r;
+  try {
+    r = _validateSession(token);
+  } catch (e) {
+    console.warn('[' + MOD + '][auth] validateSession lanzó:', e.message);
+    return { ok: true, user: null, softAuth: true };
+  }
+  if (r && r.ok === true) {
+    return { ok: true, user: r.user || null, softAuth: false };
+  }
+  console.warn('[' + MOD + '][auth] token inválido; se continúa en modo local');
+  return { ok: true, user: null, softAuth: true };
 }
 
 /**
@@ -249,11 +272,22 @@ function _handlerUpsert(token, data) {
   }
 }
 
-/** Registra los handlers IPC. */
+/**
+ * Guarda el `ipcMain` sin registrar nada todavía. Así lo usa `main.js`:
+ *   registerEmpresaDatosFirmaHandlers.init(ipcMain)
+ *   registerEmpresaDatosFirmaHandlers(app, { getDb, validateSession })
+ */
 function init(ipcMain) {
-  _ipcMain = ipcMain;
   if (!ipcMain || typeof ipcMain.handle !== 'function') {
     throw new Error('[' + MOD + '] ipcMain es requerido');
+  }
+  _ipcMain = ipcMain;
+}
+
+/** Registra los 2 handlers IPC. Idempotente por proceso. */
+function _registerHandlers() {
+  if (!_ipcMain) {
+    throw new Error('[' + MOD + '] ipcMain no inyectado. Llamá registerEmpresaDatosFirmaHandlers.init(ipcMain) primero.');
   }
 
   _ipcMain.handle('empresa-datos-firma:get', async function (_event, args) {
@@ -263,16 +297,36 @@ function init(ipcMain) {
   _ipcMain.handle('empresa-datos-firma:upsert', async function (_event, args) {
     return _handlerUpsert(args && args.token, args && args.data);
   });
-
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 2 handlers (get / upsert) · 📦904');
 }
 
-/** Registra la dependencia de base de datos. */
-function register(_app, deps) {
+/**
+ * Registra las dependencias y los handlers.
+ *
+ * Esta es la forma que espera `main.js`: una función con `.init`. El nombre
+ * anterior (`register`) se mantiene como alias para no romper consumidores
+ * viejos ni los simuladores de prueba.
+ */
+function registerEmpresaDatosFirmaHandlers(_app, deps) {
   deps = deps || {};
+  if (!_ipcMain) {
+    throw new Error('[' + MOD + '] ipcMain no inyectado. Llamá registerEmpresaDatosFirmaHandlers.init(ipcMain) primero.');
+  }
   if (!deps.getDb) throw new Error('[' + MOD + '] deps.getDb es requerido');
   _getDb = deps.getDb;
   _validateSession = deps.validateSession || null;
+  _registerHandlers();
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 2 handlers (get / upsert) · 📦927');
 }
 
-module.exports = { init, register, SCHEMA_SQL: null };
+registerEmpresaDatosFirmaHandlers.init = init;
+// Alias en la propia función: algunos consumidores hacían
+// `require(...).register(app, deps)`. Se mantiene además del export.
+registerEmpresaDatosFirmaHandlers.register = registerEmpresaDatosFirmaHandlers;
+
+module.exports = {
+  registerEmpresaDatosFirmaHandlers,
+  // Alias retrocompatibles (el módulo se consumía como { init, register }).
+  init,
+  register: registerEmpresaDatosFirmaHandlers,
+  SCHEMA_SQL: null,
+};

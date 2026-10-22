@@ -205,6 +205,31 @@ test('POST /api/sign/:token/identify: tipo de doc incorrecto → 422', async () 
   assert.equal(res.body.error.details.expected, 'CC');
 });
 
+// ESTE ES EL CONTRATO ENTRE EL MINI-APP Y EL SERVICIO.
+//
+// El mini-app ramifica con `err.status === 422 && err.code ===
+// 'MISSING_IDENTIFICATION_DATA'` (web/firma/app.js). Si el servidor manda
+// otro status, el firmante ve el error generico en vez del mensaje que dice
+// que su solicitud no tiene la identificacion registrada. El status 500 que
+// mandaba el servicio hacia que el frontend no entrara en su rama.
+//
+// El test muerde: si alguien vuelve a cambiar el 422 por un 500, esto falla.
+test('POST /api/sign/:token/identify: la solicitud SIN datos de identificacion → 422 MISSING_IDENTIFICATION_DATA', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion({
+    identificacion_tipo: null,
+    identificacion_numero_hash: null,
+  });
+  const app = makeApp();
+  const res = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
+
+  assert.equal(res.status, 422,
+    'el status tiene que ser 422: es el que el mini-app ramifica');
+  assertJsonError(res, 'MISSING_IDENTIFICATION_DATA');
+});
+
 test('POST /api/sign/:token/identify: token inválido → 404', async () => {
   resetDb();
   const app = makeApp();

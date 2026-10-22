@@ -151,7 +151,7 @@ async function _call(channel, payload) {
 //  Suite: Registro de handlers
 // =====================================================================
 
-test('registro: 21 canales firma:* están registrados (13 v0.1.190 + 7 nuevos v0.1.191 + 1 nuevo I-103.A1.5.2)', function () {
+test('registro: 22 canales firma:* están registrados (13 v0.1.190 + 7 v0.1.191 + 1 I-103.A1.5.2 + 1 📦927)', function () {
   setup();
   var expected = [
     'firma:config:get',
@@ -175,7 +175,8 @@ test('registro: 21 canales firma:* están registrados (13 v0.1.190 + 7 nuevos v0
     'firma:empresa:set-api-key',
     'firma:empresa:rotate-api-key',
     'firma:empresa:revoke-api-key',
-    'firma:empresa:list-firma-remote'
+    'firma:empresa:list-firma-remote',
+    'firma:empresa:datos:sync'       // NUEVO 📦927
   ];
   expected.forEach(function (ch) {
     assert.ok(_mockIpcHandlers[ch], 'handler registrado: ' + ch);
@@ -767,6 +768,42 @@ function _setMockClientWithAdmin() {
     _clientCallLog.push({ m: 'adminGetClient', id: id, opts: opts });
     return Promise.resolve({ success: true, data: { id_empresa: id, is_active: true } });
   };
+  // 📦927 — identidad legal de la empresa. El mock devuelve una fila
+  // "completa" para que el test del merge pueda verificar qué se preserva.
+  _lastMockedClient.adminGetEmpresa = function (id) {
+    _clientCallLog.push({ m: 'adminGetEmpresa', id: id });
+    return Promise.resolve({
+      success: true,
+      data: {
+        id_empresa: id,
+        razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+        nit: '900123456',
+        domicilio: 'Calle 100 # 20-30, Barranquilla, Atlántico',
+        representante_legal: 'ANA PEREZ',
+        representante_legal_identificacion: 'CC 111111111',
+        responsable_tratamiento: 'ANA PEREZ',
+        responsable_tratamiento_correo: 'ana@example.test',
+        canal_pqrs: 'pqrs@example.test',
+        canal_incidentes: 'seguridad@example.test',
+        politica_datos_url: 'https://example.test/privacidad',
+        plazo_retencion: '10 años',
+        plazo_retencion_dias: 3650,
+        canal_solicitud_copia: 'contacto@example.test',
+        conservacion_por_deber_legal: true,
+        norma_conservacion: 'Ley 1581 de 2012',
+        dominios_corporativos: ['example.test'],
+        activo: true,
+        anexo_encargo_firmado_at: '2026-10-01T12:00:00.000Z'
+      }
+    });
+  };
+  _lastMockedClient.adminUpdateEmpresa = function (id, body) {
+    _clientCallLog.push({ m: 'adminUpdateEmpresa', id: id, body: body });
+    return Promise.resolve({
+      success: true,
+      data: Object.assign({ id_empresa: id }, body)
+    });
+  };
   _lastMockedClient.adminRotateClient = function (id, args) {
     _clientCallLog.push({ m: 'adminRotateClient', id: id, args: args });
     return Promise.resolve({
@@ -1214,6 +1251,251 @@ test('sign-request:create con companyName sin configurar → CONFIG_MISSING', fu
   // NO debe haber llamado al backend
   var calls = _clientCallLog.filter(function (c) { return c.m === 'createSignRequest'; });
   assert.equal(calls.length, 0);
+  teardown();
+});
+
+// =====================================================================
+//  Suite: firma:empresa:datos:sync (📦927)
+//  Publica la identidad local en el firma-service con GET + merge + PUT.
+// =====================================================================
+
+var SYNC_DATOS = {
+  nit: '900123456',
+  domicilio: 'Calle 1 # 2-3',
+  domicilioMunicipio: 'Soledad',
+  domicilioDepartamento: 'Atlántico',
+  responsableNombre: 'ANA PEREZ',
+  responsableCargo: 'Representante Legal',
+  responsableCorreo: 'ana@example.test',
+  canalContacto: 'contacto@example.test',
+  canalPqrs: 'pqrs@example.test',
+  canalIncidentes: 'seguridad@example.test',
+  politicaDatosUrl: 'https://example.test/privacidad'
+};
+
+var SYNC_REP = {
+  nombre: 'ANA PEREZ',
+  tipoIdentificacion: 'CC',
+  numeroIdentificacion: '123456789'
+};
+
+function _setupSyncEmpresa() {
+  setup();
+  _setMockClientWithAdmin();
+  _setSecretsV2({
+    'EMPRESA A': {
+      idEmpresa: '900123456',
+      firmaApiKey: 'kair_live_A_key_32chars_minimum_XXXXXXXXXXXXXX',
+      activatedAt: '2026-08-20T15:00:00Z',
+      lastValidatedAt: null
+    }
+  }, { adminApiKey: 'admin-key-32chars-minimum-padding-padding' });
+}
+
+test('empresa:datos:sync — empresa no configurada se omite sin pedir admin key', async function () {
+  setup();
+  _setSecretsV2({});
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA SIN FIRMA',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, true);
+  assert.equal(r.data.skipped, true);
+  assert.equal(r.data.code, 'EMPRESA_NO_CONFIGURADA');
+  assert.equal(_clientCallLog.length, 0);
+  teardown();
+});
+
+test('empresa:datos:sync — sin adminApiKey retorna ADMIN_TOKEN_REQUIRED y no hace HTTP', async function () {
+  setup();
+  _setMockClientWithAdmin();
+  _setSecretsV2({
+    'EMPRESA A': {
+      idEmpresa: '900123456',
+      firmaApiKey: 'kair_live_A_key_32chars_minimum_XXXXXXXXXXXXXX',
+      activatedAt: '2026-08-20T15:00:00Z',
+      lastValidatedAt: null
+    }
+  });
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+  assert.equal(_clientCallLog.length, 0);
+  teardown();
+});
+
+test('empresa:datos:sync — 404 del GET se mapea a EMPRESA_NO_REGISTRADA y NO crea la empresa', async function () {
+  _setupSyncEmpresa();
+  _lastMockedClient.adminGetEmpresa = function (id) {
+    _clientCallLog.push({ m: 'adminGetEmpresa', id: id });
+    return Promise.resolve({
+      success: false,
+      error: { code: 'EMPRESA_NOT_FOUND', message: 'No existe la empresa ' + id }
+    });
+  };
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'EMPRESA_NO_REGISTRADA');
+  assert.equal(r.error.extra.idEmpresa, '900123456');
+  assert.ok(r.error.message.indexOf('Anexo de Encargo') !== -1);
+  var puts = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; });
+  var posts = _clientCallLog.filter(function (c) { return c.m === 'adminCreateEmpresa'; });
+  assert.equal(puts.length, 0, 'no debe intentar actualizar');
+  assert.equal(posts.length, 0, 'no debe crear automáticamente');
+  teardown();
+});
+
+test('empresa:datos:sync — GET + merge + PUT preserva campos del servidor y omite dominios', async function () {
+  _setupSyncEmpresa();
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'empresa a', // case-insensitive
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, true);
+  assert.equal(r.data.updated, true);
+  assert.equal(r.data.idEmpresa, '900123456');
+  assert.equal(r.data.companyKey, 'EMPRESA A');
+  assert.deepEqual(r.data.warnings, []);
+
+  var getCalls = _clientCallLog.filter(function (c) { return c.m === 'adminGetEmpresa'; });
+  var putCalls = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; });
+  assert.equal(getCalls.length, 1);
+  assert.equal(getCalls[0].id, '900123456');
+  assert.equal(putCalls.length, 1);
+  assert.equal(putCalls[0].id, '900123456');
+
+  var body = putCalls[0].body;
+  // Datos que vienen del formulario local.
+  assert.equal(body.nit, '900123456');
+  assert.equal(body.domicilio, 'Calle 1 # 2-3, Soledad, Atlántico');
+  assert.equal(body.responsable_tratamiento, 'ANA PEREZ');
+  assert.equal(body.responsable_tratamiento_correo, 'ana@example.test');
+  assert.equal(body.canal_pqrs, 'pqrs@example.test');
+  assert.equal(body.canal_incidentes, 'seguridad@example.test');
+  assert.equal(body.politica_datos_url, 'https://example.test/privacidad');
+  assert.equal(body.representante_legal, 'ANA PEREZ');
+  assert.equal(body.representante_legal_identificacion, 'CC 123456789');
+  // Campos que el formulario NO edita: se conservan del GET.
+  assert.equal(body.razon_social, 'EMPRESA DE PRUEBA S.A.S.');
+  assert.equal(body.plazo_retencion, '10 años');
+  assert.equal(body.plazo_retencion_dias, 3650);
+  assert.equal(body.canal_solicitud_copia, 'contacto@example.test');
+  assert.equal(body.conservacion_por_deber_legal, true);
+  assert.equal(body.norma_conservacion, 'Ley 1581 de 2012');
+  assert.equal(body.dominios_corporativos, undefined,
+    'dominios_corporativos NO se manda: el service lo preserva');
+  teardown();
+});
+
+test('empresa:datos:sync — documento cifrado del representante NO se reemplaza por texto plano', async function () {
+  _setupSyncEmpresa();
+  _lastMockedClient.adminGetEmpresa = function (id) {
+    _clientCallLog.push({ m: 'adminGetEmpresa', id: id });
+    return Promise.resolve({
+      success: true,
+      data: {
+        id_empresa: id,
+        razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+        representante_legal: 'ANA PEREZ',
+        representante_legal_identificacion: 'enc:AAAA_CIFRADO',
+        activo: true,
+        anexo_encargo_firmado_at: '2026-10-01T12:00:00.000Z'
+      }
+    });
+  };
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, true);
+  var put = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; })[0];
+  assert.equal(put.body.representante_legal_identificacion, 'enc:AAAA_CIFRADO');
+  teardown();
+});
+
+test('empresa:datos:sync — empresa inactiva o sin Anexo firmado devuelve warnings pero publica', async function () {
+  _setupSyncEmpresa();
+  _lastMockedClient.adminGetEmpresa = function (id) {
+    _clientCallLog.push({ m: 'adminGetEmpresa', id: id });
+    return Promise.resolve({
+      success: true,
+      data: {
+        id_empresa: id,
+        razon_social: 'EMPRESA DE PRUEBA S.A.S.',
+        activo: false,
+        anexo_encargo_firmado_at: null
+      }
+    });
+  };
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, true);
+  assert.equal(r.data.warnings.length, 2);
+  assert.ok(r.data.warnings.some(function (w) { return /dada de baja/.test(w); }));
+  assert.ok(r.data.warnings.some(function (w) { return /Anexo de Encargo/.test(w); }));
+  var puts = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; });
+  assert.equal(puts.length, 1);
+  teardown();
+});
+
+test('empresa:datos:sync — error del GET que no es 404 se propaga y NO hace PUT', async function () {
+  _setupSyncEmpresa();
+  _lastMockedClient.adminGetEmpresa = function (id) {
+    _clientCallLog.push({ m: 'adminGetEmpresa', id: id });
+    return Promise.resolve({ success: false, error: { code: 'NETWORK_ERROR', message: 'sin red' } });
+  };
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: SYNC_DATOS,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'NETWORK_ERROR');
+  var puts = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; });
+  assert.equal(puts.length, 0);
+  teardown();
+});
+
+test('empresa:datos:sync — body inválido del merge retorna INVALID_REQUEST_BODY sin PUT', async function () {
+  _setupSyncEmpresa();
+  var datosLargos = Object.assign({}, SYNC_DATOS, {
+    domicilio: 'X'.repeat(301)
+  });
+  var r = await _call('firma:empresa:datos:sync', {
+    companyName: 'EMPRESA A',
+    datos: datosLargos,
+    representante: SYNC_REP
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+  assert.match(r.error.message, /domicilio/i);
+  var puts = _clientCallLog.filter(function (c) { return c.m === 'adminUpdateEmpresa'; });
+  assert.equal(puts.length, 0);
+  teardown();
+});
+
+test('empresa:datos:sync — valida companyName y datos antes de tocar secrets', async function () {
+  setup();
+  var r1 = await _call('firma:empresa:datos:sync', { datos: SYNC_DATOS });
+  assert.equal(r1.success, false);
+  assert.equal(r1.error.code, 'INVALID_REQUEST_BODY');
+  var r2 = await _call('firma:empresa:datos:sync', { companyName: 'EMPRESA A' });
+  assert.equal(r2.success, false);
+  assert.equal(r2.error.code, 'INVALID_REQUEST_BODY');
   teardown();
 });
 

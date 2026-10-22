@@ -3201,12 +3201,14 @@
                 <div class="form-group">
                     <label class="form-label">Correo de contacto general</label>
                     <input type="email" class="form-control" id="empresa-firma-canal-contacto" placeholder="contacto@empresa.co" autocomplete="off" />
+                    <span id="empresa-firma-canal-contacto-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label class="form-label">Canal de PQRS</label>
                         <input type="email" class="form-control" id="empresa-firma-canal-pqrs" placeholder="pqrs@empresa.co" autocomplete="off" />
+                        <span id="empresa-firma-canal-pqrs-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
                         <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;">
                             <input type="checkbox" id="empresa-firma-pqrs-mismo" /> Es el mismo correo de contacto
                         </label>
@@ -3214,6 +3216,7 @@
                     <div class="form-group">
                         <label class="form-label">Canal de incidentes de seguridad</label>
                         <input type="email" class="form-control" id="empresa-firma-canal-incidentes" placeholder="seguridad@empresa.co" autocomplete="off" />
+                        <span id="empresa-firma-canal-incidentes-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
                         <label style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;">
                             <input type="checkbox" id="empresa-firma-incidentes-mismo" /> Es el mismo correo de contacto
                         </label>
@@ -5538,6 +5541,10 @@
     // de la empresa si estos datos fallan (son opcionales: sin ellos la
     // pantalla no muestra bloque, que es el comportamiento previo a la 017).
 
+    // Evita que la respuesta de una empresa que ya no está seleccionada
+    // llegue tarde y pise el formulario de la empresa actual.
+    let _datosFirmaLoadSeq = 0;
+
     function _clearDatosFirmaForm() {
         const ids = [
             'empresa-firma-nit', 'empresa-firma-domicilio',
@@ -5560,10 +5567,56 @@
             const el = document.getElementById(id);
             if (el) el.checked = false;
         });
-        ['empresa-firma-resp-correo-error', 'empresa-firma-politica-error'].forEach(function (id) {
+        [
+            'empresa-firma-resp-correo-error',
+            'empresa-firma-canal-contacto-error',
+            'empresa-firma-canal-pqrs-error',
+            'empresa-firma-canal-incidentes-error',
+            'empresa-firma-politica-error'
+        ].forEach(function (id) {
             const el = document.getElementById(id);
             if (el) { el.textContent = ''; el.style.display = 'none'; }
         });
+    }
+
+    /**
+     * Muestra u oculta un error inline debajo de un campo. Devuelve true si
+     * había error (para poder cortar el guardado de forma legible).
+     */
+    function _setInlineError(id, mensaje) {
+        const el = document.getElementById(id);
+        if (!el) return !!mensaje;
+        el.textContent = mensaje || '';
+        el.style.display = mensaje ? 'block' : 'none';
+        return !!mensaje;
+    }
+
+    function _emailValido(v) {
+        if (!v) return true;
+        return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+    }
+
+    function _urlValida(v) {
+        if (!v) return true;
+        return /^https?:\/\/[^\s]+$/i.test(v);
+    }
+
+    /**
+     * Lee el representante legal del formulario. Es la fuente para el bloque
+     * público: la empresa es la Responsable y esta persona es su contacto.
+     */
+    function _leerRepresentanteLegalParaFirma() {
+        const get = function (id) {
+            const el = document.getElementById(id);
+            return el ? String(el.value || '').trim() : '';
+        };
+        return {
+            nombre: get('empresa-rep-legal-nombre'),
+            tipoIdentificacion: get('empresa-rep-legal-tipo-id') || 'CC',
+            numeroIdentificacion: get('empresa-rep-legal-num-id'),
+            correo: get('empresa-rep-legal-correo'),
+            cargo: get('empresa-rep-legal-cargo') || 'Representante Legal'
+        };
     }
 
     /**
@@ -5581,6 +5634,7 @@
     }
 
     async function _loadDatosFirmaIntoForm(empresaKey) {
+        const seq = ++_datosFirmaLoadSeq;
         _clearDatosFirmaForm();
         if (!empresaKey) return;
         if (!electronAPI || typeof electronAPI.empresaDatosFirmaGet !== 'function') {
@@ -5589,6 +5643,7 @@
         }
         try {
             const res = await electronAPI.empresaDatosFirmaGet(empresaKey);
+            if (seq !== _datosFirmaLoadSeq) return;
             if (!res || !res.success || !res.data || !res.data.datos) return;
             const d = res.data.datos;
             const set = function (id, v) {
@@ -5614,10 +5669,10 @@
     }
 
     async function _saveDatosFirmaForEmpresa(empresaKey) {
-        if (!empresaKey) return true;
+        if (!empresaKey) return { ok: true, skipped: true, data: null };
         if (!electronAPI || typeof electronAPI.empresaDatosFirmaUpsert !== 'function') {
             console.warn('[CONFIG][DATOS-FIRMA] electronAPI.empresaDatosFirmaUpsert no disponible, se omite guardado');
-            return true;
+            return { ok: true, skipped: true, data: null };
         }
         const get = function (id) {
             const el = document.getElementById(id);
@@ -5628,6 +5683,15 @@
             return !!(el && el.checked);
         };
 
+        // Limpiar errores de una corrida anterior antes de validar de nuevo.
+        [
+            'empresa-firma-resp-correo-error',
+            'empresa-firma-canal-contacto-error',
+            'empresa-firma-canal-pqrs-error',
+            'empresa-firma-canal-incidentes-error',
+            'empresa-firma-politica-error'
+        ].forEach(function (id) { _setInlineError(id, ''); });
+
         const canalContacto = get('empresa-firma-canal-contacto');
         // Si el canal quedó marcado como "el mismo", se toma el de contacto aunque
         // el input del canal esté vacío (el usuario marcó y no escribió).
@@ -5637,15 +5701,40 @@
             ? canalContacto : get('empresa-firma-canal-incidentes');
         const responsableNombre = checked('empresa-firma-resp-mismo-rep')
             ? get('empresa-rep-legal-nombre') : get('empresa-firma-resp-nombre');
+        const responsableCorreo = get('empresa-firma-resp-correo');
+        const politicaDatosUrl = get('empresa-firma-politica-url');
+
+        // Validación inline ANTES de tocar la base local. Así el usuario ve
+        // exactamente qué campo corregir y no se guarda una fila a medias.
+        if (!_emailValido(responsableCorreo)) {
+            _setInlineError('empresa-firma-resp-correo-error', 'Correo inválido');
+            return { ok: false, message: 'Correo del responsable inválido' };
+        }
+        if (!_emailValido(canalContacto)) {
+            _setInlineError('empresa-firma-canal-contacto-error', 'Correo inválido');
+            return { ok: false, message: 'Correo de contacto inválido' };
+        }
+        if (!_emailValido(canalPqrs)) {
+            _setInlineError('empresa-firma-canal-pqrs-error', 'Correo inválido');
+            return { ok: false, message: 'Correo de PQRS inválido' };
+        }
+        if (!_emailValido(canalIncidentes)) {
+            _setInlineError('empresa-firma-canal-incidentes-error', 'Correo inválido');
+            return { ok: false, message: 'Correo de incidentes inválido' };
+        }
+        if (!_urlValida(politicaDatosUrl)) {
+            _setInlineError('empresa-firma-politica-error', 'Debe empezar por http:// o https://');
+            return { ok: false, message: 'URL de la política de datos inválida' };
+        }
 
         // Si no se digito nada, no se manda nada: no crear una fila vacia.
         const tocasteAlgo = !!(get('empresa-firma-nit') || get('empresa-firma-domicilio')
             || get('empresa-firma-municipio') || get('empresa-firma-departamento')
             || get('empresa-firma-resp-nombre') || get('empresa-firma-resp-cargo')
-            || get('empresa-firma-resp-correo') || canalContacto
+            || responsableCorreo || canalContacto
             || get('empresa-firma-canal-pqrs') || get('empresa-firma-canal-incidentes')
-            || get('empresa-firma-politica-url') || responsableNombre);
-        if (!tocasteAlgo) return true;
+            || politicaDatosUrl || responsableNombre);
+        if (!tocasteAlgo) return { ok: true, skipped: true, data: null };
 
         const data = {
             empresaId: empresaKey,
@@ -5655,25 +5744,82 @@
             domicilioDepartamento: get('empresa-firma-departamento'),
             responsableNombre: responsableNombre,
             responsableCargo: get('empresa-firma-resp-cargo'),
-            responsableCorreo: get('empresa-firma-resp-correo'),
+            responsableCorreo: responsableCorreo,
             canalContacto: canalContacto,
             canalPqrs: canalPqrs,
             canalIncidentes: canalIncidentes,
-            politicaDatosUrl: get('empresa-firma-politica-url')
+            politicaDatosUrl: politicaDatosUrl
         };
 
         try {
             const res = await electronAPI.empresaDatosFirmaUpsert({ data: data });
             if (res && res.success) {
                 console.log('[CONFIG][DATOS-FIRMA] Datos de firma guardados para', empresaKey);
-                return true;
+                return { ok: true, data: data };
             }
             const msg = (res && res.error && res.error.message) ? res.error.message : 'Error al guardar los datos de firma';
             console.warn('[CONFIG][DATOS-FIRMA]', msg);
-            return false;
+            // Si el bridge rechazó un campo puntual, el mensaje ya lo nombra;
+            // se muestra inline cuando se puede identificar.
+            if (/correo del responsable|responsable/i.test(msg)) {
+                _setInlineError('empresa-firma-resp-correo-error', msg);
+            } else if (/canal de contacto/i.test(msg)) {
+                _setInlineError('empresa-firma-canal-contacto-error', msg);
+            } else if (/pol[ií]tica|url/i.test(msg)) {
+                _setInlineError('empresa-firma-politica-error', msg);
+            }
+            return { ok: false, message: msg };
         } catch (e) {
             console.error('[CONFIG][DATOS-FIRMA] Error al guardar:', e);
-            return false;
+            return { ok: false, message: e.message || 'Error al guardar los datos de firma' };
+        }
+    }
+
+    /**
+     * Publica en el firma-service los datos que ya se guardaron localmente.
+     * Es best-effort: si falla, la UI avisa pero NO borra ni invalida el
+     * guardado local. La empresa tiene que estar configurada en firma; si no,
+     * el bridge devuelve skipped=true y no se muestra ninguna advertencia.
+     */
+    async function _syncDatosFirmaToServer(empresaKey, datos) {
+        if (!datos) return { ok: true, skipped: true };
+        if (!electronAPI || typeof electronAPI.firmaEmpresaDatosSync !== 'function') {
+            return {
+                ok: false,
+                code: 'SYNC_NOT_AVAILABLE',
+                message: 'La versión de K+AIR no tiene disponible la publicación al servidor de firma.'
+            };
+        }
+        const representante = _leerRepresentanteLegalParaFirma();
+        try {
+            const res = await electronAPI.firmaEmpresaDatosSync({
+                companyName: empresaKey,
+                datos: datos,
+                representante: representante
+            });
+            if (!res || !res.success) {
+                const err = (res && res.error) || {};
+                return {
+                    ok: false,
+                    code: err.code || 'SYNC_ERROR',
+                    message: err.message || 'No se pudo publicar la identificación en el servidor de firma.'
+                };
+            }
+            if (res.data && res.data.skipped) {
+                return { ok: true, skipped: true, message: res.data.message || '' };
+            }
+            return {
+                ok: true,
+                idEmpresa: res.data && res.data.idEmpresa,
+                warnings: (res.data && res.data.warnings) || []
+            };
+        } catch (e) {
+            console.error('[CONFIG][DATOS-FIRMA] Error al sincronizar:', e);
+            return {
+                ok: false,
+                code: 'SYNC_ERROR',
+                message: e.message || 'No se pudo publicar la identificación en el servidor de firma.'
+            };
         }
     }
 
@@ -7343,23 +7489,47 @@ en lugar de afirmar una condición específica no verificada.**`;
                             electronAPI.saveConfig(config),
                             repSavePromise,
                             // 📦904 (2026-10-17) — Datos de identificación para firma.
-                            // A diferencia del rep legal, un fallo acá NO aborta el
-                            // guardado: son datos opcionales. Peor caso: la pantalla
-                            // no muestra el bloque, que es el comportamiento previo.
+                            // 📦927: este guardado ahora devuelve un resultado. Si falla,
+                            // abortamos el cierre del modal para no mostrar un éxito falso.
                             _saveDatosFirmaForEmpresa(targetKeyName)
-                        ]).then(function (results) { return results[0]; });
+                        ]).then(function (results) {
+                            const datosRes = results[2] || { ok: true, skipped: true, data: null };
+                            if (!datosRes.ok) {
+                                throw new Error(datosRes.message || 'No se pudieron guardar los datos para firma electrónica.');
+                            }
+                            // Sin datos locales no hay nada que publicar. El push al
+                            // servidor corre SOLO después de que el guardado local funcionó.
+                            if (!datosRes.data) {
+                                return { config: results[0], firmaSync: { ok: true, skipped: true } };
+                            }
+                            return _syncDatosFirmaToServer(targetKeyName, datosRes.data).then(function (sync) {
+                                return { config: results[0], firmaSync: sync };
+                            });
+                        });
                     });
                 })
-                .then(() => {
+                .then(function (saveResult) {
                     console.log('[CONFIG][SAVE] Configuración guardada exitosamente');
                     clearInterval(timerInterval);
                     soltarProgreso();
 
-                    // Actualizar UI con éxito
+                    const sync = saveResult && saveResult.firmaSync;
+                    const syncFailed = !!(sync && sync.ok === false);
+                    const syncWarnings = (sync && sync.warnings) || [];
+                    console.log('[CONFIG][SAVE] Resultado de sincronización de firma:', sync);
+
+                    // Actualizar UI con éxito. Si la publicación al servidor falló,
+                    // el guardado local SÍ quedó: se dice la verdad, no se muestra
+                    // un "todo bien" que después no aparece en la pantalla de firma.
+                    const titulo = syncFailed
+                        ? 'Datos guardados en este equipo. Sincronización pendiente.'
+                        : (syncWarnings.length
+                            ? 'Datos guardados y publicados con advertencias.'
+                            : '¡Mapeo completado exitosamente!');
                     mappingMessage.innerHTML = `
                         <div class="mapping-step success">
-                            <span class="step-icon"><i class="fas fa-check-circle"></i></span>
-                            <span><strong>¡Mapeo completado exitosamente!</strong></span>
+                            <span class="step-icon"><i class="fas ${syncFailed ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i></span>
+                            <span><strong>${titulo}</strong></span>
                         </div>
                     `;
 
@@ -7368,7 +7538,13 @@ en lugar de afirmar una condición específica no verificada.**`;
                         mappingOverlay.style.display = 'none';
                         closeModal();
                         loadCompanies(); // Recargar la lista de empresas
-                        showToast('Empresa actualizada correctamente con estructura mapeada', 'success');
+                        if (syncFailed) {
+                            showToast('Empresa guardada en este equipo, pero no se pudo publicar en el servidor de firma: ' + sync.message, 'warning');
+                        } else if (syncWarnings.length) {
+                            showToast('Empresa guardada y publicada. ' + syncWarnings.join(' '), 'warning');
+                        } else {
+                            showToast('Empresa actualizada correctamente con estructura mapeada', 'success');
+                        }
                         btnSaveLink.disabled = false;
                         btnSaveLink.textContent = 'Guardar y Vincular';
                         // Resetear originalCompanyName para la próxima operación
@@ -7597,15 +7773,18 @@ en lugar de afirmar una condición específica no verificada.**`;
     function showToast(msg, type = 'success') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
+        const accent = type === 'success'
+            ? 'var(--success)'
+            : (type === 'warning' ? 'var(--warning)' : 'var(--danger)');
         toast.style.cssText = `
             background: #333; color: white; padding: 12px 24px; border-radius: 6px;
             margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             display: flex; align-items: center; animation: slideIn 0.3s forwards;
-            border-left: 4px solid \${type === 'success' ? 'var(--success)' : 'var(--danger)'}
+            border-left: 4px solid ${accent}
         `;
         toast.innerText = msg;
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(() => toast.remove(), type === 'success' ? 3000 : 6000);
     }
 
     // Animación simple para los toasts

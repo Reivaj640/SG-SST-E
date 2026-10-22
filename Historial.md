@@ -22,17 +22,17 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza). Antes: 2026-10-20 (jornada de la auditoría del Capítulo III y de la implementación de sus hallazgos; continuó con el carril de código acordádo con el abogado; después, auditoría de los Capítulos IV y V y la Fase 7 de código; el 20, Fase 8B, y el cierre del código: el 8B-C, las tres decisiones del owner (1.1, 1.2, 1.3), la 10.4, el D-02 y la 9A) |
-| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦924, 📦925 y 📦926. |
-| **Último commit de código** | 📦 **924-926** — 📦924 (el plan de despliegue y la prueba de humo del servicio), 📦925 (los tres fixes del e2e: la notificación, la huella de identificación y el 422 vs 500; más los scripts de operación y la documentación) y 📦926 (el check que faltaba: el e2e abre el enlace que él mismo crea; el modo `--solo-firmas` de la purga; y el runbook del despliegue con el orden que no se negocia). Antes: 📦 **912-923**
+| **Fecha de cierre** | 2026-10-22 (el catálogo de retención por tipo de documento: el plazo que fija la ley —20 años desde el cese para los cinco grupos SST, contrato electrónico sin término, historia laboral 80-100 años— con su migración 033, la habilitación que ya no exige el plazo de la empresa, el selector de tipo de documento en el modal de firma y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
+| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦927-928. |
+| **Último commit de código** | 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js`, la habilitación por categoría, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, el selector en el modal de firma y el flag del script de humo). Antes: 📦 **924-926**
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
-| **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. |
+| **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
 | **CAPÍTULO II: CERRADO** | Las tres citas (2.2.2.47.1 num. 1, 2.2.2.47.7, parágrafo del 2.2.1.1.9 y 2.2.1.1.13) están **verificadas y son correctas**. La redacción se aplicó el 19: el **2.2** ahora desarrolla los tres requisitos del 2.2.1.1.13 que importaba sin enumerar (a) vigencia de la firma igual a la del contrato y **declaración expresa de que el mecanismo no elimina el documento firmado ni la Constancia** ni por el tiempo ni por el fin de la relación, (b) costo cero para el Trabajador a cargo de la Empresa, (c) uso exclusivo para la relación laboral sin perder fuerza probatoria; y el **2.3** aclara que la copia firmada conserva íntegro el contenido, que solo se le agrega una página de sello y metadatos verificables, y que las huellas del original y de la copia firmada quedan registradas y son distintas. |
 | **CAPÍTULO III: AUDITADO E IMPLEMENTADO (19)** | **El texto no se toca: sus tres citas legales son exactas.** Y el diagnóstico que estaba escrito aquí era **falso**: el plan y este archivo decían que "el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)". El texto nunca lo dijo: siempre dijo **«huella digital con sal»** (`grep -r hmac` da cero en todo el service). La brecha real era de implementación: **la sal estaba en la misma fila que la huella** (equivale a un hash plano) y la **cédula se guardaba en texto claro**, en contra del propio 10.5(a). **Corregido el 19** con las migraciones **019** (columnas de algoritmo + HMAC) y **020** (`gh_firma_eventos` append-only con triggers), la capa `src/crypto/{keys,hmac}.js` y el seudónimo de `id_trabajador`. La llave maestra se deriva por HKDF de `TOKEN_ENCRYPTION_KEY` y vive **fuera** de la BD. Filas heredadas: se reescriben solas con el HMAC la primera vez que se usan. Efecto colateral que cierra una fuga: la mini-app exponía la cédula en claro en `GET /s/:token`; ahora expone el seudónimo. **Pendiente: solo el Anexo de Encargo (3.8) y la cláusula de custodia, que necesitan abogado.** El 19 se completó la **Fase 1 del carril de código** (📦 907): **clave HMAC por empresa** (ámbito = `id_empresa`), **versión de llave por fila** (marcador `hmac-sha256.v2.k1`) y **anillo de llaves** (`FIRMA_HMAC_KEYRING`), con la migración **022**. Rotar la llave dejó de invalidar la evidencia anterior. Corrección que salió de esa fase: **la búsqueda solo probaba la versión vigente**, así que al rotar las filas viejas se volvían invisibles; ahora prueba todas las del anillo. |
 | **CAPÍTULO IV: AUDITADO (19)** | **Sus cinco citas, verificadas una por una contra la compilación oficial.** El **4.3** (parágrafo 2 del 2.2.1.1.10 del Decreto 1072) y el **4.5** (numeral 3 del 2.2.1.1.13) son **fieles**. El **4.2** es una paráfrasis: el 47.3 dice "incluido **cualquier acuerdo aplicable**" y el Acuerdo dice "incluido este Acuerdo" (la sustancia no cambia: este Acuerdo es un acuerdo aplicable). El **4.1** cita un artículo que el 47.5 no nombra: el oficial remite al **2.2.2.43.3**, y el 43.3 vigente es "PRESUPUESTO ANUAL" de las Cámaras de Comercio, o sea que **la remisión del propio decreto está caduca**, heredada de la numeración anterior a la compilación de 2015. El **4.4** tampoco es transcripción: el artículo 244 de la Ley 1564 ("DOCUMENTO AUTÉNTICO") presume auténticos los documentos públicos y privados "mientras no hayan sido tachados de falso o desconocidos", y la frase "en forma de mensaje de datos" es del 243. **Hallazgo de fondo: el Acuerdo no cita el 2.2.2.47.4 (CONFIABILIDAD)** en ningún punto, y es el artículo que trae los dos requisitos materiales (los datos de creación son exclusivamente del firmante; se puede detectar la alteración no autorizada), al que apuntan el 2.2.1.1.11 y el parágrafo del 2.2.1.1.13. **El texto no se tocó**: las propuestas quedaron en `docs/gestion-humana/firma-electronica/auditoria-capitulo-iv-citas-normativas-2026-10-19.md`. |
 | **CAPÍTULO V: AUDITADO E IMPLEMENTADO (19)** | **Verificado el 2.2.2.47.6 contra la compilación oficial y auditado numeral por numeral (5.1 a 5.5).** El texto del Capítulo V tiene **dos hallazgos** que van al abogado y **no se tocaron**: el preámbulo del 5.1 dice que a), b) y c) son los deberes del 47.6 y no lo son (falta el deber 2, el deber 3 quedó reducido a "a la Empresa y a K+AIR" y el literal a) no está en el artículo), y el 5.1(a) obliga al Firmante a cumplir unas políticas de seguridad que nunca ve. El código tenía **dos roto**: el 5.1(c) no era cumplible (no había ningún canal de K+AIR en la mini-app) y el 5.3 no tenía apoyo en pantalla (el backend mandaba `tipo_identificacion` e `id_documento`, pero la mini-app no los pintaba, y el comentario que decía lo contrario era falso). **Corregidos el 19**: el canal de incidentes de K+AIR vive en las dos capas (valor por defecto en el HTML, para que exista también en la pantalla de error donde no hay contexto, y configurable con `FIRMA_CANAL_INCIDENCIAS`; un test exige que no divergan) en un pie fuera de las pantallas, y el bloque `#documento-identidad` muestra qué documento se firma ("Estás firmando un contrato. Referencia: ..."). **Decisión del owner (2026-10-20)**: la API **sí** rechaza el buzón corporativo para el OTP (el D-02, 📦921): el código va a un medio personal, y el rechazo queda **apagado** hasta que exista la 9A y se publique la v1.1. Detalle en `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` y en `plan-cierre-tc-y-decisiones-2026-10-20.md`. |
-| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1377 tests · 1375 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · API key de Aseplus en texto plano en el escritorio · sin puente que empuje los datos de empresa de cada PC al servidor (hoy se cargan a mano por admin) · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
+| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1436 tests · 1434 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · **pendiente de decisión administrativa: el Anexo de Encargo de Aseplus (la base dice firmado el 2026-10-21, el documento de onboarding dice que no) y la URL real de la política de datos (en `null`)** · API key de Aseplus en texto plano en el escritorio · el alta de empresas y el Anexo de Encargo siguen siendo administrativos: el puente PC → servidor de 📦927 solo actualiza empresas ya registradas · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
@@ -666,6 +666,86 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
   typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
+
+### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija la ley, no el que declara la empresa
+
+**El síntoma.** El plazo de conservación era **uno solo por empresa** (`plazo_retencion_dias`) y se contaba
+desde la **firma**. Eso no puede representar lo que la ley fija por documento: los cinco grupos de
+registros del SG-SST se conservan **20 años desde el cese** (art. 2.2.4.6.13 del Decreto 1072), el
+**contrato electrónico se conserva sin término** (art. 2.2.1.1.12) y la **historia laboral** entre 80 y
+100 años desde el retiro (T-470/2019; Concepto AGN 2-2017-01654). Con un solo número, esos tres plazos
+no existían: o se borraban antes de tiempo, o no se borraban nunca.
+
+**La causa raíz, en una frase.** El modelo de datos era "una empresa, un plazo": el catálogo por documento
+no tenía dónde vivir, y por eso la habilitación exigía a cada empresa un plazo que la ley no le pedía
+(es el 409 `EMPRESA_NO_HABILITADA` que bloqueaba la inducción de Aseplus).
+
+**Qué se cambió.**
+
+- **Catálogo** (`firma-service/src/services/retencion.js`): 9 categorías (los 5 grupos SST, contrato,
+  historia laboral, aspirante y tabla de la empresa) y 4 reglas (`SST_20_ANOS`, `CONTRATO_ELECTRONICO`,
+  `HISTORIA_LABORAL`, `TABLA_EMPRESA`). Funciones puras: `planificar`, `resolverCategoria`,
+  `validarCategoria`, `reglaDe`, `sumarAnios`, `normalizarFecha`.
+- **Migración 033**: cuatro columnas (`categoria_retencion`, `regla_retencion`, `fecha_terminacion`,
+  `plazo_retencion_aplicable`) y un índice. **Aditiva**: no reescribe filas, no hay backfill, las
+  solicitudes viejas quedan en `NULL` y conservan el comportamiento anterior (tabla de la Empresa con
+  texto vivo).
+- **Habilitación** (`empresa.js`): una solicitud SST, de contrato o de historia laboral **no** exige
+  `plazo_retencion_dias`; el plazo lo fija la ley. Legacy, `TABLA_EMPRESA` y `ASPIRANTE` sí lo exigen.
+- **Alta** (`signRequest.js`): la categoría se resuelve **antes** de la habilitación, el plan se calcula
+  con la misma fecha de creación que se inserta, y las cuatro columnas quedan en la fila.
+- **Firma dual**: el hijo hereda categoría, regla, fecha de terminación, texto, fecha de conservación y
+  hold del padre (es el mismo documento: recalcular el plazo desde la firma del representante correría
+  el reloj por el hecho equivocado).
+- **Lo que ve el Trabajador**: la mini-app (`routes/public.js`), el correo de invitación
+  (`notifyRemote`) y la constancia (`pdfGen`) comunican el plazo **de esa** solicitud.
+- **App de escritorio**: selector de tipo de documento y campo de fecha de cese en el modal de firma,
+  con sugerencia por nombre del archivo ("Inducción" → capacitación). Cache-bust `20261022-retencion-categoria`.
+- **Script de humo**: `--categoria-retencion=` / `--fecha-terminacion=`, para verificar en el servidor que
+  la 033 quedó aplicada y que la regla corre.
+
+**Decisiones del owner.** (1) El alcance es el **catálogo completo**, no solo los datos de Aseplus.
+(2) El **20 años aplica solo a los cinco grupos SST**, contados desde el **cese**; los contratos y la
+nómina quedan fuera de esa regla. (3) La historia laboral usa el **máximo del rango (100 años)** y el
+texto dice el rango. (4) **El deber legal sin término de la empresa gana siempre** sobre el plazo del
+documento: un plazo más corto no puede recortar un deber sin término, y hacerlo sería una supresión
+indebida. (5) Sin fecha de cese o de retiro **no se inventa la fecha**: la fila queda pendiente y sin
+fecha de supresión. (6) El **Anexo de Encargo** y el **canal de atención** siguen exigiéndose: la
+categoría nueva solo exonera el plazo declarado por la empresa.
+
+**Verificación.** Suite nueva `tests/retencion-por-documento.test.js` (**21/21**: catálogo, derivación,
+20 años desde el cese, contrato con hold, historia laboral 80-100, tabla de la empresa, deber legal
+mandando, legacy intacto, migración, alta sin plazo de empresa, miniatura pública, correo y herencia de
+la firma dual). Suite completa del service: **1436 pruebas, 1434 verdes, 0 fallos, 2 omitidas** (los 2
+omitidos y 3 checks rojos de `main/` son preexistentes: son regex sobre código de paquetes anteriores).
+`node --check` limpio en los 10 archivos tocados.
+
+**Lo que queda.** (1) El **Anexo de Encargo** de Aseplus sigue sin resolverse: la base dice que está
+firmado (2026-10-21) y el documento de onboarding dice que no. (2) La **URL real de la política de
+datos** sigue sin confirmar (en `null`: el bloque público muestra "no publicada"). (3) La **tabla de
+retención de la empresa** sigue sin declarar (con la categoría nueva, el SST no la necesita). (4) La
+**prueba manual** (enviar la inducción y ver el bloque) necesita el servicio con el código nuevo
+corriendo: la migración 033 **ya está aplicada** en la base local, pero el proceso tiene que reiniciarse
+para cargar el código. (5) D-02 sigue apagado y no se publicó v1.1.
+
+### 2026-10-21 · 📦927 · Datos para firma electrónica: guardar local, releer y publicar en el servidor
+
+**El síntoma.** El formulario «Datos para firma electrónica» de Configuración de Empresa no sobrevivía al cierre: al reabrir la empresa volvía vacío. El bloque «Empresa que solicita tu firma» seguía mostrando los datos que un administrador había cargado a mano, y no había forma de que el PC publicara los suyos.
+
+**La causa raíz, en tres piezas.** (1) El puente local no quedaba registrado: el nombre exportado no coincidía con el que se importaba y el chequeo de autenticación usaba una propiedad que `validateSession()` no devuelve. (2) El renderer no exponía ninguna función para publicar, y el firma-service no tenía un canal para que el PC empujara la identidad. (3) Los nombres de campo del formulario no eran los del servidor, y el `update()` del service no hace merge: todo campo omitido se guarda como `null`.
+
+**Qué se cambió.**
+
+- `main/empresa-datos-firma-bridge.js`: registro idempotente (`register...` + alias `.register`), autenticación suave como la del puente del representante legal y upsert local.
+- `main/empresa-datos-firma-sync.js`: merge puro que conserva lo que el formulario no edita (`razon_social`, plazo de retención, canal de solicitud de copia, conservación por deber legal y norma) y no manda `dominios_corporativos`, para que el service los preserve.
+- `main/firma-client.js`: `adminGetEmpresa`, `adminUpdateEmpresa` y `adminCreateEmpresa` con `X-Admin-API-Key`.
+- `main/firma-bridge.js`: canal `firma:empresa:datos:sync` con GET → merge → PUT. Si la empresa no existe devuelve `EMPRESA_NO_REGISTRADA`; **no la crea sola**, porque el alta exige decisión administrativa y Anexo de Encargo firmado. Si no está configurada en `secrets.enc`, devuelve `skipped`.
+- `preload.js` y `config-viewer.html`: guardado local honesto (si falla, no se cierra el modal ni se dice «guardado»), validación inline de correo y URL, recarga al reabrir, aviso si la publicación falla y protección contra respuestas viejas al cambiar de empresa.
+- `renderer.js`: cache-bust del iframe (`20261022-datos-firma-sync927`).
+
+**Verificación.** 182 tests verdes de las cuatro suites (`test-empresa-datos-firma`, `test-empresa-datos-firma-sync`, `test-firma-bridge`, `test-firma-client`), 8/8 del endpoint admin, arnés real de la vista (guardar → cerrar → reabrir → publicar) y una prueba de integración HTTP create → GET → merge → PUT → `publicViewFor` que confirmó que los datos del formulario cambian y los campos que no edita se conservan. Todo con datos sintéticos y la base de tests.
+
+**Lo que queda.** La empresa debe existir en el servidor y tener el Anexo firmado; el alta inicial sigue siendo administrativa. Sin `adminApiKey`, el guardado local funciona pero la publicación queda pendiente y la UI lo avisa. D-02 sigue apagado y no se publicó v1.1.
 
 ### 2026-10-21 · 📦926 · El enlace que no resolvía: la causa raíz, el check que faltaba y la limpieza que el candado bloqueaba
 

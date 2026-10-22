@@ -256,6 +256,72 @@ sudo sha256sum /opt/kair-firma/app/scripts/smoke-produccion.js
 El hash se comprueba **despues** de instalar, en el archivo final: "el comando
 no dio error" no es prueba de que el archivo quedo donde debia.
 
+### 5.1.1 El catálogo de retención por documento (migración 033)
+
+> **2026-10-22.** La 033 agrega el catálogo de retención por tipo de
+> documento: el plazo ya no es uno solo por Empresa, sino el que le
+> corresponde a cada documento (20 años desde el **cese** para los cinco
+> grupos de registros del SG-SST, conservación **sin término** para el
+> contrato electrónico, 80-100 años desde el **retiro** para la historia
+> laboral). Ver [API §6.13.6](gestion-humana/firma-electronica/API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
+
+**¿Hay que aplicar la migración a mano? En el servidor, NO.** `src/server.js`
+llama a `migrate()` en el arranque: al reiniciar el servicio, la 033 se aplica
+sola. Para verla (que es la prueba), el paso es el mismo de siempre:
+
+```bash
+cd /opt/kair-firma/app
+sudo -u kairfirma node src/db/migrate.js 2>&1 | tee /tmp/migrate.log
+grep -c "Aplicando migración" /tmp/migrate.log     # 15 (019..033) en la primera vez
+```
+
+**Si el servicio corre LOCAL (desde el repo, `npm start`)**, no hay nada que
+copiar: el código es el del repo y la migración se aplica al arrancar. Para
+aplicarla sin arrancar:
+
+```powershell
+# En el repo (Windows): el .env define DB_PATH=./data/manual-8bc/firma.sqlite
+cd sgsst-electron-app\firma-service
+node src/db/migrate.js
+node -e "const D=require('better-sqlite3');const db=new D(process.env.DB_PATH||'./data/manual-8bc/firma.sqlite',{readonly:true});console.log(db.prepare('PRAGMA table_info(gh_firmas_electronicas)').all().map(c=>c.name).filter(n=>n.includes('retencion')||n==='fecha_terminacion'))"
+```
+
+Lo que tiene que salir: `categoria_retencion`, `regla_retencion`,
+`fecha_terminacion` y `plazo_retencion_aplicable`.
+
+**La 033 es aditiva**: cuatro columnas y un índice. **No reescribe filas, no
+hace backfill y no borra nada.** Las solicitudes anteriores quedan con las
+cuatro columnas en `NULL` y siguen con el comportamiento de siempre (la tabla
+de la Empresa con texto vivo).
+
+**El orden importa**: el código nuevo escribe esas columnas. Si se arrancara
+el servicio **sin** la 033, el alta de solicitudes fallaría por una columna
+inexistente. Por eso: migraciones primero, servicio después.
+
+**La prueba que sí sirve** (el script de humo ahora sabe verificar el
+catálogo):
+
+```bash
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/smoke-produccion.js --url=https://firma.kair.fyi \
+  --interno-file=/opt/kair-firma/internal-key.txt --e2e --confirmar-e2e \
+  --empresa=900829731 --trabajador=CC-PRUEBA-001 --numero-documento=PRUEBA-001 \
+  --correo=adminkair@gmail.com \
+  --categoria-retencion=SST_CAPACITACION --fecha-terminacion=2026-01-15'
+```
+
+Sin `--categoria-retencion`, la solicitud de prueba va como legacy (tabla de la
+Empresa). Con él, el script exige que la respuesta traiga la categoría **y** la
+fecha de conservación ya calculada: es la prueba de que la 033 quedó aplicada
+y de que la regla legal del documento está corriendo en el servidor.
+
+> **Lo que la 033 NO arregla**: la habilitación sigue exigiendo el **Anexo de
+> Encargo firmado** y el **canal de atención** (`canal_pqrs`). Lo único que la
+> categoría nueva exonera es el **plazo declarado por la Empresa**
+> (`plazo_retencion_dias`), porque en un documento del SG-SST el plazo lo fija
+> la ley y no la tabla de la empresa. Si la respuesta es `409
+> EMPRESA_NO_HABILITADA`, el detalle dice qué falta.
+
 ---
 
 ## 5.2 Retirar el rastro de prueba

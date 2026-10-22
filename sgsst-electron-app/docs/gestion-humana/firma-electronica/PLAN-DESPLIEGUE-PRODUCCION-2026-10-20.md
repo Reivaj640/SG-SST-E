@@ -203,7 +203,7 @@ arrancar, verlas en el log es la prueba):
 ```bash
 cd /opt/kair-firma/app
 sudo -u kairfirma node src/db/migrate.js 2>&1 | tee /tmp/migrate.log
-grep -c "Aplicando migración" /tmp/migrate.log     # debe dar 14 (019..032)
+grep -c "Aplicando migración" /tmp/migrate.log     # debe dar 15 (019..033)
 ```
 
 Si `node src/db/migrate.js` complain de variables faltantes, es que falta la
@@ -215,14 +215,29 @@ sudo systemctl status kair-firma
 sudo journalctl -u kair-firma -n 50 --no-pager
 ```
 
-### Las 14 migraciones son ADITIVAS
+### Las 15 migraciones son ADITIVAS
 
-Verificado en el código: `019`, `022` y `026` son `ALTER TABLE ... ADD COLUMN` y
+Verificado en el código: `019`, `022`, `026` y `033` son `ALTER TABLE ... ADD COLUMN` y
 `CREATE TABLE IF NOT EXISTS`; **ninguna reescribe ni borra filas**. No hay
 backfill: las filas viejas se reescriben solas la primera vez que se tocan
 (`019` §COMPATIBILIDAD, `022` §Backfill). Los tokens ya emitidos siguen
 resolviendo porque `tokenHashCandidates` prueba el anillo, el formato v1 y el
 **SHA-256 pelado** (`src/crypto/token.js:123-134`).
+
+La **033** (`033_retencion_por_documento.sql`) agrega las cuatro columnas del
+catálogo de retención por documento (`categoria_retencion`, `regla_retencion`,
+`fecha_terminacion`, `plazo_retencion_aplicable`) y un índice. **No toca
+ninguna fila**: las solicitudes anteriores quedan con las cuatro columnas en
+`NULL` y siguen funcionando con la tabla de la Empresa, exactamente como antes
+del catálogo. Es la que habilita los plazos que fija la ley (20 años desde el
+cese para los registros del SG-SST, conservación sin término para el contrato
+electrónico, 80-100 años desde el retiro para la historia laboral). Ver
+[API §6.13.6](API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
+
+> **Ojo con el orden**: el código nuevo INSERTa esas cuatro columnas. Si se
+> copiase el código **sin** aplicar la 033, el alta de solicitudes fallaría con
+> un error de columna inexistente. Por eso la 033 va **antes** de arrancar el
+> servicio, no después.
 
 Excepción a vigilar: `020_eventos_append_only.sql` lleva la directiva
 `-- @skip-when-env test`; en producción **sí** se aplica (crea los triggers

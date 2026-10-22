@@ -829,6 +829,75 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * GET /internal/admin/empresas/:id_empresa
+   *
+   * Lee la identificación completa de una empresa (la que se le muestra al
+   * firmante). Es un endpoint admin distinto del de clientes: `clientes` es
+   * la credencial de la empresa; `empresas` es su identidad legal.
+   *
+   * @param {string} id_empresa
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: fila de gh_firma_empresas + huella_snapshot
+   *   errors: EMPRESA_NOT_FOUND (404), ADMIN_TOKEN_REQUIRED
+   */
+  function adminGetEmpresa(id_empresa) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa);
+    return _adminRequest('GET', path, null);
+  }
+
+  /**
+   * PUT /internal/admin/empresas/:id_empresa
+   *
+   * Actualiza la identificación de una empresa. OJO: el service NO hace
+   * merge. El body debe incluir TODOS los campos editables (incluido
+   * `razon_social`) y `plazo_retencion_dias`; si falta uno, se guarda null.
+   * El bridge arma ese body con `buildEmpresaUpdate()` después de un GET.
+   *
+   * @param {string} id_empresa
+   * @param {object} body - body completo de updateEmpresaBody
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: EMPRESA_NOT_FOUND (404), INVALID_REQUEST_BODY, ADMIN_TOKEN_REQUIRED
+   */
+  function adminUpdateEmpresa(id_empresa, body) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'body requerido (objeto)'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa);
+    return _adminRequest('PUT', path, body);
+  }
+
+  /**
+   * POST /internal/admin/empresas
+   *
+   * Da de alta la identificación de una empresa. NO se usa todavía en el
+   * flujo automático de Configuración: la empresa debe existir antes y tener
+   * el Anexo de Encargo firmado. Se expone para operaciones administrativas
+   * explícitas y para tests del contrato.
+   *
+   * @param {object} body - { id_empresa, razon_social, ... }
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: EMPRESA_ALREADY_EXISTS (409), INVALID_REQUEST_BODY, ADMIN_TOKEN_REQUIRED
+   */
+  function adminCreateEmpresa(body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'body requerido (objeto)'));
+    }
+    if (!body.id_empresa || typeof body.id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    if (!body.razon_social || typeof body.razon_social !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'razon_social requerido (string)'));
+    }
+    return _adminRequest('POST', '/internal/admin/empresas', body);
+  }
+
+  /**
    * POST /internal/admin/clientes/:id/rotate (DR-1, DR-4, DR-6.D)
    *
    * Rota la API key del cliente activo de la empresa `:id`. La key vieja
@@ -902,6 +971,10 @@ function createFirmaClient(opts) {
     adminCreateClient: adminCreateClient,
     adminListClients: adminListClients,
     adminGetClient: adminGetClient,
+    // Identidad legal de la empresa (no confundir con el cliente/credencial).
+    adminCreateEmpresa: adminCreateEmpresa,
+    adminGetEmpresa: adminGetEmpresa,
+    adminUpdateEmpresa: adminUpdateEmpresa,
     adminRotateClient: adminRotateClient,
     adminRevokeClient: adminRevokeClient,
     // Expose for tests

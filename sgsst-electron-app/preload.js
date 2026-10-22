@@ -657,6 +657,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaEmpresaRotateApiKey: (args) => ipcRenderer.invoke('firma:empresa:rotate-api-key', args),
   firmaEmpresaRevokeApiKey: (args) => ipcRenderer.invoke('firma:empresa:revoke-api-key', args),
   firmaEmpresaListFirmaRemote: (args) => ipcRenderer.invoke('firma:empresa:list-firma-remote', args || {}),
+  // 📦927 — Publica en el firma-service los datos de identificación de la
+  // empresa guardados localmente (GET + merge + PUT en el bridge). No crea la
+  // empresa: si no existe en el servidor devuelve EMPRESA_NO_REGISTRADA.
+  firmaEmpresaDatosSync: (args) => ipcRenderer.invoke('firma:empresa:datos:sync', args || {}),
   // I-104 RECOVERY: lista empresas del backend con metadata no sensible.
   firmaEmpresaListBackend: (args) => ipcRenderer.invoke('firma:empresa:list-backend', args || {}),
   // I-104 RECOVERY: rota una empresa que existe en backend pero no en secrets.enc.

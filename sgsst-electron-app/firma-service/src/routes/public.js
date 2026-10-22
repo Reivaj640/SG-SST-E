@@ -228,7 +228,30 @@ router.get('/s/:token', (req, res, next) => {
       // null = la empresa no está dada de alta en gh_firma_empresas. La
       // mini-app omite el bloque en ese caso, que es exactamente el
       // comportamiento previo a la 017.
-      empresa: empresaService.publicViewFor(signRequest.id_empresa),
+      // 033 · Si la solicitud tiene categoría propia, el bloque muestra el
+      // plazo de ESE documento (20 años desde el cese, contrato sin término,
+      // historia laboral) y no el de la tabla de la Empresa. Sin categoría,
+      // el bloque sale como antes, con los datos vivos de la Empresa.
+      //
+      // El deber legal de la Empresa (sin término) NO se pisa: si la fila
+      // tiene hold, se dice; y si la Empresa lo declaró después de crear la
+      // solicitud, se sigue leyendo su valor vivo.
+      empresa: empresaService.publicViewFor(
+        signRequest.id_empresa,
+        signRequest.categoria_retencion
+          ? Object.assign(
+            { plazo_retencion: signRequest.plazo_retencion_aplicable || null },
+            signRequest.hold_legal === 1
+              ? {
+                conservacion_por_deber_legal: true,
+                norma_conservacion: signRequest.motivo_hold
+                  ? String(signRequest.motivo_hold).replace(/^deber_legal_/, '')
+                  : null,
+              }
+              : {}
+          )
+          : undefined
+      ),
       // I-103.A1.6 · Correo enmascarado del firmante, para mostrar en la
       // pantalla OTP cuando el firmante re-abre el enlace y ya pasó por
       // identificación. Solo se expone si estado >= IDENTIFIED (después

@@ -62,6 +62,66 @@
     completado: 7
   };
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // El plazo de conservación NO es uno solo para toda la empresa: hay
+  // documentos cuyo plazo lo fija la LEY (20 años contados desde el cese para
+  // los cinco grupos de registros del SG-SST, conservación sin término para el
+  // contrato electrónico, 80 a 100 años desde el retiro para la historia
+  // laboral) y documentos que siguen la tabla de retención de la empresa.
+  //
+  // Estos ids son los mismos del catálogo del servicio de firma
+  // (firma-service/src/services/retencion.js). Si el servicio cambia el
+  // catálogo, esta lista hay que actualizarla en la misma revisión.
+  //
+  // La primera opción (id vacío) es la del documento que NO está en el
+  // catálogo: se comporta como hasta ahora (tabla de la empresa).
+  var FE_CATEGORIAS_RETENCION = [
+    { id: '', label: 'Otro documento (según la tabla de retención de la empresa)', requiere_fecha: false, nota: '' },
+    { id: 'SST_CAPACITACION', label: 'Capacitación, inducción o entrenamiento', requiere_fecha: true,
+      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
+    { id: 'SST_EPP', label: 'Entrega de elementos de protección personal (EPP)', requiere_fecha: true,
+      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
+    { id: 'SST_MONITOREO_AMBIENTAL', label: 'Monitoreo o mediciones ambientales', requiere_fecha: true,
+      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
+    { id: 'SST_EXAMENES_ESPECIALIZADOS', label: 'Exámenes médicos especializados o pruebas complementarias', requiere_fecha: true,
+      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
+    { id: 'SST_PERFIL_Y_CONCEPTOS_MEDICOS', label: 'Perfil epidemiológico o concepto de examen médico', requiere_fecha: true,
+      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
+    { id: 'CONTRATO_TRABAJO', label: 'Contrato de trabajo', requiere_fecha: false,
+      nota: 'El contrato firmado electrónicamente se conserva sin término (Decreto 1072 de 2015, art. 2.2.1.1.12): no se borra por el vencimiento de la tabla.' },
+    { id: 'HISTORIA_LABORAL', label: 'Historia laboral o nómina', requiere_fecha: true,
+      nota: 'Se conserva entre 80 y 100 años desde el retiro (Corte Constitucional T-470/2019; Concepto AGN 2-2017-01654). Se aplica el máximo de 100 años.' }
+  ];
+
+  /**
+   * Sugiere la categoría de retención según el nombre del documento.
+   *
+   * Es solo una SUGERENCIA: el operador puede cambiarla. El sistema no lee
+   * el PDF para clasificarlo (es la misma regla del 10.8: el contenido no se
+   * lee antes del consentimiento), así que la propuesta se basa en el título
+   * y la persona confirma.
+   */
+  function _feCategoriaSugerida(doc) {
+    var texto = (((doc && doc.titulo) || '') + ' ' + ((doc && doc.tipo) || '')).toLowerCase();
+    if (!texto) return '';
+    // Solo los casos inequívocos. Una sugerencia equivocada es peor que no
+    // sugerir: el operador siempre puede cambiarla, pero no debería tener que
+    // corregir lo que el sistema propuso por cuenta propia.
+    if (texto.indexOf('induccion') >= 0 || texto.indexOf('capacitacion') >= 0) return 'SST_CAPACITACION';
+    if (texto.indexOf('epp') >= 0 || texto.indexOf('proteccion personal') >= 0) return 'SST_EPP';
+    if (texto.indexOf('monitoreo') >= 0 || texto.indexOf('medicion ambiental') >= 0) return 'SST_MONITOREO_AMBIENTAL';
+    if (texto.indexOf('audiometria') >= 0 || texto.indexOf('espirometria') >= 0
+      || texto.indexOf('optometria') >= 0 || texto.indexOf('examen especializado') >= 0) {
+      return 'SST_EXAMENES_ESPECIALIZADOS';
+    }
+    if (texto.indexOf('contrato') >= 0) return 'CONTRATO_TRABAJO';
+    if (texto.indexOf('historia laboral') >= 0 || texto.indexOf('nomina') >= 0) return 'HISTORIA_LABORAL';
+    return '';
+  }
+
   // I-102.2.G · Mapa de estados terminales de firma-service → estado persistente
   var _TRANSICION_FIRMA = {
     'SIGNED':                { estado: 'firmado',   toast: 'Documento firmado correctamente.',                                success: true  },
@@ -346,33 +406,44 @@
       '        <div id="fe-firma-trab-summary" class="fe-firma-summary"></div>',
       '      </div>',
       '      <div class="fe-field">',
-      '        <label class="fe-field__label" for="fe-firma-correo-otp">Correo personal del trabajador (para el código de verificación)</label>',
-      '        <input id="fe-firma-correo-otp" class="fe-field__input" type="email" placeholder="correo.personal@ejemplo.net" />',
+      '        <label class="fe-field__label" for="fe-firma-categoria">Tipo de documento para la conservación</label>',
+      '        <select id="fe-firma-categoria" class="fe-field__select"></select>',
+      '        <p class="fe-field__hint" id="fe-firma-categoria-hint"></p>',
+      '      </div>',
+      '      <div class="fe-field" id="fe-firma-terminacion-field" hidden>',
+      '        <label class="fe-field__label" for="fe-firma-terminacion">Fecha de cese de la relación laboral</label>',
+      '        <input id="fe-firma-terminacion" class="fe-field__input" type="date" />',
       '        <p class="fe-field__hint">',
-      '          El código de verificación es el dato de creación de la firma: debe llegar a un buzón',
-      '          que la empresa no pueda leer (numeral 2.2.2.47.4). Opcional: si la empresa no tiene',
-      '          uno, el trabajador lo declara en la pantalla de firma.',
+      '          Con esta fecha se cuentan los años de conservación que exige la ley. Si todavía',
+      '          no la tienes, deja el campo vacío: el documento se conserva sin fecha de',
+      '          supresión y queda pendiente de completarla.',
       '        </p>',
-      '        <p class="fe-field__error" id="fe-firma-correo-otp-error" hidden></p>',
       '      </div>',
       '      <div class="fe-field">',
-      '        <label class="fe-field__label" for="fe-firma-correo">Correo para la invitación <span class="fe-field__req">*</span></label>',
-      '        <input id="fe-firma-correo" class="fe-field__input" type="email" placeholder="correo@empresa.com" />',
-      '        <p class="fe-field__hint">A este correo llega el enlace de firma. El código de verificación va al medio personal que declare el firmante.</p>',
+      '        <label class="fe-field__label" for="fe-firma-correo">Correo personal del trabajador (invitación y código) <span class="fe-field__req">*</span></label>',
+      '        <input id="fe-firma-correo" class="fe-field__input" type="email" placeholder="correo.personal@ejemplo.net" />',
+      '        <p class="fe-field__hint">',
+      '          A este correo llegan el enlace de firma y el código de verificación. Debe ser un',
+      '          buzón que el trabajador controle y que la empresa no pueda leer (numeral',
+      '          2.2.2.47.4). Si el trabajador no tiene correo personal, usá la firma en papel (9A).',
+      '        </p>',
       '        <p class="fe-field__hint" id="fe-firma-correo-hint"></p>',
       '        <p class="fe-field__error" id="fe-firma-correo-error" hidden></p>',
       '      </div>',
       '      <div class="fe-field">',
       '        <label class="fe-firma-confirm">',
       '          <input id="fe-firma-confirmar" type="checkbox" />',
-      '          <span>Confirmo que este documento será enviado a firma electrónica</span>',
+      '          <span>Confirmo que este documento se enviará a firma y que el correo indicado es personal del trabajador, sin acceso de la empresa</span>',
       '        </label>',
       '      </div>',
       // I-FIRMA-DUAL · Checkbox de firma dual (K+AIR Firma Dual · v0.1.180)
-      '      <div class="fe-field" style="margin-top: 0.5rem;">',
-      '        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">',
+      '      <div class="fe-field">',
+      '        <label class="fe-firma-confirm fe-firma-confirm--dual">',
       '          <input id="fe-firma-requiere-empresa" type="checkbox" />',
-      '          <span>Requiere firma de la empresa</span>',
+      '          <span class="fe-firma-confirm__body">',
+      '            <span class="fe-firma-confirm__title">Requiere firma de la empresa</span>',
+      '            <span class="fe-firma-confirm__hint">El representante legal también firmará este documento.</span>',
+      '          </span>',
       '        </label>',
       '      </div>',
       '      <div id="fe-firma-rep-preview" class="fe-firma-rep-preview" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-color); border-radius: 4px;">',
@@ -420,7 +491,7 @@
       '        <p id="fe-success-ttl" class="fe-field__hint">El enlace tiene vigencia limitada.</p>',
       '      </div>',
       '      <div class="fe-field">',
-      '        <label class="fe-field__label">Correo para la invitación</label>',
+      '        <label class="fe-field__label">Correo del trabajador (invitación y código)</label>',
       '        <input id="fe-success-correo" class="fe-field__input" type="text" readonly />',
       '        <p id="fe-success-feedback" class="fe-field__hint" hidden></p>',
       '      </div>',
@@ -2384,23 +2455,18 @@
       trabSummary.innerHTML = '<strong>' + _esc((trab.nombres || '') + ' ' + (trab.apellidos || '')) + '</strong>' +
         (trab.cedula ? ' — C.C. ' + _esc(trab.cedula) : '');
     }
-    // Pre-fill email
+    // D-2: un solo correo, el PERSONAL del trabajador, para la invitación y
+    // para el código de verificación (el dato de creación de la firma, el
+    // 47.4 num. 1). La empresa declara que no tiene acceso a ese buzón; el
+    // trabajador puede corregirlo en la mini-app antes de que se envíe el OTP.
     var correoInput = modal.querySelector('#fe-firma-correo');
-    // D-2: el medio PERSONAL que la EMPRESA declara para el código de
-    // verificación (el dato de creación de la firma, el 47.4 num. 1).
-    var correoOtpInput = modal.querySelector('#fe-firma-correo-otp');
-    var correoOtpErrorEl = modal.querySelector('#fe-firma-correo-otp-error');
     var hintEl = modal.querySelector('#fe-firma-correo-hint');
     var errorEl = modal.querySelector('#fe-firma-correo-error');
     var confirmarCheck = modal.querySelector('#fe-firma-confirmar');
     var enviarBtn = modal.querySelector('#fe-firma-enviar');
-    if (correoInput) correoInput.value = (trab && trab.correo) || '';
-    // Pre-fill del medio personal: si la ficha del trabajador lo tiene, se
-    // ofrece; si no, el operador lo escribe (o lo declara el trabajador en
-    // la mini-app).
-    if (correoOtpInput) correoOtpInput.value = (trab && trab.correo_personal) || '';
-    if (correoOtpErrorEl) correoOtpErrorEl.hidden = true;
-    if (hintEl) hintEl.textContent = (trab && trab.correo) ? 'Correo prellenado del trabajador.' : '';
+    var correoPrefill = (trab && (trab.correo_personal || trab.correo)) || '';
+    if (correoInput) correoInput.value = correoPrefill;
+    if (hintEl) hintEl.textContent = correoPrefill ? 'Correo prellenado de la ficha del trabajador.' : '';
     if (errorEl) errorEl.hidden = true;
     if (confirmarCheck) confirmarCheck.checked = false;
     if (enviarBtn) enviarBtn.disabled = true;
@@ -2444,6 +2510,40 @@
         }
       };
     }
+    // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO.
+    //
+    // El operador declara de qué tipo de documento se trata: eso decide el
+    // plazo de conservación (20 años desde el cese, contrato sin término,
+    // historia laboral o la tabla de la empresa). Se propone una categoría
+    // según el nombre del documento, y el operador la confirma o la cambia.
+    var categoriaSel = modal.querySelector('#fe-firma-categoria');
+    var categoriaHint = modal.querySelector('#fe-firma-categoria-hint');
+    var termField = modal.querySelector('#fe-firma-terminacion-field');
+    var termInput = modal.querySelector('#fe-firma-terminacion');
+    if (categoriaSel) {
+      categoriaSel.innerHTML = '';
+      FE_CATEGORIAS_RETENCION.forEach(function (opcion) {
+        var el = document.createElement('option');
+        el.value = opcion.id;
+        el.textContent = opcion.label;
+        categoriaSel.appendChild(el);
+      });
+      var sugerida = _feCategoriaSugerida(doc);
+      categoriaSel.value = sugerida || '';
+      if (termInput) termInput.value = '';
+    }
+    function refrescarCategoria() {
+      if (!categoriaSel) return;
+      var elegida = null;
+      for (var i = 0; i < FE_CATEGORIAS_RETENCION.length; i++) {
+        if (FE_CATEGORIAS_RETENCION[i].id === categoriaSel.value) elegida = FE_CATEGORIAS_RETENCION[i];
+      }
+      if (categoriaHint) categoriaHint.textContent = (elegida && elegida.nota) || '';
+      if (termField) termField.hidden = !(elegida && elegida.requiere_fecha);
+    }
+    if (categoriaSel) categoriaSel.onchange = refrescarCategoria;
+    refrescarCategoria();
+
     // Wire validation
     function validate() {
       var correo = (correoInput.value || '').trim();
@@ -2455,16 +2555,13 @@
     // Wire send (sin pausa de OTP — el flujo es lineal)
     if (enviarBtn) {
       enviarBtn.onclick = function () {
-        self._enviarAFirma(
-          modal, self._firmaCtx, correoInput.value.trim(),
-          (correoOtpInput && correoOtpInput.value.trim()) || ''
-        );
+        self._enviarAFirma(modal, self._firmaCtx, correoInput.value.trim());
       };
     }
     modal.hidden = false;
   };
 
-  FirmaElectronicaComponent.prototype._enviarAFirma = async function (modal, ctx, correoFirmante, correoOtp) {
+  FirmaElectronicaComponent.prototype._enviarAFirma = async function (modal, ctx, correoFirmante) {
     // FASE 4 · A1.5.4-B · REDISEÑO DEL FLUJO:
     // 1. K+AIR crea consent (pendiente, sin OTP) + sign_request + notify_remote
     // 2. El único correo que sale es la invitación con la URL pública
@@ -2546,25 +2643,31 @@
         // (el enlace) y para la copia firmada. Queda congelado al momento de
         // crear el SR (no cambia aunque cambie el correo del consent).
         //
-        // D-2 (2026-10-20): el OTP ya NO es este correo. El OTP (dato de
-        // creacion de la firma) va al medio PERSONAL que declara el propio
-        // firmante en la mini-app; este campo es el canal de la invitacion.
-        // D-2 (2026-10-20): el OTP ya NO es este correo. El OTP (dato de
-        // creacion de la firma) va al medio PERSONAL. Este campo es el canal
-        // de la invitacion.
-        //
-        // `correo_otp` es el medio personal que declara la EMPRESA (o, si no
-        // lo tiene, el propio firmante en la mini-app). Si ninguno lo declara,
-        // el OTP va al contacto registrado y el caso queda avisado en el log
-        // (el inventario del D-2 lo cuenta).
+        // D-2 (2026-10-21): la Empresa no usa correos corporativos ni crea
+        // buzones a los trabajadores. Por eso hay UN solo correo: el personal
+        // del trabajador, que sirve para la invitación y para el OTP. La
+        // Empresa declara que no tiene acceso a ese buzón; el trabajador puede
+        // corregir el medio del OTP en la mini-app antes de que se envíe el
+        // código.
         correo_verificacion: correoFirmante,
-        correo_otp: correoOtp || '',
-// Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
-      // no requieren migración de schema en firma-service).
-      nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
-      nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim(),
-      correo_empresa: ''  // se llena abajo si hay representante legal
+        correo_otp: correoFirmante,
+        // Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
+        // no requieren migración de schema en firma-service).
+        nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
+        nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim(),
+        correo_empresa: ''  // se llena abajo si hay representante legal
       };
+      // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO.
+      //
+      // La categoría decide el plazo de conservación y se manda top-level (es
+      // lo que acepta el esquema del servicio). La fecha de cese/retiro se
+      // manda solo si el operador la tiene: sin ella, el documento queda
+      // pendiente de fecha en vez de inventar un plazo.
+      var catSel = modal.querySelector('#fe-firma-categoria');
+      var catId = (catSel && catSel.value) ? String(catSel.value) : '';
+      if (catId) metadata.categoria_retencion = catId;
+      var termIn = modal.querySelector('#fe-firma-terminacion');
+      if (termIn && termIn.value) metadata.fecha_terminacion = termIn.value;
       // I-FIRMA-DUAL · v0.1.180: si el checkbox de firma dual está marcado,
       // agregar los 2 campos nuevos al metadata. El bridge ya pasa metadata
       // tal cual al firma-service, así que no se requieren cambios en firma-bridge.js.

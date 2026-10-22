@@ -59,6 +59,13 @@
  * `--trabajador`). El script calcula la huella con ese mismo numero, asi que
  * tienen que coincidir: la mini-app pide tipo `CC` y ese numero.
  *
+ * Con `--categoria-retencion=` (y opcionalmente `--fecha-terminacion=`) la
+ * solicitud de prueba se crea con el CATALOGO DE RETENCION POR DOCUMENTO:
+ * `SST_CAPACITACION`, `SST_EPP`, `CONTRATO_TRABAJO`, `HISTORIA_LABORAL`...
+ * El script verifica que la respuesta traiga la categoria y la fecha de
+ * conservacion ya calculada: es la prueba de que la migracion 033 esta
+ * aplicada en el servidor. Sin el flag, la solicitud va como legacy.
+ *
  * Las llaves se pueden pasar por archivo (`--interno-file`, `--admin-file`) o
  * por el ambiente (`FIRMA_SMOKE_INTERNAL_KEY`, `FIRMA_SMOKE_ADMIN_KEY`).
  * NUNCA se imprimen.
@@ -141,6 +148,8 @@ function parseArgs(argv) {
     numeroDocumento: null,
     correo: null,
     correoEmpresa: null,
+    categoriaRetencion: null,
+    fechaTerminacion: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     json: false,
     error: null,
@@ -162,6 +171,8 @@ function parseArgs(argv) {
     else if (a.startsWith('--numero-documento=')) args.numeroDocumento = a.split('=').slice(1).join('=');
     else if (a.startsWith('--correo=')) args.correo = a.split('=').slice(1).join('=');
     else if (a.startsWith('--correo-empresa=')) args.correoEmpresa = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--categoria-retencion=')) args.categoriaRetencion = a.split('=').slice(1).join('=');
+    else if (a.startsWith('--fecha-terminacion=')) args.fechaTerminacion = a.split('=').slice(1).join('=');
     else if (a.startsWith('--timeout-ms=')) args.timeoutMs = parseInt(a.split('=')[1], 10);
     else if (a === '--help' || a === '-h') {
       console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].replace(/^\/\*\*?/, ''));
@@ -472,7 +483,7 @@ function numeroDocumentoDe(args) {
  */
 function metadataSignRequest(args, acuerdoActivo, documentHash) {
   const numero = numeroDocumentoDe(args);
-  return {
+  const metadata = {
     id_documento: 'PRUEBA-HUMO-' + Date.now(),
     id_trabajador: args.trabajador,
     id_empresa: args.empresa,
@@ -494,6 +505,18 @@ function metadataSignRequest(args, acuerdoActivo, documentHash) {
     // ("Expected string, received object").
     metadata: JSON.stringify({ subtipo_identificacion: 'prueba-de-humo' }),
   };
+  // 033 · El catálogo de retención por documento (opcional). Con
+  // `--categoria-retencion=SST_CAPACITACION` la solicitud se crea con la regla
+  // de 20 años desde el cese: es la prueba de que el servidor ya aplicó la
+  // migración 033. Sin el flag, la solicitud va como legacy (tabla de la
+  // Empresa).
+  if (args.categoriaRetencion) {
+    metadata.categoria_retencion = args.categoriaRetencion;
+  }
+  if (args.fechaTerminacion) {
+    metadata.fecha_terminacion = args.fechaTerminacion;
+  }
+  return metadata;
 }
 
 /**
@@ -693,6 +716,20 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
       emitir('  (NO se puede reutilizar el token: se devuelve una sola vez)');
       emitir('  Para identificarte en la mini-app: tipo CC y numero '
         + numeroDocumentoDe(args));
+    }
+    // 033 · La retention por documento. Si se pidio una categoria, la
+    // respuesta tiene que traerla con la fecha de conservacion ya calculada:
+    // es la prueba de que la migracion 033 esta aplicada y de que el servidor
+    // ya aplica la regla legal del documento.
+    if (args.categoriaRetencion) {
+      if (r.categoria_retencion === args.categoriaRetencion) {
+        ok('La retencion por documento se aplico',
+          'categoria=' + r.categoria_retencion
+          + ' fecha_conservacion=' + (r.fecha_conservacion || '(sin fecha: pendiente)'));
+      } else {
+        fail('La retencion por documento se aplico',
+          'pedida=' + args.categoriaRetencion + ' devuelta=' + (r.categoria_retencion || '(null)'));
+      }
     }
     // Crear la solicitud NO manda ningun correo: el primer contacto con el
     // firmante es un endpoint aparte. Sin esta llamada, el e2e "pasa" sin

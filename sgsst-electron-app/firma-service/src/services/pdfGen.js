@@ -13,6 +13,7 @@
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs');
 const empresaService = require('./empresa');
+const db = require('../db/connection');  // 033: leer el plazo de la propia solicitud
 const { esPseudonimo } = require('./trabajador');
 
 // Texto legal compartido entre la página de sello y la Constancia.
@@ -639,7 +640,29 @@ async function generateConstanciaPdf(metadata) {
     // Numeral 8.6 del Acuerdo: la Empresa debe comunicarle al Trabajador el
     // plazo de conservación y dónde puede pedir una copia. La constancia
     // deja constancia de lo que se le comunico.
-    campo('Plazo de conservación de sus datos', empresaId.plazo_retencion);
+    //
+    // 033 · El snapshot de la Empresa se congeló al firmar, así que no
+    // alcanza para el catálogo por documento: si esta firma tiene categoría
+    // propia, el plazo que se comunica es el de ESE documento (20 años desde
+    // el cese, contrato sin término, historia laboral). Se lee de la fila de
+    // la firma, que es donde quedó congelado.
+    const plazoRetencionSolicitud = (function () {
+      if (!metadata.id_solicitud) return null;
+      try {
+        const fila = db.prepare(
+          'SELECT categoria_retencion, plazo_retencion_aplicable '
+          + 'FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+        ).get(metadata.id_solicitud);
+        if (!fila || !fila.categoria_retencion) return null;
+        return fila.plazo_retencion_aplicable || null;
+      } catch (e) {
+        // La constancia NUNCA se cae por esto: si no se puede leer la fila, se
+        // imprime el plazo del snapshot, que es lo que se le mostró al firmante.
+        return null;
+      }
+    })();
+    campo('Plazo de conservación de sus datos',
+      plazoRetencionSolicitud || empresaId.plazo_retencion);
     campo('Canal para solicitar copia', empresaId.canal_solicitud_copia);
     // El hash va COMPLETO (no truncado como los demás) porque es el valor de
     // evidencia de la constancia. Se calcula sobre el snapshot EN CLARO.

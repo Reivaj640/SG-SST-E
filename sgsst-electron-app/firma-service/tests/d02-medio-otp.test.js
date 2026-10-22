@@ -44,6 +44,7 @@ const request = require('supertest');
 
 const db = require('../src/db/connection');
 const config = require('../src/config');
+const { signRequestBody } = require('../src/schemas');
 const empresaService = require('../src/services/empresa');
 const mediosService = require('../src/services/medios');
 const mailer = require('../src/services/mailer');
@@ -344,4 +345,38 @@ test('D-2 · con el rechazo ENCENDIDO, un medio personal SI pasa', async () => {
   } finally {
     config.exigirMedioPersonalOtp = antes;
   }
+});
+
+// ===========================================================================
+// 9. El schema de la ruta acepta el medio OTP de la app de escritorio
+// ===========================================================================
+test('D-2 · signRequestBody acepta correo_otp (mismo correo, vacío o inválido)', () => {
+  const h = 'a'.repeat(64);
+  const base = {
+    id_documento: 'doc-d2',
+    id_trabajador: '1234567890',
+    id_empresa: EMPRESA,
+    tipo_firma: 'remoto',
+    agreement_version: 'v1.0',
+    agreement_hash: h,
+    document_hash: h,
+    version_kair: '0.1.190-test',
+    correo_verificacion: CORREO_PERSONAL,
+  };
+
+  // El caso de la app: un solo correo, el personal, para la invitación y el OTP.
+  const mismo = signRequestBody.safeParse({ ...base, correo_otp: CORREO_PERSONAL });
+  assert.equal(mismo.success, true, JSON.stringify(mismo.error && mismo.error.issues));
+
+  // Compatibilidad con versiones anteriores que mandaban el campo vacío.
+  const vacio = signRequestBody.safeParse({ ...base, correo_otp: '' });
+  assert.equal(vacio.success, true, JSON.stringify(vacio.error && vacio.error.issues));
+
+  // Las solicitudes legacy que no mandan el campo siguen pasando.
+  const ausente = signRequestBody.safeParse(base);
+  assert.equal(ausente.success, true, JSON.stringify(ausente.error && ausente.error.issues));
+
+  // Un valor que no es correo no puede pasar.
+  const invalido = signRequestBody.safeParse({ ...base, correo_otp: 'no-es-correo' });
+  assert.equal(invalido.success, false);
 });

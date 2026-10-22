@@ -200,6 +200,44 @@ function asignarFechaConservacion(idFirma, id_empresa, fecha_creacion) {
 }
 
 /**
+ * Aplica el plan del catálogo por documento a una fila ya insertada.
+ *
+ * A diferencia de `asignarFechaConservacion`, este camino NO mira la tabla de
+ * la Empresa cuando la regla tiene plazo legal propio: la fecha viene calculada
+ * por `retencion.planificar` (20 años desde el cese, 100 desde el retiro) o es
+ * NULL porque falta la fecha de cese/retiro. Un plan con hold deja el hold
+ * automático, igual que el deber legal de la Empresa.
+ *
+ * @param {number} idFirma
+ * @param {object} plan - resultado de retencion.planificar()
+ * @returns {string|null} la fecha aplicada
+ */
+function aplicarPlanRetencion(idFirma, plan) {
+  if (!plan || typeof plan !== 'object') {
+    throw new Error('aplicarPlanRetencion necesita un plan de retención.');
+  }
+
+  db.prepare(
+    'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
+  ).run(plan.fecha_conservacion || null, idFirma);
+
+  if (plan.hold) {
+    ponerHold(idFirma, plan.hold);
+  }
+
+  if (plan.aviso === 'RETAIN_PENDIENTE_CESE' || plan.aviso === 'RETAIN_PENDIENTE_RETIRO') {
+    logger.warn('SignRequest: retención pendiente de fecha de terminación', {
+      firma_id: idFirma,
+      regla: plan.regla,
+      aviso: plan.aviso,
+      categoria: plan.categoria,
+    });
+  }
+
+  return plan.fecha_conservacion || null;
+}
+
+/**
  * Declara un deber legal o contractual de conservación.
  *
  * El 8.6 y el 10.6 dicen "sin que exista un deber legal o contractual de
@@ -668,6 +706,7 @@ module.exports = {
   plazoDeclarado,
   deberLegalEmpresa,
   asignarFechaConservacion,
+  aplicarPlanRetencion,
   ponerHold,
   liberarHold,
   holdsDe,

@@ -7411,7 +7411,7 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
     // `overflow-x: auto` sin declarar `overflow-y`: CSS convierte el `visible`
     // del eje Y en `auto`, y cualquier desborde de un píxel dibujaba la barrita.
     // Sin el bump el navegador sigue mostrando la versión anterior.
-iframe.src = 'components/config/config-viewer.html?v=20261014-cfg-tabs883';
+iframe.src = 'components/config/config-viewer.html?v=20261022-datos-firma-sync927';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';

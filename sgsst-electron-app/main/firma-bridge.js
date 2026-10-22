@@ -29,6 +29,7 @@ const path = require('path');
 const { app, safeStorage, dialog } = require('electron');
 
 const firmaClientModule = require('./firma-client');
+const { buildEmpresaUpdate } = require('./empresa-datos-firma-sync');
 
 const MOD = 'FIRMA-BRIDGE';
 // Versión actual del schema de secrets.enc. v1 = API key global plana.
@@ -2078,6 +2079,112 @@ function _handlerEmpresaListFirmaRemote(args) {
   }));
 }
 
+// -------- firma:empresa:datos:sync (📦927) --------
+// Publica en el firma-service los datos de identificación que el usuario
+// guardó en el PC. El flujo es DELIBERADAMENTE GET + merge + PUT:
+//
+//   - GET: leer la fila actual (razón social, plazo de conservación, deber
+//     legal, etc.). El service update() NO hace merge: todo campo omitido se
+//     guardaría como null.
+//   - buildEmpresaUpdate(): mezcla local + servidor y produce el body completo.
+//   - PUT: actualiza solo la identidad que el formulario administra.
+//
+// Si la empresa no está configurada en secrets.enc, NO es un error: la
+// empresa simplemente no usa firma electrónica. Se devuelve skipped=true para
+// que la UI no muestre una advertencia falsa.
+//
+// Si la empresa está configurada pero NO existe en el servidor, NO se crea
+// automáticamente: el alta exige decisión administrativa y Anexo de Encargo
+// firmado. Se devuelve EMPRESA_NO_REGISTRADA con la indicación.
+function _handlerEmpresaDatosSync(args) {
+  args = args || {};
+  if (!args.companyName || typeof args.companyName !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'companyName requerido (string)');
+  }
+  if (!args.datos || typeof args.datos !== 'object' || Array.isArray(args.datos)) {
+    return _err('INVALID_REQUEST_BODY', 'datos requerido (objeto)');
+  }
+
+  var sec = _requireSecretsV2WithUrl();
+  if (!sec.ok) return sec.response;
+
+  var found = _resolveEmpresa(sec.s2.empresas, args.companyName);
+  if (!found) {
+    return _ok({
+      skipped: true,
+      code: 'EMPRESA_NO_CONFIGURADA',
+      message: 'La empresa no tiene firma electrónica configurada en este equipo.'
+    });
+  }
+  if (!found.entry || !found.entry.idEmpresa) {
+    return _err('EMPRESA_NO_CONFIGURADA',
+      'La empresa está configurada en este equipo pero no tiene idEmpresa. Reconfigure la firma electrónica.');
+  }
+
+  var adminErr = _requireAdminToken();
+  if (adminErr) return adminErr;
+
+  var idEmpresa = String(found.entry.idEmpresa).trim();
+  var client = _createAdminClient(sec.s2.firmaServiceUrl, sec.s2.firmaServiceClientInstanceId);
+
+  if (!client || typeof client.adminGetEmpresa !== 'function' ||
+      typeof client.adminUpdateEmpresa !== 'function') {
+    return _err('ENDPOINT_NOT_AVAILABLE',
+      'El cliente de firma no soporta la sincronización de identidad de empresa. Actualice K+AIR.');
+  }
+
+  return Promise.resolve(client.adminGetEmpresa(idEmpresa)).then(function (r) {
+    if (!r.success) {
+      if (r.error && r.error.code === 'EMPRESA_NOT_FOUND') {
+        return _err('EMPRESA_NO_REGISTRADA',
+          'La empresa ' + idEmpresa + ' no existe en el servidor de firma. ' +
+          'Un administrador debe crearla y firmar el Anexo de Encargo antes de publicar estos datos.',
+          {
+            idEmpresa: idEmpresa,
+            remediationHint: 'firma:admin:empresa:create + anexo-firmado'
+          });
+      }
+      return r;
+    }
+
+    var existing = r.data || {};
+    var body;
+    try {
+      body = buildEmpresaUpdate(existing, args.datos, args.representante || {});
+    } catch (e) {
+      return _err('INVALID_REQUEST_BODY', e.message);
+    }
+
+    if (!body.razon_social) {
+      return _err('EMPRESA_INCOMPLETA',
+        'La empresa no tiene razón social en el servidor. Un administrador debe completarla antes de publicar estos datos.',
+        { idEmpresa: idEmpresa });
+    }
+
+    return Promise.resolve(client.adminUpdateEmpresa(idEmpresa, body)).then(function (upd) {
+      if (!upd.success) return upd;
+
+      // Advertencias que NO impiden el guardado: la identidad ya se publicó,
+      // pero el operador tiene que saber que el bloque puede no mostrarse o
+      // que falta un requisito legal.
+      var warnings = [];
+      if (existing.activo === false) {
+        warnings.push('La empresa está dada de baja en el servidor: el bloque "Empresa que solicita tu firma" no se mostrará a nuevos firmantes.');
+      }
+      if (!existing.anexo_encargo_firmado_at) {
+        warnings.push('El Anexo de Encargo no figura firmado en el servidor. Regularícelo antes de solicitar firmas.');
+      }
+
+      return _ok({
+        idEmpresa: idEmpresa,
+        companyKey: found.companyKey,
+        updated: true,
+        warnings: warnings
+      });
+    });
+  });
+}
+
 // -------- firma:empresa:list-backend (I-104 RECOVERY: READ-ONLY) --------
 // Lista per-company clients del backend con metadata NO sensible, para
 // que el UI de Configuración pueda detectar:
@@ -2375,6 +2482,11 @@ function registerFirmaHandlers(appArg, deps) {
   handle('firma:empresa:list-firma-remote', function (event, payload) {
     try { return _handlerEmpresaListFirmaRemote(payload || {}); }
     catch (e) { console.error('[' + MOD + '][empresa:list-firma-remote]', e.message); return _err('INTERNAL', e.message); }
+  });
+  // 📦927: publica la identidad de la empresa local en el firma-service.
+  handle('firma:empresa:datos:sync', function (event, payload) {
+    try { return _handlerEmpresaDatosSync(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][empresa:datos:sync]', e.message); return _err('INTERNAL', e.message); }
   });
   // I-104 RECOVERY: list-backend (READ-ONLY) para que la UI detecte
   // empresas que existen en el backend pero no en secrets.enc.
