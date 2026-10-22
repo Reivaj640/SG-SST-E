@@ -360,10 +360,13 @@ transacciones críticas (`DOCUMENT_VIEWED → SIGNED`).
 > **Nota (migración `033_retencion_por_documento`).** La tabla tiene además
 > cuatro columnas para la **retención por tipo de documento**:
 > `categoria_retencion` (id del catálogo), `regla_retencion` (regla aplicada),
-> `fecha_terminacion` (el cese o el retiro) y `plazo_retencion_aplicable`
-> (el texto que se le comunicar al Trabajador para esa solicitud). Las cuatro
-> son `NULL` en las solicitudes anteriores: no hay backfill y el
-> comportamiento legacy (tabla de la Empresa con texto vivo) se conserva.
+> `fecha_terminacion` (el cese o el retiro, **si el sistema lo conoce**) y
+> `plazo_retencion_aplicable` (el texto que se le comunico al Trabajador para
+> esa solicitud). El plazo aplicado sale del código: **80 años de custodia
+> desde la firma**, o el de la tabla de la Empresa si declaró uno (y el hold
+> sin término del contrato electrónico). Las cuatro columnas son `NULL` en las
+> solicitudes anteriores: no hay backfill y esas filas siguen con el texto
+> vivo de la Empresa.
 > Ver [API §6.13.6](API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
 
 **SQL de creación:**

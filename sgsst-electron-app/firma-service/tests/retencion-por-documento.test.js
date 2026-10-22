@@ -2,24 +2,22 @@
  * CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO
  * ============================================
  *
- * El 8.6 del Acuerdo deja el plazo en la tabla de retención documental de la
- * Empresa, pero hay documentos cuyo plazo NO lo fija la Empresa: lo fija la
- * ley. El artículo 2.2.4.6.13 del Decreto 1072 de 2015 ordena conservar por
- * un mínimo de 20 años, desde el cese de la relación laboral, cinco grupos de
- * registros del SG-SST. Y el artículo 2.2.1.1.12 (adicionado por el Decreto
- * 526 de 2021) obliga a conservar los contratos electrónicos sin fijar término.
+ * El plazo de conservación de una firma NO se le pregunta a nadie: vive en el
+ * código del sistema. Estos tests fijan cuál es ese plazo y cuándo se aplica.
  *
- * Estos tests fijan:
- *   1. El catálogo resuelve la categoría explícita y la derivada del tipo.
- *   2. Los cinco grupos SST se conservan 20 años desde el CESE, no desde la
- *      firma.
- *   3. El contrato electrónico queda con un HOLD, sin fecha de supresión.
- *   4. La historia laboral usa el rango 80-100 años desde el RETIRO.
- *   5. Sin fecha de cese/retiro no se inventa una fecha: queda pendiente.
- *   6. La tabla de la Empresa sigue siendo el fallback de los documentos que
- *      la ley no regula.
- *   7. Una solicitud SST se puede crear aunque la Empresa no haya declarado
- *      `plazo_retencion_dias` (el plazo lo fija la ley, no la Empresa).
+ * Lo que estos tests fijan:
+ *   1. La custodia del sistema: 80 años desde la fecha de la firma.
+ *   2. Si la Empresa declaró un plazo en su tabla, ese plazo manda (el 8.6).
+ *   3. Los cinco grupos SST del art. 2.2.4.6.13 del Decreto 1072 tienen un
+ *      piso legal de 20 años desde el cese: si la fecha de cese se conoce y
+ *      esa fecha fuera más lejana, esa gana.
+ *   4. El contrato electrónico (art. 2.2.1.1.12) no tiene término: queda con
+ *      un HOLD y no se borra por el vencimiento de la custodia.
+ *   5. El deber legal sin término de la Empresa gana sobre cualquier plazo.
+ *   6. Una Empresa que NO declaró plazo de conservación puede firmar: no hay
+ *      nada que declarar, el plazo ya existe en el código.
+ *   7. La categoría la deriva el sistema del tipo de documento; el operador
+ *      no elige nada.
  */
 'use strict';
 
@@ -38,7 +36,18 @@ const {
 
 const EMPRESA = '900123456';
 
-const EMPRESA_BASE = {
+// 2026-01-01 + 80 años = 2106-01-01
+const CUSTODIA_80 = '2106-01-01T00:00:00.000Z';
+
+const EMPRESA_SIN_TABLA = {
+  plazo_retencion: null,
+  plazo_retencion_dias: null,
+  conservacion_por_deber_legal: false,
+  norma_conservacion: null,
+};
+
+// La tabla de la Empresa con 5 años declarados.
+const EMPRESA_CON_TABLA = {
   plazo_retencion: '5 años',
   plazo_retencion_dias: 1825,
   conservacion_por_deber_legal: false,
@@ -62,7 +71,7 @@ function crearEmpresa({ conAnexo = true, conPlazo = false, conDeber = false } = 
     canal_pqrs: 'pqrs@example.com',
     canal_incidentes: 'seguridad@example.com',
     canal_solicitud_copia: 'privacidad@example.com',
-    plazo_retencion: '5 años',
+    plazo_retencion: conPlazo ? '5 años' : null,
     plazo_retencion_dias: conPlazo ? 1825 : null,
     conservacion_por_deber_legal: conDeber,
     norma_conservacion: conDeber ? '2.2.1.1.12 del Decreto 1072 de 2015' : null,
@@ -74,13 +83,18 @@ function crearEmpresa({ conAnexo = true, conPlazo = false, conDeber = false } = 
 // 1. Catálogo y resolución de categoría
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('catálogo · los cinco grupos SST están bajo la regla de 20 años', () => {
+test('catálogo · los cinco grupos SST están bajo la regla de custodia', () => {
   const sst = retencion.CATEGORIAS.filter((c) => c.regla === 'SST_20_ANOS');
   assert.equal(sst.length, 5);
   for (const c of sst) {
-    assert.equal(c.requiere_fecha, true, `${c.id} necesita fecha de cese`);
     assert.match(c.norma, /2\.2\.4\.6\.13/);
   }
+});
+
+test('catálogo · la custodia del sistema son 80 años', () => {
+  assert.equal(retencion.ANIOS_CUSTODIA, 80);
+  assert.equal(retencion.REGLAS.CUSTODIA_80_ANOS.anios, 80);
+  assert.equal(retencion.REGLAS.CUSTODIA_80_ANOS.base, 'creacion');
 });
 
 test('catálogo · resuelve la categoría explícita y la derivada', () => {
@@ -110,7 +124,7 @@ test('catálogo · resuelve la categoría explícita y la derivada', () => {
     retencion.resolverCategoria({ tipo_identificacion: 'ACTA' }),
     'TABLA_EMPRESA',
   );
-  assert.equal(retencion.resolverCategoria({}), null, 'sin datos es legacy');
+  assert.equal(retencion.resolverCategoria({}), null, 'sin datos no hay categoría');
 });
 
 test('catálogo · la derivación pone primero lo más específico', () => {
@@ -132,7 +146,7 @@ test('catálogo · la derivación pone primero lo más específico', () => {
     'SST_CAPACITACION',
   );
   // Una palabra genérica NO debe inventar un grupo legal: sin coincidencia
-  // clara, la tabla de la Empresa.
+  // clara, la custodia general del sistema.
   assert.equal(
     retencion.resolverCategoria({
       tipo_identificacion: 'ACTA',
@@ -154,111 +168,85 @@ test('catálogo · rechaza una categoría desconocida', () => {
 // 2. Planes de retención (funciones puras)
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('SST · 20 años desde el cese, no desde la firma', () => {
+test('custodia · sin plazo de empresa, 80 años desde la firma', () => {
   const plan = retencion.planificar({
-    categoria_retencion: 'SST_CAPACITACION',
+    categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    fecha_terminacion: '2026-01-15',
-    empresa: EMPRESA_BASE,
+    empresa: EMPRESA_SIN_TABLA,
   });
-  assert.equal(plan.regla, 'SST_20_ANOS');
-  assert.equal(plan.fecha_conservacion, '2046-01-15T00:00:00.000Z');
+  assert.equal(plan.regla, 'TABLA_EMPRESA');
+  assert.equal(plan.fecha_conservacion, CUSTODIA_80);
+  assert.equal(plan.anios, 80);
   assert.equal(plan.aviso, 'RETAIN_FECHA');
-  assert.match(plan.texto, /20 años/);
-  assert.match(plan.texto, /cese de la relación laboral/);
-  assert.match(plan.texto, /2\.2\.4\.6\.13/);
+  assert.match(plan.texto, /80 años/);
   assert.equal(plan.hold, null);
 });
 
-test('SST · sin fecha de cese no se inventa la fecha', () => {
+test('custodia · la tabla de la Empresa manda si declaró un plazo', () => {
   const plan = retencion.planificar({
-    categoria_retencion: 'SST_EPP',
+    categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_BASE,
+    empresa: EMPRESA_CON_TABLA,
   });
-  assert.equal(plan.fecha_conservacion, null);
-  assert.equal(plan.aviso, 'RETAIN_PENDIENTE_CESE');
-  assert.match(plan.texto, /pendiente/i);
-  assert.equal(plan.hold, null);
+  assert.equal(plan.fecha_conservacion, '2030-12-31T00:00:00.000Z');
+  assert.equal(plan.anios, 5);
+  assert.match(plan.texto, /5 años/);
+});
+
+test('SST · la custodia cubre el mínimo de 20 años desde el cese', () => {
+  const plan = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    empresa: EMPRESA_SIN_TABLA,
+  });
+  assert.equal(plan.fecha_conservacion, CUSTODIA_80);
+  assert.match(plan.texto, /20 años/);
+  assert.match(plan.texto, /cese de la relación laboral/);
+  assert.match(plan.texto, /2\.2\.4\.6\.13/);
+});
+
+test('SST · si el cese se conoce y es más lejano, ese plazo gana', () => {
+  // Relación laboral de 70 años: el mínimo legal (20 desde el cese) cae
+  // después de la custodia de 80 años desde la firma.
+  const plan = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    fecha_terminacion: '2096-01-01',
+    empresa: EMPRESA_SIN_TABLA,
+  });
+  assert.equal(plan.fecha_conservacion, '2116-01-01T00:00:00.000Z');
 });
 
 test('contrato electrónico · hold sin fecha de supresión', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'CONTRATO_TRABAJO',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_BASE,
+    empresa: EMPRESA_SIN_TABLA,
   });
   assert.equal(plan.regla, 'CONTRATO_ELECTRONICO');
   assert.equal(plan.fecha_conservacion, null);
   assert.equal(plan.aviso, 'RETAIN_DEBER_LEGAL');
   assert.ok(plan.hold);
   assert.match(plan.hold.motivo, /2\.2\.1\.1\.12/);
-  assert.match(plan.texto, /autenticidad, integridad y disponibilidad/);
+  assert.match(plan.texto, /sin término/);
 });
 
-test('historia laboral · rango 80-100 años desde el retiro, aplica 100', () => {
+test('historia laboral · dentro del rango de 80 a 100 años', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'HISTORIA_LABORAL',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    fecha_terminacion: '2026-01-15',
-    empresa: EMPRESA_BASE,
+    empresa: EMPRESA_SIN_TABLA,
   });
-  assert.equal(plan.regla, 'HISTORIA_LABORAL');
-  assert.equal(plan.fecha_conservacion, '2126-01-15T00:00:00.000Z');
-  assert.equal(plan.aviso, 'RETAIN_FECHA');
-  assert.match(plan.texto, /80/);
-  assert.match(plan.texto, /100/);
-  assert.match(plan.texto, /retiro/);
+  assert.equal(plan.fecha_conservacion, CUSTODIA_80);
+  assert.match(plan.texto, /80 a 100 años/);
+  assert.match(plan.texto, /T-470\/2019/);
 });
 
-test('historia laboral · sin fecha de retiro queda pendiente', () => {
-  const plan = retencion.planificar({
-    categoria_retencion: 'HISTORIA_LABORAL',
-    fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_BASE,
-  });
-  assert.equal(plan.fecha_conservacion, null);
-  assert.equal(plan.aviso, 'RETAIN_PENDIENTE_RETIRO');
-  assert.match(plan.texto, /pendiente/i);
-});
-
-test('tabla de la Empresa · usa el plazo declarado', () => {
-  const plan = retencion.planificar({
-    categoria_retencion: 'TABLA_EMPRESA',
-    fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_BASE,
-  });
-  assert.equal(plan.regla, 'TABLA_EMPRESA');
-  assert.equal(plan.fecha_conservacion, '2030-12-31T00:00:00.000Z');
-  assert.equal(plan.texto, '5 años');
-  assert.equal(plan.aviso, 'RETAIN_FECHA');
-});
-
-test('tabla de la Empresa · el deber legal de la Empresa manda', () => {
-  const plan = retencion.planificar({
-    categoria_retencion: 'TABLA_EMPRESA',
-    fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: Object.assign({}, EMPRESA_BASE, {
-      conservacion_por_deber_legal: true,
-      norma_conservacion: '2.2.1.1.12 del Decreto 1072 de 2015',
-    }),
-  });
-  assert.equal(plan.fecha_conservacion, null);
-  assert.equal(plan.aviso, 'RETAIN_DEBER_LEGAL');
-  assert.ok(plan.hold);
-  assert.match(plan.hold.motivo, /2\.2\.1\.1\.12/);
-});
-
-test('SST · el deber legal de la Empresa NO se recorta con los 20 años', () => {
-  // Si la Empresa declaró un deber legal SIN término, ese deber manda
-  // aunque el documento tenga un plazo legal propio: un plazo más corto no
-  // puede recortar un deber sin término (perder esa protección sería una
-  // supresión indebida).
+test('el deber legal de la Empresa gana sobre cualquier plazo', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    fecha_terminacion: '2026-01-15',
-    empresa: Object.assign({}, EMPRESA_BASE, {
+    empresa: Object.assign({}, EMPRESA_CON_TABLA, {
       conservacion_por_deber_legal: true,
       norma_conservacion: '2.2.1.1.12 del Decreto 1072 de 2015',
     }),
@@ -267,17 +255,6 @@ test('SST · el deber legal de la Empresa NO se recorta con los 20 años', () =>
   assert.equal(plan.aviso, 'RETAIN_DEBER_LEGAL');
   assert.ok(plan.hold);
   assert.match(plan.hold.motivo, /2\.2\.1\.1\.12/);
-});
-
-test('legacy · sin categoría conserva la tabla de la Empresa', () => {
-  const plan = retencion.planificar({
-    fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_BASE,
-  });
-  assert.equal(plan.categoria, null);
-  assert.equal(plan.regla, 'TABLA_EMPRESA');
-  assert.equal(plan.fecha_conservacion, '2030-12-31T00:00:00.000Z');
-  assert.equal(plan.texto, null, 'legacy no congela texto: usa la empresa viva');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,53 +275,50 @@ test('migración 033 · las columnas de retención por documento existen', () =>
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Integración: creación, habilitación y vista pública
+// 4. Integración: alta, habilitación, vista pública y correo
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('SST · la Empresa sin plazo puede firmar una inducción', async () => {
+test('una Empresa sin plazo declarado puede firmar: 80 años de custodia', async () => {
   limpiar();
   crearEmpresa({ conAnexo: true, conPlazo: false });
 
-  const h = empresaService.verificarHabilitacionFirma(EMPRESA, {
-    categoria_retencion: 'SST_CAPACITACION',
-  });
-  assert.equal(h.ok, true, 'el plazo lo fija la ley, no la Empresa');
+  // No hay nada que declarar: la habilitación no lo pide.
+  const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+  assert.equal(h.ok, true);
   assert.deepEqual(h.pendientes, []);
 
-  const legacy = empresaService.verificarHabilitacionFirma(EMPRESA);
-  assert.equal(legacy.ok, false, 'sin categoría sigue exigiendo el plazo');
-  assert.deepEqual(legacy.pendientes, ['plazo_retencion']);
-
   const { signRequest } = await createSignRequestWithIdentificacion({
     id_empresa: EMPRESA,
     categoria_retencion: 'SST_CAPACITACION',
-    fecha_terminacion: '2026-01-15',
   });
-
+  // La custodia se cuenta desde la fecha real de creación de la firma.
+  const esperado = new Date(signRequest.fecha_creacion);
+  esperado.setUTCFullYear(esperado.getUTCFullYear() + 80);
   assert.equal(signRequest.categoria_retencion, 'SST_CAPACITACION');
   assert.equal(signRequest.regla_retencion, 'SST_20_ANOS');
-  assert.equal(signRequest.fecha_terminacion, '2026-01-15T00:00:00.000Z');
-  assert.equal(signRequest.fecha_conservacion, '2046-01-15T00:00:00.000Z');
+  assert.equal(signRequest.fecha_conservacion, esperado.toISOString());
   assert.equal(signRequest.hold_legal, 0);
-  assert.match(signRequest.plazo_retencion_aplicable, /20 años/);
+  assert.match(signRequest.plazo_retencion_aplicable, /80 años/);
 });
 
-test('SST · sin fecha de cese queda pendiente en la fila', async () => {
+test('la categoría la deriva el sistema del tipo de documento', async () => {
   limpiar();
   crearEmpresa({ conAnexo: true, conPlazo: false });
 
   const { signRequest } = await createSignRequestWithIdentificacion({
     id_empresa: EMPRESA,
-    categoria_retencion: 'SST_EPP',
+    tipo_identificacion: 'CONTRATO',
   });
-  assert.equal(signRequest.fecha_conservacion, null);
-  assert.equal(signRequest.hold_legal, 0);
-  assert.match(signRequest.plazo_retencion_aplicable, /pendiente/i);
+  assert.equal(signRequest.categoria_retencion, 'CONTRATO_TRABAJO');
+  assert.equal(signRequest.regla_retencion, 'CONTRATO_ELECTRONICO');
+  assert.equal(signRequest.fecha_conservacion, null, 'el contrato no tiene término');
+  assert.equal(signRequest.hold_legal, 1);
+  assert.match(signRequest.motivo_hold, /2\.2\.1\.1\.12/);
 });
 
-test('contrato electrónico · la fila queda con hold y sin fecha', async () => {
+test('el contrato con la tabla de la Empresa también queda sin término', async () => {
   limpiar();
-  crearEmpresa({ conAnexo: true, conPlazo: false });
+  crearEmpresa({ conAnexo: true, conPlazo: true });
 
   const { signRequest } = await createSignRequestWithIdentificacion({
     id_empresa: EMPRESA,
@@ -352,33 +326,50 @@ test('contrato electrónico · la fila queda con hold y sin fecha', async () => 
   });
   assert.equal(signRequest.fecha_conservacion, null);
   assert.equal(signRequest.hold_legal, 1);
-  assert.match(signRequest.motivo_hold, /2\.2\.1\.1\.12/);
-  assert.match(signRequest.plazo_retencion_aplicable, /2\.2\.1\.1\.12/);
 });
 
-test('vista pública · usa el texto de la solicitud, no el de la Empresa', () => {
+test('la mini-app muestra el plazo de la solicitud', async () => {
   limpiar();
-  crearEmpresa({ conAnexo: true, conPlazo: true });
+  crearEmpresa({ conAnexo: true, conPlazo: false });
 
-  const vista = empresaService.publicViewFor(EMPRESA, {
-    plazo_retencion: 'Mínimo 20 años desde el cese (texto de la solicitud)',
-    conservacion_por_deber_legal: false,
-    norma_conservacion: null,
+  const { token } = await createSignRequestWithIdentificacion({
+    id_empresa: EMPRESA,
+    categoria_retencion: 'SST_CAPACITACION',
   });
-  assert.match(vista.plazo_retencion, /texto de la solicitud/);
-  assert.equal(vista.conservacion_por_deber_legal, false);
 
-  const sinOverride = empresaService.publicViewFor(EMPRESA);
-  assert.equal(sinOverride.plazo_retencion, '5 años');
+  const res = await request(makeApp()).get(`/s/${token}`);
+  assert.equal(res.status, 200);
+  assert.match(res.body.empresa.plazo_retencion, /80 años/);
+  assert.equal(res.body.empresa.conservacion_por_deber_legal, false);
 });
 
-test('firma dual · el hijo hereda la categoría y la fecha del padre', async () => {  limpiar();
+test('el correo de invitación comunica el plazo de la solicitud', async () => {
+  limpiar();
+  crearEmpresa({ conAnexo: true, conPlazo: false });
+  mailer.clearDevInbox();
+
+  const { signRequest } = await createSignRequestWithIdentificacion({
+    id_empresa: EMPRESA,
+    categoria_retencion: 'SST_CAPACITACION',
+    correo_verificacion: 'trabajador@example.com',
+  });
+
+  await signRequestService.notifyRemote(signRequest, 'trabajador@example.com', {
+    actor: 'test',
+  });
+
+  const invite = mailer.getDevInbox().find((m) => m.tipo === 'invite');
+  assert.ok(invite, 'salió un correo de invitación');
+  assert.match(invite.body, /80 años/);
+});
+
+test('firma dual · el hijo hereda la fecha y el hold del padre', async () => {
+  limpiar();
   crearEmpresa({ conAnexo: true, conPlazo: false });
 
   const { signRequest: padre } = await createSignRequestWithIdentificacion({
     id_empresa: EMPRESA,
-    categoria_retencion: 'SST_CAPACITACION',
-    fecha_terminacion: '2026-01-15',
+    categoria_retencion: 'CONTRATO_TRABAJO',
     requiere_firma_empresa: 1,
     representante_legal_snapshot: {
       nombre: 'Lilia Maria Vasquez Muñoz',
@@ -403,54 +394,12 @@ test('firma dual · el hijo hereda la categoría y la fecha del padre', async ()
   });
 
   const fila = db.prepare(
-    'SELECT categoria_retencion, regla_retencion, fecha_terminacion, ' +
+    'SELECT categoria_retencion, regla_retencion, ' +
     'plazo_retencion_aplicable, fecha_conservacion, hold_legal ' +
     'FROM gh_firmas_electronicas WHERE id = ?'
   ).get(hijo.id);
-  assert.equal(fila.categoria_retencion, 'SST_CAPACITACION');
-  assert.equal(fila.regla_retencion, 'SST_20_ANOS');
-  assert.equal(fila.fecha_terminacion, '2026-01-15T00:00:00.000Z');
-  assert.equal(fila.fecha_conservacion, '2046-01-15T00:00:00.000Z');
-  assert.equal(fila.hold_legal, 0);
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. Lo que ve el Trabajador: la mini-app y el correo de invitación
-// ─────────────────────────────────────────────────────────────────────────────
-
-test('la mini-app muestra el plazo de la solicitud, no el de la Empresa', async () => {
-  limpiar();
-  crearEmpresa({ conAnexo: true, conPlazo: true });
-
-  const { token } = await createSignRequestWithIdentificacion({
-    id_empresa: EMPRESA,
-    categoria_retencion: 'SST_CAPACITACION',
-    fecha_terminacion: '2026-01-15',
-  });
-
-  const res = await request(makeApp()).get(`/s/${token}`);
-  assert.equal(res.status, 200);
-  assert.match(res.body.empresa.plazo_retencion, /20 años/);
-  assert.equal(res.body.empresa.conservacion_por_deber_legal, false);
-});
-
-test('el correo de invitación comunica el plazo de la solicitud', async () => {
-  limpiar();
-  crearEmpresa({ conAnexo: true, conPlazo: true });
-  mailer.clearDevInbox();
-
-  const { signRequest, token } = await createSignRequestWithIdentificacion({
-    id_empresa: EMPRESA,
-    categoria_retencion: 'SST_CAPACITACION',
-    fecha_terminacion: '2026-01-15',
-    correo_verificacion: 'trabajador@example.com',
-  });
-
-  await signRequestService.notifyRemote(signRequest, 'trabajador@example.com', {
-    actor: 'test',
-  });
-
-  const invite = mailer.getDevInbox().find((m) => m.tipo === 'invite');
-  assert.ok(invite, 'salió un correo de invitación');
-  assert.match(invite.body, /20 años/);
+  assert.equal(fila.categoria_retencion, 'CONTRATO_TRABAJO');
+  assert.equal(fila.regla_retencion, 'CONTRATO_ELECTRONICO');
+  assert.equal(fila.fecha_conservacion, null);
+  assert.equal(fila.hold_legal, 1, 'el hold del contrato se hereda');
 });

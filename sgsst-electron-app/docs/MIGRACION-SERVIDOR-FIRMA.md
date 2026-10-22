@@ -258,12 +258,13 @@ no dio error" no es prueba de que el archivo quedo donde debia.
 
 ### 5.1.1 El catálogo de retención por documento (migración 033)
 
-> **2026-10-22.** La 033 agrega el catálogo de retención por tipo de
-> documento: el plazo ya no es uno solo por Empresa, sino el que le
-> corresponde a cada documento (20 años desde el **cese** para los cinco
-> grupos de registros del SG-SST, conservación **sin término** para el
-> contrato electrónico, 80-100 años desde el **retiro** para la historia
-> laboral). Ver [API §6.13.6](gestion-humana/firma-electronica/API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
+> **2026-10-22.** La 033 agrega las cuatro columnas del catálogo de retención
+> por tipo de documento. El plazo **no se le pregunta a nadie**: vive en el
+> código, que aplica **80 años de custodia** desde la firma (cubre el mínimo de
+> 20 años desde el cese de los cinco grupos del SG-SST, y el rango de 80 a 100
+> años de la historia laboral), o el plazo de la tabla de la Empresa si declaró
+> uno. El contrato electrónico queda con hold, sin término. Ver
+> [API §6.13.6](gestion-humana/firma-electronica/API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
 
 **¿Hay que aplicar la migración a mano? En el servidor, NO.** `src/server.js`
 llama a `migrate()` en el arranque: al reiniciar el servicio, la 033 se aplica
@@ -315,12 +316,11 @@ Empresa). Con él, el script exige que la respuesta traiga la categoría **y** l
 fecha de conservación ya calculada: es la prueba de que la 033 quedó aplicada
 y de que la regla legal del documento está corriendo en el servidor.
 
-> **Lo que la 033 NO arregla**: la habilitación sigue exigiendo el **Anexo de
-> Encargo firmado** y el **canal de atención** (`canal_pqrs`). Lo único que la
-> categoría nueva exonera es el **plazo declarado por la Empresa**
-> (`plazo_retencion_dias`), porque en un documento del SG-SST el plazo lo fija
-> la ley y no la tabla de la empresa. Si la respuesta es `409
-> EMPRESA_NO_HABILITADA`, el detalle dice qué falta.
+> **Lo que la 033 cambia en la habilitación**: el **plazo de conservación ya
+> no se le exige a la Empresa** (la custodia vive en el código). Siguen
+> exigiéndose el **Anexo de Encargo firmado** y el **canal de atención**
+> (`canal_pqrs`). Si la respuesta es `409 EMPRESA_NO_HABILITADA`, el detalle
+> dice qué falta.
 
 ---
 

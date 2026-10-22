@@ -66,60 +66,34 @@
   // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO
   // ═══════════════════════════════════════════════════════════════════
   //
-  // El plazo de conservación NO es uno solo para toda la empresa: hay
-  // documentos cuyo plazo lo fija la LEY (20 años contados desde el cese para
-  // los cinco grupos de registros del SG-SST, conservación sin término para el
-  // contrato electrónico, 80 a 100 años desde el retiro para la historia
-  // laboral) y documentos que siguen la tabla de retención de la empresa.
+  // El plazo de conservación NO se le pregunta al operador. El sistema lo
+  // aplica solo: 80 años de custodia documental por defecto (y el hold sin
+  // término del contrato electrónico), y el texto que se le comunica al
+  // Trabajador sale de la categoría del documento.
   //
-  // Estos ids son los mismos del catálogo del servicio de firma
-  // (firma-service/src/services/retencion.js). Si el servicio cambia el
-  // catálogo, esta lista hay que actualizarla en la misma revisión.
-  //
-  // La primera opción (id vacío) es la del documento que NO está en el
-  // catálogo: se comporta como hasta ahora (tabla de la empresa).
-  var FE_CATEGORIAS_RETENCION = [
-    { id: '', label: 'Otro documento (según la tabla de retención de la empresa)', requiere_fecha: false, nota: '' },
-    { id: 'SST_CAPACITACION', label: 'Capacitación, inducción o entrenamiento', requiere_fecha: true,
-      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
-    { id: 'SST_EPP', label: 'Entrega de elementos de protección personal (EPP)', requiere_fecha: true,
-      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
-    { id: 'SST_MONITOREO_AMBIENTAL', label: 'Monitoreo o mediciones ambientales', requiere_fecha: true,
-      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
-    { id: 'SST_EXAMENES_ESPECIALIZADOS', label: 'Exámenes médicos especializados o pruebas complementarias', requiere_fecha: true,
-      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
-    { id: 'SST_PERFIL_Y_CONCEPTOS_MEDICOS', label: 'Perfil epidemiológico o concepto de examen médico', requiere_fecha: true,
-      nota: 'Se conserva mínimo 20 años desde el cese de la relación laboral (Decreto 1072 de 2015, art. 2.2.4.6.13).' },
-    { id: 'CONTRATO_TRABAJO', label: 'Contrato de trabajo', requiere_fecha: false,
-      nota: 'El contrato firmado electrónicamente se conserva sin término (Decreto 1072 de 2015, art. 2.2.1.1.12): no se borra por el vencimiento de la tabla.' },
-    { id: 'HISTORIA_LABORAL', label: 'Historia laboral o nómina', requiere_fecha: true,
-      nota: 'Se conserva entre 80 y 100 años desde el retiro (Corte Constitucional T-470/2019; Concepto AGN 2-2017-01654). Se aplica el máximo de 100 años.' }
-  ];
+  // La categoría se deriva del TIPO del documento, que ya está en la ficha
+  // (`gh_documentos.tipo`): es un dato del sistema, no una decisión de la
+  // persona que está firmando. Estos ids son los del catálogo del servicio de
+  // firma (firma-service/src/services/retencion.js).
+  var FE_CATEGORIA_POR_TIPO = {
+    contrato: 'CONTRATO_TRABAJO',
+    induccion: 'SST_CAPACITACION',
+    autorizacion_hojas_vida: 'ASPIRANTE',
+    autorizacion_datos: 'TABLA_EMPRESA',
+    actualizacion_datos: 'TABLA_EMPRESA',
+    carta_examenes: 'TABLA_EMPRESA',
+    carta_cuenta_bancaria: 'TABLA_EMPRESA'
+  };
 
   /**
-   * Sugiere la categoría de retención según el nombre del documento.
+   * La categoría de retención de un documento, según su tipo.
    *
-   * Es solo una SUGERENCIA: el operador puede cambiarla. El sistema no lee
-   * el PDF para clasificarlo (es la misma regla del 10.8: el contenido no se
-   * lee antes del consentimiento), así que la propuesta se basa en el título
-   * y la persona confirma.
+   * Lo que NO está en el mapa cae en la custodia general del sistema: siempre
+   * es una regla válida, y nunca una decisión del operador.
    */
-  function _feCategoriaSugerida(doc) {
-    var texto = (((doc && doc.titulo) || '') + ' ' + ((doc && doc.tipo) || '')).toLowerCase();
-    if (!texto) return '';
-    // Solo los casos inequívocos. Una sugerencia equivocada es peor que no
-    // sugerir: el operador siempre puede cambiarla, pero no debería tener que
-    // corregir lo que el sistema propuso por cuenta propia.
-    if (texto.indexOf('induccion') >= 0 || texto.indexOf('capacitacion') >= 0) return 'SST_CAPACITACION';
-    if (texto.indexOf('epp') >= 0 || texto.indexOf('proteccion personal') >= 0) return 'SST_EPP';
-    if (texto.indexOf('monitoreo') >= 0 || texto.indexOf('medicion ambiental') >= 0) return 'SST_MONITOREO_AMBIENTAL';
-    if (texto.indexOf('audiometria') >= 0 || texto.indexOf('espirometria') >= 0
-      || texto.indexOf('optometria') >= 0 || texto.indexOf('examen especializado') >= 0) {
-      return 'SST_EXAMENES_ESPECIALIZADOS';
-    }
-    if (texto.indexOf('contrato') >= 0) return 'CONTRATO_TRABAJO';
-    if (texto.indexOf('historia laboral') >= 0 || texto.indexOf('nomina') >= 0) return 'HISTORIA_LABORAL';
-    return '';
+  function _categoriaDeRetencion(doc) {
+    var tipo = String((doc && doc.tipo) || '').toLowerCase();
+    return FE_CATEGORIA_POR_TIPO[tipo] || 'TABLA_EMPRESA';
   }
 
   // I-102.2.G · Mapa de estados terminales de firma-service → estado persistente
@@ -404,20 +378,6 @@
       '      <div class="fe-field">',
       '        <label class="fe-field__label">Firmante</label>',
       '        <div id="fe-firma-trab-summary" class="fe-firma-summary"></div>',
-      '      </div>',
-      '      <div class="fe-field">',
-      '        <label class="fe-field__label" for="fe-firma-categoria">Tipo de documento para la conservación</label>',
-      '        <select id="fe-firma-categoria" class="fe-field__select"></select>',
-      '        <p class="fe-field__hint" id="fe-firma-categoria-hint"></p>',
-      '      </div>',
-      '      <div class="fe-field" id="fe-firma-terminacion-field" hidden>',
-      '        <label class="fe-field__label" for="fe-firma-terminacion">Fecha de cese de la relación laboral</label>',
-      '        <input id="fe-firma-terminacion" class="fe-field__input" type="date" />',
-      '        <p class="fe-field__hint">',
-      '          Con esta fecha se cuentan los años de conservación que exige la ley. Si todavía',
-      '          no la tienes, deja el campo vacío: el documento se conserva sin fecha de',
-      '          supresión y queda pendiente de completarla.',
-      '        </p>',
       '      </div>',
       '      <div class="fe-field">',
       '        <label class="fe-field__label" for="fe-firma-correo">Correo personal del trabajador (invitación y código) <span class="fe-field__req">*</span></label>',
@@ -2510,40 +2470,6 @@
         }
       };
     }
-    // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO.
-    //
-    // El operador declara de qué tipo de documento se trata: eso decide el
-    // plazo de conservación (20 años desde el cese, contrato sin término,
-    // historia laboral o la tabla de la empresa). Se propone una categoría
-    // según el nombre del documento, y el operador la confirma o la cambia.
-    var categoriaSel = modal.querySelector('#fe-firma-categoria');
-    var categoriaHint = modal.querySelector('#fe-firma-categoria-hint');
-    var termField = modal.querySelector('#fe-firma-terminacion-field');
-    var termInput = modal.querySelector('#fe-firma-terminacion');
-    if (categoriaSel) {
-      categoriaSel.innerHTML = '';
-      FE_CATEGORIAS_RETENCION.forEach(function (opcion) {
-        var el = document.createElement('option');
-        el.value = opcion.id;
-        el.textContent = opcion.label;
-        categoriaSel.appendChild(el);
-      });
-      var sugerida = _feCategoriaSugerida(doc);
-      categoriaSel.value = sugerida || '';
-      if (termInput) termInput.value = '';
-    }
-    function refrescarCategoria() {
-      if (!categoriaSel) return;
-      var elegida = null;
-      for (var i = 0; i < FE_CATEGORIAS_RETENCION.length; i++) {
-        if (FE_CATEGORIAS_RETENCION[i].id === categoriaSel.value) elegida = FE_CATEGORIAS_RETENCION[i];
-      }
-      if (categoriaHint) categoriaHint.textContent = (elegida && elegida.nota) || '';
-      if (termField) termField.hidden = !(elegida && elegida.requiere_fecha);
-    }
-    if (categoriaSel) categoriaSel.onchange = refrescarCategoria;
-    refrescarCategoria();
-
     // Wire validation
     function validate() {
       var correo = (correoInput.value || '').trim();
@@ -2659,15 +2585,11 @@
       };
       // 033 · CATÁLOGO DE RETENCIÓN POR TIPO DE DOCUMENTO.
       //
-      // La categoría decide el plazo de conservación y se manda top-level (es
-      // lo que acepta el esquema del servicio). La fecha de cese/retiro se
-      // manda solo si el operador la tiene: sin ella, el documento queda
-      // pendiente de fecha en vez de inventar un plazo.
-      var catSel = modal.querySelector('#fe-firma-categoria');
-      var catId = (catSel && catSel.value) ? String(catSel.value) : '';
-      if (catId) metadata.categoria_retencion = catId;
-      var termIn = modal.querySelector('#fe-firma-terminacion');
-      if (termIn && termIn.value) metadata.fecha_terminacion = termIn.value;
+      // La categoría la decide el SISTEMA a partir del tipo del documento (que
+      // ya está en la ficha): el operador no elige nada y no tiene que
+      // completar ninguna fecha. El servicio aplica la custodia que
+      // corresponde y le comunica al Trabajador el plazo que quedó.
+      metadata.categoria_retencion = _categoriaDeRetencion(self._firmaDoc);
       // I-FIRMA-DUAL · v0.1.180: si el checkbox de firma dual está marcado,
       // agregar los 2 campos nuevos al metadata. El bridge ya pasa metadata
       // tal cual al firma-service, así que no se requieren cambios en firma-bridge.js.

@@ -228,19 +228,19 @@ router.get('/s/:token', (req, res, next) => {
       // null = la empresa no está dada de alta en gh_firma_empresas. La
       // mini-app omite el bloque en ese caso, que es exactamente el
       // comportamiento previo a la 017.
-      // 033 · Si la solicitud tiene categoría propia, el bloque muestra el
-      // plazo de ESE documento (20 años desde el cese, contrato sin término,
-      // historia laboral) y no el de la tabla de la Empresa. Sin categoría,
-      // el bloque sale como antes, con los datos vivos de la Empresa.
+      // 033 · Si la solicitud tiene un plazo propio (el que el sistema le
+      // aplicó y congeló en la fila), el bloque muestra ESE plazo y no el
+      // vivo de la tabla de la Empresa: es lo que se le comunicó al firmante
+      // cuando se le pidió la firma. Las solicitudes anteriores a este
+      // catálogo (sin plazo congelado) siguen mostrando el de la Empresa.
       //
       // El deber legal de la Empresa (sin término) NO se pisa: si la fila
-      // tiene hold, se dice; y si la Empresa lo declaró después de crear la
-      // solicitud, se sigue leyendo su valor vivo.
+      // tiene hold, se dice.
       empresa: empresaService.publicViewFor(
         signRequest.id_empresa,
-        signRequest.categoria_retencion
+        signRequest.plazo_retencion_aplicable
           ? Object.assign(
-            { plazo_retencion: signRequest.plazo_retencion_aplicable || null },
+            { plazo_retencion: signRequest.plazo_retencion_aplicable },
             signRequest.hold_legal === 1
               ? {
                 conservacion_por_deber_legal: true,

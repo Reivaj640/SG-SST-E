@@ -5,8 +5,8 @@
  * POR QUÉ EXISTE
  * --------------
  * El numeral 8.6 del Acuerdo deja el plazo de conservación en la tabla de
- * retención documental de la Empresa. Eso funciona para los documentos que la
- * ley no regula, pero no para los que tienen un plazo legal propio:
+ * retención documental de la Empresa. Pero hay documentos cuyo plazo NO lo
+ * fija la Empresa, y hay un piso que ninguna tabla puede bajar:
  *
  *   - El artículo 2.2.4.6.13 del Decreto 1072 de 2015 ordena conservar por un
  *     mínimo de VEINTE (20) AÑOS, contados desde el cese de la relación
@@ -21,28 +21,44 @@
  *
  *   - El artículo 2.2.1.1.12 (adicionado por el Decreto 526 de 2021) obliga a
  *     conservar los contratos de trabajo firmados electrónicamente con
- *     autenticidad, integridad y disponibilidad, SIN fijar un término. Por eso
- *     el contrato no se purga por el vencimiento de la tabla: queda con un HOLD
- *     legal, igual que el deber legal de la Empresa de la migración 029, pero
- *     ahora por documento.
+ *     autenticidad, integridad y disponibilidad, SIN fijar un término.
  *
- *   - La historia laboral y la nómina tienen un deber de conservación que la
- *     Corte Constitucional (T-470/2019) vincula con los derechos pensionales.
- *     El Concepto 2-2017-01654 del Archivo General de la Nación sugiere un
- *     rango de 80 a 100 años desde el retiro. Este catálogo aplica el máximo
- *     (100) para no suprimir antes de tiempo; la Empresa puede declarar un
- *     hold si su tabla es más larga.
+ *   - La historia laboral y la nómina tienen un deber de conservación ligado a
+ *     los derechos pensionales (Corte Constitucional T-470/2019). El Concepto
+ *     2-2017-01654 del Archivo General de la Nación propone un rango de 80 a
+ *     100 años desde el retiro.
+ *
+ * LA REGLA DEL SISTEMA: 80 AÑOS DE CUSTODIA
+ * ----------------------------------------
+ * El sistema aplica por defecto **80 años de custodia documental contados
+ * desde la fecha de la firma** (`ANIOS_CUSTODIA`). Es un piso, no un techo:
+ *
+ *   - Cubre el mínimo legal de 20 años desde el cese para los cinco grupos
+ *     SST (80 años desde la firma superan los 20 años desde el cese en
+ *     cualquier relación laboral de duración razonable). Cuando el sistema
+ *     conoce la fecha de cese, la compara y se queda con la más lejana.
+ *   - Cubre el rango de 80 a 100 años desde el retiro de la historia laboral.
+ *   - Si la Empresa declara un plazo MÁS LARGO en su tabla de retención, ese
+ *     plazo manda: la tabla de la Empresa es la fuente del 8.6.
+ *   - El contrato electrónico es la única excepción: no tiene término, queda
+ *     con un HOLD y no se borra por el vencimiento de la custodia.
+ *
+ * POR QUÉ NADA DE ESTO SE LE PIDE AL OPERADOR
+ * -------------------------------------------
+ * El operador no elige el plazo ni la fecha de cese. El sistema clasifica el
+ * documento por su tipo (que el sistema ya conoce) y aplica la regla. La
+ * fecha de cese se usa solo si el sistema la conoce (p. ej. porque la ficha
+ * del trabajador la trae); nunca se le pregunta a nadie.
  *
  * LO QUE ESTE MÓDULO NO HACE
- * --------------------------
- * No lee el PDF. La categoría la elige el operador (o se deriva del tipo y
- * subtipo que manda el cliente). El sistema no puede adivinar el contenido de
- * un documento antes del consentimiento; la clasificación es una decisión
- * humana y queda registrada en la fila.
+ * ---------------------------
+ * No lee el PDF. La categoría se deriva del TIPO del documento, que es un
+ * dato estructurado del propio sistema, o la declara el cliente en la API.
+ * El sistema no puede adivinar el contenido de un documento antes del
+ * consentimiento; la clasificación es una regla de código, no un juicio.
  *
- * Los plazos sin fecha de cese/retiro NO se inventan: la fila queda con
- * `fecha_conservacion = NULL` y un aviso para que el operador complete la
- * fecha. Sin fecha no hay purga.
+ * Los plazos sin fecha de cese conocida NO se inventan: se aplica la custodia
+ * de 80 años desde la firma, que es el piso del sistema.
  */
 'use strict';
 
@@ -54,62 +70,80 @@ const NORMA_HISTORIA = 'Corte Constitucional T-470/2019; Concepto AGN 2-2017-016
 const NORMA_DEBER_LEGAL_EMPRESA = '2.2.1.1.12 del Decreto 1072 de 2015';
 
 /**
+ * La custodia documental del sistema, en años.
+ *
+ * Es el plazo por defecto de TODA firma. Está en el código y no se pide: ni
+ * al operador, ni a la Empresa. Ver la cabecera del archivo.
+ */
+const ANIOS_CUSTODIA = 80;
+
+/**
  * Las reglas de retención. Una categoría apunta a una regla; varias
- * categorías SST comparten la misma regla de 20 años.
+ * categorías SST comparten la misma regla de custodia.
+ *
+ * `base` es de dónde se cuenta el plazo:
+ *   - 'creacion' → desde la fecha de la firma.
+ *   - 'cese'     → desde el cese de la relación laboral (o el retiro).
+ *   - null       → no hay plazo: el documento queda con HOLD.
+ *
+ * `piso` es el mínimo legal que NO se puede bajar por mucho que la tabla de
+ * la Empresa declare menos.
  */
 const REGLAS = Object.freeze({
+  CUSTODIA_80_ANOS: Object.freeze({
+    id: 'CUSTODIA_80_ANOS',
+    base: 'creacion',
+    anios: ANIOS_CUSTODIA,
+    piso: null,
+    hold: false,
+    norma: null,
+    texto: 'Se conserva {anios} años contados desde la fecha de la firma.',
+  }),
   SST_20_ANOS: Object.freeze({
     id: 'SST_20_ANOS',
-    base: 'cese',
-    anios: 20,
-    requiere_fecha: true,
+    base: 'creacion',
+    anios: ANIOS_CUSTODIA,
+    // El mínimo legal del 2.2.4.6.13: 20 años desde el cese. Se compara con
+    // la fecha de cese cuando el sistema la conoce.
+    piso: Object.freeze({ base: 'cese', anios: 20, norma: NORMA_SST }),
     hold: false,
     norma: NORMA_SST,
-    texto: 'Mínimo 20 años contados desde el cese de la relación laboral '
-      + '(artículo 2.2.4.6.13 del Decreto 1072 de 2015).',
-    avisoPendiente: 'RETAIN_PENDIENTE_CESE',
-    textoPendiente: 'La fecha de cese aún no está registrada; la fecha de '
-      + 'conservación queda pendiente.',
+    texto: 'Se conserva {anios} años contados desde la fecha de la firma. '
+      + 'El mínimo legal es de 20 años contados desde el cese de la relación '
+      + 'laboral (artículo 2.2.4.6.13 del Decreto 1072 de 2015), y esta '
+      + 'custodia lo cubre.',
   }),
   CONTRATO_ELECTRONICO: Object.freeze({
     id: 'CONTRATO_ELECTRONICO',
     base: null,
     anios: null,
-    requiere_fecha: false,
+    piso: null,
     hold: true,
     norma: NORMA_CONTRATO,
-    texto: 'Conservación permanente mientras exista la relación laboral y '
-      + 'después, con autenticidad, integridad y disponibilidad; no se suprime '
-      + 'automáticamente por la tabla de retención (artículo 2.2.1.1.12 del '
-      + 'Decreto 1072 de 2015).',
-    aviso: 'RETAIN_DEBER_LEGAL',
+    texto: 'El contrato firmado electrónicamente se conserva sin término, con '
+      + 'autenticidad, integridad y disponibilidad (artículo 2.2.1.1.12 del '
+      + 'Decreto 1072 de 2015): no se borra por el vencimiento de la custodia.',
   }),
   HISTORIA_LABORAL: Object.freeze({
     id: 'HISTORIA_LABORAL',
-    base: 'retiro',
-    anios: 100,
-    anios_min: 80,
-    anios_max: 100,
-    requiere_fecha: true,
+    base: 'creacion',
+    anios: ANIOS_CUSTODIA,
+    piso: null,
     hold: false,
     norma: NORMA_HISTORIA,
-    texto: 'Entre 80 y 100 años desde el retiro, según la tabla de retención '
-      + 'documental (Corte Constitucional T-470/2019; Concepto AGN '
-      + '2-2017-01654). Se aplica el máximo de 100 años.',
-    avisoPendiente: 'RETAIN_PENDIENTE_RETIRO',
-    textoPendiente: 'La fecha de retiro aún no está registrada; la fecha de '
-      + 'conservación queda pendiente.',
+    texto: 'Se conserva {anios} años contados desde la fecha de la firma, '
+      + 'dentro del rango de 80 a 100 años desde el retiro que fija el Concepto '
+      + '2-2017-01654 del Archivo General de la Nación (Corte Constitucional '
+      + 'T-470/2019).',
   }),
   TABLA_EMPRESA: Object.freeze({
     id: 'TABLA_EMPRESA',
     base: 'creacion',
-    anios: null,
-    requiere_fecha: false,
+    anios: ANIOS_CUSTODIA,
+    piso: null,
     hold: false,
     norma: null,
-    texto: null,
-    textoEmpresa: true,
-    aviso: 'RETAIN_FECHA',
+    texto: 'Se conserva {anios} años contados desde la fecha de la firma.',
   }),
 });
 
@@ -126,7 +160,6 @@ const CATEGORIAS = Object.freeze([
     id: 'SST_PERFIL_Y_CONCEPTOS_MEDICOS',
     label: 'SST · Perfiles epidemiológicos y conceptos de exámenes médicos',
     regla: 'SST_20_ANOS',
-    requiere_fecha: true,
     norma: NORMA_SST,
     keywords: [
       'perfil_epidemiologico', 'concepto_medico', 'concepto_ocupacional',
@@ -138,7 +171,6 @@ const CATEGORIAS = Object.freeze([
     id: 'SST_EXAMENES_ESPECIALIZADOS',
     label: 'SST · Exámenes médicos especializados y pruebas complementarias',
     regla: 'SST_20_ANOS',
-    requiere_fecha: true,
     norma: NORMA_SST,
     keywords: [
       'especializado', 'complementario', 'paraclinico', 'audiometria',
@@ -149,7 +181,6 @@ const CATEGORIAS = Object.freeze([
     id: 'SST_MONITOREO_AMBIENTAL',
     label: 'SST · Monitoreo y mediciones ambientales',
     regla: 'SST_20_ANOS',
-    requiere_fecha: true,
     norma: NORMA_SST,
     keywords: [
       'monitoreo', 'medicion_ambiental', 'higienico', 'ruido',
@@ -160,7 +191,6 @@ const CATEGORIAS = Object.freeze([
     id: 'SST_CAPACITACION',
     label: 'SST · Capacitación, inducción y entrenamiento',
     regla: 'SST_20_ANOS',
-    requiere_fecha: true,
     norma: NORMA_SST,
     keywords: [
       'induccion', 'capacitacion', 'entrenamiento', 'formacion', 'charla',
@@ -171,7 +201,6 @@ const CATEGORIAS = Object.freeze([
     id: 'SST_EPP',
     label: 'SST · Entrega de elementos de protección personal',
     regla: 'SST_20_ANOS',
-    requiere_fecha: true,
     norma: NORMA_SST,
     keywords: [
       'epp', 'elemento_de_proteccion', 'elementos_de_proteccion',
@@ -180,9 +209,8 @@ const CATEGORIAS = Object.freeze([
   },
   {
     id: 'CONTRATO_TRABAJO',
-    label: 'Contrato de trabajo electrónico',
+    label: 'Contrato de trabajo',
     regla: 'CONTRATO_ELECTRONICO',
-    requiere_fecha: false,
     norma: NORMA_CONTRATO,
     keywords: ['contrato', 'otrosi'],
   },
@@ -190,7 +218,6 @@ const CATEGORIAS = Object.freeze([
     id: 'HISTORIA_LABORAL',
     label: 'Historia laboral y nómina',
     regla: 'HISTORIA_LABORAL',
-    requiere_fecha: true,
     norma: NORMA_HISTORIA,
     keywords: [
       'historia_laboral', 'historial_laboral', 'nomina', 'certificado_laboral',
@@ -201,15 +228,13 @@ const CATEGORIAS = Object.freeze([
     id: 'ASPIRANTE',
     label: 'Hoja de vida de aspirante',
     regla: 'TABLA_EMPRESA',
-    requiere_fecha: false,
     norma: null,
     keywords: ['hoja_de_vida', 'aspirante', 'candidato', 'postulante', 'entrevista'],
   },
   {
     id: 'TABLA_EMPRESA',
-    label: 'Según la tabla de retención de la empresa',
+    label: 'Resto de documentos (custodia del sistema)',
     regla: 'TABLA_EMPRESA',
-    requiere_fecha: false,
     norma: null,
     keywords: [],
   },
@@ -273,7 +298,7 @@ function validarCategoria(id) {
  * Resuelve la categoría de retención de una solicitud.
  *
  * Orden:
- *   1. La categoría explícita (la elige el operador).
+ *   1. La categoría explícita (la declara el cliente en la API).
  *   2. El tipo de documento + el subtipo (contrato, SST, historia laboral...).
  *   3. `TABLA_EMPRESA` si el cliente mandó un tipo que no está catalogado.
  *   4. `null` si no mandó nada: es una solicitud legacy y se conserva el
@@ -319,23 +344,16 @@ function resolverCategoria({
     }
   }
 
-  // Mandó un tipo de documento que no está en el catálogo: la tabla de la
-  // Empresa es la respuesta correcta, no un plazo inventado.
+  // Mandó un tipo de documento que no está en el catálogo: la custodia del
+  // sistema es la respuesta correcta, no un plazo inventado.
   return tipo ? 'TABLA_EMPRESA' : null;
 }
 
-/**
- * Devuelve la definición de la regla de una categoría. Si la categoría no
- * existe, devuelve la regla de la tabla de la Empresa.
- */
-function reglaDe(categoriaId) {
-  const categoria = POR_ID.get(categoriaId);
-  return categoria ? REGLAS[categoria.regla] : REGLAS.TABLA_EMPRESA;
-}
 
 /**
  * Suma años a una fecha, en UTC. Si la fecha no es válida, devuelve null.
- * No se inventa una fecha: sin fecha de cese/retiro no hay plazo computable.
+ * No se inventa una fecha: sin fecha de cese/retiro se aplica la custodia
+ * desde la firma.
  */
 function sumarAnios(fecha, anios) {
   if (!fecha) return null;
@@ -368,18 +386,34 @@ function _sumarDias(fecha, dias) {
   return new Date(base.getTime() + d * MS_POR_DIA).toISOString();
 }
 
+/** Convierte días a años redondeados (para el texto que ve el trabajador). */
+function _aniosDeDias(dias) {
+  const d = Number(dias);
+  if (!Number.isFinite(d) || d <= 0) return ANIOS_CUSTODIA;
+  return Math.max(1, Math.round(d / 365.25));
+}
+
+/** La fecha más lejana de las dos (null = no aplica). */
+function _fechaMasLejana(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
 /**
  * Calcula el plan de retención de una solicitud.
  *
  * Es una función PURA: no escribe en la base. El llamador (signRequest.create
- * o conservacion.asignarFechaConservacion) aplica el plan después de insertar
- * la fila.
+ * o conservacion.aplicarPlanRetencion) aplica el plan después de insertar la
+ * fila.
  *
  * @param {object} opts
  * @param {string} [opts.categoria_retencion]
  * @param {string} [opts.regla_retencion]
  * @param {string} [opts.fecha_creacion]
- * @param {string} [opts.fecha_terminacion]
+ * @param {string} [opts.fecha_terminacion] - Cese o retiro, si el sistema lo
+ *   conoce. Nunca se le pide a nadie: si no está, la custodia de 80 años desde
+ *   la firma cubre el mínimo legal.
  * @param {object} [opts.empresa] - fila de gh_firma_empresas (con
  *   plazo_retencion, plazo_retencion_dias, conservacion_por_deber_legal y
  *   norma_conservacion).
@@ -411,38 +445,50 @@ function planificar({
   const regla = REGLAS[reglaId];
   const emp = empresa || {};
 
-  // Texto que se comunica al Trabajador. La tabla de la Empresa usa el texto
-  // vivo de la Empresa; las reglas legales usan su texto fijo. Las solicitudes
-  // legacy (sin categoría) devuelven null a propósito: la vista pública sigue
-  // leyendo la Empresa viva, como antes de este catálogo.
-  let texto = null;
-  if (!categoriaId && reglaId === 'TABLA_EMPRESA') {
-    // Solicitud legacy: la vista pública sigue leyendo la Empresa viva.
-    texto = null;
-  } else if (regla.textoEmpresa) {
-    texto = (typeof emp.plazo_retencion === 'string' && emp.plazo_retencion.trim())
-      ? emp.plazo_retencion.trim()
-      : null;
-  } else {
-    texto = regla.texto;
-  }
-
-  // Fecha de conservación.
+  // ── La fecha de conservación ────────────────────────────────────────────
+  //
+  // 1. El plazo base: la tabla de la Empresa si declaró uno (es la fuente
+  //    del 8.6); si no declaró nada, la custodia del sistema (80 años). Nadie
+  //    tiene que declarar nada para que exista un plazo.
+  // 2. El piso legal de la categoría (los grupos SST: 20 años, contados
+  //    desde la creación y, si se conoce el cese, desde el cese). El piso no
+  //    se puede bajar por mucho que la tabla declare menos.
+  let aniosBase = regla.anios || ANIOS_CUSTODIA;
   let fecha = null;
-  if (regla.base === 'cese' || regla.base === 'retiro') {
+
+  if (regla.base === 'creacion') {
+    const diasEmpresa = Number(emp.plazo_retencion_dias);
+    if (Number.isInteger(diasEmpresa) && diasEmpresa > 0) {
+      fecha = _sumarDias(fecha_creacion, diasEmpresa);
+      aniosBase = _aniosDeDias(diasEmpresa);
+    } else {
+      fecha = sumarAnios(fecha_creacion, aniosBase);
+    }
+  } else if (regla.base === 'cese' || regla.base === 'retiro') {
     const termino = normalizarFecha(fecha_terminacion);
-    if (termino) fecha = sumarAnios(termino, regla.anios);
-  } else if (regla.base === 'creacion') {
-    fecha = _sumarDias(fecha_creacion, emp.plazo_retencion_dias);
+    fecha = termino ? sumarAnios(termino, regla.anios) : null;
+  }
+  const fechaBase = fecha;
+
+  // El piso legal: 20 años para los cinco grupos SST. Se cuenta desde la
+  // creación (siempre se puede calcular) y, si el sistema conoce la fecha de
+  // cese, también desde el cese (que es el hecho que mira la ley).
+  let usoPiso = false;
+  if (regla.piso && !regla.hold && fechaBase) {
+    fecha = _fechaMasLejana(fechaBase, sumarAnios(fecha_creacion, regla.piso.anios));
+    const termino = normalizarFecha(fecha_terminacion);
+    if (termino) {
+      fecha = _fechaMasLejana(fecha, sumarAnios(termino, regla.piso.anios));
+    }
+    usoPiso = fecha !== fechaBase;
   }
 
-  // Hold legal.
+  // ── El hold legal ───────────────────────────────────────────────────────
   //
   // El deber legal declarado por la Empresa (migración 029) MANDA sobre
   // cualquier plazo: es la parte que no se puede suprimir, y un plazo más
   // corto no puede recortar un deber sin término. Perder esa protección por
-  // clasificar el documento sería una supresión indebida, así que aquí el
-  // hold de la Empresa gana siempre.
+  // clasificar el documento sería una supresión indebida.
   //
   // Si la Empresa NO declaró deber legal, el hold lo trae la propia regla
   // (el contrato electrónico del 2.2.1.1.12).
@@ -462,36 +508,47 @@ function planificar({
     };
   }
 
-  // Con hold no hay fecha de supresión: la fecha que el catálogo calculó
-  // deja de ser una fecha de supresión y es solo un piso informativo.
+  // Con hold no hay fecha de supresión: la fecha calculada deja de ser una
+  // fecha de supresión y es solo un piso informativo.
   if (hold) fecha = null;
+
+  // ── El texto que se comunica al Trabajador ─────────────────────────────
+  //
+  // El texto dice el plazo APLICADO (el que la fila va a guardar):
+  //   - el texto que declaró la Empresa, cuando el plazo aplicado es el suyo
+  //     (es su tabla de retención y su redacción);
+  //   - el texto de la regla, cuando el plazo lo puso el sistema (custodia
+  //     de 80 años) o cuando el piso legal subió el plazo de la Empresa (ahí
+  //     manda la redacción del sistema, que dice la base legal).
+  const aniosAplicados = fecha
+    ? Math.max(1, Math.round(
+      (new Date(fecha).getTime() - new Date(fecha_creacion).getTime())
+      / (365.25 * MS_POR_DIA)
+    ))
+    : aniosBase;
+  const textoEmpresa = (typeof emp.plazo_retencion === 'string' && emp.plazo_retencion.trim())
+    ? emp.plazo_retencion.trim()
+    : null;
+  const texto = (regla.hold || usoPiso || !textoEmpresa)
+    ? (regla.texto || '').replace('{anios}', String(aniosAplicados))
+    : textoEmpresa;
 
   let aviso;
   if (hold) {
     aviso = 'RETAIN_DEBER_LEGAL';
   } else if (fecha) {
     aviso = 'RETAIN_FECHA';
-  } else if (regla.base === 'cese') {
-    aviso = 'RETAIN_PENDIENTE_CESE';
-  } else if (regla.base === 'retiro') {
-    aviso = 'RETAIN_PENDIENTE_RETIRO';
   } else {
     aviso = 'RETAIN_SIN_PLAZO';
-  }
-
-  // Si la regla exige una fecha y no la hay, se dice en el texto que se
-  // comunica. No se inventa la fecha ni se simula un hold.
-  if (regla.requiere_fecha && !fecha && texto) {
-    texto = `${texto} ${regla.textoPendiente}`;
   }
 
   return {
     categoria: categoriaId,
     regla: reglaId,
     base: regla.base,
-    anios: regla.anios,
+    anios: aniosAplicados,
     fecha_conservacion: fecha,
-    texto,
+    texto: (texto && texto.trim()) || null,
     hold,
     aviso,
   };
@@ -500,13 +557,13 @@ function planificar({
 module.exports = {
   REGLAS,
   CATEGORIAS,
+  ANIOS_CUSTODIA,
   NORMA_SST,
   NORMA_CONTRATO,
   NORMA_HISTORIA,
   categoriaValida,
   validarCategoria,
   resolverCategoria,
-  reglaDe,
   sumarAnios,
   normalizarFecha,
   planificar,

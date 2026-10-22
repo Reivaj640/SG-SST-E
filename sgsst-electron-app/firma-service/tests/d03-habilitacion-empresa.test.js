@@ -91,19 +91,17 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
   assert.equal(n, 0, 'no queda ninguna fila a medias');
 });
 
-test('D-03 · sin plazo declarado la solicitud NO se crea', async () => {
+test('D-03 · sin plazo declarado la solicitud SÍ se crea (la custodia vive en el código)', async () => {
+  // La custodia de 80 años es del sistema: la Empresa no tiene nada que
+  // declarar y el 8.6 se cumple con lo que el sistema comunica al firmante.
   limpiar();
   registrarEmpresa({ conAnexo: true, conPlazo: false });
 
-  await assert.rejects(
-    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA }),
-    (e) => {
-      assert.equal(e.statusCode, 409);
-      assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
-      assert.match(e.message, /plazo de conservaci/i);
-      return true;
-    }
-  );
+  const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
+  assert.ok(signRequest && signRequest.id_solicitud,
+    'una empresa sin plazo declarado firma: el plazo ya existe');
+  assert.ok(signRequest.fecha_conservacion,
+    'y la firma tiene fecha de conservación (80 años desde la firma)');
 });
 
 test('D-03 · con Anexo y plazo la solicitud se crea', async () => {

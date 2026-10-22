@@ -229,9 +229,9 @@ catálogo de retención por documento (`categoria_retencion`, `regla_retencion`,
 `fecha_terminacion`, `plazo_retencion_aplicable`) y un índice. **No toca
 ninguna fila**: las solicitudes anteriores quedan con las cuatro columnas en
 `NULL` y siguen funcionando con la tabla de la Empresa, exactamente como antes
-del catálogo. Es la que habilita los plazos que fija la ley (20 años desde el
-cese para los registros del SG-SST, conservación sin término para el contrato
-electrónico, 80-100 años desde el retiro para la historia laboral). Ver
+del catálogo. Es la que habilita la **custodia de 80 años** que aplica el
+código (y el hold sin término del contrato electrónico); la Empresa ya no
+tiene que declarar `plazo_retencion_dias`. Ver
 [API §6.13.6](API.md#6136-el-catálogo-de-retención-por-tipo-de-documento).
 
 > **Ojo con el orden**: el código nuevo INSERTa esas cuatro columnas. Si se

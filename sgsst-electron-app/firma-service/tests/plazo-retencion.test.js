@@ -35,7 +35,6 @@ const empresaService = require('../src/services/empresa');
 const signRequestService = require('../src/services/signRequest');
 const mailer = require('../src/services/mailer');
 const db = require('../src/db/connection');
-const config = require('../src/config');
 
 const PLAZO = '5 años para hoja de vida; 10 años para contrataciones.';
 const CANAL = 'RRHH por correo o en la sede de la empresa.';
@@ -165,54 +164,45 @@ test('el correo de invitacion comunica el plazo y el canal de copia', async () =
   assert.ok(cuerpo.includes(CANAL), 'el correo debe comunicar el canal para pedir copia');
 });
 
-test('D-03 · si la empresa no declara plazo, la firma NO se puede pedir', async () => {
-  // El 8.6 obliga a la Empresa a comunicar el plazo ANTES de pedir la firma.
-  // Sin plazo declarado, esa comunicación no se puede hacer y la firma se
-  // conservaría de forma indefinida (el 10.6 no tiene fecha). Con el D-03 la
-  // solicitud ni se crea: se rechaza con un 409 que dice qué falta.
+test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', async () => {
+  // La custodia de 80 años vive en el código del sistema: la Empresa no tiene
+  // nada que declarar y el 8.6 se cumple con lo que el sistema comunica al
+  // firmante. Antes esto se rechazaba con un 409; ahora la firma sale.
   resetDb();
   _crearEmpresa(false);
 
-  await assert.rejects(
-    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA.id_empresa }),
-    (e) => {
-      assert.equal(e.statusCode, 409);
-      assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
-      return true;
-    }
-  );
+  const { signRequest } = await createSignRequestWithIdentificacion({
+    id_empresa: EMPRESA.id_empresa,
+  });
+  assert.ok(signRequest && signRequest.id_solicitud,
+    'una empresa sin plazo declarado puede pedir firmas');
+  assert.ok(signRequest.fecha_conservacion,
+    'y la firma tiene fecha de conservación (la custodia del sistema)');
 });
 
-test('si la empresa no declara plazo, el correo NO inventa uno', async () => {
-  // Con el bloqueo desactivado (la transición), la firma se puede pedir y el
-  // correo sigue sin inventar un plazo. Es el camino que queda mientras las
-  // Empresas se habilitan.
+test('si la empresa no declara plazo, el correo comunica la custodia del sistema', async () => {
+  // El sistema NO inventa un plazo: comunica el suyo, que es la custodia de
+  // 80 años contados desde la firma, y la fila guarda esa fecha. El correo
+  // sale con esa línea y con el canal de copia que sí declaró la Empresa.
   resetDb();
   mailer.clearDevInbox();
   _crearEmpresa(false);
 
-  const antes = config.exigirHabilitacionEmpresa;
-  config.exigirHabilitacionEmpresa = false;
-  let signRequest;
-  try {
-    ({ signRequest } = await createSignRequestWithIdentificacion({
-      id_empresa: EMPRESA.id_empresa,
-    }));
-  } finally {
-    config.exigirHabilitacionEmpresa = antes;
-  }
+  const { signRequest } = await createSignRequestWithIdentificacion({
+    id_empresa: EMPRESA.id_empresa,
+  });
 
   await signRequestService.notifyRemote(signRequest, 'trabajador@example.com', {});
 
   const inbox = mailer.getDevInbox();
   assert.equal(inbox.length, 1);
   const cuerpo = inbox[0].body;
-  assert.ok(!cuerpo.includes('Plazo de conservación'),
-    'no debe aparecer una línea de plazo si la empresa no lo declaró');
+  assert.ok(cuerpo.includes('80 años'),
+    'el correo debe comunicar la custodia del sistema');
   assert.ok(!cuerpo.includes('Dónde puedes pedir una copia'),
-    'no debe aparecer una línea de canal si la empresa no lo declaró');
-  // El correo sale igual: la comunicación es un deber de la Empresa, no
-  // puede bloquear la invitación.
+    'no debe aparecer una línea de canal si la empresa no lo declar\u00f3');
+  // El correo sale igual: la comunicación es un deber, no puede bloquear
+  // la invitación.
   assert.ok(cuerpo.includes('ID de solicitud'), 'el correo debe salir igual');
 });
 

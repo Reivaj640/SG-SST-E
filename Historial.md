@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-22 (el catálogo de retención por tipo de documento: el plazo que fija la ley —20 años desde el cese para los cinco grupos SST, contrato electrónico sin término, historia laboral 80-100 años— con su migración 033, la habilitación que ya no exige el plazo de la empresa, el selector de tipo de documento en el modal de firma y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
+| **Fecha de cierre** | 2026-10-22 (el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
 | **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦927-928. |
-| **Último commit de código** | 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js`, la habilitación por categoría, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, el selector en el modal de firma y el flag del script de humo). Antes: 📦 **924-926**
+| **Último commit de código** | 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -667,66 +667,70 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
-### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija la ley, no el que declara la empresa
+### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija el código, no la persona
 
-**El síntoma.** El plazo de conservación era **uno solo por empresa** (`plazo_retencion_dias`) y se contaba
-desde la **firma**. Eso no puede representar lo que la ley fija por documento: los cinco grupos de
-registros del SG-SST se conservan **20 años desde el cese** (art. 2.2.4.6.13 del Decreto 1072), el
-**contrato electrónico se conserva sin término** (art. 2.2.1.1.12) y la **historia laboral** entre 80 y
-100 años desde el retiro (T-470/2019; Concepto AGN 2-2017-01654). Con un solo número, esos tres plazos
-no existían: o se borraban antes de tiempo, o no se borraban nunca.
+**El síntoma.** El plazo de conservación era **uno solo por Empresa** (`plazo_retencion_dias`) y se contaba
+desde la **firma**. Eso no puede representar lo que la ley fija por documento: los cinco grupos de registros
+del SG-SST se conservan **20 años desde el cese** (art. 2.2.4.6.13 del Decreto 1072), el **contrato
+electrónico se conserva sin término** (art. 2.2.1.1.12) y la **historia laboral** entre 80 y 100 años desde
+el retiro (T-470/2019; Concepto AGN 2-2017-01654). Con un solo número, esos plazos no existían. Y como la
+habilitación exigía que la Empresa declarara el plazo, una empresa que no lo declaraba **no podía firmar
+nada**: el 409 `EMPRESA_NO_HABILITADA` bloqueaba la inducción de Aseplus.
 
-**La causa raíz, en una frase.** El modelo de datos era "una empresa, un plazo": el catálogo por documento
-no tenía dónde vivir, y por eso la habilitación exigía a cada empresa un plazo que la ley no le pedía
-(es el 409 `EMPRESA_NO_HABILITADA` que bloqueaba la inducción de Aseplus).
+**La causa raíz, en una frase.** El plazo era un dato **de la Empresa**; tenía que ser una regla **del
+código**. Mientras fuera un dato, alguien lo tenía que cargar — y el que lo cargaba era una persona
+eligiendo en una pantalla, que es exactamente lo que no puede pasar.
 
 **Qué se cambió.**
 
-- **Catálogo** (`firma-service/src/services/retencion.js`): 9 categorías (los 5 grupos SST, contrato,
-  historia laboral, aspirante y tabla de la empresa) y 4 reglas (`SST_20_ANOS`, `CONTRATO_ELECTRONICO`,
-  `HISTORIA_LABORAL`, `TABLA_EMPRESA`). Funciones puras: `planificar`, `resolverCategoria`,
-  `validarCategoria`, `reglaDe`, `sumarAnios`, `normalizarFecha`.
+- **Catálogo** (`firma-service/src/services/retencion.js`): 9 categorías y 4 reglas. La regla del sistema es
+  la **custodia de 80 años** contados desde la firma (`ANIOS_CUSTODIA`), que cubre el mínimo de 20 años
+  desde el cese de los cinco grupos del SG-SST y el rango de 80 a 100 años de la historia laboral. Si la
+  Empresa declaró un plazo en su tabla, ese manda (el 8.6); el piso legal de los grupos SST nunca se puede
+  bajar. El contrato queda con **hold**, sin término. El **deber legal sin término** de la Empresa gana
+  sobre cualquier plazo.
 - **Migración 033**: cuatro columnas (`categoria_retencion`, `regla_retencion`, `fecha_terminacion`,
   `plazo_retencion_aplicable`) y un índice. **Aditiva**: no reescribe filas, no hay backfill, las
-  solicitudes viejas quedan en `NULL` y conservan el comportamiento anterior (tabla de la Empresa con
-  texto vivo).
-- **Habilitación** (`empresa.js`): una solicitud SST, de contrato o de historia laboral **no** exige
-  `plazo_retencion_dias`; el plazo lo fija la ley. Legacy, `TABLA_EMPRESA` y `ASPIRANTE` sí lo exigen.
-- **Alta** (`signRequest.js`): la categoría se resuelve **antes** de la habilitación, el plan se calcula
-  con la misma fecha de creación que se inserta, y las cuatro columnas quedan en la fila.
+  solicitudes viejas quedan en `NULL` y conservan el comportamiento anterior.
+- **La clasificación es del sistema**: el cliente de K+AIR deriva la categoría del **tipo del documento**
+  (`gh_documentos.tipo`: `contrato`, `induccion`, `autorizacion_hojas_vida`...) y la manda en el
+  metadata. La API también acepta la categoría explícita y la derivación por tipo + subtipo.
+- **La interfaz no muestra nada de esto.** Se quitó el selector de "tipo de documento para la conservación"
+  y el campo "fecha de cese de la relación laboral" que se habían agregado al modal de firma (el owner los
+  vio en la pantalla y los mandó sacar: "no debemos dejarle nada al usuario para que haga algo"). El
+  operador no elige el plazo, no elige la categoría y no completa ninguna fecha.
+- **La habilitación ya no exige el plazo**: `verificarHabilitacionFirma` pide solo el **Anexo de Encargo**
+  y el **canal de atención**. Una empresa sin plazo declarado firma, y su custodia es la de 80 años.
+- **Lo que ve el Trabajador**: la mini-app, el correo de invitación y la constancia comunican el plazo
+  **aplicado y congelado en la fila**, no el de la Empresa en vivo.
 - **Firma dual**: el hijo hereda categoría, regla, fecha de terminación, texto, fecha de conservación y
-  hold del padre (es el mismo documento: recalcular el plazo desde la firma del representante correría
-  el reloj por el hecho equivocado).
-- **Lo que ve el Trabajador**: la mini-app (`routes/public.js`), el correo de invitación
-  (`notifyRemote`) y la constancia (`pdfGen`) comunican el plazo **de esa** solicitud.
-- **App de escritorio**: selector de tipo de documento y campo de fecha de cese en el modal de firma,
-  con sugerencia por nombre del archivo ("Inducción" → capacitación). Cache-bust `20261022-retencion-categoria`.
-- **Script de humo**: `--categoria-retencion=` / `--fecha-terminacion=`, para verificar en el servidor que
-  la 033 quedó aplicada y que la regla corre.
+  hold del padre: es el mismo documento.
+- **Script de humo**: `--categoria-retencion=` / `--fecha-terminacion=` para verificar en el servidor que
+  la 033 quedó aplicada.
+- **Documentación**: API §6.13.6 (reescrita), DATA_MODEL, el runbook del servidor (§5.1.1) y el plan de
+  despliegue (el conteo de migraciones pasa de 14 a 15).
 
 **Decisiones del owner.** (1) El alcance es el **catálogo completo**, no solo los datos de Aseplus.
-(2) El **20 años aplica solo a los cinco grupos SST**, contados desde el **cese**; los contratos y la
-nómina quedan fuera de esa regla. (3) La historia laboral usa el **máximo del rango (100 años)** y el
-texto dice el rango. (4) **El deber legal sin término de la empresa gana siempre** sobre el plazo del
-documento: un plazo más corto no puede recortar un deber sin término, y hacerlo sería una supresión
-indebida. (5) Sin fecha de cese o de retiro **no se inventa la fecha**: la fila queda pendiente y sin
-fecha de supresión. (6) El **Anexo de Encargo** y el **canal de atención** siguen exigiéndose: la
-categoría nueva solo exonera el plazo declarado por la empresa.
+(2) **Nada de esto se le pregunta al operador**: el plazo vive en el código y el sistema clasifica solo.
+(3) El **deber legal sin término de la Empresa gana siempre** sobre el plazo del documento: un plazo más
+corto no puede recortar un deber sin término, y hacerlo sería una supresión indebida. (4) El **Anexo de
+Encargo** y el **canal de atención** siguen exigiéndose: el código solo reemplaza el plazo declarado.
+(5) La fecha de cese **no se le pide a nadie**: se usa solo si el sistema ya la conoce.
 
-**Verificación.** Suite nueva `tests/retencion-por-documento.test.js` (**21/21**: catálogo, derivación,
-20 años desde el cese, contrato con hold, historia laboral 80-100, tabla de la empresa, deber legal
-mandando, legacy intacto, migración, alta sin plazo de empresa, miniatura pública, correo y herencia de
-la firma dual). Suite completa del service: **1436 pruebas, 1434 verdes, 0 fallos, 2 omitidas** (los 2
-omitidos y 3 checks rojos de `main/` son preexistentes: son regex sobre código de paquetes anteriores).
-`node --check` limpio en los 10 archivos tocados.
+**Verificación.** Suite nueva `tests/retencion-por-documento.test.js` (**19/19**: custodia de 80 años,
+la tabla de la Empresa cuando declara, el piso de 20 años de los grupos SST, el hold del contrato, la
+historia laboral, el deber legal, la migración, el alta sin plazo declarado, la clasificación automática,
+la mini-app, el correo y la herencia de la firma dual). Se actualizaron `tests/d03-habilitacion-empresa.test.js`
+y `tests/plazo-retencion.test.js` a la regla nueva (antes fijaban "sin plazo declarado no se firma").
+Suite completa del service: **1434 pruebas, 1432 verdes, 0 fallos, 2 omitidas** (los omitidos y los 3
+checks rojos de `main/` son preexistentes: son regex sobre código de paquetes anteriores). `node --check`
+limpio en los archivos tocados.
 
 **Lo que queda.** (1) El **Anexo de Encargo** de Aseplus sigue sin resolverse: la base dice que está
 firmado (2026-10-21) y el documento de onboarding dice que no. (2) La **URL real de la política de
-datos** sigue sin confirmar (en `null`: el bloque público muestra "no publicada"). (3) La **tabla de
-retención de la empresa** sigue sin declarar (con la categoría nueva, el SST no la necesita). (4) La
-**prueba manual** (enviar la inducción y ver el bloque) necesita el servicio con el código nuevo
-corriendo: la migración 033 **ya está aplicada** en la base local, pero el proceso tiene que reiniciarse
-para cargar el código. (5) D-02 sigue apagado y no se publicó v1.1.
+datos** sigue sin confirmar (en `null`: el bloque público muestra "no publicada"). (3) La **prueba manual**
+necesita el servidor con el código nuevo: la migración 033 corre al arrancar, así que es desplegar y
+reiniciar. (4) D-02 sigue apagado y no se publicó v1.1.
 
 ### 2026-10-21 · 📦927 · Datos para firma electrónica: guardar local, releer y publicar en el servidor
 

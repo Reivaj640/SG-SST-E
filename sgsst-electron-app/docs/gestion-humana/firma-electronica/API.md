@@ -209,7 +209,7 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `AGREEMENT_VERSION_REACCEPT_REQUIRED` | Lo mismo, detectado en la puerta del documento: sin aceptar la versión vigente no se sirve el documento (el orden (g) → (h) del 3.4). `details.accion = "reaceptar_version_vigente"` |
 | `CONSENT_NOT_FOUND` | El `consent_id` no existe. |
 | `EMPRESA_NOT_FOUND` | La empresa no existe en el directorio de empresas. |
-| `EMPRESA_NO_HABILITADA` | La empresa registrada **no tiene Anexo de Encargo firmado**, **no ha declarado el plazo de conservación** (el 1.4 y el 8.6) o **no tiene canal de atención** (decisión del owner, 2026-10-20: sin canal, el derecho del 7.2-7.3 a la firma en papel no tiene puerta). La solicitud de firma **no se crea**. El `details.pendientes` dice qué falta (`anexo_encargo_firmado`, `plazo_retencion`, `canal_pqrs`) y el mensaje dice dónde se resuelve. El override es el del D-03 (la bandera + el WARN con código + el inventario). Ver §6.16.5. **Excepción del catálogo por documento:** si la solicitud lleva una categoría con plazo legal propio (SST, contrato electrónico, historia laboral), la falta de `plazo_retencion_dias` **no** bloquea: el plazo lo fija la ley, no la tabla de la Empresa. Ver §6.13.6. |
+| `EMPRESA_NO_HABILITADA` | La empresa registrada **no tiene el Anexo de Encargo firmado** (el 1.4) o **no tiene canal de atención** (el 7.2-7.3: sin canal, el derecho del Trabajador a la firma en papel no tiene puerta; es la decisión del owner del 2026-10-20). La solicitud de firma **no se crea**. El `details.pendientes` dice qué falta (`anexo_encargo_firmado`, `canal_pqrs`) y el mensaje dice dónde se resuelve. El override es el del D-03 (la bandera + el WARN con código + el inventario). Ver §6.16.5. **El plazo de conservación ya NO se exige**: la custodia de 80 años vive en el código (ver §6.13.6), así que la Empresa no tiene nada que declarar. |
 | `PAPER_ALREADY_SIGNED` | La solicitud ya tiene una firma autográfica registrada (409). No se puede registrar dos veces |
 | `PAPER_REQUEST_NOT_FOUND` | No hay firma en papel para esa solicitud (404) |
 | `DOCUMENT_NOT_SIGNED` | Se pidió el suministro a una autoridad de un documento que todavía no está firmado (409) |
@@ -1237,8 +1237,8 @@ Content-Type: application/pdf
 | `finalidad_sensible` | string | no | Para qué se usa el dato sensible. Va en el aviso previo. |
 | `base_legal_sensible` | string | no | Base legal del tratamiento del dato sensible. Va en el aviso previo. |
 | `representante_legal_snapshot` | object | no | **Nuevo en la 8B.** Snapshot del representante legal, para la firma dual: `{ nombre, cargo, tipo_identificacion, numero_identificacion, correo }`. **El `numero_identificacion` se cifra antes de archivarse** (AES-256-GCM, llave fuera de la base): no queda en texto claro en la base ni en las respuestas. Ver §6.16. |
-| `categoria_retencion` | string | no | **Nuevo en el catálogo por documento.** Id del catálogo de `src/services/retencion.js`: `SST_PERFIL_Y_CONCEPTOS_MEDICOS`, `SST_EXAMENES_ESPECIALIZADOS`, `SST_MONITOREO_AMBIENTAL`, `SST_CAPACITACION`, `SST_EPP`, `CONTRATO_TRABAJO`, `HISTORIA_LABORAL`, `ASPIRANTE`, `TABLA_EMPRESA`. Un id fuera de la lista se **rechaza con 400**. Ver §6.13.6. |
-| `fecha_terminacion` | string | no | **Nuevo en el catálogo por documento.** Fecha del **cese** de la relación laboral (SST) o del **retiro** (historia laboral). Es la base del cómputo de 20 y de 100 años. Si no viene, la fila queda con `fecha_conservacion` nula y un aviso: **no se inventa la fecha**. |
+| `categoria_retencion` | string | no | **Catálogo de retención por documento.** Id de `src/services/retencion.js`: `SST_PERFIL_Y_CONCEPTOS_MEDICOS`, `SST_EXAMENES_ESPECIALIZADOS`, `SST_MONITOREO_AMBIENTAL`, `SST_CAPACITACION`, `SST_EPP`, `CONTRATO_TRABAJO`, `HISTORIA_LABORAL`, `ASPIRANTE`, `TABLA_EMPRESA`. Un id fuera de la lista se **rechaza con 400**. El cliente de K+AIR la deriva solo, del tipo del documento: el operador no elige nada. Ver §6.13.6. |
+| `fecha_terminacion` | string | no | Fecha del **cese** de la relación laboral o del **retiro**, **si el sistema la conoce** (p. ej. porque la ficha del trabajador la trae). Se usa solo para verificar el piso legal de los grupos SST. **Nunca se le pide al operador**; si no viene, la custodia de 80 años desde la firma cubre el mínimo legal. |
 | `subtipo_identificacion` | string | no | Subtipo libre del documento (p. ej. `induccion`). **Solo** sirve para derivar la categoría cuando el cliente no manda `categoria_retencion`. La categoría explícita siempre gana. |
 
 **Validación del PDF**:
@@ -2030,69 +2030,79 @@ accidente. Para levantarlo hay que mandar `false` explícito.
 
 ### 6.13.6 El catálogo de retención por tipo de documento
 
-**Por qué existe.** `plazo_retencion_dias` es **un** plazo por Empresa y se
-cuenta desde la firma. Eso no puede representar los plazos que la ley fija
-por documento:
+**El plazo no se le pregunta a nadie: vive en el código.** Ni el operador de
+K+AIR, ni la Empresa tienen que decidir nada por firma. No hay un selector de
+"tipo de documento para la conservación", no hay una fecha de cese que
+completar y la Empresa no tiene que declarar un plazo para poder firmar.
 
-- El artículo **2.2.4.6.13 del Decreto 1072 de 2015** ordena conservar por un
-  mínimo de **20 años, contados desde el cese de la relación laboral**, cinco
-  grupos de registros del SG-SST. Para los demás documentos, el mismo
-  artículo remite al sistema de archivo o retención documental de la Empresa.
-- El artículo **2.2.1.1.12** (adicionado por el Decreto 526 de 2021) obliga a
-  conservar los **contratos de trabajo firmados electrónicamente** con
-  autenticidad, integridad y disponibilidad, **sin fijar término**.
-- La **historia laboral y la nómina** tienen un deber de conservación ligado a
-  los derechos pensionales (Corte Constitucional T-470/2019). El Concepto
-  2-2017-01654 del Archivo General de la Nación sugiere un rango de **80 a 100
-  años desde el retiro**: el catálogo aplica el **máximo (100)**.
+**La regla del sistema: 80 años de custodia** (`ANIOS_CUSTODIA`, en
+`src/services/retencion.js`), contados desde la fecha de la firma. Es un piso
+legalmente fundado y no un número inventado:
 
-**El catálogo** (`src/services/retencion.js`):
+- Cubre el mínimo de **20 años desde el cese de la relación laboral** que el
+  artículo 2.2.4.6.13 del Decreto 1072 de 2015 exige para cinco grupos de
+  registros del SG-SST. Si el sistema conoce la fecha de cese y el mínimo
+  legal cayera más lejos, esa fecha gana.
+- Cubre el rango de **80 a 100 años desde el retiro** que el Concepto
+  2-2017-01654 del Archivo General de la Nación propone para la historia
+  laboral (Corte Constitucional T-470/2019).
+- Para los demás documentos, el mismo artículo remite al sistema de retención
+  de la Empresa: **si la Empresa declara un plazo en su tabla, ese plazo
+  manda** (el 8.6). Si no declara ninguno, rige la custodia de 80 años.
+- El **contrato electrónico** es la excepción: el artículo 2.2.1.1.12
+  (Decreto 526 de 2021) obliga a conservarlo con autenticidad, integridad y
+  disponibilidad **sin fijar término**, así que queda con un **hold** y no se
+  borra por el vencimiento de la custodia.
+- El **deber legal sin término** que la Empresa haya declarado (migración 029)
+  gana sobre cualquier plazo: un plazo más corto no puede recortar un deber
+  sin término.
 
-| `categoria_retencion` | Regla | Base del cómputo | Texto que se comunica |
-|---|---|---|---|
-| `SST_PERFIL_Y_CONCEPTOS_MEDICOS` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
-| `SST_EXAMENES_ESPECIALIZADOS` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
-| `SST_MONITOREO_AMBIENTAL` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
-| `SST_CAPACITACION` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
-| `SST_EPP` | `SST_20_ANOS` | cese + 20 años | 2.2.4.6.13 |
-| `CONTRATO_TRABAJO` | `CONTRATO_ELECTRONICO` | sin fecha + **hold** | 2.2.1.1.12 |
-| `HISTORIA_LABORAL` | `HISTORIA_LABORAL` | retiro + 100 años | T-470/2019 · AGN 2-2017-01654 |
-| `ASPIRANTE` | `TABLA_EMPRESA` | la tabla de la Empresa | el de la Empresa |
-| `TABLA_EMPRESA` | `TABLA_EMPRESA` | la tabla de la Empresa | el de la Empresa |
+**El catálogo** (`src/services/retencion.js`): la categoría no cambia el
+plazo (salvo el hold del contrato y el piso de los grupos SST); cambia el
+**texto** que se le comunica al Trabajador y la base legal que lo respalda.
 
-**Cómo se resuelve la categoría** (en este orden):
+| `categoria_retencion` | Regla | Qué le dice al Trabajador |
+|---|---|---|
+| `SST_PERFIL_Y_CONCEPTOS_MEDICOS` | `SST_20_ANOS` | custodia + mínimo de 20 años desde el cese (2.2.4.6.13) |
+| `SST_EXAMENES_ESPECIALIZADOS` | `SST_20_ANOS` | ídem |
+| `SST_MONITOREO_AMBIENTAL` | `SST_20_ANOS` | ídem |
+| `SST_CAPACITACION` | `SST_20_ANOS` | ídem |
+| `SST_EPP` | `SST_20_ANOS` | ídem |
+| `CONTRATO_TRABAJO` | `CONTRATO_ELECTRONICO` | se conserva **sin término** y no se borra automáticamente (2.2.1.1.12) |
+| `HISTORIA_LABORAL` | `HISTORIA_LABORAL` | custodia dentro del rango de 80 a 100 años desde el retiro (T-470/2019 · AGN 2-2017-01654) |
+| `ASPIRANTE` | `TABLA_EMPRESA` | custodia del sistema |
+| `TABLA_EMPRESA` | `TABLA_EMPRESA` | custodia del sistema (o el plazo de la Empresa, si lo declaró) |
 
-1. `categoria_retencion` explícita → manda ella. Si el id no existe → **400**.
-2. Si no viene, se deriva de `tipo_identificacion` + `subtipo_identificacion`
-   (p. ej. `CONTRATO` → `CONTRATO_TRABAJO`; `FORMATO` + `induccion` →
-   `SST_CAPACITACION`).
-3. Si hay tipo pero no hay coincidencia → `TABLA_EMPRESA`.
-4. Si no hay ni tipo ni subtipo → la solicitud queda **legacy**: las cuatro
-   columnas nuevas quedan en `NULL` y se conserva el comportamiento anterior
-   (tabla de la Empresa con texto vivo). **No hay backfill.**
+**Quién clasifica.** El sistema, con datos que ya tiene. El cliente de K+AIR
+manda `categoria_retencion` derivada del **tipo del documento** (que está en
+la ficha: `gh_documentos.tipo` — `contrato`, `induccion`,
+`autorizacion_hojas_vida`, etc.), sin intervención del operador. La API
+también acepta la derivación desde `tipo_identificacion` +
+`subtipo_identificacion`, y la categoría explícita sigue siendo válida.
 
 **Columnas nuevas** (migración `033_retencion_por_documento`):
 
 | Columna | Qué guarda |
 |---|---|
-| `categoria_retencion` | El id del catálogo. `NULL` = legacy. |
-| `regla_retencion` | La regla aplicada (`SST_20_ANOS`, `CONTRATO_ELECTRONICO`, `HISTORIA_LABORAL`, `TABLA_EMPRESA`). `NULL` en las legacy. |
-| `fecha_terminacion` | El cese o el retiro. `NULL` si aún no se conoce. |
-| `plazo_retencion_aplicable` | El texto que se le comunica al Trabajador para **esta** solicitud. Congela el legal (y también el de la tabla de la Empresa cuando la categoría es explícita). |
+| `categoria_retencion` | El id del catálogo. `NULL` si el sistema no pudo derivarla. |
+| `regla_retencion` | La regla aplicada (`SST_20_ANOS`, `CONTRATO_ELECTRONICO`, `HISTORIA_LABORAL`, `TABLA_EMPRESA`). |
+| `fecha_terminacion` | El cese o el retiro, **si el sistema lo conoce**. Nunca se le pide a nadie. |
+| `plazo_retencion_aplicable` | El texto que se le comunicó al Trabajador para **esta** solicitud. |
 
-**Sin fecha de cese/retiro no se inventa nada**: la fila queda con
-`fecha_conservacion` nula y un aviso (`RETAIN_PENDIENTE_CESE` /
-`RETAIN_PENDIENTE_RETIRO`). Sin fecha no hay supresión.
+**Lo que ve el Trabajador** sale de esa fila: el bloque de la mini-app, el
+correo de invitación y la constancia imprimen el plazo aplicado y congelado, no
+el de la Empresa en vivo. Las solicitudes anteriores a este catálogo (con las
+cuatro columnas en `NULL`) siguen mostrando el texto de la Empresa: **no hay
+backfill**.
 
-**La habilitación de la Empresa cambia con esto**: una solicitud de categoría
-`SST_*`, `CONTRATO_TRABAJO` o `HISTORIA_LABORAL` **no** exige que la Empresa
-haya declarado `plazo_retencion_dias` (el plazo lo fija la ley). La
-solicitud legacy, `TABLA_EMPRESA` y `ASPIRANTE` sí lo exigen. Ver
-§6.16.5 (`EMPRESA_NO_HABILITADA`).
+**La habilitación de la Empresa ya no exige el plazo** (ver §6.16.5): la
+custodia vive en el código, así que no hay nada que declarar. Siguen
+exigiéndose el **Anexo de Encargo firmado** y el **canal de atención**
+(`canal_pqrs`).
 
 **La firma dual hereda**: el hijo (firma del representante) es el mismo
 documento, así que hereda la categoría, la regla, la fecha de terminación, el
-texto y la `fecha_conservacion` del padre, y el hold si el padre lo tiene.
+texto, la fecha de conservación y el hold del padre.
 
 ### 6.14 `POST /internal/sign-requests/{id}/link/rotate` - el enlace, otra vez
 

@@ -48,7 +48,6 @@ const db = require('../db/connection');
 const { sha256 } = require('../crypto/hash');
 const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
 const representanteService = require('./representante');
-const retencion = require('./retencion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -747,15 +746,10 @@ function listConPendientes() {
  * empresa. Este control es para las empresas que YA están en el registro.
  *
  * @param {string} id_empresa
- * @param {object} [opciones]
- * @param {string} [opciones.categoria_retencion] - Categoría del catálogo por
- *   documento. Si la categoría trae un plazo legal propio (SST, contrato
- *   electrónico, historia laboral), la Empresa NO necesita declarar
- *   `plazo_retencion_dias`: el plazo lo fija la ley, no la tabla de la Empresa.
  * @returns {{ok: boolean, registrada: boolean, id_empresa: string,
  *   pendientes: string[], mensaje: string}}
  */
-function verificarHabilitacionFirma(id_empresa, opciones) {
+function verificarHabilitacionFirma(id_empresa) {
   const empresa = getById(id_empresa);
   if (!empresa) {
     return {
@@ -767,23 +761,20 @@ function verificarHabilitacionFirma(id_empresa, opciones) {
     };
   }
 
-  const categoria = opciones && opciones.categoria_retencion;
-  const regla = categoria ? retencion.reglaDe(categoria) : null;
-  // SST, contrato electrónico e historia laboral NO dependen de la tabla de la
-  // Empresa: el plazo (o el hold) lo fija la ley. `TABLA_EMPRESA` y `ASPIRANTE`
-  // sí la necesitan; una solicitud legacy también.
-  const tienePlazoLegalPropio = Boolean(regla && regla.id !== 'TABLA_EMPRESA');
-
+  // El PLAZO DE CONSERVACIÓN ya no se le exige a la Empresa: la custodia de 80
+  // años vive en el código del sistema (src/services/retencion.js) y no hay
+  // nada que declarar ni que decidir. Lo que sí se exige es lo que la Empresa
+  // no puede dejar de tener:
+  //   - el Anexo de Encargo firmado (el 1.4): sin él, K+AIR no tiene el
+  //     encargo que respalda la firma.
+  //   - el canal de atención (el 7.2-7.3): sin él, el derecho del Trabajador
+  //     a la firma autográfica no tiene puerta. Cuando el rechazo del D-2 esté
+  //     encendido, el 400 le dice al Trabajador «pedile a tu Empresa la firma
+  //     en papel»: si la Empresa no tiene canal, ese 400 apunta a una puerta
+  //     que no existe (es el mismo error que el 409 sin salida que la 10.4 vino
+  //     a matar).
   const pendientes = [];
   if (!empresa.anexo_encargo_firmado_at) pendientes.push('anexo_encargo_firmado');
-  if (!empresa.plazo_retencion_dias && !tienePlazoLegalPropio) {
-    pendientes.push('plazo_retencion');
-  }
-  // El canal de atención (el 7.2-7.3): sin él, el derecho del Trabajador a la
-  // firma autográfica no tiene puerta. Cuando el rechazo del D-2 esté
-  // encendido, el 400 le dice al Trabajador «pedile a tu Empresa la firma en
-  // papel»: si la Empresa no tiene canal, ese 400 apunta a una puerta que
-  // no existe (es el mismo error que el 409 sin salida que la 10.4 vino a matar).
   if (!empresa.canal_pqrs) pendientes.push('canal_pqrs');
 
   if (pendientes.length === 0) {
@@ -798,7 +789,6 @@ function verificarHabilitacionFirma(id_empresa, opciones) {
 
   const falta = pendientes.map((p) => {
     if (p === 'anexo_encargo_firmado') return 'no tiene registrado el Anexo de Encargo firmado';
-    if (p === 'plazo_retencion') return 'no ha declarado el plazo de conservación';
     return 'no tiene declarado el canal de atención (el 7.2-7.3: es por dón donde el Trabajador pide la firma en papel)';
   }).join(' y ');
 
@@ -810,8 +800,8 @@ function verificarHabilitacionFirma(id_empresa, opciones) {
     mensaje: `La empresa ${id_empresa} ${falta}. `
       + 'Regístrelo en POST /internal/admin/empresas/'
       + `${id_empresa}/anexo-firmado (Anexo) y en `
-      + `PUT /internal/admin/empresas/${id_empresa} (plazo de conservación `
-      + 'y canal de atención) antes de solicitar firmas.',
+      + `PUT /internal/admin/empresas/${id_empresa} (canal de atención) `
+      + 'antes de solicitar firmas.',
   };
 }
 
