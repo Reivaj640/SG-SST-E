@@ -213,6 +213,64 @@ El paso 5 es el que falto. `uptime_seconds` tiene que ser **chico** (unos
 segundos): si el proceso lleva horas arriba, no es el que se acaba de instalar,
 por mas que los hashes del disco esten bien.
 
+### Empaquetar en Windows: el separador de rutas del zip (trampa del 2026-10-22)
+
+`Compress-Archive` de PowerShell 5.1 escribe las rutas **con `\`**
+(`src\server.js`). En Linux ese `\` **no es un separador: es parte del
+nombre del archivo**. La extracción "funciona" sin un solo error y deja
+archivos planos llamados `src\server.js`: el código nuevo nunca aparece donde
+el servicio lo busca. Pasó en el despliegue del 2026-10-22 — el servicio se
+reinició, la migración dijo "No hay migraciones pendientes, total: 31" y el
+archivo que se acababa de "instalar" `ls` lo daba como inexistente.
+
+Dos formas de evitarlo:
+
+**1. Empaquetar con `tar`** (bsdtar viene en Windows 10+ y Linux lo lee siempre):
+
+```powershell
+# EN EL PC
+tar -czf "$env:TEMP\kair-deploy.tar.gz" src web scripts package.json package-lock.json
+scp "$env:TEMP\kair-deploy.tar.gz" javier@192.168.1.11:/tmp/
+```
+
+```bash
+# EN EL SERVIDOR
+sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma/app
+```
+
+**2. Extraer normalizando el separador** (si el zip ya se subió, o si el
+servidor no tiene `unzip` — Ubuntu mínimo no lo trae):
+
+```bash
+sudo python3 - <<'PY'
+import os, zipfile
+dst = '/opt/kair-firma/app'
+z = zipfile.ZipFile('/tmp/kair-deploy.zip')
+for name in z.namelist():
+    rel = name.replace('\\', '/')
+    target = os.path.join(dst, rel)
+    if rel.endswith('/'):
+        os.makedirs(target, exist_ok=True); continue
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with z.open(name) as f, open(target, 'wb') as out:
+        out.write(f.read())
+print('archivos escritos')
+PY
+sudo chown -R kairfirma:kairfirma /opt/kair-firma
+```
+
+**La verificación que lo habría atrapado en 10 segundos** — hacerla SIEMPRE
+después de copiar y ANTES de arrancar:
+
+```bash
+ls -l /opt/kair-firma/app/src/server.js
+ls -l /opt/kair-firma/app/src/db/schema/033_retencion_por_documento.sql
+grep -c categoria_retencion /opt/kair-firma/app/src/schemas/index.js
+```
+
+Si el archivo que se acaba de desplegar no aparece ahí, **el despliegue no
+ocurrió**: reiniciar el servicio solo pone en marcha el código viejo otra vez.
+
 ### Lo que NO es prueba
 
 | Lo que se comprobó | Por qué no sirve |

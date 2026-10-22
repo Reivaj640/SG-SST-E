@@ -726,11 +726,19 @@ Suite completa del service: **1434 pruebas, 1432 verdes, 0 fallos, 2 omitidas** 
 checks rojos de `main/` son preexistentes: son regex sobre código de paquetes anteriores). `node --check`
 limpio en los archivos tocados.
 
+**El despliegue (2026-10-22, en el servidor).** El código llegó a `kair-server` y la **033 se
+aplicó en producción** (`"Aplicando migración","version":"033_retencion_por_documento"`, `"total":32`), con el
+servicio reiniciado y el `uptime` del proceso en segundos. **La trampa que costó dos intentos:** el zip armado con
+`Compress-Archive` de PowerShell guarda las rutas con `\` y en Linux ese `\` es parte del nombre del archivo,
+así que la extracción "funcionaba" sin error y dejaba archivos planos llamados `src\server.js`: el servicio
+reiniciaba con el código viejo y la migración seguía diciendo `total:31`. Se resolvió extrayendo con `python3`
+normalizando el separador, y quedó documentado en el runbook (§5.1, "Empaquetar en Windows") junto con la
+verificación de 10 segundos que lo habría atrapado antes de arrancar.
+
 **Lo que queda.** (1) El **Anexo de Encargo** de Aseplus sigue sin resolverse: la base dice que está
 firmado (2026-10-21) y el documento de onboarding dice que no. (2) La **URL real de la política de
-datos** sigue sin confirmar (en `null`: el bloque público muestra "no publicada"). (3) La **prueba manual**
-necesita el servidor con el código nuevo: la migración 033 corre al arrancar, así que es desplegar y
-reiniciar. (4) D-02 sigue apagado y no se publicó v1.1.
+datos** sigue sin confirmar (en `null`: el bloque público muestra "no publicada"). (3) **El servidor ya está actualizado** (2026-10-22): la prueba manual quedó a un clic de la app.
+(4) D-02 sigue apagado y no se publicó v1.1.
 
 ### 2026-10-21 · 📦927 · Datos para firma electrónica: guardar local, releer y publicar en el servidor
 

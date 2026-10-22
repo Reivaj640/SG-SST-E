@@ -197,6 +197,15 @@ cd /tmp && sudo unzip -o kair-firma-b5c04f93.zip -d /opt/kair-firma/app
 sudo chown -R kairfirma:kairfirma /opt/kair-firma
 ```
 
+> ⚠️ **El zip de `Compress-Archive` (PowerShell 5.1) guarda las rutas con
+> `\`, y en Linux ese `\` es parte del NOMBRE del archivo.** La extracción
+> "funciona" y deja archivos planos llamados `src\server.js`: el código nuevo
+> nunca llega a su lugar y el servicio reinicia con el viejo (pasó el
+> 2026-10-22). Empaquetar con `tar -czf` (bsdtar, viene en Windows 10+) y
+> extraer con `tar -xzf`, o extraer con el one-liner de `python3` que
+> normaliza el separador. El detalle y la verificación están en
+> [MIGRACION-SERVIDOR-FIRMA.md §5.1](../../MIGRACION-SERVIDOR-FIRMA.md).
+
 **Aplicar las migraciones explícitamente** (aunque el servicio las corre al
 arrancar, verlas en el log es la prueba):
 
