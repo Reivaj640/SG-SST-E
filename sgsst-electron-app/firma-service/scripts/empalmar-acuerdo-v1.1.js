@@ -1,0 +1,693 @@
+#!/usr/bin/env node
+/**
+ * scripts/empalmar-acuerdo-v1.1.js
+ *
+ * ARMA el texto del Acuerdo v1.1 a partir de la v1.0 sellada y del texto
+ * final que entregó el abogado (respuesta 11A).
+ *
+ * POR QUÉ EXISTE ESTE SCRIPT
+ * --------------------------
+ * El empalme de la v1.1 estaba escrito como un documento markdown (el mapa de
+ * empalme): decía QUÉ numerales cambian, pero no había una máquina que los
+ * empalmara. Armar el archivo a mano significa transcribir un texto legal
+ * desde un documento que no es el texto: un cambio de una palabra es un bug
+ * legal, no un typo.
+ *
+ * Este script hace el empalme de forma reproducible:
+ *   1. Lee la v1.0 sellada (scripts/fixtures/acuerdo-v1.0.txt). NO la toca.
+ *   2. Lee el JSON de cambios (scripts/fixtures/acuerdo-v1.1-cambios.json),
+ *      que tiene el texto final de cada numeral, copiado íntegro del .txt
+ *      del abogado.
+ *   3. Reemplaza el texto de los numerales que cambian y deja intactos los
+ *      que no cambian.
+ *   4. Verifica el texto resultante con `analizarTextoLegal` (el MISMO módulo
+ *      que usa la guarda de publicación: src/utils/textoLegal.js).
+ *   5. Si el texto no tiene placeholders ni marcas de borrador, escribe
+ *      scripts/fixtures/acuerdo-v1.1.txt (LF, sin BOM) e imprime su huella.
+ *      Si tiene placeholders, NO escribe nada: imprime el reporte de lo que
+ *      falta y sale con código 2.
+ *
+ * REGLAS
+ * ------
+ *   1. La v1.0 no se modifica: es la base, y está sellada.
+ *   2. El texto del abogado se copia tal cual. El script no reescribe, no
+ *      parafrasea y no reordena nada: solo cambia de sitio un bloque de texto
+ *      que ya viene escrito.
+ *   3. Idempotente: correrlo dos veces da el mismo resultado. La base siempre
+ *      se relee del disco; la salida nunca es la entrada.
+ *
+ * Uso:
+ *   node scripts/empalmar-acuerdo-v1.1.js
+ *   node scripts/empalmar-acuerdo-v1.1.js --version=v1.1
+ *   node scripts/empalmar-acuerdo-v1.1.js --salida=otra/ruta.txt
+ *   node scripts/empalmar-acuerdo-v1.1.js --reporte=reporte-placeholders.txt
+ *
+ * Exit codes:
+ *   0 = texto listo (sin placeholders), archivo escrito
+ *   2 = hay placeholders: NO se escribió el archivo
+ *   3 = error (archivos que faltan, JSON ilegible, numeral que no calza)
+ */
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const {
+  analizarTextoLegal,
+  listarPlaceholders,
+  esVersionSujetaAGuarda,
+} = require('../src/utils/textoLegal');
+
+const SERVICE_ROOT = path.resolve(__dirname, '..');
+const FIXTURES = path.resolve(__dirname, 'fixtures');
+
+const DEFAULT_VERSION = 'v1.1';
+const DEFAULT_BASE = path.join(FIXTURES, 'acuerdo-v1.0.txt');
+const DEFAULT_CAMBIOS = path.join(FIXTURES, 'acuerdo-v1.1-cambios.json');
+const DEFAULT_SALIDA = path.join(FIXTURES, 'acuerdo-v1.1.txt');
+const MANIFIESTO = path.join(FIXTURES, 'acuerdo-ARCHIVO.json');
+const MAPA_EMPALME = path.resolve(
+  SERVICE_ROOT, '..', 'docs', 'gestion-humana', 'firma-electronica',
+  'mapa-empalme-v1.1-2026-10-23.md'
+);
+
+// ---------------------------------------------------------------------------
+// Estructura del texto del Acuerdo
+// ---------------------------------------------------------------------------
+
+// Numeral de primer nivel: "1.2. " al principio de una línea.
+// OJO: los números de LEY (2.2.2.47.7) NO llevan espacio después del
+// segundo punto, así que no se confunden con un numeral del Acuerdo.
+const RE_NUMERAL = /^(\d+\.\d+)\. /;
+
+// Literal subordinado: "    a) " o "a) " al principio de una línea.
+const RE_LITERAL = /^(\s*)([a-z])\) /;
+
+// Encabezado de capítulo y título de capítulo ("1. IDENTIFICACIÓN ...").
+const RE_CAPITULO = /^CAPÍTULO [IVXLCDM]+\. /;
+const RE_TITULO_CAPITULO = /^\d+\. [A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 ,.()\-]*$/;
+const RE_MANIFESTACION = /^MANIFESTACIÓN DE VOLUNTAD$/;
+
+// Placeholders: el MISMO criterio que usa src/utils/textoLegal.js.
+const RE_PLACEHOLDER = /\[[^\]\n]{0,200}\]/g;
+
+const LITERAL_NIVEL = /^\d+\.\d+\(([a-z])\)$/;
+
+// ---------------------------------------------------------------------------
+// Utilidades
+// ---------------------------------------------------------------------------
+
+function sha256(texto) {
+  return crypto.createHash('sha256').update(texto, 'utf8').digest('hex');
+}
+
+function parseArgs(argv) {
+  const args = {
+    version: DEFAULT_VERSION,
+    base: DEFAULT_BASE,
+    cambios: DEFAULT_CAMBIOS,
+    salida: DEFAULT_SALIDA,
+    reporte: null,
+  };
+  const lista = Array.isArray(argv) ? argv : process.argv;
+  for (let i = 2; i < lista.length; i++) {
+    const a = lista[i];
+    if (a.startsWith('--version=')) args.version = a.slice('--version='.length).trim();
+    else if (a.startsWith('--base=')) args.base = path.resolve(a.slice('--base='.length).trim());
+    else if (a.startsWith('--cambios=')) args.cambios = path.resolve(a.slice('--cambios='.length).trim());
+    else if (a.startsWith('--salida=')) args.salida = path.resolve(a.slice('--salida='.length).trim());
+    else if (a.startsWith('--reporte=')) args.reporte = path.resolve(a.slice('--reporte='.length).trim());
+    else if (a === '--help' || a === '-h') {
+      printHelp();
+      process.exit(0);
+    } else {
+      console.error('Argumento desconocido: ' + a);
+      printHelp();
+      process.exit(2);
+    }
+  }
+  return args;
+}
+
+function printHelp() {
+  console.log(`
+Uso: node scripts/empalmar-acuerdo-v1.1.js [opciones]
+
+Arma el texto del Acuerdo v1.1 a partir de la v1.0 sellada y del texto final
+del abogado (JSON de cambios). NO modifica la v1.0.
+
+Opciones:
+  --version=v1.1     Versión que se arma (default v1.1)
+  --base=<ruta>      Texto base (default scripts/fixtures/acuerdo-v1.0.txt)
+  --cambios=<ruta>   JSON con el texto final de cada numeral
+                     (default scripts/fixtures/acuerdo-v1.1-cambios.json)
+  --salida=<ruta>    Archivo a escribir cuando el texto no tenga placeholders
+                     (default scripts/fixtures/acuerdo-v1.1.txt)
+  --reporte=<ruta>   Escribir el reporte de placeholders en ese archivo
+                     (default: el reporte se imprime en la salida)
+  -h, --help         Esta ayuda
+
+Exit codes:
+  0  texto listo, archivo escrito
+  2  hay placeholders: NO se escribió el archivo
+  3  error
+`);
+}
+
+/**
+ * Detecta si una línea abre un bloque del Acuerdo.
+ * @param {string} linea
+ * @param {string|null} numeralActual numeral vigente (para los literales)
+ * @returns {{tipo: string, clave: string|null, indent: number}|null}
+ */
+function detectarMarca(linea, numeralActual) {
+  const mNum = RE_NUMERAL.exec(linea);
+  if (mNum) return { tipo: 'numeral', clave: mNum[1], indent: 0 };
+  const mLit = RE_LITERAL.exec(linea);
+  if (mLit && numeralActual) {
+    return { tipo: 'literal', clave: numeralActual + '(' + mLit[2] + ')', indent: mLit[1].length };
+  }
+  if (RE_MANIFESTACION.test(linea)) {
+    return { tipo: 'manifestacion', clave: 'MANIFESTACIÓN DE VOLUNTAD', indent: 0 };
+  }
+  if (RE_CAPITULO.test(linea) || RE_TITULO_CAPITULO.test(linea)) {
+    return { tipo: 'capitulo', clave: null, indent: 0 };
+  }
+  return null;
+}
+
+/**
+ * Parte el texto del Acuerdo en bloques.
+ *
+ * Un bloque es una marca (numeral, literal, capítulo) más su párrafo corrido:
+ * las líneas que siguen sin dejar una línea en blanco y sin abrir otra marca.
+ * Los huecos (líneas en blanco y párrafos sueltos) quedan como bloques de
+ * texto libre y no se tocan nunca.
+ *
+ * @param {string} texto
+ * @returns {{bloques: Array, lineas: string[]}}
+ */
+function analizarEstructura(texto) {
+  const lineas = texto.split('\n');
+  const bloques = [];
+  let numeralActual = null;
+  let i = 0;
+
+  while (i < lineas.length) {
+    const marca = detectarMarca(lineas[i], numeralActual);
+    if (!marca) {
+      let j = i;
+      while (j < lineas.length && !detectarMarca(lineas[j], numeralActual)) j++;
+      bloques.push({ tipo: 'texto', clave: null, inicio: i, fin: j - 1, indent: 0 });
+      i = j;
+      continue;
+    }
+    if (marca.tipo === 'numeral') numeralActual = marca.clave;
+    let j = i;
+    while (
+      j + 1 < lineas.length
+      && lineas[j + 1].trim() !== ''
+      && !detectarMarca(lineas[j + 1], numeralActual)
+    ) {
+      j++;
+    }
+    bloques.push({
+      tipo: marca.tipo,
+      clave: marca.clave,
+      inicio: i,
+      fin: j,
+      indent: marca.indent,
+    });
+    i = j + 1;
+  }
+
+  return { bloques, lineas };
+}
+
+/**
+ * Indenta un texto multilínea con el mismo margen que el bloque que reemplaza.
+ * @param {string} texto
+ * @param {number} margen
+ * @returns {string[]}
+ */
+function indentar(texto, margen) {
+  const prefijo = margen > 0 ? ' '.repeat(margen) : '';
+  return texto.split('\n').map((l) => (l === '' ? '' : prefijo + l));
+}
+
+/**
+ * Lee la lista de numerales que cambian del mapa de empalme.
+ * El mapa es el CHECKLIST de cobertura: si un numeral del mapa no está en el
+ * JSON de cambios, se avisa (para que no se pierda ninguno).
+ * @param {string} ruta
+ * @returns {string[]}
+ */
+function leerNumeralesDelMapa(ruta) {
+  if (!fs.existsSync(ruta)) return [];
+  const lineas = fs.readFileSync(ruta, 'utf8').split(/\r?\n/);
+  const numeros = [];
+  let dentro = false;
+  for (const linea of lineas) {
+    if (/^##\s/.test(linea)) {
+      dentro = /^##\s*1\.\s/.test(linea);
+      continue;
+    }
+    if (!dentro) continue;
+    const celda = /^\|\s*([^|]+?)\s*\|/.exec(linea);
+    if (!celda) continue;
+    const valor = celda[1].trim();
+    if (/^\d+(\.\d+)?(\([a-z]\))?$/.test(valor)) numeros.push(valor);
+  }
+  return numeros;
+}
+
+/**
+ * Arma el texto: aplica los cambios sobre la estructura de la base.
+ *
+ * @param {string} textoBase
+ * @param {object} cambios  { cambios, inserciones, absorbe }
+ * @returns {{texto: string, resumen: object}}
+ */
+function empalmar(textoBase, cambios) {
+  const { bloques, lineas } = analizarEstructura(textoBase);
+
+  const porClave = new Map();
+  for (const b of bloques) {
+    if (b.clave && !porClave.has(b.clave)) porClave.set(b.clave, b);
+  }
+
+  const mapaCambios = cambios.cambios || {};
+  const inserciones = cambios.inserciones || {};
+  const absorbe = cambios.absorbe || {};
+
+  const ops = [];
+  const aplicados = [];
+  const insertados = [];
+  const absorbidos = [];
+
+  // 1. Reemplazos (numerales y literales que ya existen en la base).
+  for (const clave of Object.keys(mapaCambios)) {
+    const bloque = porClave.get(clave);
+    if (!bloque) {
+      if (inserciones[clave]) continue; // es un numeral nuevo: se inserta abajo
+      const error = new Error(
+        'El numeral "' + clave + '" está en el JSON de cambios pero no existe en la base. '
+        + 'Revisar el empalme.'
+      );
+      error.codigo = 3;
+      throw error;
+    }
+    ops.push({
+      tipo: 'reemplazar',
+      inicio: bloque.inicio,
+      fin: bloque.fin,
+      lineas: indentar(mapaCambios[clave], bloque.indent),
+      clave,
+    });
+    aplicados.push(clave);
+  }
+
+  // 2. Literales absorbidos: el texto nuevo del numeral padre ya trae el
+  //    literal dentro, así que el literal viejo se borra (con su línea en
+  //    blanco de separación).
+  for (const clave of Object.keys(mapaCambios)) {
+    const lista = absorbe[clave];
+    if (!lista) continue;
+    const padre = porClave.get(clave);
+    if (!padre) continue;
+    for (const letra of lista) {
+      const literal = porClave.get(clave + '(' + letra + ')');
+      if (!literal) continue;
+      let inicio = literal.inicio;
+      if (inicio > 0 && lineas[inicio - 1].trim() === '') inicio -= 1;
+      ops.push({ tipo: 'borrar', inicio, fin: literal.fin, lineas: [], clave: clave + '(' + letra + ')' });
+      absorbidos.push(clave + '(' + letra + ')');
+    }
+  }
+
+  // 3. Inserciones: numerales que el abogado creó y que no existían en la v1.0.
+  for (const clave of Object.keys(inserciones)) {
+    const textoNuevo = mapaCambios[clave];
+    if (typeof textoNuevo !== 'string') {
+      const error = new Error(
+        'El numeral "' + clave + '" está en "inserciones" pero no tiene texto en "cambios".'
+      );
+      error.codigo = 3;
+      throw error;
+    }
+    const ancla = porClave.get(inserciones[clave]);
+    if (!ancla) {
+      const error = new Error(
+        'El numeral "' + clave + '" se debe insertar después de "' + inserciones[clave]
+        + '", y ese ancla no existe en la base.'
+      );
+      error.codigo = 3;
+      throw error;
+    }
+    if (porClave.has(clave)) {
+      const error = new Error(
+        'El numeral "' + clave + '" está marcado como inserción, pero ya existe en la base.'
+      );
+      error.codigo = 3;
+      throw error;
+    }
+    ops.push({
+      tipo: 'insertar',
+      inicio: ancla.fin + 1,
+      fin: ancla.fin,
+      lineas: [''].concat(indentar(textoNuevo, ancla.indent)),
+      clave,
+    });
+    insertados.push(clave);
+  }
+
+  // 4. Aplicar las operaciones sobre las líneas de la base.
+  ops.sort((a, b) => (a.inicio - b.inicio) || (a.fin - b.fin));
+  const salida = [];
+  let cursor = 0;
+  for (const op of ops) {
+    if (op.inicio < cursor) {
+      const error = new Error('Operaciones que se pisan sobre "' + op.clave + '".');
+      error.codigo = 3;
+      throw error;
+    }
+    for (const l of lineas.slice(cursor, op.inicio)) salida.push(l);
+    for (const l of op.lineas) salida.push(l);
+    cursor = op.fin + 1;
+  }
+  for (const l of lineas.slice(cursor)) salida.push(l);
+
+  const texto = salida.join('\n');
+
+  // 5. Conteos para el resumen.
+  const numerales = bloques.filter((b) => b.tipo === 'numeral');
+  const literales = bloques.filter((b) => b.tipo === 'literal');
+  const nivel1 = new Set(numerales.map((b) => b.clave));
+  const nivel2 = new Set(literales.map((b) => b.clave));
+
+  const cambiados1 = [...nivel1].filter((c) => aplicados.includes(c));
+  const cambiados2 = [...nivel2].filter((c) => aplicados.includes(c));
+  const absorbidas = [...nivel2].filter((c) => absorbidos.includes(c));
+  const intactos1 = [...nivel1].filter((c) => !aplicados.includes(c));
+  const intactos2 = [...nivel2].filter((c) => !aplicados.includes(c) && !absorbidos.includes(c));
+
+  return {
+    texto,
+    resumen: {
+      numeralesTotal: nivel1.size,
+      numeralesCambiados: cambiados1.length,
+      numeralesIntactos: intactos1.length,
+      literalesTotal: nivel2.size,
+      literalesCambiados: cambiados2.length,
+      literalesAbsorbidos: absorbidas.length,
+      literalesIntactos: intactos2.length,
+      insertados,
+      absorbidos,
+      aplicados,
+    },
+  };
+}
+
+/**
+ * Localiza cada placeholder del texto y dice en qué numeral está.
+ *
+ * La ubicación se lleva por bloques: un numeral, un literal o un capítulo
+ * fijan dónde estamos; los párrafos sueltos (el cierre de un numeral, la
+ * Manifestación de Voluntad) heredan la ubicación del bloque anterior.
+ *
+ * @param {string} texto
+ * @returns {Array<{placeholder: string, ubicacion: string, linea: number}>}
+ */
+function localizarPlaceholders(texto) {
+  const { bloques, lineas } = analizarEstructura(texto);
+  const encontrados = [];
+  let ubicacion = 'preámbulo';
+  for (const bloque of bloques) {
+    if (bloque.tipo === 'numeral' || bloque.tipo === 'literal') ubicacion = bloque.clave;
+    else if (bloque.tipo === 'manifestacion') ubicacion = bloque.clave;
+    else if (bloque.tipo === 'capitulo') ubicacion = lineas[bloque.inicio].trim();
+    for (let i = bloque.inicio; i <= bloque.fin && i < lineas.length; i++) {
+      const linea = lineas[i];
+      RE_PLACEHOLDER.lastIndex = 0;
+      const matches = linea.match(RE_PLACEHOLDER) || [];
+      for (const m of matches) {
+        encontrados.push({ placeholder: m.trim(), ubicacion, linea: i + 1 });
+      }
+    }
+  }
+  return encontrados;
+}
+
+/**
+ * Arma el texto de reporte de los placeholders.
+ *
+ * Distingue los huecos que el dueño tiene que llenar (los que trae el texto
+ * nuevo del abogado) de los que ya venían en la base: los del bloque de
+ * Manifestación de Voluntad los llena el sistema al firmar, y no son un dato
+ * que falte. Los dos igual bloquean la escritura del archivo, porque la
+ * guarda de publicación cuenta todos los corchetes.
+ *
+ * @param {string} texto texto resultante
+ * @param {string} [textoBase] texto base, para saber qué placeholders ya existían
+ * @returns {{texto: string, total: number, distintos: number, nuevos: number, heredados: number}}
+ */
+function armarReportePlaceholders(texto, textoBase) {
+  const encontrados = localizarPlaceholders(texto);
+  const heredados = new Set();
+  if (typeof textoBase === 'string') {
+    RE_PLACEHOLDER.lastIndex = 0;
+    const base = textoBase.match(RE_PLACEHOLDER) || [];
+    for (const b of base) heredados.add(b.trim());
+  }
+  if (encontrados.length === 0) {
+    return {
+      texto: 'SIN PLACEHOLDERS: el texto resultante no tiene huecos por llenar.\n',
+      total: 0,
+      distintos: 0,
+      nuevos: 0,
+      heredados: 0,
+    };
+  }
+  const lineas = [];
+  const nuevos = encontrados.filter((e) => !heredados.has(e.placeholder));
+  const deLaBase = encontrados.filter((e) => heredados.has(e.placeholder));
+  lineas.push('PLACEHOLDERS DEL TEXTO RESULTANTE (' + encontrados.length + ' ocurrencias, '
+    + nuevos.length + ' nuevos y ' + deLaBase.length + ' heredados de la base)');
+  lineas.push('');
+  if (nuevos.length > 0) {
+    lineas.push('Huecos que hay que llenar (traen el texto final de la v1.1):');
+    for (const e of nuevos) {
+      lineas.push('  - ' + e.placeholder + '  ->  numeral ' + e.ubicacion + ' (linea ' + e.linea + ')');
+    }
+    lineas.push('');
+  }
+  if (deLaBase.length > 0) {
+    lineas.push('Placeholders que ya venían en la v1.0 (la guarda de publicación también los cuenta):');
+    for (const e of deLaBase) {
+      lineas.push('  - ' + e.placeholder + '  ->  ' + e.ubicacion + ' (linea ' + e.linea + ')');
+    }
+    lineas.push('');
+  }
+  lineas.push('Cada hueco nuevo se llena con el dato que le corresponde y despues se vuelve a correr');
+  lineas.push('este script. El archivo de salida NO se escribe mientras queden huecos.');
+  lineas.push('');
+  return {
+    texto: lineas.join('\n'),
+    total: encontrados.length,
+    distintos: new Set(encontrados.map((e) => e.placeholder)).size,
+    nuevos: nuevos.length,
+    heredados: deLaBase.length,
+  };
+}
+
+/**
+ * Función principal, exportable para los tests.
+ * @param {string[]} argv
+ * @returns {number} exit code (0 listo, 2 placeholders, 3 error)
+ */
+function main(argv) {
+  const args = parseArgs(argv);
+
+  console.log('=== EMPALME DEL ACUERDO ' + args.version + ' ===');
+  console.log('  base:      ' + args.base);
+  console.log('  cambios:   ' + args.cambios);
+  console.log('  salida:    ' + args.salida);
+
+  // 1. Leer la base.
+  if (!fs.existsSync(args.base)) {
+    console.error('');
+    console.error('  ERROR: no existe el texto base: ' + args.base);
+    return 3;
+  }
+  const textoBase = fs.readFileSync(args.base, 'utf8');
+
+  // 2. La base tiene que ser la que está sellada (aviso, no bloqueo: el
+  //    manifiesto se archiva aparte y puede no tener la versión).
+  try {
+    if (fs.existsSync(MANIFIESTO)) {
+      const manifiesto = JSON.parse(fs.readFileSync(MANIFIESTO, 'utf8'));
+      const sellada = manifiesto.versiones && manifiesto.versiones['v1.0'];
+      if (sellada && sellada.sha256 && sellada.sha256 !== sha256(textoBase)) {
+        console.error('');
+        console.error('  AVISO: la base NO coincide con la huella archivada de la v1.0.');
+        console.error('    archivada: ' + sellada.sha256);
+        console.error('    base de hoy: ' + sha256(textoBase));
+      }
+    }
+  } catch (e) {
+    console.error('  AVISO: no se pudo leer el manifiesto: ' + e.message);
+  }
+
+  // 3. Leer el JSON de cambios.
+  if (!fs.existsSync(args.cambios)) {
+    console.error('');
+    console.error('  ERROR: no existe el JSON de cambios: ' + args.cambios);
+    return 3;
+  }
+  let cambios;
+  try {
+    cambios = JSON.parse(fs.readFileSync(args.cambios, 'utf8'));
+  } catch (e) {
+    console.error('');
+    console.error('  ERROR: el JSON de cambios no se pudo leer: ' + e.message);
+    return 3;
+  }
+  const claves = Object.keys(cambios.cambios || {});
+  if (claves.length === 0) {
+    console.error('');
+    console.error('  ERROR: el JSON de cambios no trae numerales.');
+    return 3;
+  }
+
+  // 4. Empalmar.
+  let resultado;
+  try {
+    resultado = empalmar(textoBase, cambios);
+  } catch (e) {
+    console.error('');
+    console.error('  ERROR: el empalme falló: ' + e.message);
+    return 3;
+  }
+  const texto = resultado.texto;
+  const resumen = resultado.resumen;
+
+  // 5. Cobertura contra el mapa de empalme (checklist).
+  const delMapa = leerNumeralesDelMapa(MAPA_EMPALME);
+  const faltantes = delMapa.filter((n) => !claves.includes(n));
+  const sobrantes = claves.filter((n) => !delMapa.includes(n));
+
+  console.log('');
+  console.log('  numerales de primer nivel: ' + resumen.numeralesTotal
+    + ' (cambiados ' + resumen.numeralesCambiados
+    + ', intactos ' + resumen.numeralesIntactos + ')');
+  console.log('  literales:                 ' + resumen.literalesTotal
+    + ' (cambiados ' + resumen.literalesCambiados
+    + ', absorbidos ' + resumen.literalesAbsorbidos
+    + ', intactos ' + resumen.literalesIntactos + ')');
+  console.log('  insertados: ' + (resumen.insertados.length
+    ? resumen.insertados.join(', ') : 'ninguno'));
+  console.log('  caracteres: ' + texto.length);
+  console.log('  version sujeta a la guarda de publicacion: '
+    + (esVersionSujetaAGuarda(args.version) ? 'SI' : 'no'));
+
+  if (delMapa.length === 0) {
+    console.log('  cobertura del mapa: NO SE PUDO LEER el mapa de empalme');
+  } else {
+    console.log('  cobertura del mapa: ' + (delMapa.length - faltantes.length)
+      + '/' + delMapa.length + ' numerales del mapa estan en el JSON de cambios');
+  }
+  if (faltantes.length > 0) {
+    console.error('');
+    console.error('  AVISO: hay numerales del mapa de empalme que NO estan en el JSON de cambios:');
+    for (const n of faltantes) console.error('    - ' + n);
+    console.error('  Revisar antes de publicar: un numeral que se pierda deja la v1.0 en ese punto.');
+  }
+  if (sobrantes.length > 0) {
+    console.error('');
+    console.error('  AVISO: hay numerales en el JSON de cambios que NO estan en el mapa de empalme:');
+    for (const n of sobrantes) console.error('    - ' + n);
+  }
+
+  // 6. La guarda: el MISMO análisis que usa la publicación.
+  const revision = analizarTextoLegal(texto);
+  const reporte = armarReportePlaceholders(texto, textoBase);
+
+  // 6a. Control de consistency: el localizador de placeholders tiene que
+  //     contar lo mismo que cuenta el modulo compartido. Si no, el reporte
+  //     estaria mintiendo.
+  const contadosPorElModulo = listarPlaceholders(texto).total;
+  if (contadosPorElModulo !== reporte.total) {
+    console.error('');
+    console.error('  AVISO: el localizador encontró ' + reporte.total
+      + ' placeholders y el modulo compartido cuenta ' + contadosPorElModulo + '.');
+    console.error('  El reporte puede estar incompleto: revisar antes de llenar los huecos.');
+  }
+
+  // 6b. La Manifestacion de Voluntad de la v1.0 dice "version v1.0". El
+  //     abogado no la toco (los numerales no listados quedan como estan), asi
+  //     que el script no la cambia: avisa, porque el archivo nuevo se
+  //     contradice a si mismo y la decision es del owner.
+  if (texto.includes('versión v1.0') && args.version !== 'v1.0') {
+    console.error('');
+    console.error('  AVISO: el texto todavia menciona "versión v1.0" (bloque de Manifestación');
+    console.error('  de Voluntad). El abogado no toco ese bloque y este script no lo cambia:');
+    console.error('  decidir con el owner si la v1.1 lo actualiza.');
+  }
+
+  if (!revision.ok) {
+    console.error('');
+    console.error('  EL TEXTO TIENE PLACEHOLDERS O MARCAS DE BORRADOR. No se escribe el archivo.');
+    for (const m of revision.marcadores) {
+      console.error('  Marca prohibida: ' + m.etiqueta);
+    }
+    console.error('');
+    if (args.reporte) {
+      fs.writeFileSync(args.reporte, reporte.texto, 'utf8');
+      console.error('  Reporte de placeholders escrito en: ' + args.reporte);
+    } else {
+      console.error(reporte.texto);
+    }
+    console.error('');
+    console.error('  NO se escribió: ' + args.salida);
+    return 2;
+  }
+
+  // 7. Listo: escribir el archivo (LF, sin BOM).
+  fs.writeFileSync(args.salida, texto, 'utf8');
+  console.log('');
+  console.log('  SIN PLACEHOLDERS: el texto está listo para archivar.');
+  console.log('  archivo:   ' + args.salida);
+  console.log('  caracteres: ' + texto.length);
+  console.log('  SHA-256:   ' + sha256(texto));
+  console.log('');
+  console.log('  Para archivarlo:');
+  console.log('    node scripts/archivar-acuerdo.js --version=' + args.version);
+  if (args.reporte) {
+    fs.writeFileSync(args.reporte, reporte.texto, 'utf8');
+    console.log('  Reporte de placeholders escrito en: ' + args.reporte);
+  }
+  return 0;
+}
+
+module.exports = {
+  main,
+  parseArgs,
+  empalmar,
+  analizarEstructura,
+  localizarPlaceholders,
+  armarReportePlaceholders,
+  leerNumeralesDelMapa,
+  sha256,
+  DEFAULT_VERSION,
+  DEFAULT_BASE,
+  DEFAULT_CAMBIOS,
+  DEFAULT_SALIDA,
+  MAPA_EMPALME,
+  // Reexportados para que los tests usen la MISMA regla y no una copia.
+  listarPlaceholders,
+  esVersionSujetaAGuarda,
+};
+
+if (require.main === module) {
+  process.exit(main(process.argv));
+}
