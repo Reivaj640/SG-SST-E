@@ -86,110 +86,162 @@ function parseArgs(argv) {
   return opts;
 }
 
-function main() {
+/**
+ * La operación de purga.
+ *
+ * @param {string[]} [argv] - los argumentos de la línea de comandos (sin el
+ *   node y sin el nombre del script). Si no se pasan, se usa `process.argv`.
+ * @param {object} [deps] - las dependencias, para poder inyectarlas en un
+ *   test. Por defecto son las de verdad.
+ * @param {object} [deps.conservacion]
+ * @param {object} [deps.supresion]
+ * @param {function} [deps.write] - dónde va la salida (stdout por defecto).
+ * @returns {number} el código de salida: 0 ok, 2 argumentos, 3 error.
+ */
+function main(argv, deps = {}) {
+  const cons = deps.conservacion || conservacion;
+  const sup = deps.supresion || supresion;
+  const write = deps.write || ((t) => process.stdout.write(t));
+
   let opts;
   try {
-    opts = parseArgs(process.argv.slice(2));
+    opts = parseArgs(argv || process.argv.slice(2));
   } catch (e) {
     process.stderr.write('[purga-ventana] ' + e.message + '\n');
-    process.exit(2);
+    return 2;
   }
 
   const linea = '─'.repeat(72);
   let grupos;
   try {
-    grupos = conservacion.vencimientos({ id_empresa: opts.empresa });
+    grupos = cons.vencimientos({ id_empresa: opts.empresa });
   } catch (e) {
     process.stderr.write('[purga-ventana] error de base de datos: ' + e.message + '\n');
-    process.exit(3);
+    return 3;
   }
 
-  process.stdout.write('\n' + linea + '\n');
-  process.stdout.write('SUPPRESIÓN DE DATOS VENCIDOS (10.6 · el 8.6 es comunicar el plazo)\n');
-  process.stdout.write(`Actor:  ${opts.actor}\n`);
-  process.stdout.write(`Motivo: ${opts.motivo}\n`);
-  process.stdout.write(linea + '\n\n');
+  write('\n' + linea + '\n');
+  write('SUPPRESIÓN DE DATOS VENCIDOS (10.6 · el 8.6 es comunicar el plazo)\n');
+  write(`Actor:  ${opts.actor}\n`);
+  write(`Motivo: ${opts.motivo}\n`);
+  write(linea + '\n\n');
 
   // El alcance, dicho antes de hacer nada. Un operador que no sepa esto
   // puede creer que ya cumplió el 10.6 cuando solo se borró la prueba.
-  process.stdout.write('ALCANCE DE ESTA OPERACIÓN\n');
-  process.stdout.write('  Se suprime en DOS capas:\n');
-  process.stdout.write('    1. el REGISTRO DE AUDITORÍA (los eventos) de las firmas del lote;\n');
-  process.stdout.write('    2. la CAPA DE DATOS: la fila completa de la firma y los archivos\n');
-  process.stdout.write('       (PDF original, PDF firmado y constancia).\n');
-  process.stdout.write('  Sobrevive: la PRUEBA DE LA ACEPTACIÓN (versión, huella del texto,\n');
-  process.stdout.write('  fecha y hora e identificador de la solicitud), que es donde el 12.7\n');
-  process.stdout.write('  deja la prueba de que el trabajador aceptó el Acuerdo.\n');
-  process.stdout.write('  Se escribe una LÁPIDA por firma (gh_firma_purgadas), sin datos\n');
-  process.stdout.write('  personales y sin la credencial del enlace, para que un enlace ya\n');
-  process.stdout.write('  suprimido responda "no disponible por vencimiento del plazo".\n\n');
+  write('ALCANCE DE ESTA OPERACIÓN\n');
+  write('  Se suprime en DOS capas:\n');
+  write('    1. el REGISTRO DE AUDITORÍA (los eventos) de las firmas del lote;\n');
+  write('    2. la CAPA DE DATOS: la fila completa de la firma y los archivos\n');
+  write('       (PDF original, PDF firmado y constancia).\n');
+  write('  Sobrevive: la PRUEBA DE LA ACEPTACIÓN (versión, huella del texto,\n');
+  write('  fecha y hora e identificador de la solicitud), que es donde el 12.7\n');
+  write('  deja la prueba de que el trabajador aceptó el Acuerdo.\n');
+  write('  Se escribe una LÁPIDA por firma (gh_firma_purgadas), sin datos\n');
+  write('  personales y sin la credencial del enlace, para que un enlace ya\n');
+  write('  suprimido responda "no disponible por vencimiento del plazo".\n\n');
 
-  process.stdout.write(`Vencidas y elegibles (se suprimen sus eventos): ${grupos.vencidosElegibles.length}\n`);
-  grupos.vencidosElegibles.forEach((f) => process.stdout.write(
+  write(`Vencidas y elegibles (se suprimen sus eventos): ${grupos.vencidosElegibles.length}\n`);
+  grupos.vencidosElegibles.forEach((f) => write(
     `    ${f.id_solicitud}  vence=${f.fecha_conservacion}\n`
   ));
-  process.stdout.write(`Vencidas en hold (NO se suprimen): ${grupos.vencidosEnHold.length}\n`);
-  grupos.vencidosEnHold.forEach((f) => process.stdout.write(
+  write(`Vencidas en hold (NO se suprimen): ${grupos.vencidosEnHold.length}\n`);
+  grupos.vencidosEnHold.forEach((f) => write(
     `    ${f.id_solicitud}  motivo=${f.motivo_hold || '(sin motivo)'}\n`
   ));
-  process.stdout.write(`Sin plazo declarado (NO se suprimen): ${grupos.sinPlazo.length}\n`);
+  write(`Sin plazo declarado (NO se suprimen): ${grupos.sinPlazo.length}\n`);
+  // El 8.6(e)(iii): con una solicitud de copia pendiente NO se suprime. La
+  // cuenta va en la salida, para que el operador vea por qué falta algo.
+  write(`Vencidas con copia pendiente (NO se suprimen): ${grupos.vencidosConCopia.length}\n`);
+  grupos.vencidosConCopia.forEach((f) => write(
+    `    ${f.id_solicitud}  hay una solicitud de copia pendiente\n`
+  ));
 
   // La simulación de la capa de datos: qué se borraría, sin borrar nada.
-  const sim = supresion.simular({ id_empresa: opts.empresa });
-  process.stdout.write(`\nSimulación de la capa de datos: ${sim.firmas} firmas, ${sim.archivos} archivos.\n`);
-  sim.detalle.forEach((d) => process.stdout.write(
+  //
+  // Se simula sobre las MISMAS firmas que el lote va a contener (las
+  // vencidas y elegibles), no sobre el lote: antes de abrir la ventana el
+  // lote está vacío, y simular sobre él daba siempre "0 firmas, 0 archivos"
+  // mientras la operación real suprimía una firma y tres archivos.
+  const sim = sup.simularFirmas(grupos.vencidosElegibles);
+  write(`\nSimulación de la capa de datos: ${sim.firmas} firmas, ${sim.archivos} archivos.\n`);
+  sim.detalle.forEach((d) => write(
     `    ${d.id_solicitud}  archivos=${d.archivos}\n`
   ));
 
   if (!opts.ejecutar) {
-    process.stdout.write('\nSIMULACIÓN: no se borró nada.\n');
-    process.stdout.write('Agregue --ejecutar para suprimir de verdad.\n');
-    process.stdout.write(linea + '\n');
-    return;
+    write('\nSIMULACIÓN: no se borró nada.\n');
+    write('Agregue --ejecutar para suprimir de verdad.\n');
+    write(linea + '\n');
+    return 0;
   }
 
   if (!grupos.vencidosElegibles.length) {
-    process.stdout.write('\nNo hay nada elegible: no se abrió ventana.\n');
-    process.stdout.write(linea + '\n');
-    return;
+    write('\nNo hay nada elegible: no se abrió ventana.\n');
+    write(linea + '\n');
+    return 0;
   }
 
   let resultado;
+  let datos;
+  let lote;
   try {
-    conservacion.abrirVentana({
+    cons.abrirVentana({
       actor: opts.actor,
       motivo: opts.motivo,
       minutos: opts.minutos,
     });
-    const lote = conservacion.armarLote({
+    lote = cons.armarLote({
       actor: opts.actor,
       motivo: opts.motivo,
       id_empresa: opts.empresa,
     });
     // Capa 1: el registro de auditoría.
-    resultado = conservacion.purgar({ actor: opts.actor });
+    //
+    // `cerrar: false` es OBLIGATORIO acá. La capa 1 cerraba la ventana y
+    // vaciaba el lote al terminar, así que la capa 2 (que exige ventana
+    // vigente y lote armado) ya no podía correr: fallaba con "No hay ventana
+    // de purga abierta" y el documento, la constancia y los archivos de las
+    // firmas vencidas NO se suprimían nunca. La ventana se cierra al final,
+    // después de las dos capas.
+    resultado = cons.purgar({ actor: opts.actor, cerrar: false });
     // Capa 2: la fila y los archivos. Se hace dentro de la misma ventana y
     // sobre el mismo lote, y vuelve a comprobar el hold de cada firma.
-    const datos = supresion.suprimir({
+    datos = sup.suprimir({
       actor: opts.actor,
       motivo: opts.motivo,
       dryRun: false,
       id_empresa: opts.empresa,
     });
-    process.stdout.write('\nSUPPRESIÓN EJECUTADA\n');
-    process.stdout.write(`  firmas en el lote:      ${lote.firmas}\n`);
-    process.stdout.write(`  eventos suprimidos:     ${resultado.eventos_purgados}\n`);
-    process.stdout.write(`  filas suprimidas:       ${datos.firmas}\n`);
-    process.stdout.write(`  archivos eliminados:    ${datos.archivos}\n`);
-    process.stdout.write(`  bloqueadas por hold:    ${resultado.hold_bloqueados}\n`);
-    process.stdout.write('  la ventana quedó cerrada y el lote vacío\n');
-    process.stdout.write('  recibo por firma en gh_firma_purga_registro (sin datos personales)\n');
-    process.stdout.write('  lápida por firma en gh_firma_purgadas (append-only)\n');
   } catch (e) {
+    // Si algo falla, la ventana se cierra igual: no se deja una ventana
+    // abierta con un lote a medias, que habilitaría una purga que el
+    // operador no pidió.
+    try { cons.cerrarVentana({ actor: opts.actor }); } catch (e2) { /* nada */ }
     process.stderr.write('[purga-ventana] error: ' + e.message + '\n');
-    process.exit(3);
+    return 3;
   }
-  process.stdout.write(linea + '\n');
+  // Las dos capas corrieron: la ventana se cierra y el lote queda vacío.
+  cons.cerrarVentana({ actor: opts.actor });
+  write('\nSUPPRESIÓN EJECUTADA\n');
+  write(`  firmas en el lote:      ${lote.firmas}\n`);
+  write(`  eventos suprimidos:     ${resultado.eventos_purgados}\n`);
+  write(`  filas suprimidas:       ${datos.firmas}\n`);
+  write(`  archivos eliminados:    ${datos.archivos}\n`);
+  write(`  bloqueadas por hold:    ${resultado.hold_bloqueados}\n`);
+  write('  la ventana quedó cerrada y el lote vacío\n');
+  write('  recibo por firma en gh_firma_purga_registro (sin datos personales)\n');
+  write('  lápida por firma en gh_firma_purgadas (append-only)\n');
+  write('  el recibo de supresión se entrega a la Empresa por\n');
+  write('  GET /internal/empresas/:id_empresa/recibos-supresion\n');
+  write(linea + '\n');
+  return 0;
 }
 
-main();
+module.exports = { main, parseArgs };
+
+// El guion corre solo cuando se lo invoca directamente. Con este candado,
+// un test puede exigirlo y ejercitar la orquestación real (la que decide si
+// las dos capas corren o no) sin que el script se le execute debajo.
+if (require.main === module) {
+  process.exit(main(process.argv.slice(2)));
+}
