@@ -9,6 +9,10 @@
  *     El texto_hash se calcula SERVER-SIDE (nunca del cliente).
  *     Si activa=true, se desactivan las anteriores en transacción atómica.
  *
+ * - GET /internal/admin/readiness-legal?gate=publicacion|primera_firma
+ *     Auditoría de solo lectura de los 11 bloqueantes de la respuesta 11A.
+ *     No publica, no firma y no cambia nada.
+ *
  * Ver API.md §6.12 y SECURITY.md §3.3.
  */
 'use strict';
@@ -19,6 +23,7 @@ const router = express.Router();
 const { adminApiAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 const agreementService = require('../services/agreement');
+const readinessLegal = require('../services/readinessLegal');
 const logger = require('../utils/logger');
 
 /**
@@ -90,5 +95,23 @@ router.post('/acuerdo-versiones',
     }
   },
 );
+
+/**
+ * GET /internal/admin/readiness-legal
+ *
+ * Devuelve el mismo reporte que `scripts/auditar-readiness-legal.js`.
+ * Es de solo lectura: no publica la v1.1, no enciende D-02 y no modifica
+ * empresas. El gate por defecto es `primera_firma`; `publicacion` solo mira
+ * los bloqueantes que la respuesta 11A exige antes de publicar.
+ */
+router.get('/readiness-legal', adminApiAuth(), (req, res, next) => {
+  try {
+    const gate = req.query.gate === 'publicacion' ? 'publicacion' : 'primera_firma';
+    const reporte = readinessLegal.evaluar({ gate });
+    res.json(reporte);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

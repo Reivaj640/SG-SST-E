@@ -12,6 +12,10 @@ const db = require('../db/connection');
 const { sha256 } = require('../crypto/hash');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
+const {
+  analizarTextoLegal,
+  esVersionSujetaAGuarda,
+} = require('../utils/textoLegal');
 
 const VERSION_REGEX = /^v\d+\.\d+$/;
 const MAX_TEXTO_CHARS = 50000;
@@ -115,6 +119,30 @@ function createVersion({
   if (texto.length > MAX_TEXTO_CHARS) {
     throw new AppError(400, 'INVALID_REQUEST_BODY',
       `texto demasiado largo (${texto.length} chars, max ${MAX_TEXTO_CHARS})`);
+  }
+
+  // 2.1 Guarda de placeholders y marcas de borrador.
+  //
+  // La v1.0 ya está publicada y sellada: no se le aplica, porque su proceso
+  // ya cerró y los fixtures de desarrollo la usan con textos sintéticos. La
+  // guarda empieza en la v1.1, que es la primera versión nueva después del
+  // cierre. Si el texto trae un corchete o una marca como "ACUERDO DEV", se
+  // rechaza ANTES de tocar la base: un texto legal a medio llenar no se
+  // publica ni se firma.
+  if (esVersionSujetaAGuarda(version)) {
+    const analisis = analizarTextoLegal(texto);
+    if (!analisis.ok) {
+      throw new AppError(
+        400,
+        'TEXTO_LEGAL_CON_PLACEHOLDERS',
+        `El texto de la versión ${version} tiene placeholders o marcas de borrador; no se puede publicar.`,
+        {
+          placeholders: analisis.placeholders.total,
+          placeholders_unicos: analisis.placeholders.unicos,
+          marcadores: analisis.marcadores.map((m) => m.etiqueta),
+        },
+      );
+    }
   }
 
   // 3. Verificar unicidad ANTES de INSERT

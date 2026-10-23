@@ -56,6 +56,7 @@
   - [6.16 Fase 8B — metadata con lista blanca, dato sensible y representante cifrado](#616-fase-8b--metadata-con-lista-blanca-dato-sensible-y-representante-cifrado)
   - [6.17 Endpoints de las solicitudes de los Titulares — `/internal/admin/solicitudes`](#617-endpoints-de-las-solicitudes-de-los-titulares--internaladminsolicitudes)
   - [6.18 El recibo de supresión (el 3.6(g) y el 10.6)](#618-el-recibo-de-supresión-el-36g-y-el-106)
+  - [6.19 La auditoría de readiness legal — `GET /internal/admin/readiness-legal`](#619-la-auditoría-de-readiness-legal--get-internaladminreadiness-legal)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -2535,6 +2536,114 @@ la solicitud no fue suprimida (`RECIBO_SUPERSION_NOT_FOUND`).
 
 > Un `404` (y no un `204`) es lo correcto: el que llama tiene que poder
 > distinguir "no hay recibo" de "sí lo hay" para poder decirlo al Trabajador.
+
+---
+
+## 6.19 La auditoría de readiness legal — `GET /internal/admin/readiness-legal`
+
+**Auth**: `X-Admin-API-Key` (operador humano). No lo usa K+AIR desde la app.
+
+Es una **fotografía** del estado legal: no publica, no firma, no enciende el
+D-02 y **no escribe en la base**. Devuelve los bloqueantes del proceso legal
+como un reporte con una acción concreta para cada uno.
+
+El mismo reporte se puede generar sin HTTP, con el mismo servicio:
+
+```bash
+node scripts/auditar-readiness-legal.js --gate=publicacion
+node scripts/auditar-readiness-legal.js --gate=primera_firma --json
+node scripts/auditar-readiness-legal.js --estricto   # sale con 1 si el gate no está listo
+```
+
+El endpoint y el CLI **comparten el mismo servicio** (`src/services/readinessLegal.js`)
+para que no haya dos listas de requisitos que se desactualicen por separado.
+
+**Query**:
+
+| Parámetro | Valores | Qué hace |
+|---|---|---|
+| `gate` | `publicacion` \| `primera_firma` | `primera_firma` (por defecto) mira todo lo que falta para aceptar la primera firma real; `publicacion` solo mira lo que la respuesta 11A exige antes de publicar la v1.1. |
+
+**Response — `200 OK`** (la forma real, verificada contra
+`src/services/readinessLegal.js`):
+
+```json
+{
+  "generado_at": "2026-10-23T23:52:38.531Z",
+  "gate": "publicacion",
+  "listo": false,
+  "resumen": {
+    "total_items": 38, "ok": 4, "pendientes": 31, "avisos": 1,
+    "no_aplica": 2, "bloqueantes": 19, "bloqueantes_pendientes": 16
+  },
+  "manifiesto": {
+    "existe": true, "archivo": "firma-service/legal-readiness.json",
+    "error": null, "version": "2026-10-23", "actualizado_at": null
+  },
+  "db": {
+    "disponible": true,
+    "acuerdo_activo": null,
+    "empresas": {
+      "disponible": true, "total": 0, "con_anexo_base": 0,
+      "con_anexo_nube": 0, "con_canal_pqrs": 0,
+      "columna_anexo_nube": false, "error": null
+    },
+    "tablas": {
+      "medios_trabajador": true, "firmas_papel": true, "excepciones": false,
+      "excepciones_eventos": false, "solicitudes_titular": false,
+      "trigger_excepciones_append_only": false
+    }
+  },
+  "documentos": {
+    "acuerdo_v1_1": {
+      "archivo": "scripts/fixtures/acuerdo-v1.1.txt",
+      "existe": false, "hash": "…",
+      "placeholders": { "total": 0, "unicos": [], "muestras": [] },
+      "marcadores": [],
+      "clausulas_ok": false,
+      "faltan": [ { "id": "veinte_anios", "titulo": "Piso de veinte (20) años" } ]
+    }
+  },
+  "grupos": [
+    {
+      "id": "acuerdo_v1_1",
+      "titulo": "Acuerdo de uso v1.1",
+      "listo": false,
+      "items": [
+        {
+          "id": "texto_v1_1",
+          "titulo": "Texto completo, sin placeholders ni marcas de borrador",
+          "estado": "pendiente",
+          "bloquea": ["publicacion", "primera_firma"],
+          "detalle": "El documento no está disponible. Faltan cláusulas: …",
+          "accion": "Montar la §2 de la respuesta 11A como archivo nuevo, …",
+          "referencia": "scripts/fixtures/acuerdo-v1.1.txt"
+        }
+      ]
+    }
+  ],
+  "bloqueantes": [
+    { "grupo": "acuerdo_v1_1", "id": "texto_v1_1", "titulo": "…",
+      "estado": "pendiente", "detalle": "…", "accion": "…" }
+  ],
+  "pendientes": [
+    { "grupo": "acuerdo_v1_1", "id": "texto_v1_1", "titulo": "…",
+      "detalle": "…", "accion": "…" }
+  ]
+}
+```
+
+Los estados de un item son `ok`, `pendiente`, `aviso` y `no_aplica`. `listo`
+vale `true` solo cuando no queda ningún bloqueante pendiente en ese gate.
+
+**De dónde sale cada dato**: el inventario de evidencias es
+`firma-service/legal-readiness.json` (un campo por evidencia, con su fecha, su
+archivo o su huella; **nunca** un valor de ejemplo); el texto y las cláusulas se
+leen de los documentos reales del repo; el estado de publicación y el de las
+empresas se leen de SQLite; la configuración operativa se lee de `config`.
+
+Un campo que no tiene evidencia queda **pendiente**, con la acción que lo
+resolvería: el reporte no inventa lo que falta ni lo deja pasar en silencio.
 
 ---
 

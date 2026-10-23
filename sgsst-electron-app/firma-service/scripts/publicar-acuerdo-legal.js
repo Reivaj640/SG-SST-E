@@ -40,6 +40,10 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const {
+  analizarTextoLegal,
+  esVersionSujetaAGuarda,
+} = require('../src/utils/textoLegal');
 
 const FIXTURES = path.resolve(__dirname, 'fixtures');
 const MANIFIESTO = path.join(FIXTURES, 'acuerdo-ARCHIVO.json');
@@ -98,6 +102,24 @@ function archivoDe(version) {
   return { ruta, entrada };
 }
 
+/**
+ * Verifica que el texto de una versión posterior a la v1.0 no tenga
+ * placeholders ni marcas de borrador.
+ *
+ * Es una función aparte para poder probarla sin red y sin publicar nada.
+ * La v1.0 queda fuera: ya está sellada y los fixtures la usan tal cual.
+ *
+ * @param {string} version
+ * @param {string} texto
+ * @returns {{ok: boolean, placeholders: object, marcadores: Array}}
+ */
+function verificarTextoLegal(version, texto) {
+  if (!esVersionSujetaAGuarda(version)) {
+    return { ok: true, placeholders: { total: 0, unicos: [], muestras: [] }, marcadores: [] };
+  }
+  return analizarTextoLegal(texto);
+}
+
 function pedir(url, opcion, cuerpo, timeoutMs) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -148,6 +170,28 @@ async function main(argv) {
   }
   console.log('  el archivo coincide con la huella archivada');
 
+  const revision = verificarTextoLegal(opts.version, texto);
+  if (!revision.ok) {
+    console.error('\n  EL TEXTO TIENE PLACEHOLDERS O MARCAS DE BORRADOR. No se publica nada.');
+    if (revision.placeholders.total > 0) {
+      console.error(
+        `  Placeholders: ${revision.placeholders.total} `
+        + `(${revision.placeholders.unicos.length} distintos)`,
+      );
+      for (const u of revision.placeholders.unicos.slice(0, 20)) {
+        console.error(`    - ${u}`);
+      }
+    }
+    for (const m of revision.marcadores) {
+      console.error(`  Marca prohibida: ${m.etiqueta}`);
+    }
+    console.error('  Completá el texto y volvé a archivarlo antes de publicar.');
+    return 4;
+  }
+  if (esVersionSujetaAGuarda(opts.version)) {
+    console.log('  sin placeholders ni marcas de borrador');
+  }
+
   if (opts.simular) {
     console.log('\nSimulación: no se envía nada.');
     return 0;
@@ -197,4 +241,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, archivoDe };
+module.exports = { parseArgs, archivoDe, verificarTextoLegal };

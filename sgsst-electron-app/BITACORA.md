@@ -6291,3 +6291,54 @@ cierra la salida. Un check que solo se puede abrir y no se puede cerrar no es un
 que no tiene marco.
 
 
+
+## 📦941 · El reporte que dice qué falta, sin inventar nada
+
+*23-oct-2026 · los bloqueantes de la respuesta 11A · la guarda de texto legal · el manifiesto de evidencias*
+
+### El problema que se veía y el que no
+
+Hasta ahora, la pregunta "¿el sistema ya puede publicar la v1.1 y aceptar la primera firma real?"
+vivía únicamente en la cabeza del operador. Y no por descuido: la respuesta estaba repartida en
+archivos sueltos —el texto de la v1.1, el Anexo de Nube, el Anexo de Encargo, la ficha de las
+empresas, el inventario de retención, la configuración— y en datos que solo tiene el owner (NIT,
+canal de datos, responsable, URL de la política). Reunirlos era trabajo de cada vez, y el error
+fácil era uno: **rellenar el hueco con un valor plausible**.
+
+Ese es el error que este trabajo se propone no cometer. `legal-readiness.json` es un inventario de
+**evidencias**, y todas sus claves de datos están en `null`: cada campo se llena solo con una fecha,
+un archivo o una huella. Un `null` no es un olvido: es un pendiente con nombre. Y
+`src/services/readinessLegal.js` recorre ese manifiesto, los documentos reales del repo, el código
+y la base, y devuelve **38 items**: 4 ok, 31 pendientes, 1 aviso, 2 que no aplican, con **19
+bloqueantes** para el gate de publicación y la acción concreta que resolvería cada uno.
+
+El reporte no publica, no firma, no enciende el D-02 y **no escribe en la base**: es una
+fotografía. Se puede pedir por HTTP (`GET /internal/admin/readiness-legal`, con la key de operador)
+o por consola (`node scripts/auditar-readiness-legal.js --gate=publicacion --json`), y **los dos
+paths llaman al mismo servicio**: una lista de requisitos duplicada en dos archivos se
+desactualiza sola, y un reporte que dice "está listo" cuando dejó de estarlo es peor que no
+tener reporte.
+
+### La guarda: un texto legal a medio llenar no se publica
+
+En el otro extremo, `src/utils/textoLegal.js` mira un texto y dice si tiene corchetes o marcas de
+borrador ("ACUERDO DEV", "PENDIENTE DE COMPLETAR", "Revisión profesional pendiente", "por
+diligenciar"). La v1.0 queda fuera: está publicada y sellada, y sus fixtures de desarrollo la usan
+tal cual. Desde la v1.1, `agreementService.createVersion()` **rechaza** el texto con
+`TEXTO_LEGAL_CON_PLACEHOLDERS` antes de tocar la base, y `publicar-acuerdo-legal.js` hace la misma
+comprobación antes de enviar nada. El texto que se publica no puede salir a medio llenar, y el
+código que lo publica dice por qué no.
+
+### Lo que el reporte dice hoy
+
+Con lo que hay en el repo ahora, el gate de publicación **NO está listo**, y el reporte lo dice sin
+suavizar: falta el texto de la v1.1 (y por tanto su huella en el manifiesto), la URL del Anexo de
+Encargo, la URL de la política de tratamiento, la persona y el canal de protección de datos, el
+responsable y su acta, y el NIT del Encargado. El Anexo de Nube tiene 53 placeholders y una marca
+prohibida; el Anexo de Encargo, una. Faltan las pruebas en el ambiente real de la 9A, la 10.4 y el
+D-03, y las tablas de excepciones (migraciones 035 y 036) no están en esta base.
+
+Eso no es un dato pessimisticista: es la lista de trabajo, escrita con lo que falta y con quién
+falta.
+
+

@@ -1,0 +1,88 @@
+{
+  "version": "2026-10-23",
+  "actualizado_at": null,
+  "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
+  "acuerdo": {
+    "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
+    "v1_1_hash": null,
+    "v1_1_fecha": null,
+    "publicado": false
+  },
+  "encargado": {
+    "nit": null,
+    "representante_legal": null,
+    "domicilio": null,
+    "canal_proteccion_datos": null,
+    "canal_confirmado": false,
+    "responsable_datos": null,
+    "acta_designacion": null,
+    "url_politica": null,
+    "url_anexo_encargo": null
+  },
+  "infraestructura": {
+    "ubicacion_servidor": null,
+    "respaldos": null,
+    "monitoreo": null,
+    "soporte": null,
+    "seguridad_fisica": null,
+    "rto_horas": null,
+    "rpo_horas": null,
+    "plan_continuidad": null
+  },
+  "subencargados": {
+    "cloudflare": {
+      "dpa": false,
+      "version": null,
+      "fecha": null,
+      "devolucion_supresion": false,
+      "auditoria": false,
+      "evidencia": null
+    },
+    "google": {
+      "cuenta": null,
+      "dpa": false,
+      "version": null,
+      "fecha": null,
+      "devolucion_supresion": false,
+      "auditoria": false,
+      "evidencia": null
+    }
+  },
+  "anexo_encargo": {
+    "estado": "desconocido",
+    "fecha": null,
+    "evidencia": null
+  },
+  "anexo_nube": {
+    "firmado": false,
+    "fecha": null,
+    "version": null,
+    "hash": null,
+    "evidencia": null
+  },
+  "n9a": {
+    "probada": false,
+    "evidencia": null
+  },
+  "n10_4": {
+    "probada": false,
+    "evidencia": null
+  },
+  "d03": {
+    "probada": false,
+    "evidencia": null
+  },
+  "token_unico": {
+    "probada": false,
+    "evidencia": null
+  },
+  "d02": {
+    "inventario_buzones": null,
+    "inventario_evidencia": null
+  },
+  "pqrs": {
+    "canal": null,
+    "responsable": null,
+    "plazo_dias": 2
+  }
+}
