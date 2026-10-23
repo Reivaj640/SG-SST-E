@@ -6058,3 +6058,106 @@ publicar la v1.1 → encender el D-02 → firmar el Anexo de Nube → primera fi
 tres primeros ya están.**
 
 
+
+## 📦934-935 · La purga en dos capas y el fallo que no hacia ruido
+
+*23-oct-2026 · el texto legal en el codigo · el recibo de supresion · la purga que no se ejecutaba*
+
+### La operacion que se declaraba completa y no hacia la segunda mitad
+
+El `scripts/purga-ventana.js` es el ejecutor de la supresion de datos vencidos. Su guion, textual:
+
+> "Capa 1: el registro de auditoria."
+> "Capa 2: la fila y los archivos. Se hace dentro de la misma ventana y sobre el mismo lote, y vuelve a
+> comprobar el hold de cada firma."
+
+La segunda linea era una **intencion**, no un hecho. La capa 1 (`conservacion.purgar()`) **cerraba la
+ventana de purga y vaciaba el lote** al terminar, y la capa 2 (`supresion.suprimir()`) exige ventana
+vigente y lote armado. El resultado era que la segunda capa moria con "No hay ventana de purga abierta" y
+el script salia con codigo 3.
+
+Lo que la segunda capa borra es **el documento, la constancia y los archivos**, y lo que escribe es **la
+lapida** (`gh_firma_purgadas`) con la que un enlace ya suprimido responde 410 CONSERVACION_VENCIDA. Es
+decir: **la capa 2 nunca se ejecuto en produccion**. Las firmas vencidas habrian seguido con su PDF
+original, su PDF firmado y su constancia en el disco, y la tabla de lapidas estaba vacia.
+
+Lo unico que impedia que esto fuera un desastre era que en produccion hay **0 firmas**. El
+incumplimiento del 8.6 y del 10.6 de la v1.0 **vigente** era real; el daño, todavia no.
+
+La trampa de fondo no es el bug: es que **el guion describia el comportamiento deseado, y nadie lo
+comparo con el comportamiento real**. El codigo de la capa 1 era el que decidia cuando se cerraba la
+ventana, y el codigo de la capa 2 asumia lo contrario. Dos piezas que se contradician en silencio, cada
+una con su test en verde.
+
+### La regla que sale: la ventana la cierra el orquestador
+
+El arreglo no fue "quitar el cierre" (eso habria dejado la ventana abierta para siempre, que es peor):
+fue **sacar la decision del cierre de la capa y ponerla en el que orchestra**. La capa 1 acepta
+`{ cerrar: false }` —el default sigue siendo cerrar, porque su unico llamador fuera del script es el
+test que mira la secuencia del log— y el script cierra **despues** de las dos capas. Y si algo falla, la
+ventana se cierra igual en el `catch`: una ventana abierta con un lote a medias habilitaria una purga
+que el operador no pidio.
+
+### La simulacion que decia "0 firmas, 0 archivos" y un segundo despues suprimia una y tres
+
+El mismo script, en la parte de arriba, decia "Simulacion de la capa de datos: 0 firmas, 0 archivos" y
+despues reportaba "filas suprimidas: 1, archivos eliminados: 3". La simulacion leia el **lote**, y el
+lote existe solo cuando ya se abrio la ventana: antes de abrirla estaba vacio. Se probo sobre las mismas
+firmas que el lote va a contener (las vencidas y elegibles), sin que la ventana tenga que estar abierta.
+
+La leccion es mas general que el script: **una simulación que no dice lo que va a pasar es peor que no
+tenerla**, porque hace creer que no hay nada que hacer. Y una simulacion que se calcula sobre un estado
+posterior al que se va a comparar no simula nada.
+
+### El fallo silencioso que casi se va: un `undefined` ligado como NULL no lanza
+
+Al revisar el codigo del recibo de supresion aparecio un `SELECT` que no traia la columna `firma_id` y
+la usaba despues como parametro de bind. La primera caracterizacion fue "reventaba la consulta".
+**Era falsa**: `better-sqlite3` liga un `undefined` como `NULL` y no lanza. El `WHERE firma_id =
+NULL` no encontraba la fila del recibo de purgas y el recibo salia **sin la ventana de purga, sin la
+comprobacion del hold y sin el recuento de eventos**: un fallo silencioso, con un objeto que parecia
+completo.
+
+Lo que lo destapo fue la mutacion: **quitar esa columna del `SELECT` no ponia ningun test en rojo**.
+No porque el test fuera flojo, sino porque **no comprobaba los tres campos que esa mutacion degrada**.
+El arreglo no fue solo agregar la columna al `SELECT`: fue **agregar al test las aserciones de esos tres
+campos**. Un check que no muerde no es un check, y la forma de saber si muerde es mutar el codigo y
+mirar.
+
+Y la regla sobre el diagnostico: **un diagnostico equivocado escrito en un comentario es la forma mas
+larga de propagar el error**. La caracterizacion correcta ("no lanza; degrada en silencio") quedo escrita
+en el codigo y en el test, porque la primera version habia quedado en un comentario que explicaba un
+crash que no existia.
+
+### El 3.6(g) exige cuatro cosas y la evidencia guardaba dos
+
+El 3.6(g) pide que la lapida identifique **la solicitud, la fecha y hora, las categorias suprimidas y el
+fundamento del plazo**, y que haya **un recibo que la Empresa entrega al Trabajador si lo solicita**. La
+lapida guardaba el `firma_id` (un entero interno) y el `id_empresa`, y como la supresion borra la fila
+de la firma entera, el identificador que el Trabajador y la Empresa conocen se perdia **para siempre**.
+
+Lo que faltaba no era solo guardar la columna: era **la via de entrega**. Nadie podia obtener el recibo
+para darselo al Trabajador: el 3.6(g) se cumplia a medias. Por eso los endpoints son **per-empresa** (la
+Empresa es la Responsable del dato y la que se lo entrega al Titular, 10.7(e)), con `404` silencioso
+entre Empresas y sin datos personales en la respuesta.
+
+Y una decision que se tomo a proposito: la purga del registro de auditoria (el 10.5(d)) **no** escribe
+en `gh_firma_purgadas`. Esa tabla no es solo el archivo de la evidencia: es **el mecanismo del 410**, y
+`supresion.buscarLapidada()` busca por `token_tombstone`. Meter ahi filas que no son lapidas de tokens
+podia hacer que un enlace que SIGUE VIVO respondiera "no disponible por vencimiento del plazo". La
+salida fue darle al recibo de purgas las dos columnas que faltaban (la 041) y armar el recibo con la
+fuente que las tenga. Mezclar el archivo de la evidencia con el mecanismo del 410 es la clase de error
+que despues nadie sabe explicar.
+
+### Lo que el texto no tocaba y el codigo si
+
+La v1.0 **vigente** no contradecía el codigo nuevo: su 8.6 no fija plazo y su 3.4(c) si dice "token de un
+solo uso". Lo que si estaba incumplido era el **3.4(e)**: "expira a los seiscientos (600) segundos
+contados desde su envio". Por eso la expiracion del OTP se implemento aunque la v1.1 no este publicada:
+**una brecha contra el texto vigente se cierra igual**, y no es lo mismo que una mejora.
+
+Y el rechazo es `410 OTP_EXPIRADO` con codigo propio, **no** el 410 generico: el generico diria "el
+enlace expiro", y el enlace sigue vivo. El codigo explicito le dice a la mini-app que lo que vencio es
+el codigo, y le deja ofrecer el reenvio. Un 410 generico para un caso que no es un 410 es una mentira
+en la respuesta.
+

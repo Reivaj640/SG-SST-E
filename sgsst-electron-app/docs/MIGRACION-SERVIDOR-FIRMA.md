@@ -380,6 +380,104 @@ y de que la regla legal del documento está corriendo en el servidor.
 > (`canal_pqrs`). Si la respuesta es `409 EMPRESA_NO_HABILITADA`, el detalle
 > dice qué falta.
 
+### 5.1.2 Las migraciones 037 a 041 (las etapas 1 a 5)
+
+> **2026-10-23.** Estas **cinco** migraciones (037 a 041) **todavia no estan en el servidor**: el
+> `kair-server` corre el codigo viejo (sin 034 a 041). Se aplican solas al
+> arrancar el servicio (`src/server.js` llama a `migrate()`), pero el **orden**
+> sigue siendo: migraciones primero, servicio despues.
+
+Las migraciones **034 a 036** (custodia de 20 anos y la excepcion auditable de
+habilitacion) estan documentadas en la **§5.5** mas abajo. Estas son las **nuevas**:
+
+| Migracion | Que hace | Aditiva |
+|---|---|---|
+| 037 | La tabla del rastro auditable de la ficha de la Empresa | Si (tabla) |
+| 038 | Los triggers append-only del rastro (se salta en test) | Si (triggers) |
+| 039 | La copia permanente: `plazo_copia` y su indice | Si (columna + indice) |
+| 040 | La lapida identifica la solicitud y el fundamento del plazo | Si (dos columnas) |
+| 041 | El recibo de purgas identifica la solicitud y el fundamento del plazo | Si (dos columnas) |
+
+**Ninguna reescribe filas, ninguna hace backfill y ninguna borra nada.** Lo que
+ya esta escrito queda con las columnas nuevas en `NULL`, y el servicio lo dice
+explicitamente en vez de inventar un valor.
+
+**Como verlas aplicadas** (la prueba):
+
+```bash
+sudo journalctl -u kair-firma --since '-10 min' | grep -E '034_|035_|036_|037_|038_|039_|040_|041_'
+```
+
+O, sin depender del arranque:
+
+```bash
+cd /opt/kair-firma/app
+sudo -u kairfirma node src/db/migrate.js 2>&1 | tee /tmp/migrate.log
+grep "Aplicando migración" /tmp/migrate.log | tail -12
+```
+
+**Lo que hay que verificar despues de reiniciar**, y no antes:
+
+```bash
+# 1. El proceso nuevo (uptime_seconds chico)
+curl -sS https://firma.kair.fyi/health
+
+# 2. Las columnas nuevas de la lapida y del recibo
+sudo -u kairfirma node -e "
+const D=require('better-sqlite3');const db=new D('/opt/kair-firma/data/firma.sqlite',{readonly:true});
+console.log('lapida:', db.prepare('PRAGMA table_info(gh_firma_purgadas)').all().map(c=>c.name).filter(n=>n.includes('solicitud')||n.includes('conservacion')));
+console.log('recibo:', db.prepare('PRAGMA table_info(gh_firma_purga_registro)').all().map(c=>c.name).filter(n=>n.includes('solicitud')||n.includes('conservacion')));
+"
+
+# 3. La ruta nueva del recibo de supresion (no debe ser 404 de ruta)
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  curl -sS -o /dev/null -w '%{http_code}\\n' -H "X-Internal-API-Key: $(cat /opt/kair-firma/internal-key.txt)" \
+  https://firma.kair.fyi/internal/empresas/900829731/recibos-supresion'
+```
+
+El paso 3 tiene que dar **200** (con `{"total":0,...}`) y **no** un 404 de
+ruta: un 404 ahi significa que el router nuevo no esta montado.
+
+#### La purga en dos capas (el arreglo del 2026-10-23)
+
+> **El bug que se llevo por delante la supresion de datos.** El script
+> `scripts/purga-ventana.js` corria la capa de auditoria, esa capa **cerraba la
+> ventana de purga y vaciaba el lote**, y la capa de datos (la que borra el
+> documento, la constancia y los archivos, y escribe la lapida) exigia ventana
+> vigente: **nunca se ejecuto**. En el servidor hay 0 firmas, asi que no hay
+> nada que purgar todavia, pero hay que corregirlo antes de la primera
+> expiracion real.
+
+Despues del despliegue, el guion de la purga es el que toca (no los servicios
+sueltos):
+
+```bash
+# 1. SIMULAR primero: no borra nada y tiene que decir 0 firmas, 0 archivos
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/purga-ventana.js --actor="Nombre" --motivo="Vencimiento del plazo declarado"'
+
+# 2. Ejecutar, solo cuando la simulacion diga lo que se espera
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/purga-ventana.js --actor="Nombre" --motivo="Vencimiento del plazo declarado" --ejecutar'
+```
+
+La simulacion ahora corre sobre las **mismas firmas** que el lote va a
+contener. Antes decia "0 firmas, 0 archivos" y un segundo despues suprimia una
+firma y tres archivos: si la simulacion dice 0 y la ejecucion dice 3, el
+despliegue esta a medias.
+
+**La salida que hay que leer:**
+
+```
+  filas suprimidas:       1
+  archivos eliminados:    3
+  bloqueadas por hold:    0
+  la ventana quedó cerrada y el lote vacío
+```
+
+"filas suprimidas: 0" con "archivos eliminados: 0" y firmas elegibles
+reportadas es el sintoma del bug viejo. Con el arreglo, las dos capas corren.
+
 ---
 
 ## 5.2 Retirar el rastro de prueba
@@ -506,6 +604,10 @@ Opciones: `--ids=A,B` (la lista), `--todos` (escanear todos los huerfanos) y
 
 ### 5.5 Las tres migraciones del 📦933 (custodia de 20, excepción auditable)
 
+> **El despliegue del 23-oct-2026 incluye las 037 a 041 tambien.** La lista
+> completa de lo que va al servidor y el orden de verificacion estan en la
+> **§5.1.2**.
+
 **Se aplican solas** al arrancar el servicio (`src/server.js` llama a `migrate()`), pero
 conviene **mirar el log** para confirmar que entraron las tres y en este orden:
 
@@ -571,22 +673,24 @@ la suite contra `firma.sqlite` y se perdio `SIGN-2026-037663`.
 
 ---
 
-## 7. Estado de la suite (2026-10-15)
+## 7. Estado de la suite (2026-10-23)
 
 ```
-tests 973 | pass 969 | fail 2 | skipped 2
+tests 1639 | pass 1633 | fail 4 | skipped 2
 ```
 
-Los dos fallos **no son bugs de codigo**:
+Los **4 fallos** son de `tests/scripts/seed-dev-acuerdo.test.js`: la guarda
+`TEXTO_LEGAL_CON_PLACEHOLDERS` de `src/services/agreement.js` rechaza las versiones
+v2.0/v3.0/v4.0/v9.0 que siembra ese script. **No son de la migracion de las etapas 1 a 5** y
+no se tocan desde ahi.
 
-1. **`pdfValidator.test.js` §6.2** — mide que el rechazo por timeout de parseo ocurra en menos de
-   200 ms. Tarda 270-330 ms con 973 tests en serie sobre 2 vCPU. El objetivo del test es detectar un
-   *hang* (que serian >5 s), y eso no ocurre. Sensibilidad a la carga, no a la correccion.
-2. **`idempotency-isolation.test.js` caso 2** — el helper `postSign()` genera un PDF nuevo en cada
-   llamada, y pdf-lib escribe `CreationDate`/`ModDate`, asi que los dos requests llevan SHA-256
-   distintos. Como el fingerprint de idempotencia incluye el hash del PDF (decision G6), el
-   servidor responde `409 IDEMPOTENCY_KEY_CONFLICT`, que es **lo correcto**. El test no puede
-   construir el escenario de replay que dice probar. El arreglo es cachear el buffer del PDF.
+Los dos fallos de la medicion del 2026-10-15 (`pdfValidator.test.js` §6.2, por sensibilidad a la
+carga, e `idempotency-isolation.test.js` caso 2, por el `CreationDate` que pdf-lib escribe en
+cada PDF) **ya no estan**: los 1639 tests corren en 152 s en esta PC, con la suite completa.
+
+La verificacion de las etapas 0 a 6 (2026-10-23): `node --check` 24/24, barrido de caracteres no
+latinos limpio en 30 archivos, **5 de 5 mutaciones mordieron** y arranque en frio del service con el
+router del recibo de supresion montado.
 
 ---
 

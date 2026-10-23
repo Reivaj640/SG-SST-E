@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-23 (las tres condiciones de codigo del abogado: la custodia de 20 anos, el token unico y el D-03 que si bloquea —📦933—; el paquete del 11A y las credenciales de correo al `.env` —📦932, 📦931—; la purga del rastro de prueba en producción: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacía nada —📦929—; y el script de archivos huérfanos que sí sirve en producción: rutas del entorno, dry-run permitido en producción y el aviso que impide leer «nada que mover» como «storage limpio» —📦930—; el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
-| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦930; **📦931, 📦932 y 📦933 estan escritos y SIN commitear: esperando la palabra del owner.** (el script de archivos huérfanos, el reinstal del panel con el fix del ESC y la documentación de esta bitácora). |
-| **Último commit de código** | 📦 **933** (sin commitear: la custodia de 20 anos, el token unico del 3.4(c) y el D-03 bloqueante con excepcion auditable) — 📦 **930** — 📦930 (el script de archivos huérfanos que sí sirve en producción: rutas del entorno, dry-run permitido en producción y el aviso de los huérfanos fuera de la lista; y el reinstal del panel con el fix del ESC, verificado en el servidor). Antes: 📦 **929** — 📦929 (el panel de firmas: tablero general, panel de empresa y detalle de firma, en solo lectura; y la corrección de dos frases falsas de esta bitácora). Antes: 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
+| **Fecha de cierre** | 2026-10-23 (la v1.1 alineada en el codigo —📦934-: el rastro auditable de la ficha de la Empresa (B1), la copia permanente con su SLA de cinco dias habiles y el freno de la supresion (8.5, 8.6(e)(iii)), el recibo de supresion entregable con su lapida y su fundamento del plazo (3.6(g) y 10.6), y el OTP que expira a los 600 segundos (3.4(e)); —📦935-: la purga en dos capas, el bug por el que la supresion de datos NO se ejecutaba nunca; —📦936-: el empalme mecanico de la v1.1 con sus 49 numerales; —📦937-: el endurecimiento del operador). Antes: 2026-10-23 (las tres condiciones de codigo del abogado: la custodia de 20 anos, el token unico y el D-03 que si bloquea —📦933—; el paquete del 11A y las credenciales de correo al `.env` —📦932, 📦931—; la purga del rastro de prueba en produccion: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacia nada —📦929—; el script de archivos huerfanos que si sirve en produccion: rutas del entorno, dry-run permitido en produccion y el aviso que impide leer «nada que mover» como «storage limpio» —📦930—; el catalogo de retencion por documento: el plazo vive en el codigo —80 anos de custodia, el hold del contrato electronico y el piso legal de los grupos SST— con su migracion 033, la clasificacion automatica por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitacion que ya no exige el plazo de la empresa y la documentacion del despliegue —📦928—; y el cierre del formulario de datos para firma electronica: guardado local, relectura y publicacion al servidor —📦927—) |
+| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦938. El trabajo de las etapas 0 a 6 quedo **escrito y commiteado**; lo que falta es el despliegue en el servidor y la evidencia en el ambiente real. |
+| **Último commit de código** | 📦 **938** — 📦938 (el estado al cierre de la jornada: este bloque y la bitacora de las etapas 0 a 6) — 📦 **937** (el endurecimiento del operador: la bandera retirada documentada como inerte, el comentario obsoleto del 026 corregido y el 409 del D-03 que pasa a ser AVISO en vez de FALLA en el smoke) — 📦 **936** (el empalme mecanico de la v1.1: 49 numerales con su texto integro y un script que no escribe un texto con placeholders) — 📦 **935** (la purga en dos capas: la supresion de datos no se ejecutaba nunca porque la capa de auditoria cerraba la ventana antes de que corriera la capa de datos) — 📦 **934** (el texto legal en el codigo: el rastro auditable de la ficha de la Empresa, la copia permanente con su SLA de cinco dias habiles, el recibo de supresion entregable y el OTP que expira a los 600 segundos). Antes: 📦 **933** |
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -32,7 +32,7 @@
 | **CAPÍTULO III: AUDITADO E IMPLEMENTADO (19)** | **El texto no se toca: sus tres citas legales son exactas.** Y el diagnóstico que estaba escrito aquí era **falso**: el plan y este archivo decían que "el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)". El texto nunca lo dijo: siempre dijo **«huella digital con sal»** (`grep -r hmac` da cero en todo el service). La brecha real era de implementación: **la sal estaba en la misma fila que la huella** (equivale a un hash plano) y la **cédula se guardaba en texto claro**, en contra del propio 10.5(a). **Corregido el 19** con las migraciones **019** (columnas de algoritmo + HMAC) y **020** (`gh_firma_eventos` append-only con triggers), la capa `src/crypto/{keys,hmac}.js` y el seudónimo de `id_trabajador`. La llave maestra se deriva por HKDF de `TOKEN_ENCRYPTION_KEY` y vive **fuera** de la BD. Filas heredadas: se reescriben solas con el HMAC la primera vez que se usan. Efecto colateral que cierra una fuga: la mini-app exponía la cédula en claro en `GET /s/:token`; ahora expone el seudónimo. **Pendiente: solo el Anexo de Encargo (3.8) y la cláusula de custodia, que necesitan abogado.** El 19 se completó la **Fase 1 del carril de código** (📦 907): **clave HMAC por empresa** (ámbito = `id_empresa`), **versión de llave por fila** (marcador `hmac-sha256.v2.k1`) y **anillo de llaves** (`FIRMA_HMAC_KEYRING`), con la migración **022**. Rotar la llave dejó de invalidar la evidencia anterior. Corrección que salió de esa fase: **la búsqueda solo probaba la versión vigente**, así que al rotar las filas viejas se volvían invisibles; ahora prueba todas las del anillo. |
 | **CAPÍTULO IV: AUDITADO (19)** | **Sus cinco citas, verificadas una por una contra la compilación oficial.** El **4.3** (parágrafo 2 del 2.2.1.1.10 del Decreto 1072) y el **4.5** (numeral 3 del 2.2.1.1.13) son **fieles**. El **4.2** es una paráfrasis: el 47.3 dice "incluido **cualquier acuerdo aplicable**" y el Acuerdo dice "incluido este Acuerdo" (la sustancia no cambia: este Acuerdo es un acuerdo aplicable). El **4.1** cita un artículo que el 47.5 no nombra: el oficial remite al **2.2.2.43.3**, y el 43.3 vigente es "PRESUPUESTO ANUAL" de las Cámaras de Comercio, o sea que **la remisión del propio decreto está caduca**, heredada de la numeración anterior a la compilación de 2015. El **4.4** tampoco es transcripción: el artículo 244 de la Ley 1564 ("DOCUMENTO AUTÉNTICO") presume auténticos los documentos públicos y privados "mientras no hayan sido tachados de falso o desconocidos", y la frase "en forma de mensaje de datos" es del 243. **Hallazgo de fondo: el Acuerdo no cita el 2.2.2.47.4 (CONFIABILIDAD)** en ningún punto, y es el artículo que trae los dos requisitos materiales (los datos de creación son exclusivamente del firmante; se puede detectar la alteración no autorizada), al que apuntan el 2.2.1.1.11 y el parágrafo del 2.2.1.1.13. **El texto no se tocó**: las propuestas quedaron en `docs/gestion-humana/firma-electronica/auditoria-capitulo-iv-citas-normativas-2026-10-19.md`. |
 | **CAPÍTULO V: AUDITADO E IMPLEMENTADO (19)** | **Verificado el 2.2.2.47.6 contra la compilación oficial y auditado numeral por numeral (5.1 a 5.5).** El texto del Capítulo V tiene **dos hallazgos** que van al abogado y **no se tocaron**: el preámbulo del 5.1 dice que a), b) y c) son los deberes del 47.6 y no lo son (falta el deber 2, el deber 3 quedó reducido a "a la Empresa y a K+AIR" y el literal a) no está en el artículo), y el 5.1(a) obliga al Firmante a cumplir unas políticas de seguridad que nunca ve. El código tenía **dos roto**: el 5.1(c) no era cumplible (no había ningún canal de K+AIR en la mini-app) y el 5.3 no tenía apoyo en pantalla (el backend mandaba `tipo_identificacion` e `id_documento`, pero la mini-app no los pintaba, y el comentario que decía lo contrario era falso). **Corregidos el 19**: el canal de incidentes de K+AIR vive en las dos capas (valor por defecto en el HTML, para que exista también en la pantalla de error donde no hay contexto, y configurable con `FIRMA_CANAL_INCIDENCIAS`; un test exige que no divergan) en un pie fuera de las pantallas, y el bloque `#documento-identidad` muestra qué documento se firma ("Estás firmando un contrato. Referencia: ..."). **Decisión del owner (2026-10-20)**: la API **sí** rechaza el buzón corporativo para el OTP (el D-02, 📦921): el código va a un medio personal, y el rechazo queda **apagado** hasta que exista la 9A y se publique la v1.1. Detalle en `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` y en `plan-cierre-tc-y-decisiones-2026-10-20.md`. |
-| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1474 tests · 1472 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · **pendiente de decisión administrativa: el Anexo de Encargo de Aseplus (la base dice firmado el 2026-10-21, el documento de onboarding dice que no) y la URL real de la política de datos (en `null`)** · contraseñas de aplicación de Gmail en texto plano en el escritorio (`utils/emailSender.js`) — las llaves de firma NO están en claro: viven en `secrets.enc`, cifradas con `safeStorage` de Electron · el alta de empresas y el Anexo de Encargo siguen siendo administrativos: el puente PC → servidor de 📦927 solo actualiza empresas ya registradas · el `acuerdo-dev-v1.0.txt` **NO es una divergencia dev/prod**: es un fixture de PRUEBAS marcado "ACUERDO DEV — NO LEGAL — SOLO PRUEBAS", sembrado por `seed-dev-acuerdo.js` y con bloqueo duro en `NODE_ENV=production`; el legal sellado es otro archivo (`acuerdo-v1.0.txt`, 33357 bytes, `52a490a4…`). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
+| **Deuda técnica global** | Suite del `firma-service`: **1639 tests · 1633 verdes · 4 rojos · 2 omitidos**. Los 4 rojos son de la **otra sesion** (`tests/scripts/seed-dev-acuerdo.test.js`: la guarda `TEXTO_LEGAL_CON_PLACEHOLDERS` rechaza las versiones v2.0/v3.0/v4.0/v9.0 que siembra el script) y **no son de este trabajo**: lo de esta jornada esta en **1633/1633**. Verificacion de las etapas 0 a 6: `node --check` 24/24, barrido de caracteres no latinos limpio en 30 archivos, **5/5 mutaciones mordieron** (mutar el codigo pone el test en rojo) y arranque en frio del service con el router nuevo montado. **Pendiente de decision administrativa:** el Anexo de Encargo de Aseplus (la base dice firmado el 2026-10-21, el documento de onboarding dice que no) y la URL real de la politica de datos (en `null`) · **rotar las 5 app passwords** (el repo es publico y quedaron en el historial) · **D-02**: correr `scripts/inventario-buzon-corporativo.js` sobre una COPIA de la BD (abre con escritura) para decidir `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` · **el despliegue**: las migraciones 034 a 041 y las etapas 1 a 5 siguen SIN desplegar en `kair-server`, que corre el codigo viejo |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
@@ -666,6 +666,172 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
   typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
+
+### 2026-10-23 · 📦934 · El texto legal en el codigo: la ficha, la copia, el recibo y el OTP
+
+**El encargo.** "Verifica el estado actual y continua con la tarea, realiza la investigacion de todo el
+proceso para validar que exactamente hace falta, crea un plan de accion para cerrar estas brechas y
+queden alineadas con lo actualmente construido alrededor del proceso de firma electronica, una vez tengas
+el plan procede a implementarlo, por cada etapa entrega un resumen de lo realizado y checklists de lo que
+falta hasta terminar, valida que entre etapas no se rompa nada del proceso de firma." Siete etapas, de la 0
+(investigacion) a la 6 (verificacion).
+
+**La investigacion (etapa 0) cambio la foto.** Tres exploraciones en paralelo: el mapa del proceso de
+firma, las brechas entre el texto y el codigo, y el estado operativo con sus banderas. El hallazgo de
+fondo: **la v1.0 vigente (publicada, sellada `52a490a4...`) NO contradice el codigo nuevo**. Su 8.6 no
+fija plazo y su 3.4(c) si dice "token de un solo uso", que hoy se cumple. El texto que trae las
+exigencias nuevas es la **v1.1**, y lo que hay que entregarle al abogado es el texto; lo que hay que
+cumplir en el codigo es lo que ya esta en vigor. Por eso la M1 (el OTP que expira) se implemento: es una
+brecha contra la v1.0 **vigente**, no solo contra la v1.1.
+
+**B1 — el rastro auditable de la ficha de la Empresa.** El override del `canal_pqrs` no dejaba rastro: un
+campo de la ficha de la Empresa podia cambiar sin que nadie supiera quien lo cambio ni por que. Ahora hay
+tabla (`037`), triggers append-only (`038`, probados contra el archivo real), y un servicio que escribe
+**un renglón por campo que REALMENTE cambio**: un guardado que no cambia nada no deja renglón, porque no
+es un cambio. El documento del representante no se copia en claro al rastro: va enmascarado (`****` mas
+los ultimos cuatro), igual que en el resto del sistema. El actor y el motivo llegan por headers
+(`X-Admin-Actor`, `X-Admin-Motivo`) porque el `PUT` es un reemplazo completo de la ficha y el body no se
+contamina con metadatos de auditoria. 17 tests.
+
+**El 8.5 y el 8.6(e)(iii): la copia permanente.** El texto final aprobado pide que la Empresa entregue la
+copia en cinco dias habiles, y que **no se suprima con una solicitud de copia pendiente**. Son DOS relojes
+distintos y no se mezclan: `plazoTramiteDias` (2, cuando K+AIR trasmite) y `plazoCopiaDias` (5, cuando
+la Empresa entrega). El freno se chequea **dos veces**: al armar el lote y otra vez en la capa de datos,
+para el caso de que la copia llegue mientras la operacion corre. 15 tests.
+
+**El 3.6(g) y el 10.6: el recibo de supresion.** El texto exige una lapida que identifique la solicitud,
+la fecha y hora, las categorias suprimidas y el fundamento del plazo, "y a un recibo que la Empresa
+entrega al Trabajador si lo solicita". La lapida guardaba el `firma_id` (un entero interno) y no el
+identificador que el Trabajador y la Empresa conocen; y como la supresion borra la fila de la firma
+entera, ese dato se perdia para siempre. La migracion `040` lo arregla, y la `041` le da al recibo de
+purgas las dos columnas que faltaban (la solicitud y el fundamento del plazo), para que la purga de
+auditoria del 10.5(d) tambien deje un recibo completo. Y se creo la **via de entrega**: dos endpoints
+per-empresa (la Empresa es la Responsable del dato y la que se lo entrega al Trabajador, 10.7(e)), con
+`404` silencioso entre Empresas y sin datos personales en la respuesta. 19 tests.
+
+**La M1: el OTP expira a los 600 segundos.** El 3.4(e) de la v1.0 **vigente** dice "expira a los seiscientos
+(600) segundos contados desde su envio". El codigo no lo cumplia. El rechazo es `410 OTP_EXPIRADO`, con
+codigo propio y no el 410 generico: el 410 generico diria "el enlace expiro", y el enlace **sigue
+vivo**. No consume intento y no cambia el estado, para que el reenvio siga disponible. La mini-app
+maneja el caso antes del 410 generico y ofrece el boton de pedir un codigo nuevo. 8 tests.
+
+**Lo que quedo debiendo, sin esconderlo.** La ventana entre el registro y la trasmision con `id_empresa =
+NULL`; la granularidad de la copia es por Empresa y no por Titular; `copia_atendida` es una declaracion de
+la Empresa y no una verificacion; el `PUT` de la ficha es reemplazo completo, asi que el rastro es un
+diff y no un historial por version; y el actor llega por header, no por una identidad real del admin.
+
+### 2026-10-23 · 📦935 · La purga en dos capas: la supresion de datos no se ejecutaba nunca
+
+**El bug que aparecio al escribir los tests del recibo.** `scripts/purga-ventana.js` es el ejecutor de la
+supresion de datos vencidos. Su guion dice, textualmente:
+
+> "Capa 1: el registro de auditoria."
+> "Capa 2: la fila y los archivos. Se hace dentro de la misma ventana y sobre el mismo lote, y vuelve a
+> comprobar el hold de cada firma."
+
+Pero la capa 1 (`conservacion.purgar()`) **cerraba la ventana de purga y vaciaba el lote** al terminar. La
+capa 2 (`supresion.suprimir()`) exige una ventana vigente y un lote armado: `ventanaVigente()` devolvia
+null y la operacion moria con "No hay ventana de purga abierta", exit code 3.
+
+**Que significaba eso.** La capa 2 es la que borra el documento, la constancia y los archivos, y la que
+escribe la LAPIDA (`gh_firma_purgadas`) con la que un enlace ya suprimido responde 410
+CONSERVACION_VENCIDA. O sea: **la capa 2 nunca se ejecuto en produccion**. Las firmas vencidas
+seguirian con su PDF original, su PDF firmado y su constancia en el disco, y la tabla de lapidas estaba
+vacia. No era un detalle del texto de la v1.1: era un incumplimiento del 8.6 y del 10.6 de la **v1.0
+vigente**, la que ya esta publicada y sellada.
+
+**La precision que hay que hacer.** En produccion hay **0 firmas**, asi que el bug no dejo ningun dato
+violando. El incumplimiento es real y hay que corregirlo antes de la primera expiracion, pero decir "se
+filtraron datos" seria falso.
+
+**El arreglo.** La ventana la cierra el **orquestador**, no la capa 1: `conservacion.purgar()` acepta
+`{ cerrar: false }` (el default sigue siendo cerrar, y el test que mira la secuencia del log sigue
+viendo `VENTANA_CERRADA`), y el script cierra al final, despues de las dos capas. Si algo falla, la
+ventana se cierra igual en el `catch`: no se deja una ventana abierta con un lote a medias, que
+habilitaria una purga que el operador no pidio.
+
+**El segundo defecto del mismo script: la simulacion mentia.** Decia "Simulacion de la capa de datos: 0
+firmas, 0 archivos" y un segundo despues suprimia una firma y tres archivos. La simulacion leia el
+**lote**, y el lote existe solo cuando ya se abrio la ventana: antes de abrirla estaba vacio. Ahora
+simula sobre las **mismas firmas** que el lote va a contener (las vencidas y elegibles), sin que la
+ventana tenga que estar abierta. Una simulacion que no dice lo que va a pasar es peor que no tenerla:
+hace creer que no hay nada que hacer.
+
+**El test que lo atrapa, escrito como el bug.** El archivo `tests/purga-dos-capas.test.js` tiene la
+mutacion como caso: con el comportamiento viejo (la capa 1 cierra la ventana), la capa 2 **no puede
+correr** y la fila de la firma sobrevive. 8 tests.
+
+### 2026-10-23 · 📦936 · El empalme mecanico de la v1.1
+
+**Que es.** La v1.1 no se publica todavia, pero para que publicarla sea un trámite y no un proyecto, los
+49 numerales que cambian respecto de la v1.0 estan escritos con su texto integro en
+`scripts/fixtures/acuerdo-v1.1-cambios.json`, y hay un script que los empalma sobre la v1.0.
+
+**El empalme deja 5 huecos, no 28.** El plan daba 28; la realidad son 5, y son los que solo el owner
+puede llenar. Ademas aparecio un hallazgo que no estaba en el plan: la v1.0 deja **4 marcadores
+`[registrada por el sistema]`** heredados, y la guarda que exige un texto sin placeholders los rechaza.
+Por eso la v1.1 no se publica todavia: no es que falte trabajo tecnico, es que falta una **decision**
+(aceptar la excepcion de la guarda o depurar el texto v1.0 en el empalme).
+
+**La regla del script.** Reutiliza `src/utils/textoLegal.js` (la misma validacion que usa la publicacion
+real) y **no escribe** `acuerdo-v1.1.txt` si quedan placeholders: sale con codigo 2. Un script que
+escribe un texto juridico incompleto es peor que uno que se niega.
+
+**El mapa con los 49 numerales** quedo escrito en
+`docs/gestion-humana/firma-electronica/mapa-empalme-v1.1-2026-10-23.md`. 21 tests.
+
+### 2026-10-23 · 📦937 · El endurecimiento del operador
+
+Tres cosas que no son funciones pero que hacen la diferencia entre un servicio que se puede auditar y uno
+que no:
+
+**La bandera retirada, documentada como inerte.** `FIRMA_EXIGIR_HABILITACION_EMPRESA` ya no existe: el
+D-03 bloquea en los cuatro puntos y su unica salida es la excepcion auditable
+(`POST /internal/admin/excepciones-habilitacion`). Borrar la bandera del `.env.example` sin mas habria
+dejado un hueco donde alguien podria volver a ponerla creyendo que hace algo. Ahora el bloque dice
+expresamente que esta inerte y por donde va la excepcion.
+
+**El comentario obsoleto del 026.** Decia "Los anteriores siguen validos" y "tope 3 tokens vivos", cuando
+el 3.4(c) manda el **token unico** (`MAX_TOKENS_VIGENTES = 1`). Un comentario que contradice el codigo es
+una trampa esperando a que alguien lo lea como si fuera la regla.
+
+**El 409 del D-03 en el smoke de produccion.** El script de humo tratava el `409
+EMPRESA_NO_HABILITADA` como FALLA, cuando el propio mensaje del servicio dice que **no es un fallo del
+servicio: es el control del D-03**. Ahora es un AVISO (que dice cual es la salida) y cualquier otro 409
+sigue siendo FALLA. 2 tests.
+
+### 2026-10-23 · 📦938 · El cierre de las etapas 0 a 6
+
+**El estado.** Las siete etapas quedaron implementadas y verificadas. El servicio corre **1639 tests ·
+1633 verdes · 4 rojos · 2 omitidos**. Los 4 rojos son de la **otra sesion** (`seed-dev-acuerdo.test.js`
+contra la guarda `TEXTO_LEGAL_CON_PLACEHOLDERS` de `agreement.js`, que es zona de la otra sesion y no se
+toco): lo de esta jornada esta en **1633/1633**.
+
+**La verificacion que si muerde.** `node --check` 24/24 en los archivos tocados. Barrido de caracteres no
+latinos limpio en 30 archivos (LF y sin BOM). **5 de 5 mutaciones mordieron**: mutar el codigo pone el
+test en rojo, y una de ellas -quitar el `firma_id` del SELECT de la lapida- **no mordia** al principio,
+porque el test no comprobaba los tres campos que esa mutacion degrada. Ese es el punto: un check que no
+muerde no es un check, y un fallo silencioso es peor que uno ruidoso. Arranque en frio del service con el
+router nuevo montado.
+
+**El fallo silencioso que casi se va.** Al revisar mi propio codigo del recibo encontre que el SELECT de la
+lapida no traia el `firma_id`, y que se usaba como parametro de bind. La primera caracterizacion fue
+"reventaba la consulta": **falsa**. `better-sqlite3` liga un `undefined` como NULL, no lanza. El
+`WHERE firma_id = NULL` no encontraba la fila del recibo de purgas y el recibo salia **sin la ventana, sin
+la comprobacion del hold y sin el recuento de eventos**: un fallo silencioso, con el recibo aparentemente
+completo. La caracterizacion correcta quedo escrita en el codigo y en el test, porque un diagnostico
+equivocado escrito en un comentario es la forma mas larga de propagar un error.
+
+**Lo que sigue, en orden.** (1) Desplegar en `kair-server`: las migraciones 034 a 041 y las etapas 1 a 5,
+siguen sin desplegar; el servidor corre el codigo viejo. (2) Rotar las 5 app passwords: el repo es publico
+y quedaron en el historial. (3) El D-02: correr el inventario del buzon sobre una **copia** de la BD (abre
+con escritura) para decidir `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`. (4) Las decisiones del owner: los 4
+marcadores heredados de la v1.0, el `respuesta-11A-2026-10-23.md` contradictorio y sin origen verificable,
+la regresion de `seed-dev-acuerdo.test.js` y el cierre de `SECURITY.md`. (5) Los datos que solo tiene el
+owner para la v1.1: NIT y representante de Gesstiar, persona y canal del 10.7(b), URL de la politica de
+datos, URL del Anexo de Encargo, los 5 datos del Anexo de Nube, ubicacion fisica del servidor, DPAs de
+Cloudflare y Google, tipo de cuenta de Google, y el responsable de respaldos, monitoreo y soporte con su
+RTO y su RPO.
 
 ### 2026-10-23 · 📦933 · Las tres condiciones de código que el abogado puso antes de la v1.1
 
