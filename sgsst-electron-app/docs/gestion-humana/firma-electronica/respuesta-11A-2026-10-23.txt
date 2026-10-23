@@ -1,0 +1,274 @@
+Respuesta 11A — Decisiones, texto de la v1.1 y Anexo de Nube
+Para: owner y equipo de K+AIR (Gesstiar S.A.S.) De: asesoría legal laboral y de protección de datos Fecha: 23 de octubre de 2026 Objeto: respuesta a la Solicitud 11A. Decide las cuatro cuestiones abiertas, entrega el texto final de los doce grupos y dictamina el Anexo de Nube. Base: acuerdo-v1.0.txt, versión sellada, SHA-256 52a490a4f4ce922109d42fa01ac45632cd62d5242bb82bf6e1967ede55710c04. La v1.0 no se toca.
+
+Respuesta corta. Se acogen A.1 reformulada, B.3, C.1 y el reemplazo del Anexo. La v1.1 puede publicarse con el texto de la §2, pero la primera firma real no puede ocurrir hasta que estén: D-02 encendido, 9A y 10.4 probadas, Anexo de Nube firmado, Cloudflare y Google nombrados con su DPA y la ubicación física del servidor declarada. Sin eso, el texto describe una operación que no existe.
+
+Nota de método. Las citas se verificaron contra el Gestor Normativo de Función Pública (Ley 1581 de 2012), la compilación del Decreto 1072 de 2015 y la compilación del Decreto 1074 de 2015, el 23 de octubre de 2026. Lo que no se pudo confirmar va marcado ⚠️ No verificado. Esto no es un concepto firmado: la responsabilidad final es del abogado que suscribe el Acuerdo.
+
+1. Las cuatro decisiones
+1.1 Decisión 1 — El 8.6: A.1, reformulada
+La premisa de la solicitud es incorrecta. El artículo 2.2.2.25.2.8 del Decreto 1074 de 2015 (Decreto 1377 de 2013, art. 11) regula las limitaciones temporales al tratamiento: exige un plazo razonable y necesario, la supresión cuando se cumple la finalidad, la conservación cuando hay obligación legal o contractual, y procedimientos de tratamiento, conservación y supresión. No menciona un “código de sustitución” ni una “modalidad que el Titular pueda rechazar”. Esa expresión pertenece a la gestión documental y a las tablas de retención (Ley 594 de 2000, Archivo General de la Nación), no al régimen de protección de datos. No se usa en el 8.6.
+
+Hay tres precisiones más que cambian el texto:
+
+El 2.2.1.1.12 no fija plazo. Obliga a conservar el contrato firmado electrónicamente con autenticidad, integridad y disponibilidad. El término no existe en la norma.
+El piso de 20 años del 2.2.4.6.13 no cubre todo el SG-SST. Cubre cinco categorías: perfiles epidemiológicos y conceptos de exámenes de ingreso, periódicos y de retiro; resultados de exámenes y pruebas complementarias cuando hay médico especialista; mediciones y monitoreo de ambientes de trabajo; registros de capacitación, formación y entrenamiento; y registros de suministro de EPP. Los demás documentos van por la tabla de retención de la Empresa. El contrato de trabajo no está en esa lista.
+Los 80 años no son un plazo legal: son una política interna. Como plazo por defecto es difícil de sostener frente al 2.2.2.25.2.8: conservar 80 años un documento sin deber legal de conservación es sobre-retención. Recomiendo bajarlo a 20 años como máximo por defecto. El contrato va con hold sin término.
+Texto final del 8.6
+
+8.6. Conservación, copia y supresión.
+
+a) El plazo de conservación de los registros del proceso de firma es el que resulte de la tabla de retención documental de la Empresa. Ese plazo no puede ser inferior a los mínimos del literal b).
+
+b) Los registros del SG-SST enumerados en el artículo 2.2.4.6.13 del Decreto 1072 de 2015 se conservan como mínimo veinte (20) años contados desde el cese de la relación laboral: (i) perfiles epidemiológicos y conceptos de exámenes de ingreso, periódicos y de retiro; (ii) resultados de exámenes y pruebas complementarias cuando la Empresa cuente con médico especialista; (iii) resultados de mediciones y monitoreo de ambientes de trabajo; (iv) registros de capacitación, formación y entrenamiento; y (v) registros de suministro de elementos y equipos de protección personal. Los demás documentos y registros del SG-SST se rigen por la tabla de retención de la Empresa.
+
+c) El contrato individual de trabajo y sus adiciones, modificaciones y anexos firmados electrónicamente se conservan con autenticidad, integridad y disponibilidad conforme al artículo 2.2.1.1.12 del Decreto 1072 de 2015, que no fija término. El sistema les asigna un hold y no los suprime por el vencimiento de la custodia.
+
+d) Si la Empresa declara un deber legal o contractual de conservación, el sistema aplica un hold sobre el documento y no lo suprime mientras ese deber subsista.
+
+e) La supresión procede solo cuando concurren: (i) vencimiento del plazo aplicable; (ii) ausencia de deber legal o contractual de conservación; (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold vigente. La supresión deja la lápida y el recibo del numeral 3.6(g).
+
+f) La Empresa entrega al Trabajador, siempre y sin costo, copia del contrato, sus anexos y modificaciones, por el medio electrónico que el Trabajador autorice, conforme a los artículos 2.2.1.1.12 y 2.2.1.1.13 del Decreto 1072 de 2015. La solicitud se registra y se atiende antes de cualquier supresión.
+
+g) Antes de la firma, la Empresa informa al Trabajador el plazo aplicable, el deber de conservación del contrato y el canal para solicitar copia. El sistema no envía aviso previo de supresión y este Acuerdo no lo promete.
+
+h) Si la Empresa no declara un plazo, se aplica el mínimo legal que corresponda y, en su defecto, veinte (20) años contados desde la firma. Ese plazo es un máximo de custodia y no autoriza a conservar más allá de la finalidad.
+
+Efecto en el código. Cambia una constante: ANIOS_CUSTODIA de 80 a 20 (retencion.js). Se mantienen el hold del contrato, el piso de 20 años y conservacion_por_deber_legal. Si el owner decide conservar 80, el texto debe decir “techo técnico de custodia” y asumir el riesgo de sobre-retención; no lo recomiendo.
+
+1.2 Decisión 2 — El bloqueo D-03: B.3
+Se bloquea la creación de la solicitud, el commit, la creación del consentimiento y la doble firma cuando falta el Anexo de Encargo o el canal de PQRS. La excepción solo procede si cumple todas estas condiciones:
+
+Condición	Contenido
+Autorización	Escrita, del owner o representante legal, con fecha y alcance.
+Alcance	Una Empresa y un número máximo de firmas.
+Ruta en papel	Disponible y operativa el mismo día.
+Plazo	Fecha cierta para firmar el Anexo (máximo 30 días).
+Rastro	Bitácora inmutable: usuario, fecha, motivo, Empresa, número de firmas.
+Límite	No se usa para una Empresa nueva sin ningún Anexo, salvo piloto autorizado.
+Por qué no B.1 absoluta. Sin Anexo no hay base contractual para el tratamiento (2.2.2.25.5.2) y la transmisión no está amparada (2.2.2.25.5.1 num. 2). Pero bloquear sin salida convierte una falla administrativa del empleador en una barrera de acceso al empleo, prohibida por el 2.2.1.1.11. B.3 bloquea el tratamiento ilícito sin dejar al Trabajador sin contratación.
+
+Efecto en el código. Hoy empresa.js exige anexo_encargo_firmado_at y canal_pqrs, pero avisa. La v1.1 ordena el bloqueo en los cuatro puntos. La excepción debe ser un flag auditable, no un if silencioso. Si el flag no existe, se implementa antes de publicar.
+
+1.3 Decisión 3 — El 10.7(b): C.1
+Corrección a la solicitud y al borrador anterior. El plazo de 2 días hábiles no es solo contractual: el artículo 15.1 de la Ley 1581 de 2012 ordena que quien reciba un reclamo y no sea competente para resolverlo dé traslado a quien corresponda en un término máximo de dos (2) días hábiles e informe al interesado. K+AIR, como Encargado, no decide: traslada. La norma le aplica directamente.
+
+Bases que sostienen el numeral:
+
+Art. 15.1 Ley 1581: traslado en 2 días hábiles.
+Art. 18, literales d) y e): actualizar en 5 días hábiles y tramitar consultas y reclamos.
+Art. 2.2.2.25.4.4 (Decreto 1377, art. 23): todo Responsable y Encargado debe designar una persona o área de protección de datos.
+Art. 2.2.2.25.4.2 (art. 21): mecanismos sencillos, ágiles y permanentemente disponibles.
+Arts. 14 y 15 Ley 1581: la Empresa responde consultas en 10 días hábiles y reclamos en 15.
+Texto final del 10.7(b)
+
+b) Los derechos del Titular se ejercen ante la Empresa, como Responsable, por el canal publicado en su política de tratamiento. K+AIR, como Encargado, también atiende las solicitudes que le sean dirigidas: designa una persona o área de protección de datos, mantiene un mecanismo permanente y gratuito publicado en la pantalla de firma y en el Anexo de Encargo, registra toda solicitud con fecha, identidad, tipo y radicado, y la traslada a la Empresa dentro de los dos (2) días hábiles siguientes, con la evidencia que repose en su custodia. K+AIR informa al Titular que la solicitud fue trasladada y no decide sobre el acceso, la rectificación, la supresión o la revocación. La Empresa decide y responde dentro de los plazos de los artículos 14 y 15 de la Ley 1581 de 2012. El canal de K+AIR es [correo o URL] y la persona o área responsable es [nombre o cargo].
+
+Lo que debe definir el owner antes de publicar: persona o área (con acta de designación), canal que alguien atienda, y confirmación de que el formulario del escritorio y el endpoint administrativo escriben en el mismo registro.
+
+1.4 Decisión 4 — El Anexo de Nube: no sirve como está; se reemplaza
+El Anexo actual (legal/anexo-encargo.html) describe la app de escritorio, no el firma-service. Dice “base de datos local en los equipos de la empresa”, prohíbe “centralizar los datos fuera de los equipos” y habla de un “servidor configurado por la empresa”. Las tres afirmaciones son falsas para este servicio. Además no nombra a Cloudflare y solo menciona a Google de forma condicional.
+
+Las tres preguntas de la §5, respondidas:
+
+¿Transmisión o transferencia? Depende del rol del receptor, no del país. Cloudflare y Google son transmisión internacional si y solo si un contrato/DPA los constituye en Encargados (2.2.2.25.5.2); entonces no requieren autorización del Titular (2.2.2.25.5.1 num. 2). Si Google actúa como Responsable —cuenta de Gmail de consumidor— es transferencia y exige autorización expresa e inequívoca (art. 26(a) Ley 1581) o una excepción.
+¿Basta el Anexo? No. Son dos instrumentos: el Acuerdo fija el mecanismo (2.2.2.47.7) y debe mencionar que existen subencargados y remitir a la política y al Anexo; el Anexo los detalla y fija las obligaciones del Encargado. El Trabajador no es parte del Anexo y el Anexo no sustituye su autorización.
+¿La Ley 1712 exige algo por Gmail? La cita está equivocada. La Ley 1712 de 2014 es transparencia y acceso a la información pública; no regula el correo entre particulares. Aplican la Ley 527 de 1999 y el Capítulo 47 del Decreto 1074 de 2015. Gmail no exige autorización especial; lo que exige análisis es el rol de Google y el tratamiento que hace.
+La solución correcta para Google no es añadir una autorización de transferencia al contrato de trabajo. Es migrar el envío a Google Workspace/Cloud con DPA y configurarlo como Encargado. Si se mantiene una cuenta de consumidor, el Anexo no puede decir “transmisión”: hay transferencia y el Acuerdo necesita una autorización expresa, separable e informada que hoy no tiene.
+
+2. Texto final de la v1.1
+Cómo está organizado. Los doce grupos se solapan (el 2.2 aparece en dos grupos, el 3.1 en dos, el 3.7(a) en dos). Para que el texto se pueda pegar sin duplicados, lo presento en orden de numeral; al final va la tabla grupo → numeral. Los numerales no listados quedan como están en la v1.0.
+
+Capítulo I
+1.2. Los datos de identificación de la Empresa (razón social, NIT, domicilio, representante legal y su documento, responsable interno del tratamiento, canales y política) se muestran al Firmante en el bloque «Empresa que solicita tu firma». En esa pantalla se muestra el número completo del documento del representante legal, para que el Trabajador pueda contrastarlo con el Registro Único Empresarial y Social.
+
+La identificación que se incorpora a la Constancia es la copia archivada al momento de la aceptación: se almacena cifrada y se muestra enmascarada, con los cuatro (4) últimos dígitos, porque la Constancia se archiva y puede compartirse con la autoridad laboral. La diferencia es deliberada y no se extiende a los datos del Firmante.
+
+La Constancia incorpora la huella SHA-256 de esa identificación archivada, calculada sin clave secreta sobre la identificación en claro, incluido el número completo del representante. La pantalla muestra la huella de la identificación vigente en ese momento. Si la Empresa cambia sus datos entre la aceptación y la firma, las huellas difieren. Esas huellas acreditan integridad; no reservan el dato frente a terceros, porque la identificación es pública en el RUES. Ni la identificación ni su huella alteran el texto ni la huella de este Acuerdo.
+
+1.4. K+AIR, operada por Gesstiar S.A.S., es el proveedor del mecanismo descrito en el Capítulo III. El servicio se presta en la infraestructura operada por Gesstiar que se describe en el 10.1 y en el Anexo de Nube. K+AIR interviene como Encargado por cuenta de la Empresa, dentro de los alcances, finalidades y plazos de este Acuerdo y del contrato de transmisión del artículo 2.2.2.25.5.2 del Decreto 1074 de 2015 (Anexo de Encargo y su Anexo de Nube). K+AIR no es parte de la relación laboral.
+
+1.5. Los datos completos de Gesstiar S.A.S., su domicilio, sus canales de atención y el canal de protección de datos del 10.7(b) constan en el Anexo de Encargo, disponible en [URL]. No forman parte del texto porque son susceptibles de cambiar y este Acuerdo, una vez publicado, no se modifica: cada versión tiene su propia huella.
+
+Capítulo II
+2.2. Este Acuerdo se celebra al amparo del artículo 2.2.2.47.7 del Decreto 1074 de 2015. Cuando el documento sea el contrato individual de trabajo o sus adiciones, modificaciones o anexos, se dicta además al amparo del artículo 2.2.1.1.8 del Decreto 1072 de 2015 y del artículo 2.2.1.1.9, que exige cumplir los requisitos mínimos del artículo 39 del Código Sustantivo del Trabajo; el parágrafo de ese artículo dispone que el acuerdo sobre el mecanismo se rige por el artículo 2.2.1.1.13 y por las estipulaciones adicionales que las partes convengan. Para los tres casos de los numerales 1, 2 y 3 del artículo 2.2.1.1.13, las partes dejan constancia de lo siguiente:
+
+2.2(a). La vigencia de la firma corresponde a la del contrato y sus adiciones, modificaciones o anexos. El mecanismo no aplica al documento firmado ni a la Constancia ninguna política de eliminación por la terminación de la relación laboral; la conservación por plazo y la supresión posterior se rigen por el 8.6. La Constancia identifica la versión aceptada y la huella de su texto, según el 9.6.
+
+2.2(c). El uso del mecanismo es exclusivo para la relación laboral, sin que el documento firmado pierda validez, eficacia ni fuerza probatoria por el hecho de que la relación haya terminado, conforme al numeral 3 del artículo 2.2.1.1.13 del Decreto 1072 de 2015.
+
+Capítulo III
+3.1. El método consiste en: (i) un enlace individual remitido a la dirección de correo registrada; (ii) un token de acceso; (iii) un código OTP remitido a la dirección de correo personal del Firmante, que la Empresa no administra; y (iv) la confirmación de la firma. El OTP es el dato de creación; el token es una credencial de acceso. El servicio se presta en la infraestructura del 10.1 y del Anexo de Nube.
+
+3.3. El código OTP es el único dato de creación de la firma. El token es una credencial que permite abrir el enlace, pero no constituye dato de creación ni habilita por sí solo la manifestación de voluntad. La firma se perfecciona solo cuando el Firmante introduce el OTP y confirma.
+
+El OTP se remite exclusivamente a la dirección personal del Firmante, no administrada por la Empresa. El token puede remitirse a la dirección de contacto registrada por la Empresa, pero su posesión no sustituye el OTP. Si el Firmante no cuenta con dirección personal, no se utiliza el mecanismo electrónico y se firma en papel.
+
+3.4(c). El Trabajador abre el enlace. El enlace incorpora un token aleatorio, personal e intransferible, con vigencia de setenta y dos (72) horas en la modalidad remota. K+AIR puede reemitirlo a solicitud de la Empresa; cada reemisión se registra y deja sin efecto el token anterior. No hay más de un token vigente por solicitud.
+
+Condición de código: si el sistema mantiene válidos los tokens anteriores, se cambia el código antes de publicar. Un token “de un solo uso” que convive con otros tres contradice el 3.2 y debilita el 3.7(a).
+
+3.4(d). El Trabajador se identifica con el tipo y número de su documento. K+AIR compara el valor con la información registrada por la Empresa mediante HMAC-SHA-256 con clave secreta, registra el resultado y no conserva el número en texto claro.
+
+3.4(e). Verificada la identificación, K+AIR envía al medio personal del Firmante, que la Empresa no administra, un OTP de un solo uso, que expira a los 600 segundos y admite cinco (5) intentos. El código nunca se almacena en claro: solo su HMAC-SHA-256.
+
+3.4(g). Superada la verificación, el Trabajador lee en pantalla el Acuerdo en la versión vigente al momento de la firma y lo acepta. Si la solicitud se creó bajo una versión anterior, el sistema le presenta la vigente para que la lea y la acepte en ese momento. La aceptación se registra con la versión, la huella SHA-256 del texto y la fecha y hora. El Trabajador no puede avanzar sin leer y aceptar.
+
+3.6(e). El OTP y el token se conservan únicamente como HMAC-SHA-256, nunca en texto claro. La clave secreta se mantiene fuera de la base de datos y bajo control de K+AIR.
+
+3.6(g). El registro de auditoría no puede alterarse una vez escrito. La supresión dentro de la ventana de purga del 8.6 no es alteración: da lugar a una lápida que identifica la solicitud, la fecha y hora, las categorías suprimidas y el fundamento del plazo, y a un recibo que la Empresa entrega al Trabajador si lo solicita.
+
+3.7(a). El Firmante declara que la dirección personal a la que recibe el OTP es de su uso exclusivo, que no está administrada por la Empresa y que mantiene el control y la custodia del OTP conforme al artículo 2.2.2.47.6 del Decreto 1074 de 2015. Si no cuenta con una dirección personal, el mecanismo electrónico no se utiliza y la firma se hace en papel. El token puede remitirse a la dirección de contacto registrada por la Empresa, pero no es dato de creación y no permite firmar por sí solo.
+
+3.8. K+AIR conserva y pone a disposición los registros técnicos del mecanismo: la solicitud, los hitos, la constancia de envío del OTP, el registro de emisión y validación del token (sin conservarlo en claro), la verificación del OTP, la huella del documento y la constancia de firma. La Empresa conserva y pone a disposición la autorización del Trabajador, su identidad, la relación laboral y el medio electrónico autorizado para la copia. Conforme al parágrafo del artículo 2.2.2.47.7, K+AIR prueba la seguridad y confiabilidad técnica del mecanismo; la Empresa prueba la autorización y la identidad. La parte que invoca la firma acredita la cadena completa; la sola constancia no sustituye la prueba de la autorización.
+
+3.10. Definiciones técnicas. Se distinguen tres huellas que no son equivalentes: a) SHA-256: se aplica a contenido íntegro y público; puede recalcularla cualquier tercero. Se usa para el texto del Acuerdo (3.6(b), 9.3, 9.6) y para el documento y su copia (2.3, 3.6(a), 3.7(b), 10.5(c)). b) HMAC-SHA-256: usa una clave secreta fuera de la base de datos; no puede recalcularse sin ella. Se usa para el documento de identidad del Firmante, el OTP y el token (3.4(d), 3.4(e), 3.6(e), 10.5(a), 10.5(b)). c) SHA-256 de la identificación de la Empresa: sin clave secreta, sobre la identificación en claro, incluido el documento del representante. Es reproducible por quien conozca esa identificación, que es pública en el RUES, y no ofrece reserva frente a terceros. Se usa para acreditar integridad en la Constancia (1.2, 10.5(g)).
+
+Capítulo IV
+4.1. La firma electrónica tiene la misma validez y efectos jurídicos que la firma cuando cumple el requisito de firma del artículo 2.2.2.47.3 y es confiable en los términos del artículo 2.2.2.47.4 del Decreto 1074 de 2015.
+
+Por qué no se cita el 2.2.2.47.5: su remisión al 2.2.2.43.3 quedó apuntando al presupuesto de las Cámaras de Comercio. La explicación va en el memorando, no en el contrato.
+
+4.2. El requisito de firma de una persona queda cumplido respecto de un mensaje de datos cuando se usa una firma electrónica que, a la luz de todas las circunstancias —incluido este Acuerdo—, sea tan confiable como apropiada para los fines con que se generó o comunicó el mensaje (art. 2.2.2.47.3).
+
+4.3. Conforme al parágrafo 2 del artículo 2.2.1.1.10 del Decreto 1072 de 2015, la firma electrónica tiene los mismos efectos que la firma manuscrita si cumple el artículo 2.2.2.47.3 del Decreto 1074 de 2015.
+
+4.4. Conforme al artículo 244 de la Ley 1564 de 2012, los documentos en forma de mensaje de datos se presumen auténticos. Su valoración se sujeta al artículo 247 de la misma ley. La firma electrónica no es firma digital: son figuras distintas.
+
+4.5. La validez, eficacia y fuerza probatoria de la firma no se afectan por la terminación de la relación laboral (numeral 3 del artículo 2.2.1.1.13). La supresión de la evidencia material conforme al 8.6 no revoca la firma ni altera su presunción; lo que puede afectar es la disponibilidad de los medios de prueba, por lo que la Empresa debe entregar la copia solicitada antes de suprimir y no suprimir mientras haya una solicitud pendiente.
+
+Capítulo V
+5.1. El Firmante acepta los deberes del artículo 2.2.2.47.6 del Decreto 1074 de 2015 y se compromete a cumplirlos: a) Cumplir las condiciones de este Acuerdo y las instrucciones de seguridad que se le informen por escrito antes de la firma, consultables en el enlace. No está obligado a cumplir políticas internas que no le hayan sido puestas a disposición antes de firmar. b) Custodiar el OTP, que es el dato de creación, y el token, que es una credencial de acceso, sin entregarlos ni permitir que un tercero los use. c) Avisar de inmediato a la Empresa y a K+AIR, por el canal de incidentes publicado en la pantalla de firma, cualquier situación que comprometa la seguridad: acceso no autorizado al correo, pérdida del dispositivo o conocimiento de que un tercero obtuvo el OTP o el enlace.
+
+5.4. El Firmante puede imprimir o descargar copia de este Acuerdo y del documento firmado desde el enlace, mientras esté vigente y sin costo. El vencimiento del enlace no extingue su derecho a obtener copia de la Empresa conforme al 8.5.
+
+Capítulo VI
+6.1(d). Parágrafo. Conforme al parágrafo del artículo 2.2.1.1.13 del Decreto 1072 de 2015, el empleador garantiza que el mecanismo cumple las condiciones del artículo 2.2.2.47.4 del Decreto 1074 de 2015.
+
+6.2. Las reglas anteriores son de cumplimiento obligatorio para el contrato individual de trabajo y sus adiciones, modificaciones y anexos. Para los demás documentos de la relación laboral, la Empresa se obliga contractualmente a aplicar las mismas reglas, con fundamento en el parágrafo del artículo 2.2.1.1.9. El incumplimiento es responsabilidad de la Empresa y no afecta al Firmante.
+
+Capítulo VIII
+8.2. El Trabajador autoriza que la Empresa le entregue el contrato, sus anexos y modificaciones por el medio electrónico que indique en la solicitud. La autorización se registra, puede modificarse o revocarse en cualquier momento y no se presume por la aceptación del mecanismo. Si no autoriza un medio electrónico, la Empresa entrega copia en papel o por el medio que el Trabajador acepte. La falta de autorización no impide la firma electrónica.
+
+8.3. Los documentos firmados se mantienen disponibles para consulta en el formato en que fueron creados, por el canal que la Empresa publique.
+
+8.4. La Empresa suministra a las autoridades judiciales y de inspección, vigilancia y control los documentos requeridos, a través de su canal de atención, y los solicita a K+AIR por el medio previsto en el Anexo de Encargo.
+
+8.5. El Trabajador puede solicitar en cualquier momento una copia permanente del contrato firmado, sus anexos, modificaciones y la Constancia. La Empresa la entrega por el medio autorizado, sin costo, dentro de los cinco (5) días hábiles siguientes. La copia se conserva aunque el enlace haya expirado; la descarga desde el enlace es una cortesía y no sustituye este derecho.
+
+8.6. (Texto del §1.1.)
+
+8.7. La conservación puede realizarse en la infraestructura operada por Gesstiar y en los servicios de los subencargados identificados en el Anexo de Nube (Cloudflare, Inc. y Google LLC), con las medidas, plazos y obligaciones de devolución y supresión allí pactados. La supresión del 8.6 alcanza a los respaldos dentro del plazo allí previsto. La Empresa conserva la titularidad y puede solicitar devolución o supresión.
+
+Capítulo IX
+9.2. El Trabajador puede leer el Acuerdo antes de firmar. El sistema muestra la versión vigente al momento de la firma, habilita la casilla solo cuando el texto ha sido desplegado hasta su final y registra la aceptación con la huella del texto y la fecha y hora. El sistema acredita el despliegue, no la lectura.
+
+Capítulo X
+10.1. Infraestructura y terceros. El servicio se presta en un servidor propio de Gesstiar S.A.S., ubicado físicamente en [ciudad, país], en la red local del operador y detrás de NAT. Se expone mediante el túnel kair-firma de Cloudflare, Inc. hacia firma.kair.fyi. El correo transaccional se envía mediante Google LLC (smtp.gmail.com, puerto 587). Cloudflare y Google actúan como subencargados solo si están vinculados por los contratos/DPA descritos en el Anexo de Nube; mientras no lo estén, no se les puede tratar como Encargados. El almacenamiento principal es el sistema de archivos del servidor; no hay proveedor externo de almacenamiento de objetos. Respaldos, monitoreo y soporte: [interno, a cargo de … / provisto por …]. Cuando este Acuerdo use “nube”, se refiere a la infraestructura operada por Gesstiar aquí descrita, no a un proveedor de hosting distinto.
+
+10.2(h). La identificación de la Empresa que se muestra en el bloque «Empresa que solicita tu firma»: razón social, NIT, domicilio, nombre y documento del representante legal, y la huella de esa identificación. Estos datos no pertenecen al Titular: se tratan por cuenta de la Empresa para que el Trabajador contraste quién le solicita la firma.
+
+10.4(a). La finalidad del 10.3(f) se sustenta en el deber legal de conservar evidencia del proceso de firma (arts. 2.2.1.1.12, 2.2.1.1.13 num. 3 y 2.2.2.47.7) y en el deber de conservar prueba de la autorización, conforme al artículo 2.2.2.25.2.5. Opera sin perjuicio de la autorización del Titular.
+
+10.5(a). El documento del Trabajador se compara mediante HMAC-SHA-256 y se conserva solo la huella, no el número en claro. 10.5(b). El OTP y el token se conservan solo como HMAC-SHA-256. 10.5(d). Los registros de auditoría no se alteran. Su supresión en la ventana de purga deja la lápida y el recibo del 3.6(g) y no afecta la prueba de aceptación del 12.7. 10.5(f). Los operadores de infraestructura y correo actúan como Encargados y tratan los datos solo conforme a instrucciones, en los términos del artículo 2.2.2.25.5.2. 10.5(g). El documento del representante legal no se conserva en claro: se cifra con clave fuera de la base, se restringe el acceso y se muestra enmascarado con los cuatro últimos dígitos. La huella SHA-256 de la identificación de la Empresa es reproducible por quien conozca esa identificación, pública en el RUES; no reserva el dato y solo acredita integridad.
+
+10.6. Los plazos se determinan por categoría en la tabla de retención de la Empresa. Vencido el plazo y sin deber legal o contractual, el dato se suprime conforme al 8.6. La supresión del documento, la Constancia y los registros de auditoría deja la lápida y el recibo del 3.6(g) y 10.5(d). Los plazos del SG-SST son los del 8.6(b).
+
+10.7(b). (Texto del §1.3.) 10.7(c). El Titular acredita su identidad. El ejercicio de los derechos y el acceso son gratuitos al menos una vez al mes calendario y cada vez que haya modificaciones sustanciales de la política. Para consultas más frecuentes, la Empresa solo puede cobrar gastos de envío, reproducción y certificación (art. 2.2.2.25.4.2). 10.7(e). El Titular acude primero a la Empresa o a K+AIR, conforme al artículo 15 de la Ley 1581 de 2012. Solo procede acudir a la SIC agotado el reclamo interno (art. 16). 10.7(f). La solicitud de copia es un derecho de acceso (art. 8(f) Ley 1581; art. 2.2.2.25.4.2) y no implica por sí misma un derecho de supresión. La supresión y la revocatoria no proceden cuando existe un deber legal o contractual de permanencia (art. 2.2.2.25.2.6).
+
+Capítulo XII
+12.1. Este Acuerdo se rige por la ley colombiana y, en particular, por: Constitución Política, arts. 15 y 20; Ley 527 de 1999; Ley 594 de 2000; Ley 1562 de 2012; Ley 1564 de 2012; Ley 1581 de 2012; Decreto 1377 de 2013; Decreto 1072 de 2015; Decreto 1074 de 2015; Decreto 526 de 2021; Decreto 2364 de 2012; Resolución 0312 de 2019; y las normas que los modifiquen o sustituyan. El Decreto 526 de 2021 adicionó los artículos 2.2.1.1.8 a 2.2.1.1.15 del Decreto 1072 de 2015; el Decreto 2364 de 2012 reglamentó el artículo 7 de la Ley 527 y fue compilado en el Capítulo 47 del Decreto 1074 de 2015.
+
+12.3. El régimen de los documentos del SG-SST se determina por su normativa, por la Ley 1562 de 2012 y por la Resolución 0312 de 2019 del Ministerio del Trabajo, «Por la cual se definen los Estándares Mínimos del Sistema de Gestión de la Seguridad y Salud en el Trabajo SG-SST» (13 de febrero de 2019; Diario Oficial 50.872 de 19 de febrero de 2019), en cuanto resulte aplicable. Para esos documentos las reglas del Capítulo VI no son de imposición legal directa, porque el 2.2.1.1.13 está dirigido al contrato individual de trabajo, pero la Empresa se obliga contractualmente a aplicarlas en los términos del 6.2.
+
+12.7. La Empresa conserva la prueba de la aceptación junto con la versión aceptada, la huella del texto, la fecha y hora y el identificador de la solicitud, conforme al artículo 2.2.2.25.2.5. Esta prueba subsiste a la supresión del 8.6.
+
+Tabla de los doce grupos
+#	Grupo	Numerales	Veredicto
+1	Nube (T1)	1.4, 1.5, 3.1, 3.7(a), 5.1(c), 8.7, 10.1	Reescritos
+2	§4 vs §8	2.2, 2.2(a), 2.2(c), 4.5, 8.6	Reescritos
+3	Gobernanza (T5)	2.2, 6.1(d), 6.2	Aprobados con la cita al art. 39 CST
+4	Citas del Cap. IV	4.1, 4.2, 4.3, 4.4	Corregidas (47.3 y 47.4; no 47.5/43.3)
+5	Deberes del Firmante	5.1, 5.1(a)-(c)	Corregidos
+6	Carga de la prueba	3.8	Precisado
+7	Huellas	1.2, 3.4(d), 3.4(e), 3.6(e), 3.10, 10.5(a), 10.5(b), 10.5(g)	Aprobados con vocabulario controlado
+8	Tokens y versión	3.1, 3.3, 3.4(c), 3.4(g), 9.2	Reescritos
+9	Copia y conservación	5.4, 8.2, 8.3, 8.4, 8.5	Reescritos 5.4, 8.2 y 8.5
+10	Auditoría y purga	3.6(g), 10.5(d), 10.6, 12.7	Aprobados
+11	Datos personales	10.2(h), 10.4(a), 10.7(b)-(f)	Corregidos
+12	Ley aplicable	12.1, 12.3	Corregidos
+3. Anexo de Nube — validación y texto
+3.1 Veredicto
+No se firma el Anexo actual. Se reemplaza por un Anexo de Nube con su propia versión y huella. Si el Anexo de Encargo ya está firmado con alguna Empresa, el de Nube entra como otrosí y excluye expresamente las cláusulas §3 (“base local”), §4 (“no centralizar”), §5 (“servidor de la empresa”) y §7 (“elimina de sus copias de trabajo”) en lo que contradigan el firma-service. Si no está firmado, se reemplaza.
+
+No se puede firmar si falta alguno de estos cinco datos: (i) NIT y representante de Gesstiar; (ii) ciudad y país del servidor; (iii) DPAs con Cloudflare y Google; (iv) tipo de cuenta de Google; (v) responsable de respaldos, monitoreo y soporte. Un Anexo que diga “los subencargados que se usen” no cumple el artículo 2.2.2.25.5.2.
+
+3.2 Texto modelo
+ANEXO DE NUBE — SERVICIO DE FIRMA ELECTRÓNICA K+AIR
+
+Entre [EMPRESA], NIT [ ], representada por [ ], en calidad de Responsable, y GESSTIAR S.A.S., NIT [ ], representada por [ ], en calidad de Encargado.
+
+1. Servicio y alcance. El Encargado presta el servicio de firma electrónica K+AIR para que el Responsable celebre contratos individuales de trabajo y sus anexos. Este Anexo se incorpora al Anexo de Encargo de Tratamiento de Datos Personales y prevalece sobre las cláusulas de ese Anexo que contradigan el Servicio. El alcance son las categorías del 10.2 del Acuerdo, las finalidades del 10.3 y los sistemas de firma, base de datos, almacenamiento de archivos y envío de correo.
+
+2. Datos y finalidad. Se tratan: identificación del Trabajador; correo; IP y agente de usuario; fechas y horas de los hitos; documento firmado y Constancia; identificación laboral; e identificación del Responsable. La finalidad es la firma, la Constancia, las notificaciones, el soporte y el cumplimiento legal. No hay usos secundarios. El Encargado no recibe datos distintos de los aquí previstos y los descarta si llegan.
+
+3. Infraestructura y ubicación. Servidor propio del Encargado, ubicado físicamente en [ciudad, país], con Ubuntu Server 24.04.5 LTS, en la red local del operador, detrás de NAT. Se expone por el túnel kair-firma de Cloudflare, Inc. hacia firma.kair.fyi. El correo se envía por Google LLC (smtp.gmail.com, puerto 587). El almacenamiento es el sistema de archivos del servidor; no hay almacenamiento de objetos externo. Respaldos: [frecuencia, retención, cifrado, responsable]. Monitoreo: [herramienta o persona]. Soporte: [interno o proveedor]. Seguridad física: [control de acceso al lugar, energía, conectividad]. Continuidad: RTO [ ], RPO [ ].
+
+4. Subencargados. El Responsable autoriza los siguientes, con las obligaciones de este Anexo:
+
+Proveedor	Servicio	Datos	Rol	Ubicación	DPA	Devolución / supresión	Auditoría
+Cloudflare, Inc.	Túnel, tránsito y seguridad	IP, metadatos, contenido en tránsito	Subencargado	Red global	[self-serve / enterprise]	[ ]	[ ]
+Google LLC	SMTP	Correo, contenido y metadatos	Subencargado solo si Workspace/Cloud	[EE. UU./global]	[Workspace/Cloud]	[ ]	[ ]
+[Respaldo]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]
+[Monitoreo]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]
+[Soporte]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]	[ ]
+El Encargado notifica cualquier cambio de subencargado y el Responsable puede oponerse. Si un proveedor actúa como Responsable —por ejemplo, una cuenta de Gmail de consumidor—, el tratamiento es transferencia internacional y requiere autorización expresa del Titular o excepción del artículo 26 de la Ley 1581; el Encargado no puede tratarlo como transmisión.
+
+5. Seguridad. TLS en tránsito; cifrado en reposo; clave fuera de la base; control de acceso y mínimo privilegio; autenticación del personal; registros de acceso; respaldos cifrados; plan de respuesta a incidentes; confidencialidad del personal; revisión de vulnerabilidades; prohibición de datos sensibles en correos y registros. Detalle: [anexo técnico].
+
+6. Conservación, devolución y supresión. Se aplica el 8.6 del Acuerdo: tabla de la Empresa; 20 años para los registros del 2.2.4.6.13; hold sin término para el contrato; deber legal declarado. Al terminar, el Encargado devuelve los datos en formato común [CSV/JSON/PDF] y los suprime de sistemas y respaldos en [plazo], salvo norma que exija conservarlos, y entrega certificación de supresión.
+
+7. Derechos de los Titulares. El Encargado recibe, registra y traslada al Responsable dentro de los dos (2) días hábiles siguientes (art. 15.1 Ley 1581). El Responsable decide y responde en los plazos de los artículos 14 y 15. Canal: [correo/URL]; persona o área: [nombre/cargo]. Gratuito.
+
+8. Auditoría e incidentes. El Encargado permite auditoría anual o entrega informes [SOC 2 / ISO 27001 / propio]. Notifica incidentes sin demora injustificada y a más tardar en [3] días hábiles (plazo contractual), colabora con la SIC e informa conforme al artículo 18(k) de la Ley 1581.
+
+9. Vigencia, terminación y firmas. Vigencia: [ ]. Terminación: [ ]. Sobreviven confidencialidad, devolución, supresión y auditoría. Versión: [ ]. Firmas: Responsable y Encargado, con NIT y representante legal.
+
+3.3 Condiciones de firma y qué hacer con el Anexo actual
+Completar NIT, ubicación, DPAs y responsables. Sin eso, no se firma.
+Verificar el estado del Anexo de Encargo: la base dice firmado y el onboarding dice que no hay ninguno. Esa contradicción se resuelve antes, porque el Anexo de Nube se incorpora a él.
+Firmar otrosí si el Anexo base ya está firmado; reemplazarlo si no.
+Eliminar “Revisión profesional pendiente” y fijar versión y fecha.
+No usar “nube de Gesstiar” como sustituto de la descripción. Si se usa, va con la ciudad y el país, el túnel, el SMTP y la lista de subencargados.
+Riesgo de disponibilidad. El 2.2.1.1.12 exige disponibilidad. Un servidor único, en una red local, sin respaldo declarado, no la garantiza. El Anexo debe declarar RTO/RPO y plan de continuidad, o el servicio no está en condiciones de sostener contratos de trabajo. Esto no es un defecto del texto: es una condición de operación.
+
+4. Qué bloquea la publicación y qué bloquea la primera firma
+#	Requisito	¿Bloquea publicar la v1.1?	¿Bloquea la primera firma real?
+1	9A (copia permanente, medios autorizados) probada	Sí — el 8.2 y el 8.5 la prometen	Sí
+2	10.4 (migración a la versión vigente) probada	Sí — el 3.4(g) la promete	Sí
+3	D-03 (bloqueo en creación, commit, consentimiento y doble firma)	Sí — el 1.4 y el 8.6 lo ordenan	Sí
+4	8.6 con el plazo corregido (20 años)	Sí — si se publica 80, el texto miente sobre el código	Sí
+5	D-02 encendido	No	Sí — el 3.1, 3.3 y 3.7(a) lo ordenan
+6	Anexo de Nube firmado + DPAs	No	Sí
+7	Ubicación física del servidor	No	Sí
+8	Anexo de Encargo: estado resuelto	No	Sí
+9	Persona/área y canal de datos	Sí — el 10.7(b) los nombra	Sí
+10	NIT, URL de la política	Sí — el 1.5 y el 10.7 lo remiten	Sí
+11	Canal de PQRS único (formulario o endpoint)	Sí — sin él, el override no deja rastro	Sí
+Secuencia correcta: (1) cerrar 9A, 10.4 y D-03; (2) ajustar el 8.6 en el código; (3) publicar la v1.1 como archivo nuevo con su propia huella; (4) encender D-02; (5) firmar el Anexo de Nube; (6) primera firma real. La v1.0 y los consentimientos ya aceptados no se tocan.
+
+5. Lo que no está verificado
+⚠️ No verificado — Tipo de cuenta de Google (Workspace/Cloud o consumidor). Define si hay transmisión o transferencia.
+⚠️ No verificado — DPAs de Cloudflare y Google y si cubren devolución, supresión y auditoría.
+⚠️ No verificado — Ubicación física del servidor. El 11A da 192.168.1.11, no la ciudad ni el país.
+⚠️ No verificado — EE. UU. en la lista de países adecuados de la SIC. No se afirma que esté. Si no está, la transferencia a un Responsable en EE. UU. necesita autorización expresa o excepción del art. 26.
+⚠️ No verificado — 9A, 10.4 y D-02 en producción. El 11A las declara cerradas; no se probaron en esta sesión.
+⚠️ No verificado — Estado del Anexo de Encargo. La base y el onboarding se contradicen.
+⚠️ No verificado — Si el código invalida el token anterior al reemitirlo. El 3.4(c) lo exige; si no lo hace, se cambia el código.
+⚠️ No verificado — Alcance de la autorización de los Trabajadores ya firmados. Hoy no hay firmas reales; aplicará cuando las haya.
+6. Fuentes
+Ley 1581 de 2012, Gestor Normativo de Función Pública: https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=49981. Verificados: arts. 3, 4, 5, 6, 8, 9, 10, 14, 15, 16, 17 (incl. literal n), 18 (incl. literal k), 26.
+Decreto 1072 de 2015, art. 2.2.4.6.13: texto verificado en compilación (Normograma Colpensiones/SENA). El plazo de 20 años cubre las cinco categorías enumeradas, no todo el SG-SST.
+Decreto 1074 de 2015, Capítulos 25 y 47: compilación oficial. Verificados 2.2.2.25.1.3, 2.2.2.25.2.8, 2.2.2.25.4.2, 2.2.2.25.4.3, 2.2.2.25.4.4, 2.2.2.25.5.1, 2.2.2.25.5.2, 2.2.2.47.3, 2.2.2.47.4, 2.2.2.47.5, 2.2.2.47.6 y 2.2.2.47.7.
+Resolución 0312 de 2019: título y fecha verificados (13 de febrero de 2019; Diario Oficial 50.872 de 19 de febrero de 2019).
+Descargo. Esta respuesta es una guía de redacción y una revisión de coherencia jurídica. No sustituye la revisión final del abogado que firma el Acuerdo ni constituye representación ante la SIC. No se modificó ningún archivo de código, ni la v1.0, ni los consentimientos aceptados. La decisión final es del owner.
