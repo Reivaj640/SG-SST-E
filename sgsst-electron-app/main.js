@@ -21115,7 +21115,10 @@ ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, e
     }
 
   } catch (error) {
-    sendLog(`[REMISION-EMAIL] Error crítico: ${error.message}`, 'ERROR');
+    // 📦931 — El `detalle` (que puede mencionar el nombre de la variable de
+    // entorno que falta) va SOLO al log. El `error.message` es lo que ve el
+    // usuario final, y ese mensaje no puede hablar de `.env`.
+    sendLog(`[REMISION-EMAIL] Error crítico: ${error.detalle || error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });

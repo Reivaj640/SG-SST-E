@@ -174,13 +174,31 @@ Correo: {remitente}"""
         "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/Formato - Base de datos personal ASEL.xlsx"
     }
 
-    # Credenciales de correo por empresa
-    CREDENCIALES = {
-        "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "password": "pxfu wxit wpjf svxd"},
-        "TEMPOSUM": {"email": "temposumestsas@gmail.com", "password": "bcfw rzxh ksob ddns"},
-        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "password": "yudh myrl zjpk eoej"},
-        "ASEL": {"email": "asel.contratacion@gmail.com", "password": "kdyh degt juwf tuqd"}
+    # Cuentas de correo por empresa (📦931).
+    #
+    # SOLO la direccion de correo, que no es un secreto. La CONTRASENA no puede
+    # quedar en el codigo: este repo es publico y estas app passwords de Gmail
+    # quedaron en el historial de git. Sale del entorno, de la variable
+    # KAIR_EMAIL_<EMPRESA>_PASSWORD.
+    CUENTAS = {
+        "TEMPOACTIVA": {"email": "tempoactivaestsas@gmail.com", "variable": "KAIR_EMAIL_TEMPOACTIVA_PASSWORD"},
+        "TEMPOSUM": {"email": "temposumestsas@gmail.com", "variable": "KAIR_EMAIL_TEMPOSUM_PASSWORD"},
+        "ASEPLUS": {"email": "asepluscaribesas@gmail.com", "variable": "KAIR_EMAIL_ASEPLUS_PASSWORD"},
+        "ASEL": {"email": "asel.contratacion@gmail.com", "variable": "KAIR_EMAIL_ASEL_PASSWORD"}
     }
+
+    @classmethod
+    def resolver_credenciales(cls, empresa):
+        """Devuelve {'email':..., 'password':...}. La contrasena sale del entorno."""
+        cuenta = cls.CUENTAS.get(empresa)
+        if not cuenta:
+            raise ValueError(f"No hay credenciales configuradas para {empresa}")
+        password = os.environ.get(cuenta["variable"], "").strip()
+        if not password:
+            raise RuntimeError(
+                f"Falta la credencial de correo de {empresa} ({cuenta['variable']})"
+            )
+        return {"email": cuenta["email"], "password": password}
     
     # Rutas por empresa para plantillas, remisiones y control
     RUTAS = {
@@ -254,7 +272,7 @@ class WhatsAppSender:
 class EmailSender:
     def __init__(self, empresa):
         self.empresa = empresa.upper()
-        self.credenciales = Config.CREDENCIALES.get(self.empresa)
+        self.credenciales = Config.resolver_credenciales(self.empresa)
         self.plantilla = Config.PLANTILLAS.get(self.empresa, Config.PLANTILLAS["DEFAULT"])
         self.base_datos = Config.BASES_DATOS.get(self.empresa)
         

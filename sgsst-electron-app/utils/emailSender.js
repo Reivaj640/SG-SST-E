@@ -8,6 +8,7 @@
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
+const envLoader = require('../shared/env-loader');
 
 class EmailSender {
   // Plantillas de email por empresa
@@ -144,13 +145,28 @@ Correo: {remitente}`
     }
   };
 
-  // Credenciales de correo por empresa
-  static CREDENCIALES = {
-    "TEMPOACTIVA": { email: "tempoactivaestsas@gmail.com", password: "pxfu wxit wpjf svxd" },
-    "TEMPOSUM": { email: "temposumestsas@gmail.com", password: "bcfw rzxh ksob ddns" },
-    "ASEPLUS": { email: "asepluscaribesas@gmail.com", password: "yudh myrl zjpk eoej" },
-    "ASEL": { email: "asel.contratacion@gmail.com", password: "kdyh degt juwf tuqd" },
-    "COOTRACOM": { email: "tempoactivaestsas@gmail.com", password: "pxfu wxit wpjf svxd" }
+  // Cuentas de correo por empresa.
+  //
+  // 📦931 — SOLO la direccion de correo, que no es un secreto: es un
+  // identificador que ya estaba en el repo y en los correos que salen. La
+  // CONTRASENA no vive mas en el codigo: se lee del entorno (`.env` de la
+  // maquina que compila, o variable de entorno del sistema) en cada envio.
+  //
+  // Por que la contrasena no puede seguir aca: este repo es PUBLICO y estas
+  // app passwords de Gmail quedaron en el historial de git. Sacarlas del
+  // codigo NO las invalida (eso es rotarlas, en Google Account), pero si
+  // evita que sigan por ahi para siempre y que se puedan cambiar sin tocar
+  // codigo.
+  //
+  // `variable` es el nombre de la variable de entorno que guarda la contrasena.
+  // La contrasena de Gmail es "xxxx xxxx xxxx xxxx": SIEMPRE entre comillas en
+  // el `.env`, porque el parser no hace trim interno.
+  static CUENTAS = {
+    "TEMPOACTIVA": { email: "tempoactivaestsas@gmail.com", variable: "KAIR_EMAIL_TEMPOACTIVA_PASSWORD" },
+    "TEMPOSUM": { email: "temposumestsas@gmail.com", variable: "KAIR_EMAIL_TEMPOSUM_PASSWORD" },
+    "ASEPLUS": { email: "asepluscaribesas@gmail.com", variable: "KAIR_EMAIL_ASEPLUS_PASSWORD" },
+    "ASEL": { email: "asel.contratacion@gmail.com", variable: "KAIR_EMAIL_ASEL_PASSWORD" },
+    "COOTRACOM": { email: "tempoactivaestsas@gmail.com", variable: "KAIR_EMAIL_COOTRACOM_PASSWORD" }
   };
 
   /**
@@ -159,14 +175,31 @@ Correo: {remitente}`
    */
   constructor(empresa) {
     this.empresa = empresa.toUpperCase();
-    this.credenciales = EmailSender.CREDENCIALES[this.empresa];
+    const cuenta = EmailSender.CUENTAS[this.empresa];
     this.plantilla = EmailSender.PLANTILLAS[this.empresa] || EmailSender.PLANTILLAS["TEMPOACTIVA"];
 
-    if (!this.credenciales) {
+    this.transporter = null;
+
+    if (!cuenta) {
       throw new Error(`No hay credenciales configuradas para ${this.empresa}`);
     }
 
-    this.transporter = null;
+    // La contrasena se resuelve en CADA construccion: la app crea un
+    // EmailSender por envio, asi que una contrasena rotada aplica al
+    // siguiente envio sin reiniciar la app.
+    const password = envLoader.resolverVariables([cuenta.variable])[cuenta.variable] || '';
+    if (!password) {
+      // El mensaje de este error LLEGA AL USUARIO FINAL (el renderer lo
+      // muestra), asi que no puede mencionar `.env` ni nombres de variable.
+      // El detalle tecnico va en `detalle`, que el main escribe al log.
+      const error = new Error(
+        'El envio por correo no esta disponible en esta instalacion. Contacte al administrador de K+AIR.'
+      );
+      error.detalle = `falta la credencial de correo de ${this.empresa} (${cuenta.variable})`;
+      throw error;
+    }
+
+    this.credenciales = { email: cuenta.email, password };
   }
 
   /**

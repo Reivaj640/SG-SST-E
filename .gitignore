@@ -29,6 +29,14 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+# 📦931 — `.env.production`, `.env.staging` y cualquier `.env.<algo>` tampoco
+# se commitean: hasta ahora solo estaba cubierto `.env.local` y `.env.*.local`,
+# así que un `.env.production` se podía commitear por accidente.
+.env.*
+# ...salvo los ejemplos, que sí van versionados (incluido
+# `firma-service/deploy/.env.production.example`).
+!.env.example
+!.env.*.example
 
 # Editor / OS junk
 .vscode/
