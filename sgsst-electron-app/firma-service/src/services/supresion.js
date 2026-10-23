@@ -38,6 +38,13 @@
  * conserva. El trigger de la migración 020 ya se niega a borrarla; el
  * servicio lo comprueba otra vez antes de tocar nada (cinturón y tirantes).
  *
+ * LA COPIA PENDIENTE
+ * ------------------
+ * El 8.6(e)(iii) pone una cuarta condición: la supresión procede solo cuando
+ * NO hay solicitud de copia pendiente. Y el 8.6(f) manda que la solicitud "se
+ * registra y se atiende antes de cualquier supresión". Mientras la Empresa
+ * tenga una copia pendiente, esta supresión no toca nada de esa empresa.
+ *
  * QUÉ SOBREVIVE
  * -------------
  * La fila de la firma se borra entera. Sobrevive:
@@ -63,6 +70,9 @@ const storage = require('./storage');
 const logger = require('../utils/logger');
 const { hashTokenTombstone } = require('../crypto/token');
 const { esElegible, ventanaVigente } = require('./conservacion');
+// El 8.6(e)(iii): la supresión no procede con una solicitud de copia
+// pendiente. La consulta vive en el módulo que es dueño de la tabla.
+const { tieneCopiaPendiente } = require('./solicitudes');
 
 /**
  * Las categorías de dato que la supresión se lleva. Es lo que se escribe en
@@ -101,12 +111,28 @@ const COLUMNAS_PERSONALES = [
  * hold y el plazo en el momento (nada de confiar en el lote: el estado pudo
  * cambiar entre que se armó y ahora).
  *
+ * LA COPIA PENDIENTE TAMBIÉN SE REVALIDA AQUÍ (el 8.6(e)(iii))
+ * -----------------------------------------------------------
+ * "La supresión procede solo cuando concurren: (i) vencimiento del plazo
+ * aplicable; (ii) ausencia de deber legal o contractual de conservación;
+ * (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold
+ * vigente."
+ *
+ * Se revalida aquí, y no solo al armar el lote, por una razón concreta: una
+ * solicitud de copia puede LLEGAR DESPUÉS de que el lote se armó. Si la
+ * condición se comprobara solo al armar el lote, una copia registrada a mitad
+ * de camino se purgaría igual. `esElegible` ya la mira; el chequeo explícito
+ * de abajo es el cinturón y los tirantes: el 8.6(f) manda que la solicitud
+ * "se atiende antes de cualquier supresión", y esta es la supresión que
+ * borra los datos.
+ *
  * @param {number|null} [id_empresa] - filtra por empresa
- * @returns {object[]} filas elegibles
+ * @returns {{lista: object[], bloqueadasPorCopia: number[]}}
  */
-function elegibles(id_empresa) {
+function elegiblesConDetalle(id_empresa) {
   const lote = db.prepare('SELECT firma_id FROM gh_firma_purga_lote ORDER BY firma_id').all();
   const lista = [];
+  const bloqueadasPorCopia = [];
   for (const { firma_id } of lote) {
     const f = db.prepare(
       'SELECT id, id_solicitud, id_empresa, estado, fecha_conservacion, hold_legal, '
@@ -115,10 +141,27 @@ function elegibles(id_empresa) {
     ).get(firma_id);
     if (!f) continue;
     if (id_empresa && f.id_empresa !== id_empresa) continue;
+    // El 8.6(e)(iii): con una solicitud de copia pendiente, no se suprime.
+    // La firma queda CONTADA aparte para que el informe diga POR QUÉ no se
+    // suprimió nada: no suprimir en silencio es media garantía.
+    if (tieneCopiaPendiente(f.id_empresa)) {
+      bloqueadasPorCopia.push(f.id);
+      continue;
+    }
     if (!esElegible(f)) continue;
     lista.push(f);
   }
-  return lista;
+  return { lista, bloqueadasPorCopia };
+}
+
+/**
+ * Las firmas que la supresión tocaría.
+ *
+ * @param {number|null} [id_empresa] - filtra por empresa
+ * @returns {object[]} filas elegibles
+ */
+function elegibles(id_empresa) {
+  return elegiblesConDetalle(id_empresa).lista;
 }
 
 /**
@@ -143,8 +186,33 @@ function archivosDe(f) {
  * @returns {object} el informe
  */
 function simular(opts = {}) {
-  const firmas = elegibles(opts.id_empresa);
-  const detalle = firmas.map((f) => ({
+  const { lista: firmas, bloqueadasPorCopia } = elegiblesConDetalle(opts.id_empresa);
+  const sim = simularFirmas(firmas);
+  sim.copia_bloqueadas = bloqueadasPorCopia.length;
+  return sim;
+}
+
+/**
+ * La simulación de la capa de datos sobre una lista de firmas dada.
+ *
+ * QUÉ HACE DISTINTO A `simular()`
+ * --------------------------------
+ * `simular()` lee el LOTE. El lote existe solo cuando ya se abrió la ventana
+ * de purga, así que antes de abrirla `simular()` siempre devolvía cero: el
+ * script de purga le mostraba al operador "Simulación de la capa de datos: 0
+ * firmas, 0 archivos" y un segundo después suprimía una firma y tres
+ * archivos. Una simulación que no dice lo que va a pasar es peor que no
+ * tenerla: hace creer que no hay nada que hacer.
+ *
+ * Esta función simula sobre las mismas firmas que el lote va a contener (las
+ * vencidas y elegibles), sin que la ventana tenga que estar abierta.
+ *
+ * @param {object[]} firmas - las filas de la firma a simular
+ * @returns {object} el informe de lo suprimido
+ */
+function simularFirmas(firmas) {
+  const lista = Array.isArray(firmas) ? firmas : [];
+  const detalle = lista.map((f) => ({
     firma_id: f.id,
     id_solicitud: f.id_solicitud,
     id_empresa: f.id_empresa,
@@ -157,6 +225,9 @@ function simular(opts = {}) {
     archivos: detalle.reduce((n, d) => n + d.archivos, 0),
     detalle,
     categorias: CATEGORIAS_DATOS.slice(),
+    // Las frenadas por una copia pendiente no entran en la lista: son las que
+    // el 8.6(e)(iii) saca del lote. La cuenta la pone quien arma el lote.
+    copia_bloqueadas: 0,
   };
 }
 
@@ -203,12 +274,13 @@ function suprimir(opts = {}) {
       firmas: 0,
       archivos: 0,
       hold_bloqueados: 0,
+      copia_bloqueadas: 0,
       nada_que_suprimir: true,
       categorias: CATEGORIAS_DATOS.slice(),
     };
   }
 
-  const firmas = elegibles(opts.id_empresa);
+  const { lista: firmas, bloqueadasPorCopia } = elegiblesConDetalle(opts.id_empresa);
   const bloqueadas = lote.length - firmas.length;
 
   let archivosEliminados = 0;
@@ -261,8 +333,9 @@ function suprimir(opts = {}) {
       db.prepare(`
         INSERT INTO gh_firma_purgadas
           (firma_id, token_tombstone, token_tombstones, id_empresa, purgado_at,
-           actor, motivo, categorias, archivos_eliminados)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           actor, motivo, categorias, archivos_eliminados,
+           id_solicitud, fecha_conservacion)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         f.id,
         principal,
@@ -272,16 +345,26 @@ function suprimir(opts = {}) {
         actor,
         motivo,
         JSON.stringify(CATEGORIAS_DATOS),
-        rutas.length
+        rutas.length,
+        // El 3.6(g): la lápida "identifica la solicitud ... y el fundamento
+        // del plazo". Sin estas dos columnas, una vez borrada la fila de la
+        // firma la lápida no decía a qué solicitud pertenecía ni hasta qué
+        // fecha estaba obligado a conservarse (migración 040).
+        f.id_solicitud || null,
+        f.fecha_conservacion || null
       );
 
       // El recibo de purgas (append-only): qué firma, qué empresa, cuándo,
       // quién, por qué, en qué ventana y qué categorías. Sin datos personales.
+      //
+      // El 3.6(g) y el 10.5(d): el recibo identifica la solicitud y el
+      // fundamento del plazo (migración 041).
       db.prepare(`
         INSERT INTO gh_firma_purga_registro
           (firma_id, id_empresa, purgado_at, actor, motivo, ventana_hasta,
-           categorias, hold_verificado, eventos_purgados)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+           categorias, hold_verificado, eventos_purgados,
+           id_solicitud, fecha_conservacion)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
       `).run(
         f.id,
         f.id_empresa,
@@ -290,7 +373,9 @@ function suprimir(opts = {}) {
         motivo,
         ventana.abierta_hasta,
         'datos:' + JSON.stringify(CATEGORIAS_DATOS),
-        0
+        0,
+        f.id_solicitud || null,
+        f.fecha_conservacion || null
       );
       return true;
     });
@@ -301,14 +386,18 @@ function suprimir(opts = {}) {
     actor,
     firmas: firmasSuprimidas,
     archivos_eliminados: archivosEliminados,
-    hold_bloqueados: bloqueadas,
+    hold_bloqueados: bloqueadas - bloqueadasPorCopia.length,
+    copia_bloqueadas: bloqueadasPorCopia.length,
   });
 
   return {
     simulacion: false,
     firmas: firmasSuprimidas,
     archivos: archivosEliminados,
-    hold_bloqueados: bloqueadas,
+    hold_bloqueados: bloqueadas - bloqueadasPorCopia.length,
+    // El 8.6(e)(iii): cuántas quedaron afuera por una solicitud de copia
+    // pendiente. El informe dice POR QUÉ no se suprimió nada.
+    copia_bloqueadas: bloqueadasPorCopia.length,
     categorias: CATEGORIAS_DATOS.slice(),
   };
 }
@@ -362,6 +451,7 @@ module.exports = {
   CATEGORIAS_DATOS,
   COLUMNAS_PERSONALES,
   simular,
+  simularFirmas,
   suprimir,
   esTombstone,
   buscarLapidada,

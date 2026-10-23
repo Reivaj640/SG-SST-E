@@ -30,6 +30,7 @@ const { adminApiAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
+const auditoriaService = require('../services/empresaAuditoria');
 const {
   idEmpresa,
   createEmpresaBody,
@@ -38,6 +39,35 @@ const {
   setActivoBody,
 } = require('../schemas/admin-empresas');
 const { AppError } = require('../middleware/errors');
+
+/**
+ * Arma el contexto de auditoria de un request admin.
+ *
+ * `adminApiAuth()` SOLO dice "esta peticion viene con la API key administrativa":
+ * no dice quien la hizo. Para que el rastro de la ficha tenga un "quien" real,
+ * el operador puede declarar el actor con el header `X-Admin-Actor` (quien
+ * firma el cambio) y el motivo con `X-Admin-Motivo`. Si no se declara nada,
+ * el rastro queda con `admin` como actor: el cambio sigue siendo visible (que
+ * es lo que el abogado exige: "sin el, el override no deja rastro"), pero no
+ * se le atribuye a una persona.
+ *
+ * El motivo va en HEADER y no en el body a proposito: el body de `PUT
+ * /empresas/:id` es un REEMPLAZO de la ficha, y meter el motivo ahi lo
+ * contaminaria (el service no lo reconoceria como campo de la Empresa).
+ *
+ * @param {object} req
+ * @returns {{actor: string|null, motivo: string|null, ip: string|null, user_agent: string|null}}
+ */
+function _contextoAuditoria(req) {
+  const actor = req.get('X-Admin-Actor');
+  const motivo = req.get('X-Admin-Motivo');
+  return {
+    actor: typeof actor === 'string' && actor.trim() ? actor.trim().slice(0, 200) : null,
+    motivo: typeof motivo === 'string' && motivo.trim() ? motivo.trim().slice(0, 500) : null,
+    ip: req.ip || req.socket?.remoteAddress || null,
+    user_agent: req.get('User-Agent') || null,
+  };
+}
 
 /**
  * Lee y valida el path param id_empresa con el mismo schema que se usa para
@@ -106,12 +136,42 @@ router.post('/empresas', adminApiAuth(), validateBody(createEmpresaBody), (req, 
 
 // ============================================================================
 // PUT /internal/admin/empresas/:id_empresa
+// Actualiza la identificacion. Cada campo que REALMENTE cambia queda
+// rastreado (migraciones 037 y 038): como este PUT es un reemplazo completo,
+// un guardado de escritorio puede pisar un canal de PQRS declarado por via
+// administrativa, y el abogado exige que ese override deje rastro.
 // ============================================================================
 router.put('/empresas/:id_empresa', adminApiAuth(), validateBody(updateEmpresaBody), (req, res, next) => {
   try {
     const id = _parseId(req);
-    const actualizada = empresaService.update(id, req.body);
+    const actualizada = empresaService.update(id, req.body, _contextoAuditoria(req));
     res.json(actualizada);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// GET /internal/admin/empresas/:id_empresa/historial
+// El rastro de los cambios de la ficha, del mas reciente al mas antiguo.
+//
+// Es el endpoint que responde "de donde salio este canal": quien lo cambio,
+// cuando, desde donde, por que, y de que valor a que valor.
+// ============================================================================
+router.get('/empresas/:id_empresa/historial', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const limiteRaw = req.query.limite;
+    let limite = 200;
+    if (limiteRaw !== undefined) {
+      const n = Number(limiteRaw);
+      if (!Number.isInteger(n) || n <= 0 || n > 1000) {
+        throw new AppError(400, 'INVALID_REQUEST_BODY',
+          'limite debe ser un entero entre 1 y 1000');
+      }
+      limite = n;
+    }
+    res.json({ items: auditoriaService.historial(id, { limite }) });
   } catch (err) {
     next(err);
   }
@@ -126,7 +186,7 @@ router.put('/empresas/:id_empresa', adminApiAuth(), validateBody(updateEmpresaBo
 router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth(), validateBody(anexoBody), (req, res, next) => {
   try {
     const id = _parseId(req);
-    const empresa = empresaService.marcarAnexoFirmado(id, req.body.fecha);
+    const empresa = empresaService.marcarAnexoFirmado(id, req.body.fecha, _contextoAuditoria(req));
     res.json(empresa);
   } catch (err) {
     next(err);
@@ -141,7 +201,7 @@ router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth(), validateBody(
 router.post('/empresas/:id_empresa/estado', adminApiAuth(), validateBody(setActivoBody), (req, res, next) => {
   try {
     const id = _parseId(req);
-    const empresa = empresaService.setActivo(id, req.body.activo);
+    const empresa = empresaService.setActivo(id, req.body.activo, _contextoAuditoria(req));
     logger.warn('Estado de empresa cambiado por admin', {
       id_empresa: id,
       activo: req.body.activo,

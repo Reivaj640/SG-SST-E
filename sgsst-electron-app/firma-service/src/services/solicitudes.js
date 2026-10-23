@@ -44,6 +44,40 @@
  * `FIRMA_PLAZO_TRAMITE_DIAS`. Si el abogado pone otro número, se cambia la
  * variable de entorno, no este archivo. El plazo se calcula en días hábiles
  * (no se cuenta el fin de semana).
+ *
+ * LA COPIA PERMANENTE (el 8.5): UN PLAZO QUE NO ES ESTE
+ * ---------------------------------------------------
+ * El 8.5 del texto final aprobado por el abogado dice:
+ *
+ *   "8.5. El Trabajador puede solicitar en cualquier momento una copia
+ *    permanente del contrato firmado, sus anexos, modificaciones y la
+ *    Constancia. La Empresa la entrega por el medio autorizado, sin costo,
+ *    dentro de los cinco (5) días hábiles siguientes. La copia se conserva
+ *    aunque el enlace haya expirado; la descarga desde el enlace es una
+ *    cortesía y no sustituye este derecho."
+ *
+ * Son DOS relojes y NO SE CONFUNDEN:
+ *
+ *   - `plazoTramiteDias` (2 días hábiles) = cuándo K+AIR TRASMITE la
+ *     solicitud a la Empresa. Deudor: K+AIR, el Encargado (10.7(b)).
+ *   - `plazoCopiaDias` (5 días hábiles)   = cuándo la EMPRESA ENTREGA la
+ *     copia permanente. Deudor: la Empresa, la Responsable (8.5).
+ *
+ * El de la copia se registra en `plazo_copia` al RECEPIR la solicitud y NO se
+ * recalcula: es la fecha límite que se le ofreció al Titular, y moverla sería
+ * cambiarle un plazo ya comunicado.
+ *
+ * POR QUÉ UNA COPIA NO SE CIERRA POR VÍNCULO EXPIRADO
+ * ---------------------------------------------------
+ * El 8.5 dice que "la copia se conserva aunque el enlace haya expirado". O
+ * sea: el vencimiento del enlace de firma NO es un motivo para dar por
+ * atendida una solicitud de copia. Por eso la única salida de "pendiente" es
+ * la respuesta de la Empresa (`responder`), y para una COPIA esa respuesta
+ * exige la declaración de que la solicitud fue ATENDIDA (`copia_atendida`).
+ * No hay ninguna otra puerta: no hay expiración, no hay cierre automático.
+ *
+ * Y una copia pendiente FRENA la supresión (el 8.6(e)(iii) y el 8.6(f)): lo
+ * consulta `tieneCopiaPendiente`, que usan la conservación y la supresión.
  */
 'use strict';
 
@@ -63,6 +97,12 @@ const TIPOS = Object.freeze([
   'REVOCACION',
   'RECLAMO',
   'OTRO',
+  // El 8.5: la copia permanente del contrato firmado, sus anexos,
+  // modificaciones y la Constancia. La v1.0 (publicada) ya decía que el
+  // Trabajador tiene derecho a obtenerla "en cualquier momento y sin costo";
+  // el texto final aprobado le pone el plazo de cinco (5) días hábiles y la
+  // regla de que la copia se conserva aunque el enlace haya expirado.
+  'COPIA',
 ]);
 
 const ESTADOS = Object.freeze(['RECIBIDA', 'TRASMITIDA', 'RESPONDIDA', 'CERRADA']);
@@ -93,6 +133,29 @@ function _sumarDiasHabiles(base, dias) {
     if (dia !== 0 && dia !== 6) restantes--;
   }
   return d;
+}
+
+/**
+ * Una fecha ISO, legible para una persona.
+ *
+ * Se usa para el mensaje al Titular: el plazo del 8.5 tiene que poder LEERSE,
+ * no solo machine-checkearse.
+ *
+ * OJO: el DÍA es el local, no el de UTC. `_sumarDiasHabiles` cuenta en días
+ * del calendario local, así que si el mensaje dijera el día UTC, un registro
+ * hecho de noche mostraría el día siguiente (el plazo que se le dice al
+ * Titular tiene que ser el mismo que se le guardó).
+ *
+ * @param {string|null} iso
+ * @returns {string} YYYY-MM-DD, o el valor original si no se puede leer
+ */
+function _fechaLegible(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
 /**
@@ -167,13 +230,21 @@ function registrar(datos = {}) {
   const plazo = _sumarDiasHabiles(ahora, config.plazoTramiteDias);
   const folio = _folio();
 
+  // El 8.5: la fecha límite de ENTREGA de la copia permanente. Es OTRO reloj
+  // (la respuesta de la Empresa, no la trasmisión de K+AIR) y se calcula una
+  // sola vez, al registrar: es la fecha que se le comunica al Titular.
+  const esCopia = tipo === 'COPIA';
+  const plazoCopia = esCopia
+    ? _sumarDiasHabiles(ahora, config.plazoCopiaDias).toISOString()
+    : null;
+
   const id = db.transaction(() => {
     const res = db.prepare(`
       INSERT INTO gh_solicitudes_titular
         (folio, fecha_registro, canal, tipo, solicitante_nombre, solicitante_correo,
          solicitante_documento_hash, contenido, estado, id_empresa, canal_empresa,
-         plazo_tramite, creado_por, ip, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECIBIDA', ?, ?, ?, ?, ?, ?)
+         plazo_tramite, plazo_copia, creado_por, ip, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECIBIDA', ?, ?, ?, ?, ?, ?, ?)
     `).run(
       folio,
       ahora.toISOString(),
@@ -188,6 +259,7 @@ function registrar(datos = {}) {
       _texto(datos.id_empresa, 64),
       _texto(datos.canal_empresa, 300),
       plazo.toISOString(),
+      plazoCopia,
       _texto(datos.creado_por, 100) || 'titular',
       _texto(datos.ip, 64),
       _texto(datos.user_agent, 300)
@@ -197,6 +269,7 @@ function registrar(datos = {}) {
       folio,
       tipo,
       plazo_tramite: plazo.toISOString(),
+      plazo_copia: plazoCopia,
     });
     return nuevoId;
   })();
@@ -210,10 +283,19 @@ function registrar(datos = {}) {
     id_solicitud: id,
     estado: 'RECIBIDA',
     plazo_tramite: plazo.toISOString(),
-    mensaje:
-      'Recibimos tu solicitud. K+AIR la registró y la va a trasmitir a la '
-      + 'Empresa, que es quien debe responder. Puedes preguntar por ella con '
-      + 'el folio ' + folio + '.',
+    // El 8.5: el plazo de entrega de la copia, cuando la solicitud es de copia.
+    plazo_copia: plazoCopia,
+    mensaje: esCopia
+      ? 'Recibimos tu solicitud de copia permanente. K+AIR la registró y la va a '
+        + 'trasmitir a la Empresa, que es quien debe entregarla por el medio '
+        + 'que autorizaste, sin costo, dentro de los ' + config.plazoCopiaDias
+        + ' días hábiles siguientes (hasta el ' + _fechaLegible(plazoCopia) + '). '
+        + 'La copia se conserva aunque el enlace de firma haya expirado: '
+        + 'descargarla del enlace es una cortesía, no el derecho. Puedes preguntar '
+        + 'por ella con el folio ' + folio + '.'
+      : 'Recibimos tu solicitud. K+AIR la registró y la va a trasmitir a la '
+        + 'Empresa, que es quien debe responder. Puedes preguntar por ella con '
+        + 'el folio ' + folio + '.',
   };
 }
 
@@ -277,11 +359,28 @@ function trasmitir(id, datos = {}) {
  * Registra la respuesta de la Empresa (la Responsable) y la devuelve al
  * Titular.
  *
+ * UNA COPIA SOLO SE CIERRA DECLARANDO QUE FUE ATENDIDA
+ * ---------------------------------------------------
+ * El 8.5: "La copia se conserva aunque el enlace haya expirado; la descarga
+ * desde el enlace es una cortesía y no sustituye este derecho." Y el 8.6(f):
+ * "La solicitud se registra y se atiende antes de cualquier supresión."
+ *
+ * Por eso una solicitud de tipo COPIA NO se puede cerrar como si el vínculo
+ * hubiera expirado: la única salida de "pendiente" es la respuesta de la
+ * Empresa, y esa respuesta tiene que declarar que la solicitud fue ATENDIDA
+ * (`copia_atendida: true`). Sin esa declaración la solicitud sigue pendiente,
+ * y pendiente significa que la supresión no procede (8.6(e)(iii)).
+ *
+ * Quien declara es la Empresa, que es la Responsable: el sistema registra lo
+ * que la Responsable declara, no lo que puede verificar por sí mismo (la
+ * entrega es por un medio autorizado que el sistema no controla).
+ *
  * @param {number} id
  * @param {object} datos
  * @param {string} datos.actor
  * @param {string} datos.respuesta
  * @param {object} [datos.evidencia]
+ * @param {boolean} [datos.copia_atendida] - obligatorio si la solicitud es COPIA
  * @returns {object}
  */
 function responder(id, datos = {}) {
@@ -296,6 +395,13 @@ function responder(id, datos = {}) {
   const actual = _fila(id);
   if (!actual) {
     throw new AppError(404, 'SOLICITUD_NOT_FOUND', 'La solicitud no existe');
+  }
+  if (actual.tipo === 'COPIA' && datos.copia_atendida !== true) {
+    throw new AppError(409, 'COPIA_NO_ATENDIDA',
+      'Una solicitud de copia no se cierra sin declarar que fue atendida: la '
+      + 'copia se conserva aunque el enlace haya expirado (8.5) y se atiende '
+      + 'antes de cualquier supresión (8.6(f)).',
+      { estado: actual.estado, folio: actual.folio });
   }
 
   const ahora = new Date().toISOString();
@@ -314,6 +420,8 @@ function responder(id, datos = {}) {
     _evento(id, 'SOLICITUD_RESPONDIDA', actor, {
       respondida_at: ahora,
       evidencia: datos.evidencia ? Object.keys(datos.evidencia) : null,
+      // La declaración de la Empresa de que la copia fue atendida (8.5/8.6(f)).
+      copia_atendida: actual.tipo === 'COPIA' ? true : undefined,
     });
   })();
 
@@ -329,13 +437,124 @@ function _fila(id) {
   return db.prepare('SELECT * FROM gh_solicitudes_titular WHERE id = ?').get(n) || null;
 }
 
+// ===========================================================================
+// LA COPIA PENDIENTE FRENA LA SUPRESIÓN (el 8.6(e)(iii) y el 8.6(f))
+// ===========================================================================
+//
+// EL TEXTO
+// --------
+// 8.6(e): "La supresión procede solo cuando concurren: (i) vencimiento del
+// plazo aplicable; (ii) ausencia de deber legal o contractual de conservación;
+// (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold
+// vigente."
+//
+// 8.6(f): "La solicitud se registra y se atiende antes de cualquier supresión."
+//
+// POR QUÉ SE CRUZA POR EMPRESA Y NO POR TITULAR
+// ---------------------------------------------
+// Las dos tablas no se cruzan por el documento del Titular, y no es un descuido:
+//
+//   - `gh_solicitudes_titular.solicitante_documento_hash` es el SHA-256 del
+//     documento (el 10.5(a): huella, nunca en claro).
+//   - `gh_firmas_electronicas.id_trabajador` es el SEUDÓNIMO del trabajador:
+//     un HMAC con el ÁMBITO de la Empresa (ver src/services/trabajador.js).
+//
+// Son dos funciones distintas del mismo dato, con amplitudes distintas: el
+// seudónimo NO se puede calcular sin saber la Empresa, y el sha256 no se
+// puede comparar con el HMAC. Cruzar por el hash "funcionaría" solo para las
+// filas cuyo hash previo coincide (las no saladas) y fallaría en silencio
+// para las demás: un cruce frágil que a veces no bloquea.
+//
+// Por eso el cruce es POR EMPRESA: mientras esa Empresa tenga una solicitud
+// de copia PENDIENTE, ninguna de sus firmas vencidas es elegible. Es la misma
+// granularidad del hold de deber legal (migración 030), que también frena a
+// nivel de empresa: aquí se conserva de más, que es el lado correcto en el que
+// equivocarse.
+//
+// LIMITACIÓN CONOCIDA
+// -------------------
+// Una COPIA registrada por el canal público todavía NO tiene `id_empresa`: se
+// lo asigna K+AIR al trasmitirla a la Empresa. Entre el registro y la
+// trasmisión (el plazo de trasmisión del 10.7(b)), el bloqueo no aplica a
+// ninguna empresa, porque no hay a cuál atribuírselo. Queda como deuda
+// abierta: hace falta un camino que ate la solicitud al Titular antes de
+// que laEmpresa la transmita.
+//
+// QUÉ ESTADOS SON "PENDIENTE"
+// ---------------------------
+// Todo estado que no sea RESPONDIDA ni CERRADA. La lista es abierta a
+// propósito: un estado nuevo que nadiePensó sigue contando como pendiente,
+// y pendiente es lo que FRENA la supresión.
+
+/**
+ * ¿Esta Empresa tiene alguna solicitud de COPIA pendiente?
+ *
+ * @param {string|null} id_empresa
+ * @returns {boolean}
+ */
+function tieneCopiaPendiente(id_empresa) {
+  if (!id_empresa) return false;
+  const row = db.prepare(`
+    SELECT COUNT(*) AS n
+      FROM gh_solicitudes_titular
+     WHERE tipo = 'COPIA'
+       AND id_empresa = ?
+       AND estado NOT IN ('RESPONDIDA', 'CERRADA')
+  `).get(String(id_empresa));
+  return Number(row && row.n) > 0;
+}
+
+/**
+ * Las Empresas que tienen alguna solicitud de COPIA pendiente.
+ *
+ * Es la versión de conjunto de `tieneCopiaPendiente`: una sola consulta para
+ * todo un lote, en vez de una por firma.
+ *
+ * @returns {Set<string>}
+ */
+function empresasConCopiaPendiente() {
+  const filas = db.prepare(`
+    SELECT DISTINCT id_empresa
+      FROM gh_solicitudes_titular
+     WHERE tipo = 'COPIA'
+       AND id_empresa IS NOT NULL
+       AND estado NOT IN ('RESPONDIDA', 'CERRADA')
+  `).all();
+  const salida = new Set();
+  for (const f of filas) {
+    if (f.id_empresa) salida.add(String(f.id_empresa));
+  }
+  return salida;
+}
+
+/**
+ * La proyección de una fila para la respuesta: además de la fila, lo que el
+ * operador tiene que ver de una solicitud de COPIA (el plazo del 8.5 y si
+ * sigue pendiente).
+ *
+ * @param {object} fila
+ * @returns {object}
+ */
+function _decorar(fila) {
+  if (!fila) return fila;
+  const salida = { ...fila, evidencia: _json(fila.evidencia) };
+  if (fila.tipo === 'COPIA') {
+    salida.copia = {
+      plazo_copia: fila.plazo_copia || null,
+      plazo_dias_habiles: config.plazoCopiaDias,
+      // El 8.5: la copia se conserva aunque el enlace haya expirado. Por eso
+      // lo único que deja de estar pendiente es la respuesta de la Empresa.
+      pendiente: fila.estado !== 'RESPONDIDA' && fila.estado !== 'CERRADA',
+      se_entrega_por: 'medio electronico autorizado por el Trabajador (8.2)',
+    };
+  }
+  return salida;
+}
+
 function obtener(id) {
   const fila = _fila(id);
   if (!fila) return null;
-  return {
-    ...fila,
-    evidencia: _json(fila.evidencia),
-  };
+  return _decorar(fila);
 }
 
 function porFolio(folio) {
@@ -356,11 +575,11 @@ function listar(filtros = {}) {
   if (filtros.estado) {
     return db.prepare(
       'SELECT * FROM gh_solicitudes_titular WHERE estado = ? ORDER BY id DESC LIMIT ?'
-    ).all(String(filtros.estado), limite).map((f) => ({ ...f, evidencia: _json(f.evidencia) }));
+    ).all(String(filtros.estado), limite).map(_decorar);
   }
   return db.prepare(
     'SELECT * FROM gh_solicitudes_titular ORDER BY id DESC LIMIT ?'
-  ).all(limite).map((f) => ({ ...f, evidencia: _json(f.evidencia) }));
+  ).all(limite).map(_decorar);
 }
 
 /** El historial de una solicitud. */
@@ -385,5 +604,7 @@ module.exports = {
   porFolio,
   listar,
   eventos,
+  tieneCopiaPendiente,
+  empresasConCopiaPendiente,
   _sumarDiasHabiles,
 };

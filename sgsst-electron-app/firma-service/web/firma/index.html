@@ -105,6 +105,14 @@
         <button type="submit" class="btn btn-primary" id="btn-otp">VERIFICAR</button>
       </form>
       <button type="button" class="btn-link" id="btn-back-identify">← Cambiar documento</button>
+      <!--
+        3.4(e) · El código expira a los 600 segundos. Cuando eso pasa, el
+        backend responde 410 OTP_EXPIRADO y este botón aparece para que el
+        Trabajador pueda pedir un código nuevo sin quedarse atrapado.
+      -->
+      <button type="button" class="btn-link" id="btn-reenviar-otp" hidden>
+        Solicitar un código nuevo
+      </button>
       <!-- 9A (el 8.2): la vía para ver y cambiar los medios autorizados. -->
       <button type="button" class="btn-link" id="btn-mis-medios">Mis medios autorizados</button>
     </section>

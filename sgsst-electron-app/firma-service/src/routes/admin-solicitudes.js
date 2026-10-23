@@ -22,6 +22,10 @@ const solicitudes = require('../services/solicitudes');
 
 /**
  * Body de la respuesta de la Empresa.
+ *
+ * `copia_atendida` es obligatorio para las solicitudes de tipo COPIA: el 8.5
+ * dice que la copia se conserva aunque el enlace haya expirado, así que una
+ * copia no se cierra sin que la Empresa declare que la atendió.
  */
 function _respuestaBody(req) {
   const respuesta = req.body && req.body.respuesta;
@@ -30,6 +34,7 @@ function _respuestaBody(req) {
     actor: (req.body && req.body.actor) || 'empresa',
     respuesta,
     evidencia: evidencia && typeof evidencia === 'object' ? evidencia : null,
+    copia_atendida: (req.body && req.body.copia_atendida) === true,
   };
 }
 

@@ -146,6 +146,10 @@
     const box = $('#' + formId);
     if (!box) return;
     box.textContent = message;
+    // Si la caja quedó en modo aviso (info) de un mensaje anterior, se
+    // devuelve a error: un error tiene que verse como error.
+    box.classList.remove('alert-info');
+    box.classList.add('alert-error');
     box.hidden = false;
   }
 
@@ -154,6 +158,23 @@
     if (!box) return;
     box.hidden = true;
     box.textContent = '';
+  }
+
+  /**
+   * Muestra un aviso que NO es un error (por ejemplo: "te enviamos un código
+   * nuevo"). Reusa la misma caja, pero le cambia la clase para que no salga
+   * en rojo un mensaje que es una buena noticia.
+   *
+   * @param {string} formId
+   * @param {string} message
+   */
+  function showFormNotice(formId, message) {
+    const box = $('#' + formId);
+    if (!box) return;
+    box.textContent = message;
+    box.classList.remove('alert-error');
+    box.classList.add('alert-info');
+    box.hidden = false;
   }
 
   function setButtonBusy(button, busyText, originalText) {
@@ -493,6 +514,25 @@
           );
           otpInput.value = '';
           otpInput.focus();
+        } else if (err.status === 410 && err.code === 'OTP_EXPIRADO') {
+          // El 3.4(e) del Acuerdo de uso dice que el código "expira a los
+          // seiscientos (600) segundos contados desde su envío". Acá el
+          // backend ya lo cumple (antes no: un código de hace horas seguía
+          // valiendo).
+          //
+          // Un 410 genérico ("Este enlace ha expirado") sería MENTIROSO: el
+          // enlace sigue vivo, lo que venció es el código. Por eso este
+          // caso va antes del 410 genérico, y la salida es pedir un código
+          // nuevo (POST /api/sign/:token/resend-otp), no un callejón sin
+          // salida.
+          showFormError(
+            'otp-error',
+            'Tu código expiró (es válido por 10 minutos). Solicita uno nuevo a tu empleador.'
+          );
+          otpInput.value = '';
+          const reenviarBtn = $('#btn-reenviar-otp');
+          if (reenviarBtn) reenviarBtn.hidden = false;
+          otpInput.focus();
         } else if (err.status === 410) {
           return showError('Este enlace ha expirado o ya fue utilizado.');
         } else {
@@ -516,6 +556,46 @@
       hideFormError('otp-error');
       showScreen('identify');
     });
+
+    // 3.4(e) · Pedir un código nuevo cuando el anterior expiró.
+    //
+    // El endpoint solo deja reenviar si el OTP anterior YA expiró (por eso
+    // devuelve OTP_NOT_EXPIRED si todavía sirve) o si el estado está
+    // bloqueado. Es la salida del Trabajador cuando su código caduca, y la
+    // razón por la que el 410 OTP_EXPIRADO no lo deja trapped.
+    const reenviarBtn = $('#btn-reenviar-otp');
+    if (reenviarBtn) {
+      reenviarBtn.addEventListener('click', async () => {
+        hideFormError('otp-error');
+        setButtonBusy(reenviarBtn, 'ENVIANDO...', 'Solicitar un código nuevo');
+        try {
+          await apiFetch('/api/sign/' + state.token + '/resend-otp', {
+            method: 'POST',
+            body: {},
+          });
+          showFormNotice(
+            'otp-error',
+            'Te enviamos un código nuevo a tu correo. Revisa también la carpeta de spam.'
+          );
+          reenviarBtn.hidden = true;
+          otpInput.value = '';
+          otpInput.focus();
+        } catch (err) {
+          if (err.status === 400 && err.code === 'OTP_NOT_EXPIRED') {
+            showFormError('otp-error', 'Tu código actual todavía sirve. Usalo antes de que expire.');
+            reenviarBtn.hidden = true;
+          } else if (err.status === 429) {
+            showFormError('otp-error', 'Se enviaron demasiados códigos seguidos. Espera unos minutos e intenta de nuevo.');
+          } else if (err.status === 410) {
+            return showError('Este enlace ha expirado o ya fue utilizado.');
+          } else {
+            showFormError('otp-error', err.message || 'No se pudo enviar un código nuevo.');
+          }
+        } finally {
+          clearButtonBusy(reenviarBtn);
+        }
+      });
+    }
   }
 
   // ============================================================

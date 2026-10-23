@@ -49,6 +49,7 @@ const { sha256 } = require('../crypto/hash');
 const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
 const representanteService = require('./representante');
 const excepcionService = require('./excepcionHabilitacion');
+const auditoriaService = require('./empresaAuditoria');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -562,12 +563,20 @@ function create(datos) {
  * `activo` NO se toca aquí: dar de baja una empresa tiene su propio endpoint
  * para que no ocurra por accidente en una actualización de rutina.
  *
+ * CADA CAMPO QUE REALMENTE CAMBIA QUEDA RASTREADO (migraciones 037 y 038).
+ * Como este update es un reemplazo completo, un guardado de escritorio puede
+ * pisar un canal de PQRS declarado por via administrativa. El abogado lo pone
+ * como bloqueante de la publicacion de la v1.1: "sin el, el override no deja
+ * rastro". Por eso `ctx` (actor, motivo, ip, user_agent) se propaga al
+ * servicio de auditoria y se escribe UN RENGLON POR CAMPO QUE CAMBIO.
+ *
  * @param {string} id_empresa
  * @param {object} datos
+ * @param {object} [ctx] - Contexto de auditoria: { actor, motivo, ip, user_agent }.
  * @returns {object} La empresa actualizada.
  * @throws AppError 404 si no existe.
  */
-function update(id_empresa, datos) {
+function update(id_empresa, datos, ctx = {}) {
   const actual = getById(id_empresa);
   if (!actual) {
     throw new AppError(404, 'EMPRESA_NOT_FOUND',
@@ -615,13 +624,29 @@ function update(id_empresa, datos) {
     id_empresa
   );
 
+  const actualizada = getById(id_empresa);
+
+  // El rastro se escribe DESPUES del UPDATE y se compara contra el estado
+  // anterior. Si el guardado no cambio nada, no se escribe nada: un guardado
+  // que re-manda lo mismo no es un cambio.
+  const cambios = auditoriaService.registrarCambios({
+    id_empresa,
+    anterior: actual,
+    nuevo: actualizada,
+    actor: ctx.actor || null,
+    ip: ctx.ip || null,
+    user_agent: ctx.user_agent || null,
+    motivo: ctx.motivo || null,
+  });
+
   logger.info('Empresa actualizada', {
     id_empresa,
     campos_actualizados: EDITABLE_FIELDS.filter((c) => datos[c] !== undefined),
     conservacion_por_deber_legal: Boolean(deberLegal),
+    campos_con_rastro: cambios.map((c) => c.campo),
   });
 
-  return getById(id_empresa);
+  return actualizada;
 }
 
 /**
@@ -634,12 +659,16 @@ function update(id_empresa, datos) {
  * OJO: registrar el anexo NO habilita el candado. Eso se activa por separado
  * (ver nota de la migración 017).
  *
+ * El cambio queda RASTREADO (migraciones 037 y 038): la fecha del Anexo es el
+ * sustento del cumplimiento legal, y su alteration tiene que ser visible.
+ *
  * @param {string} id_empresa
  * @param {string} fecha - ISO8601.
+ * @param {object} [ctx] - Contexto de auditoria: { actor, motivo, ip, user_agent }.
  * @returns {object}
  * @throws AppError 404 si la empresa no existe; 400 si la fecha no parsea.
  */
-function marcarAnexoFirmado(id_empresa, fecha) {
+function marcarAnexoFirmado(id_empresa, fecha, ctx = {}) {
   const actual = getById(id_empresa);
   if (!actual) {
     throw new AppError(404, 'EMPRESA_NOT_FOUND',
@@ -657,17 +686,33 @@ function marcarAnexoFirmado(id_empresa, fecha) {
     WHERE id_empresa = ?
   `).run(iso, id_empresa);
   logger.info('Anexo de Encargo marcado como firmado', { id_empresa, fecha: iso });
-  return getById(id_empresa);
+  const actualizada = getById(id_empresa);
+  auditoriaService.registrarCampo({
+    id_empresa,
+    campo: 'anexo_encargo_firmado_at',
+    valor_anterior: actual.anexo_encargo_firmado_at,
+    valor_nuevo: actualizada.anexo_encargo_firmado_at,
+    actor: ctx.actor || null,
+    ip: ctx.ip || null,
+    user_agent: ctx.user_agent || null,
+    motivo: ctx.motivo || null,
+  });
+  return actualizada;
 }
 
 /**
  * Da de baja (soft) o reactiva una empresa.
  *
+ * La baja y la reactivacion quedan RASTREADAS (migraciones 037 y 038): una
+ * empresa dada de baja deja de mostrarse al firmante, y eso tiene que poder
+ * explicarse despues.
+ *
  * @param {string} id_empresa
  * @param {boolean} activo
+ * @param {object} [ctx] - Contexto de auditoria: { actor, motivo, ip, user_agent }.
  * @returns {object}
  */
-function setActivo(id_empresa, activo) {
+function setActivo(id_empresa, activo, ctx = {}) {
   const actual = getById(id_empresa);
   if (!actual) {
     throw new AppError(404, 'EMPRESA_NOT_FOUND',
@@ -679,7 +724,18 @@ function setActivo(id_empresa, activo) {
     WHERE id_empresa = ?
   `).run(activo ? 1 : 0, id_empresa);
   logger.info('Empresa ' + (activo ? 'reactivada' : 'dada de baja'), { id_empresa });
-  return getById(id_empresa);
+  const actualizada = getById(id_empresa);
+  auditoriaService.registrarCampo({
+    id_empresa,
+    campo: 'activo',
+    valor_anterior: actual.activo ? 'SI' : 'NO',
+    valor_nuevo: actualizada.activo ? 'SI' : 'NO',
+    actor: ctx.actor || null,
+    ip: ctx.ip || null,
+    user_agent: ctx.user_agent || null,
+    motivo: ctx.motivo || null,
+  });
+  return actualizada;
 }
 
 /**

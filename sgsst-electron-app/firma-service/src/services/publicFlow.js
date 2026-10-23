@@ -2330,6 +2330,33 @@ function verifyOtp(token, otp, ip, user_agent) {
       { current_state: signRequest.estado });
   }
 
+  // 3-bis. El OTP EXPIRA a los 600 segundos contados desde su envío.
+  //
+  // El 3.4(e) de la v1.0 VIGENTE lo promete ("un código OTP de un solo uso,
+  // que expira a los seiscientos (600) segundos contados desde su envío") y el
+  // código no lo cumplía: `verifyOtp` comparaba el código sin mirar la fecha.
+  // Solo `resendOtp` miraba la expiración, y únicamente para decidir si
+  // dejaba reenviar. Un código de hace dos horas seguía valiendo.
+  //
+  // OJO con el fallback: si `fecha_otp_enviado` es NULL (fila heredada, sin
+  // la marca de envío) NO se puede calcular la expiración, y en ese caso NO
+  // se aplica la rama: se valida el código como se ha hecho siempre. Es el
+  // mismo criterio que usa el consentimiento (services/consent.js).
+  //
+  // El estado NO cambia a EXPIRED: el reenvío (POST /api/sign/:token/
+  // resend-otp) solo funciona en estado OTP_SENT, y es la salida que el
+  // Trabajador tiene cuando su código caduca.
+  if (signRequest.estado === 'OTP_SENT' && signRequest.fecha_otp_enviado &&
+    isExpired(signRequest.fecha_otp_enviado, config.ttl.otpSeconds)) {
+    throw new AppError(410, 'OTP_EXPIRADO',
+      'El código de verificación expiró. Solicita uno nuevo a tu empleador.',
+      {
+        fecha_otp_enviado: signRequest.fecha_otp_enviado,
+        ttl_seconds: config.ttl.otpSeconds,
+        se_puede_reenviar: true,
+      });
+  }
+
   // 4. Verificar OTP
   //
   //    La fila guarda el HMAC del código (migración 019). Las filas

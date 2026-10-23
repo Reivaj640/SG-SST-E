@@ -69,6 +69,9 @@
 
 const db = require('../db/connection');
 const logger = require('../utils/logger');
+// El 8.6(e)(iii): la supresión no procede con una solicitud de copia
+// pendiente. La consulta vive en el módulo que es dueño de la tabla.
+const { tieneCopiaPendiente, empresasConCopiaPendiente } = require('./solicitudes');
 
 // Una ventana de purga dura, como máximo, este tiempo. Se vence sola: si
 // el operador se cae a mitad del procedimiento, la ventana se cierra sin que
@@ -337,10 +340,26 @@ function holdsDe(idFirma) {
 /**
  * ¿Esta fila es elegible para supresión?
  *
- * Las tres condiciones, en orden:
+ * Las CUATRO condiciones, en orden:
  *   1. Tiene fecha de conservación (la Empresa declaró plazo).
  *   2. El plazo venció.
  *   3. No hay deber legal o contractual de conservación.
+ *   4. No hay solicitud de copia pendiente (el 8.6(e)(iii)).
+ *
+ * LA CUARTA CONDICIÓN (el 8.6(e)(iii) y el 8.6(f))
+ * ------------------------------------------------
+ * "La supresión procede solo cuando concurren: (i) vencimiento del plazo
+ * aplicable; (ii) ausencia de deber legal o contractual de conservación;
+ * (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold
+ * vigente."
+ *
+ * Y el 8.6(f): "La solicitud se registra y se atiende antes de cualquier
+ * supresión."
+ *
+ * Mientras la Empresa tenga una solicitud de COPIA pendiente, su evidencia no
+ * se suprime: primero se entrega la copia. Es la misma granularidad que el
+ * hold de deber legal (que también frena a nivel de empresa): se conserva de
+ * más antes que suprimir de más.
  *
  * @param {object} fila - fila de gh_firmas_electronicas
  * @returns {boolean}
@@ -349,6 +368,8 @@ function esElegible(fila) {
   if (!fila) return false;
   if (!fila.fecha_conservacion) return false;
   if (Number(fila.hold_legal) === 1) return false;
+  // El 8.6(e)(iii): hay una solicitud de copia pendiente, no se suprime.
+  if (tieneCopiaPendiente(fila.id_empresa)) return false;
   const t = new Date(fila.fecha_conservacion).getTime();
   if (Number.isNaN(t)) return false;
   return t <= Date.now();
@@ -404,10 +425,15 @@ function vencidaPorConservacion(fila) {
  *   vencidosEnHold    - venció pero hay deber legal: NO se suprime
  *   sinPlazo          - la Empresa no declaró plazo: no hay purga
  *
+ * MÁS UN QUINTO: `vencidosConCopia`
+ * -----------------------------------
+ * Venció, no hay deber legal, pero hay una solicitud de COPIA pendiente
+ * (el 8.6(e)(iii)). NO se suprime: primero se entrega la copia (8.6(f)).
+ *
  * @param {object} [opts]
  * @param {string} [opts.id_empresa] - filtra por empresa
  * @param {number} [opts.dias_proximos] - ventana del grupo "próximos"
- * @returns {{proximos: object[], vencidosElegibles: object[], vencidosEnHold: object[], sinPlazo: object[]}}
+ * @returns {{proximos: object[], vencidosElegibles: object[], vencidosEnHold: object[], sinPlazo: object[], vencidosConCopia: object[]}}
  */
 function vencimientos(opts = {}) {
   const diasProximos = Number.isInteger(opts.dias_proximos) && opts.dias_proximos >= 0
@@ -417,7 +443,8 @@ function vencimientos(opts = {}) {
   const params = [];
   let sql = `
     SELECT id, id_solicitud, id_empresa, estado, fecha_creacion,
-           fecha_conservacion, hold_legal, motivo_hold
+           fecha_conservacion, hold_legal, motivo_hold,
+           pdf_original_path, pdf_firmado_path, constancia_path
       FROM gh_firmas_electronicas`;
   if (opts.id_empresa) {
     sql += ' WHERE id_empresa = ?';
@@ -429,11 +456,16 @@ function vencimientos(opts = {}) {
   const ahora = Date.now();
   const limiteProximos = ahora + diasProximos * MS_POR_DIA;
 
+  // Una sola consulta para todo el reporte: qué empresas tienen una copia
+  // pendiente. Sin esto, cada fila pagaría su propia consulta.
+  const empresasConCopia = empresasConCopiaPendiente();
+
   const grupos = {
     proximos: [],
     vencidosElegibles: [],
     vencidosEnHold: [],
     sinPlazo: [],
+    vencidosConCopia: [],
   };
 
   for (const f of filas) {
@@ -451,8 +483,16 @@ function vencimientos(opts = {}) {
       continue;
     }
     // Vencida.
-    if (Number(f.hold_legal) === 1) grupos.vencidosEnHold.push(f);
-    else grupos.vencidosElegibles.push(f);
+    if (Number(f.hold_legal) === 1) {
+      grupos.vencidosEnHold.push(f);
+      continue;
+    }
+    // El 8.6(e)(iii): con una solicitud de copia pendiente, no se suprime.
+    if (empresasConCopia.has(String(f.id_empresa))) {
+      grupos.vencidosConCopia.push(f);
+      continue;
+    }
+    grupos.vencidosElegibles.push(f);
   }
 
   return grupos;
@@ -553,7 +593,7 @@ function cerrarVentana(opts = {}) {
  * @param {string} opts.actor
  * @param {string} [opts.motivo]
  * @param {string} [opts.id_empresa] - limita el lote a una empresa
- * @returns {{firmas: number, agregadas: number, omitidas_hold: number, omitidas_sin_plazo: number}}
+ * @returns {{firmas: number, agregadas: number, omitidas_hold: number, omitidas_sin_plazo: number, omitidas_copia: number}}
  */
 function armarLote(opts = {}) {
   const actor = String(opts.actor || '').trim();
@@ -585,12 +625,15 @@ function armarLote(opts = {}) {
     // El chequeo del hold, contado.
     hold_revisados: grupos.vencidosElegibles.length + grupos.vencidosEnHold.length,
     hold_bloqueados: grupos.vencidosEnHold.length,
+    // El 8.6(e)(iii): las que no entran al lote por una copia pendiente.
+    copia_bloqueadas: grupos.vencidosConCopia.length,
   });
   return {
     firmas: total,
     agregadas: elegibles.length,
     omitidas_hold: grupos.vencidosEnHold.length,
     omitidas_sin_plazo: grupos.sinPlazo.length,
+    omitidas_copia: grupos.vencidosConCopia.length,
   };
 }
 
@@ -610,10 +653,20 @@ function armarLote(opts = {}) {
  *
  * @param {object} opts
  * @param {string} opts.actor
+ * @param {boolean} [opts.cerrar=true] - Si es false, la ventana QUEDA ABIERTA
+ *   y el lote NO se vacía. Es lo que necesita la operación de dos capas
+ *   (scripts/purga-ventana.js): la capa 2 (la fila de la firma y los
+ *   archivos) corre sobre el MISMO lote y en la MISMA ventana, y vuelve a
+ *   comprobar el hold de cada firma. Si esta capa cerrara la ventana, la
+ *   capa 2 no podría correr: `ventanaVigente()` devolvería null y el lote
+ *   estaría vacío.
  * @returns {{firmas: number, eventos_purgados: number}}
  */
 function purgar(opts = {}) {
   const actor = String(opts.actor || '').trim();
+  // El nombre de la opción NO puede ser `cerrarVentana`: dentro de esta
+  // función ese nombre lo ocupa la función homonima que hace el cierre.
+  const cerrar = opts.cerrar !== false;
   if (!actor) throw new Error('La purga necesita un actor.');
   const ventana = ventanaVigente();
   if (!ventana) throw new Error('No hay ventana de purga abierta.');
@@ -635,18 +688,24 @@ function purgar(opts = {}) {
   const tx = db.transaction(() => {
     for (const { firma_id } of elegibles) {
       const f = db.prepare(
-        'SELECT id_empresa FROM gh_firmas_electronicas WHERE id = ?'
+        'SELECT id_solicitud, id_empresa, fecha_conservacion FROM gh_firmas_electronicas WHERE id = ?'
       ).get(firma_id);
       const r = db.prepare('DELETE FROM gh_firma_eventos WHERE firma_id = ?').run(firma_id);
       eventos += r.changes;
       // El recibo: qué firma, qué empresa, cuándo, quién, por qué, en qué
       // ventana, qué categorías y que se comprobó el hold. SIN datos
       // personales: solo identificadores internos.
+      //
+      // El 3.6(g) y el 10.5(d): el recibo identifica la SOLICITUD y el
+      // FUNDAMENTO DEL PLAZO. Sin estas dos columnas (migración 041), el
+      // recibo de la purga de auditoría no podía decir a qué solicitud
+      // pertenecía ni hasta cuándo hubo que conservarla.
       db.prepare(`
         INSERT INTO gh_firma_purga_registro
           (firma_id, id_empresa, purgado_at, actor, motivo, ventana_hasta,
-           categorias, hold_verificado, eventos_purgados)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+           categorias, hold_verificado, eventos_purgados,
+           id_solicitud, fecha_conservacion)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
       `).run(
         firma_id,
         f ? f.id_empresa : null,
@@ -655,7 +714,9 @@ function purgar(opts = {}) {
         ventana.motivo || null,
         ventana.abierta_hasta,
         CATEGORIAS_AUDITORIA,
-        r.changes
+        r.changes,
+        f ? f.id_solicitud : null,
+        f ? f.fecha_conservacion : null
       );
     }
   });
@@ -671,7 +732,9 @@ function purgar(opts = {}) {
   logger.info('Purga del registro de auditoría ejecutada', {
     actor, firmas: elegibles.length, eventos_purgados: eventos, hold_bloqueados: bloqueadas,
   });
-  cerrarVentana({ actor });
+  // El cierre lo decide el llamador: en la operación de dos capas la ventana
+  // tiene que seguir viva para que la capa 2 corra sobre el mismo lote.
+  if (cerrar) cerrarVentana({ actor });
   return { firmas: elegibles.length, eventos_purgados: eventos, hold_bloqueados: bloqueadas };
 }
 

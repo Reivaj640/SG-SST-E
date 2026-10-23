@@ -54,6 +54,8 @@
   - [6.14 `POST /internal/sign-requests/{id}/link/rotate` — el enlace, otra vez](#614-post-internalsign-requestsidlinkrotate--el-enlace-otra-vez)
   - [6.15 `GET /internal/sign-requests/{id}/link` — DEPRECADO](#615-get-internalsign-requestsidlink--deprecated)
   - [6.16 Fase 8B — metadata con lista blanca, dato sensible y representante cifrado](#616-fase-8b--metadata-con-lista-blanca-dato-sensible-y-representante-cifrado)
+  - [6.17 Endpoints de las solicitudes de los Titulares — `/internal/admin/solicitudes`](#617-endpoints-de-las-solicitudes-de-los-titulares--internaladminsolicitudes)
+  - [6.18 El recibo de supresión (el 3.6(g) y el 10.6)](#618-el-recibo-de-supresión-el-36g-y-el-106)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -1881,7 +1883,7 @@ la firma.
 **Tipo:** entero positivo, máximo 36500 (100 años). `null` o ausente = sin
 plazo declarado.
 
-### 6.13.2 Los seis endpoints
+### 6.13.2 Los siete endpoints
 
 | Método | Ruta | Qué hace |
 |---|---|---|
@@ -1889,6 +1891,7 @@ plazo declarado.
 | `GET` | `/internal/admin/empresas/:id_empresa` | Devuelve una empresa. |
 | `POST` | `/internal/admin/empresas` | Crea la empresa (identificación completa, incluido `plazo_retencion` y `plazo_retencion_dias`). |
 | `PUT` | `/internal/admin/empresas/:id_empresa` | Actualiza la identificación. |
+| `GET` | `/internal/admin/empresas/:id_empresa/historial` | El **rastro de los cambios** de la ficha: un renglón por campo que realmente cambió, con el valor anterior, el nuevo, quién, desde dónde, cuándo y por qué. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado` | Registra la fecha de firma del Anexo de Encargo (art. 25 Decreto 1377/2013). Endpoint aparte: ese dato sustenta el cumplimiento legal y no debe cambiar en una actualización de rutina. |
 | `POST` | `/internal/admin/empresas/:id_empresa/estado` | Alta/baja lógica. Una empresa inactiva no muestra bloque en la mini-app, pero sus firmas históricas se conservan intactas. |
 
@@ -1915,6 +1918,25 @@ plazo declarado.
 `plazo_retencion` y `plazo_retencion_dias` son opcionales en el body, pero
 **declarar el plazo es condición para que las firmas de esa Empresa puedan
 suprimirse algún día**.
+
+**El rastro de la ficha (`GET .../historial`)**. Cada campo que *realmente*
+cambia deja un renglón: valor anterior, valor nuevo, actor, IP, user-agent,
+fecha y motivo. Un guardado que no cambia nada no deja renglón (no es un
+cambio). El rastro es **append-only** (triggers de la migración 038, probados
+contra el archivo real). El documento del representante legal **no se copia en
+claro**: va enmascarado (`****` + los cuatro últimos), como en el resto del
+sistema.
+
+El actor y el motivo llegan en headers, porque el `PUT` es un reemplazo
+completo de la ficha y el body no se contamina con metadatos de auditoría:
+
+| Header | Qué es | Por defecto |
+|---|---|---|
+| `X-Admin-Actor` | Quién hizo el cambio. | `admin` |
+| `X-Admin-Motivo` | Por qué se hizo el cambio. | `null` |
+
+La respuesta es una lista de renglones, del más reciente al más antiguo.
+`?limite=` entre 1 y 1000 (por defecto 200).
 
 ### 6.13.3 El hold legal de conservación
 
@@ -1974,6 +1996,18 @@ dice por qué.
 **El dry-run es el modo por defecto.** `scripts/purga-ventana.js` **simula**
 salvo que se pase `--ejecutar`. La simulación no borra ni la fila ni los
 archivos, y no escribe ninguna lápida.
+
+**Las dos capas van en la MISMA ventana y sobre el MISMO lote.** La capa de
+auditoría no cierra la ventana al terminar: la cierra el script, después de
+que corrieron las dos capas. Si la cerrara antes, la segunda capa no podría
+correr (exige ventana vigente y lote armado) y el documento, la constancia y
+los archivos de las firmas vencidas **no se suprimirían nunca**. La segunda
+capa vuelve a comprobar el hold de cada firma y la copia pendiente.
+
+La simulación se calcula sobre las **mismas firmas** que el lote va a
+contener (las vencidas y elegibles), no sobre el lote: antes de abrir la
+ventana el lote está vacío y simular sobre él daba siempre "0 firmas, 0
+archivos" mientras la operación real suprimía una firma y tres archivos.
 
 **El gobierno es el mismo de la capa de auditoría.** La supresión exige:
 
@@ -2437,6 +2471,70 @@ esta tabla no cuelga de ninguna. Sus eventos tienen triggers de inalterabilidad
 **Errores**: `401` sin llave (`INVALID_API_KEY`), `404` si no existe
 (`SOLICITUD_NOT_FOUND`), `409` si ya está respondida
 (`SOLICITUD_ESTADO_INVALIDO`), `400` body inválido (`INVALID_REQUEST_BODY`).
+
+---
+
+### 6.18 El recibo de supresión (el 3.6(g) y el 10.6)
+
+**Auth**: `X-Internal-API-Key` (K+AIR). Requiere la operación `sign_request:read`.
+
+El **3.6(g)**: *"La supresión dentro de la ventana de purga del 8.6 no es
+alteración: da lugar a una lápida que identifica la solicitud, la fecha y
+hora, las categorías suprimidas y el fundamento del plazo, y a un recibo que
+la Empresa entrega al Trabajador si lo solicita."*
+
+Estos endpoints son **la vía de entrega** de ese recibo. Antes no existía
+ninguna: la evidencia se guardaba, pero nadie podía obtenerla para
+entregársela al Trabajador.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/internal/empresas/:id_empresa/recibos-supresion` | Los recibos de supresión de la Empresa, del más reciente al más antiguo. `?limite=` (1 a 500, por defecto 100). |
+| `GET` | `/internal/recibos-supresion/:id_solicitud` | El recibo de UNA solicitud (`SIGN-YYYY-NNNNNN`). |
+
+**A quién se le entrega**: a la **Empresa**, que es la Responsable del dato y
+la que se lo entrega al Trabajador (el **10.7(e)**: el Titular acude primero a
+la Empresa). Por eso el listado es per-empresa.
+
+**Aislamiento**: un cliente per-empresa que pide el recibo de otra recibe
+`404` (`RECIBO_SUPERSION_NOT_FOUND`): no se revela la existencia de un recurso
+ajeno. Un cliente que pide el path `/internal/empresas/{otra}/...` recibe
+`403` (`EMPRESA_MISMATCH`) del middleware de alcance.
+
+**El recibo**:
+
+```json
+{
+  "id_solicitud": "SIGN-2026-020330",
+  "id_empresa": "900123456",
+  "purgado_at": "2026-10-23T20:15:39.427Z",
+  "actor": "operador",
+  "motivo": "Vencimiento del plazo declarado",
+  "categorias": ["fila_firma", "pdf_original", "pdf_firmado", "constancia", "registro_auditoria", "archivos"],
+  "fecha_conservacion": "2026-10-22T19:51:31.384Z",
+  "ventana_hasta": "2026-10-23T20:15:39.427Z",
+  "hold_verificado": true,
+  "archivos_eliminados": 3,
+  "eventos_purgados": 1
+}
+```
+
+Los cuatro campos que el 3.6(g) exige son `id_solicitud` (la solicitud),
+`purgado_at` (la fecha y hora), `categorias` (las categorías suprimidas) y
+`fecha_conservacion` (el fundamento del plazo: hasta cuándo hubo que
+conservar el dato).
+
+**El recibo NO lleva datos personales**: ni el correo del Trabajador, ni su
+documento, ni su nombre, ni la huella del documento, ni el token del enlace.
+Solo identificadores internos, fechas, categorías y el fundamento. Es la misma
+regla de la lápida y del recibo de purgas.
+
+**Errores**: `401` sin llave (`INVALID_API_KEY`), `400` id de solicitud con
+formato inválido o `limite` fuera de rango (`INVALID_REQUEST_BODY`), `404` si
+la solicitud no fue suprimida (`RECIBO_SUPERSION_NOT_FOUND`).
+
+> Un `404` (y no un `204`) es lo correcto: el que llama tiene que poder
+> distinguir "no hay recibo" de "sí lo hay" para poder decirlo al Trabajador.
 
 ---
 

@@ -36,6 +36,7 @@ const adminEmpresasRouter = require('../src/routes/admin-empresas');
 const adminExcepcionesRouter = require('../src/routes/admin-excepciones');
 const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
 const internalAuditRouter = require('../src/routes/internal-audit');
+const recibosSupresionRouter = require('../src/routes/recibos-supresion');
 const constanciaRouter = require('../src/routes/constancia');
 const verificacionRouter = require('../src/routes/verificacion');
 const { errorHandler } = require('../src/middleware/errors');
@@ -76,6 +77,37 @@ const SQL_020 = fs.readFileSync(
 );
 
 /**
+ * Garantiza que una tabla tenga las columnas de texto indicadas.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * La migración 041 (`041_recibo_identifica_solicitud.sql`) lleva
+ * `@skip-when-env test`, porque la tabla que altera (`gh_firma_purga_registro`)
+ * la crea la migración 020, que también lleva esa directiva: en el ambiente
+ * de test esa tabla se crea a mano desde el archivo 020 (arriba, SQL_020) y
+ * por tanto SIN las columnas de la 041.
+ *
+ * Es idempotente: si la columna ya está, no hace nada. Y funciona tanto si
+ * la tabla se acaba de crear como si ya existía de una corrida anterior.
+ *
+ * @param {string} tabla - el nombre de la tabla
+ * @param {string[]} columnas - las columnas de texto que tienen que existir
+ */
+function _asegurarColumnasTexto(tabla, columnas) {
+  let existentes;
+  try {
+    existentes = db.prepare(`PRAGMA table_info(${tabla})`).all().map((c) => c.name);
+  } catch (e) {
+    return; // la tabla no existe: no hay nada que asegurar
+  }
+  for (const col of columnas) {
+    if (!existentes.includes(col)) {
+      db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${col} TEXT;`);
+    }
+  }
+}
+
+/**
  * Garantiza que existan las tablas de la ventana de purga (migración 020) y la
  * de los holds (023), sin los triggers append-only.
  *
@@ -97,6 +129,11 @@ function asegurarTablasPurga() {
   if (existe === 0) {
     db.exec(SQL_020);
   }
+
+  // La 041: el recibo de purgas identifica la solicitud y el fundamento del
+  // plazo (el 3.6(g) y el 10.5(d)). En el ambiente de test la 020 se salta, y
+  // con ella las columnas de la 041: se agregan a mano, acá.
+  _asegurarColumnasTexto('gh_firma_purga_registro', ['id_solicitud', 'fecha_conservacion']);
 
   // Los triggers se quitan SIEMPRE (no solo cuando la tabla se acaba de
   // crear): no pueden estar en la BD compartida porque los tests limpian esas
@@ -167,6 +204,13 @@ const TABLES = [
   // base en memoria.
   'gh_firma_excepciones_habilitacion_eventos',
   'gh_firma_excepciones_habilitacion',
+  // B1: el rastro de los cambios de la ficha de la Empresa (migración 037).
+  // Los triggers append-only viven en la 038, que lleva `@skip-when-env
+  // test`: en el ambiente de test el trigger NO está instalado y la tabla se
+  // puede limpiar. La inmutabilidad se comprueba en
+  // tests/empresa-auditoria.test.js, que aplica el SQL de la 038 a una base
+  // en memoria.
+  'gh_firma_empresas_auditoria',
   // El 10.7(b): las solicitudes de los Titulares y su historial. Los
   // eventos van PRIMERO: tienen FK a la solicitud.
   'gh_solicitudes_titular_eventos',
@@ -281,6 +325,9 @@ function makeApp() {
   app.use('/internal', signRequestRouter);
   app.use('/internal', constanciaRouter);
   app.use('/internal', internalAuditRouter);
+  // El recibo de supresión (3.6(g) y 10.6): per-empresa, para que la Empresa
+  // lo consulte y se lo entregue al Trabajador.
+  app.use('/internal', recibosSupresionRouter);
   // Oráculo de verificación de identidad (Fase 3).
   app.use('/internal', verificacionRouter);
   // Endpoints administrativos: deben estar en makeApp para tests.

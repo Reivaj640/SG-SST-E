@@ -38,6 +38,7 @@ const adminEmpresasRouter = require('./routes/admin-empresas');
 const adminExcepcionesRouter = require('./routes/admin-excepciones');
 const adminSolicitudesRouter = require('./routes/admin-solicitudes');
 const internalAuditRouter = require('./routes/internal-audit');
+const recibosSupresionRouter = require('./routes/recibos-supresion');
 const verificacionRouter = require('./routes/verificacion');
 const constanciaRouter = require('./routes/constancia');
 const { migrate } = require('./db/migrate');
@@ -153,6 +154,9 @@ function createApp() {
   app.use('/internal/sign-requests', signRequestLimiter);
   app.use('/internal', signRequestRouter);
   app.use('/internal', internalAuditRouter);
+  // El recibo de supresión (3.6(g) y 10.6): la Empresa lo consulta para
+  // entregárselo al Trabajador. Es per-empresa (sign_request:read).
+  app.use('/internal', recibosSupresionRouter);
   // Oráculo de verificación de identidad (Fase 3): la Empresa pregunta si
   // el documento que registró es el mismo con el que firmó el trabajador,
   // sin apartar el número en claro. Ver src/services/verificacion.js.

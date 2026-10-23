@@ -123,6 +123,23 @@ const config = {
   // (traslado a quien corresponda: dos días hábiles).
   plazoTramiteDias: int('FIRMA_PLAZO_TRAMITE_DIAS', 2),
 
+  // El plazo de ENTREGA de la copia permanente (el 8.5), en días HÁBILES.
+  //
+  // Son DOS relojes distintos y no se deben mezclar:
+  //
+  //   - plazoTramiteDias (2)  = cuándo K+AIR trasmite la solicitud a la
+  //     Empresa. Es un deber del Encargado (10.7(b)).
+  //   - plazoCopiaDias (5)    = cuándo la EMPRESA debe entregar la copia
+  //     permanente. Es un deber de la Responsable (8.5).
+  //
+  // El 8.5 (texto final aprobado por el abogado): "La Empresa la entrega por
+  // el medio autorizado, sin costo, dentro de los cinco (5) días hábiles
+  // siguientes."
+  //
+  // Lo define la política, no el código: si el abogado pone otro número, se
+  // cambia la variable de entorno, no el código.
+  plazoCopiaDias: int('FIRMA_PLAZO_COPIA_DIAS', 5),
+
   // D-2: el OTP (dato de creación de la firma) tiene que ir a un medio
   // PERSONAL del Trabajador, no a un buzón que la Empresa pueda leer.
   //
