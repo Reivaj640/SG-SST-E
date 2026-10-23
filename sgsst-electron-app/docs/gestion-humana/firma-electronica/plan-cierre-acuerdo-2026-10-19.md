@@ -260,7 +260,7 @@ fundamento para que la sesion siguiente no tenga que reconstruirlas.
 
 | # | Decision | Fundamento del owner | Como queda |
 |---|---|---|---|
-| **D1** | **Rotacion, no excepcion declarada.** | El 3.6(e)/10.5(b) promete que el token existe unicamente como huella digital; el `token_encrypted` y el endpoint que devuelve el texto claro rompen la letra y el propósito. La necesidad operativa ("la Empresa perdio la respuesta de creacion") se cubre sin excepcion: se genera un token nuevo, se guarda su HMAC y se devuelve una sola vez; los anteriores siguen validos hasta su vencimiento, con **maximo 3 activos por solicitud**; cada emision se registra y se puede revocar. | **Fase 8C, y no al final.** El texto debe decir **HMAC-SHA-256 con clave secreta**, no "sal": la sal es publica, la clave no. |
+| **D1** | **Rotacion, no excepcion declarada.** | El 3.6(e)/10.5(b) promete que el token existe unicamente como huella digital; el `token_encrypted` y el endpoint que devuelve el texto claro rompen la letra y el propósito. La necesidad operativa ("la Empresa perdio la respuesta de creacion") se cubre sin excepcion: se genera un token nuevo, se guarda su HMAC y se devuelve una sola vez; los anteriores siguen validos hasta su vencimiento, con **maximo 3 activos por solicitud** *(regla vigente hasta el 23-oct-2026: desde entonces la reemision invalida el anterior y queda un solo token vigente)*; cada emision se registra y se puede revocar. | **Fase 8C, y no al final.** El texto debe decir **HMAC-SHA-256 con clave secreta**, no "sal": la sal es publica, la clave no. |
 | **D2** | **Rechazar por defecto.** | Un correo que dice venir del dominio de la Empresa pero lo envia Gesstiar debe identificar al remitente real: si no, es informacion engañosa. | Excepcion solo con: dominio verificado (SPF/DKIM/DMARC), autorizacion escrita de la Empresa, remitente visible "Gesstiar S.A.S. en nombre de [Empresa]", reply-to monitoreado y registro de cada envio. |
 | **D3** | **Bloquear, no avisar.** | Sin Anexo firmado no hay contrato de transmision; sin plazo no hay tratamiento temporalmente limitado. Un warning no es control. | Falla con **409 explicable**: "falta Anexo firmado" / "falta plazo declarado". Transicion documentada y comunicada para empresas existentes. **Override por tipo de documento** (un plazo unico es arbitrario para salud, laboral y contable) y **dies a quo definido** ("desde la firma" no es "desde la terminacion de la relacion laboral"). |
 | **D4** | **Mecanica completa, con minimizacion y sin condicionar.** | El 10.8 es un hallazgo normativo, no una mejora de redaccion. | Flag de sensibilidad **por tipo de documento, inferido y no solo declarado**; aviso previo con las categorias concretas; **checkbox separado** del consentimiento general; registro de version, texto y consentimiento; control de acceso y cifrado; **minimizacion** (si solo se necesita "aptitud", no el diagnostico); **prohibicion de datos sensibles en correos, notificaciones y logs**; retencion y purga. "Aviso generico" no cumple. Si el producto no quiere asumir salud, **bloquea el documento y deriva a papel** (no se puede procesar sin mecanismo). |
@@ -314,7 +314,7 @@ contenedor y una compuerta.
 |---|---|---|
 | **8A.1 (vencimiento)** | Bajo. Cambia un mensaje. | El mas seguro: es el primero y no borra nada. |
 | **8A.2 (5B)** | **El mas alto de todo el plan.** Destruye la fila, los PDFs y los archivos. Un error = evidencia de firma perdida e irrecuperable. | Modo *dry-run* con recibo y sin borrar; staging con copia de produccion; **restauracion probada** antes (0.2); purga idempotente y transaccional; **hold legal en base**; el recibo de purga sin datos personales; el evento de aceptacion sobrevive (minimo). |
-| **8C (token)** | Rompe `GET /internal/sign-requests/:id/link` y el modelo de credenciales. Los tokens anteriores siguen validos hasta su vencimiento (max 3 activos). | Versionado del endpoint; aviso a los clientes; los tokens previos no se invalidan de golpe; cada emision auditada y revocable. |
+| **8C (token)** | Rompe `GET /internal/sign-requests/:id/link` y el modelo de credenciales. Los tokens anteriores siguen validos hasta su vencimiento (max 3 activos; regla vigente hasta el 23-oct-2026: desde entonces la reemision invalida el anterior y queda un solo token vigente). | Versionado del endpoint; aviso a los clientes; los tokens previos se invalidan en cada reemision (3.4(c), desde el 23-oct-2026); cada emision auditada y revocable. |
 | **8B (sensibles + metadata)** | Un documento sensible se firma con la casilla generica si no se implementa bien; cerrar `metadata` rompe clientes. | Inferir el flag por **tipo de documento**, no solo declararlo; dry-run del inventario (0.5); 409 explicable y derivacion a papel. |
 | **10.4 (version positiva)** | Medio: toca la logica de version y el gate de aceptacion. | Debe existir **antes** de la 11A, porque publicar la v1.1 cambia el hash. |
 | **9 (derechos)** | Bajo en código, alto en impacto para el trabajador. | Es la fase que más conviene hacer bien la primera vez: el texto de rechazo, la firma en papel, los medios y la copia permanente. |
@@ -531,27 +531,37 @@ La salida no es una excepcion declarada en el texto, sino un mecanismo: la
 
 ### Las tres decisiones que importan
 
-1. **Los tokens anteriores no se invalidan.** La rotacion emite otro acceso al
-   mismo plazo; los anteriores siguen valiendo hasta su vencimiento. Un enlace que
-   el trabajador ya tiene en el telefono no se le rompe a mitad de camino. La
-   revocacion existe, pero es **explicita** (`revocar_anteriores: true`).
-2. **El tope de 3 vivos no revoca por su cuenta.** Al llegar al tope la respuesta
-   es `409 TOKEN_LIMIT_REACHED` con las emisiones vivas. Revocar es una decision de
-   quien llama: el sistema no mata en silencio un enlace que alguien ya tiene.
+> **Actualizado el 23-oct-2026 (📦933):** el 3.4(c) de la v1.1 exige que cada
+> reemision deje sin efecto el token anterior y que no haya mas de un token
+> vigente por solicitud. Antes la reemision no revocaba y el tope eran 3 tokens
+> vivos.
+
+1. **La reemision invalida siempre el token anterior.** El 3.4(c) de la v1.1 lo
+   ordena: cada reemision se registra y deja sin efecto el token anterior. No hay
+   mas de un token vigente por solicitud; la reemision no se bloquea, invalida.
+2. **La invariante se verifica despues de emitir.** Despues de emitir el token
+   nuevo se cuentan los tokens vigentes; si quedara alguno, es un fallo del
+   sistema y sale `500 TOKEN_INVARIANTE_ROTA` dentro de la transaccion, sin
+   dejar nada escrito.
 3. **La invariante se sostiene sin excepciones.** No se declara una excepcion en
    el texto del Acuerdo: el mecanismo (rotacion) cubre la necesidad operativa
    ("la Empresa perdio la respuesta de creacion") sin que el token vuelva a
-   existir de forma recuperable.
+   existir de forma recuperable. El campo `revocar_anteriores` del cuerpo de
+   `POST /internal/sign-requests/:id/link/rotate` quedo **obsoleto**: se sigue
+   aceptando para no romper a los clientes que lo manden, pero ya no decide —un
+   `false` explicito no evita la revocacion y queda en la auditoria.
 
 ### Como se valido
 
-12 tests nuevos (`tests/fase8c-rotacion-token.test.js`): el token no queda guardado
-de forma recuperable (con un test de mutacion que comprueba que el detector
-muede), el registro de la huella, la emision y el retorno una sola vez, el token
-anterior sigue funcionando, la auditoria (`LINK_ROTATED`), el tope de 3, la
-revocacion explicita, la respuesta del endpoint deprecado, la 5B cubriendo el
-enlace rotado, el `TOKEN_MISMATCH` y el `notify-remote` que no gasta cupo si el
-cliente trae su token.
+13 tests (`tests/fase8c-rotacion-token.test.js`): el token NO queda guardado de forma
+recuperable en la base, MUTACION: el detector de token recuperable muerde, el token
+queda registrado como huella en la tabla de tokens, la rotacion emite un token nuevo
+y lo devuelve una vez, el token anterior DEJA de funcionar: la reemision lo invalida,
+la emision queda auditada (`LINK_ROTATED`), no hay mas de un token vigente por
+solicitud (el 3.4(c)), la reemision deja sin efecto el token anterior y emite uno
+nuevo, `revocar_anteriores: false` NO evita la revocacion (el 3.4(c)), la respuesta
+del endpoint deprecado, la 5B cubriendo el enlace rotado, el `TOKEN_MISMATCH` y el
+`notify-remote` que no gasta cupo si el cliente trae su token.
 
 **Suite completa: 1227 tests · 1225 verdes · 0 fallos · 2 omitidos.**
 

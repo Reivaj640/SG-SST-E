@@ -9,18 +9,25 @@
  * con la llave: el token existía en la base en una forma recuperable.
  *
  * La salida es la ROTACIÓN: cuando la Empresa necesita el enlace otra vez, se
- * emite un token NUEVO, se guarda su HMAC y se devuelve una sola vez. Los
- * anteriores siguen valiendo hasta su vencimiento, con un tope de 3 vivos por
- * solicitud.
+ * emite un token NUEVO, se guarda su HMAC y se devuelve una sola vez.
+ *
+ * 📦933 (23-oct-2026): la reemisión **deja sin efecto el token anterior** y no
+ * hay más de un token vigente por solicitud. Es el 3.4(c) del Acuerdo v1.1:
+ * "cada reemisión se registra y deja sin efecto el token anterior. No hay más
+ * de un token vigente por solicitud", con la condición de código textual: "si
+ * el sistema mantiene válidos los tokens anteriores, se cambia el código antes
+ * de publicar". Antes la reemisión no revocaba y el tope eran 3 vivos.
  *
  * Lo que comprueban estos tests:
  *
  *   1. El token NO queda guardado de forma recuperable (y el check muerde).
  *   2. La rotación emite un token nuevo y lo devuelve una vez.
- *   3. El token anterior SIGUE funcionando: no se invalidan de golpe.
+ *   3. El token anterior DEJA de funcionar: la reemisión lo invalida.
  *   4. La emisión queda auditada.
- *   5. El tope de 3 tokens vivos se respeta.
- *   6. La revocación explícita deja el enlace muerto.
+ *   5. No hay más de un token vigente por solicitud, y la invariancia se
+ *      verifica después de emitir.
+ *   6. `revocar_anteriores` quedó obsoleto: mandar `false` NO evita la
+ *      revocación, y lo que pidió el cliente queda en la auditoría.
  *   7. La 5B cubre TODOS los tokens de la firma (el rotado también dice
  *      "vencido", no "no existe").
  *   8. El notify-remote con un token ajeno no cuela.
@@ -169,7 +176,7 @@ test('8C · la rotación emite un token nuevo y lo devuelve una vez', async () =
   assert.notEqual(fila.token_hash, res.body.token, 'lo guardado es la huella, no el token');
 });
 
-test('8C · el token anterior SIGUE funcionando: la rotación no invalida de golpe', async () => {
+test('8C · el token anterior DEJA de funcionar: la reemisión lo invalida', async () => {
   resetDb();
   seedActiveAgreement();
   const app = makeApp();
@@ -180,12 +187,13 @@ test('8C · el token anterior SIGUE funcionando: la rotación no invalida de gol
     .set(HEADERS)
     .send({});
 
-  // El enlace original sigue sirviendo: el trabajador puede tenerlo en el
-  // teléfono y no se le rompe el proceso a mitad de camino.
+  // El enlace original deja de servir: el 3.4(c) ordena que cada reemisión
+  // deje sin efecto el token anterior y que no haya más de un token vigente.
   const res = await request(app).get(`/api/sign/${token}/verify`);
-  assert.equal(res.status, 200, 'el token anterior debe seguir resolviendo');
+  assert.equal(res.status, 404, 'el token anterior no debe resolver');
+  assert.equal(res.body.error.code, 'TOKEN_NOT_FOUND');
 
-  // Y el nuevo también.
+  // Y el nuevo sí.
   const rotado = await request(app)
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
     .set(HEADERS)
@@ -219,39 +227,53 @@ test('8C · la emisión queda auditada', async () => {
 // 3. El tope de tokens vivos
 // =========================================================================
 
-test('8C · no se pueden tener más de 3 tokens vivos por solicitud', async () => {
+test('8C · no hay más de un token vigente por solicitud (el 3.4(c))', async () => {
+  assert.equal(signRequestService.MAX_TOKENS_VIGENTES, 1,
+    'el 3.4(c): no hay más de un token vigente por solicitud');
+
   resetDb();
   seedActiveAgreement();
   const app = makeApp();
   const { signRequest } = await crearFirma();
 
-  // El original cuenta. Rotamos dos veces más: 3 vivos.
+  // El original cuenta. Cada reemisión deja sin efecto el anterior.
   const r2 = await request(app)
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
     .set(HEADERS).send({});
   assert.equal(r2.status, 200);
+  assert.deepEqual(r2.body.revocados, [1],
+    'la reemisión deja sin efecto el token anterior');
+  assert.equal(r2.body.tokens_activos, 1);
+
   const r3 = await request(app)
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
     .set(HEADERS).send({});
   assert.equal(r3.status, 200);
-  assert.equal(r3.body.tokens_activos, 3);
+  assert.deepEqual(r3.body.revocados, [2]);
+  assert.equal(r3.body.tokens_activos, 1);
 
-  // El cuarto no pasa: el tope son 3.
+  // Y las siguientes también: la reemisión no se bloquea, invalida.
   const r4 = await request(app)
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
     .set(HEADERS).send({});
-  assert.equal(r4.status, 409);
-  assert.equal(r4.body.error.code, 'TOKEN_LIMIT_REACHED');
-  assert.equal(r4.body.error.details.max_tokens, 3);
+  assert.equal(r4.status, 200);
+  assert.equal(r4.body.tokens_activos, 1);
 
-  // Y el sistema NO revoca por su cuenta: revocar es una decisión.
+  // En cualquier momento hay UNO solo vigente.
   const vivos = db.prepare(
     'SELECT COUNT(*) AS n FROM gh_firma_tokens WHERE firma_id = ? AND revocado_at IS NULL'
   ).get(signRequest.id).n;
-  assert.equal(vivos, 3, 'los tres tokens vivos siguen vivos');
+  assert.equal(vivos, 1, 'un solo token vigente por solicitud');
+
+  // Y todos quedan registrados: uno vivo, los demás revocados.
+  const todos = db.prepare(
+    'SELECT emision, revocado_at FROM gh_firma_tokens WHERE firma_id = ? ORDER BY emision'
+  ).all(signRequest.id);
+  assert.equal(todos.length, 4, 'las cuatro emisiones quedan en el registro');
+  assert.equal(todos.filter((t) => t.revocado_at === null).length, 1);
 });
 
-test('8C · revocar_anteriores deja el enlace anterior muerto y emite uno nuevo', async () => {
+test('8C · la reemisión deja sin efecto el token anterior y emite uno nuevo', async () => {
   resetDb();
   seedActiveAgreement();
   const app = makeApp();
@@ -260,7 +282,7 @@ test('8C · revocar_anteriores deja el enlace anterior muerto y emite uno nuevo'
   const res = await request(app)
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
     .set(HEADERS)
-    .send({ revocar_anteriores: true, motivo: 'Se perdió el control del enlace' });
+    .send({ motivo: 'Se perdió el control del enlace' });
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.revocados, [1], 'el token original queda revocado');
@@ -281,6 +303,34 @@ test('8C · revocar_anteriores deja el enlace anterior muerto y emite uno nuevo'
   assert.ok(fila.revocado_at, 'debe quedar revocada');
   assert.match(fila.revocado_por, /^rh:/);
   assert.equal(fila.motivo_revocacion, 'Se perdió el control del enlace');
+});
+
+test('8C · revocar_anteriores: false NO evita la revocación (el 3.4(c))', async () => {
+  resetDb();
+  seedActiveAgreement();
+  const app = makeApp();
+  const { signRequest, token } = await crearFirma();
+
+  const res = await request(app)
+    .post(`/internal/sign-requests/${signRequest.id_solicitud}/link/rotate`)
+    .set(HEADERS)
+    .send({ revocar_anteriores: false });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.revocados, [1],
+    'el campo obsoleto no abre la puerta: la reemisión invalida siempre');
+
+  const resViejo = await request(app).get(`/api/sign/${token}/verify`);
+  assert.equal(resViejo.status, 404);
+
+  // Queda en el registro de auditoría lo que pidió el cliente.
+  const eventos = db.prepare(`
+    SELECT metadata FROM gh_firma_eventos
+    WHERE firma_id = ? AND evento = 'LINK_ROTATED'
+  `).all(signRequest.id);
+  const meta = JSON.parse(eventos[0].metadata);
+  assert.equal(meta.revoco_anteriores, true, 'la reemisión revocó');
+  assert.equal(meta.revocar_anteriores_pedido, false, 'queda lo que pidió el cliente');
 });
 
 // =========================================================================

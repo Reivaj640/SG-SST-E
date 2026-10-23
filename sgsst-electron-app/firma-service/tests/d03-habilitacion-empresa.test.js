@@ -76,7 +76,7 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
   registrarEmpresa({ conAnexo: false, conPlazo: true });
 
   await assert.rejects(
-    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA }),
+    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA, consent_id: null }),
     (e) => {
       assert.equal(e.statusCode, 409);
       assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
@@ -92,7 +92,7 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
 });
 
 test('D-03 · sin plazo declarado la solicitud SÍ se crea (la custodia vive en el código)', async () => {
-  // La custodia de 80 años es del sistema: la Empresa no tiene nada que
+  // La custodia de 20 años es del sistema: la Empresa no tiene nada que
   // declarar y el 8.6 se cumple con lo que el sistema comunica al firmante.
   limpiar();
   registrarEmpresa({ conAnexo: true, conPlazo: false });
@@ -101,7 +101,7 @@ test('D-03 · sin plazo declarado la solicitud SÍ se crea (la custodia vive en 
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado firma: el plazo ya existe');
   assert.ok(signRequest.fecha_conservacion,
-    'y la firma tiene fecha de conservación (80 años desde la firma)');
+    'y la firma tiene fecha de conservación (20 años desde la firma)');
 });
 
 test('D-03 · con Anexo y plazo la solicitud se crea', async () => {
@@ -143,24 +143,26 @@ test('D-03 · una empresa NO registrada no se bloquea', async () => {
   assert.ok(signRequest.id_solicitud);
 });
 
-test('D-03 · con la bandera apagada la firma pasa pero queda en el log', async () => {
+test('D-03 · el bloqueo NO se puede desactivar con una bandera', async () => {
+  // Antes existía `FIRMA_EXIGIR_HABILITACION_EMPRESA`: con ella en 'false' la
+  // firma pasaba y solo quedaba un WARN en el log. Se RETIRÓ (decisión B.3
+  // del 23-oct-2026): era exactamente el "if silencioso" que el abogado no
+  // quiere. La única salida del bloqueo es la EXCEPCIÓN auditable.
   limpiar();
   registrarEmpresa({ conAnexo: false, conPlazo: true });
 
-  const antes = config.exigirHabilitacionEmpresa;
-  config.exigirHabilitacionEmpresa = false;
-  try {
-    const { objetos } = await capturarLogs(async () => {
-      const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
-      assert.ok(signRequest.id_solicitud, 'con la bandera apagada la firma pasa');
-    });
+  assert.equal(config.exigirHabilitacionEmpresa, undefined,
+    'la bandera ya no existe en el config');
 
-    const aviso = objetos.find((o) => o.aviso === 'EMPRESA_NO_HABILITADA');
-    assert.ok(aviso, 'el default no es silencioso: queda en el log');
-    assert.equal(aviso.level, 'warn');
-  } finally {
-    config.exigirHabilitacionEmpresa = antes;
-  }
+  await assert.rejects(
+    () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA, consent_id: null }),
+    (e) => {
+      assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
+      assert.match(e.message, /excepción/i,
+        'el mensaje dice que hay una salida: la excepción auditable');
+      return true;
+    }
+  );
 });
 
 test('D-03 · sin canal de atención la solicitud NO se crea (el 7.2-7.3)', async () => {
@@ -169,7 +171,7 @@ test('D-03 · sin canal de atención la solicitud NO se crea (el 7.2-7.3)', asyn
 
   let e = null;
   try {
-    await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
+    await createSignRequestWithIdentificacion({ id_empresa: EMPRESA, consent_id: null });
   } catch (err) { e = err; }
   assert.ok(e, 'la solicitud tiene que rechazarse');
   assert.equal(e.code, 'EMPRESA_NO_HABILITADA');

@@ -58,6 +58,11 @@ async function sembrarFilaHistorica() {
   resetDb();
   db.prepare('DELETE FROM gh_firma_empresas').run();
   empresaService.create(EMPRESA_DATOS);
+  // D-03 (decisión B.3): la creación del consentimiento exige que la Empresa
+  // esté habilitada. Este archivo prueba el BACKFILL del snapshot, no el
+  // D-03: la empresa de prueba se habilita para que el bloqueo no se
+  // confunda con lo que se prueba.
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-20');
 
   const { consent_id } = await createAcceptedConsent({
     id_trabajador: TRABAJADOR,

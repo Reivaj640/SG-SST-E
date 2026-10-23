@@ -301,9 +301,18 @@ const signRequestNotifyBody = z.object({
  * Schema del body de POST /internal/sign-requests/:id/link/rotate (8C).
  *
  * `motivo` es lo que queda escrito en el registro del token emitido: por qué
- * se emitió. `revocar_anteriores` revoca los tokens vivos antes de emitir el
- * nuevo (el que se usa cuando la Empresa quiere que el enlace anterior deje
- * de funcionar).
+ * se emitió.
+ *
+ * `revocar_anteriores` está OBSOLETO. Antes significaba "revoca los tokens
+ * vivos antes de emitir el nuevo". El 3.4(c) del Acuerdo v1.1 lo cambió:
+ * "cada reemisión se registra y deja sin efecto el token anterior. No hay más
+ * de un token vigente por solicitud". La reemisión revoca SIEMPRE, así que el
+ * campo ya no decide nada.
+ *
+ * Se sigue aceptando para no romper a un cliente que lo mande (rechazarlo
+ * con un 400 sería una regresión de API), y su valor queda en el registro de
+ * auditoría de la emisión. Mandar `false` no evita la revocación: se registra
+ * como aviso.
  */
 const signRequestRotateBody = z.object({
   motivo: z.string().max(200).optional(),

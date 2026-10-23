@@ -54,6 +54,11 @@ despliegue), que es una ruta que solo existe desde el 1.3.
 
 ### R2 — El 409 `EMPRESA_NO_HABILITADA` puede cortar la operación
 
+> **Actualizado el 23-oct-2026 (📦933).** `FIRMA_EXIGIR_HABILITACION_EMPRESA` **se
+> retiró**: el bloqueo es incondicional y la única salida es la excepción auditable
+> (`POST /internal/admin/excepciones-habilitacion`). Lo que sigue describe el
+> estado en la fecha de este plan.
+
 - `src/config.js:166-167`: `exigirHabilitacionEmpresa` es **true por defecto**
   (`FIRMA_EXIGIR_HABILITACION_EMPRESA !== 'false'`).
 - `src/services/empresa.js:746-753`: una empresa registrada que no tenga

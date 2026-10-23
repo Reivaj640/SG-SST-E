@@ -48,6 +48,7 @@ const db = require('../db/connection');
 const { sha256 } = require('../crypto/hash');
 const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
 const representanteService = require('./representante');
+const excepcionService = require('./excepcionHabilitacion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -761,7 +762,7 @@ function verificarHabilitacionFirma(id_empresa) {
     };
   }
 
-  // El PLAZO DE CONSERVACIÓN ya no se le exige a la Empresa: la custodia de 80
+  // El PLAZO DE CONSERVACIÓN ya no se le exige a la Empresa: la custodia de 20
   // años vive en el código del sistema (src/services/retencion.js) y no hay
   // nada que declarar ni que decidir. Lo que sí se exige es lo que la Empresa
   // no puede dejar de tener:
@@ -803,6 +804,88 @@ function verificarHabilitacionFirma(id_empresa) {
       + `PUT /internal/admin/empresas/${id_empresa} (canal de atención) `
       + 'antes de solicitar firmas.',
   };
+}
+
+/**
+ * Exige que la Empresa esté HABILITADA para pedir firmas. (D-03, decisión B.3)
+ *
+ * Esto es el BLOQUEO, no el aviso. Se llama en los cuatro puntos que ordena
+ * la respuesta 11A del abogado (23-oct-2026): creación de la solicitud,
+ * commit, creación del consentimiento y doble firma.
+ *
+ * La única salida del bloqueo es una EXCEPCIÓN auditable
+ * (`src/services/excepcionHabilitacion.js`): autorización escrita, alcance de
+ * firmas, ruta en papel operativa, plazo cierto y bitácora inmutable. El
+ * abogado lo dice textualmente: "La excepción debe ser un flag auditable, no
+ * un if silencioso".
+ *
+ * @param {string} id_empresa
+ * @param {object} [ctx]
+ * @param {string} [ctx.punto] - dónde se está comprobando.
+ * @param {boolean} [ctx.cuenta_firma] - true si este punto ABRE una firma y
+ *   por lo tanto gasta una unidad del alcance de la excepción. False si el
+ *   punto solo verifica una firma que ya está abierta (el commit y la
+ *   creación del consentimiento): ahí la excepción ya se gastó y solo se
+ *   levanta el bloqueo.
+ * @param {string} [ctx.actor] - quién.
+ * @param {string} [ctx.ip]
+ * @param {string} [ctx.user_agent]
+ * @returns {{ok: true, excepcion: object|null, con_excepcion: boolean,
+ *   habilitacion: object}}
+ * @throws {AppError} 409 EMPRESA_NO_HABILITADA si no hay excepción vigente.
+ */
+function assertHabilitadaParaFirma(id_empresa, ctx = {}) {
+  const habilitacion = verificarHabilitacionFirma(id_empresa);
+  if (habilitacion.ok !== false) {
+    return { ok: true, excepcion: null, con_excepcion: false, habilitacion };
+  }
+
+  const cuenta_firma = ctx.cuenta_firma === true;
+  const excepcion = excepcionService.vigentePara(id_empresa, { para_firma: cuenta_firma });
+  if (excepcion) {
+    if (cuenta_firma) {
+      const actualizada = excepcionService.registrarUso({
+        excepcion,
+        actor: ctx.actor || 'sistema',
+        ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null,
+        punto: ctx.punto || 'desconocido',
+      });
+      return {
+        ok: true,
+        excepcion: actualizada,
+        con_excepcion: true,
+        habilitacion,
+      };
+    }
+    excepcionService.registrarAplicacion({
+      excepcion,
+      actor: ctx.actor || 'sistema',
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      punto: ctx.punto || 'desconocido',
+    });
+    return {
+      ok: true,
+      excepcion,
+      con_excepcion: true,
+      habilitacion,
+    };
+  }
+
+  throw new AppError(
+    409,
+    'EMPRESA_NO_HABILITADA',
+    habilitacion.mensaje
+      + ' Si tiene que firmar antes de completarlo, pida una excepción de '
+      + 'habilitación (POST /internal/admin/excepciones-habilitacion): exige '
+      + 'autorización escrita, un alcance de firmas, una ruta en papel '
+      + 'operativa y un plazo cierto.',
+    {
+      id_empresa,
+      pendientes: habilitacion.pendientes,
+    }
+  );
 }
 
 /**
@@ -1045,6 +1128,7 @@ module.exports = {
   marcarAnexoFirmado,
   setActivo,
   verificarHabilitacionFirma,
+  assertHabilitadaParaFirma,
   dominiosCorporativos,
   esDominioCorporativo,
   list,

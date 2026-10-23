@@ -354,6 +354,13 @@ Quedó así: al llegar al tope, `409 TOKEN_LIMIT_REACHED` con las emisiones
 vivas, y `revocar_anteriores: true` para revocar y emitir en la misma
 operación. Revocar es una decisión, y las decisiones tienen autor.
 
+> **Esto fue así hasta el 23-oct-2026 (📦933) y ya no es.** El 3.4(c) de la v1.1
+> exige que *cada* reemisión deje sin efecto el token anterior y que no haya
+> más de un token vigente por solicitud: la reemisión revoca siempre, y
+> `revocar_anteriores` quedó obsoleto. La lección de esta entrada tampoco era
+> del todo correcta: la decisión de revocar no era solo de quien llama, era
+> también del **Acuerdo**. Ver la entrada del 📦933 al final del archivo.
+
 ---
 
 ## 🐗 La tabla que no se podía limpiar, y la suite que dependía del orden (📦915, 2026-10-19)
@@ -5959,4 +5966,95 @@ sin tocar ninguna versión del Acuerdo.
 se probaba, estaba en el código que comprobaba.** Un e2e que recorre la mitad del camino y
 sale verde es peor que uno que no corre, porque se cree que probó. Y un despliegue se prueba
 con el hash de lo que quedó corriendo, no con el del archivo que se copió.
+
+---
+
+## 📦933 · El bloqueo que bloqueaba, la excepción que deja rastro y la mutación que muerde por el motivo equivocado
+
+*23-oct-2026 · la respuesta 11A del abogado · retención de 20 años · token único · D-03*
+
+### El abogado no estaba equivocado en la ley; estaba equivocado en el código
+
+El pedido fue: «que el bloqueo de la habilitación de la Empresa se aplique en los cuatro
+puntos y que la excepción sea un flag auditable, no un if silencioso». Lo segundo se hizo
+tal cual. Lo primero tenía una sorpresa: el abogado escribió que hoy el sistema «avisa»,
+y **eso era inexacto**. Con el default, el bloqueo ya lanzaba `409 EMPRESA_NO_HABILITADA`
+—pero **solo en la creación de la solicitud**. El commit, la creación del consentimiento y
+la doble firma no comprobaban nada.
+
+La moraleja: una instrucción que describe el código hay que **contrastarla con el código**
+antes de tocarlo, no después. Si se hubiera implementado «lo que el abogado dijo que
+había», se habría escrito un aviso nuevo donde ya había un bloqueo, y el sistema habría
+quedado bloqueando en un punto y avisando en los otros tres.
+
+### El «if silencioso» tenía dos caras
+
+El `FIRMA_EXIGIR_HABILITACION_EMPRESA=false` era la puerta de atrás: apagaba el bloqueo y
+dejaba un `WARN`. No era silencioso, pero era **inrastreable**: nadie sabe quién lo apagó
+ni a quién dejó firmar sin Anexo de Encargo.
+
+La salida que quedó no es una bandera, es una **excepción con expediente**: autorización
+escrita (quién, fecha y referencia del documento), alcance de una Empresa y un número
+máximo de firmas, ruta en papel operativa el mismo día, fecha cierta con máximo 30 días, y
+una bitácora **append-only por triggers** (migración 036) donde cada uso queda con usuario,
+fecha, motivo, Empresa y número de firmas. Y una regla que no es del abogado y sí del
+sistema: una Empresa **sin ningún Anexo** solo entra como **piloto autorizado**, con
+quien lo autoriza.
+
+**El límite tenía que contar firmas, no puntos de verificación.** La primera versión gastaba
+una unidad de alcance cada vez que se levantaba el bloqueo, y una firma atraviesa tres
+puntos: creación, consentimiento y commit. Con un alcance de 3 se autorizaba **una** firma,
+no tres. La corrección fue distinguir el punto que **abre** una firma (gasta) del punto que
+la **verifica** (solo consulta). Es el mismo tipo de error del `PUT` de la ficha de la
+Empresa: un límite que dice una cosa y cuenta otra es un límite que no significa nada.
+
+### La mutación que muerde por el motivo equivocado
+
+La lección más cara del día no fue del dominio: fue del arnés de pruebas. Al renombrar
+`MAX_TOKENS_ACTIVOS` a `MAX_TOKENS_VIGENTES`, quedó la referencia vieja en el
+`module.exports`. El `ReferenceError` no apareció en un test: apareció al **cargar el
+módulo**, y como treinta archivos de test lo importan, **treinta archivos fallaron a la vez**
+con un error que no tenía nada que ver con el cambio.
+
+Lo peligroso es lo que pasó después: el script de mutaciones.reportó **14 de 14
+detectadas**. Y era mentira para las que tocaban ese módulo: con el `ReferenceError` presente,
+los tests fallaban **con la mutación puesta y sin ella**, así que cualquier mutación parecía
+detectada. El contador estaba contando mientras el check no había bosteado.
+
+La regla que sale de ahí es una sola y no es nueva, pero se vio con nombre: **antes de
+creer un «14/14 de mutaciones detectadas», hay que verificar que el código carga y que la
+suite está verde**. Si una mutación sobrevive, el check no muerde. Si detecta de golpe, hay
+que sospechar que está fallando por otro lado. Y el fix es de una línea:
+`node -e "require('./src/services/signRequest')"`.
+
+### Dos respuestas del abogado, y gana la que se puede probar de dónde salió
+
+En el repo aparecieron dos documentos con el mismo nombre y fechas distintas: el `.txt` de
+41 128 bytes, copiado byte a byte del asset que el owner pegó, y un `.md` de 71 367 bytes
+creado a las 3:33 AM que **no aparecía en ningún snapshot de sesión, ni en `assets/`, ni en
+los logs del runtime**. Se contradecían en lo decisivo: uno decía «80 años por defecto,
+efecto en el código: ninguno» y el otro «Recomiendo bajarlo a 20 años… cambia una
+constante: ANIOS_CUSTODIA de 80 a 20».
+
+El `.md` era **más grande y más reciente**: por tamaño y por hora, ganaba. Pero **no se
+puede probar de dónde salió**, y eso lo descalifica. El criterio que se aplicó es el
+general: *¿se puede probar el origen?* Un documento sin origen no compite —se señala como
+contradictorio y no se usa como fuente—. Y la regla de por qué importa: cuando dos
+fuentes se contradicen, la tentación no es promediarlas ni elegir la más reciente, es
+**preguntar de dónde salió cada una**.
+
+### Lo que quedó escrito y lo que no
+
+El texto final del abogado trae **28 huecos** que solo el owner puede llenar (NIT y
+representante, ciudad y país del servidor, los DPAs de Cloudflare y Google, el tipo de
+cuenta de Google, el responsable de respaldos/monitoreo/soporte con su RTO/RPO, la persona o
+área y el canal del 10.7(b), la URL de la política de datos). **La v1.1 no se publica con
+huecos**: el abogado dice que sin ella no hay primera firma. Así que el mapa de empalme
+quedó escrito (los 49 numerales que cambian, con el texto final citado íntegro y la lista
+de lo que falta) y la publicación quedó para cuando los datos existan.
+
+El orden del abogado se respeta: cerrar 9A, 10.4 y D-03 → ajustar el 8.6 en el código →
+publicar la v1.1 → encender el D-02 → firmar el Anexo de Nube → primera firma real. **Los
+tres primeros ya están.**
+
 

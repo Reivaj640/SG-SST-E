@@ -187,7 +187,7 @@ Leyenda: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE.
 | 3.2 | ✅ | El PDF firmado no lleva firma criptográfica; la cita del 47.1 nums. 2, 3 y 4 es **fiel** [V] |
 | 3.3 | 🟡 | OTP y token se guardan solo como HMAC ✅; pero la Empresa puede redirigir la invitación a cualquier correo → **H-TC-05** |
 | 3.4(a)–(b) | ✅ | — |
-| 3.4(c) | 🟡 | "de un solo uso" ya no es exacto: la rotación 8C admite hasta **3 tokens vivos** por solicitud → **H-TC-11** |
+| 3.4(c) | ✅ | "de un solo uso" es exacto: desde el 23-oct-2026 (📦933) la reemisión invalida siempre el token anterior y no hay más de un token vigente por solicitud → la parte del 3.4(c) de **H-TC-11** quedó **cerrada** |
 | 3.4(d) | ✅ | La comparación por huella es real (`identificacion.verificar`, `identificacion_coincidio`, evento). La palabra "con sal" está desactualizada → **H-TC-10** |
 | 3.4(e)–(f) | ✅ | OTP de un solo uso, 600 s, 5 intentos, nunca en texto claro (HMAC) |
 | 3.4(g) | 🟡 | El gate es real (no se avanza sin aceptar), pero se muestra la versión **ligada a la solicitud**, no la vigente; si ya no es la activa, el trabajador recibe un 409 sin salida → depende de la **10.4** |
@@ -282,7 +282,7 @@ Leyenda: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE.
 | **H-TC-08** | 🟠 Media | El **2.2** presenta a), b) y c) como "el caso previsto en el **parágrafo**" del 2.2.1.1.13, pero ese parágrafo regula otro deber: a), b) y c) son los tres **numerales** | `acuerdo-v1.0.txt:64-84` |
 | **H-TC-09** | 🟠 Media | El **3.6(g)** ("no puede ser alterado ni eliminado") no tiene la excepción de la ventana de purga gobernada que el código sí respeta | `020_eventos_append_only.sql`; `supresion.js` |
 | **H-TC-10** | 🟠 Media | "Huella digital **con sal**" (3.4(d), 3.4(e), 3.6(e)) describe una garantía **más débil y falsa**: el código usa HMAC-SHA-256 con clave fuera de la base | `crypto/otp.js`; `crypto/token.js` |
-| **H-TC-11** | 🟠 Media | "Token de **un solo uso**" (3.1, 3.3, 3.4(c)) ya no es exacto: la 8C admite hasta **3 tokens vivos**; y el 3.4(g) promete la "versión **vigente**" cuando el sistema muestra la versión **ligada a la solicitud** | `026_tokens_rotacion.sql`; `publicFlow.js` |
+| **H-TC-11** | 🟠 Media | La parte del **3.4(c)** quedó **resuelta el 23-oct-2026 (📦933)**: "token de **un solo uso**" (3.1, 3.3, 3.4(c)) vuelve a ser exacto, porque la reemisión invalida siempre el token anterior y no hay más de un token vigente por solicitud. **Sigue en pie la parte del 3.4(g)**: el texto promete la "versión **vigente**" cuando el sistema muestra la versión **ligada a la solicitud** | `026_tokens_rotacion.sql`; `publicFlow.js` |
 | **H-TC-12** | 🟠 Media | El **8.3/8.4/8.5** no tienen canal real: el PDF firmado solo baja por el token (que caduca) y no hay consulta pública que sirva el PDF a una autoridad | `publicFlow.js`; `routes/signRequest.js` |
 
 ### 5.2 De la revisión de los capítulos V a XII
@@ -306,7 +306,7 @@ Leyenda: ✅ CUMPLE · 🟡 PARCIAL · ❌ NO CUMPLE.
 | 8A.1 | Vencimiento y verificación de la conservación | 10.6 |
 | 8A.2 | Supresión del dato con lápida y recibo | 10.6, 12.7 |
 | 8B | Lista blanca de metadata + dato sensible con casilla separada | 10.2, 10.8 |
-| 8C | El token solo existe como huella; rotación (3 tokens vivos) | 10.5(b) — con el ajuste de texto de H-TC-11 |
+| 8C | El token solo existe como huella; rotación (un token vigente: la reemisión invalida el anterior) | 10.5(b) — con el ajuste de texto de H-TC-11 |
 | 8B-C | La copia de empresa del consentimiento va cifrada y la huella se verifica al presentar | 1.2, 10.5 |
 | **D-03 (hoy)** | La creación de la firma se bloquea con 409 si la Empresa no tiene Anexo firmado o plazo declarado | 1.4, 8.6 |
 

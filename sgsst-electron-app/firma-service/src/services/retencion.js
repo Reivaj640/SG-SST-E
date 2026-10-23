@@ -25,23 +25,28 @@
  *
  *   - La historia laboral y la nómina tienen un deber de conservación ligado a
  *     los derechos pensionales (Corte Constitucional T-470/2019). El Concepto
- *     2-2017-01654 del Archivo General de la Nación propone un rango de 80 a
- *     100 años desde el retiro.
+ *     2-2017-01654 del Archivo General de la Nación ORIENTA el plazo de la
+ *     historia laboral, pero no lo fija: el plazo lo declara la tabla de
+ *     retención de la Empresa y, si la Empresa no declara, el del sistema.
  *
- * LA REGLA DEL SISTEMA: 80 AÑOS DE CUSTODIA
- * ----------------------------------------
- * El sistema aplica por defecto **80 años de custodia documental contados
- * desde la fecha de la firma** (`ANIOS_CUSTODIA`). Es un piso, no un techo:
+ * LA REGLA DEL SISTEMA: 20 AÑOS DE CUSTODIA POR DEFECTO
+ * ------------------------------------------------------
+ * El sistema aplica por defecto **20 años de custodia documental contados
+ * desde la fecha de la firma** (`ANIOS_CUSTODIA`). Es el plazo de reserva del
+ * 8.6(h): cuando la Empresa NO declara un plazo en su tabla de retención, se
+ * aplica el mínimo legal que corresponda y, en su defecto, veinte (20) años
+ * contados desde la firma. Ese plazo es un MÁXIMO de custodia: no autoriza a
+ * conservar más allá de la finalidad.
  *
- *   - Cubre el mínimo legal de 20 años desde el cese para los cinco grupos
- *     SST (80 años desde la firma superan los 20 años desde el cese en
- *     cualquier relación laboral de duración razonable). Cuando el sistema
- *     conoce la fecha de cese, la compara y se queda con la más lejana.
- *   - Cubre el rango de 80 a 100 años desde el retiro de la historia laboral.
- *   - Si la Empresa declara un plazo MÁS LARGO en su tabla de retención, ese
- *     plazo manda: la tabla de la Empresa es la fuente del 8.6.
+ *   - Si la Empresa declara un plazo en su tabla de retención, ese plazo
+ *     manda: la tabla de la Empresa es la fuente del 8.6(a). El plazo del
+ *     sistema es el de reserva, no un mínimo que la Empresa pueda bajar.
+ *   - El mínimo legal de 20 años desde el cese para los cinco grupos SST se
+ *     mantiene: cuando el sistema conoce la fecha de cese, la compara con la
+ *     fecha calculada y se queda con la más lejana.
  *   - El contrato electrónico es la única excepción: no tiene término, queda
  *     con un HOLD y no se borra por el vencimiento de la custodia.
+ *   - El deber legal declarado por la Empresa manda sobre cualquier plazo.
  *
  * POR QUÉ NADA DE ESTO SE LE PIDE AL OPERADOR
  * -------------------------------------------
@@ -58,7 +63,7 @@
  * consentimiento; la clasificación es una regla de código, no un juicio.
  *
  * Los plazos sin fecha de cese conocida NO se inventan: se aplica la custodia
- * de 80 años desde la firma, que es el piso del sistema.
+ * de 20 años desde la firma, que es el plazo de reserva del 8.6(h).
  */
 'use strict';
 
@@ -74,8 +79,22 @@ const NORMA_DEBER_LEGAL_EMPRESA = '2.2.1.1.12 del Decreto 1072 de 2015';
  *
  * Es el plazo por defecto de TODA firma. Está en el código y no se pide: ni
  * al operador, ni a la Empresa. Ver la cabecera del archivo.
+ *
+ * HISTORIAL DE ESTA CONSTANTE
+ *   - 80 años: la política interna original. Sobre-retención: conservar 80 años
+ *     un documento sin deber legal de conservación es difícil de sostener
+ *     frente al artículo 2.2.2.25.2.8 del Decreto 1074 de 2015.
+ *   - 20 años: el plazo de reserva del 8.6(h) ("se aplica el mínimo legal que
+ *     corresponda y, en su defecto, veinte (20) años contados desde la firma.
+ *     Ese plazo es un máximo de custodia"). Exigido así por la respuesta 11A
+ *     del abogado (23-oct-2026): "cambia una constante: ANIOS_CUSTODIA de 80 a
+ *     20 (retencion.js)".
+ *
+ * Lo que NO cambia con esta constante: el HOLD sin término del contrato
+ * electrónico, el piso de 20 años desde el cese de los cinco grupos SST, y el
+ * deber legal declarado por la Empresa.
  */
-const ANIOS_CUSTODIA = 80;
+const ANIOS_CUSTODIA = 20;
 
 /**
  * Las reglas de retención. Una categoría apunta a una regla; varias
@@ -90,8 +109,8 @@ const ANIOS_CUSTODIA = 80;
  * la Empresa declare menos.
  */
 const REGLAS = Object.freeze({
-  CUSTODIA_80_ANOS: Object.freeze({
-    id: 'CUSTODIA_80_ANOS',
+  CUSTODIA_20_ANOS: Object.freeze({
+    id: 'CUSTODIA_20_ANOS',
     base: 'creacion',
     anios: ANIOS_CUSTODIA,
     piso: null,
@@ -109,9 +128,9 @@ const REGLAS = Object.freeze({
     hold: false,
     norma: NORMA_SST,
     texto: 'Se conserva {anios} años contados desde la fecha de la firma. '
-      + 'El mínimo legal es de 20 años contados desde el cese de la relación '
-      + 'laboral (artículo 2.2.4.6.13 del Decreto 1072 de 2015), y esta '
-      + 'custodia lo cubre.',
+      + 'El mínimo legal es de veinte (20) años contados desde el cese de la '
+      + 'relación laboral (artículo 2.2.4.6.13 del Decreto 1072 de 2015); el '
+      + 'sistema aplica ese plazo desde el cese cuando conoce esa fecha.',
   }),
   CONTRATO_ELECTRONICO: Object.freeze({
     id: 'CONTRATO_ELECTRONICO',
@@ -131,10 +150,12 @@ const REGLAS = Object.freeze({
     piso: null,
     hold: false,
     norma: NORMA_HISTORIA,
-    texto: 'Se conserva {anios} años contados desde la fecha de la firma, '
-      + 'dentro del rango de 80 a 100 años desde el retiro que fija el Concepto '
-      + '2-2017-01654 del Archivo General de la Nación (Corte Constitucional '
-      + 'T-470/2019).',
+    texto: 'Se conserva {anios} años contados desde la fecha de la firma. El '
+      + 'Concepto 2-2017-01654 del Archivo General de la Nación orienta el '
+      + 'plazo de la historia laboral y la nómina sin fijarlo (Corte '
+      + 'Constitucional T-470/2019): el plazo es el que declare la tabla de '
+      + 'retención de la Empresa y, si la Empresa no declara, el de reserva '
+      + 'del sistema.',
   }),
   TABLA_EMPRESA: Object.freeze({
     id: 'TABLA_EMPRESA',
@@ -145,6 +166,20 @@ const REGLAS = Object.freeze({
     norma: null,
     texto: 'Se conserva {anios} años contados desde la fecha de la firma.',
   }),
+});
+
+/**
+ * Los ids de regla que el sistema usó antes y que todavía pueden estar
+ * GUARDADOS en la fila (columna `regla_retencion`, migración 033).
+ *
+ * La migración 034 los actualiza, pero una base que no la corrió —o una fila
+ * escrita por otra versión— no puede quedar reinterpretada: el id viejo se
+ * traduce al nuevo y la fila dice la verdad. Sin este mapa, una fila con el id
+ * viejo caería en el `TABLA_EMPRESA` por el fallback de `planificar()` y su
+ * `regla_retencion` quedaría mintiendo.
+ */
+const REGLAS_LEGACY = Object.freeze({
+  CUSTODIA_80_ANOS: 'CUSTODIA_20_ANOS',
 });
 
 /**
@@ -412,8 +447,8 @@ function _fechaMasLejana(a, b) {
  * @param {string} [opts.regla_retencion]
  * @param {string} [opts.fecha_creacion]
  * @param {string} [opts.fecha_terminacion] - Cese o retiro, si el sistema lo
- *   conoce. Nunca se le pide a nadie: si no está, la custodia de 80 años desde
- *   la firma cubre el mínimo legal.
+ *   conoce. Nunca se le pide a nadie: si no está, se aplica el plazo de
+ *   reserva del sistema (20 años desde la firma, el 8.6(h)).
  * @param {object} [opts.empresa] - fila de gh_firma_empresas (con
  *   plazo_retencion, plazo_retencion_dias, conservacion_por_deber_legal y
  *   norma_conservacion).
@@ -439,8 +474,12 @@ function planificar({
     ? categoria_retencion
     : null;
   const categoria = categoriaId ? POR_ID.get(categoriaId) : null;
-  const reglaId = regla_retencion && REGLAS[regla_retencion]
-    ? regla_retencion
+  // El id puede venir legacy (guardado antes de la migración 034): se traduce
+  // al id vigente ANTES de buscar la regla, para que la fila guarde la verdad
+  // y no quede reinterpretada por el fallback de abajo.
+  const reglaPedida = REGLAS_LEGACY[regla_retencion] || regla_retencion;
+  const reglaId = reglaPedida && REGLAS[reglaPedida]
+    ? reglaPedida
     : (categoria ? categoria.regla : 'TABLA_EMPRESA');
   const regla = REGLAS[reglaId];
   const emp = empresa || {};
@@ -448,8 +487,9 @@ function planificar({
   // ── La fecha de conservación ────────────────────────────────────────────
   //
   // 1. El plazo base: la tabla de la Empresa si declaró uno (es la fuente
-  //    del 8.6); si no declaró nada, la custodia del sistema (80 años). Nadie
-  //    tiene que declarar nada para que exista un plazo.
+  //    del 8.6(a)); si no declaró nada, la custodia del sistema (20 años, el
+  //    plazo de reserva del 8.6(h)). Nadie tiene que declarar nada para que
+  //    exista un plazo.
   // 2. El piso legal de la categoría (los grupos SST: 20 años, contados
   //    desde la creación y, si se conoce el cese, desde el cese). El piso no
   //    se puede bajar por mucho que la tabla declare menos.
@@ -518,7 +558,7 @@ function planificar({
   //   - el texto que declaró la Empresa, cuando el plazo aplicado es el suyo
   //     (es su tabla de retención y su redacción);
   //   - el texto de la regla, cuando el plazo lo puso el sistema (custodia
-  //     de 80 años) o cuando el piso legal subió el plazo de la Empresa (ahí
+  //     de 20 años) o cuando el piso legal subió el plazo de la Empresa (ahí
   //     manda la redacción del sistema, que dice la base legal).
   const aniosAplicados = fecha
     ? Math.max(1, Math.round(
@@ -556,6 +596,7 @@ function planificar({
 
 module.exports = {
   REGLAS,
+  REGLAS_LEGACY,
   CATEGORIAS,
   ANIOS_CUSTODIA,
   NORMA_SST,

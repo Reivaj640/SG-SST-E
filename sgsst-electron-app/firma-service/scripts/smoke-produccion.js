@@ -747,8 +747,10 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
     const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
     if (codigo === 'EMPRESA_NO_HABILITADA') {
       fail('POST /internal/sign-requests', '409 EMPRESA_NO_HABILITADA: la Empresa '
-        + 'no tiene Anexo firmado, plazo de conservacion declarado o canal PQRS. '
-        + 'Es la bandera FIRMA_EXIGIR_HABILITACION_EMPRESA (que viene en true). '
+        + 'no tiene Anexo de Encargo firmado ni canal de PQRS. '
+        + 'El bloqueo es INCONDICIONAL (📦933): no hay bandera que lo apague. '
+        + 'La unica salida es la excepcion auditable '
+        + '(POST /internal/admin/excepciones-habilitacion). '
         + 'NO es un fallo del servicio: es el control del D-03. Detalle: '
         + JSON.stringify((res.json && res.json.error && res.json.error.details) || {}));
     } else {

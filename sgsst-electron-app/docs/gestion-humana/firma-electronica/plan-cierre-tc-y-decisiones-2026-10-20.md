@@ -312,6 +312,10 @@ documentada y sin default silencioso. **Implementado hoy.**
      apagada el sistema **avisa en el log** cada vez que deja pasar una firma
      sin habilitación, con código: no es un default silencioso, es un default
      ruidoso.
+     > **Obsoleto desde el 23-oct-2026 (📦933).** La bandera se retiró: el bloqueo
+     > es incondicional y la única salida es la **excepción auditable**
+     > (`POST /internal/admin/excepciones-habilitacion`), que exige autorización
+     > escrita, alcance de firmas, ruta en papel operativa y un plazo cierto.
   3. Aviso a las Empresas afectadas antes de activarlo.
 - **No** se hace en producción sin: el inventario, el aviso, y el "dale" del
   owner. El estado real de los clientes de producción **no está confirmado**:

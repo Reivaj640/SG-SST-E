@@ -165,7 +165,7 @@ test('el correo de invitacion comunica el plazo y el canal de copia', async () =
 });
 
 test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', async () => {
-  // La custodia de 80 años vive en el código del sistema: la Empresa no tiene
+  // La custodia de 20 años vive en el código del sistema: la Empresa no tiene
   // nada que declarar y el 8.6 se cumple con lo que el sistema comunica al
   // firmante. Antes esto se rechazaba con un 409; ahora la firma sale.
   resetDb();
@@ -182,7 +182,7 @@ test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', asyn
 
 test('si la empresa no declara plazo, el correo comunica la custodia del sistema', async () => {
   // El sistema NO inventa un plazo: comunica el suyo, que es la custodia de
-  // 80 años contados desde la firma, y la fila guarda esa fecha. El correo
+  // 20 años contados desde la firma, y la fila guarda esa fecha. El correo
   // sale con esa línea y con el canal de copia que sí declaró la Empresa.
   resetDb();
   mailer.clearDevInbox();
@@ -197,7 +197,7 @@ test('si la empresa no declara plazo, el correo comunica la custodia del sistema
   const inbox = mailer.getDevInbox();
   assert.equal(inbox.length, 1);
   const cuerpo = inbox[0].body;
-  assert.ok(cuerpo.includes('80 años'),
+  assert.ok(cuerpo.includes('20 años'),
     'el correo debe comunicar la custodia del sistema');
   assert.ok(!cuerpo.includes('Dónde puedes pedir una copia'),
     'no debe aparecer una línea de canal si la empresa no lo declar\u00f3');

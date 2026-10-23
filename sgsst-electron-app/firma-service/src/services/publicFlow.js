@@ -1369,6 +1369,38 @@ async function commit(token, opts, ip, user_agent) {
   //      revocación), por lo que la ventana de race es teórica.
   consentService.validateForCommit(signRequest);
 
+  // 2.7. D-03 · la Empresa tiene que estar habilitada para el COMMIT.
+  //
+  //      Segundo punto del bloqueo (respuesta 11A, 23-oct-2026): "Se bloquea
+  //      la creación de la solicitud, el commit, la creación del consentimiento
+  //      y la doble firma cuando falta el Anexo de Encargo o el canal de
+  //      PQRS."
+  //
+  //      Va ANTES de generar el PDF y la constancia: si la Empresa no está
+  //      habilitada, no se produce evidencia de una firma que no se puede
+  //      sostener. La única salida es la excepción auditable.
+  const habilitacionEmpresa = empresaService.assertHabilitadaParaFirma(
+    signRequest.id_empresa,
+    {
+      punto: 'commit',
+      // El commit VERIFICA una firma ya abierta: la excepcion ya se gastó
+      // cuando se creó la solicitud. Aquí solo se levanta el bloqueo.
+      cuenta_firma: false,
+      actor: `firmante:${signRequest.id_solicitud}`,
+      ip: ip || null,
+      user_agent: user_agent || null,
+    }
+  );
+  if (habilitacionEmpresa.con_excepcion) {
+    logger.warn('publicFlow: el commit se hizo con una EXCEPCIÓN de habilitación', {
+      id_solicitud: signRequest.id_solicitud,
+      id_empresa: signRequest.id_empresa,
+      excepcion_id: habilitacionEmpresa.excepcion.id,
+      firmas_usadas: habilitacionEmpresa.excepcion.firmas_usadas,
+      alcance_firmas_max: habilitacionEmpresa.excepcion.alcance_firmas_max,
+    });
+  }
+
   // 3. Validar precondiciones
   if (signRequest.estado !== 'DOCUMENT_VIEWED') {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',

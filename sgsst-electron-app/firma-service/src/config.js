@@ -152,19 +152,22 @@ const config = {
   // se pueden cumplir: por eso la creación de la solicitud se bloquea con
   // un 409 que dice qué falta y dónde se resuelve.
   //
-  // La bandera existe para la TRANSICIÓN, no para abrir una puerta trasera:
+  // EL BLOQUEO ES INCONDICIONAL (decisión B.3 del abogado, 23-oct-2026).
   //
-  //   - true  (default): la firma sin habilitación NO se crea.
-  //   - false: se permite, pero cada caso queda en el log como WARN con
-  //             código. No es un default silencioso: es un default ruidoso,
-  //             y en producción se enciende después del inventario y del
-  //             aviso a las Empresas (scripts/inventario-empresas-no-habilitadas.js).
+  // Antes existía la bandera `FIRMA_EXIGIR_HABILITACION_EMPRESA`: con ella en
+  // 'false', la firma pasaba y solo quedaba un WARN. Se RETIRÓ porque era
+  // exactamente lo que el abogado no quiere: "La excepción debe ser un flag
+  // auditable, no un if silencioso". Un interruptor de entorno no deja rastro
+  // de quién lo apagó ni de a quién dejó firmar sin Anexo.
+  //
+  // La única salida del bloqueo es la EXCEPCIÓN auditable
+  // (src/services/excepcionHabilitacion.js): autorización escrita, alcance de
+  // firmas, ruta en papel operativa, plazo cierto (máximo 30 días) y bitácora
+  // inmutable. Para usarla: POST /internal/admin/excepciones-habilitacion.
   //
   // OJO: el bloqueo solo aplica a las empresas REGISTRADAS en
   // `gh_firma_empresas`. Una empresa que no está dada de alta es otro
   // problema (identificación incompleta) y se atiende aparte.
-  exigirHabilitacionEmpresa:
-    process.env.FIRMA_EXIGIR_HABILITACION_EMPRESA !== 'false',
 
   email: {
     retryDelaysMin: required('EMAIL_RETRY_DELAYS_MIN', '5,30,120')

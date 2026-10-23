@@ -101,11 +101,14 @@ function main() {
   console.log('');
   console.log('  Para habilitar una empresa:');
   console.log('    POST /internal/admin/empresas/{id}/anexo-firmado  {"fecha":"YYYY-MM-DD"}');
-  console.log('    PUT  /internal/admin/empresas/{id}  {...,"plazo_retencion":"...","plazo_retencion_dias":N}');
+  console.log('    PUT  /internal/admin/empresas/{id}  {...,"canal_pqrs":"correo@empresa"}');
   console.log('');
-  console.log('  Encender el bloqueo en producción:');
-  console.log('    FIRMA_EXIGIR_HABILITACION_EMPRESA=true (ya es el default)');
-  console.log('  Antes de eso: avisar a estas empresas y dejarlas habilitarse.');
+  console.log('  El bloqueo ya esta ENCENDIDO y es incondicional (📦933): no hay');
+  console.log('  bandera que lo apague. La unica salida es la excepcion auditable:');
+  console.log('    POST /internal/admin/excepciones-habilitacion');
+  console.log('  (exige autorizacion escrita, alcance de firmas, ruta en papel');
+  console.log('   operativa y un plazo cierto de maximo 30 dias).');
+  console.log('  Antes de una excepcion: avisar a estas empresas y dejarlas habilitarse.');
 }
 
 try {

@@ -318,6 +318,11 @@ beforeEach(() => {
   // se borra aquí para que cada caso arranque con la empresa de prueba.
   db.prepare('DELETE FROM gh_firma_empresas').run();
   empresaService.create(EMPRESA_DATOS);
+  // D-03 (decisión B.3): la creación del consentimiento exige que la Empresa
+  // esté habilitada (Anexo de Encargo firmado + canal de PQRS). Este archivo
+  // prueba el CIFRADO del snapshot, no el D-03: la empresa de prueba se
+  // habilita para que el bloqueo no se confunda con lo que se prueba.
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-20');
 });
 
 test('8B-C · el consentimiento del trabajador no guarda el número en claro', async () => {

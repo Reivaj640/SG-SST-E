@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anexo de Nube &mdash; Servicio de firma electr&oacute;nica K+AIR (modelo, versi&oacute;n 1.0)</title>
+<meta name="description" content="Anexo de Nube del servicio de firma electr&oacute;nica K+AIR: infraestructura, subencargados, conservaci&oacute;n, devoluci&oacute;n y supresi&oacute;n. Modelo, versi&oacute;n 1.0, para anexarlo al Anexo de Encargo de Tratamiento de Datos Personales.">
+<link rel="stylesheet" href="assets/estilo.css">
+</head>
+<body>
+
+<div class="cabecera">
+  <div class="envoltura">
+    <h1>Anexo de Nube &mdash; Servicio de firma electr&oacute;nica K+AIR</h1>
+    <p class="sub">Modelo &middot; versi&oacute;n 1.0 del Anexo de Nube &middot; anexo al Anexo de Encargo de
+    Tratamiento de Datos Personales</p>
+  </div>
+</div>
+
+<main class="envoltura">
+
+  <ul class="enlaces">
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="terminos.html">T&eacute;rminos y Condiciones</a></li>
+    <li><a href="privacidad.html">Pol&iacute;tica de Privacidad</a></li>
+    <li><a href="anexo-encargo.html">Anexo de encargo de tratamiento</a></li>
+    <li><a href="anexo-nube-v1.0.html">Anexo de nube</a></li>
+    <li><a href="autorizacion-trabajadores.html">Autorizaci&oacute;n de trabajadores</a></li>
+    <li><a href="soporte.html">Soporte y contacto</a></li>
+  </ul>
+
+  <p class="fecha">Modelo &middot; Versi&oacute;n 1.0 &middot; 23 de octubre de 2026</p>
+
+  <div class="destacado">
+    <p><strong>Resumen en una l&iacute;nea:</strong> este Anexo describe la infraestructura del servicio de firma
+    electr&oacute;nica K+AIR y lo incorpora al Anexo de Encargo de Tratamiento de Datos Personales. Tiene su propia
+    versi&oacute;n y su propia huella, y no se firma sin los cinco datos del bloque de pendientes.</p>
+  </div>
+
+  <div class="aviso">
+    <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Sin estos cinco datos el Anexo no se puede
+    firmar:</p>
+    <ul>
+      <li><strong>NIT y representante de Gesstiar.</strong></li>
+      <li><strong>Ciudad y pa&iacute;s del servidor.</strong></li>
+      <li><strong>DPAs con Cloudflare y Google.</strong></li>
+      <li><strong>Tipo de cuenta de Google.</strong></li>
+      <li><strong>Responsable de respaldos, monitoreo y soporte.</strong></li>
+    </ul>
+    <p>Un Anexo que diga &laquo;los subencargados que se usen&raquo; no cumple el art&iacute;culo 2.2.2.25.5.2
+    del Decreto 1074 de 2015.</p>
+    <p>En la respuesta jur&iacute;dica que dio origen a este modelo, el tipo de cuenta de Google, los DPAs de
+    Cloudflare y Google y la ubicaci&oacute;n f&iacute;sica del servidor aparecen marcados como
+    &laquo;No verificado&raquo;.</p>
+  </div>
+
+  <p><strong>ANEXO DE NUBE &mdash; SERVICIO DE FIRMA ELECTR&Oacute;NICA K+AIR</strong></p>
+
+  <p>Entre [EMPRESA], NIT [ ], representada por [ ], en calidad de Responsable, y GESSTIAR S.A.S., NIT [ ],
+  representada por [ ], en calidad de Encargado.</p>
+
+  <h2>1. Servicio y alcance</h2>
+  <p>El Encargado presta el servicio de firma electr&oacute;nica K+AIR para que el Responsable celebre contratos
+  individuales de trabajo y sus anexos. Este Anexo se incorpora al Anexo de Encargo de Tratamiento de Datos
+  Personales y prevalece sobre las cl&aacute;usulas de ese Anexo que contradigan el Servicio. El alcance son las
+  categor&iacute;as del 10.2 del Acuerdo, las finalidades del 10.3 y los sistemas de firma, base de datos,
+  almacenamiento de archivos y env&iacute;o de correo.</p>
+
+  <h2>2. Datos y finalidad</h2>
+  <p>Se tratan: identificaci&oacute;n del Trabajador; correo; IP y agente de usuario; fechas y horas de los hitos;
+  documento firmado y Constancia; identificaci&oacute;n laboral; e identificaci&oacute;n del Responsable. La finalidad
+  es la firma, la Constancia, las notificaciones, el soporte y el cumplimiento legal. No hay usos secundarios. El
+  Encargado no recibe datos distintos de los aqu&iacute; previstos y los descarta si llegan.</p>
+
+  <h2>3. Infraestructura y ubicaci&oacute;n</h2>
+  <p>Servidor propio del Encargado, ubicado f&iacute;sicamente en [ciudad, pa&iacute;s], con Ubuntu Server 24.04.5
+  LTS, en la red local del operador, detr&aacute;s de NAT. Se expone por el t&uacute;nel kair-firma de Cloudflare,
+  Inc. hacia firma.kair.fyi. El correo se env&iacute;a por Google LLC (smtp.gmail.com, puerto 587). El
+  almacenamiento es el sistema de archivos del servidor; no hay almacenamiento de objetos externo.
+  <strong>Respaldos:</strong> [frecuencia, retenci&oacute;n, cifrado, responsable].
+  <strong>Monitoreo:</strong> [herramienta o persona].
+  <strong>Soporte:</strong> [interno o proveedor].
+  <strong>Seguridad f&iacute;sica:</strong> [control de acceso al lugar, energ&iacute;a, conectividad].
+  <strong>Continuidad:</strong> RTO [ ], RPO [ ].</p>
+
+  <h2>4. Subencargados</h2>
+  <p>El Responsable autoriza los siguientes, con las obligaciones de este Anexo:</p>
+  <table>
+    <thead>
+      <tr><th>Proveedor</th><th>Servicio</th><th>Datos</th><th>Rol</th><th>Ubicaci&oacute;n</th><th>DPA</th><th>Devoluci&oacute;n / supresi&oacute;n</th><th>Auditor&iacute;a</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Cloudflare, Inc.</td>
+        <td>T&uacute;nel, tr&aacute;nsito y seguridad</td>
+        <td>IP, metadatos, contenido en tr&aacute;nsito</td>
+        <td>Subencargado</td>
+        <td>Red global</td>
+        <td>[self-serve / enterprise]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+      </tr>
+      <tr>
+        <td>Google LLC</td>
+        <td>SMTP</td>
+        <td>Correo, contenido y metadatos</td>
+        <td>Subencargado solo si Workspace/Cloud</td>
+        <td>[EE. UU./global]</td>
+        <td>[Workspace/Cloud]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+      </tr>
+      <tr>
+        <td>[Respaldo]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+      </tr>
+      <tr>
+        <td>[Monitoreo]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+      </tr>
+      <tr>
+        <td>[Soporte]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+        <td>[ ]</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>El Encargado notifica cualquier cambio de subencargado y el Responsable puede oponerse. Si un proveedor act&uacute;a
+  como Responsable &mdash;por ejemplo, una cuenta de Gmail de consumidor&mdash;, el tratamiento es transferencia
+  internacional y requiere autorizaci&oacute;n expresa del Titular o excepci&oacute;n del art&iacute;culo 26 de la Ley
+  1581; el Encargado no puede tratarlo como transmisi&oacute;n.</p>
+
+  <h2>5. Seguridad</h2>
+  <p>TLS en tr&aacute;nsito; cifrado en reposo; clave fuera de la base; control de acceso y m&iacute;nimo privilegio;
+  autenticaci&oacute;n del personal; registros de acceso; respaldos cifrados; plan de respuesta a incidentes;
+  confidencialidad del personal; revisi&oacute;n de vulnerabilidades; prohibici&oacute;n de datos sensibles en correos y
+  registros. Detalle: [anexo t&eacute;cnico].</p>
+
+  <h2>6. Conservaci&oacute;n, devoluci&oacute;n y supresi&oacute;n</h2>
+  <p>Se aplica el 8.6 del Acuerdo: tabla de la Empresa; 20 a&ntilde;os para los registros del 2.2.4.6.13; hold sin
+  t&eacute;rmino para el contrato; deber legal declarado. Al terminar, el Encargado devuelve los datos en formato
+  com&uacute;n [CSV/JSON/PDF] y los suprime de sistemas y respaldos en [plazo], salvo norma que exija conservarlos, y
+  entrega certificaci&oacute;n de supresi&oacute;n.</p>
+
+  <h2>7. Derechos de los Titulares</h2>
+  <p>El Encargado recibe, registra y traslada al Responsable dentro de los dos (2) d&iacute;as h&aacute;biles
+  siguientes (art. 15.1 Ley 1581). El Responsable decide y responde en los plazos de los art&iacute;culos 14 y 15.
+  <strong>Canal:</strong> [correo/URL]; <strong>persona o &aacute;rea:</strong> [nombre/cargo]. Gratuito.</p>
+
+  <h2>8. Auditor&iacute;a e incidentes</h2>
+  <p>El Encargado permite auditor&iacute;a anual o entrega informes [SOC 2 / ISO 27001 / propio]. Notifica incidentes
+  sin demora injustificada y a m&aacute;s tardar en [3] d&iacute;as h&aacute;biles (plazo contractual), colabora con la SIC
+  e informa conforme al art&iacute;culo 18(k) de la Ley 1581.</p>
+
+  <h2>9. Vigencia, terminaci&oacute;n y firmas</h2>
+  <p><strong>Vigencia:</strong> [ ]. <strong>Terminaci&oacute;n:</strong> [ ]. Sobreviven confidencialidad,
+  devoluci&oacute;n, supresi&oacute;n y auditor&iacute;a. <strong>Versi&oacute;n:</strong> [ ]. Firmas: Responsable y
+  Encargado, con NIT y representante legal.</p>
+
+  <h2>10. Firmas</h2>
+  <p>Al firmar, ambas partes manifiestan haber le&iacute;do este Anexo y aceptan sus condiciones.</p>
+  <table>
+    <thead>
+      <tr><th>Por el responsable (empresa cliente)</th><th>Por el encargado (Gesstiar S.A.S.)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Nombre: ________________________<br><br>
+        Cargo: ________________________<br><br>
+        NIT: ________________________<br><br>
+        Firma: ________________________<br><br>
+        Fecha: ____ / ____ / 20____</td>
+        <td>Nombre: ________________________<br><br>
+        Cargo: ________________________<br><br>
+        NIT: ________________________<br><br>
+        Firma: ________________________<br><br>
+        Fecha: ____ / ____ / 20____</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="aviso">
+    <p><strong>Este Anexo no se firma hasta que se haya completado la lista del bloque de pendientes.</strong> Si el
+    Anexo de Encargo base ya est&aacute; firmado con alguna Empresa, este Anexo de Nube entra como otros&iacute; y
+    excluye expresamente las cl&aacute;usulas &sect;3 (&laquo;base local&raquo;), &sect;4 (&laquo;no centralizar&raquo;),
+    &sect;5 (&laquo;servidor de la empresa&raquo;) y &sect;7 (&laquo;elimina de sus copias de trabajo&raquo;) en lo que
+    contradigan el firma-service. Si no est&aacute; firmado, se reemplaza.</p>
+  </div>
+
+  <h2>11. Referencias normativas</h2>
+  <ul>
+    <li>Ley 1581 de 2012, art&iacute;culo 15.1 (traslado del reclamo), art&iacute;culos 14 y 15 (plazos de respuesta),
+    art&iacute;culo 18(k) (comunicaci&oacute;n de incidentes) y art&iacute;culo 26 (transferencia internacional).</li>
+    <li>Decreto 1072 de 2015, art&iacute;culo 2.2.4.6.13 (plazos de conservaci&oacute;n de los registros del SG-SST).</li>
+    <li>Decreto 1074 de 2015, art&iacute;culo 2.2.2.25.5.2 (transmisi&oacute;n y subencargados) y numeral 8.6 del
+    Acuerdo sobre el uso del mecanismo de firma electr&oacute;nica.</li>
+  </ul>
+
+</main>
+
+<div class="pie">
+  <div class="envoltura">
+    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Modelo del Anexo de Nube, versi&oacute;n 1.0 &middot;
+    23 de octubre de 2026</p>
+  </div>
+</div>
+
+</body>
+</html>

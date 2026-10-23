@@ -1,0 +1,49 @@
+-- ============================================================================
+-- 034 · CUSTODIA DE 20 AÑOS
+-- ============================================================================
+--
+-- El plazo de reserva del sistema baja de OCHENTA (80) a VEINTE (20) años
+-- (`ANIOS_CUSTODIA` en src/services/retencion.js), como lo exige el 8.6(h) de
+-- la v1.1 del Acuerdo:
+--
+--   "Si la Empresa no declara un plazo, se aplica el mínimo legal que
+--    corresponda y, en su defecto, veinte (20) años contados desde la firma.
+--    Ese plazo es un máximo de custodia y no autoriza a conservar más allá de
+--    la finalidad."
+--
+-- (Respuesta 11A del abogado, 23-oct-2026: "cambia una constante: ANIOS_CUSTODIA
+-- de 80 a 20 (retencion.js)". Conservar 80 exigiría decir "techo técnico de
+-- custodia" y asumir el riesgo de sobre-retención frente al artículo
+-- 2.2.2.25.2.8 del Decreto 1074 de 2015.)
+--
+-- LO QUE NO CAMBIA CON ESTA MIGRACIÓN
+--   - El HOLD sin término del contrato electrónico (art. 2.2.1.1.12).
+--   - El piso de 20 años desde el CESE para los cinco grupos SST del
+--     artículo 2.2.4.6.13 del Decreto 1072 de 2015.
+--   - El deber legal declarado por la Empresa, que manda sobre cualquier
+--     plazo.
+--   - El texto del Acuerdo v1.0, que sigue publicado y sellado.
+--
+-- ESTA MIGRACIÓN
+--   1. Traduce el id de regla que quedó GUARDADO en la fila (columna
+--      `regla_retencion`, migración 033). `CUSTODIA_80_ANOS` ya no existe en el
+--      código: ahora la regla se llama `CUSTODIA_20_ANOS`. Sin este UPDATE, la
+--      fila quedaría con un id que el código no reconoce y su
+--      `regla_retencion` mentiría sobre la regla que se aplicó.
+--
+--   2. NO recalcula `fecha_conservacion` de las filas existentes. La fecha ya
+--      calculada se le comunicó al Trabajador (columna
+--      `plazo_retencion_aplicable`) y no se puede recortar un plazo ya
+--      comunicado: eso es supresión indebida, no una corrección. En la v1.0 no
+--      hay firmas reales, así que la lista de filas afectadas es vacía; la
+--      regla se deja escrita para el caso en que la migración se aplique sobre
+--      una base con firmas.
+--
+-- La lectura del id legacy también está resuelta en el código
+-- (`REGLAS_LEGACY` en src/services/retencion.js): una base donde esta
+-- migración no se aplicó NO queda reinterpretada.
+-- ============================================================================
+
+UPDATE gh_firmas_electronicas
+   SET regla_retencion = 'CUSTODIA_20_ANOS'
+ WHERE regla_retencion = 'CUSTODIA_80_ANOS';

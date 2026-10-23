@@ -506,6 +506,9 @@ function create({
   id_documento, id_trabajador, id_empresa, tipo_firma,
   agreement_version, agreement_hash, document_hash, pdf_buffer, pdf_filename,
   version_kair, ip, user_agent, metadata,
+  // Quién pide la creación. Va al registro de auditoría: si la firma sale
+  // con una EXCEPCIÓN de habilitación, la bitácora tiene que decir quién.
+  actor,
   identificacion_tipo, identificacion_numero_hash,
   identificacion_numero_sal,  // P1-2: opcional, server genera si falta
   tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
@@ -613,21 +616,25 @@ function create({
   // El bloqueo va AQUÍ (antes de generar token e identificadores) para que
   // una solicitud rechazada no consuma identificadores ni tokens.
   //
-  // La bandera `FIRMA_EXIGIR_HABILITACION_EMPRESA` existe para la
-  // transición: con ella apagada, la firma pasa pero queda un WARN con
-  // código. No hay default silencioso.
-  const habilitacion = empresaService.verificarHabilitacionFirma(id_empresa);
-  if (habilitacion.ok === false) {
-    if (config.exigirHabilitacionEmpresa) {
-      throw new AppError(409, 'EMPRESA_NO_HABILITADA', habilitacion.mensaje, {
-        id_empresa,
-        pendientes: habilitacion.pendientes,
-      });
-    }
-    logger.warn('SignRequest: la Empresa NO está habilitada y el bloqueo está desactivado', {
+  // El bloqueo es INCONDICIONAL (decisión B.3 del 23-oct-2026): no hay bandera
+  // de entorno que lo desactive. La única salida es una excepción auditable
+  // (src/services/excepcionHabilitacion.js), que exige autorización escrita,
+  // alcance de firmas, ruta en papel operativa, plazo cierto y bitácora
+  // inmutable.
+  const habilitacion = empresaService.assertHabilitadaParaFirma(id_empresa, {
+    punto: 'creacion_solicitud',
+    // Este punto ABRE la firma: gasta una unidad del alcance de la excepcion.
+    cuenta_firma: true,
+    actor: actor || 'sistema',
+    ip: ip || null,
+    user_agent: user_agent || null,
+  });
+  if (habilitacion.con_excepcion) {
+    logger.warn('SignRequest: la solicitud se crea con una EXCEPCIÓN de habilitación', {
       id_empresa,
-      pendientes: habilitacion.pendientes,
-      aviso: 'EMPRESA_NO_HABILITADA',
+      excepcion_id: habilitacion.excepcion.id,
+      firmas_usadas: habilitacion.excepcion.firmas_usadas,
+      alcance_firmas_max: habilitacion.excepcion.alcance_firmas_max,
     });
   }
 
@@ -692,7 +699,7 @@ function create({
   const fecha_expiracion = new Date(now.getTime() + ttl_horas * 3600 * 1000).toISOString();
 
   // El plan de retención se calcula con la MISMA fecha de creación que se
-  // inserta. Aplica a TODA firma nueva: la custodia del sistema (80 años) o,
+  // inserta. Aplica a TODA firma nueva: la custodia del sistema (20 años) o,
   // si la Empresa declaró un plazo en su tabla, el de esa tabla. No hay nada
   // que decidir ni que preguntar.
   const planRetencion = retencion.planificar({
@@ -959,7 +966,7 @@ function create({
     );
 
     // Congelar la fecha de conservación (numeral 8.6). El plazo vive en el
-    // código del sistema (la custodia de 80 años) o en la tabla de retención
+    // código del sistema (la custodia de 20 años) o en la tabla de retención
     // que declaró la Empresa; si esa tabla no existe, la custodia del sistema
     // la reemplaza. Se congela acá y no después: el 8.6 habla del plazo "que le
     // resulta aplicable" al firmante cuando se le pide la firma, y que la
@@ -1165,6 +1172,34 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
 
   // 4. Validar Acuerdo del padre (re-validación 5-pasos; misma función que create)
   validateAcuerdo(padre.agreement_version, padre.agreement_hash);
+
+  // 4.bis. D-03 · la Empresa tiene que estar habilitada para la DOBLE FIRMA.
+  //
+  //   Este es el cuarto punto del bloqueo (respuesta 11A, 23-oct-2026). En la
+  //   practica el commit (punto ii) ya lo comprueba antes de que el Trabajador
+  //   firme, así que aquí casi nunca se dispara: es la segunda línea de
+  //   defensa para el caso de que la Empresa se deshabilite entre el commit y
+  //   la creación del hijo.
+  //
+  //   La excepción auditable es la misma salida que en los otros puntos.
+  const habilitacionEmpresa = empresaService.assertHabilitadaParaFirma(
+    padre.id_empresa,
+    {
+      punto: 'doble_firma',
+      // La firma del representante es OTRA firma: gasta su propia unidad.
+      cuenta_firma: true,
+      actor: 'sistema',
+    }
+  );
+  if (habilitacionEmpresa.con_excepcion) {
+    logger.warn('SignRequest: la doble firma se crea con una EXCEPCIÓN de habilitación', {
+      id_solicitud: padre.id_solicitud,
+      id_empresa: padre.id_empresa,
+      excepcion_id: habilitacionEmpresa.excepcion.id,
+      firmas_usadas: habilitacionEmpresa.excepcion.firmas_usadas,
+      alcance_firmas_max: habilitacionEmpresa.excepcion.alcance_firmas_max,
+    });
+  }
 
   // 5. Generar token + IDs
   const token = generateToken();
@@ -1617,19 +1652,25 @@ function getByTokenHash(token_hash) {
 const ESTADOS_TERMINALES = ['SIGNED', 'REJECTED', 'REVOKED', 'EXPIRED', 'CANCELLED'];
 
 /**
- * Tope de tokens VIVOS por solicitud.
+ * Tokens VIVOS por solicitud: UNO (3.4(c)).
  *
- * Cada token es una credencial de acceso al flujo de firma. El tope acota
- * cuántas hay vivas a la vez para una misma solicitud: con el original y dos
- * rotaciones hay tres accesos, que es lo que hace falta para el caso real
- * (la Empresa perdió la respuesta de creación, y reenvía la invitación).
+ * Cada token es una credencial de acceso al flujo de firma. Antes esta regla
+ * era "hasta tres a la vez", y quien llamara decidía si revocaba los
+ * anteriores (`revocar_anteriores`). El 3.4(c) del Acuerdo v1.1 lo cierra:
  *
- * Cuando se llega al tope, el sistema NO emite un cuarto token ni revoca por
- * su cuenta el más viejo: revocar es una decisión, y un enlace que ya está
- * en manos del trabajador no se rompe a escondidas. Quien llama decide con
- * `revocar_anteriores: true`.
+ *   "K+AIR puede reemitirlo a solicitud de la Empresa; cada reemisión se
+ *    registra y deja sin efecto el token anterior. No hay más de un token
+ *    vigente por solicitud."
+ *
+ * Y la condición de código es literal: "si el sistema mantiene válidos los
+ * tokens anteriores, se cambia el código antes de publicar". Un token "de un
+ * solo uso" que convive con otros dos contradice el 3.2 y debilita el 3.7(a).
+ *
+ * Por eso la reemisión revoca SIEMPRE. Y después de emitir el token nuevo se
+ * VERIFICA la invariante: si quedara algún token vigente, es un fallo del
+ * sistema y se dice en voz alta en vez de dejar dos enlaces vivos.
  */
-const MAX_TOKENS_ACTIVOS = 3;
+const MAX_TOKENS_VIGENTES = 1;
 
 /**
  * Los tokens emitidos de una firma (todos, revocados incluidos).
@@ -1661,17 +1702,19 @@ function tokensDe(firmaId) {
  * HMAC-SHA-256 con clave secreta. El que lo recibe lo usa una vez y, si lo
  * pierde, pide otra rotación.
  *
- * Los tokens anteriores NO se invalidan: siguen sirviendo hasta su
- * vencimiento (la ventana de la firma). La rotación no extiende el plazo,
- * solo emite otro acceso al mismo plazo.
+ * La reemisión SIEMPRE deja sin efecto el token anterior (3.4(c): "cada
+ * reemisión se registra y deja sin efecto el token anterior. No hay más de un
+ * token vigente por solicitud"). `revocarAnteriores` ya no DECIDE: se
+ * conserva por compatibilidad con los llamadores y con el cuerpo de la API,
+ * y un `false` explícito queda registrado como aviso, no como permiso.
  *
  * @param {object} opts
  * @param {number} opts.firmaId
  * @param {string} opts.actor - quién pide la rotación (queda en el registro).
  * @param {string} [opts.motivo] - por qué (queda en el registro).
  * @param {string} [opts.origen] - 'rotate' | 'notify'.
- * @param {boolean} [opts.revocarAnteriores] - revoca los tokens vivos antes
- *   de emitir el nuevo.
+ * @param {boolean} [opts.revocarAnteriores] - obsoleto: la reemisión revoca
+ *   siempre. Se ignora el valor y se registra el `false` explícito.
  * @returns {{token: string, url_publica: string, emision: number, expira_en: string, revocados: number[]}}
  */
 function emitirToken({ firmaId, actor, motivo, origen = 'rotate', revocarAnteriores = false }) {
@@ -1713,41 +1756,25 @@ function emitirToken({ firmaId, actor, motivo, origen = 'rotate', revocarAnterio
       `).run(firmaId, firma.token_hash, firma.fecha_creacion || ahora, firma.fecha_expiracion);
     }
 
-    // Revocación explícita de los anteriores.
-    const revocados = [];
-    if (revocarAnteriores) {
-      const previos = db.prepare(`
-        SELECT emision FROM gh_firma_tokens
-        WHERE firma_id = ? AND revocado_at IS NULL
-      `).all(firmaId);
-      db.prepare(`
-        UPDATE gh_firma_tokens
-           SET revocado_at = ?, revocado_por = ?, motivo_revocacion = ?
-         WHERE firma_id = ? AND revocado_at IS NULL
-      `).run(ahora, quien, motivo || 'rotacion_con_revocacion', firmaId);
-      revocados.push(...previos.map(p => p.emision));
+    // La reemisión invalida el token anterior SIEMPRE (3.4(c)). Un `false`
+    // explícito no abre la puerta: queda registrado como aviso.
+    if (revocarAnteriores === false) {
+      logger.warn('8C: se pidió NO revocar los tokens anteriores; el 3.4(c) lo impide', {
+        id_solicitud: firma.id_solicitud,
+        actor: quien,
+        emision: 'reemision',
+      });
     }
-
-    // El tope de tokens vivos. Se comprueba DESPUÉS de la revocación
-    // explícita: revocar y emitir es una sola operación.
-    const activos = db.prepare(`
+    const previos = db.prepare(`
       SELECT emision FROM gh_firma_tokens
       WHERE firma_id = ? AND revocado_at IS NULL
-        AND (expira_en IS NULL OR expira_en > ?)
-      ORDER BY emision ASC
-    `).all(firmaId, ahora);
-    if (activos.length >= MAX_TOKENS_ACTIVOS) {
-      throw new AppError(
-        409,
-        'TOKEN_LIMIT_REACHED',
-        `La solicitud ya tiene ${activos.length} enlaces vigentes`,
-        {
-          max_tokens: MAX_TOKENS_ACTIVOS,
-          tokens_activos: activos.map(a => a.emision),
-          revocables: true,
-        }
-      );
-    }
+    `).all(firmaId);
+    db.prepare(`
+      UPDATE gh_firma_tokens
+         SET revocado_at = ?, revocado_por = ?, motivo_revocacion = ?
+       WHERE firma_id = ? AND revocado_at IS NULL
+    `).run(ahora, quien, motivo || 'reemision_invalida_token_anterior', firmaId);
+    const revocados = previos.map(p => p.emision);
 
     const emision = (db.prepare(
       'SELECT MAX(emision) AS m FROM gh_firma_tokens WHERE firma_id = ?'
@@ -1760,6 +1787,31 @@ function emitirToken({ firmaId, actor, motivo, origen = 'rotate', revocarAnterio
         (firma_id, token_hash, emision, emitido_at, expira_en, origen)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(firmaId, tokenHash, emision, ahora, firma.fecha_expiracion, origen);
+
+    // La invariante del 3.4(c): no hay más de un token vigente por solicitud.
+    //
+    // Se comprueba DESPUÉS de insertar el nuevo, que es cuando se puede
+    // contar: si la revocación de arriba falló (o alguien reintrodujo la
+    // convivencia de tokens), aquí se dice en voz alta en vez de dejar dos
+    // enlaces vivos. El throw va dentro de la transacción: si se rompe la
+    // invariante, no queda nada escrito.
+    const activos = db.prepare(`
+      SELECT emision FROM gh_firma_tokens
+      WHERE firma_id = ? AND revocado_at IS NULL
+        AND (expira_en IS NULL OR expira_en > ?)
+      ORDER BY emision ASC
+    `).all(firmaId, ahora);
+    if (activos.length > MAX_TOKENS_VIGENTES) {
+      throw new AppError(
+        500,
+        'TOKEN_INVARIANTE_ROTA',
+        'La reemisión dejó tokens vigentes: no se emite otro enlace',
+        {
+          max_tokens: MAX_TOKENS_VIGENTES,
+          tokens_activos: activos.map(a => a.emision),
+        }
+      );
+    }
 
     return { token, emision, expira_en: firma.fecha_expiracion, revocados };
   });
@@ -2061,7 +2113,7 @@ module.exports = {
   tokensDe,
   tokensActivosDe,
   tokenPerteneceA,
-  MAX_TOKENS_ACTIVOS,
+  MAX_TOKENS_VIGENTES,
   ESTADOS_TERMINALES,
   notifyRemote,  // I-103.A1.5.1: enviar invitación al firmante
   // Exports para tests

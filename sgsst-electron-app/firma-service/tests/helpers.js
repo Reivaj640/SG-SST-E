@@ -33,6 +33,7 @@ const publicRouter = require('../src/routes/public');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
+const adminExcepcionesRouter = require('../src/routes/admin-excepciones');
 const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
 const internalAuditRouter = require('../src/routes/internal-audit');
 const constanciaRouter = require('../src/routes/constancia');
@@ -156,6 +157,16 @@ const TABLES = [
   // empresa filtrada de un test a otro bloqueaba firmas en archivos que no
   // tienen nada que ver: el fallo aparece en el test equivocado.
   'gh_firma_empresas',
+  // D-03 (B.3): las excepciones de habilitación y su bitácora. Los eventos
+  // van PRIMERO: tienen FK a la excepción.
+  //
+  // La bitácora tiene trigger append-only, pero la migración 036 lleva
+  // `@skip-when-env test`: en el ambiente de test el trigger NO está
+  // instalado y la tabla se puede limpiar. La inmutabilidad se comprueba en
+  // tests/excepcion-habilitacion.test.js, que aplica el SQL de la 036 a una
+  // base en memoria.
+  'gh_firma_excepciones_habilitacion_eventos',
+  'gh_firma_excepciones_habilitacion',
   // El 10.7(b): las solicitudes de los Titulares y su historial. Los
   // eventos van PRIMERO: tienen FK a la solicitud.
   'gh_solicitudes_titular_eventos',
@@ -283,6 +294,7 @@ function makeApp() {
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
   app.use('/internal/admin', adminEmpresasRouter);
+  app.use('/internal/admin', adminExcepcionesRouter);
   app.use('/internal/admin', adminSolicitudesRouter);
   app.use(errorHandler());
   return app;

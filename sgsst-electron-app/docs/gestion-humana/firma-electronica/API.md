@@ -189,7 +189,7 @@ Todas las respuestas de error siguen el mismo formato JSON:
 | `CONSERVACION_VENCIDA` | Venció el plazo de conservación que declaró la Empresa (numeral 10.6). El dato se debe suprimir: el sistema no afirma que la firma esté vigente. No aplica si hay deber legal de conservación (hold). |
 | `TOKEN_ALREADY_USED` | La solicitud está en estado terminal. |
 | `LINK_NOT_AVAILABLE` | El enlace no se puede entregar: la solicitud está en estado terminal, o el token no se puede recuperar (deprecated, ver §6.14). El `details.reason` dice cuál. |
-| `TOKEN_LIMIT_REACHED` | La solicitud ya tiene el tope de enlaces vivos (3). Hay que revocar uno explícitamente (`revocar_anteriores: true`) antes de emitir otro. |
+| `TOKEN_LIMIT_REACHED` | **Eliminado.** La reemisión ya no tiene tope: cada una invalida el token anterior y solo queda uno vigente (3.4(c). Si la invariancia se rompiera, el error sería `500 TOKEN_INVARIANTE_ROTA`.) |
 | `TOKEN_MISMATCH` | El token que vino en el body no pertenece a esta solicitud. |
 | `SENSIBLE_CONSENT_NOT_ACCEPTED` | El documento trata datos sensibles de salud (10.8) y el Titular no ha dado el consentimiento expreso. El visor y el PDF quedan bloqueados. Ver §5.12 y §6.16.2. |
 | `INVALID_STATE_TRANSITION` | Se intentó una transición de estado inválida. |
@@ -1375,7 +1375,7 @@ la solicitud con `tipo_firma: 'remoto'`.
 |---|---|
 | `401` | API key inválida |
 | `404` | Solicitud no encontrada (o es de otra Empresa: 404 silencioso) |
-| `409` | `TOKEN_MISMATCH`: el token del body no es de esta solicitud. `TOKEN_LIMIT_REACHED`: ya hay 3 enlaces vivos. |
+| `409` | `TOKEN_MISMATCH`: el token del body no es de esta solicitud. |
 | `410` | `INVITE_NOT_AVAILABLE`: la solicitud está en estado terminal. |
 | `502` | `INVITE_EMAIL_FAILED`: el SMTP falló. |
 
@@ -2123,17 +2123,21 @@ vencimiento** (la ventana de la firma). La rotación no extiende el plazo:
 emite otro acceso al mismo plazo. Un enlace que ya está en manos del
 trabajador no se rompe.
 
-**El tope.** Tres tokens vivos por solicitud. Al llegar al tope la respuesta
-es `409 TOKEN_LIMIT_REACHED`: el sistema **no** revoca por su cuenta el más
-viejo, porque revocar es una decisión de quien llama y un enlace que alguien
-ya tiene no se rompe a escondidas.
+**El tope.** **Un token vigente por solicitud** (3.4(c)). Cada reemisión **deja sin efecto
+el token anterior**: el que se emite es el único que sirve. Después de emitirlo, el sistema
+**verifica la invariancia**; si quedara algún token vigente, la operación falla con
+`500 TOKEN_INVARIANTE_ROTA` y **no queda nada escrito** (la transacción se revierte).
+
+> `revocar_anteriores` quedó **obsoleto**: se acepta para no romper clientes que lo manden,
+> pero **ya no decide**. Mandar `false` **no** evita la revocación, y su valor queda en el
+> registro de auditoría (`revocar_anteriores_pedido`).
 
 **Request**:
 
 ```json
 {
   "motivo": "La Empresa perdió la respuesta de creación",  // opcional
-  "revocar_anteriores": false  // opcional
+  "revocar_anteriores": false  // opcional y OBSOLETO: ya no decide nada
 }
 ```
 
@@ -2161,14 +2165,14 @@ ya tiene no se rompe a escondidas.
 | `400` | `id` malformado o body inválido |
 | `401` / `403` | API key inválida o sin permiso |
 | `404` | Solicitud no encontrada (o es de otra Empresa: 404 silencioso) |
-| `409` | `TOKEN_LIMIT_REACHED`: ya hay 3 enlaces vivos. |
+| `409` | No aplica al rotate: la reemisión nunca se bloquea por cupo (no hay tope de 3 vivos). |
 | `410` | `LINK_NOT_AVAILABLE`: la solicitud está en estado terminal (`details.current_state`). |
 
 **Side effects**:
 
 - Inserta una fila en `gh_firma_tokens` (la huella del token nuevo).
-- Si viene `revocar_anteriores: true`, marca los tokens vivos como revocados
-  (con motivo, actor y fecha) y los devuelve en `revocados`.
+- **Revoca los tokens vivos anteriores** (con motivo, actor y fecha) y los devuelve en
+  `revocados`. Siempre, sin excepción.
 - Inserta el evento `LINK_ROTATED` en `gh_firma_eventos`.
 
 ---
@@ -2325,31 +2329,70 @@ cosas antes de que K+AIR acepte una solicitud de firma:
 | Requisito | De dónde sale | Dónde se resuelve |
 |---|---|---|
 | **Anexo de Encargo firmado** | `anexo_encargo_firmado_at` | `POST /internal/admin/empresas/{id}/anexo-firmado` |
-| **Plazo de conservación declarado** | `plazo_retencion_dias` | `PUT /internal/admin/empresas/{id}` |
+| **Canal de atención (PQRS)** | `canal_pqrs` | `PUT /internal/admin/empresas/{id}` |
 
-Si falta cualquiera de las dos, la creación de la solicitud se rechaza con
-**`409 EMPRESA_NO_HABILITADA`** y el mensaje dice qué falta y dónde se
-resuelve. La comprobación se hace **antes** de generar el token y el
-identificador, así que una solicitud rechazada no consume nada.
+Si falta cualquiera de las dos, la firma se rechaza con
+**`409 EMPRESA_NO_HABILITADA`** y el mensaje dice qué falta, dónde se resuelve y
+cómo pedir una excepción.
+
+**Dónde se comprueba (los cuatro puntos, 📦933).** El bloqueo no es solo de la
+creación: se comprueba en la **creación de la solicitud**, en el **commit**, en la
+**creación del consentimiento** (el del trabajador y el del representante) y en la
+**doble firma**. En el commit la comprobación va **antes** de generar el PDF y la
+constancia: si la Empresa no está habilitada, no se produce evidencia de una firma
+que no se puede sostener.
+
+> **El plazo de conservación NO es un requisito.** La custodia vive en el código
+> (`ANIOS_CUSTODIA`, 20 años) y no hay nada que declarar. `plazo_retencion_dias`
+> sigue siendo el dato **de la Empresa** que manda sobre el del sistema cuando sí
+> está declarado.
 
 **Por qué**: el 1.4 del Acuerdo hace depender de un Anexo de Encargo firmado
-la relación entre la Empresa (Responsable) y K+AIR (Encargado), y el 8.6
-obliga a la Empresa a comunicar el plazo **antes** de pedir la firma. Sin
-plazo declarado no hay fecha de conservación (10.6) y la firma se conservaría
-de forma indefinida.
+la relación entre la Empresa (Responsable) y K+AIR (Encargado), y el 7.2-7.3
+exige el canal por el que el Trabajador pide la firma en papel.
 
 **Una empresa que NO está registrada no se bloquea**: eso es otro problema
 (identificación incompleta) y se atiende por el alta.
 
-**La transición** (para no dejar clientes sin poder firmar):
+**La excepción (📦933).** La **única** salida del bloqueo es una excepción
+**auditable**: no es un `if` silencioso ni una bandera de entorno (la bandera
+`FIRMA_EXIGIR_HABILITACION_EMPRESA` **se retiró**: era exactamente el atajo que
+no deja rastro). La excepción vive en `gh_firma_excepciones_habilitacion`, con su
+bitácora **inalterable** en `gh_firma_excepciones_habilitacion_eventos`.
 
-- `FIRMA_EXIGIR_HABILITACION_EMPRESA=false` desactiva el bloqueo. El default
-  es **bloquear**; con la bandera apagada, cada firma que pasa sin
-  habilitación queda en el log como `WARN` con el código
-  `EMPRESA_NO_HABILITADA`: no es un default silencioso, es un default ruidoso.
-- `scripts/inventario-empresas-no-habilitadas.js` lista, **sin escribir
-  nada**, qué empresas están en ese estado y cuántas firmas tiene cada una.
-  Es el paso previo: inventario → aviso a las Empresas → activar el bloqueo.
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/internal/admin/excepciones-habilitacion` | Lista las excepciones (`?id_empresa=` para filtrar). |
+| `GET` | `/internal/admin/excepciones-habilitacion/:id` | Devuelve una excepción **con su bitácora**. |
+| `POST` | `/internal/admin/excepciones-habilitacion` | Crea una excepción (los seis requisitos están en la tabla de abajo). |
+| `POST` | `/internal/admin/excepciones-habilitacion/:id/cerrar` | Cierra la excepción (queda escrito). |
+
+**Body de `POST /internal/admin/excepciones-habilitacion`** (los seis requisitos
+del abogado, validados en el servidor):
+
+| Campo | Qué es | Regla |
+|---|---|---|
+| `id_empresa` | La Empresa | **Una** por excepción |
+| `autorizado_por` | Quién autoriza | Obligatorio: el owner o el representante legal |
+| `autorizacion_fecha` | La fecha de la autorización | Obligatoria |
+| `autorizacion_ref` | Dónde queda el documento escrito | Obligatoria |
+| `alcance_firmas_max` | Número máximo de firmas | Entero ≥ 1 (máx. 1000) |
+| `ruta_papel` | Cómo se firma en papel mientras tanto | Obligatoria |
+| `ruta_papel_operativa` | Si está operativa **hoy** | Obligatorio: `true` o `false` |
+| `plazo_hasta` | Fecha cierta para firmar el Anexo | **Máximo 30 días** desde la creación |
+| `piloto_autorizado` | Solo si la Empresa no tiene ningún Anexo | `true` **y** `piloto_autorizado_por` |
+| `motivo` | Por qué | Obligatorio: queda en la bitácora |
+
+**Cómo cuenta el alcance.** El límite es de **firmas**, no de puntos de
+verificación: lo gasta el punto que **abre** una firma (la creación de la
+solicitud y la doble firma); el commit y la creación del consentimiento solo
+aplican la excepción y levantan el bloqueo. Una firma atraviesa varios puntos y
+no consume una unidad por cada uno.
+
+**El inventario** (`scripts/inventario-empresas-no-habilitadas.js`) lista, **sin
+escribir nada**, qué empresas están en ese estado y cuántas firmas tiene cada
+una.
+
 
 ### 6.17 Endpoints de las solicitudes de los Titulares - `/internal/admin/solicitudes`
 

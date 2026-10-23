@@ -504,6 +504,37 @@ Opciones: `--ids=A,B` (la lista), `--todos` (escanear todos los huerfanos) y
 > escribir en ellos. El script, como root, **se niega** y pide correrlo como el
 > usuario del servicio. Ver la trampa #62 del `PROMPT.md`.
 
+### 5.5 Las tres migraciones del 📦933 (custodia de 20, excepción auditable)
+
+**Se aplican solas** al arrancar el servicio (`src/server.js` llama a `migrate()`), pero
+conviene **mirar el log** para confirmar que entraron las tres y en este orden:
+
+| Migración | Qué hace | Ojo |
+|---|---|---|
+| `034_retencion_custodia_20` | Traduce el id de regla guardado en la fila: `CUSTODIA_80_ANOS` → `CUSTODIA_20_ANOS` | **No** recalcula `fecha_conservacion`: la fecha ya comunicada no se recorta |
+| `035_excepciones_habilitacion` | Crea las dos tablas de la excepción de habilitación (la excepción y su bitácora) | — |
+| `036_excepciones_habilitacion_append_only` | Instala los dos triggers que hacen la bitácora **inalterable** | Lleva `@skip-when-env test`: en el **servidor sí se aplica** (el ambiente es producción) |
+
+```bash
+# 1. Que las tres entraron (en el log de arranque)
+sudo journalctl -u kair-firma --since '-10 min' | grep -E '034_|035_|036_'
+
+# 2. Que la 036 quedo instalada (los triggers tienen que estar)
+sudo -u kairfirma bash -c "sqlite3 /opt/kair-firma/data/firma.sqlite \"SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_excepciones%';\""
+
+# 3. Que el id viejo de la retencion quedo traducido (tiene que salir vacio)
+sudo -u kairfirma bash -c "sqlite3 /opt/kair-firma/data/firma.sqlite \"SELECT COUNT(*) FROM gh_firmas_electronicas WHERE regla_retencion='CUSTODIA_80_ANOS';\""
+
+# 4. Que el servicio quedo arriba y con el codigo nuevo
+curl -sS http://127.0.0.1:3001/health
+```
+
+> **La bandera `FIRMA_EXIGIR_HABILITACION_EMPRESA` se RETIRO (📦933).** Si el `.env` del
+> servidor la tiene, ahora es **inerte**: el bloqueo de la habilitacion es incondicional y
+> la unica salida es la excepcion auditable
+> (`POST /internal/admin/excepciones-habilitacion`). No hace falta quitarla del `.env`,
+> pero saberlo evita confundir "la variable no hace nada" con "el bloqueo no funciona".
+
 ---
 
 ## 6. Correr los tests en el servidor

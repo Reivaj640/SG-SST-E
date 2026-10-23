@@ -281,6 +281,37 @@ async function create({
   const { valor: id_trabajador_guardado, alg: id_trabajador_alg } =
     valorParaGuardar(id_trabajador, id_empresa);
   const correo_alg = algHmac();
+
+  // D-03 · la Empresa tiene que estar habilitada para la CREACIÓN DEL
+  // CONSENTIMIENTO (tercer punto del bloqueo, respuesta 11A del 23-oct-2026).
+  //
+  // El chequeo va AQUÍ, y no al principio de la función, a propósito: si ya
+  // hay un consentimiento (aceptado o pendiente) se devuelve el que hay y no
+  // se crea nada. Bloquear la RECUPERACIÓN dejaría al Trabajador sin poder
+  // firmar un consentimiento que ya le emitieron, y el abogado lo dice en el
+  // 2.2.1.1.11: una falla administrativa del empleador no puede convertirse en
+  // una barrera de acceso al empleo.
+  const habilitacionEmpresa = empresaService.assertHabilitadaParaFirma(
+    id_empresa,
+    {
+      punto: 'creacion_consentimiento',
+      // El consentimiento VERIFICA una firma ya abierta: la excepcion ya se
+      // gastó cuando se creó la solicitud. Aquí solo se levanta el bloqueo.
+      cuenta_firma: false,
+      actor: `consentimiento:${id_trabajador}`,
+      ip: ip || null,
+      user_agent: user_agent || null,
+    }
+  );
+  if (habilitacionEmpresa.con_excepcion) {
+    logger.warn('consent: el consentimiento se crea con una EXCEPCIÓN de habilitación', {
+      id_empresa,
+      excepcion_id: habilitacionEmpresa.excepcion.id,
+      firmas_usadas: habilitacionEmpresa.excepcion.firmas_usadas,
+      alcance_firmas_max: habilitacionEmpresa.excepcion.alcance_firmas_max,
+    });
+  }
+
   const tx = db.transaction(() => {
     const result = db.prepare(`
       INSERT INTO gh_consentimientos_firma
@@ -382,6 +413,30 @@ function ensureRepConsent({
     return { consent: getById(existing.id), reused: true };
   }
   const now = new Date().toISOString();
+  // D-03 · también el consentimiento del REPRESENTANTE es creación de
+  // consentimiento: la Empresa tiene que estar habilitada. Mismo criterio que
+  // en create(): si ya hay uno, se reutiliza y no se crea nada.
+  const habilitacionEmpresa = empresaService.assertHabilitadaParaFirma(
+    id_empresa,
+    {
+      punto: 'creacion_consentimiento_representante',
+      // El consentimiento del representante es OTRO firmante, pero su
+      // excepcion se gasta en la doble firma (punto iv), que es la que abre
+      // esa firma. Aquí solo se levanta el bloqueo.
+      cuenta_firma: false,
+      actor: `representante:${id_trabajador}`,
+      ip: ip || null,
+      user_agent: user_agent || null,
+    }
+  );
+  if (habilitacionEmpresa.con_excepcion) {
+    logger.warn('consent: el consentimiento del representante se crea con una EXCEPCIÓN de habilitación', {
+      id_empresa,
+      excepcion_id: habilitacionEmpresa.excepcion.id,
+      firmas_usadas: habilitacionEmpresa.excepcion.firmas_usadas,
+      alcance_firmas_max: habilitacionEmpresa.excepcion.alcance_firmas_max,
+    });
+  }
   // Misma razón que en createConsent: se archiva la identificación de la
   // empresa que se le mostró, con su huella propia.
   const empresaCols = empresaService.snapshotColumnsFor(id_empresa);

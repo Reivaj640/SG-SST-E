@@ -321,6 +321,11 @@ router.post('/sign-requests',
       metadata: metadataToPersist,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,
+      // Quién pide la creación. Si la firma sale con una EXCEPCIÓN de
+      // habilitación, la bitácora tiene que decir quién la pidió.
+      actor: req.api_key_hash_prefix
+        ? `rh:${req.api_key_hash_prefix}`
+        : 'sistema',
     });
 
     // IMPORTANTE: el token SOLO se retorna en esta respuesta.
@@ -1020,18 +1025,27 @@ router.get('/sign-requests/:id/link',
 // perdió la respuesta de creación"— se cubre sin guardar el token en una
 // forma reversible.
 //
-// LO QUE NO SE INVALIDA
-// ----------------------
-// Los tokens anteriores siguen sirviendo hasta su vencimiento (la ventana de
-// la firma). La rotación no extiende el plazo: emite otro acceso al mismo
-// plazo. Un enlace que ya está en manos del trabajador no se rompe.
+// LO QUE SE INVALIDA
+// --------------------
+// La reemisión deja SIN EFECTO el token anterior: el que se emite es el único
+// que sirve. Es el 3.4(c) del Acuerdo v1.1: "cada reemisión se registra y deja
+// sin efecto el token anterior. No hay más de un token vigente por solicitud",
+// con la condición de código textual: "si el sistema mantiene válidos los
+// tokens anteriores, se cambia el código antes de publicar".
+//
+// La rotación no extiende el plazo: emite otro acceso al mismo plazo.
 //
 // EL TOPE
 // -------
-// 3 tokens vivos por solicitud. Al llegar al tope, la respuesta es 409
-// TOKEN_LIMIT_REACHED con las emisiones vivas: revocar es una decisión de
-// quien llama, no un efecto colateral. Con `revocar_anteriores: true` se
-// revocan los vivos y se emite el nuevo en la misma operación.
+// UN token vigente por solicitud (`MAX_TOKENS_VIGENTES = 1`). No hay tope que
+// se alcance: la reemisión siempre revoca, y después de emitir se VERIFICA la
+// invariante. Si quedara algún token vigente (fallo del sistema), la
+// transacción se revierte y sale 500 TOKEN_INVARIANTE_ROTA: no queda nada
+// escrito.
+//
+// `revocar_anteriores` quedó OBSOLETO: se acepta para no romper clientes que lo
+// manden, pero ya no decide. Mandar `false` NO evita la revocación; su valor
+// queda en la auditoría (`revocar_anteriores_pedido`).
 //
 // Status codes:
 //   - 200: token emitido { id_solicitud, token, url_publica, qr_payload,
@@ -1040,11 +1054,12 @@ router.get('/sign-requests/:id/link',
 //   - 400: id malformado o body inválido (zod)
 //   - 401/403/429: middleware
 //   - 404 NOT_FOUND: no existe o cross-company (silent)
-//   - 409 TOKEN_LIMIT_REACHED: ya hay 3 tokens vivos
 //   - 410 LINK_NOT_AVAILABLE: la solicitud está en estado terminal
+//   - 500 TOKEN_INVARIANTE_ROTA: se rompió la invariante del 3.4(c)
 //
 // Side effects:
-//   - INSERT en gh_firma_tokens (y UPDATE de revocación si se pidió)
+//   - INSERT en gh_firma_tokens
+//   - UPDATE de revocación de los tokens vivos anteriores (siempre)
 //   - INSERT en gh_firma_eventos (evento=LINK_ROTATED)
 
 router.post('/sign-requests/:id/link/rotate',
@@ -1096,14 +1111,17 @@ router.post('/sign-requests/:id/link/rotate',
         ? `rh:${req.api_key_hash_prefix}`
         : 'sistema';
 
-      // El service lanza AppError si la solicitud está terminal (410) o si ya
-      // hay 3 tokens vivos (409 TOKEN_LIMIT_REACHED).
+      // El service lanza AppError si la solicitud está terminal (410).
+      //
+      // La reemisión deja sin efecto el token anterior SIEMPRE (3.4(c)): el
+      // `revocar_anteriores` del cuerpo ya no decide, solo queda en el
+      // registro de auditoría de lo que pidió el cliente.
       const emitido = signRequestService.emitirToken({
         firmaId: signRequest.id,
         actor,
         motivo: req.body.motivo || null,
         origen: 'rotate',
-        revocarAnteriores: req.body.revocar_anteriores === true,
+        revocarAnteriores: true,
       });
 
       // Auditoría: la emisión de un token es un hecho que queda registrado.
@@ -1114,7 +1132,8 @@ router.post('/sign-requests/:id/link/rotate',
           {
             emision: emitido.emision,
             origen: 'rotate',
-            revoco_anteriores: req.body.revocar_anteriores === true,
+            revoco_anteriores: true,
+            revocar_anteriores_pedido: req.body.revocar_anteriores ?? null,
             revocados: emitido.revocados,
             api_key_hash_prefix: req.api_key_hash_prefix || null,
           },
