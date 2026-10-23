@@ -828,8 +828,30 @@ sigue vivo (id=2). Y el **Esc ya vuelve al tablero general**: el fix del 📦929
 verificado en el servidor con esta versión.
 
 **Lo que queda.** (1) El **consentimiento de prueba (id=2)** sigue vivo: `--solo-firmas` no lo
-borra y `--solo-consentimientos` todavía no existe. Falta la decisión del owner. (2) El
-**11A con el abogado**, que es lo que enciende el D-02 y mide el inventario del buzón.
+borra y `--solo-consentimientos` todavía no existe. **Decisión del owner (23-oct): se deja la
+fila.** La fila es la aceptación de `SIGN-2026-492341` (una de las 9 firmas de prueba que la
+purga del 22-oct borró con recibo), apunta a la **v1.0 viva** (`52a490a4…`, no una referencia
+rota) y guarda el correo y la IP del propio owner; el `otp_hash` no está (no quedó la
+credencial del OTP). **El modo no se implementa por ahora.**
+
+**La deuda que deja esa decisión (anotada, no resuelta).** Ni la lápida (`gh_firma_purgadas`)
+ni el recibo de la purga de prueba (`gh_firma_purga_registro`) guardan el `id_solicitud`:
+guardan un `firma_id` numérico y un HMAC del token. Y el plan de `--solo-firmas` **ni siquiera
+trae el `id_solicitud` del consentimiento** (la migración 024 lo agregó a la tabla y el script
+no lo usa), así que filtró por fecha y dejó esta fila. Las dos consecuencias: (a) un
+consentimiento huérfano **no se puede clasificar desde la base**: "no hay firma viva" NO
+significa "es de prueba", porque es exactamente la forma que deja la 5B cuando suprime una
+firma vencida (la 5B **sí** escribe lápida; la purga de prueba **no**); (b) los recibos son
+ilegibles para un humano: no dicen qué firma se suprimió.
+
+**Lo que quedaría hecho (📦931, pospuesto).** Una migración 034 que agregue el
+`id_solicitud` a las dos tablas (y lo escriba en `supresion.js` y en el script de purga); un
+modo `--solo-consentimientos` con lista explícita, la verificación de "sin firma viva y sin
+lápida", el borrado de sus `gh_consentimientos_eventos` (la FK los bloquea) y un recibo sin
+datos personales; y el arreglo de `--solo-firmas` para que borre los consentimientos de las
+firmas que él borre, para que esto no se repita.
+
+(2) El **11A con el abogado**, que es lo que enciende el D-02 y mide el inventario del buzón.
 
 ### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija el código, no la persona
 
