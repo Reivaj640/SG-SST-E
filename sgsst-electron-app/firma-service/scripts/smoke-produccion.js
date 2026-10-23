@@ -746,7 +746,16 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
   } else if (res.status === 409) {
     const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';
     if (codigo === 'EMPRESA_NO_HABILITADA') {
-      fail('POST /internal/sign-requests', '409 EMPRESA_NO_HABILITADA: la Empresa '
+      // AVISO y no FALLA. El 409 EMPRESA_NO_HABILITADA es el control del D-03
+      // FUNCIONANDO: la Empresa que se probó no tiene Anexo de Encargo firmado
+      // ni canal de PQRS, y el sistema se lo dice en vez de dejarla firmar.
+      // Contarlo como FALLA haría que el smoke exitara con codigo 1 por un
+      // control que se comportó como debe, y el aviso que sigue dice qué
+      // hacer.
+      //
+      // Lo que SÍ es una falla es que el servicio no responda, o que el 409
+      // sea por otro motivo (aun está en el `else` de abajo).
+      warn('POST /internal/sign-requests', '409 EMPRESA_NO_HABILITADA: la Empresa '
         + 'no tiene Anexo de Encargo firmado ni canal de PQRS. '
         + 'El bloqueo es INCONDICIONAL (📦933): no hay bandera que lo apague. '
         + 'La unica salida es la excepcion auditable '

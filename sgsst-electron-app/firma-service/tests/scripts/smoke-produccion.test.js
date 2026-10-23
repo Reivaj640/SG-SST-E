@@ -412,3 +412,69 @@ test('el check del token no puede quedarse sin comprobar: si no hay token, FALLA
   assert.equal(r.ok, false, 'sin token no hay nada que comprobar: eso es una FALLA');
   assert.equal(r.codigo, 'SIN_TOKEN');
 });
+
+// ---------------------------------------------------------------------------
+// 17. El 409 del D-03 es un AVISO, no una FALLA
+// ---------------------------------------------------------------------------
+//
+// El 409 EMPRESA_NO_HABILITADA es el control del D-03 FUNCIONANDO: el
+// servicio se niega a crear la firma de una Empresa sin Anexo de Encargo
+// firmado ni canal de PQRS. Contarlo como FALLA hacía que el smoke terminara
+// con codigo 1 por un control que se comportó como debe, y tapaba los
+// fallos de verdad.
+//
+// Pero un AVISO que no dice nada es un AVISO inútil: tiene que explicar qué
+// es y cuál es la salida.
+test('el 409 EMPRESA_NO_HABILITADA queda como AVISO, no como FALLA', async () => {
+  const pedirDoble = async () => ({
+    status: 409,
+    texto: '{"error":{"code":"EMPRESA_NO_HABILITADA","message":"no habilitada"}}',
+    json: { error: { code: 'EMPRESA_NO_HABILITADA', message: 'no habilitada' } },
+  });
+
+  await script.comprobarE2e(
+    {
+      e2e: true, confirmarE2e: true, url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-SIN-ANEXO', trabajador: 'CC-1', correo: 'firmante@example.com',
+      idempotencia: false,
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    { pedir: pedirDoble, notificar: async () => ({ ok: true, codigo: 'OK', detalle: '' }) },
+  );
+
+  const renglones = script.resultados.filter(
+    (r) => String(r.detalle || '').indexOf('EMPRESA_NO_HABILITADA') !== -1
+  );
+  assert.equal(renglones.length, 1, 'el 409 del D-03 deja un renglon en el resumen');
+  assert.equal(renglones[0].estado, 'AVISO',
+    'el bloqueo del D-03 funcionando NO es una falla del servicio');
+  assert.match(renglones[0].detalle, /excepcion auditable/,
+    'el aviso dice cual es la salida');
+});
+
+test('un 409 que NO es del D-03 sigue siendo FALLA', async () => {
+  const pedirDoble = async () => ({
+    status: 409,
+    texto: '{"error":{"code":"OTRO_CONFLICTO","message":"x"}}',
+    json: { error: { code: 'OTRO_CONFLICTO', message: 'x' } },
+  });
+
+  await script.comprobarE2e(
+    {
+      e2e: true, confirmarE2e: true, url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-001', trabajador: 'CC-1', correo: 'firmante@example.com',
+      idempotencia: false,
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    { pedir: pedirDoble, notificar: async () => ({ ok: true, codigo: 'OK', detalle: '' }) },
+  );
+
+  const renglones = script.resultados.filter(
+    (r) => String(r.detalle || '').indexOf('OTRO_CONFLICTO') !== -1
+  );
+  assert.equal(renglones.length, 1);
+  assert.equal(renglones[0].estado, 'FALLA',
+    'un 409 que no es del D-03 SI es una falla');
+});

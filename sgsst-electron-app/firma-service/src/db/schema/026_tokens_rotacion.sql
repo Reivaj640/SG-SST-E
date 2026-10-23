@@ -17,9 +17,17 @@
 -- La salida no es una excepción declarada en el texto, sino un mecanismo: la
 -- **rotación**. Cuando la Empresa necesita el enlace otra vez (perdió la
 -- respuesta de creación, o va a reenviar la invitación), se emite un token
--- NUEVO, se guarda su huella y se devuelve **una sola vez**. Los anteriores
--- siguen validos hasta su vencimiento, de modo que un enlace que ya está en
--- manos del trabajador no se rompe.
+-- NUEVO, se guarda su huella y se devuelve **una sola vez**.
+--
+-- OJO · ESTE COMENTARIO describe la rotación como estaba antes del 📦933.
+-- El 3.4(c) del Acuerdo de uso (texto aprobado por el abogado) dice que el
+-- token es de UN SOLO USO, y la reemisión INVALIDA el anterior. Hoy solo hay
+-- UN token vigente por solicitud (`MAX_TOKENS_VIGENTES = 1` en
+-- src/services/signRequest.js) y `emitirToken` revoca siempre el anterior.
+-- Un enlace que ya está en manos del trabajador SÍ se rompe cuando la
+-- Empresa reenvía: es lo que el 3.4(c) ordena, y el código lo cumple.
+-- La tabla y la revocación explícita se conservan: son las que permiten
+-- dejar constancia de por qué un enlace dejó de servir.
 --
 -- QUÉ GUARDA ESTA TABLA
 -- ----------------------
@@ -28,15 +36,15 @@
 --   - `token_hash`: el HMAC-SHA-256 con clave secreta. ES la credencial. No
 --     es reversible y no está en la misma base que la llave.
 --   - `emision`: 1 es el token original (el que nació con la firma); 2, 3...
---     son las rotaciones.
+--     son las reemisiones.
 --   - `emitido_at`, `expira_en`: cuándo se emitió y hasta cuándo sirve.
 --   - `revocado_at`, `revocado_por`, `motivo_revocacion`: la revocación
 --     explícita.
 --   - `origen`: por qué se emitió (`create`, `rotate`, `notify`, `legacy`).
 --
--- El tope son 3 tokens vivos por solicitud. Es un límite de credenciales
--- vivas para una misma firma, no un capricho: cada token es una puerta de
--- entrada al flujo de firma.
+-- El tope es UN token vigente por solicitud (📦933). Es un límite de
+-- credenciales vivas para una misma firma: cada token es una puerta de
+-- entrada al flujo de firma, y con el 3.4(c) el enlace anterior se invalida.
 --
 -- POR QUÉ LA FIRMA NO PUEDE QUEDAR SIN TOKENS
 -- --------------------------------------------
