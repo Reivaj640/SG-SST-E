@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-22 (el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
-| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦927-928. |
-| **Último commit de código** | 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
+| **Fecha de cierre** | 2026-10-22 (la purga del rastro de prueba en producción: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacía nada —📦929—; el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
+| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦927-928. El 📦929 (panel de firmas) y las correcciones de esta bitácora van en un commit propio, sin push hasta que el owner lo diga. |
+| **Último commit de código** | 📦 **929** — 📦929 (el panel de firmas: tablero general, panel de empresa y detalle de firma, en solo lectura; y la corrección de dos frases falsas de esta bitácora). Antes: 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -32,7 +32,7 @@
 | **CAPÍTULO III: AUDITADO E IMPLEMENTADO (19)** | **El texto no se toca: sus tres citas legales son exactas.** Y el diagnóstico que estaba escrito aquí era **falso**: el plan y este archivo decían que "el texto promete HMAC-SHA256 con clave secreta en 3.4(d), 3.4(e) y 3.6(e)". El texto nunca lo dijo: siempre dijo **«huella digital con sal»** (`grep -r hmac` da cero en todo el service). La brecha real era de implementación: **la sal estaba en la misma fila que la huella** (equivale a un hash plano) y la **cédula se guardaba en texto claro**, en contra del propio 10.5(a). **Corregido el 19** con las migraciones **019** (columnas de algoritmo + HMAC) y **020** (`gh_firma_eventos` append-only con triggers), la capa `src/crypto/{keys,hmac}.js` y el seudónimo de `id_trabajador`. La llave maestra se deriva por HKDF de `TOKEN_ENCRYPTION_KEY` y vive **fuera** de la BD. Filas heredadas: se reescriben solas con el HMAC la primera vez que se usan. Efecto colateral que cierra una fuga: la mini-app exponía la cédula en claro en `GET /s/:token`; ahora expone el seudónimo. **Pendiente: solo el Anexo de Encargo (3.8) y la cláusula de custodia, que necesitan abogado.** El 19 se completó la **Fase 1 del carril de código** (📦 907): **clave HMAC por empresa** (ámbito = `id_empresa`), **versión de llave por fila** (marcador `hmac-sha256.v2.k1`) y **anillo de llaves** (`FIRMA_HMAC_KEYRING`), con la migración **022**. Rotar la llave dejó de invalidar la evidencia anterior. Corrección que salió de esa fase: **la búsqueda solo probaba la versión vigente**, así que al rotar las filas viejas se volvían invisibles; ahora prueba todas las del anillo. |
 | **CAPÍTULO IV: AUDITADO (19)** | **Sus cinco citas, verificadas una por una contra la compilación oficial.** El **4.3** (parágrafo 2 del 2.2.1.1.10 del Decreto 1072) y el **4.5** (numeral 3 del 2.2.1.1.13) son **fieles**. El **4.2** es una paráfrasis: el 47.3 dice "incluido **cualquier acuerdo aplicable**" y el Acuerdo dice "incluido este Acuerdo" (la sustancia no cambia: este Acuerdo es un acuerdo aplicable). El **4.1** cita un artículo que el 47.5 no nombra: el oficial remite al **2.2.2.43.3**, y el 43.3 vigente es "PRESUPUESTO ANUAL" de las Cámaras de Comercio, o sea que **la remisión del propio decreto está caduca**, heredada de la numeración anterior a la compilación de 2015. El **4.4** tampoco es transcripción: el artículo 244 de la Ley 1564 ("DOCUMENTO AUTÉNTICO") presume auténticos los documentos públicos y privados "mientras no hayan sido tachados de falso o desconocidos", y la frase "en forma de mensaje de datos" es del 243. **Hallazgo de fondo: el Acuerdo no cita el 2.2.2.47.4 (CONFIABILIDAD)** en ningún punto, y es el artículo que trae los dos requisitos materiales (los datos de creación son exclusivamente del firmante; se puede detectar la alteración no autorizada), al que apuntan el 2.2.1.1.11 y el parágrafo del 2.2.1.1.13. **El texto no se tocó**: las propuestas quedaron en `docs/gestion-humana/firma-electronica/auditoria-capitulo-iv-citas-normativas-2026-10-19.md`. |
 | **CAPÍTULO V: AUDITADO E IMPLEMENTADO (19)** | **Verificado el 2.2.2.47.6 contra la compilación oficial y auditado numeral por numeral (5.1 a 5.5).** El texto del Capítulo V tiene **dos hallazgos** que van al abogado y **no se tocaron**: el preámbulo del 5.1 dice que a), b) y c) son los deberes del 47.6 y no lo son (falta el deber 2, el deber 3 quedó reducido a "a la Empresa y a K+AIR" y el literal a) no está en el artículo), y el 5.1(a) obliga al Firmante a cumplir unas políticas de seguridad que nunca ve. El código tenía **dos roto**: el 5.1(c) no era cumplible (no había ningún canal de K+AIR en la mini-app) y el 5.3 no tenía apoyo en pantalla (el backend mandaba `tipo_identificacion` e `id_documento`, pero la mini-app no los pintaba, y el comentario que decía lo contrario era falso). **Corregidos el 19**: el canal de incidentes de K+AIR vive en las dos capas (valor por defecto en el HTML, para que exista también en la pantalla de error donde no hay contexto, y configurable con `FIRMA_CANAL_INCIDENCIAS`; un test exige que no divergan) en un pie fuera de las pantallas, y el bloque `#documento-identidad` muestra qué documento se firma ("Estás firmando un contrato. Referencia: ..."). **Decisión del owner (2026-10-20)**: la API **sí** rechaza el buzón corporativo para el OTP (el D-02, 📦921): el código va a un medio personal, y el rechazo queda **apagado** hasta que exista la 9A y se publique la v1.1. Detalle en `auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` y en `plan-cierre-tc-y-decisiones-2026-10-20.md`. |
-| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1436 tests · 1434 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · **pendiente de decisión administrativa: el Anexo de Encargo de Aseplus (la base dice firmado el 2026-10-21, el documento de onboarding dice que no) y la URL real de la política de datos (en `null`)** · API key de Aseplus en texto plano en el escritorio · el alta de empresas y el Anexo de Encargo siguen siendo administrativos: el puente PC → servidor de 📦927 solo actualiza empresas ya registradas · `acuerdo-dev-v1.0.txt` sigue sin las correcciones del Capítulo I (divergencia dev/prod). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
+| **Deuda técnica global** | Suite de 973 tests **ya corre** (se desbloqueó el 19 con `better-sqlite3` v12 para Node 26 en un árbol de deps propio del service): **1474 tests · 1472 verdes · 0 fallos · 2 omitidos** — la base de 47 fallos quedó en **cero** (ver 📦909: eran dos causas raíz, no 47 problemas) y el rojo intermitente que quedaba se cerró con el *sink* del logger (ver 📦910: ocho tests parcheaban `process.stdout` y le robaban la salida al runner) · **pendiente de decisión administrativa: el Anexo de Encargo de Aseplus (la base dice firmado el 2026-10-21, el documento de onboarding dice que no) y la URL real de la política de datos (en `null`)** · contraseñas de aplicación de Gmail en texto plano en el escritorio (`utils/emailSender.js`) — las llaves de firma NO están en claro: viven en `secrets.enc`, cifradas con `safeStorage` de Electron · el alta de empresas y el Anexo de Encargo siguen siendo administrativos: el puente PC → servidor de 📦927 solo actualiza empresas ya registradas · el `acuerdo-dev-v1.0.txt` **NO es una divergencia dev/prod**: es un fixture de PRUEBAS marcado "ACUERDO DEV — NO LEGAL — SOLO PRUEBAS", sembrado por `seed-dev-acuerdo.js` y con bloqueo duro en `NODE_ENV=production`; el legal sellado es otro archivo (`acuerdo-v1.0.txt`, 33357 bytes, `52a490a4…`). El rótulo «vence en 24 horas» **quedó corregido**: ahora se arma con la `fecha_expiracion` que devuelve el servidor. |
 
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
@@ -667,6 +667,96 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
 
+### 2026-10-22 · 📦929 · El panel de firmas: ver el proceso completo sin escribir en la base
+
+**El pedido.** "Necesito ver en tiempo real cómo van las firmas, por empresa: el estado, los
+tokens, todo." Con el servicio ya en producción, esa pregunta se respondía con `sqlite3` a
+mano: un comando por tabla, copiado y pegado. Con nueve firmas ya había que ejecutar cuatro
+consultas para saber si algo seguía vivo, qué tokens quedaban y cuándo se había movido algo
+por última vez.
+
+**Qué se construyó.** `firma-service/scripts/panel-firmas.js`: un tablero de **solo
+lectura** con tres vistas navegables (tablero general → panel de empresa → detalle de
+firma), **sin una dependencia nueva** (solo `readline` y secuencias ANSI de Node).
+
+- **Tablero general**: todas las empresas con su resumen, y las firmas que NO están en
+  estado terminal (las que siguen vivas), con sus tokens y si alguien abrió el enlace.
+- **Panel de empresa**: la ficha (Anexo, plazo, canal de PQRS, política de datos), el
+  resumen de conteos y la tabla de firmas.
+- **Detalle de firma**: estado, tokens (`VIVO` / `VENCIDO` / `REVOCADO`), sesión,
+  consentimiento y la **traza completa** de `gh_firma_eventos`, que es la tabla donde vive
+  el comportamiento de cada firma.
+
+**El candado: esto no puede romper nada.** La base se abre con `better-sqlite3` en modo
+`readonly: true`; si el motor no deja (una base en WAL a la que no se le puede crear el
+`-shm`), cae a una conexión normal **avisando**. Nunca imprime el `token_hash` (es la
+credencial del enlace), ni el pseudónimo completo del trabajador, ni la `metadata` cruda de
+los eventos: la IP sale enmascarada (`192.168.x.x`) y los hashes, truncados.
+
+**La trampa que sólo apareció corriendo el script.** Instalado en el servidor, el owner
+probó que **`Esc` no lo devolvía**: el panel se quedaba quieto. No era el script: era **el
+parser de Node**. `readline.emitKeypressEvents` **no emite ningún `keypress` cuando lo que
+llega es una ESC sola** (el parser espera a ver si lo que sigue es una secuencia ANSI).
+Reproducido en Node v26: `ESC sola -> NINGUN keypress`; la flecha (`ESC [ A`) sí llega como
+`up`. O sea, la tecla "volver" era **inalcanzable**, y el test que la cubría miraba
+`key.name === 'escape'`, un valor que el runtime jamás produce: el test pasaba con la tecla
+inexistente. Se reescribió el lector de teclas (`crearLectorTeclado`, decodificación byte a
+byte: ESC sola tras 50 ms = ESC; ESC + `[` u `O` = secuencia) y la navegación se movió a
+`aplicarTecla()`, una función **pura** (no dibuja, no lee la base) para poder probarla sin
+terminal.
+
+**El segundo bug, del mismo molde.** El despacho de `--empresa` comparaba `opts.vista` donde
+debía comparar `datos.vista`: la vista de empresa caía al tablero general. **Ningún test lo
+cubría** (la función se probaba por partes, no de punta a punta); salió de **correr** el
+script. Ahora hay un test de despacho para cada modo.
+
+**Verificación.** **40 tests** nuevos (`tests/scripts/panel-firmas.test.js`) y **6 mutaciones
+verificadas**: degradar el enmascarado de la IP, imprimir el `token_hash`, meter un
+`UPDATE` en el script, romper el despacho de `--empresa`, romper la emisión de `escape` y
+romper el "volver" de la firma a la empresa — **las seis tienen que caerse y caen**. Suite
+completa del service: **1474 pruebas · 1472 verdes · 0 fallos · 2 omitidas**.
+
+**Lo que se encontró de paso.** `empresaService.update()` es un **reemplazo completo** de
+la ficha, no un parche: lo que no se manda queda en `NULL`, y `razon_social` es `NOT NULL`
+(mandar solo `canal_pqrs` revienta con `SQLITE_CONSTRAINT_NOTNULL`, un 500 y no un 400). El
+puente del escritorio lo hace bien (GET + merge + PUT), pero es la trampa #60 del
+`PROMPT.md` para el override auditado de `canal_pqrs` del D-02.
+
+**La purga de producción: HECHA.** El 22-oct a las 19:33 COT (00:33Z del 23) corrió en
+`kair-server` con `--hasta=2026-10-22 --solo-firmas`, actor `Javier Robles Fontalvo`, motivo
+"Rastro de prueba del e2e del 21 y 22-oct, antes de produccion real". El corte del 22 era el
+correcto: las firmas del 21-oct por la tarde quedan con fecha **UTC** del 22 y con `--hasta=2026-10-21`
+el script se negaba a tocar nada. Resultado: **9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15
+archivos** fuera; **0 consentimientos** borrados (este modo no borra consentimientos); la **v1.0
+sin tocar** (`hash=52a490a4f4ce`, `activa=1`); `integrity_check: ok` y los triggers append-only
+repostos. Recibo: **9 filas** en `gh_firma_purga_registro` y **2** en `gh_firma_purga_log`. La base
+quedó en `firmas=0 eventos=0 tokens=0 sesiones=0 consent=1 versiones=1 activa=1`: el production
+arranca sin rastro del ensayo.
+
+**Lo que la purga NO se llevó: un PDF huérfano del 21-oct.** El `ls` de los tres directorios de
+PDF dejó uno: `originales/SIGN-2026-020330.pdf`. No estaba en el plan de la purga (los 15 que sí
+salieron son los `SIGN-2026-211245`, `-873182`, `-381270`, `-492341`, `-217085`, `-823423`,
+`-952767`, `-614813` y `-313464`): es un sobreviviente de la **purga del 21-oct**, cuya firma se
+retiró entonces (2 firmas, 27 eventos, 4 archivos) pero cuyo original quedó en disco porque su
+fila no apuntaba a él. Es un huérfano confirmado: en la base no hay ninguna firma con ese
+`id_solicitud` (la tabla tiene 0 filas).
+
+**Y la herramienta que existe para eso no sirve en producción tal cual.**
+`scripts/cleanup-orphan-pdfs.js` (que **mueve**, nunca borra, y deja manifiesto con el SHA-256)
+tiene las rutas fijas al layout local: `DEV_DB_PATH = <app>/data/firma.sqlite` y
+`STORAGE_ROOT = <app>/storage/pdfs`. En `kair-server` la base está en
+`/opt/kair-firma/data/` y el storage en `/opt/kair-firma/storage/`: son **hermanos** de `app/`,
+no hijos. Con el despliegue actual el script sale con "BD no encontrada" (exit 2), y además
+**el hard-block de producción** impide siquiera el dry-run (`NODE_ENV=production` exige
+`--yes`). La salida es que ese script sirve para el portátil y **no para el servidor**:
+habría que leer `DB_PATH` y `PDF_STORAGE_PATH` del entorno, como hace el resto del servicio.
+
+**Lo que queda.** (1) El **consentimiento de prueba (id=2)** sigue vivo: `--solo-firmas` no lo
+borra y `--solo-consentimientos` todavía no existe. Falta la decisión del owner. (2) Se corrigen
+aquí las **dos frases falsas** que quedaban de la entrada del 📦925: el 422 vs 500 **se detectó**
+en el 📦925 (trampa #54) pero **se arregló** en el 📦927-928, y la falta de ruta de actualización
+de Empresa **ya no es cierta** (la agregó el 📦927-928).
+
 ### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija el código, no la persona
 
 **El síntoma.** El plazo de conservación era **uno solo por Empresa** (`plazo_retencion_dias`) y se contaba
@@ -795,11 +885,13 @@ Reiniciar el servicio cargó el código desplegado y el token nuevo resolvió al
    compararla se vio la diferencia. Un `404 TOKEN_NOT_FOUND` dice lo mismo en los cinco casos:
    no sirve para culpar a nadie sin leer el log.
 
-**Qué se cambió (📦925).** Los tres fixes del e2e que el ensayo contra el servicio real
+**Qué se cambió (📦925).** Dos fixes del e2e que el ensayo contra el servicio real
 atrapó: que llame a `/notify-remote` (el correo nunca salía y el script declaraba haberlo
-mandado), que mande la huella de identificación (`identify()` exige `identificacion_tipo` +
-`identificacion_numero_hash` y respondía 500), y el 422 vs 500 de `MISSING_IDENTIFICATION_DATA`
-que el mini-app espera distinto al que el servidor manda.
+mandado) y que mande la huella de identificación (`identify()` exige `identificacion_tipo` +
+`identificacion_numero_hash` y respondía 500). El **tercero se detectó pero no se arregló
+aquí**: el 422 vs 500 de `MISSING_IDENTIFICATION_DATA` (el mini-app espera 422 y el servidor
+mandaba 500) quedó documentado como hallazgo y trampa #54, y **el arreglo entró en el
+📦927-928**, con el status corregido a 422 en `publicFlow.js` y su test.
 
 **Qué se cambió (📦926).**
 
@@ -877,7 +969,7 @@ fantasma. Los dos van pusheados a `origin/Dev` en la misma tanda.
 
 1. **`/health` miente**: la versión está fija en el código (`routes/health.js:45`). La prueba de despliegue es `POST /api/solicitudes`, no el health.
 2. **`Idempotency-Key` es incompatible con la llave interna** (400 `IDEMPOTENCY_LEGACY_NOT_SUPPORTED`): el K+AIR de escritorio no puede usar idempotencia hasta migrar a la llave por empresa (I-010).
-3. **El alta de Empresa no tiene ruta de actualización**: se crea y ya, no hay `PUT`/`PATCH` ni borrado. Para el D-02 hace falta poder cambiar el canal de una Empresa ya registrada.
+3. **El alta de Empresa no tenía ruta de actualización** (cierto el 20-oct, **ya no lo es**): se creaba y ya, sin `PUT`/`PATCH`. El 📦927-928 agregó `PUT /internal/admin/empresas/:id_empresa` (+ `POST /:id/anexo-firmado` y `POST /:id/estado`), y el puente del escritorio ya lo usa. Lo que **queda** para el D-02 es el **override auditado** de `canal_pqrs`: la ruta existe, pero el cambio no deja rastro en una tabla append-only (solo un log) y `update()` es un reemplazo completo de la ficha (trampa #60).
 4. El `id_trabajador` se **pseudonimiza** al guardarse (`psn1_<hash>`), no queda en claro en la fila.
 5. El `.env` de producción tiene un valor con espacio sin comillas (`SMTP_FROM_NAME`): systemd lo tolera, pero `source` en bash no (`Firma: command not found`).
 

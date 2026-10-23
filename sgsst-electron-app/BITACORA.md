@@ -4,6 +4,48 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 La tecla que el parser de Node no entregaba (📦929, 2026-10-22)
+
+### El ESC que no hacía nada
+
+El panel de firmas es un tablero de tres vistas: el tablero general, el panel de la
+empresa y el detalle de una firma. La navegación es con flechas y con `Esc` para volver.
+Instalado en el servidor, el owner probó que **`Esc` no lo devolvía**: el panel se
+quedaba quieto.
+
+No era el script: era **el parser de Node**. `readline.emitKeypressEvents` **no emite
+ningún evento `keypress` cuando lo que llega es una ESC sola**. El parser ve el `\x1b` y
+espera a ver si lo que sigue es una secuencia de escape (las flechas empiezan por `ESC [`);
+si no llega nada más, no emite nada. Reproducido en Node v26:
+
+```
+ESC sola                  -> NINGUN keypress
+ESC ESC                   -> NINGUN keypress
+flecha arriba (ESC [ A)   -> ch=undefined name=up
+Enter                     -> ch="\r" name=return
+```
+
+O sea: **la tecla "volver" era inalcanzable**, y ningún test lo podía delatar: el test
+miraba `key.name === 'escape'`, un valor que el runtime jamás produce. El test pasaba con
+la tecla inexistente.
+
+### La regla
+
+**Una tecla que el runtime no entrega no es una tecla: es un caso que no se puede probar.**
+El parser de Node no es un traductor de teclado, es un reconocedor de secuencias ANSI, y
+frente a una ESC ambigua su respuesta es "no sé qué es". Un TUI que dependa de `Esc` tiene
+que **decodificar los bytes él mismo**: una ESC que no llega seguida de nada en 50 ms es
+ESC; una ESC seguida de `[` u `O` es una secuencia.
+
+### Lo que se hizo
+
+`crearLectorTeclado()` decodifica los bytes a mano, y la lógica de navegación se movió a
+`aplicarTecla()`, una función **pura** (no dibuja, no lee la base) para que "qué tecla abre
+qué" se pueda probar sin terminal. Ese movimiento también sacó a la luz un bug que ningún
+test cubría: el despacho de `--empresa` comparaba `opts.vista` donde debía comparar
+`datos.vista`, así que caía al tablero general. Salió de **correr** el script, no de
+leerlo.
+
 ## 🐗 El endpoint que se colgaba y nadie lo había probado (📦918, 2026-10-20)
 
 ### El router que no estaba montado

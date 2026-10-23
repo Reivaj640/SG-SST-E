@@ -405,6 +405,60 @@ va con `--solo-firmas`.
 El recibo queda en `gh_firma_purga_log` y `gh_firma_purga_registro` (tablas
 append-only), y la base se verifica con `integrity_check` al final.
 
+### El corte tiene que cubrir las firmas del dia anterior
+
+El script **se niega a tocar nada** si hay firmas mas nuevas que el corte
+(`--hasta`). Eso es lo que impide que una purga "de pruebas" se lleve por
+delante una firma de verdad. Pero el corte se compara contra la fecha en
+**UTC**: una firma creada el 21-oct a las 19:47 COT queda con fecha
+`2026-10-22T00:47Z`, o sea **fuera** de `--hasta=2026-10-21`.
+
+Por eso el corte del 2026-10-22 fue `--hasta=2026-10-22` (fin de hoy), no
+`--hasta=2026-10-21`: las nueve filas de prueba del ensayo de los dias 21 y
+22 estaban dentro.
+
+---
+
+## 5.3 El panel de firmas (ver sin escribir)
+
+`scripts/panel-firmas.js` es un tablero de **solo lectura** del proceso de
+firma. No escribe nada: abre la base con `better-sqlite3` en modo
+`readonly: true` (si el motor no deja, cae a una conexion normal **avisando**),
+y nunca imprime el `token_hash`, ni el pseudonimo completo del trabajador, ni
+la `metadata` cruda de los eventos.
+
+Tres vistas, navegables con las flechas y con `Esc` para volver:
+
+| Vista | Que muestra |
+|---|---|
+| **Tablero general** | Todas las empresas con su resumen, y las firmas que NO estan en estado terminal (las que siguen vivas), con sus tokens y si alguien abrio el enlace |
+| **Panel de empresa** | La ficha (Anexo, plazo, canal de PQRS, politica de datos) + el resumen de conteos + la tabla de firmas |
+| **Detalle de firma** | Estado, tokens (VIVO / VENCIDO / REVOCADO), sesion, consentimiento y la **traza completa** de `gh_firma_eventos` |
+
+```bash
+# Instalar (un solo archivo)
+curl -sS -o /tmp/panel-firmas.js http://192.168.1.2:8765/panel-firmas.js
+sha256sum /tmp/panel-firmas.js
+sudo install -o kairfirma -g kairfirma -m 664 /tmp/panel-firmas.js /opt/kair-firma/app/scripts/panel-firmas.js
+
+# Correrlo (interactivo)
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/panel-firmas.js'
+
+# O una sola vista, sin terminal (para pipelines y para pegar en un ticket)
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/panel-firmas.js --empresa=900829731'
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/panel-firmas.js --firma=6'
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/panel-firmas.js --json'
+```
+
+Solo necesita `DB_PATH` (del `.env`): **no pide ninguna llave**. El refresco
+automático es cada 5 segundos (`--cada=N` lo cambia).
+
+> **Trampa del teclado (2026-10-22).** `Esc` no funcionaba en la primera
+> version: con `readline.emitKeypressEvents`, **una ESC sola no emite ningun
+> `keypress`** (el parser espera a ver si lo que sigue es una secuencia ANSI).
+> El script ahora decodifica los bytes por su cuenta. Ver la trampa #59 del
+> `PROMPT.md` y la seccion del `BITACORA.md`.
+
 ---
 
 ## 6. Correr los tests en el servidor
