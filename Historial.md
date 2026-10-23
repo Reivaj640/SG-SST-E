@@ -22,9 +22,9 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-22 (la purga del rastro de prueba en producción: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacía nada —📦929—; el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
-| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦929 (el panel de firmas, el recibo de la purga y las dos frases corregidas de esta bitácora). |
-| **Último commit de código** | 📦 **929** — 📦929 (el panel de firmas: tablero general, panel de empresa y detalle de firma, en solo lectura; y la corrección de dos frases falsas de esta bitácora). Antes: 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
+| **Fecha de cierre** | 2026-10-22 (la purga del rastro de prueba en producción: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacía nada —📦929—; y el script de archivos huérfanos que sí sirve en producción: rutas del entorno, dry-run permitido en producción y el aviso que impide leer «nada que mover» como «storage limpio» —📦930—; el catálogo de retención por documento: el plazo vive en el código —80 años de custodia, el hold del contrato electrónico y el piso legal de los grupos SST— con su migración 033, la clasificación automática por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitación que ya no exige el plazo de la empresa y la documentación del despliegue —📦928—; y el cierre del formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor —📦927—). Antes: 2026-10-21 (producción: el despliegue, el Acuerdo legal vigente y la 8C en el servidor; y el cierre del 404 de los enlaces: la causa raíz, el check que faltaba y la limpieza) |
+| **Rama** | `Dev`, nivelada con `origin/Dev` tras el push de 📦930 (el script de archivos huérfanos, el reinstal del panel con el fix del ESC y la documentación de esta bitácora). |
+| **Último commit de código** | 📦 **930** — 📦930 (el script de archivos huérfanos que sí sirve en producción: rutas del entorno, dry-run permitido en producción y el aviso de los huérfanos fuera de la lista; y el reinstal del panel con el fix del ESC, verificado en el servidor). Antes: 📦 **929** — 📦929 (el panel de firmas: tablero general, panel de empresa y detalle de firma, en solo lectura; y la corrección de dos frases falsas de esta bitácora). Antes: 📦 **927-928** — 📦927 (el formulario de datos para firma electrónica: guardado local, relectura y publicación al servidor) y 📦928 (el catálogo de retención por documento: la migración 033, el módulo `retencion.js` con la custodia de 80 años, la clasificación automática por tipo de documento, la habilitación que ya no exige el plazo, la herencia de la firma dual, el texto por solicitud en la mini-app, el correo y la constancia, y el flag del script de humo). Antes: 📦 **924-926**
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -756,6 +756,80 @@ borra y `--solo-consentimientos` todavía no existe. Falta la decisión del owne
 aquí las **dos frases falsas** que quedaban de la entrada del 📦925: el 422 vs 500 **se detectó**
 en el 📦925 (trampa #54) pero **se arregló** en el 📦927-928, y la falta de ruta de actualización
 de Empresa **ya no es cierta** (la agregó el 📦927-928).
+
+### 2026-10-22 · 📦930 · El PDF huérfano que quedó en producción y el script que no miraba donde debía
+
+**Lo que había quedado.** La purga del rastro de prueba (📦929) dejó en producción un PDF
+huérfano: `storage/pdfs/originales/SIGN-2026-020330.pdf`, un sobreviviente del 21-oct cuya
+fila no apuntaba a él. La base ya estaba limpia (9 firmas, 57 eventos, 6 sesiones, 15 tokens
+y 15 archivos fuera); ese archivo era lo único que quedaba en el árbol de PDFs.
+
+**La herramienta existía y no servía.** `scripts/cleanup-orphan-pdfs.js` (que mueve, nunca
+borra, y deja manifiesto con el SHA-256) tenía las rutas fijas al layout local: la base y el
+storage como hijos de `app/`. En `kair-server` son **hermanos** (`/opt/kair-firma/data/` y
+`/opt/kair-firma/storage/`), así que el script salía con «BD no encontrada» (exit 2). Peor:
+el hard-block de producción exigía `--yes` para el dry-run, y `--yes` **mueve**: en
+producción no había forma de *ver* qué se iba a mover sin hacerlo. Un «nada que mover» que
+en realidad significa «no miré donde debía» es peor que un error: **se lee como una buena
+noticia**.
+
+**Qué se cambió.**
+
+- **Rutas del entorno** (`DB_PATH`, `PDF_STORAGE_PATH`), resueltas contra la raíz del
+  servicio como en `src/config.js`; el archivo queda como hermano del árbol de PDFs
+  (`/opt/kair-firma/storage/pdf-archive`).
+- **El dry-run se permite en producción** porque no escribe nada (ni crea el directorio de
+  archivo, ni el manifiesto, ni mueve un byte). Lo que exige `--yes` es **mover**.
+- **El aviso que no puede faltar**: si hay huérfanos **fuera** de la lista objetivo, el
+  script los nombra. «Nada que mover» ya no puede leerse como «el storage está limpio».
+- **El manifiesto del día acumula** entre ejecuciones (antes se pisaba) y lleva el SHA-256
+  de cada archivo movido.
+- **Los cuatro árboles de PDF**: `originales`, `firmados`, `constancias` y `papel` (el 9A),
+  con los sufijos de cada uno (`-constancia`, `-firmado`, `-registro`).
+- **`main(argv)` devuelve el código de salida** (testeable sin spawns) y `--json` imprime
+  solo JSON.
+- **El blindaje de root**: si la base no abre en solo lectura (WAL sin `-shm`), como root el
+  script **se niega** a abrirla en modo escritura —dejaría `-wal`/`-shm` de root en el
+  directorio de datos y el servicio (que corre como `kairfirma`) dejaría de poder escribir
+  en ellos—. Pide correrlo como el usuario del servicio.
+
+**Verificación.** **23 tests** nuevos (`tests/scripts/cleanup-orphan-pdfs.test.js`) y **13
+mutaciones verificadas**: degradar las rutas al layout local, quitar el aviso, hacer que el
+dry-run mueva de verdad, quitar el `readonly`, hacer que el dry-run cree el directorio de
+archivo, hacer que el manifiesto se pise, invertir la detección de huérfanos, romper
+`--ids=`, dejar de escanear `papel/` — **las trece tienen que caerse y caen**. Suite
+completa del service: **1495 pruebas · 1493 verdes · 0 fallos · 2 omitidas**.
+
+**Lo que pasó en el servidor.** Instalado con el hash verificado (`5a2ef98f…`), el dry-run
+resolvió las rutas del entorno (`BD: /opt/kair-firma/data/firma.sqlite`, `Storage:
+/opt/kair-firma/storage/pdfs`), encontró **1 candidato, 1 huérfano confirmado, 1 a mover** y
+no escribió nada. Con `--yes`: **1 archivo movido** y manifiesto en
+`/opt/kair-firma/storage/pdf-archive/2026-10-23/manifest.json` (fechado en UTC: el servidor
+ya iba en el 23). Corrió como `sudo -u kairfirma`, no como root.
+
+**Verificado en el servidor.** El archivo quedó en
+`pdf-archive/2026-10-23/originales/SIGN-2026-020330.pdf` (174 898 bytes, con su **fecha
+original** —el 17-oct—: el `rename` la conserva, y la evidencia conserva su cronología),
+con el SHA-256 `54e831a1…` en el manifiesto (`total_orphans=1`, `moved=1`, `errors=0`). Todo
+**con dueño `kairfirma`**, incluido el manifiesto: el directorio de archivo hereda el dueño
+del storage. Y los cuatro árboles del storage principal quedaron **vacíos**: `originales`,
+`firmados`, `constancias` y `papel` dan `total 0`. El storage está limpio, y ahora se puede
+decir porque está verificado, y no porque el script lo dijera.
+
+**Y el servicio no se reinició.** `/health` da `db: ok` y `smtp: configured`, con
+`uptime_seconds` de más de 5 horas (el mismo proceso de antes): ni la base ni el proceso se
+tocaron, y el túnel público responde igual.
+
+**De paso, el panel se reinstaló.** En el servidor seguía la versión **anterior** (la que
+no tenía el fix del ESC), así que se volvió a instalar con el hash verificado
+`c12dd0e4…`. Corriendo, el tablero general da: 1 empresa (`ASEPLUS CARIBE S.A.S.`, activa),
+`firmas=0 eventos=0 tokens=0 vivos=0 sesiones=0` y **1 consentimiento**: el de prueba que
+sigue vivo (id=2). Y el **Esc ya vuelve al tablero general**: el fix del 📦929 quedó
+verificado en el servidor con esta versión.
+
+**Lo que queda.** (1) El **consentimiento de prueba (id=2)** sigue vivo: `--solo-firmas` no lo
+borra y `--solo-consentimientos` todavía no existe. Falta la decisión del owner. (2) El
+**11A con el abogado**, que es lo que enciende el D-02 y mide el inventario del buzón.
 
 ### 2026-10-22 · 📦928 · El catálogo de retención por documento: el plazo que fija el código, no la persona
 

@@ -4,6 +4,69 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 El script que no miraba donde debía (📦930, 2026-10-22)
+
+### El "nada que mover" que no significaba nada
+
+La purga del rastro de prueba dejó un PDF huérfano en producción:
+`storage/pdfs/originales/SIGN-2026-020330.pdf`, sin firma en la base. Para
+recogerlo ya existía `scripts/cleanup-orphan-pdfs.js`, que **mueve** (nunca
+borra) y deja un manifiesto con el SHA-256. En el servidor el script salía con
+`BD no encontrada` y listo: exit 2.
+
+La causa era una línea de rutas. El script tenía la base y el storage fijos al
+layout local (`<app>/data/firma.sqlite`, `<app>/storage/pdfs`), y en
+`kair-server` la base está en `/opt/kair-firma/data/` y el storage en
+`/opt/kair-firma/storage/`: son **hermanos** de `app/`, no hijos. El mensaje
+"nada que mover" no significaba que no hubiera nada: significaba que el script
+no miró donde debía. Un script que no encuentra lo que busca **no puede
+diferenciar "no hay" de "no miré"**.
+
+El otro defecto era el hard-block: `NODE_ENV=production` exigía `--yes`, y el
+`--yes` **mueve**. O sea, en producción no había forma de *ver* qué se iba a
+mover sin hacerlo. Eso obliga a mover a ciegas, que es exactamente lo que un
+script de archivo no debe.
+
+### La regla
+
+**El dry-run tiene que poder correr en producción.** Mover es escribir; un
+dry-run que no escribe nada no es un riesgo, es la única forma de ver el
+efecto antes de producirlo. Y **"nada que mover" no puede significar "está
+limpio"**: si hay huérfanos fuera de la lista objetivo, el script tiene que
+nombrarlos, o el que lo lee se lleva una seguridad que no existe.
+
+Y las rutas de un script de operación salen **del entorno**, igual que
+`src/config.js`: `DB_PATH` y `PDF_STORAGE_PATH`, resueltas contra la raíz del
+servicio cuando son relativas.
+
+### El detalle que casi no se ve: root y los archivos `-wal`
+
+La base en producción está en WAL, y una base en WAL a la que no se le puede
+crear el `-shm` **no se abre en solo lectura**. El plan B de siempre es abrirla
+en modo normal, avisando: el script solo hace SELECT.
+
+Ese plan B tiene una trampa: en modo normal, **SQLite escribe**, y como root
+deja los archivos `-wal` y `-shm` con dueño root en el directorio de datos. El
+servicio corre como `kairfirma` y ya no puede escribir en ellos. Un script de
+solo lectura, mal escrito, **rompe el servicio que venía a limpiar**.
+
+El plan B correcto: como root, **negarse** y pedir que se corra como el usuario
+del servicio (`sudo -u kairfirma`). Los directorios que el script crea en el
+archivo heredan el dueño del storage, para que después el servicio pueda
+administrarlos.
+
+### Lo que se hizo
+
+`scripts/cleanup-orphan-pdfs.js` reescrito: rutas del entorno, `main(argv)` que
+devuelve el código de salida (testeable sin spawns), dry-run permitido en
+producción, **aviso** de los huérfanos fuera de la lista, manifiesto que
+**acumula** entre ejecuciones del mismo día, escaneo de los cuatro árboles de
+PDF (`originales`, `firmados`, `constancias` y `papel`) y el plan B de la base
+blindado contra root. **23 tests** y **13 mutaciones verificadas**: degradar
+las rutas al layout local, quitar el aviso, hacer que el dry-run mueva, quitar
+el `readonly`, hacer que el manifiesto se pise — **las trece tienen que caerse y
+caen**.
+
 ## 🐗 La tecla que el parser de Node no entregaba (📦929, 2026-10-22)
 
 ### El ESC que no hacía nada

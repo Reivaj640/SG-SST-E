@@ -461,6 +461,51 @@ automático es cada 5 segundos (`--cada=N` lo cambia).
 
 ---
 
+## 5.4 Los PDF huerfanos (mover, nunca borrar)
+
+`scripts/cleanup-orphan-pdfs.js` saca del arbol principal los PDF que **no
+tienen firma en la base** (los `/opt/kair-firma/storage/pdfs/{originales,
+firmados,constancias,papel}/`). **MUEVE, nunca borra**: cada archivo va a
+`/opt/kair-firma/storage/pdf-archive/<fecha>/<mismo-arbol>/` y queda un
+`manifest.json` con el SHA-256 de lo movido.
+
+| Regla | Por que |
+|---|---|
+| El **dry-run no escribe nada** y se puede correr en produccion | Es la unica forma de *ver* que se moveria antes de moverlo. Un script que en produccion solo dice "no se puede" obliga a mover a ciegas |
+| **Mover** exige `--yes` | Mover es escribir |
+| La **lista de IDs** es la unica fuente de verdad | Un huerfano que no esta en la lista no se mueve |
+| Si hay huerfanos **fuera** de la lista, el script los **nombra** | "Nada que mover" no puede significar "el storage esta limpio" |
+
+```bash
+# Instalar (un solo archivo)
+curl -sS -o /tmp/cleanup-orphan-pdfs.js http://192.168.1.2:8765/cleanup-orphan-pdfs.js
+sha256sum /tmp/cleanup-orphan-pdfs.js
+sudo install -o kairfirma -g kairfirma -m 664 /tmp/cleanup-orphan-pdfs.js /opt/kair-firma/app/scripts/cleanup-orphan-pdfs.js
+
+# Ver (no escribe nada)
+sudo -u kairfirma bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/cleanup-orphan-pdfs.js --ids=SIGN-2026-020330'
+
+# Mover
+sudo -u kairfirma bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node scripts/cleanup-orphan-pdfs.js --ids=SIGN-2026-020330 --yes'
+
+# Verificar
+sudo -u kairfirma ls -lR /opt/kair-firma/storage/pdf-archive/
+sudo -u kairfirma cat /opt/kair-firma/storage/pdf-archive/*/manifest.json
+sudo -u kairfirma ls -l /opt/kair-firma/storage/pdfs/originales /opt/kair-firma/storage/pdfs/firmados /opt/kair-firma/storage/pdfs/constancias /opt/kair-firma/storage/pdfs/papel
+```
+
+Opciones: `--ids=A,B` (la lista), `--todos` (escanear todos los huerfanos) y
+`--json` (que imprime solo JSON, parseable).
+
+> **Correrlo como `kairfirma`, no como root (2026-10-22).** La base esta en WAL:
+> si no se puede abrir en solo lectura, el "plan B" de abrirla en modo normal
+> **escribe**, y como root deja los archivos `-wal`/`-shm` con dueno root en el
+> directorio de datos: el servicio (que corre como `kairfirma`) deja de poder
+> escribir en ellos. El script, como root, **se niega** y pide correrlo como el
+> usuario del servicio. Ver la trampa #62 del `PROMPT.md`.
+
+---
+
 ## 6. Correr los tests en el servidor
 
 En el portatil **no corren**: el `better-sqlite3` de alla esta compilado para Electron 37
