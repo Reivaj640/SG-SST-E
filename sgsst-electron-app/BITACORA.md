@@ -6233,3 +6233,61 @@ El test que comprueba "los tokens también están borrados" usaba `firma.id`. El
 test que pasa porque su bind es NULL no es un test: es la misma trampa del `undefined`, vestida de
 test.
 
+
+
+## 📦940 · La guarda que se comió al seed y la salida que no abre la puerta de par en par
+
+*23-oct-2026 · la guarda de texto legal · el seed DEV · la salida con condición verificable*
+
+### El choque
+
+Del otro lado del repo, sin commitear, apareció una guarda de publicación: desde la v1.1, un texto
+con corchetes o con marcas de borrador ("ACUERDO DEV", "PENDIENTE DE COMPLETAR") **no se publica**.
+La guarda vive en el servicio (`agreement.js` → `textoLegal.js`) y es correcta: un texto legal a
+medio llenar no se publica ni se firma.
+
+El seed de desarrollo rompe contra ella, y no por casualidad: `scripts/seed-dev-acuerdo.js` siembra,
+por definición, un texto que lleva la marca "ACUERDO DEV — NO LEGAL" a propósito, para que nadie lo
+confunda con el texto legal. Las cuatro pruebas del seed que publican bajo una versión posterior a la
+v1.0 quedaron rojas, y el `AppError` además se escapaba de `main()`: el script moría con una
+excepción en vez de devolver un código de salida.
+
+Las dos cosas son correctas. La guarda protege el camino legal; el seed siembra, por definición, un
+texto que no es legal. El problema no era la guarda: era que **faltaba el punto de encuentro**.
+
+### La salida: angosta, en el seed, y con condición verificable
+
+La salida NO está en relajar la guarda, y tampoco en tocar los archivos del otro trabajo (que no se
+tocan). Está en el seed, que escribe la fila él mismo —mismo hash, misma transición atómica de la
+activa— cuando se cumplen **las dos** condiciones:
+
+1. El ambiente no es producción (el bloque duro de arriba ya lo impide).
+2. **TODA versión que hay en la base es una semilla DEV.**
+
+La segunda es la que importa, y no es una suposición: se comprueba contra las filas. Si esa base
+tiene un Acuerdo legal publicado —la v1.0 real y sellada del servidor—, la condición no se cumple y
+**no hay salida**: el seed dice por qué y sale con código 1. O sea: si hay texto legal en la base, el
+seed no puede dejar un texto marcado. El seed tampoco puede abrir la puerta a una base vacía por
+accidente: una base vacía no es una base con texto legal, y ahí lo que se siembra es el fixture de
+desarrollo, que es lo que la base espera.
+
+La fila sembrada por el seed queda marcada con `metadata.dev_seed = true`. Esa marca es lo que
+permite después distinguir "esto lo sembró el seed" de "esto es un Acuerdo real", y es la que hace
+que la condición sea comprobable y no una promesa.
+
+### Lo que NO se relajó
+
+El camino legal sigue igual de duro: `agreementService.createVersion()` con un texto marcado y una
+versión posterior a la v1.0 **sigue tirando** `TEXTO_LEGAL_CON_PLACEHOLDERS`, y hay un test que lo
+comprueba. El bypass vive solo en el script de desarrollo, y solo se abre si la base es de
+desarrollo.
+
+### La red
+
+Seis pruebas nuevas. Las dos que importan son las que cierran la puerta: una siembra una v1.0 legal
+en la base y verifica que el seed se niegue (código 1) y que no quede ninguna fila nueva, y la otra
+mete una semilla DEV **y** un Acuerdo legal para verificar que una sola versión legal en la base
+cierra la salida. Un check que solo se puede abrir y no se puede cerrar no es un check: es una puerta
+que no tiene marco.
+
+

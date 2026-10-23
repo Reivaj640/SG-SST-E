@@ -320,3 +320,120 @@ test('main: constantes exportadas son correctas', () => {
   assert.equal(MARCA_DEV, 'ACUERDO DEV');
   assert.equal(MARCA_NO_LEGAL, 'NO LEGAL');
 });
+
+// =========================================================================
+// La salida del seed para los textos con marcas de borrador
+// =========================================================================
+//
+// La guarda de texto legal del servicio rechaza los textos con marcas de
+// borrador ("ACUERDO DEV") en toda versión posterior a la v1.0: un texto legal
+// a medio llenar no se publica ni se firma. Y el seed DEV publica, por
+// definición, un texto que lleva esas marcas.
+//
+// El seed tiene una salida ANGOSTA para eso: siembra por su cuenta SOLO en
+// una base de desarrollo (todas sus versiones son semillas DEV). Estos tests
+// son la red de esa salida: si alguien la abre de más, se caen.
+
+test('el seed siembra un texto de DEV en una version posterior a la v1.0', () => {
+  resetDb();
+  const code = runSilent(['--yes', '--version=v2.0']);
+  assert.equal(code, 0, 'en una base de desarrollo el seed sí puede sembrar');
+  const row = db.prepare('SELECT * FROM gh_firma_acuerdo_versiones WHERE version = ?')
+    .get('v2.0');
+  assert.ok(row, 'la versión tiene que quedar sembrada');
+  assert.equal(row.activa, 1);
+  assert.equal(row.creado_por, 'rh:seed-dev-acuerdo');
+  assert.match(row.texto_hash, /^[0-9a-f]{64}$/);
+});
+
+test('la fila sembrada por el seed queda marcada como semilla de desarrollo', () => {
+  resetDb();
+  runSilent(['--yes', '--version=v2.0']);
+  const row = db.prepare('SELECT metadata FROM gh_firma_acuerdo_versiones WHERE version = ?')
+    .get('v2.0');
+  const meta = JSON.parse(row.metadata);
+  assert.equal(meta.dev_seed, true, 'la marca es lo que distingue una semilla de un Acuerdo real');
+  assert.equal(meta.source, 'scripts/seed-dev-acuerdo.js');
+});
+
+test('el texto sembrado por el seed es el del fixture, con su hash', () => {
+  resetDb();
+  const fixture = fs.readFileSync(DEFAULT_FIXTURE, 'utf8');
+  runSilent(['--yes', '--version=v2.0']);
+  const row = db.prepare('SELECT texto, texto_hash FROM gh_firma_acuerdo_versiones WHERE version = ?')
+    .get('v2.0');
+  assert.equal(row.texto, fixture, 'el texto guardado tiene que ser el del fixture');
+  const crypto = require('node:crypto');
+  const hash = crypto.createHash('sha256').update(fixture, 'utf8').digest('hex');
+  assert.equal(row.texto_hash, hash, 'el hash tiene que ser el del texto sembrado');
+});
+
+test('el seed NO siembra en una base que ya tiene un Acuerdo legal publicado', () => {
+  resetDb();
+  // Se simula el servidor: la v1.0 real, publicada y sellada.
+  db.prepare(`
+    INSERT INTO gh_firma_acuerdo_versiones
+      (version, texto, texto_hash, fecha_vigencia_inicio, fecha_vigencia_fin,
+       activa, creado_por, kair_version, fecha_creacion, metadata)
+    VALUES ('v1.0', 'texto legal real', ?, datetime('now'), NULL, 1,
+            'admin', 'v0.1.0', datetime('now'), ?)
+  `).run('b'.repeat(64), JSON.stringify({ source: 'publicar-acuerdo-legal.js' }));
+
+  const code = runSilent(['--yes', '--version=v2.0']);
+
+  assert.equal(code, 1, 'en una base con Acuerdo legal el seed tiene que negarse');
+  const row = db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones WHERE version = ?')
+    .get('v2.0').n;
+  assert.equal(row, 0, 'no se puede dejar un texto de DEV en una base con texto legal');
+  const v10 = db.prepare('SELECT texto_hash, activa FROM gh_firma_acuerdo_versiones WHERE version = ?')
+    .get('v1.0');
+  assert.equal(v10.texto_hash, 'b'.repeat(64), 'el Acuerdo legal no se toca');
+  assert.equal(v10.activa, 1, 'el Acuerdo legal sigue activo');
+});
+
+test('la salida se abre SOLO si todas las versiones de la base son semillas DEV', () => {
+  resetDb();
+  // Una base con una semilla DEV y un Acuerdo legal: no es base de desarrollo.
+  runSilent(['--yes', '--version=v1.0']);
+  db.prepare(`
+    INSERT INTO gh_firma_acuerdo_versiones
+      (version, texto, texto_hash, fecha_vigencia_inicio, fecha_vigencia_fin,
+       activa, creado_por, kair_version, fecha_creacion, metadata)
+    VALUES ('v1.1', 'texto legal real', ?, datetime('now'), NULL, 0,
+            'admin', 'v0.1.0', datetime('now'), ?)
+  `).run('c'.repeat(64), JSON.stringify({ source: 'publicar-acuerdo-legal.js' }));
+
+  const code = runSilent(['--yes', '--version=v2.0']);
+  assert.equal(code, 1, 'con un Acuerdo legal en la base, la salida se cierra');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones WHERE version = ?')
+      .get('v2.0').n,
+    0,
+  );
+});
+
+test('la guarda no se relaja para el camino legal: el servicio sigue rechazando', () => {
+  resetDb();
+  // El servicio (no el seed) sigue rechazando un texto con marcas de borrador
+  // en una versión posterior a la v1.0. La salida del seed NO lo toca.
+  assert.throws(
+    () => agreementService.createVersion({
+      version: 'v1.1',
+      texto: 'Texto con ACUERDO DEV y NO LEGAL',
+      activa: true,
+      creado_por: 'admin',
+      kair_version: 'v0.1.0',
+      metadata: { source: 'test' },
+    }),
+    (e) => {
+      assert.equal(e.code, 'TEXTO_LEGAL_CON_PLACEHOLDERS');
+      return true;
+    },
+    'la guarda legal tiene que seguir viva',
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones').get().n,
+    0,
+    'no se puede publicar un texto con marcas por la vía del servicio',
+  );
+});
