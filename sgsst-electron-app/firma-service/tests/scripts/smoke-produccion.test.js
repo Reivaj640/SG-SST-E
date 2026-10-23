@@ -245,8 +245,8 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
     };
   };
   let notificado = null;
-  const notificarDoble = async (args, internoKey, idSolicitud, pedirFn) => {
-    notificado = { idSolicitud, hayPedir: typeof pedirFn === 'function' };
+  const notificarDoble = async (args, internoKey, idSolicitud, pedirFn, token) => {
+    notificado = { idSolicitud, hayPedir: typeof pedirFn === 'function', token };
     return { ok: true, codigo: 'OK', detalle: '' };
   };
 
@@ -269,6 +269,9 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
   assert.equal(llamadas[0].path, '/internal/sign-requests');
   assert.equal(llamadas[1].path, '/api/sign/tok/verify',
     'el e2e tiene que abrir el enlace que el mismo creo');
+  assert.equal(notificado.token, 'tok',
+    'el e2e tiene que MANDAR el token de la creacion: sin eso la notificacion '
+    + 'rota el token (3.4(c)) y el 5c comprueba un enlace que ya no existe');
 });
 
 test('la notificacion va a /notify-remote con el correo del firmante', async () => {
@@ -290,6 +293,26 @@ test('la notificacion va a /notify-remote con el correo del firmante', async () 
     '/internal/sign-requests/SIGN-2026-211245/notify-remote');
   assert.equal(pedidos[0].op.headers['X-Internal-API-Key'], 'llave-interna');
   assert.deepEqual(JSON.parse(pedidos[0].body), { correo: 'firmante@example.com' });
+});
+
+test('la notificacion MANDA el token que el cliente ya tenia (no se gasta la rotacion)', async () => {
+  const pedidos = [];
+  const pedirDoble = async (op, body) => {
+    pedidos.push({ op, body });
+    return { status: 200, texto: '{"ok":true}', json: { ok: true, messageId: '<m@gmail.com>' } };
+  };
+
+  const r = await script.notificarInvitacion(
+    { url: 'https://x', correo: 'firmante@example.com', timeoutMs: 1000 },
+    'llave-interna', 'SIGN-2026-211245', pedirDoble, 'el-token-de-la-creacion',
+  );
+
+  assert.equal(r.ok, true);
+  assert.deepEqual(JSON.parse(pedidos[0].body), {
+    correo: 'firmante@example.com',
+    token: 'el-token-de-la-creacion',
+  }, 'el token tiene que ir en el body: el 3.4(c) hace que la reemision sin '
+    + 'token deje sin efecto el anterior');
 });
 
 test('un fallo del servidor de correo NO se reporta como exito', async () => {

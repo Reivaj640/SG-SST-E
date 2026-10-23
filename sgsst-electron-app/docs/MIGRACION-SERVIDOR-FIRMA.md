@@ -503,6 +503,46 @@ va con `--solo-firmas`.
 El recibo queda en `gh_firma_purga_log` y `gh_firma_purga_registro` (tablas
 append-only), y la base se verifica con `integrity_check` al final.
 
+### Cuando el hold bloquea la limpieza: `--forzar-hold`
+
+La ficha de la Empresa puede tener `conservacion_por_deber_legal = 1`. Esa
+bandera le levanta el **hold automático** a toda firma de esa Empresa
+(migración 030), y entonces el script se niega: "1 firma(s) tienen deber legal
+de conservación (hold)".
+
+Para una fila de prueba que **nunca se firmó**, la salida es `--forzar-hold`:
+
+```bash
+# 1. Simular primero (no escribe nada): el plan dice qué fila y por qué
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Rastro del e2e" \
+  --hasta=2026-10-24 --solo-firmas --forzar-hold'
+
+# 2. Ejecutar (solo si la simulación dice "HOLD FORZADO" y nada más)
+sudo bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && \
+  node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Rastro del e2e" \
+  --hasta=2026-10-24 --solo-firmas --forzar-hold --ejecutar'
+```
+
+**La válvula es angosta, a propósito.** Solo se fuerza una fila que cumple las
+dos condiciones:
+
+1. **Que nunca haya habido un acto**: no está en `SIGNED`, `DUAL_FIRMADO`,
+   `REJECTED`, `REVOKED` ni `CANCELLED`, y no tiene documento firmado, hash de
+   evidencia, constancia ni PDF firmado.
+2. **Que el hold sea el automático**: el motivo es `deber_legal_*`, el actor es
+   `sistema`, y no hay un hold vigente en `gh_firma_holds` declarado por una
+   persona.
+
+Si una sola fila del rango falla alguna de las dos, **no se borra nada** (código
+4): o se limpia entero o no se limpia. Una firma que sí ocurrió conserva su hold
+para siempre.
+
+El forzamiento queda escrito en el recibo append-only, con quién lo hizo y por
+qué (`HOLD FORZADO` en el motivo). El hold no se "libera" antes de borrar: la
+fila desaparece dentro de la misma transacción que la borra, así que en ningún
+momento queda una firma real sin su protección.
+
 ### El corte tiene que cubrir las firmas del dia anterior
 
 El script **se niega a tocar nada** si hay firmas mas nuevas que el corte

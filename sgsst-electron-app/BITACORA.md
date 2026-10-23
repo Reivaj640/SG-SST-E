@@ -6161,3 +6161,75 @@ enlace expiro", y el enlace sigue vivo. El codigo explicito le dice a la mini-ap
 el codigo, y le deja ofrecer el reenvio. Un 410 generico para un caso que no es un 410 es una mentira
 en la respuesta.
 
+
+
+## 📦939 · La falla que no era del despliegue y el hold que no se podía limpiar
+
+*23-oct-2026 · el smoke que miraba el token viejo · el forzado del hold · las filas hijas que quedaban*
+
+### El 5c fallaba por el motivo equivocado
+
+El humo de producción dio 14 comprobaciones, 1 falla y 3 avisos. La falla era el 5c: "El token de la
+prueba NO resuelve :: HTTP 404 TOKEN_NOT_FOUND". La primera lectura fue "el despliegue rompió el
+token". Era falsa. El guion del smoke era este:
+
+1. `POST /internal/sign-requests` → 201, devuelve el token A.
+2. `POST /internal/sign-requests/:id/notify-remote` **sin** `token` → el servicio emite el token B y,
+   por el 3.4(c) ("cada reemisión se registra y deja sin efecto el token anterior"), **el token A
+   muere**.
+3. El 5c abre **el token A** → 404 TOKEN_NOT_FOUND.
+
+El correo que sí salió llevaba el token B, y el token B servía. O sea: el check no comprobaba "el
+enlace que recibe el firmante": comprobaba un enlace que **el propio script había invalidado dos
+pasos antes**. La válvula ya existía y funcionaba: `notify-remote` acepta `token` en el body,
+verifica que sea de esa solicitud (`tokenPerteneceA`) y lo reutiliza **sin rotar**. El humo no la
+usaba. El arreglo estuvo en el script, no en el servicio: el token de la creación se calcula ANTES de
+notificar y se manda en el body, así que la invitación sale con el mismo enlace que el check abre.
+
+La regla: **antes de declarar "fallo del despliegue", comprobar que la cosa que el check mira siga
+siendo la cosa que el servicio produjo**. Un check que falla porque la operación invalidó su propio
+insumo es un check con el sujeto equivocado.
+
+### El rastro de prueba que no se podía limpiar
+
+El e2e dejó una fila en producción (id=12, SIGN-2026-427494, PENDING, 1 PDF) y
+`limpiar-rastro-prueba.js --solo-firmas` se negó a borrarla: "1 firma(s) tienen deber legal de
+conservación (hold)".
+
+El hold venía de la **ficha de la Empresa**: `conservacion_por_deber_legal = 1` le levanta el hold
+automático a toda firma de esa Empresa (migración 030). No era una disputa sobre esa firma: era la
+bandera general aplicada a una fila que nunca se firmó.
+
+`--forzar-hold` es la válvula, y solo se abre para filas que cumplen **dos** condiciones:
+
+1. **Que nunca haya habido un acto.** La fila no puede estar en SIGNED / DUAL_FIRMADO / REJECTED /
+   REVOKED / CANCELLED, ni tener documento firmado, hash de evidencia, constancia o PDF firmado.
+2. **Que el hold sea el automático.** El motivo tiene que ser `deber_legal_*`, el actor `sistema`, y
+   no puede haber un hold vigente en `gh_firma_holds` declarado por una persona.
+
+Si una sola fila del rango falla alguna de las dos, **no se borra nada** (código 4): no hay limpieza
+a medias. Una firma que sí ocurrió conserva su hold para siempre.
+
+Y el forzamiento queda escrito en el recibo append-only (`gh_firma_purga_log` y
+`gh_firma_purga_registro`), con quién lo hizo y por qué. El hold no se "libera" antes de borrar: la
+fila desaparece dentro de la misma transacción que la borra, así que en ningún momento queda una firma
+real sin su protección.
+
+### Las filas hijas que quedaban
+
+El script borraba tokens, eventos, sesiones y lotes, pero **no** `gh_firma_holds`: el historial de
+los declares de conservación cuelga de la firma por `firma_id`. Al borrar la firma, el hold quedaba
+en la base apuntando a una fila que ya no existía. Eso no es limpiar el rastro: es cambiar de rastro.
+
+Las tablas que cuelgan de una fila hay que **enumerarlas del esquema**, no de la memoria: son
+`gh_firma_eventos`, `gh_firma_sesiones`, `gh_firma_purga_lote`, `gh_firma_tokens`, `gh_firma_holds`,
+`gh_firma_firmas_papel` y `gh_firma_purgadas` (esta última es la lápida: append-only, no se borra).
+
+### Y un aserto que no mordía
+
+El test que comprueba "los tokens también están borrados" usaba `firma.id`. El helper devuelve
+`{signRequest, token, url_publica}`: `firma.id` era `undefined`, `better-sqlite3` lo ligaba como
+`NULL`, el conteo salía 0 y el test pasaba **sin comprobar nada**. Ahora usa `firma.signRequest.id`. Un
+test que pasa porque su bind es NULL no es un test: es la misma trampa del `undefined`, vestida de
+test.
+

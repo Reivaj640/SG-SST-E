@@ -604,13 +604,31 @@ async function comprobarCodigoNuevo(args) {
  * Si el SMTP falla, la ruta responde 502 INVITE_EMAIL_FAILED y el error trae
  * el motivo del servidor de correo: eso es un AVISO, no un fallo del servicio.
  *
+ * EL TOKEN QUE EL CLIENTE YA TENÍA
+ * --------------------------------
+ * Si el body NO trae `token`, el servicio emite uno nuevo (rotación) y lo
+ * manda en el correo. Con el 3.4(c) eso **deja sin efecto el token anterior**:
+ * "cada reemisión se registra y deja sin efecto el token anterior. No hay más
+ * de un token vigente por solicitud."
+ *
+ * El smoke, por lo tanto, tiene que MANDAR el token que la creación le
+ * devolvió. Sin eso pasa esto: la creación da el token A, la notificación
+ * rota y emite el B (y el A queda muerto), y el check de 5c —que comprueba el
+ * token de la creación— recibe 404 TOKEN_NOT_FOUND. **El enlace del correo
+ * estaba bien y el check miraba el equivocado**: una FALLA por el motivo
+ * equivocado. Con el token mandado, la notificación reutiliza el MISMO
+ * enlace, el correo lleva el token que el check abre, y 5c vuelve a comprobar
+ * lo que dice comprobar: que el enlace que el firmante va a recibir sirve.
+ *
  * @param {object} args
  * @param {string} internoKey
  * @param {string} idSolicitud
  * @param {function} [pedirFn] - doble de `pedir` para los tests.
+ * @param {string} [token] - el token que la creación ya devolvió. Si viene,
+ *   la invitación sale con ESE enlace y no se gasta una rotación.
  * @returns {Promise<{ok: boolean, codigo: string, detalle: string}>}
  */
-async function notificarInvitacion(args, internoKey, idSolicitud, pedirFn) {
+async function notificarInvitacion(args, internoKey, idSolicitud, pedirFn, token) {
   const pedirReal = pedirFn || pedir;
   titulo('5b. La invitacion sale por correo (ESCRIBE)');
   if (!idSolicitud) {
@@ -629,7 +647,8 @@ async function notificarInvitacion(args, internoKey, idSolicitud, pedirFn) {
         'X-Internal-API-Key': internoKey,
         'Content-Type': 'application/json',
       },
-    }, JSON.stringify({ correo: args.correo }), args.timeoutMs);
+    }, JSON.stringify(token ? { correo: args.correo, token } : { correo: args.correo }),
+    args.timeoutMs);
   } catch (e) {
     fail('POST /internal/sign-requests/:id/notify-remote', 'no respondio: ' + e.message);
     return { ok: false, codigo: 'SIN_RESPUESTA', detalle: e.message };
@@ -717,6 +736,14 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
       emitir('  Para identificarte en la mini-app: tipo CC y numero '
         + numeroDocumentoDe(args));
     }
+    // El token de la creación, en texto claro: es la credencial del enlace.
+    //
+    // Se calcula ANTES de notificar, porque el 3.4(c) hace que la reemisión
+    // deje sin efecto el token anterior: si la notificación no recibe el
+    // token, se emite otro y el de aquí queda muerto. Con el token entregado,
+    // la invitación sale con el MISMO enlace y el 5c abre exactamente el
+    // enlace que el firmante va a recibir.
+    const token = r.token || (r.url_publica ? String(r.url_publica).split('/').pop() : null);
     // 033 · La retention por documento. Si se pidio una categoria, la
     // respuesta tiene que traerla con la fecha de conservacion ya calculada:
     // es la prueba de que la migracion 033 esta aplicada y de que el servidor
@@ -734,14 +761,17 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
     // Crear la solicitud NO manda ningun correo: el primer contacto con el
     // firmante es un endpoint aparte. Sin esta llamada, el e2e "pasa" sin
     // haber probado que el correo sale.
+    //
+    // El token se manda para que la invitación salga con el MISMO enlace que
+    // devuelve la creación (ver la nota de `notificarInvitacion`): sin eso,
+    // el 3.4(c) rota el token y el 5c comprueba un enlace que ya no existe.
     if (args.correo) {
-      await notificarFn(args, internoKey, r.id_solicitud, pedirFn);
+      await notificarFn(args, internoKey, r.id_solicitud, pedirFn, token);
     }
 
     // 5c. Y el token tiene que RESOLVER. Sin esta comprobacion el e2e puede
     // dar verde con un servicio donde ningun enlace sirve: el alta dio 201,
     // el correo salio, y el firmante abre un 404.
-    const token = r.token || (r.url_publica ? String(r.url_publica).split('/').pop() : null);
     await comprobarTokenResuelve(args, token, pedirFn);
   } else if (res.status === 409) {
     const codigo = (res.json && res.json.error && res.json.error.code) || 'UNKNOWN';

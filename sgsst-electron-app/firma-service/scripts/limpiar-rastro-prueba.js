@@ -60,6 +60,9 @@
  *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por Qué" \
  *        --hasta=2026-10-21 --solo-firmas --ejecutar
  *
+ *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por Qué" \
+ *        --hasta=2026-10-24 --solo-firmas --forzar-hold --ejecutar
+ *
  * EL MODO `--solo-firmas` (21-oct-2026)
  * --------------------------------------
  * El modo normal borra una PUBLICACIÓN DE PRUEBA COMPLETA: sus firmas y la
@@ -80,6 +83,38 @@
  * solo por estar en la ventana de tiempo sería borrarlos a ciegas. Si hay
  * consentimientos en el rango, el plan los lista y los deja.
  *
+ * EL MODO `--forzar-hold` (26-oct-2026)
+ * -------------------------------------
+ * En produccion, la fila que dejo el e2e (id=12, SIGN-2026-427494) quedo con
+ * hold: la ficha de la Empresa tiene `conservacion_por_deber_legal = 1`, y esa
+ * bandera le levanta el hold AUTOMATICO a toda firma de esa Empresa. El
+ * script se negaba a borrar la fila y el rastro de prueba se quedaba en
+ * produccion para siempre.
+ *
+ * `--forzar-hold` es la válvula para ese caso, y SOLO para ese caso. Un hold
+ * es un deber legal de conservación: ordinarily no se toca. Se puede forzar
+ * únicamente si la fila cumple las DOS condiciones:
+ *
+ *   1. QUE NUNCA HUBO UN ACTO DE FIRMA. La fila no puede estar firmada
+ *      (SIGNED / DUAL_FIRMADO), ni rechazada, revocada o cancelada, ni tener
+ *      documento firmado, hash de evidencia, constancia o PDF firmado. Es decir:
+ *      no hay ni un solo rastro de que alguien firmó. Una firma que SÍ
+ *      ocurrió conserva su hold siempre: eso no se fuerza nunca.
+ *   2. QUE EL HOLD ES EL AUTOMATICO. El motivo tiene que ser el del sistema
+ *      (`deber_legal_*`), el actor tiene que ser `sistema`, y no puede haber
+ *      un hold vigente en `gh_firma_holds` declarado por una persona. Un hold
+ *      que alguien declaró a mano es un acto de gobierno: no se toca.
+ *
+ * Si una sola fila del rango no cumple las dos, el script NO borra nada y
+ * sale con codigo 4: o se limpia entero, o no se limpia. No hay limpieza a
+ * medias.
+ *
+ * El forzamiento queda escrito en el recibo append-only (`gh_firma_purga_log`
+ * y `gh_firma_purga_registro`), con quien lo hizo y por que. El hold no se
+ * "libera" antes de borrar: la fila desaparece dentro de la misma transaccion
+ * que la borra, asi que no queda en ningun momento una firma real sin su
+ * proteccion.
+ *
  * Exit codes:
  *   0  operación exitosa (incluida la simulación)
  *   2  argumentos inválidos
@@ -99,6 +134,11 @@ const TRIGGERS = ['trg_firma_eventos_no_update', 'trg_firma_eventos_no_delete'];
 
 const CATEGORIAS = ['PRUEBA_OPERATIVA'];
 
+// Los estados en los que YA PASÓ UN ACTO de una persona: firmó, rechazó,
+// revocó o canceló. Una fila en uno de estos estados conservó un hecho que
+// ocurrió: su hold no se puede forzar nunca.
+const ESTADOS_CON_ACTO = ['SIGNED', 'DUAL_FIRMADO', 'REJECTED', 'REVOKED', 'CANCELLED'];
+
 // ----------------------------------------------------------------------
 // Argumentos
 // ----------------------------------------------------------------------
@@ -106,12 +146,15 @@ function parseArgs(argv) {
   const opts = {
     actor: null, motivo: null, hasta: null, version: 'v1.0', ejecutar: false,
     soloFirmas: false,
+    forzarHold: false,
   };
   for (const arg of argv) {
     if (arg === '--ejecutar') {
       opts.ejecutar = true;
     } else if (arg === '--solo-firmas') {
       opts.soloFirmas = true;
+    } else if (arg === '--forzar-hold') {
+      opts.forzarHold = true;
     } else if (arg.startsWith('--actor=')) {
       opts.actor = arg.slice('--actor='.length).trim();
     } else if (arg.startsWith('--motivo=')) {
@@ -175,6 +218,88 @@ function statementsDeTriggers() {
 }
 
 // ----------------------------------------------------------------------
+// El hold: la fila que se puede forzar y la que no
+// ----------------------------------------------------------------------
+/**
+ * Decide si el hold de una fila se puede forzar con `--forzar-hold`.
+ *
+ * Un hold es un deber legal de conservacion: por defecto NO se toca. La
+ * unica excepcion que justifica el forzamiento es una fila de PRUEBA que
+ * nunca tuvo un acto de firma, con el hold automatico de la ficha de la
+ * Empresa. Cualquier otra cosa se niega, y se dice por que.
+ *
+ * @param {object} f - la fila de gh_firmas_electronicas
+ * @param {boolean} hayTablaHolds - si existe gh_firma_holds en la base
+ * @returns {{hold: boolean, forzable: boolean, razon: string|null}}
+ */
+function evaluarHold(f, hayTablaHolds) {
+  if (Number(f.hold_legal) !== 1) {
+    return { hold: false, forzable: false, razon: null };
+  }
+
+  // 1. Que nunca haya habido un acto de una persona.
+  if (ESTADOS_CON_ACTO.includes(String(f.estado))) {
+    return {
+      hold: true,
+      forzable: false,
+      razon: `la fila esta en estado ${f.estado}: ya hubo un acto (firma, rechazo, `
+        + 'revocacion o cancelacion). Un hold sobre una firma que ocurrio NO se fuerza.',
+    };
+  }
+  if (f.document_hash_firmado) {
+    return { hold: true, forzable: false, razon: 'la fila tiene documento firmado.' };
+  }
+  if (f.evidence_hash) {
+    return { hold: true, forzable: false, razon: 'la fila tiene hash de evidencia.' };
+  }
+  if (f.constancia_path) {
+    return { hold: true, forzable: false, razon: 'la fila tiene constancia emitida.' };
+  }
+  if (f.pdf_firmado_path) {
+    return { hold: true, forzable: false, razon: 'la fila tiene PDF firmado.' };
+  }
+
+  // 2. Que el hold sea el AUTOMATICO (el que levanta la bandera de la ficha
+  //    de la Empresa o la regla del sistema), no uno declarado a mano.
+  const motivo = f.motivo_hold ? String(f.motivo_hold) : '';
+  if (!/^deber_legal_/.test(motivo)) {
+    return {
+      hold: true,
+      forzable: false,
+      razon: `el hold no es el automatico (motivo: ${motivo || 'sin motivo'}). `
+        + 'Un hold con otro motivo es un acto de gobierno y no se fuerza.',
+    };
+  }
+  if (f.hold_actor && String(f.hold_actor) !== 'sistema') {
+    return {
+      hold: true,
+      forzable: false,
+      razon: `el hold lo declaro ${f.hold_actor}, no el sistema. No se fuerza.`,
+    };
+  }
+  if (hayTablaHolds) {
+    const humano = db.prepare(
+      "SELECT actor FROM gh_firma_holds WHERE firma_id = ? AND activo = 1 "
+      + "AND COALESCE(actor, '') <> 'sistema' ORDER BY id DESC LIMIT 1"
+    ).get(f.id);
+    if (humano) {
+      return {
+        hold: true,
+        forzable: false,
+        razon: `hay un hold vigente declarado por ${humano.actor} sobre esta firma. `
+          + 'No se fuerza.',
+      };
+    }
+  }
+
+  return {
+    hold: true,
+    forzable: true,
+    razon: 'nunca se firmo y el hold es el automatico de la ficha de la Empresa',
+  };
+}
+
+// ----------------------------------------------------------------------
 // Plan
 // ----------------------------------------------------------------------
 function armarPlan(opts) {
@@ -183,6 +308,8 @@ function armarPlan(opts) {
   const firmas = db.prepare(`
     SELECT id, id_solicitud, id_empresa, estado, fecha_creacion,
            agreement_version, agreement_hash, hold_legal,
+           motivo_hold, hold_actor,
+           document_hash_firmado, evidence_hash,
            pdf_original_path, pdf_firmado_path, constancia_path
       FROM gh_firmas_electronicas
      ORDER BY id
@@ -225,6 +352,20 @@ function armarPlan(opts) {
     }
   }
 
+  // El hold de cada fila del rango. Sin `--forzar-hold` NINGUN hold se
+  // fuerza: la fila queda marcada y `verificar` se niega. Con `--forzar-hold`,
+  // solo se fuerzan las que cumplen las dos reglas de `evaluarHold`.
+  const hayTablaHolds = tablaExiste('gh_firma_holds');
+  for (const f of enRango) {
+    const ev = evaluarHold(f, hayTablaHolds);
+    f.hold_evaluado = ev.hold;
+    f.hold_forzado = ev.hold && opts.forzarHold === true && ev.forzable;
+    f.hold_razon = ev.razon;
+  }
+
+  const holdsForzados = enRango.filter(f => f.hold_forzado);
+  const holdsBloqueados = enRango.filter(f => f.hold_evaluado && !f.hold_forzado);
+
   return {
     corte,
     firmas: enRango,
@@ -235,6 +376,8 @@ function armarPlan(opts) {
     version: versionABorrar,
     versionSeQueda: opts.soloFirmas ? version : null,
     archivos,
+    holdsForzados,
+    holdsBloqueados,
   };
 }
 
@@ -288,13 +431,28 @@ function verificar(plan, opts) {
       + `${opts.version}. Borrarla las dejaría rotas.`);
   }
 
-  // 4. Hold legal: si una de las filas tiene hold, no se toca.
+  // 4. Hold legal: si una de las filas tiene hold, no se toca. La unica
+  //    excepcion es `--forzar-hold`, y solo para filas que `evaluarHold`
+  //    declaro forzables (nunca firmadas + hold automatico).
   const conHold = plan.firmas.filter(f => Number(f.hold_legal) === 1);
-  if (conHold.length) {
+  const forzados = conHold.filter(f => f.hold_forzado === true);
+  const bloqueados = conHold.filter(f => f.hold_forzado !== true);
+  if (bloqueados.length) {
+    const razones = bloqueados
+      .map(f => `id=${f.id} (${f.hold_razon || 'hold sin evaluacion'})`)
+      .join('; ');
     problemas.push(
-      `${conHold.length} firma(s) tienen deber legal de conservación (hold). `
+      `${bloqueados.length} firma(s) tienen deber legal de conservación (hold) `
+      + `que NO se puede forzar: ${razones}. `
       + 'Un hold impide destruir la prueba de una firma en discusión.');
+    if (!opts.forzarHold) {
+      problemas.push(
+        'Si la fila nunca se firmo, el operador puede repetir el comando con '
+        + '--forzar-hold: el forzamiento queda escrito en el recibo con quien '
+        + 'lo hizo y por que.');
+    }
   }
+  void forzados;
 
   // 5. Coherencia: los consentimientos que se borran deben apuntar a la
   //    versión que se borra, o no tocarlos.
@@ -323,15 +481,40 @@ function imprimirPlan(plan, opts) {
   console.log(`alcance: ${opts.soloFirmas
     ? 'SOLO LAS FILAS DE PRUEBA (no se toca ninguna versión del Acuerdo)'
     : 'filas de prueba + versión del Acuerdo ' + opts.version}`);
+  if (opts.forzarHold) {
+    console.log('hold:   se evalua el forzado (solo filas que nunca se firmaron '
+      + 'con el hold automatico)');
+  }
 
   console.log('\n--- Firmas a eliminar ---');
   if (!plan.firmas.length) {
     console.log('  (ninguna)');
   }
   for (const f of plan.firmas) {
+    const marca = f.hold_forzado ? ' [HOLD FORZADO]' : '';
     console.log(`  id=${f.id} ${f.id_solicitud} estado=${f.estado} `
       + `empresa=${f.id_empresa} creada=${f.fecha_creacion} `
-      + `acuerdo=${f.agreement_version} hash=${String(f.agreement_hash).slice(0, 12)}`);
+      + `acuerdo=${f.agreement_version} hash=${String(f.agreement_hash).slice(0, 12)}${marca}`);
+  }
+
+  console.log('\n--- Hold legal (deber de conservacion) ---');
+  const conHold = plan.firmas.filter(f => f.hold_evaluado || Number(f.hold_legal) === 1);
+  if (!conHold.length) {
+    console.log('  (ninguna fila del rango tiene hold)');
+  }
+  for (const f of conHold) {
+    if (f.hold_forzado) {
+      console.log(`  id=${f.id} ${f.id_solicitud}: HOLD FORZADO — ${f.hold_razon}`);
+    } else {
+      console.log(`  id=${f.id} ${f.id_solicitud}: hold vigente — `
+        + `${f.hold_razon || 'no se puede forzar'}`);
+    }
+  }
+  if (opts.forzarHold && !(plan.holdsForzados || []).length && conHold.length) {
+    console.log('  (--forzar-hold no alcanza: ninguna fila cumple las dos reglas)');
+  }
+  if (opts.forzarHold && !conHold.length) {
+    console.log('  (--forzar-hold sin efecto: no hay hold que forzar)');
   }
 
   console.log('\n--- Consentimientos a eliminar ---');
@@ -413,7 +596,11 @@ function aplicar(plan, opts) {
   let consentimientosBorrados = 0;
   let archivosBorrados = 0;
   let tokensBorrados = 0;
+  let holdsBorrados = 0;
+  let papelBorrados = 0;
   const hayTokens = tablaExiste('gh_firma_tokens');
+  const hayHolds = tablaExiste('gh_firma_holds');
+  const hayPapel = tablaExiste('gh_firma_firmas_papel');
 
   try {
     const tx = db.transaction(() => {
@@ -424,6 +611,18 @@ function aplicar(plan, opts) {
         if (hayTokens) {
           const to = db.prepare('DELETE FROM gh_firma_tokens WHERE firma_id = ?').run(f.id);
           tokensBorrados += to.changes;
+        }
+        // El historial de holds (migración 023) CUELGA de la firma: si se
+        // borra la firma y el hold se queda, queda un rastro huérfano de una
+        // fila que ya no existe. También es parte del rastro de la prueba.
+        if (hayHolds) {
+          const ho = db.prepare('DELETE FROM gh_firma_holds WHERE firma_id = ?').run(f.id);
+          holdsBorrados += ho.changes;
+        }
+        // Las firmas en papel (migración 032, el 9A) cuelgan de la firma.
+        if (hayPapel) {
+          const pa = db.prepare('DELETE FROM gh_firma_firmas_papel WHERE firma_id = ?').run(f.id);
+          papelBorrados += pa.changes;
         }
         const ev = db.prepare('DELETE FROM gh_firma_eventos WHERE firma_id = ?').run(f.id);
         eventosBorrados += ev.changes;
@@ -456,21 +655,39 @@ function aplicar(plan, opts) {
   archivosBorrados = eliminarArchivos(plan.archivos);
 
   // 4. El recibo: las tablas append-only que registran qué se tocó y por qué.
+  //
+  //    El conteo del hold va con numeros reales: cuantas filas del lote se
+  //    revisaron con hold y cuantas quedaron afuera. Con `--forzar-hold` el
+  //    forzamiento queda escrito en el motivo, con quien lo hizo y por que:
+  //    es la prueba de que el hold se comprobo y se decidio, no que se paso
+  //    por alto.
+  const conHold = plan.firmas.filter(f => f.hold_evaluado || Number(f.hold_legal) === 1);
+  const forzados = conHold.filter(f => f.hold_forzado === true);
+  const bloqueados = conHold.filter(f => f.hold_forzado !== true);
+  const motivoLimpieza = forzados.length
+    ? `${opts.motivo} | HOLD FORZADO en ${forzados.length} fila(s) `
+      + `(${forzados.map(f => 'id=' + f.id).join(', ')}): `
+      + `${forzados.map(f => f.hold_razon).join('; ')}`
+    : opts.motivo;
+
   db.prepare(`
     INSERT INTO gh_firma_purga_log
       (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
        hold_revisados, hold_bloqueados)
-    VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA', ?, ?, ?, ?, ?, 0)
-  `).run(ahora, opts.actor, opts.motivo, firmasBorradas, eventosBorrados,
-    plan.firmas.length);
+    VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA', ?, ?, ?, ?, ?, ?)
+  `).run(ahora, opts.actor, motivoLimpieza, firmasBorradas, eventosBorrados,
+    conHold.length, bloqueados.length);
 
   for (const f of plan.firmas) {
+    const motivoFila = f.hold_forzado
+      ? `${motivoLimpieza} | Esta fila tenia hold y se forzo: ${f.hold_razon}`
+      : opts.motivo;
     db.prepare(`
       INSERT INTO gh_firma_purga_registro
         (firma_id, id_empresa, purgado_at, actor, motivo, categorias,
          hold_verificado, eventos_purgados)
       VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-    `).run(f.id, f.id_empresa || 'DESCONOCIDA', ahora, opts.actor, opts.motivo,
+    `).run(f.id, f.id_empresa || 'DESCONOCIDA', ahora, opts.actor, motivoFila,
       JSON.stringify(CATEGORIAS), eventosBorrados);
   }
 
@@ -481,21 +698,22 @@ function aplicar(plan, opts) {
       INSERT INTO gh_firma_purga_log
         (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
          hold_revisados, hold_bloqueados)
-      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_SOLO_FIRMAS', ?, ?, ?, ?, ?, 0)
+      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_SOLO_FIRMAS', ?, ?, ?, ?, ?, ?)
     `).run(ahora, opts.actor,
       `Se retiraron solo las filas de prueba (firmas, eventos, sesiones, lotes, `
-      + `tokens y archivos). NO se toco ninguna version del Acuerdo: el texto legal `
-      + `vigente sigue publicado. Motivo: ${opts.motivo}`,
-      firmasBorradas, eventosBorrados, plan.firmas.length);
+      + `tokens, holds y archivos). NO se toco ninguna version del Acuerdo: el `
+      + `texto legal vigente sigue publicado. Motivo: ${motivoLimpieza}`,
+      firmasBorradas, eventosBorrados, conHold.length, bloqueados.length);
   } else {
     db.prepare(`
       INSERT INTO gh_firma_purga_log
         (fecha_hora, evento, actor, motivo, firmas_en_lote, eventos_purgados,
          hold_revisados, hold_bloqueados)
-      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_ACUERDO', ?, ?, 0, 0, 0, 0)
+      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_ACUERDO', ?, ?, 0, 0, ?, ?)
     `).run(ahora, opts.actor,
       `Se retiro la version ${opts.version} de prueba para publicar el texto legal `
-      + `como ${opts.version}. Motivo: ${opts.motivo}`);
+      + `como ${opts.version}. Motivo: ${motivoLimpieza}`,
+      conHold.length, bloqueados.length);
   }
 
   console.log('\n=== RESULTADO ===');
@@ -504,8 +722,13 @@ function aplicar(plan, opts) {
   console.log(`  sesiones eliminadas:      ${sesionesBorradas}`);
   console.log(`  filas de lote eliminadas: ${lotesBorrados}`);
   console.log(`  tokens eliminados:        ${tokensBorrados}`);
+  console.log(`  holds eliminados:         ${holdsBorrados}`);
+  console.log(`  firmas en papel borradas: ${papelBorrados}`);
   console.log(`  consentimientos:          ${consentimientosBorrados}`);
   console.log(`  archivos eliminados:      ${archivosBorrados}`);
+  console.log(`  hold revisados:           ${conHold.length}`);
+  console.log(`  hold forzados:            ${forzados.length}`
+    + (forzados.length ? ` (${forzados.map(f => 'id=' + f.id).join(', ')})` : ''));
   console.log(`  version del Acuerdo:     ${opts.soloFirmas
     ? 'NO SE TOCO (modo --solo-firmas)' : 'eliminada (' + opts.version + ')'}`);
   console.log(`  recibo: ${firmasBorradas} fila(s) en gh_firma_purga_registro `
@@ -513,7 +736,8 @@ function aplicar(plan, opts) {
 
   return {
     firmasBorradas, eventosBorrados, consentimientosBorrados, archivosBorrados,
-    tokensBorrados,
+    tokensBorrados, holdsBorrados, papelBorrados,
+    holdsForzados: forzados.length, holdBloqueados: bloqueados.length,
   };
 }
 
@@ -611,6 +835,10 @@ function main(argv) {
     console.log('\nListo. Solo se retiraron las filas de prueba.');
     console.log(`  (firmas: ${r.firmasBorradas}, eventos: ${r.eventosBorrados}, `
       + `tokens: ${r.tokensBorrados}, archivos: ${r.archivosBorrados})`);
+    if (r.holdsForzados) {
+      console.log(`  Se forzaron ${r.holdsForzados} hold(s): la fila nunca se habia `
+        + 'firmado y el hold era el automatico. Queda escrito en el recibo.');
+    }
     console.log(`  La version ${opts.version} del Acuerdo sigue publicada y sellada.`);
     return 0;
   }
@@ -629,7 +857,7 @@ if (require.main === module) {
       console.error('');
       console.error('Uso: node scripts/limpiar-rastro-prueba.js --actor="Nombre" '
         + '--motivo="Por qué" --hasta=YYYY-MM-DD [--version=v1.0] [--solo-firmas] '
-        + '[--ejecutar]');
+        + '[--forzar-hold] [--ejecutar]');
       process.exit(2);
     }
     console.error('Error: ' + (e && e.stack ? e.stack : e));
@@ -637,4 +865,6 @@ if (require.main === module) {
   }
 }
 
-module.exports = { main, parseArgs, armarPlan, verificar, statementsDeTriggers };
+module.exports = {
+  main, parseArgs, armarPlan, verificar, statementsDeTriggers, evaluarHold,
+};
