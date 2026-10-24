@@ -662,11 +662,27 @@ function update(id_empresa, datos, ctx = {}) {
  * El cambio queda RASTREADO (migraciones 037 y 038): la fecha del Anexo es el
  * sustento del cumplimiento legal, y su alteration tiene que ser visible.
  *
+ * TRES REGLAS QUE NO SON NEGOCIABLES
+ * ----------------------------------
+ * 1. Una firma no puede estar en el FUTURO. Si el operador se equivoca de año,
+ *    el sistema no lo acepta en silencio.
+ * 2. Cambiar una fecha YA registrada exige motivo (`X-Admin-Motivo`). La fecha
+ *    del Anexo no se reemplaza por una actualización de rutina: es el dato que
+ *    sostiene el art. 25 del Decreto 1377 de 2013.
+ * 3. Registrar la MISMA fecha otra vez es un reintento idempotente: no toca
+ *    `updated_at` ni escribe un renglon de rastro, porque no hubo cambio.
+ *
+ * La fecha del papel puede ser anterior al alta de la Empresa en el sistema
+ * (el contrato se firma antes de cargar la ficha). Eso NO se bloquea, pero se
+ * advierte en el log: es una senal para revisar contra el PDF firmado, no una
+ * prueba de fraude.
+ *
  * @param {string} id_empresa
  * @param {string} fecha - ISO8601.
  * @param {object} [ctx] - Contexto de auditoria: { actor, motivo, ip, user_agent }.
  * @returns {object}
- * @throws AppError 404 si la empresa no existe; 400 si la fecha no parsea.
+ * @throws AppError 404 si la empresa no existe; 400 si la fecha no parsea, es
+ *   futura o falta el motivo para cambiar una fecha existente.
  */
 function marcarAnexoFirmado(id_empresa, fecha, ctx = {}) {
   const actual = getById(id_empresa);
@@ -679,25 +695,117 @@ function marcarAnexoFirmado(id_empresa, fecha, ctx = {}) {
     throw new AppError(400, 'INVALID_REQUEST_BODY',
       'fecha de firma del anexo no es una fecha valida');
   }
+  if (d.getTime() > Date.now()) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'la fecha de firma del anexo no puede ser futura');
+  }
   const iso = d.toISOString();
-  db.prepare(`
-    UPDATE gh_firma_empresas
-    SET anexo_encargo_firmado_at = ?, updated_at = datetime('now')
-    WHERE id_empresa = ?
-  `).run(iso, id_empresa);
-  logger.info('Anexo de Encargo marcado como firmado', { id_empresa, fecha: iso });
-  const actualizada = getById(id_empresa);
-  auditoriaService.registrarCampo({
-    id_empresa,
-    campo: 'anexo_encargo_firmado_at',
-    valor_anterior: actual.anexo_encargo_firmado_at,
-    valor_nuevo: actualizada.anexo_encargo_firmado_at,
-    actor: ctx.actor || null,
-    ip: ctx.ip || null,
-    user_agent: ctx.user_agent || null,
-    motivo: ctx.motivo || null,
+  if (actual.anexo_encargo_firmado_at === iso) return actual;
+
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (actual.anexo_encargo_firmado_at && !motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'para cambiar una fecha de Anexo ya registrada hay que declarar el motivo '
+      + 'en X-Admin-Motivo');
+  }
+
+  const alta = actual.created_at
+    ? new Date(String(actual.created_at).replace(' ', 'T') + 'Z')
+    : null;
+  if (alta && !Number.isNaN(alta.getTime()) && d.getTime() < alta.getTime()) {
+    logger.warn('La fecha del Anexo es anterior al alta de la empresa', {
+      id_empresa, fecha: iso, created_at: actual.created_at,
+    });
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firma_empresas
+      SET anexo_encargo_firmado_at = ?, updated_at = datetime('now')
+      WHERE id_empresa = ?
+    `).run(iso, id_empresa);
+    auditoriaService.registrarCampo({
+      id_empresa,
+      campo: 'anexo_encargo_firmado_at',
+      valor_anterior: actual.anexo_encargo_firmado_at,
+      valor_nuevo: iso,
+      actor: ctx.actor || null,
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      motivo: motivo || null,
+    });
   });
-  return actualizada;
+  tx();
+
+  logger.info('Anexo de Encargo marcado como firmado', { id_empresa, fecha: iso });
+  return getById(id_empresa);
+}
+
+/**
+ * Quita la fecha de firma del Anexo de Encargo.
+ *
+ * POR QUE EXISTE UN CAMINO DE SALIDA
+ * ----------------------------------
+ * Un endpoint que solo permite PONER la fecha deja el sistema sin forma de
+ * corregir una marca equivocada. La unica salida seria tocar la base a mano,
+ * sin rastro. Eso es peor que el error: convierte un dato legal en un valor
+ * que nadie puede explicar.
+ *
+ * El borrado NO es silencioso:
+ *   - exige `motivo` (quien quita la fecha tiene que decir por que);
+ *   - escribe el valor anterior y el nuevo (`null`) en el rastro append-only;
+ *   - deja un WARN en el log.
+ *
+ * Despues de quitarla, D-03 vuelve a bloquear la Empresa hasta que se registre
+ * una fecha respaldada por el PDF firmado.
+ *
+ * @param {string} id_empresa
+ * @param {object} [ctx] - { actor, motivo, ip, user_agent }; el motivo es obligatorio.
+ * @returns {object}
+ * @throws AppError 404 si la empresa no existe; 409 si no hay fecha registrada;
+ *   400 si falta el motivo.
+ */
+function desmarcarAnexoFirmado(id_empresa, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND',
+      `No existe la empresa ${id_empresa}`, { id_empresa });
+  }
+  if (!actual.anexo_encargo_firmado_at) {
+    throw new AppError(409, 'ANEXO_NO_REGISTRADO',
+      `La empresa ${id_empresa} no tiene una fecha de Anexo de Encargo registrada`);
+  }
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'para quitar la fecha del Anexo de Encargo hay que declarar el motivo '
+      + 'en X-Admin-Motivo');
+  }
+
+  const anterior = actual.anexo_encargo_firmado_at;
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firma_empresas
+      SET anexo_encargo_firmado_at = NULL, updated_at = datetime('now')
+      WHERE id_empresa = ?
+    `).run(id_empresa);
+    auditoriaService.registrarCampo({
+      id_empresa,
+      campo: 'anexo_encargo_firmado_at',
+      valor_anterior: anterior,
+      valor_nuevo: null,
+      actor: ctx.actor || null,
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      motivo,
+    });
+  });
+  tx();
+
+  logger.warn('Anexo de Encargo desmarcado', {
+    id_empresa, fecha_anterior: anterior, motivo,
+  });
+  return getById(id_empresa);
 }
 
 /**
@@ -1182,6 +1290,7 @@ module.exports = {
   create,
   update,
   marcarAnexoFirmado,
+  desmarcarAnexoFirmado,
   setActivo,
   verificarHabilitacionFirma,
   assertHabilitadaParaFirma,

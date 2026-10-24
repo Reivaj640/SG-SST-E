@@ -26,6 +26,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { resetDb, seedActiveAgreement, createSignRequestWithIdentificacion } = require('../helpers');
 const db = require('../../src/db/connection');
@@ -559,4 +560,326 @@ test('un hold declarado por una persona bloquea, aunque nunca se haya firmado', 
   assert.equal(codigo, 4, 'un hold de una persona es un acto de gobierno: no se toca');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_firmas_electronicas WHERE id = ?')
     .get(id).n, 1, 'la fila tiene que seguir ahi');
+});
+
+// =========================================================================
+// 6. EL MODO --solo-consentimientos (24-oct-2026)
+// =========================================================================
+//
+// Después de una limpieza --solo-firmas queda el consentimiento de prueba
+// huérfano: la firma ya no está, pero la aceptación sigue en la base. Ese
+// registro dice que "alguien aceptó" cuando no hubo un trabajador real.
+//
+// Este modo retira UNA fila concreta, con backup previo, recibo y
+// verificación. Los tests son la red: si alguien afloja un candado (borrar
+// por rango, borrar una aceptación con firma, tocar el texto legal), se caen.
+
+/**
+ * La situación de producción: el texto legal sellado y una aceptación de
+ * prueba, sin firma asociada.
+ */
+function sembrarConsentimientoDePrueba(extra = {}) {
+  resetDb();
+  const texto = fs.readFileSync(ARCHIVO_LEGAL, 'utf8');
+  const version = seedActiveAgreement({ version: 'v1.0', texto });
+
+  const hash = 'x'.repeat(64);
+  const fecha = extra.fecha_aceptacion || new Date().toISOString();
+  const info = db.prepare(`
+    INSERT INTO gh_consentimientos_firma
+      (id_trabajador, id_empresa, version_acuerdo, hash_texto_acuerdo,
+       correo_verificacion, correo_hash, otp_hash, otp_sal,
+       kair_version, manifestacion_aceptada, estado, fecha_aceptacion,
+       rol_firmante, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, '0.1.189-test', 1, 'ACCEPTED', ?,
+            'TRABAJADOR', datetime('now'), datetime('now'))
+  `).run(
+    extra.id_trabajador || 'psn1_prueba',
+    extra.id_empresa || '900829731',
+    version.version,
+    hash,
+    extra.correo || 'jrf@example.com',
+    hash, hash, hash,
+    fecha,
+  );
+
+  return { version, consentId: Number(info.lastInsertRowid) };
+}
+
+function sembrarEventosConsentimiento(consentId, cuantos = 2) {
+  const ins = db.prepare(`
+    INSERT INTO gh_consentimientos_eventos
+      (consent_id, evento, fecha_hora, id_actor, ip, user_agent, metadata)
+    VALUES (?, ?, ?, 'psn1_prueba', '127.0.0.1', 'test', NULL)
+  `);
+  for (let i = 0; i < cuantos; i++) {
+    ins.run(consentId, 'EVENTO_' + i, new Date().toISOString());
+  }
+}
+
+function dirDeBackup(prefijo) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefijo));
+}
+
+test('parseArgs: --solo-consentimientos exige id y no se mezcla con otros modos', () => {
+  const opts = parseArgs([
+    '--actor=Javier', '--motivo=prueba', '--hasta=' + HOY,
+    '--solo-consentimientos', '--consentimiento=2', '--backup-dir=C:\\tmp\\bk',
+  ]);
+  assert.equal(opts.soloConsentimientos, true);
+  assert.equal(opts.consentimiento, 2, 'el id se guarda como número, no como texto');
+  assert.equal(opts.backupDir, 'C:\\tmp\\bk');
+
+  assert.throws(
+    () => parseArgs([
+      '--actor=Javier', '--motivo=x', '--hasta=' + HOY, '--solo-consentimientos',
+    ]),
+    /--consentimiento/);
+  assert.throws(
+    () => parseArgs([
+      '--actor=Javier', '--motivo=x', '--hasta=' + HOY, '--solo-consentimientos',
+      '--consentimiento=2', '--solo-firmas',
+    ]),
+    /no se pueden usar juntos/);
+  assert.throws(
+    () => parseArgs([
+      '--actor=Javier', '--motivo=x', '--hasta=' + HOY, '--solo-consentimientos',
+      '--consentimiento=2', '--forzar-hold',
+    ]),
+    /--forzar-hold no aplica/);
+  assert.throws(
+    () => parseArgs([
+      '--actor=Javier', '--motivo=x', '--hasta=' + HOY, '--consentimiento=2',
+    ]),
+    /solo se usa con --solo-consentimientos/);
+});
+
+test('--solo-consentimientos en simulación no borra nada ni crea backup', () => {
+  const { consentId } = sembrarConsentimientoDePrueba();
+  const dir = dirDeBackup('kair-consent-sim-');
+  try {
+    const codigo = runSilent([
+      '--actor=Javier Robles Fontalvo',
+      '--motivo=consentimiento ficticio del e2e',
+      '--hasta=' + HOY,
+      '--solo-consentimientos',
+      '--consentimiento=' + consentId,
+      '--backup-dir=' + dir,
+    ]);
+
+    assert.equal(codigo, 0, 'la simulación tiene que salir bien (código 0)');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+      .get(consentId).n, 1, 'la simulación no puede borrar el consentimiento');
+    assert.deepEqual(fs.readdirSync(dir), [], 'la simulación no puede crear backups');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_firma_purga_log').get().n, 0,
+      'la simulación no puede dejar recibo');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--solo-consentimientos retira la fila, sus eventos y deja backup y recibo', () => {
+  const { consentId, version } = sembrarConsentimientoDePrueba();
+  sembrarEventosConsentimiento(consentId, 2);
+
+  const firmasAntes = db.prepare('SELECT COUNT(*) n FROM gh_firmas_electronicas').get().n;
+  const versionesAntes = db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones').get().n;
+  const dir = dirDeBackup('kair-consent-ejec-');
+
+  try {
+    const codigo = runSilent([
+      '--actor=Javier Robles Fontalvo',
+      '--motivo=consentimiento ficticio del e2e, sin trabajador real',
+      '--hasta=' + HOY,
+      '--solo-consentimientos',
+      '--consentimiento=' + consentId,
+      '--backup-dir=' + dir,
+      '--ejecutar',
+    ]);
+
+    assert.equal(codigo, 0, 'la limpieza tiene que salir bien (código 0)');
+
+    // 1. El consentimiento y sus eventos se fueron.
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+      .get(consentId).n, 0, 'el consentimiento tiene que estar borrado');
+    assert.equal(db.prepare(
+      'SELECT COUNT(*) n FROM gh_consentimientos_eventos WHERE consent_id = ?'
+    ).get(consentId).n, 0, 'los eventos del consentimiento tienen que estar borrados');
+
+    // 2. Nada más cambió: firmas, versiones y versión activa.
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_firmas_electronicas').get().n,
+      firmasAntes, 'este modo no puede tocar firmas');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones').get().n,
+      versionesAntes, 'este modo no puede tocar versiones del Acuerdo');
+    const fila = db.prepare(
+      'SELECT texto_hash, activa FROM gh_firma_acuerdo_versiones WHERE version = ?'
+    ).get('v1.0');
+    assert.ok(fila, 'la versión vigente no puede desaparecer');
+    assert.equal(fila.texto_hash, version.texto_hash, 'el texto legal no puede cambiar');
+    assert.equal(fila.activa, 1, 'la versión vigente tiene que seguir activa');
+
+    // 3. El recibo va SOLO en el log: no hay firma a la que colgar un registro.
+    const log = db.prepare(`
+      SELECT * FROM gh_firma_purga_log
+       WHERE evento = 'LIMPIEZA_RASTRO_PRUEBA_CONSENTIMIENTO'
+       ORDER BY id DESC LIMIT 1
+    `).get();
+    assert.ok(log, 'tiene que quedar el recibo de la limpieza');
+    assert.equal(log.actor, 'Javier Robles Fontalvo');
+    assert.equal(log.firmas_en_lote, 0);
+    assert.equal(log.eventos_purgados, 2);
+    assert.equal(log.hold_revisados, 0);
+    assert.equal(log.hold_bloqueados, 0);
+    assert.equal(log.ventana_hasta, HOY);
+    assert.match(log.motivo, new RegExp('id=' + consentId + ' '));
+    assert.match(log.motivo, /jrf\*\*\*/, 'el recibo identifica el correo enmascarado');
+    assert.doesNotMatch(log.motivo, /jrf@example\.com/,
+      'el recibo no puede guardar el correo completo');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_firma_purga_registro').get().n, 0,
+      'gh_firma_purga_registro es por firma: acá no se usa');
+
+    // 4. El backup existe, no está vacío y conserva la fila borrada.
+    const backups = fs.readdirSync(dir);
+    assert.equal(backups.length, 1, 'tiene que quedar exactamente un backup');
+    const ruta = path.join(dir, backups[0]);
+    assert.ok(fs.statSync(ruta).size > 0, 'el backup no puede estar vacío');
+
+    const Database = require('better-sqlite3');
+    const copia = new Database(ruta, { readonly: true });
+    try {
+      assert.equal(copia.prepare(
+        'SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(consentId).n, 1, 'el backup tiene que conservar lo que se borró');
+    } finally {
+      copia.close();
+    }
+
+    assert.equal(db.pragma('integrity_check', { simple: true }), 'ok');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--solo-consentimientos se NIEGA si una firma referencia la aceptación', async () => {
+  const { consentId, version } = sembrarConsentimientoDePrueba();
+
+  // La firma se vincula por la terna trabajador + empresa + versión. El
+  // servicio guarda el trabajador PSEUDONIMIZADO (psn1_...), igual que en
+  // producción; el consentimiento tiene que llevar ese mismo valor.
+  const firma = await createSignRequestWithIdentificacion({
+    id_documento: 'doc-consent-terna',
+    id_trabajador: 'psn1_prueba',
+    id_empresa: '900829731',
+    consent_id: null,
+    agreement_version: version.version,
+    agreement_hash: version.texto_hash,
+  });
+  const trabajadorHasheado = db.prepare(
+    'SELECT id_trabajador FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firma.signRequest.id).id_trabajador;
+  db.prepare('UPDATE gh_consentimientos_firma SET id_trabajador = ? WHERE id = ?')
+    .run(trabajadorHasheado, consentId);
+
+  const dir = dirDeBackup('kair-consent-bloqueo-');
+  try {
+    const codigo = runSilent([
+      '--actor=Javier Robles Fontalvo',
+      '--motivo=consentimiento de prueba',
+      '--hasta=' + HOY,
+      '--solo-consentimientos',
+      '--consentimiento=' + consentId,
+      '--backup-dir=' + dir,
+      '--ejecutar',
+    ]);
+
+    assert.equal(codigo, 4, 'una firma asociada tiene que bloquear (código 4)');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+      .get(consentId).n, 1, 'el consentimiento tiene que seguir ahí');
+    assert.deepEqual(fs.readdirSync(dir), [],
+      'si se niega, no debe crear backup: falla antes de escribir');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('--solo-consentimientos se NIEGA si el vínculo es solo por consent_id', async () => {
+  const { consentId, version } = sembrarConsentimientoDePrueba();
+
+  // Otro trabajador: la terna no coincide, solo el vínculo explícito.
+  const firma = await createSignRequestWithIdentificacion({
+    id_documento: 'doc-consent-id',
+    id_trabajador: 'otro-trabajador',
+    id_empresa: '900829731',
+    consent_id: null,
+    agreement_version: version.version,
+    agreement_hash: version.texto_hash,
+  });
+  db.prepare('UPDATE gh_firmas_electronicas SET consent_id = ? WHERE id = ?')
+    .run(consentId, firma.signRequest.id);
+
+  const codigo = runSilent([
+    '--actor=Javier Robles Fontalvo',
+    '--motivo=consentimiento de prueba',
+    '--hasta=' + HOY,
+    '--solo-consentimientos',
+    '--consentimiento=' + consentId,
+    '--ejecutar',
+  ]);
+
+  assert.equal(codigo, 4, 'el vínculo por consent_id también tiene que bloquear');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+    .get(consentId).n, 1);
+});
+
+test('--solo-consentimientos se NIEGA si el id no existe', () => {
+  resetDb();
+  const codigo = runSilent([
+    '--actor=Javier Robles Fontalvo',
+    '--motivo=consentimiento de prueba',
+    '--hasta=' + HOY,
+    '--solo-consentimientos',
+    '--consentimiento=9999',
+    '--ejecutar',
+  ]);
+  assert.equal(codigo, 4, 'un id inexistente no se puede "limpiar"');
+});
+
+test('--solo-consentimientos se NIEGA con una aceptación posterior al corte', () => {
+  const { consentId } = sembrarConsentimientoDePrueba({
+    fecha_aceptacion: '2099-01-01T00:00:00.000Z',
+  });
+
+  const codigo = runSilent([
+    '--actor=Javier Robles Fontalvo',
+    '--motivo=consentimiento de prueba',
+    '--hasta=' + HOY,
+    '--solo-consentimientos',
+    '--consentimiento=' + consentId,
+    '--ejecutar',
+  ]);
+
+  assert.equal(codigo, 4, 'nada más nuevo que el corte se toca');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+    .get(consentId).n, 1);
+});
+
+test('--solo-consentimientos se NIEGA si no hubo aceptación', () => {
+  const { consentId } = sembrarConsentimientoDePrueba();
+  db.prepare(
+    "UPDATE gh_consentimientos_firma SET fecha_aceptacion = NULL, estado = 'OTP_PENDING' "
+    + 'WHERE id = ?'
+  ).run(consentId);
+
+  const codigo = runSilent([
+    '--actor=Javier Robles Fontalvo',
+    '--motivo=consentimiento de prueba',
+    '--hasta=' + HOY,
+    '--solo-consentimientos',
+    '--consentimiento=' + consentId,
+    '--ejecutar',
+  ]);
+
+  assert.equal(codigo, 4, 'sin fecha de aceptación no es una aceptación cerrada');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?')
+    .get(consentId).n, 1);
 });

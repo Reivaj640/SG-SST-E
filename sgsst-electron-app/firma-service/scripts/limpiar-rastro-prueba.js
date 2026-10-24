@@ -83,6 +83,48 @@
  * solo por estar en la ventana de tiempo sería borrarlos a ciegas. Si hay
  * consentimientos en el rango, el plan los lista y los deja.
  *
+ * EL MODO `--solo-consentimientos` (24-oct-2026)
+ * ------------------------------------------------
+ * Después de una limpieza `--solo-firmas` puede quedar el consentimiento de
+ * prueba huérfano: la firma, sus eventos y su sesión ya no están, pero la
+ * aceptación del Acuerdo sigue en `gh_consentimientos_firma`. Ese registro
+ * dice que "alguien aceptó" cuando en realidad no hubo un trabajador real.
+ *
+ * Los otros dos modos no sirven para esto:
+ *   - `--solo-firmas` deja los consentimientos a propósito (son la prueba del
+ *     12.7 y no cuelgan de una firma).
+ *   - El modo normal borraría también la versión del Acuerdo, y el candado lo
+ *     impide porque la versión vigente es el texto legal sellado.
+ *
+ * Este tercer modo retira UN consentimiento concreto, identificado por
+ * `--consentimiento=ID`. NO borra por rango de fechas: un consentimiento real
+ * cuya firma se purgó por vencimiento (la 5B) también es la prueba del 12.7,
+ * y borrarlo a ciegas destruiría esa prueba. La persona que opera tiene que
+ * mirar el plan (empresa, fecha, correo enmascarado, firma asociada) y decir
+ * que ese consentimiento es de prueba.
+ *
+ * Candados:
+ *   - Exige `--consentimiento=ID`; no hay borrado "de todo lo que haya".
+ *   - Se niega si alguna firma referencia el consentimiento (por `consent_id`
+ *     o por la terna trabajador/empresa/versión): una firma real conserva su
+ *     aceptación.
+ *   - Se niega si el consentimiento no tiene fecha de aceptación o si fue
+ *     aceptado después de `--hasta`.
+ *   - No toca ninguna versión del Acuerdo ni ninguna Empresa.
+ *   - Antes de borrar hace un backup con `VACUUM INTO` (una copia consistente
+ *     aunque la base esté en WAL). Con `--backup-dir=RUTA` se elige la carpeta;
+ *     por defecto va a `backups/` al lado de la base.
+ *   - Borra primero los eventos del consentimiento (FK de la migración 010) y
+ *     después el consentimiento, en una sola transacción.
+ *   - Deja el recibo en `gh_firma_purga_log` con el evento
+ *     `LIMPIEZA_RASTRO_PRUEBA_CONSENTIMIENTO`, el actor, el motivo y cuántos
+ *     eventos se borraron. No escribe en `gh_firma_purga_registro` porque esa
+ *     tabla es una fila por FIRMA y acá no hay firma.
+ *
+ * Ejemplo:
+ *   node scripts/limpiar-rastro-prueba.js --actor="Nombre" --motivo="Por qué" \
+ *        --hasta=2026-10-24 --solo-consentimientos --consentimiento=2
+ *
  * EL MODO `--forzar-hold` (26-oct-2026)
  * -------------------------------------
  * En produccion, la fila que dejo el e2e (id=12, SIGN-2026-427494) quedo con
@@ -146,6 +188,9 @@ function parseArgs(argv) {
   const opts = {
     actor: null, motivo: null, hasta: null, version: 'v1.0', ejecutar: false,
     soloFirmas: false,
+    soloConsentimientos: false,
+    consentimiento: null,
+    backupDir: null,
     forzarHold: false,
   };
   for (const arg of argv) {
@@ -153,8 +198,14 @@ function parseArgs(argv) {
       opts.ejecutar = true;
     } else if (arg === '--solo-firmas') {
       opts.soloFirmas = true;
+    } else if (arg === '--solo-consentimientos') {
+      opts.soloConsentimientos = true;
     } else if (arg === '--forzar-hold') {
       opts.forzarHold = true;
+    } else if (arg.startsWith('--consentimiento=')) {
+      opts.consentimiento = arg.slice('--consentimiento='.length).trim();
+    } else if (arg.startsWith('--backup-dir=')) {
+      opts.backupDir = arg.slice('--backup-dir='.length).trim();
     } else if (arg.startsWith('--actor=')) {
       opts.actor = arg.slice('--actor='.length).trim();
     } else if (arg.startsWith('--motivo=')) {
@@ -172,6 +223,34 @@ function parseArgs(argv) {
   if (!opts.hasta) throw new Error('Falta --hasta (fecha YYYY-MM-DD: nada más nuevo se toca)');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.hasta)) {
     throw new Error('--hasta tiene que ser una fecha YYYY-MM-DD');
+  }
+
+  // Los modos son excluyentes: uno borra filas de firma, el otro UNA
+  // aceptación concreta. Mezclarlos dejaría un plan ambiguo.
+  if (opts.soloFirmas && opts.soloConsentimientos) {
+    throw new Error('--solo-firmas y --solo-consentimientos no se pueden usar juntos: '
+      + 'son dos limpiezas distintas');
+  }
+  if (opts.soloConsentimientos) {
+    if (!opts.consentimiento) {
+      throw new Error('Falta --consentimiento=ID (el consentimiento de prueba que se retira)');
+    }
+    const id = Number(opts.consentimiento);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error('--consentimiento tiene que ser un id entero positivo (el de la fila)');
+    }
+    opts.consentimiento = id;
+    if (opts.forzarHold) {
+      throw new Error('--forzar-hold no aplica a --solo-consentimientos: '
+        + 'este modo no toca firmas ni holds');
+    }
+  } else {
+    if (opts.consentimiento) {
+      throw new Error('--consentimiento solo se usa con --solo-consentimientos');
+    }
+    if (opts.backupDir) {
+      throw new Error('--backup-dir solo se usa con --solo-consentimientos');
+    }
   }
   return opts;
 }
@@ -467,6 +546,399 @@ function verificar(plan, opts) {
 
   void idsABorrar;
   return problemas;
+}
+
+// ======================================================================
+// MODO --solo-consentimientos
+//
+// Retira UNA aceptación de prueba concreta. No borra por rango de fechas ni
+// "todo lo que haya": la persona que opera mira el plan y dice cuál fila es
+// la de la prueba. Los candados están en `verificarConsentimientos`.
+// ======================================================================
+
+/**
+ * Enmascara un dato personal para poder mostrarlo en el plan y en el recibo
+ * sin volver a guardarlo completo. No es un hash: es solo para leer.
+ * @param {string|null} valor
+ * @returns {string}
+ */
+function enmascarar(valor) {
+  const s = valor == null ? '' : String(valor).trim();
+  if (!s) return '(vacío)';
+  if (s.length <= 3) return s.slice(0, 1) + '***';
+  return s.slice(0, 3) + '***';
+}
+
+/**
+ * Arma el plan del modo `--solo-consentimientos`: la fila que se va a
+ * retirar, sus eventos, las firmas que dependen de ella y una foto de lo
+ * que NO se puede tocar (firmas y versiones del Acuerdo).
+ *
+ * @param {object} opts
+ * @returns {object}
+ */
+function armarPlanConsentimientos(opts) {
+  const corte = opts.hasta + 'T23:59:59.999Z';
+
+  const consentimiento = db.prepare(`
+    SELECT id, id_trabajador, id_empresa, version_acuerdo, hash_texto_acuerdo,
+           correo_verificacion, estado, rol_firmante, nombre_aceptante,
+           cargo_aceptante, identificacion_aceptante, fecha_aceptacion,
+           created_at, updated_at
+      FROM gh_consentimientos_firma
+     WHERE id = ?
+  `).get(opts.consentimiento) || null;
+
+  const eventos = consentimiento
+    ? db.prepare(
+      'SELECT COUNT(*) n FROM gh_consentimientos_eventos WHERE consent_id = ?'
+    ).get(consentimiento.id).n
+    : 0;
+
+  // Una firma "depende" del consentimiento por dos caminos: el vínculo
+  // explícito (`consent_id`, migración 004) o la terna que usa el servicio
+  // para validarlo (trabajador + empresa + versión del Acuerdo). Si
+  // cualquiera de los dos aparece, la aceptación es prueba de una firma
+  // real y no se toca.
+  const firmasAsociadas = consentimiento
+    ? db.prepare(`
+        SELECT id, id_solicitud, estado, fecha_creacion, consent_id,
+               agreement_version
+          FROM gh_firmas_electronicas
+         WHERE consent_id = ?
+            OR (id_trabajador = ? AND id_empresa = ? AND agreement_version = ?)
+         ORDER BY id
+      `).all(
+        consentimiento.id,
+        consentimiento.id_trabajador,
+        consentimiento.id_empresa,
+        consentimiento.version_acuerdo,
+      )
+    : [];
+
+  const firmasTotal = db.prepare(
+    'SELECT COUNT(*) n FROM gh_firmas_electronicas'
+  ).get().n;
+
+  const versionesTotal = db.prepare(
+    'SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones'
+  ).get().n;
+
+  const versionActiva = db.prepare(`
+    SELECT version, texto_hash, activa
+      FROM gh_firma_acuerdo_versiones
+     WHERE activa = 1
+     ORDER BY id DESC
+     LIMIT 1
+  `).get() || null;
+
+  // El backup va al lado de la base por defecto. La ruta se puede cambiar
+  // con `--backup-dir`; el nombre del archivo lo pone `crearBackup`.
+  const rutaDb = db.name && db.name !== ':memory:' ? path.resolve(db.name) : null;
+  const backupDir = opts.backupDir
+    ? path.resolve(opts.backupDir)
+    : (rutaDb ? path.join(path.dirname(rutaDb), 'backups') : path.resolve('backups'));
+
+  return {
+    corte,
+    consentimiento,
+    eventos,
+    firmasAsociadas,
+    firmasTotal,
+    versionesTotal,
+    versionActiva,
+    backupDir,
+  };
+}
+
+/**
+ * Las razones por las que NO se puede retirar este consentimiento.
+ * @param {object} plan
+ * @param {object} opts
+ * @returns {string[]}
+ */
+function verificarConsentimientos(plan, opts) {
+  const problemas = [];
+  const c = plan.consentimiento;
+
+  if (!c) {
+    problemas.push(
+      `No existe el consentimiento id=${opts.consentimiento}. No hay nada que retirar.`);
+    return problemas;
+  }
+
+  if (plan.firmasAsociadas.length) {
+    const ids = plan.firmasAsociadas.map(f => 'id=' + f.id).join(', ');
+    problemas.push(
+      `El consentimiento id=${c.id} tiene ${plan.firmasAsociadas.length} firma(s) `
+      + `asociada(s) (${ids}). Una firma real conserva su aceptación: no se toca. `
+      + 'Si son filas de prueba, primero hay que retirarlas con --solo-firmas.');
+  }
+
+  if (!c.fecha_aceptacion) {
+    problemas.push(
+      `El consentimiento id=${c.id} no tiene fecha de aceptación (estado=${c.estado}). `
+      + 'No es una aceptación cerrada: revisar antes de borrar.');
+  } else if (String(c.fecha_aceptacion) > plan.corte) {
+    problemas.push(
+      `El consentimiento id=${c.id} fue aceptado el ${c.fecha_aceptacion}, después `
+      + `de --hasta=${opts.hasta}. No se toca.`);
+  }
+
+  return problemas;
+}
+
+/**
+ * Imprime el plan del modo `--solo-consentimientos`.
+ */
+function imprimirPlanConsentimientos(plan, opts) {
+  const c = plan.consentimiento;
+
+  console.log('\n=== LIMPIEZA DEL RASTRO DE PRUEBA (CONSENTIMIENTO) ===');
+  console.log(`actor:  ${opts.actor}`);
+  console.log(`motivo: ${opts.motivo}`);
+  console.log(`corte:  ${opts.hasta} (nada más nuevo se toca)`);
+  console.log(`modo:   ${opts.ejecutar ? 'EJECUCIÓN' : 'SIMULACIÓN (nada se escribe)'}`);
+  console.log('alcance: UN consentimiento concreto. No se toca ninguna versión del '
+    + 'Acuerdo ni ninguna Empresa.');
+
+  console.log('\n--- Consentimiento a retirar ---');
+  if (!c) {
+    console.log(`  (no existe el id=${opts.consentimiento})`);
+  } else {
+    console.log(`  id=${c.id} empresa=${c.id_empresa} acuerdo=${c.version_acuerdo}`);
+    console.log(`  estado=${c.estado} rol=${c.rol_firmante} `
+      + `aceptado=${c.fecha_aceptacion || '(sin fecha)'}`);
+    console.log(`  correo=${enmascarar(c.correo_verificacion)} `
+      + `nombre=${enmascarar(c.nombre_aceptante)} `
+      + `identificacion=${enmascarar(c.identificacion_aceptante)}`);
+    console.log(`  creado=${c.created_at} actualizado=${c.updated_at}`);
+    console.log(`  eventos del consentimiento: ${plan.eventos}`);
+  }
+
+  console.log('\n--- Firmas asociadas (bloquean el borrado) ---');
+  if (!plan.firmasAsociadas.length) {
+    console.log('  (ninguna: el consentimiento no prueba ninguna firma)');
+  }
+  for (const f of plan.firmasAsociadas) {
+    console.log(`  id=${f.id} ${f.id_solicitud || ''} estado=${f.estado} `
+      + `consent_id=${f.consent_id == null ? '(null)' : f.consent_id} `
+      + `creada=${f.fecha_creacion}`);
+  }
+
+  console.log('\n--- Lo que NO se toca ---');
+  console.log(`  firmas: ${plan.firmasTotal} (no se borra ninguna)`);
+  console.log(`  versiones del Acuerdo: ${plan.versionesTotal} (no se borra ninguna)`);
+  if (plan.versionActiva) {
+    console.log(`  versión activa: ${plan.versionActiva.version} `
+      + `hash=${String(plan.versionActiva.texto_hash).slice(0, 12)}…`);
+  } else {
+    console.log('  versión activa: (ninguna)');
+  }
+
+  console.log('\n--- Backup previo ---');
+  console.log(`  carpeta: ${plan.backupDir}`);
+  console.log('  (se crea con VACUUM INTO antes de borrar; si falla, no se borra nada)');
+}
+
+/**
+ * Copia consistente de la base antes de borrar. `VACUUM INTO` funciona
+ * aunque la base esté en WAL y deja un archivo solo, sin los -wal y -shm.
+ *
+ * @param {object} plan
+ * @param {object} opts
+ * @returns {string} ruta del backup
+ */
+function crearBackup(plan, opts) {
+  fs.mkdirSync(plan.backupDir, { recursive: true });
+
+  const sello = new Date().toISOString()
+    .replace(/[-:]/g, '')
+    .replace('T', '-')
+    .slice(0, 15); // YYYYMMDD-HHMMSS
+  const base = `firma-antes-limpieza-consentimiento-${opts.consentimiento}-${sello}`;
+
+  let destino = path.join(plan.backupDir, base + '.sqlite');
+  let n = 1;
+  while (fs.existsSync(destino)) {
+    destino = path.join(plan.backupDir, `${base}-${n}.sqlite`);
+    n++;
+  }
+
+  db.prepare('VACUUM INTO ?').run(destino);
+
+  const st = fs.statSync(destino);
+  if (!st.size) {
+    throw new Error(`El backup quedó vacío: ${destino}`);
+  }
+  return destino;
+}
+
+/**
+ * Borra el consentimiento y sus eventos, en una sola transacción, y deja el
+ * recibo append-only. El backup se hace ANTES de la transacción: si el
+ * backup falla, no se borra nada.
+ *
+ * @param {object} plan
+ * @param {object} opts
+ * @returns {{consentimientosBorrados: number, eventosBorrados: number, backupPath: string}}
+ */
+function aplicarConsentimientos(plan, opts) {
+  const ahora = new Date().toISOString();
+  const c = plan.consentimiento;
+
+  console.log('\n--- Backup previo ---');
+  const backupPath = crearBackup(plan, opts);
+  console.log('  ok: ' + backupPath);
+
+  let eventosBorrados = 0;
+  let consentimientosBorrados = 0;
+
+  const tx = db.transaction(() => {
+    // Primero los eventos: la FK de la migración 010 apunta al
+    // consentimiento y SQLite no deja borrar el padre antes del hijo.
+    const ev = db.prepare(
+      'DELETE FROM gh_consentimientos_eventos WHERE consent_id = ?'
+    ).run(c.id);
+    eventosBorrados += ev.changes;
+
+    const rc = db.prepare(
+      'DELETE FROM gh_consentimientos_firma WHERE id = ?'
+    ).run(c.id);
+    consentimientosBorrados += rc.changes;
+
+    if (consentimientosBorrados !== 1) {
+      throw new Error(
+        `Se esperaba borrar 1 consentimiento y se borraron ${consentimientosBorrados}. `
+        + 'Se revierte todo.');
+    }
+
+    // El recibo va SOLO en gh_firma_purga_log: gh_firma_purga_registro es
+    // una fila por FIRMA y acá no hay firma (su firma_id es NOT NULL).
+    // Va dentro de la MISMA transacción: o queda el borrado con su recibo,
+    // o no queda nada.
+    const motivoRecibo = `Se retiro el consentimiento de prueba id=${c.id} `
+      + `(empresa=${c.id_empresa}, acuerdo=${c.version_acuerdo}, `
+      + `estado=${c.estado}, aceptado=${c.fecha_aceptacion}, `
+      + `correo=${enmascarar(c.correo_verificacion)}). `
+      + `Eventos borrados: ${eventosBorrados}. Backup previo: ${backupPath}. `
+      + `NO se toco ninguna version del Acuerdo ni ninguna Empresa. `
+      + `Motivo: ${opts.motivo}`;
+
+    db.prepare(`
+      INSERT INTO gh_firma_purga_log
+        (fecha_hora, evento, actor, motivo, ventana_hasta, firmas_en_lote,
+         eventos_purgados, hold_revisados, hold_bloqueados)
+      VALUES (?, 'LIMPIEZA_RASTRO_PRUEBA_CONSENTIMIENTO', ?, ?, ?, 0, ?, 0, 0)
+    `).run(ahora, opts.actor, motivoRecibo, opts.hasta, eventosBorrados);
+  });
+  tx();
+
+  console.log('\n=== RESULTADO ===');
+  console.log(`  consentimientos eliminados: ${consentimientosBorrados}`);
+  console.log(`  eventos eliminados:        ${eventosBorrados}`);
+  console.log(`  backup:                    ${backupPath}`);
+  console.log('  versiones del Acuerdo:     NO SE TOCARON');
+  console.log('  firmas:                    NO SE TOCARON');
+  console.log('  recibo: 1 fila en gh_firma_purga_log '
+    + '(LIMPIEZA_RASTRO_PRUEBA_CONSENTIMIENTO)');
+
+  return { consentimientosBorrados, eventosBorrados, backupPath };
+}
+
+/**
+ * Comprueba que la base quedó como se esperaba después del borrado.
+ * @returns {boolean}
+ */
+function verificarDespuesConsentimientos(plan, opts, resultado) {
+  const problemas = [];
+
+  const integridad = db.pragma('integrity_check', { simple: true });
+  if (integridad !== 'ok') problemas.push(`integrity_check: ${integridad}`);
+
+  const consentimiento = db.prepare(
+    'SELECT COUNT(*) n FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(opts.consentimiento).n;
+  if (consentimiento !== 0) {
+    problemas.push(`El consentimiento id=${opts.consentimiento} sigue en la base.`);
+  }
+
+  const eventos = db.prepare(
+    'SELECT COUNT(*) n FROM gh_consentimientos_eventos WHERE consent_id = ?'
+  ).get(opts.consentimiento).n;
+  if (eventos !== 0) {
+    problemas.push(`Quedaron ${eventos} evento(s) del consentimiento retirado.`);
+  }
+
+  const firmas = db.prepare('SELECT COUNT(*) n FROM gh_firmas_electronicas').get().n;
+  if (firmas !== plan.firmasTotal) {
+    problemas.push(`Las firmas cambiaron: antes ${plan.firmasTotal}, ahora ${firmas}.`);
+  }
+
+  const versiones = db.prepare('SELECT COUNT(*) n FROM gh_firma_acuerdo_versiones').get().n;
+  if (versiones !== plan.versionesTotal) {
+    problemas.push(
+      `Las versiones del Acuerdo cambiaron: antes ${plan.versionesTotal}, ahora ${versiones}.`);
+  }
+
+  const activa = db.prepare(`
+    SELECT version, texto_hash FROM gh_firma_acuerdo_versiones
+     WHERE activa = 1 ORDER BY id DESC LIMIT 1
+  `).get() || null;
+  if (plan.versionActiva) {
+    if (!activa
+      || activa.version !== plan.versionActiva.version
+      || activa.texto_hash !== plan.versionActiva.texto_hash) {
+      problemas.push(
+        `La versión activa cambió: antes ${plan.versionActiva.version} `
+        + `(${String(plan.versionActiva.texto_hash).slice(0, 12)}…), ahora `
+        + (activa
+          ? `${activa.version} (${String(activa.texto_hash).slice(0, 12)}…)`
+          : '(ninguna)') + '.');
+    }
+  } else if (activa) {
+    problemas.push('Apareció una versión activa del Acuerdo que antes no estaba.');
+  }
+
+  const recibo = db.prepare(`
+    SELECT id, motivo FROM gh_firma_purga_log
+     WHERE evento = 'LIMPIEZA_RASTRO_PRUEBA_CONSENTIMIENTO'
+     ORDER BY id DESC LIMIT 1
+  `).get();
+  if (!recibo) {
+    problemas.push('No quedó el recibo en gh_firma_purga_log.');
+  } else if (!String(recibo.motivo).includes(`id=${opts.consentimiento} `)) {
+    problemas.push(`El último recibo (id=${recibo.id}) no menciona el consentimiento retirado.`);
+  }
+
+  if (!resultado || !resultado.backupPath) {
+    problemas.push('No se registró la ruta del backup.');
+  } else if (!fs.existsSync(resultado.backupPath)) {
+    problemas.push(`No se encuentra el backup: ${resultado.backupPath}`);
+  } else if (fs.statSync(resultado.backupPath).size === 0) {
+    problemas.push(`El backup quedó vacío: ${resultado.backupPath}`);
+  }
+
+  console.log('\n=== VERIFICACIÓN ===');
+  console.log(`  ${'integridad:'.padEnd(28)}${integridad}`);
+  console.log(`  ${'consentimiento:'.padEnd(28)}${consentimiento} `
+    + `(id=${opts.consentimiento})`);
+  console.log(`  ${'eventos del consentimiento:'.padEnd(28)}${eventos}`);
+  console.log(`  ${'firmas:'.padEnd(28)}${firmas} (antes ${plan.firmasTotal})`);
+  console.log(`  ${'versiones del Acuerdo:'.padEnd(28)}${versiones} `
+    + `(antes ${plan.versionesTotal})`);
+  console.log(`  ${'versión activa:'.padEnd(28)}${activa ? activa.version : '(ninguna)'}`);
+  console.log(`  ${'recibo:'.padEnd(28)}${recibo ? 'id=' + recibo.id : 'NO'}`);
+  console.log(`  ${'backup:'.padEnd(28)}${resultado && resultado.backupPath
+    ? resultado.backupPath : 'NO'}`);
+
+  if (problemas.length) {
+    console.log('\n  PROBLEMAS:');
+    for (const p of problemas) console.log('   - ' + p);
+    return false;
+  }
+  console.log('  OK: el consentimiento se retiró y todo lo demás quedó igual.');
+  return true;
 }
 
 // ----------------------------------------------------------------------
@@ -802,14 +1274,46 @@ function verificarDespues(opts) {
 function main(argv) {
   const opts = parseArgs(argv);
 
-  for (const t of ['gh_firmas_electronicas', 'gh_firma_eventos', 'gh_firma_sesiones',
+  const tablasRequeridas = [
+    'gh_firmas_electronicas', 'gh_firma_eventos', 'gh_firma_sesiones',
     'gh_consentimientos_firma', 'gh_firma_acuerdo_versiones', 'gh_firma_purga_log',
-    'gh_firma_purga_registro']) {
+    'gh_firma_purga_registro',
+  ];
+  if (opts.soloConsentimientos) tablasRequeridas.push('gh_consentimientos_eventos');
+
+  for (const t of tablasRequeridas) {
     if (!tablaExiste(t)) {
       console.error(`Falta la tabla ${t}. Este script necesita el esquema con las `
         + 'migraciones aplicadas.');
       return 3;
     }
+  }
+
+  // --solo-consentimientos tiene su propio plan, sus propios candados y su
+  // propia verificación. No comparte el flujo de firmas/versiones.
+  if (opts.soloConsentimientos) {
+    const planConsentimiento = armarPlanConsentimientos(opts);
+    imprimirPlanConsentimientos(planConsentimiento, opts);
+
+    const problemas = verificarConsentimientos(planConsentimiento, opts);
+    if (problemas.length) {
+      console.log('\n=== NO SE TOCA NADA ===');
+      for (const p of problemas) console.log('  - ' + p);
+      return 4;
+    }
+
+    if (!opts.ejecutar) {
+      console.log('\nSimulacion. Con --ejecutar se aplica (con backup previo).');
+      return 0;
+    }
+
+    const r = aplicarConsentimientos(planConsentimiento, opts);
+    const ok = verificarDespuesConsentimientos(planConsentimiento, opts, r);
+    if (!ok) return 3;
+
+    console.log('\nListo. Se retiro el consentimiento de prueba.');
+    console.log('  La version vigente del Acuerdo y las firmas siguen intactas.');
+    return 0;
   }
 
   const plan = armarPlan(opts);
@@ -852,12 +1356,15 @@ if (require.main === module) {
   try {
     process.exit(main(process.argv.slice(2)));
   } catch (e) {
-    if (e && /Falta --|Argumento desconocido|--hasta/.test(String(e.message))) {
+    if (e && /Falta --|Argumento desconocido|^--/.test(String(e.message))) {
       console.error(e.message);
       console.error('');
       console.error('Uso: node scripts/limpiar-rastro-prueba.js --actor="Nombre" '
         + '--motivo="Por qué" --hasta=YYYY-MM-DD [--version=v1.0] [--solo-firmas] '
         + '[--forzar-hold] [--ejecutar]');
+      console.error('  o: node scripts/limpiar-rastro-prueba.js --actor="Nombre" '
+        + '--motivo="Por qué" --hasta=YYYY-MM-DD --solo-consentimientos '
+        + '--consentimiento=ID [--backup-dir=RUTA] [--ejecutar]');
       process.exit(2);
     }
     console.error('Error: ' + (e && e.stack ? e.stack : e));
@@ -867,4 +1374,10 @@ if (require.main === module) {
 
 module.exports = {
   main, parseArgs, armarPlan, verificar, statementsDeTriggers, evaluarHold,
+  enmascarar,
+  armarPlanConsentimientos,
+  verificarConsentimientos,
+  crearBackup,
+  aplicarConsentimientos,
+  verificarDespuesConsentimientos,
 };

@@ -219,6 +219,81 @@ test('rastro · la firma del Anexo y la baja tambien dejan rastro', () => {
   assert.equal(porCampo.activo.valor_nuevo, 'NO');
 });
 
+test('rastro · quitar la firma del Anexo exige motivo y deja rastro', () => {
+  limpiar();
+  registrarEmpresa();
+
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-21', {
+    actor: 'el owner', motivo: 'fecha cargada al crear la empresa',
+  });
+
+  assert.throws(
+    () => empresaService.desmarcarAnexoFirmado(EMPRESA, { actor: 'el owner' }),
+    (e) => {
+      assert.equal(e.statusCode, 400);
+      assert.equal(e.code, 'MOTIVO_REQUERIDO');
+      return true;
+    },
+    'sin motivo no se puede quitar una fecha legal'
+  );
+
+  const empresa = empresaService.desmarcarAnexoFirmado(EMPRESA, {
+    actor: 'el owner',
+    motivo: 'no existe el PDF firmado; se vuelve a firmar',
+  });
+  assert.equal(empresa.anexo_encargo_firmado_at, null);
+
+  const filas = renglones();
+  const ultima = filas[filas.length - 1];
+  assert.equal(ultima.campo, 'anexo_encargo_firmado_at');
+  assert.equal(ultima.valor_anterior, '2026-10-21T00:00:00.000Z');
+  assert.equal(ultima.valor_nuevo, null);
+  assert.equal(ultima.id_actor, 'el owner');
+  assert.match(String(ultima.motivo), /PDF/i);
+});
+
+test('rastro · cambiar una fecha ya registrada exige motivo', () => {
+  limpiar();
+  registrarEmpresa();
+
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-21', {
+    motivo: 'alta de la empresa',
+  });
+
+  assert.throws(
+    () => empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-22'),
+    (e) => e.code === 'MOTIVO_REQUERIDO',
+    'un reemplazo silencioso de la fecha del Anexo no se acepta'
+  );
+
+  // Re-registrar la MISMA fecha es un reintento idempotente: no exige motivo
+  // y no escribe un renglon nuevo.
+  const antes = renglones().length;
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-21');
+  assert.equal(renglones().length, antes, 'la misma fecha no deja rastro nuevo');
+
+  const empresa = empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-22', {
+    motivo: 'correccion de la fecha contra el PDF',
+  });
+  assert.equal(empresa.anexo_encargo_firmado_at, '2026-10-22T00:00:00.000Z');
+});
+
+test('rastro · una fecha futura del Anexo se rechaza', () => {
+  limpiar();
+  registrarEmpresa();
+
+  const futura = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  assert.throws(
+    () => empresaService.marcarAnexoFirmado(EMPRESA, futura),
+    (e) => {
+      assert.equal(e.statusCode, 400);
+      assert.match(e.message, /futura/i);
+      return true;
+    }
+  );
+  assert.equal(empresaService.getById(EMPRESA).anexo_encargo_firmado_at, null);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. El documento del representante NO se copia en claro
 // ─────────────────────────────────────────────────────────────────────────────

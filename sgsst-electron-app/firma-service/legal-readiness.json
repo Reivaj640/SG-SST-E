@@ -1,6 +1,6 @@
 {
   "version": "2026-10-23",
-  "actualizado_at": null,
+  "actualizado_at": "2026-10-24",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
     "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
@@ -49,7 +49,7 @@
     }
   },
   "anexo_encargo": {
-    "estado": "desconocido",
+    "estado": "no_firmado",
     "fecha": null,
     "evidencia": null
   },

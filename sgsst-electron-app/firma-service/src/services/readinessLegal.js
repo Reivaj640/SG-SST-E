@@ -212,6 +212,7 @@ function _resumenEmpresas(dbConn) {
     con_anexo_base: 0,
     con_anexo_nube: 0,
     con_canal_pqrs: 0,
+    fechas_antes_del_alta: 0,
     columna_anexo_nube: false,
     error: null,
   };
@@ -227,11 +228,20 @@ function _resumenEmpresas(dbConn) {
       return base;
     }
     const tieneNube = columnas.includes('anexo_nube_firmado_at');
-    const seleccion = ['anexo_encargo_firmado_at', 'canal_pqrs'];
+    const seleccion = ['anexo_encargo_firmado_at', 'canal_pqrs', 'created_at'];
     if (tieneNube) seleccion.push('anexo_nube_firmado_at');
     const filas = dbConn.prepare(
       `SELECT ${seleccion.join(', ')} FROM gh_firma_empresas WHERE activo = 1`,
     ).all();
+    // Una fecha anterior al alta en el sistema NO es un error: el contrato se
+    // puede firmar antes de cargar la Empresa. Pero es una senal que el
+    // reporte muestra para que el operador la confronte con el PDF.
+    const antesDelAlta = filas.filter((f) => {
+      if (!f.anexo_encargo_firmado_at || !f.created_at) return false;
+      const anexo = new Date(f.anexo_encargo_firmado_at).getTime();
+      const alta = new Date(String(f.created_at).replace(' ', 'T') + 'Z').getTime();
+      return Number.isFinite(anexo) && Number.isFinite(alta) && anexo < alta;
+    }).length;
     return {
       ...base,
       disponible: true,
@@ -241,6 +251,7 @@ function _resumenEmpresas(dbConn) {
         ? filas.filter((f) => !!f.anexo_nube_firmado_at).length
         : 0,
       con_canal_pqrs: filas.filter((f) => !!_texto(f.canal_pqrs)).length,
+      fechas_antes_del_alta: antesDelAlta,
       columna_anexo_nube: tieneNube,
       error: null,
     };
@@ -1102,7 +1113,38 @@ function evaluar(opciones = {}) {
     && !!_texto(anexoEncargoMan.evidencia);
   const encargoEstadoOk = encargoFirmadoOk;
   const encargoDocumentoOk = anEncargo.clausulasOk;
-  const empresasBaseOk = empresas.total === 0 || empresas.con_anexo_base === empresas.total;
+  // Una fecha no nula en la ficha NO es evidencia por si sola: puede ser una
+  // marca de prueba o un dato cargado a mano. La evidencia vive en el
+  // manifiesto (`anexo_encargo.estado === 'firmado'` + fecha + archivo). Sin
+  // esa evidencia, el item no puede salir OK: queda en AVISO, que tambien
+  // bloquea el gate de primera firma.
+  const faltanAnexoBase = Math.max(0, empresas.total - empresas.con_anexo_base);
+  let estadoEmpresasBase = ESTADOS.NO_APLICA;
+  if (empresas.total > 0) {
+    if (faltanAnexoBase > 0) estadoEmpresasBase = ESTADOS.PENDIENTE;
+    else if (!encargoFirmadoOk) estadoEmpresasBase = ESTADOS.AVISO;
+    else estadoEmpresasBase = ESTADOS.OK;
+  }
+  const empresasBaseOk = estadoEmpresasBase === ESTADOS.OK;
+  const detalleEmpresasBase = [];
+  if (faltanAnexoBase > 0) {
+    detalleEmpresasBase.push(`${faltanAnexoBase} empresa(s) sin fecha de Anexo registrada`);
+  }
+  if (!encargoFirmadoOk && empresas.con_anexo_base > 0) {
+    detalleEmpresasBase.push(
+      'hay fechas en la ficha pero el manifiesto no tiene la evidencia del Anexo firmado',
+    );
+  }
+  if (empresas.fechas_antes_del_alta > 0) {
+    detalleEmpresasBase.push(
+      `${empresas.fechas_antes_del_alta} fecha(s) anterior(es) al alta en el sistema; confirmar contra el PDF`,
+    );
+  }
+  const detalleOkEmpresasBase = 'Todas las empresas activas tienen Anexo de Encargo firmado '
+    + 'y la evidencia esta en el manifiesto.'
+    + (empresas.fechas_antes_del_alta > 0
+      ? ` ${empresas.fechas_antes_del_alta} fecha(s) anterior(es) al alta en el sistema; confirmar contra el PDF.`
+      : '');
 
   const grupoEncargo = _grupo('anexo_encargo', 'Anexo de Encargo base', [
     _item(
@@ -1142,18 +1184,19 @@ function evaluar(opciones = {}) {
     _item(
       'empresas_base',
       'Anexo de Encargo firmado por cada empresa activa',
-      empresas.total === 0
-        ? ESTADOS.NO_APLICA
-        : _estado(empresasBaseOk),
+      estadoEmpresasBase,
       {
         bloquea: GATE_PRIMERA,
         detalle: empresas.total === 0
           ? 'No hay empresas activas: no hay primera firma posible.'
           : (empresasBaseOk
-            ? 'Todas las empresas activas tienen Anexo de Encargo firmado.'
-            : `${empresas.total - empresas.con_anexo_base} empresa(s) no tienen Anexo de Encargo firmado.`),
-        accion: 'Completar el Anexo de Encargo de cada empresa o registrar el otrosí del Anexo de Nube.',
-        referencia: 'gh_firma_empresas.anexo_encargo_firmado_at',
+            ? detalleOkEmpresasBase
+            : `${detalleEmpresasBase.join('; ')}.`),
+        accion: empresasBaseOk
+          ? ''
+          : 'Completar la fecha de cada empresa y adjuntar el PDF firmado con su '
+            + 'fecha y evidencia en legal-readiness.json → anexo_encargo.',
+        referencia: 'gh_firma_empresas.anexo_encargo_firmado_at + legal-readiness.json → anexo_encargo',
       },
     ),
   ]);

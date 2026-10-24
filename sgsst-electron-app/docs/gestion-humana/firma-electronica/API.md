@@ -1884,7 +1884,7 @@ la firma.
 **Tipo:** entero positivo, máximo 36500 (100 años). `null` o ausente = sin
 plazo declarado.
 
-### 6.13.2 Los siete endpoints
+### 6.13.2 Los ocho endpoints
 
 | Método | Ruta | Qué hace |
 |---|---|---|
@@ -1894,6 +1894,7 @@ plazo declarado.
 | `PUT` | `/internal/admin/empresas/:id_empresa` | Actualiza la identificación. |
 | `GET` | `/internal/admin/empresas/:id_empresa/historial` | El **rastro de los cambios** de la ficha: un renglón por campo que realmente cambió, con el valor anterior, el nuevo, quién, desde dónde, cuándo y por qué. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado` | Registra la fecha de firma del Anexo de Encargo (art. 25 Decreto 1377/2013). Endpoint aparte: ese dato sustenta el cumplimiento legal y no debe cambiar en una actualización de rutina. |
+| `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado/quitar` | **Quita** la fecha del Anexo de Encargo. Es la salida auditada para una marca equivocada: exige `X-Admin-Motivo`, escribe el valor anterior y `null` en el historial append-only y deja un WARN en el log. Después de quitarla, D-03 vuelve a bloquear la Empresa hasta que se registre una fecha respaldada por el PDF. |
 | `POST` | `/internal/admin/empresas/:id_empresa/estado` | Alta/baja lógica. Una empresa inactiva no muestra bloque en la mini-app, pero sus firmas históricas se conservan intactas. |
 
 **Body de `POST` / `PUT`** (los campos de identificación):
@@ -1938,6 +1939,42 @@ completo de la ficha y el body no se contamina con metadatos de auditoría:
 
 La respuesta es una lista de renglones, del más reciente al más antiguo.
 `?limite=` entre 1 y 1000 (por defecto 200).
+
+**Las reglas del Anexo de Encargo (`POST .../anexo-firmado`)**. La fecha del
+Anexo es el sustento del artículo 25 del Decreto 1377 de 2013, así que el
+registro tiene tres reglas duras:
+
+1. **No se acepta una fecha futura.** Si el operador se equivoca de año, el
+   sistema responde `400 INVALID_REQUEST_BODY` y no guarda nada.
+2. **Cambiar una fecha ya registrada exige motivo.** El body solo lleva
+   `{ "fecha": "..." }`; el motivo va en `X-Admin-Motivo`. Sin motivo, la
+   respuesta es `400 MOTIVO_REQUERIDO`. Registrar **la misma fecha** otra vez
+   es un reintento idempotente: no toca `updated_at` y no escribe un renglón
+   nuevo en el historial.
+3. **Una fecha anterior al alta de la Empresa no se bloquea, pero se
+   advierte.** El contrato se puede firmar antes de cargar la ficha en K+AIR;
+   el sistema deja un WARN en el log y el reporte de readiness lo cuenta en
+   `empresas.fechas_antes_del_alta` para que se confronte con el PDF.
+
+**Quitar la fecha (`POST .../anexo-firmado/quitar`)**. No recibe body. Exige
+`X-Admin-Motivo` y devuelve la empresa con `anexo_encargo_firmado_at: null`.
+El borrado queda en el historial con el valor anterior, `null` como valor
+nuevo, el actor y el motivo.
+
+| Situación | HTTP | Código |
+|---|---|---|
+| La empresa no existe | `404` | `EMPRESA_NOT_FOUND` |
+| La fecha no parsea o es futura | `400` | `INVALID_REQUEST_BODY` |
+| Se intenta cambiar una fecha existente sin `X-Admin-Motivo` | `400` | `MOTIVO_REQUERIDO` |
+| Se intenta quitar una fecha sin `X-Admin-Motivo` | `400` | `MOTIVO_REQUERIDO` |
+| Se intenta quitar una fecha que no está registrada | `409` | `ANEXO_NO_REGISTRADO` |
+
+> **Una fecha no es evidencia.** Que la ficha tenga una fecha no demuestra que
+> el Anexo exista. El reporte de readiness (`GET /internal/admin/readiness`)
+> solo marca `empresas_base` en OK cuando la ficha tiene la fecha **y**
+> `legal-readiness.json → anexo_encargo` tiene `estado: "firmado"`, fecha y
+> archivo de evidencia. Si hay fecha sin evidencia, el ítem queda en `aviso`,
+> que también bloquea el gate de primera firma.
 
 ### 6.13.3 El hold legal de conservación
 

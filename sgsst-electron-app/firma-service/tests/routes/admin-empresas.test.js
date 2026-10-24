@@ -136,6 +136,92 @@ test('admin empresas · el Anexo firmado se registra en su propio endpoint', asy
   assert.ok(res.body.anexo_encargo_firmado_at, 'la fecha del Anexo queda registrada');
 });
 
+test('admin empresas · quitar el Anexo exige motivo y deja rastro', async () => {
+  limpiar();
+  const app = makeApp();
+  await request(app).post('/internal/admin/empresas').set(ADMIN).send(ALTA);
+  await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado`)
+    .set(ADMIN)
+    .send({ fecha: '2026-10-20' });
+
+  const sinMotivo = await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado/quitar`)
+    .set(ADMIN)
+    .set('X-Admin-Actor', 'Operador de prueba')
+    .timeout({ response: 3000 });
+
+  assert.equal(sinMotivo.status, 400);
+  assert.equal(sinMotivo.body.error.code, 'MOTIVO_REQUERIDO');
+
+  const conMotivo = await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado/quitar`)
+    .set(ADMIN)
+    .set('X-Admin-Actor', 'Operador de prueba')
+    .set('X-Admin-Motivo', 'No existe el PDF firmado; se vuelve a firmar')
+    .timeout({ response: 3000 });
+
+  assert.equal(conMotivo.status, 200);
+  assert.equal(conMotivo.body.anexo_encargo_firmado_at, null);
+
+  const historial = await request(app)
+    .get(`/internal/admin/empresas/${EMPRESA}/historial`)
+    .set(ADMIN)
+    .timeout({ response: 3000 });
+
+  const fila = historial.body.items.find(
+    (i) => i.campo === 'anexo_encargo_firmado_at' && i.valor_nuevo === null
+  );
+  assert.ok(fila, 'el desmarcado queda en el historial');
+  assert.equal(fila.id_actor, 'Operador de prueba');
+  assert.match(String(fila.motivo), /PDF/i);
+});
+
+test('admin empresas · cambiar una fecha ya registrada exige motivo', async () => {
+  limpiar();
+  const app = makeApp();
+  await request(app).post('/internal/admin/empresas').set(ADMIN).send(ALTA);
+  await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado`)
+    .set(ADMIN)
+    .send({ fecha: '2026-10-20' });
+
+  const sinMotivo = await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado`)
+    .set(ADMIN)
+    .send({ fecha: '2026-10-19' })
+    .timeout({ response: 3000 });
+
+  assert.equal(sinMotivo.status, 400);
+  assert.equal(sinMotivo.body.error.code, 'MOTIVO_REQUERIDO');
+
+  const conMotivo = await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado`)
+    .set(ADMIN)
+    .set('X-Admin-Motivo', 'Corrección de la fecha contra el PDF')
+    .send({ fecha: '2026-10-19' })
+    .timeout({ response: 3000 });
+
+  assert.equal(conMotivo.status, 200);
+  assert.equal(conMotivo.body.anexo_encargo_firmado_at, '2026-10-19T00:00:00.000Z');
+});
+
+test('admin empresas · una fecha futura del Anexo se rechaza', async () => {
+  limpiar();
+  const app = makeApp();
+  await request(app).post('/internal/admin/empresas').set(ADMIN).send(ALTA);
+
+  const futura = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const res = await request(app)
+    .post(`/internal/admin/empresas/${EMPRESA}/anexo-firmado`)
+    .set(ADMIN)
+    .send({ fecha: futura })
+    .timeout({ response: 3000 });
+
+  assert.equal(res.status, 400);
+  assert.match(res.body.error.message, /futura/i);
+});
+
 test('admin empresas · el estado se puede cambiar sin tocar la identidad', async () => {
   limpiar();
   const app = makeApp();

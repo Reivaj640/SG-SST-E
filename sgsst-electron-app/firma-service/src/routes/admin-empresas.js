@@ -20,6 +20,7 @@
  *   POST   /internal/admin/empresas            alta
  *   PUT    /internal/admin/empresas/:id        actualizar identidad
  *   POST   /internal/admin/empresas/:id/anexo-firmado
+ *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
  *   POST   /internal/admin/empresas/:id/estado  alta/baja lógica
  */
 'use strict';
@@ -187,6 +188,28 @@ router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth(), validateBody(
   try {
     const id = _parseId(req);
     const empresa = empresaService.marcarAnexoFirmado(id, req.body.fecha, _contextoAuditoria(req));
+    res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-firmado/quitar
+// Quita la fecha de firma del Anexo de Encargo.
+//
+// Es la salida auditada para una marca equivocada: exige `X-Admin-Motivo`,
+// escribe el valor anterior y el nuevo (null) en el historial append-only y
+// deja un WARN en el log. Sin este camino, la unica forma de corregir seria
+// tocar la base a mano, sin rastro.
+//
+// Despues de quitarla, D-03 vuelve a bloquear la Empresa hasta que se registre
+// una fecha respaldada por el PDF firmado.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-firmado/quitar', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const empresa = empresaService.desmarcarAnexoFirmado(id, _contextoAuditoria(req));
     res.json(empresa);
   } catch (err) {
     next(err);

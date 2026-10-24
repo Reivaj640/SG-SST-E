@@ -130,6 +130,22 @@ test('D-03 · verificarHabilitacionFirma dice qué falta', () => {
   assert.deepEqual(ok.pendientes, []);
 });
 
+test('D-03 · quitar la fecha del Anexo vuelve a bloquear la Empresa', () => {
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conPlazo: true });
+  assert.equal(empresaService.verificarHabilitacionFirma(EMPRESA).ok, true);
+
+  empresaService.desmarcarAnexoFirmado(EMPRESA, {
+    actor: 'el owner',
+    motivo: 'no existe el PDF firmado; se vuelve a firmar',
+  });
+
+  const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+  assert.equal(h.ok, false);
+  assert.deepEqual(h.pendientes, ['anexo_encargo_firmado']);
+  assert.match(h.mensaje, /Anexo de Encargo/i);
+});
+
 test('D-03 · una empresa NO registrada no se bloquea', async () => {
   // Es otro problema (identificación incompleta) y se atiende por el alta.
   // Bloquearlo aquí rompería a los clientes que no usan el directorio.
