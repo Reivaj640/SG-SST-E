@@ -6196,9 +6196,16 @@ El e2e dejó una fila en producción (id=12, SIGN-2026-427494, PENDING, 1 PDF) y
 `limpiar-rastro-prueba.js --solo-firmas` se negó a borrarla: "1 firma(s) tienen deber legal de
 conservación (hold)".
 
-El hold venía de la **ficha de la Empresa**: `conservacion_por_deber_legal = 1` le levanta el hold
-automático a toda firma de esa Empresa (migración 030). No era una disputa sobre esa firma: era la
-bandera general aplicada a una fila que nunca se firmó.
+El hold venía de la **regla de retención, no de la ficha de la Empresa**. La ficha del servidor tiene
+`conservacion_por_deber_legal = 0` (verificado el 24-oct-2026 con `panel-firmas.js --json`): no
+levanta ningún hold. El hold lo trajo la **regla `CONTRATO_ELECTRONICO`**, la del 2.2.1.1.12 — el
+contrato electrónico se conserva **sin término** — y el smoke cae en ella porque crea la solicitud
+con `tipo_identificacion: 'OTROSI'`, que el catálogo resuelve a la categoría `CONTRATO_TRABAJO`.
+O sea: el hold era el **más fuerte** de todos, no una bandera de la Empresa.
+
+Eso no cambia la limpieza: `--forzar-hold` abre solo para filas que nunca tuvieron un acto y con el
+hold automático (motivo `deber_legal_*`, actor `sistema`), y esa fila cumplía las dos. Pero el
+recibo dice ahora la verdad de por qué se forzó, y no dice una cosa que no era.
 
 `--forzar-hold` es la válvula, y solo se abre para filas que cumplen **dos** condiciones:
 

@@ -505,10 +505,17 @@ append-only), y la base se verifica con `integrity_check` al final.
 
 ### Cuando el hold bloquea la limpieza: `--forzar-hold`
 
-La ficha de la Empresa puede tener `conservacion_por_deber_legal = 1`. Esa
-bandera le levanta el **hold automático** a toda firma de esa Empresa
-(migración 030), y entonces el script se niega: "1 firma(s) tienen deber legal
-de conservación (hold)".
+El hold automático de una firma tiene **dos** orígenes, y conviene saber cuál de los dos se
+disparó:
+
+1. **La ficha de la Empresa**: si tiene `conservacion_por_deber_legal = 1` (migración 030), esa
+   bandera le levanta el hold automático a toda firma de esa Empresa.
+2. **La regla de retención**: si el documento se clasificó como `CONTRATO_TRABAJO` (que es lo que
+   pasa cuando la solicitud llega con `tipo_identificacion: 'CONTRATO'` u `'OTROSI'`), la regla
+   `CONTRATO_ELECTRONICO` le levanta el hold del **2.2.1.1.12**: el contrato electrónico se
+   conserva **sin término**. Este es el hold más fuerte de todos.
+
+En los dos casos el script se niega: "1 firma(s) tienen deber legal de conservación (hold)".
 
 Para una fila de prueba que **nunca se firmó**, la salida es `--forzar-hold`:
 
