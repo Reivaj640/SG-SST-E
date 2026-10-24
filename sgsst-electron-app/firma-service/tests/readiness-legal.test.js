@@ -18,6 +18,10 @@ const assert = require('node:assert/strict');
 
 const readiness = require('../src/services/readinessLegal');
 const { analizarTextoLegal, listarPlaceholders } = require('../src/utils/textoLegal');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const Database = require('better-sqlite3');
 
 const CONFIG_TEST = {
   env: 'test',
@@ -310,4 +314,120 @@ test('readiness · analizarAnexos devuelve los tres documentos', () => {
   assert.equal(r.anexo_nube.ok, true);
   assert.equal(r.anexo_encargo.clausulasOk, true);
   assert.ok(r.anexo_nube.hash.length === 64);
+});
+
+test('readiness · la tabla de solicitudes del Titular se detecta con el SQL real de la 028', () => {
+  // El nombre de la tabla lo decide la migración 028: `gh_solicitudes_titular`,
+  // SIN el prefijo `firma_`, porque esa tabla no cuelga de ninguna firma (la
+  // 5B no la alcanza). El check tiene que buscar ese nombre exacto: si
+  // busca `gh_firma_solicitudes_titular` no lo encuentra nunca, y el reporte
+  // pide "aplicar las migraciones 028/029" cuando ya estan aplicadas.
+  // Este test aplica el SQL de la migración, no una copia a mano: si alguien
+  // renombra la tabla en la 028, el test se rompe y avisa.
+  const ruta = path.join(
+    os.tmpdir(),
+    'kair-readiness-tablas-' + process.pid + '-' + Date.now() + '.sqlite',
+  );
+  const bd = new Database(ruta);
+  try {
+    const sql = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'db', 'schema', '028_solicitudes_titular.sql'),
+      'utf8',
+    );
+    bd.exec(sql);
+
+    const r = readiness.evaluar({
+      gate: 'publicacion',
+      db: bd,
+      config: CONFIG_TEST,
+      manifiesto: manifiestoCompleto(),
+      textos: {
+        acuerdoV11: ACUERDO_OK,
+        anexoNube: NUBE_OK,
+        anexoEncargo: ENCARGO_OK,
+      },
+    });
+    const idsPendientes = r.pendientes.map((p) => p.id);
+    assert.ok(
+      !idsPendientes.includes('tabla_solicitudes'),
+      `la tabla de solicitudes del Titular quedo pendiente: ${JSON.stringify(idsPendientes)}`,
+    );
+  } finally {
+    bd.close();
+    try { fs.unlinkSync(ruta); } catch (_) { /* el archivo ya no esta */ }
+  }
+});
+
+test('readiness · con la huella puesta y sin archivo, la accion no manda a registrar la huella', () => {
+  // La huella YA esta en el manifiesto. La accion que se le da al operador
+  // tiene que decir lo que falta (el archivo aprobado), no mandarlo a
+  // registrar una huella que ya esta registrada.
+  const r = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: manifiestoCompleto(),
+    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+  });
+  const item = r.pendientes.find((p) => p.id === 'hash_v1_1');
+  assert.ok(item, 'el item hash_v1_1 deberia quedar pendiente sin archivo');
+  assert.doesNotMatch(item.accion, /registrarlo en legal-readiness/);
+  assert.match(item.accion, /huella ya est/);
+});
+
+test('readiness · el Anexo de Encargo con la redaccion de sustitucion pasa', () => {
+  // La decision del 24-oct-2026 fue (b) reemplazo: no hay un Anexo base firmado
+  // al que anadirle un otrosi, asi que el Anexo nuevo lo sustituye. El check
+  // tiene que aceptar las DOS redacciones: exigir una clausula que el
+  // documento final no lleva es un requisito que no puede satisfacerse.
+  const r = readiness.analizarAnexoEncargo([
+    'Anexo de Nube.',
+    'Sustituye en su totalidad el Anexo anterior.',
+    'Artículo 2.2.4.6.13 del Decreto 1072 de 2015.',
+    'Veinte (20) años.',
+    'Servicio en nube: firma-service.',
+  ].join('\n'));
+  assert.equal(r.clausulasOk, true);
+  assert.equal(r.faltan.length, 0);
+});
+
+test('readiness · el Anexo de Encargo del repo trae las cinco clausulas', () => {
+  // El documento que se publica en kair.fyi/anexo-encargo.html. El punto 3 no
+  // se cierra con una URL que apunte a un documento viejo: este es el del
+  // servicio en la nube, con la remision al Anexo de Nube, la clausula de
+  // sustitucion, el art. 2.2.4.6.13, los veinte anos y el servicio en nube.
+  const html = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'legal', 'anexo-encargo.html'),
+    'utf8',
+  );
+  const r = readiness.analizarAnexoEncargo(html);
+  assert.deepEqual(
+    r.faltan.map((f) => f.id),
+    [],
+    `faltan: ${JSON.stringify(r.faltan.map((f) => f.id))}`,
+  );
+  assert.equal(r.placeholders.huecos.total, 0);
+});
+
+test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/', () => {
+  // Sellar una URL que no sirve el documento es peor que no sellarla: el
+  // Acuerdo apuntaria a algo que no existe o a otra version del documento.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  const base = 'https://kair.fyi/';
+  for (const [clave, archivo] of [
+    ['url_politica', 'politica-firma.html'],
+    ['url_anexo_encargo', 'anexo-encargo.html'],
+  ]) {
+    const url = man.encargado[clave];
+    assert.ok(url, `${clave} esta en null`);
+    assert.ok(url.startsWith(base), `${clave} no apunta a ${base}: ${url}`);
+    const nombre = url.slice(base.length);
+    assert.ok(
+      fs.existsSync(path.join(__dirname, '..', '..', '..', 'sitio', nombre)),
+      `el documento publicado ${nombre} no esta en sitio/`,
+    );
+  }
 });

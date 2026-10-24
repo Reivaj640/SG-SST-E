@@ -6660,3 +6660,142 @@ NIT entra dentro del 📦944; aquí es donde el documento **publicado** cambia.
 En el manifiesto siguen en `null`, y por eso el `partes_encargado` y el banner del Anexo de
 Nube no pueden quedar listos: `encargado.representante_legal`, `encargado.acta_designacion`,
 `encargado.url_politica` y `encargado.url_anexo_encargo`. Ninguno se rellena con un ejemplo.
+
+## 📦947 · El check pedía una migración que ya estaba aplicada
+
+*24-oct-2026 · el readiness en el servidor · el nombre de la tabla de solicitudes del Titular*
+
+### Lo que dijo el servidor
+
+El despliegue del 24-oct-2026 (el commit `f26f8bc1`) terminó bien: los tres hashes en
+disco coincidieron con los del commit, el servicio arrancó y el journal mostró
+`"No hay migraciones pendientes","total":40`. Pero el readiness del servidor sacaba
+**doce bloqueantes**, y entre ellos estaba uno que no podía ser cierto:
+
+```
+[pqrs] Tabla de solicitudes del Titular
+    Falta la tabla de solicitudes del Titular.
+    -> Aplicar las migraciones 028/029.
+```
+
+El journal de ese mismo arranque decía, línea por línea, que **028 y 029 ya estaban
+aplicadas**. El reporte pedía aplicar unas migraciones que no había que aplicar: el
+check no podía pasar nunca, y bloqueaba los dos gates.
+
+### La causa, contrastada con el SQL
+
+La migración 028 crea `gh_solicitudes_titular` — **sin el prefijo `firma_`**, a
+propósito: esa tabla no cuelga de ninguna firma, y por eso la 5B (la supresión) no
+la alcanza. El check buscaba `gh_firma_solicitudes_titular`, un nombre que **no
+aparece en ninguna migración**. Los otros cuatro nombres del bloque
+(`gh_firma_medios_trabajador`, `gh_firma_firmas_papel`,
+`gh_firma_excepciones_habilitacion`, `gh_firma_excepciones_habilitacion_eventos`) sí
+coincidían con sus migraciones (032 y 035); el quinto no.
+
+La prueba no es la lectura del código: el test nuevo aplica el **SQL real** de la
+migración 028 en una base en memoria y exige que el check vea la tabla. Con el
+nombre viejo el test falla y `tabla_solicitudes` queda en los pendientes; con el
+nombre correcto pasa.
+
+### La segunda corrección: la acción que mandaba a hacer algo inútil
+
+El ítem `hash_v1_1` ("Huella del texto registrada en el manifiesto") decía, cuando
+faltaba el archivo de la v1.1:
+
+> Calcular el SHA-256 del texto aprobado y registrarlo en legal-readiness.json.
+
+La huella **ya estaba** en el manifiesto (`a88e41af…b7bc5`): lo que faltaba era el
+archivo aprobado, que no entra al servidor hasta que el abogado apruebe el texto.
+La acción mandaba al operador a registrar algo ya registrado.
+
+Ahora la acción dice lo que falta, y el detalle sigue diciendo la verdad. Lo mismo
+con la tabla: la acción pasó de "Aplicar las migraciones 028/029" a "Aplicar la
+migración 028, que crea la tabla gh_solicitudes_titular".
+
+### Verificación
+
+- **2 tests nuevos** en `tests/readiness-legal.test.js`: uno aplica el SQL de la 028 y
+  exige que el check vea la tabla; el otro exige que la acción no mande a registrar
+  una huella que ya está puesta.
+- **Mutación comprobada**: con el nombre viejo el primer test falla
+  (`tabla_solicitudes` en los pendientes). Un test que no falla cuando se rompe el
+  código no está probando nada.
+- Suite completa: **1719 tests · 1717 pass · 0 fail · 2 skipped**.
+- `node --check` en los dos archivos; barrido de caracteres no latina limpio; EOL LF
+  puro sin BOM.
+
+### Lo que este paquete NO hace
+
+No publica la v1.1 ni los documentos finales: eso sigue esperando la aprobación del
+abogado y las URLs (`encargado.url_politica`, `encargado.url_anexo_encargo`). Y el
+Anexo de Nube sigue con sus 53 huecos: eso es el punto 7, y no es del código.
+
+## 📦️948 · El Anexo de Encargo del servicio en la nube y las URLs del punto 3
+
+*24-oct-2026 · el punto 3 cerrado · el Anexo de Encargo nuevo (reemplazo) · la politica del Encargado*
+
+### Lo que habia
+
+El punto 3 era "URLs del Anexo y de la política". La parte (a) —el DNS, el `CNAME` y el certificado—
+ya estaba hecha y verificada. Faltaban (b) publicar los documentos y (c) declarar las URLs en el
+manifiesto, y (c) no se puede hacer antes que (b): sellar una URL que todavía no sirve el
+documento hace que el Acuerdo apunte a algo que no existe.
+
+Al medir (b) apareció la sorpresa: **el Anexo de Encargo del repo era el de la app de
+escritorio** (base de datos local en los equipos del cliente, control de acceso por cuenta de
+Windows, Google Calendar, jsDelivr) y el Anexo de Nube no estaba en `sitio/`. Los dos
+documentos describían un producto que ya no es el que se firma.
+
+### Los tres documentos
+
+- **El Anexo de Encargo nuevo** (`legal/anexo-encargo.html`, y su copia en `sitio/`): describe
+  el `firma-service` —servicio en la nube— con las medidas que el código tiene de verdad (huella
+  con sal, un solo token vigente por solicitud, OTP a los 600 segundos, bitácora de auditoría que
+  no se altera, 48 horas de incidentes, dos días hábiles de traslado de PQRS, veinte años de
+  custodia). Trae las cinco cláusulas que el checker exige y que el documento viejo no tenía: la
+  remisión al Anexo de Nube, la **sustitución** (no un otrosí: la decisión del 24-oct fue
+  (b) reemplazo), el art. 2.2.4.6.13, los veinte años y el servicio en la nube.
+- **El Anexo de Nube**, copiado a `sitio/` y por fin en el menu del sitio. Sigue siendo el modelo
+  v1.0 con sus 53 huecos y su aviso: diligenciarlo es el punto 7.
+- **La política de tratamiento del Encargado** (`politica-firma.html`, nueva): la del **servicio
+  de firma**, no la de la app. La que estaba publicada (`privacidad.html`) habla de conectar la
+  cuenta de Google y de los tokens en el equipo: es de otro producto.
+
+### El nudo que casi se pasa por alto
+
+El `url_politica` del manifiesto se iba a llenar con `https://kair.fyi/privacidad.html`, que era
+la decisión que estaba escrita. Al leer esa página resultó que es la política de la **app de
+escritorio**: describe la conexión con Google, los tokens guardados en el equipo del usuario y
+la revocación de esos tokens. Sellar esa URL como "la política de tratamiento" del Encargado
+del servicio de firma habría sido **un sello falso**: el Acuerdo de la nube habría remitido a
+un documento que no describe ese servicio.
+
+El texto aprobado del Acuerdo (la v1.0, sellada) no obliga a esto: el 1.2 y el 10.7 remiten a la
+política de la **Empresa** (la Responsable), no a la del Encargado. La del Encargado es un
+documento propio, y por eso se redactó y se publicó aparte.
+
+### El check del otrosí, que no admitía la sustitución
+
+`REQUERIDOS_ENCARGO` exigía una cláusula de otrosí. Con la decisión (b) no hay otrosí: hay
+sustitución, y un documento que no lleva la cláusula exigida no puede pasar un check.
+El ítem ahora acepta **las dos redacciones** (`otros[ií]` o `sustitu`), porque son dos formas de
+la misma cláusula y el requirement no es "otrosí" sino "que el documento diga cómo se
+relaciona con el Anexo anterior".
+
+### Verificación
+
+- **3 tests nuevos**: la redacción de sustitución pasa; el Anexo de Encargo **real del repo** trae
+  las cinco cláusulas; y las URLs del manifiesto apuntan a archivos que **existen en `sitio/`**.
+  Ese último es el que ata el sello al documento: una URL que no sirve el archivo es un sello
+  falso.
+- Las tres URLs se **verificaron por HTTP** (200 y el contenido esperado) **antes** de sellarlas
+  en el manifiesto, no después.
+- Suite completa: **1722 tests · 1720 pass · 0 fail · 2 skipped**.
+- El documento nuevo conserva la marca de revisión profesional pendiente: **lo redactó el
+  modelo, no un abogado**, y quitar esa marca sin la revisión del abogado sería afirmar algo
+  falso. Por eso el ítem `documento_encargo` sigue en pendiente y bloqueando la primera firma.
+
+### Lo que este paquete NO cierra
+
+El punto 7 (diligenciar el Anexo de Nube) y el punto 11 (la firma del Anexo de Encargo nuevo, que
+necesita al abogado) siguen abiertos. El punto 3 era el de las URLs, y esas ya son verdad.

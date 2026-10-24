@@ -472,7 +472,16 @@ const REQUERIDOS_NUBE = [
 
 const REQUERIDOS_ENCARGO = [
   { id: 'anexo_nube', titulo: 'Remisión al Anexo de Nube', re: /Anexo\s+de\s+Nube/i },
-  { id: 'otrosi', titulo: 'Cláusula de otrosí', re: /otros[ií]/i },
+  {
+    // La cláusula sirve para las DOS redacciones. La decisión del 24-oct-2026 fue
+    // (b) REEMPLAZO: no hay un Anexo base firmado al que añadirle un otrosí, así
+    // que el Anexo nuevo sustituye al anterior. El check tenía que aceptar las
+    // dos formas, no solo la del otrosí: exigir una cláusula que el documento
+    // final no lleva es un requisito que no puede satisfacerse.
+    id: 'sustitucion',
+    titulo: 'Sustitución del Anexo anterior o cláusula de otrosí',
+    re: /(otros[ií]|sustitu)/i,
+  },
   { id: 'cinco_categorias', titulo: 'Art. 2.2.4.6.13', re: /2\.2\.4\.6\.13/i },
   { id: 'veinte_anios', titulo: 'Veinte (20) años', re: /(veinte\s*\(20\)|20\s*años|20\s*anos)/i },
   { id: 'servicio_nube', titulo: 'Servicio en nube / firma-service', re: /firma-service|servicio\s+en\s+nube|servicio\s+de\s+firma\s+en\s+la\s+nube/i },
@@ -732,7 +741,12 @@ function evaluar(opciones = {}) {
     firmas_papel: _tablaExiste(dbConn, 'gh_firma_firmas_papel'),
     excepciones: _tablaExiste(dbConn, 'gh_firma_excepciones_habilitacion'),
     excepciones_eventos: _tablaExiste(dbConn, 'gh_firma_excepciones_habilitacion_eventos'),
-    solicitudes_titular: _tablaExiste(dbConn, 'gh_firma_solicitudes_titular'),
+    // El nombre NO lleva "firma_": la 028 crea `gh_solicitudes_titular` a
+    // propósito, porque esa tabla no cuelga de ninguna firma (la 5B no la
+    // alcanza). Buscar `gh_firma_solicitudes_titular` hacía que este check
+    // NUNCA pudiera pasar: la migración 028 llevaba aplicada y el reporte
+    // pedía "aplicar las migraciones 028/029", que ya estaban aplicadas.
+    solicitudes_titular: _tablaExiste(dbConn, 'gh_solicitudes_titular'),
     trigger_excepciones_append_only: _triggerExiste(
       dbConn, 'trg_excepciones_habilitacion_eventos_no_update',
     ),
@@ -762,6 +776,9 @@ function evaluar(opciones = {}) {
   const publicadoV11 = dbConn
     ? _versionEsAlMenosV11(versionActiva)
     : acMan.publicado === true;
+  const hashV11Ok = _esHashSha256(acMan.v1_1_hash)
+    && anAcuerdo.existe
+    && _hash(docAcuerdo.texto) === acMan.v1_1_hash.toLowerCase();
 
   // -------------------------------------------------------------------------
   // 1. Acuerdo v1.1
@@ -782,8 +799,7 @@ function evaluar(opciones = {}) {
     _item(
       'hash_v1_1',
       'Huella del texto registrada en el manifiesto',
-      _estado(_esHashSha256(acMan.v1_1_hash) && anAcuerdo.existe
-        && _hash(docAcuerdo.texto) === acMan.v1_1_hash.toLowerCase()),
+      _estado(hashV11Ok),
       {
         bloquea: GATE_AMBOS,
         detalle: _esHashSha256(acMan.v1_1_hash)
@@ -793,7 +809,21 @@ function evaluar(opciones = {}) {
               ? 'El hash del manifiesto coincide con el archivo.'
               : 'El hash del manifiesto NO coincide con el archivo actual.'))
           : 'El manifiesto todavía no tiene la huella de la v1.1.',
-        accion: 'Calcular el SHA-256 del texto aprobado y registrarlo en legal-readiness.json.',
+        // La acción dice lo que FALTA, no lo que ya se hizo. La huella ya
+        // está en el manifiesto: lo que falta es el archivo aprobado (o que
+        // el archivo y la huella digan lo mismo). Antes esta acción pedía
+        // "registrarlo en legal-readiness.json" cuando ya estaba registrado,
+        // y mandaba al operador a hacer algo inútil.
+        accion: _accionSi(
+          hashV11Ok,
+          _esHashSha256(acMan.v1_1_hash)
+            ? (!anAcuerdo.existe
+              ? 'La huella ya está en el manifiesto: falta el archivo aprobado de la v1.1 '
+                + '(entra al servidor cuando el abogado apruebe el texto).'
+              : 'El archivo no coincide con la huella del manifiesto: recalcular su SHA-256 '
+                + 'y actualizar legal-readiness.json → acuerdo.v1_1_hash.')
+            : 'Calcular el SHA-256 del texto aprobado y registrarlo en legal-readiness.json.',
+        ),
         referencia: 'legal-readiness.json → acuerdo.v1_1_hash',
       },
     ),
@@ -831,8 +861,12 @@ function evaluar(opciones = {}) {
         bloquea: GATE_AMBOS,
         detalle: _urlValida(enc.url_politica)
           ? 'URL declarada.'
-          : 'Falta la URL de la política de tratamiento (el 1.5 y el 10.7 la remiten).',
-        accion: 'Publicar la política y registrar su URL en el manifiesto.',
+          : 'Falta la URL de la política de tratamiento de datos del Encargado.',
+        // OJO: el 1.2 y el 10.7 del Acuerdo remiten a la política de la EMPRESA
+        // (la Responsable), no a la del Encargado. Esta es la del Encargado: la
+        // que declara el manifiesto y a la que K+AIR se obliga en este anexo.
+        accion: 'Publicar la política de tratamiento de datos del servicio de firma '
+          + 'y registrar su URL en el manifiesto.',
         referencia: 'legal-readiness.json → encargado.url_politica',
       },
     ),
@@ -1309,7 +1343,8 @@ function evaluar(opciones = {}) {
             : 'El estado es desconocido.'),
         accion: estadoEncargo === 'firmado'
           ? 'Adjuntar la fecha y la evidencia del Anexo firmado.'
-          : 'Resolver el estado real: firmar el Anexo base o incorporar el Anexo de Nube como otrosí.',
+          : 'Resolver el estado real: firmar el Anexo de Encargo vigente (el que incorpora '
+            + 'el Anexo de Nube) y registrar la fecha y la evidencia en el manifiesto.',
         referencia: 'legal-readiness.json → anexo_encargo',
       },
     ),
@@ -1324,7 +1359,12 @@ function evaluar(opciones = {}) {
         detalle: _detalleDocumento(anEncargo),
         accion: encargoDocumentoOk
           ? ''
-          : 'Quitar la marca de revisión pendiente y agregar la remisión al Anexo de Nube.',
+          : (anEncargo.faltan.length === 0
+            ? 'Quitar la marca de revisión pendiente: las cláusulas y la remisión al Anexo '
+              + 'de Nube ya están. La marca solo se quita cuando el abogado revise el documento.'
+            : 'Agregar las cláusulas que faltan (remisión al Anexo de Nube, sustitución u '
+              + 'otrosí, art. 2.2.4.6.13, veinte años y servicio en la nube) y quitar la '
+              + 'marca de revisión pendiente.'),
         referencia: docEncargo.archivo,
       },
     ),
@@ -1390,8 +1430,8 @@ function evaluar(opciones = {}) {
         bloquea: GATE_AMBOS,
         detalle: tablas.solicitudes_titular
           ? 'La tabla existe.'
-          : 'Falta la tabla de solicitudes del Titular.',
-        accion: 'Aplicar las migraciones 028/029.',
+          : 'Falta la tabla gh_solicitudes_titular en la base.',
+        accion: 'Aplicar la migración 028, que crea la tabla gh_solicitudes_titular.',
         referencia: 'migración 028',
       },
     ),
