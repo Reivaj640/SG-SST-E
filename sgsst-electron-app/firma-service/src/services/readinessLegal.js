@@ -891,15 +891,27 @@ function evaluar(opciones = {}) {
     ),
     _item(
       'responsable_datos',
-      'Responsable de protección de datos y acta de designación',
-      _estado(!!_texto(enc.responsable_datos) && !!_texto(enc.acta_designacion)),
+      'Persona o área responsable de la protección de datos',
+      // Lo que la ley exige es DESIGNAR una persona o área (art. 2.2.2.25.4.4
+      // del Decreto 1074 de 2015, que reproduce el art. 23 del Decreto 1377 de
+      // 2013). NO exige un acta de designación: la SIC ha precisado que la Ley
+      // 1581 y sus normas reglamentarias "no establecen un procedimiento
+      // específico para la designación" (Resolución 384 de 2026, Secretaría
+      // Jurídica Distrital, que cita a la SIC). La forma de documentarla la
+      // define la organización; aquí es la declaración pública en el Anexo de
+      // Encargo y en la política, que es verificable por un tercero. Exigir el
+      // acta era un requisito que la ley no impone y que el owner no tiene.
+      _estado(!!_texto(enc.responsable_datos)),
       {
         bloquea: GATE_AMBOS,
-        detalle: !!_texto(enc.responsable_datos) && !!_texto(enc.acta_designacion)
-          ? 'Responsable y acta declarados.'
-          : 'Falta la persona/área responsable o la referencia del acta de designación.',
-        accion: 'Designar formalmente al responsable y adjuntar la referencia del acta.',
-        referencia: 'legal-readiness.json → encargado.responsable_datos / acta_designacion',
+        detalle: _texto(enc.responsable_datos)
+          ? `Persona o área designada: ${enc.responsable_datos}.`
+          : 'Falta designar la persona o el área que asume la función de '
+            + 'protección de datos y de trámite de las solicitudes de los titulares.',
+        accion: 'Designar la persona o el área que asume la función de protección '
+          + 'de datos (art. 2.2.2.25.4.4 del Decreto 1074 de 2015) y declararla en el '
+          + 'Anexo de Encargo y en la política de tratamiento.',
+        referencia: 'legal-readiness.json → encargado.responsable_datos',
       },
     ),
     _item(

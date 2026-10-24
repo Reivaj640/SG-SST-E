@@ -920,6 +920,52 @@ modelo, no un abogado), así que el ítem `documento_encargo` sigue bloqueando l
 **Commits** — el 📦️947 (el check que pedía una migración ya aplicada) y este 📦️948 van en dos
 commits; los hashes quedan anotados en la entrada siguiente.
 
+### 2026-10-24 · 📦️949 · El acta de designación no era una obligación legal
+
+**El encargo.** "ok perfecto ahora quiero que resuelvas el punto 5, si no es obligación crear un acta del responsable
+quitemos esa referencia para que no nos genere un bloqueo".
+
+**Lo que pedía el check.** El ítem `responsable_datos` exigía la persona o área responsable **y** la referencia del
+acta de designación. Con el responsable ya declarado (el cargo del Representante Legal de Gesstiar) el ítem
+seguía en `pendiente` y bloqueaba la primera firma. El origen de esa segunda condición era la línea 67 de la
+respuesta 11A del abogado: "persona o área (con acta de designación)".
+
+**Lo que dice la norma.** El art. 2.2.2.25.4.4 del Decreto 1074 de 2015 (que reproduce el art. 23 del Decreto 1377 de
+2013) exige **designar una persona o área**: nada más. Para responder si el acta hacía parte de ese "designar" se
+leyó la Resolución 384 de 2026 de la Secretaría Jurídica Distrital, que cita a la SIC: "la Superintendencia de
+Industria y Comercio ha precisado que la Ley Estatutaria 1581 de 2012 y sus normas reglamentarias no establecen un
+procedimiento específico para la designación, ni determinan una profesión, tipo de vinculación o dependencia
+particular". Esa misma resolución designa con una **Resolución**, no con un acta. Y el texto aprobado del Acuerdo
+(10.7(b) final) tampoco pide acta: dice "designa una persona o área" y "la persona o área responsable es [nombre o cargo]".
+
+**La decisión.** Se quitó el acta del requisito bloqueante: el campo `acta_designacion` desaparece del manifiesto y
+el ítem depende ya solo de la designación. La designación se documenta en los **documentos públicos** (el
+Anexo de Encargo y la política), que es la forma que la ley deja a la organización y que un tercero puede verificar
+sin pedirle nada a nadie. Un acta interna no se le puede pedir a un tercero; una declaración publicada, sí.
+
+**Los cuatro documentos.** `legal/anexo-encargo.html` y `sitio/anexo-encargo.html` (19 381 B): el párrafo en el
+capítulo 1, el dato en el capítulo 11 y el art. 23 del Decreto 1377 de 2013 en la lista de normas.
+`legal/politica-firma.html` y `sitio/politica-firma.html` (10 366 B): el párrafo en el capítulo 1 y la cita de las dos
+normas en el capítulo 7 (derechos del titular), que es donde el art. 23 aplica de verdad. Los dos pares quedaron
+**idénticos** (mismo SHA-256).
+
+**La prueba.** 2 tests nuevos: uno afirma que con solo la designación el ítem queda `ok` (y que **sin**
+designación sigue en `pendiente`), y otro ata el manifiesto real (si alguien vuelve a meter `acta_designacion` en
+`legal-readiness.json`, el test falla). **Mutación comprobada por los dos lados**: reintroducir el acta en el código
+rompe el primero, y reintroducir el campo en el manifiesto rompe el segundo. Suite completa: **1724 tests · 1722
+verdes · 0 rojos · 2 omitidos** (antes 1722/1720/0/2).
+
+**Lo que NO cierra.** Sigue faltando el **nombre** del representante legal de Gesstiar: con el cargo la designación
+legal está hecha; con el nombre, además, se enciende `partes_encargado` (punto 2 y el banner del Anexo de Nube,
+punto 7). Ese nombre es del owner.
+
+**Archivos tocados** — `firma-service/legal-readiness.json`, `firma-service/src/services/readinessLegal.js`,
+`firma-service/scripts/fixtures/acuerdo-v1.1-datos.json`, `firma-service/tests/readiness-legal.test.js`,
+`legal/anexo-encargo.html`, `legal/politica-firma.html`, `sitio/anexo-encargo.html`, `sitio/politica-firma.html`,
+`BITACORA.md`, `PROMPT.md` (trampa 80), `Historial.md`.
+
+**Commits** — pendiente de la palabra del owner.
+
 ### 📋 El tablero de los 15 puntos (estado medido al 24-oct-2026)
 
 | # | Pendiente | Estado |
@@ -938,27 +984,31 @@ de la nube habría remitido a un documento que no describe ese servicio. El text
 política de la **Empresa** (Responsable), no a la del Encargado: esa es la que se redactó aparte. Un test ata cada URL
 declarada al archivo que realmente se publica en `sitio/` |
 | 4 | Canal de protección de datos | ✅ **Cerrado en los 5 lugares, y ya verificado en el servidor.** `.env` local, `config.js:117`, `.env.example`, manifiesto (`canal_proteccion_datos` + `canal_confirmado: true`) y el 10.7(b) del texto armado. El `.env` **del servidor** también, verificado: `FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com`. ✅ El aviso anterior ("en el servidor el ítem `canal_datos` está en FALLA hasta el deploy") **quedó obsoleto**: el despliegue del 24-oct-2026 llevó el manifiesto del 📦️944 y el ítem `canal_datos` **ya no aparece** entre los 12 bloqueantes medidos en el servidor |
-| 5 | Responsable + acta | 🟡 **Medio cerrado, sin cambio.** El responsable ya quedó registrado: `Cargo Representante Legal de Gesstiar`. Falta la **referencia del acta de designación**, y por eso `responsable_datos` sigue en `pendiente` (el check exige responsable **y** acta). No inventarla: o es un acta interna, o la referencia al RUT o certificado de representación legal. En el servidor sigue entre los bloqueantes: "[acuerdo_v1_1] Responsable de protección de datos y acta de designación" |
+| 5 | Responsable + acta | ✅ **Cerrado (📦️949): el acta no era una obligación legal.** El check pedía la persona o área responsable **y** la referencia del acta de designación; con el responsable ya declarado (el cargo del Representante Legal de Gesstiar) el ítem seguía en `pendiente` y bloqueaba la primera firma. Verificado en la fuente oficial: el art. 2.2.2.25.4.4 del Decreto 1074 de 2015 (que reproduce el art. 23 del Decreto 1377 de 2013) exige **designar una persona o área**, nada más, y la Resolución 384 de 2026 de la Secretaría Jurídica Distrital (que cita a la SIC) precisa que la ley "no establece un procedimiento específico para la designación" (además designa con una Resolución, no con un acta). El texto aprobado tampoco pedía acta: el 10.7(b) final solo dice "designa una persona o área" y "la persona o área responsable es [nombre o cargo]". **Se quitó el acta del requisito**: el campo `acta_designacion` desaparece del manifiesto, el ítem pasa a `ok` ("Persona o área designada: Cargo Representante Legal de Gesstiar") y la designación se documenta en los **documentos públicos** (Anexo de Encargo y política), que es la forma que la ley deja a la organización y que un tercero puede verificar. 2 tests nuevos con **mutación comprobada** por los dos lados. ⚠️ Lo que sigue pendiente es el **nombre** del representante legal, que es del owner y enciende `partes_encargado` |
 | 6 | Canal único de PQRS | 🟡 Casi listo, sin cambio. El plazo ya está `ok` (2 días hábiles) y la ficha del servidor ya tiene `asepluscaribesas@gmail.com`. Falta que lo confirmes como **único** + el responsable, y declararlo en el manifiesto (`pqrs.canal` y `pqrs.responsable` siguen en `null`). En el servidor sigue entre los 12 bloqueantes: "[pqrs] Canal único de PQRS" |
 | 7 | Anexo de Nube | 🟡 **Medido y corregido (commiteado en `f26f8bc1`).** El checker leía el HTML crudo y no veía las cláusulas que el documento sí tiene (por las entidades): de **6 cláusulas faltantes a 0** (`clausulas_ok: true`), con los **53 huecos intactos** y el hash del archivo igual. De los 5 datos del banner ya están la ciudad/país, los tres responsables internos (respaldos/monitoreo/soporte) y **el NIT** (punto 2). Faltan: el **representante legal** (punto 2), los **DPAs** (punto 8) y el **tipo de cuenta de Google** (punto 9). Sigue pendiente una **decisión de fondo**: si el archivo del repo es el MODELO (con los huecos por Empresa) o el DOCUMENTO FINAL (diligenciado) — hoy **nadie diligencia el Anexo de Nube** (el servicio nunca lo lee) y los 3 huecos por-Empresa (`[EMPRESA]`, su NIT y su representante) no tienen dueño |
 | 8 | DPAs | 🔴 **Tu dato.** Sin cambio: los 6 campos por subencargado, todos en `false`/`null`. El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA |
 | 9 | Tipo de cuenta de Google | 🔴 **Tu dato.** Sin cambio: `subencargados.google.cuenta` en `null` y `[Workspace/Cloud]` en el Anexo de Nube. El 11A lo marcó "⚠️ No verificado" |
 | 10 | Ubicación + RTO/RPO + responsables | 🟡 **4 de 8 cerrados.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo). Faltan: **seguridad física, RTO, RPO y plan de continuidad**. ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe |
-| 11 | Estado real del Anexo de Encargo | 🔴 **Tu dato**, con la contradicción medida intacta: la BD del servidor dice firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no hay PDF; el manifiesto dice `no_firmado`; el documento tenía la marca "por diligenciar" (hoy ya no: se quitó al poner el NIT). **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publica un Anexo de Encargo nuevo, completo, con el servicio en la nube. Ojo: el check exige la cláusula de `otrosí` (que en el reemplazo no aplica: sería una *sustitución*); esa diferencia hay que resolverla en el check y en el texto. Las **5 cláusulas que le faltan al documento** (la remisión al Anexo de Nube, la de otrosí, el art. 2.2.4.6.13, los veinte años y el servicio en nube) son **mías**: están pendientes de redactar |
-| 12 | Aprobar la v1.1 con el abogado | 🟡 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). Falta que tú lo envíes; puedo convertirlo a Word o PDF |
+| 11 | Estado real del Anexo de Encargo | 🟢 **El documento ya está redactado (📦️948); falta la revisión del abogado.** La BD del servidor decía firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no había PDF; el manifiesto decía `no_firmado`. **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publicó un Anexo de Encargo nuevo, completo, con el servicio en la nube, las cinco cláusulas que el check exige y la remisión al Anexo de Nube. El check del `otrosí` ya acepta las dos redacciones (`otros[ií]` o `sustitu`). ⚠️ **Conserva la marca `REVISION_PENDIENTE`** a propósito: lo redactó el modelo, no un abogado, así que el ítem `documento_encargo` sigue bloqueando la primera firma |
+| 12 | Aprobar la v1.1 con el abogado | 🟢 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). 🟢 **Y ahora el Anexo de Encargo nuevo también**: lo redactó el modelo, no un abogado, y por eso conserva la marca `REVISION_PENDIENTE` (punto 11). Falta que tú los envíes; puedo convertir la v1.1 a Word o PDF |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ **Cerrado y commiteado** (`f26f8bc1`). Los 4 `[registrada por el sistema]` → el detector los reconoce (excepción de contenido exacto; las variantes siguen bloqueando). La línea "versión v1.0" → sello de versión en el encabezado y en el Manifiesto, con 4 checks negativos. Efecto medido: el texto pasó de `faltan:[{id:"version"}]` a `ok:true, faltan:[]` |
 | 14 | Rotar las 5 app passwords | ⚪ **Solo tuyo.** El repo es público y quedaron en el historial. Sin cambio |
 | 15 | SECURITY.md A/B/C | 🟡 **Medido; falta tu decisión.** C está descartada por los hechos (25+ referencias del código apuntan a secciones suyas). A = corregir las afirmaciones falsas + ejecutar el §7 (39 casillas, 0 marcadas). B = congelar con lo mínimo. Sigue en pie el hallazgo del servidor: **Node 20 está en EOL desde el 2026-04-30** (verificado contra `endoflife.date`), y la suposición del §1.3 ya era falsa cuando se escribió el documento |
 
-**El despliegue ya está hecho.** El commit `f26f8bc1` está en el servidor `kair-server`: los tres hashes en
+**El despliegue del `f26f8bc1` ya está hecho.** Ese commit está en el servidor `kair-server`: los tres hashes en
 disco coincidieron con los del commit, el arranque quedó limpio (`"No hay migraciones pendientes","total":40`),
-`/health` da 200 y el readiness del servidor baja de 19 a **12 bloqueantes** (los de la v1.1, la 9A, la 10.4,
-el D-03, el 8.6 y los dos de PQRS). El tar se arma desde el commit, nunca desde el working tree.
+`/health` da 200 y el readiness del servidor bajó de 19 a **12 bloqueantes** (los de la v1.1, la 9A, la 10.4,
+el D-03, el 8.6 y los dos de PQRS). **Falta un redespliegue**: el commit `d8c35ee3` (📦️947-948) ya está armado
+en un tar (`81776334…e770`, 531 222 B) y servido por el puente; este 📦️949 se suma al mismo despliegue.
+**El número de bloqueantes del servidor se mide en el despliegue, no se estima aquí**: el tar se arma desde el
+commit, nunca desde el working tree.
 
-**Los dos paquetes de esta sesión (📦️947 y 📦️948) están escritos y verificados.** El 📦️947 es el
+**Los tres paquetes de esta sesión (📦️947, 📦️948 y 📦️949) están escritos y verificados.** El 📦️947 es el
 check que pedía una migración ya aplicada (el readiness buscaba `gh_firma_solicitudes_titular` y la 028 crea
-`gh_solicitudes_titular`); el 📦️948 es el cierre del punto 3. Con el 📦️947 desplegado, ese bloqueante cae y
-quedan **11** en el servidor.
+`gh_solicitudes_titular`); el 📦️948 es el cierre del punto 3 (el Anexo de Encargo nuevo, el Anexo de Nube publicado
+y la política del Encargado, con las URLs selladas **después** de verificarlas por HTTP); el 📦️949 cierra el
+punto 5 (el acta de designación no era una obligación legal).
 
 **El Anexo de Encargo nuevo conserva la marca de revisión profesional pendiente**: lo redactó el modelo, no un abogado.
 Por eso el ítem `documento_encargo` sigue en pendiente y **bloqueando la primera firma**. El documento ya tiene las

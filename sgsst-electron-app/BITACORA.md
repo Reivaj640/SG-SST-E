@@ -6799,3 +6799,71 @@ relaciona con el Anexo anterior".
 
 El punto 7 (diligenciar el Anexo de Nube) y el punto 11 (la firma del Anexo de Encargo nuevo, que
 necesita al abogado) siguen abiertos. El punto 3 era el de las URLs, y esas ya son verdad.
+
+## 📦️949 · El acta de designación no era una obligación legal
+
+*24-oct-2026 · el punto 5 · la designación de la persona o área · el acta que la ley no pide*
+
+### Lo que pedía el check
+
+El ítem `responsable_datos` del readiness exigía **dos** cosas: la persona o el área responsable de la
+protección de datos **y** la referencia del acta de designación. Con la primera ya declarada (el cargo
+del Representante Legal de Gesstiar) el ítem seguía en `pendiente`, y con él se bloqueaba la primera
+firma.
+
+El origen de la segunda condición era una línea de la respuesta 11A del abogado: *"Lo que debe
+definir el owner antes de publicar: persona o área (con acta de designación), canal que alguien
+atienda..."*.
+
+### Lo que dice la norma
+
+La norma que el check citaba es el **art. 2.2.2.25.4.4 del Decreto 1074 de 2015** (que reproduce el
+art. 23 del Decreto 1377 de 2013): *"Todo Responsable y Encargado deberá designar a una persona o área
+que asuma la función de protección de datos personales, que dará trámite a las solicitudes de los
+Titulares..."*. Lo que exige es **designar**. Nada más.
+
+Para responder si el acta formaba parte de ese "designar", se leyó la **Resolución 384 de 2026** de la
+Secretaría Jurídica Distrital, que cita a la SIC: *"la Superintendencia de Industria y Comercio ha
+precisado que la Ley Estatutaria 1581 de 2012 y sus normas reglamentarias no establecen un
+procedimiento específico para la designación, ni determinan una profesión, tipo de vinculación o
+dependencia particular..."*. Y esa misma resolución designa con una **Resolución**, no con un acta.
+
+El texto aprobado del Acuerdo tampoco pide acta: el 10.7(b) final dice que la Empresa *"designa una
+persona o área"* y que *"la persona o área responsable es [nombre o cargo]"*. La condición del acta
+nunca llegó al texto final: era solo una nota de la lista de pendientes del Exchange.
+
+### La decisión
+
+Se quitó el acta del requisito bloqueante. El campo `acta_designacion` desaparece del manifiesto y el
+ítem depende ya solo de la designación. La forma de documentarla es la **declaración pública**: el
+Anexo de Encargo y la política dicen quién asume la función, con la cita de las dos normas, y ese
+texto lo puede verificar un tercero sin pedirle nada a nadie. Un acta interna no se le puede pedir a
+un tercero; una declaración publicada, sí.
+
+### Los cuatro documentos
+
+- `legal/anexo-encargo.html` y `sitio/anexo-encargo.html` (19 381 B, idénticos): el párrafo en el
+  capítulo 1, el dato en el capítulo 11 y el art. 23 del Decreto 1377 de 2013 en la lista de normas.
+- `legal/politica-firma.html` y `sitio/politica-firma.html` (10 366 B, idénticos): el párrafo en el
+  capítulo 1 y la cita de las dos normas en el capítulo 7 (derechos del titular), que es donde el
+  art. 23 aplica de verdad.
+
+### Verificación
+
+- **2 tests nuevos**: uno afirma que con solo la designación el ítem queda `ok` (y que **sin**
+  designación sigue en `pendiente`), y otro ata el manifiesto real: si alguien vuelve a meter
+  `acta_designacion` en `legal-readiness.json`, el test falla.
+- **Mutación comprobada por los dos lados**: reintroducir el acta en el código (`&& !!_texto(enc.acta_designacion)`)
+  rompe el primer test, y reintroducir el campo en el manifiesto rompe el segundo. Un check que se
+  afloja sin que nada lo detecte es un check que ya no muerde.
+- El reporte local: el ítem `responsable_datos` pasó de `pendiente` a `ok` — *"Persona o área
+  designada: Cargo Representante Legal de Gesstiar."*
+- Suite completa: **1724 tests · 1722 pass · 0 fail · 2 skipped** (antes 1722/1720/0/2: los dos
+  tests nuevos son los de este paquete).
+- Barrido de caracteres no latinos: limpio en los ocho archivos del paquete.
+
+### Lo que este paquete NO cierra
+
+Sigue faltando el **nombre** del representante legal de Gesstiar: con el cargo, la designación legal
+está hecha; con el nombre, además, la identificación completa del Encargado en el Anexo de Nube
+(`partes_encargado`). Ese nombre es del owner.

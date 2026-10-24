@@ -26,7 +26,7 @@
     "responsable_proteccion_datos": {
       "placeholder": "[nombre o cargo]",
       "valor": "Cargo Representante Legal de Gesstiar",
-      "nota": "Indicado por el owner. Falta la referencia del acta de designación, que el readiness exige junto a este valor."
+      "nota": "Indicado por el owner. La designación de la persona o área es lo que exige el art. 2.2.2.25.4.4 del Decreto 1074 de 2015; no hace falta un acta de designación, porque la SIC ha precisado que la ley no establece un procedimiento específico para ella. La designación se documenta en el Anexo de Encargo y en la política, que son públicos."
     }
   }
 }

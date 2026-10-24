@@ -81,7 +81,6 @@ function manifiestoCompleto() {
       canal_proteccion_datos: 'privacidad@example.com',
       canal_confirmado: true,
       responsable_datos: 'Área de Privacidad',
-      acta_designacion: 'acta-001.pdf',
       url_politica: 'https://example.com/privacidad',
       url_anexo_encargo: 'https://example.com/anexo-encargo',
     },
@@ -407,6 +406,57 @@ test('readiness · el Anexo de Encargo del repo trae las cinco clausulas', () =>
     `faltan: ${JSON.stringify(r.faltan.map((f) => f.id))}`,
   );
   assert.equal(r.placeholders.huecos.total, 0);
+});
+
+test('readiness · la designacion del responsable NO exige un acta de designacion', () => {
+  // Lo que la ley exige es DESIGNAR una persona o area (art. 2.2.2.25.4.4 del
+  // Decreto 1074 de 2015, que reproduce el art. 23 del Decreto 1377 de 2013).
+  // NO exige un acta: la SIC ha precisado que la Ley 1581 y sus normas
+  // reglamentarias "no establecen un procedimiento especifico para la
+  // designacion" (Resolucion 384 de 2026, Secretaria Juridica Distrital, que
+  // cita a la SIC). Exigir el acta era un requisito que la ley no impone.
+  const base = manifiestoCompleto();
+  const r = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: base,
+    textos: { acuerdoV11: ACUERDO_OK, anexoNube: NUBE_OK, anexoEncargo: ENCARGO_OK },
+  });
+  const idsPendientes = r.pendientes.map((p) => p.id);
+  assert.ok(
+    !idsPendientes.includes('responsable_datos'),
+    `el responsable quedo pendiente sin acta: ${JSON.stringify(idsPendientes)}`,
+  );
+  // Y sin la designacion, el item SI tiene que quedar pendiente.
+  const sinResponsable = JSON.parse(JSON.stringify(base));
+  sinResponsable.encargado.responsable_datos = null;
+  const r2 = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: sinResponsable,
+    textos: { acuerdoV11: ACUERDO_OK, anexoNube: NUBE_OK, anexoEncargo: ENCARGO_OK },
+  });
+  const item = r2.pendientes.find((p) => p.id === 'responsable_datos');
+  assert.ok(item, 'sin designacion el item responsable_datos debe quedar pendiente');
+  assert.match(item.accion, /Designar la persona o el \u00e1rea/);
+});
+
+test('readiness · el manifiesto real ya no pide el acta de designacion', () => {
+  // Si alguien vuelve a meter `acta_designacion` en el manifiesto, el check
+  // tiene que seguir funcionando: el campo se puede ignorar, pero no puede
+  // volver a ser un requisito. Este test ata el archivo real.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(man.encargado, 'acta_designacion'),
+    false,
+    'legal-readiness.json todavia declara acta_designacion',
+  );
+  assert.ok(man.encargado.responsable_datos, 'falta la designacion del responsable');
 });
 
 test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/', () => {
