@@ -115,7 +115,17 @@ function archivoDe(version) {
  */
 function verificarTextoLegal(version, texto) {
   if (!esVersionSujetaAGuarda(version)) {
-    return { ok: true, placeholders: { total: 0, unicos: [], muestras: [] }, marcadores: [] };
+    return {
+      ok: true,
+      placeholders: {
+        total: 0,
+        unicos: [],
+        muestras: [],
+        huecos: { total: 0, unicos: [], muestras: [] },
+        sistema: { total: 0, unicos: [], muestras: [] },
+      },
+      marcadores: [],
+    };
   }
   return analizarTextoLegal(texto);
 }
@@ -173,14 +183,19 @@ async function main(argv) {
   const revision = verificarTextoLegal(opts.version, texto);
   if (!revision.ok) {
     console.error('\n  EL TEXTO TIENE PLACEHOLDERS O MARCAS DE BORRADOR. No se publica nada.');
-    if (revision.placeholders.total > 0) {
+    if (revision.placeholders.huecos.total > 0) {
       console.error(
-        `  Placeholders: ${revision.placeholders.total} `
-        + `(${revision.placeholders.unicos.length} distintos)`,
+        `  Huecos por llenar: ${revision.placeholders.huecos.total} `
+        + `(${revision.placeholders.huecos.unicos.length} distintos)`,
       );
-      for (const u of revision.placeholders.unicos.slice(0, 20)) {
+      for (const u of revision.placeholders.huecos.unicos.slice(0, 20)) {
         console.error(`    - ${u}`);
       }
+    }
+    if (revision.placeholders.sistema.total > 0) {
+      console.error(
+        `  Campos que registra el sistema: ${revision.placeholders.sistema.total} (no bloquean).`,
+      );
     }
     for (const m of revision.marcadores) {
       console.error(`  Marca prohibida: ${m.etiqueta}`);

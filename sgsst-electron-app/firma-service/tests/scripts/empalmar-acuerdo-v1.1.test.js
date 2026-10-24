@@ -30,6 +30,7 @@ const {
   sha256,
   DEFAULT_BASE,
   DEFAULT_CAMBIOS,
+  DEFAULT_DATOS,
   DEFAULT_SALIDA,
   MAPA_EMPALME,
 } = require('../../scripts/empalmar-acuerdo-v1.1.js');
@@ -73,6 +74,8 @@ function conTemporal(fn) {
 const BASE_SINTETICA = [
   'ACUERDO DE PRUEBA',
   '',
+  'Versión del Acuerdo: v1.0',
+  '',
   '1. PRIMER CAPITULO',
   '',
   '1.1. Primer numeral de prueba, que no debe cambiar.',
@@ -86,6 +89,10 @@ const BASE_SINTETICA = [
   '    a) Literal de prueba que no cambia.',
   '',
   '    b) Literal de prueba que si cambia.',
+  '',
+  'MANIFESTACIÓN DE VOLUNTAD',
+  '',
+  'He leído el Acuerdo, versión v1.0, que se me ha presentado en pantalla.',
   '',
 ].join('\n');
 
@@ -169,6 +176,13 @@ test('empalmar: la base no se modifica', () => {
   assert.equal(sha256(BASE_SINTETICA), antes);
 });
 
+// Un archivo de datos que NO existe: estos tests del empalme no usan los datos
+// del owner (el texto sintetico no tiene sus placeholders), asi que el script
+// tiene que quedarse sin ellos.
+const RUTA_SIN_DATOS = path.join(
+  os.tmpdir(), 'empalme-v11-sin-datos-' + process.pid + '.json'
+);
+
 // =========================================================================
 // El script (main): escribe o no escribe
 // =========================================================================
@@ -181,7 +195,9 @@ test('main: sin placeholders escribe el archivo y sale con código 0', () => {
     fs.writeFileSync(base, BASE_SINTETICA, 'utf8');
     fs.writeFileSync(cambios, JSON.stringify(CAMBIOS_SINTETICOS), 'utf8');
 
-    const code = runSilent(['--base=' + base, '--cambios=' + cambios, '--salida=' + salida]);
+    const code = runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida, '--datos=' + RUTA_SIN_DATOS,
+    ]);
     assert.equal(code, 0);
     assert.ok(fs.existsSync(salida), 'con el texto limpio tiene que escribir el archivo');
 
@@ -205,7 +221,9 @@ test('main: con un placeholder NO escribe el archivo y sale con código 2', () =
       absorbe: {},
     }), 'utf8');
 
-    const code = runSilent(['--base=' + base, '--cambios=' + cambios, '--salida=' + salida]);
+    const code = runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida, '--datos=' + RUTA_SIN_DATOS,
+    ]);
     assert.equal(code, 2, 'con placeholders el codigo de salida es 2');
     assert.ok(!fs.existsSync(salida), 'con placeholders NO se debe escribir el archivo');
   });
@@ -227,6 +245,7 @@ test('main: el reporte de placeholders se puede escribir en un archivo', () => {
 
     const code = runSilent([
       '--base=' + base, '--cambios=' + cambios, '--salida=' + salida, '--reporte=' + reporte,
+      '--datos=' + RUTA_SIN_DATOS,
     ]);
     assert.equal(code, 2);
     assert.ok(fs.existsSync(reporte));
@@ -245,8 +264,12 @@ test('main: es idempotente (dos corridas dan el mismo texto)', () => {
     fs.writeFileSync(base, BASE_SINTETICA, 'utf8');
     fs.writeFileSync(cambios, JSON.stringify(CAMBIOS_SINTETICOS), 'utf8');
 
-    assert.equal(runSilent(['--base=' + base, '--cambios=' + cambios, '--salida=' + salida1]), 0);
-    assert.equal(runSilent(['--base=' + base, '--cambios=' + cambios, '--salida=' + salida2]), 0);
+    assert.equal(runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida1, '--datos=' + RUTA_SIN_DATOS,
+    ]), 0);
+    assert.equal(runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida2, '--datos=' + RUTA_SIN_DATOS,
+    ]), 0);
 
     const uno = fs.readFileSync(salida1, 'utf8');
     const dos = fs.readFileSync(salida2, 'utf8');
@@ -373,19 +396,258 @@ test('CASO REAL: HOY el texto tiene placeholders y el script NO escribe el archi
   assert.equal(reporte.total, 9);
   assert.equal(reporte.nuevos, 5, 'cinco huecos que hay que llenar');
   assert.equal(reporte.heredados, 4, 'los cuatro que ya venían en la v1.0');
+  assert.equal(reporte.huecos.total, 5, 'los huecos son los cinco del abogado');
+  assert.equal(reporte.huecos.heredados, 0, 'ningún hueco venía en la v1.0');
+  assert.equal(reporte.sistema.total, 4, 'los cuatro del Manifiesto los registra el sistema');
+  assert.deepEqual(
+    reporte.sistema.unicos,
+    ['[registrada por el sistema]'],
+  );
 });
 
-test('CASO REAL: el script sale con código 2 y no crea acuerdo-v1.1.txt', () => {
-  assert.ok(
-    !fs.existsSync(DEFAULT_SALIDA),
-    'el archivo de salida no debe existir mientras falten placeholders'
+test('CASO REAL: el localizador MARCA los cuatro campos del sistema', () => {
+  const r = empalmar(TEXTO_REAL, CAMBIOS_REALES);
+  const encontrados = localizarPlaceholders(r.texto);
+  const delSistema = encontrados.filter((e) => e.tipo === 'sistema');
+  const huecos = encontrados.filter((e) => e.tipo === 'hueco');
+  assert.equal(delSistema.length, 4);
+  assert.equal(huecos.length, 5);
+  for (const e of delSistema) {
+    assert.equal(e.placeholder, '[registrada por el sistema]');
+    assert.equal(e.ubicacion, 'MANIFESTACIÓN DE VOLUNTAD');
+  }
+  // El localizador sigue ADCREDITANDO los 9: nada queda escondido.
+  assert.equal(encontrados.length, 9);
+});
+
+test('CASO REAL: con los datos del owner el script ESCRIBE el archivo', () => {
+  conTemporal((dir) => {
+    const rutaSalida = path.join(dir, 'acuerdo-v1.1.txt');
+
+    const code = runSilent([
+      '--cambios=' + DEFAULT_CAMBIOS,
+      '--datos=' + DEFAULT_DATOS,
+      '--salida=' + rutaSalida,
+    ]);
+    assert.equal(code, 0, 'sin huecos el script escribe el archivo');
+    assert.ok(fs.existsSync(rutaSalida), 'el archivo de la v1.1 tiene que existir');
+
+    const texto = fs.readFileSync(rutaSalida, 'utf8');
+    const reporte = armarReportePlaceholders(texto, TEXTO_REAL);
+    assert.equal(reporte.huecos.total, 0, 'no quedan huecos');
+    assert.equal(reporte.sistema.total, 4, 'los cuatro campos del sistema siguen ahí');
+    assert.ok(texto.includes('[registrada por el sistema]'), 'el texto los conserva');
+
+    // La cláusula de versión que exige el readiness (readinessLegal.js
+    // `analizarAcuerdo`): "Versión del Acuerdo: v1.1". Se comprueba acá con
+    // el mismo patrón para que este archivo no abra la base de datos.
+    assert.ok(
+      /^Versión del Acuerdo:\s*v1\.1\s*$/m.test(texto),
+      'el encabezado tiene que decir "Versión del Acuerdo: v1.1"',
+    );
+    assert.ok(
+      /versión v1\.1/.test(texto),
+      'el bloque de Manifestación tiene que decir "versión v1.1"',
+    );
+    assert.ok(
+      !/Versión del Acuerdo:\s*v1\.0/.test(texto),
+      'no puede quedar ninguna mención a la v1.0',
+    );
+
+    // Y los cinco datos del owner, en su sitio.
+    assert.ok(texto.includes('https://kair.fyi/anexo-encargo.html'), 'el 1.5 lleva la URL');
+    assert.ok(texto.includes('Barranquilla, Colombia'), 'el 10.1 lleva la ciudad');
+    assert.ok(texto.includes('privacidad.kair@gmail.com'), 'el 10.7(b) lleva el canal');
+    assert.ok(texto.includes('Cargo Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+  });
+});
+
+// =========================================================================
+// El sello de versión
+// =========================================================================
+
+test('sello: la versión nueva queda en el encabezado y en la Manifestación', () => {
+  const r = empalmar(BASE_SINTETICA, CAMBIOS_SINTETICOS);
+  assert.ok(r.texto.includes('Versión del Acuerdo: v1.1'), 'el encabezado se sella');
+  assert.ok(r.texto.includes('versión v1.1'), 'la Manifestación se sella');
+  assert.ok(!r.texto.includes('Versión del Acuerdo: v1.0'));
+  assert.ok(!r.texto.includes('versión v1.0'));
+  assert.equal(r.resumen.sello.sellado, true);
+  assert.equal(r.resumen.sello.versionBase, 'v1.0');
+  assert.equal(r.resumen.sello.versionNueva, 'v1.1');
+});
+
+test('sello: si el texto NO nombra su versión, el empalme se niega', () => {
+  const base = BASE_SINTETICA
+    .replace('Versión del Acuerdo: v1.0', '')
+    .replace('He leído el Acuerdo, versión v1.0, que se me ha presentado en pantalla.', '');
+  assert.throws(
+    () => empalmar(base, CAMBIOS_SINTETICOS),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /exactamente una/);
+      return true;
+    },
   );
-  const code = runSilent(['--salida=' + path.join(os.tmpdir(), 'no-debe-existir-v1.1.txt')]);
-  assert.equal(code, 2);
-  assert.ok(
-    !fs.existsSync(DEFAULT_SALIDA),
-    'el script NO debe escribir el archivo de la v1.1 todavia'
+});
+
+test('sello: si el encabezado y la Manifestación no dicen lo mismo, se niega', () => {
+  const base = BASE_SINTETICA.replace('He leído el Acuerdo, versión v1.0,', 'He leído el Acuerdo, versión v0.9,');
+  assert.throws(
+    () => empalmar(base, CAMBIOS_SINTETICOS),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /coherente consigo mismo/);
+      return true;
+    },
   );
+});
+
+test('sello: si el JSON no declara la versión, el empalme se niega', () => {
+  const cambios = Object.assign({}, CAMBIOS_SINTETICOS);
+  delete cambios.version;
+  assert.throws(
+    () => empalmar(BASE_SINTETICA, cambios),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /no declara la versión/);
+      return true;
+    },
+  );
+});
+
+test('main: si se arma una versión que no es la del JSON, el script se niega', () => {
+  conTemporal((dir) => {
+    const base = path.join(dir, 'base.txt');
+    const cambios = path.join(dir, 'cambios.json');
+    const salida = path.join(dir, 'salida.txt');
+    fs.writeFileSync(base, BASE_SINTETICA, 'utf8');
+    fs.writeFileSync(cambios, JSON.stringify(CAMBIOS_SINTETICOS), 'utf8');
+
+    const code = runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida, '--version=v2.0',
+    ]);
+    assert.equal(code, 3, 'el código de salida es 3');
+    assert.ok(!fs.existsSync(salida), 'no se escribe nada');
+  });
+});
+
+// =========================================================================
+// Los datos del owner
+// =========================================================================
+
+const DATOS_REALES = JSON.parse(
+  fs.readFileSync(path.join(RAIZ_SERVICIO, 'scripts', 'fixtures', 'acuerdo-v1.1-datos.json'), 'utf8'),
+);
+
+test('datos: los cinco huecos reales se sustituyen y no queda ninguno', () => {
+  const r = empalmar(TEXTO_REAL, CAMBIOS_REALES, DATOS_REALES);
+  assert.equal(r.resumen.datos.aplicados.length, 5);
+  assert.equal(r.resumen.datos.huecosRestantes, 0);
+  assert.ok(r.texto.includes('https://kair.fyi/anexo-encargo.html'), 'el 1.5 lleva la URL');
+  assert.ok(r.texto.includes('Barranquilla, Colombia'), 'el 10.1 lleva la ciudad');
+  assert.ok(r.texto.includes('privacidad.kair@gmail.com'), 'el 10.7(b) lleva el canal');
+  assert.ok(r.texto.includes('Cargo Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+  // Los cuatro campos del sistema siguen, y NO son huecos.
+  const reporte = armarReportePlaceholders(r.texto, TEXTO_REAL);
+  assert.equal(reporte.huecos.total, 0);
+  assert.equal(reporte.sistema.total, 4);
+});
+
+test('datos: cada placeholder del archivo de datos aparece UNA vez en el texto', () => {
+  const r = empalmar(TEXTO_REAL, CAMBIOS_REALES);
+  for (const [id, entrada] of Object.entries(DATOS_REALES.datos)) {
+    const ocurrencias = r.texto.split(entrada.placeholder).length - 1;
+    assert.equal(ocurrencias, 1, 'el placeholder de "' + id + '" aparece ' + ocurrencias + ' veces');
+  }
+});
+
+test('datos: si un placeholder no aparece, el empalme se niega', () => {
+  const datos = {
+    version: 'v1.1',
+    datos: { x: { placeholder: '[NO EXISTE]', valor: 'algo' } },
+  };
+  assert.throws(
+    () => empalmar(TEXTO_REAL, CAMBIOS_REALES, datos),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /aparece 0 veces/);
+      return true;
+    },
+  );
+});
+
+test('datos: si un placeholder aparece dos veces, el empalme se niega', () => {
+  const datos = {
+    version: 'v1.1',
+    datos: { x: { placeholder: '[registrada por el sistema]', valor: 'Rellenado' } },
+  };
+  assert.throws(
+    () => empalmar(TEXTO_REAL, CAMBIOS_REALES, datos),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /aparece 4 veces/);
+      return true;
+    },
+  );
+});
+
+test('datos: un valor con corchetes seria otro placeholder: el empalme se niega', () => {
+  const datos = {
+    version: 'v1.1',
+    datos: { x: { placeholder: '[URL]', valor: 'https://kair.fyi/[anexo]' } },
+  };
+  assert.throws(
+    () => empalmar(TEXTO_REAL, CAMBIOS_REALES, datos),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /trae corchetes/);
+      return true;
+    },
+  );
+});
+
+test('datos: si quedan huecos sin llenar, el empalme se niega', () => {
+  const datos = {
+    version: 'v1.1',
+    datos: { x: { placeholder: '[URL]', valor: 'https://kair.fyi/anexo-encargo.html' } },
+  };
+  assert.throws(
+    () => empalmar(TEXTO_REAL, CAMBIOS_REALES, datos),
+    (e) => {
+      assert.equal(e.codigo, 3);
+      assert.match(e.message, /hueco\(s\) sin llenar/);
+      return true;
+    },
+  );
+});
+
+test('main: sin archivo de datos el texto queda con huecos y no se escribe', () => {
+  conTemporal((dir) => {
+    const base = path.join(dir, 'base.txt');
+    const cambios = path.join(dir, 'cambios.json');
+    const salida = path.join(dir, 'salida.txt');
+    fs.writeFileSync(base, TEXTO_REAL, 'utf8');
+    fs.writeFileSync(cambios, JSON.stringify(CAMBIOS_REALES), 'utf8');
+
+    const code = runSilent([
+      '--base=' + base, '--cambios=' + cambios, '--salida=' + salida,
+      '--datos=' + path.join(dir, 'no-existe.json'),
+    ]);
+    assert.equal(code, 2, 'quedan huecos: el codigo es 2');
+    assert.ok(!fs.existsSync(salida), 'no se escribe nada');
+  });
+});
+
+test('CASO REAL: sin los datos del owner el script sale con código 2 y no escribe nada', () => {
+  conTemporal((dir) => {
+    const salida = path.join(dir, 'salida.txt');
+    const code = runSilent([
+      '--salida=' + salida, '--datos=' + RUTA_SIN_DATOS,
+    ]);
+    assert.equal(code, 2, 'sin los datos quedan huecos: el codigo es 2');
+    assert.ok(!fs.existsSync(salida), 'el script NO debe escribir el archivo de la v1.1 todavia');
+  });
 });
 
 test('CASO REAL: la v1.0 sellada no se toco', () => {

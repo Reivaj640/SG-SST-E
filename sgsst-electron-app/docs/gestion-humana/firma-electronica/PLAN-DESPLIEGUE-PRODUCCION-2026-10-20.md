@@ -177,7 +177,7 @@ sudo nano /opt/kair-firma/.env
 | `FIRMA_EXIGIR_HABILITACION_EMPRESA` | `true` (default) bloquea a las empresas sin Anexo/plazo/canal. `false` deja pasar con un WARN en el log. | **Dejarla en el default (bloquea)** y resolver con el inventario. Ponerla en `false` es una decisión de negocio, no técnica. |
 | `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` | `false` (default). En `true`, un buzón corporativo recibe `400 MEDIO_OTP_CORPORATIVO`. | **No encender.** Sin la v1.1 y sin el inventario, no. |
 | `FIRMA_HMAC_KEYRING` / `FIRMA_HMAC_KEY_VERSION` | Opcionales: sin ellas el anillo es `{k1: TOKEN_ENCRYPTION_KEY}`. | **No hacen falta** para este despliegue. Son para la rotación futura. |
-| `FIRMA_CANAL_PROTECCION_DATOS` | Default `privacidad@k-air.com`. | Verificar que el buzón exista ANTES de publicar la v1.1. No bloquea este despliegue. |
+| `FIRMA_CANAL_PROTECCION_DATOS` | Default `privacidad.kair@gmail.com` (elegido por el owner el 24-oct-2026; **cambia el valor anterior `privacidad@k-air.com`**). | Verificar que el buzón exista ANTES de publicar la v1.1. No bloquea este despliegue. |
 
 ---
 

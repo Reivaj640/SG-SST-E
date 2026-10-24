@@ -129,6 +129,10 @@ function createVersion({
   // cierre. Si el texto trae un corchete o una marca como "ACUERDO DEV", se
   // rechaza ANTES de tocar la base: un texto legal a medio llenar no se
   // publica ni se firma.
+  //
+  // Los campos que registra el sistema (`[registrada por el sistema]`) NO
+  // cuentan como hueco: la v1.0 ya está publicada con ellos y los llena el
+  // sistema al firmar.
   if (esVersionSujetaAGuarda(version)) {
     const analisis = analizarTextoLegal(texto);
     if (!analisis.ok) {
@@ -137,8 +141,9 @@ function createVersion({
         'TEXTO_LEGAL_CON_PLACEHOLDERS',
         `El texto de la versión ${version} tiene placeholders o marcas de borrador; no se puede publicar.`,
         {
-          placeholders: analisis.placeholders.total,
-          placeholders_unicos: analisis.placeholders.unicos,
+          placeholders: analisis.placeholders.huecos.total,
+          placeholders_unicos: analisis.placeholders.huecos.unicos,
+          campos_del_sistema: analisis.placeholders.sistema.total,
           marcadores: analisis.marcadores.map((m) => m.etiqueta),
         },
       );

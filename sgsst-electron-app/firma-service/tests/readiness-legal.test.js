@@ -28,8 +28,10 @@ const CONFIG_TEST = {
   exigirAnexoNube: false,
 };
 
+// El Anexo que se FIRMA no lleva el aviso de "no firmar": un documento que
+// dice "no firmar" no se firma (lo bloquea el marcador `NO_FIRMAR`). El aviso
+// es del MODELO, y el modelo es el que tiene datos pendientes.
 const NUBE_OK = [
-  'NO FIRMAR HASTA COMPLETAR LOS DATOS',
   'Artículo 2.2.4.6.13 del Decreto 1072 de 2015.',
   'Veinte (20) años.',
   'Hold sin término del contrato electrónico.',
@@ -165,6 +167,30 @@ test('readiness · Anexo de Nube con placeholder no pasa', () => {
   const r = readiness.analizarAnexoNube(NUBE_OK + '\n[NIT]');
   assert.equal(r.ok, false);
   assert.equal(r.placeholders.total, 1);
+});
+
+test('readiness · un Anexo con datos pendientes TIENE que advertir que no se firme', () => {
+  // El aviso no es una cláusula del documento final: es el aviso del modelo.
+  // Si el documento tiene huecos y no lo dice, alguien lo diligencia a mano y
+  // se lleva un documento con huecos sin la advertencia.
+  const r = readiness.analizarAnexoNube(NUBE_OK + '\n[NIT]');
+  assert.ok(
+    r.faltan.some((f) => f.id === 'aviso_sin_datos'),
+    `faltan: ${JSON.stringify(r.faltan.map((f) => f.id))}`,
+  );
+  assert.equal(r.ok, false);
+});
+
+test('readiness · un Anexo con el aviso de no firmar NO se puede firmar', () => {
+  // La direccion contraria: un documento completo que todavia dice "no
+  // firmar" tampoco se firma.
+  const r = readiness.analizarAnexoNube(NUBE_OK + '\nNO FIRMAR HASTA COMPLETAR LOS DATOS');
+  assert.equal(r.placeholders.huecos.total, 0);
+  assert.ok(
+    r.marcadores.some((m) => m.codigo === 'NO_FIRMAR'),
+    `marcadores: ${JSON.stringify(r.marcadores.map((m) => m.codigo))}`,
+  );
+  assert.equal(r.ok, false);
 });
 
 test('readiness · Anexo de Nube sin una cláusula la reporta', () => {

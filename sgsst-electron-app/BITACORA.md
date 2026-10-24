@@ -6349,3 +6349,314 @@ Eso no es un dato pessimisticista: es la lista de trabajo, escrita con lo que fa
 falta.
 
 
+
+## 📦944 · La v1.1 deja de estar bloqueada: los campos del sistema y el sello de versión
+
+*24-oct-2026 · la guarda de texto legal · los campos que registra el sistema · el empalme de la v1.1*
+
+### Lo que el empalme contaba y lo que la guarda bloqueaba
+
+El empalme de la v1.1 reportaba nueve corchetes: **cinco huecos** (los del abogado, en el 1.5,
+el 10.1 y el 10.7(b)) y **cuatro más**. Los cuatro ya venían en la v1.0 y están en el bloque de
+Manifestación de Voluntad:
+
+```
+Fecha y hora de aceptación: [registrada por el sistema]
+Versión del Acuerdo aceptada: [registrada por el sistema]
+Huella digital del texto: [registrada por el sistema]
+Firma del Trabajador: [registrada por el sistema]
+```
+
+La guarda de publicación (`src/utils/textoLegal.js`) contaba **los nueve** y rechazaba el texto:
+`analizarTextoLegal` devolvía `ok: false` con cuatro huecos que nadie podía llenar. O sea: la
+v1.1 no se podía publicar ni con los cinco datos listos, y el bloqueo no venía de un dato
+faltante sino de una regla que no entendía la diferencia entre "falta esto" y "esto lo pone el
+sistema".
+
+### Lo que dice el código, medido
+
+Antes de tocar nada se comprobó qué pasa con esos cuatro campos en runtime:
+
+- **El sistema no los sustituye en el texto que ve el trabajador.** Las únicas apariciones de
+  `[registrada por el sistema]` en todo el `firma-service` son el fixture y el test;
+  `web/firma/app.js:650` pinta `acuerdo.texto` tal cual (`box.textContent = acuerdo.texto;`).
+- **Los valores sí existen, pero en otro lado**: la base de datos y la constancia PDF
+  (`src/services/pdfGen.js:696-704`: "Versión del acuerdo", "Aceptado el", "Hash del acuerdo").
+- **La v1.0 ya está publicada, sellada y viva en producción con esos cuatro dentro** (la guarda no
+  le aplica a la v1.0). El trabajador que acepte el Acuerdo hoy ve ese texto.
+- **El Anexo de Nube —el documento que sí se firma— no usa esa fórmula**: sus 53 corchetes son
+  huecos, y después del cambio siguen siendo 53 huecos (`huecos.total: 53`, `sistema.total: 0`).
+
+### La salida: el texto legal manda, el código se ajusta
+
+El texto legal es el que manda. La v1.0 sellada ya usa esa fórmula, así que la regla del código
+era más estricta que el texto. `src/utils/textoLegal.js` ahora conoce **un** campo del sistema,
+`[registrada por el sistema]`, y lo clasifica aparte: no es un hueco, no bloquea, **pero se
+lista**. El conteo quedó partido en dos en todos los consumidores:
+
+| | qué es | bloquea |
+|---|---|---|
+| `huecos` | lo que alguien tiene que llenar | sí |
+| `sistema` | lo que registra el sistema al firmar | no |
+
+Y la excepción es de **contenido exacto**: `[registrada por la empresa]` o `[registrada por el
+sistema más adelante]` siguen siendo huecos y bloquean. Hay tests para esas variantes, porque
+una excepción de guarda sin la prueba de que sigue bloqueando es un agujero, no una excepción.
+
+### La trampa que apareció por el camino
+
+El empalme (`scripts/empalmar-acuerdo-v1.1.js`) **tenía su propia copia del patrón** de
+placeholders. Si se hubiera arreglado solo el módulo compartido, el script habría salido con
+código 0 —el texto ya sin huecos— mientras su reporte seguía diciendo "9 placeholders": un check
+que no muerde y un reporte mintiendo. La copia se borró: el empalme ahora **importa** la regla
+(`buscarPlaceholders`, `esPlaceholderDelSistema`) y su control de consistencia compara las dos
+cuentas, las de todas las ocurrencias y las de los huecos.
+
+El reporte nuevo dice las dos cosas, sin fundirlas:
+
+```
+PLACEHOLDERS DEL TEXTO RESULTANTE (9 ocurrencias: 5 huecos por llenar y 4 campos del sistema)
+
+Huecos que hay que llenar (traen el texto final de la v1.1):
+  - [URL]  ->  numeral 1.5 (linea 35)
+  ...
+
+Campos que registra el sistema (ya venían en la v1.0; no son huecos y NO bloquean):
+  - [registrada por el sistema]  ->  MANIFESTACIÓN DE VOLUNTAD (linea 498)
+  ...
+```
+
+### El segundo bloqueo: el texto seguía diciendo «v1.0»
+
+Con los cinco huecos llenos, la v1.1 **todavía no se publicaba**. El motivo era otro, y no
+era un dato que nadie tuviera: el texto que armaba el empalme seguía nombrando la versión
+equivocada, en **dos** lugares:
+
+```
+L4    Versión del Acuerdo: v1.0
+L620  …mecanismo de firma electrónica de K+AIR, versión v1.0, que se me ha presentado en
+```
+
+El primero es la cláusula que el propio readiness exige (`readinessLegal.analizarAcuerdo`
+busca `Versión del Acuerdo: v1.1`) → el texto salía con `faltan: [{id: "version"}]` y
+`ok: false`. El segundo es el bloque de Manifestación de Voluntad, donde el trabajador
+declara qué versión acepta.
+
+O sea: **el check existía desde el 📦941 y mordía**; lo que faltaba era correr la cadena
+completa (empalme → guarda → readiness) y no las partes por separado. Con los cinco datos
+puestos y el texto todavía en «v1.0», la primera firma real seguía bloqueada.
+
+### La salida: el sello de versión
+
+El Acuerdo nombra su versión en dos lugares y los dos tienen que decir la misma. El sello
+**no va en el mapa de cambios** (ese mapa es el texto del abogado, copiado íntegro del
+`.txt` de la respuesta 11A): es una **propiedad de la versión**, y lo aplica el script
+tomándola del campo `version` del propio JSON.
+
+Las reglas son estrictas a propósito:
+
+| Regla | Por qué |
+|---|---|
+| Tiene que haber **exactamente una** mención en el encabezado | si hay dos, no se sabe cuál es la buena; si no hay ninguna, el texto no dice su versión |
+| Tiene que haber **exactamente una** mención en la Manifestación | ídem, y es la que el trabajador lee |
+| Las dos tienen que **decir lo mismo** | un texto que se contradice a sí mismo no se puede sellar |
+| El JSON tiene que **declarar** la versión | sin eso no se sabe qué hay que sellar |
+| Después de sellar se **vuelve a verificar** | un sello mal escrito es un texto que miente |
+
+La última regla se pagó sola: durante la implementación, el sello producía `vv1.1` (la "v"
+estaba dos veces) y el propio check lo cazó. Un sello que no se verifica es un sello que
+miente.
+
+Resultado: con los cinco huecos llenos, el empalme escribe el archivo (código 0), la guarda
+lo deja pasar y **el readiness dice `ok: true`, `faltan: []`**. Es la primera vez que el
+texto de la v1.1 queda armable y publicable.
+
+### Los cinco datos del owner: en un archivo aparte
+
+Los cinco corchetes que dejó el texto del abogado los llena el owner, no el abogado. La
+primera tentación era rellenarlos en el mapa de cambios, pero ese mapa tiene una garantía
+escrita y probada: **cada texto aparece LITERAL en el `.txt` de la respuesta 11A**
+(`tests/scripts/empalmar-acuerdo-v1.1.test.js`). Rellenarlos ahí la habría roto, y el mapa
+quedaría con texto que el abogado nunca escribió.
+
+Así que los datos van en su propio archivo —`scripts/fixtures/acuerdo-v1.1-datos.json`— y el
+empalme los sustituye con las mismas reglas estrictas del sello: cada placeholder tiene que
+aparecer **exactamente una vez**, el valor no puede traer corchetes (sería otro placeholder) y
+al terminar no puede quedar ningún hueco. Si algo falla, el script se niega (código 3) y no
+escribe nada.
+
+| Placeholder | Valor (owner, 24-oct-2026) |
+|---|---|
+| `[URL]` (1.5) | `https://kair.fyi/anexo-encargo.html` |
+| `[ciudad, país]` (10.1) | `Barranquilla, Colombia` |
+| `[interno, a cargo de … / provisto por …]` (10.1) | `a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo` |
+| `[correo o URL]` (10.7(b)) | `privacidad.kair@gmail.com` |
+| `[nombre o cargo]` (10.7(b)) | `Cargo Representante Legal de Gesstiar` |
+
+### El canal, en un solo lugar
+
+El canal de protección de datos estaba en tres sitios distintos: el `.env` del servidor
+(`privacidad@k-air.com`), el default de `config.js` (`privacidad.kair@gmail.com`) y el
+manifiesto (`null`). El readiness comparaba el configurado contra el documentado y por eso
+decía *"El canal configurado y el documentado no coinciden"*. Ahora los cinco sitios dicen lo
+mismo: `.env` (local y servidor), `config.js`, `.env.example`, manifiesto y el texto del
+10.7(b).
+
+### El texto armado no se commitea antes de la aprobación
+
+`scripts/fixtures/acuerdo-v1.1.txt` es la versión que se firma. Salió del empalme (38 969
+bytes, SHA-256 `a88e41af…0b7bc5`) y está en `.gitignore`: sale de ahí solo cuando el abogado
+lo apruebe, y ese momento queda visible en el diff. Mientras tanto `publicado` sigue en
+`false` en el manifiesto y `v1_1_fecha` en `null`.
+
+### Lo que quedó verificado
+
+- Con los cinco datos del owner, el empalme **escribe** el archivo (código 0), la guarda lo deja
+  pasar y el readiness del texto dice `ok: true`, `faltan: []`. Sin los datos, sale con código 2
+  y no escribe nada.
+- El sello tiene sus propias pruebas de negativa: sin versión en el texto, con el encabezado y
+  la Manifestación en desacuerdo, sin `version` en el JSON, y con la versión del JSON distinta
+  de la que se está armando → el script se niega (código 3) en los cuatro casos.
+- La sustitución de los datos también: placeholder que no aparece, placeholder que aparece
+  cuatro veces, valor con corchetes, y huecos que quedan sin llenar → el script se niega en los
+  cuatro casos.
+- `node --check` en los cinco archivos tocados; suite completa **1705 tests · 1703 pass · 0 fail ·
+  2 skipped** (28 tests nuevos: 11 del módulo compartido, 3 de la guarda, 14 del empalme).
+- El readiness del gate de publicación pasó de **4 ok / 31 pendientes / 19 bloqueantes** a
+  **9 ok / 26 pendientes / 13 bloqueantes** (`texto_v1_1`, `hash_v1_1` y `canal_datos`}.
+- La v1.0 sellada no se tocó: su huella sigue siendo `52a490a4…10c04`.
+
+### Lo que entra en este mismo commit
+
+Este paquete se commitéa **junto con el 📦945** (`src/utils/textoLegal.js` y
+`src/services/readinessLegal.js` quedan tocados por los dos en las mismas líneas; separarlos
+por hunks sería frágil). Además del texto de la v1.1 y la guarda, este commit trae:
+
+- **El NIT de Gesstiar S.A.S. (`900987987`)** en el manifiesto (`encargado.nit`) y en los seis
+  documentos (`legal/` y `sitio/`): política, términos y Anexo de Encargo. Con eso el
+  aviso "por diligenciar" quedó en **cero** y el ítem `nit_encargado` del readiness pasó a
+  `ok`. El NIT va **tal como lo dió el owner** (nueve dígitos base, sin dígito de
+  verificación): no se completa con datos que nadie confirmó.
+- **Los cinco datos del owner** en `scripts/fixtures/acuerdo-v1.1-datos.json`. El texto armado
+  (38 969 bytes, sha256 `a88e41af…b7bc5`) **no entra al repo**: `.gitignore` deja
+  `scripts/fixtures/acuerdo-v1.1.txt` fuera hasta que el abogado apruebe la v1.1.
+- El **fix del readiness** (§945): los checks de cláusulas leían el HTML crudo y no veían
+  las cláusulas del Anexo de Nube porque están escritas con entidades HTML.
+## 📦945 · El readiness leía el HTML crudo y no veía las cláusulas del Anexo de Nube
+
+> **Este paquete se commitéa con el 📦944**, no aparte: los dos tocan
+> `src/utils/textoLegal.js` y `src/services/readinessLegal.js` en las mismas líneas y
+> separarlos por hunks sería frágil. La número de paquete se conserva para la
+> bitácora.
+
+### El bug
+
+`analizarAnexoNube` y `analizarAnexoEncargo` corrían sus checks de cláusulas sobre el
+**archivo HTML crudo**. Los dos anexos están escritos con entidades (`d&iacute;as
+h&aacute;biles`, `Auditor&iacute;a`, `supresi&oacute;n`, `Devoluci&oacute;n`, `20
+a&ntilde;os`), y los patrones de las cláusulas buscan el texto con la letra:
+
+```js
+{ id: 'dos_dias', re: /dos\s*\(2\)\s*d[ií]as\s*h[aá]biles/i }
+```
+
+`"dos (2) d&iacute;as h&aacute;biles"` **no matchea**. El resultado medido: el Anexo de
+Nube reportaba **6 cláusulas faltantes**, y **cuatro de ellas el documento sí las tiene**.
+El check no estaba mirando el documento legal: estaba mirando el marcado.
+
+### La corrección
+
+El texto que firma el Titular es el **renderizado**, no el HTML. Ahora hay un
+`_textoRenderizado()` que quita las etiquetas y resuelve las entidades (las que el repo
+usa de verdad y las numéricas), y las cláusulas, los corchetes y los marcadores se leen
+sobre ese texto. **El hash sigue siendo el del archivo, byte a byte**: la huella
+identifica el documento, no su forma de marcado.
+
+Medido sobre el Anexo de Nube real:
+
+| | antes | después |
+|---|---|---|
+| cláusulas faltantes | 6 | **0** |
+| `clausulasOk` | false | **true** |
+| huecos | 53 | 53 (no se perdió ninguno) |
+| hash | `f50ed32c…19628` | `f50ed32c…19628` (igual) |
+
+Las cuatro cláusulas que aparecían como faltantes —los veinte (20) años, los dos (2)
+días hábiles, la devolución, la supresión y la auditoría— **estaban en el documento**.
+
+### El segundo bug: un documento que dice "no firmar" podía estar `ok: true`
+
+El aviso "NO FIRMAR HASTA COMPLETAR LOS DATOS" estaba en la lista de cláusulas
+**requeridas** del Anexo de Nube, y ninguna marca del analizador legal lo reconocía. Las
+dos cosas juntas producían una contradicción:
+
+- con el aviso y sin huecos, el documento quedaba `ok: true` → **se podía publicar un
+  documento que dice "no firmar"** (un check que no muerde en la dirección peligrosa);
+- como el aviso era un requisito, **un documento final nunca podía quedar `ok`** → el
+  ítem `documento_nube` bloqueaba la primera firma **para siempre**, porque el archivo
+  del repo es el modelo y siempre tiene huecos.
+
+Ahora el aviso es un **marcador** (`NO_FIRMAR`, en `src/utils/textoLegal.js`) y la
+cláusula `banner` deja de ser un requisito permanente. La regla queda coherente en los
+dos sentidos:
+
+- **con datos pendientes, el documento tiene que advertirlo** (el aviso de no firmar o
+  cualquier marca de borrador): si no, alguien lo diligencia a mano y se lleva un
+  documento con huecos sin advertencia → el check reporta `aviso_sin_datos`;
+- **sin datos pendientes, no puede llevar el aviso**: no se firma un documento que dice
+  "no firmar" → el marcador lo bloquea.
+
+El patrón vive **una sola vez**, en el módulo legal: el readiness lo pide con
+`reDeMarcador('NO_FIRMAR')`, no con una copia del regex (la trampa 74).
+
+### Verificación
+
+- **12 tests nuevos**: 10 en `tests/readiness-documentos-html.test.js` (las entidades no
+  esconden la cláusula; el texto plano y el HTML dan el MISMO resultado; el check muerde
+  cuando la cláusula falta; la frase del aviso es una sola fuente; la regla del aviso en
+  los dos sentidos; un documento que dice "no firmar" no se publica; el hash sigue siendo
+  del archivo; los corchetes no se pierden) y 2 en `tests/readiness-legal.test.js`.
+- Suite completa: **1717 tests · 1715 pass · 0 fail · 2 skipped**.
+- `node --check` en los tres archivos; barrido de caracteres no latina limpio; EOL LF
+  puro sin BOM en los cuatro.
+
+### Lo que este paquete NO decide
+
+El ítem `documento_nube` sigue en `pendiente`, y con razón: el modelo tiene 53 huecos.
+Pero uno de ellos es una decisión de fondo que **no es del código**: si el archivo del
+repo es el **modelo** (con los huecos por Empresa) o el **documento final** (diligenciado).
+Hoy nadie diligencia el Anexo de Nube — el servicio nunca lo lee — y los tres huecos
+por-Empresa (`[EMPRESA]`, su NIT y su representante) no tienen dueño. Eso es el punto 7,
+y lo tiene que decidir el owner con el abogado.
+
+## 📦946 · El NIT de Gesstiar S.A.S. y el dominio kair.fyi en los documentos publicados
+
+*24-oct-2026 · la rama `gh-pages` · el CNAME · el NIT en los seis documentos*
+
+Este es el commit de la **rama `gh-pages`** (la del sitio publicado), no de `Dev`. En `Dev` el
+NIT entra dentro del 📦944; aquí es donde el documento **publicado** cambia.
+
+### Los dos cambios
+
+- **El `CNAME`** (9 bytes: `kair.fyi`): es lo que le faltaba a GitHub Pages para verificar el
+  dominio. Sin el `CNAME` commiteado en la rama publicada, la página servía en
+  `reignaj640.github.io` y `kair.fyi` nunca tendría certificado.
+- **El NIT de Gesstiar S.A.S.** en los tres documentos del sitio (`anexo-encargo.html`,
+  `privacidad.html`, `terminos.html`): `NIT 900987987` y `Datos de contacto:
+  privacidad.kair@gmail.com`. En el sitio publicado ya no queda ningún "por diligenciar".
+
+### El estado medido (no supuesto)
+
+- `kair.fyi` resuelve a `185.199.108-111.153` (las cuatro IP de GitHub Pages): **DNS listo**.
+- `http://kair.fyi/` responde **200**.
+- `https://kair.fyi/` daba **error de certificado**: GitHub Pages aún no había verificado
+  el dominio. La verificación se dispara con el `CNAME` commiteado; el certificado sale en
+  minutos, no en días.
+- El registro `firma.kair.fyi` (túnel `kair-firma`) **no se toca**: es otro nombre y otro
+  destino.
+
+### Lo que sigue sin dueño
+
+En el manifiesto siguen en `null`, y por eso el `partes_encargado` y el banner del Anexo de
+Nube no pueden quedar listos: `encargado.representante_legal`, `encargado.acta_designacion`,
+`encargado.url_politica` y `encargado.url_anexo_encargo`. Ninguno se rellena con un ejemplo.

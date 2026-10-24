@@ -22,9 +22,17 @@
 
 | Campo | Valor |
 |---|---|
-| **Fecha de cierre** | 2026-10-23 (la v1.1 alineada en el codigo —📦934-: el rastro auditable de la ficha de la Empresa (B1), la copia permanente con su SLA de cinco dias habiles y el freno de la supresion (8.5, 8.6(e)(iii)), el recibo de supresion entregable con su lapida y su fundamento del plazo (3.6(g) y 10.6), y el OTP que expira a los 600 segundos (3.4(e)); —📦935-: la purga en dos capas, el bug por el que la supresion de datos NO se ejecutaba nunca; —📦936-: el empalme mecanico de la v1.1 con sus 49 numerales; —📦937-: el endurecimiento del operador; —📦939-: el humo de produccion que miraba el token viejo y el hold que no se podia limpiar; —📦940-: la guarda de texto legal y el seed DEV, con la salida angosta que solo se abre en una base de desarrollo; —📦941-: la auditoria de readiness legal, que dice que falta sin inventar nada). Antes: 2026-10-23 (las tres condiciones de codigo del abogado: la custodia de 20 anos, el token unico y el D-03 que si bloquea —📦933—; el paquete del 11A y las credenciales de correo al `.env` —📦932, 📦931—; la purga del rastro de prueba en produccion: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacia nada —📦929—; el script de archivos huerfanos que si sirve en produccion: rutas del entorno, dry-run permitido en produccion y el aviso que impide leer «nada que mover» como «storage limpio» —📦930—; el catalogo de retencion por documento: el plazo vive en el codigo —80 anos de custodia, el hold del contrato electronico y el piso legal de los grupos SST— con su migracion 033, la clasificacion automatica por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitacion que ya no exige el plazo de la empresa y la documentacion del despliegue —📦928—; y el cierre del formulario de datos para firma electronica: guardado local, relectura y publicacion al servidor —📦927—) |
-| **Rama** | `Dev`, nivelada con `origin/Dev`: 📦939 (el humo que miraba el token viejo y el forzado del hold) y 📦940 (la guarda legal y el seed DEV) ya estan pusheados; el 📦941 (la auditoria de readiness legal) entra con este commit y queda pendiente de push. Las etapas 0 a 6 estan **escritas, commiteadas y desplegadas**: el servicio corre el codigo de 📦938 con las migraciones 037 a 041 aplicadas y verificadas. |
-| **Último commit de código** | 📦 **941** — 📦941 (la auditoria de readiness legal: el manifiesto de evidencias con sus nulls, el servicio que cruza manifiesto, documentos, codigo y base, el CLI y el endpoint admin que comparten ese mismo servicio, y la guarda que impide publicar un texto legal a medio llenar) — 📦 **940** — 📦940 (la guarda de texto legal y el seed DEV: el seed siembra su texto marcado en una base de desarrollo por su propia cuenta, y se niega si esa base tiene un Acuerdo legal publicado) — 📦 **939** — 📦939 (el humo de produccion que miraba el token viejo y la limpieza que no podia forzar el hold: el token de la creacion se manda a `notify-remote` y `--forzar-hold` solo abre para filas que nunca se firmaron) — 📦938 (el estado al cierre de la jornada: este bloque y la bitacora de las etapas 0 a 6) — 📦 **937** (el endurecimiento del operador: la bandera retirada documentada como inerte, el comentario obsoleto del 026 corregido y el 409 del D-03 que pasa a ser AVISO en vez de FALLA en el smoke) — 📦 **936** (el empalme mecanico de la v1.1: 49 numerales con su texto integro y un script que no escribe un texto con placeholders) — 📦 **935** (la purga en dos capas: la supresion de datos no se ejecutaba nunca porque la capa de auditoria cerraba la ventana antes de que corriera la capa de datos) — 📦 **934** (el texto legal en el codigo: el rastro auditable de la ficha de la Empresa, la copia permanente con su SLA de cinco dias habiles, el recibo de supresion entregable y el OTP que expira a los 600 segundos). Antes: 📦 **933** |
+| **Fecha de cierre** | 2026-10-24 (la v1.1 alineada en el codigo —📦934-: el rastro auditable de la ficha de la Empresa (B1), la copia permanente con su SLA de cinco dias habiles y el freno de la supresion (8.5, 8.6(e)(iii)), el recibo de supresion entregable con su lapida y su fundamento del plazo (3.6(g) y 10.6), y el OTP que expira a los 600 segundos (3.4(e)); —📦935-: la purga en dos capas, el bug por el que la supresion de datos NO se ejecutaba nunca; —📦936-: el empalme mecanico de la v1.1 con sus 49 numerales; —📦937-: el endurecimiento del operador; —📦939-: el humo de produccion que miraba el token viejo y el hold que no se podia limpiar; —📦940-: la guarda de texto legal y el seed DEV, con la salida angosta que solo se abre en una base de desarrollo; —📦941-: la auditoria de readiness legal, que dice que falta sin inventar nada; —📦944-: la guarda
+de texto legal que separa los huecos de los campos que registra el sistema). Antes: 2026-10-23 (las tres condiciones de codigo del abogado: la custodia de 20 anos, el token unico y el D-03 que si bloquea —📦933—; el paquete del 11A y las credenciales de correo al `.env` —📦932, 📦931—; la purga del rastro de prueba en produccion: 9 firmas, 57 eventos, 6 sesiones, 15 tokens y 15 archivos fuera, con recibo y la v1.0 intacta; y el panel de firmas: el tablero general, el panel de empresa y el detalle de una firma, en solo lectura, con la trampa del ESC que no hacia nada —📦929—; el script de archivos huerfanos que si sirve en produccion: rutas del entorno, dry-run permitido en produccion y el aviso que impide leer «nada que mover» como «storage limpio» —📦930—; el catalogo de retencion por documento: el plazo vive en el codigo —80 anos de custodia, el hold del contrato electronico y el piso legal de los grupos SST— con su migracion 033, la clasificacion automatica por tipo de documento, la interfaz SIN selector ni fecha de cese, la habilitacion que ya no exige el plazo de la empresa y la documentacion del despliegue —📦928—; y el cierre del formulario de datos para firma electronica: guardado local, relectura y publicacion al servidor —📦927—) |
+| **Rama** | `Dev`, nivelada con `origin/Dev`: 📦939 (el humo que miraba el token viejo y el forzado del hold) y 📦940 (la guarda legal y el seed DEV) ya estan pusheados; el 📦941 (la auditoria de readiness legal) entra con este commit y queda pendiente de push. Las etapas 0 a 6 estan **escritas, commiteadas y desplegadas**: el servicio corre el codigo de 📦938 con las migraciones 037 a 041 aplicadas y verificadas. **La rama esta un commit adelante de `origin/Dev`**: el 📦942 (la salida auditada del
+Anexo de Encargo y el readiness sin falso positivo) esta commiteado y **SIN push** — el servidor ya
+corre ese codigo, asi que un redespliegue desde `origin/Dev` lo perderia. Los 📦943 (la correccion
+del hold) y 📦944 (la guarda de los campos del sistema) estan escritos y verificados, sin commitear. El 📦945 (el
+readiness que leia el HTML crudo) tambien esta escrito y verificado, sin commitear. 
+**El rastro de prueba de produccion quedo limpio el 24-oct-2026**: 0 firmas, 0 tokens, 0 sesiones, 0 eventos y 0 consentimientos; 1 empresa (900829731) y 1 version del Acuerdo (v1.0 activa, huella `52a490a4...c04`, igual al archivo del repo y al manifiesto archivado); integridad `ok` y backup previo en `/opt/kair-firma/backups/`. |
+| **Último commit de código** | 📦 **942** — 📦942 (la salida auditada del Anexo de Encargo y el
+readiness sin falso positivo: la salida del panel que no inventa datos y el item que no marca un
+documento firmado sin evidencia) — 📦 **941** — 📦941 (la auditoria de readiness legal: el manifiesto de evidencias con sus nulls, el servicio que cruza manifiesto, documentos, codigo y base, el CLI y el endpoint admin que comparten ese mismo servicio, y la guarda que impide publicar un texto legal a medio llenar) — 📦 **940** — 📦940 (la guarda de texto legal y el seed DEV: el seed siembra su texto marcado en una base de desarrollo por su propia cuenta, y se niega si esa base tiene un Acuerdo legal publicado) — 📦 **939** — 📦939 (el humo de produccion que miraba el token viejo y la limpieza que no podia forzar el hold: el token de la creacion se manda a `notify-remote` y `--forzar-hold` solo abre para filas que nunca se firmaron) — 📦938 (el estado al cierre de la jornada: este bloque y la bitacora de las etapas 0 a 6) — 📦 **937** (el endurecimiento del operador: la bandera retirada documentada como inerte, el comentario obsoleto del 026 corregido y el 409 del D-03 que pasa a ser AVISO en vez de FALLA en el smoke) — 📦 **936** (el empalme mecanico de la v1.1: 49 numerales con su texto integro y un script que no escribe un texto con placeholders) — 📦 **935** (la purga en dos capas: la supresion de datos no se ejecutaba nunca porque la capa de auditoria cerraba la ventana antes de que corriera la capa de datos) — 📦 **934** (el texto legal en el codigo: el rastro auditable de la ficha de la Empresa, la copia permanente con su SLA de cinco dias habiles, el recibo de supresion entregable y el OTP que expira a los 600 segundos). Antes: 📦 **933** |
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | Solo el **NIT de Gesstiar S.A.S.**, y solo para la ficha del Encargado en el Anexo de Encargo. El domicilio ya está diligenciado en los seis documentos legales. Además, **cargar los datos de la empresa cliente en el servidor** (`POST /internal/admin/empresas`): es un `curl`, el endpoint ya existe; el 18 el servidor no respondía al SSH. El puente de 📦927 ya empuja desde cada PC los datos de una empresa **ya registrada**; el alta inicial y el Anexo siguen siendo administrativos. |
 | **NO es deuda: publicar la v1.1** | **No se registra como pendiente mientras siga la revisión por capítulos.** No se puede publicar un texto que todavía se está auditando. Publicar no es una tarea atrasada: es la consecuencia de terminar la auditoría. |
@@ -666,6 +674,169 @@ solo va el resumen de las que **cambian cómo se trabaja mañana**:
   typos que busca. Listar solo lo que es **inequívocamente** error en ese documento.
 - Los documentos nuevos viven en la **raíz del repo**, junto a `PRODUCT.md`; los de la app, en
   `sgsst-electron-app/`. Un script que los agrupe mal marca "FALTA" sobre archivos que sí existen.
+
+### 2026-10-24 · 📦944 · La v1.1 deja de estar bloqueada: los campos del sistema, el sello de version y los datos del owner
+
+**Qué se hizo**
+
+| Paquete | Qué |
+|---|---|
+| 📦944 | La guarda de texto legal separa los huecos de los campos que registra el sistema: `[registrada por el sistema]` no bloquea la publicación, pero se sigue listando |
+| 📦944 | El conteo quedo partido en `huecos` (bloquean) y `sistema` (no bloquean) en la guarda, el readiness, el script de publicacion y el empalme |
+| 📦944 | El empalme dejo de llevar su propia copia del patron de placeholders: importa la regla del modulo compartido |
+| 📦944 | El sello de version: el encabezado ("Version del Acuerdo: vX") y el bloque de Manifestacion de Voluntad pasan a la version que se esta armando, con reglas estrictas (exactamente una mencion de cada lado, y las dos diciendo lo mismo) |
+| 📦944 | El JSON de cambios declara su `version`, y el empalme se niega si se arma una version distinta de la que dice el JSON |
+| 📦944 | Los cinco datos del owner van en su propio archivo (`scripts/fixtures/acuerdo-v1.1-datos.json`), NO en el mapa de cambios: ese mapa es el texto del abogado copiado integro y tiene una garantia probada (cada texto aparece literal en la respuesta 11A) |
+| 📦944 | El empalme sustituye los datos con las mismas reglas estrictas: cada placeholder exactamente una vez, el valor sin corchetes, y al final ni un hueco |
+| 📦944 | El canal de proteccion de datos quedo en un solo lugar: `.env` (local y servidor), `config.js`, `.env.example`, manifiesto y el texto del 10.7(b) |
+| 📦944 | El texto armado de la v1.1 (`scripts/fixtures/acuerdo-v1.1.txt`) esta en `.gitignore` hasta que el abogado lo apruebe |
+| 📦943 | Correccion de la documentacion: el hold de la fila de prueba venia de la regla `CONTRATO_ELECTRONICO`, no de la ficha de la Empresa |
+
+**El segundo bloqueo, y el que mas se coughs: el texto seguia diciendo "v1.0".** El Acuerdo nombra su
+version en DOS lugares (el encabezado "Version del Acuerdo: vX" y el bloque de Manifestacion de
+Voluntad "…K+AIR, version vX…"), y el empalme los dejaba como estaban. Con los cinco datos puestos, el
+readiness rechazaba el texto con `faltan: [{id: "version"}]`: el check ya existia desde el 📦941 y
+mordia; lo que faltaba era correr la cadena COMPLETA (empalme → guarda → readiness) y no las partes.
+El sello no va en el mapa de cambios (ese mapa es el texto del abogado, copiado integro): es una
+propiedad de la version, y lo aplica el script tomandola del campo `version` del JSON. El sello se
+niega a seguir si no encuentra exactamente una mencion de cada lado, si las dos no dicen lo mismo,
+o si el JSON no declara la version. **Durante la implementacion el sello produjo "vv1.1" y el propio
+check lo caza**: un sello que no se verifica es un sello que miente.
+
+**Por qué** — la v1.1 no se podia publicar ni con los cinco datos del abogado listos: la guarda contaba
+nueve corchetes, y cuatro de ellos (`[registrada por el sistema]`, del bloque de Manifestacion de
+Voluntad) los llena el sistema al firmar. La v1.0, ya publicada y sellada y viva en produccion, los
+usa desde hace semanas: la regla del codigo era mas estricta que el texto legal.
+
+**Decisiones del owner** — "que el detector reconozca `[registrada por el sistema]` como campo del
+sistema", de entre dos opciones (la otra era que el abogado reescribiera esas cuatro lineas sin
+corchetes). La eleccion del owner es la que no depende del abogado y deja el texto igual que el
+que ya esta en produccion.
+
+**Los cinco datos** (owner, 24-oct-2026) — URL `https://kair.fyi/anexo-encargo.html` (1.5) · ciudad y
+pais `Barranquilla, Colombia` (10.1) · respaldos, monitoreo y soporte "a cargo de Gesstiar S.A.S.,
+de forma interna, sin proveedor externo" (10.1) · canal `privacidad.kair@gmail.com` (10.7(b)) ·
+responsable "Cargo Representante Legal de Gesstiar" (10.7(b)). Y el dominio del sitio legal:
+`kair.fyi` apuntando a GitHub Pages (el CNAME quedo preparado y staged en la rama `gh-pages`).
+
+**Tests** — 28 nuevos: 11 en `tests/utils/textoLegal.test.js` (el modulo compartido, con la v1.0
+real como fixture), 3 en `tests/guarda-texto-legal.test.js` y 14 en
+`tests/scripts/empalmar-acuerdo-v1.1.test.js` (cuatro del sello: el texto con la version nueva en el
+encabezado y en la Manifestacion, y sus tres negativas — sin version en el texto, con el
+encabezado y la Manifestacion en desacuerdo, y con la version del JSON distinta de la que se arma;
+y siete de los datos: los cinco huecos reales llenados, cada placeholder apareciendo una sola vez, y
+sus cuatro negativas — placeholder inexistente, placeholder repetido, valor con corchetes y huecos
+que quedan sin llenar; mas el caso real con los datos del owner).
+Suite completa: **1705 tests · 1703 verdes · 0 rojos · 2 omitidos**. `node --check` en los 5
+archivos de codigo.
+
+**El resultado** — con los cinco datos del owner, el empalme escribe el archivo (codigo 0), la guarda
+lo deja pasar y el readiness del texto dice `ok: true`, `faltan: []`: la primera vez que el texto de
+la v1.1 queda armable y publicable. Sin los datos, el empalme sale con codigo 2 y no escribe nada.
+El readiness del gate de publicacion paso de **4 ok / 31 pendientes / 19 bloqueantes** a
+**9 ok / 26 pendientes / 13 bloqueantes** (`texto_v1_1`, `hash_v1_1` y `canal_datos`). El texto
+armado tiene SHA-256 `a88e41af5a5d5c7c5c6d89bc2eeac19a758b47945f37c9aaccd144052e0b7bc5` y 38 969
+bytes; queda en `.gitignore` hasta que el abogado lo apruebe.
+
+**Bugs encontrados** — el empalme llevaba su propio `RE_PLACEHOLDER`: arreglando solo el modulo
+compartido, el script salia con codigo 0 mientras su reporte seguia diciendo "9 placeholders". Un
+check que no muerde y un reporte mintiendo. Por eso el empalme ahora importa la regla y compara
+las dos cuentas (todas las ocurrencias y los huecos).
+
+**Archivos tocados** — `src/utils/textoLegal.js`, `src/services/agreement.js`,
+`src/services/readinessLegal.js`, `scripts/publicar-acuerdo-legal.js`,
+`scripts/empalmar-acuerdo-v1.1.js`, `tests/utils/textoLegal.test.js`,
+`tests/guarda-texto-legal.test.js`, `tests/scripts/empalmar-acuerdo-v1.1.test.js`,
+`docs/gestion-humana/firma-electronica/API.md`, `BITACORA.md`, `PROMPT.md`, `Historial.md`.
+
+**Commits** — ninguno todavia: los tres paquetes (📦943, 📦944 y 📦945) estan escritos y
+verificados, esperando la palabra del owner.
+
+### 2026-10-24 · 📦945 · El readiness leía el HTML crudo: cuatro cláusulas del Anexo de Nube que el documento sí tiene
+
+**Qué se hizo**
+
+| Paquete | Qué |
+|---|---|
+| 📦945 | El checker de cláusulas y de corchetes lee el texto RENDERIZADO (sin etiquetas, con las entidades resueltas): el documento legal es el que se firma, no el marcado |
+| 📦945 | El aviso "NO FIRMAR HASTA COMPLETAR LOS DATOS" es un marcador (`NO_FIRMAR`) y deja de ser una cláusula requerida permanente |
+| 📦945 | La regla del aviso queda coherente en los dos sentidos: con datos pendientes tiene que advertir; sin datos pendientes no puede llevar el aviso |
+| 📦945 | El patrón de la frase vive UNA vez, en `src/utils/textoLegal.js`, y el readiness lo pide con `reDeMarcador()` |
+
+**El bug.** `analizarAnexoNube` y `analizarAnexoEncargo` corrían sus checks sobre el
+archivo HTML crudo. Los anexos están escritos con entidades (`d&iacute;as h&aacute;biles`,
+`Auditor&iacute;a`, `supresi&oacute;n`, `Devoluci&oacute;n`, `20 a&ntilde;os`), y los
+patrones buscan la letra: `"dos (2) d&iacute;as h&aacute;biles"` no matchea
+`/dos\s*\(2\)\s*días\s+hábiles/`. El Anexo de Nube reportaba **6 cláusulas faltantes** y
+**cuatro de ellas el documento sí las tiene**. No faltaba la cláusula: el check miraba el
+marcado.
+
+**El segundo bug, peor.** El aviso "no firmar" estaba como cláusula **requerida** y ninguna
+marca lo reconocía. Las dos cosas juntas: (a) un documento que decía "no firmar" podía
+quedar `ok: true` —un check que no muerde en la dirección peligrosa— y (b) como el
+requisito era permanente, el ítem `documento_nube` bloqueaba la primera firma **para
+siempre**, porque el archivo del repo es el modelo y siempre tiene huecos. Un check que
+nunca puede pasar es un check que no muerde: el problema era del requisito.
+
+**Medido** — Anexo de Nube real: cláusulas faltantes **6 → 0**, `clausulasOk` false →
+true, huecos **53 → 53** (no se perdió ninguno) y el hash del archivo **igual**
+(`f50ed32c…19628`): la huella identifica el documento, no su forma de marcado. El Anexo
+de Encargo sigue con 5 cláusulas faltantes, y esas cinco **son reales** (le faltan la
+remisión al Anexo de Nube, la de otrosí, el art. 2.2.4.6.13, los veinte años y el
+servicio en nube).
+
+**La regla del aviso, en los dos sentidos.** Con datos pendientes, el documento tiene que
+advertirlo (el aviso o cualquier marca de borrador): si no, alguien lo diligencia a mano y
+se lleva un documento con huecos sin advertencia → el check reporta `aviso_sin_datos`. Sin
+datos pendientes, no puede llevar el aviso: no se firma un documento que dice "no firmar" →
+lo bloquea el marcador `NO_FIRMAR`. El patrón vive una vez, en el módulo legal; el
+readiness lo pide con `reDeMarcador('NO_FIRMAR')`, nunca con una copia del regex.
+
+**Tests** — 12 nuevos: 10 en `tests/readiness-documentos-html.test.js` (las entidades no
+esconden la cláusula; el HTML y el texto plano dan el MISMO resultado; el check muerde
+cuando la cláusula falta; la frase del aviso es una sola fuente; la regla del aviso en los
+dos sentidos; un documento que dice "no firmar" no se publica; el hash sigue siendo del
+archivo; los corchetes no se pierden) y 2 en `tests/readiness-legal.test.js`. Suite completa:
+**1717 tests · 1715 verdes · 0 rojos · 2 omitidos**. `node --check` en los tres archivos.
+Barrido de caracteres no latina limpio.
+
+**Lo que este paquete NO decide.** El ítem `documento_nube` sigue en `pendiente`, y con
+razón: el modelo tiene 53 huecos. Pero uno es una decisión de fondo que no es del código:
+si el archivo del repo es el MODELO (con los huecos por Empresa) o el DOCUMENTO FINAL
+(diligenciado). Hoy nadie diligencia el Anexo de Nube —el servicio nunca lo lee— y los
+tres huecos por-Empresa (`[EMPRESA]`, su NIT y su representante) no tienen dueño. Eso es
+el punto 7, y lo tiene que decidir el owner con el abogado.
+
+**Archivos tocados** — `src/utils/textoLegal.js`, `src/services/readinessLegal.js`,
+`tests/readiness-documentos-html.test.js`, `tests/readiness-legal.test.js`,
+`BITACORA.md`, `PROMPT.md` (trampa 77), `Historial.md`.
+
+**Commits** — ninguno todavía: los tres paquetes (📦943, 📦944 y 📦945) están escritos y
+verificados, esperando la palabra del owner.
+
+### 📋 El tablero de los 15 puntos (estado medido al 24-oct-2026)
+
+| # | Pendiente | Estado |
+|---|---|---|
+| 1 | Los 5 huecos de la v1.1 | ✅ **Cerrado.** Los 5 valores llegaron (URL, ciudad/país, respaldos/monitoreo/soporte, buzón del canal, persona/área). El empalme corre con código 0 y escribe el archivo: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, **0 huecos** y 4 campos del sistema. El readiness lo confirma: `texto_v1_1 → ok` y `hash_v1_1 → ok` ("el hash del manifiesto coincide con el archivo"). Falta el commit (📦944) y el envío al abogado (punto 12): **la v1.1 no se publica todavía** |
+| 2 | NIT de Gesstiar | 🟡 **El NIT ya está.** `900987987` (lo dio el owner el 24-oct-2026): puesto en el manifiesto (`encargado.nit`) y en los **6 documentos** donde decía "por diligenciar" (política de privacidad, términos y Anexo de Encargo, en los dos árboles: `legal/` y `sitio/`), lo que además **quitó el marcador `POR_DILIGENCIAR`** del Anexo de Encargo (ya solo queda `REVISION_PENDIENTE`, que es el abogado). El ítem `nit_encargado` del readiness pasó a **ok**. Falta el **representante legal** (el nombre de quién representa a Gesstiar) para encender `partes_encargado` |
+| 3 | URLs del Anexo y de la política | 🟡 Base decidida (`kair.fyi`), CNAME preparado y staged en la rama `gh-pages` (sin commitear). Falta: (a) tu DNS en Cloudflare (CNAME → `reivaj640.github.io`, **DNS only**) y verificar el dominio en GitHub → Settings → Pages; (b) publicar los documentos finales — el Anexo de Encargo que está en el repo es el viejo (de la app de escritorio) y el Anexo de Nube no está en `sitio/`; (c) llenar `encargado.url_anexo_encargo` y `encargado.url_politica` en el manifiesto. **(c) no se puede hacer antes de (b)**: sellar una URL que después apunta a otro documento hace que el Acuerdo apunte a algo que cambió después del sellado |
+| 4 | Canal de protección de datos | ✅ **Cerrado en los 5 lugares**: `.env` local, `config.js:117`, `.env.example`, manifiesto (`canal_proteccion_datos` + `canal_confirmado: true`) y el 10.7(b) del texto armado. El `.env` **del servidor** también, verificado: `FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com`. ⚠️ En el servidor el ítem `canal_datos` está **en FALLA** hasta el deploy: el manifiesto que hay allí es el del 📦942, con `canal_proteccion_datos: null`. Se enciende con el despliegue (que lleva el manifiesto del 📦944) |
+| 5 | Responsable + acta | 🟡 **Medio cerrado.** El responsable ya quedó registrado: `Cargo Representante Legal de Gesstiar`. Falta la **referencia del acta de designación**, y por eso `responsable_datos` sigue en `pendiente` (el check exige responsable **y** acta). No inventarla: o es un acta interna, o la referencia al RUT o certificado de representación legal |
+| 6 | Canal único de PQRS | 🟡 Casi listo. El plazo ya está `ok` (2 días hábiles) y la ficha del servidor ya tiene `asepluscaribesas@gmail.com`. Falta que lo confirmes como **único** + el responsable, y declararlo en el manifiesto (`pqrs.canal` y `pqrs.responsable` siguen en `null`) |
+| 7 | Anexo de Nube | 🟡 **Medido y corregido hoy (📦945).** El checker leía el HTML crudo y no veía las cláusulas que el documento sí tiene (por las entidades): de **6 cláusulas faltantes a 0** (`clausulas_ok: true`), con los **53 huecos intactos** y el hash del archivo igual. Los 5 datos del banner: **2 ya están** (ciudad/país = Barranquilla, Colombia; respaldos/monitoreo/soporte = a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo) → el banner baja de 5 a **3**: NIT y representante (punto 2), DPAs (punto 8) y tipo de cuenta de Google (punto 9). Sigue pendiente una **decisión de fondo**: si el archivo del repo es el MODELO (con los huecos por Empresa) o el DOCUMENTO FINAL (diligenciado) — hoy **nadie diligencia el Anexo de Nube** (el servicio nunca lo lee) y los 3 huecos por-Empresa (`[EMPRESA]`, su NIT y su representante) no tienen dueño |
+| 8 | DPAs | 🔴 **Tu dato.** Sin cambio: los 6 campos por subencargado, todos en `false`/`null`. El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA |
+| 9 | Tipo de cuenta de Google | 🔴 **Tu dato.** Sin cambio: `subencargados.google.cuenta` en `null` y `[Workspace/Cloud]` en el Anexo de Nube. El 11A lo marcó "⚠️ No verificado" |
+| 10 | Ubicación + RTO/RPO + responsables | 🟡 **4 de 8 cerrados hoy.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo). Faltan: **seguridad física, RTO, RPO y plan de continuidad**. ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe |
+| 11 | Estado real del Anexo de Encargo | 🔴 **Tu dato**, con la contradicción medida intacta: la BD del servidor dice firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no hay PDF; el manifiesto dice `no_firmado`; el documento tiene la marca "por diligenciar". **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publica un Anexo de Encargo nuevo, completo, con el servicio en la nube. Ojo: el check exige la cláusula de `otrosí` (que en el reemplazo no aplica: sería una *sustitución*); esa diferencia hay que resolverla en el check y en el texto. Además, **5 cláusulas que sí le faltan al documento** (la remisión al Anexo de Nube, la de otrosí, el art. 2.2.4.6.13, los veinte años y el servicio en nube) — esas son mías |
+| 12 | Aprobar la v1.1 con el abogado | 🟡 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). Falta que tú lo envíes; puedo convertirlo a Word o PDF |
+| 13 | Los 4 marcadores + "versión v1.0" | ✅ **Cerrado hoy.** Los 4 `[registrada por el sistema]` → el detector los reconoce (excepción de contenido exacto; las variantes siguen bloqueando). La línea "versión v1.0" → sello de versión en el encabezado y en el Manifiesto, con 4 checks negativos. Efecto medido: el texto pasó de `faltan:[{id:"version"}]` a `ok:true, faltan:[]` |
+| 14 | Rotar las 5 app passwords | ⚪ **Solo tuyo.** El repo es público y quedaron en el historial. Sin cambio |
+| 15 | SECURITY.md A/B/C | 🟡 **Medido; falta tu decisión.** C está descartada por los hechos (25+ referencias del código apuntan a secciones suyas). A = corregir las afirmaciones falsas + ejecutar el §7 (39 casillas, 0 marcadas). B = congelar con lo mínimo. Sigue en pie el hallazgo del servidor: **Node 20 está en EOL desde el 2026-04-30** (verificado contra `endoflife.date`), y la suposición del §1.3 ya era falsa cuando se escribió el documento |
+
+**Lo único que bloquea el despliegue** es el commit: 📦943 está staged y verificado, 📦944 y 📦945 tienen el mensaje escrito, y falta la palabra del owner. El tar se arma desde el commit, nunca desde el working tree: por eso el paquete que se sirvió antes salía viejo.
+
+---
 
 ### 2026-10-23 · 📦934 · El texto legal en el codigo: la ficha, la copia, el recibo y el OTP
 

@@ -2623,6 +2623,7 @@ para que no haya dos listas de requisitos que se desactualicen por separado.
     "empresas": {
       "disponible": true, "total": 0, "con_anexo_base": 0,
       "con_anexo_nube": 0, "con_canal_pqrs": 0,
+      "fechas_antes_del_alta": 0,
       "columna_anexo_nube": false, "error": null
     },
     "tablas": {
@@ -2635,7 +2636,11 @@ para que no haya dos listas de requisitos que se desactualicen por separado.
     "acuerdo_v1_1": {
       "archivo": "scripts/fixtures/acuerdo-v1.1.txt",
       "existe": false, "hash": "…",
-      "placeholders": { "total": 0, "unicos": [], "muestras": [] },
+      "placeholders": {
+        "total": 0, "unicos": [], "muestras": [],
+        "huecos":  { "total": 0, "unicos": [], "muestras": [] },
+        "sistema": { "total": 0, "unicos": [], "muestras": [] }
+      },
       "marcadores": [],
       "clausulas_ok": false,
       "faltan": [ { "id": "veinte_anios", "titulo": "Piso de veinte (20) años" } ]
@@ -2672,6 +2677,15 @@ para que no haya dos listas de requisitos que se desactualicen por separado.
 
 Los estados de un item son `ok`, `pendiente`, `aviso` y `no_aplica`. `listo`
 vale `true` solo cuando no queda ningún bloqueante pendiente en ese gate.
+
+**`placeholders` separa los corchetes en dos clases.** `total` cuenta todas las
+ocurrencias. `huecos` son las que alguien tiene que llenar: **son las que
+bloquean** la publicación del texto. `sistema` son los campos que registra el
+propio sistema (`[registrada por el sistema]`, los cuatro del bloque de
+Manifestación de Voluntad): se listan —nada queda escondido— pero **no
+bloquean**, porque el sistema los llena al firmar y la v1.0 ya está publicada
+con ellos. La excepción es de contenido exacto: cualquier otra variante
+(`[registrada por la empresa]`) sigue contando como hueco.
 
 **De dónde sale cada dato**: el inventario de evidencias es
 `firma-service/legal-readiness.json` (un campo por evidencia, con su fecha, su

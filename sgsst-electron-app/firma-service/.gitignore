@@ -11,6 +11,13 @@ storage/pdfs/constancias/*
 !storage/pdfs/originales/.gitkeep
 !storage/pdfs/firmados/.gitkeep
 !storage/pdfs/constancias/.gitkeep
+
+# El texto del Acuerdo v1.1 mientras NO lo apruebe el abogado.
+# Se arma con scripts/empalmar-acuerdo-v1.1.js (base v1.0 + cambios del
+# abogado + datos del owner). Publicarlo en git es un acto: el texto es la
+# versión que se firma. Quitar esta línea SOLO cuando el abogado lo apruebe
+# y se archive con scripts/archivar-acuerdo.js.
+scripts/fixtures/acuerdo-v1.1.txt
 # Entorno local desechable de la prueba manual (I-107 / 8B-C)
 storage/manual-8bc/
 

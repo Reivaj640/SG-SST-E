@@ -81,7 +81,15 @@ SMTP_USER=<cuenta gmail que envia>
 SMTP_PASS=<app password de 16 caracteres, SIN ESPACIOS>
 SMTP_FROM_NAME=K+AIR
 SMTP_FROM_EMAIL=<mismo que SMTP_USER>
+FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com
 ```
+
+**El canal de proteccion de datos tiene que ser UNO solo.** `src/config.js` lo lee de
+`FIRMA_CANAL_PROTECCION_DATOS` y el manifiesto `legal-readiness.json` lo declara en
+`encargado.canal_proteccion_datos`. Si los dos no dicen lo mismo, el readiness marca
+el item `canal_datos` como FALLA, y el texto legal le estaria prometiendo al Titular
+un buzon distinto del que el sistema usa de verdad. Cambiarlo en el `.env` **exige
+reiniciar el servicio**: la configuracion se lee al arrancar, no en caliente.
 
 Generar llaves nuevas:
 
@@ -194,22 +202,48 @@ sudo systemctl stop kair-firma
 
 # 2. Copiar el codigo nuevo al directorio de la app
 sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma/app
+sudo chown -R kairfirma:kairfirma /opt/kair-firma/app
 
 # 3. VERIFICAR el hash de lo que quedo en disco (no del repo, no del tar)
 sha256sum /opt/kair-firma/app/src/crypto/token.js
 sha256sum /opt/kair-firma/app/src/services/signRequest.js
 
-# 4. Arrancar: el proceso nuevo carga lo que esta en disco
+# 4. LAS MIGRACIONES, con el servicio parado y ANTES de arrancar
+cd /opt/kair-firma/app
+sudo -u kairfirma node src/db/migrate.js 2>&1 | tail -20
+
+# 5. Arrancar: el proceso nuevo carga lo que esta en disco
 sudo systemctl start kair-firma
 sleep 3
 systemctl is-active kair-firma
 
-# 5. VERIFICAR que el proceso que corre es el nuevo
+# 6. VERIFICAR que el proceso que corre es el nuevo
 sudo systemctl show -p MainPID -p ActiveEnterTimestamp kair-firma
 curl -sS https://firma.kair.fyi/health
 ```
 
-El paso 5 es el que falto. `uptime_seconds` tiene que ser **chico** (unos
+El paso 4 esta aparte a proposito. `src/server.js` llama a `migrate()` al arrancar:
+si una migracion falla, el proceso sale con codigo 1 y el servicio **no vuelve**
+(el systemd lo reintenta en bucle). Corriendolas a mano con el servicio parado, el
+error se ve **antes** de que el servicio lo encuentre solo.
+
+> **La ventana de caida se mide en segundos, no en minutos.** El 24-oct-2026 el servicio
+> quedo **caido** (502 de Cloudflare) por un tiempo largo: el despliegue se hizo en pasos
+> sueltos y se **pauso a la espera de una validacion** entre "parar" y "arrancar". La
+> regla: **todo el ciclo parar → extraer → verificar → migrar → arrancar se pega de corrido,
+> sin pausa y sin esperar a nadie.** Si hay que validar algo, se valida **antes** de parar
+> (el hash del tar se compara con el servicio todavia arriba) o **despues** de arrancar.
+> Un despliegue no se deja a medio camino: si el servicio esta parado, se levanta, aunque
+> sea con el codigo viejo.
+>
+> **Un comando a la vez: no se pega un bloque.** La terminal de Cockpit (`xterm.js`) ejecuta
+> lo pegado linea por linea y con bloques largos la entrada se enreda: el 24-oct-2026 un
+> `journalctl` pegado en la terminal hizo que bash intentara ejecutar `oct 24 19:01:48 ...`
+> (40 veces "command not found") y el bloque de despliegue quedo a medias, con el servicio
+> parado. Los comandos van **de uno en uno**, con su salida leida antes del siguiente, y
+> **la salida se copia al chat, no a la terminal**.
+
+El paso 6 es el que falto. `uptime_seconds` tiene que ser **chico** (unos
 segundos): si el proceso lleva horas arriba, no es el que se acaba de instalar,
 por mas que los hashes del disco esten bien.
 
@@ -225,18 +259,41 @@ archivo que se acababa de "instalar" `ls` lo daba como inexistente.
 
 Dos formas de evitarlo:
 
-**1. Empaquetar con `tar`** (bsdtar viene en Windows 10+ y Linux lo lee siempre):
+**1. Empaquetar desde el COMMIT con `git archive`** (la que se usa hoy):
+
+El paquete tiene que salir del **commit**, no del working tree: lo que corre en
+produccion tiene que ser lo mismo que esta en el repo, con la misma huella.
 
 ```powershell
-# EN EL PC
-tar -czf "$env:TEMP\kair-deploy.tar.gz" src web scripts package.json package-lock.json
-scp "$env:TEMP\kair-deploy.tar.gz" javier@192.168.1.11:/tmp/
+# EN EL PC, dentro de firma-service/
+New-Item -ItemType Directory -Force -Path "$env:TEMP\kair-deploy" | Out-Null
+git archive --format=tar.gz -o "$env:TEMP\kair-deploy\kair-deploy.tar.gz" HEAD `
+  src web scripts package.json package-lock.json legal-readiness.json
+Get-FileHash "$env:TEMP\kair-deploy\kair-deploy.tar.gz" -Algorithm SHA256
+```
+
+`git archive` resuelve tres cosas solo: las rutas son **relativas a la carpeta del
+servicio** (`src/server.js`), entra **solo lo commiteado** —el texto armado de la
+v1.1 esta en `.gitignore` hasta que lo apruebe el abogado, y este metodo no lo
+sube—, y el manifiesto `legal-readiness.json` viaja en la raiz de la app, que es
+donde el readiness lo busca.
+
+**Subirlo: el puente HTTP.** El `kair-server` no acepta SSH desde el portatil
+(`Permission denied`): el transporte es un servidor HTTP en el PC y un `curl` en el
+servidor.
+
+```powershell
+# EN EL PC (dejar corriendo en otra terminal)
+python -m http.server 8765 --bind 0.0.0.0 --directory "$env:TEMP\kair-deploy"
 ```
 
 ```bash
 # EN EL SERVIDOR
-sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma/app
+curl -sS -o /tmp/kair-deploy.tar.gz http://192.168.1.2:8765/kair-deploy.tar.gz
+sha256sum /tmp/kair-deploy.tar.gz     # el MISMO hash que dio Get-FileHash (en minusculas)
 ```
+
+Si los dos hashes no coinciden, **el paquete no viaja**: se vuelve a bajar.
 
 **2. Extraer normalizando el separador** (si el zip ya se subió, o si el
 servidor no tiene `unzip` — Ubuntu mínimo no lo trae):
@@ -386,6 +443,15 @@ y de que la regla legal del documento está corriendo en el servidor.
 > `kair-server` corre el codigo viejo (sin 034 a 041). Se aplican solas al
 > arrancar el servicio (`src/server.js` llama a `migrate()`), pero el **orden**
 > sigue siendo: migraciones primero, servicio despues.
+>
+> **2026-10-24. Corregido con el dato del servidor.** El arranque del 24-oct-2026 a las
+> 19:01:48 UTC escribio `"No hay migraciones pendientes","total":40`: **las 40 migraciones
+> estan aplicadas** en `kair-server` (el repositorio tiene 40 archivos `.sql`; el 015 no
+> existe). Las que faltaban (028, 029, 035, 036 y 037 a 041) ya se aplicaron en los
+> despliegues del 23 y del 24 de octubre. Lo que **si** falta, y no es una migracion, es el
+> **Anexo de Nube**: la columna `anexo_nube_firmado_at` no la crea ninguna migracion (el
+> codigo la lee de forma opcional y avisa `columna_anexo_nube: false`), porque todavia no
+> existe el documento que la respaldaria.
 
 Las migraciones **034 a 036** (custodia de 20 anos y la excepcion auditable de
 habilitacion) estan documentadas en la **§5.5** mas abajo. Estas son las **nuevas**:

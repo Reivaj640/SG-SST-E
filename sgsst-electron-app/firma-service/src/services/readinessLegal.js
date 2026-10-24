@@ -37,6 +37,7 @@ const {
   listarPlaceholders,
   analizarTextoLegal,
   parseVersion,
+  reDeMarcador,
 } = require('../utils/textoLegal');
 
 // Raíz del Servicio (firma-service) y raíz del repo que lo contiene.
@@ -132,6 +133,59 @@ function _rutaRelativa(ruta) {
   } catch (_) {
     return path.basename(String(ruta));
   }
+}
+
+/**
+ * Entidades HTML que aparecen en los documentos legales del sitio.
+ *
+ * Solo las que el repo usa de verdad: el sitio escribe con entidades
+ * (`d&iacute;as`, `Auditor&iacute;a`, `supresi&oacute;n`) y el texto que se
+ * firma es el RENDERIZADO, no el HTML crudo.
+ */
+const ENTIDADES_HTML = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú',
+  Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ', mdash: '—', ndash: '–',
+  laquo: '«', raquo: '»', middot: '·', hellip: '…',
+  ordm: 'º', ordf: 'ª', copy: '©', reg: '®',
+};
+
+/**
+ * Convierte un documento HTML en el TEXTO que el firmante lee: le quita las
+ * etiquetas y resuelve las entidades.
+ *
+ * POR QUÉ: el checker de cláusulas corría sobre el HTML crudo, así que una
+ * cláusula escrita con entidades no aparecía. El 24-oct-2026 eso hizo que el
+ * Anexo de Nube reportara como faltantes cuatro cláusulas que el documento sí
+ * tiene (los veinte (20) años, los dos (2) días hábiles, la devolución, la
+ * supresión y la auditoría): "dos d&iacute;as h&aacute;biles" no matchea
+ * /dos\s*\(2\)\s*días\s+hábiles/. El documento legal es el que se ve, no el
+ * marcado.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function _textoRenderizado(html) {
+  if (typeof html !== 'string' || html.length === 0) return '';
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&([a-zA-Z]+|#\d{1,5});/g, (match, entidad) => {
+      if (entidad.charAt(0) === '#') {
+        const numero = entidad.charAt(1) === 'x'
+          ? parseInt(entidad.slice(2), 16)
+          : parseInt(entidad.slice(1), 10);
+        return Number.isFinite(numero) ? String.fromCodePoint(numero) : match;
+      }
+      const valor = ENTIDADES_HTML[entidad];
+      return valor === undefined ? match : valor;
+    })
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
 }
 
 function _leerTexto(ruta) {
@@ -336,22 +390,84 @@ function _faltantes(texto, requeridos) {
     .map((r) => ({ id: r.id, titulo: r.titulo }));
 }
 
+/**
+ * La frase de "no firmar" del Anexo de Nube. Vive en el modulo legal: es el
+ * mismo patron que el marcador prohibido `NO_FIRMAR`, para que la exijencia
+ * y el bloqueo no se desincronicen.
+ */
+const RE_AVISO_NO_FIRMAR = reDeMarcador('NO_FIRMAR');
+
 const REQUERIDOS_NUBE = [
-  { id: 'banner', titulo: 'Aviso de no firmar con pendientes', re: /NO\s+FIRMAR\s+HASTA\s+COMPLETAR\s+LOS\s+DATOS/i },
-  { id: 'cinco_categorias', titulo: 'Las cinco categorías del art. 2.2.4.6.13', re: /2\.2\.4\.6\.13/i },
-  { id: 'veinte_anios', titulo: 'Piso de veinte (20) años', re: /(veinte\s*\(20\)|20\s*años|20\s*anos)/i },
-  { id: 'hold', titulo: 'Hold sin término del contrato electrónico', re: /\bhold\b/i },
-  { id: 'dos_dias', titulo: 'Traslado de PQRS en dos (2) días hábiles', re: /dos\s*\(2\)\s*d[ií]as\s*h[aá]biles/i },
-  { id: 'cloudflare', titulo: 'Cloudflare nombrado', re: /Cloudflare/i },
-  { id: 'google', titulo: 'Google nombrado', re: /Google/i },
-  { id: 'dpa', titulo: 'DPA / acuerdo de encargo de los subencargados', re: /(DPA|Acuerdo de Tratamiento de Datos)/i },
-  { id: 'rto', titulo: 'RTO declarado', re: /\bRTO\b/ },
-  { id: 'rpo', titulo: 'RPO declarado', re: /\bRPO\b/ },
-  { id: 'devolucion', titulo: 'Devolución de datos', re: /devoluci[oó]n/i },
-  { id: 'supresion', titulo: 'Supresión de datos', re: /supresi[oó]n/i },
-  { id: 'auditoria', titulo: 'Auditoría del Encargado', re: /auditor[ií]a/i },
-  { id: 'titular', titulo: 'Derechos del Titular', re: /Titular/i },
-  { id: 'transferencia', titulo: 'Transferencia internacional', re: /transferencia\s+internacional/i },
+  {
+    id: 'cloudflare',
+    titulo: 'Cloudflare nombrado',
+    re: /Cloudflare/i,
+  },
+  {
+    id: 'google',
+    titulo: 'Google nombrado',
+    re: /Google/i,
+  },
+  {
+    id: 'dpa',
+    titulo: 'DPA / acuerdo de encargo de los subencargados',
+    re: /(DPA|Acuerdo de Tratamiento de Datos)/i,
+  },
+  {
+    id: 'rto',
+    titulo: 'RTO declarado',
+    re: /\bRTO\b/,
+  },
+  {
+    id: 'rpo',
+    titulo: 'RPO declarado',
+    re: /\bRPO\b/,
+  },
+  {
+    id: 'devolucion',
+    titulo: 'Devolución de datos',
+    re: /devoluci[oó]n/i,
+  },
+  {
+    id: 'supresion',
+    titulo: 'Supresión de datos',
+    re: /supresi[oó]n/i,
+  },
+  {
+    id: 'auditoria',
+    titulo: 'Auditoría del Encargado',
+    re: /auditor[ií]a/i,
+  },
+  {
+    id: 'titular',
+    titulo: 'Derechos del Titular',
+    re: /Titular/i,
+  },
+  {
+    id: 'transferencia',
+    titulo: 'Transferencia internacional',
+    re: /transferencia\s+internacional/i,
+  },
+  {
+    id: 'veinte_anios',
+    titulo: 'Piso de veinte (20) años',
+    re: /(veinte\s*\(20\)|20\s*años|20\s*anos)/i,
+  },
+  {
+    id: 'hold',
+    titulo: 'Hold sin término del contrato electrónico',
+    re: /\bhold\b/i,
+  },
+  {
+    id: 'dos_dias',
+    titulo: 'Traslado de PQRS en dos (2) días hábiles',
+    re: /dos\s*\(2\)\s*d[ií]as\s*h[aá]biles/i,
+  },
+  {
+    id: 'cinco_categorias',
+    titulo: 'Las cinco categorías del art. 2.2.4.6.13',
+    re: /2\.2\.4\.6\.13/i,
+  },
 ];
 
 const REQUERIDOS_ENCARGO = [
@@ -380,12 +496,18 @@ function _detalleDocumento(analisis) {
   if (analisis.marcadores && analisis.marcadores.length > 0) {
     partes.push('Marcadores prohibidos: ' + analisis.marcadores.map((m) => m.etiqueta).join('; ') + '.');
   }
-  if (analisis.placeholders && analisis.placeholders.total > 0) {
-    const muestra = analisis.placeholders.muestras.join(' ');
+  if (analisis.placeholders && analisis.placeholders.huecos.total > 0) {
+    const muestra = analisis.placeholders.huecos.muestras.join(' ');
     partes.push(
-      `Placeholders: ${analisis.placeholders.total} `
-      + `(${analisis.placeholders.unicos.length} distintos)`
+      `Huecos por llenar: ${analisis.placeholders.huecos.total} `
+      + `(${analisis.placeholders.huecos.unicos.length} distintos)`
       + (muestra ? `: ${muestra}` : '.'),
+    );
+  }
+  if (analisis.placeholders && analisis.placeholders.sistema.total > 0) {
+    partes.push(
+      `Campos que registra el sistema: ${analisis.placeholders.sistema.total} `
+      + '(no bloquean; los llena el sistema al firmar).',
     );
   }
   if (partes.length === 0) {
@@ -401,9 +523,31 @@ function _detalleDocumento(analisis) {
 function analizarAnexoNube(texto) {
   const t = typeof texto === 'string' ? texto : '';
   const existe = t.length > 0;
-  const faltan = _faltantes(t, REQUERIDOS_NUBE);
-  const placeholders = listarPlaceholders(t);
-  const legales = analizarTextoLegal(t);
+  // Las clausulas y los corchetes se miran en el TEXTO RENDERIZADO: lo que
+  // firma el Titular es el documento, no el HTML con entidades. El HASH sigue
+  // siendo el del archivo, byte a byte.
+  const v = _textoRenderizado(t);
+  const faltan = _faltantes(v, REQUERIDOS_NUBE);
+  const placeholders = listarPlaceholders(v);
+  const legales = analizarTextoLegal(v);
+  // El aviso de "no firmar" NO es una clausula del documento final: es un
+  // aviso del MODELO. Su regla es coherente en los dos sentidos:
+  //   - si el documento tiene datos pendientes, TIENE que advertirlo: el
+  //     aviso de no firmar o cualquier marca de borrador. Si no, alguien lo
+  //     diligencia a mano y se lleva un documento con huecos sin advertencia;
+  //   - si no tiene datos pendientes, NO puede llevar el aviso de no firmar:
+  //     no se firma un documento que dice "no firmar" (lo bloquea el marcador
+  //     `NO_FIRMAR`).
+  //
+  // La regla NO depende de la redaccion exacta del aviso: cualquier marca de
+  // borrador es una advertencia de que el documento esta a medias.
+  const tieneAviso = Boolean(RE_AVISO_NO_FIRMAR) && RE_AVISO_NO_FIRMAR.test(v);
+  if (placeholders.huecos.total > 0 && !tieneAviso && legales.marcadores.length === 0) {
+    faltan.push({
+      id: 'aviso_sin_datos',
+      titulo: 'Aviso de no firmar (el documento tiene datos pendientes y no lo advierte)',
+    });
+  }
   const clausulasOk = existe && faltan.length === 0;
   return {
     existe,
@@ -412,7 +556,7 @@ function analizarAnexoNube(texto) {
     placeholders,
     marcadores: legales.marcadores,
     hash: _hash(t),
-    ok: clausulasOk && placeholders.total === 0 && legales.marcadores.length === 0,
+    ok: clausulasOk && placeholders.huecos.total === 0 && legales.marcadores.length === 0,
     detalle: '',
   };
 }
@@ -425,9 +569,12 @@ function analizarAnexoNube(texto) {
 function analizarAnexoEncargo(texto) {
   const t = typeof texto === 'string' ? texto : '';
   const existe = t.length > 0;
-  const faltan = _faltantes(t, REQUERIDOS_ENCARGO);
-  const placeholders = listarPlaceholders(t);
-  const legales = analizarTextoLegal(t);
+  // Igual que el Anexo de Nube: las clausulas se miran en el texto
+  // renderizado, y el hash sigue siendo el del archivo.
+  const v = _textoRenderizado(t);
+  const faltan = _faltantes(v, REQUERIDOS_ENCARGO);
+  const placeholders = listarPlaceholders(v);
+  const legales = analizarTextoLegal(v);
   const clausulasOk = existe && faltan.length === 0 && legales.marcadores.length === 0;
   return {
     existe,
@@ -466,7 +613,7 @@ function analizarAcuerdo(texto, version = 'v1.1') {
     placeholders,
     marcadores: legales.marcadores,
     hash: _hash(t),
-    ok: clausulasOk && placeholders.total === 0 && legales.marcadores.length === 0,
+    ok: clausulasOk && placeholders.huecos.total === 0 && legales.marcadores.length === 0,
     detalle: '',
   };
 }
@@ -1170,7 +1317,7 @@ function evaluar(opciones = {}) {
       'documento_encargo',
       'Plantilla alineada con el Anexo de Nube',
       encargoDocumentoOk
-        ? (anEncargo.placeholders.total > 0 ? ESTADOS.AVISO : ESTADOS.OK)
+        ? (anEncargo.placeholders.huecos.total > 0 ? ESTADOS.AVISO : ESTADOS.OK)
         : ESTADOS.PENDIENTE,
       {
         bloquea: encargoDocumentoOk ? [] : GATE_PRIMERA,
@@ -1414,8 +1561,11 @@ function _resumenDocumento(doc) {
   const partes = [];
   if (doc.clausulas_ok) partes.push('cláusulas ok');
   else partes.push(`faltan ${doc.faltan.length} cláusula(s)`);
-  if (doc.placeholders && doc.placeholders.total > 0) {
-    partes.push(`${doc.placeholders.total} placeholder(s)`);
+  if (doc.placeholders && doc.placeholders.huecos.total > 0) {
+    partes.push(`${doc.placeholders.huecos.total} hueco(s) por llenar`);
+  }
+  if (doc.placeholders && doc.placeholders.sistema.total > 0) {
+    partes.push(`${doc.placeholders.sistema.total} campo(s) del sistema`);
   }
   if (doc.marcadores && doc.marcadores.length > 0) {
     partes.push(`${doc.marcadores.length} marca(s) prohibida(s)`);

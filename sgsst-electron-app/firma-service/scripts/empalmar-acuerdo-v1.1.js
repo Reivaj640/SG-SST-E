@@ -56,6 +56,8 @@ const {
   analizarTextoLegal,
   listarPlaceholders,
   esVersionSujetaAGuarda,
+  esPlaceholderDelSistema,
+  buscarPlaceholders,
 } = require('../src/utils/textoLegal');
 
 const SERVICE_ROOT = path.resolve(__dirname, '..');
@@ -64,6 +66,7 @@ const FIXTURES = path.resolve(__dirname, 'fixtures');
 const DEFAULT_VERSION = 'v1.1';
 const DEFAULT_BASE = path.join(FIXTURES, 'acuerdo-v1.0.txt');
 const DEFAULT_CAMBIOS = path.join(FIXTURES, 'acuerdo-v1.1-cambios.json');
+const DEFAULT_DATOS = path.join(FIXTURES, 'acuerdo-v1.1-datos.json');
 const DEFAULT_SALIDA = path.join(FIXTURES, 'acuerdo-v1.1.txt');
 const MANIFIESTO = path.join(FIXTURES, 'acuerdo-ARCHIVO.json');
 const MAPA_EMPALME = path.resolve(
@@ -88,10 +91,19 @@ const RE_CAPITULO = /^CAPÍTULO [IVXLCDM]+\. /;
 const RE_TITULO_CAPITULO = /^\d+\. [A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 ,.()\-]*$/;
 const RE_MANIFESTACION = /^MANIFESTACIÓN DE VOLUNTAD$/;
 
-// Placeholders: el MISMO criterio que usa src/utils/textoLegal.js.
-const RE_PLACEHOLDER = /\[[^\]\n]{0,200}\]/g;
+// Los placeholders se buscan con `buscarPlaceholders` del módulo compartido:
+// el MISMO criterio (y la MISMA excepción) que usa la guarda de publicación.
+// Este script no lleva su propia copia del patrón: una copia se desincroniza
+// y el reporte termina mintiendo sobre lo que bloquea.
 
 const LITERAL_NIVEL = /^\d+\.\d+\(([a-z])\)$/;
+
+// La versión del Acuerdo aparece en DOS lugares del texto: el encabezado
+// ("Versión del Acuerdo: vX") y el bloque de Manifestación de Voluntad
+// ("...K+AIR, versión vX, que se me ha presentado en pantalla"). Los dos tienen
+// que decir lo mismo, y tienen que decir la versión que se está armando.
+const RE_VERSION_ENCABEZADO = /^(Versión del Acuerdo:[ \t]*)v(\d+\.\d+)([ \t]*)$/gm;
+const RE_VERSION_MANIFESTACION = /versión v(\d+\.\d+)/g;
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -101,11 +113,25 @@ function sha256(texto) {
   return crypto.createHash('sha256').update(texto, 'utf8').digest('hex');
 }
 
+/**
+ * Un error del empalme. El codigo 3 es el que main() traduce a "salir con 3":
+ * el empalme no se puede hacer, y el archivo de salida no se escribe.
+ *
+ * @param {string} mensaje
+ * @returns {Error}
+ */
+function errorEmpalme(mensaje) {
+  const error = new Error(mensaje);
+  error.codigo = 3;
+  return error;
+}
+
 function parseArgs(argv) {
   const args = {
     version: DEFAULT_VERSION,
     base: DEFAULT_BASE,
     cambios: DEFAULT_CAMBIOS,
+    datos: DEFAULT_DATOS,
     salida: DEFAULT_SALIDA,
     reporte: null,
   };
@@ -115,6 +141,7 @@ function parseArgs(argv) {
     if (a.startsWith('--version=')) args.version = a.slice('--version='.length).trim();
     else if (a.startsWith('--base=')) args.base = path.resolve(a.slice('--base='.length).trim());
     else if (a.startsWith('--cambios=')) args.cambios = path.resolve(a.slice('--cambios='.length).trim());
+    else if (a.startsWith('--datos=')) args.datos = path.resolve(a.slice('--datos='.length).trim());
     else if (a.startsWith('--salida=')) args.salida = path.resolve(a.slice('--salida='.length).trim());
     else if (a.startsWith('--reporte=')) args.reporte = path.resolve(a.slice('--reporte='.length).trim());
     else if (a === '--help' || a === '-h') {
@@ -141,6 +168,10 @@ Opciones:
   --base=<ruta>      Texto base (default scripts/fixtures/acuerdo-v1.0.txt)
   --cambios=<ruta>   JSON con el texto final de cada numeral
                      (default scripts/fixtures/acuerdo-v1.1-cambios.json)
+  --datos=<ruta>     JSON con los datos del owner que llenan los placeholders
+                     (default scripts/fixtures/acuerdo-v1.1-datos.json).
+                     Si el archivo no existe, el texto queda con huecos y no
+                     se escribe: es lo que hoy impide publicar la v1.1.
   --salida=<ruta>    Archivo a escribir cuando el texto no tenga placeholders
                      (default scripts/fixtures/acuerdo-v1.1.txt)
   --reporte=<ruta>   Escribir el reporte de placeholders en ese archivo
@@ -262,13 +293,140 @@ function leerNumeralesDelMapa(ruta) {
 }
 
 /**
+ * Sella la versión en el texto.
+ *
+ * El Acuerdo nombra su versión en dos lugares: el encabezado ("Versión del
+ * Acuerdo: vX") y el bloque de Manifestación de Voluntad ("...K+AIR, versión
+ * vX, que se me ha presentado en pantalla"). Si lo que se publica es la v1.1 y
+ * el texto sigue diciendo "v1.0", el trabajador acepta una versión distinta de
+ * la que se le muestra: el documento miente, y el readiness lo rechaza
+ * (`Versión del Acuerdo: v1.1`).
+ *
+ * El sello NO es texto del abogado: es una propiedad de la versión. Por eso no
+ * va en el mapa de cambios (que es el texto del abogado, copiado íntegro) sino
+ * aquí, con la versión que el propio JSON de cambios declara.
+ *
+ * Las reglas son estrictas a propósito: si no hay exactamente una mención de
+ * cada lado, o si el encabezado y la Manifestación no coinciden, el script se
+ * niega. Un sello a ciegas es peor que no sellar.
+ *
+ * @param {string} texto
+ * @param {string} versionNueva con la 'v', por ejemplo 'v1.1'
+ * @returns {{texto: string, sellado: boolean, versionBase: string, versionNueva: string}}
+ */
+function sellarVersion(texto, versionNueva) {
+  const encabezado = [...texto.matchAll(RE_VERSION_ENCABEZADO)];
+  const manifestacion = [...texto.matchAll(RE_VERSION_MANIFESTACION)];
+
+  if (encabezado.length !== 1) {
+    throw errorEmpalme(
+      'El texto tiene ' + encabezado.length + ' líneas "Versión del Acuerdo: vX"; '
+      + 'se necesita exactamente una para poder sellar la versión.',
+    );
+  }
+  if (manifestacion.length !== 1) {
+    throw errorEmpalme(
+      'El texto tiene ' + manifestacion.length + ' menciones de "versión vX" '
+      + 'en el bloque de Manifestación de Voluntad; se necesita exactamente una.',
+    );
+  }
+  const versionBase = 'v' + encabezado[0][2];
+  const versionDeLaManifiestacion = 'v' + manifestacion[0][1];
+  if (versionBase !== versionDeLaManifiestacion) {
+    throw errorEmpalme(
+      'El encabezado dice "' + versionBase + '" y el bloque de Manifestación dice "'
+      + versionDeLaManifiestacion + '": el texto no es coherente consigo mismo y no se puede sellar.',
+    );
+  }
+  if (versionBase === versionNueva) {
+    // El texto ya es de la versión que se está armando: no hay nada que sellar,
+    // pero ya se verificó que las dos menciones coinciden.
+    return { texto, sellado: false, versionBase, versionNueva };
+  }
+
+  const sellado = texto
+    .replace(RE_VERSION_ENCABEZADO, (m, pre, _v, post) => pre + versionNueva + post)
+    .replace(RE_VERSION_MANIFESTACION, () => 'versión ' + versionNueva);
+
+  // Verificar DESPUÉS: el sello tiene que haber quedado, y solo una vez.
+  const encabezadoFinal = [...sellado.matchAll(RE_VERSION_ENCABEZADO)];
+  const manifestacionFinal = [...sellado.matchAll(RE_VERSION_MANIFESTACION)];
+  if (encabezadoFinal.length !== 1
+    || encabezadoFinal[0][2] !== versionNueva.replace(/^v/, '')) {
+    throw errorEmpalme('El sello del encabezado no quedó bien aplicado.');
+  }
+  if (manifestacionFinal.length !== 1
+    || manifestacionFinal[0][1] !== versionNueva.replace(/^v/, '')) {
+    throw errorEmpalme('El sello del bloque de Manifestación no quedó bien aplicado.');
+  }
+  return { texto: sellado, sellado: true, versionBase, versionNueva };
+}
+
+/**
+ * Sustituye los placeholders del texto con los datos del owner.
+ *
+ * Los datos van en un archivo aparte del mapa de cambios: el mapa es el texto
+ * del abogado copiado íntegro, y estos valores son del owner. La sustitución es
+ * mecánica, pero no a ciegas:
+ *
+ *  - cada placeholder tiene que aparecer EXACTAMENTE una vez;
+ *  - el valor no puede traer corchetes (sería otro placeholder);
+ *  - al terminar no puede quedar ningún hueco: si queda, el texto no se publica.
+ *
+ * @param {string} texto
+ * @param {object|null} datos { version, datos: { id: {placeholder, valor} } }
+ * @returns {{texto: string, aplicados: string[], huecosRestantes: number}}
+ */
+function sustituirDatos(texto, datos) {
+  const entradas = datos && datos.datos ? datos.datos : null;
+  if (!entradas || Object.keys(entradas).length === 0) {
+    return { texto, aplicados: [], huecosRestantes: listarPlaceholders(texto).huecos.total };
+  }
+  let salida = texto;
+  const aplicados = [];
+  for (const [id, entrada] of Object.entries(entradas)) {
+    const placeholder = entrada && entrada.placeholder;
+    const valor = entrada && entrada.valor;
+    if (typeof placeholder !== 'string' || placeholder.length === 0) {
+      throw errorEmpalme('El dato "' + id + '" no dice qué placeholder reemplaza.');
+    }
+    if (typeof valor !== 'string' || valor.length === 0) {
+      throw errorEmpalme('El dato "' + id + '" no tiene valor.');
+    }
+    if (/[\[\]]/.test(valor)) {
+      throw errorEmpalme(
+        'El valor del dato "' + id + '" trae corchetes: seria otro placeholder.',
+      );
+    }
+    const ocurrencias = salida.split(placeholder).length - 1;
+    if (ocurrencias !== 1) {
+      throw errorEmpalme(
+        'El placeholder ' + placeholder + ' (dato "' + id + '") aparece ' + ocurrencias
+        + ' veces en el texto; tiene que aparecer exactamente una.',
+      );
+    }
+    salida = salida.split(placeholder).join(valor);
+    aplicados.push(id);
+  }
+  const huecosRestantes = listarPlaceholders(salida).huecos.total;
+  if (huecosRestantes > 0) {
+    throw errorEmpalme(
+      'Despues de sustituir los datos quedan ' + huecosRestantes + ' hueco(s) sin llenar: '
+      + listarPlaceholders(salida).huecos.unicos.join(' '),
+    );
+  }
+  return { texto: salida, aplicados, huecosRestantes };
+}
+
+/**
  * Arma el texto: aplica los cambios sobre la estructura de la base.
  *
  * @param {string} textoBase
- * @param {object} cambios  { cambios, inserciones, absorbe }
+ * @param {object} cambios  { version, cambios, inserciones, absorbe }
+ * @param {object} [datos]  { version, datos: { id: {placeholder, valor} } }
  * @returns {{texto: string, resumen: object}}
  */
-function empalmar(textoBase, cambios) {
+function empalmar(textoBase, cambios, datos) {
   const { bloques, lineas } = analizarEstructura(textoBase);
 
   const porClave = new Map();
@@ -377,7 +535,27 @@ function empalmar(textoBase, cambios) {
   }
   for (const l of lineas.slice(cursor)) salida.push(l);
 
-  const texto = salida.join('\n');
+  let texto = salida.join('\n');
+
+  // 4b. Sello de versión. El texto nombra la versión en el encabezado y en el
+  //     bloque de Manifestación de Voluntad; si se está armando una versión
+  //     nueva, los dos tienen que pasar a esa versión. Se hace acá y no en el
+  //     mapa de cambios porque el mapa es el texto del abogado, copiado
+  //     íntegro, y el sello no es suyo: es una propiedad de la versión.
+  if (!cambios.version) {
+    throw errorEmpalme(
+      'El JSON de cambios no declara la versión ("version"). Sin eso no se sabe '
+      + 'qué versión hay que sellar en el texto.',
+    );
+  }
+  const sello = sellarVersion(texto, cambios.version);
+  texto = sello.texto;
+
+  // 4c. Datos del owner: los placeholders que dejó el texto del abogado. Van
+  //     en un archivo aparte; acá solo se sustituyen y se verifica que no
+  //     quede ningún hueco.
+  const sustitucion = sustituirDatos(texto, datos);
+  texto = sustitucion.texto;
 
   // 5. Conteos para el resumen.
   const numerales = bloques.filter((b) => b.tipo === 'numeral');
@@ -404,6 +582,15 @@ function empalmar(textoBase, cambios) {
       insertados,
       absorbidos,
       aplicados,
+      sello: {
+        sellado: sello.sellado,
+        versionBase: sello.versionBase,
+        versionNueva: sello.versionNueva,
+      },
+      datos: {
+        aplicados: sustitucion.aplicados,
+        huecosRestantes: sustitucion.huecosRestantes,
+      },
     },
   };
 }
@@ -416,7 +603,7 @@ function empalmar(textoBase, cambios) {
  * Manifestación de Voluntad) heredan la ubicación del bloque anterior.
  *
  * @param {string} texto
- * @returns {Array<{placeholder: string, ubicacion: string, linea: number}>}
+ * @returns {Array<{placeholder: string, ubicacion: string, linea: number, tipo: string}>}
  */
 function localizarPlaceholders(texto) {
   const { bloques, lineas } = analizarEstructura(texto);
@@ -428,10 +615,15 @@ function localizarPlaceholders(texto) {
     else if (bloque.tipo === 'capitulo') ubicacion = lineas[bloque.inicio].trim();
     for (let i = bloque.inicio; i <= bloque.fin && i < lineas.length; i++) {
       const linea = lineas[i];
-      RE_PLACEHOLDER.lastIndex = 0;
-      const matches = linea.match(RE_PLACEHOLDER) || [];
-      for (const m of matches) {
-        encontrados.push({ placeholder: m.trim(), ubicacion, linea: i + 1 });
+      for (const m of buscarPlaceholders(linea)) {
+        encontrados.push({
+          placeholder: m.trim(),
+          ubicacion,
+          linea: i + 1,
+          // 'hueco' es lo que alguien tiene que llenar; 'sistema' es un campo
+          // que registra el propio sistema y no bloquea la publicación.
+          tipo: esPlaceholderDelSistema(m) ? 'sistema' : 'hueco',
+        });
       }
     }
   }
@@ -442,23 +634,28 @@ function localizarPlaceholders(texto) {
  * Arma el texto de reporte de los placeholders.
  *
  * Distingue los huecos que el dueño tiene que llenar (los que trae el texto
- * nuevo del abogado) de los que ya venían en la base: los del bloque de
- * Manifestación de Voluntad los llena el sistema al firmar, y no son un dato
- * que falte. Los dos igual bloquean la escritura del archivo, porque la
- * guarda de publicación cuenta todos los corchetes.
+ * nuevo del abogado) de los campos que registra el sistema. Los del bloque de
+ * Manifestación de Voluntad los llena el sistema al firmar, no son un dato que
+ * falte y NO bloquean la escritura del archivo: la guarda de publicación
+ * cuenta los huecos, no los campos del sistema.
  *
  * @param {string} texto texto resultante
  * @param {string} [textoBase] texto base, para saber qué placeholders ya existían
- * @returns {{texto: string, total: number, distintos: number, nuevos: number, heredados: number}}
+ * @returns {{texto: string, total: number, distintos: number, nuevos: number,
+ *            heredados: number,
+ *            huecos: {total: number, nuevos: number, heredados: number, unicos: string[]},
+ *            sistema: {total: number, unicos: string[]}}}
  */
 function armarReportePlaceholders(texto, textoBase) {
   const encontrados = localizarPlaceholders(texto);
   const heredados = new Set();
   if (typeof textoBase === 'string') {
-    RE_PLACEHOLDER.lastIndex = 0;
-    const base = textoBase.match(RE_PLACEHOLDER) || [];
-    for (const b of base) heredados.add(b.trim());
+    for (const b of buscarPlaceholders(textoBase)) heredados.add(b.trim());
   }
+  const huecos = encontrados.filter((e) => e.tipo === 'hueco');
+  const delSistema = encontrados.filter((e) => e.tipo === 'sistema');
+  const huecosNuevos = huecos.filter((e) => !heredados.has(e.placeholder));
+  const huecosDeLaBase = huecos.filter((e) => heredados.has(e.placeholder));
   if (encontrados.length === 0) {
     return {
       texto: 'SIN PLACEHOLDERS: el texto resultante no tiene huecos por llenar.\n',
@@ -466,37 +663,61 @@ function armarReportePlaceholders(texto, textoBase) {
       distintos: 0,
       nuevos: 0,
       heredados: 0,
+      huecos: { total: 0, nuevos: 0, heredados: 0, unicos: [] },
+      sistema: { total: 0, unicos: [] },
     };
   }
   const lineas = [];
   const nuevos = encontrados.filter((e) => !heredados.has(e.placeholder));
   const deLaBase = encontrados.filter((e) => heredados.has(e.placeholder));
-  lineas.push('PLACEHOLDERS DEL TEXTO RESULTANTE (' + encontrados.length + ' ocurrencias, '
-    + nuevos.length + ' nuevos y ' + deLaBase.length + ' heredados de la base)');
+  lineas.push('PLACEHOLDERS DEL TEXTO RESULTANTE (' + encontrados.length + ' ocurrencias: '
+    + huecos.length + ' huecos por llenar y ' + delSistema.length + ' campos del sistema)');
   lineas.push('');
-  if (nuevos.length > 0) {
+  if (huecosNuevos.length > 0) {
     lineas.push('Huecos que hay que llenar (traen el texto final de la v1.1):');
-    for (const e of nuevos) {
+    for (const e of huecosNuevos) {
       lineas.push('  - ' + e.placeholder + '  ->  numeral ' + e.ubicacion + ' (linea ' + e.linea + ')');
     }
     lineas.push('');
   }
-  if (deLaBase.length > 0) {
-    lineas.push('Placeholders que ya venían en la v1.0 (la guarda de publicación también los cuenta):');
-    for (const e of deLaBase) {
+  if (huecosDeLaBase.length > 0) {
+    lineas.push('Huecos que ya venían en la v1.0 (estos sí bloquean):');
+    for (const e of huecosDeLaBase) {
       lineas.push('  - ' + e.placeholder + '  ->  ' + e.ubicacion + ' (linea ' + e.linea + ')');
     }
     lineas.push('');
   }
-  lineas.push('Cada hueco nuevo se llena con el dato que le corresponde y despues se vuelve a correr');
-  lineas.push('este script. El archivo de salida NO se escribe mientras queden huecos.');
-  lineas.push('');
+  if (delSistema.length > 0) {
+    lineas.push('Campos que registra el sistema (ya venían en la v1.0; no son huecos y NO bloquean):');
+    for (const e of delSistema) {
+      lineas.push('  - ' + e.placeholder + '  ->  ' + e.ubicacion + ' (linea ' + e.linea + ')');
+    }
+    lineas.push('');
+  }
+  if (huecos.length === 0) {
+    lineas.push('No quedan huecos por llenar: el archivo de salida se puede escribir.');
+    lineas.push('');
+  } else {
+    lineas.push('Cada hueco nuevo se llena con el dato que le corresponde y despues se vuelve a correr');
+    lineas.push('este script. El archivo de salida NO se escribe mientras queden huecos.');
+    lineas.push('');
+  }
   return {
     texto: lineas.join('\n'),
     total: encontrados.length,
     distintos: new Set(encontrados.map((e) => e.placeholder)).size,
     nuevos: nuevos.length,
     heredados: deLaBase.length,
+    huecos: {
+      total: huecos.length,
+      nuevos: huecosNuevos.length,
+      heredados: huecosDeLaBase.length,
+      unicos: [...new Set(huecos.map((e) => e.placeholder))],
+    },
+    sistema: {
+      total: delSistema.length,
+      unicos: [...new Set(delSistema.map((e) => e.placeholder))],
+    },
   };
 }
 
@@ -558,11 +779,41 @@ function main(argv) {
     console.error('  ERROR: el JSON de cambios no trae numerales.');
     return 3;
   }
+  // El JSON dice de qué versión es. Si se está armando otra, el sello de
+  // versión pondría una versión que no es la que el abogado apruebe.
+  if (cambios.version && cambios.version !== args.version) {
+    console.error('');
+    console.error('  ERROR: se está armando ' + args.version + ' pero el JSON de cambios es de '
+      + cambios.version + '.');
+    console.error('  Revisar el "version" del JSON o la opción --version.');
+    return 3;
+  }
 
-  // 4. Empalmar.
+  // 4. Leer los datos del owner (si existen) y empalmar.
+  let datos = null;
+  if (fs.existsSync(args.datos)) {
+    try {
+      datos = JSON.parse(fs.readFileSync(args.datos, 'utf8'));
+    } catch (e) {
+      console.error('');
+      console.error('  ERROR: el JSON de datos no se pudo leer: ' + e.message);
+      return 3;
+    }
+    if (datos.version && datos.version !== args.version) {
+      console.error('');
+      console.error('  ERROR: el JSON de datos es de ' + datos.version + ' y se está armando '
+        + args.version + '.');
+      console.error('  Revisar el "version" del JSON de datos o la opción --version.');
+      return 3;
+    }
+    console.log('  datos:    ' + args.datos);
+  } else {
+    console.log('  datos:    (no existe ' + args.datos + ': el texto queda con huecos)');
+  }
+
   let resultado;
   try {
-    resultado = empalmar(textoBase, cambios);
+    resultado = empalmar(textoBase, cambios, datos);
   } catch (e) {
     console.error('');
     console.error('  ERROR: el empalme falló: ' + e.message);
@@ -614,24 +865,33 @@ function main(argv) {
 
   // 6a. Control de consistency: el localizador de placeholders tiene que
   //     contar lo mismo que cuenta el modulo compartido. Si no, el reporte
-  //     estaria mintiendo.
-  const contadosPorElModulo = listarPlaceholders(texto).total;
-  if (contadosPorElModulo !== reporte.total) {
+  //     estaria mintiendo. Se comparan las dos cuentas: la de TODAS las
+  //     ocurrencias y la de los huecos (los que de verdad bloquean).
+  const contadosPorElModulo = listarPlaceholders(texto);
+  if (contadosPorElModulo.total !== reporte.total) {
     console.error('');
     console.error('  AVISO: el localizador encontró ' + reporte.total
-      + ' placeholders y el modulo compartido cuenta ' + contadosPorElModulo + '.');
+      + ' placeholders y el modulo compartido cuenta ' + contadosPorElModulo.total + '.');
+    console.error('  El reporte puede estar incompleto: revisar antes de llenar los huecos.');
+  }
+  if (contadosPorElModulo.huecos.total !== reporte.huecos.total) {
+    console.error('');
+    console.error('  AVISO: el localizador encontró ' + reporte.huecos.total
+      + ' huecos y el modulo compartido cuenta ' + contadosPorElModulo.huecos.total + '.');
     console.error('  El reporte puede estar incompleto: revisar antes de llenar los huecos.');
   }
 
-  // 6b. La Manifestacion de Voluntad de la v1.0 dice "version v1.0". El
-  //     abogado no la toco (los numerales no listados quedan como estan), asi
-  //     que el script no la cambia: avisa, porque el archivo nuevo se
-  //     contradice a si mismo y la decision es del owner.
-  if (texto.includes('versión v1.0') && args.version !== 'v1.0') {
-    console.error('');
-    console.error('  AVISO: el texto todavia menciona "versión v1.0" (bloque de Manifestación');
-    console.error('  de Voluntad). El abogado no toco ese bloque y este script no lo cambia:');
-    console.error('  decidir con el owner si la v1.1 lo actualiza.');
+  // 6b. El sello de versión. El encabezado y el bloque de Manifestación de
+  //     Voluntad nombran la versión; el empalme los pasa a la que se está
+  //     armando, y se niega si no puede hacerlo con certeza (versionBase
+  //     distinto de versionManifiestacion, o menciones que no son una).
+  if (resumen.sello && resumen.sello.sellado) {
+    console.log('  sello de version: ' + resumen.sello.versionBase + ' -> '
+      + resumen.sello.versionNueva + ' (encabezado y Manifestacion de Voluntad)');
+  }
+  if (resumen.datos && resumen.datos.aplicados.length > 0) {
+    console.log('  datos aplicados: ' + resumen.datos.aplicados.length + ' ('
+      + resumen.datos.aplicados.join(', ') + ')');
   }
 
   if (!revision.ok) {
@@ -655,7 +915,11 @@ function main(argv) {
   // 7. Listo: escribir el archivo (LF, sin BOM).
   fs.writeFileSync(args.salida, texto, 'utf8');
   console.log('');
-  console.log('  SIN PLACEHOLDERS: el texto está listo para archivar.');
+  console.log('  SIN HUECOS POR LLENAR: el texto está listo para archivar.');
+  if (reporte.sistema.total > 0) {
+    console.log('  (trae ' + reporte.sistema.total
+      + ' campos que registra el sistema; no son huecos y no bloquean)');
+  }
   console.log('  archivo:   ' + args.salida);
   console.log('  caracteres: ' + texto.length);
   console.log('  SHA-256:   ' + sha256(texto));
@@ -681,11 +945,15 @@ module.exports = {
   DEFAULT_VERSION,
   DEFAULT_BASE,
   DEFAULT_CAMBIOS,
+  DEFAULT_DATOS,
   DEFAULT_SALIDA,
   MAPA_EMPALME,
   // Reexportados para que los tests usen la MISMA regla y no una copia.
   listarPlaceholders,
   esVersionSujetaAGuarda,
+  esPlaceholderDelSistema,
+  sellarVersion,
+  sustituirDatos,
 };
 
 if (require.main === module) {
