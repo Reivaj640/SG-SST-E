@@ -78,7 +78,9 @@ política de datos (en `null`) · **rotar las 5 app passwords** (el repo es
 público y quedaron en el historial) · **D-02**: correr
 `scripts/inventario-buzon-corporativo.js` sobre una COPIA de la BD (abre con
 escritura) para decidir `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` · **Node 20 en EOL**:
-el servidor corre Node 20.20.2 y su EOL fue el 2026-04-30 (migrar a 22 o 24 LTS) |
+el servidor corre Node 20.20.2 y su EOL fue el 2026-04-30. **Decisión 2026-10-25: se
+aplaza como sugerencia no restrictiva; no bloquea la primera firma**; plan en
+`docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md` |
 
 ### 🛠️ Pendientes abiertos (al 2026-10-15, cierre 20:00 — actualizado con la sesion de migracion a kair-server)
 
@@ -966,6 +968,35 @@ punto 7). Ese nombre es del owner.
 
 **Commits** — `9152f7ab` (📦️949) en `Dev`, pusheado; `cf310e10` en `gh-pages`, pusheado.
 
+### 2026-10-25 · La deuda de seguridad aplazada como sugerencia, no como bloqueo (📦953)
+
+**La decisión.** El owner decidió aplazar la migración de **Node 20 a Node 24**, el
+`npm audit fix` y el cierre **A/B/C** del `SECURITY.md`. No es un gate: **la primera firma
+con la v1.0 puede seguir** y el servicio sigue funcionando como hoy. El plan queda en
+[`docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md`](sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md),
+marcado como **sugerencia no restrictiva**.
+
+**Por qué.** No hay firmas reales todavía, la app funciona y el salto de runtime tiene riesgo
+de despliegue. La prioridad inmediata es la primera firma; la higiene de seguridad se retoma
+en una ventana tranquila. No se encontró un fallo funcional que obligue a hacerlo hoy.
+
+**Lo que se acepta por escrito (al 2026-10-25).** Node **20.20.2** (última versión de la rama
+20, publicada el 2026-03-24; EOL **2026-04-30**); `npm audit --omit=dev` con **7
+vulnerabilidades** (1 crítica, 4 altas, 2 moderadas); `SECURITY.md` §7 con **39 casillas y 0
+marcadas**; backups manuales, sin cron. **Nada de eso se presenta como resuelto.**
+
+**Lo que no cambia.** La validez de la firma no depende de la versión de Node: depende de la
+identidad, la integridad, la trazabilidad y la constancia. Node 24 es continuidad y seguridad
+operativa, no un requisito formal del mecanismo.
+
+**Cuándo se retoma.** Antes de una auditoría, un DPA o un cliente nuevo; antes de un
+redespliegue que obligue a reinstalar dependencias; si aparece un CVE crítico; o, a más tardar,
+el **2027-01-31**.
+
+**Archivos tocados** — `docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md`
+(nuevo), `SECURITY.md` (nota de estado y avisos en §1.3 y §7), `docs/MIGRACION-SERVIDOR-FIRMA.md`
+(§8.1), `Historial.md`.
+
 ### 2026-10-24 · 📦️950 · El nombre del representante legal y el canal único de PQRS
 
 **Los datos.** El owner respondió lo que faltaba del punto 2 y del punto 6 el 24-oct-2026 (18:57):
@@ -1033,9 +1064,10 @@ declarada al archivo que realmente se publica en `sitio/` |
 | 12 | Aprobar la v1.1 con el abogado | 🟡 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). 🟡 **Y ahora el Anexo de Encargo nuevo también**: lo redactó el modelo, no un abogado, y por eso conserva la marca `REVISION_PENDIENTE` (punto 11). Falta que tú los envíes; puedo convertir la v1.1 a Word o PDF |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ **Cerrado y commiteado** (`f26f8bc1`). Los 4 `[registrada por el sistema]` → el detector los reconoce (excepción de contenido exacto; las variantes siguen bloqueando). La línea "versión v1.0" → sello de versión en el encabezado y en el Manifiesto, con 4 checks negativos. Efecto medido: el texto pasó de `faltan:[{id:"version"}]` a `ok:true, faltan:[]` |
 | 14 | Rotar las 5 app passwords | ⚪ **Solo tuyo.** El repo es público y quedaron en el historial. Sin cambio |
-| 15 | SECURITY.md A/B/C | 🟡 **Medido; falta tu decisión.** C está descartada por los hechos (25+ referencias del código apuntan a secciones suyas). A = corregir las afirmaciones falsas + ejecutar el §7 (39 casillas, 0 marcadas). B = congelar con lo mínimo. Sigue en pie el hallazgo del servidor: **Node 20 está en EOL desde el 2026-04-30** (verificado contra `endoflife.date`), y la suposición del §1.3 ya era falsa cuando se escribió el documento |
+| 15 | SECURITY.md A/B/C | 🔵 **Decidido el 25-oct-2026: se aplaza como sugerencia no restrictiva.** El owner decidió no cerrar A/B/C ahora: **no bloquea la primera firma** ni el funcionamiento del servicio. Queda registrado como plan diferido en `docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md`, con disparadores para retomarlo (auditoría, DPA, cliente nuevo, redespliegue, CVE crítico o, a más tardar, el **2027-01-31**). C sigue descartada por los hechos (28 referencias del código y los docs apuntan a secciones suyas: §3, §4, §8, §9 y §11). Cuando se retome, el camino recomendado es **B+**: congelar el documento como análisis de diseño, corrigiendo las afirmaciones hoy falsas, sin marcar casillas sin evidencia. Medido al 25-oct-2026: **Node 20.20.2 en EOL desde el 2026-04-30**; `npm audit --omit=dev` con **7 vulnerabilidades** (1 crítica, 4 altas, 2 moderadas); **§7 con 39 casillas y 0 marcadas**. Se corrigieron ya las afirmaciones falsas de §1.3 (no es VPS, dominio `firma.kair.fyi`, Node 20 EOL) y se marcó §7 como plantilla, no como cumplimiento |
 
 **Resumen del tablero (24-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias, por una decisión o un dato que falta** (7, 10, 11, 12, 15) · 🔴 **2 que dependen solo de tu dato** (8, 9) · ⚪ **1 que es solo tuyo** (14).
+**Actualización del 25-oct-2026:** el **15 dejó de ser una decisión pendiente**: se decidió **aplazarlo como sugerencia no restrictiva** (plan `plan-seguridad-2026-10-25.md`), así que el tablero queda en ✅ **7 cerrados** · 🟡 **4 a medias** (7, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **2 solo con tu dato** (8, 9) · ⚪ **1 solo tuyo** (14).
 Los **7 cerrados son de hoy**: el 2 (NIT y representante legal), el 3 (las URLs del Anexo y de la
 política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal)
 y el 6 (el canal único de PQRS), más el 1 (los 5 huecos de la v1.1) y el 13 (los 4 marcadores y el sello de versión),

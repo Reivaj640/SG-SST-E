@@ -1,7 +1,7 @@
 # Firma Electrónica K+AIR v1 — Análisis de Seguridad
 
-**Versión del documento**: 0.1 (borrador de diseño)
-**Fecha**: 2026-08-17
+**Versión del documento**: 0.1.1 (nota de estado; el análisis sigue en 0.1)
+**Fecha**: 2026-08-17 · **Nota de estado**: 2026-10-25
 **Estado**: Borrador para revisión. Derivado de `ARCHITECTURE.md`, `DATA_MODEL.md`, `API.md` y `FLOWS.md`.
 **Documentos rectores**:
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md)
@@ -17,6 +17,18 @@
 > auditoría de seguridad formal.** La validación definitiva del
 > mecanismo debe realizarla un **profesional jurídico colombiano** y
 > un **auditor de seguridad** antes de producción.
+
+> **Nota de estado (2026-10-25) — esto no es un gate de producción**
+>
+> Este documento es un **análisis de diseño**, no una certificación. El owner decidió el
+> 2026-10-25 **aplazar** la migración de Node 20 a Node 24 y el cierre A/B/C del §7: no
+> bloquea la primera firma con la v1.0. El riesgo aceptado y el plan están en
+> [`plan-seguridad-2026-10-25.md`](./plan-seguridad-2026-10-25.md).
+>
+> Al 2026-10-25: el servidor corre **Node 20.20.2**, cuya EOL fue el **2026-04-30**;
+> `npm audit --omit=dev` reporta **7 vulnerabilidades** (1 crítica, 4 altas, 2 moderadas);
+> el §7 tiene **39 casillas y 0 marcadas**. Los conteos de §9.12 y §11.5 son históricos.
+> Nada de esto se presenta como resuelto.
 
 ---
 
@@ -102,9 +114,14 @@ Este análisis cubre:
 ### 1.3. Suposiciones
 
 - El VPS corre Linux actualizado con Node 20 LTS.
+  - ⚠️ **Actualización 2026-10-25:** no es un VPS: es un **Ubuntu 24.04.5 local**, detrás
+    de NAT, con **Cloudflare Tunnel**, y corre **Node 20.20.2** (EOL **2026-04-30**). La
+    migración a Node 24 está **aplazada como sugerencia no restrictiva**. Ver la nota de
+    estado y el plan.
 - HTTPS está correctamente configurado (certificado válido,
   TLS 1.2+).
 - El DNS de `firma.k-air.com` apunta al VPS.
+  - ⚠️ **Actualización 2026-10-25:** el dominio real es **`firma.kair.fyi`**.
 - K+AIR local está razonablemente protegido (autenticación de
   usuario, etc.).
 
@@ -764,6 +781,10 @@ sensibles con `[REDACTED]`.
 ---
 
 ## 7. Checklist pre-producción
+
+> **Estado al 2026-10-25:** ninguna de estas casillas está marcada. Son una **plantilla de
+> verificación**, no una afirmación de cumplimiento. El plan diferido está en
+> [`plan-seguridad-2026-10-25.md`](./plan-seguridad-2026-10-25.md).
 
 Antes de habilitar el Servicio en producción, verificar:
 

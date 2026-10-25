@@ -824,6 +824,18 @@ router del recibo de supresion montado.
 - [ ] Monitorizacion: nada avisa si el servidor se cae o si el tunnel se desconecta. El panel de
       Cloudflare muestra el estado, pero no hay alerta.
 
+### 8.1. Deuda de seguridad aplazada (sugerencia, no restrictiva)
+
+El owner decidio el **2026-10-25** aplazar la migracion a **Node 24**, el `npm audit fix` y
+el cierre A/B/C del `SECURITY.md`. **No bloquea la primera firma ni el funcionamiento
+actual.** El plan, los criterios de aceptacion, el rollback y los disparadores para
+retomarlo estan en
+[`docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md`](gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md).
+
+Estado al 2026-10-25: **Node 20.20.2** (EOL 2026-04-30), `npm audit --omit=dev` con **7
+vulnerabilidades** (1 critica, 4 altas, 2 moderadas) y el **§7 del SECURITY.md con 0/39
+casillas**. No se presenta como resuelto.
+
 ---
 
 ## 9. Guia anterior (Oracle + Caddy + sslip.io)
