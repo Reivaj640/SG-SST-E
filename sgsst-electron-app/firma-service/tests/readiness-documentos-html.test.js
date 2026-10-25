@@ -179,3 +179,83 @@ test('los corchetes dentro del texto siguen siendo huecos (no se pierde ninguno)
   assert.equal(r.placeholders.huecos.total, 3, `huecos: ${JSON.stringify(r.placeholders.huecos)}`);
   assert.equal(r.ok, false);
 });
+
+test('los tres campos que diligencia la Empresa al firmar no bloquean, pero se listan', function () {
+  // El Anexo de Nube del repo es el MODELO: lo firma cada Empresa con sus
+  // datos. Los tres campos de la parte responsable cambian en cada copia, asi
+  // que no se pueden diligenciar en el modelo: se listan, pero no bloquean.
+  const conCampos = NUBE_CON_ENTIDADES.replace(
+    '<p>Derechos del Titular.</p>',
+    '<p>Derechos del Titular.</p>'
+      + '<p>Entre [nombre de la Empresa], NIT [NIT de la Empresa], representada por'
+      + ' [representante legal de la Empresa].</p>',
+  );
+  const r = readiness.analizarAnexoNube(conCampos);
+  assert.equal(r.de_la_empresa.total, 3, `de la Empresa: ${JSON.stringify(r.de_la_empresa)}`);
+  assert.equal(r.huecosBloqueantes, 0);
+  assert.equal(r.ok, false, 'el aviso de no firmar sigue bloqueando como documento final');
+  assert.equal(r.modeloOk, true, 'pero como MODELO esta completo');
+});
+
+test('un hueco que depende del owner SI bloquea el modelo', function () {
+  const conHueco = NUBE_CON_ENTIDADES.replace(
+    '<p>Derechos del Titular.</p>',
+    '<p>Derechos del Titular.</p><p>RTO [RTO en horas] horas.</p>',
+  );
+  const r = readiness.analizarAnexoNube(conHueco);
+  assert.equal(r.huecosBloqueantes, 1);
+  assert.equal(r.de_la_empresa.total, 0);
+  assert.equal(r.modeloOk, false, 'un dato del owner pendiente bloquea el modelo');
+});
+
+test('la excepcion de la Empresa es de CONTENIDO EXACTO', function () {
+  // "NIT de la Empresa cliente" NO es el campo: sigue contando como hueco y
+  // bloquea. Una excepcion laxa es un agujero.
+  const casi = NUBE_CON_ENTIDADES.replace(
+    '<p>Derechos del Titular.</p>',
+    '<p>Derechos del Titular.</p><p>NIT [NIT de la Empresa cliente]</p>',
+  );
+  const r = readiness.analizarAnexoNube(casi);
+  assert.equal(r.de_la_empresa.total, 0);
+  assert.equal(r.huecosBloqueantes, 1);
+  assert.equal(r.modeloOk, false);
+});
+
+test('el Anexo de Nube del repo es el MODELO y le faltan solo datos del owner', function () {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'legal', 'anexo-nube-v1.0.html'),
+    'utf8',
+  );
+  const r = readiness.analizarAnexoNube(html);
+  assert.equal(r.clausulasOk, true, `faltan: ${JSON.stringify(r.faltan)}`);
+  assert.equal(
+    r.de_la_empresa.total,
+    3,
+    `los tres campos de la Empresa: ${JSON.stringify(r.de_la_empresa)}`,
+  );
+  assert.ok(
+    r.huecosBloqueantes > 0,
+    'el modelo todavia tiene datos del owner por diligenciar',
+  );
+  assert.equal(r.modeloOk, false, 'por eso el modelo no esta listo para firmar');
+});
+
+test('los dos arboles del Anexo de Nube estan identicos (legal/ y sitio/)', function () {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const legal = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'legal', 'anexo-nube-v1.0.html'),
+    'utf8',
+  );
+  const sitio = fs.readFileSync(
+    path.join(__dirname, '..', '..', '..', 'sitio', 'anexo-nube-v1.0.html'),
+    'utf8',
+  );
+  assert.equal(
+    sitio,
+    legal,
+    'el Anexo de Nube publicado y el del repo tienen que ser el mismo archivo',
+  );
+});

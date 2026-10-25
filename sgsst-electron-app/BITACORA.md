@@ -6581,6 +6581,9 @@ Medido sobre el Anexo de Nube real:
 | huecos | 53 | 53 (no se perdió ninguno) |
 | hash | `f50ed32c…19628` | `f50ed32c…19628` (igual) |
 
+> La tabla de arriba midió el modelo **con sus 53 huecos**. El 25-oct-2026 (📦954) el modelo se diligenció y su
+> hash pasó a `5a2413b3…23f866`: la huella identifica el documento, y el documento cambió a propósito.
+
 Las cuatro cláusulas que aparecían como faltantes —los veinte (20) años, los dos (2)
 días hábiles, la devolución, la supresión y la auditoría— **estaban en el documento**.
 
@@ -6920,3 +6923,133 @@ nombre: la designación por cargo cumple la norma (art. 2.2.2.25.4.4 del Decreto
 obliga a re-empalmar el texto y a re-sellar su huella, así que el owner decide si lo quiere así. El Anexo
 de Nube sigue siendo el modelo con sus 53 huecos (punto 7). Y este paquete está commiteado
 (`8031c573`) y pusheado.
+
+## 📦️954 · El Anexo de Nube: el modelo va diligenciado y el check deja de pedir lo imposible
+
+*25-oct-2026 · el punto 7 · la decisión de fondo · el DPA de Cloudflare verificado*
+
+### La pregunta de fondo
+
+El punto 7 era "el Anexo de Nube", con una pregunta de fondo abierta: **¿el archivo del repo es el MODELO
+o el DOCUMENTO FINAL?**
+
+La respuesta es **modelo**, y no es una preferencia: es lo que dice el texto que escribió el abogado
+(*"Este documento es un modelo del Anexo de Nube… se diligencia por cada Empresa que firme"*) y lo que
+soporta el código:
+
+- El §4 del modelo tiene **tres campos de la parte responsable** (nombre, NIT y representante legal de la
+  Empresa): cambian en cada copia, no se pueden diligenciar en el repo.
+- El aviso del documento dice que no se firma hasta que se complete la lista del bloque de pendientes.
+- El servicio guarda `anexo_nube_firmado_at` **por Empresa**, y el manifiesto tiene un bloque `anexo_nube`
+  con firmado, fecha, versión, hash y evidencia.
+
+Lo que se firma, entonces, es **la copia diligenciada** que cada Empresa recibe del modelo. El archivo del
+repo es la plantilla.
+
+### El bug: el check pedía lo imposible
+
+`documento_nube` exigía *"sin placeholders"*: cero corchetes. En un modelo por-Empresa eso **no puede pasar
+nunca**, porque los tres campos de la Empresa son huecos por diseño. El pendiente le pedía al operador
+"quitar todos los corchetes" y daba por hecho que eso era posible, cuando no lo era: era un bloqueo
+permanente en el primer gate, y el punto 7 no se podía cerrar por más que se trabajara.
+
+### La solución: una tercera clase de placeholders
+
+En `textoLegal.js` hay ahora una **tercera clase** de placeholder, junto a los que registra el sistema:
+
+| clase | quién lo llena | bloquea |
+|---|---|---|
+| hueco | alguien tiene que diligenciarlo | sí |
+| campo que registra el sistema | el sistema, al firmar | no |
+| **campo que diligencia la Empresa** | cada Empresa, en la copia que firma | no |
+
+Son tres, de **contenido exacto** (`nombre de la Empresa`, `NIT de la Empresa`, `representante legal de la
+Empresa`): cualquier variación sigue contando como hueco y bloquea. La excepción la aplica **solo el Anexo
+de Nube** —el módulo legal dice cuáles son y el consumidor decide dónde— para que la v1.1 y el Anexo de
+Encargo no cambien de comportamiento.
+
+Y el analizador distingue dos estados: `ok` sigue significando *"este archivo sirve tal cual como el
+documento que se firma"* (cero marcadores: un documento que dice "no firmar" no se publica), y `modeloOk`
+significa *"este archivo sirve como modelo"* (todas las cláusulas y ningún dato del Encargado pendiente). El
+aviso de "no firmar" es parte de la naturaleza de un modelo y no lo penaliza.
+
+### El modelo, diligenciado
+
+De 53 huecos (20 distintos) a **10** (10 distintos):
+
+| | antes | después |
+|---|---|---|
+| huecos | 53 (20 distintos) | **10** (10 distintos) |
+| los diligencia la Empresa | 3 (sin nombre) | **3** (con nombre; no bloquean) |
+| dependen del owner | 50 | **7** |
+| NIT de Gesstiar | `[ ]` | 900987987 |
+| representante de Gesstiar | `[ ]` | Javier Robles Fontalvo, Representante Legal |
+| ciudad y país | `[ciudad, país]` | Barranquilla, Colombia |
+| respaldos / monitoreo / soporte | `[frecuencia, retención, cifrado, responsable]`… | a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo |
+| subencargados | 5 filas (3 de ejemplo) | **2**: Cloudflare y Google |
+| canal de derechos | `[correo/URL]` | privacidad.kair@gmail.com |
+| responsable | `[nombre/cargo]` | Javier Robles Fontalvo |
+| informe de auditoría | `[SOC 2 / ISO 27001 / propio]` | SOC 2 Tipo II, ISO/IEC 27001 e ISO/IEC 27701 de Cloudflare |
+| plazo de incidentes | `[3] días hábiles` | cuarenta y ocho (48) horas, el mismo plazo de la Política |
+| vigencia / terminación / versión | `[ ]` `[ ]` `[ ]` | desde la firma / al terminar el encargo / 1.0 |
+
+Las tres filas de ejemplo (`[Respaldo]`, `[Monitoreo]`, `[Soporte]`) se fueron porque esos servicios los
+presta el Encargado con su propio personal: no hay proveedor externo, luego no hay subencargado. Y el aviso
+final pasó de "entra como otrosí" a "**sustituye**", que es lo que dice el Anexo de Encargo nuevo (📦948).
+
+### Cloudflare: el DPA verificado en la fuente oficial
+
+El bloque `subencargados.cloudflare` del manifiesto estaba en `false`/`null` (punto 8). Se llenó con lo que
+dice la fuente oficial ([Data Processing Addendum](https://www.cloudflare.com/cloudflare-customer-dpa/),
+v6.4, del 3 de abril de 2026):
+
+- El DPA **forma parte del acuerdo de suscripción** y aplica **a los planes enterprise y self-serve**: no
+  hay que migrar de plan.
+- El apartado **3.i** obliga a devolver o eliminar los datos personales al terminar el acuerdo o el
+  servicio.
+- El apartado **5.2** habilita la auditoría mediante un informe de un auditor externo independiente de no
+  más de trece (13) meses.
+- El Anexo 2 declara ISO/IEC 27001, ISO/IEC 27701, PCI DSS L1 y SOC 2 Tipo II.
+
+Con eso, `cloudflare_dpa` quedó en **ok**.
+
+### Lo que sigue abierto (y es del owner)
+
+Siete huecos, en cuatro datos:
+
+| dato | por qué falta |
+|---|---|
+| tipo de cuenta de Google | decide si Google es subencargado o si el envío es transferencia internacional (art. 26 de la Ley 1581) |
+| RTO y RPO | el respaldo es **manual**: hoy no hay cron, y sin copia automática no se puede declarar un RPO menor que el intervalo entre copias |
+| plan de continuidad | no está declarado en ningún documento |
+| plazo de supresión | el §6 lo exige y no está en el manifiesto ni en el config |
+
+Y el bloqueo que ningún dato quita: **`firmado_nube`** (el Anexo de Nube firmado, con fecha, versión, hash y
+evidencia). Ese lo firma la Empresa.
+
+### La divergencia que nadie detectaba
+
+`legal/anexo-nube-v1.0.html` y `sitio/anexo-nube-v1.0.html` **no eran el mismo archivo** (11 040 B contra
+11 115 B): la versión de `legal/` no tenía el enlace a la Política en el menú. Los demás documentos sí se
+mantenían idénticos byte a byte. Ahora los dos son el mismo archivo y hay un test que lo comprueba.
+
+### Verificación
+
+- **5 tests nuevos**: los tres campos de la Empresa no bloquean pero se listan; un hueco del owner sí
+  bloquea; la excepción es de contenido exacto (un casi-exacto sigue bloqueando); el Anexo del repo es el
+  modelo y le faltan solo datos del owner; los dos árboles son idénticos. Más dos del manifiesto: el DPA de
+  Cloudflare y la seguridad física.
+- **Mutación comprobada por los tres lados**: cambiar el texto de la excepción rompe 2 tests, volver
+  `dpa: false` rompe 2, borrar `seguridad_fisica` rompe 1.
+- Suite completa: **1735 tests · 1733 pass · 0 fail · 2 skipped** (antes 1727/1725/0/2).
+- El pendiente ahora es accionable: *"Faltan 7 datos del owner (7 distintos): [RTO en horas] [RPO en horas]
+  [plan de continuidad] [tipo de cuenta de Google]…"*, en vez de "quitar todos los corchetes".
+- Dos ítems nuevos en **ok**: `cloudflare_dpa` y `seguridad_fisica` —este último existía en el manifiesto
+  desde siempre y **ningún check lo leía**: un dato declarado que no bloqueaba nada.
+
+### Lo que este paquete NO cierra
+
+El punto 7 no se cierra entero: siguen el tipo de cuenta de Google, el RTO/RPO, el plan de continuidad y el
+plazo de supresión (datos del owner), y la firma del Anexo de Nube por la Empresa. Lo que sí queda cerrado
+es la **decisión de fondo**, el **modelo diligenciado**, el **check que ya no pide lo imposible** y el **DPA
+de Cloudflare verificado**.

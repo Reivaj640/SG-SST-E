@@ -820,7 +820,7 @@ nunca puede pasar es un check que no muerde: el problema era del requisito.
 
 **Medido** — Anexo de Nube real: cláusulas faltantes **6 → 0**, `clausulasOk` false →
 true, huecos **53 → 53** (no se perdió ninguno) y el hash del archivo **igual**
-(`f50ed32c…19628`): la huella identifica el documento, no su forma de marcado. El Anexo
+(`f50ed32c…19628`, después `5a2413b3…23f866` en el 📦️954: la huella identifica el documento, y el documento cambió a propósito): la huella identifica el documento, no su forma de marcado. El Anexo
 de Encargo sigue con 5 cláusulas faltantes, y esas cinco **son reales** (le faltan la
 remisión al Anexo de Nube, la de otrosí, el art. 2.2.4.6.13, los veinte años y el
 servicio en nube).
@@ -1036,6 +1036,66 @@ sus 53 huecos (punto 7). (3) Falta el despliegue en el servidor: el paquete est�
 
 **Commits** — `8031c573` (📦️950) en `Dev`, pusheado; `15bc2c7d` en `gh-pages`, pusheado.
 
+### 2026-10-25 · 📦️954 · El Anexo de Nube: el modelo diligenciado y el check que ya no pide lo imposible
+
+**El encargo.** "quiero que trabajes en Anexo de Nube U0001F7E1 Publicado y medido; falta la decisión de fondo.
+De 6 cláusulas faltantes a 0, 53 huecos intactos… Sigue la pregunta de fondo: ¿modelo o documento final?
+Hoy nadie lo diligencia — ciéralo que falta para cerrarlo sin romper nada".
+
+**La decisión de fondo: es el MODELO.** No es una preferencia: lo dice el texto que escribió el abogado
+("este documento es un modelo del Anexo de Nube… se diligencia por cada Empresa que firme") y lo soporta el
+código: los tres campos de la parte responsable cambian en cada copia, el aviso de "no firmar hasta completar",
+y el `anexo_nube_firmado_at` que es **por Empresa**. Lo que se firma es la copia diligenciada que cada
+Empresa recibe del modelo; el archivo del repo es la plantilla.
+
+**El bug que se cerró con esa decisión.** El ítem `documento_nube` pedía "sin placeholders" (cero
+corchetes) y le decía al operador "quitar todos los corchetes". En una plantilla por-Empresa eso **nunca puede
+pasar**: los tres campos de la Empresa son huecos por diseño. Era un bloqueo permanente en el primer gate, y
+el pendiente era **imposible** de cerrar. La solución: en `textoLegal.js` hay ahora una **tercera clase** de
+placeholder (junto a los que registra el sistema): los que **diligencia la Empresa** en la copia que firma.
+Se listan (nada queda escondido) pero no bloquean, y la excepción es de **contenido exacto**:
+`NIT de la Empresa` sí; `NIT de la Empresa cliente` no, y sigue bloqueando. La aplica **solo el Anexo de Nube**,
+así que la v1.1 y el Anexo de Encargo no cambian de comportamiento. Y el análisis distingue dos estados:
+`ok` ("este archivo sirve tal cual como el documento que se firma", cero marcadores) y `modeloOk` ("este archivo
+sirve como modelo": todas las cláusulas y ningún dato del Encargado pendiente). El aviso de "no firmar" es
+parte de la naturaleza de un modelo y no lo penaliza.
+
+**El modelo, diligenciado.** De **53 huecos (20 distintos) a 10 (10 distintos)**: el NIT (900987987), el
+representante legal (Javier Robles Fontalvo), la ciudad/país (Barranquilla, Colombia), los responsables de
+respaldos/monitoreo/soporte, la seguridad física, el canal (privacidad.kair@gmail.com), el responsable, los
+plazos, la vigencia y la versión. Las 3 filas de ejemplo de subencargados se fueron porque esos servicios
+los presta el Encargado con su propio personal: no hay proveedor externo, luego no hay subencargado. El aviso
+final pasó de "entra como otrosí" a "**sustituye**", coherente con el Anexo de Encargo nuevo.
+
+**Cloudflare: el DPA verificado en la fuente oficial.** El bloque `subencargados.cloudflare` estaba en
+`false`/`null` (punto 8). Se llenó con lo que dice el Data Processing Addendum v6.4 del 3-abr-2026: el DPA
+**forma parte del acuerdo de suscripción y aplica a enterprise y a self-serve** (no hay que migrar de plan),
+el apartado **3.i** obliga a devolver o eliminar los datos al terminar el acuerdo o el servicio, el **5.2**
+habilita la auditoría con un informe de un auditor externo de no más de trece (13) meses, y el Anexo 2
+declara ISO/IEC 27001, ISO/IEC 27701, PCI DSS L1 y SOC 2 Tipo II. → `cloudflare_dpa` en **ok**.
+
+**La divergencia que nadie detectaba.** `legal/anexo-nube-v1.0.html` y `sitio/anexo-nube-v1.0.html` **no eran el
+mismo archivo** (11 040 B contra 11 115 B): la versión de `legal/` no tenía el enlace a la Política en el
+menú. Los demás documentos sí se mantenían idénticos byte a byte. Ahora hay un test que lo comprueba.
+
+**La prueba.** 7 tests nuevos (5 del documento y 2 del manifiesto) y **mutación comprobada por los tres
+lados**: cambiar el texto de la excepción rompe 2 tests, volver `dpa: false` rompe 2, borrar
+`seguridad_fisica` rompe 1. Suite completa: **1735 tests · 1733 verdes · 0 rojos · 2 omitidos** (antes 1727/1725/0/2). El pendiente ahora es accionable ("Faltan 7 datos del
+owner: [RTO en horas] [RPO en horas] [plan de continuidad] [tipo de cuenta de Google]…"), no "quitar todos los
+corchetes".
+
+**Lo que NO cierra.** Siete huecos en cuatro datos del owner (tipo de cuenta de Google, RTO/RPO, plan de
+continuidad y plazo de supresión) y el bloqueo que ningún dato quita: `firmado_nube`, que lo firma la
+Empresa. El respaldo es **manual**: sin el cron diario no se puede declarar un RPO menor que el intervalo
+entre copias, y esa es una decisión del owner, no del modelo.
+
+**Archivos tocados** — `firma-service/src/utils/textoLegal.js`, `firma-service/src/services/readinessLegal.js`,
+`firma-service/legal-readiness.json`, `firma-service/tests/readiness-legal.test.js`,
+`firma-service/tests/readiness-documentos-html.test.js`, `legal/anexo-nube-v1.0.html`,
+`sitio/anexo-nube-v1.0.html`, `BITACORA.md`, `PROMPT.md` (trampa 82), `Historial.md`.
+
+**Commits** — pendiente de la palabra del owner.
+
 ### 📋 El tablero de los 15 puntos (estado medido al 24-oct-2026)
 
 | # | Pendiente | Estado |
@@ -1056,7 +1116,7 @@ declarada al archivo que realmente se publica en `sitio/` |
 | 4 | Canal de protección de datos | ✅ **Cerrado en los 5 lugares, y ya verificado en el servidor.** `.env` local, `config.js:117`, `.env.example`, manifiesto (`canal_proteccion_datos` + `canal_confirmado: true`) y el 10.7(b) del texto armado. El `.env` **del servidor** también, verificado: `FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com`. ✅ El aviso anterior ("en el servidor el ítem `canal_datos` está en FALLA hasta el deploy") **quedó obsoleto**: el despliegue del 24-oct-2026 llevó el manifiesto del 📦️944 y el ítem `canal_datos` **ya no aparece** entre los 12 bloqueantes medidos en el servidor. ⚠️ Ese 12 es la medición del despliegue del 📦️944: con el tar final (`e064893a`) el número se mide en el despliegue, no se estima aquí |
 | 5 | Responsable + acta | ✅ **Cerrado (📦️949): el acta no era una obligación legal.** El check pedía la persona o área responsable **y** la referencia del acta de designación; con el responsable ya declarado (el cargo del Representante Legal de Gesstiar) el ítem seguía en `pendiente` y bloqueaba la primera firma. Verificado en la fuente oficial: el art. 2.2.2.25.4.4 del Decreto 1074 de 2015 (que reproduce el art. 23 del Decreto 1377 de 2013) exige **designar una persona o área**, nada más, y la Resolución 384 de 2026 de la Secretaría Jurídica Distrital (que cita a la SIC) precisa que la ley "no establece un procedimiento específico para la designación" (además designa con una Resolución, no con un acta). El texto aprobado tampoco pedía acta: el 10.7(b) final solo dice "designa una persona o área" y "la persona o área responsable es [nombre o cargo]". **Se quitó el acta del requisito**: el campo `acta_designacion` desaparece del manifiesto, el ítem pasa a `ok` y la designación se documenta en los **documentos públicos** (Anexo de Encargo y política), que es la forma que la ley deja a la organización y que un tercero puede verificar. 2 tests nuevos con **mutación comprobada** por los dos lados. ✅ El **nombre** llegó después (📦950): el ítem quedó en `ok` ("Persona o área designada: Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S.") y con él se encendió también `partes_encargado` |
 | 6 | Canal único de PQRS | ✅ **Cerrado (📦️950).** El owner confirmó el 24-oct-2026 que el canal de PQRS del servicio es **adminkair@gmail.com** y que el responsable es **Javier Robles Fontalvo**. Declarados en el manifiesto (`pqrs.canal` y `pqrs.responsable`) y **publicados** en los tres documentos del sitio (`soporte.html`, `anexo-encargo.html`, `politica-firma.html`): un canal solo es verificable si está publicado, y un test ata el valor del manifiesto a los archivos. El ítem `canal_pqrs` pasó a **ok** ("Canal y responsable declarados") y el plazo de 2 días hábiles sigue `ok`. ⚠️ Aclaración: `asepluscaribesas@gmail.com` es el correo de **ASEPLUS** (remisiones médicas, `Portear/`), **no** un canal de PQRS de K+AIR: no hay dos canales |
-| 7 | Anexo de Nube | 🟡 **Publicado y medido; falta la decisión de fondo (📦️948 y 📦️950).** El documento ya está en `sitio/` (antes no estaba) y el checker leía el HTML crudo: de **6 cláusulas faltantes a 0** (`clausulas_ok: true`), con los **53 huecos intactos** y el hash del archivo igual. Del banner, el **NIT** (📦️946), la **ciudad/país**, los **tres responsables internos** (respaldos/monitoreo/soporte) y el **representante legal** (📦️950, "Javier Robles Fontalvo") ya están declarados: quedan los **DPAs** (punto 8) y el **tipo de cuenta de Google** (punto 9). ⚠️ **La decisión que sigue abierta**: si el archivo del repo es el MODELO (con los huecos por Empresa) o el DOCUMENTO FINAL (diligenciado) — hoy **nadie diligencia el Anexo de Nube** (el servicio nunca lo lee) y los 3 huecos por-Empresa (`[EMPRESA]`, su NIT y su representante) no tienen dueño. El ítem `partes_encargado` ya está en **ok** porque lee del manifiesto, no del documento |
+| 7 | Anexo de Nube | 🟡 **La decisión de fondo está tomada (📦️954): el archivo del repo es el MODELO, y el modelo ya va diligenciado.** No es una preferencia: lo dice el texto del abogado ("este documento es un modelo… se diligencia por cada Empresa") y lo soporta el código (los tres campos de la parte responsable cambian en cada copia, el aviso de "no firmar" y el `anexo_nube_firmado_at` por Empresa). **El bug que cerró**: el check pedía "sin placeholders" y le decía al operador "quitar todos los corchetes", pero en una plantilla por-Empresa eso **nunca puede pasar**: era un bloqueo permanente. Ahora hay una tercera clase de placeholder (los que diligencia la Empresa: se listan, no bloquean, contenido exacto) y el análisis distingue "listo para firmarse tal cual" de "listo como modelo". **El modelo quedó diligenciado**: de 53 huecos (20 distintos) a **10** (10 distintos); el NIT, el representante legal, la ciudad/país, los responsables de respaldos/monitoreo/soporte, el canal, el responsable, los plazos y la vigencia, están puestos; las 3 filas de ejemplo de subencargados se fueron (los presta el Encargado: no hay subencargado). **Cloudflare cerrado**: el DPA v6.4 del 3-abr-2026 verificado en la fuente oficial (aplica a enterprise y self-serve; 3.i devuelve o elimina al terminar; 5.2 habilita la auditoría) → `cloudflare_dpa` ok. Además `seguridad_fisica` tiene su propio ítem (existía en el manifiesto y **ningún check lo leía**). ⚠️ **Quedan 7 huecos, en 4 datos del owner**: el tipo de cuenta de Google, el RTO/RPO, el plan de continuidad y el plazo de supresión; y el bloqueo que ningún dato quita, `firmado_nube`, que lo firma la Empresa. El hash del modelo pasó de `f50ed32c…19628` a `5a2413b3…23f866` |
 | 8 | DPAs | 🔴 **Tu dato.** Sin cambio: los 6 campos por subencargado, todos en `false`/`null`. El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA |
 | 9 | Tipo de cuenta de Google | 🔴 **Tu dato.** Sin cambio: `subencargados.google.cuenta` en `null` y `[Workspace/Cloud]` en el Anexo de Nube. El 11A lo marcó "⚠️ No verificado" |
 | 10 | Ubicación + RTO/RPO + responsables | 🟡 **4 de 8 cerrados.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo). Faltan: **seguridad física, RTO, RPO y plan de continuidad**. ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe |

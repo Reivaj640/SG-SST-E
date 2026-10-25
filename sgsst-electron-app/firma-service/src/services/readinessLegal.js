@@ -35,7 +35,9 @@ const db = require('../db/connection');
 const config = require('../config');
 const {
   listarPlaceholders,
+  buscarPlaceholders,
   analizarTextoLegal,
+  esPlaceholderDeLaEmpresa,
   parseVersion,
   reDeMarcador,
 } = require('../utils/textoLegal');
@@ -506,17 +508,32 @@ function _detalleDocumento(analisis) {
     partes.push('Marcadores prohibidos: ' + analisis.marcadores.map((m) => m.etiqueta).join('; ') + '.');
   }
   if (analisis.placeholders && analisis.placeholders.huecos.total > 0) {
-    const muestra = analisis.placeholders.huecos.muestras.join(' ');
-    partes.push(
-      `Huecos por llenar: ${analisis.placeholders.huecos.total} `
-      + `(${analisis.placeholders.huecos.unicos.length} distintos)`
-      + (muestra ? `: ${muestra}` : '.'),
-    );
+    // Cuando el analisis separa los huecos que bloquean de los que no (el
+    // Anexo de Nube), el detalle nombra SOLO los que bloquean: decir "10
+    // huecos" cuando tres los diligencia la Empresa al firmar y no bloquean
+    // es una cuenta que no ayuda a nadie.
+    const bloqueantes = analisis.huecos_bloqueantes
+      ? analisis.huecos_bloqueantes
+      : analisis.placeholders.huecos;
+    if (bloqueantes.total > 0) {
+      const muestra = bloqueantes.unicos.slice(0, 6).join(' ');
+      partes.push(
+        `Huecos por llenar: ${bloqueantes.total} `
+        + `(${bloqueantes.unicos.length} distintos)`
+        + (muestra ? `: ${muestra}.` : '.'),
+      );
+    }
   }
   if (analisis.placeholders && analisis.placeholders.sistema.total > 0) {
     partes.push(
       `Campos que registra el sistema: ${analisis.placeholders.sistema.total} `
       + '(no bloquean; los llena el sistema al firmar).',
+    );
+  }
+  if (analisis.de_la_empresa && analisis.de_la_empresa.total > 0) {
+    partes.push(
+      `Campos que diligencia la Empresa al firmar: ${analisis.de_la_empresa.total} `
+      + `(${analisis.de_la_empresa.unicos.join(' ')}); no bloquean: cambian en cada copia.`,
     );
   }
   if (partes.length === 0) {
@@ -526,8 +543,57 @@ function _detalleDocumento(analisis) {
 }
 
 /**
- * Analiza el Anexo de Nube. Es el documento que se firma: exige todas las
- * cláusulas y CERO placeholders.
+ * Detalle del MODELO del Anexo de Nube.
+ *
+ * No usa `_detalleDocumento`: ese detalle lista los marcadores prohibidos como
+ * si fueran un defecto, y en un modelo el aviso de "no firmar" es parte de su
+ * naturaleza, no un defecto. Lo que el operador tiene que saber es qué datos
+ * faltan y de quién son.
+ *
+ * @param {object} analisis el resultado de `analizarAnexoNube`
+ * @returns {string}
+ */
+function _detalleModelo(analisis) {
+  if (!analisis.existe) return 'El documento no está disponible.';
+  const partes = [];
+  if (analisis.faltan && analisis.faltan.length > 0) {
+    partes.push('Faltan cláusulas: ' + analisis.faltan.map((f) => f.titulo).join('; ') + '.');
+  }
+  const hb = analisis.huecos_bloqueantes || { total: 0, unicos: [] };
+  if (hb.total > 0) {
+    partes.push(
+      `Faltan ${hb.total} datos del owner (${hb.unicos.length} distintos): `
+      + hb.unicos.join(' ') + '.',
+    );
+  }
+  if (analisis.de_la_empresa && analisis.de_la_empresa.total > 0) {
+    partes.push(
+      `Los ${analisis.de_la_empresa.total} campos de la Empresa los diligencia cada Empresa `
+      + 'en la copia que firma: no se diligencian en el modelo.',
+    );
+  }
+  if (partes.length === 0) {
+    partes.push('El modelo tiene todas las cláusulas y no le falta ningún dato del owner.');
+  }
+  return partes.join(' ');
+}
+
+/**
+ * Analiza el Anexo de Nube.
+ *
+ * El archivo del repo es el MODELO: describe la nube de K+AIR y lo firma cada
+ * Empresa con sus datos. Por eso hay dos formas de mirarlo:
+ *
+ *   - `ok`: el archivo sirve TAL CUAL como el documento que se firma. Exige
+ *     cero marcadores: un documento que dice "no firmar" no se publica.
+ *   - `modeloOk`: el archivo sirve como MODELO. Exige todas las clausulas y
+ *     que no le falte ningun dato del Encargado. El aviso de "no firmar" es
+ *     parte de la naturaleza de un modelo y no lo penaliza: lo que no puede
+ *     es que le falten datos.
+ *
+ * Los tres campos que diligencia cada Empresa al firmar (nombre, NIT y
+ * representante legal de la Empresa) no son huecos que el Encargado pueda
+ * llenar: se listan, pero no bloquean.
  */
 function analizarAnexoNube(texto) {
   const t = typeof texto === 'string' ? texto : '';
@@ -550,14 +616,25 @@ function analizarAnexoNube(texto) {
   //
   // La regla NO depende de la redaccion exacta del aviso: cualquier marca de
   // borrador es una advertencia de que el documento esta a medias.
+  // Los tres campos que diligencia la Empresa en la copia que firma (nombre,
+  // NIT y representante legal de la Empresa) NO son huecos que el Encargado
+  // pueda llenar: cambian en cada copia. Se LISTAN, pero no bloquean el
+  // modelo. Los demas huecos (los que dependen de datos del owner) si
+  // bloquean, y el detalle los nombra uno por uno.
+  const ocurrencias = buscarPlaceholders(v);
+  const deLaEmpresa = ocurrencias.filter(esPlaceholderDeLaEmpresa);
+  const huecosBloqueantes = placeholders.huecos.total - deLaEmpresa.length;
+  const unicosDeLaEmpresa = [...new Set(deLaEmpresa.map((s) => s.trim()))];
+
   const tieneAviso = Boolean(RE_AVISO_NO_FIRMAR) && RE_AVISO_NO_FIRMAR.test(v);
-  if (placeholders.huecos.total > 0 && !tieneAviso && legales.marcadores.length === 0) {
+  if (huecosBloqueantes > 0 && !tieneAviso && legales.marcadores.length === 0) {
     faltan.push({
       id: 'aviso_sin_datos',
       titulo: 'Aviso de no firmar (el documento tiene datos pendientes y no lo advierte)',
     });
   }
   const clausulasOk = existe && faltan.length === 0;
+
   return {
     existe,
     clausulasOk,
@@ -565,7 +642,24 @@ function analizarAnexoNube(texto) {
     placeholders,
     marcadores: legales.marcadores,
     hash: _hash(t),
-    ok: clausulasOk && placeholders.huecos.total === 0 && legales.marcadores.length === 0,
+    huecosBloqueantes,
+    huecos_bloqueantes: {
+      total: huecosBloqueantes,
+      unicos: placeholders.huecos.unicos.filter((u) => !esPlaceholderDeLaEmpresa(u)),
+    },
+    de_la_empresa: {
+      total: deLaEmpresa.length,
+      unicos: unicosDeLaEmpresa,
+    },
+    // `ok`: el archivo sirve TAL CUAL como el documento que se firma (con sus
+    //   marcadores de borrador: un documento que dice "no firmar" no se
+    //   publica).
+    // `modeloOk`: el archivo sirve como MODELO: tiene todas las clausulas y
+    //   no le falta ningun dato del Encargado. El aviso de "no firmar" es
+    //   parte de la naturaleza de un modelo y no lo penaliza: lo que no se
+    //   puede es que le falten datos.
+    ok: clausulasOk && huecosBloqueantes === 0 && legales.marcadores.length === 0,
+    modeloOk: clausulasOk && huecosBloqueantes === 0,
     detalle: '',
   };
 }
@@ -1117,7 +1211,7 @@ function evaluar(opciones = {}) {
   // -------------------------------------------------------------------------
   // 7. Anexo de Nube
   // -------------------------------------------------------------------------
-  const nubeDocumentoOk = anNube.ok;
+  const nubeDocumentoOk = anNube.modeloOk;
   const partesOk = _nitValido(enc.nit)
     && !!_texto(enc.representante_legal)
     && !!_texto(enc.domicilio);
@@ -1130,6 +1224,7 @@ function evaluar(opciones = {}) {
   const operacionOk = !!_texto(inf.respaldos)
     && !!_texto(inf.monitoreo)
     && !!_texto(inf.soporte);
+  const seguridadFisicaOk = !!_texto(inf.seguridad_fisica);
   const rtoRpoOk = _numeroPositivo(inf.rto_horas)
     && _numeroPositivo(inf.rpo_horas)
     && !!_texto(inf.plan_continuidad);
@@ -1146,12 +1241,12 @@ function evaluar(opciones = {}) {
   const grupoNube = _grupo('anexo_nube', 'Anexo de Nube y subencargados', [
     _item(
       'documento_nube',
-      'Anexo de Nube sin placeholders y con todas las cláusulas',
+      'Anexo de Nube: el modelo con todas las cláusulas y sin datos pendientes',
       _estado(nubeDocumentoOk),
       {
         bloquea: GATE_PRIMERA,
-        detalle: _detalleDocumento(anNube),
-        accion: 'Completar el Anexo de Nube con los datos del owner y quitar todos los corchetes.',
+        detalle: _detalleModelo(anNube),
+        accion: 'Diligenciar en el modelo los datos que nombra el bloque de pendientes (los del owner). Los tres campos de la Empresa los llena cada Empresa en la copia que firma: no se diligencian en el modelo.',
         referencia: docNube.archivo,
       },
     ),
@@ -1208,6 +1303,19 @@ function evaluar(opciones = {}) {
       },
     ),
     _item(
+      'seguridad_fisica',
+      'Seguridad física del local del servidor',
+      _estado(seguridadFisicaOk),
+      {
+        bloquea: GATE_PRIMERA,
+        detalle: seguridadFisicaOk
+          ? 'Seguridad física declarada.'
+          : 'Falta la seguridad física del local donde está el servidor.',
+        accion: 'Declarar quién responde por el control de acceso al local, la energía y la conectividad.',
+        referencia: 'legal-readiness.json → infraestructura.seguridad_fisica',
+      },
+    ),
+    _item(
       'rto_rpo',
       'RTO, RPO y plan de continuidad',
       _estado(rtoRpoOk),
@@ -1240,10 +1348,10 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: gg.cuenta === 'consumidor'
-          ? 'La cuenta es de consumidor: migrar a Workspace/Cloud o documentar la transferencia internacional.'
+          ? 'La cuenta es de consumidor: Google no actúa como subencargado y el envío es transferencia internacional (autorización expresa del Titular o excepción del art. 26 de la Ley 1581).'
           : (ggOk
             ? 'DPA de Google con cuenta Workspace/Cloud y evidencia.'
-            : 'Falta el DPA de Google o el tipo de cuenta Workspace/Cloud.'),
+            : 'Falta el tipo de cuenta de Google (Workspace/Cloud o de consumidor) y, si es Workspace/Cloud, su DPA.'),
         accion: 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
         referencia: 'legal-readiness.json → subencargados.google',
       },

@@ -521,6 +521,66 @@ test('readiness · el canal de PQRS declarado es el que se publica', () => {
   }
 });
 
+test('readiness · el DPA de Cloudflare esta verificado en la fuente oficial', () => {
+  // Cloudflare, Inc.: Data Processing Addendum v6.4, del 3 de abril de 2026.
+  // El apartado 3.i obliga a devolver o eliminar los datos personales al
+  // terminar el acuerdo o el servicio, y el 5.2 habilita la auditoria con un
+  // informe de un auditor externo independiente de no mas de trece (13) meses.
+  // Verificado en cloudflare.com/cloudflare-customer-dpa.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  const cf = man.subencargados.cloudflare;
+  assert.equal(cf.dpa, true);
+  assert.equal(cf.version, 'v6.4');
+  assert.equal(cf.fecha, '2026-04-03');
+  assert.equal(cf.devolucion_supresion, true);
+  assert.equal(cf.auditoria, true);
+  assert.match(cf.evidencia, /cloudflare\.com/);
+});
+
+test('readiness · con el DPA de Cloudflare verificado, el item queda ok', () => {
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  const r = readiness.evaluar({
+    gate: 'primera_firma',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: man,
+    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+  });
+  const idsPendientes = r.pendientes.map((p) => p.id);
+  assert.ok(
+    !idsPendientes.includes('cloudflare_dpa'),
+    `cloudflare_dpa quedo pendiente: ${JSON.stringify(idsPendientes)}`,
+  );
+});
+
+test('readiness · la seguridad fisica del local ya no es un campo que nadie vigila', () => {
+  // El campo existia en el manifiesto y NINGUN check lo leia: un dato
+  // declarado que no bloquea nada. Ahora tiene su propio item.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  assert.ok(man.infraestructura.seguridad_fisica, 'falta la seguridad fisica');
+  const r = readiness.evaluar({
+    gate: 'primera_firma',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: man,
+    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+  });
+  const idsPendientes = r.pendientes.map((p) => p.id);
+  assert.ok(
+    !idsPendientes.includes('seguridad_fisica'),
+    `seguridad_fisica quedo pendiente: ${JSON.stringify(idsPendientes)}`,
+  );
+});
+
 test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/', () => {
   // Sellar una URL que no sirve el documento es peor que no sellarla: el
   // Acuerdo apuntaria a algo que no existe o a otra version del documento.

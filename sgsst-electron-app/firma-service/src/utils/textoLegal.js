@@ -52,6 +52,41 @@ const PLACEHOLDERS_DEL_SISTEMA = [
 ];
 
 /**
+ * Campos que diligencia la Empresa en la copia que firma: NO son huecos que
+ * el Encargado pueda llenar.
+ *
+ * El Anexo de Nube es un MODELO: describe la nube de K+AIR (que es una sola) y
+ * lo firma cada Empresa con sus propios datos. Los tres campos de la parte
+ * responsable —nombre, NIT y representante legal de la Empresa— cambian en cada
+ * copia, asi que no se pueden diligenciar en el archivo del repo: se diligencian
+ * a mano, en cada copia, al firmar.
+ *
+ * Si esos tres campos fueran huecos que bloquean, el check del repo pediria
+ * quitarlos y el Anexo no podria publicarse nunca: un requisito que la
+ * arquitectura no puede satisfacer. Si NO fueran huecos, el aviso de que el
+ * documento esta a medias dejaria de tener sentido. Por eso son una tercera
+ * clase: se LISTAN (nada queda escondido) pero no bloquean, igual que los
+ * campos que registra el sistema.
+ *
+ * La excepcion es de CONTENIDO EXACTO y aplica SOLO al Anexo de Nube: el
+ * modulo legal dice cuales son, y el consumidor decide donde las aplica.
+ */
+const PLACEHOLDERS_DE_LA_EMPRESA = [
+  {
+    valor: 'nombre de la Empresa',
+    etiqueta: 'nombre de la Empresa que firma',
+  },
+  {
+    valor: 'NIT de la Empresa',
+    etiqueta: 'NIT de la Empresa que firma',
+  },
+  {
+    valor: 'representante legal de la Empresa',
+    etiqueta: 'representante legal de la Empresa que firma',
+  },
+];
+
+/**
  * Normaliza el contenido de un placeholder para compararlo: sin corchetes, sin
  * espacios sobrantes y en minúsculas.
  *
@@ -76,6 +111,25 @@ function esPlaceholderDelSistema(placeholder) {
   if (!m) return false;
   const contenido = _normalizarContenido(m[1]);
   return PLACEHOLDERS_DEL_SISTEMA.some(
+    (campo) => contenido === _normalizarContenido(campo.valor),
+  );
+}
+
+/**
+ * ¿Este placeholder es un campo que diligencia la Empresa al firmar?
+ *
+ * Misma regla que `esPlaceholderDelSistema`: contenido EXACTO. Cualquier
+ * variacion ("NIT de la Empresa cliente", "NIT de la empresa") sigue contando
+ * como hueco y bloquea.
+ *
+ * @param {string} placeholder el corchete completo, con sus corchetes
+ * @returns {boolean}
+ */
+function esPlaceholderDeLaEmpresa(placeholder) {
+  const m = /^\[([^\]\n]*)\]$/.exec(String(placeholder == null ? '' : placeholder).trim());
+  if (!m) return false;
+  const contenido = _normalizarContenido(m[1]);
+  return PLACEHOLDERS_DE_LA_EMPRESA.some(
     (campo) => contenido === _normalizarContenido(campo.valor),
   );
 }
@@ -266,12 +320,14 @@ module.exports = {
   RE_PLACEHOLDER,
   MARCADORES_PROHIBIDOS,
   PLACEHOLDERS_DEL_SISTEMA,
+  PLACEHOLDERS_DE_LA_EMPRESA,
   listarPlaceholders,
   analizarTextoLegal,
   parseVersion,
   esVersionPosteriorA10,
   esVersionSujetaAGuarda,
   esPlaceholderDelSistema,
+  esPlaceholderDeLaEmpresa,
   buscarPlaceholders,
   reDeMarcador,
 };
