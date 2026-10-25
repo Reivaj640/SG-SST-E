@@ -459,6 +459,68 @@ test('readiness · el manifiesto real ya no pide el acta de designacion', () => 
   assert.ok(man.encargado.responsable_datos, 'falta la designacion del responsable');
 });
 
+test('readiness · el manifiesto real declara el representante legal y el canal de PQRS', () => {
+  // Datos reales declarados por el owner el 24-oct-2026. El check de
+  // `partes_encargado` (NIT + representante + domicilio) y el de `canal_pqrs`
+  // (canal + responsable) leen del manifiesto: si estos campos no estan, los
+  // dos items quedan pendientes y bloquean la primera firma.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  assert.equal(man.encargado.representante_legal, 'Javier Robles Fontalvo');
+  assert.match(man.encargado.responsable_datos, /Javier Robles Fontalvo/);
+  assert.equal(man.pqrs.canal, 'adminkair@gmail.com');
+  assert.equal(man.pqrs.responsable, 'Javier Robles Fontalvo');
+  assert.equal(man.pqrs.plazo_dias, 2);
+});
+
+test('readiness · con el representante legal y el canal de PQRS, los dos items quedan ok', () => {
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  const r = readiness.evaluar({
+    gate: 'primera_firma',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: man,
+    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+  });
+  const idsPendientes = r.pendientes.map((p) => p.id);
+  assert.ok(
+    !idsPendientes.includes('partes_encargado'),
+    `partes_encargado quedo pendiente: ${JSON.stringify(idsPendientes)}`,
+  );
+  assert.ok(
+    !idsPendientes.includes('canal_pqrs'),
+    `canal_pqrs quedo pendiente: ${JSON.stringify(idsPendientes)}`,
+  );
+});
+
+test('readiness · el canal de PQRS declarado es el que se publica', () => {
+  // "Canal unico" solo es verificable si el canal esta publicado. El dato del
+  // manifiesto tiene que aparecer en los documentos que publica el sitio: si
+  // uno cambia y el otro no, hay dos canales y el unico es una fiction.
+  const man = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'legal-readiness.json'),
+    'utf8',
+  ));
+  const canal = man.pqrs.canal;
+  assert.ok(canal, 'el manifiesto no declara pqrs.canal');
+  for (const archivo of [
+    path.join(__dirname, '..', '..', '..', 'sitio', 'soporte.html'),
+    path.join(__dirname, '..', '..', '..', 'sitio', 'anexo-encargo.html'),
+    path.join(__dirname, '..', '..', '..', 'sitio', 'politica-firma.html'),
+  ]) {
+    const html = fs.readFileSync(archivo, 'utf8');
+    assert.ok(
+      html.includes(canal),
+      `el canal ${canal} no aparece en ${path.basename(archivo)}`,
+    );
+  }
+});
+
 test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/', () => {
   // Sellar una URL que no sirve el documento es peor que no sellarla: el
   // Acuerdo apuntaria a algo que no existe o a otra version del documento.

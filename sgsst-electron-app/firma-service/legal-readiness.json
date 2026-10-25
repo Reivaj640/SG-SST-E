@@ -10,11 +10,11 @@
   },
   "encargado": {
     "nit": "900987987",
-    "representante_legal": null,
+    "representante_legal": "Javier Robles Fontalvo",
     "domicilio": "Calle 114 # 43B - 83, Barranquilla (Atlántico)",
     "canal_proteccion_datos": "privacidad.kair@gmail.com",
     "canal_confirmado": true,
-    "responsable_datos": "Cargo Representante Legal de Gesstiar",
+    "responsable_datos": "Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S.",
     "url_politica": "https://kair.fyi/politica-firma.html",
     "url_anexo_encargo": "https://kair.fyi/anexo-encargo.html"
   },
@@ -80,8 +80,8 @@
     "inventario_evidencia": null
   },
   "pqrs": {
-    "canal": null,
-    "responsable": null,
+    "canal": "adminkair@gmail.com",
+    "responsable": "Javier Robles Fontalvo",
     "plazo_dias": 2
   }
 }

@@ -6860,10 +6860,63 @@ un tercero; una declaración publicada, sí.
   designada: Cargo Representante Legal de Gesstiar."*
 - Suite completa: **1724 tests · 1722 pass · 0 fail · 2 skipped** (antes 1722/1720/0/2: los dos
   tests nuevos son los de este paquete).
-- Barrido de caracteres no latinos: limpio en los ocho archivos del paquete.
+- Barrido de caracteres no latinos: limpio en los once archivos del paquete.
 
 ### Lo que este paquete NO cierra
 
 Sigue faltando el **nombre** del representante legal de Gesstiar: con el cargo, la designación legal
 está hecha; con el nombre, además, la identificación completa del Encargado en el Anexo de Nube
 (`partes_encargado`). Ese nombre es del owner.
+
+## 📦️950 · El nombre del representante legal y el canal único de PQRS
+
+*24-oct-2026 · los puntos 2 y 6 · los datos que faltaban del owner · tres ítems que pasan a ok*
+
+### Los datos
+
+El owner respondió lo que faltaba del punto 2 y del punto 6 el 24-oct-2026 (18:57): el representante
+legal de Gesstiar es **Javier Robles Fontalvo**, el canal único de PQRS es **adminkair@gmail.com** y el
+responsable de PQRS es **Javier Robles Fontalvo**.
+
+### Los cuatro campos del manifiesto
+
+`encargado.representante_legal` (estaba en `null`), `encargado.responsable_datos` (que decía solo el cargo
+"Cargo Representante Legal de Gesstiar" y ahora lleva el nombre), `pqrs.canal` y `pqrs.responsable` (los
+dos en `null`).
+
+### Los documentos
+
+El nombre aparece en los cuatro documentos públicos —el Anexo de Encargo y la Política del Encargado, en
+`legal/` y en `sitio/`— y los dos pares quedaron **idénticos byte a byte**.
+
+### El canal se publica, no solo se declara
+
+Un canal "único" que solo existe en un JSON interno no es verificable: el titular no lo ve. Por eso el
+canal de PQRS **y su responsable** se imprimen en el Anexo de Encargo (§9) y en la Política (§7), y un test
+comprueba que el valor del manifiesto aparece en `sitio/soporte.html`, `sitio/anexo-encargo.html` y
+`sitio/politica-firma.html`.
+
+### La aclaración que evitó una trampa
+
+El correo `asepluscaribesas@gmail.com` —que estaba anotado en el tablero como el canal de PQRS del
+servidor— es el de **ASEPLUS**, la empresa que remite las remisiones médicas (`Portear/`). **No** es un
+canal de PQRS de K+AIR. Confirmarlo evitó declarar dos canales y llamar "único" a una cosa que son dos.
+
+### Verificación
+
+- **3 tests nuevos**: el manifiesto real declara los cuatro campos; con ellos los ítems `partes_encargado`
+  y `canal_pqrs` quedan `ok`; y el canal declarado aparece en los tres documentos publicados.
+- **Mutación comprobada por los tres lados**: sin representante legal, con otro canal o sin responsable de
+  PQRS, los tests se rompen.
+- Suite completa: **1727 tests · 1725 pass · 0 fail · 2 skipped** (antes 1724/1722/0/2).
+- **Efecto medido en el readiness local**: tres ítems pasaron de `pendiente` a `ok` — `responsable_datos`
+  (con el nombre), `partes_encargado` (*"NIT, representante y domicilio declarados"*) y `canal_pqrs`
+  (*"Canal y responsable declarados"*).
+
+### Lo que este paquete NO cierra
+
+El texto de la v1.1 que va al abogado sigue diciendo **"Cargo Representante Legal de Gesstiar"**, no el
+nombre: la designación por cargo cumple la norma (art. 2.2.2.25.4.4 del Decreto 1074 de 2015), y cambiarlo
+obliga a re-empalmar el texto y a re-sellar su huella, así que el owner decide si lo quiere así. El Anexo
+de Nube sigue siendo el modelo con sus 53 huecos (punto 7). Y este paquete **todavía no está commiteado**:
+espera la palabra del owner.
