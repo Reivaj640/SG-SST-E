@@ -964,7 +964,7 @@ punto 7). Ese nombre es del owner.
 `legal/anexo-encargo.html`, `legal/politica-firma.html`, `sitio/anexo-encargo.html`, `sitio/politica-firma.html`,
 `BITACORA.md`, `PROMPT.md` (trampa 80), `Historial.md`.
 
-**Commits** — pendiente de la palabra del owner.
+**Commits** — `9152f7ab` (📦️949) en `Dev`, pusheado; `cf310e10` en `gh-pages`, pusheado.
 
 ### 2026-10-24 · 📦️950 · El nombre del representante legal y el canal único de PQRS
 
@@ -997,13 +997,13 @@ los tests se rompen. Suite completa: **1727 tests · 1725 verdes · 0 rojos · 2
 **Lo que NO cierra.** (1) El texto de la v1.1 que va al abogado sigue diciendo **"Cargo Representante Legal de
 Gesstiar"**, no el nombre: la designación por cargo cumple la norma y cambiarlo obliga a re-empalmar y a
 re-sellar la huella, así que el owner decide si lo quiere así. (2) El Anexo de Nube sigue siendo el modelo con
-sus 53 huecos (punto 7). (3) Falta el despliegue en el servidor: este paquete aún no está commiteado.
+sus 53 huecos (punto 7). (3) Falta el despliegue en el servidor: el paquete está commiteado y pusheado (`8031c573`), pero el tar del despliegue se arma después del commit.
 
 **Archivos tocados** — `firma-service/legal-readiness.json`, `firma-service/tests/readiness-legal.test.js`,
 `legal/anexo-encargo.html`, `legal/politica-firma.html`, `sitio/anexo-encargo.html`, `sitio/politica-firma.html`,
 `BITACORA.md`, `PROMPT.md` (trampa 81), `Historial.md`.
 
-**Commits** — pendiente de la palabra del owner.
+**Commits** — `8031c573` (📦️950) en `Dev`, pusheado; `15bc2c7d` en `gh-pages`, pusheado.
 
 ### 📋 El tablero de los 15 puntos (estado medido al 24-oct-2026)
 
@@ -1046,18 +1046,19 @@ Encargo (11) y de la revisión del abogado (12).
 **El despliegue del `f26f8bc1` ya está hecho.** Ese commit está en el servidor `kair-server`: los tres hashes en
 disco coincidieron con los del commit, el arranque quedó limpio (`"No hay migraciones pendientes","total":40`),
 `/health` da 200 y el readiness del servidor bajó de 19 a **12 bloqueantes** (los de la v1.1, la 9A, la 10.4,
-el D-03, el 8.6 y los dos de PQRS). **Falta un redespliegue**: el commit `d8c35ee3` (📦️947-948) y el `9152f7ab`
-(📦️949) ya están armados en un tar (`3d870256…a3cb`, 531 674 B) y servidos por el puente; este 📦️950
-se suma al mismo despliegue cuando el owner autorice el commit. **El número de bloqueantes del servidor se mide en
-el despliegue, no se estima aquí**: el tar se arma desde el commit, nunca desde el working tree.
+el D-03, el 8.6 y los dos de PQRS). **Falta un redespliegue**: el tar final `fb98061d… 54d1` (531 692 B) lleva el
+`d8c35ee3` (📦️947-948), el `9152f7ab` (📦️949) y el `8031c573` (📦️950), y ya está servido por el puente (verificado
+por descarga). **El número de bloqueantes del servidor se mide en el despliegue, no se estima aquí**: el tar
+se arma desde el commit, nunca desde el working tree. commit, nunca desde el working tree.
 
-**Los cuatro paquetes de esta sesión (📦️947, 📦️948, 📦️949 y 📦️950) están escritos y verificados.** El 📦️947 es el
-check que pedía una migración ya aplicada (el readiness buscaba `gh_firma_solicitudes_titular` y la 028 crea
-`gh_solicitudes_titular`); el 📦️948 es el cierre del punto 3 (el Anexo de Encargo nuevo, el Anexo de Nube publicado
-y la política del Encargado, con las URLs selladas **después** de verificarlas por HTTP); el 📦️949 cierra el
-punto 5 (el acta de designación no era una obligación legal); el 📦️950 cierra los puntos 2 y 6 (el nombre del
-representante legal y el canal único de PQRS con su responsable). **El 📦️950 aún no está commiteado**: está
-esperando la palabra del owner.
+**Los cuatro paquetes de esta sesión (📦️947, 📦️948, 📦️949 y 📦️950) están escritos, verificados y
+pusheados.** El 📦️947 es el check que pedía una migración ya aplicada (el readiness buscaba
+`gh_firma_solicitudes_titular` y la 028 crea `gh_solicitudes_titular`); el 📦️948 es el cierre del punto 3 (el Anexo de
+Encargo nuevo, el Anexo de Nube publicado y la política del Encargado, con las URLs selladas **después** de
+verificarlas por HTTP); el 📦️949 cierra el punto 5 (el acta de designación no era una obligación legal); el 📦️950
+cierra los puntos 2 y 6 (el nombre del representante legal y el canal único de PQRS con su responsable).
+**Commits** — `d8c35ee3` (📦️947-948) · `9152f7ab` (📦️949) · `8031c573` (📦️950), los tres en `Dev`; en `gh-pages`,
+`60c1a421` · `cf310e10` · `15bc2c7d`. Los dos remotos quedaron nivelados.
 
 **El Anexo de Encargo nuevo conserva la marca de revisión profesional pendiente**: lo redactó el modelo, no un abogado.
 Por eso el ítem `documento_encargo` sigue en pendiente y **bloqueando la primera firma**. El documento ya tiene las

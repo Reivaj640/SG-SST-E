@@ -6918,5 +6918,5 @@ canal de PQRS de K+AIR. Confirmarlo evitó declarar dos canales y llamar "único
 El texto de la v1.1 que va al abogado sigue diciendo **"Cargo Representante Legal de Gesstiar"**, no el
 nombre: la designación por cargo cumple la norma (art. 2.2.2.25.4.4 del Decreto 1074 de 2015), y cambiarlo
 obliga a re-empalmar el texto y a re-sellar su huella, así que el owner decide si lo quiere así. El Anexo
-de Nube sigue siendo el modelo con sus 53 huecos (punto 7). Y este paquete **todavía no está commiteado**:
-espera la palabra del owner.
+de Nube sigue siendo el modelo con sus 53 huecos (punto 7). Y este paquete está commiteado
+(`8031c573`) y pusheado.
