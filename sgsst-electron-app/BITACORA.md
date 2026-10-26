@@ -7560,3 +7560,48 @@ la v1.1, así que depende del abogado.
 
 **Archivos** — `firma-service/legal-readiness.json` (D-02 y token único), `PROMPT.md` (trampa 90),
 `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️964 · El motivo de cierre que afirmaba una firma que no ocurrió
+
+*26-oct-2026 · el piloto de la excepcion de habilitacion · D-03*
+
+### Qué pasó
+
+El piloto se dio en un solo lote de comandos: abrir la excepción y cerrarla. El cierre se ejecutó
+**catorce segundos** después de la creación, sin que nadie abriera el enlace ni firmara. La respuesta del
+servidor lo dejó escrito: `firmas_usadas: 0`, y el motivo de cierre afirmaba *"la firma de prueba se completó
+(commit, consentimiento y constancia)"*. **No era cierto.**
+
+La base lo contradijo, y esa es la parte que importa:
+
+```
+SIGN-2026-734698|PENDING|2026-10-26T19:42:25.404Z|2026-10-29T19:42:25.404Z|
+```
+
+`estado` en `PENDING` y `fecha_firma` vacía. Ocurrió dos veces seguidas (excepciones 2 y 3), y como la
+bitácora es **append-only** esos motivos falsos ya no se pueden editar: quedan, y se corrigen con un evento
+nuevo (la excepción 3 ya lleva la corrección en su motivo).
+
+### La lección (trampa 91)
+
+**El cierre de un instrumento legal va en un lote aparte, después de la evidencia.** El lote que abre la
+excepción no puede traer el que la cierra, porque el paso humano que hay en el medio —firmar en el celular—
+se salta sin que nadie lo note: los comandos se ejecutan en orden y el paso humano no es un comando.
+
+El motivo de cierre es una **afirmación sobre un hecho que la base puede verificar**: si dice "la firma se
+completó" y `firmas_usadas = 0`, el registro se contradice. Y ese registro es exactamente lo que el abogado
+lee para saber qué pasó. La forma de evitarlo es mirar el dato antes de escribir la afirmación:
+
+```bash
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite "SELECT id_solicitud, estado, fecha_firma FROM gh_firmas_electronicas WHERE id_solicitud='SIGN-XXXXXX';"
+```
+
+El procedimiento correcto (abrir → verificar → **firmar** → verificar → cerrar) quedó documentado en el
+runbook, sección 5.6.
+
+**Lo que sí quedó bien:** la retirada de la fecha ficticia del Anexo de Encargo de ASEPLUS, con su rastro
+append-only completo (valor anterior, valor nuevo, motivo, actor e IP), y el manifiesto con las dos evidencias
+verificadas (D-02 en 0 y el token único con el 5c). El check del servidor quedó en **24 ok · 14 pendientes**.
+
+**Archivos** — `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (sección 5.6, el orden correcto),
+`PROMPT.md` (trampa 91), `sgsst-electron-app/BITACORA.md` y `Historial.md`.

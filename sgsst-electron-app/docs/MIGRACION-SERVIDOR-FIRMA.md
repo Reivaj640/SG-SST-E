@@ -903,3 +903,27 @@ casillas**. No se presenta como resuelto.
 dominio `sslip.io`. **Esa guia no es la que se uso.** Se conserva como referencia para el caso de
 que algun dia se quiera una IP publica propia y sin depender de Cloudflare. Para el despliegue
 vigente, este documento.
+
+### 5.6. La excepcion de habilitacion (D-03): el orden correcto
+
+La excepcion de habilitacion es la **unica** salida del bloqueo del D-03, y su bitacora es append-only: lo que
+queda escrito no se puede editar. Por eso el orden no es un detalle:
+
+1. **Abrir** la excepcion (`POST /internal/admin/excepciones-habilitacion`) con las seis condiciones:
+   autorizacion escrita (quien, fecha y donde queda el documento), alcance de firmas, ruta en papel
+   operativa HOY y plazo cierto (maximo 30 dias).
+2. **Verificar el estado** antes de seguir:
+
+   ```bash
+   sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite "SELECT id_solicitud, estado, fecha_creacion, fecha_expiracion, fecha_firma FROM gh_firmas_electronicas WHERE id_solicitud='SIGN-XXXXXX';"
+   ```
+
+   `estado` en `PENDING` y `fecha_firma` vacia significan que **todavia no se firmo**.
+3. **El paso humano**: el firmante abre el enlace en el celular y completa el commit, el consentimiento y la
+   firma. Es el unico paso que ninguna maquina hace.
+4. **Volver a verificar**: ahora `estado` cambio y `fecha_firma` tiene valor. Solo entonces:
+5. **Cerrar** la excepcion (`POST /internal/admin/excepciones-habilitacion/:id/cerrar`), con un motivo que
+   describa lo que **realmente** paso.
+
+El cierre va en un lote aparte: un lote que abre y cierra el mismo instrumento deja el paso humano fuera y
+produce un motivo falso que la bitacora conservara para siempre (trampa 91).

@@ -1428,6 +1428,32 @@ que depende del abogado.
 
 **Commits** — el 📦963 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️964 · El motivo de cierre que afirmaba una firma que no ocurrió
+
+**El piloto se dio en un solo lote de comandos y el paso humano se saltó.** El cierre de la excepción se
+ejecutó **catorce segundos** después de crearla, con `firmas_usadas: 0` y un motivo que afirmaba *"la firma de
+prueba se completó (commit, consentimiento y constancia)"*. No era cierto: la base lo contradijo con
+`SIGN-2026-734698 | PENDING | ... | ` y `fecha_firma` vacía. Ocurrió dos veces seguidas (excepciones 2 y 3), y
+como la bitácora es **append-only** esos motivos falsos ya no se editan: quedan, y se corrigen con un evento
+nuevo (la excepción 3 lleva la corrección en su motivo).
+
+**La lección (trampa 91):** el cierre de un instrumento legal va en un **lote aparte, después de la evidencia**.
+Un lote que abre y cierra el mismo instrumento deja el paso humano fuera, y el paso humano no es un comando:
+se salta sin que nadie lo note. Y el motivo de cierre es una **afirmación sobre un hecho que la base puede
+verificar**: si dice "la firma se completó" y `firmas_usadas = 0`, el registro se contradice — y ese registro es
+lo que el abogado lee. El procedimiento correcto (abrir → verificar → **firmar en el celular** → verificar →
+cerrar) quedó documentado en el runbook, sección 5.6.
+
+**Lo que sí quedó bien:** la retirada de la fecha ficticia del Anexo de Encargo de ASEPLUS con su rastro
+append-only completo (valor anterior `2026-10-21T00:00:00.000Z`, valor nuevo `null`, motivo, actor e IP), y el
+manifiesto del 📦963 desplegado y verificado: el check del servidor quedó en **24 ok · 14 pendientes · 1 aviso ·
+0 N/A**, y el vínculo de la solicitud sigue vivo hasta el 29-oct (TTL de 72 h de la firma remota).
+
+**Archivos tocados** — `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (sección 5.6), `PROMPT.md`
+(trampa 91), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦964 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
