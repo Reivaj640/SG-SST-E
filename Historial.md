@@ -1390,6 +1390,44 @@ documentado en el runbook (sección 5).
 
 **Commits** — el 📦962 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️963 · La fecha que no era, el bloqueo que sí, y la excepción que se cerró demasiado pronto
+
+**La fecha del Anexo de Encargo de ASEPLUS era una ficción.** La ficha declaraba
+`anexo_encargo_firmado_at = 2026-10-21T00:00:00.000Z` y el alta de la empresa fue el **21-oct a las 02:25:47**:
+22 minutos **antes** de que la empresa existiera en el sistema. Sin PDF, y con el manifiesto declarando
+`no_firmado`. El gate del D-03 lee la ficha, no el manifiesto: con esa fecha, **ASEPLUS ya podía pedir
+firmas**. Se retiró por la vía auditada del propio código (`anexo-firmado/quitar`, con motivo y rastro
+append-only) y el ítem pasó de *aviso* a **pendiente bloqueante**: el sistema ya dice "no hay Anexo
+firmado".
+
+**El control del D-03 quedó probado en sus dos caras.** Sin excepción: `409 EMPRESA_NO_HABILITADA` con
+`pendientes: ["anexo_encargo_firmado"]`, reportado como **AVISO** y no como falla (el bloqueo funcionando no es
+un fallo del servicio). Con la excepción de piloto (id 1, alcance 1 firma, plazo 2-nov, piloto autorizado,
+registrada con actor, motivo e IP en la bitácora append-only): **201**, solicitud `SIGN-2026-734698` ligada al
+Acuerdo vigente (hash `52a490a4…`) y **5c "El token resuelve"**. El smoke: **12 comprobaciones, 0 fallas, 2
+avisos**.
+
+**El error propio: cerré la excepción antes del commit.** Con `estado = 'CERRADA'` la firma que quedó
+abierta **ya no se puede commitear**: `vigentePara` filtra por `estado = 'VIGENTE'` y el commit y la
+creación del consentimiento piden la excepción con `cuenta_firma: false` (el punto que solo necesita que siga
+en plazo). Agotada y cerrada son estados distintos a propósito: la agotada sigue levantando el bloqueo de los
+puntos que verifican, la cerrada no. Para completar la firma hay que **crear otra excepción** y cerrarla al
+terminar. Es la trampa 90.
+
+**Dos evidencias quedan en el manifiesto.** **D-02**: el inventario corrió y dio **0 solicitudes revisadas, 0
+casos en riesgo** — resultado real, pero por población vacía: hay que repetirlo cuando haya solicitudes, y el
+flag del medio personal sigue apagado. **Token único**: el 5c abrió el enlace recién creado y el token
+resolvió (este ítem es informativo, no bloquea).
+
+**Lo que queda de la prueba humana:** el commit, el consentimiento y la doble firma (los tres puntos del D-03
+que faltan) y la 9A (la firma en papel). El **10.4 no es una prueba técnica**: es la migración a la v1.1, así
+que depende del abogado.
+
+**Archivos tocados** — `sgsst-electron-app/firma-service/legal-readiness.json` (D-02 y token único),
+`PROMPT.md` (trampa 90), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦963 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
@@ -1411,7 +1449,7 @@ documentado en el runbook (sección 5).
 | 15 | SECURITY.md A/B/C | 🔵 Decidido el 25-oct: se aplaza como sugerencia no restrictiva (plan plan-seguridad-2026-10-25.md, con disparadores y tope 2027-01-31). Sigue en pie Node 20 en EOL desde el 2026-04-30 (el servidor corre 20.20.2) |
 
 **Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias** (7, 8, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
-**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 cerró del todo y quedó verificado en producción con el 📦962**: el cron quedó instalado, la restauración se probó en el servidor (`tablas=26 migraciones=40 empresas=1`), la hora se corrigió a America/Bogota y el manifiesto y el modelo declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
+**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **📦963** retiró la fecha de firma ficticia de ASEPLUS (era anterior al alta de la empresa y no tenía PDF), probó el bloqueo del D-03 en sus dos caras (409 y luego 201 con la excepción auditable) y dejó dos evidencias en el manifiesto: el inventario de D-02 en 0 y el token único con el 5c. El **10 cerró del todo y quedó verificado en producción con el 📦962**: el cron quedó instalado, la restauración se probó en el servidor (`tablas=26 migraciones=40 empresas=1`), la hora se corrigió a America/Bogota y el manifiesto y el modelo declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
 Los **7 cerrados**: el 1 (los 5 huecos de la v1.1), el 2 (NIT y representante legal), el 3 (las URLs del Anexo
 y de la política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal),
 el 6 (el canal único de PQRS) y el 13 (los 4 marcadores y el sello de versión). Los que siguen **bloqueando la

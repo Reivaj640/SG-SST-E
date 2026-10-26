@@ -74,12 +74,12 @@
     "evidencia": null
   },
   "token_unico": {
-    "probada": false,
-    "evidencia": null
+    "probada": true,
+    "evidencia": "Prueba de humo de extremo a extremo del 2026-10-26 contra https://firma.kair.fyi (scripts/smoke-produccion.js --e2e --confirmar-e2e): 12 comprobaciones, 0 fallas. El paso 5c abrio el enlace que el propio script acababa de crear (id_solicitud=SIGN-2026-734698) y el token resolvio; la solicitud quedo ligada a la version vigente del Acuerdo (hash 52a490a4...). La excepcion de habilitacion que la desbloqueo quedo con su alcance consumido (firmas_usadas=1) y su bitacora append-only"
   },
   "d02": {
-    "inventario_buzones": null,
-    "inventario_evidencia": null
+    "inventario_buzones": 0,
+    "inventario_evidencia": "Inventario ejecutado el 2026-10-26 en el servidor de produccion (scripts/inventario-buzon-corporativo.js): 0 solicitudes revisadas y 0 casos en riesgo (47.4). El directorio tiene 1 empresa activa (ASEPLUS CARIBE S.A.S.) y todavia no hay solicitudes de firma: el resultado es 0 por poblacion vacia, asi que el inventario hay que repetirlo cuando haya solicitudes reales. El flag FIRMA_EXIGIR_MEDIO_PERSONAL_OTP sigue APAGADO"
   },
   "pqrs": {
     "canal": "adminkair@gmail.com",

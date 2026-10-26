@@ -7511,3 +7511,52 @@ publicada, la 9A y la 10.4 probadas y el Anexo de Nube firmado. Es el último en
   decisión: es el insumo" (así lo dice el propio script).
 
 **Archivos** — `Historial.md` (esta sección y el tablero).
+
+## 📦️963 · La fecha que no era, el bloqueo que sí, y la excepción que se cerró demasiado pronto
+
+*26-oct-2026 · ASEPLUS CARIBE S.A.S. · D-03 · el token único · D-02*
+
+### La fecha del Anexo de Encargo era una ficción
+
+La ficha de ASEPLUS declaraba `anexo_encargo_firmado_at = 2026-10-21T00:00:00.000Z`, pero el alta de la
+empresa fue el **21-oct a las 02:25:47**: la fecha de firma estaba puesta a medianoche del mismo día, 22
+minutos **antes** de que la empresa existiera en el sistema. No había PDF, y el manifiesto declaraba
+`no_firmado`. El gate D-03 lee la ficha, no el manifiesto: con esa fecha, **ASEPLUS ya podía pedir firmas**.
+
+Se retiró por la vía que el propio código ofrece (`POST /internal/admin/empresas/:id/anexo-firmado/quitar`,
+que exige `X-Admin-Motivo` y deja el rastro append-only). Inmediatamente el ítem del Anexo de Encargo pasó de
+*aviso* a **pendiente bloqueante**: el sistema ya no dice "hay una fecha dudosa" sino "no hay Anexo firmado".
+
+### El control del D-03 quedó probado en sus dos caras
+
+| Corrida | Resultado | Qué prueba |
+|---|---|---|
+| Sin excepción | `409 EMPRESA_NO_HABILITADA` (`pendientes: ["anexo_encargo_firmado"]`), reportado como **AVISO**, no como falla | el bloqueo es incondicional: sin Anexo firmado no se pide firma |
+| Con excepción de piloto | `201`, solicitud `SIGN-2026-734698`, ligada al Acuerdo vigente (hash `52a490a4…`), y **5c "El token resuelve"** | la salida auditable abre el paso y el enlace resuelve |
+
+La excepción (id 1) quedó registrada con alcance de 1 firma, plazo 2-nov, piloto autorizado, y su bitácora
+append-only con el actor, el motivo y la IP. El smoke: **12 comprobaciones, 0 fallas, 2 avisos**.
+
+### El error propio: cerrar la excepción antes del commit
+
+Se cerró la excepción (id 1) "porque la prueba ya estaba hecha". **Con `estado = 'CERRADA'` la firma que
+quedó abierta ya no se puede commitear**: `vigentePara` filtra por `estado = 'VIGENTE'`, y el commit y la
+creación del consentimiento piden la excepción con `cuenta_firma: false` — el punto que solo necesita que
+siga en plazo. Agotada y cerrada son estados distintos a propósito: la agotada sigue levantando el bloqueo
+de los puntos que verifican; la cerrada no. Para completar la firma hay que **crear otra excepción** y
+cerrarla al terminar, no antes (trampa 90).
+
+### Dos evidencias que sí quedan en el manifiesto
+
+- **D-02**: el inventario corrió y dio **0 solicitudes revisadas, 0 casos en riesgo**. Es un resultado real,
+  pero por población vacía: hay que repetirlo cuando haya solicitudes. El flag
+  `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` sigue apagado.
+- **Token único**: el 5c abrió el enlace recién creado y el token resolvió. (Este ítem es informativo: no
+  bloquea el gate.)
+
+**Lo que queda pendiente de la prueba humana**: el commit, el consentimiento y la doble firma (los tres
+puntos del D-03 que faltan) y la 9A (la firma en papel). El 10.4 no es una prueba técnica: es la migración a
+la v1.1, así que depende del abogado.
+
+**Archivos** — `firma-service/legal-readiness.json` (D-02 y token único), `PROMPT.md` (trampa 90),
+`sgsst-electron-app/BITACORA.md` y `Historial.md`.
