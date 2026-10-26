@@ -1576,6 +1576,50 @@ firma por cada Empresa), 2 pruebas reales (9A y D-03) y el flag del D-02.
 
 **Commits** — el 📦967 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️968 · El paquete para el abogado: tres documentos, cuatro preguntas, con hash
+
+**Qué se armó.** La respuesta 11A (23-oct) decidió las cuatro cuestiones, entrego el texto final de
+los doce grupos de la v1.1 y dictamino el Anexo de Nube. Faltaban dos cosas de proceso, no de fondo:
+**publicar** la v1.1 (que no se publica sin su aprobación) y **quitar la marca de revisión
+profesional** del Anexo de Encargo (que solo se quita cuando él revisa el documento). El paquete son
+tres documentos y una nota:
+
+| # | Documento | Bytes | SHA-256 |
+|---|---|---|---|
+| 1 | Acuerdo de uso **v1.1** (texto final armado) | 42 475 | `634b063c6494549f7918d51c273cc67b09b7628942394ef9603dbfad177629d0` |
+| 2 | **Anexo de Encargo** (a la espera de su revisión) | 24 768 | `891259196782e5c14231cc5a5a0263c096796d896055e574842dd512a64987ec` |
+| 3 | **Anexo de Nube** v1.0 (el que reemplaza al anterior) | 13 704 | `f7e126b1be9ed79a486e3371e3e5a3e9a7e9f4f9dd1df322974bdeb2cb3a0a84` |
+
+**Lo que se le pregunta (cuatro, numeradas como su respuesta).** (1) ¿aprueba la v1.1? (2) ¿aprueba
+el Anexo de Encargo? La nota le **copia las cuatro cosas que la propia marca señala** (datos
+sensibles de salud, envío del enlace y del OTP, plazo de dos días hábiles, devolución de datos) para
+que responda sin releer el anexo entero. (3) Los tres huecos del **DPA de Google**, como pregunta
+cerrada con dos caminos: crear la cuenta Workspace/Cloud con DPA (la recomendada; con eso Google es
+Encargado y el Anexo dice "transmisión") o mantener la cuenta de consumo y redactar la autorización
+expresa de transferencia. (4) ¿Sigue vigente lo que decidió el 23-oct?
+
+**La nota además le dice lo que ya está verificado**: la firma piloto (con sus cuatro hashes y la
+cadena de 14 eventos), el D-03 con su excepción auditable y su cierre con el motivo verdadero, la
+continuidad con RTO 4 h / RPO 24 h, el inventario del D-02 en 0 casos, y el estado medido del gate
+(24 ok / 14 pendientes). Y una tabla de **qué desbloquea cada respuesta**: con la v1.1 aprobada y el
+Anexo de Encargo aprobado se van 4 bloqueantes de golpe.
+
+**La lección (trampa 95):** al abogado se le manda un documento **con hash**, porque el archivo que
+llega por correo es una copia y la respuesta va a venir contra ese texto: el `SHA256SUMS.txt` del
+paquete es lo que permite verificar que el documento que tiene el abogado es el que tiene el
+sistema. Y la marca de revisión pendiente **no se quita por buena voluntad**: se quita con la
+revisión, y el motivo de la quitada dice quién revisó.
+
+**Dónde está.** La carpeta del paquete vive **fuera del repositorio**
+(`%TEMP%\kair-paquete-abogado`, 4 archivos + `SHA256SUMS.txt`), porque el texto de la v1.1 está en
+`.gitignore` a propósito: no es el texto publicado y no debe viajar en el repo ni en el tar. La nota
+del paquete sí vive en el repo, que es donde queda escrito qué se envió y con qué hash.
+
+**Archivos tocados** — `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-26.md`
+(nuevo), `PROMPT.md` (trampa 95), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦968 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |

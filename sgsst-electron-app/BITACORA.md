@@ -7838,3 +7838,62 @@ bloqueantes: 8 del abogado (v1.1 ×3, `n10_4`, `n86`, Anexo de Encargo ×3), 3 d
 (DPA de Google ×2 y la firma por cada Empresa), 2 pruebas reales (9A y D-03) y el flag del D-02.
 
 **Archivos** — `PROMPT.md` (trampa 94), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️968 · El paquete para el abogado: tres documentos, cuatro preguntas, con hash
+
+*26-oct-2026 · puntos 11 y 12 · y el 9, la parte que depende de él*
+
+### Qué es
+
+La respuesta 11A (23-oct) decidió las cuatro cuestiones, entregó el texto final de los doce grupos de
+la v1.1 y dictaminó el Anexo de Nube. Lo que faltaba era de proceso, no de fondo: **publicar** la
+v1.1 (que no se publica sin su aprobación) y **quitar la marca de revisión profesional** del Anexo de
+Encargo (que solo se quita cuando él revisa el documento).
+
+El paquete son tres documentos y una nota:
+
+| # | Documento | Bytes | SHA-256 |
+|---|---|---|---|
+| 1 | Acuerdo de uso **v1.1** (texto final armado) | 42 475 | `634b063c6494549f7918d51c273cc67b09b7628942394ef9603dbfad177629d0` |
+| 2 | **Anexo de Encargo** (a la espera de su revisión) | 24 768 | `891259196782e5c14231cc5a5a0263c096796d896055e574842dd512a64987ec` |
+| 3 | **Anexo de Nube** v1.0 (el que reemplaza al anterior) | 13 704 | `f7e126b1be9ed79a486e3371e3e5a3e9a7e9f4f9dd1df322974bdeb2cb3a0a84` |
+
+El texto de la v1.1 es **el suyo**: el script `empalmar-acuerdo-v1.1.js` empalma los doce grupos
+sobre la v1.0 sellada **sin reescribir, parafrasear ni reordenar** nada. El texto no tiene ni un
+hueco: los tres datos que él dejó entre corchetes (URL del Anexo, canal de protección de datos y
+persona responsable) ya están definidos por el owner. El único corchete que queda —`[registrada por
+el sistema]`— no es un hueco: es el campo que el sistema llena al aceptar el Acuerdo.
+
+El Anexo de Encargo tiene **cero placeholders** y conserva la marca. La nota del paquete **copia las
+cuatro cosas que la propia marca señala** (el tratamiento de los datos sensibles de salud, el envío
+del enlace y del OTP, el plazo de dos días hábiles y la devolución de datos al terminar), para que
+pueda responder sobre ellas sin releer el anexo entero.
+
+El Anexo de Nube conserva **seis** corchetes: **tres** del DPA de Google y **tres** del bloque de
+firma de la Empresa. Los tres de Google son los únicos que no podemos llenar nosotros, y la nota
+los presenta como **pregunta cerrada con dos caminos**: (1) crear la cuenta Google Workspace/Cloud
+con DPA —la recomendada, y con eso Google es Encargado y el Anexo dice «transmisión» sin
+autorización del Titular—, o (2) mantener la cuenta de consumo y redactar la autorización expresa de
+transferencia como instrumento separado.
+
+### La lección (trampa 95)
+
+**Al abogado se le manda un documento con hash: la respuesta va a venir contra ese texto, y sin hash
+nadie puede probar cuál era.** El archivo que llega por correo es una copia; el `SHA256SUMS.txt` del
+paquete es lo que permite verificar que el documento que tiene el abogado es el que tiene el
+sistema, y la respuesta se aplica contra ese texto.
+
+Y la marca de revisión pendiente **no se quita por buena voluntad**: se quita con la revisión, y el
+motivo de la quitada dice quién revisó (trampa 86: el dato se llena con la evidencia).
+
+### Verificación
+
+Los tres hashes se recalcularon al armar el paquete y coinciden con los del manifiesto
+(`legal-readiness.json → acuerdo.v1_1_hash`) y con los del §1 de la nota. La carpeta del paquete vive
+**fuera del repositorio** (`%TEMP%\kair-paquete-abogado`), porque el texto de la v1.1 está en
+`.gitignore` a propósito: no es el texto publicado y no debe viajar en el repo ni en el tar.
+
+Barrido de caracteres no latinos limpio en los cuatro archivos del paquete.
+
+**Archivos** — `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-26.md`
+(nuevo), `PROMPT.md` (trampa 95), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
