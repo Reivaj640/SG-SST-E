@@ -7654,3 +7654,89 @@ Reglas que quedaron en el script:
 **Archivos** — `firma-service/scripts/smoke-produccion.js` (`validarArgumentos`),
 `firma-service/tests/scripts/smoke-produccion.test.js` (8 tests), `PROMPT.md` (trampa 92),
 `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️966 · La firma que no se podía hacer: faltaba el consentimiento del Acuerdo
+
+*26-oct-2026 · el piloto de la excepcion de habilitacion · D-03*
+
+### Qué pasó
+
+El e2e dio **14 comprobaciones, 0 fallas, `RESULTADO: OK`**:
+
+```
+[OK] La solicitud de firma se creo :: id=SIGN-2026-827084
+[OK] La invitacion salio por correo :: destino=jrf2011@live.com
+[OK] El token de la prueba resuelve :: id_solicitud=SIGN-2026-827084
+```
+
+Y la firma **no se podía hacer**. El firmante se identificó, recibió el código, llegó a la
+**tercera casilla** de la mini-app (la del Acuerdo de uso) y ahí el servidor respondió:
+
+```
+409 CONSENT_REQUIRED
+```
+
+La fila de la solicitud se había creado **sin `consent_id`**: sin el consentimiento del Acuerdo,
+que es el objeto que la mini-app tiene que aceptar antes de firmar. El smoke creaba **uno de los
+dos objetos** del proceso (la solicitud) y no el otro (el consentimiento). En el flujo real de
+K+AIR el cliente crea el consentimiento, crea la solicitud **con su `consent_id`**, y recién ahí
+se emite el enlace.
+
+El síntoma era peor que el bug, porque el mensaje de la mini-app decía:
+
+> *Esta solicitud no requiere aceptación de Acuerdo. Contacta a tu empleador.*
+
+Eso es **al revés** de lo que significa el código: `CONSENT_REQUIRED` se lanza cuando la fila
+**no tiene** consentimiento vinculado. El mensaje mandaba al firmante a pensar que la solicitud
+estaba mal, cuando lo que faltaba era un paso del cliente que la creó — y el mensaje original,
+además, lo dejaba sin salida, porque la única salida de verdad es que la Empresa le emita un
+enlace nuevo.
+
+**Y `SIGN-2026-827084` no tiene arreglo**: el vínculo `consent_id` se escribe al crear la
+solicitud y no hay endpoint para enlazarlo después. Esa solicitud se quedó muerta: hay que
+crear otra.
+
+### La lección (trampa 93)
+
+**Un e2e que crea la solicitud pero no llega al commit no prueba que la firma se pueda hacer:
+cada objeto que el firmante tiene que aceptar tiene que existir antes del enlace.**
+
+Reglas que quedaron:
+
+1. **Un check que mira el alta no mira la firma**: que el alta dé 201 y que el enlace exista no
+   dice nada de si el firmante puede llegar al final. El check tiene que comprobar que la
+   solicitud tiene **todo** lo que la mini-app va a necesitar.
+2. **El cliente tiene que hacer los pasos que el servidor exige**: la firma es un proceso de dos
+   objetos (consentimiento + solicitud). El smoke es un cliente: hacer la mitad no es probar.
+3. **El mensaje de error tiene que decir lo que el código significa**: un mensaje al revés manda
+   al usuario al lugar equivocado, y en un celular eso se lee como "el sistema está roto".
+4. **Un 201 no es una firma**: el alta puede ser correcta y la firma imposible.
+5. **Lo que no se puede reparar, hay que rehacerlo**: sin endpoint de enlace, la solicitud se
+   queda muerta y se crea otra (y hay que decirlo, no dejar el número viejo dando vueltas).
+6. **El check que muerde es el que relee la fila**: la creación no devuelve el `consent_id`, así
+   que la comprobación relee la solicitud y verifica el vínculo — y **FALLA** si no quedó.
+
+### Qué cambió
+
+- `scripts/smoke-produccion.js`: nueva función `crearConsentimiento` (crea el consentimiento o
+  reutiliza el pendiente con `CONSENT_PENDING`), el `consent_id` viaja en el `metadata` de la
+  creación de la solicitud, y un check nuevo relee la fila y **falla** si el vínculo no quedó.
+  El 409 del D-03 en el paso del consentimiento se reporta como **AVISO** (es el control
+  funcionando, no un fallo del servicio).
+- `web/firma/app.js`: el mensaje de `CONSENT_REQUIRED` ahora dice lo que pasa ("a esta
+  solicitud le falta el consentimiento del Acuerdo") y dice cuál es la salida.
+- `tests/scripts/smoke-produccion.test.js`: 4 tests nuevos (el `consent_id` viaja en el
+  `metadata`; sin vínculo el e2e **FALLA**; el pendiente se reutiliza; un error al crear el
+  consentimiento se reporta).
+
+**Verificación.** Suite del service: **1753 tests · 1751 verdes · 0 fallos · 2 omitidos**. Barrido
+de caracteres no latinos limpio en los tres archivos; LF preservado; sin bump de versión.
+
+**Lo que sigue del piloto:** hay que desplegar este paquete (el script vive en `app/scripts/`) y
+re-correr el smoke para obtener una solicitud **con** consentimiento. La excepción 4 sigue
+`VIGENTE` con `firmas_usadas: 0`.
+
+**Archivos** — `firma-service/scripts/smoke-produccion.js` (`crearConsentimiento`),
+`firma-service/tests/scripts/smoke-produccion.test.js` (4 tests), `firma-service/web/firma/app.js`
+(el mensaje de `CONSENT_REQUIRED`), `PROMPT.md` (trampa 93), `sgsst-electron-app/BITACORA.md` y
+`Historial.md`.

@@ -619,9 +619,10 @@ function numeroDocumentoDe(args) {
  * @param {object} args
  * @param {object} acuerdoActivo
  * @param {string} documentHash
+ * @param {number} [consentId] - id del consentimiento del Acuerdo (Bloque E6).
  * @returns {object}
  */
-function metadataSignRequest(args, acuerdoActivo, documentHash) {
+function metadataSignRequest(args, acuerdoActivo, documentHash, consentId) {
   const numero = numeroDocumentoDe(args);
   const metadata = {
     id_documento: 'PRUEBA-HUMO-' + Date.now(),
@@ -645,6 +646,23 @@ function metadataSignRequest(args, acuerdoActivo, documentHash) {
     // ("Expected string, received object").
     metadata: JSON.stringify({ subtipo_identificacion: 'prueba-de-humo' }),
   };
+  // EL CONSENTIMIENTO DEL ACUERDO (Bloque E6)
+  // -----------------------------------------
+  // Sin este vinculo, la mini-app no puede aceptar el Acuerdo: la tercera
+  // casilla llama a `POST /api/sign/:token/consent/accept`, que exige
+  // `signRequest.consent_id` y responde 409 CONSENT_REQUIRED si no lo hay.
+  //
+  // OJO con lo que ese 409 le dice al firmante: la mini-app lo traduce como
+  // "Esta solicitud NO requiere aceptacion de Acuerdo. Contacta a tu
+  // empleador", que es al reves de lo que pasa (falta el consentimiento), y
+  // por eso el sintoma parece un error de la solicitud y no del cliente.
+  //
+  // El consentimiento se crea ANTES (ver `crearConsentimiento`) y su id viaja
+  // en la creacion de la solicitud. El servidor enlaza los dos (y deja el
+  // `id_solicitud` en la fila del consentimiento).
+  if (consentId) {
+    metadata.consent_id = consentId;
+  }
   // 033 · El catálogo de retención por documento (opcional). Con
   // `--categoria-retencion=SST_CAPACITACION` la solicitud se crea con la regla
   // de 20 años desde el cese: es la prueba de que el servidor ya aplicó la
@@ -815,6 +833,111 @@ async function notificarInvitacion(args, internoKey, idSolicitud, pedirFn, token
   return { ok: false, codigo, detalle: texto };
 }
 
+/**
+ * Crea (o reutiliza) el CONSENTIMIENTO DEL ACUERDO del firmante.
+ *
+ * POR QUE ESTE PASO EXISTE
+ * ------------------------
+ * El 26-oct-2026 la corrida e2e dio 201, la invitacion salio por correo y el
+ * firmante llego hasta la TERCERA casilla de la mini-app (la del Acuerdo).
+ * Ahi el servidor respondio `409 CONSENT_REQUIRED` y la mini-app le mostro
+ * "Esta solicitud no requiere aceptacion de Acuerdo. Contacta a tu
+ * empleador": un mensaje que dice al reves de lo que pasa (falta el
+ * consentimiento) y que hace que el sintoma parezca un error de la solicitud
+ * y no del cliente que la creo.
+ *
+ * La causa: `POST /internal/sign-requests` acepta `consent_id` en el
+ * `metadata` (Bloque E6), y sin ese vinculo la fila queda con
+ * `consent_id = NULL`. La mini-app no puede aceptar el Acuerdo sin el
+ * consentimiento, y la firma no se puede completar. O sea: **una solicitud de
+ * firma sin consentimiento del Acuerdo es una carta sin firma**.
+ *
+ * En el flujo real de K+AIR el cliente (la app de escritorio) crea el
+ * consentimiento y luego la solicitud. El smoke, que es un cliente, tiene que
+ * hacer los DOS pasos.
+ *
+ * En produccion la creacion del consentimiento NO manda ningun correo (el
+ * codigo de verificacion de la firma es otro, el de la mini-app).
+ *
+ * @param {object} args
+ * @param {string} internoKey
+ * @param {object} acuerdoActivo
+ * @param {function} [pedirFn] - doble de `pedir` para los tests.
+ * @returns {Promise<{ok: boolean, consent_id: number|null, reusado: boolean, detalle: string}>}
+ */
+async function crearConsentimiento(args, internoKey, acuerdoActivo, pedirFn) {
+  const pedirReal = pedirFn || pedir;
+  const cuerpo = JSON.stringify({
+    id_trabajador: args.trabajador,
+    id_empresa: args.empresa,
+    version_acuerdo: acuerdoActivo.version,
+    correo_verificacion: args.correo || 'prueba@example.com',
+    kair_version: 'smoke-produccion',
+  });
+
+  let res;
+  try {
+    res = await pedirReal({
+      base: args.url, path: '/internal/consentimientos', method: 'POST',
+      headers: {
+        'X-Internal-API-Key': internoKey,
+        'Content-Type': 'application/json',
+      },
+    }, cuerpo, args.timeoutMs);
+  } catch (e) {
+    return {
+      ok: false, consent_id: null, reusado: false,
+      detalle: 'no respondio: ' + e.message,
+    };
+  }
+
+  const j = res.json || {};
+
+  if (res.status === 201) {
+    if (!j.consent_id) {
+      return {
+        ok: false, consent_id: null, reusado: false,
+        detalle: 'HTTP 201 sin consent_id en la respuesta :: ' + res.texto.slice(0, 200),
+      };
+    }
+    return { ok: true, consent_id: j.consent_id, reusado: false, detalle: '' };
+  }
+
+  // 200 · ya estaba aceptado (mismo trabajador, misma empresa, misma version).
+  if (res.status === 200) {
+    if (!j.consent_id) {
+      return {
+        ok: false, consent_id: null, reusado: true,
+        detalle: 'HTTP 200 sin consent_id en la respuesta :: ' + res.texto.slice(0, 200),
+      };
+    }
+    return { ok: true, consent_id: j.consent_id, reusado: true, detalle: 'ya estaba aceptado' };
+  }
+
+  if (res.status === 409) {
+    const codigo = (j.error && j.error.code) || 'UNKNOWN';
+    const detalles = (j.error && j.error.details) || {};
+    // 409 CONSENT_PENDING: ya hay un consentimiento PENDIENTE para la misma
+    // clave (trabajador, empresa, version). Se reusa: es el mismo
+    // consentimiento, y el que lo acepte en la mini-app es el de esta firma.
+    if (codigo === 'CONSENT_PENDING' && detalles.consent_id) {
+      return {
+        ok: true, consent_id: detalles.consent_id, reusado: true, codigo,
+        detalle: 'ya habia uno pendiente',
+      };
+    }
+    return {
+      ok: false, consent_id: null, reusado: false, codigo,
+      detalle: 'HTTP 409 ' + codigo + ' :: ' + res.texto.slice(0, 250),
+    };
+  }
+
+  return {
+    ok: false, consent_id: null, reusado: false, codigo: 'HTTP_' + res.status,
+    detalle: 'HTTP ' + res.status + ' :: ' + res.texto.slice(0, 300),
+  };
+}
+
 async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
   const pedirFn = (deps && deps.pedir) || pedir;
   const notificarFn = (deps && deps.notificar) || notificarInvitacion;
@@ -843,8 +966,38 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
 
   const pdf = await pdfDePrueba();
   const documentHash = crypto.createHash('sha256').update(pdf).digest('hex');
+
+  // 5a. EL CONSENTIMIENTO DEL ACUERDO (Bloque E6).
+  //
+  // Este paso NO es un detalle: sin el consentimiento vinculado, la mini-app
+  // no deja aceptar el Acuerdo y la firma no se puede completar. Es lo que
+  // paso el 26-oct-2026: el alta dio 201 y el firmante llego hasta la tercera
+  // casilla, donde el servidor respondio 409 CONSENT_REQUIRED.
+  const consent = await crearConsentimiento(args, internoKey, acuerdoActivo, pedirFn);
+  if (!consent.ok) {
+    // El D-03 bloquea en CUATRO puntos, y la creacion del consentimiento es
+    // uno de ellos: si la Empresa no esta habilitada, el bloqueo aparece
+    // aqui, antes que en la creacion de la solicitud. Se reporta igual que
+    // el otro (AVISO, no FALLA): un control que se comporta como debe no es
+    // un fallo del servicio.
+    if (consent.codigo === 'EMPRESA_NO_HABILITADA') {
+      warn('POST /internal/consentimientos', '409 EMPRESA_NO_HABILITADA: la Empresa '
+        + 'no tiene Anexo de Encargo firmado ni canal de PQRS. '
+        + 'El bloqueo es INCONDICIONAL (D-03): no hay bandera que lo apague. '
+        + 'La unica salida es la excepcion auditable '
+        + '(POST /internal/admin/excepciones-habilitacion). '
+        + 'NO es un fallo del servicio: es el control del D-03. Detalle: '
+        + consent.detalle);
+    } else {
+      fail('El consentimiento del Acuerdo se creo', consent.detalle);
+    }
+    return;
+  }
+  ok('El consentimiento del Acuerdo quedo vinculado a la solicitud',
+    'consent_id=' + consent.consent_id + (consent.reusado ? ' (reusado: ya habia uno pendiente)' : ''));
+
   const { body, contentType } = multipart({
-    metadata: JSON.stringify(metadataSignRequest(args, acuerdoActivo, documentHash)),
+    metadata: JSON.stringify(metadataSignRequest(args, acuerdoActivo, documentHash, consent.consent_id)),
   }, { campo: 'documento', nombre: 'prueba-humo.pdf', contenido: pdf });
 
   let res;
@@ -875,6 +1028,36 @@ async function comprobarE2e(args, internoKey, acuerdoActivo, deps) {
       emitir('  (NO se puede reutilizar el token: se devuelve una sola vez)');
       emitir('  Para identificarte en la mini-app: tipo CC y numero '
         + numeroDocumentoDe(args));
+    }
+    // 5a-bis. LA SOLICITUD QUEDO VINCULADA AL CONSENTIMIENTO.
+    //
+    // La respuesta de la creacion NO trae `consent_id`, asi que hay que
+    // releer la fila. Este es el check que habria atrapado el 409
+    // CONSENT_REQUIRED del 26-oct-2026: una solicitud sin consentimiento del
+    // Acuerdo no se puede firmar, y el sintoma (un error en el celular del
+    // firmante) no dice nada de la causa real.
+    if (r.id_solicitud) {
+      let fila = null;
+      try {
+        const resFila = await pedirFn({
+          base: args.url,
+          path: '/internal/sign-requests/' + encodeURIComponent(r.id_solicitud),
+          method: 'GET',
+          headers: { 'X-Internal-API-Key': internoKey },
+        }, null, args.timeoutMs);
+        if (resFila.status === 200) fila = resFila.json || {};
+      } catch (e) {
+        fila = null;
+      }
+      if (fila && fila.consent_id) {
+        ok('La solicitud quedo vinculada al consentimiento del Acuerdo',
+          'consent_id=' + fila.consent_id);
+      } else {
+        fail('La solicitud quedo vinculada al consentimiento del Acuerdo',
+          'consent_id=' + (fila ? String(fila.consent_id) : '(no se pudo leer la fila)')
+          + ' · sin este vinculo la mini-app no deja aceptar el Acuerdo '
+          + '(409 CONSENT_REQUIRED) y la firma no se puede completar');
+      }
     }
     // El token de la creación, en texto claro: es la credencial del enlace.
     //
@@ -1078,6 +1261,7 @@ module.exports = {
   pdfDePrueba,
   cabecerasSignRequest,
   metadataSignRequest,
+  crearConsentimiento,
   comprobarE2e,
   notificarInvitacion,
   comprobarTokenResuelve,

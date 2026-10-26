@@ -233,11 +233,26 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
   const llamadas = [];
   const pedirDoble = async (op, body) => {
     llamadas.push({ path: op.path, method: op.method, body });
+    if (op.path === '/internal/consentimientos') {
+      return {
+        status: 201,
+        texto: '{"consent_id":7}',
+        json: { consent_id: 7 },
+      };
+    }
     if (op.path.indexOf('/verify') !== -1) {
       return {
         status: 200,
         texto: '{"id_solicitud":"SIGN-2026-000001"}',
         json: { id_solicitud: 'SIGN-2026-000001' },
+      };
+    }
+    if (op.method === 'GET') {
+      // La releida de la fila: tiene que traer el consent_id.
+      return {
+        status: 200,
+        texto: '{"id_solicitud":"SIGN-2026-000001","consent_id":7}',
+        json: { id_solicitud: 'SIGN-2026-000001', consent_id: 7 },
       };
     }
     return {
@@ -266,14 +281,156 @@ test('el e2e pide la notificacion: crear la solicitud NO manda el correo', async
   assert.notEqual(notificado, null,
     'el e2e tiene que pedir la notificacion: sin ella el correo no sale');
   assert.equal(notificado.idSolicitud, 'SIGN-2026-000001');
-  assert.equal(llamadas.length, 2,
-    'el e2e hace la creacion y la comprobacion del token: nada mas');
-  assert.equal(llamadas[0].path, '/internal/sign-requests');
-  assert.equal(llamadas[1].path, '/api/sign/tok/verify',
+  assert.equal(llamadas.length, 4,
+    'el e2e crea el consentimiento, crea la solicitud, relee la fila y '
+    + 'comprueba el token: nada mas');
+  assert.equal(llamadas[0].path, '/internal/consentimientos',
+    'el consentimiento del Acuerdo va PRIMERO: sin el, la solicitud queda '
+    + 'sin consent_id y la mini-app no deja aceptar el Acuerdo');
+  assert.equal(llamadas[1].path, '/internal/sign-requests');
+  assert.equal(llamadas[2].path, '/internal/sign-requests/SIGN-2026-000001',
+    'la fila se relee para comprobar el vinculo con el consentimiento');
+  assert.equal(llamadas[3].path, '/api/sign/tok/verify',
     'el e2e tiene que abrir el enlace que el mismo creo');
   assert.equal(notificado.token, 'tok',
     'el e2e tiene que MANDAR el token de la creacion: sin eso la notificacion '
     + 'rota el token (3.4(c)) y el 5c comprueba un enlace que ya no existe');
+});
+
+test('el e2e manda el consent_id del Acuerdo en la creacion de la solicitud', async () => {
+  let metadata = null;
+  const pedirDoble = async (op, body) => {
+    if (op.path === '/internal/consentimientos') {
+      return { status: 201, texto: '{"consent_id":42}', json: { consent_id: 42 } };
+    }
+    if (op.method === 'GET') {
+      return {
+        status: 200,
+        texto: '{"id_solicitud":"SIGN-2026-000001","consent_id":42}',
+        json: { id_solicitud: 'SIGN-2026-000001', consent_id: 42 },
+      };
+    }
+    if (op.path.indexOf('/verify') !== -1) {
+      return { status: 200, texto: '{}', json: { id_solicitud: 'SIGN-2026-000001' } };
+    }
+    // El cuerpo es multipart: se busca el campo `metadata`.
+    const texto = String(body || '');
+    const i = texto.indexOf('name="metadata"');
+    if (i !== -1) {
+      const fin = texto.indexOf('\r\n\r\n', i);
+      const siguiente = texto.indexOf('\r\n--', fin);
+      metadata = texto.slice(fin + 4, siguiente === -1 ? undefined : siguiente);
+    }
+    return {
+      status: 201,
+      texto: '{"id_solicitud":"SIGN-2026-000001"}',
+      json: { id_solicitud: 'SIGN-2026-000001', url_publica: 'https://x/s/tok', token: 'tok' },
+    };
+  };
+
+  await script.comprobarE2e(
+    {
+      e2e: true, confirmarE2e: true, url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-001', trabajador: '1234567890', correo: 'firmante@example.com',
+      idempotencia: false,
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    { pedir: pedirDoble, notificar: async () => ({ ok: true, codigo: 'OK', detalle: '' }) },
+  );
+
+  assert.ok(metadata, 'la creacion tiene que mandar el campo metadata');
+  const meta = JSON.parse(metadata);
+  assert.equal(meta.consent_id, 42,
+    'sin consent_id en el metadata la solicitud queda sin vinculo y la '
+    + 'mini-app responde 409 CONSENT_REQUIRED al aceptar el Acuerdo');
+});
+
+test('si la fila queda SIN consent_id, el e2e FALLA (no puede quedar en verde)', async () => {
+  const pedirDoble = async (op) => {
+    if (op.path === '/internal/consentimientos') {
+      return { status: 201, texto: '{"consent_id":42}', json: { consent_id: 42 } };
+    }
+    if (op.method === 'GET') {
+      return {
+        status: 200,
+        texto: '{"id_solicitud":"SIGN-2026-000001","consent_id":null}',
+        json: { id_solicitud: 'SIGN-2026-000001', consent_id: null },
+      };
+    }
+    if (op.path.indexOf('/verify') !== -1) {
+      return { status: 200, texto: '{}', json: { id_solicitud: 'SIGN-2026-000001' } };
+    }
+    return {
+      status: 201,
+      texto: '{"id_solicitud":"SIGN-2026-000001"}',
+      json: { id_solicitud: 'SIGN-2026-000001', url_publica: 'https://x/s/tok', token: 'tok' },
+    };
+  };
+
+  script.resultados.length = 0;
+  await script.comprobarE2e(
+    {
+      e2e: true, confirmarE2e: true, url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-001', trabajador: '1234567890', correo: 'firmante@example.com',
+      idempotencia: false,
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    { pedir: pedirDoble, notificar: async () => ({ ok: true, codigo: 'OK', detalle: '' }) },
+  );
+
+  const renglones = script.resultados.filter(
+    (r) => String(r.nombre || '').indexOf('consentimiento del Acuerdo') !== -1
+      && String(r.nombre || '').indexOf('quedo vinculada') !== -1
+  );
+  assert.equal(renglones.length, 1, 'el vinculo con el consentimiento deja renglon en el resumen');
+  assert.equal(renglones[0].estado, 'FALLA',
+    'una solicitud sin consentimiento del Acuerdo no se puede firmar: '
+    + 'el e2e no puede quedar en verde');
+});
+
+test('el consentimiento se reusa si ya habia uno pendiente (CONSENT_PENDING)', async () => {
+  const pedirDoble = async () => ({
+    status: 409,
+    texto: '{"error":{"code":"CONSENT_PENDING","details":{"consent_id":99}}}',
+    json: { error: { code: 'CONSENT_PENDING', details: { consent_id: 99 } } },
+  });
+
+  const r = await script.crearConsentimiento(
+    {
+      url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-001', trabajador: '1234567890', correo: 'firmante@example.com',
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    pedirDoble,
+  );
+
+  assert.equal(r.ok, true, 'un consentimiento pendiente se reusa, no es un fallo');
+  assert.equal(r.consent_id, 99);
+  assert.equal(r.reusado, true);
+});
+
+test('si el consentimiento no se puede crear, el e2e lo dice', async () => {
+  const pedirDoble = async () => ({
+    status: 500,
+    texto: '{"error":{"code":"BOOM"}}',
+    json: { error: { code: 'BOOM' } },
+  });
+
+  const r = await script.crearConsentimiento(
+    {
+      url: 'https://x', timeoutMs: 1000,
+      empresa: 'EMP-001', trabajador: '1234567890', correo: 'firmante@example.com',
+    },
+    'llave-interna',
+    { version: 'v1.0', texto_hash: 'hash-legal' },
+    pedirDoble,
+  );
+
+  assert.equal(r.ok, false);
+  assert.match(r.detalle, /HTTP 500/);
 });
 
 test('la notificacion va a /notify-remote con el correo del firmante', async () => {

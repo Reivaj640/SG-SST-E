@@ -1209,7 +1209,16 @@
             } else if (err.code === 'CONSENT_ACCEPT_TOO_EARLY') {
               msg = 'No se puede aceptar el Acuerdo en este momento. Intenta recargar la página.';
             } else if (err.code === 'CONSENT_REQUIRED') {
-              msg = 'Esta solicitud no requiere aceptación de Acuerdo. Contacta a tu empleador.';
+              // El mensaje decia "esta solicitud NO requiere aceptacion de
+              // Acuerdo", que es al reves de lo que significa el codigo: el
+              // servidor lanza CONSENT_REQUIRED cuando la fila NO TIENE
+              // consentimiento vinculado (`consent_id` nulo), y en ese caso la
+              // mini-app no puede aceptar el Acuerdo y la firma no se puede
+              // completar. Decirle al firmante que la solicitud "no requiere"
+              // aceptacion lo dejaba sin salida, cuando la salida es una sola:
+              // que la Empresa le emita un enlace nuevo.
+              msg = 'A esta solicitud le falta el consentimiento del Acuerdo. '
+                + 'Contacta a tu empleador para que te envíe un enlace nuevo.';
             } else if (err.code === 'CONSENT_LOCKED') {
               msg = 'El Acuerdo está bloqueado por intentos previos. Contacta al área de RRHH.';
             } else if (err.code === 'CONSENT_INCONSISTENT_STATE') {
