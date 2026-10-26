@@ -9,7 +9,7 @@
     "publicado": false
   },
   "encargado": {
-    "nit": "900987987-1",
+    "nit": "900987987-4",
     "representante_legal": "Javier Robles Fontalvo",
     "domicilio": "Calle 114 # 43B - 83, Barranquilla (Atlántico)",
     "canal_proteccion_datos": "privacidad.kair@gmail.com",
@@ -38,7 +38,7 @@
       "evidencia": "https://www.cloudflare.com/cloudflare-customer-dpa/"
     },
     "google": {
-      "cuenta": null,
+      "cuenta": "consumidor",
       "dpa": false,
       "version": null,
       "fecha": null,

@@ -7288,3 +7288,56 @@ no lo está**, porque lo que no le aplica a Google (el DPA) es precisamente lo q
 De ahí la trampa 85 del PROMPT: **un bloque permanente tiene que venir con el motivo y la salida**; y **quitar una marca
 que bloquea exige la razón que la quitaba**: un aviso de "revisión profesional pendiente" se quita cuando un abogado lo
 aprueba, no porque otro agente reescribiera el documento.
+
+## 📦️958 · Las tres decisiones del owner: el dígito que sí valida, Google por Workspace, y no publicar todavía
+
+*26-oct-2026 · los puntos 2 y 9 · el cierre de lo heredado*
+
+### El dígito de verificación del NIT
+
+La otra sesión había aplicado `900987987-1` en 17 lugares de 11 archivos, con el dígito que dio el owner. El
+algoritmo oficial de la DIAN (Orden Administrativa 4 de 1989) da **4**:
+
+```
+9×41 + 0×37 + 0×29 + 9×23 + 8×19 + 7×17 + 9×13 + 8×7 + 7×3 = 1041
+1041 mod 11 = 7   ->   DV = 11 - 7 = 4
+```
+
+La implementación se contrastó con tres ejemplos publicados (900123456 → 8, 800191045 → 1, 213123432 → 1). El owner
+confirmó que el NIT completo es `900987987-4`, y se cambió en los 17 lugares de los 11 archivos.
+
+Lo que lo dejó pasar sin que nadie lo viera: **`_nitValido` solo mira que haya entre 8 y 12 dígitos**. Un dígito de
+verificación inválido no es un dato raro, es un dato que el check no sabe leer.
+
+### Google: Workspace/Cloud con DPA
+
+El dato del servidor es `SMTP_USER=adminkair@gmail.com`: una cuenta de **consumo**. Y el Acuerdo (10.1 y 10.5(f))
+condiciona el papel de subencargado al vínculo por contrato o DPA y **prohíbe transmitir datos personales a un
+proveedor no vinculado**: con esa cuenta, el servicio no puede enviar el OTP por Gmail. El owner decidió migrar a una
+cuenta **Google Workspace/Cloud con DPA**.
+
+Lo que quedó escrito, y por qué en cada lugar:
+
+- **El manifiesto declara `cuenta: "consumidor"`.** Es lo que el servidor usa hoy, y el manifiesto dice en su propia nota
+  que "cada campo se completa solo con evidencia verificable; no se rellena con valores de ejemplo". Declarar
+  `workspace` antes de que la cuenta exista sería rellenar un campo con una intención, no con una evidencia.
+- **El modelo del Anexo de Nube declara el camino decidido**: la columna "Rol" dice que la cuenta es de Workspace/Cloud
+  con contrato o DPA, y los tres huecos de la tabla de Google son ahora el DPA (versión, fecha y evidencia) y sus dos
+  cláusulas (devolución/supresión y auditoría). El modelo describe el servicio como va a quedar cuando se firme; el
+  manifiesto describe el servicio como está; y el gate no abre hasta que las dos cosas coincidan.
+- **El check** dice el motivo y las tres salidas, en vez de un pendiente sin nombre.
+
+El modelo sigue con 10 huecos: 3 de la Empresa (que diligencia cada Empresa en la copia que firma) y 7 del owner (RTO,
+RPO, plan de continuidad, DPA de Google, sus dos cláusulas y el plazo de supresión).
+
+### No se publica todavía
+
+El sitio (kair.fyi) sigue con la versión anterior: sin el dígito del NIT y sin las 24 correcciones legales del Anexo de
+Encargo. Decisión del owner: **primero resolver el NIT y el correo**. Publicar un Anexo de Encargo que ningún abogado ha
+visto, con un NIT sin confirmar, pone en público dos documentos que después hay que corregir.
+
+### La regla
+
+**Un instrumento que declara el estado no puede declarar el estado que uno quiere.** El manifiesto es el que el check
+lee: si se llena con la intención ("ya voy a tener Workspace"), el check deja de medir y empieza a mentir. La decisión se
+escribe en el tablero y en el modelo —los dos lugares donde sí es una declaración— y el manifiesto espera la evidencia.
