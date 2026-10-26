@@ -1094,9 +1094,62 @@ entre copias, y esa es una decisión del owner, no del modelo.
 `firma-service/tests/readiness-documentos-html.test.js`, `legal/anexo-nube-v1.0.html`,
 `sitio/anexo-nube-v1.0.html`, `BITACORA.md`, `PROMPT.md` (trampa 82), `Historial.md`.
 
-**Commits** — pendiente de la palabra del owner.
+**Commits** — `359fe7a1` (📦954), pusheado a `origin/Dev`.
 
-### 📋 El tablero de los 15 puntos (estado medido al 24-oct-2026)
+### 2026-10-26 · 📦️955 · El paquete de despliegue no llevaba los documentos: el servidor reportaba huecos que no existían
+
+**El hallazgo.** Al re-armar el tar de despliegue del 📦954 se encontró que `git archive` solo metía el service
+(`src`, `web`, `scripts`, `package.json`, `package-lock.json`, `legal-readiness.json`). Pero el readiness no lee
+los documentos legales de ahí: `readinessLegal.js` calcula `REPO_ROOT` como **un nivel arriba** del directorio del
+service (`path.resolve(SERVICE_ROOT, '..')`) y de ahí lee el Anexo de Nube y el Anexo de Encargo. En el PC eso es
+`sgsst-electron-app/legal/`; en el servidor, `/opt/kair-firma/legal/`: **hermano** de `app/`, no hijo. El tar se
+extraía en `/opt/kair-firma/app`, así que ese directorio nunca existió allá.
+
+**El efecto era un resultado falso, no un error.** En el servidor el readiness reportaba:
+`"El documento no está disponible. Faltan cláusulas: Remisión al Anexo de Nube; Sustitución del Anexo anterior o
+cláusula de otrosí; Art. 2.2.4.6.13; Veinte (20) años; Servicio en nube / firma-service"` — cinco cláusulas que
+**no faltaban**: están en `legal/anexo-encargo.html` (19 568 B, sha256 `932ec4e7…b3ad8`). El que leía el reporte se
+llevaba una conclusión falsa sobre un documento completo, y el pendiente mandaba a "reparar" algo que estaba bien.
+
+**La medición, aislando la variable.** La misma evaluación con las rutas de los tres documentos apuntando a
+archivos inexistentes: cambian `texto_v1_1`, `hash_v1_1` y `texto_20`, y los detalles de `documento_nube` y
+`documento_encargo` pasan del "no está disponible" a la razón real.
+
+**El arreglo, sin tocar código.** El tar ahora se arma en dos pasos desde el commit (el service con
+`--strip-components=2` a `app/`, los dos documentos legales con `--strip-components=1` a `legal/`) y se
+empaqueta como `app` + `legal`: `efc457de…0651` (541 226 B), verificado por descarga a través del puente. **El
+comando de extracción cambia con la forma del paquete**: ahora va en `/opt/kair-firma`, no en
+`/opt/kair-firma/app`. Con el comando viejo el tar nuevo deja el código viejo en su sitio, el servicio arranca con
+él y el despliegue es un **no-op silencioso**; por eso el `sha256sum` de los archivos en disco no es opcional.
+
+**La simulación del servidor, que se puede hacer en el PC.** Se extrajo el tar a una ruta con la forma
+`/opt/kair-firma` y se corrió el readiness con el mismo `.env` y la misma base: `documento_nube` vuelve a decir
+*"Faltan 7 datos del owner"* y `documento_encargo` vuelve a decir *"Marcadores prohibidos: marca Revisión
+profesional pendiente"*. Las dos razones son la verdad. Con el tar viejo: 39 ítems → ✅ 16 ok · 20 pendiente ·
+1 aviso · 2 no_aplica; en el PC, con los documentos presentes: ✅ 19 ok · 17 pendiente · 1 aviso · 2 no_aplica.
+
+**El tope que salió de esa medición (punto 9).** Con una cuenta de Google **de consumidor**, el gate no se puede
+abrir: `devolucion_supresion` y `auditoria` exigen los **dos** subencargados (`cf && gg`), y `ggOk` solo es
+verdadero si la cuenta es Workspace/Cloud. El ítem `google_dpa` explica correctamente que Google no actúa como
+subencargado (y que el envío es una transferencia internacional, art. 26 de la Ley 1581) pero **se queda en
+pendiente igual**. Con ese dato no basta: hay que cambiar el check para que Google cuente solo cuando sí es
+subencargado. Queda anotado en el punto 9 del tablero.
+
+**El tablero, al día.** El 8 pasó a "mitad cerrado" (Cloudflare sí, Google no), el 10 pasó de 4 de 8 a 5 de 8
+(la seguridad física), el 7 tiene la decisión de fondo cerrada y el 9 quedó con los dos escenarios de la cuenta
+de Google medidos. Se corrigieron dos filas que estaban desactualizadas contra el manifiesto: el 8 decía que los
+6 campos de Cloudflare seguían en `false`/`null`, y el 10 contaba la seguridad física como faltante.
+
+**Publicación en el sitio.** El modelo del Anexo de Nube ya está en `https://kair.fyi/anexo-nube-v1.0.html`
+(commit `d6cfa7c5` en `gh-pages`, verificado por HTTP: 13 258 B, sha256 `5a2413b3…23f866`, idéntico byte a byte
+con `legal/`).
+
+**Archivos tocados** — `Historial.md`, `PROMPT.md` (trampa 83), `sgsst-electron-app/BITACORA.md` (§955),
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (el empaquetado y el comando de extracción).
+
+**Commits** — el 📦955 (este paquete, en `Dev`) y el `d6cfa7c5` (el Anexo de Nube publicado, en `gh-pages`).
+
+### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
 |---|---|---|
@@ -1113,44 +1166,53 @@ sellar esa URL como política del Encargado del servicio de firma habría sido u
 de la nube habría remitido a un documento que no describe ese servicio. El texto aprobado (1.2 y 10.7) remiten a la
 política de la **Empresa** (Responsable), no a la del Encargado: esa es la que se redactó aparte. Un test ata cada URL
 declarada al archivo que realmente se publica en `sitio/` |
-| 4 | Canal de protección de datos | ✅ **Cerrado en los 5 lugares, y ya verificado en el servidor.** `.env` local, `config.js:117`, `.env.example`, manifiesto (`canal_proteccion_datos` + `canal_confirmado: true`) y el 10.7(b) del texto armado. El `.env` **del servidor** también, verificado: `FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com`. ✅ El aviso anterior ("en el servidor el ítem `canal_datos` está en FALLA hasta el deploy") **quedó obsoleto**: el despliegue del 24-oct-2026 llevó el manifiesto del 📦️944 y el ítem `canal_datos` **ya no aparece** entre los 12 bloqueantes medidos en el servidor. ⚠️ Ese 12 es la medición del despliegue del 📦️944: con el tar final (`e064893a`) el número se mide en el despliegue, no se estima aquí |
+| 4 | Canal de protección de datos | ✅ **Cerrado en los 5 lugares, y ya verificado en el servidor.** `.env` local, `config.js:117`, `.env.example`, manifiesto (`canal_proteccion_datos` + `canal_confirmado: true`) y el 10.7(b) del texto armado. El `.env` **del servidor** también, verificado: `FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com`. ✅ El aviso anterior ("en el servidor el ítem `canal_datos` está en FALLA hasta el deploy") **quedó obsoleto**: el despliegue del 24-oct-2026 llevó el manifiesto del 📦️944 y el ítem `canal_datos` **ya no aparece** entre los 12 bloqueantes medidos en el servidor. 📊 **Medición del 26-oct-2026**: 39 ítems → ✅ **19 ok** · 17 pendiente · 1 aviso · 2 no_aplica (en el PC, con los documentos presentes). En el servidor, con el tar que ya los lleva: ✅ **16 ok** · 20 pendiente · 1 aviso · 2 no_aplica. El número del servidor se mide en el despliegue, no se estima aquí |
 | 5 | Responsable + acta | ✅ **Cerrado (📦️949): el acta no era una obligación legal.** El check pedía la persona o área responsable **y** la referencia del acta de designación; con el responsable ya declarado (el cargo del Representante Legal de Gesstiar) el ítem seguía en `pendiente` y bloqueaba la primera firma. Verificado en la fuente oficial: el art. 2.2.2.25.4.4 del Decreto 1074 de 2015 (que reproduce el art. 23 del Decreto 1377 de 2013) exige **designar una persona o área**, nada más, y la Resolución 384 de 2026 de la Secretaría Jurídica Distrital (que cita a la SIC) precisa que la ley "no establece un procedimiento específico para la designación" (además designa con una Resolución, no con un acta). El texto aprobado tampoco pedía acta: el 10.7(b) final solo dice "designa una persona o área" y "la persona o área responsable es [nombre o cargo]". **Se quitó el acta del requisito**: el campo `acta_designacion` desaparece del manifiesto, el ítem pasa a `ok` y la designación se documenta en los **documentos públicos** (Anexo de Encargo y política), que es la forma que la ley deja a la organización y que un tercero puede verificar. 2 tests nuevos con **mutación comprobada** por los dos lados. ✅ El **nombre** llegó después (📦950): el ítem quedó en `ok` ("Persona o área designada: Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S.") y con él se encendió también `partes_encargado` |
 | 6 | Canal único de PQRS | ✅ **Cerrado (📦️950).** El owner confirmó el 24-oct-2026 que el canal de PQRS del servicio es **adminkair@gmail.com** y que el responsable es **Javier Robles Fontalvo**. Declarados en el manifiesto (`pqrs.canal` y `pqrs.responsable`) y **publicados** en los tres documentos del sitio (`soporte.html`, `anexo-encargo.html`, `politica-firma.html`): un canal solo es verificable si está publicado, y un test ata el valor del manifiesto a los archivos. El ítem `canal_pqrs` pasó a **ok** ("Canal y responsable declarados") y el plazo de 2 días hábiles sigue `ok`. ⚠️ Aclaración: `asepluscaribesas@gmail.com` es el correo de **ASEPLUS** (remisiones médicas, `Portear/`), **no** un canal de PQRS de K+AIR: no hay dos canales |
-| 7 | Anexo de Nube | 🟡 **La decisión de fondo está tomada (📦️954): el archivo del repo es el MODELO, y el modelo ya va diligenciado.** No es una preferencia: lo dice el texto del abogado ("este documento es un modelo… se diligencia por cada Empresa") y lo soporta el código (los tres campos de la parte responsable cambian en cada copia, el aviso de "no firmar" y el `anexo_nube_firmado_at` por Empresa). **El bug que cerró**: el check pedía "sin placeholders" y le decía al operador "quitar todos los corchetes", pero en una plantilla por-Empresa eso **nunca puede pasar**: era un bloqueo permanente. Ahora hay una tercera clase de placeholder (los que diligencia la Empresa: se listan, no bloquean, contenido exacto) y el análisis distingue "listo para firmarse tal cual" de "listo como modelo". **El modelo quedó diligenciado**: de 53 huecos (20 distintos) a **10** (10 distintos); el NIT, el representante legal, la ciudad/país, los responsables de respaldos/monitoreo/soporte, el canal, el responsable, los plazos y la vigencia, están puestos; las 3 filas de ejemplo de subencargados se fueron (los presta el Encargado: no hay subencargado). **Cloudflare cerrado**: el DPA v6.4 del 3-abr-2026 verificado en la fuente oficial (aplica a enterprise y self-serve; 3.i devuelve o elimina al terminar; 5.2 habilita la auditoría) → `cloudflare_dpa` ok. Además `seguridad_fisica` tiene su propio ítem (existía en el manifiesto y **ningún check lo leía**). ⚠️ **Quedan 7 huecos, en 4 datos del owner**: el tipo de cuenta de Google, el RTO/RPO, el plan de continuidad y el plazo de supresión; y el bloqueo que ningún dato quita, `firmado_nube`, que lo firma la Empresa. El hash del modelo pasó de `f50ed32c…19628` a `5a2413b3…23f866` |
-| 8 | DPAs | 🔴 **Tu dato.** Sin cambio: los 6 campos por subencargado, todos en `false`/`null`. El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA |
-| 9 | Tipo de cuenta de Google | 🔴 **Tu dato.** Sin cambio: `subencargados.google.cuenta` en `null` y `[Workspace/Cloud]` en el Anexo de Nube. El 11A lo marcó "⚠️ No verificado" |
-| 10 | Ubicación + RTO/RPO + responsables | 🟡 **4 de 8 cerrados.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo). Faltan: **seguridad física, RTO, RPO y plan de continuidad**. ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe |
-| 11 | Estado real del Anexo de Encargo | 🟡 **El documento ya está redactado (📦️948); falta la revisión del abogado.** La BD del servidor decía firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no había PDF; el manifiesto decía `no_firmado`. **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publicó un Anexo de Encargo nuevo, completo, con el servicio en la nube, las cinco cláusulas que el check exige y la remisión al Anexo de Nube. El check del `otrosí` ya acepta las dos redacciones (`otros[ií]` o `sustitu`). ⚠️ **Conserva la marca `REVISION_PENDIENTE`** a propósito: lo redactó el modelo, no un abogado, así que el ítem `documento_encargo` sigue bloqueando la primera firma |
+| 7 | Anexo de Nube | 🟡 **La decisión de fondo está tomada (📦️954): el archivo del repo es el MODELO, y el modelo ya va diligenciado.** No es una preferencia: lo dice el texto del abogado ("este documento es un modelo… se diligencia por cada Empresa") y lo soporta el código (los tres campos de la parte responsable cambian en cada copia, el aviso de "no firmar" y el `anexo_nube_firmado_at` por Empresa). **El bug que cerró**: el check pedía "sin placeholders" y le decía al operador "quitar todos los corchetes", pero en una plantilla por-Empresa eso **nunca puede pasar**: era un bloqueo permanente. Ahora hay una tercera clase de placeholder (los que diligencia la Empresa: se listan, no bloquean, contenido exacto) y el análisis distingue "listo para firmarse tal cual" de "listo como modelo". **El modelo quedó diligenciado**: de 53 huecos (20 distintos) a **10** (10 distintos); el NIT, el representante legal, la ciudad/país, los responsables de respaldos/monitoreo/soporte, el canal, el responsable, los plazos y la vigencia, están puestos; las 3 filas de ejemplo de subencargados se fueron (los presta el Encargado: no hay subencargado). **Cloudflare cerrado**: el DPA v6.4 del 3-abr-2026 verificado en la fuente oficial (aplica a enterprise y self-serve; 3.i devuelve o elimina al terminar; 5.2 habilita la auditoría) → `cloudflare_dpa` ok. Además `seguridad_fisica` tiene su propio ítem (existía en el manifiesto y **ningún check lo leía**). ⚠️ **Quedan 7 huecos, en 4 datos del owner**: el tipo de cuenta de Google, el RTO/RPO, el plan de continuidad y el plazo de supresión; y el bloqueo que ningún dato quita, `firmado_nube`, que lo firma la Empresa. El hash del modelo pasó de `f50ed32c…19628` a `5a2413b3…23f866`. 📤 **Publicado en el sitio (26-oct-2026)**: commit `d6cfa7c5` en `gh-pages`, verificado por HTTP (`https://kair.fyi/anexo-nube-v1.0.html`, 13 258 B, sha256 `5a2413b3…23f866`, idéntico byte a byte con `legal/`). 🔧 **Y el paquete de despliegue ya lo lleva**: antes el servidor leía un documento que no existía (ver BITACORA 📦955) |
+| 8 | DPAs | 🟡 **Mitad cerrado: Cloudflare sí, Google no.** El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA. **Cloudflare ya lo está**: su DPA v6.4 del 3-abr-2026 se verificó en la fuente oficial (aplica a enterprise **y** self-serve) → los 6 campos del subencargado completados y el ítem `cloudflare_dpa` en **ok** ("DPA de Cloudflare con versión, fecha, evidencia y cláusulas de devolución/auditoría"). 🔴 **Google sigue con los 6 campos en `false`/`null`**: no es un dato nuevo, es el **punto 9** — depende de qué tipo de cuenta sea. ⚠️ Y hay un tope: `devolucion_supresion` y `auditoria` exigen **los dos** subencargados (`cf && gg`), así que con una cuenta de consumidor de Google **esos tres ítems no pueden quedar `ok` nunca**: hay que corregir el check (ver punto 9) |
+| 9 | Tipo de cuenta de Google | 🔴 **Tu dato — y es el que decide el resto.** `subencargados.google.cuenta` sigue en `null`; el Anexo de Nube lo pide como `[Workspace/Cloud]`. **Medido el 26-oct-2026** (con una copia del manifiesto, sin tocar el del repo): si la cuenta es **Workspace/Cloud**, el ítem `google_dpa` espera el DPA de Google y sus 6 campos; si es **de consumidor**, el ítem ya **explica** la situación correcta ("Google no actúa como subencargado y el envío es transferencia internacional — art. 26 de la Ley 1581") pero **se queda en `pendiente` igual**, porque `ggOk` solo es verdadero si la cuenta es Workspace/Cloud. ⚠️ Con una cuenta de consumidor, `devolucion_supresion` y `auditoria` tampoco pueden quedar `ok`: el código exige los **dos** subencargados (`cf && gg`) y Google no lo es. **O sea: el gate no se abre con ese dato solo — hay que cambiar el check para que Google cuente solo cuando sí es subencargado.** El dato sale de un comando: `sudo grep SMTP_USER /opt/kair-firma/.env` |
+| 10 | Ubicación + RTO/RPO + responsables | 🟡 **5 de 8 cerrados.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo) y **seguridad física** (📦954: el servidor está en la red local del operador, detrás de NAT, y se expone por el túnel de Cloudflare), que además ya tiene **su propio ítem** en el readiness (`seguridad_fisica` → ok), porque existía en el manifiesto desde siempre y **ningún check lo leía**. Faltan **3**: **RTO, RPO y plan de continuidad** (los tres en `null`; el ítem `rto_rpo` sigue en pendiente: "Falta RTO, RPO o plan de continuidad"). ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe, y el RPO no puede ser menor al intervalo entre copias |
+| 11 | Estado real del Anexo de Encargo | 🟡 **El documento ya está redactado (📦️948); falta la revisión del abogado.** La BD del servidor decía firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no había PDF; el manifiesto decía `no_firmado`. **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publicó un Anexo de Encargo nuevo, completo, con el servicio en la nube, las cinco cláusulas que el check exige y la remisión al Anexo de Nube. El check del `otrosí` ya acepta las dos redacciones (`otros[ií]` o `sustitu`). ⚠️ **Conserva la marca `REVISION_PENDIENTE`** a propósito: lo redactó el modelo, no un abogado, así que el ítem `documento_encargo` sigue bloqueando la primera firma — y ahora el servidor lo dice **por la razón verdadera** ("Marcadores prohibidos: marca Revisión profesional pendiente"), no por "el documento no está disponible" (📦955). El ítem `estado_encargo` también sigue en pendiente ("No está firmado") |
 | 12 | Aprobar la v1.1 con el abogado | 🟡 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). 🟡 **Y ahora el Anexo de Encargo nuevo también**: lo redactó el modelo, no un abogado, y por eso conserva la marca `REVISION_PENDIENTE` (punto 11). Falta que tú los envíes; puedo convertir la v1.1 a Word o PDF |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ **Cerrado y commiteado** (`f26f8bc1`). Los 4 `[registrada por el sistema]` → el detector los reconoce (excepción de contenido exacto; las variantes siguen bloqueando). La línea "versión v1.0" → sello de versión en el encabezado y en el Manifiesto, con 4 checks negativos. Efecto medido: el texto pasó de `faltan:[{id:"version"}]` a `ok:true, faltan:[]` |
 | 14 | Rotar las 5 app passwords | ⚪ **Solo tuyo.** El repo es público y quedaron en el historial. Sin cambio |
 | 15 | SECURITY.md A/B/C | 🔵 **Decidido el 25-oct-2026: se aplaza como sugerencia no restrictiva.** El owner decidió no cerrar A/B/C ahora: **no bloquea la primera firma** ni el funcionamiento del servicio. Queda registrado como plan diferido en `docs/gestion-humana/firma-electronica/plan-seguridad-2026-10-25.md`, con disparadores para retomarlo (auditoría, DPA, cliente nuevo, redespliegue, CVE crítico o, a más tardar, el **2027-01-31**). C sigue descartada por los hechos (28 referencias del código y los docs apuntan a secciones suyas: §3, §4, §8, §9 y §11). Cuando se retome, el camino recomendado es **B+**: congelar el documento como análisis de diseño, corrigiendo las afirmaciones hoy falsas, sin marcar casillas sin evidencia. Medido al 25-oct-2026: **Node 20.20.2 en EOL desde el 2026-04-30**; `npm audit --omit=dev` con **7 vulnerabilidades** (1 crítica, 4 altas, 2 moderadas); **§7 con 39 casillas y 0 marcadas**. Se corrigieron ya las afirmaciones falsas de §1.3 (no es VPS, dominio `firma.kair.fyi`, Node 20 EOL) y se marcó §7 como plantilla, no como cumplimiento |
 
-**Resumen del tablero (24-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias, por una decisión o un dato que falta** (7, 10, 11, 12, 15) · 🔴 **2 que dependen solo de tu dato** (8, 9) · ⚪ **1 que es solo tuyo** (14).
-**Actualización del 25-oct-2026:** el **15 dejó de ser una decisión pendiente**: se decidió **aplazarlo como sugerencia no restrictiva** (plan `plan-seguridad-2026-10-25.md`), así que el tablero queda en ✅ **7 cerrados** · 🟡 **4 a medias** (7, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **2 solo con tu dato** (8, 9) · ⚪ **1 solo tuyo** (14).
-Los **7 cerrados son de hoy**: el 2 (NIT y representante legal), el 3 (las URLs del Anexo y de la
-política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal)
-y el 6 (el canal único de PQRS), más el 1 (los 5 huecos de la v1.1) y el 13 (los 4 marcadores y el sello de versión),
-que se cerraron con el 📦️944. Los que siguen **bloqueando la primera firma** son los que dependen de
-evidencia del ambiente real (9A, 10.4, D-03), del Anexo de Nube diligenciado (7), de la firma del Anexo de
-Encargo (11) y de la revisión del abogado (12).
+**Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias** (7, 8, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
+**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 pasó de 4 de 8 a 5 de 8** con la seguridad física. Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
+Los **7 cerrados**: el 1 (los 5 huecos de la v1.1), el 2 (NIT y representante legal), el 3 (las URLs del Anexo
+y de la política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal),
+el 6 (el canal único de PQRS) y el 13 (los 4 marcadores y el sello de versión). Los que siguen **bloqueando la
+primera firma** son los que dependen de evidencia del ambiente real (9A, 10.4, D-03), de los **datos que solo
+tienes tú** (tipo de cuenta de Google, RTO, RPO, plan de continuidad, plazo de supresión), de la **firma del
+Anexo de Nube** por la Empresa (7), de la **revisión del abogado** del Anexo de Encargo (11) y del **envío de la
+v1.1** y del Anexo de Encargo al abogado (12).
 
-**El despliegue del `f26f8bc1` ya está hecho.** Ese commit está en el servidor `kair-server`: los tres hashes en
-disco coincidieron con los del commit, el arranque quedó limpio (`"No hay migraciones pendientes","total":40`),
-`/health` da 200 y el readiness del servidor bajó de 19 a **12 bloqueantes** (los de la v1.1, la 9A, la 10.4,
-el D-03, el 8.6 y los dos de PQRS). **Falta un redespliegue**: el tar final `fb98061d… 54d1` (531 692 B) lleva el
-`d8c35ee3` (📦️947-948), el `9152f7ab` (📦️949) y el `8031c573` (📦️950), y ya está servido por el puente (verificado
-por descarga). **El número de bloqueantes del servidor se mide en el despliegue, no se estima aquí**: el tar
-se arma desde el commit, nunca desde el working tree. commit, nunca desde el working tree.
+**El despliegue del `f26f8bc1` ya está hecho** (los tres hashes en disco coincidieron con los del commit, el
+arranque quedó limpio, `/health` da 200). **Falta el redespliegue**: el tar final `efc457de…0651` (541 226 B) lleva el
+`359fe7a1` (📦954) **y los dos documentos legales** (`legal/anexo-nube-v1.0.html` y `legal/anexo-encargo.html`), y
+ya está servido por el puente (verificado por descarga). **El número de bloqueantes del servidor se mide en el
+despliegue, no se estima aquí**: el tar se arma desde el commit, nunca desde el working tree.
 
-**Los cuatro paquetes de esta sesión (📦️947, 📦️948, 📦️949 y 📦️950) están escritos, verificados y
-pusheados.** El 📦️947 es el check que pedía una migración ya aplicada (el readiness buscaba
-`gh_firma_solicitudes_titular` y la 028 crea `gh_solicitudes_titular`); el 📦️948 es el cierre del punto 3 (el Anexo de
-Encargo nuevo, el Anexo de Nube publicado y la política del Encargado, con las URLs selladas **después** de
-verificarlas por HTTP); el 📦️949 cierra el punto 5 (el acta de designación no era una obligación legal); el 📦️950
-cierra los puntos 2 y 6 (el nombre del representante legal y el canal único de PQRS con su responsable).
-**Commits** — `d8c35ee3` (📦️947-948) · `9152f7ab` (📦️949) · `8031c573` (📦️950), los tres en `Dev`; en `gh-pages`,
-`60c1a421` · `cf310e10` · `15bc2c7d`. Los dos remotos quedaron nivelados.
+**⚠️ El paquete cambió de forma (📦955) y con él el comando de extracción.** El tar ahora lleva `app/` y `legal/`
+en la raíz, porque `readinessLegal.js` busca los documentos en `REPO_ROOT/legal/` —**un nivel arriba** del directorio
+de la app— y en el servidor eso es `/opt/kair-firma/legal/`. Antes de esto el tar solo traía el service: el servidor
+leía un documento **que no existía** y reportaba "Faltan cláusulas: Remisión al Anexo de Nube; Sustitución del
+Anexo anterior o cláusula de otrosí; Art. 2.2.4.6.13; Veinte (20) años; Servicio en nube / firma-service" —cinco
+cláusulas que **no faltaban**. Por eso el comando de despliegue ahora extrae en `/opt/kair-firma` y **no** en
+`/opt/kair-firma/app`: con el comando viejo el despliegue sería un no-op silencioso (el servicio arrancaría con el
+código viejo). Ver la BITACORA 📦955 y el runbook.
+
+**Los paquetes escritos, verificados y pusheados:** el 📦️947 es el check que pedía una migración ya aplicada
+(el readiness buscaba `gh_firma_solicitudes_titular` y la 028 crea `gh_solicitudes_titular`); el 📦️948 es el cierre del
+punto 3 (el Anexo de Encargo nuevo, el Anexo de Nube publicado y la política del Encargado, con las URLs selladas
+**después** de verificarlas por HTTP); el 📦️949 cierra el punto 5 (el acta de designación no era una obligación legal);
+el 📦️950 cierra los puntos 2 y 6 (el nombre del representante legal y el canal único de PQRS con su responsable); el
+📦️954 cierra la decisión de fondo del punto 7 (el Anexo de Nube como modelo diligenciado, con el check corregido y
+el DPA de Cloudflare verificado). **Commits** — `d8c35ee3` (📦️947-948) · `9152f7ab` (📦️949) · `8031c573` (📦️950) ·
+`359fe7a1` (📦️954), en `Dev`; en `gh-pages`, `60c1a421` · `cf310e10` · `15bc2c7d` · `d6cfa7c5` (el Anexo de Nube
+publicado). Los dos remotos quedaron nivelados.
 
 **El Anexo de Encargo nuevo conserva la marca de revisión profesional pendiente**: lo redactó el modelo, no un abogado.
 Por eso el ítem `documento_encargo` sigue en pendiente y **bloqueando la primera firma**. El documento ya tiene las

@@ -7053,3 +7053,97 @@ El punto 7 no se cierra entero: siguen el tipo de cuenta de Google, el RTO/RPO, 
 plazo de supresión (datos del owner), y la firma del Anexo de Nube por la Empresa. Lo que sí queda cerrado
 es la **decisión de fondo**, el **modelo diligenciado**, el **check que ya no pide lo imposible** y el **DPA
 de Cloudflare verificado**.
+
+## 📦️955 · El paquete que no llevaba los documentos: el servidor reportaba huecos que no existían
+
+*26-oct-2026 · el punto 7 y el despliegue · el tablero al día*
+
+### Lo que el servidor decía y no era verdad
+
+Al re-armar el tar de despliegue del 📦954 se encontró que `git archive` solo metía el service
+(`src`, `web`, `scripts`, `package.json`, `package-lock.json`, `legal-readiness.json`). Pero
+`readinessLegal.js` no lee los documentos legales de ahí:
+
+```js
+const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = path.resolve(SERVICE_ROOT, '..');
+const RUTAS_DEFAULT = {
+  anexoNube: path.join(REPO_ROOT, 'legal', 'anexo-nube-v1.0.html'),
+  anexoEncargo: path.join(REPO_ROOT, 'legal', 'anexo-encargo.html'),
+```
+
+`REPO_ROOT` es **un nivel arriba** del directorio del service. En el PC eso es
+`sgsst-electron-app/legal/` y en el servidor es `/opt/kair-firma/legal/`: **hermano** de `app/`, no
+hijo. El tar se extraía en `/opt/kair-firma/app`, así que ese directorio nunca existió allá.
+
+El efecto no era un error: era un **resultado falso**. En el servidor, el readiness reportaba:
+
+```
+[pendiente] documento_encargo :: El documento no está disponible. Faltan cláusulas: Remisión al
+                                Anexo de Nube; Sustitución del Anexo anterior o cláusula de otrosí;
+                                Art. 2.2.4.6.13; Veinte (20) años; Servicio en nube / firma-service.
+[pendiente] documento_nube    :: El documento no está disponible.
+```
+
+Cinco cláusulas que **no faltaban**: están en `legal/anexo-encargo.html` (19 568 B, sha256
+`932ec4e7…b3ad8`), con su remisión al Anexo de Nube, su decisión de sustitución, el art. 2.2.4.6.13,
+el piso de veinte (20) años y el servicio en la nube. El servidor pedía Repair y el documento estaba
+completo.
+
+La medición se hizo **aislando la variable**: la misma evaluación, con las rutas de los tres
+documentos apuntando a archivos inexistentes. Los tres ítems que cambian de estado son `texto_v1_1`,
+`hash_v1_1` y `texto_20`, y los detalles de `documento_nube` y `documento_encargo` cambian del "no
+está disponible" a la razón real.
+
+### La regla
+
+**Un check que lee un archivo que el paquete no lleva lee el vacío, y un vacío con forma de
+pendiente es peor que un error.** No hay excepción ni log: el archivo no está, el texto es "", la
+cláusula falta, y el pendiente dice "Faltan cláusulas: ...". El readiness no puede distinguir "el
+documento no tiene esta cláusula" de "el documento no llegó", y el que lee el reporte se lleva una
+conclusión falsa sobre un documento que sí existe.
+
+Tres reglas que salen de eso:
+
+1. **El paquete se arma contra las rutas que el código lee, no contra las que el código tiene.**
+   `git archive` con rutas relativas al service no puede llegar a `../legal`: el archivo está fuera
+   del directorio que se empaqueta. La forma del paquete tiene que seguir a `REPO_ROOT` y
+   `SERVICE_ROOT`: `app/` (el service) y `legal/` (los documentos), **hermanos**.
+2. **La forma del paquete y el comando de extracción son la misma cosa.** Con el tar viejo,
+   `-C /opt/kair-firma/app`; con el nuevo, `-C /opt/kair-firma`. Con el comando viejo, el tar nuevo
+   deja el código viejo en su sitio y el servicio arranca con él: el despliegue es un **no-op
+   silencioso**. Por eso el `sha256sum` de los archivos en disco no es opcional: es lo único que
+   distingue "desplegué" de "no pasó nada".
+3. **La simulación del servidor es una prueba que se puede hacer en el PC.** Extraer el tar a una
+   ruta con la forma `/opt/kair-firma` y correr el readiness con el mismo `.env` y la misma base.
+
+### Lo que se hizo
+
+- El tar ahora se arma en dos pasos desde el commit (el service con `--strip-components=2` a `app/`,
+  los dos documentos legales con `--strip-components=1` a `legal/`) y se empaqueta como `app` +
+  `legal`: `efc457de…0651` (541 226 B), verificado por descarga a través del puente.
+- El runbook (`docs/MIGRACION-SERVIDOR-FIRMA.md`) documenta los comandos y **por qué** cambió el
+  destino de la extracción.
+- Se **simuló el servidor de verdad**: se extrajo el tar a una ruta con la forma `/opt/kair-firma` y
+  se corrió el readiness con el mismo `.env` y la misma base. Resultado: `documento_nube` vuelve a
+  decir *"Faltan 7 datos del owner"* y `documento_encargo` vuelve a decir *"Marcadores prohibidos:
+  marca Revisión profesional pendiente"*. Las dos razones son la verdad.
+- El tablero de los 15 puntos quedó al día: el 8 pasó a "mitad cerrado" (Cloudflare sí, Google no),
+  el 10 pasó de 4 de 8 a 5 de 8 (seguridad física), el 7 tiene la decisión de fondo cerrada, y el 9
+  quedó con la medición de los dos escenarios de la cuenta de Google.
+
+### El tope que salió de esa medición
+
+Con una cuenta de Google **de consumidor**, el gate no se puede abrir: `devolucion_supresion` y
+`auditoria` exigen los **dos** subencargados (`cf && gg`), y `ggOk` solo es verdadero si la cuenta es
+Workspace/Cloud. O sea: el ítem `google_dpa` explica correctamente que Google no es subencargado (y
+que el envío es una transferencia internacional, art. 26 de la Ley 1581) pero **se queda en pendiente
+igual**. Con un dato de cuenta de consumidor no basta: hay que cambiar el check para que Google
+cuente solo cuando sí es subencargado. Queda anotado en el punto 9 del tablero.
+
+### Lo que este paquete NO cierra
+
+No cambia el código: el paquete y el runbook. Sigue pendiente el redespliegue (los cuatro comandos en
+Cockpit), el tipo de cuenta de Google (que además puede obligar a cambiar el check), el RTO/RPO, el
+plan de continuidad, el plazo de supresión, la firma del Anexo de Nube por la Empresa y la revisión
+del abogado del Anexo de Encargo.

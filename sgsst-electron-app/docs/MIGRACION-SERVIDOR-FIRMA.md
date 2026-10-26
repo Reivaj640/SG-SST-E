@@ -200,9 +200,12 @@ El orden que no se negocia:
 # 1. Parar el servicio (que no atienda con el codigo viejo)
 sudo systemctl stop kair-firma
 
-# 2. Copiar el codigo nuevo al directorio de la app
-sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma/app
-sudo chown -R kairfirma:kairfirma /opt/kair-firma/app
+# 2. Copiar el codigo nuevo. OJO: el tar lleva app/ y legal/ en la raiz,
+#    y se extrae en /opt/kair-firma (NO en /opt/kair-firma/app):
+#    - app/   -> /opt/kair-firma/app    (el service)
+#    - legal/ -> /opt/kair-firma/legal  (lo que el readiness lee: REPO_ROOT/legal)
+sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma
+sudo chown -R kairfirma:kairfirma /opt/kair-firma/app /opt/kair-firma/legal
 
 # 3. VERIFICAR el hash de lo que quedo en disco (no del repo, no del tar)
 sha256sum /opt/kair-firma/app/src/crypto/token.js
@@ -265,18 +268,45 @@ El paquete tiene que salir del **commit**, no del working tree: lo que corre en
 produccion tiene que ser lo mismo que esta en el repo, con la misma huella.
 
 ```powershell
-# EN EL PC, dentro de firma-service/
+# EN EL PC, desde la RAIZ DEL REPO (no desde firma-service/):
+$repo = 'C:\Proyectos Programación\SG-SST-E'
+$svc  = 'sgsst-electron-app/firma-service'
+$stage = "$env:TEMP\kair-deploy-stage"
 New-Item -ItemType Directory -Force -Path "$env:TEMP\kair-deploy" | Out-Null
-git archive --format=tar.gz -o "$env:TEMP\kair-deploy\kair-deploy.tar.gz" HEAD `
-  src web scripts package.json package-lock.json legal-readiness.json
+New-Item -ItemType Directory -Force -Path "$stage\app" | Out-Null
+
+# 1. El service, desde el commit
+cd $repo
+git archive --format=tar.gz --output="$env:TEMP\kair-deploy\svc.tar.gz" HEAD `
+  "$svc/src" "$svc/web" "$svc/scripts" "$svc/package.json" "$svc/package-lock.json" "$svc/legal-readiness.json"
+tar -xzf "$env:TEMP\kair-deploy\svc.tar.gz" -C "$stage\app" --strip-components=2
+
+# 2. Los documentos legales que el readiness lee
+#    (solo los del servicio en la nube: el Anexo de Nube y el Anexo de Encargo)
+git archive --format=tar.gz --output="$env:TEMP\kair-deploy\legal.tar.gz" HEAD `
+  'sgsst-electron-app/legal/anexo-nube-v1.0.html' 'sgsst-electron-app/legal/anexo-encargo.html'
+tar -xzf "$env:TEMP\kair-deploy\legal.tar.gz" -C $stage --strip-components=1
+
+# 3. El tar final, con la forma que el servidor espera
+tar -czf "$env:TEMP\kair-deploy\kair-deploy.tar.gz" -C $stage app legal
 Get-FileHash "$env:TEMP\kair-deploy\kair-deploy.tar.gz" -Algorithm SHA256
 ```
 
-`git archive` resuelve tres cosas solo: las rutas son **relativas a la carpeta del
-servicio** (`src/server.js`), entra **solo lo commiteado** —el texto armado de la
-v1.1 esta en `.gitignore` hasta que lo apruebe el abogado, y este metodo no lo
-sube—, y el manifiesto `legal-readiness.json` viaja en la raiz de la app, que es
-donde el readiness lo busca.
+**Por qué el tar lleva `app/` y `legal/` y no solo el service.** `readinessLegal.js`
+calcula `REPO_ROOT` como **un nivel arriba** del directorio del service
+(`path.resolve(SERVICE_ROOT, '..')`) y de ahí lee los documentos: en el PC son
+`sgsst-electron-app/legal/*.html` y en el servidor `/opt/kair-firma/legal/*.html`,
+**hermanos** de `app/`, no hijos. Si el paquete no los lleva, el readiness lee un
+archivo que no existe y reporta huecos que son puro artefacto del empaquetado: se
+midió que decía "Faltan cláusulas: Remisión al Anexo de Nube; Sustitución del Anexo
+anterior o cláusula de otrosí; Art. 2.2.4.6.13; Veinte (20) años; Servicio en
+nube / firma-service" —cinco cláusulas que **no faltaban**. Por eso el comando de
+extractción va en `/opt/kair-firma` y no en `/opt/kair-firma/app`.
+
+`git archive` sigue resolviendo lo de siempre: entra **solo lo commiteado** —el
+texto armado de la v1.1 esta en `.gitignore` hasta que lo apruebe el abogado, y
+este metodo no lo sube— y el manifiesto `legal-readiness.json` viaja en la raiz de
+la app, que es donde el readiness lo busca.
 
 **Subirlo: el puente HTTP.** El `kair-server` no acepta SSH desde el portatil
 (`Permission denied`): el transporte es un servidor HTTP en el PC y un `curl` en el
@@ -323,6 +353,10 @@ después de copiar y ANTES de arrancar:
 ls -l /opt/kair-firma/app/src/server.js
 ls -l /opt/kair-firma/app/src/db/schema/033_retencion_por_documento.sql
 grep -c categoria_retencion /opt/kair-firma/app/src/schemas/index.js
+
+# Y los documentos legales, que viven UN NIVEL ARRIBA de la app:
+ls -l /opt/kair-firma/legal/anexo-nube-v1.0.html
+ls -l /opt/kair-firma/legal/anexo-encargo.html
 ```
 
 Si el archivo que se acaba de desplegar no aparece ahí, **el despliegue no
