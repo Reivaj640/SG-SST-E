@@ -861,7 +861,10 @@ router del recibo de supresion montado.
       pero no hay cron instalado en el servidor. Los comandos exactos estan en
       `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md`
       (seccion 5) y en `firma-service/deploy/README-DESPLIEGUE.md` (Paso 9). El respaldo
-      diario queda programado para las **22:00 (hora de Colombia)**.
+      diario queda programado para las **22:00 (hora de Colombia)** y la **prueba de restauracion
+      mensual** para el dia 1 de cada mes (04:00 UTC = 23:00 de Colombia), que es lo que hace
+      verdadera la frase del Anexo de Nube "se verifica mensualmente que el respaldo se restaura
+      correctamente".
 - [ ] Arreglar el test de idempotency (ver seccion 7).
 - [ ] Revisar las 6 vulnerabilidades que reporto `npm audit` al desplegar. No se corrio `npm audit
       fix` a proposito.

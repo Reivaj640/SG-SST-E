@@ -187,6 +187,7 @@ sudo chmod +x /opt/kair-firma/backup-firma.sh /opt/kair-firma/probar-restauracio
 sudo mkdir -p /opt/kair-firma/logs
 echo "0 22 * * * root /opt/kair-firma/backup-firma.sh >> /opt/kair-firma/backups/backup.log 2>&1" | sudo tee /etc/cron.d/kair-firma-backup
 echo "*/5 * * * * root /opt/kair-firma/health-check.sh >> /opt/kair-firma/logs/health-check.log 2>&1" | sudo tee /etc/cron.d/kair-firma-health
+echo "0 4 1 * * root /opt/kair-firma/probar-restauracion.sh >> /opt/kair-firma/backups/restauracion.log 2>&1" | sudo tee /etc/cron.d/kair-firma-restauracion
 ```
 
 El cron usa la hora local del servidor. **El servidor debe estar en
@@ -208,6 +209,10 @@ La retencion es de 30 dias (la poda la hace el propio script). La prueba de
 restauracion copia el ultimo respaldo a un temporal, comprueba su integridad
 y sus tablas, y borra el temporal al terminar: nunca deja datos personales
 tirados en `/tmp`.
+
+El tercer cron (dia 1 de cada mes a las 04:00 UTC = 23:00 de Colombia) corre
+la prueba de restauracion: es lo que hace verdadera la frase del Anexo de
+Nube "se verifica mensualmente que el respaldo se restaura correctamente".
 
 Un respaldo que nunca se ha restaurado no es un respaldo: por eso la prueba
 de restauracion va en el mismo paso que el cron.

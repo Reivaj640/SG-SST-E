@@ -209,6 +209,15 @@ echo "0 22 * * * root /opt/kair-firma/backup-firma.sh >> /opt/kair-firma/backups
 echo "*/5 * * * * root /opt/kair-firma/health-check.sh >> /opt/kair-firma/logs/health-check.log 2>&1" | sudo tee /etc/cron.d/kair-firma-health
 ```
 
+```bash
+echo "0 4 1 * * root /opt/kair-firma/probar-restauracion.sh >> /opt/kair-firma/backups/restauracion.log 2>&1" | sudo tee /etc/cron.d/kair-firma-restauracion
+```
+
+Este tercero corre el dia 1 de cada mes a las 04:00 UTC (23:00 de Colombia) y
+es lo que hace verdadera la frase del Anexo de Nube "se verifica mensualmente
+que el respaldo se restaura correctamente". Sin el, el texto del Anexo seria
+una promesa sin cron.
+
 ### 5.2 Correrlo una vez a mano y ver la salida
 
 ```bash
