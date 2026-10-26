@@ -363,6 +363,60 @@ function sellarVersion(texto, versionNueva) {
 }
 
 /**
+ * Sella la fecha de vigencia en el encabezado.
+ *
+ * La fecha es una propiedad de la versión, igual que el número: no va en el
+ * mapa de cambios. Se escribe en una línea propia, inmediatamente después de
+ * "Versión del Acuerdo: vX". Si el texto ya trae una línea "Fecha de vigencia:",
+ * se reemplaza (para que el empalme sea idempotente); si hay más de una, se
+ * niega. Si el JSON no declara `fecha_vigencia`, no se toca nada: los tests
+ * sintéticos y las versiones anteriores siguen funcionando.
+ *
+ * @param {string} texto
+ * @param {string|undefined} fecha
+ * @returns {{texto: string, insertada: boolean, fecha: string|null}}
+ */
+function sellarFechaVigencia(texto, fecha) {
+  if (fecha === undefined || fecha === null || fecha === '') {
+    return { texto, insertada: false, fecha: null };
+  }
+  if (typeof fecha !== 'string') {
+    throw errorEmpalme('La fecha de vigencia tiene que ser un texto.');
+  }
+  const limpia = fecha.trim().replace(/\.$/, '');
+  if (!/^\d{1,2} de [a-záéíóúñ]+ de \d{4}$/i.test(limpia)) {
+    throw errorEmpalme(
+      'La fecha de vigencia "' + fecha + '" no tiene el formato "D de mes de AAAA".',
+    );
+  }
+  const linea = 'Fecha de vigencia: ' + limpia + '.';
+  const lineas = texto.split('\n');
+  const versiones = lineas.filter((l) => l.startsWith('Versión del Acuerdo:'));
+  if (versiones.length !== 1) {
+    throw errorEmpalme(
+      'El texto tiene ' + versiones.length + ' líneas "Versión del Acuerdo:"; '
+      + 'se necesita exactamente una para insertar la fecha de vigencia.',
+    );
+  }
+  const fechas = lineas
+    .map((l, i) => ({ linea: l, indice: i }))
+    .filter((x) => x.linea.startsWith('Fecha de vigencia:'));
+  if (fechas.length > 1) {
+    throw errorEmpalme(
+      'El texto tiene ' + fechas.length + ' líneas "Fecha de vigencia:"; '
+      + 'se necesita como máximo una.',
+    );
+  }
+  if (fechas.length === 1) {
+    lineas[fechas[0].indice] = linea;
+    return { texto: lineas.join('\n'), insertada: false, fecha: limpia };
+  }
+  const indiceVersion = lineas.findIndex((l) => l.startsWith('Versión del Acuerdo:'));
+  lineas.splice(indiceVersion + 1, 0, linea);
+  return { texto: lineas.join('\n'), insertada: true, fecha: limpia };
+}
+
+/**
  * Sustituye los placeholders del texto con los datos del owner.
  *
  * Los datos van en un archivo aparte del mapa de cambios: el mapa es el texto
@@ -551,6 +605,32 @@ function empalmar(textoBase, cambios, datos) {
   const sello = sellarVersion(texto, cambios.version);
   texto = sello.texto;
 
+  // 4b-bis. Fecha de vigencia: otra propiedad de la versión, no del texto del
+  //         abogado. Va en una línea propia después del número de versión.
+  const fecha = sellarFechaVigencia(texto, cambios.fecha_vigencia);
+  texto = fecha.texto;
+
+  // 4b-ter. Reemplazos de texto libre que no caen dentro de un numeral o
+  //         literal (por ejemplo, el párrafo de cierre del 10.3). Se exige
+  //         coincidencia exacta y única: si el texto base cambió, el empalme
+  //         se niega en vez de aplicar un reemplazo a medias.
+  const reemplazosTexto = cambios.reemplazos_texto || [];
+  const reemplazosAplicados = [];
+  for (const r of reemplazosTexto) {
+    if (!r || typeof r.antiguo !== 'string' || typeof r.nuevo !== 'string') {
+      throw errorEmpalme('Cada reemplazo de texto libre necesita "antiguo" y "nuevo".');
+    }
+    const ocurrencias = texto.split(r.antiguo).length - 1;
+    if (ocurrencias !== 1) {
+      throw errorEmpalme(
+        'El reemplazo de texto libre "' + (r.motivo || 'sin motivo') + '" aparece '
+        + ocurrencias + ' veces; tiene que aparecer exactamente una.',
+      );
+    }
+    texto = texto.replace(r.antiguo, r.nuevo);
+    reemplazosAplicados.push(r.motivo || 'sin motivo');
+  }
+
   // 4c. Datos del owner: los placeholders que dejó el texto del abogado. Van
   //     en un archivo aparte; acá solo se sustituyen y se verifica que no
   //     quede ningún hueco.
@@ -587,6 +667,11 @@ function empalmar(textoBase, cambios, datos) {
         versionBase: sello.versionBase,
         versionNueva: sello.versionNueva,
       },
+      fecha: {
+        insertada: fecha.insertada,
+        valor: fecha.fecha,
+      },
+      reemplazosTexto: reemplazosAplicados,
       datos: {
         aplicados: sustitucion.aplicados,
         huecosRestantes: sustitucion.huecosRestantes,
@@ -889,6 +974,14 @@ function main(argv) {
     console.log('  sello de version: ' + resumen.sello.versionBase + ' -> '
       + resumen.sello.versionNueva + ' (encabezado y Manifestacion de Voluntad)');
   }
+  if (resumen.fecha && resumen.fecha.valor) {
+    console.log('  fecha de vigencia: ' + resumen.fecha.valor
+      + (resumen.fecha.insertada ? ' (insertada)' : ' (ya estaba)'));
+  }
+  if (resumen.reemplazosTexto && resumen.reemplazosTexto.length > 0) {
+    console.log('  reemplazos de texto libre: ' + resumen.reemplazosTexto.length + ' ('
+      + resumen.reemplazosTexto.join('; ') + ')');
+  }
   if (resumen.datos && resumen.datos.aplicados.length > 0) {
     console.log('  datos aplicados: ' + resumen.datos.aplicados.length + ' ('
       + resumen.datos.aplicados.join(', ') + ')');
@@ -953,6 +1046,7 @@ module.exports = {
   esVersionSujetaAGuarda,
   esPlaceholderDelSistema,
   sellarVersion,
+  sellarFechaVigencia,
   sustituirDatos,
 };
 

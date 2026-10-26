@@ -6,9 +6,10 @@
  *  - Un placeholder en el texto final IMPIDE que se escriba el archivo.
  *  - El empalme es idempotente: dos corridas dan el mismo texto.
  *  - El caso REAL (v1.0 sellada + respuesta 11A): el texto tiene más de 30.000
- *    caracteres, los 49 numerales del mapa de empalme aparecen con su texto
- *    final, y el reporte de placeholders es el de HOY: el texto tiene huecos
- *    y el script NO escribe el archivo.
+ *    caracteres, los 52 numerales del mapa de empalme aparecen con su texto
+ *    final, y el reporte de placeholders es el de HOY: quedan tres huecos y
+ *    cuatro campos del sistema, y sin los datos del owner el script NO escribe
+ *    el archivo.
  *
  * Este archivo NO abre la base de datos: el script es de texto puro.
  */
@@ -110,6 +111,23 @@ const TEXTO_REAL = fs.readFileSync(DEFAULT_BASE, 'utf8');
 const CAMBIOS_REALES = JSON.parse(fs.readFileSync(DEFAULT_CAMBIOS, 'utf8'));
 const TEXTO_ABCADO = fs.readFileSync(RESPUESTA_ABOGADO, 'utf8').replace(/\r\n/g, '\n');
 const NUMERALES_DEL_MAPA = leerNumeralesDelMapa(MAPA_EMPALME);
+
+/**
+ * Numerales cuyo texto YA NO es el literal de la respuesta 11A: son las
+ * correcciones de la revisión legal del 26-oct-2026 (fechas, base legal,
+ * remisión al Anexo de Nube, etc.). El texto vigente de estos numerales vive
+ * en el JSON de cambios; el resto tiene que seguir siendo copia literal del
+ * .txt del abogado. Esta lista es la ÚNICA excepción admitida.
+ */
+const NUMERALES_CORREGIDOS = [
+  '1.4', '1.5', '3.4(e)', '8.6', '9.5', '10.1', '10.2(h)', '10.4(a)',
+  '10.5(f)', '10.5(g)', '10.8(a)', '10.8(c)', '12.7',
+];
+
+/** Compara texto ignorando la sangría de cada línea (el empalme indenta literales). */
+function sinSangria(texto) {
+  return texto.split('\n').map((l) => l.replace(/^\s+/, '')).join('\n');
+}
 
 // =========================================================================
 // parseArgs
@@ -301,23 +319,29 @@ test('main: un numeral que no existe en la base es un error (código 3)', () => 
 // El JSON de cambios: los 49 numerales, con el texto VERBATIM del abogado
 // =========================================================================
 
-test('el JSON de cambios trae los 49 numerales del mapa de empalme', () => {
+test('el JSON de cambios trae los 52 numerales del mapa de empalme', () => {
   const claves = Object.keys(CAMBIOS_REALES.cambios);
-  assert.equal(claves.length, 49, 'el mapa de empalme lista 49 numerales que cambian');
-  assert.equal(NUMERALES_DEL_MAPA.length, 49, 'el mapa de empalme tiene que listar 49 numerales');
+  assert.equal(claves.length, 52, 'el mapa de empalme lista 52 numerales que cambian');
+  assert.equal(NUMERALES_DEL_MAPA.length, 52, 'el mapa de empalme tiene que listar 52 numerales');
   for (const n of NUMERALES_DEL_MAPA) {
     assert.ok(claves.includes(n), 'falta el numeral ' + n + ' en el JSON de cambios');
   }
 });
 
-test('cada texto del JSON aparece LITERAL en el .txt del abogado', () => {
+test('cada texto del JSON aparece LITERAL en el .txt del abogado, salvo las correcciones aprobadas', () => {
   for (const clave of Object.keys(CAMBIOS_REALES.cambios)) {
     const texto = CAMBIOS_REALES.cambios[clave];
     assert.ok(typeof texto === 'string' && texto.length > 0, 'el texto de ' + clave + ' esta vacio');
+    if (NUMERALES_CORREGIDOS.includes(clave)) continue;
     assert.ok(
       TEXTO_ABCADO.includes(texto),
       'el texto de ' + clave + ' no aparece literal en la respuesta del abogado'
     );
+  }
+  // La lista de excepciones no puede crecer sin que alguien lo note: cada
+  // numeral corregido tiene que estar en el JSON.
+  for (const clave of NUMERALES_CORREGIDOS) {
+    assert.ok(CAMBIOS_REALES.cambios[clave], 'la excepción ' + clave + ' no está en el JSON');
   }
 });
 
@@ -345,13 +369,13 @@ test('CASO REAL: el texto empalmado tiene más de 30.000 caracteres', () => {
   );
 });
 
-test('CASO REAL: los 49 numerales del mapa aparecen con su texto final', () => {
+test('CASO REAL: los 52 numerales del mapa aparecen con su texto final', () => {
   const r = empalmar(TEXTO_REAL, CAMBIOS_REALES);
   for (const clave of NUMERALES_DEL_MAPA) {
     const textoFinal = CAMBIOS_REALES.cambios[clave];
     assert.ok(textoFinal, 'el numeral ' + clave + ' no esta en el JSON de cambios');
     assert.ok(
-      r.texto.includes(textoFinal),
+      sinSangria(r.texto).includes(sinSangria(textoFinal)),
       'el texto resultante NO trae el texto final del numeral ' + clave
     );
   }
@@ -381,9 +405,7 @@ test('CASO REAL: HOY el texto tiene placeholders y el script NO escribe el archi
     .sort();
 
   assert.deepEqual(pares, [
-    '[ciudad, país] @ 10.1',
     '[correo o URL] @ 10.7(b)',
-    '[interno, a cargo de … / provisto por …] @ 10.1',
     '[nombre o cargo] @ 10.7(b)',
     '[registrada por el sistema] @ MANIFESTACIÓN DE VOLUNTAD',
     '[registrada por el sistema] @ MANIFESTACIÓN DE VOLUNTAD',
@@ -393,10 +415,10 @@ test('CASO REAL: HOY el texto tiene placeholders y el script NO escribe el archi
   ].sort(), 'este es el reporte de placeholders de HOY: documenta el estado real');
 
   const reporte = armarReportePlaceholders(r.texto, TEXTO_REAL);
-  assert.equal(reporte.total, 9);
-  assert.equal(reporte.nuevos, 5, 'cinco huecos que hay que llenar');
+  assert.equal(reporte.total, 7);
+  assert.equal(reporte.nuevos, 3, 'tres huecos que hay que llenar');
   assert.equal(reporte.heredados, 4, 'los cuatro que ya venían en la v1.0');
-  assert.equal(reporte.huecos.total, 5, 'los huecos son los cinco del abogado');
+  assert.equal(reporte.huecos.total, 3, 'los huecos son los tres del abogado');
   assert.equal(reporte.huecos.heredados, 0, 'ningún hueco venía en la v1.0');
   assert.equal(reporte.sistema.total, 4, 'los cuatro del Manifiesto los registra el sistema');
   assert.deepEqual(
@@ -411,13 +433,13 @@ test('CASO REAL: el localizador MARCA los cuatro campos del sistema', () => {
   const delSistema = encontrados.filter((e) => e.tipo === 'sistema');
   const huecos = encontrados.filter((e) => e.tipo === 'hueco');
   assert.equal(delSistema.length, 4);
-  assert.equal(huecos.length, 5);
+  assert.equal(huecos.length, 3);
   for (const e of delSistema) {
     assert.equal(e.placeholder, '[registrada por el sistema]');
     assert.equal(e.ubicacion, 'MANIFESTACIÓN DE VOLUNTAD');
   }
-  // El localizador sigue ADCREDITANDO los 9: nada queda escondido.
-  assert.equal(encontrados.length, 9);
+  // El localizador sigue ADCREDITANDO los 7: nada queda escondido.
+  assert.equal(encontrados.length, 7);
 });
 
 test('CASO REAL: con los datos del owner el script ESCRIBE el archivo', () => {
@@ -454,11 +476,13 @@ test('CASO REAL: con los datos del owner el script ESCRIBE el archivo', () => {
       'no puede quedar ninguna mención a la v1.0',
     );
 
-    // Y los cinco datos del owner, en su sitio.
+    // Y los tres datos del owner, en su sitio.
     assert.ok(texto.includes('https://kair.fyi/anexo-encargo.html'), 'el 1.5 lleva la URL');
-    assert.ok(texto.includes('Barranquilla, Colombia'), 'el 10.1 lleva la ciudad');
     assert.ok(texto.includes('privacidad.kair@gmail.com'), 'el 10.7(b) lleva el canal');
-    assert.ok(texto.includes('Cargo Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+    assert.ok(texto.includes('Javier Robles Fontalvo, Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+    assert.ok(!texto.includes('[ciudad, país]'), 'la ciudad del servidor ya no vive en el Acuerdo');
+    assert.ok(!texto.includes('[interno, a cargo de'), 'los respaldos ya no viven en el Acuerdo');
+    assert.ok(texto.includes('Fecha de vigencia: 26 de octubre de 2026.'), 'el encabezado lleva la fecha');
   });
 });
 
@@ -540,14 +564,15 @@ const DATOS_REALES = JSON.parse(
   fs.readFileSync(path.join(RAIZ_SERVICIO, 'scripts', 'fixtures', 'acuerdo-v1.1-datos.json'), 'utf8'),
 );
 
-test('datos: los cinco huecos reales se sustituyen y no queda ninguno', () => {
+test('datos: los tres huecos reales se sustituyen y no queda ninguno', () => {
   const r = empalmar(TEXTO_REAL, CAMBIOS_REALES, DATOS_REALES);
-  assert.equal(r.resumen.datos.aplicados.length, 5);
+  assert.equal(r.resumen.datos.aplicados.length, 3);
   assert.equal(r.resumen.datos.huecosRestantes, 0);
   assert.ok(r.texto.includes('https://kair.fyi/anexo-encargo.html'), 'el 1.5 lleva la URL');
-  assert.ok(r.texto.includes('Barranquilla, Colombia'), 'el 10.1 lleva la ciudad');
   assert.ok(r.texto.includes('privacidad.kair@gmail.com'), 'el 10.7(b) lleva el canal');
-  assert.ok(r.texto.includes('Cargo Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+  assert.ok(r.texto.includes('Javier Robles Fontalvo, Representante Legal de Gesstiar'), 'el 10.7(b) lleva el responsable');
+  assert.ok(!r.texto.includes('[ciudad, país]'), 'la ciudad del servidor se remite al Anexo de Nube');
+  assert.ok(!r.texto.includes('[interno, a cargo de'), 'los respaldos se remiten al Anexo de Nube');
   // Los cuatro campos del sistema siguen, y NO son huecos.
   const reporte = armarReportePlaceholders(r.texto, TEXTO_REAL);
   assert.equal(reporte.huecos.total, 0);

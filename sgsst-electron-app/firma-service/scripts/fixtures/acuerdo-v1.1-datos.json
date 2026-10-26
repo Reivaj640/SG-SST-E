@@ -1,22 +1,12 @@
 {
   "version": "v1.1",
-  "fuente": "decision del owner del 24-oct-2026 (punto 1 del cierre)",
-  "nota": "Los cinco datos que el texto del abogado deja entre corchetes. Van aparte del mapa de cambios a proposito: el mapa es el texto del abogado copiado INTEGRO del .txt de la respuesta 11A, y estos cinco valores son del owner. El empalme los sustituye y se niega si un placeholder no aparece, si aparece mas de una vez, o si despues de sustituir queda algun corchete sin llenar.",
+  "fuente": "decision del owner del 26-oct-2026 (revision legal v1.1)",
+  "nota": "Los tres datos que el texto del abogado deja entre corchetes y que el owner debe definir. La ciudad del servidor y los respaldos/monitoreo se remiten al Anexo de Nube, no al Acuerdo.",
   "datos": {
     "url_anexo_encargo": {
       "placeholder": "[URL]",
       "valor": "https://kair.fyi/anexo-encargo.html",
       "nota": "Base decidida por el owner: kair.fyi apuntando a GitHub Pages. El archivo que se referencia es el Anexo de Encargo final, no el que esta publicado hoy."
-    },
-    "ciudad_pais_servidor": {
-      "placeholder": "[ciudad, país]",
-      "valor": "Barranquilla, Colombia",
-      "nota": "Confirmado por el owner. Es la ubicacion fisica del servidor donde corre el servicio de firma."
-    },
-    "respaldos_monitoreo_soporte": {
-      "placeholder": "[interno, a cargo de … / provisto por …]",
-      "valor": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo",
-      "nota": "Confirmado por el owner. El numeral 10.1 pide una sola linea para respaldos, monitoreo y soporte."
     },
     "canal_proteccion_datos": {
       "placeholder": "[correo o URL]",
@@ -25,8 +15,8 @@
     },
     "responsable_proteccion_datos": {
       "placeholder": "[nombre o cargo]",
-      "valor": "Cargo Representante Legal de Gesstiar",
-      "nota": "Indicado por el owner. La designación de la persona o área es lo que exige el art. 2.2.2.25.4.4 del Decreto 1074 de 2015; no hace falta un acta de designación, porque la SIC ha precisado que la ley no establece un procedimiento específico para ella. La designación se documenta en el Anexo de Encargo y en la política, que son públicos."
+      "valor": "Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S., o la persona que lo reemplace",
+      "nota": "Designado por el owner. Es la persona o área responsable de protección de datos; el canal sigue siendo privacidad.kair@gmail.com."
     }
   }
 }

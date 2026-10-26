@@ -7211,3 +7211,80 @@ Declarar la cuenta en el manifiesto y llenar los tres huecos del modelo **depend
 la otra sesión tenía sin commitear** (el manifiesto y los HTML del Anexo de Nube): hacerlos exige
 escribir sobre un trabajo a medio terminar. Y la base del art. 26 —autorización expresa o
 excepción— es del abogado, no del código.
+
+## 📦️957 · El trabajo de la otra sesión, revisado: tres correcciones y un dígito que no valida
+
+*26-oct-2026 · heredar, verificar y corregir · el punto 9 y el punto 2*
+
+### Lo que se heredó
+
+La otra sesión había dejado 16 archivos sin commitear: el NIT con dígito de verificación en 11 documentos vivos, 24
+correcciones legales en el Anexo de Encargo, 19 cambios + 5 refinamientos en la v1.1 y el empalme ajustado para que el
+texto quede reproducible. Antes de commitear, todo se verificó:
+
+- **La v1.1 es reproducible byte a byte** desde la fuente versionada: se corrió el empalme y el archivo generado dio los
+  mismos 42 475 B y el mismo SHA-256 (`634b063c…629d0`), con 0 huecos y 4 campos que registra el sistema.
+- **El manifiesto coincide con el disco**: el `v1_1_hash` es el del archivo, el hash del Anexo de Encargo es el de
+  `legal/anexo-encargo.html`, y `anexo_encargo.estado` quedó en `no_firmado` (la otra sesión le había puesto una fecha de
+  firma que nunca existió).
+- **`legal/` y `sitio/` siguen idénticos** en los documentos del servicio. `privacidad.html` y `terminos.html` difieren
+  entre sí, pero **ya diferían en HEAD**: son los documentos de la app de escritorio, no los del servicio.
+- **Suite completa: 1741 tests · 1739 verdes · 0 rojos · 2 omitidos.** Los "2 fallos SQLITE_ERROR" del reporte de la otra
+  sesión eran de su entorno, no reales.
+
+### Corrección 1 · el aviso de revisión profesional
+
+La otra sesión quitó del Anexo de Encargo el bloque entero de "Revisión profesional pendiente" — el aviso que decía que
+el contenido *"debe ser revisado por un abogado antes de considerarlo contractualmente válido"*. Con el aviso fuera,
+`documento_encargo` pasó a **ok** y el punto 11 se cerraba sin que el abogado hubiera visto nada, mientras el propio
+reporte de la otra sesión listaba "enviar al abogado" como el paso siguiente.
+
+Se **restituyó**, adaptado a lo que el documento ahora dice (datos sensibles de salud, el enlace y el OTP por canales
+distintos, el plazo de dos días hábiles de PQRS y la devolución al terminar el encargo). El check vuelve a bloquear, que
+es lo correcto.
+
+### Corrección 2 · la columna "Rol" de Google en el Anexo de Nube
+
+Decía que con una cuenta de consumidor "Google actúa como Responsable", lo que contradice el propio bloque de
+pendientes del mismo documento ("Google no actúa como subencargado") y el Acuerdo 10.1. Ahora: "no se le puede tratar
+como subencargado y el envío es una transferencia internacional (art. 26 de la Ley 1581)".
+
+### Corrección 3 · el check del punto 9
+
+El 📦956 abrió una "segunda salida" que dejaba `google_dpa` en **ok** con una cuenta de consumidor. Eso era un **verde
+falso**: el Acuerdo (10.1 y 10.5(f)) condiciona el papel de subencargado al vínculo por contrato o DPA y **prohíbe
+transmitir datos personales a un proveedor no vinculado**, así que con una cuenta de consumo el servicio no puede
+enviar el OTP por Gmail.
+
+El item sigue **pendiente**, pero ahora dice el motivo (la cláusula que lo impide) y las tres salidas: una cuenta
+Workspace/Cloud con DPA, otro proveedor de correo con DPA, o un otrosí del Acuerdo aprobado por el abogado. Y para ese
+tercer camino falta algo: **la v1.1 no recoge la autorización expresa del Titular** —no menciona la transferencia
+internacional en ninguna parte—, así que el otrosí tendría que recogerla.
+
+`devolucion_supresion` y `auditoria` sí se resuelven con Cloudflare, que sí es subencargado y sí trae esas cláusulas.
+
+### El dígito de verificación no valida
+
+El NIT con DV quedó en `900987987-1` en 17 lugares de 11 archivos. Con el algoritmo oficial de la DIAN (Orden
+Administrativa 4 de 1989: pesos 41, 37, 29, 23, 19, 17, 13, 7, 3 de izquierda a derecha; suma; mod 11; si el residuo
+es 0 o 1 ese es el DV, si es mayor a 1 el DV es 11 menos el residuo) la base 900987987 da **DV = 4**:
+
+```
+9×41 + 0×37 + 0×29 + 9×23 + 8×19 + 7×17 + 9×13 + 8×7 + 7×3 = 1041
+1041 mod 11 = 7   ->   DV = 11 - 7 = 4
+```
+
+La implementación se contrastó con tres ejemplos publicados (900123456 → 8, 800191045 → 1, 213123432 → 1) y coincide en
+los tres. Además `_nitValido` **solo mira que haya entre 8 y 12 dígitos**: un DV inválido pasa el check en silencio, que
+es la razón por la que el error no se veía en ningún reporte.
+
+### La regla
+
+**Un check que valida el estado del contrato, no el estado de la parte.** "El proveedor tiene DPA" y "el contrato permite
+usar al proveedor" son dos preguntas distintas, y el 📦956 las confundió: relajar la exigencia de cláusulas a un proveedor
+que no es subencargado está bien; **declarar resuelto el asunto porque a ese proveedor no se le puede exigir un DPA,
+no lo está**, porque lo que no le aplica a Google (el DPA) es precisamente lo que impide usarlo (transmitirle datos).
+
+De ahí la trampa 85 del PROMPT: **un bloque permanente tiene que venir con el motivo y la salida**; y **quitar una marca
+que bloquea exige la razón que la quitaba**: un aviso de "revisión profesional pendiente" se quita cuando un abogado lo
+aprueba, no porque otro agente reescribiera el documento.

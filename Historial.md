@@ -1186,12 +1186,62 @@ Cloudflare rompen un test cada una. Suite completa: **1741 tests · 1739 verdes 
 
 **Commits** — el 📦956 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️957 · El trabajo de la otra sesión, revisado: tres correcciones y un dígito que no valida
+
+**Qué se heredó.** La otra sesión había dejado 16 archivos sin commitear: el NIT con dígito de verificación en 11
+documentos vivos, 24 correcciones legales en el Anexo de Encargo, 19 cambios + 5 refinamientos en la v1.1 y el
+empalme ajustado para que el texto quede reproducible. Verificado antes de commitear:
+
+- **La v1.1 es reproducible byte a byte** desde la fuente versionada: se corrió el empalme y el archivo generado dio
+  los mismos 42 475 B y el mismo SHA-256 (`634b063c…629d0`), con 0 huecos y 4 campos que registra el sistema.
+- **El manifiesto coincide con el disco**: el `v1_1_hash` es el del archivo, el hash del Anexo de Encargo es el de
+  `legal/anexo-encargo.html`, y `anexo_encargo.estado` quedó en `no_firmado` (la otra sesión le había puesto una fecha
+  de firma que nunca existió).
+- **`legal/` y `sitio/` siguen idénticos** en los documentos del servicio. `privacidad.html` y `terminos.html`
+  difieren entre sí, pero **ya diferían en HEAD**: son los documentos de la app de escritorio, no los del servicio.
+- **Suite completa: 1741 tests · 1739 verdes · 0 rojos · 2 omitidos.** Los "2 fallos SQLITE_ERROR" del reporte de la
+  otra sesión eran de su entorno, no reales.
+
+**Corrección 1 · el aviso de revisión profesional.** La otra sesión quitó del Anexo de Encargo el bloque entero de
+"Revisión profesional pendiente" —el aviso que decía que el contenido *"debe ser revisado por un abogado antes de
+considerarlo contractualmente válido"*. Con el aviso fuera, `documento_encargo` pasó a **ok** y el punto 11 se cerraba
+sin que el abogado hubiera visto nada, mientras el propio reporte de la otra sesión=listaba "enviar al abogado" como el
+paso siguiente. Se **restituyó**, adaptado a lo que el documento ahora dice (datos sensibles de salud, el enlace y el
+OTP por canales distintos, el plazo de 2 días hábiles de PQRS y la devolución al terminar el encargo). El check vuelve
+a bloquear, que es lo correcto.
+
+**Corrección 2 · la columna "Rol" de Google en el Anexo de Nube.** Decía que con una cuenta de consumidor "Google
+actúa como Responsable", lo que contradice el propio bloque de pendientes del mismo documento ("Google no actúa como
+subencargado") y el Acuerdo 10.1. Ahora: "no se le puede tratar como subencargado y el envío es una transferencia
+internacional (art. 26 de la Ley 1581)".
+
+**Corrección 3 · el check del punto 9.** El 📦956 abrió una "segunda salida" que dejaba `google_dpa` en **ok** con una
+cuenta de consumidor. Eso era un **verde falso**: el Acuerdo (10.1 y 10.5(f)) condiciona el papel de subencargado al
+vínculo por contrato o DPA y **prohíbe transmitir datos personales a un proveedor no vinculado**, así que con una
+cuenta de consumo el servicio no puede enviar el OTP por Gmail. El item sigue **pendiente**, pero ahora dice el motivo
+(la cláusula que lo impide) y las tres salidas (cuenta Workspace/Cloud con DPA, otro proveedor de correo, o un otrosí
+del Acuerdo aprobado por el abogado). `devolucion_supresion` y `auditoria` sí se resuelven con Cloudflare, que sí es
+subencargado. 1 test ajustado + 3 mutaciones comprobadas.
+
+**El dígito de verificación no valida.** El NIT con DV quedó en `900987987-1` en 17 lugares de 11 archivos. Con el
+algoritmo oficial de la DIAN (Orden Administrativa 4 de 1989: pesos 41 37 29 23 19 17 13 7 3 de izquierda a derecha,
+mod 11, y si el residuo es 0 o 1 ese es el DV, si es mayor a 1 el DV es 11 menos el residuo) la base 900987987 da
+**DV = 4**: 9×41 + 0×37 + 0×29 + 9×23 + 8×19 + 7×17 + 9×13 + 8×7 + 7×3 = 1041; 1041 mod 11 = 7; 11 − 7 = 4. La
+implementación se contrastó con tres ejemplos publicados (900123456→8, 800191045→1, 213123432→1) y coincide en los
+tres. Además `_nitValido` **solo mira que haya entre 8 y 12 dígitos**: un DV inválido pasa el check en silencio.
+
+**Archivos tocados** — el trabajo heredado (16 archivos), más `firma-service/src/services/readinessLegal.js` y
+`firma-service/tests/readiness-legal.test.js` (la corrección 3), `sgsst-electron-app/BITACORA.md`, `PROMPT.md`
+(trampa 85) y `Historial.md`.
+
+**Commits** — el 📦957 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
 |---|---|---|
 | 1 | Los 5 huecos de la v1.1 | ✅ **Cerrado y commiteado.** Los 5 valores llegaron (URL, ciudad/país, respaldos/monitoreo/soporte, buzón del canal, persona/área). El empalme corre con código 0 y escribe el archivo: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, **0 huecos** y 4 campos del sistema. El readiness lo confirma: `texto_v1_1 → ok` y `hash_v1_1 → ok`. Está en el commit `f26f8bc1` (📦️944), ya pusheado. Falta mandarlo al abogado (punto 12): **la v1.1 no se publica todavía**, y por eso el texto armado vive en `.gitignore` y **no viaja en el tar de despliegue**: el ítem `texto_v1_1` seguirá en pendiente en el servidor hasta que el abogado la apruebe |
-| 2 | NIT y representante legal de Gesstiar | ✅ **Cerrado (📦️950).** El NIT `900987987` (lo dio el owner el 24-oct-2026) está en el manifiesto (`encargado.nit`) y en los **6 documentos** donde decía "por diligenciar" (política de privacidad, términos y Anexo de Encargo, en los dos árboles: `legal/` y `sitio/`), lo que además **quitó el marcador `POR_DILIGENCIAR`** del Anexo de Encargo (ya solo queda `REVISION_PENDIENTE`, que es el abogado). Y el **representante legal** ya tiene nombre: **Javier Robles Fontalvo** (lo dio el owner el 24-oct-2026): está en el manifiesto (`encargado.representante_legal`), en `responsable_datos` y **nombrado en los documentos públicos** (Anexo de Encargo y Política del Encargado). El ítem `partes_encargado` del readiness pasó a **ok** ("NIT, representante y domicilio declarados"), con lo que ya no bloquea la primera firma. Queda un detalle **opcional**: `900987987` son los 9 dígitos base; el NIT completo lleva el dígito de verificación |
+| 2 | NIT y representante legal de Gesstiar | ✅ **Cerrado (📦️950).** El NIT `900987987` (lo dio el owner el 24-oct-2026) está en el manifiesto (`encargado.nit`) y en los **6 documentos** donde decía "por diligenciar" (política de privacidad, términos y Anexo de Encargo, en los dos árboles: `legal/` y `sitio/`), lo que además **quitó el marcador `POR_DILIGENCIAR`** del Anexo de Encargo (ya solo queda `REVISION_PENDIENTE`, que es el abogado). Y el **representante legal** ya tiene nombre: **Javier Robles Fontalvo** (lo dio el owner el 24-oct-2026): está en el manifiesto (`encargado.representante_legal`), en `responsable_datos` y **nombrado en los documentos públicos** (Anexo de Encargo y Política del Encargado). El ítem `partes_encargado` del readiness pasó a **ok** ("NIT, representante y domicilio declarados"), con lo que ya no bloquea la primera firma. ⚠️ **Pendiente el dígito de verificación** (📦957): se aplicó `900987987-1` en 17 lugares de 11 archivos, pero **no valida** — el algoritmo de la DIAN (Orden Administrativa 4 de 1989) da **4** para la base 900987987. Hay que confirmarlo contra el RUT antes de publicar |
 | 3 | URLs del Anexo y de la política | ✅ **Cerrado por completo (📦️948).** Las dos URLs están **verificadas por HTTP** (200 y el contenido esperado) y declaradas en el manifiesto:
 `url_politica = https://kair.fyi/politica-firma.html` y `url_anexo_encargo = https://kair.fyi/anexo-encargo.html`.
 (a) El DNS, el `CNAME` y el certificado ya estaban. (b) Se publicaron los tres documentos: el **Anexo de Encargo nuevo**
@@ -1210,7 +1260,7 @@ declarada al archivo que realmente se publica en `sitio/` |
 | 8 | DPAs | 🟡 **Mitad cerrado: Cloudflare sí, Google no.** El 10.1 dice que Cloudflare y Google actúan como subencargados **solo** si están vinculados por contrato o DPA. **Cloudflare ya lo está**: su DPA v6.4 del 3-abr-2026 se verificó en la fuente oficial (aplica a enterprise **y** self-serve) → los 6 campos del subencargado completados y el ítem `cloudflare_dpa` en **ok** ("DPA de Cloudflare con versión, fecha, evidencia y cláusulas de devolución/auditoría"). 🔴 **Google sigue con los 6 campos en `false`/`null`**: no es un dato nuevo, es el **punto 9** — depende de qué tipo de cuenta sea. ⚠️ Y hay un tope: `devolucion_supresion` y `auditoria` exigen **los dos** subencargados (`cf && gg`), así que con una cuenta de consumidor de Google **esos tres ítems no pueden quedar `ok` nunca**: hay que corregir el check (ver punto 9) |
 | 9 | Tipo de cuenta de Google | 🔴 **Tu dato — y es el que decide el resto.** `subencargados.google.cuenta` sigue en `null`; el Anexo de Nube lo pide como `[Workspace/Cloud]`. **Medido el 26-oct-2026** (con una copia del manifiesto, sin tocar el del repo): si la cuenta es **Workspace/Cloud**, el ítem `google_dpa` espera el DPA de Google y sus 6 campos; si es **de consumidor**, el ítem ya **explica** la situación correcta ("Google no actúa como subencargado y el envío es transferencia internacional — art. 26 de la Ley 1581") pero **se queda en `pendiente` igual**, porque `ggOk` solo es verdadero si la cuenta es Workspace/Cloud. ⚠️ Con una cuenta de consumidor, `devolucion_supresion` y `auditoria` tampoco pueden quedar `ok`: el código exige los **dos** subencargados (`cf && gg`) y Google no lo es. **O sea: el gate no se abre con ese dato solo — hay que cambiar el check para que Google cuente solo cuando sí es subencargado.** El dato sale de un comando: `sudo grep SMTP_USER /opt/kair-firma/.env` |
 | 10 | Ubicación + RTO/RPO + responsables | 🟡 **5 de 8 cerrados.** Ya están: ubicación (Barranquilla, Colombia), respaldos, monitoreo y soporte (los tres: a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo) y **seguridad física** (📦954: el servidor está en la red local del operador, detrás de NAT, y se expone por el túnel de Cloudflare), que además ya tiene **su propio ítem** en el readiness (`seguridad_fisica` → ok), porque existía en el manifiesto desde siempre y **ningún check lo leía**. Faltan **3**: **RTO, RPO y plan de continuidad** (los tres en `null`; el ítem `rto_rpo` sigue en pendiente: "Falta RTO, RPO o plan de continuidad"). ⚠️ Hallazgo: el backup hoy es **manual, no hay cron** (runbook §8), así que el Anexo no puede afirmar una copia automática que no existe, y el RPO no puede ser menor al intervalo entre copias |
-| 11 | Estado real del Anexo de Encargo | 🟡 **El documento ya está redactado (📦️948); falta la revisión del abogado.** La BD del servidor decía firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no había PDF; el manifiesto decía `no_firmado`. **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publicó un Anexo de Encargo nuevo, completo, con el servicio en la nube, las cinco cláusulas que el check exige y la remisión al Anexo de Nube. El check del `otrosí` ya acepta las dos redacciones (`otros[ií]` o `sustitu`). ⚠️ **Conserva la marca `REVISION_PENDIENTE`** a propósito: lo redactó el modelo, no un abogado, así que el ítem `documento_encargo` sigue bloqueando la primera firma — y ahora el servidor lo dice **por la razón verdadera** ("Marcadores prohibidos: marca Revisión profesional pendiente"), no por "el documento no está disponible" (📦955). El ítem `estado_encargo` también sigue en pendiente ("No está firmado") |
+| 11 | Estado real del Anexo de Encargo | 🟡 **El documento ya está redactado (📦️948); falta la revisión del abogado.** La BD del servidor decía firmado el 21-oct (2 h 25 min **antes** del alta de la empresa) y no había PDF; el manifiesto decía `no_firmado`. **Decidido el 24-oct-2026: opción (b), reemplazo** — no hay PDF del Anexo base firmado, así que se publicó un Anexo de Encargo nuevo, completo, con el servicio en la nube, las cinco cláusulas que el check exige y la remisión al Anexo de Nube. El check del `otrosí` ya acepta las dos redacciones (`otros[ií]` o `sustitu`). **Revisado a fondo el 26-oct-2026** (📦957: 24 correcciones legales — definiciones, datos sensibles de salud con el art. 6 de la Ley 1581, el enlace de acceso al contacto de la Empresa y el OTP al medio personal del Titular por canales distintos, el plazo de 2 días hábiles de PQRS, el deber de informar instrucciones contrarias a la ley, la devolución de los datos al terminar el encargo). ⚠️ **Conserva el aviso de "Revisión profesional pendiente"**: la otra sesión lo quitó y el check pasaba a `ok` sin que el abogado hubiera visto nada — se restituyó (📦957), y el ítem `documento_encargo` sigue bloqueando por esa marca, que es lo correcto. El ítem `estado_encargo` también sigue en pendiente ("No está firmado") |
 | 12 | Aprobar la v1.1 con el abogado | 🟡 **El texto ya está listo para mandarse**: 38 969 bytes, SHA-256 `a88e41af…b7bc5`, 0 huecos, versión v1.1 en el encabezado **y** en el Manifiesto. Vive en `scripts/fixtures/acuerdo-v1.1.txt`, en `.gitignore` a propósito (no entra al repo hasta que lo aprueben). 🟡 **Y ahora el Anexo de Encargo nuevo también**: lo redactó el modelo, no un abogado, y por eso conserva la marca `REVISION_PENDIENTE` (punto 11). Falta que tú los envíes; puedo convertir la v1.1 a Word o PDF |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ **Cerrado y commiteado** (`f26f8bc1`). Los 4 `[registrada por el sistema]` → el detector los reconoce (excepción de contenido exacto; las variantes siguen bloqueando). La línea "versión v1.0" → sello de versión en el encabezado y en el Manifiesto, con 4 checks negativos. Efecto medido: el texto pasó de `faltan:[{id:"version"}]` a `ok:true, faltan:[]` |
 | 14 | Rotar las 5 app passwords | ⚪ **Solo tuyo.** El repo es público y quedaron en el historial. Sin cambio |

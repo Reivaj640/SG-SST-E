@@ -12,6 +12,11 @@ respuesta, y el texto del **10.7(b)** está en la sección 1.3. La sección 4 de
 tabla de qué bloquea la publicación y qué bloquea la primera firma. La sección 3 es el Anexo de
 Nube.
 
+**Corrección del 26-oct-2026.** La revisión legal del owner corrigió trece numerales: 1.4, 1.5,
+3.4(e), 8.6, 9.5, 10.1, 10.2(h), 10.4(a), 10.5(f), 10.5(g), 10.8(a), 10.8(c) y 12.7. El texto
+vigente de esos trece vive en `firma-service/scripts/fixtures/acuerdo-v1.1-cambios.json`; la tabla
+cita el texto del abogado como referencia y, en las tres filas nuevas, el texto ya corregido.
+
 **Regla que no se negocia.** La **v1.0 no se toca**: está publicada y sellada. La v1.1 será un
 **archivo nuevo** (`acuerdo-v1.1.txt`) con **su propia huella**, y cada versión del Acuerdo tiene
 la suya (numerales 1.5, 9.3 y 9.4 de la v1.0). Los consentimientos ya aceptados tampoco se
@@ -26,9 +31,10 @@ explican en la columna de cambios y **no** se copian al Acuerdo.
 
 ## 1. Numerales que cambian
 
-Una fila por numeral reescrito por el abogado. Son **49 filas**: los 47 numerales con texto escrito en
-la sección 2 de la respuesta, más el 8.6 y el 10.7(b), que esa misma sección remite a la 1.1 y a
-la 1.3 respectivamente.
+Una fila por numeral reescrito. Son **52 filas**: los 47 numerales con texto escrito en la sección 2
+de la respuesta, más el 8.6 y el 10.7(b), que esa misma sección remite a la 1.1 y a la 1.3
+respectivamente, más el 9.5, el 10.8(a) y el 10.8(c), que se corrigen por la revisión legal del
+26-oct-2026.
 
 | Numeral | Texto final (citado íntegro del .txt) | Qué cambió respecto de la v1.0 | Deja huecos que llenar |
 |---|---|---|---|
@@ -65,6 +71,7 @@ la 1.3 respectivamente.
 | 8.6 | 8.6. Conservación, copia y supresión.<br>a) El plazo de conservación de los registros del proceso de firma es el que resulte de la tabla de retención documental de la Empresa. Ese plazo no puede ser inferior a los mínimos del literal b).<br>b) Los registros del SG-SST enumerados en el artículo 2.2.4.6.13 del Decreto 1072 de 2015 se conservan como mínimo veinte (20) años contados desde el cese de la relación laboral: (i) perfiles epidemiológicos y conceptos de exámenes de ingreso, periódicos y de retiro; (ii) resultados de exámenes y pruebas complementarias cuando la Empresa cuente con médico especialista; (iii) resultados de mediciones y monitoreo de ambientes de trabajo; (iv) registros de capacitación, formación y entrenamiento; y (v) registros de suministro de elementos y equipos de protección personal. Los demás documentos y registros del SG-SST se rigen por la tabla de retención de la Empresa.<br>c) El contrato individual de trabajo y sus adiciones, modificaciones y anexos firmados electrónicamente se conservan con autenticidad, integridad y disponibilidad conforme al artículo 2.2.1.1.12 del Decreto 1072 de 2015, que no fija término. El sistema les asigna un hold y no los suprime por el vencimiento de la custodia.<br>d) Si la Empresa declara un deber legal o contractual de conservación, el sistema aplica un hold sobre el documento y no lo suprime mientras ese deber subsista.<br>e) La supresión procede solo cuando concurren: (i) vencimiento del plazo aplicable; (ii) ausencia de deber legal o contractual de conservación; (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold vigente. La supresión deja la lápida y el recibo del numeral 3.6(g).<br>f) La Empresa entrega al Trabajador, siempre y sin costo, copia del contrato, sus anexos y modificaciones, por el medio electrónico que el Trabajador autorice, conforme a los artículos 2.2.1.1.12 y 2.2.1.1.13 del Decreto 1072 de 2015. La solicitud se registra y se atiende antes de cualquier supresión.<br>g) Antes de la firma, la Empresa informa al Trabajador el plazo aplicable, el deber de conservación del contrato y el canal para solicitar copia. El sistema no envía aviso previo de supresión y este Acuerdo no lo promete.<br>h) Si la Empresa no declara un plazo, se aplica el mínimo legal que corresponda y, en su defecto, veinte (20) años contados desde la firma. Ese plazo es un máximo de custodia y no autoriza a conservar más allá de la finalidad. | Reescribe el 8.6 por completo: la v1.0 no fijaba plazo propio; ahora fija el piso de veinte (20) años del 2.2.4.6.13 para las cinco categorías enumeradas, hold sin término para el contrato, el deber legal declarado, la supresión condicionada y la entrega de copia. | No. (Texto tomado de la sección 1.1 de la respuesta, no de la sección 2.) |
 | 8.7 | 8.7. La conservación puede realizarse en la infraestructura operada por Gesstiar y en los servicios de los subencargados identificados en el Anexo de Nube (Cloudflare, Inc. y Google LLC), con las medidas, plazos y obligaciones de devolución y supresión allí pactados. La supresión del 8.6 alcanza a los respaldos dentro del plazo allí previsto. La Empresa conserva la titularidad y puede solicitar devolución o supresión. | Nombra a los subencargados (Cloudflare, Inc. y Google LLC) y remite al Anexo de Nube; la v1.0 hablaba de "herramientas o sistemas externos" en genérico. | No. |
 | 9.2 | 9.2. El Trabajador puede leer el Acuerdo antes de firmar. El sistema muestra la versión vigente al momento de la firma, habilita la casilla solo cuando el texto ha sido desplegado hasta su final y registra la aceptación con la huella del texto y la fecha y hora. El sistema acredita el despliegue, no la lectura. | Cambia "sólo cuando el texto ha sido leído en su totalidad" por "desplegado hasta su final" y aclara que el sistema acredita el despliegue, no la lectura. | No. |
+| 9.5 | 9.5. Este Acuerdo es de aplicación desde la fecha de vigencia que consta en su encabezado y no tiene efectos retroactivos. El Trabajador que haya aceptado una versión anterior se rige por esa versión respecto de las firmas ya realizadas. Para las firmas posteriores a la entrada en vigencia de una versión nueva, el Trabajador debe leer y aceptar esa versión nueva en el momento mismo de la firma. | Fija la fecha de vigencia en el encabezado y aclara que no hay efectos retroactivos. (Corrección de la revisión del 26-oct: la v1.0 no llevaba fecha en el encabezado.) | No. |
 | 10.1 | 10.1. Infraestructura y terceros. El servicio se presta en un servidor propio de Gesstiar S.A.S., ubicado físicamente en [ciudad, país], en la red local del operador y detrás de NAT. Se expone mediante el túnel kair-firma de Cloudflare, Inc. hacia firma.kair.fyi. El correo transaccional se envía mediante Google LLC (smtp.gmail.com, puerto 587). Cloudflare y Google actúan como subencargados solo si están vinculados por los contratos/DPA descritos en el Anexo de Nube; mientras no lo estén, no se les puede tratar como Encargados. El almacenamiento principal es el sistema de archivos del servidor; no hay proveedor externo de almacenamiento de objetos. Respaldos, monitoreo y soporte: [interno, a cargo de … / provisto por …]. Cuando este Acuerdo use “nube”, se refiere a la infraestructura operada por Gesstiar aquí descrita, no a un proveedor de hosting distinto. | Reescribe el 10.1: describe la infraestructura real del firma-service (servidor propio, túnel kair-firma de Cloudflare, SMTP de Google LLC) y condiciona el rol de subencargados a los DPA del Anexo de Nube. | **Sí: `[ciudad, país]`** (ubicación física del servidor) y **`[interno, a cargo de … / provisto por …]`** (respaldos, monitoreo y soporte). |
 | 10.2(h) | 10.2(h). La identificación de la Empresa que se muestra en el bloque «Empresa que solicita tu firma»: razón social, NIT, domicilio, nombre y documento del representante legal, y la huella de esa identificación. Estos datos no pertenecen al Titular: se tratan por cuenta de la Empresa para que el Trabajador contraste quién le solicita la firma. | Agrega el literal h) y separa la identificación de la Empresa de los datos del Titular (los literales a) a g) del 10.2 quedan como están). | No. |
 | 10.4(a) | 10.4(a). La finalidad del 10.3(f) se sustenta en el deber legal de conservar evidencia del proceso de firma (arts. 2.2.1.1.12, 2.2.1.1.13 num. 3 y 2.2.2.47.7) y en el deber de conservar prueba de la autorización, conforme al artículo 2.2.2.25.2.5. Opera sin perjuicio de la autorización del Titular. | Agrega la cita al artículo 2.2.2.25.2.5 (deber de conservar prueba de la autorización). | No. |
@@ -78,6 +85,8 @@ la 1.3 respectivamente.
 | 10.7(c) | 10.7(c). El Titular acredita su identidad. El ejercicio de los derechos y el acceso son gratuitos al menos una vez al mes calendario y cada vez que haya modificaciones sustanciales de la política. Para consultas más frecuentes, la Empresa solo puede cobrar gastos de envío, reproducción y certificación (art. 2.2.2.25.4.2). | Agrega el límite de lo que se puede cobrar en consultas más frecuentes, con la cita al 2.2.2.25.4.2. | No. |
 | 10.7(e) | 10.7(e). El Titular acude primero a la Empresa o a K+AIR, conforme al artículo 15 de la Ley 1581 de 2012. Solo procede acudir a la SIC agotado el reclamo interno (art. 16). | Cambia "debe acudir primero a la Empresa" por "a la Empresa o a K+AIR" y agrega la cita al artículo 16. | No. |
 | 10.7(f) | 10.7(f). La solicitud de copia es un derecho de acceso (art. 8(f) Ley 1581; art. 2.2.2.25.4.2) y no implica por sí misma un derecho de supresión. La supresión y la revocatoria no proceden cuando existe un deber legal o contractual de permanencia (art. 2.2.2.25.2.6). | Agrega las citas al artículo 8(f) de la Ley 1581, al 2.2.2.25.4.2 y al 2.2.2.25.2.6. | No. |
+| 10.8(a) | 10.8(a). Cuando un documento objeto de firma contenga información relativa a la salud, el Titular debe ser informado de manera explícita y previa de que el dato es sensible, de cuáles son los datos que serán objeto de tratamiento y de la finalidad de éste, y debe otorgar su autorización expresa e informada en los términos del artículo 6 de la Ley 1581 de 2012 y del artículo 6 del Decreto 1377 de 2013, compilado en el artículo 2.2.2.25.2.3 del Decreto 1074 de 2015, salvo que concurra una excepción legal que releve la autorización, en los términos del artículo 6 o del artículo 10 de la Ley 1581 de 2012. En dicho evento debe informársele igualmente que, por tratarse de datos sensibles, no está obligado a autorizar su tratamiento. | Corrige la concordancia ("debe otorgar su autorización") y aclara que la excepción puede venir del artículo 6 o del artículo 10 de la Ley 1581. (Corrección de la revisión del 26-oct.) | No. |
+| 10.8(c) | 10.8(c). BASE LEGAL. Para el tratamiento de la información de salud de que trata este numeral, la base legal es la autorización expresa del Titular en los términos del literal anterior o, cuando concurra, la excepción legal aplicable prevista en la ley, en particular las del artículo 6 o del artículo 10 de la Ley 1581 de 2012, que la Empresa identificará y documentará. Si la Empresa fundara el tratamiento en una base legal distinta, debe informárselo al Titular de forma expresa y anticipada antes de recoger el dato, y esa base debe constar en su política de tratamiento de datos personales. | Admite las excepciones del artículo 6 o del artículo 10, además de la autorización expresa, y mantiene el deber de informar una base distinta. (Corrección de la revisión del 26-oct.) | No. |
 | 12.1 | 12.1. Este Acuerdo se rige por la ley colombiana y, en particular, por: Constitución Política, arts. 15 y 20; Ley 527 de 1999; Ley 594 de 2000; Ley 1562 de 2012; Ley 1564 de 2012; Ley 1581 de 2012; Decreto 1377 de 2013; Decreto 1072 de 2015; Decreto 1074 de 2015; Decreto 526 de 2021; Decreto 2364 de 2012; Resolución 0312 de 2019; y las normas que los modifiquen o sustituyan. El Decreto 526 de 2021 adicionó los artículos 2.2.1.1.8 a 2.2.1.1.15 del Decreto 1072 de 2015; el Decreto 2364 de 2012 reglamentó el artículo 7 de la Ley 527 y fue compilado en el Capítulo 47 del Decreto 1074 de 2015. | Reescribe el 12.1: amplía la lista de normas (Constitución Política, Ley 527 de 1999, Ley 594 de 2000, Decreto 526 de 2021, Decreto 2364 de 2012, Resolución 0312 de 2019) y explica dos de ellas. | No. |
 | 12.3 | 12.3. El régimen de los documentos del SG-SST se determina por su normativa, por la Ley 1562 de 2012 y por la Resolución 0312 de 2019 del Ministerio del Trabajo, «Por la cual se definen los Estándares Mínimos del Sistema de Gestión de la Seguridad y Salud en el Trabajo SG-SST» (13 de febrero de 2019; Diario Oficial 50.872 de 19 de febrero de 2019), en cuanto resulte aplicable. Para esos documentos las reglas del Capítulo VI no son de imposición legal directa, porque el 2.2.1.1.13 está dirigido al contrato individual de trabajo, pero la Empresa se obliga contractualmente a aplicarlas en los términos del 6.2. | Reescribe el 12.3: identifica la Resolución 0312 de 2019 con su título, fecha y Diario Oficial, y precisa el alcance del Capítulo VI. | No. |
 | 12.7 | 12.7. La Empresa conserva la prueba de la aceptación junto con la versión aceptada, la huella del texto, la fecha y hora y el identificador de la solicitud, conforme al artículo 2.2.2.25.2.5. Esta prueba subsiste a la supresión del 8.6. | Agrega que la prueba subsiste a la supresión del 8.6 y la cita al 2.2.2.25.2.5. | No. |
@@ -113,9 +122,9 @@ tal cual:
 - **Capítulo VI:** 6.1(a), 6.1(b), 6.1(c).
 - **Capítulo VII:** 7.1, 7.2, 7.3 (ninguno cambia).
 - **Capítulo VIII:** 8.1.
-- **Capítulo IX:** 9.1, 9.3, 9.4, 9.5, 9.6.
+- **Capítulo IX:** 9.1, 9.3, 9.4, 9.6.
 - **Capítulo X:** 10.2(a) a 10.2(g), 10.3(a) a 10.3(h), 10.4(b), 10.5(c), 10.5(e), 10.7(a), 10.7(d),
-  10.7(g), 10.8(a), 10.8(b), 10.8(c), 10.9.
+  10.7(g), 10.8(b), 10.9.
 - **Capítulo XI:** 11.1, 11.2, 11.3 (ninguno cambia).
 - **Capítulo XII:** 12.2, 12.4, 12.5, 12.6.
 - **Fuera de los capítulos:** el preámbulo ("Alcance" y "Las partes identificadas en el Capítulo I hemos
@@ -136,54 +145,53 @@ Lista plana. Cada hueco con el numeral o el bloque donde aparece.
 
 1. **1.5 — `[URL]`**: dirección del Anexo de Encargo. Bloquea la publicación y la primera firma
    (fila 10 de la tabla del §4).
-2. **10.1 — `[ciudad, país]`**: ubicación física del servidor. Bloquea la primera firma.
-3. **10.1 — `[interno, a cargo de … / provisto por …]`**: quién responde por respaldos, monitoreo y
-   soporte. Bloquea la primera firma.
-4. **10.7(b) — `[correo o URL]`**: canal de datos de K+AIR. Bloquea la publicación y la primera firma
+2. **10.7(b) — `[correo o URL]`**: canal de datos de K+AIR. Bloquea la publicación y la primera firma
    (fila 9 de la tabla del §4).
-5. **10.7(b) — `[nombre o cargo]`**: persona o área responsable de protección de datos, con acta de
+3. **10.7(b) — `[nombre o cargo]`**: persona o área responsable de protección de datos, con acta de
    designación. Bloquea la publicación y la primera firma (fila 9 de la tabla del §4).
-6. **NIT de Gesstiar S.A.S. y URL de la política de tratamiento**: no viven en el texto del Acuerdo;
-   el 1.5 y el 10.7(b) remiten a esa información, que está en el Anexo de Encargo. Bloquea la
-   publicación y la primera firma (fila 10 de la tabla del §4).
-
+4. **Anexo de Encargo — NIT de Gesstiar S.A.S. con dígito de verificación, domicilio, representante
+   legal y URL de la política de tratamiento**: no viven en el texto del Acuerdo; el 1.5 y el
+   10.7(b) remiten a ese Anexo. **Resuelto el 26-oct-2026:** el NIT completo es `900987987-1`, y el
+   domicilio, el representante y la URL ya constan en el Anexo. No bloquea por este concepto.
+5. **Anexo de Nube — ubicación del servidor, respaldos, monitoreo y soporte**: desde la revisión del
+   26-oct el 10.1 remite a ese Anexo; ya no son huecos del Acuerdo, pero sí condiciones de la firma.
 ### Del Anexo de Nube (`legal/anexo-nube-v1.0.html`)
 
-7. **Partes — `[EMPRESA]`, `NIT [ ]`, `representada por [ ]`**: datos del Responsable.
-8. **Partes — `NIT [ ]`, `representada por [ ]`**: datos del Encargado (Gesstiar S.A.S.).
-9. **Infraestructura — `[ciudad, país]`**: ubicación física del servidor.
-10. **Respaldos — `[frecuencia, retención, cifrado, responsable]`**.
-11. **Monitoreo — `[herramienta o persona]`**.
-12. **Soporte — `[interno o proveedor]`**.
-13. **Seguridad física — `[control de acceso al lugar, energía, conectividad]`**.
-14. **Continuidad — `RTO [ ]` y `RPO [ ]`**: sin RTO/RPO y plan de continuidad el servicio no está en
+6. **Partes — `[EMPRESA]`, `NIT [ ]`, `representada por [ ]`**: datos del Responsable.
+7. **Partes — `NIT [ ]`, `representada por [ ]`**: datos del Encargado (Gesstiar S.A.S.).
+8. **Infraestructura — `[ciudad, país]`**: ubicación física del servidor.
+9. **Respaldos — `[frecuencia, retención, cifrado, responsable]`**.
+10. **Monitoreo — `[herramienta o persona]`**.
+11. **Soporte — `[interno o proveedor]`**.
+12. **Seguridad física — `[control de acceso al lugar, energía, conectividad]`**.
+13. **Continuidad — `RTO [ ]` y `RPO [ ]`**: sin RTO/RPO y plan de continuidad el servicio no está en
     condiciones de sostener contratos de trabajo (riesgo de disponibilidad, §3.3 de la respuesta).
-15. **Subencargados — columnas "Devolución / supresión" y "Auditoría" de Cloudflare y de Google**: `[ ]`.
-16. **Subencargados — filas `[Respaldo]`, `[Monitoreo]` y `[Soporte]`**: `[ ]` en proveedor, servicio,
+14. **Subencargados — columnas "Devolución / supresión" y "Auditoría" de Cloudflare y de Google**: `[ ]`.
+15. **Subencargados — filas `[Respaldo]`, `[Monitoreo]` y `[Soporte]`**: `[ ]` en proveedor, servicio,
     datos, rol, ubicación, DPA, devolución/supresión y auditoría.
-17. **Rol de Google — `[Workspace/Cloud]`**: si la cuenta es de consumidor, el tratamiento es
+16. **Rol de Google — `[Workspace/Cloud]`**: si la cuenta es de consumidor, el tratamiento es
     transferencia internacional y el Acuerdo necesita una autorización expresa, separable e
     informada que hoy no tiene (no alcanza con decir "transmisión").
-18. **DPAs — `[self-serve / enterprise]` (Cloudflare) y `[Workspace/Cloud]` (Google)**: sin DPA
+17. **DPAs — `[self-serve / enterprise]` (Cloudflare) y `[Workspace/Cloud]` (Google)**: sin DPA
     firmada, Cloudflare y Google no pueden tratarse como Encargados.
-19. **Seguridad — `Detalle: [anexo técnico]`**.
-20. **Devolución y supresión — `[CSV/JSON/PDF]` (formato) y `[plazo]` (plazo de supresión)**.
-21. **Derechos de los Titulares — `Canal: [correo/URL]` y `persona o área: [nombre/cargo]`**.
-22. **Auditoría e incidentes — `[SOC 2 / ISO 27001 / propio]` (informes) y `[3]` (plazo contractual de
+18. **Seguridad — `Detalle: [anexo técnico]`**.
+19. **Devolución y supresión — `[CSV/JSON/PDF]` (formato) y `[plazo]` (plazo de supresión)**.
+20. **Derechos de los Titulares — `Canal: [correo/URL]` y `persona o área: [nombre/cargo]`**.
+21. **Auditoría e incidentes — `[SOC 2 / ISO 27001 / propio]` (informes) y `[3]` (plazo contractual de
     notificación de incidentes)**.
-23. **Vigencia, terminación y versión — `Vigencia: [ ]`, `Terminación: [ ]`, `Versión: [ ]`**.
+22. **Vigencia, terminación y versión — `Vigencia: [ ]`, `Terminación: [ ]`, `Versión: [ ]`**.
 
 ### Adicionales que la respuesta marca como no verificado (§5)
 
-24. **Tipo de cuenta de Google (Workspace/Cloud o consumidor)**: NO VERIFICADO. Define si hay
+23. **Tipo de cuenta de Google (Workspace/Cloud o consumidor)**: NO VERIFICADO. Define si hay
     transmisión o transferencia.
-25. **DPAs de Cloudflare y de Google, y si cubren devolución, supresión y auditoría**: NO VERIFICADO.
-26. **Ubicación física del servidor**: NO VERIFICADO. La respuesta da 192.168.1.11, no la ciudad ni el
+24. **DPAs de Cloudflare y de Google, y si cubren devolución, supresión y auditoría**: NO VERIFICADO.
+25. **Ubicación física del servidor**: NO VERIFICADO. La respuesta da 192.168.1.11, no la ciudad ni el
     país.
-27. **Si EE. UU. está en la lista de países adecuados de la SIC**: NO VERIFICADO. Si no está, la
+26. **Si EE. UU. está en la lista de países adecuados de la SIC**: NO VERIFICADO. Si no está, la
     transferencia a un Responsable en EE. UU. necesita autorización expresa o excepción del
     artículo 26.
-28. **Estado del Anexo de Encargo**: NO VERIFICADO. La base dice firmado y el onboarding dice que no
+27. **Estado del Anexo de Encargo**: NO VERIFICADO. La base dice firmado y el onboarding dice que no
     hay ninguno. Hay que resolverlo **antes**, porque el Anexo de Nube se incorpora a él: otrosí si
     ya está firmado, reemplazo si no.
 

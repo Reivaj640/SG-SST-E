@@ -1,15 +1,15 @@
 {
-  "version": "2026-10-25",
-  "actualizado_at": "2026-10-25",
+  "version": "2026-10-26",
+  "actualizado_at": "2026-10-26",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
     "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
-    "v1_1_hash": "a88e41af5a5d5c7c5c6d89bc2eeac19a758b47945f37c9aaccd144052e0b7bc5",
-    "v1_1_fecha": null,
+    "v1_1_hash": "634b063c6494549f7918d51c273cc67b09b7628942394ef9603dbfad177629d0",
+    "v1_1_fecha": "2026-10-26",
     "publicado": false
   },
   "encargado": {
-    "nit": "900987987",
+    "nit": "900987987-1",
     "representante_legal": "Javier Robles Fontalvo",
     "domicilio": "Calle 114 # 43B - 83, Barranquilla (Atlántico)",
     "canal_proteccion_datos": "privacidad.kair@gmail.com",
@@ -50,7 +50,9 @@
   "anexo_encargo": {
     "estado": "no_firmado",
     "fecha": null,
-    "evidencia": null
+    "evidencia": null,
+    "version": "2026-10-26",
+    "hash": "189c25b5fdae3782b875798c8c81cf131be2ce210b5e80971b7ba5e91b014743"
   },
   "anexo_nube": {
     "firmado": false,

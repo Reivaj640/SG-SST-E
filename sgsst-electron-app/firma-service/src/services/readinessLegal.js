@@ -1237,10 +1237,18 @@ function evaluar(opciones = {}) {
   // podian quedar `ok` nunca: el gate no abria por mas que se llenara todo
   // lo demas. Google cuenta como subencargado solo si la cuenta es
   // Workspace/Cloud; en ese caso le aplican las mismas clausulas.
+  //
+  // 📦957 Y con una cuenta de consumidor el item de Google NO puede quedar
+  // ok: el Acuerdo (10.1 y 10.5(f)) condiciona el papel de subencargado al
+  // vinculo por contrato o DPA y prohibe transmitir datos personales a un
+  // proveedor no vinculado. La cuenta de correo de consumo no habilita el
+  // servicio: el item sigue pendiente, pero con el motivo real y las tres
+  // salidas (cuenta Workspace/Cloud con DPA, otro proveedor de correo, o un
+  // otrosi del Acuerdo aprobado por el abogado).
   const ggCuentaOk = gg.cuenta === 'workspace' || gg.cuenta === 'cloud';
   const ggEsConsumidor = gg.cuenta === 'consumidor';
   const ggOk = ggCuentaOk && _proveedorOk(gg);
-  const googleOk = ggEsConsumidor || ggOk;
+  const googleOk = ggOk;
   const devolucionOk = cf.devolucion_supresion === true
     && (ggEsConsumidor || (ggCuentaOk && gg.devolucion_supresion === true));
   const auditoriaOk = cf.auditoria === true
@@ -1360,14 +1368,14 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: ggEsConsumidor
-          ? 'La cuenta es de consumidor: Google no actúa como subencargado y el envío es transferencia internacional (autorización expresa del Titular o excepción del art. 26 de la Ley 1581).'
+          ? 'La cuenta es de consumidor: no hay DPA y el Acuerdo (10.5(f)) no permite transmitir datos personales a un proveedor sin contrato o DPA, así que la cuenta de correo no habilita el servicio. Google no actúa como subencargado y el envío sería una transferencia internacional (art. 26 de la Ley 1581).'
           : (ggOk
             ? 'DPA de Google con cuenta Workspace/Cloud y evidencia.'
             : (ggCuentaOk
               ? 'Falta el DPA de Google o alguna de sus cláusulas (devolución/supresión o auditoría).'
               : 'Falta declarar el tipo de cuenta de Google (Workspace/Cloud o de consumidor).')),
         accion: ggEsConsumidor
-          ? 'Documentar en el Anexo de Nube la base del art. 26 (autorización expresa del Titular o excepción) y el aviso al Titular.'
+          ? 'Usar una cuenta Workspace/Cloud con DPA, cambiar el proveedor de correo, o un otrosí del Acuerdo aprobado por el abogado.'
           : 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
         referencia: 'legal-readiness.json → subencargados.google',
       },

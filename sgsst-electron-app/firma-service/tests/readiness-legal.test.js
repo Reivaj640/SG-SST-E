@@ -633,15 +633,18 @@ function manifiestoConCuentaGoogle(cuenta, extra = {}) {
   return man;
 }
 
-function idsPendientesDe(man) {
-  const r = readiness.evaluar({
+function reporteDe(man) {
+  return readiness.evaluar({
     gate: 'primera_firma',
     db: null,
     config: CONFIG_TEST,
     manifiesto: man,
     textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
   });
-  return r.pendientes.map((p) => p.id);
+}
+
+function idsPendientesDe(man) {
+  return reporteDe(man).pendientes.map((p) => p.id);
 }
 
 test('readiness · con una cuenta Workspace/Cloud y el DPA completo, los items de subencargados quedan ok', () => {
@@ -653,12 +656,22 @@ test('readiness · con una cuenta Workspace/Cloud y el DPA completo, los items d
   }
 });
 
-test('readiness · una cuenta de Google de consumidor no es subencargado: no hay DPA que exigirle', () => {
-  const ids = idsPendientesDe(manifiestoConCuentaGoogle('consumidor'));
+test('readiness · una cuenta de consumidor no habilita el servicio: el item de Google sigue pendiente y dice cual es la salida', () => {
+  // 📦957 El Acuerdo (10.1 y 10.5(f)) prohibe transmitir datos personales a
+  // un proveedor sin contrato o DPA. Con una cuenta de consumo Google no es
+  // subencargado y la cuenta de correo no habilita el servicio: el item NO
+  // puede quedar ok. Lo que tiene que hacer el check es decir el motivo y
+  // las tres salidas, para que no sea un bloqueo sin nombre.
+  const r = reporteDe(manifiestoConCuentaGoogle('consumidor'));
+  const ids = r.pendientes.map((p) => p.id);
   assert.ok(
-    !ids.includes('google_dpa'),
-    `google_dpa quedo pendiente con una cuenta de consumidor: ${JSON.stringify(ids)}`,
+    ids.includes('google_dpa'),
+    `google_dpa quedo ok con una cuenta de consumidor: ${JSON.stringify(ids)}`,
   );
+  const item = r.pendientes.find((p) => p.id === 'google_dpa');
+  assert.ok(/10\.5\(f\)/.test(item.detalle), `el detalle no cita la clausula que lo impide: ${item.detalle}`);
+  assert.ok(/Workspace\/Cloud/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
+  assert.ok(/proveedor de correo/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
 });
 
 test('readiness · con una cuenta de consumidor, la devolucion y la auditoria se resuelven con Cloudflare', () => {
