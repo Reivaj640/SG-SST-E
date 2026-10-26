@@ -177,15 +177,37 @@ sudo systemctl reload caddy
    a un correo tuyo. Ábrela desde el celular, firma, descarga la constancia:
    la trazabilidad ahora debe mostrar **la IP pública real de tu celular**.
 
-## Paso 9 — Backups (cron diario)
+## Paso 9 — Backups (cron diario a las 22:00), restauracion y vigilancia
 
 ```bash
 sudo cp .../deploy/backup-firma.sh /opt/kair-firma/backup-firma.sh
-sudo chmod +x /opt/kair-firma/backup-firma.sh
-echo "17 3 * * * root /opt/kair-firma/backup-firma.sh" | sudo tee /etc/cron.d/kair-firma-backup
+sudo cp .../deploy/probar-restauracion.sh /opt/kair-firma/probar-restauracion.sh
+sudo cp .../deploy/health-check.sh /opt/kair-firma/health-check.sh
+sudo chmod +x /opt/kair-firma/backup-firma.sh /opt/kair-firma/probar-restauracion.sh /opt/kair-firma/health-check.sh
+sudo mkdir -p /opt/kair-firma/logs
+echo "0 22 * * * root /opt/kair-firma/backup-firma.sh >> /opt/kair-firma/backups/backup.log 2>&1" | sudo tee /etc/cron.d/kair-firma-backup
+echo "*/5 * * * * root /opt/kair-firma/health-check.sh >> /opt/kair-firma/logs/health-check.log 2>&1" | sudo tee /etc/cron.d/kair-firma-health
 ```
 
-Verifica: `sudo /opt/kair-firma/backup-firma.sh` y mira `/opt/kair-firma/backups/`.
+El cron usa la hora local del servidor. Confirma con `timedatectl` que sea
+`America/Bogota` (UTC-5), o el respaldo va a caer a una hora distinta de las
+22:00 que declara el Anexo de Nube.
+
+Verifica:
+
+```bash
+sudo /opt/kair-firma/backup-firma.sh          # respaldo manual
+sudo /opt/kair-firma/probar-restauracion.sh   # prueba de restauracion
+sudo /opt/kair-firma/health-check.sh          # vigilancia
+```
+
+La retencion es de 30 dias (la poda la hace el propio script). La prueba de
+restauracion copia el ultimo respaldo a un temporal, comprueba su integridad
+y sus tablas, y borra el temporal al terminar: nunca deja datos personales
+tirados en `/tmp`.
+
+Un respaldo que nunca se ha restaurado no es un respaldo: por eso la prueba
+de restauracion va en el mismo paso que el cron.
 
 (Opcional) rclone `gdrive` para copiar off-site — instrucciones en el propio script.
 

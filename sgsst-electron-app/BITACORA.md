@@ -7341,3 +7341,69 @@ visto, con un NIT sin confirmar, pone en público dos documentos que después ha
 **Un instrumento que declara el estado no puede declarar el estado que uno quiere.** El manifiesto es el que el check
 lee: si se llena con la intención ("ya voy a tener Workspace"), el check deja de medir y empieza a mentir. La decisión se
 escribe en el tablero y en el modelo —los dos lugares donde sí es una declaración— y el manifiesto espera la evidencia.
+
+## 📦️959 · El respaldo que se restaura, el RTO que se cumple
+
+*26-oct-2026 · el punto 10 · continuidad, retención y detección de caídas*
+
+Los cuatro datos que eran del owner quedaron decididos y documentados: **RTO 4 h**, **RPO 24 h**, **plan de
+continuidad** redactado y **plazo de supresión 30 días calendario**. El respaldo queda **cada 24 h a las 22:00**
+(hora de Colombia) con **retención de 30 días**.
+
+### Por qué son cumplibles y no promesas
+
+Ninguna norma fija un RTO ni un RPO: la Ley 1581 art. 19 y el Decreto 1074 art. 2.2.2.25.3.7 le piden a la SIC
+poder evidenciar que las medidas de seguridad se implementaron, no una cifra. Son compromisos propios, así que
+tienen que aguantar una auditoría y tener una cadena de evidencia detrás:
+
+| Pieza | Qué es | Dónde está probada |
+|---|---|---|
+| Detectar la caída | `health-check.sh` en cron cada 5 min: revisa el servicio local y el público, reinicia el caído con 10 min de enfriamiento y deja log | Escrito; falta programarlo en el servidor |
+| Restaurar | `probar-restauracion.sh`: toma el último respaldo, lo restaura en un temporal, comprueba integridad, tablas, conteos y `user_version`, y borra el temporal con `trap` | **Probado en el PC: OK** |
+| Que las copias existan y estén sanas | `backup-firma.sh`: backup online de SQLite (`.backup`, no copiando el archivo a pelo), `PRAGMA integrity_check` **sobre la copia**, tar de los PDF, retención de 30 días, log con tamaño y sha256 | **Probado en el PC: OK** |
+
+El RPO de 24 h es exactamente el intervalo entre copias: no se puede prometer menos. El plazo de supresión de 30
+días es el mismo que la retención, así que **la poda hace cumplir el plazo** en lugar de dejarlo en promesa. Y el
+RTO de 4 h solo es verdad si hay detección: sin ella, el reloj empieza cuando el owner mira el panel, que puede ser
+a la mañana siguiente. Por eso el paquete trae el detector.
+
+### Los tres scripts
+
+- **`backup-firma.sh`** (reescrito): retención de 30 días (antes 14), `PRAGMA integrity_check` sobre la copia,
+  constancia en el log con tamaño y sha256, `BASE` y retención parametrizables, y el cron de las 22:00 documentado
+  en la cabecera.
+- **`probar-restauracion.sh`** (nuevo): restaura el último respaldo en un temporal, verifica integridad + tablas +
+  conteos + `user_version`, y **borra el temporal con `trap`**: una copia restaurada es un temporal con datos
+  personales y no puede quedar tirada en `/tmp`. Falla si no hay respaldos.
+- **`health-check.sh`** (nuevo): cada 5 minutos revisa el servicio local y el público. Si el local no responde,
+  reinicia el servicio (con enfriamiento de 10 minutos, para no entrar en un bucle de reinicios) y lo registra; si
+  el local responde y el público no, el problema es del túnel o del dominio y **no** se reinicia nada.
+
+### La prueba funcional (en el PC) pasó los 5 chequeos
+
+Sintaxis de los dos scripts, respaldo con hash e integridad ok, **poda de la copia de 40 días conservando la de
+10**, restauración OK (tablas=2, empresas=1, solicitudes=1, user_version=40) sin temporales tirados, y fallo
+correcto cuando no hay respaldos. En el PC no hay `sqlite3` CLI, así que se probó con un shim sobre
+`better-sqlite3` —el mismo motor del service—, no con una imitación.
+
+### Lo que NO se hizo a propósito
+
+El manifiesto y el modelo del Anexo de Nube **siguen con los tres campos en `null`**. Se llenan cuando el cron
+esté instalado y la restauración probada **en el servidor**. Llenarlos antes sería un verde falso: el check
+pasaría y el respaldo que el RTO promete no existiría todavía.
+
+### Lo que queda abierto
+
+- **La otra mitad de la detección**: el health check deja log y reinicia, pero **no avisa a nadie**. La alerta
+  externa es un monitor de uptime en el panel de Cloudflare (del owner).
+- **La copia off-site**: hoy los respaldos viven en el mismo servidor que los datos. El RTO de 4 h asume que se
+  puede levantar otro equipo con la imagen del sistema y restaurar desde ahí, y eso pide una copia fuera del
+  servidor. Es la brecha más grande del plan y la más fácil de cerrar (una línea de `rclone` y una cuenta).
+- **Punto 9 y puntos 11/12**: la cuenta de Google de consumo sigue sin DPA y el Anexo de Encargo sigue con el aviso
+  de revisión profesional pendiente. Nada de esto lo arregla este paquete.
+
+**Archivos** — `firma-service/deploy/backup-firma.sh` (reescrito), `firma-service/deploy/probar-restauracion.sh`
+(nuevo), `firma-service/deploy/health-check.sh` (nuevo), `firma-service/deploy/README-DESPLIEGUE.md` (Paso 9),
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (§8),
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md` (nuevo), `PROMPT.md`
+(trampa 87) y `Historial.md`.

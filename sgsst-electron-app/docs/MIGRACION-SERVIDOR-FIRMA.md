@@ -856,13 +856,23 @@ router del recibo de supresion montado.
 - [ ] Eliminar la tarea `KairFirmaTunnel` del portatil. **Esta muerta**: el script corre
       `cloudflared tunnel run kair-firma`, que lee `~/.cloudflared/config.yml`, y ese directorio ya
       no existe en ninguna maquina. El tunnel vive ahora en el servidor.
-- [ ] Backup automatico diario de la BD. La carpeta `/opt/kair-firma/backups` existe y hay copias
-      manuales, pero no hay cron.
+- [ ] Backup automatico diario de la BD. **Los 3 scripts estan listos y probados en el PC**
+      (`deploy/backup-firma.sh`, `deploy/probar-restauracion.sh`, `deploy/health-check.sh`),
+      pero no hay cron instalado en el servidor. Los comandos exactos estan en
+      `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md`
+      (seccion 5) y en `firma-service/deploy/README-DESPLIEGUE.md` (Paso 9). El respaldo
+      diario queda programado para las **22:00 (hora de Colombia)**.
 - [ ] Arreglar el test de idempotency (ver seccion 7).
 - [ ] Revisar las 6 vulnerabilidades que reporto `npm audit` al desplegar. No se corrio `npm audit
       fix` a proposito.
-- [ ] Monitorizacion: nada avisa si el servidor se cae o si el tunnel se desconecta. El panel de
-      Cloudflare muestra el estado, pero no hay alerta.
+- [ ] Monitorizacion: **la mitad del servidor ya esta** (`deploy/health-check.sh` en cron cada
+      5 minutos: revisa el servicio local y el publico, reinicia si esta caido y deja log).
+      Falta la **alerta externa**: el log no despierta a nadie. Hay que crear un monitor de
+      uptime en el panel de Cloudflare (del owner). Sin eso, el RTO de 4 h declarado en el
+      Anexo de Nube cuenta desde que el owner se entere, no desde que la caida ocurre.
+- [ ] Copia **off-site** de los respaldos (hoy viven en el mismo servidor que los datos).
+      Es la brecha mas grande del plan de continuidad y la mas facil de cerrar: una linea de
+      `rclone` mas una cuenta.
 
 ### 8.1. Deuda de seguridad aplazada (sugerencia, no restrictiva)
 
