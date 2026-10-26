@@ -1454,6 +1454,44 @@ manifiesto del 📦963 desplegado y verificado: el check del servidor quedó en 
 
 **Commits** — el 📦964 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️965 · El marcador sin cambiar, validado antes de tocar el servidor
+
+**Qué pasó.** La corrida e2e del piloto se ejecutó **dos veces seguidas** con los valores de ejemplo
+sin cambiar (`--correo=CORREO_REAL`, `--numero-documento=NUMERO_DE_CEDULA`). Las dos veces el servidor
+respondió `400 INVALID_REQUEST_BODY` con `"Invalid email"` en `correo_verificacion`: un mensaje que
+describe la **forma** del dato y no la **causa**, así que no decía que faltaba cambiar el marcador. El daño
+mayor estaba en el otro marcador: con `PRUEBA-001` el alta habría dado **201** y la solicitud habría sido
+**imposible de firmar** (la mini-app borra todo lo que no es dígito y `identifyBody` exige `^\d+$` con 4 a 20
+caracteres). Los dos 400 no gastaron alcance: la excepción quedó en `firmas_usadas: 0`.
+
+**La lección (trampa 92):** la herramienta que pide datos al operador los **valida antes de la primera
+llamada** y dice qué falta y cómo se corrige. Un 400 de schema no es un diagnóstico. Los marcadores se
+rechazan **por nombre**, no solo por formato; un correo **vacío** es peor que uno mal formado (el default
+`prueba@example.com` es un buzón muerto: el OTP no le llega a nadie); y un **201 no prueba que la firma se
+pueda hacer**: la solicitud creada tiene que ser *firmable*, y eso se comprueba antes de crearla.
+
+**Qué cambió en el código.** `scripts/smoke-produccion.js` gana `validarArgumentos`: el correo tiene que
+parecer un correo (y no puede ser un marcador ni quedar vacío), el número de documento tiene que tener entre
+4 y 20 dígitos (la regla de la mini-app, no una del script) y un e2e sin número se rechaza. `main` devuelve 2
+sin tocar el servidor. 8 tests nuevos.
+
+**Verificación.** Suite del service: **1749 tests · 1747 verdes · 0 fallos · 2 omitidos**. Barrido de
+caracteres no latinos limpio en los dos archivos; LF preservado; sin bump de versión.
+
+**El piloto, en estado.** La excepción de habilitación **4** quedó `VIGENTE` (id 4, alcance 2 firmas —1 para
+el piloto y 1 de repuesto—, plazo 2026-11-02, piloto autorizado, bitácora con actor e IP `181.63.26.145`).
+Falta re-correr el smoke con un número de dígitos y un correo real, y **firmar en el celular**.
+
+**Lo que falta para que esto llegue al servidor.** El refuerzo vive en `app/scripts/`, así que viaja en el
+próximo paquete de despliegue; hasta entonces el comando del piloto funciona con lo instalado, porque la
+validación es del script y no del servicio.
+
+**Archivos tocados** — `sgsst-electron-app/firma-service/scripts/smoke-produccion.js`,
+`sgsst-electron-app/firma-service/tests/scripts/smoke-produccion.test.js`, `PROMPT.md` (trampa 92),
+`sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦965 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |

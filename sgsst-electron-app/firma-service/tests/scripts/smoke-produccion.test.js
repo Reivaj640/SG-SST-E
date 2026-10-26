@@ -16,6 +16,8 @@
  *   9. El e2e pide la notificacion (crear la solicitud NO manda el correo).
  *  10. La notificacion va a /notify-remote con el correo del firmante.
  *  11. Un fallo del servidor de correo NO se reporta como exito.
+ *  12. Un marcador sin cambiar (--correo=CORREO_REAL) se rechaza ANTES de
+ *      tocar el servidor, con un mensaje que dice que falta.
  *
  * Por qué el 2 importa: sin ese candado, una corrida "de prueba" podría crear
  * solicitudes y mandar correos a alguien sin que nadie lo pidiera. Es la
@@ -500,4 +502,99 @@ test('un 409 que NO es del D-03 sigue siendo FALLA', async () => {
   assert.equal(renglones.length, 1);
   assert.equal(renglones[0].estado, 'FALLA',
     'un 409 que no es del D-03 SI es una falla');
+});
+
+// ----------------------------------------------------------------------
+// 12. Los marcadores sin cambiar se rechazan ANTES de tocar el servidor
+// ----------------------------------------------------------------------
+//
+// El 26-oct-2026 la corrida e2e se ejecuto dos veces con
+// `--correo=CORREO_REAL` y `--numero-documento=NUMERO_DE_CEDULA` literales.
+// Las dos veces el servidor respondio 400 INVALID_REQUEST_BODY ("Invalid
+// email") y el operador no se entero de la causa real: no habia cambiado el
+// marcador. Cada intento perdio un ciclo entero.
+//
+// La regla del proyecto: un chequeo que no muerde no es un chequeo. El
+// servidor rejects el dato (bien), pero el operador tiene que recibir un
+// error de USO, con la correccion, en la consola y no un 400 de schema.
+test('un --correo que es un marcador se rechaza antes de la llamada', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=12345678901', '--correo=CORREO_REAL',
+  ]);
+  const problema = script.validarArgumentos(args);
+  assert.ok(problema, 'el marcador tiene que producir un error');
+  assert.match(problema, /marcador/);
+  assert.match(problema, /correo real/i,
+    'el error dice que hay que poner el dato real');
+});
+
+test('un --numero-documento que es un marcador se rechaza', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=NUMERO_DE_CEDULA', '--correo=javier@example.com',
+  ]);
+  const problema = script.validarArgumentos(args);
+  assert.ok(problema);
+  assert.match(problema, /marcador/);
+});
+
+test('un numero de documento con letras se rechaza (la mini-app solo acepta digitos)', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=PRUEBA-001',
+    '--numero-documento=PRUEBA-001', '--correo=javier@example.com',
+  ]);
+  const problema = script.validarArgumentos(args);
+  assert.ok(problema);
+  assert.match(problema, /DIGITOS/);
+});
+
+test('un correo con formato invalido se rechaza', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=12345678901', '--correo=antonio',
+  ]);
+  const problema = script.validarArgumentos(args);
+  assert.ok(problema);
+  assert.match(problema, /no parece un correo/);
+});
+
+test('un --correo vacio se rechaza (dejaria el buzon muerto de prueba@example.com)', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=12345678901', '--correo=',
+  ]);
+  const problema = script.validarArgumentos(args);
+  assert.ok(problema);
+  assert.match(problema, /vacio/);
+});
+
+test('un e2e con numero de digitos y correo real pasa la validacion', () => {
+  const args = script.parseArgs([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=12345678901', '--correo=javier@example.com',
+  ]);
+  assert.equal(script.validarArgumentos(args), null);
+});
+
+test('una corrida de solo lectura no se valida contra la mini-app', () => {
+  const args = script.parseArgs(['node', 'smoke-produccion.js']);
+  assert.equal(script.validarArgumentos(args), null,
+    'sin e2e no hay numero de documento que validar');
+});
+
+test('main devuelve 2 sin tocar el servidor cuando el correo es un marcador', async () => {
+  const codigo = await script.main([
+    'node', 'smoke-produccion.js', '--e2e', '--confirmar-e2e',
+    '--empresa=900829731', '--trabajador=12345678901',
+    '--numero-documento=12345678901', '--correo=CORREO_REAL',
+    '--url=https://firma.kair.fyi',
+  ]);
+  assert.equal(codigo, 2, 'los argumentos invalidos salen con codigo 2');
 });

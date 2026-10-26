@@ -7605,3 +7605,52 @@ verificadas (D-02 en 0 y el token único con el 5c). El check del servidor qued�
 
 **Archivos** — `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (sección 5.6, el orden correcto),
 `PROMPT.md` (trampa 91), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️965 · El marcador sin cambiar: dos 400 que nadie entendió
+
+*26-oct-2026 · el piloto de la excepcion de habilitacion · D-03*
+
+### Qué pasó
+
+La corrida e2e del piloto se ejecutó **dos veces seguidas** con los valores de ejemplo sin cambiar:
+
+```
+--trabajador=NUMERO_DE_CEDULA --numero-documento=NUMERO_DE_CEDULA --correo=CORREO_REAL
+```
+
+Las dos veces el servidor respondió lo mismo:
+
+```
+[FALLA] POST /internal/sign-requests :: HTTP 400 ::
+{"error":{"code":"INVALID_REQUEST_BODY","message":"El metadata no cumple el schema",
+ "details":{"issues":[{"validation":"email","message":"Invalid email",
+ "path":["correo_verificacion"]}]}}}
+```
+
+El mensaje es **correcto y es el problema**: describe la **forma** del dato (`correo_verificacion` no es un email) y no la **causa** (que nadie cambió el marcador). Un 400 de schema no es un diagnóstico: para entenderlo hay que abrir el schema del servidor. Cada intento costó un ciclo entero del owner.
+
+El daño grande estaba en el otro marcador. Con `--numero-documento=PRUEBA-001` el alta habría dado **201** y la solicitud habría sido **imposible de firmar**: la mini-app borra todo lo que no sea dígito (`web/firma/app.js`) y la ruta `identifyBody` exige `regex(/^\d+$/)` con 4 a 20 caracteres. El firmante nunca podría identificarse, y el único síntoma sería un `422 IDENTIFICATION_FAILED` sin causa aparente — en el celular, sin la consola delante.
+
+El número que el script calcula la huella (`sha256(numero)`) y el que el firmante escribe en el celular tienen que ser **el mismo string**, y por eso el número del comando no puede llevar puntos ni guiones.
+
+### La lección (trampa 92)
+
+**El error de schema del servidor describe la forma del dato, no la causa; la herramienta que pide los datos al operador los valida antes de llamar y dice qué falta.** El servidor haciendo su trabajo (rechazar un email inválido) es correcto — lo que faltaba era la capa de uso, que es donde vive la pregunta "¿qué tenía que escribir?".
+
+Reglas que quedaron en el script:
+
+1. **Validar antes de la primera llamada**: un marcador sin cambiar falla en la consola del operador, con código de salida 2, y no con un 400 de schema.
+2. **Un valor de ejemplo que se copia es un valor sin cambiar**: los marcadores (`CORREO_REAL`, `NUMERO_DE_CEDULA`, `TU_CEDULA`, `MAIL`…) se rechazan **por nombre**, no solo por formato.
+3. **Correo con formato inválido y correo vacío son dos fallos distintos**: el vacío es peor, porque el default del script (`prueba@example.com`) es un buzón muerto — el OTP no le llega a nadie y la prueba no prueba nada.
+4. **Un 201 no prueba que la firma se pueda hacer**: la solicitud creada tiene que ser *firmable*, y eso se comprueba antes de crearla.
+5. **El smoke es una herramienta de línea de comandos que el owner usa a mano**: su ergonomía es parte del control. Por eso el comando del piloto ahora lo pide con `read -p`, para que los datos se escriban y no se peguen.
+
+**Verificación.** Suite del service: **1749 tests · 1747 verdes · 0 fallos · 2 omitidos** (los 8 nuevos son de esta validación). Barrido de caracteres no latinos limpio en los dos archivos; LF preservado en ambos. Sin bump de versión.
+
+**Lo que falta para que esto llegue al servidor:** el paquete de despliegue. El script vive en `app/scripts/` dentro del tar, así que el refuerzo viaja en el **próximo despliegue** (📦966 o el que salga después de la firma). Mientras tanto, el comando del piloto funciona con lo que ya está instalado, porque la validación vive en el script, no en el servicio.
+
+**Lo que queda del piloto:** la excepción de habilitación **4** está `VIGENTE` (id 4, alcance 2 firmas —1 para el piloto y 1 de repuesto—, plazo 2026-11-02, piloto autorizado, bitácora con actor e IP `181.63.26.145`), y `firmas_usadas: 0`: los dos 400 no gastaron alcance. Falta re-correr el smoke con un número de dígitos y un correo real, y **firmar en el celular**.
+
+**Archivos** — `firma-service/scripts/smoke-produccion.js` (`validarArgumentos`),
+`firma-service/tests/scripts/smoke-produccion.test.js` (8 tests), `PROMPT.md` (trampa 92),
+`sgsst-electron-app/BITACORA.md` y `Historial.md`.

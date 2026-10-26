@@ -210,6 +210,146 @@ function modoEscritura(args) {
   return { escribe: false, motivo: 'Modo lectura: no se escribe nada.' };
 }
 
+/**
+ * Los marcadores que se copian y no se cambian.
+ *
+ * POR QUE EXISTE ESTA LISTA
+ * -------------------------
+ * El 26-oct-2026 la corrida e2e se ejecuto DOS veces seguidas con estos
+ * textos literales (`--correo=CORREO_REAL`, `--numero-documento=NUMERO_DE_CEDULA`).
+ * Las dos veces el servidor respondio 400 INVALID_REQUEST_BODY con
+ * "Invalid email" en `correo_verificacion`, un mensaje que no dice la causa
+ * real: que nadie cambio el marcador. Cada corrida perdio un ciclo entero.
+ *
+ * La leccion es la misma de siempre: un chequeo que no muerde no es un
+ * chequeo. El servidor SI rechaza el dato malo (eso esta bien), pero el
+ * operador recibe un error de SCHEMA, no de USO. Este script tiene que
+ * detectar el marcador antes de la llamada y decir QUE FALTA.
+ *
+ * La comparacion es exacta (el valor entero, sin espacios) y sin distincion
+ * de mayusculas: un correo de verdad nunca es "CORREO_REAL".
+ */
+const MARCADORES = {
+  correo: [
+    'CORREO', 'CORREO_REAL', 'CORREO_PERSONAL', 'TU_CORREO', 'MI_CORREO',
+    'EMAIL', 'E_MAIL', 'MAIL', 'X', 'XXX', 'TBD',
+  ],
+  numero: [
+    'NUMERO', 'NUMERO_DE_CEDULA', 'NUMERO_DOCUMENTO', 'CEDULA', 'MI_CEDULA',
+    'TU_CEDULA', 'DOCUMENTO', 'NUM_DOCUMENTO', 'NUM', 'N', 'X', 'XXX', 'TBD',
+  ],
+};
+
+/**
+ * ¿El valor es uno de los marcadores de ejemplo?
+ *
+ * @param {*} valor
+ * @param {string[]} lista
+ * @returns {boolean}
+ */
+function _esMarcador(valor, lista) {
+  const v = String(valor === null || valor === undefined ? '' : valor).trim().toUpperCase();
+  if (!v) return false;
+  return lista.indexOf(v) !== -1;
+}
+
+/**
+ * ¿El texto parece un correo?
+ *
+ * Es una comprobacion de forma, no de existencia: el unico que puede saber
+ * si un buzon existe es el que lo abre. La forma basta para que el servidor
+ * no responda 400 con un mensaje de schema.
+ *
+ * @param {*} valor
+ * @returns {boolean}
+ */
+function _pareceCorreo(valor) {
+  const v = String(valor || '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+/**
+ * VALIDA LOS ARGUMENTOS ANTES DE TOCAR EL SERVICIO.
+ *
+ * Devuelve `null` cuando todo esta bien, o un texto que explica QUE FALTA
+ * y QUE HACER. El texto es la parte importante: un error que no dice que
+ * hacer obliga a leer el codigo, y el codigo esta en el servidor, no en la
+ * pantalla del operador.
+ *
+ * Las tres reglas:
+ *
+ *   1. `--correo` tiene que parecer un correo. Sin `--correo`, la solicitud
+ *      queda con `prueba@example.com` (ver `metadataSignRequest`), que es un
+ *      buzon muerto: el OTP no le llega a nadie y la prueba no prueba nada.
+ *   2. `--numero-documento` tiene que tener entre 4 y 20 DIGITOS. No es una
+ *      regla del script: es la del mini-app (`src/routes/public.js`, la ruta
+ *      `identifyBody` exige `regex(/^\\d+$/)` con 4..20 caracteres) y el
+ *      front-end borra lo que no sea digito. Un numero con letras nunca
+ *      podria identificarse en el celular, aunque el servidor lo aceptara.
+ *   3. El numero que va en el comando tiene que ser EXACTAMENTE el que el
+ *      firmante escribe en el celular: la comparacion es por huella
+ *      (`sha256` -> HMAC), no por contenido. Por eso el script calcula la
+ *      huella con el mismo numero que imprime.
+ *
+ * @param {object} args
+ * @returns {string|null}
+ */
+function validarArgumentos(args) {
+  // 1. El correo del firmante.
+  if (args.correo !== null && args.correo !== undefined) {
+    if (String(args.correo).trim() === '') {
+      return '--correo quedo vacio. Pasa el correo real del firmante (a donde '
+        + 'llega el codigo de verificacion). Sin ese dato la solicitud queda '
+        + 'con prueba@example.com, que es un buzon muerto: el OTP no llega a '
+        + 'nadie y la prueba no prueba nada.';
+    }
+    if (_esMarcador(args.correo, MARCADORES.correo)) {
+      return 'El valor de --correo ("' + args.correo + '") es un marcador de '
+        + 'ejemplo, no un correo. Reemplazalo por el correo real del firmante '
+        + 'y vuelve a correr.';
+    }
+    if (!_pareceCorreo(args.correo)) {
+      return 'El valor de --correo ("' + args.correo + '") no parece un correo '
+        + '(falta el @ o el dominio).';
+    }
+  }
+
+  // 1b. El canal de copia de la Empresa.
+  if (args.correoEmpresa !== null && args.correoEmpresa !== undefined
+    && String(args.correoEmpresa).trim() !== '') {
+    if (_esMarcador(args.correoEmpresa, MARCADORES.correo)) {
+      return 'El valor de --correo-empresa ("' + args.correoEmpresa + '") es un '
+        + 'marcador de ejemplo, no un correo.';
+    }
+    if (!_pareceCorreo(args.correoEmpresa)) {
+      return 'El valor de --correo-empresa ("' + args.correoEmpresa + '") no '
+        + 'parece un correo (falta el @ o el dominio).';
+    }
+  }
+
+  // 2 y 3. El numero de documento (solo importa cuando se crea una firma).
+  if (args.e2e) {
+    const numero = String(args.numeroDocumento || args.trabajador || '').trim();
+    if (!numero) {
+      return 'La prueba e2e necesita el numero de documento del firmante '
+        + '(--numero-documento, o --trabajador si es la cedula).';
+    }
+    if (_esMarcador(numero, MARCADORES.numero)) {
+      return 'El numero de documento ("' + numero + '") es un marcador de '
+        + 'ejemplo. Poné el numero real en digitos (por ejemplo 12345678901, '
+        + 'sin puntos ni guiones) y vuelve a correr.';
+    }
+    if (!/^\d{4,20}$/.test(numero)) {
+      return 'El numero de documento ("' + numero + '") tiene que tener entre 4 '
+        + 'y 20 DIGITOS: la mini-app solo acepta digitos y borra lo demas. El '
+        + 'mismo numero, digito por digito, es el que hay que escribir en el '
+        + 'celular.';
+    }
+  }
+
+  return null;
+}
+
 function leerLlave(valorInline, archivo, varAmbiente) {
   if (valorInline) return String(valorInline).trim();
   if (archivo) {
@@ -808,6 +948,15 @@ async function main(argv, opciones) {
     if (args.error !== 'HELP') console.error(args.error);
     return args.error === 'HELP' ? 0 : 2;
   }
+  // Los argumentos se validan ANTES de la primera llamada: un marcador sin
+  // cambiar tiene que fallar en la consola del operador, no con un 400 de
+  // schema del servidor (ver validarArgumentos).
+  const problema = validarArgumentos(args);
+  if (problema) {
+    console.error(problema);
+    args.error = problema;
+    return 2;
+  }
   resultados.length = 0; // Cada corrida arranca limpio.
   _sink = salida;
   try {
@@ -924,6 +1073,7 @@ module.exports = {
   main,
   parseArgs,
   modoEscritura,
+  validarArgumentos,
   multipart,
   pdfDePrueba,
   cabecerasSignRequest,
