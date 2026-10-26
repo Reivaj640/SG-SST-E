@@ -7740,3 +7740,101 @@ re-correr el smoke para obtener una solicitud **con** consentimiento. La excepci
 `firma-service/tests/scripts/smoke-produccion.test.js` (4 tests), `firma-service/web/firma/app.js`
 (el mensaje de `CONSENT_REQUIRED`), `PROMPT.md` (trampa 93), `sgsst-electron-app/BITACORA.md` y
 `Historial.md`.
+
+## 📦️967 · La primera firma real: 16:10:16, hora Colombia
+
+*26-oct-2026 · el piloto de la excepcion de habilitacion · D-03*
+
+### Qué pasó
+
+La primera firma electronica real de K+AIR se hizo y se verificó en producción:
+
+| Dato | Valor |
+|---|---|
+| Solicitud | `SIGN-2026-927141` |
+| Estado | `SIGNED` |
+| Firmada | `2026-10-26T21:10:16.268Z` = **16:10:16 hora Colombia** (26-oct-2026) |
+| Identificación | `CC`, `identificacion_coincidio = 1` (la huella del número dio match exacto) |
+| Canal de verificación | `email` |
+| Consentimiento | `consent_id = 3` (el del Acuerdo de uso, aceptado en la mini-app) |
+| Hash del documento original | `b7d6f08ac783f9404a6ceec32635c86847c09a7fb95297b053f20c6129aa782a` |
+| Hash del documento firmado | `188bf0651dab3d4eba257f477b2f2a7f08f159287f3f0bba6e55e7eb1d5fd6be` |
+| Hash de la evidencia | `8db98db0e5ec9dfc0f82e3b3a41b72698145d028709c30c5b83adf3a799cbe10` |
+| Hash de la manifestación | `2b1ba3d3a311c2c7e253d134c549d38507d649ba0fd116e114153171cf8381b0` |
+| PDF firmado | `/opt/kair-firma/storage/pdfs/firmados/SIGN-2026-927141.pdf` |
+| Constancia | `/opt/kair-firma/storage/pdfs/constancias/SIGN-2026-927141-constancia.pdf` |
+
+La bitácora de auditoría tiene la cadena completa, sin huecos, los catorce eventos con la IP del
+firmante (`181.63.26.145`):
+
+```
+CREATED → INVITE_SENT → PAPER_OPTION_AVAILABLE → VERIFY_CONSULTED → OPENED
+→ IDENTIFICATION_COMPLETED → OTP_SENT → OTP_VERIFIED → CONSENT_ACCEPTED
+→ DOCUMENT_VIEWED → MANIFESTATION_RECORDED → SIGN_COMMITTED → PDF_GENERATED → COPY_SENT
+```
+
+Dos hechos que se leen en esa cadena y que vale la pena mirar: el `CONSENT_ACCEPTED` (16:09:43) es
+**anterior** al `MANIFESTATION_RECORDED` (16:10:17) — el Acuerdo se aceptó antes de la
+manifestación, que es el orden que exige el Bloque E6 — y el `COPY_SENT` dice que la copia salió
+por el canal de la Empresa.
+
+**El círculo forense cierra.** Los tres archivos en disco dan **exactamente** los hashes que la
+base tiene registrados, y sus fechas de archivo están en hora de Colombia (el servidor está en
+`America/Bogota`, trampa 88):
+
+| Archivo | Bytes | Fecha (local) | sha256 |
+|---|---|---|---|
+| `storage/pdfs/originales/SIGN-2026-927141.pdf` | 969 | 16:08 | `b7d6f08a…` = `document_hash_original` |
+| `storage/pdfs/firmados/SIGN-2026-927141.pdf` | 2 777 | 16:10 | `188bf065…` = `document_hash_firmado` |
+| `storage/pdfs/constancias/SIGN-2026-927141-constancia.pdf` | 8 927 | 16:10 | `fd45ed76…` |
+
+El PDF firmado y la constancia se escribieron a las **16:10**, el minuto de la firma
+(`fecha_firma = 21:10:16.268Z`); el original, a las 16:08, el minuto de la creación
+(`21:08:38.074Z`). El reloj del servidor y las marcas de tiempo de la base cuentan lo mismo.
+
+**La excepción 4 quedó cerrada** el 26-oct-2026 a las 16:34:49 hora Colombia (`cerrada_at =
+2026-10-26T21:34:49.116Z`), con el evento `EXCEPCION_CERRADA` (id 13) en la bitácora append-only
+y la IP del operador. El motivo dice exactamente lo que pasó y nada más: que la firma del piloto
+se realizó, con el identificador de la solicitud, la hora en Colombia, la verificación de la
+identificación, el consentimiento que la respaldó y el alcance gastado. **No** afirma la 9A en
+papel (que no se ha hecho) ni una segunda firma que no ocurrió.
+
+Al cerrarse, el bloqueo del D-03 vuelve a levantar para ASEPLUS CARIBE S.A.S.: el sistema vuelve a
+decir *"esta Empresa no tiene Anexo de Encargo firmado"*, que es lo que tiene que pasar.
+
+### La lección (trampa 94)
+
+**El alcance de firmas se gasta al ABRIR la firma, no al firmarla: una solicitud que se abre y no
+se puede completar consume alcance igual, y ese alcance no vuelve.**
+
+La excepción 4 se creó con `alcance_firmas_max: 2` ("1 para el piloto y 1 de repuesto") y terminó
+en **`firmas_usadas: 2` de 2 con una sola firma**. Las dos unidades se gastaron en la apertura de
+dos solicitudes: `SIGN-2026-827084` —que se creó sin el consentimiento del Acuerdo y por tanto era
+imposible de firmar— y `SIGN-2026-927141`, que sí se firmó.
+
+El dato del código que lo explica: `creacion_solicitud` va con `cuenta_firma: true` (gasta
+alcance) y `commit` va con `cuenta_firma: false` (solo verifica una firma ya abierta, y la
+excepción que la abrió es la suya). Por eso el commit pasó con el alcance ya agotado.
+
+Reglas:
+
+1. **El alcance se gasta al abrir, no al firmar.** El número que el abogado autoriza es el número
+   de firmas *abiertas*, no el de firmas *completadas*.
+2. **Una solicitud que se abre y no se puede completar consume alcance igual.** Por eso hay que
+   verificar que la solicitud es **firmable** (consentimiento vinculado, Acuerdo vigente, token
+   vivo) **antes** de abrirla. El alcance gastado no vuelve.
+3. **`firmas_usadas` se lee contra el alcance, no contra las firmas.** "2 de 2" puede querer decir
+   dos firmas o una firma y una carta.
+4. **Agotada no es cerrada** (trampa 90): mientras siga `VIGENTE` y en plazo, la excepción sigue
+   levantando el bloqueo en los puntos que verifican.
+
+### Lo que falta
+
+El piloto **no cierra ningún punto del manifiesto**: el `d03` sigue abierto porque exige probar los
+**cuatro puntos de bloqueo** del D-03 (creación, commit, consentimiento y doble firma) y faltan
+las caras 409 del commit y de la doble firma (el commit solo se alcanza con una solicitud
+pendiente y un consentimiento **aceptado**). La 9A en papel tampoco está hecha. Quedan 14
+bloqueantes: 8 del abogado (v1.1 ×3, `n10_4`, `n86`, Anexo de Encargo ×3), 3 del Anexo de Nube
+(DPA de Google ×2 y la firma por cada Empresa), 2 pruebas reales (9A y D-03) y el flag del D-02.
+
+**Archivos** — `PROMPT.md` (trampa 94), `sgsst-electron-app/BITACORA.md` y `Historial.md`.

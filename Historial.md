@@ -1535,6 +1535,47 @@ smoke para obtener una solicitud con consentimiento. La excepción 4 sigue `VIGE
 
 **Commits** — el 📦966 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️967 · La primera firma real y el cierre de la excepción 4
+
+**Qué pasó.** La primera firma electronica real de K+AIR quedo **hecha y verificada** en produccion:
+`SIGN-2026-927141`, estado `SIGNED`, firmada el **26-oct-2026 a las 16:10:16 hora Colombia**
+(`2026-10-26T21:10:16.268Z`), con identificacion `CC` verificada (`identificacion_coincidio = 1`),
+canal `email` y `consent_id = 3` (el Acuerdo de uso, aceptado en la mini-app). La bitacora tiene la
+cadena completa de los 14 eventos, con la IP del firmante, y el `CONSENT_ACCEPTED` (16:09:43) es
+**anterior** al `MANIFESTATION_RECORDED` (16:10:17): el Acuerdo se aceptó antes de la manifestacion.
+Hashes: documento original `b7d6f08a…`, documento firmado `188bf065…`, evidencia `8db98db0…`,
+manifestacion `2b1ba3d3…`.
+
+**La excepción 4 quedó CERRADA** el 26-oct-2026 a las 16:34:49 hora Colombia (`cerrada_at =
+2026-10-26T21:34:49.116Z`), con el evento `EXCEPCION_CERRADA` (id 13) en la bitacora append-only y
+la IP del operador. El motivo dice lo que pasó y nada mas: la firma del piloto, con el id de la
+solicitud, la hora en Colombia, la verificacion de la identificacion, el consentimiento que la
+respaldo y el alcance gastado. **No** afirma la 9A en papel (no se ha hecho) ni una segunda firma.
+Al cerrarse, el bloqueo del D-03 vuelve a levantar para ASEPLUS: el sistema vuelve a decir "esta
+Empresa no tiene Anexo de Encargo firmado", que es lo que tiene que pasar.
+
+**La leccion (trampa 94):** el alcance de firmas se gasta al **ABRIR** la firma, no al firmarla. La
+excepcion 4 se creo con `alcance_firmas_max: 2` ("1 para el piloto y 1 de repuesto") y termino en
+**`firmas_usadas: 2` de 2 con una sola firma**: las dos unidades se gastaron en la apertura de
+`SIGN-2026-827084` (creada sin el consentimiento del Acuerdo, o sea imposible de firmar) y de
+`SIGN-2026-927141` (la que si se firmo). En el codigo, `creacion_solicitud` va con
+`cuenta_firma: true` (gasta) y `commit` con `cuenta_firma: false` (solo verifica). Reglas: (1) el
+alcance se gasta al abrir; (2) **una solicitud que se abre y no se puede completar consume alcance
+igual**, asi que hay que verificar que es FIRMABLE (consentimiento vinculado, Acuerdo vigente,
+token vivo) antes de abrirla; (3) `firmas_usadas` se lee contra el alcance, no contra las firmas
+("2 de 2" puede ser una firma y una carta); (4) agotada no es cerrada (trampa 90).
+
+**Lo que NO cierra esta firma.** El piloto **no cierra ningun punto del manifiesto**: el `d03` sigue
+abierto porque exige probar los cuatro puntos de bloqueo del D-03 y faltan las caras 409 del
+*commit* y de la *doble firma* (el commit solo se alcanza con una solicitud pendiente y un
+consentimiento ACEPTADO). La 9A en papel tampoco esta hecha. Quedan **14 bloqueantes**: 8 del
+abogado (v1.1 x3, `n10_4`, `n86`, Anexo de Encargo x3), 3 del Anexo de Nube (DPA de Google x2 y la
+firma por cada Empresa), 2 pruebas reales (9A y D-03) y el flag del D-02.
+
+**Archivos tocados** — `PROMPT.md` (trampa 94), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦967 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
