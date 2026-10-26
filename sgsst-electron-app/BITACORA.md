@@ -7968,3 +7968,47 @@ Empresa), la 9A en papel y el flag del D-02.
 
 **Archivos** — `sgsst-electron-app/firma-service/legal-readiness.json` (solo `d03`), `PROMPT.md`
 (trampas 96 y 97), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️970 · El cierre de la jornada: el bloque de estado y el tablero con las cifras reales
+
+*26-oct-2026 · cierre de sesión*
+
+### Qué es
+
+El bloque de estado del 26-oct en el `Historial.md`: qué se hizo hoy con su evidencia, el gate
+medido en producción (**39 items · 25 ok · 13 pendientes · 1 aviso**), los 13 pendientes **con su
+dueño**, lo que **no** se hizo y por qué, las dos brechas que son de este equipo (alerta externa y
+copia off-site) y dónde quedó cada cosa.
+
+### El hallazgo del tablero (trampa 98)
+
+Al reescribir el tablero aparecieron **cifras viejas**: la fila de la v1.1 decía *"38 969 B,
+a88e41af…b7bc5"* y el manifiesto decía *"634b063c…"*. Las dos eran ciertas en su momento: la v1.1 se
+re-empalmó con los doce grupos de la respuesta 11A del abogado y creció. El tablero se había escrito
+con la cifra de la versión anterior y nadie lo actualizó al re-empalmar.
+
+El riesgo no es un número viejo: es que **quien lo lea lo compare con el archivo, no coincida y
+pierda la confianza en todo lo demás** — y, peor, que mande ese hash al abogado como si fuera el
+del texto que se va a revisar. Las filas 1, 7, 9, 11 y 12 se actualizaron con las cifras reales
+(42 475 B · `634b063c…29d0`), y cada fila pendiente dice **quién la cierra**: el abogado, el owner,
+la Empresa o el sistema.
+
+Reglas: las cifras se recalculan contra el archivo, nunca de memoria; el manifiesto y el tablero
+dicen lo mismo del mismo objeto; cada paquete revisa las filas que tocó; y cada fila dice quién
+la cierra.
+
+### Lo que quedó abierto, dicho de una
+
+1. **La confirmación del despliegue del 📦969** en dos comandos (los tres ítems del grupo `d03` en
+   verde y la lista de los 13). El contador bajó de 24/14 a 25/13, que es lo esperado.
+2. **El push de los paquetes 967, 968 y 969**: commiteados en `Dev`, no subidos a `origin/Dev`.
+3. **La respuesta del abogado**: cuando llegue, el orden es quitar la marca del Anexo de Encargo
+   (con su revisión como evidencia) → publicar la v1.1 → llenar el manifiesto → correr la migración
+   del 10.4. **Cuatro bloqueantes de un solo movimiento.**
+4. **La cuenta de Google Workspace/Cloud** (tú, en Google) y **la 9A en papel** (tú y un trabajador
+   de ASEPLUS).
+5. **Las dos brechas de este equipo**: el detector de caídas no avisa a nadie (el RTO de 4 h
+   cuenta desde que el owner se entere) y los respaldos viven en el mismo servidor que los datos.
+
+**Archivos** — `Historial.md` (bloque de estado + tablero), `PROMPT.md` (trampa 98),
+`sgsst-electron-app/BITACORA.md` y este archivo.

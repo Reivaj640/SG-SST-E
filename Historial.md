@@ -1672,27 +1672,88 @@ Empresa), 2 pruebas reales (9A y la 9A/D-03 restante), y el flag del D-02.
 
 **Commits** — el 📦969 (este paquete, en `Dev`).
 
+### 🔻 Estado al cierre de la jornada del 26-oct-2026
+
+**Lo que se hizo hoy, con su evidencia:**
+
+| Hecho | Evidencia |
+|---|---|
+| **La primera firma real de K+AIR** | `SIGN-2026-927141`, `SIGNED`, firmada el 26-oct-2026 a las **16:10:16 hora Colombia** (`21:10:16.268Z`). Identificación CC con coincidencia de huella, canal `email`, `consent_id = 3` (el Acuerdo v1.0 aceptado en la mini-app). Los tres PDF en disco dan **exactamente** los hashes de la base: original `b7d6f08a…`, firmado `188bf065…`, constancia `fd45ed76…`; evidencia `8db98db0…` y manifestación `2b1ba3d3…` |
+| La bitácora de la firma | Los **14 eventos** completos con la IP del firmante: `CREATED → INVITE_SENT → PAPER_OPTION_AVAILABLE → VERIFY_CONSULTED → OPENED → IDENTIFICATION_COMPLETED → OTP_SENT → OTP_VERIFIED → CONSENT_ACCEPTED → DOCUMENT_VIEWED → MANIFESTATION_RECORDED → SIGN_COMMITTED → PDF_GENERATED → COPY_SENT`. El `CONSENT_ACCEPTED` es **anterior** al `MANIFESTATION_RECORDED` |
+| La excepción 4, cerrada con la verdad | Creada con las seis condiciones del abogado, usada **2 de 2**, **CERRADA** el 26-oct a las 16:34:49 con el motivo de la firma (`cerrada_at = 21:34:49.116Z`, evento `EXCEPCION_CERRADA` id 13, bitácora append-only, IP `181.63.26.145`) |
+| El `d03` del manifiesto | `probada: true` con la evidencia de los **cuatro puntos** del bloqueo en las dos direcciones (suite) y del ciclo completo en producción, **con el límite escrito de una**. Verificado en el servidor: **25 ok / 13 pendientes** |
+| El paquete del abogado | Tres documentos con su SHA-256 + una nota de cuatro preguntas, en `%TEMP%\kair-paquete-abogado` (📦968). La nota vive en el repo |
+| Tres herramientas que muerden | El smoke valida los datos del firmante **antes** de llamar (📦965), crea el **consentimiento del Acuerdo** y comprueba el vínculo con la solicitud (📦966) — los dos 400 que gastaron dos ciclos — y el mensaje de `CONSENT_REQUIRED` ya no dice al revés lo que pasa |
+
+**El gate medido en producción (26-oct-2026, después del 📦969):**
+`Items: 39 · OK: 25 · Pendientes: 13 · Avisos: 1 · N/A: 0`
+
+**Los 13 pendientes, y de quién son:**
+
+| Pendiente | De quién |
+|---|---|
+| v1.1 ×3 (publicar, huellas, texto), `n10_4` (migración a la versión vigente), `n86` (custodia de 20 años), Anexo de Encargo ×3 | **el abogado** — el paquete está armado, falta mandarlo (📦968) |
+| DPA de Google ×2 (versión/fecha/evidencia, devolución y supresión, auditoría) | **tú**: crear la cuenta Workspace/Cloud, o la autorización de transferencia |
+| La firma del Anexo de Nube por cada Empresa | la Empresa, cuando tenga el Anexo de Encargo firmado |
+| La 9A en papel | **tú** + un trabajador de ASEPLUS, ante un supervisor |
+| El flag del D-02 | el sistema, al final (después de v1.1 + 9A/10.4 + Anexo de Nube firmado) |
+
+**Lo que NO se hizo, y por qué (para que no se pierda):**
+
+1. **La confirmación del despliegue del 📦969** en dos comandos: los tres ítems del grupo `d03`
+   (`grep -A4 'D-03 · Bloqueo'`) y la lista de los 13 (`grep -E '\[PENDIENTE\]'`). El contador
+   bajó de 24/14 a 25/13, que es lo esperado, pero falta el nombre del ítem en verde.
+2. **El push de los paquetes 967, 968 y 969**: están commiteados en `Dev`, no subidos a
+   `origin/Dev`.
+3. **La respuesta del abogado**: no ha llegado. Cuando llegue, se aplica en este orden: quitar la
+   marca del Anexo de Encargo (con su revisión como evidencia) → publicar la v1.1 → llenar el
+   manifiesto → correr la migración del 10.4. Son **cuatro bloqueantes de un solo movimiento**.
+4. **La cuenta de Google Workspace/Cloud**: es tuya, en Google.
+5. **La 9A en papel**: es tuya y de la Empresa.
+
+**Las dos brechas que son mías, no del abogado (y que no bloquean, pero que el Anexo de Nube ya
+firmó):**
+
+- **Alerta externa**: el detector de caídas deja log y reinicia el servicio, pero **no avisa a
+  nadie**. El RTO de 4 h cuenta desde que el owner se entere: hace falta un monitor de uptime en el
+  panel de Cloudflare.
+- **Copia off-site**: los respaldos viven en el mismo servidor que los datos: hace falta `rclone` y
+  una cuenta.
+
+**Lo que también queda de este repo, sin relación con el gate:** rotar las **5 app passwords** (el
+repo es público y quedaron en el historial), y la decisión de **Node 20 en EOL** (el servidor corre
+20.20.2).
+
+**Dónde quedó cada cosa:**
+
+- Commits de hoy, en `Dev`: `c35abae3` (📦967 firma y cierre de la excepción) · `eacbd6b7`
+  (📦968 paquete del abogado) · `0aec98d6` (📦969 d03 del manifiesto). **Sin push.**
+- Tar del último despliegue: `829d25c076731d6b83868cf0a1f6ddbae730d3e317c476ab782f846c623cb4ae`
+  (563 435 B), desde el commit `0aec98d6`, servido por el puente.
+- Paquete para el abogado: `%TEMP%\kair-paquete-abogado` (4 archivos + `SHA256SUMS.txt`).
+- El Abogado: `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-26.md`.
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
 |---|---|---|
-| 1 | Los 5 huecos de la v1.1 | ✅ Cerrado (f26f8bc1, 📦944). 38 969 B, a88e41af…b7bc5, 0 huecos. El texto armado está en .gitignore y no viaja en el tar: texto_v1_1 seguirá pendiente en el servidor hasta que lo apruebe el abogado. Falta mandárselo (punto 12) |
+| 1 | Los 5 huecos de la v1.1 | ✅ Cerrado (f26f8bc1, 📦944) y **re-empaquemado** con los doce grupos de la respuesta 11A: el texto actual son **42 475 B, 634b063c…29d0, 0 huecos** (el que decía 38 969 B / a88e41af era el anterior). El texto armado está en .gitignore y no viaja en el tar: sigue pendiente en el servidor hasta que lo apruebe el abogado. Falta mandárselo (punto 12) |
 | 2 | NIT + representante legal | ✅ Cerrado (📦950). 900987987 en el manifiesto y en los 6 documentos; quitó el "por diligenciar". Representante: Javier Robles Fontalvo, nombrado en los documentos públicos. partes_encargado en ok |
 | 3 | URLs del Anexo y la política | ✅ Cerrado (📦948). Verificadas por HTTP y selladas. El hallazgo del nudo sigue siendo el más importante: privacidad.html era la política de la app de escritorio; sellarla habría sido un sello falso |
 | 4 | Canal de protección de datos | ✅ Cerrado en los 5 lugares y verificado en el servidor. 📊 Medición del 26-oct: 39 ítems → ✅19 ok · 17 pendiente · 1 aviso · 2 no_aplica (PC). En el servidor con el tar nuevo: ✅ 16 ok · 20 pendiente · 1 aviso · 2 no_aplica |
 | 5 | Responsable + acta | ✅ Cerrado (📦949): el acta no era obligación legal (art. 2.2.2.25.4.4 del Decreto 1074 de 2015; la Resolución 384 de 2026 dice que no hay procedimiento). Con el nombre (📦950) se encendió también partes_encargado |
 | 6 | Canal único de PQRS | ✅ Cerrado (📦950). adminkair@gmail.com + responsable Javier Robles Fontalvo, publicados en los tres documentos del sitio. asepluscaribesas@gmail.com es de ASEPLUS, no de K+AIR: no hay dos canales |
-| 7 | Anexo de Nube | 🟡 La decisión de fondo está tomada y el modelo va diligenciado (📦954). El repo es el MODELO (lo dice el abogado y lo soporta el código). De 53 huecos a 10: 3 los diligencia cada Empresa (no bloquean) y 7 dependen de tus datos. El bug del check que pedía "quitar todos los corchetes" quedó cerrado. Publicado en el sitio (d6cfa7c5, verificado por HTTP). Sigue pendiente firmado_nube: lo firma la Empresa |
+| 7 | Anexo de Nube | 🟡 El modelo va diligenciado (📦954) y publicado en el sitio (d6cfa7c5, verificado por HTTP). **Hoy quedó en 6 corchetes**: 3 del DPA de Google (dependen de la cuenta, punto 9) y 3 del bloque de firma de cada Empresa (se llenan en cada firma, no bloquean). El RTO 4 h, el RPO 24 h, el plan de continuidad y la supresión de 30 días ya están dentro. Sigue pendiente `firmado_nube`: lo firma la Empresa |
 | 8 | DPAs | 🟡 Mitad cerrado: Cloudflare sí, Google no. Cloudflare tiene los 6 campos de su DPA v6.4 (verificado en la fuente oficial) → cloudflare_dpa en ok. Google sigue en false/null: no es un dato nuevo, depende del punto 9 |
-| 9 | Tipo de cuenta de Google | 🔴 Tu dato — y es el que decide el resto. Medido hoy con una copia del manifiesto: si la cuenta es Workspace/Cloud, espera el DPA de Google; si es de consumidor, el ítem ya explica la razón correcta (transferencia internacional, art. 26 Ley 1581) pero se queda pendiente igual, porque ggOk solo es verdadero si es Workspace/Cloud. ⚠️ Con una cuenta de consumidor, devolucion_supresion y auditoria exigen los dos subencargados (cf && gg) y no pueden quedar ok nunca: el gate no se abre con ese dato solo, hay que cambiar el check |
+| 9 | Tipo de cuenta de Google | 🔴 **Tu dato**, y es el que decide el resto. Hoy se le preguntó al abogado como pregunta cerrada con dos caminos: **(1)** crear la cuenta Google Workspace/Cloud con DPA (la recomendada: con eso Google es Encargado, el Anexo dice "transmisión" y no hace falta autorización del Titular) o **(2)** mantener la cuenta de consumo y redactar la autorización expresa de transferencia (art. 26 Ley 1581) como instrumento separado. ⚠️ Con una cuenta de consumidor, `devolucion_supresion` y `auditoria` exigen los dos subencargados (cf && gg) y no pueden quedar ok nunca: el gate no se abre con ese dato solo, hay que cambiar el check |
 | 10 | Ubicación + RTO/RPO + responsables | ✅ **Cerrado y verificado en producción (📦962).** RTO 4 h, RPO 24 h, plan de continuidad y plazo de supresión de 30 días: en el manifiesto y en el Anexo de Nube, y la operación que los respalda instalada y probada (respaldo diario a las 22:00 con `integrity ok`, restauración mensual, detector de caídas cada 5 min, hora del servidor en America/Bogota). Medido en el servidor: **22 ok · 15 pendientes · 2 avisos**. ⚠️ Siguen abiertas la alerta externa (monitor de uptime en Cloudflare) y la copia off-site |
-| 11 | Estado real del Anexo de Encargo | 🟡 Redactado y publicado (📦948), con las cinco cláusulas y la remisión al Anexo de Nube. Falta la revisión del abogado (conserva REVISION_PENDIENTE a propósito) → documento_encargo sigue bloqueando. Ahora el servidor lo dice por la razón verdadera, no por "el documento no está disponible" |
-| 12 | Aprobar la v1.1 con el abogado | 🟡 El texto está listo (38 969 B, a88e41af…b7bc5, 0 huecos). Ahora van dos documentos: la v1.1 y el Anexo de Encargo nuevo. Te los convierto a Word o PDF cuando digas |
+| 11 | Estado real del Anexo de Encargo | 🟡 Redactado y publicado (📦948), con las cinco cláusulas y la remisión al Anexo de Nube, y **cero placeholders**. Conserva `REVISION_PENDIENTE` a propósito → `documento_encargo` sigue bloqueando. **Hoy (📦968) el paquete al abogado le pide la revisión y le copia las cuatro cosas que la propia marca señala** (datos sensibles de salud, envío del enlace y del OTP, plazo de dos días hábiles, devolución de datos), para que responda sin releer el anexo |
+| 12 | Aprobar la v1.1 con el abogado | 🟡 **El paquete está armado (📦968)**: la v1.1 (42 475 B, 634b063c…29d0), el Anexo de Encargo y el Anexo de Nube, con `SHA256SUMS.txt` y una nota de cuatro preguntas numeradas como su respuesta 11A. La carpeta está en `%TEMP%\kair-paquete-abogado`. **Falta que tú lo mandes** |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ Cerrado (f26f8bc1) |
 | 14 | Rotar las 5 app passwords | ⚪ Solo tuyo. El repo es público y quedaron en el historial |
 | 15 | SECURITY.md A/B/C | 🔵 Decidido el 25-oct: se aplaza como sugerencia no restrictiva (plan plan-seguridad-2026-10-25.md, con disparadores y tope 2027-01-31). Sigue en pie Node 20 en EOL desde el 2026-04-30 (el servidor corre 20.20.2) |
 
-**Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias** (7, 8, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
+**Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **4 a medias** (7, 8, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
 **Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **📦963** retiró la fecha de firma ficticia de ASEPLUS (era anterior al alta de la empresa y no tenía PDF), probó el bloqueo del D-03 en sus dos caras (409 y luego 201 con la excepción auditable) y dejó dos evidencias en el manifiesto: el inventario de D-02 en 0 y el token único con el 5c. El **10 cerró del todo y quedó verificado en producción con el 📦962**: el cron quedó instalado, la restauración se probó en el servidor (`tablas=26 migraciones=40 empresas=1`), la hora se corrigió a America/Bogota y el manifiesto y el modelo declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
 Los **7 cerrados**: el 1 (los 5 huecos de la v1.1), el 2 (NIT y representante legal), el 3 (las URLs del Anexo
 y de la política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal),
