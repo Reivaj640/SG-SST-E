@@ -1358,6 +1358,38 @@ servidor), `sgsst-electron-app/BITACORA.md`, `PROMPT.md` (trampas 88 y 89) y `Hi
 
 **Commits** — el 📦960 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️962 · El punto 10 cerrado en producción: 22 ok, 15 bloqueantes
+
+**La verificación en el servidor** (26-oct-2026, 13:39 hora de Colombia): el tar del 📦960 con su hash exacto
+(`9613103c…a928`), el manifiesto y el Anexo de Nube con los hashes del F2 (`5ff11903…e79e3` y
+`f7e126b1…a0a84`), sin migraciones pendientes (40), el servicio `active` y `/health` con `db: ok` y `smtp:
+configured`, el script de restauración corregido instalado (`efc70395…4af`), el tercer cron (prueba de
+restauración mensual) instalado, la prueba de restauración con **`tablas=26 migraciones=40 empresas=1 firmas=0
+consentimientos=0`** y el temporal borrado, y el check legal en **`Items: 39 · OK: 22 · Pendientes: 15 · Avisos:
+2 · N/A: 0`**.
+
+**El punto 10 queda cerrado con evidencia.** Los cuatro datos (RTO 4 h, RPO 24 h, plan de continuidad y
+supresión de 30 días) están en el manifiesto y en el Anexo de Nube, y la operación que los respalda está
+instalada, programada y probada: respaldo diario a las 22:00 con verificación de integridad de la copia,
+prueba de restauración mensual, detector de caídas cada 5 minutos y la hora del servidor en America/Bogota.
+
+**Los 15 que quedan, en tres clases.** **6 son del abogado**: las tres de la v1.1 (texto, huella, versión
+activa) más el `n86`, y las tres del Anexo de Encargo (estado real, plantilla sin la marca de revisión y firma
+por cada empresa). **6 se cierran probando** en el ambiente real: 9A, 10.4, D-03, el inventario de D-02, el
+flag de D-02 y el token único. **3 son del Anexo de Nube**: dos del DPA de Google (el modelo y el tipo de
+cuenta) y la firma por cada Empresa. Y hay un orden que el propio check declara: **el flag de D-02 no se puede
+encender antes** de que la v1.1 esté publicada, la 9A y la 10.4 probadas y el Anexo de Nube firmado — es el
+último en cerrarse, no el primero.
+
+**Los dos instrumentos para las seis pruebas ya existen:** `scripts/smoke-produccion.js` (el e2e con el paso 5c,
+que abre el enlace que el propio script acaba de crear y exige que resuelva) y
+`scripts/inventario-buzon-corporativo.js` (el inventario de buzones del D-02). El comando del smoke ya está
+documentado en el runbook (sección 5).
+
+**Archivos tocados** — `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦962 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
@@ -1371,7 +1403,7 @@ servidor), `sgsst-electron-app/BITACORA.md`, `PROMPT.md` (trampas 88 y 89) y `Hi
 | 7 | Anexo de Nube | 🟡 La decisión de fondo está tomada y el modelo va diligenciado (📦954). El repo es el MODELO (lo dice el abogado y lo soporta el código). De 53 huecos a 10: 3 los diligencia cada Empresa (no bloquean) y 7 dependen de tus datos. El bug del check que pedía "quitar todos los corchetes" quedó cerrado. Publicado en el sitio (d6cfa7c5, verificado por HTTP). Sigue pendiente firmado_nube: lo firma la Empresa |
 | 8 | DPAs | 🟡 Mitad cerrado: Cloudflare sí, Google no. Cloudflare tiene los 6 campos de su DPA v6.4 (verificado en la fuente oficial) → cloudflare_dpa en ok. Google sigue en false/null: no es un dato nuevo, depende del punto 9 |
 | 9 | Tipo de cuenta de Google | 🔴 Tu dato — y es el que decide el resto. Medido hoy con una copia del manifiesto: si la cuenta es Workspace/Cloud, espera el DPA de Google; si es de consumidor, el ítem ya explica la razón correcta (transferencia internacional, art. 26 Ley 1581) pero se queda pendiente igual, porque ggOk solo es verdadero si es Workspace/Cloud. ⚠️ Con una cuenta de consumidor, devolucion_supresion y auditoria exigen los dos subencargados (cf && gg) y no pueden quedar ok nunca: el gate no se abre con ese dato solo, hay que cambiar el check |
-| 10 | Ubicación + RTO/RPO + responsables | ✅ **Cerrado con evidencia (📦960).** RTO 4 h, RPO 24 h, plan de continuidad y plazo de supresión de 30 días: decididos, redactados y **medidos en el servidor** (respaldo automático a las 22:00 con `integrity ok`, restauración probada con 40 migraciones y 26 tablas, detector de caídas cada 5 min, y la hora del servidor corregida a America/Bogota). `rto_rpo` en **ok**. ⚠️ Falta el despliegue del 📦960 para que el servidor lo vea. ⚠️ Siguen abiertas la alerta externa (monitor de uptime en Cloudflare) y la copia off-site |
+| 10 | Ubicación + RTO/RPO + responsables | ✅ **Cerrado y verificado en producción (📦962).** RTO 4 h, RPO 24 h, plan de continuidad y plazo de supresión de 30 días: en el manifiesto y en el Anexo de Nube, y la operación que los respalda instalada y probada (respaldo diario a las 22:00 con `integrity ok`, restauración mensual, detector de caídas cada 5 min, hora del servidor en America/Bogota). Medido en el servidor: **22 ok · 15 pendientes · 2 avisos**. ⚠️ Siguen abiertas la alerta externa (monitor de uptime en Cloudflare) y la copia off-site |
 | 11 | Estado real del Anexo de Encargo | 🟡 Redactado y publicado (📦948), con las cinco cláusulas y la remisión al Anexo de Nube. Falta la revisión del abogado (conserva REVISION_PENDIENTE a propósito) → documento_encargo sigue bloqueando. Ahora el servidor lo dice por la razón verdadera, no por "el documento no está disponible" |
 | 12 | Aprobar la v1.1 con el abogado | 🟡 El texto está listo (38 969 B, a88e41af…b7bc5, 0 huecos). Ahora van dos documentos: la v1.1 y el Anexo de Encargo nuevo. Te los convierto a Word o PDF cuando digas |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ Cerrado (f26f8bc1) |
@@ -1379,7 +1411,7 @@ servidor), `sgsst-electron-app/BITACORA.md`, `PROMPT.md` (trampas 88 y 89) y `Hi
 | 15 | SECURITY.md A/B/C | 🔵 Decidido el 25-oct: se aplaza como sugerencia no restrictiva (plan plan-seguridad-2026-10-25.md, con disparadores y tope 2027-01-31). Sigue en pie Node 20 en EOL desde el 2026-04-30 (el servidor corre 20.20.2) |
 
 **Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias** (7, 8, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
-**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 cerró del todo con el 📦960**: el cron quedó instalado, la restauración se probó en el servidor y la hora del servidor se corrigió a America/Bogota, así que el manifiesto y el modelo ya declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
+**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 cerró del todo y quedó verificado en producción con el 📦962**: el cron quedó instalado, la restauración se probó en el servidor (`tablas=26 migraciones=40 empresas=1`), la hora se corrigió a America/Bogota y el manifiesto y el modelo declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
 Los **7 cerrados**: el 1 (los 5 huecos de la v1.1), el 2 (NIT y representante legal), el 3 (las URLs del Anexo
 y de la política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal),
 el 6 (el canal único de PQRS) y el 13 (los 4 marcadores y el sello de versión). Los que siguen **bloqueando la

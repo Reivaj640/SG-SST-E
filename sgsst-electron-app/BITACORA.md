@@ -7469,3 +7469,45 @@ tabla), `firma-service/deploy/README-DESPLIEGUE.md` (la hora del servidor),
 `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (la hora del servidor),
 `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md` (evidencia del
 servidor), `PROMPT.md` (trampas 88 y 89) y `Historial.md`.
+
+## 📦️962 · El punto 10 cerrado en producción
+
+*26-oct-2026 · la verificación del despliegue del 📦960 · el último bloqueante de continuidad*
+
+### Lo que se verificó en el servidor (13:39 hora de Colombia)
+
+- El tar del 📦960 con su hash exacto: `9613103c…a928`.
+- El manifiesto y el Anexo de Nube con los hashes del F2: `5ff11903…e79e3` y `f7e126b1…a0a84`.
+- Sin migraciones pendientes (40 aplicadas), servicio `active`, `/health` con `db: ok` y `smtp: configured`.
+- El script de restauración corregido instalado: `efc70395…4af`.
+- El tercer cron (prueba de restauración mensual) instalado.
+- La prueba de restauración: **`tablas=26 migraciones=40 empresas=1 firmas=0 consentimientos=0`**, con el
+  temporal borrado.
+- El check legal: **`Items: 39 · OK: 22 · Pendientes: 15 · Avisos: 2 · N/A: 0`**.
+
+### El punto 10 queda cerrado con evidencia
+
+Los cuatro datos (RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días) están en el manifiesto y en
+el Anexo de Nube, y la operación que los respalda está instalada, programada y probada: respaldo diario a las
+22:00 con verificación de integridad de la copia, prueba de restauración mensual, detector de caídas cada 5
+minutos y la hora del servidor en America/Bogota.
+
+### Los 15 que quedan, en tres clases
+
+| Clase | Cuántos | Cuáles |
+|---|---|---|
+| **Del abogado** | 6 | las tres de la v1.1 (texto, huella, versión activa) más el `n86`, y las tres del Anexo de Encargo |
+| **Se cierran probando** | 6 | 9A, 10.4, D-03, el inventario de D-02, el flag de D-02 y el token único |
+| **Del Anexo de Nube** | 3 | dos del DPA de Google (el modelo y el tipo de cuenta) y la firma por cada Empresa |
+
+Hay un orden que el propio check declara: **el flag de D-02 no se puede encender antes** de que la v1.1 esté
+publicada, la 9A y la 10.4 probadas y el Anexo de Nube firmado. Es el último en cerrarse, no el primero.
+
+### Los dos instrumentos que ya existen para las seis pruebas
+
+- `scripts/smoke-produccion.js` — el e2e con el paso 5c, que abre el enlace que el propio script acaba de crear
+  y exige que resuelva. El comando exacto está en el runbook (sección 5).
+- `scripts/inventario-buzon-corporativo.js` — el inventario de buzones del D-02, que es "el resultado no es una
+  decisión: es el insumo" (así lo dice el propio script).
+
+**Archivos** — `Historial.md` (esta sección y el tablero).
