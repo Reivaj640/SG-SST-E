@@ -211,9 +211,15 @@ sudo chown -R kairfirma:kairfirma /opt/kair-firma/app /opt/kair-firma/legal
 sha256sum /opt/kair-firma/app/src/crypto/token.js
 sha256sum /opt/kair-firma/app/src/services/signRequest.js
 
-# 4. LAS MIGRACIONES, con el servicio parado y ANTES de arrancar
-cd /opt/kair-firma/app
-sudo -u kairfirma node src/db/migrate.js 2>&1 | tail -20
+# 4. LAS MIGRACIONES, con el servicio parado y ANTES de arrancar.
+#    OJO: con el .env cargado. El .env real esta en /opt/kair-firma/.env y
+#    src/config.js lo busca con dotenv en /opt/kair-firma/app/.env, que NO
+#    existe: sin las variables, DB_PATH cae al default ./data/firma.sqlite,
+#    resuelve a /opt/kair-firma/app/data/firma.sqlite (un directorio que no
+#    esta) y SQLite revienta al abrir la base DENTRO del require. El error
+#    sale con el stack terminando en Module._compile y no dice nada de la base.
+#    (Pasa el 26-oct-2026 con el despliegue del 📦954.)
+sudo -u kairfirma bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node src/db/migrate.js' 2>&1 | tail -20
 
 # 5. Arrancar: el proceso nuevo carga lo que esta en disco
 sudo systemctl start kair-firma

@@ -7147,3 +7147,67 @@ No cambia el código: el paquete y el runbook. Sigue pendiente el redespliegue (
 Cockpit), el tipo de cuenta de Google (que además puede obligar a cambiar el check), el RTO/RPO, el
 plan de continuidad, el plazo de supresión, la firma del Anexo de Nube por la Empresa y la revisión
 del abogado del Anexo de Encargo.
+
+## 📦️956 · Una cuenta de Google de consumidor: el check le exigía un DPA a quien no es subencargado
+
+*26-oct-2026 · el punto 9 · el dato que llegó del servidor*
+
+### El dato
+
+Del despliegue del 26-oct-2026: `SMTP_USER=adminkair@gmail.com`. Esa es una cuenta de **consumo**, no
+de Workspace: el dominio es `gmail.com`, no un dominio propio con administración.
+
+### Lo que el check exigía
+
+`devolucionOk = cf.devolucion_supresion === true && gg.devolucion_supresion === true` y
+`auditoriaOk = cf.auditoria === true && gg.auditoria === true`: los **dos** subencargados. Y
+`ggOk = (cuenta es workspace o cloud) && _proveedorOk(gg)`: con una cuenta de consumidor, `ggOk` es
+falso para siempre.
+
+La consecuencia se midió con una copia del manifiesto, sin tocar el del repo:
+
+| cuenta de Google | `google_dpa` | `devolucion_supresion` | `auditoria` |
+|---|---|---|---|
+| Workspace/Cloud con DPA | ok | ok | ok |
+| Workspace/Cloud sin DPA | pendiente | pendiente | pendiente |
+| **consumidor** | **pendiente, para siempre** | **pendiente, para siempre** | **pendiente, para siempre** |
+| sin declarar | pendiente | pendiente | pendiente |
+
+Con una cuenta de consumidor, **el gate no se podía abrir**: no importaba cuánto llenara el owner. El
+item `google_dpa` hasta explicaba la razón correcta ("Google no actúa como subencargado y el envío es
+transferencia internacional") y se quedaba en `pendiente` de todas formas, porque el estado salía de
+`ggOk`.
+
+### La regla
+
+**Un check que le exige un contrato a quien no es parte del contrato es un bloqueo permanente.** La
+pregunta que había que hacerse no era "¿tiene Google las cláusulas?" sino "¿es Google un
+subencargado?". Con una cuenta de consumo, Google **no lo es**: una cuenta gratuita no tiene Data
+Processing Addendum, y el tratamiento es transferencia internacional (art. 26 de la Ley 1581), que
+tiene su propio requisito (autorización expresa del Titular o excepción) — no un DPA.
+
+Y el requisito de la devolución y la auditoría no es "de los subencargados" en abstracto: es "de
+**cada** subencargado". Un AND de dos, con uno solo que sea subencargado, se resuelve con el que
+existe.
+
+### Lo que se hizo
+
+- `google_dpa`: con `cuenta: "consumidor"` el item queda **ok** (el detalle ya explicaba el art. 26);
+  con Workspace/Cloud sigue exigiendo el DPA, y ahora el detalle distingue "falta el DPA" de "falta
+  declarar el tipo de cuenta".
+- `devolucion_supresion` y `auditoria`: Cloudflare siempre cuenta; Google cuenta **solo** si es
+  subencargado. Los títulos decían "en ambos subencargados" y ahora dicen "en los subencargados".
+- **5 tests nuevos**: la vía normal no se toca; la cuenta de consumidor resuelve los tres; la salida
+  **no le perdona a Cloudflare** sus propias cláusulas; sin declarar la cuenta los tres siguen
+  pendientes; y con Workspace/Cloud sin DPA, el de Google sigue pendiente.
+- **3 mutaciones comprobadas**: volver al AND de los dos, quitar la salida en `google_dpa`, y perdonar
+  las cláusulas de Cloudflare — las tres rompen un test.
+- Suite completa: **1741 tests · 1739 verdes · 0 rojos · 2 omitidos**.
+- El runbook: la migración ahora carga el `.env` (ver la nota del despliegue del 26-oct-2026).
+
+### Lo que este paquete NO cierra
+
+Declarar la cuenta en el manifiesto y llenar los tres huecos del modelo **depende de dos archivos que
+la otra sesión tenía sin commitear** (el manifiesto y los HTML del Anexo de Nube): hacerlos exige
+escribir sobre un trabajo a medio terminar. Y la base del art. 26 —autorización expresa o
+excepción— es del abogado, no del código.

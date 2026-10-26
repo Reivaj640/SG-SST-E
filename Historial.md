@@ -1149,6 +1149,43 @@ con `legal/`).
 
 **Commits** — el 📦955 (este paquete, en `Dev`) y el `d6cfa7c5` (el Anexo de Nube publicado, en `gh-pages`).
 
+### 2026-10-26 · 📦️956 · Una cuenta de Google de consumidor: el check le exigía un DPA a quien no es subencargado
+
+**El dato.** Del despliegue del 26-oct-2026: `SMTP_USER=adminkair@gmail.com`. Es una cuenta de **consumo**, no
+de Workspace. Google, con una cuenta de consumo, **no es subencargado**: una cuenta gratuita no tiene Data
+Processing Addendum, y el envío de correo con datos personales es una **transferencia internacional** (art. 26 de la
+Ley 1581), que tiene su propio requisito: autorización expresa del Titular o una excepción.
+
+**Lo que el check exigía.** `devolucionOk` y `auditoriaOk` exigían los **dos** subencargados (`cf && gg`), y
+`ggOk` solo era verdadero con cuenta Workspace/Cloud. Medido con una copia del manifiesto: con una cuenta de
+consumidor, `google_dpa`, `devolucion_supresion` y `auditoria` **no podían quedar `ok` nunca**. El item
+`google_dpa` hasta explicaba la razón correcta y se quedaba pendiente igual, porque el estado salía del AND. Con
+esa cuenta, **el gate no se abría por más que el owner llenara todo lo demás**.
+
+**Lo que se hizo.** `google_dpa` queda **ok** con `cuenta: "consumidor"` (el detalle ya explicaba el art. 26); con
+Workspace/Cloud sigue exigiendo el DPA, y el detalle ahora distingue "falta el DPA" de "falta declarar el tipo de
+cuenta". `devolucion_supresion` y `auditoria`: Cloudflare siempre cuenta y Google **solo** si es subencargado. Los
+títulos decían "en ambos subencargados" y ahora dicen "en los subencargados".
+
+**Verificación.** 5 tests nuevos: la vía normal (Workspace/Cloud con DPA completo) no se toca; la cuenta de
+consumidor resuelve los tres items; la salida **no le perdona a Cloudflare** sus propias cláusulas; sin declarar el
+tipo de cuenta los tres siguen pendientes; y con Workspace/Cloud sin DPA el de Google sigue pendiente. **3
+mutaciones comprobadas**: volver al AND de los dos, quitar la salida en `google_dpa` y perdonar las cláusulas de
+Cloudflare rompen un test cada una. Suite completa: **1741 tests · 1739 verdes · 0 rojos · 2 omitidos** (antes
+1735/1733/0/2).
+
+**De paso, el runbook.** El comando de migración del despliegue del 26-oct crasheó: `src/config.js` busca el
+`.env` con dotenv en `/opt/kair-firma/app/.env`, pero el real está en `/opt/kair-firma/.env`. Sin variables,
+`DB_PATH` cae al default y SQLite revienta al abrir la base **dentro del `require`** (el stack termina en
+`Module._compile` y no dice nada de la base). El runbook ahora usa la forma de siempre:
+`sudo -u kairfirma bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node src/db/migrate.js'`.
+
+**Archivos tocados** — `firma-service/src/services/readinessLegal.js`, `firma-service/tests/readiness-legal.test.js`,
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md`, `sgsst-electron-app/BITACORA.md`, `PROMPT.md` (trampa 84),
+`Historial.md`.
+
+**Commits** — el 📦956 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |

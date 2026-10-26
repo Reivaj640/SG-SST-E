@@ -603,3 +603,94 @@ test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/'
     );
   }
 });
+
+// =============================================================================
+// 📦956 · Una cuenta de Google de CONSUMIDOR no es subencargado
+//
+// El dato vino del servidor (26-oct-2026): SMTP_USER=adminkair@gmail.com es
+// una cuenta de consumo. Una cuenta gratuita no tiene Data Processing
+// Addendum, asi que no hay DPA que exigirle: el envio de correo con datos
+// personales es una transferencia internacional (art. 26 de la Ley 1581).
+//
+// El check decia `cf && gg` para las clausulas de devolucion y auditoria, y
+// `ggOk` solo era verdadero con cuenta Workspace/Cloud: con una cuenta de
+// consumidor esos TRES items no podian quedar ok nunca. El gate no abria por
+// mas que el owner llenara todo lo demas.
+// =============================================================================
+
+function manifiestoConCuentaGoogle(cuenta, extra = {}) {
+  const man = manifiestoCompleto();
+  man.subencargados.google = {
+    cuenta,
+    dpa: false,
+    version: null,
+    fecha: null,
+    devolucion_supresion: false,
+    auditoria: false,
+    evidencia: null,
+    ...extra,
+  };
+  return man;
+}
+
+function idsPendientesDe(man) {
+  const r = readiness.evaluar({
+    gate: 'primera_firma',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: man,
+    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+  });
+  return r.pendientes.map((p) => p.id);
+}
+
+test('readiness · con una cuenta Workspace/Cloud y el DPA completo, los items de subencargados quedan ok', () => {
+  // La via normal no se toca: Google sigue siendo subencargado y le aplican
+  // las mismas clausulas que a Cloudflare.
+  const ids = idsPendientesDe(manifiestoCompleto());
+  for (const id of ['google_dpa', 'devolucion_supresion', 'auditoria']) {
+    assert.ok(!ids.includes(id), `${id} quedo pendiente: ${JSON.stringify(ids)}`);
+  }
+});
+
+test('readiness · una cuenta de Google de consumidor no es subencargado: no hay DPA que exigirle', () => {
+  const ids = idsPendientesDe(manifiestoConCuentaGoogle('consumidor'));
+  assert.ok(
+    !ids.includes('google_dpa'),
+    `google_dpa quedo pendiente con una cuenta de consumidor: ${JSON.stringify(ids)}`,
+  );
+});
+
+test('readiness · con una cuenta de consumidor, la devolucion y la auditoria se resuelven con Cloudflare', () => {
+  const ids = idsPendientesDe(manifiestoConCuentaGoogle('consumidor'));
+  assert.ok(!ids.includes('devolucion_supresion'), `devolucion_supresion pendiente: ${JSON.stringify(ids)}`);
+  assert.ok(!ids.includes('auditoria'), `auditoria pendiente: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · la salida de consumidor no le perdona a Cloudflare sus propias clausulas', () => {
+  // La segunda salida es para Google, no para todos: si Cloudflare no trae
+  // la clausula, el item sigue pendiente.
+  const man = manifiestoConCuentaGoogle('consumidor');
+  man.subencargados.cloudflare.devolucion_supresion = false;
+  man.subencargados.cloudflare.auditoria = false;
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('devolucion_supresion'), `devolucion_supresion no quedo pendiente: ${JSON.stringify(ids)}`);
+  assert.ok(ids.includes('auditoria'), `auditoria no quedo pendiente: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · sin declarar el tipo de cuenta, los tres items siguen pendientes', () => {
+  // Declarar el tipo de cuenta es lo que abre la salida: sin declararlo no
+  // se puede asumir que Google no es subencargado.
+  const ids = idsPendientesDe(manifiestoConCuentaGoogle(null));
+  for (const id of ['google_dpa', 'devolucion_supresion', 'auditoria']) {
+    assert.ok(ids.includes(id), `${id} quedo ok sin declarar la cuenta: ${JSON.stringify(ids)}`);
+  }
+});
+
+test('readiness · con una cuenta Workspace/Cloud sin DPA, el item de Google sigue pendiente', () => {
+  const ids = idsPendientesDe(manifiestoConCuentaGoogle('workspace'));
+  assert.ok(
+    ids.includes('google_dpa'),
+    `google_dpa quedo ok sin el DPA de Google: ${JSON.stringify(ids)}`,
+  );
+});

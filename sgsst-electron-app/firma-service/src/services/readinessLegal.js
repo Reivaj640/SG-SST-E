@@ -1229,10 +1229,22 @@ function evaluar(opciones = {}) {
     && _numeroPositivo(inf.rpo_horas)
     && !!_texto(inf.plan_continuidad);
   const cfOk = _proveedorOk(cf);
+  // 📦956 Una cuenta de Google de CONSUMIDOR no es subencargado: una cuenta
+  // gratuita no tiene Data Processing Addendum, y el envio de correo con
+  // datos personales es una transferencia internacional (art. 26 de la Ley
+  // 1581). Antes el check exigia las clausulas de los DOS subencargados
+  // (`cf && gg`), asi que con una cuenta de consumidor estos tres items no
+  // podian quedar `ok` nunca: el gate no abria por mas que se llenara todo
+  // lo demas. Google cuenta como subencargado solo si la cuenta es
+  // Workspace/Cloud; en ese caso le aplican las mismas clausulas.
   const ggCuentaOk = gg.cuenta === 'workspace' || gg.cuenta === 'cloud';
+  const ggEsConsumidor = gg.cuenta === 'consumidor';
   const ggOk = ggCuentaOk && _proveedorOk(gg);
-  const devolucionOk = cf.devolucion_supresion === true && gg.devolucion_supresion === true;
-  const auditoriaOk = cf.auditoria === true && gg.auditoria === true;
+  const googleOk = ggEsConsumidor || ggOk;
+  const devolucionOk = cf.devolucion_supresion === true
+    && (ggEsConsumidor || (ggCuentaOk && gg.devolucion_supresion === true));
+  const auditoriaOk = cf.auditoria === true
+    && (ggEsConsumidor || (ggCuentaOk && gg.auditoria === true));
   const exigirNube = cfg.exigirAnexoNube === true;
   const empresasNubeOk = !exigirNube
     ? true
@@ -1344,41 +1356,49 @@ function evaluar(opciones = {}) {
     _item(
       'google_dpa',
       'DPA de Google y tipo de cuenta',
-      _estado(ggOk),
+      _estado(googleOk),
       {
         bloquea: GATE_PRIMERA,
-        detalle: gg.cuenta === 'consumidor'
+        detalle: ggEsConsumidor
           ? 'La cuenta es de consumidor: Google no actúa como subencargado y el envío es transferencia internacional (autorización expresa del Titular o excepción del art. 26 de la Ley 1581).'
           : (ggOk
             ? 'DPA de Google con cuenta Workspace/Cloud y evidencia.'
-            : 'Falta el tipo de cuenta de Google (Workspace/Cloud o de consumidor) y, si es Workspace/Cloud, su DPA.'),
-        accion: 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
+            : (ggCuentaOk
+              ? 'Falta el DPA de Google o alguna de sus cláusulas (devolución/supresión o auditoría).'
+              : 'Falta declarar el tipo de cuenta de Google (Workspace/Cloud o de consumidor).')),
+        accion: ggEsConsumidor
+          ? 'Documentar en el Anexo de Nube la base del art. 26 (autorización expresa del Titular o excepción) y el aviso al Titular.'
+          : 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
         referencia: 'legal-readiness.json → subencargados.google',
       },
     ),
     _item(
       'devolucion_supresion',
-      'Devolución y supresión en ambos subencargados',
+      'Devolución y supresión en los subencargados',
       _estado(devolucionOk),
       {
         bloquea: GATE_PRIMERA,
         detalle: devolucionOk
-          ? 'Cloudflare y Google aceptan devolución y supresión.'
+          ? (ggEsConsumidor
+            ? 'Cloudflare acepta devolución y supresión; Google no es subencargado en una cuenta de consumidor.'
+            : 'Cloudflare y Google aceptan devolución y supresión.')
           : 'Falta la cláusula de devolución/supresión en Cloudflare o Google.',
-        accion: 'Verificar y documentar la devolución/supresión en ambos DPAs.',
+        accion: 'Verificar y documentar la devolución/supresión en los DPAs de los subencargados.',
         referencia: 'legal-readiness.json → subencargados',
       },
     ),
     _item(
       'auditoria',
-      'Auditoría en ambos subencargados',
+      'Auditoría en los subencargados',
       _estado(auditoriaOk),
       {
         bloquea: GATE_PRIMERA,
         detalle: auditoriaOk
-          ? 'Cloudflare y Google permiten auditoría.'
+          ? (ggEsConsumidor
+            ? 'Cloudflare permite auditoría; Google no es subencargado en una cuenta de consumidor.'
+            : 'Cloudflare y Google permiten auditoría.')
           : 'Falta la cláusula de auditoría en Cloudflare o Google.',
-        accion: 'Verificar y documentar la auditoría en ambos DPAs.',
+        accion: 'Verificar y documentar la auditoría en los DPAs de los subencargados.',
         referencia: 'legal-readiness.json → subencargados',
       },
     ),
