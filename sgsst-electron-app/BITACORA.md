@@ -7897,3 +7897,74 @@ Barrido de caracteres no latinos limpio en los cuatro archivos del paquete.
 
 **Archivos** — `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-26.md`
 (nuevo), `PROMPT.md` (trampa 95), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+## 📦️969 · El d03 del manifiesto: la evidencia dice dónde se probó cada parte
+
+*26-oct-2026 · el punto `d03` del manifiesto · y una mina de aislamiento de tests*
+
+### Qué se cerró
+
+`legal-readiness.json` → `d03.probada: true`, con la evidencia del D-03 (2 926 caracteres).
+**Solo cambió esa sección**: el parche compara el objeto entero antes y después e imprime qué
+secciones cambiaron.
+
+### Las dos fuentes de la evidencia, y la evidencia dice cuál es cuál
+
+**1. La suite automatica** prueba los cuatro puntos del bloqueo **en las dos direcciones**
+(`tests/excepcion-habilitacion.test.js`):
+
+| Punto | Sin excepción | Con excepción |
+|---|---|---|
+| (i) creación | "sin excepcion NO se crea la solicitud" | "con excepcion la solicitud SI se crea" |
+| (ii) commit | "sin excepcion vigente NO se firma" | "con excepcion vigente la firma pasa y queda escrita" |
+| (iii) consentimiento | "sin excepcion NO se crea" | "con excepcion SI se crea" |
+| (iv) doble firma | "sin excepcion vigente NO se crea el hijo" | — |
+
+Más el ciclo de vida de la excepción: "agotado el alcance deja de servir", "cerrar la deja sin vigor y
+queda escrito" y "la migracion 036 la vuelve append-only de verdad".
+
+**2. La producción** (kair-server, 26-oct-2026) probar el mecanismo de punta a punta: la excepción 4
+creada con las seis condiciones, usada 2 de 2, **cerrada con el motivo verdadero**, la cara **409
+real** observada en el punto (i) creación, y la firma piloto verificada por hash (original
+`b7d6f08a`, firmado `188bf065`, evidencia `8db98db0`, manifestación `2b1ba3d3`, 14 eventos).
+
+### El límite, escrito de una
+
+En el servidor real **no** se observaron las caras 409 de los puntos (ii) commit, (iii) consentimiento
+y (iv) doble firma. No es un descuido: en el commit el chequeo del D-03 va **antes** de generar el
+PDF, y en la doble firma el fallo queda en el **log** del servidor (`firma-dual: error creando hijo`),
+no en la respuesta, porque el padre ya firmó legalmente. Esas tres caras están probadas por la suite
+sobre el **mismo código** que corre en producción (mismo tar, mismo módulo).
+
+### La lección (trampa 96)
+
+**La evidencia de un control dice DÓNDE se probó cada parte: la suite que pasa no es el servidor que
+corre.** Una corrida en el servidor no prueba todas las ramas, y una suite en verde tampoco es una
+observación de producción. Un booleano de "probada" es una puerta: lo que la sostiene es el texto de
+la evidencia, y ese texto tiene que poder auditarse — **límite incluido**. No se presenta como cierre
+lo que es un límite.
+
+### La mina (trampa 97)
+
+Corriendo `node --test tests/readiness-anexo-empresas.test.js` **suelto**, tres tests fallan con
+`{ code: 'SQLITE_ERROR' }`; dentro de la suite completa el mismo archivo pasa. No es el archivo:
+depende del setup de otro y, solo, no encuentra el esquema.
+
+El riesgo real no es el error: es que el que lo corre suelto **crea que rompió algo** — en este caso,
+que el manifiesto estaba mal — y revierta un cambio que estaba bien. Por eso, antes de dar por rota una
+cosa, se reprodujo con el estado anterior (fallaba igual con el manifiesto de `HEAD`) y se comparó el
+manifiesto antes y después (solo cambió `d03`).
+
+### Verificación
+
+Suite del service: **1753 tests · 1751 verdes · 0 fallos · 2 omitidos**. Barrido de caracteres no
+latinos limpio; el manifiesto queda en LF, sin BOM; el `JSON.stringify` con 2 espacios conserva el
+formato del archivo.
+
+**Lo que sigue.** El `d03` sale de los pendientes **si el gate lo confirma en el servidor**: el
+manifiesto viaja en el tar, así que esto necesita un despliegue. Quedan 13: 8 del abogado (v1.1 ×3,
+`n10_4`, `n86`, Anexo de Encargo ×3), 3 del Anexo de Nube (DPA de Google ×2 y la firma por cada
+Empresa), la 9A en papel y el flag del D-02.
+
+**Archivos** — `sgsst-electron-app/firma-service/legal-readiness.json` (solo `d03`), `PROMPT.md`
+(trampas 96 y 97), `sgsst-electron-app/BITACORA.md` y `Historial.md`.

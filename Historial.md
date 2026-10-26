@@ -1620,6 +1620,58 @@ del paquete sí vive en el repo, que es donde queda escrito qué se envió y con
 
 **Commits** — el 📦968 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️969 · El d03 del manifiesto: la evidencia dice dónde se probó cada parte
+
+**Qué se cerró.** El manifiesto `legal-readiness.json` tiene ahora `d03.probada: true` con la
+evidencia del D-03 (2 926 caracteres). **Solo cambió esa sección**: el parche imprime qué secciones
+cambiaron y comparó el resto del objeto antes y después.
+
+**La evidencia tiene dos fuentes y las dice:**
+
+1. **La suite automatica** prueba los cuatro puntos del bloqueo **en las dos direcciones**
+   (`tests/excepcion-habilitacion.test.js`): "punto (i) creacion: sin excepcion NO se crea la
+   solicitud" / "con excepcion la solicitud SI se crea"; "punto (ii) commit: sin excepcion vigente
+   NO se firma" / "con excepcion vigente la firma pasa y queda escrita"; "punto (iii) consentimiento:
+   sin excepcion NO se crea" / "con excepcion SI se crea"; "punto (iv) doble firma: sin excepcion
+   vigente NO se crea el hijo". Ademas, "agotado el alcance deja de servir", "cerrar la deja sin
+   vigor y queda escrito" y "la migracion 036 la vuelve append-only de verdad".
+2. **La produccion** (kair-server, 26-oct-2026) probar el mecanismo de punta a punta: la excepcion 4
+   creada con las seis condiciones, usada 2 de 2, **cerrada con el motivo verdadero**, la cara
+   **409 real** observada en el punto (i) creacion, y la firma piloto verificada por hash (original
+   `b7d6f08a`, firmado `188bf065`, evidencia `8db98db0`, manifestacion `2b1ba3d3`, 14 eventos).
+
+**El limite, escrito de una.** En el servidor real **no** se observaron las caras 409 de los puntos
+(ii) commit, (iii) consentimiento y (iv) doble firma: en el commit el chequeo del D-03 va antes de
+generar el PDF, y en la doble firma el fallo queda en el LOG del servidor ("firma-dual: error creando
+hijo"), no en la respuesta, porque el padre ya firmo legalmente. Esas tres caras estan probadas por
+la suite sobre el **mismo codigo** que corre en produccion (mismo tar, mismo modulo).
+
+**La leccion (trampa 96):** la evidencia de un control dice **DONDE** se probo cada parte. El suite
+que pasa no es el servidor que corre, y una corrida en el servidor no prueba todas las ramas. Un
+booleano de "probada" es una puerta: lo que la sostiene es el texto de la evidencia, y ese texto
+tiene que poder auditarse, **limite incluido**. Y no se presenta como cierre lo que es un limite.
+
+**La mina (trampa 97).** Corriendo `node --test tests/readiness-anexo-empresas.test.js` **suelto**,
+tres tests fallan con `{ code: 'SQLITE_ERROR' }`; dentro de la suite completa el mismo archivo
+pasa. No es el archivo: depende del setup de otro y, solo, no encuentra el esquema. El riesgo real es
+que el que lo corre suelto **crea que rompio algo** (en este caso, que el manifiesto estaba mal) y
+revierta un cambio que estaba bien. Por eso, antes de dar por rota una cosa, se reprodujo con el
+estado anterior (fallaba igual con el manifiesto de HEAD) y se comparo el manifiesto antes y despues
+(solo cambio `d03`).
+
+**Verificacion.** Suite del service: **1753 tests · 1751 verdes · 0 fallos · 2 omitidos**. Barrido de
+caracteres no latinos limpio; el manifiesto queda en LF, sin BOM.
+
+**Lo que sigue.** El `d03` cae de los pendientes (de 14 a 13, si el gate lo confirma en el servidor:
+el manifiesto viaja en el tar, asi que esto necesita un despliegue). Quedan 13: 8 del abogado (v1.1
+x3, `n10_4`, `n86`, Anexo de Encargo x3), 3 del Anexo de Nube (DPA de Google x2 y la firma por cada
+Empresa), 2 pruebas reales (9A y la 9A/D-03 restante), y el flag del D-02.
+
+**Archivos tocados** — `sgsst-electron-app/firma-service/legal-readiness.json` (solo `d03`),
+`PROMPT.md` (trampas 96 y 97), `sgsst-electron-app/BITACORA.md` y `Historial.md`.
+
+**Commits** — el 📦969 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
