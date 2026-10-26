@@ -20,13 +20,13 @@
   },
   "infraestructura": {
     "ubicacion_servidor": "Barranquilla, Colombia",
-    "respaldos": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo",
-    "monitoreo": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo",
+    "respaldos": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: copia automatica diaria a las 22:00 (hora de Colombia) de la base de datos y de la evidencia en PDF, con retencion de 30 dias",
+    "monitoreo": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: verificacion automatica de disponibilidad cada 5 minutos, con reinicio del servicio y registro en bitacora",
     "soporte": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo",
     "seguridad_fisica": "a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: el servidor esta en la red local del operador, detras de NAT, y se expone por el tunel de Cloudflare",
-    "rto_horas": null,
-    "rpo_horas": null,
-    "plan_continuidad": null
+    "rto_horas": 4,
+    "rpo_horas": 24,
+    "plan_continuidad": "copia automatica diaria a las 22:00 (hora de Colombia) de la base de datos y de la evidencia en PDF, con retencion de 30 dias; cada copia se verifica con PRAGMA integrity_check y hay una prueba de restauracion mensual; deteccion automatica de caidas cada 5 minutos, con reinicio del servicio y registro en bitacora; si el servidor no vuelve, se restaura en otro equipo con la imagen del sistema y el ultimo respaldo, se avisa a cada Empresa por el canal de PQRS y la firma se reanuda una vez restablecido el servicio, sin que las firmas realizadas pierdan validez"
   },
   "subencargados": {
     "cloudflare": {

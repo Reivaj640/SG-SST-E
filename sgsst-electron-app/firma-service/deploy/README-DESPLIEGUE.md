@@ -189,9 +189,12 @@ echo "0 22 * * * root /opt/kair-firma/backup-firma.sh >> /opt/kair-firma/backups
 echo "*/5 * * * * root /opt/kair-firma/health-check.sh >> /opt/kair-firma/logs/health-check.log 2>&1" | sudo tee /etc/cron.d/kair-firma-health
 ```
 
-El cron usa la hora local del servidor. Confirma con `timedatectl` que sea
-`America/Bogota` (UTC-5), o el respaldo va a caer a una hora distinta de las
-22:00 que declara el Anexo de Nube.
+El cron usa la hora local del servidor. **El servidor debe estar en
+America/Bogota**: con `Etc/UTC` el respaldo de las 22:00 cae a las 17:00 de
+Colombia, los plazos en dias habiles se cuentan con el dia UTC y la constancia
+PDF imprime la hora de UTC. Corrigelo con `sudo timedatectl set-timezone
+America/Bogota` y verifica con `timedatectl` que diga `America/Bogota
+(UTC-05:00)`.
 
 Verifica:
 

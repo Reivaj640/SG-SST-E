@@ -100,6 +100,40 @@ Los comandos van en el §5. Salida esperada: 3 lineas de log del respaldo, 1
 linea de la restauracion, 2 lineas del health check, y `timedatectl` en
 America/Bogota.
 
+#### Requisito previo: la hora del servidor (medido el 26-oct-2026)
+
+El servidor corre en **`Etc/UTC`**, no en hora de Colombia. Eso rompe tres
+cosas a la vez, y por eso es el **primer** paso, antes del cron:
+
+1. **El cron de las 22:00 no es a las 22:00 de Colombia**: en UTC son las
+   17:00. El Anexo de Nube y este plan declaran "22:00 (hora de Colombia)", y
+   esa frase sería falsa.
+2. **Los plazos en dias habiles se cuentan con el calendario UTC**
+   (`src/services/solicitudes.js`, `_sumarDiasHabiles` usa `getDay()`): el
+   plazo de dos (2) dias habiles de PQRS y el de cinco (5) dias habiles de la
+   copia permanente se cuentan desde el dia UTC, que puede ser el dia
+   siguiente (una solicitud del viernes a las 9 de la noche en Colombia es
+   "sabado" en UTC). El codigo mismo dice que el dia debe ser **local**: el
+   servidor es el que esta mal puesto.
+3. **La constancia PDF imprime la hora del servidor**: un documento firmado a
+   la 1 de la tarde en Colombia queda impreso a las 6 de la tarde. La
+   precision legal la da el ISO crudo en base de datos, pero la lectura humana
+   va 5 horas corrida.
+
+La correccion es una linea: `sudo timedatectl set-timezone America/Bogota`.
+Es reversible (`sudo timedatectl set-timezone Etc/UTC`) y **no** toca los datos:
+la base guarda ISO en UTC y las comparaciones son por instante. Lo unico que
+cambia es lo que ya decia tener que ser local (el codigo lo documenta en
+`solicitudes.js:144` y en `pdfGen.js:123`). Colombia no tiene horario de
+verano, asi que UTC-5 es fijo todo el ano.
+
+**Que el deploy del 26-oct-2026 quedo instalado y funcionando** (evidencia):
+el tar con los cuatro hashes correctos, las 40 migraciones aplicadas, el
+servicio `active`, `/health` con `db: ok` y `smtp: configured`, los tres
+scripts de continuidad con sus hashes correctos, los dos crons instalados, un
+respaldo de 458 752 B con `integrity ok` y una restauracion con 26 tablas y
+la empresa registrada.
+
 ### F2 — Llenar el manifiesto y el modelo (solo con la evidencia de F1)
 
 | Donde | Campo | Valor | Cuando |
@@ -140,6 +174,22 @@ sin que exista el respaldo que el RTO promete.
 ## 5. Comandos (para Cockpit, uno por uno)
 
 ### 5.1 Instalar los scripts y los crons
+
+**Paso 0 — la hora del servidor (antes que el cron):**
+
+```bash
+sudo timedatectl set-timezone America/Bogota
+```
+
+```bash
+timedatectl
+```
+
+Debe decir `Time zone: America/Bogota (UTC-05:00)`. Si sigue en `Etc/UTC`, el
+cron de las 22:00 dispararia a las 17:00 de Colombia y los plazos en dias
+habiles se contarian con el dia UTC.
+
+**Despues, los scripts y los crons:**
 
 ```bash
 sudo cp /opt/kair-firma/app/deploy/backup-firma.sh /opt/kair-firma/backup-firma.sh

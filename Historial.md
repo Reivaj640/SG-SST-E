@@ -1310,6 +1310,54 @@ hoy los respaldos viven en el mismo servidor que los datos.
 
 **Commits** — el 📦959 (este paquete, en `Dev`).
 
+### 2026-10-26 · 📦️960 · El RTO con evidencia: la hora del servidor y los cuatro datos
+
+**Lo que quedó medido en el servidor** (26-oct-2026, 13:14 hora de Colombia). El despliegue del 📦959 quedó
+verificado: el tar con su hash exacto, los cuatro hashes de archivos idénticos, las 40 migraciones aplicadas,
+el servicio `active`, `/health` con `db: ok` y `smtp: configured`, los tres scripts de continuidad con sus
+hashes correctos, los dos crons instalados, un respaldo de 458 752 B con `integrity ok`, una restauración con
+26 tablas y la empresa registrada, y el health check con `OK local` y `OK publico`.
+
+**El hallazgo: el servidor estaba en `Etc/UTC`.** Tres consecuencias, todas silenciosas: (1) el cron de las
+22:00 **no era a las 22:00 de Colombia** (en UTC eran las 17:00); (2) los **plazos en días hábiles** —los dos
+(2) de PQRS y los cinco (5) de la copia permanente— se contaban con el **día UTC** (`_sumarDiasHabiles` usa
+`getDay()`), y el propio código dice que el día debe ser local (`solicitudes.js:144`); (3) la **constancia PDF**
+imprimía la hora de UTC. Corregido con `timedatectl set-timezone America/Bogota` y un reinicio del servicio
+(Node lee la zona al arrancar). No toca los datos: la base guarda ISO en UTC y las comparaciones son por
+instante; lo único que cambia es lo que ya decía tener que ser local. Colombia no tiene horario de verano.
+
+**El otro hallazgo: mi propio script medía con nombres inventados.** La primera prueba de restauración en el
+servidor dio `solicitudes=n/d` y `user_version=0`: la tabla `gh_firma_solicitudes` no existe (la real es
+`gh_firmas_electronicas`) y el service no usa `PRAGMA user_version` (registra las migraciones en
+`gh_firma_schema_migrations`). El respaldo estaba bien; el que medía mal era el script. Corregido y vuelto a
+probar en el PC: **OK**.
+
+**El F2: los tres datos y el plazo, ya con evidencia.** Con el cron instalado, la hora corregida, el respaldo
+probado y el detector en marcha, el manifiesto y el modelo se llenan: `rto_horas: 4`, `rpo_horas: 24` y
+`plan_continuidad` (texto completo); en el Anexo de Nube, el RTO, el RPO, el plan de continuidad y el plazo de
+supresión de 30 días. En el modelo hubo una corrección que no estaba en el plan y era obligatoria: la frase
+**"hoy la copia es manual y la copia automática diaria está pendiente"** ya era falsa — un documento que se va
+a firmar no describe cómo funcionaba el servicio antes de cambiarlo. Y el bloque de pendientes pasó de cuatro
+datos a uno (el DPA de Google). Las dos copias (`legal/` y `sitio/`) quedaron **byte a byte idénticas**
+(`f7e126b1…a0a84`).
+
+**Medición tras el F2 (en el PC):** 39 ítems → ✅ 22 ok · 14 pendiente · 1 aviso · 2 N/A, con `rto_rpo` en
+**ok** ("RTO 4 h, RPO 24 h y plan de continuidad"). El modelo quedó con 6 huecos: 3 de la Empresa (los
+diligencia cada Empresa en la copia que firma) y 3 del owner (el DPA de Google).
+
+**El punto 10, en una línea:** el dato está cerrado y con evidencia; falta el despliegue del 📦960 para que el
+servidor lo vea. Y siguen abiertas la alerta externa (monitor de uptime en Cloudflare) y la copia off-site.
+
+**Archivos tocados** — `sgsst-electron-app/legal/anexo-nube-v1.0.html` y `sitio/anexo-nube-v1.0.html` (F2),
+`sgsst-electron-app/firma-service/legal-readiness.json` (F2),
+`sgsst-electron-app/firma-service/deploy/probar-restauracion.sh` (nombres reales de tabla),
+`sgsst-electron-app/firma-service/deploy/README-DESPLIEGUE.md` (la hora del servidor),
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (la hora del servidor),
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md` (evidencia del
+servidor), `sgsst-electron-app/BITACORA.md`, `PROMPT.md` (trampas 88 y 89) y `Historial.md`.
+
+**Commits** — el 📦960 (este paquete, en `Dev`).
+
 ### 📋 El tablero de los 15 puntos (estado medido al 26-oct-2026)
 
 | # | Pendiente | Estado |
@@ -1323,7 +1371,7 @@ hoy los respaldos viven en el mismo servidor que los datos.
 | 7 | Anexo de Nube | 🟡 La decisión de fondo está tomada y el modelo va diligenciado (📦954). El repo es el MODELO (lo dice el abogado y lo soporta el código). De 53 huecos a 10: 3 los diligencia cada Empresa (no bloquean) y 7 dependen de tus datos. El bug del check que pedía "quitar todos los corchetes" quedó cerrado. Publicado en el sitio (d6cfa7c5, verificado por HTTP). Sigue pendiente firmado_nube: lo firma la Empresa |
 | 8 | DPAs | 🟡 Mitad cerrado: Cloudflare sí, Google no. Cloudflare tiene los 6 campos de su DPA v6.4 (verificado en la fuente oficial) → cloudflare_dpa en ok. Google sigue en false/null: no es un dato nuevo, depende del punto 9 |
 | 9 | Tipo de cuenta de Google | 🔴 Tu dato — y es el que decide el resto. Medido hoy con una copia del manifiesto: si la cuenta es Workspace/Cloud, espera el DPA de Google; si es de consumidor, el ítem ya explica la razón correcta (transferencia internacional, art. 26 Ley 1581) pero se queda pendiente igual, porque ggOk solo es verdadero si es Workspace/Cloud. ⚠️ Con una cuenta de consumidor, devolucion_supresion y auditoria exigen los dos subencargados (cf && gg) y no pueden quedar ok nunca: el gate no se abre con ese dato solo, hay que cambiar el check |
-| 10 | Ubicación + RTO/RPO + responsables | 🟡 **8 de 8 en el dato (📦959).** RTO 4 h, RPO 24 h y plan de continuidad decididos y redactados; respaldo diario a las 22:00 con retención de 30 días, prueba de restauración y detector de caídas, los tres scripts **probados en el PC**. ⚠️ Falta la evidencia en el servidor: instalar el cron, correr el respaldo y la prueba de restauración. Solo entonces se llenan el manifiesto y el modelo (trampa 86). ⚠️ El detector deja log y reinicia, pero **no avisa a nadie**: la alerta externa es del owner |
+| 10 | Ubicación + RTO/RPO + responsables | ✅ **Cerrado con evidencia (📦960).** RTO 4 h, RPO 24 h, plan de continuidad y plazo de supresión de 30 días: decididos, redactados y **medidos en el servidor** (respaldo automático a las 22:00 con `integrity ok`, restauración probada con 40 migraciones y 26 tablas, detector de caídas cada 5 min, y la hora del servidor corregida a America/Bogota). `rto_rpo` en **ok**. ⚠️ Falta el despliegue del 📦960 para que el servidor lo vea. ⚠️ Siguen abiertas la alerta externa (monitor de uptime en Cloudflare) y la copia off-site |
 | 11 | Estado real del Anexo de Encargo | 🟡 Redactado y publicado (📦948), con las cinco cláusulas y la remisión al Anexo de Nube. Falta la revisión del abogado (conserva REVISION_PENDIENTE a propósito) → documento_encargo sigue bloqueando. Ahora el servidor lo dice por la razón verdadera, no por "el documento no está disponible" |
 | 12 | Aprobar la v1.1 con el abogado | 🟡 El texto está listo (38 969 B, a88e41af…b7bc5, 0 huecos). Ahora van dos documentos: la v1.1 y el Anexo de Encargo nuevo. Te los convierto a Word o PDF cuando digas |
 | 13 | Los 4 marcadores + "versión v1.0" | ✅ Cerrado (f26f8bc1) |
@@ -1331,7 +1379,7 @@ hoy los respaldos viven en el mismo servidor que los datos.
 | 15 | SECURITY.md A/B/C | 🔵 Decidido el 25-oct: se aplaza como sugerencia no restrictiva (plan plan-seguridad-2026-10-25.md, con disparadores y tope 2027-01-31). Sigue en pie Node 20 en EOL desde el 2026-04-30 (el servidor corre 20.20.2) |
 
 **Resumen del tablero (26-oct-2026, medido):** ✅ **7 cerrados** (1, 2, 3, 4, 5, 6, 13) · 🟡 **5 a medias** (7, 8, 10, 11, 12) · 🔵 **1 decidido y aplazado** (15) · 🔴 **1 que depende solo de tu dato** (9) · ⚪ **1 que es solo tuyo** (14).
-**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 pasó de 4 de 8 a 5 de 8** con la seguridad física y cerró el dato con el 📦959 (RTO 4 h, RPO 24 h, plan de continuidad, respaldo a las 22:00 con retención de 30 días): los tres scripts están probados en el PC, pero el manifiesto y el modelo **siguen en `null` hasta que el cron esté instalado y la restauración probada en el servidor**. Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
+**Actualización del 26-oct-2026:** el **8 dejó de estar enteramente en rojo**: Cloudflare tiene los 6 campos de su DPA (verificados en la fuente oficial) y `cloudflare_dpa` está en **ok**; lo que sigue en rojo es Google, que depende del **punto 9**. El **10 cerró del todo con el 📦960**: el cron quedó instalado, la restauración se probó en el servidor y la hora del servidor se corrigió a America/Bogota, así que el manifiesto y el modelo ya declaran RTO 4 h, RPO 24 h, plan de continuidad y supresión de 30 días (`rto_rpo` en **ok**). Y el **7** ya no tiene la decisión de fondo abierta: el archivo del repo es el modelo, el modelo va diligenciado, está **publicado en el sitio** y **el paquete de despliegue ya lo lleva**.
 Los **7 cerrados**: el 1 (los 5 huecos de la v1.1), el 2 (NIT y representante legal), el 3 (las URLs del Anexo
 y de la política), el 4 (el canal de protección de datos), el 5 (el acta de designación, que no era obligación legal),
 el 6 (el canal único de PQRS) y el 13 (los 4 marcadores y el sello de versión). Los que siguen **bloqueando la

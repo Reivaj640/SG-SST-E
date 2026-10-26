@@ -46,15 +46,18 @@ if [ "$INTEGRIDAD" != "ok" ]; then
   exit 1
 fi
 
-# 3. Que tenga las tablas del servicio (no solo el esquema de la migracion)
+# 3. Que tenga las tablas del servicio (no solo el esquema de la migracion).
+#    Los nombres son los REALES del esquema (src/db/schema/*.sql): medir con
+#    nombres inventados daria "n/d" y pareceria que el respaldo esta vacio.
 TABLAS=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+MIGRACIONES=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM gh_firma_schema_migrations;" 2>/dev/null || echo 'n/d')
 EMPRESAS=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM gh_firma_empresas;" 2>/dev/null || echo 'n/d')
-SOLICITUDES=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM gh_firma_solicitudes;" 2>/dev/null || echo 'n/d')
-VERSION=$(sqlite3 "$TMP" "PRAGMA user_version;" 2>/dev/null || echo 'n/d')
+FIRMAS=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM gh_firmas_electronicas;" 2>/dev/null || echo 'n/d')
+CONSENTIMIENTOS=$(sqlite3 "$TMP" "SELECT COUNT(*) FROM gh_consentimientos_firma;" 2>/dev/null || echo 'n/d')
 
-echo "[$(date -Is)] Restauracion OK: tablas=$TABLAS empresas=$EMPRESAS solicitudes=$SOLICITUDES user_version=$VERSION"
+echo "[$(date -Is)] Restauracion OK: tablas=$TABLAS migraciones=$MIGRACIONES empresas=$EMPRESAS firmas=$FIRMAS consentimientos=$CONSENTIMIENTOS"
 
-# 4. Que la copia no quede tirada en /tmp con los datos personales dentro
+# 4. Que el temporal no quede tirado en /tmp con los datos personales dentro
 rm -f "$TMP"
 trap - EXIT
 echo "[$(date -Is)] El temporal de la prueba se borro."

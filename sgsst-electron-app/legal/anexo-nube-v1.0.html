@@ -36,27 +36,24 @@
     <p><strong>Resumen en una l&iacute;nea:</strong> este Anexo describe la infraestructura del servicio de firma
     electr&oacute;nica K+AIR y lo incorpora al Anexo de Encargo de Tratamiento de Datos Personales. Tiene su propia
     versi&oacute;n y su propia huella; es el modelo que cada Empresa diligencia con sus datos y firma con el
-    Encargado, y no se firma sin los cuatro datos del bloque de pendientes.</p>
+    Encargado, y no se firma sin el DPA de Google que falta en el bloque de pendientes.</p>
   </div>
 
   <div class="aviso">
-    <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Sin estos cuatro datos el Anexo no se puede
+    <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Sin este dato el Anexo no se puede
     firmar:</p>
     <ul>
       <li><strong>DPA de Google y sus clausulas.</strong> La cuenta de correo es de Workspace/Cloud, con su
       Data Processing Addendum: versi&oacute;n, fecha, evidencia, y las clausulas de devoluci&oacute;n y supresi&oacute;n y
       de auditor&iacute;a. Una cuenta de consumidor no habilita el servicio: el Acuerdo (10.5(f)) no permite
       transmitir datos personales a un proveedor sin contrato o DPA.</li>
-      <li><strong>RTO y RPO del servicio.</strong></li>
-      <li><strong>Plan de continuidad operativa.</strong></li>
-      <li><strong>Plazo de supresi&oacute;n de los datos al terminar el encargo.</strong></li>
     </ul>
     <p>Un Anexo que diga &laquo;los subencargados que se usen&raquo; no cumple el art&iacute;culo 2.2.2.25.5.2
     del Decreto 1074 de 2015.</p>
     <p>Los datos del Encargado (NIT 900987987-4, representante legal Javier Robles Fontalvo, ciudad y pa&iacute;s
     Barranquilla, Colombia) y los responsables de respaldos, monitoreo y soporte ya est&aacute;n declarados en
     este modelo, y el DPA de Cloudflare est&aacute; verificado (Data Processing Addendum v6.4, del 3 de abril
-    de 2026). Los cuatro datos de la lista anterior son los que faltan.</p>
+    de 2026). El dato de la lista anterior es el que falta.</p>
   </div>
 
   <p><strong>ANEXO DE NUBE &mdash; SERVICIO DE FIRMA ELECTR&Oacute;NICA K+AIR</strong></p>
@@ -84,15 +81,21 @@
   24.04.5 LTS, en la red local del operador, detr&aacute;s de NAT. Se expone por el t&uacute;nel kair-firma de
   Cloudflare, Inc. hacia firma.kair.fyi. El correo se env&iacute;a por Google LLC (smtp.gmail.com, puerto 587). El
   almacenamiento es el sistema de archivos del servidor; no hay almacenamiento de objetos externo.
-  <strong>Respaldos:</strong> copias de la base de datos del servicio, a cargo de Gesstiar S.A.S., de forma
-  interna, sin proveedor externo; hoy la copia es manual y la copia autom&aacute;tica diaria est&aacute; pendiente.
-  <strong>Monitoreo:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo.
+  <strong>Respaldos:</strong> copias de la base de datos del servicio y de la evidencia en PDF, a cargo de
+  Gesstiar S.A.S., de forma interna, sin proveedor externo; la copia es autom&aacute;tica diaria a las 22:00
+  (hora de Colombia), con retenci&oacute;n de 30 d&iacute;as.
+  <strong>Monitoreo:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo:
+  verificaci&oacute;n autom&aacute;tica de disponibilidad cada cinco (5) minutos, con reinicio del servicio y
+  registro en bit&aacute;cora.
   <strong>Soporte:</strong> interno, a cargo de Gesstiar S.A.S.
   <strong>Seguridad f&iacute;sica:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: el
   servidor est&aacute; en la red local del operador, detr&aacute;s de NAT.
-  <strong>Continuidad:</strong> el tiempo objetivo de recuperaci&oacute;n (RTO) es de [RTO en horas] horas y
-  el punto objetivo de recuperaci&oacute;n (RPO) es de [RPO en horas] horas; plan de continuidad operativa:
-  [plan de continuidad].</p>
+  <strong>Continuidad:</strong> el tiempo objetivo de recuperaci&oacute;n (RTO) es de 4 horas y el punto objetivo
+  de recuperaci&oacute;n (RPO) es de 24 horas; plan de continuidad operativa: se realiza un respaldo diario a las
+  22:00 (hora de Colombia) de la base de datos y de la evidencia en PDF, con retenci&oacute;n de 30 d&iacute;as, y se
+  verifica mensualmente que el respaldo se restaura correctamente; si el servidor no vuelve, se restaura en otro
+  equipo con la imagen del sistema y el &uacute;ltimo respaldo, se avisa a cada Empresa por el canal de PQRS y la
+  firma se reanuda una vez restablecido el servicio, sin que las firmas realizadas pierdan validez.</p>
 
   <h2>4. Subencargados</h2>
   <p>El Responsable autoriza los siguientes, con las obligaciones de este Anexo:</p>
@@ -147,7 +150,7 @@
   <p>Se aplica el 8.6 del Acuerdo: tabla de la Empresa; 20 a&ntilde;os para los registros del 2.2.4.6.13; hold sin
   t&eacute;rmino para el contrato; deber legal declarado. Al terminar, el Encargado devuelve los datos en formato
   JSON (exportaci&oacute;n de la base de datos del servicio) y los suprime de sistemas y respaldos en
-  [plazo de supresi&oacute;n en d&iacute;as] d&iacute;as calendario, salvo norma que exija conservarlos, y entrega
+  30 d&iacute;as calendario, salvo norma que exija conservarlos, y entrega
   certificaci&oacute;n de supresi&oacute;n.</p>
 
   <h2>7. Derechos de los Titulares</h2>

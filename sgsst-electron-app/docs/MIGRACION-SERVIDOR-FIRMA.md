@@ -870,6 +870,12 @@ router del recibo de supresion montado.
       Falta la **alerta externa**: el log no despierta a nadie. Hay que crear un monitor de
       uptime en el panel de Cloudflare (del owner). Sin eso, el RTO de 4 h declarado en el
       Anexo de Nube cuenta desde que el owner se entere, no desde que la caida ocurre.
+- [ ] **La hora del servidor esta en `Etc/UTC`** (medido el 26-oct-2026). Esto rompe tres cosas a la vez:
+      el cron de las 22:00 cae a las **17:00 de Colombia**, los plazos en dias habiles (2 dias habiles de PQRS y
+      5 dias habiles de la copia permanente) se cuentan con el **dia UTC** (`src/services/solicitudes.js`,
+      `_sumarDiasHabiles` usa `getDay()`), y la **constancia PDF** imprime la hora de UTC. El codigo dice que el
+      dia debe ser local (`solicitudes.js:144`); lo que esta mal puesto es el servidor. Se corrige con
+      `sudo timedatectl set-timezone America/Bogota` (reversible, no toca los datos: la base guarda ISO en UTC).
 - [ ] Copia **off-site** de los respaldos (hoy viven en el mismo servidor que los datos).
       Es la brecha mas grande del plan de continuidad y la mas facil de cerrar: una linea de
       `rclone` mas una cuenta.

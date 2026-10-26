@@ -7407,3 +7407,65 @@ pasaría y el respaldo que el RTO promete no existiría todavía.
 `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (§8),
 `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md` (nuevo), `PROMPT.md`
 (trampa 87) y `Historial.md`.
+
+## 📦️960 · El RTO con evidencia: la hora del servidor y los cuatro datos
+
+*26-oct-2026 · el punto 10 · el cierre del dato de continuidad*
+
+El despliegue del 📦959 quedó verificado en el servidor (26-oct-2026, 13:14 hora de Colombia): el tar con
+su hash exacto, los cuatro hashes de archivos idénticos, las 40 migraciones aplicadas, el servicio `active`,
+`/health` con `db: ok` y `smtp: configured`, los tres scripts de continuidad con sus hashes correctos, los
+dos crons instalados, un respaldo de 458 752 B con `integrity ok`, una restauración con 26 tablas y la empresa
+registrada, y el health check con `OK local` y `OK publico`.
+
+### El hallazgo: el servidor estaba en `Etc/UTC`
+
+Tres consecuencias, todas silenciosas, todas medidas:
+
+1. El cron del respaldo "de las 22:00" **disparaba a las 17:00 de Colombia**.
+2. Los plazos de **dos (2) y cinco (5) días hábiles** —PQRS y copia permanente— se contaban con el **día
+   UTC** (`_sumarDiasHabiles` usa `getDay()`). Una solicitud del viernes a las nueve de la noche en Colombia
+   es "sábado" en UTC: el plazo vencía antes.
+3. La **constancia PDF** imprimía la hora de UTC, cinco horas corrida.
+
+El código no era el culpable: `solicitudes.js:144` dice que el día es **local** y `pdfGen.js:123` dice "hora
+local del servidor". Lo que estaba mal puesto era el servidor. La corrección es una línea
+(`timedatectl set-timezone America/Bogota`) más un reinicio del servicio, porque Node lee la zona al arrancar.
+No toca los datos: la base guarda ISO en UTC y las comparaciones son por instante.
+
+### El otro hallazgo: el script medía con nombres inventados
+
+La primera prueba de restauración en el servidor dio `solicitudes=n/d` y `user_version=0`. La tabla
+`gh_firma_solicitudes` no existe (la real es `gh_firmas_electronicas`) y el service no usa
+`PRAGMA user_version` (registra las migraciones en `gh_firma_schema_migrations`). El respaldo estaba bien; el
+que medía mal era el script. Corregido y vuelto a probar en el PC.
+
+### El F2: los tres datos y el plazo, ya con evidencia
+
+Con el cron instalado, la hora corregida, el respaldo probado y el detector en marcha, el manifiesto y el
+modelo se llenan: `rto_horas: 4`, `rpo_horas: 24`, `plan_continuidad` (texto completo), y en el Anexo de Nube
+el RTO, el RPO, el plan de continuidad y el plazo de supresión de 30 días.
+
+En el modelo hubo una corrección que no estaba en el plan y era obligatoria: la frase **"hoy la copia es
+manual y la copia automática diaria está pendiente"** ya era falsa. Un documento legal que se va a firmar no
+describe cómo funcionaba el servicio antes de cambiarlo. Y el bloque de pendientes pasó de cuatro datos a
+uno (el DPA de Google). Las dos copias (`legal/` y `sitio/`) quedaron **byte a byte idénticas**
+(`f7e126b1…a0a84`).
+
+**Medición tras el F2 (en el PC):** 39 ítems → ✅ 22 ok · 14 pendiente · 1 aviso · 2 N/A, con `rto_rpo` en
+**ok** ("RTO 4 h, RPO 24 h y plan de continuidad"). El modelo quedó con 6 huecos: 3 de la Empresa (los
+diligencia cada Empresa) y 3 del owner (el DPA de Google, que sigue siendo su decisión).
+
+### Lo que sigue abierto
+
+- **La alerta externa**: el detector deja log y reinicia, pero no avisa a nadie. Es un monitor de uptime en
+  el panel de Cloudflare.
+- **La copia off-site**: los respaldos viven en el mismo servidor que los datos.
+- **El DPA de Google** (punto 9) y **el abogado** (puntos 11 y 12).
+
+**Archivos** — `legal/anexo-nube-v1.0.html` y `sitio/anexo-nube-v1.0.html` (F2),
+`firma-service/legal-readiness.json` (F2), `firma-service/deploy/probar-restauracion.sh` (nombres reales de
+tabla), `firma-service/deploy/README-DESPLIEGUE.md` (la hora del servidor),
+`sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (la hora del servidor),
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md` (evidencia del
+servidor), `PROMPT.md` (trampas 88 y 89) y `Historial.md`.
