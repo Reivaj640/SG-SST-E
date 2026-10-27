@@ -145,14 +145,14 @@ la estructura.** Concretamente:
    y la autorización del trabajador bastan, o hace falta un instrumento aparte**?
 3. **El flujo de correo, como está hoy, es una transferencia internacional** en los términos del
    artículo 26 de la Ley 1581: sale del país la dirección del correo del firmante, el contenido
-   del mensaje con el enlace y el OTP, y los metadatos del envío. **¿Qué base jurídica concretas
-   recommends**, y qué redacción necesita el Anexo de Encargo para declararla?
+   del mensaje con el enlace y el OTP, y los metadatos del envío. **¿Qué base jurídica concreta
+   recomienda**, y qué redacción necesita el Anexo de Encargo para declararla?
 4. **¿Conviene que el Anexo de Nube siga siendo un documento que no se firma hasta que la condición
    se resuelva**, o que se firme con la condición declarada y sea la empresa cliente la que decide
    si lo acepta? Hoy está en la primera postura.
 
 **Lo que no se hizo, deliberadamente:** no se sustituyó el DPA inexistente por una cláusula propia
-que diga lo mismo, ni se presents la cuenta de consumo como si tuviera un acuerdo empresarial.
+que diga lo mismo, ni se presenta la cuenta de consumo como si tuviera un acuerdo empresarial.
 
 ### 2.4 · ¿Sigue vigente lo que decidió el 23 de octubre?
 
