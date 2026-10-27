@@ -47,6 +47,7 @@ const config = require('../src/config');
 const { signRequestBody } = require('../src/schemas');
 const empresaService = require('../src/services/empresa');
 const mediosService = require('../src/services/medios');
+const medioPersonal = require('../src/services/medioPersonal');
 const mailer = require('../src/services/mailer');
 const {
   resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion, capturarLogs,
@@ -134,15 +135,22 @@ test('D-2 · sin medio declarado, el OTP va al contacto registrado (lo de hoy)',
   assert.equal(conOtp.to, 'personal@ejemplo.net');
 });
 
-test('D-2 · la EMPRESA declara el medio personal y el OTP va ahí (opción B)', async () => {
-  // Decisión del owner (2026-10-20): QUIÉN declara el medio personal es la
+test('D-2 · la EMPRESA registra el medio personal y el OTP va ahí (opción B)', async () => {
+  // Decisión del owner (2026-10-20): QUIÉN registra el medio personal es la
   // Empresa, que es quien tiene la ficha del trabajador. El mini-app lo deja
   // igual (si la Empresa no lo tiene, el Trabajador lo declara al
   // identificarse), pero el camino normal es este.
+  //
+  // Decisión 1.a (2026-10-27): la Empresa lo obtiene del candidato verbalmente
+  // en la contratación y lo registra; elTrabajador lo CONFIRMA en la pantalla
+  // de firma, porque la garantía del 3.7(a) es del Trabajador: que ese buzón
+  // es de su uso exclusivo y que la Empresa no lo administra. Sin esa
+  // confirmación el servidor NO manda el código a ese buzón (422
+  // MEDIO_OTP_CONFIRMACION_REQUERIDA).
   limpiar();
   const { token, signRequest } = await crearSolicitud({ correo: CORREO_EMPRESA });
 
-  // La Empresa declara el medio personal al crear la solicitud.
+  // La Empresa registra el medio personal al crear la solicitud.
   const creada = await createSignRequestWithIdentificacion({
     id_empresa: EMPRESA,
     correo_verificacion: CORREO_EMPRESA,
@@ -150,10 +158,16 @@ test('D-2 · la EMPRESA declara el medio personal y el OTP va ahí (opción B)',
     metadata: JSON.stringify({ correo: CORREO_EMPRESA }),
   });
 
-  // El OTP va al medio declarado por la Empresa, no al contacto.
+  // El OTP va al medio registrado por la Empresa, no al contacto: el
+  // Trabajador confirma la declaración y el código sale a ese buzón.
   const res = await request(makeApp())
     .post(`/api/sign/${creada.token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
+    .send({
+      tipo_identificacion: 'CC',
+      numero_documento: '1234567890',
+      medio_otp_confirmado: true,
+      medio_otp_version: medioPersonal.DECLARACION_VERSION,
+    })
     .timeout({ response: 5000 });
   assert.equal(res.status, 200, JSON.stringify(res.body));
 
@@ -163,11 +177,12 @@ test('D-2 · la EMPRESA declara el medio personal y el OTP va ahí (opción B)',
   assert.equal(conOtp.to, CORREO_PERSONAL,
     'el código va al medio personal, no al buzón de la empresa');
 
-  // Y queda en el registro de medios, con origen EMPRESA.
+  // Y queda en el registro de medios, con origen TRABAJADOR_CONFIRMADO: lo
+  // registró la Empresa, pero lo confirmó el Trabajador (decisión 1.a).
   const medios = mediosService.listarTodos(EMPRESA, creada.signRequest.id_trabajador);
   const declarado = medios.find((m) => m.tipo === 'CORREO_OTP');
-  assert.ok(declarado, 'el medio declarado queda en el registro');
-  assert.equal(declarado.origen, 'EMPRESA');
+  assert.ok(declarado, 'el medio registrado queda en el registro');
+  assert.equal(declarado.origen, 'TRABAJADOR_CONFIRMADO');
   assert.equal(declarado.estado, 'PENDIENTE',
     'nace pendiente: hasta que el Trabajador no demuestre que lo controla, no');
 

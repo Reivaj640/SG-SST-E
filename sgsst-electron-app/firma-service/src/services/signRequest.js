@@ -325,11 +325,18 @@ async function notifyRemote(signRequest, correo, opts = {}) {
         : null;
       deberLegal = { activo: true, norma: alcance || deberLegal.norma || null };
     }
+    // La cuenta de envío de la Empresa (decisión 1.b): la invitación la emite
+    // la Empresa, con su identidad. Si la Empresa no tiene cuenta configurada
+    // (o está inactiva), la invitación sale por la cuenta de K+AIR: ese es el
+    // comportamiento de siempre y no se rompe.
+    const cuentaEnvioService = require('./cuentaEnvio');
+    const cuentaEnvio = cuentaEnvioService.resolverCuenta(signRequest.id_empresa);
     sendResult = await mailer.sendInvite({
       to: correo,
       url_publica: urlPublica,
       id_solicitud: signRequest.id_solicitud,
       context: opts.context || null,
+      cuenta_envio: cuentaEnvio,
       plazo_retencion: plazoRetencion,
       canal_solicitud_copia: canalCopia,
       // El canal de derechos del Titular (10.7(b)). Es distinto del de
@@ -1407,6 +1414,11 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
   const urlHijo = `${config.publicUrl}/s/${token}`;
   (async () => {
     try {
+      // La cuenta de envío de la Empresa (decisión 1.b): la invitación al
+      // representante legal la emite la Empresa. Sin cuenta configurada (o
+      // inactiva), sale por la de K+AIR.
+      const cuentaEnvioService = require('./cuentaEnvio');
+      const cuentaEnvio = cuentaEnvioService.resolverCuenta(id_empresa);
       await mailer.sendInviteForCompany({
         to: representante.correo,
         url_publica: urlHijo,
@@ -1414,6 +1426,7 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
         id_documento: id_documento,
         rep_nombre: representante.nombre,
         context: { parent_id_solicitud, tipo_firmante: 'EMPRESA' },
+        cuenta_envio: cuentaEnvio,
       });
       logger.info('firma-dual: invitación enviada al rep', {
         id_solicitud,

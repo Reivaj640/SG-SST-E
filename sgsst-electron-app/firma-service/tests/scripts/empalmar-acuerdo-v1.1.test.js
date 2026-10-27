@@ -121,10 +121,16 @@ const NUMERALES_DEL_MAPA = leerNumeralesDelMapa(MAPA_EMPALME);
  * estos numerales vive en el JSON de cambios; el resto tiene que seguir
  * siendo copia literal del .txt del abogado. Esta lista es la ÚNICA
  * excepción admitida.
+ *
+ * El 27-oct-2026 se agregaron 3.3, 3.4(g) y 3.7(a): son las tres decisiones
+ * del abogado que cambian el TEXTO (1.a el medio personal que el Trabajador
+ * confirma, 1.c la aceptación por versión sin retroacción y 1.b el remitente
+ * del enlace). Los seis que ya estaban (3.1, 3.4(b), 3.4(e), 8.7, 10.1 y
+ * 10.5(f)) se reescribieron otra vez con las decisiones 1.a a 1.f.
  */
 const NUMERALES_CORREGIDOS = [
-  '1.4', '1.5', '3.1', '3.4(b)', '3.4(e)', '8.6', '8.7', '9.5', '10.1',
-  '10.2(h)', '10.4(a)', '10.5(f)', '10.5(g)', '10.8(a)', '10.8(c)', '12.7',
+  '1.4', '1.5', '3.1', '3.3', '3.4(b)', '3.4(e)', '3.4(g)', '3.7(a)', '8.6', '8.7',
+  '9.5', '10.1', '10.2(h)', '10.4(a)', '10.5(f)', '10.5(g)', '10.8(a)', '10.8(c)', '12.7',
 ];
 
 /** Compara texto ignorando la sangría de cada línea (el empalme indenta literales). */

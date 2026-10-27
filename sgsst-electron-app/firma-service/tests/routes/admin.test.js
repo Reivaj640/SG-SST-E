@@ -33,11 +33,47 @@ const db = require('../../src/db/connection');
 const {
   resetDb, makeApp, withAdminApiKey, TEST_ADMIN_API_KEY,
 } = require('../helpers');
+const aprobacionPublicacion = require('../../src/services/aprobacionPublicacion');
 
 const HEADERS = { 'X-Admin-API-Key': TEST_ADMIN_API_KEY };
 
 const TEXT_V1 = 'ACUERDO DE USO v1.0\nTérminos y condiciones del servicio.';
 const TEXT_V2 = 'ACUERDO DE USO v2.0\nTérminos actualizados.';
+
+/**
+ * Publica una versión por la vía admin.
+ *
+ * Decisión 1.f: publicar exige la AUTORIZACIÓN OPERATIVA registrada para ese
+ * texto (la barrera vive en agreement.createVersion). Este helper la registra
+ * primero, como lo haría el operador por
+ * POST /internal/admin/aprobaciones-publicacion, para que el test pueda
+ * probar la publicación y no la barrera.
+ */
+async function publicar(app, body) {
+  if (body.activa !== false) {
+    try {
+      aprobacionPublicacion.registrar({
+        version: body.version,
+        texto: body.texto,
+        tipo: 'OPERATIVA',
+        aprobado_por: 'test:responsable',
+        fecha: '2026-10-27',
+        garantia: 'Verificación automática del texto',
+        resultado_verificaciones: 'OK',
+        responsable_despliegue: 'test:despliegue',
+      });
+    } catch (e) {
+      // Si la aprobación NO se puede registrar (el body no tiene texto, o el
+      // texto no es el de la versión que ya existe), la publicación queda sin
+      // autorizar: el endpoint responde con su propio error, que es lo que el
+      // test está probando.
+    }
+  }
+  return request(app)
+    .post('/internal/admin/acuerdo-versiones')
+    .set(HEADERS)
+    .send(body);
+}
 
 // =========================================================================
 // Autenticación
@@ -82,10 +118,7 @@ test('POST /internal/admin/acuerdo-versiones: X-Internal-API-Key NO funciona →
 test('POST acuerdo-versiones: sin version → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ texto: TEXT_V1 });
+  const res = await publicar(app, { texto: TEXT_V1 });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
   assert.ok(res.body.error.details.issues.some(i => i.path === 'version'));
@@ -94,10 +127,7 @@ test('POST acuerdo-versiones: sin version → 400', async () => {
 test('POST acuerdo-versiones: version formato inválido "1.0" → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: '1.0', texto: TEXT_V1 });
+  const res = await publicar(app, { version: '1.0', texto: TEXT_V1 });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -105,10 +135,7 @@ test('POST acuerdo-versiones: version formato inválido "1.0" → 400', async ()
 test('POST acuerdo-versiones: version formato inválido "v1" → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1', texto: TEXT_V1 });
+  const res = await publicar(app, { version: 'v1', texto: TEXT_V1 });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -116,10 +143,7 @@ test('POST acuerdo-versiones: version formato inválido "v1" → 400', async () 
 test('POST acuerdo-versiones: version formato inválido "v1.0.0" → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0.0', texto: TEXT_V1 });
+  const res = await publicar(app, { version: 'v1.0.0', texto: TEXT_V1 });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -127,10 +151,7 @@ test('POST acuerdo-versiones: version formato inválido "v1.0.0" → 400', async
 test('POST acuerdo-versiones: sin texto → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0' });
+  const res = await publicar(app, { version: 'v1.0' });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -139,10 +160,7 @@ test('POST acuerdo-versiones: texto > 50000 chars → 400', async () => {
   resetDb();
   const app = makeApp();
   const textoLargo = 'x'.repeat(50001);
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: textoLargo });
+  const res = await publicar(app, { version: 'v1.0', texto: textoLargo });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -150,10 +168,7 @@ test('POST acuerdo-versiones: texto > 50000 chars → 400', async () => {
 test('POST acuerdo-versiones: fecha_vigencia_fin no es ISO-8601 → 400', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1, fecha_vigencia_fin: 'ayer' });
+  const res = await publicar(app, { version: 'v1.0', texto: TEXT_V1, fecha_vigencia_fin: 'ayer' });
   assert.equal(res.status, 400);
   // zod detecta formato datetime inválido
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
@@ -169,10 +184,7 @@ test('POST acuerdo-versiones: 201 crear v1.0 activa → calcula texto_hash serve
   const { sha256 } = require('../../src/crypto/hash');
   const hashEsperado = sha256(TEXT_V1);
 
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  const res = await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   assert.equal(res.status, 201);
   assert.equal(res.body.version, 'v1.0');
@@ -191,10 +203,7 @@ test('POST acuerdo-versiones: cliente NO puede inyectar texto_hash (server siemp
   const hashReal = sha256(TEXT_V1);
 
   // Intentar inyectar texto_hash falso
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({
+  const res = await publicar(app, {
       version: 'v1.0',
       texto: TEXT_V1,
       texto_hash: hashFalso,  // ← el server debe IGNORAR este campo
@@ -210,16 +219,10 @@ test('POST acuerdo-versiones: 409 version duplicada', async () => {
   resetDb();
   const app = makeApp();
   // Crear primera versión
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   // Intentar crear la misma
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V2 });
+  const res = await publicar(app, { version: 'v1.0', texto: TEXT_V2 });
   assert.equal(res.status, 409);
   assert.equal(res.body.error.code, 'ACUERDO_VERSION_EXISTS');
 });
@@ -228,16 +231,10 @@ test('POST acuerdo-versiones: activa=true desactiva la versión activa anterior'
   resetDb();
   const app = makeApp();
   // v1.0 activa
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   // v2.0 activa (debe desactivar v1.0)
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v2.0', texto: TEXT_V2, activa: true });
+  const res = await publicar(app, { version: 'v2.0', texto: TEXT_V2, activa: true });
 
   assert.equal(res.status, 201);
   assert.equal(res.body.activa, true);
@@ -256,16 +253,10 @@ test('POST acuerdo-versiones: activa=false NO desactiva la versión activa anter
   resetDb();
   const app = makeApp();
   // v1.0 activa
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   // v1.1 inactiva
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.1', texto: TEXT_V1, activa: false });
+  const res = await publicar(app, { version: 'v1.1', texto: TEXT_V1, activa: false });
 
   assert.equal(res.status, 201);
   assert.equal(res.body.activa, false);
@@ -281,16 +272,10 @@ test('POST acuerdo-versiones: NUNCA 2 activas simultáneamente (índice único p
   resetDb();
   const app = makeApp();
   // v1.0 activa
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   // v2.0 activa (debe desactivar v1.0)
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v2.0', texto: TEXT_V2, activa: true });
+  await publicar(app, { version: 'v2.0', texto: TEXT_V2, activa: true });
 
   // Verificar SOLO 1 activa
   const activas = db.prepare('SELECT COUNT(*) AS n FROM gh_firma_acuerdo_versiones WHERE activa = 1').get();
@@ -303,10 +288,7 @@ test('POST acuerdo-versiones: fecha_vigencia_fin en pasado → 400 INVALID_VIGEN
   resetDb();
   const app = makeApp();
   const ayer = new Date(Date.now() - 86400000).toISOString();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({
+  const res = await publicar(app, {
       version: 'v1.0', texto: TEXT_V1,
       fecha_vigencia_fin: ayer,
     });
@@ -317,10 +299,7 @@ test('POST acuerdo-versiones: fecha_vigencia_fin en pasado → 400 INVALID_VIGEN
 test('POST acuerdo-versiones: con metadata opcional', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({
+  const res = await publicar(app, {
       version: 'v1.0',
       texto: TEXT_V1,
       creado_por: 'admin@tempoactiva.com',
@@ -347,10 +326,7 @@ test('POST acuerdo-versiones: GET /internal/acuerdo-activo ve la nueva versión'
   assert.equal(antes.status, 404);
 
   // Publicar v1.0
-  await request(app)
-    .post('/internal/admin/acuerdo-versiones')
-    .set(HEADERS)
-    .send({ version: 'v1.0', texto: TEXT_V1 });
+  await publicar(app, { version: 'v1.0', texto: TEXT_V1 });
 
   // Después: GET acuerdo-activo retorna v1.0
   const despues = await request(app).get('/internal/acuerdo-activo')

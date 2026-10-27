@@ -986,6 +986,15 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
   }
 
   // 10. Enviar OTP
+  //
+  // El OTP sale SIEMPRE por la cuenta de K+AIR, NUNCA por la cuenta de la
+  // Empresa, aunque la Empresa tenga una configurada y activa (decisión 1.b).
+  //
+  // POR QUÉ: el OTP es el dato de creación de la firma. Si su custodia
+  // dependiera de la Empresa, el dato de creación dejaría de corresponder
+  // exclusivamente al firmante (3.7(a) y 2.2.2.47.4 num. 1) y la garantía del
+  // 6.1(d) sería falsa. Por eso el enlace puede salir de la cuenta de la
+  // Empresa y el código NO: son canales distintos a propósito.
   const sendResult = await mailer.sendOTP({
     to: correo,
     otp,
@@ -1064,6 +1073,8 @@ function maskEmail(email) {
  * @param {object} signRequest
  * @param {string} [medioDeclarado] - el medio que declaró el Trabajador
  * @returns {{correo: string|null, origen: string, riesgo_47_4: boolean}}
+ *   `origen` dice QUIÉN declaró el medio: 'declarado_por_el_trabajador',
+ *   'registrado_por_la_empresa' o 'contacto_registrado'.
  */
 /**
  * Declara el medio personal del OTP desde la vápica pública (D-2).
@@ -1077,6 +1088,50 @@ function declararMedioPublico(token, medio) {
   return declararMedioOtp(signRequest, medio);
 }
 
+/**
+ * De dónde viene el medio personal del OTP.
+ *
+ * - 'declarado_por_el_trabajador': el medio llegó en el body del identify (la
+ *   mini-app), o el Trabajador lo declaró antes en esa misma pantalla.
+ * - 'registrado_por_la_empresa': el medio vino de `signRequest.correo_otp`, que
+ *   la Empresa registró al crear la solicitud.
+ * - 'contacto_registrado': no hay medio personal; se usa el contacto que la
+ *   Empresa registró.
+ *
+ * POR QUÉ se pregunta al REGISTRO DE MEDIOS y no solo al campo de la fila:
+ * `signRequest.correo_otp` es un SOLO campo, y el Trabajador lo pisa cuando
+ * declara su medio en la mini-app. Sin preguntar quién lo declaró, un
+ * reingreso del Trabajador en la pantalla de firma quedaría etiquetado como si
+ * lo hubiera declarado la Empresa: la misma mentira que esta etiqueta vino a
+ * corregir.
+ *
+ * @param {object} signRequest
+ * @returns {string}
+ */
+function _origenDelMedioEnLaFila(signRequest) {
+  if (!signRequest || !signRequest.correo_otp) return 'contacto_registrado';
+  try {
+    if (signRequest.id_trabajador) {
+      const medios = mediosService.listarTodos(
+        signRequest.id_empresa,
+        signRequest.id_trabajador
+      );
+      const delTrabajador = medios.find(
+        (m) => m.tipo === 'CORREO_OTP' && m.origen === 'TRABAJADOR'
+      );
+      if (delTrabajador) return 'declarado_por_el_trabajador';
+    }
+  } catch (e) {
+    // Sin el registro de medios no se puede afirmar quién declaró el medio:
+    // se deja el origen del campo, que es de donde vino.
+    logger.warn('No se pudo leer el registro de medios para saber quién declaró el OTP', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e.message,
+    });
+  }
+  return 'registrado_por_la_empresa';
+}
+
 function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
   // `correoBase` permite que quien ya resolvio el contacto (el reenvio de OTP
   // usa el del consentimiento) lo conserve: la regla del D-2 cambia el
@@ -1084,6 +1139,9 @@ function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
   const contacto = correoBase || resolveCorreo(signRequest);
   const declarado = (medioDeclarado || signRequest.correo_otp || '');
   const medio = (typeof declarado === 'string' ? declarado.trim().toLowerCase() : '');
+  // ¿El medio vino en el body del identify (la mini-app) o del campo de la
+  // fila? La etiqueta del origen depende de eso.
+  const desdeElBody = typeof medioDeclarado === 'string' && medioDeclarado.trim().length > 0;
 
   const evaluar = (correo, origen) => {
     if (!correo) return { correo: null, origen, riesgo_47_4: false };
@@ -1122,7 +1180,12 @@ function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
 
   // 1. El medio que declaró el Trabajador manda.
   if (medio && medio.includes('@')) {
-    return evaluar(medio, 'declarado_por_el_trabajador');
+    // Si vino en el body del identify, lo declaró el Trabajador. Si vino del
+    // campo de la fila, se pregunta al registro de medios quién lo puso ahí.
+    const origen = desdeElBody
+      ? 'declarado_por_el_trabajador'
+      : _origenDelMedioEnLaFila(signRequest);
+    return evaluar(medio, origen);
   }
 
   // 2. Sin medio declarado: el contacto registrado de la Empresa.
@@ -1862,8 +1925,13 @@ async function commit(token, opts, ip, user_agent) {
       'sistema', ip, user_agent);
   } else {
     try {
+      // La cuenta de envío de la Empresa (decisión 1.b): el aviso lo emite la
+      // Empresa. Sin cuenta configurada (o inactiva), sale por la de K+AIR.
+      const cuentaEnvioService = require('./cuentaEnvio');
+      const cuentaEnvio = cuentaEnvioService.resolverCuenta(signRequest.id_empresa);
       const sendResult = await mailer.sendCopiaAviso({
         to: correo,
+        cuenta_envio: cuentaEnvio,
         url_publica: `${config.publicUrl}/s/${token}`,
         id_solicitud: signRequest.id_solicitud,
         context: {
@@ -2894,6 +2962,10 @@ function resendOtpDeSignRequest(signRequest, ip, user_agent) {
   // 7. Enviar OTP vía mailer (post-tx, best-effort)
   //    Si el envío falla, el OTP ya quedó generado en BD. El frontend puede
   //    reintentar resend o el usuario puede reportar el problema a RH.
+  //
+  //    Como el OTP original, este sale por la cuenta de K+AIR y NUNCA por la
+  //    cuenta de la Empresa (decisión 1.b): es el dato de creación de la firma
+  //    y su custodia no puede depender de la Empresa.
   mailer.sendOTP({
     to: correo,
     otp,
@@ -3342,8 +3414,14 @@ async function registrarFirmaEnPapel(id_solicitud, opts) {
   let copia = { enviada: false, motivo: 'sin_medio_autorizado' };
   if (destino.correo) {
     try {
+      // La cuenta de envío de la Empresa (decisión 1.b): la copia del
+      // documento firmado en papel la emite la Empresa. Sin cuenta
+      // configurada (o inactiva), sale por la de K+AIR.
+      const cuentaEnvioService = require('./cuentaEnvio');
+      const cuentaEnvio = cuentaEnvioService.resolverCuenta(signRequest.id_empresa);
       await mailer.sendCopiaFirmadoPapel({
         to: destino.correo,
+        cuenta_envio: cuentaEnvio,
         pdfPath,
         constanciaPath: registroPath,
         context: {

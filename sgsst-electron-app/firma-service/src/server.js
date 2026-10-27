@@ -36,6 +36,7 @@ const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const adminEmpresasRouter = require('./routes/admin-empresas');
 const adminExcepcionesRouter = require('./routes/admin-excepciones');
+const adminAprobacionesRouter = require('./routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('./routes/admin-solicitudes');
 const internalAuditRouter = require('./routes/internal-audit');
 const recibosSupresionRouter = require('./routes/recibos-supresion');
@@ -170,6 +171,9 @@ function createApp() {
   app.use('/internal/admin', adminClientesRouter);
   app.use('/internal/admin', adminEmpresasRouter);
   app.use('/internal/admin', adminExcepcionesRouter);
+  // Las aprobaciones de publicacion del Acuerdo (decision 1.f): por esta ruta
+  // se registra la autorizacion operativa que exige la barrera de publicacion.
+  app.use('/internal/admin', adminAprobacionesRouter);
 app.use('/internal/admin', adminSolicitudesRouter);
 
   // 404 para rutas no existentes

@@ -756,7 +756,9 @@ test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_REACCEP
 
   // Desactivar v1.0 publicando v2.0 como activa
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+  // Decisión 1.f: publicar exige la autorización operativa registrada
+  // para ese texto (la registra seedActiveAgreement).
+  seedActiveAgreement({ version: 'v2.0', texto: 'texto v2' });
 
   // view-document debe ser rechazado con 409
   const r2 = await request(app)
@@ -787,7 +789,9 @@ test('POST /commit: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTI
 
   // Desactivar v1.0
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+  // Decisión 1.f: publicar exige la autorización operativa registrada
+  // para ese texto (la registra seedActiveAgreement).
+  seedActiveAgreement({ version: 'v2.0', texto: 'texto v2' });
 
   // commit debe ser rechazado con 409
   const r2 = await request(app)

@@ -34,6 +34,7 @@ const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
 const adminExcepcionesRouter = require('../src/routes/admin-excepciones');
+const adminAprobacionesRouter = require('../src/routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
 const internalAuditRouter = require('../src/routes/internal-audit');
 const recibosSupresionRouter = require('../src/routes/recibos-supresion');
@@ -41,6 +42,7 @@ const constanciaRouter = require('../src/routes/constancia');
 const verificacionRouter = require('../src/routes/verificacion');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
+const aprobacionPublicacion = require('../src/services/aprobacionPublicacion');
 const mailer = require('../src/services/mailer');
 const storage = require('../src/services/storage');
 const logger = require('../src/utils/logger');
@@ -297,7 +299,29 @@ function resetDb() {
   }
 }
 
+/**
+ * Siembra la versión activa del Acuerdo.
+ *
+ * Decisión 1.f: publicar una versión exige la AUTORIZACIÓN OPERATIVA
+ * registrada para ese texto (la barrera vive en agreement.createVersion). El
+ * helper la registra antes de publicar, porque si no, sembrar el Acuerdo en
+ * los tests sería imposible — y el helper es justamente el atajo que los
+ * tests usan para no tener que hacerlo de a mano.
+ *
+ * La tabla de aprobaciones es append-only y NO la limpia resetDb(): por eso
+ * `registrar` es idempotente y sembrar dos veces no duplica la fila.
+ */
 function seedActiveAgreement({ version = 'v1.0', texto = 'ACUERDO DE PRUEBA\nVersión v1.0' } = {}) {
+  aprobacionPublicacion.registrar({
+    version,
+    texto,
+    tipo: 'OPERATIVA',
+    aprobado_por: 'test:responsable',
+    fecha: '2026-10-27',
+    garantia: 'Verificación automática del texto',
+    resultado_verificaciones: 'OK',
+    responsable_despliegue: 'test:despliegue',
+  });
   return agreementService.createVersion({
     version,
     texto,
@@ -343,6 +367,10 @@ function makeApp() {
   app.use('/internal/admin', adminEmpresasRouter);
   app.use('/internal/admin', adminExcepcionesRouter);
   app.use('/internal/admin', adminSolicitudesRouter);
+  // Las aprobaciones de publicacion del Acuerdo (decision 1.f). Montado acá
+  // por la misma razon que los de arriba: si nadie lo monta, sus endpoints no
+  // se ejercitan y un error de wiring pasa inadvertido.
+  app.use('/internal/admin', adminAprobacionesRouter);
   app.use(errorHandler());
   return app;
 }

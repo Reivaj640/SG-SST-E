@@ -53,9 +53,9 @@ test('GET /internal/acuerdo-activo con múltiples versiones → solo la activa',
   agreementService.createVersion({
     version: 'v1.0', texto: 'texto v1', activa: false,
   });
-  agreementService.createVersion({
-    version: 'v2.0', texto: 'texto v2', activa: true,
-  });
+  // Decisión 1.f: publicar exige la autorización operativa registrada
+  // (la registra seedActiveAgreement).
+  seedActiveAgreement({ version: 'v2.0', texto: 'texto v2' });
 
   const app = makeApp();
   const res = await require('supertest')(app)
@@ -73,9 +73,7 @@ test('GET /internal/acuerdo-activo con múltiples versiones → solo la activa',
 test('getActive: Acuerdo vencido (fecha_vigencia_fin en el pasado) → null', async () => {
   resetDb();
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({
-    version: 'v1.0', texto: 'texto v1', activa: true,
-  });
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   // Forzar fecha_vigencia_fin a ayer
   const ayer = new Date(Date.now() - 86400000).toISOString();
   require('../../src/db/connection').prepare(
@@ -89,9 +87,7 @@ test('getActive: Acuerdo vencido (fecha_vigencia_fin en el pasado) → null', as
 test('getActive: Acuerdo sin fecha_vigencia_fin (NULL) → retorna activa', async () => {
   resetDb();
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({
-    version: 'v1.0', texto: 'texto v1', activa: true,
-  });
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   // Por defecto fecha_vigencia_fin = NULL en createVersion → válida indefinidamente
   const acuerdo = agreementService.getActive();
   assert.ok(acuerdo, 'Acuerdo sin fecha_fin debe retornarse como activo');
@@ -101,9 +97,7 @@ test('getActive: Acuerdo sin fecha_vigencia_fin (NULL) → retorna activa', asyn
 test('getActive: Acuerdo futuro (fecha_vigencia_inicio en el futuro) → null', async () => {
   resetDb();
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({
-    version: 'v1.0', texto: 'texto v1', activa: true,
-  });
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   // Forzar fecha_vigencia_inicio a mañana
   const manana = new Date(Date.now() + 86400000).toISOString();
   require('../../src/db/connection').prepare(
@@ -117,9 +111,7 @@ test('getActive: Acuerdo futuro (fecha_vigencia_inicio en el futuro) → null', 
 test('GET /internal/acuerdo-activo con Acuerdo vencido → 404', async () => {
   resetDb();
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({
-    version: 'v1.0', texto: 'texto v1', activa: true,
-  });
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   const ayer = new Date(Date.now() - 86400000).toISOString();
   require('../../src/db/connection').prepare(
     'UPDATE gh_firma_acuerdo_versiones SET fecha_vigencia_fin = ?'

@@ -255,6 +255,10 @@
     sensitiveRequired: false,
     sensitiveAccepted: false,
     sensitiveAcceptInProgress: false, // evita doble POST al marcar/desmarcar rápido
+    // Decisión 1.a · el medio personal que registró la Empresa y la versión
+    // del texto de la declaración que hay que confirmar.
+    medioRegistrado: null,
+    declaracionVersion: null,
   };
 
   // ============================================================
@@ -285,6 +289,11 @@
     try {
       const contexto = await apiFetch('/s/' + token);
       state.contexto = contexto;
+
+      // Decisión 1.a · el medio personal que registró la Empresa (si hubo).
+      // Se pinta antes de mostrar cualquier pantalla: la pantalla de
+      // identificación es la que lo muestra.
+      renderMedioPersonal(contexto);
 
       // I-103.A1.6 · FIX: respetar el estado real del sign request.
       // Sin este fix, si el firmante cierra el navegador y re-abre el
@@ -414,6 +423,79 @@
   // 2. Pantalla: Identificación
   // ============================================================
 
+  /**
+   * Decisión 1.a · EL MEDIO PERSONAL DEL CÓDIGO, CONFIRMADO POR EL TRABAJADOR.
+   *
+   * La Empresa que contrata obtuvo del candidato su correo personal de forma
+   * verbal y lo registró en la solicitud. Acá se lo mostramos al Trabajador
+   * para que lo CONFIRME: el buzón del código de verificación tiene que ser de
+   * su uso exclusivo y la Empresa no puede leerlo (si lo lee, lee el código).
+   *
+   * Si no hay ninguna dirección registrada, el bloque no se muestra y el campo
+   * de arriba sigue editable y opcional, como antes.
+   *
+   * @param {object} contexto - Contexto publico de GET /s/:token.
+   */
+  function renderMedioPersonal(contexto) {
+    const bloque = $('#medio-personal-bloque');
+    const registro = $('#medio-personal-registro');
+    const check = $('#medio_otp_confirmado');
+    const texto = $('#medio_otp_confirmado_texto');
+    if (!bloque || !registro || !check) return;
+
+    const medio = contexto && contexto.medio_personal_registrado;
+    if (!medio || !medio.correo) {
+      bloque.hidden = true;
+      state.medioRegistrado = null;
+      state.declaracionVersion = null;
+      check.checked = false;
+      check.required = false;
+      check.disabled = false;
+      return;
+    }
+
+    // El texto de la declaración lo manda el servidor: es el mismo texto que
+    // queda archivado con la confirmación (y con su versión).
+    if (texto && medio.declaracion_texto) {
+      texto.textContent = medio.declaracion_texto;
+    }
+
+    registro.textContent =
+      'Tu empresa registró esta dirección para enviarte el código de verificación: '
+      + medio.correo;
+    bloque.hidden = false;
+    state.medioRegistrado = medio.correo;
+    state.declaracionVersion = medio.declaracion_version || null;
+    actualizarConfirmacionMedio();
+  }
+
+  /**
+   * ¿Aplica la casilla de confirmación?
+   *
+   * Aplica cuando la dirección que va a recibir el código es la que registró
+   * la Empresa: el campo está vacío o tiene exactamente esa dirección. Si el
+   * Trabajador escribe otra dirección, el código va a SU buzón y no hay nada
+   * que confirmar del de la Empresa.
+   *
+   * El servidor aplica la misma regla: la casilla es una condición para que
+   * el código salga a ese buzón, no una promesa del cliente.
+   */
+  function actualizarConfirmacionMedio() {
+    const check = $('#medio_otp_confirmado');
+    if (!check) return;
+    const registrado = state.medioRegistrado;
+    if (!registrado) {
+      check.required = false;
+      check.disabled = false;
+      return;
+    }
+    const escrito = (($('#correo_otp') && $('#correo_otp').value) || '').trim().toLowerCase();
+    const aplica = !escrito || escrito === registrado;
+    check.required = aplica;
+    check.disabled = !aplica;
+    if (!aplica) check.checked = false;
+  }
+
   function setupIdentifyForm() {
     const form = $('#form-identify');
     const btn = $('#btn-identify');
@@ -437,6 +519,24 @@
         const correoOtp = ($('#correo_otp') && $('#correo_otp').value || '').trim();
         const body = { tipo_identificacion: tipo_identificacion, numero_documento: numero_documento };
         if (correoOtp) body.correo_otp = correoOtp;
+
+        // Decisión 1.a · la CONFIRMACIÓN del medio que registró la Empresa.
+        // Viaja solo si la casilla está marcada (y aplica: si el Trabajador
+        // escribió otro buzón, la casilla se deshabilita y no se manda).
+        const check = $('#medio_otp_confirmado');
+        const confirmado = !!(check && check.checked && !check.disabled);
+        if (check && check.required && !confirmado) {
+          return showFormError(
+            'identify-error',
+            'Marcá la casilla para confirmar que esa dirección es de tu uso exclusivo '
+            + 'y que tu empresa no administra ese buzón.'
+          );
+        }
+        if (confirmado) {
+          body.medio_otp_confirmado = true;
+          body.medio_otp_version = state.declaracionVersion;
+        }
+
         const result = await apiFetch('/api/sign/' + state.token + '/identify', {
           method: 'POST',
           body: body,
@@ -449,6 +549,24 @@
           showFormError('identify-error', 'La identificación no coincide con nuestros registros. Verifica e intenta de nuevo.');
         } else if (err.status === 422 && err.code === 'MISSING_IDENTIFICATION_DATA') {
           showFormError('identify-error', 'No tenemos registrada tu identificación para esta solicitud. Contacta a tu empleador.');
+        } else if (err.status === 422 && err.code === 'MEDIO_OTP_CONFIRMACION_REQUERIDA') {
+          // El servidor exige la confirmación: la casilla se muestra y hay que
+          // marcarla para que el código vaya a ese buzón.
+          showFormError(
+            'identify-error',
+            'Tenés que confirmar que la dirección que registró tu empresa es de tu uso '
+            + 'exclusivo y que tu empresa no administra ese buzón.'
+          );
+          const check = $('#medio_otp_confirmado');
+          if (check) {
+            check.disabled = false;
+            check.required = true;
+          }
+        } else if (err.status === 409 && err.code === 'MEDIO_OTP_DECLARACION_DESACTUALIZADA') {
+          showFormError(
+            'identify-error',
+            'Cambió el texto de la declaración. Recargá la página y volvé a confirmar.'
+          );
         } else if (err.status === 410) {
           return showError('Este enlace ha expirado o ya fue utilizado.');
         } else {
@@ -464,6 +582,14 @@
     numInput.addEventListener('input', () => {
       numInput.value = numInput.value.replace(/\D/g, '');
     });
+
+    // Decisión 1.a · si el Trabajador escribe otra dirección, la casilla de
+    // confirmación del medio de la Empresa deja de aplicar (el código va a SU
+    // buzón).
+    const correoInput = $('#correo_otp');
+    if (correoInput) {
+      correoInput.addEventListener('input', actualizarConfirmacionMedio);
+    }
   }
 
   // ============================================================

@@ -190,7 +190,10 @@ test('CAPÍTULO V · cada mutación es detectada', () => {
     ['el render de identidad no pinta la categoría',
       (h, j) => ({ h, j: j.replace(/#documento-categoria/, '#otro-caso') })],
     ['el render de identidad no muestra el bloque',
-      (h, j) => ({ h, j: j.replace(/bloque\.hidden = false;/, '') })],
+      // El replace tiene que caer dentro del render de IDENTIDAD: la
+      // mini-app tiene más de un bloque que se muestra (el del medio personal
+      // del 1.a, por ejemplo) y el primero que aparece ya no es este.
+      (h, j) => ({ h, j: j.replace(/(function renderDocumentoIdentidad[\s\S]{0,2000}?)bloque\.hidden = false;/, '$1') })],
     ['se quita el pie de K+AIR',
       (h, j) => ({ h: h.replace('id="pie-kair"', 'id="x"'), j })],
     ['se vacía el canal por defecto',

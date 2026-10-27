@@ -1348,6 +1348,18 @@
 
 ---
 
+## 🖋️ Servicio de firma electrónica (`firma-service`)
+
+Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
+
+**Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**
+
+- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).
+- **El medio personal del código lo confirma el Trabajador.** La Empresa lo registra (lo obtiene del candidato en la contratación) y el Trabajador lo confirma en la pantalla de firma con una declaración de texto fijo, que el servidor exige (422 `MEDIO_OTP_CONFIRMACION_REQUERIDA`) y archiva con fecha, hora y versión del texto.
+- **Aprobar el texto y autorizar a publicar son dos decisiones.** `agreement.createVersion` con `activa: true` devuelve **409** si no hay autorización operativa registrada para esa versión **y ese texto** (`gh_firma_aprobaciones_publicacion`, append-only). La autorización operativa la registra el owner por `POST /internal/admin/aprobaciones-publicacion`.
+
+**Documentos legales:** viven en `sgsst-electron-app/legal/` (los originales) y se publican byte a byte en `sitio/` (la copia del sitio). La v1.1 del Acuerdo se arma con `scripts/empalmar-acuerdo-v1.1.js` sobre la v1.0 sellada, y su texto vive en `scripts/fixtures/acuerdo-v1.1.txt` (generado, no versionado) a partir del JSON de cambios.
+
 ## 📁 Archivos clave (raíz del proyecto Electron)
 
 | Archivo | Líneas | Propósito |

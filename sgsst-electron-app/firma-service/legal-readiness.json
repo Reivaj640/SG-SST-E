@@ -1,10 +1,10 @@
 {
-  "version": "2026-10-26",
-  "actualizado_at": "2026-10-26",
+  "version": "2026-10-27",
+  "actualizado_at": "2026-10-27",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
     "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
-    "v1_1_hash": "9b5779989e98628f0f960a6eefea2f787addab52ea807d463e88ce3ca2f326e7",
+    "v1_1_hash": "09d69065b60000bb215be8f28fd67d0fb6fad7d32cb5a8e9c3afb45d817123d2",
     "v1_1_fecha": "2026-10-27",
     "publicado": false
   },
@@ -45,22 +45,28 @@
       "devolucion_supresion": false,
       "auditoria": false,
       "evidencia": null,
-      "nota": "Cuenta de consumidor: Google no ofrece DPA para Gmail de consumo y no actua como encargado. El envio por SMTP es una transferencia internacional pendiente de autorizacion expresa del Titular (art. 26 Ley 1581) y de concepto del abogado. Condicion contractual ABIERTA: no se declara satisfecha."
+      "nota": "Cuenta de consumidor: Google no ofrece DPA para Gmail de consumo y no actua como encargado. El codigo OTP sale SIEMPRE de la cuenta de Gmail de K+AIR, porque es el dato de creacion de la firma y su custodia no puede depender de la Empresa; el enlace de acceso y los avisos del procedimiento salen de la cuenta de envio de la Empresa cuando esta configura una en el servicio, y de la cuenta de K+AIR cuando no la tiene. El envio por SMTP es una transferencia internacional pendiente de autorizacion expresa del Titular (art. 26 Ley 1581) y de concepto del abogado. Condicion contractual ABIERTA: no se declara satisfecha."
     }
   },
   "anexo_encargo": {
     "estado": "no_firmado",
     "fecha": null,
     "evidencia": null,
-    "version": "2026-10-27",
-    "hash": "8ae584c000bdd7b8b6c5651667056fa09308c533303e2843321400f0136f3052"
+    "version": "2026-10-27-b",
+    "hash": "6831f53a03b9c2dd334ab16c022e942dfd09d1f2faee86d1f556fdf5ae825ab6"
   },
   "anexo_nube": {
     "firmado": false,
     "fecha": null,
     "version": null,
     "hash": null,
-    "evidencia": null
+    "evidencia": null,
+    "modelo": {
+      "version": "1.0",
+      "hash": "b8de57852a214b98c35ae3ace4ae7af31171636e105189ef4fef08a81a2e8d77",
+      "actualizado": "2026-10-27",
+      "nota": "Modelo sin firmar: ninguna Empresa ha diligenciado ni firmado esta version. Su contenido se ajusto el 27-oct-2026 con las decisiones 1.a a 1.f (medio personal confirmado por el firmante y cuenta de envio propia de la Empresa). La copia firmada, cuando exista, sera la que se registre en version y hash."
+    }
   },
   "n9a": {
     "probada": false,

@@ -12,6 +12,12 @@
  * - createVersion con version duplicada
  * - createVersion con metadata tipo array (rechazado)
  * - createVersion con creado_por/kair_version demasiado largos
+ *
+ * Decisión 1.f: publicar una versión del Acuerdo exige la AUTORIZACIÓN
+ * OPERATIVA registrada para ese texto. Por eso los tests que publican usan el
+ * helper `publicar()`, que registra la aprobación y después publica: sin eso,
+ * la barrera rechazaría la publicación (y los tests no probarían el
+ * comportamiento que quieren probar, sino la barrera).
  */
 'use strict';
 
@@ -19,18 +25,38 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { resetDb } = require('../helpers');
 const agreementService = require('../../src/services/agreement');
+const aprobacionPublicacion = require('../../src/services/aprobacionPublicacion');
 const db = require('../../src/db/connection');
 
 const TEXTO_BASE = 'ACUERDO BASE';
+
+/**
+ * Publica una versión con la autorización operativa registrada.
+ *
+ * @param {string} version
+ * @param {string} texto
+ * @param {object} [extra] - lo que se le pasa a createVersion
+ */
+function publicar(version, texto, extra = {}) {
+  aprobacionPublicacion.registrar({
+    version,
+    texto,
+    tipo: 'OPERATIVA',
+    aprobado_por: 'test:responsable',
+    fecha: '2026-10-27',
+    garantia: 'Verificación automática del texto',
+    resultado_verificaciones: 'OK',
+    responsable_despliegue: 'test:despliegue',
+  });
+  return agreementService.createVersion(Object.assign({ version, texto }, extra));
+}
 
 test('createVersion: con texto grande (cerca del límite 50000) → OK', () => {
   resetDb();
   // TEXTO_BASE = 'ACUERDO BASE' = 12 chars; completar hasta 50000
   const textoGrande = TEXTO_BASE + 'x'.repeat(50000 - TEXTO_BASE.length);
   assert.equal(textoGrande.length, 50000);
-  const result = agreementService.createVersion({
-    version: 'v1.0', texto: textoGrande,
-  });
+  const result = publicar('v1.0', textoGrande);
   assert.equal(result.version, 'v1.0');
   assert.equal(result.texto.length, 50000);
 });
@@ -43,11 +69,7 @@ test('createVersion: con metadata JSON complejo → persiste correctamente', () 
     references: ['doc-1', 'doc-2'],
     nested: { field: 'value' },
   };
-  const result = agreementService.createVersion({
-    version: 'v1.0',
-    texto: TEXTO_BASE,
-    metadata,
-  });
+  const result = publicar('v1.0', TEXTO_BASE, { metadata });
   assert.equal(result.version, 'v1.0');
 
   // Verificar que se persistió como JSON
@@ -62,11 +84,7 @@ test('createVersion: con metadata JSON complejo → persiste correctamente', () 
 test('createVersion: con fecha_vigencia_fin futura → OK', () => {
   resetDb();
   const futuro = new Date(Date.now() + 365 * 86400000).toISOString(); // 1 año
-  const result = agreementService.createVersion({
-    version: 'v1.0',
-    texto: TEXTO_BASE,
-    fecha_vigencia_fin: futuro,
-  });
+  const result = publicar('v1.0', TEXTO_BASE, { fecha_vigencia_fin: futuro });
   assert.equal(result.version, 'v1.0');
   assert.ok(result.fecha_vigencia_fin);
   // Comparar con tolerancia de 1 segundo
@@ -75,11 +93,7 @@ test('createVersion: con fecha_vigencia_fin futura → OK', () => {
 
 test('createVersion: con fecha_vigencia_fin null → OK (válida indefinidamente)', () => {
   resetDb();
-  const result = agreementService.createVersion({
-    version: 'v1.0',
-    texto: TEXTO_BASE,
-    fecha_vigencia_fin: null,
-  });
+  const result = publicar('v1.0', TEXTO_BASE, { fecha_vigencia_fin: null });
   assert.equal(result.version, 'v1.0');
   assert.equal(result.fecha_vigencia_fin, null);
 });
@@ -110,7 +124,7 @@ test('createVersion: con version formato inválido "VERSION_1.0" → throw 400',
 
 test('createVersion: con version duplicada → throw 409 ACUERDO_VERSION_EXISTS', () => {
   resetDb();
-  agreementService.createVersion({ version: 'v1.0', texto: TEXTO_BASE });
+  publicar('v1.0', TEXTO_BASE);
   assert.throws(
     () => agreementService.createVersion({ version: 'v1.0', texto: 'otro' }),
     (err) => err.statusCode === 409 && err.code === 'ACUERDO_VERSION_EXISTS',
@@ -161,18 +175,18 @@ test('createVersion: con texto > 50000 → throw 400', () => {
 test('createVersion: desactivar lista de anteriores solo si activa=true', () => {
   resetDb();
   // v1.0 activa
-  const r1 = agreementService.createVersion({ version: 'v1.0', texto: TEXTO_BASE });
+  const r1 = publicar('v1.0', TEXTO_BASE);
   assert.deepEqual(r1.desactivadas, []);
 
   // v2.0 activa
-  const r2 = agreementService.createVersion({ version: 'v2.0', texto: TEXTO_BASE, activa: true });
+  const r2 = publicar('v2.0', TEXTO_BASE, { activa: true });
   assert.deepEqual(r2.desactivadas, ['v1.0']);
 
   // v2.1 inactiva
-  const r3 = agreementService.createVersion({ version: 'v2.1', texto: TEXTO_BASE, activa: false });
+  const r3 = publicar('v2.1', TEXTO_BASE, { activa: false });
   assert.deepEqual(r3.desactivadas, []);
 
   // v3.0 activa
-  const r4 = agreementService.createVersion({ version: 'v3.0', texto: TEXTO_BASE, activa: true });
+  const r4 = publicar('v3.0', TEXTO_BASE, { activa: true });
   assert.deepEqual(r4.desactivadas, ['v2.0']);
 });

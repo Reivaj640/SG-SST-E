@@ -45,6 +45,76 @@ function getTransporter() {
 }
 
 /**
+ * La cuenta con la que sale un correo.
+ *
+ * - `null` o ausente: la cuenta de K+AIR (la de `config.smtp`).
+ * - `{ origen: 'empresa', from_nombre, from_email, transporter }`: la cuenta que
+ *   registró la Empresa (services/cuentaEnvio.js).
+ *
+ * POR QUÉ el remitente viaja con la cuenta y no como un flag aparte: el `from`
+ * y el transporter tienen que ser SIEMPRE los de la misma cuenta. Separarlos
+ * abriría la puerta a mandar el correo de la Empresa desde el servidor de
+ * K+AIR (o al revés) sin que nadie lo note.
+ *
+ * @param {object|null} cuenta
+ * @returns {{origen: string, from_nombre: string, from_email: string, transporter: object|null}}
+ */
+function _cuentaDe(cuenta) {
+  if (cuenta && cuenta.origen === 'empresa' && cuenta.from_email) {
+    return {
+      origen: 'empresa',
+      from_nombre: cuenta.from_nombre,
+      from_email: cuenta.from_email,
+      transporter: cuenta.transporter || null,
+    };
+  }
+  return {
+    origen: 'kair',
+    from_nombre: config.smtp.fromName,
+    from_email: config.smtp.fromEmail,
+    transporter: null,
+  };
+}
+
+/**
+ * El encabezado `from` del correo, con el nombre y la dirección de la cuenta
+ * que lo envía.
+ */
+function _fromDe(cuenta) {
+  return `"${cuenta.from_nombre}" <${cuenta.from_email}>`;
+}
+
+/**
+ * El transporter de la cuenta.
+ *
+ * El de K+AIR se resuelve lazy (solo hace falta en producción). El de la
+ * Empresa viene resuelto desde `services/cuentaEnvio.js`: si no llega, es un
+ * error de configuración y NO se cae de vuelta al de K+AIR, porque eso mandaría
+ * el correo de la Empresa desde el servidor de K+AIR sin avisar.
+ */
+function _transporterDe(cuenta) {
+  if (cuenta.transporter) return cuenta.transporter;
+  if (typeof cuenta.obtenerTransporter === 'function') return cuenta.obtenerTransporter();
+  if (cuenta.origen === 'empresa') {
+    throw new Error('La cuenta de envío de la Empresa no tiene transporter resuelto');
+  }
+  return getTransporter();
+}
+
+/**
+ * De qué cuenta salió el correo. Es lo que queda en el inbox de dev y lo que
+ * permite a los tests afirmar "esto salió por la cuenta de la Empresa" y "el
+ * OTP salió por la de K+AIR".
+ */
+function _remitente(cuenta) {
+  return {
+    origen: cuenta.origen,
+    from_nombre: cuenta.from_nombre,
+    from_email: cuenta.from_email,
+  };
+}
+
+/**
  * Envía la copia del documento firmado EN PAPEL al medio que el Trabajador
  * autorizó (el 8.2).
  *
@@ -68,11 +138,14 @@ function getTransporter() {
  * @param {string} opts.pdfPath - Path absoluto al PDF firmado en papel
  * @param {string} opts.constanciaPath - Path absoluto al Registro de firma autográfica
  * @param {object} opts.context - Metadata adicional
+ * @param {object} [opts.cuenta_envio] - La cuenta de envío de la Empresa
+ *   ({ origen: 'empresa', from_nombre, from_email, transporter }). Si no
+ *   viene, el correo sale por la cuenta de K+AIR.
  *
  * @returns {Promise<{ok: boolean, messageId: string}>}
  * @throws Error si los archivos no existen o falla el envío
  */
-async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context }) {
+async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context, cuenta_envio }) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendCopiaFirmadoPapel: `to` debe ser un correo válido');
   }
@@ -105,10 +178,12 @@ async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context }) {
     '— K+AIR',
   ].join('\n');
 
+  const cuenta = _cuentaDe(cuenta_envio);
+
   if (config.env === 'production') {
-    const transporter = getTransporter();
+    const transporter = _transporterDe(cuenta);
     const info = await transporter.sendMail({
-      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      from: _fromDe(cuenta),
       to,
       subject,
       text: body,
@@ -127,12 +202,14 @@ async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context }) {
     to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
     id_solicitud,
     id_constancia,
+    remitente: _remitente(cuenta),
     pdf_size: pdfStat.size,
     constancia_size: conStat.size,
     message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
   });
   const entry = {
     to, subject, body, tipo: 'copy_signed', context, sentAt: new Date().toISOString(),
+    remitente: _remitente(cuenta),
     attachments: [
       { filename: 'documento-firmado.pdf', path: pdfPath, size: pdfStat.size },
       { filename: 'constancia.pdf', path: constanciaPath, size: conStat.size },
@@ -178,11 +255,14 @@ async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context }) {
  * @param {string} opts.id_solicitud - ID legible de la solicitud
  *                                     (SIGN-YYYY-NNNNNN).
  * @param {object} [opts.context] - Metadata adicional (NO se loggea en plaintext).
+ * @param {object} [opts.cuenta_envio] - La cuenta de envío de la Empresa
+ *   ({ origen: 'empresa', from_nombre, from_email, transporter }). Si no
+ *   viene, el aviso sale por la cuenta de K+AIR.
  *
  * @returns {Promise<{ok: true, messageId: string}>}
  * @throws Error si `to` no parece correo, o si falla el envío.
  */
-async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
+async function sendCopiaAviso({ to, url_publica, id_solicitud, context, cuenta_envio }) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendCopiaAviso: `to` debe ser un correo válido');
   }
@@ -221,12 +301,14 @@ async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
     '— K+AIR',
   ].join('\n');
 
+  const cuenta = _cuentaDe(cuenta_envio);
+
   if (config.env === 'production') {
-    const transporter = getTransporter();
+    const transporter = _transporterDe(cuenta);
     // SIN attachments: el aviso no lleva el documento firmado ni la
     // Constancia. La copia se baja del enlace.
     const info = await transporter.sendMail({
-      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}">`,
+      from: _fromDe(cuenta),
       to,
       subject,
       text: body,
@@ -238,12 +320,14 @@ async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
   logger.info('[DEV-COPY-AVISO] Aviso de firma enviada', {
     to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
     id_solicitud,
+    remitente: _remitente(cuenta),
     message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
   });
   const entry = {
     to, subject, body, tipo: 'copy_aviso',
     id_solicitud, url_publica,
     context: context || null,
+    remitente: _remitente(cuenta),
     sentAt: new Date().toISOString(),
   };
   _devInbox.push(entry);
@@ -294,6 +378,9 @@ async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
  *   activo, el documento NO se borra automáticamente porque hay un deber legal
  *   de conservación sin término (migración 029). El Trabajador tiene que
  *   saberlo: el 8.6 obliga a comunicar el plazo y sus consecuencias.
+ * @param {object} [opts.cuenta_envio] - La cuenta de envío de la Empresa
+ *   ({ origen: 'empresa', from_nombre, from_email, transporter }). Si no
+ *   viene, la invitación sale por la cuenta de K+AIR.
  *
  * @returns {Promise<{ok: true, messageId: string}>}
  * @throws Error si `to` no parece correo, o si falla el envío.
@@ -301,7 +388,7 @@ async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
 async function sendInvite({
   to, url_publica, id_solicitud, context,
   plazo_retencion, canal_solicitud_copia, deber_legal_conservacion,
-  canal_proteccion_datos,
+  canal_proteccion_datos, cuenta_envio,
 }) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendInvite: `to` debe ser un correo válido');
@@ -337,10 +424,18 @@ async function sendInvite({
     // vía exista como opción y no como letra. No promete un plazo (la
     // Empresa no declara ninguno en el sistema) ni un resultado: solo dice
     // que la vía existe y que no tiene costo.
+    //
+    // DÓNDE SE PIDE: la mini-app NO tiene una opción de papel y la vía en
+    // papel NO tiene ruta pública (ver src/routes/public.js). El Trabajador le
+    // pide el papel a su Empresa por el canal de atención de la Empresa, y la
+    // Empresa lo registra desde K+AIR. Prometer "la misma página del enlace"
+    // sería prometer un botón que no existe, y el producto no puede prometer
+    // en nombre de la Empresa lo que la Empresa hará (veracidad, Ley 1581
+    // art. 4(d)(e) y D.1377 art. 4).
     '',
     'Si no querés firmar por esta vía, podés pedir la firma en papel:',
-    'es tu derecho, no tiene costo y no te perjudica en nada. Lo pedís desde',
-    'la misma página del enlace.',
+    'es tu derecho, no tiene costo y no te perjudica en nada. Pedile a tu',
+    'Empresa la firma en papel por su canal de atención.',
     'Si no reconoces esta operación, contacta al área de RRHH de inmediato.',
     '',
     // Numeral 8.6 del Acuerdo de uso: "La Empresa debe comunicar al
@@ -379,10 +474,12 @@ async function sendInvite({
     '— K+AIR',
   ].join('\n');
 
+  const cuenta = _cuentaDe(cuenta_envio);
+
   if (config.env === 'production') {
-    const transporter = getTransporter();
+    const transporter = _transporterDe(cuenta);
     const info = await transporter.sendMail({
-      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      from: _fromDe(cuenta),
       to,
       subject,
       text: body,
@@ -400,12 +497,14 @@ async function sendInvite({
   logger.info('[DEV-INVITE] Invitación simulada', {
     to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
     id_solicitud,
+    remitente: _remitente(cuenta),
     message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
   });
   const entry = {
     to, subject, body, tipo: 'invite',
     id_solicitud, url_publica,
     context: context || null,
+    remitente: _remitente(cuenta),
     sentAt: new Date().toISOString(),
   };
   _devInbox.push(entry);
@@ -434,10 +533,13 @@ async function sendInvite({
  * @param {string} opts.id_documento - ID del documento
  * @param {string} opts.rep_nombre - Nombre del representante legal
  * @param {object} opts.context - Metadata adicional
+ * @param {object} [opts.cuenta_envio] - La cuenta de envío de la Empresa
+ *   ({ origen: 'empresa', from_nombre, from_email, transporter }). Si no
+ *   viene, la invitación sale por la cuenta de K+AIR.
  *
  * @returns {Promise<{ok: boolean, messageId?: string}>}
  */
-async function sendInviteForCompany({ to, url_publica, id_solicitud, id_documento, rep_nombre, context }) {
+async function sendInviteForCompany({ to, url_publica, id_solicitud, id_documento, rep_nombre, context, cuenta_envio }) {
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendInviteForCompany: `to` debe ser un correo válido');
   }
@@ -473,10 +575,12 @@ async function sendInviteForCompany({ to, url_publica, id_solicitud, id_document
     '— K+AIR Firma Dual',
   ].join('\n');
 
+  const cuenta = _cuentaDe(cuenta_envio);
+
   if (config.env === 'production') {
-    const transporter = getTransporter();
+    const transporter = _transporterDe(cuenta);
     const info = await transporter.sendMail({
-      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      from: _fromDe(cuenta),
       to,
       subject,
       text: body,
@@ -488,12 +592,14 @@ async function sendInviteForCompany({ to, url_publica, id_solicitud, id_document
   logger.info('[DEV-INVITE-COMPANY] Invitación al rep simulada', {
     to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
     id_solicitud,
+    remitente: _remitente(cuenta),
     message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
   });
   const entry = {
     to, subject, body, tipo: 'invite-company',
     id_solicitud, id_documento, rep_nombre, url_publica,
     context: context || null,
+    remitente: _remitente(cuenta),
     sentAt: new Date().toISOString(),
   };
   _devInbox.push(entry);
@@ -505,6 +611,10 @@ async function sendInviteForCompany({ to, url_publica, id_solicitud, id_document
 /**
  * Envía un OTP al correo del trabajador.
  *
+ * EL REMITENTE SIEMPRE ES K+AIR. Esta función ignora la cuenta de envío que
+ * se le pase (y avisa por log): el OTP es el dato de creación de la firma y su
+ * custodia no puede depender de la Empresa (3.7(a) y 2.2.2.47.4 num. 1).
+ *
  * @param {object} opts
  * @param {string} opts.to - Correo destino
  * @param {string} opts.otp - OTP en texto plano (solo viaja, NO se guarda)
@@ -514,7 +624,23 @@ async function sendInviteForCompany({ to, url_publica, id_solicitud, id_document
  * @returns {Promise<{ok: boolean, messageId?: string, devOtp?: string}>}
  *   En dev, retorna devOtp para que los tests puedan capturarlo.
  */
-async function sendOTP({ to, otp, tipo, context }) {
+async function sendOTP(opts) {
+  const { to, otp, tipo, context } = opts || {};
+  // EL OTP NUNCA SALE POR LA CUENTA DE LA EMPRESA.
+  //
+  // Si alguien pasa una cuenta de envío, se ignora y se avisa. El OTP es el
+  // dato de creación de la firma: si su custodia dependiera de la Empresa, el
+  // dato de creación dejaría de corresponder exclusivamente al firmante
+  // (3.7(a) y 2.2.2.47.4 num. 1) y la garantía del 6.1(d) sería falsa. Por
+  // eso el código sale siempre por la cuenta de K+AIR, aunque el enlace de la
+  // invitación haya salido por la cuenta de la Empresa: son canales distintos
+  // a propósito.
+  if (opts && opts.cuenta_envio) {
+    logger.warn('sendOTP: se ignora la cuenta de envío de la Empresa (el OTP sale por K+AIR)', {
+      origen: opts.cuenta_envio.origen || 'desconocido',
+      id_solicitud: (context && context.id_solicitud) || null,
+    });
+  }
   if (typeof to !== 'string' || !to.includes('@')) {
     throw new Error('sendOTP: `to` debe ser un correo válido');
   }
@@ -543,7 +669,13 @@ async function sendOTP({ to, otp, tipo, context }) {
     otp_marker: '[REDACTED]',  // nunca loguear el OTP
     message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
   });
-  const entry = { to, subject, body, otp, tipo, context, sentAt: new Date().toISOString() };
+  const entry = {
+    to, subject, body, otp, tipo, context,
+    // El OTP sale SIEMPRE por la cuenta de K+AIR. Queda dicho en el registro
+    // para que el test (y el que lea la traza) lo pueda comprobar.
+    remitente: _remitente(_cuentaDe(null)),
+    sentAt: new Date().toISOString(),
+  };
   _devInbox.push(entry);
   // Mantener solo los últimos 50
   if (_devInbox.length > 50) _devInbox.shift();
@@ -619,12 +751,85 @@ function makeBody({ otp, tipo, context }) {
   return lines.join('\n');
 }
 
+/**
+ * Envía un correo de PRUEBA con la cuenta que se le pase.
+ *
+ * Para qué: para poder afirmar operativamente que una cuenta de envío está
+ * "configurada Y probada". Configurar no es probar: el puerto puede estar
+ * cerrado, el servidor puede rechazar las credenciales o el remitente puede
+ * estar bloqueado por el proveedor. Solo un envío real dice algo.
+ *
+ * En producción el correo SALE. En dev no sale a la red (jsonTransport): se
+ * simula y se dice en la respuesta, para que nadie afirme "probado" sobre un
+ * mensaje que nunca salió.
+ *
+ * NUNCA se loguean credenciales: de la cuenta solo se anota el remitente.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo destino de la prueba.
+ * @param {object} [opts.cuenta_envio] - La cuenta con la que se prueba.
+ * @returns {Promise<{ok: boolean, messageId: string, remitente: object, simulado?: boolean}>}
+ */
+async function sendPruebaCuenta({ to, cuenta_envio }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendPruebaCuenta: `to` debe ser un correo válido');
+  }
+
+  const cuenta = _cuentaDe(cuenta_envio);
+  const subject = 'K+AIR — Prueba de la cuenta de correo de la Empresa';
+  const body = [
+    'Hola,',
+    '',
+    'Este es un correo de PRUEBA.',
+    '',
+    'Se envió con la cuenta de correo que la Empresa registró en K+AIR, para',
+    'comprobar que el servidor, el puerto y las credenciales funcionan.',
+    '',
+    'Este mensaje no tiene ningún efecto sobre tus datos ni sobre la firma.',
+    '',
+    '— K+AIR',
+  ].join('\n');
+
+  if (config.env === 'production') {
+    const transporter = _transporterDe(cuenta);
+    const info = await transporter.sendMail({
+      from: _fromDe(cuenta),
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId, remitente: _remitente(cuenta) };
+  }
+
+  // Dev: no sale a la red. Se dice, para que "probado" no sea una promesa
+  // falsa sobre un mensaje que nunca salió de la máquina.
+  logger.info('[DEV-PRUEBA-CUENTA] Prueba de cuenta de envío simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    remitente: _remitente(cuenta),
+  });
+  const entry = {
+    to, subject, body, tipo: 'prueba_cuenta',
+    remitente: _remitente(cuenta),
+    sentAt: new Date().toISOString(),
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return {
+    ok: true,
+    messageId: 'dev-prueba-cuenta-' + Date.now(),
+    remitente: _remitente(cuenta),
+    simulado: true,
+  };
+}
+
 module.exports = {
   sendOTP,
   sendCopiaFirmadoPapel,  // 9A: la copia en PAPEL sí viaja por correo (adjunta).
   sendCopiaAviso,         // Firma electrónica: aviso con el enlace, SIN adjuntos.
   sendInvite,
   sendInviteForCompany,  // I-FIRMA-DUAL: invitación al rep legal (2da firma)
+  sendPruebaCuenta,      // Prueba de la cuenta de envío de la Empresa.
   getDevInbox,
   clearDevInbox,
 };

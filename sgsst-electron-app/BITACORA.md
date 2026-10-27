@@ -8083,3 +8083,137 @@ limpio en los 27 archivos; Anexo de Nube de **3 huecos bloqueantes a 1** (queda 
 contractual, que debe quedar); Anexo de Encargo con 0 huecos; v1.1 de 42 475 B
 (`634b063c…29d0`) a 46 579 B (`9b577998…26e7`) con la **v1.0 sellada intacta**
 (`52a490a4…10c04`).
+
+## 📦️976 · Las seis decisiones del abogado, aplicadas al código y a los tres documentos
+
+### Lo que llegó, y por qué ninguna se pudo aplicar solo con texto
+
+El abogado devolvió seis decisiones (1.a a 1.f) sobre el Acuerdo v1.1, contestando las seis
+preguntas que le llevó el paquete del 27-oct. Tres de ellas **mueven el papel de un actor**:
+la 1.a (la Empresa obtiene del candidato su correo personal verbalmente, durante la
+contratación), la 1.b (la Empresa es quien remite, con sus propios correos; K+AIR es el puente)
+y la 1.f (aprobar el texto no autoriza a publicar). Un texto solo no alcanza: si el Acuerdo dice
+que la Empresa remite y el código sigue mandando todo desde la cuenta de K+AIR, el documento
+vuelve a mentir, que es exactamente la trampa 99.
+
+### La pregunta que la 1.b obligó a contestar: ¿de quién sale el OTP?
+
+La 1.b, tal como la escribió el owner, es "la empresa es quien realiza el envío, con sus propios
+correos". Implementada al pie de la letra, el OTP también saldría por la cuenta de la Empresa, y
+eso **debilita la garantía central del servicio**: el código de verificación es el dato de
+creación de la firma, y el art. 2.2.2.47.4 num. 1 del Decreto 1074 de 2015 exige que ese dato
+corresponda exclusivamente al firmante. Si la Empresa remitiera el código, la Empresa custodiaría
+el dato de creación, y el 3.7(a) del Acuerdo sería falso.
+
+La regla que quedó, escrita en el código y no en el papel:
+
+- **El enlace de acceso y el aviso de la firma** los remite la Empresa, desde la cuenta de correo
+  que haya configurado en el servicio (`cuentaEnvio.js`, con la contraseña cifrada con la llave
+  maestra y con rastro de cada cambio). Si la Empresa no tiene cuenta configurada, salen desde la
+  cuenta de K+AIR, como hasta ahora.
+- **El código de verificación sale SIEMPRE desde la cuenta de K+AIR.** `mailer.sendOTP` ignora la
+  cuenta de la Empresa aunque se le pase, y deja el aviso en el log.
+
+Eso tiene una consecuencia que es una **mejora**, no un problema: cuando el enlace sale de la
+cuenta de la Empresa y el código de la de K+AIR, los dos viajan por canales distintos, y el que
+tenga acceso al buzón de la Empresa no obtiene por sí solo el dato de creación. El texto viejo
+("el enlace y el OTP salen de esa misma cuenta, y por eso no son dos factores independientes")
+dejó de ser cierto en cuanto el enlace pudo cambiar de emisor, y se reescribió en los tres
+documentos que lo decían.
+
+### La 1.a: el medio personal que el Trabajador confirma (tres orígenes, no dos)
+
+La 1.a resuelve el nudo que se había encontrado el 27-oct: el 3.4(e) describía una garantía
+(medio personal obligatorio) que el código no exigía, porque el campo de la mini-app era opcional
+y el flag `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` está apagado a propósito (sin la 9A probada, exigir un
+medio personal sería una barrera de acceso al empleo).
+
+Lo que quedó, con las tres decisiones que conviven:
+
+1. La Empresa registra el medio personal al crear la solicitud (`correo_otp`), con la dirección
+   que obtuvo del candidato en la contratación.
+2. En la pantalla de firma, el Trabajador **confirma** esa dirección con una declaración fija
+   ("Confirmo que esta dirección de correo es de mi uso exclusivo, que la Empresa no administra
+   este buzón y que yo custodio el código de verificación que se envía a él"). La confirmación la
+   exige el **servidor** (422 `MEDIO_OTP_CONFIRMACION_REQUERIDA`): una declaración que un cliente
+   armado se salta no es una declaración.
+3. El medio tiene **tres orígenes**, no dos: `TRABAJADOR` (lo escribió el Trabajador),
+   `TRABAJADOR_CONFIRMADO` (lo registró la Empresa y lo confirmó el Trabajador) y `EMPRESA`
+   (lo registró la Empresa y nadie lo confirmó).
+
+El flag `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP` **sigue apagado**: la 1.f-separated aprobación no
+autoriza a encenderlo, y la 9A en papel todavía no está probada. Lo que sí cambió es que ahora el
+texto y el código dicen lo mismo: el OTP va al medio que el Firmante confirma, o al contacto
+registrado por la Empresa si no hay medio personal, con el caso registrado como advertencia
+(`OTP_MEDIO_CORPORATIVO`).
+
+### La 1.f: una barrera real, no una promesa
+
+El abogado pidió que la garantía técnica fuera verificable y que **bloqueara** la publicación si
+no se cumple. Eso no se puede hacer con un documento, así que se hizo en el código:
+
+- `aprobacionPublicacion.js` y la tabla `gh_firma_aprobaciones_publicacion` (append-only)
+  registran la aprobación **jurídica** y la **operativa** por separado, con versión, huella
+  SHA-256 del texto, garantía, resultado de las verificaciones, responsable y fecha.
+- `agreement.createVersion` con `activa: true` devuelve **409** si no hay autorización operativa
+  registrada para esa versión **y ese texto**. Preparar el texto (`activa: false`) es libre:
+  publicar no.
+- El gate de readiness tiene un item nuevo, `aprobacion_operativa_vigente`, que mira la versión
+  que está en vigor y bloquea los dos gates mientras no tenga la autorización.
+- El documento nuevo `legal/constancia-aprobacion-acuerdo.html` (publicado en el sitio) lleva el
+  texto del abogado íntegro y la garantía definida como se le pidió: qué protege, cómo se
+  comprueba, qué bloquea la publicación y qué ocurre si deja de cumplirse.
+
+**Lo que esto deja en manos del owner**: la autorización operativa es suya. Se registra por
+`POST /internal/admin/aprobaciones-publicacion` con la versión y la huella del texto aprobado.
+
+### Los tres documentos que tenían que cambiar juntos
+
+El hallazgo del día: la 1.b no rompía **un** documento, rompía **tres**, y en el Anexo de Nube la
+afirmación rota estaba en la §3, no en la §5 donde se mira primero.
+
+- **Acuerdo v1.1**: 3.1, 3.3, 3.4(b), 3.4(e), 3.4(g), 3.7(a), 8.7, 10.1 y 10.5(f) reescritos.
+  La 1.c quedó en el 3.4(g): versiones inmutables, sin retroacción, y la aceptación previa con su
+  huella. La 1.d y la 1.e son el texto del abogado, con una precisión: el 10.5(f)(iv) pedía
+  "revisar y corregir las direcciones de destinatario", y el código **rechaza** las direcciones
+  inválidas, no las corrige: el numeral dice lo que el código hace. La 10.1 conservó, además del
+  texto propuesto del abogado, el párrafo de infraestructura (que incorpora el Anexo de Nube por
+  referencia) y la declaración de la condición contractual con sus dos salidas, porque el texto
+  propuesto no los menciona y sin ellos el Acuerdo dejaría de incorporar el Anexo de Nube y de
+  declarar la condición abierta.
+- **Anexo de Encargo** (versión **2026-10-27-b**): §2, §3, §4, §5, §6 y §8. Se añadió la fila del
+  **proveedor de correo de la Empresa** (que es proveedor del Responsable, no subencargado del
+  Encargado), la obligación de la Empresa de autorizar por escrito el uso de su cuenta de envío
+  y de obtener del trabajador su dirección personal, y el bloque de conservación del 8.7 del
+  abogado, con los plazos de Google separados de los de Gesstiar.
+- **Anexo de Nube** (modelo 1.0): la §3 y la fila de Google. El texto decía "ambos mensajes salen
+  por la misma cuenta remitente y a la misma dirección del destinatario", que era falso en cuanto
+  el enlace pudo salir de la cuenta de la Empresa.
+
+**Copia publicada**: los siete pares `legal/` ≡ `sitio/` quedaron **idénticos byte a byte**, con el
+enlace a la Constancia en la navegación de los seis documentos y en las dos páginas del sitio que
+no viven en `legal/`.
+
+### Lo que NO se hizo
+
+No se encendió el flag del medio personal (depende de la 9A). No se declaró satisfecha la condición
+contractual de Google: sigue abierta, con sus dos salidas. No se publicó la v1.1 en el servidor ni
+se autorizó operativamente ninguna versión: la autorización operativa es del owner. No se cambió
+la v1.0 sellada (`52a490a4…10c04`). Y el **Anexo de Nube no se versionó**: el modelo nunca fue
+firmado por ninguna Empresa, así que su contenido se ajustó en el sitio y el manifiesto lleva la
+huella del modelo nuevo en `anexo_nube.modelo`, con la nota de que no hay copia firmada.
+
+### Verificación
+
+- Suite completa: **1 856 tests · 1 854 pass · 0 fail · 2 skipped** (los 2 skipped son
+  pre-existentes).
+- El empalme de la v1.1 es determinista: **57 187 B**, SHA-256 `09d69065…123d2`, 0 huecos y 0
+  marcadores. La v1.0 sellada sigue intacta.
+- Manifiesto recalculado **contra los archivos**: `acuerdo.v1_1_hash`, `anexo_encargo.hash` y
+  `anexo_nube.modelo.hash` son los del contenido real.
+- Barrido limpio en los 51 archivos del paquete.
+
+### La lección (trampa 100)
+
+**Aprobar el texto de una versión y autorizar a publicarla son dos decisiones, con dos
+evidencias.** Y una garantía que no bloquea la publicación no es una garantía: es una promesa.

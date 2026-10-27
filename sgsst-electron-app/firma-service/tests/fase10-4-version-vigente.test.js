@@ -33,6 +33,7 @@ const request = require('supertest');
 
 const db = require('../src/db/connection');
 const agreementService = require('../src/services/agreement');
+const aprobacionPublicacion = require('../src/services/aprobacionPublicacion');
 const {
   resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion,
 } = require('./helpers');
@@ -62,8 +63,23 @@ async function hastaOtpVerificado(app, token) {
   return dev;
 }
 
-/** Publica la v1.1 y la deja activa (desactivando la v1.0). */
+/**
+ * Publica la v1.1 y la deja activa (desactivando la v1.0).
+ *
+ * Decisión 1.f: publicar exige la autorización operativa registrada para ese
+ * texto. Por eso se registra antes de publicar.
+ */
 function publicarV11() {
+  aprobacionPublicacion.registrar({
+    version: 'v1.1',
+    texto: TEXTO_V11,
+    tipo: 'OPERATIVA',
+    aprobado_por: 'test:responsable',
+    fecha: '2026-10-27',
+    garantia: 'Verificación automática del texto',
+    resultado_verificaciones: 'OK',
+    responsable_despliegue: 'test:despliegue',
+  });
   return agreementService.createVersion({
     version: 'v1.1',
     texto: TEXTO_V11,

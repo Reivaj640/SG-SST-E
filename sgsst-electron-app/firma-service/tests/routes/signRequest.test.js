@@ -707,7 +707,9 @@ test('POST /internal/sign-requests: agreement_version inactiva → 422 ACUERDO_I
   const acuerdoV1 = seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
   // Crear v2.0 y marcarla activa (auto-desactiva v1.0)
   const agreementService = require('../../src/services/agreement');
-  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+  // Decisión 1.f: publicar exige la autorización operativa registrada
+  // para ese texto (la registra seedActiveAgreement).
+  seedActiveAgreement({ version: 'v2.0', texto: 'texto v2' });
   const app = makeApp();
   const pdf = await makePdf();
   // Intentar firmar con v1.0 (que ya no es activa)

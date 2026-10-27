@@ -27,6 +27,10 @@ const signRequestService = require('../services/signRequest');
 // La resolución del Acuerdo de uso vive en el servicio (publicFlow), para
 // que la pantalla y la descarga (5.4) muestren SIEMPRE el mismo texto.
 const empresaService = require('../services/empresa');
+// El medio personal del código y la DECLARACIÓN del Trabajador (decisión 1.a).
+// Vive en su propio módulo para no ensuciar el flujo público, que es del otro
+// bloque de trabajo.
+const medioPersonal = require('../services/medioPersonal');
 const storage = require('../services/storage');
 const logger = require('../utils/logger');
 const config = require('../config');
@@ -64,6 +68,15 @@ const identifyBody = z.object({
   // `tipo_identificacion` (categoría del doc que se firma: CONTRATO, etc.).
   tipo_identificacion: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
   numero_documento: z.string().min(4).max(20).regex(/^\d+$/, 'Solo dígitos'),
+  // Decisión 1.a: el Trabajador CONFIRMA el medio personal que registró la
+  // Empresa. La casilla es obligatoria cuando esa dirección va a ser la
+  // destinataria del código (el servidor lo exige: no es una promesa del
+  // cliente).
+  medio_otp_confirmado: z.boolean().optional(),
+  // La versión del texto de la declaración que se le mostró. Si no coincide
+  // con la del servidor, la pantalla tiene que recargar: lo que confirmó no
+  // fue lo que el servicio tiene archivado.
+  medio_otp_version: z.string().max(16).optional(),
 });
 
 const verifyOtpBody = z.object({
@@ -252,6 +265,15 @@ router.get('/s/:token', (req, res, next) => {
           )
           : undefined
       ),
+      // El medio personal que registró la EMPRESA para el código de
+      // verificación (decisión 1.a): la Empresa lo obtuvo del candidato en la
+      // contratación y el Trabajador lo CONFIRMA en esta pantalla.
+      //
+      // La dirección va EN CLARO: es el buzón del propio Trabajador (que lo
+      // conoce) y la Empresa ya lo tenía. Enmascararla no aportaría nada y le
+      // impediría al Trabajador reconocerla. NO se expone NADA más de la
+      // Empresa acá: solo esa dirección y el texto de la declaración.
+      medio_personal_registrado: medioPersonal.exposicionParaMiniApp(signRequest),
       // I-103.A1.6 · Correo enmascarado del firmante, para mostrar en la
       // pantalla OTP cuando el firmante re-abre el enlace y ya pasó por
       // identificación. Solo se expone si estado >= IDENTIFIED (después
@@ -274,9 +296,59 @@ router.get('/s/:token', (req, res, next) => {
 /**
  * POST /api/sign/:token/identify
  * Identifica al trabajador por tipo + número de documento.
+ *
+ * Decisión 1.a: la Empresa puede haber registrado el medio personal del
+ * código de verificación. Si esa dirección va a ser la destinataria del
+ * código, el Trabajador tiene que CONFIRMAR (casilla con una declaración
+ * fija) que es de su uso exclusivo y que la Empresa no administra ese buzón.
+ *
+ * POR QUÉ se resuelve ANTES de identificar: la confirmación es una condición
+ * para que el código salga a ese buzón. Si se exigiera después, el código ya
+ * habría salido. Y si el control de dominio corporativo rechaza la
+ * dirección (400 MEDIO_OTP_CORPORATIVO, dentro de publicFlow), la
+ * confirmación NO se registra: no se archivó una declaración sobre un buzón
+ * que el sistema no acepta.
  */
 router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req, res, next) => {
   try {
+    // 1 · El medio que registró la Empresa (solo lectura).
+    const { signRequest } = publicFlow.resolveToken(req.params.token);
+    const medioEmpresa = medioPersonal.medioRegistradoPorEmpresa(signRequest);
+    const correoDeclarado = typeof req.body.correo_otp === 'string'
+      ? req.body.correo_otp.trim().toLowerCase()
+      : '';
+    // El destino del código: lo que escribió el Trabajador o, si no escribió
+    // nada, el medio que registró la Empresa.
+    const destino = correoDeclarado || medioEmpresa;
+    const vaAlMedioRegistrado = Boolean(medioEmpresa) && destino === medioEmpresa;
+    const confirmado = req.body.medio_otp_confirmado === true;
+
+    if (vaAlMedioRegistrado && !confirmado) {
+      throw new AppError(
+        422,
+        'MEDIO_OTP_CONFIRMACION_REQUERIDA',
+        'La dirección que registró la Empresa va a recibir el código de verificación. '
+        + 'Confirmá que es de tu uso exclusivo y que la Empresa no administra ese buzón.',
+        { id_solicitud: signRequest.id_solicitud },
+      );
+    }
+    if (confirmado) {
+      const version = typeof req.body.medio_otp_version === 'string'
+        ? req.body.medio_otp_version.trim()
+        : '';
+      if (version !== medioPersonal.DECLARACION_VERSION) {
+        throw new AppError(
+          409,
+          'MEDIO_OTP_DECLARACION_DESACTUALIZADA',
+          'El texto de la declaración que confirmaste no es el que tiene archivado el '
+          + 'servicio. Recargá la pantalla y volvé a confirmar.',
+          { version_esperada: medioPersonal.DECLARACION_VERSION },
+        );
+      }
+    }
+
+    // 2 · El flujo de siempre (identificación + envío del código). Acá sigue
+    //     el control de dominio corporativo: la confirmación no lo salta.
     const result = await publicFlow.identify(
       req.params.token,
       req.body.tipo_identificacion,  // D-1 (I-002): antes tipo_documento
@@ -285,6 +357,19 @@ router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req,
       req.get('User-Agent'),
       req.body.correo_otp,   // D-2: medio personal del OTP
     );
+
+    // 3 · La constancia de la declaración (fecha, hora, dirección y versión
+    //     del texto). Se registra AHORA: el código ya salió y el control de
+    //     dominio corporativo ya pasó.
+    if (confirmado) {
+      medioPersonal.registrarConfirmacion({
+        signRequest,
+        version_declaracion: req.body.medio_otp_version,
+        ip: req.ip,
+        user_agent: req.get('User-Agent'),
+      });
+    }
+
     res.json(result);
   } catch (err) {
     next(err);

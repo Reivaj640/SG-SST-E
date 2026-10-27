@@ -32,12 +32,16 @@ const { validateBody } = require('../middleware/validate');
 const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
 const auditoriaService = require('../services/empresaAuditoria');
+const cuentaEnvioService = require('../services/cuentaEnvio');
+const mailer = require('../services/mailer');
 const {
   idEmpresa,
   createEmpresaBody,
   updateEmpresaBody,
   anexoBody,
   setActivoBody,
+  cuentaEnvioBody,
+  probarCuentaEnvioBody,
 } = require('../schemas/admin-empresas');
 const { AppError } = require('../middleware/errors');
 
@@ -67,6 +71,50 @@ function _contextoAuditoria(req) {
     motivo: typeof motivo === 'string' && motivo.trim() ? motivo.trim().slice(0, 500) : null,
     ip: req.ip || req.socket?.remoteAddress || null,
     user_agent: req.get('User-Agent') || null,
+  };
+}
+
+/**
+ * El texto de un header, decodificado como UTF-8.
+ *
+ * POR QUÉ: Node decodifica los headers como latin1, así que un actor
+ * escrito con tilde ("Julián") llega como "JuliÃ¡n". Sin esta corrección, el
+ * rastro de la cuenta de envío guardaría el nombre del operador hecho
+ * pedazos, y el rastro es justo lo que tiene que poder leerse después.
+ *
+ * El viaje de ida y vuelta solo se aplica si el resultado es UTF-8 válido: si
+ * el cliente mandó ASCII, el texto no cambia.
+ *
+ * @param {string} valor
+ * @returns {string}
+ */
+function _textoUtf8(valor) {
+  if (typeof valor !== 'string' || !valor) return valor;
+  try {
+    const utf8 = Buffer.from(valor, 'latin1').toString('utf8');
+    if (!utf8.includes('\uFFFD')) return utf8;
+  } catch (e) {
+    // Si no se puede reinterpretar, se deja el valor como vino.
+  }
+  return valor;
+}
+
+/**
+ * El contexto de auditoría de la cuenta de envío.
+ *
+ * Es el de `_contextoAuditoria`, con el texto de los headers corregido: en el
+ * rastro de la cuenta de envío el nombre del operador tiene que leerse.
+ *
+ * @param {object} req
+ * @returns {{actor: string|null, motivo: string|null, ip: string|null, user_agent: string|null}}
+ */
+function _contextoAuditoriaCuentaEnvio(req) {
+  const ctx = _contextoAuditoria(req);
+  return {
+    actor: ctx.actor ? _textoUtf8(ctx.actor) : ctx.actor,
+    motivo: ctx.motivo ? _textoUtf8(ctx.motivo) : ctx.motivo,
+    ip: ctx.ip,
+    user_agent: ctx.user_agent,
   };
 }
 
@@ -230,6 +278,173 @@ router.post('/empresas/:id_empresa/estado', adminApiAuth(), validateBody(setActi
       activo: req.body.activo,
     });
     res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// LA CUENTA DE CORREO DE ENVÍO DE LA EMPRESA (migración 042)
+// ============================================================================
+//
+// La decisión 1.b del owner: "la Empresa es quien realiza el envío, con sus
+// propios correos; K+AIR es el puente".
+//
+// Endpoints:
+//   GET    /internal/admin/empresas/:id_empresa/cuenta-envio
+//   POST   /internal/admin/empresas/:id_empresa/cuenta-envio
+//   DELETE /internal/admin/empresas/:id_empresa/cuenta-envio
+//   POST   /internal/admin/empresas/:id_empresa/cuenta-envio/probar
+//
+// La contraseña NUNCA se devuelve: el GET responde la vista enmascarada (con
+// `clave_presente`, que dice si hay clave, no cuál es).
+// ============================================================================
+
+/**
+ * Verifica que la Empresa exista antes de tocar su cuenta de envío.
+ *
+ * POR QUÉ: la cuenta de envío es un dato de la Empresa (de su operación), y
+ * una cuenta huérfana no tiene a quién pertenecer: nadie la usa y nadie la
+ * puede dejar de usar.
+ */
+function _exigirEmpresa(id) {
+  const empresa = empresaService.getById(id);
+  if (!empresa) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND',
+      `No existe la empresa ${id}`, { id_empresa: id });
+  }
+  return empresa;
+}
+
+// ============================================================================
+// GET /internal/admin/empresas/:id_empresa/cuenta-envio
+// La vista ENMASCARADA de la cuenta: sin la clave y con el usuario
+// enmascarado. 404 si la Empresa no tiene cuenta configurada.
+// ============================================================================
+router.get('/empresas/:id_empresa/cuenta-envio', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const vista = cuentaEnvioService.obtenerVista(id);
+    if (!vista) {
+      throw new AppError(404, 'CUENTA_ENVIO_NOT_FOUND',
+        `La empresa ${id} no tiene cuenta de envío configurada`, { id_empresa: id });
+    }
+    res.json(vista);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/cuenta-envio
+// Da de alta o actualiza la cuenta de envío.
+//
+// La clave viaja en el body y NO sale nunca: se cifra con la llave maestra
+// (que vive fuera de la base) y queda como un sobre. Si no se manda clave en
+// una actualización, se conserva la que había.
+//
+// Actor y motivo van en los headers `X-Admin-Actor` / `X-Admin-Motivo`, igual
+// que en el resto del router: el cuerpo es la CONFIGURACIÓN, no el rastro.
+// ============================================================================
+router.post('/empresas/:id_empresa/cuenta-envio', adminApiAuth(), validateBody(cuentaEnvioBody), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    _exigirEmpresa(id);
+    const resultado = cuentaEnvioService.guardar(id, req.body, _contextoAuditoriaCuentaEnvio(req));
+    logger.warn('Cuenta de envío de la Empresa ' + (resultado.creado ? 'creada' : 'actualizada') + ' por admin', {
+      id_empresa: id,
+      host: req.body.host,
+      activo: req.body.activo,
+    });
+    res.status(resultado.creado ? 201 : 200).json(resultado.vista);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// DELETE /internal/admin/empresas/:id_empresa/cuenta-envio
+// Elimina la cuenta de envío y deja rastro.
+//
+// A partir de acá, todo lo que salga para esa Empresa vuelve a salir por la
+// cuenta de K+AIR.
+// ============================================================================
+router.delete('/empresas/:id_empresa/cuenta-envio', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const borrada = cuentaEnvioService.eliminar(id, _contextoAuditoriaCuentaEnvio(req));
+    if (!borrada) {
+      throw new AppError(404, 'CUENTA_ENVIO_NOT_FOUND',
+        `La empresa ${id} no tiene cuenta de envío configurada`, { id_empresa: id });
+    }
+    res.json({ ok: true, id_empresa: id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/cuenta-envio/probar
+// Manda un correo de PRUEBA a la dirección que se le pase.
+//
+// Para qué: para poder afirmar que la cuenta está "configurada Y probada".
+// Configurar no es probar: el puerto puede estar cerrado, el servidor puede
+// rechazar las credenciales o el remitente puede estar bloqueado.
+//
+// NUNCA se loguean credenciales: del correo de prueba solo se anota el
+// remitente y el destino (enmascarado).
+// ============================================================================
+router.post('/empresas/:id_empresa/cuenta-envio/probar', adminApiAuth(), validateBody(probarCuentaEnvioBody), async (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    _exigirEmpresa(id);
+
+    let cuenta;
+    try {
+      cuenta = cuentaEnvioService.resolverCuentaEstricta(id);
+    } catch (e) {
+      throw new AppError(400, 'CUENTA_ENVIO_INVALIDA',
+        'La cuenta de envío no se pudo resolver: revisa el host, el puerto y las credenciales',
+        { id_empresa: id, error: e.message });
+    }
+    if (!cuenta) {
+      throw new AppError(400, 'CUENTA_ENVIO_NO_CONFIGURADA',
+        `La empresa ${id} no tiene una cuenta de envío activa para probar`,
+        { id_empresa: id });
+    }
+
+    try {
+      const enviado = await mailer.sendPruebaCuenta({
+        to: req.body.to,
+        cuenta_envio: cuenta,
+      });
+      logger.info('Correo de prueba enviado con la cuenta de la Empresa', {
+        id_empresa: id,
+        remitente: enviado.remitente,
+        simulado: !!enviado.simulado,
+      });
+      res.json({
+        ok: true,
+        detalle: enviado.simulado
+          ? 'Prueba simulada: en este ambiente el correo no sale a la red.'
+          : 'Correo de prueba enviado.',
+        remitente: enviado.remitente,
+        simulado: !!enviado.simulado,
+      });
+    } catch (e) {
+      // El detalle dice POR QUÉ no salió, sin credenciales: el servidor SMTP
+      // rechaza la autenticación, el puerto está cerrado, etc.
+      logger.warn('No se pudo enviar el correo de prueba de la cuenta de la Empresa', {
+        id_empresa: id,
+        host: cuenta.host,
+        puerto: cuenta.puerto,
+        error: e.message,
+      });
+      res.status(502).json({
+        ok: false,
+        detalle: 'El correo de prueba no pudo salir: ' + String(e.message || e.code || 'error desconocido').slice(0, 300),
+      });
+    }
   } catch (err) {
     next(err);
   }

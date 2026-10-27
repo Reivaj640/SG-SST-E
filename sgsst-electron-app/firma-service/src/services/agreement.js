@@ -16,6 +16,7 @@ const {
   analizarTextoLegal,
   esVersionSujetaAGuarda,
 } = require('../utils/textoLegal');
+const aprobacionPublicacion = require('./aprobacionPublicacion');
 
 const VERSION_REGEX = /^v\d+\.\d+$/;
 const MAX_TEXTO_CHARS = 50000;
@@ -202,6 +203,35 @@ function createVersion({
   const texto_hash = sha256(texto);
   const fecha_vigencia_inicio = now.toISOString();
   const fecha_creacion = fecha_vigencia_inicio;
+
+  // 7.1 BARRERA DE PUBLICACIÓN (decisión del owner 1.f, con el abogado).
+  //
+  // Aprobar el TEXTO no autoriza a publicarlo. La publicación exige una
+  // AUTORIZACIÓN OPERATIVA registrada para esa versión y para ESE texto.
+  //
+  // POR QUÉ el hash va explícito: la autorización es sobre un texto, no sobre
+  // un nombre de versión. Si el texto cambia un caracter, el hash cambia (lo
+  // calcula el servidor, en el paso 7) y la autorización deja de servir: sin
+  // esto, la autorización de un texto serviría para publicar cualquier otro
+  // como la misma versión.
+  //
+  // POR QUÉ `activa: false` NO se bloquea: preparar el texto es libre. Lo que
+  // se bloquea es publicarlo, que es lo que exige evidencia operativa.
+  if (activa) {
+    const autorizada = aprobacionPublicacion.tieneAprobacionOperativa(version, texto_hash);
+    if (!autorizada) {
+      throw new AppError(
+        409,
+        'APROBACION_OPERATIVA_REQUERIDA',
+        `No se puede publicar la versión ${version}: falta la autorización operativa `
+        + `para ese texto (huella ${texto_hash}). Regístrala por `
+        + 'POST /internal/admin/aprobaciones-publicacion con tipo OPERATIVA, la '
+        + `versión ${version} y la huella del texto, y volvé a publicar. `
+        + 'Preparar el texto sin publicarlo (activa: false) no requiere autorización.',
+        { version, texto_hash },
+      );
+    }
+  }
 
   // 8. Transacción atómica: desactivar anteriores + insertar
   const desactivadas = [];

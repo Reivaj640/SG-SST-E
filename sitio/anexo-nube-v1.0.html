@@ -27,6 +27,7 @@
     <li><a href="anexo-encargo.html">Anexo de encargo de tratamiento</a></li>
     <li><a href="anexo-nube-v1.0.html">Anexo de nube</a></li>
     <li><a href="autorizacion-trabajadores.html">Autorizaci&oacute;n de trabajadores</a></li>
+    <li><a href="constancia-aprobacion-acuerdo.html">Constancia de aprobaci&oacute;n</a></li>
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
@@ -36,18 +37,18 @@
     <p><strong>Resumen en una l&iacute;nea:</strong> este Anexo describe la infraestructura del servicio de firma
     electr&oacute;nica K+AIR y lo incorpora al Anexo de Encargo de Tratamiento de Datos Personales. Tiene su propia
     versi&oacute;n y su propia huella; es el modelo que cada Empresa diligencia con sus datos y firma con el
-    Encargado. El correo del servicio sale por una cuenta gratuita de Gmail de Google LLC, es decir una cuenta
-    de consumidor, sin contrato ni DPA: esa condici&oacute;n contractual est&aacute; pendiente de concepto del
-    abogado y mientras no se resuelva este Anexo no se firma.</p>
+    Encargado. El c&oacute;digo de verificaci&oacute;n sale por una cuenta gratuita de Gmail de Google LLC, es
+    decir una cuenta de consumidor, sin contrato ni DPA: esa condici&oacute;n contractual est&aacute; pendiente de
+    concepto del abogado y mientras no se resuelva este Anexo no se firma.</p>
   </div>
 
   <div class="aviso">
     <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Hay dos clases de pendientes y no se
     confunden:</p>
     <ul>
-      <li><strong>Pendiente contractual (lo resuelve el abogado, no el sistema).</strong> El correo sale por
-      una cuenta de Gmail gratuita de Google LLC, es decir una cuenta de consumidor, sin contrato ni Data
-      Processing Addendum. Google no ofrece un acuerdo de procesamiento de datos para las versiones de
+      <li><strong>Pendiente contractual (lo resuelve el abogado, no el sistema).</strong> El c&oacute;digo de
+      verificaci&oacute;n sale por una cuenta de Gmail gratuita de Google LLC, es decir una cuenta de consumidor, sin
+      contrato ni Data Processing Addendum. Google no ofrece un acuerdo de procesamiento de datos para las versiones de
       consumo de Gmail y no act&uacute;a como encargado del tratamiento en esa modalidad, de manera que con la
       cuenta actual no se le puede tratar como subencargado. El Acuerdo (10.1 y 10.5(f)) condiciona esa
       caracterizaci&oacute;n al v&iacute;nculo por contrato o DPA, as&iacute; que la condici&oacute;n no puede
@@ -95,19 +96,26 @@
   Cloudflare, Inc. hacia firma.kair.fyi. El almacenamiento es el sistema de archivos del servidor; no hay
   almacenamiento de objetos externo.
   <strong>Servicio de correo electr&oacute;nico y proveedor externo:</strong> Gesstiar S.A.S. utiliza actualmente
-  una cuenta gratuita de Gmail de Google LLC, es decir una cuenta de consumidor, para enviar las
-  comunicaciones del servicio de firma electr&oacute;nica; no se utiliza una cuenta de Google Workspace para esta
-  funci&oacute;n. El enlace de acceso a la solicitud de firma y el c&oacute;digo de verificaci&oacute;n de un solo
-  uso (OTP) se env&iacute;an al correo electr&oacute;nico personal registrado por el trabajador o firmante, y ambos
-  mensajes salen por la misma cuenta remitente y a la misma direcci&oacute;n del destinatario. El correo es un
-  canal de notificaci&oacute;n: no transporta el documento firmado ni la Constancia, que se obtienen desde la
-  aplicaci&oacute;n. La operaci&oacute;n del servicio implica la intervenci&oacute;n de Google en la prestaci&oacute;n
-  del correo electr&oacute;nico; por tanto <strong>no se afirma que Google act&uacute;e como encargado del
-  tratamiento de Gesstiar S.A.S. ni que exista un acuerdo empresarial de tratamiento de datos personales
-  aplicable a la cuenta gratuita utilizada</strong>. Esa condici&oacute;n debe evaluarse en el an&aacute;lisis de
-  protecci&oacute;n de datos y en la aprobaci&oacute;n contractual del servicio por parte de la empresa cliente.
-  El enlace y el OTP <strong>no se consideran factores de autenticaci&oacute;n independientes</strong>, porque
-  ambos se reciben en la misma cuenta de correo: el acceso de terceros a ese buzon compromete los dos a la vez.
+  una cuenta gratuita de Gmail de Google LLC, es decir una cuenta de consumidor, para el c&oacute;digo de
+  verificaci&oacute;n de un solo uso (OTP) y para las dem&aacute;s comunicaciones del servicio de firma
+  electr&oacute;nica cuando la Empresa no tiene una cuenta de env&iacute;o propia configurada en el servicio; no se
+  utiliza una cuenta de Google Workspace para esta funci&oacute;n. El enlace de acceso a la solicitud de firma lo
+  remite la Empresa desde la cuenta de correo que haya configurado en el servicio o, si no tiene ninguna, el
+  Encargado desde la cuenta del servicio; el OTP lo remite siempre el Encargado, desde su propia cuenta, porque es
+  el dato de creaci&oacute;n de la firma y su custodia no puede depender de la Empresa. El OTP se env&iacute;a al
+  medio personal que el Firmante confirma en la pantalla de firma; si no hay medio personal confirmado, se
+  env&iacute;a al correo registrado por la Empresa y el caso queda registrado como advertencia en el registro de
+  operaciones del servicio. El correo es un canal de notificaci&oacute;n: no transporta el documento firmado ni la
+  Constancia, que se obtienen desde la aplicaci&oacute;n. La operaci&oacute;n del servicio implica la intervenci&oacute;n
+  de Google en la prestaci&oacute;n del correo electr&oacute;nico; por tanto <strong>no se afirma que Google
+  act&uacute;e como encargado del tratamiento de Gesstiar S.A.S. ni que exista un acuerdo empresarial de
+  tratamiento de datos personales aplicable a la cuenta gratuita utilizada</strong>. Esa condici&oacute;n debe
+  evaluarse en el an&aacute;lisis de protecci&oacute;n de datos y en la aprobaci&oacute;n contractual del servicio por
+  parte de la empresa cliente. El enlace y el OTP <strong>no se consideran factores de autenticaci&oacute;n
+  independientes cuando ambos salen de la misma cuenta y llegan al mismo buz&oacute;n</strong>: en ese caso el acceso
+  de terceros a ese buz&oacute;n compromete los dos a la vez. Cuando el enlace sale de la cuenta de la Empresa y el
+  OTP de la del Encargado, viajan por canales distintos, y el acceso al buz&oacute;n de la Empresa no basta para
+  conocer el dato de creaci&oacute;n.
   <strong>Respaldos:</strong> copias de la base de datos del servicio y de la evidencia en PDF, a cargo de
   Gesstiar S.A.S., de forma interna, sin proveedor externo; copia autom&aacute;tica diaria con verificaci&oacute;n
   de integridad de la copia y retenci&oacute;n de 30 d&iacute;as. Probada en el servidor el 26 de octubre de
@@ -146,6 +154,20 @@
     </thead>
     <tbody>
       <tr>
+        <td>Proveedor de correo de la Empresa</td>
+        <td>SMTP: env&iacute;o del enlace de firma y de los avisos del procedimiento, cuando la Empresa configura
+        en el servicio una cuenta de env&iacute;o propia</td>
+        <td>Direcci&oacute;n de correo del destinatario, contenido del mensaje y metadatos del env&iacute;o. El
+        c&oacute;digo OTP no sale por esa cuenta</td>
+        <td><strong>Proveedor del Responsable.</strong> No es subencargado del Encargado: es un proveedor de la
+        Empresa, que lo autoriza por escrito en el Anexo de Encargo. El Encargado lo utiliza con esa autorizaci&oacute;n
+        y para el solo efecto de remitir esas comunicaciones</td>
+        <td>El que determine la Empresa</td>
+        <td>No aplica: el Encargado no es parte del contrato de la Empresa con su proveedor</td>
+        <td>Corresponde a la Empresa, que responde por su propio proveedor</td>
+        <td>Corresponde a la Empresa</td>
+      </tr>
+      <tr>
         <td>Cloudflare, Inc.</td>
         <td>T&uacute;nel, tr&aacute;nsito y seguridad</td>
         <td>IP, metadatos, contenido en tr&aacute;nsito</td>
@@ -160,7 +182,8 @@
       </tr>
       <tr>
         <td>Google LLC</td>
-        <td>SMTP: env&iacute;o del enlace de firma, del c&oacute;digo OTP y de los avisos del servicio</td>
+        <td>SMTP: env&iacute;o del c&oacute;digo OTP y, cuando la Empresa no tenga una cuenta de env&iacute;o
+        propia configurada, del enlace de firma y de los avisos del servicio</td>
         <td>Direcci&oacute;n de correo del destinatario, contenido del mensaje y metadatos del env&iacute;o
         (fecha y hora, direcci&oacute;n IP de origen, identificador del mensaje). No se incluye el documento
         firmado ni la Constancia en el correo</td>

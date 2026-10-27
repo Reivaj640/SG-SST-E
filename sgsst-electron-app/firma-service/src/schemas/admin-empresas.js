@@ -143,10 +143,75 @@ const setActivoBody = z.object({
   }),
 });
 
+/**
+ * Body de la cuenta de correo de envío de la Empresa (migración 042).
+ *
+ * `puerto` y `secure` tienen default (587 / false): son los valores con los
+ * que arranca un servidor SMTP de verdad, y que el operador tenga que
+ * recordarlos para probar la cuenta es una barrera sin motivo.
+ *
+ * `clave` es la contraseña del buzón. Viaja en el body (no en un header) y
+ * NO se devuelve nunca: el `GET` de admin devuelve la vista enmascarada.
+ *
+ * `activo` es opcional: si no viene, el service conserva el valor que haya.
+ * Levantar o bajar la cuenta es un acto, con actor y motivo en el rastro.
+ */
+const cuentaEnvioBody = z.object({
+  host: z
+    .string()
+    .min(1, 'host es requerido')
+    .max(255, 'host demasiado largo (max 255 chars)')
+    .transform((s) => s.trim()),
+  puerto: z
+    .number()
+    .int()
+    .min(1, 'puerto inválido')
+    .max(65535, 'puerto inválido')
+    .optional()
+    .default(587),
+  secure: z.boolean().optional().default(false),
+  usuario: z
+    .string()
+    .min(1, 'usuario es requerido')
+    .max(254, 'usuario demasiado largo (max 254 chars)')
+    .transform((s) => s.trim()),
+  clave: z
+    .string()
+    .min(1, 'clave es requerida')
+    .max(512, 'clave demasiado larga (max 512 chars)'),
+  from_nombre: z
+    .string()
+    .min(1, 'from_nombre es requerido')
+    .max(200, 'from_nombre demasiado largo (max 200 chars)')
+    .transform((s) => s.trim()),
+  from_email: z
+    .string()
+    .max(254, 'from_email demasiado largo (max 254 chars)')
+    .email('from_email no parece un correo')
+    .transform((s) => s.trim().toLowerCase()),
+  activo: z.boolean().nullish(),
+});
+
+/**
+ * Body de la prueba de la cuenta de envío: a quién se le manda el correo de
+ * prueba. La dirección es la que se le pase, no la de la cuenta: la prueba
+ * tiene que poder mandarse a un buzón que el operador controle.
+ */
+const probarCuentaEnvioBody = z.object({
+  to: z
+    .string()
+    .min(1, 'to es requerido')
+    .max(254, 'to demasiado largo (max 254 chars)')
+    .email('to no parece un correo')
+    .transform((s) => s.trim().toLowerCase()),
+});
+
 module.exports = {
   idEmpresa,
   createEmpresaBody,
   updateEmpresaBody,
   anexoBody,
   setActivoBody,
+  cuentaEnvioBody,
+  probarCuentaEnvioBody,
 };

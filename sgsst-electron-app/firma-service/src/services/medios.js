@@ -32,6 +32,10 @@
  *     código de verificación (la decisión D-2 del 2026-10-20, que separa el
  *     canal del OTP del canal de la invitación). Lo declara y lo modifica el
  *     Trabajador (origen 'TRABAJADOR').
+ *     Y el que registró la Empresa y el Trabajador CONFIRMÓ en la pantalla de
+ *     firma (decisión 1.a del 2026-10-27): origen 'TRABAJADOR_CONFIRMADO'.
+ *     Confirmar NO es verificar: el medio sigue PENDIENTE hasta que llegue el
+ *     código.
  *
  *   LINK_KAIR — el enlace de firma electrónica de K+AIR. Lo autoriza el 8.2
  *     de entrada y lo registra el sistema (origen 'SISTEMA') cuando se crea
@@ -330,6 +334,101 @@ function registrarAltaPorSolicitud(signRequest) {
   return { medios: registrados };
 }
 
+/**
+ * El TRABAJADOR confirma un medio que había registrado la EMPRESA.
+ *
+ * Es el registro de la decisión 1.a: la Empresa obtiene el correo personal del
+ * candidato en la contratación y lo registra en la solicitud; el Trabajador lo
+ * CONFIRMA en la pantalla de firma (ese buzón es de su uso exclusivo y la
+ * Empresa no lo administra).
+ *
+ * POR QUÉ el origen pasa a 'TRABAJADOR_CONFIRMADO' y no a 'TRABAJADOR'
+ * ------------------------------------------------------------------------
+ * 'TRABAJADOR' dice que el Trabajador lo DECLARÓ (lo escribió él). Cuando lo
+ * registró la Empresa y después el Trabajador lo confirmó, la verdad es esa
+ * otra: lo registró la Empresa y el Trabajador lo confirmó. El origen es el
+ * dato que dice quién puso cada medio en el registro del 8.2, y confundirlos
+ * borra justamente el hecho que la declaración deja constancia.
+ *
+ * POR QUÉ el estado NO se activa acá
+ * ----------------------------------
+ * Confirmar NO es verificar: el Trabajador todavía no demostró que controla el
+ * buzón (eso pasa cuando verifica el código, y es lo que llama a `activar`).
+ * El medio sigue PENDIENTE, y por eso NO se puede entregar una copia por ese
+ * medio.
+ *
+ * @param {object} datos
+ * @param {string} datos.id_empresa
+ * @param {string} datos.id_trabajador - el seudónimo (psn1_...), no el documento
+ * @param {string} datos.valor - el correo confirmado
+ * @returns {{id: number, tipo: string, valor: string, estado: string, origen: string}}
+ */
+function confirmarPorTrabajador(datos) {
+  const id_empresa = datos.id_empresa;
+  const id_trabajador = datos.id_trabajador;
+  if (!id_empresa || !id_trabajador) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'Falta la empresa o el trabajador del medio');
+  }
+  const tipo = 'CORREO_OTP';
+  const valor = _validar(tipo, datos.valor);
+  const ahora = new Date().toISOString();
+
+  const existente = db.prepare(`
+    SELECT * FROM gh_firma_medios_trabajador
+    WHERE id_empresa = ? AND id_trabajador = ? AND tipo = ? AND valor = ?
+  `).get(id_empresa, id_trabajador, tipo, valor);
+
+  if (existente) {
+    // Ya estaba confirmado: no se toca nada (registrar dos veces no crea dos
+    // filas ni cambia la fecha de modificación).
+    if (existente.origen === 'TRABAJADOR_CONFIRMADO') {
+      return {
+        id: existente.id, tipo, valor,
+        estado: existente.estado, origen: existente.origen,
+      };
+    }
+    // El estado se conserva tal cual (PENDIENTE sigue PENDIENTE, ACTIVO sigue
+    // ACTIVO: confirmar no deshace una verificación). Un medio dado de baja
+    // vuelve a PENDIENTE, porque el Trabajador lo está usando ahora mismo.
+    const estado = existente.estado === 'BAJA' ? 'PENDIENTE' : existente.estado;
+    // El origen solo cambia si lo había puesto la Empresa. Si el Trabajador lo
+    // declaró él, el origen sigue diciendo 'TRABAJADOR': la Empresa nunca lo
+    // registró y no hay nada que confirmar de ella.
+    const origen = existente.origen === 'EMPRESA' ? 'TRABAJADOR_CONFIRMADO' : existente.origen;
+    db.prepare(`
+      UPDATE gh_firma_medios_trabajador
+      SET estado = ?, origen = ?, fecha_modificacion = ?
+      WHERE id = ?
+    `).run(estado, origen, ahora, existente.id);
+    logger.info('Medio confirmado por el Trabajador', {
+      id_empresa, tipo, estado, origen,
+      id_trabajador: '[seudónimo]',
+    });
+    return { id: existente.id, tipo, valor, estado, origen };
+  }
+
+  // No había fila: el Trabajador confirmó una dirección que no estaba
+  // registrada (la escribió él en la pantalla). Nace PENDIENTE, como todo
+  // medio sin verificar.
+  const info = db.prepare(`
+    INSERT INTO gh_firma_medios_trabajador
+      (id_empresa, id_trabajador, tipo, valor, estado, origen,
+       fecha_registro, fecha_modificacion)
+    VALUES (?, ?, ?, ?, 'PENDIENTE', 'TRABAJADOR_CONFIRMADO', ?, ?)
+  `).run(id_empresa, id_trabajador, tipo, valor, ahora, ahora);
+
+  logger.info('Medio confirmado por el Trabajador', {
+    id_empresa, tipo, estado: 'PENDIENTE', origen: 'TRABAJADOR_CONFIRMADO',
+    id_trabajador: '[seudónimo]',
+  });
+
+  return {
+    id: info.lastInsertRowid, tipo, valor,
+    estado: 'PENDIENTE', origen: 'TRABAJADOR_CONFIRMADO',
+  };
+}
+
 module.exports = {
   TIPOS,
   registrar,
@@ -338,4 +437,5 @@ module.exports = {
   darDeBaja,
   activar,
   registrarAltaPorSolicitud,
+  confirmarPorTrabajador,
 };

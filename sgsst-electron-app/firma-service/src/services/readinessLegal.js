@@ -332,7 +332,42 @@ function _acuerdoActivo(dbConn) {
   }
 }
 
+/**
+ * ¿Hay autorización OPERATIVA para la versión vigente y SU texto?
+ *
+ * La decisión 1.f (con el abogado): aprobar el TEXTO no autoriza a
+ * publicarlo. Este item dice si la versión que está EN VIGOR hoy —la que
+ * firma la gente— tiene la autorización operativa con su evidencia.
+ *
+ * El hash va explícito porque la autorización es sobre un texto: sin él, una
+ * autorización de un texto serviría para cualquier otro.
+ *
+ * @param {object|null} dbConn
+ * @param {object|null} acuerdoActivo - {version, texto_hash}
+ * @returns {{existe: boolean, id?: number, fecha?: string, aprobado_por?: string}}
+ */
+function _aprobacionOperativaVigente(dbConn, acuerdoActivo) {
+  if (!dbConn || !acuerdoActivo || !acuerdoActivo.version || !acuerdoActivo.texto_hash) {
+    return { existe: false };
+  }
+  try {
+    const fila = dbConn.prepare(`
+      SELECT id, fecha, aprobado_por
+      FROM gh_firma_aprobaciones_publicacion
+      WHERE version = ? AND hash = ? AND tipo = 'OPERATIVA'
+      LIMIT 1
+    `).get(acuerdoActivo.version, acuerdoActivo.texto_hash);
+    return fila ? { existe: true, ...fila } : { existe: false };
+  } catch (_) {
+    // La tabla puede no existir (una base sin la migración 044). No hay
+    // autorización: esa es la respuesta segura (la publicación queda
+    // bloqueada hasta que se registre).
+    return { existe: false };
+  }
+}
+
 function _versionEsAlMenosV11(version) {
+
   const v = parseVersion(version);
   if (!v) return false;
   return v.major > 1 || (v.major === 1 && v.minor >= 1);
@@ -867,6 +902,10 @@ function evaluar(opciones = {}) {
   const canalConfigValido = _canalValido(cfg.canalProteccionDatos);
 
   const versionActiva = acuerdoActivo && acuerdoActivo.version;
+  // La autorización operativa de la versión vigente (decisión 1.f): sin ella,
+  // la versión que está en vigor no tiene la evidencia técnica que autoriza
+  // su publicación.
+  const aprobacionOperativa = _aprobacionOperativaVigente(dbConn, acuerdoActivo);
   const publicadoV11 = dbConn
     ? _versionEsAlMenosV11(versionActiva)
     : acMan.publicado === true;
@@ -932,6 +971,30 @@ function evaluar(opciones = {}) {
           : 'No hay una versión activa del Acuerdo.',
         accion: 'Publicar la v1.1 como versión activa después de cerrar los bloqueantes de publicación.',
         referencia: 'gh_firma_acuerdo_versiones',
+      },
+    ),
+    _item(
+      // Decisión 1.f (con el abogado): aprobar el texto NO autoriza a
+      // publicarlo. La publicación exige una autorización operativa con
+      // evidencia, y esta es la versión que está EN VIGOR: la que firma la
+      // gente hoy. Por eso bloquea los dos gates.
+      'aprobacion_operativa_vigente',
+      'Aprobación operativa de la versión vigente',
+      _estado(aprobacionOperativa.existe),
+      {
+        bloquea: GATE_AMBOS,
+        detalle: !versionActiva
+          ? 'No hay una versión activa del Acuerdo.'
+          : (aprobacionOperativa.existe
+            ? `La versión ${versionActiva} tiene autorización operativa `
+              + `(aprobada por ${aprobacionOperativa.aprobado_por} el ${aprobacionOperativa.fecha}).`
+            : `La versión ${versionActiva} no tiene autorización operativa registrada `
+              + `para su texto (huella ${(acuerdoActivo && acuerdoActivo.texto_hash) || 'sin huella'}).`),
+        accion: _accionSi(aprobacionOperativa.existe,
+          'Registrar la autorización operativa de la versión vigente por '
+          + 'POST /internal/admin/aprobaciones-publicacion (tipo OPERATIVA, con la '
+          + 'garantía, el resultado de las verificaciones y el responsable del despliegue).'),
+        referencia: 'gh_firma_aprobaciones_publicacion',
       },
     ),
     _item(

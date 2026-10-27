@@ -176,6 +176,22 @@ function esRechazoDeGuarda(e) {
 }
 
 /**
+ * ¿El error es el rechazo de la barrera de publicación?
+ *
+ * Decisión 1.f (2026-10-27): publicar una versión exige la AUTORIZACIÓN
+ * OPERATIVA registrada para ese texto. Una semilla DEV no la tiene (no es un
+ * texto legal que alguien vaya a autorizar), así que el seed cae por su propia
+ * salida, la de SOLO desarrollo.
+ *
+ * @param {Error} e
+ * @returns {boolean}
+ */
+function esRechazoDePublicacion(e) {
+  if (!e) return false;
+  return String(e.code || '') === 'APROBACION_OPERATIVA_REQUERIDA';
+}
+
+/**
  * Siembra la versión DEV por la ruta del seed (sin pasar por el servicio).
  *
  * Es la MISMA fila que deja `agreementService.createVersion()` —mismo hash,
@@ -329,18 +345,35 @@ function main(argv) {
     // El seed siembra por su cuenta SOLO en una base de desarrollo (todas sus
     // versiones son semillas DEV). Si la base tiene un Acuerdo legal
     // publicado, no hay salida: el seed no escribe y dice por qué.
-    if (!esRechazoDeGuarda(e)) throw e;
+    //
+    // La decisión 1.f agrega una segunda puerta: publicar exige la
+    // autorización operativa registrada para ese texto. Una semilla DEV
+    // tampoco la tiene (no es un texto legal que alguien vaya a autorizar), así
+    // que cae por la MISMA salida: la del seed, que es de SOLO desarrollo.
+    //
+    // NO se registra una aprobación "de mentira" para pasar la barrera: la
+    // tabla de aprobaciones es el rastro de la evidencia, y ahí no va nada
+    // inventado.
+    if (!esRechazoDeGuarda(e) && !esRechazoDePublicacion(e)) throw e;
 
     const db = loadDb();
     if (config.env === 'production' || !esBaseDeDesarrollo(db)) {
-      console.error('ERROR: el texto tiene marcas de borrador y la guarda legal lo rechaza.');
-      console.error(`La versión ${version} no se puede sembrar aquí: esta base tiene un`);
-      console.error('Acuerdo legal publicado y no es una base de desarrollo.');
-      console.error('En el servidor, el Acuerdo legal se publica con el endpoint admin.');
+      if (esRechazoDePublicacion(e)) {
+        console.error('ERROR: publicar exige la autorización operativa registrada para ese texto.');
+        console.error(`La versión ${version} no se puede sembrar aquí: esta base tiene un`);
+        console.error('Acuerdo legal publicado y no es una base de desarrollo.');
+        console.error('En el servidor, el Acuerdo legal se publica con el endpoint admin,');
+        console.error('previa autorización operativa (POST /internal/admin/aprobaciones-publicacion).');
+      } else {
+        console.error('ERROR: el texto tiene marcas de borrador y la guarda legal lo rechaza.');
+        console.error(`La versión ${version} no se puede sembrar aquí: esta base tiene un`);
+        console.error('Acuerdo legal publicado y no es una base de desarrollo.');
+        console.error('En el servidor, el Acuerdo legal se publica con el endpoint admin.');
+      }
       return 1;
     }
 
-    console.warn('AVISO: la guarda legal rechaza el texto de DEV; se siembra por la ruta');
+    console.warn('AVISO: el servicio rechaza publicar el texto de DEV; se siembra por la ruta');
     console.warn('      del seed (base de desarrollo: todas sus versiones son semillas DEV).');
     creada = sembrarVersionDev(db, Object.assign({}, datos, { texto_hash: hashPreview }));
   }
