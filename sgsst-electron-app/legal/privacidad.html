@@ -22,17 +22,23 @@
     <li><a href="index.html">Inicio</a></li>
     <li><a href="terminos.html">T&eacute;rminos y Condiciones</a></li>
     <li><a href="privacidad.html">Pol&iacute;tica de Privacidad</a></li>
+    <li><a href="politica-firma.html">Pol&iacute;tica de la firma</a></li>
     <li><a href="anexo-encargo.html">Anexo de encargo de tratamiento</a></li>
+    <li><a href="anexo-nube-v1.0.html">Anexo de nube</a></li>
     <li><a href="autorizacion-trabajadores.html">Autorizaci&oacute;n de trabajadores</a></li>
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
-  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 8 de octubre de 2026 &middot; Versi&oacute;n 2026-10-08</p>
+  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 27 de octubre de 2026 &middot; Versi&oacute;n 2026-10-27</p>
 
   <div class="destacado">
-    <p><strong>Resumen en una l&iacute;nea:</strong> cuando conect&aacute;s tu cuenta de Google a K+AIR,
-    el contenido de tus correos se descarga y se guarda <strong>unicamente en tu propio equipo</strong>.
-    Gesstiar S.A.S. no recibe el contenido de tus correos ni lo almacena en ning&uacute;n servidor.</p>
+    <p><strong>Resumen en una l&iacute;nea:</strong> los datos que registras en la aplicaci&oacute;n de escritorio
+    se procesan y se guardan <strong>en el equipo de tu empresa</strong>: cuando conectas tu cuenta de Google,
+    el contenido de tus correos se descarga y queda local, y Gesstiar S.A.S. no recibe ese contenido ni lo
+    almacena en ning&uacute;n servidor. <strong>Eso no significa que todo el tratamiento sea local</strong>:
+    algunas funciones, entre ellas la firma electr&oacute;nica, s&iacute; env&iacute;an datos a servicios
+    externos. La secci&oacute;n 4 describe qu&eacute; sale del equipo, con qui&eacute;n y con qu&eacute;
+    prop&oacute;sito.</p>
   </div>
 
   <h2>1. Qui&eacute;n es responsable</h2>
@@ -53,8 +59,9 @@
     constancia de su autorizaci&oacute;n.</li>
   </ul>
   <div class="aviso">
-    <p><strong>Datos de contacto del responsable</strong></p>
-    <p>Raz&oacute;n social: Gesstiar S.A.S. &middot; Domicilio: Calle 114 # 43B - 83, Barranquilla (Atlántico). NIT 900987987-4 &middot; Datos de contacto: <a href="mailto:privacidad.kair@gmail.com">privacidad.kair@gmail.com</a>. </p>
+    <p><strong>Datos de contacto de Gesstiar S.A.S. (responsable o encargado, seg&uacute;n el rol)</strong></p>
+    <p>Raz&oacute;n social: Gesstiar S.A.S. &middot; Domicilio: Calle 114 # 43B - 83, Barranquilla (Atlántico). NIT 900987987-4 &middot; Datos de contacto: <a href="mailto:privacidad.kair@gmail.com">privacidad.kair@gmail.com</a>.
+    </p>
   </div>
   <ul>
     <li><strong>Titular del producto:</strong> Javier Robles F., Profesional en Seguridad y Salud en el Trabajo, Especializaci&oacute;n en Gerencia de Proyectos.</li>
@@ -151,7 +158,7 @@
     &uacute;nicamente con autorizaci&oacute;n</strong>: cuando existe una obligaci&oacute;n legal &mdash;por ejemplo, el
     seguimiento de las obligaciones de seguridad y salud en el trabajo&mdash; la base es esa obligaci&oacute;n,
     no el consentimiento, y de todas formas se informa al titular (Decreto 1377 de 2013, art&iacute;culos 6
-    y 15; Ley 1581 de 2012, art&iacute;culo 7).</p>
+    y 15; Ley 1581 de 2012, art&iacute;culo 10).</p>
   </div>
   <p><strong>K+AIR no es un sistema de historia cl&iacute;nica.</strong> No almacena historias cl&iacute;nicas ni
   las sustituye. Seg&uacute;n la <strong>Resoluci&oacute;n 1843 de 2025</strong>, la custodia de la historia
@@ -166,6 +173,11 @@
   <p><strong>Gesstiar S.A.S. no recibe ni almacena en sus servidores el contenido de tus correos.</strong>
   El &uacute;nico servidor externo con el que K+AIR habla para correo es el propio
   <code>gmail.googleapis.com</code> de Google.</p>
+  <p><strong>Esto describe el tratamiento de los datos de la aplicaci&oacute;n de escritorio, no todo el
+  tratamiento de K+AIR.</strong> K+AIR tiene una segunda parte que s&iacute; es un servicio remoto: la firma
+  electr&oacute;nica, cuyos datos se procesan en el servidor del servicio de firma y cuyas comunicaciones
+  viajan por correo a un proveedor externo. La secci&oacute;n 4 describe ese camino y qu&eacute; datos viajan
+  por &eacute;l.</p>
 
   <div class="destacado">
     <p><strong>Sincronizaci&oacute;n entre equipos.</strong> Si configuras una carpeta de sincronizaci&oacute;n
@@ -193,9 +205,18 @@
         <td>Unicamente cuando usas la funcionalidad de firma electr&oacute;nica</td>
       </tr>
       <tr>
+        <td>Google, como proveedor externo de correo del servicio de firma electr&oacute;nica
+        (cuenta gratuita de Gmail)</td>
+        <td>La direcci&oacute;n de correo del destinatario y el contenido del mensaje (el enlace de acceso a la
+        solicitud y, en un mensaje aparte, el c&oacute;digo OTP)</td>
+        <td>Para ejecutar la firma electr&oacute;nica: entregar al firmante el enlace de acceso y el c&oacute;digo
+        de verificaci&oacute;n</td>
+      </tr>
+      <tr>
         <td>GitHub</td>
-        <td>Petici&oacute;n de comprobaci&oacute;n de actualizaciones de la aplicaci&oacute;n</td>
-        <td>Para mantener la aplicaci&oacute;n al día</td>
+        <td>La direcci&oacute;n IP del equipo y el identificador de la aplicaci&oacute;n
+        (<code>K+AIR-Updater</code>). Ning&uacute;n dato de la empresa ni de sus trabajadores</td>
+        <td>Para comprobar si hay una versi&oacute;n actualizada. Ocurre siempre, no depende de que la empresa lo active</td>
       </tr>
       <tr>
         <td>CDN p&uacute;blicos (jsDelivr, cdnjs, Google Fonts)</td>
@@ -203,7 +224,22 @@
         <td>Para cargar librer&iacute;as de interfaz</td>
       </tr>
       <tr>
-        <td>Registro de consentimiento</td>
+        <td>WhatsApp (WhatsApp Web)</td>
+        <td>El nombre, el n&uacute;mero de identificaci&oacute;n, el cargo, la fecha de atenci&oacute;n y la
+        evaluaci&oacute;n ocupacional del trabajador, y su n&uacute;mero de tel&eacute;fono</td>
+        <td>Solo cuando el usuario prepara el env&iacute;o de una remisi&oacute;n m&eacute;dica a la EPS desde el
+        m&oacute;dulo Remisiones M&eacute;dicas. K+AIR abre WhatsApp Web con el mensaje preparado; el env&iacute;o
+        al trabajador ocurre solo si el usuario lo confirma dentro de WhatsApp</td>
+      </tr>
+      <tr>
+        <td>Proveedor de correo de tu empresa</td>
+        <td>El destinatario, el nombre del trabajador, la fecha de atenci&oacute;n y el documento adjunto de la
+        remisi&oacute;n m&eacute;dica</td>
+        <td>Solo cuando usas el env&iacute;o por correo de las Remisiones M&eacute;dicas. El env&iacute;o es
+        autom&aacute;tico: ocurre al pulsar enviar, sin confirmaci&oacute;n adicional</td>
+      </tr>
+      <tr>
+        <td>Registro de consentimiento (se guarda solo en este equipo: no se transmite a nadie)</td>
         <td>Correo electr&oacute;nico del usuario, un identificador aleatorio del equipo, versi&oacute;n de la
         aplicaci&oacute;n, versi&oacute;n del documento aceptado, marca de tiempo, y una huella digital del texto
         legal que se mostr&oacute;</td>
@@ -214,6 +250,54 @@
   </table>
   <p>No utilizamos herramientas de publicidad, perfiles de comportamiento ni an&aacute;lisis de
   terceros. No vendemos ni cedemos datos personales a terceros con fines comerciales.</p>
+
+  <h3>El correo del servicio de firma electr&oacute;nica: qu&eacute; sale del equipo y con qui&eacute;n</h3>
+  <p>La firma electr&oacute;nica no se resuelve dentro del equipo: se resuelve en el servidor del servicio de
+  firma, que es de Gesstiar S.A.S., y se le avisa al firmante por correo. Por eso hay datos que
+  <strong>s&iacute; salen</strong> del entorno local, aunque el resto de la aplicaci&oacute;n siga siendo
+  local.</p>
+  <ul>
+    <li><strong>Qu&eacute; sale:</strong> la direcci&oacute;n de correo del destinatario (la que la empresa
+    registr&oacute; para el trabajador o firmante) y el contenido del mensaje. El aviso lleva el enlace de
+    acceso a la solicitud; un mensaje aparte lleva el c&oacute;digo OTP. En el correo <strong>no viajan el
+    n&uacute;mero de documento de identidad ni los datos del documento</strong>: el documento firmado y la
+    Constancia se obtienen desde la mini-aplicaci&oacute;n del servicio, no por correo.</li>
+    <li><strong>Para qu&eacute;:</strong> solo para que el firmante pueda abrir su solicitud y demostrar que
+    controla el buz&oacute;n. Sin correo no hay enlace ni c&oacute;digo, y sin ellos no hay firma.</li>
+    <li><strong>Qui&eacute;n interviene:</strong> <strong>Google</strong>, como <strong>proveedor externo de
+    correo</strong>, no como encargado del tratamiento. Gesstiar S.A.S. utiliza actualmente una
+    <strong>cuenta gratuita de Gmail (cuenta de consumidor)</strong> para enviar las comunicaciones del
+    servicio de firma electr&oacute;nica; <strong>no se utiliza Google Workspace</strong>. El enlace de acceso y
+    el c&oacute;digo OTP se env&iacute;an al correo personal registrado por el trabajador o firmante, ambos
+    mediante la misma cuenta remitente y a la misma direcci&oacute;n.</li>
+    <li><strong>Qu&eacute; puede afirmar el responsable y qu&eacute; no:</strong> puede afirmar qu&eacute; datos
+    salen, con qu&eacute; prop&oacute;sito y ante qui&eacute;n, y que el acceso al servicio queda registrado. No
+    puede afirmar que exista un acuerdo de tratamiento de datos (<em>DPA</em>) empresarial con Google, ni que
+    el correo baste por s&iacute; solo como prueba concluyente de la identidad del firmante.</li>
+  </ul>
+  <div class="aviso">
+    <p><strong>Condici&oacute;n contractual pendiente de revisi&oacute;n jur&iacute;dica.</strong> Una cuenta
+    gratuita de Gmail es una cuenta de consumidor: Google <strong>no ofrece un DPA empresarial</strong> para esa
+    modalidad y <strong>no act&uacute;a como encargado</strong> del tratamiento. Eso <strong>no elimina la
+    protecci&oacute;n contractual</strong>: el <a href="anexo-encargo.html">Anexo de encargo</a> exige que los
+    proveedores que reciben datos personales est&eacute;n vinculados por contrato o DPA, y <strong>hoy esa
+    exigencia no est&aacute; satisfecha</strong> por la condici&oacute;n de la cuenta de Gmail. <strong>La
+    empresa cliente debe conocer y evaluar esta limitaci&oacute;n antes de autorizar el uso del
+    servicio</strong>; el servicio no queda por ello aprobado de manera general. Resolver esta condici&oacute;n
+    exige migrar el env&iacute;o a una cuenta de Google Workspace (o a otro proveedor) que s&iacute; tenga DPA
+    empresarial, y actualizar el <a href="anexo-nube-v1.0.html">Anexo de Nube</a>.</p>
+  </div>
+  <p><strong>Los datos salen de Colombia.</strong> El servidor del servicio de firma est&aacute; en
+  Barranquilla, pero <strong>eso no significa que todos los datos permanezcan en Colombia</strong>: la
+  intervenci&oacute;n del proveedor de correo implica que la direcci&oacute;n del destinatario y el contenido de
+  los mensajes se transmiten fuera del pa&iacute;s. Lo que se transfiere es la direcci&oacute;n del destinatario y
+  el contenido del mensaje, para la finalizaci&oacute;n de la firma. Esa transmisi&oacute;n a un proveedor
+  externo, hoy sin contrato ni DPA, se encuadra en la <strong>transferencia internacional del art&iacute;culo 26
+  de la Ley 1581 de 2012</strong>, que exige autorizaci&oacute;n expresa del titular o la excepci&oacute;n legal
+  que corresponda. Cu&aacute;l de las dos bases aplica en cada caso, y si la autorizaci&oacute;n del firmante
+  cubre o no esta transmisi&oacute;n, es una cuesti&oacute;n <strong>pendiente de revisi&oacute;n
+  jur&iacute;dica</strong> que la empresa cliente debe resolver con su asesor antes de autorizar el
+  servicio.</p>
 
   <h2>5. Credenciales y tokens de acceso</h2>
   <div class="aviso">
@@ -240,6 +324,11 @@
   operativo, no como texto plano). Ese canal no transporta correos ni mensajes de Gmail.</p>
   <p>Si tu empresa no usa la firma electr&oacute;nica, K+AIR no se comunica con ning&uacute;n servidor de
   firma.</p>
+  <p>El servicio de firma que K+AIR conecta es el de Gesstiar S.A.S.: corre en un servidor propio en
+  Barranquilla (Colombia) y se expone por t&uacute;nel de Cloudflare. Sus comunicaciones s&iacute; salen por
+  correo a trav&eacute;s de un proveedor externo, como se explica en la secci&oacute;n 4. La pol&iacute;tica de
+  tratamiento de ese servicio, con sus finalidades, sus plazos y sus medidas, est&aacute; en la
+  <a href="politica-firma.html">Pol&iacute;tica de la firma</a>.</p>
 
   <h2>7. Conservaci&oacute;n y eliminaci&oacute;n</h2>
   <ul>
@@ -256,6 +345,13 @@
     cualquier momento. Deja de tratarse la informaci&oacute;n nueva de salud, pero las anteriores no se borran
     solas: escr&iacute;benos para solicitar su eliminaci&oacute;n, porque el registro de aceptaciones y los datos ya
     tratados se conservan como respaldo de lo que ya ocurri&oacute;.</li>
+    <li><strong>Lo que ya sali&oacute; del equipo:</strong> borrar o desinstalar K+AIR en tu equipo no borra lo
+    que ya se transmiti&oacute; a un servicio externo. Los mensajes del servicio de firma electr&oacute;nica quedan
+    en el buz&oacute;n del destinatario y en los sistemas del proveedor de correo; la evidencia del proceso de
+    firma queda en el servidor del servicio, con sus copias de seguridad; y la remisi&oacute;n m&eacute;dica enviada
+    por correo queda en la bandeja del destinatario y en el proveedor de correo de tu empresa. Cada uno de esos
+    entornos se conserva o se suprime por separado, y <strong>la conservaci&oacute;n o la supresi&oacute;n en uno
+    no implica la eliminaci&oacute;n en los dem&aacute;s</strong>.</li>
   </ul>
 
   <h2>8. Tus derechos como titular</h2>
@@ -268,11 +364,16 @@
     <li><strong>Solicitar la supresi&oacute;n</strong> de los datos que consideres innecesarios o excesivos.</li>
     <li><strong>Revocar</strong> el consentimiento en cualquier momento, sin que esto afecte la licitud del tratamiento previo.</li>
   </ul>
-  <p><strong>C&oacute;mo ejercerlos:</strong> escr&iacute;benos por los canales indicados en la
+  <p><strong>C&oacute;mo ejercerlos:</strong> escr&iacute;benos a
+  <a href="mailto:privacidad.kair@gmail.com">privacidad.kair@gmail.com</a> o por los canales indicados en la
   <a href="soporte.html">p&aacute;gina de soporte</a>. Responderemos dentro de los plazos legales. Si el dato
   lo registr&oacute; tu empresa y no Gesstiar S.A.S., la solicitud se dirige a la empresa como responsable;
-  nosotros, en calidad de encargados, la recibimos y la trasladamos a ella de inmediato, sin
-  tratarla para otra cosa (Decreto 1377 de 2013, art&iacute;culos 15 y 19).</p>
+  nosotros, en calidad de encargados, la recibimos, la registramos con fecha y la trasladamos a ella de
+  inmediato, sin tratarla para otra cosa (Decreto 1377 de 2013, art&iacute;culos 15 y 19).</p>
+  <p>Una solicitud puede abarcar datos que est&aacute;n en m&aacute;s de un entorno (por ejemplo, lo que qued&oacute;
+  en el buz&oacute;n del firmante y lo que est&aacute; en el servidor del servicio de firma): cada responsable
+  suprime lo que le corresponde en el &aacute;mbito de su propio entorno, y cada conservaci&oacute;n o
+  supresi&oacute;n en uno <strong>no implica por s&iacute; sola la eliminaci&oacute;n en los dem&aacute;s</strong>.</p>
 
   <h2>9. Seguridad</h2>
   <p>Adoptamos medidas razonables para proteger tus datos: la informaci&oacute;n se procesa localmente,
@@ -291,7 +392,7 @@
   datos, te lo informaremos dentro de la aplicaci&oacute;n y pediremos la aceptaci&oacute;n de nuevo antes de
   continuar.</p>
   <p><strong>C&oacute;mo identificar la versi&oacute;n vigente para soporte.</strong> Cada versi&oacute;n lleva su fecha
-  junto al t&iacute;tulo y en el pie; la vigente es la de <strong>8 de octubre de 2026</strong>. Las
+  junto al t&iacute;tulo y en el pie; la vigente es la de <strong>27 de octubre de 2026</strong>. Las
   versiones anteriores se conservan archivadas con su fecha, de modo que siempre se pueda verificar
   qu&eacute; texto estaba vigente cuando se acept&oacute;. Cuando contactes al soporte, basta con indicar esa
   fecha: con ella se localiza el texto exacto, y la huella guardada en el registro de la aceptaci&oacute;n
@@ -305,7 +406,7 @@
 
 <div class="pie">
   <div class="envoltura">
-    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Documento actualizado el 8 de octubre de 2026</p>
+    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Documento actualizado el 27 de octubre de 2026</p>
   </div>
 </div>
 

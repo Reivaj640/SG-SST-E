@@ -2795,7 +2795,7 @@ ipcMain.handle('get-app-version', async () => {
 // `main/test-consent-version-898.js` ata esta constante a las del renderer y a la
 // "Versión" de sitio/terminos.html y sitio/privacidad.html: si se edita un texto
 // legal sin subir el número, el test falla acá y no en casa de un cliente.
-const CONSENT_DOCUMENT_VERSION = '2026-10-16';
+const CONSENT_DOCUMENT_VERSION = '2026-10-27';
 
 // ─────────────────────────────────────────────────────────────────────────────
 ipcMain.handle('consent:estado', async () => {

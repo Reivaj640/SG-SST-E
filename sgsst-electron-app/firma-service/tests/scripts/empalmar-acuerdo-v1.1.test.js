@@ -115,13 +115,16 @@ const NUMERALES_DEL_MAPA = leerNumeralesDelMapa(MAPA_EMPALME);
 /**
  * Numerales cuyo texto YA NO es el literal de la respuesta 11A: son las
  * correcciones de la revisión legal del 26-oct-2026 (fechas, base legal,
- * remisión al Anexo de Nube, etc.). El texto vigente de estos numerales vive
- * en el JSON de cambios; el resto tiene que seguir siendo copia literal del
- * .txt del abogado. Esta lista es la ÚNICA excepción admitida.
+ * remisión al Anexo de Nube, etc.) y las del 27-oct-2026 (alineación del
+ * canal de correo con la operación real: quién envía el enlace y el OTP,
+ * y la condición del proveedor de correo sin DPA). El texto vigente de
+ * estos numerales vive en el JSON de cambios; el resto tiene que seguir
+ * siendo copia literal del .txt del abogado. Esta lista es la ÚNICA
+ * excepción admitida.
  */
 const NUMERALES_CORREGIDOS = [
-  '1.4', '1.5', '3.4(e)', '8.6', '9.5', '10.1', '10.2(h)', '10.4(a)',
-  '10.5(f)', '10.5(g)', '10.8(a)', '10.8(c)', '12.7',
+  '1.4', '1.5', '3.1', '3.4(b)', '3.4(e)', '8.6', '8.7', '9.5', '10.1',
+  '10.2(h)', '10.4(a)', '10.5(f)', '10.5(g)', '10.8(a)', '10.8(c)', '12.7',
 ];
 
 /** Compara texto ignorando la sangría de cada línea (el empalme indenta literales). */
@@ -319,13 +322,14 @@ test('main: un numeral que no existe en la base es un error (código 3)', () => 
 // El JSON de cambios: los 49 numerales, con el texto VERBATIM del abogado
 // =========================================================================
 
-test('el JSON de cambios trae los 52 numerales del mapa de empalme', () => {
+test('el JSON de cambios trae los 52 numerales del mapa de empalme y el 3.4(b)', () => {
   const claves = Object.keys(CAMBIOS_REALES.cambios);
-  assert.equal(claves.length, 52, 'el mapa de empalme lista 52 numerales que cambian');
+  assert.equal(claves.length, 53, 'los 52 numerales del mapa de empalme y el 3.4(b)');
   assert.equal(NUMERALES_DEL_MAPA.length, 52, 'el mapa de empalme tiene que listar 52 numerales');
   for (const n of NUMERALES_DEL_MAPA) {
     assert.ok(claves.includes(n), 'falta el numeral ' + n + ' en el JSON de cambios');
   }
+  assert.ok(claves.includes('3.4(b)'), 'el 3.4(b) tiene que estar en el JSON de cambios');
 });
 
 test('cada texto del JSON aparece LITERAL en el .txt del abogado, salvo las correcciones aprobadas', () => {

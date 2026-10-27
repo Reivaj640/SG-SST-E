@@ -486,6 +486,36 @@ router.get('/api/sign/:token/signed-document.pdf', (req, res, next) => {
 });
 
 /**
+ * GET /api/sign/:token/constancia.pdf
+ * Devuelve la CONSTANCIA de la firma (el registro que la certifica).
+ *
+ * Es la ruta hermana de `signed-document.pdf`, con las MISMAS protecciones:
+ * el token resuelve como en `getSignedPdfForToken` (token válido, solicitud
+ * ya firmada, enlace vigente) y la respuesta es un PDF descargable.
+ *
+ * Por qué existe: hasta ahora elTrabajador recibía la Constancia por
+ * correo, y el correo dejó de ser un canal de entrega de documentos. Con
+ * esta ruta la Constancia se baja desde el propio enlace de firma, que es
+ * lo que el 5.4 del Acuerdo ya le daba al Firmante.
+ *
+ * El token solo NO sirve la Constancia antes de la identidad: en cualquier
+ * estado previo a la firma la respuesta es 409 CONSTANCIA_NOT_AVAILABLE.
+ */
+router.get('/api/sign/:token/constancia.pdf', (req, res, next) => {
+  try {
+    const { buffer, filename } = publicFlow.getConstanciaPdfForToken(req.params.token);
+
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Cache-Control', 'private, no-store');
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/sign/:token/acuerdo.txt
  * Devuelve el TEXTO del Acuerdo de uso que el Firmante aceptó (5.4).
  *

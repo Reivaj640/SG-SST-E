@@ -3719,8 +3719,8 @@ async function loadAssignedCompaniesFromSession(token) {
  * puede demostrar qué versión se aceptó, aunque habría que regenerarlo al cambiar.
  */
 
-const CONSENT_VERSION_TERMINOS = '2026-10-16';
-const CONSENT_VERSION_PRIVACIDAD = '2026-10-16';
+const CONSENT_VERSION_TERMINOS = '2026-10-27';
+const CONSENT_VERSION_PRIVACIDAD = '2026-10-27';
 
 /** SHA-256 del texto legal. Si crypto.subtle no existiera, un fallback no criptográfico. */
 async function _consentTextoHash(texto) {

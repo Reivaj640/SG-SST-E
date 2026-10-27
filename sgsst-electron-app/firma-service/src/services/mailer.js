@@ -45,9 +45,18 @@ function getTransporter() {
 }
 
 /**
- * Envía la copia firmada del documento al correo del firmante.
+ * Envía la copia del documento firmado EN PAPEL al medio que el Trabajador
+ * autorizó (el 8.2).
  *
- * Adjunta el PDF firmado y la Constancia como attachments.
+ * Esta es la ÚNICA ruta en la que el archivo viaja por correo, y es a
+ * propósito: en la firma en papel el documento se firmó a mano, el flujo
+ * electrónico de esa solicitud queda CANCELLED y el Trabajador no tiene
+ * cuenta ni enlace con el que bajar nada. El medio que él autorizó es el
+ * correo, así que el archivo tiene que ir adjunto.
+ *
+ * La firma electrónica NO usa esta función: su copia se entrega por el
+ * enlace de firma (el 5.4 del Acuerdo de uso) y el correo es solo un aviso,
+ * sin adjuntos. Ver `sendCopiaAviso`.
  *
  * - Producción: nodemailer con SMTP + attachments reales.
  * - Dev: nodemailer jsonTransport (no envía), pero los attachments
@@ -56,31 +65,28 @@ function getTransporter() {
  *
  * @param {object} opts
  * @param {string} opts.to - Correo destino
- * @param {string} opts.pdfPath - Path absoluto al PDF firmado
- * @param {string} opts.constanciaPath - Path absoluto a la Constancia
+ * @param {string} opts.pdfPath - Path absoluto al PDF firmado en papel
+ * @param {string} opts.constanciaPath - Path absoluto al Registro de firma autográfica
  * @param {object} opts.context - Metadata adicional
  *
  * @returns {Promise<{ok: boolean, messageId: string}>}
  * @throws Error si los archivos no existen o falla el envío
  */
-async function sendSignedCopy({ to, pdfPath, constanciaPath, context, tipo }) {
+async function sendCopiaFirmadoPapel({ to, pdfPath, constanciaPath, context }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendCopiaFirmadoPapel: `to` debe ser un correo válido');
+  }
+  if (typeof pdfPath !== 'string' || !fs.existsSync(pdfPath)) {
+    throw new Error(`sendCopiaFirmadoPapel: PDF firmado no existe: ${pdfPath}`);
+  }
+  if (typeof constanciaPath !== 'string' || !fs.existsSync(constanciaPath)) {
+    throw new Error(`sendCopiaFirmadoPapel: Registro de firma no existe: ${constanciaPath}`);
+  }
+
   // 9A (el 7.2): la firma en PAPEL tiene su propia constancia (el
   // "Registro de firma autográfica"), y el correo no puede decir
   // "Constancia de firma electrónica" cuando el documento se firmó a mano.
-  const esPapel = tipo === 'PAPEL';
-  if (typeof to !== 'string' || !to.includes('@')) {
-    throw new Error('sendSignedCopy: `to` debe ser un correo válido');
-  }
-  if (typeof pdfPath !== 'string' || !fs.existsSync(pdfPath)) {
-    throw new Error(`sendSignedCopy: PDF firmado no existe: ${pdfPath}`);
-  }
-  if (typeof constanciaPath !== 'string' || !fs.existsSync(constanciaPath)) {
-    throw new Error(`sendSignedCopy: Constancia no existe: ${constanciaPath}`);
-  }
-
-  const subject = esPapel
-    ? 'K+AIR — Copia de tu documento firmado en papel'
-    : 'K+AIR — Copia de tu documento firmado';
+  const subject = 'K+AIR — Copia de tu documento firmado en papel';
   const id_solicitud = (context && context.id_solicitud) || 'desconocido';
   const id_constancia = (context && context.id_constancia) || 'desconocido';
   const body = [
@@ -91,9 +97,7 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context, tipo }) {
     `ID de solicitud: ${id_solicitud}`,
     `ID de constancia: ${id_constancia}`,
     '',
-    esPapel
-      ? 'Adjuntamos el PDF del documento que firmaste en papel y el Registro de firma autográfica.'
-      : 'Adjuntamos el PDF firmado y la Constancia de firma electrónica.',
+    'Adjuntamos el PDF del documento que firmaste en papel y el Registro de firma autográfica.',
     'Conserva ambos documentos como evidencia de la firma.',
     '',
     'Si no reconoces esta operación, contacta a RRHH de inmediato.',
@@ -141,10 +145,119 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context, tipo }) {
 }
 
 /**
+ * Envía el AVISO de que la firma electrónica quedó cerrada.
+ *
+ * Es un correo de AVISO, no un envío de documentos: NO lleva el PDF firmado
+ * ni la Constancia adjuntos. La copia se entrega por el ENLACE de firma (el
+ * 5.4 del Acuerdo de uso: "El Firmante puede imprimir o descargar copia de
+ * este Acuerdo y del documento firmado desde el propio enlace de firma, sin
+ * costo alguno") y el correo solo dice dónde está.
+ *
+ * Por qué el archivo no viaja: mandar el documento firmado y la Constancia
+ * como adjuntos mete la evidencia de la firma en una caja de correo que no
+ * es la del Responsable del tratamiento, y el aviso con enlace cumple el
+ * mismo propósito sin ese problema. La firma en papel es la excepción, y
+ * va por otra función (`sendCopiaFirmadoPapel`): ahí el Trabajador no tiene
+ * enlace con el que bajar nada.
+ *
+ * Lo que SÍ viaja en el cuerpo: el ID de la solicitud (referencia legible
+ * para el Trabajador y la Empresa; no es un dato de identidad ni del
+ * documento) y la URL del enlace de firma. NO viaja: el número de
+ * identificación del firmante, el nombre o el hash del documento, ni ningún
+ * otro dato del documento. El ID de la Constancia tampoco: ya está impreso
+ * dentro del propio PDF de la Constancia.
+ *
+ * En dev (jsonTransport): se guarda en `_devInbox` con tipo='copy_aviso' y
+ * SIN clave `attachments`, para que los tests puedan comprobar que el
+ * correo post-firma no lleva nada adjunto.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo destino
+ * @param {string} opts.url_publica - URL del enlace de firma
+ *                                    (formato: `${publicUrl}/s/<token>`).
+ * @param {string} opts.id_solicitud - ID legible de la solicitud
+ *                                     (SIGN-YYYY-NNNNNN).
+ * @param {object} [opts.context] - Metadata adicional (NO se loggea en plaintext).
+ *
+ * @returns {Promise<{ok: true, messageId: string}>}
+ * @throws Error si `to` no parece correo, o si falla el envío.
+ */
+async function sendCopiaAviso({ to, url_publica, id_solicitud, context }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendCopiaAviso: `to` debe ser un correo válido');
+  }
+  if (typeof url_publica !== 'string' || url_publica.length === 0) {
+    throw new Error('sendCopiaAviso: `url_publica` requerida');
+  }
+  if (typeof id_solicitud !== 'string' || id_solicitud.length === 0) {
+    throw new Error('sendCopiaAviso: `id_solicitud` requerido');
+  }
+
+  const subject = 'K+AIR — Ya puedes descargar tu documento firmado';
+  const body = [
+    'Hola,',
+    '',
+    'Tu documento quedó firmado electrónicamente en K+AIR.',
+    '',
+    `ID de solicitud: ${id_solicitud}`,
+    '',
+    'Para obtener tus copias, abre este enlace en tu navegador:',
+    url_publica,
+    '',
+    'Desde el enlace puedes:',
+    '- Descargar el documento firmado.',
+    '- Ver la Constancia de la firma (el registro que certifica la firma).',
+    '- Descargar la copia del Acuerdo de uso que aceptaste.',
+    '',
+    'Este correo no lleva el archivo adjunto: tus copias se descargan desde el',
+    'enlace, para que el documento no quede en el correo.',
+    '',
+    'El enlace es el mismo que usaste para firmar y sirve mientras esté vigente.',
+    'Si ya no responde, pídele a tu empresa una copia del documento firmado y',
+    'de la Constancia.',
+    '',
+    'Si no reconoces esta operación, contacta a RRHH de inmediato.',
+    '',
+    '— K+AIR',
+  ].join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    // SIN attachments: el aviso no lleva el documento firmado ni la
+    // Constancia. La copia se baja del enlace.
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}">`,
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  // Dev: jsonTransport no envía, pero guardamos el aviso en el inbox.
+  logger.info('[DEV-COPY-AVISO] Aviso de firma enviada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    id_solicitud,
+    message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
+  });
+  const entry = {
+    to, subject, body, tipo: 'copy_aviso',
+    id_solicitud, url_publica,
+    context: context || null,
+    sentAt: new Date().toISOString(),
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return { ok: true, messageId: 'dev-copy-aviso-' + Date.now() };
+}
+
+/**
  * Envía una invitación de firma al correo del firmante.
  *
  * A diferencia de sendOTP (que se usa durante la identification) y
- * sendSignedCopy (post-commit, adjunta el PDF firmado), sendInvite es
+ * sendCopiaAviso (post-commit, aviso con el enlace de descarga y SIN
+ * adjuntos), sendInvite es
  * el "primer contacto" con el firmante: le notifica que tiene un documento
  * para firmar y le entrega la URL pública única de la mini-app.
  *
@@ -156,8 +269,8 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context, tipo }) {
  * body: incluye id_solicitud, URL pública, instrucciones (abrir link,
  *       identificar con cédula, esperar OTP, firmar).
  * attachments: ninguno (es solo la invitación; el PDF no se envía por
- *              correo — el firmante lo VE en la mini-app y luego lo recibe
- *              firmado vía sendSignedCopy() post-commit).
+ *              correo — el firmante lo VE en la mini-app y, una vez
+ *              firmado, lo descarga desde el mismo enlace).
  *
  * En dev (jsonTransport): se guarda en _devInbox con tipo='invite' para
  * que los tests puedan verificar.
@@ -508,7 +621,8 @@ function makeBody({ otp, tipo, context }) {
 
 module.exports = {
   sendOTP,
-  sendSignedCopy,
+  sendCopiaFirmadoPapel,  // 9A: la copia en PAPEL sí viaja por correo (adjunta).
+  sendCopiaAviso,         // Firma electrónica: aviso con el enlace, SIN adjuntos.
   sendInvite,
   sendInviteForCompany,  // I-FIRMA-DUAL: invitación al rep legal (2da firma)
   getDevInbox,

@@ -316,9 +316,17 @@
         <h2 id="signed-title-dual" hidden>✓ Documento firmado por ambas partes</h2>
         <p id="signed-msg-single">Tu documento ha sido firmado electrónicamente.</p>
         <p id="signed-msg-dual" hidden>Este documento fue firmado por el trabajador y por el representante legal de la empresa (firma dual). La firma dual cumple los requisitos del Decreto 1072 de 2015 y la Circular 008 de 2020 de la UGPP para la validación de la manifestación de la voluntad del trabajador.</p>
-        <p id="signed-info">Se enviará una copia a tu correo.</p>
+        <p id="signed-info">Se enviará un aviso a tu correo. Desde esta misma pantalla puedes descargar el documento firmado y la Constancia.</p>
       </div>
-      <a id="constancia-link" class="btn btn-secondary" target="_blank" rel="noopener">VER CONSTANCIA</a>
+      <!--
+        La Constancia se baja del propio enlace de firma (5.4 del Acuerdo de
+        uso). Antes el botón estaba oculto: la única ruta de la Constancia
+        era la interna, que exige API key, y el Trabajador la recibía por
+        correo. El botón arranca oculto y lo muestra el JS solo cuando la
+        solicitud está firmada.
+      -->
+      <a id="constancia-link" class="btn btn-secondary" hidden>VER CONSTANCIA</a>
+      <p id="constancia-error" class="alert alert-error" hidden></p>
       <!--
         FASE 6 · 5.4 del Acuerdo de uso: "El Firmante puede imprimir o
         descargar copia de este Acuerdo y del documento firmado desde el

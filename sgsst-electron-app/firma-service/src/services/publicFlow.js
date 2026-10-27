@@ -1832,19 +1832,25 @@ async function commit(token, opts, ip, user_agent) {
     throw err;
   }
 
-  // 13. Enviar copia firmada al correo (Bloque E2).
+  // 13. Avisar por correo que la firma quedó cerrada (Bloque E2).
   //     Best-effort: si el envío falla, el sign request sigue en SIGNED
   //     (la firma es válida legalmente), pero se registra COPY_FAILED en
   //     la auditoría para que RH pueda intervenir (reenviar, escalar).
-  //     El PDF y la Constancia se adjuntan al correo vía sendSignedCopy().
   //
-  //     D-2: la copia va al CONTACTO REGISTRADO por la Empresa (el mismo
+  //     El correo NO lleva el PDF firmado ni la Constancia adjuntos: la
+  //     copia se entrega por el ENLACE de firma (el 5.4 del Acuerdo: el
+  //     Firmante puede imprimir o descargar copia del documento firmado
+  //     desde el propio enlace de firma). El correo es solo el aviso y
+  //     dice dónde está. Así el archivo no queda en el buzón desde el que
+  //     se envía, que no es un buzón del Responsable del tratamiento.
+  //
+  //     D-2: el aviso va al CONTACTO REGISTRADO por la Empresa (el mismo
   //     canal que la invitación), no al medio personal del OTP. Son dos
-  //     canales distintos: el OTP es el dato de creación; la copia es la
-  //     evidencia que la Empresa le debe a su trabajador.
+  //     canales distintos: el OTP es el dato de creación; el aviso es la
+  //     noticia de que la evidencia ya se puede descargar.
   const correo = resolveCorreo(signRequest);
   if (!correo) {
-    logger.warn('No hay correo para enviar copia firmada', {
+    logger.warn('No hay correo para enviar el aviso de firma firmada', {
       id_solicitud: signRequest.id_solicitud,
     });
     signRequestService.registerEvent(signRequest.id, 'COPY_FAILED',
@@ -1856,13 +1862,12 @@ async function commit(token, opts, ip, user_agent) {
       'sistema', ip, user_agent);
   } else {
     try {
-      const sendResult = await mailer.sendSignedCopy({
+      const sendResult = await mailer.sendCopiaAviso({
         to: correo,
-        pdfPath: pdf_firmado_path,
-        constanciaPath: constancia_path,
+        url_publica: `${config.publicUrl}/s/${token}`,
+        id_solicitud: signRequest.id_solicitud,
         context: {
           id_solicitud: signRequest.id_solicitud,
-          id_constancia,
         },
       });
       signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
@@ -1873,13 +1878,13 @@ async function commit(token, opts, ip, user_agent) {
           size_constancia: constanciaBuf.length,
         },
         'sistema', ip, user_agent);
-      logger.info('Copia firmada enviada', {
+      logger.info('Aviso de firma enviada', {
         id_solicitud: signRequest.id_solicitud,
         id_constancia,
         messageId: sendResult.messageId,
       });
     } catch (err) {
-      logger.warn('No se pudo enviar copia al trabajador', {
+      logger.warn('No se pudo avisar al trabajador que su documento quedó firmado', {
         id_solicitud: signRequest.id_solicitud,
         id_constancia,
         error: err.message,
@@ -2266,6 +2271,48 @@ function getSignedPdfForToken(token) {
   return {
     buffer: pdfBuffer,
     filename: `${signRequest.id_solicitud}-firmado.pdf`,
+  };
+}
+
+/**
+ * Devuelve el PDF de la CONSTANCIA de la solicitud.
+ *
+ * La Constancia es el registro que certifica la firma: quién firmó, qué
+ * documento, con qué fecha y con qué huellas. La genera el commit() y la
+ * guarda junto al PDF firmado (`constancia_path`).
+ *
+ * Es la misma entrega que hace `getSignedPdfForToken`, con las MISMAS
+ * protecciones: token válido, solicitud ya firmada y enlace vigente. El
+ * enlace es de un solo uso (3.4(c)), así que esto NO reabre el flujo: solo
+ * baja lo que ya está firmado.
+ *
+ * @param {string} token
+ * @returns {{buffer: Buffer, filename: string}}
+ */
+function getConstanciaPdfForToken(token) {
+  // 1. Resolver token permitiendo el estado firmado (no los demás terminales:
+  //    una solicitud rechazada, revocada o cancelada no descarga nada).
+  const { signRequest } = resolveToken(token, { permitirFirmado: true });
+
+  // 2. Solo si la firma ya ocurrió.
+  if (!ESTADOS_FIRMADOS.includes(signRequest.estado)) {
+    throw new AppError(409, 'CONSTANCIA_NOT_AVAILABLE',
+      'La Constancia todavía no está disponible',
+      { current_state: signRequest.estado });
+  }
+
+  // 3. Leer la Constancia que dejó el commit().
+  if (!signRequest.constancia_path) {
+    throw new AppError(404, 'PDF_NOT_FOUND', 'No se encontró la Constancia');
+  }
+  const archivo = storage.readPdfIfExists(signRequest.constancia_path);
+  if (!archivo.found) {
+    throw new AppError(404, 'PDF_NOT_FOUND', 'No se encontró la Constancia');
+  }
+
+  return {
+    buffer: archivo.buffer,
+    filename: `${signRequest.id_solicitud}-constancia.pdf`,
   };
 }
 
@@ -3285,11 +3332,17 @@ async function registrarFirmaEnPapel(id_solicitud, opts) {
   txCierre();
 
   // 5. La copia al Trabajador, por un medio que él autorizó (el 8.2/8.5).
+  //
+  //    En PAPEL el archivo SÍ viaja adjunto: el documento se firmó a mano
+  //    y el flujo electrónico de esta solicitud queda CANCELLED (arriba), así
+  //    que el enlace de firma no sirve para bajar ni el PDF firmado ni el
+  //    Registro de firma autográfica. El medio autorizado es el correo, y el
+  //    correo es lo que tiene que llevar los archivos.
   const destino = _destinoCopiaTrabajador(signRequest);
   let copia = { enviada: false, motivo: 'sin_medio_autorizado' };
   if (destino.correo) {
     try {
-      await mailer.sendSignedCopy({
+      await mailer.sendCopiaFirmadoPapel({
         to: destino.correo,
         pdfPath,
         constanciaPath: registroPath,
@@ -3297,7 +3350,6 @@ async function registrarFirmaEnPapel(id_solicitud, opts) {
           id_solicitud: signRequest.id_solicitud,
           id_constancia: 'REGISTRO-' + id_solicitud,
         },
-        tipo: 'PAPEL',
       });
       copia = { enviada: true, medio: destino.medio, correo: destino.correo };
     } catch (e) {
@@ -3597,6 +3649,9 @@ module.exports = {
   // FASE 6 · 5.4: el enlace de firma entrega el documento firmado y la copia
   // del Acuerdo, sin reabrir el flujo.
   getSignedPdfForToken,
+  // La Constancia también se entrega desde el propio enlace de firma, para
+  // que el Trabajador no dependa del correo para obtenerla.
+  getConstanciaPdfForToken,
   getAgreementCopyForToken,
   // FASE 6 · orden (g)/(h): resolución del Acuerdo de la solicitud y estado
   // de aceptación. La versión estricta (exigirAcuerdoAceptado) es interna.

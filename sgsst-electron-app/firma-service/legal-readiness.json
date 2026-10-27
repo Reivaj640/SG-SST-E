@@ -4,8 +4,8 @@
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
     "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
-    "v1_1_hash": "634b063c6494549f7918d51c273cc67b09b7628942394ef9603dbfad177629d0",
-    "v1_1_fecha": "2026-10-26",
+    "v1_1_hash": "9b5779989e98628f0f960a6eefea2f787addab52ea807d463e88ce3ca2f326e7",
+    "v1_1_fecha": "2026-10-27",
     "publicado": false
   },
   "encargado": {
@@ -44,15 +44,16 @@
       "fecha": null,
       "devolucion_supresion": false,
       "auditoria": false,
-      "evidencia": null
+      "evidencia": null,
+      "nota": "Cuenta de consumidor: Google no ofrece DPA para Gmail de consumo y no actua como encargado. El envio por SMTP es una transferencia internacional pendiente de autorizacion expresa del Titular (art. 26 Ley 1581) y de concepto del abogado. Condicion contractual ABIERTA: no se declara satisfecha."
     }
   },
   "anexo_encargo": {
     "estado": "no_firmado",
     "fecha": null,
     "evidencia": null,
-    "version": "2026-10-26",
-    "hash": "189c25b5fdae3782b875798c8c81cf131be2ce210b5e80971b7ba5e91b014743"
+    "version": "2026-10-27",
+    "hash": "8ae584c000bdd7b8b6c5651667056fa09308c533303e2843321400f0136f3052"
   },
   "anexo_nube": {
     "firmado": false,

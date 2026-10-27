@@ -5324,6 +5324,50 @@ Oscuro y Claro. El owner lo aprobó.
 
 ---
 
+### 2026-10-27 · 📦️971 · La alineacion de los documentos con el Gmail gratuito
+
+**El cambio de enfoque**: el owner decidio mantener la **cuenta gratuita de Gmail** y, en vez de prometer
+un DPA empresarial de Google que no existe, **alinear los documentos con la operacion real**: que el uso de
+Gmail quede declarado de forma transparente, limitado a las notificaciones necesarias, y sin afirmar un
+contrato empresarial de tratamiento que no esta acreditado.
+
+**Lo primero fue medir, no redactar.** Tres afirmaciones del Anexo de Nube que el codigo contradijo:
+
+1. El correo post-firma **adjuntaba el PDF firmado y la Constancia** al buzon del firmante. Con eso, la
+   cuenta de consumidor recibia el contrato completo: **ningun texto podia decir "notificaciones necesarias"**.
+2. La §5 afirmaba "cifrado en reposo", "respaldos cifrados" y "autenticacion del personal". El codigo dice
+   lo contrario: `better-sqlite3` sin SQLCipher, respaldo `sqlite3 .backup` + `tar.gz` **sin cifrar**, y
+   acceso por `X-Admin-API-Key` sin doble factor.
+3. La §3 seguia diciendo que el servidor estaba en `Etc/UTC` y que la prueba mensual de restauracion
+   estaba "pendiente de programar", cuando **las dos cosas ya se habian corregido el 26 de octubre**. El
+   documento describia un servicio que ya no existia, y nadie lo habia tocado.
+
+**El cambio de codigo que hace cierto el texto**: el correo post-firma paso a ser un **aviso con el
+enlace** (`sendCopiaAviso`, sin adjuntos) y se creo `GET /api/sign/:token/constancia.pdf` para que el
+firmante baje la Constancia desde el enlace. El boton "VER CONSTANCIA" de la mini-app estaba oculto
+porque el trabajador la recibia por correo: ahora se muestra. **El flujo en papel conserva los adjuntos**:
+en `registrarFirmaEnPapel` la solicitud queda `CANCELLED` y con ese estado `resolveToken` lanza 410, asi
+que sin adjunto el firmante en papel se quedaria **sin su copia**.
+
+**Los nueve documentos** quedaron describiendo la operacion real: Google es **proveedor externo de correo,
+no subencargado** (con cuenta de consumo no hay DPA aplicable); el enlace y el OTP **no son dos factores
+independientes** (misma cuenta, misma direccion); y la clausula que exige contrato o DPA a los proveedores
+que reciben datos **se conservo y se declaro no satisfecha**, con sus dos salidas: migrar a un proveedor con
+DPA o la autorizacion expresa y separable del Titular. El gate de primera firma **sigue bloqueado** por
+`google_dpa`, con el motivo real y las tres acciones.
+
+**El Acuerdo v1.1** cambio en 3.1, 3.4(b), 3.4(e), 8.7, 10.1 y 10.5(f): de 42 475 B (`634b063c…29d0`) a
+**46 579 B (`9b577998…26e7`)**. La **v1.0 sellada no se toco** (`52a490a4…10c04`).
+
+**Cifras**: suite `1770 · 1768 pass · 0 fail · 2 skipped`; barrido limpio en los 27 archivos; Anexo de
+Nube de **3 huecos bloqueantes a 1** (queda el de la condicion contractual, que debe quedar); Anexo de
+Encargo con 0 huecos y su marca de revision profesional pendiente (la quita el abogado); los 6 pares
+`legal/` ≡ `sitio/` **identicos byte a byte**.
+
+**Lo que sigue abierto, sin cambios**: la condicion contractual de Gmail (la resuelve el abogado), la
+cuenta con DPA si se decide migrar, la 9A en papel, la 10.4, el D-02, la firma del Anexo de Nube por cada
+Empresa, la 9A y el push de los paquetes 967 a 971.
+
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

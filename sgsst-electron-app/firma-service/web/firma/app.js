@@ -1476,11 +1476,6 @@
 
   function showSignedScreen(result) {
     showScreen('signed');
-    // El endpoint /internal/sign-requests/:id/constancia requiere API key.
-    // El trabajador recibe la Constancia por correo, así que en la mini-app
-    // ocultamos el botón "VER CONSTANCIA" y mostramos el mensaje informativo.
-    const link = $('#constancia-link');
-    if (link) link.style.display = 'none';
     wireSignedDownloads();
   }
 
@@ -1502,8 +1497,75 @@
     if (acuerdoLink && state.token) {
       acuerdoLink.setAttribute('href', '/api/sign/' + state.token + '/acuerdo.txt');
     }
+    wireConstanciaDownload();
     const descargas = $('#signed-downloads');
     if (descargas) descargas.hidden = false;
+  }
+
+  /**
+   * La Constancia se baja del propio enlace de firma (5.4 del Acuerdo de uso).
+   *
+   * Antes el botón "VER CONSTANCIA" estaba oculto: la única ruta de la
+   * Constancia era la interna (/internal/sign-requests/:id/constancia.pdf,
+   * que exige API key) y el Trabajador la recibía por correo. Ahora hay una
+   * ruta pública con el token, así que la Constancia se descarga desde acá
+   * y no depende del correo.
+   *
+   * El botón se pide con fetch y no con un <a target="_blank">: así un
+   * error de K+AIR (enlace vencido, Constancia no disponible) se muestra
+   * como alerta en esta misma pantalla, y no como un JSON crudo en una
+   * pestaña nueva.
+   */
+  function wireConstanciaDownload() {
+    const link = $('#constancia-link');
+    const errorEl = $('#constancia-error');
+    if (!link || !state.token) return;
+
+    link.setAttribute('href', '/api/sign/' + state.token + '/constancia.pdf');
+    showEl(link);
+
+    // El listener se pone una sola vez: esta función corre desde el commit
+    // y también al reabrir el enlace ya firmado.
+    if (link.dataset.listener) return;
+    link.dataset.listener = '1';
+
+    link.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      hideEl(errorEl);
+      fetch('/api/sign/' + state.token + '/constancia.pdf')
+        .then(function (res) {
+          if (!res.ok) {
+            var msg = 'No se pudo descargar la Constancia.';
+            return res.json().then(function (data) {
+              if (data && data.error && data.error.message) msg = data.error.message;
+              throw new Error(msg);
+            }, function () {
+              throw new Error(msg);
+            });
+          }
+          var cd = res.headers.get('content-disposition') || '';
+          var m = /filename="?([^";]+)"?/.exec(cd);
+          return res.blob().then(function (blob) {
+            return { blob: blob, nombre: m ? m[1] : 'constancia.pdf' };
+          });
+        })
+        .then(function (out) {
+          var url = URL.createObjectURL(out.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = out.nombre;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        })
+        .catch(function (err) {
+          if (errorEl) {
+            errorEl.textContent = err.message || 'No se pudo descargar la Constancia.';
+            errorEl.hidden = false;
+          }
+        });
+    });
   }
 
   // ============================================================

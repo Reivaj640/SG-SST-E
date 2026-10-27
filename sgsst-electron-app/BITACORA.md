@@ -8012,3 +8012,74 @@ la cierra.
 
 **Archivos** — `Historial.md` (bloque de estado + tablero), `PROMPT.md` (trampa 98),
 `sgsst-electron-app/BITACORA.md` y este archivo.
+
+## 📦️971 · El documento que describe un servicio y el servicio que describe el documento
+
+**El pedido**: cambiar el enfoque para mantener la cuenta gratuita de Gmail y alinear el Acuerdo de
+firma, el Anexo de Encargo y el Anexo de Nube, de modo que el uso de Gmail quede declarado de forma
+transparente, limitado a las notificaciones necesarias y sin afirmar un contrato empresarial de
+tratamiento con Google que no está acreditado.
+
+**Lo que se encontró al medir antes de redactar.** Tres cosas que el texto decía y el código no:
+
+1. **El correo post-firma adjuntaba el documento firmado y la Constancia** al buzón del firmante
+   (`src/services/mailer.js`, `sendSignedCopy`). Con eso, la cuenta de consumidor no recibía "una
+   notificación": recibía el contrato completo. Ningún texto podía decir "notificaciones necesarias"
+   mientras eso fuera cierto.
+2. **La §5 del Anexo de Nube afirmaba "cifrado en reposo", "respaldos cifrados" y "autenticación del
+   personal"**. El código dice lo contrario: `better-sqlite3` sin SQLCipher (el cifrado de reposo del
+   disco no está confirmado), `backup-firma.sh` hace `sqlite3 .backup` + `tar.gz` **sin cifrar**, y
+   el acceso del personal es por `X-Admin-API-Key` sin segundo factor ni identidad por persona.
+3. **La §3 del Anexo de Nube seguía diciendo que el servidor estaba en `Etc/UTC`** y que la prueba
+   mensual de restauración estaba "pendiente de programar". Ambas cosas ya se habían corregido el 26 de
+   octubre (`America/Bogota` verificado, los tres cron instalados). El documento describía un servicio
+   que ya no existía.
+
+**El tercer hallazgo es el más importante y el más difícil de ver**: el §3 de un Anexo puede volverse
+falso **solo**, sin que nadie lo toque. El servicio cambió (la zona horaria, los cron) y el documento
+siguió diciendo la verdad de hace un día. Un documento que describe cómo funciona el servicio no es un
+documento histórico: es una **afirmación viva** que hay que contrastar contra el servidor cada vez que
+la operación cambia. Por eso el §3 se reescribió con lo medido —copia diaria a las 22:00 hora de
+Colombia con `integrity_check`, prueba de restauración mensual el día 1 a las 04:00, detección de caídas
+cada 5 minutos **sin aviso a ninguna persona**— y no con lo que el documento ya decía.
+
+**Lo que se hizo, en tres frentes con archivos disjuntos**:
+
+- **Código** (`mailer.js`, `publicFlow.js`, `public.js`, `web/firma/`): el correo post-firma pasó
+  a ser un **aviso con el enlace**, sin adjuntar el PDF firmado ni la Constancia, y se creó
+  `GET /api/sign/:token/constancia.pdf` para que el firmante baje la Constancia desde el enlace. El
+  botón "VER CONSTANCIA" de la mini-app estaba oculto justamente porque el trabajador la recibía por
+  correo: ahora se muestra. **El flujo en papel conserva los adjuntos**, y no por convenience: en
+  `registrarFirmaEnPapel` la solicitud queda `CANCELLED`, y con ese estado `resolveToken` lanza 410,
+  así que el firmante no tiene enlace por el que bajar nada. Sin adjuntar, el firmante en papel se
+  quedaría sin su copia.
+- **Documentos**: los nueve (Anexo de Nube, Anexo de Encargo, política de la firma, Acuerdo, política
+  de privacidad, términos, autorización de trabajadores, soporte e index) quedaron describiendo la
+  operación real. Google es **proveedor externo de correo, no subencargado**, porque con una cuenta de
+  consumo no hay DPA aplicable; el enlace y el OTP **no son dos factores independientes** porque salen
+  por la misma cuenta a la misma dirección; y la cláusula que exige contrato o DPA a los proveedores que
+  reciben datos **se conservó** (no se borró para tapar el problema) y se declaró no satisfecha, con sus
+  dos salidas reales: migrar a una cuenta con DPA o la autorización expresa y separable del Titular.
+- **Manifiesto**: el hash del Anexo de Encargo estaba desactualizado desde el 📦960 —decía
+  `189c25b5…` y el archivo era otro— y el de la v1.1 apuntaba al texto viejo. Los dos se recalcularon
+  contra el archivo, que es lo único que un hash puede registrar.
+
+**La regla que dejó este trabajo**: *alinear un documento con la realidad no es reescribirlo, es
+cambiar lo que el sistema hace y lo que el texto dice, y que los dos digan lo mismo*. Si el texto
+dice "notificaciones necesarias" y el código manda el contrato adjunto, el que miente es el texto;
+si el texto dice "cifrado en reposo" y la base no lo tiene, el que miente es el texto. **La dirección
+de la corrección siempre es hacia el documento, salvo que el documento tenga una promesa que el
+servicio cumple y que vale la pena defender** (el RTO de 4 h, el respaldo con verificación de
+integridad y la prueba de restauración: esos se midieron y se dejaron).
+
+**Lo que NO se hizo, y por qué**. No se borró la protección contractual del Anexo de Encargo, no se
+declaró satisfecha la condición de Gmail, no se presentó el servicio como aprobado y el gate de
+primera firma sigue **bloqueado** por ella: `google_dpa` sigue pendiente con el motivo real y las
+tres salidas. Tampoco se amplió la vigencia del enlace para que el aviso post-firma no caducara:
+eso tocaría la validez y la conservación, que no eran el objeto.
+
+**Números**: suite `1770 · 1768 pass · 0 fail · 2 skipped` (los 2 skipped son pre-existentes); barrido
+limpio en los 27 archivos; Anexo de Nube de **3 huecos bloqueantes a 1** (queda el de la condición
+contractual, que debe quedar); Anexo de Encargo con 0 huecos; v1.1 de 42 475 B
+(`634b063c…29d0`) a 46 579 B (`9b577998…26e7`) con la **v1.0 sellada intacta**
+(`52a490a4…10c04`).
