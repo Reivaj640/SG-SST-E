@@ -30,39 +30,49 @@
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
-  <p class="fecha">Modelo &middot; Versi&oacute;n 1.0 &middot; 24 de octubre de 2026</p>
+  <p class="fecha">Modelo &middot; Versi&oacute;n 1.0 &middot; 27 de octubre de 2026</p>
 
   <div class="destacado">
     <p><strong>Resumen en una l&iacute;nea:</strong> este Anexo describe la infraestructura del servicio de firma
     electr&oacute;nica K+AIR y lo incorpora al Anexo de Encargo de Tratamiento de Datos Personales. Tiene su propia
     versi&oacute;n y su propia huella; es el modelo que cada Empresa diligencia con sus datos y firma con el
-    Encargado, y no se firma sin los cuatro datos del bloque de pendientes.</p>
+    Encargado. El correo del servicio sale por una cuenta gratuita de Gmail de Google LLC, es decir una cuenta
+    de consumidor, sin contrato ni DPA: esa condici&oacute;n contractual est&aacute; pendiente de concepto del
+    abogado y mientras no se resuelva este Anexo no se firma.</p>
   </div>
 
   <div class="aviso">
-    <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Sin estos cuatro datos el Anexo no se puede
-    firmar:</p>
+    <p><strong>PENDIENTE DE COMPLETAR ANTES DE FIRMAR.</strong> Hay dos clases de pendientes y no se
+    confunden:</p>
     <ul>
-      <li><strong>Tipo de cuenta de Google y el tratamiento que implica.</strong> Si la cuenta es de
-      consumidor, Google no act&uacute;a como subencargado y el env&iacute;o de correo es una transferencia
-      internacional: se ampara en la autorizaci&oacute;n expresa del Titular o en una excepci&oacute;n del
-      art&iacute;culo 26 de la Ley 1581.</li>
-      <li><strong>RTO y RPO del servicio.</strong></li>
-      <li><strong>Plan de continuidad operativa.</strong></li>
-      <li><strong>Plazo de supresi&oacute;n de los datos al terminar el encargo.</strong></li>
+      <li><strong>Pendiente contractual (lo resuelve el abogado, no el sistema).</strong> El correo sale por
+      una cuenta de Gmail gratuita de Google LLC, es decir una cuenta de consumidor, sin contrato ni Data
+      Processing Addendum. Google no ofrece un acuerdo de procesamiento de datos para las versiones de
+      consumo de Gmail y no act&uacute;a como encargado del tratamiento en esa modalidad, de manera que con la
+      cuenta actual no se le puede tratar como subencargado. El Acuerdo (10.1 y 10.5(f)) condiciona esa
+      caracterizaci&oacute;n al v&iacute;nculo por contrato o DPA, as&iacute; que la condici&oacute;n no puede
+      resolverse con una cl&aacute;usula: hay que cambiar a un proveedor de correo con DPA, contratar Google
+      para servicios empresariales, o determinar jur&iacute;dicamente c&oacute;mo se sostiene esta condici&oacute;n
+      [condici&oacute;n contractual de Gmail pendiente de concepto del abogado]. Hasta entonces este Anexo
+      no se firma y el servicio no se ofrece como plenamente aprobado.</li>
+      <li><strong>Pendientes t&eacute;cnicos (se llenan con evidencia del servidor, no con una promesa).</strong>
+      La verificaci&oacute;n mensual autom&aacute;tica de restauraci&oacute;n de los respaldos y la copia del
+      respaldo fuera del servidor: la segunda no est&aacute; implementada y por eso este documento no la
+      declara. Las dem&aacute;s medidas t&eacute;cnicas de este Anexo se declaran solo con la evidencia que las
+      respalda.</li>
     </ul>
     <p>Un Anexo que diga &laquo;los subencargados que se usen&raquo; no cumple el art&iacute;culo 2.2.2.25.5.2
     del Decreto 1074 de 2015.</p>
-    <p>Los datos del Encargado (NIT 900987987, representante legal Javier Robles Fontalvo, ciudad y pa&iacute;s
+    <p>Los datos del Encargado (NIT 900987987-4, representante legal Javier Robles Fontalvo, ciudad y pa&iacute;s
     Barranquilla, Colombia) y los responsables de respaldos, monitoreo y soporte ya est&aacute;n declarados en
     este modelo, y el DPA de Cloudflare est&aacute; verificado (Data Processing Addendum v6.4, del 3 de abril
-    de 2026). Los cuatro datos de la lista anterior son los que faltan.</p>
+    de 2026). Lo que falta es lo del primer punto.</p>
   </div>
 
   <p><strong>ANEXO DE NUBE &mdash; SERVICIO DE FIRMA ELECTR&Oacute;NICA K+AIR</strong></p>
 
   <p>Entre [nombre de la Empresa], NIT [NIT de la Empresa], representada por
-  [representante legal de la Empresa], en calidad de Responsable, y GESSTIAR S.A.S., NIT 900987987,
+  [representante legal de la Empresa], en calidad de Responsable, y GESSTIAR S.A.S., NIT 900987987-4,
   representada por Javier Robles Fontalvo, Representante Legal, en calidad de Encargado. Los tres campos de la
   Empresa los diligencia cada Empresa en la copia que firma: son los mismos que pide el &sect;10.</p>
 
@@ -82,20 +92,54 @@
   <h2>3. Infraestructura y ubicaci&oacute;n</h2>
   <p>Servidor propio del Encargado, ubicado f&iacute;sicamente en Barranquilla, Colombia, con Ubuntu Server
   24.04.5 LTS, en la red local del operador, detr&aacute;s de NAT. Se expone por el t&uacute;nel kair-firma de
-  Cloudflare, Inc. hacia firma.kair.fyi. El correo se env&iacute;a por Google LLC (smtp.gmail.com, puerto 587). El
-  almacenamiento es el sistema de archivos del servidor; no hay almacenamiento de objetos externo.
-  <strong>Respaldos:</strong> copias de la base de datos del servicio, a cargo de Gesstiar S.A.S., de forma
-  interna, sin proveedor externo; hoy la copia es manual y la copia autom&aacute;tica diaria est&aacute; pendiente.
-  <strong>Monitoreo:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo.
+  Cloudflare, Inc. hacia firma.kair.fyi. El almacenamiento es el sistema de archivos del servidor; no hay
+  almacenamiento de objetos externo.
+  <strong>Servicio de correo electr&oacute;nico y proveedor externo:</strong> Gesstiar S.A.S. utiliza actualmente
+  una cuenta gratuita de Gmail de Google LLC, es decir una cuenta de consumidor, para enviar las
+  comunicaciones del servicio de firma electr&oacute;nica; no se utiliza una cuenta de Google Workspace para esta
+  funci&oacute;n. El enlace de acceso a la solicitud de firma y el c&oacute;digo de verificaci&oacute;n de un solo
+  uso (OTP) se env&iacute;an al correo electr&oacute;nico personal registrado por el trabajador o firmante, y ambos
+  mensajes salen por la misma cuenta remitente y a la misma direcci&oacute;n del destinatario. El correo es un
+  canal de notificaci&oacute;n: no transporta el documento firmado ni la Constancia, que se obtienen desde la
+  aplicaci&oacute;n. La operaci&oacute;n del servicio implica la intervenci&oacute;n de Google en la prestaci&oacute;n
+  del correo electr&oacute;nico; por tanto <strong>no se afirma que Google act&uacute;e como encargado del
+  tratamiento de Gesstiar S.A.S. ni que exista un acuerdo empresarial de tratamiento de datos personales
+  aplicable a la cuenta gratuita utilizada</strong>. Esa condici&oacute;n debe evaluarse en el an&aacute;lisis de
+  protecci&oacute;n de datos y en la aprobaci&oacute;n contractual del servicio por parte de la empresa cliente.
+  El enlace y el OTP <strong>no se consideran factores de autenticaci&oacute;n independientes</strong>, porque
+  ambos se reciben en la misma cuenta de correo: el acceso de terceros a ese buzon compromete los dos a la vez.
+  <strong>Respaldos:</strong> copias de la base de datos del servicio y de la evidencia en PDF, a cargo de
+  Gesstiar S.A.S., de forma interna, sin proveedor externo; copia autom&aacute;tica diaria con verificaci&oacute;n
+  de integridad de la copia y retenci&oacute;n de 30 d&iacute;as. Probada en el servidor el 26 de octubre de
+  2026 (copia de 458 752 B, integridad correcta). Las copias <strong>no est&aacute;n cifradas</strong> y viven
+  en el mismo servidor que los datos, sin copia fuera del servidor. La copia diaria se programa a las 22:00
+  (hora de Colombia): el servidor de producci&oacute;n corre en <code>America/Bogota</code>, zona verificada el
+  26 de octubre de 2026, de manera que la hora programada corresponde a la hora de Colombia. Adem&aacute;s, el
+  primer d&iacute;a de cada mes a las 04:00 se ejecuta una prueba de restauraci&oacute;n que comprueba la
+  integridad y las tablas del &uacute;ltimo respaldo y borra el temporal al terminar, sin dejar datos personales
+  en el servidor.
+  <strong>Monitoreo:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: un
+  programa que revisa el servicio cada cinco (5) minutos, lo reinicia si est&aacute; ca&iacute;do y deja
+  registro en bit&aacute;cora; consta instalado en el servidor en el despliegue del 26 de octubre de 2026.
+  <strong>No avisa a ninguna persona</strong>: no hay alerta externa, as&iacute; que la recuperaci&oacute;n
+  empieza cuando alguien se entera, no cuando el servicio cae.
   <strong>Soporte:</strong> interno, a cargo de Gesstiar S.A.S.
   <strong>Seguridad f&iacute;sica:</strong> a cargo de Gesstiar S.A.S., de forma interna, sin proveedor externo: el
   servidor est&aacute; en la red local del operador, detr&aacute;s de NAT.
-  <strong>Continuidad:</strong> el tiempo objetivo de recuperaci&oacute;n (RTO) es de [RTO en horas] horas y
-  el punto objetivo de recuperaci&oacute;n (RPO) es de [RPO en horas] horas; plan de continuidad operativa:
-  [plan de continuidad].</p>
+  <strong>Continuidad:</strong> el tiempo objetivo de recuperaci&oacute;n (RTO) es de 4 horas y el punto objetivo
+  de recuperaci&oacute;n (RPO) es de 24 horas, alineado con el respaldo diario; son compromisos propios del
+  Encargado, no plazos que fije una norma. Plan de continuidad operativa: copia diaria con retenci&oacute;n de
+  30 d&iacute;as y prueba de restauraci&oacute;n mensual; el 26 de octubre de 2026 se prob&oacute; una
+  restauraci&oacute;n completa en el servidor (26 tablas y la empresa registrada). Si el servidor no
+  vuelve, se restaura en otro equipo con la imagen del sistema y el &uacute;ltimo respaldo, se avisa a cada
+  Empresa por el canal de PQRS y la firma se reanuda una vez restablecido el servicio, sin que las firmas
+  realizadas pierdan validez.</p>
 
-  <h2>4. Subencargados</h2>
-  <p>El Responsable autoriza los siguientes, con las obligaciones de este Anexo:</p>
+  <h2>4. Proveedores externos y subencargados</h2>
+  <p>El Responsable conoce y autoriza los siguientes proveedores externos, con las obligaciones de este Anexo.
+  La columna de rol dice qu&eacute; papel desempeña cada uno en la operaci&oacute;n concreta: ser subencargado
+  exige un v&iacute;nculo por contrato o DPA, y esa condici&oacute;n no est&aacute; satisfecha con la cuenta de
+  correo gratuita que hoy usa el Encargado:</p>
   <table>
     <thead>
       <tr><th>Proveedor</th><th>Servicio</th><th>Datos</th><th>Rol</th><th>Ubicaci&oacute;n</th><th>DPA</th><th>Devoluci&oacute;n / supresi&oacute;n</th><th>Auditor&iacute;a</th></tr>
@@ -116,37 +160,56 @@
       </tr>
       <tr>
         <td>Google LLC</td>
-        <td>SMTP</td>
-        <td>Correo, contenido y metadatos</td>
-        <td>Subencargado solo si la cuenta es Workspace/Cloud; con una cuenta de consumidor Google act&uacute;a
-        como Responsable y el env&iacute;o es transferencia internacional</td>
+        <td>SMTP: env&iacute;o del enlace de firma, del c&oacute;digo OTP y de los avisos del servicio</td>
+        <td>Direcci&oacute;n de correo del destinatario, contenido del mensaje y metadatos del env&iacute;o
+        (fecha y hora, direcci&oacute;n IP de origen, identificador del mensaje). No se incluye el documento
+        firmado ni la Constancia en el correo</td>
+        <td><strong>Proveedor externo del servicio de correo.</strong> No es subencargado: con una cuenta de
+        consumidor Google no ofrece Data Processing Addendum ni act&uacute;a como encargado del tratamiento, y
+        el Acuerdo (10.1 y 10.5(f)) condiciona esa caracterizaci&oacute;n al v&iacute;nculo por contrato o DPA.
+        El env&iacute;o de los mensajes implica que esa informaci&oacute;n salga de Colombia y es una
+        transferencia internacional en los t&eacute;rminos del art&iacute;culo 26 de la Ley 1581 de 2012, que
+        exige autorizaci&oacute;n expresa del Titular o la excepci&oacute;n aplicable</td>
         <td>Global</td>
-        <td>[tipo de cuenta de Google: Workspace/Cloud o Gmail de consumidor]</td>
-        <td>[devoluci&oacute;n y supresi&oacute;n de Google, seg&uacute;n el tipo de cuenta]</td>
-        <td>[auditor&iacute;a de Google, seg&uacute;n el tipo de cuenta]</td>
+        <td><strong>No existe un DPA empresarial aplicable a esta cuenta.</strong> Google no ofrece un acuerdo
+        de procesamiento de datos para las versiones de consumo de Gmail. Es una condici&oacute;n contractual
+        pendiente de concepto del abogado (bloque de pendientes): no se declara satisfecha</td>
+        <td>Sin cl&aacute;usula contractual: sin acuerdo ni DPA con Google no hay compromiso de devoluci&oacute;n
+        ni de supresi&oacute;n que reclamar a Google sobre los mensajes ya enviados</td>
+        <td>Sin cl&aacute;usula contractual: sin acuerdo ni DPA con Google no hay derecho de auditor&iacute;a
+        sobre Google</td>
       </tr>
     </tbody>
   </table>
   <p>Los respaldos, el monitoreo y el soporte los presta el Encargado con su propio personal, en la red local
   del operador: no hay un proveedor externo detr&aacute;s de esas funciones y por eso no son subencargados. Los
-  subencargados del Servicio son los que figuran en la tabla.</p>
-  <p>El Encargado notifica cualquier cambio de subencargado y el Responsable puede oponerse. Si un proveedor act&uacute;a
-  como Responsable &mdash;por ejemplo, una cuenta de Gmail de consumidor&mdash;, el tratamiento es transferencia
-  internacional y requiere autorizaci&oacute;n expresa del Titular o excepci&oacute;n del art&iacute;culo 26 de la Ley
-  1581; el Encargado no puede tratarlo como transmisi&oacute;n.</p>
+  proveedores externos del Servicio son los que figuran en la tabla.</p>
+  <p>El Encargado notifica cualquier cambio de proveedor externo y el Responsable puede oponerse. La
+  clasificaci&oacute;n jur&iacute;dica de cada operaci&oacute;n (transmisi&oacute;n, transferencia internacional
+  o tratamiento por cuenta propia del proveedor) depende del papel concreto que ese proveedor desempeña en
+  cada operaci&oacute;n y de las condiciones que le aplican, y no se presume por el solo hecho de estar en el
+  exterior: en el flujo de correo, la cuenta gratuita de Gmail opera bajo sus propias condiciones y sin un
+  acuerdo de tratamiento que obligue a Google a actuar por cuenta de Gesstiar S.A.S. Por eso el Encargado no
+  lo trata como subencargado, y por eso la condici&oacute;n sigue abierta a revisi&oacute;n jur&iacute;dica.</p>
 
   <h2>5. Seguridad</h2>
-  <p>TLS en tr&aacute;nsito; cifrado en reposo; clave fuera de la base; control de acceso y m&iacute;nimo privilegio;
-  autenticaci&oacute;n del personal; registros de acceso; respaldos cifrados; plan de respuesta a incidentes;
-  confidencialidad del personal; revisi&oacute;n de vulnerabilidades; prohibici&oacute;n de datos sensibles en correos y
-  registros. Detalle: no hay un anexo t&eacute;cnico separado: el detalle de la infraestructura es el &sect;3 de este
-  Anexo.</p>
+  <p>TLS en tr&aacute;nsito; cifrado de los campos sensibles de la base de datos con AES-256-GCM y clave
+  derivada fuera de la base; control de acceso por clave de administraci&oacute;n del servicio y m&iacute;nimo
+  privilegio; <strong>autenticaci&oacute;n del personal por clave de administraci&oacute;n, sin doble factor ni
+  autenticaci&oacute;n individual por persona</strong>; registros de acceso; los respaldos <strong>no est&aacute;n
+  cifrados</strong> y el cifrado en reposo del disco <strong>no est&aacute; confirmado</strong>: ninguno de los
+  dos se declara como implementado hasta verificarlo; la copia de los respaldos <strong>vive en el mismo
+  servidor que los datos</strong>, sin copia fuera del servidor; detecci&oacute;n autom&aacute;tica de ca&iacute;das
+  cada cinco (5) minutos, con reinicio del servicio y registro en bit&aacute;cora, <strong>sin aviso a ninguna
+  persona</strong>; plan de respuesta a incidentes; confidencialidad del personal; prohibici&oacute;n de datos
+  sensibles en correos y registros. Detalle: no hay un anexo t&eacute;cnico separado: el detalle de la
+  infraestructura es el &sect;3 de este Anexo.</p>
 
   <h2>6. Conservaci&oacute;n, devoluci&oacute;n y supresi&oacute;n</h2>
   <p>Se aplica el 8.6 del Acuerdo: tabla de la Empresa; 20 a&ntilde;os para los registros del 2.2.4.6.13; hold sin
   t&eacute;rmino para el contrato; deber legal declarado. Al terminar, el Encargado devuelve los datos en formato
   JSON (exportaci&oacute;n de la base de datos del servicio) y los suprime de sistemas y respaldos en
-  [plazo de supresi&oacute;n en d&iacute;as] d&iacute;as calendario, salvo norma que exija conservarlos, y entrega
+  30 d&iacute;as calendario, salvo norma que exija conservarlos, y entrega
   certificaci&oacute;n de supresi&oacute;n.</p>
 
   <h2>7. Derechos de los Titulares</h2>
@@ -212,7 +275,7 @@
 <div class="pie">
   <div class="envoltura">
     <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Modelo del Anexo de Nube, versi&oacute;n 1.0 &middot;
-    24 de octubre de 2026</p>
+    27 de octubre de 2026</p>
   </div>
 </div>
 

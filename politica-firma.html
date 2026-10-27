@@ -29,7 +29,7 @@
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
-  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 24 de octubre de 2026 &middot; Versi&oacute;n 2026-10-24</p>
+  <p class="fecha">&Uacute;ltima actualizaci&oacute;n: 27 de octubre de 2026 &middot; Versi&oacute;n 2026-10-27</p>
 
   <div class="destacado">
     <p><strong>Resumen en una l&iacute;nea:</strong> K+AIR (Gesstiar S.A.S.) no decide para qu&eacute; se tratan
@@ -53,7 +53,7 @@
   domicilio, representante legal, responsable interno del tratamiento, sus canales de atenci&oacute;n y su
   pol&iacute;tica de tratamiento) se muestra al firmante en el bloque &laquo;Empresa que solicita tu
   firma&raquo; del Acuerdo de Uso y queda incorporada a la constancia de firma con su propia huella digital.</p>
-  <p><strong>K+AIR</strong>, operada por <strong>Gesstiar S.A.S.</strong> (NIT 900987987, Calle 114 # 43B - 83,
+  <p><strong>K+AIR</strong>, operada por <strong>Gesstiar S.A.S.</strong> (NIT 900987987-4, Calle 114 # 43B - 83,
   Barranquilla (Atl&aacute;ntico)), es el <strong>Encargado</strong>: trata los datos &uacute;nicamente por cuenta
   de la empresa, dentro de los alcances, finalidades y plazos del Acuerdo de Uso y conforme al contrato de
   transmisi&oacute;n de datos personales (art&iacute;culo 25 del Decreto 1377 de 2013, compilado en el art&iacute;culo
@@ -73,13 +73,21 @@
   accede al servicio; fechas y horas de las etapas del proceso de firma; el documento que se firma y la
   constancia de firma; y los datos de identificaci&oacute;n laboral que la empresa inscriba en la solicitud de
   firma.</p>
+  <p>Adem&aacute;s, <strong>sale del servicio hacia un proveedor externo de correo</strong> un conjunto
+  acotado de datos: la direcci&oacute;n de correo del destinatario y el contenido del mensaje. El aviso lleva el
+  enlace de acceso a la solicitud, y un mensaje aparte lleva el c&oacute;digo OTP. En el correo <strong>no
+  viajan el n&uacute;mero de documento de identidad ni los datos del documento</strong>: el documento firmado y la
+  Constancia se obtienen desde la mini-aplicaci&oacute;n del servicio, no por correo. El correo es un canal de
+  <strong>aviso</strong>, no un canal de entrega de documentos.</p>
   <p>No se autoriza a la empresa a enviar al servicio datos distintos de esos. Cualquier dato adicional
   requiere una actualizaci&oacute;n previa del Acuerdo de Uso.</p>
 
   <h2>3. Con qu&eacute; finalidad y con qu&eacute; base legal</h2>
   <ul>
-    <li>Crear y gestionar la solicitud de firma; enviar al titular el enlace de acceso y el c&oacute;digo OTP;
-    verificar la identidad del firmante; registrar su manifestaci&oacute;n de aceptaci&oacute;n; generar y entregar
+    <li>Crear y gestionar la solicitud de firma; enviar el enlace de acceso al correo registrado en la
+    solicitud de firma y el c&oacute;digo OTP al medio personal que el titular haya declarado o, si no
+    declar&oacute; ninguno, a ese mismo correo; verificar la identidad del firmante; registrar su
+    manifestaci&oacute;n de aceptaci&oacute;n; generar y entregar
     la constancia de firma; conservar la evidencia del proceso; atender peticiones, quejas, reclamos y
     solicitudes; y cumplir obligaciones legales, administrativas o judiciales.</li>
     <li><strong>Base legal:</strong> la conservaci&oacute;n de la evidencia del proceso de firma se sustenta en el
@@ -96,7 +104,26 @@
     <li>El n&uacute;mero del documento de identidad se compara mediante huella digital con sal y se conserva
     &uacute;nicamente esa huella, no el n&uacute;mero en texto claro.</li>
     <li>El c&oacute;digo OTP y el token de acceso se conservan &uacute;nicamente como huella digital con sal. El OTP
-    expira a los seiscientos (600) segundos y se entrega a un medio personal del titular.</li>
+    expira a los seiscientos (600) segundos, admite un m&aacute;ximo de <strong>cinco (5) intentos</strong> y se
+    entrega al medio personal que el titular haya declarado o, si no declar&oacute; ninguno, al mismo correo en
+    que se env&iacute;a el enlace de acceso. El enlace de acceso es v&aacute;lido por <strong>setenta y dos (72)
+    horas</strong> en las firmas remotas, y por veinticuatro (24) horas en las presenciales.</li>
+    <li><strong>El enlace de acceso y el c&oacute;digo OTP no son dos factores de autenticaci&oacute;n
+    independientes.</strong> El enlace permite abrir la solicitud y el OTP comprueba el acceso al buz&oacute;n,
+    pero ambos salen de la misma cuenta remitente y, cuando el firmante no declara un medio personal, llegan a
+    la misma direcci&oacute;n. Por eso el acceso de un tercero al buz&oacute;n compromete los dos: son dos
+    comprobaciones de un mismo canal, no dos comprobaciones independientes. Por eso el firmante debe mantener
+    el control de su correo y no debe compartir el enlace ni el c&oacute;digo con nadie. La firma electr&oacute;nica
+    se sustenta en el conjunto de evidencias y controles del proceso &mdash;la identificaci&oacute;n, la
+    manifestaci&oacute;n expresa de voluntad, la huella del documento, la constancia y la auditor&iacute;a&mdash;,
+    <strong>no en el correo por s&iacute; solo</strong>: el correo por s&iacute; solo no es una prueba concluyente de
+    la identidad del firmante. Recibir el c&oacute;digo tampoco sustituye la lectura del documento ni la
+    manifestaci&oacute;n expresa de voluntad.</li>
+    <li><strong>El canal de correo.</strong> Gesstiar S.A.S. utiliza actualmente una <strong>cuenta gratuita de
+    Gmail (cuenta de consumidor)</strong> para enviar las comunicaciones del servicio de firma electr&oacute;nica.
+    <strong>No se utiliza Google Workspace.</strong> El enlace de acceso y el c&oacute;digo OTP se env&iacute;an al
+    correo personal registrado por el trabajador o firmante, ambos mediante la misma cuenta remitente y a la
+    misma direcci&oacute;n.</li>
     <li>El documento se identifica por su huella digital SHA-256: toda modificaci&oacute;n de su contenido resulta
     detectable.</li>
     <li>Los registros de auditor&iacute;a no pueden alterarse ni eliminarse una vez escritos.</li>
@@ -113,13 +140,34 @@
   electr&oacute;nicos quedan con retenci&oacute;n indefinida (<em>hold</em>), porque no admiten supresi&oacute;n
   mientras subsista la relaci&oacute;n laboral.</p>
 
-  <h2>6. Subencargados y transferencia internacional</h2>
-  <p>El servicio se presta con dos subencargados: <strong>Cloudflare</strong> (t&uacute;nel de acceso y DNS del
-  dominio) y <strong>Google</strong> (correo electr&oacute;nico y, cuando la empresa lo use, calendario). Las
-  funciones, la ubicaci&oacute;n de la infraestructura, las medidas t&eacute;cnicas y el contrato o acuerdo de
-  tratamiento de datos de cada uno est&aacute;n en el
+  <h2>6. Proveedores externos, subencargados y transferencia internacional</h2>
+  <p><strong>Subencargado.</strong> <strong>Cloudflare</strong> (t&uacute;nel de acceso y DNS del dominio),
+  vinculado por un contrato o DPA verificado. Las funciones, la ubicaci&oacute;n de la infraestructura, las
+  medidas t&eacute;cnicas y el contrato o acuerdo de tratamiento de datos est&aacute;n en el
   <a href="anexo-nube-v1.0.html">Anexo de Nube</a>, que forma parte del
   <a href="anexo-encargo.html">Anexo de Encargo</a>.</p>
+  <p><strong>Proveedor externo de correo, no subencargado.</strong> <strong>Google</strong> interviene en el
+  env&iacute;o del enlace de acceso y del c&oacute;digo OTP desde una <strong>cuenta gratuita de Gmail (cuenta de
+  consumidor)</strong>. Para esa modalidad <strong>Google no ofrece un DPA empresarial</strong> y
+  <strong>no act&uacute;a como encargado</strong> del tratamiento: hoy <strong>no est&aacute; vinculado por
+  contrato ni por DPA</strong>, y por eso <strong>no se le puede tratar como subencargado</strong>. La
+  consecuencia pr&aacute;ctica es directa: el Acuerdo (10.1 y 10.5(f)) exige que los proveedores que reciben
+  datos personales est&eacute;n vinculados por contrato o DPA, y <strong>esa exigencia no est&aacute; satisfecha
+  en la situaci&oacute;n actual</strong>. Resolverla exige migrar el env&iacute;o a una cuenta de Google Workspace
+  (o a otro proveedor) que s&iacute; tenga DPA empresarial, y actualizar el Anexo de Nube en consecuencia.
+  <strong>Se trata de una condici&oacute;n contractual pendiente de revisi&oacute;n jur&iacute;dica</strong>, no de
+  una limitaci&oacute;n ya resuelta: la empresa cliente debe conocerla y evaluarla antes de autorizar el uso del
+  servicio, y el servicio <strong>no queda por ello aprobado de manera general</strong>.</p>
+  <p><strong>Los datos salen de Colombia.</strong> El servidor del servicio est&aacute; f&iacute;sicamente en
+  Barranquilla (Colombia), pero <strong>eso no implica que todos los datos permanezcan en Colombia</strong>: la
+  intervenci&oacute;n del proveedor de correo implica que la direcci&oacute;n del destinatario y el contenido de los
+  mensajes se transmiten fuera del pa&iacute;s. Lo que se transfiere es exactamente eso, para la finalizaci&oacute;n
+  de la firma. Esa transmisi&oacute;n a un proveedor externo, hoy sin contrato ni DPA, se encuadra en la
+  <strong>transferencia internacional del art&iacute;culo 26 de la Ley 1581 de 2012</strong>, que exige
+  autorizaci&oacute;n expresa del titular o la excepci&oacute;n legal que corresponda. Cu&aacute;l de las dos
+  bases aplica en cada caso, y si la autorizaci&oacute;n del firmante cubre o no esta transmisi&oacute;n, es una
+  cuesti&oacute;n <strong>pendiente de revisi&oacute;n jur&iacute;dica</strong> que la empresa cliente debe
+  resolver con su asesor antes de autorizar el servicio.</p>
 
   <h2>7. Derechos del titular</h2>
   <p>Los derechos de conocer, actualizar, rectificar, suprimir y revocar la autorizaci&oacute;n, acceder a los
@@ -154,7 +202,7 @@
 
 <div class="pie">
   <div class="envoltura">
-    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Documento actualizado el 24 de octubre de 2026</p>
+    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Documento actualizado el 27 de octubre de 2026</p>
   </div>
 </div>
 
