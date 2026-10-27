@@ -28,6 +28,15 @@ externo**, y por eso la pregunta que le hacemos (§2.3) cambió de "¿qué prove
 **Qué se le pide:** cuatro cosas, numeradas como su respuesta 11A, para que pueda contestarlas en
 el mismo formato (§2 de esta nota).
 
+**Una de ellas es una pregunta que el texto hace y el sistema todavía no cumple**, y por eso la
+adelantamos aquí: el 3.4(e) de la v1.1 dice que el OTP va *«al medio personal del Firmante, que la
+Empresa no administra»*, pero ese medio es **opcional** en el sistema y, si nadie lo declara, el
+código cae al contacto de la Empresa. La separación de canales **está implementada y probada, pero
+hoy no es exigible**: el interruptor que la vuelve obligatoria (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`)
+está apagado a propósito, porque sin la firma en papel de la 9A encenderlo sería una barrera de
+acceso al empleo. La pregunta 1.a de §2.1 es si el numeral describe el sistema que se va a
+entregar —y entonces hay que encenderlo antes de publicar la v1.1— o el que existe hoy.
+
 **Lo que ya no necesita hacer:** el código del 8.6 (20 años), el del 10.4 (migración a la versión
 vigente) y el del D-03 (bloqueo auditable) están implementados y probados en producción (§3).
 
@@ -96,6 +105,46 @@ ajustados al canal de correo real. Necesitamos una de dos:
 Al aprobarla se publica como versión vigente y se habilita la migración de las solicitudes
 existentes a esa versión (§4).
 
+**Pero hay una pregunta que el texto de la v1.1 hace y que el sistema, hoy, no cumple.** El 3.4(e)
+dice que el OTP va *«al medio personal del Firmante, que la Empresa no administra»*, y el 3.7(a) le
+pide al Firmante que declare ese medio. En el sistema:
+
+- el campo de la mini-app es **opcional**;
+- si el Trabajador no declara nada, el OTP cae **al contacto registrado por la Empresa**;
+- la Empresa **puede** declarar ese medio;
+- el rechazo del buzón corporativo (el 400 que impide que la Empresa lea el código) **está escrito
+  en el código pero apagado** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP = false`), porque sin la vía en papel
+  de la 9A encenderlo sería una barrera de acceso al empleo.
+
+O sea: **la garantía del 3.4(e) describe el sistema que se va a entregar, no el que existe hoy.**
+Por eso la pregunta:
+
+> **1.a.** ¿El 3.4(e) describe el sistema que se va a entregar —y entonces hay que **encender el
+> flag** y probar la 9A antes de publicar la v1.1—, o describe el sistema que existe hoy —y entonces
+> hay que redactarlo como «medio declarado, opcional, con caída al contacto de la Empresa»?
+
+Las otras preguntas de este bloque, sobre el texto:
+
+> **1.b.** (3.1 y 3.4(b)) La v1.0 decía que el enlace lo remitía la Empresa; la v1.1 dice que lo
+> remite K+AIR. ¿La Empresa, como Responsable, puede delegar en K+AIR el envío del enlace al
+> Trabajador, o esa remisión es parte de su relación con el Trabajador y no puede delegarse?
+>
+> **1.c.** (3.4(g)) ¿Es correcto que un consentimiento dado bajo la v1.0 quede «actualizado» a la
+> v1.1 sin que el Trabajador vuelva a firmar nada, y que la aceptación se registre con la huella de
+> la v1.1?
+>
+> **1.d.** (8.7) La v1.1 quita a Google de la lista de subencargados y deja la conservación en la
+> infraestructura de Gesstiar y Cloudflare, con «el canal de correo se rige por el 10.1». ¿Alcanza
+> con esa remisión, o la conservación que hace Google de los mensajes en la cuenta de consumo debe
+> quedar declarada aparte, con su plazo?
+>
+> **1.e.** (10.1 y 10.5(f)) ¿La redacción de la condición contractual de Google es la que
+> corresponde, o el 10.5(f) debería decir algo más sobre las obligaciones que K+AIR asume por sí
+> misma en ese canal?
+>
+> **1.f.** Al aprobar, ¿se aprueba solo el texto para publicarlo, o también la decisión de encender
+> el flag y de publicar la v1.1 solo con esa garantía activa?
+
 ### 2.2 · El Anexo de Encargo (punto 11) — ¿lo aprueba?
 
 La marca de revisión pendiente señala textualmente cuatro cosas. Sobre cada una, una línea:
@@ -103,8 +152,10 @@ La marca de revisión pendiente señala textualmente cuatro cosas. Sobre cada un
 1. **El tratamiento de los datos sensibles de salud.** (¿El alcance y las clausuras son los que
    usted quiere, dada la lectura corregida del 2.2.4.6.13?)
 2. **El envío del enlace de acceso al contacto de la Empresa y del código OTP al medio personal
-   del Titular.** (Verificado en producción: el OTP va al correo que el firmante declara en la
-   pantalla de firma, no al buzón de la Empresa. §3.5.)
+   del Titular.** (Verificado en producción el 26 de octubre: en la firma piloto el OTP llegó al
+   correo que el firmante declaró en la pantalla de firma. **Pero ese medio es hoy opcional**: si el
+   firmante no declara nada, el OTP va al contacto de la Empresa. Es la misma pregunta de **1.a**,
+   leída desde el Anexo. §3.5.)
 3. **El plazo de atención de dos (2) días hábiles de las peticiones, quejas y reclamos.**
 4. **La devolución de los datos al terminar el encargo.**
 
@@ -230,10 +281,20 @@ ninguna Empresa con buzones corporativos registrados. El flag `FIRMA_EXIGIR_MEDI
 enciende al final, después de la v1.1 publicada, la 9A y la 10.4 probadas y el Anexo de Nube
 firmado.
 
-### 3.5 · El OTP va al medio personal del firmante — verificado
+### 3.5 · El OTP: dónde fue en la firma piloto y qué garantiza hoy
 
-En la firma piloto, el código llegó al **correo que el firmante declaró en la pantalla de firma**, no
-al buzón de la Empresa. Son los dos comportamientos que exige el 10.7(b) y la decisión 3.
+En la firma piloto del 26 de octubre, el código llegó al **correo que el firmante declaró en la
+pantalla de firma**, no al buzón de la Empresa.
+
+**Pero conviene saber con precisión qué es una declaración y qué es una garantía**, porque de eso
+depende la pregunta 1.a: en el sistema, ese medio es **opcional**. Si el firmante no declara nada,
+el OTP va al contacto registrado por la Empresa, y la Empresa puede declararlo por su cuenta. El
+código que impide que el OTP caiga en un buzón que la Empresa pueda leer existe y está probado,
+pero **está apagado** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP = false`) porque sin la firma en papel de la
+9A encenderlo sería una barrera de acceso al empleo.
+
+Es decir: **la separación de canales está implementada y probada, pero hoy no es exigible.** Es una
+decisión de operación, no un defecto del texto.
 
 ### 3.6 · El correo post-firma ya no transporta el documento
 
@@ -302,7 +363,16 @@ de los demás.
 Como en su respuesta 11A, numerada, para poder aplicarla sin ambigüedad:
 
 ```
-1. v1.1: apruebo / cambio los numerales ...
+1. v1.1:
+   1.a El 3.4(e): describe el sistema que se entrega (enciendemos el flag antes de
+       publicar) o el que existe hoy (se redacta como medio opcional con caída al
+       contacto de la Empresa) ...
+   1.b El 3.1 y el 3.4(b): la Empresa puede delegar en K+AIR el envío del enlace ...
+   1.c El 3.4(g): el consentimiento bajo la v1.0 se actualiza a la v1.1 sin que el
+       Trabajador vuelva a firmar ...
+   1.d El 8.7: alcanza la remisión al 10.1 o la conservación de Google va aparte ...
+   1.e El 10.1 y el 10.5(f): la redacción de la condición de Google ...
+   1.f Alcance de la aprobación: solo el texto, o también encender el flag ...
 2. Anexo de Encargo: apruebo / los puntos a corregir son ...
 3. Canal de correo:
    3.1 ¿Basta declarar la condición, o no se ofrece el servicio hasta resolverla? ...
