@@ -282,7 +282,7 @@ sigue con el abogado.
     console.log('cuerpo listo:', fs.statSync('/tmp/acuerdo-cuerpo.json').size, 'bytes');
   "
   curl -sS -X POST https://firma.kair.fyi/internal/admin/acuerdo-versiones \
-    -H "X-Admin-API-Key: $(cat /opt/kair-firma/admin-key.txt)" \
+    -H "X-Admin-API-Key: $(sudo cat /opt/kair-firma/admin-key.txt)" \
     -H "Content-Type: application/json" \
     --data-binary @/tmp/acuerdo-cuerpo.json
   ```

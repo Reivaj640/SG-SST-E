@@ -8217,3 +8217,68 @@ huella del modelo nuevo en `anexo_nube.modelo`, con la nota de que no hay copia 
 
 **Aprobar el texto de una versión y autorizar a publicarla son dos decisiones, con dos
 evidencias.** Y una garantía que no bloquea la publicación no es una garantía: es una promesa.
+
+---
+
+## 📦️977 · La autorización operativa de la v1.0, registrada en producción
+
+### Qué se registró, y por qué la v1.0 y no la v1.1
+
+El gate de readiness tiene un item propio, `aprobacion_operativa_vigente`, que mira la versión que
+está **en vigor** —la que firma la gente hoy— y exige que tenga autorización operativa registrada
+para **su texto** (`readinessLegal.js`, `_aprobacionOperativaVigente`). En producción esa versión
+es la **v1.0** (`52a490a4…10c04`), no la v1.1: la v1.1 todavía no está aprobada por el abogado, y
+registrarle la autorización operativa sería **pre-autorizar la publicación de un texto que nadie
+aprueba todavía**. Son dos actos separados (trampa 100) y el que se registró es el del texto que
+ya está aprobado y en vigor.
+
+Quedó en `gh_firma_aprobaciones_publicacion` con `id = 1`:
+
+| Campo | Valor |
+|---|---|
+| version | `v1.0` |
+| hash | `52a490a4f4ce922109d42fa01ac45632cd62d5242bb82bf6e1967ede55710c04` |
+| tipo | `OPERATIVA` |
+| fecha | `2026-10-27` |
+| aprobado_por | Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S. |
+| responsable_despliegue | Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S. |
+| fecha_creacion | `2026-10-27T21:58:26.540Z` |
+
+La garantía registrada es la del numeral 3 de la Constancia de aprobación (qué protege, cómo se
+comprueba, qué bloquea y qué ocurre si deja de cumplirse), y el resultado de las verificaciones
+declara las tres comprobaciones una por una. La tabla es **append-only**: lo que se escribió no se
+edita ni se borra; una autorización corregida es una autorización nueva.
+
+### Dos verificaciones que mentían, y por qué
+
+El registro salió bien —`HTTP 201`, la fila existe, y la respuesta del servidor trae el texto con
+las tildes correctas— pero dos consultas de verificación dieron negativo. Las dos **eran las
+consultas**:
+
+- `SELECT ... instr(garantia, char(233))` dio `REVISAR`. **233 decimal es la `é` (hex C3A9), no la
+  `ó`: el código de la `ó` es 243 (C3B3)**. Y el texto de la garantía no tiene ninguna `é`, así que
+  el `CASE` caía en la rama equivocada con el dato sano. Reproducido en local antes de corregir:
+  `instr(texto, char(243))` = 12 y `char(243)` = `C3B3`.
+- `grep 'aprobacion_operativa_vigente'` sobre el reporte no encontró nada. El reporte en texto
+  imprime el **título** del item ("Aprobación operativa de la versión vigente"), no su id de
+  máquina; y un item que ya pasó a OK **desaparece de la lista de "Faltan N bloqueante(s)"**. La
+  ausencia era justamente la buena noticia.
+
+El orden correcto es el que se aplicó: primero el registro, después las comprobaciones, y cuando
+una comprobación contradice la evidencia que ya se vio, **el sospechoso es el verificador**. Esa
+lección queda como trampa 101 en el `PROMPT.md`.
+
+### El defecto del runbook que apareció en el camino
+
+El runbook de despliegue usaba `$(cat /opt/kair-firma/admin-key.txt)` **sin `sudo`** (en
+`docs/gestion-humana/firma-electronica/PLAN-DESPLIEGUE-PRODUCCION-2026-10-20.md`). Con el operador
+`javier` eso da `Permission denied`: el archivo no es legible por el usuario de despliegue y el
+`curl` se queda sin cabecera. Corregido a `$(sudo cat ...)` en este paquete.
+
+### Qué sigue abierto
+
+La v1.1 **no** está autorizada ni publicada: cuando el abogado apruebe su texto, esa versión
+necesita su propia autorización operativa, con su propia huella. Siguen pendientes la 9A en papel,
+la 10.4 (que solo se puede probar cuando exista una versión nueva activa), el flag del medio
+personal (D-02), el envío del paquete al abogado, la publicación de `gh-pages`, la firma del Anexo
+de Nube y del Anexo de Encargo por ASEPLUS, y una excepción de habilitación nueva para ASEPLUS.
