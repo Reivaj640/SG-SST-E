@@ -4,11 +4,49 @@
 > y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
-**Última actualización:** 6 de octubre de 2026
+**Última actualización:** 27 de octubre de 2026
 **Versión actual:** 0.1.247 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 v0.1.247 (📦978 · 📦980 — el servicio de firma electrónica, y la v1.2 del Acuerdo que espera al abogado):**
+> El proyecto que está en marcha es el **servicio de firma electrónica de K+AIR**
+> (`sgsst-electron-app/firma-service`), y su línea es jurídica: un Acuerdo de Uso que
+> tiene que resistir la revisión de un abogado, no solo funcionar. El último gran hito
+> de esa línea era el del 📦868 (6 de octubre); desde entonces avanzó al 📦978 y al
+> 📦980, que son lo que este bloque describe.
+> **Dónde está hoy.** En producción corre la **v1.0 del Acuerdo**, sellada, con su
+> autorización operativa registrada en la base (id 1, tipo OPERATIVA, huella
+> `52a490a4…10c04`). La **v1.1 nunca se publicó**: el abogado la devolvió el 27-oct-2026
+> con tres críticos, seis problemas de coherencia, tres de datos personales, dos de
+> conservación y ocho controles técnicos, y **sin autorizar la publicación**. De esa
+> revisión salió la **v1.2**, que ya está armada y verificada (empalme determinista,
+> 75/75 comprobaciones) y **espera la aprobación del abogado**.
+> **El texto no puede prometer lo que el código no cumple**, y por eso el 📦978 cerró esa
+> brecha antes de publicar la v1.2: el buzón corporativo se rechaza **siempre** (y el caso
+> queda en el registro append-only de eventos), la confirmación del medio es obligatoria
+> para **cualquier** destino, el bloqueo del OTP es **duro** (la salida es una nueva
+> solicitud) y la caducidad alcanza a las filas heredadas. La Constancia ya lleva los
+> anexos que rigen cada firma, con versión y huella SHA-256.
+> **Ese código está commiteado y pusheado, pero NO desplegado:** en `kair-server` sigue la
+> v1.0 con el 📦976. El tar del 📦978 ya está armado y verificado desde el commit
+> (650 495 B, sha256 `fba78da6…fedeb`), pero el despliegue exige **crear antes
+> `/opt/kair-firma/backup.passphrase`** (600, root:root) o el script de respaldos aborta y los
+> respaldos dejan de correr, y las migraciones 045 y 046 hay que aplicarlas antes de encender
+> el cron de purga.
+> **El canal de correo se resolvió por la vía B**: no se cambia de proveedor, se
+> **documenta** la transferencia. Con Gmail de consumo, Google es **Responsable** (no
+> Encargado) y el envío es una transferencia internacional a EE.UU., un país con
+> **nivel adecuado** de protección: la base es ese nivel, **no** la autorización expresa
+> del Titular, que es la excepción del artículo 26 de la Ley 1581 para cuando el destino
+> *no* tiene nivel. Lo que falta es demostrar medidas, validar con la Circular 2 de 2025 y
+> declarar la transferencia en el RNBD.
+> **Reglas del repo que no son estilo, sino hechos comprobables:** el texto armado
+> (`acuerdo-v1.2.txt`) está en
+> `.gitignore` porque es la versión que se firma; el JSON de cambios sí se commitea.
+> La rama `gh-pages` es una COPIA generada de `sitio/`, así que editar uno obliga a
+> regenerar el otro. Y el EOL de cada archivo lo fija su test.
+>> **Anterior · v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**
 > **🆕 v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**
 > Google respondía "Acceso bloqueado — Missing required parameter: client_id / Error 400",
 > una pantalla que no menciona K+AIR; peor, el servidor de callback quedaba esperando y el
