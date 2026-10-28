@@ -10,6 +10,100 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0/).
 
+## [0.1.252] - 2026-10-28
+
+> 🔴 **Nota sobre el reparto con la 0.1.251:** esta versión recoge los tres paquetes de la
+> jornada del 28-oct-2026 (📦985, 📦986 y 📦987). Los paquetes **📦901 a 📦984**, que son del 15
+> al 27 de octubre, quedaron documentados **dentro de la sección de la 0.1.251**, porque en esas
+> jornadas no se bumpeó la versión (la regla del owner: la versión SOLO se bumpea cuando él lo
+> dice). Sus entradas siguen más abajo, bajo `## [0.1.251]`, y no se movieron para no reescribir
+> mil líneas de historial.
+
+### 📦985 · El listado de incapacidades salía vacío y el formulario no guardaba
+
+**Qué cambió.** La pantalla "Registros de Ausentismo" de Tempoactiva salía vacía, con los dos
+desplegables en "Cargando años..." para siempre, y el formulario de registro no lograba escribir.
+Ahora la pantalla muestra **1.275 registros** y el registro vuelve a funcionar.
+
+**El defecto que-no-cv.** El commit `33d40d90` (📦863-867, Fase 3) quitó el campo `files[]` del
+JSON que produce `Portear/src/map_directory.py`, y lo justificó con un grep que dio "mismos 0
+consumidores". **Ese grep estaba mal**: `main.js` leía `node.files` en los cuatro handlers de
+ausentismo (el listado, el PRI.xlsx, editar fila y eliminar fila). Cuatro consumidores, cero
+registrados.
+
+Medido el 28-oct-2026 en el portátil: Tempoactiva tiene `files: []` en **sus 364 carpetas** (fue
+re-mapeada con la versión nueva) y 269 carpetas con archivos en disco. El handler no encontraba
+ningún `.xlsx`, lanzaba `No hay archivos .xlsx en la carpeta de ausentismo`, y el renderer
+capturaba el error dejando la tabla vacía. Las otras tres empresas (Temposum, Aseplus, Asel) no
+se han re-mapeado: guardan la lista vieja, y por eso a ellas les funcionaba. Era una bomba de
+tiempo: el próximo re-mapeo de Temposum la reventaba igual.
+
+Había un **segundo defecto**: las tres ramas de error del renderer no llamaban a
+`populateDynamicFilters()`, así que los desplegables quedaban en "Cargando años..." para siempre.
+La pantalla **decía que estaba cargando cuando ya había terminado con error**; por eso el bug se
+veía como "faltan los datos" y no como "no se encontró el archivo".
+
+**El arreglo.** `main/structure-files.js` (nuevo) resuelve los archivos de un nodo de la
+estructura: si el nodo trae `files[]` se respeta (las empresas mapeadas antes del 📦866), y si
+no, lee la carpeta del disco. `node.path` sí es confiable: el mapeo siempre lo guarda. El formato
+es el del config viejo (`extension` CON punto y con la capitalización original), porque los
+handlers comparan contra `'.xlsx'`. Los cuatro handlers quedaron usando el helper, y el
+renderer llena los filtros también en las tres ramas de error.
+
+**Verificación.** End-to-end contra el Drive real: Tempoactiva pasa de 0 a 1.275 registros (12
+años en el filtro y 3 tipos de clase de incapacidad); Temposum, Aseplus y Asel quedan igual que
+antes, porque su lista del config se respeta. Se comprobó además que el índice que el listado
+manda al editor y el que el Python usa para escribir (`fila_excel = 8 + row_index`) apuntan a la
+misma fila en las cuatro empresas: 0 filas descartadas intercaladas por el filtro del handler.
+Suite del app: **146 tests · 140 verdes · 6 rojos**, y los 6 son los mismos que ya estaban
+(ninguno es de este paquete). Test propio: `main/test-ausentismo-estructura-985.js` (29 checks,
+9 mutaciones y las 9 caen).
+
+### 📦986 · El Python sin pandas se detectaba a mitad de uso, no al arrancar
+
+**Qué cambió.** El formulario de registro de incapacidades no funcionaba en el portátil por un
+motivo distinto al del 📦985: `Portear/src/actualizar_ausentismo.py` hace `import pandas` y en
+esa máquina **ningún Python lo tenía**. Ahora, cuando el Python que encuentra no tiene las
+dependencias, K+AIR lo dice **al arrancar**, con un mensaje que dice qué ejecutar.
+
+**El defecto que-no-cv.** `Portear/python-embed/` tenía las 143 librerías instaladas (pandas
+2.2.3, openpyxl 3.1.5, numpy 2.4.3, todas compiladas para cp311) pero **le faltaba el
+runtime**: ni `python.exe`, ni `python311.dll`, ni `python311.zip`, ni el `python311._pth`. Y como
+`python-embed/` está en `.gitignore`, **el instalador tampoco lo lleva**: `extraResources`
+copia `Portear/python-embed` → `resources/python-embed`, pero si la carpeta no existe —que es lo
+que pasa en cualquier checkout limpio— electron-builder no copia nada y no avisa.
+
+`findPython()` solo comprobaba `python --version`, así que un Python cualquiera del PATH pasaba
+el chequeo y el fallo aparecía a mitad de uso como `ModuleNotFoundError: No module named
+'pandas'`. El check de arranque tampoco lo veía: solo miraba que existieran los archivos `.py`.
+El comentario del propio código decía "Esto garantiza que se use el Python con todas las
+dependencias instaladas", y no era cierto.
+
+**El arreglo.** `main/python-deps.js` (nuevo): `pythonTieneDependencias(pythonPath)` importa
+pandas y openpyxl en el intérprete y responde true/false, sin lanzar nunca. `findPython()`
+valida las dependencias en sus tres bucles (proyecto, PATH y rutas comunes) y, si encuentra
+ejecutables que no las tienen, sigue al siguiente candidato; si ninguno sirve, el error lo dice y
+menciona `scripts\prepare-python-embed.bat`. `check-dependencies` calcula `hasDependencies` y
+deja de contar como disponible un Python sin dependencias.
+
+**Verificación.** En el portátil se completó el runtime (embeedable oficial 3.11.9 de python.org,
+11,2 MB, con el `python311._pth` apuntando a `Lib\site-packages` y `import site`), reusando las
+143 librerías que ya eran cp311. El registro real, corrido sobre una **copia** del Excel de
+Tempoactiva, escribió en la fila 1283 (la primera libre) con los datos correctos, y la
+previsualización Excel → PDF generó su PDF por pywin32. Test propio:
+`main/test-python-deps-guard-986.js` (17 checks, 5 mutaciones y las 5 caen).
+
+### 📦987 · El estado al cierre de la jornada y las dos lecciones
+
+**Qué cambió.** `Historial.md` quedó con el estado de cierre del 28-oct-2026 y los siete
+pendientes abiertos de la jornada. `BITACORA.md` recibió las dos lecciones del día: el grep de
+"0 consumidores" que mentía, y el `.gitignore` que se come el runtime del instalador.
+
+**Verificación.** Barrido de caracteres no latinos limpio en los cuatro archivos. Nota de EOL:
+`Historial.md` es un archivo **mixto** (366 líneas LF y 5.110 CRLF); las ediciones se hicieron
+con Node sobre una copia de HEAD para no normalizarlo, porque la herramienta de edición de texto
+pasaba el archivo entero a CRLF y rompía el diff (772 líneas en vez de 45).
+
 ## [0.1.251] - 2026-10-07
 
 > 🔴 **Hueco sin documentar:** 📦879, 📦880 y 📦881 se commitearon y se pushearon, pero
