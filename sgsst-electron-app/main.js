@@ -110,6 +110,11 @@ const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = 
 // 📦762 — Certificados de aptitud del submódulo 3.1.4 Evaluaciones Médicas
 // Ocupacionales. Antes no se guardaba nada (era solo un explorador de carpetas).
 const { registerEvaluacionesMedicasHandlers, SCHEMA_SQL: EMO_CERT_SCHEMA_SQL } = require('./main/evaluaciones-medicas-bridge');
+// 📦985 (2026-10-28) — Resolver los archivos de una carpeta de la estructura.
+// El mapeo (📦866) quitó `files[]` del config, pero los handlers de ausentismo
+// lo seguían leyendo: toda empresa re-mapeada quedaba sin registros de
+// ausentismo aunque el Excel estuviera en la carpeta.
+const { resolverArchivosNodo } = require('./main/structure-files');
 // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario
 // Hasta ahora el iframe de Bandeja Integrada estaba disponible para todos los
 // usuarios. Con este bridge, el admin puede condicionar el acceso por usuario
@@ -11299,7 +11304,9 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
     // -------------------------------------------------------------------------
     // 6. Obtener archivos de la carpeta de ausentismo
     // -------------------------------------------------------------------------
-    const allFiles = ausentismoDir.files || [];
+    // 📦985 — La lista del config puede venir vacía (el mapeo del 📦866 quitó
+    // `files[]`): se resuelve desde el disco cuando eso pasa.
+    const allFiles = await resolverArchivosNodo(ausentismoDir);
     
     console.log(`[AUSENTISMO][MAIN] === ARCHIVOS EN LA CARPETA DE AUSENTISMO ===`);
     console.log(`[AUSENTISMO][MAIN] Total de archivos encontrados: ${allFiles.length}`);
@@ -12058,7 +12065,8 @@ ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
     // -------------------------------------------------------------------------
     // 6. Buscar específicamente el archivo PRI.xlsx
     // -------------------------------------------------------------------------
-    const allFiles = ausentismoDir.files || [];
+    // 📦985 — Se resuelve desde el disco cuando el config no trae la lista.
+    const allFiles = await resolverArchivosNodo(ausentismoDir);
     const priFile = allFiles.find(
       f => f.name && f.name.toUpperCase() === 'PRI.XLSX' && f.extension?.toLowerCase() === '.xlsx'
     );
@@ -12516,7 +12524,8 @@ async function obtenerRutaAusentismo(companyName) {
   // como ASEL, que tienen PRI.xlsx + A-FR-31 Ausentismo Laboral.xlsx en la misma
   // carpeta). Ahora prioriza el archivo con "AUSENTISMO" o "PI-FO-076" en el
   // nombre; si no, agarra el primer .xlsx que NO sea PRI.
-  const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
+  // 📦985 — Se resuelve desde el disco cuando el config no trae la lista.
+  const excelFiles = (await resolverArchivosNodo(ausentismoDir)).filter(f => f.extension?.toLowerCase() === '.xlsx');
   if (excelFiles.length === 0) throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
 
   // 1. Buscar archivo con "AUSENTISMO" o "PI/PG/GI-FO-076" en el nombre
@@ -12580,7 +12589,8 @@ async function obtenerRutaPri(companyName) {
   if (!ausentismoDir) throw new Error("No se encontró submódulo de ausentismo");
 
   // Buscar específicamente PRI.xlsx
-  const allFiles = ausentismoDir.files || [];
+  // 📦985 — Se resuelve desde el disco cuando el config no trae la lista.
+  const allFiles = await resolverArchivosNodo(ausentismoDir);
   const priFile = allFiles.find(
     f => f.name && f.name.toUpperCase() === 'PRI.XLSX' && f.extension?.toLowerCase() === '.xlsx'
   );

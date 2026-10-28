@@ -8370,7 +8370,11 @@ class MedicionAusentismoComponent {
                 this.populateDynamicFilters();
             } else if (result && result._missingFile) {
                 // 📦459 — Modo degradado: banner amarillo + empty state con CTA
+                // 📦985 — Los filtros se llenan igual: si no, quedan en "Cargando
+                // años..." para siempre y la pantalla miente que está cargando.
+                this.currentAusentismoData = [];
                 this.renderTable(tableElement, []);
+                this.populateDynamicFilters();
                 this.showNotification(
                     `Archivo de ausentismo no disponible. ${this._getMissingFileMessage(result._missingFileReason, result._details).action}.`,
                     'warning'
@@ -8388,12 +8392,19 @@ class MedicionAusentismoComponent {
                     tableContainer.insertBefore(wrapper.firstElementChild, tableContainer.firstChild);
                 }
             } else {
+                // 📦985 — Mismo motivo que arriba: los filtros no pueden quedar
+                // en "Cargando años..." cuando ya no hay nada que cargar.
+                this.currentAusentismoData = [];
                 this.renderTable(tableElement, []);
+                this.populateDynamicFilters();
                 this.showNotification('No hay registros disponibles', 'warning');
             }
         } catch (error) {
             console.error('Error loading ausentismo data:', error);
+            // 📦985 — Igual: un error no puede dejar los filtros colgados.
+            this.currentAusentismoData = [];
             this.renderTable(tableElement, []);
+            this.populateDynamicFilters();
             this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
