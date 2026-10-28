@@ -8378,3 +8378,165 @@ archivo lo fija su test y no se movió.
 
 Y sigue en pie la regla del 📦977: **aprobar el texto y autorizar a publicarlo son dos decisiones**. Este paquete deja el
 código listo; la publicación de la v1.2 la autoriza el abogado, y después el owner.
+
+## 📦985 · El listado de incapacidades salía vacío: un grep de "0 consumidores" que mentía
+
+*28-oct-2026 · el mapeo del 📦866 · la lista de archivos de la estructura · los cuatro handlers de ausentismo*
+
+### Lo que se veía
+
+La pantalla "Registros de Ausentismo" de Tempoactiva salía vacía, con los dos
+dropdowns en "Cargando años..." para siempre. **Los datos no faltaban**: el Excel
+`GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx` estaba en la carpeta 3.3.6 con
+**1.275 registros** (hoja "Tempoactiva 2024").
+
+### El bug de origen estaba en un commit de hace tres semanas
+
+`33d40d90` (📦863-867, Fase 3) quitó el campo `files[]` del JSON que produce
+`Portear/src/map_directory.py`. En el mensaje del commit está la razón:
+
+> Fase 3, 📦866: fuera `files[]`, `file_count`, `dir_count`, `errors` por nodo
+> ... esos mismos 0 consumidores (grep)
+
+**Ese grep estaba mal.** `main.js` leía `node.files` en los cuatro handlers de
+ausentismo: el listado, el PRI.xlsx, editar fila y eliminar fila. Cuatro
+consumidores, cero registrados.
+
+La consecuencia se midió el 28-oct-2026 en el portátil: Tempoactiva tiene
+`files: []` en **sus 364 carpetas** (fue re-mapeada con la versión nueva) y 269
+carpetas con archivos en disco. El handler no encontraba ningún `.xlsx`, lanzaba
+`No hay archivos .xlsx en la carpeta de ausentismo` y el renderer capturaba el
+error dejando la tabla vacía.
+
+Las otras tres empresas (Temposum, Aseplus, Asel) no se han re-mapeado: guardan
+la lista vieja y por eso a ellas les funciona. **Era una bomba de tiempo**: el
+próximo re-mapeo de Temposum la reventaba igual.
+
+### El segundo defecto: la pantalla mentía
+
+Las tres ramas de error del renderer (falta el archivo, no hay registros, la
+carga falla) **no llamaban a `populateDynamicFilters()`**. Los dropdowns
+quedaban en "Cargando años..." para siempre: la pantalla **decía que estaba
+cargando cuando ya había terminado con error**. Por eso el bug se veía como
+"faltan los datos" y no como "el archivo no se encontró".
+
+### El arreglo
+
+`main/structure-files.js` (nuevo) resuelve los archivos de un nodo de la
+estructura: si el nodo trae `files[]` se respeta (las empresas mapeadas antes
+del 📦866), y si no, **lee la carpeta del disco**. `node.path` sí es confiable:
+el mapeo siempre lo guarda. El formato es el del config viejo — `extension` CON
+punto y con la capitalización original (`.xlsx`, `.XLSX`) — porque los handlers
+comparan contra `'.xlsx'`, no contra `'xlsx'`.
+
+Los cuatro handlers quedaron usando el helper, y el renderer llena los filtros
+también en las tres ramas de error.
+
+Medido end-to-end contra el Drive real: Tempoactiva pasa de 0 a 1.275 registros.
+Temposum, Aseplus y Asel quedan igual que antes, porque su lista del config se
+respeta. Además se comprobó que el índice que el listado manda al editor y el
+que el Python usa para escribir (`fila_excel = 8 + row_index`) apuntan a la
+misma fila en las cuatro empresas: 0 filas descartadas intercaladas por el
+filtro del handler.
+
+### Lo que hay que llevarse
+
+**Un grep de "0 consumidores" es una afirmación, no una prueba.** Cuando se
+quita un campo de un contrato, el grep tiene que buscar el *uso*, no el *nombre
+del campo*: `node.files`, `node['files']`, `dir.files` y `files[]` son cuatro
+formas de escribir lo mismo, y un grep del nombre literal se las pierde todas.
+Acá se quitó `files[]` del JSON y el grep buscó `files` en el script Python, no
+en `main.js`, que es donde estaban los cuatro consumidores.
+
+La forma que sí funciona: **buscar el productor y el consumidor por separado**.
+El productor es `map_directory.py` (qué campos escribe). El consumidor es quien
+lee el JSON (`main.js`, los bridges, el renderer). Un campo no está "muerto"
+porque nadie lo mencione en el archivo que lo produce.
+
+Y el corolario: **un contrato que se ensancha en silencio es un contrato
+roto**. El mapeo siguió funcionando, el mapeo se siguió ejecutando, y por eso
+nadie notó que la app había dejado de encontrar archivos. Lo que rompió fue el
+consumidor, tres semanas después, y sin ningún error visible.
+
+---
+
+## 📦986 · El Python embebido: un `.gitignore` se comió el runtime y nadie lo notó hasta que alguien quiso registrar una incapacidad
+
+*28-oct-2026 · el runtime de Python · `Portear/python-embed` · lo que el instalador realmente lleva*
+
+### El síntoma
+
+El formulario de registro de incapacidades no funcionaba en el portátil. No por
+el bug del 📦985: por otra cosa. `Portear/src/actualizar_ausentismo.py` hace
+`import pandas as pd` en la línea 9, y **en esa máquina ningún Python tenía
+pandas**.
+
+### Lo que había
+
+`Portear/python-embed/` tenía las 143 librerías instaladas — pandas 2.2.3,
+openpyxl 3.1.5, numpy 2.4.3, todas compiladas para **cp311** — pero **le faltaba
+el runtime**: ni `python.exe`, ni `python311.dll`, ni `python311.zip`, ni el
+`python311._pth`. Es decir: un Python embebido al que le copiaron las librerías
+y le olvidaron el intérprete.
+
+Y `python-embed/` está en `.gitignore` (`.gitignore:46`). El runtime **nunca
+estuvo en el repo**.
+
+### Por qué la app no avisaba
+
+`findPython()` en `main.js` recorría sus candidatos y sólo comprobaba
+`python --version`. Eso deja pasar cualquier Python del PATH: el 3.14 de esta
+máquina responde `--version` y no tiene pandas. El error aparecía **a mitad de
+uso** — `ModuleNotFoundError: No module named 'pandas'` al registrar — sin
+ninguna pista de que faltara el runtime.
+
+El check de arranque (`check-dependencies`) tampoco lo veía: sólo miraba que
+existieran los archivos `.py`. Y el comentario del propio código decía "Esto
+garantiza que se use el Python con todas las dependencias instaladas", que no
+era cierto.
+
+### El agujero de verdad: el instalador
+
+`extraResources` en `package.json` copia `Portear/python-embed` → `resources/python-embed`.
+Pero como esa carpeta está en `.gitignore`, **en cualquier build sin preparar el
+embed electron-builder no copia nada** y la app instalada queda sin Python.
+Comprobado en el portátil: `C:\Program Files\K+AIR\resources\` tiene
+`python-scripts` (los 19 `.py`) y **no tiene `python-embed`**.
+
+El `Portear/README.md` afirma que "a partir de v0.1.80 Python está empaquetado
+con el installer de K+AIR". En esta instalación no lo está. O el README miente
+o el paso se saltó: `scripts/prepare-python-embed.bat` tiene que correrse **en
+la máquina que compila**, antes de `npm run build:win`, y no hay nada en el
+build que lo exija.
+
+### El arreglo
+
+`main/python-deps.js` (nuevo): `pythonTieneDependencias(pythonPath)` importa
+pandas y openpyxl en el intérprete y responde true/false. Nunca lanza — para un
+chequeo de arranque interesa saber "no sirve", no recibir una excepción.
+
+`main.js`: `findPython()` valida las dependencias en los tres bucles (proyecto,
+PATH y rutas comunes) y, si encuentra ejecutables que no las tienen, sigue al
+siguiente candidato; si ninguno sirve, el error lo dice y menciona
+`prepare-python-embed.bat`. `check-dependencies` calcula `hasDependencies` y
+deja de contar como disponible un Python sin deps: **el error sale al arrancar**,
+no cuando el usuario intenta registrar.
+
+En el portátil se completó el runtime (embeedable oficial 3.11.9 de python.org,
+11,2 MB; `python311._pth` apuntando a `Lib\site-packages` con `import site`),
+reusando las 143 librerías que ya eran cp311. Verificado: el registro real,
+corrido sobre una **copia** del Excel de Tempoactiva, escribió en la fila 1283
+(la primera libre) con los datos correctos.
+
+### Lo que hay que llevarse
+
+**Un `.gitignore` no solo esconde archivos del repo: los saca del build.**
+`extraResources` no avisa cuando la carpeta de origen no existe; simplemente
+no copia nada, y el artefacto sale sin una pieza entera. Si una carpeta tiene
+que estar en el instalador, su ausencia tiene que **romper** el build, no
+pasar desapercibida.
+
+Y el patrón de chequeo: **"responde" no es "sirve"**. `--version` prueba que el
+binario arranca; no prueba que pueda importar lo que los scripts necesitan. Un
+chequeo de dependencias tiene que hacer `import` de verdad, como hace ahora
+`pythonTieneDependencias`.
