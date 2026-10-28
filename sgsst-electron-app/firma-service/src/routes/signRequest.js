@@ -35,6 +35,7 @@ const {
 } = require('../schemas');
 const signRequestService = require('../services/signRequest');
 const metadataService = require('../services/metadata');  // 8B: lista blanca de `metadata`
+const declaracionSalud = require('../services/declaracionSalud');  // 045: el documento NO tiene datos de salud
 const publicFlow = require('../services/publicFlow');
 const mediosService = require('../services/medios');   // 9A: los medios autorizados (el 8.2)
 const papelService = require('../services/papel');   // 9A: la firma autográfica (el 7.1-7.3)
@@ -163,6 +164,32 @@ router.post('/sign-requests',
       });
     }
 
+    // ───────────────────────────────────────────────────────────────────────────
+    // LA DECLARACIÓN DE QUE EL DOCUMENTO NO TIENE DATOS SENSIBLES DE SALUD
+    // ───────────────────────────────────────────────────────────────────────────
+    // El servicio de firma electrónica NO recibe documentos con datos
+    // sensibles de salud: la Empresa conserva el original. Para que el
+    // servicio no los reciba, la Empresa tiene que DECLARAR que el documento
+    // no los contiene, con un texto fijo (no un boolean genérico: así queda
+    // escrito QUÉ se declaró).
+    //
+    // Se puede mandar en DOS lugares, y los dos son el cuerpo de la petición:
+    //   - como campo propio del multipart (`declaracion_datos_sensibles`), o
+    //   - dentro del JSON del campo `metadata`.
+    //
+    // La clave del metadata se QUITA antes de validar contra el schema: el
+    // schema es `.strict()` (una clave desconocida se rechaza con 400) y esta
+    // no es una clave de negocio, es un control de la frontera.
+    const declaracionRecibida =
+      (typeof req.body.declaracion_datos_sensibles === 'string'
+        ? req.body.declaracion_datos_sensibles
+        : (typeof metaObj.declaracion_datos_sensibles === 'string'
+          ? metaObj.declaracion_datos_sensibles
+          : null));
+    if (Object.prototype.hasOwnProperty.call(metaObj, 'declaracion_datos_sensibles')) {
+      delete metaObj.declaracion_datos_sensibles;
+    }
+
     // I-010 (D-13): per-company authz post-parse del body multipart.
     // El middleware requireEmpresaScopeAndLimit corrió ANTES de multer, así que
     // no pudo checkar body.id_empresa. Lo hacemos acá, ya con metaObj.
@@ -198,6 +225,38 @@ router.post('/sign-requests',
       });
     }
     const meta = validation.data;
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // LA DECLARACIÓN DE QUE EL DOCUMENTO NO TIENE DATOS SENSIBLES DE SALUD
+    // ───────────────────────────────────────────────────────────────────────────
+    // El servicio de firma electrónica NO recibe documentos con datos sensibles
+    // de salud: la Empresa conserva el original. Para que el servicio no los
+    // reciba, la Empresa tiene que DECLARAR que el documento no los contiene,
+    // con un texto fijo (no un boolean genérico: así queda escrito QUÉ se
+    // declaró).
+    //
+    // Se puede mandar en DOS lugares, y los dos son el cuerpo de la petición:
+    //   - como campo propio del multipart (`declaracion_datos_sensibles`), o
+    //   - dentro del JSON del campo `metadata`.
+    //
+    // La clave del metadata se QUITA antes de validar contra el schema (arriba,
+    // el schema es `.strict()` y esa clave no es un dato de negocio, es un
+    // control de la frontera), pero la EXIGENCIA se comprueba acá: primero la
+    // forma del pedido (400 si el metadata no cumple el schema), después el
+    // control (422 si no declaró).
+    if (!declaracionSalud.esDeclaracionValida(declaracionRecibida)) {
+      return res.status(422).json({
+        error: {
+          code: declaracionSalud.CODIGO_ERROR,
+          message: declaracionSalud.MENSAJE_ERROR,
+          details: {
+            campo: 'declaracion_datos_sensibles',
+            valor_esperado: declaracionSalud.DECLARACION_SALUD,
+          },
+          request_id: req.id,
+        },
+      });
+    }
 
     // I-FIRMA-DUAL: si el cliente pidió firma de empresa, debe traer el
     // snapshot del representante. Validación inline para devolver 400 limpio
@@ -318,6 +377,10 @@ router.post('/sign-requests',
       base_legal_sensible: meta.base_legal_sensible || null,
       base_legal_sensible_descripcion: meta.base_legal_sensible_descripcion || null,
       finalidad_sensible: meta.finalidad_sensible || null,
+      // 045 · La declaración de que el documento NO contiene datos sensibles
+      // de salud. Ya validada arriba: si no fuera exacta, la ruta habría
+      // respondido 422 y no habría llegado acá.
+      declaracion_datos_sensibles: declaracionRecibida,
       metadata: metadataToPersist,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,

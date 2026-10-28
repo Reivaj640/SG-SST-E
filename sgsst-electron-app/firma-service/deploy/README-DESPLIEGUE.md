@@ -177,17 +177,19 @@ sudo systemctl reload caddy
    a un correo tuyo. Ábrela desde el celular, firma, descarga la constancia:
    la trazabilidad ahora debe mostrar **la IP pública real de tu celular**.
 
-## Paso 9 — Backups (cron diario a las 22:00), restauracion y vigilancia
+## Paso 9 — Backups CIFRADOS (cron diario a las 22:00), restauracion, purga y vigilancia
 
 ```bash
 sudo cp .../deploy/backup-firma.sh /opt/kair-firma/backup-firma.sh
 sudo cp .../deploy/probar-restauracion.sh /opt/kair-firma/probar-restauracion.sh
+sudo cp .../deploy/purgar-respaldos.sh /opt/kair-firma/purgar-respaldos.sh
 sudo cp .../deploy/health-check.sh /opt/kair-firma/health-check.sh
-sudo chmod +x /opt/kair-firma/backup-firma.sh /opt/kair-firma/probar-restauracion.sh /opt/kair-firma/health-check.sh
+sudo chmod +x /opt/kair-firma/backup-firma.sh /opt/kair-firma/probar-restauracion.sh /opt/kair-firma/purgar-respaldos.sh /opt/kair-firma/health-check.sh
 sudo mkdir -p /opt/kair-firma/logs
 echo "0 22 * * * root /opt/kair-firma/backup-firma.sh >> /opt/kair-firma/backups/backup.log 2>&1" | sudo tee /etc/cron.d/kair-firma-backup
 echo "*/5 * * * * root /opt/kair-firma/health-check.sh >> /opt/kair-firma/logs/health-check.log 2>&1" | sudo tee /etc/cron.d/kair-firma-health
 echo "0 4 1 * * root /opt/kair-firma/probar-restauracion.sh >> /opt/kair-firma/backups/restauracion.log 2>&1" | sudo tee /etc/cron.d/kair-firma-restauracion
+echo "0 3 * * * root /opt/kair-firma/purgar-respaldos.sh >> /opt/kair-firma/backups/purga.log 2>&1" | sudo tee /etc/cron.d/kair-firma-purga
 ```
 
 El cron usa la hora local del servidor. **El servidor debe estar en
@@ -197,27 +199,136 @@ PDF imprime la hora de UTC. Corrigelo con `sudo timedatectl set-timezone
 America/Bogota` y verifica con `timedatectl` que diga `America/Bogota
 (UTC-05:00)`.
 
-Verifica:
+### 9.1 La frase (el secreto de los respaldos)
+
+Los respaldos se guardan **cifrados**. El secreto es UN archivo, en el
+servidor, y el owner guarda una copia de ese mismo secreto **fuera** del
+servidor:
 
 ```bash
-sudo /opt/kair-firma/backup-firma.sh          # respaldo manual
+# 1. La frase se crea UNA vez, a proposito. Ningun script la crea ni la regenera.
+sudo install -m 600 -o root -g root /dev/null /opt/kair-firma/backup.passphrase
+sudo sh -c 'openssl rand -base64 48 > /opt/kair-firma/backup.passphrase'
+
+# 2. Verificar que quedo bien:
+sudo ls -l /opt/kair-firma/backup.passphrase     # 600, root, root
+```
+
+🔴 **El owner DEBE guardar una copia de esa frase fuera del servidor** (una
+gestión de contraseñas, un sobre sellado, lo que sea). Si el servidor se pierde
+y no hay copia, **los respaldos son ilegibles**: no hay recuperación posible.
+La copia off-site (rclone) lleva los archivos **cifrados** y **nunca** la frase
+— si la frase sube a la nube, quien tenga la nube puede descifrar los
+respaldos y la copia off-site deja de ser una salvaguarda.
+
+Si el archivo de frase no existe, no se puede leer o está vacío,
+`backup-firma.sh` **aborta**: nunca se escribe un respaldo en claro "por si
+acaso".
+
+### 9.2 Qué cifrado se usa
+
+Los tres scripts detectan la herramienta en este orden y usan la primera que
+exista:
+
+| Herramienta | Cómo cifra | Nota |
+|---|---|---|
+| `gpg` | simétrico, `--cipher-algo AES256`, `--batch --passphrase-file` | **Autenticado** (MDC). El recomendado: `sudo apt install gnupg` |
+| `openssl` | `enc -aes-256-cbc -pbkdf2 -pass file:` | Última instancia: cifra pero **no autentica**; el log avisa |
+| ninguna | — | El script **aborta** (fail closed) |
+
+**Por qué no `age`:** `age -p/--passphrase` lee la frase **siempre del
+terminal** (en `age` 1.3.2 no existe `--passphrase-file`), así que no
+sirve desde un cron sin TTY. El modo asimétrico de `age` (`age-keygen`) sí es
+no interactivo, pero usa un par de llaves y no una frase: no es el modelo de
+"una frase" que este respaldo asume.
+
+### 9.3 Verificar
+
+```bash
+sudo /opt/kair-firma/backup-firma.sh          # respaldo manual (cifrado)
 sudo /opt/kair-firma/probar-restauracion.sh   # prueba de restauracion
+sudo /opt/kair-firma/purgar-respaldos.sh       # purga a nivel de registro
 sudo /opt/kair-firma/health-check.sh          # vigilancia
 ```
 
-La retencion es de 30 dias (la poda la hace el propio script). La prueba de
-restauracion copia el ultimo respaldo a un temporal, comprueba su integridad
-y sus tablas, y borra el temporal al terminar: nunca deja datos personales
-tirados en `/tmp`.
+En `$BACKUPS` solo hay archivos `.enc`: `firma-<marca>.sqlite.enc` y
+`storage-<marca>.tar.gz.enc`. **Ninguna copia queda en claro.**
 
-El tercer cron (dia 1 de cada mes a las 04:00 UTC = 23:00 de Colombia) corre
+### 9.4 Restaurar a mano (el comando exacto)
+
+La prueba de restauración (`probar-restauracion.sh`) descifra el último
+respaldo en un temporal privado, comprueba su integridad y sus tablas, y borra
+el temporal al terminar (`trap`): nunca deja datos personales tirados en
+`/tmp`. Para restaurar a mano:
+
+```bash
+# con gpg (el recomendado):
+sudo gpg --batch --yes --pinentry-mode loopback \
+  --passphrase-file /opt/kair-firma/backup.passphrase \
+  --output /tmp/firma-restaurada.sqlite \
+  /opt/kair-firma/backups/firma-<marca>.sqlite.enc
+
+# con openssl:
+sudo openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+  -pass file:/opt/kair-firma/backup.passphrase \
+  -in /opt/kair-firma/backups/firma-<marca>.sqlite.enc \
+  -out /tmp/firma-restaurada.sqlite
+
+# verificar antes de usarlo:
+sqlite3 /tmp/firma-restaurada.sqlite "PRAGMA integrity_check;"
+```
+
+`probar-restauracion.sh` imprime en el log el comando exacto que corresponde a
+la herramienta instalada.
+
+El tercer cron (día 1 de cada mes a las 04:00 UTC = 23:00 de Colombia) corre
 la prueba de restauracion: es lo que hace verdadera la frase del Anexo de
 Nube "se verifica mensualmente que el respaldo se restaura correctamente".
+
+### 9.5 La purga de los respaldos (lo que cumple el numeral 8.7)
+
+El numeral 8.7 del Acuerdo promete que **la supresión alcanza a los
+respaldos**. Borrar el archivo de respaldo a los 30 días NO lo cumple: el dato
+suprimido hoy sigue en el respaldo de ayer.
+
+`purgar-respaldos.sh` aplica la supresión **a nivel de registro** sobre cada
+copia que sigue existiendo:
+
+- descifra la copia a un temporal privado (con `trap`, se borra siempre);
+- borra la fila de la firma y sus filas hijas **dentro de la copia** de la base
+  de datos, y saca el PDF del tarball de `storage/`;
+- **re-cifra y reemplaza el archivo de forma atómica** (escribe al lado y
+  renombra con `mv`), dejando el hash del resultado en el log;
+- si una copia no se puede descifrar o no abre, la **reporta y no la borra**: un
+  respaldo ilegible se reporta, no se descarta en silencio.
+
+Corre **todos los días a las 03:00** (antes del respaldo de las 22:00). La
+lista de lo suprimido la deja el servicio en la tabla
+`gh_firma_purgas_pendientes` (migración `046`), dentro de la misma transacción
+en que borra la fila de la firma. **La migración 046 tiene que estar aplicada
+en el servidor** (`npm run migrate`) antes de que este cron haga nada útil.
+
+🔴 **El hold manda.** Si una firma tiene un deber legal de conservación
+(`hold_legal = 1`), **no se suprime**: la presencia de ese dato en los
+respaldos es **obligatoria**, no una violación. El script lo comprueba en cada
+copia antes de tocar nada y lo deja escrito en el log.
+
+### 9.6 Retención: de COPIAS, no de registros
+
+La poda de 30 días del `backup-firma.sh` es la **retención de las COPIAS de
+respaldo**. **No es** el plazo de conservación de los registros: ese plazo lo
+declaró la Empresa y vive en `gh_firmas_electronicas.fecha_conservacion`, y el
+deber legal de conservación (hold) vive en `gh_firmas_electronicas.hold_legal`.
+
+Por eso la poda **no borra ninguna copia mientras exista un hold vigente**: es
+la decisión conservadora (acumular copias antes que borrar una copia con un
+dato que hay que conservar). Cuando el hold se levanta, la poda vuelve.
 
 Un respaldo que nunca se ha restaurado no es un respaldo: por eso la prueba
 de restauracion va en el mismo paso que el cron.
 
-(Opcional) rclone `gdrive` para copiar off-site — instrucciones en el propio script.
+(Opcional) rclone `gdrive` para copiar off-site — instrucciones en el propio
+script. La copia off-site lleva los archivos **cifrados** y **nunca** la frase.
 
 ---
 

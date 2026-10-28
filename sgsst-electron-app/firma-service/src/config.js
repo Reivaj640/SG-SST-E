@@ -143,11 +143,18 @@ const config = {
   // D-2: el OTP (dato de creación de la firma) tiene que ir a un medio
   // PERSONAL del Trabajador, no a un buzón que la Empresa pueda leer.
   //
-  // **APAGADO por defecto.** Se enciende cuando exista la 9A (la firma en
-  // papel): sin esa salida, exigir un medio personal sería una barrera de
-  // acceso al empleo (el 2.2.1.1.11). Mientras esté apagado, los casos en
-  // los que el OTP cae en un buzón corporativo quedan en el log como WARN
-  // (código OTP_MEDIO_CORPORATIVO): de ahí sale el número del inventario.
+  // **SIN EFECTO (27-oct-2026, v1.2).** El rechazo del buzón corporativo es
+  // ahora INCONDICIONAL en el código: el OTP nunca sale a un buzón que la
+  // Empresa pueda leer, y cada caso rechazado queda como evento
+  // OTP_MEDIO_CORPORATIVO en `gh_firma_eventos` (append-only).
+  //
+  // Antes este interruptor decidía si el rechazo era un 400 o solo un
+  // `logger.warn` con el código saliendo igual. Con el interruptor apagado,
+  // el texto del Acuerdo prometía un registro protegido que no existía: por
+  // eso la v1.2 cierra esa promesa con el código y no con una configuración.
+  //
+  // Se conserva la variable (y su valor) para que los despliegues que ya la
+  // tengan definida no se rompan. El valor ya no cambia ningún comportamiento.
   exigirMedioPersonalOtp:
     process.env.FIRMA_EXIGIR_MEDIO_PERSONAL_OTP === 'true',
   // (fin de la configuracion de canales y plazos)

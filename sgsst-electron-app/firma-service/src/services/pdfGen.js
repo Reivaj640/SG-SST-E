@@ -13,8 +13,53 @@
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs');
 const empresaService = require('./empresa');
+const manifiestoLegal = require('./manifiestoLegal');  // 045: los anexos que rigen la firma
 const db = require('../db/connection');  // 033: leer el plazo de la propia solicitud
 const { esPseudonimo } = require('./trabajador');
+
+// Los anexos que rigen la firma (numeral 1.5 del Acuerdo).
+//
+// El 1.5 promete que la version incorporada del Anexo de Encargo y la del
+// Anexo de Nube constan, CON SU IDENTIFICADOR Y HUELLA SHA-256, en la
+// Constancia de cada firma. Antes de esto no habia nada de eso en el PDF.
+//
+// Si el llamador ya leyo los anexos (metadata.anexos) se usan esos: son los
+// mismos que quedaron archivados en la fila de la firma. Si no los pasa, se
+// leen del manifiesto legal aqui, para que la Constancia NUNCA salga sin el
+// bloque aunque el que la genera no haya cableado la lectura.
+//
+// La lectura NUNCA puede tumbar la Constancia: si el manifiesto no esta, el
+// bloque lo dice y no inventa version ni huella.
+function _anexosDeLaConstancia(metadata) {
+  if (metadata && metadata.anexos && typeof metadata.anexos === 'object') {
+    return metadata.anexos;
+  }
+  try {
+    return manifiestoLegal.datosAnexos({
+      id_empresa: metadata ? metadata.id_empresa : null,
+    });
+  } catch (e) {
+    return {
+      disponible: false,
+      error: (e && e.message) ? e.message : 'error desconocido',
+      anexo_encargo: null,
+      anexo_nube: null,
+    };
+  }
+}
+
+// La huella de un anexo en la Constancia.
+//
+// El valor de evidencia va COMPLETO (64 hexadecimales) para que se pueda
+// comparar con el que quedo archivado en la base de datos. Si el valor no es
+// una SHA-256 completa se imprime como PREFIJO y se dice que lo es: una
+// huella truncada que no lo aclara se lee como una huella entera.
+function _huellaAnexo(h) {
+  if (!h) return 'N/D';
+  const s = String(h).trim();
+  if (/^[0-9a-f]{64}$/i.test(s)) return s;
+  return s.slice(0, 24) + ' (prefijo; el valor completo no es una SHA-256)';
+}
 
 // Texto legal compartido entre la página de sello y la Constancia.
 // Fuente de verdad normativa: Ley 527/1999 + Decreto 1074/2015 (Cap. 47,
@@ -702,6 +747,57 @@ async function generateConstanciaPdf(metadata) {
   parrafo(metadata.manifestacion_voluntad_texto ||
     'El firmante aceptó expresamente el contenido y el método de firma electrónica.',
     { size: 9, color: C.texto });
+
+  // ═══ ANEXOS QUE RIGEN ESTA FIRMA (numeral 1.5 del Acuerdo) ═══
+  // El 1.5 promete que la version incorporada del Anexo de Encargo y la del
+  // Anexo de Nube constan, CON SU IDENTIFICADOR Y HUELLA SHA-256, en la
+  // Constancia de cada firma. Antes de este bloque no habia nada: la
+  // Constancia no mencionaba ningun anexo.
+  //
+  // Si un anexo NO esta firmado, se dice de forma expresa. No se inventa una
+  // fecha ni una huella de copia firmada: la huella que se publica es la del
+  // TEXTO de la version incorporada, tal como consta en el manifiesto legal.
+  const anexos = _anexosDeLaConstancia(metadata);
+  seccion('Anexos que rigen esta firma (Acuerdo 1.5)');
+  if (!anexos || !anexos.disponible) {
+    parrafo('No fue posible leer el manifiesto legal (legal-readiness.json), y por lo tanto esta '
+      + 'constancia NO puede identificar los anexos que rigen esta firma. No se inventa ninguna '
+      + 'version ni ninguna huella: lo que no se puede comprobar, no se afirma. Detalle: '
+      + (((anexos && anexos.error) || 'manifiesto no disponible')) + '.',
+    { size: 9, color: C.texto });
+  } else {
+    const enc = anexos.anexo_encargo || {};
+    const nube = anexos.anexo_nube || {};
+
+    // ── Anexo de Encargo ──
+    campo('Anexo de Encargo (versión)', enc.version || 'N/D');
+    campo('Anexo de Encargo (SHA-256)', _huellaAnexo(enc.hash));
+    campo('Estado del Anexo de Encargo', enc.firmado
+      ? ('Firmado por la Empresa' + (enc.fecha_firma ? ' el ' + fmtFechaHora(enc.fecha_firma) : ''))
+      : 'No firmado a la fecha de esta firma');
+
+    // ── Anexo de Nube ──
+    const sinFirmarNube = 'Sin versión firmada a la fecha de esta firma';
+    campo('Anexo de Nube (firmada)', nube.version || sinFirmarNube);
+    campo('Anexo de Nube (SHA-256)', nube.hash ? _huellaAnexo(nube.hash) : sinFirmarNube);
+    campo('Estado del Anexo de Nube', nube.firmado
+      ? ('Firmado' + (nube.fecha ? ' el ' + fmtFechaHora(nube.fecha) : ''))
+      : 'No firmado a la fecha de esta firma');
+    if (nube.modelo && (nube.modelo.version || nube.modelo.hash)) {
+      campo('Anexo de Nube (modelo)', nube.modelo.version || 'N/D');
+      campo('Huella del modelo (SHA-256)', _huellaAnexo(nube.modelo.hash));
+      if (nube.modelo.actualizado) campo('Fecha del modelo', nube.modelo.actualizado);
+    }
+
+    const cierre = ['La huella es el SHA-256 del TEXTO de la version incorporada del anexo, tal como '
+      + 'consta en el manifiesto legal del servicio: no es la huella de una copia firmada.'];
+    if (nube.origen_incorporada === 'modelo') {
+      cierre.push('Del Anexo de Nube solo consta el MODELO, sin firmar: es el texto que el '
+        + 'servicio incorpora, y la huella que se imprime es la del modelo, no la de una '
+        + 'version firmada.');
+    }
+    parrafo(cierre.join(' '), { size: 8, color: C.grisClaro, lh: 11 });
+  }
 
   // ═══ MARCO LEGAL ═══
   seccion('Marco legal');

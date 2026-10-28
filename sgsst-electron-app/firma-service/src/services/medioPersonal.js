@@ -133,6 +133,16 @@ function medioRegistradoPorEmpresa(signRequest) {
  * conoce) y la Empresa ya lo tenía (lo obtuvo en la contratación). Enmascararla
  * no aportaría nada y le impediría al Trabajador reconocerla.
  *
+ * `requiere_confirmacion` es SIEMPRE true (v1.2). Antes era
+ * `Boolean(correo)`: la casilla solo era obligatoria cuando la dirección
+ * registrada por la Empresa iba a ser la destinataria del código, y el
+ * Trabajador podía esquivarla escribiendo otro buzón. Con la regla del 3.4(e)
+ * y del 3.7(a) de la v1.2 el OTP sale únicamente al medio que el Firmante
+ * confirmó en la pantalla de firma, así que la confirmación es la condición
+ * del envío, cualquiera que sea el destino. Y `correo` puede ser null: cuando
+ * la Empresa no registró medio, la casilla sigue siendo obligatoria para el
+ * buzón que el Trabajador escriba en el campo de arriba.
+ *
  * @param {object} signRequest - la fila de gh_firmas_electronicas
  * @returns {{correo: string|null, requiere_confirmacion: boolean,
  *            declaracion_texto: string, declaracion_version: string}}
@@ -141,10 +151,7 @@ function exposicionParaMiniApp(signRequest) {
   const correo = medioRegistradoPorEmpresa(signRequest);
   return {
     correo,
-    // La casilla es obligatoria SOLO cuando la dirección registrada va a ser la
-    // destinataria del código. Si el Trabajador escribe otro buzón, el código
-    // va a su buzón y no hay nada que confirmar del de la Empresa.
-    requiere_confirmacion: Boolean(correo),
+    requiere_confirmacion: true,
     declaracion_texto: DECLARACION_TEXTO,
     declaracion_version: DECLARACION_VERSION,
   };
@@ -165,9 +172,13 @@ function exposicionParaMiniApp(signRequest) {
  *
  * @param {object} datos
  * @param {object} datos.signRequest - la fila de gh_firmas_electronicas
- * @param {string} [datos.correo] - la dirección confirmada. Si no se pasa, se
- *   lee de la fila (que es la fuente de verdad: es la columna `correo_otp`, la
- *   que quedó congelada con el destino real del código).
+ * @param {string} [datos.correo] - la dirección confirmada. Es la que
+ *   recibió el código. Si no se pasa, se lee de la fila (la columna
+ *   `correo_otp`, que queda congelada con el destino real del código).
+ *   La ruta HTTP la pasa SIEMPRE: cuando el Trabajador no declaró medio y la
+ *   Empresa tampoco tenía uno, la fila queda vacía y, sin este dato, la
+ *   confirmación se rechazaba con un 400 DESPUÉS de que el código ya había
+ *   salido por el correo.
  * @param {string} [datos.version_declaracion]
  * @param {string} [datos.ip]
  * @param {string} [datos.user_agent]
@@ -180,12 +191,15 @@ function registrarConfirmacion(datos) {
     throw new AppError(400, 'INVALID_REQUEST_BODY',
       'No hay solicitud de firma para registrar la confirmación');
   }
-  // La dirección que se confirma es la que quedó congelada en la fila: es la
-  // que recibió el código. La fila manda, no el dato que trae la petición.
+  // La dirección que se confirma es LA QUE RECIBIÓ EL CÓDIGO: por eso manda
+  // `datos.correo` (la que resolvió la ruta) y no la de la fila. La fila
+  // (`correo_otp`) es el medio CONGELADO, que puede no ser el mismo si el
+  // Trabajador declaró otro buzón. Si la ruta no pasó el dato, se recurre a
+  // la fila.
   const fila = db.prepare(
     'SELECT correo_otp FROM gh_firmas_electronicas WHERE id = ?'
   ).get(signRequest.id);
-  const correo = _correo((fila && fila.correo_otp) || datos.correo || '');
+  const correo = _correo(datos.correo || (fila && fila.correo_otp) || '');
   if (!correo.includes('@') || correo.includes(' ')) {
     throw new AppError(400, 'INVALID_REQUEST_BODY',
       'La dirección confirmada no es un correo válido');

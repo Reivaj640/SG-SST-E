@@ -297,10 +297,15 @@ router.get('/s/:token', (req, res, next) => {
  * POST /api/sign/:token/identify
  * Identifica al trabajador por tipo + número de documento.
  *
- * Decisión 1.a: la Empresa puede haber registrado el medio personal del
- * código de verificación. Si esa dirección va a ser la destinataria del
- * código, el Trabajador tiene que CONFIRMAR (casilla con una declaración
- * fija) que es de su uso exclusivo y que la Empresa no administra ese buzón.
+ * LA CONFIRMACIÓN DEL MEDIO ES OBLIGATORIA PARA CUALQUIER DESTINO (v1.2).
+ *
+ * POR QUÉ: la regla del 3.4(e) y del 3.7(a) de la v1.2 es que el OTP sale
+ * únicamente al medio que el Firmante confirmó en la pantalla de firma: no al
+ * que registró la Empresa, no al que indique el sistema, al que confirmó el
+ * Firmante. Antes esto solo se exigía cuando el destino era exactamente el
+ * medio que había registrado la Empresa. Con eso el Trabajador podía
+ * declarar otro buzón, el código salía ahí sin que nadie declarara nada, y
+ * la confirmación quedaba archivada solo a veces.
  *
  * POR QUÉ se resuelve ANTES de identificar: la confirmación es una condición
  * para que el código salga a ese buzón. Si se exigiera después, el código ya
@@ -311,24 +316,27 @@ router.get('/s/:token', (req, res, next) => {
  */
 router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req, res, next) => {
   try {
-    // 1 · El medio que registró la Empresa (solo lectura).
+    // 1 · El destino del código: lo que escribió el Trabajador o, si no
+    //     escribió nada, el contacto registrado por la Empresa.
+    //
+    //     Se resuelve con la MISMA función del servicio (publicFlow), para que
+    //     la dirección que se archiva con la declaración sea exactamente la
+    //     que recibe el código y no una aproximación.
     const { signRequest } = publicFlow.resolveToken(req.params.token);
-    const medioEmpresa = medioPersonal.medioRegistradoPorEmpresa(signRequest);
-    const correoDeclarado = typeof req.body.correo_otp === 'string'
-      ? req.body.correo_otp.trim().toLowerCase()
-      : '';
-    // El destino del código: lo que escribió el Trabajador o, si no escribió
-    // nada, el medio que registró la Empresa.
-    const destino = correoDeclarado || medioEmpresa;
-    const vaAlMedioRegistrado = Boolean(medioEmpresa) && destino === medioEmpresa;
+    const destino = publicFlow.resolverDestinoOtp(signRequest, req.body.correo_otp);
     const confirmado = req.body.medio_otp_confirmado === true;
 
-    if (vaAlMedioRegistrado && !confirmado) {
+    // 1-bis · Si no hay destino, NO hay nada que confirmar: el flujo termina
+    //        en el 400 MISSING_EMAIL del servicio (que ofrece la firma en
+    //        papel). Preguntar por la confirmación de un medio que no existe
+    //        sería mandar al Trabajador a un callejón sin salida.
+    if (destino.correo && !confirmado) {
       throw new AppError(
         422,
         'MEDIO_OTP_CONFIRMACION_REQUERIDA',
-        'La dirección que registró la Empresa va a recibir el código de verificación. '
-        + 'Confirmá que es de tu uso exclusivo y que la Empresa no administra ese buzón.',
+        'Tenés que confirmar el medio por el que vas a recibir el código de '
+        + 'verificación: que esa dirección es de tu uso exclusivo y que la '
+        + 'Empresa no administra ese buzón.',
         { id_solicitud: signRequest.id_solicitud },
       );
     }
@@ -361,9 +369,16 @@ router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req,
     // 3 · La constancia de la declaración (fecha, hora, dirección y versión
     //     del texto). Se registra AHORA: el código ya salió y el control de
     //     dominio corporativo ya pasó.
+    //
+    //     La dirección se pasa EXPLÍCITA (la que se confirmó): antes se leía
+    //     solo de la fila, y cuando el Trabajador no había declarado medio y
+    //     la Empresa tampoco tenía uno, la fila quedaba vacía y la
+    //     confirmación se rechazaba con un 400 DESPUÉS de que el código ya
+    //     había salido.
     if (confirmado) {
       medioPersonal.registrarConfirmacion({
         signRequest,
+        correo: destino.correo,
         version_declaracion: req.body.medio_otp_version,
         ip: req.ip,
         user_agent: req.get('User-Agent'),

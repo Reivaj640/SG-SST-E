@@ -108,7 +108,7 @@ test('identify() aparta los últimos cuatro dígitos en memoria', async () => {
 
   const r = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r.status, 200);
 
   const entrada = ultimos4.obtener(signRequest.id);
@@ -128,7 +128,7 @@ test('una identificación fallida NO aparta dígitos', async () => {
 
   const r = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '9999999999' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '9999999999', medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r.status, 422);
   assert.equal(ultimos4.obtener(signRequest.id), null,
     'un intento fallido no puede dejar dígitos de ningún documento');
@@ -144,7 +144,7 @@ test('la fila de la firma NO contiene el número ni sus últimos cuatro dígitos
   });
   await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   const fila = db.prepare(`
     SELECT id_trabajador, identificacion_numero_hash, correo_verificacion, metadata
@@ -225,7 +225,7 @@ test('la verificación pública NO muestra los últimos cuatro dígitos', async 
   });
   await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   const publicFlow = require('../src/services/publicFlow');
   const ctx = publicFlow.getVerificationContext(token);
@@ -249,7 +249,7 @@ test('un reinicio degrada con gracia: la constancia sale sin los dígitos', asyn
   });
   await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.ok(ultimos4.obtener(signRequest.id), 'antes del reinicio hay dígitos');
 
   // El proceso se reinicia: el mapa en memoria se pierde.
@@ -263,7 +263,7 @@ test('un reinicio degrada con gracia: la constancia sale sin los dígitos', asyn
   });
   const r = await request(makeApp())
     .post(`/api/sign/${token2}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r.status, 200, 'identificarse sigue funcionando tras el reinicio');
   void token;
 });

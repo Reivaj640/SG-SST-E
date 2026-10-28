@@ -76,6 +76,9 @@ test('isolation #1: POST sign-request K_A con id_empresa=A → 201', async () =>
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000010')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-A-iso1',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -108,6 +111,9 @@ test('isolation #3: POST sign-request K_B con id_empresa=B → 201', async () =>
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000011')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-B-iso3',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '222',
       id_empresa: TEST_EMPRESA_B,
       tipo_firma: 'presencial',
@@ -331,6 +337,9 @@ test('isolation edge: K_A con id_empresa=A después de rotar → 201 (nueva key 
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000020')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-iso-edge1',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -351,6 +360,9 @@ test('isolation edge: K_A con id_empresa=A después de rotar → 201 (nueva key 
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000021')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-iso-edge2',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -387,6 +399,9 @@ test('isolation edge: K_A revocada en backend → 401 INVALID_API_KEY', async ()
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000030')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-revoke-1',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -410,6 +425,9 @@ test('isolation edge: K_A revocada en backend → 401 INVALID_API_KEY', async ()
     .set('Idempotency-Key', '00000000-0000-4000-8000-000000000031')
     .field('metadata', JSON.stringify({
       id_documento: 'doc-revoke-2',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -442,6 +460,9 @@ test('isolation edge: K_legacy con id_empresa=A → 201 (legacy fallback funcion
     // NO Idempotency-Key: legacy mode lo rechaza con 400
     .field('metadata', JSON.stringify({
       id_documento: 'doc-legacy-A',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',
@@ -475,6 +496,9 @@ test('isolation edge: K_legacy con id_empresa=B → 201 (legacy no distingue emp
     // NO Idempotency-Key
     .field('metadata', JSON.stringify({
       id_documento: 'doc-legacy-B',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '222',
       id_empresa: TEST_EMPRESA_B,
       tipo_firma: 'presencial',

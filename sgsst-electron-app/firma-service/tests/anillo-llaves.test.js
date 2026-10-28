@@ -107,7 +107,7 @@ test('rotar la llave NO invalida la evidencia anterior', async () => {
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   assert.equal(res.status, 200, 'la rotación no puede invalidar una firma en curso');
   assert.equal(res.body.estado, 'OTP_SENT');

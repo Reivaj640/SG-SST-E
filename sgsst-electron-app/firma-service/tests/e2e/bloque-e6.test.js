@@ -63,7 +63,7 @@ async function recorrerFlujoHastaViewed(token, identificacion_numero) {
   // 1. Identify
   const r3 = await request(require('../helpers').makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: identificacion_numero });
+    .send({ tipo_identificacion: 'CC', numero_documento: identificacion_numero, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   if (r3.status !== 200) {
     throw new Error(`identify falló: status=${r3.status} body=${JSON.stringify(r3.body)}`);
   }
@@ -625,6 +625,9 @@ test('E6 schema: signRequestBody acepta consent_id opcional', async () => {
   // Sin consent_id → 201
   const metaSinConsent = {
     id_documento: 'doc-001',
+    // La declaración de que el documento NO tiene datos sensibles de salud es
+    // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+    declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
     id_trabajador: '1234567890',
     id_empresa: '900123456',
     tipo_firma: 'presencial',

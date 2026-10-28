@@ -51,7 +51,7 @@ function limpiar() {
 async function hastaOtpVerificado(app, token) {
   const id = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: TRABAJADOR })
+    .send({ tipo_identificacion: 'CC', numero_documento: TRABAJADOR, medio_otp_confirmado: true, medio_otp_version: '1.0' })
     .timeout({ response: 5000 });
   // En el ambiente de test, el OTP de la firma vuelve en la respuesta.
   const otp = (id.body && id.body.devOtp) || '999999';

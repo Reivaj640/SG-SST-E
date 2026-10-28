@@ -33,6 +33,7 @@ const storage = require('./storage');
 const agreementService = require('./agreement');
 const metadataService = require('./metadata');  // 8B: lista blanca de lo que se archiva
 const sensibles = require('./sensibles');  // 8B: documentos con información de salud (10.8)
+const declaracionSalud = require('./declaracionSalud');  // 045: el documento NO tiene datos de salud
 const representanteService = require('./representante');  // 8B: el número del representante va cifrado
 const conservacion = require('./conservacion');
 const retencion = require('./retencion');  // catálogo de retención por documento
@@ -542,6 +543,14 @@ function create({
   base_legal_sensible,
   base_legal_sensible_descripcion,
   finalidad_sensible,
+  // La declaración de que el documento NO contiene datos sensibles de salud
+  // (política 1 del abogado). Ver services/declaracionSalud.js.
+  //
+  // OBLIGATORIA por la vía HTTP (la ruta la exige y responde 422 si falta o
+  // no coincide). Acá el service solo VALIDA el valor: si viene, tiene que
+  // ser la constante exacta, para que en la base nunca quede archivada una
+  // declaración que el cliente se inventó.
+  declaracion_datos_sensibles,
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -566,6 +575,33 @@ function create({
     throw new AppError(422, 'DOCUMENT_HASH_MISMATCH',
       'El hash del PDF no coincide con el declarado',
       { declared: document_hash, calculated: calculated_hash });
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // LA DECLARACIÓN DE SALUD
+  // ───────────────────────────────────────────────────────────────────────────
+  // El servicio de firma NO recibe documentos con datos sensibles de salud.
+  // La Empresa lo declara con un texto fijo (no un boolean: queda escrito QUÉ
+  // se declaró). Si el valor viene pero no es el exacto, se rechaza: en la
+  // base nunca puede quedar archivada una declaración que el cliente se
+  // inventó.
+  //
+  // Si NO viene, la fila queda sin declaración. Eso no significa que se
+  // acepte el documento: la vía HTTP (src/routes/signRequest.js) exige la
+  // declaración y responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA. El
+  // service no la exige porque acá también entran los caminos internos que
+  // no suben un documento (la firma dual, por ejemplo).
+  let declaracionDeclarada = null;
+  if (declaracion_datos_sensibles != null && declaracion_datos_sensibles !== '') {
+    if (!declaracionSalud.esDeclaracionValida(declaracion_datos_sensibles)) {
+      throw new AppError(422, declaracionSalud.CODIGO_ERROR, declaracionSalud.MENSAJE_ERROR, {
+        valor_recibido: typeof declaracion_datos_sensibles === 'string'
+          ? declaracion_datos_sensibles.slice(0, 200)
+          : typeof declaracion_datos_sensibles,
+        valor_esperado: declaracionSalud.DECLARACION_SALUD,
+      });
+    }
+    declaracionDeclarada = declaracionSalud.DECLARACION_SALUD;
   }
 
   // Validar Acuerdo (Bloque A — agreement_version obligatorio, 5 pasos).
@@ -971,6 +1007,39 @@ function create({
         tipo_identificacion: tipo_identificacion || null,  // I-002
       }),
     );
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // LA DECLARACIÓN DE SALUD, QUEDADA CON LA SOLICITUD
+    // ───────────────────────────────────────────────────────────────────────────
+    // Se guarda en la MISMA fila que la huella del PDF original
+    // (document_hash_original): eso es lo que la hace trazable al documento
+    // exacto. Una declaración suelta, sin la huella al lado, no probaría
+    // sobre qué documento se hizo.
+    if (declaracionDeclarada) {
+      db.prepare(`
+        UPDATE gh_firmas_electronicas
+           SET declaracion_datos_sensibles = ?,
+               declaracion_datos_sensibles_at = ?
+         WHERE id = ?
+      `).run(declaracionDeclarada, now.toISOString(), firmaId);
+
+      // Y queda en el registro de auditoría (append-only: esto no se altera
+      // ni se borra nunca). El metadata lleva el valor declarado, la huella
+      // del documento, la solicitud y la Empresa.
+      registerEvent(
+        firmaId,
+        'DECLARACION_DATOS_SENSIBLES',
+        {
+          valor_declarado: declaracionDeclarada,
+          hash_documento: calculated_hash,
+          id_solicitud,
+          id_empresa,
+        },
+        actor || 'empresa',
+        ip || null,
+        user_agent || null,
+      );
+    }
 
     // Congelar la fecha de conservación (numeral 8.6). El plazo vive en el
     // código del sistema (la custodia de 20 años) o en la tabla de retención

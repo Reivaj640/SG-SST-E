@@ -75,6 +75,9 @@ test('I-010 cross-company: POST create A→A (id_empresa matches auth) → 201',
     .set('X-Internal-API-Key', TEST_API_KEY_CLIENT_A)
     .field('metadata', JSON.stringify({
       id_documento: 'doc-A',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '1234567890',
       id_empresa: TEST_EMPRESA_A,  // matches client A's id_empresa
       tipo_firma: 'presencial',
@@ -102,6 +105,9 @@ test('I-010 cross-company: POST create A→B (id_empresa mismatch con auth) → 
     .set('X-Internal-API-Key', TEST_API_KEY_CLIENT_A)
     .field('metadata', JSON.stringify({
       id_documento: 'doc-ataque',
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: '1234567890',
       id_empresa: TEST_EMPRESA_B,  // ← B con key de A → cross-company
       tipo_firma: 'presencial',

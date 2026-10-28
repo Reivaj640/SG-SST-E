@@ -49,7 +49,7 @@ const IDENTIFICACION = '1234567890';
 async function identificarYVerificar(app, token) {
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: IDENTIFICACION });
+    .send({ tipo_identificacion: 'CC', numero_documento: IDENTIFICACION, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r1.status, 200, `identify: ${JSON.stringify(r1.body)}`);
 
   const r2 = await request(app)

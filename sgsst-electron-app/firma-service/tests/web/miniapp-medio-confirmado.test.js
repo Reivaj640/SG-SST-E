@@ -8,18 +8,25 @@
  * lo CONFIRMA en la pantalla de firma (declaración fija: es de su uso
  * exclusivo y la Empresa no administra ese buzón).
  *
+ * La v1.2 (el 3.4(e) y el 3.7(a)) hace la CONFIRMACIÓN OBLIGATORIA PARA
+ * CUALQUIER DESTINO, no solo cuando el destino es la dirección que registró
+ * la Empresa: el código sale únicamente al medio que el Firmante confirmó. Si
+ * la Empresa no registró ninguna dirección, el Trabajador confirma el buzón
+ * que escribió él en el campo de arriba.
+ *
  * Qué fija este archivo:
  *
  *   A. La MINI-APP (estático): el bloque, la casilla, el texto de la
- *      declaración, la regla de cuándo la casilla aplica y el payload.
+ *      declaración, que la confirmación es obligatoria para cualquier destino
+ *      y el payload.
  *      Son archivos que se editan a mano, así que aplico §7.2: además de
  *      afirmar la forma buena, corro mutaciones en memoria y exijo que el
  *      evaluador marque cada una. Un check que no muerde no es un check.
  *
  *   B. El SERVIDOR (con base): la dirección se expone en claro, la
- *      confirmación se EXIGE antes de que el código salga, queda registrada en
- *      la fila y en la bitácora, y el medio pasa a origen
- *      'TRABAJADOR_CONFIRMADO' sin dejar de estar PENDIENTE.
+ *      confirmación se EXIGE antes de que el código salga (para CUALQUIER
+ *      destino), queda registrada en la fila y en la bitácora, y el medio pasa
+ *      a origen 'TRABAJADOR_CONFIRMADO' sin dejar de estar PENDIENTE.
  */
 'use strict';
 
@@ -63,9 +70,9 @@ function evaluar(htm, js) {
     htm.includes('id="medio-personal-bloque"'),
     'sin el bloque no hay dónde mostrar la dirección que registró la Empresa');
 
-  check('el bloque del medio personal arranca oculto',
-    /id="medio-personal-bloque"[^>]*hidden/.test(htm),
-    'sin medio registrado no hay nada que mostrar: el bloque no puede salir siempre');
+  check('el bloque del medio personal nunca está oculto',
+    !/id="medio-personal-bloque"[^>]*\bhidden\b/.test(htm),
+    'la confirmación es obligatoria para cualquier destino: el bloque no puede esconderse');
 
   check('existe la casilla de confirmación',
     htm.includes('id="medio_otp_confirmado"'),
@@ -97,27 +104,41 @@ function evaluar(htm, js) {
     /registro\.textContent\s*=\s*[\s\S]{0,160}?\+\s*medio\.correo\s*;/.test(js),
     'enmascarada el Trabajador no puede reconocer su propio buzón');
 
-  check('la casilla se exige cuando el código va al medio registrado',
-    /check\.required\s*=\s*aplica/.test(js),
-    'si no se exige, la confirmación es un adorno');
+  check('sin dirección registrada la mini-app no inventa una',
+    /Tu empresa no registró ninguna dirección/.test(js),
+    'no hay dirección de la Empresa: no se puede decir que registró una');
 
-  check('la casilla se deshabilita si el Trabajador escribe otro buzón',
-    /check\.disabled\s*=\s*!aplica/.test(js),
-    'el código va a SU buzón: no hay nada que confirmar del de la Empresa');
+  // La regla de la casilla vive en `actualizarConfirmacionMedio`. Se mira SOLO
+  // ese cuerpo: en el archivo hay otras casillas (la del Acuerdo de uso y la
+  // del consentimiento de datos sensibles) que sí se habilitan y se deshabilitan,
+  // y esas no tienen nada que ver con el medio del OTP.
+  const cuerpoConfirmacion = (js.match(
+    /function actualizarConfirmacionMedio\(\)\s*\{([\s\S]*?)\n {2}\}/
+  ) || ['', ''])[1];
+
+  check('la casilla es siempre obligatoria',
+    /check\.required\s*=\s*true/.test(cuerpoConfirmacion) &&
+    !/check\.required\s*=\s*false/.test(cuerpoConfirmacion),
+    'si no se exige, la confirmación es un adorno: el código puede salir sin declararse');
+
+  check('la casilla nunca se deshabilita',
+    /check\.disabled\s*=\s*false/.test(cuerpoConfirmacion) &&
+    !/check\.disabled\s*=\s*true/.test(cuerpoConfirmacion),
+    'escribir otro buzón ya no esquiva la declaración del 3.4(e) de la v1.2');
 
   check('el payload viaja con la confirmación y su versión',
     /body\.medio_otp_confirmado\s*=\s*true/.test(js) &&
     /body\.medio_otp_version\s*=/.test(js),
     'sin la versión el servidor no puede saber con qué texto confirmó');
 
-  check('el envío se frena si la casilla exigida no está marcada',
-    /check\.required\s*&&\s*!confirmado/.test(js),
+  check('el envío se frena si la casilla no está marcada',
+    /if\s*\(\s*!confirmado\s*\)/.test(js),
     'el cliente tiene que frenar el envío, no solo avisar');
 
   return { f: fallos.length, fallos };
 }
 
-const CHECKS_TOTAL = 13;
+const CHECKS_TOTAL = 14;
 
 test('la mini-app pasa todos los checks del medio personal confirmado', () => {
   const { f, fallos } = evaluar(HTML_REAL, JS_REAL);
@@ -131,8 +152,8 @@ const MUTANTES = [
     htm: (h) => h.replace(/\s*<div class="form-group" id="medio-personal-bloque"[\s\S]*?\n\s*<\/div>\n/, '\n'),
   },
   {
-    nombre: 'el bloque del medio personal deja de estar oculto',
-    htm: (h) => h.replace('id="medio-personal-bloque" hidden', 'id="medio-personal-bloque"'),
+    nombre: 'el bloque del medio personal vuelve a estar oculto',
+    htm: (h) => h.replace('id="medio-personal-bloque"', 'id="medio-personal-bloque" hidden'),
   },
   {
     nombre: 'se borra la casilla de confirmación',
@@ -161,12 +182,18 @@ const MUTANTES = [
       "registro.textContent = 'Tu empresa registró una direccion';"),
   },
   {
-    nombre: 'la casilla nunca se exige',
-    js: (j) => j.replace('check.required = aplica;', 'check.required = false;'),
+    nombre: 'la mini-app inventa una dirección que la Empresa no registró',
+    js: (j) => j.replace(
+      'Tu empresa no registró ninguna dirección',
+      'Tu empresa registró esta dirección'),
   },
   {
-    nombre: 'la casilla nunca se deshabilita',
-    js: (j) => j.replace('check.disabled = !aplica;', 'check.disabled = false;'),
+    nombre: 'la casilla deja de ser obligatoria',
+    js: (j) => j.replace('check.required = true;', 'check.required = false;'),
+  },
+  {
+    nombre: 'la casilla se vuelve a deshabilitar',
+    js: (j) => j.replace(/check\.disabled = false;/g, 'check.disabled = true;'),
   },
   {
     nombre: 'el payload no lleva la confirmación',
@@ -178,7 +205,7 @@ const MUTANTES = [
   },
   {
     nombre: 'el cliente no frena el envío',
-    js: (j) => j.replace('check.required && !confirmado', 'false'),
+    js: (j) => j.replace('if (!confirmado) {', 'if (false) {'),
   },
 ];
 
@@ -258,14 +285,19 @@ test('SERVIDOR · sin medio registrado, el contexto no inventa uno', async () =>
   const res = await request(makeApp()).get(`/s/${token}`);
 
   assert.equal(res.status, 200);
-  assert.equal(res.body.medio_personal_registrado.correo, null);
-  assert.equal(res.body.medio_personal_registrado.requiere_confirmacion, false);
+  assert.equal(res.body.medio_personal_registrado.correo, null,
+    'la Empresa no registró ninguna dirección: no se inventa ninguna');
+  assert.equal(res.body.medio_personal_registrado.requiere_confirmacion, true,
+    'la confirmación es obligatoria para CUALQUIER destino: también cuando la '
+    + 'Empresa no registró ninguna dirección');
 });
 
 test('SERVIDOR · sin confirmar, la identificación se rechaza y el código NO sale', async () => {
   limpiar();
   const { token } = await crearSolicitud({ correo_otp: CORREO_PERSONAL });
 
+  // Sin `medio_otp_confirmado`: el destino es el medio que registró la Empresa,
+  // pero nadie declaró nada sobre ese buzón.
   const res = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
     .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
@@ -343,21 +375,58 @@ test('SERVIDOR · la confirmación con una versión vieja se rechaza', async () 
   assert.equal(res.body.error.code, 'MEDIO_OTP_DECLARACION_DESACTUALIZADA');
 });
 
-test('SERVIDOR · sin medio registrado, la identificación sigue siendo como antes', async () => {
+test('SERVIDOR · sin medio registrado, el Trabajador confirma su propio buzón y el código sale ahí', async () => {
+  limpiar();
+  const { token, signRequest } = await crearSolicitud();
+
+  // Sin medio de la Empresa, el Trabajador escribe el suyo y lo confirma.
+  const propio = 'mipropio@ejemplo.net';
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send({
+      tipo_identificacion: 'CC',
+      numero_documento: '1234567890',
+      correo_otp: propio,
+      medio_otp_confirmado: true,
+      medio_otp_version: medioPersonal.DECLARACION_VERSION,
+    })
+    .timeout({ response: 5000 });
+
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  const inbox = mailer.getDevInbox();
+  const conOtp = inbox.find((m) => m.tipo === 'signature');
+  assert.ok(conOtp);
+  assert.equal(conOtp.to, propio, 'el código va al buzón que declaró el Trabajador');
+
+  // La declaración queda archivada con ESE buzón: es el que recibió el código.
+  const fila = db.prepare(
+    'SELECT medio_otp_confirmado_correo FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  assert.equal(fila.medio_otp_confirmado_correo, propio);
+});
+
+test('SERVIDOR · sin medio registrado y sin confirmar, el código NO sale', async () => {
   limpiar();
   const { token } = await crearSolicitud();
 
+  // El destino sería el contacto de la Empresa: también ese exige
+  // confirmación.
   const res = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
     .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
     .timeout({ response: 5000 });
 
-  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.equal(res.body.error.code, 'MEDIO_OTP_CONFIRMACION_REQUERIDA');
+  const inbox = mailer.getDevInbox();
+  assert.equal(inbox.filter((m) => m.tipo === 'signature').length, 0,
+    'sin confirmación no sale el código, sea cual sea el destino');
 });
 
-test('SERVIDOR · el Trabajador escribe otro buzón: ese manda y no hay nada que confirmar', async () => {
+test('SERVIDOR · el Trabajador escribe otro buzón Y confirma: ese manda y la declaración queda con esa dirección', async () => {
   limpiar();
-  const { token } = await crearSolicitud({ correo_otp: CORREO_PERSONAL });
+  const { token, signRequest } = await crearSolicitud({ correo_otp: CORREO_PERSONAL });
 
   const otro = 'miotro@ejemplo.net';
   const res = await request(makeApp())
@@ -366,6 +435,8 @@ test('SERVIDOR · el Trabajador escribe otro buzón: ese manda y no hay nada que
       tipo_identificacion: 'CC',
       numero_documento: '1234567890',
       correo_otp: otro,
+      medio_otp_confirmado: true,
+      medio_otp_version: medioPersonal.DECLARACION_VERSION,
     })
     .timeout({ response: 5000 });
 
@@ -374,4 +445,19 @@ test('SERVIDOR · el Trabajador escribe otro buzón: ese manda y no hay nada que
   const conOtp = inbox.find((m) => m.tipo === 'signature');
   assert.ok(conOtp);
   assert.equal(conOtp.to, otro, 'el código va al buzón que declaró el Trabajador');
+
+  // La declaración se archiva con ESE buzón, no con el que registró la
+  // Empresa: lo que se confirmó es adonde salió el código.
+  const fila = db.prepare(
+    'SELECT medio_otp_confirmado_correo, medio_otp_confirmado_version'
+    + ' FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  assert.equal(fila.medio_otp_confirmado_correo, otro);
+  assert.equal(fila.medio_otp_confirmado_version, medioPersonal.DECLARACION_VERSION);
+
+  const evento = db.prepare(
+    'SELECT metadata FROM gh_firma_eventos WHERE firma_id = ? AND evento = ?'
+  ).get(signRequest.id, medioPersonal.EVENTO_CONFIRMACION);
+  assert.ok(evento, 'la confirmación queda en la bitácora de eventos');
+  assert.equal(JSON.parse(evento.metadata).correo, otro);
 });

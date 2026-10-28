@@ -78,7 +78,7 @@ async function firmaConOtp() {
   const app = makeApp();
   const r = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r.status, 200, `identify falló: ${JSON.stringify(r.body)}`);
   return { app, token, signRequest, otp: r.body.devOtp };
 }
@@ -180,10 +180,19 @@ test('M1 · un OTP que vence juste antes del TTL todavía se acepta', async () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. El fallback para filas heredadas
+// 3. Las filas heredadas (sin fecha de envío)
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('M1 · una fila sin fecha de envío NO se bloquea (fallback seguro)', async () => {
+test('M1 · una fila sin fecha de envío CADUCA (no se puede probar la vigencia)', async () => {
+  // ANTES: sin `fecha_otp_enviado` no se calculaba la expiración y el código
+  // se validaba igual. Eso dejaba un código vigente por tiempo indeterminado,
+  // y el 3.4(e) no lo cumple: el código expira a los 600 segundos contados
+  // desde su envío.
+  //
+  // AHORA: sin la marca de envío NO se puede probar que el código sea
+  // vigente, y un código del que no se puede probar la vigencia no se
+  // valida. Se falla cerrado. El Trabajador no queda atrapado: el reenvío
+  // sigue funcionando en estado OTP_SENT (ver el test de más abajo).
   const { app, token, signRequest, otp } = await firmaConOtp();
   sinFechaOtp(signRequest.id);
 
@@ -191,9 +200,11 @@ test('M1 · una fila sin fecha de envío NO se bloquea (fallback seguro)', async
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp });
 
-  assert.equal(res.status, 200,
-    'sin fecha de envío no se puede calcular la expiración: no se bloquea');
-  assert.equal(res.body.estado, 'OTP_VERIFIED');
+  assert.equal(res.status, 410,
+    'sin fecha de envío no se puede probar que el código sea vigente: no se valida');
+  assertJsonError(res, 'OTP_EXPIRADO');
+  assert.equal(res.body.error.details.se_puede_reenviar, true,
+    'el reenvío es la salida: el Trabajador pide uno nuevo');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

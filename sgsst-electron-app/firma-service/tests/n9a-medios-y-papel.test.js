@@ -44,7 +44,14 @@ const {
 
 const EMPRESA = '900123456';
 const TRABAJADOR = '1234567890';
-const CORREO_EMPRESA = 'trabajador@empresa-corp.com';
+// El 8.2: la Empresa registra el "correo electrónico registrado en su hoja
+// de vida", que es el del TRABAJADOR. Este fixture lo pone personal a
+// propósito: un buzón del dominio de la Empresa NO sirve como medio del
+// OTP (el 3.4(e) y el 2.2.2.47.4 num. 1: la Empresa podría leer el código),
+// y desde la v1.2 esa solicitud se RECHAZA en vez de mandar el código. Ese
+// caso lo fija `d02-medio-otp.test.js`; aquí lo que se prueba es el registro
+// de los medios y la vía en papel.
+const CORREO_EMPRESA = 'trabajador@ejemplo.net';
 const CORREO_PERSONAL = 'mipersonal@ejemplo.net';
 
 function registrarEmpresa() {
@@ -76,7 +83,7 @@ function crearSolicitud({ correo = CORREO_EMPRESA } = {}) {
 async function identificarYVerificar(token) {
   const id = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: TRABAJADOR })
+    .send({ tipo_identificacion: 'CC', numero_documento: TRABAJADOR, medio_otp_confirmado: true, medio_otp_version: '1.0' })
     .timeout({ response: 5000 });
   assert.equal(id.status, 200, JSON.stringify(id.body));
   const dev = await request(makeApp())

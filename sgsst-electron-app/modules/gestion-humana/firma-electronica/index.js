@@ -29,6 +29,14 @@
 (function () {
   var COMPONENT_NAME = 'FirmaElectronicaComponent';
 
+  // DECLARACIÓN DE DATOS SENSIBLES DE SALUD (decisión del 27-oct-2026).
+  // El valor tiene que ser EXACTAMENTE este: el firma-service lo exige en la
+  // frontera HTTP (422 DECLARACION_DATOS_SENSIBLES_REQUERIDA) y lo archiva
+  // en la fila de la firma, atado a la huella del PDF. Si K+AIR y el service
+  // dejaran de coincidir, el envío falla con un 422 explicito — que es lo
+  // que conviene: que se note, en vez de archivar una declaración inventada.
+  var DECLARACION_DATOS_SENSIBLES = 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD';
+
   // Estados principales del PROCESO del trabajador (no del documento individual).
   // Los estados técnicos (PENDING, OTP_PENDING, SIGNED, etc.) solo aparecen
   // dentro del expediente (Fase 2).
@@ -394,6 +402,22 @@
       '        <label class="fe-firma-confirm">',
       '          <input id="fe-firma-confirmar" type="checkbox" />',
       '          <span>Confirmo que este documento se enviará a firma y que el correo indicado es personal del trabajador, sin acceso de la empresa</span>',
+      '        </label>',
+      '      </div>',
+      // DECLARACIÓN DE DATOS SENSIBLES DE SALUD (decisión del 27-oct-2026).
+      // El servicio NO recibe documentos con datos sensibles de salud: la
+      // Empresa conserva el original. Sin esta declaración, el servidor
+      // responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA, porque una
+      // casilla de aceptación general no es suficiente para datos de salud
+      // (numeral 10.8 del Acuerdo). La declaración viaja en el metadata y
+      // queda archivada, atada a la huella del PDF.
+      '      <div class="fe-field">',
+      '        <label class="fe-firma-confirm fe-firma-confirm--salud">',
+      '          <input id="fe-firma-declaracion-salud" type="checkbox" />',
+      '          <span class="fe-firma-confirm__body">',
+      '            <span class="fe-firma-confirm__title">Declaro que el documento NO contiene datos sensibles de salud</span>',
+      '            <span class="fe-firma-confirm__hint">Sin historias clínicas, diagnósticos, tratamientos ni datos de salud de terceros. La plataforma de firma electrónica no recibe ese tipo de información: si el documento las contiene, la firma se hace en papel. La declaración queda archivada con la huella del PDF.</span>',
+      '          </span>',
       '        </label>',
       '      </div>',
       // I-FIRMA-DUAL · Checkbox de firma dual (K+AIR Firma Dual · v0.1.180)
@@ -2423,12 +2447,14 @@
     var hintEl = modal.querySelector('#fe-firma-correo-hint');
     var errorEl = modal.querySelector('#fe-firma-correo-error');
     var confirmarCheck = modal.querySelector('#fe-firma-confirmar');
+    var declaracionSaludCheck = modal.querySelector('#fe-firma-declaracion-salud');
     var enviarBtn = modal.querySelector('#fe-firma-enviar');
     var correoPrefill = (trab && (trab.correo_personal || trab.correo)) || '';
     if (correoInput) correoInput.value = correoPrefill;
     if (hintEl) hintEl.textContent = correoPrefill ? 'Correo prellenado de la ficha del trabajador.' : '';
     if (errorEl) errorEl.hidden = true;
     if (confirmarCheck) confirmarCheck.checked = false;
+    if (declaracionSaludCheck) declaracionSaludCheck.checked = false;
     if (enviarBtn) enviarBtn.disabled = true;
     // FASE 4 · A1.5.4-B: ya no hay pausa para OTP en K+AIR.
     // El único correo que sale es la invitación con la URL.
@@ -2473,11 +2499,17 @@
     // Wire validation
     function validate() {
       var correo = (correoInput.value || '').trim();
-      var valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) && confirmarCheck.checked;
+      // Las DOS declaraciones son obligatorias para habilitar el envío: la
+      // del buzón personal (D-2) y la de datos sensibles de salud (10.8).
+      // Sin la segunda, el servidor responde 422 y el envío no llega.
+      var valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)
+        && confirmarCheck.checked
+        && (!declaracionSaludCheck || declaracionSaludCheck.checked);
       enviarBtn.disabled = !valid;
     }
     if (correoInput) correoInput.oninput = validate;
     if (confirmarCheck) confirmarCheck.onchange = validate;
+    if (declaracionSaludCheck) declaracionSaludCheck.onchange = validate;
     // Wire send (sin pausa de OTP — el flujo es lineal)
     if (enviarBtn) {
       enviarBtn.onclick = function () {
@@ -2577,6 +2609,11 @@
         // código.
         correo_verificacion: correoFirmante,
         correo_otp: correoFirmante,
+        // DECLARACIÓN DE DATOS SENSIBLES DE SALUD (numeral 10.8 del Acuerdo).
+        // Solo llega si la Empresa marco la casilla del modal: `validate()`
+        // no habilita el boton de envio sin las dos declaraciones. El service
+        // la exige, la archiva con la huella del PDF y registra el evento.
+        declaracion_datos_sensibles: DECLARACION_DATOS_SENSIBLES,
         // Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
         // no requieren migración de schema en firma-service).
         nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)

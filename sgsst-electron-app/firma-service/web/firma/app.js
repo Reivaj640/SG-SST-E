@@ -255,8 +255,9 @@
     sensitiveRequired: false,
     sensitiveAccepted: false,
     sensitiveAcceptInProgress: false, // evita doble POST al marcar/desmarcar rápido
-    // Decisión 1.a · el medio personal que registró la Empresa y la versión
-    // del texto de la declaración que hay que confirmar.
+    // Decisión 1.a · el medio personal que registró la Empresa (null cuando no
+    // registró ninguno) y la versión del texto de la declaración que hay que
+    // confirmar.
     medioRegistrado: null,
     declaracionVersion: null,
   };
@@ -431,8 +432,12 @@
    * para que lo CONFIRME: el buzón del código de verificación tiene que ser de
    * su uso exclusivo y la Empresa no puede leerlo (si lo lee, lee el código).
    *
-   * Si no hay ninguna dirección registrada, el bloque no se muestra y el campo
-   * de arriba sigue editable y opcional, como antes.
+   * El bloque se muestra SIEMPRE (v1.2): la CONFIRMACIÓN es obligatoria para
+   * CUALQUIER destino, no solo cuando el destino es la dirección que registró
+   * la Empresa. El código sale únicamente al medio que el Firmante confirmó (el
+   * 3.4(e) y el 3.7(a) de la v1.2). Si la Empresa no registró ninguna
+   * dirección, el Trabajador confirma el buzón que escribió en el campo de
+   * arriba.
    *
    * @param {object} contexto - Contexto publico de GET /s/:token.
    */
@@ -444,56 +449,49 @@
     if (!bloque || !registro || !check) return;
 
     const medio = contexto && contexto.medio_personal_registrado;
-    if (!medio || !medio.correo) {
-      bloque.hidden = true;
-      state.medioRegistrado = null;
-      state.declaracionVersion = null;
-      check.checked = false;
-      check.required = false;
-      check.disabled = false;
-      return;
-    }
 
     // El texto de la declaración lo manda el servidor: es el mismo texto que
     // queda archivado con la confirmación (y con su versión).
-    if (texto && medio.declaracion_texto) {
+    if (texto && medio && medio.declaracion_texto) {
       texto.textContent = medio.declaracion_texto;
     }
 
-    registro.textContent =
-      'Tu empresa registró esta dirección para enviarte el código de verificación: '
-      + medio.correo;
+    if (medio && medio.correo) {
+      registro.textContent =
+        'Tu empresa registró esta dirección para enviarte el código de verificación: '
+        + medio.correo;
+    } else {
+      // Sin dirección de la Empresa NO se inventa una: se le pide al
+      // Trabajador que confirme la que él escribió en el campo de arriba.
+      registro.textContent =
+        'Tu empresa no registró ninguna dirección para el código: confirma el '
+        + 'buzón que escribiste en el campo de arriba.';
+    }
+
     bloque.hidden = false;
-    state.medioRegistrado = medio.correo;
-    state.declaracionVersion = medio.declaracion_version || null;
+    state.medioRegistrado = medio && medio.correo ? medio.correo : null;
+    state.declaracionVersion = (medio && medio.declaracion_version) || null;
     actualizarConfirmacionMedio();
   }
 
   /**
-   * ¿Aplica la casilla de confirmación?
+   * La confirmación del medio es OBLIGATORIA (v1.2).
    *
-   * Aplica cuando la dirección que va a recibir el código es la que registró
-   * la Empresa: el campo está vacío o tiene exactamente esa dirección. Si el
-   * Trabajador escribe otra dirección, el código va a SU buzón y no hay nada
-   * que confirmar del de la Empresa.
+   * El código de verificación sale únicamente al medio que el Firmante confirmó
+   * en la pantalla de firma: al que registró la Empresa o al que escribió el
+   * Trabajador en el campo de arriba. Por eso la casilla NUNCA se deshabilita:
+   * antes se apagaba cuando el Trabajador escribía otro buzón, y con eso
+   * esquivaba la declaración (el 3.4(e) y el 3.7(a) de la v1.2 quedaban sin
+   * cumplir y la confirmación no se archivaba).
    *
-   * El servidor aplica la misma regla: la casilla es una condición para que
-   * el código salga a ese buzón, no una promesa del cliente.
+   * El servidor aplica la misma regla: la casilla es la condición para que el
+   * código salga a ese buzón, no una promesa del cliente.
    */
   function actualizarConfirmacionMedio() {
     const check = $('#medio_otp_confirmado');
     if (!check) return;
-    const registrado = state.medioRegistrado;
-    if (!registrado) {
-      check.required = false;
-      check.disabled = false;
-      return;
-    }
-    const escrito = (($('#correo_otp') && $('#correo_otp').value) || '').trim().toLowerCase();
-    const aplica = !escrito || escrito === registrado;
-    check.required = aplica;
-    check.disabled = !aplica;
-    if (!aplica) check.checked = false;
+    check.required = true;
+    check.disabled = false;
   }
 
   function setupIdentifyForm() {
@@ -520,22 +518,22 @@
         const body = { tipo_identificacion: tipo_identificacion, numero_documento: numero_documento };
         if (correoOtp) body.correo_otp = correoOtp;
 
-        // Decisión 1.a · la CONFIRMACIÓN del medio que registró la Empresa.
-        // Viaja solo si la casilla está marcada (y aplica: si el Trabajador
-        // escribió otro buzón, la casilla se deshabilita y no se manda).
+        // Decisión 1.a (v1.2) · la CONFIRMACIÓN del medio es OBLIGATORIA
+        // para CUALQUIER destino: el código sale únicamente al medio que el
+        // Firmante confirmó en la pantalla de firma (el 3.4(e) y el 3.7(a) de
+        // la v1.2). Si la casilla no está marcada, no se manda nada y el
+        // servidor rechaza con un 422 y el código NO sale.
         const check = $('#medio_otp_confirmado');
-        const confirmado = !!(check && check.checked && !check.disabled);
-        if (check && check.required && !confirmado) {
+        const confirmado = !!(check && check.checked);
+        if (!confirmado) {
           return showFormError(
             'identify-error',
-            'Marcá la casilla para confirmar que esa dirección es de tu uso exclusivo '
-            + 'y que tu empresa no administra ese buzón.'
+            'Marcá la casilla para confirmar que la dirección donde vas a recibir el '
+            + 'código es de tu uso exclusivo y que tu empresa no administra ese buzón.'
           );
         }
-        if (confirmado) {
-          body.medio_otp_confirmado = true;
-          body.medio_otp_version = state.declaracionVersion;
-        }
+        body.medio_otp_confirmado = true;
+        body.medio_otp_version = state.declaracionVersion;
 
         const result = await apiFetch('/api/sign/' + state.token + '/identify', {
           method: 'POST',
@@ -550,17 +548,19 @@
         } else if (err.status === 422 && err.code === 'MISSING_IDENTIFICATION_DATA') {
           showFormError('identify-error', 'No tenemos registrada tu identificación para esta solicitud. Contacta a tu empleador.');
         } else if (err.status === 422 && err.code === 'MEDIO_OTP_CONFIRMACION_REQUERIDA') {
-          // El servidor exige la confirmación: la casilla se muestra y hay que
-          // marcarla para que el código vaya a ese buzón.
+          // El servidor exige la confirmación: la casilla se deja HABILITADA y
+          // SIN MARCAR para que el Trabajador la marque y vuelva a enviar.
           showFormError(
             'identify-error',
-            'Tenés que confirmar que la dirección que registró tu empresa es de tu uso '
-            + 'exclusivo y que tu empresa no administra ese buzón.'
+            'Tenés que confirmar la dirección donde vas a recibir el código de '
+            + 'verificación: que es de tu uso exclusivo y que tu empresa no '
+            + 'administra ese buzón.'
           );
           const check = $('#medio_otp_confirmado');
           if (check) {
             check.disabled = false;
             check.required = true;
+            check.checked = false;
           }
         } else if (err.status === 409 && err.code === 'MEDIO_OTP_DECLARACION_DESACTUALIZADA') {
           showFormError(
@@ -583,9 +583,10 @@
       numInput.value = numInput.value.replace(/\D/g, '');
     });
 
-    // Decisión 1.a · si el Trabajador escribe otra dirección, la casilla de
-    // confirmación del medio de la Empresa deja de aplicar (el código va a SU
-    // buzón).
+    // Decisión 1.a (v1.2) · la confirmación es obligatoria para cualquier
+    // destino, así que cambiar la dirección no cambia nada: la casilla nunca
+    // se deshabilita. El aviso se deja para cuando el servidor pida volver a
+    // confirmar.
     const correoInput = $('#correo_otp');
     if (correoInput) {
       correoInput.addEventListener('input', actualizarConfirmacionMedio);

@@ -88,15 +88,16 @@
           CONFIRMA: ese buzón es de su uso exclusivo y la Empresa no lo
           administra (si lo administrara, también leería el código).
 
-          El bloque se muestra SOLO si hay una dirección registrada (la mini-app
-          lo activa con el contexto público). Si no hay ninguna, el campo de
-          arriba sigue editable y opcional, como antes.
+          El bloque se muestra SIEMPRE y la confirmación es OBLIGATORIA para
+          CUALQUIER destino, incluido el buzón que el Trabajador escriba en el
+          campo de arriba: el código de verificación sale únicamente al medio
+          que el Firmante confirmó (el 3.4(e) y el 3.7(a) de la v1.2).
 
           El texto de la declaración lo pinta el servidor (`contexto.medio_personal_registrado.declaracion_texto`):
           es el mismo texto que queda archivado con la confirmación, con su
           versión.
         -->
-        <div class="form-group" id="medio-personal-bloque" hidden>
+        <div class="form-group" id="medio-personal-bloque">
           <p class="form-hint" id="medio-personal-registro"></p>
           <label class="checkbox-label" for="medio_otp_confirmado">
             <input type="checkbox" id="medio_otp_confirmado" name="medio_otp_confirmado">

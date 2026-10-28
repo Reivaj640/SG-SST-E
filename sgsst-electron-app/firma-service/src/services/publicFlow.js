@@ -38,6 +38,7 @@ const agreementService = require('./agreement');  // D2: re-validar Acuerdo en v
 const empresaService = require('./empresa');
 const mediosService = require('./medios');   // 9A: los medios autorizados (el 8.2)
 const papelService = require('./papel');   // 9A: la firma autográfica (el 7.1-7.3)
+const manifiestoLegal = require('./manifiestoLegal');  // 045: los anexos que rigen la firma
 const pdfGenPapel = require('./pdfGenPapel');   // 9A: el Registro de firma autográfica
 const conservacion = require('./conservacion');    // 8A.1: vencimiento del plazo (num. 10.6)
 const supresion = require('./supresion');        // 8A.2: lápida de la supresión de datos
@@ -926,6 +927,36 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
     tipo_identificacion
   );
 
+  // 9. D-2 · EL MEDIO Y SU DESTINO SE RESUELVEN ANTES DE ESCRIBIR NADA.
+  //
+  //    El OTP (dato de creación) va al medio PERSONAL que declaró el
+  //    Trabajador; la invitación (token) sigue yendo al contacto registrado
+  //    por la Empresa. El medio declarado queda congelado en la fila.
+  //
+  //    POR QUÉ EL ORDEN IMPORTA: el control del buzón corporativo (el 3.4(e)
+  //    de la v1.2) RECHAZA la solicitud. Si el rechazo viniera después de
+  //    generar el OTP, la fila quedaba en estado OTP_SENT con un código que
+  //    nunca salió por correo y sin evento que lo explicara: una firma
+  //    fantasma, con un código vivo que nadie tiene. Resolviendo antes, el
+  //    rechazo no deja rastro de estado: solo queda el evento
+  //    OTP_MEDIO_CORPORATIVO, que es la evidencia de la contingencia.
+  //
+  //    El formato del medio declarado se valida PRIMERO (sin escribir nada),
+  //    para que un medio inválido se reporte como INVALID_REQUEST_BODY y no
+  //    como un error de dominio.
+  if (medioOtp) {
+    _validarFormatoMedioOtp(medioOtp);
+  }
+  const destinoOtp = resolveCorreoOtp(signRequest, medioOtp);
+  const correo = destinoOtp.correo;
+  if (!correo) {
+    throw new AppError(400, 'MISSING_EMAIL',
+      'No hay correo de verificación disponible para esta solicitud');
+  }
+  if (medioOtp) {
+    declararMedioOtp(signRequest, medioOtp);
+  }
+
   // 6+7+8. Identificación + generación OTP + guardado, TODO en una sola tx.
   //    P1-3: antes había 2 tx separadas (IDENTIFIED y OTP_SENT) con una
   //    ventana de 20-30ms donde el estado podía quedar en IDENTIFIED sin
@@ -971,19 +1002,6 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
       { tipo_identificacion }, 'trabajador', ip, user_agent);
   });
   tx();
-
-  // 9. D-2: el OTP (dato de creación) va al medio PERSONAL que declaró
-  //    el Trabajador; la invitación (token) sigue yendo al contacto
-  //    registrado por la Empresa. El medio declarado queda congelado en la fila.
-  if (medioOtp) {
-    declararMedioOtp(signRequest, medioOtp);
-  }
-  const destinoOtp = resolveCorreoOtp(signRequest, medioOtp);
-  const correo = destinoOtp.correo;
-  if (!correo) {
-    throw new AppError(400, 'MISSING_EMAIL',
-      'No hay correo de verificación disponible para esta solicitud');
-  }
 
   // 10. Enviar OTP
   //
@@ -1132,7 +1150,27 @@ function _origenDelMedioEnLaFila(signRequest) {
   return 'registrado_por_la_empresa';
 }
 
-function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
+/**
+ * Resuelve el DESTINO del código de verificación, sin aplicar ningún control.
+ *
+ * El destino es el medio que declaró el Trabajador (el `correo_otp` del body
+ * del identify) o, si no declaró nada, el contacto registrado por la Empresa.
+ *
+ * POR QUÉ ESTÁ SEPARADA DEL CONTROL
+ * ---------------------------------
+ * El control del buzón corporativo vive en `_controlarMedioCorporativo`, que
+ * se aplica aparte. Esta función NO rechaza nada y NO escribe nada: la ruta
+ * HTTP la usa para resolver a qué dirección va a salir el código (y para
+ * archivarla junto con la confirmación del Trabajador) sin saltarse el
+ * control ni adelantar ninguna escritura.
+ *
+ * @param {object} signRequest
+ * @param {string} [medioDeclarado] el medio que declaró el Trabajador
+ * @param {string} [correoBase] destino preferente (el reenvío de OTP usa el
+ *   del consentimiento)
+ * @returns {{correo: string|null, origen: string}}
+ */
+function _destinoBruto(signRequest, medioDeclarado, correoBase) {
   // `correoBase` permite que quien ya resolvio el contacto (el reenvio de OTP
   // usa el del consentimiento) lo conserve: la regla del D-2 cambia el
   // DESTINO, no la prioridad de resolucion.
@@ -1143,41 +1181,6 @@ function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
   // fila? La etiqueta del origen depende de eso.
   const desdeElBody = typeof medioDeclarado === 'string' && medioDeclarado.trim().length > 0;
 
-  const evaluar = (correo, origen) => {
-    if (!correo) return { correo: null, origen, riesgo_47_4: false };
-    const corporativo = empresaService.esDominioCorporativo(correo, signRequest.id_empresa);
-    if (corporativo) {
-      if (config.exigirMedioPersonalOtp) {
-        // El mensaje NO manda a una puerta que no existe en el producto: la
-        // vía en papel no es un botón de la mini-app, es el canal de atención
-        // de la Empresa. Por eso el mensaje dice a quién le pedirlo.
-        const empresaDelCanal = empresaService.getById(signRequest.id_empresa);
-        const canalEmpresa = empresaDelCanal ? (empresaDelCanal.canal_pqrs || null) : null;
-        throw new AppError(400, 'MEDIO_OTP_CORPORATIVO',
-          'Ese buzón es del dominio de la Empresa. Si la Empresa puede leer ese '
-          + 'buzón, también puede leer el código de verificación, y entonces los '
-          + 'datos de creación de la firma no corresponderían exclusivamente al '
-          + 'Firmante (numeral 3.7(a) y 2.2.2.47.4 num. 1), con lo que la '
-          + 'garantía del 6.1(d) sería falsa. Usá un medio personal, o '
-          + 'pedile a tu Empresa la firma en papel (numeral 7.2 del Acuerdo): '
-          + 'es tu derecho y no tiene costo.',
-          {
-            id_solicitud: signRequest.id_solicitud,
-            origen,
-            dominio_corporativo: true,
-            canal_empresa: canalEmpresa,
-          });
-      }
-      logger.warn('El OTP va a un buzón que la Empresa puede leer: el 47.4 queda en riesgo', {
-        id_solicitud: signRequest.id_solicitud,
-        id_empresa: signRequest.id_empresa,
-        origen,
-        aviso: 'OTP_MEDIO_CORPORATIVO',
-      });
-    }
-    return { correo, origen, riesgo_47_4: corporativo };
-  };
-
   // 1. El medio que declaró el Trabajador manda.
   if (medio && medio.includes('@')) {
     // Si vino en el body del identify, lo declaró el Trabajador. Si vino del
@@ -1185,11 +1188,182 @@ function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
     const origen = desdeElBody
       ? 'declarado_por_el_trabajador'
       : _origenDelMedioEnLaFila(signRequest);
-    return evaluar(medio, origen);
+    return { correo: medio, origen };
   }
 
   // 2. Sin medio declarado: el contacto registrado de la Empresa.
-  return evaluar(contacto, 'contacto_registrado');
+  return { correo: contacto, origen: 'contacto_registrado' };
+}
+
+/**
+ * EL CONTROL DEL BUZÓN CORPORATIVO (el D-2 y el 3.4(e) de la v1.2).
+ *
+ * QUÉ HACE, Y POR QUÉ AHORA ES INCONDICIONAL
+ * -------------------------------------------
+ * Si el destino del código cae en un dominio que la EMPRESA puede leer, el
+ * código también lo puede leer: el OTP es el dato de creación de la firma
+ * (el 3.4(e) y el 3.7(a)) y su custodia no puede depender de la Empresa (el
+ * 2.2.2.47.4 num. 1 del Decreto 1074 de 2015). Por eso el sistema RECHAZA
+ * la solicitud y ofrece la firma en papel del 7.2.
+ *
+ * ANTES este control dependía de `config.exigirMedioPersonalOtp`: con el
+ * interruptor apagado solo se escribía un `logger.warn` a la consola (stderr,
+ * que no es un registro de operaciones) y el código SE ENVIABA igual. El
+ * 3.4(e) de la v1.1 promete que el caso queda "en el registro de operaciones
+ * del servicio" y que ese registro "no puede suprimirse": eso solo es cierto
+ * si el aviso entra en `gh_firma_eventos`, que es append-only (la migración
+ * 020 impide UPDATE y DELETE). Con el 📦978 el aviso es un EVENTO y el
+ * rechazo es siempre.
+ *
+ * `riesgo_47_4` queda SIEMPRE en false: el control es incondicional, así que
+ * el sistema nunca llega a dejar salir un código a un buzón que la Empresa
+ * pueda leer. El campo se conserva porque es parte de la forma de la
+ * respuesta y de su documentación.
+ *
+ * @param {object} signRequest
+ * @param {{correo: string|null, origen: string}} destino
+ * @throws {AppError} 400 MEDIO_OTP_CORPORATIVO
+ * @returns {{correo: string|null, origen: string, riesgo_47_4: boolean}}
+ */
+function _controlarMedioCorporativo(signRequest, destino) {
+  if (!destino.correo) return { ...destino, riesgo_47_4: false };
+
+  const corporativo = empresaService.esDominioCorporativo(destino.correo, signRequest.id_empresa);
+  if (!corporativo) return { ...destino, riesgo_47_4: false };
+
+  // EL EVENTO PRIMERO: es la evidencia de la contingencia que el 3.4(e)
+  // promete. `gh_firma_eventos` no admite UPDATE ni DELETE (migración 020),
+  // así que este registro no se puede suprimir ni corregir.
+  signRequestService.registerEvent(signRequest.id, 'OTP_MEDIO_CORPORATIVO', {
+    origen: destino.origen,
+    dominio_corporativo: true,
+    resultado: 'rechazado',
+    correo_destino_enmascarado: maskEmail(destino.correo),
+  }, 'sistema', null, null);
+
+  // El aviso a la consola del operador: complements el evento, no lo
+  // reemplaza (un warn a stderr no es un registro de operaciones).
+  logger.warn('El OTP iba a un buzón que la Empresa puede leer: la solicitud se rechaza', {
+    id_solicitud: signRequest.id_solicitud,
+    id_empresa: signRequest.id_empresa,
+    origen: destino.origen,
+    aviso: 'OTP_MEDIO_CORPORATIVO',
+  });
+
+  // El mensaje NO manda a una puerta que no existe en el producto: la
+  // vía en papel no es un botón de la mini-app, es el canal de atención
+  // de la Empresa. Por eso el mensaje dice a quién le pedirlo.
+  const empresaDelCanal = empresaService.getById(signRequest.id_empresa);
+  const canalEmpresa = empresaDelCanal ? (empresaDelCanal.canal_pqrs || null) : null;
+  throw new AppError(400, 'MEDIO_OTP_CORPORATIVO',
+    'Ese buzón es del dominio de la Empresa. Si la Empresa puede leer ese '
+    + 'buzón, también puede leer el código de verificación, y entonces los '
+    + 'datos de creación de la firma no corresponderían exclusivamente al '
+    + 'Firmante (numeral 3.7(a) y 2.2.2.47.4 num. 1), con lo que la '
+    + 'garantía del 6.1(d) sería falsa. Usá un medio personal, o '
+    + 'pedile a tu Empresa la firma en papel (numeral 7.2 del Acuerdo): '
+    + 'es tu derecho y no tiene costo.',
+    {
+      id_solicitud: signRequest.id_solicitud,
+      origen: destino.origen,
+      dominio_corporativo: true,
+      canal_empresa: canalEmpresa,
+    });
+}
+
+/**
+ * El correo al que el REENVÍO mandaría el código.
+ *
+ * I-AUDIT-2026-09-10 (v0.1.194): en resend-otp, la fuente autoritativa es el
+ * correo del CONSENTIMIENTO vinculado (no metadata.correo ni la columna del
+ * SR). Razón: el operador introduce un solo correo al crear el consent y el
+ * OTP debe ir siempre a ese correo, aunque el SR traiga su propio metadata.
+ * Si NO hay consent vinculado, caemos al resolveCorreo estándar (columna >
+ * metadata) para preservar comportamiento de SR legacy.
+ *
+ * Vive en una función aparte porque el error de caducidad necesita saber si
+ * el reenvío PROCEDE: si el destino es un buzón que la Empresa puede leer,
+ * el reenvío no procede (el control del 3.4(e)) y la salida es el papel. Sin
+ * este cálculo compartido, el `se_puede_reenviar: true` del error sería una
+ * promesa falsa.
+ *
+ * @param {object} signRequest
+ * @returns {string|null}
+ */
+function _correoDeResend(signRequest) {
+  if (signRequest.consent_id) {
+    const consentRow = db.prepare(
+      'SELECT correo_verificacion FROM gh_consentimientos_firma WHERE id = ?'
+    ).get(signRequest.consent_id);
+    if (consentRow && consentRow.correo_verificacion) {
+      return consentRow.correo_verificacion;
+    }
+  }
+  return resolveCorreo(signRequest);
+}
+
+/**
+ * ¿El correo cae en un dominio que la EMPRESA puede leer?
+ *
+ * @param {object} signRequest
+ * @param {string|null} correo
+ * @returns {boolean}
+ */
+function _esMedioCorporativo(signRequest, correo) {
+  if (!correo) return false;
+  return empresaService.esDominioCorporativo(correo, signRequest.id_empresa);
+}
+
+/**
+ * Resuelve el destino del código Y aplica el control del buzón corporativo.
+ *
+ * @param {object} signRequest
+ * @param {string} [medioDeclarado]
+ * @param {string} [correoBase]
+ * @returns {{correo: string|null, origen: string, riesgo_47_4: boolean}}
+ */
+function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
+  return _controlarMedioCorporativo(
+    signRequest,
+    _destinoBruto(signRequest, medioDeclarado, correoBase)
+  );
+}
+
+/**
+ * El destino del código, SIN el control del buzón corporativo.
+ *
+ * La ruta HTTP la usa para (a) saber a qué dirección va a salir el código y
+ * (b) archivar esa dirección junto con la confirmación del Trabajador. El
+ * control del buzón corporativo lo aplica `resolveCorreoOtp`, dentro del
+ * servicio, antes de que salga el código.
+ *
+ * @param {object} signRequest
+ * @param {string} [medioDeclarado]
+ * @returns {{correo: string|null, origen: string}}
+ */
+function resolverDestinoOtp(signRequest, medioDeclarado) {
+  return _destinoBruto(signRequest, medioDeclarado);
+}
+
+/**
+ * Valida el FORMATO del medio declarado por el Trabajador.
+ *
+ * Va aparte de `declararMedioOtp` porque el `identify()` valida el formato
+ * ANTES de resolver el destino (y antes de escribir nada): un medio que no
+ * parece un correo tiene que reportarse como INVALID_REQUEST_BODY, no como
+ * un error de dominio corporativo.
+ *
+ * @param {string} medio
+ * @returns {string} el correo normalizado
+ * @throws {AppError} 400 INVALID_REQUEST_BODY
+ */
+function _validarFormatoMedioOtp(medio) {
+  const correo = (typeof medio === 'string' ? medio.trim().toLowerCase() : '');
+  if (!correo || !correo.includes('@')) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'El medio para el código de verificación no parece un correo');
+  }
+  return correo;
 }
 
 /**
@@ -1203,11 +1377,7 @@ function resolveCorreoOtp(signRequest, medioDeclarado, correoBase) {
  * @returns {{correo_otp: string, congelado: boolean}}
  */
 function declararMedioOtp(signRequest, medio) {
-  const correo = (typeof medio === 'string' ? medio.trim().toLowerCase() : '');
-  if (!correo || !correo.includes('@')) {
-    throw new AppError(400, 'INVALID_REQUEST_BODY',
-      'El medio para el código de verificación no parece un correo');
-  }
+  const correo = _validarFormatoMedioOtp(medio);
 
   // Ya se envió un OTP: el medio queda congelado.
   if (signRequest.correo_otp && signRequest.fecha_otp_enviado) {
@@ -1857,6 +2027,17 @@ async function commit(token, opts, ip, user_agent) {
         throw new AppError(409, 'INVALID_STATE_TRANSITION',
           'La firma no se pudo cerrar: el estado cambió durante el commit');
       }
+      // LOS ANEXOS QUE RIGEN ESTA FIRMA (el 1.5 y el 3.6 de la v1.2).
+      //
+      // Se archivan EN LA MISMA TRANSACCIÓN que cierra la firma: o queda la
+      // Constancia (que ya se generó con la versión y la huella de cada
+      // anexo) y la fila con esos mismos datos, o no queda ninguna de las dos.
+      // `registrarAnexosFirma` NO propaga errores a propósito: si la
+      // migración 045 todavía no está aplicada, la firma NO se cae (el PDF
+      // no depende de la tabla).
+      manifiestoLegal.registrarAnexosFirma(signRequest.id, null, {
+        id_empresa: signRequest.id_empresa,
+      });
       // I-008.3: usar withAppErrorWrappingSync (no la versión async) porque
       // estamos DENTRO de la callback sync de db.transaction (better-sqlite3
       // v11 no soporta await en esa callback). Errores no-AppError ahora se
@@ -2454,22 +2635,53 @@ function verifyOtp(token, otp, ip, user_agent) {
   // dejaba reenviar. Un código de hace dos horas seguía valiendo.
   //
   // OJO con el fallback: si `fecha_otp_enviado` es NULL (fila heredada, sin
-  // la marca de envío) NO se puede calcular la expiración, y en ese caso NO
-  // se aplica la rama: se valida el código como se ha hecho siempre. Es el
-  // mismo criterio que usa el consentimiento (services/consent.js).
+  // la marca de envío) NO se puede calcular la expiración. ANTES esa fila se
+  // validaba como se ha hecho siempre, sin caducidad: el código de una fila
+  // heredada quedaba vigente por tiempo indeterminado, y eso no lo cumple el
+  // 3.4(e). AHORA ESA FILA TAMBIÉN CADUCA, y no por comodidad sino por lo
+  // contrario: sin la marca de envío NO se puede probar que el código sea
+  // vigente, y un código del que no se puede probar la vigencia no se
+  // valida. Se falla cerrado.
+  //
+  // El Trabajador no queda atrapado: el reenvío (POST /api/sign/:token/
+  // resend-otp) funciona en estado OTP_SENT, así que pide uno nuevo y la
+  // fila queda con su fecha de envío desde ese momento.
   //
   // El estado NO cambia a EXPIRED: el reenvío (POST /api/sign/:token/
   // resend-otp) solo funciona en estado OTP_SENT, y es la salida que el
   // Trabajador tiene cuando su código caduca.
-  if (signRequest.estado === 'OTP_SENT' && signRequest.fecha_otp_enviado &&
-    isExpired(signRequest.fecha_otp_enviado, config.ttl.otpSeconds)) {
-    throw new AppError(410, 'OTP_EXPIRADO',
-      'El código de verificación expiró. Solicita uno nuevo a tu empleador.',
-      {
-        fecha_otp_enviado: signRequest.fecha_otp_enviado,
-        ttl_seconds: config.ttl.otpSeconds,
-        se_puede_reenviar: true,
-      });
+  if (signRequest.estado === 'OTP_SENT') {
+    if (!signRequest.fecha_otp_enviado) {
+      // El reenvío procede solo si el destino no es un buzón que la Empresa
+      // pueda leer: en ese caso el control del 3.4(e) lo rechazaría y la
+      // salida sería el papel. Decir `se_puede_reenviar: true` a ciegas sería
+      // una promesa falsa, que es exactamente lo que el abogado señaló.
+      const destinoResend = _destinoBruto(signRequest, null, _correoDeResend(signRequest));
+      const corporativo = _esMedioCorporativo(signRequest, destinoResend.correo);
+      throw new AppError(410, 'OTP_EXPIRADO',
+        'El código de verificación expiró. Solicita uno nuevo a tu empleador.',
+        {
+          causa: 'sin_fecha_de_envio',
+          ttl_seconds: config.ttl.otpSeconds,
+          se_puede_reenviar: !corporativo,
+          ...(corporativo
+            ? {
+              nota: 'El código no puede reenviarse a un buzón que la Empresa pueda '
+                + 'leer. La salida es la firma en papel (numeral 7.2 del Acuerdo): '
+                + 'es tu derecho y no tiene costo.',
+            }
+            : {}),
+        });
+    }
+    if (isExpired(signRequest.fecha_otp_enviado, config.ttl.otpSeconds)) {
+      throw new AppError(410, 'OTP_EXPIRADO',
+        'El código de verificación expiró. Solicita uno nuevo a tu empleador.',
+        {
+          fecha_otp_enviado: signRequest.fecha_otp_enviado,
+          ttl_seconds: config.ttl.otpSeconds,
+          se_puede_reenviar: true,
+        });
+    }
   }
 
   // 4. Verificar OTP
@@ -2855,8 +3067,32 @@ function resendOtpDeSignRequest(signRequest, ip, user_agent) {
       `La solicitud está en estado terminal '${signRequest.estado}'`);
   }
 
-  // 2. Validar estado actual
-  const ESTADOS_RESEND_PERMITIDOS = ['OTP_SENT', 'OTP_LOCKED'];
+  // 2. EL BLOQUEO ES DURO: un OTP bloqueado es TERMINAL.
+  //
+  //    Antes, `OTP_LOCKED` estaba entre los estados que permitían reenviar y
+  //    el reenvío ponía los contadores en cero (`otp_intentos = 0`,
+  //    `otp_bloqueado = 0`): el bloqueo era blando. Con cinco intentos
+  //    equivocados el código se bloqueaba, y un reenvío lo desbloqueaba
+  //    devolviendo otros cinco intentos, una y otra vez. El límite de cinco
+  //    del 3.4(e) no era un límite: era una pausa.
+  //
+  //    Ahora el bloqueo es terminal: con un OTP bloqueado NO se reenvía, y la
+  //    salida es una NUEVA SOLICITUD. Es lo que dice el 3.4(e) de la v1.2
+  //    ("se requiere una nueva solicitud") y es lo que hace que la promesa
+  //    del texto sea cierta.
+  if (signRequest.estado === 'OTP_LOCKED' || signRequest.otp_bloqueado) {
+    throw new AppError(422, 'OTP_LOCKED',
+      'Demasiados intentos. El código está bloqueado y no se puede reenviar: '
+      + 'se requiere una nueva solicitud de firma.',
+      {
+        attempts: signRequest.otp_intentos,
+        max_attempts: config.ttl.otpMaxAttempts,
+        se_puede_reenviar: false,
+      });
+  }
+
+  // 2-bis. Validar estado actual
+  const ESTADOS_RESEND_PERMITIDOS = ['OTP_SENT'];
   if (!ESTADOS_RESEND_PERMITIDOS.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `No se puede reenviar OTP en estado '${signRequest.estado}'`,
@@ -2903,24 +3139,9 @@ function resendOtpDeSignRequest(signRequest, ip, user_agent) {
   const now_iso = new Date().toISOString();
 
   // 5. Obtener correo
-  // I-AUDIT-2026-09-10 (v0.1.194): en resend-otp, la fuente autoritativa es
-  // el correo del CONSENTIMIENTO vinculado (no metadata.correo ni la columna
-  // del SR). Razón: el operador introduce un solo correo al crear el consent
-  // y el OTP debe ir siempre a ese correo, aunque el SR traiga su propio
-  // metadata. Si NO hay consent vinculado, caemos al resolveCorreo estándar
-  // (columna > metadata) para preservar comportamiento de SR legacy.
-  let correo = null;
-  if (signRequest.consent_id) {
-    const consentRow = db.prepare(
-      'SELECT correo_verificacion FROM gh_consentimientos_firma WHERE id = ?'
-    ).get(signRequest.consent_id);
-    if (consentRow && consentRow.correo_verificacion) {
-      correo = consentRow.correo_verificacion;
-    }
-  }
-  if (!correo) {
-    correo = resolveCorreo(signRequest);
-  }
+  // (el cálculo vive en `_correoDeResend`: el consentimiento vinculado manda,
+  // y si no hay, el resolveCorreo estándar).
+  let correo = _correoDeResend(signRequest);
   if (!correo) {
     throw new AppError(400, 'MISSING_EMAIL',
       'No hay correo de verificación disponible para reenviar OTP');
@@ -2936,8 +3157,11 @@ function resendOtpDeSignRequest(signRequest, ip, user_agent) {
 
   // 6. Actualizar BD + registrar evento en transacción atómica
   const tx = db.transaction(() => {
-    // Si estaba bloqueado, desbloquear
-    const wasLocked = signRequest.estado === 'OTP_LOCKED';
+    // El desbloqueo ya no existe: el bloqueo es duro (más arriba) y una
+    // solicitud bloqueada nunca llega a este punto. El campo del evento se
+    // conserva (siempre en false) para que el lector de una bitácora antigua
+    // sepa de dónde viene el dato.
+    const OTP_ANTERIOR_BLOQUEADO = false;
     db.prepare(`
       UPDATE gh_firmas_electronicas
       SET estado = 'OTP_SENT',
@@ -2951,7 +3175,7 @@ function resendOtpDeSignRequest(signRequest, ip, user_agent) {
     signRequestService.registerEvent(signRequest.id, 'OTP_RESENT', {
       canal: 'email',
       correo_destino_enmascarado: maskEmail(correo),
-      OTP_ANTERIOR_BLOQUEADO: wasLocked,
+      OTP_ANTERIOR_BLOQUEADO: OTP_ANTERIOR_BLOQUEADO,
     }, 'sistema', ip, user_agent);
   });
   tx();
@@ -3736,6 +3960,7 @@ module.exports = {
   resolverAcuerdo,
   resolverAcuerdoVigente,
   resolveCorreoOtp,
+  resolverDestinoOtp,
   declararMedioOtp,
   declararMedioPublico,
   // 9A: la firma en papel (el 7.1-7.3)

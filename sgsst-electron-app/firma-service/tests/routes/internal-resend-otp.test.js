@@ -61,7 +61,7 @@ async function identifySR(token) {
   const app = makeApp();
   return request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 }
 
 async function verifyOtpWrong(token) {
@@ -219,7 +219,7 @@ test('POST /internal/.../resend-otp: PENDING (sin OTP generado) → 409 INVALID_
     .send({});
   assert.equal(res.status, 409);
   assert.equal(res.body.error.code, 'INVALID_STATE_TRANSITION');
-  assert.deepEqual(res.body.error.details.allowed_states, ['OTP_SENT', 'OTP_LOCKED']);
+  assert.deepEqual(res.body.error.details.allowed_states, ['OTP_SENT']);
 });
 
 test('POST /internal/.../resend-otp: IDENTIFIED → 409 INVALID_STATE_TRANSITION', async () => {
@@ -301,7 +301,9 @@ test('POST /internal/.../resend-otp: OTP_SENT con OTP expirado (>10 min) → 200
 // OTP_LOCKED
 // =====================================================================
 
-test('POST /internal/.../resend-otp: OTP_LOCKED → 200 + desbloqueo + nuevo OTP + OTP_ANTERIOR_BLOQUEADO', async () => {
+test('POST /internal/.../resend-otp: OTP_LOCKED → 422 + NO desbloqueo (el bloqueo es duro)', async () => {
+  // El bloqueo del OTP es TERMINAL: el endpoint interno tampoco lo levanta.
+  // La salida es una nueva solicitud (el 3.4(e) de la v1.2).
   const { token, signRequest } = await createSrWithOtpSent();
   // Agotar intentos para forzar OTP_LOCKED
   for (let i = 0; i < config.ttl.otpMaxAttempts; i++) {
@@ -316,19 +318,18 @@ test('POST /internal/.../resend-otp: OTP_LOCKED → 200 + desbloqueo + nuevo OTP
     .post(`/internal/sign-requests/${signRequest.id_solicitud}/resend-otp`)
     .set('X-Internal-API-Key', TEST_API_KEY)
     .send({});
-  assert.equal(res.status, 200);
-  assert.equal(res.body.estado, 'OTP_SENT');
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'OTP_LOCKED');
+  assert.equal(res.body.error.details.se_puede_reenviar, false);
 
-  // El SR debe estar desbloqueado en BD
+  // El SR sigue bloqueado en BD: el reenvío no lo desbloqueó.
   const after = db.prepare('SELECT estado, otp_bloqueado, otp_intentos FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
-  assert.equal(after.estado, 'OTP_SENT');
-  assert.equal(after.otp_bloqueado, 0);
-  assert.equal(after.otp_intentos, 0);
+  assert.equal(after.estado, 'OTP_LOCKED');
+  assert.equal(after.otp_bloqueado, 1);
 
-  // El evento OTP_RESENT debe tener OTP_ANTERIOR_BLOQUEADO=true
+  // Y no se generó un OTP nuevo.
   const evt = db.prepare(`SELECT metadata FROM gh_firma_eventos WHERE firma_id = ? AND evento = 'OTP_RESENT' ORDER BY id LIMIT 1`).get(signRequest.id);
-  const meta = JSON.parse(evt.metadata);
-  assert.equal(meta.OTP_ANTERIOR_BLOQUEADO, true);
+  assert.equal(evt, undefined, 'un reenvío rechazado no genera OTP ni evento OTP_RESENT');
 });
 
 // =====================================================================

@@ -38,7 +38,7 @@ const {
 async function firmar(app, token) {
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890', medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r1.status, 200, `identify: ${JSON.stringify(r1.body)}`);
 
   const r2 = await request(app)

@@ -68,6 +68,7 @@
 const db = require('../db/connection');
 const storage = require('./storage');
 const logger = require('../utils/logger');
+const path = require('path');
 const { hashTokenTombstone } = require('../crypto/token');
 const { esElegible, ventanaVigente } = require('./conservacion');
 // El 8.6(e)(iii): la supresión no procede con una solicitud de copia
@@ -174,6 +175,33 @@ function archivosDe(f) {
   const rutas = [f.pdf_original_path, f.pdf_firmado_path, f.constancia_path]
     .filter((p) => typeof p === 'string' && p.length > 0);
   return rutas.filter((p) => storage.exists(p));
+}
+
+/**
+ * La ruta de un archivo COMO LA GUARDA EL TARBALL DE STORAGE.
+ *
+ * El numeral 8.7 dice que la supresión "alcanza a los respaldos". Para que el
+ * script de purga (que corre como root y descifra las copias) pueda SACAR el
+ * PDF del tarball, la fila de la cola tiene que guardar el NOMBRE DEL MIEMBRO
+ * del tar, que es la ruta relativa a la raíz del servidor (`storage/pdfs/...`),
+ * NO la ruta absoluta del archivo en la base viva.
+ *
+ * El tar se hace con `tar -C /opt/kair-firma ... storage`, así que sus
+ * miembros empiezan por `storage/`. Por eso se busca ese segmento: funciona
+ * igual en desarrollo y en produccion, y no depende de como este configurado
+ * PDF_STORAGE_PATH. Si el archivo no estuviera bajo un directorio `storage`,
+ * se devuelve el nombre suelto: el script tiene un respaldo por nombre base.
+ *
+ * @param {string} ruta - ruta absoluta del archivo
+ * @returns {string} la ruta como miembro del tarball
+ */
+function rutaEnTARBALL(ruta) {
+  if (typeof ruta !== 'string' || !ruta) return null;
+  const normalizada = ruta.replace(/\\/g, '/');
+  const i = normalizada.lastIndexOf('/storage/');
+  if (i >= 0) return normalizada.slice(i + 1);
+  if (normalizada.startsWith('storage/')) return normalizada;
+  return path.basename(normalizada);
 }
 
 /**
@@ -315,6 +343,41 @@ function suprimir(opts = {}) {
 
       const r = db.prepare('DELETE FROM gh_firmas_electronicas WHERE id = ?').run(f.id);
       if (r.changes === 0) return false; // ya no estaba: idempotencia
+
+      // EL 8.7: LA SUPRESION ALCANZA A LOS RESPALDOS (migracion 046).
+      //
+      // El servicio corre como `kairfirma` y el script que descifra y
+      // re-cifra las copias corre como root: el uno no puede tocar las copias
+      // y el otro no sabe que hay que purgar. Esta cola es el paso intermedio.
+      //
+      // Va DENTRO de esta transaccion, y no en un archivo aparte, a proposito:
+      // si la escritura de la solicitud de purga quedara FUERA de la
+      // transaccion, una caida entre el COMMIT (la fila ya borrada) y la
+      // escritura dejaria el dato suprimido en los respaldos para siempre, y
+      // en silencio. Con la tabla, o se borra la fila y queda la solicitud, o
+      // no se borra nada.
+      //
+      // `archivos` guarda la ruta como la tiene el tarball de storage
+      // (`storage/pdfs/...`), que es como el script puede sacar el PDF del
+      // tar sin adivinar.
+      const archivosEnTARBALL = rutas
+        .map((p) => rutaEnTARBALL(p))
+        .filter((p) => typeof p === 'string' && p.length > 0);
+      db.prepare(`
+        INSERT INTO gh_firma_purgas_pendientes
+          (firma_id, id_empresa, id_solicitud, categorias, archivos,
+           purgado_at, actor, motivo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        f.id,
+        f.id_empresa || null,
+        f.id_solicitud || null,
+        JSON.stringify(CATEGORIAS_DATOS),
+        JSON.stringify(archivosEnTARBALL),
+        new Date().toISOString(),
+        actor,
+        motivo
+      );
 
       // La lápida. Sin datos personales y sin la credencial: un HMAC con
       // propósito propio sobre el hash de cada token.

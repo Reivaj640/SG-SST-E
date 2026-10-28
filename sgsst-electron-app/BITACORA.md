@@ -8282,3 +8282,99 @@ necesita su propia autorización operativa, con su propia huella. Siguen pendien
 la 10.4 (que solo se puede probar cuando exista una versión nueva activa), el flag del medio
 personal (D-02), el envío del paquete al abogado, la publicación de `gh-pages`, la firma del Anexo
 de Nube y del Anexo de Encargo por ASEPLUS, y una excepción de habilitación nueva para ASEPLUS.
+
+---
+
+## 📦️978 · Los ocho controles que el texto promete y el código no cumplía
+
+### Lo que llegó
+
+El abogado devolvió el Acuerdo v1.1 el 27-oct-2026 con **tres críticos, seis problemas de coherencia, tres de datos
+personales, dos de conservación y ocho controles técnicos**, y una instrucción explícita: **no autorizó la publicación**.
+Su orden fue: (1) corregir las contradicciones internas, (2) resolver y documentar la evaluación del canal de correo,
+(3) verificar los controles técnicos, (4) pruebas documentadas de escenarios normales **y de fallo**, y (5) aprobar la
+versión jurídica definitiva y, **por separado**, autorizar la publicación.
+
+El 📦978 es el paso (3): el código que hace que las promesas del texto sean ciertas.
+
+### Los ocho controles, y qué era verdad de cada uno
+
+Se verificaron los ocho contra el código (no contra el texto), con dos exploradores independientes:
+
+| Control | Lo que decía el texto | Lo que hacía el código |
+|---|---|---|
+| A · HMAC del OTP | la clave no está en la base | **cumplía** |
+| B · caducidad 600 s / 5 intentos | expira a los 600 s, 5 intentos | **parcial**: el bloqueo era blando y la caducidad no se aplicaba a las filas heredadas |
+| C · un token vigente | una sola firma viva | **cumplía** |
+| D · verificación del correo personal | el Trabajador confirma el medio | **parcial**: con el flag apagado solo un `logger.warn` y el OTP salía igual |
+| E · huellas de bytes exactos | el hash es del documento exacto | **cumplía** |
+| F · Constancia con los anexos | la Constancia identifica los anexos | **parcial**: **lo prometido no existía** (cero coincidencias de "anexo" en los generadores) |
+| G · conservación y respaldos | respaldos y supresión | **parcial**: los respaldos no se cifraban y la supresión no los alcanzaba |
+| H · canal de correo | el aviso queda registrado | **cumplía con matiz**: el OTP salía siempre de K+AIR, pero el rastro no decía qué cuenta envió |
+
+El caso I fue el que más dolió: el 3.4(e) promete que el aviso `OTP_MEDIO_CORPORATIVO` queda "en el registro de
+operaciones del servicio" y que ese registro "no puede suprimirse". En el código, ese aviso era **una línea de
+`logger.warn` a stderr**: no entraba a `gh_firma_eventos`, el logger redactaba el `id_empresa`, y el flag `riesgo_47_4`
+se calculaba y se tiraba. El texto prometía un registro protegido que no existía. Esa es la trampa 99 al revés.
+
+### Los cuatro cambios de código
+
+1. **El buzón corporativo se rechaza SIEMPRE.** El control dejó de depender de `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`: o el
+   código no sale a un buzón que la Empresa pueda leer, o no sale. Y el aviso es un **evento** (`OTP_MEDIO_CORPORATIVO`)
+   en `gh_firma_eventos`, que es append-only. El rechazo se evalúa **antes de escribir nada**: resolver el destino
+   después de generar el OTP dejaba la fila en `OTP_SENT` con un código que nunca salió por correo y sin evento que lo
+   explicara. Una firma fantasma, con un código vivo que nadie tiene.
+2. **La confirmación del medio es obligatoria para CUALQUIER destino.** Antes solo se exigía cuando el destino era
+   exactamente el medio que había registrado la Empresa: el Trabajador podía declarar otro buzón, el código salía ahí sin
+   que nadie declarara nada, y la confirmación quedaba archivada solo a veces. Ahora es la condición del envío. Y la
+   dirección que se archiva es **la que recibió el código**, no la de la fila (que puede ser otra): con eso se cierra la
+   trampa de `registrarConfirmacion`, que devolvía un 400 **después** de que el OTP ya había salido.
+3. **El bloqueo del OTP es duro.** `OTP_LOCKED` estaba entre los estados que permitían reenviar, y el reenvío ponía los
+   contadores en cero: el límite de cinco del 3.4(e) no era un límite, era una pausa. Ahora el bloqueo es terminal y la
+   salida es una **nueva solicitud**. Esto cambia el texto: el 3.4(e) decía "se requiere un nuevo OTP o una nueva
+   solicitud", y en la v1.2 queda "se requiere una nueva solicitud".
+4. **La caducidad alcanza a las filas heredadas.** Sin `fecha_otp_enviado` no se puede probar que el código sea vigente, y
+   un código del que no se puede probar la vigencia no se valida: se **falla cerrado**. El Trabajador no queda atrapado:
+   el reenvío sigue funcionando en `OTP_SENT`, y ahora el `se_puede_reenviar` del error dice la verdad (si el destino es
+   un buzón corporativo, el reenvío no procede y la salida es el papel).
+
+Además: la Constancia incluye los anexos que rigen la firma con su versión y su huella SHA-256; hay una declaración
+expresa por documento de que **no** contiene datos sensibles de salud (política de prohibición: el servicio no recibe
+documentos con datos de salud); y los respaldos van cifrados, con una purga a nivel de registro que alcanza a las copias
+y una poda que respeta el `hold_legal`.
+
+### El script que rompió 24 archivos de test
+
+Lo que más tiempo llevó, y casi dejó el working tree dañado, fue un script propio: uno que metía la confirmación del medio
+en los 68 cuerpos de `/identify` de 24 archivos de test. La primera versión **metía los campos al principio del objeto**
+en vez de al final, y dejaba los archivos con una línea así:
+
+```js
+.send({
+, medio_otp_confirmado: true, medio_otp_version: '1.0'tipo_identificacion: 'CC',
+```
+
+Sintaxis rota en 24 archivos. Lo que lo hizo recuperable fue una regla que ya estaba en el `PROMPT.md`: **el `git diff`
+contra `HEAD` tiene que ser exactamente el cambio que el script dice hacer**. El diff mostró los cambios de otro worker
+(19 archivos de test que ya estaban tocados y **no** commiteados) mezclados con los míos. `git checkout` no servía:
+se llevaba por delante el trabajo ajeno. Hubo que escribir un reparador que deshacía la transformación exacta, restaurar
+un archivo desde `HEAD` (el único que no tenía trabajo ajeno) y **re-aplicar el script con el bug corregido**.
+
+La lección queda como trampa 102: **un script que edita archivos en lote no se puede deshacer con git si los archivos no
+están commiteados**.
+
+### El 500 que era un ReferenceError
+
+Cambiar el desbloqueo del reenvío dejó una referencia a una variable que ya no existía (`wasLocked`), y el `catch` genérico
+se la comió a todos los errores de negocio: 14 tests de reenvío fallaron con **500 INTERNAL_ERROR** en vez del 422 que
+corresponde. El síntoma no era "la lógica está rota": era una variable que no carga (la trampa 63, pero en local). Queda
+como trampa 103.
+
+### Lo que quedó
+
+Suite completa: **1892 tests, 1890 pass, 0 fail, 2 skipped**. Barrido de caracteres no latinos: limpio en los 62 archivos
+tocados. `pdfGen.js` sigue en CRLF puro (898) y `tests/routes/public.test.js` sigue en CRLF con BOM (976): el EOL de cada
+archivo lo fija su test y no se movió.
+
+Y sigue en pie la regla del 📦977: **aprobar el texto y autorizar a publicarlo son dos decisiones**. Este paquete deja el
+código listo; la publicación de la v1.2 la autoriza el abogado, y después el owner.

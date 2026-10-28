@@ -1,6 +1,6 @@
 /**
- * D-2 · EL OTP (DATO DE CREACIÓN) VA A UN MEDIO PERSONAL
- * =====================================================
+ * D-2 · EL OTP (DATO DE CREACIÓN) VA A UN MEDIO PERSONAL CONFIRMADO
+ * ================================================================
  *
  * EL PROBLEMA
  * -----------
@@ -13,17 +13,17 @@
  * El 2.2.2.47.4 num. 1: "los datos de creación de la firma, en el contexto en
  * que son utilizados, corresponden exclusivamente al firmante".
  *
- * LA DECISIÓN (owner, 2026-10-20)
- * -------------------------------
- * Separar los dos canales:
- *
- *   - La INVITACIÓN sigue yendo al contacto registrado por la Empresa. En el
- *     contexto de uso no es un factor: sin el OTP no se firma.
- *   - El OTP va a un medio PERSONAL que declara el propio Trabajador.
- *
- * Y el rechazo (D2) queda **APAGADO** (`FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`):
- * se enciende cuando exista la 9A (la firma en papel), porque sin esa salida
- * exigir un medio personal sería una barrera de acceso al empleo (2.2.1.1.11).
+ * LAS REGLAS (v1.2, 27-oct-2026)
+ * ------------------------------
+ *   1. El OTP va al medio PERSONAL que el FIRMANTE confirma en la pantalla de
+ *      firma. La confirmación es obligatoria para CUALQUIER destino: es la
+ *      condición para que el código salga, no un aviso.
+ *   2. El buzón corporativo se RECHAZA SIEMPRE (ya no hay interruptor): si el
+ *      destino cae en un dominio que la Empresa puede leer, la solicitud se
+ *      rechaza con 400 y el caso queda en la bitácora append-only con el aviso
+ *      OTP_MEDIO_CORPORATIVO, que no se puede suprimir.
+ *   3. Agotados los cinco (5) intentos, el OTP queda BLOQUEADO DE FORMA DURA:
+ *      no se puede reenviar. La salida es una nueva solicitud.
  *
  * Lo que estos tests fijan:
  *   1. El OTP va al medio declarado (o, si no hay, al contacto registrado).
@@ -31,10 +31,11 @@
  *   3. El medio declarado queda CONGELADO en la fila.
  *   4. Los dominios corporativos: los explícitos + los derivados de los
  *      canales de la empresa.
- *   5. Con el rechazo encendido, un buzón corporativo da 400 con el texto
- *      del 3.7(a) al lado.
- *   6. Con el rechazo apagado, el caso corporativo queda en el log como WARN
- *      (de ahí sale el número del inventario).
+ *   5. El rechazo del buzón corporativo es incondicional, no manda el código
+ *      y deja el aviso en el registro de operaciones.
+ *   6. La confirmación del medio es obligatoria para cualquier destino.
+ *   7. El bloqueo del OTP es duro: no se puede reenviar.
+ *   8. Una fila heredada sin marca de envío no puede validar un código.
  */
 'use strict';
 
@@ -43,14 +44,13 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 
 const db = require('../src/db/connection');
-const config = require('../src/config');
 const { signRequestBody } = require('../src/schemas');
 const empresaService = require('../src/services/empresa');
 const mediosService = require('../src/services/medios');
 const medioPersonal = require('../src/services/medioPersonal');
 const mailer = require('../src/services/mailer');
 const {
-  resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion, capturarLogs,
+  resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion,
 } = require('./helpers');
 
 const EMPRESA = '900123456';
@@ -85,6 +85,21 @@ function crearSolicitud(correo) {
   });
 }
 
+/**
+ * El cuerpo de la identificación CON la confirmación del medio.
+ *
+ * La confirmación es obligatoria para cualquier destino (v1.2), así que todos
+ * los tests que llegan al envío del código la llevan.
+ */
+function cuerpoConfirmado(extra = {}) {
+  return Object.assign({
+    tipo_identificacion: 'CC',
+    numero_documento: '1234567890',
+    medio_otp_confirmado: true,
+    medio_otp_version: medioPersonal.DECLARACION_VERSION,
+  }, extra);
+}
+
 function limpiar() {
   resetDb();
   seedActiveAgreement();
@@ -102,11 +117,7 @@ test('D-2 · el OTP va al medio personal que declara el Trabajador', async () =>
 
   const res = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({
-      tipo_identificacion: 'CC',
-      numero_documento: '1234567890',
-      correo_otp: CORREO_PERSONAL,
-    })
+    .send(cuerpoConfirmado({ correo_otp: CORREO_PERSONAL }))
     .timeout({ response: 5000 });
 
   assert.equal(res.status, 200, JSON.stringify(res.body));
@@ -126,12 +137,13 @@ test('D-2 · sin medio declarado, el OTP va al contacto registrado (lo de hoy)',
 
   const res = await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
+    .send(cuerpoConfirmado())
     .timeout({ response: 5000 });
 
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 200, JSON.stringify(res.body));
   const inbox = mailer.getDevInbox();
   const conOtp = inbox.find((m) => m.tipo === 'signature');
+  assert.ok(conOtp);
   assert.equal(conOtp.to, 'personal@ejemplo.net');
 });
 
@@ -142,13 +154,12 @@ test('D-2 · la EMPRESA registra el medio personal y el OTP va ahí (opción B)'
   // identificarse), pero el camino normal es este.
   //
   // Decisión 1.a (2026-10-27): la Empresa lo obtiene del candidato verbalmente
-  // en la contratación y lo registra; elTrabajador lo CONFIRMA en la pantalla
+  // en la contratación y lo registra; el Trabajador lo CONFIRMA en la pantalla
   // de firma, porque la garantía del 3.7(a) es del Trabajador: que ese buzón
   // es de su uso exclusivo y que la Empresa no lo administra. Sin esa
-  // confirmación el servidor NO manda el código a ese buzón (422
+  // confirmación el servidor NO manda el código (422
   // MEDIO_OTP_CONFIRMACION_REQUERIDA).
   limpiar();
-  const { token, signRequest } = await crearSolicitud({ correo: CORREO_EMPRESA });
 
   // La Empresa registra el medio personal al crear la solicitud.
   const creada = await createSignRequestWithIdentificacion({
@@ -162,12 +173,7 @@ test('D-2 · la EMPRESA registra el medio personal y el OTP va ahí (opción B)'
   // Trabajador confirma la declaración y el código sale a ese buzón.
   const res = await request(makeApp())
     .post(`/api/sign/${creada.token}/identify`)
-    .send({
-      tipo_identificacion: 'CC',
-      numero_documento: '1234567890',
-      medio_otp_confirmado: true,
-      medio_otp_version: medioPersonal.DECLARACION_VERSION,
-    })
+    .send(cuerpoConfirmado())
     .timeout({ response: 5000 });
   assert.equal(res.status, 200, JSON.stringify(res.body));
 
@@ -207,11 +213,7 @@ test('D-2 · la invitación NO cambia de destino', async () => {
 
   await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({
-      tipo_identificacion: 'CC',
-      numero_documento: '1234567890',
-      correo_otp: CORREO_PERSONAL,
-    })
+    .send(cuerpoConfirmado({ correo_otp: CORREO_PERSONAL }))
     .timeout({ response: 5000 });
 
   const fila = db.prepare(
@@ -244,7 +246,7 @@ test('D-2 · el medio declarado queda congelado', async () => {
   // Se identifica (sale el OTP).
   await request(makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
+    .send(cuerpoConfirmado())
     .timeout({ response: 5000 });
 
   // Ahora el medio NO se puede cambiar: el código ya viajó.
@@ -281,85 +283,216 @@ test('D-2 · los dominios corporativos son los declarados + los derivados', () =
 });
 
 // ===========================================================================
-// 3. El rechazo (D2) — apagado y encendido
+// 3. El rechazo del buzón corporativo es INCONDICIONAL
 // ===========================================================================
 
-test('D-2 · con el rechazo APAGADO, un buzón corporativo pasa pero queda avisado', async () => {
+test('D-2 · un buzón corporativo se rechaza SIEMPRE y el caso queda en la bitácora', async () => {
+  // ANTES esto dependía de `FIRMA_EXIGIR_MEDIO_PERSONAL_OTP`: con el
+  // interruptor apagado solo se escribía un warn a la consola y el código
+  // salía igual. Ahora el rechazo no depende de ninguna configuración: o el
+  // código no sale a un buzón que la Empresa pueda leer, o no sale.
   limpiar();
   registrarEmpresa();
-  const antes = config.exigirMedioPersonalOtp;
-  config.exigirMedioPersonalOtp = false;
-  try {
-    const { token } = await crearSolicitud(CORREO_CORP);
-    const { objetos } = await capturarLogs(async () => {
-      const res = await request(makeApp())
-        .post(`/api/sign/${token}/identify`)
-        .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
-        .timeout({ response: 5000 });
-      assert.equal(res.status, 200, 'con el rechazo apagado, no se rompe el flujo');
-    });
-    const aviso = objetos.find((o) => o.aviso === 'OTP_MEDIO_CORPORATIVO');
-    assert.ok(aviso, 'pero el caso queda registrado: de ahí sale el inventario');
-  } finally {
-    config.exigirMedioPersonalOtp = antes;
-  }
+  const { token, signRequest } = await crearSolicitud(CORREO_CORP);
+
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send(cuerpoConfirmado())
+    .timeout({ response: 5000 });
+
+  assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.equal(res.body.error.code, 'MEDIO_OTP_CORPORATIVO');
+  assert.match(res.body.error.message, /3\.7\(a\)/,
+    'el mensaje cita el numeral que lo sostiene');
+  assert.match(res.body.error.message, /7\.2/, 'y ofrece el papel');
+
+  // El código NO salió.
+  const inbox = mailer.getDevInbox();
+  assert.equal(inbox.filter((m) => m.tipo === 'signature').length, 0,
+    'el código no puede salir a un buzón que la Empresa pueda leer');
+
+  // Y la fila no quedó con un OTP vivo que nadie tiene.
+  const fila = db.prepare(
+    'SELECT estado FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  assert.notEqual(fila.estado, 'OTP_SENT',
+    'el rechazo no puede dejar un código generado en la fila');
+
+  // El caso queda en el registro de operaciones: `gh_firma_eventos` es
+  // append-only, así que este aviso no se puede suprimir (el 3.4(e) lo
+  // promete).
+  const evento = db.prepare(
+    'SELECT evento, metadata FROM gh_firma_eventos WHERE firma_id = ? AND evento = ?'
+  ).get(signRequest.id, 'OTP_MEDIO_CORPORATIVO');
+  assert.ok(evento, 'el aviso OTP_MEDIO_CORPORATIVO queda en la bitácora');
+  const metadata = JSON.parse(evento.metadata);
+  assert.equal(metadata.resultado, 'rechazado');
+  assert.equal(metadata.dominio_corporativo, true);
 });
 
-test('D-2 · con el rechazo ENCENDIDO, un buzón corporativo da 400 con el 3.7(a)', async () => {
+test('D-2 · un medio personal SÍ pasa el control del buzón corporativo', async () => {
   limpiar();
   registrarEmpresa();
-  const antes = config.exigirMedioPersonalOtp;
-  config.exigirMedioPersonalOtp = true;
-  try {
-    const { token } = await crearSolicitud(CORREO_CORP);
+  const { token } = await crearSolicitud(CORREO_CORP);
 
-    // (a) El contacto registrado es corporativo.
-    const r1 = await request(makeApp())
-      .post(`/api/sign/${token}/identify`)
-      .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
-      .timeout({ response: 5000 });
-    assert.equal(r1.status, 400);
-    assert.equal(r1.body.error.code, 'MEDIO_OTP_CORPORATIVO');
-    assert.match(r1.body.error.message, /3\.7\(a\)/,
-      'el mensaje cita el numeral que lo sostiene');
-    assert.match(r1.body.error.message, /7\.2/, 'y ofrece el papel');
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send(cuerpoConfirmado({ correo_otp: CORREO_PERSONAL }))
+    .timeout({ response: 5000 });
 
-    // (b) El medio declarado es corporativo.
-    const { token: token2 } = await crearSolicitud('personal@ejemplo.net');
-    const r2 = await request(makeApp())
-      .post(`/api/sign/${token2}/identify`)
-      .send({
-        tipo_identificacion: 'CC',
-        numero_documento: '1234567890',
-        correo_otp: 'otro@' + DOMINIO_CORP,
-      })
-      .timeout({ response: 5000 });
-    assert.equal(r2.status, 400);
-    assert.equal(r2.body.error.code, 'MEDIO_OTP_CORPORATIVO');
-  } finally {
-    config.exigirMedioPersonalOtp = antes;
-  }
+  assert.equal(res.status, 200, JSON.stringify(res.body));
 });
 
-test('D-2 · con el rechazo ENCENDIDO, un medio personal SI pasa', async () => {
+// ===========================================================================
+// 4. La confirmación del medio es obligatoria para CUALQUIER destino
+// ===========================================================================
+
+test('D-2 · sin la confirmación del medio, el código NO sale', async () => {
+  // La regla del 3.4(e) y del 3.7(a) de la v1.2: el OTP sale únicamente al
+  // medio que el Firmante confirmó en la pantalla de firma. Antes solo se
+  // exigía cuando el destino era el medio que había registrado la Empresa.
   limpiar();
   registrarEmpresa();
-  const antes = config.exigirMedioPersonalOtp;
-  config.exigirMedioPersonalOtp = true;
-  try {
-    const { token } = await crearSolicitud(CORREO_CORP);
-    const res = await request(makeApp())
-      .post(`/api/sign/${token}/identify`)
-      .send({
-        tipo_identificacion: 'CC',
-        numero_documento: '1234567890',
-        correo_otp: CORREO_PERSONAL,
-      })
+  const { token } = await crearSolicitud('personal@ejemplo.net');
+
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' })
+    .timeout({ response: 5000 });
+
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.equal(res.body.error.code, 'MEDIO_OTP_CONFIRMACION_REQUERIDA');
+  const inbox = mailer.getDevInbox();
+  assert.equal(inbox.filter((m) => m.tipo === 'signature').length, 0,
+    'sin confirmación no sale el código: es una condición, no un aviso');
+});
+
+test('D-2 · la confirmación se exige también cuando el Trabajador declara otro buzón', async () => {
+  // Antes, escribir otro buzón deshabilitaba la casilla: el código iba a SU
+  // buzón y no había nada que confirmar. Con la v1.2 la declaración es la
+  // condición del envío, se vaya donde se vaya el código.
+  limpiar();
+  registrarEmpresa();
+  const { token } = await crearSolicitud('personal@ejemplo.net');
+
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send({
+      tipo_identificacion: 'CC',
+      numero_documento: '1234567890',
+      correo_otp: 'mio@ejemplo.net',
+    })
+    .timeout({ response: 5000 });
+
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.equal(res.body.error.code, 'MEDIO_OTP_CONFIRMACION_REQUERIDA');
+  const inbox = mailer.getDevInbox();
+  assert.equal(inbox.filter((m) => m.tipo === 'signature').length, 0);
+});
+
+test('D-2 · con la confirmación, la dirección que se archiva es la que recibió el código', async () => {
+  // Si el Trabajador declara otro buzón, la declaración se archiva con ESE
+  // buzón: es el que recibió el código. Antes se archivaba el de la fila, que
+  // podía ser otro.
+  limpiar();
+  registrarEmpresa();
+  const { token, signRequest } = await crearSolicitud('personal@ejemplo.net');
+
+  const otro = 'mio@ejemplo.net';
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send(cuerpoConfirmado({ correo_otp: otro }))
+    .timeout({ response: 5000 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  const fila = db.prepare(
+    'SELECT medio_otp_confirmado_correo FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  assert.equal(fila.medio_otp_confirmado_correo, otro);
+});
+
+// ===========================================================================
+// 5. El bloqueo del OTP es DURO
+// ===========================================================================
+
+test('D-2 · agotados los cinco intentos, el OTP queda bloqueado y NO se puede reenviar', async () => {
+  // Antes el bloqueo era blando: el reenvío desbloqueaba y ponía los
+  // contadores en cero, así que el límite de cinco del 3.4(e) no era un
+  // límite. Ahora el bloqueo es terminal y la salida es una nueva solicitud.
+  limpiar();
+  registrarEmpresa();
+  const { token, signRequest } = await crearSolicitud('personal@ejemplo.net');
+
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send(cuerpoConfirmado())
+    .timeout({ response: 5000 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  // Un código que NO es el bueno (determinista: nunca depende del azar).
+  const malo = res.body.devOtp === '000000' ? '000001' : '000000';
+
+  for (let intento = 1; intento <= 5; intento++) {
+    const dev = await request(makeApp())
+      .post(`/api/sign/${token}/verify-otp`)
+      .send({ otp: malo })
       .timeout({ response: 5000 });
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-  } finally {
-    config.exigirMedioPersonalOtp = antes;
+    if (intento < 5) {
+      assert.equal(dev.status, 422, JSON.stringify(dev.body));
+      assert.equal(dev.body.error.code, 'OTP_INVALID');
+    } else {
+      assert.equal(dev.status, 422, JSON.stringify(dev.body));
+      assert.equal(dev.body.error.code, 'OTP_LOCKED');
+    }
   }
+
+  // Y el reenvío NO lo desbloquea.
+  const reenvio = await request(makeApp())
+    .post(`/api/sign/${token}/resend-otp`)
+    .send({})
+    .timeout({ response: 5000 });
+  assert.equal(reenvio.status, 422, JSON.stringify(reenvio.body));
+  assert.equal(reenvio.body.error.code, 'OTP_LOCKED');
+  assert.equal(reenvio.body.error.details.se_puede_reenviar, false);
+
+  // La fila queda bloqueada.
+  const fila = db.prepare(
+    'SELECT estado, otp_bloqueado FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  assert.equal(fila.estado, 'OTP_LOCKED');
+  assert.equal(fila.otp_bloqueado, 1);
+});
+
+// ===========================================================================
+// 6. La caducidad también alcanza a las filas heredadas
+// ===========================================================================
+
+test('D-2 · una fila heredada sin marca de envío no puede validar el código', async () => {
+  // Sin `fecha_otp_enviado` NO se puede probar que el código sea vigente, y
+  // un código del que no se puede probar la vigencia no se valida. Se falla
+  // cerrado. El Trabajador no queda atrapado: puede pedir uno nuevo.
+  limpiar();
+  registrarEmpresa();
+  const { token, signRequest } = await crearSolicitud('personal@ejemplo.net');
+
+  const res = await request(makeApp())
+    .post(`/api/sign/${token}/identify`)
+    .send(cuerpoConfirmado())
+    .timeout({ response: 5000 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  db.prepare(
+    'UPDATE gh_firmas_electronicas SET fecha_otp_enviado = NULL WHERE id = ?'
+  ).run(signRequest.id);
+
+  const dev = await request(makeApp())
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: res.body.devOtp })
+    .timeout({ response: 5000 });
+
+  assert.equal(dev.status, 410, JSON.stringify(dev.body));
+  assert.equal(dev.body.error.code, 'OTP_EXPIRADO');
+  assert.equal(dev.body.error.details.se_puede_reenviar, true);
 });
 
 // ===========================================================================

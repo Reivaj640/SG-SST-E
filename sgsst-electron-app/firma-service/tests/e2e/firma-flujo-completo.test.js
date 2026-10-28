@@ -94,6 +94,9 @@ async function makePdf(seed = 'e2e') {
 function buildMetadata(acuerdo, overrides = {}) {
   return {
     id_documento: 'doc-e2e',
+    // La declaración de que el documento NO tiene datos sensibles de salud es
+    // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+    declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
     id_trabajador: '1234567890',
     id_empresa: TEST_EMPRESA_A,
     tipo_firma: 'presencial',
@@ -145,7 +148,7 @@ async function recorrerFlujoCompleto(app, token, opts = {}) {
   // 1. Identify
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: identificacion });
+    .send({ tipo_identificacion: 'CC', numero_documento: identificacion, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r1.status, 200,
     `identify falló: status=${r1.status} body=${JSON.stringify(r1.body)}`);
   assert.equal(r1.body.estado, 'OTP_SENT');

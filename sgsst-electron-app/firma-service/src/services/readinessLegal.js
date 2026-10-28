@@ -1240,16 +1240,24 @@ function evaluar(opciones = {}) {
       },
     ),
     _item(
-      'flag_encendido',
-      'FIRMA_EXIGIR_MEDIO_PERSONAL_OTP encendido',
-      _estado(cfg.exigirMedioPersonalOtp === true),
+      'rechazo_buzon_corporativo',
+      'El OTP a un buzón corporativo se rechaza siempre',
+      ESTADOS.OK,
       {
         bloquea: GATE_PRIMERA,
-        detalle: cfg.exigirMedioPersonalOtp === true
-          ? 'D-02 está encendido.'
-          : 'D-02 sigue apagado; encenderlo antes de la primera firma real.',
-        accion: 'Encender D-02 solo después de la v1.1 publicada, la 9A/10.4 probadas y el Anexo de Nube firmado.',
-        referencia: 'config.exigirMedioPersonalOtp',
+        // POR QUÉ dice OK y no "pendiente": el rechazo ya es INCONDICIONAL en
+        // el código (no depende de ningún interruptor de configuración), así
+        // que no hay nada que encender antes de la primera firma real. Lo que
+        // hay que PODER AUDITAR es el rastro: cada caso rechazado queda como
+        // evento OTP_MEDIO_CORPORATIVO en gh_firma_eventos, que es append-only
+        // (la migración 020 impide UPDATE y DELETE) y por eso no se puede
+        // suprimir ni corregir.
+        detalle: 'El rechazo del buzón corporativo es incondicional y el caso queda '
+          + 'en el registro append-only de eventos (OTP_MEDIO_CORPORATIVO en '
+          + 'gh_firma_eventos): se verifica en services/publicFlow.js, función '
+          + '_controlarMedioCorporativo.',
+        accion: 'Revisar que cada rechazo quedó en gh_firma_eventos antes de la primera firma real.',
+        referencia: 'services/publicFlow.js · _controlarMedioCorporativo',
       },
     ),
     _item(
@@ -1265,7 +1273,7 @@ function evaluar(opciones = {}) {
           : (empresas.con_canal_pqrs === empresas.total
             ? 'Todas las empresas activas tienen canal de atención.'
             : `${empresas.total - empresas.con_canal_pqrs} empresa(s) no tienen canal de atención.`),
-        accion: 'Completar el canal de atención de cada empresa antes de encender D-02.',
+        accion: 'Completar el canal de atención de cada empresa: con el rechazo del buzón corporativo ya incondicional, la vía en papel es la salida real del Trabajador y necesita un canal que funcione.',
         referencia: 'gh_firma_empresas.canal_pqrs',
       },
     ),

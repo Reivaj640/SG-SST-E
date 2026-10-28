@@ -1343,6 +1343,9 @@
 }
 .fe-firma-confirm--dual { align-items: flex-start; }
 .fe-firma-confirm--dual input[type="checkbox"] { margin-top: 0.125rem; }
+/* Declaración de datos sensibles de salud: misma caja, texto en columna. */
+.fe-firma-confirm--salud { align-items: flex-start; }
+.fe-firma-confirm--salud input[type="checkbox"] { margin-top: 0.125rem; }
 .fe-firma-confirm__body {
   display: flex;
   flex-direction: column;

@@ -146,6 +146,9 @@ async function makePdf(seed = 'dual-completa') {
 function buildMetadataDual(acuerdo, opts = {}) {
   return {
     id_documento: 'doc-dual-completa',
+    // La declaración de que el documento NO tiene datos sensibles de salud es
+    // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+    declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
     id_trabajador: WORKER_CC_PLAIN,
     id_empresa: TEST_EMPRESA_A,
     tipo_firma: 'presencial',
@@ -189,7 +192,7 @@ async function recorrerFlujoCompleto(app, token, identificacion = WORKER_CC_PLAI
   // 1. Identify
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: identificacion });
+    .send({ tipo_identificacion: 'CC', numero_documento: identificacion, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r1.status, 200,
     `identify falló: status=${r1.status} body=${JSON.stringify(r1.body)}`);
   const { devOtp } = r1.body;

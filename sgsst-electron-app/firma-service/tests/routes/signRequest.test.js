@@ -59,6 +59,9 @@ function sha256Hex(buffer) {
 function buildMetadata(acuerdo, overrides = {}) {
   return {
     id_documento: 'doc-001',
+    // La declaración de que el documento NO tiene datos sensibles de salud es
+    // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+    declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
     id_trabajador: '1234567890',
     id_empresa: '900123456',
     tipo_firma: 'presencial',
@@ -178,10 +181,15 @@ test('POST /internal/sign-requests: evento CREATED registrado', async () => {
     ORDER BY id
   `).all(res.body.id_interno);
 
-  assert.equal(eventos.length, 1);
-  assert.equal(eventos[0].evento, 'CREATED');
-  assert.equal(eventos[0].id_actor, 'rh:system');
-  const meta_evento = JSON.parse(eventos[0].metadata);
+  // OJO: el conteo NO es 1. La creación con la declaración de salud escribe
+  // DOS eventos: CREATED y DECLARACION_DATOS_SENSIBLES. La declaración es
+  // obligatoria y trazable por documento, así que su propio evento es
+  // obligatorio: el "viejo" conteo de 1 evento era incorrecto porque
+  // asumía que la única traza de una solicitud es su creación.
+  const creados = eventos.filter((e) => e.evento === 'CREATED');
+  assert.equal(creados.length, 1, 'tiene que haber exactamente un evento CREATED');
+  assert.equal(creados[0].id_actor, 'rh:system');
+  const meta_evento = JSON.parse(creados[0].metadata);
   assert.equal(meta_evento.id_documento, meta.id_documento);
 });
 
@@ -757,6 +765,9 @@ test('POST /internal/sign-requests: sin Acuerdo activo → 422 ACUERDO_INVALIDO'
   const pdf = await makePdf();
   const meta = {
     id_documento: 'd',
+    // La declaración de que el documento NO tiene datos sensibles de salud es
+    // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+    declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
     id_trabajador: 't',
     id_empresa: 'e',
     tipo_firma: 'presencial',
@@ -815,8 +826,12 @@ test('POST /internal/sign-requests: evento CREATED incluye agreement_version en 
     SELECT evento, metadata FROM gh_firma_eventos
     WHERE firma_id = ? ORDER BY id
   `).all(res.body.id_interno);
-  assert.equal(eventos.length, 1);
-  const metaEvento = JSON.parse(eventos[0].metadata);
+  // Mismo caso que el test de arriba: con la declaración de salud hay dos
+  // eventos (CREATED y DECLARACION_DATOS_SENSIBLES). Lo que se comprueba acá
+  // es el contenido del evento CREATED, no que sea el único evento.
+  const creados = eventos.filter((e) => e.evento === 'CREATED');
+  assert.equal(creados.length, 1, 'tiene que haber exactamente un evento CREATED');
+  const metaEvento = JSON.parse(creados[0].metadata);
   assert.equal(metaEvento.agreement_version, acuerdo.version);
 });
 

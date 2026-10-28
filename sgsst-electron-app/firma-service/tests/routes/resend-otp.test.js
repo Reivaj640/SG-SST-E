@@ -39,7 +39,7 @@ async function identifySR(token) {
   const app = makeApp();
   return request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 }
 
 async function verifyOtpWithWrong(token, otp) {
@@ -107,9 +107,17 @@ test('resend-otp: OTP vigente (no expirado) → 400 OTP_NOT_EXPIRED', async () =
   assertJsonError(res, 'OTP_NOT_EXPIRED');
 });
 
-// ─── 3. OTP_LOCKED → desbloqueo + nuevo OTP ───
+// ─── 3. OTP_LOCKED → el bloqueo es DURO: no se reenvía ───
 
-test('resend-otp: OTP_LOCKED → 200 + desbloqueo + nuevo OTP', async () => {
+test('resend-otp: OTP_LOCKED → 422 + NO desbloqueo (el bloqueo es duro)', async () => {
+  // ANTES el reenvío desbloqueaba: ponía los contadores en cero y devolvía
+  // otros cinco intentos. El límite de cinco del 3.4(e) no era un límite,
+  // era una pausa.
+  //
+  // AHORA el bloqueo es terminal: con el OTP bloqueado no se reenvía, y la
+  // salida es una NUEVA SOLICITUD. Es lo que dice el 3.4(e) de la v1.2
+  // ("se requiere una nueva solicitud") y es lo que hace que la promesa del
+  // texto sea cierta.
   const consent = await createAcceptedConsent({ correo: CORREO_CONSENT });
   const { token, signRequest } = await createSignRequestWithIdentificacion({
     metadata: JSON.stringify({ correo: CORREO_METADATA }),
@@ -131,18 +139,18 @@ test('resend-otp: OTP_LOCKED → 200 + desbloqueo + nuevo OTP', async () => {
     .post(`/api/sign/${token}/resend-otp`)
     .send({});
 
-  assert.equal(res.status, 200);
-  assert.equal(res.body.estado, 'OTP_SENT');
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'OTP_LOCKED');
+  assert.equal(res.body.error.details.se_puede_reenviar, false);
 
+  // Y la fila SIGUE bloqueada: el reenvío no la desbloqueó.
   const after = db.prepare('SELECT estado, otp_bloqueado, otp_intentos FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
-  assert.equal(after.estado, 'OTP_SENT');
-  assert.equal(after.otp_bloqueado, 0);
-  assert.equal(after.otp_intentos, 0);
+  assert.equal(after.estado, 'OTP_LOCKED');
+  assert.equal(after.otp_bloqueado, 1);
 
+  // Y no se generó un OTP nuevo.
   const ev = db.prepare("SELECT metadata FROM gh_firma_eventos WHERE firma_id = ? AND evento = 'OTP_RESENT'").get(signRequest.id);
-  assert.ok(ev, 'Debe registrar OTP_RESENT');
-  const meta = JSON.parse(ev.metadata);
-  assert.equal(meta.OTP_ANTERIOR_BLOQUEADO, true);
+  assert.equal(ev, undefined, 'un reenvío rechazado no genera OTP ni evento OTP_RESENT');
 });
 
 // ─── 4. Estados terminales → rechazo ───

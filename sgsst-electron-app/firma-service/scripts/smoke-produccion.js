@@ -83,6 +83,12 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 
+// La declaración de que el documento NO contiene datos sensibles de salud es
+// OBLIGATORIA para crear una solicitud (ver src/services/declaracionSalud.js).
+// El documento de humo es un PDF vacío de prueba: no tiene datos de salud, y
+// el script lo declara. Sin esto, el servicio responde 422.
+const { DECLARACION_SALUD } = require('../src/services/declaracionSalud');
+
 const FIXTURES_DIR = path.resolve(__dirname, 'fixtures');
 const MANIFIEST_PATH = path.join(FIXTURES_DIR, 'acuerdo-ARCHIVO.json');
 const ARCHIVO_LEGAL = path.join(FIXTURES_DIR, 'acuerdo-v1.0.txt');
@@ -641,6 +647,11 @@ function metadataSignRequest(args, acuerdoActivo, documentHash, consentId) {
     nombre_trabajador: 'Trabajador de Prueba',
     nombre_empresa: 'K+AIR PRUEBA S.A.S.',
     correo_empresa: args.correoEmpresa || 'copia-prueba@example.com',
+    // La declaración de que el documento NO tiene datos sensibles de salud.
+    // Es obligatoria: sin ella el servicio responde 422
+    // DECLARACION_DATOS_SENSIBLES_REQUERIDA. El PDF de humo no tiene datos
+    // de salud.
+    declaracion_datos_sensibles: DECLARACION_SALUD,
     // OJO: el `metadata` de adentro es un STRING JSON, no un objeto: el schema
     // lo declara como `z.string().max(8192)`. Mandarlo como objeto es un 400
     // ("Expected string, received object").

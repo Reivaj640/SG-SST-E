@@ -87,6 +87,9 @@ async function postSignRequest(app, apiKey, opts) {
     .set('X-Internal-API-Key', apiKey)
     .field('metadata', JSON.stringify({
       id_documento: opts.id_documento,
+      // La declaración de que el documento NO tiene datos sensibles de salud es
+      // OBLIGATORIA: sin ella la ruta responde 422 DECLARACION_DATOS_SENSIBLES_REQUERIDA.
+      declaracion_datos_sensibles: 'EL_DOCUMENTO_NO_CONTIENE_DATOS_SENSIBLES_DE_SALUD',
       id_trabajador: opts.id_trabajador || '111',
       id_empresa: TEST_EMPRESA_A,
       tipo_firma: 'presencial',

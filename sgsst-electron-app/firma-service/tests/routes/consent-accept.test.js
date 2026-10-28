@@ -53,7 +53,7 @@ async function recorrerFlujo(token, identificacion_numero, targetEstado) {
   // 1. identify
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: identificacion_numero });
+    .send({ tipo_identificacion: 'CC', numero_documento: identificacion_numero, medio_otp_confirmado: true, medio_otp_version: '1.0' });
   if (r1.status !== 200) {
     throw new Error(`identify: status=${r1.status} body=${JSON.stringify(r1.body)}`);
   }
@@ -269,7 +269,7 @@ test('POST /consent/accept: estado OTP_SENT (post-identify, pre-verify-otp) → 
   // Solo identify (transiciona a OTP_SENT)
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890', medio_otp_confirmado: true, medio_otp_version: '1.0' });
   assert.equal(r1.status, 200);
 
   // Intentar accept

@@ -203,7 +203,7 @@ test('el flujo de identificación sigue funcionando con la cédula real', async 
 
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   assert.equal(res.status, 200);
   assert.equal(res.body.estado, 'OTP_SENT');
@@ -219,7 +219,7 @@ test('una cédula incorrecta sigue siendo rechazada', async () => {
 
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: '9999999999' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '9999999999', medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   assert.equal(res.status, 422);
 });
@@ -233,7 +233,7 @@ test('el OTP se archiva con HMAC y sin sal', async () => {
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   const fila = db.prepare(
     'SELECT otp_hash, otp_sal, otp_alg FROM gh_firmas_electronicas WHERE id = ?'
@@ -277,7 +277,7 @@ test('una fila heredada se identifica y se reescribe sola con el HMAC', async ()
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA });
+    .send({ tipo_identificacion: 'CC', numero_documento: CEDULA, medio_otp_confirmado: true, medio_otp_version: '1.0' });
 
   // La fila heredada se identifica igual: no se invalidan las firmas en curso.
   assert.equal(res.status, 200);
