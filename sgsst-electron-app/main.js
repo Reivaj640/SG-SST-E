@@ -115,6 +115,10 @@ const { registerEvaluacionesMedicasHandlers, SCHEMA_SQL: EMO_CERT_SCHEMA_SQL } =
 // lo seguían leyendo: toda empresa re-mapeada quedaba sin registros de
 // ausentismo aunque el Excel estuviera en la carpeta.
 const { resolverArchivosNodo } = require('./main/structure-files');
+// 📦986 (2026-10-28) — Comprobar que el Python encontrado tenga pandas y
+// openpyxl. Sin esto, un Python cualquiera del PATH (que responde --version pero
+// no tiene pandas) pasaba el chequeo y el fallo aparecia a mitad de uso.
+const { pythonTieneDependencias, PYTHON_DEPS_REQUERIDAS } = require('./main/python-deps');
 // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario
 // Hasta ahora el iframe de Bandeja Integrada estaba disponible para todos los
 // usuarios. Con este bridge, el admin puede condicionar el acceso por usuario
@@ -341,11 +345,21 @@ async function findPython() {
 		path.join(baseDir, 'Portear', '.venv', 'Scripts', 'python.exe')
 	];
 
+	// 📦986 — Candidatos que EJECUTAN pero a los que les faltan pandas/openpyxl.
+	// Se guardan para poder decir en el error final cuales eran y que les faltaba.
+	const executableSinDeps = [];
+
 	for (const p of projectPythonPaths) {
 		console.log(`[DEBUG] Checking project Python: ${p}`);
 		if (fs.existsSync(p)) {
 			try {
 				await execFilePromise(p, ['--version']);
+				// 📦986 — Que responda no basta: tiene que tener pandas y openpyxl.
+				if (!(await pythonTieneDependencias(p))) {
+					console.warn(`[WARN] Project Python found but missing ${PYTHON_DEPS_REQUERIDAS.join('/')}: ${p}`);
+					executableSinDeps.push(p);
+					continue;
+				}
 				console.log(`[SUCCESS] Project Python found at: ${p}`);
 				return p;
 			} catch (e) {
@@ -369,6 +383,12 @@ async function findPython() {
 				try {
 					console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
 					await execFilePromise(trimmedPath, ['--version']);
+					// 📦986 — Mismo chequeo que en los Python del proyecto.
+					if (!(await pythonTieneDependencias(trimmedPath))) {
+						console.warn(`[WARN] Python from PATH missing ${PYTHON_DEPS_REQUERIDAS.join('/')}: ${trimmedPath}`);
+						executableSinDeps.push(trimmedPath);
+						continue;
+					}
 					console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
 					return trimmedPath;
 				} catch (e) {
@@ -411,6 +431,12 @@ async function findPython() {
 			try {
 				console.log(`[DEBUG] Testing Python executable: ${p}`);
 				await execFilePromise(p, ['--version']);
+				// 📦986 — Mismo chequeo que en los otros candidatos.
+				if (!(await pythonTieneDependencias(p))) {
+					console.warn(`[WARN] Common Python missing ${PYTHON_DEPS_REQUERIDAS.join('/')}: ${p}`);
+					executableSinDeps.push(p);
+					continue;
+				}
 				console.log(`[SUCCESS] Python found at: ${p}`);
 				return p;
 			} catch (e) {
@@ -420,6 +446,21 @@ async function findPython() {
 		} else {
 			console.log(`[DEBUG] Path does not exist: ${p}`);
 		}
+	}
+
+	// 📦986 — Si hubo ejecutables pero sin las dependencias, el mensaje tiene que
+	// decirlo: "instale Python" no ayuda si el problema es que le faltan las
+	// librerias. Sin esto el fallo aparece a mitad de uso como
+	// "ModuleNotFoundError: No module named 'pandas'".
+	if (executableSinDeps.length > 0) {
+		throw new Error(
+			'Se encontro un Python ejecutable, pero le faltan ' + PYTHON_DEPS_REQUERIDAS.join(' y ') +
+			': ' + executableSinDeps.join(' | ') + '. ' +
+			'K+AIR necesita esas librerias para registrar incapacidades, generar actas y calcular indicadores. ' +
+			'Si tiene el repositorio: ejecute scripts\\prepare-python-embed.bat. ' +
+			'Si usa la app instalada: reinstale K+AIR desde un instalador que incluya el Python embebido ' +
+			'(se copia desde Portear\\python-embed, que esta en .gitignore y por eso no viaja en el repo).'
+		);
 	}
 
 	throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
@@ -3125,6 +3166,24 @@ ipcMain.handle('check-dependencies', async () => {
     } catch (vError) {
       result.python.version = 'Desconocida';
     }
+
+    // 📦986 — Que el Python exista y responda NO basta: los scripts de Portear
+    // necesitan pandas y openpyxl. Sin este chequeo, una maquina con un Python
+    // sin dependencias arrancaba "bien" y fallaba a mitad de uso, con un
+    // ModuleNotFoundError sin ninguna pista de la causa.
+    const conDeps = await pythonTieneDependencias(pythonPath);
+    result.python.hasDependencies = conDeps;
+    if (!conDeps) {
+      result.python.error = 'El Python encontrado no tiene ' + PYTHON_DEPS_REQUERIDAS.join(' ni ') + '.';
+      result.messages.push({
+        type: 'error',
+        title: 'Al Python le faltan dependencias',
+        message: `El Python en "${pythonPath}" se ejecuta, pero no tiene ${PYTHON_DEPS_REQUERIDAS.join(' ni ')}. `
+          + 'Sin ellas no funcionan el registro de ausentismo, las actas ni los indicadores. '
+          + 'Si tiene el repositorio: ejecute scripts\\prepare-python-embed.bat. '
+          + 'Si usa la app instalada: reinstale K+AIR desde un instalador que incluya el Python embebido.'
+      });
+    }
   } catch (pyError) {
     result.python.error = pyError.message;
     result.messages.push({
@@ -3166,7 +3225,10 @@ ipcMain.handle('check-dependencies', async () => {
   }
 
   // 3. Determinar estado general
-  result.overall = result.python.available && result.scripts.available;
+  // 📦986 — El Python sin dependencias NO cuenta como disponible: el error de
+  // arranque tiene que salir aqui, no cuando el usuario intente registrar.
+  result.overall = result.python.available && result.scripts.available
+    && result.python.hasDependencies !== false;
 
   if (result.overall) {
     result.messages.push({
