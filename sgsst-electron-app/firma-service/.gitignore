@@ -18,6 +18,10 @@ storage/pdfs/constancias/*
 # versión que se firma. Quitar esta línea SOLO cuando el abogado lo apruebe
 # y se archive con scripts/archivar-acuerdo.js.
 scripts/fixtures/acuerdo-v1.1.txt
+# Lo mismo para la v1.2 (27-oct-2026): el texto que sale del empalme es la
+# versión que se firma, así que no se commitea antes de que el abogado la
+# apruebe. El .json de cambios sí se commitea: ese es el texto del abogado.
+scripts/fixtures/acuerdo-v1.2.txt
 # Entorno local desechable de la prueba manual (I-107 / 8B-C)
 storage/manual-8bc/
 

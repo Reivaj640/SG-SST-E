@@ -1434,19 +1434,33 @@ function evaluar(opciones = {}) {
     ),
     _item(
       'google_dpa',
-      'DPA de Google y tipo de cuenta',
+      'Vínculo con Google: DPA, o transferencia internacional documentada',
       _estado(googleOk),
       {
         bloquea: GATE_PRIMERA,
         detalle: ggEsConsumidor
-          ? 'La cuenta es de consumidor: no hay DPA y el Acuerdo (10.5(f)) no permite transmitir datos personales a un proveedor sin contrato o DPA, así que la cuenta de correo no habilita el servicio. Google no actúa como subencargado y el envío sería una transferencia internacional (art. 26 de la Ley 1581).'
+          ? 'La cuenta es de consumidor: no hay DPA y Google NO actúa como subencargado. '
+            + 'En la operación concreta, Google es Responsable del dato y el envío es una '
+            + 'TRANSFERENCIA INTERNACIONAL a Estados Unidos, un país con nivel adecuado de '
+            + 'protección (numeral 3.2 del Título V de la Circular Única de la SIC). La '
+            + 'base de la transferencia es ese nivel adecuado, NO la autorización expresa '
+            + 'del Titular: esa es la excepción del artículo 26 de la Ley 1581 de 2012 para '
+            + 'cuando el destino NO tiene nivel adecuado. Lo que falta es documentarla: el '
+            + 'papel de Google escrito en el expediente, las medidas de seguridad '
+            + 'demostradas, la validación conforme a la Circular 2 de 2025 y la declaración '
+            + 'de la transferencia en el RNBD.'
           : (ggOk
             ? 'DPA de Google con cuenta Workspace/Cloud y evidencia.'
             : (ggCuentaOk
               ? 'Falta el DPA de Google o alguna de sus cláusulas (devolución/supresión o auditoría).'
               : 'Falta declarar el tipo de cuenta de Google (Workspace/Cloud o de consumidor).')),
         accion: ggEsConsumidor
-          ? 'Usar una cuenta Workspace/Cloud con DPA, cambiar el proveedor de correo, o un otrosí del Acuerdo aprobado por el abogado.'
+          ? 'Documentar la transferencia en el expediente (el Anexo de Nube ya declara el '
+            + 'papel de Google como Responsable y la base del nivel adecuado): determinar '
+            + 'por escrito ese papel, demostrar las medidas, validar con la Circular 2 de '
+            + '2025 y declarar la transferencia en el RNBD. La v1.2 del Acuerdo es la que '
+            + 'sostiene ese régimen; hasta que el abogado la apruebe, la primera firma '
+            + 'queda bloqueada.'
           : 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
         referencia: 'legal-readiness.json → subencargados.google',
       },

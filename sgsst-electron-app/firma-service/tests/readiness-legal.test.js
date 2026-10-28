@@ -661,7 +661,17 @@ test('readiness · una cuenta de consumidor no habilita el servicio: el item de 
   // un proveedor sin contrato o DPA. Con una cuenta de consumo Google no es
   // subencargado y la cuenta de correo no habilita el servicio: el item NO
   // puede quedar ok. Lo que tiene que hacer el check es decir el motivo y
-  // las tres salidas, para que no sea un bloqueo sin nombre.
+  // la salida, para que no sea un bloqueo sin nombre.
+  //
+  // 📦978 (v1.2, salida B): la salida ya NO es "conseguir un DPA de Google"
+  // ni "cambiar de proveedor". Con una cuenta de consumo, Google es
+  // RESPONSABLE y el envio es una transferencia internacional a un pais con
+  // nivel adecuado: la base es ese nivel (Titulo V, 3.2), NO la
+  // autorizacion expresa del Titular (que es la excepcion del art. 26 de la
+  // Ley 1581, para cuando el destino NO tiene nivel). Lo que hay que hacer
+  // es DOCUMENTAR la transferencia, y el item tiene que decir cuales son
+  // los pasos: el papel de Google escrito, las medidas demostradas, la
+  // validacion con la Circular 2 de 2025 y la declaracion en el RNBD.
   const r = reporteDe(manifiestoConCuentaGoogle('consumidor'));
   const ids = r.pendientes.map((p) => p.id);
   assert.ok(
@@ -669,9 +679,16 @@ test('readiness · una cuenta de consumidor no habilita el servicio: el item de 
     `google_dpa quedo ok con una cuenta de consumidor: ${JSON.stringify(ids)}`,
   );
   const item = r.pendientes.find((p) => p.id === 'google_dpa');
-  assert.ok(/10\.5\(f\)/.test(item.detalle), `el detalle no cita la clausula que lo impide: ${item.detalle}`);
-  assert.ok(/Workspace\/Cloud/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
-  assert.ok(/proveedor de correo/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
+  assert.ok(/TRANSFERENCIA INTERNACIONAL/.test(item.detalle),
+    `el detalle no dice que es una transferencia internacional: ${item.detalle}`);
+  assert.ok(/nivel adecuado/.test(item.detalle),
+    `el detalle no dice la base de la transferencia: ${item.detalle}`);
+  assert.ok(/NO la autorizaci[oó]n expresa/.test(item.detalle),
+    `el detalle no aclara que la autorizacion expresa NO es la base: ${item.detalle}`);
+  assert.ok(/RNBD/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
+  assert.ok(/Circular 2 de 2025/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
+  assert.ok(/v1\.2/.test(item.accion),
+    `la accion no dice que la v1.2 es la que sostiene el regimen: ${item.accion}`);
 });
 
 test('readiness · con una cuenta de consumidor, la devolucion y la auditoria se resuelven con Cloudflare', () => {
