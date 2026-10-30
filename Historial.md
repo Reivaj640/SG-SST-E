@@ -5677,9 +5677,11 @@ portatil (la red llega por Tailscale); la publicacion de la v1.3 no esta automat
 texto ni actualiza el manifiesto del servidor, asi que publicar es a mano); y la app instalada sigue sin
 Python. El estado del servidor desplegado **no se pudo verificar** y por eso no se afirma nada sobre el.
 
-**Limpieza pendiente** — dos carpetas hermanas en `C:` (`C:\Proyectos de.programación` y `C:\Proyectos de
-programming`) quedaron de erratas de ruta en jornadas anteriores y hoy. Solo contienen scripts de diagnostico
-temporales. El runtime bloquea borrarlas desde aqui: borrarlas a mano, por favor.
+**Limpieza de las carpetas hermanas de `C:` — HECHA (30-oct-2026, noche).** Las dos carpetas que
+quedaron de erratas de ruta (`C:\Proyectos de.programación` y `C:\Proyectos deprogramming`) ya no
+existen: solo tenian scripts de diagnostico temporales. `C:\Proyectos deprogramming` ya no estaba y
+`C:\Proyectos de.programación` se borro con Node al cierre de esta jornada, junto con los 844
+temporales del `TEMP%` del portatil (39 MB).
 
 ## 2026-10-30 (noche) · La compuerta de activación y el despliegue a producción
 
@@ -5758,7 +5760,7 @@ y se recalculó el hash del paquete: **el mismo** (`02da7343…6354`).
 **Lo que sigue abierto, igual que antes:** la aprobación del abogado (el texto de la v1.3 contra la huella
 `2f8884c3…a875`, el Anexo de Encargo, **los plazos de diez (10) y cinco (5) años**, el papel de Google, la Circular
 002 de 2025, el RNBD y la ficha técnica del canal OTP), la fecha de vigencia del Acuerdo; las cuatro llaves de la
-firma en 401; el `gh` sin instalar para el release 0.1.252; y la limpieza de las dos carpetas hermanas en `C:`.
+firma en 401; y el `gh` sin instalar para el release 0.1.252.
 
 ---
 ## 🔻 Regla de cierre (obligatoria)
