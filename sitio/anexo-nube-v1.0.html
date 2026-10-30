@@ -31,7 +31,7 @@
     <li><a href="soporte.html">Soporte y contacto</a></li>
   </ul>
 
-  <p class="fecha">Modelo &middot; Versi&oacute;n 1.0 &middot; 27 de octubre de 2026</p>
+  <p class="fecha">Modelo &middot; Versi&oacute;n 1.0 &middot; 30 de octubre de 2026</p>
 
   <div class="destacado">
     <p><strong>Resumen en una l&iacute;nea:</strong> este Anexo describe la infraestructura del servicio de firma
@@ -41,7 +41,10 @@
     decir una cuenta de consumidor, sin contrato ni DPA: Google no act&uacute;a como encargado ni como
     subencargado, sino como Responsable del dato, y el env&iacute;o es una transferencia internacional a Estados
     Unidos, pa&iacute;s con nivel adecuado de protecci&oacute;n. La condici&oacute;n contractual queda cerrada con esa
-    caracterizaci&oacute;n; lo que sigue pendiente son los pasos documentales que este Anexo nombra uno por uno.</p>
+    caracterizaci&oacute;n; lo que sigue pendiente son los pasos documentales que este Anexo nombra uno por uno. La
+    caracterizaci&oacute;n jur&iacute;dica de la operaci&oacute;n queda, en todo caso, sometida a la revisi&oacute;n
+    jur&iacute;dica profesional que este Anexo nombra en su bloque de pendientes, y el detalle verificado del canal de
+    correo OTP est&aacute; en la ficha t&eacute;cnica de la secci&oacute;n 5.</p>
   </div>
 
   <div class="aviso">
@@ -69,17 +72,25 @@
       medidas de seguridad del canal de correo, que es la responsabilidad demostrada del par&aacute;grafo primero del
       T&iacute;tulo V; (iii) la validaci&oacute;n de la transferencia conforme a la Circular 2 de 2025; (iv) la
       declaraci&oacute;n de la transferencia en el Registro Nacional de Bases de Datos, previa confirmaci&oacute;n de
-      que Gesstiar S.A.S. est&aacute; inscrita; (v) la determinaci&oacute;n de si esta operaci&oacute;n exige adem&aacute;s
+      la situaci&oacute;n de inscripci&oacute;n de Gesstiar S.A.S. en ese registro; (v) la determinaci&oacute;n de si esta
+      operaci&oacute;n exige adem&aacute;s
       Normas Corporativas Vinculantes (art&iacute;culo 27 de la Ley 1581 de 2012) o un contrato de transmisi&oacute;n en
       los t&eacute;rminos del art&iacute;culo 2.2.2.25.5.2 del Decreto 1074 de 2015, que solo corresponde si el papel de
-      Google se determinara como Encargado; y (vi) las tres preguntas puntuales que quedan abiertas para el abogado.
-      Hasta que se completen los puntos (i) a (iv) y el abogado cierre (v) y (vi), este Anexo no se firma.</li>
+      Google se determinara como Encargado; (vi) las tres preguntas puntuales, cuyas respuestas este Anexo ya
+      incorpora en su secci&oacute;n 4 y que el abogado debe validar; (vii) la verificaci&oacute;n del estado de la
+      inscripci&oacute;n de Gesstiar S.A.S. en el Registro Nacional de Bases de Datos, que este Anexo no declara ni
+      inscrita ni exenta, y la presentaci&oacute;n de la declaraci&oacute;n de la transferencia; y (viii) la evidencia de
+      cada apartado de la ficha t&eacute;cnica del canal de correo OTP, que hoy est&aacute; marcada como pendiente.
+      Hasta que se completen los puntos (i) a (iv), (vii) y (viii), y el abogado cierre (v) y (vi), este Anexo no se
+      firma.</li>
       <li><strong>Pendientes t&eacute;cnicos (se llenan con evidencia del servidor, no con una promesa).</strong>
       El cifrado en reposo del disco: no est&aacute; confirmado, y por eso el &sect;5 no lo declara como implementado. La
       copia del respaldo fuera del servidor y la purga peri&oacute;dica de los respaldos se ejecutan con los scripts
       del despliegue, con la frase de paso que el owner conserva en una copia fuera del servidor, y quedan
       declarados en el &sect;3 y en el &sect;5 de este Anexo. Las dem&aacute;s medidas t&eacute;cnicas de este Anexo se
-      declaran solo con la evidencia que las respalda.</li>
+      declaran solo con la evidencia que las respalda. La ficha t&eacute;cnica del canal de correo OTP de la
+      secci&oacute;n 5 es la lista de esa evidencia: cada apartado que aparece marcado como pendiente es un documento
+      que falta y que el owner tiene que aportar.</li>
     </ul>
     <p>Un Anexo que diga &laquo;los subencargados que se usen&raquo; no cumple el art&iacute;culo 2.2.2.25.5.2
     del Decreto 1074 de 2015.</p>
@@ -220,9 +231,11 @@
         <td>Google LLC</td>
         <td>SMTP: env&iacute;o del c&oacute;digo OTP y, cuando la Empresa no tenga una cuenta de env&iacute;o
         propia configurada, del enlace de firma y de los avisos del servicio</td>
-        <td>Direcci&oacute;n de correo del destinatario, contenido del mensaje y metadatos del env&iacute;o
-        (fecha y hora, direcci&oacute;n IP de origen, identificador del mensaje). No se incluye el documento
-        firmado ni la Constancia en el correo</td>
+        <td>Los datos que efectivamente salen por ese canal, y solo esos: (i) el correo del destinatario;
+        (ii) la informaci&oacute;n t&eacute;cnica del env&iacute;o, es decir la fecha y la hora y los metadatos
+        t&eacute;cnicos del mensaje; (iii) el c&oacute;digo de verificaci&oacute;n de un solo uso (OTP); y (iv) el
+        enlace individual de acceso a la solicitud de firma. No sale el documento firmado, ni la Constancia,
+        ni el contenido del documento, ni ning&uacute;n dato sensible</td>
         <td><strong>Proveedor externo del servicio de correo. No es subencargado: act&uacute;a como
         Responsable del dato.</strong> Con una cuenta de consumidor Google no ofrece Data Processing Addendum ni
         obra como encargado del tratamiento: define las finalidades y los medios de su propio tratamiento y trata
@@ -236,7 +249,9 @@
         en el Registro Nacional de Bases de Datos. <strong>La autorizaci&oacute;n expresa del Titular no es lo que
         esta operaci&oacute;n necesita:</strong> es la excepci&oacute;n del art&iacute;culo 26 de la Ley 1581 de 2012
         para cuando el destino no tiene nivel adecuado de protecci&oacute;n, y aqu&iacute; el destino s&iacute; lo
-        tiene</td>
+        tiene. La determinaci&oacute;n escrita de este papel es el pendiente (i) del bloque de pendientes de este
+        Anexo y la valida el abogado: este Anexo documenta la operaci&oacute;n con la evidencia disponible y no
+        sustituye esa validaci&oacute;n</td>
         <td>Global</td>
         <td><strong>No existe un DPA empresarial aplicable a esta cuenta.</strong> Google no ofrece un acuerdo
         de procesamiento de datos para las versiones de consumo de Gmail. No se requiere para esta operaci&oacute;n,
@@ -245,7 +260,10 @@
         Circular 2 de 2025 y la declaraci&oacute;n de la transferencia en el Registro Nacional de Bases de Datos, que
         quedan pendientes (bloque de pendientes) y no se declaran cumplidos</td>
         <td>Sin cl&aacute;usula contractual: sin acuerdo ni DPA con Google no hay compromiso de devoluci&oacute;n
-        ni de supresi&oacute;n que reclamar a Google sobre los mensajes ya enviados</td>
+        ni de supresi&oacute;n que reclamar a Google sobre los mensajes ya enviados. El Encargado no controla, y no
+        puede garantizar, la eliminaci&oacute;n de las copias internas que el proveedor conserva en sus propios
+        sistemas conforme a sus condiciones: la supresi&oacute;n que el Encargado ejecuta en su propia
+        infraestructura no alcanza los sistemas del proveedor</td>
         <td>Sin cl&aacute;usula contractual: sin acuerdo ni DPA con Google no hay derecho de auditor&iacute;a
         sobre Google</td>
       </tr>
@@ -265,6 +283,133 @@
   la Circular 2 de 2025 y la declaraci&oacute;n en el Registro Nacional de Bases de Datos, queda pendiente en el
   bloque de pendientes de este Anexo.</p>
 
+  <p><strong>El uso real del canal y el papel de Google LLC.</strong> El canal de correo del servicio es una
+  <strong>cuenta gratuita de Gmail para consumidores, operada por Google LLC</strong>. Desde esa cuenta remite el
+  Encargado el c&oacute;digo de verificaci&oacute;n de un solo uso (OTP) y, cuando la Empresa no ha configurado
+  una cuenta de env&iacute;o propia en el servicio, el enlace individual de acceso a la solicitud de firma y los
+  avisos del servicio. No se utiliza una cuenta de Google Workspace ni una cuenta empresarial de correo para esta
+  funci&oacute;n. <strong>No existe un Data Processing Addendum empresarial aplicable a esta cuenta:</strong> Google no
+  ofrece un acuerdo de procesamiento de datos para las versiones de consumo de Gmail. Por eso
+  <strong>Google no act&uacute;a como Encargado del tratamiento ni como subencargado contractual de Gesstiar S.A.S., y
+  no hay contrato de transmisi&oacute;n que lo vincule</strong>: Google interviene en la prestaci&oacute;n del servicio
+  de correo y trata los datos que maneja por cuenta propia, conforme a sus propias condiciones. En esta
+  operaci&oacute;n concreta, y contrastando los t&eacute;rminos aplicables a la modalidad de consumo, su papel es el de
+  <strong>Responsable del dato</strong> en una <strong>transferencia internacional</strong> a Estados Unidos. La
+  determinaci&oacute;n escrita de ese papel es el pendiente (i) del bloque de pendientes de este Anexo y la valida el
+  abogado: este Anexo documenta la operaci&oacute;n con la evidencia disponible y no sustituye esa validaci&oacute;n.</p>
+
+  <p><strong>Los datos que efectivamente se transmiten por ese canal, y solo esos.</strong> Por el canal descrito en
+  esta secci&oacute;n salen: (i) el <strong>correo del destinatario</strong>; (ii) la <strong>informaci&oacute;n
+  t&eacute;cnica del env&iacute;o</strong>, es decir la fecha y la hora y los metadatos t&eacute;cnicos del mensaje;
+  (iii) el <strong>c&oacute;digo de verificaci&oacute;n de un solo uso (OTP)</strong>; y (iv) el <strong>enlace
+  individual de acceso</strong> a la solicitud de firma. No sale por ese canal ning&uacute;n otro dato. El c&oacute;digo
+  se genera, viaja y se descarta: lo que queda guardado de &eacute;l es su hash con sal, no el c&oacute;digo en
+  claro.</p>
+
+  <p><strong>Reglas expresas del canal (l&iacute;mites que no se negocian).</strong> (i) <strong>Por el canal del OTP
+  no se env&iacute;a ning&uacute;n documento laboral completo</strong>: el mensaje del c&oacute;digo se env&iacute;a en
+  el cuerpo, sin adjunto, y la copia del documento firmado y la Constancia se obtienen desde la aplicaci&oacute;n, no
+  por correo. (ii) <strong>Por el canal del OTP y por el del enlace y los avisos de la firma electr&oacute;nica, el
+  correo no incluye documentos de identidad ni datos sensibles</strong>: no se incorporan al mensaje la c&eacute;dula,
+  el tipo ni el n&uacute;mero de documento de identidad del firmante, ni ning&uacute;n dato sensible. (iii) El
+  &uacute;nico caso en que un archivo viaja por correo es la copia del documento firmado <em>en papel</em> y su
+  Registro de firma autogr&aacute;fica, que se env&iacute;an al medio que el Trabajador autoriz&oacute; expresamente
+  (el 8.2 del Acuerdo de uso): ese env&iacute;o no es el canal del OTP, no transporta el c&oacute;digo de
+  verificaci&oacute;n y no se usa en la firma electr&oacute;nica, en la que el correo es solo un aviso con el enlace.</p>
+
+  <p><strong>Lo que el Encargado no controla.</strong> El Encargado no controla, y no puede garantizar, la
+  eliminaci&oacute;n de las copias internas que el proveedor de correo conserva en sus propios sistemas conforme a sus
+  condiciones: la supresi&oacute;n que el Encargado ejecuta en su propia infraestructura no alcanza los sistemas del
+  proveedor, y la conservaci&oacute;n que este haga de los mensajes es independiente de los plazos de conservaci&oacute;n
+  del &sect;6 de este Anexo.</p>
+
+  <p><strong>Circular 002 de 2025 de la SIC.</strong> La Circular Externa No. 002 del 7 de octubre de 2025 (la
+  &laquo;Circular 2 de 2025&raquo; en las referencias de este Anexo), publicada en el Diario Oficial No. 53.268 del
+  9 de octubre de 2025, da instrucciones aplicables a los <strong>procesos de transferencia de
+  tecnolog&iacute;a</strong> en los que se transfieran datos personales o en los que se transfieran tecnolog&iacute;as
+  que permitan o tengan por objeto el tratamiento de datos personales. <strong>Este Anexo documenta la
+  operaci&oacute;n</strong>: el uso de una cuenta gratuita de Gmail para consumidores por parte del Encargado, con los
+  datos, la finalidad, el destinatario y el pa&iacute;s que quedan declarados en esta secci&oacute;n y en el &sect;2 de
+  este Anexo. <strong>Este Anexo no implementa ni declara ninguna comunicaci&oacute;n previa a la Delegatura para la
+  Protecci&oacute;n de Datos Personales de la SIC por el hecho de usar Gmail</strong>, y tampoco afirma que dicha
+  comunicaci&oacute;n sea necesaria: el &aacute;mbito de la Circular se refiere a los procesos de transferencia de
+  tecnolog&iacute;a, y el simple uso de un canal de correo no es por s&iacute; solo un proceso de esa naturaleza.
+  <strong>Conclusi&oacute;n jur&iacute;dica: Pendiente de revisi&oacute;n jur&iacute;dica profesional.</strong></p>
+
+  <p><strong>Registro Nacional de Bases de Datos (RNBD).</strong> Este Anexo <strong>no declara</strong> que Gesstiar
+  S.A.S. est&eacute; inscrita en el RNBD ni que est&eacute; exenta de la inscripci&oacute;n. Verificarlo le
+  corresponde al owner, y el checklist siguiente deja por escrito qu&eacute; hay que comprobar, d&oacute;nde se
+  comprueba y qu&eacute; evidencia queda en el expediente:</p>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Qu&eacute; hay que verificar</th><th>D&oacute;nde se comprueba</th><th>Evidencia</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Naturaleza jur&iacute;dica de Gesstiar S.A.S. (sociedad an&oacute;nima, con o sin inversi&oacute;n
+        extranjera) y si es sujeto de la Ley 1581 de 2012</td>
+        <td>C&aacute;mara de Comercio de Barranquilla: certificado de existencia y representaci&oacute;n y ficha de
+        la sociedad</td>
+        <td>[PENDIENTE: el owner completa con la evidencia]</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Activos totales de la sociedad a la fecha de corte, que es uno de los puntos que el abogado indic&oacute;
+        verificar para determinar la obligaci&oacute;n de inscripci&oacute;n</td>
+        <td>Estados financieros y balance de la sociedad, con sus notas</td>
+        <td>[PENDIENTE: el owner completa con la evidencia]</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Si existe obligaci&oacute;n de inscripci&oacute;n de la base de datos que la Empresa declara, incluida la
+        que contiene los datos del servicio de firma</td>
+        <td>Normatividad vigente de la SIC sobre el RNBD, aplicada a los hechos verificados en los puntos 1 y 2</td>
+        <td>[PENDIENTE: el owner completa con la evidencia]</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Estado del registro de Gesstiar S.A.S. en el RNBD, y si la declaraci&oacute;n de la transferencia
+        internacional de los datos que salen por el canal de correo ya est&aacute; presentada y con qu&eacute; causal</td>
+        <td>Portal de la SIC (sede electr&oacute;nica), consulta del RNBD</td>
+        <td>[PENDIENTE: el owner completa con la evidencia]</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Estado del registro en el RNBD: pendiente de verificaci&oacute;n por el owner.</strong> Este Anexo no
+  afirma que la transferencia est&eacute; declarada en el RNBD ni que la declaraci&oacute;n sea o no exigible: esa
+  determinaci&oacute;n la hace el owner con los puntos 1 a 4 verificados y la revisa el abogado.</p>
+
+  <p><strong>Contrato de transmisi&oacute;n y Normas Corporativas Vinculantes.</strong> Este Anexo <strong>no crea, no
+  declara ni presupone</strong> un contrato de transmisi&oacute;n con Google LLC, y <strong>no declara</strong> la
+  aplicaci&oacute;n de Normas Corporativas Vinculantes (art&iacute;culo 27 de la Ley 1581 de 2012) ni ninguna
+  exenci&oacute;n a las obligaciones de informaci&oacute;n y autorizaci&oacute;n del Titular. Los dos instrumentos solo
+  tendr&iacute;an sentido si el papel del proveedor se determinara como Encargado, y en esta operaci&oacute;n no lo
+  es. <strong>Si en el futuro se contrata un servicio empresarial de correo con acuerdo de encargo, este Anexo se
+  actualiza</strong>: en ese caso se declaran el proveedor, el v&iacute;nculo contractual, los datos, los pa&iacute;ses,
+  los subencargados y las cl&aacute;usulas de devoluci&oacute;n, supresi&oacute;n y auditor&iacute;a que correspondan, y el
+  papel de cada proveedor se reeval&uacute;a antes de que ese canal se use.</p>
+
+  <p><strong>Las tres preguntas del abogado y las respuestas que este Anexo incorpora.</strong> Las tres preguntas
+  planteadas sobre este canal (si el papel del destinatario debe determinarse desde los t&eacute;rminos del proveedor
+  o desde la operaci&oacute;n concreta; si la Circular 002 de 2025 exige comunicaci&oacute;n previa a la Delegatura o
+  basta la declaraci&oacute;n en el RNBD; y qu&eacute; redacci&oacute;n deja la base de la transferencia declarada de
+  forma que pueda considerarse suficiente) quedan respondidas en este Anexo con los textos siguientes, que el abogado
+  valida:</p>
+  <ul>
+    <li><strong>Pregunta 1.</strong> &laquo;Por la operaci&oacute;n concreta, contrastada con los t&eacute;rminos
+    aplicables.&raquo;</li>
+    <li><strong>Pregunta 2.</strong> &laquo;No por el simple uso de Gmail; debe verificarse si existe una
+    operaci&oacute;n espec&iacute;fica comprendida en su &aacute;mbito.&raquo;</li>
+    <li><strong>Pregunta 3.</strong> &laquo;Identificaci&oacute;n de la operaci&oacute;n, datos, finalidad,
+    destinatario, pa&iacute;s, fundamento aplicable y obligaciones de informaci&oacute;n y
+    autorizaci&oacute;n.&raquo;</li>
+  </ul>
+  <p>La respuesta 3 se materializa as&iacute;: la operaci&oacute;n, los datos y la finalidad en esta secci&oacute;n y
+  en el &sect;2 de este Anexo; el destinatario, en la secci&oacute;n 4; el pa&iacute;s de destino, en esta secci&oacute;n
+  y en el &sect;3; el fundamento aplicable, en el &sect;11 y en el bloque de pendientes; y las obligaciones de
+  informaci&oacute;n y autorizaci&oacute;n, en el &sect;2, en el &sect;7 y en el &sect;8 de este Anexo.</p>
+
   <h2>5. Seguridad</h2>
   <p>TLS en tr&aacute;nsito; cifrado de los campos sensibles de la base de datos con AES-256-GCM y clave
   derivada fuera de la base; control de acceso por clave de administraci&oacute;n del servicio y m&iacute;nimo
@@ -276,8 +421,125 @@
   implementado; detecci&oacute;n autom&aacute;tica de ca&iacute;das
   cada cinco (5) minutos, con reinicio del servicio y registro en bit&aacute;cora, <strong>sin aviso a ninguna
   persona</strong>; plan de respuesta a incidentes; confidencialidad del personal; prohibici&oacute;n de datos
-  sensibles en correos y registros. Detalle: no hay un anexo t&eacute;cnico separado: el detalle de la
-  infraestructura es el &sect;3 de este Anexo.</p>
+  sensibles en correos y registros. Detalle: el detalle de la infraestructura es el &sect;3 de este Anexo; el
+  detalle del canal de correo es la ficha t&eacute;cnica que sigue.</p>
+
+  <p><strong>Seguridad del canal de correo (OTP, enlace y avisos).</strong> El canal se abre con autenticaci&oacute;n
+  SMTP y con una credencial de cuenta de aplicaci&oacute;n que no se documenta en este Anexo; el remitente es la
+  cuenta del Encargado y nunca la cuenta de la Empresa, porque el OTP es el dato de creaci&oacute;n de la firma. El
+  cifrado en tr&aacute;nsito se negocia con STARTTLS cuando el servidor de correo lo ofrece, y el repositorio no
+  activa la opci&oacute;n que obliga a cifrar la conexi&oacute;n: la evidencia de que la conexi&oacute;n sale cifrada
+  la aporta el owner en la ficha t&eacute;cnica de esta secci&oacute;n. El c&oacute;digo de un solo uso caduca a los
+  600 segundos (10 minutos) por configuraci&oacute;n del servicio, se valida con un l&iacute;mite de intentos que, al
+  agotarse, bloquea la verificaci&oacute;n, y no se guarda en claro sino con hash y sal. El destinatario del OTP
+  debe ser un medio personal confirmado por el propio Firmante en la pantalla de firma, y el sistema rechaza de
+  forma incondicional el env&iacute;o a un buz&oacute;n que la Empresa pueda leer, con el asiento
+  <code>OTP_MEDIO_CORPORATIVO</code> en el registro append-only de operaciones del servicio. El detalle verificado de
+  esta configuraci&oacute;n, con el archivo y la l&iacute;nea que lo implementa, est&aacute; en la ficha t&eacute;cnica
+  siguiente.</p>
+
+  <h3>Ficha t&eacute;cnica del canal de correo OTP</h3>
+  <p>Esta ficha es una <strong>plantilla estructurada</strong>: cada apartado se completa con la evidencia del
+  servidor y de la cuenta de correo. Donde no hay evidencia dice, literalmente,
+  <strong>[PENDIENTE: el owner completa con la evidencia]</strong>. La ficha describe el canal t&eacute;cnico; no
+  sustituye la determinaci&oacute;n jur&iacute;dica del papel del proveedor, que es el pendiente (i) del bloque de
+  pendientes de este Anexo.</p>
+  <table>
+    <thead>
+      <tr><th>Apartado</th><th>Lo que la ficha declara</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>SMTP (servidor, puerto, cifrado)</strong></td>
+        <td>El env&iacute;o se hace por SMTP con nodemailer, en modo autenticado por usuario y contrase&ntilde;a
+        (<code>firma-service/src/services/mailer.js:27-35</code>). Servidor, puerto y modo de cifrado se configuran
+        por variables de entorno: <code>SMTP_HOST</code> (<code>firma-service/src/config.js:73</code>),
+        <code>SMTP_PORT</code>, con valor por defecto 587 (<code>src/config.js:74</code>), y
+        <code>SMTP_SECURE</code>, con valor por defecto falso (<code>src/config.js:75</code>). Con el puerto por
+        defecto, el cifrado en tr&aacute;nsito se negocia con STARTTLS cuando el servidor lo ofrece y el
+        repositorio no activa la opci&oacute;n que obliga a cifrar la conexi&oacute;n
+        (<code>src/config.js:72-80</code>). <strong>Servidor efectivamente desplegado y evidencia de que la
+        conexi&oacute;n sale cifrada: [PENDIENTE: el owner completa con la evidencia]</strong>. Remitente:
+        <code>SMTP_FROM_NAME</code> (valor por defecto &laquo;K+AIR&raquo;) y <code>SMTP_FROM_EMAIL</code>
+        (<code>src/config.js:78-79</code>). <strong>Remitente efectivo y su evidencia:
+        [PENDIENTE: el owner completa con la evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>Contrase&ntilde;a de aplicaci&oacute;n</strong></td>
+        <td>La autenticaci&oacute;n usa el usuario y la contrase&ntilde;a de la cuenta de correo del Encargado, tomados de
+        <code>SMTP_USER</code> y <code>SMTP_PASS</code> (<code>src/config.js:76-77</code>).
+        <strong>Las credenciales no se documentan en este Anexo ni en ning&uacute;n documento del expediente.</strong>
+        Si la cuenta tiene la verificaci&oacute;n en dos pasos activada, el acceso por SMTP exige una contrase&ntilde;a de
+        aplicaci&oacute;n. <strong>Existencia de la contrase&ntilde;a de aplicaci&oacute;n, de qu&eacute; cuenta depende y
+        cu&aacute;ndo se gener&oacute;: [PENDIENTE: el owner completa con la evidencia]</strong>.
+        <strong>Procedimiento y fecha de rotaci&oacute;n: [PENDIENTE: el owner completa con la
+        evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>MFA (verificaci&oacute;n en dos pasos)</strong></td>
+        <td><strong>Estado de la verificaci&oacute;n en dos pasos de la cuenta de correo de salida:
+        [PENDIENTE: el owner completa con la evidencia]</strong>. El acceso del personal al servicio es por clave de
+        administraci&oacute;n del servicio y <strong>no tiene doble factor</strong> (v&eacute;ase el p&aacute;rrafo
+        anterior de esta secci&oacute;n); el OTP es un segundo factor del Firmante, no un factor de acceso
+        administrativo.</td>
+      </tr>
+      <tr>
+        <td><strong>Plantilla del correo OTP</strong></td>
+        <td>El correo del OTP se arma en el c&oacute;digo, en
+        <code>firma-service/src/services/mailer.js:704-752</code>, y se env&iacute;a sin adjunto. Asunto: &laquo;K+AIR
+        &mdash; Tu c&oacute;digo para firmar el documento&raquo; o &laquo;K+AIR &mdash; Tu c&oacute;digo para aceptar el
+        Acuerdo de firma&raquo;, seg&uacute;n el tipo de env&iacute;o. Cuerpo: &laquo;Hola,&raquo;, &laquo;Has
+        solicitado firmar un documento en K+AIR.&raquo;, &laquo;Tu c&oacute;digo de verificaci&oacute;n es: [c&oacute;digo
+        de 6 d&iacute;gitos]&raquo;, &laquo;Este c&oacute;digo expira en 10 minutos.&raquo; y &laquo;Si no solicitaste
+        firmar este documento, ignora este mensaje.&raquo; <strong>Plantilla vigente y evidencia de un env&iacute;o real:
+        [PENDIENTE: el owner completa con la evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>Contenido m&iacute;nimo</strong></td>
+        <td>Los datos que salen por el canal son los cuatro que enumera la secci&oacute;n 4 (correo del destinatario,
+        informaci&oacute;n t&eacute;cnica del env&iacute;o, OTP y enlace individual de acceso) y nada m&aacute;s. El
+        c&oacute;digo viaja en el cuerpo del mensaje, caduca a los 600 segundos por configuraci&oacute;n del servicio
+        (<code>src/config.js:83</code>) y no se almacena en claro: lo que queda es su hash con sal
+        (<code>src/services/publicFlow.js:985</code>). El destinatario del OTP debe ser el medio personal que el
+        Firmante confirm&oacute; en la pantalla de firma, y el env&iacute;o a un buz&oacute;n que la Empresa pueda leer
+        se rechaza de forma incondicional (<code>src/services/publicFlow.js:1247-1261</code>).
+        <strong>La regla escrita y su evidencia: [PENDIENTE: el owner completa con la evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>Registro de errores y de env&iacute;os</strong></td>
+        <td>Cada env&iacute;o del OTP queda registrado en el registro append-only de operaciones del servicio
+        (<code>gh_firma_eventos</code>, que no admite UPDATE ni DELETE): el evento <code>OTP_SENT</code> con el
+        canal, el correo destino enmascarado, el identificador del mensaje y el indicador de env&iacute;o exitoso
+        (<code>src/services/publicFlow.js:1025-1031</code>); el evento <code>OTP_RESENT</code> en el reenv&iacute;o
+        (<code>src/services/publicFlow.js:3210-3216</code>); y el evento <code>OTP_SEND_FAILED</code> con el c&oacute;digo
+        de error cuando el env&iacute;o falla (<code>src/services/publicFlow.js:3222-3227</code>). El c&oacute;digo
+        nunca se registra: en bit&aacute;cora aparece como redactado
+        (<code>src/services/mailer.js:666-671</code>). <strong>Bit&aacute;cora del servidor con un env&iacute;o real:
+        [PENDIENTE: el owner completa con la evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>Gesti&oacute;n de incidentes del canal</strong></td>
+        <td>El rechazo del OTP hacia un buz&oacute;n que la Empresa puede leer queda asentado con el aviso
+        <code>OTP_MEDIO_CORPORATIVO</code> (<code>src/services/publicFlow.js:1247-1261</code>); la carga accidental
+        de datos de salud se comunica a la Empresa con un aviso que no lleva adjunto ni enlace de descarga
+        (<code>src/services/mailer.js:872-957</code>); y el documento firmado nunca comparte canal con el OTP: se
+        entrega por el enlace. La notificaci&oacute;n al Responsable y los plazos son los del &sect;8 de este Anexo.
+        <strong>Escalamiento del canal, con responsables y evidencia: [PENDIENTE: el owner completa con la
+        evidencia]</strong>.</td>
+      </tr>
+      <tr>
+        <td><strong>Procedimiento de revocaci&oacute;n de credenciales</strong></td>
+        <td>Cuando el owner declare revocada la credencial del canal: (1) se revoca en el servidor de correo y se
+        elimina la variable de entorno que la alimenta; (2) se genera una credencial nueva y se instala sin que quede
+        registro de la anterior; (3) se prueba el canal con un env&iacute;o real, porque configurar no es probar: el
+        servicio tiene una prueba de cuenta que, en producci&oacute;n, env&iacute;a un mensaje y devuelve el remitente
+        y el identificador del mensaje (<code>src/services/mailer.js:773-824</code>); (4) se deja constancia de la
+        revocaci&oacute;n, de la credencial nueva y del resultado de la prueba.
+        <strong>&Uacute;ltima revocaci&oacute;n y su evidencia: [PENDIENTE: el owner completa con la
+        evidencia]</strong>.</td>
+      </tr>
+    </tbody>
+  </table>
 
   <h2>6. Conservaci&oacute;n, devoluci&oacute;n y supresi&oacute;n</h2>
   <p>Se aplica el 8.6 del Acuerdo: tabla de la Empresa; 20 a&ntilde;os para los registros del 2.2.4.6.13; hold sin
@@ -349,9 +611,15 @@
     tr&aacute;nsito transfronterizo no comporta una transferencia) y cuarto (la transmisi&oacute;n a pa&iacute;ses con
     nivel adecuado, en los t&eacute;rminos de la transferencia); actualizada por la Circular 001 del 9 de enero de
     2026, Diario Oficial 53.362.</li>
-    <li>Circular 2 de 2025 de la SIC (instrucciones para los procesos de transferencia de tecnolog&iacute;a).</li>
+    <li>Circular Externa No. 002 del 7 de octubre de 2025 (la &laquo;Circular 2 de 2025&raquo; en las referencias de
+    este Anexo) de la SIC, Diario Oficial No. 53.268 del 9 de octubre de 2025: instrucciones aplicables a los
+    procesos de transferencia de tecnolog&iacute;a en los que se transfieran datos personales o en los que se
+    transfieran tecnolog&iacute;as que permitan o tengan por objeto el tratamiento de datos personales.</li>
     <li>Concepto SIC 25-632634 del 25 de febrero de 2026 (criterios para determinar el papel de Responsable o de
     Encargado del destinatario).</li>
+    <li>Registro Nacional de Bases de Datos Personales de la SIC: el estado de la inscripci&oacute;n de Gesstiar
+    S.A.S. y la declaraci&oacute;n de la transferencia internacional quedan pendientes de verificaci&oacute;n por el
+    owner (v&eacute;ase el checklist de la secci&oacute;n 4).</li>
   </ul>
 
 </main>
@@ -359,7 +627,7 @@
 <div class="pie">
   <div class="envoltura">
     <p>K+AIR &mdash; Gesstiar S.A.S. &middot; Colombia &middot; Modelo del Anexo de Nube, versi&oacute;n 1.0 &middot;
-    27 de octubre de 2026</p>
+    30 de octubre de 2026</p>
   </div>
 </div>
 

@@ -57,6 +57,7 @@
   - [6.17 Endpoints de las solicitudes de los Titulares — `/internal/admin/solicitudes`](#617-endpoints-de-las-solicitudes-de-los-titulares--internaladminsolicitudes)
   - [6.18 El recibo de supresión (el 3.6(g) y el 10.6)](#618-el-recibo-de-supresión-el-36g-y-el-106)
   - [6.19 La auditoría de readiness legal — `GET /internal/admin/readiness-legal`](#619-la-auditoría-de-readiness-legal--get-internaladminreadiness-legal)
+  - [6.20 La carga accidental de datos de salud — `/internal/admin/sign-requests/{id}/incidente-datos-sensibles`](#620-la-carga-accidental-de-datos-de-salud--internaladminsign-requestsidincidente-datos-sensibles)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -2342,13 +2343,26 @@ presentar como prueba.
 | Lo que se muestra | Los **últimos 4** (`****3456`), como con el firmante. |
 | Filas anteriores | Las que guardan el número en claro **siguen funcionando** (se reconocen y se enmascaran). El re-cifrado es un script aparte, en simulación por defecto (`scripts/recifrar-representante.js`). |
 
-**Lo que no cambia**: el bloque «Empresa que solicita tu firma» del **1.2**
-muestra la identificación del representante legal **completa**, pero esa no viene
-del snapshot: viene del registro mercantil que la Empresa cargó en
-`gh_firma_empresas`. El texto legal aprobado manda.
+**Lo que cambia en la v1.2**: el bloque «Empresa que solicita tu firma» del
+**1.2** ya **no** muestra la identificación del representante legal completa. La
+v1.2 dice: *"En esa pantalla se muestra el tipo de documento del representante
+legal y sus últimos cuatro (4) dígitos, no el número completo de la
+identificación."* Ese dato no viene del snapshot cifrado: viene del registro
+mercantil que la Empresa cargó en `gh_firma_empresas`, y ahora viaja
+enmascarado igual.
 
-**Lo que sí cambia**: la constancia consolidada mostraba el número completo del
-representante. Ahora muestra los últimos 4, igual que hace con el firmante.
+| Aspecto | Cómo es |
+|---|---|
+| Qué viaja | El **tipo** declarado (CC, CE, TI, PPT, PA) y los **últimos 4** (`****3456`), en un solo campo: `CC ****3456`. |
+| De dónde sale el tipo | Del texto que la Empresa cargó (`CC 12345678`). Si el tipo no es uno de los que el sistema conoce, **no se inventa**: sale `null` y se muestran solo los últimos 4. |
+| Dónde se enmascara | En el servidor (`empresa.publicViewFor`), reutilizando el enmascarado de `services/representante.js` (el mismo de la Constancia). |
+| Segunda barrera | En el cliente (`web/firma/app.js`): si el contexto llega con el dato en claro —un servidor viejo, una respuesta cacheada— la pantalla lo enmascara antes de pintarlo. |
+| Lo que **no** cambia | La **huella** (`huella`): sigue siendo el SHA-256 del snapshot **en claro**, con el documento entero. Cambiarla invalidaría los consentimientos ya archivados. Lo que cambia es lo que se muestra, no lo que se archiva. |
+| Los usos internos | El número completo sigue disponible por su propia vía: la fila de la Empresa (`GET /internal/admin/empresas/:id_empresa`) y el snapshot cifrado. El enmascarado es de la **vista pública**, no del dato. |
+
+**Lo que sí cambia desde la v1.1**: la constancia consolidada mostraba el
+número completo del representante. Ahora muestra los últimos 4, igual que hace
+con el firmante.
 
 #### 6.16.4 La copia de empresa en los consentimientos (8B-C)
 
@@ -2695,6 +2709,100 @@ empresas se leen de SQLite; la configuración operativa se lee de `config`.
 
 Un campo que no tiene evidencia queda **pendiente**, con la acción que lo
 resolvería: el reporte no inventa lo que falta ni lo deja pasar en silencio.
+
+---
+
+### 6.20 La carga accidental de datos de salud — `/internal/admin/sign-requests/{id}/incidente-datos-sensibles`
+
+> **Nuevo en la v1.2.** Es el soporte del **10.8(d)**: el procedimiento
+> contractual que corre cuando se carga por accidente un documento con datos
+> de salud. **No es un módulo de incidentes**: no hay bandeja, ni triaje, ni
+> plazos, ni escalamiento.
+
+**Auth**: `X-Admin-API-Key` (operador humano). Lo mismo que el resto de
+`/internal/admin/*`.
+
+#### `POST /internal/admin/sign-requests/{id_solicitud}/incidente-datos-sensibles`
+
+Registra el reporte y ejecuta los pasos (i) a (iv) del 10.8(d).
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `causa` | string | sí | La causa invocada. Queda en el evento. |
+| `reporta` | string | no | Quién reporta. Si no viene, se usa `X-Admin-Actor`. |
+| `medidas` | string[] | no | Medidas que declara quien reporta. |
+
+**Qué hace**:
+
+1. **Bloquea** la solicitud (estado terminal `REVOKED`): el enlace de firma
+   responde `410`, así que no se puede firmar ni reimprimir. Una solicitud ya
+   firmada no se "desfirma" (eso falsearía la evidencia): el bloqueo no se
+   aplica, y el reporte lo dice.
+2. **Retiene** la solicitud con un hold: no es elegible para supresión
+   mientras se resuelve el reporte (y su registro de eventos tampoco se
+   puede alterar).
+3. **Aisla** el documento: no se comunica, no se usa para otra finalidad y se
+   conserva solo mientras se resuelve el reporte.
+4. **Avisa** a la Empresa por su canal de incidentes (`canal_incidentes`). Si
+   ahí no hay un correo válido, cae al `responsable_tratamiento_correo`; si no
+   hay ninguno, **no se manda correo**: el reporte se registra igual y el
+   evento deja constancia de que el aviso no salió.
+5. **Registra** el evento `INCIDENTE_DATOS_SENSIBLES` con fecha y hora, quién
+   reporta, la causa invocada y las medidas adoptadas (el 3.6(g)).
+
+**Response exitosa — `201 Created`**:
+
+```json
+{
+  "id_solicitud": "SIGN-2026-000123",
+  "estado": "REVOKED",
+  "bloqueo": { "aplicado": true, "estado_previo": "PENDING", "estado_nuevo": "REVOKED", "motivo": null },
+  "retencion": { "declarada": true, "motivo": null, "hold_previo": null },
+  "aislamiento": {
+    "documento_comunicado": false,
+    "documento_en_correo": false,
+    "enlace_de_descarga": false,
+    "conservado_hasta_resolver_el_reporte": true
+  },
+  "notificacion": {
+    "enviada": true,
+    "destinatario": "seguridad@ejemplo.co",
+    "origen_canal": "canal_incidentes",
+    "motivo_fallback": null,
+    "message_id": "…",
+    "error": null
+  },
+  "medidas": ["…"],
+  "evento": "INCIDENTE_DATOS_SENSIBLES"
+}
+```
+
+**Errores**: `400` body inválido (`INVALID_REQUEST_BODY`), `401` API key
+(`INVALID_API_KEY`), `404` solicitud inexistente
+(`SIGN_REQUEST_NOT_FOUND`), `409` la solicitud cambió de estado mientras se
+registraba (`INVALID_STATE_TRANSITION`).
+
+#### `POST /internal/admin/sign-requests/{id_solicitud}/incidente-datos-sensibles/resolver`
+
+Resuelve el reporte: libera el hold y deja el documento disponible para la vía
+de supresión del 8.6. **Body**: `causa` (obligatoria), `resuelve` (opcional,
+por defecto `X-Admin-Actor`), `medidas` (opcional).
+
+El hold **no** se levanta si hay otra retención vigente que no sea de este
+reporte: esa retención es el deber legal o contractual de otro, y levantarla
+sería privar a la Empresa de una retención que no le pertenece a este
+procedimiento. La respuesta dice si el hold se liberó y por qué.
+
+**Errores**: `400`, `401`, `404` (`SIGN_REQUEST_NOT_FOUND`), `409` si no hay
+un incidente abierto (`NO_HAY_INCIDENTE_ABIERTO`) o si ya estaba resuelto
+(`INCIDENTE_YA_RESUELTO`).
+
+> El aislamiento del documento original que está en poder de la Empresa, las
+> medidas hacia el Titular y el reporte a la autoridad son de la **Empresa**,
+> que es la Responsable del tratamiento (el 10.1). K+AIR es el Encargado: este
+> endpoint registra, bloquea, retiene y avisa; nada más.
 
 ---
 

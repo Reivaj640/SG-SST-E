@@ -1,12 +1,14 @@
 {
-  "version": "2026-10-27",
-  "actualizado_at": "2026-10-27",
+  "version": "2026-10-30",
+  "actualizado_at": "2026-10-30",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
-    "v1_1_archivo": "scripts/fixtures/acuerdo-v1.1.txt",
-    "v1_1_hash": "09d69065b60000bb215be8f28fd67d0fb6fad7d32cb5a8e9c3afb45d817123d2",
-    "v1_1_fecha": "2026-10-27",
-    "publicado": false
+    "v1_1_archivo": "scripts/fixtures/acuerdo-v1.3.txt",
+    "v1_1_hash": "2f8884c36f7450728c452db9f7329e2eecd63874cc798405875911698e71a875",
+    "version": "v1.3",
+    "v1_1_fecha": "2026-10-30",
+    "publicado": false,
+    "nota": "Candidata v1.3, NO aprobada y NO publicada. Las claves conservan el nombre v1_1_* porque asi las lee el codigo (readinessLegal.js); su valor apunta a la v1.3, y el campo version declara la version que el texto debe llevar. La v1.1 y la v1.2 nunca se publicaron y quedan sin uso. El texto se arma desde la v1.0 sellada con scripts/empalmar-acuerdo-v1.1.js --version=v1.3 --cambios=scripts/fixtures/acuerdo-v1.3-cambios.json; ese JSON se construye con scripts/construir-acuerdo-v1.3.js a partir del de la v1.2, de modo que la diferencia entre las dos versiones queda escrita y no transcrita. La fecha de vigencia la declara el owner antes de publicar y no se inventa. La v1.3 aplica la especificacion del abogado del 30-oct-2026: T1 (el 5.1 separa los tres deberes legales del articulo 2.2.2.47.6 del Decreto 1074 de 2015 de los deberes operativos adicionales de K+AIR), T2 (el literal f) del 5.1 y el 5.6 nuevo: las politicas de seguridad solo obligan si fueron informadas y se pusieron a disposicion antes de su aplicacion) y D1 (fin de la retencion indefinida: la tabla supletoria de conservacion que administra K+AIR, con precedencia de la tabla de la Empresa y sin recalcular historicos). El 12.7 se ajusto tambien a esa precedencia."
   },
   "encargado": {
     "nit": "900987987-4",
@@ -52,8 +54,9 @@
     "estado": "no_firmado",
     "fecha": null,
     "evidencia": null,
-    "version": "2026-10-27-b",
-    "hash": "5ce42ad3c0b86a7898d3cc9a253196b517e138ae414633a5427ba7d28586d572"
+    "version": "2026-10-30",
+    "hash": "8c54a8deb51f44a608cef769caa6121961da50dce66517fcfe2aab16aeecf6d7",
+    "nota": "Modelo sin firmar: el 30-oct-2026 se regeneraron las secciones 2 y 8 desde las fuentes unicas. La seccion 2 es la matriz de finalidades E1: ocho finalidades del 10.3, Grupo A siete y Grupo B una (10.3(h), no habilitada, pendiente de entrega de informacion por la Empresa), con nueve campos por finalidad. La seccion 8 es la tabla de conservacion E2, generada desde config/tabla-conservacion.json, que es la fuente unica de la que tambien sale el plazo por defecto del codigo. El contenido es coherente con el Acuerdo v1.3 candidato, que elimina la retencion indefinida: la tabla supletoria que administra K+AIR da un plazo por defecto por categoria y la tabla de retencion documental de la Empresa tiene precedencia. Los plazos de diez (10) y cinco (5) anos no se activan en produccion hasta que el abogado los valide; el mecanismo queda construido y la activacion es otra decision. La seccion 13 se completo con los articulos que el propio Anexo cita. La firma y la fecha las declara el owner."
   },
   "anexo_nube": {
     "firmado": false,
@@ -63,9 +66,9 @@
     "evidencia": null,
     "modelo": {
       "version": "1.0",
-      "hash": "a2589a2ac7031818402d32cbefc9c493c4dd65f2e7c6a4af6939db1b8874bac5",
-      "actualizado": "2026-10-27",
-      "nota": "Modelo sin firmar: ninguna Empresa ha diligenciado ni firmado esta version. Su contenido se ajusto el 27-oct-2026 con las decisiones 1.a a 1.f (medio personal confirmado por el firmante y cuenta de envio propia de la Empresa) y con la salida B del canal de correo: el proveedor de correo (Google LLC, cuenta de consumidor) queda determinado como Responsable del dato en una transferencia internacional a Estados Unidos, no como encargado ni subencargado, y los pendientes documentales que faltan quedan declarados en el propio Anexo, sin declararse cumplidos. La copia firmada, cuando exista, sera la que se registre en version y hash."
+      "hash": "ad9ddcd45f20b80bdfb3a5026b60f15d29300c061ec3d342e3e82c94a0e5baa7",
+      "actualizado": "2026-10-30",
+      "nota": "Modelo sin firmar: ninguna Empresa ha diligenciado ni firmado esta version. Su contenido se ajusto el 30-oct-2026 con la especificacion del abogado: el papel de Google LLC se documenta como proveedor de un Gmail de consumo, sin afirmar DPA empresarial ni subencargo contractual ni contrato de transmision; quedan escritas las reglas expresas del canal (por OTP no se envia ningun documento laboral completo y el correo no incluye documentos de identidad ni datos sensibles, con la excepcion documentada de la copia en papel con su registro de firma autografica); se documenta la Circular Externa 002 de 2025 de la SIC sin declarar comunicacion previa, con la conclusion juridica pendiente de revision profesional; se deja el checklist del RNBD sin declarar inscrita ni exenta; no se crea contrato de transmision ficticio ni se declara NCV; y se incorporan las tres respuestas a las preguntas del abogado. El 5 trae la ficha tecnica del canal OTP, con los datos verificables citados por archivo y linea y el resto marcado como pendiente de evidencia del owner. Los pendientes documentales que faltan quedan declarados en el propio Anexo, sin declararse cumplidos. La copia firmada, cuando exista, sera la que se registre en version y hash."
     }
   },
   "n9a": {

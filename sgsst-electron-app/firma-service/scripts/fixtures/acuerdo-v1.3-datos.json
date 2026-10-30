@@ -1,0 +1,22 @@
+{
+  "version": "v1.3",
+  "fuente": "decision del owner del 26-oct-2026 (revision legal v1.1), sin cambios para la v1.2 ni para la v1.3",
+  "nota": "Los tres datos que el texto del abogado deja entre corchetes y que el owner debe definir. Se arrastran sin cambio desde la v1.1: la v1.2 y la v1.3 no introducen ni eliminan placeholders. La ciudad del servidor y los respaldos/monitoreo se remiten al Anexo de Nube, no al Acuerdo. La fecha de vigencia NO se llena aqui: la fija el owner en el encabezado y sigue pendiente.",
+  "datos": {
+    "url_anexo_encargo": {
+      "placeholder": "[URL]",
+      "valor": "https://kair.fyi/anexo-encargo.html",
+      "nota": "Base decidida por el owner: kair.fyi apuntando a GitHub Pages. El archivo que se referencia es el Anexo de Encargo final, no el que esta publicado hoy."
+    },
+    "canal_proteccion_datos": {
+      "placeholder": "[correo o URL]",
+      "valor": "privacidad.kair@gmail.com",
+      "nota": "Elegido por el owner. Es el mismo valor que declara config.js (FIRMA_CANAL_PROTECCION_DATOS) y el que debe quedar en el manifiesto, en el Anexo de Encargo y en el .env del servidor."
+    },
+    "responsable_proteccion_datos": {
+      "placeholder": "[nombre o cargo]",
+      "valor": "Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S., o la persona que lo reemplace",
+      "nota": "Designado por el owner. Es la persona o área responsable de protección de datos; el canal sigue siendo privacidad.kair@gmail.com."
+    }
+  }
+}

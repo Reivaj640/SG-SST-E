@@ -4,6 +4,27 @@
 `acuerdo-v1.1.txt` sin volver a interpretar al abogado. No es el Acuerdo: es el mapa que dice
 qué numeral va, con qué texto y qué queda pendiente.
 
+**Estado de este mapa (30-oct-2026).** Es el mapa de la **v1.1** y se conserva como registro
+histórico: es la fuente de los 52 numerales que la v1.1 cambió. **La v1.2 y la v1.3 ya no se
+arman a partir de este mapa.** A partir de la v1.2 la ruta es otra, y es reproducible:
+
+```
+scripts/construir-acuerdo-v1.3.js     ->  scripts/fixtures/acuerdo-v1.3-cambios.json
+scripts/empalmar-acuerdo-v1.1.js      ->  scripts/fixtures/acuerdo-v1.3.txt
+```
+
+El primer script deriva el JSON de la v1.3 del JSON de la v1.2 aplicando **solo** los deltas de
+la especificación del abogado del 30-oct-2026 (T1, T2 y D1). El segundo sella el texto desde la
+v1.0 sellada, como siempre.
+
+**Consecuencia práctica.** El empalme sigue usando este mapa como **checklist de cobertura**, y
+por eso al armar la v1.3 imprime un aviso con los numerales que el JSON tiene y este mapa no.
+Ese aviso **es esperado**: la mayoría son numerales que se cambiaron después de la v1.1 y que
+por definición no están en el mapa de la v1.1. El único que la v1.3 añade es el **5.6** (nuevo,
+el mecanismo de las políticas de seguridad del T2). Para el detalle de qué cambió en cada
+versión, la tabla correcta es el propio JSON de cambios de esa versión y, para la v1.3, el
+documento `especificacion-abogado-2026-10-30.md`.
+
 **De dónde sale.** Todo el texto citado sale de
 `docs/gestion-humana/firma-electronica/respuesta-11A-2026-10-23.txt` (respuesta 11A de la asesoría
 legal laboral y de protección de datos, 23 de octubre de 2026). La sección 2 de ese archivo es el

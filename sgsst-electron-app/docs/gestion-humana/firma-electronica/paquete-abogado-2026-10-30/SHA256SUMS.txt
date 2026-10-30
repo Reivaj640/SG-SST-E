@@ -1,0 +1,8 @@
+2f8884c36f7450728c452db9f7329e2eecd63874cc798405875911698e71a875  01-acuerdo-uso-v1.3.txt
+8c54a8deb51f44a608cef769caa6121961da50dce66517fcfe2aab16aeecf6d7  02-anexo-de-encargo.html
+ad9ddcd45f20b80bdfb3a5026b60f15d29300c061ec3d342e3e82c94a0e5baa7  03-anexo-de-nube-v1.0.html
+0f015187ac501c71c98742c947fbfe9859d76520c37766fd9c0d93a6a83d3a00  04-constancia-de-aprobacion-v1.3.html
+53fba74027846865611a8c2e5693e21bb93522037fd6a879e4a1f76142a540b1  05-correspondencia-texto-codigo-v1.3.md
+0b407184917b4da1bcd9f07e6b94e2afd27f4d037d1a426f37476a5f4361e654  06-auditoria-capitulo-v-t1-t2.md
+3bb89a58f1756d37dc633a4a8a9084638f53c05d4505eb55f8b970f84cf1e1be  07-evaluacion-canal-correo.md
+6e6d3f4a3aba229ab3b38d9e8a96f3ab6ae733b3dea518899d07fcd47ab0d47e  08-especificacion-abogado-2026-10-30.md
