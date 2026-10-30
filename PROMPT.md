@@ -705,6 +705,113 @@ el número para el momento de escribirlo. Y si un documento **declara su propio 
 script que lo escribe y verifique que coincida —contando `\n` sobre el texto joined, **no** elementos de
 un array: un elemento con `\n` embebido cuenta una línea de menos y el número declarado queda viejo.
 
+### 5.19 🔴 Un control que compara contra una constante no comprueba el documento: comprueba la constante
+
+**El caso.** `readinessLegal.js` validaba el Acuerdo contra la cadena fija `'v1.1'`:
+`analizarAcuerdo(docAcuerdo.texto, 'v1.1')`. Cuando la v1.2 pasó a ser la candidata, el manifiesto pasó a
+apuntar al archivo `acuerdo-v1.2.txt` — pero la constante se quedó en `'v1.1'`. El control quedó **rojo**
+("Faltan cláusulas: Versión del Acuerdo: v1.1" sobre un texto que decía v1.2) y **nadie lo notó**, porque el
+readiness no se corría contra el texto nuevo: se corría contra su archivo de siempre.
+
+**Regla:** un control que valida un documento deriva el dato que compara **del documento o de su manifiesto**,
+nunca de una constante escrita a mano. Y cuando cambia el texto, el control se corre **contra el texto nuevo**.
+
+**Como quedó (30-oct-2026).** `_versionAcuerdoEsperada(datos, rutaArchivo)` lee `manifiesto.acuerdo.version`; si
+no está, lo saca del nombre del archivo (`acuerdo-v1.3.txt` -> `v1.3`); y solo si no está en ninguno de los dos,
+vuelve a `'v1.1'` como último recurso. El manifiesto es la fuente de verdad de qué versión se está revisando.
+
+**Y el gemelo del bug.** El control textual del 8.6 exigía la redacción **vieja** ("retención por plazo no
+declarado"). Cuando D1 eliminó ese mecanismo, el control nuevo empezó a exigir algo que el código ya no hacía y
+dejó de exigir lo que el texto nuevo sí decía. Un control de un numeral es un **contrato bidireccional**: tiene
+que exigir lo que el texto dice **y rechazar** lo que el texto dejó de decir. Por eso hoy el control tiene un
+**control de ausencia**: un texto que todavía prometa el hold por plazo no declarado **falla**.
+
+---
+
+### 5.20 🔴 Cuando una regla legal cambia de fondo, hay que barrer TODO el texto por las frases del mecanismo retirado
+
+**El caso.** D1 (30-oct-2026) eliminó la retención indefinida. Se reescribieron el 8.6(a) y el 8.6(h) — y el
+**12.7** y el **3.6(g)** quedaron prometiendo el mecanismo viejo: "mientras ese plazo no esté declarado, la
+prueba no se suprime y queda retenida por esa razón, conforme al 8.6(h)". El 12.7 hasta remitía a un literal
+cuyo contenido ya no era ese.
+
+**Regla:** cuando se retira un mecanismo, **no basta con reescribir el numeral que lo define**. Hay que buscar en
+todo el documento las **frases** del mecanismo retirado — por la frase, no por el numeral. El barrido son
+minutos; leer 72.000 caracteres a ojo son horas, y las horas son cuando se escapa.
+
+**El patrón.** Una lista de frases del mecanismo viejo, aplicada al texto, que imprime el número de línea de cada
+aparición:
+
+```js
+const L = fs.readFileSync(texto, 'utf8').split('\n');
+L.forEach((l, i) => { if (/plazo no declarado|no se suprime|pendiente/i.test(l)) console.log(i + 1, l.trim()); });
+```
+
+Y el segundo control es el de **ausencia** del §5.19: el texto que conserva la frase vieja tiene que fallar.
+
+---
+
+### 5.21 🔴 Los números que se mandan a alguien salen de un script, no de una reescritura
+
+**El caso.** La nota al abogado cita, para ocho documentos, sus bytes y su SHA-256. Esos números se escribieron a
+mano la primera vez; el día que se regeneró el Anexo de Encargo (85.678 -> 85.947 B) la nota quedó mintiendo, y el
+hash que el abogado iba a aprobar era el de un texto que ya no existía.
+
+**Reglas:**
+
+1. **La nota tiene un verificador**: `firma-service/scripts/verificar-nota-abogado.js` compara cada bytes y cada
+   huella de la tabla contra el archivo real y contra `SHA256SUMS.txt`. Si el verificador falla, **la nota no
+   sale**.
+2. **El manifiesto es la fuente de las huellas** y el paquete se arma contra él (`armar-paquete-abogado.js` sale
+   con código 3 si no coincide). Las huellas **se recalculan desde los archivos**, nunca se escriben de memoria.
+3. **El manifiesto legal es ASCII puro**: sus notas van sin tildes y con escapes (`\u00e1`). Re-serializarlo con
+   `JSON.stringify` convierte cada escape en el carácter real, el archivo deja de ser ASCII y el diff es
+   enorme. Se edita con **reemplazo literal** + validación (JSON válido y ASCII puro) — así lo hace
+   `actualizar-manifiesto-v1.3.js`.
+4. **Un documento que se manda se documenta en el repo**: qué se mandó, cuándo y con qué hash.
+
+---
+
+### 5.22 🔴 Un parámetro que depende de validación jurídica se construye, pero no se activa
+
+**El caso.** Los plazos de diez (10) y cinco (5) años de la tabla supletoria de conservación son "parámetros
+iniciales" que el abogado dejó **sujetos a validación jurídica antes de activarse en producción**.
+
+**Reglas:**
+
+1. **Construir el mecanismo y activar el valor son dos decisiones.** El mecanismo va al código; el valor queda
+   como **PROPUESTA** en la fuente de configuración (`config/tabla-conservacion.json`, campo `estado`) y en el
+   Anexo, con el estado escrito.
+2. **El Anexo que va al abogado publica los parámetros**: el documento dice qué se aplicaría, y es la
+   **aprobación del abogado** la que los habilita. No se publica un Anexo con plazos "sin definir" para no
+   mentir: se publica con los parámetros propuestos y se deja constancia de que están sujetos a validación.
+3. **El estado vive en la fuente única, no en el código**: cambiar `estado` a "aprobado" es lo que habilita, y
+   nadie lo cambia sin la validación encima.
+
+---
+
+### 5.23 🔴 Declarar que un parámetro no se activa no es lo mismo que impedir que se active
+
+**El caso.** La 5.22 decía que los plazos de diez (10) y cinco (5) años "no se activan en producción hasta que el
+abogado los valide", y la tabla de conservación lo **declaraba** en su campo `estado`: *"PROPUESTA. Los plazos de
+diez (10) y cinco (5) años NO se activan en produccion hasta que el abogado los valide"*. Pero el **código no leía ese
+estado**: el planificador aplicaba el plazo por defecto de la tabla sin mirarlo. La declaración era cierta en el
+documento y falsa en el código, y el día que se desplegó se activaron en producción exactamente los plazos que el
+abogado no había validado.
+
+**Reglas:**
+
+1. **Un parámetro que depende de validación jurídica se declara Y se bloquea.** La fuente legal lleva su propio
+   interruptor (`aplicacion.activada`) y el código lo lee. Con la compuerta cerrada, el plazo por defecto es el del
+   catálogo (la custodia que estaba en vigor) y la fila lo dice, con su fuente (`catalogo_sistema`).
+2. **Las excepciones legales no dependen de la compuerta.** El piso del SG-SST y el hold del contrato sin término son
+   deberes: siguen aplicando con la compuerta cerrada. Una compuerta apaga un parámetro, no una obligación.
+3. **El respaldo de emergencia también arranca cerrado.** El respaldo congelado en el código, que entra cuando el
+   archivo de configuración no se puede leer, tiene la compuerta cerrada: si no, una falla de lectura aplicaría los
+   plazos no validados.
+4. **Con la compuerta cerrada, el despliegue tiene que ser neutro**: el mismo plazo, el mismo texto al Trabajador y
+   el mismo día de purga que antes. Es lo que hace que desplegar el mecanismo no sea activar el parámetro.
+
 ---
 
 ## 6. Convenciones de código
@@ -1342,6 +1449,14 @@ Caso real (27-oct-2026): la autorizacion operativa de la v1.0 quedo registrada e
 | 102 | 🔴 **Un script que edita archivos en lote no se puede deshacer con git si los archivos no estan commiteados: el trabajo de otro worker en el MISMO archivo se lleva por delante** | `%TEMP%\kair-confirmar-tests.js` (batch de `/identify`), `sgsst-electron-app/firma-service/tests/*.test.js` | Un script propio metia la confirmacion del medio en los 68 cuerpos de `/identify` de 24 archivos de test. La primera version **metia los campos al principio del objeto** en vez de al final, y dejo 24 archivos con sintaxis rota. Agravante: 19 de esos archivos ya estaban tocados por otro worker y **no estaban commiteados**, asi que `git checkout` no restauraba nada sin llevarse por delante el trabajo ajeno. Reglas: (1) **un batch se prueba en SECO primero** (`--dry`) y, despues de aplicarlo, el `git diff` contra `HEAD` tiene que ser **exactamente** el cambio que el script dice hacer: si aparece algo mas, el script rompio algo; (2) **un archivo con trabajo ajeno no se restaura con `git checkout`**: se repara, o se restaura solo cuando se sabe que nadie mas lo toco; (3) **quien repara un batch escribe el inverso exacto de la transformacion**, y lo demuestra con un viaje de ida y vuelta antes de tocar un archivo real; (4) **un batch que reescribe un objeto inserta al FINAL del contenido**, antes del espacio final, nunca al principio: la forma del objeto es parte del archivo y el EOL de cada linea se respeta |
 | 103 | 🔴 **Una variable que se borra dentro de una funcion deja referencias fantasma, y el `catch` generico las disfraza de 500: el error de negocio se pierde** | `sgsst-electron-app/firma-service/src/services/publicFlow.js` (`resendOtpDeSignRequest`), `src/middleware/errors.js` | Al cambiar el desbloqueo del reenvio (el bloqueo duro del OTP, 📦978) se dejo una referencia a `wasLocked`, que ya no existia. El `catch` generico se la comio a todos los errores de negocio: **14 tests de reenvio fallaron con 500 INTERNAL_ERROR** en vez del 422 que corresponde, y el unico rastro era el log del servidor. Reglas: (1) **cuando se borra o renombra una variable, se busca su nombre viejo en TODO el bloque**, no solo donde se declaraba; (2) **un 500 donde deberia haber un 4xx es un ReferenceError hasta que se demuestre lo contrario**: el primer paso es el log del servidor, no el test; (3) **el `catch` generico es la ultima linea de defensa, no el plan**: un error de negocio (400/409/422) tiene que salir como tal, y si sale como 500 lo primero que se revisa es una variable que no carga |
 | 104 | 🔴 **`CONTEXT.md` tiene TRES tipos de separador y cada region usa el suyo: la trampa 16 dice "tres CR" pero solo las primeras 6 lineas los tienen** | `sgsst-electron-app/CONTEXT.md` (todo el archivo) | Medido el 27-oct-2026 con los bytes crudos: 1589 separadores, **1369 con CR CR LF**, **178 con LF puro** y **42 con CRLF (1 CR)**. Las **primeras 6 lineas** son CR CR CR LF; el **bloque de entradas del principio** (donde se inserta un hito nuevo, lineas 7 a ~104) es **CRLF normal**; el cuerpo del archivo es CR CR LF. La trampa 16 acierta en "nunca lo reescribas entero", pero su conteo ("1337 de sus 1354 lineas") ya no describe el archivo. Reglas: (1) **el separador se mide en el ancla exacta, no se supone**: se leen los bytes de la linea del ancla y de la anterior antes de escribir; (2) **un contador ingenuo de "\r\n" cuenta igual los "\r\r\n"**: por eso un archivo CR CR LF puede aparecer como "CRLF puro" y el EOL se tiene que medir con los bytes; (3) **el texto nuevo se arma con el separador de SU ancla, no con el del archivo entero**: insertar CRLF en una region CR CR LF rompe el diff de esa linea; (4) **insertar un hito en CONTEXT.md es un `replace` del ancla**: bloque nuevo + un marcador `>> **Anterior · ...**` + el ancla original (esa duplicacion **es** el estilo de la casa, no un error), y el separador del texto nuevo es el de la linea del ancla |
+| 105 | 🔴 **El readiness comparaba el Acuerdo contra una versión fija: el control estaba rojo desde la v1.2 y nadie lo notó** | `sgsst-electron-app/firma-service/src/services/readinessLegal.js` (`analizarAcuerdo`, `_versionAcuerdoEsperada`), `firma-service/legal-readiness.json` (`acuerdo.version`) | La versión que se compara sale del **manifiesto**, y si no está, del **nombre del archivo**. Cuando cambies el texto del Acuerdo, corré el readiness **contra el texto nuevo** |
+Caso real (30-oct-2026): cerrando la línea legal en v1.3 se descubrió que el control textual del Acuerdo estaba en rojo **desde la v1.2**: comparaba el texto contra la cadena fija `'v1.1'` y reportaba "Faltan cláusulas: Versión del Acuerdo: v1.1" sobre un texto que decía v1.2. Nadie lo notó porque el readiness se corría contra su propio archivo de siempre, no contra el texto candidato. Reglas: (1) **un control que compara contra una constante no comprueba el documento: comprueba la constante** — el dato que se compara se deriva del documento o de su manifiesto, nunca de un literal escrito a mano; (2) **cuando cambia el texto, el control se corre contra el texto nuevo**: el readiness que no se corrió contra la v1.2 es el que dejó el rojo pasar; (3) **un control de un numeral es un contrato bidireccional**: además de exigir lo que el texto dice, tiene que **rechazar** lo que el texto dejó de decir — el control textual del 8.6 exigía la redacción vieja ("retención por plazo no declarado") que D1 eliminó, y por eso hoy tiene un control de **ausencia**; (4) **el manifiesto declara qué versión se revisa**: el campo `acuerdo.version` es la fuente de verdad, y el nombre del archivo es el plan B; (5) **un control que nadie corre es un control que no existe**: por eso el verificador de la nota al abogado es un script, no una revisión manual |
+| 106 | 🔴 **El 12.7 y el 3.6(g) seguían prometiendo la retención indefinida después de que D1 la eliminara** | `sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.3.txt` (numerales 12.7 y 3.6(g)), `firma-service/src/services/readinessLegal.js` (`_textoRetencionV13`) | Cuando se retira un mecanismo, **barré todo el texto por las frases del mecanismo viejo**, no solo el numeral que lo definía. El barrido son minutos; leer 72.000 caracteres a ojo son horas |
+Caso real (30-oct-2026): D1 eliminó la retención indefinida y se reescribieron el 8.6(a) y el 8.6(h) — pero el **12.7** seguía diciendo "mientras ese plazo no esté declarado, la prueba no se suprime y queda retenida por esa razón, conforme al 8.6(h)", y remitía a un literal cuyo contenido ya no era ese. Lo cazó un barrido del texto por las frases del mecanismo retirado, no la lectura. Reglas: (1) **retirar un mecanismo es reescribir todos los numerales que lo nombran**, no solo el que lo define: un numeral puede remitir a otro y quedarse hablando de un mundo que ya no existe; (2) **el barrido es por la frase, no por el numeral**: la lista de frases del mecanismo viejo se aplica al texto entero y devuelve números de línea; (3) **el texto no puede prometer lo que el código no cumple**: los dos numerales apuntaban a un mecanismo que ya no existía en el código, y por eso el 12.7 y el 3.6(g) se corrigieron en la v1.3 antes de mandarse; (4) **un control de ausencia es el que sostiene la corrección**: el texto que todavía trae la frase vieja tiene que **fallar**, porque si pasara, nadie se enteraría |
+| 107 | 🟡 **La nota al abogado citaba bytes y huellas escritas a mano: el día que cambió un documento, quedó mintiendo** | `docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/nota-al-abogado-2026-10-30.md`, `firma-service/scripts/verificar-nota-abogado.js`, `firma-service/scripts/actualizar-manifiesto-v1.3.js` | Los números de la nota los **compara un script** contra el archivo real; si el verificador falla, la nota no sale. Las huellas se recalculan desde los archivos, no se transcriben |
+Caso real (30-oct-2026): la nota al abogado de la ronda 4 cita, para ocho documentos, sus bytes y su SHA-256. Los números se escribieron a mano; cuando el Anexo de Encargo se regeneró (85.678 -> 85.947 B) la nota quedó diciendo una cosa y el paquete otra, y el hash que el abogado iba a aprobar era el de un texto que ya no existía. Reglas: (1) **una nota con cifras escritas a mano es una nota que se pudre**: hoy las compara `verificar-nota-abogado.js`, que además valida contra `SHA256SUMS.txt`; (2) **las huellas se recalculan, no se transcriben**: `actualizar-manifiesto-v1.3.js` las saca de los archivos reales y `armar-paquete-abogado.js` sale con código 3 si el manifiesto no coincide; (3) **el manifiesto legal es ASCII puro y se edita con reemplazo literal**: un `JSON.stringify` convierte los `\u00e1` en caracteres reales, el archivo deja de ser ASCII y el diff es enorme; (4) **el paquete se arma con un script, no a mano**: el script copia los adjuntos, calcula las huellas y retira los adjuntos de una ronda anterior, para que al abogado no le lleguen dos versiones del mismo documento |
+| 108 | 🔴 **Un mecanismo legal desplegado sin su compuerta aplica en producción lo que el texto vigente no dice** | `sgsst-electron-app/firma-service/config/tabla-conservacion.json` (`aplicacion.activada`), `firma-service/src/services/retencion.js` (`_tablaActivada`), `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (§5.1) | La fuente legal declara su propio estado y el código lo lee. Con la compuerta cerrada, el plazo por defecto es el del catálogo y las excepciones legales siguen aplicando |
+Caso real (30-oct-2026, noche): el owner dijo "pongámoslo en producción" y la revisión del camino de despliegue encontró tres defectos que eran jurídicos, no técnicos. (1) La tabla de conservación declaraba `estado: PROPUESTA` — "los plazos de diez (10) y cinco (5) años NO se activan en producción hasta que el abogado los valide" — pero el **código no leía ese estado**: el planificador aplicaba el plazo por defecto de la tabla sin mirarlo. Desplegarlo activaba en producción exactamente los plazos que el abogado no había validado, y el Acuerdo **vigente** (la v1.0, cuyo 8.6 remite a la tabla de la Empresa y no describe esos plazos) no los dice. (2) El `git archive` del §5.1 no llevaba `config/`: sin la tabla en disco el servicio arrancaba con el **respaldo congelado del código (tres categorías en vez de ocho)** y lo hacía **en silencio**. (3) El manifiesto apuntaba a `scripts/fixtures/acuerdo-v1.3.txt`, que **no estaba versionado ni viajaba en el tar**: el readiness del servidor iba a leer un archivo inexistente y a reportar huecos que son puro artefacto del empaquetado. Reglas: (1) **un mecanismo que administra plazos declara su propia activación y el código la lee**: lo que decide cuándo se aplica un plazo es el documento que lo administra, no una constante ni una variable de entorno; (2) **lo que el texto vigente no describe, el código no lo aplica**: el Acuerdo que manda en producción es el que está en la base, no el que se está preparando; (3) **el paquete se verifica por su contenido, no por su hash**: un hash de un tar no dice si dentro va la tabla de conservación; (4) **el tar se arma desde el commit, así que lo que no está versionado no viaja**: versionar el texto del Acuerdo no es opcional cuando el manifiesto lo declara; (5) **el respaldo de emergencia de un mecanismo con compuerta, arranca con la compuerta cerrada**: si no, la falla de leer el archivo activa lo que la compuerta bloquea |
 
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):

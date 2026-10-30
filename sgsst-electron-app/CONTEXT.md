@@ -4,12 +4,62 @@
 > y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
 > última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
 
-**Última actualización:** 27 de octubre de 2026
+**Última actualización:** 30 de octubre de 2026
 **Versión actual:** 0.1.247 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
-> **🆕 v0.1.247 (📦978 · 📦980 — el servicio de firma electrónica, y la v1.2 del Acuerdo que espera al abogado):**
+> **🆕 30-oct-2026 — la línea legal cerrada en la v1.3, esperando al abogado:**
+> El proyecto que está en marcha es el **servicio de firma electrónica de K+AIR**
+> (`sgsst-electron-app/firma-service`), y su línea es jurídica: un Acuerdo de Uso que
+> tiene que resistir la revisión de un abogado, no solo funcionar. **Esa línea cerró hoy
+> en la v1.3**, con la especificación del abogado del 30-oct-2026 (12:59) aplicada
+> completa: **T1** (el 5.1 separa los tres deberes legales del artículo 2.2.2.47.6 del
+> Decreto 1074 de 2015 de los deberes operativos de K+AIR), **T2** (las políticas de
+> seguridad solo obligan si el firmante pudo conocerlas antes de usarlas) y **D1**
+> (se elimina la retención indefinida: aparece una **tabla supletoria de conservación
+> administrada por K+AIR**, con la precedencia de la tabla de la Empresa, y el *hold* por
+> plazo no declarado deja de existir en el texto y en el código).
+> **Dónde está hoy.** En producción sigue la **v1.0 del Acuerdo**. La **v1.1 nunca se
+> publicó** (la devolvió el abogado el 27-oct-2026 con tres críticos, seis problemas de
+> coherencia, tres de datos personales, dos de conservación y ocho controles técnicos).
+> La **v1.2 tampoco llegó a aprobarse**: quedó reemplazada por la **v1.3**, que está
+> armada y verificada (73.056 B, `2f8884c3…a875`) y **espera la aprobación del abogado**.
+> **Los parámetros de diez (10) y cinco (5) años de la tabla supletoria NO se activan en
+> producción** hasta que el abogado los valide: el mecanismo está construido, la
+> decisión es suya.
+>
+> **Esto ya no es solo una declaración: es una compuerta en el código.** La tabla de
+> conservación declara su propia activación (`aplicacion.activada`) y el planificador la lee.
+> Con la compuerta **cerrada** —que es como viene— el plazo por defecto NO es el de la tabla
+> sino el de custodia del catálogo (veinte (20) años desde la firma), que es el que estaba en
+> vigor; y la fila lo dice, con la fuente `catalogo_sistema`. Las **excepciones legales** no
+> dependen de la tabla y siguen aplicando con la compuerta cerrada: el piso del SG-SST y el
+> hold del contrato sin término. El respaldo congelado del código también arranca cerrado.
+> Abrir la compuerta es un acto expreso del owner, con la validación escrita del abogado:
+> ni el código ni una actualización automática lo hacen.
+>
+> **🆕 30-oct-2026 (noche) — el despliegue a producción:** el owner dijo "pongámoslo en
+> producción". La revisión del camino de despliegue encontró tres defectos jurídicos antes de
+> tocar el servidor, y los tres están corregidos: (1) el código no leía el estado de la tabla
+> y habría activado en producción los plazos no validados (ya está: la compuerta); (2) el
+> `git archive` no llevaba `config/`, y sin la tabla en disco el servicio arrancaba con el
+> respaldo congelado de **tres** categorías en vez de ocho, **en silencio** (ya viaja, y el paso
+> 3 de la guía verifica su hash en disco); (3) el manifiesto apuntaba a un texto del Acuerdo que
+> no estaba versionado ni viajaba en el tar, y el readiness del servidor iba a leer un archivo
+> inexistente (ya está versionado y ya viaja). **El Acuerdo vigente en producción sigue siendo
+> la v1.0**: la v1.3 va preparada, **no vigente**, con `publicado: false` en el manifiesto.
+> **Lo que va al abogado** es un paquete de ocho documentos con `SHA256SUMS.txt`, en
+> `docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/`, con una nota que
+> dice los cinco puntos que le quedan y **lo que no viaja**: la constancia contra el
+> servidor desplegado, que no se pudo verificar (sin llave SSH y con las cuatro llaves
+> de la firma en 401). La **correspondencia texto ↔ código da 21 filas, 21
+> implementadas y 0 pendientes**, y se genera con script. El Anexo de Encargo lleva la
+> matriz de finalidades (ocho del 10.3: Grupo A siete y Grupo B una no habilitada) y
+> el §8 de conservación, **los dos generados desde la fuente única**
+> `firma-service/config/tabla-conservacion.json`.
+>> **Anterior · v0.1.247 (📦978 · 📦980 — el servicio de firma electrónica, y la v1.2 del Acuerdo que esperaba al abogado):**
+> **🆕 v0.1.247 (📦978 · 📦980 — el servicio de firma electrónica, y la v1.2 del Acuerdo que esperaba al abogado):**
 > El proyecto que está en marcha es el **servicio de firma electrónica de K+AIR**
 > (`sgsst-electron-app/firma-service`), y su línea es jurídica: un Acuerdo de Uso que
 > tiene que resistir la revisión de un abogado, no solo funcionar. El último gran hito
@@ -20,8 +70,8 @@
 > `52a490a4…10c04`). La **v1.1 nunca se publicó**: el abogado la devolvió el 27-oct-2026
 > con tres críticos, seis problemas de coherencia, tres de datos personales, dos de
 > conservación y ocho controles técnicos, y **sin autorizar la publicación**. De esa
-> revisión salió la **v1.2**, que ya está armada y verificada (empalme determinista,
-> 75/75 comprobaciones) y **espera la aprobación del abogado**.
+> revisión salió la **v1.2**, que quedó armada y verificada (empalme determinista,
+> 75/75 comprobaciones) pero **nunca llegó a aprobarse**: fue reemplazada por la **v1.3**.
 > **El texto no puede prometer lo que el código no cumple**, y por eso el 📦978 cerró esa
 > brecha antes de publicar la v1.2: el buzón corporativo se rechaza **siempre** (y el caso
 > queda en el registro append-only de eventos), la confirmación del medio es obligatoria
@@ -41,10 +91,12 @@
 > del Titular, que es la excepción del artículo 26 de la Ley 1581 para cuando el destino
 > *no* tiene nivel. Lo que falta es demostrar medidas, validar con la Circular 2 de 2025 y
 > declarar la transferencia en el RNBD.
-> **Reglas del repo que no son estilo, sino hechos comprobables:** el texto armado
-> (`acuerdo-v1.2.txt`) está en
-> `.gitignore` porque es la versión que se firma; el JSON de cambios sí se commitea.
-> La rama `gh-pages` es una COPIA generada de `sitio/`, así que editar uno obliga a
+> **Reglas del repo que no son estilo, sino hechos comprobables:** el texto de la v1.2
+> (`acuerdo-v1.2.txt`) esta en `.gitignore` porque es la version que no se publica; **el de
+> la v1.3 (`acuerdo-v1.3.txt`) SI esta commiteado**, porque el manifiesto lo declara y el
+> readiness lo lee en el servidor: sin el en el paquete, el readiness de produccion lee un
+> archivo inexistente y reporta huecos que son puro artefacto del empaquetado. La rama
+> `gh-pages` es una COPIA generada de `sitio/`, así que editar uno obliga a
 > regenerar el otro. Y el EOL de cada archivo lo fija su test.
 >> **Anterior · v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**
 > **🆕 v0.1.247 (📦868 — Correo que conecta solo, en cualquier PC):**

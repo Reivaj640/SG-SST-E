@@ -5490,6 +5490,266 @@ código), 📦979 `f445bb1c` (los tres anexos), 📦980 `43fedd4a` (el JSON de c
 `26398205` (este estado al cierre). La rama `gh-pages` recibió `04c5e762` (los tres anexos). El texto
 armado `acuerdo-v1.2.txt` (66 681 B, SHA-256 `97da2c14…7977`) queda en `.gitignore`: es la versión que se
 firma. En la rama `gh-pages`, el commit `f8a86962` con los ocho archivos del sitio sigue **local y sin push**.
+### 2026-10-30 · La linea legal v1.2 completa: texto, codigo y paquete para el abogado
+
+**Que se hizo** — el plan legal "candidata final v1.2" que el owner aprobo (8 piezas) se ejecuto de
+principio a fin, con luz verde sobre el Anexo de Encargo y `legal-readiness.json`:
+
+| Fase | Que | Resultado |
+|---|---|---|
+| 1 · Texto | 9 parches sobre el JSON de cambios de la v1.2 y regeneracion del Acuerdo | 68 798 caracteres, SHA-256 `a74839f9…6b08` |
+| 2a · Codigo | El 8.6(h) en el sistema: retencion por plazo no declarado, la liberacion cuando la Empresa declara, la via de supresion de la prueba de aceptacion (migraciones 047 y 048) y `codigo_20` | `retencion.js`, `conservacion.js`, `empresa.js`, `supresion.js`, `reciboSupresion.js`, `readinessLegal.js` |
+| 2b · Codigo | El D2 (el documento del representante enmascarado en pantalla) y el D3 (el 10.8(d): bloqueo, registro, aviso a la Empresa y supresion con lapida y recibo) | `empresa.js`, `representante.js`, `incidenteSalud.js`, `admin-incidentes.js`, `publicFlow.js`, `web/firma/app.js` |
+| 5 · Anexo | El §2 (matriz de finalidades, procedimiento de carga accidental) y el §8 (tabla de conservacion de nueve filas, con la de lapida y recibo) migrados al regimen del 8.6(h) | 60 796 B, SHA-256 `d27191c5…bdeb77` |
+| 6 · Paquete | Los cinco adjuntos con su huella, la nota al abogado y el manifiesto actualizado | `paquete-abogado-2026-10-30/` |
+
+**Por que** — el owner confirmo el plan completo y dio luz verde a las dos piezas (Anexo de Encargo y
+manifiesto). El punto de fondo es el mismo de siempre: **el texto no puede prometer lo que el codigo no
+hace**.
+
+**Tests** — suite del `firma-service`: **2000 · 1997 verdes · 1 rojo · 2 omitidos**. El unico rojo es
+`ADVE6.7` (zod coerce), que ya venia roto de la linea base. Se agregaron `tests/conservacion-8-6-h.test.js`
+(11 casos del 8.6(h) de punta a punta), `tests/services/incidente-datos-sensibles.test.js` y
+`tests/services/empresa-documento-representante.test.js`.
+
+**Decisiones del owner** — el 30-oct: (a) plan legal v1.2 completo, las 8 piezas; (b) luz verde sobre el
+Anexo de Encargo y `legal-readiness.json`. El plan mismo ordena: no publicar, no activar el feature flag,
+no firmar la Constancia, sin commit ni push. **Eso se respeta: nada se publico, nada se firmo, nada se
+pusheo y no se bumpeo la version.**
+
+**Bugs encontrados** — tres, y los tres eran huecos entre el texto y el codigo, no del codigo:
+
+1. **El 10.5(g) seguia diciendo que la pantalla de firma muestra el numero completo**, contradiciendo el
+   1.2 nuevo y el codigo que el 2b escribio. El plan lo pedia (punto b de la decision D2) y la primera
+   pasada de texto no lo cubria. Corregido: la pantalla muestra el tipo de documento y los ultimos
+   cuatro digitos, y el contraste con la identificacion completa se hace en el RUES.
+2. **El 8.6(h) era inerte en el camino principal.** La maquinaria de retencion existia y funcionaba, pero
+   `retencion.planificar` calculaba siempre una fecha (veinte anos desde la firma) cuando la Empresa no
+   declaraba plazo, y con fecha no hay nada que retener. El texto nuevo dice que sin plazo declarado no
+   hay plazo. Ahora, sin plazo declarado, no hay fecha: el registro queda retenido y se reporta; y cuando
+   la Empresa declara su plazo, la retencion cesa y los registros recalculan su fecha.
+3. **El manifiesto y la nota quedaban desalineados con el texto.** La nota todavia remitia a los "3 y 5
+   anos del 8.6(h)" (que D1 borro) y afirmaba una version de paquete que no se pudo verificar. Corregido
+   sin re-serializar el manifiesto: se reemplaza sobre el crudo, porque `legal-readiness.json` escapa el
+   no-ASCII y `JSON.stringify` no reproduce su formato.
+
+**La consecuencia que el owner tiene que decidir** — el 8.6(h) nuevo no es solo redaccion: cambia el
+comportamiento. Mientras una Empresa no declare su tabla de retencion documental, sus registros se
+acumulan como pendientes y **nada de lo que firme se suprime**. Antes el sistema aplicaba veinte anos de
+custodia por defecto y si suprimia. Si se prefiere el comportamiento anterior, hay que reescribir el
+8.6(h) y devolver la custodia de reserva: no se puede dejar el texto como esta y el codigo como estaba.
+Queda escrito en el §2.5 de la nota al abogado.
+
+**Archivos tocados** — `firma-service/`: `legal-readiness.json`, `scripts/fixtures/acuerdo-v1.2-cambios.json`,
+`scripts/armar-paquete-abogado.js` (nuevo), `scripts/correspondencia-texto-codigo.js` (nuevo),
+`scripts/limpiar-rastro-prueba.js`, `src/services/{retencion,conservacion,empresa,supresion,reciboSupresion,
+readinessLegal,incidenteSalud,publicFlow,mailer,pdfGen}.js`, `src/routes/admin-incidentes.js` (nuevo),
+`src/db/schema/047_prueba_aceptacion_supresion.sql` y `048_prueba_aceptacion_append_only.sql` (nuevos),
+`src/server.js`, `web/firma/app.js`, `tests/` (varios). Fuera: `legal/anexo-encargo.html` y su copia en
+`sitio/`, `modules/gestion-humana/firma-electronica/index.js`, `docs/API.md`, los documentos de
+`docs/gestion-humana/firma-electronica/` y el paquete del abogado.
+
+**Commits** — **ninguno**. Todo queda en el arbol de trabajo, sin commitear y sin pushear, esperando el
+OK del owner. La rama sigue en `Dev-Pc` en `38796e0c` (paquete 988), con `origin/Dev` cuatro commits atras.
+
+**La tabla de correspondencia** — `scripts/correspondencia-texto-codigo.js` genera el mapa numeral ->
+archivo y linea -> test, y **se genera, no se escribe a mano**: una tabla escrita a mano se desactualiza y
+sigue afirmandolo. Hoy da **18 filas, 18 implementadas, 0 pendientes**, y distingue *presencia* (el ancla
+debe estar) de *ausencia* (el ancla prohibido no debe estar). Es el adjunto 5 del paquete.
+
+**Lo que sigue bloqueado** — el despliegue de la v1.2 no esta automatizado: `deploy/` no arma el texto ni
+actualiza el manifiesto del servidor, asi que publicar exige empalmar, subir el texto, actualizar el
+manifiesto del servidor con la huella nueva y verificar `readiness-legal` en verde, a mano. Y siguen
+faltando la llave SSH en el portatil (la red ya llega por Tailscale) y las cuatro llaves de la firma,
+que dan 401.
+
+---
+## 2026-10-30 (tarde) — Linea legal cerrada en v1.3 por especificacion del abogado
+
+**Que se ordeno.** El abogado adjunto una especificacion el 30-oct-2026 (12:59) que **reemplaza** el plan
+v1.2. Trae T1 (el 5.1 separado en deberes legales y operativos), T2 (las politicas de seguridad solo
+obligan si el firmante pudo conocerlas antes de usarlas), D1 (se elimina la retencion indefinida y aparece
+una tabla supletoria de conservacion administrada por K+AIR), E1 (matriz de finalidades en Grupo A y Grupo B),
+E2 (una sola fuente de configuracion) y N1 a N6 (el Anexo de Nube). El registro completo de la
+especificacion quedo en `docs/gestion-humana/firma-electronica/especificacion-abogado-2026-10-30.md`, que es
+la `fuente_ruta` del JSON de cambios de la v1.3.
+
+**El Acuerdo v1.3.** Se arma en dos pasos reproducibles: `scripts/construir-acuerdo-v1.3.js` deriva el JSON de
+cambios de la v1.2 aplicando SOLO los deltas de la especificacion (5.1, 5.6 nuevo, 8.6, 3.6(g), 10.4(a), 10.6 y
+12.7), y `scripts/empalmar-acuerdo-v1.1.js` relee la v1.0 sellada y sella. Texto final: **72.069 caracteres,
+73.056 bytes, SHA-256 `2f8884c36f7450728c452db9f7329e2eecd63874cc798405875911698e71a875`**. Sin corchetes ni
+marcas de borrador; la fecha de vigencia la fija el owner y sigue pendiente.
+
+- **T1**: el 5.1 queda en dos bloques. Los tres deberes legales son los del articulo 2.2.2.47.6 del Decreto
+  1074 de 2015 con la redaccion que la auditoria del Capitulo V ya contrasto contra la compilacion oficial,
+  incluido el literal c) completo (el aviso a cualquier persona que posea, haya recibido o vaya a recibir, que
+  en la v1.2 estaba reducido a avisar a la Empresa y a K+AIR). En "Adicionalmente" quedan d) y e), y el deber
+  de cumplir las condiciones del Acuerdo y de la legislacion, que antes estaba dentro del literal a).
+- **T2**: literal f) con la redaccion literal del abogado, mas un **5.6 nuevo** que declara el mecanismo con el
+  que el firmante conoce las politicas: la pantalla muestra la version junto con el texto y la aceptacion
+  registra texto, huella SHA-256 y fecha y hora. No se promete un versioning que el codigo no tiene: se usa el
+  que ya existia.
+- **D1**: el 8.6(a) fija la precedencia (reglas legales que no se bajan, tabla de la Empresa, y a falta de
+  plazo declarado la tabla supletoria de K+AIR). El 8.6(h) empieza con "No hay retencion indefinida". El
+  **12.7 y el 3.6(g) tambien se ajustaron**: los dos seguian prometiendo el mecanismo viejo, y el barrido del
+  texto lo detecto antes de que llegara al abogado.
+
+**D1 en el codigo** (migracion `049_conservacion_supletoria.sql`, con `categoria_conservacion`,
+`plazo_conservacion_fuente` y `fecha_inicio_conservacion`). La fuente unica es
+`firma-service/config/tabla-conservacion.json`, con ocho categorias; de ella salen el plazo por defecto del
+codigo, la tabla publicada del §8 del Anexo de Encargo y la regla que se congela en cada firma. Cada documento
+guarda el plazo que le fue aplicado, con su fuente y la fecha desde la que corre. **El hold por plazo no
+declarado ya no se pone en el alta** (la maquinaria de liberacion se conserva para las filas que ya lo tienen);
+`recalcularPlazosDeclarados` corre en cada `empresa.update()` y solo toca las filas sin fecha. Se conservan el
+piso de veinte (20) anos del SG-SST desde el cese y el hold del contrato individual mientras subsista la
+relacion laboral. **Los plazos de diez (10) y cinco (5) anos NO se activan en produccion** hasta que el abogado
+los valide.
+
+**Anexo de Encargo** — la matriz E1 (ocho finalidades del 10.3, **Grupo A siete y Grupo B una** — 10.3(h), no
+habilitada, pendiente de entrega de informacion por la Empresa —, con los nueve campos pedidos y sin inventar
+bases juridicas) y el §8 generado desde la fuente unica. Todo por `scripts/generar-anexo-encargo.js`, que es
+idempotente y se puede correr en modo `--check`. Correcciones de coherencia aplicadas: la fecha del pie (27 ->
+30 de octubre), un `</p>` de mas en el 10.8(d), y la seccion 13 completada con los articulos que el propio
+Anexo cita pero no listaba. **85.947 bytes, SHA-256 `8c54a8deb51f44a608cef769caa6121961da50dce66517fcfe2aab16aeecf6d7`**;
+`legal/` y `sitio/` byte a byte iguales.
+
+**Anexo de Nube** — N1 (el papel de Google LLC documentado como proveedor de un Gmail de consumo, sin DPA
+empresarial, sin subencargo contractual y sin contrato de transmision), N3 (Circular 002 de 2025 de la SIC
+documentada, sin declarar comunicacion previa, con la conclusion juridica pendiente de revision profesional),
+N4 (RNBD con checklist de cuatro puntos, sin declarar inscrita ni exenta), N5 (sin contrato de transmision
+ficticio ni NCV) y N6 (las tres respuestas, incorporadas). El §5 trae la ficha tecnica del canal OTP: lo
+verificable en el codigo va con archivo y linea, el resto con `[PENDIENTE: el owner completa con la evidencia]`.
+**Dieciseis marcadores de texto pendiente** a la vista. **51.076 bytes, SHA-256
+`ad9ddcd45f20b80bdfb3a5026b60f15d29300c061ec3d342e3e82c94a0e5baa7`**.
+
+**Un hallazgo que hay que mirar** — la regla "por OTP no se envia ningun documento laboral completo" tiene una
+excepcion real: la **copia del documento firmado en papel, con su registro de firma autografica, si viaja por
+correo con adjunto** (`mailer.js`). Es el unico flujo con adjunto, y por eso la regla se escribio con esa
+excepcion explicita en vez de ser falsa. El remitente efectivo del enlace es la cuenta de la Empresa cuando
+esta tiene una configurada, y la del Encargado cuando no.
+
+**Un bug del readiness que estaba rojo desde la v1.2** — `readinessLegal.js` comparaba el texto contra la cadena
+fija `v1.1`, asi que con el archivo v1.2 el control reportaba "Faltan clausulas: Version del Acuerdo: v1.1"
+sobre un texto que decia v1.2. Ahora la version esperada sale del manifiesto (y, si no esta, del nombre del
+archivo). Ademas el control textual del 8.6 cambio a la regla de la v1.3 e **agrego un control de AUSENCIA**: un
+texto que todavia prometa el hold por plazo no declarado **falla**, porque estaria prometiendo un mecanismo que
+el codigo ya no tiene. El test nuevo que lo cubre esta en `tests/readiness-legal.test.js`.
+
+**Pruebas** — `firma-service`: **2025 tests, 2022 verdes, 1 rojo, 2 omitidos**. El rojo es `ADVE6.7: zod acepta
+"5" (coerce)`, **preexistente** y ajeno a esta linea. App: **146 tests, 140 verdes, 6 rojos**, identica a la
+linea base (bandeja-premium-v2, cfg-tabs-scroll-883, firma-constancia-consolidada, firma-constancia-p0-p1,
+firma-deploy-kit, firma-tunnel-kit).
+
+**La tabla de correspondencia** — ahora **21 filas, 21 implementadas, 0 pendientes**. Las tres filas nuevas son
+el 5.1, el 5.6 y el 10.6; el 8.6(a), el 8.6(b) y el 8.6(h) se reescribieron contra la regla nueva, y el 8.6(h)
+lleva un control de AUSENCIA sobre `plazo_no_declarado` en el planificador. El 8.6(b) cambio de anclas porque
+el piso de veinte (20) anos se movio del codigo a la tabla supletoria (`piso_legal`).
+
+**El manifiesto** — `legal-readiness.json` apunta a la v1.3 con sus tres huellas. Se edita con
+`scripts/actualizar-manifiesto-v1.3.js`, que reemplaza literals y **recalcula las huellas desde los archivos
+reales**: el manifiesto es ASCII puro y re-serializarlo con `JSON.stringify` lo romperia (los `\u00e1` se
+convertirian en caracteres reales y el diff seria enorme).
+
+**Nota al abogado** — `paquete-abogado-2026-10-30/nota-al-abogado-2026-10-30.md`, reescrita para la v1.3: ocho
+documentos, los cinco puntos que le quedan, las tres preguntas con las respuestas ya incorporadas, lo que NO
+viaja (la constancia contra el servidor, que no se pudo verificar) y cuatro **interpretaciones declaradas** para
+que las corrija (T2 como literal f); el 5.6 como mecanismo; los parametros en una sola fuente; y que D1 no
+elimino el 8.6(b)). `scripts/verificar-nota-abogado.js` comprueba que cada bytes y cada huella de la nota
+coincidan con el archivo real: **la nota no puede mentir**.
+
+**Commits** — **ninguno**. Todo queda en el arbol de trabajo, sin commitear y sin pushear, esperando el OK del
+owner. La rama sigue en `Dev-Pc` en `38796e0c` (paquete 988), con `origin/Dev` cuatro commits atras. **No se
+bumpeo la version**: el "Acuerdo v1.3" es version de documento, no de app.
+
+**Lo que queda abierto** (todo del lado del abogado o del owner, no del codigo):
+
+1. Aprobar o corregir el texto de la v1.3 contra la huella `2f8884c3…a875`.
+2. Aprobar o corregir el Anexo de Encargo (matriz y §8).
+3. **Validar los parametros de diez (10) y cinco (5) anos**: hasta entonces no se activan en produccion.
+4. Determinar por escrito el papel de Google y las dos conclusiones que el Anexo de Nube deja pendientes
+   (Circular 002 de 2025 y RNBD).
+5. Completar la ficha tecnica del canal OTP con las evidencias del owner (SMTP, MFA, plantilla, registros,
+   incidentes, revocacion). Las credenciales no van al documento ni al repositorio.
+6. Fijar la fecha de vigencia del Acuerdo.
+
+**Lo que sigue bloqueado, igual que antes:** las cuatro llaves de la firma dan 401; falta la llave SSH en el
+portatil (la red llega por Tailscale); la publicacion de la v1.3 no esta automatizada (`deploy/` no arma el
+texto ni actualiza el manifiesto del servidor, asi que publicar es a mano); y la app instalada sigue sin
+Python. El estado del servidor desplegado **no se pudo verificar** y por eso no se afirma nada sobre el.
+
+**Limpieza pendiente** — dos carpetas hermanas en `C:` (`C:\Proyectos de.programación` y `C:\Proyectos de
+programming`) quedaron de erratas de ruta en jornadas anteriores y hoy. Solo contienen scripts de diagnostico
+temporales. El runtime bloquea borrarlas desde aqui: borrarlas a mano, por favor.
+
+## 2026-10-30 (noche) · La compuerta de activación y el despliegue a producción
+
+El owner dijo "pongámoslo en producción". La revisión del camino de despliegue encontró **tres defectos
+jurídicos**, no técnicos: los tres habrían hecho del despliegue un problema legal, no un problema técnico.
+
+**1. La tabla de conservación se desplegaba sin su compuerta.** La tabla declara su propio estado
+(`estado: PROPUESTA. Los plazos de diez (10) y cinco (5) años NO se activan en produccion hasta que el abogado
+los valide`), pero **el código no lo leía**: el planificador aplicaba el plazo por defecto de la tabla (diez (10)
+años) sin mirar. Desplegarlo activaba en producción **exactamente los plazos que el abogado todavía no validó**.
+La compuerta se implementó: la fuente legal lleva su propio interruptor (`aplicacion.activada`) y el código lo
+lee. Con la compuerta **cerrada** (que es como viene), el plazo por defecto es el de custodia del catálogo
+(veinte (20) años desde la firma), que es el que estaba en vigor, y la fila lo dice con su fuente
+(`catalogo_sistema`). Las **excepciones legales** no dependen de la tabla y siguen aplicando con la compuerta
+cerrada: el piso del SG-SST y el hold del contrato sin término. El respaldo congelado del código también arranca
+cerrado, para que la sola falla de leer el archivo no active lo que la compuerta bloquea.
+
+Con la compuerta cerrada **el despliegue es neutro**: el mismo plazo, el mismo texto al Trabajador y el mismo día
+de purga que antes. Es lo que permite desplegar el mecanismo sin activar el parámetro.
+
+**2. `config/` no viajaba en el tar.** El `git archive` del §5.1 de `MIGRACION-SERVIDOR-FIRMA.md` llevaba `src`,
+`web`, `scripts`, `package.json`, `package-lock.json` y `legal-readiness.json`, y se le olvidó `config/`. Sin la
+tabla en disco, el servicio arranca con el **respaldo congelado del código (tres categorías en vez de ocho)**, y
+lo hace **en silencio**. Ahora `config/` viaja, el paso 3 de la guía verifica su hash en disco, y la guía dice
+por qué el texto del Acuerdo que declara el manifiesto también tiene que estar versionado: sin él, el readiness
+del servidor lee un archivo inexistente y reporta huecos que son puro artefacto del empaquetado.
+
+**3. La incoherencia entre el texto vigente y el código.** El Acuerdo **vigente** en producción es la **v1.0**,
+cuyo 8.6 remite a la tabla de retención documental de la Empresa y no describe estos plazos. Desplegar el código
+de la tabla supletoria sin que la v1.3 fuera el Acuerdo vigente habría sido aplicar en producción un plazo por
+defecto que el texto en vigor no describe. Con la compuerta no pasa: la v1.3 va **preparada, no vigente**,
+`publicado: false` en el manifiesto, y el Acuerdo que manda en la base sigue siendo la v1.0.
+
+**Además, un defecto del propio manifiesto:** la clave `"version"` estaba **repetida tres veces** en el bloque
+`acuerdo`, porque `actualizar-manifiesto-v1.3.js` insertaba la clave en cada corrida y no era idempotente. Un
+JSON con la misma clave dos veces no dice lo que parece decir: el último valor gana y el primero desaparece sin
+dejar rastro. El script ahora actualiza la clave si ya está, las notas se escriben por la clave que las contiene
+(no por un prefijo de texto, que hacía que el script solo pudiera correr una vez), y se verificó corriendo dos
+veces seguidas: el archivo queda byte a byte igual.
+
+**Commits** — `bd7113a0` (📦989, el código), `aa568023` (📦990, el texto y la evidencia) y este (📦991, el
+despliegue y el estado al cierre). **No se bumpeo la version**: el "Acuerdo v1.3" es version de documento, no de
+app. El `CHANGELOG.md` no se toco porque su propia cabecera dice que es un registro **por version publicada**, y
+los 📦989 a 📦991 entran con el proximo bump que el owner autorice.
+
+**El paquete de despliegue, armado y verificado** — 750.261 B, 192 archivos, SHA-256
+`02da734368008a9ee4b9f3bde61d896185b92ce1d06f4f247becf60117ae6354`. Verificado por dentro: `config/` con sus dos
+fuentes, `scripts/fixtures/acuerdo-v1.3.txt`, las tres migraciones (047, 048, 049) y los cuatro hashes de los
+documentos coinciden con el manifiesto. La prueba de ida y vuelta por el puente HTTP da el **mismo** SHA-256 que
+el archivo en disco, así que lo que el servidor baje es byte a byte lo que se verifica.
+
+**El puente HTTP quedó levantado** en el portátil (`python -m http.server 8765 --bind 0.0.0.0 --directory
+`%TEMP%\kair-deploy`), alcanzable por Tailscale en `100.120.63.35:8765` y por la LAN en `192.168.40.50:8765`.
+
+**Lo que falta es la última milla y es del owner:** el servidor no tiene shell desde el portátil (falta la llave
+SSH), así que la secuencia `parar → extraer → verificar → migrar → arrancar → verificar` hay que pegarla en la
+terminal de Cockpit, **de un comando por vez**. El `kair_version` del `/health` es un valor fijo: **no dice qué
+código corre**, así que el estado real del servidor sigue sin verificarse, y no se afirma nada sobre él.
+
+**Verificación** — suite del service **2033 tests · 2030 verdes · 1 rojo · 2 omitidos** (el único rojo es
+`ADVE6.7`, el de zod con coerce, preexistente y ajeno a este paquete); app **146 · 140 · 6**, idéntica a la línea
+base. Barrido de caracteres no latinos: 0. EOL de cada archivo conservado (`Historial.md` mixto, `CONTEXT.md` con
+sus CR CR LF, `mailer.js` mixto, `pdfGen.js` CRLF).
+
+**Lo que sigue abierto, igual que antes:** la aprobación del abogado (el texto de la v1.3 contra la huella
+`2f8884c3…a875`, el Anexo de Encargo, **los plazos de diez (10) y cinco (5) años**, el papel de Google, la Circular
+002 de 2025, el RNBD y la ficha técnica del canal OTP), la fecha de vigencia del Acuerdo; las cuatro llaves de la
+firma en 401; el `gh` sin instalar para el release 0.1.252; y la limpieza de las dos carpetas hermanas en `C:`.
+
+---
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

@@ -210,6 +210,13 @@ sudo chown -R kairfirma:kairfirma /opt/kair-firma/app /opt/kair-firma/legal
 # 3. VERIFICAR el hash de lo que quedo en disco (no del repo, no del tar)
 sha256sum /opt/kair-firma/app/src/crypto/token.js
 sha256sum /opt/kair-firma/app/src/services/signRequest.js
+# La tabla de conservacion: sin ella el servicio arranca con el RESPALDO
+# congelado (tres categorias) en vez de las ocho de la tabla.
+sha256sum /opt/kair-firma/app/config/tabla-conservacion.json
+# El texto del Acuerdo que declara el manifiesto: sin este archivo el
+# readiness lee un archivo inexistente y reporta huecos que son puro
+# artefacto del empaquetado.
+ls -l /opt/kair-firma/app/scripts/fixtures/acuerdo-v1.3.txt
 
 # 4. LAS MIGRACIONES, con el servicio parado y ANTES de arrancar.
 #    OJO: con el .env cargado. El .env real esta en /opt/kair-firma/.env y
@@ -284,7 +291,7 @@ New-Item -ItemType Directory -Force -Path "$stage\app" | Out-Null
 # 1. El service, desde el commit
 cd $repo
 git archive --format=tar.gz --output="$env:TEMP\kair-deploy\svc.tar.gz" HEAD `
-  "$svc/src" "$svc/web" "$svc/scripts" "$svc/package.json" "$svc/package-lock.json" "$svc/legal-readiness.json"
+  "$svc/src" "$svc/web" "$svc/scripts" "$svc/config" "$svc/package.json" "$svc/package-lock.json" "$svc/legal-readiness.json"
 tar -xzf "$env:TEMP\kair-deploy\svc.tar.gz" -C "$stage\app" --strip-components=2
 
 # 2. Los documentos legales que el readiness lee
@@ -309,10 +316,21 @@ anterior o cláusula de otrosí; Art. 2.2.4.6.13; Veinte (20) años; Servicio en
 nube / firma-service" —cinco cláusulas que **no faltaban**. Por eso el comando de
 extractción va en `/opt/kair-firma` y no en `/opt/kair-firma/app`.
 
-`git archive` sigue resolviendo lo de siempre: entra **solo lo commiteado** —el
-texto armado de la v1.1 esta en `.gitignore` hasta que lo apruebe el abogado, y
-este metodo no lo sube— y el manifiesto `legal-readiness.json` viaja en la raiz de
-la app, que es donde el readiness lo busca.
+`git archive` sigue resolviendo lo de siempre: entra **solo lo commiteado**. Eso tiene dos
+consecuencias que hay que tener presentes, porque las dos fallan **en silencio**:
+
+- **El texto del Acuerdo que declara el manifiesto tiene que estar versionado**, porque el
+  readiness lo lee en el servidor (`acuerdo.v1_1_archivo` ->
+  `scripts/fixtures/acuerdo-v1.3.txt`). Si no estuviera commiteado, el paquete viajaria
+  sin el y el readiness leeria un archivo inexistente: reportaria huecos que son puro
+  artefacto del empaquetado.
+- **`config/` tiene que estar versionado**, porque es ahi donde vive la tabla de
+  conservacion. Sin ella, el servicio arranca con el RESPALDO congelado en el codigo
+  (tres categorias) en vez de las ocho de la tabla, y lo hace sin avisar.
+
+Lo que NO viaja es lo que no está commiteado, y eso incluye el texto de una versión
+candidata que el abogado todavía no aprobó. El manifiesto `legal-readiness.json` viaja en
+la raiz de la app, que es donde el readiness lo busca.
 
 **Subirlo: el puente HTTP.** El `kair-server` no acepta SSH desde el portatil
 (`Permission denied`): el transporte es un servidor HTTP en el PC y un `curl` en el

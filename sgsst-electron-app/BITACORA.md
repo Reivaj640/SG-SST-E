@@ -8540,3 +8540,122 @@ Y el patrón de chequeo: **"responde" no es "sirve"**. `--version` prueba que el
 binario arranca; no prueba que pueda importar lo que los scripts necesitan. Un
 chequeo de dependencias tiene que hacer `import` de verdad, como hace ahora
 `pythonTieneDependencias`.
+
+## 🔴 El control que comparaba el Acuerdo contra una versión que ya no era (30-oct-2026 — línea legal v1.3)
+
+### El rojo que nadie miró
+
+La línea legal se cerró en v1.3 el 30-oct-2026, aplicando la especificación del abogado (T1, T2, D1, E1, E2,
+N1 a N6). Al correr el readiness contra el texto nuevo, el control textual del Acuerdo salió **rojo**:
+"Faltan cláusulas: Versión del Acuerdo: v1.1".
+
+El texto no decía v1.1. Decía v1.2. Y el control llevaba **semanas** diciendo que el texto no servía, sin que
+nadie lo notara.
+
+### Por qué un control escrito a mano se queda viejo
+
+`analizarAcuerdo(docAcuerdo.texto, 'v1.1')` recibía la versión **declarada a mano**, en el código. El archivo
+que se revisaba sí venía del manifiesto (`acuerdo.v1_1_archivo`), y ese sí se actualizó cuando la v1.2 pasó a ser la
+candidata. Pero la cadena con la que el texto se comparaba se quedó en la v1.1.
+
+El resultado es un control que **parece** verificar el documento y en realidad verifica una constante: si el
+texto hubiera seguido diciendo v1.1 para siempre, el control habría seguido en verde sin mirar el contenido. El
+control no estaba roto por el texto: estaba roto por su propia forma de preguntar.
+
+Y hay un segundo motivo por el que nadie lo notó: **el readiness no se corría contra el texto nuevo**. El
+readiness es un script que se ejecuta; si nadie lo ejecuta contra el candidato, el candidato no existe para él. Un
+control que no se corre no está en rojo ni en verde: no está.
+
+### El gemelo: el control que exigía la regla que el abogado acababa de borrar
+
+La segunda mitad del bug era más silenciosa y más fea. El control textual del 8.6 (`_textoRetencionV12`) exigía
+**la redacción vieja**: que el texto dijera "retención por plazo no declarado" y "lo reporta a la Empresa".
+
+D1 eliminó exactamente ese mecanismo. Así que, en el mismo cambio:
+
+- el texto nuevo dejaba de decir la frase que el control exigía, y
+- el control nuevo tenía que exigir la regla nueva (la tabla supletoria que administra K+AIR), y
+- el **12.7** y el **3.6(g)** seguían prometiendo el mecanismo viejo, y el 12.7 hasta remitía al 8.6(h) como si
+  su contenido fuera el de antes.
+
+Un control de un numeral es un **contrato bidireccional**: tiene que exigir lo que el texto dice **y rechazar** lo
+que el texto dejó de decir. El código tenía los dos problemas, pero con nombres distintos: el control pedía una
+frase que ya no era, y el código hacía una cosa que el texto todavía prometía.
+
+### Lo que se hizo
+
+1. `_versionAcuerdoEsperada(datos, rutaArchivo)`: la versión esperada sale de `manifiesto.acuerdo.version`; si no
+   está, del nombre del archivo; y solo si no está en ninguno de los dos, vuelve a `'v1.1'` como último recurso.
+2. `_textoRetencionV13`: el control textual pasó a exigir la regla de la v1.3 (el piso de veinte (20) años desde el
+   cese, la tabla supletoria que administra K+AIR a falta de plazo declarado, su fundamento y su punto de inicio,
+   y que un cambio no recalcula históricos) **y a rechazar** la redacción vieja: si el texto vuelve a traer "hold
+   por plazo no declarado" o "lo reporta a la Empresa", el control falla.
+3. El barrido del texto por las frases del mecanismo retirado encontró el 12.7 y el 3.6(g). Los dos se corrigieron
+   en la v1.3 antes de mandarse al abogado.
+4. Test nuevo: `readiness · AUSENCIA: un texto que todavía promete el hold por plazo no declarado NO pasa`.
+
+### Lo que hay que llevarse
+
+**Un control que compara contra una constante no comprueba el documento: comprueba la constante.** Y un control
+que no se corre contra el texto nuevo no está en rojo: no está.
+
+El patrón general que dejó la jornada: **un documento legal que cambia de fondo tiene tres consumidores** — el
+texto, el código que lo cumple y el control que lo verifica. Si se cambia uno y no los otros, el sistema no falla:
+**se contradice en voz baja**. Por eso hoy, cuando una regla de fondo cambia, el orden es: (1) barrer el texto por
+las frases del mecanismo retirado, (2) cambiar el código, (3) cambiar el control para que exija lo nuevo y
+rechace lo viejo, y (4) correr los tres contra el mismo artefacto.
+
+## 🔴 Un script que inserta una clave no es idempotente: la tercera corrida deja la clave repetida (30-oct-2026 — línea legal v1.3, despliegue)
+
+### El síntoma
+
+`legal-readiness.json` (el manifiesto legal) tenía **la misma clave repetida tres veces** en el bloque `acuerdo`:
+
+    "version": "v1.3",
+    "version": "v1.3",
+    "version": "v1.3",
+
+El archivo es **JSON puro** y `JSON.parse` lo aceptaba sin quejarse: en un JSON, la clave repetida no es un
+error, gana la última. Es decir que el manifiesto llevaba tres `version` y la que mandaba era la última: el
+archivo **parecía** correcto, el parser no daba ningún error, y casi todos los chequeos pasaban. Lo que no
+pasaba era nada: la primera clave había desaparecido sin dejar rastro.
+
+### Por qué pasó
+
+`actualizar-manifiesto-v1.3.js` insertaba la clave con un reemplazo literal:
+
+    m = m.replace(/"v1_1_fecha":\s*"[^"]*"/, '"version": "' + version + '",\n    "v1_1_fecha": "' + hoy() + '"');
+
+El patrón `v1_1_fecha` **seguía estando después de la primera corrida** (el propio script lo volvía a escribir),
+así que la segunda corrida volvía a encontrarlo e insertaba OTRA `version`. Y la tercera, la misma. El script
+se había corrido una vez por cada ronda de la línea legal, y nadie miró el archivo crudo: se miraba lo que el
+script imprimía, que se veía perfecto.
+
+### El gemelo: las notas se buscaban por un prefijo de texto
+
+El mismo script buscaba las notas del manifiesto por un **prefijo de texto** ("Modelo sin firmar: el 30-oct-2026
+se migraron..."). Eso funciona **una vez**: en la segunda corrida la nota ya era la nueva, el prefijo viejo no
+estaba, y el script salía con error sin tocar nada. Un script que se puede correr **una sola vez** es un script
+que no se puede verificar ni re-ejecutar, que es justo lo contrario de lo que se le pide a un script que genera
+evidencia.
+
+### Lo que se hizo
+
+1. La clave se **actualiza si ya está**, y solo se inserta si no está: el script ahora es **idempotente**, y se
+   verificó corriendo dos veces seguidas — el archivo queda byte a byte igual.
+2. Las notas se escriben con `ponerEnBloque`, que las busca por **la clave que las contiene** (`nota` dentro de
+   `acuerdo`, de `anexo_encargo` y de `modelo`), no por un prefijo de texto.
+3. `ponerEnBloque` ahora reconoce un **string JSON completo** (`(?:[^"\\]|\\.)*`) y no solo `[^"]*`: con el
+   patrón viejo, un valor con comillas escapadas se cortaba en la primera.
+4. `reemplazarNota` se eliminó: era código muerto.
+
+### Lo que hay que llevarse
+
+**Un JSON con la clave repetida no da error: da un archivo que parece correcto y una clave que desapareció sin
+que nadie lo notara.** Y un script que genera evidencia tiene que ser **idempotente por construcción**: correrlo
+dos veces tiene que dejar el archivo igual, porque la segunda corrida es la que verifica que el archivo es el que
+creemos.
+
+Un detalle que salió en el camino y que conviene no olvidar: el `SHA-256` del manifiesto **no cambió** al
+arreglar la clave repetida, porque el manifiesto no se hashea a sí mismo. Lo que cambió fue el archivo. **Un hash
+verifica un archivo, no dice si el archivo está bien formado.**
