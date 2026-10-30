@@ -823,6 +823,139 @@ async function sendPruebaCuenta({ to, cuenta_envio }) {
   };
 }
 
+/**
+ * Avisa a la EMPRESA de que K+AIR bloqueó una solicitud por una carga
+ * accidental de datos de salud (el 10.8(d)(iv) del Acuerdo de uso).
+ *
+ * POR QUÉ ES UN CORREO NUEVO Y NO `sendCopiaAviso`
+ * -------------------------------------------------
+ * `sendCopiaAviso` es el aviso POST-firma: le dice al TRABAJADOR que su
+ * documento quedó firmado y le da el enlace para bajarlo. Este aviso dice lo
+ * contrario: que la solicitud quedó BLOQUEADA y que no se puede firmar ni
+ * reimprimir. Reusar la plantilla del aviso de copia mandaría al destinatario
+ * un enlace a algo que no se puede descargar, y el texto affirmaría una firma
+ * que no ocurrió.
+ *
+ * QUIÉN LO MANDA
+ * --------------
+ * Sale por la cuenta de K+AIR, NO por la cuenta de envío de la Empresa. El
+ * aviso es de K+AIR a la Empresa: si saliera por la cuenta de la Empresa
+ * parecería que la Empresa se avisó a sí misma. (El OTP es el contraejemplo:
+ * ese sale siempre por K+AIR porque es el dato de creación de la firma.)
+ *
+ * QUÉ NO VIAJA
+ * ------------
+ * Ni el documento, ni un adjunto, ni un enlace de descarga, ni el contenido
+ * del archivo que se subió por accidente. El aislamiento del 10.8(d)(ii)
+ * empieza por acá: el aviso no puede ser el camino por el que el documento
+ * llegue a un tercero. Solo viajan el identificador de la solicitud (que no
+ * es dato de identidad ni del documento), la causa invocada y las medidas.
+ *
+ * En dev (jsonTransport): se guarda en `_devInbox` con
+ * tipo='incidente_datos_sensibles', SIN clave `attachments` (para que los
+ * tests puedan comprobar que el aviso no lleva nada adjunto) y con el `canal`
+ * del que salio la direccion: `canal_incidentes` es el que el 10.8(d)(iv)
+ * manda; `responsable_tratamiento_correo` es el respaldo cuando el canal de
+ * incidentes no tiene un correo valido.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo destino.
+ * @param {string} [opts.canal] - De que campo salio la direccion
+ *   ('canal_incidentes' o 'responsable_tratamiento_correo').
+ * @param {string} opts.id_solicitud - ID legible de la solicitud.
+ * @param {string} opts.causa - La causa invocada en el reporte.
+ * @param {string[]} [opts.medidas] - Medidas declaradas por quien reporta.
+ * @param {string} [opts.fecha_reporte] - Fecha y hora del reporte (ISO).
+ * @returns {Promise<{ok: true, messageId: string}>}
+ * @throws Error si `to` no parece correo, o si falla el envío.
+ */
+async function sendAvisoIncidenteDatosSensibles({ to, canal, id_solicitud, causa, medidas, fecha_reporte }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendAvisoIncidenteDatosSensibles: `to` debe ser un correo válido');
+  }
+  if (typeof id_solicitud !== 'string' || id_solicitud.length === 0) {
+    throw new Error('sendAvisoIncidenteDatosSensibles: `id_solicitud` requerido');
+  }
+
+  const subject = 'K+AIR — Solicitud bloqueada por carga accidental de datos de salud';
+  const lineas = [
+    'Hola,',
+    '',
+    'K+AIR registro el reporte de una carga accidental de un documento con datos',
+    'de salud en una solicitud de firma. La solicitud quedo BLOQUEADA.',
+    '',
+    `ID de solicitud: ${id_solicitud}`,
+  ];
+  if (fecha_reporte) {
+    lineas.push(`Fecha del reporte: ${fecha_reporte}`);
+  }
+  lineas.push(
+    '',
+    'Que quedo bloqueado:',
+    '- El enlace de firma no abre: la solicitud no se puede firmar.',
+    '- El documento no se puede reimprimir ni descargar.',
+    '- La solicitud queda retenida por K+AIR: no se suprime mientras se resuelve',
+    '  el reporte.',
+    '',
+    'Causa invocada en el reporte:',
+    causa || '(no se informo)',
+    ''
+  );
+  if (Array.isArray(medidas) && medidas.length > 0) {
+    lineas.push('Medidas declaradas por quien reporto:');
+    for (const m of medidas) lineas.push(`- ${m}`);
+    lineas.push('');
+  }
+  lineas.push(
+    'K+AIR no comunica ese documento a terceros, no lo usa para otra finalidad y',
+    'lo conserva solo mientras se resuelve el reporte.',
+    '',
+    'Como Responsable del tratamiento, la Empresa resuelve lo que le corresponde',
+    'por su cuenta, incluido el aislamiento del documento original que ella',
+    'conserva.',
+    '',
+    'Este correo no lleva el archivo adjunto ni ningun enlace de descarga: el',
+    'documento no sale de K+AIR por este canal.',
+    '',
+    'K+AIR',
+    ''
+  );
+
+  const body = lineas.join('\n');
+  const cuenta = _cuentaDe(null);   // el aviso es de K+AIR, no de la Empresa
+
+  if (config.env === 'production') {
+    const transporter = _transporterDe(cuenta);
+    // SIN attachments y SIN enlaces: el documento no viaja.
+    const info = await transporter.sendMail({
+      from: _fromDe(cuenta),
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  logger.info('[DEV-INCIDENTE-DATOS-SENSIBLES] Aviso de bloqueo enviado a la Empresa', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    id_solicitud,
+    canal: canal || null,
+    remitente: _remitente(cuenta),
+    message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
+  });
+  const entry = {
+    to, subject, body, tipo: 'incidente_datos_sensibles',
+    id_solicitud,
+    canal: canal || null,
+    remitente: _remitente(cuenta),
+    sentAt: new Date().toISOString(),
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return { ok: true, messageId: 'dev-incidente-datos-sensibles-' + Date.now() };
+}
+
 module.exports = {
   sendOTP,
   sendCopiaFirmadoPapel,  // 9A: la copia en PAPEL sí viaja por correo (adjunta).
@@ -830,6 +963,9 @@ module.exports = {
   sendInvite,
   sendInviteForCompany,  // I-FIRMA-DUAL: invitación al rep legal (2da firma)
   sendPruebaCuenta,      // Prueba de la cuenta de envío de la Empresa.
+  // 10.8(d)(iv): aviso a la Empresa de que la solicitud quedó bloqueada por
+  // una carga accidental de datos de salud. SIN adjunto y SIN enlace.
+  sendAvisoIncidenteDatosSensibles,
   getDevInbox,
   clearDevInbox,
 };

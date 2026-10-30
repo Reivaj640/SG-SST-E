@@ -50,6 +50,7 @@ const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
 const representanteService = require('./representante');
 const excepcionService = require('./excepcionHabilitacion');
 const auditoriaService = require('./empresaAuditoria');
+const conservacionService = require('./conservacion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -433,13 +434,104 @@ function snapshotColumnsFor(id_empresa) {
 }
 
 /**
+ * Tipos de documento de IDENTIFICACIÓN que usa el sistema: CC, CE, TI, PPT, PA.
+ *
+ * Es la misma lista de `identificacion_tipo` (src/schemas/index.js) y de
+ * `TIPOS_DOCUMENTO_IDENTIDAD` (src/routes/verificacion.js). El documento del
+ * representante se declara con el mismo vocabulario.
+ */
+const TIPOS_DOCUMENTO_IDENTIDAD = ['CC', 'CE', 'TI', 'PPT', 'PA'];
+
+/**
+ * Parte el documento del representante en TIPO y NÚMERO.
+ *
+ * La columna maestra (`gh_firma_empresas.representante_legal_identificacion`)
+ * es texto libre y guarda las dos cosas juntas: 'CC 1010101010' es lo que
+ * escribe el puente de escritorio (ver `_formatRepId` en
+ * modules/gestion-humana/firma-electronica/index.js) y lo que documenta
+ * API.md.
+ *
+ * POR QUÉ EL TIPO NO SE ADIVINA: el tipo NO se deduce del número. Un número
+ * que empieza por 'E' puede ser una cédula de extranjería o un registro mal
+ * capturado; adivinarlo sería mostrarle al firmante un dato que K+AIR no
+ * sabe. Si la Empresa no declaró un tipo reconocible, el tipo sale null y la
+ * pantalla muestra solo los últimos cuatro dígitos.
+ *
+ * @param {string} valor - El texto tal como está en la columna maestra.
+ * @returns {{tipo: string|null, numero: string}}
+ */
+function _partirDocumentoRepresentante(valor) {
+  const texto = typeof valor === 'string' ? valor.trim() : '';
+  if (!texto) return { tipo: null, numero: '' };
+  const corte = /^([A-Za-z]{2,4})\s*[:#-]?\s+(\S.*)$/.exec(texto);
+  if (corte) {
+    const tipo = corte[1].toUpperCase();
+    if (TIPOS_DOCUMENTO_IDENTIDAD.includes(tipo)) {
+      return { tipo, numero: corte[2].trim() };
+    }
+  }
+  return { tipo: null, numero: texto };
+}
+
+/**
+ * Quita los separadores del número ('CC 12.345.678' -> '12345678').
+ *
+ * El objetivo es que los últimos cuatro sean DÍGITOS y no los últimos cuatro
+ * caracteres: con separadores, '12.345.678' terminaría en '5.678'.
+ */
+function _normalizarNumeroDocumento(numero) {
+  return String(numero || '').replace(/[\s.\-_:]+/g, '').trim();
+}
+
+/**
+ * El documento del representante legal, listo para MOSTRAR (D2 de la v1.2).
+ *
+ * Lo que sale de acá es lo único que puede llegar a la pantalla del firmante:
+ * el TIPO declarado y los ÚLTIMOS CUATRO dígitos. El número completo no sale:
+ * ni en claro, ni cifrado, ni "por si acaso".
+ *
+ * El enmascarado NO se reimplementa acá: se reutiliza el de
+ * `services/representante.js` (`estadoEnmascarado` / `numeroEnmascarado`),
+ * que es el mismo que usa la Constancia. Si ese servicio no puede abrir el
+ * número, el estado queda 'error' y el valor es null: la pantalla dice que
+ * no está disponible en vez de inventar o de mostrar el número.
+ *
+ * @param {string} id_empresa
+ * @param {string|null} valor - El texto de la columna maestra.
+ * @returns {{estado: 'dato'|'sin_dato'|'error', tipo: string|null, valor: string|null, enmascarado: string|null, error: string|null}}
+ */
+function documentoRepresentanteEnmascarado(id_empresa, valor) {
+  const partes = _partirDocumentoRepresentante(valor);
+  const numero = _normalizarNumeroDocumento(partes.numero);
+  if (!numero) {
+    return { estado: 'sin_dato', tipo: null, valor: null, enmascarado: null, error: null };
+  }
+  // El snapshot mínimo que el servicio de representante ya sabe abrir.
+  const snapshot = { numero_identificacion: numero };
+  const est = representanteService.estadoEnmascarado(snapshot, id_empresa);
+  const enmascarado = representanteService.numeroEnmascarado(snapshot, id_empresa);
+  return {
+    estado: est.estado,
+    tipo: partes.tipo,
+    enmascarado: enmascarado,
+    valor: enmascarado ? (partes.tipo ? `${partes.tipo} ${enmascarado}` : enmascarado) : null,
+    error: est.error,
+  };
+}
+
+/**
  * Shape para la mini-app: qué campos se exponen al firmante.
  *
- * `representante_legal_identificacion` se expone COMPLETO a propósito: es el
- * representante legal de una sociedad, dato público en el registro mercantil,
- * y es justamente contra ese dato contra el que el firmante verifica que
- * quien firma por la empresa es quien dice ser. En la verificación pública
- * (`/verify`) sí se enmascara, porque ahí el lector no es el firmante.
+ * D2 (Acuerdo v1.2): `representante_legal_identificacion` NO se expone
+ * completo. Lo que viaja es el TIPO declarado y los ÚLTIMOS CUATRO dígitos
+ * ('CC ****1010'), nunca el número completo. El enmascarado lo hace
+ * `documentoRepresentanteEnmascarado()` y la mini-app tiene una segunda
+ * barrera que lo repite en el cliente (ver web/firma/app.js), para que un
+ * servidor viejo o una respuesta cacheada no muestren el numero en claro.
+ *
+ * Lo que SÍ sigue saliendo completo es lo que no es dato de identidad: la
+ * razón social, el NIT y el domicilio de la Empresa, que el firmante necesita
+ * para saber a quién está firmando.
  *
  * @param {string} id_empresa
  * @param {object} [overrides] - Texto de retención propio de la solicitud
@@ -467,13 +559,26 @@ function publicViewFor(id_empresa, overrides) {
     ? (extra.norma_conservacion || null)
     : ((empresa && empresa.norma_conservacion) || null);
 
+  // D2 (Acuerdo v1.2): el documento del representante NO viaja completo al
+  // firmante. Viaja el tipo declarado y los últimos cuatro dígitos. El
+  // enmascarado es el del servicio de representante (el mismo de la Constancia).
+  const documentoRep = documentoRepresentanteEnmascarado(
+    id_empresa,
+    snap.datos.representante_legal_identificacion
+  );
+
   return {
     id_empresa: snap.datos.id_empresa,
     razon_social: snap.datos.razon_social,
     nit: snap.datos.nit,
     domicilio: snap.datos.domicilio,
     representante_legal: snap.datos.representante_legal,
-    representante_legal_identificacion: snap.datos.representante_legal_identificacion,
+    // 'CC ****1010' — el tipo y los últimos cuatro. Nunca el número completo.
+    representante_legal_identificacion: documentoRep.valor,
+    // El tipo por separado, para quien quiera construir la etiqueta sin parsear.
+    representante_legal_identificacion_tipo: documentoRep.tipo,
+    // Solo la máscara ('****1010'), sin el tipo.
+    representante_legal_identificacion_enmascarada: documentoRep.enmascarado,
     responsable_tratamiento: snap.datos.responsable_tratamiento,
     responsable_tratamiento_correo: snap.datos.responsable_tratamiento_correo,
     canal_pqrs: snap.datos.canal_pqrs,
@@ -606,6 +711,8 @@ function update(id_empresa, datos, ctx = {}) {
     ? (actual.dominios_corporativos || null)
     : _norm('dominios_corporativos', datos.dominios_corporativos);
 
+  const plazos = _normEntero('plazo_retencion_dias', datos.plazo_retencion_dias);
+
   db.prepare(`
     UPDATE gh_firma_empresas
     SET ${EDITABLE_FIELDS.map((c) => `${c} = ?`).join(', ')},
@@ -617,7 +724,7 @@ function update(id_empresa, datos, ctx = {}) {
     WHERE id_empresa = ?
   `).run(
     ...EDITABLE_FIELDS.map((c) => valores[c]),
-    _normEntero('plazo_retencion_dias', datos.plazo_retencion_dias),
+    plazos,
     norma,
     deberLegal,
     dominios,
@@ -639,11 +746,44 @@ function update(id_empresa, datos, ctx = {}) {
     motivo: ctx.motivo || null,
   });
 
+  // EL RECÁLCULO DE LOS REGISTROS RETENIDOS POR PLAZO NO DECLARADO.
+  //
+  // El 8.6(h) del Acuerdo v1.2: "la retención por plazo no declarado cesa
+  // cuando la Empresa declara ese plazo para la categoría, y desde entonces
+  // rigen las reglas generales de este numeral".
+  //
+  // Con la tabla supletoria de conservación (decisión D1 del abogado), el
+  // recálculo ya no DEPENDE de que la Empresa declare: el plazo por defecto
+  // de la tabla es el que se aplica cuando ella no declaró uno. Por eso el
+  // recálculo corre en CADA actualización de la Empresa: es la operación
+  // EXPLÍCITA, AUTORIZADA y AUDITADA que pone en regla las filas que
+  // quedaron con el hold viejo ('plazo_no_declarado') en las bases
+  // existentes. Sin ella, esas filas quedarían retenidas para siempre: nadie
+  // más las movería.
+  //
+  // LO QUE EL RECÁLCULO NO TOCA
+  // ---------------------------
+  // Las firmas que YA tienen fecha de conservación: son registros históricos
+  // ya calculados, y su plazo, su fuente y su fecha de inicio quedan
+  // CONGELADOS (migración 049). Cambiar el plazo de la Empresa no mueve un
+  // documento que ya se firmó.
+  const plazoAntes = Number(actual.plazo_retencion_dias);
+  const plazoAhora = Number(plazos);
+  const declaroAhora = Number.isInteger(plazoAhora) && plazoAhora > 0;
+  const cambioDePlazo = declaroAhora && plazoAntes !== plazoAhora;
+  const recalculo = conservacionService.recalcularPlazosDeclarados(id_empresa, {
+    actor: ctx.actor || 'empresa',
+    motivo: ctx.motivo || (cambioDePlazo
+      ? 'la Empresa declara su plazo de retencion documental'
+      : 'puesta en regla de los registros retenidos por plazo no declarado'),
+  });
+
   logger.info('Empresa actualizada', {
     id_empresa,
     campos_actualizados: EDITABLE_FIELDS.filter((c) => datos[c] !== undefined),
     conservacion_por_deber_legal: Boolean(deberLegal),
     campos_con_rastro: cambios.map((c) => c.campo),
+    retenciones_liberadas: recalculo ? recalculo.liberados : 0,
   });
 
   return actualizada;
@@ -1286,6 +1426,7 @@ module.exports = {
   parseSnapshot,
   parseSnapshotParaMostrar,
   documentoRepresentanteParaMostrar,
+  documentoRepresentanteEnmascarado,
   publicViewFor,
   create,
   update,

@@ -32,7 +32,15 @@ const signRequestService = require('../src/services/signRequest');
 const mailer = require('../src/services/mailer');
 const {
   resetDb, seedActiveAgreement, createSignRequestWithIdentificacion, makeApp,
+  tablaConservacionActivada,
 } = require('./helpers');
+
+// La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada: los
+// plazos de diez (10) y cinco (5) años no los validó el abogado. Estos tests
+// verifican el MECANISMO de la tabla, así que la usan con la compuerta
+// abierta; el estado cerrado tiene sus propios tests en
+// tests/services/conservacion-supletoria.test.js.
+const TABLA_ACTIVADA = tablaConservacionActivada();
 
 const EMPRESA = '900123456';
 
@@ -109,10 +117,14 @@ test('catálogo · el id legacy CUSTODIA_80_ANOS se traduce al vigente', () => {
     regla_retencion: 'CUSTODIA_80_ANOS',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
     empresa: EMPRESA_SIN_TABLA,
+    tabla_conservacion: TABLA_ACTIVADA,
   });
   assert.equal(plan.regla, 'CUSTODIA_20_ANOS',
     'la fila dice la regla que de verdad se aplicó');
-  assert.equal(plan.fecha_conservacion, CUSTODIA_20);
+  assert.ok(plan.fecha_conservacion,
+    'y, sin plazo declarado, el plazo es el de la tabla supletoria (decisión D1)');
+  assert.equal(plan.aviso, 'RETAIN_FECHA');
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria');
 });
 
 test('catálogo · resuelve la categoría explícita y la derivada', () => {
@@ -186,17 +198,31 @@ test('catálogo · rechaza una categoría desconocida', () => {
 // 2. Planes de retención (funciones puras)
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('custodia · sin plazo de empresa, 20 años desde la firma', () => {
+test('custodia · sin plazo de empresa el plazo es el de la tabla supletoria', () => {
+  // Decisión D1: a falta de plazo declarado por la Empresa, el plazo es el
+  // de la TABLA SUPLETORIA de conservación administrada por K+AIR. No hay
+  // fecha nula por falta de configuración, y el texto que se comunica lo dice
+  // de forma honesta: el plazo es del sistema.
+  //
+  // La excepción es la del 8.6(b): los documentos del SG-SST, que tienen plazo
+  // propio en el Acuerdo (veinte años desde el cese).
   const plan = retencion.planificar({
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
     empresa: EMPRESA_SIN_TABLA,
+    tabla_conservacion: TABLA_ACTIVADA,
   });
   assert.equal(plan.regla, 'TABLA_EMPRESA');
-  assert.equal(plan.fecha_conservacion, CUSTODIA_20);
-  assert.equal(plan.anios, 20);
+  assert.ok(plan.fecha_conservacion,
+    'la tabla supletoria aporta el plazo: nunca hay fecha nula por falta de plazo');
+  assert.equal(plan.anios, 10);
   assert.equal(plan.aviso, 'RETAIN_FECHA');
-  assert.match(plan.texto, /20 años/);
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria');
+  assert.equal(plan.plazo_conservacion_dias, 3650);
+  assert.match(plan.texto, /tabla de conservación del sistema/);
+  assert.doesNotMatch(plan.texto, /pendiente de declaración/);
+  assert.doesNotMatch(plan.texto, /20 años/,
+    'el texto no puede prometer los veinte años que no aplican');
   assert.equal(plan.hold, null);
 });
 
@@ -250,16 +276,41 @@ test('contrato electrónico · hold sin fecha de supresión', () => {
 });
 
 test('historia laboral · el Concepto AGN orienta el plazo sin fijarlo', () => {
+  // Con plazo declarado por la Empresa, el texto que se le comunica al
+  // Trabajador cita el Concepto AGN (que orienta el plazo de la historia
+  // laboral sin fijarlo) y la jurisprudencia que lo sostiene.
   const plan = retencion.planificar({
     categoria_retencion: 'HISTORIA_LABORAL',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
-    empresa: EMPRESA_SIN_TABLA,
+    // La Empresa declara el plazo COMPUTABLE pero no un texto libre: entonces
+    // el texto que se le comunica al Trabajador es el de la regla, que cita el
+    // Concepto AGN. (Si la Empresa declarara su propio texto, mandaría el
+    // suyo: es su tabla de retención y su redacción.)
+    empresa: Object.assign({}, EMPRESA_CON_TABLA, { plazo_retencion: null }),
   });
-  assert.equal(plan.fecha_conservacion, CUSTODIA_20);
+  assert.equal(plan.fecha_conservacion, '2030-12-31T00:00:00.000Z');
   assert.match(plan.texto, /Concepto 2-2017-01654/);
   assert.match(plan.texto, /T-470\/2019/);
   assert.doesNotMatch(plan.texto, /80 a 100 años/,
     'el rango de 80 a 100 años no es el plazo del sistema');
+});
+
+test('historia laboral · sin plazo declarado, el plazo es el de la tabla supletoria', () => {
+  // La historia laboral no tiene plazo propio en el Acuerdo: sin plazo
+  // declarado por la Empresa, aplica el de la tabla supletoria, y el texto
+  // sigue citando la orientación del Concepto AGN (que orienta sin fijar).
+  const plan = retencion.planificar({
+    categoria_retencion: 'HISTORIA_LABORAL',
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    empresa: EMPRESA_SIN_TABLA,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+  assert.ok(plan.fecha_conservacion);
+  assert.equal(plan.aviso, 'RETAIN_FECHA');
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria');
+  assert.match(plan.texto, /tabla de conservación del sistema/);
+  assert.match(plan.texto, /Concepto 2-2017-01654/,
+    'la orientación legal de la categoría también se comunica cuando el plazo es del sistema');
 });
 
 test('el deber legal de la Empresa gana sobre cualquier plazo', () => {
@@ -319,6 +370,20 @@ test('una Empresa sin plazo declarado puede firmar: 20 años de custodia', async
   assert.equal(signRequest.fecha_conservacion, esperado.toISOString());
   assert.equal(signRequest.hold_legal, 0);
   assert.match(signRequest.plazo_retencion_aplicable, /20 años/);
+
+  // 049 · la fila deja la trazabilidad de la regla que se aplicó: el plazo,
+  // su fuente y la fecha de inicio del cómputo. Con eso, el §4 se puede
+  // demostrar documento por documento.
+  const filaFirma = db.prepare(
+    'SELECT plazo_conservacion_dias, plazo_conservacion_fuente, '
+    + 'fecha_inicio_conservacion, categoria_conservacion '
+    + 'FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(signRequest.id_solicitud);
+  assert.equal(filaFirma.plazo_conservacion_dias, 7305);
+  assert.equal(filaFirma.plazo_conservacion_fuente, 'piso_legal');
+  assert.equal(filaFirma.categoria_conservacion, 'SST_ESPECIAL');
+  assert.ok(filaFirma.fecha_inicio_conservacion,
+    'y la fecha de inicio del cómputo queda registrada');
 });
 
 test('la categoría la deriva el sistema del tipo de documento', async () => {

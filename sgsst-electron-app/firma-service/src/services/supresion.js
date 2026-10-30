@@ -89,6 +89,17 @@ const CATEGORIAS_DATOS = [
 ];
 
 /**
+ * Las categorías de dato que se lleva la supresión de la PRUEBA DE ACEPTACIÓN
+ * (el 12.7). Es lo que se escribe en su lápida y en su recibo: una sola
+ * categoría, la prueba misma.
+ */
+const CATEGORIAS_PRUEBA = [
+  'prueba_aceptacion',
+];
+
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+/**
  * Las columnas de la fila que son datos personales o derivados de ellos.
  * Se documentan aquí para que la lista y el borrado no se separen nunca.
  */
@@ -466,13 +477,332 @@ function suprimir(opts = {}) {
 }
 
 /**
+ * LA VÍA DE SUPRESIÓN DE LA PRUEBA DE ACEPTACIÓN — `pruebaAceptacion`
+ * =======================================================================
+ *
+ * EL 12.7 (Acuerdo v1.2)
+ * ---------------------
+ * "La Empresa conserva la prueba de la aceptación junto con la versión
+ *  aceptada, la huella del texto, la fecha y hora y el identificador de la
+ *  solicitud, conforme al artículo 2.2.2.25.2.5. Esta prueba subsiste a la
+ *  supresión de los demás registros del 8.6 y se sujeta al plazo de
+ *  conservación que la Empresa declare para ella; mientras ese plazo no esté
+ *  declarado, la prueba no se suprime y queda retenida por esa razón, conforme
+ *  al 8.6(h)."
+ *
+ * QUÉ HACE ESTA FUNCIÓN
+ * ---------------------
+ * Abre la vía y deja constancia: registra la SOLICITUD de supresión de la
+ * prueba con el plazo declarado por la Empresa, su fundamento y su punto de
+ * inicio, y —cuando ese plazo ya venció— deja la LÁPIDA y el RECIBO de la
+ * supresión, en la misma transacción.
+ *
+ * LO QUE RECHAZA (y por qué)
+ * --------------------------
+ *   1. SIN PLAZO DECLARADO. El 8.6(h): "Si la Empresa no declara un plazo para
+ *      una categoría documental, el registro no se suprime". Sin plazo
+ *      declarado no hay vía: la prueba QUEDA RETENIDA por esa razón (el hold
+ *      lo levanta `conservacion.retainerPorPlazoNoDeclarado`).
+ *   2. SIN FUNDAMENTO O SIN PUNTO DE INICIO. El 8.6(h): "Un plazo sin
+ *      fundamento y sin punto de inicio identificable no es admisible".
+ *   3. CON HOLD VIGENTE. El 8.6(e)(iv): la supresión procede solo si no hay
+ *      hold vigente. El hold de una firma de esa misma solicitud (deber legal
+ *      o plazo no declarado) frena la vía.
+ *
+ * IDEMPOTENCIA
+ * ------------
+ * `id_solicitud` es UNIQUE en las tres tablas de la migración 047: pedir dos
+ * veces la misma vía no duplica ni la solicitud, ni la lápida, ni el recibo.
+ *
+ * QUÉ NO HACE
+ * -----------
+ * No borra la fila de `gh_consentimientos_firma`. Esta función REGISTRA la
+ * supresión y deja su constancia; la eliminación material del dato de la
+ * aceptación es una operación aparte, gobernada por la ventana de purga como
+ * el resto de la supresión. Borrar la prueba desde aquí la dejaría sin
+ * respaldo para el mismo recibo que esta función acaba de escribir.
+ *
+ * @param {object} opts
+ * @param {string} opts.actor - QUIÉN suprime (obligatorio)
+ * @param {string} opts.motivo - POR QUÉ (obligatorio)
+ * @param {string} opts.id_solicitud - la solicitud cuya aceptación se suprime
+ * @param {number} opts.plazo_declarado_dias - el PLAZO DECLARADO, en días
+ * @param {string} opts.fundamento_plazo - el FUNDAMENTO del plazo
+ * @param {string} opts.punto_inicio - el PUNTO DE INICIO del plazo (ISO)
+ * @param {boolean} [opts.dryRun=false] - si es true, solo informa
+ * @returns {object} el estado de la vía
+ */
+function registrarSupresionPruebaAceptacion(opts = {}) {
+  const actor = String(opts.actor || '').trim();
+  const motivo = String(opts.motivo || '').trim();
+  const idSolicitud = String(opts.id_solicitud || '').trim();
+  const dryRun = opts.dryRun === true;
+
+  if (!actor) throw new Error('La supresión de la prueba de aceptación necesita un actor.');
+  if (!motivo) throw new Error('La supresión de la prueba de aceptación necesita un motivo.');
+  if (!idSolicitud) {
+    throw new Error('La supresión de la prueba de aceptación necesita la solicitud.');
+  }
+
+  // EL PLAZO DECLARADO. Sin plazo declarado, la vía NO se abre: el 8.6(h)
+  // ordena retener la prueba y reportar el pendiente, no suprimirla.
+  const dias = Number(opts.plazo_declarado_dias);
+  if (!Number.isInteger(dias) || dias <= 0) {
+    throw new Error(
+      'La supresión de la prueba de aceptación necesita un plazo declarado (días).'
+    );
+  }
+  const fundamento = String(opts.fundamento_plazo || '').trim();
+  if (!fundamento) {
+    throw new Error(
+      'La supresión de la prueba de aceptación necesita el fundamento del plazo.'
+    );
+  }
+  const puntoInicio = String(opts.punto_inicio || '').trim();
+  const punto = new Date(puntoInicio);
+  if (!puntoInicio || Number.isNaN(punto.getTime())) {
+    throw new Error(
+      'La supresión de la prueba de aceptación necesita el punto de inicio del plazo.'
+    );
+  }
+
+  // LA PRUEBA: la aceptación que el Trabajador firmó (el 12.7). Sin ella no
+  // hay nada que suprimir: la vía se dirige a una solicitud que no tiene
+  // prueba de aceptación.
+  const consent = db.prepare(
+    `SELECT id, id_empresa, id_solicitud, version_acuerdo, fecha_aceptacion, estado
+       FROM gh_consentimientos_firma
+      WHERE id_solicitud = ?
+      ORDER BY id DESC
+      LIMIT 1`
+  ).get(idSolicitud);
+  if (!consent) {
+    throw new Error('No hay prueba de aceptación para esa solicitud.');
+  }
+  if (!consent.fecha_aceptacion) {
+    throw new Error('La prueba de aceptación de esa solicitud no está aceptada: no se suprime.');
+  }
+
+  // EL HOLD VIGENTE (el 8.6(e)(iv)). El hold de una firma de esa solicitud
+  // frena la vía: si la firma está retenida, su prueba de aceptación también.
+  const enHold = db.prepare(
+    `SELECT id, id_solicitud, motivo_hold
+       FROM gh_firmas_electronicas
+      WHERE id_solicitud = ? AND hold_legal = 1
+      ORDER BY id`
+  ).all(idSolicitud);
+  if (enHold.length) {
+    throw new Error(
+      'La solicitud tiene un hold vigente: la prueba de aceptación no se suprime.'
+    );
+  }
+
+  // La fecha de conservación: el punto de inicio más el plazo declarado. No hay
+  // nada más en el cálculo: el 8.6(h) no admite un plazo sin fundamento ni sin
+  // punto de inicio.
+  const fechaConservacion = new Date(
+    punto.getTime() + dias * MS_POR_DIA
+  ).toISOString();
+  const vencida = new Date(fechaConservacion).getTime() <= Date.now();
+
+  if (dryRun) {
+    logger.info('Supresión de la prueba de aceptación SIMULADA', {
+      actor,
+      id_solicitud: idSolicitud,
+      plazo_declarado_dias: dias,
+      fecha_conservacion: fechaConservacion,
+      vencida,
+    });
+    return {
+      simulacion: true,
+      id_solicitud: idSolicitud,
+      id_empresa: consent.id_empresa,
+      consent_id: consent.id,
+      estado: vencida ? 'SUPRIMIDA' : 'SOLICITADA',
+      suprimida: false,
+      fecha_conservacion: fechaConservacion,
+      fundamento_plazo: fundamento,
+      punto_inicio: puntoInicio,
+      // LA DECLARACIÓN DEL PLAZO de la prueba, tal como la declaró la Empresa.
+      pruebaAceptacion: {
+        id_solicitud: idSolicitud,
+        plazo_declarado_dias: dias,
+        fundamento_plazo: fundamento,
+        punto_inicio: puntoInicio,
+        fecha_conservacion: fechaConservacion,
+        estado: vencida ? 'SUPRIMIDA' : 'SOLICITADA',
+      },
+    };
+  }
+
+  // UNA TRANSACCIÓN: la solicitud, la lápida y el recibo, o nada. Un recibo sin
+  // su solicitud (o al revés) sería un rastro que no se puede auditar.
+  const tx = db.transaction(() => {
+    const existente = db.prepare(
+      'SELECT * FROM gh_firma_prueba_supresion WHERE id_solicitud = ?'
+    ).get(idSolicitud);
+
+    // IDEMPOTENCIA: si la vía ya se ejecutó, no se toca nada. La lápida y el
+    // recibo son hechos: no se reescriben.
+    if (existente && existente.estado === 'SUPRIMIDA') {
+      return {
+        id_solicitud: idSolicitud,
+        id_empresa: existente.id_empresa,
+        consent_id: existente.consent_id,
+        estado: 'SUPRIMIDA',
+        suprimida: true,
+        ya_suprimida: true,
+        fecha_conservacion: existente.fecha_conservacion,
+        fundamento_plazo: existente.fundamento_plazo,
+        punto_inicio: existente.punto_inicio,
+      };
+    }
+
+    const ahora = new Date().toISOString();
+    if (existente) {
+      db.prepare(`
+        UPDATE gh_firma_prueba_supresion
+           SET id_empresa = ?, consent_id = ?, plazo_declarado_dias = ?,
+               fundamento_plazo = ?, punto_inicio = ?, fecha_conservacion = ?,
+               estado = ?, hold_verificado = ?, suprimido_at = ?,
+               actor = ?, motivo = ?
+         WHERE id_solicitud = ?
+      `).run(
+        consent.id_empresa,
+        consent.id,
+        dias,
+        fundamento,
+        puntoInicio,
+        fechaConservacion,
+        vencida ? 'SUPRIMIDA' : 'SOLICITADA',
+        vencida ? 1 : 0,
+        vencida ? ahora : null,
+        actor,
+        motivo,
+        idSolicitud
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO gh_firma_prueba_supresion
+          (id_solicitud, id_empresa, consent_id, categoria, plazo_declarado_dias,
+           fundamento_plazo, punto_inicio, fecha_conservacion, estado,
+           hold_verificado, solicitado_at, suprimido_at, actor, motivo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        idSolicitud,
+        consent.id_empresa,
+        consent.id,
+        CATEGORIAS_PRUEBA[0],
+        dias,
+        fundamento,
+        puntoInicio,
+        fechaConservacion,
+        vencida ? 'SUPRIMIDA' : 'SOLICITADA',
+        vencida ? 1 : 0,
+        ahora,
+        vencida ? ahora : null,
+        actor,
+        motivo
+      );
+    }
+
+    // El plazo declarado todavía no vence: la vía queda SOLICITADA. No hay
+    // lápida ni recibo porque no se suprimió nada.
+    if (!vencida) {
+      return {
+        id_solicitud: idSolicitud,
+        id_empresa: consent.id_empresa,
+        consent_id: consent.id,
+        estado: 'SOLICITADA',
+        suprimida: false,
+        ya_suprimida: false,
+        fecha_conservacion: fechaConservacion,
+        fundamento_plazo: fundamento,
+        punto_inicio: puntoInicio,
+      };
+    }
+
+    // LA LÁPIDA (el 3.6(g)): identifica la solicitud, la fecha y hora, las
+    // categorías suprimidas y el fundamento del plazo. Una sola vez.
+    const lapida = db.prepare(
+      'SELECT id FROM gh_firma_prueba_lapida WHERE id_solicitud = ?'
+    ).get(idSolicitud);
+    if (!lapida) {
+      db.prepare(`
+        INSERT INTO gh_firma_prueba_lapida
+          (id_solicitud, id_empresa, consent_id, categorias, suprimido_at,
+           actor, motivo, fecha_conservacion, fundamento_plazo, punto_inicio)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        idSolicitud,
+        consent.id_empresa,
+        consent.id,
+        JSON.stringify(CATEGORIAS_PRUEBA),
+        ahora,
+        actor,
+        motivo,
+        fechaConservacion,
+        fundamento,
+        puntoInicio
+      );
+    }
+
+    // EL RECIBO (el 3.6(g)): lo que la Empresa entrega al Trabajador. Una sola
+    // vez, y con la comprobación del hold anotada.
+    const recibo = db.prepare(
+      'SELECT id FROM gh_firma_prueba_recibo WHERE id_solicitud = ?'
+    ).get(idSolicitud);
+    if (!recibo) {
+      db.prepare(`
+        INSERT INTO gh_firma_prueba_recibo
+          (id_solicitud, id_empresa, emitido_at, actor, motivo, categorias,
+           fecha_conservacion, fundamento_plazo, punto_inicio, hold_verificado)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      `).run(
+        idSolicitud,
+        consent.id_empresa,
+        ahora,
+        actor,
+        motivo,
+        JSON.stringify(CATEGORIAS_PRUEBA),
+        fechaConservacion,
+        fundamento,
+        puntoInicio
+      );
+    }
+
+    return {
+      id_solicitud: idSolicitud,
+      id_empresa: consent.id_empresa,
+      consent_id: consent.id,
+      estado: 'SUPRIMIDA',
+      suprimida: true,
+      ya_suprimida: false,
+      fecha_conservacion: fechaConservacion,
+      fundamento_plazo: fundamento,
+      punto_inicio: puntoInicio,
+    };
+  });
+
+  const resultado = tx();
+
+  logger.info('Supresión de la prueba de aceptación registrada', {
+    actor,
+    id_solicitud: idSolicitud,
+    estado: resultado.estado,
+    fecha_conservacion: resultado.fecha_conservacion,
+  });
+
+  return resultado;
+}
+
+/**
  * ¿Esta marca de lápida corresponde a un token?
  *
  * @param {string} tokenTombstone - la marca guardada en la lápida
  * @param {string[]} candidatos - marcas candidatas del token
  * @returns {boolean}
- */
-function esTombstone(tokenTombstone, candidatos) {
+ */function esTombstone(tokenTombstone, candidatos) {
   if (!tokenTombstone || !Array.isArray(candidatos)) return false;
   return candidatos.includes(tokenTombstone);
 }
@@ -512,10 +842,12 @@ function buscarLapidada(candidatos) {
 
 module.exports = {
   CATEGORIAS_DATOS,
+  CATEGORIAS_PRUEBA,
   COLUMNAS_PERSONALES,
   simular,
   simularFirmas,
   suprimir,
+  registrarSupresionPruebaAceptacion,
   esTombstone,
   buscarLapidada,
   elegibles,

@@ -91,17 +91,23 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
   assert.equal(n, 0, 'no queda ninguna fila a medias');
 });
 
-test('D-03 · sin plazo declarado la solicitud SÍ se crea (la custodia vive en el código)', async () => {
-  // La custodia de 20 años es del sistema: la Empresa no tiene nada que
-  // declarar y el 8.6 se cumple con lo que el sistema comunica al firmante.
+test('D-03 · sin plazo declarado la solicitud SÍ se crea (con el plazo de la tabla)', async () => {
+  // La custodia de 20 años YA NO es del sistema, y con la decisión D1 tampoco
+  // hay retención indefinida: sin plazo declarado, el plazo es el de la tabla
+  // supletoria de conservación de K+AIR. La Empresa no tiene nada que declarar
+  // para firmar: lo que pasa es que su documento se conserva el plazo que
+  // corresponde a su categoría.
   limpiar();
   registrarEmpresa({ conAnexo: true, conPlazo: false });
 
   const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
   assert.ok(signRequest && signRequest.id_solicitud,
-    'una empresa sin plazo declarado firma: el plazo ya existe');
+    'una empresa sin plazo declarado firma: no hay nada que ella tenga que declarar');
   assert.ok(signRequest.fecha_conservacion,
-    'y la firma tiene fecha de conservación (20 años desde la firma)');
+    'y hay fecha de conservación: la aporta la tabla supletoria');
+  assert.equal(signRequest.hold_legal, 0,
+    'y NO queda retenida por plazo no declarado: esa retención ya no existe');
+  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado');
 });
 
 test('D-03 · con Anexo y plazo la solicitud se crea', async () => {

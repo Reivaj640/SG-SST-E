@@ -1,0 +1,123 @@
+{
+  "version": "1.0",
+  "actualizado_at": "2026-10-30",
+  "estado": "PROPUESTA. Los plazos de diez (10) y cinco (5) años NO se activan en produccion hasta que el abogado los valide. El mecanismo es configurable desde ahora; la activacion es una decision distinta.",
+  "aplicacion": {
+    "activada": false,
+    "estado": "PROPUESTA",
+    "validado_por": null,
+    "validado_at": null,
+    "nota": "LA COMPUERTA DE ACTIVACION. Mientras 'activada' sea false, el plazo por defecto de esta tabla NO se aplica: el sistema conserva el plazo de custodia del catalogo (veinte (20) anos) y las excepciones legales que ya estan en vigor (el piso del SG-SST y el hold del contrato sin termino). Esto es deliberado: el Acuerdo v1.3 que describe este mecanismo no esta aprobado, y el Acuerdo vigente no describe estos plazos, asi que desplegarlos sin la validacion del abogado seria aplicar un plazo que el texto en vigor no dice. Cambiar 'activada' a true es un acto expreso del owner, con la validacion escrita del abogado sobre los plazos de diez (10) y cinco (5) anos: ni el codigo ni una actualizacion automatica lo hacen."
+  },
+  "nota": "Fuente unica de la conservacion. De esta tabla salen: (a) el plazo que aplica el sistema cuando la Empresa no declara uno, (b) la tabla del §8 del Anexo de Encargo, (c) la regla que se congela en cada firma. La tabla de retencion documental de la Empresa, cuando existe, TIENE PRECEDENCIA sobre el plazo por defecto: es la fuente del 8.6(a). Modificar esta tabla no altera los registros ya calculados: el plazo aplicado, su fuente y la fecha de inicio quedan congelados en cada documento.",
+  "categorias": [
+    {
+      "id": "DOCUMENTO_FIRMADO",
+      "nombre": "Documento original y firmado",
+      "plazo_dias": 3650,
+      "plazo_texto": "diez (10) anos",
+      "punto_inicio": "fecha_firma",
+      "fundamento": "Finalidad del tratamiento: el documento firmado es la prueba del acto que el Trabajador acepto y del que la Empresa es Responsable.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": "Cubre el documento original, el PDF firmado y las adiciones, modificaciones y anexos firmados que no sean el contrato individual de trabajo."
+    },
+    {
+      "id": "CONSTANCIA_Y_MANIFESTACION",
+      "nombre": "Constancia y manifestacion de aceptacion",
+      "plazo_dias": null,
+      "plazo_texto": "igual al del documento asociado",
+      "hereda_de": "documento_asociado",
+      "punto_inicio": "fecha_firma",
+      "fundamento": "Finalidad del tratamiento: la constancia y la manifestacion son evidencia del mismo acto que el documento asociado, y no pueden vivir mas tiempo que el.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": "El plazo se toma del documento al que se refiere la firma; si ese documento no tiene plazo propio, se aplica el de DOCUMENTO_FIRMADO."
+    },
+    {
+      "id": "REGISTRO_OPERACIONES",
+      "nombre": "Registro de operaciones y autenticacion",
+      "plazo_dias": 1825,
+      "plazo_texto": "cinco (5) anos",
+      "punto_inicio": "fecha_registro",
+      "fundamento": "Finalidad del tratamiento: el registro acredita la autenticidad y la trazabilidad de la operacion de firma y permite atender responsabilidades y conocimientos.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": "El registro de eventos es append-only: no se reescribe ni se borra fuera de la ventana de purga."
+    },
+    {
+      "id": "SOLICITUDES_OPERATIVAS",
+      "nombre": "Solicitudes y comunicaciones operativas",
+      "plazo_dias": 1825,
+      "plazo_texto": "cinco (5) anos",
+      "punto_inicio": "fecha_solicitud",
+      "fundamento": "Finalidad del tratamiento: atender el procedimiento de firma y las comunicaciones con el Titular y con la Empresa.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": ""
+    },
+    {
+      "id": "LAPIDA_Y_RECIBO",
+      "nombre": "Lapida y recibo de supresion",
+      "plazo_dias": 1825,
+      "plazo_texto": "cinco (5) anos",
+      "punto_inicio": "fecha_supresion",
+      "fundamento": "Finalidad del tratamiento: la lapida y el recibo acreditan que se suprimio y con que fundamento.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": "Se conservan mas alla de la supresion del documento: son su propia evidencia."
+    },
+    {
+      "id": "RESPALDOS_CIFRADOS",
+      "nombre": "Respaldos cifrados",
+      "plazo_dias": 30,
+      "plazo_texto": "treinta (30) dias",
+      "punto_inicio": "fecha_respaldo",
+      "fundamento": "Medidas de seguridad del canal de correo y del servidor: el respaldo es una copia de restauracion, no el archivo de custodia.",
+      "piso_legal": false,
+      "hold_siempre": false,
+      "nota": "El Anexo de Nube §3 fija el mismo plazo. La purga del respaldo respeta el hold del documento al que corresponde."
+    },
+    {
+      "id": "SST_ESPECIAL",
+      "nombre": "Categorias SG-SST sujetas a conservacion especial",
+      "plazo_dias": 7305,
+      "plazo_texto": "veinte (20) anos contados desde el cese de la relacion laboral",
+      "punto_inicio": "fecha_cese",
+      "fundamento": "Deber legal: articulo 2.2.4.6.13 del Decreto 1072 de 2015 (perfiles epidemiologicos y conceptos de examenes de ingreso, periodicos y de retiro; resultados de examenes y pruebas complementarias; mediciones y monitoreo de ambientes de trabajo; registros de capacitacion; y registros de suministro de elementos y equipos de proteccion personal).",
+      "piso_legal": true,
+      "hold_siempre": false,
+      "nota": "Es un MINIMO LEGAL: la tabla de la Empresa no puede bajarlo. Cuando el sistema no conoce la fecha de cese, el plazo se cuenta desde la fecha de la firma, que es siempre calculable, y el supuesto queda declarado en el texto que se le comunica al Trabajador."
+    },
+    {
+      "id": "CONTRATO_SIN_TERMINO",
+      "nombre": "Contrato individual de trabajo y sus adiciones, modificaciones y anexos",
+      "plazo_dias": null,
+      "plazo_texto": "sin termino",
+      "punto_inicio": null,
+      "fundamento": "Deber legal: articulo 2.2.1.1.12 del Decreto 1072 de 2015, con autenticidad, integridad y disponibilidad.",
+      "piso_legal": false,
+      "hold_siempre": true,
+      "nota": "No se suprime por vencimiento: lleva un hold mientras subsista la relacion laboral. A su terminacion se aplica el plazo que resulte de la tabla de la Empresa o, en su defecto, el de la tabla por defecto."
+    }
+  ],
+  "mapeo_codigo": {
+    "SST_PERFIL_Y_CONCEPTOS_MEDICOS": "SST_ESPECIAL",
+    "SST_EXAMENES_ESPECIALIZADOS": "SST_ESPECIAL",
+    "SST_MONITOREO_AMBIENTAL": "SST_ESPECIAL",
+    "SST_CAPACITACION": "SST_ESPECIAL",
+    "SST_EPP": "SST_ESPECIAL",
+    "CONTRATO_TRABAJO": "CONTRATO_SIN_TERMINO",
+    "HISTORIA_LABORAL": "DOCUMENTO_FIRMADO",
+    "ASPIRANTE": "DOCUMENTO_FIRMADO",
+    "TABLA_EMPRESA": "DOCUMENTO_FIRMADO"
+  },
+  "puntos_inicio": {
+    "fecha_firma": "La fecha de la firma.",
+    "fecha_registro": "La fecha del registro del evento.",
+    "fecha_solicitud": "La fecha de la solicitud.",
+    "fecha_supresion": "La fecha de la supresion.",
+    "fecha_respaldo": "La fecha del respaldo.",
+    "fecha_cese": "La fecha del cese de la relacion laboral; si el sistema no la conoce, la fecha de la firma, que siempre es calculable."
+  }
+}

@@ -34,7 +34,11 @@ const Database = require('better-sqlite3');
 
 const db = require('../src/db/connection');
 const conservacion = require('../src/services/conservacion');
-const { resetDb, asegurarTablasPurga } = require('./helpers');
+const { resetDb, asegurarTablasPurga, tablaConservacionActivada } = require('./helpers');
+
+// La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada: los
+// plazos de diez (10) y cinco (5) años no los validó el abogado.
+const TABLA_ACTIVADA = tablaConservacionActivada();
 
 const SERVICE = path.resolve(__dirname, '..');
 const SQL_020 = fs.readFileSync(
@@ -159,17 +163,55 @@ test('asignar la fecha de conservación la congela en el momento de crear la fir
   assert.equal(fila.fecha_conservacion, '2027-01-01T00:00:00.000Z');
 });
 
-test('sin plazo declarado la firma se queda SIN fecha: nunca se purga', () => {
+test('sin plazo declarado la firma toma el plazo de la tabla supletoria', () => {
+  // Decisión D1: sin plazo declarado por la Empresa, el plazo es el de la
+  // tabla supletoria de conservación administrada por K+AIR. La firma NO
+  // queda retenida por falta de configuración.
+  //
+  // La tabla se inyecta con la compuerta ABIERTA: la que se despacha viene
+  // cerrada (los plazos de diez (10) y cinco (5) años no los validó el
+  // abogado), y el caso cerrado tiene su propio test más abajo.
+  declararPlazo(null);
+  const firmaId = sembrarFirma({});
+  const fecha = conservacion.asignarFechaConservacion(
+    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z',
+    { tabla_conservacion: TABLA_ACTIVADA }
+  );
+  assert.equal(fecha, '2035-12-30T00:00:00.000Z',
+    'el plazo por defecto de la tabla supletoria (3650 días desde la firma)');
+  const fila = db.prepare(
+    'SELECT fecha_conservacion, hold_legal, motivo_hold, '
+    + 'plazo_conservacion_dias, plazo_conservacion_fuente '
+    + 'FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.fecha_conservacion, '2035-12-30T00:00:00.000Z');
+  assert.equal(fila.hold_legal, 0, 'y no queda retenida');
+  assert.equal(fila.motivo_hold, null);
+  assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria');
+});
+
+test('sin plazo declarado, con la compuerta CERRADA, la firma toma la custodia del catálogo', () => {
+  // Es lo que hace en producción mientras la tabla no se active: el plazo
+  // por defecto es el de custodia del catálogo (veinte (20) años), que es el
+  // que estaba en vigor. La firma tampoco queda retenida por falta de
+  // configuración: no hay retención indefinida en ningún caso.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
     firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
   );
-  assert.equal(fecha, null);
+  assert.equal(fecha, '2046-01-01T00:00:00.000Z',
+    'la custodia del catálogo: veinte (20) años desde la firma');
   const fila = db.prepare(
-    'SELECT fecha_conservacion FROM gh_firmas_electronicas WHERE id = ?'
+    'SELECT fecha_conservacion, hold_legal, motivo_hold, '
+    + 'plazo_conservacion_dias, plazo_conservacion_fuente '
+    + 'FROM gh_firmas_electronicas WHERE id = ?'
   ).get(firmaId);
-  assert.equal(fila.fecha_conservacion, null);
+  assert.equal(fila.hold_legal, 0, 'y no queda retenida');
+  assert.equal(fila.motivo_hold, null);
+  assert.equal(fila.plazo_conservacion_fuente, 'catalogo_sistema',
+    'y la fila dice de dónde salió el plazo');
+  assert.equal(fila.plazo_conservacion_dias, 7305);
 });
 
 // =========================================================================
@@ -791,4 +833,275 @@ test('una firma con hold activo NO entra al lote ni se purga', () => {
   assert.equal(
     db.prepare('SELECT COUNT(*) AS n FROM gh_firma_purga_registro WHERE firma_id = ?').get(fHold).n, 0
   );
+});
+
+// =========================================================================
+// EL 8.6(h): SIN PLAZO DECLARADO NO SE SUPRIME, SE RETIENE Y SE REPORTA
+// =========================================================================
+//
+// La RETENCIÓN POR PLAZO NO DECLARADO, después de la decisión D1.
+//
+// El numeral 8.6(h) del Acuerdo v1.2 decía: "Si la Empresa no declara un
+// plazo para una categoría documental, el registro no se suprime: el sistema lo
+// retiene con un hold por plazo no declarado, deja constancia del pendiente y
+// lo reporta a la Empresa".
+//
+// La decisión D1 del abogado (30-oct-2026) elimina esa retención INDEFINIDA:
+// a falta de plazo declarado se aplica el plazo por defecto de la TABLA
+// SUPLETORIA de conservación administrada por K+AIR. El hold por plazo no
+// declarado NO se pone en el alta de una firma.
+//
+// Su maquinaria, en cambio, SIGUE VIVA: en las bases ya hay filas con ese
+// hold (en producción y en los tests), y tienen que poder salir por el
+// recálculo. Estos tests comprueban las dos cosas: que el alta ya no lo pone,
+// y que la liberación y el reporte siguen funcionando.
+//
+
+test('sin plazo declarado la firma NO queda retenida: el plazo es el de la tabla', () => {
+  declararPlazo(null);
+  const firmaId = sembrarFirma({});
+  const fecha = conservacion.asignarFechaConservacion(
+    firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
+  );
+
+  assert.ok(fecha, 'sin plazo declarado hay fecha: la aporta la tabla supletoria');
+  const fila = db.prepare(
+    'SELECT fecha_conservacion, hold_legal, motivo_hold, hold_actor, hold_alcance FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.hold_legal, 0, 'y la firma NO queda retenida');
+  assert.equal(fila.motivo_hold, null);
+  assert.equal(conservacion.holdsDe(firmaId).length, 0);
+});
+
+test('el hold por plazo no declarado sigue disponible para las filas que ya lo tienen', () => {
+  // Es lo que hay en las bases existentes: filas retenidas por el mecanismo
+  // viejo. La función no se borra (las tiene que liberar), y es idempotente.
+  declararPlazo(null);
+  const firmaId = sembrarFirma({});
+  const primero = conservacion.retenerPorPlazoNoDeclarado(firmaId, { actor: 'sistema' });
+  const segundo = conservacion.retenerPorPlazoNoDeclarado(firmaId, { actor: 'sistema' });
+
+  assert.equal(primero.ya_retenida, false, 'la primera vez sí la retiene');
+  assert.equal(segundo.ya_retenida, true);
+  assert.equal(conservacion.holdsDe(firmaId).length, 1, 'una sola fila en el historial');
+
+  const fila = db.prepare(
+    'SELECT motivo_hold, hold_actor FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.motivo_hold, 'plazo_no_declarado');
+  assert.equal(fila.hold_actor, 'sistema');
+});
+
+test('el hold por plazo no declarado es DISTINTO del hold por deber legal', () => {
+  // El deber legal: su motivo es la norma que obliga a conservar.
+  db.prepare('DELETE FROM gh_firma_empresas WHERE id_empresa = ?').run(EMPRESA);
+  db.prepare(`
+    INSERT INTO gh_firma_empresas
+      (id_empresa, razon_social, plazo_retencion_dias, conservacion_por_deber_legal, norma_conservacion)
+    VALUES (?, 'EMPRESA DE PRUEBA SAS', NULL, 1, '2.2.1.1.12 del Decreto 1072 de 2015')
+  `).run(EMPRESA);
+  const conDeber = sembrarFirma({ id_solicitud: 'SIGN-2026-000010' });
+  conservacion.asignarFechaConservacion(conDeber, EMPRESA, '2026-01-01T00:00:00.000Z');
+
+  // El plazo no declarado: su motivo es el pendiente (fila legacy).
+  declararPlazo(null);
+  const sinPlazo = sembrarFirma({ id_solicitud: 'SIGN-2026-000011' });
+  conservacion.retenerPorPlazoNoDeclarado(sinPlazo, { actor: 'sistema' });
+
+  const motivoDeber = db.prepare(
+    'SELECT motivo_hold FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(conDeber).motivo_hold;
+  const motivoPendiente = db.prepare(
+    'SELECT motivo_hold FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(sinPlazo).motivo_hold;
+
+  assert.notEqual(motivoDeber, motivoPendiente, 'son dos razones distintas');
+  assert.ok(motivoDeber.startsWith('deber_legal_'));
+  assert.equal(motivoPendiente, 'plazo_no_declarado');
+});
+
+test('una firma retenida por plazo no declarado NO es elegible y el reporte la nombra', () => {
+  declararPlazo(null);
+  const firmaId = sembrarFirma({ id_solicitud: 'SIGN-2026-000012' });
+  // Se simula la fila legacy: retenida por el mecanismo viejo.
+  conservacion.retenerPorPlazoNoDeclarado(firmaId, { actor: 'sistema' });
+
+  const fila = db.prepare(
+    'SELECT id, id_empresa, fecha_conservacion, hold_legal FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(conservacion.esElegible(fila), false, 'no se suprime');
+
+  const reporte = conservacion.reportePlazoPendiente({ id_empresa: EMPRESA });
+  assert.equal(reporte.total, 1);
+  assert.equal(reporte.pendientes[0].id, firmaId);
+  assert.equal(reporte.pendientes[0].retenida, true);
+  assert.equal(reporte.pendientes[0].motivo_retencion, 'plazo_no_declarado');
+  assert.ok(
+    reporte.pendientes[0].plazo_pendiente.includes('no declarado'),
+    'el reporte nombra el plazo pendiente'
+  );
+  assert.ok(reporte.mensaje.includes('8.6(h)'));
+
+  // Y el reporte de vencimientos lo mete en el grupo "sin plazo", nombrado.
+  const grupos = conservacion.vencimientos({ id_empresa: EMPRESA });
+  assert.equal(grupos.sinPlazo.length, 1);
+  assert.equal(grupos.sinPlazo[0].plazo_pendiente, true);
+  assert.equal(grupos.sinPlazo[0].motivo_retencion, 'plazo_no_declarado');
+});
+
+test('un plan de retención sin fecha NO retiene por plazo no declarado', () => {
+  // Última defensa: un plan sin fecha (una tabla supletoria sin plazo
+  // computable). La firma queda SIN fecha: nunca se suprime, y no se le
+  // inventa un motivo de retención que ya no existe.
+  const firmaId = sembrarFirma({});
+  const plan = {
+    categoria: 'tabla_empresa',
+    regla: 'TABLA_EMPRESA',
+    base: 'creacion',
+    anios: 20,
+    fecha_conservacion: null,
+    texto: null,
+    hold: null,
+    aviso: 'RETAIN_SIN_PLAZO',
+  };
+  const fecha = conservacion.aplicarPlanRetencion(firmaId, plan);
+
+  assert.equal(fecha, null);
+  const fila = db.prepare(
+    'SELECT hold_legal, motivo_hold, fecha_conservacion FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.hold_legal, 0,
+    'un plan sin fecha NO retiene por plazo no declarado: ese motivo ya no existe');
+  assert.equal(fila.motivo_hold, null);
+  assert.equal(fila.fecha_conservacion, null,
+    'y sin fecha no hay supresión: el registro nunca se suprime');
+});
+
+test('un plan CON fecha no levanta el hold por plazo no declarado', () => {
+  const firmaId = sembrarFirma({});
+  const fecha = new Date(Date.now() + 365 * DIA_MS).toISOString();
+  conservacion.aplicarPlanRetencion(firmaId, {
+    categoria: 'tabla_empresa',
+    regla: 'TABLA_EMPRESA',
+    fecha_conservacion: fecha,
+    hold: null,
+    aviso: 'RETAIN_FECHA',
+  });
+
+  const fila = db.prepare(
+    'SELECT hold_legal, motivo_hold FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.hold_legal, 0, 'con plazo no hay hold');
+});
+
+test('la liberación del hold por plazo no declarado ocurre cuando la Empresa declara el plazo', () => {
+  // La fila legacy: retenida por el mecanismo viejo, sin fecha.
+  declararPlazo(null);
+  const firmaId = sembrarFirma({});
+  conservacion.retenerPorPlazoNoDeclarado(firmaId, { actor: 'sistema' });
+
+  const r = conservacion.liberarHoldPorPlazoNoDeclarado(firmaId, {
+    actor: 'La Empresa',
+    motivo: 'Declaró el plazo de conservación documental',
+  });
+  assert.equal(r.liberado, true);
+
+  const fila = db.prepare(
+    'SELECT hold_legal, hold_liberado_at FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.hold_legal, 0);
+  assert.ok(fila.hold_liberado_at, 'la liberación queda con fecha');
+
+  // La declaración original no se reescribe: queda el historial.
+  const holds = conservacion.holdsDe(firmaId);
+  assert.equal(holds.length, 1);
+  assert.equal(holds[0].activo, 0);
+  assert.equal(holds[0].liberado_por, 'La Empresa');
+});
+
+test('al declarar la Empresa el plazo, la liberación deja la firma con fecha de conservación', () => {
+  // Sin fecha no hay supresión: soltar el hold sin fecha dejaría la firma
+  // retenida ya no, pero tampoco suprimible, y sin registro de por qué.
+  declararPlazo(null);
+  const firmaId = sembrarFirma({});
+  conservacion.retenerPorPlazoNoDeclarado(firmaId, { actor: 'sistema' });
+  assert.equal(
+    db.prepare('SELECT fecha_conservacion FROM gh_firmas_electronicas WHERE id = ?').get(firmaId).fecha_conservacion,
+    null
+  );
+
+  const r = conservacion.liberarHoldPorPlazoNoDeclarado(firmaId, {
+    actor: 'La Empresa',
+    motivo: 'Declaró el plazo de conservación documental',
+    plazo_declarado_dias: 365,
+    punto_inicio: '2026-01-01T00:00:00.000Z',
+  });
+  assert.equal(r.liberado, true);
+  assert.equal(r.fecha_conservacion, '2027-01-01T00:00:00.000Z');
+
+  const fila = db.prepare(
+    'SELECT fecha_conservacion, hold_legal FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(firmaId);
+  assert.equal(fila.hold_legal, 0);
+  assert.equal(fila.fecha_conservacion, '2027-01-01T00:00:00.000Z');
+});
+
+test('la liberación por plazo declarado NO levanta un hold por deber legal', () => {
+  const firmaId = sembrarFirma({});
+  conservacion.ponerHold(firmaId, {
+    actor: 'La Empresa',
+    motivo: 'deber_legal_2.2.1.1.12 del Decreto 1072 de 2015',
+    alcance: '2.2.1.1.12',
+  });
+
+  assert.throws(
+    () => conservacion.liberarHoldPorPlazoNoDeclarado(firmaId, { actor: 'La Empresa' }),
+    /no es por plazo no declarado/,
+    'el deber legal no se levanta porque la Empresa haya declarado un plazo'
+  );
+  const fila = db.prepare('SELECT hold_legal FROM gh_firmas_electronicas WHERE id = ?').get(firmaId);
+  assert.equal(fila.hold_legal, 1, 'el hold sigue vigente');
+});
+
+test('retenerPendientesDePlazo pone en regla lo que ya está en la base', () => {
+  declararPlazo(null);
+  const f1 = sembrarFirma({ id_solicitud: 'SIGN-2026-000020' });
+  const f2 = sembrarFirma({ id_solicitud: 'SIGN-2026-000021' });
+  // Una ya retenida, otra no: el hold se pone solo donde falta.
+  conservacion.retenerPorPlazoNoDeclarado(f1, { actor: 'sistema' });
+
+  const r = conservacion.retenerPendientesDePlazo({ id_empresa: EMPRESA, actor: 'sistema' });
+  assert.equal(r.revisados, 2);
+  assert.equal(r.retenidas, 1);
+  assert.equal(r.ya_retenidas, 1);
+
+  assert.equal(
+    db.prepare('SELECT hold_legal FROM gh_firmas_electronicas WHERE id = ?').get(f2).hold_legal, 1
+  );
+});
+
+test('MUTACION: la fila sin plazo declarado ya no depende de un hold para no suprimirse', () => {
+  // La fila con fecha vencida y SIN hold ES elegible: eso es lo que el hold
+  // impide. Si `retenerPorPlazoNoDeclarado` no hiciera nada, el test de
+  // "queda retenida" fallaría en hold_legal === 1.
+  const vencida = new Date(Date.now() - DIA_MS).toISOString();
+  const conFecha = sembrarFirma({ fecha_conservacion: vencida, id_solicitud: 'SIGN-2026-000030' });
+  const fila = db.prepare(
+    'SELECT id, id_empresa, fecha_conservacion, hold_legal FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(conFecha);
+  assert.equal(conservacion.esElegible(fila), true, 'sin hold, la firma vencida SÍ se suprime');
+
+  // Sin plazo declarado ya no hay hold: la fila no se suprime porque su plazo
+  // (el de la tabla supletoria) NO ha vencido.
+  declararPlazo(null);
+  const sinPlazo = sembrarFirma({ id_solicitud: 'SIGN-2026-000031' });
+  const fecha = conservacion.asignarFechaConservacion(
+    sinPlazo, EMPRESA, '2026-01-01T00:00:00.000Z'
+  );
+  assert.ok(fecha, 'sin plazo declarado hay fecha: la aporta la tabla supletoria');
+  const fila2 = db.prepare(
+    'SELECT id, id_empresa, fecha_conservacion, hold_legal FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(sinPlazo);
+  assert.equal(fila2.hold_legal, 0, 'y no hay hold: ese motivo ya no existe');
+  assert.equal(conservacion.esElegible(fila2), false, 'NO se suprime: el plazo no ha vencido');
 });

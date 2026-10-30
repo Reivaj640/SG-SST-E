@@ -21,7 +21,9 @@
  *   2. El buzón corporativo se RECHAZA SIEMPRE (ya no hay interruptor): si el
  *      destino cae en un dominio que la Empresa puede leer, la solicitud se
  *      rechaza con 400 y el caso queda en la bitácora append-only con el aviso
- *      OTP_MEDIO_CORPORATIVO, que no se puede suprimir.
+ *      OTP_MEDIO_CORPORATIVO, que no se puede corregir ni alterar. SÍ se
+ *      suprime: conforme al 8.6, dentro de la ventana de purga, y su supresión
+ *      deja la lápida y el recibo del 3.6(g).
  *   3. Agotados los cinco (5) intentos, el OTP queda BLOQUEADO DE FORMA DURA:
  *      no se puede reenviar. La salida es una nueva solicitud.
  *
@@ -319,8 +321,9 @@ test('D-2 · un buzón corporativo se rechaza SIEMPRE y el caso queda en la bit�
     'el rechazo no puede dejar un código generado en la fila');
 
   // El caso queda en el registro de operaciones: `gh_firma_eventos` es
-  // append-only, así que este aviso no se puede suprimir (el 3.4(e) lo
-  // promete).
+  // append-only, así que este aviso no se puede CORREGIR ni ALTERAR (el 3.4(e)
+  // lo promete). SÍ se suprime: conforme al 8.6, dentro de la ventana de purga,
+  // y su supresión deja la lápida y el recibo del 3.6(g).
   const evento = db.prepare(
     'SELECT evento, metadata FROM gh_firma_eventos WHERE firma_id = ? AND evento = ?'
   ).get(signRequest.id, 'OTP_MEDIO_CORPORATIVO');

@@ -38,6 +38,7 @@ const adminEmpresasRouter = require('./routes/admin-empresas');
 const adminExcepcionesRouter = require('./routes/admin-excepciones');
 const adminAprobacionesRouter = require('./routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('./routes/admin-solicitudes');
+const adminIncidentesRouter = require('./routes/admin-incidentes');
 const internalAuditRouter = require('./routes/internal-audit');
 const recibosSupresionRouter = require('./routes/recibos-supresion');
 const verificacionRouter = require('./routes/verificacion');
@@ -175,6 +176,9 @@ function createApp() {
   // se registra la autorizacion operativa que exige la barrera de publicacion.
   app.use('/internal/admin', adminAprobacionesRouter);
 app.use('/internal/admin', adminSolicitudesRouter);
+  // El reporte de carga accidental de datos de salud (el 10.8(d)): bloquea la
+  // solicitud, la retiene, avisa a la Empresa y deja el evento.
+  app.use('/internal/admin', adminIncidentesRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {

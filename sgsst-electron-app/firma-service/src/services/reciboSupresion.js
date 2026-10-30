@@ -69,6 +69,15 @@ const COLUMNAS_REPARTO = [
   'hold_verificado',
   'archivos_eliminados',
   'eventos_purgados',
+  // El 3.6(g): el recibo identifica "el fundamento del plazo". En la vía de la
+  // prueba de aceptación (el 12.7) el fundamento y el punto de inicio son los
+  // que declaró la Empresa; en la vía de la firma los dice la fecha de
+  // conservación.
+  'fundamento_plazo',
+  'punto_inicio',
+  // Qué vía es este recibo: la supresión de la firma o la de la prueba de
+  // aceptación del 12.7. Una solicitud puede tener las dos.
+  'via',
 ];
 
 /**
@@ -150,6 +159,46 @@ function _armar(lapida, registro, idSolicitud = null) {
     // Qué se borró.
     archivos_eliminados: lapida ? lapida.archivos_eliminados : null,
     eventos_purgados: registro ? registro.eventos_purgados : null,
+    // El fundamento y el punto de inicio los trae la vía del 12.7 (la supresión
+    // de la prueba de aceptación). En la vía de la firma no hay fundamento
+    // declarado: el plazo lo aplicó el sistema o la Empresa, y la fecha de
+    // conservación ya lo dice.
+    fundamento_plazo: null,
+    punto_inicio: null,
+    // Qué vía es este recibo.
+    via: 'firma',
+  };
+}
+
+/**
+ * Arma el recibo de la vía de la PRUEBA DE ACEPTACIÓN (el 12.7).
+ *
+ * Es la misma forma que el recibo de la firma, para que la Empresa pueda
+ * entregarlo al Trabajador por el mismo camino. Lo que cambia es de dónde
+ * salen el fundamento y el punto de inicio: los declaró la Empresa.
+ *
+ * @param {object|null} fila - Fila de `gh_firma_prueba_recibo`.
+ * @returns {object|null}
+ */
+function _armarPrueba(fila) {
+  if (!fila) return null;
+  return {
+    id_solicitud: fila.id_solicitud,
+    id_empresa: fila.id_empresa,
+    purgado_at: fila.emitido_at,
+    actor: fila.actor,
+    motivo: fila.motivo,
+    categorias: _categorias(fila.categorias),
+    fecha_conservacion: fila.fecha_conservacion,
+    // La vía del 12.7 no corre dentro de una ventana de purga: la gobierna el
+    // plazo declarado por la Empresa para la prueba.
+    ventana_hasta: null,
+    hold_verificado: Boolean(fila.hold_verificado),
+    archivos_eliminados: null,
+    eventos_purgados: null,
+    fundamento_plazo: fila.fundamento_plazo,
+    punto_inicio: fila.punto_inicio,
+    via: 'prueba_aceptacion',
   };
 }
 
@@ -210,7 +259,14 @@ function porSolicitud(id_solicitud) {
     `).get(lapida.firma_id) || null;
   }
 
-  if (!lapida && !registro) return null;
+  if (!lapida && !registro) {
+    // Todavía puede haber recibo: la vía del 12.7 (la supresión de la prueba
+    // de aceptación) es independiente de la de la firma. Se mira más abajo.
+    const prueba = db.prepare(
+      'SELECT id FROM gh_firma_prueba_recibo WHERE id_solicitud = ?'
+    ).get(id_solicitud);
+    if (!prueba) return null;
+  }
 
   // Si la lápida no trae el id_solicitud (escrita antes de la migración 040),
   // se completa con el de la firma viva, si todavía existe.
@@ -221,7 +277,41 @@ function porSolicitud(id_solicitud) {
     if (firma) lapida.id_solicitud = firma.id_solicitud || null;
   }
 
-  return _armar(lapida, registro, id_solicitud);
+  const reciboFirma = _armar(lapida, registro, id_solicitud);
+
+  // 3. La vía del 12.7: la supresión de la PRUEBA DE ACEPTACIÓN. La prueba
+  // sobrevive a la supresión de la firma (no tiene llave foránea contra ella)
+  // y su propia supresión deja su propio recibo, con el plazo declarado por la
+  // Empresa, su fundamento y su punto de inicio.
+  const prueba = _armarPrueba(db.prepare(`
+    SELECT id_solicitud, id_empresa, emitido_at, actor, motivo, categorias,
+           fecha_conservacion, fundamento_plazo, punto_inicio, hold_verificado
+      FROM gh_firma_prueba_recibo
+     WHERE id_solicitud = ?
+     ORDER BY id DESC
+     LIMIT 1
+  `).get(id_solicitud));
+
+  if (!reciboFirma && !prueba) return null;
+
+  // LA ENTREGA. La vía de la firma manda en el nivel superior (es la que el
+  // Trabajador viene a pedir) y `vias` deja las DOS a la vista: una solicitud
+  // puede tener la supresión de la firma y la de su prueba de aceptación. Si
+  // solo hay recibo de la prueba, ese es el que se entrega.
+  const principal = reciboFirma || prueba;
+  const vias = [];
+  // COPIAS: si `vias` guardara el mismo objeto que `principal`, la respuesta
+  // JSON tendría un ciclo y el servicio no podría serializarla.
+  if (reciboFirma) vias.push(Object.assign({}, reciboFirma));
+  if (prueba) vias.push(Object.assign({}, prueba));
+  if (prueba) {
+    // El fundamento y el punto de inicio los declaró la Empresa (el 8.6(h)).
+    principal.fundamento_plazo = prueba.fundamento_plazo;
+    principal.punto_inicio = prueba.punto_inicio;
+  }
+  principal.vias = vias;
+
+  return principal;
 }
 
 /**
@@ -253,7 +343,7 @@ function porEmpresa(id_empresa, { limite = 100 } = {}) {
     LIMIT ?
   `).all(id_empresa, max);
 
-  return filas.map((f) => _armar(
+  const firmaItems = filas.map((f) => _armar(
     {
       id_solicitud: f.lapida_id_solicitud,
       id_empresa: f.id_empresa,
@@ -278,6 +368,22 @@ function porEmpresa(id_empresa, { limite = 100 } = {}) {
       fecha_conservacion: f.registro_fecha_conservacion,
     }
   ));
+
+  // La vía del 12.7: la supresión de la PRUEBA DE ACEPTACIÓN. La lista de la
+  // Empresa trae las dos vías, de la más reciente a la más antigua.
+  const pruebaFilas = db.prepare(`
+    SELECT id_solicitud, id_empresa, emitido_at, actor, motivo, categorias,
+           fecha_conservacion, fundamento_plazo, punto_inicio, hold_verificado
+      FROM gh_firma_prueba_recibo
+     WHERE id_empresa = ?
+     ORDER BY emitido_at DESC
+     LIMIT ?
+  `).all(id_empresa, max);
+  const pruebaItems = pruebaFilas.map((f) => _armarPrueba(f));
+
+  return [...firmaItems, ...pruebaItems]
+    .sort((a, b) => String(b.purgado_at || '').localeCompare(String(a.purgado_at || '')))
+    .slice(0, max);
 }
 
 /**
@@ -289,10 +395,15 @@ function porEmpresa(id_empresa, { limite = 100 } = {}) {
  */
 function totalPorEmpresa(id_empresa) {
   if (typeof id_empresa !== 'string' || id_empresa.length === 0) return 0;
-  const fila = db.prepare(
+  const firma = db.prepare(
     'SELECT COUNT(*) AS n FROM gh_firma_purgadas WHERE id_empresa = ?'
   ).get(id_empresa);
-  return fila ? fila.n : 0;
+  // La vía del 12.7 también es un recibo de supresión de la Empresa: si no se
+  // contara, el total no cuadraría con la lista de `porEmpresa`.
+  const prueba = db.prepare(
+    'SELECT COUNT(*) AS n FROM gh_firma_prueba_recibo WHERE id_empresa = ?'
+  ).get(id_empresa);
+  return (firma ? firma.n : 0) + (prueba ? prueba.n : 0);
 }
 
 module.exports = {

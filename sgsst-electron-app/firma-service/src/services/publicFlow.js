@@ -1210,12 +1210,20 @@ function _destinoBruto(signRequest, medioDeclarado, correoBase) {
  * interruptor apagado solo se escribía un `logger.warn` a la consola (stderr,
  * que no es un registro de operaciones) y el código SE ENVIABA igual. El
  * 3.4(e) de la v1.1 promete que el caso queda "en el registro de operaciones
- * del servicio" y que ese registro "no puede suprimirse": eso solo es cierto
- * si el aviso entra en `gh_firma_eventos`, que es append-only (la migración
- * 020 impide UPDATE y DELETE). Con el 📦978 el aviso es un EVENTO y el
- * rechazo es siempre.
+ * del servicio": eso solo es cierto si el aviso entra en `gh_firma_eventos`,
+ * que es append-only (la migración 020 impide UPDATE y DELETE). Con el 📦978
+ * el aviso es un EVENTO y el rechazo es siempre.
  *
- * `riesgo_47_4` queda SIEMPRE en false: el control es incondicional, así que
+ * LO QUE EL AVISO NO ES (la v1.2 loCorrige)
+ * ------------------------------------------
+ * El aviso NO puede corregirse ni alterarse: `gh_firma_eventos` es de solo
+ * anexado. Pero SÍ se suprime: conforme al 8.6, dentro de la ventana de purga,
+ * y su supresión deja la lápida y el recibo del 3.6(g). Decir que "no se puede
+ * suprimir" sería untrue: lo que no se puede es CORREGIRLO ni ALTERARLO. La
+ * v1.2 lo dice así: "Ese registro no puede corregirse ni alterarse; se suprime
+ * conforme al 8.6, dentro de la ventana de purga, y su supresión deja la
+ * lápida y el recibo del 3.6(g)".
+ * * `riesgo_47_4` queda SIEMPRE en false: el control es incondicional, así que
  * el sistema nunca llega a dejar salir un código a un buzón que la Empresa
  * pueda leer. El campo se conserva porque es parte de la forma de la
  * respuesta y de su documentación.
@@ -1233,7 +1241,9 @@ function _controlarMedioCorporativo(signRequest, destino) {
 
   // EL EVENTO PRIMERO: es la evidencia de la contingencia que el 3.4(e)
   // promete. `gh_firma_eventos` no admite UPDATE ni DELETE (migración 020),
-  // así que este registro no se puede suprimir ni corregir.
+  // así que este registro no se puede CORREGIR ni ALTERAR. SÍ se suprime,
+  // eso sí: conforme al 8.6, dentro de la ventana de purga, y su supresión
+  // deja la lápida y el recibo del 3.6(g).
   signRequestService.registerEvent(signRequest.id, 'OTP_MEDIO_CORPORATIVO', {
     origen: destino.origen,
     dominio_corporativo: true,

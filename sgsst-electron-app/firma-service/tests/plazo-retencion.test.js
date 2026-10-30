@@ -18,7 +18,9 @@
  *  - La mini-app los muestra en el bloque «Empresa que solicita tu firma».
  *  - El correo de invitacion los comunica (es la comunicacion que sale antes
  *    de que el Trabajador firme).
- *  - Si la Empresa NO los declara, el sistema NO inventa un plazo.
+ *  - Si la Empresa NO los declara, el plazo que aplica es el de la tabla
+ *    supletoria de conservación de K+AIR, y lo que se le comunica al
+ *    Trabajador dice de dónde viene (decisión D1).
  *
  * Tests:
  *   - node --test tests/plazo-retencion.test.js
@@ -165,9 +167,10 @@ test('el correo de invitacion comunica el plazo y el canal de copia', async () =
 });
 
 test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', async () => {
-  // La custodia de 20 años vive en el código del sistema: la Empresa no tiene
-  // nada que declarar y el 8.6 se cumple con lo que el sistema comunica al
-  // firmante. Antes esto se rechazaba con un 409; ahora la firma sale.
+  // La decisión D1: sin plazo declarado por la Empresa, el plazo es el de la
+  // TABLA SUPLETORIA de conservación administrada por K+AIR. La Empresa no
+  // tiene nada que declarar para pedir firmas, y su registro NO queda
+  // retenido: hay fecha de conservación y no hay hold.
   resetDb();
   _crearEmpresa(false);
 
@@ -177,13 +180,22 @@ test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', asyn
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado puede pedir firmas');
   assert.ok(signRequest.fecha_conservacion,
-    'y la firma tiene fecha de conservación (la custodia del sistema)');
+    'sin plazo declarado hay fecha: la aporta la tabla supletoria');
+  assert.equal(signRequest.hold_legal, 0,
+    'y la firma NO queda retenida: la retención indefinida se eliminó');
+  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado');
 });
 
-test('si la empresa no declara plazo, el correo comunica la custodia del sistema', async () => {
-  // El sistema NO inventa un plazo: comunica el suyo, que es la custodia de
-  // 20 años contados desde la firma, y la fila guarda esa fecha. El correo
-  // sale con esa línea y con el canal de copia que sí declaró la Empresa.
+test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE aplica', async () => {
+  // El correo es la comunicación del 8.6(g): tiene que decir el plazo que se
+  // aplica. No puede prometer un plazo que no aplica, ni callar de dónde
+  // viene.
+  //
+  // CON LA COMPUERTA CERRADA (que es como se despacha: los plazos de diez (10)
+  // y cinco (5) años de la tabla supletoria no los validó el abogado), el plazo
+  // que aplica es el de custodia del catálogo: veinte (20) años desde la
+  // firma. El correo dice eso. Y no dice que el plazo viene de la tabla
+  // supletoria, porque de ahí no viene todavía.
   resetDb();
   mailer.clearDevInbox();
   _crearEmpresa(false);
@@ -198,9 +210,15 @@ test('si la empresa no declara plazo, el correo comunica la custodia del sistema
   assert.equal(inbox.length, 1);
   const cuerpo = inbox[0].body;
   assert.ok(cuerpo.includes('20 años'),
-    'el correo debe comunicar la custodia del sistema');
+    'el correo dice el plazo que aplica: la custodia del catálogo');
+  assert.ok(cuerpo.includes('la fecha de la firma'),
+    'y dice desde qué fecha corre');
+  assert.ok(!cuerpo.includes('tabla de conservación del sistema'),
+    'el plazo no sale de la tabla supletoria mientras la compuerta esté cerrada');
+  assert.ok(!cuerpo.includes('pendiente de declaración'),
+    'el plazo ya no está pendiente: hay una tabla supletoria');
   assert.ok(!cuerpo.includes('Dónde puedes pedir una copia'),
-    'no debe aparecer una línea de canal si la empresa no lo declar\u00f3');
+    'no debe aparecer una línea de canal si la empresa no lo declaró');
   // El correo sale igual: la comunicación es un deber, no puede bloquear
   // la invitación.
   assert.ok(cuerpo.includes('ID de solicitud'), 'el correo debe salir igual');

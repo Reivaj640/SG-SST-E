@@ -36,6 +36,7 @@ const adminEmpresasRouter = require('../src/routes/admin-empresas');
 const adminExcepcionesRouter = require('../src/routes/admin-excepciones');
 const adminAprobacionesRouter = require('../src/routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
+const adminIncidentesRouter = require('../src/routes/admin-incidentes');
 const internalAuditRouter = require('../src/routes/internal-audit');
 const recibosSupresionRouter = require('../src/routes/recibos-supresion');
 const constanciaRouter = require('../src/routes/constancia');
@@ -246,6 +247,13 @@ function resetDb() {
   // no choca con el trigger append-only porque ese trigger vive en la
   // migración 025, que lleva `@skip-when-env test` (misma razón que la 020).
   try { db.prepare('DELETE FROM gh_firma_purgadas').run(); } catch (e) { /* la tabla no existe */ }
+  // La vía de supresión de la prueba de aceptación (migración 047): la
+  // solicitud, la lápida y el recibo. El DELETE no choca con los triggers
+  // append-only porque esos viven en la 048, que lleva `@skip-when-env test`
+  // (misma razón que la 025).
+  for (const t of ['gh_firma_prueba_supresion', 'gh_firma_prueba_lapida', 'gh_firma_prueba_recibo']) {
+    try { db.prepare(`DELETE FROM ${t}`).run(); } catch (e) { /* la tabla no existe */ }
+  }
   try {
     db.prepare(
       "UPDATE gh_firma_purga_control SET ventana_activa = 0, cerrada_at = datetime('now') WHERE id = 1"
@@ -367,6 +375,10 @@ function makeApp() {
   app.use('/internal/admin', adminEmpresasRouter);
   app.use('/internal/admin', adminExcepcionesRouter);
   app.use('/internal/admin', adminSolicitudesRouter);
+  // El reporte de carga accidental de datos de salud (el 10.8(d)). Montado
+  // por la misma razon que los de arriba: si nadie lo monta, sus endpoints
+  // no se ejercitan y un error de wiring pasa inadvertido.
+  app.use('/internal/admin', adminIncidentesRouter);
   // Las aprobaciones de publicacion del Acuerdo (decision 1.f). Montado acá
   // por la misma razon que los de arriba: si nadie lo monta, sus endpoints no
   // se ejercitan y un error de wiring pasa inadvertido.
@@ -835,10 +847,36 @@ async function capturarLogs(fn) {
   }
 }
 
+/**
+ * La tabla supletoria de conservación con la COMPUERTA ABIERTA.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * La tabla que se despacha declara su propia activación
+ * (`aplicacion.activada`), y viene CERRADA: los plazos de diez (10) y cinco
+ * (5) años no los validó el abogado. Con la compuerta cerrada, el plazo por
+ * defecto es el de custodia del catálogo (veinte (20) años).
+ *
+ * Los tests que verifican el MECANISMO de la tabla (que su plazo por defecto
+ * sea el que aplica, con su fuente y su punto de inicio) necesitan la tabla
+ * con la compuerta abierta. Este helper la arma a partir de la real, sin
+ * tocar el archivo: el archivo es la fuente legal y los tests no lo modifican.
+ *
+ * @returns {object} la tabla con `aplicacion.activada` en true
+ */
+function tablaConservacionActivada() {
+  const retencion = require('../src/services/retencion');
+  const base = retencion.tablaConservacion();
+  return Object.assign({}, base, {
+    aplicacion: Object.assign({}, base.aplicacion, { activada: true }),
+  });
+}
+
 module.exports = {
   resetDb,
   asegurarTablasPurga,
   seedActiveAgreement,
+  tablaConservacionActivada,
   makeApp,
   obtenerConsentimientoAceptado,
   withApiKey,

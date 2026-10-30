@@ -69,6 +69,7 @@
 
 const db = require('../db/connection');
 const logger = require('../utils/logger');
+const retencionService = require('./retencion');
 // El 8.6(e)(iii): la supresión no procede con una solicitud de copia
 // pendiente. La consulta vive en el módulo que es dueño de la tabla.
 const { tieneCopiaPendiente, empresasConCopiaPendiente } = require('./solicitudes');
@@ -86,6 +87,20 @@ const DIAS_PRORRO = 30;
 // de cada firma purgada, para que se sepa QUÉ se suprimió. La capa 5B
 // (datos personales: fila, PDF, constancia) usará sus propias categorías.
 const CATEGORIAS_AUDITORIA = 'eventos_auditoria';
+
+// El 8.6(h) del Acuerdo v1.2: "Si la Empresa no declara un plazo para una
+// categoría documental, el registro no se suprime: el sistema lo retiene con
+// un hold por plazo no declarado, deja constancia del pendiente y lo reporta a
+// la Empresa".
+//
+// Este hold es DISTINTO del hold por deber legal (migración 029): tiene su
+// propio actor, su propio motivo y su propio alcance, para que el reporte
+// dice POR QUÉ se retiene y para que la liberación por "la Empresa declaró el
+// plazo" no levante un deber legal que sigue vigente.
+const ACTOR_HOLD_PLAZO_NO_DECLARADO = 'sistema';
+const MOTIVO_HOLD_PLAZO_NO_DECLARADO = 'plazo_no_declarado';
+const ALCANCE_HOLD_PLAZO_NO_DECLARADO =
+  '8.6(h): plazo de conservacion no declarado por la Empresa';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
@@ -155,6 +170,105 @@ function deberLegalEmpresa(id_empresa) {
 }
 
 /**
+ * La fila de la Empresa, en la forma que la necesita el plan de retención.
+ *
+ * Se lee con SQL directo y no con el servicio de empresas: los dos módulos se
+ * necesitan mutuamente (empresa.update llama al recálculo, y el recálculo
+ * necesita el plan) y un require de ida y vuelta en Node es un ciclo.
+ *
+ * @param {string} id_empresa
+ * @returns {object}
+ */
+function _empresaParaPlan(id_empresa) {
+  if (!id_empresa) return {};
+  try {
+    const row = db.prepare(
+      'SELECT plazo_retencion, plazo_retencion_dias, conservacion_por_deber_legal, norma_conservacion'
+      + ' FROM gh_firma_empresas WHERE id_empresa = ?'
+    ).get(id_empresa);
+    return row || {};
+  } catch (e) {
+    // La columna puede no existir todavía (migración 029 sin aplicar): sin el
+    // flag, el comportamiento es el de siempre.
+    return {};
+  }
+}
+
+/**
+ * El plan de retención de una firma que YA está en la base.
+ *
+ * Lee de la fila lo que el plan necesita (la categoría, la regla y la fecha
+ * de terminación) y calcula con la MISMA función del catálogo que usa el
+ * alta de la firma. Una sola fuente de verdad para el cálculo: si el alta y
+ * el recálculo usaran reglas distintas, el registro cambiaría de fecha.
+ *
+ * @param {number} idFirma
+ * @param {string} id_empresa
+ * @param {string} [fecha_creacion] - la fecha de creación que conoce el
+ *   llamador; si no viene, se usa la de la fila.
+ * @returns {object} el plan de `retencion.planificar`
+ */
+function _planDeFirma(idFirma, id_empresa, fecha_creacion, tabla_conservacion) {
+  let fila = null;
+  try {
+    fila = db.prepare(
+      'SELECT id_empresa, fecha_creacion, categoria_retencion, regla_retencion, fecha_terminacion'
+      + ' FROM gh_firmas_electronicas WHERE id = ?'
+    ).get(idFirma);
+  } catch (e) {
+    fila = null;
+  }
+  return retencionService.planificar({
+    categoria_retencion: fila ? fila.categoria_retencion : null,
+    regla_retencion: fila ? fila.regla_retencion : null,
+    fecha_creacion: fecha_creacion || (fila && fila.fecha_creacion) || null,
+    fecha_terminacion: fila ? fila.fecha_terminacion : null,
+    empresa: _empresaParaPlan(id_empresa || (fila && fila.id_empresa) || null),
+    tabla_conservacion,
+  });
+}
+
+/**
+ * Escribe en la fila la TRAZABILIDAD de la regla que se aplicó (migración
+ * 049): el plazo, su fuente y la fecha de inicio del cómputo.
+ *
+ * Con eso, el §4 se puede demostrar documento por documento: qué regla corrió
+ * y de dónde salió el plazo.
+ *
+ * Si la migración 049 no está aplicada, la escritura falla y NO se propaga:
+ * la fecha de conservación ya quedó escrita, y perder la trazabilidad es
+ * malo, pero tumbar el alta de la firma es peor.
+ *
+ * @param {number} idFirma
+ * @param {object} plan - resultado de `retencion.planificar`
+ */
+function _escribirTrazabilidad(idFirma, plan) {
+  const oNull = (v) => (v === undefined || v === null ? null : v);
+  try {
+    db.prepare(`
+      UPDATE gh_firmas_electronicas
+         SET plazo_conservacion_dias = ?,
+             plazo_conservacion_fuente = ?,
+             fecha_inicio_conservacion = ?,
+             categoria_conservacion = ?
+       WHERE id = ?
+    `).run(
+      oNull(plan.plazo_conservacion_dias),
+      oNull(plan.plazo_conservacion_fuente),
+      oNull(plan.fecha_inicio_conservacion),
+      oNull(plan.categoria_conservacion),
+      idFirma
+    );
+  } catch (e) {
+    logger.warn('Conservacion: no se pudo escribir la trazabilidad del plazo', {
+      firma_id: idFirma,
+      error: e.message,
+      aviso: 'TRAZABILIDAD_NO_ESCRITA',
+    });
+  }
+}
+
+/**
  * Congela la fecha de conservación de una firma, en el momento en que se
  * crea. Se congela a propósito: el 8.6 habla del plazo "que le resulta
  * aplicable" al firmante cuando se le solicita la firma. Si la Empresa cambia
@@ -168,12 +282,25 @@ function deberLegalEmpresa(id_empresa) {
  * NO es "nunca se purga": es "nunca se purga SOLO". Esa es la diferencia entre
  * un deber legal y un accidente.
  *
+ * LA TABLA SUPLETORIA
+ * --------------------
+ * Este es el camino de REFUERDO (lo usa signRequest cuando el plan del
+ * catálogo no se pudo aplicar). Calcula con el MISMO plan del catálogo
+ * (`retencion.planificar`), para que el camino normal y el de refuerzo den la
+ * misma fecha: si se calcularan distinto, un fallo de la base movería el plazo
+ * de un documento. Y con la tabla supletoria de conservación, el plan SIEMPRE
+ * trae fecha: la ausencia de un plazo de la Empresa ya no deja el registro
+ * retenido por esa razón.
+ *
  * @param {number} idFirma
  * @param {string} id_empresa
  * @param {string} fecha_creacion
- * @returns {string|null} la fecha calculada, o null si no hay plazo declarado
+ * @param {object} [opciones]
+ * @param {object} [opciones.tabla_conservacion] - la tabla supletoria a usar,
+ *   en vez de la del archivo. Es el punto de inyección que usan los tests.
+ * @returns {string|null} la fecha calculada, o null si no hay plazo aplicable
  */
-function asignarFechaConservacion(idFirma, id_empresa, fecha_creacion) {
+function asignarFechaConservacion(idFirma, id_empresa, fecha_creacion, opciones = {}) {
   const deber = deberLegalEmpresa(id_empresa);
   if (deber.activo) {
     const norma = deber.norma || '2.2.1.1.12 del Decreto 1072 de 2015';
@@ -190,26 +317,40 @@ function asignarFechaConservacion(idFirma, id_empresa, fecha_creacion) {
     });
     return null;
   }
-  const dias = plazoDeclarado(id_empresa);
-  const fecha = calcularFechaConservacion(fecha_creacion, dias);
-  if (!fecha) {
-    // Sin plazo declarado no hay fecha y no hay purga. No se inventa nada.
+  const plan = _planDeFirma(idFirma, id_empresa, fecha_creacion, opciones.tabla_conservacion);
+  if (!plan.fecha_conservacion) {
+    // Ni la Empresa ni la tabla supletoria pudieron dar un plazo. No se
+    // inventa nada: la firma queda sin fecha (nunca se suprime) y el aviso
+    // RETAIN_SIN_PLAZO queda en el log.
+    logger.warn('Conservacion: la firma queda sin fecha de conservacion', {
+      firma_id: idFirma,
+      id_empresa,
+      aviso: 'RETAIN_SIN_PLAZO',
+    });
     return null;
   }
   db.prepare(
     'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
-  ).run(fecha, idFirma);
-  return fecha;
+  ).run(plan.fecha_conservacion, idFirma);
+  _escribirTrazabilidad(idFirma, plan);
+  return plan.fecha_conservacion;
 }
 
 /**
  * Aplica el plan del catálogo por documento a una fila ya insertada.
  *
- * A diferencia de `asignarFechaConservacion`, este camino NO mira la tabla de
- * la Empresa cuando la regla tiene plazo legal propio: la fecha viene calculada
- * por `retencion.planificar` (20 años desde el cese, 100 desde el retiro) o es
- * NULL porque falta la fecha de cese/retiro. Un plan con hold deja el hold
- * automático, igual que el deber legal de la Empresa.
+ * El plan trae la fecha calculada, la trazabilidad de la regla que se aplicó
+ * (migración 049) y, si el documento no tiene término (el contrato
+ * electrónico) o la Empresa declaró un deber legal sin término, el hold
+ * automático.
+ *
+ * UN PLAN SIN FECHA
+ * -----------------
+ * Con la tabla supletoria de conservación, el plan SIEMPRE trae fecha o hold:
+ * la ausencia de un plazo de la Empresa ya no es una razón para retener. Este
+ * camino sin fecha es la última defensa (una tabla sin plazo computable) y
+ * deja la firma sin fecha de supresión: sin fecha, no hay purga, y el
+ * registro aparece en el reporte de pendientes.
  *
  * @param {number} idFirma
  * @param {object} plan - resultado de retencion.planificar()
@@ -224,8 +365,22 @@ function aplicarPlanRetencion(idFirma, plan) {
     'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
   ).run(plan.fecha_conservacion || null, idFirma);
 
+  // 049 · la trazabilidad de la regla aplicada: el plazo, su fuente y la
+  // fecha de inicio del cómputo quedan congelados en la fila.
+  _escribirTrazabilidad(idFirma, plan);
+
   if (plan.hold) {
     ponerHold(idFirma, plan.hold);
+  } else if (!plan.fecha_conservacion) {
+    // Última defensa: un plan sin fecha no deja la firma retenida con un
+    // motivo inventado, pero tampoco suprimible. Queda sin fecha (nunca se
+    // suprime) y se reporta como pendiente.
+    logger.warn('Conservacion: la firma queda sin fecha de conservacion', {
+      firma_id: idFirma,
+      regla: plan.regla,
+      categoria: plan.categoria,
+      aviso: plan.aviso,
+    });
   }
 
   if (plan.aviso === 'RETAIN_PENDIENTE_CESE' || plan.aviso === 'RETAIN_PENDIENTE_RETIRO') {
@@ -326,6 +481,360 @@ function liberarHold(idFirma, liberacion = {}) {
 }
 
 /**
+ * Retiene una firma cuyo plazo de conservación NO declaró la Empresa.
+ *
+ * El 8.6(h) del Acuerdo v1.2: "Si la Empresa no declara un plazo para una
+ * categoría documental, el registro no se suprime: el sistema lo retiene con un
+ * hold por plazo no declarado, deja constancia del pendiente y lo reporta a la
+ * Empresa, que debe declarar en su tabla de retención documental un plazo
+ * concreto, con su fundamento y con el punto de inicio desde el que corre."
+ *
+ * DESPUÉS DE LA DECISIÓN D1: ESTA FUNCIÓN YA NO SE LLAMA EN EL ALTA
+ * -------------------------------------------------------------------
+ * Con la tabla supletoria de conservación, si la Empresa no declara un plazo
+ * el sistema aplica el de la tabla: hay fecha, no hay retención, y el aviso
+ * `RETAIN_SIN_PLAZO` es inalcanzable en el camino normal.
+ *
+ * La función se conserva porque en las bases YA HAY filas con ese hold (en
+ * producción y en los tests) y tienen que poder salir: es la maquinaria de
+ * puesta en regla, y se llama de forma EXPRESA (con actor y motivo), nunca
+ * como efecto de crear una firma.
+ *
+ * El motivo y el alcance son PROPIOS de este hold: se distinguen del deber
+ * legal (migración 029) porque la razón de retener es otra y porque la
+ * liberación es otra. La liberación de este hold ocurre cuando se recalcula
+ * el plazo aplicable; la del deber legal, cuando el deber termina.
+ *
+ * Es IDEMPOTENTE: si ya hay un hold vigente por plazo no declarado, no se
+ * escribe una segunda fila en `gh_firma_holds`.
+ *
+ * @param {number} idFirma
+ * @param {object} [declaracion]
+ * @param {string} [declaracion.actor] - QUIÉN aplica la retención
+ * @returns {{firma_id: number, actor: string, motivo: string, alcance: string, ya_retenida: boolean}}
+ */
+function retenerPorPlazoNoDeclarado(idFirma, declaracion = {}) {
+  const actor = String(declaracion.actor || '').trim() || ACTOR_HOLD_PLAZO_NO_DECLARADO;
+  const motivo = MOTIVO_HOLD_PLAZO_NO_DECLARADO;
+  const alcance = ALCANCE_HOLD_PLAZO_NO_DECLARADO;
+
+  const vigente = db.prepare(
+    'SELECT id FROM gh_firma_holds WHERE firma_id = ? AND activo = 1 AND motivo = ? ORDER BY id DESC LIMIT 1'
+  ).get(idFirma, motivo);
+  if (vigente) {
+    return { firma_id: idFirma, actor, motivo, alcance, ya_retenida: true };
+  }
+
+  const hold = ponerHold(idFirma, { actor, motivo, alcance });
+  logger.warn('Hold por plazo no declarado declarado (8.6(h))', {
+    firma_id: idFirma,
+    actor,
+    motivo,
+  });
+  return { ...hold, ya_retenida: false };
+}
+
+/**
+ * Levanta el hold por PLAZO NO DECLARADO: la Empresa declaró el plazo y el
+ * registro vuelve al circuito normal del 8.6.
+ *
+ * NO levanta un hold de otro motivo. Si el hold vigente es un deber legal, esta
+ * función se niega: el deber legal no se levanta porque la Empresa haya
+ * declarado un plazo, y un "liberar" genérico lo tumbaría por accidente.
+ *
+ * LA FECHA DE CONSERVACIÓN
+ * -----------------------
+ * Una firma retenida por plazo no declarado NO tiene fecha de conservación
+ * (sin fecha no hay supresión, y sin supresión el 8.6 no se cumple). Por eso,
+ * al levantar el hold, la fecha se calcula en la MISMA operación: el punto de
+ * inicio declarado más el plazo declarado, si quien libera dice cuáles son.
+ *
+ * Si no los dice, la fecha sale del PLAN DEL CATÁLOGO: el plazo que declaró
+ * la Empresa o, en su defecto, el de la tabla supletoria de conservación. Con
+ * la tabla supletoria SIEMPRE hay un plazo, así que levantar este hold nunca
+ * deja el registro sin fecha: quedaría retenido ya no, pero tampoco
+ * suprimible, y sin registro de por qué.
+ *
+ * @param {number} idFirma
+ * @param {object} [liberacion]
+ * @param {string} [liberacion.actor] - QUIÉN lo levanta
+ * @param {string} [liberacion.motivo] - POR QUÉ se levanta
+ * @param {number} [liberacion.plazo_declarado_dias] - el plazo que declaró la Empresa
+ * @param {string} [liberacion.punto_inicio] - el punto de inicio desde el que corre
+ * @param {object} [liberacion.plan] - el plan ya calculado (el que hizo el
+ *   recálculo); se usa tal cual para no calcular dos veces.
+ * @returns {{firma_id: number, liberado: boolean, motivo: string|null, fecha_conservacion: string|null}}
+ * @throws {Error} si el hold vigente no es por plazo no declarado.
+ */
+function liberarHoldPorPlazoNoDeclarado(idFirma, liberacion = {}) {
+  const vigente = db.prepare(
+    'SELECT id, motivo FROM gh_firma_holds WHERE firma_id = ? AND activo = 1 ORDER BY id DESC LIMIT 1'
+  ).get(idFirma);
+
+  if (!vigente) {
+    return { firma_id: idFirma, liberado: false, motivo: null, fecha_conservacion: null };
+  }
+  if (vigente.motivo !== MOTIVO_HOLD_PLAZO_NO_DECLARADO) {
+    throw new Error(
+      'El hold vigente de esta firma no es por plazo no declarado: no se libera.'
+    );
+  }
+
+  // La fecha de conservación: la que dice quien libera, o la que resulta del
+  // plan del catálogo (el plazo de la Empresa o, en su defecto, el de la
+  // tabla supletoria de conservación).
+  const dias = Number(liberacion.plazo_declarado_dias);
+  const puntoInicio = liberacion.punto_inicio ? String(liberacion.punto_inicio).trim() : '';
+  let fechaConservacion = null;
+  let plan = liberacion.plan || null;
+  if (Number.isInteger(dias) && dias > 0 && puntoInicio) {
+    const punto = new Date(puntoInicio);
+    if (!Number.isNaN(punto.getTime())) {
+      fechaConservacion = new Date(punto.getTime() + dias * MS_POR_DIA).toISOString();
+    }
+  } else {
+    if (!plan) plan = _planDeFirma(idFirma, null);
+    fechaConservacion = plan.fecha_conservacion || null;
+  }
+
+  const r = liberarHold(idFirma, liberacion);
+  if (fechaConservacion) {
+    db.prepare(
+      'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
+    ).run(fechaConservacion, idFirma);
+    if (plan) _escribirTrazabilidad(idFirma, plan);
+  }
+  logger.info('Hold por plazo no declarado liberado', {
+    firma_id: idFirma,
+    actor: liberacion.actor || null,
+    fecha_conservacion: fechaConservacion,
+  });
+  return {
+    ...r,
+    liberado: true,
+    motivo: vigente.motivo,
+    fecha_conservacion: fechaConservacion,
+  };
+}
+
+/**
+ * EL REPORTE DEL PLAZO PENDIENTE (el 8.6(h)).
+ *
+ * El 8.6(h) no dice solo "no se suprime": dice que el sistema "deja constancia
+ * del pendiente y lo reporta a la Empresa". Esto es ese reporte: la lista de
+ * los registros que están retenidos porque la Empresa no declaró un plazo,
+ * con el motivo y el alcance de la retención.
+ *
+ * DESPUÉS DE LA DECISIÓN D1
+ * -------------------------
+ * Con la tabla supletoria de conservación, el alta de una firma YA NO deja
+ * registros en este estado: si la Empresa no declara un plazo, aplica el de la
+ * tabla. Este reporte nombra, entonces, las filas que ya estaban en las bases
+ * (con el hold viejo) y que siguen esperando un recálculo: son las que hay que
+ * poner en regla, y el recálculo es una operación expresa, autorizada y
+ * auditada.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.id_empresa] - filtra por empresa
+ * @returns {{total: number, pendientes: object[], mensaje: string}}
+ */
+function reportePlazoPendiente(opts = {}) {
+  const grupos = vencimientos({ id_empresa: opts.id_empresa || null });
+  const pendientes = grupos.sinPlazo.map((f) => ({
+    id: f.id,
+    id_solicitud: f.id_solicitud,
+    id_empresa: f.id_empresa,
+    fecha_creacion: f.fecha_creacion,
+    retenida: Number(f.hold_legal) === 1,
+    motivo_retencion: f.motivo_hold || MOTIVO_HOLD_PLAZO_NO_DECLARADO,
+    alcance_retencion: f.hold_alcance || ALCANCE_HOLD_PLAZO_NO_DECLARADO,
+    plazo_pendiente: 'plazo de conservacion no declarado por la Empresa',
+  }));
+  return {
+    total: pendientes.length,
+    pendientes,
+    mensaje:
+      'Registros retenidos por plazo de conservacion no declarado (8.6(h)): no se '
+      + 'suprimen hasta que se recalculen con el plazo que resulta aplicable (el que '
+      + 'declara la Empresa o, en su defecto, el de la tabla de conservacion del '
+      + 'sistema). El recalculo es una operacion expresa, autorizada y auditada.',
+  };
+}
+
+/**
+ * Retiene TODOS los registros que hoy estan sin plazo declarado.
+ *
+ * Es la puesta en regla de lo que ya esta en la base: el 8.6(h) dice que un
+ * registro sin plazo declarado QUEDA RETENIDO, no solo reportado. Se apoya en
+ * el mismo mecanismo de reporte (`grupos.sinPlazo`) y es idempotente.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.id_empresa] - filtra por empresa
+ * @param {string} [opts.actor] - QUIÉN aplica la retención
+ * @returns {{revisados: number, retenidas: number, ya_retenidas: number}}
+ */
+function retenerPendientesDePlazo(opts = {}) {
+  const actor = String(opts.actor || '').trim() || ACTOR_HOLD_PLAZO_NO_DECLARADO;
+  const grupos = vencimientos({ id_empresa: opts.id_empresa || null });
+  let retenidas = 0;
+  let yaRetenidas = 0;
+  for (const f of grupos.sinPlazo) {
+    const r = retenerPorPlazoNoDeclarado(f.id, { actor });
+    if (r.ya_retenida) yaRetenidas += 1;
+    else retenidas += 1;
+  }
+  return {
+    revisados: grupos.sinPlazo.length,
+    retenidas,
+    ya_retenidas: yaRetenidas,
+  };
+}
+
+/**
+ * RECALCULA LOS PLAZOS CUANDO LA EMPRESA DECLARA EL SUYO (el 8.6(h)).
+ *
+ * El 8.6(h) del Acuerdo v1.2 no se queda en "no se suprime": termina diciendo
+ * que "la retención por plazo no declarado cesa cuando la Empresa declara ese
+ * plazo para la categoría, y desde entonces rigen las reglas generales de este
+ * numeral". Sin esta pieza, declarar el plazo no cambiaría nada: los registros
+ * quedarían retenidos para siempre.
+ *
+ * QUÉ HACE, PASO A PASO
+ *   1. Toma las firmas de la Empresa SIN fecha de conservación que estén
+ *      retenidas por plazo no declarado. Las de otro motivo (deber legal,
+ *      contrato electrónico) NO se tocan: son otros holds, con otra vida.
+ *   2. Las re-planifica con la MISMA función que usa el alta de la firma
+ *      (`retencion.planificar`), ahora con el plazo ya declarado. Una sola
+ *      fuente de verdad para el cálculo: si el alta y el recálculo usaran
+ *      reglas distintas, el registro cambiaria de fecha al declarar el plazo.
+ *   3. Si el plan trae fecha, la escribe (con su trazabilidad) y levanta el
+ *      hold por plazo no declarado. Si NO trae fecha (el plazo no es
+ *      computable para esa categoría), la firma sigue retenida y se sigue
+ *      reportando.
+ *
+ * YA NO SE EXIGE QUE LA EMPRESA HAYA DECLARADO UN PLAZO
+ * -------------------------------------------------------
+ * Con la tabla supletoria de conservación, el plazo por defecto existe
+ * siempre: si la Empresa no declaró uno, el que aplica es el de la tabla
+ * (fuente 'tabla_supletoria'). Por eso el recálculo de las filas que
+ * quedaron con el hold viejo ya no depende de que la Empresa declare:
+ * depende de que alguien lo ORDENE, con actor y motivo. Ese es el motivo de
+ * que la operación sea explícita, autorizada y auditada.
+ *
+ * LO QUE NO TOCA
+ * --------------
+ * Solo las filas SIN fecha de conservación y con el motivo de hold
+ * 'plazo_no_declarado'. Las que ya tienen fecha son registros históricos ya
+ * calculados: su plazo, su fuente y su fecha de inicio quedan CONGELADOS, y
+ * cambiar la tabla supletoria o el plazo de la Empresa no los mueve. Un
+ * recálculo es una operación aparte, con su actor y su motivo.
+ *
+ * NO INVENTA NADA: si el plazo no es computable para esa categoría, el
+ * registro queda como estaba.
+ *
+ * @param {string} id_empresa
+ * @param {object} [declaracion]
+ * @param {string} [declaracion.actor] - QUIÉN declara el plazo
+ * @param {string} [declaracion.motivo] - POR QUÉ se recalcula
+ * @param {object} [opciones]
+ * @param {object} [opciones.tabla_conservacion] - la tabla supletoria a usar,
+ *   en vez de la del archivo. Es el punto de inyección que usan los tests.
+ * @returns {{id_empresa: string, revisados: number, con_fecha: number, liberados: number, sin_fecha: number, mensaje: string}}
+ */
+function recalcularPlazosDeclarados(id_empresa, declaracion = {}, opciones = {}) {
+  const actor = String(declaracion.actor || '').trim() || 'empresa';
+  const motivo = String(declaracion.motivo || '').trim()
+    || 'la Empresa declara su plazo de retencion documental';
+
+  const empresa = db.prepare(
+    'SELECT * FROM gh_firma_empresas WHERE id_empresa = ?'
+  ).get(id_empresa);
+
+  // Las firmas SIN fecha de conservación de esta Empresa.
+  const filas = db.prepare(`
+    SELECT f.id, f.fecha_creacion, f.categoria_retencion, f.regla_retencion,
+           f.fecha_terminacion, f.motivo_hold
+      FROM gh_firmas_electronicas f
+     WHERE f.id_empresa = ?
+       AND f.fecha_conservacion IS NULL
+  `).all(id_empresa);
+
+  // Los registros que están retenidos por plazo no declarado: son los que
+  // este recálculo puede liberar.
+  const pendientes = filas.filter(
+    (f) => f.motivo_hold === MOTIVO_HOLD_PLAZO_NO_DECLARADO
+  );
+
+  if (!empresa) {
+    return {
+      id_empresa, revisados: pendientes.length, con_fecha: 0, liberados: 0, sin_fecha: 0,
+      mensaje: 'La Empresa no existe: no hay nada que recalcular.',
+    };
+  }
+
+  let con_fecha = 0;
+  let liberados = 0;
+  let sin_fecha = 0;
+
+  for (const f of pendientes) {
+    // Solo las retenidas POR PLAZO NO DECLARADO. Un hold por deber legal o el
+    // del contrato electrónico son otros motivos: levantarlos acá seria
+    // levantar una proteccion que sigue vigente.
+    const plan = retencionService.planificar({
+      categoria_retencion: f.categoria_retencion,
+      regla_retencion: f.regla_retencion,
+      fecha_creacion: f.fecha_creacion,
+      fecha_terminacion: f.fecha_terminacion,
+      empresa,
+      tabla_conservacion: opciones.tabla_conservacion,
+    });
+
+    if (!plan.fecha_conservacion) {
+      // El plazo no es computable para esta categoria: el registro sigue
+      // retenido y se sigue reportando. No se inventa una fecha.
+      sin_fecha += 1;
+      continue;
+    }
+
+    db.prepare(
+      'UPDATE gh_firmas_electronicas SET fecha_conservacion = ? WHERE id = ?'
+    ).run(plan.fecha_conservacion, f.id);
+    // 049 · el plazo aplicado, su fuente y su fecha de inicio quedan
+    // congelados en la fila, igual que en el alta.
+    _escribirTrazabilidad(f.id, plan);
+    con_fecha += 1;
+
+    // Se levanta el hold SIN fechas: la fecha ya la puso el plan, y volver a
+    // calcularla acá (punto de inicio + dias) podria dejar una fecha distinta
+    // de la que el propio plan decidio.
+    const r = liberarHoldPorPlazoNoDeclarado(f.id, { actor, motivo, plan });
+    if (r.liberado) liberados += 1;
+  }
+
+  logger.info('Plazos de conservacion recalculados', {
+    id_empresa,
+    actor,
+    motivo,
+    revisados: pendientes.length,
+    con_fecha,
+    liberados,
+    sin_fecha,
+  });
+
+  return {
+    id_empresa,
+    revisados: pendientes.length,
+    con_fecha,
+    liberados,
+    sin_fecha,
+    mensaje: con_fecha > 0
+      ? 'Los registros retenidos por plazo no declarado que ya tienen plazo aplicable '
+        + 'quedaron con fecha de conservacion y su retencion se levanto.'
+      : 'No hay registros pendientes de plazo para esta Empresa.',
+  };
+}
+
+/**
  * El historial de declares de una firma: cada declaración y cada liberación.
  *
  * @param {number} idFirma
@@ -417,13 +926,31 @@ function vencidaPorConservacion(fila) {
 }
 
 /**
+ * Marca una fila del grupo "sin plazo": el 8.6(h) dice que ese registro no se
+ * suprime y QUEDA RETENIDO por falta de plazo declarado, y que el pendiente se
+ * reporta. La fila sale del reporte con el nombre de lo que está pendiente.
+ *
+ * @param {object} f - fila de gh_firmas_electronicas
+ * @returns {object} la fila con el pendiente nombrado
+ */
+function _pendienteDePlazo(f) {
+  return {
+    ...f,
+    plazo_pendiente: true,
+    motivo_retencion: f.motivo_hold || MOTIVO_HOLD_PLAZO_NO_DECLARADO,
+    alcance_retencion: f.hold_alcance || null,
+  };
+}
+
+/**
  * Reporte de vencimientos, en los cuatro grupos que le importan a quien
  * decide:
  *
  *   proximos          - vence pronto, todavía no
  *   vencidosElegibles - venció y no hay deber legal de conservación
  *   vencidosEnHold    - venció pero hay deber legal: NO se suprime
- *   sinPlazo          - la Empresa no declaró plazo: no hay purga
+ *   sinPlazo          - la Empresa no declaró plazo: no hay purga y el registro
+ *                       queda retenido por esa razón (el 8.6(h))
  *
  * MÁS UN QUINTO: `vencidosConCopia`
  * -----------------------------------
@@ -443,7 +970,7 @@ function vencimientos(opts = {}) {
   const params = [];
   let sql = `
     SELECT id, id_solicitud, id_empresa, estado, fecha_creacion,
-           fecha_conservacion, hold_legal, motivo_hold,
+           fecha_conservacion, hold_legal, motivo_hold, hold_actor, hold_alcance,
            pdf_original_path, pdf_firmado_path, constancia_path
       FROM gh_firmas_electronicas`;
   if (opts.id_empresa) {
@@ -470,12 +997,12 @@ function vencimientos(opts = {}) {
 
   for (const f of filas) {
     if (!f.fecha_conservacion) {
-      grupos.sinPlazo.push(f);
+      grupos.sinPlazo.push(_pendienteDePlazo(f));
       continue;
     }
     const t = new Date(f.fecha_conservacion).getTime();
     if (Number.isNaN(t)) {
-      grupos.sinPlazo.push(f);
+      grupos.sinPlazo.push(_pendienteDePlazo(f));
       continue;
     }
     if (t > ahora) {
@@ -765,6 +1292,9 @@ module.exports = {
   VENTANA_MAX_MINUTOS,
   DIAS_PRORRO,
   CATEGORIAS_AUDITORIA,
+  ACTOR_HOLD_PLAZO_NO_DECLARADO,
+  MOTIVO_HOLD_PLAZO_NO_DECLARADO,
+  ALCANCE_HOLD_PLAZO_NO_DECLARADO,
   calcularFechaConservacion,
   plazoDeclarado,
   deberLegalEmpresa,
@@ -772,6 +1302,11 @@ module.exports = {
   aplicarPlanRetencion,
   ponerHold,
   liberarHold,
+  retenerPorPlazoNoDeclarado,
+  liberarHoldPorPlazoNoDeclarado,
+  reportePlazoPendiente,
+  retenerPendientesDePlazo,
+  recalcularPlazosDeclarados,
   holdsDe,
   esElegible,
   vencidaPorConservacion,

@@ -889,6 +889,52 @@
     if (check) { check.checked = false; check.disabled = false; }
   }
 
+  /**
+   * El documento del representante legal, listo para pintar (D2 de la v1.2).
+   *
+   * En la pantalla de firma se muestra el TIPO del documento del representante
+   * legal y sus ULTIMOS CUATRO digitos. El numero completo no se imprime
+   * nunca.
+   *
+   * ESTA ES LA SEGUNDA BARRIERA. La primera es el servidor:
+   * `publicViewFor()` ya devuelve el valor enmascarado. Si el contexto
+   * llegara con el dato en claro —un servidor viejo, una respuesta cacheada,
+   * un proxy que no actualizo— la pantalla no lo imprime igual: el
+   * enmascarado se repite aca, en el cliente, sobre el valor que se va a
+   * pintar. Las dos barreras hacen lo mismo a propósito: la que falta no
+   * alcanza para que el numero llegue a la pantalla.
+   *
+   * @param {*} valor - Lo que llego en el contexto.
+   * @returns {string|null} 'CC ****1010', '****1010' o null.
+   */
+  function documentoRepresentanteParaMostrar(valor) {
+    if (typeof valor !== 'string') return null;
+    const texto = valor.trim();
+    if (!texto) return null;
+
+    const MASCARA = '****';
+    const TIPOS = ['CC', 'CE', 'TI', 'PPT', 'PA'];
+
+    // Ya viene enmascarado: no se toca (el servidor lo hizo bien).
+    if (texto.indexOf(MASCARA) !== -1) return texto;
+
+    // 'CC 1010101010' -> tipo 'CC', numero '1010101010'.
+    let tipo = null;
+    let numero = texto;
+    const corte = /^([A-Za-z]{2,4})\s*[:#-]?\s+(\S.*)$/.exec(texto);
+    if (corte && TIPOS.indexOf(corte[1].toUpperCase()) !== -1) {
+      tipo = corte[1].toUpperCase();
+      numero = corte[2];
+    }
+
+    // Sin separadores, para que los ultimos cuatro sean digitos.
+    numero = numero.replace(/[\s.\-_:]+/g, '');
+    if (!numero) return null;
+
+    const ultimos = numero.slice(-4);
+    return (tipo ? tipo + ' ' : '') + MASCARA + ultimos;
+  }
+
   function renderEmpresa(contexto) {
     const panel = $('#empresa-panel');
     const lista = $('#empresa-datos');
@@ -922,7 +968,12 @@
     // del bloque que el trabajador puede consultar por su cuenta.
     lista.textContent = '';
     CAMPOS.forEach(function (par) {
-      const valor = empresa[par[1]];
+      let valor = empresa[par[1]];
+      // D2: el documento del representante se enmascara antes de pintarse,
+      // aunque el contexto llegue con el dato en claro.
+      if (par[1] === 'representante_legal_identificacion') {
+        valor = documentoRepresentanteParaMostrar(valor);
+      }
       const fila = document.createElement('div');
       fila.className = 'empresa__campo';
 

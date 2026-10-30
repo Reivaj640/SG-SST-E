@@ -373,13 +373,23 @@ test('8C · tras la supresión, el enlace ROTADO también dice "vencido"', async
   assert.equal(rotado.status, 200);
 
   // La firma vence por conservación y se suprime (la 5B).
+  //
+  // OJO con el hold: desde la v1.2, una firma cuya Empresa no declaró plazo
+  // nace RETENIDA por esa razón (el 8.6(h)) y con esa retención no es
+  // suprimible. Este test simula la otra situación: la Empresa declaró su
+  // plazo, la firma tiene fecha de conservación y esa fecha ya venció. Por eso
+  // el UPDATE levanta también la retención: una firma vencida por
+  // conservación NO puede estar retenida por plazo no declarado.
   const ahora = Date.now();
   db.prepare(`
     UPDATE gh_firmas_electronicas
        SET estado = 'SIGNED',
            fecha_firma = ?,
            fecha_conservacion = ?,
-           fecha_expiracion = ?
+           fecha_expiracion = ?,
+           hold_legal = 0,
+           motivo_hold = NULL,
+           hold_alcance = NULL
      WHERE id = ?
   `).run(
     new Date(ahora).toISOString(),
@@ -387,6 +397,9 @@ test('8C · tras la supresión, el enlace ROTADO también dice "vencido"', async
     new Date(ahora + 48 * HORA).toISOString(),
     signRequest.id
   );
+  db.prepare(
+    'UPDATE gh_firma_holds SET activo = 0, liberado_at = ?, liberado_por = ?, motivo_liberacion = ? WHERE firma_id = ? AND activo = 1'
+  ).run(new Date(ahora).toISOString(), 'test', 'la Empresa declara su plazo', signRequest.id);
 
   conservacion.abrirVentana({ actor: 'test', motivo: 'Vencimiento del plazo declarado', minutos: 15 });
   conservacion.armarLote({ actor: 'test', motivo: 'Vencimiento del plazo declarado' });

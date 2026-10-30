@@ -96,6 +96,9 @@ const EVENTO_LABEL = {
   EXPIRED: 'Solicitud expirada',
   REVOKED: 'Solicitud revocada',
   CANCELLED: 'Solicitud cancelada',
+  // 10.8(d): el reporte de carga accidental de datos de salud y su resolucion.
+  INCIDENTE_DATOS_SENSIBLES: 'Incidente de carga accidental de datos de salud',
+  INCIDENTE_DATOS_SENSIBLES_RESUELTO: 'Incidente de datos de salud resuelto',
 };
 
 const MARCO_LEGAL_LINEAS = [

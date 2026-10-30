@@ -1589,7 +1589,12 @@
     PAPER_COPY_FAILED:           { label: 'No se pudo enviar la copia',   icon: 'fa-triangle-exclamation', color: '#dc2626' },
     DOCUMENT_SUPPLIED_TO_AUTHORITY: { label: 'Documento a una autoridad', icon: 'fa-gavel',            color: '#7c3aed' },
     AUTHORIZED_MEDIA_ADDED:      { label: 'Medio autorizado agregado',   icon: 'fa-envelope-open',    color: '#059669' },
-    AUTHORIZED_MEDIA_REMOVED:    { label: 'Medio autorizado retirado',   icon: 'fa-envelope-close',   color: '#6b7280' }
+    AUTHORIZED_MEDIA_REMOVED:    { label: 'Medio autorizado retirado',   icon: 'fa-envelope-close',   color: '#6b7280' },
+    // 10.8(d) · la carga accidental de un documento con datos de salud: el
+    // reporte y su resolucion. Sin estas etiquetas la linea de tiempo
+    // mostraria el nombre crudo del evento.
+    INCIDENTE_DATOS_SENSIBLES:   { label: 'Carga accidental de datos de salud', icon: 'fa-triangle-exclamation', color: '#dc2626' },
+    INCIDENTE_DATOS_SENSIBLES_RESUELTO: { label: 'Incidente de datos de salud resuelto', icon: 'fa-check-circle', color: '#059669' }
   };
 
   FirmaElectronicaComponent.prototype._renderExpedienteTrazabilidad = function (data) {

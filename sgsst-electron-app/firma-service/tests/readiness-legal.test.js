@@ -57,12 +57,58 @@ const ENCARGO_OK = [
   'Servicio en nube: firma-service.',
 ].join('\n');
 
+// El Acuerdo v1.3. El control textual del 8.6 mira el TEXTO, y lo que tiene que
+// encontrar es la regla nueva: el piso de veinte (20) años desde el cese (8.6(b)),
+// la tabla supletoria de conservación que administra K+AIR a falta de plazo
+// declarado (8.6(a) y 8.6(h)), y la ausencia de retención indefinida.
 const ACUERDO_OK = [
   'Versión del Acuerdo: v1.1',
   'Veinte (20) años.',
   'Hold sin término del contrato electrónico.',
   'Dos (2) días hábiles.',
   'Artículo 2.2.4.6.13 del Decreto 1072 de 2015.',
+  // 8.6(b): el piso legal, contado desde el cese.
+  'Los registros del SG-SST enumerados en el artículo 2.2.4.6.13 del Decreto 1072 de 2015 '
+    + 'se conservan como mínimo veinte (20) años contados desde el cese de la relación laboral.',
+  // 8.6(a): la precedencia.
+  'El plazo de conservación se determina por categoría documental: primero por las reglas '
+    + 'legales especiales, que no pueden rebajarse; luego por la tabla de retención documental '
+    + 'de la Empresa; y a falta de plazo declarado por la Empresa, por la tabla supletoria de '
+    + 'conservación que administra K+AIR.',
+  // 8.6(h): no hay retención indefinida, y la tabla supletoria es configurable con
+  // fundamento y punto de inicio, sin recalcular históricos.
+  'No hay retención indefinida.',
+  'La tabla supletoria es configurable: cada regla que la integra ha de tener un fundamento y '
+    + 'un punto de inicio desde el que corre. Un cambio en esa tabla no altera los plazos ya '
+    + 'calculados: un recálculo exige una operación expresa, autorizada y auditada.',
+].join('\n');
+
+// El mismo Acuerdo SIN la tabla supletoria: el piso de veinte (20) años está, pero
+// no la regla que da un plazo por defecto a falta de plazo declarado.
+const ACUERDO_SIN_H = [
+  'Versión del Acuerdo: v1.1',
+  'Veinte (20) años.',
+  'Hold sin término del contrato electrónico.',
+  'Dos (2) días hábiles.',
+  'Artículo 2.2.4.6.13 del Decreto 1072 de 2015.',
+  'Los registros del SG-SST enumerados en el artículo 2.2.4.6.13 del Decreto 1072 de 2015 '
+    + 'se conservan como mínimo veinte (20) años contados desde el cese de la relación laboral.',
+].join('\n');
+
+// El Acuerdo v1.2: todavía promete el hold por plazo no declarado. La v1.3 lo
+// eliminó, así que este texto tiene que FALLAR el control. Es el control de
+// AUSENCIA del D1: un texto que conserva la frase vieja no puede pasar.
+const ACUERDO_CON_HOLD_VIEJO = [
+  'Versión del Acuerdo: v1.1',
+  'Veinte (20) años.',
+  'Hold sin término del contrato electrónico.',
+  'Dos (2) días hábiles.',
+  'Artículo 2.2.4.6.13 del Decreto 1072 de 2015.',
+  'Los registros del SG-SST enumerados en el artículo 2.2.4.6.13 del Decreto 1072 de 2015 '
+    + 'se conservan como mínimo veinte (20) años contados desde el cese de la relación laboral.',
+  'Si la Empresa no declara un plazo para una categoría documental, el registro no se suprime: '
+    + 'el sistema lo retiene con un hold por plazo no declarado, deja constancia del pendiente '
+    + 'y lo reporta a la Empresa.',
 ].join('\n');
 
 function manifiestoCompleto() {
@@ -284,6 +330,71 @@ test('readiness · un manifiesto completo no inventa lo que falta en la base', (
   assert.ok(idsPendientes.includes('tablas_d03'));
   assert.ok(!idsPendientes.includes('nit_encargado'));
   assert.ok(!idsPendientes.includes('canal_datos'));
+});
+
+// El control `codigo_20` es TEXTUAL sobre el texto del Acuerdo: verifica lo
+// que la v1.2 dice, no un literal del código.
+
+test('readiness · el control codigo_20 pasa con el 8.6(b) y el 8.6(h) en el texto', () => {
+  const r = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: manifiestoCompleto(),
+    textos: {
+      acuerdoV11: ACUERDO_OK,
+      anexoNube: NUBE_OK,
+      anexoEncargo: ENCARGO_OK,
+    },
+  });
+  const idsPendientes = r.pendientes.map((p) => p.id);
+  assert.ok(
+    !idsPendientes.includes('codigo_20'),
+    'el texto dice el piso de veinte (20) años desde el cese y la retención por '
+      + 'plazo no declarado: el control tiene que pasar'
+  );
+});
+
+test('readiness · MUTACION: sin la tabla supletoria el control codigo_20 queda pendiente', () => {
+  // Si el control se limitara a buscar "veinte (20) años", este texto (que lo
+  // tiene) pasaría. El control tiene que exigir ALSO la regla que da el plazo
+  // por defecto a falta de plazo declarado.
+  const r = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: manifiestoCompleto(),
+    textos: {
+      acuerdoV11: ACUERDO_SIN_H,
+      anexoNube: NUBE_OK,
+      anexoEncargo: ENCARGO_OK,
+    },
+  });
+  const item = r.pendientes.find((p) => p.id === 'codigo_20');
+  assert.ok(item, 'sin la tabla supletoria el control tiene que quedar pendiente');
+  assert.match(item.detalle, /tabla supletoria/);
+  assert.match(item.detalle, /retenci[oó]n indefinida/);
+});
+
+test('readiness · AUSENCIA: un texto que todavia promete el hold por plazo no declarado NO pasa', () => {
+  // Este es el control de ausencia del D1. La v1.3 elimino la retencion
+  // indefinida: un texto que conserve la frase vieja esta prometiendo un
+  // mecanismo que el codigo ya no tiene, y tiene que fallar.
+  const r = readiness.evaluar({
+    gate: 'publicacion',
+    db: null,
+    config: CONFIG_TEST,
+    manifiesto: manifiestoCompleto(),
+    textos: {
+      acuerdoV11: ACUERDO_CON_HOLD_VIEJO,
+      anexoNube: NUBE_OK,
+      anexoEncargo: ENCARGO_OK,
+    },
+  });
+  const item = r.pendientes.find((p) => p.id === 'codigo_20');
+  assert.ok(item, 'el texto que aun promete el hold viejo tiene que quedar pendiente');
+  assert.match(item.detalle, /hold por plazo no declarado/);
+  assert.match(item.detalle, /reporte del plazo pendiente/);
 });
 
 test('readiness · el reporte de texto incluye el gate y el estado', () => {

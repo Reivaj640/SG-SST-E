@@ -57,6 +57,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const Database = require('better-sqlite3');
 const request = require('supertest');
 
 const db = require('../src/db/connection');
@@ -500,4 +503,423 @@ test('recibo · MUTACION: sin las columnas de la 041 el recibo no lleva el funda
     'la migracion 041 tiene que haber agregado id_solicitud al recibo');
   assert.ok(columnas.includes('fecha_conservacion'),
     'la migracion 041 tiene que haber agregado fecha_conservacion al recibo');
+});
+
+// =========================================================================
+// LA VÍA DE SUPRESIÓN DE LA PRUEBA DE ACEPTACIÓN (el 12.7)
+// =========================================================================
+//
+// El 12.7 del Acuerdo v1.2: "Esta prueba subsiste a la supresión de los demás
+// registros del 8.6 y se sujeta al plazo de conservación que la Empresa
+// declare para ella; mientras ese plazo no esté declarado, la prueba no se
+// suprime y queda retenida por esa razón, conforme al 8.6(h)."
+//
+// Antes de la migración 047 y de `supresion.registrarSupresionPruebaAceptacion`
+// no existía esa vía: la lápida y el recibo se escribían SOLO al purgar la
+// firma.
+
+const DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * Siembra la prueba de aceptación de una solicitud: la fila de
+ * `gh_consentimientos_firma` que el 12.7 manda conservar.
+ */
+function sembrarPruebaAceptacion({
+  id_solicitud = 'SIGN-2026-000777',
+  id_empresa = TEST_EMPRESA_A,
+  aceptada = true,
+} = {}) {
+  const r = db.prepare(`
+    INSERT INTO gh_consentimientos_firma
+      (id_trabajador, id_empresa, version_acuerdo, hash_texto_acuerdo,
+       correo_verificacion, correo_hash, otp_hash, otp_sal,
+       fecha_aceptacion, kair_version, manifestacion_aceptada, estado,
+       id_solicitud)
+    VALUES ('psn1_prueba', ?, 'v1.1', 'hash-texto', 'a@b.com', 'h', 'o', 's',
+            ?, '0.1.0-test', ?, 'ACEPTADO', ?)
+  `).run(
+    id_empresa,
+    aceptada ? new Date().toISOString() : null,
+    aceptada ? 1 : 0,
+    id_solicitud
+  );
+  return r.lastInsertRowid;
+}
+
+/**
+ * Siembra una firma de esa solicitud, para poder ponerla (o no) en hold.
+ */
+function sembrarFirmaDeSolicitud(id_solicitud, { hold_legal = 0 } = {}) {
+  const r = db.prepare(`
+    INSERT INTO gh_firmas_electronicas
+      (id_solicitud, id_documento, id_trabajador, id_empresa, tipo_firma,
+       document_hash_original, agreement_hash, token_hash,
+       fecha_creacion, fecha_expiracion, version_kair,
+       fecha_conservacion, hold_legal, motivo_hold)
+    VALUES (?, 'doc-p', 'psn1_prueba', ?, 'presencial',
+            'hash-doc', 'hash-acuerdo', 'hash-token-p',
+            datetime('now'), datetime('now'), '0.1.0-test',
+            NULL, ?, ?)
+  `).run(id_solicitud, TEST_EMPRESA_A, hold_legal, hold_legal ? 'deber_legal_x' : null);
+  return r.lastInsertRowid;
+}
+
+test('12.7 · la vía registra la solicitud y deja la lápida y el recibo', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000777';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+
+  // El punto de inicio es de hace tres años y el plazo declarado es de un
+  // año: el plazo declarado ya venció, la supresión procede.
+  const puntoInicio = new Date(Date.now() - 3 * 365 * DIA).toISOString();
+  const r = supresion.registrarSupresionPruebaAceptacion({
+    actor: 'operador',
+    motivo: 'Vencimiento del plazo declarado para la prueba de aceptación',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Artículo 2.2.2.25.2.5 del Decreto 1072 de 2015',
+    punto_inicio: puntoInicio,
+  });
+
+  assert.equal(r.estado, 'SUPRIMIDA');
+  assert.equal(r.suprimida, true);
+
+  // La SOLICITUD: con el plazo declarado, su fundamento, su punto de inicio,
+  // la fecha de conservación y el estado.
+  const solicitud = db.prepare(
+    'SELECT * FROM gh_firma_prueba_supresion WHERE id_solicitud = ?'
+  ).get(idSolicitud);
+  assert.ok(solicitud, 'la solicitud de supresión quedó registrada');
+  assert.equal(solicitud.plazo_declarado_dias, 365);
+  assert.equal(solicitud.fundamento_plazo, 'Artículo 2.2.2.25.2.5 del Decreto 1072 de 2015');
+  assert.equal(solicitud.punto_inicio, puntoInicio);
+  assert.equal(solicitud.estado, 'SUPRIMIDA');
+  assert.equal(solicitud.hold_verificado, 1);
+  assert.ok(solicitud.fecha_conservacion);
+
+  // La LÁPIDA y el RECIBO.
+  const lapida = db.prepare(
+    'SELECT * FROM gh_firma_prueba_lapida WHERE id_solicitud = ?'
+  ).get(idSolicitud);
+  assert.ok(lapida, 'la lápida quedó escrita');
+  assert.equal(lapida.id_empresa, TEST_EMPRESA_A);
+  assert.ok(lapida.suprimido_at);
+  assert.equal(lapida.fundamento_plazo, solicitud.fundamento_plazo);
+
+  const recibo = db.prepare(
+    'SELECT * FROM gh_firma_prueba_recibo WHERE id_solicitud = ?'
+  ).get(idSolicitud);
+  assert.ok(recibo, 'el recibo quedó escrito');
+  assert.equal(recibo.actor, 'operador');
+  assert.equal(recibo.hold_verificado, 1);
+});
+
+test('12.7 · la vía RECHAZA la supresión si el plazo no está declarado', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000778';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+
+  // Sin plazo declarado: el 8.6(h) ordena RETENER, no suprimir.
+  assert.throws(
+    () => supresion.registrarSupresionPruebaAceptacion({
+      actor: 'operador',
+      motivo: 'Vencimiento del plazo',
+      id_solicitud: idSolicitud,
+      fundamento_plazo: 'Obligación legal',
+      punto_inicio: new Date().toISOString(),
+    }),
+    /plazo declarado/,
+    'sin plazo declarado la vía no se abre'
+  );
+  assert.throws(
+    () => supresion.registrarSupresionPruebaAceptacion({
+      actor: 'operador',
+      motivo: 'Vencimiento del plazo',
+      id_solicitud: idSolicitud,
+      plazo_declarado_dias: 0,
+      fundamento_plazo: 'Obligación legal',
+      punto_inicio: new Date().toISOString(),
+    }),
+    /plazo declarado/
+  );
+
+  // Y no quedó nada escrito.
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_supresion').get().n, 0
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_lapida').get().n, 0
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_recibo').get().n, 0
+  );
+});
+
+test('12.7 · la vía RECHAZA la supresión si el plazo no tiene fundamento ni punto de inicio', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000779';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+  const base = {
+    actor: 'operador',
+    motivo: 'Vencimiento del plazo',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+  };
+
+  assert.throws(
+    () => supresion.registrarSupresionPruebaAceptacion({
+      ...base, punto_inicio: new Date().toISOString(),
+    }),
+    /fundamento/
+  );
+  assert.throws(
+    () => supresion.registrarSupresionPruebaAceptacion({
+      ...base, fundamento_plazo: 'Obligación legal',
+    }),
+    /punto de inicio/
+  );
+});
+
+test('12.7 · la vía RECHAZA la supresión si hay hold vigente', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000780';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+  sembrarFirmaDeSolicitud(idSolicitud, { hold_legal: 1 });
+
+  assert.throws(
+    () => supresion.registrarSupresionPruebaAceptacion({
+      actor: 'operador',
+      motivo: 'Vencimiento del plazo',
+      id_solicitud: idSolicitud,
+      plazo_declarado_dias: 365,
+      fundamento_plazo: 'Obligación legal',
+      punto_inicio: new Date(Date.now() - 3 * 365 * DIA).toISOString(),
+    }),
+    /hold vigente/
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_supresion').get().n, 0
+  );
+});
+
+test('12.7 · la vía es idempotente: no duplica ni la lápida ni el recibo', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000781';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+  const args = {
+    actor: 'operador',
+    motivo: 'Vencimiento del plazo declarado',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Obligación legal',
+    punto_inicio: new Date(Date.now() - 3 * 365 * DIA).toISOString(),
+  };
+
+  const primero = supresion.registrarSupresionPruebaAceptacion(args);
+  const segundo = supresion.registrarSupresionPruebaAceptacion(args);
+  const tercero = supresion.registrarSupresionPruebaAceptacion(args);
+
+  assert.equal(primero.suprimida, true);
+  assert.equal(segundo.ya_suprimida, true);
+  assert.equal(tercero.ya_suprimida, true);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_supresion').get().n, 1
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_lapida').get().n, 1
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_recibo').get().n, 1
+  );
+});
+
+test('12.7 · la escritura de la lápida y del recibo es ATÓMICA con la solicitud', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000782';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+
+  // Se rompe el recibo: si la escritura del recibo falla, la transacción
+  // entera tiene que deshacerse. Si la solicitud o la lápida quedaran, el
+  // rastro de la supresión sería incoherente.
+  db.exec('ALTER TABLE gh_firma_prueba_recibo RENAME TO gh_firma_prueba_recibo_rota');
+  try {
+    assert.throws(
+      () => supresion.registrarSupresionPruebaAceptacion({
+        actor: 'operador',
+        motivo: 'Vencimiento del plazo declarado',
+        id_solicitud: idSolicitud,
+        plazo_declarado_dias: 365,
+        fundamento_plazo: 'Obligación legal',
+        punto_inicio: new Date(Date.now() - 3 * 365 * DIA).toISOString(),
+      }),
+      /no such table/
+    );
+  } finally {
+    db.exec('ALTER TABLE gh_firma_prueba_recibo_rota RENAME TO gh_firma_prueba_recibo');
+  }
+
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_supresion').get().n, 0,
+    'la solicitud no quedó: la transacción se deshizo'
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_lapida').get().n, 0,
+    'la lápida no quedó: la transacción se deshizo'
+  );
+});
+
+test('12.7 · con el plazo declarado sin vencer la vía queda SOLICITADA, sin lápida ni recibo', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000783';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+
+  const r = supresion.registrarSupresionPruebaAceptacion({
+    actor: 'operador',
+    motivo: 'La Empresa declaró el plazo para la prueba',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Obligación legal',
+    punto_inicio: new Date().toISOString(),
+  });
+
+  assert.equal(r.estado, 'SOLICITADA');
+  assert.equal(r.suprimida, false);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_lapida').get().n, 0
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_recibo').get().n, 0
+  );
+});
+
+test('12.7 · cuando el plazo declarado vence, la vía pasa a SUPRIMIDA y deja la lápida y el recibo', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000785';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+
+  // Primera pasada: el plazo declarado todavía no vence.
+  const primera = supresion.registrarSupresionPruebaAceptacion({
+    actor: 'operador',
+    motivo: 'La Empresa declaró el plazo para la prueba',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Obligación legal',
+    punto_inicio: new Date(Date.now() + 30 * DIA).toISOString(),
+  });
+  assert.equal(primera.estado, 'SOLICITADA');
+
+  // Segunda pasada, con el plazo ya vencido: la vía se ejecuta y deja su
+  // lápida y su recibo, sin duplicar la solicitud.
+  const segunda = supresion.registrarSupresionPruebaAceptacion({
+    actor: 'operador',
+    motivo: 'Vencimiento del plazo declarado para la prueba',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Obligación legal',
+    punto_inicio: new Date(Date.now() - 3 * 365 * DIA).toISOString(),
+  });
+  assert.equal(segunda.estado, 'SUPRIMIDA');
+  assert.equal(segunda.suprimida, true);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_supresion').get().n, 1
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_lapida').get().n, 1
+  );
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM gh_firma_prueba_recibo').get().n, 1
+  );
+  const solicitud = db.prepare(
+    'SELECT estado, suprimido_at, hold_verificado FROM gh_firma_prueba_supresion WHERE id_solicitud = ?'
+  ).get(idSolicitud);
+  assert.equal(solicitud.estado, 'SUPRIMIDA');
+  assert.ok(solicitud.suprimido_at, 'la supresión lleva fecha');
+  assert.equal(solicitud.hold_verificado, 1);
+});
+
+test('12.7 · el recibo de la prueba aparece en porSolicitud, porEmpresa y COLUMNAS_REPARTO', () => {
+  resetDb();
+  const idSolicitud = 'SIGN-2026-000784';
+  sembrarPruebaAceptacion({ id_solicitud: idSolicitud });
+  supresion.registrarSupresionPruebaAceptacion({
+    actor: 'operador',
+    motivo: 'Vencimiento del plazo declarado para la prueba',
+    id_solicitud: idSolicitud,
+    plazo_declarado_dias: 365,
+    fundamento_plazo: 'Obligación legal',
+    punto_inicio: new Date(Date.now() - 3 * 365 * DIA).toISOString(),
+  });
+
+  // 1. porSolicitud.
+  const recibo = reciboService.porSolicitud(idSolicitud);
+  assert.ok(recibo, 'la vía del 12.7 deja recibo');
+  assert.equal(recibo.id_solicitud, idSolicitud);
+  assert.equal(recibo.id_empresa, TEST_EMPRESA_A);
+  assert.equal(recibo.via, 'prueba_aceptacion');
+  assert.equal(recibo.fundamento_plazo, 'Obligación legal');
+  assert.ok(recibo.punto_inicio);
+  assert.ok(recibo.categorias.includes('prueba_aceptacion'));
+
+  // 2. porEmpresa.
+  const lista = reciboService.porEmpresa(TEST_EMPRESA_A);
+  assert.ok(lista.length >= 1);
+  const item = lista.find((r) => r.via === 'prueba_aceptacion');
+  assert.ok(item, 'la lista de la Empresa trae el recibo de la prueba');
+  assert.equal(item.id_solicitud, idSolicitud);
+  assert.equal(reciboService.totalPorEmpresa(TEST_EMPRESA_A), lista.length);
+
+  // 3. COLUMNAS_REPARTO: el fundamento y el punto de inicio son parte de lo
+  // que se entrega.
+  assert.ok(reciboService.COLUMNAS_REPARTO.includes('fundamento_plazo'));
+  assert.ok(reciboService.COLUMNAS_REPARTO.includes('punto_inicio'));
+  assert.ok(reciboService.COLUMNAS_REPARTO.includes('via'));
+});
+
+test('12.7 · la lápida y el recibo de la prueba son append-only', () => {
+  // Los triggers de la migración 048 no se aplican en el ambiente de test
+  // (llevan `@skip-when-env test`), así que se comprueban contra el ARCHIVO
+  // REAL, en una base de datos aislada: es la misma razón y el mismo
+  // mecanismo que la migración 020 (el registro de auditoría).
+  const ruta = path.join(os.tmpdir(), 'kair-prueba-append-only-' + Date.now() + '.sqlite');
+  const bd = new Database(ruta);
+  try {
+    bd.exec(fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'db', 'schema', '047_prueba_aceptacion_supresion.sql'),
+      'utf8'
+    ));
+    bd.exec(fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'db', 'schema', '048_prueba_aceptacion_append_only.sql'),
+      'utf8'
+    ));
+    bd.prepare(`
+      INSERT INTO gh_firma_prueba_lapida
+        (id_solicitud, id_empresa, actor, motivo, fecha_conservacion, fundamento_plazo, punto_inicio)
+      VALUES ('SIGN-2026-000001', '900123456', 'operador', 'plazo', '2026-01-01', 'legal', '2020-01-01')
+    `).run();
+    bd.prepare(`
+      INSERT INTO gh_firma_prueba_recibo
+        (id_solicitud, id_empresa, actor, motivo, fecha_conservacion, fundamento_plazo, punto_inicio)
+      VALUES ('SIGN-2026-000001', '900123456', 'operador', 'plazo', '2026-01-01', 'legal', '2020-01-01')
+    `).run();
+
+    assert.throws(
+      () => bd.prepare("UPDATE gh_firma_prueba_lapida SET actor = 'X'").run(),
+      /append-only/
+    );
+    assert.throws(
+      () => bd.prepare('DELETE FROM gh_firma_prueba_lapida').run(),
+      /append-only/
+    );
+    assert.throws(
+      () => bd.prepare("UPDATE gh_firma_prueba_recibo SET actor = 'X'").run(),
+      /append-only/
+    );
+    assert.throws(
+      () => bd.prepare('DELETE FROM gh_firma_prueba_recibo').run(),
+      /append-only/
+    );
+  } finally {
+    bd.close();
+    try { fs.unlinkSync(ruta); } catch (e) { /* ya no está */ }
+  }
 });

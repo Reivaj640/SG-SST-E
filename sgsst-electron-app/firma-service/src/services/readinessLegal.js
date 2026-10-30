@@ -396,6 +396,101 @@ function _codigoRetencion(ruta) {
   };
 }
 
+/**
+ * EL CONTROL TEXTUAL DE LA REGLA DE CONSERVACIÓN (el 8.6 de la v1.3).
+ *
+ * La v1.3 cambió el 8.6 en dos puntos:
+ *
+ *   (a) El piso legal de veinte (20) años es el de los registros del 8.6(b)
+ *       (los del artículo 2.2.4.6.13 del Decreto 1072 de 2015) y se cuenta
+ *       desde el CESE de la relación laboral. No cambia.
+ *   (b) YA NO HAY RETENCIÓN INDEFINIDA. La v1.2 decía que, sin plazo declarado
+ *       por la Empresa, el registro quedaba retenido con un hold por plazo no
+ *       declarado, dejaba constancia del pendiente y se reportaba a la Empresa.
+ *       La v1.3 elimina ese mecanismo: a falta de plazo declarado se aplica el
+ *       plazo por defecto de la tabla supletoria que administra K+AIR, que es
+ *       configurable, con fundamento y punto de inicio por categoría, y cuya
+ *       modificación no altera los plazos ya calculados.
+ *
+ * Este control es TEXTUAL: mira el TEXTO DEL ACUERDO, no el código. Es el
+ * control que dice si el texto vigente dice lo que tiene que decir. Y como la
+ * regla cambió, también comprueba las AUSENCIAS: si el texto todavía promete el
+ * hold por plazo no declarado o el reporte del plazo pendiente, falla. Un texto
+ * que conserva esas dos frases está prometiendo un mecanismo que el código ya
+ * no tiene.
+ *
+ * @param {object} doc - documento del Acuerdo ({existe, texto, archivo})
+ * @returns {{existe: boolean, ok: boolean, faltan: string[], detalle: string, archivo: string|null}}
+ */
+function _textoRetencionV13(doc) {
+  const archivo = doc ? doc.archivo : null;
+  if (!doc || !doc.existe) {
+    return {
+      existe: false,
+      ok: false,
+      faltan: ['el texto del Acuerdo'],
+      detalle: 'No hay texto del Acuerdo para verificar el 8.6.',
+      archivo,
+    };
+  }
+  const texto = doc.texto || '';
+
+  // (a) El piso legal de veinte (20) años de los registros del 8.6(b),
+  //     contado desde el cese de la relación laboral. La v1.3 no lo toca.
+  const tieneVeinte = /veinte\s*\(20\)\s*a[nñ]os/i.test(texto);
+  const tieneNormaSST = /2\.2\.4\.6\.13/i.test(texto);
+  const tieneCese = /contad[oa]s\s+desde\s+el\s+cese\s+de\s+la\s+relaci[oó]n\s+laboral/i.test(texto);
+
+  // (b) La tabla supletoria de conservación que administra K+AIR, que es el plazo
+  //     por defecto a falta de plazo declarado por la Empresa.
+  const tieneTablaSupletoria = /tabla\s+supletoria\s+de\s+conservaci[oó]n/i.test(texto);
+  const tieneAdministraKair = /tabla\s+supletoria[^.]*\bque\s+administra\s+K\+AIR/i.test(texto);
+  const tienePrecedenciaEmpresa = /tabla\s+de\s+retenci[oó]n\s+documental\s+de\s+la\s+Empresa/i.test(texto);
+  const tieneFaltaDePlazo = /a\s+falta\s+de\s+plazo\s+declarado/i.test(texto);
+  const tieneSinIndefinida = /No\s+hay\s+retenci[oó]n\s+indefinida/i.test(texto);
+  const tieneConfigurable = /tabla\s+supletoria\s+es\s+configurable/i.test(texto);
+  const tieneFundamento = /cada\s+regla\s+que\s+la\s+integra\s+ha\s+de\s+tener\s+un\s+fundamento/i.test(texto);
+  const tienePuntoInicio = /un\s+punto\s+de\s+inicio\s+desde\s+el\s+que\s+corre/i.test(texto);
+  const tieneNoRecalcula = /no\s+altera\s+los\s+plazos\s+ya\s+calculados/i.test(texto);
+  const tieneRecalculoAuditado = /rec[aá]lculo\s+exige\s+una\s+operaci[oó]n\s+expresa,\s+autorizada\s+y\s+auditada/i.test(texto);
+
+  // (c) AUSENCIAS. La v1.3 eliminó la retención indefinida: el texto no puede
+  //     seguir prometiendo el hold por plazo no declarado ni el reporte del plazo
+  //     pendiente. Un texto que conserve esas dos frases está prometiendo un
+  //     mecanismo que el código ya no tiene.
+  const tieneHoldPlazo = /hold\s+por\s+plazo\s+no\s+declarado/i.test(texto);
+  const tieneReporte = /(deja\s+constancia\s+del\s+pendiente|lo\s+reporta\s+a\s+la\s+Empresa)/i.test(texto);
+
+  const faltan = [];
+  if (!tieneVeinte) faltan.push('el piso de veinte (20) años');
+  if (!tieneNormaSST) faltan.push('la norma del 2.2.4.6.13 (los registros del 8.6(b))');
+  if (!tieneCese) faltan.push('el cómputo desde el cese de la relación laboral');
+  if (!tieneTablaSupletoria) faltan.push('la tabla supletoria de conservación');
+  if (!tieneAdministraKair) faltan.push('que la tabla supletoria la administra K+AIR');
+  if (!tienePrecedenciaEmpresa) faltan.push('la precedencia de la tabla de retención documental de la Empresa');
+  if (!tieneFaltaDePlazo) faltan.push('el plazo por defecto a falta de plazo declarado por la Empresa');
+  if (!tieneSinIndefinida) faltan.push('la regla de que no hay retención indefinida');
+  if (!tieneConfigurable) faltan.push('que la tabla supletoria es configurable');
+  if (!tieneFundamento) faltan.push('el fundamento de cada regla de la tabla supletoria');
+  if (!tienePuntoInicio) faltan.push('el punto de inicio de cada regla de la tabla supletoria');
+  if (!tieneNoRecalcula) faltan.push('que un cambio de la tabla no altera los plazos ya calculados');
+  if (!tieneRecalculoAuditado) faltan.push('que el recálculo exige una operación expresa, autorizada y auditada');
+  if (tieneHoldPlazo) faltan.push('el texto todavía promete el hold por plazo no declarado, que la v1.3 eliminó');
+  if (tieneReporte) faltan.push('el texto todavía promete el reporte del plazo pendiente, que la v1.3 eliminó');
+
+  return {
+    existe: true,
+    ok: faltan.length === 0,
+    faltan,
+    archivo,
+    detalle: faltan.length === 0
+      ? 'El texto dice el piso de veinte (20) años desde el cese (8.6(b)), la tabla '
+        + 'supletoria que administra K+AIR a falta de plazo declarado, y que no hay '
+        + 'retención indefinida.'
+      : 'Al texto le falta: ' + faltan.join(', '),
+  };
+}
+
 function _codigoToken(ruta) {
   const doc = _leerTexto(ruta);
   if (!doc.existe) {
@@ -823,6 +918,7 @@ function _cargarDocumentos(opciones = {}) {
     manifiesto,
     datos,
     rutas,
+    versionAcuerdo: _versionAcuerdoEsperada(datos, rutas.acuerdoV11),
     docNube: _textoDocumento(
       textos, 'anexoNube', rutas.anexoNube, 'legal/anexo-nube-v1.0.html',
     ),
@@ -833,6 +929,37 @@ function _cargarDocumentos(opciones = {}) {
       textos, 'acuerdoV11', rutas.acuerdoV11, etiquetaAcuerdo,
     ),
   };
+}
+
+/**
+ * La versión del Acuerdo que el texto revisado debe declarar.
+ *
+ * El manifiesto guarda las claves con el prefijo `v1_1_*` porque así las lee el
+ * código, pero su VALOR es la versión vigente del texto. Antes se comparaba el
+ * texto contra la cadena fija 'v1.1': con el archivo v1.2 eso ya fallaba, y el
+ * readiness reportaba "Faltan cláusulas: Versión del Acuerdo: v1.1" sobre un texto
+ * que decía v1.2. Un control que compara el documento contra una constante no
+ * comprueba el documento: comprueba la constante.
+ *
+ * La versión sale del manifiesto; si el manifiesto no la declara, del nombre del
+ * archivo; y solo si tampoco está ahí, se usa la v1.1.
+ *
+ * @param {object} datos contenido del manifiesto
+ * @param {string} rutaArchivo ruta del archivo del Acuerdo
+ * @returns {string} con la 'v' delante, por ejemplo 'v1.3'
+ */
+function _versionAcuerdoEsperada(datos, rutaArchivo) {
+  const declarada = datos && datos.acuerdo && datos.acuerdo.version;
+  // La 'v' es opcional: el manifiesto la escribe con 'v' ('v1.3'), pero
+  // aceptarla sin 'v' tambien. Con la 'v' rechazada, la clave del manifiesto se
+  // ignoraba en silencio y la version salia del NOMBRE del archivo: cambiar la
+  // version en el manifiesto no habria cambiado nada.
+  if (typeof declarada === 'string' && /^v?\d+\.\d+$/i.test(declarada.trim())) {
+    return 'v' + declarada.trim().replace(/^v/i, '');
+  }
+  const delNombre = /acuerdo-v(\d+\.\d+)\.txt$/i.exec(String(rutaArchivo || ''));
+  if (delNombre) return 'v' + delNombre[1];
+  return 'v1.1';
 }
 
 // =============================================================================
@@ -855,12 +982,16 @@ function evaluar(opciones = {}) {
   const gate = GATES.includes(opciones.gate) ? opciones.gate : 'primera_firma';
   const cfg = opciones.config || config;
   const dbConn = opciones.db === undefined ? db : opciones.db;
-  const { manifiesto, datos, docNube, docEncargo, docAcuerdo } = _cargarDocumentos(opciones);
+  const { manifiesto, datos, docNube, docEncargo, docAcuerdo, versionAcuerdo } = _cargarDocumentos(opciones);
 
   const anNube = analizarAnexoNube(docNube.texto);
   const anEncargo = analizarAnexoEncargo(docEncargo.texto);
-  const anAcuerdo = analizarAcuerdo(docAcuerdo.texto, 'v1.1');
+  const anAcuerdo = analizarAcuerdo(docAcuerdo.texto, versionAcuerdo);
   const retencion = _codigoRetencion(RUTAS_DEFAULT.retencion);
+  // El control TEXTUAL de la regla de conservación del 8.6 (v1.3): el piso de
+  // veinte (20) años desde el cese (8.6(b)), la tabla supletoria que administra
+  // K+AIR a falta de plazo declarado, y la ausencia de retención indefinida.
+  const retencionTexto = _textoRetencionV13(docAcuerdo);
   const token = _codigoToken(RUTAS_DEFAULT.signRequest);
 
   const empresas = _resumenEmpresas(dbConn);
@@ -1195,13 +1326,25 @@ function evaluar(opciones = {}) {
   const grupo86 = _grupo('n86', '8.6 · Custodia de 20 años y hold', [
     _item(
       'codigo_20',
-      'Código con ANIOS_CUSTODIA = 20',
-      _estado(retencion.ok),
+      'Acuerdo con el piso de 20 años (8.6(b)) y la retención por plazo no declarado (8.6(h))',
+      _estado(retencionTexto.ok && retencion.ok),
       {
         bloquea: GATE_AMBOS,
-        detalle: retencion.detalle,
-        accion: 'Corregir retencion.js para que aplique 20 años, la norma del 2.2.4.6.13 y el hold.',
-        referencia: retencion.archivo,
+        // QUÉ MIRA ESTE CONTROL
+        // -------------------
+        // Dos cosas, y las dos importan:
+        //   - El TEXTO del Acuerdo: que diga el piso de veinte (20) años de los
+        //     registros del 8.6(b) contado desde el cese, y que diga que sin
+        //     plazo declarado el registro no se suprime sino que se retiene y se
+        //     reporta el pendiente.
+        //   - El CÓDIGO: que `retencion.js` siga aplicando los veinte años, la
+        //     norma del 2.2.4.6.13 y el hold.
+        // El texto va primero: es el que manda. El código es la segunda mitad
+        // de la misma promesa.
+        detalle: retencionTexto.detalle
+          + (retencion.ok ? '' : ' Además, ' + retencion.detalle + '.'),
+        accion: 'Incluir en el Acuerdo el 8.6(b) y el 8.6(h) completos (piso de veinte (20) años desde el cese, y retención por plazo no declarado con reporte del pendiente), y dejar retencion.js aplicando los veinte años, la norma del 2.2.4.6.13 y el hold.',
+        referencia: docAcuerdo.archivo,
       },
     ),
     _item(
@@ -1251,11 +1394,15 @@ function evaluar(opciones = {}) {
         // hay que PODER AUDITAR es el rastro: cada caso rechazado queda como
         // evento OTP_MEDIO_CORPORATIVO en gh_firma_eventos, que es append-only
         // (la migración 020 impide UPDATE y DELETE) y por eso no se puede
-        // suprimir ni corregir.
+        // CORREGIR ni ALTERAR. SÍ se suprime: conforme al 8.6, dentro de la
+        // ventana de purga, y su supresión deja la lápida y el recibo del
+        // 3.6(g).
         detalle: 'El rechazo del buzón corporativo es incondicional y el caso queda '
           + 'en el registro append-only de eventos (OTP_MEDIO_CORPORATIVO en '
-          + 'gh_firma_eventos): se verifica en services/publicFlow.js, función '
-          + '_controlarMedioCorporativo.',
+          + 'gh_firma_eventos), que no se puede corregir ni alterar pero sí se '
+          + 'suprime conforme al 8.6, dentro de la ventana de purga, dejando la '
+          + 'lápida y el recibo del 3.6(g): se verifica en services/publicFlow.js, '
+          + 'función _controlarMedioCorporativo.',
         accion: 'Revisar que cada rechazo quedó en gh_firma_eventos antes de la primera firma real.',
         referencia: 'services/publicFlow.js · _controlarMedioCorporativo',
       },
@@ -1807,10 +1954,10 @@ function evaluar(opciones = {}) {
  * @returns {{acuerdo_v1_1: object, anexo_nube: object, anexo_encargo: object}}
  */
 function analizarAnexos(opciones = {}) {
-  const { docNube, docEncargo, docAcuerdo } = _cargarDocumentos(opciones);
+  const { docNube, docEncargo, docAcuerdo, versionAcuerdo } = _cargarDocumentos(opciones);
   const nube = analizarAnexoNube(docNube.texto);
   const encargo = analizarAnexoEncargo(docEncargo.texto);
-  const acuerdo = analizarAcuerdo(docAcuerdo.texto, 'v1.1');
+  const acuerdo = analizarAcuerdo(docAcuerdo.texto, versionAcuerdo);
   return {
     acuerdo_v1_1: { archivo: docAcuerdo.archivo, ...acuerdo },
     anexo_nube: { archivo: docNube.archivo, ...nube },

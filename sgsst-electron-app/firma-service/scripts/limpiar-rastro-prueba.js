@@ -340,8 +340,18 @@ function evaluarHold(f, hayTablaHolds) {
 
   // 2. Que el hold sea el AUTOMATICO (el que levanta la bandera de la ficha
   //    de la Empresa o la regla del sistema), no uno declarado a mano.
+  //
+  //    Desde la v1.2 hay DOS holds automaticos:
+  //      - `deber_legal_*`: el deber legal de conservacion sin termino.
+  //      - `plazo_no_declarado`: la Empresa no declaro un plazo (el 8.6(h)).
+  //        Este NO es un deber legal: es un PENDIENTE administrativo. La
+  //        retencion existe para que el registro no se suprima mientras la
+  //        Empresa declara, no porque haya una obligacion de conservar. Por eso
+  //        se puede forzar con las MISMAS reglas que el primero: la fila tiene
+  //        que ser de prueba y no puede haber tenido un acto de firma.
   const motivo = f.motivo_hold ? String(f.motivo_hold) : '';
-  if (!/^deber_legal_/.test(motivo)) {
+  const esAutomatico = /^deber_legal_/.test(motivo) || motivo === 'plazo_no_declarado';
+  if (!esAutomatico) {
     return {
       hold: true,
       forzable: false,
@@ -374,7 +384,7 @@ function evaluarHold(f, hayTablaHolds) {
   return {
     hold: true,
     forzable: true,
-    razon: 'nunca se firmo y el hold es el automatico de la ficha de la Empresa',
+    razon: 'nunca se firmo y el hold es el automatico (deber legal o plazo no declarado)',
   };
 }
 

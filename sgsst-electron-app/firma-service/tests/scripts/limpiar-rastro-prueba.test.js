@@ -58,6 +58,32 @@ function runSilent(args) {
 }
 
 /**
+ * La Empresa de produccion, con su tabla de retencion declarada.
+ *
+ * Sin plazo declarado, desde la v1.2 la firma nace RETENIDA por esa razon (el
+ * 8.6(h)) y el script de limpieza se negaria a tocarla. En produccion la
+ * Empresa declara su plazo; esta es esa empresa.
+ */
+function crearEmpresaConPlazo() {
+  db.prepare('DELETE FROM gh_firma_empresas WHERE id_empresa = ?').run(EMPRESA);
+  empresaService.create({
+    id_empresa: EMPRESA,
+    razon_social: 'Empresa de Prueba S.A.S.',
+    nit: EMPRESA,
+    responsable_tratamiento: 'Responsable de Prueba',
+    responsable_tratamiento_correo: 'privacidad@example.com',
+    canal_pqrs: 'pqrs@example.com',
+    canal_incidentes: 'seguridad@example.com',
+    canal_solicitud_copia: 'privacidad@example.com',
+    plazo_retencion: '20 anos',
+    plazo_retencion_dias: 7305,
+    conservacion_por_deber_legal: false,
+    norma_conservacion: null,
+  });
+  empresaService.marcarAnexoFirmado(EMPRESA, '2026-10-20');
+}
+
+/**
  * Deja la base como esta en produccion: la version vigente con la huella
  * del texto legal SELLADO, mas una firma de prueba.
  */
@@ -65,6 +91,7 @@ async function sembrarProduccion() {
   resetDb();
   const texto = fs.readFileSync(ARCHIVO_LEGAL, 'utf8');
   const version = seedActiveAgreement({ version: 'v1.0', texto });
+  crearEmpresaConPlazo();
   const firma = await createSignRequestWithIdentificacion({
     id_documento: 'doc-limpieza',
     id_trabajador: '1234567890',

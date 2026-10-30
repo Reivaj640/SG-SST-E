@@ -1,0 +1,137 @@
+{
+  "version": "1.0",
+  "actualizado_at": "2026-10-30",
+  "estado": "PROPUESTA. El reparto entre Grupo A y Grupo B, la base juridica de cada finalidad y el estado de habilitacion de cada una deben ser validados por el abogado antes de publicar esta version del Anexo de Encargo. Los plazos de conservacion de las finalidades no salen de aca: salen de config/tabla-conservacion.json, que es la fuente unica.",
+  "nota": "Fuente unica de la matriz de finalidades del Anexo de Encargo (seccion 2). De este archivo sale el bloque generado por scripts/generar-anexo-encargo.js. La matriz no se edita a mano en el HTML: se edita aca y se regenera. Convencion de escritura: este archivo va en UTF-8 con tildes y el generador las convierte en entidades HTML; config/tabla-conservacion.json va en ASCII y el generador le restituye las tildes antes de convertirlas. Las dos fuentes nunca se editan a mano en el Anexo.",
+  "instruccion": {
+    "documento": "este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electronica K+AIR",
+    "version": "2026-10-30",
+    "fecha": "30 de octubre de 2026",
+    "responsable": "la Empresa (Responsable del tratamiento)",
+    "encargado": "Gesstiar S.A.S. (K+AIR), en calidad de Encargado",
+    "soporte": "La version y la huella SHA-256 de ambos quedan registradas con la solicitud (numerales 3.6(b), 3.8 y 12.7 del Acuerdo)."
+  },
+  "reglas": [
+    "Grupo A. Son las finalidades necesarias para la prestacion del servicio. K+AIR las opera bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo, con fundamento documentado, y unicamente dentro del alcance que este Anexo describe.",
+    "Grupo B. Son las finalidades particulares de la Empresa. No se activan hasta que la Empresa entregue la informacion necesaria. Mientras tanto su estado de habilitacion es «No habilitada - pendiente de entrega de informacion por la Empresa» y K+AIR no ejecuta ese tratamiento.",
+    "La declaracion de la Empresa no reemplaza la autorizacion del Titular cuando esa autorizacion sea la base juridica de la finalidad. El numeral 10.4(b) del Acuerdo dispone que la autorizacion del Titular solo cubre las finalidades que en esta matriz tienen como base juridica esa autorizacion, y que no puede invocarse para ninguna otra.",
+    "K+AIR no usa los datos para finalidades propias no documentadas ni legitimadas. El numeral 10.3 del Acuerdo es taxativo: el tratamiento se realiza exclusivamente para las ocho finalidades que ese numeral enumera, y ninguna otra queda habilitada por esta matriz.",
+    "Las finalidades no habilitadas no se ejecutan. La aceptacion del Acuerdo no habilita ninguna finalidad del Grupo B, y K+AIR no las activa por si sola ni por el solo curso de una firma."
+  ],
+  "grupos": {
+    "A": {
+      "titulo": "Grupo A. Finalidades necesarias para la prestacion del servicio",
+      "regla": "Operan bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo, con fundamento documentado. El Encargado no sustituye esa instruccion ni la amplia."
+    },
+    "B": {
+      "titulo": "Grupo B. Finalidades particulares de la Empresa",
+      "regla": "No se activan hasta que la Empresa entregue la informacion necesaria. Hasta entonces no se ejecutan, su estado de habilitacion es «No habilitada - pendiente de entrega de informacion por la Empresa» y K+AIR no las activa por si sola."
+    }
+  },
+  "finalidades": [
+    {
+      "id": "10.3(a)",
+      "literal": "Crear y gestionar la solicitud de firma.",
+      "grupo": "A",
+      "descripcion": "Crear y gestionar la solicitud de firma.",
+      "categorias_datos": "Identificacion del Firmante (tipo y numero de documento, que el servicio compara mediante HMAC-SHA-256 con clave secreta y no conserva en texto claro); direccion de correo registrada por la Empresa y la que el Titular confirme en la pantalla de firma; direccion IP y agente de usuario; fechas y horas de las etapas del proceso de firma; identificacion del documento a firmar mediante su huella SHA-256; y datos de identificacion laboral que la Empresa inscriba en la solicitud (numeral 10.2 del Acuerdo).",
+      "titulares": "El Trabajador o la persona cuya firma se solicita. Los datos de identificacion de la Empresa y de su representante legal que aparecen en el bloque «Empresa que solicita tu firma» se tratan por cuenta de la Empresa, no del Titular (numeral 10.2(h) del Acuerdo).",
+      "base_juridica": "Instruccion documentada del Responsable (la Empresa) y del contrato de encargo (este Anexo y el Acuerdo), con fundamento en la finalidad del tratamiento. Base juridica propia de la Empresa para esta finalidad: No declarada en los documentos actuales - pendiente de validacion juridica. El numeral 10.4(b) del Acuerdo exige que cada finalidad tenga su base en esta matriz, y no invoca la autorizacion del Titular para las finalidades cuya base no sea esa autorizacion.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Solicitudes y comunicaciones operativas» de la tabla de conservacion de la seccion 8: cinco (5) anos por defecto. Si la Empresa declara un plazo para esa categoria en su tabla de retencion documental, ese plazo tiene precedencia (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "Sin solicitud no hay firma. La revocatoria o la supresion no afecta la evidencia ya generada, que se rige por el numeral 8.6 del Acuerdo.",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(b)",
+      "literal": "Enviar al Titular el enlace de acceso y el codigo OTP.",
+      "grupo": "A",
+      "descripcion": "Enviar al Titular el enlace de acceso y el codigo OTP.",
+      "categorias_datos": "Direccion de correo del destinatario y medio de recepcion que el Firmante confirmo en la pantalla de firma; contenido del mensaje y metadatos del envio (fecha y hora, direccion IP de origen e identificador del mensaje); y registro de emision y validacion del OTP y del token, sin conservarlos en texto claro (numerales 3.4(e), 3.6(b) y 3.8 del Acuerdo).",
+      "titulares": "El Titular destinatario del enlace de acceso y del codigo OTP.",
+      "base_juridica": "Instruccion documentada del Responsable (la Empresa) y del contrato de encargo. Medida de seguridad del envio: deber de confiabilidad de la firma electronica (articulo 2.2.2.47.4, numeral 1, del Decreto 1074 de 2015) y custodia del dato de creacion de la firma por parte de quien provee el mecanismo (articulo 2.2.2.47.6 del Decreto 1074 de 2015), en los terminos de los numerales 3.4(e) y 3.7(a) del Acuerdo. Base juridica propia de la Empresa para esta finalidad: No declarada en los documentos actuales - pendiente de validacion juridica.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categorias «Solicitudes y comunicaciones operativas» y «Registro de operaciones y autenticacion» de la tabla de conservacion de la seccion 8: cinco (5) anos por defecto, con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "El codigo no se envia a un medio no confirmado: si el destino cae en un dominio que la Empresa puede leer, el sistema rechaza la solicitud y ofrece la firma autografica sobre papel (numeral 7.2 del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(c)",
+      "literal": "Verificar la identidad del Firmante.",
+      "grupo": "A",
+      "descripcion": "Verificar la identidad del Firmante.",
+      "categorias_datos": "Tipo y numero de documento del Firmante, que se comparan mediante HMAC-SHA-256 con clave secreta y no se conservan en texto claro; resultado de la verificacion de identidad; huellas de los datos de creacion de la firma (numerales 3.4(d), 3.6(d), 3.7(a) y 3.10 del Acuerdo).",
+      "titulares": "El Firmante cuya identidad se verifica.",
+      "base_juridica": "Instruccion documentada del Responsable (la Empresa) y del contrato de encargo. El deber de confiabilidad de la firma electronica exige verificar la identidad del firmante: articulo 2.2.2.47.4, numeral 1, del Decreto 1074 de 2015, en los terminos del numeral 3.7(a) del Acuerdo. Base juridica propia de la Empresa para esta finalidad: No declarada en los documentos actuales - pendiente de validacion juridica.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Registro de operaciones y autenticacion» de la tabla de conservacion de la seccion 8: cinco (5) anos por defecto, con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "No aplica: sin verificar la identidad no se firma. La revocatoria no habilita a continuar el tratamiento con esa base despues de la revocatoria (numeral 10.7(a) del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(d)",
+      "literal": "Registrar y conservar su manifestacion de aceptacion de este Acuerdo.",
+      "grupo": "A",
+      "descripcion": "Registrar y conservar su manifestacion de aceptacion de este Acuerdo.",
+      "categorias_datos": "Version del Acuerdo aceptada, huella SHA-256 del texto, fecha y hora de la aceptacion e identificador de la solicitud (numerales 3.6(b) y 12.7 del Acuerdo).",
+      "titulares": "El Titular que acepta el Acuerdo.",
+      "base_juridica": "Deber legal de conservar la prueba de la aceptacion: articulo 2.2.2.25.2.5 del Decreto 1074 de 2015, en los terminos del numeral 12.7 del Acuerdo, que ordena conservar la version aceptada, la huella del texto, la fecha y hora y el identificador de la solicitud. Esa prueba subsiste a la supresion de los demas registros del numeral 8.6.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Constancia y manifestacion de aceptacion» de la tabla de conservacion de la seccion 8: el mismo plazo del documento asociado y, si ese documento no tiene plazo propio, el de «Documento original y firmado»; con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "No borra la prueba ya generada: la prueba de la aceptacion subsiste a la supresion de los demas registros (numeral 12.7 del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(e)",
+      "literal": "Generar y entregar la constancia de firma.",
+      "grupo": "A",
+      "descripcion": "Generar y entregar la constancia de firma.",
+      "categorias_datos": "Documento firmado y huella SHA-256 de su version final firmada; constancia de firma con la huella SHA-256 de la identificacion de la Empresa archivada en el momento de la aceptacion, y con la version y la huella SHA-256 de los anexos que rigen la firma (numerales 3.4(i), 3.6(h), 3.8 y 3.10 del Acuerdo).",
+      "titulares": "El Firmante y la Empresa, destinatarios de la constancia.",
+      "base_juridica": "Instruccion documentada del Responsable (la Empresa) y del contrato de encargo. Deber contractual de generar y entregar la constancia de firma despues de la firma (numerales 3.4(i) y 3.6(h) del Acuerdo) y de ponerla a disposicion del Titular sin costo (numeral 5.4 del Acuerdo). Base juridica propia de la Empresa para esta finalidad: No declarada en los documentos actuales - pendiente de validacion juridica.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Constancia y manifestacion de aceptacion» de la tabla de conservacion de la seccion 8: el mismo plazo del documento asociado y, si ese documento no tiene plazo propio, el de «Documento original y firmado»; con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "La supresion de la constancia no afecta el documento firmado, que se rige por su propia categoria, ni la validez de la firma: la supresion de la evidencia material no revoca la firma ni altera su presuncion (numeral 4.5 del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(f)",
+      "literal": "Conservar la evidencia del proceso de firma por el tiempo indicado en el numeral 8.6.",
+      "grupo": "A",
+      "descripcion": "Conservar la evidencia del proceso de firma por el tiempo indicado en el numeral 8.6.",
+      "categorias_datos": "Todos los datos del proceso de firma: la solicitud, los hitos, la constancia de envio del OTP, el registro de emision y validacion del token, la verificacion del OTP, la huella del documento y la constancia de firma (numeral 3.8 del Acuerdo).",
+      "titulares": "El Titular y la Empresa.",
+      "base_juridica": "Deber legal de conservar el documento firmado segun su naturaleza y, en particular, los registros del SG-SST (articulo 2.2.4.6.13 del Decreto 1072 de 2015), en la tabla de retencion documental de la Empresa y, en lo aplicable, en el deber de conservar prueba de la autorizacion (articulo 2.2.2.25.2.5 del Decreto 1074 de 2015). Esa base legal opera con independencia de la autorizacion del Titular, que no es la base juridica de esta finalidad (numeral 10.4(a) del Acuerdo).",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Documento original y firmado» de la tabla de conservacion de la seccion 8: diez (10) anos por defecto; categoria «Registro de operaciones y autenticacion»: cinco (5) anos; con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo). Para los registros del SG-SST, veinte (20) anos contados desde el cese de la relacion laboral, que es un piso legal que la tabla de la Empresa no puede bajar. Para el contrato individual de trabajo y sus adiciones, modificaciones y anexos, hold mientras subsista la relacion laboral (numeral 8.6(c) del Acuerdo).",
+      "consecuencia_revocatoria": "No se suprime mientras subsista el deber legal o contractual de conservacion (numeral 8.6(d) del Acuerdo). Vencido el plazo y sin deber legal o contractual, hold ni solicitud de copia pendiente, se suprime: la supresion deja la lapida y el recibo del numeral 3.6(g) y no revoca la firma ni altera su presuncion (numerales 8.6(e) y 4.5 del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(g)",
+      "literal": "Atender peticiones, quejas, reclamos y solicitudes relacionadas con el proceso de firma.",
+      "grupo": "A",
+      "descripcion": "Atender peticiones, quejas, reclamos y solicitudes relacionadas con el proceso de firma.",
+      "categorias_datos": "Identidad del Titular que presenta la solicitud, datos de contacto, tipo de solicitud, radicado, fecha, contenido y evidencia que repose en la custodia del Encargado (numeral 10.7(b) del Acuerdo).",
+      "titulares": "El Titular que presenta la peticion, queja, reclamo o solicitud.",
+      "base_juridica": "Deber legal de atender los derechos del Titular y de responder dentro de los plazos de los articulos 14 y 15 de la Ley 1581 de 2012 (numeral 10.7(b) del Acuerdo), y deber contractual de registrar la solicitud con fecha, identidad, tipo y radicado y de trasladarla a la Empresa dentro de los dos (2) dias habiles siguientes (numerales 10.7(b) y 3.6(g) del Acuerdo, y seccion 4 de este Anexo).",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), por instruccion documentada, en los terminos de la seccion 4 de este Anexo. El Encargado no sustituye esa instruccion.",
+      "plazo_conservacion": "Categoria «Solicitudes y comunicaciones operativas» de la tabla de conservacion de la seccion 8: cinco (5) anos por defecto, con precedencia de la tabla de la Empresa (numeral 8.6(a) del Acuerdo).",
+      "consecuencia_revocatoria": "No impide atender la solicitud. El traslado se hace dentro de los dos (2) dias habiles siguientes a su recepcion, y el Encargado no decide sobre el acceso, la rectificacion, la supresion o la revocatoria (numeral 10.7(b) del Acuerdo).",
+      "estado_habilitacion": "Habilitada - se ejecuta bajo las instrucciones documentadas del Responsable (la Empresa) y del contrato de encargo."
+    },
+    {
+      "id": "10.3(h)",
+      "literal": "Cumplir obligaciones legales, administrativas o judiciales que resulten aplicables.",
+      "grupo": "B",
+      "descripcion": "Cumplir obligaciones legales, administrativas o judiciales que resulten aplicables.",
+      "categorias_datos": "Los datos estrictamente necesarios para cumplir la obligacion que resulte aplicable. No se determinan aqui: los determina la Empresa cuando entrega la informacion que activa esta finalidad.",
+      "titulares": "Los Titulares cuyos datos resulten necesarios para la obligacion que resulte aplicable.",
+      "base_juridica": "Deber legal, administrativo o judicial que resulte aplicable (numeral 10.3(h) del Acuerdo). En los documentos actuales no hay una obligacion concreta identificada, con su fundamento y su plazo: No declarada en los documentos actuales - pendiente de validacion juridica.",
+      "responsable_instruye": "La Empresa (Responsable del tratamiento), que debe entregar la informacion que activa la finalidad. Hasta que la entregue, K+AIR no ejecuta este tratamiento.",
+      "plazo_conservacion": "El de la obligacion que resulte aplicable, que la Empresa debe declarar con su fundamento y su punto de inicio. Mientras esa informacion no se entregue no hay plazo que aplicar, porque la finalidad no esta habilitada.",
+      "consecuencia_revocatoria": "La obligacion legal o judicial prevalece sobre la revocatoria: no se suprime el dato que se debe conservar por un deber legal o contractual, y la revocatoria no habilita a continuar el tratamiento con esa base (numerales 10.7(a) y 10.7(f) del Acuerdo).",
+      "estado_habilitacion": "No habilitada - pendiente de entrega de informacion por la Empresa"
+    }
+  ]
+}
