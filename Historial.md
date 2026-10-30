@@ -5744,6 +5744,17 @@ código corre**, así que el estado real del servidor sigue sin verificarse, y n
 base. Barrido de caracteres no latinos: 0. EOL de cada archivo conservado (`Historial.md` mixto, `CONTEXT.md` con
 sus CR CR LF, `mailer.js` mixto, `pdfGen.js` CRLF).
 
+**Limpieza de temporales.** El `TEMP%` del portátil tenía **800 carpetas y 46 archivos** de K+AIR acumulados de
+sesiones anteriores (`kair-huerfanos-*`, `kair-firma-test-*`, `kair-eval-*`, `kair-lab-*`, `kair-sync-*`, los
+bundles `*.tmp.js` que escribe la app en cada corrida y dos archivos sueltos): **39 MB** que se reproducen solos.
+Se borraron **844**, con 0 fallos.
+
+**Se conservó a propósito `%TEMP%\kair-deploy\kair-deploy.tar.gz`**: es el paquete que se está sirviendo por
+HTTP para el despliegue, con el SHA-256 ya verificado, y borrarlo mataría el puente y dejaría al servidor sin
+qué bajar y sin huella con la cual comparar. El script de limpieza lo excluye por nombre. También se conservaron
+los dos procesos `python` que **no son nuestros** (el `unsloth studio` en el 8888): antes de matar un proceso
+se lee su línea de comandos. Después de limpiar se verificó otra vez el puente (HTTP 200 y los mismos 750.261 B)
+y se recalculó el hash del paquete: **el mismo** (`02da7343…6354`).
 **Lo que sigue abierto, igual que antes:** la aprobación del abogado (el texto de la v1.3 contra la huella
 `2f8884c3…a875`, el Anexo de Encargo, **los plazos de diez (10) y cinco (5) años**, el papel de Google, la Circular
 002 de 2025, el RNBD y la ficha técnica del canal OTP), la fecha de vigencia del Acuerdo; las cuatro llaves de la
