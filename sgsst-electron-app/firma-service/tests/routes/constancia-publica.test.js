@@ -29,7 +29,7 @@ const fs = require('fs');
 
 const db = require('../../src/db/connection');
 const {
-  resetDb, makeApp, createSignRequestWithIdentificacion,
+  resetDb, makeApp, createSignRequestWithIdentificacion, aceptarAcuerdo,
 } = require('../helpers');
 
 /**
@@ -46,9 +46,7 @@ async function firmar(app, token) {
     .send({ otp: r1.body.devOtp });
   assert.equal(r2.status, 200, `verify-otp: ${JSON.stringify(r2.body)}`);
 
-  const r3 = await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({});
+  const r3 = await aceptarAcuerdo(app, token);
   assert.equal(r3.status, 200, `consent/accept: ${JSON.stringify(r3.body)}`);
 
   const r4 = await request(app)

@@ -61,11 +61,16 @@ async function identificarYVerificar(app, token) {
 
 /**
  * Acepta el Acuerdo de uso (el paso (g)).
+ *
+ * C-2 / J3: el servidor exige que las politicas se hayan puesto a disposicion
+ * ANTES (por eso se sirve el contexto, como hace la mini-app) y que el
+ * Firmante declare el medio.
  */
 async function aceptarAcuerdo(app, token) {
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   const r = await request(app)
     .post(`/api/sign/${token}/consent/accept`)
-    .send({});
+    .send({ medio_disposicion: 'pantalla_firma' });
   assert.equal(r.status, 200, `consent/accept: ${JSON.stringify(r.body)}`);
   return r.body;
 }

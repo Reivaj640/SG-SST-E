@@ -72,7 +72,7 @@ const {
   resetDb, seedActiveAgreement, seedTestClients, makeApp,
   withClientAApiKey,
   TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A,
-  createAcceptedConsent,
+  createAcceptedConsent, buildEvidenciaFirma,
 } = require('../helpers');
 const storage = require('../../src/services/storage');
 
@@ -171,34 +171,16 @@ async function recorrerFlujoCompleto(app, token, opts = {}) {
 
 /**
  * Reconstruye el evidence_hash esperado a partir de la fila de BD.
- * El evidence_hash se calcula en publicFlow.js commit() sobre el
- * `evidencia` object (líneas 418-439). Esta función replica la
- * construcción para verificar reproducibilidad.
  *
- * NOTA: si publicFlow.js cambia la composición del evidencia object,
- * esta función también debe cambiar. Es un acoplamiento explícito
- * (ver F1.4 en firma-flujo-completo.test.js para el patrón original).
+ * La composición vive en UN SOLO LUGAR: `buildEvidenciaFirma`
+ * (tests/helpers.js), que es la receta de recomputación por terceros.
+ * Si publicFlow.js cambia la composición, se cambia esa función y todas las
+ * pruebas siguen midiendo lo mismo (acoplamiento explícito, en un solo sitio).
  */
 function buildEvidenceObjectFromRow(row, fecha_firma) {
-  return {
-    id_solicitud: row.id_solicitud,
-    id_documento: row.id_documento,
-    id_trabajador: row.id_trabajador,
-    id_empresa: row.id_empresa,
-    document_hash_original: row.document_hash_original,
-    document_hash_firmado: row.document_hash_firmado,
-    agreement_hash: row.agreement_hash,
-    agreement_version: row.agreement_version,
-    identificacion_tipo: row.identificacion_tipo,
-    tipo_firma: row.tipo_firma,
-    manifestacion_voluntad_hash: row.manifestacion_voluntad_hash,
-    ip_origen: row.ip_origen || null,
-    user_agent: row.user_agent || null,
-    fecha_creacion: row.fecha_creacion,
-    fecha_firma,
-    version_kair: row.version_kair,
-    manifestacion_voluntad_texto: row.manifestacion_voluntad_texto,
-  };
+  const evidencia = buildEvidenciaFirma(row);
+  if (fecha_firma !== undefined) evidencia.fecha_firma = fecha_firma;
+  return evidencia;
 }
 
 // =========================================================================

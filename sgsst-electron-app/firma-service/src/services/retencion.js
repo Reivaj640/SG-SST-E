@@ -190,13 +190,18 @@ const TEXTO_PLAZO_SISTEMA = 'Se conserva {anios} años ({dias} días) contados d
   + 'declarado un plazo propio en su tabla de retención documental.';
 
 /**
- * Cómo se nombra el punto de inicio del plazo del CATÁLOGO (la custodia de
- * veinte (20) años). El catálogo lo cuenta desde la firma, y el texto que ve
- * el Trabajador lo dice con esas palabras.
+ * Cómo se nombra la punto de inicio "la fecha de la firma".
+ *
+ * OJO: el catálogo legado de veinte (20) años desde la firma se RETIRO el
+ * 30-oct-2026 (J8 y J9 del abogado: "la fecha de la firma NO sustituye la fecha
+ * de cese" y "la tabla no puede activar los plazos por defecto mientras el
+ * sistema conserve el catálogo legado de 20 años desde la firma"). La
+ * constante queda porque es parte de la API del módulo y porque el nombre del
+ * punto de inicio "la fecha de la firma" sigue siendo el de las categorías que
+ * lo declaran así, pero YA NO es el punto de inicio de un plazo del catálogo.
  *
  * No es lo mismo que `punto.nombre`, que es el punto de inicio que declara la
- * CATEGORÍA de la tabla supletoria: con la compuerta cerrada el plazo corre
- * desde la firma, porque el que cuenta es el catálogo.
+ * CATEGORÍA de la tabla supletoria.
  */
 const NOMBRE_INICIO_FIRMA = 'la fecha de la firma';
 
@@ -423,13 +428,24 @@ const ORDEN_BUSQUEDA = Object.freeze([
  * respeta. Con la compuerta CERRADA (que es como viene):
  *
  *   - el plazo por defecto de la tabla NO se aplica;
- *   - el sistema conserva el plazo de custodia del catálogo (veinte (20) años),
- *     que es el que estaba en vigor antes de que la tabla existiera;
+ *   - una Empresa que NO declara plazo NO recibe el plazo legado de veinte
+ *     (20) años desde la firma: ese catálogo se retiró. Lo que recibe es un
+ *     HOLD (`tabla_supletoria_pendiente_validacion`), sin fecha de supresión
+ *     calculada, hasta que la tabla esté validada y la compuerta se abra;
  *   - las excepciones legales siguen aplicando: el piso del SG-SST y el hold
  *     del contrato sin término. No dependen de la tabla: son deberes.
  *
+ * ESTO ES LO QUE ORDENÓ EL ABOGADO (30-oct-2026, J8 y J9): "la tabla no
+ * puede activar los plazos por defecto mientras el sistema conserve el
+ * catálogo legado de 20 años desde la firma [...] Orden correcto: (i)
+ * validar los plazos; (ii) alinear el catálogo legado al orden de
+ * precedencia del 8.6(a) [...] (iii) reejecutar pruebas; (iv) recién entonces
+ * abrir la compuerta, con validación escrita." Y sobre la fecha de cese:
+ * "la fecha de la firma NO sustituye la fecha de cese; el registro queda
+ * pendiente y sin fecha de supresión calculada".
+ *
  * La razón es jurídica: los plazos de diez (10) y cinco (5) años de esta tabla
- * todavía no los validó el abogado, y el Acuerdo que los describe (la v1.3)
+ * todavía no los validó el abogado, y el Acuerdo que los describe (la v1.4)
  * no está aprobado. Aplicarlos sin la validación sería aplicar un plazo que el
  * Acuerdo vigente no dice. Abrir la compuerta es un acto expreso del owner,
  * con la validación escrita del abogado: no lo hace el código ni una
@@ -458,8 +474,9 @@ const TABLA_CONSERVACION_PATH = path.join(
 const _TABLA_RESPALDO = Object.freeze({
   version: 'respaldo-en-codigo',
   // El respaldo tambien arranca con la compuerta CERRADA: si el archivo de
-  // configuracion falta o no se puede leer, el sistema conserva el plazo de
-  // custodia del catalogo (veinte (20) anos), que es el que estaba en vigor.
+  // configuracion falta o no se puede leer, no se aplican los plazos de la
+  // tabla supletoria ni se calcula fecha de supresion: el registro queda
+  // retenido con el hold tabla_supletoria_pendiente_validacion.
   // Un respaldo con la compuerta abierta aplicaria los plazos de la tabla
   // supletoria por la sola falla de leer el archivo.
   aplicacion: Object.freeze({
@@ -553,12 +570,14 @@ function tablaActivada(opts = {}) {
  *
  * Por qué existe: la tabla administra plazos que el abogado todavía no validó
  * (los de diez (10) y cinco (5) años), y el Acuerdo que describe este
- * mecanismo (la v1.3) no está aprobado. Mientras la compuerta está cerrada:
+ * mecanismo (la v1.4) no está aprobado. Mientras la compuerta está cerrada:
  *
  *   - el plazo por defecto de la tabla NO se aplica;
- *   - el sistema conserva el plazo de custodia del catálogo (veinte (20) años),
- *     que es el que estaba en vigor antes de que la tabla existiera;
- *   - las EXCEPCIONES LEGALES siguen applying: el piso del SG-SST y el hold del
+ *   - una Empresa que NO declara plazo NO recibe el plazo legado del catálogo
+ *     (veinte (20) años desde la firma): ese catálogo se retiró por orden del
+ *     abogado (30-oct-2026, J8 y J9). Lo que queda es un HOLD
+ *     (`tabla_supletoria_pendiente_validacion`), sin fecha de supresión;
+ *   - las EXCEPCIONES LEGALES siguen aplicando: el piso del SG-SST y el hold del
  *     contrato sin término. No dependen de la tabla: son deberes.
  *
  * Con la compuerta abierta, el plazo por defecto de la categoría entra a
@@ -605,8 +624,8 @@ function _categoriaConservacion(categoriaId, tabla) {
  * La tabla declara el punto de inicio de cada categoría (`punto_inicio`):
  *
  *   fecha_firma → la fecha de la firma.
- *   fecha_cese  → la fecha del cese de la relación laboral; si el sistema no la
- *                  conoce, la fecha de la firma, que siempre es calculable.
+ *   fecha_cese  → exclusivamente la fecha real del cese. Si falta, el cómputo
+ *                  queda pendiente; nunca se sustituye por la fecha de firma.
  *
  * El resto de puntos de inicio de la tabla (fecha_registro, fecha_solicitud,
  * fecha_supresion, fecha_respaldo) son de otros subsistemas (registro de
@@ -627,6 +646,7 @@ function _puntoInicio(def, fecha_creacion, fecha_terminacion) {
   if (tipo === 'fecha_cese') {
     const cese = normalizarFecha(fecha_terminacion);
     if (cese) return { fecha: cese, nombre: 'la fecha del cese de la relación laboral' };
+    return { fecha: null, nombre: 'la fecha real del cese de la relación laboral (pendiente de informar)' };
   }
   return { fecha: normalizarFecha(fecha_creacion), nombre: 'la fecha de la firma' };
 }
@@ -953,7 +973,15 @@ function planificar({
   let diasAplicados = null;
   let fuente = null;
 
-  if (!holdSiempre) {
+  const cesePendiente = Boolean(piso && !inicio);
+  if (cesePendiente) {
+    // La regla legal queda trazada, pero sin el punto de inicio no se calcula
+    // una fecha de supresión ni se sustituye el cese por la fecha de firma.
+    fuente = 'piso_legal';
+    diasAplicados = piso.dias;
+  }
+
+  if (!holdSiempre && !cesePendiente) {
     if (piso) {
       // (b) EL PISO LEGAL (los grupos SG-SST del 2.2.4.6.13): veinte años
       // contados desde el cese. La tabla de la Empresa NO lo baja: si declara
@@ -991,30 +1019,10 @@ function planificar({
       // queda nula: es la última defensa (aviso RETAIN_SIN_PLAZO) y NO es el
       // camino normal.
     } else {
-      // (d-bis) LA COMPUERTA CERRADA: el plazo por defecto NO es el de la
-      // tabla, sino el del catálogo: la custodia de veinte (20) años, que es
-      // lo que el sistema aplicaba antes de que la tabla existiera y lo que
-      // el Acuerdo vigente describe.
-      //
-      // La tabla no se descarta: la categoría y su punto de inicio se siguen
-      // registrando, y el día que la compuerta se abra, las filas ya
-      // calculadas quedan congeladas con el plazo que se les aplicó
-      // (migración 049). Lo que cambia con la compuerta cerrada es de dónde
-      // sale el plazo, y queda dicho en la fila: la fuente es
-      // 'catalogo_sistema'.
-      const aniosCatalogo = Number(regla.anios) || ANIOS_CUSTODIA;
-      if (regla.base === 'creacion') {
-        fecha = sumarAnios(fecha_creacion, aniosCatalogo);
-        inicioAplicado = normalizarFecha(fecha_creacion);
-      } else {
-        const termino = normalizarFecha(fecha_terminacion);
-        fecha = termino ? sumarAnios(termino, aniosCatalogo) : null;
-        inicioAplicado = termino;
-      }
-      if (fecha) {
-        diasAplicados = Math.round(aniosCatalogo * 365.25);
-        fuente = 'catalogo_sistema';
-      }
+      // La tabla supletoria no está activada. Se conserva temporalmente con
+      // fecha de supresión nula; no se inventa el fallback histórico de 20
+      // años desde la firma ni se adelanta la tabla pendiente de aprobación.
+      fuente = 'tabla_supletoria_pendiente';
     }
   }
 
@@ -1041,6 +1049,31 @@ function planificar({
       motivo: 'deber_legal_' + (regla.norma || NORMA_CONTRATO),
       alcance: regla.norma || NORMA_CONTRATO,
     };
+  } else if (cesePendiente) {
+    hold = {
+      actor: 'sistema',
+      motivo: 'fecha_cese_pendiente',
+      alcance: 'No calcular ni ejecutar supresión de esta categoría SG-SST hasta que la Empresa informe y valide la fecha real de cese.',
+    };
+  } else if (!piso && !holdSiempre && !empresaDeclara && !tablaActiva) {
+    // El hold de la tabla supletoria SOLO aplica a lo que la tabla supletoria
+    //iba a resolver: "el resto" (el 8.6(a)(ii)), cuando la Empresa no declara
+    // un plazo. Si la categoría tiene PISO LEGAL (las cinco del 8.6(b)), el
+    // plazo ya salio del DEBER legal y de la fecha real de cese: ese deber no
+    // depende de que la tabla supletoria este validada ni activada (es lo que
+    // dicen el 8.6(a)(iii) y la condicion (ii) del orden que fijo el abogado
+    // el 30-oct-2026: "20 anos desde el cese para las cinco categorias del
+    // 8.6(b), hold sin termino para el contrato, y el plazo de la Empresa o el
+    // supletorio para el resto").
+    //
+    // Sin esta guarda, el hold borraba la fecha del piso (la linea de abajo
+    // pone fecha en null cuando hay hold) y el registro del SG-SST se
+    // quedaba retenido sin fecha, cuando su plazo legal si se puede calcular.
+    hold = {
+      actor: 'sistema',
+      motivo: 'tabla_supletoria_pendiente_validacion',
+      alcance: 'No calcular ni ejecutar supresión hasta que la tabla supletoria esté validada y activada expresamente por el owner.',
+    };
   }
 
   // Con hold no hay fecha de supresión: la fecha calculada deja de ser una
@@ -1058,16 +1091,19 @@ function planificar({
   //   - el texto del sistema, cuando el plazo salió de la tabla supletoria:
   //     ahí se dice, de forma honesta, que el plazo es del sistema porque la
   //     Empresa no declaró uno;
-  //   - el texto de la regla, cuando el plazo salió del catálogo porque la
-  //     compuerta de la tabla supletoria está cerrada: el plazo es el de
-  //     custodia del sistema, y su texto es el de la regla.
+  //   - el texto de la PENDIENTE, cuando la tabla supletoria todavía no está
+  //     validada: ahí NO se promete ningún plazo, porque el sistema no tiene
+  //     ninguno que prometer (el catálogo legado de veinte (20) años desde la
+  //     firma se retiró el 30-oct-2026, por J8 y J9 del abogado).
   const aniosAplicados = _aniosAplicados(fecha, inicioAplicado, diasAplicados, regla);
   const textoEmpresa = (typeof emp.plazo_retencion === 'string' && emp.plazo_retencion.trim())
     ? emp.plazo_retencion.trim()
     : null;
 
   let texto;
-  if (!fecha && !hold) {
+  if (cesePendiente) {
+    texto = 'El plazo mínimo de veinte (20) años para esta categoría SG-SST se cuenta desde la fecha real de cese. La Empresa debe informar y validar esa fecha; hasta entonces no se calcula una fecha de supresión y el registro queda pendiente.';
+  } else if (!fecha && !hold) {
     // Última defensa: ni la Empresa ni la tabla pudieron dar un plazo.
     texto = TEXTO_PLAZO_PENDIENTE;
   } else if (holdSiempre) {
@@ -1079,11 +1115,22 @@ function planificar({
       .replace('{dias}', String(diasAplicados))
       .replace('{inicio}', punto.nombre)
       + (regla.notaSistema ? ' ' + regla.notaSistema : '');
-  } else if (fuente === 'catalogo_sistema') {
-    // La compuerta cerrada: el plazo es el de custodia del catálogo, y corre
-    // desde la firma (que es de donde lo cuenta el catálogo).
-    texto = _textoRegla(regla, aniosAplicados, NOMBRE_INICIO_FIRMA)
-      + (regla.notaSistema ? ' ' + regla.notaSistema : '');
+  } else if (fuente === 'tabla_supletoria_pendiente') {
+    // La COMPUERTA de la tabla supletoria está CERRADA: los plazos por
+    // defecto (diez (10) y cinco (5) años) todavía no los validó el abogado,
+    // y el catálogo legado de veinte (20) años desde la firma se RETIRÓ
+    // (J8 y J9 del abogado, 30-oct-2026).
+    //
+    // El texto que ve el Trabajador NO puede prometer un plazo que el sistema
+    // no tiene. Antes este caso caia en la rama general y producia "Se
+    // conserva 20 años contados desde la fecha de la firma": el plazo que se
+    // retiró, para una categoria a la que ni siquiera le corresponde. Ahora
+    // dice la verdad: no hay fecha de supresión calculada y el registro queda
+    // retenido.
+    texto = 'La Empresa no ha declarado un plazo en su tabla de retención documental y la tabla de '
+      + 'conservación por defecto del sistema todavía no ha sido validada, de modo que este documento '
+      + 'no tiene una fecha de supresión calculada: queda retenido y no se suprime mientras esa '
+      + 'declaración o esa validación se formalicen.';
   } else if (fuente === 'empresa' && textoEmpresa) {
     texto = textoEmpresa;
   } else {
@@ -1091,7 +1138,11 @@ function planificar({
   }
 
   let aviso;
-  if (hold) {
+  if (cesePendiente && !emp.conservacion_por_deber_legal) {
+    aviso = 'RETAIN_PENDIENTE_CESE';
+  } else if (hold && hold.motivo === 'tabla_supletoria_pendiente_validacion') {
+    aviso = 'RETAIN_TABLA_PENDIENTE';
+  } else if (hold) {
     aviso = 'RETAIN_DEBER_LEGAL';
   } else if (fecha) {
     aviso = 'RETAIN_FECHA';

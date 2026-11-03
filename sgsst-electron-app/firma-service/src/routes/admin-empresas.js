@@ -22,6 +22,8 @@
  *   POST   /internal/admin/empresas/:id/anexo-firmado
  *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
  *   POST   /internal/admin/empresas/:id/estado  alta/baja lógica
+ *   POST   /internal/admin/empresas/:id/fecha-terminacion
+ *   GET    /internal/admin/empresas/:id/fecha-terminacion/pendientes
  */
 'use strict';
 
@@ -33,15 +35,18 @@ const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
 const auditoriaService = require('../services/empresaAuditoria');
 const cuentaEnvioService = require('../services/cuentaEnvio');
+const fechaTerminacionService = require('../services/fechaTerminacion');
 const mailer = require('../services/mailer');
 const {
   idEmpresa,
   createEmpresaBody,
   updateEmpresaBody,
   anexoBody,
+  anexoNubeBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
+  fechaTerminacionBody,
 } = require('../schemas/admin-empresas');
 const { AppError } = require('../middleware/errors');
 
@@ -236,6 +241,17 @@ router.post('/empresas/:id_empresa/anexo-firmado', adminApiAuth(), validateBody(
   try {
     const id = _parseId(req);
     const empresa = empresaService.marcarAnexoFirmado(id, req.body.fecha, _contextoAuditoria(req));
+    res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Registra la versión del Anexo de Nube suscrita por esta Empresa.
+router.post('/empresas/:id_empresa/anexo-nube-firmado', adminApiAuth(), validateBody(anexoNubeBody), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const empresa = empresaService.marcarAnexoNubeFirmado(id, req.body, _contextoAuditoria(req));
     res.json(empresa);
   } catch (err) {
     next(err);
@@ -445,6 +461,96 @@ router.post('/empresas/:id_empresa/cuenta-envio/probar', adminApiAuth(), validat
         detalle: 'El correo de prueba no pudo salir: ' + String(e.message || e.code || 'error desconocido').slice(0, 300),
       });
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// EL CANAL DE LA FECHA DE TERMINACIÓN (Anexo de Encargo, sección 6)
+// ============================================================================
+//
+// La Empresa comunica al Encargado la fecha de terminación de la relación
+// laboral de un trabajador, por el canal que el Encargado habilita en el
+// servicio, con el fin de iniciar el cómputo del plazo legal.
+//
+// Endpoints:
+//   POST   /internal/admin/empresas/:id_empresa/fecha-terminacion
+//   GET    /internal/admin/empresas/:id_empresa/fecha-terminacion/pendientes
+//   GET    /internal/admin/empresas/:id_empresa/fecha-terminacion
+//
+// Actor y motivo van en los headers `X-Admin-Actor` / `X-Admin-Motivo`, igual
+// que en el resto del router: el cuerpo es el DATO, el rastro va aparte.
+//
+// El motivo que viene en el body (opcional) COMPLEMENTA al del header: el del
+// header explica por qué se hizo la operación administrativa, el del body
+// explica por qué se comunica esa fecha.
+// ============================================================================
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/fecha-terminacion
+// Registra la fecha comunicada, la escribe en las filas del trabajador,
+// recalcula el plazo de ESAS filas y deja el registro de la operación.
+//
+// Sin la evidencia no hay registro: es lo que pide el Anexo de Encargo.
+// ============================================================================
+router.post('/empresas/:id_empresa/fecha-terminacion', adminApiAuth(), validateBody(fechaTerminacionBody), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    _exigirEmpresa(id);
+    const ctx = _contextoAuditoriaCuentaEnvio(req);
+    const resultado = fechaTerminacionService.registrar({
+      id_empresa: id,
+      id_trabajador: req.body.id_trabajador,
+      fecha_terminacion: req.body.fecha_terminacion,
+      evidencia: req.body.evidencia,
+      canal: req.body.canal,
+      motivo: req.body.motivo || ctx.motivo,
+      actor: ctx.actor,
+      ip: ctx.ip,
+      user_agent: ctx.user_agent,
+    });
+    logger.warn('Fecha de terminacion comunicada por la Empresa', {
+      id_empresa: id,
+      actor: ctx.actor,
+      fecha_terminacion: req.body.fecha_terminacion,
+      filas: resultado.filas.encontradas,
+      recalculadas: resultado.filas.recalculadas,
+    });
+    res.status(201).json(resultado);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// GET /internal/admin/empresas/:id_empresa/fecha-terminacion/pendientes
+// La REVISIÓN PERIÓDICA del Anexo de Encargo: qué filas siguen esperando la
+// fecha de terminación y cuáles tienen la fecha pero conservan el recálculo
+// pendiente.
+//
+// "Mientras la fecha no se reciba, la fila permanece retenida, no se calcula
+//  fecha de supresión y se revisa periódicamente."
+// ============================================================================
+router.get('/empresas/:id_empresa/fecha-terminacion/pendientes', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    _exigirEmpresa(id);
+    res.json(fechaTerminacionService.pendientes({ id_empresa: id }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// GET /internal/admin/empresas/:id_empresa/fecha-terminacion
+// Las comunicaciones registradas de esta Empresa, con su bitácora.
+// ============================================================================
+router.get('/empresas/:id_empresa/fecha-terminacion', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    _exigirEmpresa(id);
+    res.json({ items: fechaTerminacionService.comunicaciones(id) });
   } catch (err) {
     next(err);
   }

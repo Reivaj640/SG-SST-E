@@ -18,9 +18,12 @@
  *  - La mini-app los muestra en el bloque «Empresa que solicita tu firma».
  *  - El correo de invitacion los comunica (es la comunicacion que sale antes
  *    de que el Trabajador firme).
- *  - Si la Empresa NO los declara, el plazo que aplica es el de la tabla
- *    supletoria de conservación de K+AIR, y lo que se le comunica al
- *    Trabajador dice de dónde viene (decisión D1).
+ *  - Si la Empresa NO los declara, la firma se puede pedir igual (D-03) y, con
+ *    la compuerta de la tabla supletoria CERRADA (que es como se despacha: los
+ *    plazos de diez (10) y cinco (5) años no los validó el abogado), no hay
+ *    plazo aplicable: el catálogo legado de veinte (20) años desde la firma se
+ *    retiró (J8 y J9), el registro queda retenido esperando la validación de la
+ *    tabla y lo que se le comunica al Trabajador dice eso (decisión D1).
  *
  * Tests:
  *   - node --test tests/plazo-retencion.test.js
@@ -167,10 +170,14 @@ test('el correo de invitacion comunica el plazo y el canal de copia', async () =
 });
 
 test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', async () => {
-  // La decisión D1: sin plazo declarado por la Empresa, el plazo es el de la
-  // TABLA SUPLETORIA de conservación administrada por K+AIR. La Empresa no
-  // tiene nada que declarar para pedir firmas, y su registro NO queda
-  // retenido: hay fecha de conservación y no hay hold.
+  // La Empresa no tiene NADA que declarar para pedir firmas: la falta de un
+  // plazo declarado no bloquea la solicitud.
+  //
+  // Lo de la conservación es otra cosa (J8 y J9): con la compuerta de la tabla
+  // supletoria CERRADA (que es como se despacha) y sin plazo declarado por la
+  // Empresa no hay fecha de supresión —el catálogo legado de veinte (20) años
+  // desde la firma se retiró— y el registro queda retenido con el motivo de la
+  // tabla pendiente de validación.
   resetDb();
   _crearEmpresa(false);
 
@@ -179,23 +186,25 @@ test('D-03 · si la empresa no declara plazo, la firma SÍ se puede pedir', asyn
   });
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado puede pedir firmas');
-  assert.ok(signRequest.fecha_conservacion,
-    'sin plazo declarado hay fecha: la aporta la tabla supletoria');
-  assert.equal(signRequest.hold_legal, 0,
-    'y la firma NO queda retenida: la retención indefinida se eliminó');
-  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado');
+  assert.equal(signRequest.fecha_conservacion, null,
+    'no hay fecha de supresión: el sistema no inventa plazos');
+  assert.equal(signRequest.hold_legal, 1,
+    'y el registro queda retenido: la tabla supletoria espera la validación del abogado');
+  assert.equal(signRequest.motivo_hold, 'tabla_supletoria_pendiente_validacion');
+  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado',
+    'el motivo viejo (retención indefinida por falta de configuración) ya no existe');
 });
 
 test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE aplica', async () => {
   // El correo es la comunicación del 8.6(g): tiene que decir el plazo que se
-  // aplica. No puede prometer un plazo que no aplica, ni callar de dónde
-  // viene.
+  // aplica. No puede prometer un plazo que el sistema no tiene, ni callar de
+  // dónde viene.
   //
   // CON LA COMPUERTA CERRADA (que es como se despacha: los plazos de diez (10)
-  // y cinco (5) años de la tabla supletoria no los validó el abogado), el plazo
-  // que aplica es el de custodia del catálogo: veinte (20) años desde la
-  // firma. El correo dice eso. Y no dice que el plazo viene de la tabla
-  // supletoria, porque de ahí no viene todavía.
+  // y cinco (5) años de la tabla supletoria no los validó el abogado) NO hay
+  // plazo aplicable: el catálogo legado de veinte (20) años desde la firma se
+  // retiró (J8 y J9) y la tabla supletoria espera la validación. El correo lo
+  // dice así: el plazo está pendiente y el documento no se suprime.
   resetDb();
   mailer.clearDevInbox();
   _crearEmpresa(false);
@@ -209,14 +218,14 @@ test('si la empresa no declara plazo, el correo dice el plazo que REALMENTE apli
   const inbox = mailer.getDevInbox();
   assert.equal(inbox.length, 1);
   const cuerpo = inbox[0].body;
-  assert.ok(cuerpo.includes('20 años'),
-    'el correo dice el plazo que aplica: la custodia del catálogo');
-  assert.ok(cuerpo.includes('la fecha de la firma'),
-    'y dice desde qué fecha corre');
+  assert.ok(!cuerpo.includes('20 años'),
+    'el correo no puede prometer veinte (20) años desde la firma: ese catálogo se retiró (J8 y J9)');
+  assert.ok(!cuerpo.includes('la fecha de la firma'),
+    'y la fecha de la firma no es el punto de inicio de ningún plazo vigente');
+  assert.match(cuerpo, /pendiente/i,
+    'el correo dice que el plazo aplicable está pendiente de validación');
   assert.ok(!cuerpo.includes('tabla de conservación del sistema'),
     'el plazo no sale de la tabla supletoria mientras la compuerta esté cerrada');
-  assert.ok(!cuerpo.includes('pendiente de declaración'),
-    'el plazo ya no está pendiente: hay una tabla supletoria');
   assert.ok(!cuerpo.includes('Dónde puedes pedir una copia'),
     'no debe aparecer una línea de canal si la empresa no lo declaró');
   // El correo sale igual: la comunicación es un deber, no puede bloquear

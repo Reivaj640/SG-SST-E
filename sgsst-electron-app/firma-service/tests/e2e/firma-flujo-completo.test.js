@@ -65,7 +65,7 @@ const {
   resetDb, seedActiveAgreement, seedTestClients, makeApp,
   withClientAApiKey, withLegacyApiKey,
   TEST_API_KEY_CLIENT_A, TEST_EMPRESA_A,
-  createAcceptedConsent,
+  createAcceptedConsent, buildEvidenciaFirma,
 } = require('../helpers');
 
 // =========================================================================
@@ -421,28 +421,17 @@ test('F1.4 clientA + consent_id (Bloque E6) → 201 + flujo → SIGNED + evidenc
   // con src/services/publicFlow.js#commit() — todos los campos vienen
   // del row de BD, NO del metadata enviado por el cliente, para que el
   // contrato de verificación por terceros sea estable).
-  const evidencia = {
-    id_solicitud: finalRow.id_solicitud,
-    id_documento: finalRow.id_documento,
-    id_trabajador: finalRow.id_trabajador,
-    id_empresa: finalRow.id_empresa,
-    document_hash_original: finalRow.document_hash_original,
-    document_hash_firmado: finalRow.document_hash_firmado,
-    agreement_hash: finalRow.agreement_hash,
-    agreement_version: finalRow.agreement_version,
-    identificacion_tipo: finalRow.identificacion_tipo,
-    tipo_firma: finalRow.tipo_firma,
-    manifestacion_voluntad_hash: finalRow.manifestacion_voluntad_hash,
-    ip_origen: finalRow.ip_origen || null,
-    user_agent: finalRow.user_agent || null,
-    fecha_creacion: finalRow.fecha_creacion,
-    fecha_firma: finalRow.fecha_firma,
-    version_kair: finalRow.version_kair,
-    manifestacion_voluntad_texto: finalRow.manifestacion_voluntad_texto,
-  };
+  //
+  // C-2 / J3: la evidencia también ata el ALCANCE de la aceptación (los
+  // anexos que rigen la firma, la matriz de finalidades que se puso a
+  // disposición, el medio y la fecha). Esos campos NO están en la fila de la
+  // firma: están en el REGISTRO DE ACEPTACIÓN (gh_consentimientos_firma), y
+  // es de ahí donde los lee el commit. La composición vive en UN SOLO LUGAR
+  // (`buildEvidenciaFirma`, tests/helpers.js).
+  const evidencia = buildEvidenciaFirma(finalRow);
   const evidenciaHash = sha256(canonicalJSON(evidencia));
   assert.equal(evidenciaHash, commitBody.evidence_hash,
-    'evidence_hash debe ser reproducible por terceros con canonicalJSON (16 campos, composición post-E3)');
+    'evidence_hash debe ser reproducible por terceros con canonicalJSON (post-E3 + C-2/J3)');
 });
 
 // =========================================================================

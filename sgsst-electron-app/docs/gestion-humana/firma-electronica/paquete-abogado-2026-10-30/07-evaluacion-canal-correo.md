@@ -7,6 +7,12 @@ documentada ("hay que resolver y documentar la evaluación del canal de correo a
 resuelta la condición"). Las conclusiones de derecho que aquí se apuntan salen de las fuentes
 citadas, y **las confirma o corrige el abogado**.
 
+> **Vigencia:** las conclusiones jurídicas preliminares de este documento quedaron superadas
+> por la especificación del abogado del 30-oct-2026. Mantener Gmail es una decisión operativa;
+> no cierra el papel de Google, la clasificación del flujo, el fundamento ni las obligaciones
+> aplicables. Esos puntos requieren determinación profesional escrita. El análisis siguiente
+> se conserva como antecedente de la decisión del 27-oct y no debe usarse como posición vigente.
+
 ---
 
 ## 1. Qué pregunta el abogado
@@ -173,33 +179,27 @@ autorización genérica**.
 
 ## 9. La pregunta de fondo: ¿se ofrece el servicio mientras la condición está abierta?
 
-Con esta evaluación, **la zona gris se cierra**: la operación del canal de correo no es un
-"pendiente contractual" indeterminado, es una transferencia internacional a un país con nivel
-adecuado, con tres condiciones que cumplir. Lo que falta no es una definición jurídica: es
-documentación y, en su caso, un contrato.
+**Esta conclusión queda superada por la especificación del abogado del 30-oct-2026.** La
+elección de mantener Gmail es una decisión operativa y no cierra la clasificación jurídica
+del flujo. El papel de Google por operación, si corresponde transferencia o transmisión,
+el fundamento y las obligaciones aplicables deben quedar determinados por escrito por el
+abogado colombiano.
 
 Eso abre tres caminos y el owner elige:
 
 1. **Salida A** (cambiar de proveedor): resuelve de raíz, con coste de licencia y migración.
-2. **Salida B** (documentar): resuelve con trabajo documental, sin coste de licencia, y la
-   condición queda **cerrada y explicada** en los tres documentos.
-3. **No resolver ahora**: seguir con la condición declarada como abierta. Es lo que el texto
-   actual hace, y es lo que el abogado dice que no es admisible sin evaluación documentada.
+2. **Salida B** (documentar): mantiene el proveedor y documenta el flujo real, sin anticipar
+   la conclusión jurídica.
+3. La calificación del flujo sigue abierta hasta recibir validación profesional escrita.
 
-> **Decisión del owner (27-oct-2026): salida B.** No se cambia de proveedor de correo. La condición
-> se cierra documentando el encuadre de transferencia internacional a Estados Unidos (país con nivel
-> adecuado de protección de la SIC), y cumpliendo las tres condiciones del punto 6. Con esa decisión,
-> el texto del Acuerdo v1.2 **debe dejar de decir "condición contractual pendiente"** y decir qué
-> operación es, con qué base, y qué se hace para demostrar las medidas.
+> **Decisión operativa del owner (27-oct-2026): salida B.** No se cambia de proveedor de correo.
+> La especificación del abogado del 30-oct-2026 aclara que esta decisión no determina el papel
+> jurídico de Google ni la clasificación del flujo. No afirmar una transferencia, transmisión,
+> fundamento o suficiencia hasta contar con la validación profesional correspondiente.
 
-Lo que **no** es admisible en ningún caso es seguir declarando una condición abierta sin haber
-hecho ninguna de las dos cosas. Y hay una tercera cosa que tampoco es admisible: **ofrecer el
-servicio a nuevas Empresas sin resolver**, porque eso multiplica los titulares afectados por una
-condición que ya se sabe cuál es.
+La ficha debe distinguir la decisión operativa de mantener Gmail de las conclusiones jurídicas pendientes. La compuerta de publicación y activación permanece cerrada mientras esas conclusiones y la evidencia del canal sigan pendientes.
 
-**Nota operativa:** la salida B no exige cambiar de proveedor ni bloquear nada; exige un
-documento. La salida A exige una decisión de compra. La diferencia entre una y otra es el
-tiempo, no la injusticia.
+**Nota operativa:** la salida B documenta el uso real y los datos enviados; la conclusión jurídica y cualquier requisito técnico o contractual se determinan después de la revisión profesional.
 
 ---
 

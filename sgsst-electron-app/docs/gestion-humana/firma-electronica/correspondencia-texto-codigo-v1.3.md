@@ -7,8 +7,8 @@
 
 | Documento | SHA-256 |
 |---|---|
-| Acuerdo de uso v1.3 | `2f8884c36f7450728c452db9f7329e2eecd63874cc798405875911698e71a875` |
-| Anexo de Encargo | `8c54a8deb51f44a608cef769caa6121961da50dce66517fcfe2aab16aeecf6d7` |
+| Acuerdo de uso v1.3 | `49eab0c5f3f0fa7e637843c50988b0f91867fe74ff31222cf8c327beabf4de12` |
+| Anexo de Encargo | `11e7ac238f8c19262ec2cca9e41ff60c6fc7b2e5a133a9652f2bddf74379a0f0` |
 
 Generada el 2026-10-30.
 
@@ -33,7 +33,7 @@ cada fila lista tambien la presencia del comportamiento que la reemplaza.
 
 | Numeral | Que exige el texto | Donde vive en el codigo | Que lo prueba | Estado |
 |---|---|---|---|---|
-| **8.6(a)** | El plazo de conservacion se determina por categoria documental, con la precedencia: primero las reglas legales especiales que no pueden rebajarse, luego la tabla de retencion documental de la Empresa y, a falta de plazo declarado por ella, la tabla supletoria de conservacion que administra K+AIR. | `src/services/retencion.js:893`<br>`src/services/retencion.js:11`<br>`src/services/conservacion.js:359`<br>`config/tabla-conservacion.json:15` | `tests/services/conservacion-supletoria.test.js`<br>`tests/plazo-retencion.test.js` | Implementado |
+| **8.6(a)** | El plazo de conservacion se determina por categoria documental, con la precedencia: primero las reglas legales especiales que no pueden rebajarse, luego la tabla de retencion documental de la Empresa y, a falta de plazo declarado por ella, la tabla supletoria de conservacion que administra K+AIR. | `src/services/retencion.js:894`<br>`src/services/retencion.js:11`<br>`src/services/conservacion.js:359`<br>`config/tabla-conservacion.json:15` | `tests/services/conservacion-supletoria.test.js`<br>`tests/plazo-retencion.test.js` | Implementado |
 | **8.6(b)** | Los registros del SG-SST del 2.2.4.6.13 se conservan como minimo veinte (20) anos contados desde el cese, y ese minimo no se puede bajar. | `src/services/retencion.js:122`<br>`src/services/retencion.js:231`<br>`src/services/retencion.js:63`<br>`config/tabla-conservacion.json:82` | `tests/conservacion-purga.test.js`<br>`tests/services/conservacion-supletoria.test.js` | Implementado |
 | **8.6(c)** | El contrato y sus anexos firmados electronicamente se conservan con autenticidad, integridad y disponibilidad; el sistema les asigna un hold mientras subsista la relacion laboral. | `src/services/conservacion.js:418` | `tests/conservacion-deber-legal.test.js` | Implementado |
 | **8.6(e)** | La supresion procede solo cuando concurren: (i) vencimiento del plazo; (ii) ausencia de deber legal o contractual; (iii) ausencia de solicitud de copia pendiente; y (iv) ausencia de hold vigente. | `src/services/conservacion.js:876`<br>`src/services/conservacion.js:75` | `tests/conservacion-purga.test.js` | Implementado |
@@ -44,7 +44,7 @@ cada fila lista tambien la presencia del comportamiento que la reemplaza.
 | **3.6(g) (bitacora)** | El registro de eventos del servicio esta protegido en la base de datos con disparadores que impiden las sentencias de actualizacion y de eliminacion: es de solo anexado. | `src/db/schema/020_eventos_append_only.sql:193` | `tests/eventos-append-only.test.js` | Implementado |
 | **3.6(g) (lapida y recibo)** | La supresion dentro de la ventana de purga da lugar a una lapida que identifica la solicitud, la fecha y hora, las categorias suprimidas y el fundamento del plazo, y a un recibo que la Empresa entrega al Trabajador si lo solicita. | `src/services/supresion.js:56`<br>`src/services/supresion.js:58`<br>`src/services/reciboSupresion.js:211` | `tests/recibo-supresion.test.js` | Implementado |
 | **3.6(g) (retencion)** | Mientras subsista un deber legal o contractual de conservacion, el registro queda retenido por esa razon y no se suprime. | `src/services/conservacion.js:418`<br>`src/services/conservacion.js:455` | `tests/conservacion-deber-legal.test.js` | Implementado |
-| **10.5(d)** | Los registros de auditoria no se alteran; su supresion en la ventana de purga deja la lapida y el recibo del 3.6(g) y no afecta la prueba de aceptacion del 12.7. | `src/db/schema/020_eventos_append_only.sql:193`<br>`src/services/readinessLegal.js:1324` | `tests/readiness-legal.test.js` | Implementado |
+| **10.5(d)** | Los registros de auditoria no se alteran; su supresion en la ventana de purga deja la lapida y el recibo del 3.6(g) y no afecta la prueba de aceptacion del 12.7. | `src/db/schema/020_eventos_append_only.sql:193`<br>`src/services/readinessLegal.js:1328` | `tests/readiness-legal.test.js` | Implementado |
 | **12.7** | La prueba de aceptacion se sujeta al plazo que declare la Empresa y, a falta de plazo declarado, al plazo por defecto de la tabla supletoria que administra K+AIR. | `src/services/supresion.js:480` | `tests/recibo-supresion.test.js` | Implementado |
 | **10.8(a)** | La Empresa declara, de manera expresa y por cada documento, que el documento que entrega a firma no contiene datos sensibles de salud; esa declaracion es obligatoria para crear la solicitud y queda atada a la huella del PDF. | `src/services/declaracionSalud.js:42`<br>`src/services/publicFlow.js:588` | `tests/datos-sensibles.test.js` | Implementado |
 | **10.8(d)(i) bloqueo** | Ante una carga accidental, K+AIR bloquea la solicitud y su enlace de firma, de modo que no pueda firmarse ni reimprimirse, y lo deja retenido mientras se resuelve el reporte. | `src/services/incidenteSalud.js:75` | `tests/services/incidente-datos-sensibles.test.js`<br>`tests/datos-sensibles.test.js` | Implementado |
@@ -53,7 +53,7 @@ cada fila lista tambien la presencia del comportamiento que la reemplaza.
 | **10.8(d)(v) supresion** | Resuelto el reporte, el documento y sus derivados se suprimen conforme al 8.6, con la lapida y el recibo del 3.6(g). | `src/services/supresion.js:286`<br>`src/services/incidenteSalud.js:308` | `tests/services/incidente-datos-sensibles.test.js`<br>`tests/datos-sensibles.test.js` | Implementado |
 | **1.2 (pantalla)** | En la pantalla de firma se muestra el tipo de documento del representante legal y sus ultimos cuatro (4) digitos, no el numero completo de la identificacion. | `src/services/representante.js:192`<br>`src/services/empresa.js:494`<br>`src/services/empresa.js` — correcto: no expone el dato crudo<br>`web/firma/app.js:955` | `tests/services/empresa-documento-representante.test.js`<br>`tests/ultimos4-constancia.test.js` | Implementado |
 | **3.4(e) (buzon corporativo)** | El sistema comprueba si el medio al que va a salir el codigo pertenece a un dominio que la Empresa pueda leer; ese control es incondicional y no existe ninguna opcion que lo desactive. | `src/services/publicFlow.js:1161` | `tests/d02-medio-otp.test.js` | Implementado |
-| **3.4(e) y 10.5(f) (aviso OTP)** | El aviso OTP_MEDIO_CORPORATIVO no puede corregirse ni alterarse, pero SI se suprime en la ventana del 8.6, con la lapida y el recibo del 3.6(g). | `src/services/readinessLegal.js:1377`<br>`src/services/supresion.js:56` | `tests/recibo-supresion.test.js` | Implementado |
+| **3.4(e) y 10.5(f) (aviso OTP)** | El aviso OTP_MEDIO_CORPORATIVO no puede corregirse ni alterarse, pero SI se suprime en la ventana del 8.6, con la lapida y el recibo del 3.6(g). | `src/services/readinessLegal.js:1381`<br>`src/services/supresion.js:56` | `tests/recibo-supresion.test.js` | Implementado |
 
 ## Resumen
 

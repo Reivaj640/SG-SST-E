@@ -213,7 +213,9 @@ async function recorrerFlujoCompleto(app, token, identificacion = WORKER_CC_PLAI
   // view-document va después del consent/accept.
   const r35 = await request(app)
     .post(`/api/sign/${token}/consent/accept`)
-    .send({});
+    // C-2 / J3: el Firmante declara el medio por el que se le pusieron a
+    // disposicion las politicas (la pantalla de firma, con el texto integro).
+    .send({ medio_disposicion: 'pantalla_firma' });
   assert.equal(r35.status, 200,
     `consent/accept falló: status=${r35.status} body=${JSON.stringify(r35.body)}`);
 

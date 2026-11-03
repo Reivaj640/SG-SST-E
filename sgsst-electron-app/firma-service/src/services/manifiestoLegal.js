@@ -46,7 +46,9 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/connection');
+const config = require('../config');
 const empresaService = require('./empresa');
+const { AppError } = require('../middleware/errors');
 
 // Raíz del service (firma-service). En producción el service se despliega en
 // /opt/kair-firma/app, así que esta misma ruta resuelve a
@@ -176,10 +178,19 @@ function datosAnexos(opciones = {}) {
   // Empresa: vive en su fila (gh_firma_empresas.anexo_encargo_firmado_at),
   // que es donde el servicio ya guardaba el dato.
   let fechaFirmaEmpresa = null;
+  let firmaNubeEmpresa = null;
   if (idEmpresa) {
     try {
       const empresa = empresaService.getById(idEmpresa);
-      if (empresa) fechaFirmaEmpresa = empresa.anexo_encargo_firmado_at || null;
+      if (empresa) {
+        fechaFirmaEmpresa = empresa.anexo_encargo_firmado_at || null;
+        firmaNubeEmpresa = {
+          fecha: empresa.anexo_nube_firmado_at || null,
+          version: empresa.anexo_nube_version || null,
+          hash: empresa.anexo_nube_hash || null,
+          evidencia: empresa.anexo_nube_evidencia || null,
+        };
+      }
     } catch (e) {
       // La constancia NUNCA se cae por esto: si no se puede leer la Empresa,
       // el Anexo de Encargo se declara sin firmar, que es el lado seguro.
@@ -187,7 +198,7 @@ function datosAnexos(opciones = {}) {
     }
   }
   const encHash = _texto(encMan.hash);
-  const encFirmado = Boolean(fechaFirmaEmpresa) || _texto(encMan.estado) === 'firmado';
+  const encFirmado = Boolean(fechaFirmaEmpresa);
 
   const anexoEncargo = {
     nombre: 'Anexo de Encargo',
@@ -207,8 +218,9 @@ function datosAnexos(opciones = {}) {
   // Hoy solo hay el MODELO: un texto sin firmar. La versión firmada y su
   // huella son null, y eso es lo que se devuelve como `version`/`hash`. El
   // modelo va aparte, en `modelo`, con su propia huella.
-  const nubeHash = _texto(nubeMan.hash);
-  const nubeFirmado = nubeMan.firmado === true;
+  const nubeHash = _texto(firmaNubeEmpresa && firmaNubeEmpresa.hash);
+  const nubeFirmado = Boolean(firmaNubeEmpresa && firmaNubeEmpresa.fecha
+    && firmaNubeEmpresa.version && _esHashSha256(nubeHash));
   const modelo = nubeMan.modelo && typeof nubeMan.modelo === 'object'
     ? {
       version: _texto(nubeMan.modelo.version) || null,
@@ -221,20 +233,19 @@ function datosAnexos(opciones = {}) {
   const anexoNube = {
     nombre: 'Anexo de Nube',
     // La versión FIRMADA (hoy no hay ninguna).
-    version: _texto(nubeMan.version) || null,
+    version: nubeFirmado ? firmaNubeEmpresa.version : null,
     hash: nubeHash || null,
     hash_valido: _esHashSha256(nubeHash),
     firmado: nubeFirmado,
-    fecha: _texto(nubeMan.fecha) || null,
+    fecha: nubeFirmado ? firmaNubeEmpresa.fecha : null,
     estado: nubeFirmado ? 'firmado' : 'no_firmado',
     // El texto sin firmar, con su huella.
     modelo,
     // Lo que realmente rige: la versión firmada si existe; si no, el modelo.
-    version_incorporada: _texto(nubeMan.version) || (modelo ? modelo.version : null),
-    hash_incorporada: nubeHash || (modelo ? modelo.hash : null),
-    origen_incorporada: _texto(nubeMan.version)
-      ? 'version_firmada'
-      : (modelo ? 'modelo' : null),
+    version_incorporada: nubeFirmado ? firmaNubeEmpresa.version : null,
+    hash_incorporada: nubeFirmado ? nubeHash : null,
+    origen_incorporada: nubeFirmado ? 'version_firmada_por_empresa' : null,
+    evidencia_firma_empresa: nubeFirmado ? firmaNubeEmpresa.evidencia : null,
   };
 
   return {
@@ -274,6 +285,54 @@ function registrarAnexosFirma(firmaId, datos, opciones = {}) {
   const enc = anexos.anexo_encargo || {};
   const nube = anexos.anexo_nube || {};
 
+  // LO QUE SE ESCRIBE Y LO QUE SE BLOQUEA SON DOS COSAS DISTINTAS.
+  //
+  // 1. LO QUE SE ESCRIBE: la Constancia NUNCA vincula un modelo de Anexo de
+  //    Nube sin firmar (C-1 del abogado, A1 §3.6(h) y A4). Si esa Empresa no
+  //    suscrito el Anexo de Nube, lo que se archiva es null: no hay version
+  //    firmada que vincular. Esto no depende de ninguna compuerta: es la
+  //    integridad del instrumento.
+  //
+  // 2. LO QUE SE BLOQUEA: que la FIRMA se detenga porque a esa Empresa le
+  //    falta el Anexo de Nube es la regla del C-1 ("el servicio no permite
+  //    crear solicitudes de firma"), y esa regla va detras de la COMPUERTA
+  //    `config.exigirAnexoNube`: mientras el Anexo de Nube v1.0 sea un modelo
+  //    SIN PUBLICAR, el sistema no puede bloquear el flujo de firma por un
+  //    documento que todavia no publica. Ver el comentario de
+  //    `config.exigirAnexoNube`.
+  //
+  // 3. LO QUE NO SE COMPRUEBA EN ESTE PASO, Y POR QUE. El Anexo de ENCARGO
+  //    no se exige aqui y este paso no propaga su fallo:
+  //    - La suscripcion del Anexo de Encargo ya es requisito de CREAR la
+  //      solicitud (`empresa.js`, `verificarHabilitacionFirma`, pendiente
+  //      `anexo_encargo_firmado`), con su excepcion auditable. Una firma que
+  //      llego hasta aqui por una via legitima no se deshace: la excepcion
+  //      existe justamente para que exista esa via.
+  //    - Las columnas de la fila guardan la version y la huella del TEXTO que
+  //      rigio esa firma (migracion 045); la fecha de la suscripcion de la
+  //      Empresa va aparte, en `gh_firma_empresas.anexo_encargo_firmado_at`.
+  //      El archivado no juzga la suscripcion: la registra.
+  //    - El C-1 no manda bloquear por el Anexo de Encargo: manda NO INVENTAR
+  //      el vinculo, que es lo del punto 1 (y alli, del Anexo de Nube).
+  //    - Un manifiesto ausente o ilegible es un problema de despliegue, y lo
+  //      reporta el reporte de readiness; no es una condicion por Empresa que
+  //      deba tumbar una firma ya otorgada.
+  //
+  // El error del punto 2 es un AppError con codigo propio: un `Error` pelado
+  // salia como 500 INTERNAL_ERROR, que le dice al operador "se rompio el
+  // servicio" cuando lo que hay es un requisito documental que la Empresa
+  // todavia no cumple.
+  if (config.exigirAnexoNube === true
+      && (!nube.firmado || !nube.hash_valido
+        || !nube.version_incorporada || !nube.hash_incorporada)) {
+    throw new AppError(
+      409,
+      'EMPRESA_NO_HABILITADA',
+      'No se pueden archivar anexos ni emitir constancia: la Empresa debe tener suscrito '
+      + 'el Anexo de Nube con su version y su huella validas.',
+    );
+  }
+
   try {
     dbConn.prepare(`
       UPDATE gh_firmas_electronicas
@@ -285,8 +344,8 @@ function registrarAnexosFirma(firmaId, datos, opciones = {}) {
     `).run(
       enc.version || null,
       enc.hash || null,
-      nube.version_incorporada || null,
-      nube.hash_incorporada || null,
+      nube.version_incorporada,
+      nube.hash_incorporada,
       id,
     );
   } catch (e) {

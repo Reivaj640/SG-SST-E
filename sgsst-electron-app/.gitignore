@@ -82,6 +82,11 @@ _*.js
 # ese script es código de producto. Sin él, `npm run build` muere en el hook `pre` en
 # cualquier clon, porque los cuatro `prebuild*` de package.json lo invocan (PROMPT.md §5.5).
 !main/_verificar-credenciales-build.js
+# Las pruebas reales del firma-service que empiezan con guion bajo NO son scripts
+# temporales: se ejecutan en la suite y tienen que viajar con el repo (37 casos).
+# Sin esta excepcion, `git diff` de esos archivos sale vacio y parece que nadie los toco.
+!firma-service/tests/_*.test.js
+!firma-service/tests/routes/__test-isolation.test.js
 
 # 📦773 · Mensajes de commit temporales (raíz del repo)
 /commit-msg*.txt

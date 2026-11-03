@@ -1,0 +1,128 @@
+Hoy no se puede firmar ni autorizar producción: faltan tres cosas de naturaleza distinta. (1) Seis correcciones documentales que aún no están aplicadas —dos de ellas hacen que el expediente se contradiga a sí mismo—; (2) la evidencia que solo tiene el owner —14 marcadores del Anexo de Nube, 6 decisiones del abogado y 2 actos del owner—; y (3) el cierre técnico T3 a T9, que no depende de texto.
+
+El plan de abajo está ordenado para que nada se firme antes de que el texto esté congelado y para que nada se publique antes de que la compuerta de conservación esté decidida. El orden no es estético: cualquier edición posterior a la firma invalida el hash aprobado y obliga a volver a firmar.
+
+1. Estado de partida (semáforo)
+Bloque	Estado	Qué falta
+Contradicciones jurídicas A-2 a A-6, B-1 a B-4, C-1 a C-4	✅ Cerradas y verificadas	Nada
+Coherencia del manifiesto legal-readiness.json	🔴 Abierta	N-1 (línea 87), N-2 (línea 66)
+Evidencia de pruebas (T1)	🔴 Desactualizada	N-3: dice 2 075/1 roja; la corrida real es 2 076/0
+Remisiones cruzadas	🟠 Dos rotas	N-4: dicen «§5» donde la conclusión está en el §4
+Fechas del manifiesto	🟠 Incoherentes	N-5
+Reproducibilidad del candidato	🔴 Hueco	N-6: 37 pruebas viven en archivos que .gitignore se traga
+Firma sección E, vigencia, T3-T9	⛔ Pendientes	Fases 2 a 5
+El cuadro canónico 63 cerrados · 33 pendientes · 96 no se mueve en la Fase 0: esas correcciones no crean ni cierran requisitos, solo hacen que el expediente diga la verdad. Se mueve en las fases 1 a 4.
+
+2. Fase 0 — Correcciones documentales (dev, 2-3 h)
+Se aplican en el origen, nunca en la copia del paquete. Después se reconstruye.
+
+ID	Archivo y punto	Cambio exacto	Aceptación
+N-1	firma-service/legal-readiness.json:87	Reemplazar el tramo «el papel por operación, la clasificación jurídica, la Circular Externa 002 de 2025… quedan pendientes de validación profesional escrita» por: «El papel por operacion y la clasificacion juridica estan determinados (Google LLC actua como Responsable del Tratamiento y el flujo es una transferencia internacional a un pais con nivel adecuado); la Circular Externa 002 de 2025 no aplica a este canal; quedan pendientes la verificacion del RNBD por el owner y la evidencia tecnica del canal.»	Ya no queda ninguna frase que afirme lo contrario de A2 §5 y A3 §4
+N-2	legal-readiness.json:66 (nota subencargados.google)	Quitar «; Circular Externa 002 de 2025, numeral 2» y dejar: «(art. 2.2.2.25.6.1 del Decreto 1074, si el abogado confirma que es exigible en una transferencia a pais con nivel adecuado)»	La Circular solo aparece para decir que no aplica
+N-3	11-checklist…:86, 09-respuesta…:71-72, 985, 1030, 1243, 10-informe…:130	2 078 pruebas · 2 076 verdes · 0 rojas · 2 omitidas. Explicar que ADVE6.7 no era defecto de código: faltaba declaracion_datos_sensibles (exigida desde 5534aca7 / 📦978), que se conservaron version_kair, consent_id:'5' y assert.equal(r.status, 201), y que el archivo sí se modificó en esta ronda. Eliminar «el archivo no fue modificado»	Las seis menciones coinciden y ninguna dice «1 roja»
+N-4	legal/anexo-encargo.html:483 y legal/anexo-nube-v1.0.html:44	Cambiar «(Anexo de Nube, §5)» y «§5» por «§4» o, mejor, por «(según la conclusión de este Anexo)», que no se rompe si se renumera. No tocar anexo-nube-v1.0.html:274: es texto del abogado	Ninguna remisión apunta a «Seguridad» para una conclusión que está en «Proveedores externos»
+N-5	legal-readiness.json:2-3, 86 (y verificar :73)	version y actualizado_at → 2026-10-31; anexo_nube.modelo.actualizado → 2026-10-31; revisar si anexo_encargo.version: "2026-10-30" debe ser 2026-10-31, porque el checklist y la nota lo fechan el 31	Ninguna fecha del manifiesto anterior al archivo que describe
+N-6	.gitignore (reglas __*-*.js y _*.js, líneas 79-80)	Decisión del owner. Opción recomendada: agregar !firma-service/tests/_*.test.js y !firma-service/tests/routes/__test-isolation.test.js, verificar con git check-ignore -v y sumarlos al commit. Alternativa: renombrarlos sin guion bajo	Las 37 pruebas viajan con el repo; git ls-files las muestra
+Cadena de reconstrucción obligatoria al cerrar la Fase 0:
+
+Recalcular SHA-256 de los archivos tocados.
+SHA256SUMS.txt → nota al abogado → manifiesto (actualizar-manifiesto-v1.4.js y --check).
+armar-paquete-abogado.js (sale con 3 si no coincide).
+tests/readiness-manifiesto-v1.4.test.js → node -e "JSON.parse(...)" sobre legal-readiness.json (archivo ASCII puro).
+Compuerta G0: 13/13 filas de la nota sin problemas; --check en 0; ninguna huella vieja (c09c6d8b, 9d6dbfb7, 11e7ac23) usada como vigente; las dos frases contradictorias eliminadas; las seis cifras de pruebas iguales; N-6 decidido.
+
+3. Fase 1 — Evidencia y decisiones (owner + abogado, 1-3 días)
+1.1 Los 14 marcadores del Anexo de Nube (solo el owner)
+Bloque	Marcadores	Fuente
+RNBD	4: naturaleza jurídica y activos de la sociedad; obligación de inscripción; estado del registro; causal de la declaración	Cámara de comercio, estados financieros, SIC
+Ficha del canal	10: host SMTP y evidencia de TLS; remitente; contraseña de aplicación y fecha; procedimiento y fecha de rotación; MFA; plantilla del OTP; contenido mínimo y su regla; registro de errores y envíos; escalamiento con responsables; última revocación	Servidor y cuenta de correo
+Mientras estén vacíos, el Anexo de Nube no es firmable y, con C-1 encendido, el servicio no crea solicitudes ni emite Constancia.
+
+1.2 Los 8 puntos de la nota: 6 del abogado, 2 del owner
+#	Punto	Quién	Respuesta esperada
+1	Aprobar la v1.4 de A1, A2, A3 y A4 con versión y huella	Abogado	Aprobado / condicionado / corregido
+2	Papel de Google por operación, por escrito	Abogado	Validación del literal ya incorporado
+3	Circular Externa 002 de 2025	Abogado	Confirmar que no aplica al canal
+4	RNBD	Abogado	Obligación, responsable, evidencia, plazo
+5	Plazos de 10 y 5 años	Abogado	Validar / cambiar / no aprobar
+6	Fecha de vigencia del Acuerdo	Owner	Fecha cierta, anterior a la publicación
+7	Evidencia de la cuenta de correo	Owner	Se solapa con los 10 marcadores de la ficha: un solo trabajo
+8	Ámbito de la condición de J9 (A2 §6) y de J4	Abogado	Precisión del literal
+1.3 Canal de fecha_terminacion
+No es un marcador del Anexo, pero sin él la retención desde el cese no se puede evidenciar: el canal existe por rutas admin (/internal/admin/empresas/:id_empresa/fecha-terminacion…), no por autoservicio. Documentar en una página: quién recibe la novedad, quién la registra, con qué soporte, en qué plazo y qué pasa si la fecha no llega (el registro queda pendiente, sin fecha de supresión calculada).
+
+Compuerta G1: 14/14 marcadores diligenciados con evidencia; 6 decisiones escritas; vigencia fijada; procedimiento del canal escrito.
+
+4. Fase 2 — Congelamiento y reproducibilidad (dev, 4-6 h)
+Esta fase existe para que la firma se ponga sobre algo que otra máquina puede reconstruir.
+
+Commit candidato (T3) con código, configuración, documentos, migraciones y —si se aprobó N-6— los dos archivos de prueba. Sin push todavía.
+Corrida limpia desde clon nuevo del commit: 2 078 · 2 076 · 0 · 2. Si el clon da otra cosa, T1 no está probado.
+Pre-T4 read-only (para no firmar algo que el servidor contradice): versión instalada, migraciones aplicadas, permisos, secretos presentes, respaldos, bitácora, TLS negociado. Es una comprobación previa, no la certificación de T4.
+Congelar: anotar los hashes definitivos de A1-A4 y de los anexos. Desde este momento no se toca ningún byte de esos archivos.
+Compuerta G2: commit identificado, corrida reproducible, pre-T4 sin discrepancias, hashes congelados y anotados.
+
+5. Fase 3 — Firma jurídica (abogado, 1-3 días)
+El abogado firma la sección E marcando una sola decisión y escribiendo, en las condiciones, versión + hash íntegro de cada documento.
+Se completa la Constancia (A4): sección 1 con aprobador y fecha; sección 4 con versión y huella definitivas. Sección 5 y sección 6 fila 2 quedan vacías: son el acto posterior del owner.
+Se registra el original firmado y su evidencia.
+Regla dura: si después de la firma hay que cambiar una coma de A1-A4, se vuelve a la Fase 0 y se firma de nuevo. No hay excepción.
+
+Compuerta G3: sección E firmada con hashes que coinciden con los congelados; Constancia firmada; ninguna edición posterior.
+
+6. Fase 4 — Cierre técnico y autorización operativa (dev + owner, 1-2 días)
+ID	Qué se hace	Evidencia
+T4	Verificación formal en servidor: versión, configuración legal, migraciones, permisos, secretos, respaldos, auditoría	Acta con fecha, versión y responsable
+T6	E2E controlado posterior al despliegue candidato, limpieza del rastro y acta	Acta con casos, resultados y limpieza
+T7	Reversión probada, no descrita	Registro de la prueba y del estado restaurado
+T8	Autorización operativa independiente del owner, después de la aprobación jurídica	Documento firmado, distinto de la Constancia
+T9	Reconfirmar en el momento: acuerdo.publicado=false, aplicacion.activada=false, exigirAnexoNube=false	Captura o salida fechada de las tres
+Compuerta G4: T4, T6, T7 con acta; T8 firmada; T9 reconfirmado. La aprobación jurídica no sustituye ninguna de estas.
+
+7. Fase 5 — Publicación, activación y acta (owner, 1 día)
+Orden inamovible:
+
+Publicar el Acuerdo v1.4 con la fecha de vigencia fijada → acuerdo.publicado = true y publicación en kair.fyi.
+Decidir la compuerta de conservación (ver §8, decisión B): si se valida 10/5, alinear el catálogo, reejecutar pruebas y solo entonces aplicacion.activada = true. Si no se valida, queda cerrada y el texto debe poder sostenerse con la compuerta cerrada.
+Decidir exigirAnexoNube (ver §8, decisión C).
+E2E final con una Empresa piloto y limpieza.
+Acta de cierre con: versión, hashes, commit, resultados T1-T9, decisiones A/B/C, fecha y firmas.
+Compuerta G5 (producción aprobada): los 8 criterios del §9 se cumplen simultáneamente.
+
+8. Las cuatro decisiones que solo puede tomar el owner
+Decisión	Opción	Consecuencia
+A. N-6	Versionar los dos archivos (recomendado)	T1/T3 reproducibles; el repo crece 37 pruebas reales
+No versionar	La corrida verde no viaja con el commit; T1 queda afirmado sobre un archivo que git no ve. Habría que excluir esas 37 del conteo y explicarlo
+B. Plazos 10/5	Validarlos antes de publicar	Se puede publicar y activar sin contradicción
+Publicar con la compuerta cerrada	El texto promete un plazo por defecto que el sistema no aplica (8.6(a)/(h) remiten a la tabla supletoria). Es defendible solo con cláusula transitoria o con la compuerta cerrada explicada en el propio Acuerdo
+C. exigirAnexoNube	Encenderlo	C-1 pasa a control técnico real, pero exige al menos una Empresa con A3 firmado; si no, el servicio deja de crear solicitudes
+Mantenerlo apagado	C-1 queda como obligación contractual sin control técnico. Aceptable como transitorio, no como estado de producción indefinido
+D. Vigencia	Fecha cierta anterior a la publicación	Sin ella no se puede publicar; el texto la deja en blanco a propósito
+9. Definición de «aprobado para producción»
+Se considera aprobado solo si todo esto es verdad el mismo día:
+
+Sección E firmada, con versión y hash de A1-A4.
+Constancia firmada, sección 4 con esos hashes.
+Commit candidato identificado y corrida reproducible desde clon limpio: 2 078 · 2 076 · 0 · 2.
+T4, T6 y T7 con acta.
+T8 firmada por el owner, separada de la aprobación jurídica.
+T9 reconfirmado en el momento de abrir.
+Decisiones A, B y C documentadas por escrito, con su fecha.
+Acta de cierre con firmas.
+Si falta uno, el estado correcto es «aprobado con condiciones» o «no aprobado», no «listo para producción».
+
+10. Ruta crítica y riesgos
+Riesgo	Mitigación
+Se firma y después T4 revela una discrepancia	Pre-T4 read-only en Fase 2, antes de congelar
+Se publica v1.4 con la compuerta cerrada y el texto promete plazos	Decisión B antes de publicar, o cláusula transitoria
+Se enciende exigirAnexoNube sin ningún A3 firmado	Encender solo después del primer A3 suscrito; si no, dejar apagado y documentarlo
+Los 14 marcadores no llegan	A3 no se firma; si C-1 está apagado, se puede operar con hueco contractual, pero no se puede decir «cumplido»
+El canal de fecha_terminacion no se documenta	La retención desde el cese queda sin evidencia; T5 y J9 no cierran
+Esfuerzo orientativo: Fase 0, 2-3 h; Fase 1, 1-3 días (depende de terceros); Fase 2, 4-6 h; Fase 3, 1-3 días; Fase 4, 1-2 días; Fase 5, 1 día. No son compromisos: son órdenes de magnitud.
+
+11. Base normativa
+Circular Externa 002 de 2025 (SIC, 7-oct-2025; D.O. 53.268 del 9-oct-2025) — su ámbito son los procesos de transferencia de tecnología con datos personales; sostiene que no aplica al canal de correo. Verificada el 31-oct-2026 en https://sedeelectronica.sic.gov.co/transparencia/normativa/circular-externa-no-002-del-07-de-octubre-de-2025
+Decreto 1074 de 2015, art. 2.2.2.26.1.2 (modificado por Decreto 090 de 2018) — inscripción en el RNBD para sociedades y ESAL con activos superiores a 100.000 UVT y personas jurídicas públicas. Verificado el 31-oct-2026 en https://www.sic.gov.co/registro-nacional-de-bases-de-datos
+Ley 1581 de 2012, arts. 3 d)-e), 18(k), 26 y 27; Decreto 1074 de 2015, art. 2.2.2.25.1.3 num. 4; Circular Única, Título V num. 3.2 — ⚠️ No verificado hoy: son las citas que el expediente trae verificadas del 30-oct-2026 y no las repuse en fuente oficial en esta sesión.
+Ley 527 de 1999 (mensajes de datos y firma electrónica) — ⚠️ No verificado hoy; aplica al valor probatorio del servicio, no a este plan de cierre.
+Huellas SHA-256 — ⚠️ No recomputado por mí sobre los bytes: en modo asesoría no ejecuto comandos. Tomo las declaradas en SHA256SUMS.txt, manifiesto y nota, que coinciden entre sí.

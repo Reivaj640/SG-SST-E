@@ -14,6 +14,14 @@
  * Lo que se verifica acá:
  * - El manifiesto legal se lee y devuelve version + huella de cada anexo.
  * - El Anexo de Nube distingue el MODELO (sin firmar) de la version firmada.
+ * - Si la Empresa NO suscribio el Anexo de Nube, lo que se archiva con la
+ *   firma es NULL: la Constancia no vincula un modelo sin firmar (C-1 del
+ *   abogado, A1 §3.6(h) y A4).
+ * - La suscripcion del Anexo de Encargo NO se comprueba en el archivado: ya es
+ *   requisito de CREAR la solicitud (`empresa.js`), con su excepcion auditable,
+ *   y una firma otorgada por una via legitima no se deshace. Un manifiesto
+ *   ausente no tumba la firma: no se inventa nada y la fila se queda sin
+ *   version ni huella.
  * - La Constancia lleva la seccion de anexos con version, huella y estado.
  * - Si el anexo NO esta firmado, la Constancia lo dice de forma expresa.
  * - El dato queda CONSULTABLE POR FIRMA (columnas de la fila), no solo impreso.
@@ -59,15 +67,18 @@ const ID_EMPRESA = '900999111';
 /**
  * Da de alta una Empresa, con o sin el Anexo de Encargo firmado.
  *
+ * El canal de atención (canal_pqrs) va siempre: sin él la Empresa no está
+ * habilitada para pedir firmas (el 7.2-7.3) y el alta de la solicitud falla.
+ *
  * @param {string|null} firmadoAt fecha ISO de la firma, o null
  * @returns {string} el id_empresa
  */
 function sembrarEmpresa(firmadoAt) {
   db.prepare(`
     INSERT INTO gh_firma_empresas
-      (id_empresa, razon_social, nit, anexo_encargo_firmado_at, activo)
-    VALUES (?, ?, ?, ?, 1)
-  `).run(ID_EMPRESA, 'EMPRESA DE PRUEBA SAS', '900999111', firmadoAt || null);
+      (id_empresa, razon_social, nit, anexo_encargo_firmado_at, canal_pqrs, activo)
+    VALUES (?, ?, ?, ?, ?, 1)
+  `).run(ID_EMPRESA, 'EMPRESA DE PRUEBA SAS', '900999111', firmadoAt || null, 'pqrs@empresa.test');
   return ID_EMPRESA;
 }
 
@@ -137,10 +148,16 @@ test('datosAnexos: el Anexo de Nube distingue el MODELO de la version firmada', 
   assert.ok(nube.modelo, 'el modelo si tiene que estar');
   assert.equal(nube.modelo.version, '1.0');
   assert.match(nube.modelo.hash, /^[0-9a-f]{64}$/i);
-  // Lo que realmente rige (y lo que se archiva) es el modelo.
-  assert.equal(nube.version_incorporada, '1.0');
-  assert.equal(nube.hash_incorporada, nube.modelo.hash);
-  assert.equal(nube.origen_incorporada, 'modelo');
+
+  // Lo que realmente rige (y lo que se archiva con la firma) es la version
+  // suscrita por la Empresa. Como esta Empresa no suscribio el Anexo de
+  // Nube, no hay version firmada que vincular: la Constancia NO puede
+  // incorporar un modelo sin firmar (C-1 del abogado, A1 §3.6(h) y A4).
+  assert.equal(nube.version_incorporada, null,
+    'sin Anexo de Nube suscrito no hay version incorporada: no se vincula el modelo');
+  assert.equal(nube.hash_incorporada, null,
+    'ni huella: la del modelo no es la de una copia firmada');
+  assert.equal(nube.origen_incorporada, null);
 });
 
 test('datosAnexos: el Anexo de Encargo no firmado dice NO firmado, sin fecha inventada', () => {
@@ -253,6 +270,9 @@ test('la Constancia lee el manifiesto sola si el llamador no le pasa los anexos'
 
 test('registrarAnexosFirma deja los anexos consultables en la fila de la firma', async () => {
   resetDb();
+  // La Empresa tiene firmado el Anexo de Encargo: sin eso no se archivan
+  // anexos ni se emite constancia.
+  sembrarEmpresa('2026-10-01T10:00:00.000Z');
   const sr = await createSignRequestWithIdentificacion({
     id_empresa: ID_EMPRESA,
     id_documento: 'doc-anexos',
@@ -268,9 +288,35 @@ test('registrarAnexosFirma deja los anexos consultables en la fila de la firma',
   const fila = manifiestoLegal.anexosDeFirma(sr.signRequest.id);
   assert.equal(fila.anexo_encargo_version, '2026-10-27-b');
   assert.equal(fila.anexo_encargo_hash, MANIFIESTO_PRUEBA.anexo_encargo.hash);
-  // Del Anexo de Nube solo hay modelo: lo que rige es el modelo.
-  assert.equal(fila.anexo_nube_version, '1.0');
-  assert.equal(fila.anexo_nube_hash, MANIFIESTO_PRUEBA.anexo_nube.modelo.hash);
+  // Del Anexo de Nube no hay nada que archivar: la Empresa no lo suscribio y
+  // no se archiva el modelo sin firmar (C-1).
+  assert.equal(fila.anexo_nube_version, null);
+  assert.equal(fila.anexo_nube_hash, null);
+});
+
+test('con el Anexo de Encargo firmado y sin Anexo de Nube, la fila guarda null en el Nube', async () => {
+  // La Empresa suscribio el Anexo de Encargo pero no el de Nube: el archivo
+  // guarda lo que rige (el Encargo) y NULL en el Nube. No inventa ni una
+  // version ni una huella del modelo sin publicar.
+  resetDb();
+  sembrarEmpresa('2026-10-01T10:00:00.000Z');
+  const sr = await createSignRequestWithIdentificacion({
+    id_empresa: ID_EMPRESA,
+    id_documento: 'doc-sin-nube',
+  });
+
+  const anexos = manifiestoLegal.datosAnexos({
+    id_empresa: ID_EMPRESA,
+    manifiesto: MANIFIESTO_PRUEBA,
+  });
+  const escrito = manifiestoLegal.registrarAnexosFirma(sr.signRequest.id, anexos);
+  assert.equal(escrito.anexo_encargo_version, '2026-10-27-b');
+  assert.equal(escrito.anexo_nube_version, null);
+  assert.equal(escrito.anexo_nube_hash, null);
+
+  const fila = manifiestoLegal.anexosDeFirma(sr.signRequest.id);
+  assert.equal(fila.anexo_nube_version, null);
+  assert.equal(fila.anexo_nube_hash, null);
 });
 
 test('sin manifiesto, registrarAnexosFirma no inventa y no tumba la firma', async () => {
@@ -284,12 +330,26 @@ test('sin manifiesto, registrarAnexosFirma no inventa y no tumba la firma', asyn
     manifiesto: {},
     rutaManifiesto: 'no-existe.json',
   });
-  // El manifiesto inyectado como objeto vacio no tiene anexos: no hay nada
-  // que escribir, y la firma sigue en pie.
+  // El manifiesto inyectado como objeto vacio no tiene anexos. ESTE PASO NO
+  // TUMBA LA FIRMA: la suscripcion del Anexo de Encargo ya se exige al CREAR
+  // la solicitud, con su excepcion auditable, y un manifiesto ausente es un
+  // problema de despliegue que reporta el reporte de readiness, no una
+  // condicion por Empresa. Lo que no se permite es INVENTAR: la fila se queda
+  // sin version ni huella.
   const escrito = manifiestoLegal.registrarAnexosFirma(sr.signRequest.id, anexos);
   assert.equal(escrito.anexo_encargo_version, null);
+  assert.equal(escrito.anexo_encargo_hash, null);
   assert.equal(escrito.anexo_nube_version, null);
-  const fila = db.prepare('SELECT id FROM gh_firmas_electronicas WHERE id = ?')
-    .get(sr.signRequest.id);
+  assert.equal(escrito.anexo_nube_hash, null);
+  // Y no se invento nada: la fila sigue en pie, sin version ni huella.
+  const fila = db.prepare(
+    'SELECT id, anexo_encargo_version, anexo_encargo_hash, '
+    + 'anexo_nube_version, anexo_nube_hash '
+    + 'FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(sr.signRequest.id);
   assert.ok(fila, 'la firma no puede caerse por esto');
+  assert.equal(fila.anexo_encargo_version, null);
+  assert.equal(fila.anexo_encargo_hash, null);
+  assert.equal(fila.anexo_nube_version, null);
+  assert.equal(fila.anexo_nube_hash, null);
 });

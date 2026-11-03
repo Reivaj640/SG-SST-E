@@ -203,9 +203,13 @@ function main() {
   let m = fs.readFileSync(MANIFIESTO, 'utf8');
 
   // --- Acuerdo -----------------------------------------------------------
-  const viejoArchivo = /"v1_1_archivo":\s*"[^"]*"/;
-  if (!viejoArchivo.test(m)) throw error('El manifiesto no tiene la clave "v1_1_archivo".');
-  m = m.replace(viejoArchivo, '"v1_1_archivo": "' + relativoAcuerdo + '"');
+  // Las claves se renombraron a archivo/hash/fecha (J14-5): las v1_1_* tenthian
+  // el valor de otra version. Este script historicó se actualiza con los
+  // nombres nuevos y usa las funciones con bloque, para no tocar las claves
+  // homonimas de otros bloques (constancia.archivo, matriz_finalidades.archivo).
+  m = ponerEnBloque(m, 'acuerdo', 'archivo', relativoAcuerdo, 'acuerdo.archivo');
+  m = ponerEnBloque(m, 'acuerdo', 'hash', hashAcuerdo, 'acuerdo.hash');
+  m = ponerEnBloque(m, 'acuerdo', 'fecha', hoy(), 'acuerdo.fecha');
 
   // La versión que el texto debe llevar, dentro del bloque "acuerdo".
   //
@@ -214,25 +218,7 @@ function main() {
   // la segunda corrida dejaría "version" repetida. Un JSON con la misma clave
   // dos veces no dice lo que parece decir: el último valor gana y el primero
   // desaparece sin dejar rastro.
-  if (/"version"\s*:\s*"[^"]*"/.test(cuerpoDeBloque(m, 'acuerdo'))) {
-    m = ponerEnBloque(m, 'acuerdo', 'version', version, 'acuerdo.version');
-  } else {
-    const viejoVersion = /"v1_1_fecha":\s*"[^"]*"/;
-    if (!viejoVersion.test(m)) throw error('El manifiesto no tiene la clave "v1_1_fecha".');
-    m = m.replace(viejoVersion, '"version": "' + version + '",\n    "v1_1_fecha": "' + hoy() + '"');
-  }
-
-  // La fecha de la evidencia, siempre la de hoy.
-  const viejoFechaAcuerdo = /"v1_1_fecha":\s*"[^"]*"/;
-  if (!viejoFechaAcuerdo.test(m)) throw error('El manifiesto no tiene la clave "v1_1_fecha".');
-  m = m.replace(viejoFechaAcuerdo, '"v1_1_fecha": "' + hoy() + '"');
-
-  m = reemplazar(
-    m,
-    /"v1_1_hash":\s*"[^"]*"/.exec(m)[0],
-    '"v1_1_hash": "' + hashAcuerdo + '"',
-    'v1_1_hash',
-  );
+  m = ponerEnBloque(m, 'acuerdo', 'version', version, 'acuerdo.version');
 
   m = ponerEnBloque(m, 'acuerdo', 'nota', NOTA_ACUERDO, 'la nota del Acuerdo');
 

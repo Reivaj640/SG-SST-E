@@ -484,6 +484,11 @@ test('rastro · la lista de campos trazados cubre toda la ficha editable', () =>
   for (const campo of [
     'plazo_retencion_dias', 'norma_conservacion',
     'conservacion_por_deber_legal', 'dominios_corporativos',
+    // Los cuatro del Anexo de Nube (C-1 del abogado, 30-oct-2026): la
+    // suscripcion es un dato de la ficha y su cambio tiene que quedar
+    // escrito.
+    'anexo_nube_firmado_at', 'anexo_nube_version',
+    'anexo_nube_hash', 'anexo_nube_evidencia',
   ]) {
     assert.ok(trazables.has(campo), `el campo ${campo} no esta en CAMPOS_TRAZABLES`);
   }

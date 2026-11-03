@@ -35,7 +35,7 @@ const db = require('../../src/db/connection');
 const { hashToken } = require('../../src/crypto/token');
 const {
   resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createPendingConsent, createAcceptedConsent, TEST_API_KEY,
-  assertJsonError,
+  assertJsonError, aceptarAcuerdo,
 } = require('../helpers');
 
 const HEADERS = { 'X-Internal-API-Key': TEST_API_KEY };
@@ -122,7 +122,7 @@ test('POST /consent/accept: sign request en OTP_VERIFIED + consent pending → 2
   const { token, consent_id } = await setupOtpVerified();
 
   const app = makeApp();
-  const res = await request(app).post(`/api/sign/${token}/consent/accept`);
+  const res = await aceptarAcuerdo(app, token);
 
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
@@ -146,7 +146,7 @@ test('POST /consent/accept: sign request en DOCUMENT_VIEWED → 200 (también pe
   const { token, consent_id } = await setupDocumentViewed();
 
   const app = makeApp();
-  const res = await request(app).post(`/api/sign/${token}/consent/accept`);
+  const res = await aceptarAcuerdo(app, token);
 
   assert.equal(res.status, 200);
   assert.equal(res.body.idempotente, false);
@@ -158,7 +158,7 @@ test('POST /consent/accept: registra evento CONSENT_ACCEPTED con metadata comple
   const { token, consent_id } = await setupOtpVerified();
 
   const app = makeApp();
-  await request(app).post(`/api/sign/${token}/consent/accept`);
+  await aceptarAcuerdo(app, token);
 
   // Buscar el evento
   const eventos = db.prepare(`
@@ -188,12 +188,12 @@ test('POST /consent/accept: 2ª llamada → 200 idempotente:true + sin nuevo eve
 
   const app = makeApp();
   // 1ª llamada
-  const r1 = await request(app).post(`/api/sign/${token}/consent/accept`);
+  const r1 = await aceptarAcuerdo(app, token);
   assert.equal(r1.status, 200);
   assert.equal(r1.body.idempotente, false);
 
   // 2ª llamada
-  const r2 = await request(app).post(`/api/sign/${token}/consent/accept`);
+  const r2 = await aceptarAcuerdo(app, token);
   assert.equal(r2.status, 200);
   assert.equal(r2.body.idempotente, true, '2ª llamada debe ser idempotente');
   assert.equal(r2.body.manifestacion_aceptada, true);

@@ -93,6 +93,42 @@ function _esHashSha256(valor) {
   return typeof valor === 'string' && /^[a-f0-9]{64}$/i.test(valor.trim());
 }
 
+/**
+ * La huella del Acuerdo declarada en el manifiesto.
+ *
+ * Las claves se renombraron (J14-5): "v1_1_hash" contenia el valor de otra
+ * version (la v1.3) y hacia ambigua la comprobacion que exige la Constancia
+ * (seccion 3): con ese nombre de clave no se sabe que texto se esta
+ * comparando. Ahora la clave es "hash". El nombre viejo se sigue aceptando
+ * para no romper un manifiesto historico que se pase a mano, pero nunca tiene
+ * preferencia sobre el nuevo.
+ *
+ * @param {object} acMan bloque "acuerdo" del manifiesto
+ * @returns {string|null}
+ */
+function _hashAcuerdoManifiesto(acMan) {
+  if (!acMan) return null;
+  if (typeof acMan.hash === 'string' && acMan.hash.trim()) return acMan.hash.trim();
+  if (typeof acMan.v1_1_hash === 'string' && acMan.v1_1_hash.trim()) return acMan.v1_1_hash.trim();
+  return null;
+}
+
+/**
+ * El archivo del Acuerdo declarado en el manifiesto (mismo renombrado que
+ * `_hashAcuerdoManifiesto`).
+ *
+ * @param {object} acMan bloque "acuerdo" del manifiesto
+ * @returns {string|null}
+ */
+function _archivoAcuerdoManifiesto(acMan) {
+  if (!acMan) return null;
+  if (typeof acMan.archivo === 'string' && acMan.archivo.trim()) return acMan.archivo.trim();
+  if (typeof acMan.v1_1_archivo === 'string' && acMan.v1_1_archivo.trim()) {
+    return acMan.v1_1_archivo.trim();
+  }
+  return null;
+}
+
 function _nitValido(valor) {
   const s = _texto(valor);
   if (!s) return false;
@@ -907,12 +943,12 @@ function _cargarDocumentos(opciones = {}) {
     : _leerManifiesto(rutaManifiesto);
   const datos = manifiesto.datos || {};
   const rutas = { ...RUTAS_DEFAULT, ...(opciones.rutas || {}) };
-  const rel = datos.acuerdo && datos.acuerdo.v1_1_archivo;
+  const rel = _archivoAcuerdoManifiesto(datos.acuerdo);
   if (rel && !(opciones.rutas && opciones.rutas.acuerdoV11)) {
     rutas.acuerdoV11 = path.isAbsolute(rel) ? rel : path.resolve(SERVICE_ROOT, rel);
   }
   const textos = opciones.textos || {};
-  const etiquetaAcuerdo = (datos.acuerdo && datos.acuerdo.v1_1_archivo)
+  const etiquetaAcuerdo = _archivoAcuerdoManifiesto(datos.acuerdo)
     || _rutaRelativa(rutas.acuerdoV11);
   return {
     manifiesto,
@@ -1040,9 +1076,10 @@ function evaluar(opciones = {}) {
   const publicadoV11 = dbConn
     ? _versionEsAlMenosV11(versionActiva)
     : acMan.publicado === true;
-  const hashV11Ok = _esHashSha256(acMan.v1_1_hash)
+  const hashManifiesto = _hashAcuerdoManifiesto(acMan);
+  const hashV11Ok = _esHashSha256(hashManifiesto)
     && anAcuerdo.existe
-    && _hash(docAcuerdo.texto) === acMan.v1_1_hash.toLowerCase();
+    && _hash(docAcuerdo.texto) === hashManifiesto.toLowerCase();
 
   // -------------------------------------------------------------------------
   // 1. Acuerdo v1.1
@@ -1066,13 +1103,13 @@ function evaluar(opciones = {}) {
       _estado(hashV11Ok),
       {
         bloquea: GATE_AMBOS,
-        detalle: _esHashSha256(acMan.v1_1_hash)
+        detalle: _esHashSha256(hashManifiesto)
           ? (!anAcuerdo.existe
-            ? 'No hay archivo de la v1.1 para comparar con el hash del manifiesto.'
-            : (_hash(docAcuerdo.texto).toLowerCase() === acMan.v1_1_hash.toLowerCase()
+            ? 'No hay archivo del Acuerdo para comparar con el hash del manifiesto.'
+            : (_hash(docAcuerdo.texto).toLowerCase() === hashManifiesto.toLowerCase()
               ? 'El hash del manifiesto coincide con el archivo.'
               : 'El hash del manifiesto NO coincide con el archivo actual.'))
-          : 'El manifiesto todavía no tiene la huella de la v1.1.',
+          : 'El manifiesto todavía no tiene la huella del Acuerdo.',
         // La acción dice lo que FALTA, no lo que ya se hizo. La huella ya
         // está en el manifiesto: lo que falta es el archivo aprobado (o que
         // el archivo y la huella digan lo mismo). Antes esta acción pedía
@@ -1080,15 +1117,15 @@ function evaluar(opciones = {}) {
         // y mandaba al operador a hacer algo inútil.
         accion: _accionSi(
           hashV11Ok,
-          _esHashSha256(acMan.v1_1_hash)
+          _esHashSha256(hashManifiesto)
             ? (!anAcuerdo.existe
-              ? 'La huella ya está en el manifiesto: falta el archivo aprobado de la v1.1 '
+              ? 'La huella ya está en el manifiesto: falta el archivo aprobado del Acuerdo '
                 + '(entra al servidor cuando el abogado apruebe el texto).'
               : 'El archivo no coincide con la huella del manifiesto: recalcular su SHA-256 '
-                + 'y actualizar legal-readiness.json → acuerdo.v1_1_hash.')
+                + 'y actualizar legal-readiness.json → acuerdo.hash.')
             : 'Calcular el SHA-256 del texto aprobado y registrarlo en legal-readiness.json.',
         ),
-        referencia: 'legal-readiness.json → acuerdo.v1_1_hash',
+        referencia: 'legal-readiness.json → acuerdo.hash',
       },
     ),
     _item(

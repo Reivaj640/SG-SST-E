@@ -157,6 +157,32 @@ const config = {
   // tengan definida no se rompan. El valor ya no cambia ningún comportamiento.
   exigirMedioPersonalOtp:
     process.env.FIRMA_EXIGIR_MEDIO_PERSONAL_OTP === 'true',
+  // La COMPUERTA DEL ANEXO DE NUBE (C-1 del abogado, 30-oct-2026).
+  //
+  // El abogado escribio: "Si la Empresa no ha suscrito el Anexo de Nube, el
+  // servicio no permite crear solicitudes de firma y, en consecuencia, no
+  // puede emitirse Constancia". La regla esta IMPLEMENTADA
+  // (src/services/empresa.js), pero no puede estar encendida mientras el
+  // Anexo de Nube v1.0 sea un modelo sin publicar: exigir la firma de un
+  // documento que el sistema todavia no publica dejaria a todas las Empresas
+  // sin poder firmar, y el Anexo de Nube no es el unico documento que exige
+  // la Operacion.
+  //
+  // Por eso el bloqueo va detras de esta compuerta, igual que la tabla
+  // supletoria de conservacion (config/tabla-conservacion.json):
+  //   - APAGADA (default): el servicio NO bloquea por falta del Anexo de
+  //     Nube firmado. La regla queda construida y probada.
+  //   - ENCENDIDA: el bloqueo es real y la excepcion auditable NO lo levanta
+  //     (una excepcion operativa no sustituye un anexo suscrito).
+  //
+  // El reporte de readiness (readinessLegal.js) lee ESTA MISMA variable: por
+  // eso avisa, antes de encenderla, cuantas Empresas tienen el Anexo de Nube
+  // firmado y cuantas no. Antes de ENCENDERLA hay que resolver eso y dejar la
+  // validacion escrita, en el mismo orden que fijo el abogado para la
+  // compuerta de conservacion: validar, alinear, reejecutar pruebas y solo
+  // entonces abrir.
+  exigirAnexoNube:
+    process.env.FIRMA_EXIGIR_ANEXO_NUBE === 'true',
   // (fin de la configuracion de canales y plazos)
 
   rateLimit: {

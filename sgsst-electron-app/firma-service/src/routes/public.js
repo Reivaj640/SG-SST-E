@@ -168,6 +168,17 @@ router.get('/s/:token', (req, res, next) => {
     const { signRequest, estado } = publicFlow.resolveToken(req.params.token);
     publicFlow.registerOpenedIfFirst(signRequest, req.ip, req.get('User-Agent'));
 
+    // C-2 / J3 · ESTE es el momento en que el servidor pone las políticas de
+    // seguridad a disposición del Firmante: le está entregando el texto
+    // íntegro del Acuerdo y la matriz de finalidades. La fecha la pone el
+    // SERVIDOR (no la que afirme el navegador) y es la que después ata la
+    // aceptación.
+    publicFlow.registrarPuestaEnDisposicionPoliticas(
+      signRequest,
+      req.ip,
+      req.get('User-Agent'),
+    );
+
 
     // Contexto mínimo para la mini-app. NO se exponen:
     //   - token_hash
@@ -208,6 +219,12 @@ router.get('/s/:token', (req, res, next) => {
       // que la pantalla y la descarga del Acuerdo (5.4) muestren SIEMPRE el
       // mismo texto, no dos copias que pueden divergir.
       acuerdo: publicFlow.resolverAcuerdoVigente(signRequest),
+      // C-2 · La MATRIZ DE FINALIDADES que determina el alcance de la
+      // autorización del Firmante (ordinal 3 de la Manifestación de Voluntad).
+      // Va con su versión y su huella, y la mini-app la muestra ANTES de
+      // habilitar la casilla de aceptación: sin ella, el Titular aceptaba
+      // sobre una matriz que no aceptaba ni veía.
+      matriz_finalidades: publicFlow.resolverMatrizFinalidades(),
       // FASE 6 · orden (g)/(h): si el Firmante YA aceptó el Acuerdo en una
       // visita anterior, la mini-app lo necesita para poder mostrar el
       // documento sin volver a pedir la aceptación. Con el Acuerdo sin
@@ -449,10 +466,18 @@ router.post('/api/sign/:token/consent/accept', async (req, res, next) => {
   try {
     // Es `async` porque la 10.4 puede migrar la solicitud a la versión
     // vigente del Acuerdo, y eso implica escribir en la base.
+    //
+    // C-2 / J3: el Firmante DECLARA el medio por el que se le pusieron a
+    // disposición las políticas de seguridad. El servidor lo valida (contra
+    // la lista de medios permitidos) y lo consigna en el registro de
+    // aceptación; la fecha de esa puesta a disposición la pone el servidor.
     const result = await publicFlow.consentAccept(
       req.params.token,
       req.ip,
       req.get('User-Agent'),
+      {
+        medio_disposicion: (req.body && req.body.medio_disposicion) || null,
+      },
     );
     res.json(result);
   } catch (err) {

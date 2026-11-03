@@ -48,11 +48,16 @@ const representanteService = require('./representante');
 /**
  * Campos de la ficha cuyo cambio se rastrea.
  *
- * Son los 12 editables mas los 4 que el service escribe aparte. La lista
+ * Son los 12 editables mas los que el service escribe aparte. La lista
  * esta ACA y no se importa de `services/empresa.js` a proposito: este modulo
  * no puede requerir a `empresa.js` (se require mutuamente) y, si la lista
  * viviera en el otro lado, un cambio alli seARIA un cambio aca sin que nadie
  * lo viera. La lista se compara con la de `empresa.js` en los tests.
+ *
+ * Los cuatro campos del Anexo de NUBE estan desde el 30-oct-2026 (C-1 del
+ * abogado): la suscripcion del Anexo de Nube es un dato de la ficha que la
+ * Empresa no puede dejar de tener, y si alguien la cambiara por otra via
+ * (un UPDATE general, un script) el cambio tiene que quedar en el rastro.
  */
 const CAMPOS_TRAZABLES = [
   'razon_social', 'nit', 'domicilio',
@@ -62,6 +67,8 @@ const CAMPOS_TRAZABLES = [
   'plazo_retencion', 'canal_solicitud_copia',
   'plazo_retencion_dias', 'norma_conservacion',
   'conservacion_por_deber_legal', 'dominios_corporativos',
+  'anexo_nube_firmado_at', 'anexo_nube_version',
+  'anexo_nube_hash', 'anexo_nube_evidencia',
 ];
 
 /**

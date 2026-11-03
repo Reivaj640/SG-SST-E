@@ -35,12 +35,26 @@ const db = require('../src/db/connection');
 const agreementService = require('../src/services/agreement');
 const aprobacionPublicacion = require('../src/services/aprobacionPublicacion');
 const {
-  resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion,
+  resetDb, seedActiveAgreement, makeApp, createSignRequestWithIdentificacion, aceptarAcuerdo,
 } = require('./helpers');
 
 const TRABAJADOR = '1234567890';
 const EMPRESA = '900123456';
 const TEXTO_V11 = 'ACUERDO DE PRUEBA\nVersión v1.1 (la vigente)\ncon un deber legal nuevo';
+
+/**
+ * Acepta el Acuerdo como lo hace la mini-app.
+ *
+ * C-2 / J3: el contexto se sirve antes (el servidor registra la puesta a
+ * disposicion de las politicas) y el Firmante declara el medio.
+ */
+async function aceptar(app, token) {
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
+  return request(app)
+    .post(`/api/sign/${token}/consent/accept`)
+    .send({ medio_disposicion: 'pantalla_firma' })
+    .timeout({ response: 5000 });
+}
 
 function limpiar() {
   resetDb();
@@ -130,10 +144,7 @@ test('10.4 · al aceptar, la solicitud migra a la versión vigente', async () =>
 
   publicarV11();
 
-  const res = await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({})
-    .timeout({ response: 5000 });
+  const res = await aceptar(app, token);
   assert.equal(res.status, 200, 'lo que aceptó es la versión vigente: '
     + JSON.stringify(res.body) + ' / ' + JSON.stringify(res.body && res.body.error));
   assert.equal(res.body.version_acuerdo, 'v1.1',
@@ -173,10 +184,7 @@ test('10.4 · el consentimiento ya aceptado de la versión anterior NO se toca',
   await hastaOtpVerificado(app, token);
 
   // Se acepta con la v1.0 (la vigente en ese momento).
-  await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({})
-    .timeout({ response: 5000 });
+  await aceptar(app, token);
 
   const consentViejo = db.prepare(
     'SELECT id, version_acuerdo, manifestacion_aceptada, fecha_aceptacion FROM gh_consentimientos_firma WHERE id = ?'
@@ -187,10 +195,7 @@ test('10.4 · el consentimiento ya aceptado de la versión anterior NO se toca',
 
   // Ahora se publica la v1.1 y el firmante vuelve a pasar por la pantalla.
   publicarV11();
-  const res = await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({})
-    .timeout({ response: 5000 });
+  const res = await aceptar(app, token);
   assert.equal(res.status, 200);
   assert.equal(res.body.version_acuerdo, 'v1.1');
 
@@ -216,10 +221,7 @@ test('10.4 · migrada la solicitud, el documento se ve y la firma sale con la v1
   await hastaOtpVerificado(app, token);
 
   publicarV11();
-  await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({})
-    .timeout({ response: 5000 });
+  await aceptar(app, token);
 
   // Ver el documento.
   const vista = await request(app)
@@ -254,10 +256,7 @@ test('10.4 · sin re-aceptar, la firma falla con un 409 que dice qué hacer', as
   await hastaOtpVerificado(app, token);
 
   // Se acepta con la v1.0.
-  await request(app)
-    .post(`/api/sign/${token}/consent/accept`)
-    .send({})
-    .timeout({ response: 5000 });
+  await aceptar(app, token);
 
   // Se ve el documento con la v1.0.
   await request(app)

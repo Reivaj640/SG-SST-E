@@ -34,6 +34,7 @@ const Database = require('better-sqlite3');
 
 const db = require('../src/db/connection');
 const conservacion = require('../src/services/conservacion');
+const retencion = require('../src/services/retencion');
 const { resetDb, asegurarTablasPurga, tablaConservacionActivada } = require('./helpers');
 
 // La tabla con la COMPUERTA ABIERTA. La que se despacha viene cerrada: los
@@ -190,28 +191,50 @@ test('sin plazo declarado la firma toma el plazo de la tabla supletoria', () => 
   assert.equal(fila.plazo_conservacion_fuente, 'tabla_supletoria');
 });
 
-test('sin plazo declarado, con la compuerta CERRADA, la firma toma la custodia del catálogo', () => {
-  // Es lo que hace en producción mientras la tabla no se active: el plazo
-  // por defecto es el de custodia del catálogo (veinte (20) años), que es el
-  // que estaba en vigor. La firma tampoco queda retenida por falta de
-  // configuración: no hay retención indefinida en ningún caso.
+test('sin plazo declarado, con la compuerta CERRADA, no hay fecha: la tabla supletoria sigue sin validar', () => {
+  // J8 (abogado, 30-oct-2026): con la compuerta cerrada el plazo por defecto
+  // de la tabla supletoria NO aplica (los plazos de diez (10) y cinco (5) años
+  // no los validó el abogado) y el catálogo legado de veinte (20) años desde
+  // la firma se retiró. Sin plazo declarado por la Empresa no hay, entonces,
+  // ninguna fecha de supresión: el sistema no inventa plazos.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
     firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
   );
-  assert.equal(fecha, '2046-01-01T00:00:00.000Z',
-    'la custodia del catálogo: veinte (20) años desde la firma');
+  assert.equal(fecha, null,
+    'con la compuerta cerrada no hay fecha de supresión');
   const fila = db.prepare(
     'SELECT fecha_conservacion, hold_legal, motivo_hold, '
     + 'plazo_conservacion_dias, plazo_conservacion_fuente '
     + 'FROM gh_firmas_electronicas WHERE id = ?'
   ).get(firmaId);
-  assert.equal(fila.hold_legal, 0, 'y no queda retenida');
-  assert.equal(fila.motivo_hold, null);
-  assert.equal(fila.plazo_conservacion_fuente, 'catalogo_sistema',
-    'y la fila dice de dónde salió el plazo');
-  assert.equal(fila.plazo_conservacion_dias, 7305);
+  assert.equal(fila.fecha_conservacion, null, 'no se inventa ninguna fecha');
+  assert.equal(conservacion.esElegible(fila), false,
+    'sin fecha de supresión, el registro nunca se suprime');
+
+  // El motivo del pendiente es la TABLA, no un plazo inventado: el ALTA (el
+  // camino que usa una solicitud de firma) deja el registro retenido con ese
+  // motivo, hasta que el abogado valide y active la tabla.
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    empresa: { plazo_retencion: null, plazo_retencion_dias: null },
+  });
+  assert.equal(plan.fecha_conservacion, null);
+  assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
+  assert.equal(plan.aviso, 'RETAIN_TABLA_PENDIENTE');
+
+  const altaId = sembrarFirma({ id_solicitud: 'SIGN-2026-000040' });
+  conservacion.aplicarPlanRetencion(altaId, plan);
+  const filaAlta = db.prepare(
+    'SELECT fecha_conservacion, hold_legal, motivo_hold '
+    + 'FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(altaId);
+  assert.equal(filaAlta.fecha_conservacion, null);
+  assert.equal(filaAlta.hold_legal, 1, 'el registro queda retenido');
+  assert.equal(filaAlta.motivo_hold, 'tabla_supletoria_pendiente_validacion');
+  assert.equal(conservacion.esElegible(filaAlta), false);
 });
 
 // =========================================================================
@@ -851,26 +874,42 @@ test('una firma con hold activo NO entra al lote ni se purga', () => {
 // SUPLETORIA de conservación administrada por K+AIR. El hold por plazo no
 // declarado NO se pone en el alta de una firma.
 //
+// Y con la COMPUERTA CERRADA (que es como se despacha: los plazos de diez (10)
+// y cinco (5) años no los validó el abogado) el plazo por defecto de esa tabla
+// tampoco aplica: no hay fecha de supresión hasta que el abogado la valide y
+// la active. El catálogo legado de veinte (20) años desde la firma se retiró
+// (J8 y J9): no se aplica para nada.
+//
 // Su maquinaria, en cambio, SIGUE VIVA: en las bases ya hay filas con ese
 // hold (en producción y en los tests), y tienen que poder salir por el
 // recálculo. Estos tests comprueban las dos cosas: que el alta ya no lo pone,
 // y que la liberación y el reporte siguen funcionando.
 //
 
-test('sin plazo declarado la firma NO queda retenida: el plazo es el de la tabla', () => {
+test('sin plazo declarado, la firma NO queda retenida por el motivo viejo (plazo no declarado)', () => {
+  // El motivo 'plazo_no_declarado' se retiró: la retención indefinida por
+  // falta de configuración ya no existe. Lo que retiene, cuando no hay plazo
+  // aplicable, es el motivo vigente (la tabla supletoria pendiente de
+  // validación), y lo pone el ALTA.
+  //
+  // Aquí, con la compuerta CERRADA y sin plazo declarado por la Empresa, no
+  // hay fecha de supresión: el registro no se suprime porque NO tiene fecha,
+  // no porque un hold lo frene.
   declararPlazo(null);
   const firmaId = sembrarFirma({});
   const fecha = conservacion.asignarFechaConservacion(
     firmaId, EMPRESA, '2026-01-01T00:00:00.000Z'
   );
 
-  assert.ok(fecha, 'sin plazo declarado hay fecha: la aporta la tabla supletoria');
+  assert.equal(fecha, null, 'con la compuerta cerrada no hay fecha: la tabla supletoria no aplica');
   const fila = db.prepare(
     'SELECT fecha_conservacion, hold_legal, motivo_hold, hold_actor, hold_alcance FROM gh_firmas_electronicas WHERE id = ?'
   ).get(firmaId);
-  assert.equal(fila.hold_legal, 0, 'y la firma NO queda retenida');
-  assert.equal(fila.motivo_hold, null);
+  assert.equal(fila.motivo_hold, null,
+    'el motivo viejo (plazo_no_declarado) ya no se pone');
   assert.equal(conservacion.holdsDe(firmaId).length, 0);
+  assert.equal(conservacion.esElegible(fila), false,
+    'sin fecha de supresión, el registro nunca se suprime');
 });
 
 test('el hold por plazo no declarado sigue disponible para las filas que ya lo tienen', () => {
@@ -1056,7 +1095,7 @@ test('la liberación por plazo declarado NO levanta un hold por deber legal', ()
 
   assert.throws(
     () => conservacion.liberarHoldPorPlazoNoDeclarado(firmaId, { actor: 'La Empresa' }),
-    /no es por plazo no declarado/,
+    /no es de un motivo recalculable/,
     'el deber legal no se levanta porque la Empresa haya declarado un plazo'
   );
   const fila = db.prepare('SELECT hold_legal FROM gh_firmas_electronicas WHERE id = ?').get(firmaId);
@@ -1091,17 +1130,20 @@ test('MUTACION: la fila sin plazo declarado ya no depende de un hold para no sup
   ).get(conFecha);
   assert.equal(conservacion.esElegible(fila), true, 'sin hold, la firma vencida SÍ se suprime');
 
-  // Sin plazo declarado ya no hay hold: la fila no se suprime porque su plazo
-  // (el de la tabla supletoria) NO ha vencido.
+  // Sin plazo declarado y con la compuerta CERRADA no hay fecha de supresión:
+  // la fila no se suprime porque NO tiene fecha, no porque su plazo no haya
+  // vencido.
   declararPlazo(null);
   const sinPlazo = sembrarFirma({ id_solicitud: 'SIGN-2026-000031' });
   const fecha = conservacion.asignarFechaConservacion(
     sinPlazo, EMPRESA, '2026-01-01T00:00:00.000Z'
   );
-  assert.ok(fecha, 'sin plazo declarado hay fecha: la aporta la tabla supletoria');
+  assert.equal(fecha, null,
+    'con la compuerta cerrada no hay fecha: la tabla supletoria no aplica');
   const fila2 = db.prepare(
     'SELECT id, id_empresa, fecha_conservacion, hold_legal FROM gh_firmas_electronicas WHERE id = ?'
   ).get(sinPlazo);
-  assert.equal(fila2.hold_legal, 0, 'y no hay hold: ese motivo ya no existe');
-  assert.equal(conservacion.esElegible(fila2), false, 'NO se suprime: el plazo no ha vencido');
+  assert.equal(fila2.fecha_conservacion, null, 'no se inventa ninguna fecha');
+  assert.equal(conservacion.esElegible(fila2), false,
+    'NO se suprime: no tiene fecha de supresión');
 });

@@ -39,6 +39,7 @@ const empresaService = require('./empresa');
 const mediosService = require('./medios');   // 9A: los medios autorizados (el 8.2)
 const papelService = require('./papel');   // 9A: la firma autográfica (el 7.1-7.3)
 const manifiestoLegal = require('./manifiestoLegal');  // 045: los anexos que rigen la firma
+const matrizFinalidades = require('./matrizFinalidades');  // C-2: la matriz que ve el Firmante
 const pdfGenPapel = require('./pdfGenPapel');   // 9A: el Registro de firma autográfica
 const conservacion = require('./conservacion');    // 8A.1: vencimiento del plazo (num. 10.6)
 const supresion = require('./supresion');        // 8A.2: lápida de la supresión de datos
@@ -57,6 +58,18 @@ const _resendOtpTimestamps = new Map();
 // enlace de firma, así que el enlace sigue sirviendo (solo para descargar)
 // en estos estados.
 const ESTADOS_FIRMADOS = ['SIGNED', 'DUAL_FIRMADO'];
+
+/**
+ * C-2 / J3 · Los medios por los que el servicio puede poner las políticas de
+ * seguridad a disposición del Firmante.
+ *
+ * En esta pantalla (la mini-app de firma) el medio es la propia pantalla de
+ * firma con el texto íntegro del Acuerdo. La lista es CERRADA a propósito: el
+ * medio lo declara el Firmante y el servidor lo valida contra esta lista. Un
+ * medio que no esté aquí no se archiva: no se inventa la forma en que alguien
+ * vio las políticas.
+ */
+const MEDIOS_DISPOSICION_PERMITIDOS = ['pantalla_firma'];
 
 /**
  * Resultado de resolver un token.
@@ -454,6 +467,286 @@ function resolverAcuerdo(signRequest) {
     texto: acuerdo.texto,
     texto_hash: acuerdo.texto_hash,
   };
+}
+
+/**
+ * C-2 · La matriz de finalidades que el Firmante tiene que ver antes de
+ * habilitar la casilla de aceptación.
+ *
+ * El ordinal 3 de la Manifestación de Voluntad delega en la matriz del Anexo
+ * de Encargo la definición de qué finalidades se fundan en la autorización del
+ * Trabajador. Sin esto, el Titular aceptaba sobre una matriz que no aceptaba
+ * ni veía.
+ *
+ * Se devuelve con su versión y su huella (SHA-256 del archivo que es la fuente
+ * única), que es lo que después se archiva en el registro de aceptación.
+ *
+ * @returns {object|null} null si la matriz no está disponible.
+ */
+function resolverMatrizFinalidades() {
+  const m = matrizFinalidades.matriz();
+  if (!m.disponible) {
+    logger.warn('La matriz de finalidades no está disponible', { error: m.error });
+    return null;
+  }
+  return {
+    version: m.version,
+    hash: m.hash,
+    actualizado_at: m.actualizado_at,
+    estado: m.estado,
+    texto: matrizFinalidades.textoParaFirmante(m),
+  };
+}
+
+/**
+ * C-2 / J3 · EL SERVIDOR pone las políticas de seguridad a disposición del
+ * Firmante, y deja constancia de CUÁNDO lo hizo.
+ *
+ * El momento de la puesta a disposición es el del SERVIDOR: cuando sirve el
+ * texto al Firmante. Nunca es una fecha que afirme el navegador.
+ *
+ * Se registra UNA vez por solicitud (la primera): esa es la fecha desde la
+ * cual las políticas estuvieron a disposición, y es la que ata la aceptación.
+ *
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @param {string} [ip]
+ * @param {string} [user_agent]
+ * @returns {string|null} la fecha registrada, o null si no se pudo registrar.
+ */
+function registrarPuestaEnDisposicionPoliticas(signRequest, ip, user_agent) {
+  if (signRequest.fecha_disposicion_politicas) {
+    return signRequest.fecha_disposicion_politicas;
+  }
+  const m = matrizFinalidades.matriz();
+  const fecha = new Date().toISOString();
+  let escrita = false;
+  try {
+    const tx = db.transaction(() => {
+      const r = db.prepare(`
+        UPDATE gh_firmas_electronicas
+        SET fecha_disposicion_politicas = ?,
+            matriz_version_disponible = ?,
+            matriz_hash_disponible = ?
+        WHERE id = ? AND fecha_disposicion_politicas IS NULL
+      `).run(
+        fecha,
+        m.disponible ? m.version : null,
+        m.disponible ? m.hash : null,
+        signRequest.id
+      );
+      // Solo quien escribe deja el rastro: dos cargas simultáneas de la
+      // pantalla no pueden dejar dos puestas a disposición.
+      escrita = r.changes === 1;
+    });
+    tx();
+  } catch (e) {
+    // Si la migración 051 no está aplicada, la firma NO se cae: lo que falta
+    // es la constancia de la puesta a disposición, y la aceptación va a fallar
+    // después con su propio código (que es el lugar honesto de fallar).
+    logger.warn('No se pudo registrar la puesta a disposición de las políticas', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e && e.message ? e.message : String(e),
+    });
+    return null;
+  }
+  const fila = db.prepare(
+    'SELECT fecha_disposicion_politicas, matriz_version_disponible, matriz_hash_disponible'
+    + ' FROM gh_firmas_electronicas WHERE id = ?'
+  ).get(signRequest.id);
+  signRequest.fecha_disposicion_politicas = fila ? fila.fecha_disposicion_politicas : null;
+  signRequest.matriz_version_disponible = fila ? fila.matriz_version_disponible : null;
+  signRequest.matriz_hash_disponible = fila ? fila.matriz_hash_disponible : null;
+  if (escrita && signRequest.fecha_disposicion_politicas) {
+    // Rastro de auditoría: el servidor puso las políticas a disposición en
+    // esta fecha, con esta matriz.
+    try {
+      signRequestService.registerEvent(signRequest.id, 'POLITICAS_PUESTAS_A_DISPOSICION', {
+        fecha_disposicion: signRequest.fecha_disposicion_politicas,
+        matriz_version: signRequest.matriz_version_disponible,
+        matriz_hash: signRequest.matriz_hash_disponible,
+      }, 'sistema', ip, user_agent);
+    } catch (e) {
+      logger.warn('No se pudo registrar el evento POLITICAS_PUESTAS_A_DISPOSICION', {
+        id_solicitud: signRequest.id_solicitud,
+        error: e && e.message ? e.message : String(e),
+      });
+    }
+  }
+  return signRequest.fecha_disposicion_politicas;
+}
+
+/**
+ * C-2 / J3 · Lo que el registro de aceptación consigna, leído del
+ * consentimiento. Lo usa el commit para atarlo a la evidencia de la firma.
+ *
+ * @param {number|string|null} consentId
+ * @returns {object} los campos del alcance (null si no hay consentimiento)
+ */
+function leerAlcanceAceptacion(consentId) {
+  const vacio = {
+    anexo_encargo_version: null,
+    anexo_encargo_hash: null,
+    anexo_encargo_firmado_at: null,
+    anexo_nube_version: null,
+    anexo_nube_hash: null,
+    anexo_nube_origen: null,
+    anexo_nube_firmado_at: null,
+    matriz_version: null,
+    matriz_hash: null,
+    medio_disposicion: null,
+    fecha_disposicion: null,
+  };
+  if (!consentId) return vacio;
+  try {
+    const c = db.prepare(
+      'SELECT anexo_encargo_version, anexo_encargo_hash, anexo_encargo_firmado_at,'
+      + ' anexo_nube_version, anexo_nube_hash, anexo_nube_origen, anexo_nube_firmado_at,'
+      + ' matriz_version, matriz_hash, medio_disposicion, fecha_disposicion'
+      + ' FROM gh_consentimientos_firma WHERE id = ?'
+    ).get(consentId);
+    if (!c) return vacio;
+    return {
+      anexo_encargo_version: c.anexo_encargo_version || null,
+      anexo_encargo_hash: c.anexo_encargo_hash || null,
+      anexo_encargo_firmado_at: c.anexo_encargo_firmado_at || null,
+      anexo_nube_version: c.anexo_nube_version || null,
+      anexo_nube_hash: c.anexo_nube_hash || null,
+      anexo_nube_origen: c.anexo_nube_origen || null,
+      anexo_nube_firmado_at: c.anexo_nube_firmado_at || null,
+      matriz_version: c.matriz_version || null,
+      matriz_hash: c.matriz_hash || null,
+      medio_disposicion: c.medio_disposicion || null,
+      fecha_disposicion: c.fecha_disposicion || null,
+    };
+  } catch (e) {
+    // Sin la migración 051 el alcance no existe: la firma no se cae.
+    return vacio;
+  }
+}
+
+/**
+ * C-2 / J3 · ESCRIBE, en el mismo acto de aceptación, lo que el registro de
+ * aceptación tiene que consignar.
+ *
+ *   - la versión y la huella SHA-256 del Anexo de Encargo y del Anexo de Nube
+ *     que rigen esa firma para esa Empresa (la FIRMADA; si la Empresa no lo
+ *     firmó, no se inventa: se registra lo que hay y la ausencia);
+ *   - la versión y la huella de la matriz de finalidades que se le puso a
+ *     disposición al Firmante antes de habilitar la casilla;
+ *   - el medio concreto por el que se le pusieron a disposición las políticas;
+ *   - la fecha de esa puesta a disposición (la del servidor), que no puede ser
+ *     posterior a la fecha de aceptación.
+ *
+ * Esta función se llama DENTRO de la misma transacción de la aceptación: si
+ * algo falta, no queda una aceptación a medias.
+ *
+ * @param {object} consent la fila del consentimiento ya aceptada
+ * @param {object} signRequest fila de gh_firmas_electronicas
+ * @param {object} [opciones] { medio_disposicion }
+ */
+function registrarAlcanceAceptacion(consent, signRequest, opciones = {}) {
+  const idSolicitud = signRequest.id_solicitud;
+
+  // 1. El MEDIO lo declara el Firmante. El servidor no lo inventa: sin medio
+  //    declarado no hay aceptación.
+  const medio = opciones.medio_disposicion ? String(opciones.medio_disposicion).trim() : '';
+  if (!medio) {
+    throw new AppError(409, 'MEDIO_DISPOSICION_MISSING',
+      'El Firmante no declaró el medio por el que se le pusieron a disposición las políticas de seguridad',
+      { id_solicitud: idSolicitud });
+  }
+  if (!MEDIOS_DISPOSICION_PERMITIDOS.includes(medio)) {
+    throw new AppError(409, 'MEDIO_DISPOSICION_INVALID',
+      `El medio de disposición '${medio}' no está permitido`,
+      {
+        id_solicitud: idSolicitud,
+        medios_permitidos: MEDIOS_DISPOSICION_PERMITIDOS.slice(),
+      });
+  }
+
+  // 2. La FECHA la puso el servidor cuando sirvió el texto. Sin ese registro
+  //    el servidor no tiene constancia de la puesta a disposición y no puede
+  //    inventar una fecha.
+  const fechaDisposicion = signRequest.fecha_disposicion_politicas || null;
+  if (!fechaDisposicion) {
+    throw new AppError(409, 'DISPOSICION_POLITICAS_NO_REGISTRADA',
+      'El servidor no tiene constancia de haber puesto las políticas de seguridad a disposición del Firmante',
+      { id_solicitud: idSolicitud });
+  }
+  const fechaAceptacion = consent.fecha_aceptacion || null;
+  if (fechaAceptacion && fechaDisposicion > fechaAceptacion) {
+    throw new AppError(409, 'DISPOSICION_POLITICAS_POSTERIOR_A_ACEPTACION',
+      'La fecha de puesta a disposición de las políticas no puede ser posterior a la fecha de aceptación',
+      {
+        id_solicitud: idSolicitud,
+        fecha_disposicion: fechaDisposicion,
+        fecha_aceptacion: fechaAceptacion,
+      });
+  }
+
+  // 3. La MATRIZ que se le puso a disposición (la que el Firmante vio), con su
+  //    versión y su huella. Sin matriz no hay aceptación: el ordinal 3 delega
+  //    en ella el alcance de la autorización.
+  const matrizVersion = signRequest.matriz_version_disponible || null;
+  const matrizHash = signRequest.matriz_hash_disponible || null;
+  if (!matrizVersion || !matrizHash) {
+    throw new AppError(409, 'MATRIZ_FINALIDADES_NO_DISPONIBLE',
+      'La matriz de finalidades no se puso a disposición del Firmante: sin ella no se puede aceptar el Acuerdo',
+      { id_solicitud: idSolicitud });
+  }
+
+  // 4. Los ANEXOS que rigen esta firma para esta Empresa.
+  const anexos = manifiestoLegal.datosAnexos({ id_empresa: signRequest.id_empresa });
+  const enc = (anexos && anexos.anexo_encargo) || {};
+  const nube = (anexos && anexos.anexo_nube) || {};
+  const modelo = nube.modelo || {};
+  const nubeFirmada = nube.firmado === true;
+  const anexoNubeVersion = nubeFirmada ? (nube.version || null) : (modelo.version || null);
+  const anexoNubeHash = nubeFirmada ? (nube.hash || null) : (modelo.hash || null);
+  const anexoNubeOrigen = nubeFirmada
+    ? 'version_firmada_por_empresa'
+    : (modelo.version ? 'modelo' : null);
+
+  // 5. Escribir TODO, en el mismo acto.
+  db.prepare(`
+    UPDATE gh_consentimientos_firma
+    SET anexo_encargo_version = ?,
+        anexo_encargo_hash = ?,
+        anexo_encargo_firmado_at = ?,
+        anexo_nube_version = ?,
+        anexo_nube_hash = ?,
+        anexo_nube_origen = ?,
+        anexo_nube_firmado_at = ?,
+        matriz_version = ?,
+        matriz_hash = ?,
+        medio_disposicion = ?,
+        fecha_disposicion = ?,
+        updated_at = datetime('now')
+    WHERE id = ? AND manifestacion_aceptada = 1
+  `).run(
+    enc.version || null,
+    enc.hash || null,
+    enc.firmado ? (enc.fecha_firma || null) : null,
+    anexoNubeVersion,
+    anexoNubeHash,
+    anexoNubeOrigen,
+    nubeFirmada ? (nube.fecha || null) : null,
+    matrizVersion,
+    matrizHash,
+    medio,
+    fechaDisposicion,
+    consent.id
+  );
+
+  logger.info('Registro de aceptación con el alcance de la autorización', {
+    id_solicitud: idSolicitud,
+    id_consentimiento: consent.id,
+    medio_disposicion: medio,
+    fecha_disposicion: fechaDisposicion,
+    matriz_version: matrizVersion,
+    anexo_encargo_version: enc.version || null,
+    anexo_nube_origen: anexoNubeOrigen,
+  });
 }
 
 /**
@@ -1796,6 +2089,11 @@ async function commit(token, opts, ip, user_agent) {
   // que aquí se hashea como evidencia.
   const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad. Acepto firmar este documento electrónicamente mediante verificación de mi correo electrónico (código OTP), conforme al art. 2.2.2.47.7 del Decreto 1074 de 2015. Reconozco que mi identificación, dirección IP y datos del dispositivo quedan registrados como evidencia de esta firma, y autorizo su tratamiento conforme a la Ley 1581 de 2012.';
   const manifestacion_voluntad_hash = sha256(manifestacion_voluntad_texto);
+  // C-2 / J3: el ALCANCE de la autorización que el Firmante aceptó. Viene del
+  // registro de aceptación (no se calcula aquí): son los anexos que rigen la
+  // firma, la matriz de finalidades que se le puso a disposición, el medio de
+  // esa puesta a disposición y su fecha. La evidencia los ata a la firma.
+  const alcance = leerAlcanceAceptacion(signRequest.consent_id);
   const evidencia = {
     id_solicitud: signRequest.id_solicitud,
     id_documento: signRequest.id_documento,
@@ -1817,6 +2115,16 @@ async function commit(token, opts, ip, user_agent) {
     fecha_firma,
     version_kair: signRequest.version_kair,
     manifestacion_voluntad_texto,
+    // === C-2 / J3: el alcance de la aceptación ===
+    anexo_encargo_version: alcance.anexo_encargo_version,
+    anexo_encargo_hash: alcance.anexo_encargo_hash,
+    anexo_nube_version: alcance.anexo_nube_version,
+    anexo_nube_hash: alcance.anexo_nube_hash,
+    anexo_nube_origen: alcance.anexo_nube_origen,
+    matriz_version: alcance.matriz_version,
+    matriz_hash: alcance.matriz_hash,
+    medio_disposicion: alcance.medio_disposicion,
+    fecha_disposicion: alcance.fecha_disposicion,
   };
   const evidencia_canonica = canonicalJSON(evidencia);
   const evidence_hash = sha256(evidencia_canonica);
@@ -2853,7 +3161,7 @@ function verifyOtp(token, otp, ip, user_agent) {
  */
 const ESTADOS_PERMITIDOS_PARA_CONSENT = ['OTP_VERIFIED', 'DOCUMENT_VIEWED'];
 
-async function consentAccept(token, ip, user_agent) {
+async function consentAccept(token, ip, user_agent, opciones = {}) {
   // 1. Resolver token (404 / 410)
   const { signRequest } = resolveToken(token);
 
@@ -2974,8 +3282,23 @@ async function consentAccept(token, ip, user_agent) {
       { id_solicitud: signRequest.id_solicitud });
   }
 
-  // 4. Llamar al service (UPDATE atómico en consentimiento)
-  const result = consentService.accept(effectiveConsentId, { signRequest });
+  // 4. Llamar al service (UPDATE atómico en consentimiento) Y, en el MISMO
+  //    acto, consignar lo que el registro de aceptación tiene que decir
+  //    (C-2 / J3): los anexos que rigen la firma, la matriz de finalidades que
+  //    se le puso a disposición, el medio concreto de esa puesta a disposición
+  //    y la fecha de esa puesta a disposición.
+  //
+  //    Va todo en UNA transacción: si falta el medio, o la fecha de la puesta
+  //    a disposición, o la matriz, no queda una aceptación a medias (se
+  //    revierte todo y el Firmante recibe un código que dice qué faltó).
+  const aceptar = db.transaction(() => {
+    const res = consentService.accept(effectiveConsentId, { signRequest });
+    if (!res.idempotente) {
+      registrarAlcanceAceptacion(res.consent, signRequest, opciones);
+    }
+    return res;
+  });
+  const result = aceptar();
 
   // 5. Registrar evento CONSENT_ACCEPTED SOLO en la primera aceptación.
   //    Si fue idempotente, ya existe un evento previo (o un reintento que
@@ -2985,6 +3308,8 @@ async function consentAccept(token, ip, user_agent) {
   //    marca idempotente) para dejar rastro por documento.
   if (!result.idempotente || esRepFlow) {
     const updatedConsent = result.consent;
+    // C-2 / J3: el evento deja el mismo rastro que el registro de aceptación.
+    const alcance = leerAlcanceAceptacion(updatedConsent.id);
     signRequestService.registerEvent(signRequest.id, 'CONSENT_ACCEPTED', {
       id_consentimiento: updatedConsent.id,
       version_acuerdo: updatedConsent.version_acuerdo,
@@ -2992,6 +3317,15 @@ async function consentAccept(token, ip, user_agent) {
       id_solicitud: signRequest.id_solicitud,
       idempotente: !!result.idempotente,
       rol_firmante: updatedConsent.rol_firmante || 'TRABAJADOR',
+      anexo_encargo_version: alcance.anexo_encargo_version,
+      anexo_encargo_hash: alcance.anexo_encargo_hash,
+      anexo_nube_version: alcance.anexo_nube_version,
+      anexo_nube_hash: alcance.anexo_nube_hash,
+      anexo_nube_origen: alcance.anexo_nube_origen,
+      matriz_version: alcance.matriz_version,
+      matriz_hash: alcance.matriz_hash,
+      medio_disposicion: alcance.medio_disposicion,
+      fecha_disposicion: alcance.fecha_disposicion,
     }, esRepFlow ? 'empresa' : 'trabajador', ip, user_agent);
   }
 
@@ -2999,6 +3333,7 @@ async function consentAccept(token, ip, user_agent) {
   //    El service retorna { ok, idempotente, consent }; el frontend prefiere
   //    campos top-level (consent_id, manifestacion_aceptada, estado, etc.).
   const c = result.consent;
+  const alcanceRespuesta = leerAlcanceAceptacion(c.id);
   return {
     ok: result.ok,
     consent_id: c.id,
@@ -3008,6 +3343,15 @@ async function consentAccept(token, ip, user_agent) {
     version_acuerdo: c.version_acuerdo,
     hash_texto_acuerdo: c.hash_texto_acuerdo,
     idempotente: result.idempotente,
+    // C-2 / J3: lo que quedó consignado en el registro de aceptación.
+    anexo_encargo_version: alcanceRespuesta.anexo_encargo_version,
+    anexo_encargo_hash: alcanceRespuesta.anexo_encargo_hash,
+    anexo_nube_version: alcanceRespuesta.anexo_nube_version,
+    anexo_nube_hash: alcanceRespuesta.anexo_nube_hash,
+    matriz_version: alcanceRespuesta.matriz_version,
+    matriz_hash: alcanceRespuesta.matriz_hash,
+    medio_disposicion: alcanceRespuesta.medio_disposicion,
+    fecha_disposicion: alcanceRespuesta.fecha_disposicion,
   };
 }
 
@@ -3969,6 +4313,11 @@ module.exports = {
   // de aceptación. La versión estricta (exigirAcuerdoAceptado) es interna.
   resolverAcuerdo,
   resolverAcuerdoVigente,
+  // C-2 · la matriz de finalidades que ve el Firmante antes de aceptar, y la
+  // puesta a disposición de las políticas (la fecha la pone el servidor).
+  resolverMatrizFinalidades,
+  registrarPuestaEnDisposicionPoliticas,
+  MEDIOS_DISPOSICION_PERMITIDOS,
   resolveCorreoOtp,
   resolverDestinoOtp,
   declararMedioOtp,

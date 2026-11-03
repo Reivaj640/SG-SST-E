@@ -28,6 +28,12 @@ function getTransporter() {
       host: config.smtp.host,
       port: config.smtp.port,
       secure: config.smtp.secure,
+      // T5 (revision del abogado del 30-oct-2026): el canal del OTP no
+      // puede enviar sin cifrado en transito. `requireTLS` obliga a que la
+      // conexion negocie TLS (STARTTLS en el puerto 587) y hace FALLAR el
+      // envio si el servidor no lo ofrece: no hay forma de degradar a
+      // texto claro, ni por error de configuracion.
+      requireTLS: true,
       auth: {
         user: config.smtp.user,
         pass: config.smtp.pass,

@@ -6,16 +6,18 @@
  * código del sistema. Estos tests fijan cuál es ese plazo y cuándo se aplica.
  *
  * Lo que estos tests fijan:
- *   1. La custodia del sistema: 20 años desde la fecha de la firma.
+ *   1. La custodia del catálogo (veinte (20) años DESDE LA FIRMA) se RETIRÓ por
+ *      orden del abogado (30-oct-2026, J8 y J9): no aplica para nada.
  *   2. Si la Empresa declaró un plazo en su tabla, ese plazo manda (el 8.6).
  *   3. Los cinco grupos SST del art. 2.2.4.6.13 del Decreto 1072 tienen un
- *      piso legal de 20 años desde el cese: si la fecha de cese se conoce y
- *      esa fecha fuera más lejana, esa gana.
+ *      piso legal de 20 años DESDE EL CESE: sin fecha real de cese el registro
+ *      queda pendiente y sin fecha de supresión (la fecha de la firma NO la
+ *      sustituye); con la fecha de cese conocida, ese plazo gana.
  *   4. El contrato electrónico (art. 2.2.1.1.12) no tiene término: queda con
  *      un HOLD y no se borra por el vencimiento de la custodia.
  *   5. El deber legal sin término de la Empresa gana sobre cualquier plazo.
  *   6. Una Empresa que NO declaró plazo de conservación puede firmar: no hay
- *      nada que declarar, el plazo ya existe en el código.
+ *      nada que declarar para pedir la firma.
  *   7. La categoría la deriva el sistema del tipo de documento; el operador
  *      no elige nada.
  */
@@ -43,9 +45,6 @@ const {
 const TABLA_ACTIVADA = tablaConservacionActivada();
 
 const EMPRESA = '900123456';
-
-// 2026-01-01 + 20 años = 2046-01-01
-const CUSTODIA_20 = '2046-01-01T00:00:00.000Z';
 
 const EMPRESA_SIN_TABLA = {
   plazo_retencion: null,
@@ -238,27 +237,66 @@ test('custodia · la tabla de la Empresa manda si declaró un plazo', () => {
 });
 
 test('SST · el mínimo de 20 años desde el cese se comunica en el texto', () => {
+  // J9 (abogado, 30-oct-2026): "la fecha de firma NO sustituye la fecha de
+  // cese; el registro queda pendiente y sin fecha de supresión calculada".
+  // El texto que ve el Trabajador dice el mínimo legal y dice que la fecha
+  // está pendiente: no promete una fecha que el sistema no tiene.
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
     empresa: EMPRESA_SIN_TABLA,
   });
-  assert.equal(plan.fecha_conservacion, CUSTODIA_20);
+  assert.equal(plan.fecha_conservacion, null,
+    'sin fecha real de cese no se calcula fecha de supresión: la firma NO la sustituye');
+  assert.equal(plan.aviso, 'RETAIN_PENDIENTE_CESE');
+  assert.equal(plan.hold.motivo, 'fecha_cese_pendiente');
+  assert.equal(plan.plazo_conservacion_fuente, 'piso_legal',
+    'la regla que aplica es el piso legal del 8.6(b)');
+  assert.equal(plan.plazo_conservacion_dias, 7305);
   assert.match(plan.texto, /veinte \(20\) años/);
-  assert.match(plan.texto, /cese de la relación laboral/);
-  assert.match(plan.texto, /2\.2\.4\.6\.13/);
+  assert.match(plan.texto, /fecha real de cese/);
+  assert.match(plan.texto, /no se calcula una fecha de supresión/);
+  assert.doesNotMatch(plan.texto, /desde la fecha de la firma/,
+    'la fecha de la firma no es el punto de inicio de nada');
 });
 
 test('SST · si el cese se conoce y es más lejano, ese plazo gana', () => {
   // Relación laboral de 70 años: el mínimo legal (20 desde el cese) cae
   // después de la custodia de 20 años desde la firma.
+  //
+  // El piso legal NO depende de la compuerta de la tabla supletoria: es un
+  // deber legal (J9), así que con la fecha real de cese conocida el plazo es
+  // de veinte (20) años DESDE EL CESE, con la compuerta abierta o cerrada.
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: '2026-01-01T00:00:00.000Z',
     fecha_terminacion: '2096-01-01',
     empresa: EMPRESA_SIN_TABLA,
   });
+  assert.equal(plan.fecha_conservacion, '2116-01-01T00:00:00.000Z',
+    'el piso legal del 8.6(b) se cuenta desde el cese');
+  assert.equal(plan.hold, null,
+    'el piso legal es un deber: no queda retenido por la tabla pendiente de validación');
+  assert.equal(plan.aviso, 'RETAIN_FECHA');
+  assert.equal(plan.plazo_conservacion_fuente, 'piso_legal');
+  assert.equal(plan.fecha_inicio_conservacion, '2096-01-01T00:00:00.000Z',
+    'el punto de inicio del cómputo es el cese');
+});
+
+test('SST · con la compuerta abierta, el piso legal se cuenta desde el cese', () => {
+  // El mecanismo, con la tabla supletoria activada: el piso legal corre igual
+  // y no queda ninguna retención.
+  const plan = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: '2026-01-01T00:00:00.000Z',
+    fecha_terminacion: '2096-01-01',
+    empresa: EMPRESA_SIN_TABLA,
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
   assert.equal(plan.fecha_conservacion, '2116-01-01T00:00:00.000Z');
+  assert.equal(plan.hold, null);
+  assert.equal(plan.aviso, 'RETAIN_FECHA');
+  assert.equal(plan.plazo_conservacion_fuente, 'piso_legal');
 });
 
 test('contrato electrónico · hold sin fecha de supresión', () => {
@@ -349,7 +387,7 @@ test('migración 033 · las columnas de retención por documento existen', () =>
 // 4. Integración: alta, habilitación, vista pública y correo
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('una Empresa sin plazo declarado puede firmar: 20 años de custodia', async () => {
+test('una Empresa sin plazo declarado puede firmar: el registro queda retenido sin fecha', async () => {
   limpiar();
   crearEmpresa({ conAnexo: true, conPlazo: false });
 
@@ -362,14 +400,19 @@ test('una Empresa sin plazo declarado puede firmar: 20 años de custodia', async
     id_empresa: EMPRESA,
     categoria_retencion: 'SST_CAPACITACION',
   });
-  // La custodia se cuenta desde la fecha real de creación de la firma.
-  const esperado = new Date(signRequest.fecha_creacion);
-  esperado.setUTCFullYear(esperado.getUTCFullYear() + 20);
+  // La firma se puede pedir: eso no depende de que la Empresa declare un plazo.
   assert.equal(signRequest.categoria_retencion, 'SST_CAPACITACION');
   assert.equal(signRequest.regla_retencion, 'SST_20_ANOS');
-  assert.equal(signRequest.fecha_conservacion, esperado.toISOString());
-  assert.equal(signRequest.hold_legal, 0);
-  assert.match(signRequest.plazo_retencion_aplicable, /20 años/);
+
+  // El documento es del SG-SST y no se conoce la fecha real de cese (J9): no
+  // hay fecha de supresión calculada y el registro queda retenido por eso.
+  // La fecha de la firma NO sustituye la fecha de cese.
+  assert.equal(signRequest.fecha_conservacion, null,
+    'sin fecha real de cese no se calcula fecha de supresión');
+  assert.equal(signRequest.hold_legal, 1, 'el registro queda retenido');
+  assert.equal(signRequest.motivo_hold, 'fecha_cese_pendiente');
+  assert.match(signRequest.plazo_retencion_aplicable, /veinte \(20\) años/);
+  assert.match(signRequest.plazo_retencion_aplicable, /no se calcula una fecha de supresión/);
 
   // 049 · la fila deja la trazabilidad de la regla que se aplicó: el plazo,
   // su fuente y la fecha de inicio del cómputo. Con eso, el §4 se puede
@@ -382,8 +425,8 @@ test('una Empresa sin plazo declarado puede firmar: 20 años de custodia', async
   assert.equal(filaFirma.plazo_conservacion_dias, 7305);
   assert.equal(filaFirma.plazo_conservacion_fuente, 'piso_legal');
   assert.equal(filaFirma.categoria_conservacion, 'SST_ESPECIAL');
-  assert.ok(filaFirma.fecha_inicio_conservacion,
-    'y la fecha de inicio del cómputo queda registrada');
+  assert.equal(filaFirma.fecha_inicio_conservacion, null,
+    'el punto de inicio del cómputo es el cese, que todavía no se conoce');
 });
 
 test('la categoría la deriva el sistema del tipo de documento', async () => {
@@ -424,8 +467,16 @@ test('la mini-app muestra el plazo de la solicitud', async () => {
 
   const res = await request(makeApp()).get(`/s/${token}`);
   assert.equal(res.status, 200);
-  assert.match(res.body.empresa.plazo_retencion, /20 años/);
-  assert.equal(res.body.empresa.conservacion_por_deber_legal, false);
+  // Lo que se comunica es el texto del plan que se aplicó: el mínimo legal de
+  // veinte (20) años desde el cese, y que la fecha de cese está pendiente.
+  assert.match(res.body.empresa.plazo_retencion, /veinte \(20\) años/);
+  assert.match(res.body.empresa.plazo_retencion, /fecha real de cese/);
+  assert.match(res.body.empresa.plazo_retencion, /no se calcula una fecha de supresión/);
+  assert.doesNotMatch(res.body.empresa.plazo_retencion, /Se conserva 20 años/,
+    'la custodia de veinte (20) años desde la firma se retiró: no puede seguir ofreciéndose');
+  // Y el Trabajador ve que su documento no se borra automáticamente: el
+  // registro está retenido.
+  assert.equal(res.body.empresa.conservacion_por_deber_legal, true);
 });
 
 test('el correo de invitación comunica el plazo de la solicitud', async () => {
@@ -445,7 +496,11 @@ test('el correo de invitación comunica el plazo de la solicitud', async () => {
 
   const invite = mailer.getDevInbox().find((m) => m.tipo === 'invite');
   assert.ok(invite, 'salió un correo de invitación');
-  assert.match(invite.body, /20 años/);
+  assert.match(invite.body, /veinte \(20\) años/);
+  assert.match(invite.body, /Plazo de conservación de tus datos/);
+  assert.match(invite.body, /no se calcula una fecha de supresión/);
+  assert.doesNotMatch(invite.body, /Se conserva 20 años contados desde la fecha de la firma/,
+    'la custodia de veinte (20) años desde la firma se retiró: no puede seguir ofreciéndose');
 });
 
 test('firma dual · el hijo hereda la fecha y el hold del padre', async () => {

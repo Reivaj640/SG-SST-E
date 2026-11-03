@@ -37,6 +37,7 @@ const db = require('../../src/db/connection');
 const {
   resetDb, seedActiveAgreement, makeApp,
   createAcceptedConsent,
+  buildEvidenciaFirma,
   TEST_API_KEY,
 } = require('../helpers');
 const { sha256 } = require('../../src/crypto/hash');
@@ -202,32 +203,14 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   assert.ok(fs.existsSync(row.constancia_path), 'Constancia debe existir en disco');
 
   // 10. evidence_hash reproducible con canonicalJSON.
-  //    Composición actual (post-E3, 14 campos) — mismo orden y keys que
-  //    src/services/publicFlow.js#commit() para garantizar que la
-  //    reproducción por terceros produzca el mismo hash.
-  const evidencia = {
-    id_solicitud: row.id_solicitud,
-    id_documento: row.id_documento,
-    id_trabajador: row.id_trabajador,
-    id_empresa: row.id_empresa,
-    document_hash_original: row.document_hash_original,
-    document_hash_firmado: row.document_hash_firmado,
-    agreement_hash: row.agreement_hash,
-    agreement_version: row.agreement_version,  // ← D1 fix
-    identificacion_tipo: row.identificacion_tipo,
-    // === E3 nuevos campos ===
-    tipo_firma: row.tipo_firma,
-    manifestacion_voluntad_hash: row.manifestacion_voluntad_hash,
-    ip_origen: row.ip_origen || null,
-    user_agent: row.user_agent || null,
-    fecha_creacion: row.fecha_creacion,
-    fecha_firma: row.fecha_firma,
-    version_kair: row.version_kair,
-    manifestacion_voluntad_texto: row.manifestacion_voluntad_texto,
-  };
+  //     La composición vive en UN SOLO LUGAR (`buildEvidenciaFirma`, en
+  //     tests/helpers.js): es la receta de recomputación por terceros. El
+  //     commit la arma con los mismos campos (Bloque E3 + el alcance de la
+  //     aceptación de C-2 / J3), así que el hash tiene que salir igual.
+  const evidencia = buildEvidenciaFirma(row);
   const evidenciaHash = sha256(canonicalJSON(evidencia));
   assert.equal(evidenciaHash, evidence_hash,
-    'evidence_hash debe ser reproducible por terceros con canonicalJSON (14 campos, post-E3)');
+    'evidence_hash debe ser reproducible por terceros con canonicalJSON (post-E3 + C-2/J3)');
 
   // 11. Eventos en orden
   const eventos = db.prepare(`

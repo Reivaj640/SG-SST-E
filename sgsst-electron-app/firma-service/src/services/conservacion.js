@@ -102,6 +102,19 @@ const MOTIVO_HOLD_PLAZO_NO_DECLARADO = 'plazo_no_declarado';
 const ALCANCE_HOLD_PLAZO_NO_DECLARADO =
   '8.6(h): plazo de conservacion no declarado por la Empresa';
 
+// Los motivos de hold que un RECÁLCULO puede liberar: dependen de un dato o de
+// una decisión que puede cambiar (la Empresa declara su plazo, la fecha real
+// del cese llega, la tabla supletoria se valida y se activa).
+//
+// Un hold por DEBER LEGAL (el declarado por la Empresa o el del contrato
+// electrónico) NO está en esta lista: levantarlo sería levantar una
+// protección que sigue vigente.
+const MOTIVOS_LIBERABLES_POR_RECALCULO = [
+  MOTIVO_HOLD_PLAZO_NO_DECLARADO,
+  'fecha_cese_pendiente',
+  'tabla_supletoria_pendiente_validacion',
+];
+
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 /**
@@ -564,7 +577,9 @@ function retenerPorPlazoNoDeclarado(idFirma, declaracion = {}) {
  * @param {object} [liberacion.plan] - el plan ya calculado (el que hizo el
  *   recálculo); se usa tal cual para no calcular dos veces.
  * @returns {{firma_id: number, liberado: boolean, motivo: string|null, fecha_conservacion: string|null}}
- * @throws {Error} si el hold vigente no es por plazo no declarado.
+ * @throws {Error} si el hold vigente no es de un motivo recalculable (plazo no
+ *   declarado, fecha de cese pendiente o tabla supletoria pendiente de
+ *   validación). Un hold por deber legal NO se libera por esta vía.
  */
 function liberarHoldPorPlazoNoDeclarado(idFirma, liberacion = {}) {
   const vigente = db.prepare(
@@ -574,9 +589,10 @@ function liberarHoldPorPlazoNoDeclarado(idFirma, liberacion = {}) {
   if (!vigente) {
     return { firma_id: idFirma, liberado: false, motivo: null, fecha_conservacion: null };
   }
-  if (vigente.motivo !== MOTIVO_HOLD_PLAZO_NO_DECLARADO) {
+  if (!MOTIVOS_LIBERABLES_POR_RECALCULO.includes(vigente.motivo)) {
     throw new Error(
-      'El hold vigente de esta firma no es por plazo no declarado: no se libera.'
+      'El hold vigente de esta firma no es de un motivo recalculable (plazo no declarado, '
+      + 'fecha de cese pendiente o tabla supletoria pendiente de validación): no se libera.'
     );
   }
 
@@ -739,6 +755,11 @@ function retenerPendientesDePlazo(opts = {}) {
  * @param {object} [opciones]
  * @param {object} [opciones.tabla_conservacion] - la tabla supletoria a usar,
  *   en vez de la del archivo. Es el punto de inyección que usan los tests.
+ * @param {number[]} [opciones.firmas] - ACOTA el recálculo a esas filas. Cuando
+ *   el recálculo viene de una operación concreta (el canal de la fecha de
+ *   terminación, que solo toca las filas del trabajador comunicado), el
+ *   recálculo se acota igual: solo las filas nombradas. Sin la lista, el
+ *   recálculo sigue siendo el general de la Empresa.
  * @returns {{id_empresa: string, revisados: number, con_fecha: number, liberados: number, sin_fecha: number, mensaje: string}}
  */
 function recalcularPlazosDeclarados(id_empresa, declaracion = {}, opciones = {}) {
@@ -759,15 +780,36 @@ function recalcularPlazosDeclarados(id_empresa, declaracion = {}, opciones = {})
        AND f.fecha_conservacion IS NULL
   `).all(id_empresa);
 
-  // Los registros que están retenidos por plazo no declarado: son los que
-  // este recálculo puede liberar.
+  // Los registros que este recálculo puede liberar.
+  //
+  // Son los retenidos por un motivo que DEPENDE DE UN DATO O DE UNA DECISIÓN
+  // que puede cambiar:
+  //   - `plazo_no_declarado`: la Empresa todavia no habia declarado su plazo.
+  //   - `fecha_cese_pendiente`: faltaba la fecha real del cese (J9). Se
+  //     libera en cuanto esa fecha exista en la fila.
+  //   - `tabla_supletoria_pendiente_validacion`: la tabla supletoria todavia
+  //     no esta validada ni activada. Se libera en cuanto se active o en
+  //     cuanto la Empresa declare su propio plazo.
+  //
+  // Un hold por DEBER LEGAL (el de la Empresa o el del contrato electronico)
+  // NO se toca aqui: levantarlo seria levantar una proteccion que sigue
+  // vigente.
+  const MOTIVOS_RECALCULABLES = MOTIVOS_LIBERABLES_POR_RECALCULO;
+  // El ACOTADO (opciones.firmas): el canal de la fecha de terminación recalcula
+  // el plazo de las filas AFECTADAS por la comunicación, no el de toda la
+  // Empresa. Se arma el conjunto una vez y se filtra acá.
+  const soloFirmas = Array.isArray(opciones.firmas) && opciones.firmas.length
+    ? new Set(opciones.firmas.map(Number).filter((n) => Number.isInteger(n) && n > 0))
+    : null;
   const pendientes = filas.filter(
-    (f) => f.motivo_hold === MOTIVO_HOLD_PLAZO_NO_DECLARADO
+    (f) => MOTIVOS_RECALCULABLES.includes(f.motivo_hold)
+      && (!soloFirmas || soloFirmas.has(f.id))
   );
 
   if (!empresa) {
     return {
       id_empresa, revisados: pendientes.length, con_fecha: 0, liberados: 0, sin_fecha: 0,
+      acotado_a: soloFirmas ? soloFirmas.size : null,
       mensaje: 'La Empresa no existe: no hay nada que recalcular.',
     };
   }
@@ -777,9 +819,9 @@ function recalcularPlazosDeclarados(id_empresa, declaracion = {}, opciones = {})
   let sin_fecha = 0;
 
   for (const f of pendientes) {
-    // Solo las retenidas POR PLAZO NO DECLARADO. Un hold por deber legal o el
-    // del contrato electrónico son otros motivos: levantarlos acá seria
-    // levantar una proteccion que sigue vigente.
+    // Solo las retenidas por un motivo RECALCULABLE (ver la lista de arriba).
+    // Un hold por deber legal o el del contrato electronico son otros motivos:
+    // levantarlos aca seria levantar una proteccion que sigue vigente.
     const plan = retencionService.planificar({
       categoria_retencion: f.categoria_retencion,
       regla_retencion: f.regla_retencion,
@@ -827,9 +869,13 @@ function recalcularPlazosDeclarados(id_empresa, declaracion = {}, opciones = {})
     con_fecha,
     liberados,
     sin_fecha,
+    acotado_a: soloFirmas ? soloFirmas.size : null,
     mensaje: con_fecha > 0
-      ? 'Los registros retenidos por plazo no declarado que ya tienen plazo aplicable '
-        + 'quedaron con fecha de conservacion y su retencion se levanto.'
+      ? (soloFirmas
+        ? 'Las filas nombradas que estaban retenidas por un motivo recalculable '
+          + 'quedaron con fecha de conservacion y su retencion se levanto.'
+        : 'Los registros retenidos por plazo no declarado que ya tienen plazo aplicable '
+          + 'quedaron con fecha de conservacion y su retencion se levanto.')
       : 'No hay registros pendientes de plazo para esta Empresa.',
   };
 }

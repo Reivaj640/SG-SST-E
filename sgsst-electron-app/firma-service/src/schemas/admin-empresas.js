@@ -63,6 +63,13 @@ const anexoBody = z.object({
     }),
 });
 
+const anexoNubeBody = z.object({
+  fecha: z.string().min(1).max(40).refine((s) => !Number.isNaN(new Date(s).getTime())),
+  version: z.string().trim().min(1).max(40),
+  hash: z.string().trim().regex(/^[0-9a-f]{64}$/i),
+  evidencia: z.string().trim().min(1).max(1000),
+});
+
 /**
  * Body de alta. Solo identidad: el anexo y el estado activo tienen endpoints
  * propios para que no se puedan cambiar por accidente.
@@ -206,12 +213,57 @@ const probarCuentaEnvioBody = z.object({
     .transform((s) => s.trim().toLowerCase()),
 });
 
+/**
+ * Body del CANAL DE LA FECHA DE TERMINACION (Anexo de Encargo, seccion 6).
+ *
+ * La Empresa comunica la fecha de terminacion de la relacion laboral de un
+ * trabajador, por el canal que el Encargado habilita en el servicio.
+ *
+ * La EVIDENCIA es obligatoria: el Anexo exige registrar "la fecha con la
+ * evidencia de la comunicacion". Sin evidencia no hay registro.
+ *
+ * El canal tambien es obligatorio: la comunicacion tiene que decir por donde
+ * llego, para que la bitacora sea la de una comunicacion y no la de una
+ * instruccion sin origen.
+ */
+const fechaTerminacionBody = z.object({
+  id_trabajador: z
+    .string()
+    .min(1, 'id_trabajador es requerido')
+    .max(64, 'id_trabajador demasiado largo (max 64 chars)')
+    .transform((s) => s.trim()),
+  fecha_terminacion: z
+    .string()
+    .min(1, 'fecha_terminacion es requerida')
+    .max(40, 'fecha_terminacion demasiado larga')
+    .refine((s) => !Number.isNaN(new Date(s).getTime()), {
+      message: 'fecha_terminacion no es una fecha valida',
+    }),
+  evidencia: z
+    .string()
+    .min(1, 'evidencia es requerida')
+    .max(1000, 'evidencia demasiado larga (max 1000 chars)')
+    .transform((s) => s.trim()),
+  canal: z
+    .string()
+    .min(1, 'canal es requerido')
+    .max(100, 'canal demasiado largo (max 100 chars)')
+    .transform((s) => s.trim()),
+  motivo: z
+    .string()
+    .max(500, 'motivo demasiado largo (max 500 chars)')
+    .transform((s) => s.trim())
+    .nullish(),
+});
+
 module.exports = {
   idEmpresa,
   createEmpresaBody,
   updateEmpresaBody,
   anexoBody,
+  anexoNubeBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
+  fechaTerminacionBody,
 };

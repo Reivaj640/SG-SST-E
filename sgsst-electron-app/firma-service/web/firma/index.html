@@ -307,6 +307,37 @@
             Desplácese hasta el final del acuerdo para habilitar la casilla de aceptación.
           </p>
         </section>
+        <!--
+          C-2 · LA MATRIZ DE FINALIDADES (ordinal 3 de la Manifestacion de
+          Voluntad).
+
+          El ordinal 3 delega en la matriz del Anexo de Encargo la definicion
+          de que finalidades se fundan en la autorizacion del Trabajador.
+          Antes el Titular aceptaba el Acuerdo sin ver esa matriz: aceptaba
+          sobre una matriz que no aceptaba ni veia.
+
+          La matriz llega en el contexto publico (GET /s/:token -> campo
+          `matriz_finalidades`), con su version y su huella SHA-256, y se
+          pinta con textContent (nunca innerHTML): es contenido que el
+          firmante tiene que leer y poder copiar literal. La huella se deja A
+          LA VISTA: es lo que el Firmante tiene que poder contrastar.
+
+          La 3a casilla de aceptacion permanece deshabilitada hasta que el
+          Firmante lea los dos textos completos (el Acuerdo y la matriz).
+        -->
+        <section class="acuerdo" id="matriz-panel" aria-labelledby="matriz-titulo">
+          <h3 class="acuerdo__titulo" id="matriz-titulo">
+            Matriz de finalidades (Anexo de Encargo)
+            <span class="acuerdo__version" id="matriz-version"></span>
+          </h3>
+          <div class="alert alert-error" id="matriz-error" hidden></div>
+          <div class="acuerdo__texto" id="matriz-texto" tabindex="0" role="region"
+               aria-label="Matriz de finalidades"></div>
+          <p class="acuerdo__nota" id="matriz-huella"></p>
+          <p class="acuerdo__nota" id="matriz-nota" hidden>
+            Desplácese hasta el final de la matriz para habilitar la casilla de aceptación.
+          </p>
+        </section>
         <div class="manifestacion">
           <label class="checkbox-label">
             <input type="checkbox" id="manifestacion_leido" required>

@@ -9,12 +9,19 @@
  *    aporta la TABLA SUPLETORIA de conservación administrada por K+AIR
  *    (config/tabla-conservacion.json). Ningún registro queda retenido
  *    indefinidamente por falta de configuración.
+ *
+ *    La tabla que se despacha viene con la COMPUERTA CERRADA (los plazos de
+ *    diez (10) y cinco (5) años no los validó el abogado): el mecanismo se
+ *    verifica aquí con la compuerta ABIERTA, y el estado cerrado, en
+ *    tests/services/conservacion-supletoria.test.js.
  *  - Que el texto que se le comunica al Trabajador (el 8.6(g)) dice el plazo
  *    que se aplica y DE DÓNDE VIENE: no promete un plazo que el sistema no
  *    tiene, y no oculta que el plazo es del del sistema.
  *  - Que la EXCEPCIÓN del 8.6(b) sigue viva: los documentos del SG-SST se
- *    conservan veinte (20) años contados desde el cese, aunque la Empresa no
- *    declare un plazo, porque ese plazo lo fija la ley.
+ *    conservan veinte (20) años contados desde el CESE, aunque la Empresa no
+ *    declare un plazo, porque ese plazo lo fija la ley. Si la fecha real de
+ *    cese no se conoce, el registro queda pendiente y SIN fecha de supresión
+ *    (J9): la fecha de la firma no la sustituye.
  *  - Que el contrato electrónico sigue con su hold sin término.
  *  - Que la maquinaria de liberación del hold viejo (plazo no declarado) SIGUE
  *    FUNCIONANDO: las filas que ya lo tienen en las bases existentes se
@@ -215,18 +222,26 @@ test('D1: el alta NO pone un hold por plazo no declarado', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('8.6(b): los documentos del SG-SST conservan 20 años aunque la Empresa no declare', () => {
+  // El plazo del 8.6(b) lo fija la ley, no la Empresa: veinte (20) años
+  // contados desde el CESE. Pero el cómputo necesita la fecha real de cese
+  // (J9): si no se conoce, el registro queda pendiente y SIN fecha de
+  // supresión. La fecha de la firma NO la sustituye.
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: FIRMA_BASE,
     empresa: { plazo_retencion_dias: null, plazo_retencion: null },
   });
 
-  assert.ok(plan.fecha_conservacion,
-    'el 8.6(b) fija el plazo de los grupos SST: no depende de que la Empresa declare');
-  assert.equal(plan.aviso, 'RETAIN_FECHA');
-  assert.equal(plan.plazo_conservacion_fuente, 'piso_legal');
+  assert.equal(plan.fecha_conservacion, null,
+    'sin fecha real de cese no se calcula fecha de supresión: el 8.6(b) no depende de que la Empresa declare');
+  assert.equal(plan.aviso, 'RETAIN_PENDIENTE_CESE');
+  assert.equal(plan.hold.motivo, 'fecha_cese_pendiente');
+  assert.equal(plan.plazo_conservacion_fuente, 'piso_legal',
+    'la regla que aplica es el piso legal del 8.6(b)');
   assert.equal(plan.plazo_conservacion_dias, 7305);
   assert.equal(plan.categoria_conservacion, 'SST_ESPECIAL');
+  assert.equal(plan.fecha_inicio_conservacion, null,
+    'el punto de inicio del cómputo es el cese, que todavía no se conoce');
 });
 
 test('8.6(b): el plazo de la Empresa NO puede bajar el piso legal', () => {
@@ -247,6 +262,8 @@ test('8.6(b): el plazo de la Empresa NO puede bajar el piso legal', () => {
 });
 
 test('8.6(b): con fecha de cese conocida, el plazo se cuenta desde el cese', () => {
+  // El piso legal es un deber: no depende de la compuerta de la tabla
+  // supletoria. Con la fecha real de cese conocida, el plazo corre desde ella.
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: FIRMA_BASE,
@@ -265,6 +282,28 @@ test('8.6(b): con fecha de cese conocida, el plazo se cuenta desde el cese', () 
     `el plazo del 8.6(b) se cuenta desde el cese (esperado ~${esperada}, obtenido ${obtenida})`);
   assert.equal(plan.fecha_inicio_conservacion, '2027-06-30T10:00:00.000Z',
     'la fecha de inicio del computo es el cese');
+  assert.equal(plan.hold, null,
+    'el piso legal es un deber: no queda retenido por la tabla pendiente de validación');
+});
+
+test('8.6(b): con la compuerta abierta, el plazo se cuenta desde el cese', () => {
+  // El mecanismo con la tabla supletoria activada: el piso legal corre igual,
+  // desde la fecha real de cese, y sin ninguna retención.
+  const plan = retencion.planificar({
+    categoria_retencion: 'SST_CAPACITACION',
+    fecha_creacion: FIRMA_BASE,
+    fecha_terminacion: '2027-06-30T10:00:00.000Z',
+    empresa: { plazo_retencion_dias: null, plazo_retencion: null },
+    tabla_conservacion: TABLA_ACTIVADA,
+  });
+
+  const esperada = new Date(
+    new Date('2027-06-30T10:00:00.000Z').getTime() + 20 * 365.25 * DIA_MS
+  ).getTime();
+  assert.ok(Math.abs(esperada - new Date(plan.fecha_conservacion).getTime()) < DIA_MS,
+    'el plazo del 8.6(b) se cuenta desde el cese');
+  assert.equal(plan.hold, null);
+  assert.equal(plan.aviso, 'RETAIN_FECHA');
 });
 
 test('8.6(c): el contrato electrónico sigue con su hold sin término', () => {

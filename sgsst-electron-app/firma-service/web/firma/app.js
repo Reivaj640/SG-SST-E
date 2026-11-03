@@ -730,6 +730,98 @@
   // ============================================================
 
   /**
+   * C-2 · La 3a casilla (aceptar el Acuerdo) se habilita SOLO cuando el
+   * Firmante leyó completos los DOS textos: el Acuerdo de uso y la MATRIZ DE
+   * FINALIDADES.
+   *
+   * El ordinal 3 de la Manifestacion de Voluntad delega en la matriz el
+   * alcance de la autorizacion del Titular: si no la vio, acepto una matriz
+   * que no acepto ni vio.
+   *
+   * Cada panel marca `data-leido="1"` cuando su texto quedo completo a la
+   * vista. `data-rendered` es otra cosa: marca que el panel ya se proceso
+   * (para no pintarlo dos veces), y se pone incluso cuando el texto NO se pudo
+   * cargar. Por eso la casilla se mira con `leido` y no con `rendered`.
+   */
+  function actualizarHabilitacionAceptacion() {
+    const check = $('#consentimiento_aceptado');
+    if (!check) return;
+    const panelAcuerdo = $('#acuerdo-panel');
+    const panelMatriz = $('#matriz-panel');
+    const leidoAcuerdo = !!(panelAcuerdo && panelAcuerdo.dataset.leido === '1');
+    const leidoMatriz = !!(panelMatriz && panelMatriz.dataset.leido === '1');
+    check.disabled = !(leidoAcuerdo && leidoMatriz);
+  }
+
+  /**
+   * C-2 · Pinta la MATRIZ DE FINALIDADES y la pone a disposicion del Firmante
+   * ANTES de habilitar la casilla de aceptacion.
+   *
+   * La matriz llega en el contexto publico (GET /s/:token -> campo
+   * `matriz_finalidades`), con su version y su huella SHA-256. Se pinta con
+   * textContent (NUNCA innerHTML: es contenido que el firmante tiene que leer
+   * y poder copiar literal) y la huella se deja a la vista, que es lo que el
+   * Firmante tiene que poder contrastar.
+   *
+   * Si la matriz no llega, el panel se oculta con su error y la casilla de
+   * aceptacion NO se habilita: no hay forma de aceptar sin ella.
+   *
+   * @param {object} contexto - Contexto publico de GET /s/:token.
+   */
+  function renderMatrizFinalidades(contexto) {
+    const panel = $('#matriz-panel');
+    const box = $('#matriz-texto');
+    const versionEl = $('#matriz-version');
+    const huellaEl = $('#matriz-huella');
+    const nota = $('#matriz-nota');
+    const errorBox = $('#matriz-error');
+    if (!panel || !box || panel.dataset.rendered === '1') return;
+
+    const matriz = contexto && contexto.matriz_finalidades;
+
+    if (!matriz || !matriz.texto) {
+      panel.dataset.rendered = '1';
+      if (errorBox) {
+        errorBox.textContent =
+          'No pudimos cargar la matriz de finalidades que determina el alcance de tu ' +
+          'autorización. Contacta a tu empleador antes de firmar.';
+        errorBox.hidden = false;
+      }
+      panel.hidden = true;
+      actualizarHabilitacionAceptacion();
+      return;
+    }
+
+    panel.hidden = false;
+    box.textContent = matriz.texto;
+    box.dataset.hash = matriz.hash || '';
+    if (versionEl) versionEl.textContent = matriz.version ? 'v' + matriz.version : '';
+    if (huellaEl) {
+      huellaEl.textContent = 'Huella SHA-256 de la matriz: ' + (matriz.hash || '');
+    }
+
+    const desborda = box.scrollHeight > box.clientHeight + 4;
+    if (!desborda) {
+      panel.dataset.rendered = '1';
+      panel.dataset.leido = '1';
+      actualizarHabilitacionAceptacion();
+      if (nota) nota.hidden = true;
+      return;
+    }
+
+    if (nota) nota.hidden = false;
+    const alLeerElFinal = function () {
+      if (box.scrollTop + box.clientHeight < box.scrollHeight - 8) return;
+      box.removeEventListener('scroll', alLeerElFinal);
+      panel.dataset.rendered = '1';
+      panel.dataset.leido = '1';
+      actualizarHabilitacionAceptacion();
+      if (nota) nota.hidden = true;
+    };
+    box.addEventListener('scroll', alLeerElFinal);
+  }
+
+  /**
    * Pinta el Acuerdo de uso y controla la 3a casilla de aceptacion.
    *
    * Reglas:
@@ -752,7 +844,6 @@
     const versionInline = $('#acuerdo-version-inline');
     const nota = $('#acuerdo-nota');
     const errorBox = $('#acuerdo-error');
-    const check = $('#consentimiento_aceptado');
     if (!panel || !box || panel.dataset.rendered === '1') return;
 
     const acuerdo = contexto && contexto.acuerdo;
@@ -766,10 +857,7 @@
         errorBox.hidden = false;
       }
       panel.hidden = true;
-      if (check) {
-        check.disabled = true;
-        check.checked = false;
-      }
+      actualizarHabilitacionAceptacion();
       return;
     }
 
@@ -783,11 +871,11 @@
         : 'Acuerdo de uso';
     }
 
-    if (check) check.disabled = true;
     const desborda = box.scrollHeight > box.clientHeight + 4;
     if (!desborda) {
       panel.dataset.rendered = '1';
-      if (check) check.disabled = false;
+      panel.dataset.leido = '1';
+      actualizarHabilitacionAceptacion();
       if (nota) nota.hidden = true;
       return;
     }
@@ -797,7 +885,8 @@
       if (box.scrollTop + box.clientHeight < box.scrollHeight - 8) return;
       box.removeEventListener('scroll', alLeerElFinal);
       panel.dataset.rendered = '1';
-      if (check) check.disabled = false;
+      panel.dataset.leido = '1';
+      actualizarHabilitacionAceptacion();
       if (nota) nota.hidden = true;
     };
     box.addEventListener('scroll', alLeerElFinal);
@@ -1297,6 +1386,11 @@
     // El Acuerdo se pinta y la 3a casilla se habilita solo tras leerlo.
     renderAcuerdo(state.contexto);
 
+    // C-2 · La matriz de finalidades se pone a disposicion del Firmante
+    // ANTES de habilitar la casilla de aceptacion: la casilla queda habilitada
+    // solo cuando el Firmante leyo los dos textos completos.
+    renderMatrizFinalidades(state.contexto);
+
     // 8B · El aviso de dato sensible (10.8). Se pinta junto al Acuerdo, pero
     // el bloque esta ARRIBA del visor: la informacion tiene que ser previa.
     renderDatoSensible(state.contexto);
@@ -1366,7 +1460,16 @@
           try {
             const result = await apiFetch(
               '/api/sign/' + state.token + '/consent/accept',
-              { method: 'POST', body: {} }
+              // C-2 / J3: el Firmante DECLARA el medio por el que se le pusieron
+              // a disposicion las politicas de seguridad. En esta pantalla el
+              // medio es la propia pantalla de firma, con el texto integro.
+              // El servidor lo valida y lo consigna en el registro de
+              // aceptacion; la fecha de esa puesta a disposicion la pone el
+              // servidor.
+              {
+                method: 'POST',
+                body: { medio_disposicion: 'pantalla_firma' },
+              }
             );
             state.consentAccepted = true;
             // FASE 6 · orden (g)/(h): con el Acuerdo aceptado ya se puede
@@ -1407,6 +1510,15 @@
                        err.code === 'CONSENT_WORKER_MISMATCH' ||
                        err.code === 'CONSENT_COMPANY_MISMATCH') {
               msg = 'El Acuerdo no corresponde a esta solicitud. Contacta al área de RRHH.';
+            } else if (err.code === 'DISPOSICION_POLITICAS_NO_REGISTRADA') {
+              // El servidor no tiene constancia de haber puesto las
+              // politicas a disposicion: normalmente es que la pantalla se
+              // abrio sin pasar por el contexto. La salida es recargar.
+              msg = 'No pudimos confirmar que las políticas se te hubieran puesto a '
+                + 'disposición. Recarga la página e inténtalo de nuevo.';
+            } else if (err.code === 'MATRIZ_FINALIDADES_NO_DISPONIBLE') {
+              msg = 'No pudimos mostrarte la matriz de finalidades, que es donde está '
+                + 'el alcance de tu autorización. Contacta a tu empleador antes de firmar.';
             } else {
               msg = err.message || 'No se pudo registrar la aceptación del Acuerdo.';
             }

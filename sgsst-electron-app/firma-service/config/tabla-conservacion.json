@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "actualizado_at": "2026-10-30",
+  "actualizado_at": "2026-10-31",
   "estado": "PROPUESTA. Los plazos de diez (10) y cinco (5) años NO se activan en produccion hasta que el abogado los valide. El mecanismo es configurable desde ahora; la activacion es una decision distinta.",
   "aplicacion": {
     "activada": false,
     "estado": "PROPUESTA",
     "validado_por": null,
     "validado_at": null,
-    "nota": "LA COMPUERTA DE ACTIVACION. Mientras 'activada' sea false, el plazo por defecto de esta tabla NO se aplica: el sistema conserva el plazo de custodia del catalogo (veinte (20) anos) y las excepciones legales que ya estan en vigor (el piso del SG-SST y el hold del contrato sin termino). Esto es deliberado: el Acuerdo v1.3 que describe este mecanismo no esta aprobado, y el Acuerdo vigente no describe estos plazos, asi que desplegarlos sin la validacion del abogado seria aplicar un plazo que el texto en vigor no dice. Cambiar 'activada' a true es un acto expreso del owner, con la validacion escrita del abogado sobre los plazos de diez (10) y cinco (5) anos: ni el codigo ni una actualizacion automatica lo hacen."
+    "nota": "LA COMPUERTA DE ACTIVACION. Mientras 'activada' sea false, el plazo por defecto de esta tabla NO se aplica: el sistema NO calcula fecha de supresion y deja el registro retenido con el hold 'tabla_supletoria_pendiente_validacion', salvo las excepciones legales en vigor (piso del SG-SST desde el cese y hold del contrato). Es deliberado: el Acuerdo v1.4 que describe este mecanismo no esta aprobado ni publicado, y el Acuerdo vigente no describe estos plazos, asi que desplegarlos sin la validacion del abogado seria aplicar un plazo que el texto en vigor no dice. Cambiar 'activada' a true es un acto expreso del owner, con la validacion escrita del abogado sobre los plazos de diez (10) y cinco (5) anos: ni el codigo ni una actualizacion automatica lo hacen."
   },
   "nota": "Fuente unica de la conservacion. De esta tabla salen: (a) el plazo que aplica el sistema cuando la Empresa no declara uno, (b) la tabla del §8 del Anexo de Encargo, (c) la regla que se congela en cada firma. La tabla de retencion documental de la Empresa, cuando existe, TIENE PRECEDENCIA sobre el plazo por defecto: es la fuente del 8.6(a). Modificar esta tabla no altera los registros ya calculados: el plazo aplicado, su fuente y la fecha de inicio quedan congelados en cada documento.",
   "categorias": [
@@ -87,7 +87,7 @@
       "fundamento": "Deber legal: articulo 2.2.4.6.13 del Decreto 1072 de 2015 (perfiles epidemiologicos y conceptos de examenes de ingreso, periodicos y de retiro; resultados de examenes y pruebas complementarias; mediciones y monitoreo de ambientes de trabajo; registros de capacitacion; y registros de suministro de elementos y equipos de proteccion personal).",
       "piso_legal": true,
       "hold_siempre": false,
-      "nota": "Es un MINIMO LEGAL: la tabla de la Empresa no puede bajarlo. Cuando el sistema no conoce la fecha de cese, el plazo se cuenta desde la fecha de la firma, que es siempre calculable, y el supuesto queda declarado en el texto que se le comunica al Trabajador."
+      "nota": "Es un MINIMO LEGAL: la tabla de la Empresa no puede bajarlo. El cómputo requiere la fecha real de cese. Si no está disponible, el registro queda pendiente de esa fecha y no se calcula una fecha de supresión usando la fecha de firma como sustituto."
     },
     {
       "id": "CONTRATO_SIN_TERMINO",
@@ -118,6 +118,6 @@
     "fecha_solicitud": "La fecha de la solicitud.",
     "fecha_supresion": "La fecha de la supresion.",
     "fecha_respaldo": "La fecha del respaldo.",
-    "fecha_cese": "La fecha del cese de la relacion laboral; si el sistema no la conoce, la fecha de la firma, que siempre es calculable."
+    "fecha_cese": "La fecha real del cese de la relación laboral. Si no está disponible, no se sustituye por la fecha de firma: el cómputo queda pendiente de que la Empresa informe y valide el cese."
   }
 }

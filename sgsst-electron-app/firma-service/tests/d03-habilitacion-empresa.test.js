@@ -91,23 +91,36 @@ test('D-03 · sin Anexo de Encargo firmado la solicitud NO se crea', async () =>
   assert.equal(n, 0, 'no queda ninguna fila a medias');
 });
 
-test('D-03 · sin plazo declarado la solicitud SÍ se crea (con el plazo de la tabla)', async () => {
+test('D-03 · sin plazo declarado la solicitud SÍ se crea (pero el registro queda retenido)', async () => {
   // La custodia de 20 años YA NO es del sistema, y con la decisión D1 tampoco
-  // hay retención indefinida: sin plazo declarado, el plazo es el de la tabla
-  // supletoria de conservación de K+AIR. La Empresa no tiene nada que declarar
-  // para firmar: lo que pasa es que su documento se conserva el plazo que
-  // corresponde a su categoría.
+  // hay retención indefinida: sin plazo declarado, el plazo sería el de la tabla
+  // supletoria de conservación de K+AIR. Pero esa tabla tiene la COMPUERTA
+  // CERRADA (`aplicacion.activada: false`): sus plazos de diez (10) y cinco
+  // (5) años todavía no los validó el abogado.
+  //
+  // Y el catálogo legado de veinte (20) años desde la firma ya NO se aplica
+  // (J8 y J9 del abogado, 30-oct-2026): "la tabla no puede activar los plazos
+  // por defecto mientras el sistema conserve el catálogo legado de 20 años
+  // desde la firma".
+  //
+  // El resultado que el texto exige: la firma se puede hacer, el registro NO
+  // se suprime y NO se le inventa una fecha. Queda retenido hasta que la tabla
+  // se valide y la compuerta se abra.
   limpiar();
   registrarEmpresa({ conAnexo: true, conPlazo: false });
 
   const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
   assert.ok(signRequest && signRequest.id_solicitud,
     'una empresa sin plazo declarado firma: no hay nada que ella tenga que declarar');
-  assert.ok(signRequest.fecha_conservacion,
-    'y hay fecha de conservación: la aporta la tabla supletoria');
-  assert.equal(signRequest.hold_legal, 0,
-    'y NO queda retenida por plazo no declarado: esa retención ya no existe');
-  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado');
+  assert.equal(signRequest.fecha_conservacion, null,
+    'mientras la compuerta de la tabla esté cerrada NO hay fecha de conservación: '
+    + 'calcular una sería inventar un plazo');
+  assert.equal(signRequest.hold_legal, 1,
+    'el registro queda retenido, no se suprime');
+  assert.equal(signRequest.motivo_hold, 'tabla_supletoria_pendiente_validacion',
+    'el motivo dice que falta la validación escrita de la tabla');
+  assert.notEqual(signRequest.motivo_hold, 'plazo_no_declarado',
+    'la retención indefinida por falta de plazo declarado ya no existe');
 });
 
 test('D-03 · con Anexo y plazo la solicitud se crea', async () => {
@@ -216,4 +229,86 @@ test('D-03 · el mensaje del 409 dice dónde se resuelve el canal', () => {
   assert.equal(h.ok, false);
   assert.deepEqual(h.pendientes, ['canal_pqrs']);
   assert.match(h.mensaje, /PUT \/internal\/admin\/empresas/);
+});
+
+// ---------------------------------------------------------------------------
+// C-1 DEL ABOGADO (30-oct-2026) · el Anexo de Nube suscrito por la Empresa.
+//
+// "Si la Empresa no ha suscrito el Anexo de Nube, el servicio no permite crear
+// solicitudes de firma y, en consecuencia, no puede emitirse Constancia."
+//
+// La regla existe, pero va detras de la COMPUERTA `config.exigirAnexoNube`,
+// igual que la tabla supletoria de conservacion: mientras el Anexo de Nube
+// v1.0 sea un MODELO SIN PUBLICAR, exigir su firma seria exigir un documento
+// que el sistema todavia no publica, y dejaria a todas las Empresas sin poder
+// firmar.
+//
+// Esta NO es la bandera que el D-03 retired (`exigirHabilitacionEmpresa`): esa
+// apagaba una promesa que el texto ya habia hecho. Esta enciende una
+// obligacion que todavia no existe, porque el documento que la crea todavia no
+// se publica. El encendido es un acto posterior, con validacion escrita, en el
+// mismo orden que fijo el abogado para la compuerta de conservacion.
+// ---------------------------------------------------------------------------
+
+test('C-1 · con la compuerta apagada, la falta del Anexo de Nube NO bloquea', async () => {
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conCanal: true });
+  assert.equal(config.exigirAnexoNube, false,
+    'la compuerta arranca apagada: el Anexo de Nube todavia no se publica');
+
+  const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+  assert.equal(h.ok, true);
+  assert.deepEqual(h.pendientes, [],
+    'con la compuerta apagada el Anexo de Nube no es un pendiente');
+
+  const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
+  assert.ok(signRequest && signRequest.id_solicitud);
+});
+
+test('C-1 · con la compuerta encendida y sin Anexo de Nube, la solicitud NO se crea', async () => {
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conCanal: true });
+  config.exigirAnexoNube = true;
+  try {
+    const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+    assert.equal(h.ok, false);
+    assert.deepEqual(h.pendientes, ['anexo_nube_firmado']);
+    assert.match(h.mensaje, /Anexo de Nube/);
+
+    await assert.rejects(
+      () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA, consent_id: null }),
+      (e) => {
+        assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
+        assert.ok(e.details.pendientes.includes('anexo_nube_firmado'));
+        assert.doesNotMatch(e.message, /excepción/i,
+          'una excepcion operativa no sustituye un anexo suscrito');
+        return true;
+      }
+    );
+  } finally {
+    config.exigirAnexoNube = false;
+  }
+});
+
+test('C-1 · con la compuerta encendida y el Anexo de Nube firmado, la solicitud se crea', async () => {
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conCanal: true });
+  empresaService.marcarAnexoNubeFirmado(EMPRESA, {
+    fecha: '2026-10-30',
+    version: 'v1.0',
+    hash: 'a'.repeat(64),
+    evidencia: 'PDF firmado por la Empresa, en el expediente',
+  }, { actor: 'el owner', motivo: 'firma registrada' });
+
+  config.exigirAnexoNube = true;
+  try {
+    const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+    assert.equal(h.ok, true);
+    assert.deepEqual(h.pendientes, []);
+
+    const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
+    assert.ok(signRequest && signRequest.id_solicitud);
+  } finally {
+    config.exigirAnexoNube = false;
+  }
 });

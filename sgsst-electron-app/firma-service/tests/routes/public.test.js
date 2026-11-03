@@ -27,6 +27,7 @@ const {
 const db = require('../../src/db/connection');
 const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent,
   assertJsonError,
+  buildEvidenciaFirma,
 } = require('../helpers');
 const mailer = require('../../src/services/mailer');
 
@@ -654,41 +655,23 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
     .send({ manifestacion_aceptada: true });
 
   // Reproducir la evidencia y recalcular hash
-  // (D1 fix: agreement_version; E3 fix: tipo_firma, manifestacion_voluntad_hash, ip_origen, user_agent)
+  // (D1 fix: agreement_version; E3 fix: tipo_firma, manifestacion_voluntad_hash, ip_origen, user_agent;
+  //  C-2 / J3: el alcance de la aceptación, que vive en el registro de aceptación)
   const { canonicalJSON } = require('../../src/crypto/compare');
   const { sha256 } = require('../../src/crypto/hash');
   const row = db.prepare(`
     SELECT id_solicitud, id_documento, id_trabajador, id_empresa,
            document_hash_original, document_hash_firmado,
            agreement_hash, agreement_version, identificacion_tipo,
-           tipo_firma, manifestacion_voluntad_texto, ip_origen, user_agent,
+           tipo_firma, manifestacion_voluntad_hash, manifestacion_voluntad_texto,
+           ip_origen, user_agent, consent_id,
            fecha_creacion, fecha_firma, version_kair
     FROM gh_firmas_electronicas WHERE id = ?
   `).get(signRequest.id);
 
-  // E3: manifestacion_voluntad_hash se calcula desde el texto (mismo método que commit)
-  const mvt = row.manifestacion_voluntad_texto;
-  const mvh = sha256(mvt);
-
-  const evidencia = {
-    id_solicitud: row.id_solicitud,
-    id_documento: row.id_documento,
-    id_trabajador: row.id_trabajador,
-    id_empresa: row.id_empresa,
-    document_hash_original: row.document_hash_original,
-    document_hash_firmado: row.document_hash_firmado,
-    agreement_hash: row.agreement_hash,
-    agreement_version: row.agreement_version,  // ← D1 fix
-    identificacion_tipo: row.identificacion_tipo,
-    tipo_firma: row.tipo_firma, // ← E3
-    manifestacion_voluntad_hash: mvh, // ← E3
-    ip_origen: row.ip_origen || null, // ← E3 (puede ser null en test sin HTTP)
-    user_agent: row.user_agent || null, // ← E3 (puede ser null en test sin HTTP)
-    fecha_creacion: row.fecha_creacion,
-    fecha_firma: row.fecha_firma,
-    version_kair: row.version_kair,
-    manifestacion_voluntad_texto: mvt,
-  };
+  // La composición de la evidencia vive en UN SOLO LUGAR
+  // (`buildEvidenciaFirma`, tests/helpers.js).
+  const evidencia = buildEvidenciaFirma(row);
   const evidenciaHash = sha256(canonicalJSON(evidencia));
 
   assert.equal(evidenciaHash, r2.body.evidence_hash,

@@ -47,6 +47,7 @@
 const db = require('../db/connection');
 const { sha256 } = require('../crypto/hash');
 const { cifrar, descifrar, esCifrado } = require('../crypto/cifrado');
+const config = require('../config');
 const representanteService = require('./representante');
 const excepcionService = require('./excepcionHabilitacion');
 const auditoriaService = require('./empresaAuditoria');
@@ -98,7 +99,8 @@ const SELECT_COLS = `
   responsable_tratamiento, responsable_tratamiento_correo,
   canal_pqrs, canal_incidentes, politica_datos_url,
   plazo_retencion, canal_solicitud_copia, plazo_retencion_dias,
-  anexo_encargo_firmado_at, activo,
+  anexo_encargo_firmado_at, anexo_nube_firmado_at, anexo_nube_version,
+  anexo_nube_hash, anexo_nube_evidencia, activo,
   conservacion_por_deber_legal, norma_conservacion,
   dominios_corporativos,
   created_at, updated_at
@@ -197,6 +199,10 @@ function _toRowShape(row) {
     out[campo] = row[campo] === undefined ? null : row[campo];
   }
   out.anexo_encargo_firmado_at = row.anexo_encargo_firmado_at || null;
+  out.anexo_nube_firmado_at = row.anexo_nube_firmado_at || null;
+  out.anexo_nube_version = row.anexo_nube_version || null;
+  out.anexo_nube_hash = row.anexo_nube_hash || null;
+  out.anexo_nube_evidencia = row.anexo_nube_evidencia || null;
   // Plazo computable de conservación (migración 023). NO va en el snapshot:
   // el snapshot es la identificación que se le MOSTRÓ al firmante, y eso ya
   // está en `plazo_retencion` (el texto que la Empresa declara y que el
@@ -881,6 +887,49 @@ function marcarAnexoFirmado(id_empresa, fecha, ctx = {}) {
   return getById(id_empresa);
 }
 
+/** Registra, con rastro, la versión del Anexo de Nube firmada por la Empresa. */
+function marcarAnexoNubeFirmado(id_empresa, { fecha, version, hash, evidencia }, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime()) || d.getTime() > Date.now()) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY', 'fecha de firma del Anexo de Nube inválida o futura');
+  }
+  if (!version || !/^[0-9a-f]{64}$/i.test(hash || '') || !evidencia) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY', 'se requieren versión, hash SHA-256 y referencia de evidencia');
+  }
+  const values = {
+    anexo_nube_firmado_at: d.toISOString(),
+    anexo_nube_version: version.trim(),
+    anexo_nube_hash: hash.trim().toLowerCase(),
+    anexo_nube_evidencia: evidencia.trim(),
+  };
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  const prev = {
+    anexo_nube_firmado_at: actual.anexo_nube_firmado_at,
+    anexo_nube_version: actual.anexo_nube_version,
+    anexo_nube_hash: actual.anexo_nube_hash,
+    anexo_nube_evidencia: actual.anexo_nube_evidencia,
+  };
+  const changed = Object.keys(values).some((k) => prev[k] !== values[k]);
+  if (!changed) return actual;
+  if (prev.anexo_nube_firmado_at && !motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO', 'X-Admin-Motivo es obligatorio para sustituir el registro de firma del Anexo de Nube');
+  }
+  db.transaction(() => {
+    db.prepare(`UPDATE gh_firma_empresas SET anexo_nube_firmado_at = ?, anexo_nube_version = ?,
+      anexo_nube_hash = ?, anexo_nube_evidencia = ?, updated_at = datetime('now') WHERE id_empresa = ?`)
+      .run(values.anexo_nube_firmado_at, values.anexo_nube_version, values.anexo_nube_hash,
+        values.anexo_nube_evidencia, id_empresa);
+    for (const campo of Object.keys(values)) {
+      auditoriaService.registrarCampo({ id_empresa, campo, valor_anterior: prev[campo],
+        valor_nuevo: values[campo], actor: ctx.actor || null, ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null, motivo: motivo || null });
+    }
+  })();
+  return getById(id_empresa);
+}
+
 /**
  * Quita la fecha de firma del Anexo de Encargo.
  *
@@ -1057,6 +1106,16 @@ function listConPendientes() {
 function verificarHabilitacionFirma(id_empresa) {
   const empresa = getById(id_empresa);
   if (!empresa) {
+    // La Empresa NO esta en el directorio. Esto NO bloquea.
+    //
+    // El bloqueo y su salida los da la EXCEPCION auditable (D-03, decision
+    // B.3 del 23-oct-2026), y el abogado lo dijo textualmente: "La excepcion
+    // debe ser un flag auditable, no un if silencioso". Si aqui se bloqueara
+    // sin salida, esa excepcion quedaria muerta justo en el caso para el que
+    // existe: una Empresa que todavia no se registro y necesita firmar.
+    //
+    // Lo que si bloquea, y desde antes, es una Empresa REGISTRADA sin el
+    // Anexo de Encargo firmado: ahi el mensaje dice que existe la excepcion.
     return {
       ok: true,
       registrada: false,
@@ -1080,6 +1139,18 @@ function verificarHabilitacionFirma(id_empresa) {
   //     a matar).
   const pendientes = [];
   if (!empresa.anexo_encargo_firmado_at) pendientes.push('anexo_encargo_firmado');
+  // El ANEXO DE NUBE (C-1 del abogado, 30-oct-2026) se exige SOLO con la
+  // compuerta encendida (config.exigirAnexoNube). Mientras el Anexo de Nube
+  // v1.0 sea un modelo sin publicar, exigir su firma seria exigir un
+  // documento que el sistema todavia no publica, y dejaria a todas las
+  // Empresas sin poder firmar. La regla queda construida y probada; el
+  // encendido es un acto posterior, con la misma disciplina que la compuerta
+  // de conservacion. Ver el comentario de `config.exigirAnexoNube`.
+  if (config.exigirAnexoNube === true
+      && (!empresa.anexo_nube_firmado_at || !empresa.anexo_nube_version
+        || !/^[0-9a-f]{64}$/i.test(empresa.anexo_nube_hash || ''))) {
+    pendientes.push('anexo_nube_firmado');
+  }
   if (!empresa.canal_pqrs) pendientes.push('canal_pqrs');
 
   if (pendientes.length === 0) {
@@ -1094,6 +1165,7 @@ function verificarHabilitacionFirma(id_empresa) {
 
   const falta = pendientes.map((p) => {
     if (p === 'anexo_encargo_firmado') return 'no tiene registrado el Anexo de Encargo firmado';
+    if (p === 'anexo_nube_firmado') return 'no tiene registrado el Anexo de Nube firmado por esa Empresa con su versión y huella SHA-256';
     return 'no tiene declarado el canal de atención (el 7.2-7.3: es por dón donde el Trabajador pide la firma en papel)';
   }).join(' y ');
 
@@ -1104,7 +1176,8 @@ function verificarHabilitacionFirma(id_empresa) {
     pendientes,
     mensaje: `La empresa ${id_empresa} ${falta}. `
       + 'Regístrelo en POST /internal/admin/empresas/'
-      + `${id_empresa}/anexo-firmado (Anexo) y en `
+      + `${id_empresa}/anexo-firmado (Anexo de Encargo), en `
+      + `POST /internal/admin/empresas/${id_empresa}/anexo-nube-firmado (Anexo de Nube) y en `
       + `PUT /internal/admin/empresas/${id_empresa} (canal de atención) `
       + 'antes de solicitar firmas.',
   };
@@ -1145,7 +1218,14 @@ function assertHabilitadaParaFirma(id_empresa, ctx = {}) {
   }
 
   const cuenta_firma = ctx.cuenta_firma === true;
-  const excepcion = excepcionService.vigentePara(id_empresa, { para_firma: cuenta_firma });
+  // C-1 del abogado: una excepción operativa no sustituye el Anexo de Nube
+  // suscrito por esa Empresa ni permite emitir constancias sobre un modelo.
+  // (Con la compuerta apagada, el Anexo de Nube no esta entre los pendientes y
+  // esta regla no se activa: ver `config.exigirAnexoNube`.)
+  const bloqueoDocumental = habilitacion.pendientes.includes('anexo_nube_firmado');
+  const excepcion = bloqueoDocumental
+    ? null
+    : excepcionService.vigentePara(id_empresa, { para_firma: cuenta_firma });
   if (excepcion) {
     if (cuenta_firma) {
       const actualizada = excepcionService.registrarUso({
@@ -1181,10 +1261,10 @@ function assertHabilitadaParaFirma(id_empresa, ctx = {}) {
     409,
     'EMPRESA_NO_HABILITADA',
     habilitacion.mensaje
-      + ' Si tiene que firmar antes de completarlo, pida una excepción de '
-      + 'habilitación (POST /internal/admin/excepciones-habilitacion): exige '
-      + 'autorización escrita, un alcance de firmas, una ruta en papel '
-      + 'operativa y un plazo cierto.',
+      + (bloqueoDocumental ? '' : ' Si tiene que firmar antes de completarlo, pida una excepción de '
+        + 'habilitación (POST /internal/admin/excepciones-habilitacion): exige '
+        + 'autorización escrita, un alcance de firmas, una ruta en papel '
+        + 'operativa y un plazo cierto.'),
     {
       id_empresa,
       pendientes: habilitacion.pendientes,
@@ -1431,6 +1511,7 @@ module.exports = {
   create,
   update,
   marcarAnexoFirmado,
+  marcarAnexoNubeFirmado,
   desmarcarAnexoFirmado,
   setActivo,
   verificarHabilitacionFirma,

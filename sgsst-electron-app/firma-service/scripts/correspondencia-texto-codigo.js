@@ -2,8 +2,8 @@
 /**
  * scripts/correspondencia-texto-codigo.js
  *
- * GENERA la tabla de correspondencia entre el texto del Acuerdo v1.3 y el
- * codigo que lo hace cierto. Es la evidencia que pidio el abogado: para cada
+ * GENERA la tabla de correspondencia entre el texto del Acuerdo y el codigo
+ * que lo hace cierto. Es la evidencia que pidio el abogado: para cada
  * numeral, que exige el texto y DONDE vive eso en el codigo.
  *
  * POR QUE SE GENERA Y NO SE ESCRIBE A MANO
@@ -17,6 +17,7 @@
  *
  * Uso:
  *   node scripts/correspondencia-texto-codigo.js
+ *   node scripts/correspondencia-texto-codigo.js --version=v1.4
  *   node scripts/correspondencia-texto-codigo.js --salida=ruta.md
  *
  * Exit codes:
@@ -31,9 +32,6 @@ const crypto = require('crypto');
 
 const SERVICE_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SERVICE_ROOT, '..');
-const SALIDA_DEFAULT = path.join(
-  REPO_ROOT, 'docs', 'gestion-humana', 'firma-electronica', 'correspondencia-texto-codigo-v1.3.md'
-);
 
 // ---------------------------------------------------------------------------
 // Las filas. Cada una: que exige el texto, que ancla lo implementa y que test
@@ -61,6 +59,22 @@ const FILAS = [
       { archivo: 'config/tabla-conservacion.json', ancla: 'SST_ESPECIAL' },
     ],
     test: ['tests/conservacion-purga.test.js', 'tests/services/conservacion-supletoria.test.js'],
+  },
+  {
+    numeral: '8.6(b) y Anexo de Encargo 6 (canal de la fecha de terminacion)',
+    exige: 'La Empresa comunica al Encargado la fecha de terminacion de la relacion laboral por el canal habilitado en el servicio, con su evidencia; el Encargado registra la fecha, recalcula el plazo de las filas afectadas y deja registro de la operacion. Mientras la fecha no se reciba, la fila permanece retenida, no se calcula fecha de supresion y se revisa periodicamente.',
+    donde: [
+      { archivo: 'src/services/fechaTerminacion.js', ancla: 'function registrar' },
+      { archivo: 'src/services/fechaTerminacion.js', ancla: 'gh_firma_fecha_terminacion' },
+      { archivo: 'src/services/fechaTerminacion.js', ancla: 'function pendientes' },
+      { archivo: 'src/db/schema/052_fecha_terminacion_canal.sql', ancla: 'gh_firma_fecha_terminacion_eventos' },
+      { archivo: 'src/db/schema/053_fecha_terminacion_append_only.sql', ancla: 'CREATE TRIGGER' },
+      { archivo: 'src/routes/admin-empresas.js', ancla: '/fecha-terminacion' },
+      // El RECALCULO ACOTADO: la comunicacion de un trabajador no mueve los
+      // plazos de los demas.
+      { archivo: 'src/services/conservacion.js', ancla: 'opciones.firmas' },
+    ],
+    test: 'tests/fecha-terminacion-canal.test.js',
   },
   {
     numeral: '8.6(c)',
@@ -118,6 +132,54 @@ const FILAS = [
       { archivo: 'src/services/publicFlow.js', ancla: 'manifestacion_voluntad_hash' },
     ],
     test: 'tests/readiness-legal.test.js',
+  },
+  {
+    // C-2 del abogado (30-oct-2026) y el ordinal 3 de la Manifestacion de
+    // Voluntad: la matriz de finalidades delimita el alcance de la
+    // autorizacion del Titular. Se pone a disposicion ANTES de habilitar la
+    // casilla de aceptacion, con su version y su huella.
+    numeral: '3.6(b) (matriz de finalidades)',
+    exige: 'El ordinal 3 de la Manifestacion de Voluntad delega en la matriz de finalidades el alcance de la autorizacion del Titular. La matriz se pone a disposicion del Firmante ANTES de habilitar la casilla de aceptacion, con su version y su huella SHA-256; si la matriz no llega o no se lee, la casilla no se habilita y no hay forma de aceptar sin ella.',
+    donde: [
+      { archivo: 'web/firma/app.js', ancla: 'renderMatrizFinalidades' },
+      { archivo: 'web/firma/app.js', ancla: 'leidoMatriz' },
+      { archivo: 'src/services/publicFlow.js', ancla: 'registrarPuestaEnDisposicionPoliticas' },
+      { archivo: 'src/services/matrizFinalidades.js', ancla: 'textoParaFirmante' },
+    ],
+    test: ['tests/services/aceptacion-c2-matriz.test.js', 'tests/web/matriz-finalidades.test.js'],
+  },
+  {
+    // C-1 del abogado (30-oct-2026).
+    numeral: '3.6(h) (Anexo de Nube suscrito por la Empresa)',
+    exige: 'Si la Empresa no ha suscrito el Anexo de Nube, el servicio no permite crear solicitudes de firma y no puede emitirse Constancia sobre un modelo sin firmar. La regla esta construida y va detras de la compuerta exigirAnexoNube: mientras el Anexo de Nube v1.0 sea un modelo sin publicar, el bloqueo no se enciende y el reporte de readiness dice cuantas Empresas lo tienen.',
+    donde: [
+      { archivo: 'src/services/empresa.js', ancla: 'anexo_nube_firmado' },
+      { archivo: 'src/services/empresa.js', ancla: 'exigirAnexoNube' },
+      { archivo: 'src/config.js', ancla: 'exigirAnexoNube' },
+      { archivo: 'src/services/manifiestoLegal.js', ancla: 'nube.firmado' },
+    ],
+    test: ['tests/d03-habilitacion-empresa.test.js', 'tests/routes/constancia-publica.test.js'],
+  },
+  {
+    numeral: '9.2 (alcance de la aceptacion)',
+    exige: 'La aceptacion registra la version y la huella SHA-256 del Anexo de Encargo y del Anexo de Nube suscritos por esa Empresa, y la version y la huella de la matriz que delimita el alcance de la autorizacion. Se registra lo que el Firmante vio, no lo que despues se edite en el archivo.',
+    donde: [
+      { archivo: 'src/services/publicFlow.js', ancla: 'anexo_encargo_version' },
+      { archivo: 'src/services/publicFlow.js', ancla: 'anexo_nube_version' },
+      { archivo: 'src/db/schema/051_alcance_aceptacion.sql', ancla: 'anexo_nube_hash' },
+      { archivo: 'src/db/schema/051_alcance_aceptacion.sql', ancla: 'matriz_hash' },
+    ],
+    test: 'tests/services/aceptacion-c2-matriz.test.js',
+  },
+  {
+    numeral: '9.6 y 5.6 (medio y fecha de puesta a disposicion)',
+    exige: 'El sistema registra el MEDIO por el que se puso a disposicion la informacion y la FECHA de esa puesta a disposicion, y deja el evento que la deja trazada. Sin esa fecha no hay constancia de cuando se cumplio el deber de informacion.',
+    donde: [
+      { archivo: 'src/services/publicFlow.js', ancla: 'medio_disposicion' },
+      { archivo: 'src/services/publicFlow.js', ancla: 'fecha_disposicion' },
+      { archivo: 'src/services/publicFlow.js', ancla: 'POLITICAS_PUESTAS_A_DISPOSICION' },
+    ],
+    test: 'tests/services/aceptacion-c2-matriz.test.js',
   },
   {
     numeral: '10.6 (precedencia de plazos)',
@@ -266,12 +328,22 @@ function sha256De(p) {
 
 function main() {
   const args = process.argv;
-  let salida = SALIDA_DEFAULT;
+  let version = 'v1.3';
+  let salida = null;
   for (let i = 2; i < args.length; i++) {
     if (args[i].startsWith('--salida=')) salida = path.resolve(args[i].slice('--salida='.length).trim());
+    else if (args[i].startsWith('--version=')) {
+      version = args[i].slice('--version='.length).trim();
+    }
+  }
+  if (!salida) {
+    salida = path.join(
+      REPO_ROOT, 'docs', 'gestion-humana', 'firma-electronica',
+      'correspondencia-texto-codigo-' + version + '.md'
+    );
   }
 
-  const acuerdo = path.join(SERVICE_ROOT, 'scripts', 'fixtures', 'acuerdo-v1.3.txt');
+  const acuerdo = path.join(SERVICE_ROOT, 'scripts', 'fixtures', 'acuerdo-' + version + '.txt');
   const anexo = path.join(REPO_ROOT, 'legal', 'anexo-encargo.html');
   if (!fs.existsSync(acuerdo) || !fs.existsSync(anexo)) {
     console.error('Faltan los archivos de los que se sacan las huellas.');
@@ -283,7 +355,7 @@ function main() {
 
   let pendientes = 0;
   const cuerpo = [];
-  cuerpo.push('# Correspondencia texto <-> codigo — Acuerdo v1.3');
+  cuerpo.push('# Correspondencia texto <-> codigo — Acuerdo ' + version);
   cuerpo.push('');
   cuerpo.push('> **Generado, no escrito a mano.** Lo produce `firma-service/scripts/correspondencia-texto-codigo.js`,');
   cuerpo.push('> que busca cada ancla en el codigo real y pone la linea donde esta. Si un ancla no aparece, la');
@@ -292,7 +364,7 @@ function main() {
   cuerpo.push('');
   cuerpo.push('| Documento | SHA-256 |');
   cuerpo.push('|---|---|');
-  cuerpo.push('| Acuerdo de uso v1.3 | `' + hAcuerdo + '` |');
+  cuerpo.push('| Acuerdo de uso ' + version + ' | `' + hAcuerdo + '` |');
   cuerpo.push('| Anexo de Encargo | `' + hAnexo + '` |');
   cuerpo.push('');
   cuerpo.push('Generada el ' + fecha + '.');
@@ -360,12 +432,12 @@ function main() {
   cuerpo.push('- Pendientes: ' + pendientes);
   cuerpo.push('');
   if (pendientes) {
-    cuerpo.push('Las filas **PENDIENTE** son las que el texto de la v1.3 promete y que el codigo todavia no');
+    cuerpo.push('Las filas **PENDIENTE** son las que el texto de la ' + version + ' promete y que el codigo todavia no');
     cuerpo.push('hace cierto. Son la lista de trabajo que queda, no un defecto de esta tabla.');
     cuerpo.push('');
   }
   cuerpo.push('El texto que estas filas citan se arma desde la v1.0 sellada con');
-  cuerpo.push('`scripts/empalmar-acuerdo-v1.1.js --version=v1.3 --cambios=scripts/fixtures/acuerdo-v1.3-cambios.json`.');
+  cuerpo.push('`scripts/empalmar-acuerdo-v1.1.js --version=' + version + ' --cambios=scripts/fixtures/acuerdo-' + version + '-cambios.json`.');
   cuerpo.push('');
   cuerpo.push('La v1.3 cambio la regla de conservacion: la retencion indefinida por falta de plazo declarado');
   cuerpo.push('desaparecio y la sustituyo la tabla supletoria que administra K+AIR. Las filas del 8.6 lo');
@@ -379,9 +451,11 @@ function main() {
   cuerpo.push('- La tabla supletoria declara su propia activacion en `config/tabla-conservacion.json`');
   cuerpo.push('  (`aplicacion.activada`), y el codigo la lee y la respeta: no hay forma de que el sistema');
   cuerpo.push('  aplique sus plazos sin que esa fuente legal lo autorice.');
-  cuerpo.push('- Con la compuerta CERRADA (que es como viene), el plazo por defecto que aplica el sistema');
-  cuerpo.push('  es el de custodia del catalogo (veinte (20) anos desde la firma), que es el que estaba en');
-  cuerpo.push('  vigor. La fuente queda registrada en la fila como `catalogo_sistema`.');
+  cuerpo.push('- Con la compuerta CERRADA (que es como viene), el sistema no aplica el plazo por defecto:');
+  cuerpo.push('  el registro queda retenido con el hold tabla_supletoria_pendiente_validacion y no se calcula');
+  cuerpo.push('  fecha de supresion. El catalogo legado de veinte (20) anos desde la firma se retiro.');
+  cuerpo.push('- La fuente que queda registrada en la fila es `tabla_supletoria_pendiente`, no');
+  cuerpo.push('  `catalogo_sistema`: con la compuerta cerrada no hay plazo de catalogo que se aplique.');
   cuerpo.push('- Las EXCEPCIONES LEGALES no dependen de la tabla y siguen aplicando con la compuerta');
   cuerpo.push('  cerrada: el piso de veinte (20) anos desde el cese de los registros del 8.6(b), y el hold');
   cuerpo.push('  sin termino del contrato del 8.6(c).');

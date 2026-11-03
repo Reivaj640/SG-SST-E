@@ -214,6 +214,16 @@ const TABLES = [
   // tests/empresa-auditoria.test.js, que aplica el SQL de la 038 a una base
   // en memoria.
   'gh_firma_empresas_auditoria',
+  // El CANAL DE LA FECHA DE TERMINACION (Anexo de Encargo, seccion 6;
+  // migraciones 052 y 053). Los eventos van PRIMERO: tienen FK al registro.
+  //
+  // La bitacora tiene trigger append-only, pero la migracion 053 lleva
+  // `@skip-when-env test`: en el ambiente de test el trigger NO esta
+  // instalado y la tabla se puede limpiar. La inmutabilidad se comprueba en
+  // tests/fecha-terminacion-canal.test.js, que aplica el SQL de la 053 a una
+  // base en memoria.
+  'gh_firma_fecha_terminacion_eventos',
+  'gh_firma_fecha_terminacion',
   // El 10.7(b): las solicitudes de los Titulares y su historial. Los
   // eventos van PRIMERO: tienen FK a la solicitud.
   'gh_solicitudes_titular_eventos',
@@ -680,6 +690,33 @@ async function createPendingConsent({
   };
 }
 
+/**
+ * Acepta el Acuerdo por el endpoint público como lo hace la mini-app.
+ *
+ * C-2 / J3: el servidor exige dos cosas que la mini-app cumple siempre:
+ *
+ *   1. Que las políticas se hayan puesto a disposición ANTES de la aceptación.
+ *      Eso pasa cuando el servidor sirve el contexto (GET /s/:token), que es
+ *      lo que hace la mini-app al abrir el enlace. La fecha de esa puesta a
+ *      disposición la pone el SERVIDOR.
+ *   2. Que el Firmante declare el MEDIO por el que se le pusieron a
+ *      disposición. En esta pantalla el medio es la propia pantalla de firma.
+ *
+ * Un test que acepte sin el contexto previo tiene que fallar: el servidor no
+ * puede inventar ni el medio ni la fecha.
+ *
+ * @param {object} app la app de express
+ * @param {string} token el token de la solicitud
+ * @param {object} [extra] campos extra del cuerpo de la petición
+ * @returns {Promise<object>} la respuesta de supertest
+ */
+async function aceptarAcuerdo(app, token, extra = {}) {
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
+  return request(app)
+    .post(`/api/sign/${token}/consent/accept`)
+    .send(Object.assign({ medio_disposicion: 'pantalla_firma' }, extra || {}));
+}
+
 function seedTestClients() {
   const internalClient = require('../src/services/internalClient');
   const ALL_OPS = [
@@ -854,8 +891,9 @@ async function capturarLogs(fn) {
  * --------------
  * La tabla que se despacha declara su propia activación
  * (`aplicacion.activada`), y viene CERRADA: los plazos de diez (10) y cinco
- * (5) años no los validó el abogado. Con la compuerta cerrada, el plazo por
- * defecto es el de custodia del catálogo (veinte (20) años).
+ * (5) años no los validó el abogado. Con la compuerta cerrada el sistema NO
+ * aplica el plazo por defecto: el registro queda retenido con el hold
+ * `tabla_supletoria_pendiente_validacion` y no se calcula fecha de supresión.
  *
  * Los tests que verifican el MECANISMO de la tabla (que su plazo por defecto
  * sea el que aplica, con su fuente y su punto de inicio) necesitan la tabla
@@ -870,6 +908,70 @@ function tablaConservacionActivada() {
   return Object.assign({}, base, {
     aplicacion: Object.assign({}, base.aplicacion, { activada: true }),
   });
+}
+
+/**
+ * LA COMPOSICIÓN DE LA EVIDENCIA, EN UN SOLO LUGAR.
+ *
+ * El `evidence_hash` que emite el commit es la huella del JSON canónico de
+ * un conjunto EXACTO de campos: los del Bloque E3, más el ALCANCE de la
+ * aceptación (C-2 / J3: los anexos que rigen la firma, la matriz de
+ * finalidades que se puso a disposición, el medio y esa fecha). Un tercero
+ * tiene que poder recomponer el mismo conjunto desde los datos publicados y
+ * obtener el mismo hash.
+ *
+ * Por eso la receta vive AQUÍ y no duplicada en cada prueba: cuando la
+ * composición cambia (como pasó con C-2) se cambia una sola vez, y todas las
+ * pruebas siguen comprobando lo mismo. `canonicalJSON` ordena las claves, así
+ * que el orden del objeto no importa: importa el conjunto de campos.
+ *
+ * @param {object} fila la fila de `gh_firmas_electronicas`
+ * @param {object} [consentimiento] la fila de `gh_consentimientos_firma`. Si
+ *   no se pasa, se busca por la firma (y su `consent_id`).
+ * @returns {object} la evidencia, tal como la arma el commit
+ */
+function buildEvidenciaFirma(fila, consentimiento) {
+  let c = consentimiento;
+  if (!c && fila && fila.id_solicitud) {
+    c = db.prepare(
+      'SELECT c.anexo_encargo_version, c.anexo_encargo_hash, c.anexo_nube_version,'
+      + ' c.anexo_nube_hash, c.anexo_nube_origen, c.matriz_version, c.matriz_hash,'
+      + ' c.medio_disposicion, c.fecha_disposicion'
+      + ' FROM gh_firmas_electronicas f'
+      + ' JOIN gh_consentimientos_firma c ON c.id = f.consent_id'
+      + ' WHERE f.id_solicitud = ?'
+    ).get(fila.id_solicitud) || {};
+  }
+  c = c || {};
+  return {
+    id_solicitud: fila.id_solicitud,
+    id_documento: fila.id_documento,
+    id_trabajador: fila.id_trabajador,
+    id_empresa: fila.id_empresa,
+    document_hash_original: fila.document_hash_original,
+    document_hash_firmado: fila.document_hash_firmado,
+    agreement_hash: fila.agreement_hash,
+    agreement_version: fila.agreement_version,
+    identificacion_tipo: fila.identificacion_tipo,
+    tipo_firma: fila.tipo_firma,
+    manifestacion_voluntad_hash: fila.manifestacion_voluntad_hash,
+    ip_origen: fila.ip_origen || null,
+    user_agent: fila.user_agent || null,
+    fecha_creacion: fila.fecha_creacion,
+    fecha_firma: fila.fecha_firma,
+    version_kair: fila.version_kair,
+    manifestacion_voluntad_texto: fila.manifestacion_voluntad_texto,
+    // === C-2 / J3: el alcance de la aceptación ===
+    anexo_encargo_version: c.anexo_encargo_version || null,
+    anexo_encargo_hash: c.anexo_encargo_hash || null,
+    anexo_nube_version: c.anexo_nube_version || null,
+    anexo_nube_hash: c.anexo_nube_hash || null,
+    anexo_nube_origen: c.anexo_nube_origen || null,
+    matriz_version: c.matriz_version || null,
+    matriz_hash: c.matriz_hash || null,
+    medio_disposicion: c.medio_disposicion || null,
+    fecha_disposicion: c.fecha_disposicion || null,
+  };
 }
 
 module.exports = {
@@ -888,6 +990,11 @@ module.exports = {
   createSignRequestWithIdentificacion,
   createAcceptedConsent,
   createPendingConsent,
+  // C-2 / J3: acepta el Acuerdo como lo hace la mini-app (contexto servido
+  // antes y medio declarado por el Firmante).
+  aceptarAcuerdo,
+  // La composición de la evidencia, en un solo lugar (ver la función).
+  buildEvidenciaFirma,
   assertJsonError,
   assertJsonResponse,
   pdfText,

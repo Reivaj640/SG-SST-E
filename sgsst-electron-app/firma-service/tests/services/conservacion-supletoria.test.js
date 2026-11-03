@@ -15,14 +15,17 @@
  *
  * Y, sobre todo, las cuatro cosas que el abogado pidió que quedaran probadas:
  *
- *   1. Ningún registro queda retenido indefinidamente por falta de
- *      configuración.
+ *   1. Con la compuerta ABIERTA, ningún registro queda retenido por falta de
+ *      configuración: el plazo por defecto lo aporta la tabla supletoria.
+ *      Con la compuerta CERRADA (que es como se despacha) no hay plazo por
+ *      defecto: el catálogo legado de veinte (20) años desde la firma se
+ *      retiró (J8 y J9) y la tabla espera la validación del abogado.
  *   2. Cada registro tiene una categoría y una regla de conservación
  *      identificable (migración 049: el plazo, su fuente y la fecha de inicio).
  *   3. La modificación de un plazo NO altera los registros históricos: los
  *      datos calculados quedan congelados.
  *   4. Las excepciones legales documentadas se conservan (el piso del SG-SST
- *      y el hold sin término del contrato).
+ *      y el hold sin término del contrato): no dependen de la tabla.
  */
 'use strict';
 
@@ -44,10 +47,11 @@ const FECHA_TABLA = new Date(
   new Date(FIRMA_BASE).getTime() + DIAS_TABLA * DIA_MS
 ).toISOString();
 
-// La custodia del CATÁLOGO: veinte (20) años desde la firma. Es el plazo que
-// aplica con la compuerta de la tabla cerrada.
-const DIAS_CATALOGO = 7305;
-const FECHA_CATALOGO = '2046-01-15T10:00:00.000Z';
+// El catálogo legado (veinte (20) años DESDE LA FIRMA) se RETIRÓ por orden del
+// abogado (30-oct-2026, J8 y J9): con la compuerta cerrada no aplica para nada.
+// Su única huella viva es la regla del catálogo, que sigue declarada.
+
+const DIAS_PISO_SST = 7305;
 
 // La tabla con la COMPUERTA ABIERTA: la que usan los tests que verifican el
 // mecanismo de la tabla (que su plazo por defecto sea el que aplica).
@@ -191,17 +195,22 @@ test('con plazo de la Empresa: manda el de la Empresa y la fuente queda registra
 });
 
 test('el piso legal del SG-SST: veinte años desde el cese', () => {
+  // El MECANISMO del piso legal, con la tabla supletoria activada. Con la
+  // compuerta cerrada (que es como se despacha) el piso legal sigue aplicando
+  // y NO depende de la tabla: eso lo verifica el test de "las EXCEPCIONES
+  // LEGALES" de más abajo.
   const plan = retencion.planificar({
     categoria_retencion: 'SST_CAPACITACION',
     fecha_creacion: FIRMA_BASE,
     fecha_terminacion: '2027-06-30T10:00:00.000Z',
     empresa: EMPRESA_SIN_PLAZO,
+    tabla_conservacion: TABLA_ACTIVADA,
   });
 
   assert.equal(plan.fecha_inicio_conservacion, '2027-06-30T10:00:00.000Z',
     'el punto de inicio del piso legal es el cese');
   assert.equal(plan.plazo_conservacion_fuente, 'piso_legal');
-  assert.equal(plan.plazo_conservacion_dias, 7305);
+  assert.equal(plan.plazo_conservacion_dias, DIAS_PISO_SST);
   assert.equal(plan.categoria_conservacion, 'SST_ESPECIAL');
 
   const esperada = new Date(
@@ -219,6 +228,10 @@ test('el plazo de la Empresa NO puede bajar el piso legal del SG-SST', () => {
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
   });
+  assert.equal(sinPiso.fecha_conservacion, null,
+    'sin fecha real de cese no se calcula una fecha de supresión');
+  assert.equal(sinPiso.aviso, 'RETAIN_PENDIENTE_CESE');
+  assert.equal(sinPiso.hold.motivo, 'fecha_cese_pendiente');
   const conPlazoCorto = retencion.planificar({
     categoria_retencion: 'SST_EPP',
     fecha_creacion: FIRMA_BASE,
@@ -431,6 +444,7 @@ test('el cálculo de fechas: un caso por categoría', () => {
       '2046-01-15T10:00:00.000Z',
       'piso_legal',
       'SST_ESPECIAL',
+      '2026-01-15T10:00:00.000Z',
     ],
     [
       'SST_EPP',
@@ -438,13 +452,15 @@ test('el cálculo de fechas: un caso por categoría', () => {
       '2046-01-15T10:00:00.000Z',
       'piso_legal',
       'SST_ESPECIAL',
+      '2026-01-15T10:00:00.000Z',
     ],
   ];
 
-  for (const [categoria, empresa, esperada, fuente, catTabla] of casos) {
+  for (const [categoria, empresa, esperada, fuente, catTabla, fecha_terminacion] of casos) {
     const plan = retencion.planificar({
       categoria_retencion: categoria,
       fecha_creacion: FIRMA_BASE,
+      fecha_terminacion,
       empresa,
       tabla_conservacion: TABLA_ACTIVADA,
     });
@@ -459,8 +475,15 @@ test('el cálculo de fechas: un caso por categoría', () => {
 //
 // Lo que se despacha viene con la compuerta CERRADA: los plazos de diez (10)
 // y cinco (5) años no los validó el abogado, y el Acuerdo que los describe
-// (la v1.3) no está aprobado. Con la compuerta cerrada, el plazo por defecto
-// es el de custodia del catálogo, que es el que estaba en vigor.
+// (la v1.3) no está aprobado.
+//
+// Con la compuerta CERRADA no hay plazo por defecto: el catálogo legado de
+// veinte (20) años desde la firma se retiró (J8 y J9) y la tabla supletoria
+// espera la validación del abogado. El registro queda RETENIDO con el motivo
+// `tabla_supletoria_pendiente_validacion` y SIN fecha de supresión.
+//
+// Lo que NO depende de la compuerta son las EXCEPCIONES LEGALES: el piso del
+// SG-SST y el hold sin término del contrato. Son deberes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('la tabla que se despacha viene con la compuerta CERRADA', () => {
@@ -471,25 +494,45 @@ test('la tabla que se despacha viene con la compuerta CERRADA', () => {
   assert.equal(retencion.tablaActivada(), false);
 });
 
-test('con la compuerta cerrada, el plazo por defecto es el del catálogo', () => {
+test('con la compuerta cerrada, no hay plazo por defecto: la tabla sigue sin validar', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'TABLA_EMPRESA',
     fecha_creacion: FIRMA_BASE,
     empresa: EMPRESA_SIN_PLAZO,
   });
 
-  assert.equal(plan.plazo_conservacion_fuente, 'catalogo_sistema',
-    'la fila dice de dónde salió el plazo: del catálogo, no de la tabla');
-  assert.equal(plan.plazo_conservacion_dias, DIAS_CATALOGO);
-  assert.equal(plan.fecha_conservacion, FECHA_CATALOGO);
-  assert.equal(plan.fecha_inicio_conservacion, FIRMA_BASE);
-  assert.equal(plan.anios, 20);
-  assert.equal(plan.aviso, 'RETAIN_FECHA');
-  assert.equal(plan.hold, null);
-  assert.match(plan.texto, /Se conserva 20 años contados desde la fecha de la firma/);
+  assert.equal(plan.fecha_conservacion, null,
+    'sin plazo declarado y con la compuerta cerrada no hay fecha de supresión');
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente',
+    'la fila dice de dónde vendría el plazo: de la tabla, que todavía no aplica');
+  assert.equal(plan.plazo_conservacion_dias, null,
+    'y no se registra un plazo que no aplica');
+  assert.equal(plan.fecha_inicio_conservacion, null,
+    'sin plazo no hay punto de inicio del cómputo');
+  assert.equal(plan.aviso, 'RETAIN_TABLA_PENDIENTE');
+  assert.ok(plan.hold, 'el registro queda retenido');
+  assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
 });
 
-test('con la compuerta cerrada, la categoría y su punto de inicio se siguen registrando', () => {
+test('con la compuerta cerrada, el texto NO promete la custodia que se retiró', () => {
+  // El texto que se le comunica al Trabajador (el 8.6(g)) no puede prometer un
+  // plazo que el sistema no tiene. El catálogo legado de veinte (20) años
+  // desde la firma se retiró: no puede seguir ofreciéndose.
+  const plan = retencion.planificar({
+    categoria_retencion: 'TABLA_EMPRESA',
+    fecha_creacion: FIRMA_BASE,
+    empresa: EMPRESA_SIN_PLAZO,
+  });
+
+  assert.doesNotMatch(plan.texto, /Se conserva 20 años contados desde la fecha de la firma/,
+    'la custodia de veinte (20) años desde la firma se retiró (J8 y J9)');
+  assert.doesNotMatch(plan.texto, /tabla de conservación del sistema/,
+    'el plazo no sale de la tabla supletoria mientras la compuerta esté cerrada');
+  assert.match(plan.texto, /pendiente|no se suprime/,
+    'el texto dice que el plazo está pendiente y que el documento no se suprime');
+});
+
+test('con la compuerta cerrada, la categoría se sigue registrando y no hay punto de inicio', () => {
   const plan = retencion.planificar({
     categoria_retencion: 'HISTORIA_LABORAL',
     fecha_creacion: FIRMA_BASE,
@@ -498,7 +541,8 @@ test('con la compuerta cerrada, la categoría y su punto de inicio se siguen reg
 
   assert.equal(plan.categoria_conservacion, 'DOCUMENTO_FIRMADO',
     'la categoría es la de la tabla, aunque su plazo no aplique todavía');
-  assert.equal(plan.fecha_inicio_conservacion, FIRMA_BASE);
+  assert.equal(plan.fecha_inicio_conservacion, null,
+    'sin plazo aplicable no hay punto de inicio del cómputo');
 });
 
 test('con la compuerta cerrada, las EXCEPCIONES LEGALES siguen aplicando', () => {
@@ -511,7 +555,18 @@ test('con la compuerta cerrada, las EXCEPCIONES LEGALES siguen aplicando', () =>
     empresa: EMPRESA_SIN_PLAZO,
   });
   assert.equal(piso.plazo_conservacion_fuente, 'piso_legal');
-  assert.equal(piso.plazo_conservacion_dias, 7305);
+  assert.equal(piso.plazo_conservacion_dias, DIAS_PISO_SST);
+  assert.equal(piso.fecha_inicio_conservacion, '2027-06-30T10:00:00.000Z',
+    'el punto de inicio del piso es el cese, y el cese se conoce');
+  const esperada = new Date(
+    new Date('2027-06-30T10:00:00.000Z').getTime() + 20 * 365.25 * DIA_MS
+  ).getTime();
+  assert.ok(
+    Math.abs(esperada - new Date(piso.fecha_conservacion).getTime()) < DIA_MS,
+    'el piso legal produce su fecha de supresión: con el cese conocido, el plazo corre'
+  );
+  assert.equal(piso.hold, null,
+    'y el registro no queda retenido por la tabla pendiente de validación');
 
   const contrato = retencion.planificar({
     categoria_retencion: 'CONTRATO_TRABAJO',
@@ -530,6 +585,8 @@ test('con la compuerta cerrada, el plazo de la Empresa tiene la precedencia de s
   });
   assert.equal(plan.plazo_conservacion_fuente, 'empresa');
   assert.equal(plan.plazo_conservacion_dias, 1825);
+  assert.ok(plan.fecha_conservacion, 'el plazo declarado por la Empresa no depende de la compuerta');
+  assert.equal(plan.hold, null);
 });
 
 test('con la compuerta ABIERTA, el plazo por defecto es el de la tabla', () => {
@@ -550,7 +607,8 @@ test('con la compuerta ABIERTA, el plazo por defecto es el de la tabla', () => {
 
 test('el respaldo congelado también arranca con la compuerta cerrada', () => {
   // Si el archivo de configuración no se puede leer, el respaldo NO puede
-  // abrir la compuerta: el sistema conserva el plazo del catálogo.
+  // abrir la compuerta: tampoco hay plazo por defecto, y el registro queda
+  // retenido esperando la validación de la tabla.
   const respaldo = retencion.TABLA_RESPALDO;
   assert.ok(respaldo.aplicacion);
   assert.equal(respaldo.aplicacion.activada, false);
@@ -561,6 +619,10 @@ test('el respaldo congelado también arranca con la compuerta cerrada', () => {
     empresa: EMPRESA_SIN_PLAZO,
     tabla_conservacion: respaldo,
   });
-  assert.equal(plan.plazo_conservacion_fuente, 'catalogo_sistema');
-  assert.equal(plan.plazo_conservacion_dias, DIAS_CATALOGO);
+  assert.equal(plan.fecha_conservacion, null,
+    'sin plazo declarado y sin compuerta abierta no hay fecha de supresión');
+  assert.equal(plan.plazo_conservacion_fuente, 'tabla_supletoria_pendiente');
+  assert.equal(plan.plazo_conservacion_dias, null);
+  assert.equal(plan.aviso, 'RETAIN_TABLA_PENDIENTE');
+  assert.equal(plan.hold.motivo, 'tabla_supletoria_pendiente_validacion');
 });

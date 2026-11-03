@@ -794,10 +794,15 @@ async function generateConstanciaPdf(metadata) {
 
     const cierre = ['La huella es el SHA-256 del TEXTO de la version incorporada del anexo, tal como '
       + 'consta en el manifiesto legal del servicio: no es la huella de una copia firmada.'];
-    if (nube.origen_incorporada === 'modelo') {
-      cierre.push('Del Anexo de Nube solo consta el MODELO, sin firmar: es el texto que el '
-        + 'servicio incorpora, y la huella que se imprime es la del modelo, no la de una '
-        + 'version firmada.');
+    // C-1 del abogado (30-oct-2026): la Constancia NO vincula un modelo de
+    // Anexo de Nube sin firmar. Lo que se imprime por arriba es el MODELO,
+    // como dato de referencia, y hay que decirlo: sin esta advertencia, la
+    // fila "Anexo de Nube (modelo)" con su huella podria leerse como el texto
+    // que rigio la firma, que es justo lo que no es.
+    if (!nube.firmado && nube.modelo && (nube.modelo.version || nube.modelo.hash)) {
+      cierre.push('Del Anexo de Nube no consta una version firmada por esta Empresa: lo que se '
+        + 'imprime es el MODELO, es decir el texto propuesto, y ese modelo no incorporo esta '
+        + 'firma. Una Constancia no puede vincular un Anexo de Nube sin firmar.');
     }
     parrafo(cierre.join(' '), { size: 8, color: C.grisClaro, lh: 11 });
   }
