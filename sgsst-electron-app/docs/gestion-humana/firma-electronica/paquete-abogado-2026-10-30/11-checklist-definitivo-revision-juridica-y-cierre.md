@@ -114,6 +114,7 @@ Esta sección documenta decisiones del representante legal. **No es aprobación 
 | J12 | | | |
 | J13 | | | |
 | J14 | | | |
+| **C-1 (la compuerta `exigirAnexoNube`)** | **Publicar la v1.4 con la compuerta apagada.** El 3.4(h) afirma, sin condicional, que si la Empresa no ha suscrito el Anexo de Nube el servicio no permite crear solicitudes de firma; el código aplica esa regla **solo** con `FIRMA_EXIGIR_ANEXO_NUBE=true`, que no está definida en el servidor. **La diferencia queda registrada y aceptada por el owner.** No se presume aprobado ningún punto J1-J14: el asesor no ha respondido a esta lista. | El Anexo de Nube v1.0 sigue siendo un modelo sin publicar y ninguna Empresa lo ha suscrito: encender la compuerta dejaría a todas las Empresas sin poder firmar. La regla está construida y probada (`src/services/empresa.js`, `src/services/manifiestoLegal.js`); se enciende en cuanto el Anexo se publique y se suscriba, **sin cambiar el texto**. Difiere de la compuerta de conservación, que sí exige la validación escrita de los plazos. Registrado también en `BITACORA.md` y en el estado al cierre de `Historial.md`. | 4-nov-2026 |
 
 **Nombre y cargo del owner:** ______________________________________________  
 **Firma:** _________________________________________  **Fecha:** ______________________________

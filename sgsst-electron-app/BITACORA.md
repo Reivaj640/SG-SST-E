@@ -9208,3 +9208,56 @@ Reglas:
 3. **Un script escrito a mano se valida antes de correrlo** (`node --check`). Un regex mal cerrado
    produce un error que señala la línea equivocada (`Invalid regular expression: missing /`) y se
    parece a un fallo del código que se está probando.
+
+## 🐗 El texto que afirma una regla que el código tiene detrás de una compuerta (2026-11-04)
+
+El Acuerdo v1.4, en su 3.4(h), dice sin condicional: «Si la Empresa no ha suscrito el Anexo de Nube, el
+servicio no permite crear solicitudes de firma». El código tiene esa regla, escrita y probada, **pero
+detrás de una compuerta**: `config.exigirAnexoNube` sale de `FIRMA_EXIGIR_ANEXO_NUBE === 'true'`, y esa
+variable **no está definida en el servidor**. O sea: el texto que se va a publicar afirma una cosa que el
+sistema en producción no hace.
+
+### Por qué no es un defecto del texto
+
+La regla del 3.4(h) es el **literal del abogado** (el punto C-1 de su ronda del 30-oct), y el código la
+implementa tal cual. Lo que está apagado no es el comportamiento: es la **compuerta**, y está apagada por
+una razón que no es técnica. El Anexo de Nube v1.0 sigue siendo un **modelo sin publicar** y ninguna
+Empresa lo ha suscrito, así que encender la compuerta dejaría a **todas** las Empresas sin poder firmar
+(por eso el propio código lo explica: exigir la firma de un documento que el sistema todavía no publica
+deja el servicio inutilizable). Y la v1.0 es la que está vigente en producción: su 8.6 remite a la tabla
+de retención de la Empresa y no describe estos plazos.
+
+### Lo que decidió el owner (4-nov-2026)
+
+**Publicar la v1.4 con la compuerta apagada, y dejar la diferencia registrada.** No es que se passaram
+por alto: es una diferencia **aceptada con nombre, con fecha y con su plan de cierre**, escrita en tres
+lugares — la sección E del checklist definitivo (que es donde el manifiesto manda registrar las decisiones
+del owner), esta bitácora y el estado al cierre de `Historial.md`.
+
+Lo que cierra la diferencia: publicar el Anexo de Nube, que la Empresa suscriba (migración 050 y
+`POST /internal/admin/empresas/:id_empresa/anexo-nube-firmado`) y encender `FIRMA_EXIGIR_ANEXO_NUBE=true`.
+**Sin cambiar una palabra del Acuerdo.** El orden importa: el Anexo se publica y se suscribe **antes**
+de encender, o el sistema queda bloqueado para todos.
+
+### Por qué la correspondencia no lo detectó
+
+La tabla texto-código da **26 de 26 implementadas**, y su propia fila del 3.6(h) dice que la regla «va
+detrás de la compuerta». El control que usa esa tabla es de **presencia del ancla**: comprueba que la
+regla esté *escrita* en el código, no que esté *encendida* en la configuración que va a estar viva. Las
+dos cosas son distintas, y la segunda es la que importa cuando se publica.
+
+Reglas:
+
+1. **Una compuerta que el código no puede encender todavía es una precondición de publicación, no un
+   detalle de implementación.** Va en el plan de publicación, con el orden de los actos: qué se publica,
+   qué se suscribe, qué se enciende y en qué momento.
+2. **La comprobación de publicación tiene que preguntar por la CONFIGURACIÓN VIVA, no por la existencia
+   del código.** Una regla presente en el código y apagada en el servidor es una promesa que el sistema
+   no cumple, por mucho que la línea exista.
+3. **Una diferencia aceptada se escribe donde el que llega después la va a leer.** Si vive solo en una
+   conversación, el próximo que lea el texto la va a «corregir» sin saber que fue una decisión — y eso es
+   peor que un defecto visible.
+4. **El texto puede prometer más que el código solo si alguien lo acepta por escrito.** La regla de oro
+   («el texto no puede prometer lo que el código no cumple») admite una excepción, y la excepción tiene
+   que tener la misma forma que la regla: escrita, con fecha, con responsable y con la condición que la
+   cierra.

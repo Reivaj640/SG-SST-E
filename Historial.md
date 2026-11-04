@@ -16,6 +16,30 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+> **Actualización 2026-11-04 (tarde) — el estado medido antes de publicar la v1.4:**
+> el owner pidió revisar el estado actual antes de preparar la publicación del Acuerdo v1.4. La
+> revisión **midió contra los bytes**, no contra los documentos: las cuatro huellas coinciden con el
+> manifiesto, `legal/` es byte a byte idéntico a `sitio/`, el paquete del abogado se rearma con
+> **exit 0** y sin diferencia en el árbol, y la correspondencia texto-código da **26 de 26**.
+> **Lo que falta, en orden de bloqueo:**
+> (a) **La sección E del checklist definitivo está vacía**: el asesor no ha respondido la lista, así
+> que **no hay aprobación jurídica de la v1.4**, y no se presume por silencio.
+> (b) **Producción está diez migraciones atrás**: tenía 43 aplicadas el 31-oct (medido en modo de solo
+> lectura) y en el repo hay 52 archivos de migración (001 a 053, sin el 015). Faltan **044 a 053**, que
+> incluyen el canal de fecha de terminación, la conservación supletoria y el alcance de aceptación.
+> (c) **`origin/gh-pages` sirve los siete documentos del 27-oct**, con el Anexo de Nube de la huella
+> `a2589a2a…`: es el que dice que la clasificación de Google «queda pendiente de validación
+> profesional», justo lo que la v1.4 corrige. La Empresa no puede firmar un Anexo que no está
+> publicado.
+> (d) **Las tres compuertas siguen en `false`** (`acuerdo.publicado`, `aplicacion.activada`,
+> `exigirAnexoNube`) y faltan **T6** (E2E controlado), **T7** (reversión probada) y **T8** (decisión
+> operativa del representante legal).
+> (e) **El 3.4(h) afirma, sin condicional, una regla que el código aplica solo con
+> `FIRMA_EXIGIR_ANEXO_NUBE=true`**, que no está definida en el servidor. **Decisión del owner
+> (4-nov-2026): publicar la v1.4 con la compuerta apagada y dejar la diferencia registrada** (sección
+> E del checklist, `BITACORA.md` y esta entrada). El plan que la cierra: publicar el Anexo de Nube,
+> que la Empresa lo suscriba, y **encender la compuerta sin cambiar una palabra del Acuerdo**.
+>
 
 > **Actualización 2026-10-31 (noche) — firma electrónica K+AIR, tercera revisión del paquete:**
 > el owner pegó la revisión del abogado (31-oct-2026, tarde) y dijo «procede con las correcciones
@@ -6573,6 +6597,80 @@ los números a mano (el informe 10 y el plan del abogado) se corrigieron con el 
 Sin commit. **HEAD sigue en `53b8b327` (📦995)**; el owner hizo a mano los commits 📦994 y 📦995 y
 no autorizó esta ronda. Sin push y sin versión de app.
 
+## 2026-11-04 (tarde) · La v1.4 medida contra los bytes, y la diferencia que se publica a sabiendas
+
+El owner pidió revisar el estado actual antes de preparar la publicación del Acuerdo v1.4, con todo
+lo que esa versión implica y todo lo que se ha trabajado para ella. Esta entrada es el resultado de
+esa revisión: **lo que se verificó, lo que falta, y una diferencia que el owner decidió publicar
+a sabiendas.**
+
+### La v1.4 es la v1.3 más la determinación de Google
+
+El delta medido línea a línea: **18 líneas nuevas y 17 retiradas**, sobre 579 líneas. El cambio de
+fondo es uno: la **determinación jurídica del papel de Google deja de estar pendiente y queda escrita**.
+La v1.3 decía «quedan pendientes de validación profesional»; la v1.4 dice que Google es **Responsable
+del Tratamiento**, que el flujo es una transferencia internacional a EE.UU. con **nivel adecuado**
+(Circular Única 3.2), que **no hay DPA ni contrato de transmisión** y que esa determinación no
+atribuye facultades de supresión sobre las copias del proveedor. Con eso entran: la aceptación registra
+la versión y la huella del **Anexo de Encargo y del Anexo de Nube** que rigen la firma (3.4(b) y 9.2),
+la **matriz de finalidades** se pone a disposición del Firmante antes de habilitar la casilla (9.2), el
+5.6 registra el **medio y la fecha** de la puesta a disposición de las políticas, el deber de avisar a
+la Delegatura (art. 18(k) de la Ley 1581) es **propio del Encargado** (10.8(d)(iv)), y Cloudflare
+transita sin almacenar copia, así que no hay datos que suprimir en ese servicio (8.6).
+
+### Lo que se verificó (contra los bytes, no contra los documentos)
+
+- **Las cuatro huellas** del Acuerdo v1.4, el Anexo de Encargo, el Anexo de Nube y la Constancia
+  coinciden **exactamente** con lo que declara `legal-readiness.json`.
+- **`legal/` y `sitio/`** son byte a byte idénticos en los tres anexos.
+- **El paquete del abogado se rearma con exit 0** («Verificado contra legal-readiness.json: coincide»),
+  y el paquete commiteado es **idéntico** al que produce el script: el árbol queda limpio.
+- **La correspondencia texto-código da 26 de 26**, con controles de presencia y de ausencia.
+- **Las tres compuertas están en `false`**: `legal-readiness.json` → `acuerdo.publicado = false`;
+  `config/tabla-conservacion.json` → `aplicacion.activada = false`; `src/config.js` →
+  `exigirAnexoNube` sale de `FIRMA_EXIGIR_ANEXO_NUBE === 'true'`, que no está definida.
+
+### La diferencia que se publica a sabiendas
+
+El **3.4(h)** de la v1.4 dice, sin condicional: «Si la Empresa no ha suscrito el Anexo de Nube, el
+servicio no permite crear solicitudes de firma». El código tiene esa regla, escrita y probada, pero
+**detrás de la compuerta** `exigirAnexoNube`, que está apagada. El texto que se publica afirma, en
+esa frase, algo que el sistema en producción no hace.
+
+**Decisión del owner (4-nov-2026): publicar la v1.4 con la compuerta apagada y dejar la diferencia
+registrada.** No se pasó por alto: la compuerta está apagada por una razón que no es técnica — el
+Anexo de Nube v1.0 sigue siendo un modelo sin publicar y ninguna Empresa lo ha suscrito, así que
+encenderla dejaría a todas las Empresas sin poder firmar. La diferencia queda escrita en la **sección
+E del checklist definitivo** (que es donde el manifiesto manda registrar las decisiones del owner),
+en `BITACORA.md` y en el estado al cierre de este archivo. El plan que la cierra: publicar el Anexo
+de Nube, que la Empresa lo suscriba, y **encender la compuerta sin cambiar una palabra del Acuerdo**.
+
+### El sitio público servía los documentos de octubre
+
+`origin/gh-pages` estaba en `04c5e762` (27-oct): los **siete** documentos del sitio tenían huellas
+viejas. El Anexo de Nube publicado era `a2589a2a…`, el que dice que la clasificación de Google
+«queda pendiente de validación profesional» — justo lo que la v1.4 corrige. La Empresa no puede
+firmar un Anexo que no está publicado, así que esto era parte del mismo bloqueo. El sitio se
+regeneró y quedó con los siete documentos de la v1.4.
+
+### Un detalle del entorno que muerde
+
+La suite del `firma-service` **no corre en local**: `better-sqlite3` está compilado para Node 20
+(ABI 136) y el Node local es v26 (ABI 147). **No se recompiló**, porque `main.js` del app de Electron
+usa ese mismo módulo y cambiarlo rompe el ABI del Electron. El gate `publicacion` se mide en el
+servidor.
+
+### Verificación
+
+- Cuatro huellas reales contra el manifiesto: **coinciden**.
+- `legal/` contra `sitio/`: **idénticos**.
+- `armar-paquete-abogado.js`: **exit 0**, y `git status` limpio después (el paquete commiteado es el
+  que produce el script).
+- `git diff --numstat` del paquete: solo los archivos esperados.
+
+### Archivos tocados y commits
+
+Ver el commit de esta jornada en `git log`.
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**
