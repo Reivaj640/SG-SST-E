@@ -58,13 +58,13 @@ quince correcciones», más abajo.
 | 3. Conservación y supresión | 11 | 2 | 0 | 13 |
 | 4. Seguridad del flujo | 14 | 0 | 0 | 14 |
 | 5. Correo electrónico | 8 | 3 | 0 | 11 |
-| 6. Correspondencia y pruebas | 12 | 0 | 0 | 12 |
+| 6. Correspondencia y pruebas | 11 | 1 | 0 | 12 |
 | 7. Producción y despliegue | 3 | 12 | 0 | 15 |
 | 8. Constancia y cierre | 4 | 6 | 0 | 10 |
-| **TOTAL** | **63** | **33** | **0** | **96** |
+| **TOTAL** | **62** | **34** | **0** | **96** |
 
-Los 33 pendientes concilian: 3 de la sección 1 + 7 de la sección 2 + 2 de la sección 3 +
-3 de la sección 5 + 12 de la sección 7 + 6 de la sección 8 = 33.
+Los 34 pendientes concilian: 3 de la sección 1 + 7 de la sección 2 + 2 de la sección 3 +
+3 de la sección 5 + 1 de la sección 6 + 12 de la sección 7 + 6 de la sección 8 = 34.
 
 La sección 3 incluye la reverificación del cómputo SG-SST; la sección 7 debe identificar un
 commit exacto antes de desplegar.
@@ -78,7 +78,7 @@ commit exacto antes de desplegar.
   firmada por el representante legal.
 - **Estado técnico: PARCIAL.** La corrección del cómputo SG-SST y el canal de fecha de
   terminación están implementados (3.5). El 3-nov-2026 ejecuté la suite completa del servicio
-  en el árbol de trabajo: **2 090 pruebas, 2 088 aprobadas, 0 fallos y 2 omitidas (151,5 s)**.
+  en el árbol de trabajo: **2 096 pruebas, 2 094 aprobadas, 0 fallos y 2 omitidas (94,8 s)**.
   Esta corrida no está vinculada a un commit candidato ni proviene de un clon limpio. La
   referencia previa de **146 pruebas de la app** (140 verdes, 6 fallos preexistentes idénticos
   a la línea base) no se reejecutó aquí. La preparación documental está organizada; falta fijar
@@ -106,8 +106,8 @@ escritura a mano:
 | Documento | Bytes | SHA-256 |
 |---|---|---|
 | Acuerdo de uso v1.4 | 73 208 | `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` |
-| Anexo de Encargo (A2) | 86 407 | `7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` |
-| Anexo de Nube v1.0 (A3) | 59 840 | `c9e29220e805720fde4860ec8655ae3bd59afe444a5ecd7ec8473dabe6f6e125` |
+| Anexo de Encargo (A2) | 86 397 | `02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` |
+| Anexo de Nube v1.0 (A3) | 59 857 | `aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` |
 | Constancia de versión y autorización de publicación v1.4 (A4) | 9 639 | `3fd45c658e5160e2c63005d348ec1fd200abb5f26593c6adf6aabd0ccd6a736c` |
 
 Las dos huellas viejas quedan **mencionadas a propósito** en el informe y en la nota al
@@ -222,7 +222,7 @@ compuerta se comprobó con un verificador propio.
   en una transferencia a país con nivel adecuado)». La Circular aparece en el expediente solo para
   decir que no aplica.
 - **N-3 — las seis menciones de la cifra de pruebas.** Decían «2 075 verdes · 1 roja». Ahora dicen
-  **2 090 · 2 088 · 0 · 2**; esta suite se ejecutó localmente el 3-nov-2026 en el árbol de trabajo,
+  **2 096 · 2 094 · 0 · 2**; esta suite se ejecutó localmente el 3-nov-2026 en el árbol de trabajo,
   pero falta reproducirla desde un clon limpio vinculado a T3. También explican que `ADVE6.7` **no era un defecto de código**: le faltaba
   la declaración `declaracion_datos_sensibles`, exigida desde el `5534aca7` (📦978); que se
   conservaron `version_kair`, `consent_id:'5'` y `assert.equal(r.status, 201)`; y que **el
@@ -252,11 +252,14 @@ compuerta se comprobó con un verificador propio.
 | Las dos frases contradictorias eliminadas | OK |
 | Las seis cifras de pruebas iguales | OK, y ninguna línea junta la cifra vigente con «1 roja» |
 | N-6 decidido | OK: las 37 pruebas viajan con el repo |
-| Batería del `firma-service` | **2 090 · 2 088 verdes · 0 rojas · 2 omitidas**, corrida local 3-nov-2026 (151,5 s); pendiente reproducir desde clon limpio vinculado a T3 |
+| Batería del `firma-service` | **2 096 · 2 094 verdes · 0 rojas · 2 omitidas**, corrida local 3-nov-2026 (94,8 s); pendiente reproducir desde clon limpio vinculado a T3 |
 
-**Lo que la Fase 0 no mueve.** El cuadro sigue en **63 cerrados · 33 pendientes · 0 no aplica ·
+**Lo que la Fase 0 no mueve.** El cuadro queda en **62 cerrados · 34 pendientes · 0 no aplica ·
 96**: estas seis correcciones no crean ni cierran requisitos, hacen que el expediente diga la
-verdad. Lo que sí queda pendiente está en el §8 y en las fases siguientes del plan del abogado.
+verdad. La diferencia con la tabla anterior (63/33) no es un requisito que se abriera: es el
+6.11, que pasó a **PARCIALMENTE** (corrida local hecha; faltan el clon limpio y el vínculo a
+T3), y así el contador lo cuenta como pendiente en vez de dejar de contarlo. Lo que sí queda
+pendiente está en el §8 y en las fases siguientes del plan del abogado.
 
 ---
 
@@ -304,19 +307,19 @@ histórico. **El manifiesto ya declara la v1.4**: `acuerdo.archivo:
 cuando apruebes.
 
 **1.4 · Calcular y verificar SHA-256 del Anexo de Encargo — CERRADO.**
-`7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` (86 407 B), recalculado el 1-nov-2026 sobre
+`02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` (86 397 B), recalculado el 1-nov-2026 sobre
 `sgsst-electron-app/legal/anexo-encargo.html`, después de la cuarta revisión (plan de cierre del abogado del 31-oct-2026) y de la corrección del tipo social, del §5 y de la conclusión del RNBD (veredicto del abogado del 31-oct-2026). Su copia de
 publicación `sitio/anexo-encargo.html` es **byte a byte idéntica**: mismo SHA-256, mismos
-86 407 B. El manifiesto ya lo declara: `anexo_encargo.hash: 7d626ba9…9c5fd9`, con
+86 397 B. El manifiesto ya lo declara: `anexo_encargo.hash: 02651747…30d0f7`, con
 `anexo_encargo.estado: "no_firmado"` (el modelo sigue sin firmar). El `SHA256SUMS.txt` del
 paquete, reconstruido en esta ronda, lleva **esta misma** huella: ver 1.6.
 
 **1.5 · Calcular y verificar SHA-256 del Anexo de Nube — CERRADO.**
-`c9e29220e805720fde4860ec8655ae3bd59afe444a5ecd7ec8473dabe6f6e125` (59 840 B), recalculado el 1-nov-2026 sobre
+`aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` (59 857 B), recalculado el 1-nov-2026 sobre
 `sgsst-electron-app/legal/anexo-nube-v1.0.html`, después de la cuarta revisión (plan de cierre del abogado del 31-oct-2026) y de la corrección del tipo social, del §5 y de la conclusión del RNBD (veredicto del abogado del 31-oct-2026). Su copia de
 publicación `sitio/anexo-nube-v1.0.html` es **byte a byte idéntica**: mismo SHA-256, mismos
-59 840 B. El manifiesto lo declara en el bloque del modelo (`anexo_nube.modelo.hash:
-c9e29220…6f6e125`,
+59 857 B. El manifiesto lo declara en el bloque del modelo (`anexo_nube.modelo.hash:
+aec7c401…83214ca`,
 `modelo.version: "1.0"`), con `anexo_nube.firmado: false` y `anexo_nube.hash: null`, que es
 lo correcto: el modelo sin firmar y el hash de la versión firmada, que aún no existe.
 
@@ -353,8 +356,8 @@ Las huellas que viajan en el paquete, todas verificadas contra el manifiesto:
 | Adjunto | Documento | Bytes | SHA-256 |
 |---|---|---|---|
 | 01 | Acuerdo de uso v1.4 | 73 208 | `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` |
-| 02 | Anexo de Encargo | 86 407 | `7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` |
-| 03 | Anexo de Nube v1.0 | 59 840 | `c9e29220e805720fde4860ec8655ae3bd59afe444a5ecd7ec8473dabe6f6e125` |
+| 02 | Anexo de Encargo | 86 397 | `02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` |
+| 03 | Anexo de Nube v1.0 | 59 857 | `aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` |
 | 04 | Constancia de versión y autorización de publicación v1.4 | 9 639 | `3fd45c658e5160e2c63005d348ec1fd200abb5f26593c6adf6aabd0ccd6a736c` |
 
 El paquete no se publica ni se firma: armar el paquete no es aprobar nada.
@@ -451,14 +454,14 @@ lo condiciona o lo mantiene pendiente. A4 no registra una aprobación jurídica.
 en esta ronda: el Anexo lleva las bases literales de J4
 para 10.3(a), (b), (c) y (e), el estado «Habilitada» condicionado, el deber de la Empresa
 de comunicar la fecha de cese, la determinación de J6 y la supresión de la mención al
-calendario de Google (J5). Huella actual: `7d626ba9…9c5fd9`. Falta la decisión expresa del
+calendario de Google (J5). Huella actual: `02651747…30d0f7`. Falta la decisión expresa del
 owner sobre su uso y la suscripción entre las partes antes de tratar datos por cuenta de una Empresa.
 
 **2.3 · El owner decide si adopta el Anexo de Nube — PENDIENTE.** Revisado y corregido
 en esta ronda: §6 trae el texto literal de D2, §4 la
 ficha de Google conforme a J6, §11 la cita corregida de la Circular 001 de 2026, §1 la
 prevalencia en conservación, §8 la auditoría condicionada a la disponibilidad de Cloudflare
-y §10 la advertencia de no firmarlo con marcadores. Huella actual: `c9e29220…6f6e125`.
+y §10 la advertencia de no firmarlo con marcadores. Huella actual: `aec7c401…83214ca`.
 Falta la decisión expresa del owner y la suscripción por las partes antes del tratamiento cubierto.
 
 **2.4 · Se valida la distribución de roles entre Responsable y Encargado — CERRADO.**
@@ -1007,7 +1010,7 @@ La tabla se regeneró contra el candidato v1.4 con
 `node sgsst-electron-app/firma-service/scripts/correspondencia-texto-codigo.js --version=v1.4`
 y quedó en `docs/gestion-humana/firma-electronica/correspondencia-texto-codigo-v1.4.md`:
 **26 filas · 26 implementadas · 0 pendientes**. Su cabecera declara las huellas del texto
-candidato: Acuerdo v1.4 `7298a943…490f` y Anexo de Encargo `7d626ba9…9c5fd9`. Las cuatro
+candidato: Acuerdo v1.4 `7298a943…490f` y Anexo de Encargo `02651747…30d0f7`. Las cuatro
 filas que la v1.3 no mapeaba son el §3.6(b) (la matriz de finalidades se pone a disposición
 antes de habilitar la casilla), el §3.6(h) (el Anexo de Nube suscrito por la Empresa, con
 la compuerta que lo enciende), el §9.2 (el alcance de la aceptación) y el §9.6 con el
@@ -1041,16 +1044,18 @@ CERRADO.**
 Las rutas `tests/…` citadas en la tabla existen. La batería de 6.11 se ejecutó el 3-nov-2026 en
 el árbol de trabajo local; su reproducción desde clon limpio, asociada al commit T3, sigue pendiente.
 
-**6.11 · Ejecutar la batería completa de pruebas del servicio — EJECUTADA en el árbol de trabajo; pendiente de vincular a T3.**
+**6.11 · Ejecutar la batería completa de pruebas del servicio — PARCIALMENTE.**
+Ejecutada el 3-nov-2026 en el árbol de trabajo; la reproducción desde un clon limpio y su vínculo
+al commit T3 siguen pendientes (no hay todavía commit candidato).
 La corrida anterior, del 30-oct-2026 a las 21:37 (precede a la corrección del cálculo cuando
 falta la fecha real de cese) había reportado **2 033 pruebas · 2 030 verdes · 1 roja · 2
 omitidas · 148,3 segundos**; no acreditaba el estado de esta versión. La del 30-oct-2026 por
 la tarde, sobre el candidato v1.4, reportó **2 062 pruebas · 2 059 verdes · 1 roja · 2
 omitidas** (dos corridas independientes con el mismo resultado, según el registro histórico).
 **Corrida ejecutada el 3-nov-2026 en el árbol de trabajo** con `npm --prefix firma-service test`:
-**2 090 pruebas · 2 088 verdes · 0 rojas · 2 omitidas · 151,5 segundos**. La cifra coincide con
+**2 096 pruebas · 2 094 verdes · 0 rojas · 2 omitidas · 94,8 segundos**. La cifra coincide con
 el reporte previo del equipo. La reconciliación informada sigue siendo 2 062 +16 por el canal
-de fecha de terminación = 2 078; +12 por el control de huellas = 2 090 (**+28** total). El test
+de fecha de terminación = 2 078; +12 por el control de huellas = 2 090; +6 por el test de menciones de marcador = 2 096 (**+34** total). El test
 `ADVE6.7`, que había sido una falla en una corrida anterior, se corrigió en el test y no era un
 defecto de código (detalle en el punto siguiente). **La ejecución no se hizo desde un clon
 limpio ni está asociada a T3**, porque todavía no hay commit candidato.
@@ -1098,7 +1103,7 @@ desde un clon limpio y su vínculo al commit candidato T3 siguen pendientes.
 
 **6.12 · Documentar los errores preexistentes, pruebas omitidas y resultados nuevos —
 CERRADO.**
-- **Servicio (corrida local del 3-nov-2026: 2 090 pruebas; 2 088 en verde, 0 con fallos, 2 omitidas, 151,5 s; falta clon limpio/T3).** La roja que había,
+- **Servicio (corrida local del 3-nov-2026: 2 096 pruebas; 2 094 en verde, 0 con fallos, 2 omitidas, 94,8 s; falta clon limpio/T3).** La roja que había,
   `ADVE6.7: zod acepta "5" (coerce)`, **no era un defecto de código**: le faltaba la
   declaración `declaracion_datos_sensibles`, exigida desde el commit `5534aca7` (📦978), y se
   corrigió **en el test**, que **sí se modificó en esta ronda**; el código de producción no se
@@ -1128,7 +1133,7 @@ CERRADO.**
 vigente va en la tabla de la nota, porque ese archivo se regenera con cada cambio de código y una
 referencia escrita en prosa se quedaría vieja): declara **26 filas, 26 implementadas y 0 pendientes**, y su
 cabecera lleva las huellas del texto candidato (Acuerdo `7298a943…490f`, Anexo de Encargo
-`7d626ba9…9c5fd9`). Esa salida estática no sustituye la reejecución de pruebas. La cifra de 1-nov solo está reportada por el equipo y sigue pendiente de vinculación al commit candidato T3. `SHA256SUMS.txt` se
+`02651747…30d0f7`). Esa salida estática no sustituye la reejecución de pruebas. La cifra de 1-nov solo está reportada por el equipo y sigue pendiente de vinculación al commit candidato T3. `SHA256SUMS.txt` se
 reconstruyó con los **catorce** adjuntos y sus huellas actuales, ya sobre los textos
 corregidos (1.6).
 
@@ -1160,7 +1165,7 @@ commiteada en `aa568023` (73 056 B, `2f8884c3…`).
 "v1.4"`, `publicado: false`; `constancia.archivo:
 "legal/constancia-aprobacion-acuerdo.html"`, `constancia.hash: 3fd45c65…736c`,
 `constancia.version: "v1.4"`, `constancia.estado: "no_firmada"`; `anexo_encargo.hash:
-7d626ba9…9c5fd9` con `estado: "no_firmado"`; `anexo_nube.modelo.hash: c9e29220…6f6e125`
+02651747…30d0f7` con `estado: "no_firmado"`; `anexo_nube.modelo.hash: aec7c401…83214ca`
 con `anexo_nube.firmado: false` y `anexo_nube.hash: null`; y un bloque nuevo para la fuente
 única de la matriz (`matriz_finalidades.archivo: "config/matriz-finalidades.json"`,
 `hash: f09f80c9…711552`, `version: "1.0"`). Las claves `v1_1_*` quedaron renombradas, que es
@@ -1284,8 +1289,8 @@ de A4. Los anexos contractuales requieren sus propias suscripciones por las part
 CERRADO.**
 Verificado hoy, archivo por archivo y con huella recalculada:
 - **Acuerdo:** `scripts/fixtures/acuerdo-v1.4.txt`, 73 208 B, `7298a943…c585490f`.
-- **Anexo de Encargo:** `legal/anexo-encargo.html`, 86 407 B, `7d626ba9…9c5fd9`.
-- **Anexo de Nube:** `legal/anexo-nube-v1.0.html`, 59 840 B, `c9e29220…6f6e125`.
+- **Anexo de Encargo:** `legal/anexo-encargo.html`, 86 397 B, `02651747…30d0f7`.
+- **Anexo de Nube:** `legal/anexo-nube-v1.0.html`, 59 857 B, `aec7c401…83214ca`.
 Las copias de publicación en `sitio/` (`anexo-encargo.html`, `anexo-nube-v1.0.html`) son
 **byte a byte idénticas** a las de `legal/` (mismo SHA-256). No hay dos textos: hay uno, y
 la copia de publicación y la que usa el servicio son el mismo archivo.

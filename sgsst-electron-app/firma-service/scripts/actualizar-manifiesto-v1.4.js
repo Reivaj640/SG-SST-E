@@ -54,6 +54,10 @@ const REPO_ROOT = path.resolve(APP_ROOT, '..');
 const MANIFIESTO = path.join(SERVICE_ROOT, 'legal-readiness.json');
 const VERSION = 'v1.4';
 
+// La fecha de la ronda en que se tocan los anexos. Vive aqui y no en el JSON:
+// el manifiesto es la salida de este script.
+const FECHA_ACTUALIZACION = '2026-11-03';
+
 // ---------------------------------------------------------------------------
 // Las notas del manifiesto. ASCII PURO: sin tildes, sin acentos crudos.
 // ---------------------------------------------------------------------------
@@ -306,17 +310,20 @@ function main() {
 
   if (!fs.existsSync(MANIFIESTO)) throw error('No existe ' + MANIFIESTO);
   let m = fs.readFileSync(MANIFIESTO, 'utf8');
-  const fechasManifiesto = m.match(/"version": "2026-11-01",\n  "actualizado_at": "2026-11-01"/g) || [];
-  if (fechasManifiesto.length === 0) {
-    m = reemplazar(
-      m,
-      '"version": "2026-10-31",\n  "actualizado_at": "2026-10-31"',
-      '"version": "2026-11-01",\n  "actualizado_at": "2026-11-01"',
-      'fecha de actualizacion del manifiesto'
-    );
-  } else if (fechasManifiesto.length !== 1) {
-    throw error('La fecha de actualizacion del manifiesto aparece mas de una vez.');
+  // La fecha de actualizacion del manifiesto vive AQUI, en el script que lo
+  // escribe: el manifiesto es la salida de este script, no un archivo que se
+  // edita a mano. La ronda del 3-nov-2026 cambio el Anexo de Encargo (el
+  // titular del aviso de revision profesional) y el Anexo de Nube (el titular
+  // del bloque de pendientes), asi que las tres fechas que dependen de esos
+  // archivos se mueven juntas.
+  const fechasManifiesto = m.match(/"version": "\d{4}-\d{2}-\d{2}",\n  "actualizado_at": "\d{4}-\d{2}-\d{2}"/g) || [];
+  if (fechasManifiesto.length !== 1) {
+    throw error('La fecha de actualizacion del manifiesto aparece ' + fechasManifiesto.length + ' veces (se esperaba 1).');
   }
+  m = m.replace(
+    fechasManifiesto[0],
+    '"version": "' + FECHA_ACTUALIZACION + '",\n  "actualizado_at": "' + FECHA_ACTUALIZACION + '"',
+  );
 
   // --- Acuerdo: renombrar las claves ambiguas (J14-5) --------------------
   //
@@ -350,6 +357,7 @@ function main() {
 
   // --- Anexo de Encargo --------------------------------------------------
   m = ponerEnBloque(m, 'anexo_encargo', 'hash', hashEncargo, 'anexo_encargo.hash');
+  m = ponerEnBloque(m, 'anexo_encargo', 'version', FECHA_ACTUALIZACION, 'anexo_encargo.version');
   m = ponerEnBloque(m, 'anexo_encargo', 'nota', NOTA_ENCARGO, 'la nota del Anexo de Encargo');
 
   // --- Anexo de Nube -----------------------------------------------------
@@ -369,7 +377,7 @@ function main() {
     m = m.replace(hashModeloLine, hashModeloLine + '\n      "bytes": ' + bytesNube + ',');
   }
   m = m.replace(/\n    "bytes": \d+,/, '');
-  m = ponerEnBloque(m, 'modelo', 'actualizado', '2026-11-01', 'anexo_nube.modelo.actualizado');
+  m = ponerEnBloque(m, 'modelo', 'actualizado', FECHA_ACTUALIZACION, 'anexo_nube.modelo.actualizado');
   m = ponerEnBloque(m, 'modelo', 'nota', NOTA_NUBE, 'la nota del Anexo de Nube');
 
   // --- Constancia y matriz: bloques nuevos -------------------------------

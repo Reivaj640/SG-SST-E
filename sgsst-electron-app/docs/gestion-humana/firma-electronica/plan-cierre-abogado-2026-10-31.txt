@@ -11,7 +11,7 @@ Remisiones cruzadas	🟠 Dos rotas	N-4: dicen «§5» donde la conclusión está
 Fechas del manifiesto	🟠 Incoherentes	N-5
 Reproducibilidad del candidato	🔴 Hueco	N-6: 37 pruebas viven en archivos que .gitignore se traga
 Firma sección E, vigencia, T3-T9	⛔ Pendientes	Fases 2 a 5
-El cuadro canónico 63 cerrados · 33 pendientes · 96 no se mueve en la Fase 0: esas correcciones no crean ni cierran requisitos, solo hacen que el expediente diga la verdad. Se mueve en las fases 1 a 4.
+El cuadro canónico 62 cerrados · 34 pendientes · 96 no se mueve en la Fase 0: esas correcciones no crean ni cierran requisitos, solo hacen que el expediente diga la verdad. Se mueve en las fases 1 a 4. (El 6.11 pasó a PARCIALMENTE el 3-nov-2026: el contador lo cuenta como pendiente.)
 
 2. Fase 0 — Correcciones documentales (dev, 2-3 h)
 Se aplican en el origen, nunca en la copia del paquete. Después se reconstruye.

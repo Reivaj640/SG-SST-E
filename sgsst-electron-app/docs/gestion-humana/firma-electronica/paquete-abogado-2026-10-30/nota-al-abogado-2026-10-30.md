@@ -19,16 +19,16 @@ El paquete tiene **catorce (14) adjuntos**. El primero es su propia revisión; l
 |---|---|---|---|---:|---|
 | 00 | **Su revisión jurídica del 30-oct-2026**, tal como se recibió | `00-revision-juridica-del-abogado-2026-10-30.txt` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/revision-juridica-abogado-2026-10-30.txt` | 61 999 | `aad6090865e9cd857bc3de06f7ac67f06eb3bcede4a246ff2173142b020ee4b0` |
 | 01 | **Acuerdo de uso v1.4** (texto final armado) | `01-acuerdo-uso-v1.4.txt` | `sgsst-electron-app/firma-service/scripts/fixtures/acuerdo-v1.4.txt` | 73 208 | `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` |
-| 02 | **Anexo de Encargo** de Tratamiento de Datos Personales | `02-anexo-de-encargo.html` | `sgsst-electron-app/legal/anexo-encargo.html` | 86 407 | `7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` |
-| 03 | **Anexo de Nube v1.0** | `03-anexo-de-nube-v1.0.html` | `sgsst-electron-app/legal/anexo-nube-v1.0.html` | 59 840 | `c9e29220e805720fde4860ec8655ae3bd59afe444a5ecd7ec8473dabe6f6e125` |
+| 02 | **Anexo de Encargo** de Tratamiento de Datos Personales | `02-anexo-de-encargo.html` | `sgsst-electron-app/legal/anexo-encargo.html` | 86 397 | `02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` |
+| 03 | **Anexo de Nube v1.0** | `03-anexo-de-nube-v1.0.html` | `sgsst-electron-app/legal/anexo-nube-v1.0.html` | 59 857 | `aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` |
 | 04 | **Constancia de versión y autorización de publicación** de la v1.4 | `04-constancia-de-aprobacion-v1.4.html` | `sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html` | 9 639 | `3fd45c658e5160e2c63005d348ec1fd200abb5f26593c6adf6aabd0ccd6a736c` |
-| 05 | **Correspondencia texto ↔ código**: qué numeral exige qué y dónde vive | `05-correspondencia-texto-codigo-v1.4.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/correspondencia-texto-codigo-v1.4.md` | 15 126 | `f76c39501c997dc18b0790bb9b8f207cc47e3d619099a3ad9e6a71bee25cf658` |
+| 05 | **Correspondencia texto ↔ código**: qué numeral exige qué y dónde vive | `05-correspondencia-texto-codigo-v1.4.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/correspondencia-texto-codigo-v1.4.md` | 15 126 | `612adaee1ed7dd76c5fea101f6d841bf1d36c5a24b216cbdabdf913d7bd6cf84` |
 | 06 | **Auditoría del Capítulo V** — los dos hallazgos T1 y T2 | `06-auditoria-capitulo-v-t1-t2.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/auditoria-capitulo-v-acuerdo-uso-2026-10-19.md` | 16 675 | `0b407184917b4da1bcd9f07e6b94e2afd27f4d037d1a426f37476a5f4361e654` |
 | 07 | **Evaluación del canal de correo** — antecedente del 27-oct, superado | `07-evaluacion-canal-correo.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/evaluacion-canal-correo-2026-10-27.md` | 17 165 | `9aa3cad83fe48abceb003488aa62ccbea82c43d7c299058bdc8b5a4e8153041b` |
 | 08 | **Su especificación del 30-oct-2026**, tal como se recibió | `08-especificacion-abogado-2026-10-30.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/especificacion-abogado-2026-10-30.md` | 10 947 | `6e6d3f4a3aba229ab3b38d9e8a96f3ab6ae733b3dea518899d07fcd47ab0d47e` |
-| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 104 231 | `e0887efdb8bee327fabf6b6734d8cf65d58d0014c603c95ff3d79dc645545e41` |
-| 10 | **Informe de correcciones para revisión jurídica** — el detalle punto por punto | `10-informe-correcciones-para-asesor-juridico.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md` | 51 361 | `3272591068dd760aaf246dfcd73f3c8a118fea46604043f21b5d4500f48b5b38` |
-| 11 | **Checklist definitivo de revisión jurídica y cierre** | `11-checklist-definitivo-revision-juridica-y-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md` | 21 072 | `2553b8d0e550b460a05ec0a818792e44772f4219028a8efd012ffccea9478f23` |
+| 09 | **Respuesta a su checklist de cierre** — los 96 requisitos con su evidencia | `09-respuesta-al-checklist-de-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/respuesta-checklist-cierre-2026-10-30.md` | 104 674 | `38376ce820026962ce1fb0bae59273885bb6591904314bfbd20d3a32e3599702` |
+| 10 | **Informe de correcciones para revisión jurídica** — el detalle punto por punto | `10-informe-correcciones-para-asesor-juridico.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/10-informe-correcciones-para-asesor-juridico.md` | 51 406 | `3fc9a866c64a25a215aaadbad2f8c76b3f1cd2f1b4ac5945fd55b294d6d141ac` |
+| 11 | **Checklist definitivo de revisión jurídica y cierre** | `11-checklist-definitivo-revision-juridica-y-cierre.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/11-checklist-definitivo-revision-juridica-y-cierre.md` | 21 120 | `dcd6443d5de392064f3815e94f3885022f9d60a67ad18de8cac6e1ed66b62910` |
 | 12 | **Procedimiento escrito de incidentes de datos de salud** — RNBD, 15 días hábiles | `12-procedimiento-incidentes-datos-salud.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/procedimiento-incidentes-datos-salud-2026-10-30.md` | 29 197 | `9e5ae201cdb00944f5d902ed3c226c099559589e60f05dc7950438bfe4e8b142` |
 | 13 | **Adenda de precisión jurídica: RNBD** | `13-adenda-rnbd-2026-11-01.md` | `sgsst-electron-app/docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/13-adenda-rnbd-2026-11-01.md` | 2 163 | `74bfcde8d56cbba00a519822ea13d018c661c4a9b0ed068d7119dc789ae08493` |
 
@@ -87,7 +87,7 @@ Conviene que lo sepa antes de leer los documentos, porque los cuatro están escr
 - **No se hizo ninguna confirmación de cambios en el repositorio**, por instrucción del propietario. Por eso el candidato de código (su T3) todavía no puede fijarse.
 - **La v1.3 no se aprueba y no se publica.** Queda como histórico. No le pedimos aprobación sobre la huella `49eab0c5…f4de12` ni sobre ninguna huella anterior: su D3 lo exige y así se hizo.
 - **El Anexo de Nube está diligenciado pero no firmado.** Los catorce (14) marcadores están
-  escritos con evidencia verificada —huella nueva `c9e29220…6f6e125`, 59 840 B—, pero **ninguna
+  escritos con evidencia verificada —huella nueva `aec7c401…83214ca`, 59 857 B—, pero **ninguna
   Empresa lo ha suscrito**: la compuerta C-1 está apagada actualmente: el bloqueo de solicitudes y Constancia se aplicará cuando se active. Lo que el propio Anexo declara pendiente son cuatro decisiones del propietario (la
   periodicidad de la rotación de la credencial, el escalamiento de un código de un solo uso
   rechazado, la fecha de generación de la contraseña de aplicación y dos documentos por adjuntar
@@ -102,10 +102,10 @@ Conviene que lo sepa antes de leer los documentos, porque los cuatro están escr
 - **T1 y T2:** la corrida local de T1 se ejecutó el 3-nov-2026 en el árbol de trabajo; los datos
   históricos y la limitación frente a T3 se distinguen en los apartados siguientes.
   - **T1 (corrida local ejecutada el 3-nov-2026 en el árbol de trabajo):**
-    **2 090 pruebas · 2 088 verdes · 0 rojas · 2 omitidas · 151,5 s**. No proviene de un clon
+    **2 096 pruebas · 2 094 verdes · 0 rojas · 2 omitidas · 94,8 s**. No proviene de un clon
     limpio ni está vinculada a T3, porque el commit candidato todavía no existe. Reconciliación frente a la base
     reportada: 2 062 +16 del canal de fecha de terminación = 2 078; +12 del nuevo control de
-    huellas = 2 090, es decir, **+28** sobre la base. La duración registrada corresponde solo a la
+    huellas = 2 090; +6 del test de menciones de marcador = 2 096, es decir, **+34** sobre la base. La duración registrada corresponde solo a la
     corrida local indicada arriba.
     El resultado histórico del 30-oct-2026 fue 2 062 pruebas · 2 059 verdes · 1 roja · 2 omitidas.
     **No era un defecto de código**: al test le faltaba la
@@ -172,8 +172,8 @@ decía en dos lugares. Con la compuerta cerrada **sí** quedan registros sin pla
 Los cuatro quedaron corregidos, y el Anexo de Encargo se regeneró desde su generador, no a mano.
 
 **Las huellas cambiaron** (por eso el paquete se reconstruyó): el Anexo de Encargo queda en
-`7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` (86 407 B) y el Anexo de Nube en
-`c9e29220e805720fde4860ec8655ae3bd59afe444a5ecd7ec8473dabe6f6e125` (59 840 B), con los catorce
+`02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` (86 397 B) y el Anexo de Nube en
+`aec7c40132979990cddbad669a8d4690d8439ddc447059d069cd8d19c83214ca` (59 857 B), con los catorce
 marcadores diligenciados.
 El Acuerdo (`7298a943…`) no cambia; A4 se reclasificó y su huella cambió a `3fd45c65…736c`. La comparación sigue siendo
 automática: el programa que arma el paquete sale con código 3 si el manifiesto y el paquete no

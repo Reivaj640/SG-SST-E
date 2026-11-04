@@ -36,6 +36,7 @@ const config = require('../config');
 const {
   listarPlaceholders,
   buscarPlaceholders,
+  listarMenciones,
   analizarTextoLegal,
   esPlaceholderDeLaEmpresa,
   parseVersion,
@@ -732,6 +733,12 @@ function _detalleModelo(analisis) {
       + hb.unicos.join(' ') + '.',
     );
   }
+  if (analisis.menciones && analisis.menciones.total > 0) {
+    partes.push(
+      `El texto nombra ${analisis.menciones.total} marcador(es) de pendiente `
+      + `(${analisis.menciones.unicos.join(' ')}): es una mención, no un dato por llenar.`,
+    );
+  }
   if (analisis.de_la_empresa && analisis.de_la_empresa.total > 0) {
     partes.push(
       `Los ${analisis.de_la_empresa.total} campos de la Empresa los diligencia cada Empresa `
@@ -789,7 +796,11 @@ function analizarAnexoNube(texto) {
   // bloquean, y el detalle los nombra uno por uno.
   const ocurrencias = buscarPlaceholders(v);
   const deLaEmpresa = ocurrencias.filter(esPlaceholderDeLaEmpresa);
-  const huecosBloqueantes = placeholders.huecos.total - deLaEmpresa.length;
+  // Las MENCIONES de un marcador (el texto nombra "[PENDIENTE]" en una regla:
+  // "no se firma con marcadores [PENDIENTE] pendientes") no son huecos: no hay
+  // ningun dato sin llenar. Se listan aparte para que nada quede escondido.
+  const menciones = listarMenciones(v);
+  const huecosBloqueantes = placeholders.huecos.total - deLaEmpresa.length - menciones.length;
   const unicosDeLaEmpresa = [...new Set(deLaEmpresa.map((s) => s.trim()))];
 
   const tieneAviso = Boolean(RE_AVISO_NO_FIRMAR) && RE_AVISO_NO_FIRMAR.test(v);
@@ -816,6 +827,12 @@ function analizarAnexoNube(texto) {
     de_la_empresa: {
       total: deLaEmpresa.length,
       unicos: unicosDeLaEmpresa,
+    },
+    // Las menciones de marcador: el texto nombra el marcador, no deja un hueco.
+    // Se listan (nada queda escondido) pero no bloquean.
+    menciones: {
+      total: menciones.length,
+      unicos: [...new Set(menciones.map((m) => m.valor.trim()))],
     },
     // `ok`: el archivo sirve TAL CUAL como el documento que se firma (con sus
     //   marcadores de borrador: un documento que dice "no firmar" no se

@@ -8,7 +8,7 @@
 | Documento | SHA-256 |
 |---|---|
 | Acuerdo de uso v1.4 | `7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f` |
-| Anexo de Encargo | `7d626ba9cdd50d99283f6fdc294cca2b08755babb502453a25ea1aad9d9c5fd9` |
+| Anexo de Encargo | `02651747c5efdb3204e59ee430b3014cbb768b8567da89c63565d1162730d0f7` |
 
 Generada el 2026-11-01.
 

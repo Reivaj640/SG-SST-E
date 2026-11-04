@@ -378,6 +378,12 @@ Select-String -Path CHANGELOG.md -Pattern '^## \[0\.1\.2(3[0-9])\]' | Select-Obj
   en el token *y* en 7 `rgba()` horneados con su descomposición RGB. Cambiar solo el token
   deja el focus ring y dos sombras del color viejo, y se nota al pasar el mouse. Buscá
   el color descompuesto (`23, 78, 166`) antes de dar por hecha una migración.
+- **Un ancla puede tapar MÁS campos de los que parece.** En un archivo de test, el ancla
+  `version_kair:'0.1.189', consent_id:'5' };` cubría **dos** campos del mismo objeto; el texto de
+  reemplazo reponía solo el segundo y el `version_kair` **desapareció**. El archivo siguió siendo
+  JavaScript válido y **la suite siguió dando verde en 2 077 de 2 078 pruebas**: un campo que falta
+  no se ve como un error de edición, se ve como un **fallo de negocio**. El ancla tiene que reponer
+  **todo** lo que tapaba, campo por campo, y el diff se lee antes de seguir.
 
 ### 5.11b 🔴 "Son copias" NO significa "se arreglan igual"
 
@@ -814,7 +820,202 @@ abogado no había validado.
 
 ---
 
+### 5.24 🔴 Un campo que otro script regenera no se edita a mano: se edita en el script
+
+**El caso.** El manifiesto legal (`firma-service/legal-readiness.json`) lo reescribe
+`scripts/actualizar-manifiesto-v1.4.js` desde constantes que el propio script declara
+(`NOTA_ACUERDO`, `NOTA_ENCARGO`, `NOTA_NUBE`, `NOTA_CONSTANCIA`, `NOTA_MATRIZ`). Una corrección se
+aplicó **en el JSON**, en la línea 87; la siguiente vez que corrió el script, la nota volvió a su
+texto anterior y **la corrección desapareció sin que nadie la notara**. Dos días después el abogado
+la volvió a señalar (N-1 de su plan de cierre). Peor: el mismo script, al **actualizar** un bloque
+que ya existía, refrescaba solo el `hash` y la `nota`, y **no** el `actualizado_at`: la fecha del
+bloque de la matriz quedó vieja aunque su fuente dijera lo contrario, y el manifiesto pasó a
+declarar una fecha anterior al archivo que describe.
+
+**Reglas:**
+
+1. **Antes de editar un archivo, hay que saber quién lo escribe.** Si hay un script que lo
+   regenera, la edición va **en el script**, y el JSON se regenera después. Editar el JSON a mano
+   es editar un archivo que se sobrescribe: la corrección no está perdida, está emboscada.
+2. **Un script que actualiza un bloque tiene que actualizarlo entero.** Si el bloque existe, se
+   refrescan `hash`, `version`, `actualizado_at` y `nota`. La comprobación es directa y barata:
+   la fecha que declara el manifiesto contra el `mtime` del archivo que describe.
+3. **El manifiesto es de solo lectura para el humano.** Se edita `actualizar-manifiesto-v1.4.js` (o
+   `config/`), y después corren el script y su `--check`.
+
+---
+
+### 5.25 🔴 Reemplazar un bloque de líneas por su número puede comerse el texto del borde
+
+**El caso.** Al actualizar un párrafo por rango de líneas (`L[71..73] = [...]`), la primera línea
+del rango era **la continuación de la frase del párrafo anterior**: el contenido empieza en la
+línea 71, pero esa línea arranca en medio de una oración que empezó en la 70. Reemplazar el rango
+dejó esa frase sin principio, y el documento quedó con un texto truncado que nadie notó hasta que
+se leyó el párrafo completo. En otro caso, la aguja transcrita a mano no coincidió con el archivo
+porque el texto decía «subencargado» y se escribió «subencargados»: la operación **abortó** (bien),
+pero el trabajo se estaba haciendo al revés.
+
+**Reglas:**
+
+1. **Antes de reemplazar un rango de líneas se imprime el ANTES y el DESPUÉS.** El rango tiene que
+   empezar donde termina la frase anterior y terminar donde empieza la siguiente.
+2. **No se transcribe el texto viejo: se lee del archivo.** Un párrafo se reemplaza por su
+   posición, o con una aserción (`split(viejo).length - 1 === 1`) que aborte si el texto no es el que
+   se cree. Una coma de diferencia **aborta** la operación; una coma de diferencia silenciosa deja
+   el documento con una frase rota.
+3. **Si el texto viejo no se puede transcribir con confianza, se copia desde el archivo**, no desde
+   el borrador.
+
+---
+
 ## 6. Convenciones de código
+
+### 5.26 🔴 Un control que apunta a una línea deja de comprobar el documento cuando el documento crece
+
+**El caso.** La compuerta G0 del abogado comprobaba que el texto del abogado en el Anexo de Nube
+(A3) seguía intacto **leyendo la línea 274** y buscando ahí una frase. Al diligenciar los
+catorce marcadores, el documento creció dos líneas, el texto pasó a la línea 276 —intacto — y
+la comprobación se puso en rojo diciendo que el texto del abogado ya no estaba.
+
+**Por qué importa.** Un control que apunta a una posición se rompe en cuanto el documento crece, y
+se rompe **falsa**: afirma que el texto no está cuando está. Eso es peor que no comprobar nada,
+porque el rojo se lee como un defecto del documento y no como un defecto del control.
+
+Reglas:
+
+1. **Un control que verifica el texto de otro lo busca por contenido, no por posición**, y con una
+   aserción de coincidencia **única**: si la frase aparece dos veces, el control aborta en vez de
+   elegir una.
+2. **Diligenciar un documento cambia su tamaño.** Todo verificador que apunte a una línea, un
+   párrafo o un byte fijo hay que revisarlo el mismo día en que el documento crece.
+3. **Un marcador puede ser una mención.** El texto del abogado en el §10 del Anexo de Nube dice
+   «no se firma con marcadores [PENDIENTE] pendientes», y el analizador contaba ese corchete como un
+   dato sin llenar. Trece huecos reales pasaron a uno, y el que quedaba era la palabra del abogado.
+4. **La ausencia de filas no es la ausencia del mecanismo.** Antes de afirmar que el sistema no
+   registra algo, buscar el `INSERT` en el código: la base dice qué pasó, el código dice qué
+   puede pasar. El evento `OTP_SEND_FAILED` existía en el código y solo faltaba que fallara un
+   envío para que hubiera fila.
+
+### 5.27 🔴 Una huella que el texto AFIRMA que es la vigente no se puede absolver con una mención a una huella vieja
+
+**El caso (31-oct-2026, noche).** El abogado revisó el paquete y encontró la huella vieja del
+Anexo de Nube en el checklist que él firma. Se construyó un control automático que barre todo hex
+de 64 caracteres de los documentos del paquete y lo compara con el manifiesto. El control pasó en
+verde... y **el paquete tenía el mismo defecto, en otra fila**: la fila D3 del checklist 11 decía
+«La huella vigente del Anexo de Encargo es `ebc294ac…` (86 382 B)», que era la huella **vieja** del
+A2 (la vigente es `7d626ba9…`, 86 407 B). La fila entera se excusaba con la palabra «histórica»,
+que estaba en **otra celda** de la misma fila: la mención a una huella vieja absolvía a la huella
+que el documento afirmaba que era la vigente.
+
+**Por qué importa.** Hay dos clases de referencia a una huella, y no son lo mismo:
+
+| Clase | Qué afirma | Cómo se juzga |
+|---|---|---|
+| **Mención** | «la huella anterior `X` queda como histórica» | Si la misma unidad la declara vieja, pasa |
+| **Afirmación** | «la huella vigente del Anexo es `X`» | Si `X` no es la vigente, el documento **miente** |
+
+Una afirmación no se absuelve con una mención. Y el defecto es invisible si el control solo busca
+huellas: encuentra `ebc294ac`, la ve junto a la palabra «histórica» y la da por buena.
+
+Reglas:
+
+1. **Una afirmación de vigencia se comprueba siempre.** Si el texto dice que una huella es la
+   vigente (la huella vigente del…, es la que lleva…, la que se entrega…), esa huella tiene que ser
+   la vigente del manifiesto. Si no lo es, es un fallo, aunque la misma fila diga «histórica».
+2. **El alcance de la declaración de «histórica» es la fila, no el documento.** Y dentro de la fila,
+   la afirmación de vigencia manda sobre la mención: se comprueba **antes**.
+3. **La afirmación se lee por el segmento que precede a la huella**, no por la fila entera: una
+   celda puede contener dos afirmaciones distintas («la huella vigente es X; la anterior es Y,
+   histórica»).
+4. **El control tiene que tener su prueba en negativa.** Reintroducir la huella vieja y comprobar
+   que el script **rechaza** el paquete. Un control que solo se probó en verde no está probado.
+5. **Las abreviaturas sueltas no se juzgan.** La forma `7298a943` la usan en el paquete también los
+   hash de commit de git (`5534aca7`, `e1d10728`). Se juzgan las huellas de 64 caracteres y las
+   formas con puntos suspensivos (`abc12345…f6d7`).
+
+### 5.28 🔴 El tar armado en Windows llega al servidor en 777: el `chown` no arregla los permisos
+
+**El caso (31-oct-2026).** El pre-T4 de solo lectura encontró `/opt/kair-firma/app` **y todas sus
+subcarpetas en 777**, con la base de prueba dentro (`app/data/test.sqlite`). El despliegue
+documentado hace `sudo tar -xzf` + `sudo chown -R kairfirma:kairfirma`: el `chown` cambia el
+**dueño**, no los **permisos**. Y el tar se arma **en Windows**, con el `tar` de bsdtar, que **no
+guarda permisos POSIX**: todos los archivos salen con modo 777 en el tar, y al extraerlos como root
+quedan 777 en disco. El árbol quedó con dueño `kairfirma` y permisos 777 al mismo tiempo.
+
+**Por qué importa.** Con 777, cualquier usuario de la máquina puede escribir el código que corre el
+servicio de firma. No es un detalle de forma: es «mínimo privilegio» sin cumplir, y el abogado lo
+marcó como bloqueante.
+
+Reglas:
+
+1. **El despliegue normaliza permisos, y es parte del ciclo pegado.** `sudo chmod -R u=rwX,go=rX`
+   después del `chown`, en el mismo bloque, sin pausas.
+2. **Endurecer no rompe el servicio.** La unidad corre como `User=kairfirma`: lee su propio código y
+   no necesita ser root. Con 755 en directorios y 644 en archivos arranca igual.
+3. **Los secretos no viven en el árbol del código.** El `.env` está en `/opt/kair-firma/.env` (600) y
+   la base de producción en `/opt/kair-firma/data/`, **fuera** de `app/`. Por eso `go=rX` (lectura
+   para otros) no expone nada secreto.
+4. **La base de prueba no viaja a producción.** `app/data/test.sqlite` se retira en el despliegue.
+5. **Permisos no es cifrado.** El disco sin cifrar (LVM sin LUKS) no lo arreglan los permisos: es una
+   decisión aparte, del owner y del abogado, y se documenta como tal.
+
+### 5.29 🔴 Una mención de un marcador no es un hueco
+
+**El caso (3-nov-2026).** El Anexo de Nube reportaba un hueco bloqueante: `[PENDIENTE]`. No era un
+dato sin llenar: los 14 apartados estaban diligenciados, y el corchete estaba **dentro** del aviso
+del propio abogado («Este Anexo no se firma con marcadores [PENDIENTE] pendientes: se firma después
+de completarlos, y la firma no sustituye la evidencia»). El texto **nombraba** el marcador; no lo
+**dejaba** pendiente. El gate además reportaba «Faltan 1 datos del owner: [PENDIENTE]», que era
+falso: al owner no le faltaba ningún dato.
+
+**Por qué importa.** Un control que cuenta la aparición de una palabra cuenta las **menciones**
+junto con los **datos**. Con el Anexo bloqueado por una mención, el flujo se detiene por un motivo
+que no existe, y quien lo lee cree que a la Empresa le falta algo.
+
+**La regla nueva, en el código y con su test.** `src/utils/textoLegal.js` gana `listarMenciones()`
+y `RE_MENCION_DE_MARCADOR`; `analizarAnexoNube` resta las menciones de `huecosBloqueantes` y las
+**lista** en el detalle («es una mención, no un dato por llenar»). Test propio de 6 casos:
+`tests/legal-menciones-marcador.test.js`.
+
+Reglas:
+
+1. **Una mención se reconoce por su forma exacta, y la forma es estrecha.** Solo un `[PENDIENTE]`
+   **inmediatamente precedido** de «marcador» o «marcadores» es mención. «los marcadores del
+   formulario: [PENDIENTE]» **no** coincide.
+2. **Una mención se lista, no se borra en silencio.** El hueco desaparece del conteo y el detalle
+   dice por qué. Si desaparece sin explicación, el que lee no puede distinguir «no había» de «se
+   decidió».
+3. **Un patrón demasiado ancho se acota, no se borra.** Cuando un control señalando una frase
+   verdadera, el arreglo es **acotar el patrón**, no quitar el control: y la acotación va por
+   **línea**, porque en una misma línea puede estar la afirmación sobre el archivo y, al lado, la
+   del servidor.
+
+### 5.30 🔴 El estado de un requisito se cuenta con una palabra clave, no con texto libre
+
+**El caso (3-nov-2026).** El cuadro canónico (`respuesta-checklist-cierre-2026-10-30.md`) declaraba
+**63 cerrados · 33 pendientes · 0 no aplica · 96** en su tabla resumen, y el conteo real daba
+**95 requisitos**: el 6.11 tenía como estado el texto libre «EJECUTADA en el árbol de trabajo;
+pendiente de vincular a T3», que el contador no reconocía. El documento declaraba 96 y **contaba
+95**: era incontabilizable, y su tabla no se podía verificar contra nada.
+
+**Por qué importa.** Un estado escrito en prosa no se puede contar, y una tabla que no se puede
+verificar es una afirmación, no un dato. Peor: el 6.11 **sí** estaba a medio hacer, así que la tabla
+decía «12 cerrados» en la sección 6 cuando en realidad había 11 cerrados y 1 a medias.
+
+**La regla.** El estado es **la última palabra de la clave** (lo que va después del último rayón
+largo) y tiene que ser una de estas cuatro: `CERRADO`, `PENDIENTE`, `PARCIALMENTE`, `No aplica`.
+`PARCIALMENTE` cuenta como pendiente (no está cerrado: algo falta). **La explicación va en el cuerpo,
+no en la clave.**
+
+Reglas:
+
+1. **La clave del encabezado es un estado, no un párrafo.** Si hay que explicar, se explica debajo.
+2. **La tabla resumen no se escribe a mano.** `scripts/contar-estados-checklist.js --escribir` la
+   regenera desde el conteo real, y sin opciones **falla** si el documento no cuadra. Cuando el
+   cuadro se mueve, los números que lo citan en otros documentos se actualizan con el conteo nuevo.
+3. **Un requisito a medias se declara a medias.** Escribir «EJECUTADA localmente; falta el clon
+   limpio» en el estado no es un detalle de redacción: hace que el requisito **desaparezca** del
+   conteo, y que la tabla declare un cierre que no ocurrió.
 
 ### 6.1 Backend — bridges
 
@@ -994,6 +1195,19 @@ un **defecto del test**, aunque parezca un fallo de entorno porque muere en runt
 reportar un rojo como "depende del entorno", hay que **leer el test y contrastarlo con el código**
 (§5.9) para saber cuál de las dos cosas es. Los dos checks invertidos **muerden**: se comprobó por
 mutación que pasan a rojo si el código vuelve al comportamiento viejo.
+
+**Caso del 31-oct-2026 (firma-service): un rojo crónico que nadie abrió.** El test
+`firma-service/tests/_adversary-e6e7.test.js` (ADVE6.7) pedía `201` al crear una solicitud y
+recibía `422`. El `422` **no venía del `consent_id` que el test medía**: venía del control
+`declaracion_datos_sensibles`, que la ruta exige **desde el commit `5534aca7` (📦978)** y que el
+test no mandaba. El rojo llevaba **semanas** en la suite y nadie lo notó, porque el conteo siempre
+salía "1 rojo" y era el de siempre. Reglas: (1) **un rojo crónico se abre una vez por cambio de
+código, no una vez por corrida**: si el número de rojos no se mueve, hay que leer **por qué** falla
+ese rojo, no compararlo con la corrida anterior; (2) **el código de error dice la causa**:
+`422 DECLARACION_DATOS_SENSIBLES_REQUERIDA` no es "el `consent_id` está mal"; (3) **un test que
+lleva semanas en rojo por un control ajeno no está midiendo lo que dice medir**: hay que
+actualizarlo; (4) **el arreglo de un rojo viejo es en el test, no en el código**: el código
+cumplía el control y el test tenía la expectativa de antes del control.
 
 **✅ También se resolvieron los 2 de presupuesto** (ver más abajo el por qué, que es la parte
 interesante): eran el mismo error de patrón dos veces.
@@ -1460,6 +1674,13 @@ Caso real (30-oct-2026, noche): al cerrar el despliegue había que limpiar **844
 | 108 | 🔴 **Un mecanismo legal desplegado sin su compuerta aplica en producción lo que el texto vigente no dice** | `sgsst-electron-app/firma-service/config/tabla-conservacion.json` (`aplicacion.activada`), `firma-service/src/services/retencion.js` (`_tablaActivada`), `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` (§5.1) | La fuente legal declara su propio estado y el código lo lee. Con la compuerta cerrada, el plazo por defecto es el del catálogo y las excepciones legales siguen aplicando |
 Caso real (30-oct-2026, noche): el owner dijo "pongámoslo en producción" y la revisión del camino de despliegue encontró tres defectos que eran jurídicos, no técnicos. (1) La tabla de conservación declaraba `estado: PROPUESTA` — "los plazos de diez (10) y cinco (5) años NO se activan en producción hasta que el abogado los valide" — pero el **código no leía ese estado**: el planificador aplicaba el plazo por defecto de la tabla sin mirarlo. Desplegarlo activaba en producción exactamente los plazos que el abogado no había validado, y el Acuerdo **vigente** (la v1.0, cuyo 8.6 remite a la tabla de la Empresa y no describe esos plazos) no los dice. (2) El `git archive` del §5.1 no llevaba `config/`: sin la tabla en disco el servicio arrancaba con el **respaldo congelado del código (tres categorías en vez de ocho)** y lo hacía **en silencio**. (3) El manifiesto apuntaba a `scripts/fixtures/acuerdo-v1.3.txt`, que **no estaba versionado ni viajaba en el tar**: el readiness del servidor iba a leer un archivo inexistente y a reportar huecos que son puro artefacto del empaquetado. Reglas: (1) **un mecanismo que administra plazos declara su propia activación y el código la lee**: lo que decide cuándo se aplica un plazo es el documento que lo administra, no una constante ni una variable de entorno; (2) **lo que el texto vigente no describe, el código no lo aplica**: el Acuerdo que manda en producción es el que está en la base, no el que se está preparando; (3) **el paquete se verifica por su contenido, no por su hash**: un hash de un tar no dice si dentro va la tabla de conservación; (4) **el tar se arma desde el commit, así que lo que no está versionado no viaja**: versionar el texto del Acuerdo no es opcional cuando el manifiesto lo declara; (5) **el respaldo de emergencia de un mecanismo con compuerta, arranca con la compuerta cerrada**: si no, la falla de leer el archivo activa lo que la compuerta bloquea |
 
+
+| 110 | 🔴 **Una regla de `.gitignore` puede tragarse archivos de prueba REALES: corren en la suite y no viajan con el repo** | `sgsst-electron-app/.gitignore:80` (`_*.js`) | Antes de decir que un archivo "está en el repo", comprobá `git check-ignore -v <archivo>`: si imprime la regla, **no está versionado**, aunque exista en disco y sus pruebas corran |
+Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-service` (ADVE6.7) se descubrió que el archivo que lo contiene —`firma-service/tests/_adversary-e6e7.test.js`— **no está versionado**: la regla `_*.js` (📦773, pensada para los scripts one-off de depuración) lo traga porque el nombre arranca con guion bajo. Lo mismo pasa con `firma-service/tests/routes/__test-isolation.test.js`. El `package.json` del servicio corre `tests/*.test.js` y `tests/routes/*.test.js`, así que **37 pruebas se ejecutan en esta máquina y no existen para nadie más**: ni para el CI, ni para otra PC, ni para un clon nuevo. Reglas: (1) **el conteo de la suite incluye pruebas que pueden no estar en el repo**: antes de reportar "2 078 en verde", hay que saber cuántas de esas viajan; (2) **`git check-ignore -v` es la forma de saber si un archivo está versionado**, no `git status` ni el hecho de que exista en disco; (3) **un archivo de prueba real no lleva el prefijo de los temporales**: la excepción va en el `.gitignore` (`!firma-service/tests/_*.test.js`), no en el nombre del archivo; (4) **una prueba que no viaja no protege a nadie**: verde en esta máquina y verde en otra son dos cosas distintas
+
+| 111 | 🔴 **El manifiesto legal lo reescribe su script: editar el JSON a mano no vale, y el script tiene que refrescar el bloque entero** | `sgsst-electron-app/firma-service/legal-readiness.json`, `sgsst-electron-app/firma-service/scripts/actualizar-manifiesto-v1.4.js` | Las `nota` de los bloques (`acuerdo`, `anexo_encargo`, `anexo_nube.modelo`, `constancia`, `matriz_finalidades`) son **constantes del script**. Una corrección aplicada al JSON desaparece en la siguiente regeneración: la de la línea 87 se perdió y el abogado la volvió a señalar dos días después. Y el script, al actualizar un bloque que ya existía, refrescaba `hash` y `nota` pero **no** `actualizado_at`: el manifiesto pasaba a declarar una fecha anterior al archivo que describe. Reglas: (1) **el manifiesto no se edita a mano**: se edita el script (o `config/`), y se corren el script y su `--check`; (2) **un bloque que se actualiza se actualiza entero**: `hash`, `version`, `actualizado_at` y `nota`; (3) **la fecha que declara el manifiesto se compara con el `mtime` del archivo que describe**, y esa comparación es parte de la cadena, no un extra (§5.24) |
+| 112 | 🔴 **Un control legal que apunta a un número de línea se rompe en cuanto el documento crece, y se rompe mintiendo** | `sgsst-electron-app/legal/anexo-nube-v1.0.html` (la línea 274 que la compuerta G0 daba por buena) | La G0 comprobaba que el texto del abogado seguía intacto **leyendo la línea 274**. Al diligenciar los catorce marcadores el documento creció dos líneas, el texto pasó a la 276 y el control quedó rojo diciendo que el texto ya no estaba. **Un control que verifica el texto de otro lo busca por contenido, con aserción de coincidencia única**; y todo verificador que apunte a una línea, un párrafo o un byte se revisa el mismo día en que el documento crece |
+| 113 | 🔴 **La ausencia de filas en la base no es la ausencia del mecanismo, y un corchete puede ser una palabra y no un dato** | `sgsst-electron-app/firma-service/src/services/publicFlow.js` (evento `OTP_SEND_FAILED`) | Del hecho de que la base de producción no tuviera filas de error de envío se concluyó que el sistema no registraba los errores: **falso**, el `INSERT` del evento está en el código y lo que no había pasado es que ningún envío fallara. Y al otro lado, el único hueco que le quedaba al Anexo diligenciado era `[PENDIENTE]`, que era **la palabra del abogado dentro de su propia regla**, no un dato. Reglas: **la base dice qué pasó, el código dice qué puede pasar**; y cuando el control discrepa del documento, la primera pregunta es si el control está contando algo que no es un dato |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 

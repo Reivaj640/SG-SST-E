@@ -207,6 +207,17 @@ sudo systemctl stop kair-firma
 sudo tar -xzf /tmp/kair-deploy.tar.gz -C /opt/kair-firma
 sudo chown -R kairfirma:kairfirma /opt/kair-firma/app /opt/kair-firma/legal
 
+# 2b. NORMALIZAR LOS PERMISOS. El tar se arma en WINDOWS (tar de bsdtar, que no
+#     guarda permisos POSIX): al extraerlo como root, TODO llega en 777. Esto no
+#     lo arregla el chown. Va pegado al chown, en el mismo ciclo.
+#     Resultado: directorios 755 (raiz 750), archivos 644, duenno kairfirma.
+sudo chmod -R u=rwX,go=rX /opt/kair-firma/app /opt/kair-firma/legal
+sudo chmod 750 /opt/kair-firma/app /opt/kair-firma/legal
+
+# 2c. La base de PRUEBA no debe quedar en el despliegue. Si un despliegue
+#     anterior la dejo dentro de app/data/, se retira.
+sudo rm -f /opt/kair-firma/app/data/test.sqlite
+
 # 3. VERIFICAR el hash de lo que quedo en disco (no del repo, no del tar)
 sha256sum /opt/kair-firma/app/src/crypto/token.js
 sha256sum /opt/kair-firma/app/src/services/signRequest.js
@@ -216,7 +227,14 @@ sha256sum /opt/kair-firma/app/config/tabla-conservacion.json
 # El texto del Acuerdo que declara el manifiesto: sin este archivo el
 # readiness lee un archivo inexistente y reporta huecos que son puro
 # artefacto del empaquetado.
-ls -l /opt/kair-firma/app/scripts/fixtures/acuerdo-v1.3.txt
+ls -l /opt/kair-firma/app/scripts/fixtures/acuerdo-v1.4.txt
+
+# Y los PERMISOS, que el chown no corrige (ver 5.1.3):
+# lo esperado: drwxr-x--- en app/, drwxr-xr-x en app/src/, -rw-r--r-- en los
+# archivos, y app/data/ SIN test.sqlite.
+ls -ld /opt/kair-firma/app /opt/kair-firma/app/src
+ls -l /opt/kair-firma/app/src/server.js
+ls -l /opt/kair-firma/app/data/
 
 # 4. LAS MIGRACIONES, con el servicio parado y ANTES de arrancar.
 #    OJO: con el .env cargado. El .env real esta en /opt/kair-firma/.env y
@@ -321,7 +339,7 @@ consecuencias que hay que tener presentes, porque las dos fallan **en silencio**
 
 - **El texto del Acuerdo que declara el manifiesto tiene que estar versionado**, porque el
   readiness lo lee en el servidor (`acuerdo.v1_1_archivo` ->
-  `scripts/fixtures/acuerdo-v1.3.txt`). Si no estuviera commiteado, el paquete viajaria
+  `scripts/fixtures/acuerdo-v1.4.txt`). Si no estuviera commiteado, el paquete viajaria
   sin el y el readiness leeria un archivo inexistente: reportaria huecos que son puro
   artefacto del empaquetado.
 - **`config/` tiene que estar versionado**, porque es ahi donde vive la tabla de
@@ -601,6 +619,56 @@ despliegue esta a medias.
 
 "filas suprimidas: 0" con "archivos eliminados: 0" y firmas elegibles
 reportadas es el sintoma del bug viejo. Con el arreglo, las dos capas corren.
+
+---
+
+### 5.1.3 Los permisos del despliegue (trampa del 2026-10-31)
+
+> **2026-10-31.** El pre-T4 de solo lectura encontro `/opt/kair-firma/app` **y todas
+> sus subcarpetas en 777**, y una **base de prueba** (`app/data/test.sqlite`,
+> 303 104 B) dentro del despliegue. El abogado lo marco como bloqueante: con
+> permisos 777, cualquier usuario de la maquina puede escribir el codigo que
+> corre el servicio, y eso no es "minimo privilegio".
+
+**Por que llega en 777.** El tar se arma **en Windows** (el `tar -czf` de
+PowerShell, que es bsdtar): bsdtar **no guarda permisos POSIX**, asi que todos
+los archivos quedan con el modo 777 en el tar. Al extraerlo **como root**, el
+`tar` los preserva tal cual: 777 en disco. El `chown` que hace el despliegue
+**cambia el dueno, no los permisos** — por eso el arbol quedo con dueno
+`kairfirma` y permisos 777 al mismo tiempo.
+
+**El arreglo no rompe el despliegue.** La unidad systemd corre como
+`User=kairfirma` (`deploy/kair-firma.service`): el servicio le el codigo al
+proprietario, no necesita ser root. `ProtectSystem=full` y
+`ReadWritePaths=/opt/kair-firma` ya limitan la escritura. Con 755 en los
+directorios interiores y 644 en los archivos, el proceso sigue arrancando igual.
+
+```bash
+# Normalizar (lo que ya va en el paso 2b del despliegue)
+sudo chmod -R u=rwX,go=rX /opt/kair-firma/app /opt/kair-firma/legal
+sudo chmod 750 /opt/kair-firma/app /opt/kair-firma/legal
+
+# Retirar la base de prueba (paso 2c)
+sudo rm -f /opt/kair-firma/app/data/test.sqlite
+
+# Verificar
+ls -ld /opt/kair-firma/app /opt/kair-firma/app/src
+ls -l /opt/kair-firma/app/src/server.js
+ls -l /opt/kair-firma/app/data/
+```
+
+Que se espera: `drwxr-x---` en `app/`, `drwxr-xr-x` en `app/src/`,
+`-rw-r--r--` en los archivos, y `app/data/` **sin** `test.sqlite`.
+
+> **Lo que NO se corrige con esto.** Los secretos no viven en `app/`: el `.env`
+> esta en `/opt/kair-firma/.env` (600) y la base de produccion en
+> `/opt/kair-firma/data/firma.sqlite`, **fuera** del arbol del codigo. Por eso
+> `go=rX` (lectura para otros) no expone ni el `.env` ni la base de produccion.
+
+**El disco del servidor no esta cifrado** (raiz sobre LVM sin LUKS, swap en
+`/swap.img` plano). Eso **no lo arreglan los permisos**: es una decision
+pendiente del owner y del abogado (LUKS o control compensatorio documentado).
+Queda registrado como tal, con fecha.
 
 ---
 

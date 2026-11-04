@@ -87,6 +87,46 @@ const PLACEHOLDERS_DE_LA_EMPRESA = [
 ];
 
 /**
+ * Una MENCIÓN de un marcador: el texto NOMBRA el marcador, no deja un hueco.
+ *
+ * El caso real (3-nov-2026): el Anexo de Nube termina con el aviso «Este Anexo
+ * no se firma con marcadores [PENDIENTE] pendientes: se firma después de
+ * completarlos». Ese `[PENDIENTE]` es el NOMBRE del marcador, citado en una
+ * regla; no es un dato sin llenar. Pero el contador de huecos lo contaba como
+ * hueco bloqueante y el readiness le decía al owner «Faltan 1 datos del
+ * owner: [PENDIENTE]» — que es falso: los catorce apartados del owner están
+ * diligenciados.
+ *
+ * La regla es DELIBERADAMENTE estrecha: solo cuenta como mención un
+ * `[PENDIENTE]` que va inmediatamente precedido de la palabra «marcador» o
+ * «marcadores». Un hueco de verdad ("los marcadores del formulario:
+ * [PENDIENTE]") NO coincide, porque entre la palabra y el corchete hay algo
+ * más. Es la diferencia entre nombrar el marcador y dejar el marcador.
+ *
+ * Como los campos del sistema y los de la Empresa, las menciones se LISTAN
+ * (nada queda escondido) pero no bloquean.
+ */
+const RE_MENCION_DE_MARCADOR = /\bmarcadores?\s*\[\s*pendiente\s*\]/gi;
+
+/**
+ * Devuelve las menciones de marcador de un texto, en orden.
+ *
+ * @param {string} texto
+ * @returns {Array<{valor: string, indice: number}>}
+ */
+function listarMenciones(texto) {
+  if (typeof texto !== 'string' || texto.length === 0) return [];
+  const re = new RegExp(RE_MENCION_DE_MARCADOR.source, 'gi');
+  const out = [];
+  let m;
+  while ((m = re.exec(texto)) !== null) {
+    const ini = m[0].indexOf('[');
+    out.push({ valor: m[0].slice(ini), indice: m.index + ini });
+  }
+  return out;
+}
+
+/**
  * Normaliza el contenido de un placeholder para compararlo: sin corchetes, sin
  * espacios sobrantes y en minúsculas.
  *
@@ -321,7 +361,9 @@ module.exports = {
   MARCADORES_PROHIBIDOS,
   PLACEHOLDERS_DEL_SISTEMA,
   PLACEHOLDERS_DE_LA_EMPRESA,
+  RE_MENCION_DE_MARCADOR,
   listarPlaceholders,
+  listarMenciones,
   analizarTextoLegal,
   parseVersion,
   esVersionPosteriorA10,

@@ -221,7 +221,7 @@ test('la excepcion de la Empresa es de CONTENIDO EXACTO', function () {
   assert.equal(r.modeloOk, false);
 });
 
-test('el Anexo de Nube del repo es el MODELO y le faltan solo datos del owner', function () {
+test('el Anexo de Nube del repo es el MODELO y no le falta ningun dato del owner', function () {
   const fs = require('node:fs');
   const path = require('node:path');
   const html = fs.readFileSync(
@@ -235,11 +235,16 @@ test('el Anexo de Nube del repo es el MODELO y le faltan solo datos del owner', 
     3,
     `los tres campos de la Empresa: ${JSON.stringify(r.de_la_empresa)}`,
   );
-  assert.ok(
-    r.huecosBloqueantes > 0,
-    'el modelo todavia tiene datos del owner por diligenciar',
+  // Los catorce apartados del owner estan diligenciados (31-oct-2026): el modelo
+  // no le falta ningun dato. El unico corchete que queda es la MENCION del
+  // marcador en el aviso de no firmar, que no es un hueco por llenar.
+  assert.equal(
+    r.huecosBloqueantes,
+    0,
+    `huecos bloqueantes: ${JSON.stringify(r.huecos_bloqueantes.unicos)}`,
   );
-  assert.equal(r.modeloOk, false, 'por eso el modelo no esta listo para firmar');
+  assert.equal(r.menciones.total, 1, 'la mencion se lista: nada queda escondido');
+  assert.equal(r.modeloOk, true, 'el modelo esta completo');
 });
 
 test('los dos arboles del Anexo de Nube estan identicos (legal/ y sitio/)', function () {

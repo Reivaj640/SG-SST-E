@@ -1,14 +1,274 @@
-# K+AIR — Contexto del Proyecto
+# K+AIR — Contexto del Proyecto
+
+
 
-> **Antes de arrancar a trabajar:** [`PROMPT.md`](../PROMPT.md) tiene las reglas de proceso
-> y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
-> última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
-
-**Última actualización:** 30 de octubre de 2026
-**Versión actual:** 0.1.247 (desarrollo) — último publicado v0.1.205
+> **Antes de arrancar a trabajar:** [`PROMPT.md`](../PROMPT.md) tiene las reglas de proceso
+
+
+> y las trampas activas; [`Historial.md`](../Historial.md) tiene el estado de cierre de la
+
+
+> última jornada. Este archivo describe el proyecto, no el estado puntual del trabajo.
+
+
+
+
+
+**Última actualización:** 3 de noviembre de 2026
+**Versión actual:** 0.1.252 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 3-nov-2026 — dos marcas prohibidas reescritas, y una mención que ya no es un hueco:**
+> La línea sigue siendo la del **servicio de firma electrónica de K+AIR**. El owner trajo una tabla
+> con dos "marcas prohibidas" y la pregunta de fondo: **si la norma no las exige, quitarlas**. Las
+> dos frases eran **nuestras**, no de la norma: ni la Ley 1581 ni el Decreto 1074 exigen «Revisión
+> profesional pendiente» ni «PENDIENTE DE COMPLETAR ANTES DE FIRMAR». Y antes de tocar nada se
+> comprobó **contra el código**, no contra la tabla, y la tabla tenía cuatro errores.
+> **La marca del Anexo de Encargo (línea 830) no frenaba la firma en runtime**: el flujo usa
+> `anexo_encargo_firmado_at` (la fecha que registra el administrador); el análisis del documento
+> solo se usa en el readiness y en el validador de anexos. Lo rojo era el **gate de publicación**, y
+> eso es lo que se quitó.
+> **La marca del Anexo de Nube (línea 41) no bloqueaba su ítem**: el ítem usa `modeloOk`, que ignora
+> los marcadores. Lo que lo bloqueaba era el **hueco**, y ese hueco no era «del owner»: los 14
+> apartados están diligenciados, y el `[PENDIENTE]` de la línea 615 está **dentro** del aviso «Este
+> Anexo no se firma con marcadores [PENDIENTE] pendientes». Es una **mención**, no un dato sin llenar.
+> El gate además mentía al decir «Faltan 1 datos del owner: [PENDIENTE]».
+> **La regla nueva, en el código y con su test:** una mención de un marcador no es un hueco.
+> `textoLegal.js` gana `listarMenciones()` con una regla deliberadamente estrecha: solo un
+> `[PENDIENTE]` **inmediatamente precedido** de «marcador» o «marcadores» es mención. La readiness
+> resta las menciones de los huecos bloqueantes y las **lista** («es una mención, no un dato por
+> llenar»). Test propio de 6 casos: `tests/legal-menciones-marcador.test.js`.
+> **Lo que se reescribió, y lo que NO.** En el Anexo de Encargo, el titular del aviso pasó de «Revisión
+> profesional pendiente.» a «Revisión profesional.»: **el fondo jurídico no se tocó**, porque el
+> cuerpo sigue diciendo que el contenido «debe ser revisado por un abogado antes de considerarlo
+> contractualmente válido». En el Anexo de Nube, el titular pasó de «PENDIENTE DE COMPLETAR ANTES DE
+> FIRMAR.» a «LO QUE TODAVÍA FALTA ANTES DE FIRMAR.», porque los datos ya están completos: lo que
+> falta es la validación del abogado y las decisiones del owner. De paso, dos acentos crudos pasaron a
+> entidades HTML (`ejecuci&oacute;n`, `condici&oacute;n`).
+> **El riesgo que el owner aceptó, y que queda escrito:** con el aviso reescrito, **el sistema ya no
+> bloquea la primera firma por la revisión del abogado**. El control que lo frenaba se quitó por
+> decisión expresa, no por error. La mitigación es que el texto del aviso sigue en el cuerpo del
+> Anexo, que es lo que se firma.
+> **Precedente que hay que conocer:** esa marca ya se había quitado una vez y se **restituyó**
+> (31-oct-2026), porque el check volvía a bloquear, «que es lo correcto». El owner lo supo y decidió
+> quitarla otra vez.
+> **Estado.** Suite del `firma-service`: **2 096 · 2 094 verdes · 0 rojas · 2 omitidas** (94,5 s,
+> corrida local 3-nov-2026). **G0 en verde (0 fallos).** Manifiesto coherente (`--check` en 0).
+> Paquete reconstruido y verificado: **14 filas, 14 adjuntos, 0 problemas**. Barrido de caracteres no
+> latinos: **0**. Huellas vigentes: A1 `7298a943…490f` (73 208 B), A2 `02651747…30d0f7` (86 397 B), A3
+> `aec7c401…83214ca` (59 857 B), A4 `3fd45c65…a736c` (9 639 B), matriz `f09f80c9…711552` (19 881 B).
+> La Constancia **cambió** desde el 1-nov (`5fd33069…bbbcb`, 10 200 B) a la vigente: el hash del 1-nov
+> queda como antecedente.
+> **El cuadro sí se movió, y por una sola cosa:** de 63/33 a **62 cerrados · 34 pendientes · 0 no
+> aplica · 96**. No se abrió ni se cerró ningún requisito: el 6.11 pasó a **PARCIALMENTE** (corrida
+> local hecha; faltan el clon limpio y el vínculo a T3) y así el contador lo cuenta como pendiente en
+> vez de **dejar de contarlo**. Antes el documento declaraba 63 cerrados y el conteo real era de 95
+> requisitos: era incontabilizable.
+> **Lo que sigue, y de quién es.** **Del owner:** los 2-3 comandos de `sudo` del servidor (permisos
+> 750/755 y retirada de `app/data/test.sqlite`), el **commit candidato (T3)**, que sigue sin
+> autorizarse, la fecha de vigencia del Acuerdo, la rotación de la contraseña de aplicación, el
+> escalamiento de `OTP_LOCKED`, el certificado de existencia y representación con la consulta a la
+> SIC, la decisión del cifrado, los plazos 10/5 y la decisión C.
+> **Del abogado:** las **6 decisiones** que le tocan y la **firma de la sección E** con las cuatro
+> huellas.
+> **Antecedente SUPERADO · 2026-11-01 — las seis correcciones posteriores del abogado:**
+> El proyecto que está en marcha sigue siendo el **servicio de firma electrónica de K+AIR**
+> (`sgsst-electron-app/firma-service`), y su línea sigue siendo jurídica. Esta noche el abogado
+> entregó un **plan de cierre** con seis correcciones documentales (N-1 a N-6) y su propia
+> compuerta (G0). Las seis están aplicadas **en sus fuentes** y **G0 está en verde (0 fallos)**
+> con un verificador propio. Lo que salió de ahí es una lección que vale para todo el repo:
+> **el manifiesto legal no es un archivo, es la salida de un script**. La corrección anterior
+> sobre la línea 87 no se había perdido: **se había emboscado**, porque
+> `actualizar-manifiesto-v1.4.js` reescribe esas notas desde constantes del propio script y la
+> edición a mano del JSON se borró en la siguiente regeneración. Se corrigió **en el script**.
+> Y el mismo script tenía un defecto de la misma clase: al actualizar un bloque que ya existía
+> refrescaba `hash` y `nota`, pero **nunca `actualizado_at`**, así que el manifiesto declaraba
+> una fecha anterior al archivo que describe. **Eso también se corrigió en el script**.
+> **Estado.** La cifra de batería **2 090 · 2 088 verdes · 0 rojas · 2 omitidas** es la reportada por el equipo el 1-nov; no se reejecutó en esta intervención. Su reconciliación reportada es 2 062 +16 del canal de fecha de terminación +12 del control de huellas = 2 090 (+28); no se atribuye duración.
+> Las huellas vigentes cambian: A2 `02651747…30d0f7` (86 397 B), A3 `aec7c401…83214ca` (59 857 B),
+> matriz `f09f80c9…711552` (19 881 B); el Acuerdo (`7298a943…490f`) y la Constancia
+> (`5fd33069…bbbcb`) no cambian. El paquete al abogado quedó reconstruido y verificado, y la
+> tabla de sus catorce adjuntos (00–13) se rellenó **desde los bytes reales**. El cuadro **no se mueve**:
+> sigue en **63 cerrados · 33 pendientes · 0 no aplica · 96**, porque esta ronda no crea ni
+> cierra requisitos: hace que el expediente diga la verdad.
+> **Y una cosa que sí quedó escrita.** El plan del abogado pedía (punto 1.3) un procedimiento
+> del canal de `fecha_terminacion`: quién recibe la novedad, quién la registra, con qué
+> soporte, en qué plazo y qué pasa si la fecha no llega. Está en
+> `procedimiento-canal-fecha-terminacion-2026-10-31.md`, con **tres puntos marcados como
+> decisiones del owner**: quién opera el canal, qué evidencia se acepta, y el plazo máximo de
+> espera con la frecuencia de la revisión. El plan literal quedó en
+> `plan-cierre-abogado-2026-10-31.txt`.
+> **Lo que sigue, y de quién es.** **Del owner:** la **fecha de vigencia** del Acuerdo v1.4, la
+> **rotación** de la contraseña de aplicación con su fecha, el **escalamiento** de un OTP rechazado
+> (persona, canal y plazo), el **certificado de existencia y representación** con la consulta a la
+> SIC, la **decisión del cifrado del disco**, el **endurecimiento del servidor** (permisos 750/755 y
+> retirada de la base de prueba, que necesita `sudo`) y el **commit candidato (T3)**, que sigue
+> sin autorizarse.
+> **Del abogado:** las **6 decisiones** que le tocan (aprobar A1-A4 con las huellas nuevas, el
+> papel de Google por escrito, la Circular 002 de 2025, el RNBD, los plazos 10/5 y el alcance
+> de J4/J9) y la **firma de la sección E**. La **Constancia** y el **T4/T6/T7/T8/T9** vienen
+> después de la firma.
+> **Antecedente SUPERADO · 2026-10-31 (noche, quinta tanda) — estado previo del Anexo de Nube:**
+> El owner respondió las nueve preguntas de la hoja de los 14 datos, y con ellas más la evidencia del
+> servidor **los catorce marcadores del Anexo de Nube quedaron diligenciados**: cuatro del RNBD y diez de
+> la ficha del canal de correo. El Anexo pasó de 49 193 B a **58 573 B** (`e281fa57…f19ef`), en `legal/`
+> y en `sitio/` byte a byte idénticos.
+> **El RNBD quedó cerrado por aritmética, no por opinión.** El umbral del artículo 2.2.2.26.1.2 del
+> Decreto 1074 de 2015 son 100.000 UVT; la UVT de 2026 es **$52.374** (Resolución DIAN 000238 de 2025), o
+> sea **$5.237.400.000 COP**. Gesstiar S.A.S. es una S.A.S. ordinaria recién creada con **$1.000.000** de
+> activo declarado: **19,09 UVT**, 5.237 veces por debajo del umbral. **No tiene obligación de
+> inscripción** y no está inscrita.
+> **El MFA salió corroborado por el propio sistema**: una contraseña de aplicación del proveedor de
+> correo solo existe si la verificación en dos pasos está activada, y el SMTP autenticó con ella el
+> 26-oct. **El cifrado en reposo del disco, verificado que no está implementado**: la raíz del servidor se
+> monta sobre LVM sin cifrado y el área de intercambio es un archivo sin cifrar. El Anexo lo dice de forma
+> expresa, porque declararlo implementado sería falso.
+> **Y una corrección propia que salió de la ronda**: la compuerta G0 comprobaba que el texto del abogado
+> seguía intacto **leyendo la línea 274**, y al diligenciar el documento creció dos líneas: el texto
+> pasó a la 276 y G0 se puso en rojo. Se corrigió **el control**, que ahora busca la frase por contenido
+> con aserción de coincidencia única. Un control que apunta a una posición deja de comprobar el
+> documento en cuanto el documento crece.
+> **Estado.** Suite del `firma-service`: **2 078 · 2 076 verdes · 0 rojas · 2 omitidas**. **G0 en verde
+> (0 fallos).** Manifiesto coherente (`--check` en 0). Paquete reconstruido y verificado (14/14 desde los
+> bytes reales). Test de readiness 7/7. Correspondencia 26/26. Cuadro **63 cerrados · 33 pendientes ·
+> 0 no aplica · 96** (no se mueve). Barrido de caracteres no latinos: 0.
+> **La nota, el cuadro, el informe y el checklist del paquete también se actualizaron**, porque
+> seguían diciendo que al Anexo le faltan catorce marcadores y que la verificación de servidor no se
+> había hecho. El paquete que se le manda al abogado ya no se contradice a sí mismo.
+> **Lo que sigue, y de quién es.** **Del owner:** los **cuatro** que quedan abiertos (la rotación de la
+> credencial, el escalamiento de un OTP rechazado, la fecha de generación de la contraseña de aplicación
+> y dos documentos por adjuntar del RNBD), la **fecha de vigencia** del Acuerdo v1.4, y el **commit
+> candidato (T3)**. **Del abogado:** las **6 decisiones** y la **firma de la sección E**. La **Constancia** y
+> el **T4/T6/T7/T8/T9** vienen después de la firma.
+
+> **Anterior · 2026-10-31 (noche, cuarta tanda) — pre-T4 de solo lectura contra el servidor real:**
+> El owner prendió el servidor y autorizó la llave SSH, así que por fin se pudo mirar la
+> **base de producción de verdad** (`/opt/kair-firma/data/firma.sqlite`) en lugar de deducirla.
+> Fue una revisión **de solo lectura**: no se reinició nada, no se desplegó nada, no se migró
+> nada y no se modificó un solo byte del servidor. Lo que salió son **ocho hallazgos que cambian
+> el plan de publicación**, no detalles de forma.
+> **Lo primero, y lo más grave: producción no corre el Acuerdo v1.4, corre el v1.0.** La tabla
+> `gh_firma_acuerdo_versiones` tiene **una sola fila**: v1.0, `activa = 1`, huella
+> `52a490a4…5710c04`, con `metadata.archivo = acuerdo-v1.0.txt`. El v1.4 que se armó, se
+> revisó y se verificó aquí **nunca se ha publicado**.
+> **Y el mecanismo para publicarlo ya existe, con una fila de ejemplo.**
+> `gh_firma_aprobaciones_publicacion` tiene 1 fila: v1.0, tipo `OPERATIVA`, aprobada por el owner el
+> 2026-10-27, con la `garantía` y el `resultado_verificaciones` redactados. Sus notas dicen
+> literal que esa autorización **no habilita la v1.1** y que cada versión exige la suya, con su
+> propia huella. O sea: **la firma de la sección E del abogado tiene un destino exacto** (una
+> fila nueva por versión), no hay que inventar un mecanismo.
+> **La ruta de publicación del v1.4 también existe en el repo**:
+> `scripts/publicar-acuerdo-legal.js` verifica la huella contra
+> `scripts/fixtures/acuerdo-ARCHIVO.json` antes de publicar y sale por
+> `POST /internal/admin/acuerdo-versiones`; la autorización operativa sale por
+> `POST /internal/admin/aprobaciones-publicacion`. **Pero `acuerdo-ARCHIVO.json` solo tiene la
+> v1.0**: hay que agregar la entrada v1.4. Y el readiness **ya resuelve bien la versión**: el
+> manifiesto declara `acuerdo.version = "v1.4"` y `acuerdo.archivo =
+> "scripts/fixtures/acuerdo-v1.4.txt"`, así que el reporte analizará el texto v1.4 y exigirá que
+> declare "v1.4" (no la constante "v1.1").
+> **El despliegue está nueve migraciones atrás.** La tabla `gh_firma_schema_migrations` de la base
+> real dice: 43 migraciones aplicadas, la última `044_aprobaciones_publicacion` (2026-10-27
+> 21:10:34). El repo tiene 53 archivos (001 a 053; el 015 no existe). **Faltan nueve: 045 a 053.**
+> Y dentro de esas nueve está el **canal de `fecha_terminacion`** (052 y 053), que en el repo
+> **ya está completo** (servicio de 14 074 B, tres rutas internas, esquema de validación,
+> bitácora inmutable y prueba de 20 752 B) pero **no está desplegado**.
+> **Una sola Empresa en producción: ASEPLUS CARIBE S.A.S., NIT 900.829.731-1** (creada el
+> 2026-10-21). Su `anexo_encargo_firmado_at` es **null**, y la auditoría del 2026-10-26 explica
+> por qué: se retiró una fecha que era anterior al alta de la empresa porque no había PDF
+> firmado. Sus campos de conservación están vacíos todos: `plazo_retencion_dias` null,
+> `conservacion_por_deber_legal` 0, `norma_conservacion` null, `dominios_corporativos` null,
+> `politica_datos_url` null. **El Anexo de Encargo de esa empresa no está suscrito.**
+> **Hoy sale todo por la cuenta de K+AIR.** `gh_firma_empresas_cuenta_envio` tiene **0 filas**.
+> El código usa la cuenta de la Empresa para la invitación, el aviso de copia y la copia del
+> firmado en papel; el OTP sale **siempre** por K+AIR, y no por descuido: `mailer.js` ignora a
+> propósito la cuenta de la Empresa y deja un aviso en el log, porque el OTP es el dato de
+> creación de la firma y si su custodia dependiera de la Empresa la garantía del 6.1(d)
+> sería falsa. **Son dos canales distintos a propósito.**
+> **Nunca se ha revocado una credencial.** Hay 3 tokens emitidos y 0 revocados (los tres ya
+> expiraron el 29-oct), y `gh_consentimientos_sensibles` tiene 0 filas: el control
+> `declaracion_datos_sensibles` nunca se ha ejercido en producción. El flujo sí se
+> ejercitó completo (25 eventos: OTP_SENT 2, OTP_VERIFIED 2, CONSENT_ACCEPTED, SIGN_COMMITTED,
+> PDF_GENERATED, COPY_SENT, MANIFESTATION_RECORDED, PAPER_OPTION_AVAILABLE 2, INVITE_SENT 2;
+> 3 firmas, 2 solicitudes, 7 purgas registradas).
+> **Un rechazo de OTP no escala a nadie.** `OTP_MAX_ATTEMPTS` es 5; al quinto intento el
+> consentimiento queda en estado `LOCKED` con error 422 `OTP_LOCKED`. No hay notificación a
+> nadie ni evento de escalamiento: solo un `logger.warn`. La pregunta 7 de la ficha del canal
+> es, por tanto, **una decisión que hay que tomar**, no un dato que exista en el sistema.
+> **Lo que quedó de antes y sigue en pie**: los permisos 777 del código desplegado, la ausencia
+> de git en el servidor (por eso el despliegue no se puede atar a un commit y eso bloquea G2), el
+> `legal-readiness.json` del servidor (8 667 B del 27-oct) contra el del repo (16 191 B), el
+> `app/data/test.sqlite` de prueba que quedó en el despliegue, y la evidencia de TLS ya
+> lista: `firma.kair.fyi:443` con TLSv1.3 `TLS_AES_256_GCM_SHA384` (CN=kair.fyi, Google Trust
+> Services) y el SMTP `smtp.gmail.com:587` con STARTTLS, TLSv1.3 y el mismo cifrado.
+> **Lo que sigue, y de quién es.** **Del owner:** los **14 marcadores** del Anexo de Nube (4 del
+> RNBD y 10 de la ficha del canal), la **fecha de vigencia** del Acuerdo v1.4, las tres
+> decisiones del canal, y el **commit candidato (T3)**, que sigue sin autorizarse.
+> **Del abogado:** las **6 decisiones** que le tocan (aprobar A1-A4 con las huellas nuevas, el
+> papel de Google por escrito, la Circular 002 de 2025, el RNBD, los plazos 10/5 y el alcance
+> de J4/J9) y la **firma de la sección E**. La **Constancia** y el **T4/T6/T7/T8/T9** vienen
+> después de la firma.
+
+> **🆕 2026-10-31 (noche, sexta tanda) — el veredicto del abogado: tres bloqueos, corregidos:**
+> El abogado revisó el paquete ya con los catorce datos diligenciados y con la evidencia del
+> servidor, y escribió un veredicto con **tres bloqueos**: la huella vieja del Anexo de Nube en
+> el checklist que firma; el tipo social mal descrito (decía «sociedad anónima ordinaria» cuando
+> la Empresa se llama Gesstiar S.A.S.), con el certificado que lo aclararía sin adjuntar; y el §5
+> que decía «mínimo privilegio» mientras el árbol del despliegue está en 777.
+> **Los tres están corregidos, y en una sola pasada**, en el orden que pidió el abogado: primero
+> el contenido del Anexo de Nube, después la huella recalculada **una sola vez**, después las
+> referencias. El paquete **no se reconstruyó dos veces**.
+> **Las huellas vigentes**: A1 `7298a943…490f` (73 208 B), A2 `7d626ba9…c5fd9` (86 407 B),
+> A3 `437eb463…c2a06` (60 075 B), A4 `5fd33069…bbbcb` (10 200 B).
+> **El control que faltaba ya existe**: `armar-paquete-abogado.js` barre todo hex de 64
+> caracteres de los documentos del paquete y **rechaza** el paquete (exit 3) si encuentra una
+> huella que no sea la vigente, salvo que la misma fila la declare histórica. Trae su propio test
+> (12 casos) y **prueba en negativa**: reintroducir la huella vieja hace que el script rechace.
+> **Y el control tuvo que endurecerse otra vez, por un defecto que tenía.** La fila D3 del
+> checklist 11 decía «La huella vigente del Anexo de Encargo es `ebc294ac…` (86 382 B)», que era
+> la huella **vieja** del A2, y la fila entera se excusaba con la palabra «histórica», que estaba
+> en **otra celda**. Ahora una **afirmación** de vigencia («la huella vigente es X») no se
+> absuelve con una **mención** a una huella vieja: si X no es la vigente, el documento miente.
+> **Lo que NO se corrigió, porque necesita `sudo`:** el endurecimiento del servidor (los 777 y la
+> base de prueba `app/data/test.sqlite`). Los comandos quedaron escritos en
+> `docs/MIGRACION-SERVIDOR-FIRMA.md` §5.1 (pasos 2b y 2c) y explicados en §5.1.3, con la causa:
+> **el tar se arma en Windows**, que no guarda permisos POSIX, y al extraerlo como root queda todo
+> en 777; el `chown` cambia el dueño, no los permisos. Endurecer **no rompe** el despliegue: la
+> unidad systemd corre como `User=kairfirma` y lee su propio código.
+> **Estado.** Suite del `firma-service`: **2 090 · 2 088 verdes · 0 rojas · 2 omitidas**. G0 en
+> verde (0 fallos). Manifiesto coherente (`--check` en 0). Paquete reconstruido y verificado
+> (14/14, 0 problemas). Cuadro: **63 cerrados · 33 pendientes · 0 no aplica · 96** (no se mueve).
+> Barrido de caracteres no latinos: **0**.
+> **Anterior · 31-oct-2026 — la tercera revisión del abogado, aplicada y verificada:**
+> **🆕 31-oct-2026 — la tercera revisión del abogado, aplicada y verificada:**
+> El proyecto que está en marcha es el **servicio de firma electrónica de K+AIR**
+> (`sgsst-electron-app/firma-service`), y su línea sigue siendo jurídica: un Acuerdo de Uso
+> que tiene que resistir la revisión de un abogado, no solo funcionar. Hoy se aplicó completa
+> la **tercera revisión del abogado** (31-oct-2026, tarde): **quince correcciones** (A-1 a
+> A-6, A-7; B-1 a B-5; C-1 a C-4) aplicadas **en los archivos de origen**, más **cuatro textos
+> extra de la misma clase** que el abogado no listó (E-1 a E-4; uno de ellos en el Anexo de
+> Encargo, que es un documento que la Empresa firma) y **un `<p>` que estaba sin abrir** en el
+> Anexo de Nube. Lo que cambió de fondo: la Circular Externa 002 de 2025 **no aplica** a este
+> canal; el RNBD depende de la **naturaleza jurídica y los activos totales de Gesstiar**, no
+> de la clasificación del flujo de correo; y **con la compuerta de conservación cerrada el
+> sistema NO aplica el plazo por defecto**: deja el registro retenido con el hold
+> `tabla_supletoria_pendiente_validacion` y **no calcula fecha de supresión**. El Acuerdo
+> v1.4 está armado y verificado (73 208 B, `7298a943…490f`), **ni aprobado ni publicado**.
+> **Dónde está hoy.** El **paquete al abogado** está en
+> `docs/gestion-humana/firma-electronica/paquete-abogado-2026-10-30/`: catorce adjuntos (00 a
+> 12) más la nota y `SHA256SUMS.txt`, con las catorce filas de la tabla de adjuntos
+> **rellenadas desde los bytes reales** y verificadas 14/14 contra el `SHA256SUMS.txt`. El
+> Anexo de Encargo va con `ebc294ac…39b22` (86 382 B) y el Anexo de Nube con
+> `b040090b…4ffdb8` (49 153 B). La **correspondencia texto ↔ código** da 26 filas, 26
+> implementadas y 0 pendientes, y el cuadro canónico> (`respuesta-checklist-cierre-2026-10-30.md`) da **63 cerrados, 33 pendientes, 0 no aplica,> 96 en total**. La suite del `firma-service` da **2 078 pruebas: 2 076 en verde, 0 en rojo,
+> 2 omitidas**.> **Lo que NO se puede cerrar sin el owner.** El Anexo de Nube tiene **catorce (14) marcadores> diligenciables** (cuatro del RNBD y diez de la ficha del canal) que necesitan evidencia del
+> servidor y de la cuenta de correo: **solo el owner la tiene**, y mientras estén vacíos ese> anexo no es firmable. Del abogado quedan **ocho decisiones**: la aprobación expresa de A1,> A2 y A3 con las huellas nuevas, el papel de Google por escrito, la Circular 002 de 2025, el
+> RNBD, la validación de los plazos de diez (10) y cinco (5) años, la evidencia del canal de> correo, el alcance de J4 y J9, y **la fecha de vigencia, que la fija el owner**.> **Y un hallazgo de esta ronda:** dos archivos de prueba reales
+> (`firma-service/tests/_adversary-e6e7.test.js` y
+> `firma-service/tests/routes/__test-isolation.test.js`) **no están versionados**: la regla
+> `_*.js` del `.gitignore` de `sgsst-electron-app/` se los traga. Corren en la suite local y
+> **no viajan con el repo**.
+> **Anterior · 30-oct-2026 — la línea legal cerrada en la v1.3, esperando al abogado:**
 > **🆕 30-oct-2026 — la línea legal cerrada en la v1.3, esperando al abogado:**
 > El proyecto que está en marcha es el **servicio de firma electrónica de K+AIR**
 > (`sgsst-electron-app/firma-service`), y su línea es jurídica: un Acuerdo de Uso que
@@ -1436,19 +1696,26 @@
 
 **Tecnologías clave:** Electron 37.x · Node.js · Python 3.11.9 · SQLite (better-sqlite3) · vanilla JS sin framework · BEM con prefijo `kair-`.
 
----
-
+---
+
+
+
+
+
 ## 🖋️ Servicio de firma electrónica (`firma-service`)
-
-Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
-
-**Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**
-
-- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).
+Servicio **separado** del app de escritorio: lo opera Gesstiar S.A.S. y vive en `sgsst-electron-app/firma-service/` (Node, Express, SQLite). Se despliega aparte (tar en `/opt/kair-firma`), expone `https://firma.kair.fyi` por túnel de Cloudflare y tiene su propio manifiesto de evidencias legales (`legal-readiness.json`) y su propio gate de publicación (`scripts/auditar-readiness-legal.js`).
+**Lo que cambió el 27-oct-2026 (📦976), que es lo que hay que tener presente:**- **El remitente del enlace puede ser la Empresa.** Cada Empresa puede registrar una cuenta de envío propia (SMTP) en el servicio; la clave se guarda cifrada con la llave maestra y cada cambio deja rastro. El enlace de acceso y el aviso de la firma salen por esa cuenta. **El código de verificación (OTP) sale SIEMPRE desde la cuenta de K+AIR**, porque es el dato de creación de la firma y su custodia no puede depender de la Empresa (art. 2.2.2.47.4 núm. 1 del Decreto 1074 de 2015).
 - **El medio personal del código lo confirma el Trabajador.** La Empresa lo registra (lo obtiene del candidato en la contratación) y el Trabajador lo confirma en la pantalla de firma con una declaración de texto fijo, que el servidor exige (422 `MEDIO_OTP_CONFIRMACION_REQUERIDA`) y archiva con fecha, hora y versión del texto.
 - **Aprobar el texto y autorizar a publicar son dos decisiones.** `agreement.createVersion` con `activa: true` devuelve **409** si no hay autorización operativa registrada para esa versión **y ese texto** (`gh_firma_aprobaciones_publicacion`, append-only). La autorización operativa la registra el owner por `POST /internal/admin/aprobaciones-publicacion`.
 
 **Documentos legales:** viven en `sgsst-electron-app/legal/` (los originales) y se publican byte a byte en `sitio/` (la copia del sitio). La v1.1 del Acuerdo se arma con `scripts/empalmar-acuerdo-v1.1.js` sobre la v1.0 sellada, y su texto vive en `scripts/fixtures/acuerdo-v1.1.txt` (generado, no versionado) a partir del JSON de cambios.
+
+**Lo que cambió el 31-oct-2026 (la tercera revisión del abogado), que es lo que hay que tener presente:**
+
+- **La v1.4 del Acuerdo está armada y verificada** (73 208 B, `7298a943…490f`) y **espera la aprobación del abogado**: ni aprobada ni publicada. En producción sigue la **v1.0**.
+- **El canal de `fecha_terminacion` está implementado en código**: migraciones 052 y 053 (la segunda con disparadores de solo-agregar), servicio `src/services/fechaTerminacion.js`, rutas admin `POST` y `GET /internal/admin/empresas/:id_empresa/fecha-terminacion`, esquema zod y recálculo **acotado** de la conservación. Con 16 pruebas propias.
+- **La compuerta de conservación sigue CERRADA, y con ella cerrada el sistema NO aplica el plazo por defecto**: el registro queda retenido con el hold `tabla_supletoria_pendiente_validacion` y **no se calcula fecha de supresión**. La Circular Externa 002 de 2025 **no aplica** a este canal.
+- **El Anexo de Nube (v1.0) tiene catorce (14) marcadores sin diligenciar** (cuatro del RNBD y diez de la ficha del canal): solo el owner tiene la evidencia del servidor y de la cuenta de correo. Mientras estén vacíos, ese anexo **no es firmable**.
 
 ## 📁 Archivos clave (raíz del proyecto Electron)
 
@@ -1671,10 +1938,21 @@ Si por error commiteás un secret, rotar inmediatamente y usar `git reset + cher
 
 - **Corto plazo:** Bandeja Integrada v2 (Calendar write, templates, snooze real)
 - **Mediano plazo:** tests automatizados, CI/CD, backups de kair.db
-- **Largo plazo:** SaaS-ificación (Bandeja web con Next.js + PostgreSQL)
-
-Detalle histórico en `CHANGELOG.md` y en los commits del repo.
-
----
-
+- **Largo plazo:** SaaS-ificación (Bandeja web con Next.js + PostgreSQL)
+
+
+
+
+Detalle histórico en `CHANGELOG.md` y en los commits del repo.
+
+
+
+
+
+---
+
+
+
+
+
 **Mantenimiento:** actualizar con cada cambio arquitectónico mayor. Si un dev/IA toca algo grande, agregar entrada en `CHANGELOG.md` + commit `📦<n>` con descripción clara.

@@ -911,7 +911,7 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 `better-sqlite3` está compilado para el ABI de Electron, así que un test que abra la base con `node`
 a secas falla con `ERR_DLOPEN_FAILED`. Hay que correrlo con el Node de Electron:
 ```powershell
-$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-bandeja-paginacion-funcional.js
+env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-bandeja-paginacion-funcional.js
 ```
 (`ELECTRON_RUN_AS_NODE=1` ejecuta Electron como Node puro: sin ventana, sin GPU, sin problemas de sandbox.)
 
@@ -3787,7 +3787,7 @@ Feature de notificaciones persistentes en el proceso main (detección + persiste
 
 ```powershell
 node tests/notificaciones-toast-e2e.js    # 25/25 — E2E del flujo toast → "Ver" (jsdom, sin Electron)
-$env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 32/28
+env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-bridge.js   # 32/28
 $env:ELECTRON_RUN_AS_NODE=1; npx electron main/test-notificaciones-service.js  # 10/10
 node main/test-notificaciones-email.js     # 17/7
 node main/test-notificaciones-wiring.js    # 11/11
@@ -8659,3 +8659,552 @@ creemos.
 Un detalle que salió en el camino y que conviene no olvidar: el `SHA-256` del manifiesto **no cambió** al
 arreglar la clave repetida, porque el manifiesto no se hashea a sí mismo. Lo que cambió fue el archivo. **Un hash
 verifica un archivo, no dice si el archivo está bien formado.**
+
+## 🐗 El 409 que tumbaba 33 firmas y el hash que se copiaba cinco veces (2026-10-30)
+
+### El bloqueo que no pedía nadie
+
+Al cerrar la línea legal del abogado, el servicio empezó a devolver **409 EMPRESA_NO_HABILITADA** en firmas
+que antes pasaban: **33 pruebas en rojo de golpe**. El origen estaba en `manifiestoLegal.js`, en la función
+que archiva los anexos de la firma, y el bloqueo era este: si la Empresa no tenía firmado el Anexo de
+Encargo, no se archivaba nada y la firma se caía.
+
+Tres cosas estaban mal, y ninguna se veía leyendo el código:
+
+1. **No era lo que pedía el abogado.** El C-1 (el literal está en el Acuerdo v1.4, §3.6(h)) dice que, si la
+   Empresa no ha suscrito el **Anexo de Nube**, el servicio no permite crear solicitudes de firma. El bloqueo
+   que se inventó era por el **Anexo de Encargo**, que es otro documento y que el C-1 no menciona.
+2. **Contradecía el invariante que el propio código documentaba.** En `publicFlow.js`, junto a la llamada, hay
+   un comentario que dice que `registrarAnexosFirma` **no propaga errores a propósito**, porque si la migración
+   045 todavía no está aplicada la firma no debe caerse. El bloqueo nuevo estaba **fuera** del `try`, así que sí
+   propagaba: exactamente lo que el comentario decía que no iba a pasar.
+3. **Estaba en el peor lugar posible.** `registrarAnexosFirma` se llama **dentro de la transacción** del commit,
+   después de que la firma ya se escribió. Tirar ahí un error deshace la firma: el trabajador firmó, el
+   sistema le dice que no firmó, y el estado del mundo no es ninguno de los dos.
+
+Lo que sí era verdad es que la suscripción del Anexo de Encargo se exige **al crear la solicitud** (en
+`empresa.js`, `verificarHabilitacionFirma`), con su excepción auditable. Si esa excepción existe es
+precisamente para que exista una vía legítima: **una firma que llegó hasta el final por una vía legítima no
+se deshace.** El archivado no juzga la suscripción, la registra.
+
+### La receta del hash estaba copiada cinco veces
+
+Con C-2 la composición del `evidence_hash` pasó de 17 campos a 26 (el alcance de la aceptación: los anexos que
+rigen la firma, la matriz de finalidades, el medio y la fecha). Y eso destapó algo más valioso: **esa composición
+estaba escrita cinco veces, una en cada prueba que recomputa el hash**, y cada copia era una receta distinta.
+Las cinco fallaron a la vez, cada una por su cuenta, y el arreglo fue cinco ediciones.
+
+Ahora vive en **una sola** función, `buildEvidenciaFirma` (`tests/helpers.js`), que es la receta de
+recomputación por terceros. Las cinco pruebas la usan. `canonicalJSON` ordena las claves, así que lo que importa
+no es el orden del objeto: es **el conjunto de campos**.
+
+### Lo que hay que llevarse
+
+**Un bloqueo es una afirmación sobre la ley, y hay que poder señalar de dónde sale.** Si el código dice "no se
+puede" y el documento no lo dice, el código se está inventando la regla. Y cuando el documento **sí** lo dice,
+tiene que decir **la misma cosa**: el C-1 habla del Anexo de Nube, no del Anexo de Encargo, y esa diferencia de
+una palabra era la diferencia entre 2 059 pruebas verdes y 33 rojas.
+
+**El comentario que explica un invariante es un contrato, no una nota.** Si el código dice "esto no propaga
+errores", agregar un `throw` por encima del `try` no es un detalle de implementación: es romper el contrato en
+silencio, y nada lo avisa hasta que la suite se pone roja.
+
+**Una receta de verificación que está copiada en varios lados es una receta que se va a desincronizar.** El
+`evidence_hash` es, por definición, un contrato con un tercero: ese tercero tiene que poder recomponer el
+conjunto de campos desde los datos publicados y obtener el mismo hash. Si la definición del conjunto está
+duplicada, el contrato tiene varias versiones y solo una puede estar bien.
+
+Y un detalle que se lleva consigo: **la suite es la que dice la verdad sobre el alcance de un cambio.** El
+bloqueo del 409 no lo detectó una revisión del código: lo detectaron 33 pruebas que fallaron a la vez, y la
+pregunta útil no era "¿qué prueba se rompió?" sino "¿por qué se rompieron 33 a la vez?". La respuesta —un solo
+bloqueo en un solo camino— era la que cambiaba todo.
+
+## 🐗 La huella que estaba bien en un archivo y mal en otros, y el «pendiente» que convivía con la decisión (2026-10-31)
+
+### La huella del Anexo de Nube
+
+Una segunda revisión del paquete abrió seis puertas. La primera se llama «huella de A3 rota» y es
+la más instructiva de las seis, porque **todo estaba en verde**.
+
+El manifiesto legal declaraba `75deec1c…c286` (47 308 B) para el Anexo de Nube. El
+`SHA256SUMS.txt` del paquete declaraba lo mismo. La nota al abogado declaraba lo mismo. El
+programa que arma el paquete **verifica el manifiesto contra los archivos reales y sale con
+código 3 si no coinciden**, y esa verificación pasaba.
+
+Pero el **cuadro de 96 requisitos** y el **checklist** pedían aprobar ese mismo Anexo de Nube con
+`263d81da…cc4d512` (46 816 B). Dos huellas del mismo archivo, en dos documentos distintos, en el
+mismo paquete. El cuadro llevaba además **las dos**: la vieja en el §1.5 y en el §2.3, y la nueva
+en el resumen.
+
+La causa no fue un error de cálculo: fue que el Anexo de Nube **cambió de bytes** (por las
+correcciones del abogado) y **el cuadro no se regeneró**. El manifiesto sí, porque lo regenera un
+programa. El cuadro no, porque es un documento escrito a mano que replica datos de otros.
+
+### Lo que hay que llevarse
+
+**Una comprobación automática solo cubre los archivos que la comprobación mira.** Que el
+manifiesto y el paquete coincidan no dice nada del cuadro: son dos consumidores distintos del
+mismo dato, y el segundo era una transcripción manual.
+
+**La huella no se escribe a mano en ningún documento que se entregue.** Se toma del manifiesto. Y
+cuando cambia el archivo, quien cambia el archivo tiene que regenerar **todo** lo que lo nombra, no
+solo lo que un programa produce. Un documento que replica datos de otro es un documento que se
+puede quedar viejo, y un documento viejo que se entrega para aprobación es peor que uno ausente:
+pide aprobar algo que no es lo que se va a aprobar.
+
+### El «pendiente» que convivía con la decisión
+
+La segunda puerta: cinco pasajes de los textos seguían diciendo que el papel de Google
+«requería validación profesional escrita», **al lado** de la determinación del abogado que ya
+decía otra cosa, con su literal, en tres secciones del Anexo de Encargo y en la ficha del Anexo
+de Nube. El propio abogado lo había formulado: «un documento contractual no puede afirmar a la
+vez que la calificación está pendiente y que ya está decidida».
+
+Lo grave no es la frase: es que **el documento se contradecía a sí mismo**, y un documento que se
+contradice a sí mismo no se puede aprobar por partes, porque no hay una versión que aprobar.
+
+Hay tres formas de que una decisión quede escrita sin que el documento lo sepa:
+
+1. **Queda un «pendiente» al lado.** La decisión se aplicó en tres secciones y en el cuarto
+   pasaje sigue la duda. Es lo que pasó.
+2. **Queda una nota vieja en el inventario.** El `legal-readiness.json` seguía diciendo que el
+   papel de Google «queda pendiente de validación profesional escrita». El manifiesto no se
+   regenera entero: su nota se envejece sin que nadie lo note.
+3. **La tabla replica un dato que otro documento escribió.** El cuadro decía que las finalidades
+   (d), (f) y (g) estaban habilitadas de forma condicional; la matriz de finalidades las traía
+   como «Propuesta; no habilitada». El cuadro estaba bien según la letra de J4; el documento
+   estaba mal. Y el documento es el que se firma.
+
+**Regla que sale de esto:** cuando se aplica una decisión a un documento, **se busca en todo el
+documento la misma decisión en otros lugares** —incluidos los inventarios, las notas de los
+manifiestos y las tablas que replican datos— y se corrigen todos. No basta con corregir el
+pasaje que la revisión señaló: hay que corregir los que nadie señaló y que dicen lo mismo.
+
+Y una regla de fuente: **la matriz de finalidades se editaba en un lado y el documento mostraba
+otro.** El documento se genera desde `config/matriz-finalidades.json` con un programa idempotente
+que escribe `legal/` y `sitio/` a la vez; ese lado está bien. El lado que se editaba a mano era el
+documento. Cuando hay una fuente única, **cualquier edición manual es una segunda fuente** que
+tarde se contradice con la primera.
+
+## 🐗 El deber del §6 sin puerta, y el recálculo que iba a mover de más (2026-10-31)
+
+### El hueco: un deber escrito que el código no tenía cómo cumplir
+
+La cuarta puerta de la segunda revisión era la única que era **código**, no texto. El Anexo de
+Encargo §6 obliga a la Empresa a comunicar la fecha de terminación de la relación laboral
+«por el canal que el Encargado habilite en el servicio», y el propio Anexo promete lo que
+pasa después: «el Encargado registra la fecha con la evidencia de la comunicación y recalcula
+el plazo de las filas afectadas, dejando registro de la operación. Mientras la fecha no se
+reciba, la fila permanece retenida, no se calcula fecha de supresión y se revisa
+periódicamente».
+
+En el código no había **puerta**: el único mecanismo por el que una fila podía tener
+`fecha_terminacion` era la creación de la solicitud. Una fila con `motivo_hold:
+fecha_cese_pendiente` —el SG-SST del 8.6(b), que espera el cese real para correr los veinte
+años— no tenía ninguna salida: quedaba retenida para siempre.
+
+**Un deber legal que solo existe en el documento es un deber que el sistema no cumple.** Y en
+este caso era peor de lo que parecía: la fila retenida tampoco desaparecía, así que el
+servicio no fallaba — **funcionaba mal y en silencio**, que es la forma más difícil de
+detectar. El caso que lo hace visible es el contrario: una fila del 8.6(b) que sí recibía su
+fecha en la creación quedaba con el plazo bien corrido, y el sistema parecía completo.
+
+### La trampa del recálculo
+
+La primera versión de la solución era la evidente: al registrar la fecha, recalcular los
+plazos. Y `conservacion.recalcularPlazosDeclarados(id_empresa, …)` ya existía y hacía
+exactamente eso: recorría **todas** las filas de la Empresa con un motivo de hold
+recalculable y les recalculaba el plazo.
+
+Conectado así, el bug es serio y silencioso: una Empresa que comunica el cese de **un**
+trabajador habría recalculado los plazos de **todas** las filas retenidas de **toda** la
+Empresa. La operación es del derecho (la comunicación), pero el alcance del efecto es del
+código, y no coincide.
+
+La corrección no fue «filtrar con un WHERE más»: fue **darle al recálculo un alcance
+explícito** (`opciones.firmas`), para que la operación diga a qué filas puede tocar. El
+recálculo general —el que barre la Empresa cuando se activa la tabla supletoria— sigue siendo
+general, porque ese sí tiene que serlo.
+
+### El registro que tiene que ser inalterable
+
+El Anexo dice «dejando registro de la operación», y eso suena a un log. No lo es: un log se
+puede editar y una bitácora que se puede editar no deja registro de nada. Por eso la bitácora
+del canal (`gh_firma_fecha_terminacion_eventos`, migración 053) lleva disparadores
+`BEFORE UPDATE` y `BEFORE DELETE` que abortan, y lleva `@skip-when-env test` porque el
+disparador impide limpiar la tabla entre pruebas: la inmutabilidad se prueba aplicando esa
+misma migración a una base en memoria.
+
+### Lo que hay que llevarse
+
+**Cuando un cálculo se dispara desde un hecho individual, el cálculo tiene que poder acotarse
+a ese hecho.** Un «recalcular la Empresa» invocado desde «comuniqué el cese de uno» es un
+`UPDATE` con consecuencias legales sobre personas que no comunicaron nada.
+
+**Y cuando un documento promete un mecanismo, hay que buscar en el código la puerta que lo
+cumple.** El Anexo §6 ya decía, literalmente, «el canal que el Encargado habilite en el
+servicio» — o sea, el documento describía una puerta que el servicio no tenía. La revisión
+del abogado no encontró esa puerta: la encontró el cruce entre el §6 y `conservacion.js`.
+
+## 🐗 Los cuatro textos que el abogado no listó, y el `<p>` que nadie miraba (2026-10-31, noche)
+
+### El abogado encontró cuatro; había ocho
+
+La tercera revisión del paquete llegó con seis contradicciones jurídicas, cinco inconsistencias de
+huella y conteo, y **cuatro textos de retención** que describían un comportamiento que el código
+ya no tiene: con la compuerta cerrada, el sistema **no** aplica «veinte años desde la firma»;
+deja el registro retenido con el `hold` `tabla_supletoria_pendiente_validacion` y no calcula fecha
+de supresión.
+
+Los cuatro que él listó estaban en la nota de la compuerta, en el respaldo congelado del código, en
+el helper de los tests y en la frase que viaja al **adjunto 05**, que es el documento que el abogado
+va a leer.
+
+Aplicándolos, la búsqueda por el **criterio** —no por la ubicación— encontró **cuatro más**:
+
+| Dónde | Qué decía |
+|---|---|
+| Anexo de Encargo §8 (texto escrito) | El plazo supletorio «siempre existe» y «ninguna categoría documental queda sin plazo» |
+| Anexo de Encargo §8 (bloque **generado**) | El mismo *lead-in*, que se regenera en cada corrida |
+| Cuadro, 3.6 | «Mientras la compuerta siga cerrada el catálogo legado de veinte años desde la firma es el que aplica en la práctica» |
+| Cuadro, 7.10 | «Con la compuerta cerrada el despliegue es **neutro**: mismo plazo por defecto» |
+
+**Y uno de ellos viajaba en el documento que la Empresa firma**, que es donde un texto falso pesa
+más: el Anexo de Encargo le decía a la Empresa que su registro nunca queda sin plazo, cuando con
+la compuerta cerrada **sí** queda retenido y sin fecha.
+
+### Lo que hay que llevarse
+
+**Cuando la revisión señala N defectos de una clase, la clase tiene más miembros.** El abogado
+señala lo que encontró; lo que no señaló es lo que nadie miró. La búsqueda que sirve no es «buscar
+el texto X en el archivo Y», sino **«buscar cualquier texto que afirme Z»**, con Z siendo el
+comportamiento real. En este caso Z era «con la compuerta cerrada se aplica el plazo por defecto»,
+y aparecía en ocho lugares, no en cuatro.
+
+**Y el bloque que se genera es un lugar más donde vive el mismo texto.** El §8 del Anexo de Encargo
+tiene dos mitades: la escrita y la que genera `generar-anexo-encargo.js`. Corregir solo la escrita
+deja la otra diciendo lo contrario, y la otra **vuelve al archivo en la siguiente regeneración**.
+La corrección va en el generador, y el archivo se regenera.
+
+### El `<p>` que nadie miraba
+
+Al revisar que el HTML siguiera bien formado apareció algo que ninguna de las tres revisiones había
+visto: en el Anexo de Nube, el bloque de «Respaldos:» (con Monitoreo, Soporte, Seguridad física y
+Continuidad) **cerraba con `</p>` sin apertura**. El navegador lo tolera y el documento se ve bien;
+el código fuente, no.
+
+La comprobación cuesta dos líneas y encuentra en un segundo lo que tres revisiones no encontraron:
+
+```js
+const abre = (s.match(/<p[ >]/g) || []).length;
+const cierra = (s.match(/<\/p>/g) || []).length;
+```
+
+**Un documento puede verse perfecto y estar mal formado.** Y un documento que se entrega para
+aprobación tiene que estar bien formado, aunque el error no se vea: lo que se firma es el texto, y
+el texto se lee en el código, no en la pantalla.
+
+### El rojo que nadie abrió y el archivo que no viaja
+
+Dos hallazgos de la misma jornada (31-oct-2026, cierre de la tercera revisión) y la misma clase de
+problema: **algo que la suite cuenta y nadie mira**.
+
+**El rojo crónico.** El `firma-service` llevaba semanas con **un** test rojo: `ADVE6.7`, que pedía
+`201` al crear una solicitud y recibía `422`. El conteo siempre salía "1 rojo" y era el de siempre,
+así que nadie lo abrió. Cuando se abrió, el `422` **no venía de lo que el test medía**: el test
+medía la coerción de `"5"` a número en el schema, y el `422` era del control
+`declaracion_datos_sensibles`, que la ruta exige **desde el `5534aca7` (📦978)** y que el test no
+mandaba. El código estaba bien; la expectativa del test era de antes del control.
+
+Reglas: (1) **un rojo crónico se abre una vez por cambio de código, no una vez por corrida**: si el
+número de rojos no se mueve, hay que leer **por qué** falla ese rojo, no compararlo con la corrida
+anterior; (2) **el código de error dice la causa**: `422 DECLARACION_DATOS_SENSIBLES_REQUERIDA` no
+es "el `consent_id` está mal"; (3) **el arreglo de un rojo viejo es en el test, no en el código**:
+el código cumplía el control y el test tenía la expectativa de antes del control.
+
+**El archivo que no viaja.** Al abrir ese test se descubrió que **el archivo no está versionado**:
+`firma-service/tests/_adversary-e6e7.test.js` arranca con guion bajo, y la regla `_*.js` del
+`.gitignore` de `sgsst-electron-app/` (📦773, hecha para los scripts one-off de depuración) se lo
+traga. El `package.json` del servicio corre `tests/*.test.js` y `tests/routes/*.test.js`, así que
+**37 pruebas se ejecutan en esta máquina y no existen para nadie más**: ni el CI, ni otra PC, ni un
+clon nuevo. Y lo que lo escondió fue que **`git diff` del archivo salía vacío**: sin cambios en el
+árbol, el archivo parecía "uno que nadie tocó" — que era exactamente la explicación que se llevaba
+en el informe.
+
+Reglas: (1) **`git check-ignore -v <archivo>` es la forma de saber si un archivo está versionado**,
+no `git status` ni el hecho de que exista en disco; (2) **el conteo de la suite incluye pruebas que
+pueden no estar en el repo**, y eso hay que decirlo cuando se reporta el verde; (3) **un archivo de
+prueba real no lleva el prefijo de los temporales**: la excepción va en el `.gitignore`, no en el
+nombre del archivo.
+
+**Y el error propio del día, que ya estaba documentado en el §5.11 del `PROMPT.md` y que igual se
+cometió:** el ancla del parche era `version_kair:'0.1.189', consent_id:'5' };` — **dos** campos —
+y el texto de reemplazo reponía solo el segundo. El `version_kair` desapareció, el archivo siguió
+siendo JavaScript válido, y el síntoma fue un `422` de negocio: **un campo que falta no se ve como
+un error de edición, se ve como un fallo del sistema.** Un ancla repone **todo** lo que tapa, campo
+por campo, y el diff se lee antes de seguir.
+
+### El manifiesto no es un archivo: es la salida de un script
+
+El plan de cierre del abogado señalaba seis correcciones. Una de ellas —N-1— decía que en
+`legal-readiness.json:87` seguía el texto viejo de la corrección de la ronda anterior.
+
+Esa corrección **no se había perdido: se había emboscado**. El manifiesto lo reescribe
+`scripts/actualizar-manifiesto-v1.4.js` desde constantes que el propio script declara
+(`NOTA_ACUERDO`, `NOTA_ENCARGO`, `NOTA_NUBE`, `NOTA_CONSTANCIA`, `NOTA_MATRIZ`). La
+corrección se aplicó **en el JSON**, a mano; la siguiente vez que corrió el script —que es lo
+que se hace SIEMPRE después de tocar un anexo— la nota volvió a su texto anterior. Nadie lo
+notó porque el `--check` pasaba: el script compara el manifiesto **consigo mismo**.
+
+Y el mismo script tenía un defecto de la misma clase: cuando el bloque **ya existía** (el caso
+normal, a partir de la segunda vez), refrescaba el `hash` y la `nota`, pero **no** el
+`actualizado_at`. La fecha del bloque de la matriz se quedó en 2026-10-30 mientras su fuente
+decía 2026-10-31: el manifiesto declaraba una fecha **anterior** al archivo que describe.
+
+Reglas:
+
+1. **Antes de editar un archivo, hay que saber quién lo escribe.** Si hay un script que lo
+   regenera, la edición va **en el script**, y el archivo se regenera después.
+2. **Un script que actualiza un bloque tiene que actualizarlo entero.** Y la comprobación es
+   barata: la fecha que declara el manifiesto contra el `mtime` del archivo que describe.
+3. **Un `--check` que compara el archivo contra sí mismo no puede detectar que el archivo
+   está mal.** El `--check` del manifiesto valida las **huellas**; la coherencia de las
+   **fechas** la tiene que mirar otra comprobación.
+
+### El borde del párrafo: dos formas de perder texto sin que se note
+
+**La primera: reemplazar un rango de líneas por su número.** La primera línea del rango era
+la continuación de la frase del párrafo anterior: el contenido empezaba en la línea 71, pero
+esa línea arrancaba en medio de una oración que había empezado en la 70. Al reemplazar el
+rango, esa frase quedó sin principio. El documento no tenía ni una línea rota: estaba
+truncado, y eso no lo delata ningún lint.
+
+**La segunda: transcribir el texto viejo.** La aguja la escribí a mano, y el archivo decía
+«subencargado» donde yo había escrito «subencargados». La operación **abortó** (bien: la
+aserción de coincidencia única hizo su trabajo), pero el trabajo se estaba haciendo al revés.
+
+Reglas:
+
+1. **Reemplazar por rango de líneas exige imprimir el ANTES y el DESPUÉS.** El rango tiene que
+   empezar donde termina la frase anterior y terminar donde empieza la siguiente.
+2. **No se transcribe: se lee del archivo.** O se reemplaza por posición, o con una aserción
+   que aborte si el texto no es el que se cree. Una coma de diferencia **aborta** la
+   operación; una coma de diferencia silenciosa deja una frase rota.
+3. **Documentar una comprobación no puede escribir lo que la comprobación prohíbe.** Al
+   documentar la compuerta G0 puse las tres huellas viejas en la tabla del cuadro, y el
+   propio barrido del abogado las encontró en el documento nuevo.
+
+## 🐗 El control que apuntaba a la línea 274 y el hueco que no era un dato (2026-10-31, noche)
+
+**El caso.** Al diligenciar los catorce marcadores del Anexo de Nube (los cuatro del RNBD y los diez
+de la ficha del canal de correo), la compuerta G0 del abogado se puso en rojo con un único fallo:
+`N-4: la linea 274 del A3 (texto del abogado) sigue intacta`.
+
+**Por qué.** La comprobación no miraba el texto del abogado: miraba **la línea 274** y esperaba
+encontrar ahí una frase. Eso solo coincide mientras el documento no crezca. Mis inserciones añadieron
+dos líneas antes de ese punto, el texto del abogado pasó a la línea 276 —intacto, verificado
+por contenido— y la comprobación señaló la línea equivocada.
+
+**Lo que una verificación tiene que comprobar no es dónde está el texto, sino qué dice.** Un
+control que apunta a una posición se rompe en cuanto el documento crece, y se rompe **falsa**: dice que el
+texto del abogado no está, cuando está. Peor que no comprobar nada, porque el rojo se lee como un
+defecto del documento y no como un defecto del control.
+
+Reglas:
+
+1. **Un control que verifica el texto de otro lo busca por contenido, no por posición**, y con una
+   aserción de coincidencia **única**: si la frase aparece dos veces, el control aborta en vez de
+   elegir una.
+2. **Diligenciar un documento cambia su tamaño.** Todo verificador que apunte a una línea, un
+   párrafo o un byte fijo hay que revisarlo el mismo día en que el documento crece.
+
+### El hueco que no era un dato
+
+El mismo Anexo, ya diligenciado, reportaba **un** hueco bloqueante: `[PENDIENTE]`. No era un dato sin
+llenar: era **la palabra del abogado**, dentro de su propia regla del §10 (el Anexo «no se firma con
+marcadores [PENDIENTE] pendientes»), y el analizador la contaba como un corchete sin llenar. Trece huecos
+pasaron a uno, y el que quedaba era una mención.
+
+Y al otro lado, un error mío de lectura: del hecho de que en la base de producción **no hubiera
+filas de error de envío** concluí que el sistema no registraba los errores. Falso: el evento
+`OTP_SEND_FAILED` **está implementado** en `publicFlow.js` y se registra con su código de error; lo que
+no había pasado es que ningún envío hubiera fallado.
+
+Reglas:
+
+1. **La ausencia de filas no es la ausencia del mecanismo.** Antes de decir que un registro no existe,
+   buscar el `INSERT` en el código. La base dice qué pasó; el código dice qué puede pasar.
+2. **Un marcador puede ser una mención.** Cuando el control y el documento discrepen, la primera
+   pregunta es si el control está contando algo que no es un dato.
+
+## 🐗 La fila que decía «histórica» y la huella que se hacía pasar por vigente (2026-10-31, noche)
+
+El abogado encontró en el checklist que firma una huella vieja del Anexo de Nube: el paquete
+entregaba dos números distintos para el mismo documento, y el que el abogado leía no era el del
+archivo. Eso se corrigió (dieciocho referencias actualizadas a la huella vigente) y se construyó un
+control automático que barre todo hex de 64 caracteres de los documentos del paquete y lo compara
+con el manifiesto: si encuentra una huella que no es la vigente y el mismo párrafo no la declara
+histórica, **rechaza el paquete**.
+
+El control pasó en verde. El paquete tenía el mismo defecto, en otra fila.
+
+La fila D3 del checklist 11 decía: «**Aplicada.** La huella vigente del Anexo de Encargo es
+`ebc294ac3f23…` (86 382 B), y es la que llevan hoy la nota, el manifiesto y el `SHA256SUMS.txt`».
+`ebc294ac…` era la huella **vieja** del Anexo de Encargo: la vigente es `7d626ba9…` (86 407 B),
+desde la corrección de la N-4. La fila se excusaba con la palabra «histórica», que estaba en
+**otra celda** de la misma fila, en la descripción de lo que había pasado: el control leía la fila,
+veía «histórica» y daba por buena la huella.
+
+El defecto era del control, no del documento. El control buscaba huellas y las comparaba con el
+manifiesto, pero no distinguía dos clases de referencia. Una **mención** («la huella anterior `X`
+queda como histórica») está absuelta por la misma fila. Una **afirmación** («la huella vigente del
+Anexo es `X`») es una afirmación sobre el archivo que se entrega: si `X` no es la vigente, el
+documento no se contradice, **miente**.
+
+Por el camino se probó una variante más estricta —juzgar cada celda por separado— y **se tiró**:
+rompía el caso legítimo de la fila que dice «v1.3 (histórico)» en la primera celda y lleva la
+huella en la tercera, que es una forma normal de tabular. El alcance de la declaración de
+«histórica» es la fila; lo que hay que mirar celda por celda es la **afirmación de vigencia**, y se
+lee sobre el segmento que precede a la huella.
+
+Reglas:
+
+1. **Mención y afirmación son dos clases de referencia, y se juzgan distinto.** La mención la
+   absuelve la misma fila; la afirmación no se absuelve con nada.
+2. **La afirmación de vigencia se comprueba antes que la mención**, y se calcula sobre el segmento
+   que precede a la huella (con el separador de tabla, eso la acota a la celda donde está escrita).
+3. **Un control que pasa en verde no está probado.** El que tiene que probarse es el que
+   **rechaza**: reintroducir la huella vieja y ver que el script sale con error.
+4. **La forma abreviada suelta no se puede juzgar.** En el paquete, `7298a943` es tanto una huella
+   abreviada como un hash de commit (`5534aca7`, `e1d10728`). Juzgarla produciría falsos positivos
+   que taparían los defectos reales; el límite queda escrito en el propio código.
+5. **El control juzga el contenido real, no una copia.** La prueba en negativa se corrió sobre el
+   archivo real del paquete, con la huella vieja puesta a mano y el texto intacto.
+
+## 🐗 El despliegue que dejaba el árbol del servicio en 777 (2026-10-31, noche)
+
+El pre-T4 de solo lectura encontró `/opt/kair-firma/app` **y todas sus subcarpetas en 777**, y una
+base de prueba (`app/data/test.sqlite`, 303 104 B) dentro del despliegue. El abogado lo marcó como
+bloqueante: con permisos 777, cualquier usuario de la máquina puede escribir el código que corre el
+servidor de firma.
+
+La causa no era del servidor ni del servicio: era de **cómo se arma el paquete**. El tar se arma
+**en Windows**, con el `tar` de bsdtar, que no guarda permisos POSIX, así que todos los archivos
+salen con modo 777 dentro del tar; y al extraerlo **como root**, el `tar` los preserva tal cual. El
+despliegue documentado hace `sudo chown -R kairfirma:kairfirma`, y ahí está la otra mitad de la
+confusión: **`chown` cambia el dueño, no los permisos**. El árbol quedó con dueño `kairfirma` y
+permisos 777 al mismo tiempo, que es el peor de los dos mundos: el código era del usuario del
+servicio, pero todo el mundo podía escribirlo.
+
+El arreglo no rompe nada: la unidad systemd corre como `User=kairfirma`, o sea que lee su propio
+código y no necesita ser root. Con 755 en los directorios interiores y 644 en los archivos, el
+servicio arranca igual. Y como los secretos no viven en el árbol del código —el `.env` está en
+`/opt/kair-firma/.env` (600) y la base de producción en `/opt/kair-firma/data/`— dejar leer a otros
+no expone nada.
+
+Lo que **no** lo arregla: el disco sigue sin cifrar (raíz sobre LVM sin LUKS, intercambio en
+`/swap.img` plano). Eso es una decisión del owner y del abogado (LUKS o control compensatorio
+documentado), no un efecto de los permisos, y queda anotado como tal.
+
+Reglas:
+
+1. **El `chown` no es el endurecimiento.** Un despliegue que dice «endurecer» y solo hace `chown`
+   deja el árbol en 777.
+2. **El `chmod` va pegado al `chown`**, en el mismo bloque del ciclo, sin pausas: un despliegue
+   interrumpido entre pasos deja el servidor parado o a medio endurecer.
+3. **La base de prueba se retira en el despliegue**, no «cuando alguien se acuerde».
+4. **Permisos no es cifrado.** Son dos decisiones distintas, y cada una con su responsable.
+
+## 🐗 La marca que ya se había quitado una vez, y la mención que sí era una mención (2026-11-03, tarde)
+
+**El caso.** El owner trajo una tabla con dos "marcas prohibidas" y la pregunta de fondo: **si la
+norma no las exige, quitarlas**. Las dos frases eran **nuestras**: ni la Ley 1581 ni el Decreto 1074
+exigen «Revisión profesional pendiente» ni «PENDIENTE DE COMPLETAR ANTES DE FIRMAR». La decisión
+fue reescribirlas ya, con la cadena completa de huellas. Pero antes de tocar un texto se comprobó
+contra el **código**, no contra la tabla, y el código dijo otra cosa.
+
+**Lo que el código decía, y la tabla no.**
+
+1. La marca del Anexo de Encargo (línea 830) **no frenaba la firma en runtime**: el flujo usa
+   `anexo_encargo_firmado_at` (la fecha que registra el administrador); el análisis del documento
+   solo se usa en el readiness y en el validador de anexos. Lo rojo era el **gate de publicación**.
+2. La marca del Anexo de Nube (línea 41) **no bloqueaba su ítem**: el ítem usa `modeloOk`, que ignora
+   los marcadores. Lo que lo bloqueaba era el **hueco**.
+3. Ese hueco **no era «del owner»**: los 14 apartados están diligenciados y el `[PENDIENTE]` de la
+   línea 615 está **dentro** del aviso «Este Anexo no se firma con marcadores [PENDIENTE]
+   pendientes». Es una **mención**, no un dato sin llenar. El gate además mentía: «Faltan 1 datos
+   del owner: [PENDIENTE]».
+4. Los puntos (iii) y (iv) están en la línea 44, no en la 41, y son prosa que describe lo pendiente
+   de la validación del abogado: no son marcas y no bloqueaban nada.
+
+### La marca que ya se había quitado una vez
+
+El 31-oct-2026 la otra sesión quitó del Anexo de Encargo el bloque entero del aviso. Con el aviso
+fuera, `documento_encargo` pasó a **ok** y el punto 11 se cerraba sin que el abogado hubiera visto
+nada, así que se **restituyó**: «el check vuelve a bloquear, que es lo correcto»
+(`BITACORA.md:7235-7244`).
+
+El owner lo supo y decidió quitarla otra vez. **Lo que cambió esta vez es qué se quita:** no el
+aviso, sino **la marca legible por la máquina**. El cuerpo del aviso sigue diciendo que el contenido
+«debe ser revisado por un abogado antes de considerarlo contractualmente válido». El texto sigue
+diciéndolo; lo que dejó de estar es el **cartel** que el gate leía.
+
+**Y queda escrito, porque es un riesgo real:** con el aviso reescrito, **el sistema ya no bloquea
+la primera firma por la revisión del abogado**. Es una decisión expresa del owner, no un descuido:
+el control que lo frenaba se quitó a propósito.
+
+### Una mención no es un hueco (y ya era una regla escrita)
+
+La regla ya estaba escrita el 31-oct en esta bitácora: «Un marcador puede ser una mención». Hoy se
+volvió código, con su test:
+
+- `textoLegal.js` gana `RE_MENCION_DE_MARCADOR` y `listarMenciones()`.
+- La regla es **deliberadamente estrecha**: solo un `[PENDIENTE]` **inmediatamente precedido** de
+  «marcador» o «marcadores» es mención. «los marcadores del formulario: [PENDIENTE]» **no**
+  coincide.
+- `analizarAnexoNube` resta las menciones de `huecosBloqueantes` y las **lista** («es una mención,
+  no un dato por llenar»), en vez de borrarlas en silencio.
+- Test propio de 6 casos: `tests/legal-menciones-marcador.test.js`.
+
+Reglas:
+
+1. **Un control que busca un marcador tiene que distinguir el dato del nombre del dato.** Un
+   documento puede **nombrar** lo que está pendiente sin **dejarlo pendiente**.
+2. **La regla se hace estrecha a propósito.** Una mención se reconoce por su forma exacta
+   (inmediatamente precedida de «marcador»). Ancharla es inviting a que el próximo texto se cuele.
+3. **Una mención se lista, no se borra.** Si el hueco desaparece del conteo pero queda visible en el
+   detalle, el que lee ve que se decidió algo; si desaparece en silencio, parece que nadie lo vio.
+
+### El control que señalaba la frase verdadera
+
+El G0 del abogado traía una comprobación («ya no queda «el archivo no fue modificado»») con el
+patrón `/no se modific[oó] un (?:solo )?byte|sin un solo byte/`. Salió en rojo contra la frase
+**verdadera** del checklist 11 y de la nota: «el servidor quedó sin un solo byte modificado», que es
+el resumen de la verificación de solo lectura del T4. El patrón era demasiado ancho: lo prohibido es
+la afirmación sobre el **archivo**, y la frase del **servidor** dice otra cosa.
+
+Regla: **un control con el patrón demasiado ancho no se corrige quitando el control, se corrige
+acotando el patrón**, y la acotación va por **línea**, no por documento: en una misma línea puede
+estar la afirmación sobre el archivo y, al lado, la del servidor.
+
+### El día que una edición de texto cambió el archivo entero
+
+Al documentar la ronda se editó `CONTEXT.md` con la herramienta de edición de texto. Ese archivo
+tiene **finales de línea mixtos por regiones** (CRLF en la cabecera y en los bloques nuevos, CR
+sueltos en el cuerpo, heredados de scripts que escriben byte a byte). La herramienta los
+**normalizó a CRLF entero**: el diff pasó de **265 líneas a 5 834**.
+
+Se reconstruyó: se alineó el archivo con el blob de HEAD y **cada línea sin cambio de contenido
+heredó su terminador de HEAD**; solo las líneas nuevas o editadas usan CRLF. El diff volvió a 265
+líneas, que es el cambio real.
+
+Reglas:
+
+1. **Un archivo con EOL mixto no se edita con una herramienta de texto**: se edita con un script que
+   escribe bytes, y el resultado se comprueba con `git diff --stat`.
+2. **Después de editar, el primer control es el diff.** Si `git diff --stat` dice que cambió el
+   archivo entero, el problema es de finales de línea, no de contenido: el contenido se puede
+   recuperar, el EOL no se adivina.
+3. **Un script escrito a mano se valida antes de correrlo** (`node --check`). Un regex mal cerrado
+   produce un error que señala la línea equivocada (`Invalid regular expression: missing /`) y se
+   parece a un fallo del código que se está probando.
