@@ -16,6 +16,60 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+> **Actualización 2026-11-05 (mañana) — el servidor medido por dentro, el tope del Acuerdo desbloqueado
+> y la v1.4 lista para publicarse:**
+> el owner pidió vía libre para probar el flujo de firma a mano con el Acuerdo v1.4 ya vigente en el
+> servidor, desde su PC. Al **medir** en vez de asumir, aparecieron cuatro bloqueantes reales — y dos de
+> las afirmaciones que este archivo daba por ciertas **eran falsas**:
+>
+> - 🔴 **El tope de 50 000 caracteres impedía registrar la v1.4 por la API.** El texto legal creció 122 %
+>   desde la v1.0 (32 907 chars) y **desde la v1.1 (56 389) ninguna versión cabía**; la v1.4 tiene 72 233.
+>   El tope vivía en `src/services/agreement.js` (`MAX_TEXTO_CHARS`), `src/routes/admin.js` y
+>   `src/routes/admin-aprobaciones.js`. **Decisión del owner (5-nov-2026): subirlo a 100 000** (margen de
+>   ~28 %) y actualizar los dos tests que lo fijaban. **📦998 · `968dd787`, pusheado a `origin/Dev`.**
+> - 🟡 **El servidor NO corre el 📦976: la v1.4 ya estaba desplegada desde el 3-nov.** Medido en el
+>   servidor: **52 migraciones aplicadas** (045 a 053 con `applied_at` del 3-nov), `app/` y `legal/` con
+>   fecha del 3-nov, y `journalctl` diciendo "No hay migraciones pendientes". Lo que **no** se había
+>   corrido era el deploy del 📦997. **Este archivo y `CONTEXT.md` mentían: se corrigen acá.**
+> - 🟡 **`sshd` y Cockpit nunca estuvieron caídos.** El diagnóstico previo era un **falso negativo**:
+>   `cockpit.socket` está `enabled`+`active` en `*:9090` y `sshd` escucha en `0.0.0.0:22` y `[::]:22`.
+>   La vía real es **Tailscale** (ruta directa, 5-23 ms), no la LAN. Cockpit sirve **HTTPS** en el 9090.
+> - 🟢 **El tope arreglado se midió con la suite completa**: **2 096 tests · 2 084 verdes · 0 rojas · 10
+>   canceladas · 2 omitidas**. Las 10 canceladas son de `pdfValidator.test.js` y son **preexistentes**
+>   (reproducidas contra HEAD limpio). **La receta para correr la suite en este PC está en `PROMPT.md`
+>   §7.8: el Node de Electron, sin recompilar nada.**
+>
+> **Lo que quedó armado y verificado, esperando que el owner lo corra (todo por Cockpit → Terminal):**
+>
+> | Qué | Cómo se corre | Qué verifica |
+> |---|---|---|
+> | Deploy del 📦997 + 📦998 | `curl -sS http://100.99.110.100:8765/deploy.sh -o /tmp/k.sh && sudo bash /tmp/k.sh` | hashes de los 5 documentos y del código nuevo, 52 migraciones, salud, gate `publicacion` |
+> | Publicar la v1.4 | `curl -sS http://100.99.110.100:8765/aprobar-publicar-v1.4.sh -o /tmp/p.sh && sudo bash /tmp/p.sh` | registra la autorización OPERATIVA y la activa; **la v1.0 queda desactivada y no hay vuelta atrás por API** |
+> | Probar el correo real | `curl -sS http://100.99.110.100:8765/probar-correo.sh -o /tmp/c.sh && sudo bash /tmp/c.sh` | `verify()` + `sendMail()` con el SMTP de producción: es lo que `/health` **no** prueba |
+> | Excepción de ASEPLUS | `curl -sS http://100.99.110.100:8765/habilitar-aseplus.sh -o /tmp/a.sh && sudo bash /tmp/a.sh` | la quinta excepción: alcance 2, ruta en papel operativa, plazo de 29 días |
+>
+> **El tar de despliegue** se rearmó desde `968dd787`: **880 062 B**, sha256
+> `12741611de5b27057f8a38106fa913d8a8ee9b39e628f85827de88a8b0363dd1`, 224 entradas, 52 migraciones,
+> 7/7 huellas críticas OK y los tres topes leídos desde el tar = 100 000. El método de armado se validó
+> **reproduciendo el tar anterior desde su commit: 0 de 207 archivos con hash distinto**.
+>
+> **Lo que sigue bloqueado, en orden:** (1) el deploy del 📦997+998, que el owner tiene que correr; (2)
+> **dos actos del owner para publicar la v1.4** — la autorización operativa y la activación — sin la
+> jurídica, porque **el abogado no ha respondido J1-J14**; (3) **la fecha de vigencia**, que declara el
+> owner; (4) ASEPLUS no tiene el Anexo de Encargo firmado, así que lo que destraba el 409 es la
+> excepción; (5) los 5 app passwords sin rotar, Node 20 en EOL, la copia off-site de respaldos y la 9A
+> en papel.
+>
+> **Una diferencia entre el documento y el código, para el abogado:** el Anexo de Encargo §12 dice que la
+> firma de la Empresa se registra en el servicio con tres datos — `anexo_encargo_firmado_at`, `fecha` y
+> `evidencia` (el archivo firmado con su huella). **El código solo registra la fecha**
+> (`marcarAnexoFirmado`, `src/services/empresa.js:867`): un `UPDATE` y la bitácora de auditoría. Lo que sí
+> existe, en `gh_firmas_electronicas` (migración 045), es `anexo_encargo_version` /
+> `anexo_encargo_hash`, y la propia migración aclara que son la huella del **texto canónico**, no la de la
+> copia firmada. **El PDF firmado con su huella tiene que vivir en el archivo de la Empresa, no en el
+> servicio.**
+>
+>
 > **Actualización 2026-11-04 (tarde) — el estado medido antes de publicar la v1.4:**
 > el owner pidió revisar el estado actual antes de preparar la publicación del Acuerdo v1.4. La
 > revisión **midió contra los bytes**, no contra los documentos: las cuatro huellas coinciden con el
@@ -153,7 +207,9 @@
 > vigente es X») no se absuelve con una **mención** a una huella vieja: si X no es la vigente, el
 > documento miente. Trae su propio test (12 casos) y **prueba en negativa**.
 >
-> **Suite del `firma-service`: 2 090 · 2 088 verdes · 0 rojas · 2 omitidas.** El cuadro **no se
+> **Suite del `firma-service`: 2 096 · 2 084 verdes · 0 rojas · 10 canceladas · 2 omitidas** (corrida del
+> 5-nov-2026 con el Node de Electron; las 10 canceladas son de `pdfValidator.test.js` y son
+> preexistentes, comprobadas contra HEAD limpio). El cuadro **no se
 > mueve**: 63 cerrados · 33 pendientes · 0 no aplica · 96. Manifiesto coherente (`--check` en 0),
 > paquete reconstruido y verificado (13/13, 0 problemas), G0 del abogado en 0, barrido de
 > caracteres no latinos en 0.
@@ -171,7 +227,7 @@
 | Campo | Valor |
 |---|---|
 | **Fecha de cierre** | 2026-10-28 (📦988: el **bump a la `0.1.252`**, con el `CHANGELOG`, el `README` y las `release-notes` para el usuario final; 📦986: el guard que detecta un Python sin `pandas` **al arrancar**, no a mitad de uso; 📦985: el listado de incapacidades de Tempoactiva, que salía vacío desde que el mapeo del 📦866 dejó de guardar la lista de archivos). Antes: 2026-10-27 (📦980: la **v1.2 del Acuerdo armada y verificada**, que espera la aprobación del abogado; 📦979: los tres anexos con la salida B del canal de correo, publicados en `gh-pages`; 📦978: los ocho controles técnicos que el texto prometía y el código no cumplía, con la suite en **1892 · 1890 · 0 · 2**; — 📦977: la autorización operativa de la v1.0 registrada en producción — `id 1`, tipo OPERATIVA, huella `52a490a4…10c04`; — 📦976: las seis decisiones del abogado aplicadas al código y a los tres documentos — la cuenta de envío propia de la Empresa con el **OTP siempre desde K+AIR**, el medio personal que el Trabajador **confirma** en la pantalla de firma, y la **barrera de publicación** que separa la aprobación jurídica de la autorización operativa; — 📦975: la pregunta del medio personal del OTP añadida al paquete del abogado; — 📦973: el tablero de los 15 puntos con el estado medido; — 📦971: el correo post-firma sin adjuntos y los nueve documentos alineados con la operación real). Antes: 2026-10-26 (📦967 a 📦972: el despliegue en kair-server, la primera firma real, el D-03 cerrado con el motivo verdadero y el paquete del abogado rehecho).
-| **Rama** | **Portátil, 28-oct-2026:** rama `Dev-Pc` en `0e90a42d` (📦986), **nivelada con `origin/Dev-Pc`** — los **cuatro** commits de la jornada (📦985 `7534ac8d`, 📦986 `0e90a42d`, 📦987 `462aac32` y 📦988) quedaron **pusheados**. Árbol de trabajo limpio y 0 commits sin pushear. La mañana del 28-oct `Dev-Pc` estaba **59 commits atrás** de `origin/Dev` y se niveló con un fast-forward limpio (`9fa06732`, 📦984); el escritorio **todavía no tiene el 📦985 ni el 📦986** (no los ha descargado). Antes: `Dev`, **nivelada con `origin/Dev`** (la 971 y las anteriores; el 976 quedó commiteado y pusheado en esta jornada, con su hash en `git log`, no dentro del propio commit). **Los cinco commits de la jornada quedaron pusheados a `origin/Dev`**: 📦978 (`5534aca7`, el código), 📦979 (`f445bb1c`, los tres anexos), 📦980 (`43fedd4a`, el JSON de cambios de la v1.2), 📦981 (`26398205`) y 📦982 (`a908ca48`, este estado al cierre). La rama `gh-pages` quedó pusheada con los tres anexos (`04c5e762`). El **working tree está limpio**: lo único que queda sin commitear es el texto armado `acuerdo-v1.2.txt`, que está en `.gitignore` porque es la versión que se firma y no se commitea antes de que el abogado la apruebe. La rama `gh-pages` quedó **pusheada** con los tres anexos (`04c5e762`, 3 archivos, +304/-123): **el sitio público ya los tiene**. **El servidor `kair-server` corre el código del 📦976** (tar `bc18fbb6…9990b8`, 603 709 B, 177 entradas; migraciones 042, 043 y 044 aplicadas; `/health` responde `ok`). La **autorización operativa de la v1.0** quedó registrada en producción (`gh_firma_aprobaciones_publicacion`, `id 1`, tipo OPERATIVA, huella `52a490a4…10c04`). La excepción de habilitación 4 está **cerrada** (26-oct, con el motivo verdadero), así que hoy ninguna Empresa puede pedir firmas sin una excepción nueva.
+| **Rama** | **Portátil, 28-oct-2026:** rama `Dev-Pc` en `0e90a42d` (📦986), **nivelada con `origin/Dev-Pc`** — los **cuatro** commits de la jornada (📦985 `7534ac8d`, 📦986 `0e90a42d`, 📦987 `462aac32` y 📦988) quedaron **pusheados**. Árbol de trabajo limpio y 0 commits sin pushear. La mañana del 28-oct `Dev-Pc` estaba **59 commits atrás** de `origin/Dev` y se niveló con un fast-forward limpio (`9fa06732`, 📦984); el escritorio **todavía no tiene el 📦985 ni el 📦986** (no los ha descargado). Antes: `Dev`, **nivelada con `origin/Dev`** (la 971 y las anteriores; el 976 quedó commiteado y pusheado en esta jornada, con su hash en `git log`, no dentro del propio commit). **Los cinco commits de la jornada quedaron pusheados a `origin/Dev`**: 📦978 (`5534aca7`, el código), 📦979 (`f445bb1c`, los tres anexos), 📦980 (`43fedd4a`, el JSON de cambios de la v1.2), 📦981 (`26398205`) y 📦982 (`a908ca48`, este estado al cierre). La rama `gh-pages` quedó pusheada con los tres anexos (`04c5e762`). El **working tree está limpio**: lo único que queda sin commitear es el texto armado `acuerdo-v1.2.txt`, que está en `.gitignore` porque es la versión que se firma y no se commitea antes de que el abogado la apruebe. La rama `gh-pages` quedó **pusheada** con los tres anexos (`04c5e762`, 3 archivos, +304/-123): **el sitio público ya los tiene**. **El servidor `kair-server` NO corre el 📦976: la v1.4 ya está desplegada desde el 3-nov** (medido el 5-nov: **52 migraciones aplicadas** — 045 a 053 con `applied_at` del 3-nov —, `app/` y `legal/` con fecha del 3-nov, `journalctl` sin migraciones pendientes). Lo que falta es el deploy del 📦997 + 📦998, que el owner tiene que correr; su tar está armado y verificado desde `968dd787` (**880 062 B**, sha256 `12741611de5b27057f8a38106fa913d8a8ee9b39e628f85827de88a8b0363dd1`). `/health` responde `ok`. La **autorización operativa de la v1.0** quedó registrada en producción (`gh_firma_aprobaciones_publicacion`, `id 1`, tipo OPERATIVA, huella `52a490a4…10c04`). La excepción de habilitación 4 está **cerrada** (26-oct, con el motivo verdadero), así que hoy ninguna Empresa puede pedir firmas sin una excepción nueva.
 | **Último commit de código** | 📦 **988** — el **bump a la `0.1.252`**: `package.json`, la sección `## [0.1.252]` del `CHANGELOG.md`, la versión de desarrollo del `README.md` y las `release-notes.md` para el usuario final. Antes: 📦 **986** — el guard del Python sin dependencias: `main/python-deps.js` (nuevo, `pythonTieneDependencias`), los tres bucles de `findPython()` y el check de arranque (`hasDependencies`). Antes: 📦 **985** — el listado de incapacidades de Tempoactiva, que salía vacío desde que el 📦866 dejó de guardar `files[]`: `main/structure-files.js` (nuevo) + los cuatro handlers de ausentismo + los filtros del renderer en las tres ramas de error. Antes: 📦 **980** — la v1.2 del Acuerdo (empalmada desde la v1.0 sellada, con las once correcciones del abogado; el texto armado queda fuera del commit porque es la versión que se firma). Antes: 📦 **979** — los tres anexos con la salida B del canal de correo. Antes: 📦 **978** — los ocho controles técnicos que el texto prometía y el código no cumplían: el buzón corporativo se rechaza **siempre** (y el caso queda en el registro append-only), la confirmación del medio es obligatoria para **cualquier** destino, el bloqueo del OTP es **duro** (la salida es una nueva solicitud) y la caducidad alcanza a las filas heredadas; más la Constancia con los anexos y su huella, la declaración expresa de datos sensibles por documento, y los respaldos cifrados con purga a nivel de registro. Antes: 📦 **976** — las seis decisiones 1.a a 1.f aplicadas: el remitente del enlace (cuenta propia de la Empresa, con el OTP exceptuado), la confirmación del medio personal y la barrera de publicación (`createVersion` con `activa: true` devuelve 409 sin autorización operativa registrada para ese texto). Módulo nuevo `constancia-aprobacion-acuerdo.html`. Antes: 📦 **975** (la pregunta 1.a al paquete del abogado) — 📦 **974** (dos erratas en la nota) — 📦 **973** (el tablero de los 15 puntos) — 📦 **972** (el paquete del abogado rehecho) — 📦 **971** (el correo post-firma sin adjuntos, el endpoint público de la Constancia y los nueve documentos alineados) |
 | **CAPÍTULO I: CERRADO** | Cerrado **en texto y en código**. Numerales 1.1 a 1.5. El 1.5 (Identificación del Operador) se agregó hoy: el 1.4 nombra a Gesstiar S.A.S. y el 1.5 dice dónde están su domicilio y sus canales, explicando que no van en el texto porque son volátiles y el Acuerdo no se modifica una vez publicado. Verificado que **el Decreto 1074 no prescribe el contenido del acuerdo** (el 2.2.2.47.2 es neutralidad tecnológica), así que el domicilio tampoco era obligatorio. **Ningún pendiente del Capítulo I depende del NIT.** |
 | **Pendiente del Capítulo I** | El **NIT de Gesstiar S.A.S. (`900987987`)** ya está en el manifiesto y en los
@@ -368,8 +424,11 @@ inicial y el Anexo siguen siendo administrativos. |
     ni un commit de esta iniciativa**, y todo lo que sigue son decisiones, no código.
 
     *Servidor.* `kair-server` = Ubuntu 24.04.5 LTS, 2 núcleos **AMD C-70**, **3,5 GB de RAM**, 96 GB
-    libres, **sin GPU**. Panel: Cockpit en `http://192.168.1.11:9090` — **HTTP plano, sin cifrar**;
-    entrar ahí manda usuario y contraseña sin proteger. SSH abierto en el 22.
+    libres, **sin GPU** — es una **laptop Acer Aspire V5-121**: servidor, base y respaldos son **un solo
+    punto de falla**. Panel: Cockpit en **`https://192.168.1.11:9090`** (también por Tailscale en
+    `https://100.119.81.74:9090`) — **con TLS**, no HTTP plano. SSH abierto en el 22: `sshd` escucha en
+    `0.0.0.0:22` y `[::]:22`, y `cockpit.socket` está `enabled`+`active` en `*:9090`. **La vía real de
+    acceso es Tailscale**, no la LAN (ruta directa, 5-23 ms).
 
     *✅ Instalado y funcionando.* `bash ~/hermes-install.sh --non-interactive --skip-browser`.
     Python 3.14.7, uv 0.12.3, el comando en `~/.local/bin/hermes` y el PATH parcheado en `.bashrc`.

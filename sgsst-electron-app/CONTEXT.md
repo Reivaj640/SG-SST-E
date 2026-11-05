@@ -14,11 +14,25 @@
 
 
 
-**Última actualización:** 3 de noviembre de 2026
+**Última actualización:** 5 de noviembre de 2026
 **Versión actual:** 0.1.252 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 5-nov-2026 — el tope del Acuerdo desbloqueado y el servidor medido por dentro:**
+> el owner pidió vía libre para probar el flujo de firma a mano con el Acuerdo v1.4 ya vigente. Al medir
+> en el servidor en vez de asumir, aparecieron cuatro bloqueantes — y **dos afirmaciones que este archivo
+> daba por ciertas eran falsas**. La más grande: **el tope de 50 000 caracteres impedía registrar la v1.4
+> por la API** (la v1.4 tiene 72 233 caracteres, y desde la v1.1 —56 389— ninguna versión cabía).
+> **Decisión del owner (5-nov-2026): subirlo a 100 000.** Ya está en el código (`agreement.js`,
+> `routes/admin.js`, `routes/admin-aprobaciones.js`) con sus dos tests, y medido con la suite completa:
+> **2 096 · 2 084 · 0**. La segunda: **este archivo decía que en `kair-server` seguía la v1.0 con el
+> 📦976, y es falso** — la v1.4 **ya estaba desplegada desde el 3-nov** (52 migraciones aplicadas). Lo que
+> faltaba era el deploy del 📦997, que el owner todavía tiene que correr. Y la tercera: **`sshd` y Cockpit
+> nunca estuvieron caídos**; la vía real de acceso es Tailscale, y Cockpit sirve HTTPS. Las tres
+> correcciones, con sus huellas y los comandos, están en `Historial.md`.
+>
+> **Anterior · 3-nov-2026 — dos marcas prohibidas reescritas, y una mención que ya no es un hueco:**
 > **🆕 3-nov-2026 — dos marcas prohibidas reescritas, y una mención que ya no es un hueco:**
 > La línea sigue siendo la del **servicio de firma electrónica de K+AIR**. El owner trajo una tabla
 > con dos "marcas prohibidas" y la pregunta de fondo: **si la norma no las exige, quitarlas**. Las
@@ -338,8 +352,9 @@
 > para **cualquier** destino, el bloqueo del OTP es **duro** (la salida es una nueva
 > solicitud) y la caducidad alcanza a las filas heredadas. La Constancia ya lleva los
 > anexos que rigen cada firma, con versión y huella SHA-256.
-> **Ese código está commiteado y pusheado, pero NO desplegado:** en `kair-server` sigue la
-> v1.0 con el 📦976. El tar del 📦978 ya está armado y verificado desde el commit
+> **Ese código está commiteado y pusheado, y en `kair-server` la v1.4 YA ESTÁ desplegada desde el
+> 3-nov** (medido el 5-nov-2026: 52 migraciones aplicadas, `app/` y `legal/` con fecha del 3-nov).
+> El tar del 📦978 ya está armado y verificado desde el commit
 > (650 495 B, sha256 `fba78da6…fedeb`), pero el despliegue exige **crear antes
 > `/opt/kair-firma/backup.passphrase`** (600, root:root) o el script de respaldos aborta y los
 > respaldos dejan de correr, y las migraciones 045 y 046 hay que aplicarlas antes de encender
