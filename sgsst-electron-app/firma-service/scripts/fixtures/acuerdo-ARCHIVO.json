@@ -8,7 +8,16 @@
       "verificado_el": "2026-10-20T16:45:29.194Z",
       "publicada_en_base": "2026-10-20T16:45:23.067Z",
       "nota": "Version inmutable. Cambiar el texto exige publicar una version nueva con su propia huella; los consentimientos ya aceptados no se tocan."
+    },
+    "v1.4": {
+      "sha256": "7298a9435b94c6c6f4f4365c3818fa7e8825524c2ebd524d380c10c2c585490f",
+      "chars": 72233,
+      "archivo": "scripts/fixtures/acuerdo-v1.4.txt",
+      "fecha_archivado": "2026-11-05T17:41:35.116Z",
+      "verificado_el": "2026-11-05T17:41:36.104Z",
+      "publicada_en_base": "2026-11-05T17:41:35.628Z",
+      "nota": "Version inmutable. Cambiar el texto exige publicar una version nueva con su propia huella; los consentimientos ya aceptados no se tocan."
     }
   },
-  "actualizado_el": "2026-10-20T16:45:29.194Z"
+  "actualizado_el": "2026-11-05T17:41:36.104Z"
 }
