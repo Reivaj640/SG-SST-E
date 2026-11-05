@@ -220,7 +220,18 @@ test('manifiesto · sigue siendo ASCII puro', () => {
 
 test('manifiesto · no declara ninguna firma que no exista', () => {
   const man = manifiesto();
-  assert.equal(man.acuerdo.publicado, false, 'el Acuerdo no esta aprobado ni publicado');
+  // El Acuerdo: si el manifiesto dice que esta publicado, tiene que declarar
+  // la version, la huella y el archivo, y el archivo tiene que existir. QUE
+  // el texto este vivo en la base no lo comprueba este archivo: lo comprueba
+  // el gate, contra la base.
+  if (man.acuerdo.publicado) {
+    assert.ok(man.acuerdo.version, 'un Acuerdo publicado tiene que declarar su version');
+    assert.ok(man.acuerdo.hash, 'un Acuerdo publicado tiene que declarar su huella');
+    assert.ok(
+      fs.existsSync(path.join(SERVICE, man.acuerdo.archivo)),
+      'un Acuerdo publicado tiene que apuntar a un archivo que existe',
+    );
+  }
   assert.equal(man.anexo_nube.firmado, false, 'no hay Anexo de Nube firmado por ninguna Empresa');
   assert.equal(man.anexo_nube.hash, null, 'no hay copia firmada del Anexo de Nube');
   assert.equal(man.anexo_encargo.estado, 'no_firmado', 'el Anexo de Encargo sigue sin firmar');
