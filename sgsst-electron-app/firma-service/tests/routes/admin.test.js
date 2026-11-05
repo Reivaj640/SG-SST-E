@@ -11,7 +11,7 @@
  *   - Sin version → 400
  *   - version formato inválido (1.0, v1, v1.0.0) → 400
  *   - Sin texto → 400
- *   - texto demasiado largo (>50000) → 400
+ *   - texto demasiado largo (>100000) → 400
  *   - fecha_vigencia_fin inválida → 400
  *   - creado_por/kair_version demasiado largos → 400
  *
@@ -156,10 +156,10 @@ test('POST acuerdo-versiones: sin texto → 400', async () => {
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
 
-test('POST acuerdo-versiones: texto > 50000 chars → 400', async () => {
+test('POST acuerdo-versiones: texto > 100000 chars → 400', async () => {
   resetDb();
   const app = makeApp();
-  const textoLargo = 'x'.repeat(50001);
+  const textoLargo = 'x'.repeat(100001);
   const res = await publicar(app, { version: 'v1.0', texto: textoLargo });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');

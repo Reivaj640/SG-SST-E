@@ -51,14 +51,14 @@ function publicar(version, texto, extra = {}) {
   return agreementService.createVersion(Object.assign({ version, texto }, extra));
 }
 
-test('createVersion: con texto grande (cerca del límite 50000) → OK', () => {
+test('createVersion: con texto grande (cerca del límite 100000) → OK', () => {
   resetDb();
-  // TEXTO_BASE = 'ACUERDO BASE' = 12 chars; completar hasta 50000
-  const textoGrande = TEXTO_BASE + 'x'.repeat(50000 - TEXTO_BASE.length);
-  assert.equal(textoGrande.length, 50000);
+  // TEXTO_BASE = 'ACUERDO BASE' = 12 chars; completar hasta 100000
+  const textoGrande = TEXTO_BASE + 'x'.repeat(100000 - TEXTO_BASE.length);
+  assert.equal(textoGrande.length, 100000);
   const result = publicar('v1.0', textoGrande);
   assert.equal(result.version, 'v1.0');
-  assert.equal(result.texto.length, 50000);
+  assert.equal(result.texto.length, 100000);
 });
 
 test('createVersion: con metadata JSON complejo → persiste correctamente', () => {
@@ -163,9 +163,9 @@ test('createVersion: con kair_version demasiado largo (>32) → throw 400', () =
   );
 });
 
-test('createVersion: con texto > 50000 → throw 400', () => {
+test('createVersion: con texto > 100000 → throw 400', () => {
   resetDb();
-  const textoLargo = 'x'.repeat(50001);
+  const textoLargo = 'x'.repeat(100001);
   assert.throws(
     () => agreementService.createVersion({ version: 'v1.0', texto: textoLargo }),
     (err) => err.statusCode === 400 && err.code === 'INVALID_REQUEST_BODY',

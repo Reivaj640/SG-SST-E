@@ -19,7 +19,18 @@ const {
 const aprobacionPublicacion = require('./aprobacionPublicacion');
 
 const VERSION_REGEX = /^v\d+\.\d+$/;
-const MAX_TEXTO_CHARS = 50000;
+// Tope del texto completo del Acuerdo.
+//
+// El tope era 50 000 chars y quedo obsoleto en la v1.1: el texto legal crecio
+// 122 % desde la v1.0 (32 907 chars) y desde la v1.1 (56 389) NINGUNA version
+// posterior cabia. La v1.4 esta en 72 233 chars, o sea que el limite viejo
+// impedia registrar por la API el texto que hay que publicar.
+//
+// Se sube a 100 000: deja un margen de ~28 % sobre la v1.4 y todavia cabe
+// de sobra en el cuerpo de la peticion (Express acepta 10 MB, server.js:100).
+// Si el Acuerdo crece otra vez, el numero se vuelve a revisar; no es un
+// limite generico, es el tope del TEXTO DEL ACUERDO, no de cualquier payload.
+const MAX_TEXTO_CHARS = 100000;
 const MAX_VERSION_CHARS = 32;
 const MAX_CREADO_POR_CHARS = 128;
 const MAX_KAIR_VERSION_CHARS = 32;
@@ -84,7 +95,7 @@ function getByVersion(version) {
  *
  * @param {object} opts
  * @param {string} opts.version - ej. 'v1.0' (formato /^v\d+\.\d+$/)
- * @param {string} opts.texto - Texto completo (1-50000 chars)
+ * @param {string} opts.texto - Texto completo (1-100000 chars)
  * @param {boolean} [opts.activa=true]
  * @param {string|null} [opts.fecha_vigencia_fin=null] - ISO-8601
  * @param {string} [opts.creado_por]

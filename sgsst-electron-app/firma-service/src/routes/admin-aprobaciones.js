@@ -43,7 +43,7 @@ const registrarAprobacionBody = z.object({
   version: z.string().regex(/^v\d+\.\d+$/, 'La versión debe tener el formato v<major>.<minor>'),
   hash: z.string().regex(/^[0-9a-fA-F]{64}$/, 'El hash debe ser un SHA-256 en hexadecimal')
     .optional(),
-  texto: z.string().min(1).max(50000).optional(),
+  texto: z.string().min(1).max(100000).optional(),
   tipo: z.enum(['JURIDICA', 'OPERATIVA']),
   aprobado_por: z.string().min(1).max(128),
   fecha: z.string().min(1).max(40),

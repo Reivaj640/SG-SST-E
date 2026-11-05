@@ -31,7 +31,7 @@ const logger = require('../utils/logger');
  *
  * Reglas:
  *  - version: /^v\d+\.\d+$/ (3-32 chars)
- *  - texto: 1-50000 chars
+ *  - texto: 1-100000 chars
  *  - activa: bool, default true
  *  - fecha_vigencia_fin: ISO-8601 o null
  *  - creado_por: max 128 chars
@@ -45,7 +45,7 @@ const createAcuerdoVersionBody = z.object({
     /^v\d+\.\d+$/,
     'version debe tener formato v<major>.<minor> (ej. v1.0)',
   ),
-  texto: z.string().min(1).max(50000),
+  texto: z.string().min(1).max(100000),
   activa: z.boolean().optional().default(true),
   fecha_vigencia_fin: z.string().datetime().nullable().optional(),
   creado_por: z.string().max(128).optional(),
