@@ -25,7 +25,7 @@
     <li><a href="privacidad.html">Pol&iacute;tica de Privacidad</a></li>
     <li><a href="politica-firma.html">Pol&iacute;tica de la firma</a></li>
     <li><a href="anexo-encargo.html">Anexo de encargo de tratamiento</a></li>
-    <li><a href="anexo-nube-v1.0.html">Anexo de nube</a></li>
+    <li><a href="anexo-nube-v1.1.html">Anexo de nube</a></li>
     <li><a href="autorizacion-trabajadores.html">Autorizaci&oacute;n de trabajadores</a></li>
     <li><a href="constancia-aprobacion-acuerdo.html">Constancia de aprobaci&oacute;n</a></li>
     <li><a href="soporte.html">Soporte y contacto</a></li>
@@ -69,7 +69,7 @@
         Datos de contacto: <a href="mailto:privacidad.kair@gmail.com">privacidad.kair@gmail.com</a></em></td>
         <td>Opera el servicio de firma electr&oacute;nica por cuenta y a nombre de la empresa, solo para los fines
         del contrato, con las obligaciones de este anexo y las medidas t&eacute;cnicas del
-        <a href="anexo-nube-v1.0.html">Anexo de Nube</a>.</td>
+        <a href="anexo-nube-v1.1.html">Anexo de Nube</a>.</td>
       </tr>
       <tr>
         <td><strong>Titulares</strong></td>
@@ -412,7 +412,7 @@
   <h2>5. Proveedores externos y subencargados</h2>
   <p>El encargado se apoya en los siguientes proveedores externos para prestar el servicio. La descripci&oacute;n
   completa de sus funciones, la ubicaci&oacute;n de la infraestructura y las medidas t&eacute;cnicas de seguridad
-  est&aacute;n en el <a href="anexo-nube-v1.0.html">Anexo de Nube</a>, que forma parte integral de este
+  est&aacute;n en el <a href="anexo-nube-v1.1.html">Anexo de Nube</a>, que forma parte integral de este
   documento:</p>
   <table>
     <thead>
@@ -749,7 +749,7 @@
   <h2>9. El servicio en la nube</h2>
   <p>El servicio de firma electr&oacute;nica K+AIR se presta como <strong>servicio en la nube</strong>: el
   <code>firma-service</code>, alojado en la infraestructura operada por Gesstiar y descrita en el
-  <a href="anexo-nube-v1.0.html">Anexo de Nube</a>. La Empresa no recibe copias de la base de datos ni del
+  <a href="anexo-nube-v1.1.html">Anexo de Nube</a>. La Empresa no recibe copias de la base de datos ni del
   almacenamiento de archivos. Accede al servicio con las credenciales propias de su cliente de empresa, no con
   el enlace de firma ni con el c&oacute;digo OTP del Trabajador, que son personales e intransferibles. La copia
   permanente se entrega seg&uacute;n el numeral 6 de este anexo.</p>
@@ -800,11 +800,18 @@
   <h2>12. Firmas</h2>
   <p>Al firmar, ambas partes manifiestan haber le&iacute;do este anexo y aceptan sus condiciones.</p>
   <p><strong>Registro de la firma de la Empresa.</strong> La firma de la Empresa sobre este Anexo queda registrada en
-  el servicio con tres datos, que son los que exige el manifiesto legal del servicio: el
-  <code>anexo_encargo_firmado_at</code> (el momento en que se registra la firma), la <code>fecha</code> (la fecha de
-  la firma) y la <code>evidencia</code> (el archivo firmado, con su huella SHA-256). <strong>Los tres valores los
-  registra la Empresa cuando firma: este documento no los trae.</strong> Mientras ese registro no exista, el Anexo
-  de Encargo figura como no firmado y el servicio no habilita a esa Empresa para la firma electr&oacute;nica.</p>
+  el servicio con un dato: el <code>anexo_encargo_firmado_at</code>, la fecha y hora (ISO 8601) en que el servicio
+  registra la firma. Ese registro queda adem&aacute;s en la bit&aacute;cora de auditor&iacute;a, con el valor
+  anterior, el nuevo, qui&eacute;n lo registr&oacute;, su direcci&oacute;n IP, su navegador y, cuando se cambia una
+  fecha ya registrada, el motivo del cambio. La <strong>versi&oacute;n</strong> y la <strong>huella SHA-256</strong> del
+  texto de este Anexo que rigi&oacute; cada firma quedan escritas en el registro de la firma y en la Constancia que el
+  servicio entrega: son la huella del texto can&oacute;nico que la Empresa acept&oacute;, no la de una copia firmada.
+  <strong>La copia firmada de este Anexo no queda almacenada en el servicio:</strong> la conservan la Empresa y
+  K+AIR en su expediente, con su propia huella SHA-256, y es esa copia la que acredita la firma ante terceros. La
+  <code>evidencia</code> que figura en la Constancia es la que se declara en el manifiesto legal del servicio: la
+  referencia a esa copia, no un archivo que el servicio guarde. Mientras el registro
+  <code>anexo_encargo_firmado_at</code> no exista, este Anexo figura como no firmado y el servicio no habilita a esa
+  Empresa para la firma electr&oacute;nica.</p>
   <table>
     <thead>
       <tr><th>Por el responsable (empresa cliente)</th><th>Por el encargado (Gesstiar S.A.S.)</th></tr>
@@ -816,7 +823,8 @@
         Firma: ________________________<br><br>
         Fecha: ____ / ____ / 20____<br><br>
         Registro en el servicio: <code>anexo_encargo_firmado_at</code> ____ / ____ / 20____ &middot;
-        <code>evidencia</code> ________________________</td>
+        Copia firmada (expediente de la Empresa y de K+AIR), con su huella SHA-256:
+        ________________________</td>
         <td>Nombre: Javier Robles Fontalvo<br><br>
         Cargo: Representante Legal<br><br>
         NIT: 900987987-4<br><br>
