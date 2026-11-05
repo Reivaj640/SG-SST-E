@@ -2,6 +2,8 @@ Hoy no se puede firmar ni autorizar producción: faltan tres cosas de naturaleza
 
 El plan de abajo está ordenado para que nada se firme antes de que el texto esté congelado y para que nada se publique antes de que la compuerta de conservación esté decidida. El orden no es estético: cualquier edición posterior a la firma invalida el hash aprobado y obliga a volver a firmar.
 
+ACTUALIZACIÓN DEL 5-NOV-2026 (decisión del owner): (a) las ACTAS DE CIERRE dejan de ser condición de producción —la evidencia registrada las reemplaza como prueba, y la firma de un acta no es lo que verifica nada—; (b) la compuerta del Anexo de Nube (decisión C) se ENCIENDE, con la condición técnica de que la Empresa activa tenga el Anexo de Nube suscrito antes del despliegue. Ver §12, donde queda el estado de los seis bloqueantes y el orden de resolución.
+
 1. Estado de partida (semáforo)
 Bloque	Estado	Qué falta
 Contradicciones jurídicas A-2 a A-6, B-1 a B-4, C-1 a C-4	✅ Cerradas y verificadas	Nada
@@ -36,7 +38,7 @@ Compuerta G0: 13/13 filas de la nota sin problemas; --check en 0; ninguna huella
 Bloque	Marcadores	Fuente
 RNBD	4: naturaleza jurídica y activos de la sociedad; obligación de inscripción; estado del registro; causal de la declaración	Cámara de comercio, estados financieros, SIC
 Ficha del canal	10: host SMTP y evidencia de TLS; remitente; contraseña de aplicación y fecha; procedimiento y fecha de rotación; MFA; plantilla del OTP; contenido mínimo y su regla; registro de errores y envíos; escalamiento con responsables; última revocación	Servidor y cuenta de correo
-Mientras estén vacíos, el Anexo de Nube no es firmable y, con C-1 encendido, el servicio no crea solicitudes ni emite Constancia.
+Mientras estén vacíos, el Anexo de Nube no puede publicarse como versión que prometa una evidencia que no existe. Desde la v1.1 (5-nov-2026) el bloque de pendientes deja de ser CONDICIÓN DE FIRMA y pasa a DECLARACIÓN DE ESTADO: la Empresa firma con la limitación a la vista, y la firma no la borra. Lo que sí bloquea es publicar una versión suscrita que afirme controles que no existen. Con C-1 encendido, el servicio no crea solicitudes ni emite Constancia para una Empresa que no tenga el Anexo de Nube suscrito.
 
 1.2 Los 8 puntos de la nota: 6 del abogado, 2 del owner
 #	Punto	Quién	Respuesta esperada
@@ -72,22 +74,22 @@ Compuerta G3: sección E firmada con hashes que coinciden con los congelados; Co
 
 6. Fase 4 — Cierre técnico y autorización operativa (dev + owner, 1-2 días)
 ID	Qué se hace	Evidencia
-T4	Verificación formal en servidor: versión, configuración legal, migraciones, permisos, secretos, respaldos, auditoría	Acta con fecha, versión y responsable
-T6	E2E controlado posterior al despliegue candidato, limpieza del rastro y acta	Acta con casos, resultados y limpieza
-T7	Reversión probada, no descrita	Registro de la prueba y del estado restaurado
-T8	Autorización operativa independiente del owner, después de la aprobación jurídica	Documento firmado, distinto de la Constancia
-T9	Reconfirmar en el momento: acuerdo.publicado=false, aplicacion.activada=false, exigirAnexoNube=false	Captura o salida fechada de las tres
-Compuerta G4: T4, T6, T7 con acta; T8 firmada; T9 reconfirmado. La aprobación jurídica no sustituye ninguna de estas.
+T4	Verificación formal en servidor: versión, configuración legal, migraciones, permisos, secretos, respaldos, auditoría	Registro de evidencia: fecha, versión, responsable y salida verificable (correo, archivo de salida o entrada de bitácora). NO es un acta firmada: la firma no es lo que prueba la verificación
+T6	E2E controlado posterior al despliegue candidato, limpieza del rastro y acta	Registro de evidencia: casos ejecutados, resultados y limpieza, con la salida del runner
+T7	Reversión probada, no descrita	Registro de evidencia: la prueba y el estado restaurado (mismo formato que T6)
+T8	Autorización operativa independiente del owner, después de la aprobación jurídica	Documento firmado, distinto de la Constancia. ESTE sí es un acto de voluntad: la firma es la prueba
+T9	Reconfirmar en el momento: acuerdo.publicado=false, aplicacion.activada=false, y el valor que corresponda a la decisión C (exigirAnexoNube)	Registro de evidencia: salida fechada de las tres
+Compuerta G4: T4, T6 y T7 con EVIDENCIA REGISTRADA (el acta firmada NO es condición: si hay salida verificable, hay prueba); T8 firmada, porque es un acto de voluntad y no una constancia; T9 reconfirmado. La aprobación jurídica no sustituye ninguna de estas.
 
-7. Fase 5 — Publicación, activación y acta (owner, 1 día)
+7. Fase 5 — Publicación, activación y registro de cierre (owner, 1 día)
 Orden inamovible:
 
 Publicar el Acuerdo v1.4 con la fecha de vigencia fijada → acuerdo.publicado = true y publicación en kair.fyi.
 Decidir la compuerta de conservación (ver §8, decisión B): si se valida 10/5, alinear el catálogo, reejecutar pruebas y solo entonces aplicacion.activada = true. Si no se valida, queda cerrada y el texto debe poder sostenerse con la compuerta cerrada.
-Decidir exigirAnexoNube (ver §8, decisión C).
+Decidir exigirAnexoNube (ver §8, decisión C): DECIDIDO el 5-nov-2026 — ENCENDERLA, y solo cuando la Empresa activa ya tenga el Anexo de Nube suscrito (ver B3 en §12).
 E2E final con una Empresa piloto y limpieza.
-Acta de cierre con: versión, hashes, commit, resultados T1-T9, decisiones A/B/C, fecha y firmas.
-Compuerta G5 (producción aprobada): los 8 criterios del §9 se cumplen simultáneamente.
+Registro de cierre con: versión, hashes, commit, resultados T1-T9, decisiones A/B/C, fecha y responsable. Este registro NO es condición de producción: su ausencia no bloquea la publicación ni la activación. Lo que bloquea es que falte la evidencia a la que el registro apunta (T4, T6, T7, T8 y T9). Se conserva como el resumen que deja constancia de qué se probó, para el expediente.
+Compuerta G5 (producción aprobada): los criterios del §9 se cumplen simultáneamente. El acta de cierre no está entre ellos.
 
 8. Las cuatro decisiones que solo puede tomar el owner
 Decisión	Opción	Consecuencia
@@ -95,28 +97,27 @@ A. N-6	Versionar los dos archivos (recomendado)	T1/T3 reproducibles; el repo cre
 No versionar	La corrida verde no viaja con el commit; T1 queda afirmado sobre un archivo que git no ve. Habría que excluir esas 37 del conteo y explicarlo
 B. Plazos 10/5	Validarlos antes de publicar	Se puede publicar y activar sin contradicción
 Publicar con la compuerta cerrada	El texto promete un plazo por defecto que el sistema no aplica (8.6(a)/(h) remiten a la tabla supletoria). Es defendible solo con cláusula transitoria o con la compuerta cerrada explicada en el propio Acuerdo
-C. exigirAnexoNube	Encenderlo	C-1 pasa a control técnico real, pero exige al menos una Empresa con A3 firmado; si no, el servicio deja de crear solicitudes
-Mantenerlo apagado	C-1 queda como obligación contractual sin control técnico. Aceptable como transitorio, no como estado de producción indefinido
-D. Vigencia	Fecha cierta anterior a la publicación	Sin ella no se puede publicar; el texto la deja en blanco a propósito
+C. exigirAnexoNube	🔒 DECIDIDA el 5-nov-2026 por el owner: ENCENDERLA. El orden es obligatorio: (1) el Anexo de Nube v1.1 (o la versión que el owner firme) queda publicado y es el texto que la Empresa suscribe; (2) la Empresa activa lo suscribe y el servicio registra la firma con versión, huella y evidencia; (3) el despliegue enciende FIRMA_EXIGIR_ANEXO_NUBE=true; (4) se publica el Acuerdo v1.4. Si se salta el paso (2), ASEPLUS queda sin poder crear solicitudes: la excepción auditable NO levanta el bloqueo por Anexo de Nube.	El preflight del despliegue aborta si no hay al menos una Empresa activa con el Anexo de Nube suscrito
+D. Vigencia	⏳ PENDIENTE del owner: fecha cierta, anterior a la publicación	Sin ella no se puede publicar; el texto la deja en blanco a propósito. OJO: hoy `createVersion` graba `fecha_vigencia_inicio = now()`, así que una fecha distinta del día de publicación exige cambiar ese endpoint o alinear el texto
 9. Definición de «aprobado para producción»
 Se considera aprobado solo si todo esto es verdad el mismo día:
 
 Sección E firmada, con versión y hash de A1-A4.
 Constancia firmada, sección 4 con esos hashes.
 Commit candidato identificado y corrida reproducible desde clon limpio: 2 078 · 2 076 · 0 · 2.
-T4, T6 y T7 con acta.
+T4, T6 y T7 con evidencia registrada (salida verificable, fechada y atribuida). El acta firmada NO es condición.
 T8 firmada por el owner, separada de la aprobación jurídica.
 T9 reconfirmado en el momento de abrir.
 Decisiones A, B y C documentadas por escrito, con su fecha.
-Acta de cierre con firmas.
+Registro de cierre con la evidencia de T1 a T9 (sin firma: no es condición de producción).
 Si falta uno, el estado correcto es «aprobado con condiciones» o «no aprobado», no «listo para producción».
 
 10. Ruta crítica y riesgos
 Riesgo	Mitigación
 Se firma y después T4 revela una discrepancia	Pre-T4 read-only en Fase 2, antes de congelar
 Se publica v1.4 con la compuerta cerrada y el texto promete plazos	Decisión B antes de publicar, o cláusula transitoria
-Se enciende exigirAnexoNube sin ningún A3 firmado	Encender solo después del primer A3 suscrito; si no, dejar apagado y documentarlo
-Los 14 marcadores no llegan	A3 no se firma; si C-1 está apagado, se puede operar con hueco contractual, pero no se puede decir «cumplido»
+Se enciende exigirAnexoNube sin ningún A3 firmado	Decisión C del 5-nov: encender SOLO después de la primera suscripción. El preflight del despliegue aborta si no hay ninguna Empresa activa con el Anexo de Nube suscrito, y la excepción auditable no se usa como sustituto
+Los 14 marcadores no llegan	Ya no bloquean la firma: desde la v1.1 del Anexo de Nube son declaración de estado, no condición. Lo que no se puede es publicar una versión suscrita que afirme una evidencia que no existe
 El canal de fecha_terminacion no se documenta	La retención desde el cese queda sin evidencia; T5 y J9 no cierran
 Esfuerzo orientativo: Fase 0, 2-3 h; Fase 1, 1-3 días (depende de terceros); Fase 2, 4-6 h; Fase 3, 1-3 días; Fase 4, 1-2 días; Fase 5, 1 día. No son compromisos: son órdenes de magnitud.
 
@@ -126,3 +127,50 @@ Decreto 1074 de 2015, art. 2.2.2.26.1.2 (modificado por Decreto 090 de 2018) —
 Ley 1581 de 2012, arts. 3 d)-e), 18(k), 26 y 27; Decreto 1074 de 2015, art. 2.2.2.25.1.3 num. 4; Circular Única, Título V num. 3.2 — ⚠️ No verificado hoy: son las citas que el expediente trae verificadas del 30-oct-2026 y no las repuse en fuente oficial en esta sesión.
 Ley 527 de 1999 (mensajes de datos y firma electrónica) — ⚠️ No verificado hoy; aplica al valor probatorio del servicio, no a este plan de cierre.
 Huellas SHA-256 — ⚠️ No recomputado por mí sobre los bytes: en modo asesoría no ejecuto comandos. Tomo las declaradas en SHA256SUMS.txt, manifiesto y nota, que coinciden entre sí.
+
+12. Los seis bloqueantes y su orden de resolución (5-nov-2026)
+El objetivo del owner es ENCENDER la compuerta del Anexo de Nube y que la Empresa pueda suscribirlo sin que su firma dependa de un acta ni de un trámite. Estos son los seis bloqueantes, en el orden en que se resuelven (cada uno deja al siguiente en condiciones de resolverse).
+
+ID	Bloqueante	Qué lo resuelve	Estado al 5-nov-2026
+B1	El Anexo de Nube v1.0 se prohíbe a sí mismo: dice «LO QUE TODAVÍA FALTA ANTES DE FIRMAR» y «Este Anexo no se firma hasta que se haya completado la lista del bloque de pendientes» (líneas 41 y 615). Con ese texto, ninguna Empresa podía suscribirlo.	Una v1.1 que (a) convierte el bloque de pendientes en DECLARACIÓN DE ESTADO y no en condición de firma, (b) elimina la prohibición de la línea 615 y (c) conserva, sin suavizar, lo que de verdad no está implementado (el cifrado en reposo del disco no lo está; el estado del RNBD queda como lo declara el owner).	TEXTO LISTO, NO PUBLICADO. `legal/anexo-nube-v1.1.html` (62 198 B, SHA-256 e9517536…1482) pasa el analizador legal del readiness (0 huecos bloqueantes, sin marcadores). El manifiesto (`legal-readiness.json`) y la compuerta de readiness ya apuntan a la v1.1, para que el sistema no describa un texto distinto del que firma. La v1.0 sigue publicada como modelo histórico. FALTA: que el owner confirme que esta v1.1 es el texto a publicar, y publicarlo en `sitio/` + `gh-pages`
+B2	No existía ningún canal para que la Empresa suscribiera el Anexo: solo un endpoint administrativo que exige que un operador registre la firma a mano.	Un enlace de suscripción de un solo uso + código de verificación al correo del firmante, con registro de versión, huella SHA-256, evidencia (fecha, IP, navegador, correo), auditoría y bloqueo por intentos. El enlace y el código salen por la cuenta de K+AIR, nunca por la cuenta de la Empresa.	RESUELTO Y PROBADO (5-nov-2026). Servicio `src/services/anexoNube.js`, rutas `src/routes/anexoNube.js`, migraciones 054/055, pantalla `web/anexo-nube/`. **24 tests nuevos** (19 de la suscripción, 3 de la ruta del documento, 2 de la coherencia manifiesto↔servicio) en verde; suite del `firma-service`: **2 120 · 2 108 verdes · 0 rojas · 10 canceladas · 2 omitidas** (la línea base era 2 096 · 2 084 · 0 · 10 · 2: exactamente **+24**, mis tests, sin regresiones). La suscripción del PDF firmado sigue siendo el camino alternativo por el endpoint administrativo. Tres deflajes que se encontraron y se corrigieron: el enlace de lectura del texto apuntaba a una ruta que nadie servía (el correo mandaba a un 404) — ahora el servicio sirve el texto en `/anexo-nube/documento`, de modo que lo que la Empresa lee es byte a byte lo que se firma; faltaba comprobar que el texto NO cambió entre que se abrió la suscripción y el momento de suscribirse (409 `TEXTO_MODIFICADO`); y el fallo de envío del correo ahora es un 502 entendible con su evento en el rastro, no un 500 crudo. La anulación de una suscripción exige motivo, igual que el resto de las bajas del módulo.
+B3	La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` está apagada, pero el texto del Acuerdo 3.4(h) dice que sin Anexo de Nube suscrito NO se crean solicitudes ni se emite Constancia. Con la compuerta apagada, el texto es falso.	Decisión C del 5-nov: ENCENDER. El orden es: publicar la v1.1 → la Empresa activa la suscribe → el despliegue enciende la variable → se publica el Acuerdo v1.4. El preflight del despliegue aborta si no hay ninguna Empresa activa con el Anexo suscrito.	PREFLIGHT LISTO Y PROBADO: `firma-service/scripts/preflight-anexo-nube.js` aborta (código 5) si no hay ninguna Empresa activa con el Anexo suscrito sobre el texto vigente, o si la huella del archivo no coincide con la del manifiesto (código 4). Verificado en los dos sentidos. PENDIENTE: la suscripción efectiva de ASEPLUS y el despliegue. La excepción auditable NO levanta este bloqueo
+B4	El plan exigía actas firmadas (T4, T6, T7 y un acta de cierre con firmas) como condición de producción.	Las ACTAS se reemplazan por EVIDENCIA REGISTRADA (salida verificable, fechada y atribuida). T8 sigue siendo un documento firmado porque es un acto de voluntad, no una constancia. La definición de «aprobado para producción» (§9) y las compuertas G4 y G5 quedan ajustadas.	RESUELTO en este paquete (5-nov-2026)
+B5	La fecha de vigencia del Acuerdo v1.4 está «por fijarse» (línea 5 del texto candidato). Sin ella el texto no se puede congelar.	La declara el owner. OJO: `createVersion` graba `fecha_vigencia_inicio = now()`; si la fecha declarada no es el día de la publicación, hay que cambiar ese endpoint o el texto, o el texto y la base quedan desalineados.	PENDIENTE DEL OWNER. No se inventa la fecha
+B6	El §12 del Anexo de Encargo promete tres datos del registro de la firma (`anexo_encargo_firmado_at`, `fecha`, `evidencia`) y el código solo registra la fecha (la auditoría). La diferencia está documentada pero no resuelta.	 Dos caminos: (a) ajustar el texto a lo que el servicio registra; (b) implementar el dato que falta, que es el patrón que YA usa `marcarAnexoNubeFirmado` (versión, huella, evidencia). Recomendación: (b), porque no mueve la huella de un Anexo que ya está publicado y verificado.	PENDIENTE DE DECISIÓN DEL OWNER. Con (b), la huella vigente del Anexo de Encargo (02651747…d0f7) no cambia
+
+Lo que queda después de los seis: la fecha de vigencia (B5), la decisión sobre el §12 (B6), la suscripción efectiva de ASEPLUS, y las verificaciones T6/T7/T8 con su evidencia. Nada de eso es un acta: es evidencia y, en dos casos, una decisión del owner.
+
+Sobre el valor probatorio: el registro de la suscripción (versión, huella SHA-256 del texto, evidencia con fecha, IP, navegador y correo del firmante, y la auditoría en solo anexado) es lo que permite después demostrar qué se firmó. Es el mismo patrón de los numerales 3.6, 5 y 9 del Acuerdo de uso, y el criterio de firma electrónica del art. 7 de la Ley 527 de 1999 (mensaje de datos con firma electrónica) exige que el firmante haya manifested su voluntad y que el mensaje sea atribuible al firmante. ⚠️ No verificado en fuente oficial en esta sesión: la cita se conserva tal como el expediente la trae verificada.
+
+13. Cómo se enciende la compuerta, paso a paso (5-nov-2026)
+Este es el guion del encendido. Cada paso deja al siguiente en condiciones de ejecutarse, y cada uno se puede comprobar sin confiar en la palabra de nadie.
+
+Paso 0 — Publicar el Anexo de Nube v1.1
+  Copiar `sgsst-electron-app/legal/anexo-nube-v1.1.html` a `sitio/anexo-nube-v1.1.html` y regenerar `gh-pages` (la rama se arma con `git hash-object` + `mktree` + `commit-tree` + `update-ref`, nunca con `git checkout --orphan`). Comprobar por HTTP que la página servida tiene 62 198 bytes y la huella e9517536…1482. La v1.0 NO se toca: sigue publicada como modelo histórico.
+  PENDIENTE DE LA CONFIRMACIÓN DEL OWNER de que esta v1.1 es el texto a publicar.
+
+Paso 1 — Abrir la suscripción de la Empresa activa
+  `POST /internal/admin/empresas/<id>/anexo-nube/suscripcion` con `{"correo_firmante":"<correo>"}`. Devuelve el enlace de un solo uso y lo manda al correo del firmante. En la base solo queda la huella del enlace.
+  La Empresa abre el enlace, pide el código, lo escribe y marca que leyó el Anexo. El correo del código sale por la cuenta de K+AIR, nunca por la cuenta de la Empresa.
+  Comprobación: `gh_firma_empresas.anexo_nube_firmado_at` queda con fecha, `anexo_nube_version` = 1.1, `anexo_nube_hash` = e9517536…1482 y `anexo_nube_evidencia` con el detalle del acto.
+
+Paso 2 — Preflight (ABORTA si algo no cuadra)
+  En el servidor, con la base de producción:
+      cd /opt/kair-firma/firma-service && node scripts/preflight-anexo-nube.js --exigir-compuerta
+  Códigos: 0 = todo en orden; 4 = el texto no está o su huella no coincide con el manifiesto; 5 = no hay ninguna Empresa activa con el Anexo de Nube suscrito sobre el texto vigente, o la variable no está en `true`. Los tres son ABORTE: no se sigue.
+  OJO: la variable `FIRMA_EXIGIR_ANEXO_NUBE` tiene que estar en `true` ANTES de correr el preflight con `--exigir-compuerta`, porque el script lee el entorno del proceso. Con la compuerta apagada, se corre sin esa bandera (y el script solo exige la suscripción).
+
+Paso 3 — Encender la compuerta en el servicio
+  `FIRMA_EXIGIR_ANEXO_NUBE=true` en el entorno del servicio, y reinicio. A partir de aquí, una Empresa sin el Anexo de Nube suscrito no puede crear solicitudes de firma y no se puede emitir Constancia sobre un modelo sin firmar. La excepción auditable de habilitación NO levanta ese bloqueo.
+
+Paso 4 — Publicar el Acuerdo v1.4
+  Solo después del paso 3, con la fecha de vigencia que declare el owner (B5). La v1.4 desactiva la v1.0 y no hay vuelta atrás por API: por eso el paso 2 tiene que dar 0 antes de este.
+
+El cambio que hay que aplicar al script del servidor
+  `aprobar-publicar-v1.4.sh` (que hoy vive fuera del repo, en el servidor que lo sirve por HTTP) declara que la compuerta del Anexo de Nube está apagada por la decisión del 4-nov. Eso ya no es cierto. Hay que:
+    a) reemplazar esa declaración por la del 5-nov (la compuerta se ENCIENDE), y
+    b) llamar al preflight antes de publicar, abortando si el script devuelve un código distinto de 0:
+         cd /opt/kair-firma/firma-service
+         node scripts/preflight-anexo-nube.js --exigir-compuerta || { echo "PREFLIGHT ABORTÓ: la compuerta del Anexo de Nube no se enciende"; exit 1; }
+  Sin (b), el orden obligatorio queda en una nota y no en una barrera: es exactamente el tipo de control que este paquete sustituyó por evidencia verificable.

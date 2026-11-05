@@ -33,6 +33,7 @@ const { adminApiAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
+const anexoNubeService = require('../services/anexoNube');
 const auditoriaService = require('../services/empresaAuditoria');
 const cuentaEnvioService = require('../services/cuentaEnvio');
 const fechaTerminacionService = require('../services/fechaTerminacion');
@@ -43,6 +44,7 @@ const {
   updateEmpresaBody,
   anexoBody,
   anexoNubeBody,
+  suscripcionAnexoNubeBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
@@ -253,6 +255,47 @@ router.post('/empresas/:id_empresa/anexo-nube-firmado', adminApiAuth(), validate
     const id = _parseId(req);
     const empresa = empresaService.marcarAnexoNubeFirmado(id, req.body, _contextoAuditoria(req));
     res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube/suscripcion
+// Abre una suscripción del Anexo de Nube y manda el enlace a la Empresa.
+//
+// Es el paso previo a `anexo-nube-firmado`: en vez de que un operador
+// registre la firma a mano, la Empresa la hace por su cuenta en la pantalla
+// de suscripción, con un enlace de un solo uso y un código de verificación.
+//
+// LO QUE DEVUELVE
+//   El enlace en claro (para mandarlo por el canal que el operador prefiera)
+//   y la versión y la huella del texto que se va a suscribir.
+//
+// LO QUE NO HACE
+//   No elige la versión: la saca del archivo del servidor y calcula su
+//   huella. Si el archivo no está, se niega (503) en vez de inventar una.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube/suscripcion', adminApiAuth(), validateBody(suscripcionAnexoNubeBody), async (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const r = await anexoNubeService.crearSuscripcion(id, req.body, _contextoAuditoria(req));
+    res.status(201).json(r);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Da de baja una suscripción que todavía no se firmó.
+router.post('/empresas/:id_empresa/anexo-nube/suscripcion/:id_suscripcion/anular', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const idSuscripcion = parseInt(req.params.id_suscripcion, 10);
+    if (!Number.isInteger(idSuscripcion) || idSuscripcion <= 0) {
+      throw new AppError(400, 'INVALID_REQUEST_BODY', 'id_suscripcion inválido');
+    }
+    const r = anexoNubeService.anularSuscripcion(id, idSuscripcion, _contextoAuditoria(req));
+    res.json(r);
   } catch (err) {
     next(err);
   }

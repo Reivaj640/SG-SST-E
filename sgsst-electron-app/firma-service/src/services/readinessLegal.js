@@ -48,7 +48,12 @@ const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(SERVICE_ROOT, '..');
 
 const RUTAS_DEFAULT = {
-  anexoNube: path.join(REPO_ROOT, 'legal', 'anexo-nube-v1.0.html'),
+  // El Anexo de Nube que el SERVICIO firma es la v1.1 (la primera susceptible
+  // de suscripcion). La v1.0 sigue publicada en el sitio como modelo
+  // historico: no era firmable. Si esto no coincide con la version que
+  // suscribe `services/anexoNube.js`, el readiness analiza un documento que
+  // no es el que se firma.
+  anexoNube: path.join(REPO_ROOT, 'legal', 'anexo-nube-v1.1.html'),
   anexoEncargo: path.join(REPO_ROOT, 'legal', 'anexo-encargo.html'),
   acuerdoV11: path.join(SERVICE_ROOT, 'scripts', 'fixtures', 'acuerdo-v1.1.txt'),
   manifiesto: path.join(SERVICE_ROOT, 'legal-readiness.json'),
@@ -973,7 +978,7 @@ function _cargarDocumentos(opciones = {}) {
     rutas,
     versionAcuerdo: _versionAcuerdoEsperada(datos, rutas.acuerdoV11),
     docNube: _textoDocumento(
-      textos, 'anexoNube', rutas.anexoNube, 'legal/anexo-nube-v1.0.html',
+      textos, 'anexoNube', rutas.anexoNube, 'legal/anexo-nube-v1.1.html',
     ),
     docEncargo: _textoDocumento(
       textos, 'anexoEncargo', rutas.anexoEncargo, 'legal/anexo-encargo.html',
@@ -1538,7 +1543,7 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: _detalleModelo(anNube),
-        accion: 'Diligenciar en el modelo los datos que nombra el bloque de pendientes (los del owner). Los tres campos de la Empresa los llena cada Empresa en la copia que firma: no se diligencian en el modelo.',
+        accion: 'Revisar el texto vigente del Anexo de Nube (la v1.1, susceptible de suscripción). Los tres campos de la Empresa los llena cada Empresa en la copia que firma: no se diligencian en el modelo.',
         referencia: docNube.archivo,
       },
     ),

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K+AIR — Suscripción del Anexo de Nube</title>
+<meta name="description" content="Suscripción del Anexo de Nube del servicio de firma electrónica K+AIR.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="cabecera">
+  <div class="envoltura">
+    <h1>Suscripción del Anexo de Nube</h1>
+    <p class="sub">Servicio de firma electrónica K+AIR &middot; Gesstiar S.A.S.</p>
+  </div>
+</div>
+
+<main class="envoltura" id="app">
+
+  <div id="cargando" class="aviso">
+    <p>Abriendo la suscripción&hellip;</p>
+  </div>
+
+  <div id="error" class="aviso oculto" role="alert">
+    <p><strong>No se pudo abrir esta suscripción.</strong></p>
+    <p id="error-texto"></p>
+    <p class="pie-nota">Si el enlace venció, escríbanos a
+      <a href="mailto:adminkair@gmail.com">adminkair@gmail.com</a> para abrir una
+      suscripción nueva.</p>
+  </div>
+
+  <div id="principal" class="oculto">
+
+    <div class="aviso">
+      <p><strong>Antes de firmar, lea el Anexo de Nube.</strong> Este documento
+        describe la infraestructura del servicio de firma electrónica en la nube:
+        servidores, correo, proveedores, conservación, devolución y supresión.
+        La suscripción no es un trámite: es el acuerdo sobre el que se puede
+        operar el servicio.</p>
+    </div>
+
+    <table class="datos">
+      <tbody>
+        <tr>
+          <th scope="row">Empresa</th>
+          <td id="d-empresa">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Versión del Anexo</th>
+          <td id="d-version">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Huella SHA-256 del texto</th>
+          <td id="d-hash" class="mono">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Firmante</th>
+          <td id="d-firmante">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Correo del código</th>
+          <td id="d-correo">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Enlace válido hasta</th>
+          <td id="d-expira">&mdash;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="pie-nota">
+      <a id="d-documento" href="#" target="_blank" rel="noopener">
+        Abrir el texto completo del Anexo de Nube
+      </a>
+      &middot; la huella de arriba es la del texto publicado: si no coincide,
+      no suscriba y escríbanos.
+    </p>
+
+    <h2 id="titulo-codigo">Solicitar el código de verificación</h2>
+    <p>El código llega a este mismo correo. El enlace y el código no vienen
+      juntos: el enlace abre esta pantalla, el código autoriza la firma.</p>
+    <button id="btn-codigo" type="button" class="primario">Enviarme el código</button>
+
+    <h2 id="titulo-firmar">Suscribir el Anexo</h2>
+    <form id="form-firma" autocomplete="off" novalidate>
+      <label for="otp">Código de verificación (6 dígitos)</label>
+      <input id="otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}"
+             maxlength="6" placeholder="000000" autocomplete="one-time-code"
+             aria-describedby="ayuda-otp">
+      <p id="ayuda-otp" class="pie-nota">El código vence en 10 minutos.</p>
+
+      <label class="casilla" for="acepta">
+        <input id="acepta" name="acepta" type="checkbox">
+        <span>He leído el Anexo de Nube en su versión
+          <span id="d-version2">1.1</span>, con la huella
+          <span id="d-hash2" class="mono">—</span>, y acepto sus condiciones en
+          nombre de la Empresa.</span>
+      </label>
+
+      <button id="btn-firmar" type="submit" class="primario">Suscribir el Anexo de Nube</button>
+    </form>
+
+    <p id="mensaje" class="mensaje oculto" role="status"></p>
+
+  </div>
+</main>
+
+<div class="pie">
+  <div class="envoltura">
+    <p>K+AIR &mdash; Gesstiar S.A.S. &middot; NIT 900987987-4 &middot; Colombia &middot;
+      Canal de soporte: <a href="mailto:adminkair@gmail.com">adminkair@gmail.com</a></p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -101,10 +101,22 @@ test('manifiesto · la huella de cada documento es la del archivo real', () => {
     sha256De(path.join(APP, 'legal', 'anexo-encargo.html')),
     'la huella del Anexo de Encargo no es la del archivo real',
   );
+  // El Anexo de Nube se compara contra el archivo de SU VERSION, no contra
+  // una constante: el manifiesto es el que dice cuál es. Un control que
+  // compara el documento contra una constante no comprueba el documento:
+  // comprueba la constante (y cuando el texto cambia de versión, el control
+  // se rompe sin que nadie haya tocado nada).
+  const versionNube = man.anexo_nube.modelo.version;
+  assert.ok(versionNube, 'el manifiesto no declara la versión del Anexo de Nube');
   assert.equal(
     man.anexo_nube.modelo.hash,
-    sha256De(path.join(APP, 'legal', 'anexo-nube-v1.0.html')),
+    sha256De(path.join(APP, 'legal', `anexo-nube-v${versionNube}.html`)),
     'la huella del Anexo de Nube no es la del archivo real',
+  );
+  assert.equal(
+    man.anexo_nube.modelo.bytes,
+    fs.statSync(path.join(APP, 'legal', `anexo-nube-v${versionNube}.html`)).size,
+    'el tamaño declarado del Anexo de Nube no es el del archivo real',
   );
   assert.equal(
     man.constancia.hash,
@@ -115,6 +127,30 @@ test('manifiesto · la huella de cada documento es la del archivo real', () => {
     man.matriz_finalidades.hash,
     sha256De(path.join(SERVICE, 'config', 'matriz-finalidades.json')),
     'la huella de la matriz de finalidades no es la del archivo real',
+  );
+});
+
+test('manifiesto · el Anexo de Nube que declara es el que el servicio suscribe', () => {
+  // El acoplamiento que importa: el manifiesto y la compuerta de readiness
+  // tienen que describir el MISMO texto que `services/anexoNube.js` firma.
+  // Si no, el sistema dice una cosa y firma otra.
+  const man = manifiesto();
+  const anexoNube = require('../src/services/anexoNube');
+
+  assert.equal(
+    man.anexo_nube.modelo.version,
+    anexoNube.VERSION_MODELO,
+    'el manifiesto declara un Anexo de Nube distinto del que el servicio suscribe',
+  );
+  assert.equal(
+    man.anexo_nube.modelo.hash,
+    anexoNube.modeloVigente().hash,
+    'la huella del manifiesto no es la del archivo que el servicio suscribe',
+  );
+  assert.equal(
+    path.basename(readiness.RUTAS_DEFAULT.anexoNube),
+    `anexo-nube-v${anexoNube.VERSION_MODELO}.html`,
+    'la compuerta de readiness analiza un Anexo de Nube distinto del que se suscribe',
   );
 });
 
@@ -134,6 +170,26 @@ test('manifiesto · las dos copias de cada HTML son identicas', () => {
       `las copias de ${nombre} difieren: legal/ y sitio/ no son el mismo texto`,
     );
   }
+});
+
+test('manifiesto · el Anexo de Nube vigente, si está publicado, es el mismo texto', () => {
+  // La v1.1 todavía NO está publicada en `sitio/` (falta la confirmación del
+  // owner). La comprobación se activa SOLO cuando el archivo aparece: en
+  // cuanto se publique, tiene que ser byte a byte el de `legal/`, porque la
+  // huella que se registra es la de `legal/`.
+  const man = manifiesto();
+  const nombre = `anexo-nube-v${man.anexo_nube.modelo.version}.html`;
+  const enSitio = path.join(REPO, 'sitio', nombre);
+  if (!fs.existsSync(enSitio)) {
+    assert.ok(true, `${nombre} todavía no está publicado en sitio/ (esperado hasta la confirmación del owner)`);
+    return;
+  }
+  const a = fs.readFileSync(path.join(APP, 'legal', nombre));
+  const b = fs.readFileSync(enSitio);
+  assert.ok(
+    a.equals(b),
+    `las copias de ${nombre} difieren: legal/ y sitio/ no son el mismo texto`,
+  );
 });
 
 test('manifiesto · sigue siendo ASCII puro', () => {

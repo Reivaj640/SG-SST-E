@@ -32,6 +32,7 @@ const agreementRouter = require('./routes/agreement');
 const consentRouter = require('./routes/consent');
 const signRequestRouter = require('./routes/signRequest');
 const publicRouter = require('./routes/public');
+const anexoNubeRouter = require('./routes/anexoNube');
 const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const adminEmpresasRouter = require('./routes/admin-empresas');
@@ -47,6 +48,8 @@ const { migrate } = require('./db/migrate');
 
 // Ruta a la mini-app estática (HTML+CSS+JS)
 const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
+// La pantalla de suscripción del Anexo de Nube (web/anexo-nube).
+const ANEXO_NUBE_APP_DIR = path.resolve(__dirname, '..', 'web', 'anexo-nube');
 
 function createApp() {
   const app = express();
@@ -145,8 +148,24 @@ function createApp() {
   // commit: 3/min por IP+token — anti spam de commits.
   app.use('/api/sign/:token/verify-otp', otpLimiter);
   app.use('/api/sign/:token/commit', commitLimiter);
+  // La suscripción del Anexo de Nube: el código de verificación se pide por
+  // un enlace de un solo uso. Mismo límite anti fuerza bruta que el OTP del
+  // Trabajador: 10/h por IP+token.
+  app.use('/api/anexo-nube/:token/codigo', otpLimiter);
+
+  // Los recursos de la pantalla de suscripción (hoja y script). El token va
+  // en la ruta, no en el archivo: estos tres son los únicos que se sirven.
+  app.use('/anexo-nube', express.static(ANEXO_NUBE_APP_DIR, {
+    index: false,
+    fallthrough: true,
+    setHeaders: (res) => {
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    },
+  }));
 
   app.use('/', publicRouter);
+  app.use('/', anexoNubeRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   // Rate limiter para creación de sign requests (E9.1): 30/min por IP.

@@ -30,6 +30,7 @@ const agreementRouter = require('../src/routes/agreement');
 const consentRouter = require('../src/routes/consent');
 const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
+const anexoNubeRouter = require('../src/routes/anexoNube');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
@@ -228,6 +229,16 @@ const TABLES = [
   // eventos van PRIMERO: tienen FK a la solicitud.
   'gh_solicitudes_titular_eventos',
   'gh_solicitudes_titular',
+  // La suscripción del Anexo de Nube por la Empresa (migración 054). Los
+  // eventos van PRIMERO: tienen FK a la suscripción.
+  //
+  // El rastro tiene trigger append-only, pero la migración 055 lleva
+  // `@skip-when-env test`: en el ambiente de test el trigger NO está
+  // instalado y la tabla se puede limpiar. La inmutabilidad se comprueba en
+  // tests/anexo-nube-suscripcion.test.js, que aplica el SQL de la 055 a una
+  // base en memoria.
+  'gh_firma_anexo_nube_eventos',
+  'gh_firma_anexo_nube_suscripciones',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
@@ -362,6 +373,11 @@ function makeApp() {
     fallthrough: true,
   }));
   app.use('/', publicRouter);
+  // La suscripción del Anexo de Nube (v1.1). Montado acá por la misma razón
+  // que los routers de arriba: si nadie lo monta, sus endpoints no se
+  // ejercitan y un error de wiring pasa inadvertido. En server.js va DESPUÉS
+  // de publicRouter, igual que acá.
+  app.use('/', anexoNubeRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);

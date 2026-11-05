@@ -719,6 +719,8 @@ function makeSubject(tipo) {
       return 'K+AIR — Tienes un documento para firmar';
     case 'copy':
       return 'K+AIR — Copia de tu documento firmado';
+    case 'anexo_nube':
+      return 'K+AIR — Tu código para firmar el Anexo de Nube';
     default:
       return 'K+AIR — Notificación';
   }
@@ -747,6 +749,15 @@ function makeBody({ otp, tipo, context }) {
       'Este código expira en 10 minutos.',
       'Si no solicitaste firmar este documento, ignora este mensaje.',
     );
+  } else if (tipo === 'anexo_nube') {
+    lines.push(
+      'Has solicitado suscribir el Anexo de Nube del servicio de firma electrónica de K+AIR.',
+      '',
+      `Tu código de verificación es: ${otp}`,
+      '',
+      'Este código expira en 10 minutos.',
+      'Si no solicitaste esto, ignora este mensaje.',
+    );
   } else {
     lines.push(
       `Notificación de K+AIR (tipo: ${tipo})`,
@@ -755,6 +766,103 @@ function makeBody({ otp, tipo, context }) {
     );
   }
   return lines.join('\n');
+}
+
+/**
+ * Envía el ENLACE de suscripción del Anexo de Nube a la Empresa.
+ *
+ * POR QUÉ ESTE CORREO ES DISTINTO DEL CÓDIGO
+ * -------------------------------------------
+ * El enlace y el código NO van en el mismo mensaje: el enlace abre la
+ * pantalla y el código la autoriza. Mandarlos juntos quitaría sentido al
+ * segundo factor (quien tiene el enlace tendría el código). Por eso el
+ * enlace sale en este correo y el código sale en otro, con su propio
+ * asunto, cuando la Empresa lo pide.
+ *
+ * El correo lo manda SIEMPRE K+AIR, nunca la cuenta de envío de la Empresa:
+ * el código es el dato de creación del acto y su custodia no puede depender
+ * de un buzón que la Empresa pueda leer.
+ *
+ * En producción el correo SALE. En dev queda en la bandeja de pruebas.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo del firmante.
+ * @param {string} opts.url - Enlace de un solo uso.
+ * @param {string} opts.empresa - Razón social de la Empresa.
+ * @param {string} opts.version - Versión del Anexo de Nube que se suscribe.
+ * @param {string} opts.hash - Huella SHA-256 del texto.
+ * @param {string} [opts.nombre_firmante]
+ * @param {string} opts.expira_en - ISO 8601.
+ * @param {string} opts.documento_url - Dirección del texto público.
+ * @returns {Promise<{ok: boolean, messageId: string, devOtp?: string}>}
+ */
+async function sendAnexoNubeInvitacion(opts) {
+  const {
+    to, url, empresa, version, hash, nombre_firmante, expira_en, documento_url,
+  } = opts || {};
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendAnexoNubeInvitacion: `to` debe ser un correo válido');
+  }
+  if (typeof url !== 'string' || !url.startsWith('http')) {
+    throw new Error('sendAnexoNubeInvitacion: `url` debe ser una dirección http(s)');
+  }
+
+  const subject = 'K+AIR — Suscripción del Anexo de Nube';
+  const fecha = expira_en ? new Date(expira_en) : null;
+  const vence = fecha && !Number.isNaN(fecha.getTime())
+    ? fecha.toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+    : 'el tiempo indicado en el enlace';
+
+  const body = [
+    'Hola,',
+    '',
+    `K+AIR (Gesstiar S.A.S.) pide a ${empresa || 'su empresa'} la suscripción del Anexo de Nube,`,
+    'el documento que describe la infraestructura del servicio de firma electrónica',
+    '(servidores, correo, subencargados, conservación, devolución y supresión).',
+    '',
+    nombre_firmante ? `El firmante declarado es: ${nombre_firmante}.` : '',
+    '',
+    'Para leerlo y suscribirlo, abra este enlace:',
+    url,
+    '',
+    `Documento: versión ${version}.`,
+    `Huella SHA-256 del texto: ${hash}`,
+    `El enlace vence el ${vence}.`,
+    '',
+    'El enlace es de un solo uso. Al abrirlo, el sistema le envía un código de',
+    'verificación a este mismo correo: ese código es el que autoriza la firma.',
+    'El código y el enlace NO vienen en el mismo mensaje.',
+    '',
+    `El texto completo también está en: ${documento_url || url}`,
+    '',
+    'Si usted no solicitó esta suscripción, ignore este mensaje: el enlace no',
+    'habilita nada por sí solo y no se registra ninguna firma sin el código.',
+    '',
+    'Gesstiar S.A.S. — NIT 900987987-4 — Colombia',
+  ].filter((l) => l !== '').join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  logger.info('[DEV] Invitación del Anexo de Nube simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    version,
+  });
+  _devInbox.push({
+    to, subject, body, tipo: 'anexo_nube_invitacion',
+    remitente: _remitente(_cuentaDe(null)),
+    sentAt: new Date().toISOString(),
+  });
+  if (_devInbox.length > 50) _devInbox.shift();
+  return { ok: true, messageId: 'dev-anexo-' + Date.now() };
 }
 
 /**
@@ -964,6 +1072,7 @@ async function sendAvisoIncidenteDatosSensibles({ to, canal, id_solicitud, causa
 
 module.exports = {
   sendOTP,
+  sendAnexoNubeInvitacion,  // Enlace de suscripción del Anexo de Nube (v1.1).
   sendCopiaFirmadoPapel,  // 9A: la copia en PAPEL sí viaja por correo (adjunta).
   sendCopiaAviso,         // Firma electrónica: aviso con el enlace, SIN adjuntos.
   sendInvite,

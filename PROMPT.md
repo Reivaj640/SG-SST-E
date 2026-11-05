@@ -1479,6 +1479,18 @@ runner, no un defecto del código** — y se comprobó **contra HEAD limpio**: d
 Cuando veas "canceladas", lo que hay que responder es "¿también pasaba sin mi cambio?", y la respuesta
 se mide, no se supone.
 
+**Medición del 5-nov-2026 (tarde, con el Anexo de Nube v1.1):** **2 120 tests · 2 108 verdes ·
+0 rojas · 10 canceladas · 2 omitidas** (la línea base de arriba + 24 tests nuevos, sin regresiones).
+
+🚨 **TRAMPA: UNA CORRIDA DE TESTS A LA VEZ. NO DOS.**
+Todos los archivos de la suite usan la misma `data/test.sqlite`, y cada test llama a `resetDb()`,
+que **borra las filas de todas las tablas**. Si se lanza la suite completa en segundo plano y al
+mismo tiempo se corre un archivo suelto, **los dos procesos se borran la base mutuamente** y salen
+fallos fantasma: el 5-nov-2026 se midieron 6 fallos en `notify-remote` y 1 en la suscripción del
+Anexo de Nube, y al re-correr la suite **en solitario** los dos quedaron en **0**. La señal de que
+es interferencia y no un defecto: los fallos caen en archivos que el cambio no toca. **Regla: una
+corrida a la vez; si hay que correr dos, la segunda va con otra base** (`DB_PATH`).
+
 ---
 
 ## 8. Reglas de comunicación

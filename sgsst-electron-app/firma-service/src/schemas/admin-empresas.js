@@ -71,6 +71,29 @@ const anexoNubeBody = z.object({
 });
 
 /**
+ * Body de la apertura de una SUSCRIPCIÓN del Anexo de Nube.
+ *
+ * Lo único que el operador declara es A QUIÉN se manda el enlace y el
+ * código. La VERSIÓN y la HUELLA no se mandan: el servicio las saca del
+ * archivo del servidor y calcula la huella sobre sus bytes. Si el operador
+ * pudiera declarar la huella, podría suspender un texto que no es el que
+ * está publicado.
+ *
+ * `nombre_firmante` y `cargo_firmante` son opcionales: si no vienen, se usan
+ * el representante legal y el cargo que ya están en la ficha de la Empresa.
+ */
+const suscripcionAnexoNubeBody = z.object({
+  correo_firmante: z
+    .string()
+    .min(1, 'correo_firmante es requerido')
+    .max(254, 'correo_firmante demasiado largo')
+    .email('correo_firmante no parece un correo')
+    .transform((s) => s.trim().toLowerCase()),
+  nombre_firmante: textoOpcional(200),
+  cargo_firmante: textoOpcional(200),
+});
+
+/**
  * Body de alta. Solo identidad: el anexo y el estado activo tienen endpoints
  * propios para que no se puedan cambiar por accidente.
  */
@@ -262,6 +285,7 @@ module.exports = {
   updateEmpresaBody,
   anexoBody,
   anexoNubeBody,
+  suscripcionAnexoNubeBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,

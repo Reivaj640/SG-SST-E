@@ -16,6 +16,77 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+> **Actualización 2026-11-05 (tarde) — los seis bloqueantes del cierre, uno por uno. La compuerta del
+> Anexo de Nube se enciende y la Empresa ya tiene un canal para firmarlo:**
+> el owner decidió encender `FIRMA_EXIGIR_ANEXO_NUBE`, facilitar la firma del Anexo de Nube por las
+> Empresas y ajustar el plan para que **las actas de cierre dejen de ser bloqueantes**. Todo eso quedó
+> armado en el working tree. **Nada se publicó, nada se commiteó y nada se desplegó.**
+>
+> **Lo que se resolvió:**
+> - 🟢 **B4 — el plan ya no exige actas.** Las ACTAS se reemplazaron por **EVIDENCIA REGISTRADA**
+>   (salida verificable, fechada y atribuida). T8 sigue siendo un documento firmado porque es un acto de
+>   voluntad, no una constancia. La definición de «aprobado para producción» (§9) y las compuertas G4/G5
+>   quedaron ajustadas: *el registro de cierre NO es condición de producción*.
+> - 🟢 **B1 — el Anexo de Nube v1.1 ya no se prohíbe a sí mismo.** `legal/anexo-nube-v1.1.html` (62 198 B,
+//   SHA-256 `e9517536…1482`) convierte el bloque de pendientes en **DECLARACIÓN DE ESTADO DEL SERVICIO Y
+>   LIMITACIONES CONOCIDAS** y elimina la frase «este Anexo no se firma hasta que se haya completado la
+>   lista del bloque de pendientes». Lo que **no** está implementado se declara sin suavizar (el cifrado en
+>   reposo del disco: verificado el 31-oct-2026 y **NO** implementado). **No está publicado**: la v1.0 sigue
+>   publicada como modelo histórico. El manifiesto y la compuerta de readiness ya apuntan a la v1.1, para que
+>   el sistema no describa un texto distinto del que firma.
+> - 🟢 **B2 — existe un canal de firma para la Empresa.** Enlace de **un solo uso** + **código de
+>   verificación al correo del firmante** (el código sale por la cuenta de K+AIR, nunca por la de la Empresa),
+>   con versión, huella SHA-256, evidencia (fecha, correo, IP, navegador), rastro **append-only** y bloqueo por
+>   intentos. Nuevo: `src/services/anexoNube.js`, `src/routes/anexoNube.js`, migraciones **054** y **055**,
+>   pantalla `web/anexo-nube/`, endpoints admin de apertura y anulación. El endpoint administrativo de PDF
+>   firmado sigue siendo el camino alternativo.
+> - 🟢 **B3 — el preflight del encendido está listo:** `firma-service/scripts/preflight-anexo-nube.js` **aborta**
+>   (código 5) si no hay ninguna Empresa activa con el Anexo de Nube suscrito sobre el texto vigente, y (código 4)
+>   si la huella del texto no coincide con la del manifiesto. Verificado en los dos sentidos.
+>
+> **Dos defectos que aparecieron al probar (y que habrían llegado a producción):**
+> - 🔴 **El enlace de lectura del texto estaba muerto.** `urlDocumento()` apuntaba a `/anexo-nube-v1.1.html`, una
+>   ruta que **nadie servía**: el correo de invitación mandaba a la Empresa a un 404 y el texto que se iba a
+>   firmar era invisible. **Corrección:** el servicio sirve el texto en `/anexo-nube/documento`, de modo que **lo
+>   que la Empresa lee es byte a byte lo que se firma** (verificado por hash del cuerpo servido). Así la
+>   suscripción no depende de que el texto esté publicado en el sitio.
+> - 🔴 **Faltaba comprobar que el texto no hubiera cambiado** entre que se abría la suscripción y el momento de
+>   suscribirse. **Corrección:** `409 TEXTO_MODIFICADO`, con el motivo en el rastro. Sin eso, una Empresa podía
+>   firmar un texto distinto del que se le mostró.
+>
+> **La suite, medida:** **2 120 tests · 2 108 verdes · 0 rojas · 10 canceladas · 2 omitidas.** La línea base era
+> **2 096 · 2 084 · 0 · 10 · 2**: exactamente **+24**, que son los tests nuevos (19 de la suscripción, 3 de la
+> ruta del documento, 2 de la coherencia entre manifiesto y servicio), **sin una sola regresión**. Las 10 canceladas
+> son las de `pdfValidator.test.js` y son **preexistentes**. Receta en `PROMPT.md`
+> §7.8 (el Node de Electron, sin recompilar nada).
+>
+> 🚨 **Trampa nueva, descubierta el 5-nov-2026: NO corran dos procesos de test al tiempo.** La suite usa
+> `data/test.sqlite` para todos los archivos, y cada test llama a `resetDb()`, que **borra las filas de todas las
+> tablas**. Si se lanza la suite completa en segundo plano y al mismo tiempo se corre un archivo suelto, los dos
+> procesos se borran la base mutuamente y aparecen **fallos fantasma** que no existen: se midieron 6 fallos en
+> `notify-remote` y 1 en la suscripción, y al re-correr la suite **en solitario** los dos quedaron en **0**. La
+> señal de que es eso: los fallos caen en archivos que nada del cambio tocaba. **La receta es: una corrida a la vez.**
+>
+> **Lo que sigue bloqueado, y ahora en el orden del §13 del plan:** (1) **que el owner confirme que esta v1.1 es
+> el texto a publicar** y publicarlo en `sitio/` + `gh-pages` (la v1.0 no se toca); (2) **la suscripción efectiva
+> de ASEPLUS** (hoy es la única Empresa activa y no tiene Anexo de Encargo ni de Nube: con la compuerta encendida
+> quedaría sin poder crear solicitudes); (3) **la fecha de vigencia del Acuerdo v1.4 (B5)**, que declara el owner
+> — `createVersion` graba `fecha_vigencia_inicio = now()`, así que una fecha distinta del día de publicación
+> exige tocar ese endpoint; (4) **la decisión sobre el §12 del Anexo de Encargo (B6)**: el texto promete tres datos
+> del registro y el código solo registra la fecha. **Recomendación: implementar el dato que falta** con el
+> patrón que ya usa `marcarAnexoNubeFirmado` (versión, huella, evidencia), porque **no mueve la huella** del
+> Anexo de Encargo ya publicado (`02651747…d0f7`); (5) aplicar al script del servidor
+> `aprobar-publicar-v1.4.sh` el preflight y cambiar su declaración de «compuerta apagada» (que ya es vieja: el
+> §13 del plan trae el guion y el cambio literal); (6) **la T6, la T7 y la T8** con su evidencia, que no son actas.
+>
+> **Sin resolver, por ser del entorno (no del código):** los **5 app passwords de Gmail sin rotar** (el repo es
+> público), **Node 20 en EOL** en el servidor (22 hasta 2027-04-30 / 24 hasta 2028-04-30) y la **copia off-site de
+> respaldos** (`rclone`) sin configurar. Son del owner y no bloquean la firma del Anexo de Nube.
+>
+> **El guion del encendido (el §13 del plan lo tiene completo):** publicar la v1.1 → abrir la suscripción de la
+> Empresa activa → `node scripts/preflight-anexo-nube.js --exigir-compuerta` (tiene que dar 0) → encender la
+> variable en el despliegue → publicar el Acuerdo v1.4. **El orden importa:** la v1.4 desactiva la v1.0 y **no hay
+> vuelta atrás por API**.
 > **Actualización 2026-11-05 (mañana) — el servidor medido por dentro, el tope del Acuerdo desbloqueado
 > y la v1.4 lista para publicarse:**
 > el owner pidió vía libre para probar el flujo de firma a mano con el Acuerdo v1.4 ya vigente en el

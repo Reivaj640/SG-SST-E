@@ -149,16 +149,25 @@ const FILAS = [
     test: ['tests/services/aceptacion-c2-matriz.test.js', 'tests/web/matriz-finalidades.test.js'],
   },
   {
-    // C-1 del abogado (30-oct-2026).
+    // C-1 del abogado (30-oct-2026), con la decision C del owner del
+    // 5-nov-2026: la compuerta se ENCIENDE y la Empresa tiene un canal
+    // propio para suscribir el Anexo de Nube.
     numeral: '3.6(h) (Anexo de Nube suscrito por la Empresa)',
-    exige: 'Si la Empresa no ha suscrito el Anexo de Nube, el servicio no permite crear solicitudes de firma y no puede emitirse Constancia sobre un modelo sin firmar. La regla esta construida y va detras de la compuerta exigirAnexoNube: mientras el Anexo de Nube v1.0 sea un modelo sin publicar, el bloqueo no se enciende y el reporte de readiness dice cuantas Empresas lo tienen.',
+    exige: 'Si la Empresa no ha suscrito el Anexo de Nube, el servicio no permite crear solicitudes de firma y no puede emitirse Constancia sobre un modelo sin firmar. La regla va detras de la compuerta exigirAnexoNube, que el owner decidio ENCENDER el 5-nov-2026 con un orden obligatorio: publicar el Anexo de Nube v1.1, que la Empresa activa lo suscriba, encender la variable y solo entonces publicar el Acuerdo v1.4. La suscripcion se registra con version, huella SHA-256 y evidencia (fecha, correo, IP y navegador), en un rastro append-only; el texto que se suscribe es el del servidor y si cambia antes de la firma la suscripcion se rechaza. El preflight del despliegue aborta si no hay ninguna Empresa activa con el Anexo suscrito sobre el texto vigente: la excepcion auditable de habilitacion NO levanta ese bloqueo.',
     donde: [
       { archivo: 'src/services/empresa.js', ancla: 'anexo_nube_firmado' },
       { archivo: 'src/services/empresa.js', ancla: 'exigirAnexoNube' },
       { archivo: 'src/config.js', ancla: 'exigirAnexoNube' },
       { archivo: 'src/services/manifiestoLegal.js', ancla: 'nube.firmado' },
+      { archivo: 'src/services/anexoNube.js', ancla: 'function suscribir' },
+      { archivo: 'src/services/anexoNube.js', ancla: 'TEXTO_MODIFICADO' },
+      { archivo: 'src/services/anexoNube.js', ancla: 'marcarAnexoNubeFirmado' },
+      { archivo: 'src/routes/anexoNube.js', ancla: '/anexo-nube/documento' },
+      { archivo: 'src/db/schema/054_anexo_nube_suscripcion.sql', ancla: 'gh_firma_anexo_nube_suscripciones' },
+      { archivo: 'src/db/schema/055_anexo_nube_eventos_append_only.sql', ancla: 'trg_anexo_nube_eventos_no_update' },
+      { archivo: 'scripts/preflight-anexo-nube.js', ancla: 'con_anexo_nube_vigente' },
     ],
-    test: ['tests/d03-habilitacion-empresa.test.js', 'tests/routes/constancia-publica.test.js'],
+    test: ['tests/d03-habilitacion-empresa.test.js', 'tests/routes/constancia-publica.test.js', 'tests/anexo-nube-suscripcion.test.js', 'tests/routes/anexo-nube-documento.test.js'],
   },
   {
     numeral: '9.2 (alcance de la aceptacion)',
