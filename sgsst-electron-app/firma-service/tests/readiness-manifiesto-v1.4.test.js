@@ -65,18 +65,36 @@ function manifiesto() {
   return JSON.parse(leerManifiestoCrudo());
 }
 
-test('manifiesto · declara el Acuerdo v1.4 con la clave inequivoca y su huella real', () => {
+test('manifiesto · declara el Acuerdo vigente con la clave inequivoca y su huella real', () => {
   const man = manifiesto();
-  assert.equal(man.acuerdo.version, 'v1.4', 'el manifiesto no declara la v1.4');
-  assert.equal(
-    man.acuerdo.archivo,
-    'scripts/fixtures/acuerdo-v1.4.txt',
-    'el archivo del Acuerdo no es el de la v1.4',
+  // El Acuerdo se compara contra el archivo de SU VERSION, no contra una
+  // constante: el manifiesto es el que dice cuál es. Un control que compara
+  // el documento contra una constante no comprueba el documento: comprueba la
+  // constante (y cuando el texto cambia de versión, el control se rompe sin
+  // que nadie haya tocado nada).
+  assert.ok(man.acuerdo.version, 'el manifiesto no declara la version del Acuerdo');
+  assert.ok(man.acuerdo.archivo, 'el manifiesto no declara el archivo del Acuerdo');
+  const rutaAcuerdo = path.join(SERVICE, man.acuerdo.archivo);
+  assert.ok(
+    fs.existsSync(rutaAcuerdo),
+    `el archivo del Acuerdo no existe: ${man.acuerdo.archivo}`,
   );
   assert.equal(
     man.acuerdo.hash,
-    sha256De(path.join(SERVICE, 'scripts', 'fixtures', 'acuerdo-v1.4.txt')),
+    sha256De(rutaAcuerdo),
     'la huella del Acuerdo no es la del archivo real',
+  );
+  // Y la version que declara el manifiesto tiene que ser la que el texto
+  // nombra en su encabezado: el texto se sella en los dos lugares donde dice
+  // cual es (el encabezado y la Manifestacion de Voluntad).
+  const encabezado = fs.readFileSync(rutaAcuerdo, 'utf8')
+    .split('\n')
+    .find((l) => l.startsWith('Versión del Acuerdo:'));
+  assert.ok(encabezado, 'el texto del Acuerdo no tiene la linea de version');
+  assert.equal(
+    man.acuerdo.version,
+    encabezado.slice('Versión del Acuerdo:'.length).trim(),
+    'el manifiesto declara una version que el texto del Acuerdo no dice',
   );
 });
 
