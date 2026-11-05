@@ -74,6 +74,31 @@ router.get('/anexo-nube/documento', (req, res, next) => {
 });
 
 /**
+ * El CONTEXTO de la suscripción, en JSON.
+ *
+ * Es lo que le da a la pantalla los datos que muestra antes de pedir el
+ * código: Empresa, versión, huella, firmante, correo y caducidad.
+ *
+ * @param {object} req
+ * @param {object} res
+ * @param {function} next
+ */
+function _contextoJson(req, res, next) {
+  try {
+    const ctx = anexoNubeService.contextoPublico(
+      req.params.token, req.ip, req.get('User-Agent'),
+    );
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'Pragma': 'no-cache',
+    });
+    res.json(ctx);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * GET /anexo-nube/:token
  *
  * El navegador pide HTML: se sirve la pantalla. El JS pide JSON con Accept
@@ -88,19 +113,27 @@ router.get('/anexo-nube/:token', (req, res, next) => {
       },
     });
   }
-  try {
-    const ctx = anexoNubeService.contextoPublico(
-      req.params.token, req.ip, req.get('User-Agent'),
-    );
-    res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-      'Pragma': 'no-cache',
-    });
-    res.json(ctx);
-  } catch (err) {
-    next(err);
-  }
+  return _contextoJson(req, res, next);
 });
+
+/**
+ * GET /api/anexo-nube/:token
+ *
+ * La MISMA respuesta que la de arriba, pero SIEMPRE en JSON.
+ *
+ * POR QUÉ EXISTE ESTA RUTA Y NO SOLO LA OTRA
+ * -----------------------------------------
+ * El script de la pantalla (web/anexo-nube/app.js) pide el contexto en
+ * `/api/anexo-nube/<token>`. La ruta `/anexo-nube/<token>` decide entre HTML
+ * y JSON según la cabecera `Accept`, así que depende de cómo llame el
+ * cliente. Con dos rutas, cada una con una sola respuesta, el cliente deja
+ * de tener que acertar la cabecera y el contrato queda escrito en un solo
+ * lado.
+ *
+ * Sin esta ruta, la pantalla recibía un 404 y le mostraba a la Empresa
+ * "[object Object]" en vez del mensaje del servicio.
+ */
+router.get('/api/anexo-nube/:token', _contextoJson);
 
 /** POST /api/anexo-nube/:token/codigo */
 router.post('/api/anexo-nube/:token/codigo', validateBody(codigoBody), async (req, res, next) => {

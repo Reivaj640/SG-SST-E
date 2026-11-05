@@ -53,8 +53,18 @@
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         if (!r.ok) {
-          var err = new Error(data.message || data.error || ('Error ' + r.status));
-          err.codigo = data.code || data.error || '';
+          // El servicio responde con { error: { code, message, request_id } }.
+          // Sin abrir esa envoltura, `data.error` es un OBJETO y el mensaje
+          // sale como "[object Object]": la Empresa no sabe qué pasó ni qué
+          // puede escribirle a soporte.
+          var env = (data && typeof data.error === 'object' && data.error !== null)
+            ? data.error : null;
+          var msg = (env && env.message)
+            || (typeof data.error === 'string' ? data.error : '')
+            || data.message
+            || ('Error ' + r.status);
+          var err = new Error(msg);
+          err.codigo = (env && env.code) || data.code || '';
           throw err;
         }
         return data;
