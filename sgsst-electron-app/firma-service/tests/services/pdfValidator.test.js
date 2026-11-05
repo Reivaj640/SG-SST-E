@@ -381,6 +381,16 @@ test('§6.2: el rechazo ocurre dentro del timeout (no hang)', async () => {
   PDFDocument.load = () => new Promise(() => {}); // never resolves
 
   config.pdf.parseTimeoutMs = 50; // 50ms es mas que suficiente para que el timeout dispare
+  // El timer del timeout del servicio esta unref() (pdfValidator.js:320): un
+  // timer sin ref no mantiene vivo el event loop. Con la carga parcheada para
+  // no resolver nunca, no queda NADA pendiente: el loop se vacia antes de que
+  // el timeout dispare y el runner cancela el resto de este archivo con
+  // "Promise resolution is still pending but the event loop has already
+  // resolved". Este intervalo SI lo mantiene vivo, y lo unico que espera el
+  // test es al timeout, que es justo lo que tiene que pasar. Sin esto, las
+  // diez pruebas que siguen a esta salen "cancelled" y el conteo de la suite
+  // depende del orden en que se corren los archivos.
+  const keepAlive = setInterval(() => {}, 10);
   try {
     const t0 = Date.now();
     let thrown = null;
@@ -396,6 +406,7 @@ test('§6.2: el rechazo ocurre dentro del timeout (no hang)', async () => {
     // es mas que suficiente para detectar un hang (que seria >5s).
     assert.ok(elapsed < 200, `el rechazo debe ocurrir en <200ms (fue ${elapsed}ms)`);
   } finally {
+    clearInterval(keepAlive);
     PDFDocument.load = origLoad;
     config.pdf.parseTimeoutMs = origTimeout;
   }
