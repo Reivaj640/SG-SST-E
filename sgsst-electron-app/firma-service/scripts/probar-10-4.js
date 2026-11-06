@@ -922,6 +922,41 @@ async function pasoOtp(args, estado) {
 }
 
 /**
+ * 7a · El servidor pone las políticas de seguridad a disposición.
+ *
+ * El servidor registra ESA fecha cuando sirve el contexto público
+ * (GET /s/:token -> registrarPuestaEnDisposicionPoliticas,
+ * publicFlow.js:176). La aceptación la exige (publicFlow.js:670-675): sin
+ * ese registro el servicio responde 409 DISPOSICION_POLITICAS_NO_REGISTRADA.
+ * El navegador lo hace solo al abrir el enlace; el script tiene que hacer lo
+ * mismo, antes de la primera aceptación.
+ */
+async function pedirContextoPublico(args, estado) {
+  let res;
+  try {
+    res = await pedir({
+      base: args.url, path: '/s/' + encodeURIComponent(estado.token), method: 'GET',
+      headers: { Accept: 'application/json' },
+    }, null, args.timeoutMs);
+  } catch (e) {
+    fail('GET /s/:token (el contexto público)', 'no respondio: ' + e.message);
+    return false;
+  }
+  if (res.status !== 200) {
+    const codigo = ((res.json || {}).error || {}).code || 'UNKNOWN';
+    fail('GET /s/:token (el contexto público)', 'HTTP ' + res.status + ' ' + codigo
+      + ' :: ' + res.texto.slice(0, 300));
+    return false;
+  }
+  const j = res.json || {};
+  ok('El servidor puso las políticas a disposición',
+    'id_solicitud=' + (j.id_solicitud || '(sin id)'));
+  estado.pasos.contexto_servido = true;
+  guardarEstado(args, estado);
+  return true;
+}
+
+/**
  * 7 · El firmante acepta el Acuerdo (con la versión de partida vigente).
  *
  * Es el estado normal del firmante: ya aceptó, y la solicitud quedó ligada a
@@ -933,6 +968,10 @@ async function pasoAceptarInicial(args, estado) {
     ok('El Acuerdo ya se habia aceptado', 'se omite (continuar, no repetir)');
     return true;
   }
+  // El servidor registra la puesta a disposición cuando sirve el contexto:
+  // sin eso, la aceptación responde 409 DISPOSICION_POLITICAS_NO_REGISTRADA.
+  const contexto = await pedirContextoPublico(args, estado);
+  if (!contexto) return false;
   const res = await aceptarAcuerdo(args, estado);
   if (!res) return false;
   const version = res.version_acuerdo;

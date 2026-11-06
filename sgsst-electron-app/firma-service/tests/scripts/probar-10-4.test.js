@@ -150,6 +150,10 @@ function motorFalso(opciones = {}) {
 function servicioFalso(motor, opciones = {}) {
   const cuenta = {
     signRequests: 0, identify: 0, verifyOtp: 0, accept: 0, viewDocument: 0,
+    contexto: 0,
+    // El servidor registra la puesta a disposicion de las politicas cuando
+    // SIRVE el contexto. El servicio falso hace lo mismo.
+    disposicion: false,
   };
   const excepcion = {
     id: 9,
@@ -221,6 +225,10 @@ function servicioFalso(motor, opciones = {}) {
       json(res, 200, { ok: true, estado: 'OTP_VERIFIED' });
     },
     'GET /s/token-de-prueba-104': (req, res) => {
+      cuenta.contexto++;
+      // Servir el contexto ES poner las politicas a disposicion: el
+      // servidor guarda aqui la fecha, el version y la huella de la matriz.
+      cuenta.disposicion = true;
       const vigente = motor.db.versionActiva;
       json(res, 200, {
         acuerdo: {
@@ -233,6 +241,17 @@ function servicioFalso(motor, opciones = {}) {
     },
     'POST /api/sign/token-de-prueba-104/consent/accept': (req, res) => {
       cuenta.accept++;
+      // El servidor real responde 409 si no tiene constancia de haber
+      // puesto las politicas a disposicion (publicFlow.js:670-675).
+      if (!cuenta.disposicion) {
+        json(res, 409, {
+          error: {
+            code: 'DISPOSICION_POLITICAS_NO_REGISTRADA',
+            message: 'El servidor no tiene constancia de haber puesto las politicas de seguridad a disposicion del Firmante',
+          },
+        });
+        return;
+      }
       const vigente = motor.db.versionActiva;
       const fila = motor.db.firmas[idSolicitud];
       // El servicio real: si la solicitud ya apunta a un consentimiento de
@@ -440,6 +459,27 @@ test('10.4 · --confirmar-escribe autoriza la escritura', async () => {
     ]), motor);
     assert.equal(r.codigo, 0, r.lineas);
     assert.match(r.lineas, /Modo escritura confirmado/);
+  } finally {
+    await srv.cerrar();
+  }
+});
+
+test('10.4 · antes de aceptar, el script pide el contexto publico', async () => {
+  // El servidor registra la puesta a disposicion de las politicas CUANDO
+  // sirve el contexto (GET /s/:token). Sin ese registro la aceptacion
+  // responde 409 DISPOSICION_POLITICAS_NO_REGISTRADA: la prueba se
+  // detuvo ahi en el servidor real.
+  const motor = motorFalso();
+  const srv = await servicioFalso(motor);
+  const estado = archivoTemporal('estado');
+  try {
+    const r = await correr(argumentos([
+      '--url=' + srv.url, '--estado=' + estado, '--confirmar-escribe',
+    ]), motor);
+    assert.equal(r.codigo, 0, r.lineas);
+    assert.ok(srv.cuenta.contexto >= 1,
+      'el script tiene que pedir el contexto publico antes de aceptar');
+    assert.match(r.lineas, /puso las .*pol.ticas a disposici.n/);
   } finally {
     await srv.cerrar();
   }
