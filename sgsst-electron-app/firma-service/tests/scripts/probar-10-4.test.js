@@ -329,7 +329,11 @@ function servicioFalso(motor, opciones = {}) {
         id_solicitud: idSolicitud,
         estado: fila.estado,
         agreement_version: fila.agreement_version,
-        agreement_hash: fila.agreement_hash,
+        // El endpoint real NO devuelve agreement_hash
+        // (src/routes/signRequest.js:469-487): la huella archivada se lee de
+        // la fila, en la base AISLADA. El servicio falso lo reproduce: si el
+        // script volviera a leerla por ahi, las comprobaciones serian falsas
+        // y este test se cae.
         consent_id: fila.consent_id,
       });
     },

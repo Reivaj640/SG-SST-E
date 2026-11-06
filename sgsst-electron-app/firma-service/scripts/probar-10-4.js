@@ -1147,20 +1147,34 @@ async function pasoVerificar(args, internoKey, estado) {
     return null;
   }
   const fila = res.json || {};
+  // La FILA, en la base AISLADA. El endpoint interno devuelve agreement_version
+  // pero NO agreement_hash (src/routes/signRequest.js:469-487): leer la huella
+  // por ahi daria VACIO y estas comprobaciones serian FALSAS. No es que el
+  // servicio no la escriba: publicFlow.js:362 la escribe en la fila.
+  let filaBd = null;
+  try {
+    const filas = _sql(args.db, "SELECT id, agreement_version, agreement_hash, consent_id, estado"
+      + " FROM gh_firmas_electronicas WHERE id_solicitud = '"
+      + String(estado.id_solicitud).replace(/'/g, "''") + "';");
+    filaBd = (filas || [])[0] || null;
+  } catch (e) {
+    fail('La fila en la base AISLADA', e.message);
+  }
+  const hashArchivado = (filaBd && filaBd.agreement_hash) ? filaBd.agreement_hash : null;
   if (fila.agreement_version === args.versionNueva) {
     ok('La solicitud quedo ligada a la version vigente',
       'agreement_version=' + fila.agreement_version
-      + ' · hash=' + String(fila.agreement_hash || '').slice(0, 16));
+      + ' · hash=' + String(hashArchivado || '').slice(0, 16));
   } else {
     fail('La solicitud quedo ligada a la version vigente',
       'la fila dice ' + fila.agreement_version);
   }
-  if (fila.agreement_hash && estado.hash_nuevo && fila.agreement_hash === estado.hash_nuevo) {
+  if (hashArchivado && estado.hash_nuevo && hashArchivado === estado.hash_nuevo) {
     ok('La huella archivada es la del texto que el firmante leyo',
-      'sha256=' + String(fila.agreement_hash).slice(0, 16));
+      'sha256=' + String(hashArchivado).slice(0, 16));
   } else {
     fail('La huella archivada es la del texto que el firmante leyo',
-      'fila=' + String(fila.agreement_hash || '').slice(0, 16)
+      'fila=' + String(hashArchivado || '').slice(0, 16)
       + ' vigente=' + String(estado.hash_nuevo || '').slice(0, 16));
   }
   estado.consent_id_nuevo = fila.consent_id || null;
@@ -1179,13 +1193,13 @@ async function pasoVerificar(args, internoKey, estado) {
   if (res && res.status === 200) {
     const hashTexto = crypto.createHash('sha256').update(res.texto, 'utf8').digest('hex');
     const hashServido = res.headers['x-acuerdo-sha256'] || null;
-    if (hashTexto === fila.agreement_hash) {
+    if (hashTexto === hashArchivado) {
       ok('El texto que descarga el firmante es el que quedo archivado',
         'sha256=' + hashTexto.slice(0, 16));
     } else {
       fail('El texto que descarga el firmante es el que quedo archivado',
         'el texto sirve ' + hashTexto.slice(0, 16)
-        + ' y la fila archiva ' + String(fila.agreement_hash || '').slice(0, 16));
+        + ' y la fila archiva ' + String(hashArchivado || '').slice(0, 16));
     }
     if (hashServido) {
       if (hashServido === hashTexto) {
@@ -1200,15 +1214,7 @@ async function pasoVerificar(args, internoKey, estado) {
   }
 
   // 10c · La base AISLADA: los consentimientos y el evento de la migracion.
-  let filasFirma = [];
-  try {
-    filasFirma = _sql(args.db, "SELECT id, agreement_version, agreement_hash, consent_id, estado"
-      + " FROM gh_firmas_electronicas WHERE id_solicitud = '"
-      + String(estado.id_solicitud).replace(/'/g, "''") + "';");
-  } catch (e) {
-    fail('La fila en la base AISLADA', e.message);
-  }
-  const filaBd = (filasFirma || [])[0] || null;
+  // (La fila ya se leyo arriba: es la misma, con la huella archivada.)
   if (filaBd) {
     if (filaBd.agreement_version === args.versionNueva
       && filaBd.agreement_hash === (estado.hash_nuevo || filaBd.agreement_hash)) {
