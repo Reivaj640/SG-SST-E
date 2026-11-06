@@ -7232,6 +7232,68 @@ La pregunta de cierre («¿querés que actualice los documentos para la próxima
 owner y respondió que sí**. Queda registrado aquí para que la próxima jornada sepa que la regla se está
 cumpliendo, y **la pregunta vuelve a hacerse en la próxima jornada igual**: no se archiva porque la
 respuesta fue sí.
+
+## 2026-11-06 (noche, segunda tanda) · Las dos compuertas del readiness, medidas contra la base real
+
+La pregunta fue si ya no quedaban bloqueantes para el proceso de la firma electrónica. No se respondió de
+memoria: **las dos compuertas del readiness legal se midieron** contra una copia consistente de la base de
+producción, con el mismo código que está desplegado (`69db60e3`).
+
+| Compuerta | Bloqueantes | Pendientes | ¿Lista? |
+|---|---|---|---|
+| `publicacion` | 20 | 0 | **sí** |
+| `primera_firma` | 37 | **3** | **NO** |
+
+**Lo que bloquea la compuerta de primera firma** (tres pendientes que son dos hechos)
+
+1. **El Anexo de Encargo vigente sin firmar** — son dos ítems y un solo hecho: `anexo_encargo::estado_encargo`
+   («No está firmado», el estado en el manifiesto) y `anexo_encargo::empresas_base` («1 empresa(s) sin fecha
+   de Anexo registrada», la fila de la empresa en la base). La acción que el propio audit pide: **firmar el
+   Anexo de Encargo v2026-11-06** (hash `5cc7a346…`), registrar la fecha y la evidencia en el manifiesto, y
+   **anexar el PDF firmado** con su fecha. → **del owner**: es el mismo envío que ya está pendiente.
+2. **El vínculo con Google** (`anexo_nube::google_dpa`) — la cuenta es de consumo: no hay DPA y Google no
+   actúa como subencargado; en la operación concreta es Responsable del dato y el envío es una **transferencia
+   internacional** a Estados Unidos (nivel adecuado, numeral 3.2 del Título V de la Circular Única). Falta
+   documentarla: el papel de Google por escrito, las medidas de seguridad demostradas, la validación conforme
+   a la Circular 2 de 2025 y la **declaración de la transferencia en el RNBD**. La v1.2 del Acuerdo es la que
+   sostiene ese régimen: hasta que el abogado la apruebe, la primera firma queda bloqueada. → **del owner y
+   del abogado**.
+
+**Lo que salió de la medición y no estaba escrito en ningún lado**
+
+- **La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` está ENCENDIDA en producción.** El 5-nov el script
+  `encender-compuerta.sh` **abortó** (el preflight dio código 5: no había ninguna Empresa con el Anexo de
+  Nube suscrito), así que la compuerta quedó apagada; hoy no lo está. Se dedujo del propio reporte del gate:
+  el deploy de las 17:10 midió `Avisos: 0`, y el **único** ítem que queda en aviso solo por tener la
+  compuerta apagada es `empresas_nube`. La base lo confirma.
+- **ASEPLUS ya tiene el Anexo de Nube suscrito**: `anexo_nube_firmado_at = 2026-11-05T22:51:34.349Z`,
+  versión 1.1, con huella. Es decir: **hoy ASEPLUS sí puede pedir firmas** (con la compuerta encendida, el
+  servicio no le aceptaría una solicitud sin el Anexo de Nube). **El Anexo de Nube no es un bloqueante.**
+- **Los tres pendientes de la compuerta de publicación no la bloqueaban**: son los que bloquean
+  `primera_firma` y nada más. Por eso el gate de publicación salió en verde y el de primera firma no.
+
+**Cómo se midió sin `sudo`** (el usuario de SSH no puede leer `/opt/kair-firma/app` ni el `.env`)
+
+1. Se hizo una **copia consistente** de la base con `sqlite3 -readonly … ".backup …"` (827 392 B, sha256
+   `0ef648d6…`, `PRAGMA integrity_check` = `ok`) y se comprobó la huella al traerla al PC.
+2. Se corrió **el mismo código desplegado** contra esa copia, con los valores reales de configuración (canal
+   `privacidad.kair@gmail.com`, compuerta del Anexo de Nube **encendida**, plazo de trámite de 2 días hábiles).
+3. **La validación fue el gate de publicación**: tiene que reproducir **exactamente** lo que midió el
+   servidor (`Items: 40 · OK: 37 · Pendientes: 3 · Avisos: 0 · N/A: 0` y `Bloqueantes: 20 · Pendientes: 0`).
+   La primera corrida **no reprodujo** (`OK: 36 · Avisos: 1`): de ahí salió el hallazgo de la compuerta. La
+   segunda **sí reprodujo**, y recién entonces se midió la otra compuerta.
+4. Las dos copias en claro (la del PC y la del servidor) se **borraron** después de medir; la base de
+   producción nunca se abrió en escritura y quedó con el mismo tamaño (827 392 B).
+
+**Lo que el gate NO cubre** (sigue en pie, y ahora con la medición encima)
+
+Los tres pendientes del gate son dos hechos. **Fuera** del gate siguen: los **5 app passwords de Gmail sin
+rotar** (incidente, no tarea), **Node 20 en EOL** y la **copia off-site de respaldos ausente**, la **T6** y
+la **T7**, la **Sección E**, la **Constancia firmada** y la **T8**, y el **dictamen J1-J14** del abogado.
+
+**La regla de cierre: se preguntó y se respondió otra vez.** El owner autorizó actualizar los tres
+documentos. La pregunta se vuelve a hacer en la próxima jornada.
+
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

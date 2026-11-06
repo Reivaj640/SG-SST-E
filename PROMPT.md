@@ -1133,6 +1133,83 @@ verificado) y, además, dejar el puente **desanclado** para que no se muera solo
    escritura atómica y un segundo origen verificado: el paso deja de depender de la causa.
 4. **Un log que se recoge por HTTP se pierde si el puente muere**: el deploy tiene que poder **terminar**
    sin que nadie lo esté mirando.
+
+### 5.35 🔴 El estado de un ítem del readiness es el MISMO en las dos compuertas: la compuerta solo filtra al final
+
+El readiness legal tiene dos compuertas (`publicacion` y `primera_firma`) y 40 ítems. Cada ítem trae su
+propio `bloquea` (a qué compuertas bloquea). El reporte de una compuerta **no** mide un subconjunto de
+ítems: **mide los 40**, y al final filtra los que bloquean la compuerta consultada.
+
+**El caso real (6-nov-2026).** El deploy medía en el servidor la compuerta `publicacion` (y por eso salía
+«20 · Pendientes: 0»). La pregunta era si quedaban bloqueantes para la **primera firma**, y esa compuerta
+**nunca se había medido en el servidor**. Se comprobó en el código que el estado de cada ítem se calcula
+igual para las dos compuertas: `gate` solo se usa en `readinessLegal.js:1922`
+(`items.filter((i) => i.bloquea.includes(gate))`) y en el generador del texto. O sea: **el reporte de una
+compuerta es el estado de todos los ítems**, y la otra compuerta se calcula con el `bloquea` de cada ítem.
+
+**Reglas:**
+
+1. **Una compuerta no es una medida distinta**: es un filtro sobre los mismos ítems. Antes de medir otra
+   compuerta, se lee **dónde** se usa `gate` en el código (acá: solo en el filtro final).
+2. **El `bloquea` de cada ítem está en el código**, no en el reporte de texto: el texto marca con `*` los que
+   bloquean la compuerta consultada, y el JSON trae el `bloquea` completo.
+3. **"El gate está verde" y "no hay bloqueantes" no son lo mismo**: el gate de publicación estaba en verde
+   con 3 pendientes, y esos 3 bloqueaban la compuerta de primera firma.
+
+### 5.36 🔴 Una variable de entorno encendida se deduce del número de avisos del reporte
+
+Hay comprobaciones cuyo estado depende de una variable de entorno, y el reporte las publica como `aviso`.
+Eso convierte un agregado en un **testigo** del valor de la variable.
+
+**El caso real (6-nov-2026).** Al medir la compuerta de primera firma contra una copia de la base de
+producción, el resultado local fue `OK: 36 · Avisos: 1` mientras el servidor había medido `OK: 37 · Avisos: 0`
+**con el mismo código**. El ítem era `anexo_nube::empresas_nube`, que queda en `AVISO` **solo** cuando la
+compuerta `FIRMA_EXIGIR_ANEXO_NUBE` está apagada (`readinessLegal.js:1704-1724`:
+`exigirNube ? … : ESTADOS.AVISO`). Los otros dos ítems que pueden dar aviso (`empresas_base` y
+`estado_encargo`) estaban en `pendiente`, así que no explicaban la diferencia. Conclusión: **la compuerta
+está encendida en producción** — y la base lo confirmó (ASEPLUS con
+`anexo_nube_firmado_at = 2026-11-05T22:51:34.349Z`).
+
+**Reglas:**
+
+1. **Un agregado que cambia entre dos corridas del mismo código es una pista**: `Avisos: 0` contra
+   `Avisos: 1` no es ruido, es **el estado de una variable**. Se busca el ítem que explica la diferencia.
+2. **Un ítem que no bloquea ninguna compuerta igual informa**: `empresas_nube` tiene `bloquea: []` cuando la
+   compuerta está apagada, y por eso no movió el resultado del gate — pero sí el conteo.
+3. **La deduceción se confirma con la fuente**: el `.env` del servidor es `0600 kairfirma` y no se lee sin
+   `sudo`; la fila de la empresa en la base sí se lee, y fue la que confirmó.
+4. **No se "ajusta" la configuración para que la medición cuadre**: primero se deduce el valor del dato
+   medido, después se vuelve a medir y se compara.
+
+### 5.37 🔴 Una medición contra una copia de la base se valida reproduciendo el número del servidor
+
+Medir con una **copia** de la base de producción (en vez de la base viva) es más seguro y no necesita
+`sudo`. Pero una copia puede no ser la base: el servicio está escribiendo, hay WAL, y hay variables de
+entorno que no se ven. **La validación no es opcional**: la medición tiene que **reproducir exactamente** el
+número que el servidor ya había medido, y si no reproduce, **no se reporta la otra compuerta**.
+
+**El caso real (6-nov-2026).** La compuerta `primera_firma` nunca se había medido en el servidor (el deploy
+solo mide `publicacion`), y `javier` no puede correr el audit allá (`/opt/kair-firma/app` es `750 kairfirma` y
+el `.env` es `0600 kairfirma`). La maniobra: copiar la base con `sqlite3 -readonly … ".backup …"` (copia
+consistente aunque el servicio escriba), traerla verificando la huella, correr **el mismo código
+desplegado** contra ella, y **exigir** que la compuerta `publicacion` reprodujera el número del servidor
+(`Items: 40 · OK: 37 · Pendientes: 3 · Avisos: 0 · N/A: 0`, `Bloqueantes: 20 · Pendientes: 0`). La primera
+corrida **no reprodujo** (`OK: 36 · Avisos: 1`): de ahí salió el descubrimiento de §5.36. La segunda, con la
+compuerta encendida, **sí reprodujo** — y recién entonces se midió la otra compuerta (`Bloqueantes: 37 ·
+Pendientes: 3`). Las dos copias en claro se borraron después.
+
+**Reglas:**
+
+1. **La copia se hace con `sqlite3 .backup`**, no copiando el archivo: con el servicio corriendo, el archivo
+   principal puede no incluir el WAL. Se abre en `-readonly` para no poder escribir en la base de producción.
+2. **La copia se verifica por huella** antes de usarla, y la base de producción **no se abre en escritura**.
+3. **La medición se valida contra un número ya medido en el servidor**: si no reproduce, el problema son los
+   insumos, y la medición **no se reporta** (el script corta con un código de salida distinto de 0).
+4. **Una copia en claro de datos personales se borra al terminar** (en el PC y en el servidor): el motivo de
+   copiarla es medir una vez.
+5. **Medir con copia no es medir en producción**: el reporte lo dice. La compuerta `primera_firma` se midió
+   **contra una copia**; lo que se afirma es el estado de la base, no una ejecución en el servidor.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -1881,7 +1958,10 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 119 | 🔴 **El revert de un deploy NO puede heredar la lista de archivos de una corrida anterior: si la hereda, puede borrar de producción lo que esa corrida instaló** | El script de deploy (`$WORK/nuevos.txt`, el directorio de trabajo `/tmp/kair-deploy-work`) | El rollback lee la lista de archivos **nuevos** (los que el paquete agrego y que no existían) para borrarlos si la corrida falla. Esa lista **queda en el disco** entre corridas: si una corrida anterior instaló archivos nuevos y esta falla **antes** de rehacerla, el revert borra de producción archivos que la corrida anterior había instalado **correctamente**. Medido el 6-nov-2026: la lista estaba **vacía** (0 archivos), así que **no se borró nada** y la app desplegada quedó intacta — el defecto estaba, la suerte no. Reglas: (1) **la lista del rollback pertenece a la corrida que la hizo**: se limpia al arrancar el script, no se hereda; (2) **un revert tiene que decir qué borró**: si dice "borrados los archivos nuevos del paquete" y no dice cuántos, no hay evidencia de nada; (3) **antes de un deploy se mira el estado real del servidor** (qué hay en `$BASE/app`), no se asume que quedó como estaba; (4) **el hash del archivo desplegado es la prueba del deploy**, no el mensaje de "despliegue completo" |
 | 120 | 🔴 **Una comprobación que lee de un endpoint que NO expone el campo falla en falso, y el servicio falso de los tests la deja pasar** | `sgsst-electron-app/firma-service/src/routes/signRequest.js` (`GET /internal/sign-requests/:id`, líneas 469-487), `sgsst-electron-app/firma-service/src/services/publicFlow.js` (`migrarAVersionVigente`, línea 362), `scripts/probar-10-4.js` | El endpoint devuelve `agreement_version` pero **no** `agreement_hash`: la herramienta de la 10.4 lo leía de ahí, obtenía vacío y **fallaba en falso** dos comprobaciones, cuando el servicio **sí** escribía la huella en la fila y la fila en la base la tenía (esa comprobación, en el mismo script, salía bien). El servicio falso de los tests **sí** devolvía el campo, así que la suite entera en verde no lo delataba. Reglas: (1) **antes de creerle a una falla, se comprueba que la fuente tiene el dato**: un valor vacío puede ser un dato que no viaja; (2) **el servicio falso tiene que reproducir la API real, incluida la ausencia de campos**: si el test devuelve un campo que el endpoint no devuelve, el test miente; (3) **se reverte el fix para comprobar que el test lo atrapa**: acá, sin el fix, **fallan 7 pruebas de 20**; (4) **un endpoint que no expone un campo que su cliente necesita se anota como decisión del owner**, no se colorea de paso en el fix de una herramienta |
 | 121 | 🔴 **El respaldo diario y la poda solo miran `*.enc`: un respaldo en claro hecho a mano no lo recoge NINGÚNO de los dos** | `sgsst-electron-app/firma-service/deploy/backup-firma.sh` (poda: `find "$BACKUPS" -name 'firma-*.sqlite.enc' ...`), `deploy/purgar-respaldos.sh` (recorre `firma-*.sqlite.enc` y `storage-*.tar.gz.enc`), el paso 15 del script de deploy (mira `$BACKUPS/firma-*.sqlite`) | Continuación de la trampa 118, medida el 6-nov-2026: después de cifrar los 46 respaldos en claro del script viejo, **quedó uno** —`manual-pre-994-2026-11-03-1749.sqlite`, 512 KB, copiado a mano el 3-nov— porque **el paso 15 del deploy también miraba `firma-*.sqlite`**, no cualquier `.sqlite`. Reglas: (1) **un patrón de nombre no es "todos"**: `firma-*` no cubre una copia que se llama `manual-*`; (2) **el que busca tiene que ser el mismo conjunto que dejaron todos los scripts**, no el del script actual (trampa 109); (3) **al cifrar un respaldo se DESCIFRA y se comprueba que abre (`PRAGMA integrity_check`) ANTES de borrar el original** — lo que no verifica se deja y se reporta; (4) **el respaldo diario ahora avisa** de cualquier `.sqlite`/`.tar.gz` en claro que no sea `.enc`, sin cifrar ni borrar nada: avisar es seguro, cifrar a ciegas no |
-| 122 | 🟡 **El puente que sirve el paquete del deploy y recoge su log es una tarea en background: tiene tope de una hora y muere solo** | `%TEMP%\kair-puente.js` (el puente), el tar del deploy (`%TEMP%\kair-deploy\kair-deploy.tar.gz`), el log del deploy (`%TEMP%\kair-deploy\deploy.txt`) | Medido el 6-nov-2026: la tarea en background que servía el puente **la mataron a las 16:30:52** por su tope de una hora, sin que nadie lo decidiera. El deploy depende de ella para dos cosas: el paquete que baja el servidor y el log que se recoge. Además, el deploy de las 16:23 falló con `curl: (23) Failure writing output to destination` **sin causa aislada** (el puente sí sirvió el archivo: `971421 B` en su log). Reglas: (1) **lo que el servidor necesita tiene que sobrevivir la sesión**: se lanza **desanclado** (`Start-Process`), no como tarea en background, y se comprueba que responde; (2) **el paquete tiene una copia local verificada en el servidor** (`/tmp/kair-paquete-*.tar.gz`) como red: si el puente no responde, el deploy usa esa y **verifica su hash igual**; (3) **cuando una falla no se aisló, se robustece en vez de inventar la causa**: tres reintentos, escritura atómica (`$TAR.parte` y `mv`) y un segundo origen; (4) **el log del deploy se recoge por HTTP**: si el puente muere, el deploy tiene que poder **terminar** sin que nadie lo esté mirando |
+| 122 | 🟡 **El puente que sirve el paquete del deploy y recoge su log es una tarea en background: tiene tope de una hora y muere solo** | `%TEMP%\kair-puente.js` (el puente), el tar del deploy (`%TEMP%\kair-deploy\kair-deploy.tar.gz`), el log del deploy (`%TEMP%\kair-deploy\deploy.txt`) | Medido el 6-nov-2026: la tarea en background que servía el puente **la mataron a las 16:30:52** por su tope de una hora, sin que nadie lo decidiera. El deploy depende de ella para dos cosas: el paquete que baja el servidor y el log que se recoge. Además, el deploy de las 16:23 falló con `curl: (23) Failure writing output to destination` **sin causa aislada** (el puente sí sirvió el archivo: `971421 B` en su log). Reglas: (1) **lo que el servidor necesita tiene que sobrevivir la sesión**: se lanza **desanclado** (`Start-Process`), no como tarea en background, y se comprueba que responde; (2) **el paquete tiene una copia local verificada en el servidor** (`/tmp/kair-paquete-*.tar.gz`) como red: si el puente no responde, el deploy usa esa y **verifica su hash igual**; (3) **cuando una falla no se aisló, se robustece en vez de inventar la causa**: tres reintentos, escritura atómica (`$TAR.parte` y `mv`) y un segundo origen; (4) **el log del deploy se recoge por HTTP**: si el puente muere, el deploy tiene que poder **terminar** sin que nadie lo esté mirando || 123 | 🔴 **El estado de un ítem del readiness es el MISMO en las dos compuertas: la compuerta solo FILTRA al final** | `sgsst-electron-app/firma-service/src/services/readinessLegal.js` (línea 1922: `items.filter((i) => i.bloquea.includes(gate))`), `sgsst-electron-app/firma-service/scripts/auditar-readiness-legal.js` | Medido el 6-nov-2026: el deploy solo mide la compuerta `publicacion`, y de ese reporte se veía que la de `primera_firma` (37 bloqueantes) nunca se había medido en el servidor. El reporte de una compuerta **mide los 40 ítems** y filtra al final: el estado de un ítem no depende de la compuerta consultada. Reglas: (1) **una compuerta no es una medida distinta**: antes de medirla, se lee **dónde** se usa `gate` en el código (acá: solo en el filtro final); (2) **el `bloquea` de cada ítem está en el código**: el texto del reporte marca con `*` los que bloquean la compuerta consultada; (3) **"el gate está verde" no es "no hay bloqueantes"**: había 3 pendientes que no bloqueaban la publicación y sí bloqueaban la primera firma |
+| 124 | 🔴 **Una variable de entorno encendida se deduce del CONTEO DE AVISOS del reporte** | `sgsst-electron-app/firma-service/src/services/readinessLegal.js` (`anexo_nube::empresas_nube`, líneas 1704-1724: `exigirNube ? … : ESTADOS.AVISO`), `sgsst-electron-app/firma-service/src/config.js` (`exigirAnexoNube`) | Medido el 6-nov-2026: el servidor había medido `Avisos: 0` y la copia dio `Avisos: 1` **con el mismo código**. El único ítem que da aviso solo por tener apagada la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` es `empresas_nube`, así que **la compuerta está encendida en producción** (y la base lo confirma: ASEPLUS con `anexo_nube_firmado_at = 2026-11-05T22:51:34.349Z`). Reglas: (1) **un agregado que difiere entre dos corridas del mismo código es el estado de una variable**, no ruido: se busca el ítem que explica la diferencia; (2) **un ítem que no bloquea ninguna compuerta igual informa** (aquí `bloquea: []` y sin embargo movió el conteo); (3) **la deduceción se confirma con la fuente** que sí se puede leer (la fila de la base), no ajustando la configuración para que la medición cuadre |
+| 125 | 🔴 **Copiar la base de producción a ojo mide una base que puede no ser la de producción** | `sqlite3 -readonly … ".backup …"` (la copia consistente), `sgsst-electron-app/firma-service/src/db/connection.js` (WAL) | Medido el 6-nov-2026: para medir la compuerta `primera_firma` sin `sudo` (`/opt/kair-firma/app` es `750 kairfirma` y el `.env` `0600 kairfirma`) se copió la base viva. Reglas: (1) **la copia se hace con `sqlite3 .backup`**, no copiando el archivo: con el servicio corriendo y el WAL activo, el archivo principal puede no reflejar lo último; (2) **en `-readonly`**, para no poder escribir en la base de producción, y **verificada por huella** al traerla; (3) **la medición se valida contra un número ya medido en el servidor**: tiene que reproducirlo EXACTO, y si no reproduce, no se reporta nada del resto; (4) **la copia en claro se borra al terminar**, en el PC y en el servidor: el motivo de copiarla es medir una vez |
+
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 
 ```

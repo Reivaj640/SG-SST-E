@@ -19,6 +19,48 @@
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 6-nov-2026 (noche, segunda tanda) — las dos compuertas del readiness medidas con la base real: la de
+> publicación verde, la de primera firma con tres bloqueantes:**
+> La pregunta del owner fue si ya no quedaban bloqueantes para el proceso de la firma electrónica. **Se
+> midieron las dos compuertas** contra una copia consistente de la base de producción, con el mismo código
+> desplegado (`69db60e3`).
+>
+> | Compuerta | Bloqueantes | Pendientes | ¿Lista? |
+> |---|---|---|---|
+> | `publicacion` | 20 | 0 | **sí** |
+> | `primera_firma` | 37 | **3** | **NO** |
+>
+> **Los tres pendientes de `primera_firma` son dos hechos.** (1) **El Anexo de Encargo vigente sin firmar**:
+> el ítem del manifiesto (`estado_encargo`: «No está firmado») y el de la base (`empresas_base`: «1 empresa(s)
+> sin fecha de Anexo registrada») son el mismo instrumento sin firmar — hay que enviarle a ASEPLUS el Anexo
+> de Encargo v2026-11-06 (hash `5cc7a346…`), que firme, y registrar la fecha, la evidencia y el PDF firmado.
+> (2) **El vínculo con Google** (`anexo_nube::google_dpa`): la cuenta es de consumo y no hay DPA; en la
+> operación concreta Google es Responsable del dato y el envío es una transferencia internacional a Estados
+> Unidos (nivel adecuado, numeral 3.2 del Título V de la Circular Única). Falta documentarlo: el papel de
+> Google por escrito, las medidas demostradas, la validación conforme a la Circular 2 de 2025 y la
+> **declaración en el RNBD**. La v1.2 del Acuerdo es la que sostiene ese régimen: hasta que el abogado la
+> apruebe, la primera firma queda bloqueada.
+>
+> **🔴 Dos hallazgos que la medición destapó y que no estaban en ningún papel.** (1) **La compuerta
+> `FIRMA_EXIGIR_ANEXO_NUBE` está ENCENDIDA en producción** (el 5-nov el script que la encendía abortó con
+> el preflight en código 5). Se dedujo del reporte del propio gate: el deploy de las 17:10 midió `Avisos: 0`
+> y el único ítem que queda en aviso solo con la compuerta apagada es `empresas_nube`; la base lo confirma.
+> (2) **ASEPLUS ya tiene el Anexo de Nube suscrito** (`anexo_nube_firmado_at = 2026-11-05T22:51:34.349Z`,
+> versión 1.1, con huella): **hoy sí puede pedir firmas** y el Anexo de Nube **no** es un bloqueante.
+>
+> **Cómo se midió sin `sudo`.** Copia consistente con `sqlite3 -readonly … ".backup …"` (827 392 B, sha256
+> `0ef648d6…`, `integrity_check` = `ok`), traída al PC verificando la huella, corrida con el **mismo código
+> desplegado**, y **validada**: la compuerta `publicacion` tiene que reproducir **exactamente** lo que midió
+> el servidor (`Items: 40 · OK: 37 · Pendientes: 3 · Avisos: 0 · N/A: 0`; `Bloqueantes: 20 · Pendientes: 0`).
+> La primera corrida no reprodujo (`Avisos: 1`) y de ahí salió el hallazgo de la compuerta; la segunda sí.
+> Las dos copias en claro se borraron y la base de producción nunca se abrió en escritura.
+>
+> **Lo que el gate no cubre sigue en pie:** los 5 app passwords de Gmail sin rotar (incidente), Node 20 en
+> EOL, la copia off-site de respaldos ausente, la T6 y la T7, la Sección E, la Constancia firmada y la T8, y
+> el dictamen J1-J14 del abogado.
+>
+> **Anterior · 6-nov-2026 (noche) — la 10.4 probada en el ambiente real y el gate de publicación sin
+> bloqueantes:**
 > **🆕 6-nov-2026 (noche) — la 10.4 probada en el ambiente real y el gate de publicación sin
 > bloqueantes:**
 > La compuerta `prueba_10_4` era el último bloqueante del gate de publicación: **queda probada** contra
