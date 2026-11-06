@@ -129,6 +129,34 @@ test('respaldos · backup-firma.sh aborta si no hay herramienta de cifrado', () 
     'sin herramienta de cifrado el script aborta (fail closed)');
 });
 
+test('respaldos · backup-firma.sh avisa de los respaldos en claro y no los toca', () => {
+  // Decisión del owner del 6-nov-2026: el respaldo diario AVISA si aparece
+  // un respaldo en claro (una copia hecha a mano), pero no lo cifra ni lo
+  // borra: la poda solo recorre *.enc, así que ese archivo se quedaba ahí.
+  const t = leer('backup-firma.sh');
+  const c = codigo(t);
+
+  assert.match(t, /AVISO: hay respaldos EN CLARO/,
+    'el script avisa cuando encuentra un respaldo en claro');
+  assert.ok(c.includes("grep -E '\\.(sqlite|tar\\.gz)$'"),
+    'el aviso mira los .sqlite y los .tar.gz que no son .enc');
+
+  // El aviso NO borra ni cifra: solo avisa.
+  const desde = c.indexOf('CLAROS=');
+  const hasta = c.indexOf('WORK=$(mktemp', desde);
+  const bloque = c.slice(desde, hasta > desde ? hasta : desde + 900);
+  assert.doesNotMatch(bloque, /\brm\b|\bmv\b|\bgpg\b|\bopenssl\b/,
+    'el aviso no toca los archivos: solo avisa');
+
+  // Y la poda sigue borrando SOLO archivos .enc: un respaldo en claro no se
+  // borra por edad.
+  const deletes = c.split('\n').filter((l) => l.includes('-delete'));
+  assert.ok(deletes.length > 0, 'la poda sigue borrando por edad');
+  for (const l of deletes) {
+    assert.match(l, /\.enc/, 'la poda solo borra .enc: ' + l.trim());
+  }
+});
+
 test('respaldos · la frase no se escribe en el codigo, ni en el log', () => {
   const t = leer('backup-firma.sh');
   const c = codigo(t);

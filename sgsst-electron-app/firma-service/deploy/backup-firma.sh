@@ -172,6 +172,29 @@ mkdir -p "$BACKUPS"
 log "Cifrado: $HERRAMIENTA. Frase: $FRASE (modo $(stat -c %a "$FRASE" 2>/dev/null || echo '?'))."
 
 # -----------------------------------------------------------------------------
+# 0c. RESPALDOS EN CLARO QUE QUEDARON (aviso; no se toca nada).
+#
+# Este script nunca escribe un respaldo en claro: todo lo que produce termina
+# en .enc. Pero una persona puede copiar la base a mano (una copia de
+# seguridad antes de un despliegue, por ejemplo) y ese archivo se queda en
+# claro. Ni la poda ni este script lo recogen: la poda solo recorre *.enc.
+#
+# Aqui NO se borra ni se cifra nada: se avisa. Cifrar un archivo del que
+# nadie puede asegurar que abre es peor que dejarlo visible. Para cerrar el
+# caso hay que cifrarlo con la misma frase, DESCIFRARLO y comprobar que
+# abre, y solo entonces borrar el original.
+# -----------------------------------------------------------------------------
+CLAROS=$(ls -1 "$BACKUPS" 2>/dev/null | grep -E '\.(sqlite|tar\.gz)$' || true)
+if [ -n "$CLAROS" ]; then
+  log "AVISO: hay respaldos EN CLARO en $BACKUPS que este script no creo:"
+  printf '%s\n' "$CLAROS" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    log "AVISO:   $f"
+  done
+  log "AVISO: no se borro nada. Cifrelos con la misma frase, descifralos y comprueba que abren antes de borrar el original."
+fi
+
+# -----------------------------------------------------------------------------
 # 1. Backup consistente de la BD (método oficial de SQLite con WAL).
 # -----------------------------------------------------------------------------
 sqlite3 "$DB" ".backup '$COPIA_PLAIN'"
