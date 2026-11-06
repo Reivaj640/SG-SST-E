@@ -7,6 +7,9 @@
  *   si el cliente prefiere HTML, devuelve una página legible en vez de JSON
  *   crudo. Fuera de ahí siempre JSON (ver isPublicSignerPath).
  * - Loguea el error completo server-side; al cliente solo lo seguro.
+ * - Un cuerpo que no es JSON válido es un error del CLIENTE (400
+ *   INVALID_JSON), no un 500: body-parser lo entrega como
+ *   `entity.parse.failed` y hay que reconocerlo antes del catch-all.
  */
 'use strict';
 
@@ -20,6 +23,31 @@ class AppError extends Error {
     this.details = details;
     this.expose = true;
   }
+}
+
+/**
+ * ¿Es un cuerpo que body-parser no pudo leer como JSON?
+ *
+ * `express.json()` marca estos fallos con `type === 'entity.parse.failed'` y
+ * `status === 400`. Hay dos familias:
+ *   - JSON malformado (`{"a":`), que lanza un SyntaxError;
+ *   - JSON válido que no es objeto ni arreglo (`null`, `0`, `"hola"`), que
+ *     body-parser rechaza en modo estricto con el mismo `type`.
+ *
+ * El segundo caso no siempre nace de `JSON.parse`, así que se reconoce por
+ * `type` y, como respaldo, por la marca `expose` + `body` que body-parser
+ * pone en sus errores 400. No alcanza con `err.status === 400`: otros errores
+ * de aplicación pueden traer ese estado y no son de parseo.
+ *
+ * @param {any} err
+ * @returns {boolean}
+ */
+function isInvalidJsonError(err) {
+  if (!err) return false;
+  if (err.type === 'entity.parse.failed') return true;
+  return err.status === 400
+    && err.expose === true
+    && Object.prototype.hasOwnProperty.call(err, 'body');
 }
 
 // =============================================================================
@@ -320,6 +348,33 @@ function errorHandler() {
           code: err.code,
           message: err.message,
           details: err.details,
+          request_id: requestId,
+        },
+      });
+    }
+
+    // Cuerpo ilegible: es un error del CLIENTE, no del servidor. Sin este
+    // caso, body-parser lo entrega al catch-all y el cliente recibe un
+    // 500 INTERNAL_ERROR que esconde el motivo real (📦1008).
+    if (isInvalidJsonError(err)) {
+      logger.warn('Cuerpo JSON invalido', {
+        request_id: requestId,
+        status: 400,
+        error: err.message,
+      });
+      if (asHtml) {
+        return renderPublicHtml(res, {
+          statusCode: 400,
+          code: 'INVALID_JSON',
+          requestId: requestId,
+          path: (req.path || '').split('?')[0],
+        });
+      }
+      noStoreIfPublic(req, res);
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_JSON',
+          message: 'El cuerpo de la solicitud no es JSON válido',
           request_id: requestId,
         },
       });
