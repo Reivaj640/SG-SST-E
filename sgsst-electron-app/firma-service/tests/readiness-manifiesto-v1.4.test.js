@@ -148,6 +148,61 @@ test('manifiesto · la huella de cada documento es la del archivo real', () => {
   );
 });
 
+test('manifiesto · la version del Anexo de Encargo es la que declara el documento', () => {
+  // El manifiesto dice qué texto se firma; el texto dice cuál es su versión.
+  // Si los dos no dicen lo mismo, hay dos Anexos de Encargo y una sola huella
+  // no describe los dos. El 5-nov-2026 pasó exactamente eso: el manifiesto
+  // declaraba 2026-11-05 y el documento seguía diciendo 2026-10-30 en su
+  // encabezado. Por eso la versión se contrasta contra el TEXTO, y no contra
+  // una constante.
+  const man = manifiesto();
+  const texto = fs.readFileSync(path.join(APP, 'legal', 'anexo-encargo.html'), 'utf8');
+  const declarado = texto.match(/<meta name="version" content="([^"]+)">/);
+  assert.ok(declarado, 'el Anexo de Encargo no declara su versión en el encabezado');
+  assert.equal(
+    man.anexo_encargo.version,
+    declarado[1],
+    'el manifiesto declara una versión que el Anexo de Encargo no dice',
+  );
+
+  // Y la línea de fecha y el pie del documento dicen lo mismo que el
+  // encabezado: un documento con dos etiquetas distintas se publica igual de
+  // roto.
+  const lineaFecha = texto.split('\n').find((l) => l.includes('<p class="fecha">'));
+  assert.ok(lineaFecha, 'el Anexo de Encargo no tiene la línea de fecha');
+  assert.ok(
+    lineaFecha.includes(`Versi&oacute;n ${declarado[1]}`),
+    `la línea de fecha no declara la versión del encabezado: ${lineaFecha}`,
+  );
+
+  // La fuente de la que sale esa etiqueta es la misma matriz del manifiesto.
+  const matriz = JSON.parse(
+    fs.readFileSync(path.join(SERVICE, 'config', 'matriz-finalidades.json'), 'utf8'),
+  );
+  assert.equal(
+    matriz.instruccion.version,
+    declarado[1],
+    'la fuente de la matriz declara otra versión que el Anexo de Encargo',
+  );
+});
+
+test('manifiesto · la matriz de finalidades que declara coincide con la fuente', () => {
+  const man = manifiesto();
+  const matriz = JSON.parse(
+    fs.readFileSync(path.join(SERVICE, 'config', 'matriz-finalidades.json'), 'utf8'),
+  );
+  assert.equal(
+    man.matriz_finalidades.version,
+    matriz.version,
+    'el manifiesto declara una versión de la matriz que la fuente no tiene',
+  );
+  assert.equal(
+    man.matriz_finalidades.actualizado_at,
+    matriz.actualizado_at,
+    'el manifiesto declara una fecha de la matriz que la fuente no tiene',
+  );
+});
+
 test('manifiesto · el Anexo de Nube que declara es el que el servicio suscribe', () => {
   // El acoplamiento que importa: el manifiesto y la compuerta de readiness
   // tienen que describir el MISMO texto que `services/anexoNube.js` firma.

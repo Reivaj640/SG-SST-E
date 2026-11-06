@@ -135,6 +135,66 @@ test('el generador falla si falta un marcador en el Anexo', () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('la version del documento sale de la fuente, no de una constante', () => {
+  // El 5-nov-2026 el texto del Anexo cambio sin que la etiqueta subiera: el
+  // manifiesto declaraba 2026-11-05 y el documento decia 2026-10-30. Con dos
+  // textos distintos, la huella que firma la Empresa no es la que el
+  // manifiesto describe. Ahora los tres lugares que declaran la version
+  // (encabezado, linea de fecha y pie) los pone el generador desde la misma
+  // fuente que el bloque generado.
+  const matriz = JSON.parse(fs.readFileSync(CONFIG_MATRIZ, 'utf8'));
+  const html = fs.readFileSync(HTML_LEGAL, 'utf8');
+  const version = matriz.instruccion.version;
+  const fecha = matriz.instruccion.fecha;
+
+  assert.ok(
+    html.includes(`<meta name="version" content="${version}">`),
+    `el encabezado no declara la version de la fuente (${version})`,
+  );
+  const lineaFecha = html.split('\n').find((l) => l.includes('<p class="fecha">'));
+  assert.ok(lineaFecha, 'el Anexo no tiene la linea de fecha');
+  assert.ok(
+    lineaFecha.includes(`Versi&oacute;n ${version}`) && lineaFecha.includes(fecha),
+    `la linea de fecha no declara la version y la fecha de la fuente: ${lineaFecha}`,
+  );
+  assert.ok(
+    html.includes(`Documento actualizado el ${fecha}`),
+    `el pie no declara la fecha de la fuente (${fecha})`,
+  );
+  // Y la evidencia de la instruccion, que vive dentro del bloque generado,
+  // dice la misma version.
+  assert.ok(
+    html.includes(`versi&oacute;n ${version}, fechada el ${fecha}`),
+    'la evidencia de la instruccion no declara la version de la fuente',
+  );
+});
+
+test('el generador falla si el Anexo no tiene la linea de version del encabezado', () => {
+  // Una etiqueta ausente o repetida deja un Anexo que no se puede publicar:
+  // el script se niega a escribir en vez de dejar un texto a medias.
+  const tmp = raizTemporal();
+  const ruta = path.join(tmp, 'sgsst-electron-app', 'legal', 'anexo-encargo.html');
+  const html = fs.readFileSync(ruta, 'utf8')
+    .replace(/<meta name="version" content="[^"]*">\n/, '');
+  fs.writeFileSync(ruta, html, 'utf8');
+  const res = spawnSync(process.execPath, [SCRIPT, `--raiz=${tmp}`], { encoding: 'utf8' });
+  assert.notEqual(res.status, 0, 'el script no fallo con la etiqueta de version faltante');
+  assert.ok(/meta name="version"/.test(res.stderr), 'el error no nombra la etiqueta faltante');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('el generador falla si la fuente no trae la version de la instruccion', () => {
+  const tmp = raizTemporal();
+  const ruta = path.join(tmp, 'sgsst-electron-app', 'firma-service', 'config', 'matriz-finalidades.json');
+  const matriz = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+  delete matriz.instruccion.version;
+  fs.writeFileSync(ruta, JSON.stringify(matriz, null, 2), 'utf8');
+  const res = spawnSync(process.execPath, [SCRIPT, `--raiz=${tmp}`], { encoding: 'utf8' });
+  assert.notEqual(res.status, 0, 'el script no fallo sin la version de la instruccion');
+  assert.ok(/instruccion\.version/.test(res.stderr), 'el error no nombra el campo faltante');
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('el generador falla si el JSON de la fuente no valida', () => {
   const tmp = raizTemporal();
   const ruta = path.join(tmp, 'sgsst-electron-app', 'firma-service', 'config', 'matriz-finalidades.json');

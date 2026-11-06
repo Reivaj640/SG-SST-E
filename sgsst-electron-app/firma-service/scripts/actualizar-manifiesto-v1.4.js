@@ -441,10 +441,15 @@ function main() {
     throw error('Alguna huella del manifiesto no coincide con la del archivo.');
   }
   if (datos.acuerdo.publicado !== false) {
-    throw error('El manifiesto dice que el Acuerdo esta publicado. No debe estarlo.');
+    throw error('Este script es de la v1.4 y exige que el Acuerdo NO este publicado. Hoy el manifiesto '
+      + 'lo declara publicado (v1.5, en vigor desde el 5-nov-2026): las huellas de este manifiesto se '
+      + 'recalculan a mano, con reemplazo literal, no con este script, que es de una version anterior.');
   }
   if (datos.anexo_nube.firmado !== false || datos.anexo_nube.hash !== null) {
-    throw error('El manifiesto dice que hay Anexo de Nube firmado. No hay ninguna firma.');
+    throw error('Este script es de la v1.4 y exige que el Anexo de Nube NO este firmado. Hoy el manifiesto '
+      + 'declara la firma real del 5-nov-2026 (ASEPLUS CARIBE S.A.S., suscripcion 1): este script la '
+      + 'BORRARIA, porque su nota y sus guardas son de antes de esa firma. Las huellas de ese bloque se '
+      + 'recalculan a mano, con reemplazo literal, conservando la firma.');
   }
 
   if (soloCheck) {

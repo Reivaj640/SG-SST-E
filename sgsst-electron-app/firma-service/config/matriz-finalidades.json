@@ -1,12 +1,12 @@
 {
   "version": "1.0",
-  "actualizado_at": "2026-10-31",
+  "actualizado_at": "2026-11-06",
   "estado": "ESTADO: las bases juridicas de las finalidades del Grupo A fueron validadas por el abogado el 30 de octubre de 2026 (punto J4 de su revision), que corrigio las de (a), (b), (c) y (e) y declaro correctas sin cambio las de (d), (f) y (g). La habilitacion de cada finalidad del Grupo A es condicional: aplica solo a la Empresa que haya suscrito este Anexo de Encargo y el Anexo de Nube, inscrito su tabla de retencion documental y designado su canal de atencion. Ninguna finalidad queda habilitada en produccion hasta que esas tres condiciones se cumplan por una Empresa determinada. La finalidad 10.3(h) del Grupo B sigue No habilitada hasta que la Empresa entregue la obligacion, su fundamento y su punto de inicio. Los plazos de conservacion salen de config/tabla-conservacion.json, que es la fuente unica.",
   "nota": "Fuente unica de la matriz de finalidades del Anexo de Encargo (seccion 2). De este archivo sale el bloque generado por scripts/generar-anexo-encargo.js. La matriz no se edita a mano en el HTML: se edita aca y se regenera. Convencion de escritura: este archivo va en UTF-8 con tildes y el generador las convierte en entidades HTML; config/tabla-conservacion.json va en ASCII y el generador le restituye las tildes antes de convertirlas. Las dos fuentes nunca se editan a mano en el Anexo.",
   "instruccion": {
     "documento": "este Anexo de Encargo de Tratamiento de Datos Personales del servicio de firma electronica K+AIR",
-    "version": "2026-10-30",
-    "fecha": "30 de octubre de 2026",
+    "version": "2026-11-06",
+    "fecha": "6 de noviembre de 2026",
     "responsable": "la Empresa (Responsable del tratamiento)",
     "encargado": "Gesstiar S.A.S. (K+AIR), en calidad de Encargado",
     "soporte": "La version y la huella SHA-256 de ambos quedan registradas con la solicitud (numerales 3.6(b), 3.8 y 12.7 del Acuerdo)."

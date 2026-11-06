@@ -2,15 +2,17 @@
 /**
  * scripts/generar-anexo-encargo.js
  *
- * GENERA los dos bloques del Anexo de Encargo que no se escriben a mano:
- * la matriz de finalidades (seccion 2) y la tabla de conservacion (seccion 8).
+ * GENERA las tres partes del Anexo de Encargo que no se escriben a mano:
+ * la matriz de finalidades (seccion 2), la tabla de conservacion (seccion 8)
+ * y la ETIQUETA DE VERSION del documento (encabezado, linea de fecha y pie).
  *
  * POR QUE SE GENERAN Y NO SE ESCRIBEN A MANO
  * -------------------------------------------
  * Una tabla escrita a mano se contradice con la fuente a la tercera version.
- * Estas dos salen de dos archivos y solo de esos:
+ * Estas salen de dos archivos y solo de esos:
  *
- *   config/matriz-finalidades.json  -> la matriz de finalidades (E1)
+ *   config/matriz-finalidades.json  -> la matriz de finalidades (E1) y la
+ *                                      etiqueta de version del documento
  *   config/tabla-conservacion.json  -> la tabla de conservacion (E2)
  *
  * El bloque generado queda entre dos marcadores de comentario HTML estables,
@@ -18,6 +20,11 @@
  *
  *   <!-- MATRIZ-FINALIDADES:GENERADA --> ... <!-- /MATRIZ-FINALIDADES -->
  *   <!-- TABLA-CONSERVACION:GENERADA --> ... <!-- /TABLA-CONSERVACION -->
+ *
+ * La etiqueta de version no lleva marcadores: se reconoce por su forma
+ * (<meta name="version">, la linea <p class="fecha"> y el pie). El script se
+ * niega a escribir si no encuentra UNA coincidencia de cada una: una etiqueta
+ * ausente o repetida deja un Anexo que no se puede publicar.
  *
  * El script es IDEMPOTENTE: correrlo dos veces produce un archivo byte a byte
  * identico, porque lo que se escribe depende solo de las dos fuentes y no
@@ -61,6 +68,23 @@ const MARCA_MATRIZ_INI = '<!-- MATRIZ-FINALIDADES:GENERADA -->';
 const MARCA_MATRIZ_FIN = '<!-- /MATRIZ-FINALIDADES -->';
 const MARCA_TABLA_INI = '<!-- TABLA-CONSERVACION:GENERADA -->';
 const MARCA_TABLA_FIN = '<!-- /TABLA-CONSERVACION -->';
+
+// La ETIQUETA DE VERSION del documento (el encabezado, la linea de fecha y el
+// pie) tampoco se escribe a mano: sale de la MISMA fuente que la matriz, del
+// bloque "instruccion".
+//
+// POR QUE NO SE ESCRIBE A MANO
+// ----------------------------
+// El 5-nov-2026 el texto del Anexo cambio (el numeral 12 y la remision al
+// Anexo de Nube v1.1) sin que la etiqueta subiera: el manifiesto declaraba
+// 2026-11-05 y el documento decia 2026-10-30. Con dos textos distintos, la
+// huella que firma la Empresa no es la que el manifiesto describe, y eso se
+// detecta tarde. Por eso la etiqueta la pone el generador, y el script se
+// niega a escribir si no encuentra UNA coincidencia de cada ancla: una etiqueta
+// ausente o repetida es un Anexo que no se puede publicar.
+const RE_VERSION_META = /<meta name="version" content="[^"]*">/;
+const RE_LINEA_FECHA = /^[ \t]*<p class="fecha">.*<\/p>$/m;
+const RE_LINEA_PIE = /Documento actualizado el [^<]*/;
 
 // Las categorias que la tabla de conservacion DEBE traer. Si falta una, el
 // Anexo quedaria sin plazo para esa clase de documento y el script no escribe.
@@ -354,6 +378,60 @@ function fechaLegible(iso) {
   return `${Number(m[3])} de ${mes} de ${m[1]}`;
 }
 
+/** Cuenta las coincidencias de un patron, sin copiar el texto. */
+function contarCoincidencias(texto, regex) {
+  const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
+  return (texto.match(new RegExp(regex.source, flags)) || []).length;
+}
+
+/**
+ * Escribe la etiqueta de version del documento desde la fuente.
+ *
+ * La etiqueta vive en tres lugares del Anexo (el encabezado, la linea de
+ * fecha y el pie) y en uno mas, dentro del bloque generado (la evidencia de
+ * la instruccion). Los cuatro tienen que decir lo mismo: si el encabezado
+ * dice una version y el manifiesto otra, la Empresa firma un texto que el
+ * manifiesto no describe.
+ *
+ * @param {string} contenido - El HTML completo del Anexo.
+ * @param {string} version - La version del documento (AAAA-MM-DD).
+ * @param {string} fecha - La fecha legible del documento.
+ * @returns {string} El HTML con la etiqueta puesta.
+ */
+function aplicarVersionAlDocumento(contenido, version, fecha) {
+  const fechaHtml = html(fecha);
+
+  if (contarCoincidencias(contenido, RE_VERSION_META) !== 1) {
+    fallar('El Anexo de Encargo debe traer la linea <meta name="version"> UNA vez.');
+  }
+  if (contarCoincidencias(contenido, RE_LINEA_FECHA) !== 1) {
+    fallar('El Anexo de Encargo debe traer la linea <p class="fecha"> con la version UNA vez.');
+  }
+  if (contarCoincidencias(contenido, RE_LINEA_PIE) !== 1) {
+    fallar('El Anexo de Encargo debe traer el pie con la fecha de actualizacion UNA vez.');
+  }
+
+  let salida = contenido.replace(
+    RE_VERSION_META,
+    `<meta name="version" content="${version}">`,
+  );
+
+  // La sangria de la linea se conserva: el pie del documento la usa y un
+  // cambio de sangria seria un cambio de formato en un documento que se firma.
+  const sangria = (contenido.match(RE_LINEA_FECHA)[0].match(/^[ \t]*/) || [''])[0];
+  salida = salida.replace(
+    RE_LINEA_FECHA,
+    `${sangria}<p class="fecha">&Uacute;ltima actualizaci&oacute;n: ${fechaHtml} &middot; Versi&oacute;n ${version}</p>`,
+  );
+
+  salida = salida.replace(
+    RE_LINEA_PIE,
+    `Documento actualizado el ${fechaHtml}`,
+  );
+
+  return salida;
+}
+
 // ---------------------------------------------------------------------------
 // La matriz de finalidades (E1)
 // ---------------------------------------------------------------------------
@@ -620,6 +698,16 @@ function validarMatriz(matriz) {
   if (!Array.isArray(matriz.finalidades)) {
     fallar('matriz-finalidades.json no trae el arreglo "finalidades".');
   }
+  // La instruccion documentada es la que el documento declara en su
+  // encabezado: sin version y sin fecha legible, la etiqueta del Anexo
+  // quedaria escrita a mano y volveria a poder desalinearse del manifiesto.
+  const instr = matriz.instruccion || {};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(instr.version || ''))) {
+    fallar('matriz-finalidades.json no trae "instruccion.version" con una fecha ISO (AAAA-MM-DD).');
+  }
+  if (!instr.fecha || String(instr.fecha).trim() === '') {
+    fallar('matriz-finalidades.json no trae "instruccion.fecha" con la fecha legible.');
+  }
   const porId = new Map();
   for (const f of matriz.finalidades) {
     if (!f.id) fallar('Una finalidad de matriz-finalidades.json no tiene "id".');
@@ -690,6 +778,7 @@ function main() {
   const bloqueTabla = construirTabla(tabla);
 
   let nuevo = contenido;
+  nuevo = aplicarVersionAlDocumento(nuevo, matriz.instruccion.version, matriz.instruccion.fecha);
   nuevo = reemplazarBloque(nuevo, MARCA_MATRIZ_INI, MARCA_MATRIZ_FIN, bloqueMatriz);
   nuevo = reemplazarBloque(nuevo, MARCA_TABLA_INI, MARCA_TABLA_FIN, bloqueTabla);
   if (eol === '\r\n') {
