@@ -14,11 +14,102 @@
 
 
 
-**Última actualización:** 5 de noviembre de 2026
+**Última actualización:** 6 de noviembre de 2026
 **Versión actual:** 0.1.252 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 6-nov-2026 (tarde) — la 9A probada en el ambiente real, el deploy armado y dos hallazgos del
+> servidor:**
+> La compuerta `prueba_9a` del gate de publicación era uno de los dos bloqueantes: **queda probada**
+> contra el servicio desplegado, con su evidencia en el manifiesto (`legal-readiness.json` → `n9a`,
+> `probada: true`). El otro bloqueante, la `prueba_10_4`, queda **decidido y armado**: probar en el
+> servidor real pero contra una **base de datos aislada** (decisión del owner, 6-nov-2026). Y al medir
+> el servidor aparecieron **dos hallazgos que no tienen que ver con la firma**.
+>
+> **La 9A, probada.** Solicitud `SIGN-2026-016820` (firma id 18), Empresa **ASEPLUS CARIBE S.A.S.**
+> (NIT 900829731), excepción de habilitación 5 (VIGENTE, alcance de 2 firmas,
+> `ruta_papel_operativa=1`, plazo 2026-12-04T14:01:43Z), Acuerdo v1.5 (hash `952592f0…5be28`).
+> **El 8.2:** al crearse la solicitud quedaron registrados `EMAIL_HOJA_VIDA` (ACTIVO, origen EMPRESA) y
+> `LINK_KAIR` (ACTIVO, origen SISTEMA); el Trabajador declaró su medio personal y lo confirmó
+> (`MEDIO_PERSONAL_CONFIRMADO`), el OTP salió solo a ese buzón (`OTP_SENT`) y quedó verificado
+> (`OTP_VERIFIED`, `identificacion_coincidio=1`), con lo cual el `CORREO_OTP` quedó ACTIVO. **El 7.1 a
+> 7.3:** la Empresa registró el documento ya firmado en papel, el servicio guardó el PDF y calculó su
+> huella `383511c1…f616`, generó el Registro de firma autográfica
+> (`/opt/kair-firma/storage/pdfs/papel/SIGN-2026-016820-registro.pdf`, sha256 `dcd7d3db…a347`),
+> entregó la copia por el medio autorizado (`CORREO_OTP`) y **cerró la vía electrónica**
+> (`PAPER_TRACK_OPENED`, `PAPER_SIGNATURE_REGISTERED`, `ELECTRONIC_FLOW_CANCELLED`); la firma id 18
+> quedó `CANCELLED`. La corrida cerró con **26 OK · 0 avisos · 0 fallas**.
+>
+> **Lo que la evidencia declara y no se oculta.** El documento de identidad (`900000001`) y el PDF
+> firmado en papel son **SINTÉTICOS** (los genera el propio script con pdf-lib, y el PDF lo dice en su
+> primera página); el canal por el que el Trabajador pidió el papel se declaró como
+> `PRUEBA_SINTETICA_9A_CANAL_DE_ATENCION_DE_LA_EMPRESA`. Lo real es el buzón (`jrf2011@live.com`),
+> donde llegaron el código y la copia. Lo que se demuestra es que **el mecanismo funciona en el
+> ambiente real contra el servicio desplegado**. La excepción 5 quedó en **2 de 2 firmas usadas**: su
+> alcance lo consumió esta prueba y no se devuelve.
+>
+> **Herramientas nuevas.** `firma-service/scripts/probar-n9a.js` (52 068 B, sha256 `574fed8e…f87`): 10
+> pasos, resumible (estado en `/tmp/kair-n9a-estado.json`), nunca crea una segunda solicitud, sin
+> `--confirmar-escribe` no escribe nada, códigos de salida **0/1/2/3** (3 = falta el OTP: corra otra
+> vez). Su test: **19 tests, 19 verdes**. Y `firma-service/scripts/probar-10-4.js` (~62 KB) + su test
+> (**19 tests, 19 verdes**), que son la herramienta de la 10.4: **quedaron commiteados como 📦1013
+> (`195f7353`) y pusheados a `origin/Dev`**.
+>
+> **Commits, los dos pusheados.** `bf4c6287` · 📦1011 (la herramienta de la 9A) y `dc8b94cc` · 📦1012
+> (el manifiesto con la evidencia, 2 líneas, LF puro). Ojo: el remoto tenía `489fc814` (la versión de
+> 📦1011 **sin** las dos correcciones, porque se había amendado localmente después de pushearla); se
+> resolvió con `git push --force-with-lease=Dev:489fc814...`, que reescribió **solo** ese commit propio
+> (mismo padre `290f7af2`, mismo autor, nunca hubo trabajo de terceros encima). **Quien lea el remoto
+> tiene la versión CORREGIDA.**
+>
+> **🔴 Los dos hallazgos del servidor (nuevos, y no tienen que ver con la firma):**
+> - 🔴 **Los respaldos NO se están haciendo desde el 3-nov-2026.** El cron
+>   `/etc/cron.d/kair-firma-backup` (22:00) **solo corrió el 1-nov y el 3-nov**. La causa de fondo:
+>   **el servidor es una laptop y se apaga** (`cron.service` se reinició el 6-nov 08:59; el health-check
+>   sí corre, porque está cada 5 minutos). Mientras la máquina esté apagada no hay respaldo: **el
+>   respaldo diario depende de que la laptop esté encendida** → refuerza el pendiente de la copia
+>   off-site y el punto único de falla.
+> - 🔴 **46 respaldos EN CLARO en `/opt/kair-firma/backups/` y CERO cifrados** (33 `.sqlite` sin `.enc`,
+>   más sus `-wal`/`-shm`, más 12 `storage-*.tar.gz`). Son del script viejo: el script nuevo solo
+>   escribe `.enc` y tanto su poda como la purga solo miran los `.enc`, así que **los en claro no se
+>   borran nunca solos**. Contradice lo que el Anexo de Nube promete. El **paso 15** del deploy los
+>   cifra con gpg (con la frase del servidor), **verifica que se descifran y que pasan `integrity_check`**,
+>   y solo entonces borra el original en claro; lo que no verifica se deja como está y se reporta. El
+>   **paso 16** corre un respaldo con el script nuevo y deja el cron escrito con el formato correcto.
+>
+> **La 10.4, y por qué no se podía probar en producción.** Hoy **no se puede provocar por API**: crear
+> una solicitud exige la versión activa y vigente (`validateAcuerdo`); las dos solicitudes viejas de
+> la v1.0 (ids 14 y 15) vencieron el 29-oct-2026 y no hay token recuperable; **no existe** mecanismo de
+> renovación de `fecha_expiracion`; y la activación de una versión **no tiene vuelta atrás por API**
+> (`agreementService` solo expone `getActive`, `getByVersion` y `createVersion`). **Decisión del owner
+> (6-nov-2026): probar en el servidor real, con el código desplegado, pero contra una BASE DE DATOS
+> AISLADA** (vía A); se descartaron la vía B (contra producción) y la vía C (solo la suite, como el
+> D-03). El envoltorio `p104.sh` hace la copia de la base, levanta la instancia aislada en el puerto
+> 8899 con `NODE_ENV=development` (para que el OTP salga en la respuesta y no se mande correo) y corre
+> el script, que es idempotente. **Falta que el owner lo corra**; la evidencia va a
+> `legal-readiness.json` → `n10_4` (hoy `probada: false`).
+>
+> **Lo que sigue, y de quién es.** **Del owner:** (1) el **deploy del `dc8b94cc`** — falta
+> `sudo bash /tmp/deploy-1013.sh`, y hasta que el manifiesto con `n9a.probada = true` llegue al
+> servidor, **el gate de producción no ve la 9A probada**; (2) **la 10.4** — falta correr el envoltorio
+> y registrar la evidencia; (3) el **Anexo de Encargo de ASEPLUS sin firmar**
+> (`anexo_encargo_firmado_at = null`): hay que enviarle el documento vigente al firmante (la etiqueta
+> de versión ya quedó alineada desde 📦1010); (4) la **Sección E** (G3 estricto o documentada), la
+> **Constancia firmada** y la **T8**; (5) la **T6** y la **T7**, con su evidencia; (6) **rotar los 5 app
+> passwords de Gmail** sin rotar y revisar los accesos: es un **incidente** (arts. 17(d), 17(n), 18(b)
+> y 18(k) de la Ley 1581 de 2012), no una tarea; (7) **Node 20 en EOL** en el servidor (22 hasta
+> 2027-04-30, 24 hasta 2028-04-30) y la **copia off-site de respaldos** ausente (`rclone` sin
+> configurar); (8) verificar que no queden `.sqlite` sin cifrar en el servidor (lo resuelve el paso 15,
+> pero hay que confirmarlo después de correrlo). **Del abogado:** **J1-J14 sin respuesta**, la matriz
+> de finalidades y la tabla de conservación como anexos faltantes.
+>
+> **La regla de cierre: esta vez sí se preguntó y sí se respondió.** El owner **sí** autorizó actualizar
+> los documentos (la pregunta se le había hecho 5 veces antes sin respuesta). Queda escrito para la
+> próxima jornada, y **la pregunta se vuelve a hacer igual**. El detalle completo de la jornada, con las
+> tres correcciones que aparecieron probando en el ambiente real, está en `Historial.md`.
+>
+> **Anterior · 5-nov-2026 — el tope del Acuerdo desbloqueado y el servidor medido por dentro:**
 > **🆕 5-nov-2026 — el tope del Acuerdo desbloqueado y el servidor medido por dentro:**
 > el owner pidió vía libre para probar el flujo de firma a mano con el Acuerdo v1.4 ya vigente. Al medir
 > en el servidor en vez de asumir, aparecieron cuatro bloqueantes — y **dos afirmaciones que este archivo

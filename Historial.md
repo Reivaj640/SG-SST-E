@@ -16,6 +16,107 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+> **Actualización 2026-11-06 (tarde) — la 9A probada en el ambiente real, el deploy armado y dos
+> hallazgos del servidor:**
+> La compuerta `prueba_9a` del gate de publicación era uno de los dos bloqueantes: **queda probada**
+> contra el servicio desplegado, y su evidencia está en el manifiesto (`legal-readiness.json` →
+> `n9a`, `probada: true`). El otro bloqueante, la `prueba_10_4`, queda **decidido y armado**: probar en
+> el servidor real pero contra una **base de datos aislada** (decisión del owner, 6-nov-2026). Y al
+> medir el servidor aparecieron **dos hallazgos que no tienen que ver con la firma**.
+>
+> **Lo que se cerró:**
+> - 🟢 **La 9A probada en el ambiente real.** Solicitud `SIGN-2026-016820` (firma id 18), Empresa
+>   ASEPLUS CARIBE S.A.S. (NIT 900829731), excepción de habilitación 5 (VIGENTE, alcance de 2 firmas,
+>   `ruta_papel_operativa=1`, plazo 2026-12-04T14:01:43Z), Acuerdo v1.5 (hash `952592f0…5be28`).
+>   **El 8.2:** al crearse la solicitud quedaron registrados `EMAIL_HOJA_VIDA` (ACTIVO, origen EMPRESA)
+>   y `LINK_KAIR` (ACTIVO, origen SISTEMA); el Trabajador declaró su medio personal y lo confirmó
+>   (`MEDIO_PERSONAL_CONFIRMADO`), el OTP salió solo a ese buzón (`OTP_SENT`) y quedó verificado
+>   (`OTP_VERIFIED`, `identificacion_coincidio=1`), con lo cual el `CORREO_OTP` quedó ACTIVO.
+>   **El 7.1 a 7.3:** la Empresa registró el documento ya firmado en papel, el servicio guardó el PDF y
+>   calculó su huella `383511c1…f616`, generó el Registro de firma autográfica
+>   (`/opt/kair-firma/storage/pdfs/papel/SIGN-2026-016820-registro.pdf`, sha256 `dcd7d3db…a347`),
+>   entregó la copia por el medio autorizado (`CORREO_OTP`) y **cerró la vía electrónica**
+>   (`PAPER_TRACK_OPENED`, `PAPER_SIGNATURE_REGISTERED`, `ELECTRONIC_FLOW_CANCELLED`); la firma id 18
+>   quedó `CANCELLED`. La corrida cerró con **26 OK · 0 avisos · 0 fallas**.
+> - 🟢 **La evidencia, con lo que NO es, declarado.** El documento de identidad (`900000001`) y el PDF
+>   firmado en papel son **SINTÉTICOS** (los genera el propio script con pdf-lib, y el PDF lo dice en su
+>   primera página); el canal por el que el Trabajador pidió el papel se declaró como
+>   `PRUEBA_SINTETICA_9A_CANAL_DE_ATENCION_DE_LA_EMPRESA`. Lo real es el buzón (`jrf2011@live.com`),
+>   donde llegaron el código y la copia. Lo que se demuestra es que **el mecanismo funciona en el
+>   ambiente real contra el servicio desplegado**. La excepción 5 quedó en **2 de 2 firmas usadas**:
+>   su alcance lo consumió esta prueba y no se devuelve.
+> - 🟢 **Herramientas nuevas.** `firma-service/scripts/probar-n9a.js` (52 068 B, sha256 `574fed8e…f87`):
+>   10 pasos, resumible (estado en `/tmp/kair-n9a-estado.json`), nunca crea una segunda solicitud, sin
+>   `--confirmar-escribe` no escribe nada, códigos de salida **0/1/2/3** (3 = falta el OTP: corra otra
+>   vez). Su test: **19 tests, 19 verdes**. Y `firma-service/scripts/probar-10-4.js` (~62 KB) + su test
+>   (**19 tests, 19 verdes**), que son la herramienta de la 10.4: **quedaron commiteados como
+>   📦1013 (`195f7353`) y pusheados a `origin/Dev`**.
+> - 🟢 **Tres correcciones que aparecieron probando en el ambiente real.** (1) `--trabajador` (id
+>   CRUDO) y `--numero` (documento de identidad) son **dos datos distintos**: el seudónimo
+>   `psn1_` + 64 hex mide **69 caracteres** y la API acepta **64** → mandarlo es un 400. (2) **El
+>   alcance agotado no puede bloquear una corrida que CONTINÚA**: `esLaMismaPrueba(args, estado)`
+>   tiene que decidir igual en el paso 2 y en el paso 3. (3) El código real del OTP vencido es
+>   **`OTP_EXPIRADO` (410)**, no `CODIGO_EXPIRADO`.
+> - 🟢 **Commits, los dos pusheados.** `bf4c6287` · 📦1011 (la herramienta de la 9A) y `dc8b94cc` ·
+>   📦1012 (el manifiesto con la evidencia, 2 líneas, LF puro). **Ojo:** el remoto tenía `489fc814`
+>   (la versión de 📦1011 **sin** las dos correcciones, porque se había amendado localmente después de
+>   pushearla); se resolvió con `git push --force-with-lease=Dev:489fc814...`, que reescribió **solo**
+>   ese commit propio (mismo padre `290f7af2`, mismo autor, nunca hubo trabajo de terceros encima).
+>   **Quien lea el remoto tiene la versión CORREGIDA.**
+>
+> **Lo que quedó ARMADO y esperando que el owner lo corra:**
+>
+> | Qué | Cómo se corre | Qué verifica |
+> |---|---|---|
+> | Deploy del `dc8b94cc` | `sudo bash /tmp/deploy-1013.sh` | el tar (971 421 B, sha256 `3336174c…b932`) verificado byte a byte; el manifiesto con `n9a.probada = true`; los pasos 15 y 16 |
+> | La 10.4 | `bash /tmp/p104.sh` | copia de la base, instancia aislada en el puerto 8899 y el circuito completo de la migración a la versión vigente |
+>
+> No hay sudo sin contraseña por ssh: los dos los tiene que correr el owner en Cockpit.
+>
+> **🔴 Los dos hallazgos del servidor (nuevos, y no tienen que ver con la firma):**
+> - 🔴 **Los respaldos NO se están haciendo desde el 3-nov-2026.** El cron
+>   `/etc/cron.d/kair-firma-backup` (22:00) **solo corrió el 1-nov y el 3-nov**. La causa de fondo:
+>   **el servidor es una laptop y se apaga** (`cron.service` se reinició el 6-nov 08:59; el health-check
+>   sí corre, porque está cada 5 minutos). Mientras la máquina esté apagada no hay respaldo: **el
+>   respaldo diario depende de que la laptop esté encendida** → refuerza el pendiente de la copia
+>   off-site y el punto único de falla.
+> - 🔴 **46 respaldos EN CLARO en `/opt/kair-firma/backups/` y CERO cifrados** (33 `.sqlite` sin `.enc`,
+>   más sus `-wal`/`-shm`, más 12 `storage-*.tar.gz`). Son del script viejo: el script nuevo solo
+>   escribe `.enc` y tanto su poda como la purga solo miran los `.enc`, así que **los en claro no se
+>   borran nunca solos**. Contradice lo que el Anexo de Nube promete. El **paso 15** del deploy los
+>   cifra con gpg (con la frase del servidor), **verifica que se descifran y que pasan `integrity_check`**,
+>   y solo entonces borra el original en claro; lo que no verifica se deja como está y se reporta. El
+>   **paso 16** corre un respaldo con el script nuevo y deja el cron escrito con el formato correcto.
+>
+> **La 10.4, y por qué no se podía probar en producción.** Hoy **no se puede provocar por API**: crear
+> una solicitud exige la versión activa y vigente (`validateAcuerdo`); las dos solicitudes viejas de
+> la v1.0 (ids 14 y 15) vencieron el 29-oct-2026 y no hay token recuperable; **no existe** mecanismo de
+> renovación de `fecha_expiracion`; y la activación de una versión **no tiene vuelta atrás por API**
+> (`agreementService` solo expone `getActive`, `getByVersion` y `createVersion`). **Decisión del owner
+> (6-nov-2026): probar en el servidor real, con el código desplegado, pero contra una BASE DE DATOS
+> AISLADA** (vía A); se descartaron la vía B (contra producción) y la vía C (solo la suite, como el
+> D-03). El script es idempotente, el motor de base es inyectable (`fijarBase`) y el envoltorio
+> `p104.sh` deja la instancia aislada en el puerto 8899 con `NODE_ENV=development` (para que el OTP
+> salga en la respuesta y no se mande correo). **Falta que el owner lo corra**; la evidencia va a
+> `legal-readiness.json` → `n10_4` (hoy `probada: false`).
+>
+> **Lo que sigue bloqueado, en orden:** (1) **el deploy del `dc8b94cc`** — hasta que el manifiesto con
+> `n9a.probada = true` llegue al servidor, **el gate de producción no ve la 9A probada**; (2) **la
+> 10.4** — falta correr el envoltorio y registrar la evidencia; (3) **el Anexo de Encargo de ASEPLUS
+> sin firmar** (`anexo_encargo_firmado_at = null`), que el owner tiene que enviarle al firmante (la
+> etiqueta de versión ya quedó alineada desde 📦1010); (4) la **Sección E** (G3 estricto o
+> documentada), la **Constancia firmada** y la **T8**; (5) la **T6** (E2E con datos sintéticos) y la
+> **T7** (reversión probada), con su evidencia; (6) **rotar los 5 app passwords de Gmail** sin rotar y
+> revisar los accesos: es un **incidente** (arts. 17(d), 17(n), 18(b) y 18(k) de la Ley 1581 de 2012), no
+> una tarea; (7) **Node 20 en EOL** en el servidor (22 hasta 2027-04-30, 24 hasta 2028-04-30) y la
+> **copia off-site de respaldos** ausente (`rclone` sin configurar); (8) **J1-J14 sin respuesta del
+> abogado**, la matriz de finalidades y la tabla de conservación como anexos faltantes; (9) verificar que
+> no queden `.sqlite` sin cifrar en el servidor (lo resuelve el paso 15, pero hay que confirmarlo
+> después de correrlo).
+>
+> **La regla de cierre: esta vez sí se preguntó y sí se respondió.** El owner **sí** autorizó actualizar
+> los documentos (la pregunta se le había hecho 5 veces antes sin respuesta). Queda escrito para la
+> próxima jornada, y **la pregunta se vuelve a hacer igual**.
 > **Actualización 2026-11-05 (tarde) — los seis bloqueantes del cierre, uno por uno. La compuerta del
 > Anexo de Nube se enciende y la Empresa ya tiene un canal para firmarlo:**
 > el owner decidió encender `FIRMA_EXIGIR_ANEXO_NUBE`, facilitar la firma del Anexo de Nube por las
@@ -6801,6 +6902,199 @@ servidor.
 ### Archivos tocados y commits
 
 Ver el commit de esta jornada en `git log`.
+
+## 2026-11-06 (tarde) · La 9A probada en el ambiente real, y dos hallazgos del servidor que nadie estaba mirando
+
+La compuerta `prueba_9a` del gate de publicación era uno de los dos bloqueantes. Esta jornada quedó
+**probada contra el servicio desplegado**, y su evidencia está en el manifiesto. La otra compuerta, la
+`prueba_10_4`, quedó **decidida y armada**: probar en el servidor real, pero contra una base de datos
+aislada. Y al medir el servidor aparecieron dos hallazgos que no tienen que ver con la firma y que son
+más graves que el trabajo de la 9A.
+
+### La 9A: probada en el ambiente real
+
+La solicitud `SIGN-2026-016820` (firma id 18) se creó para la Empresa **ASEPLUS CARIBE S.A.S.**
+(NIT 900829731), con la **excepción de habilitación 5** (VIGENTE, alcance de 2 firmas,
+`ruta_papel_operativa=1`, plazo hasta el 2026-12-04T14:01:43Z) y el **Acuerdo v1.5** (hash
+`952592f078eb3e8ca6a913361beb6a5eb7c32f22bba2c9fa30d17ab09825be28`).
+
+**El 8.2 — medios autorizados.** Al crearse la solicitud quedaron registrados `EMAIL_HOJA_VIDA`
+(ACTIVO, origen EMPRESA) y `LINK_KAIR` (ACTIVO, origen SISTEMA). El Trabajador declaró su medio
+personal y lo confirmó (`MEDIO_PERSONAL_CONFIRMADO`), el OTP salió solo a ese buzón (`OTP_SENT`) y
+quedó verificado (`OTP_VERIFIED`, `identificacion_coincidio=1`), con lo cual el `CORREO_OTP` quedó
+ACTIVO.
+
+**El 7.1 a 7.3 — firma autográfica.** La Empresa registró el documento ya firmado en papel; el
+servicio guardó el PDF y le calculó la huella
+`383511c1050e64525506b22933cf434c563dd68aadeed358665527aa3a26f616` (fila id 1 de
+`gh_firma_firmas_papel`, estado FIRMADO, `fecha_firma` 2026-11-06T20:25:34.428Z, `version_kair`
+`probar-n9a`, `acuerdo_hash` de la v1.5), generó el **Registro de firma autográfica**
+(`/opt/kair-firma/storage/pdfs/papel/SIGN-2026-016820-registro.pdf`, sha256
+`dcd7d3db8a6cf1d22100d382fa1909bc566ccc53b102ad68b0d1305c82ffa347`), entregó la copia por el medio
+autorizado (`CORREO_OTP`) y **cerró la vía electrónica** para que no haya doble firma
+(`PAPER_TRACK_OPENED`, `PAPER_SIGNATURE_REGISTERED`, `ELECTRONIC_FLOW_CANCELLED`): la firma id 18
+quedó en estado `CANCELLED`.
+
+La corrida cerró con **26 OK · 0 avisos · 0 fallas**.
+
+**Lo que la evidencia declara y no se oculta.** El documento de identidad (`900000001`) y el PDF
+firmado en papel son **SINTÉTICOS**: los genera el propio script con pdf-lib y el PDF lo dice en su
+primera página. El canal por el que el Trabajador pidió el papel se declaró como
+`PRUEBA_SINTETICA_9A_CANAL_DE_ATENCION_DE_LA_EMPRESA`. Lo que **sí** es real es el buzón
+(`jrf2011@live.com`), donde llegaron el código y la copia del documento. Lo que la prueba demuestra
+es que **el mecanismo funciona en el ambiente real contra el servicio desplegado**. Y la excepción 5
+quedó en **2 de 2 firmas usadas**: su alcance lo consumió esta prueba y no se devuelve.
+
+La evidencia vive en `legal-readiness.json` → `n9a` (`probada: true`, evidencia de **2 934
+caracteres**). El ítem `prueba_9a` del reporte de readiness sale `ok` en las dos compuertas
+(`publicacion` y `primera_firma`).
+
+### Las herramientas que quedaron
+
+| Qué | Detalle |
+|---|---|
+| `firma-service/scripts/probar-n9a.js` | 52 068 B, sha256 `574fed8edf9b616af2aea6ccfcac15b91313b0c1084290865c2e47ad1a013f87`. Corre la 9A contra el servicio de verdad en **10 pasos**, es **resumible** (guarda el estado en `/tmp/kair-n9a-estado.json`), **nunca crea una segunda solicitud**, **sin `--confirmar-escribe` no escribe nada**, y devuelve **0 / 1 / 2 / 3**: el 3 es «falta el OTP, corra otra vez» |
+| `firma-service/tests/scripts/probar-n9a.test.js` | **19 tests, 19 verdes** |
+| `firma-service/scripts/probar-10-4.js` | ~62 KB. La herramienta de la 10.4 (abajo) |
+| `firma-service/tests/scripts/probar-10-4.test.js` | **19 tests, 19 verdes**. **Los dos archivos de la 10.4 quedaron commiteados como 📦1013 (`195f7353`) y pusheados a `origin/Dev`** |
+
+### Tres correcciones que aparecieron probando en el ambiente real
+
+1. **`--trabajador` (id CRUDO) y `--numero` (documento de identidad) son dos datos distintos.** El
+   servicio seudonimiza el id que le llega: el seudónimo es `psn1_` + 64 hex, mide **69 caracteres** y
+   la API acepta **64** → mandarlo es un 400. **El cliente nunca manda el seudónimo.** El script lo
+   rechaza con un mensaje que explica por qué.
+2. **El alcance agotado no puede bloquear una corrida que CONTINÚA.** Bug que trabó la 9A: se leía
+   el estado después del control, y la decisión «¿es la misma prueba?» (`esLaMismaPrueba(args, estado)`)
+   tiene que ser **la misma** en el paso 2 (la excepción) y en el paso 3 (crear la solicitud).
+3. **El código de error real del OTP vencido es `OTP_EXPIRADO` (410), no `CODIGO_EXPIRADO`.** Con el
+   nombre equivocado la rama de reenvío nunca se habría activado.
+
+### Commits y push
+
+| Commit | Paquete | Qué |
+|---|---|---|
+| `bf4c6287` | 📦1011 | la herramienta de la 9A (script + test) |
+| `dc8b94cc` | 📦1012 | el manifiesto con la evidencia de la 9A (`legal-readiness.json` → `n9a`), 2 líneas cambiadas, LF puro |
+| `195f7353` | 📦1013 | la herramienta de la 10.4 (script + test) |
+
+Los tres están **pusheados a `origin/Dev`**. El 📦1013 se commiteó y pusheó al cierre de esta
+jornada, en otra sesión: por eso los dos archivos de la 10.4 ya no están sin commitear. **Ojo:** el
+remoto tenía `489fc814` — la versión de 📦1011 **sin** las dos correcciones, porque se había *amendado*
+localmente después de pushearla. Se resolvió con `git push --force-with-lease=Dev:489fc814...`:
+reescribió **solo** ese commit propio, nunca hubo trabajo de terceros encima (mismo padre `290f7af2`,
+mismo autor). **Quien lee el remoto tiene la versión CORREGIDA.** La regla nueva quedó en
+`PROMPT.md` §5.31.
+
+### El deploy: ARMADO, pendiente que el owner lo corra
+
+- El **tar** se armó del commit `dc8b94cc`: **971 421 B**, sha256
+  `3336174cd72ea7bd8022fabd2c7be56d92a1a24bbe201a25919c062b3de0b932`, **verificado byte a byte**
+  contra el commit y servido por el puente HTTP.
+- El `deploy.sh` actualizado está en el servidor en `/tmp/deploy-1013.sh` (sha256
+  `aa10b3515945a9cea09609a020a752c30947a29236da9ec185d471f475d63cf3`, `bash -n` OK).
+- **Falta que el owner lo corra**: `sudo bash /tmp/deploy-1013.sh`. No hay sudo sin contraseña por
+  ssh, así que lo tiene que correr él en Cockpit.
+- El deploy tiene **dos pasos nuevos (15 y 16)** que cierran los dos hallazgos del servidor de abajo.
+
+**Mientras no corra, el gate de producción no ve la 9A probada:** el manifiesto con
+`n9a.probada = true` todavía no llegó al servidor.
+
+### 🔴 Dos hallazgos del servidor
+
+**1. Los respaldos NO se están haciendo desde el 3-nov-2026.** El cron
+`/etc/cron.d/kair-firma-backup` (22:00) **solo corrió el 1-nov y el 3-nov**. La causa de fondo es que
+**el servidor es una laptop y se apaga**: `cron.service` se reinició el 6-nov a las 08:59. El
+health-check sí corre (está cada 5 minutos), pero **mientras la máquina esté apagada no hay
+respaldo**. O sea: **el respaldo diario depende de que la laptop esté encendida**. Eso refuerza el
+pendiente de la copia off-site y convierte la máquina en el **punto único de falla**.
+
+**2. Hay 46 respaldos EN CLARO en `/opt/kair-firma/backups/` y CERO cifrados.** Son 33 archivos
+`.sqlite` sin `.enc`, más sus `-wal`/`-shm`, más 12 `storage-*.tar.gz`: los dejó el script viejo. El
+script nuevo (`deploy/backup-firma.sh`) **solo escribe `.enc`** y tanto su poda como la purga
+(`deploy/purgar-respaldos.sh`) **solo miran los `.enc`**, así que **los que están en claro no se
+borran nunca solos**. Eso contradice lo que el Anexo de Nube promete (respaldos cifrados).
+
+**Cómo lo cierra el deploy:** el **paso 15** los cifra con gpg (usando la frase del servidor),
+**verifica que se descifran y que pasan `integrity_check`**, y **solo entonces** borra el original en
+claro; lo que no verifica **se deja como está y se reporta**. El **paso 16** corre un respaldo con el
+script nuevo y deja el cron del respaldo escrito con el formato correcto.
+
+### La 10.4: por qué no se podía probar en producción
+
+La compuerta `prueba_10_4` («Prueba de la 10.4 en el ambiente real») es el otro bloqueante del gate.
+La 10.4 es el mecanismo que hace que, cuando se publica una versión nueva del Acuerdo con solicitudes
+en curso, la solicitud del firmante **migre a la versión vigente** al aceptar (evento
+`AGREEMENT_VERSION_MIGRATED`), en vez de dejarlo en un 409 sin salida.
+
+**El hallazgo: hoy la 10.4 NO se puede provocar en producción por API.** Cuatro razones, todas
+verificadas contra el código y la base:
+
+1. Crear una solicitud exige la versión **activa y vigente** (`validateAcuerdo` en
+   `src/services/signRequest.js`): no hay forma de ligar una solicitud a una versión anterior.
+2. Las dos solicitudes viejas que están en la v1.0 (ids 14 y 15) **vencieron el 29-oct-2026**, y no
+   hay token recuperable (en la base solo queda el hash).
+3. **No existe ningún mecanismo de renovación** de `fecha_expiracion`.
+4. La nota operativa del 5-nov dice que **la activación de una versión no tiene vuelta atrás por
+   API**: `agreementService` solo expone `getActive`, `getByVersion` y `createVersion`; no hay
+   `activar`.
+
+**La decisión del owner (6-nov-2026): probar la 10.4 EN EL SERVIDOR REAL, con el código desplegado,
+pero contra una BASE DE DATOS AISLADA** (vía A). Se descartó la vía B (contra el servicio de
+producción: exigiría una excepción de habilitación nueva y publicar una versión nueva del Acuerdo en
+producción) y la vía C (solo la suite automatizada, como se hizo con el D-03).
+
+La maniobra es la misma que hizo el despliegue del 5-nov (la v1.5 sustituyó a la v1.4 con solicitudes
+en curso), pero sobre una **copia** de la base, con los **MISMOS** textos legales y las **MISMAS**
+huellas publicadas.
+
+`scripts/probar-10-4.js` hace el circuito completo por HTTP contra una instancia aislada del
+servicio desplegado: activa la v1.4 en la copia, crea la solicitud, la identifica, verifica el OTP,
+**acepta la v1.4**, publica la v1.5, comprueba que el firmante ve la versión vigente y que recibe un
+**409 accionable** (`AGREEMENT_VERSION_REACCEPT_REQUIRED`, `accion=reaceptar_version_vigente`), acepta
+la v1.5 → **la solicitud migra**, y verifica que la fila quedó con la huella de la v1.5, que el texto
+que el firmante descarga es el que quedó archivado, que el consentimiento de la v1.4 quedó **INTACTO**
+(el 9.5: sin efectos retroactivos) y que el evento dice qué versión se dejó y cuál se tomó. Es
+**idempotente**: una segunda corrida verifica y reescribe la evidencia sin volver a cambiar la versión
+ni volver a aceptar.
+
+El motor de base de datos del script es **inyectable** (`fijarBase`), así que los tests no dependen de
+que el PC tenga `sqlite3` instalado.
+
+El envoltorio `p104.sh` (en `/tmp/p104.sh` del servidor) hace la copia de la base, levanta la instancia
+aislada (puerto 8899, `NODE_ENV=development` para que el OTP salga en la respuesta y no se mande ningún
+correo) y corre el script. **Falta que el owner lo corra.** La evidencia va a
+`legal-readiness.json` → `n10_4`, que hoy está en `probada: false`.
+
+### Lo que sigue bloqueado (estado al cierre)
+
+| # | Qué | De quién |
+|---|---|---|
+| 1 | **El deploy del `dc8b94cc`**: falta `sudo bash /tmp/deploy-1013.sh`. Hasta que el manifiesto con `n9a.probada = true` llegue al servidor, **el gate de producción no ve la 9A probada** | owner |
+| 2 | **La 10.4**: falta correr el envoltorio `p104.sh` y registrar la evidencia en `legal-readiness.json` → `n10_4` (hoy `probada: false`) | owner |
+| 3 | **El Anexo de Encargo de ASEPLUS sin firmar** (`anexo_encargo_firmado_at = null`): el owner tiene que enviarle el documento vigente para que lo firme. La etiqueta de versión ya quedó alineada desde 📦1010 | owner |
+| 4 | **Sección E** (G3 estricto o documentada), **Constancia firmada** y **T8** | owner / abogado |
+| 5 | **T6** (E2E con datos sintéticos) y **T7** (reversión probada), con su evidencia | — |
+| 6 | **Rotar los 5 app passwords de Gmail** sin rotar y revisar los accesos: es un **incidente** (arts. 17(d), 17(n), 18(b) y 18(k) de la Ley 1581 de 2012), no una tarea | owner |
+| 7 | **Node 20 en EOL** en el servidor (22 hasta 2027-04-30, 24 hasta 2028-04-30) y **copia off-site de respaldos ausente** (`rclone` sin configurar) | owner |
+| 8 | **J1-J14 sin respuesta del abogado**, la matriz de finalidades y la tabla de conservación como anexos faltantes | abogado |
+| 9 | **Verificar que no queden `.sqlite` sin cifrar en el servidor**: el paso 15 del deploy lo resuelve, pero hay que confirmarlo después de correrlo | owner |
+
+### La regla de cierre: esta vez sí se preguntó y sí se respondió
+
+La pregunta de cierre («¿querés que actualice los documentos para la próxima jornada?») **se le hizo al
+owner y esta vez respondió que sí**. Se había recibido 5 veces antes sin respuesta. Queda registrado
+aquí para que la próxima jornada sepa que la regla se está cumpliendo, y **la pregunta vuelve a
+hacerse en la próxima jornada igual**: no se archiva porque la respuesta fue sí.
+
+### Archivos tocados y commits
+
+- `sgsst-electron-app/firma-service/scripts/probar-n9a.js` — 📦1011, `bf4c6287`, pusheado
+- `sgsst-electron-app/firma-service/tests/scripts/probar-n9a.test.js` — 📦1011, `bf4c6287`, pusheado
+- `sgsst-electron-app/firma-service/legal-readiness.json` — 📦1012, `dc8b94cc`, pusheado (2 líneas)
+- `sgsst-electron-app/firma-service/scripts/probar-10-4.js` — 📦1013, `195f7353`, pusheado
+- `sgsst-electron-app/firma-service/tests/scripts/probar-10-4.test.js` — 📦1013, `195f7353`, pusheado
+
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

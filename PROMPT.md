@@ -1017,6 +1017,40 @@ Reglas:
    limpio» en el estado no es un detalle de redacción: hace que el requisito **desaparezca** del
    conteo, y que la tabla declare un cierre que no ocurrió.
 
+### 5.31 🔴 Un commit amendado que ya estaba pusheado rompe el push: `--force-with-lease`, no `--force`
+
+`git push` rechaza un commit que ya no está en la punta del remoto, y el rechazo **no dice por qué**: la
+salida dice `! [rejected] Dev -> Dev (non-fast-forward)` y el operador, si tiene prisa, va al `--force`
+sin más.
+
+**El caso real (6-nov-2026).** Se corrigió un commit ya pusheado (📦1011) con `git commit --amend`,
+porque el script tenía dos defectos que aparecieron probando en el ambiente real. Localmente quedó
+todo bien; el remoto seguía teniendo la versión vieja (`489fc814`). El push normal falla.
+
+**La forma correcta es fijar el hash que se espera encontrar:**
+
+```powershell
+git push --force-with-lease=Dev:489fc814 origin Dev
+```
+
+`--force-with-lease=<rama>:<hash-esperado>` **falla** si el remoto no está en ese hash. Eso es
+justo lo que se quiere: si alguien más empujó mientras tanto, el push **no** pisa su trabajo.
+
+**Reglas:**
+
+1. **Nunca `--force` a secas.** Sin el `:<hash-esperado>` no hay ninguna garantía de que el remoto no
+   haya avanzado, y un `--force` a ciegas puede borrar el trabajo de otro.
+2. **Antes de forzar, mirá qué hay en el remoto** (`git log --oneline origin/<rama>`) y confirmá que
+   lo que vas a pisar es **tu** commit y nada más: mismo padre, mismo autor. Si hay trabajo de
+   terceros encima, no se fuerza: se hace cherry-pick o merge.
+3. **Un `--amend` después de pushear es un commit distinto**: el hash viejo queda huérfano y es el que
+   puede estar citado en el CHANGELOG o en un documento. Decilo.
+4. **Quien lee el remoto tiene lo que pusheaste, no lo que amendaste.** Si no forzaste, el remoto tiene
+   la versión vieja y el repo local la nueva: verificá contra el remoto, no contra local.
+5. **El `force-with-lease` se aplica a una rama, no al repo:** es un push de esa rama, con ese estado
+   esperado. Revisar el diff del remoto antes de mandarlo no es opcional: es lo que hace seguro el
+   `--force-with-lease`.
+
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -1491,6 +1525,28 @@ Anexo de Nube, y al re-correr la suite **en solitario** los dos quedaron en **0*
 es interferencia y no un defecto: los fallos caen en archivos que el cambio no toca. **Regla: una
 corrida a la vez; si hay que correr dos, la segunda va con otra base** (`DB_PATH`).
 
+**Medición del 6-nov-2026 (tarde, con el manifiesto de la 9A):** **2 166 tests · 2 163 pass · 1 fail
+· 2 skipped**. El único rojo es `§6.2: el rechazo ocurre dentro del timeout (no hang)`: el rechazo
+ocurre, pero más lento que el timeout del test.
+
+🚨 **TRAMPA (6-nov-2026): LA SUITE COMPLETA TIENE UNA INTERMITENCIA PREEXISTENTE. UN ROJO AISLADO
+NO ES REGRESIÓN.**
+Los **146 archivos** de test comparten **UN solo `data/test.sqlite`**, y `tests/setup.js` corre
+`migrate()` sobre esa base **en cada proceso**. Con eso, cada corrida completa deja **entre 0 y 9
+fallos**, y **cambian de archivo en cada corrida**: la misma suite da un rojo en `notify-remote` una
+vez y en otro archivo la siguiente. Está en la **trampa 115** del §9.
+
+**Cómo se descarta la regresión (en este orden):**
+
+1. **Corré la suite SIN el archivo nuevo** (o contra `HEAD` limpio): si también falla, no es tuyo.
+2. **Corré el archivo que falló AISLADO**: **pasa 100 %**. Un archivo que pasa solo y falla en la
+   suite es interferencia, no un defecto de tu cambio.
+3. **Compará la LISTA de archivos que fallan entre corridas, no el número**: si cambia de archivo, es
+   la intermitencia.
+
+**Y sigue valiendo la regla de arriba: nunca dos procesos de test al tiempo.** Esta es la otra mitad
+del mismo problema: la base es una sola y `resetDb()` borra todas las tablas.
+
 ---
 
 ## 8. Reglas de comunicación
@@ -1734,6 +1790,11 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 112 | 🔴 **Un control legal que apunta a un número de línea se rompe en cuanto el documento crece, y se rompe mintiendo** | `sgsst-electron-app/legal/anexo-nube-v1.0.html` (la línea 274 que la compuerta G0 daba por buena) | La G0 comprobaba que el texto del abogado seguía intacto **leyendo la línea 274**. Al diligenciar los catorce marcadores el documento creció dos líneas, el texto pasó a la 276 y el control quedó rojo diciendo que el texto ya no estaba. **Un control que verifica el texto de otro lo busca por contenido, con aserción de coincidencia única**; y todo verificador que apunte a una línea, un párrafo o un byte se revisa el mismo día en que el documento crece |
 | 113 | 🔴 **La ausencia de filas en la base no es la ausencia del mecanismo, y un corchete puede ser una palabra y no un dato** | `sgsst-electron-app/firma-service/src/services/publicFlow.js` (evento `OTP_SEND_FAILED`) | Del hecho de que la base de producción no tuviera filas de error de envío se concluyó que el sistema no registraba los errores: **falso**, el `INSERT` del evento está en el código y lo que no había pasado es que ningún envío fallara. Y al otro lado, el único hueco que le quedaba al Anexo diligenciado era `[PENDIENTE]`, que era **la palabra del abogado dentro de su propia regla**, no un dato. Reglas: **la base dice qué pasó, el código dice qué puede pasar**; y cuando el control discrepa del documento, la primera pregunta es si el control está contando algo que no es un dato |
 | 114 | 🔴 **Un diagnóstico negativo que no se midió en el puerto real es una hipótesis, no un hallazgo: y endurecer es cerrar el CAMINO de red, no apagar el servicio** | `kair-server` (acceso administrativo por SSH y por Cockpit), Tailscale | El diagnóstico de la jornada anterior concluyó que `sshd` estaba apagado y que la única vía era Cockpit. **Era falso**: medido en el servidor, `cockpit.socket` estaba `enabled`+`active` escuchando en `*:9090` y `sshd` escuchaba en `0.0.0.0:22` y `[::]:22`, con la ruta de Tailscale **directa** (5-23 ms). El falso negativo venía de probar el acceso por la IP de la LAN en vez de por el puerto que el servicio escucha. Reglas: (1) **un servicio se da por caído cuando se mide su PUERTO, no cuando falla un CAMINO**: `ss -ltnp` y `systemctl is-active` miden el servicio; un `curl` a una IP mide un camino, no un estado; (2) **un diagnóstico negativo se confirma por una vía INDEPENDIENTE antes de escribirlo**: SSH y Cockpit se probaron por separado y los dos funcionaban; (3) **endurecer es cerrar el camino, no apagar el servicio**: el `sshd` se dejó escuchando y lo que se cerró fue el acceso desde la LAN — la vía real quedó siendo Tailscale, con el firewall local en reglas de entrada y el ACL del tailnet; (4) **el acceso administrativo se ata a una identidad, no a una contraseña**: la llave pública del PC se instaló en `~javier/.ssh/authorized_keys` (600, idempotente) y el acceso es `ssh -i`, no con clave de usuario; (5) **el servidor es una LAPTOP (Acer Aspire V5-121, 3,5 GB de RAM, 2 nucleos): servidor, base y respaldos son UN SOLO punto de falla** |
+
+| 115 | 🔴 **La suite completa tiene una INTERMITENCIA PREEXISTENTE: cada corrida deja entre 0 y 9 fallos y cambian de archivo.** Los 146 archivos de test comparten UN solo `data/test.sqlite`, y `tests/setup.js` corre `migrate()` sobre esa base **en cada proceso** | `sgsst-electron-app/firma-service/tests/setup.js`, `data/test.sqlite` | Un rojo que aparece en la suite completa **no es regresión hasta que se descarta**: (1) corré la suite **sin** el archivo nuevo (o contra `HEAD` limpio) — si también falla, no es tuyo; (2) corré el archivo que falló **aislado** — pasa **100 %**; (3) compará **la lista de archivos** que fallan entre corridas, no el número: si cambia de archivo, es la intermitencia. Medido el 6-nov-2026: **2 166 tests · 2 163 pass · 1 fail · 2 skipped**; el que falla es `§6.2: el rechazo ocurre dentro del timeout (no hang)`. **Y sigue valiendo la regla de §7.8: nunca dos procesos de test al tiempo** |
+| 116 | 🔴 **El servidor de producción es una LAPTOP: si está apagada, no hay respaldo diario ni health-check.** El cron del respaldo (22:00) solo corrió el 1-nov y el 3-nov | `kair-server` (`/etc/cron.d/kair-firma-backup`, `cron.service`), `sgsst-electron-app/firma-service/deploy/health-check.sh` | Es el **punto único de falla** y no se ve desde el código. `cron.service` se reinició el 6-nov-2026 a las 08:59 (la máquina se apagó); el health-check sí corre porque está **cada 5 minutos** y sobrevive al reinicio. **Un respaldo que depende de que la máquina esté encendida no es un respaldo diario**, y su RPO no es el que dice el documento. Reglas: (1) **una periodicidad no es una garantía si el host se apaga**: la evidencia del respaldo se mira en el **servidor**, no en el cron; (2) el respaldo **off-site** (que hoy falta: `rclone` sin configurar) es lo que rompe esa dependencia, no un cron más fino; (3) al reportar, decir **cuándo corrió el último respaldo de verdad**, no que el cron está instalado |
+| 117 | 🔴 **Lo que el código desplegado hace NO se puede leer sin `sudo`: la llave interna y la de administración son `0600 kairfirma`, y `/opt/kair-firma/app` es `750 kairfirma`** | `kair-server` (`/opt/kair-firma/app`, las llaves del `firma-service`), `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` | El usuario de SSH (`javier`) **no puede** leer ni las llaves ni el código que está corriendo, y `sudo` **no** tiene contraseña por ssh: hay que entrar por Cockpit. **Un diagnóstico a medias se convierte en una afirmación**: si no se pudo leer el archivo, el resultado es «no medido», no «no pasa». Antes de afirmar qué versión corre el servidor, **medí el hash del archivo en disco** (trampa 56) o usá una ruta que solo exista en el código nuevo (trampa 47): el `version` del `/health` es fijo y no prueba nada |
+| 118 | 🔴 **Una purga que mira una extensión no limpia lo que el script ANTERIOR dejó con otra.** El script viejo escribía `.sqlite` y `.tar.gz` en claro; el nuevo solo escribe `.enc`, y tanto su poda como la purga solo miran los `.enc` | `sgsst-electron-app/firma-service/deploy/backup-firma.sh` (poda: `find "$BACKUPS" -name 'firma-*.sqlite.enc' ...`), `deploy/purgar-respaldos.sh` (recorre `firma-*.sqlite.enc` y `storage-*.tar.gz.enc`), `/opt/kair-firma/backups/` | En el servidor quedaron **46 respaldos EN CLARO** (33 `.sqlite` sin `.enc`, más sus `-wal`/`-shm`, más 12 `storage-*.tar.gz`) y **cero cifrados**: los de la **primera** categoría **no se borran nunca solos**, porque ni la poda ni la purga los miran. Reglas: (1) **una purga se define por lo que CONSERVA, no por el patrón que borra** (trampa 109): el conjunto que se mira tiene que ser el que dejaron **todos** los scripts, no solo el actual; (2) **cifrar no es renombrar**: un respaldo en claro al que se le pone `.enc` encima **no** está cifrado; (3) **el cifrado se verifica**: se descifra y se corre `PRAGMA integrity_check` **antes** de borrar el original — lo que no se verifica **se deja como está y se reporta**, nunca se borra a ciegas; (4) lo que está en claro contradice lo que el Anexo de Nube promete: es una **afirmación pública falsa**, no un detalle de operación |
 
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 
