@@ -16,6 +16,43 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+> **Actualización 2026-11-06 (noche) — la 10.4 probada en el ambiente real y el gate de publicación
+> sin bloqueantes:**
+> La compuerta `prueba_10_4` era el último bloqueante del gate: **queda probada** contra el servicio
+> desplegado en kair-server, y su evidencia está en el manifiesto (`legal-readiness.json` → `n10_4`,
+> `probada: true`). Con el deploy del commit `69db60e3`, el gate medido **en el servidor** terminó con
+> **cero bloqueantes pendientes** (`Bloqueantes de este gate: 20 · Pendientes: 0`).
+>
+> **Lo que se cerró:**
+> - 🟢 **La 10.4 probada en el ambiente real.** Se corrió contra el código desplegado, pero sobre una
+>   **copia aislada** de la base (`/tmp/kair-104/firma.sqlite`): en producción no se puede cambiar la
+>   versión activa (crear una solicitud exige la versión activa, la activación no tiene vuelta atrás por
+>   API y no hay una versión nueva publicada). La maniobra es la del despliegue del 5-nov, con los mismos
+>   textos legales y las mismas huellas publicadas. La corrida terminó con **33 OK · 0 avisos · 0
+>   fallas**, código de salida 0, y la huella de la base de **producción** salió igual antes y después.
+> - 🟢 **La evidencia en el manifiesto** (`n10_4`, 4346 caracteres, sha256 `6a51cb7e…`): el firmante se
+>   identifica, demuestra que controla su buzón y acepta la v1.4; mientras tanto se publica la v1.5; el
+>   contexto devuelve la versión vigente con `requiere_aceptar_vigente=true`; el 409 es **accionable**
+>   (`reaceptar_version_vigente`); al aceptar, la solicitud **migra** a la v1.5 con la huella de su texto;
+>   el texto que descarga el firmante es el mismo que quedó archivado; el consentimiento de la v1.4
+>   queda **intacto**; el evento `AGREEMENT_VERSION_MIGRATED` queda en la traza.
+> - 🟢 **Cero respaldos en claro** en el servidor: 42 `.enc` y ninguno en claro. El que faltaba
+>   (`manual-pre-994-2026-11-03-1749.sqlite`) se cifró **verificándolo** (descifrado + `integrity_check`
+>   antes de borrar el original).
+> - 🟢 **El respaldo diario reanudado** y el cron reescrito (22:00), con un respaldo nuevo el 6-nov.
+> - 🟢 **El respaldo diario ahora avisa** si aparece un respaldo en claro, sin cifrar ni borrar nada.
+>
+> **Los tres bugs que solo aparecieron en la prueba** (cada uno con su test, que lo atrapa):
+> 1. El script de la 10.4 **no pedía el contexto público** antes de aceptar: el servidor registra ahí la
+>    puesta a disposición de las políticas (`publicFlow.js:176`) y la aceptación la exige
+>    (`publicFlow.js:670-675`). Resultado: `409 DISPOSICION_POLITICAS_NO_REGISTRADA` (📦1015).
+> 2. El script pedía la **huella archivada** a un endpoint que **no la expone**
+>    (`src/routes/signRequest.js:469-487`): leía vacío y la comprobación fallaba en falso, cuando el
+>    servicio sí la escribía (`publicFlow.js:362`). Ahora se lee de la fila (📦1017).
+> 3. El revert del deploy podía **borrar de producción** lo que había instalado una corrida anterior,
+>    porque heredaba su lista de archivos nuevos. Esta vez la lista estaba vacía y no se borró nada, pero
+>    el defecto estaba; el script del deploy ahora limpia esa lista al arrancar.
+>
 > **Actualización 2026-11-06 (tarde) — la 9A probada en el ambiente real, el deploy armado y dos
 > hallazgos del servidor:**
 > La compuerta `prueba_9a` del gate de publicación era uno de los dos bloqueantes: **queda probada**
@@ -7095,6 +7132,106 @@ hacerse en la próxima jornada igual**: no se archiva porque la respuesta fue s�
 - `sgsst-electron-app/firma-service/scripts/probar-10-4.js` — 📦1013, `195f7353`, pusheado
 - `sgsst-electron-app/firma-service/tests/scripts/probar-10-4.test.js` — 📦1013, `195f7353`, pusheado
 
+## 2026-11-06 (noche) · La 10.4 probada en el servidor real, el gate de publicación sin bloqueantes y tres bugs que la suite no podía ver
+
+La compuerta `prueba_10_4` era el último bloqueante del gate de publicación. Esta noche quedó **probada
+contra el servicio desplegado** en `kair-server`, y el gate medido en el servidor terminó con **cero
+bloqueantes pendientes**.
+
+**La prueba, en concreto**
+
+Se corrió `scripts/probar-10-4.js` contra el código desplegado, pero sobre una **copia aislada** de la base
+(`/tmp/kair-104/firma.sqlite`): en producción no se puede cambiar la versión activa —crear una solicitud
+exige la versión activa, la activación no tiene vuelta atrás por API y no hay una versión nueva
+publicada—, así que la maniobra es la del despliegue del 5-nov (la v1.5 sustituyó a la v1.4 con
+solicitudes en curso), con los **mismos** textos legales y las **mismas** huellas publicadas.
+
+| Qué | Resultado |
+|---|---|
+| Corrida | **33 OK · 0 avisos · 0 fallas**, código de salida 0 |
+| Solicitud (en la copia) | `SIGN-2026-533103` |
+| Versión de partida → vigente | v1.4 (`7298a943…`) → v1.5 (`952592f0…`) |
+| Evento | `AGREEMENT_VERSION_MIGRATED` con `version_anterior=v1.4` y `version_nueva=v1.5` |
+| Consentimiento de la v1.4 | **intacto** (el 9.5: sin efectos retroactivos) |
+| La base de producción | **no cambió**: huella igual antes y después |
+| Evidencia | 4346 caracteres, sha256 `6a51cb7e…` (idéntico al archivo del servidor) |
+
+Lo que la evidencia declara y no se oculta: el Trabajador (`900000002`) y el documento que firma son
+**SINTÉTICOS** (los genera el propio script con pdf-lib y el PDF lo dice en su primera página), y la
+excepción de habilitación que se abrió es de prueba y queda en la bitácora de la copia. Lo que la prueba
+demuestra es que el **mecanismo** de la 10.4 funciona contra el código desplegado.
+
+**El gate, medido en el servidor**
+
+```
+Items: 40 · OK: 37 · Pendientes: 3 · Avisos: 0 · N/A: 0
+Bloqueantes de este gate: 20 · Pendientes: 0
+```
+
+Con el deploy del commit `69db60e3` (que lleva la evidencia de `n10_4` y los tres fixes de abajo), el
+gate de producción deja de bloquear por la 9A y por la 10.4.
+
+**Los tres bugs que la prueba encontró y que la suite no podía ver**
+
+1. **El script de la 10.4 no pedía el contexto público antes de aceptar.** El servidor registra la puesta
+   a disposición de las políticas **cuando sirve el contexto** (`GET /s/:token` →
+   `publicFlow.js:176`) y la aceptación **exige** ese registro (`publicFlow.js:670-675`): sin él,
+   `409 DISPOSICION_POLITICAS_NO_REGISTRADA`. El navegador lo hace al abrir el enlace; el script ahora
+   hace lo mismo. → 📦1015 (`ace1de48`).
+2. **El script pedía la huella archivada a un endpoint que no la expone.**
+   `GET /internal/sign-requests/:id` devuelve `agreement_version` pero **no** `agreement_hash`
+   (`src/routes/signRequest.js:469-487`): leía vacío y la comprobación fallaba **en falso**, cuando el
+   servicio sí la escribía (`publicFlow.js:362`). Ahora la huella se lee de la **fila**, en la base
+   aislada. → 📦1017 (`9cafa4ff`).
+3. **El revert del deploy podía borrar de producción lo que una corrida anterior había instalado:**
+   heredaba la lista de archivos nuevos (`$WORK/nuevos.txt`), que persiste entre corridas. Esta vez la
+   lista estaba **vacía** y no se borró nada (la app desplegada quedó intacta y verificada), pero el
+   defecto estaba; el script del deploy ahora limpia esa lista al arrancar.
+
+Cada fix lleva su test, y **se comprobó que el test falla sin el fix**: revirtiendo 📦1015 fallan 8
+pruebas de 20 y revirtiendo 📦1017 fallan 7. El servicio falso de los tests además reproduce el endpoint
+real (no devuelve `agreement_hash`), para que una lectura equivocada no pueda volver a pasar inadvertida.
+
+**Lo que además quedó resuelto**
+
+- **Cero respaldos en claro** en el servidor (42 `.enc`). El que faltaba
+  (`manual-pre-994-2026-11-03-1749.sqlite`, 512 KB) se cifró **verificándolo**: se descifró y se corrió
+  `PRAGMA integrity_check` **antes** de borrar el original. El paso 15 del deploy solo miraba
+  `firma-*.sqlite` y no lo agarró: por eso existe `cifrar-restantes.sh`.
+- **El respaldo diario avisa** ahora si aparece un respaldo en claro (no cifra ni borra nada): lo que
+  una persona copie a mano no lo recoge ni la poda (que solo recorre `*.enc`) ni el script que lo crea.
+  → 📦1016 (`d6f60bcc`).
+- **El respaldo diario volvió a correr** (el cron corría solo el 1-nov y el 3-nov: la máquina es una
+  laptop y se apaga) y el cron quedó reescrito (22:00), con un respaldo nuevo el 6-nov.
+
+**Archivos tocados y commits**
+
+- `sgsst-electron-app/firma-service/scripts/probar-10-4.js` — 📦1015, `ace1de48`, pusheado
+- `sgsst-electron-app/firma-service/tests/scripts/probar-10-4.test.js` — 📦1015, `ace1de48`, pusheado
+- `sgsst-electron-app/firma-service/deploy/backup-firma.sh` — 📦1016, `d6f60bcc`, pusheado
+- `sgsst-electron-app/firma-service/tests/scripts/respaldos.test.js` — 📦1016, `d6f60bcc`, pusheado
+- `sgsst-electron-app/firma-service/scripts/probar-10-4.js` — 📦1017, `9cafa4ff`, pusheado
+- `sgsst-electron-app/firma-service/tests/scripts/probar-10-4.test.js` — 📦1017, `9cafa4ff`, pusheado
+- `sgsst-electron-app/firma-service/legal-readiness.json` — 📦1018, `69db60e3`, pusheado (2 líneas)
+
+**Lo que queda (lo que el gate NO cubre)**
+
+| # | Qué | De quién |
+|---|---|---|
+| 1 | **Anexo de Encargo sin firmar** (ASEPLUS, v2026-11-06, hash `5cc7a346…`): es el bloqueo de negocio más serio y ninguna prueba lo destraba | owner |
+| 2 | **Sección E** (G3 estricto o documentada), **Constancia firmada** y **T8** | owner / abogado |
+| 3 | **T6** (E2E con datos sintéticos) y **T7** (reversión probada), con su evidencia | — |
+| 4 | **Rotar los 5 app passwords de Gmail** sin rotar y revisar los accesos: es un **incidente** (arts. 17(d), 17(n), 18(b) y 18(k) de la Ley 1581 de 2012), no una tarea | owner |
+| 5 | **Node 20 en EOL** en el servidor (22 hasta 2027-04-30, 24 hasta 2028-04-30) y **copia off-site de respaldos ausente** (`rclone` sin configurar) | owner |
+| 6 | **J1-J14 sin respuesta del abogado**, la matriz de finalidades y la tabla de conservación como anexos faltantes | abogado |
+| 7 | **El endpoint interno no devuelve `agreement_hash`**: un cliente interno que quiera comprobar la ligación de una solicitud a una versión tiene que leer la base. Queda como decisión del owner (cambia un contrato de API que consume el escritorio) | owner |
+
+### La regla de cierre: se preguntó y se respondió
+
+La pregunta de cierre («¿querés que actualice los documentos para la próxima jornada?») **se le hizo al
+owner y respondió que sí**. Queda registrado aquí para que la próxima jornada sepa que la regla se está
+cumpliendo, y **la pregunta vuelve a hacerse en la próxima jornada igual**: no se archiva porque la
+respuesta fue sí.
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

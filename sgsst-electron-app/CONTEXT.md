@@ -19,6 +19,46 @@
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 6-nov-2026 (noche) — la 10.4 probada en el ambiente real y el gate de publicación sin
+> bloqueantes:**
+> La compuerta `prueba_10_4` era el último bloqueante del gate de publicación: **queda probada** contra
+> el servicio desplegado en `kair-server`, con su evidencia en el manifiesto (`legal-readiness.json` →
+> `n10_4`, `probada: true`). Con el deploy del commit `69db60e3`, el gate medido **en el servidor**
+> terminó con **cero bloqueantes pendientes** (`Bloqueantes de este gate: 20 · Pendientes: 0`).
+>
+> **La 10.4, probada.** Se corrió contra el código desplegado, pero sobre una **copia aislada** de la
+> base (`/tmp/kair-104/firma.sqlite`): en producción no se puede cambiar la versión activa —crear una
+> solicitud exige la versión activa, la activación no tiene vuelta atrás por API y no hay una versión
+> nueva publicada—, así que la maniobra es la del despliegue del 5-nov, con los mismos textos legales y
+> las mismas huellas publicadas. La corrida cerró con **33 OK · 0 avisos · 0 fallas** (código de salida 0)
+> y la huella de la base de **producción** salió igual antes y después.
+>
+> **Qué se comprobó.** El firmante se identifica, demuestra que controla su buzón (`OTP_VERIFIED`) y
+> acepta la v1.4; mientras tanto se publica la v1.5; el contexto del firmante devuelve la versión
+> vigente con `requiere_aceptar_vigente=true`; el servicio responde con un **409 accionable**
+> (`AGREEMENT_VERSION_REACCEPT_REQUIRED`, `accion=reaceptar_version_vigente`) en vez de dejar al firmante
+> sin salida; al aceptar, la solicitud **migra** a la v1.5 con la huella de su texto; el texto que
+> descarga el firmante es el mismo que quedó archivado; el consentimiento de la v1.4 queda **intacto**
+> (el 9.5, sin efectos retroactivos); y el evento `AGREEMENT_VERSION_MIGRATED` queda en la traza con la
+> versión que se dejó y la que se tomó.
+>
+> **Lo que la evidencia declara y no se oculta.** El Trabajador (`900000002`) y el documento que firma
+> son **SINTÉTICOS** (los genera el propio script con pdf-lib, y el PDF lo dice en su primera página), y
+> la excepción de habilitación que se abrió es de prueba y queda en la bitácora de la copia. Lo que la
+> prueba demuestra es que el **mecanismo** de la 10.4 funciona contra el código desplegado.
+>
+> **Tres bugs que la prueba encontró y la suite no podía ver.** (1) El script no pedía el **contexto
+> público** antes de aceptar, y el servidor registra ahí la puesta a disposición de las políticas
+> (`publicFlow.js:176`), que la aceptación exige (`publicFlow.js:670-675`). (2) Pedía la **huella
+> archivada** a un endpoint que no la expone (`src/routes/signRequest.js:469-487`): leía vacío y la
+> comprobación fallaba en falso, cuando el servicio sí la escribía. (3) El revert del deploy podía
+> **borrar de producción** lo que una corrida anterior había instalado, por heredar su lista de
+> archivos nuevos. Cada fix lleva su test, y se comprobó que **sin el fix el test se cae**.
+>
+> **De paso, en el servidor:** cero respaldos en claro (42 `.enc`; el que faltaba se cifró
+> verificándolo, con descifrado e `integrity_check` antes de borrar el original), el respaldo diario
+> reanudado y su cron reescrito, y el respaldo diario ahora **avisa** si aparece uno en claro.
+>
 > **🆕 6-nov-2026 (tarde) — la 9A probada en el ambiente real, el deploy armado y dos hallazgos del
 > servidor:**
 > La compuerta `prueba_9a` del gate de publicación era uno de los dos bloqueantes: **queda probada**

@@ -1051,6 +1051,88 @@ justo lo que se quiere: si alguien más empujó mientras tanto, el push **no** p
    esperado. Revisar el diff del remoto antes de mandarlo no es opcional: es lo que hace seguro el
    `--force-with-lease`.
 
+### 5.32 🔴 Un 409 que no dice qué hacer es un paso que el script se saltó: el código del servidor es el contrato
+
+Un `409` de un flujo no es un ruido: es la **precondición** que el servidor no vio satisfecha. El mensaje
+diga lo que falta, pero **no cuál era el paso anterior**: hay que leer dónde se lanza el error y encontrar
+qué lo produce.
+
+**El caso real (6-nov-2026).** La herramienta que prueba la 10.4 en el servidor real se detuvo en el paso
+de aceptar el Acuerdo con `409 DISPOSICION_POLITICAS_NO_REGISTRADA`: «el servidor no tiene constancia de
+haber puesto las políticas de seguridad a disposición del Firmante». El servicio sí la registraba, pero
+**cuando sirve el contexto** (`GET /s/:token` → `registrarPuestaEnDisposicionPoliticas`,
+`publicFlow.js:176`), y la aceptación la exige (`publicFlow.js:670-675`). El script nunca pedía el
+contexto en ese punto: pedía el contexto más tarde, en el paso siguiente. El navegador lo hace al abrir
+el enlace; el script tiene que hacer lo mismo.
+
+**Reglas:**
+
+1. **El 409 se lee en el código, no se adivina.** El `code` del error (`DISPOSICION_POLITICAS_NO_REGISTRADA`)
+   se busca con `grep` en el servicio: ahí está la precondition que falta y, en las líneas de arriba, la
+   llamada que la produce.
+2. **El script tiene que hacer lo que hace el navegador.** Si el cliente real pide un contexto antes de
+   aceptar, el script lo pide antes de aceptar. "No meagre" no es una razón: el flujo se quedó esperando
+   una llamada que nunca llegó.
+3. **Un 409 que el script puede explicar es un paso que se saltó.** Antes de culpar al servicio, se
+   enumeran los pasos que el cliente real hace y se comparan con los que hace el script.
+4. **El paso que faltaba también es un paso que hay que probar.** El test tiene que **detectar el bug si
+   vuelve**: en este caso el servicio falso del test pasó a exigir el contexto (409 si no se sirvió), y
+   se comprobó que sin el fix **fallan 8 pruebas de 20**.
+5. **Un flujo probado en el ambiente real encuentra lo que la suite no puede.** La suite corría contra un
+   servicio falso que aceptaba siempre: el paso que faltaba no se podía ver.
+
+### 5.33 🔴 Una comprobación que lee de una API que no expone el dato falla en falso, y el servicio falso la deja pasar
+
+Antes de creerle a una falla: **comprobar que la fuente de la que se lee tiene el dato**. Si la API no lo
+expone, lo que se lee es vacío, y una comprobación contra vacío es **falsa por construcción** — no está
+midiendo lo que dice medir.
+
+**El caso real (6-nov-2026).** La misma herramienta de la 10.4 falló en dos comprobaciones: «la huella
+archivada es la del texto que el firmante leyó» y «el texto que descarga el firmante es el que quedó
+archivado». Ambas leían `agreement_hash` de `GET /internal/sign-requests/:id`, que devuelve
+`agreement_version` pero **no** `agreement_hash` (`src/routes/signRequest.js:469-487`). El servicio **sí**
+escribía la huella de la versión nueva en la fila (`publicFlow.js:362`) y la fila en la base **sí** la
+tenía — la comprobación de la base, en el mismo script, salía bien. Lo que fallaba era **dónde se leía**.
+
+**Reglas:**
+
+1. **Un fallo se lee contra la fuente**: si el valor leído viene vacío, primero se comprueba **qué
+   expone** esa fuente. Un `null` en la respuesta es un dato que no viaja, no un dato que falta.
+2. **La fila es la fuente de verdad** cuando lo que se verifica es cómo quedó la fila: se lee de la base,
+   no de una proyección de la API.
+3. **El servicio falso de los tests tiene que reproducir la API real**, incluida la ausencia de campos.
+   Si el test falso devuelve `agreement_hash` y el endpoint no, el test pasa con un valor que el
+   servidor nunca dio, y el error se descubre en producción.
+4. **Un test que se cae al revertir el fix es la prueba de que el test sirve.** Acá: sin el fix fallan
+   **7 pruebas de 20**.
+5. **Un endpoint que no expone un campo que su cliente necesita es un hallazgo, no un detalle**: se
+   anota y se decide con calma (cambiar ese contrato es decisión del owner), sin colarlo de paso en un
+   fix de una herramienta.
+
+### 5.34 🔴 Un deploy depende de procesos auxiliares que tienen fecha de expiración
+
+El paquete que se descarga y el log que vuelve son **procesos auxiliares**: si mueren a mitad del deploy,
+el deploy falla por una razón que no tiene nada que ver con el deploy.
+
+**El caso real (6-nov-2026).** El puente HTTP que sirve el paquete del deploy y recoge el log del
+servidor estaba corriendo como tarea en background: ese tipo de tarea tiene un **tope de una hora**, y a
+las 16:30:52 mataron el puente. El deploy de las 16:23, además, falló en el paso de descarga con
+`curl: (23) Failure writing output to destination` **sin causa aislada** (el puente sí sirvió el archivo:
+`971421 B` registrados en su log). Esa falla nunca se aisló, así que la respuesta no fue adivinar la
+causa: fue hacer el paso **resistente** (tres reintentos, escritura atómica y respaldo local ya
+verificado) y, además, dejar el puente **desanclado** para que no se muera solo.
+
+**Reglas:**
+
+1. **Lo que el servidor necesita tiene que sobrevivir la sesión**: se lanza **desanclado**
+   (`Start-Process`), no como tarea en background, y se comprueba que responde.
+2. **Un deploy depende de la vida de sus auxiliares**: el puente es parte del deploy, y su vida útil es
+   parte del plan. Un paquete que se sirve por HTTP tiene una copia local **verificada** en el servidor
+   como red de seguridad.
+3. **Cuando una falla no se aisló, la respuesta es robustecer, no inventar la causa.** Reintentos,
+   escritura atómica y un segundo origen verificado: el paso deja de depender de la causa.
+4. **Un log que se recoge por HTTP se pierde si el puente muere**: el deploy tiene que poder **terminar**
+   sin que nadie lo esté mirando.
 ### 6.1 Backend — bridges
 
 Sufijo **`-bridge.js`** (no `bridge-*.js`). Hay 30 en `main/`.
@@ -1796,6 +1878,10 @@ Caso real (31-oct-2026): al corregir el único rojo de la suite del `firma-servi
 | 117 | 🔴 **Lo que el código desplegado hace NO se puede leer sin `sudo`: la llave interna y la de administración son `0600 kairfirma`, y `/opt/kair-firma/app` es `750 kairfirma`** | `kair-server` (`/opt/kair-firma/app`, las llaves del `firma-service`), `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` | El usuario de SSH (`javier`) **no puede** leer ni las llaves ni el código que está corriendo, y `sudo` **no** tiene contraseña por ssh: hay que entrar por Cockpit. **Un diagnóstico a medias se convierte en una afirmación**: si no se pudo leer el archivo, el resultado es «no medido», no «no pasa». Antes de afirmar qué versión corre el servidor, **medí el hash del archivo en disco** (trampa 56) o usá una ruta que solo exista en el código nuevo (trampa 47): el `version` del `/health` es fijo y no prueba nada |
 | 118 | 🔴 **Una purga que mira una extensión no limpia lo que el script ANTERIOR dejó con otra.** El script viejo escribía `.sqlite` y `.tar.gz` en claro; el nuevo solo escribe `.enc`, y tanto su poda como la purga solo miran los `.enc` | `sgsst-electron-app/firma-service/deploy/backup-firma.sh` (poda: `find "$BACKUPS" -name 'firma-*.sqlite.enc' ...`), `deploy/purgar-respaldos.sh` (recorre `firma-*.sqlite.enc` y `storage-*.tar.gz.enc`), `/opt/kair-firma/backups/` | En el servidor quedaron **46 respaldos EN CLARO** (33 `.sqlite` sin `.enc`, más sus `-wal`/`-shm`, más 12 `storage-*.tar.gz`) y **cero cifrados**: los de la **primera** categoría **no se borran nunca solos**, porque ni la poda ni la purga los miran. Reglas: (1) **una purga se define por lo que CONSERVA, no por el patrón que borra** (trampa 109): el conjunto que se mira tiene que ser el que dejaron **todos** los scripts, no solo el actual; (2) **cifrar no es renombrar**: un respaldo en claro al que se le pone `.enc` encima **no** está cifrado; (3) **el cifrado se verifica**: se descifra y se corre `PRAGMA integrity_check` **antes** de borrar el original — lo que no se verifica **se deja como está y se reporta**, nunca se borra a ciegas; (4) lo que está en claro contradice lo que el Anexo de Nube promete: es una **afirmación pública falsa**, no un detalle de operación |
 
+| 119 | 🔴 **El revert de un deploy NO puede heredar la lista de archivos de una corrida anterior: si la hereda, puede borrar de producción lo que esa corrida instaló** | El script de deploy (`$WORK/nuevos.txt`, el directorio de trabajo `/tmp/kair-deploy-work`) | El rollback lee la lista de archivos **nuevos** (los que el paquete agrego y que no existían) para borrarlos si la corrida falla. Esa lista **queda en el disco** entre corridas: si una corrida anterior instaló archivos nuevos y esta falla **antes** de rehacerla, el revert borra de producción archivos que la corrida anterior había instalado **correctamente**. Medido el 6-nov-2026: la lista estaba **vacía** (0 archivos), así que **no se borró nada** y la app desplegada quedó intacta — el defecto estaba, la suerte no. Reglas: (1) **la lista del rollback pertenece a la corrida que la hizo**: se limpia al arrancar el script, no se hereda; (2) **un revert tiene que decir qué borró**: si dice "borrados los archivos nuevos del paquete" y no dice cuántos, no hay evidencia de nada; (3) **antes de un deploy se mira el estado real del servidor** (qué hay en `$BASE/app`), no se asume que quedó como estaba; (4) **el hash del archivo desplegado es la prueba del deploy**, no el mensaje de "despliegue completo" |
+| 120 | 🔴 **Una comprobación que lee de un endpoint que NO expone el campo falla en falso, y el servicio falso de los tests la deja pasar** | `sgsst-electron-app/firma-service/src/routes/signRequest.js` (`GET /internal/sign-requests/:id`, líneas 469-487), `sgsst-electron-app/firma-service/src/services/publicFlow.js` (`migrarAVersionVigente`, línea 362), `scripts/probar-10-4.js` | El endpoint devuelve `agreement_version` pero **no** `agreement_hash`: la herramienta de la 10.4 lo leía de ahí, obtenía vacío y **fallaba en falso** dos comprobaciones, cuando el servicio **sí** escribía la huella en la fila y la fila en la base la tenía (esa comprobación, en el mismo script, salía bien). El servicio falso de los tests **sí** devolvía el campo, así que la suite entera en verde no lo delataba. Reglas: (1) **antes de creerle a una falla, se comprueba que la fuente tiene el dato**: un valor vacío puede ser un dato que no viaja; (2) **el servicio falso tiene que reproducir la API real, incluida la ausencia de campos**: si el test devuelve un campo que el endpoint no devuelve, el test miente; (3) **se reverte el fix para comprobar que el test lo atrapa**: acá, sin el fix, **fallan 7 pruebas de 20**; (4) **un endpoint que no expone un campo que su cliente necesita se anota como decisión del owner**, no se colorea de paso en el fix de una herramienta |
+| 121 | 🔴 **El respaldo diario y la poda solo miran `*.enc`: un respaldo en claro hecho a mano no lo recoge NINGÚNO de los dos** | `sgsst-electron-app/firma-service/deploy/backup-firma.sh` (poda: `find "$BACKUPS" -name 'firma-*.sqlite.enc' ...`), `deploy/purgar-respaldos.sh` (recorre `firma-*.sqlite.enc` y `storage-*.tar.gz.enc`), el paso 15 del script de deploy (mira `$BACKUPS/firma-*.sqlite`) | Continuación de la trampa 118, medida el 6-nov-2026: después de cifrar los 46 respaldos en claro del script viejo, **quedó uno** —`manual-pre-994-2026-11-03-1749.sqlite`, 512 KB, copiado a mano el 3-nov— porque **el paso 15 del deploy también miraba `firma-*.sqlite`**, no cualquier `.sqlite`. Reglas: (1) **un patrón de nombre no es "todos"**: `firma-*` no cubre una copia que se llama `manual-*`; (2) **el que busca tiene que ser el mismo conjunto que dejaron todos los scripts**, no el del script actual (trampa 109); (3) **al cifrar un respaldo se DESCIFRA y se comprueba que abre (`PRAGMA integrity_check`) ANTES de borrar el original** — lo que no verifica se deja y se reporta; (4) **el respaldo diario ahora avisa** de cualquier `.sqlite`/`.tar.gz` en claro que no sea `.enc`, sin cifrar ni borrar nada: avisar es seguro, cifrar a ciegas no |
+| 122 | 🟡 **El puente que sirve el paquete del deploy y recoge su log es una tarea en background: tiene tope de una hora y muere solo** | `%TEMP%\kair-puente.js` (el puente), el tar del deploy (`%TEMP%\kair-deploy\kair-deploy.tar.gz`), el log del deploy (`%TEMP%\kair-deploy\deploy.txt`) | Medido el 6-nov-2026: la tarea en background que servía el puente **la mataron a las 16:30:52** por su tope de una hora, sin que nadie lo decidiera. El deploy depende de ella para dos cosas: el paquete que baja el servidor y el log que se recoge. Además, el deploy de las 16:23 falló con `curl: (23) Failure writing output to destination` **sin causa aislada** (el puente sí sirvió el archivo: `971421 B` en su log). Reglas: (1) **lo que el servidor necesita tiene que sobrevivir la sesión**: se lanza **desanclado** (`Start-Process`), no como tarea en background, y se comprueba que responde; (2) **el paquete tiene una copia local verificada en el servidor** (`/tmp/kair-paquete-*.tar.gz`) como red: si el puente no responde, el deploy usa esa y **verifica su hash igual**; (3) **cuando una falla no se aisló, se robustece en vez de inventar la causa**: tres reintentos, escritura atómica (`$TAR.parte` y `mv`) y un segundo origen; (4) **el log del deploy se recoge por HTTP**: si el puente muere, el deploy tiene que poder **terminar** sin que nadie lo esté mirando |
 **Formato de commit real** (verificá con `git log` antes de cada uno, la convención migró varias veces):
 
 ```
