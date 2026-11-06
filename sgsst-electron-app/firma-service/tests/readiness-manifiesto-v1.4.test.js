@@ -232,8 +232,33 @@ test('manifiesto · no declara ninguna firma que no exista', () => {
       'un Acuerdo publicado tiene que apuntar a un archivo que existe',
     );
   }
-  assert.equal(man.anexo_nube.firmado, false, 'no hay Anexo de Nube firmado por ninguna Empresa');
-  assert.equal(man.anexo_nube.hash, null, 'no hay copia firmada del Anexo de Nube');
+  // El Anexo de Nube: si el manifiesto declara una firma, tiene que estar
+  // COMPLETA. No se exige aquí un valor concreto: la firma la registra el
+  // owner cuando ocurre y el gate la contrasta contra la base. Lo que este
+  // test impide es declarar media firma (firmado=true sin fecha, versión,
+  // huella o evidencia) o una firma fantasma con los campos en null.
+  if (man.anexo_nube.firmado) {
+    assert.ok(
+      typeof man.anexo_nube.fecha === 'string'
+        && !Number.isNaN(new Date(man.anexo_nube.fecha).getTime()),
+      'un Anexo de Nube firmado tiene que declarar una fecha válida',
+    );
+    assert.ok(man.anexo_nube.version, 'un Anexo de Nube firmado tiene que declarar su versión');
+    assert.match(
+      man.anexo_nube.hash || '',
+      /^[0-9a-f]{64}$/,
+      'un Anexo de Nube firmado tiene que declarar su huella SHA-256',
+    );
+    assert.ok(
+      typeof man.anexo_nube.evidencia === 'string' && man.anexo_nube.evidencia.trim() !== '',
+      'un Anexo de Nube firmado tiene que declarar su evidencia',
+    );
+  } else {
+    assert.equal(man.anexo_nube.fecha, null, 'sin firma no puede haber fecha');
+    assert.equal(man.anexo_nube.version, null, 'sin firma no puede haber versión');
+    assert.equal(man.anexo_nube.hash, null, 'sin firma no puede haber huella');
+    assert.equal(man.anexo_nube.evidencia, null, 'sin firma no puede haber evidencia');
+  }
   assert.equal(man.anexo_encargo.estado, 'no_firmado', 'el Anexo de Encargo sigue sin firmar');
   assert.equal(man.constancia.estado, 'no_firmada', 'la Constancia sigue sin firmar');
 });
