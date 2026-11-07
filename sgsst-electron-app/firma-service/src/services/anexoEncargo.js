@@ -36,11 +36,37 @@
  *    se diligencian en el modelo.
  * 3. **SON DOS PARTES.** El §12 tiene dos bloques de firma. Esta fase es la
  *    de la Empresa; la contrafirma de K+AIR es otra fase (y otro commit).
- * 4. **LA VERDAD POR EMPRESA VIVE EN LA BASE.** La firma de la Empresa se
- *    escribe en `gh_firma_empresas.anexo_encargo_firmado_at` (con el rastro de
- *    la ficha), que es lo que lee el ítem `empresas_base` del gate. El
+ * 4. **LA VERDAD POR EMPRESA VIVE EN LA BASE.** La fase 1 se escribe en
+ *    `gh_firma_empresas.anexo_encargo_suscrito_at` (con el rastro de la
+ *    ficha), que es lo que lee el ítem `empresas_base` del gate. El
  *    manifiesto declara el INSTRUMENTO, no a las Empresas: si el manifiesto
  *    cambiara por cada Empresa que firma, sería un deploy por Empresa.
+ *
+ * LOS AJUSTES DEL ABOGADO (7-nov-2026)
+ * ------------------------------------
+ * El abogado respondió las diez preguntas del plan y pidió tres refuerzos:
+ * una cláusula expresa del mecanismo en la aceptación, la verificación
+ * documental del representante legal y un segundo canal para el código. Los
+ * tres están implementados aquí, y el tercero trae una consecuencia que
+ * cambia el estado de la Empresa:
+ *
+ *  - **EL CÓDIGO NO LLEGA AL MISMO BUZÓN QUE EL ENLACE.** El artículo 4 del
+ *    Decreto 2364 exige que los datos de creación de la firma correspondan
+ *    EXCLUSIVAMENTE al firmante, y un buzón compartido no corresponde a una
+ *    persona. El segundo canal lo declara K+AIR al abrir la suscripción (lo
+ *    confirma con la Empresa fuera de banda) y no quien hace clic en el
+ *    enlace. El servicio lo EXIGE: sin un canal distinto del buzón del
+ *    enlace, no se abre la suscripción.
+ *  - **QUIEN FIRMA DECLARA SU DOCUMENTO Y SU CALIDAD**, y K+AIR verifica esa
+ *    declaración contra el certificado de la cámara de comercio, el RUT o el
+ *    poder. El número viaja cifrado (`services/representante.js`), y de él
+ *    solo se muestra el final.
+ *  - **LA FASE 1 NO HABILITA A LA EMPRESA.** Se escribe
+ *    `anexo_encargo_suscrito_at`, no `anexo_encargo_firmado_at`: el nombre del
+ *    campo de firma solo puede ser cierto cuando el instrumento está
+ *    ejecutado por las dos partes. La contrafirma (fase 2) escribe el campo de
+ *    firma, y solo entonces la Empresa queda habilitada para firmar
+ *    documentos de sus trabajadores.
  *
  * "FIRMADA" EN ESTA TABLA NO QUIEVE DECIR "EL CONTRATO ESTÁ EJECUTADO"
  * --------------------------------------------------------------------
@@ -98,6 +124,8 @@ const empresaService = require('./empresa');
 const mailer = require('./mailer');
 const manifiestoLegal = require('./manifiestoLegal');
 const actaEncargo = require('./actaEncargo');
+const textosAceptacion = require('./anexoEncargoTextos');
+const representanteService = require('./representante');
 
 // La raíz del repo que contiene el Servicio (sgsst-electron-app): ahí vive
 // la carpeta `legal/` con el texto del Anexo de Encargo.
@@ -141,6 +169,52 @@ const DATOS_S11 = [
   { clave: 'domicilio', max: 300 },
   { clave: 'correo', max: 254 },
   { clave: 'representante', max: 200 },
+];
+
+/**
+ * EL SEGUNDO CANAL DEL CÓDIGO DE VERIFICACIÓN
+ * --------------------------------------------
+ *
+ * POR QUÉ NO PUEDE SER EL MISMO BUZÓN DEL ENLACE
+ * ------------------------------------------------
+ * El artículo 4 del Decreto 2364 (hoy 2.2.2.47.4 del Decreto 1074) pide
+ * que los datos de creación de la firma correspondan EXCLUSIVAMENTE al
+ * firmante. Un buzón compartido —el corporativo de la Empresa, que puede
+ * leer más de una persona— no corresponde a una persona. El abogado lo señaló
+ * como una de las dos grietas de confiabilidad del método: «el código llega
+ * al mismo buzón que el enlace».
+ *
+ * POR QUÉ LO DECLARA K+AIR Y NO LA PANTALLA
+ * ------------------------------------------
+ * Si quien tiene el enlace pudiera elegir el canal del código, el control
+ * del buzón no probaría nada: bastaría con que un intruso declare una
+ * dirección propia y complete la firma. El canal lo declara el operador al
+ * abrir la suscripción, lo confirma con la Empresa fuera de banda, y queda
+ * anotado QUIÉN lo confirmó y CÓMO.
+ *
+ * EL CANAL POR TELÉFONO NO EXISTE TODAVÍA
+ * ---------------------------------------
+ * El abogado lo menciona entre las opciones ("código a un teléfono"). El
+ * servicio no tiene pasarela de SMS: el único canal de salida es el correo.
+ * Por eso el tipo `telefono` NO está implementado. Declararlo sería prometer
+ * una entrega que no ocurre, y un código que "se envió" y nunca llegó es
+ * peor que un canal declarado con honestidad.
+ */
+const CANAL_CODIGO_TIPOS = {
+  CORREO: 'correo',
+};
+
+/**
+ * LOS DOCUMENTOS CONTRA LOS QUE K+AIR VERIFICA AL REPRESENTANTE.
+ *
+ * El abogado (pregunta 7): contra el certificado de existencia y
+ * representación de la cámara de comercio, o contra el RUT de la Empresa. Y
+ * si quien firma es un delegado, el poder o la autorización.
+ */
+const TIPOS_DOCUMENTO_VERIFICACION = [
+  'CERTIFICADO_CAMARA',
+  'RUT',
+  'PODER',
 ];
 
 // =============================================================================
@@ -352,6 +426,80 @@ function _datosS11(declarado) {
 }
 
 /**
+ * El segundo canal por donde sale el código de verificación.
+ *
+ * Ver la nota de `CANAL_CODIGO_TIPOS` para el porqué. Aquí solo está la regla:
+ * tiene que ser un correo válido y tiene que ser DISTINTO del buzón que
+ * recibe el enlace.
+ *
+ * @param {object} datos - lo que declaró el operador al abrir la suscripción.
+ * @param {string} correoFirmante - el buzón que recibe el enlace.
+ * @returns {string} el canal, en minúsculas.
+ * @throws AppError 400 si falta, no es un correo, o es el mismo del enlace.
+ */
+function _canalCodigo(datos, correoFirmante) {
+  const canal = _texto(datos && datos.canal_codigo, 254);
+  if (!canal || !_correoValido(canal)) {
+    throw new AppError(400, 'CANAL_CODIGO_REQUERIDO',
+      'La suscripción necesita un segundo canal para el código de verificación: '
+      + 'un correo válido y distinto del que recibe el enlace');
+  }
+  if (canal.toLowerCase() === String(correoFirmante || '').trim().toLowerCase()) {
+    throw new AppError(400, 'CANAL_CODIGO_IGUAL',
+      'El canal del código de verificación tiene que ser distinto del correo '
+      + 'que recibe el enlace: el código no puede llegar al mismo buzón');
+  }
+  return canal.toLowerCase();
+}
+
+/**
+ * QUIEN FIRMA: su documento y la calidad con la que firma.
+ *
+ * EL NÚMERO VIAJA CIFRADO
+ * -----------------------
+ * Es la misma regla que el representante legal de la ficha: el número se
+ * guarda cifrado con `services/representante.js` y de él solo se muestra el
+ * final. En el expediente queda el documento cifrado y, al lado, el tipo de
+ * documento contra el que K+AIR lo verificó.
+ *
+ * LA CALIDAD IMPORTA PORQUE CAMBIA EL TEXTO
+ * ------------------------------------------
+ * Un delegado no es el representante legal: declarar lo contrario sería una
+ * falsidad. Por eso hay dos declaraciones, y la que se imprime es la que
+ * corresponde a la calidad declarada.
+ *
+ * @param {object} declarado - { documento, calidad }.
+ * @param {string} id_empresa - el ámbito de la llave de cifrado.
+ * @returns {{documento: string, calidad: string, ultimos4: string}}
+ * @throws AppError 400 si falta el documento o la calidad no es válida.
+ */
+function _datosRepresentante(declarado, id_empresa) {
+  const documento = _texto(declarado && declarado.documento, 60);
+  if (!documento) {
+    throw new AppError(400, 'REPRESENTANTE_NO_IDENTIFICADO',
+      'Falta el número de documento de quien suscribe: la Empresa debe declararlo');
+  }
+  const calidades = Object.values(textosAceptacion.CALIDADES);
+  const calidad = String((declarado && declarado.calidad) || '').trim().toUpperCase();
+  if (!calidades.includes(calidad)) {
+    throw new AppError(400, 'REPRESENTANTE_NO_IDENTIFICADO',
+      'La calidad de quien suscribe tiene que ser ' + calidades.join(' o '));
+  }
+  const cifrado = representanteService.snapshotParaGuardar(
+    { numero_identificacion: documento }, id_empresa,
+  );
+  if (!cifrado) {
+    throw new AppError(500, 'REPRESENTANTE_NO_CIFRADO',
+      'No se pudo guardar el documento de quien suscribe: la suscripción no se cierra');
+  }
+  return {
+    documento: cifrado,
+    calidad,
+    ultimos4: representanteService.ultimosDeTexto(documento),
+  };
+}
+
+/**
  * Los cinco datos del §11 tal como salen de la ficha de la Empresa.
  *
  * Es el PRELLENADO de la pantalla: la Empresa puede confirmarlos o
@@ -385,7 +533,6 @@ function _firmaPrevia(id_empresa) {
 // =============================================================================
 // 1. ABRIR LA SUSCRIPCIÓN
 // =============================================================================
-
 /**
  * Crea una suscripción y envía el enlace al correo del firmante.
  *
@@ -414,6 +561,19 @@ async function crearSuscripcion(id_empresa, datos, ctx = {}, opciones = {}) {
   if (!_correoValido(correo)) {
     throw new AppError(400, 'INVALID_REQUEST_BODY',
       'correo_firmante debe ser un correo válido');
+  }
+
+  // EL SEGUNDO CANAL DEL CÓDIGO. Se valida ANTES de tocar la base: si el
+  // código fuera a salir al mismo buzón que el enlace, el método no probaría
+  // que quien firma sea la persona que dice ser (art. 4 del Decreto 2364), y
+  // no tiene sentido abrir una suscripción así.
+  const canalCodigo = _canalCodigo(datos, correo);
+  const canalConfirmacion = _texto(datos && datos.canal_codigo_confirmacion, 300);
+  if (!canalConfirmacion) {
+    throw new AppError(400, 'CANAL_CODIGO_SIN_CONFIRMAR',
+      'Hay que declarar CÓMO se confirmó el segundo canal con la Empresa '
+      + '(canal_codigo_confirmacion): es la prueba de que ese canal es de la '
+      + 'Empresa y no el de quien abrió el enlace');
   }
 
   const nombre = _texto(datos && datos.nombre_firmante, 200)
@@ -445,15 +605,20 @@ async function crearSuscripcion(id_empresa, datos, ctx = {}, opciones = {}) {
   const info = db.prepare(`INSERT INTO gh_firma_anexo_encargo_suscripciones
     (id_empresa, token_hash, version, hash_texto, datos_empresa, correo_firmante,
      nombre_firmante, cargo_firmante, estado, expira_enlace_at,
-     ip_creacion, user_agent_creacion, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+     ip_creacion, user_agent_creacion, creado_por,
+     canal_codigo, canal_codigo_tipo, canal_codigo_confirmacion,
+     canal_codigo_confirmado_por, canal_codigo_confirmado_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id_empresa, tokenHash, modelo.version, modelo.hash, JSON.stringify(prellenado),
       correo.toLowerCase(), nombre, cargo, ESTADOS.PENDIENTE, expira,
-      ctx.ip || null, ctx.user_agent || null, ctx.actor || null);
+      ctx.ip || null, ctx.user_agent || null, ctx.actor || null,
+      canalCodigo, CANAL_CODIGO_TIPOS.CORREO, canalConfirmacion,
+      ctx.actor || null, new Date().toISOString());
 
   const id = info.lastInsertRowid;
   _evento(id, id_empresa, 'SUSCRIPCION_CREADA',
-    `version=${modelo.version} hash=${modelo.hash}`, ctx.ip, ctx.user_agent);
+    `version=${modelo.version} hash=${modelo.hash} canal_codigo=${actaEncargo.enmascararCorreo(canalCodigo)}`,
+    ctx.ip, ctx.user_agent);
 
   const url = `${String(config.publicUrl || '').replace(/\/+$/, '')}/anexo-encargo/${token}`;
 
@@ -532,6 +697,96 @@ function anularSuscripcion(id_empresa, id_suscripcion, ctx = {}) {
   return { anulada: true, id: fila.id };
 }
 
+/**
+ * Registra la VERIFICACIÓN DOCUMENTAL de quien firmó.
+ *
+ * POR QUÉ ESTE PASO EXISTE
+ * ------------------------
+ * El método de firma probaba control de un buzón, no que quien firmara fuera
+ * el representante legal ni que tuviera poder. Para un contrato sobre datos de
+ * salud, eso es insuficiente: la Empresa podría alegar que el firmante no
+ * tenía poder y que el acto no la obliga (pregunta 7 del abogado).
+ *
+ * La verificación es un ACTO DE K+AIR, no de la Empresa: alguien de la
+ * operación contrasta el documento que la Empresa declaró contra el
+ * certificado de la cámara de comercio, el RUT o el poder, y deja constancia
+ * de contra qué documento lo contrastó y de dónde quedó radicado.
+ *
+ * CUÁNDO SE HACE
+ * --------------
+ * Después de la suscripción: el documento declarado lo escribe la Empresa en
+ * la pantalla, así que antes de ese momento no hay nada que verificar. Y el
+ * paso siguiente —la contrafirma de K+AIR— NO se puede hacer sin esta
+ * verificación: es la que cierra la brecha.
+ *
+ * @param {string} id_empresa
+ * @param {number} id_suscripcion
+ * @param {object} datos
+ * @param {string} datos.tipo_documento - 'CERTIFICADO_CAMARA' | 'RUT' | 'PODER'.
+ * @param {string} datos.referencia - el radicado o la referencia del documento.
+ * @param {string} [datos.nota] - lo que hizo falta para verificarlo.
+ * @param {object} ctx - { actor, motivo, ip, user_agent }; el motivo es obligatorio.
+ * @returns {object}
+ */
+function verificarRepresentante(id_empresa, id_suscripcion, datos, ctx = {}) {
+  const fila = db.prepare(`SELECT * FROM gh_firma_anexo_encargo_suscripciones
+    WHERE id = ? AND id_empresa = ?`).get(id_suscripcion, id_empresa);
+  if (!fila) {
+    throw new AppError(404, 'SUSCRIPCION_NO_ENCONTRADA',
+      'No existe esa suscripción para esa empresa');
+  }
+  if (fila.estado !== ESTADOS.FIRMADA) {
+    throw new AppError(409, 'SUSCRIPCION_NO_FIRMADA',
+      'Esta suscripción no está firmada: todavía no hay a quién verificar');
+  }
+
+  const tipo = String((datos && datos.tipo_documento) || '').trim().toUpperCase();
+  if (!TIPOS_DOCUMENTO_VERIFICACION.includes(tipo)) {
+    throw new AppError(400, 'VERIFICACION_INCOMPLETA',
+      'El tipo de documento con el que se verificó tiene que ser uno de: '
+      + TIPOS_DOCUMENTO_VERIFICACION.join(', '));
+  }
+  const referencia = _texto(datos && datos.referencia, 300);
+  if (!referencia) {
+    throw new AppError(400, 'VERIFICACION_INCOMPLETA',
+      'Hay que decir contra qué documento se verificó y dónde quedó radicado '
+      + '(referencia): sin eso no hay prueba en el expediente');
+  }
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'X-Admin-Motivo es obligatorio para registrar la verificación del representante');
+  }
+
+  const verificacion = {
+    tipo_documento: tipo,
+    referencia,
+    nota: _texto(datos && datos.nota, 500),
+    verificado_por: ctx.actor || null,
+    verificado_at: new Date().toISOString(),
+  };
+  db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
+    SET representante_verificacion = ?, representante_verificado_por = ?,
+        representante_verificado_at = ?, updated_at = datetime('now')
+    WHERE id = ?`)
+    .run(JSON.stringify(verificacion), ctx.actor || null, verificacion.verificado_at, fila.id);
+
+  _evento(fila.id, id_empresa, 'REPRESENTANTE_VERIFICADO',
+    `tipo=${tipo} referencia=${referencia}`, ctx.ip, ctx.user_agent);
+  logger.info('Representante verificado documentalmente', {
+    id_empresa, id_suscripcion: fila.id, tipo_documento: tipo,
+  });
+
+  return {
+    verificado: true,
+    id_suscripcion: fila.id,
+    tipo_documento: tipo,
+    referencia,
+    verificado_por: verificacion.verificado_por,
+    verificado_at: verificacion.verificado_at,
+  };
+}
+
 // =============================================================================
 // 2. EL CONTEXTO PÚBLICO
 // =============================================================================
@@ -580,8 +835,18 @@ function contextoPublico(token, ip, user_agent) {
     vigente,
     empresa: empresa ? (empresa.razon_social || fila.id_empresa) : fila.id_empresa,
     correo_firmante: actaEncargo.enmascararCorreo(fila.correo_firmante),
+    // EL SEGUNDO CANAL DEL CÓDIGO, enmascarado. La Empresa lo ve para saber
+    // dónde lo espera: el código no llega a este buzón, sino a este otro.
+    canal_codigo: actaEncargo.enmascararCorreo(fila.canal_codigo),
+    canal_codigo_confirmado: Boolean(fila.canal_codigo_confirmado_at),
     nombre_firmante: fila.nombre_firmante,
     cargo_firmante: fila.cargo_firmante,
+    // LOS TEXTOS LEGALES QUE LA EMPRESA TIENE QUE ACEPTAR. Van en el
+    // contexto (y no escritos en el HTML) para que la pantalla y el acta
+    // digan EXACTAMENTE lo mismo: si el texto viviera en los dos lados, un
+    // día dejarían de coincidir y la Empresa aceptaría una cosa mientras el
+    // acta archivaría otra.
+    textos: textosAceptacion.textosPublicos(),
     // Los cinco datos del §11, prellenados con la ficha. La Empresa los
     // confirma o los corrige: los que ella declare son los que quedan.
     datos_empresa: datos,
@@ -639,6 +904,16 @@ async function solicitarCodigo(token, ctx = {}) {
   const otpHash = hashOTPHmac(otp, fila.id_empresa);
   const enviadoAt = new Date().toISOString();
 
+  // El código sale por el SEGUNDO CANAL. Una suscripción sin segundo canal
+  // no debería existir (se exige al abrirla), pero si una fila vieja se
+  // colara, aquí se dice con claridad en vez de mandar el código al buzón
+  // del enlace: ese envío sería exactamente la grieta que el abogado señaló.
+  if (!fila.canal_codigo) {
+    throw new AppError(409, 'CANAL_CODIGO_NO_DEFINIDO',
+      'Esta suscripción no tiene un segundo canal definido para el código: '
+      + 'hay que abrir una suscripción nueva');
+  }
+
   db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
     SET otp_hash = ?, otp_intentos = 0, otp_envios = otp_envios + 1,
         otp_enviado_at = ?, estado = ?, updated_at = datetime('now')
@@ -650,7 +925,7 @@ async function solicitarCodigo(token, ctx = {}) {
 
   try {
     await mailer.sendOTP({
-      to: fila.correo_firmante,
+      to: fila.canal_codigo,
       otp,
       tipo: 'anexo_encargo',
       context: {
@@ -751,7 +1026,13 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
 
   if (datos.acepta !== true) {
     throw new AppError(400, 'ACEPTACION_REQUERIDA',
-      'La Empresa debe marcar que leyó el Anexo de Encargo y que acepta sus condiciones');
+      'La Empresa debe marcar que leyó el Anexo de Encargo, que acepta la cláusula '
+      + 'del mecanismo electrónico y que declara su representación');
+  }
+  if (datos.acepta_tratamiento !== true) {
+    throw new AppError(400, 'ACEPTACION_REQUERIDA',
+      'La Empresa debe marcar que leyó la información sobre el tratamiento de sus '
+      + 'datos personales para la ejecución de este Anexo');
   }
   if (!fila.otp_hash || !fila.otp_enviado_at) {
     throw new AppError(400, 'CODIGO_NO_SOLICITADO',
@@ -789,6 +1070,10 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
   // se suscribe con sus huecos, pero la Empresa tiene que decir quién es.
   const datosS11 = _datosS11(datos.datos_empresa);
 
+  // QUIEN FIRMA: su documento y la calidad con la que firma. Sin esto, el
+  // método solo probaría control de un buzón (pregunta 7 del abogado).
+  const representante = _datosRepresentante(datos.representante, fila.id_empresa);
+
   // ───────────────────────────────────────────────────────────────────────────
   // LA FIRMA DE LA EMPRESA (fase 1)
   // ───────────────────────────────────────────────────────────────────────────
@@ -796,7 +1081,17 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
   if (!empresa) {
     throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${fila.id_empresa}`);
   }
-  if (empresa.anexo_encargo_firmado_at) {
+  // ¿La Empresa ya tiene un Anexo de Encargo? Se miran LOS DOS campos:
+  //
+  //   - `anexo_encargo_suscrito_at`: lo que escribe la fase 1 (la Empresa
+  //     suscribió). Es el campo que escribe ESTE flujo.
+  //   - `anexo_encargo_firmado_at`: lo que escribe el circuito físico (un
+  //     operador registró un Anexo ya firmado en papel) y, desde la fase 2,
+  //     la contrafirma de K+AIR.
+  //
+  // Los dos significan lo mismo para esta pregunta: que la Empresa ya tiene
+  // un Anexo y esta suscripción no puede pisarlo.
+  if (empresa.anexo_encargo_suscrito_at || empresa.anexo_encargo_firmado_at) {
     // No se pisa una suscripción de otro texto: eso se corrige por el camino
     // administrativo, con motivo, y quedan las dos en el rastro.
     //
@@ -822,10 +1117,26 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
     version: fila.version,
     hash: fila.hash_texto,
     correo_firmante: fila.correo_firmante,
+    // El SEGUNDO CANAL del código, enmascarado como el correo. El completo
+    // vive en la columna de la suscripción, no en la evidencia que se
+    // resume al manifiesto.
+    canal_codigo: actaEncargo.enmascararCorreo(fila.canal_codigo),
+    canal_codigo_tipo: fila.canal_codigo_tipo,
     nombre_firmante: fila.nombre_firmante,
     cargo_firmante: fila.cargo_firmante,
     // Los cinco datos del §11 tal como los declaró la Empresa.
     datos_empresa: datosS11,
+    // QUIEN FIRMA. El documento va cifrado en la fila de la suscripción; aquí
+    // solo queda el final, que es lo que se puede mostrar.
+    representante: {
+      nombre: datosS11.representante,
+      documento_ultimos4: representante.ultimos4,
+      calidad: representante.calidad,
+    },
+    // LA ACEPTACIÓN: la huella de las PALABRAS que la Empresa marcó. Es la
+    // prueba de qué aceptó, no solo de que marcó una casilla.
+    aceptacion_hash: textosAceptacion.hashAceptacion(representante.calidad),
+    aceptacion_tratamiento_hash: textosAceptacion.hashTratamiento(),
     codigo_enviado_at: fila.otp_enviado_at,
     codigo_verificado_at: firmadoAt,
     enlace_abierto_at: fila.enlace_abierto_at,
@@ -846,6 +1157,10 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
   // documento que la acredita. El código de verificación sigue siendo válido
   // hasta que vence, así que el reintento no obliga a pedir otro código.
   let acta = null;
+  // El documento del representante, listo para imprimir: solo el final.
+  const documentoEnmascarado = representanteService.numeroEnmascarado(
+    representanteService.leerSnapshot(representante.documento), fila.id_empresa,
+  );
   try {
     acta = await actaEncargo.generarActa({
       id_suscripcion: fila.id,
@@ -857,6 +1172,21 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
       nombre_firmante: fila.nombre_firmante,
       cargo_firmante: fila.cargo_firmante,
       correo_firmante: fila.correo_firmante,
+      // El segundo canal del código: el acta dice que el código NO salió por
+      // el buzón del enlace, y lo dice sin nombrar la dirección entera.
+      canal_codigo: fila.canal_codigo,
+      // Quién firmó y con qué poder.
+      representante_nombre: datosS11.representante,
+      representante_documento: documentoEnmascarado,
+      representante_calidad: representante.calidad,
+      // LOS TEXTOS QUE LA EMPRESA ACEPTÓ. Van enteros en el acta: el acta es
+      // la constancia de lo que se aceptó, y una constancia que solo dice
+      // "aceptó" no prueba nada.
+      texto_mecanismo: textosAceptacion.MECANISMO,
+      texto_declaracion: textosAceptacion.declaracionRepresentacion(representante.calidad),
+      texto_tratamiento: textosAceptacion.TRATAMIENTO_DATOS,
+      aceptacion_hash: textosAceptacion.hashAceptacion(representante.calidad),
+      aceptacion_tratamiento_hash: textosAceptacion.hashTratamiento(),
       codigo_enviado_at: fila.otp_enviado_at,
       codigo_verificado_at: firmadoAt,
       enlace_abierto_at: fila.enlace_abierto_at,
@@ -897,7 +1227,22 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
   // quedar un archivo sin registro ni un registro sin archivo.
   try {
     const tx = db.transaction(() => {
-      empresaService.marcarAnexoFirmado(fila.id_empresa, firmadoAt, {
+      // LA FASE 1 ESCRIBE `anexo_encargo_suscrito_at`, NO LA FECHA DE FIRMA.
+      //
+      // El campo de firma significa "el instrumento está ejecutado": las dos
+      // partes firmaron. Escribirlo aquí haría que el sistema afirmara que el
+      // contrato está firmado cuando solo firmó una parte, y además
+      // habilitaría a la Empresa a firmar documentos de sus trabajadores
+      // antes de la contrafirma de K+AIR. Es la opción conservadora que
+      // eligió el owner el 7-nov-2026, sobre el análisis del abogado del
+      // mismo día ("la empresa no debería empezar a usar el servicio hasta
+      // que K+AIR firme la otra parte").
+      empresaService.marcarAnexoSuscrito(fila.id_empresa, {
+        fecha: firmadoAt,
+        version: fila.version,
+        hash: fila.hash_texto,
+        evidencia: evidenciaTexto,
+      }, {
         actor: `empresa:${fila.id_empresa}`,
         motivo: 'Suscripción del Anexo de Encargo por el enlace de un solo uso',
         ip: ctx.ip || null,
@@ -906,10 +1251,21 @@ async function suscribir(token, datos, ctx = {}, opciones = {}) {
 
       db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
         SET estado = ?, firmado_at = ?, evidencia = ?, datos_empresa = ?,
-            ip_firma = ?, user_agent_firma = ?, otp_hash = NULL, updated_at = datetime('now')
+            ip_firma = ?, user_agent_firma = ?, otp_hash = NULL,
+            representante_documento = ?, representante_calidad = ?,
+            aceptacion_hash = ?, aceptacion_tratamiento_hash = ?,
+            updated_at = datetime('now')
         WHERE id = ?`)
+        // EL ORDEN DE LOS ARGUMENTOS ES EL DE LOS SIGNOS DE INTERROGACIÓN.
+        // `fila.id` va AL FINAL: es el del `WHERE`. Con un `?` de más o de
+        // menos, better-sqlite3 avisa; con el MISMO número pero cambiados de
+        // sitio, no avisa de nada y la sentencia no actualiza ninguna fila
+        // (ni falla). Por eso el orden está anotado aquí.
         .run(ESTADOS.FIRMADA, firmadoAt, evidenciaTexto, JSON.stringify(datosS11),
-          ctx.ip || null, ctx.user_agent || null, fila.id);
+          ctx.ip || null, ctx.user_agent || null,
+          representante.documento, representante.calidad,
+          evidencia.aceptacion_hash, evidencia.aceptacion_tratamiento_hash,
+          fila.id);
     });
     tx();
   } catch (e) {
@@ -1033,11 +1389,13 @@ module.exports = {
   MAX_ENVIOS_CODIGO,
   ESTADOS,
   DATOS_S11,
+  TIPOS_DOCUMENTO_VERIFICACION,
   modeloVigente,
   urlDocumento,
   datosDeFicha,
   crearSuscripcion,
   anularSuscripcion,
+  verificarRepresentante,
   contextoPublico,
   solicitarCodigo,
   suscribir,

@@ -101,6 +101,8 @@ const SELECT_COLS = `
   plazo_retencion, canal_solicitud_copia, plazo_retencion_dias,
   anexo_encargo_firmado_at, anexo_nube_firmado_at, anexo_nube_version,
   anexo_nube_hash, anexo_nube_evidencia, activo,
+  anexo_encargo_suscrito_at, anexo_encargo_suscrito_version,
+  anexo_encargo_suscrito_hash, anexo_encargo_suscrito_evidencia,
   conservacion_por_deber_legal, norma_conservacion,
   dominios_corporativos,
   created_at, updated_at
@@ -199,6 +201,16 @@ function _toRowShape(row) {
     out[campo] = row[campo] === undefined ? null : row[campo];
   }
   out.anexo_encargo_firmado_at = row.anexo_encargo_firmado_at || null;
+  // La FASE 1: la Empresa suscribió. Va APARTE de la fecha de firma porque el
+  // Anexo de Encargo es BILATERAL: son dos actos distintos y el nombre del
+  // campo de firma solo puede ser cierto cuando el instrumento está
+  // ejecutado por las dos partes (el abogado, 7-nov-2026: un campo que dice
+  // «firmado» cuando solo firmó una parte es una inconsistencia semántica
+  // que se convierte en problema probatorio).
+  out.anexo_encargo_suscrito_at = row.anexo_encargo_suscrito_at || null;
+  out.anexo_encargo_suscrito_version = row.anexo_encargo_suscrito_version || null;
+  out.anexo_encargo_suscrito_hash = row.anexo_encargo_suscrito_hash || null;
+  out.anexo_encargo_suscrito_evidencia = row.anexo_encargo_suscrito_evidencia || null;
   out.anexo_nube_firmado_at = row.anexo_nube_firmado_at || null;
   out.anexo_nube_version = row.anexo_nube_version || null;
   out.anexo_nube_hash = row.anexo_nube_hash || null;
@@ -887,6 +899,93 @@ function marcarAnexoFirmado(id_empresa, fecha, ctx = {}) {
   return getById(id_empresa);
 }
 
+/**
+ * Registra, con rastro, la SUSCRIPCIÓN del Anexo de Encargo por la Empresa
+ * (la fase 1).
+ *
+ * POR QUÉ ESTE CAMPO NO ES EL DE LA FECHA DE FIRMA
+ * --------------------------------------------------
+ * `anexo_encargo_firmado_at` significa "el Anexo de Encargo está EJECUTADO":
+ * las dos partes firmaron. La fase 1 solo deja constancia de que la Empresa
+ * suscribió. Escribir la fecha de la fase 1 en ese campo haría que el
+ * sistema afirmara que el contrato está firmado cuando el instrumento todavía
+ * no está ejecutado, que es exactamente lo que el abogado señaló como
+ * inconsistencia semántica susceptible de convertirse en problema probatorio
+ * (7-nov-2026).
+ *
+ * La consecuencia es la que el abogado pidió: la Empresa que suscribió pero
+ * no ha sido contrafirmada por K+AIR NO queda habilitada para firmar
+ * documentos de sus trabajadores. La habilitación sigue exigiendo
+ * `anexo_encargo_firmado_at`, y ese campo lo escribe la contrafirma.
+ *
+ * Las mismas reglas que `marcarAnexoFirmado`: la fecha no puede ser futura,
+ * cambiar una suscripción ya registrada exige motivo, y registrar lo mismo
+ * otra vez es idempotente.
+ *
+ * @param {string} id_empresa
+ * @param {object} datos
+ * @param {string} datos.fecha - ISO 8601.
+ * @param {string} datos.version - la versión del texto que se suscribió.
+ * @param {string} datos.hash - la huella SHA-256 de ese texto.
+ * @param {string} datos.evidencia - el resumen de la evidencia.
+ * @param {object} [ctx] - { actor, motivo, ip, user_agent }.
+ * @returns {object}
+ */
+function marcarAnexoSuscrito(id_empresa, { fecha, version, hash, evidencia }, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  }
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'fecha de suscripcion del anexo no es una fecha valida');
+  }
+  if (d.getTime() > Date.now()) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'la fecha de suscripcion del anexo no puede ser futura');
+  }
+  if (!version || !/^[0-9a-f]{64}$/i.test(hash || '') || !evidencia) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'se requieren version, hash SHA-256 y referencia de evidencia');
+  }
+  const values = {
+    anexo_encargo_suscrito_at: d.toISOString(),
+    anexo_encargo_suscrito_version: version.trim(),
+    anexo_encargo_suscrito_hash: hash.trim().toLowerCase(),
+    anexo_encargo_suscrito_evidencia: evidencia.trim(),
+  };
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  const prev = {
+    anexo_encargo_suscrito_at: actual.anexo_encargo_suscrito_at,
+    anexo_encargo_suscrito_version: actual.anexo_encargo_suscrito_version,
+    anexo_encargo_suscrito_hash: actual.anexo_encargo_suscrito_hash,
+    anexo_encargo_suscrito_evidencia: actual.anexo_encargo_suscrito_evidencia,
+  };
+  const changed = Object.keys(values).some((k) => prev[k] !== values[k]);
+  if (!changed) return actual;
+  if (prev.anexo_encargo_suscrito_at && !motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'X-Admin-Motivo es obligatorio para sustituir el registro de suscripcion del Anexo de Encargo');
+  }
+  db.transaction(() => {
+    db.prepare(`UPDATE gh_firma_empresas
+      SET anexo_encargo_suscrito_at = ?, anexo_encargo_suscrito_version = ?,
+          anexo_encargo_suscrito_hash = ?, anexo_encargo_suscrito_evidencia = ?,
+          updated_at = datetime('now')
+      WHERE id_empresa = ?`)
+      .run(values.anexo_encargo_suscrito_at, values.anexo_encargo_suscrito_version,
+        values.anexo_encargo_suscrito_hash, values.anexo_encargo_suscrito_evidencia, id_empresa);
+    for (const campo of Object.keys(values)) {
+      auditoriaService.registrarCampo({ id_empresa, campo, valor_anterior: prev[campo],
+        valor_nuevo: values[campo], actor: ctx.actor || null, ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null, motivo: motivo || null });
+    }
+  })();
+  logger.info('Anexo de Encargo suscrito por la Empresa (fase 1)', { id_empresa });
+  return getById(id_empresa);
+}
+
 /** Registra, con rastro, la versión del Anexo de Nube firmada por la Empresa. */
 function marcarAnexoNubeFirmado(id_empresa, { fecha, version, hash, evidencia }, ctx = {}) {
   const actual = getById(id_empresa);
@@ -998,6 +1097,76 @@ function desmarcarAnexoFirmado(id_empresa, ctx = {}) {
 }
 
 /**
+ * Quita el registro de la SUSCRIPCIÓN (fase 1) del Anexo de Encargo.
+ *
+ * POR QUÉ HAY UN CAMINO DE SALIDA
+ * ------------------------------
+ * El mismo motivo que en `desmarcarAnexoFirmado`: un registro que solo se
+ * puede poner deja al sistema sin forma de corregir una marca equivocada.
+ * Y aquí el caso es real: una suscripción se puede anular porque la Empresa
+ * se equivocó en el nombre del representante, o porque el documento que
+ * déclararon no era el que el operador verificó.
+ *
+ * NO TOCA LA FECHA DE FIRMA. Esta función solo deshace la fase 1: si el
+ * instrumento ya está ejecutado (contrafirmado), quitar la suscripción es otro
+ * acto, con su propio motivo y su propio rastro.
+ *
+ * @param {string} id_empresa
+ * @param {object} [ctx] - { actor, motivo, ip, user_agent }; el motivo es obligatorio.
+ * @returns {object}
+ */
+function desmarcarAnexoSuscrito(id_empresa, ctx = {}) {
+  const actual = getById(id_empresa);
+  if (!actual) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  }
+  if (!actual.anexo_encargo_suscrito_at) {
+    throw new AppError(409, 'ANEXO_NO_REGISTRADO',
+      `La empresa ${id_empresa} no tiene una suscripcion de Anexo de Encargo registrada`);
+  }
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'para quitar la suscripcion del Anexo de Encargo hay que declarar el motivo '
+      + 'en X-Admin-Motivo');
+  }
+
+  const anterior = {
+    anexo_encargo_suscrito_at: actual.anexo_encargo_suscrito_at,
+    anexo_encargo_suscrito_version: actual.anexo_encargo_suscrito_version,
+    anexo_encargo_suscrito_hash: actual.anexo_encargo_suscrito_hash,
+    anexo_encargo_suscrito_evidencia: actual.anexo_encargo_suscrito_evidencia,
+  };
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firma_empresas
+      SET anexo_encargo_suscrito_at = NULL, anexo_encargo_suscrito_version = NULL,
+          anexo_encargo_suscrito_hash = NULL, anexo_encargo_suscrito_evidencia = NULL,
+          updated_at = datetime('now')
+      WHERE id_empresa = ?
+    `).run(id_empresa);
+    for (const campo of Object.keys(anterior)) {
+      auditoriaService.registrarCampo({
+        id_empresa,
+        campo,
+        valor_anterior: anterior[campo],
+        valor_nuevo: null,
+        actor: ctx.actor || null,
+        ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null,
+        motivo,
+      });
+    }
+  });
+  tx();
+
+  logger.warn('Suscripcion del Anexo de Encargo desmarcada', {
+    id_empresa, fecha_anterior: anterior.anexo_encargo_suscrito_at, motivo,
+  });
+  return getById(id_empresa);
+}
+
+/**
  * Da de baja (soft) o reactiva una empresa.
  *
  * La baja y la reactivacion quedan RASTREADAS (migraciones 037 y 038): una
@@ -1075,6 +1244,10 @@ function listConPendientes() {
       faltan_deseables,
       completa: faltan_requeridos.length === 0,
       tiene_anexo: Boolean(e.anexo_encargo_firmado_at),
+      // La fase 1 por separado: una Empresa puede haber suscrito el Anexo y
+      // estar a la espera de la contrafirma de K+AIR. Con las dos columnas el
+      // operador ve el estado sin abrir la base.
+      tiene_anexo_suscrito: Boolean(e.anexo_encargo_suscrito_at),
     };
   });
 }
@@ -1164,7 +1337,17 @@ function verificarHabilitacionFirma(id_empresa) {
   }
 
   const falta = pendientes.map((p) => {
-    if (p === 'anexo_encargo_firmado') return 'no tiene registrado el Anexo de Encargo firmado';
+    if (p === 'anexo_encargo_firmado') {
+      // El mensaje dice EN QUÉ ESTÁ la Empresa, no solo qué le falta. Una
+      // Empresa que ya suscribió pero a la que K+AIR todavía no ha
+      // contrafirmado está en un limbo distinto de una que no ha suscrito
+      // nada, y el operador tiene que poder distinguirlas sin abrir la base.
+      return empresa.anexo_encargo_suscrito_at
+        ? 'suscribió el Anexo de Encargo, pero K+AIR todavia no lo ha contrafirmado: '
+          + 'el instrumento no esta ejecutado y la Empresa no puede firmar documentos '
+          + 'de sus trabajadores'
+        : 'no tiene registrado el Anexo de Encargo firmado';
+    }
     if (p === 'anexo_nube_firmado') return 'no tiene registrado el Anexo de Nube firmado por esa Empresa con su versión y huella SHA-256';
     return 'no tiene declarado el canal de atención (el 7.2-7.3: es por dón donde el Trabajador pide la firma en papel)';
   }).join(' y ');
@@ -1511,8 +1694,10 @@ module.exports = {
   create,
   update,
   marcarAnexoFirmado,
+  marcarAnexoSuscrito,
   marcarAnexoNubeFirmado,
   desmarcarAnexoFirmado,
+  desmarcarAnexoSuscrito,
   setActivo,
   verificarHabilitacionFirma,
   assertHabilitadaParaFirma,

@@ -42,6 +42,14 @@ const { resetDb } = require('./helpers');
 const ID_EMPRESA = '900555777';
 const CORREO_FIRMANTE = 'representante@empresa-prueba.test';
 
+// El SEGUNDO CANAL del código de verificación: tiene que ser distinto del
+// buzón que recibe el enlace (artículo 4 del Decreto 2364).
+const CANAL_CODIGO = 'segundo-canal@empresa-prueba.test';
+// Cómo lo confirmó K+AIR con la Empresa: queda escrito en el registro.
+const CONFIRMACION_CANAL = 'Confirmado por llamada de prueba';
+// Quién firma: su documento y la calidad con la que firma.
+const REPRESENTANTE = { documento: '900123456', calidad: 'REPRESENTANTE_LEGAL' };
+
 // Los cinco datos del §11, tal como los declara la Empresa.
 const DATOS_S11 = {
   razon_social: 'EMPRESA DE PRUEBA SAS',
@@ -124,6 +132,8 @@ test('si el archivo del servidor NO es el que declara el manifiesto, no se abre 
   await assert.rejects(
     () => anexoEncargo.crearSuscripcion(ID_EMPRESA, {
       correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL,
     }, { actor: 'admin' }, { manifiesto: manifiestoDesalineado }),
     (e) => e.statusCode === 503 && e.code === 'ANEXO_ENCARGO_NO_DISPONIBLE',
     'con dos textos distintos no se puede abrir una suscripción',
@@ -141,6 +151,8 @@ test('si el manifiesto no declara versión y huella, no se abre suscripción', a
   await assert.rejects(
     () => anexoEncargo.crearSuscripcion(ID_EMPRESA, {
       correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL,
     }, { actor: 'admin' }, { manifiesto: { anexo_encargo: { version: '2026-11-06' } } }),
     (e) => e.statusCode === 503 && e.code === 'ANEXO_ENCARGO_NO_DISPONIBLE',
     'sin huella declarada no hay contra qué comparar',
@@ -191,6 +203,8 @@ test('crearSuscripcion abre la suscripción, manda el enlace y devuelve la huell
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
     nombre_firmante: 'PERSONA DE PRUEBA',
     cargo_firmante: 'Representante legal',
   }, { actor: 'admin', ip: '10.0.0.1', user_agent: 'test' });
@@ -218,6 +232,8 @@ test('la base NO guarda el enlace en claro: solo su huella', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   const fila = db.prepare('SELECT * FROM gh_firma_anexo_encargo_suscripciones').get();
@@ -245,6 +261,8 @@ test('el contexto público enmascara el correo y no expone el enlace', async () 
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   const ctx = anexoEncargo.contextoPublico(r.token, '1.1.1.1', 'navegador');
@@ -268,6 +286,8 @@ test('el contexto público lleva los cinco datos del §11 prellenados con la fic
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   const ctx = anexoEncargo.contextoPublico(r.token, '1.1.1.1', 'navegador');
@@ -286,13 +306,15 @@ test('el contexto público lleva los cinco datos del §11 prellenados con la fic
 // EL CÓDIGO DE VERIFICACIÓN
 // ===========================================================================
 
-test('el código se manda al correo del firmante y sale por K+AIR', async () => {
+test('el código se manda al SEGUNDO CANAL, no al buzón del enlace, y sale por K+AIR', async () => {
   resetDb();
   mailer.clearDevInbox();
   sembrarEmpresa();
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   const res = await anexoEncargo.solicitarCodigo(r.token, { ip: '1.1.1.1', user_agent: 'navegador' });
@@ -300,7 +322,10 @@ test('el código se manda al correo del firmante y sale por K+AIR', async () => 
 
   const correo = ultimoCorreo('anexo_encargo');
   assert.ok(correo, 'tiene que haber salido el correo con el código');
-  assert.equal(correo.to, CORREO_FIRMANTE);
+  assert.equal(correo.to, CANAL_CODIGO,
+    'el código sale por el segundo canal, NO por el buzón que recibió el enlace');
+  assert.notEqual(correo.to, CORREO_FIRMANTE,
+    'si el código llegara al mismo buzón del enlace, el enlace bastaría por sí solo');
   assert.match(correo.subject, /Anexo de Encargo/);
   assert.ok(correo.body.includes('Anexo de Encargo'),
     'el correo del código tiene que decir de qué instrumento es');
@@ -318,10 +343,12 @@ test('sin código no se puede suscribir', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   await assert.rejects(
-    () => anexoEncargo.suscribir(r.token, { otp: '123456', acepta: true, datos_empresa: DATOS_S11 }, {}),
+    () => anexoEncargo.suscribir(r.token, { otp: '123456', acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {}),
     (e) => e.statusCode === 400 && e.code === 'CODIGO_NO_SOLICITADO',
   );
   assert.equal(empresaService.getById(ID_EMPRESA).anexo_encargo_firmado_at, null);
@@ -334,6 +361,8 @@ test('un código incorrecto no firma y deja intento registrado', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -341,7 +370,7 @@ test('un código incorrecto no firma y deja intento registrado', async () => {
   const malo = codigo === '000000' ? '111111' : '000000';
 
   await assert.rejects(
-    () => anexoEncargo.suscribir(r.token, { otp: malo, acepta: true, datos_empresa: DATOS_S11 }, {}),
+    () => anexoEncargo.suscribir(r.token, { otp: malo, acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {}),
     (e) => e.statusCode === 400 && e.code === 'CODIGO_INVALIDO',
   );
   assert.equal(empresaService.getById(ID_EMPRESA).anexo_encargo_firmado_at, null,
@@ -359,6 +388,8 @@ test('sin la aceptación expresa tampoco se firma', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -377,6 +408,8 @@ test('sin los CINCO datos del §11 tampoco se firma', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -387,7 +420,7 @@ test('sin los CINCO datos del §11 tampoco se firma', async () => {
     delete incompletos[clave];
     await assert.rejects(
       () => anexoEncargo.suscribir(r.token,
-        { otp: ultimoCodigo(), acepta: true, datos_empresa: incompletos }, {}),
+        { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: incompletos , representante: REPRESENTANTE }, {}),
       (e) => e.statusCode === 400 && e.code === 'DATOS_S11_INCOMPLETOS',
       'sin ' + clave + ' no se puede suspender',
     );
@@ -406,13 +439,15 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
     nombre_firmante: 'PERSONA DE PRUEBA',
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
   const res = await anexoEncargo.suscribir(
     r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
   );
 
@@ -421,13 +456,25 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
   assert.equal(res.hash, anexoEncargo.modeloVigente().hash);
 
   const empresa = empresaService.getById(ID_EMPRESA);
-  assert.ok(empresa.anexo_encargo_firmado_at, 'la fecha de suscripción tiene que quedar');
+  assert.ok(empresa.anexo_encargo_suscrito_at,
+    'la fecha de la suscripción tiene que quedar en la ficha');
+  assert.equal(empresa.anexo_encargo_firmado_at, null,
+    'la suscripción NO habilita a la Empresa: la fecha de firma solo la pone la '
+    + 'contrafirma de K+AIR, que es otro acto');
 
   const evidencia = JSON.parse(res.evidencia ? JSON.stringify(res.evidencia) : '{}');
   assert.equal(evidencia.fuente, 'enlace_suscripcion');
   assert.equal(evidencia.version, '2026-11-06');
   assert.equal(evidencia.hash, anexoEncargo.modeloVigente().hash);
   assert.equal(evidencia.correo_firmante, CORREO_FIRMANTE);
+  assert.equal(evidencia.canal_codigo, 'se***@empresa-prueba.test',
+    'la evidencia lleva el segundo canal enmascarado');
+  assert.ok(evidencia.aceptacion_hash,
+    'la evidencia lleva la huella de los textos que la Empresa aceptó');
+  assert.ok(evidencia.aceptacion_tratamiento_hash,
+    'la evidencia lleva la huella del texto de tratamiento de datos');
+  assert.equal(evidencia.representante.calidad, 'REPRESENTANTE_LEGAL');
+  assert.equal(evidencia.representante.documento_ultimos4, '3456');
   assert.equal(evidencia.ip, '203.0.113.9');
   assert.equal(evidencia.user_agent, 'Navegador/1.0');
   assert.ok(evidencia.codigo_enviado_at);
@@ -441,6 +488,8 @@ test('los cinco datos del §11 quedan en la fila, en la evidencia y con lo que d
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -453,7 +502,7 @@ test('los cinco datos del §11 quedan en la fila, en la evidencia y con lo que d
 
   const res = await anexoEncargo.suscribir(
     r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: declarados },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: declarados , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
   );
 
@@ -476,6 +525,8 @@ test('la fecha del Anexo queda en la ficha de la Empresa CON el rastro de la fic
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -485,22 +536,22 @@ test('la fecha del Anexo queda en la ficha de la Empresa CON el rastro de la fic
 
   await anexoEncargo.suscribir(
     r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
   );
 
   const empresa = empresaService.getById(ID_EMPRESA);
-  assert.ok(empresa.anexo_encargo_firmado_at,
-    'la fecha del Anexo de Encargo tiene que quedar en la ficha');
+  assert.ok(empresa.anexo_encargo_suscrito_at,
+    'la fecha de la suscripción del Anexo de Encargo tiene que quedar en la ficha');
 
   const renglones = db.prepare(
     'SELECT * FROM gh_firma_empresas_auditoria WHERE id_empresa = ? AND campo = ?',
-  ).all(ID_EMPRESA, 'anexo_encargo_firmado_at');
+  ).all(ID_EMPRESA, 'anexo_encargo_suscrito_at');
   assert.ok(renglones.length > antes,
     'el cambio de la fecha tiene que quedar en el rastro de la ficha');
   const ultimo = renglones[renglones.length - 1];
   assert.equal(ultimo.valor_anterior, null);
-  assert.equal(ultimo.valor_nuevo, empresa.anexo_encargo_firmado_at);
+  assert.equal(ultimo.valor_nuevo, empresa.anexo_encargo_suscrito_at);
   assert.equal(ultimo.id_actor, 'empresa:' + ID_EMPRESA);
   assert.ok(ultimo.motivo && ultimo.motivo.length > 0,
     'el rastro tiene que decir por qué se registró');
@@ -513,12 +564,14 @@ test('suscribir NO ejecuta el contrato: la contrafirma de K+AIR va aparte', asyn
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
   const res = await anexoEncargo.suscribir(
     r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
   );
 
@@ -541,10 +594,12 @@ test('el enlace es de un solo uso: firmado, no se pide otro código', async () =
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
   await anexoEncargo.suscribir(r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {});
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {});
 
   await assert.rejects(
     () => anexoEncargo.solicitarCodigo(r.token, {}),
@@ -553,7 +608,7 @@ test('el enlace es de un solo uso: firmado, no se pide otro código', async () =
 
   // Reintento de quien ya firmó: no vuelve a registrar nada.
   const otra = await anexoEncargo.suscribir(r.token,
-    { otp: '000000', acepta: true, datos_empresa: DATOS_S11 }, {});
+    { otp: '000000', acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {});
   assert.equal(otra.ya_firmada, true);
 });
 
@@ -564,10 +619,12 @@ test('el rastro de la suscripción queda escrito y en orden', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
   await anexoEncargo.suscribir(r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' });
 
   const eventos = db.prepare(
@@ -612,6 +669,8 @@ test('no se puede suspender un texto distinto del que está en el archivo', asyn
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -625,7 +684,7 @@ test('no se puede suspender un texto distinto del que está en el archivo', asyn
 
   await assert.rejects(
     () => anexoEncargo.suscribir(r.token,
-      { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
+      { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {}),
     (e) => e.statusCode === 409 && e.code === 'TEXTO_MODIFICADO',
     'no se puede suspender un texto que no es el del archivo',
   );
@@ -639,6 +698,8 @@ test('si el texto del servidor cambia, no se firma: hay que abrir otra suscripci
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -652,7 +713,7 @@ test('si el texto del servidor cambia, no se firma: hay que abrir otra suscripci
   try {
     await assert.rejects(
       () => anexoEncargo.suscribir(r.token,
-        { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {},
+        { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {},
         { rutaModelo: copia }),
       (e) => e.statusCode === 409 && e.code === 'TEXTO_MODIFICADO',
       'la Empresa no puede firmar un texto que ya no es el que se le mostró',
@@ -678,6 +739,8 @@ test('si el texto ya cambió, no se manda un código: no hay nada que firmar', a
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   // Se falsea la huella: el texto del servidor ya no es el de la suscripción.
@@ -701,6 +764,8 @@ test('si el correo del código no sale, se dice con claridad y queda en el rastr
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   // Se simula que el SMTP no responde.
@@ -730,6 +795,8 @@ test('anular una suscripción exige el motivo, deja el rastro y mata el enlace',
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   const fila = db.prepare(
     'SELECT id FROM gh_firma_anexo_encargo_suscripciones WHERE id_empresa = ?',
@@ -769,14 +836,18 @@ test('no se pisa una suscripción de otro texto: la Empresa ya firmó otra versi
   // Primera suscripción: se firma.
   const r1 = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r1.token, {});
   await anexoEncargo.suscribir(r1.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {});
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {});
 
   // Segunda suscripción, de OTRO texto: no se puede volver a firmar encima.
   const r2 = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r2.token, {});
   db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
@@ -785,14 +856,16 @@ test('no se pisa una suscripción de otro texto: la Empresa ya firmó otra versi
 
   await assert.rejects(
     () => anexoEncargo.suscribir(r2.token,
-      { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
+      { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {}),
     (e) => e.statusCode === 409 && e.code === 'TEXTO_MODIFICADO',
     'una suscripción de otro texto no puede firmarse encima de la anterior',
   );
 
   // Y la fecha que ya estaba NO se tocó.
   const empresa = empresaService.getById(ID_EMPRESA);
-  assert.ok(empresa.anexo_encargo_firmado_at);
+  assert.ok(empresa.anexo_encargo_suscrito_at);
+  assert.equal(empresa.anexo_encargo_firmado_at, null,
+    'suscribirse no es firmar: la contrafirma de K+AIR va aparte');
 });
 
 // ===========================================================================
@@ -806,13 +879,15 @@ test('suscribir genera el acta y su huella queda en la evidencia', async () => {
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
     nombre_firmante: 'PERSONA DE PRUEBA',
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
   const res = await anexoEncargo.suscribir(
     r.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
   );
 
@@ -858,6 +933,8 @@ test('si el acta no se puede generar, la suscripción NO se cierra', async () =>
 
   const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
@@ -869,7 +946,7 @@ test('si el acta no se puede generar, la suscripción NO se cierra', async () =>
   try {
     await assert.rejects(
       () => anexoEncargo.suscribir(r.token,
-        { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
+        { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE }, {}),
       (e) => e.statusCode === 500 && e.code === 'ACTA_NO_GENERADA',
     );
   } finally {

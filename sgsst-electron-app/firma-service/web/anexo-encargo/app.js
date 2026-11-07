@@ -130,9 +130,21 @@
     texto('d-hash2', c.hash);
     texto('d-firmante', (c.nombre_firmante || '—') + (c.cargo_firmante ? ' — ' + c.cargo_firmante : ''));
     texto('d-correo', c.correo_firmante);
+    // El segundo canal: el código NO llega a este buzón. Se muestra para que
+    // la Empresa sepa dónde esperarlo.
+    texto('d-canal', c.canal_codigo);
     texto('d-expira', c.expira_en ? new Date(c.expira_en).toLocaleString('es-CO') : '—');
     var doc = el('d-documento');
     if (doc && c.documento_url) doc.setAttribute('href', c.documento_url);
+
+    // LOS TEXTOS LEGALES DE LA ACEPTACIÓN. Vienen del SERVICIO y no están
+    // escritos en esta página a mano: el acta imprime exactamente los mismos,
+    // y si cada uno tuviera su propia copia, un día dejarían de coincidir y
+    // la Empresa aceptaría una cosa mientras el acta archivaría otra.
+    var t = c.textos || {};
+    texto('texto-mecanismo', t.mecanismo || '');
+    texto('texto-tratamiento', t.tratamiento || '');
+    actualizarDeclaracion();
 
     // El PRELLENADO de los cinco datos del §11: lo que hay en la ficha. La
     // Empresa puede confirmarlo o corregirlo. Solo se rellena lo que está
@@ -159,6 +171,24 @@
     api('GET', API + encodeURIComponent(t)).then(pintarContexto).catch(function (e) {
       errorFatal(e.message);
     });
+  }
+
+  /**
+   * La DECLARACIÓN DE REPRESENTACIÓN cambia con la calidad elegida.
+   *
+   * Un delegado no es el representante legal: mostrarle la declaración de
+   * representante legal sería mostrarle una frase que no está firmando.
+   */
+  function actualizarDeclaracion() {
+    var t = (ctx && ctx.textos) || {};
+    var cal = el('rep-calidad');
+    // El menú vacío no puede pasar: la calidad por omisión es la del
+    // representante legal, que es la primera opción del formulario.
+    var calidad = (cal && cal.value) || 'REPRESENTANTE_LEGAL';
+    var textoDeclaracion = (calidad === 'DELEGADO')
+      ? (t.declaracion_delegado || t.declaracion || '')
+      : (t.declaracion_representante_legal || t.declaracion || '');
+    texto('texto-declaracion', textoDeclaracion);
   }
 
   function pedirCodigo() {
@@ -196,22 +226,53 @@
       return;
     }
 
+    // QUIEN FIRMA. El número de documento es lo que permite contrastar la
+    // representación contra el certificado, el RUT o el poder. Sin él, el
+    // método solo probaría control de un buzón.
+    var documento = el('rep-documento') ? el('rep-documento').value.trim() : '';
+    if (!documento) {
+      mensaje('Falta el número de documento de quien suscribe: declare el documento '
+        + 'del representante legal o del delegado con poder.', 'error');
+      if (el('rep-documento')) el('rep-documento').focus();
+      return;
+    }
+
+    // La aceptación de la información sobre el tratamiento de los datos es
+    // una casilla APARTE: responde a una obligación distinta (informar, art.
+    // 12 de la Ley 1581) de la de acordar el mecanismo (art. 7 del Decreto
+    // 2364).
+    if (!el('acepta-tratamiento') || el('acepta-tratamiento').checked !== true) {
+      mensaje('Marque también que leyó la información sobre el tratamiento de sus '
+        + 'datos personales para la ejecución de este Anexo.', 'error');
+      if (el('acepta-tratamiento')) el('acepta-tratamiento').focus();
+      return;
+    }
+
     var btn = el('btn-firmar');
     btn.disabled = true;
     btn.textContent = 'Registrando…';
     api('POST', API + encodeURIComponent(t) + '/suscribir', {
       otp: el('otp').value.trim(),
       acepta: el('acepta').checked === true,
+      acepta_tratamiento: el('acepta-tratamiento').checked === true,
       datos_empresa: datos,
+      // QUIEN FIRMA: el documento y la calidad. Sin esto el método probaría
+      // control de un buzón y nada más.
+      representante: {
+        documento: (el('rep-documento') ? el('rep-documento').value : '').trim(),
+        calidad: (el('rep-calidad') && el('rep-calidad').value) || 'REPRESENTANTE_LEGAL',
+      },
     }).then(function (r) {
       el('form-firma').classList.add('oculto');
       el('form-datos').classList.add('oculto');
+      el('form-representante').classList.add('oculto');
       el('btn-codigo').classList.add('oculto');
       mensaje('Anexo de Encargo suscrito por su Empresa. Versión ' + r.version + ', huella '
         + r.hash + ', registrado el ' + new Date(r.firmado_at).toLocaleString('es-CO')
         + '. Este documento es bilateral: a la firma de su Empresa le sigue la '
         + 'contrafirma de K+AIR, y el contrato queda ejecutado cuando las dos partes '
-        + 'han firmado.', 'ok');
+        + 'han firmado. Hasta entonces su Empresa no puede usar el servicio para '
+        + 'firmar documentos de sus trabajadores.', 'ok');
       // El acta: el documento que la Empresa descarga y K+AIR archiva. Su
       // huella es la de SUS bytes, no la del texto que se firmó.
       if (r.acta && r.acta.url) {
@@ -230,6 +291,9 @@
   document.addEventListener('DOMContentLoaded', function () {
     el('btn-codigo').addEventListener('click', pedirCodigo);
     el('form-firma').addEventListener('submit', suscribir);
+    // La declaración que se muestra depende de la calidad con la que firma.
+    var cal = el('rep-calidad');
+    if (cal) cal.addEventListener('change', actualizarDeclaracion);
     iniciar();
   });
 }());

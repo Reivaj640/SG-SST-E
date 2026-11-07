@@ -107,6 +107,19 @@ const suscripcionAnexoNubeBody = z.object({
  * los declara, sustituyen a los de la ficha. Lo que MANDAN son los que
  * declare la Empresa en la pantalla: el operador solo puede adelantar lo que
  * ella ya tiene, no escribir en su nombre.
+ *
+ * EL SEGUNDO CANAL DEL CÓDIGO
+ * --------------------------
+ * `canal_codigo` es por dónde sale el código de verificación, y tiene que ser
+ * DISTINTO de `correo_firmante`: el artículo 4 del Decreto 2364 pide que los
+ * datos de creación de la firma correspondan exclusivamente al firmante, y un
+ * buzón compartido no corresponde a una persona. Lo declara K+AIR (lo
+ * confirma con la Empresa fuera de banda) y no quien está haciendo clic en
+ * el enlace: si lo declarara la pantalla, un intruso con el buzón podría
+ * apuntar el código a su propia dirección.
+ *
+ * `canal_codigo_confirmacion` es CÓMO se confirmó ese canal con la Empresa.
+ * Es obligatoria porque es la prueba de que el canal es de la Empresa.
  */
 const suscripcionAnexoEncargoBody = z.object({
   correo_firmante: z
@@ -115,6 +128,17 @@ const suscripcionAnexoEncargoBody = z.object({
     .max(254, 'correo_firmante demasiado largo')
     .email('correo_firmante no parece un correo')
     .transform((s) => s.trim().toLowerCase()),
+  canal_codigo: z
+    .string()
+    .min(1, 'canal_codigo es requerido: el código no puede salir al mismo buzón del enlace')
+    .max(254, 'canal_codigo demasiado largo')
+    .email('canal_codigo no parece un correo')
+    .transform((s) => s.trim().toLowerCase()),
+  canal_codigo_confirmacion: z
+    .string()
+    .min(1, 'canal_codigo_confirmacion es requerido: hay que decir cómo se confirmó el canal')
+    .max(300, 'canal_codigo_confirmacion demasiado largo')
+    .transform((s) => s.trim()),
   nombre_firmante: textoOpcional(200),
   cargo_firmante: textoOpcional(200),
   datos_empresa: z.object({
@@ -125,6 +149,27 @@ const suscripcionAnexoEncargoBody = z.object({
     representante: textoOpcional(200),
   }).strict().nullish(),
 });
+
+/**
+ * Body de la verificación documental de quien firmó el Anexo de Encargo.
+ *
+ * Es un acto de K+AIR: alguien de la operación contrasta el documento que la
+ * Empresa declaró contra el certificado de existencia y representación de la
+ * cámara de comercio, contra el RUT de la Empresa o contra el poder, y deja
+ * constancia de contra qué lo contrastó y de dónde quedó radicado.
+ */
+const verificarRepresentanteBody = z.object({
+  tipo_documento: z
+    .enum(['CERTIFICADO_CAMARA', 'RUT', 'PODER'], {
+      errorMap: () => ({ message: 'tipo_documento tiene que ser CERTIFICADO_CAMARA, RUT o PODER' }),
+    }),
+  referencia: z
+    .string()
+    .min(1, 'referencia es requerida: hay que decir dónde quedó el documento')
+    .max(300, 'referencia demasiado larga')
+    .transform((s) => s.trim()),
+  nota: textoOpcional(500),
+}).strict();
 
 /**
  * Body de alta. Solo identidad: el anexo y el estado activo tienen endpoints
@@ -320,6 +365,7 @@ module.exports = {
   anexoNubeBody,
   suscripcionAnexoNubeBody,
   suscripcionAnexoEncargoBody,
+  verificarRepresentanteBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,

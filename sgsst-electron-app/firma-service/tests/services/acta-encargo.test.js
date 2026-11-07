@@ -57,6 +57,27 @@ const DATOS = {
     correo: 'datos@empresa-prueba.test',
     representante: 'PERSONA DE PRUEBA',
   },
+  // ─── Los ajustes del abogado (7-nov-2026) ─────────────────────────────────
+  // El segundo canal del código: distinto del buzón del enlace. El acta lo
+  // enmascara, como todo buzón que sale en un documento.
+  canal_codigo: 'segundo-canal@empresa-prueba.test',
+  // Quién firmó y con qué poder. El documento va con su final nada más.
+  representante_nombre: 'PERSONA DE PRUEBA',
+  representante_documento: '****3456',
+  representante_calidad: 'REPRESENTANTE_LEGAL',
+  // Los TRES textos que la Empresa aceptó, con sus huellas. Van enteros: el
+  // acta es la constancia de lo que se aceptó.
+  texto_mecanismo: 'Las partes acuerdan que este Anexo se suscribe mediante el mecanismo '
+    + 'electronico descrito en el Acuerdo sobre el uso del mecanismo de firma electronica '
+    + 'K+AIR, que la Empresa declara conocer y aceptar.',
+  texto_declaracion: 'Declaro que soy el representante legal de la Empresa y que tengo '
+    + 'facultades para suscribir este Anexo.',
+  texto_tratamiento: 'K+AIR trata los datos personales de la Empresa para cumplir el '
+    + 'encargo de tratamiento de datos pactado en este Anexo. El plazo de conservacion es '
+    + 'de diez anos para el documento original y firmado, y de cinco anos para el registro '
+    + 'de operaciones y autenticacion.',
+  aceptacion_hash: 'a1b2c3d4'.repeat(8),
+  aceptacion_tratamiento_hash: 'e5f6a7b8'.repeat(8),
 };
 
 // ===========================================================================
@@ -214,6 +235,83 @@ test('el acta no puede llevar su propia huella', async () => {
 
   assert.ok(!texto.includes(acta.hash),
     'la huella del acta se calcula sobre sus bytes: no puede estar dentro');
+});
+
+// ===========================================================================
+// LOS AJUSTES DEL ABOGADO (7-nov-2026)
+// ===========================================================================
+//
+// Lo que el abogado pidió que el acta dijera y que antes no decía. Ninguno de
+// estos requisitos es cosmético: son las tres cosas que hacen que el acta
+// sirva como prueba de lo que la Empresa aceptó.
+
+test('el acta dice que es una constancia y no la copia firmada', async () => {
+  const acta = await actaEncargo.generarActa(DATOS);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('ESTA ACTA ES UNA CONSTANCIA, NO LA COPIA FIRMADA'),
+    'el aviso tiene que estar en el acta, no solo en la pantalla');
+  assert.ok(texto.includes('No sustituye la copia firmada del Anexo'),
+    'la frase tiene que ser la literal');
+  assert.ok(texto.includes('cada parte conserva'),
+    'tiene que decir que la copia firmada la conserva cada parte');
+});
+
+test('el acta dice quién firmó, con su documento y con su calidad', async () => {
+  const acta = await actaEncargo.generarActa(DATOS);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('4. QUIEN FIRMÓ'), 'la sección de quién firmó');
+  assert.ok(texto.includes('PERSONA DE PRUEBA'), 'el nombre del firmante');
+  assert.ok(texto.includes('****3456'),
+    'el documento va con su final nada más: el acta es un documento que la '
+    + 'Empresa puede compartir con quien quiera');
+  assert.ok(texto.includes('REPRESENTANTE_LEGAL'), 'la calidad con la que firmó');
+  assert.ok(texto.includes('no contrafirma el Anexo sin esa verificacion')
+    || texto.includes('no contrafirma el Anexo sin esa verificación'),
+    'el acta tiene que decir que la contrafirma depende de la verificación');
+});
+
+test('el acta dice que el código NO salió por el buzón del enlace', async () => {
+  const acta = await actaEncargo.generarActa(DATOS);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('Canal del código'), 'la fila del canal del código');
+  assert.ok(texto.includes('se***@empresa-prueba.test'),
+    'el segundo canal va enmascarado, como el buzón del enlace');
+  assert.ok(!texto.includes('segundo-canal@empresa-prueba.test'),
+    'la dirección entera del segundo canal no se imprime');
+  assert.ok(texto.includes('Distinto del buzón del enlace'),
+    'tiene que quedar dicho que el código no salió por el buzón del enlace');
+});
+
+test('el acta imprime los tres textos que la Empresa aceptó, con sus huellas', async () => {
+  const acta = await actaEncargo.generarActa(DATOS);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('6. LO QUE LA EMPRESA ACEPTÓ'),
+    'la sección de lo que aceptó');
+  assert.ok(texto.includes('mecanismo electronico'),
+    'la cláusula del mecanismo, con sus palabras');
+  assert.ok(texto.includes('Declaro que soy el representante legal de la Empresa'),
+    'la declaración de representación');
+  assert.ok(texto.includes('para cumplir el encargo de tratamiento de datos'),
+    'la frase informativa de tratamiento de datos');
+
+  // Las huellas de lo aceptado: sin ellas el acta diría "aceptó" sin probar
+  // QUÉ aceptó.
+  assert.ok(texto.includes(DATOS.aceptacion_hash), 'la huella del texto aceptado');
+  assert.ok(texto.includes(DATOS.aceptacion_tratamiento_hash),
+    'la huella del texto de datos');
+});
+
+test('el acta dice que la fecha de la ficha es de SUSCRIPCIÓN y no de firma', async () => {
+  const acta = await actaEncargo.generarActa(DATOS);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('dice SUSCRIPCIÓN, no firma')
+    || texto.includes('dice SUSCRIPCION, no firma'),
+    'la sección del registro tiene que distinguir la suscripción de la firma');
 });
 
 // ===========================================================================

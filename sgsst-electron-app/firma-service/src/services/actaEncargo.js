@@ -378,11 +378,20 @@ async function generarActa(datos) {
     + 'por separado. Mientras no exista esa contrafirma, el contrato NO está ejecutado y '
     + 'esta acta NO lo declara firmado.');
   aviso(
+    'ESTA ACTA ES UNA CONSTANCIA, NO LA COPIA FIRMADA',
+    'Esta acta es una constancia de la suscripción. No sustituye la copia firmada '
+    + 'del Anexo, que cada parte conserva. El §12 del Anexo de Encargo prevé que la '
+    + 'copia firmada la conserve cada parte, y el servicio no la almacena: lo que '
+    + 'aquí queda es el documento que K+AIR archiva en el expediente y que la Empresa '
+    + 'puede descargar.');
+  aviso(
     'LA DECLARACIÓN DE LA EMPRESA',
     'La Empresa declara que leyó el texto canónico del Anexo de Encargo en la versión '
     + 'indicada, con la huella indicada, que aceptó sus condiciones en nombre propio, que '
-    + 'declaró los cinco datos del párrafo 11 que se imprimen más abajo, y que verificó '
-    + 'su identidad con el código de verificación recibido en el correo indicado.');
+    + 'declaró los cinco datos del párrafo 11 que se imprimen más abajo, que declaró el '
+    + 'documento y la calidad de quien suscribe, que verificó su identidad con el código '
+    + 'de verificación recibido en un canal distinto al del enlace, y que acepta el '
+    + 'mecanismo electrónico por el que se suscribe este Anexo.');
 
   // ─── 1. El instrumento ─────────────────────────────────────────────────────
   seccion('1. El instrumento suscrito');
@@ -423,21 +432,59 @@ async function generarActa(datos) {
   dato('Correo', _texto(s11.correo, 254));
   dato('Representante legal', _texto(s11.representante, 200));
 
-  // ─── 4. La verificación ────────────────────────────────────────────────────
-  seccion('4. La verificación');
+  // ─── 4. Quién firmó ─────────────────────────────────────────────────────
+  // El documento va con su final nada más: el número completo está cifrado en
+  // el registro, y un acta es un documento que la Empresa puede compartir con
+  // quien quiera.
+  seccion('4. Quien firmó');
+  dato('Nombre', _texto(d.representante_nombre, 200));
+  dato('Documento', _texto(d.representante_documento, 60));
+  dato('Calidad', _texto(d.representante_calidad, 40));
+  bloque('La verificación documental de esa representación (contra el certificado de '
+    + 'existencia y representación de la cámara de comercio, contra el RUT de la Empresa '
+    + 'o contra el poder, según la calidad) la hace K+AIR después de esta suscripción, '
+    + 'y queda registrada en el expediente. K+AIR no contrafirma el Anexo sin esa '
+    + 'verificación: es la contrafirma la que la deja por escrito.', { size: 8.5, lh: 11 });
+
+  // ─── 5. La verificación ────────────────────────────────────────────────────
+  seccion('5. La verificación');
   dato('Código de verificación', 'Verificado (los seis dígitos no se registran en claro)');
+  dato('Canal del código', d.canal_codigo ? enmascararCorreo(d.canal_codigo) : 'N/D');
+  dato('Distinto del buzón del enlace', d.canal_codigo ? 'Sí' : 'N/D');
   dato('Código enviado el', _texto(d.codigo_enviado_at, 40));
   dato('Código verificado el', _texto(d.codigo_verificado_at, 40));
   dato('Dirección IP', _texto(d.ip, 64));
   dato('Navegador', _texto(d.user_agent, 300));
 
-  // ─── 5. El registro ────────────────────────────────────────────────────────
-  seccion('5. Dónde queda el registro');
+  // ─── 6. Lo que la Empresa aceptó ──────────────────────────────────────────
+  // El acta imprime las PALABRAS que la Empresa marcó, con su huella. Es la
+  // diferencia entre un acta que dice "aceptó" y un acta que prueba qué se
+  // aceptó.
+  seccion('6. Lo que la Empresa aceptó');
+  if (d.texto_mecanismo) {
+    bloque(d.texto_mecanismo, { size: 8.5, lh: 11 });
+    y -= 4;
+  }
+  if (d.texto_declaracion) {
+    bloque(d.texto_declaracion, { size: 8.5, lh: 11 });
+    y -= 4;
+  }
+  if (d.texto_tratamiento) {
+    bloque(d.texto_tratamiento, { size: 8.5, lh: 11 });
+    y -= 4;
+  }
+  dato('Huella del texto aceptado', _texto(d.aceptacion_hash, 64));
+  dato('Huella del texto de datos', _texto(d.aceptacion_tratamiento_hash, 64));
+
+  // ─── 7. El registro ────────────────────────────────────────────────────────
+  seccion('7. Dónde queda el registro');
   bloque('La suscripción quedó registrada en el servicio de firma electrónica K+AIR, con su '
     + 'rastro inalterable: cada paso (apertura del enlace, envío del código, verificación y '
-    + 'suscripción) queda con fecha, dirección IP y navegador. La fecha del Anexo de '
-    + 'Encargo quedó además en la ficha de la Empresa, con el valor anterior, el nuevo, quién '
-    + 'la cambió, desde dónde y por qué.');
+    + 'suscripción) queda con fecha, dirección IP y navegador. La suscripción quedó además '
+    + 'en la ficha de la Empresa, con el valor anterior, el nuevo, quién la cambió, desde '
+    + 'dónde y por qué. Esa fecha de la ficha dice SUSCRIPCIÓN, no firma: el Anexo de '
+    + 'Encargo es bilateral y el instrumento queda ejecutado solo cuando K+AIR también '
+    + 'firma, en un segundo acto que se registra por separado.');
 
   // ─── Nota sobre la segunda huella ─────────────────────────────────────────
   espacio(60);

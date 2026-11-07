@@ -69,6 +69,23 @@ const COLUMNAS_SUSCRIPCION = {
   creado_por: 'TEXT',
   created_at: 'TEXT',
   updated_at: 'TEXT',
+  // ── Los ajustes del abogado (migración 058, 7-nov-2026) ──────────────────
+  // El segundo canal del código, con quién lo confirmó y cómo.
+  canal_codigo: 'TEXT',
+  canal_codigo_tipo: 'TEXT',
+  canal_codigo_confirmacion: 'TEXT',
+  canal_codigo_confirmado_por: 'TEXT',
+  canal_codigo_confirmado_at: 'TEXT',
+  // Quién firmó: su documento (cifrado), la calidad con la que firma y la
+  // verificación documental que hizo K+AIR.
+  representante_documento: 'TEXT',
+  representante_calidad: 'TEXT',
+  representante_verificacion: 'TEXT',
+  representante_verificado_por: 'TEXT',
+  representante_verificado_at: 'TEXT',
+  // La huella de los textos que la Empresa aceptó.
+  aceptacion_hash: 'TEXT',
+  aceptacion_tratamiento_hash: 'TEXT',
 };
 
 // Las que no pueden faltar: sin esto la fila no describe una suscripción.
@@ -117,7 +134,7 @@ test('056 · el archivo 056_anexo_encargo_suscripcion.sql existe y declara las d
     'la 056 no debe crear triggers: van en la 057 (ver tests/migration-057.test.js)');
 });
 
-test('056 · la tabla de suscripciones tiene EXACTAMENTE las columnas del plan, con su tipo', () => {
+test('056 + 058 · la tabla de suscripciones tiene EXACTAMENTE las columnas del plan y de los ajustes, con su tipo', () => {
   const info = columnasDe('gh_firma_anexo_encargo_suscripciones');
   assert.ok(info.length > 0, 'la tabla gh_firma_anexo_encargo_suscripciones debe existir');
 
@@ -132,7 +149,8 @@ test('056 · la tabla de suscripciones tiene EXACTAMENTE las columnas del plan, 
 
   const esperadas = Object.keys(COLUMNAS_SUSCRIPCION).sort();
   assert.deepEqual(nombres.slice().sort(), esperadas,
-    'la tabla no puede tener columnas de más ni de menos: el set es el del plan');
+    'la tabla no puede tener columnas de más ni de menos: el set es el del plan '
+    + 'más el de los ajustes del abogado (migración 058)');
 });
 
 test('056 · las columnas del presupuesto son NOT NULL', () => {

@@ -142,6 +142,22 @@ input[type="text"].dato {
   letter-spacing: normal;
 }
 
+/* El menú de la calidad con la que firma: mismo aspecto que los campos. */
+select.dato {
+  max-width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+select.dato:focus {
+  outline: 2px solid var(--azul);
+  outline-offset: 1px;
+}
+
 input[type="text"]:focus {
   outline: 2px solid var(--azul);
   outline-offset: 1px;
@@ -156,6 +172,23 @@ label.casilla {
 }
 
 label.casilla input { margin-top: 4px; }
+
+/* Los textos legales de la aceptación: van DENTRO de la casilla que los
+   acepta, en cuerpo pequeño y con un filete al margen, para que se lean como
+   una cita y no como una etiqueta. Los pone el SERVICIO (los recibe en el
+   contexto), no esta hoja: el acta imprime los mismos. */
+.texto-legal {
+  display: block;
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* Antes de que lleguen los textos, el hueco vacío no debe dejar filete. */
+.texto-legal:empty { display: none; }
 
 button.primario {
   background: var(--azul);

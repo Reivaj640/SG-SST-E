@@ -30,6 +30,14 @@ const { resetDb, makeApp } = require('../helpers');
 const ID_EMPRESA = '900666444';
 const CORREO_FIRMANTE = 'representante@empresa-acta.test';
 
+// El SEGUNDO CANAL del código de verificación: tiene que ser distinto del
+// buzón que recibe el enlace (artículo 4 del Decreto 2364).
+const CANAL_CODIGO = 'segundo-canal@empresa-acta.test';
+// Cómo lo confirmó K+AIR con la Empresa: queda escrito en el registro.
+const CONFIRMACION_CANAL = 'Confirmado por llamada de prueba';
+// Quién firma: su documento y la calidad con la que firma.
+const REPRESENTANTE = { documento: '900123456', calidad: 'REPRESENTANTE_LEGAL' };
+
 const DATOS_S11 = {
   razon_social: 'EMPRESA DEL ACTA SAS',
   nit: '900666444-1',
@@ -67,11 +75,13 @@ async function suscribir() {
   const app = makeApp();
   const abierto = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
     nombre_firmante: 'PERSONA DE PRUEBA',
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(abierto.token, {});
   const res = await anexoEncargo.suscribir(abierto.token,
-    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { otp: ultimoCodigo(), acepta: true, acepta_tratamiento: true, datos_empresa: DATOS_S11 , representante: REPRESENTANTE },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' });
   return { app, token: abierto.token, res };
 }
@@ -112,6 +122,8 @@ test('un enlace que no firmó nada NO tiene acta', async () => {
 
   const abierto = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   }, { actor: 'admin' });
 
   const res = await request(makeApp())

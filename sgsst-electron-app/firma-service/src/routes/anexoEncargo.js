@@ -72,10 +72,31 @@ const datosS11Body = z.object({
   representante: z.string().trim().max(200).nullish(),
 }).strict().nullish();
 
+/**
+ * QUIEN FIRMA: su documento y la calidad con la que firma.
+ *
+ * Por la misma razón que los cinco del §11: el esquema dice CÓMO se ven y el
+ * SERVICIO dice SI están. Si el esquema exigiera el documento, una Empresa
+ * que lo dejara vacío recibiría un 400 genérico de zod en vez del
+ * `REPRESENTANTE_NO_IDENTIFICADO` que le dice qué le falta.
+ */
+const representanteBody = z.object({
+  documento: z.string().trim().max(60).nullish(),
+  calidad: z.string().trim().max(40).nullish(),
+}).strict().nullish();
+
 const suscribirBody = z.object({
   otp: z.string().trim().regex(/^\d{6}$/, 'el código son 6 dígitos'),
+  // La aceptación del Anexo con su cláusula del mecanismo y la declaración de
+  // representación.
   acepta: z.boolean({ required_error: 'acepta es requerido' }),
+  // La aceptación de la información sobre el tratamiento de los datos
+  // personales. Es una casilla aparte porque responde a una obligación
+  // distinta: la del artículo 12 de la Ley 1581 (informar), no la del
+  // artículo 7 del Decreto 2364 (acordar el mecanismo).
+  acepta_tratamiento: z.boolean({ required_error: 'acepta_tratamiento es requerido' }),
   datos_empresa: datosS11Body,
+  representante: representanteBody,
 }).strict();
 
 /**
@@ -210,10 +231,13 @@ router.post('/api/anexo-encargo/:token/suscribir', validateBody(suscribirBody), 
       {
         otp: req.body.otp,
         acepta: req.body.acepta,
+        acepta_tratamiento: req.body.acepta_tratamiento,
         // Los cinco datos del §11 que declara la Empresa. Lo que ella
         // declara es lo que queda: por eso van en el cuerpo de la
         // suscripción y no se leen de la ficha.
         datos_empresa: req.body.datos_empresa || undefined,
+        // Quién firmó: su documento y la calidad con la que firma.
+        representante: req.body.representante || undefined,
       },
       { ip: req.ip, user_agent: req.get('User-Agent') },
     );

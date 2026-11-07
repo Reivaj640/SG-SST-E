@@ -38,6 +38,9 @@ const request = require('supertest');
 const { makeApp, resetDb } = require('../helpers');
 const db = require('../../src/db/connection');
 const anexoEncargo = require('../../src/services/anexoEncargo');
+// Los textos que la pantalla muestra: los compares contra el MISMO módulo que
+// usa el acta, para que se vea que salen del mismo lado.
+const textosAceptacion = require('../../src/services/anexoEncargoTextos');
 const mailer = require('../../src/services/mailer');
 
 const DIR_WEB = path.join(__dirname, '..', '..', 'web', 'anexo-encargo');
@@ -46,6 +49,14 @@ const SCRIPT = path.join(DIR_WEB, 'app.js');
 const ID_EMPRESA = '900777666';
 const RAZON_SOCIAL = 'EMPRESA DE PANTALLA SAS';
 const CORREO_FIRMANTE = 'representante@empresa-pantalla.test';
+
+// El SEGUNDO CANAL del código de verificación: tiene que ser distinto del
+// buzón que recibe el enlace (artículo 4 del Decreto 2364).
+const CANAL_CODIGO = 'segundo-canal@empresa-pantalla.test';
+// Cómo lo confirmó K+AIR con la Empresa: queda escrito en el registro.
+const CONFIRMACION_CANAL = 'Confirmado por llamada de prueba';
+// Quién firma: su documento y la calidad con la que firma.
+const REPRESENTANTE = { documento: '900123456', calidad: 'REPRESENTANTE_LEGAL' };
 
 // ===========================================================================
 // HELPERS
@@ -166,6 +177,20 @@ function correrPantalla(token, respuestas, valores) {
     // el test los necesita: un campo que el script todavía no ha pedido no
     // existe, y el test lo sabe.
     campo: elemento,
+    /**
+     * Cambia un campo y dispara su evento `change`.
+     *
+     * El `change` es lo que hace que la DECLARACIÓN DE REPRESENTACIÓN cambie
+     * con la calidad elegida: sin dispararlo, la pantalla seguiría mostrando
+     * la declaración del representante legal a un delegado.
+     */
+    cambiar(id, valor) {
+      const e = elemento(id);
+      e.value = valor;
+      const cb = listeners[id] && listeners[id].change;
+      assert.ok(cb, `el campo ${id} tiene que avisar cuando cambia`);
+      cb();
+    },
     disparar() {
       assert.ok(listo, 'el script tiene que esperar al DOMContentLoaded');
       listo();
@@ -200,6 +225,8 @@ test('la dirección que declara el script de la pantalla existe en el servicio',
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
     nombre_firmante: 'Representante de Prueba',
   });
 
@@ -224,6 +251,8 @@ test('el contexto que recibe la pantalla lleva la huella del archivo del servido
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -244,6 +273,8 @@ test('la ruta del enlace sigue sirviendo la pantalla en HTML', async () => {
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -261,7 +292,11 @@ test('un enlace que no existe responde 404 y no un error interno', async () => {
   const app = makeApp();
   const res = await request(app)
     .post('/api/anexo-encargo/token-que-no-existe/suscribir')
-    .send({ otp: '000000', acepta: true });
+    .send({ otp: '000000', acepta: true, acepta_tratamiento: true,
+      datos_empresa: { razon_social: RAZON_SOCIAL, nit: '900777666-1',
+        domicilio: 'Calle 47 # 43-57 Piso 2, Barranquilla',
+        correo: 'datos@empresa-pantalla.test', representante: 'PERSONA DE PRUEBA' },
+      representante: REPRESENTANTE });
 
   assert.equal(res.status, 404,
     'un enlace inexistente es un 404 con su codigo, no un 500: el 500 esconde el motivo');
@@ -280,6 +315,8 @@ test('la pantalla prellena los cinco datos del §11 con la ficha de la Empresa',
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   // El contexto de VERDAD: el que la Empresa va a recibir.
@@ -309,6 +346,8 @@ test('la pantalla MANDA los cinco datos que declaró la Empresa', async () => {
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -333,6 +372,8 @@ test('la pantalla MANDA los cinco datos que declaró la Empresa', async () => {
   elementos['s11-nit'].value = '900.777.666-1';
   campo('otp').value = '123456';
   campo('acepta').checked = true;
+  campo('rep-documento').value = '900123456';
+  campo('acepta-tratamiento').checked = true;
 
   enviar();
   await respiro();
@@ -362,6 +403,8 @@ test('sin los cinco datos del §11 la pantalla no manda nada y dice cuál falta'
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -380,6 +423,8 @@ test('sin los cinco datos del §11 la pantalla no manda nada y dice cuál falta'
   elementos['s11-nit'].value = '';
   campo('otp').value = '123456';
   campo('acepta').checked = true;
+  campo('rep-documento').value = '900123456';
+  campo('acepta-tratamiento').checked = true;
 
   enviar();
   await respiro();
@@ -398,6 +443,8 @@ test('la pantalla no dice que el contrato quedó firmado: falta la contrafirma',
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -420,6 +467,8 @@ test('la pantalla no dice que el contrato quedó firmado: falta la contrafirma',
 
   campo('otp').value = '123456';
   campo('acepta').checked = true;
+  campo('rep-documento').value = '900123456';
+  campo('acepta-tratamiento').checked = true;
   enviar();
   await respiro();
 
@@ -474,6 +523,8 @@ test('la pantalla ofrece el acta después de suscribir', async () => {
   const app = makeApp();
   const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
     correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
   });
 
   const res = await request(app)
@@ -501,6 +552,8 @@ test('la pantalla ofrece el acta después de suscribir', async () => {
 
   campo('otp').value = '123456';
   campo('acepta').checked = true;
+  campo('rep-documento').value = '900123456';
+  campo('acepta-tratamiento').checked = true;
   enviar();
   await respiro();
 
@@ -513,4 +566,192 @@ test('la pantalla ofrece el acta después de suscribir', async () => {
     'la pantalla tiene que mostrar la huella del acta');
   assert.equal(elementos['acta'].classList.clases.oculto, false,
     'el bloque del acta tiene que quedar visible después de suscribir');
+});
+
+// ===========================================================================
+// LOS AJUSTES DEL ABOGADO (7-nov-2026) EN LA PANTALLA
+// ===========================================================================
+
+/** El contexto REAL que la Empresa recibe, con una suscripción abierta. */
+async function contextoReal() {
+  resetDb();
+  mailer.clearDevInbox();
+  sembrarEmpresa();
+
+  const app = makeApp();
+  const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
+    correo_firmante: CORREO_FIRMANTE,
+    canal_codigo: CANAL_CODIGO,
+    canal_codigo_confirmacion: CONFIRMACION_CANAL,
+  });
+
+  const res = await request(app)
+    .get(baseDeLaApi() + encodeURIComponent(sub.token))
+    .set('Accept', 'application/json');
+  assert.equal(res.status, 200);
+
+  return { sub, ctx: res.body };
+}
+
+test('la pantalla muestra el canal del código, que NO es el buzón del enlace', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, disparar } = correrPantalla(sub.token, { get: respuestaOk(ctx) });
+  disparar();
+  await respiro();
+
+  assert.equal(elementos['d-canal'].textContent, 'se***@empresa-pantalla.test',
+    'la Empresa tiene que ver DÓNDE espera el código');
+  assert.notEqual(elementos['d-canal'].textContent, elementos['d-correo'].textContent,
+    'el canal del código tiene que ser DISTINTO del buzón del enlace: si fueran el '
+    + 'mismo, el enlace bastaría por sí solo');
+  assert.ok(!elementos['d-canal'].textContent.includes('segundo-canal@'),
+    'el segundo canal va enmascarado en la pantalla');
+});
+
+test('la pantalla pinta los tres textos legales que le manda el servicio', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, disparar } = correrPantalla(sub.token, { get: respuestaOk(ctx) });
+  disparar();
+  await respiro();
+
+  assert.equal(elementos['texto-mecanismo'].textContent, textosAceptacion.MECANISMO,
+    'la cláusula del mecanismo tiene que ser la del módulo, no una copia escrita acá');
+  assert.equal(elementos['texto-tratamiento'].textContent, textosAceptacion.TRATAMIENTO_DATOS,
+    'la frase de tratamiento de datos tiene que ser la del módulo');
+  assert.equal(elementos['texto-declaracion'].textContent,
+    textosAceptacion.DECLARACION_REPRESENTANTE_LEGAL,
+    'la declaración de representación tiene que ser la del módulo');
+});
+
+test('la declaración cambia cuando la Empresa declara que firma como delegado', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, cambiar, disparar } = correrPantalla(sub.token, { get: respuestaOk(ctx) });
+  disparar();
+  await respiro();
+
+  assert.equal(elementos['texto-declaracion'].textContent,
+    textosAceptacion.DECLARACION_REPRESENTANTE_LEGAL,
+    'por omisión, la calidad es la de representante legal');
+
+  cambiar('rep-calidad', 'DELEGADO');
+
+  assert.equal(elementos['texto-declaracion'].textContent, textosAceptacion.DECLARACION_DELEGADO,
+    'un delegado no puede estar firmando la declaración del representante legal');
+  assert.notEqual(textosAceptacion.DECLARACION_DELEGADO,
+    textosAceptacion.DECLARACION_REPRESENTANTE_LEGAL,
+    'las dos declaraciones tienen que ser distintas: si fueran la misma, cambiar '
+    + 'la calidad no cambiaría nada');
+});
+
+test('sin el documento de quien firma la pantalla no manda nada', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, llamadas, campo, disparar, enviar } = correrPantalla(sub.token, {
+    get: respuestaOk(ctx),
+    post: respuestaOk({}),
+  });
+  disparar();
+  await respiro();
+
+  campo('otp').value = '123456';
+  campo('acepta').checked = true;
+  campo('acepta-tratamiento').checked = true;
+  // El documento de quien firma queda vacío.
+
+  enviar();
+  await respiro();
+
+  assert.equal(llamadas.filter((c) => c.metodo === 'POST').length, 0,
+    'sin el documento no se manda nada: sin él el método solo probaría control de '
+    + 'un buzón');
+  assert.match(elementos['mensaje'].textContent, /documento/i,
+    'el mensaje tiene que decir qué falta');
+});
+
+test('sin marcar la segunda casilla la pantalla no manda nada', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, llamadas, campo, disparar, enviar } = correrPantalla(sub.token, {
+    get: respuestaOk(ctx),
+    post: respuestaOk({}),
+  });
+  disparar();
+  await respiro();
+
+  campo('otp').value = '123456';
+  campo('acepta').checked = true;
+  campo('rep-documento').value = '900123456';
+  // La casilla de la información sobre el tratamiento de los datos NO está marcada.
+
+  enviar();
+  await respiro();
+
+  assert.equal(llamadas.filter((c) => c.metodo === 'POST').length, 0,
+    'informar del tratamiento de los datos es una obligación distinta de la de '
+    + 'acordar el mecanismo: es otra casilla');
+  assert.match(elementos['mensaje'].textContent, /tratamiento/i,
+    'el mensaje tiene que decir qué falta');
+});
+
+test('la pantalla manda el documento, la calidad y la aceptación de los datos', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { llamadas, campo, disparar, enviar } = correrPantalla(sub.token, {
+    get: respuestaOk(ctx),
+    post: respuestaOk({}),
+  });
+  disparar();
+  await respiro();
+
+  campo('otp').value = '123456';
+  campo('acepta').checked = true;
+  campo('acepta-tratamiento').checked = true;
+  campo('rep-documento').value = '900123456';
+  campo('rep-calidad').value = 'DELEGADO';
+
+  enviar();
+  await respiro();
+
+  const envio = llamadas.find((c) => c.metodo === 'POST');
+  assert.ok(envio, 'la pantalla tiene que mandar la suscripción');
+  assert.equal(envio.cuerpo.acepta_tratamiento, true,
+    'la aceptación de la información de datos tiene que viajar en el envío');
+  assert.ok(envio.cuerpo.representante,
+    'quién firma tiene que viajar en el envío: sin eso el servicio no puede verificarlo');
+  assert.equal(envio.cuerpo.representante.documento, '900123456');
+  assert.equal(envio.cuerpo.representante.calidad, 'DELEGADO');
+});
+
+test('la pantalla dice que hasta la contrafirma la Empresa no puede firmar', async () => {
+  const { sub, ctx } = await contextoReal();
+
+  const { elementos, campo, disparar, enviar } = correrPantalla(sub.token, {
+    get: respuestaOk(ctx),
+    post: respuestaOk({
+      firmado: true,
+      version: ctx.version,
+      hash: ctx.hash,
+      firmado_at: '2026-11-06T15:00:00.000Z',
+      contrafirmado: false,
+    }),
+  });
+  disparar();
+  await respiro();
+
+  campo('otp').value = '123456';
+  campo('acepta').checked = true;
+  campo('acepta-tratamiento').checked = true;
+  campo('rep-documento').value = '900123456';
+  enviar();
+  await respiro();
+
+  const msg = elementos['mensaje'].textContent;
+  assert.match(msg, /contrafirma/i,
+    'la pantalla tiene que decir que falta la contrafirma');
+  assert.match(msg, /no puede usar el servicio/i,
+    'la Empresa tiene que saber que hasta la contrafirma NO puede firmar '
+    + 'documentos de sus trabajadores');
 });

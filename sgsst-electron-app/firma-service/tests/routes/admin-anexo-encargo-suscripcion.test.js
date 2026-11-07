@@ -38,6 +38,13 @@ const ID_EMPRESA = '900888555';
 const RAZON_SOCIAL = 'EMPRESA DEL FLUJO SAS';
 const CORREO_FIRMANTE = 'representante@empresa-flujo.test';
 
+// El SEGUNDO CANAL del código de verificación: tiene que ser distinto del
+// buzón que recibe el enlace (artículo 4 del Decreto 2364).
+const CANAL_CODIGO = 'segundo-canal@empresa-flujo.test';
+const CONFIRMACION_CANAL = 'Confirmado por llamada de prueba';
+// Quién firma: su documento y la calidad con la que firma.
+const REPRESENTANTE = { documento: '900123456', calidad: 'REPRESENTANTE_LEGAL' };
+
 const DATOS_S11 = {
   razon_social: RAZON_SOCIAL,
   nit: '900888555-1',
@@ -74,7 +81,9 @@ function abrirSuscripcion(extra = {}) {
   return request(makeApp())
     .post(`/internal/admin/empresas/${ID_EMPRESA}/anexo-encargo/suscripcion`)
     .set(ADMIN)
-    .send(Object.assign({ correo_firmante: CORREO_FIRMANTE }, extra));
+    .send(Object.assign({ correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL }, extra));
 }
 
 // ===========================================================================
@@ -88,7 +97,9 @@ test('sin la llave de admin no se abre ninguna suscripción', async () => {
 
   const res = await request(makeApp())
     .post(`/internal/admin/empresas/${ID_EMPRESA}/anexo-encargo/suscripcion`)
-    .send({ correo_firmante: CORREO_FIRMANTE });
+    .send({ correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL });
 
   assert.equal(res.status, 401);
   assert.equal(res.body.error.code, 'INVALID_API_KEY');
@@ -145,7 +156,9 @@ test('EL FLUJO COMPLETO: abrir, pedir el código y suscribir por HTTP', async ()
   const abierto = await request(app)
     .post(`/internal/admin/empresas/${ID_EMPRESA}/anexo-encargo/suscripcion`)
     .set(ADMIN)
-    .send({ correo_firmante: CORREO_FIRMANTE });
+    .send({ correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL });
   assert.equal(abierto.status, 201);
 
   const token = abierto.body.token;
@@ -170,7 +183,8 @@ test('EL FLUJO COMPLETO: abrir, pedir el código y suscribir por HTTP', async ()
   // 4. La Empresa suscribe con los cinco datos del §11.
   const firma = await request(app)
     .post(`/api/anexo-encargo/${encodeURIComponent(token)}/suscribir`)
-    .send({ otp: otp, acepta: true, datos_empresa: DATOS_S11 });
+    .send({ otp: otp, acepta: true, acepta_tratamiento: true,
+      datos_empresa: DATOS_S11, representante: REPRESENTANTE });
 
   assert.equal(firma.status, 200, JSON.stringify(firma.body));
   assert.equal(firma.body.firmado, true);
@@ -179,10 +193,13 @@ test('EL FLUJO COMPLETO: abrir, pedir el código y suscribir por HTTP', async ()
   assert.equal(firma.body.contrafirmado, false,
     'suscribir NO contrafirma: el instrumento es bilateral');
 
-  // 5. La fecha del Anexo de Encargo queda en la ficha de la Empresa.
+  // 5. La suscripción del Anexo de Encargo queda en la ficha de la Empresa.
   const empresa = empresaService.getById(ID_EMPRESA);
-  assert.ok(empresa.anexo_encargo_firmado_at,
-    'la firma de la Empresa tiene que quedar en su ficha');
+  assert.ok(empresa.anexo_encargo_suscrito_at,
+    'la suscripción de la Empresa tiene que quedar en su ficha');
+  assert.equal(empresa.anexo_encargo_firmado_at, null,
+    'la suscripción NO habilita a la Empresa: la fecha de firma la pone la '
+    + 'contrafirma de K+AIR, que es otro acto');
 
   // 6. Y la suscripción queda con el rastro de los cinco datos declarados.
   const fila = db.prepare('SELECT * FROM gh_firma_anexo_encargo_suscripciones').get();
@@ -205,7 +222,9 @@ test('suscribir sin los cinco datos del §11 no deja la firma a medias', async (
   const abierto = await request(app)
     .post(`/internal/admin/empresas/${ID_EMPRESA}/anexo-encargo/suscripcion`)
     .set(ADMIN)
-    .send({ correo_firmante: CORREO_FIRMANTE });
+    .send({ correo_firmante: CORREO_FIRMANTE,
+      canal_codigo: CANAL_CODIGO,
+      canal_codigo_confirmacion: CONFIRMACION_CANAL });
   const token = abierto.body.token;
 
   await request(app)
@@ -218,10 +237,12 @@ test('suscribir sin los cinco datos del §11 no deja la firma a medias', async (
 
   const res = await request(app)
     .post(`/api/anexo-encargo/${encodeURIComponent(token)}/suscribir`)
-    .send({ otp: otp, acepta: true, datos_empresa: incompletos });
+    .send({ otp: otp, acepta: true, acepta_tratamiento: true,
+      datos_empresa: incompletos, representante: REPRESENTANTE });
 
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'DATOS_S11_INCOMPLETOS');
+  assert.equal(empresaService.getById(ID_EMPRESA).anexo_encargo_suscrito_at, null);
   assert.equal(empresaService.getById(ID_EMPRESA).anexo_encargo_firmado_at, null);
 });
 

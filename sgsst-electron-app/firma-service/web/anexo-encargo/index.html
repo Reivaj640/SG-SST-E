@@ -60,8 +60,12 @@
           <td id="d-firmante">&mdash;</td>
         </tr>
         <tr>
-          <th scope="row">Correo del código</th>
+          <th scope="row">Correo del enlace</th>
           <td id="d-correo">&mdash;</td>
+        </tr>
+        <tr>
+          <th scope="row">Canal del código</th>
+          <td id="d-canal">&mdash;</td>
         </tr>
         <tr>
           <th scope="row">Enlace válido hasta</th>
@@ -113,9 +117,28 @@
              maxlength="200" autocomplete="name">
     </form>
 
+    <h2 id="titulo-representante">Quién firma</h2>
+    <p>Declare el número de documento de quien suscribe y la calidad con la que
+      firma. K+AIR contrasta ese documento contra el certificado de existencia y
+      representación de la cámara de comercio, contra el RUT de la Empresa o
+      contra el poder, y solo después contrafirma el Anexo.</p>
+
+    <form id="form-representante" autocomplete="off" novalidate>
+      <label for="rep-documento">Número de documento de quien suscribe</label>
+      <input id="rep-documento" name="representante_documento" type="text" class="dato"
+             maxlength="60" autocomplete="off">
+
+      <label for="rep-calidad">Calidad con la que firma</label>
+      <select id="rep-calidad" name="representante_calidad" class="dato">
+        <option value="REPRESENTANTE_LEGAL">Representante legal de la Empresa</option>
+        <option value="DELEGADO">Delegado con poder</option>
+      </select>
+    </form>
+
     <h2 id="titulo-codigo">Solicitar el código de verificación</h2>
-    <p>El código llega a este mismo correo. El enlace y el código no vienen
-      juntos: el enlace abre esta pantalla, el código autoriza la firma.</p>
+    <p>El código no llega a este buzón: llega al canal de arriba, que es distinto.
+      El enlace y el código no están en el mismo lugar, para que el enlace no
+      baste por sí solo.</p>
     <button id="btn-codigo" type="button" class="primario">Enviarme el código</button>
 
     <h2 id="titulo-firmar">Suscribir el Anexo de Encargo</h2>
@@ -131,7 +154,18 @@
         <span>He leído el Anexo de Encargo en su versión
           <span id="d-version2">—</span>, con la huella
           <span id="d-hash2" class="mono">—</span>, he declarado los cinco datos
-          del §11 y acepto sus condiciones en nombre de la Empresa.</span>
+          del §11 y acepto sus condiciones en nombre de la Empresa.
+          <span class="texto-legal" id="texto-mecanismo"></span>
+          <span class="texto-legal" id="texto-declaracion"></span>
+        </span>
+      </label>
+
+      <label class="casilla" for="acepta-tratamiento">
+        <input id="acepta-tratamiento" name="acepta_tratamiento" type="checkbox">
+        <span>He leído la información sobre el tratamiento de mis datos personales
+          para la ejecución de este Anexo.
+          <span class="texto-legal" id="texto-tratamiento"></span>
+        </span>
       </label>
 
       <button id="btn-firmar" type="submit" class="primario">Suscribir el Anexo de Encargo</button>
@@ -142,7 +176,8 @@
     <p id="acta" class="mensaje ok oculto">
       <a id="d-acta" href="#" download>Descargar el acta de suscripción (PDF)</a>
       <span class="pie-nota">&middot; guarde este archivo: es la constancia de
-        la suscripción. Su huella (la de sus bytes) es
+        la suscripción, no la copia firmada del Anexo, que cada parte conserva.
+        Su huella (la de sus bytes) es
         <span id="d-acta-hash" class="mono">—</span>.</span>
     </p>
 

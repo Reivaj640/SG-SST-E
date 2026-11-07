@@ -49,6 +49,7 @@ const {
   anexoNubeBody,
   suscripcionAnexoNubeBody,
   suscripcionAnexoEncargoBody,
+  verificarRepresentanteBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
@@ -356,6 +357,44 @@ router.post('/empresas/:id_empresa/anexo-encargo/suscripcion/:id_suscripcion/anu
     next(err);
   }
 });
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-encargo/suscripcion/:id_suscripcion/verificar-representante
+// Registra la verificación documental de quien firmó el Anexo de Encargo.
+//
+// POR QUÉ ESTE PASO NO ES UN ADITIVO
+// ----------------------------------
+// El método de firma probaba control de un buzón, no que quien firmara fuera
+// el representante legal ni que tuviera poder. Para un contrato sobre datos de
+// salud eso es insuficiente: la Empresa podría alegar que el firmante no
+// tenía poder (pregunta 7 del abogado, 7-nov-2026).
+//
+// La verificación la hace K+AIR contra el certificado de existencia y
+// representación de la cámara de comercio, contra el RUT de la Empresa o
+// contra el poder, según la calidad con la que se firmó. Queda en el
+// expediente con quién la hizo, cuándo y contra qué documento.
+//
+// ES UN REQUISITO DE LA CONTRAFIRMA
+// ---------------------------------
+// K+AIR no contrafirma el Anexo sin esta verificación registrada. Por eso
+// exige `X-Admin-Motivo`: es un acto con efecto sobre el expediente.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-encargo/suscripcion/:id_suscripcion/verificar-representante',
+  adminApiAuth(), validateBody(verificarRepresentanteBody), (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const idSuscripcion = parseInt(req.params.id_suscripcion, 10);
+      if (!Number.isInteger(idSuscripcion) || idSuscripcion <= 0) {
+        throw new AppError(400, 'INVALID_REQUEST_BODY', 'id_suscripcion inválido');
+      }
+      const r = anexoEncargoService.verificarRepresentante(
+        id, idSuscripcion, req.body, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
 
 // ============================================================================
 // POST /internal/admin/empresas/:id_empresa/anexo-firmado/quitar
