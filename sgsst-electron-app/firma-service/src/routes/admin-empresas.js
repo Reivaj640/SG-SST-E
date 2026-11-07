@@ -17,6 +17,7 @@
  * Endpoints:
  *   GET    /internal/admin/empresas            lista con pendientes
  *   GET    /internal/admin/empresas/:id        una empresa
+ *   GET    /internal/admin/empresas/:id/anexos las suscripciones de los dos anexos
  *   POST   /internal/admin/empresas            alta
  *   PUT    /internal/admin/empresas/:id        actualizar identidad
  *   POST   /internal/admin/empresas/:id/anexo-firmado
@@ -40,6 +41,7 @@ const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
 const anexoNubeService = require('../services/anexoNube');
 const anexoEncargoService = require('../services/anexoEncargo');
+const actaEncargoService = require('../services/actaEncargo');
 const auditoriaService = require('../services/empresaAuditoria');
 const cuentaEnvioService = require('../services/cuentaEnvio');
 const fechaTerminacionService = require('../services/fechaTerminacion');
@@ -238,6 +240,167 @@ router.get('/empresas/:id_empresa/historial', adminApiAuth(), (req, res, next) =
       limite = n;
     }
     res.json({ items: auditoriaService.historial(id, { limite }) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// GET /internal/admin/empresas/:id_empresa/anexos
+// La lectura que necesita el PANEL DE OPERADOR: la suscripción viva de cada
+// anexo (la más reciente) y el rastro de eventos de esa suscripción.
+//
+// POR QUÉ ESTA RUTA HACÍA FALTA
+// -----------------------------
+// Las tres acciones de la contrafirma ("verificar-representante",
+// "contrafirmar/codigo" y "contrafirmar") y el "anular" exigen el
+// `id_suscripcion` en el path, y ese id NO está en la ficha de la Empresa ni
+// en ninguna respuesta de lectura. Sin esta ruta, el operador tenía que abrir
+// la consola para descubrir el id de una suscripción.
+//
+// EL TOKEN EN CLARO NO SE PUEDE RECUPERAR
+// ---------------------------------------
+// En la base solo vive su huella (`token_hash`), y la ruta de alta es la
+// única que lo devuelve en claro. Esta ruta no lo intenta: no se puede.
+//
+// LO QUE NO SE DEVUELVE
+// ---------------------
+// Ni `token_hash`, ni `otp_hash`, ni `contrafirma_otp_hash`, ni
+// `canal_codigo_tipo`: son las llaves y los contadores del mecanismo, y el
+// operador no los necesita para cumplir la contrafirma. El `canal_codigo` sí
+// se devuelve (el operador lo declaró al abrir la suscripción y lo necesita
+// para el expediente) y el `contrafirma_canal` va ENMASCARADO, con la misma
+// función que usa el acta.
+// ============================================================================
+
+/**
+ * Parsea una columna que es JSON EN TEXTO.
+ *
+ * `representante_verificacion` y `evidencia` se guardan como texto (el
+ * SQLite no tiene un tipo JSON). Si el texto no parsea, NO se inventa nada:
+ * se devuelve `null` y el operador ve que no hay evidencia legible, que es
+ * muy distinto de ver un objeto vacío.
+ *
+ * @param {string|null} texto
+ * @returns {object|null}
+ */
+function _json(texto) {
+  if (typeof texto !== 'string' || texto.length === 0) return null;
+  try {
+    const valor = JSON.parse(texto);
+    return (valor && typeof valor === 'object') ? valor : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * La suscripción del Anexo de ENCARGO, en la forma que la lee el operador.
+ *
+ * `FIRMADA` en esta tabla significa que la EMPRESA suscribió (fase 1), NO que
+ * el instrumento esté ejecutado: para eso está `contrafirmado_at` (fase 2).
+ *
+ * @param {object|null} fila - la fila cruda, o null si no hay suscripción.
+ * @returns {object|null}
+ */
+function _suscripcionEncargo(fila) {
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    estado: fila.estado,
+    version: fila.version,
+    hash: fila.hash_texto,
+    correo_firmante: fila.correo_firmante,
+    canal_codigo: fila.canal_codigo || null,
+    nombre_firmante: fila.nombre_firmante || null,
+    cargo_firmante: fila.cargo_firmante || null,
+    firmado_at: fila.firmado_at || null,
+    contrafirmado_at: fila.contrafirmado_at || null,
+    representante_verificacion: _json(fila.representante_verificacion),
+    representante_verificado_at: fila.representante_verificado_at || null,
+    // El canal de la CONTRAFIRMA va enmascarado: es el buzón de K+AIR, y la
+    // misma función que usa el acta es la que lo enmascara acá (si fueran
+    // dos implementaciones distintas, el operador vería un correo y el acta
+    // otro).
+    contrafirma_canal: fila.contrafirma_canal
+      ? actaEncargoService.enmascararCorreo(fila.contrafirma_canal) : null,
+    evidencia: _json(fila.evidencia),
+    contrafirma_acta_archivo: fila.contrafirma_acta_archivo || null,
+    contrafirma_acta_hash: fila.contrafirma_acta_hash || null,
+    created_at: fila.created_at,
+    updated_at: fila.updated_at,
+  };
+}
+
+/**
+ * La suscripción del Anexo de NUBE, en la forma que la lee el operador.
+ *
+ * El Anexo de Nube NO es bilateral: no hay contrafirma ni verificación del
+ * representante. Los campos de esas fases van en `null` para que el panel
+ * pueda leer los dos anexos con la misma forma.
+ *
+ * @param {object|null} fila - la fila cruda, o null si no hay suscripción.
+ * @returns {object|null}
+ */
+function _suscripcionNube(fila) {
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    estado: fila.estado,
+    version: fila.version,
+    hash: fila.hash_texto,
+    correo_firmante: fila.correo_firmante,
+    canal_codigo: null,
+    nombre_firmante: fila.nombre_firmante || null,
+    cargo_firmante: fila.cargo_firmante || null,
+    firmado_at: fila.firmado_at || null,
+    contrafirmado_at: null,
+    representante_verificacion: null,
+    representante_verificado_at: null,
+    contrafirma_canal: null,
+    evidencia: _json(fila.evidencia),
+    contrafirma_acta_archivo: null,
+    contrafirma_acta_hash: null,
+    created_at: fila.created_at,
+    updated_at: fila.updated_at,
+  };
+}
+
+/**
+ * El bloque de un anexo: su suscripción más reciente y el rastro de esa
+ * suscripción.
+ *
+ * @param {object[]} suscripciones - de la más reciente a la más antigua.
+ * @param {function} leerEventos - `eventosDeSuscripcion(id)`.
+ * @param {function} forma - `_suscripcionEncargo` o `_suscripcionNube`.
+ * @returns {{suscripcion: object|null, eventos: object[]}}
+ */
+function _bloqueAnexo(suscripciones, leerEventos, forma) {
+  const fila = Array.isArray(suscripciones) && suscripciones.length > 0
+    ? suscripciones[0] : null;
+  if (!fila) return { suscripcion: null, eventos: [] };
+  return {
+    suscripcion: forma(fila),
+    eventos: leerEventos(fila.id),
+  };
+}
+
+router.get('/empresas/:id_empresa/anexos', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    res.json({
+      id_empresa: id,
+      anexo_encargo: _bloqueAnexo(
+        anexoEncargoService.suscripcionesDeEmpresa(id),
+        anexoEncargoService.eventosDeSuscripcion,
+        _suscripcionEncargo,
+      ),
+      anexo_nube: _bloqueAnexo(
+        anexoNubeService.suscripcionesDeEmpresa(id),
+        anexoNubeService.eventosDeSuscripcion,
+        _suscripcionNube,
+      ),
+    });
   } catch (err) {
     next(err);
   }

@@ -1771,6 +1771,57 @@ async function contrafirmar(id_empresa, id_suscripcion, datos, ctx = {}) {
   };
 }
 
+// =============================================================================
+// 6. LECTURA: LAS SUSCRIPCIONES DE UNA EMPRESA Y SU RASTRO
+// =============================================================================
+//
+// POR QUÉ SON FUNCIONES NUEVAS Y NO UNA REUTILIZACIÓN DE `_firmaPrevia`
+// ------------------------------------------------------------------------
+// `_firmaPrevia` (más arriba) busca la ÚLTIMA suscripción en estado `FIRMADA`:
+// es el control de "esta Empresa ya tiene el Anexo, no lo pises", y por eso
+// mira un solo estado. Lo que necesita el panel del operador es OTRA cosa:
+// TODAS las suscripciones de la Empresa, con el estado de cada una (las
+// pendientes y las anuladas también), de la más reciente a la más antigua.
+//
+// Y el rastro: `_evento()` (más arriba) lo ESCRIBE. Antes de estas dos
+// funciones no existía ninguna forma PÚBLICA de leerlo, así que el operador no
+// podía ver qué pasó con una suscripción sin abrir la consola.
+
+/**
+ * Las suscripciones de una Empresa, de la más reciente a la más antigua.
+ *
+ * El orden es `id DESC` porque el id es un AUTOINCREMENT: el id más alto es
+ * el más nuevo. La más reciente es la que manda para el operador (la que
+ * está viva); las anteriores quedan para el expediente.
+ *
+ * @param {string} id_empresa
+ * @returns {object[]} las filas de la tabla, de la más reciente a la más antigua.
+ */
+function suscripcionesDeEmpresa(id_empresa) {
+  if (typeof id_empresa !== 'string' || id_empresa.length === 0) return [];
+  return db.prepare(`SELECT * FROM gh_firma_anexo_encargo_suscripciones
+    WHERE id_empresa = ? ORDER BY id DESC`).all(id_empresa);
+}
+
+/**
+ * El rastro de una suscripción: los eventos, del primero al último.
+ *
+ * Devuelve SOLO los cinco campos del evento. El resto de la fila es
+ * bookkeeping (el id, el id_empresa y el id de la suscripción), y el operador
+ * no lo necesita: lo que tiene que poder leer es QUÉ pasó, CUÁNDO, desde
+ * QUÉ IP y con QUÉ navegador.
+ *
+ * @param {number|string} id_suscripcion
+ * @returns {object[]} { evento, detalle, fecha_hora, ip, user_agent }, en orden.
+ */
+function eventosDeSuscripcion(id_suscripcion) {
+  const id = parseInt(id_suscripcion, 10);
+  if (!Number.isInteger(id) || id <= 0) return [];
+  return db.prepare(`SELECT evento, detalle, fecha_hora, ip, user_agent
+    FROM gh_firma_anexo_encargo_eventos
+    WHERE id_suscripcion = ? ORDER BY id ASC`).all(id);
+}
+
 module.exports = {
   RUTA_MODELO,
   TTL_ENLACE_HORAS,
@@ -1790,4 +1841,6 @@ module.exports = {
   obtenerActa,
   solicitarCodigoContrafirma,
   contrafirmar,
+  suscripcionesDeEmpresa,
+  eventosDeSuscripcion,
 };

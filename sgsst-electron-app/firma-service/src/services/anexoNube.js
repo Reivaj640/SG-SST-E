@@ -657,6 +657,49 @@ function suscribir(token, datos, ctx = {}, opciones = {}) {
   };
 }
 
+// =============================================================================
+// 5. LECTURA: LAS SUSCRIPCIONES DE UNA EMPRESA Y SU RASTRO
+// =============================================================================
+//
+// Son las dos mismas funciones que tiene el gemelo del Anexo de Encargo
+// (`services/anexoEncargo.js`), sobre las tablas de este anexo. Viven en los
+// dos servicios y no en uno compartido porque cada tabla tiene su nombre y su
+// forma: una función compartida con el nombre de la tabla inyectado sería más
+// corta de escribir y más fácil de equivocar.
+
+/**
+ * Las suscripciones de una Empresa, de la más reciente a la más antigua.
+ *
+ * El orden es `id DESC` porque el id es un AUTOINCREMENT: el id más alto es
+ * el más nuevo. La más reciente es la que manda para el operador (la que está
+ * viva); las anteriores quedan para el expediente.
+ *
+ * @param {string} id_empresa
+ * @returns {object[]} las filas de la tabla, de la más reciente a la más antigua.
+ */
+function suscripcionesDeEmpresa(id_empresa) {
+  if (typeof id_empresa !== 'string' || id_empresa.length === 0) return [];
+  return db.prepare(`SELECT * FROM gh_firma_anexo_nube_suscripciones
+    WHERE id_empresa = ? ORDER BY id DESC`).all(id_empresa);
+}
+
+/**
+ * El rastro de una suscripción: los eventos, del primero al último.
+ *
+ * Devuelve SOLO los cinco campos del evento. Lo que tiene que poder leer el
+ * operador es QUÉ pasó, CUÁNDO, desde QUÉ IP y con QUÉ navegador.
+ *
+ * @param {number|string} id_suscripcion
+ * @returns {object[]} { evento, detalle, fecha_hora, ip, user_agent }, en orden.
+ */
+function eventosDeSuscripcion(id_suscripcion) {
+  const id = parseInt(id_suscripcion, 10);
+  if (!Number.isInteger(id) || id <= 0) return [];
+  return db.prepare(`SELECT evento, detalle, fecha_hora, ip, user_agent
+    FROM gh_firma_anexo_nube_eventos
+    WHERE id_suscripcion = ? ORDER BY id ASC`).all(id);
+}
+
 module.exports = {
   VERSION_MODELO,
   RUTA_MODELO,
@@ -670,4 +713,6 @@ module.exports = {
   contextoPublico,
   solicitarCodigo,
   suscribir,
+  suscripcionesDeEmpresa,
+  eventosDeSuscripcion,
 };
