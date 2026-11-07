@@ -1749,3 +1749,60 @@
 [data-theme="dark-legacy"] .fe-timeline__item + .fe-timeline__item { border-top: 1px dashed var(--border-color); }
 [data-theme="dark"] .fe-timeline__title,
 [data-theme="dark-legacy"] .fe-timeline__title { color: var(--text-color); }
+
+/* ═══ 📦1039 · Estado del Anexo de Encargo ═══
+   La tarjeta que le dice al cliente si su Anexo esta suscrito, si K+AIR ya
+   lo contrafirmo y por que no puede firmar todavia. Antes de esto el cliente
+   se enteraba del problema solo cuando le llegaba un 409 al pedir una firma. */
+.fe-anexo-estado {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #9ca3af;
+  border-radius: 8px;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 0.875rem;
+  flex-shrink: 0;
+}
+.fe-anexo-estado[hidden] { display: none; }
+.fe-anexo-estado--verde { background: #f0fdf7; border-color: #bbf7d0; border-left-color: #16a34a; }
+.fe-anexo-estado--ambar { background: #fffbeb; border-color: #fde68a; border-left-color: #f59e0b; }
+.fe-anexo-estado__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+.fe-anexo-estado--verde .fe-anexo-estado__icon { background: #dcfce7; color: #15803d; }
+.fe-anexo-estado--ambar .fe-anexo-estado__icon { background: #fef3c7; color: #b45309; }
+.fe-anexo-estado__body { flex: 1 1 auto; min-width: 0; }
+.fe-anexo-estado__titulo {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 0.125rem;
+}
+.fe-anexo-estado__estado { font-size: 0.9375rem; font-weight: 600; color: #1f2937; }
+.fe-anexo-estado__nota { font-size: 0.8125rem; color: #6b7280; margin-top: 0.125rem; line-height: 1.45; }
+.fe-anexo-estado__acciones { flex-shrink: 0; }
+[data-theme="dark"] .fe-anexo-estado,
+[data-theme="dark-legacy"] .fe-anexo-estado { background: var(--widget-bg-color); border-color: var(--border-color); }
+[data-theme="dark"] .fe-anexo-estado--verde,
+[data-theme="dark-legacy"] .fe-anexo-estado--verde { background: rgba(22,163,74,0.12); border-color: rgba(22,163,74,0.35); }
+[data-theme="dark"] .fe-anexo-estado--ambar,
+[data-theme="dark-legacy"] .fe-anexo-estado--ambar { background: rgba(240,173,78,0.12); border-color: rgba(240,173,78,0.35); }
+[data-theme="dark"] .fe-anexo-estado__estado,
+[data-theme="dark-legacy"] .fe-anexo-estado__estado { color: var(--text-color); }
+[data-theme="dark"] .fe-anexo-estado__titulo,
+[data-theme="dark-legacy"] .fe-anexo-estado__titulo,
+[data-theme="dark"] .fe-anexo-estado__nota,
+[data-theme="dark-legacy"] .fe-anexo-estado__nota { color: var(--text-light-color); }

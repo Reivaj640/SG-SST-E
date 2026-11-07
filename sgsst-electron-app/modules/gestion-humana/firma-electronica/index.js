@@ -150,6 +150,22 @@
       .replace(/'/g, '&#39;');
   }
 
+  /**
+   * 📦1039 · La fecha del Anexo, en formato de Colombia.
+   *
+   * Es una función aparte (y no un `toLocaleDateString`) porque la fecha del
+   * Anexo es un dato que el service manda en ISO y el formato tiene que ser
+   * el mismo en toda la app: si un dia se cambia aca, se cambia en la vista
+   * del operador tambien.
+   */
+  function _fmtFechaAnexo(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    var mes = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return ('0' + d.getDate()).slice(-2) + ' ' + mes[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
   // I-103.A1.6 · Validación de correo antes de reenviar invitación.
   // Filtra valores obviamente placeholder para evitar enviar al destinatario
   // equivocado. NO hace validación completa RFC 5321; usa regex razonable +
@@ -225,6 +241,21 @@
   FirmaElectronicaComponent.prototype._getShellHtml = function () {
     return [
       '<div class="fe-wrapper" id="fe-wrapper">',
+      // 📦1039 · El estado del Anexo de Encargo de ESTA empresa. Antes el
+      // cliente se enteraba del problema solo cuando intentaba firmar y le
+      // llegaba un 409: aca queda visible antes de que eso pase.
+      '  <div class="fe-anexo-estado" id="fe-anexo-estado" hidden>',
+      '    <div class="fe-anexo-estado__icon"><i class="fas fa-file-contract"></i></div>',
+      '    <div class="fe-anexo-estado__body">',
+      '      <div class="fe-anexo-estado__titulo">Anexo de Encargo</div>',
+      '      <div class="fe-anexo-estado__estado" id="fe-anexo-estado-texto"></div>',
+      '      <div class="fe-anexo-estado__nota" id="fe-anexo-estado-nota"></div>',
+      '    </div>',
+      '    <div class="fe-anexo-estado__acciones">',
+      '      <a class="fe-btn fe-btn--ghost fe-btn--sm" id="fe-anexo-documento" href="#"',
+      '        target="_blank" rel="noopener noreferrer">Ver el documento</a>',
+      '    </div>',
+      '  </div>',
       '  <div class="fe-search-section">',
       '    <div class="fe-search">',
       '      <i class="fas fa-search fe-search__icon"></i>',
@@ -719,6 +750,76 @@
     self._cargando = false;
     self._calcularProcesos();
     self._renderTabla();
+    // 📦1039 · El estado del Anexo. Va DESPUES de la tabla: la tabla es lo
+    // que el cliente vino a hacer, y esta tarjeta es informacion.
+    self._renderEstadoAnexo();
+  };
+
+  /**
+   * 📦1039 · El estado del Anexo de Encargo (y del Anexo de Nube) de la
+   * empresa activa.
+   *
+   * Se consulta con la API key DE LA EMPRESA (canal `firma:empresa:anexos`),
+   * que solo puede leer lo suyo. NO hay version admin de este canal a
+   * proposito: el cliente ve su propio estado y nada mas.
+   *
+   * El texto del estado NO se reescribe aca: lo produce el service
+   * (`verificarHabilitacionFirma`) y esta tarjeta lo muestra. Si el service
+   * no esta disponible o la empresa no esta configurada, la tarjeta se
+   * esconde: es informacion, no un bloqueo.
+   */
+  FirmaElectronicaComponent.prototype._renderEstadoAnexo = async function () {
+    var self = this;
+    var cont = self.container.querySelector('#fe-anexo-estado');
+    if (!cont) return;
+    if (!window.electronAPI || !window.electronAPI.firmaEmpresaAnexos || !self.companyName) return;
+
+    var r;
+    try {
+      r = await window.electronAPI.firmaEmpresaAnexos({ companyName: self.companyName });
+    } catch (e) {
+      return; // sin tarjeta: no es un error que el cliente tenga que ver
+    }
+    if (!r || !r.success || !r.data) return;
+
+    var d = r.data;
+    var enc = d.anexo_encargo || {};
+    var hab = d.habilitacion || {};
+    var texto = self.container.querySelector('#fe-anexo-estado-texto');
+    var nota = self.container.querySelector('#fe-anexo-estado-nota');
+    var doc = self.container.querySelector('#fe-anexo-documento');
+
+    var clase = 'fe-anexo-estado--neutro';
+    var titular = '';
+    if (enc.estado === 'ejecutado') {
+      clase = 'fe-anexo-estado--verde';
+      titular = 'Ejecutado' + (enc.firmado_at ? ' el ' + _fmtFechaAnexo(enc.firmado_at) : '');
+    } else if (enc.estado === 'suscrito') {
+      clase = 'fe-anexo-estado--ambar';
+      titular = 'Suscrito' + (enc.suscrito_at ? ' el ' + _fmtFechaAnexo(enc.suscrito_at) : '')
+        + ' · falta la contrafirma de K+AIR';
+    } else {
+      titular = 'No suscrito';
+    }
+    cont.className = 'fe-anexo-estado ' + clase;
+    if (texto) texto.textContent = titular;
+    // El mensaje del service: es el que distingue "suscribio pero K+AIR no
+    // ha contrafirmado" de "no tiene Anexo". No se reescribe.
+    if (nota) nota.textContent = hab.mensaje || '';
+
+    if (doc) {
+      var cfg = null;
+      try {
+        cfg = await window.electronAPI.firmaConfigGet();
+      } catch (e) { cfg = null; }
+      var url = (cfg && cfg.success && cfg.data && cfg.data.url) ? String(cfg.data.url) : '';
+      if (url) {
+        doc.href = url.replace(/\/+$/, '') + '/anexo-encargo/documento';
+      } else {
+        doc.hidden = true;
+      }
+    }
+    cont.hidden = false;
   };
 
   /**
