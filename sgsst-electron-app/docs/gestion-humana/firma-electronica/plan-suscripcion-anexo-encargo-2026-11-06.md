@@ -218,15 +218,30 @@ Espejo de `anexoNube.js` (27 KB) con cuatro diferencias:
    `legal/anexo-encargo.html` del disco; la comparación de ambas contra la
    huella del manifiesto es la que hace el `TEXTO_MODIFICADO`.
 2. Los **cinco datos del §11** se declaran en la pantalla y se registran.
-3. Al suscribir, escribe en `gh_firma_empresas.anexo_encargo_firmado_at` (con el
-   rastro de la ficha) y en la fila de la suscripción, con la evidencia en JSON
-   —igual que el Anexo de Nube, que escribe `anexo_nube_firmado_at`,
-   `anexo_nube_version`, `anexo_nube_hash` y `anexo_nube_evidencia`.
-4. La fase 2: la contrafirma del Encargado (DECISIÓN 1).
+3. Al suscribir, escribe en `gh_firma_empresas.anexo_encargo_suscrito_at` (con el
+   rastro de la ficha) y en la fila de la suscripción, con la evidencia en JSON.
+   **NO escribe `anexo_encargo_firmado_at`**: ese campo es la fecha de EJECUCIÓN
+   del instrumento y lo escribe la contrafirma. Es el ajuste del abogado del
+   7-nov-2026 (📦1028): la fase 1 deja constancia de un acto, no de un contrato
+   ejecutado, y una Empresa que solo se suscribió no puede firmar documentos de sus
+   trabajadores.
+4. La fase 2: la contrafirma del Encargado (DECISIÓN 1), que sí escribe
+   `anexo_encargo_firmado_at` y es la que habilita a la Empresa.
 
-La escritura en la ficha reusa `empresaService.marcarAnexoFirmado`, que ya
-existe y que **pide motivo** para cambiar una fecha ya registrada
-(`MOTIVO_REQUERIDO`): la regla de no pisar una firma sin rastro ya está puesta.
+La escritura en la ficha reusa `empresaService.marcarAnexoSuscrito` (fase 1) y
+`empresaService.marcarAnexoFirmado` (contrafirma), que ya existen y que **piden
+motivo** para cambiar una fecha ya registrada (`MOTIVO_REQUERIDO`): la regla de
+no pisar una firma sin rastro ya está puesta.
+
+**Los siete ajustes del abogado (7-nov-2026, 📦1028).** El abogado revisó la
+fase 1 y pidió siete cosas; las que cambian el código son: la fase 1 **no
+habilita** a la Empresa; una **cláusula expresa del mecanismo** en el texto que
+la Empresa acepta; la **verificación documental** de quien firmó por la
+Empresa (documento cifrado en el expediente, `X-Admin-Motivo` obligatorio)
+**antes** de contrafirmar; el código a un **segundo canal** declarado por K+AIR
+y no por la Empresa; el acta como **constancia** y no como copia firmada; el §11
+como parte integral del Anexo; y la frase informativa de tratamiento de datos
+(10 años el documento original, 5 años el registro de operaciones).
 
 ### 4.3 Las rutas `src/routes/anexoEncargo.js`
 
@@ -240,7 +255,13 @@ token):
 - `GET /api/anexo-encargo/:token` — el contexto, siempre en JSON.
 - `POST /api/anexo-encargo/:token/codigo` — pide el código.
 - `POST /api/anexo-encargo/:token/suscribir` — acepta y suscribe.
-- (Fase 2) `POST /internal/admin/empresas/:id_empresa/anexo-encargo/contrafirmar`.
+- `GET /api/anexo-encargo/:token/acta` — el acta de suscripción (la huella de sus
+  bytes, que la Empresa conserva).
+- (Fase 2, en `src/routes/admin-empresas.js`, **no** en este archivo) las cinco
+  rutas administrativas: `.../anexo-encargo/suscripcion` (abrir la suscripción y
+  mandar el enlace a la Empresa), `.../anexo-encargo/suscripcion/:id_suscripcion/anular`,
+  `.../anexo-encargo/suscripcion/:id_suscripcion/verificar-representante`,
+  `.../anexo-encargo/contrafirmar/codigo` y `.../anexo-encargo/contrafirmar`.
 
 ### 4.4 La pantalla `web/anexo-encargo/`
 
@@ -267,15 +288,53 @@ descarga y guarda (y que K+AIR guarda en el expediente), con su propia huella.
 | Canónica `5cc7a346…` | del texto del Anexo | manifiesto, `hash_texto` de la suscripción, el registro de la firma, la Constancia |
 | De la copia firmada | del acta (y de la copia con el §11 diligenciado) | la evidencia del manifiesto y de la fila de la empresa |
 
+**Hay DOS actas, y la segunda no reescribe la primera (📦1029).** La contrafirma
+genera **su propio acta**, que cita la de la suscripción (su nombre y su huella)
+y deja por escrito los dos actos. El acta de la suscripción **no se toca**: la
+Empresa ya salió del servidor con su huella, y una huella que cambia después de
+entregada no es una huella.
+
+Las dos actas se arman con el **mismo lienzo** (las mismas herramientas de
+dibujar): dos actas del mismo instrumento que se ven distintas hacen pensar que
+son dos instrumentos. El refactor se verificó byte a byte (el acta de
+suscripción que genera el código nuevo es idéntica a la del anterior: misma
+huella SHA-256, mismos 5942 bytes).
+
+**Lo que el acta dice de este mecanismo, sin adornos.** K+AIR no tiene hoy un
+proveedor de firma ni un servicio de sellado de tiempo: **no hay certificado
+digital ni sello de tiempo de terceros**. Lo que hay es una **firma electrónica
+reforzada** (un código de un solo uso al buzón de K+AIR, la verificación
+documental de quien firmó por la Empresa, y un rastro inalterable con fecha,
+IP y navegador). El acta lo declara, y declara en mayúsculas que **es una
+constancia, no la copia firmada**: la copia la conserva cada parte.
+
 ### 4.6 El preflight `scripts/preflight-anexo-encargo.js`
 
-Espejo del del Anexo de Nube (7,7 KB), con una diferencia de fondo: el Anexo de
-Encargo **no tiene compuerta**. Su requisito es duro (`anexo_encargo_firmado_at`
-tiene que existir), y hoy lo cubre la **excepción 5** de ASEPLUS. El preflight
-entonces no guarda un encendido: **guarda el retiro de la excepción**. Comprueba
-que (1) el texto está en el servidor y su huella es la del manifiesto, y (2) hay
-al menos una empresa activa con el Anexo de Encargo suscrito sobre el texto
-vigente.
+Espejo del del Anexo de Nube, con cinco comprobaciones (📦1030):
+
+1. **El TEXTO**: que esté en el servidor y que su huella sea la que declara el
+   manifiesto. Si no coinciden, el servicio firmaría un texto que nadie ha
+   verificado.
+2. **La CONTRAFIRMA**: que exista al menos una Empresa **activa** con los dos
+   actos y con la fecha de ejecución en la ficha.
+3. **LAS ACTAS**: que los dos archivos estén en disco y que sus bytes tengan la
+   huella que quedó registrada.
+4. **EL MANIFIESTO**: que diga `firmado`, con fecha y evidencia (con
+   `--exigir-firmado`).
+5. **EL RESPALDO**: que `deploy/backup-firma.sh` se lleve la carpeta **entera**
+   de `storage/` y no una lista de subcarpetas.
+
+El punto 5 es el que se mira de cerca: el acta de la suscripción ya salió del
+servidor y **no se puede regenerar**. Si el respaldo no la copia, el expediente
+pierde un documento. Por eso el preflight exige `tar -C "$BASE" … storage` y no
+una lista fija: la carpeta de las actas es nueva, y una lista se quedaría atrás
+sin avisar.
+
+El preflight **aborta y no avisa**: un manifiesto que dice `firmado` sin que el
+texto, los dos actos, las actas y el respaldo estén en su sitio no es un aviso
+pendiente, es una afirmación falsa en el documento que lee la compuerta de
+publicación. Códigos: 0 todo en orden · 2 argumentos · 3 base o lectura · 4 el
+texto · 5 la contrafirma · 6 las actas · 7 el manifiesto · 8 el respaldo.
 
 ### 4.7 El manifiesto
 
@@ -287,14 +346,26 @@ vigente.
   que imprime la Constancia.
 - `anexo_encargo.evidencia`: **ASCII puro** (sin tildes, sin «», sin eñes), como
   el resto del manifiesto.
-- `nota`: se le añade una línea con lo que pasó (fecha, quién, con qué
-  evidencia), en el mismo estilo de las que ya tiene.
+- `nota`: **tampoco se toca**, y es una decisión. El plan original decía que se
+  le añadía una línea con lo que pasó; pero `version`, `hash` y `nota` son la
+  **identidad del texto**, no del acto: el manifiesto es la salida de los
+  scripts que sellan el texto, y un script que cambia su huella por un cambio de
+  estado sería una segunda verdad sobre el mismo documento. La evidencia (que sí
+  describe el acto) va en `evidencia`.
+
+**Quién lo escribe: `scripts/actualizar-manifiesto-anexo-encargo.js` (📦1030).**
+Lee la base, y **se niega a escribir `firmado` si no hay contrafirma** (código
+4): el Anexo es bilateral y el instrumento solo queda ejecutado cuando las dos
+partes firman. Edita el archivo con **reemplazo literal** (nunca con
+`JSON.stringify`, que dejaría el diff entero) y después valida que siga siendo
+JSON válido y ASCII puro. Con `--check` no escribe nada: dice qué habría que
+escribir y si coincide con lo que hay.
 
 ---
 
 ## 5. El plan de trabajo
 
-Nueve commits de implementación, en este orden. Cada uno con sus tests, y cada
+Diez commits de implementación, en este orden. Cada uno con sus tests, y cada
 test con la comprobación de que **sin el fix falla** (la regla del repo: un test
 que no detecta el bug si vuelve no sirve).
 
@@ -309,6 +380,13 @@ tipografía y el manifiesto se reparó a nivel de bytes, sin re-serializarlo.
 El 📦1024 (la memoria de esta tanda) se coló entre la base y el servicio
 porque el owner autorizó cerrar la documentación en este punto, no al final.
 
+**La numeración corrió, y por qué.** El plan se escribió antes de que el abogado
+respondiera. Cuando llegó su respuesta (7-nov-2026) y se implementaron los siete
+ajustes, **hubo que meter un commit más**: el 📦1028. Y como la contrafirma, el
+manifiesto y el preflight se hicieron después de ese ajuste, el 📦1029 y el
+📦1030 del plan original quedaron **corridos una casilla**. La tabla de abajo es
+la **numeración real** de la rama `Dev`, que es la que sirve.
+
 | # | Qué | Qué incluye |
 |---|---|---|
 | 📦1021 | El plan | Este documento |
@@ -318,9 +396,10 @@ porque el owner autorizó cerrar la documentación en este punto, no al final.
 | 📦1025 | El servicio | `src/services/anexoEncargo.js` + los 21 tests del espejo, adaptados |
 | 📦1026 | Las rutas y la pantalla | `src/routes/anexoEncargo.js` + `web/anexo-encargo/` + los tests de rutas y de página |
 | 📦1027 | El acta | La generación del acta con `pdf-lib` + su test (que la huella del acta sea la de sus bytes) |
-| 📦1028 | La contrafirma | La fase 2 del Encargado + su test (y la regla de que sin contrafirma el manifiesto no dice "firmado") |
-| 📦1029 | El manifiesto y el preflight | `legal-readiness.json` con la evidencia de la primera suscripción + `scripts/preflight-anexo-encargo.js` |
-| 📦1030 | Los documentos | `Historial.md`, `PROMPT.md`, `CONTEXT.md`, `API.md`, `FLOWS.md`, `DATA_MODEL.md`, `SECURITY.md` |
+| 📦1028 | **Los ajustes del abogado (7-nov-2026)** | Los siete cambios: la fase 1 no habilita, la cláusula del mecanismo, la verificación documental del representante, el segundo canal, el acta como constancia, el §11 integral y la frase de datos |
+| 📦1029 | La contrafirma (fase 2) | La migración 059, el propósito de derivación del código, `solicitarCodigoContrafirma` y `contrafirmar`, el acta de contrafirma y sus dos rutas |
+| 📦1030 | El manifiesto y el preflight | `scripts/actualizar-manifiesto-anexo-encargo.js` (que solo dice "firmado" con contrafirma) + `scripts/preflight-anexo-encargo.js` |
+| 📦1031 | Los documentos | `Historial.md`, `PROMPT.md`, `CONTEXT.md`, `API.md` y este plan |
 
 Y después, el deploy, con el mismo script que se usó el 6-nov (`deploy-1018.sh`
 como molde), que ya sabe: respaldos, compuertas, gate y cron.
@@ -418,12 +497,23 @@ el usuario de SSH, pero el servicio sí (corre como `kairfirma`). Eso no cambia
 nada para el plan, pero el preflight tiene que correr como `kairfirma`, igual
 que el gate.
 
-### 6.7 El texto del §12 y la firma del Encargado
+### 6.7 El texto del §12 y la firma del Encargado — RESUELTO (7-nov-2026)
 
-La DECISIÓN 1 no es de código. Si el abogado dice que el instrumento no está
-firmado con una sola parte, el `estado: "firmado"` del manifiesto no se puede
-poner, y el gate se queda en 1 pendiente (el de Google). El plan no escribe esa
-palabra hasta que la decisión esté tomada.
+La DECISIÓN 1 no era de código, y el abogado la respondió el 7-nov-2026: **«la
+empresa no debería empezar a usar el servicio hasta que K+AIR firme la otra
+parte»**. O sea que el instrumento **no** está firmado con una sola parte, y la
+habilitación se aplaza a la contrafirma.
+
+Eso es exactamente lo que quedó implementado (📦1028 y 📦1029): la fase 1
+escribe `anexo_encargo_suscrito_at` y **nunca** `anexo_encargo_firmado_at`; la
+contrafirma escribe `anexo_encargo_firmado_at`, que es la fecha de EJECUCIÓN y
+la que `verificarHabilitacionFirma` exige. El `estado: "firmado"` del manifiesto
+se pone solo con los dos actos, y el script que lo escribe **se niega** si no
+hay contrafirma.
+
+Lo que el §12 **no** cambia: el texto del Anexo (`5cc7a346…`) sigue siendo el
+mismo, y el texto firmado y su huella van juntos. El §12 no necesita un
+añadido.
 
 ---
 
@@ -460,11 +550,11 @@ Nube, sin que nadie tenga que transcribir una fecha a mano.
 
 | # | Decisión | Quién | Estado |
 |---|---|---|---|
-| 1 | ¿Hace falta la contrafirma del Encargado para que el Anexo esté "firmado"? | owner | **Tomada (6-nov-2026): dos fases.** Falta la validación del abogado |
-| 2 | ¿Cómo se diligencia el §11 en la vía digital? | owner | **Tomada (6-nov-2026): la Empresa los confirma o corrige en la pantalla, y el acta los lleva.** Falta la validación del abogado |
+| 1 | ¿Hace falta la contrafirma del Encargado para que el Anexo esté "firmado"? | owner | **Tomada (6-nov-2026): dos fases.** **Validada por el abogado (7-nov-2026): la habilitación se aplaza a la contrafirma.** Implementada en 📦1028 y 📦1029 |
+| 2 | ¿Cómo se diligencia el §11 en la vía digital? | owner | **Tomada (6-nov-2026): la Empresa los confirma o corrige en la pantalla, y el acta los lleva.** **Validada por el abogado (7-nov-2026): el §11 forma parte integral del Anexo y el acta lleva los cinco datos tal como se declararon** |
 | 3 | ¿La verdad por empresa vive en la base o el manifiesto cambia por empresa? | — | **Resuelta por la restricción:** en la base. El manifiesto declara el instrumento; si cambiara por empresa, sería un deploy por empresa |
 | 4 | ¿Se rotan los app passwords antes de abrir el flujo? | owner | **Tomada (6-nov-2026): abrir el flujo ahora y rotar después.** Riesgo aceptado, con su mitigación en §6.2 |
-| 5 | ¿El abogado valida que una suscripción con OTP equivale a firma para este instrumento, y que la sustitución de los datos del §11 sea admisible? | abogado | **ABIERTA.** Se manda con este plan y el §12 a la vista |
+| 5 | ¿El abogado valida que una suscripción con OTP equivale a firma para este instrumento, y que la sustitución de los datos del §11 sea admisible? | abogado | **PARCIALMENTE RESPONDIDA (7-nov-2026):** el §12 sí está resuelto (la habilitación se aplaza a la contrafirma) y los siete ajustes de la fase 1 están validados. **ABIERTA:** el dictamen J1-J14 completo, la fecha de vigencia y el 3.4(h) |
 
 Las tres decisiones del owner son las que el plan recomendaba (1 y 2) y la que no
 (4): esa última queda como **riesgo aceptado por el owner**, con su mitigación
@@ -478,20 +568,24 @@ escrita, no como recomendación del plan.
 2. Se manda la DECISIÓN 5 al abogado, con este plan y el §12 a la vista. No
    bloquea el código: su respuesta pesa en la fase 2 (la contrafirma), no en el
    flujo.
-3. 📦1025 a 📦1029, en ese orden, con la suite en verde en cada commit (y el
-   📦1030 con los documentos del plan, al final).
+3. 📦1025 a 📦1030, en ese orden, con la suite en verde en cada commit (y el
+   📦1031 con los documentos del plan, al final). **Hecho.**
 4. Deploy con el guion del 6-nov, que ya sabe medir el gate.
 5. **Piloto:** ASEPLUS se suscribe por el enlace. Es el único uso del flujo
    hasta que los app passwords estén rotados (§6.2).
-6. **Fase 1 cerrada:** la suscripción escribe `anexo_encargo_firmado_at` en la
-   ficha, y el ítem `empresas_base` del gate pasa a `ok`. El manifiesto **sigue
-   diciendo `no_firmado`**: falta la contrafirma. El gate queda con **2
-   pendientes**.
-7. **Fase 2:** el owner contrafirma en el servicio; se registra en el manifiesto
-   la evidencia de los dos actos (`estado: "firmado"`, la fecha, la evidencia)
-   y se despliega. El ítem `estado_encargo` pasa a `ok` y el gate queda con **1
-   pendiente**: el vínculo con Google.
+6. **Fase 1 cerrada:** la suscripción escribe `anexo_encargo_suscrito_at` en la
+   ficha — **no** `anexo_encargo_firmado_at`: la Empresa **sigue sin poder
+   firmar** documentos de sus trabajadores. El manifiesto **sigue diciendo
+   `no_firmado`**. El ítem `empresas_base` del gate **no** pasa a `ok` (exige
+   la fecha de ejecución, no la de suscripción).
+7. **Fase 2:** el owner verifica al representante (la ruta de verificación
+   documental), pide el código de contrafirma y contrafirma; después se corre
+   `scripts/actualizar-manifiesto-anexo-encargo.js`, que escribe en el
+   manifiesto la evidencia de los dos actos (`estado: "firmado"`, la fecha, la
+   evidencia) y **se niega a hacerlo si no hay contrafirma**. Se despliega. El
+   ítem `estado_encargo` pasa a `ok` y el gate queda con **1 pendiente**: el
+   vínculo con Google.
 8. Se retira la excepción 5, con su motivo en el rastro: con el Anexo
-   suscrito, ASEPLUS queda habilitada sin excepción.
+   ejecutado, ASEPLUS queda habilitada sin excepción.
 9. Se rotan los app passwords y recién entonces se anuncia el flujo a otras
    empresas.

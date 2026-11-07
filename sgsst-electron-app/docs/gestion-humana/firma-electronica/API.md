@@ -58,6 +58,7 @@
   - [6.18 El recibo de supresión (el 3.6(g) y el 10.6)](#618-el-recibo-de-supresión-el-36g-y-el-106)
   - [6.19 La auditoría de readiness legal — `GET /internal/admin/readiness-legal`](#619-la-auditoría-de-readiness-legal--get-internaladminreadiness-legal)
   - [6.20 La carga accidental de datos de salud — `/internal/admin/sign-requests/{id}/incidente-datos-sensibles`](#620-la-carga-accidental-de-datos-de-salud--internaladminsign-requestsidincidente-datos-sensibles)
+  - [6.21 El Anexo de Encargo — la suscripción de la Empresa y la contrafirma de K+AIR](#621-el-anexo-de-encargo--la-suscripción-de-la-empresa-y-la-contrafirma-de-kair)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -2803,6 +2804,650 @@ un incidente abierto (`NO_HAY_INCIDENTE_ABIERTO`) o si ya estaba resuelto
 > medidas hacia el Titular y el reporte a la autoridad son de la **Empresa**,
 > que es la Responsable del tratamiento (el 10.1). K+AIR es el Encargado: este
 > endpoint registra, bloquea, retiene y avisa; nada más.
+
+---
+
+## 6.21 El Anexo de Encargo — la suscripción de la Empresa y la contrafirma de K+AIR
+
+> **Lo primero: el instrumento es BILATERAL.**
+> El Anexo de Encargo (art. 25 del Decreto 1377 de 2013) es el contrato de
+> encargo del tratamiento de datos entre la Empresa, que es la **Responsable**,
+> y Gesstiar S.A.S. (K+AIR), que es la **Encargada**. Por eso el §12 del texto
+> tiene **dos** bloques de firma, y por eso el sistema lo registra en **dos
+> actos**, con **dos** fechas y **dos** actas.
+>
+> **La consecuencia operativa, que es la que hay que leer antes de operar:** la
+> fase 1 (la suscripción de la Empresa) **NO habilita** a la Empresa para firmar
+> documentos de sus trabajadores. Esa habilitación la da la fase 2 (la
+> contrafirma de K+AIR). Sin contrafirma, la Empresa **no puede firmar**.
+
+### 6.21.1 Los dos actos y las dos fechas de la ficha
+
+| | **Fase 1 — la suscripción** | **Fase 2 — la contrafirma** |
+|---|---|---|
+| Quién lo hace | La Empresa, desde el enlace de un solo uso que recibe por correo | K+AIR, desde el panel de administración |
+| Qué escribe en la ficha | `anexo_encargo_suscrito_at` | `anexo_encargo_firmado_at` |
+| Qué significa | "La Empresa se suscribió" | "El instrumento está EJECUTADO: las dos partes firmaron" |
+| Qué habilita | Nada | La habilitación para firmar documentos de sus trabajadores |
+| Su acta | `acta-{id_suscripcion}-anexo-encargo.pdf` | `acta-{id_suscripcion}-contrafirma-anexo-encargo.pdf` |
+| Su código de verificación | Al **segundo canal** que declara K+AIR | Al buzón de protección de datos de K+AIR |
+
+**Por qué los dos campos se llaman distinto.** `anexo_encargo_firmado_at`
+significa "el instrumento está ejecutado": las dos partes firmaron. Escribirlo
+en la fase 1 haría que el sistema afirmara que el contrato está firmado cuando
+solo firmó una parte, y además habilitaría a la Empresa a firmar documentos
+de sus trabajadores antes de que K+AIR contrafirmara. La fase 1 escribe
+entonces el campo que dice exactamente lo que pasó, y nada más.
+
+**La habilitación la lee un solo campo.** El control que decide si una Empresa
+puede pedir firmas (`verificarHabilitacionFirma`) mira `anexo_encargo_firmado_at`
+y nada más. Con la suscripción sola, la Empresa queda en un limbo que el propio
+mensaje del sistema distingue: *"suscribió el Anexo de Encargo, pero K+AIR
+todavía no lo ha contrafirmado: el instrumento no está ejecutado y la Empresa no
+puede firmar documentos de sus trabajadores"*. El campo
+`anexo_encargo_suscrito_at` no habilita nada por sí solo.
+
+> **Que el estado de la suscripción sea `FIRMADA` no quiere decir que el
+> contrato esté firmado.** `FIRMADA` significa *la Empresa suscribió*. Mientras
+> K+AIR no contrafirme, el manifiesto legal no puede decir `estado: "firmado"`.
+> Son dos actos, y hacen falta los dos.
+
+### 6.21.2 Los dos códigos, los dos canales, y por qué no los elige quien pide el acto
+
+| | **Código de la suscripción** | **Código de la contrafirma** |
+|---|---|---|
+| Lo pide | La Empresa, desde su enlace | El operador de K+AIR |
+| A dónde sale | Al **segundo canal** declarado por K+AIR al abrir la suscripción | Al **buzón de protección de datos de K+AIR** (`FIRMA_CANAL_PROTECCION_DATOS`) |
+| Quién declara el canal | K+AIR, al abrir la suscripción; lo confirma con la Empresa fuera de banda | La **configuración** del servicio. No lo declara nadie en la petición |
+| Ámbito de derivación | `otp` | `otp-contrafirma` |
+
+**El canal del código de la suscripción tiene que ser DISTINTO del buzón que
+recibe el enlace**, y el servicio lo exige: abrir una suscripción sin segundo
+canal es `400 CANAL_CODIGO_REQUERIDO`, y declararlo igual al buzón del enlace
+es `400 CANAL_CODIGO_IGUAL`. El motivo es el artículo 4 del Decreto 2364: los
+datos de creación de la firma tienen que corresponder **exclusivamente** al
+firmante, y un buzón compartido —el corporativo de la Empresa, que puede leer
+más de una persona— no le corresponde a una persona. Por eso el canal lo
+declara K+AIR al abrir la suscripción (y queda escrito **cómo** se confirmó
+con la Empresa), y no quien hace clic en el enlace: si quien tiene el enlace
+pudiera elegir el canal, el control del buzón no probaría nada.
+
+**El canal de la contrafirma ni siquiera se puede declarar.** El esquema del
+cuerpo es estricto: mandar un `canal_codigo` en el
+`POST .../anexo-encargo/contrafirmar/codigo` es `400 INVALID_REQUEST_BODY`. El
+código sale al buzón que dice la configuración.
+
+**Los dos códigos son DISTINTOS, con su propio ámbito de derivación.** El
+código de la contrafirma se deriva con el propósito `otp-contrafirma`, de modo
+que la huella de un código es otra huella: los mismos seis dígitos que sirven
+para suscribir **no** sirven para contrafirmar, ni al revés.
+
+### 6.21.3 Lo que este mecanismo NO es
+
+La contrafirma **no es una firma electrónica calificada**: K+AIR no tiene hoy
+un proveedor de firma ni un servicio de sellado de tiempo de terceros, así que
+**no hay certificado digital ni sello de tiempo de un tercero**. Lo que existe
+es una firma electrónica **reforzada**: un código de un solo uso que sale al
+buzón de protección de datos de K+AIR, la verificación documental previa de
+quien firmó por la Empresa, y un rastro inalterable con la fecha, la
+dirección IP y el navegador de los dos actos. El acta de contrafirma dice eso
+mismo, en su propio texto y sin adornos.
+
+Las **dos** actas (la de suscripción y la de contrafirma) son una **CONSTANCIA**:
+no sustituyen la copia firmada del Anexo, que conserva cada parte (el §12 del
+Anexo de Encargo lo prevé, y el servicio no la almacena). Lo que queda en el
+expediente es el documento que K+AIR archiva.
+
+### 6.21.4 Los endpoints públicos de la suscripción (los usa la Empresa)
+
+**Auth**: ninguna. El `token` de la URL **es** la credencial: es un enlace de
+un solo uso, con caducidad (72 horas), y en la base solo vive su huella. El
+enlace **no habilita** la firma: hace falta además el código de verificación y
+la aceptación expresa.
+
+#### `GET /anexo-encargo/documento` — el texto canónico
+
+Sirve el texto del Anexo de Encargo **desde el servidor**, no desde el sitio
+público. La razón es que lo que la Empresa lee tiene que ser exactamente el
+archivo cuya huella queda registrada: si el enlace apuntara al sitio, habría
+dos copias y la Empresa podría leer una mientras el servicio registra la huella
+de la otra.
+
+**Response — `200 OK`**:
+
+```
+Content-Type: text/html; charset=utf-8
+X-Content-Type-Options: nosniff
+X-Anexo-Encargo-Version: 2026-11-06
+X-Anexo-Encargo-Hash: 5cc7a346...960aa72
+Cache-Control: no-cache
+```
+
+La versión y la huella **no están escritas en el código**: las declara el
+manifiesto legal (`legal-readiness.json` → `anexo_encargo`) y el servicio las
+contrasta con los bytes del archivo del servidor. Si no coinciden, el servicio
+**no sirve el texto**.
+
+En los ejemplos de esta sección los valores son los que declara el manifiesto en
+este momento. Cambian cuando se publica una versión nueva del texto, y por eso
+el servicio los manda en la cabecera en vez de tenerlos fijos en el código.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `503` | `ANEXO_ENCARGO_NO_DISPONIBLE`: el manifiesto no está, no declara versión y huella válidas, el archivo no está en el servidor, o su huella no es la que declara el manifiesto. Es un fallo de despliegue, no un error de la Empresa |
+
+#### `GET /anexo-encargo/{token}` — la pantalla o el contexto
+
+**Negociación de contenido**: con `Accept: text/html` (lo que manda un
+navegador) devuelve el HTML de la pantalla de suscripción. Con
+`Accept: application/json` **explícito** devuelve el contexto en JSON. Sin
+cabecera `Accept`, o con `*/*`, devuelve el HTML: el HTML va primero en la
+lista de negociación.
+
+Por eso existe además `GET /api/anexo-encargo/{token}` (§6.21.5): con dos
+rutas, cada una con una sola respuesta, el cliente deja de tener que acertar
+la cabecera y el contrato queda escrito en un solo lado.
+
+**Errores** (siempre en JSON, también para el navegador): `404 ENLACE_NO_VALIDO`,
+`410 ENLACE_ANULADO`, `410 ENLACE_EXPIRADO`, `429 ENLACE_BLOQUEADO`.
+
+#### `GET /api/anexo-encargo/{token}` — el contexto, siempre JSON
+
+Es lo que la pantalla consume. **Response — `200 OK`**:
+
+```json
+{
+  "estado": "PENDIENTE",
+  "version": "2026-11-06",
+  "hash": "5cc7a346...960aa72",
+  "vigente": true,
+  "empresa": "EMPRESA DE EJEMPLO S.A.S.",
+  "correo_firmante": "re***@ejemplo.co",
+  "canal_codigo": "se***@ejemplo.co",
+  "canal_codigo_confirmado": true,
+  "nombre_firmante": "Nombre del firmante",
+  "cargo_firmante": "Representante legal",
+  "textos": {
+    "mecanismo": "Las partes acuerdan que este Anexo se suscribe mediante el mecanismo electrónico descrito en el Acuerdo sobre el uso del mecanismo de firma electrónica K+AIR...",
+    "declaracion": "Declaro que soy el representante legal de la Empresa y que tengo facultades para suscribir este Anexo.",
+    "declaracion_representante_legal": "Declaro que soy el representante legal de la Empresa...",
+    "declaracion_delegado": "Declaro que actúo en nombre de la Empresa como delegado con facultades suficientes...",
+    "tratamiento": "Tratamiento de mis datos personales. K+AIR (Gesstiar S.A.S.), como Encargado, recoge el nombre y el número de documento de quien suscribe...",
+    "calidades": ["REPRESENTANTE_LEGAL", "DELEGADO"]
+  },
+  "datos_empresa": {
+    "razon_social": "EMPRESA DE EJEMPLO S.A.S.",
+    "nit": "900123456",
+    "domicilio": "Calle 1 # 2-3, Bogotá",
+    "correo": "privacidad@ejemplo.co",
+    "representante": "Nombre del representante"
+  },
+  "expira_en": "2026-11-10T15:30:00.000Z",
+  "documento_url": "https://firma.k-air.com/anexo-encargo/documento",
+  "codigo_enviado": false,
+  "firmado_at": null,
+  "contrafirmado_at": null
+}
+```
+
+| Campo | Qué es |
+|---|---|
+| `vigente` | Si el texto que se va a suscribir sigue siendo el del servidor. Si es `false`, la pantalla avisa antes de pedir el código |
+| `textos` | Los **tres textos legales** que la Empresa tiene que aceptar: la cláusula del mecanismo, la declaración de representación y la frase informativa de tratamiento de datos |
+| `datos_empresa` | Los cinco datos del §11, prellenados con la ficha. La Empresa los confirma o los corrige |
+| `canal_codigo` | El segundo canal, **enmascarado**. La Empresa lo ve para saber dónde espera el código: no es este buzón |
+| `contrafirmado_at` | La contrafirma de K+AIR es **otro** acto: sin ella el instrumento no está ejecutado, aunque la Empresa ya haya suscrito |
+
+**Los textos van en el contexto y NO escritos en el HTML**, a propósito: si el
+texto legal viviera en los dos lados, un día dejarían de coincidir y la Empresa
+aceptaría una cosa mientras el acta archivaría otra. El acta los imprime desde
+la misma fuente.
+
+**Errores**: `404 ENLACE_NO_VALIDO`, `410 ENLACE_ANULADO`, `410 ENLACE_EXPIRADO`,
+`429 ENLACE_BLOQUEADO`.
+
+#### `POST /api/anexo-encargo/{token}/codigo` — el código de verificación
+
+Manda el código de seis dígitos al **segundo canal**. **No lleva datos**: el
+cuerpo es un objeto vacío, porque el token de la URL ya dice a quién pertenece.
+
+**Request**:
+
+```json
+{}
+```
+
+**Response — `200 OK`**:
+
+```json
+{
+  "ok": true,
+  "expira_en_segundos": 600
+}
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `ENLACE_NO_VALIDO` |
+| `410` | `ENLACE_ANULADO` / `ENLACE_EXPIRADO` |
+| `429` | `ENLACE_BLOQUEADO` (la suscripción quedó bloqueada por intentos fallidos) |
+| `409` | `YA_SUSCRITO` (ya está firmada: no se manda un código nuevo) |
+| `409` | `TEXTO_MODIFICADO` (el texto cambió después de abrir esta suscripción) |
+| `409` | `CANAL_CODIGO_NO_DEFINIDO` (esa suscripción no tiene segundo canal: hay que abrir una nueva) |
+| `429` | `LIMITE_ENVIOS` (se agotaron los 5 envíos de código de esta suscripción) |
+| `502` | `ENVIO_FALLIDO` (no se pudo enviar el correo con el código) |
+
+#### `POST /api/anexo-encargo/{token}/suscribir` — la fase 1
+
+**Request**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `otp` | string | sí | El código de seis dígitos que llegó al segundo canal |
+| `acepta` | boolean | sí | Que la Empresa leyó el Anexo, acepta la cláusula del mecanismo y declara su representación |
+| `acepta_tratamiento` | boolean | sí | Que leyó la información sobre el tratamiento de sus datos personales. Es una casilla aparte porque responde a una obligación distinta: la del artículo 12 de la Ley 1581 (informar), no la del artículo 7 del Decreto 2364 (acordar el mecanismo) |
+| `datos_empresa` | object | sí | Los cinco datos del §11 (abajo) |
+| `datos_empresa.razon_social` | string | sí | ≤200 chars |
+| `datos_empresa.nit` | string | sí | ≤60 chars |
+| `datos_empresa.domicilio` | string | sí | ≤300 chars |
+| `datos_empresa.correo` | string | sí | ≤254 chars. Tiene que ser un correo válido |
+| `datos_empresa.representante` | string | sí | ≤200 chars |
+| `representante` | object | sí | Quién firma (abajo) |
+| `representante.documento` | string | sí | El número de documento de quien suscribe. Viaja cifrado |
+| `representante.calidad` | enum | sí | `REPRESENTANTE_LEGAL` o `DELEGADO` |
+
+El esquema de validación **tolera** que falten los datos del §11 y los del
+representante, pero el servicio no suscribe sin ellos: la diferencia es el
+mensaje. Con el esquema listo, una Empresa que deja vacío el NIT recibe
+`400 DATOS_S11_INCOMPLETOS` (que le dice qué le falta) y no un error genérico
+de validación. El esquema dice **cómo** se ven los datos; el servicio dice
+**si** están.
+
+**Response — `200 OK`**:
+
+```json
+{
+  "ok": true,
+  "firmado": true,
+  "version": "2026-11-06",
+  "hash": "5cc7a346...960aa72",
+  "firmado_at": "2026-11-07T15:30:00.000Z",
+  "contrafirmado": false,
+  "ya_firmada": false,
+  "acta": {
+    "hash": "9a1c...",
+    "bytes": 48213,
+    "url": "/api/anexo-encargo/<token>/acta"
+  }
+}
+```
+
+**`contrafirmado` es `false` siempre en esta fase.** La fase 1 escribe
+`anexo_encargo_suscrito_at`: la Empresa se suscribió, el instrumento todavía
+**NO** está ejecutado. Le falta la contrafirma de K+AIR.
+
+Si la Empresa ya se había suscrito, la respuesta es la misma con
+`ya_firmada: true` y `acta: null`: es un reintento idempotente, no se vuelve a
+registrar nada.
+
+El **código se verifica antes que los datos del §11**: si el código está mal,
+el error es el del código, y el intento queda contado.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `ENLACE_NO_VALIDO` |
+| `410` | `ENLACE_ANULADO` / `ENLACE_EXPIRADO` |
+| `429` | `ENLACE_BLOQUEADO` |
+| `400` | `ACEPTACION_REQUERIDA` (falta `acepta` o `acepta_tratamiento`, o vienen en `false`) |
+| `400` | `CODIGO_NO_SOLICITADO` (primero hay que pedir el código) |
+| `400` | `CODIGO_EXPIRADO` |
+| `400` | `CODIGO_INVALIDO` |
+| `429` | `CODIGO_BLOQUEADO` (se agotaron los intentos de verificación) |
+| `400` | `DATOS_S11_INCOMPLETOS` (falta alguno de los cinco datos del §11, o el correo no es válido) |
+| `400` | `REPRESENTANTE_NO_IDENTIFICADO` (falta el documento de quien suscribe, o la calidad no es válida) |
+| `500` | `REPRESENTANTE_NO_CIFRADO` |
+| `409` | `TEXTO_MODIFICADO` |
+| `409` | `SUSCRIPCION_EXISTENTE` (la Empresa tiene el Anexo suscrito en otra versión: la corrección se registra por el canal administrativo, con su motivo) |
+| `404` | `EMPRESA_NOT_FOUND` |
+| `500` | `ACTA_NO_GENERADA` |
+
+#### `GET /api/anexo-encargo/{token}/acta` — el acta de suscripción
+
+El acta en PDF: el documento que la Empresa guarda y que K+AIR archiva en el
+expediente. Va por API y no como un archivo de una carpeta estática porque el
+token es la credencial: sin él no se baja nada, y el archivo en disco no se
+expone por una ruta que se pueda adivinar.
+
+**Response — `200 OK`**:
+
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="acta-42-anexo-encargo.pdf"
+Content-Length: 48213
+X-Anexo-Encargo-Acta-Hash: 9a1c...
+Cache-Control: no-store, no-cache, must-revalidate, private
+X-Content-Type-Options: nosniff
+```
+
+**La caducidad del enlace no aplica aquí.** La caducidad protege el **acto de
+firmar**: pasadas las 72 horas el enlace deja de servir para firmar. El acta es
+el documento de un acto ya hecho, así que la Empresa la puede bajar al día
+siguiente. Lo que sí se exige es que la suscripción esté en estado `FIRMADA`.
+
+La huella del acta va en la cabecera: quien la descarga puede contrastarla
+contra el registro sin abrir el archivo.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `ENLACE_NO_VALIDO` |
+| `409` | `ACTA_NO_DISPONIBLE` (la suscripción no está firmada, o el acta no está en el servidor) |
+| `409` | `ACTA_ALTERADA` (los bytes en disco no coinciden con la huella registrada: no se sirve) |
+
+### 6.21.5 Los endpoints administrativos (los usa K+AIR)
+
+**Auth**: `X-Admin-API-Key` (operador humano). No es la llave de K+AIR: estos
+actos son de la operación de K+AIR.
+
+**Headers de auditoría** (opcionales en las cinco rutas):
+
+| Header | Qué es |
+|---|---|
+| `X-Admin-Actor` | Quién hace el acto. Queda en el rastro. Sin él, el actor queda `null` |
+| `X-Admin-Motivo` | Por qué se hace el acto. **Obligatorio en tres de las cinco rutas** (tabla abajo) |
+
+**El motivo va en la cabecera y no en el body**, a propósito: el body de estas
+peticiones es el del acto (los datos que declara la Empresa, el código, la
+aceptación) y meter el motivo ahí lo contaminaría. Además los esquemas de esta
+ruta son estrictos: un `motivo` en el body es `400 INVALID_REQUEST_BODY`.
+
+| Ruta | ¿Exige `X-Admin-Motivo`? |
+|---|---|
+| `POST .../anexo-encargo/suscripcion` | No |
+| `POST .../anexo-encargo/suscripcion/:id_suscripcion/anular` | **Sí** → `400 MOTIVO_REQUERIDO` |
+| `POST .../anexo-encargo/suscripcion/:id_suscripcion/verificar-representante` | **Sí** → `400 MOTIVO_REQUERIDO` |
+| `POST .../anexo-encargo/contrafirmar/codigo` | No |
+| `POST .../anexo-encargo/contrafirmar` | **Sí** → `400 MOTIVO_REQUERIDO` |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-encargo/suscripcion` — abrir la suscripción
+
+Abre la suscripción y manda el enlace a la Empresa. Es la ruta que usa el
+operador para el piloto: **el enlace no se arma a mano**.
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `correo_firmante` | string | sí | A quién se manda el enlace. Un correo válido |
+| `canal_codigo` | string | sí | El **segundo canal**, por donde sale el código. Un correo válido y **distinto** de `correo_firmante` |
+| `canal_codigo_confirmacion` | string | sí | **Cómo** se confirmó ese canal con la Empresa. Es la prueba de que el canal es de la Empresa y no del de quien abrió el enlace. ≤300 chars |
+| `nombre_firmante` | string | no | ≤200 chars. Si no viene, el de la ficha |
+| `cargo_firmante` | string | no | ≤200 chars. Por defecto `Representante legal` |
+| `datos_empresa` | object | no | Prellenado de los cinco datos del §11 |
+
+**Response — `201 Created`**:
+
+```json
+{
+  "token": "<el token del enlace, de un solo uso>",
+  "url": "https://firma.k-air.com/anexo-encargo/<token>",
+  "expira_en": "2026-11-10T15:30:00.000Z",
+  "version": "2026-11-06",
+  "hash": "5cc7a346...960aa72",
+  "correo_firmante": "representante@ejemplo.co",
+  "datos_empresa": {
+    "razon_social": "EMPRESA DE EJEMPLO S.A.S.",
+    "nit": "900123456",
+    "domicilio": "Calle 1 # 2-3, Bogotá",
+    "correo": "privacidad@ejemplo.co",
+    "representante": "Nombre del representante"
+  }
+}
+```
+
+El `token` sale de la respuesta y **es la credencial**: en la base solo vive su
+huella. El enlace vence a las 72 horas.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `EMPRESA_NOT_FOUND` |
+| `409` | `EMPRESA_INACTIVA` (la empresa está dada de baja: no se pueden abrir suscripciones) |
+| `400` | `INVALID_REQUEST_BODY` (body malformado) |
+| `400` | `CANAL_CODIGO_REQUERIDO` (falta el segundo canal, o no es un correo válido) |
+| `400` | `CANAL_CODIGO_IGUAL` (el segundo canal es el mismo buzón que recibe el enlace) |
+| `400` | `CANAL_CODIGO_SIN_CONFIRMAR` (falta decir cómo se confirmó el canal con la Empresa) |
+| `503` | `ANEXO_ENCARGO_NO_DISPONIBLE` (el texto del servidor no es el que declara el manifiesto) |
+| `502` | `ENVIO_FALLIDO` (no se pudo enviar el correo: no se abrió ninguna suscripción) |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-encargo/suscripcion/{id_suscripcion}/anular` — dar de baja una suscripción pendiente
+
+Da de baja una suscripción que **todavía no se firmó**. El enlace queda
+muerto y el rastro dice por qué.
+
+**Lo que YA se firmó no se toca por aquí**: una suscripción en estado
+`FIRMADA` es `409 YA_SUSCRITO`, y se corrige por el camino administrativo, con
+motivo.
+
+**Body**: ninguno. **Exige `X-Admin-Motivo`.**
+
+**Response — `200 OK`**:
+
+```json
+{
+  "anulada": true,
+  "id_suscripcion": 42
+}
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `SUSCRIPCION_NO_ENCONTRADA` |
+| `400` | `INVALID_REQUEST_BODY` (el `id_suscripcion` no es un entero positivo) |
+| `400` | `MOTIVO_REQUERIDO` (falta `X-Admin-Motivo`) |
+| `409` | `YA_SUSCRITO` (ya está firmada: no se anula) |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-encargo/suscripcion/{id_suscripcion}/verificar-representante` — la verificación documental
+
+Registra la verificación documental de **quién firmó por la Empresa**. Es un
+acto de K+AIR: alguien de la operación contrasta el documento que la Empresa
+declaró contra el certificado de existencia y representación de la cámara de
+comercio, contra el RUT de la Empresa o contra el poder, y deja constancia de
+contra qué lo contrastó y de dónde quedó radicado.
+
+**ES UN REQUISITO DE LA CONTRAFIRMA**: sin esta verificación registrada, la
+contrafirma es `409 REPRESENTANTE_NO_VERIFICADO`. El método de firma probaba
+control de un buzón, no que quien firmara fuera el representante legal ni que
+tuviera poder; para un contrato sobre datos de salud eso es insuficiente,
+porque la Empresa podría alegar que el firmante no tenía poder.
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `tipo_documento` | enum | sí | `CERTIFICADO_CAMARA`, `RUT` o `PODER` |
+| `referencia` | string | sí | El radicado o la referencia del documento. ≤300 chars |
+| `nota` | string | no | Lo que hizo falta para verificarlo. ≤500 chars |
+
+**Response — `200 OK`**:
+
+```json
+{
+  "verificado": true,
+  "id_suscripcion": 42,
+  "tipo_documento": "CERTIFICADO_CAMARA",
+  "referencia": "Radicado 2026-11-07-14",
+  "verificado_por": "nombre-del-operador",
+  "verificado_at": "2026-11-07T16:00:00.000Z"
+}
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `SUSCRIPCION_NO_ENCONTRADA` |
+| `400` | `INVALID_REQUEST_BODY` (el `id_suscripcion` no es un entero positivo, o el body no cumple el esquema) |
+| `409` | `SUSCRIPCION_NO_FIRMADA` (todavía no hay a quién verificar) |
+| `400` | `VERIFICACION_INCOMPLETA` (el tipo de documento no es uno de los tres, o falta la referencia) |
+| `400` | `MOTIVO_REQUERIDO` (falta `X-Admin-Motivo`) |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-encargo/contrafirmar/codigo` — el código de la contrafirma
+
+Manda el código de la contrafirma al buzón de protección de datos de K+AIR.
+**No contrafirma nada**: es una ruta aparte del acto, para que pedir el
+código no se confunda con contrafirmar.
+
+**El canal no se declara**: sale al buzón que dice la configuración
+(`FIRMA_CANAL_PROTECCION_DATOS`). El esquema del cuerpo es estricto: un
+`canal_codigo` en el body es `400 INVALID_REQUEST_BODY`.
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `id_suscripcion` | number | sí | El id de la suscripción a contrafirmar. Entero positivo |
+
+**Response — `200 OK`**:
+
+```json
+{
+  "expira_en_segundos": 600,
+  "canal": "pr***@ejemplo.co"
+}
+```
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `SUSCRIPCION_NO_ENCONTRADA` (o la suscripción es de otra empresa) |
+| `409` | `SUSCRIPCION_NO_FIRMADA` (la Empresa no ha suscrito: no hay nada que contrafirmar) |
+| `409` | `YA_CONTRAFIRMADO` (el instrumento ya está ejecutado) |
+| `409` | `REPRESENTANTE_NO_VERIFICADO` (falta la verificación documental del representante) |
+| `503` | `CANAL_CONTRAFIRMA_NO_DEFINIDO` (el buzón de protección de datos de K+AIR no está configurado) |
+| `429` | `LIMITE_ENVIOS` (se agotaron los 5 envíos de código de contrafirma de esta suscripción) |
+| `502` | `ENVIO_FALLIDO` (no se pudo enviar el correo con el código) |
+| `400` | `INVALID_REQUEST_BODY` (body malformado, o con un canal declarado) |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-encargo/contrafirmar` — la fase 2
+
+Contrafirma el Anexo de Encargo. **Con este acto el instrumento queda EJECUTADO
+y la Empresa queda habilitada** para firmar documentos de sus trabajadores.
+
+**Lo que exige** (y por qué):
+
+| Exigencia | Por qué |
+|---|---|
+| Que la Empresa haya suscrito | No se contrafirma lo que no se firmó |
+| La verificación documental del representante | Es lo que el dictamen del abogado señala como la grieta del método |
+| El código | Sale al buzón de K+AIR, no al de la Empresa |
+| La aceptación expresa (`acepta: true`) | La contrafirma no es un valor por omisión |
+| El motivo (`X-Admin-Motivo`) | Es un acto que habilita a la Empresa |
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `id_suscripcion` | number | sí | Entero positivo |
+| `otp` | string | sí | El código de seis dígitos que salió al buzón de K+AIR |
+| `acepta` | boolean | sí | Que quien contrafirma lo acepta de forma expresa |
+
+**El motivo NO va en el body**: va en `X-Admin-Motivo`.
+
+**Response — `200 OK`**:
+
+```json
+{
+  "contrafirmado": true,
+  "version": "2026-11-06",
+  "hash": "5cc7a346...960aa72",
+  "suscrito_at": "2026-11-07T15:30:00.000Z",
+  "contrafirmado_at": "2026-11-07T16:30:00.000Z",
+  "evidencia": {
+    "fuente": "contrafirma_kair",
+    "id_suscripcion": 42,
+    "suscrito_at": "2026-11-07T15:30:00.000Z",
+    "acta_suscripcion_hash": "9a1c...",
+    "acta_suscripcion_archivo": "acta-42-anexo-encargo.pdf",
+    "contrafirmado_at": "2026-11-07T16:30:00.000Z",
+    "actor": "nombre-del-operador",
+    "motivo": "Verificado el certificado de la camara de comercio",
+    "canal_codigo": "pr***@ejemplo.co",
+    "representante_verificacion": {
+      "tipo_documento": "CERTIFICADO_CAMARA",
+      "referencia": "Radicado 2026-11-07-14",
+      "verificado_por": "nombre-del-operador",
+      "verificado_at": "2026-11-07T16:00:00.000Z"
+    },
+    "fase": 2,
+    "acta_hash": "b7d2...",
+    "acta_bytes": 52104,
+    "acta_archivo": "acta-42-contrafirma-anexo-encargo.pdf"
+  },
+  "acta": {
+    "hash": "b7d2...",
+    "bytes": 52104,
+    "archivo": "acta-42-contrafirma-anexo-encargo.pdf"
+  }
+}
+```
+
+**La contrafirma genera SU propio acta, y CITA la de la suscripción**
+(`acta_suscripcion_hash`, `acta_suscripcion_archivo`). El acta de la
+suscripción **no se reescribe**: ya salió del servidor y la Empresa la conserva
+con su huella; reescribir ese archivo cambiaría su huella y dejaría sin papel
+lo que la Empresa conserva. Son **dos documentos distintos**: el de la
+suscripción y el de la contrafirma.
+
+> **El acta de contrafirma no se descarga por ninguna ruta.** La respuesta
+> devuelve el **nombre** del archivo y su huella; el documento es el que K+AIR
+> archiva en el expediente. La única acta descargable por API es la de la
+> suscripción (`GET /api/anexo-encargo/{token}/acta`), y la descarga la hace la
+> Empresa con su token.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `404` | `SUSCRIPCION_NO_ENCONTRADA` (o la suscripción es de otra empresa) |
+| `409` | `SUSCRIPCION_NO_FIRMADA` |
+| `409` | `YA_CONTRAFIRMADO` (el instrumento ya está ejecutado) |
+| `409` | `REPRESENTANTE_NO_VERIFICADO` (falta la verificación documental del representante) |
+| `400` | `MOTIVO_REQUERIDO` (falta `X-Admin-Motivo`) |
+| `400` | `ACEPTACION_REQUERIDA` (`acepta` no vino en `true`) |
+| `400` | `CODIGO_NO_SOLICITADO` (primero hay que pedir el código de contrafirma) |
+| `400` | `CODIGO_EXPIRADO` |
+| `400` | `CODIGO_INVALIDO` |
+| `429` | `CODIGO_BLOQUEADO` (se agotaron los intentos de verificación del código de contrafirma) |
+| `404` | `EMPRESA_NOT_FOUND` |
+| `500` | `ACTA_NO_GENERADA` |
+| `400` | `INVALID_REQUEST_BODY` (body malformado) |
+
+### 6.21.6 El recorrido completo, de punta a punta
+
+| # | Quién | Qué hace |
+|---|---|---|
+| 1 | Operador | `POST .../anexo-encargo/suscripcion`, con el buzón del firmante, el **segundo canal** y cómo se confirmó ese canal |
+| 2 | Servicio | Manda el enlace de un solo uso al buzón del firmante. El enlace vence a las 72 horas |
+| 3 | Empresa | Abre `GET /anexo-encargo/{token}` (la pantalla) y recibe el contexto con los textos que tiene que aceptar |
+| 4 | Empresa | `POST /api/anexo-encargo/{token}/codigo` → el código sale al **segundo canal** |
+| 5 | Empresa | `POST /api/anexo-encargo/{token}/suscribir` con el código, las dos aceptaciones, los cinco datos del §11 y el representante → **fase 1**: queda `anexo_encargo_suscrito_at` y el acta de suscripción |
+| 6 | Empresa | `GET /api/anexo-encargo/{token}/acta` → descarga su acta |
+| 7 | Operador | `POST .../verificar-representante` con el tipo de documento y la referencia → la verificación documental |
+| 8 | Operador | `POST .../contrafirmar/codigo` → el código sale al buzón de protección de datos de K+AIR |
+| 9 | Operador | `POST .../contrafirmar` con el código, `acepta: true` y `X-Admin-Motivo` → **fase 2**: queda `anexo_encargo_firmado_at` y el acta de contrafirma |
+| 10 | — | A partir de aquí la Empresa ya puede firmar documentos de sus trabajadores |
 
 ---
 

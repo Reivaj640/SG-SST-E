@@ -14,10 +14,30 @@
 
 
 
-**Última actualización:** 6 de noviembre de 2026
+**Última actualización:** 7 de noviembre de 2026
 **Versión actual:** 0.1.252 (desarrollo) — último publicado v0.1.205
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 7-nov-2026 (mañana) — el Anexo de Encargo por autoservicio, de punta a punta: los ajustes del abogado, la contrafirma y el manifiesto que solo dice "firmado" con los dos actos:**
+> El owner pegó la respuesta del abogado (7-nov-2026) sobre el Anexo de Encargo y dijo «procede con los ajustes para continuar con la fase 2». La respuesta era una crítica al método de la fase 1 y siete cambios concretos. Los siete están implementados, y con ellos quedó completa la fase 2.
+>
+> **Lo que cambió de fondo: la fase 1 ya NO habilita a la Empresa.** El Anexo de Encargo es bilateral (§12 tiene dos bloques de firma), y el abogado fue explícito: «la empresa no debería empezar a usar el servicio hasta que K+AIR firme la otra parte». Así que la suscripción (fase 1) escribe `anexo_encargo_suscrito_at` —una columna nueva— y **nunca** `anexo_encargo_firmado_at`. Ese campo es la fecha de EJECUCIÓN del instrumento, y lo escribe la contrafirma (fase 2), que es la que `verificarHabilitacionFirma` exige. Sin contrafirma, la Empresa no puede firmar documentos de sus trabajadores, y el mensaje de la habilitación lo dice.
+>
+> **Los siete ajustes del abogado.** (a) La fase 1 no habilita. (b) Una cláusula expresa del mecanismo electrónico, que la Empresa acepta en la pantalla. (c) La verificación documental de quién firmó por la Empresa: el documento queda cifrado en el expediente, el motivo es obligatorio, y la contrafirma **no** procede sin ella (409 `REPRESENTANTE_NO_VERIFICADO`). (d) El código de verificación sale a un **segundo canal** que declara K+AIR, no la Empresa. (e) El acta es una **constancia**, no la copia firmada. (f) El §11 forma parte integral del Anexo, y el acta lleva los cinco datos tal como la Empresa los declaró. (g) Una frase informativa de tratamiento de datos (10 años el documento original, 5 años el registro de operaciones).
+>
+> **La contrafirma (📦1029, `906bcbda`).** Es el segundo acto: K+AIR verifica al representante, pide un código (que sale al buzón de protección de datos de K+AIR, fijo en la configuración y **no** declarado por quien lo pide) y contrafirma con su motivo. El código de la contrafirma es **otro código**, con su propio propósito de derivación (`otp-contrafirma`): los mismos seis dígitos no sirven para los dos actos. La contrafirma genera **su propio acta**, que cita la de la suscripción; el acta de la suscripción **no se reescribe**, porque la Empresa ya salió del servidor con su huella. Y escribe la fecha de ejecución en la ficha **en la misma transacción** que la suscripción: o quedan las dos escrituras, o no queda ninguna.
+>
+> **Lo que este mecanismo NO es (y está escrito en el acta, sin adornos).** K+AIR no tiene proveedor de firma ni servicio de sellado de tiempo: **no hay certificado digital ni sello de tiempo de terceros**. Lo que hay es una **firma electrónica reforzada**: un código de un solo uso al buzón de K+AIR, la verificación documental de quien firmó por la Empresa, y un rastro inalterable con la fecha, la IP y el navegador de los dos actos. Un acta que presentara esto como firma calificada sería una falsificación, y una falsificación archivada en un expediente es peor que una limitación documentada.
+>
+> **El manifiesto solo dice "firmado" con los dos actos (📦1030, `4360bd12`).** `scripts/actualizar-manifiesto-anexo-encargo.js` lee la base y escribe `estado`, `fecha` y `evidencia`; **se niega** (código 4) si no hay contrafirma, y **se niega** (código 5) si hay una suscripción contrafirmada cuya ficha no tiene la fecha de ejecución (las dos escrituras van en una sola transacción: esa incongruencia se reporta, no se promedia). No toca `version`, `hash` ni `nota`: son la identidad del TEXTO, no del acto. Edita el archivo con reemplazo literal y valida que siga siendo JSON válido y ASCII puro.
+>
+> **El preflight (📦1030).** `scripts/preflight-anexo-encargo.js` comprueba cinco cosas antes de que el manifiesto diga nada: el texto (y su huella contra la del manifiesto), la contrafirma (una Empresa activa con los dos actos y la fecha de ejecución), las dos actas (en disco y con la huella registrada), el manifiesto (con `--exigir-firmado`) y **el respaldo**: que `deploy/backup-firma.sh` se lleve la carpeta **entera** de `storage/` y no una lista de subcarpetas, porque el acta de la suscripción ya salió del servidor y no se puede regenerar.
+>
+> **El estado del gate no cambia.** La compuerta `publicacion` sigue verde (20 ítems · 0 pendientes) y la `primera_firma` sigue **sin** estarlo (37 ítems · 3 pendientes). Lo que cambió es que **ya se puede cerrar el pendiente del Anexo de Encargo**: el flujo existe, está probado y es todo digital. Lo que falta es el **deploy** y que una Empresa se suscriba y K+AIR contrafirme.
+>
+> **Lo que NO cambia.** El texto del Anexo de Encargo no se toca: la huella `5cc7a346…` sigue siendo la que declara el manifiesto. La producción no se toca: el código está en la rama `Dev` y el servidor sigue con la app `69db60e3`.
+>
 
 > **🆕 6-nov-2026 (noche, tercera tanda) — el Anexo de Encargo pasa a la vía de autoservicio: el plan ya
 > está escrito y la base ya está en marcha:**
