@@ -351,3 +351,131 @@ test('enmascararCorreo deja el dominio y esconde el resto', () => {
   assert.equal(actaEncargo.enmascararCorreo(''), '***');
   assert.equal(actaEncargo.enmascararCorreo(null), '***');
 });
+
+// ===========================================================================
+// EL ACTA DE LA CONTRAFIRMA (FASE 2)
+// ===========================================================================
+//
+// El segundo acta del Anexo de Encargo. Es OTRO documento: el de la
+// suscripción ya salió del servidor y la Empresa lo conserva con su huella.
+//
+// Lo que se comprueba acá es lo que el acta dice y lo que NO puede decir: un
+// expediente que presentara este mecanismo como una firma calificada
+// estaría mintiendo.
+
+const DATOS_CONTRAFIRMA = {
+  id_suscripcion: 123,
+  id_empresa: '900555777',
+  empresa: 'EMPRESA DE PRUEBA SAS',
+  version: '2026-11-06',
+  hash_texto: HASH_TEXTO,
+  // El primer acto.
+  suscrito_at: '2026-11-06T20:15:30.000Z',
+  acta_suscripcion_hash: 'c'.repeat(64),
+  acta_suscripcion_archivo: 'acta-123-anexo-encargo.pdf',
+  acta_suscripcion_bytes: 4539,
+  // El segundo acto.
+  contrafirmado_at: '2026-11-07T14:02:11.000Z',
+  canal_codigo: 'privacidad.kair@gmail.com',
+  codigo_enviado_at: '2026-11-07T14:00:00.000Z',
+  codigo_verificado_at: '2026-11-07T14:02:11.000Z',
+  actor: 'admin:operador',
+  motivo: 'Verificado el certificado de la camara de comercio',
+  ip: '10.0.0.9',
+  user_agent: 'Operador/1.0',
+  verificacion_representante: {
+    tipo_documento: 'CERTIFICADO_CAMARA',
+    referencia: 'Radicado 2026-11-07-14',
+    verificado_por: 'admin',
+    verificado_at: '2026-11-07T13:55:00.000Z',
+  },
+  datos_empresa: DATOS.datos_empresa,
+};
+
+test('el acta de contrafirma es un PDF y su huella es la de sus bytes', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+
+  assert.ok(Buffer.isBuffer(acta.buffer));
+  assert.equal(acta.buffer.slice(0, 5).toString('latin1'), '%PDF-');
+  const hash = crypto.createHash('sha256').update(acta.buffer).digest('hex');
+  assert.equal(acta.hash, hash,
+    'la huella del acta tiene que ser la de SUS bytes');
+  assert.equal(acta.bytes, acta.buffer.length);
+  assert.equal(acta.filename, 'acta-123-contrafirma-anexo-encargo.pdf',
+    'el archivo de la contrafirma es OTRO: el de la suscripción ya salió del servidor');
+});
+
+test('el acta de contrafirma dice que el instrumento queda EJECUTADO', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('FASE 2 DE 2'),
+    'el acta tiene que decir que es la segunda de las dos fases');
+  assert.ok(texto.includes('EJECUTADO'),
+    'con la contrafirma, el instrumento queda ejecutado y el acta lo dice');
+  assert.ok(texto.includes('2026-11-06T20:15:30.000Z'),
+    'la fecha del PRIMER acto: la suscripción de la Empresa');
+  assert.ok(texto.includes('2026-11-07T14:02:11.000Z'),
+    'la fecha del SEGUNDO acto: la contrafirma');
+});
+
+test('el acta de contrafirma dice, sin adornos, lo que este mecanismo NO es', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('NO es una firma electrónica con certificado digital'),
+    'el acta tiene que decir que no hay certificado digital');
+  assert.ok(texto.includes('sello de tiempo de un tercero'),
+    'el acta tiene que decir que no hay sello de tiempo de terceros');
+  assert.ok(texto.includes('firma electrónica REFORZADA'),
+    'y tiene que decir lo que sí hay');
+  assert.ok(texto.includes('CONSTANCIA, NO LA COPIA FIRMADA'),
+    'el acta es una constancia, no la copia firmada');
+});
+
+test('el acta de contrafirma cita el acta de la suscripción', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('acta-123-anexo-encargo.pdf'),
+    'el acta de contrafirma cita el acta de la suscripción');
+  assert.ok(texto.includes(DATOS_CONTRAFIRMA.acta_suscripcion_hash.slice(0, 32)),
+    'y cita su huella');
+});
+
+test('el acta de contrafirma deja por escrito la verificación del representante', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('CERTIFICADO_CAMARA'), 'el tipo de documento');
+  assert.ok(texto.includes('Radicado 2026-11-07-14'), 'la referencia del documento');
+  assert.ok(texto.includes('admin'), 'quién verificó');
+  assert.ok(texto.includes('2026-11-07T13:55:00.000Z'), 'cuándo verificó');
+});
+
+test('el acta de contrafirma enmascara el canal del código', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(texto.includes('pr***@gmail.com'),
+    'el canal del código va enmascarado');
+  assert.ok(!texto.includes('privacidad.kair@gmail.com'),
+    'la dirección entera del canal no se imprime');
+});
+
+test('el acta de contrafirma no puede llevar su propia huella', async () => {
+  const acta = await actaEncargo.generarActaContrafirma(DATOS_CONTRAFIRMA);
+  const texto = textoPlano(acta.buffer);
+
+  assert.ok(!texto.includes(acta.hash),
+    'la huella del acta se calcula sobre sus bytes: no puede estar dentro');
+});
+
+test('el nombre del acta de contrafirma sale del id y no puede salir de la carpeta', () => {
+  assert.equal(actaEncargo.nombreActaContrafirma(123),
+    'acta-123-contrafirma-anexo-encargo.pdf');
+
+  const ruta = actaEncargo.rutaActa('../../etc/passwd');
+  assert.ok(path.resolve(ruta).startsWith(path.resolve(storage.PATHS.actas)),
+    'una ruta con ../ no puede salirse de la carpeta de las actas');
+});

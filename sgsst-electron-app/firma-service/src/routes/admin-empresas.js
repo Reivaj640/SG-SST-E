@@ -23,6 +23,9 @@
  *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
  *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion
  *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion/:id_suscripcion/anular
+ *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion/:id_suscripcion/verificar-representante
+ *   POST   /internal/admin/empresas/:id/anexo-encargo/contrafirmar/codigo
+ *   POST   /internal/admin/empresas/:id/anexo-encargo/contrafirmar
  *   POST   /internal/admin/empresas/:id/estado  alta/baja lógica
  *   POST   /internal/admin/empresas/:id/fecha-terminacion
  *   GET    /internal/admin/empresas/:id/fecha-terminacion/pendientes
@@ -50,6 +53,8 @@ const {
   suscripcionAnexoNubeBody,
   suscripcionAnexoEncargoBody,
   verificarRepresentanteBody,
+  contrafirmaCodigoBody,
+  contrafirmaBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
@@ -396,6 +401,68 @@ router.post('/empresas/:id_empresa/anexo-encargo/suscripcion/:id_suscripcion/ver
     }
   });
 
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-encargo/contrafirmar/codigo
+// Manda el código de la CONTRAFIRMA al buzón de protección de datos de K+AIR.
+//
+// EL CANAL NO SE DECLARA
+// ----------------------
+// El código sale al buzón que dice la CONFIGURACIÓN
+// (FIRMA_CANAL_PROTECCION_DATOS), no a uno que elija quien pide la
+// contrafirma. Es la misma razón por la que el segundo canal de la
+// suscripción lo declara K+AIR y no la Empresa: un canal elegido por quien
+// pide el acto no probaría nada.
+//
+// ESTA RUTA NO CONTRAFIRMA NADA
+// -----------------------------
+// Solo manda el código. El acto es otra ruta, la de la contrafirma, que pide
+// el código, la aceptación expresa y el motivo. Separarlas deja claro que
+// pedir el código no es contrafirmar.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-encargo/contrafirmar/codigo',
+  adminApiAuth(), validateBody(contrafirmaCodigoBody), async (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const r = await anexoEncargoService.solicitarCodigoContrafirma(
+        id, req.body.id_suscripcion, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-encargo/contrafirmar
+// Contrafirma el Anexo de Encargo: el SEGUNDO acto del instrumento.
+//
+// QUÉ HACE
+//   Verifica el código (que salió al buzón de K+AIR), exige la aceptación
+//   expresa y el motivo, genera el acta de la contrafirma y escribe la fecha
+//   de EJECUCIÓN del instrumento en la ficha de la Empresa. Con esa fecha, y
+//   solo con ella, la Empresa queda habilitada para firmar documentos de sus
+//   trabajadores.
+//
+// LO QUE EXIGE (y por qué)
+//   - Que la Empresa haya suscrito: no se contrafirma lo que no se firmó.
+//   - Que K+AIR haya verificado documentalmente a quien firmó por ella: es
+//     lo que el abogado señaló como la grieta del método.
+//   - El código: sale al buzón de K+AIR, no al de la Empresa.
+//   - La aceptación expresa: la contrafirma no es un valor por omisión.
+//   - El motivo (`X-Admin-Motivo`): es un acto que habilita a la Empresa.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-encargo/contrafirmar',
+  adminApiAuth(), validateBody(contrafirmaBody), async (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const r = await anexoEncargoService.contrafirmar(
+        id, req.body.id_suscripcion, req.body, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
 // ============================================================================
 // POST /internal/admin/empresas/:id_empresa/anexo-firmado/quitar
 // Quita la fecha de firma del Anexo de Encargo.

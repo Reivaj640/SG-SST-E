@@ -172,6 +172,42 @@ const verificarRepresentanteBody = z.object({
 }).strict();
 
 /**
+ * Body de la petición del código de la CONTRAFIRMA del Anexo de Encargo.
+ *
+ * Solo se dice QUÉ suscripción se contrafirma. El canal NO se declara: el
+ * código sale al buzón de protección de datos de K+AIR, que está FIJO en la
+ * configuración. Es la misma razón por la que el segundo canal de la
+ * suscripción lo declara K+AIR y no la Empresa: si quien pide la contrafirma
+ * pudiera elegir el canal, el control del buzón no probaría nada.
+ */
+const contrafirmaCodigoBody = z.object({
+  id_suscripcion: z
+    .number()
+    .int('id_suscripcion tiene que ser un numero entero')
+    .positive('id_suscripcion tiene que ser un id valido'),
+}).strict();
+
+/**
+ * Body de la CONTRAFIRMA del Anexo de Encargo.
+ *
+ * `acepta` es obligatorio, pero el que dice si vale `true` es el SERVICIO
+ * (ACEPTACION_REQUERIDA): el esquema dice CÓMO se ven los datos y el servicio
+ * dice SI están. Lo que no se puede es que la contrafirma se dé sin que nadie
+ * la acepte de forma expresa: es el acto que ejecuta el instrumento.
+ */
+const contrafirmaBody = z.object({
+  id_suscripcion: z
+    .number()
+    .int('id_suscripcion tiene que ser un numero entero')
+    .positive('id_suscripcion tiene que ser un id valido'),
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'el código son 6 dígitos'),
+  acepta: z.boolean({ required_error: 'acepta es requerido' }),
+}).strict();
+
+/**
  * Body de alta. Solo identidad: el anexo y el estado activo tienen endpoints
  * propios para que no se puedan cambiar por accidente.
  */
@@ -366,6 +402,8 @@ module.exports = {
   suscripcionAnexoNubeBody,
   suscripcionAnexoEncargoBody,
   verificarRepresentanteBody,
+  contrafirmaCodigoBody,
+  contrafirmaBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,

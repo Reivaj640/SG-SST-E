@@ -86,6 +86,21 @@ const COLUMNAS_SUSCRIPCION = {
   // La huella de los textos que la Empresa aceptó.
   aceptacion_hash: 'TEXT',
   aceptacion_tratamiento_hash: 'TEXT',
+  // El SEGUNDO ACTO (migración 059): la contrafirma de K+AIR. El código es
+  // otro (propósito de derivación propio) y el acta es OTRO archivo: el de la
+  // suscripción ya salió del servidor y la Empresa lo conserva con su huella.
+  contrafirma_otp_hash: 'TEXT',
+  contrafirma_otp_intentos: 'INTEGER',
+  contrafirma_otp_envios: 'INTEGER',
+  contrafirma_otp_enviado_at: 'TEXT',
+  contrafirma_canal: 'TEXT',
+  contrafirma_actor: 'TEXT',
+  contrafirma_motivo: 'TEXT',
+  contrafirma_ip: 'TEXT',
+  contrafirma_user_agent: 'TEXT',
+  contrafirma_acta_hash: 'TEXT',
+  contrafirma_acta_bytes: 'INTEGER',
+  contrafirma_acta_archivo: 'TEXT',
 };
 
 // Las que no pueden faltar: sin esto la fila no describe una suscripción.
@@ -134,7 +149,7 @@ test('056 · el archivo 056_anexo_encargo_suscripcion.sql existe y declara las d
     'la 056 no debe crear triggers: van en la 057 (ver tests/migration-057.test.js)');
 });
 
-test('056 + 058 · la tabla de suscripciones tiene EXACTAMENTE las columnas del plan y de los ajustes, con su tipo', () => {
+test('056 + 058 + 059 · la tabla de suscripciones tiene EXACTAMENTE las columnas del plan, de los ajustes y de la contrafirma, con su tipo', () => {
   const info = columnasDe('gh_firma_anexo_encargo_suscripciones');
   assert.ok(info.length > 0, 'la tabla gh_firma_anexo_encargo_suscripciones debe existir');
 
@@ -150,7 +165,8 @@ test('056 + 058 · la tabla de suscripciones tiene EXACTAMENTE las columnas del 
   const esperadas = Object.keys(COLUMNAS_SUSCRIPCION).sort();
   assert.deepEqual(nombres.slice().sort(), esperadas,
     'la tabla no puede tener columnas de más ni de menos: el set es el del plan '
-    + 'más el de los ajustes del abogado (migración 058)');
+    + 'más el de los ajustes del abogado (migración 058) más el de la contrafirma '
+    + '(migración 059)');
 });
 
 test('056 · las columnas del presupuesto son NOT NULL', () => {

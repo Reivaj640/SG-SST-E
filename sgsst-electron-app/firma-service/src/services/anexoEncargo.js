@@ -119,7 +119,9 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const { generateToken, hashTokenHmac, tokenHashCandidates } = require('../crypto/token');
-const { generateOTP, hashOTPHmac, verifyOTPHmac, isExpired } = require('../crypto/otp');
+const {
+  generateOTP, hashOTPHmac, verifyOTPHmac, isExpired, PROPOSITO_OTP_CONTRAFIRMA,
+} = require('../crypto/otp');
 const empresaService = require('./empresa');
 const mailer = require('./mailer');
 const manifiestoLegal = require('./manifiestoLegal');
@@ -1383,6 +1385,392 @@ function obtenerActa(token) {
   };
 }
 
+// =============================================================================
+// 5. LA CONTRAFIRMA (FASE 2)
+// =============================================================================
+//
+// QUÉ ES ESTA FASE
+// ----------------
+// El Anexo de Encargo es bilateral: el §12 tiene dos bloques de firma. La
+// fase 1 (la que está arriba) deja constancia de la SÚCRIPCIÓN de la Empresa;
+// esta fase deja constancia de la CONTRAFIRMA de K+AIR. Solo con los dos
+// actos el instrumento está EJECUTADO, y solo entonces la Empresa queda
+// habilitada para firmar documentos de sus trabajadores.
+//
+// EL CÓDIGO ES DISTINTO
+// ---------------------
+// El código de la contrafirma tiene su propio propósito de derivación
+// (`otp-contrafirma`): los mismos seis dígitos no sirven para los dos actos.
+// El código de la suscripción no verifica contra la huella de la contrafirma,
+// ni al revés.
+//
+// EL CANAL NO LO DECLARA QUIEN PIDE LA CONTRAFIRMA
+// -------------------------------------------------
+// Sale al buzón de protección de datos de K+AIR, que está FIJO en la
+// configuración. Es la misma razón por la que el segundo canal de la
+// suscripción lo declara K+AIR y no la Empresa: un canal elegido por quien
+// pide el acto no probaría nada.
+//
+// LO QUE NO SE PUEDE SALTAR
+// --------------------------
+//  - Que la Empresa haya suscrito (si no, no hay nada que contrafirmar).
+//  - Que K+AIR haya verificado DOCUMENTALMENTE a quien firmó por la
+//    Empresa (el punto 7 del abogado: verificar quién es el representante).
+//  - El código (que sale al buzón de K+AIR).
+//  - La aceptación expresa de quien contrafirma.
+//  - El motivo (`X-Admin-Motivo`): es un acto que habilita a la Empresa.
+//
+// EL ACTA: UN SEGUNDO ACTA, NO UNA COPIA DEL PRIMERO
+// --------------------------------------------------
+// El acta de la suscripción ya salió del servidor y la Empresa la conserva con
+// su huella: no se puede reescribir. La contrafirma genera SU acta, que cita
+// la primera (fecha y huella) y deja por escrito los dos actos.
+
+/**
+ * La suscripción que se puede contrafirmar, con todas las condiciones
+ * cumplidas.
+ *
+ * @param {string} id_empresa
+ * @param {number} id_suscripcion
+ * @returns {object} la fila de la suscripción.
+ */
+function _filaContrafirmable(id_empresa, id_suscripcion) {
+  const fila = db.prepare(`SELECT * FROM gh_firma_anexo_encargo_suscripciones
+    WHERE id = ? AND id_empresa = ?`).get(id_suscripcion, id_empresa);
+  if (!fila) {
+    throw new AppError(404, 'SUSCRIPCION_NO_ENCONTRADA',
+      'No existe esa suscripción para esa empresa');
+  }
+  if (fila.estado !== ESTADOS.FIRMADA) {
+    throw new AppError(409, 'SUSCRIPCION_NO_FIRMADA',
+      'Esta suscripción no está firmada por la Empresa: no hay nada que contrafirmar');
+  }
+  if (fila.contrafirmado_at) {
+    throw new AppError(409, 'YA_CONTRAFIRMADO',
+      'Esta suscripción ya está contrafirmada: el instrumento ya está ejecutado');
+  }
+  if (!fila.representante_verificacion) {
+    throw new AppError(409, 'REPRESENTANTE_NO_VERIFICADO',
+      'K+AIR no contrafirma el Anexo sin verificar quién firmó por la Empresa: '
+      + 'primero hay que registrar la verificación documental del representante');
+  }
+  return fila;
+}
+
+/**
+ * Manda el código de la contrafirma al buzón de protección de datos de K+AIR.
+ *
+ * @param {string} id_empresa
+ * @param {number} id_suscripcion
+ * @param {object} [ctx] - { ip, user_agent }.
+ * @returns {Promise<object>} { expira_en_segundos, canal }
+ */
+async function solicitarCodigoContrafirma(id_empresa, id_suscripcion, ctx = {}) {
+  const fila = _filaContrafirmable(id_empresa, id_suscripcion);
+
+  // El canal es FIJO: lo declara la configuración de K+AIR, no quien pide la
+  // contrafirma. Si el que pide el acto pudiera elegir el canal, el control
+  // del buzón no probaría nada.
+  const canal = String(config.canalProteccionDatos || '').trim();
+  if (!canal) {
+    throw new AppError(503, 'CANAL_CONTRAFIRMA_NO_DEFINIDO',
+      'El canal de protección de datos de K+AIR no está configurado: no se puede contrafirmar');
+  }
+  if (fila.contrafirma_otp_envios >= MAX_ENVIOS_CODIGO) {
+    throw new AppError(429, 'LIMITE_ENVIOS',
+      'Se agotaron los envíos de código de contrafirma de esta suscripción: '
+      + 'hable con el responsable legal antes de continuar');
+  }
+
+  const otp = generateOTP();
+  const otpHash = hashOTPHmac(otp, fila.id_empresa, PROPOSITO_OTP_CONTRAFIRMA);
+  const enviadoAt = new Date().toISOString();
+
+  db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
+    SET contrafirma_otp_hash = ?, contrafirma_otp_intentos = 0,
+        contrafirma_otp_envios = contrafirma_otp_envios + 1,
+        contrafirma_otp_enviado_at = ?, contrafirma_canal = ?,
+        updated_at = datetime('now')
+    WHERE id = ?`)
+    .run(otpHash, enviadoAt, canal, fila.id);
+
+  _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_CODIGO_ENVIADO',
+    `intento=${fila.contrafirma_otp_envios + 1}`, ctx.ip, ctx.user_agent);
+
+  try {
+    await mailer.sendOTP({
+      to: canal,
+      otp,
+      tipo: 'anexo_encargo_contrafirma',
+      context: {
+        id_suscripcion: fila.id,
+        empresa: fila.id_empresa,
+        version: fila.version,
+      },
+    });
+  } catch (e) {
+    _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_ENVIO_FALLIDO',
+      e && e.message ? e.message : String(e), ctx.ip, ctx.user_agent);
+    logger.error('No se pudo enviar el código de contrafirma del Anexo de Encargo', {
+      id_empresa: fila.id_empresa, id_suscripcion: fila.id,
+      error: e && e.message ? e.message : String(e),
+    });
+    throw new AppError(502, 'ENVIO_FALLIDO',
+      'No se pudo enviar el correo con el código de contrafirma: inténtelo otra vez');
+  }
+
+  return {
+    expira_en_segundos: config.ttl.otpSeconds,
+    // Enmascarado: el canal se muestra, no se imprime entero.
+    canal: actaEncargo.enmascararCorreo(canal),
+  };
+}
+
+/**
+ * Contrafirma el Anexo de Encargo: el segundo acto.
+ *
+ * Con este acto el instrumento queda EJECUTADO y la Empresa queda habilitada
+ * para firmar documentos de sus trabajadores. Por eso el motivo es
+ * obligatorio y el acto queda con su rastro completo.
+ *
+ * @param {string} id_empresa
+ * @param {number} id_suscripcion
+ * @param {object} datos
+ * @param {string} datos.otp - el código de contrafirma.
+ * @param {boolean} datos.acepta - que quien contrafirma lo acepta de forma expresa.
+ * @param {object} ctx - { actor, motivo, ip, user_agent }.
+ * @returns {Promise<object>}
+ */
+async function contrafirmar(id_empresa, id_suscripcion, datos, ctx = {}) {
+  const fila = _filaContrafirmable(id_empresa, id_suscripcion);
+
+  // EL MOTIVO: es un acto de K+AIR con efecto sobre el expediente y habilita a
+  // la Empresa. Sin motivo no hay quién lo hizo ni por qué.
+  const motivo = typeof ctx.motivo === 'string' ? ctx.motivo.trim() : '';
+  if (!motivo) {
+    throw new AppError(400, 'MOTIVO_REQUERIDO',
+      'X-Admin-Motivo es obligatorio para contrafirmar el Anexo de Encargo');
+  }
+
+  // LA ACEPTACIÓN EXPRESA: quien contrafirma tiene que marcar que la acepta.
+  if (!datos || datos.acepta !== true) {
+    throw new AppError(400, 'ACEPTACION_REQUERIDA',
+      'La contrafirma tiene que ser expresa: el que la hace tiene que marcar que la acepta');
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // EL CÓDIGO, ANTES QUE NADA
+  // ───────────────────────────────────────────────────────────────────────────
+  if (!fila.contrafirma_otp_hash || !fila.contrafirma_otp_enviado_at) {
+    throw new AppError(400, 'CODIGO_NO_SOLICITADO',
+      'Primero hay que pedir el código de contrafirma');
+  }
+  if (isExpired(fila.contrafirma_otp_enviado_at, config.ttl.otpSeconds)) {
+    throw new AppError(400, 'CODIGO_EXPIRADO', 'El código venció: pida uno nuevo');
+  }
+  const otp = typeof datos.otp === 'string' ? datos.otp.trim() : '';
+  if (!verifyOTPHmac(otp, fila.contrafirma_otp_hash, fila.id_empresa, PROPOSITO_OTP_CONTRAFIRMA)) {
+    const intentos = fila.contrafirma_otp_intentos + 1;
+    const bloqueo = intentos >= config.ttl.otpMaxAttempts;
+    db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
+      SET contrafirma_otp_intentos = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(intentos, fila.id);
+    _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_CODIGO_INVALIDO',
+      `intento=${intentos}`, ctx.ip, ctx.user_agent);
+    if (bloqueo) {
+      throw new AppError(429, 'CODIGO_BLOQUEADO',
+        'Se agotaron los intentos de verificación del código de contrafirma');
+    }
+    throw new AppError(400, 'CODIGO_INVALIDO', 'El código no es correcto');
+  }
+
+  const empresa = empresaService.getById(id_empresa);
+  if (!empresa) {
+    throw new AppError(404, 'EMPRESA_NOT_FOUND', `No existe la empresa ${id_empresa}`);
+  }
+
+  let verificacion = {};
+  try {
+    verificacion = fila.representante_verificacion
+      ? JSON.parse(fila.representante_verificacion) : {};
+  } catch (e) {
+    verificacion = {};
+  }
+  let datosS11 = {};
+  try {
+    datosS11 = fila.datos_empresa ? JSON.parse(fila.datos_empresa) : {};
+  } catch (e) {
+    datosS11 = {};
+  }
+  // La evidencia del PRIMER acto: el acta de la suscripción, con su huella.
+  // La contrafirma la CITA (no la reescribe).
+  let evidenciaSuscripcion = {};
+  try {
+    evidenciaSuscripcion = fila.evidencia ? JSON.parse(fila.evidencia) : {};
+  } catch (e) {
+    evidenciaSuscripcion = {};
+  }
+
+  const contrafirmadoAt = new Date().toISOString();
+  const actor = ctx.actor || null;
+
+  const evidencia = {
+    fuente: 'contrafirma_kair',
+    id_suscripcion: fila.id,
+    version: fila.version,
+    hash: fila.hash_texto,
+    // EL PRIMER ACTO: la suscripción de la Empresa.
+    suscrito_at: fila.firmado_at,
+    acta_suscripcion_hash: evidenciaSuscripcion.acta_hash || null,
+    acta_suscripcion_archivo: evidenciaSuscripcion.acta_archivo || null,
+    // EL SEGUNDO ACTO: la contrafirma.
+    contrafirmado_at: contrafirmadoAt,
+    actor,
+    motivo,
+    ip: ctx.ip || null,
+    user_agent: ctx.user_agent || null,
+    // El canal por el que salió el código: enmascarado. El completo vive en la
+    // columna de la suscripción, no en la evidencia que se resume al manifiesto.
+    canal_codigo: actaEncargo.enmascararCorreo(fila.contrafirma_canal),
+    // La verificación documental de quien firmó por la Empresa: es lo que
+    // sostiene esta contrafirma.
+    representante_verificacion: verificacion,
+    fase: 2,
+  };
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // EL ACTA DE LA CONTRAFIRMA: EL DOCUMENTO QUE QUEDA
+  // ───────────────────────────────────────────────────────────────────────────
+  // Mismo criterio que en la fase 1: el archivo se escribe ANTES de tocar la
+  // base. Si el acta no se puede generar o escribir, la contrafirma NO se
+  // cierra. Y si la transacción falla después, el acta se borra: no puede
+  // quedar un archivo sin registro ni un registro sin archivo.
+  let acta = null;
+  try {
+    acta = await actaEncargo.generarActaContrafirma({
+      id_suscripcion: fila.id,
+      id_empresa: fila.id_empresa,
+      empresa: empresa.razon_social || fila.id_empresa,
+      version: fila.version,
+      hash_texto: fila.hash_texto,
+      suscrito_at: fila.firmado_at,
+      acta_suscripcion_hash: evidenciaSuscripcion.acta_hash || null,
+      acta_suscripcion_archivo: evidenciaSuscripcion.acta_archivo || null,
+      acta_suscripcion_bytes: evidenciaSuscripcion.acta_bytes || null,
+      contrafirmado_at: contrafirmadoAt,
+      canal_codigo: fila.contrafirma_canal,
+      codigo_enviado_at: fila.contrafirma_otp_enviado_at,
+      codigo_verificado_at: contrafirmadoAt,
+      actor,
+      motivo,
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      verificacion_representante: verificacion,
+      datos_empresa: datosS11,
+    });
+    actaEncargo.guardarActa(acta.filename, acta.buffer);
+  } catch (e) {
+    _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_ACTA_FALLIDA',
+      e && e.message ? e.message : String(e), ctx.ip, ctx.user_agent);
+    logger.error('No se pudo generar el acta de contrafirma del Anexo de Encargo', {
+      id_empresa: fila.id_empresa, id_suscripcion: fila.id,
+      error: e && e.message ? e.message : String(e),
+    });
+    throw new AppError(500, 'ACTA_NO_GENERADA',
+      'No se pudo generar el acta de contrafirma: la contrafirma no se cerró. '
+      + 'Inténtelo otra vez con el mismo código.');
+  }
+
+  evidencia.acta_hash = acta.hash;
+  evidencia.acta_bytes = acta.bytes;
+  evidencia.acta_archivo = acta.filename;
+  const evidenciaTexto = JSON.stringify(evidencia);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // LAS DOS ESCRITURAS, EN UNA SOLA TRANSACCIÓN
+  // ───────────────────────────────────────────────────────────────────────────
+  // La suscripción (el segundo acto) y la ficha de la Empresa (la fecha de
+  // EJECUCIÓN del instrumento, que es la que la habilita). Si una de las dos
+  // falla, las dos se deshacen.
+  try {
+    const tx = db.transaction(() => {
+      db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
+        SET contrafirmado_at = ?, contrafirma_evidencia = ?, contrafirma_acta_hash = ?,
+            contrafirma_acta_bytes = ?, contrafirma_acta_archivo = ?,
+            contrafirma_actor = ?, contrafirma_motivo = ?, contrafirma_ip = ?,
+            contrafirma_user_agent = ?, contrafirma_otp_hash = NULL,
+            updated_at = datetime('now')
+        WHERE id = ?`)
+        // EL ORDEN DE LOS ARGUMENTOS ES EL DE LOS SIGNOS DE INTERROGACIÓN.
+        // Con un `?` de más o de menos, better-sqlite3 avisa; con el MISMO
+        // número pero cambiados de sitio, no avisa de nada y la sentencia no
+        // actualiza ninguna fila (ni falla). Por eso el orden está anotado.
+        .run(contrafirmadoAt, evidenciaTexto, acta.hash, acta.bytes, acta.filename,
+          actor, motivo, ctx.ip || null, ctx.user_agent || null, fila.id);
+
+      // LA FECHA DE EJECUCIÓN DEL INSTRUMENTO. Este es el campo que
+      // `verificarHabilitacionFirma` exige: con él, la Empresa puede firmar
+      // documentos de sus trabajadores.
+      //
+      // Si la fecha venía del circuito FÍSICO (un operador la registró a mano),
+      // se reemplaza por la de la contrafirma: desde este momento el
+      // instrumento tiene una ejecución digital con evidencia completa, que es
+      // más fuerte que un registro de una fecha. La anterior NO se pierde: la
+      // escritura va con su rastro (valor anterior, valor nuevo, quién y por
+      // qué), y el motivo queda en la evidencia de la contrafirma.
+      if (empresa.anexo_encargo_firmado_at) {
+        logger.warn('La contrafirma reemplaza una fecha de Anexo de Encargo ya registrada', {
+          id_empresa: id_empresa,
+          fecha_anterior: empresa.anexo_encargo_firmado_at,
+          fecha_nueva: contrafirmadoAt,
+        });
+      }
+      empresaService.marcarAnexoFirmado(id_empresa, contrafirmadoAt, {
+        actor: actor || 'kair:contrafirma',
+        motivo,
+        ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null,
+      });
+    });
+    tx();
+  } catch (e) {
+    try {
+      fs.unlinkSync(actaEncargo.rutaActa(acta.filename));
+    } catch (_) { /* el archivo nunca llegó a escribirse */ }
+    _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_FALLIDA',
+      e && e.message ? e.message : String(e), ctx.ip, ctx.user_agent);
+    logger.error('No se pudo cerrar la contrafirma del Anexo de Encargo', {
+      id_empresa: id_empresa, id_suscripcion: fila.id,
+      error: e && e.message ? e.message : String(e),
+    });
+    throw e;
+  }
+
+  _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_FIRMADA',
+    `version=${fila.version} hash=${fila.hash_texto}`, ctx.ip, ctx.user_agent);
+  _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_ACTA_GENERADA',
+    `hash=${acta.hash} bytes=${acta.bytes}`, ctx.ip, ctx.user_agent);
+
+  logger.info('Anexo de Encargo contrafirmado por K+AIR (fase 2)', {
+    id_empresa: id_empresa, id_suscripcion: fila.id, version: fila.version,
+    acta_hash: acta.hash,
+  });
+
+  return {
+    contrafirmado: true,
+    version: fila.version,
+    hash: fila.hash_texto,
+    suscrito_at: fila.firmado_at,
+    contrafirmado_at: contrafirmadoAt,
+    evidencia,
+    acta: {
+      hash: acta.hash,
+      bytes: acta.bytes,
+      archivo: acta.filename,
+    },
+  };
+}
+
 module.exports = {
   RUTA_MODELO,
   TTL_ENLACE_HORAS,
@@ -1400,4 +1788,6 @@ module.exports = {
   solicitarCodigo,
   suscribir,
   obtenerActa,
+  solicitarCodigoContrafirma,
+  contrafirmar,
 };

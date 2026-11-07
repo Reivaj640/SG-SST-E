@@ -37,6 +37,20 @@ const OTP_MAX = 999999;
 const PROPOSITO_OTP = 'otp';
 
 /**
+ * EL PROPÓSITO DEL CÓDIGO DE LA CONTRAFIRMA (fase 2 del Anexo de Encargo).
+ *
+ * La contrafirma de K+AIR tiene su PROPIO código, y no puede ser el mismo que
+ * el de la suscripción de la Empresa. Sin esto, los mismos seis dígitos
+ * valdrían para los dos actos: quien tuviera el código de la suscripción
+ * podría contrafirmar sin recibir nada.
+ *
+ * El propósito es la clave de la derivación (ver src/crypto/hmac.js): con otra
+ * clave, la huella del mismo código es OTRA huella. Por eso el código de la
+ * suscripción no verifica contra la huella de la contrafirma, ni al revés.
+ */
+const PROPOSITO_OTP_CONTRAFIRMA = 'otp-contrafirma';
+
+/**
  * Genera un OTP numérico de 6 dígitos.
  * Retorna string de exactamente 6 chars (con padding de ceros).
  */
@@ -72,13 +86,16 @@ function hashOTP(otp) {
  *
  * @param {string} otp - 6 dígitos
  * @param {string} [id_empresa] - ámbito de la derivación
+ * @param {string} [proposito] - propósito de la derivación. Por defecto el del
+ *   OTP ('otp'). La contrafirma del Anexo de Encargo usa el suyo propio
+ *   ('otp-contrafirma'): es otro acto y no puede compartir código.
  * @returns {string} 64 chars hex
  */
-function hashOTPHmac(otp, id_empresa) {
+function hashOTPHmac(otp, id_empresa, proposito = PROPOSITO_OTP) {
   if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) {
     throw new Error('hashOTPHmac: OTP debe ser string de 6 dígitos');
   }
-  return hmacHex(PROPOSITO_OTP, otp, id_empresa);
+  return hmacHex(proposito, otp, id_empresa);
 }
 
 /**
@@ -93,9 +110,13 @@ function hashOTPHmac(otp, id_empresa) {
  * @param {string} providedOTP
  * @param {string} storedHash - hash HMAC de 64 chars
  * @param {string} [id_empresa] - ámbito de la derivación
+ * @param {string} [proposito] - propósito de la derivación. Por defecto el del
+ *   OTP ('otp'). El de la contrafirma es OTRO: con otro propósito se deriva
+ *   otra clave, así que un código de la suscripción no verifica contra la
+ *   huella de la contrafirma.
  * @returns {boolean}
  */
-function verifyOTPHmac(providedOTP, storedHash, id_empresa) {
+function verifyOTPHmac(providedOTP, storedHash, id_empresa, proposito = PROPOSITO_OTP) {
   if (typeof providedOTP !== 'string' || !/^\d{6}$/.test(providedOTP)) {
     return false;
   }
@@ -103,12 +124,12 @@ function verifyOTPHmac(providedOTP, storedHash, id_empresa) {
     return false;
   }
   for (const version of listKeyVersions()) {
-    if (constantTimeEqual(hmacHex(PROPOSITO_OTP, providedOTP, id_empresa, version), storedHash)) {
+    if (constantTimeEqual(hmacHex(proposito, providedOTP, id_empresa, version), storedHash)) {
       return true;
     }
   }
   // Formato v1 (ámbito global, llave maestra).
-  if (constantTimeEqual(hmacV1Hex(PROPOSITO_OTP, providedOTP), storedHash)) {
+  if (constantTimeEqual(hmacV1Hex(proposito, providedOTP), storedHash)) {
     return true;
   }
   return false;
@@ -196,4 +217,5 @@ module.exports = {
   isExpired,
   OTP_LENGTH,
   PROPOSITO_OTP,
+  PROPOSITO_OTP_CONTRAFIRMA,
 };
