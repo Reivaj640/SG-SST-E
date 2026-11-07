@@ -473,6 +473,9 @@
   };
 
   FirmaOperadorComponent.prototype._htmlSuscripcionEncargo = function (sub, eventos) {
+    // Sin esto, `self` resuelve al `window` del navegador y la llamada a
+    // `self._htmlEventos` revienta con "is not a function".
+    var self = this;
     var html = [];
     var etiqueta = ETIQUETA_SUSCRIPCION[sub.estado] || sub.estado || '—';
     var verificada = !!sub.representante_verificacion;
@@ -518,6 +521,8 @@
   };
 
   FirmaOperadorComponent.prototype._htmlSuscripcionNube = function (sub, eventos) {
+    // Mismo caso que en `_htmlSuscripcionEncargo`: `self` tiene que ser `this`.
+    var self = this;
     var html = [];
     var etiqueta = ETIQUETA_SUSCRIPCION[sub.estado] || sub.estado || '—';
     html.push('<div class="fo-kv"><span class="fo-kv__k">Suscripcion</span><span class="fo-kv__v">#'
