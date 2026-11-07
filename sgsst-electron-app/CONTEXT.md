@@ -19,7 +19,53 @@
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
-> **🆕 6-nov-2026 (noche, segunda tanda) — las dos compuertas del readiness medidas con la base real: la de
+> **🆕 6-nov-2026 (noche, tercera tanda) — el Anexo de Encargo pasa a la vía de autoservicio: el plan ya
+> está escrito y la base ya está en marcha:**
+> El owner preguntó si el Anexo de Encargo podía suscribirse **como el Anexo de Nube** (enlace de un solo uso,
+> código de verificación y rastro) en vez de por correo y papel. Se puede, y el plan quedó escrito en
+> `docs/gestion-humana/firma-electronica/plan-suscripcion-anexo-encargo-2026-11-06.md` (📦1021, `0c020825`).
+>
+> **Lo que se replica y lo que no.** Las siete propiedades de seguridad del flujo del Anexo de Nube se replican
+> una por una (el token es la credencial y en la base solo vive su HMAC; el enlace es de un solo uso y caduca a
+> las 72 horas; el código se manda al correo y solo se guarda su HMAC; la aceptación expresa es obligatoria; lo
+> que la Empresa lee es lo que firma; `TEXTO_MODIFICADO` si el texto cambió; y el rastro append-only). El Anexo
+> de Encargo impone **cuatro diferencias**: son **dos partes** (§12 tiene dos bloques de firma), el **§11 lo
+> diligencia la Empresa**, el **manifiesto es global pero la firma es por empresa**, y el **modelo se versiona
+> por fecha con un generador** que puede matar suscripciones vivas.
+>
+> **Las decisiones del owner.** (1) **Dos fases**: la Empresa se suscribe y K+AIR contrafirma después; el
+> manifiesto solo dice `firmado` con los dos actos. (2) La Empresa **confirma o corrige sus datos en la
+> pantalla** y el acta los lleva; el texto canónico se suscribe tal cual, con sus huecos. (3) La verdad por
+> empresa vive **en la base** (si no, el manifiesto sería un deploy por empresa): el gate no cambia. (4) **Abrir
+> el flujo ahora y rotar los app passwords después** — riesgo aceptado por el owner, con la mitigación de que el
+> primer uso es el piloto de ASEPLUS y el flujo no se anuncia a otras empresas hasta rotarlos. (5) **ABIERTA**:
+> la validación del abogado (que una suscripción con OTP equivalga a firma en un instrumento bilateral, y que
+> la sustitución de los datos del §11 sea admisible). No bloquea el código: pesa en la fase 2.
+>
+> **Verificado, no supuesto.** El texto vigente **no exige firma autógrafa**; la huella desplegada del archivo es
+> `5cc7a346…`, la misma del manifiesto; `pdf-lib` ya es dependencia del servicio (el acta se genera en el
+> servidor); y el flujo del Encargo no depende de la compuerta `FIRMA_EXIGIR_ANEXO_NUBE` ni de que ASEPLUS tenga
+> el Anexo de Nube.
+>
+> **📦1023 — la base (`15bc8ce3`).** `056_anexo_encargo_suscripcion.sql` (la suscripción con `datos_empresa` para
+> los cinco datos del §11 y con `contrafirmado_at`/`contrafirma_evidencia` para la fase 2, más su rastro) y
+> `057_anexo_encargo_eventos_append_only.sql` (los triggers en su propia migración, con `@skip-when-env test`, por
+> la misma razón que la 055). Con sus dos archivos de test y las tablas nuevas en el `resetDb()` de
+> `tests/helpers.js`. **Una separación que queda escrita en la tabla:** `estado = 'FIRMADA'` significa que la
+> Empresa suscribió, NO que el instrumento esté ejecutado — para eso hace falta `contrafirmado_at`.
+>
+> **📦1022 — un rojo que venía de la tanda anterior: el manifiesto volvió a ser ASCII puro (`166a4610`).** El test «manifiesto ·
+> sigue siendo ASCII puro» salió en rojo con 4 caracteres no ASCII: el commit 📦1018 metió cuatro `·` (U+00B7) en
+> la evidencia de la 10.4, y esa evidencia se copia tal cual al manifiesto — que es **ASCII puro por regla propia**
+> (`actualizar-manifiesto-v1.4.js` aborta si deja de serlo). El origen era `scripts/probar-10-4.js`, que usaba `·`
+> como separador en `escribirEvidencia()`: se cambiaron por ASCII (` - `), se corrigió el manifiesto a nivel de
+> bytes (sin re-serializar el JSON) y se dejó escrito el porqué en el docstring de la función. **Ninguna huella,
+> ningún estado y ningún orden cambian.**
+>
+> **El camino físico sigue preparado** en `tmp/envio-anexo-encargo-aseplus-2026-11-06/` por si al final el flujo
+> que se usa es otro.
+
+> **Anterior · 6-nov-2026 (noche, segunda tanda) — las dos compuertas del readiness medidas con la base real: la de
 > publicación verde, la de primera firma con tres bloqueantes:**
 > La pregunta del owner fue si ya no quedaban bloqueantes para el proceso de la firma electrónica. **Se
 > midieron las dos compuertas** contra una copia consistente de la base de producción, con el mismo código
@@ -60,8 +106,6 @@
 > el dictamen J1-J14 del abogado.
 >
 > **Anterior · 6-nov-2026 (noche) — la 10.4 probada en el ambiente real y el gate de publicación sin
-> bloqueantes:**
-> **🆕 6-nov-2026 (noche) — la 10.4 probada en el ambiente real y el gate de publicación sin
 > bloqueantes:**
 > La compuerta `prueba_10_4` era el último bloqueante del gate de publicación: **queda probada** contra
 > el servicio desplegado en `kair-server`, con su evidencia en el manifiesto (`legal-readiness.json` →

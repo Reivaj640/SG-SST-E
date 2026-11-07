@@ -7233,6 +7233,105 @@ owner y respondió que sí**. Queda registrado aquí para que la próxima jornad
 cumpliendo, y **la pregunta vuelve a hacerse en la próxima jornada igual**: no se archiva porque la
 respuesta fue sí.
 
+## 2026-11-06 (noche, tercera tanda) · El Anexo de Encargo por autoservicio: el plan y la base
+
+El owner preguntó si el Anexo de Encargo podía firmarse **como el Anexo de Nube** —por enlace, código de
+verificación y rastro— en vez de por correo y papel, para que fuera más rápido e igual de seguro. Se respondió
+que sí, y quedó escrito en un plan. Después se empezó la base.
+
+**Lo que hay que replicar y lo que no**
+
+El flujo del Anexo de Nube ya existe y es sólido: `src/services/anexoNube.js` (27 003 B), sus rutas, la
+pantalla, las migraciones 054 y 055 (la segunda con los triggers de inalterabilidad en su propia migración),
+el preflight y 21 tests. Sus **siete propiedades de seguridad** se replican una por una: el token es la
+credencial y en la base solo vive su HMAC; el enlace es de un solo uso, caduca a las 72 horas y admite 5
+códigos; el código se manda al correo del firmante y solo se guarda su HMAC; la aceptación expresa es
+obligatoria; lo que la Empresa lee es lo que firma (el texto se sirve desde el servidor, no desde el sitio);
+`TEXTO_MODIFICADO` (409) si el texto cambió entre abrir y firmar; y el rastro append-only.
+
+El Anexo de Encargo impone **cuatro diferencias**, que el plan resuelve así:
+
+1. **Son dos partes.** El §12 tiene dos bloques de firma. → **DECISIÓN 1 (owner): dos fases.** La Empresa se
+   suscribe (fase 1) y K+AIR contrafirma después (fase 2). El manifiesto solo dice `firmado` con los dos actos.
+2. **El §11 lo diligencia la Empresa.** → **DECISIÓN 2 (owner): la Empresa confirma o corrige sus datos en la
+   pantalla**, y el acta los lleva. El texto canónico se suscribe tal cual, con sus huecos y su huella. Es el
+   precedente ya establecido con el Anexo de Nube: los datos de la Empresa no se diligencian en el modelo.
+3. **El manifiesto es global y la firma es por empresa.** → Resuelta por la restricción, no por el código: **la
+   verdad por empresa vive en la base** y el manifiesto declara el instrumento. Si el manifiesto cambiara por
+   empresa, sería un deploy por empresa. El gate no cambia.
+4. **El modelo se versiona por fecha y lo pone un generador** (`scripts/generar-anexo-encargo.js`). De ahí sale
+   la trampa central: el generador puede matar suscripciones vivas.
+
+**El plan** (📦1021, `0c020825`) queda en
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-suscripcion-anexo-encargo-2026-11-06.md`
+(25 319 B, sha256 `86d9f6b5…`): el espejo a replicar con sus siete propiedades, los cuatro códigos de error que
+se reutilizan, el diseño (migraciones 056/057, `anexoEncargo.js`, rutas, pantalla, acta con `pdf-lib`,
+preflight, manifiesto), **ocho commits en orden**, siete riesgos, lo que no cambia y lo que el flujo no compra.
+
+**La quinta decisión queda abierta, con el abogado:** que una suscripción con OTP equivalga a firma para un
+instrumento bilateral, y que la sustitución de los cinco datos del §11 sea admisible. No bloquea el código:
+pesa en la fase 2 (la contrafirma), no en el flujo.
+
+**Lo que se verificó, no se supuso**
+
+- El texto vigente del Anexo de Encargo **no exige firma autógrafa**: no dice «autógrafa», ni «manuscrita», ni
+  «notarial», ni exige firma en papel. La única mención de un código de verificación es la del OTP del
+  Trabajador.
+- La ruta del texto en el servidor es `/opt/kair-firma/legal/anexo-encargo.html` y su huella desplegada es
+  `5cc7a346…`, la misma que declara el manifiesto.
+- El servicio tiene `pdf-lib` como dependencia: el acta de suscripción se puede generar en el servidor.
+- La compuerta `FIRMA_EXIGIR_ANEXO_NUBE` ya está **encendida** y ASEPLUS ya tiene el Anexo de Nube suscrito: el
+  flujo del Anexo de Encargo no depende de eso.
+- El §12 del Anexo manda lo que se archiva: «la huella del texto canónico que la Empresa aceptó, no la de una
+  copia firmada». De ahí sale el reparto de las dos huellas: la canónica (`5cc7a346…`, en el manifiesto, los
+  consentimientos y la Constancia) y la de la copia firmada (que es la evidencia).
+
+**El camino físico queda preparado**, por si al final el flujo que se usa es otro: el paquete de envío está en
+`tmp/envio-anexo-encargo-aseplus-2026-11-06/` (el PDF de 15 páginas generado desde el texto canónico, la carta
+de remisión, el guion de registro y el script del servidor, ya subido a `/tmp` con la sintaxis verificada).
+
+**📦1022 · El manifiesto vuelve a ser ASCII puro** (`166a4610`, un rojo que venía de la tanda anterior)
+
+Al correr la suite del `firma-service` salió **un test en rojo que no era de este trabajo**: «manifiesto · sigue
+siendo ASCII puro» (4 caracteres no ASCII). Se rastreó hasta la causa: el commit **📦1018** (`69db60e3`) metió
+cuatro puntos medios (`·`, U+00B7) en la evidencia de la 10.4, y esa evidencia se copia **tal cual** a
+`legal-readiness.json` → `n10_4.evidencia`. El manifiesto legal es **ASCII puro por regla propia**
+(`scripts/actualizar-manifiesto-v1.4.js` aborta si deja de serlo, y hay un test que lo exige).
+
+El origen era el propio generador: `scripts/probar-10-4.js` usaba `·` como separador en `escribirEvidencia()`. Se
+cambiaron esos cuatro separadores por ASCII (` - `), se corrigió el manifiesto **a nivel de bytes** (sin
+re-serializar el JSON: re-serializar convertiría cada escape `\uXXXX` en el carácter real y el diff sería enorme) y
+se dejó escrito el porqué en el docstring de la función, para que el próximo que agregue un separador sepa que
+ahí no puede poner tipografía. **Ninguna huella, ningún estado y ningún orden cambian**: el texto es el mismo con
+otro separador.
+
+**📦1023 · La base** (`15bc8ce3`)
+
+- `056_anexo_encargo_suscripcion.sql`: `gh_firma_anexo_encargo_suscripciones` (espejo de la 054, con
+  `datos_empresa` para los cinco datos del §11 y con `contrafirmado_at`/`contrafirma_evidencia` para la fase 2) y
+  `gh_firma_anexo_encargo_eventos`.
+- `057_anexo_encargo_eventos_append_only.sql`: los triggers de inalterabilidad **en su propia migración**, con
+  `@skip-when-env test`, por la misma razón que la 055: el trigger impide que `resetDb()` vacíe la tabla entre
+  tests.
+- `tests/migration-056.test.js` y `tests/migration-057.test.js`: el set **exacto** de columnas con su tipo, los
+  NOT NULL del presupuesto, el `UNIQUE` del `token_hash`, los índices, el registro en el registry, y el trigger
+  real aplicado a una base en memoria (UPDATE y DELETE abortan, INSERT no).
+- `tests/helpers.js`: las dos tablas nuevas en la lista de `resetDb()`.
+
+**Una decisión de diseño que quedó escrita en la propia tabla:** `estado = 'FIRMADA'` significa que **la Empresa
+suscribió** (fase 1), NO que el instrumento esté ejecutado. Para eso hace falta además `contrafirmado_at`. Sin
+esa separación, el manifiesto podría declarar «firmado» un contrato que solo tiene una parte.
+
+**Commits**
+
+- 📦1020 (`4140d2cc`) — los tres documentos con la medición de las dos compuertas.
+- 📦1021 (`0c020825`) — el plan de la suscripción digital del Anexo de Encargo.
+- Los dos están **pusheados** a `origin/Dev`. El 📦1022 (el fix del manifiesto) y el 📦1023 (la base) también
+  están en la historia de esta rama.
+
+**La regla de cierre: se preguntó y se respondió otra vez.** El owner autorizó actualizar los documentos. La
+pregunta se vuelve a hacer en la próxima jornada.
+
 ## 2026-11-06 (noche, segunda tanda) · Las dos compuertas del readiness, medidas contra la base real
 
 La pregunta fue si ya no quedaban bloqueantes para el proceso de la firma electrónica. No se respondió de
