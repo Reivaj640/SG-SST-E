@@ -117,16 +117,41 @@
     return (b / 1024 / 1024).toFixed(1) + ' MB';
   }
 
+  // 📦1042 · El panel se monta dentro del modal de Configuración (que vive
+  // en un IFRAME). Ahí `window.electronAPI` no existe: el padre se lo
+  // inyecta en el `contentWindow` (renderer.js). Por eso el puente se
+  // resuelve en el MOMENTO de usarlo y no al cargar el modulo.
+  function _api() {
+    var a = (typeof window !== 'undefined' && window.electronAPI) ? window.electronAPI : null;
+    if (!a) {
+      try {
+        if (window.parent && window.parent !== window && window.parent.electronAPI) {
+          a = window.parent.electronAPI;
+        }
+      } catch (e) { a = null; }
+    }
+    if (!a) throw new Error('No hay puente de firma disponible en esta pantalla.');
+    return a;
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   //  EL COMPONENTE
   // ═══════════════════════════════════════════════════════════════════
 
-  function FirmaOperadorComponent(container, companyName, moduleName, subName, onBack) {
+  // 📦1042 · `opts`:
+  //   idEmpresa  → el panel se limita a ESA empresa (sin la tabla general).
+  //   embebido   → se dibuja dentro de otro modal (Configuración): sin
+  //                header propio, sin modal propio y sin tabla.
+  function FirmaOperadorComponent(container, companyName, moduleName, subName, onBack, opts) {
     this.container = container;
     this.companyName = companyName || null;
     this.moduleName = moduleName || 'Gestión Humana';
     this.subName = subName || 'Anexos';
     this.onBack = typeof onBack === 'function' ? onBack : null;
+
+    opts = opts || {};
+    this._idEmpresa = opts.idEmpresa || null;
+    this._embebido = !!opts.embebido;
 
     this._empresas = [];
     this._seleccion = null;   // la Empresa abierta en el modal
@@ -150,6 +175,19 @@
   // ── El esqueleto ──────────────────────────────────────────────────
 
   FirmaOperadorComponent.prototype._getShellHtml = function () {
+    // 📦1042 · Modo embebido: el panel vive DENTRO del modal de
+    // Configuración. No puede traer header propio (el modal ya tiene
+    // título) ni modal propio (sería un modal dentro de otro modal), y
+    // tampoco la tabla general: ahí se ve UNA empresa, la del modal.
+    if (this._embebido) {
+      return [
+        '<div class="fo-wrapper fo-wrapper--inline">',
+        '  <div class="fo-main fo-main--inline" id="fo-main">',
+        '    <div class="fo-cargando">Cargando…</div>',
+        '  </div>',
+        '</div>'
+      ].join('\n');
+    }
     return [
       '<div class="fo-wrapper">',
       '  <header class="fo-header">',
@@ -237,7 +275,7 @@
     //    claro en vez de mostrar una tabla vacía que parece un error.
     var diag;
     try {
-      diag = await window.electronAPI.firmaConfigAdminDiag();
+      diag = await _api().firmaConfigAdminDiag();
     } catch (e) {
       self._cargando = false;
       self._main.innerHTML = '<div class="fo-alerta fo-alerta--error">No se pudo consultar la configuración: '
@@ -253,10 +291,22 @@
       return;
     }
 
+    // 📦1042 · Embebido en Configuración: no hay tabla general. Se abre
+    // directo el detalle de LA empresa del modal.
+    if (self._embebido && self._idEmpresa) {
+      self._seleccion = self._idEmpresa;
+      self._empresas = [{
+        id_empresa: self._idEmpresa,
+        razon_social: self.companyName || self._idEmpresa
+      }];
+      await self._abrirDetalle(self._idEmpresa);
+      return;
+    }
+
     // 2) El listado de Empresas con su estado de anexos.
     var r;
     try {
-      r = await window.electronAPI.firmaAnexoEmpresas();
+      r = await _api().firmaAnexoEmpresas();
     } catch (e) {
       self._cargando = false;
       self._main.innerHTML = '<div class="fo-alerta fo-alerta--error">No se pudo consultar las empresas: '
@@ -288,7 +338,7 @@
       '    puede contrafirmar el Anexo de cualquier Empresa. No se escribe en el equipo de un cliente.',
       '  </p>',
       '  <p class="fo-sinkey__text">',
-      '    Configurala en <strong>Configuración → Firma Electrónica</strong>.',
+      '    Configurala en <strong>Configuración → Firma Electrónica → Credencial administrativa</strong>.',
       '  </p>',
       '</div>'
     ].join('\n');
@@ -380,12 +430,20 @@
   // ── El modal ──────────────────────────────────────────────────────
 
   FirmaOperadorComponent.prototype._cerrarModal = function () {
+    // 📦1042 · Embebido: no hay modal propio que cerrar. El "volver" de los
+    // formularios llama a `_renderDetalle`, que repinta la seccion.
+    if (this._embebido) return;
     if (this._modal) this._modal.hidden = true;
     this._modo = null;
     this._enlace = null;
   };
 
   FirmaOperadorComponent.prototype._abrirModal = function (titulo, html) {
+    // 📦1042 · Embebido: el contenido se pinta en la seccion, no en un modal.
+    if (this._embebido) {
+      if (this._main) this._main.innerHTML = html;
+      return;
+    }
     if (!this._modal) return;
     if (this._modalTitle) this._modalTitle.textContent = titulo;
     if (this._modalBody) this._modalBody.innerHTML = html;
@@ -417,7 +475,7 @@
     self._abrirModal('Cargando…', '<div class="fo-cargando">Cargando…</div>');
     var r;
     try {
-      r = await window.electronAPI.firmaAnexoEstado({ id_empresa: id_empresa });
+      r = await _api().firmaAnexoEstado({ id_empresa: id_empresa });
     } catch (e) {
       self._abrirModal('Anexo', '<div class="fo-alerta fo-alerta--error">'
         + _esc(e.message) + '</div>');
@@ -627,8 +685,8 @@
     }
 
     var r = esNube
-      ? await window.electronAPI.firmaAnexoNubeSuscripcion({ id_empresa: self._seleccion, datos: datos })
-      : await window.electronAPI.firmaAnexoSuscripcion({ id_empresa: self._seleccion, datos: datos });
+      ? await _api().firmaAnexoNubeSuscripcion({ id_empresa: self._seleccion, datos: datos })
+      : await _api().firmaAnexoSuscripcion({ id_empresa: self._seleccion, datos: datos });
 
     if (!r || !r.success) {
       self._showToast((r && r.error && r.error.message) || 'No se pudo abrir la suscripcion', 'error');
@@ -695,7 +753,7 @@
     if (!motivo) { self._showToast('Falta el motivo: queda en el rastro', 'error'); return; }
     var sub = (self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null;
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
-    var r = await window.electronAPI.firmaAnexoVerificarRepresentante({
+    var r = await _api().firmaAnexoVerificarRepresentante({
       id_empresa: self._seleccion,
       id_suscripcion: sub.id,
       datos: {
@@ -717,7 +775,7 @@
     var self = this;
     var sub = (self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null;
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
-    var r = await window.electronAPI.firmaAnexoContrafirmaCodigo({
+    var r = await _api().firmaAnexoContrafirmaCodigo({
       id_empresa: self._seleccion,
       id_suscripcion: sub.id
     });
@@ -760,7 +818,7 @@
     if (!/^\d{6}$/.test(otp)) { self._showToast('El codigo son 6 digitos', 'error'); return; }
     var sub = (self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null;
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
-    var r = await window.electronAPI.firmaAnexoContrafirmar({
+    var r = await _api().firmaAnexoContrafirmar({
       id_empresa: self._seleccion,
       id_suscripcion: sub.id,
       otp: otp,
@@ -800,8 +858,8 @@
       : ((self._detalle && self._detalle.anexo_encargo && self._detalle.anexo_encargo.suscripcion) || null);
     if (!sub) { self._showToast('No hay suscripcion abierta', 'error'); return; }
     var r = esNube
-      ? await window.electronAPI.firmaAnexoNubeAnular({ id_empresa: self._seleccion, id_suscripcion: sub.id, motivo: motivo })
-      : await window.electronAPI.firmaAnexoAnular({ id_empresa: self._seleccion, id_suscripcion: sub.id, motivo: motivo });
+      ? await _api().firmaAnexoNubeAnular({ id_empresa: self._seleccion, id_suscripcion: sub.id, motivo: motivo })
+      : await _api().firmaAnexoAnular({ id_empresa: self._seleccion, id_suscripcion: sub.id, motivo: motivo });
     if (!r || !r.success) {
       self._showToast((r && r.error && r.error.message) || 'No se pudo anular', 'error');
       return;

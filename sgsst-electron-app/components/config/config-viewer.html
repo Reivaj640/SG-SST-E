@@ -13,6 +13,12 @@
          scopada bajo `.kair-config` (ver bloque PREMIUM v2). -->
     <link rel="stylesheet" href="../../shared/kair-design-tokens.css">
 
+    <!-- 📦1042 · El panel de los anexos (Anexo de Encargo y de Nube) se monta
+         al final del modal de configuración por empresa. Es el MISMO
+         componente de la app, en modo embebido: usa los mismos tokens
+         (`--kair-*`), asi que esta hoja entra sin variantes. -->
+    <link rel="stylesheet" href="../../modules/gestion-humana/firma-operador/index.css?v=GH-20261107-anexos-operador">
+
     <style>
         /* =========================================
            1. SISTEMA VISUAL & VARIABLES
@@ -2527,6 +2533,20 @@
 
                     <!-- Banner resultado -->
                     <div id="firma-modal-result" style="display:none; margin-top: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
+
+                    <!-- 📦1042 · Los anexos de esta empresa (Anexo de Encargo y Anexo de Nube).
+                         Va AL FINAL de la configuración por empresa. Es una gestión de
+                         K+AIR (usa la credencial administrativa, no la de la empresa), asi
+                         que no vive en el módulo de Gestión Humana: vive acá, con lo demás
+                         que K+AIR configura de cada empresa. -->
+                    <div id="firma-modal-anexos-block" style="display:none; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color, #e2e8f0);">
+                        <div class="firma-card__form-title" style="margin-bottom: 0.25rem;">Anexos de Encargo y de Nube</div>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 0.75rem;">
+                            Suscripciones, verificación del representante y contrafirma de K+AIR.
+                            Esta gestión usa la credencial administrativa de K+AIR.
+                        </p>
+                        <div id="firma-modal-anexos"></div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline" id="firma-modal-cancel">Cancelar</button>
@@ -4496,6 +4516,47 @@
     // I-104 RECOVERY: detecta también si la empresa existe en el backend
     // (vía firmaEmpresaListBackend) para ofrecer "Recuperar y rotar" cuando
     // la empresa existe en backend pero NO en secrets.enc local.
+    // 📦1042 · Los anexos de esta empresa: el panel del operador, embebido al
+    // final de la configuracion por empresa. El panel es el MISMO componente
+    // de la app (modules/gestion-humana/firma-operador), en modo embebido:
+    // sin tabla general y sin modal propio (seria un modal dentro de otro).
+    var _anexosPanel = null;
+
+    function _destruirAnexosEmpresa() {
+        if (_anexosPanel) {
+            try { _anexosPanel.destroy(); } catch (e) { /* noop */ }
+            _anexosPanel = null;
+        }
+    }
+
+    function _montarAnexosEmpresa(companyName, nit) {
+        var cont = document.getElementById('firma-modal-anexos');
+        var block = document.getElementById('firma-modal-anexos-block');
+        if (!cont || !block) return;
+        _destruirAnexosEmpresa();
+        cont.innerHTML = '';
+        block.style.display = '';
+
+        if (!nit) {
+            cont.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">'
+                + 'Configura primero el NIT de esta empresa: el Anexo se registra con ese identificador.'
+                + '</p>';
+            return;
+        }
+        var C = window.FirmaOperadorComponent;
+        if (typeof C !== 'function') {
+            cont.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); margin: 0;">'
+                + 'No se pudo cargar el panel de anexos. Reinicia K+AIR.'
+                + '</p>';
+            return;
+        }
+        _anexosPanel = new C(cont, companyName, 'Configuración', 'Anexos', null, {
+            idEmpresa: nit,
+            embebido: true
+        });
+        _anexosPanel.render();
+    }
+
     async function prepareFirmaModal(companyName) {
         if (!window.electronAPI || !window.electronAPI.firmaEmpresaCreate) {
             showToast('Bridge de firma no disponible. Reinicia K+AIR.', 'error');
@@ -4525,6 +4586,9 @@
         var infoNit = document.getElementById('firma-modal-nit-info');
         if (infoCompany) infoCompany.textContent = 'Empresa: ' + companyName;
         if (infoNit) infoNit.textContent = 'NIT: ' + (nit || '— (no configurado)');
+
+        // 📦1042 · Montar los anexos de esta empresa (al final del modal).
+        _montarAnexosEmpresa(companyName, nit);
 
         // 2. Buscar estado de firma en cache
         var firmaState = _getFirmaStateForCompany(companyName, _firmaConfiguredCache);
@@ -4721,6 +4785,9 @@
         // Limpiar inputs sensibles (defensivo)
         var apikeyInput = document.getElementById('firma-modal-apikey');
         if (apikeyInput) apikeyInput.value = '';
+        // 📦1042 · El panel de anexos escucha eventos del documento: se
+        // destruye al cerrar el modal, no queda hablando por la casa.
+        _destruirAnexosEmpresa();
         _firmaModalCtx = null;
         _firmaModalBusy = false;
     }
@@ -8566,6 +8633,11 @@ en lugar de afirmar una condición específica no verificada.**`;
       };
     }
 </script>
+
+<!-- 📦1042 · El panel de los anexos (Anexo de Encargo y de Nube).
+     Vive acá porque este documento es el que se carga dentro del IFRAME de
+     Configuración; el panel se monta al final del modal de la empresa. -->
+<script src="../../modules/gestion-humana/firma-operador/index.js?v=GH-20261107-anexos-operador"></script>
 
 </body>
 </html>

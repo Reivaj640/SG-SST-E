@@ -16,6 +16,28 @@
   box-sizing: border-box;
 }
 
+/* 📦1042 · Modo embebido: el panel se dibuja DENTRO del modal de
+   Configuración. Sin posicionamiento absoluto (el modal ya tiene su propio
+   flujo), sin padding de pagina y sin scroll propio: el modal scrollea. */
+.fo-wrapper--inline {
+  position: static;
+  inset: auto;
+  overflow: visible;
+  padding: 0;
+  display: block;
+}
+
+.fo-main--inline {
+  display: block;
+  width: 100%;
+}
+
+/* El detalle embebido arranca con un borde arriba para separarlo del
+   bloque de configuracion que lo precede. */
+.fo-wrapper--inline .fo-detalle-empresa {
+  margin-bottom: 0.75rem;
+}
+
 /* ═══ Header ═══ */
 .fo-header {
   display: flex;

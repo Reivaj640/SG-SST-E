@@ -99,24 +99,36 @@ test('vistas · la vista del operador pide el motivo en los tres actos', functio
     'los tres actos con motivo (verificar, contrafirmar, anular) tienen su campo: hay ' + motivos.length);
 });
 
-test('vistas · el shell monta la vista del operador en su propio caso', function () {
-  assert.match(srcHome, /id:\s*'firma-operador'/,
-    'la pestana del operador tiene que estar en el nav');
-  assert.match(srcHome, /case 'firma-operador':/,
-    'y el switch de montaje tiene que tener su caso');
-  assert.match(srcHome, /_mountExistingView\(content,\s*'FirmaOperadorComponent'/,
-    'el caso del switch tiene que montar FirmaOperadorComponent');
-  assert.match(srcHome, /'firma-operador':\s*\{\s*title:/,
-    'y el titulo de la vista, para que el shell la presente bien');
+test('vistas · 📦1042 · los anexos NO viven en Gestion Humana', function () {
+  // Los anexos (Anexo de Encargo y de Nube) son una gestion de K+AIR: usan
+  // la credencial ADMINISTRATIVA y se gestionan por empresa desde
+  // Configuracion. Meterlos en el modulo de personal era un error de
+  // categoria: no le compete a Gestion Humana.
+  assert.doesNotMatch(srcHome, /id:\s*'firma-operador'/,
+    'la pestana del operador NO tiene que estar en el nav de Gestion Humana');
+  assert.doesNotMatch(srcHome, /case 'firma-operador':/,
+    'ni el switch de montaje tiene que tener su caso');
+  assert.doesNotMatch(srcHome, /view:\s*'firma-operador'/,
+    'ni la tarjeta del resumen del modulo');
 });
 
-test('vistas · index.html carga la vista del operador con su version', function () {
+test('vistas · 📦1042 · index.html ya NO carga la vista del operador', function () {
+  // La ventana principal ya no la carga: vive en el iframe de Configuracion.
+  assert.doesNotMatch(srcIndexHtml, /firma-operador\/index\.css/,
+    'la hoja del panel no se carga en la ventana principal');
+  assert.doesNotMatch(srcIndexHtml, /firma-operador\/index\.js/,
+    'el script del panel no se carga en la ventana principal');
+});
+
+test('vistas · 📦1042 · Configuracion carga el panel con su ?v=', function () {
   // La regla del repo: tocar un archivo propio obliga a bumpear su ?v=.
   // Sin esto el navegador sirve la version vieja.
-  assert.match(srcIndexHtml, /firma-operador\/index\.css\?v=[^\s"']+/,
-    'la hoja de la vista del operador se carga con su ?v=');
-  assert.match(srcIndexHtml, /firma-operador\/index\.js\?v=[^\s"']+/,
-    'el script de la vista del operador se carga con su ?v=');
+  const srcConfig = fs.readFileSync(
+    path.join(__dirname, '..', 'components', 'config', 'config-viewer.html'), 'utf8');
+  assert.match(srcConfig, /firma-operador\/index\.css\?v=[^\s"']+/,
+    'la hoja del panel se carga en Configuracion con su ?v=');
+  assert.match(srcConfig, /firma-operador\/index\.js\?v=[^\s"']+/,
+    'el script del panel se carga en Configuracion con su ?v=');
 });
 
 test('vistas · el CSS de la vista del operador usa los tokens y tiene dark mode', function () {
