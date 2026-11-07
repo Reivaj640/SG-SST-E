@@ -21,6 +21,8 @@
  *   PUT    /internal/admin/empresas/:id        actualizar identidad
  *   POST   /internal/admin/empresas/:id/anexo-firmado
  *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
+ *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion
+ *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion/:id_suscripcion/anular
  *   POST   /internal/admin/empresas/:id/estado  alta/baja lógica
  *   POST   /internal/admin/empresas/:id/fecha-terminacion
  *   GET    /internal/admin/empresas/:id/fecha-terminacion/pendientes
@@ -34,6 +36,7 @@ const { validateBody } = require('../middleware/validate');
 const logger = require('../utils/logger');
 const empresaService = require('../services/empresa');
 const anexoNubeService = require('../services/anexoNube');
+const anexoEncargoService = require('../services/anexoEncargo');
 const auditoriaService = require('../services/empresaAuditoria');
 const cuentaEnvioService = require('../services/cuentaEnvio');
 const fechaTerminacionService = require('../services/fechaTerminacion');
@@ -45,6 +48,7 @@ const {
   anexoBody,
   anexoNubeBody,
   suscripcionAnexoNubeBody,
+  suscripcionAnexoEncargoBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
@@ -295,6 +299,58 @@ router.post('/empresas/:id_empresa/anexo-nube/suscripcion/:id_suscripcion/anular
       throw new AppError(400, 'INVALID_REQUEST_BODY', 'id_suscripcion inválido');
     }
     const r = anexoNubeService.anularSuscripcion(id, idSuscripcion, _contextoAuditoria(req));
+    res.json(r);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-encargo/suscripcion
+// Abre una suscripción del Anexo de Encargo y manda el enlace a la Empresa.
+//
+// POR QUÉ ESTA RUTA NO ESTABA EN EL PLAN
+// --------------------------------------
+// El §4.3 del plan listaba las rutas públicas y la de contrafirma, pero no la
+// que ABRE la suscripción. Sin ella el servicio del Anexo de Encargo era
+// código muerto: nadie podía abrir una suscripción y el flujo no era
+// alcanzable por HTTP. Es el mismo hueco que ya se había cerrado para el
+// Anexo de Nube (`/anexo-nube/suscripcion`), replicado aquí.
+//
+// LO QUE DEVUELVE
+//   El enlace en claro (para mandarlo por el canal que el operador prefiera),
+//   la versión y la huella del texto que se va a suscribir, y el prellenado
+//   de los cinco datos del §11.
+//
+// LO QUE NO HACE
+//   No elige la versión: la lee del manifiesto legal y la contrasta con los
+//   bytes del archivo del servidor. Si el texto del servidor no es el que
+//   declara el manifiesto, no se abre nada (503): es un fallo de despliegue,
+//   no un error de la Empresa.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-encargo/suscripcion', adminApiAuth(), validateBody(suscripcionAnexoEncargoBody), async (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const r = await anexoEncargoService.crearSuscripcion(id, req.body, _contextoAuditoria(req));
+    res.status(201).json(r);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Da de baja una suscripción del Anexo de Encargo que todavía no se firmó.
+//
+// Es el mismo camino que el del Anexo de Nube: lo que YA se firmó no se toca
+// por aquí (eso se corrige por el camino administrativo, con motivo); lo que
+// está pendiente se da de baja y queda el motivo en el rastro.
+router.post('/empresas/:id_empresa/anexo-encargo/suscripcion/:id_suscripcion/anular', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const idSuscripcion = parseInt(req.params.id_suscripcion, 10);
+    if (!Number.isInteger(idSuscripcion) || idSuscripcion <= 0) {
+      throw new AppError(400, 'INVALID_REQUEST_BODY', 'id_suscripcion inválido');
+    }
+    const r = anexoEncargoService.anularSuscripcion(id, idSuscripcion, _contextoAuditoria(req));
     res.json(r);
   } catch (err) {
     next(err);

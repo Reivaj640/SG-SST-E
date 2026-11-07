@@ -94,6 +94,39 @@ const suscripcionAnexoNubeBody = z.object({
 });
 
 /**
+ * Body de la apertura de una SUSCRIPCIÓN del Anexo de Encargo.
+ *
+ * Es el mismo contrato que el del Anexo de Nube, con una diferencia: la
+ * VERSIÓN y la HUELLA tampoco se mandan (el servicio las lee del manifiesto
+ * legal y las contrasta con los bytes del archivo del servidor). El Anexo de
+ * Encargo se versiona POR FECHA y su texto canónico lo produce un generador,
+ * así que una constante en el código —o un valor declarado por el operador—
+ * podría desincronizarse del manifiesto sin que nadie lo notara.
+ *
+ * `datos_empresa` es el PRELLENADO de los cinco datos del §11: si el operador
+ * los declara, sustituyen a los de la ficha. Lo que MANDAN son los que
+ * declare la Empresa en la pantalla: el operador solo puede adelantar lo que
+ * ella ya tiene, no escribir en su nombre.
+ */
+const suscripcionAnexoEncargoBody = z.object({
+  correo_firmante: z
+    .string()
+    .min(1, 'correo_firmante es requerido')
+    .max(254, 'correo_firmante demasiado largo')
+    .email('correo_firmante no parece un correo')
+    .transform((s) => s.trim().toLowerCase()),
+  nombre_firmante: textoOpcional(200),
+  cargo_firmante: textoOpcional(200),
+  datos_empresa: z.object({
+    razon_social: textoOpcional(200),
+    nit: textoOpcional(60),
+    domicilio: textoOpcional(300),
+    correo: textoOpcional(254),
+    representante: textoOpcional(200),
+  }).strict().nullish(),
+});
+
+/**
  * Body de alta. Solo identidad: el anexo y el estado activo tienen endpoints
  * propios para que no se puedan cambiar por accidente.
  */
@@ -286,6 +319,7 @@ module.exports = {
   anexoBody,
   anexoNubeBody,
   suscripcionAnexoNubeBody,
+  suscripcionAnexoEncargoBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,

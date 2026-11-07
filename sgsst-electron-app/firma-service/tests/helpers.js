@@ -31,6 +31,7 @@ const consentRouter = require('../src/routes/consent');
 const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
 const anexoNubeRouter = require('../src/routes/anexoNube');
+const anexoEncargoRouter = require('../src/routes/anexoEncargo');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
@@ -388,6 +389,10 @@ function makeApp() {
   // ejercitan y un error de wiring pasa inadvertido. En server.js va DESPUÉS
   // de publicRouter, igual que acá.
   app.use('/', anexoNubeRouter);
+  // La suscripción del Anexo de Encargo. Montado acá por la misma razón que
+  // el de arriba: si nadie lo monta, sus endpoints no se ejercitan y un error
+  // de wiring pasa inadvertido.
+  app.use('/', anexoEncargoRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
