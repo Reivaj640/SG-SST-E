@@ -721,6 +721,8 @@ function makeSubject(tipo) {
       return 'K+AIR — Copia de tu documento firmado';
     case 'anexo_nube':
       return 'K+AIR — Tu código para firmar el Anexo de Nube';
+    case 'anexo_encargo':
+      return 'K+AIR — Tu código para firmar el Anexo de Encargo';
     default:
       return 'K+AIR — Notificación';
   }
@@ -752,6 +754,17 @@ function makeBody({ otp, tipo, context }) {
   } else if (tipo === 'anexo_nube') {
     lines.push(
       'Has solicitado suscribir el Anexo de Nube del servicio de firma electrónica de K+AIR.',
+      '',
+      `Tu código de verificación es: ${otp}`,
+      '',
+      'Este código expira en 10 minutos.',
+      'Si no solicitaste esto, ignora este mensaje.',
+    );
+  } else if (tipo === 'anexo_encargo') {
+    lines.push(
+      'Has solicitado suscribir el Anexo de Encargo del servicio de firma electrónica de K+AIR.',
+      'Ese es el contrato de encargo de tratamiento de datos entre su empresa y',
+      'Gesstiar S.A.S., como encargado del servicio.',
       '',
       `Tu código de verificación es: ${otp}`,
       '',
@@ -863,6 +876,103 @@ async function sendAnexoNubeInvitacion(opts) {
   });
   if (_devInbox.length > 50) _devInbox.shift();
   return { ok: true, messageId: 'dev-anexo-' + Date.now() };
+}
+/**
+ * Envía el enlace de suscripción del ANEXO DE ENCARGO.
+ *
+ * Es el mismo mecanismo que el Anexo de Nube (enlace de un solo uso, código
+ * de verificación aparte, el correo siempre por la cuenta de K+AIR), pero el
+ * texto es otro: el Anexo de Encargo es el CONTRATO de encargo de tratamiento
+ * de datos entre la Empresa y Gesstiar S.A.S. (art. 25 del Decreto 1377 de
+ * 2013), no un anexo de infraestructura del servicio.
+ *
+ * Por eso el correo dice dos cosas que en el del Anexo de Nube no tienen
+ * sentido: que es un contrato, y que la Empresa va a confirmar o corregir sus
+ * datos de identificación (los del §11).
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo del firmante.
+ * @param {string} opts.url - Enlace de un solo uso.
+ * @param {string} opts.empresa - Razón social de la Empresa.
+ * @param {string} opts.version - Versión del Anexo de Encargo que se suscribe.
+ * @param {string} opts.hash - Huella SHA-256 del texto.
+ * @param {string} [opts.nombre_firmante]
+ * @param {string} opts.expira_en - ISO 8601.
+ * @param {string} opts.documento_url - Dirección del texto servido por el servicio.
+ * @returns {Promise<{ok: boolean, messageId: string}>}
+ */
+async function sendAnexoEncargoInvitacion(opts) {
+  const {
+    to, url, empresa, version, hash, nombre_firmante, expira_en, documento_url,
+  } = opts || {};
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendAnexoEncargoInvitacion: `to` debe ser un correo válido');
+  }
+  if (typeof url !== 'string' || !url.startsWith('http')) {
+    throw new Error('sendAnexoEncargoInvitacion: `url` debe ser una dirección http(s)');
+  }
+
+  const subject = 'K+AIR — Suscripción del Anexo de Encargo';
+  const fecha = expira_en ? new Date(expira_en) : null;
+  const vence = fecha && !Number.isNaN(fecha.getTime())
+    ? fecha.toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+    : 'el tiempo indicado en el enlace';
+
+  const body = [
+    'Hola,',
+    '',
+    `K+AIR (Gesstiar S.A.S.) pide a ${empresa || 'su empresa'} la suscripción del Anexo de Encargo,`,
+    'el contrato de encargo de tratamiento de datos entre su empresa, como',
+    'Responsable del tratamiento, y Gesstiar S.A.S., como Encargado del servicio',
+    'de firma electrónica (artículo 25 del Decreto 1377 de 2013).',
+    '',
+    nombre_firmante ? `El firmante declarado es: ${nombre_firmante}.` : '',
+    '',
+    'Para leerlo y suscribirlo, abra este enlace:',
+    url,
+    '',
+    `Documento: versión ${version}.`,
+    `Huella SHA-256 del texto: ${hash}`,
+    `El enlace vence el ${vence}.`,
+    '',
+    'El enlace es de un solo uso. Al abrirlo, el sistema le envía un código de',
+    'verificación a este mismo correo: ese código es el que autoriza la firma.',
+    'El código y el enlace NO vienen en el mismo mensaje.',
+    '',
+    'En la pantalla le vamos a pedir que confirme o corrija los datos de su',
+    'empresa (razón social, NIT o cédula, domicilio, correo y representante).',
+    'Esos datos son los que quedan en su copia del contrato y en el acta.',
+    '',
+    `El texto completo también está en: ${documento_url || url}`,
+    '',
+    'Si usted no solicitó esta suscripción, ignore este mensaje: el enlace no',
+    'habilita nada por sí solo y no se registra ninguna firma sin el código.',
+    '',
+    'Gesstiar S.A.S. — NIT 900987987-4 — Colombia',
+  ].filter((l) => l !== '').join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  logger.info('[DEV] Invitación del Anexo de Encargo simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    version,
+  });
+  _devInbox.push({
+    to, subject, body, tipo: 'anexo_encargo_invitacion',
+    remitente: _remitente(_cuentaDe(null)),
+    sentAt: new Date().toISOString(),
+  });
+  if (_devInbox.length > 50) _devInbox.shift();
+  return { ok: true, messageId: 'dev-anexo-encargo-' + Date.now() };
 }
 
 /**
@@ -1073,6 +1183,8 @@ async function sendAvisoIncidenteDatosSensibles({ to, canal, id_solicitud, causa
 module.exports = {
   sendOTP,
   sendAnexoNubeInvitacion,  // Enlace de suscripción del Anexo de Nube (v1.1).
+  // Enlace de suscripción del Anexo de Encargo (el contrato de encargo).
+  sendAnexoEncargoInvitacion,
   sendCopiaFirmadoPapel,  // 9A: la copia en PAPEL sí viaja por correo (adjunta).
   sendCopiaAviso,         // Firma electrónica: aviso con el enlace, SIN adjuntos.
   sendInvite,
