@@ -294,20 +294,33 @@ vigente.
 
 ## 5. El plan de trabajo
 
-Ocho commits, en este orden. Cada uno con sus tests, y cada test con la
-comprobación de que **sin el fix falla** (la regla del repo: un test que no
-detecta el bug si vuelve no sirve).
+Nueve commits de implementación, en este orden. Cada uno con sus tests, y cada
+test con la comprobación de que **sin el fix falla** (la regla del repo: un test
+que no detecta el bug si vuelve no sirve).
+
+El 📦1022 no es de este plan: es un rojo que salió al correr la suite, y que
+estaba en el árbol desde el 📦1018. El manifiesto legal es **ASCII puro por
+regla propia** (`scripts/actualizar-manifiesto-v1.4.js` aborta si deja de
+serlo, y hay un test que lo exige), pero la evidencia de la 10.4 —que se copia
+tal cual al manifiesto— traía cuatro `·` (U+00B7) del propio
+`scripts/probar-10-4.js`. Se corrigieron los dos: el generador ya no emite
+tipografía y el manifiesto se reparó a nivel de bytes, sin re-serializarlo.
+
+El 📦1024 (la memoria de esta tanda) se coló entre la base y el servicio
+porque el owner autorizó cerrar la documentación en este punto, no al final.
 
 | # | Qué | Qué incluye |
 |---|---|---|
 | 📦1021 | El plan | Este documento |
-| 📦1022 | La base | Migraciones 056 y 057 + los tests de los triggers (que muerden de verdad) |
-| 📦1023 | El servicio | `src/services/anexoEncargo.js` + los 21 tests del espejo, adaptados |
-| 📦1024 | Las rutas y la pantalla | `src/routes/anexoEncargo.js` + `web/anexo-encargo/` + los tests de rutas y de página |
-| 📦1025 | El acta | La generación del acta con `pdf-lib` + su test (que la huella del acta sea la de sus bytes) |
-| 📦1026 | La contrafirma | La fase 2 del Encargado + su test (y la regla de que sin contrafirma el manifiesto no dice "firmado") |
-| 📦1027 | El manifiesto y el preflight | `legal-readiness.json` con la evidencia de la primera suscripción + `scripts/preflight-anexo-encargo.js` |
-| 📦1028 | Los documentos | `Historial.md`, `PROMPT.md`, `CONTEXT.md`, `API.md`, `FLOWS.md`, `DATA_MODEL.md`, `SECURITY.md` |
+| 📦1022 | El fix del manifiesto | `legal-readiness.json` vuelve a ser ASCII puro y `scripts/probar-10-4.js` deja de emitir `·` en la evidencia |
+| 📦1023 | La base | Migraciones 056 y 057 + los tests de los triggers (que muerden de verdad) |
+| 📦1024 | La memoria de esta tanda | `Historial.md` y `CONTEXT.md` con el plan, el fix del manifiesto y la base |
+| 📦1025 | El servicio | `src/services/anexoEncargo.js` + los 21 tests del espejo, adaptados |
+| 📦1026 | Las rutas y la pantalla | `src/routes/anexoEncargo.js` + `web/anexo-encargo/` + los tests de rutas y de página |
+| 📦1027 | El acta | La generación del acta con `pdf-lib` + su test (que la huella del acta sea la de sus bytes) |
+| 📦1028 | La contrafirma | La fase 2 del Encargado + su test (y la regla de que sin contrafirma el manifiesto no dice "firmado") |
+| 📦1029 | El manifiesto y el preflight | `legal-readiness.json` con la evidencia de la primera suscripción + `scripts/preflight-anexo-encargo.js` |
+| 📦1030 | Los documentos | `Historial.md`, `PROMPT.md`, `CONTEXT.md`, `API.md`, `FLOWS.md`, `DATA_MODEL.md`, `SECURITY.md` |
 
 Y después, el deploy, con el mismo script que se usó el 6-nov (`deploy-1018.sh`
 como molde), que ya sabe: respaldos, compuertas, gate y cron.
@@ -465,7 +478,8 @@ escrita, no como recomendación del plan.
 2. Se manda la DECISIÓN 5 al abogado, con este plan y el §12 a la vista. No
    bloquea el código: su respuesta pesa en la fase 2 (la contrafirma), no en el
    flujo.
-3. 📦1022 a 📦1026, en ese orden, con la suite en verde en cada commit.
+3. 📦1025 a 📦1029, en ese orden, con la suite en verde en cada commit (y el
+   📦1030 con los documentos del plan, al final).
 4. Deploy con el guion del 6-nov, que ya sabe medir el gate.
 5. **Piloto:** ASEPLUS se suscribe por el enlace. Es el único uso del flujo
    hasta que los app passwords estén rotados (§6.2).

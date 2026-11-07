@@ -239,6 +239,16 @@ const TABLES = [
   // base en memoria.
   'gh_firma_anexo_nube_eventos',
   'gh_firma_anexo_nube_suscripciones',
+  // La suscripción del Anexo de Encargo por la Empresa (migración 056). Los
+  // eventos van PRIMERO: tienen FK a la suscripción.
+  //
+  // El rastro tiene trigger append-only, pero la migración 057 lleva
+  // `@skip-when-env test`: en el ambiente de test el trigger NO está
+  // instalado y la tabla se puede limpiar. La inmutabilidad se comprueba en
+  // tests/migration-057.test.js, que aplica el SQL de la 057 a una base en
+  // memoria.
+  'gh_firma_anexo_encargo_eventos',
+  'gh_firma_anexo_encargo_suscripciones',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
