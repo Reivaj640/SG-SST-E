@@ -7602,6 +7602,57 @@ El texto de los anexos, su versión y su huella. La fase 1 y la fase 2: la Empre
 
 **La regla de cierre: se pregunta otra vez.** La pregunta se le hace al owner al final de esta tanda, igual que en todas las anteriores.
 
+## 2026-11-07 (tarde, segunda tanda) · El piloto de ASEPLUS ejecutado: la Empresa se suscribió, K+AIR contrafirmó y la Empresa quedó habilitada
+
+**Lo que pasó.** El owner diligenció en el panel de Configuración el formulario de suscripción del Anexo de Encargo de ASEPLUS y el service mandó la invitación a `jrf2011@live.com`. La **fase 1** quedó FIRMADA a las **14:30:14** (hora Colombia): enlace abierto a las 14:19:25, código enviado a las 14:28:52 y verificado a las 14:30:14, con el acta de suscripción `acta-1-anexo-encargo.pdf` (SHA-256 `f4a96bee…bdf3`, 7.708 bytes). La **verificación documental** de la representante legal quedó registrada a las **15:25:39** y la **contrafirma** de K+AIR (fase 2) a las **15:33:22**, con el acta de contrafirma `acta-1-contrafirma-anexo-encargo.pdf` (SHA-256 `b1ec9fa2…513c`, 6.702 bytes). La ficha de ASEPLUS quedó con `anexo_encargo_suscrito_at = 2026-11-07T19:30:14.503Z` y `anexo_encargo_firmado_at = 2026-11-07T20:33:22.748Z`, y la vista de la propia Empresa (`GET /internal/empresa/anexos`) ya responde `anexo_encargo.estado = "ejecutado"` y `habilitacion.ok = true`, sin pendientes. **El instrumento está ejecutado por las dos partes.**
+
+**La verificación se registró contra el RUT, no contra el certificado.** El owner dijo que el CC 1129566447 de la ficha salió del **RUT** de ASEPLUS, y que el certificado de la cámara de comercio **no** se había revisado todavía. La referencia que quedó escrita dice exactamente eso: el RUT de ASEPLUS (NIT 900.829.731-1) registra a Lilia Maria Vasquez Muñoz como representante legal, el contraste con lo declarado al suscribir coincide en razón social, NIT, domicilio, nombre y número de documento, y la **nota** deja escrito que el certificado de la Cámara de Comercio **no se revisó en este piloto**. Poner `CERTIFICADO_CAMARA` habría sido afirmar una revisión documental que no ocurrió: el service solo tiene tres tipos y el que corresponde a la fuente real es el RUT.
+
+**El código de la contrafirma salió al buzón de K+AIR, no al del piloto.** El canal es fijo (`config.canalProteccionDatos` = `privacidad.kair@gmail.com`), por diseño: si quien pide el acto pudiera elegir el canal, el control del buzón no probaría nada. El `user_agent` de ese acto quedó como `node` porque el acto se hizo por la API con un script y no por el panel.
+
+### Tres cosas que quedaron escritas en el expediente y hay que saber antes de auditar
+
+1. **El nombre del firmante quedó con una errata, y ya no se puede tocar.** El owner registró en el panel `nombre_firmante = "Lilia Maria Vazques Muñoz"` (sin la z) y el correo salió con esa errata; la Empresa declaró en el §11 "Lilia Maria Vasquez Muñoz" (con z), que es lo que dice la ficha de K+AIR. El acta lleva los dos nombres. **No hay ruta para corregirlo**: anular es solo para suscripciones no firmadas, y esta ya está firmada (409 `YA_SUSCRITO`). Se documenta, no se reescribe.
+2. **`actor` y `verificado_por` quedaron en `null`.** El service lee `X-Admin-Actor` (`admin-empresas.js:86`) y el cliente de escritorio **nunca lo manda**: `grep X-Admin-Actor main/` no devuelve nada. Todo acto administrativo queda sin decir quién lo hizo. Es un hueco del **app**, no del service.
+3. **Un hallazgo que era falso, y cómo se cayó.** A primera hora pareció que el correo de invitación no lo había generado este repo: en la captura de Outlook parecía un HTML con "Gestiar S.A.S." (una sola `s`) y una frase rota ("la empresa no habilitada para el solo"), mientras que el repo manda texto plano con "K+AIR (Gesstiar S.A.S.)" y "el enlace no habilita nada por sí solo". Lo desmintió el `sha256sum` del archivo **en el servidor**: `db0385400ac1218b2fae7713073934a34b8c6818c91f6384b9a1d14413d9f0fb`, **idéntico al del repo**, y ni "Gestiar S.A.S." ni "habilitada para el solo" aparecen en él. Lo que había pasado es que **leí mal la captura**: el panel de Outlook tenía el correo a 7 px de alto, y "Gesstiar" se lee como "Gestiar". La lección: **una captura de baja resolución no es evidencia de nada**; el archivo y su huella sí lo son. (De paso: el correo sí decía "Gesstiar", que es el nombre vigente — el owner lo confirmó el 18-oct-2026, `plan-onboarding-empresas-2026-10-17.md:38-41`.)
+
+### El manifiesto se escribió y el preflight quedó en verde
+
+El manifiesto **ya dice "firmado"** en el servidor, y el archivo del repo quedó **byte a byte igual**: `f31bdae3084cfdf3c983dc18c909312bbef77764d988b48e38647fb416760ae9` en los dos lados. Eso se comprobó aplicando en el repo el mismo reemplazo literal que hace el script del servidor y comparando el SHA-256: si no coinciden, el próximo deploy resucitaría el `no_firmado`.
+
+El preflight (como root y con el `.env` cargado) dio:
+
+```
+  Texto: legal/anexo-encargo.html
+    huella archivo:    5cc7a346…60aa72
+    huella manifiesto: 5cc7a346…60aa72
+    coinciden:         true
+  Empresas activas: 1
+    - 900829731 ASEPLUS CARIBE S.A.S. :: suscrita=true contrafirmada=true ejecutada=true vigente=true
+  Actas verificadas: 2
+  Manifiesto: estado=firmado fecha=2026-11-07T20:33:22.748Z
+  Respaldo: /opt/kair-firma/backup-firma.sh lleva storage entero=true
+  RESULTADO: OK
+```
+
+**El manifiesto solo puede decir "firmado" con los dos actos**: `actualizar-manifiesto-anexo-encargo.js` se niega a escribirlo si no hay contrafirma, y el preflight aborta (exit 5) si no hay ninguna Empresa contrafirmada. La evidencia que quedó escrita es el resumen de los dos actos, con las huellas de las dos actas y los nueve eventos del rastro.
+
+### El gate: de tres pendientes a uno
+
+La auditoría del gate `primera_firma` quedó en **`Items: 40 · OK: 39 · Pendientes: 1 · Avisos: 0`** (antes del piloto: `OK: 37 · Pendientes: 3`). Los tres items del Anexo de Encargo pasaron a **OK**:
+
+```
+  [OK] Estado real del Anexo de Encargo resuelto → Firmado con fecha y evidencia.
+  [OK] Plantilla alineada con el Anexo de Nube → Documento completo y sin placeholders.
+  [OK] Anexo de Encargo firmado por cada empresa activa → Todas las empresas activas tienen Anexo de Encargo firmado y la evidencia esta en el manifiesto.
+```
+
+El único pendiente que queda es **[anexo_nube] Vínculo con Google: DPA, o transferencia internacional documentada**: el papel de Google escrito en el expediente, las medidas de seguridad demostradas, la validación conforme a la Circular 2 de 2025 y la declaración de la transferencia en el RNBD. Es el único que **no depende del código**. (El gate de publicación, el otro, quedó con 20 bloqueantes y 0 pendientes el 7-nov a las 12:49.)
+
+### Lo que sigue
+
+1. **Desplegar el manifiesto**: como cambió el `legal-readiness.json`, su huella cambia y el paquete del próximo deploy tiene que llevar esta versión (la local ya es la misma).
+2. **La excepción 5 de ASEPLUS**: con el Anexo ejecutado, el manifiesto firmado y el gate con un solo pendiente, queda por decidir si se retira.
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**
