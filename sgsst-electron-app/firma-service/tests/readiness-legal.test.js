@@ -798,8 +798,33 @@ test('readiness · una cuenta de consumidor no habilita el servicio: el item de 
     `el detalle no aclara que la autorizacion expresa NO es la base: ${item.detalle}`);
   assert.ok(/RNBD/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
   assert.ok(/Circular 2 de 2025/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
-  assert.ok(/v1\.2/.test(item.accion),
-    `la accion no dice que la v1.2 es la que sostiene el regimen: ${item.accion}`);
+});
+
+test('readiness · la accion del pendiente nombra la version vigente del Acuerdo, no una version superada', () => {
+  // 📦1046 La accion del item de Google decia, con la version ESCRITA A MANO,
+  // que "la v1.2 del Acuerdo es la que sostiene ese regimen". La v1.2 ya no
+  // es candidata: la superaron la v1.3, la v1.4 y la v1.5, y su texto ni
+  // siquiera esta en el repo (esta en el .gitignore, a la espera del
+  // abogado). El gate mandaba a buscar la aprobacion de una version muerta,
+  // y de paso contradecía al manifiesto, que ya declara la determinacion del
+  // papel de Google por operacion (punto J6 del abogado, 30-oct-2026).
+  //
+  // Ahora la version sale del MANIFIESTO. Este test lo comprueba de las dos
+  // formas: lo que declara el manifiesto es lo que dice la accion, y la
+  // version superada no aparece.
+  //
+  // La version se cambia en una COPIA del manifiesto y no en el compartido:
+  // `manifiestoCompleto()` lo usan muchas pruebas y tocarlo ahi movia el
+  // control de la version del texto para todas.
+  const man = manifiestoConCuentaGoogle('consumidor');
+  man.acuerdo.version = 'v9.9';
+
+  const item = reporteDe(man).pendientes.find((p) => p.id === 'google_dpa');
+  assert.ok(item, 'google_dpa no quedo pendiente: el item tiene que existir');
+  assert.ok(item.accion.includes('v9.9'),
+    `la accion no nombra la version que declara el manifiesto: ${item.accion}`);
+  assert.ok(!/v1\.2/.test(item.accion),
+    `la accion sigue nombrando una version superada: ${item.accion}`);
 });
 
 test('readiness · con una cuenta de consumidor, la devolucion y la auditoria se resuelven con Cloudflare', () => {

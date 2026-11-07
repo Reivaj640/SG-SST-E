@@ -379,6 +379,7 @@ function _getClient() {
     baseUrl: cfg.url,
     apiKey: cfg.apiKey,
     clientInstanceId: cfg.clientInstanceId,
+    adminActor: _resolveAdminActor(),
     appVersion: _appVersion
   });
   _cachedClientConfigKey = key;
@@ -530,6 +531,7 @@ function _getClientForCompany(companyName) {
     apiKey: cfg.apiKey,
     clientInstanceId: cfg.clientInstanceId,
     adminApiKey: adminKey,
+    adminActor: _resolveAdminActor(),
     appVersion: _appVersion
   });
   _clientCache.set(key, client);
@@ -1482,6 +1484,49 @@ function _hashAdminApiKey(key) {
 }
 
 /**
+ * 📦1046 · El ACTOR del acto administrativo.
+ *
+ * El service lee la cabecera `X-Admin-Actor` en `_contextoAuditoria` y la
+ * escribe en el rastro: `actor` en los cambios de la ficha y `verificado_por`
+ * en la verificación del representante del Anexo de Encargo. La contrafirma
+ * también la guarda.
+ *
+ * ANTES DE ESTE FIX el cliente de escritorio NUNCA mandaba esa cabecera, y por
+ * eso los actos del piloto de ASEPLUS (7-nov-2026) quedaron con el actor y
+ * el verificado_por en null: el acto estaba registrado, pero no se le
+ * atribuía a nadie. El `X-Admin-Motivo` sívia, pero el motivo dice POR QUE,
+ * no QUIEN.
+ *
+ * DE DONDE SALE, EN ESTE ORDEN:
+ *   1) `FIRMA_ADMIN_ACTOR`: la declaración explícita del owner. Es la que
+ *      atribuya el acto a una PERSONA con nombre y apellido, que es lo que
+ *      pide el abogado.
+ *   2) La cuenta del sistema con la que se está operando y el nombre del
+ *      equipo (`usuario@EQUIPO`). Identifica a QUIEN ESTABA en el teclado,
+ *      que es un dato real y verificable, pero no es un nombre de persona.
+ *
+ * El recorte a 200 caracteres lo hace también el service al leer el header:
+ * lo que se manda y lo que queda en el rastro tienen que ser lo mismo.
+ *
+ * @returns {string} el actor, o '' si no se pudo determinar
+ */
+function _resolveAdminActor() {
+  var declarado = (process.env.FIRMA_ADMIN_ACTOR || '').trim();
+  if (declarado) return declarado.slice(0, 200);
+  try {
+    var os = require('os');
+    var usuario = os.userInfo().username || '';
+    var equipo = os.hostname() || '';
+    if (usuario && equipo) return ('K+AIR ' + usuario + '@' + equipo).slice(0, 200);
+    if (usuario) return ('K+AIR ' + usuario).slice(0, 200);
+  } catch (e) {
+    // Sin `os` no hay identidad: el service la guardará en null, que es
+    // mejor que mandar un actor inventado.
+  }
+  return '';
+}
+
+/**
  * Helper: valida que haya un adminApiKey configurado (DR-2). Si no, retorna
  * ADMIN_TOKEN_REQUIRED. Usa _resolveAdminApiKey() que prioriza secrets.enc
  * sobre env var (I-103.A0).
@@ -1510,6 +1555,7 @@ function _createAdminClient(url, clientInstanceId) {
     apiKey: '__admin__',  // dummy; el factory va a usar adminApiKey
     clientInstanceId: clientInstanceId,
     adminApiKey: adminKey,
+    adminActor: _resolveAdminActor(),
     appVersion: _appVersion
   });
 }

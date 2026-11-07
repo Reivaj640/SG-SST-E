@@ -257,6 +257,14 @@ async function _parseResponse(response, expectedContentType) {
  *                                          presente, los métodos admin lanzan
  *                                          `ADMIN_TOKEN_REQUIRED` sin hacer HTTP.
  * @param {string} [opts.appVersion]     - Versión de K+AIR (User-Agent).
+ * @param {string} [opts.adminActor]     - Identidad del operador que hace el acto
+ *                                          administrativo (header `X-Admin-Actor`).
+ *                                          El service lo lee en `_contextoAuditoria`
+ *                                          y lo escribe en el rastro (`actor`,
+ *                                          `verificado_por`). SIN esta cabecera el
+ *                                          rastro queda con el actor en null: el
+ *                                          acto queda registrado pero no se le
+ *                                          atribuye a nadie.
  * @param {function} [opts._fetch]       - DEPRECADO. Override de fetch para tests. Usar
  *                                          en lugar de mockear globalThis.fetch.
  * @param {function} [opts._sleep]       - DEPRECADO. Override de sleep para tests.
@@ -283,6 +291,16 @@ function createFirmaClient(opts) {
   var adminApiKey = (opts.adminApiKey && typeof opts.adminApiKey === 'string')
     ? opts.adminApiKey
     : null;
+  // El ACTOR del acto administrativo. Es OPCIONAL en la firma (para no romper
+  // a quien ya lo usa), pero el bridge SIEMPRE lo pasa: sin actor, el rastro
+  // de los actos del panel queda con el campo en null.
+  //
+  // El recorte a 200 caracteres es el MISMO que hace el service al leer el
+  // header (`_contextoAuditoria`): lo que se manda truncado y lo que se
+  // guarda tienen que ser lo mismo.
+  var adminActor = (opts.adminActor && typeof opts.adminActor === 'string')
+    ? opts.adminActor.trim().slice(0, 200)
+    : '';
 
   // Override de fetch y sleep para tests (sustituye a mockear globalThis).
   // Mantenerlo opcional: si no se pasa, se usa el fetch global de Node 20+.
@@ -694,6 +712,13 @@ function createFirmaClient(opts) {
    * Construye headers para endpoints admin (X-Admin-API-Key en lugar de
    * X-Internal-API-Key). Lanza si adminApiKey no está configurado.
    *
+   * 📦1046 También manda `X-Admin-Actor` cuando hay actor declarado. El
+   * service lo lee en `_contextoAuditoria` y lo escribe en el rastro de los
+   * actos administrativos (`actor` y `verificado_por`). Sin esa cabecera el
+   * acto QUEDA REGISTRADO pero no se le atribuye a nadie: en el piloto de
+   * ASEPLUS (7-nov-2026) la verificación del representante y la contrafirma
+   * quedaron con los dos campos en null.
+   *
    * @param {object} [extraOpts]
    * @returns {object} headers
    */
@@ -706,6 +731,12 @@ function createFirmaClient(opts) {
     // lo reemplazamos por 'X-Admin-API-Key' (DR-2: header distinto).
     delete headers['X-Internal-API-Key'];
     headers['X-Admin-API-Key'] = adminApiKey;
+    // El actor solo viaja en los endpoints ADMIN: es el service el que lo
+    // guarda en el rastro de los actos administrativos. En los endpoints de
+    // cliente no significa nada.
+    if (adminActor) {
+      headers['X-Admin-Actor'] = adminActor;
+    }
     return headers;
   }
 

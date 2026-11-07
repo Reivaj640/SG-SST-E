@@ -7653,6 +7653,95 @@ El único pendiente que queda es **[anexo_nube] Vínculo con Google: DPA, o tran
 
 1. **Desplegar el manifiesto**: como cambió el `legal-readiness.json`, su huella cambia y el paquete del próximo deploy tiene que llevar esta versión (la local ya es la misma).
 2. **La excepción 5 de ASEPLUS**: con el Anexo ejecutado, el manifiesto firmado y el gate con un solo pendiente, queda por decidir si se retira.
+
+## 2026-11-07 (noche) · El piloto cerrado por dentro: cuatro rojos que no eran del código, un deploy que no hizo falta y una excepción que sí se retiró
+
+La noche del 7-nov, con el 📦1044 ya commiteado y pusheado, se comprobó que el estado real de producción y el repo decían lo mismo, y aparecieron tres cosas que estaban mal. Dos de las tres eran de código; la tercera, de un test que congelaba una versión.
+
+**LOS CUATRO ROJOS: LA CAUSA ERA EL ESTADO VIVO DEL MANIFIESTO**
+-------------------------------------------------------------
+El 📦1044 metió en el repo el `legal-readiness.json` con el Anexo de Encargo en `firmado`, que es el estado real desde el piloto. Al correr la suite completa del firma-service aparecieron **4 rojos de 2427**: uno en `readiness-manifiesto-v1.4.test.js` y tres en los tests de `actualizar-manifiesto-anexo-encargo` y `preflight-anexo-encargo`.
+
+La causa se comprobó empíricamente: **los tests heredaban el estado vivo del manifiesto**. Los dos tests de scripts hacen `fs.copyFileSync(MANIFIESTO_REAL, copia)` y el de readiness afirmaba `man.anexo_encargo.estado === "no_firmado"`. Con el manifiesto firmado, el test que comprueba que el script se NIEGA a escribir `"firmado"` pasaba por la vía equivocada, y el que comprueba que `--exigir-firmado` aborta con código 7 no abortaba nunca.
+
+El arreglo va **en el test**, no en el código: el estado `firmado` es real y verificado. Es el 📦1045 (`25b47902`, pusheado):
+
+1. `tests/helpers.js` gana `manifiestoSinFirmar(texto)`: devuelve el manifiesto con el bloque `anexo_encargo` en su línea base sin firmar, conservando byte a byte la `version`, la `hash` y la `nota` (que son la identidad del TEXTO y contra las que el script contrasta).
+2. Los dos tests de scripts usan ese helper: el fixture es determinista y el test vuelve a medir lo que dice medir.
+3. La aserción del test del manifiesto pasa a ser **de coherencia**: si dice `firmado`, tiene que declarar fecha válida y evidencia; si no, los tres van en `null`. Es el mismo criterio que ya usaba el Anexo de Nube más abajo en ese archivo.
+
+**Suite completa del firma-service: 2427 tests · 2425 pass · 0 fail** (2 skipped, los mismos de antes). Los 3 archivos afectados, 59/59.
+
+**EL DEPLOY: NO HACÍA FALTA, Y EL VERIFICADOR ENSEÑÓ POR QUÉ**
+-------------------------------------------------------------------------
+Desde el deploy del 📦1041, lo único que había cambiado en el paquete del service era el `legal-readiness.json`: **ni una línea de código**. El manifiesto del servidor ya era byte a byte el del repo (SHA-256 `f31bdae3084cfdf3c983dc18c909312bbef77764d988b48e38647fb416760ae9` en los dos lados).
+
+Se armó un verificador de huellas contra HEAD y dio **16 de 16 archivos "difieren (en disco: no existe)"**, incluidos `app/src/server.js` y los cuatro textos de `legal/`, que sí estaban. El Deployment no estaba roto: **el deploy deja `/opt/kair-firma/app` y `/opt/kair-firma/legal` en 750 con dueño `kairfirma`**, así que un usuario que no esté en ese grupo no puede entrar y `sha256sum` no imprime nada. Un "no existe" y un "no tengo permiso" se ven igual. Corrido como root: **16/16 OK**. Es la trampa 135.
+
+El paquete del 📦1041 (`494346145b…`) **no se puede volver a correr**: lleva el manifiesto anterior (`bb4f3177…`) y lo dejaría en `no_firmado`, con la compuerta retrocediendo a tres pendientes.
+
+**LO QUE EL SERVICIO DICE HOY**
+----------------------------
+```
+[preflight-anexo-encargo] Preflight del Anexo de Encargo
+  Texto: legal/anexo-encargo.html
+    existen:            true
+    huella archivo:    5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72
+    huella manifiesto: 5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72
+    coinciden:         true
+  Empresas activas: 1
+    - 900829731 ASEPLUS CARIBE S.A.S. :: suscrita=true contrafirmada=true ejecutada=true vigente=true
+  Actas verificadas: 2
+  Manifiesto: estado=firmado fecha=2026-11-07T20:33:22.748Z
+  Respaldo: /opt/kair-firma/backup-firma.sh lleva storage entero=true
+  RESULTADO: OK
+
+Gate primera_firma: Items: 40 · OK: 39 · Pendientes: 1 · Avisos: 0
+```
+
+El único pendiente sigue siendo **[anexo_nube] Vínculo con Google**.
+
+**LA INSTRUCCIÓN VIEJA DEL GATE (la trampa 136)**
+------------------------------------------------
+La acción de ese pendiente decía, textualmente: *"La **v1.2** del Acuerdo es la que sostiene ese régimen; hasta que el abogado la apruebe, la primera firma queda bloqueada."*
+
+La v1.2 **ya no era candidata**: la superaron la v1.3, la v1.4 y la v1.5 (la vigente, publicada el 5-nov-2026), y su texto ni siquiera está en el repo — está en el `.gitignore`, a la espera del abogado. El gate mandaba a buscar la aprobación de una versión muerta y, de paso, contradecía al manifiesto, que ya declara la determinación del papel de Google por operación (punto J6 del abogado, 30-oct-2026).
+
+El test lo **congelaba**: `assert.ok(/v1\.2/.test(item.accion))` — el mismo patrón que se corrigió en el 📦1045. Ahora la versión sale del manifiesto (`versionAcuerdo`), el test compara contra lo que el manifiesto declara, y la acción nombra la v1.5 y los tres pasos reales que faltan: la evidencia de medidas, la validación con la Circular 2 de 2025 y la declaración de la transferencia en el RNBD a cargo de la Empresa.
+
+**EL HUECO DE `X-Admin-Actor`**
+-------------------------------
+El service lee la cabecera `X-Admin-Actor` (`admin-empresas.js`) y la escribe en el rastro: `actor` en la ficha y `verificado_por` en la verificación del representante. El cliente de escritorio **nunca la mandaba**, así que en los dos actos del piloto de ASEPLUS los dos campos quedaron en `null`: el acto estaba registrado, pero no se le atribuía a nadie. El `X-Admin-Motivo` sí viajaba, pero el motivo dice POR QUÉ, no QUIÉN.
+
+Ahora el cliente la manda: `createFirmaClient` acepta `adminActor` y `_buildAdminHeaders` lo pone en la cabecera (recortado a 200 caracteres, como hace el service al leerlo). El actor sale de `FIRMA_ADMIN_ACTOR` si el owner lo declara, y si no de la cuenta del sistema con la que se está operando (`usuario@EQUIPO`). En los endpoints de la Empresa no viaja: el actor es del operador.
+
+**Para que el rastro diga un NOMBRE de persona y no una cuenta**, hay que definir `FIRMA_ADMIN_ACTOR` en el entorno con el que se lanza la app (decisión del owner, 7-nov-2026). Sin eso, el rastro atribuye el acto a la cuenta del sistema que lo hizo, que es un dato real y verificable, pero no es el nombre de quien lo hizo.
+
+**LA EXCEPCIÓN 5: RETIRADA**
+----------------------------
+Con el Anexo de Encargo ejecutado, la excepción 5 de ASEPLUS no habilitaba nada: su alcance ya estaba **agotado** (2 de 2 firmas usadas) y la Empresa está habilitada por su Anexo. Pero mientras estuviera `VIGENTE`, `vigentePara` la devolvía en los dos puntos que **no** abren firma (el commit y la creación del consentimiento), que es exactamente una puerta trasera a un bloqueo que ya no aplica.
+
+Se cerró por la vía que ya existe (`POST /internal/admin/excepciones-habilitacion/:id/cerrar`), con el motivo en la bitácora:
+
+```
+Cierre del piloto de ASEPLUS (7-nov-2026). La excepcion 5 (5-nov-2026, alcance 2 de 2 firmas ya AGOTADAS) cumplio su objeto: el Anexo de Encargo quedo firmado y ejecutado el 7-nov-2026T20:33:22.748Z, con las dos actas en el expediente. La Empresa ya esta habilitada por su Anexo: la excepcion no habilita nada, y mientras siga VIGENTE se devuelve en el commit y el consentimiento, que no gastan firma. Decision escrita del owner; la bitacora conserva la trazabilidad.
+```
+
+La bitácora (append-only) tiene ahora el evento `EXCEPCION_CERRADA` del 7-nov-2026T23:01:26Z. **No se borró ni se alteró nada**: la excepción queda `CERRADA`, con su historial entero — `EXCEPCION_CREADA`, dos `EXCEPCION_USADA` y dos `EXCEPCION_APLICADA` — y al final el cierre. ASEPLUS sigue habilitada: la vista de la Empresa responde con `anexo_encargo_firmado_at` y `anexo_nube_firmado_at`.
+
+El endpoint de cierre además ahora lee `X-Admin-Actor` (antes fijaba `"admin"` a pelo), para que el cierre de una excepción quede atribuido a quien lo hizo.
+
+**LO QUE SIGUE**
+----------------
+1. **La transferencia internacional a Google**, que es el único pendiente del gate. El papel de Google por operación ya está determinado por escrito (J6, 30-oct) y la v1.5 lo sostiene; faltan la evidencia de medidas, la validación con la Circular 2 de 2025 y la declaración en el RNBD a cargo de la Empresa.
+2. **El dictamen J1-J14 al abogado**, con la fecha de vigencia (05-nov-2026, v1.5) y el 3.4(h).
+3. **Las 5 app passwords de Gmail sin rotar**, que además bloquean el build del instalador.
+4. **Node 20.20.2 en EOL** y la copia off-site con `rclone` (el respaldo diario existe y está cifrado; la copia fuera del servidor, no).
+5. **La sección E (G3)**, la Constancia firmada y T8; y **T6** (E2E con datos sintéticos) y **T7** (reversión probada).
+6. **El `user_agent` de la contrafirma quedó como `node`**: se hizo por API con un script, no desde el panel (que manda `K+AIR-Desktop/0.1.252`).
+
+La errata del nombre en el acta (*"Lilia Maria Vasques Muñoz"*, sin la z) se documenta y no se reescribe: no hay ruta de edición (409 `YA_SUSCRITO`). En la ficha de la Empresa el nombre sí está bien: *"Lilia Maria Vazquez Muñoz"*.
+
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**

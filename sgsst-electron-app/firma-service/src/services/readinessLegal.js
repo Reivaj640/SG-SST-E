@@ -1660,13 +1660,33 @@ function evaluar(opciones = {}) {
             : (ggCuentaOk
               ? 'Falta el DPA de Google o alguna de sus cláusulas (devolución/supresión o auditoría).'
               : 'Falta declarar el tipo de cuenta de Google (Workspace/Cloud o de consumidor).')),
+        // POR QUE la version sale del manifiesto y no esta escrita aqui
+        // -----------------------------------------------------------
+        // Esta accion vivio con el texto "La v1.2 del Acuerdo es la que
+        // sostiene ese regimen" desde el 27-oct-2026. La v1.2 ya no es
+        // candidata: esta superada por la v1.3, la v1.4 y la v1.5, y su
+        // texto ni siquiera esta en el repo (esta en el .gitignore, a la
+        // espera del abogado). El gate seguia mandando a buscar la
+        // aprobacion de una version muerta, y de paso CONTRADECIA al
+        // manifiesto, que ya declara la determinacion del papel de Google
+        // por operacion (punto J6 del abogado, 30-oct-2026) y sus tres
+        // pendientes externos.
+        //
+        // La version que se nombra sale de `versionAcuerdo`, que se deriva
+        // del manifiesto (y, si el manifiesto no la declara, del nombre del
+        // archivo). Un texto que compara contra una constante no comprueba
+        // el documento: comprueba la constante. Cuando el owner publique
+        // la v1.6, esta accion la nombra sola.
         accion: ggEsConsumidor
           ? 'Documentar la transferencia en el expediente (el Anexo de Nube ya declara el '
-            + 'papel de Google como Responsable y la base del nivel adecuado): determinar '
-            + 'por escrito ese papel, demostrar las medidas, validar con la Circular 2 de '
-            + '2025 y declarar la transferencia en el RNBD. La v1.2 del Acuerdo es la que '
-            + 'sostiene ese régimen; hasta que el abogado la apruebe, la primera firma '
-            + 'queda bloqueada.'
+            + 'papel de Google como Responsable y la base del nivel adecuado): demostrar '
+            + 'las medidas de seguridad que la Empresa ha implementado, validar con la '
+            + 'Circular 2 de 2025 y declarar la transferencia en el RNBD a cargo de la '
+            + 'Empresa, junto con la política de tratamiento que informa al Titular. El '
+            + 'papel de Google por operación ya está determinado por escrito (punto J6 '
+            + 'del abogado, 30-oct-2026) y lo sostiene la versión vigente del Acuerdo '
+            + `(${versionAcuerdo}): lo que falta es la evidencia externa, no la `
+            + 'calificación.'
           : 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
         referencia: 'legal-readiness.json → subencargados.google',
       },

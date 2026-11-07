@@ -115,13 +115,23 @@ router.post('/excepciones-habilitacion', adminApiAuth(), validateBody(crearExcep
 
 // ============================================================================
 // POST /internal/admin/excepciones-habilitacion/:id/cerrar
+//
+// 📦1046 El actor sale de la cabecera `X-Admin-Actor`, como en el resto de
+// los actos administrativos. Con el valor fijo "admin", el cierre de una
+// excepcion no se le atribuye a nadie: el mismo hueco que se corrigio en los
+// actos del panel. Sin la cabecera, el fallback es "admin" (no "sistema"):
+// el cierre es SIEMPRE un acto administrativo.
 // ============================================================================
 router.post('/excepciones-habilitacion/:id/cerrar', adminApiAuth(), validateBody(cerrarExcepcionBody), (req, res, next) => {
   try {
     const id = _parseId(req);
+    const declarado = req.get('X-Admin-Actor');
+    const actor = typeof declarado === 'string' && declarado.trim()
+      ? declarado.trim().slice(0, 200)
+      : 'admin';
     const { excepcion, evento } = excepcionService.cerrar({
       id,
-      actor: 'admin',
+      actor,
       motivo: req.body.motivo,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,

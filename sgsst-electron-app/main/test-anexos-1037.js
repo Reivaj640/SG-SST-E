@@ -111,6 +111,68 @@ test('anexos · adminListEmpresas pega a GET /internal/admin/empresas con la adm
     'una ruta admin no lleva la key de la Empresa');
 });
 
+// ── El actor del acto administrativo (📦1046) ───────────────────────
+//
+// El service lee la cabecera `X-Admin-Actor` en `_contextoAuditoria` y la
+// escribe en el rastro: `actor` en los cambios de la ficha y `verificado_por`
+// en la verificación del representante del Anexo de Encargo. La contrafirma
+// también la guarda.
+//
+// Antes de esto el cliente NUNCA mandaba la cabecera, y por eso los actos del
+// piloto de ASEPLUS (7-nov-2026) quedaron con los dos campos en null: el acto
+// estaba registrado, pero no se le atribuía a nadie. El `X-Admin-Motivo` sí
+// viajaba, pero el motivo dice POR QUÉ, no QUIÉN.
+
+test('anexos · el actor viaja en X-Admin-Actor', async function () {
+  var fetchMock = makeFetchMock(function () { return _jsonOk({ items: [] }); });
+  var client = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, adminApiKey: ADMIN_API_KEY,
+    clientInstanceId: CLIENT_INSTANCE_ID, appVersion: '0.1.190-test',
+    adminActor: 'Javier Robles Fontalvo',
+    _fetch: fetchMock, _sleep: function () { return Promise.resolve(); }
+  });
+  var r = await client.adminListEmpresas();
+  assert.equal(r.success, true);
+  assert.equal(fetchMock.calls[0].opts.headers['X-Admin-Actor'], 'Javier Robles Fontalvo',
+    'el acto administrativo tiene que quedar atribuido a alguien');
+});
+
+test('anexos · sin actor declarado NO se manda la cabecera', async function () {
+  var fetchMock = makeFetchMock(function () { return _jsonOk({ items: [] }); });
+  var client = makeAdminClient({ _fetch: fetchMock });
+  await client.adminListEmpresas();
+  assert.equal(fetchMock.calls[0].opts.headers['X-Admin-Actor'], undefined,
+    'sin actor no se manda una cabecera vacia: el service la guardaria en null');
+});
+
+test('anexos · el actor se recorta a 200 caracteres, como hace el service al leerlo', async function () {
+  // Lo que se manda truncado y lo que queda en el rastro tienen que ser lo
+  // mismo: el recorte es el del service (`_contextoAuditoria`), no otro.
+  var fetchMock = makeFetchMock(function () { return _jsonOk({ items: [] }); });
+  var client = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, adminApiKey: ADMIN_API_KEY,
+    clientInstanceId: CLIENT_INSTANCE_ID, appVersion: '0.1.190-test',
+    adminActor: 'x'.repeat(250),
+    _fetch: fetchMock, _sleep: function () { return Promise.resolve(); }
+  });
+  await client.adminListEmpresas();
+  assert.equal(fetchMock.calls[0].opts.headers['X-Admin-Actor'].length, 200);
+});
+
+test('anexos · el estado del cliente NO lleva X-Admin-Actor', async function () {
+  // El actor es del OPERADOR. En los endpoints de la Empresa no significa
+  // nada, y mandarlo sería inventar una atribución.
+  var fetchMock = makeFetchMock(function () { return _jsonOk({ id_empresa: '900829731' }); });
+  var client = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, adminApiKey: ADMIN_API_KEY,
+    clientInstanceId: CLIENT_INSTANCE_ID, appVersion: '0.1.190-test',
+    adminActor: 'Javier Robles Fontalvo',
+    _fetch: fetchMock, _sleep: function () { return Promise.resolve(); }
+  });
+  await client.getEmpresaAnexos();
+  assert.equal(fetchMock.calls[0].opts.headers['X-Admin-Actor'], undefined);
+});
+
 test('anexos · sin admin key, adminListEmpresas responde ADMIN_TOKEN_REQUIRED sin hacer HTTP', async function () {
   var fetchMock = makeFetchMock(function () { return _jsonOk({}); });
   var client = fc.createFirmaClient({
@@ -501,5 +563,45 @@ test('anexos · admin-diag dice SI hay key y NUNCA el valor', async function () 
   assert.equal(con.data.source, 'secrets');
   assert.equal(JSON.stringify(con.data).indexOf('admin-key-de-prueba'), -1,
     'la key jamas se muestra: solo se dice si existe');
+  teardown();
+});
+
+// ── El actor del acto administrativo (📦1046) ───────────────────────
+
+test('anexos · el bridge le pasa el actor al cliente admin', async function () {
+  // El actor lo declara el operador: `FIRMA_ADMIN_ACTOR` si está, y si no,
+  // la cuenta del sistema con la que se está operando. Lo que NO puede pasar
+  // es que viaje vacío: el service guardaría el campo en null.
+  var capturadas = [];
+  setup({ adminApiKey: 'admin-key-de-prueba-32-caracteres-min!!' });
+  registerFirmaHandlers._test_setClientFactory(function (opts) {
+    capturadas.push(opts);
+    return _lastMockedClient;
+  });
+  process.env.FIRMA_ADMIN_ACTOR = 'Javier Robles Fontalvo';
+
+  var r = await _call('firma:anexo:empresas');
+  assert.equal(r.success, true);
+  assert.ok(capturadas.length > 0, 'el bridge creo el cliente');
+  assert.equal(capturadas[0].adminActor, 'Javier Robles Fontalvo');
+
+  delete process.env.FIRMA_ADMIN_ACTOR;
+  teardown();
+});
+
+test('anexos · sin FIRMA_ADMIN_ACTOR el actor es la cuenta del sistema', async function () {
+  var capturadas = [];
+  setup({ adminApiKey: 'admin-key-de-prueba-32-caracteres-min!!' });
+  registerFirmaHandlers._test_setClientFactory(function (opts) {
+    capturadas.push(opts);
+    return _lastMockedClient;
+  });
+  delete process.env.FIRMA_ADMIN_ACTOR;
+
+  var r = await _call('firma:anexo:empresas');
+  assert.equal(r.success, true);
+  assert.ok(capturadas.length > 0, 'el bridge creo el cliente');
+  assert.ok(typeof capturadas[0].adminActor === 'string' && capturadas[0].adminActor.length > 0,
+    'el actor nunca viaja vacio: el service lo guardaria en null');
   teardown();
 });
