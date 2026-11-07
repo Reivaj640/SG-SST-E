@@ -66,7 +66,16 @@ const APP_ROOT = path.resolve(SERVICE_ROOT, '..');
 const RUTAS_POR_DEFECTO = {
   texto: path.join(APP_ROOT, 'legal', 'anexo-encargo.html'),
   manifiesto: path.join(SERVICE_ROOT, 'legal-readiness.json'),
-  backup: path.join(SERVICE_ROOT, 'deploy', 'backup-firma.sh'),
+  // El script de respaldo que CORRE. En el servidor es
+  // /opt/kair-firma/backup-firma.sh: un nivel ARRIBA del service (asi lo
+  // instala el README y asi lo llama el cron). En el repo vive en
+  // firma-service/deploy/. Se prueban los dos y se usa el primero que exista:
+  // mirar en el servidor un archivo que no esta ahi daria un falso "no hay
+  // script de respaldo", que es el codigo 8 (ABORTA).
+  backups: [
+    path.join(APP_ROOT, 'backup-firma.sh'),
+    path.join(SERVICE_ROOT, 'deploy', 'backup-firma.sh'),
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -115,7 +124,8 @@ function resultadoInicial(exigirFirmado) {
       esperado_firmado: Boolean(exigirFirmado),
     },
     respaldo: {
-      script: 'deploy/backup-firma.sh',
+      script: null,
+      buscados: [],
       existe: false,
       lleva_storage_entero: false,
       problema: null,
@@ -136,7 +146,7 @@ function parseArgs(args) {
     exigirFirmado: false,
     texto: RUTAS_POR_DEFECTO.texto,
     manifiesto: RUTAS_POR_DEFECTO.manifiesto,
-    backup: RUTAS_POR_DEFECTO.backup,
+    backups: RUTAS_POR_DEFECTO.backups.slice(),
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -149,7 +159,13 @@ function parseArgs(args) {
         e.codigo = 2;
         throw e;
       }
-      opciones[a.slice(2)] = path.resolve(args[i]);
+      const resuelta = path.resolve(args[i]);
+      if (a === '--backup') {
+        // El override replaces la lista de candidatos por el archivo exacto.
+        opciones.backups = [resuelta];
+      } else {
+        opciones[a.slice(2)] = resuelta;
+      }
     } else {
       const e = new Error('Argumento desconocido: ' + a);
       e.codigo = 2;
@@ -317,12 +333,28 @@ function leerActas(salida) {
  * fija se quedaría atrás sin avisar.
  */
 function leerRespaldo(rutas, salida) {
-  if (!fs.existsSync(rutas.backup)) {
-    salida.respaldo.problema = 'no se encuentra deploy/backup-firma.sh';
+  // El archivo que CORRE el respaldo. En el servidor es
+  // /opt/kair-firma/backup-firma.sh (un nivel arriba del service: asi lo
+  // instala el README y asi lo llama el cron). En el repo vive en
+  // firma-service/deploy/. Se prueban los candidatos en orden y se usa el
+  // primero que exista: mirar en el servidor un archivo que no esta ahi
+  // daria un falso "no hay script de respaldo" (codigo 8, ABORTA).
+  const candidatos = (rutas.backups && rutas.backups.length)
+    ? rutas.backups
+    : RUTAS_POR_DEFECTO.backups;
+  let elegido = null;
+  for (const c of candidatos) {
+    if (fs.existsSync(c)) { elegido = c; break; }
+  }
+  salida.respaldo.script = elegido || candidatos[0];
+  salida.respaldo.buscados = candidatos.slice();
+  if (!elegido) {
+    salida.respaldo.problema = 'no se encuentra el script de respaldo (se buscaron: '
+      + candidatos.join(' · ') + ')';
     return;
   }
   salida.respaldo.existe = true;
-  const texto = fs.readFileSync(rutas.backup, 'utf8');
+  const texto = fs.readFileSync(elegido, 'utf8');
   // `tar -C "$BASE" ... storage` (el directorio entero) es lo que vale.
   const llevaEntero = /tar\s+-C\s+"?\$?\{?BASE\}?"?\s+[^\n]*\bstorage\b/.test(texto)
     && !/tar\s+[^\n]*\bstorage\/(originales|firmados|constancias|papel)\b/.test(texto);
@@ -382,7 +414,8 @@ function main(args) {
     }
     SALIDA_FN('  Manifiesto: estado=' + (salida.manifiesto.estado || '-')
       + ' fecha=' + (salida.manifiesto.fecha || '-'));
-    SALIDA_FN('  Respaldo: lleva storage entero=' + salida.respaldo.lleva_storage_entero);
+    SALIDA_FN('  Respaldo: ' + (salida.respaldo.script || '(sin script)')
+      + ' lleva storage entero=' + salida.respaldo.lleva_storage_entero);
     SALIDA_FN('  RESULTADO: ABORTA — ' + motivo);
   };
 
@@ -463,7 +496,8 @@ function main(args) {
   SALIDA_FN('  Actas verificadas: ' + salida.actas.detalle.length);
   SALIDA_FN('  Manifiesto: estado=' + (salida.manifiesto.estado || '-')
     + ' fecha=' + (salida.manifiesto.fecha || '-'));
-  SALIDA_FN('  Respaldo: lleva storage entero=' + salida.respaldo.lleva_storage_entero);
+  SALIDA_FN('  Respaldo: ' + (salida.respaldo.script || '(sin script)')
+    + ' lleva storage entero=' + salida.respaldo.lleva_storage_entero);
   SALIDA_FN('  RESULTADO: OK');
   return 0;
 }

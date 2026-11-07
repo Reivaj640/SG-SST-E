@@ -69,7 +69,7 @@
 
 ### 1.1. URLs y transporte
 
-- **Base URL producción**: `https://firma.k-air.com`
+- **Base URL producción**: `https://firma.kair.fyi`
 - **Base URL desarrollo**: `http://localhost:3001`
 - **Transporte**: HTTPS obligatorio en producción.
 - **Path style**: kebab-case para rutas, snake_case para campos en
@@ -1261,8 +1261,8 @@ Content-Type: application/pdf
   "id_solicitud": "SIGN-2026-000123",
   "id_interno": 42,
   "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",  // SOLO se retorna en este momento
-  "url_publica": "https://firma.k-air.com/s/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
-  "qr_payload": "https://firma.k-air.com/s/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+  "url_publica": "https://firma.kair.fyi/s/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+  "qr_payload": "https://firma.kair.fyi/s/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
   "document_hash_original": "9a73f8c7...",
   "fecha_creacion": "2026-08-17T15:30:00.000000Z",
   "fecha_expiracion": "2026-08-18T15:30:00.000000Z",
@@ -2985,7 +2985,7 @@ Es lo que la pantalla consume. **Response — `200 OK`**:
     "representante": "Nombre del representante"
   },
   "expira_en": "2026-11-10T15:30:00.000Z",
-  "documento_url": "https://firma.k-air.com/anexo-encargo/documento",
+  "documento_url": "https://firma.kair.fyi/anexo-encargo/documento",
   "codigo_enviado": false,
   "firmado_at": null,
   "contrafirmado_at": null
@@ -3197,7 +3197,7 @@ operador para el piloto: **el enlace no se arma a mano**.
 ```json
 {
   "token": "<el token del enlace, de un solo uso>",
-  "url": "https://firma.k-air.com/anexo-encargo/<token>",
+  "url": "https://firma.kair.fyi/anexo-encargo/<token>",
   "expira_en": "2026-11-10T15:30:00.000Z",
   "version": "2026-11-06",
   "hash": "5cc7a346...960aa72",

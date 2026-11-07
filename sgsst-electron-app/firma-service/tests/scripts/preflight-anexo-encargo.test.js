@@ -285,6 +285,32 @@ test('el respaldo real se lleva la carpeta ENTERA de storage', async () => {
   assert.equal(salida.respaldo.lleva_storage_entero, true);
 });
 
+test('el preflight mira el script de respaldo que CORRE, y dice cuál', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const rc = preflight.main(args(['--json']));
+  assert.equal(rc, 0);
+  const salida = JSON.parse(lineasSalida[lineasSalida.length - 1]);
+
+  // En el repo el script vive en firma-service/deploy/. En el SERVIDOR el que
+  // corre el cron es /opt/kair-firma/backup-firma.sh, un nivel ARRIBA del
+  // service. El preflight tiene que encontrar el que exista y decir cual es:
+  // si mirara una ruta que no esta en el servidor, abortaria con codigo 8
+  // (ABORTA) por un archivo que si esta.
+  assert.ok(salida.respaldo.script, 'dice que script miro');
+  assert.ok(fs.existsSync(salida.respaldo.script), 'ese script existe de verdad');
+  assert.ok(salida.respaldo.buscados.length >= 2, 'probo mas de una ruta');
+  assert.equal(salida.respaldo.existe, true);
+});
+
+test('un servidor donde el script no esta en ninguna de las rutas aborta con 8', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const rc = preflight.main(args([
+    '--json',
+    '--backup', path.join(tmp, 'no-existe.sh'),
+  ]));
+  assert.equal(rc, 8);
+});
+
 test('un respaldo que se lleva solo una subcarpeta aborta con codigo 8', async () => {
   await sembrarFlujo({ contrafirmar: true });
   const backup = path.join(tmp, 'backup-firma.sh');
