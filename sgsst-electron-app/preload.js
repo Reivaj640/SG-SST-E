@@ -620,6 +620,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Agreement (1)
   firmaAgreementGet: (args) => ipcRenderer.invoke('firma:agreement:get', args || {}),
 
+  // 📦1037 — Los anexos (Anexo de Encargo y Anexo de Nube).
+  // 9 canales del OPERADOR (usan la admin key: son actos de K+AIR) + 1 del
+  // CLIENTE (usa la API key de la Empresa) + 1 de diagnostico.
+  //
+  // El estado que ve el cliente es SOLO lectura y va con la key de SU
+  // empresa: no hay version admin de ese canal a proposito.
+  firmaAnexoEmpresas: () => ipcRenderer.invoke('firma:anexo:empresas'),
+  firmaAnexoEstado: (args) => ipcRenderer.invoke('firma:anexo:estado', args || {}),
+  firmaAnexoSuscripcion: (args) => ipcRenderer.invoke('firma:anexo:suscripcion', args || {}),
+  firmaAnexoNubeSuscripcion: (args) => ipcRenderer.invoke('firma:anexo:nube-suscripcion', args || {}),
+  firmaAnexoVerificarRepresentante: (args) => ipcRenderer.invoke('firma:anexo:verificar-representante', args || {}),
+  firmaAnexoContrafirmaCodigo: (args) => ipcRenderer.invoke('firma:anexo:contrafirma-codigo', args || {}),
+  firmaAnexoContrafirmar: (args) => ipcRenderer.invoke('firma:anexo:contrafirmar', args || {}),
+  firmaAnexoAnular: (args) => ipcRenderer.invoke('firma:anexo:anular', args || {}),
+  firmaAnexoNubeAnular: (args) => ipcRenderer.invoke('firma:anexo:nube-anular', args || {}),
+  firmaEmpresaAnexos: (args) => ipcRenderer.invoke('firma:empresa:anexos', args || {}),
+  // Dice si hay admin key configurada y de donde viene. NUNCA el valor.
+  firmaConfigAdminDiag: () => ipcRenderer.invoke('firma:config:admin-diag'),
+
   // --- I-FIRMA-DUAL · v0.1.180 — Representante Legal por empresa ---
   // Bridge: main/empresa-representante-legal-bridge.js (canal 'rep-legal:get').
   // Multi-tenant: el bridge recibe `empresaId` (= company_key).

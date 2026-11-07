@@ -717,9 +717,13 @@ function createFirmaClient(opts) {
    * @param {string} method
    * @param {string} path
    * @param {object} [body]
+   * @param {object} [extraHeaders] - headers adicionales (p.ej. X-Admin-Motivo).
+   *   Las tres rutas que lo exigen (anular, verificar-representante y
+   *   contrafirmar) lo mandan: sin el, el service responde 400
+   *   MOTIVO_REQUERIDO y el acto NO se registra.
    * @returns {Promise<{success,data}|{success:false,error}>}
    */
-  function _adminRequest(method, path, body) {
+  function _adminRequest(method, path, body, extraHeaders) {
     if (!adminApiKey) {
       return Promise.resolve(_fail(
         'ADMIN_TOKEN_REQUIRED',
@@ -734,6 +738,12 @@ function createFirmaClient(opts) {
       return Promise.resolve(_fail('ADMIN_TOKEN_REQUIRED', e.message));
     }
     headers['Content-Type'] = 'application/json; charset=utf-8';
+    if (extraHeaders && typeof extraHeaders === 'object') {
+      Object.keys(extraHeaders).forEach(function (k) {
+        var v = extraHeaders[k];
+        if (v !== undefined && v !== null && v !== '') headers[k] = v;
+      });
+    }
     var bodyStr = (body === undefined || body === null) ? undefined : JSON.stringify(body);
     var url = baseUrl + path;
     return _doRequestRaw(method, url, headers, bodyStr, DEFAULT_TIMEOUT_MS)
@@ -897,6 +907,304 @@ function createFirmaClient(opts) {
     return _adminRequest('POST', '/internal/admin/empresas', body);
   }
 
+  // ===================================================================
+  //  LOS ANEXOS · el flujo del operador (panel de la app de escritorio)
+  // ===================================================================
+  //
+  //  El Anexo de Encargo (fase 1: la Empresa se suscribe) y el Anexo de
+  //  Nube se suscriben por el MISMO camino: el operador abre la suscripción
+  //  desde la app, el SERVICE manda el correo de invitación con el enlace,
+  //  y la Empresa se suscribe en la pantalla web del servicio.
+  //
+  //  La contrafirma (fase 2 del Encargo) es el ACTO DE K+AIR: por eso
+  //  vive en el lado admin y nunca en el lado de la Empresa.
+
+  /**
+   * GET /internal/empresa/anexos
+   *
+   * El estado del Anexo de Encargo y del Anexo de Nube de la Empresa
+   * AUTENTICADA (la API key de esa Empresa, no la del operador).
+   *
+   * El service toma la Empresa de la identidad autenticada: esta llamada no
+   * puede pedir los datos de otra empresa, ni siquiera por parámetro.
+   *
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { id_empresa, anexo_encargo: { estado, suscrito_at, suscrito_version,
+   *           suscrito_hash, firmado_at }, anexo_nube: { firmado, fecha, version,
+   *           hash }, habilitacion: { ok, registrada, pendientes[], mensaje } }
+   */
+  function getEmpresaAnexos() {
+    // `_doRequest` devuelve el Result crudo ({_isResponse, response}); el
+    // parseo (y el mapeo de errores a `{success, error}`) lo hace
+    // `_parseResult`, igual que en `getActiveAgreement`.
+    return _doRequest('GET', '/internal/empresa/anexos', null, null)
+      .then(function (r) { return _parseResult(r, 'application/json'); });
+  }
+
+  /**
+   * GET /internal/admin/empresas
+   *
+   * El listado de Empresas con su estado de Anexos (`tiene_anexo`,
+   * `tiene_anexo_suscrito` y `faltan_requeridos`). Es lo que pinta la tabla
+   * del panel de operador.
+   *
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { items: [{ id_empresa, razon_social, nit, tiene_anexo,
+   *           tiene_anexo_suscrito, faltan_requeridos[], ... }] }
+   */
+  function adminListEmpresas() {
+    return _adminRequest('GET', '/internal/admin/empresas', null);
+  }
+
+  /**
+   * GET /internal/admin/empresas/:id_empresa/anexos
+   *
+   * El detalle de las suscripciones de los dos anexos de esa Empresa, con su
+   * rastro de eventos. Es lo que permite al operador saber en que paso va
+   * el flujo (sin necesidad de abrir la base).
+   *
+   * @param {string} id_empresa
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { id_empresa, anexo_encargo: { suscripcion, eventos[] },
+   *           anexo_nube: { suscripcion, eventos[] } }
+   */
+  function adminGetEmpresaAnexos(id_empresa) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa) + '/anexos';
+    return _adminRequest('GET', path, null);
+  }
+
+  /**
+   * POST /internal/admin/empresas/:id_empresa/anexo-encargo/suscripcion
+   *
+   * Abre la suscripción del Anexo de Encargo. El SERVICE manda el correo de
+   * invitación con el enlace de un solo uso (el código de verificación sale
+   * aparte, a `canal_codigo`, que tiene que ser OTRO buzón).
+   *
+   * El enlace sale EN CLARO en la respuesta y no se puede recuperar despues
+   * (la base solo guarda su HMAC): si el operador lo pierde, hay que anular
+   * la suscripción y abrir otra.
+   *
+   * @param {string} id_empresa
+   * @param {object} datos - { correo_firmante, canal_codigo,
+   *   canal_codigo_confirmacion, nombre_firmante?, cargo_firmante?,
+   *   datos_empresa? }
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { token, url, expira_en, version, hash, correo_firmante, datos_empresa }
+   *   errors: EMPRESA_NOT_FOUND (404), INVALID_REQUEST_BODY, ANEXO_ENCARGO_NO_DISPONIBLE (503),
+   *           ENVIO_FALLIDO (502)
+   */
+  function adminCrearSuscripcionAnexoEncargo(id_empresa, datos) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    datos = datos || {};
+    if (!datos.correo_firmante || typeof datos.correo_firmante !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'correo_firmante requerido (string)'));
+    }
+    if (!datos.canal_codigo || typeof datos.canal_codigo !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY',
+        'canal_codigo requerido: el codigo no puede salir al mismo buzon del enlace'));
+    }
+    if (String(datos.canal_codigo).toLowerCase() === String(datos.correo_firmante).toLowerCase()) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY',
+        'canal_codigo tiene que ser un buzon DISTINTO de correo_firmante: el enlace y el codigo no van al mismo canal'));
+    }
+    var body = {
+      correo_firmante: datos.correo_firmante,
+      canal_codigo: datos.canal_codigo,
+      canal_codigo_confirmacion: datos.canal_codigo_confirmacion
+    };
+    if (datos.nombre_firmante) body.nombre_firmante = datos.nombre_firmante;
+    if (datos.cargo_firmante) body.cargo_firmante = datos.cargo_firmante;
+    if (datos.datos_empresa && typeof datos.datos_empresa === 'object') {
+      body.datos_empresa = datos.datos_empresa;
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-encargo/suscripcion';
+    return _adminRequest('POST', path, body);
+  }
+
+  /**
+   * POST /internal/admin/empresas/:id_empresa/anexo-nube/suscripcion
+   *
+   * Abre la suscripción del Anexo de Nube. A diferencia del Encargo, NO pide
+   * `canal_codigo`: el Anexo de Nube no tiene fase de contrafirma.
+   *
+   * @param {string} id_empresa
+   * @param {object} datos - { correo_firmante, nombre_firmante?, cargo_firmante? }
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { token, url, expira_en, version, hash, correo_firmante }
+   */
+  function adminCrearSuscripcionAnexoNube(id_empresa, datos) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    datos = datos || {};
+    if (!datos.correo_firmante || typeof datos.correo_firmante !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'correo_firmante requerido (string)'));
+    }
+    var body = { correo_firmante: datos.correo_firmante };
+    if (datos.nombre_firmante) body.nombre_firmante = datos.nombre_firmante;
+    if (datos.cargo_firmante) body.cargo_firmante = datos.cargo_firmante;
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-nube/suscripcion';
+    return _adminRequest('POST', path, body);
+  }
+
+  /**
+   * POST /internal/admin/empresas/:id_empresa/anexo-encargo/suscripcion/:id/anular
+   *
+   * Da de baja una suscripción que todavía no se firmó. EXIGE `X-Admin-Motivo`:
+   * sin el, el service responde 400 MOTIVO_REQUERIDO.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @param {string} motivo
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: MOTIVO_REQUERIDO (400), SUSCRIPCION_NO_ENCONTRADA (404),
+   *           YA_SUSCRITO (409)
+   */
+  function adminAnularSuscripcionAnexoEncargo(id_empresa, id_suscripcion, motivo) {
+    var pre = _preAnexo(id_empresa, id_suscripcion, motivo);
+    if (pre) return Promise.resolve(pre);
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-encargo/suscripcion/' + encodeURIComponent(String(id_suscripcion))
+      + '/anular';
+    return _adminRequest('POST', path, null, { 'X-Admin-Motivo': motivo });
+  }
+
+  /**
+   * POST /internal/admin/empresas/:id_empresa/anexo-nube/suscripcion/:id/anular
+   *
+   * Da de baja la suscripción del Anexo de Nube. EXIGE `X-Admin-Motivo`.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @param {string} motivo
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function adminAnularSuscripcionAnexoNube(id_empresa, id_suscripcion, motivo) {
+    var pre = _preAnexo(id_empresa, id_suscripcion, motivo);
+    if (pre) return Promise.resolve(pre);
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-nube/suscripcion/' + encodeURIComponent(String(id_suscripcion))
+      + '/anular';
+    return _adminRequest('POST', path, null, { 'X-Admin-Motivo': motivo });
+  }
+
+  /**
+   * POST .../anexo-encargo/suscripcion/:id/verificar-representante
+   *
+   * Registra la verificación DOCUMENTAL de quien firmó por la Empresa. Es un
+   * requisito del abogado y una precondición de la contrafirma: sin ella el
+   * service responde 409 REPRESENTANTE_NO_VERIFICADO.
+   *
+   * EXIGE `X-Admin-Motivo`.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @param {object} datos - { tipo_documento, referencia, nota? }
+   * @param {string} motivo
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: SUSCRIPCION_NO_FIRMADA (409), MOTIVO_REQUERIDO (400)
+   */
+  function adminVerificarRepresentante(id_empresa, id_suscripcion, datos, motivo) {
+    var pre = _preAnexo(id_empresa, id_suscripcion, motivo);
+    if (pre) return Promise.resolve(pre);
+    datos = datos || {};
+    if (!datos.tipo_documento) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'tipo_documento requerido'));
+    }
+    if (!datos.referencia) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'referencia requerido'));
+    }
+    var body = { tipo_documento: datos.tipo_documento, referencia: datos.referencia };
+    if (datos.nota) body.nota = datos.nota;
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-encargo/suscripcion/' + encodeURIComponent(String(id_suscripcion))
+      + '/verificar-representante';
+    return _adminRequest('POST', path, body, { 'X-Admin-Motivo': motivo });
+  }
+
+  /**
+   * POST .../anexo-encargo/contrafirmar/codigo
+   *
+   * Pide el código de contrafirma. El código sale al buzón de protección de
+   * datos de K+AIR (NO al de la Empresa) y el service lo enmascara en la
+   * respuesta. NO lleva `X-Admin-Motivo`: pedir el código no es contrafirmar.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { expira_en_segundos, canal }
+   *   errors: REPRESENTANTE_NO_VERIFICADO (409), SUSCRIPCION_NO_FIRMADA (409),
+   *           YA_CONTRAFIRMADO (409)
+   */
+  function adminPedirCodigoContrafirma(id_empresa, id_suscripcion) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    if (!id_suscripcion) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_suscripcion requerido'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-encargo/contrafirmar/codigo';
+    return _adminRequest('POST', path, { id_suscripcion: id_suscripcion });
+  }
+
+  /**
+   * POST .../anexo-encargo/contrafirmar
+   *
+   * El SEGUNDO ACTO: K+AIR contrafirma el Anexo de Encargo. Con esto la
+   * Empresa queda habilitada para firmar los documentos de sus trabajadores
+   * (es lo que escribe `anexo_encargo_firmado_at`, la fecha de ejecución).
+   *
+   * EXIGE `X-Admin-Motivo`.
+   *
+   * @param {string} id_empresa
+   * @param {number} id_suscripcion
+   * @param {string} otp - los 6 digitos
+   * @param {string} motivo
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   errors: OTP_INVALIDO (400), REPRESENTANTE_NO_VERIFICADO (409),
+   *           MOTIVO_REQUERIDO (400)
+   */
+  function adminContrafirmar(id_empresa, id_suscripcion, otp, motivo) {
+    var pre = _preAnexo(id_empresa, id_suscripcion, motivo);
+    if (pre) return Promise.resolve(pre);
+    if (!otp || !/^\d{6}$/.test(String(otp))) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'el codigo son 6 digitos'));
+    }
+    var path = '/internal/admin/empresas/' + encodeURIComponent(id_empresa)
+      + '/anexo-encargo/contrafirmar';
+    var body = { id_suscripcion: id_suscripcion, otp: String(otp), acepta: true };
+    return _adminRequest('POST', path, body, { 'X-Admin-Motivo': motivo });
+  }
+
+  /**
+   * Valida lo que las rutas de anexos exigen antes de gastar un HTTP: la
+   * empresa, la suscripción y el MOTIVO (que va en `X-Admin-Motivo` y sin el
+   * el service responde 400 MOTIVO_REQUERIDO y el acto no se registra).
+   *
+   * @returns {object|null} un error `_fail(...)` o null si todo esta bien.
+   */
+  function _preAnexo(id_empresa, id_suscripcion, motivo) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return _fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+    }
+    if (!id_suscripcion) {
+      return _fail('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+    }
+    if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
+      return _fail('MOTIVO_REQUERIDO',
+        'este acto exige un motivo: va en X-Admin-Motivo y queda en el rastro');
+    }
+    return null;
+  }
+
   /**
    * POST /internal/admin/clientes/:id/rotate (DR-1, DR-4, DR-6.D)
    *
@@ -977,6 +1285,18 @@ function createFirmaClient(opts) {
     adminUpdateEmpresa: adminUpdateEmpresa,
     adminRotateClient: adminRotateClient,
     adminRevokeClient: adminRevokeClient,
+    // Los anexos: el flujo del operador (admin key) y el estado que ve el
+    // cliente (la key de la Empresa).
+    getEmpresaAnexos: getEmpresaAnexos,
+    adminListEmpresas: adminListEmpresas,
+    adminGetEmpresaAnexos: adminGetEmpresaAnexos,
+    adminCrearSuscripcionAnexoEncargo: adminCrearSuscripcionAnexoEncargo,
+    adminCrearSuscripcionAnexoNube: adminCrearSuscripcionAnexoNube,
+    adminAnularSuscripcionAnexoEncargo: adminAnularSuscripcionAnexoEncargo,
+    adminAnularSuscripcionAnexoNube: adminAnularSuscripcionAnexoNube,
+    adminVerificarRepresentante: adminVerificarRepresentante,
+    adminPedirCodigoContrafirma: adminPedirCodigoContrafirma,
+    adminContrafirmar: adminContrafirmar,
     // Expose for tests
     _internals: {
       _buildHeaders: _buildHeaders,

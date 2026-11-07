@@ -2271,6 +2271,230 @@ function _handlerConfigSetAdminKey(args) {
 }
 
 // =====================================================================
+//  LOS ANEXOS · el panel del operador (admin key) y el estado del
+//  cliente (la API key de la Empresa)
+// =====================================================================
+//
+//  QUÉ ES CADA LADO.
+//
+//  El panel de OPERADOR (abrir la suscripción, verificar al representante,
+//  pedir el código de contrafirma, contrafirmar, anular) usa la ADMIN KEY:
+//  son actos de K+AIR y K+AIR es quien responde por ellos.
+//
+//  El estado que ve el CLIENTE usa la API KEY DE LA EMPRESA y solo puede
+//  leer lo suyo: el service toma la Empresa de la identidad autenticada.
+//
+//  LA CONTRAFIRMA NO TIENE VERSIÓN DE CLIENTE. Es el acto de K+AIR y su
+//  código sale al buzón de protección de datos de K+AIR. Si la admin key
+//  llegara al equipo de un cliente, ese cliente podría contrafirmar su
+//  propio Anexo: por eso la key es del operador y no se comparte.
+//
+//  LAS TRES RUTAS QUE EXIGEN MOTIVO (anular, verificar-representante y
+//  contrafirmar) lo mandan en `X-Admin-Motivo`. Sin el, el service responde
+//  400 MOTIVO_REQUERIDO y el acto NO se registra.
+
+/**
+ * El cliente admin (con la admin key) y la config de la URL.
+ * Si falta cualquiera de los dos, devuelve el error con su remediationHint.
+ *
+ * @returns {object} { ok: true, client } o { ok: false, response }
+ */
+function _clienteAdminAnexos() {
+  var adminErr = _requireAdminToken();
+  if (adminErr) return { ok: false, response: adminErr };
+  var sec = _requireSecretsV2WithUrl();
+  if (!sec.ok) return { ok: false, response: sec.response };
+  var client = _createAdminClient(sec.s2.firmaServiceUrl, sec.s2.firmaServiceClientInstanceId);
+  if (!client) {
+    return { ok: false, response: _err('CONFIG_MISSING', 'No hay cliente de firma configurado.') };
+  }
+  return { ok: true, client: client };
+}
+
+/**
+ * Delega en un metodo admin del cliente y normaliza la respuesta IPC.
+ *
+ * @param {object} cliente
+ * @param {string} metodo - el nombre del metodo en firma-client.js
+ * @param {Array} args
+ * @returns {Promise<object>} la respuesta IPC
+ */
+function _delegarAdminAnexo(cliente, metodo, args) {
+  if (typeof cliente[metodo] !== 'function') {
+    return Promise.resolve(_err('ENDPOINT_NOT_AVAILABLE',
+      'El cliente de firma no soporta esta operacion de anexos. Actualice K+AIR.'));
+  }
+  return Promise.resolve(cliente[metodo].apply(cliente, args)).then(function (r) {
+    return r && r.success ? _ok(r.data) : r;
+  });
+}
+
+// -------- firma:anexo:empresas --------
+// El listado de Empresas con su estado de Anexos.
+function _handlerAnexoEmpresas() {
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminListEmpresas', []);
+}
+
+// -------- firma:anexo:estado --------
+// El detalle de las suscripciones de los dos anexos de UNA Empresa.
+function _handlerAnexoEstado(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminGetEmpresaAnexos', [args.id_empresa]);
+}
+
+// -------- firma:anexo:suscripcion --------
+// Abre la suscripción del Anexo de Encargo. El service manda el correo de
+// invitación con el enlace; la respuesta trae el enlace EN CLARO y no se
+// puede recuperar despues.
+function _handlerAnexoSuscripcion(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminCrearSuscripcionAnexoEncargo',
+    [args.id_empresa, args.datos || {}]);
+}
+
+// -------- firma:anexo:nube-suscripcion --------
+// Abre la suscripción del Anexo de Nube.
+function _handlerAnexoNubeSuscripcion(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminCrearSuscripcionAnexoNube',
+    [args.id_empresa, args.datos || {}]);
+}
+
+// -------- firma:anexo:verificar-representante --------
+// La verificación documental de quien firmó por la Empresa. Es
+// precondición de la contrafirma.
+function _handlerAnexoVerificarRepresentante(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  if (!args.motivo || !String(args.motivo).trim()) {
+    return _err('MOTIVO_REQUERIDO',
+      'este acto exige un motivo: va en X-Admin-Motivo y queda en el rastro');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminVerificarRepresentante',
+    [args.id_empresa, args.id_suscripcion, args.datos || {}, args.motivo]);
+}
+
+// -------- firma:anexo:contrafirma-codigo --------
+// Pide el código de contrafirma. Sale al buzón de K+AIR; NO lleva motivo
+// (pedir el código no es contrafirmar).
+function _handlerAnexoContrafirmaCodigo(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminPedirCodigoContrafirma',
+    [args.id_empresa, args.id_suscripcion]);
+}
+
+// -------- firma:anexo:contrafirmar --------
+// EL SEGUNDO ACTO: K+AIR contrafirma. Con esto la Empresa queda habilitada
+// para firmar los documentos de sus trabajadores.
+function _handlerAnexoContrafirmar(args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  if (!args.motivo || !String(args.motivo).trim()) {
+    return _err('MOTIVO_REQUERIDO',
+      'este acto exige un motivo: va en X-Admin-Motivo y queda en el rastro');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, 'adminContrafirmar',
+    [args.id_empresa, args.id_suscripcion, args.otp, args.motivo]);
+}
+
+// -------- firma:anexo:anular y firma:anexo:nube-anular --------
+// Da de baja una suscripción que todavía no se firmó.
+function _handlerAnexoAnular(args) {
+  return _handlerAnexoAnularCon('adminAnularSuscripcionAnexoEncargo', args);
+}
+
+function _handlerAnexoNubeAnular(args) {
+  return _handlerAnexoAnularCon('adminAnularSuscripcionAnexoNube', args);
+}
+
+function _handlerAnexoAnularCon(metodo, args) {
+  args = args || {};
+  if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'id_empresa requerido (string)');
+  }
+  if (!args.id_suscripcion) {
+    return _err('INVALID_REQUEST_BODY', 'id_suscripcion requerido');
+  }
+  if (!args.motivo || !String(args.motivo).trim()) {
+    return _err('MOTIVO_REQUERIDO',
+      'este acto exige un motivo: va en X-Admin-Motivo y queda en el rastro');
+  }
+  var c = _clienteAdminAnexos();
+  if (!c.ok) return c.response;
+  return _delegarAdminAnexo(c.client, metodo,
+    [args.id_empresa, args.id_suscripcion, args.motivo]);
+}
+
+// -------- firma:empresa:anexos --------
+// El estado de los anexos de la empresa activa, con la API key DE ESA
+// empresa. No hay versión admin de este canal a propósito: el cliente ve su
+// propio estado y nada más.
+function _handlerEmpresaAnexos(args) {
+  args = args || {};
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) return r.response;
+  var client = r.client;
+  if (!client || typeof client.getEmpresaAnexos !== 'function') {
+    return _err('ENDPOINT_NOT_AVAILABLE',
+      'El cliente de firma no soporta la consulta de anexos. Actualice K+AIR.');
+  }
+  return Promise.resolve(client.getEmpresaAnexos()).then(function (res) {
+    return res && res.success ? _ok(res.data) : res;
+  });
+}
+
+// -------- firma:config:admin-diag --------
+// ¿Hay admin key configurada? NUNCA el valor: solo si existe y de donde
+// viene. Es lo que usa la vista de operador para explicar que es una vista
+// de operador y como se configura.
+function _handlerConfigAdminDiag() {
+  var resolved = _resolveAdminApiKey();
+  return _ok({
+    hayAdminKey: !!resolved,
+    source: resolved ? resolved.source : null
+  });
+}
+
+// =====================================================================
 //  REGISTRATION (patrón init + register)
 // =====================================================================
 
@@ -2504,6 +2728,53 @@ function registerFirmaHandlers(appArg, deps) {
   handle('firma:config:set-admin-key', function (event, payload) {
     try { return _handlerConfigSetAdminKey(payload || {}); }
     catch (e) { console.error('[' + MOD + '][config:set-admin-key]', e.message); return _err('INTERNAL', e.message); }
+  });
+
+  // --- Los anexos: el operador (admin key) + el estado del cliente ---
+  // 9 handlers del operador + 1 del cliente + 1 de diagnostico.
+  handle('firma:anexo:empresas', function (event, payload) {
+    try { return _handlerAnexoEmpresas(); }
+    catch (e) { console.error('[' + MOD + '][anexo:empresas]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:estado', function (event, payload) {
+    try { return _handlerAnexoEstado(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:estado]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:suscripcion', function (event, payload) {
+    try { return _handlerAnexoSuscripcion(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:suscripcion]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:nube-suscripcion', function (event, payload) {
+    try { return _handlerAnexoNubeSuscripcion(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:nube-suscripcion]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:verificar-representante', function (event, payload) {
+    try { return _handlerAnexoVerificarRepresentante(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:verificar-representante]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:contrafirma-codigo', function (event, payload) {
+    try { return _handlerAnexoContrafirmaCodigo(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:contrafirma-codigo]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:contrafirmar', function (event, payload) {
+    try { return _handlerAnexoContrafirmar(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:contrafirmar]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:anular', function (event, payload) {
+    try { return _handlerAnexoAnular(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:anular]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:anexo:nube-anular', function (event, payload) {
+    try { return _handlerAnexoNubeAnular(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][anexo:nube-anular]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:empresa:anexos', function (event, payload) {
+    try { return _handlerEmpresaAnexos(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][empresa:anexos]', e.message); return _err('INTERNAL', e.message); }
+  });
+  handle('firma:config:admin-diag', function (event, payload) {
+    try { return _handlerConfigAdminDiag(); }
+    catch (e) { console.error('[' + MOD + '][config:admin-diag]', e.message); return _err('INTERNAL', e.message); }
   });
 }
 
