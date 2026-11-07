@@ -1365,6 +1365,21 @@ async function pasoVerificar(args, internoKey, estado) {
  * Es lo que va al manifiesto (`legal-readiness.json` → `n10_4.evidencia`). Dice
  * qué se probó, cuándo, contra qué, con qué ids y con qué huellas, y dice
  * también qué NO es real.
+ *
+ * POR QUÉ ESTA EVIDENCIA ES ASCII PURO
+ * ------------------------------------
+ * El manifiesto legal es ASCII PURO: lo exige el test "manifiesto · sigue
+ * siendo ASCII puro" (tests/readiness-manifiesto-v1.4.test.js) y lo exige el
+ * propio script que lo reescribe (scripts/actualizar-manifiesto-v1.4.js
+ * aborta si el archivo deja de serlo). La evidencia de la 10.4 se copia
+ * TAL CUAL a `n10_4.evidencia`, así que si esta función emite un solo
+ * `·` (U+00B7), el manifiesto deja de ser ASCII puro y la suite se pone roja.
+ *
+ * Ya pasó: el 6-nov-2026 esta función usaba `·` como separador, la evidencia
+ * se copió al manifiesto con cuatro de ellos y el test de ASCII puro quedó en
+ * rojo desde el commit 📦1018. Por eso los separadores son ASCII (` - `) y no
+ * tipográficos. Lo que se imprime en la CONSOLA (los `·` de `emitir`) sí puede
+ * usar tipografía: esa salida no entra al manifiesto.
  */
 function escribirEvidencia(args, contexto) {
   const lineas = [];
@@ -1379,14 +1394,14 @@ function escribirEvidencia(args, contexto) {
   lineas.push('Trabajador (id CRUDO, SINTETICO): ' + args.trabajador);
   lineas.push('Documento de identidad con el que se identifico: SINTETICO, ' + args.numero);
   lineas.push('Version de partida: ' + args.versionInicial
-    + ' · hash ' + String(contexto.hashInicial || '').slice(0, 32));
+    + ' - hash ' + String(contexto.hashInicial || '').slice(0, 32));
   lineas.push('Version vigente al final: ' + args.versionNueva
-    + ' · hash ' + String(contexto.hashNuevo || '').slice(0, 32));
+    + ' - hash ' + String(contexto.hashNuevo || '').slice(0, 32));
   if (contexto.excepcion) {
     lineas.push('Excepcion de habilitacion: id=' + contexto.excepcion.id
-      + ' · firmas ' + contexto.excepcion.firmas_usadas + '/'
+      + ' - firmas ' + contexto.excepcion.firmas_usadas + '/'
       + contexto.excepcion.alcance_firmas_max
-      + ' · plazo_hasta=' + contexto.excepcion.plazo_hasta);
+      + ' - plazo_hasta=' + contexto.excepcion.plazo_hasta);
   }
   lineas.push('');
   lineas.push('QUE SE PROBO');

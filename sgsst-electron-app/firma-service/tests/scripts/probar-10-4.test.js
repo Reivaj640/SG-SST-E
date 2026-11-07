@@ -648,6 +648,46 @@ test('10.4 · la corrida completa: la solicitud migra y todo queda en su sitio',
   }
 });
 
+test('10.4 · la evidencia es ASCII PURO: se copia al manifiesto y el manifiesto lo exige', async () => {
+  // POR QUE ESTE TEST EXISTE
+  // --------------------------
+  // La evidencia de la 10.4 se copia TAL CUAL a `legal-readiness.json` ->
+  // `n10_4.evidencia`, y el manifiesto legal es ASCII PURO por regla propia:
+  // `scripts/actualizar-manifiesto-v1.4.js` aborta si deja de serlo, y hay
+  // un test que lo exige ("manifiesto · sigue siendo ASCII puro").
+  //
+  // El 6-nov-2026 este script usaba el punto medio (U+00B7) como separador, la
+  // evidencia se copio al manifiesto con cuatro de ellos y el test de ASCII
+  // puro quedo en rojo desde el commit 📦1018. Este guard muerde: si alguien
+  // vuelve a poner un separador tipografico, el manifiesto se vuelve a romper.
+  const motor = motorFalso();
+  const srv = await servicioFalso(motor);
+  const estado = archivoTemporal('estado');
+  const evidencia = archivoTemporal('evidencia');
+  try {
+    const r = await correr(argumentos([
+      '--url=' + srv.url,
+      '--estado=' + estado,
+      '--evidencia=' + evidencia,
+      '--confirmar-escribe',
+    ]), motor);
+    assert.equal(r.codigo, 0, r.lineas);
+
+    const txt = fs.readFileSync(evidencia, 'utf8');
+    const noAscii = (txt.match(/[^\x00-\x7F]/g) || []);
+    assert.equal(noAscii.length, 0,
+      'la evidencia tiene ' + noAscii.length + ' caracteres no ASCII (' +
+      JSON.stringify(noAscii.join('')) + '): al copiarla al manifiesto lo rompe');
+
+    // Y el separador que se usa es ASCII de verdad, no un escape: la
+    // evidencia se pega al manifiesto como texto plano.
+    assert.match(txt, /Version de partida: v1\.4 - hash [0-9a-f]{32}/,
+      'el separador de la evidencia tiene que ser ASCII');
+  } finally {
+    await srv.cerrar();
+  }
+});
+
 test('10.4 · la maniobra del cambio de version ocurre en la base AISLADA indicada', async () => {
   const motor = motorFalso();
   const srv = await servicioFalso(motor);
