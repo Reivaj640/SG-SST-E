@@ -314,8 +314,37 @@ test('manifiesto · no declara ninguna firma que no exista', () => {
     assert.equal(man.anexo_nube.hash, null, 'sin firma no puede haber huella');
     assert.equal(man.anexo_nube.evidencia, null, 'sin firma no puede haber evidencia');
   }
-  assert.equal(man.anexo_encargo.estado, 'no_firmado', 'el Anexo de Encargo sigue sin firmar');
-  assert.equal(man.constancia.estado, 'no_firmada', 'la Constancia sigue sin firmar');
+  // El Anexo de Encargo: el estado lo declara el owner cuando ocurre la
+  // firma, asi que aqui no se exige un valor concreto. Lo que este test
+  // impide es declarar MEDIA firma (estado "firmado" sin fecha o sin
+  // evidencia) o una firma fantasma (estado "firmado" con la fecha y la
+  // evidencia en null). Es el mismo criterio del Anexo de Nube, arriba.
+  if (man.anexo_encargo.estado === 'firmado') {
+    assert.ok(
+      typeof man.anexo_encargo.fecha === 'string'
+        && !Number.isNaN(new Date(man.anexo_encargo.fecha).getTime()),
+      'un Anexo de Encargo firmado tiene que declarar una fecha válida',
+    );
+    assert.ok(
+      typeof man.anexo_encargo.evidencia === 'string' && man.anexo_encargo.evidencia.trim() !== '',
+      'un Anexo de Encargo firmado tiene que declarar su evidencia',
+    );
+  } else {
+    assert.equal(man.anexo_encargo.estado, 'no_firmado',
+      'un Anexo de Encargo sin firmar dice "no_firmado"');
+    assert.equal(man.anexo_encargo.fecha, null, 'sin firma no puede haber fecha');
+    assert.equal(man.anexo_encargo.evidencia, null, 'sin firma no puede haber evidencia');
+  }
+  // La Constancia: el mismo criterio. El owner la firma cuando procede.
+  if (man.constancia.estado === 'firmada') {
+    assert.ok(man.constancia.fecha, 'una Constancia firmada tiene que declarar su fecha');
+    assert.ok(man.constancia.evidencia, 'una Constancia firmada tiene que declarar su evidencia');
+  } else {
+    assert.equal(man.constancia.estado, 'no_firmada',
+      'una Constancia sin firmar dice "no_firmada"');
+    assert.equal(man.constancia.fecha, null, 'sin firma no puede haber fecha');
+    assert.equal(man.constancia.evidencia, null, 'sin firma no puede haber evidencia');
+  }
 });
 
 test('readiness · con el manifiesto real, la huella del Acuerdo queda verificada', () => {

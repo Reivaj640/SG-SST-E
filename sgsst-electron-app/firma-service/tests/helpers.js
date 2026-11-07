@@ -1010,8 +1010,62 @@ function buildEvidenciaFirma(fila, consentimiento) {
   };
 }
 
+/**
+ * El manifiesto con el bloque `anexo_encargo` devuelto a su linea base SIN
+ * FIRMAR: estado "no_firmado", sin fecha y sin evidencia.
+ *
+ * POR QUE NO SE USA EL MANIFIESTO REAL TAL CUAL
+ * -----------------------------------------------
+ * El manifiesto real cambia de estado cuando ocurre una firma: el piloto de
+ * ASEPLUS (7-nov-2026) lo dejo en "firmado" con fecha y evidencia. Un test
+ * que hereda ese estado deja de medir lo que dice medir: el que comprueba
+ * "sin contrafirma el script NO escribe firmado" pasaria porque el manifiesto
+ * ya decia "firmado", y el que comprueba "--exigir-firmado aborta con 7" no
+ * abortaria nunca. El fixture tiene que ser DETERMINISTA.
+ *
+ * La copia conserva todo lo demas byte a byte: la `version`, la `huella` y
+ * la `nota` son la identidad del TEXTO, y el script las contrasta contra el
+ * archivo real. Solo se tocan los tres campos que el script escribe.
+ *
+ * @param {string} texto El manifiesto crudo (el del repo).
+ * @returns {string} El mismo manifiesto con el Anexo de Encargo sin firmar.
+ */
+function manifiestoSinFirmar(texto) {
+  let salida = texto;
+  salida = _ponerEnBloque(salida, 'anexo_encargo', 'estado', '"no_firmado"');
+  salida = _ponerEnBloque(salida, 'anexo_encargo', 'fecha', 'null');
+  salida = _ponerEnBloque(salida, 'anexo_encargo', 'evidencia', 'null');
+  return salida;
+}
+
+/**
+ * Pone un valor CRUDO en una clave de un bloque del manifiesto, con
+ * reemplazo literal sobre el texto (nunca con JSON.stringify).
+ *
+ * El valor se pasa CRUDO (`"firmado"`, `null`) porque el destino puede ser
+ * un null y no un string: el JSON del manifiesto distingue las dos cosas y
+ * una fecha en null es la ausencia de fecha, no una fecha vacia.
+ *
+ * @param {string} texto El manifiesto crudo.
+ * @param {string} bloque El bloque donde vive la clave.
+ * @param {string} clave La clave a escribir.
+ * @param {string} valor El valor CRUDO a escribir.
+ * @returns {string} El manifiesto con la clave escrita.
+ */
+function _ponerEnBloque(texto, bloque, clave, valor) {
+  const i = texto.indexOf('"' + bloque + '": {');
+  if (i < 0) throw new Error('El manifiesto no tiene el bloque "' + bloque + '".');
+  const fin = texto.indexOf('\n  },', i);
+  if (fin < 0) throw new Error('No se pudo cerrar el bloque "' + bloque + '".');
+  const cuerpo = texto.slice(i, fin);
+  const m = new RegExp('("' + clave + '"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|null)').exec(cuerpo);
+  if (!m) throw new Error('El bloque "' + bloque + '" no tiene la clave "' + clave + '".');
+  return texto.slice(0, i) + cuerpo.replace(m[0], m[1] + valor) + texto.slice(fin);
+}
+
 module.exports = {
   resetDb,
+  manifiestoSinFirmar,
   asegurarTablasPurga,
   seedActiveAgreement,
   tablaConservacionActivada,

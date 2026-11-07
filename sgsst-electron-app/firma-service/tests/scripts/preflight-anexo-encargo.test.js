@@ -36,7 +36,7 @@ const db = require('../../src/db/connection');
 const anexoEncargo = require('../../src/services/anexoEncargo');
 const mailer = require('../../src/services/mailer');
 const storage = require('../../src/services/storage');
-const { resetDb } = require('../helpers');
+const { resetDb, manifiestoSinFirmar } = require('../helpers');
 const preflight = require('../../scripts/preflight-anexo-encargo');
 const manifiesto = require('../../scripts/actualizar-manifiesto-anexo-encargo');
 
@@ -151,7 +151,10 @@ function args(extra = []) {
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-encargo-'));
   copia = path.join(tmp, 'legal-readiness.json');
-  fs.copyFileSync(MANIFIESTO_REAL, copia);
+  // El fixture NO hereda el estado vivo del manifiesto: el Anexo de Encargo
+  // esta firmado en el repo desde el piloto, y estos tests necesitan el
+  // estado SIN FIRMAR para poder comprobar lo que dicen comprobar.
+  fs.writeFileSync(copia, manifiestoSinFirmar(fs.readFileSync(MANIFIESTO_REAL, 'utf8')), 'utf8');
   lineasSalida = [];
   preflight.fijarSalida((t) => lineasSalida.push(t), (t) => lineasSalida.push(t));
   manifiesto.fijarSalida((t) => lineasSalida.push(t), (t) => lineasSalida.push(t));
