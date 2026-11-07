@@ -41,6 +41,7 @@ Antes de proponer cualquier cosa, lee el documento que corresponda. **No adivine
 | Cambiar un bridge, la base de datos o el sync | Este archivo §6.2 |
 | Cambiar el header o el shell | Este archivo §9 trampa #3 |
 | Tocar la Bandeja Integrada | Este archivo §9 trampas #1 y #4 |
+| Tocar los anexos (Anexo de Encargo o de Nube) o la firma | `sgsst-electron-app/docs/gestion-humana/firma-electronica/` — `API.md` §6.21-§6.22 y `FLOWS.md` |
 | Preparar un commit o un release | `AGENTS.md` §Protocolo + este §5 |
 | Cerrar la jornada | `Historial.md` §Regla de cierre |
 

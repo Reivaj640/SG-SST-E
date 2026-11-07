@@ -312,15 +312,27 @@ El **📦1033 ya está reservado** para el fix del preflight (el EACCES de
 `backup-firma.sh` y el `coincide` que miente), que está pendiente de autorización del
 owner. Esta tanda arranca en el 📦1034.
 
-| # | Qué | Qué incluye |
-|---|---|---|
-| 📦1034 | **El plan** | Este documento |
-| 📦1035 | **El servicio · la lectura para el operador** | `suscripcionesDeEmpresa()` y `eventosDeSuscripcion()` en los dos services + `GET /internal/admin/empresas/:id/anexos` + los tests |
-| 📦1036 | **El servicio · el estado del cliente** | `GET /internal/empresa/anexos` + el test que **prueba que no cruza empresas** + el test que prueba que la respuesta no trae `token`, `otp` ni el canal completo |
-| 📦1037 | **La app · la capa HTTP y los handlers** | Los 10 métodos nuevos en `main/firma-client.js` + los 11 handlers en `main/firma-bridge.js` + el mapeo de `preload.js` + los tests del bridge |
-| 📦1038 | **La app · el panel de operador** | `modules/gestion-humana/firma-operador/` + el registro en el nav + el `?v=` de `index.html` + los guards de la vista |
-| 📦1039 | **La app · el panel de estado del cliente** | La tarjeta nueva en `firma-electronica/index.js` + sus guards |
-| 📦1040 | **Los documentos** | `API.md` (§6.22, la API de la app y los endpoints nuevos), `FLOWS.md` (hoy **no menciona** el Anexo de Encargo), `Historial.md`, `PROMPT.md`, `CONTEXT.md` y este plan |
+> **Cómo quedó esa tabla.** La columna de estado se agregó el 7-nov-2026, cuando la
+> tanda se terminó. El párrafo de arriba se conserva como se escribió: al momento de
+> redactar el plan, el 📦1033 efectivamente estaba pendiente de autorización. Lo que
+> pasó después está en la §12.
+
+| # | Qué | Qué incluye | Estado (7-nov-2026) |
+|---|---|---|---|
+| 📦1033 | **El fix del preflight** | El `EACCES` del script de respaldo y el `coincide` que miente | **Hecho** (en el working tree, sin commitear) |
+| 📦1034 | **El plan** | Este documento | **Hecho** (commiteado: `2bceca13`) |
+| 📦1035 | **El servicio · la lectura para el operador** | `suscripcionesDeEmpresa()` y `eventosDeSuscripcion()` en los dos services + `GET /internal/admin/empresas/:id/anexos` + los tests | **Hecho** |
+| 📦1036 | **El servicio · el estado del cliente** | `GET /internal/empresa/anexos` + el test que **prueba que no cruza empresas** + el test que prueba que la respuesta no trae `token`, `otp` ni el canal completo | **Hecho** |
+| 📦1037 | **La app · la capa HTTP y los handlers** | Los 10 métodos nuevos en `main/firma-client.js` + los 11 handlers en `main/firma-bridge.js` + el mapeo de `preload.js` + los tests del bridge | **Hecho** |
+| 📦1038 | **La app · el panel de operador** | `modules/gestion-humana/firma-operador/` + el registro en el nav + el `?v=` de `index.html` + los guards de la vista | **Hecho** |
+| 📦1039 | **La app · el panel de estado del cliente** | La tarjeta nueva en `firma-electronica/index.js` + sus guards | **Hecho** |
+| 📦1040 | **Los documentos** | `API.md` (§6.22, la API de la app y los endpoints nuevos), `FLOWS.md` (hoy **no menciona** el Anexo de Encargo), `Historial.md`, `PROMPT.md`, `CONTEXT.md` y este plan | **Hecho** |
+
+> **Lo que no se midió en esta tanda.** La suite completa del `firma-service` la mide el
+> owner: los dos archivos de prueba de los endpoints nuevos (`tests/routes/empresa-anexos.test.js`
+> y `tests/routes/admin-empresas-anexos.test.js`) se escribieron en paralelo a esta tanda.
+> Del lado de la app, los tres archivos nuevos (`main/test-anexos-1037.js`,
+> `main/test-anexos-1038.js`, `main/test-anexos-1039.js`) dan **36 en verde** (22 + 11 + 3).
 
 Cada commit de código lleva sus tests, y cada test tiene que **morder**: si vuelve el
 defecto, tiene que fallar (PROMPT.md §7.1-§7.2). Los documentos van en el último, como
@@ -488,3 +500,81 @@ Están abiertos y son de otro dueño:
 - El **vínculo con Google**, que es el único pendiente del gate `primera_firma` que no
   depende del código.
 - El **dictamen J1-J14** del abogado y la fecha de vigencia.
+
+---
+
+## 12. Cómo quedó
+
+> Esta sección la escribió el worker de documentación al cerrar la tanda. El
+> resto del plan queda como está: es el documento aprobado.
+
+### 12.1 Qué se construyó
+
+Las **cinco piezas** del §1 están, y ninguna quedó a medias:
+
+| Pieza | Dónde quedó | Cómo se sabe que está |
+|---|---|---|
+| **Los dos endpoints de lectura** | `GET /internal/empresa/anexos` (`src/routes/empresaAnexos.js`) y `GET /internal/admin/empresas/:id_empresa/anexos` (`src/routes/admin-empresas.js`) | Sus pruebas: `tests/routes/empresa-anexos.test.js` y `tests/routes/admin-empresas-anexos.test.js` |
+| **La capa HTTP y los handlers** | 10 métodos en `main/firma-client.js`, 11 handlers en `main/firma-bridge.js`, el mapeo en `preload.js` | `main/test-anexos-1037.js` (22 en verde) |
+| **El panel del operador** | `modules/gestion-humana/firma-operador/` (`index.js` + `index.css`), en el nav de Gestión Humana como **"Anexos"**, con su `?v=` en `index.html` | `main/test-anexos-1038.js` (11 en verde) |
+| **El panel de estado del cliente** | La tarjeta nueva arriba de todo en `modules/gestion-humana/firma-electronica/index.js` | `main/test-anexos-1039.js` (3 en verde) |
+| **Los documentos** | `API.md` §6.22 (los dos endpoints y los once canales), `FLOWS.md` (los flujos 11 y 12, que antes no mencionaban el Anexo de Encargo), `Historial.md`, `PROMPT.md` y `CONTEXT.md` | La revisión del diff |
+
+Las **dos funciones nuevas de lectura** que el §5.2 pedía existen en los dos
+services (`suscripcionesDeEmpresa()` y `eventosDeSuscripcion()`), y la
+suscripción que se muestra es **la más reciente** (`id DESC`, se toma la
+primera), con el rastro de **esa** suscripción.
+
+### 12.2 Qué se decidió
+
+1. **Las tres decisiones del owner** (§3) quedaron implementadas tal cual: el
+   acto de K+AIR vive en la app lado operador con la **admin key**, el plan
+   cierra **los dos anexos**, y el cliente ve **el estado de su Anexo** en
+   solo lectura.
+2. **Las cinco decisiones que tomó este plan** (§9) siguen válidas, y ahora
+   están escritas en el código: el panel del operador es una vista nueva, el
+   estado del cliente va dentro de la vista que el cliente ya usa, el endpoint
+   del cliente se llama `/internal/empresa/anexos` y toma la Empresa de
+   `req.id_empresa`, la pestaña de operador siempre se ve (se explica si no hay
+   admin key), y **la UI no reescribe los mensajes del servicio**.
+3. **Las tres reglas que no se cruzan** quedan como criterio escrito, y cada
+   una tiene su código detrás: la admin key **es del operador** y nunca se
+   comparte con un cliente; la **contrafirma no tiene versión de cliente** (su
+   código sale al buzón de K+AIR); y el **estado del cliente va con la API key
+   de la Empresa**, en una ruta **sin `:id_empresa`**.
+4. **Las dos decisiones abiertas** (§9, numerales 6 y 7) siguen abiertas: el
+   panel **no** gestiona las excepciones de habilitación, y **no** descarga las
+   actas a un disco local: las muestra y las copia.
+
+### 12.3 Qué NO cambió
+
+- **El texto de los anexos**, su versión, su huella y el manifiesto.
+- **La fase 1 y la fase 2**: la Empresa se suscribe y K+AIR contrafirma, igual
+  que antes. Cambia **quién pulsa**, no qué se firma ni en qué orden.
+- **El gate y la excepción 5**: la excepción 5 de ASEPLUS sigue vigente hasta
+  que el Anexo esté ejecutado, y se cierra después, por su cuenta.
+- **El preflight y el script del manifiesto**: siguen siendo de consola en el
+  servidor. Contrafirmar desde la app **no** cierra el gate: después hay que
+  correrlos, como en el piloto.
+- **La app no pasó a ser cliente del servicio**: la API key de la Empresa
+  sigue siendo la que firma los documentos de sus trabajadores.
+- **La producción no se toca.** El texto de los anexos, los hashes y los
+  estados del servidor no cambian por esta tanda.
+
+### 12.4 El piloto ASEPLUS sigue pendiente
+
+**El piloto con ASEPLUS NO se ha hecho.** La app deja al operador frente a la
+consola **más cómoda**, no lo reemplaza: hasta que una Empresa se suscriba por
+el enlace y K+AIR contrafirme desde la app, el flujo nuevo está probado pero
+**no ejercido en el ambiente real**. Sigue en pie, y en este orden:
+
+1. El **deploy** del flujo (el mismo guion del 6-nov), que ahora incluye los
+   dos endpoints nuevos y los once canales.
+2. El **piloto**: se suscribe por el enlace y K+AIR contrafirma.
+3. El **preflight** y el **manifiesto** en el servidor, y recién entonces se
+   re-mide el gate.
+4. **Rotar los 5 app passwords de Gmail** antes de que el flujo se anuncie a
+   otra Empresa: el correo de invitación sale por SMTP con el canal de K+AIR.
+
+Y siguen abiertas, sin cambio, las dos decisiones del §9 (numerales 6 y 7) y
+los pendientes del §11.

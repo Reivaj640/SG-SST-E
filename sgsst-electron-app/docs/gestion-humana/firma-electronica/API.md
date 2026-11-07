@@ -59,6 +59,7 @@
   - [6.19 La auditoría de readiness legal — `GET /internal/admin/readiness-legal`](#619-la-auditoría-de-readiness-legal--get-internaladminreadiness-legal)
   - [6.20 La carga accidental de datos de salud — `/internal/admin/sign-requests/{id}/incidente-datos-sensibles`](#620-la-carga-accidental-de-datos-de-salud--internaladminsign-requestsidincidente-datos-sensibles)
   - [6.21 El Anexo de Encargo — la suscripción de la Empresa y la contrafirma de K+AIR](#621-el-anexo-de-encargo--la-suscripción-de-la-empresa-y-la-contrafirma-de-kair)
+  - [6.22 La API de los anexos en la app de escritorio](#622-la-api-de-los-anexos-en-la-app-de-escritorio)
 - [7. Healthcheck](#7-healthcheck)
 - [8. Headers comunes](#8-headers-comunes)
 - [9. Seguridad operacional](#9-seguridad-operacional)
@@ -3448,6 +3449,260 @@ suscripción y el de la contrafirma.
 | 8 | Operador | `POST .../contrafirmar/codigo` → el código sale al buzón de protección de datos de K+AIR |
 | 9 | Operador | `POST .../contrafirmar` con el código, `acepta: true` y `X-Admin-Motivo` → **fase 2**: queda `anexo_encargo_firmado_at` y el acta de contrafirma |
 | 10 | — | A partir de aquí la Empresa ya puede firmar documentos de sus trabajadores |
+
+---
+
+## 6.22 La API de los anexos en la app de escritorio
+
+> **Lo que hay en esta sección.** Los **dos endpoints de lectura** que el
+> servicio le agregó a los anexos para que la app de escritorio pueda hablar de
+> ellos (uno para el operador, uno para la Empresa que pregunta), y los
+> **once canales IPC** que la app abre sobre el servicio.
+>
+> Los endpoints de **escritura** —abrir la suscripción, anular, verificar al
+> representante y contrafirmar— **no cambian**: ya están en el §6.21.5. Lo que
+> cambia es **quién los llama**: la app de escritorio los llama con la
+> **admin key** del operador y, en los tres actos que lo exigen, con un
+> motivo. Antes eso se hacía con un `curl` pegado a mano en una consola.
+
+### 6.22.1 `GET /internal/empresa/anexos` — el estado de los anexos de la Empresa que llama
+
+**Auth**: `X-Internal-API-Key` — **la key de la Empresa**, no la del operador.
+El middleware es `requireEmpresaScopeAndLimit()`, el mismo patrón que el resto
+de `/internal`.
+
+**La Empresa sale SOLO de `req.id_empresa`**, que es la identidad autenticada.
+**La ruta no tiene `:id_empresa`**: no hay un parámetro que la ruta pueda leer
+y, por lo tanto, no hay por dónde escaparse a otra Empresa. (En las rutas que
+sí llevan `:id_empresa`, lo que protege es `checkIdEmpresa`, que compara el
+parámetro con la identidad; acá no hay nada que comparar.)
+
+**En modo legacy** —la key no está atada a ninguna Empresa— el middleware deja
+`req.id_empresa = null` y la ruta **se niega**: no se puede decir de quién es
+el estado de los anexos si no se sabe de quién es la key. No es un 200 con los
+datos de alguna Empresa.
+
+**Response — `200 OK`**:
+
+```json
+{
+  "id_empresa": "EMP-000123",
+  "anexo_encargo": {
+    "estado": "suscrito",
+    "suscrito_at": "2026-11-07T15:30:00.000Z",
+    "suscrito_version": "2026-11-06",
+    "suscrito_hash": "5cc7a346...960aa72",
+    "firmado_at": null
+  },
+  "anexo_nube": {
+    "firmado": true,
+    "fecha": "2026-11-05T22:51:34.349Z",
+    "version": "1.1",
+    "hash": "e9517536...1482"
+  },
+  "habilitacion": {
+    "ok": false,
+    "registrada": true,
+    "id_empresa": "EMP-000123",
+    "pendientes": ["anexo_encargo_firmado"],
+    "mensaje": "La empresa EMP-000123 suscribió el Anexo de Encargo, pero K+AIR todavia no lo ha contrafirmado: el instrumento no esta ejecutado y la Empresa no puede firmar documentos de sus trabajadores. Regístrelo en POST /internal/admin/empresas/EMP-000123/anexo-firmado (Anexo de Encargo), en POST /internal/admin/empresas/EMP-000123/anexo-nube-firmado (Anexo de Nube) y en PUT /internal/admin/empresas/EMP-000123 (canal de atención) antes de solicitar firmas."
+  }
+}
+```
+
+**Los TRES estados del Anexo de Encargo.** Son tres y no dos, porque el
+instrumento es **bilateral**:
+
+| `estado` | Qué significa |
+|---|---|
+| `ejecutado` | Las dos partes: la Empresa suscribió **y** K+AIR contrafirmó. Es el único estado que habilita a la Empresa para firmar documentos de sus trabajadores |
+| `suscrito` | Solo la Empresa suscribió. Falta la contrafirma de K+AIR |
+| `no_suscrito` | La Empresa no ha suscrito nada |
+
+`firmado_at` es la fecha de **ejecución** (la de la contrafirma), no la de la
+suscripción: esa está en `suscrito_at`. `suscrito_version` y `suscrito_hash`
+son la versión y la huella del **texto** que la Empresa suscribió.
+
+**El bloque `habilitacion` se devuelve TAL COMO lo produce
+`empresaService.verificarHabilitacionFirma()`**: la UI lo **muestra**, no lo
+reescribe. Ese texto es el que distingue "suscribió pero K+AIR todavía no lo
+ha contrafirmado" de "no tiene Anexo", y es el mismo que aparece en el 409 del
+bloqueo. Los `pendientes` posibles son `anexo_encargo_firmado`,
+`anexo_nube_firmado` (este último solo cuando la compuerta del Anexo de Nube
+está encendida) y `canal_pqrs`.
+
+> **Si la Empresa no está en el directorio, la respuesta NO es un 404**: es un
+> 200 con `habilitacion.registrada = false` y `ok = true`. Una Empresa que no
+> está registrada no está *bloqueada* —eso es otro problema—: el bloqueo lo da
+> la excepción auditable.
+
+**Lo que NO devuelve**: ni el `id_suscripcion`, ni el token, ni el código de
+verificación, ni el `canal_codigo` en claro, ni la evidencia cruda. Es un
+endpoint de **estado**, no un volcado de la tabla.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `401` | `INVALID_API_KEY` (falta el header, o la key no existe o está revocada) |
+| `403` | `EMPRESA_NO_RESUELTA` (la key es del modo legacy: no está atada a ninguna Empresa) |
+| `429` | Se agotó el rate limit interno (las cuatro capas de `/internal`) |
+
+### 6.22.2 `GET /internal/admin/empresas/{id_empresa}/anexos` — el detalle de las suscripciones, para el operador
+
+**Auth**: `X-Admin-API-Key` (la del operador). El middleware es `adminApiAuth()`.
+
+**Para qué existe**: las tres acciones de la contrafirma
+(`verificar-representante`, `contrafirmar/codigo` y `contrafirmar`) y el
+`anular` exigen el **`id_suscripcion`** en el path, y ese id **no está** en la
+ficha de la Empresa ni en ninguna otra respuesta de lectura. Sin esta ruta el
+operador tenía que abrir una consola para descubrirlo.
+
+**Response — `200 OK`**:
+
+```json
+{
+  "id_empresa": "EMP-000123",
+  "anexo_encargo": {
+    "suscripcion": {
+      "id": 42,
+      "estado": "FIRMADA",
+      "version": "2026-11-06",
+      "hash": "5cc7a346...960aa72",
+      "correo_firmante": "representante@ejemplo.co",
+      "canal_codigo": "segundo.canal@ejemplo.co",
+      "nombre_firmante": "Nombre del firmante",
+      "cargo_firmante": "Representante legal",
+      "firmado_at": "2026-11-07T15:30:00.000Z",
+      "contrafirmado_at": null,
+      "representante_verificacion": {
+        "tipo_documento": "CERTIFICADO_CAMARA",
+        "referencia": "Radicado 2026-11-07-14",
+        "verificado_por": "nombre-del-operador",
+        "verificado_at": "2026-11-07T16:00:00.000Z"
+      },
+      "representante_verificado_at": "2026-11-07T16:00:00.000Z",
+      "contrafirma_canal": null,
+      "evidencia": null,
+      "contrafirma_acta_archivo": null,
+      "contrafirma_acta_hash": null,
+      "created_at": "2026-11-07T14:00:00.000Z",
+      "updated_at": "2026-11-07T16:00:00.000Z"
+    },
+    "eventos": [
+      {
+        "evento": "SUSCRIPCION_CREADA",
+        "detalle": null,
+        "fecha_hora": "2026-11-07T14:00:00.000Z",
+        "ip": "203.0.113.10",
+        "user_agent": "Mozilla/5.0"
+      }
+    ]
+  },
+  "anexo_nube": {
+    "suscripcion": null,
+    "eventos": []
+  }
+}
+```
+
+**La suscripción del Anexo de Encargo** trae los dieciocho campos de arriba.
+Dos cosas que hay que leer con cuidado:
+
+- **`estado = FIRMADA` significa que la EMPRESA suscribió** (fase 1), **NO** que
+  el instrumento esté ejecutado: para eso está `contrafirmado_at` (fase 2).
+- **`contrafirma_canal` va ENMASCARADO**, con la misma función
+  (`actaEncargoService.enmascararCorreo`) que usa el acta. Si fueran dos
+  implementaciones distintas, el operador vería un correo y el acta otro.
+
+**La suscripción del Anexo de Nube** tiene **la misma forma**, pero con los
+campos de la fase 2 en `null`: `canal_codigo`, `contrafirmado_at`,
+`representante_verificacion`, `representante_verificado_at`,
+`contrafirma_canal`, `contrafirma_acta_archivo` y `contrafirma_acta_hash`. El
+Anexo de Nube **no es bilateral**: lo suscribe la Empresa y ya está.
+
+**Cada evento** trae cinco campos: `evento`, `detalle`, `fecha_hora`, `ip` y
+`user_agent`, en orden `id ASC` (del primero al último).
+
+**La suscripción que manda es la más reciente**: se leen las suscripciones de
+la Empresa en orden `id DESC` y se toma la primera. Las anteriores (las
+anuladas, las vencidas) quedan para el expediente, no se muestran.
+
+**Lo que NO se devuelve**: ni `token_hash`, ni `otp_hash`, ni
+`contrafirma_otp_hash`, ni `canal_codigo_tipo`. Son las llaves y los
+contadores del mecanismo, y el operador no los necesita para cumplir la
+contrafirma.
+
+> **El token en claro NO es recuperable.** En la base solo vive su HMAC
+> (`token_hash`), y la ruta de alta (§6.21.5) es la única que lo devuelve en
+> claro. Si el operador cierra la pantalla sin copiarlo, **no hay "reenviar la
+> invitación"**: lo que hay es anular (con motivo) y abrir otra.
+
+**Errores**:
+
+| Código | Cuándo |
+|---|---|
+| `401` | `INVALID_API_KEY` (falta el header o la key no es la de operador) |
+| `400` | `INVALID_REQUEST_BODY` (el `id_empresa` del path no es válido) |
+
+### 6.22.3 Los once canales IPC de la app de escritorio
+
+La app de escritorio no habla con el servicio por HTTP suelto: lo hace por
+**IPC** (`main/firma-bridge.js`), y cada canal es una operación con su
+credencial. Los expone `preload.js` como `window.electronAPI.firmaXxx`.
+
+La respuesta de un canal es `{ success: true, data }` o
+`{ success: false, error: { code, message, extra } }`.
+
+| Canal IPC | Quién lo llama | Endpoint del servicio | `X-Admin-Motivo` | Qué hace |
+|---|---|---|---|---|
+| `firma:anexo:empresas` | Operador (admin key) | `GET /internal/admin/empresas` | No | Lista las Empresas con lo que les falta |
+| `firma:anexo:estado` | Operador (admin key) | `GET /internal/admin/empresas/:id_empresa/anexos` | No | La suscripción viva de los dos anexos y su rastro |
+| `firma:anexo:suscripcion` | Operador (admin key) | `POST /internal/admin/empresas/:id_empresa/anexo-encargo/suscripcion` | No | Abre la suscripción del Anexo de Encargo y devuelve el enlace **en claro** |
+| `firma:anexo:nube-suscripcion` | Operador (admin key) | `POST /internal/admin/empresas/:id_empresa/anexo-nube/suscripcion` | No | Abre la suscripción del Anexo de Nube |
+| `firma:anexo:verificar-representante` | Operador (admin key) | `POST .../anexo-encargo/suscripcion/:id_suscripcion/verificar-representante` | **Sí** | Registra la verificación documental de quien firmó por la Empresa |
+| `firma:anexo:contrafirma-codigo` | Operador (admin key) | `POST .../anexo-encargo/contrafirmar/codigo` | No | Pide el código de contrafirma (sale al buzón de K+AIR) |
+| `firma:anexo:contrafirmar` | Operador (admin key) | `POST .../anexo-encargo/contrafirmar` | **Sí** | **Fase 2**: K+AIR contrafirma y el instrumento queda ejecutado |
+| `firma:anexo:anular` | Operador (admin key) | `POST .../anexo-encargo/suscripcion/:id_suscripcion/anular` | **Sí** | Da de baja una suscripción que todavía no se firmó |
+| `firma:anexo:nube-anular` | Operador (admin key) | `POST .../anexo-nube/suscripcion/:id_suscripcion/anular` | **Sí** | Da de baja una suscripción del Anexo de Nube |
+| `firma:empresa:anexos` | **Cliente** (la key de **su** Empresa) | `GET /internal/empresa/anexos` | No | El estado de los anexos de la empresa activa |
+| `firma:config:admin-diag` | Diagnóstico | (ninguno: no sale a la red) | No | Dice si hay admin key configurada y **de dónde** |
+
+**El motivo va en `X-Admin-Motivo`, no en el body.** Los cuatro canales que lo
+exigen (`verificar-representante`, `contrafirmar`, `anular` y `nube-anular`) lo
+piden siempre: sin motivo, el servicio responde `400 MOTIVO_REQUERIDO` y **el
+acto no se registra**. Y en `suscripcion` ni en `contrafirmar/codigo` **no se
+pide**: el plan no inventa un motivo donde el servicio no lo exige (pedir el
+código no es contrafirmar).
+
+**`firma:config:admin-diag` nunca devuelve el valor de la key.** Devuelve solo
+`{ hayAdminKey, source }`, con `source` en `secrets` (la key persistida en
+`secrets.enc`) o `env` (el fallback `FIRMA_SERVICE_ADMIN_KEY`), o `null` si no
+hay ninguna. Es lo que la vista de operador usa para explicar que es una vista
+de operador y cómo se configura. Los canales del operador que no tienen key
+responden `ADMIN_TOKEN_REQUIRED` con su `remediationHint`.
+
+### 6.22.4 Las tres reglas que no se cruzan
+
+Son el corazón del diseño, y por eso van escritas:
+
+1. **La admin key es del OPERADOR y NUNCA se escribe en el equipo de un
+   cliente.** La app *puede* guardarla (`firma:config:set-admin-key`), pero si
+   esa key llega a la máquina de un cliente, ese cliente puede **contrafirmar su
+   propio Anexo de Encargo** —que es el acto que le corresponde a K+AIR— y
+   además crear y revocar clientes de otras empresas. El panel de operador
+   dejaría de ser un control y pasaría a ser un botón.
+
+2. **La contrafirma NO tiene versión de cliente.** Su código sale al **buzón de
+   protección de datos de K+AIR** (`FIRMA_CANAL_PROTECCION_DATOS`), no al de la
+   Empresa, y el canal no lo declara quien pide el acto: lo dice la
+   configuración. No hay canal IPC de cliente para contrafirmar, y no lo
+   habrá.
+
+3. **El estado del cliente va con la API key de la Empresa**
+   (`X-Internal-API-Key`), **sin `:id_empresa` en la ruta**: no hay por dónde
+   escaparse. El canal `firma:empresa:anexos` no tiene versión admin a
+   propósito —el cliente ve su propio estado y nada más—.
 
 ---
 

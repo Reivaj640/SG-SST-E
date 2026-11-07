@@ -31,7 +31,9 @@
 - [9. Flujo 8: OTP bloqueado](#9-flujo-8-otp-bloqueado)
 - [10. Flujo 9: Verificación posterior](#10-flujo-9-verificación-posterior)
 - [11. Flujo 10: Sincronización K+AIR ← Servicio](#11-flujo-10-sincronización-kair--servicio)
-- [12. Matriz resumen de flujos](#12-matriz-resumen-de-flujos)
+- [12. Flujo 11: Anexo de Encargo (suscripción y contrafirma)](#12-flujo-11-anexo-de-encargo-suscripción-y-contrafirma)
+- [13. Flujo 12: Anexo de Nube (suscripción)](#13-flujo-12-anexo-de-nube-suscripción)
+- [14. Matriz resumen de flujos](#14-matriz-resumen-de-flujos)
 
 ---
 
@@ -841,7 +843,262 @@ K+AIR local              Servicio
 
 ---
 
-## 12. Matriz resumen de flujos
+## 12. Flujo 11: Anexo de Encargo (suscripción y contrafirma)
+
+**Cuándo ocurre**: una vez por Empresa, antes de que pueda firmar
+documentos de sus trabajadores.
+
+**Duración típica**: minutos para la fase 1; entre la fase 1 y la
+fase 2, lo que tarde el operador en contrastar al representante.
+
+**Quiénes son**: el **operador de K+AIR** (desde la app de escritorio),
+el **Servicio**, el **correo**, la **Empresa** (que se suscribe) y, en
+la fase 2, el **buzón de protección de datos de K+AIR**.
+
+> **El instrumento es BILATERAL.** Son dos actos: la Empresa
+> suscribió (fase 1) y K+AIR contrafirma (fase 2). **La fase 1 NO
+> habilita** a la Empresa: sin contrafirma el Anexo no está
+> ejecutado y la Empresa no puede firmar.
+
+### 12.1. Precondiciones
+
+- La Empresa está en el directorio (`gh_firma_empresas`) y está **activa**.
+- El operador tiene la **admin key** configurada en la app
+  (Configuración → Firma Electrónica). Es la key de **K+AIR**, nunca
+  la de la Empresa.
+- El texto vigente del Anexo de Encargo está en el servidor y su
+  huella coincide con la del manifiesto (`legal-readiness.json` →
+  `anexo_encargo`). Si no, el alta responde `503
+  ANEXO_ENCARGO_NO_DISPONIBLE`.
+- El **segundo canal** (el del código de la fase 1) es un buzón
+  **distinto** del que recibe el enlace.
+
+### 12.2. Diagrama de secuencia
+
+#### 12.2.1. Fase 1 — la suscripción de la Empresa
+
+```
+Operador     Servicio        SMTP         Empresa
+   │             │             │             │
+   │ 1.Abre la suscripción del Anexo de Encargo
+   │             │             │             │
+   │   (correo del firmante, segundo canal   │
+   │             │             │             │
+   │   y cómo se confirmó ese canal)         │
+   │             │             │             │
+   │ 2.POST /internal/admin/empresas/:id/anexo-encargo/suscripcion
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 3.Token de un solo uso + su HMAC en la base
+   │             │             │             │
+   │             │ 4.INSERT evento SUSCRIPCION_CREADA
+   │             │             │             │
+   │             │ 5.Correo de invitación con el enlace
+   │             │────────────▶│             │
+   │             │             │             │
+   │             │             │ 6.Al buzón del firmante
+   │             │             │────────────▶│
+   │             │             │             │
+   │             │ 7.{token, url, expira_en, version, hash}
+   │◀────────────│             │             │
+   │             │             │             │
+   │ 7.el enlace, EN CLARO (sale una sola vez)
+   │────────────▶│             │             │
+   │             │             │             │
+   │ 8.Copia el enlace         │             │
+   │             │             │             │
+   │             │             │             │ 9.Abre GET /anexo-encargo/{token}
+   │             │             │             │
+   │             │             │             │   y pide el código de verificación
+   │             │             │             │
+   │             │ 10.El código de la fase 1 │
+   │             │────────────▶│             │
+   │             │             │             │
+   │             │             │ 11.Al SEGUNDO canal (no al del enlace)
+   │             │             │────────────▶│
+   │             │             │             │
+   │             │             │             │ 12.POST /api/anexo-encargo/{token}/suscribir:
+   │             │             │             │
+   │             │             │             │   otp, acepta, acepta_tratamiento,
+   │             │             │             │
+   │             │             │             │   datos_empresa (los cinco del §11)
+   │             │             │             │
+   │             │             │             │   y representante (documento + calidad)
+   │             │             │             │
+   │             │ 13.FASE 1: estado FIRMADA,│
+   │             │             │             │
+   │             │   anexo_encargo_suscrito_at y el acta
+   │             │             │             │
+```
+
+#### 12.2.2. Fase 2 — la contrafirma de K+AIR
+
+```
+Operador     Servicio        SMTP          K+AIR
+   │             │             │             │
+   │ 1.Abre el detalle (GET /internal/admin/ │
+   │             │             │             │
+   │   empresas/:id/anexos) y ve el id_suscripcion
+   │             │             │             │
+   │ 2.POST .../anexo-encargo/suscripcion/:id/verificar-representante (X-Admin-Motivo)
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 3.{ verificado: true, referencia, verificado_at }
+   │◀────────────│             │             │
+   │             │             │             │
+   │ 3.queda registrada la verificación      │
+   │────────────▶│             │             │
+   │             │             │             │
+   │ 4.POST .../anexo-encargo/contrafirmar/codigo
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 5.El código de la CONTRAFIRMA
+   │             │────────────▶│             │
+   │             │             │             │
+   │             │             │ 6.Al buzón de protección de datos de K+AIR
+   │             │             │────────────▶│
+   │             │             │             │
+   │             │             │             │ 7.El operador lo recibe y lo transcribe
+   │             │             │             │
+   │ 8.POST .../anexo-encargo/contrafirmar (otp, acepta, X-Admin-Motivo)
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 9.FASE 2: anexo_encargo_firmado_at
+   │             │             │             │
+   │             │   y el acta de contrafirma, que cita
+   │             │             │             │
+   │             │   la de la suscripción sin reescribirla
+   │             │             │             │
+   │             │ 10.{ contrafirmado: true, version, hash, acta }
+   │◀────────────│             │             │
+   │             │             │             │
+   │ 10.el instrumento queda EJECUTADO       │
+   │────────────▶│             │             │
+   │             │             │             │
+   │ 11.La Empresa ya puede firmar documentos│
+   │             │             │             │
+   │   de sus trabajadores     │             │
+   │             │             │             │
+```
+
+### 12.3. Postcondiciones
+
+- En la suscripción (`gh_firma_anexo_encargo_suscripciones`): estado
+  `FIRMADA`, con `firmado_at`, la versión y la huella del texto
+  suscrito, y su **acta de suscripción** archivada.
+- En la ficha de la Empresa: `anexo_encargo_suscrito_at`,
+  `anexo_encargo_suscrito_version` y `anexo_encargo_suscrito_hash`.
+- **NO** `anexo_encargo_firmado_at`: ese campo es la fecha de
+  **ejecución** y lo escribe la fase 2.
+- En la contrafirma: `contrafirmado_at`, `representante_verificacion`,
+  `representante_verificado_at`, `contrafirma_acta_archivo` y
+  `contrafirma_acta_hash`, y `anexo_encargo_firmado_at` en la ficha.
+- El rastro (`gh_firma_anexo_encargo_eventos`) queda con los dos
+  actos, con fecha, IP y navegador.
+
+### 12.4. Lo que NO pasa en este flujo
+
+- **La fase 1 no habilita** a la Empresa: sin contrafirma, el
+  instrumento no está ejecutado y la Empresa no puede firmar.
+- **El enlace no se puede recuperar**: en la base solo vive su HMAC.
+  Sale **una sola vez**, en la respuesta del alta. Si el operador lo
+  pierde, la salida es anular (con motivo) y abrir otra.
+- **La contrafirma no se mueve al cliente**: el código sale al buzón de
+  K+AIR y no hay versión de cliente de este canal.
+- **El gate no se cierra solo**: contrafirmar desde la app no cambia
+  el manifiesto legal. Después hay que correr el preflight y
+  `scripts/actualizar-manifiesto-anexo-encargo.js` en el servidor.
+
+---
+
+## 13. Flujo 12: Anexo de Nube (suscripción)
+
+**Cuándo ocurre**: una vez por Empresa. Con la compuerta
+`FIRMA_EXIGIR_ANEXO_NUBE` encendida, es condición para pedir firmas.
+
+**Duración típica**: minutos.
+
+**Quiénes son**: el **operador de K+AIR** (desde la app de escritorio),
+el **Servicio**, el **correo** y la **Empresa** (que se suscribe).
+
+### 13.1. Precondiciones
+
+- La Empresa está en el directorio y está **activa**.
+- El operador tiene la **admin key** configurada en la app.
+- El texto vigente del Anexo de Nube está en el servidor: su versión y
+  su huella salen **del archivo**, no del manifiesto (son fuentes
+  distintas, y por eso los dos anexos se comportan distinto en el mismo
+  botón).
+
+### 13.2. Diagrama de secuencia
+
+```
+Operador     Servicio        SMTP         Empresa
+   │             │             │             │
+   │ 1.Abre la suscripción del Anexo de Nube │
+   │             │             │             │
+   │   (correo del firmante; NO hay segundo  │
+   │             │             │             │
+   │   canal: el Anexo de Nube no tiene      │
+   │             │             │             │
+   │   contrafirma)            │             │
+   │             │             │             │
+   │ 2.POST /internal/admin/empresas/:id/anexo-nube/suscripcion
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 3.Token + su HMAC, y el texto vigente
+   │             │             │             │
+   │             │   con su huella (del archivo, no del
+   │             │             │             │
+   │             │   manifiesto: son fuentes distintas)
+   │             │             │             │
+   │             │ 4.Correo de invitación con el enlace
+   │             │────────────▶│             │
+   │             │             │             │
+   │             │             │ 5.Al buzón del firmante
+   │             │             │────────────▶│
+   │             │             │             │
+   │             │ 6.{ token, url, expira_en, version, hash }
+   │◀────────────│             │             │
+   │             │             │             │
+   │ 6.el enlace, EN CLARO (sale una sola vez)
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │             │             │ 7.Abre GET /anexo-nube/{token} y se suscribe
+   │             │             │             │
+   │             │ 8.anexo_nube_firmado_at + version + hash
+   │             │             │             │
+   │             │   + evidencia, en la ficha de la Empresa
+   │             │             │             │
+   │ 9.Con la compuerta FIRMA_EXIGIR_ANEXO_NUBE
+   │             │             │             │
+   │   encendida, el Anexo de Nube es condición
+   │             │             │             │
+   │   para pedir firmas       │             │
+   │             │             │             │
+```
+
+### 13.3. Postcondiciones
+
+- En la suscripción (`gh_firma_anexo_nube_suscripciones`): estado
+  `FIRMADA`, con `firmado_at` y su rastro de eventos.
+- En la ficha de la Empresa: `anexo_nube_firmado_at`,
+  `anexo_nube_version`, `anexo_nube_hash` y `anexo_nube_evidencia`.
+
+### 13.4. Diferencia con el Anexo de Encargo
+
+| | Anexo de Encargo | Anexo de Nube |
+|---|---|---|
+| ¿Bilateral? | **Sí**: son dos actos | **No**: lo suscribe la Empresa y ya |
+| ¿Segundo canal del código? | Sí, y tiene que ser otro buzón | **No**: no hay fase de contrafirma |
+| ¿Verificación del representante? | **Sí**, y es precondición de la contrafirma | No |
+| ¿La contrafirma? | Sí, con el código de K+AIR | No |
+| ¿Motivo? | En anular, verificar y contrafirmar | Solo en anular |
+| ¿Dónde sale la versión y la huella? | Del **manifiesto** | Del **archivo** |
+
+---
+
+## 14. Matriz resumen de flujos
 
 | # | Flujo | Iniciador | Estado final | Eventos clave | Frecuencia típica |
 |---|---|---|---|---|---|
@@ -855,6 +1112,8 @@ K+AIR local              Servicio
 | 8 | OTP bloqueado | Trabajador | `OTP_LOCKED` | OTP_LOCKED | <5 min |
 | 9 | Verificación posterior | Tercero | (no cambia) | (consulta) | Bajo demanda |
 | 10 | Sync K+AIR ← Servicio | K+AIR | (no cambia) | SYNC_COMPLETED | Cada 5 min |
+| 11 | Anexo de Encargo (fase 1 + fase 2) | Operador (K+AIR) | `EJECUTADO` (o `SUSCRITO` si falta la contrafirma) | SUSCRIPCION_CREADA, SUSCRIPCION_FIRMADA, REPRESENTANTE_VERIFICADO, CONTRAFIRMA_FIRMADA | 1 vez por Empresa |
+| 12 | Anexo de Nube | Operador (K+AIR) | `FIRMADA` | SUSCRIPCION_CREADA, SUSCRIPCION_FIRMADA | 1 vez por Empresa |
 
 ### Estados terminales
 

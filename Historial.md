@@ -16,6 +16,25 @@
 ---
 
 ## 🚦 ESTADO AL CIERRE
+
+> **Actualización 2026-11-07 (tarde) — los anexos en la app de escritorio: el operador tiene panel, el cliente ve su estado, y los dos endpoints que faltaban:**
+> La tanda del 📦1033 al 📦1040 terminó la otra mitad de los anexos. El Anexo de Encargo ya tenía la pantalla que ve la Empresa (📦1026) y el servicio con sus dos fases (📦1028-📦1030); lo que faltaba era **la pantalla que ve K+AIR**: hasta hoy el operador abría una consola, pegaba un `curl` con la admin key y leía la respuesta.
+>
+> **Lo que se construyó.**
+> - 🟢 **Dos endpoints de lectura nuevos en el servicio.** `GET /internal/empresa/anexos` (el estado de los anexos **de la Empresa que llama**, con la API key de esa Empresa y **sin `:id_empresa`** en la ruta) y `GET /internal/admin/empresas/:id_empresa/anexos` (la suscripción viva de los dos anexos y su rastro de eventos, para el operador). Con el primero, el cliente ve si puede firmar **antes** de que le llegue el 409.
+> - 🟢 **Once canales IPC** en `main/firma-bridge.js`, expuestos en `preload.js`: nueve del operador (con la admin key), uno del cliente (con la key de su Empresa) y uno de diagnóstico. En los cuatro actos que lo exigen, el motivo va en `X-Admin-Motivo`; en `suscripcion` y en `contrafirmar/codigo` **no** se pide, porque el servicio no lo exige.
+> - 🟢 **La vista nueva `firma-operador`** (`modules/gestion-humana/firma-operador/`): una fila por Empresa, con el estado de los dos anexos, el botón de abrir suscripción, la verificación documental del representante, el pedido del código de contrafirma, la contrafirma y el anulado. Es una vista **nueva** y no una sección de `firma-electronica`: el módulo de firma es **por empresa** y el panel del operador es **entre empresas**.
+> - 🟢 **La tarjeta nueva del cliente** en `firma-electronica/index.js`: el estado del Anexo de Encargo de la empresa activa, con el texto del servicio **tal cual** (no reescrito) y el botón de ver el documento. El panel no cambia el bloqueo: **lo hace visible antes**.
+> - 🟢 **📦1033 — el fix del preflight** (el `EACCES` del script de respaldo y el `coincide` que mentía): está escrito en el working tree. Un preflight que reventaba con un error crudo de Node cuando el archivo existe pero no se puede leer (en el servidor es `root:root 750`) y que imprimía "coinciden: false" con las dos huellas iguales era un reporte que miente: ahora distingue "no se pudo **verificar**" de "el respaldo no lleva `storage/` entero", y la coincidencia se calcula donde se conocen las dos huellas.
+>
+> **Las tres reglas que no se cruzan (ahora están escritas en el código y en los documentos).** (1) La **admin key es del operador** y nunca se escribe en el equipo de un cliente: si llegara, ese cliente podría contrafirmar su propio Anexo. (2) La **contrafirma no tiene versión de cliente**: su código sale al buzón de K+AIR, no al de la Empresa. (3) El **estado del cliente va con la API key de la Empresa** y sin `:id_empresa` en la ruta: no hay por dónde escaparse.
+>
+> **Las pruebas.** Del lado de la app, **36 en verde**: 22 del bridge (`main/test-anexos-1037.js`), 11 de la vista del operador (`main/test-anexos-1038.js`) y 3 de la tarjeta del cliente (`main/test-anexos-1039.js`). Del lado del servicio, los dos archivos de prueba de los endpoints nuevos (`tests/routes/empresa-anexos.test.js` y `tests/routes/admin-empresas-anexos.test.js`) los escribió en paralelo el otro worker de esta tanda, y la suite completa la mide el owner: **acá no se declara un número que no se midió**.
+>
+> **Lo que NO cambia.** El texto de los anexos, su versión y su huella. La fase 1 y la fase 2: la Empresa se suscribe y K+AIR contrafirma, igual que antes; cambia **quién pulsa**, no qué se firma. El gate y la excepción 5. El preflight y el script del manifiesto: siguen siendo de consola en el servidor. Y la producción no se toca.
+>
+> **Lo que sigue pendiente.** El **piloto con ASEPLUS** (que se suscriba y contrafirme) sigue **sin** hacerse: la app deja al operador frente a la consola, no lo reemplaza. Y después del piloto hay que correr el preflight y el manifiesto en el servidor: contrafirmar desde la UI **no** cierra el gate.
+
 > **Actualización 2026-11-07 (mañana) — el Anexo de Encargo por autoservicio, completo: los ajustes del abogado, la contrafirma y el manifiesto que solo dice "firmado" con los dos actos:**
 > El owner pegó la respuesta del abogado sobre el Anexo de Encargo (7-nov-2026) y dijo «procede con los ajustes para continuar con la fase 2». La respuesta era una crítica al método de la fase 1 y siete cambios concretos. Los siete están implementados (📦1028), la fase 2 —la contrafirma— quedó completa (📦1029) y el manifiesto que dice "firmado" solo con los dos actos ya existe (📦1030).
 >
@@ -7499,6 +7518,74 @@ El gate no cambia. El texto del Anexo de Encargo no se toca (huella `5cc7a346…
 12. **Decidir** si se manda a ASEPLUS el PDF del Anexo de Encargo por la vía física: el paquete sigue armado en `tmp/envio-anexo-encargo-aseplus-2026-11-06/`, pero **el owner decidió que en adelante todo es digital**, así que lo natural es resolverlo al desplegar el flujo digital.
 
 **La regla de cierre: se preguntó y se respondió otra vez.** El owner autorizó a actualizar los documentos. La pregunta se vuelve a hacer en la próxima jornada.
+
+## 2026-11-07 (tarde) · Los anexos en la app de escritorio: el panel del operador y el estado del cliente
+
+La tarde del 7-nov: el plan de la UI de los anexos (📦1034, `2bceca13`) se ejecutó de punta a punta. El plan era de cinco piezas —dos endpoints de lectura en el servicio, los handlers en la app, el panel del operador y el panel de estado del cliente— y las cinco están.
+
+**Lo que hay en el working tree**
+
+| # | Qué | Estado |
+|---|---|---|
+| 📦1033 | El fix del preflight (el `EACCES` y el `coincide` que miente) | En el working tree, sin commitear |
+| 📦1034 | El plan de la UI de los anexos | Commiteado (`2bceca13`) |
+| 📦1035 | El servicio · la lectura para el operador | En el working tree |
+| 📦1036 | El servicio · el estado del cliente | En el working tree |
+| 📦1037 | La app · la capa HTTP y los handlers | En el working tree |
+| 📦1038 | La app · el panel del operador | En el working tree |
+| 📦1039 | La app · el panel de estado del cliente | En el working tree |
+| 📦1040 | Los documentos | Este commit |
+
+**LOS DOS ENDPOINTS NUEVOS**
+--------------------------
+Son de **lectura**, y los dos hacen falta porque hoy no había forma de preguntar:
+
+1. `GET /internal/empresa/anexos` — el estado de los anexos **de la Empresa que llama**. La Empresa sale SOLO de `req.id_empresa` (la identidad autenticada): la ruta **no tiene `:id_empresa`**, y por eso no hay por dónde escaparse a otra Empresa. En modo legacy (la key no está atada a ninguna Empresa) responde **403 `EMPRESA_NO_RESUELTA`**: no se puede decir de quién es el estado si no se sabe de quién es la key. El bloque `habilitacion` se devuelve **tal como lo produce** `verificarHabilitacionFirma()`: la UI lo muestra, no lo reescribe. Y el Anexo de Encargo tiene **tres** estados —`ejecutado` (las dos partes), `suscrito` (solo la Empresa) y `no_suscrito`— porque el instrumento es bilateral.
+2. `GET /internal/admin/empresas/:id_empresa/anexos` — el detalle para el operador: la suscripción **más reciente** de cada anexo (`id DESC`, se toma la primera) con su estado, su verificación del representante, su contrafirma, y el rastro de eventos (`id ASC`). El `contrafirma_canal` va **enmascarado**, con la misma función que usa el acta. No devuelve `token_hash`, `otp_hash` ni `contrafirma_otp_hash`.
+
+**LO QUE NO SE PUEDE RECUPERAR**
+-------------------------------
+El token en claro **no es recuperable**: en la base solo vive su HMAC. El enlace sale **una sola vez**, en la respuesta del alta. Si el operador cierra la pantalla sin copiarlo, la suscripción queda viva pero el enlace se pierde, y **no hay "reenviar la invitación"**: lo que hay es anular (con motivo) y abrir otra.
+
+**LOS ONCE CANALES IPC**
+------------------------
+Nueve del operador (con la **admin key**), uno del cliente (con la **key de su propia Empresa**) y uno de diagnóstico. Los cuatro actos que exigen motivo lo mandan en `X-Admin-Motivo`; `suscripcion` y `contrafirmar/codigo` **no** lo llevan, porque el servicio no lo exige. El canal `firma:config:admin-diag` dice **si** hay admin key y **de dónde** (`secrets` o `env`), **nunca el valor**.
+
+**LA VISTA NUEVA Y LA TARJETA NUEVA**
+------------------------------------
+- `modules/gestion-humana/firma-operador/` (`index.js` + `index.css`), registrada en el nav de Gestión Humana como **"Anexos"** y con su `?v=` propio en `index.html`. Es una vista **nueva**, no una sección de `firma-electronica`: el módulo de firma es **por empresa** (`self.companyName`) y el panel del operador es **entre empresas**. Meterlo ahí mezclaría las dos cosas.
+- La tarjeta del cliente va **arriba de todo** en `firma-electronica/index.js`: el estado del Anexo de Encargo de la empresa activa, con el mensaje del servicio tal cual y el botón de ver el documento. Si el service no está disponible, la tarjeta **se esconde**: es información, no un bloqueo.
+
+**LAS TRES REGLAS QUE NO SE CRUZAN**
+-----------------------------------
+1. La **admin key es del operador** y nunca se escribe en el equipo de un cliente: si llegara, ese cliente podría contrafirmar su propio Anexo —que es el acto que le corresponde a K+AIR— y además crear y revocar clientes de otras empresas.
+2. La **contrafirma no tiene versión de cliente**: su código sale al buzón de protección de datos de K+AIR, no al de la Empresa, y el canal no lo declara quien pide el acto.
+3. El **estado del cliente va con la API key de la Empresa** y **sin `:id_empresa`** en la ruta: no hay por dónde escaparse. El canal `firma:empresa:anexos` no tiene versión admin a propósito.
+
+**LAS PRUEBAS**
+--------------
+Del lado de la app, **36 en verde**: `main/test-anexos-1037.js` (22, el bridge), `main/test-anexos-1038.js` (11, la vista del operador) y `main/test-anexos-1039.js` (3, la tarjeta del cliente). Del lado del servicio, los dos archivos de prueba de los endpoints nuevos (`tests/routes/empresa-anexos.test.js` y `tests/routes/admin-empresas-anexos.test.js`) los escribió en paralelo el otro worker de esta tanda, y la suite completa la mide el owner: **este registro no declara un número que no se midió**.
+
+**LO QUE NO CAMBIA**
+-------------------
+El texto de los anexos, su versión y su huella. La fase 1 y la fase 2: la Empresa se suscribe y K+AIR contrafirma, igual que antes; cambia **quién pulsa**, no qué se firma ni en qué orden. El gate y la excepción 5. El preflight y el script del manifiesto: siguen siendo de consola en el servidor, y son la puerta que verifica el resultado de lo que la UI hizo. La producción no se toca.
+
+**LO QUE FALTA, Y DE QUIÉN ES**
+-------------------------------
+**Del owner, y en este orden:**
+
+1. **El deploy** del flujo (mismo guion del 6-nov), que ahora incluye los dos endpoints nuevos y los once canales.
+2. **El piloto con ASEPLUS**: se suscribe por el enlace y K+AIR contrafirma desde la app. Es el único uso del flujo hasta que los app passwords estén rotados. **La app deja al operador frente a la consola: no lo reemplaza.**
+3. **Correr el preflight**, contrafirmar, y entonces correr `scripts/actualizar-manifiesto-anexo-encargo.js` (que se negaría a hacerlo sin contrafirma), commit, deploy y re-medir el gate. **Contrafirmar desde la UI no cierra el gate.**
+4. **Rotar los 5 app passwords de Gmail** y revisar accesos (es incidente, no tarea).
+5. **Documentar la transferencia internacional a Google**: el papel escrito, las medidas, la Circular 2 de 2025 y la declaración en el RNBD.
+6. **Mandarle al abogado**: el dictamen J1-J14 y la fecha de vigencia.
+7. **Subir Node** (el 20 está en EOL) y **montar la copia off-site** de los respaldos.
+8. **La sección E** (G3 estricto o documentada), la **Constancia firmada** y la **T8**.
+9. **T6** (E2E con datos sintéticos) y **T7** (reversión probada), con su evidencia.
+10. **Decidir** si `GET /internal/sign-requests/:id` debe devolver `agreement_hash`.
+
+**La regla de cierre: se pregunta otra vez.** La pregunta se le hace al owner al final de esta tanda, igual que en todas las anteriores.
 
 ## 🔻 Regla de cierre (obligatoria)
 

@@ -19,6 +19,21 @@
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 7-nov-2026 (tarde) — los anexos en la app de escritorio: la vista nueva del operador y la tarjeta nueva del cliente:**
+> El plan de la UI de los anexos (📦1034, `2bceca13`) ya se ejecutó. Hasta hoy el Anexo de Encargo tenía la pantalla que ve la Empresa y el servicio con sus dos fases, pero **la pantalla que ve K+AIR no existía**: el operador abría una consola, pegaba un `curl` con la admin key y leía la respuesta. Ahora la tiene en la app.
+>
+> **La vista nueva `firma-operador`** (`modules/gestion-humana/firma-operador/`, con su `index.js` y su `index.css`, registrada en el nav de Gestión Humana como **"Anexos"** y con su `?v=` propio en `index.html`). Es una vista **nueva**, no una sección de `firma-electronica`: el módulo de firma es **por empresa** (trabaja con `self.companyName`) y el panel del operador es **entre empresas** — meterlo ahí mezclaría las dos cosas. Muestra una fila por Empresa con el estado del Anexo de Encargo y del Anexo de Nube, el botón de **abrir suscripción**, el enlace que devuelve el alta (con botón de copiar, porque **sale una sola vez**), y en el orden que el servicio impone las tres acciones de la contrafirma: **verificar el representante** → **pedir el código** → **contrafirmar**. Los tres actos de la contrafirma exigen `X-Admin-Motivo`, y la vista lo pide siempre. Si no hay admin key configurada, la vista **se explica** en vez de esconderse: el nav es un arreglo estático y una pestaña que se explica es más descubrible que una que no está.
+>
+> **La tarjeta nueva del cliente** va arriba de todo en `firma-electronica/index.js`: el estado del Anexo de Encargo de la empresa activa, con el texto del servicio **tal cual** (no reescrito — es el que distingue "suscribió pero K+AIR no contrafirmó" de "no tiene Anexo"), el botón de **ver el documento** y el motivo del bloqueo. El panel **no cambia el bloqueo: lo hace visible antes**. Antes el cliente se enteraba del problema cuando intentaba firmar y le llegaba el 409.
+>
+> **La capa de abajo: dos endpoints de lectura nuevos y once canales IPC.** `GET /internal/empresa/anexos` (el estado de los anexos de la Empresa **que llama**, con su propia API key y **sin `:id_empresa`** en la ruta) y `GET /internal/admin/empresas/:id_empresa/anexos` (la suscripción viva de los dos anexos y su rastro, para el operador). En la app, `main/firma-bridge.js` registra once canales nuevos: nueve del operador con la **admin key**, uno del cliente con la **key de su Empresa** (`firma:empresa:anexos`, sin versión admin a propósito) y uno de diagnóstico (`firma:config:admin-diag`, que dice **si** hay admin key y **de dónde**, nunca el valor). Los expone `preload.js` como `window.electronAPI.firmaXxx`.
+>
+> **Las tres reglas que no se cruzan.** La **admin key es del operador** y nunca se escribe en el equipo de un cliente (si llegara, ese cliente podría contrafirmar su propio Anexo). La **contrafirma no tiene versión de cliente**: su código sale al buzón de K+AIR, no al de la Empresa. Y el **estado del cliente va con la API key de la Empresa**, sin `:id_empresa` en la ruta: no hay por dónde escaparse.
+>
+> **Lo que NO cambia.** El texto de los anexos, su versión y su huella. La fase 1 y la fase 2: la Empresa se suscribe y K+AIR contrafirma, igual que antes; cambia **quién pulsa**, no qué se firma. El gate y la excepción 5. El preflight y el script del manifiesto: siguen siendo de consola en el servidor. Y la producción no se toca.
+>
+> **Lo que sigue pendiente.** El **piloto con ASEPLUS** (que se suscriba y contrafirme) sigue sin hacerse, y después del piloto hay que correr el preflight y el manifiesto en el servidor: contrafirmar desde la UI **no** cierra el gate.
+
 > **🆕 7-nov-2026 (mañana) — el Anexo de Encargo por autoservicio, de punta a punta: los ajustes del abogado, la contrafirma y el manifiesto que solo dice "firmado" con los dos actos:**
 > El owner pegó la respuesta del abogado (7-nov-2026) sobre el Anexo de Encargo y dijo «procede con los ajustes para continuar con la fase 2». La respuesta era una crítica al método de la fase 1 y siete cambios concretos. Los siete están implementados, y con ellos quedó completa la fase 2.
 >
