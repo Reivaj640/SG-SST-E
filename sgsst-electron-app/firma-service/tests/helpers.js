@@ -32,6 +32,7 @@ const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
 const anexoNubeRouter = require('../src/routes/anexoNube');
 const anexoEncargoRouter = require('../src/routes/anexoEncargo');
+const empresaAnexosRouter = require('../src/routes/empresaAnexos');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
@@ -398,6 +399,10 @@ function makeApp() {
   app.use('/internal', signRequestRouter);
   app.use('/internal', constanciaRouter);
   app.use('/internal', internalAuditRouter);
+  // El estado de los anexos de la Empresa (solo lectura). Montado acá por la
+  // misma razon que los de arriba: si nadie lo monta, sus endpoints no se
+  // ejercitan y un error de wiring pasa inadvertido.
+  app.use('/internal', empresaAnexosRouter);
   // El recibo de supresión (3.6(g) y 10.6): per-empresa, para que la Empresa
   // lo consulte y se lo entregue al Trabajador.
   app.use('/internal', recibosSupresionRouter);

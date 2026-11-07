@@ -42,6 +42,7 @@ const adminAprobacionesRouter = require('./routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('./routes/admin-solicitudes');
 const adminIncidentesRouter = require('./routes/admin-incidentes');
 const internalAuditRouter = require('./routes/internal-audit');
+const empresaAnexosRouter = require('./routes/empresaAnexos');
 const recibosSupresionRouter = require('./routes/recibos-supresion');
 const verificacionRouter = require('./routes/verificacion');
 const constanciaRouter = require('./routes/constancia');
@@ -202,6 +203,10 @@ function createApp() {
   app.use('/internal', verificacionRouter);
   // Constancia general del expediente (generada al vuelo; sign_request:read).
   app.use('/internal', constanciaRouter);
+  // El ESTADO DE LOS ANEXOS de la Empresa (solo lectura). La Empresa sale de
+  // `req.id_empresa` (la identidad de la API key), nunca de un parámetro: por
+  // eso no lleva `:id_empresa` en la ruta. Ver src/routes/empresaAnexos.js.
+  app.use('/internal', empresaAnexosRouter);
   // Endpoints administrativos: protegidos por X-Admin-API-Key
   // (no expuestos a K+AIR, solo operador humano con acceso físico).
   // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).
