@@ -17,6 +17,8 @@ var GESTION_HUMANA_NAV = [
   { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'userplus',  group: 'Gestión' },
   { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'folder',    group: 'Documentos' },
   { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'filepen', group: 'Documentos' },
+  // 📦1038 · Los anexos: la vista del OPERADOR (K+AIR), entre empresas.
+  { id: 'firma-operador', label: 'Anexos', shortLabel: 'Anexos', icon: 'filecontract', group: 'Documentos' },
   { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'shield',    group: 'Gestión' },
   { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'users',      group: 'Gestión' },
   { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'umbrella',   group: 'Gestión' },
@@ -39,7 +41,9 @@ var GH_SVG = {
   bell:      '<path d="M6 9.5a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/>',
   chevron:   '<path d="M9 6l6 6-6 6"/>',
   pulse:     '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
-  checkflag: '<path d="M5 21V4"/><path d="M5 4.7C7.5 3 10 3 12 4.7s4.5 1.7 7 0V13c-2.5 1.7-5 1.7-7 0S7.5 11.7 5 13"/>'
+  checkflag: '<path d="M5 21V4"/><path d="M5 4.7C7.5 3 10 3 12 4.7s4.5 1.7 7 0V13c-2.5 1.7-5 1.7-7 0S7.5 11.7 5 13"/>',
+  // 📦1038 · Los anexos (Anexo de Encargo y Anexo de Nube): documento con visto.
+  filecontract: '<path d="M6 3.5h7L19 9v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M13 3.5V9h6"/><path d="M8.5 14.5l2 2 4.5-4.5"/>'
 };
 
 function ghSvg(name, cls) {
@@ -55,6 +59,8 @@ var GESTION_HUMANA_TITLES = {
   permisos:     { title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto y permisos diversos' },
   afiliaciones: { title: 'Afiliaciones',     subtitle: 'EPS, Pensión, ARL y Caja de Compensación' },
   'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso documental y firma electrónica' },
+  // 📦1038 · La vista del operador de los anexos.
+  'firma-operador': { title: 'Anexos', subtitle: 'Suscripciones al Anexo de Encargo y al Anexo de Nube, y contrafirma de K+AIR' },
   carpetas:     { title: 'Carpetas',          subtitle: 'Archivo digital por trabajador' },
   comunicacion: { title: 'Comunicación',     subtitle: 'Anuncios y mensajes oficiales' }
 };
@@ -335,6 +341,11 @@ class GestionHumanaHome {
       case 'firma-electronica':
         this._mountExistingView(content, 'FirmaElectronicaComponent', 'Firma electrónica');
         break;
+      // 📦1038 · Los anexos: la vista del OPERADOR. Es entre empresas, asi que
+      // va en su propia vista y no dentro del modulo por empresa.
+      case 'firma-operador':
+        this._mountExistingView(content, 'FirmaOperadorComponent', 'Anexos');
+        break;
       case 'comunicacion':
         this._mountExistingView(content, 'ComunicacionComponent', 'Comunicación');
         break;
@@ -479,6 +490,10 @@ class GestionHumanaHome {
       { view: 'firma-electronica', icon: 'filepen', accent: '#d97706', tint: 'rgba(217,119,6,.12)',
         title: 'Firma electrónica', sub: 'Centro de control',
         desc: 'Vista unificada del proceso de firma por trabajador: estados agregados, buscador por solicitud y expediente con trazabilidad.' },
+      // 📦1038 · Los anexos (vista del operador).
+      { view: 'firma-operador', icon: 'filecontract', accent: '#2057b8', tint: 'rgba(32,87,184,.12)',
+        title: 'Anexos', sub: 'Encargo y Nube',
+        desc: 'Suscripciones al Anexo de Encargo y al Anexo de Nube de cada empresa: verificacion del representante y contrafirma de K+AIR.' },
       { view: 'afiliaciones', icon: 'shield', accent: '#0891b2', tint: 'rgba(8,145,178,.12)',
         title: 'Afiliaciones', sub: 'Seguridad social',
         desc: 'Estado 4/4 de cada trabajador: EPS, Fondo de Pensión, ARL y Caja de Compensación, con búsqueda por nombre o cédula.' },
