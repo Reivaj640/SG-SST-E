@@ -237,8 +237,16 @@ es **por empresa** (trabaja con `self.companyName`), y el panel de operador es
 | Pieza | Ruta |
 |---|---|
 | La vista | `sgsst-electron-app/modules/gestion-humana/firma-operador/index.js` + `index.css` |
-| El registro en el nav | `modules/gestion-humana/gestion-humana-home.js:14-25` (`GESTION_HUMANA_NAV`), `:50-60` (`GESTION_HUMANA_TITLES`), `:335-337` (el `switch` de montaje) |
-| La carga en la app | `sgsst-electron-app/index.html` (la hoja y el script, **con su `?v=` bumpeado**) |
+| El registro en el nav | 📦1042 · **saco**: ya no hay entrada en el nav de Gestión Humana |
+| La carga en la app | 📦1042 · `sgsst-electron-app/components/config/config-viewer.html` (la hoja y el script, **con su `?v=`**) |
+
+> 📦1042 · **La ubicación cambió.** El plan original lo puso en el nav de
+> Gestión Humana como "Anexos". El owner lo corrigió: *eso no le compete a
+> Gestión Humana*. Los anexos son una gestión de **K+AIR** (credencial
+> administrativa, por empresa) y ahora viven **en Configuración → Gestión de
+> Empresas → la ficha de la empresa → "Configurar Firma Electrónica" → al
+> final del modal**. El componente es el mismo, en **modo embebido**: sin
+> tabla general, sin header y sin modal propio.
 
 El patrón de la vista es el del módulo existente: IIFE con prototipo
 (`FirmaElectronicaComponent.prototype.render / _getShellHtml / _cacheRefs /
@@ -465,6 +473,14 @@ pero conviene que la lista de pendientes lo tenga en cuenta.
 4. **La pestaña de operador siempre se ve.** Si no hay admin key, explica por qué.
 5. **La UI no reescribe los mensajes del servicio.** El texto del "suscribió pero K+AIR
    no contrafirmó" lo produce `verificarHabilitacionFirma` y la UI lo muestra.
+
+> 📦1042 · **La decisión 1 cambió de lugar, no de sustancia.** El panel sigue
+> siendo un componente propio (no una sección de `firma-electronica`), pero
+> **no está en el nav de Gestión Humana**: el owner lo movió a
+> **Configuración → Gestión de Empresas → "Configurar Firma Electrónica"**,
+> al final del modal. Su razón: *los anexos no le competen a Gestión
+> Humana*. La decisión 4 (siempre visible, explica por qué) sigue valiendo:
+> sin admin key, la sección explica dónde configurarla.
 
 **Abiertas** (para el owner, cuando toque):
 

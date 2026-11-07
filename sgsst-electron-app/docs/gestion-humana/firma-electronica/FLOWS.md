@@ -866,6 +866,11 @@ la fase 2, el **buzón de protección de datos de K+AIR**.
 - El operador tiene la **admin key** configurada en la app
   (Configuración → Firma Electrónica). Es la key de **K+AIR**, nunca
   la de la Empresa.
+- 📦1042 · El operador hace estos actos **desde Configuración → Gestión de
+  Empresas → la ficha de la empresa → "Configurar Firma Electrónica"**, en la
+  sección **"Anexos de Encargo y de Nube"** que está al final del modal. El
+  panel **no** está en el módulo de Gestión Humana: los anexos no son un
+  asunto de personal.
 - El texto vigente del Anexo de Encargo está en el servidor y su
   huella coincide con la del manifiesto (`legal-readiness.json` →
   `anexo_encargo`). Si no, el alta responde `503

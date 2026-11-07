@@ -3465,6 +3465,40 @@ suscripción y el de la contrafirma.
 > **admin key** del operador y, en los tres actos que lo exigen, con un
 > motivo. Antes eso se hacía con un `curl` pegado a mano en una consola.
 
+### 6.22.0 Dónde vive el panel del operador en la app
+
+> 📦1042 · Esto cambió de lugar. El panel **no** está en el módulo de
+> **Gestión Humana**: los anexos son una gestión de **K+AIR** (usan la
+> credencial *administrativa*, no la de la Empresa) y le compete a la
+> **configuración**, no al personal.
+
+**Ruta en la app**:
+
+```
+Configuración (engranaje del encabezado)
+  └─ Gestión de Empresas
+      └─ la ficha de la empresa  →  "Configurar Firma Electrónica"
+          └─ AL FINAL del modal:  la sección "Anexos de Encargo y de Nube"
+```
+
+**Qué cambia y qué no**:
+
+- El panel es **el mismo componente** (`modules/gestion-humana/firma-operador/`),
+  pero en **modo embebido**: sin la tabla general de empresas, sin header
+  propio y **sin modal propio** (sería un modal dentro de otro modal). Los
+  formularios se pintan **en línea** dentro de la sección.
+- Configuración vive en un **iframe**: el puente (`window.electronAPI`) no
+  existe ahí hasta que el padre se lo inyecta en el `contentWindow`
+  (`renderer.js`). Por eso el panel resuelve el puente **en el momento de
+  usarlo**, no al cargarse.
+- El `id_empresa` de la sección es el **NIT** de la empresa: es el mismo
+  identificador con el que el service la registra.
+
+> **Por qué no en Configuración → Firma Electrónica.** Esa pestaña es la
+> configuración **global** del servicio (URL, credencial administrativa). Los
+> anexos son **por empresa**, y por eso viven con lo demás que se configura de
+> cada empresa.
+
 ### 6.22.1 `GET /internal/empresa/anexos` — el estado de los anexos de la Empresa que llama
 
 **Auth**: `X-Internal-API-Key` — **la key de la Empresa**, no la del operador.
