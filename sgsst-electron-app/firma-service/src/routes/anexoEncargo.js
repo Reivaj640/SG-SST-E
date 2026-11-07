@@ -203,9 +203,9 @@ router.post('/api/anexo-encargo/:token/codigo', validateBody(codigoBody), async 
 });
 
 /** POST /api/anexo-encargo/:token/suscribir */
-router.post('/api/anexo-encargo/:token/suscribir', validateBody(suscribirBody), (req, res, next) => {
+router.post('/api/anexo-encargo/:token/suscribir', validateBody(suscribirBody), async (req, res, next) => {
   try {
-    const r = anexoEncargoService.suscribir(
+    const r = await anexoEncargoService.suscribir(
       req.params.token,
       {
         otp: req.body.otp,
@@ -228,7 +228,43 @@ router.post('/api/anexo-encargo/:token/suscribir', validateBody(suscribirBody), 
       firmado_at: r.firmado_at,
       contrafirmado: r.contrafirmado === true,
       ya_firmada: r.ya_firmada === true,
+      // El acta: el documento que la Empresa descarga y K+AIR archiva en el
+      // expediente. Su huella es la de SUS bytes, no la del texto firmado.
+      acta: r.acta ? {
+        hash: r.acta.hash,
+        bytes: r.acta.bytes,
+        url: `/api/anexo-encargo/${encodeURIComponent(req.params.token)}/acta`,
+      } : null,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/anexo-encargo/:token/acta
+ *
+ * El acta de suscripción, en PDF. Es el documento que la Empresa guarda y
+ * que K+AIR archiva en el expediente.
+ *
+ * Va por API (y no como un archivo de la carpeta estática) porque el token
+ * es la credencial: sin él no se baja nada, y el archivo en el disco no se
+ * expone por una ruta que se pueda adivinar.
+ */
+router.get('/api/anexo-encargo/:token/acta', (req, res, next) => {
+  try {
+    const acta = anexoEncargoService.obtenerActa(req.params.token);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${acta.filename}"`,
+      'Content-Length': String(acta.bytes),
+      // La huella del acta va en la cabecera: quien la descarga puede
+      // contrastarla contra el registro sin abrir el archivo.
+      'X-Anexo-Encargo-Acta-Hash': acta.hash || '',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    res.send(acta.buffer);
   } catch (err) {
     next(err);
   }

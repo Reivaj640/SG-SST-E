@@ -97,6 +97,7 @@ const { generateOTP, hashOTPHmac, verifyOTPHmac, isExpired } = require('../crypt
 const empresaService = require('./empresa');
 const mailer = require('./mailer');
 const manifiestoLegal = require('./manifiestoLegal');
+const actaEncargo = require('./actaEncargo');
 
 // La raíz del repo que contiene el Servicio (sgsst-electron-app): ahí vive
 // la carpeta `legal/` con el texto del Anexo de Encargo.
@@ -165,16 +166,15 @@ function _texto(valor, max) {
 
 /**
  * Enmascara un correo para mostrarlo sin exponerlo entero.
+ *
+ * La función vive en `services/actaEncargo.js` y se usa en los dos lados: el
+ * contexto público de la pantalla y el acta de suscripción. Si fueran dos
+ * implementaciones distintas, la Empresa vería un correo diferente en la
+ * pantalla y en el acta, y el registro dejaría de cuadrar con lo que ella
+ * leyó.
+ *
  * `representante@empresa.com` → `re***@empresa.com`
  */
-function _enmascararCorreo(correo) {
-  const s = String(correo || '');
-  const arroba = s.indexOf('@');
-  if (arroba <= 0) return '***';
-  const usuario = s.slice(0, arroba);
-  const visible = usuario.slice(0, 2);
-  return `${visible}***${s.slice(arroba)}`;
-}
 
 /**
  * El texto vigente del Anexo de Encargo: su versión y su huella.
@@ -579,7 +579,7 @@ function contextoPublico(token, ip, user_agent) {
     hash: fila.hash_texto,
     vigente,
     empresa: empresa ? (empresa.razon_social || fila.id_empresa) : fila.id_empresa,
-    correo_firmante: _enmascararCorreo(fila.correo_firmante),
+    correo_firmante: actaEncargo.enmascararCorreo(fila.correo_firmante),
     nombre_firmante: fila.nombre_firmante,
     cargo_firmante: fila.cargo_firmante,
     // Los cinco datos del §11, prellenados con la ficha. La Empresa los
@@ -682,10 +682,18 @@ async function solicitarCodigo(token, ctx = {}) {
 // =============================================================================
 
 /**
- * Suscribe el Anexo de Encargo y lo registra en la ficha de la Empresa.
+ * Suscribe el Anexo de Encargo, genera su acta y lo registra en la ficha de
+ * la Empresa.
  *
  * ESTA ES LA FASE 1: LA FIRMA DE LA EMPRESA. El instrumento es bilateral y
  * todavía le falta la contrafirma de K+AIR (fase 2).
+ *
+ * POR QUÉ ES ASÍNCRONA
+ * --------------------
+ * Porque genera el ACTA DE SUSCRIPCIÓN (un PDF con pdf-lib) y la escribe en
+ * disco. El acta se genera y se escribe ANTES de tocar la base: si no se
+ * puede, la suscripción no se cierra. Es el mismo criterio del commit de las
+ * firmas (archivos primero, base después).
  *
  * @param {string} token
  * @param {object} datos
@@ -699,9 +707,9 @@ async function solicitarCodigo(token, ctx = {}) {
  * @param {string} [opciones.rutaModelo] - ver `modeloVigente()`. Solo para
  *   tests; en producción es el archivo del servidor.
  * @param {object} [opciones.manifiesto] - manifiesto inyectado (tests).
- * @returns {object} el registro de la suscripción.
+ * @returns {Promise<object>} el registro de la suscripción.
  */
-function suscribir(token, datos, ctx = {}, opciones = {}) {
+async function suscribir(token, datos, ctx = {}, opciones = {}) {
   const fila = _fila(token, { permitirFirmada: true });
   if (fila.estado === ESTADOS.FIRMADA) {
     // Reintento de quien ya firmó: se devuelve lo mismo, no se vuelve a
@@ -827,30 +835,104 @@ function suscribir(token, datos, ctx = {}, opciones = {}) {
     // y todavía le falta la contrafirma de K+AIR.
     fase: 1,
   };
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // EL ACTA DE SUSCRIPCIÓN: EL DOCUMENTO QUE QUEDA
+  // ───────────────────────────────────────────────────────────────────────────
+  // El acta se genera y se escribe ANTES de tocar la base (el mismo orden del
+  // commit de las firmas: archivos primero, base después). Si el acta no se
+  // puede generar o no se puede escribir, la suscripción NO se cierra: es
+  // preferible que la Empresa reintente a que quede una suscripción sin el
+  // documento que la acredita. El código de verificación sigue siendo válido
+  // hasta que vence, así que el reintento no obliga a pedir otro código.
+  let acta = null;
+  try {
+    acta = await actaEncargo.generarActa({
+      id_suscripcion: fila.id,
+      id_empresa: fila.id_empresa,
+      empresa: empresa.razon_social || fila.id_empresa,
+      version: fila.version,
+      hash_texto: fila.hash_texto,
+      firmado_at: firmadoAt,
+      nombre_firmante: fila.nombre_firmante,
+      cargo_firmante: fila.cargo_firmante,
+      correo_firmante: fila.correo_firmante,
+      codigo_enviado_at: fila.otp_enviado_at,
+      codigo_verificado_at: firmadoAt,
+      enlace_abierto_at: fila.enlace_abierto_at,
+      ip: ctx.ip || null,
+      user_agent: ctx.user_agent || null,
+      datos_empresa: datosS11,
+    });
+    actaEncargo.guardarActa(acta.filename, acta.buffer);
+  } catch (e) {
+    _evento(fila.id, fila.id_empresa, 'ACTA_FALLIDA',
+      e && e.message ? e.message : String(e), ctx.ip, ctx.user_agent);
+    logger.error('No se pudo generar el acta de suscripción del Anexo de Encargo', {
+      id_empresa: fila.id_empresa, id_suscripcion: fila.id,
+      error: e && e.message ? e.message : String(e),
+    });
+    throw new AppError(500, 'ACTA_NO_GENERADA',
+      'No se pudo generar el acta de suscripción: la suscripción no se cerró. '
+      + 'Inténtelo otra vez con el mismo código.');
+  }
+
+  // La huella del acta (la de SUS bytes) y su nombre. NO la ruta absoluta: la
+  // evidencia de esta suscripción se copia al manifiesto legal, y una ruta del
+  // servidor no puede aparecer en un documento que sale del servidor. El
+  // nombre sale del id de la suscripción, y de ahí se rehace la ruta.
+  evidencia.acta_hash = acta.hash;
+  evidencia.acta_bytes = acta.bytes;
+  evidencia.acta_archivo = acta.filename;
   const evidenciaTexto = JSON.stringify(evidencia);
 
-  // La fecha del Anexo de Encargo en la ficha de la Empresa, con el rastro de
-  // la ficha (migraciones 037 y 038): valor anterior, valor nuevo, quién, su
-  // IP, su navegador y el motivo.
-  empresaService.marcarAnexoFirmado(fila.id_empresa, firmadoAt, {
-    actor: `empresa:${fila.id_empresa}`,
-    motivo: 'Suscripción del Anexo de Encargo por el enlace de un solo uso',
-    ip: ctx.ip || null,
-    user_agent: ctx.user_agent || null,
-  });
+  // ───────────────────────────────────────────────────────────────────────────
+  // LAS DOS ESCRITURAS, EN UNA SOLA TRANSACCIÓN
+  // ───────────────────────────────────────────────────────────────────────────
+  // La fecha del Anexo de Encargo en la ficha de la Empresa (con el rastro de
+  // la ficha: valor anterior, valor nuevo, quién, su IP, su navegador y el
+  // motivo) y el estado de la suscripción. Si una de las dos falla, las dos
+  // se deshacen: no puede quedar la fecha de la ficha sin la suscripción, ni
+  // al revés. Y si la transacción falla, el acta se borra del disco: no puede
+  // quedar un archivo sin registro ni un registro sin archivo.
+  try {
+    const tx = db.transaction(() => {
+      empresaService.marcarAnexoFirmado(fila.id_empresa, firmadoAt, {
+        actor: `empresa:${fila.id_empresa}`,
+        motivo: 'Suscripción del Anexo de Encargo por el enlace de un solo uso',
+        ip: ctx.ip || null,
+        user_agent: ctx.user_agent || null,
+      });
 
-  db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
-    SET estado = ?, firmado_at = ?, evidencia = ?, datos_empresa = ?,
-        ip_firma = ?, user_agent_firma = ?, otp_hash = NULL, updated_at = datetime('now')
-    WHERE id = ?`)
-    .run(ESTADOS.FIRMADA, firmadoAt, evidenciaTexto, JSON.stringify(datosS11),
-      ctx.ip || null, ctx.user_agent || null, fila.id);
+      db.prepare(`UPDATE gh_firma_anexo_encargo_suscripciones
+        SET estado = ?, firmado_at = ?, evidencia = ?, datos_empresa = ?,
+            ip_firma = ?, user_agent_firma = ?, otp_hash = NULL, updated_at = datetime('now')
+        WHERE id = ?`)
+        .run(ESTADOS.FIRMADA, firmadoAt, evidenciaTexto, JSON.stringify(datosS11),
+          ctx.ip || null, ctx.user_agent || null, fila.id);
+    });
+    tx();
+  } catch (e) {
+    try {
+      fs.unlinkSync(actaEncargo.rutaActa(acta.filename));
+    } catch (_) { /* el archivo nunca llegó a escribirse */ }
+    _evento(fila.id, fila.id_empresa, 'SUSCRIPCION_FALLIDA',
+      e && e.message ? e.message : String(e), ctx.ip, ctx.user_agent);
+    logger.error('No se pudo cerrar la suscripción del Anexo de Encargo', {
+      id_empresa: fila.id_empresa, id_suscripcion: fila.id,
+      error: e && e.message ? e.message : String(e),
+    });
+    throw e;
+  }
 
   _evento(fila.id, fila.id_empresa, 'SUSCRIPCION_FIRMADA',
     `version=${fila.version} hash=${fila.hash_texto}`, ctx.ip, ctx.user_agent);
+  _evento(fila.id, fila.id_empresa, 'ACTA_GENERADA',
+    `hash=${acta.hash} bytes=${acta.bytes}`, ctx.ip, ctx.user_agent);
 
   logger.info('Anexo de Encargo suscrito por la Empresa (fase 1)', {
     id_empresa: fila.id_empresa, id_suscripcion: fila.id, version: fila.version,
+    acta_hash: acta.hash,
   });
 
   return {
@@ -859,9 +941,89 @@ function suscribir(token, datos, ctx = {}, opciones = {}) {
     hash: fila.hash_texto,
     firmado_at: firmadoAt,
     evidencia,
+    // El acta: el documento que la Empresa descarga y K+AIR archiva.
+    acta: {
+      hash: acta.hash,
+      bytes: acta.bytes,
+      archivo: acta.filename,
+    },
     // La contrafirma de K+AIR es otro commit: sin ella el instrumento no está
     // ejecutado y el manifiesto no puede decir "firmado".
     contrafirmado: false,
+  };
+}
+
+/**
+ * El acta de una suscripción, para que la Empresa la descargue (y para que
+ * K+AIR la sirva en el expediente).
+ *
+ * POR QUÉ AQUÍ NO SE APLICA LA CADUCIDAD DEL ENLACE
+ * --------------------------------------------------
+ * La caducidad protege el ACTO DE FIRMAR: pasadas las 72 horas, el enlace
+ * deja de servir para firmar. El acta es el documento de un acto YA HECHO: si
+ * la Empresa la descarga al día siguiente, cuando el enlace ya venció, tiene
+ * que poder volver a bajarla. El token sigue siendo la credencial (es un
+ * enlace secreto, con la huella en la base), y la suscripción tiene que
+ * estar FIRMADA: un enlace que no firmó nada no tiene acta.
+ *
+ * LA HUELLA SE COMPRUEBA AL SERVIR
+ * -------------------------------
+ * Los bytes que hay en el disco se comparan con la huella que quedó
+ * registrada al suscribir. Si no son los mismos, el archivo fue alterado
+ * después de escrito: no se sirve como si fuera el original (409
+ * ACTA_ALTERADA). Un acta cuya huella no cuadra no es un acta.
+ *
+ * @param {string} token
+ * @returns {{buffer: Buffer, hash: string, bytes: number, filename: string}}
+ */
+function obtenerActa(token) {
+  const fila = _buscarPorToken(token);
+  if (!fila) {
+    throw new AppError(404, 'ENLACE_NO_VALIDO',
+      'El enlace no corresponde a ninguna suscripción del Anexo de Encargo');
+  }
+  if (fila.estado !== ESTADOS.FIRMADA) {
+    throw new AppError(409, 'ACTA_NO_DISPONIBLE',
+      'Esta suscripción no está firmada: todavía no hay acta de suscripción');
+  }
+
+  let evidencia = {};
+  try {
+    evidencia = fila.evidencia ? JSON.parse(fila.evidencia) : {};
+  } catch (e) {
+    evidencia = {};
+  }
+  const archivo = evidencia.acta_archivo;
+  if (!archivo) {
+    throw new AppError(404, 'ACTA_NO_DISPONIBLE',
+      'No se encontró el acta de esta suscripción');
+  }
+
+  const leido = actaEncargo.leerActa(archivo);
+  if (!leido.found) {
+    throw new AppError(404, 'ACTA_NO_DISPONIBLE',
+      'El acta de esta suscripción no está en el servidor');
+  }
+
+  const hash = evidencia.acta_hash || null;
+  if (hash) {
+    const actual = crypto.createHash('sha256').update(leido.buffer).digest('hex');
+    if (actual !== String(hash).toLowerCase()) {
+      logger.error('El acta en disco no es la que se registró al suscribir', {
+        id_empresa: fila.id_empresa, id_suscripcion: fila.id,
+        hash_registrado: hash, hash_archivo: actual,
+      });
+      throw new AppError(409, 'ACTA_ALTERADA',
+        'El acta de esta suscripción no coincide con la huella registrada: '
+        + 'no se sirve. Escríbanos a adminkair@gmail.com');
+    }
+  }
+
+  return {
+    buffer: leido.buffer,
+    hash: hash,
+    bytes: evidencia.acta_bytes || leido.buffer.length,
+    filename: path.basename(String(archivo)),
   };
 }
 
@@ -879,4 +1041,5 @@ module.exports = {
   contextoPublico,
   solicitarCodigo,
   suscribir,
+  obtenerActa,
 };

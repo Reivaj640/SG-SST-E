@@ -105,8 +105,14 @@ function correrPantalla(token, respuestas, valores) {
         checked: false,
         disabled: false,
         className: '',
-        classList: { toggle() {}, add() {} },
-        setAttribute() {},
+        classList: {
+          clases: {},
+          toggle(nombre, activo) { this.clases[nombre] = activo; },
+          add(nombre) { this.clases[nombre] = true; },
+        },
+        // Los atributos se guardan: el href del enlace del acta se comprueba.
+        attrs: {},
+        setAttribute(nombre, valor) { this.attrs[nombre] = valor; },
         addEventListener(evento, cb) {
           listeners[id] = listeners[id] || {};
           listeners[id][evento] = cb;
@@ -454,4 +460,57 @@ test('un error sin envoltura tampoco se muestra como "[object Object]"', async (
   const mostrado = elementos['error-texto'].textContent;
   assert.notEqual(mostrado, '[object Object]');
   assert.ok(mostrado && mostrado.length > 0, 'tiene que haber un mensaje');
+});
+
+// ===========================================================================
+// EL ACTA DESDE LA PANTALLA
+// ===========================================================================
+
+test('la pantalla ofrece el acta después de suscribir', async () => {
+  resetDb();
+  mailer.clearDevInbox();
+  sembrarEmpresa();
+
+  const app = makeApp();
+  const sub = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
+    correo_firmante: CORREO_FIRMANTE,
+  });
+
+  const res = await request(app)
+    .get(baseDeLaApi() + encodeURIComponent(sub.token))
+    .set('Accept', 'application/json');
+  assert.equal(res.status, 200);
+
+  const { elementos, campo, disparar, enviar } = correrPantalla(sub.token, {
+    get: respuestaOk(res.body),
+    post: respuestaOk({
+      firmado: true,
+      version: res.body.version,
+      hash: res.body.hash,
+      firmado_at: '2026-11-06T15:00:00.000Z',
+      contrafirmado: false,
+      acta: {
+        hash: 'b'.repeat(64),
+        bytes: 4539,
+        url: `/api/anexo-encargo/${encodeURIComponent(sub.token)}/acta`,
+      },
+    }),
+  });
+  disparar();
+  await respiro();
+
+  campo('otp').value = '123456';
+  campo('acepta').checked = true;
+  enviar();
+  await respiro();
+
+  // El enlace del acta apunta a la ruta de descarga y muestra su huella.
+  const enlace = elementos['d-acta'];
+  assert.ok(enlace, 'la pantalla tiene que tener el enlace del acta');
+  assert.equal(enlace.attrs.href, `/api/anexo-encargo/${encodeURIComponent(sub.token)}/acta`,
+    'el enlace tiene que apuntar a la ruta de descarga del acta');
+  assert.equal(elementos['d-acta-hash'].textContent, 'b'.repeat(64),
+    'la pantalla tiene que mostrar la huella del acta');
+  assert.equal(elementos['acta'].classList.clases.oculto, false,
+    'el bloque del acta tiene que quedar visible después de suscribir');
 });

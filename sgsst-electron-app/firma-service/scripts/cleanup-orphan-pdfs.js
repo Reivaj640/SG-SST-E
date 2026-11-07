@@ -93,6 +93,12 @@ const EXCLUDED_IDS = [
 //   originales/<id>.pdf          firmados/<id>.pdf
 //   constancias/<id>-constancia.pdf
 //   papel/<id>-firmado.pdf       papel/<id>-registro.pdf
+//
+// OJO: la carpeta `actas/` (el acta de suscripcion del Anexo de Encargo) NO
+// esta en esta lista, y no tiene que estarlo. Su contraparte no esta en
+// `gh_firmas_electronicas` sino en `gh_firma_anexo_encargo_suscripciones`:
+// este script la veria como huerfana y la moveria al archivo. El acta es
+// evidencia de un acto de la Empresa: no se mueve, no se borra.
 const PDF_DIRS = {
   originales: path.join(STORAGE_ROOT, 'originales'),
   firmados: path.join(STORAGE_ROOT, 'firmados'),

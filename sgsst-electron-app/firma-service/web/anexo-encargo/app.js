@@ -209,9 +209,17 @@
       el('btn-codigo').classList.add('oculto');
       mensaje('Anexo de Encargo suscrito por su Empresa. Versión ' + r.version + ', huella '
         + r.hash + ', registrado el ' + new Date(r.firmado_at).toLocaleString('es-CO')
-        + '. Guarde esta pantalla: es la constancia de la suscripción. Este documento es '
-        + 'bilateral: a la firma de su Empresa le sigue la contrafirma de K+AIR, y el '
-        + 'contrato queda ejecutado cuando las dos partes han firmado.', 'ok');
+        + '. Este documento es bilateral: a la firma de su Empresa le sigue la '
+        + 'contrafirma de K+AIR, y el contrato queda ejecutado cuando las dos partes '
+        + 'han firmado.', 'ok');
+      // El acta: el documento que la Empresa descarga y K+AIR archiva. Su
+      // huella es la de SUS bytes, no la del texto que se firmó.
+      if (r.acta && r.acta.url) {
+        var enlace = el('d-acta');
+        if (enlace) enlace.setAttribute('href', r.acta.url);
+        texto('d-acta-hash', r.acta.hash);
+        mostrar('acta', true);
+      }
     }).catch(function (e) {
       btn.disabled = false;
       btn.textContent = 'Suscribir el Anexo de Encargo';

@@ -35,6 +35,8 @@ const db = require('../src/db/connection');
 const anexoEncargo = require('../src/services/anexoEncargo');
 const empresaService = require('../src/services/empresa');
 const mailer = require('../src/services/mailer');
+const actaEncargo = require('../src/services/actaEncargo');
+const storage = require('../src/services/storage');
 const { resetDb } = require('./helpers');
 
 const ID_EMPRESA = '900555777';
@@ -318,7 +320,7 @@ test('sin código no se puede suscribir', async () => {
     correo_firmante: CORREO_FIRMANTE,
   }, { actor: 'admin' });
 
-  assert.throws(
+  await assert.rejects(
     () => anexoEncargo.suscribir(r.token, { otp: '123456', acepta: true, datos_empresa: DATOS_S11 }, {}),
     (e) => e.statusCode === 400 && e.code === 'CODIGO_NO_SOLICITADO',
   );
@@ -338,7 +340,7 @@ test('un código incorrecto no firma y deja intento registrado', async () => {
   const codigo = ultimoCodigo();
   const malo = codigo === '000000' ? '111111' : '000000';
 
-  assert.throws(
+  await assert.rejects(
     () => anexoEncargo.suscribir(r.token, { otp: malo, acepta: true, datos_empresa: DATOS_S11 }, {}),
     (e) => e.statusCode === 400 && e.code === 'CODIGO_INVALIDO',
   );
@@ -360,7 +362,7 @@ test('sin la aceptación expresa tampoco se firma', async () => {
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
-  assert.throws(
+  await assert.rejects(
     () => anexoEncargo.suscribir(r.token,
       { otp: ultimoCodigo(), acepta: false, datos_empresa: DATOS_S11 }, {}),
     (e) => e.statusCode === 400 && e.code === 'ACEPTACION_REQUERIDA',
@@ -383,7 +385,7 @@ test('sin los CINCO datos del §11 tampoco se firma', async () => {
   for (const clave of Object.keys(DATOS_S11)) {
     const incompletos = Object.assign({}, DATOS_S11);
     delete incompletos[clave];
-    assert.throws(
+    await assert.rejects(
       () => anexoEncargo.suscribir(r.token,
         { otp: ultimoCodigo(), acepta: true, datos_empresa: incompletos }, {}),
       (e) => e.statusCode === 400 && e.code === 'DATOS_S11_INCOMPLETOS',
@@ -408,7 +410,7 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
-  const res = anexoEncargo.suscribir(
+  const res = await anexoEncargo.suscribir(
     r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
@@ -449,7 +451,7 @@ test('los cinco datos del §11 quedan en la fila, en la evidencia y con lo que d
     domicilio: 'Carrera 43 # 43-57, Edificio Norte, Barranquilla',
   });
 
-  const res = anexoEncargo.suscribir(
+  const res = await anexoEncargo.suscribir(
     r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: declarados },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
@@ -481,7 +483,7 @@ test('la fecha del Anexo queda en la ficha de la Empresa CON el rastro de la fic
     'SELECT COUNT(*) AS c FROM gh_firma_empresas_auditoria WHERE id_empresa = ?',
   ).get(ID_EMPRESA).c;
 
-  anexoEncargo.suscribir(
+  await anexoEncargo.suscribir(
     r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
@@ -514,7 +516,7 @@ test('suscribir NO ejecuta el contrato: la contrafirma de K+AIR va aparte', asyn
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
 
-  const res = anexoEncargo.suscribir(
+  const res = await anexoEncargo.suscribir(
     r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
@@ -541,7 +543,7 @@ test('el enlace es de un solo uso: firmado, no se pide otro código', async () =
     correo_firmante: CORREO_FIRMANTE,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
-  anexoEncargo.suscribir(r.token,
+  await anexoEncargo.suscribir(r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {});
 
   await assert.rejects(
@@ -550,7 +552,7 @@ test('el enlace es de un solo uso: firmado, no se pide otro código', async () =
   );
 
   // Reintento de quien ya firmó: no vuelve a registrar nada.
-  const otra = anexoEncargo.suscribir(r.token,
+  const otra = await anexoEncargo.suscribir(r.token,
     { otp: '000000', acepta: true, datos_empresa: DATOS_S11 }, {});
   assert.equal(otra.ya_firmada, true);
 });
@@ -564,7 +566,7 @@ test('el rastro de la suscripción queda escrito y en orden', async () => {
     correo_firmante: CORREO_FIRMANTE,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r.token, {});
-  anexoEncargo.suscribir(r.token,
+  await anexoEncargo.suscribir(r.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
     { ip: '203.0.113.9', user_agent: 'Navegador/1.0' });
 
@@ -621,7 +623,7 @@ test('no se puede suspender un texto distinto del que está en el archivo', asyn
     WHERE id_empresa = ? AND estado != 'FIRMADA'`)
     .run('a'.repeat(64), ID_EMPRESA);
 
-  assert.throws(
+  await assert.rejects(
     () => anexoEncargo.suscribir(r.token,
       { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
     (e) => e.statusCode === 409 && e.code === 'TEXTO_MODIFICADO',
@@ -648,7 +650,7 @@ test('si el texto del servidor cambia, no se firma: hay que abrir otra suscripci
     fs.readFileSync(anexoEncargo.RUTA_MODELO).toString('utf8') + '\n<!-- cambio -->');
 
   try {
-    assert.throws(
+    await assert.rejects(
       () => anexoEncargo.suscribir(r.token,
         { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {},
         { rutaModelo: copia }),
@@ -769,7 +771,7 @@ test('no se pisa una suscripción de otro texto: la Empresa ya firmó otra versi
     correo_firmante: CORREO_FIRMANTE,
   }, { actor: 'admin' });
   await anexoEncargo.solicitarCodigo(r1.token, {});
-  anexoEncargo.suscribir(r1.token,
+  await anexoEncargo.suscribir(r1.token,
     { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {});
 
   // Segunda suscripción, de OTRO texto: no se puede volver a firmar encima.
@@ -781,7 +783,7 @@ test('no se pisa una suscripción de otro texto: la Empresa ya firmó otra versi
     SET hash_texto = ? WHERE id_empresa = ? AND estado != 'FIRMADA'`)
     .run('b'.repeat(64), ID_EMPRESA);
 
-  assert.throws(
+  await assert.rejects(
     () => anexoEncargo.suscribir(r2.token,
       { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
     (e) => e.statusCode === 409 && e.code === 'TEXTO_MODIFICADO',
@@ -791,4 +793,98 @@ test('no se pisa una suscripción de otro texto: la Empresa ya firmó otra versi
   // Y la fecha que ya estaba NO se tocó.
   const empresa = empresaService.getById(ID_EMPRESA);
   assert.ok(empresa.anexo_encargo_firmado_at);
+});
+
+// ===========================================================================
+// EL ACTA DE SUSCRIPCIÓN
+// ===========================================================================
+
+test('suscribir genera el acta y su huella queda en la evidencia', async () => {
+  resetDb();
+  mailer.clearDevInbox();
+  sembrarEmpresa();
+
+  const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
+    correo_firmante: CORREO_FIRMANTE,
+    nombre_firmante: 'PERSONA DE PRUEBA',
+  }, { actor: 'admin' });
+  await anexoEncargo.solicitarCodigo(r.token, {});
+
+  const res = await anexoEncargo.suscribir(
+    r.token,
+    { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 },
+    { ip: '203.0.113.9', user_agent: 'Navegador/1.0' },
+  );
+
+  // El acta tiene su propia huella, y es la de SUS bytes.
+  assert.ok(res.acta, 'al suscribir tiene que quedar el acta');
+  assert.match(res.acta.hash, /^[0-9a-f]{64}$/);
+  assert.ok(res.acta.bytes > 0);
+
+  const ruta = actaEncargo.rutaActa(res.acta.archivo);
+  assert.ok(fs.existsSync(ruta), 'el acta tiene que quedar en el disco');
+  const bytes = fs.readFileSync(ruta);
+  const hash = crypto.createHash('sha256').update(bytes).digest('hex');
+  assert.equal(hash, res.acta.hash,
+    'la huella del acta tiene que ser la de los bytes que quedaron en el disco');
+  assert.equal(bytes.length, res.acta.bytes);
+
+  // Y la huella queda en la evidencia de la fila.
+  const fila = db.prepare('SELECT * FROM gh_firma_anexo_encargo_suscripciones').get();
+  const evidencia = JSON.parse(fila.evidencia);
+  assert.equal(evidencia.acta_hash, res.acta.hash);
+  assert.equal(evidencia.acta_archivo, res.acta.archivo);
+  assert.equal(evidencia.acta_bytes, res.acta.bytes);
+
+  // La evidencia NO lleva la ruta absoluta: se copia al manifiesto legal, y
+  // una ruta del servidor no puede aparecer en un documento que sale de él.
+  assert.ok(!JSON.stringify(evidencia).includes(storage.PATHS.root),
+    'la evidencia no puede filtrar la raíz del servidor');
+  assert.ok(!evidencia.acta_archivo.includes('/'), 'el nombre del acta es un nombre, no una ruta');
+
+  // El rastro dice que el acta se generó.
+  const evento = db.prepare(
+    'SELECT * FROM gh_firma_anexo_encargo_eventos WHERE evento = ?').get('ACTA_GENERADA');
+  assert.ok(evento, 'el rastro tiene que decir que el acta se generó');
+  assert.ok(evento.detalle.includes(res.acta.hash));
+
+  fs.unlinkSync(ruta);
+});
+
+test('si el acta no se puede generar, la suscripción NO se cierra', async () => {
+  resetDb();
+  mailer.clearDevInbox();
+  sembrarEmpresa();
+
+  const r = await anexoEncargo.crearSuscripcion(ID_EMPRESA, {
+    correo_firmante: CORREO_FIRMANTE,
+  }, { actor: 'admin' });
+  await anexoEncargo.solicitarCodigo(r.token, {});
+
+  // El acta no se puede generar (lo que pasa si pdf-lib falla o si el disco
+  // está lleno). La suscripción no se cierra: es preferible que la Empresa
+  // reintente a que quede una suscripción sin el documento que la acredita.
+  const original = actaEncargo.generarActa;
+  actaEncargo.generarActa = async () => { throw new Error('disco lleno (simulado)'); };
+  try {
+    await assert.rejects(
+      () => anexoEncargo.suscribir(r.token,
+        { otp: ultimoCodigo(), acepta: true, datos_empresa: DATOS_S11 }, {}),
+      (e) => e.statusCode === 500 && e.code === 'ACTA_NO_GENERADA',
+    );
+  } finally {
+    actaEncargo.generarActa = original;
+  }
+
+  // La fila NO quedó firmada y la ficha de la Empresa NO se tocó.
+  const fila = db.prepare('SELECT * FROM gh_firma_anexo_encargo_suscripciones').get();
+  assert.notEqual(fila.estado, 'FIRMADA', 'la suscripción no puede quedar firmada sin acta');
+  assert.equal(fila.firmado_at, null);
+  assert.equal(empresaService.getById(ID_EMPRESA).anexo_encargo_firmado_at, null,
+    'la fecha de la ficha no puede quedar si la suscripción no se cerró');
+
+  // Y el fallo queda en el rastro.
+  const evento = db.prepare(
+    'SELECT * FROM gh_firma_anexo_encargo_eventos WHERE evento = ?').get('ACTA_FALLIDA');
+  assert.ok(evento, 'el fallo tiene que quedar en el rastro');
 });

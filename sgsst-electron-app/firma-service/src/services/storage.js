@@ -29,6 +29,13 @@ const PATHS = {
   originales: resolveUnderRoot(path.join(config.storage.pdfPath, 'originales')),
   firmados: resolveUnderRoot(path.join(config.storage.pdfPath, 'firmados')),
   constancias: resolveUnderRoot(path.join(config.storage.pdfPath, 'constancias')),
+  // El acta de suscripcion del Anexo de Encargo (fase 1 del contrato
+  // bilateral). Tiene SU PROPIA carpeta, y no va en `constancias/`:
+  // esa carpeta tiene un invariante de 1:1 con las filas de firma
+  // (`gh_firmas_electronicas.constancia_path`), y el script de limpieza de
+  // PDFs huerfanos la revisa: un acta sin firma-electronica seria movida al
+  // archivo, y el acta es evidencia de un acto de la Empresa.
+  actas: resolveUnderRoot(path.join(config.storage.pdfPath, 'actas')),
   // 9A: la firma autografica (el 7.2). El PDF firmado en papel (el que
   // escanea la Empresa) y el Registro de firma autografica que lo evidencia.
   papel: resolveUnderRoot(path.join(config.storage.pdfPath, 'papel')),
@@ -36,7 +43,7 @@ const PATHS = {
 
 // Asegurar que los directorios existen al cargar el módulo.
 function ensureDirs() {
-  for (const dir of [PATHS.pdfs, PATHS.originales, PATHS.firmados, PATHS.constancias, PATHS.papel]) {
+  for (const dir of [PATHS.pdfs, PATHS.originales, PATHS.firmados, PATHS.constancias, PATHS.papel, PATHS.actas]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
       logger.info('Directorio creado', { dir });
