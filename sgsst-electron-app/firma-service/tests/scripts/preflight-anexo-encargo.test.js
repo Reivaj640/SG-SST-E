@@ -327,6 +327,120 @@ test('un respaldo que no existe aborta con codigo 8', async () => {
 });
 
 // ===========================================================================
+// 5.b EL RESPALDO QUE EXISTE PERO NO SE PUEDE LEER
+// ===========================================================================
+//
+// En el servidor, /opt/kair-firma/backup-firma.sh es root:root 750. Si el
+// preflight se corre como kairfirma, el archivo EXISTE pero no se puede leer:
+// antes eso reventaba el script entero con un EACCES crudo de Node.
+//
+// Para reproducirlo sin depender de los permisos de Windows se usa un
+// DIRECTORIO: existe (o sea que el preflight lo elige), y readFileSync sobre
+// un directorio falla igual que un EACCES: la ruta esta ahi y no se puede
+// leer como archivo.
+
+test('un script de respaldo que existe pero no se puede leer NO revienta el preflight', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const ilegible = path.join(tmp, 'backup-ilegible');
+  fs.mkdirSync(ilegible);
+
+  const rc = preflight.main(args(['--json', '--backup', ilegible]));
+  assert.equal(rc, 3, 'no se pudo leer: es un error de lectura, no un respaldo roto');
+
+  const salida = JSON.parse(lineasSalida[lineasSalida.length - 1]);
+  assert.ok(salida.motivo && salida.motivo.includes('no se pudo leer'),
+    'el motivo lo dice el preflight y no un error crudo de Node: ' + salida.motivo);
+  assert.equal(salida.respaldo.leible, false, 'y marca el respaldo como no leible');
+});
+
+test('el respaldo ilegible NO se reporta como un respaldo que no lleva storage entero', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const ilegible = path.join(tmp, 'backup-ilegible');
+  fs.mkdirSync(ilegible);
+
+  const rc = preflight.main(args(['--json', '--backup', ilegible]));
+  assert.equal(rc, 3);
+  assert.notEqual(rc, 8, 'el 8 dice "el respaldo esta roto", y no se puede saber eso');
+
+  const salida = JSON.parse(lineasSalida[lineasSalida.length - 1]);
+  assert.equal(salida.respaldo.existe, true, 'el script existe');
+  assert.equal(salida.respaldo.leible, false, 'pero no se pudo leer');
+  assert.ok(salida.respaldo.error_lectura, 'dice por que');
+  assert.match(salida.respaldo.error_lectura, /root/, 'dice como se arregla: correr como root');
+  assert.equal(salida.respaldo.problema, null, 'NO dice que el respaldo este roto');
+});
+
+test('el reporte NO miente sobre las huellas cuando el respaldo no se puede leer', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const ilegible = path.join(tmp, 'backup-ilegible');
+  fs.mkdirSync(ilegible);
+
+  const rc = preflight.main(args(['--json', '--backup', ilegible]));
+  assert.equal(rc, 3);
+
+  const salida = JSON.parse(lineasSalida[lineasSalida.length - 1]);
+  // Las dos huellas SI coinciden: el texto del servidor es el del manifiesto.
+  // El reporte tiene que decirlo aunque el preflight aborte por otra cosa:
+  // antes se calculaba la coincidencia DESPUES del bloque try/catch, asi que
+  // un abort imprimia "coinciden: false" con las huellas iguales.
+  assert.ok(salida.texto.hash, 'hay huella del archivo');
+  assert.equal(salida.texto.hash_manifiesto, salida.texto.hash, 'y es la del manifiesto');
+  assert.equal(salida.texto.coincide, true, 'el reporte no dice que no coinciden');
+});
+
+test('la salida de texto dice que no se pudo leer el respaldo', async () => {
+  await sembrarFlujo({ contrafirmar: true });
+  const ilegible = path.join(tmp, 'backup-ilegible');
+  fs.mkdirSync(ilegible);
+
+  const rc = preflight.main(args(['--backup', ilegible]));
+  assert.equal(rc, 3);
+
+  const texto = lineasSalida.join('\n');
+  assert.match(texto, /NO SE PUDO LEER/, 'el reporte lo dice');
+  assert.match(texto, /coinciden:\s+true/, 'y las huellas SI coinciden');
+});
+
+// ===========================================================================
+// 5.c EL REPORTE NO MIENTE CUANDO ABORTA POR OTRA COSA
+// ===========================================================================
+//
+// Este es el otro bug, y es independiente del anterior: la coincidencia de las
+// huellas se calculaba DESPUES del bloque try/catch. Si cualquier comprobacion
+// de adentro del try reventaba, el catch imprimia el reporte con
+// "coinciden: false" con las DOS huellas iguales: el preflight decia que el
+// texto del servidor no era el del manifiesto cuando si lo era.
+//
+// Aqui el error sale DENTRO del try, DESPUES de que el manifiesto ya se leyo:
+// por eso la coincidencia tiene que estar calculada para ese momento.
+
+test('el reporte NO miente sobre las huellas cuando una comprobacion revienta', async () => {
+  const { idSuscripcion } = await sembrarFlujo({ contrafirmar: true });
+  const actas = actasDe(idSuscripcion);
+  const ruta = path.join(storage.PATHS.actas, actas.suscripcion);
+  const bytes = fs.readFileSync(ruta);
+
+  try {
+    // Un acta que existe pero no se puede LEER (aqui, un directorio con el
+    // nombre del acta): el error sale dentro del bloque try.
+    fs.unlinkSync(ruta);
+    fs.mkdirSync(ruta);
+
+    const rc = preflight.main(args(['--json']));
+    assert.notEqual(rc, 0, 'aborta: un acta que no se puede leer no es un acta');
+
+    const salida = JSON.parse(lineasSalida[lineasSalida.length - 1]);
+    assert.ok(salida.texto.hash, 'hay huella del archivo');
+    assert.equal(salida.texto.hash_manifiesto, salida.texto.hash, 'y es la del manifiesto');
+    assert.equal(salida.texto.coincide, true,
+      'abortar por otra cosa no significa que el texto del servidor sea otro');
+  } finally {
+    fs.rmSync(ruta, { recursive: true, force: true });
+    fs.writeFileSync(ruta, bytes);
+  }
+});
+
+// ===========================================================================
 // 6. EL MANIFIESTO
 // ===========================================================================
 

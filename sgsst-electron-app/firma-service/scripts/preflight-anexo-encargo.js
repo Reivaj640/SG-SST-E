@@ -127,8 +127,15 @@ function resultadoInicial(exigirFirmado) {
       script: null,
       buscados: [],
       existe: false,
+      // Si el script EXISTE pero no se puede LEER (en el servidor es
+      // root:root 750 y el preflight se corre como kairfirma), esto queda en
+      // false y `error_lectura` explica por que. Son dos cosas distintas de
+      // "el respaldo no se lleva storage entero": una es un problema del
+      // respaldo (codigo 8) y la otra es que no se pudo verificar (codigo 3).
+      leible: null,
       lleva_storage_entero: false,
       problema: null,
+      error_lectura: null,
     },
   };
 }
@@ -208,6 +215,15 @@ function leerManifiesto(rutas, salida) {
   salida.manifiesto.estado = bloque.estado || null;
   salida.manifiesto.fecha = bloque.fecha || null;
   salida.manifiesto.evidencia = bloque.evidencia || null;
+  // La coincidencia se calcula AQUI, y no al final del preflight.
+  //
+  // Antes se computaba despues del bloque try/catch, asi que si una
+  // comprobacion posterior abortaba (por ejemplo, un EACCES al leer el script
+  // de respaldo) el reporte imprimia "coinciden: false" con las DOS huellas
+  // iguales. Un reporte que miente es peor que un reporte que aborta: hace
+  // creer que el texto del servidor no es el del manifiesto cuando si lo es.
+  salida.texto.coincide = String(salida.texto.hash).toLowerCase()
+    === String(salida.texto.hash_manifiesto || '').toLowerCase();
 }
 
 /**
@@ -354,7 +370,26 @@ function leerRespaldo(rutas, salida) {
     return;
   }
   salida.respaldo.existe = true;
-  const texto = fs.readFileSync(elegido, 'utf8');
+  let texto;
+  try {
+    texto = fs.readFileSync(elegido, 'utf8');
+  } catch (e) {
+    // El script puede EXISTIR y no poder LEERSE. En el servidor el que corre
+    // el cron es /opt/kair-firma/backup-firma.sh, que es root:root 750: si el
+    // preflight se corre como kairfirma, readFileSync tira EACCES y antes eso
+    // reventaba el script entero con un error crudo de Node.
+    //
+    // Lo que NO se puede hacer es reportarlo como "el respaldo no se lleva
+    // storage entero" (codigo 8): seria una alarma falsa sobre un respaldo que
+    // puede estar bien. Aca se dice la verdad: no se pudo VERIFICAR, y hay que
+    // correr el preflight como root.
+    salida.respaldo.leible = false;
+    salida.respaldo.error_lectura = 'no se pudo leer el script de respaldo ' + elegido
+      + ' (' + (e.code || e.message) + '): el respaldo no se pudo verificar. '
+      + 'Correr el preflight como root (sudo) para poder leerlo.';
+    return;
+  }
+  salida.respaldo.leible = true;
   // `tar -C "$BASE" ... storage` (el directorio entero) es lo que vale.
   const llevaEntero = /tar\s+-C\s+"?\$?\{?BASE\}?"?\s+[^\n]*\bstorage\b/.test(texto)
     && !/tar\s+[^\n]*\bstorage\/(originales|firmados|constancias|papel)\b/.test(texto);
@@ -416,6 +451,9 @@ function main(args) {
       + ' fecha=' + (salida.manifiesto.fecha || '-'));
     SALIDA_FN('  Respaldo: ' + (salida.respaldo.script || '(sin script)')
       + ' lleva storage entero=' + salida.respaldo.lleva_storage_entero);
+    if (salida.respaldo.error_lectura) {
+      SALIDA_FN('    NO SE PUDO LEER: ' + salida.respaldo.error_lectura);
+    }
     SALIDA_FN('  RESULTADO: ABORTA — ' + motivo);
   };
 
@@ -435,8 +473,10 @@ function main(args) {
     imprimir(4, 'El texto del Anexo de Encargo no esta en el servidor.');
     return 4;
   }
-  salida.texto.coincide = String(salida.texto.hash).toLowerCase()
-    === String(salida.texto.hash_manifiesto || '').toLowerCase();
+  // La coincidencia YA se calculo en leerManifiesto, que es donde se conocen
+  // las dos huellas. No se recalcula aca: recalcularla aca es justamente lo
+  // que hacia que un abort posterior imprimiera "coinciden: false" con las
+  // huellas iguales.
   if (!salida.texto.coincide) {
     imprimir(4, 'El texto del servidor no tiene la huella que declara el manifiesto: '
       + 'el servicio firmaria un texto que nadie ha verificado.');
@@ -460,6 +500,16 @@ function main(args) {
   if (salida.actas.problema) {
     imprimir(6, salida.actas.problema);
     return 6;
+  }
+
+  // Un error de LECTURA del script de respaldo no es lo mismo que un respaldo
+  // roto. El codigo 3 dice "no se pudo leer"; el 8 dice "el respaldo esta mal".
+  // Confundir los dos seria una alarma falsa sobre un respaldo que puede estar
+  // bien: en el servidor el script es root:root 750 y el preflight se corre
+  // como kairfirma.
+  if (salida.respaldo.error_lectura) {
+    imprimir(3, salida.respaldo.error_lectura);
+    return 3;
   }
 
   if (salida.respaldo.problema) {
