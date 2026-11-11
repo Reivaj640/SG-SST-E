@@ -32,7 +32,7 @@
 - [10. Flujo 9: Verificación posterior](#10-flujo-9-verificación-posterior)
 - [11. Flujo 10: Sincronización K+AIR ← Servicio](#11-flujo-10-sincronización-kair--servicio)
 - [12. Flujo 11: Anexo de Encargo (suscripción y contrafirma)](#12-flujo-11-anexo-de-encargo-suscripción-y-contrafirma)
-- [13. Flujo 12: Anexo de Nube (suscripción)](#13-flujo-12-anexo-de-nube-suscripción)
+- [13. Flujo 12: Anexo de Nube (suscripción y contrafirma)](#13-flujo-12-anexo-de-nube-suscripción-y-contrafirma)
 - [14. Matriz resumen de flujos](#14-matriz-resumen-de-flujos)
 
 ---
@@ -965,8 +965,15 @@ Operador     Servicio        SMTP          K+AIR
    │             │             │             │
    │             │             │             │ 7.El operador lo recibe y lo transcribe
    │             │             │             │
-   │ 8.POST .../anexo-encargo/contrafirmar (otp, acepta, X-Admin-Motivo)
+   │ 8.POST .../anexo-encargo/contrafirmar (otp, acepta, X-Admin-Actor, X-Admin-Motivo)
    │────────────▶│             │             │
+   │             │             │             │
+   │             │ 8.b.Coteja LA FACULTAD de quien contrafirma por
+   │             │   Gesstiar (P7, 10-nov-2026): si es el representante
+   │             │   legal del Encargado, vale; si es otra persona,
+   │             │   tiene que tener un poder VIGENTE a su nombre.
+   │             │   Si no: 409 FACULTAD_NO_ACREDITADA, y no hay
+   │             │   contrafirma. El actor se declara en X-Admin-Actor.
    │             │             │             │
    │             │ 9.FASE 2: anexo_encargo_firmado_at
    │             │             │             │
@@ -1016,7 +1023,7 @@ Operador     Servicio        SMTP          K+AIR
 
 ---
 
-## 13. Flujo 12: Anexo de Nube (suscripción)
+## 13. Flujo 12: Anexo de Nube (suscripción y contrafirma)
 
 **Cuándo ocurre**: una vez por Empresa. Con la compuerta
 `FIRMA_EXIGIR_ANEXO_NUBE` encendida, es condición para pedir firmas.
@@ -1026,6 +1033,13 @@ Operador     Servicio        SMTP          K+AIR
 **Quiénes son**: el **operador de K+AIR** (desde la app de escritorio),
 el **Servicio**, el **correo** y la **Empresa** (que se suscribe).
 
+> 📦1047 · punto 3 (9-nov-2026) **El Anexo de Nube es BILATERAL.** El texto
+> vigente (la v1.2, §10) lo suscribe la Empresa y lo contrafirma K+AIR, y el
+> instrumento solo queda **ejecutado** con los dos actos. Antes este flujo
+> documentaba un solo acto y decía que el Anexo de Nube no era bilateral: era
+> falso, y el código tampoco tenía la contrafirma. Ahora el flujo 12 tiene las
+> **dos fases**, como el flujo 11.
+
 ### 13.1. Precondiciones
 
 - La Empresa está en el directorio y está **activa**.
@@ -1034,19 +1048,22 @@ el **Servicio**, el **correo** y la **Empresa** (que se suscribe).
   su huella salen **del archivo**, no del manifiesto (son fuentes
   distintas, y por eso los dos anexos se comportan distinto en el mismo
   botón).
+- Para la **fase 2**, el buzón de protección de datos de K+AIR está
+  configurado (`FIRMA_CANAL_PROTECCION_DATOS`): es a donde sale el código de
+  contrafirma, y nunca a un buzón que la Empresa pueda leer.
 
-### 13.2. Diagrama de secuencia
+### 13.2. Diagrama de secuencia — fase 1 (la suscripción)
 
 ```
 Operador     Servicio        SMTP         Empresa
    │             │             │             │
    │ 1.Abre la suscripción del Anexo de Nube │
    │             │             │             │
-   │   (correo del firmante; NO hay segundo  │
+   │   (correo del firmante; el código de la │
    │             │             │             │
-   │   canal: el Anexo de Nube no tiene      │
+   │   CONTRAFIRMA va al buzón de K+AIR, que │
    │             │             │             │
-   │   contrafirma)            │             │
+   │   es otro buzón)           │             │
    │             │             │             │
    │ 2.POST /internal/admin/empresas/:id/anexo-nube/suscripcion
    │────────────▶│             │             │
@@ -1075,31 +1092,102 @@ Operador     Servicio        SMTP         Empresa
    │             │             │             │
    │             │   + evidencia, en la ficha de la Empresa
    │             │             │             │
-   │ 9.Con la compuerta FIRMA_EXIGIR_ANEXO_NUBE
+   │             │   FASE 1 CERRADA. El instrumento AÚN NO
+   │             │   está EJECUTADO: falta la contrafirma.
    │             │             │             │
-   │   encendida, el Anexo de Nube es condición
+```
+
+### 13.2.1 Diagrama de secuencia — fase 2 (la contrafirma de K+AIR)
+
+```
+Operador     Servicio        SMTP         K+AIR
    │             │             │             │
-   │   para pedir firmas       │             │
+   │ 9.Pide el código de contrafirma        │
+   │             │             │             │
+   │   (el código sale al buzón de K+AIR: el│
+   │             │             │             │
+   │   canal lo dice la CONFIGURACIÓN, no    │
+   │             │             │             │
+   │   quien pide el acto)                   │
+   │             │             │             │
+   │ 10.POST /internal/admin/empresas/:id/anexo-nube/contrafirmar/codigo
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 11.Código con propósito de derivación PROPIO
+   │             │   (otp-contrafirma): el código de la
+   │             │   suscripción NO contrafirma
+   │             │────────────▶│             │
+   │             │             │ 12.Al buzón de K+AIR
+   │             │             │────────────▶│
+   │             │             │             │
+   │ 13.POST /internal/admin/empresas/:id/anexo-nube/contrafirmar
+   │   con { id_suscripcion, otp, acepta: true }, X-Admin-Actor
+   │   y X-Admin-Motivo
+   │────────────▶│             │             │
+   │             │             │             │
+   │             │ 14.Coteja QUIEN FIRMO por la Empresa contra el
+   │             │   representante legal de la ficha. Si no coincide:
+   │             │   409 FIRMANTE_NO_COINCIDE, y no hay contrafirma.
+   │             │             │             │
+   │             │ 14.b.Coteja LA FACULTAD de quien contrafirma por
+   │             │   Gesstiar (P7, 10-nov-2026): si es el representante
+   │             │   legal del Encargado, vale; si es otra persona,
+   │             │   tiene que tener un poder VIGENTE a su nombre.
+   │             │   Si no: 409 FACULTAD_NO_ACREDITADA, y no hay
+   │             │   contrafirma. El actor se declara en X-Admin-Actor:
+   │             │   sin actor no se sabe quien hizo el acto.
+   │             │             │             │
+   │             │ 15.Genera el acta de contrafirma y la escribe
+   │             │   ANTES de tocar la base. Si la transacción falla,
+   │             │   el acta se borra.
+   │             │             │             │
+   │             │ 16.UNA SOLA TRANSACCIÓN:
+   │             │   · contrasfirmado_at, actor, motivo, evidencia,
+   │             │     huella y nombre del acta
+   │             │   · anexo_nube_ejecutado_at en la ficha de la Empresa
+   │             │             │             │
+   │             │ 17.{ contrafirmado: true, evidencia, acta }
+   │◀────────────│             │             │
+   │             │             │             │
+   │   FASE 2 CERRADA. El Anexo de Nube queda EJECUTADO
+   │   para esa Empresa, y con esa fecha la Empresa ya puede
+   │   firmar documentos de sus trabajadores.
    │             │             │             │
 ```
 
 ### 13.3. Postcondiciones
+
+**Fase 1** (la suscripción):
 
 - En la suscripción (`gh_firma_anexo_nube_suscripciones`): estado
   `FIRMADA`, con `firmado_at` y su rastro de eventos.
 - En la ficha de la Empresa: `anexo_nube_firmado_at`,
   `anexo_nube_version`, `anexo_nube_hash` y `anexo_nube_evidencia`.
 
+**Fase 2** (la contrafirma):
+
+- En la suscripción: `contrafirmado_at`, `contrafirma_actor`,
+  `contrafirma_motivo`, `contrafirma_evidencia`, `contrafirma_acta_hash`,
+  `contrafirma_acta_bytes` y `contrafirma_acta_archivo`. **El `estado` de la
+  suscripción no se toca**: es el de la fase 1.
+- En la ficha de la Empresa: `anexo_nube_ejecutado_at` — la fecha de
+  **ejecución** del instrumento, y la que exige la habilitación para firmar.
+- En el rastro: `CONTRAFIRMA_CODIGO_ENVIADO`, `CONTRAFIRMA_FIRMADA` y
+  `CONTRAFIRMA_ACTA_GENERADA`.
+
 ### 13.4. Diferencia con el Anexo de Encargo
 
 | | Anexo de Encargo | Anexo de Nube |
 |---|---|---|
-| ¿Bilateral? | **Sí**: son dos actos | **No**: lo suscribe la Empresa y ya |
-| ¿Segundo canal del código? | Sí, y tiene que ser otro buzón | **No**: no hay fase de contrafirma |
-| ¿Verificación del representante? | **Sí**, y es precondición de la contrafirma | No |
-| ¿La contrafirma? | Sí, con el código de K+AIR | No |
-| ¿Motivo? | En anular, verificar y contrafirmar | Solo en anular |
+| ¿Bilateral? | **Sí**: son dos actos | **Sí**: son dos actos (desde el 9-nov-2026) |
+| ¿Segundo canal del código? | Sí, y tiene que ser otro buzón | **Sí**: el código de la contrafirma va al buzón de K+AIR, nunca al de la Empresa |
+| ¿Verificación del representante? | **Sí**, y es precondición de la contrafirma | **Sí**: el cotejo contra el representante legal de la ficha es precondición de la contrafirma |
+| ¿La contrafirma? | Sí, con el código de K+AIR | **Sí**, con el código de K+AIR (desde el 9-nov-2026) |
+| ¿Motivo? | En anular, verificar y contrafirmar | En anular **y en contrafirmar** |
+| ¿Acta? | La de la suscripción **y** la de la contrafirma | Solo la de la contrafirma: la Empresa no se lleva PDF de la suscripción (su constancia es la pantalla) |
 | ¿Dónde sale la versión y la huella? | Del **manifiesto** | Del **archivo** |
+| ¿Quién puede ejecutarla? | El operador, **desde la app** (panel "Anexos") | El operador, **por HTTP contra el servicio**: la app **no tiene canal IPC** para esta contrafirma (el `?v=` del panel bumpea, pero no hay handler en el bridge). Está escrito paso a paso en `contrafirma-anexo-nube-v1-2.md` §3.2 |
+| ¿Dónde se ve el estado? | En el panel y en la ficha | En el panel y en la ficha, con los **tres** estados (no suscrito / suscrito sin contrafirma / ejecutado). La lectura del operador devuelve la fase 2 **leída de la fila**, no clavada en `null` |
 
 ---
 
@@ -1118,7 +1206,7 @@ Operador     Servicio        SMTP         Empresa
 | 9 | Verificación posterior | Tercero | (no cambia) | (consulta) | Bajo demanda |
 | 10 | Sync K+AIR ← Servicio | K+AIR | (no cambia) | SYNC_COMPLETED | Cada 5 min |
 | 11 | Anexo de Encargo (fase 1 + fase 2) | Operador (K+AIR) | `EJECUTADO` (o `SUSCRITO` si falta la contrafirma) | SUSCRIPCION_CREADA, SUSCRIPCION_FIRMADA, REPRESENTANTE_VERIFICADO, CONTRAFIRMA_FIRMADA | 1 vez por Empresa |
-| 12 | Anexo de Nube | Operador (K+AIR) | `FIRMADA` | SUSCRIPCION_CREADA, SUSCRIPCION_FIRMADA | 1 vez por Empresa |
+| 12 | Anexo de Nube (fase 1 + fase 2) | Operador (K+AIR) | `EJECUTADO` (o `SUSCRITO` si falta la contrafirma) | SUSCRIPCION_CREADA, SUSCRIPCION_FIRMADA, CONTRAFIRMA_CODIGO_ENVIADO, CONTRAFIRMA_FIRMADA, CONTRAFIRMA_ACTA_GENERADA | 1 vez por Empresa |
 
 ### Estados terminales
 

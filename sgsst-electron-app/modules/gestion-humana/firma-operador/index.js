@@ -53,10 +53,15 @@
     ejecutado: { label: 'Ejecutado', clase: 'fo-badge--verde' }
   };
 
+  // El Anexo de Nube también es BILATERAL (el texto vigente, §10): lo suscribe
+  // la Empresa y lo contrafirma K+AIR. Antes esta tabla tenía un estado
+  // 'firmado' en verde que se activaba con `anexo_nube_firmado_at`, que es la
+  // FASE 1: el operador veía "Firmado" en una Empresa que solo se había
+  // suscrito. Ahora son los mismos tres estados que el Anexo de Encargo.
   var ESTADO_NUBE = {
     no_suscrito: { label: 'No suscrito', clase: 'fo-badge--neutro' },
-    suscrito: { label: 'Suscrito', clase: 'fo-badge--ambar' },
-    firmado: { label: 'Firmado', clase: 'fo-badge--verde' }
+    suscrito: { label: 'Suscrito · falta contrafirma', clase: 'fo-badge--ambar' },
+    ejecutado: { label: 'Ejecutado', clase: 'fo-badge--verde' }
   };
 
   // Los estados de la suscripción que ve el operador. El service los llama
@@ -410,7 +415,11 @@
 
   FirmaOperadorComponent.prototype._renderFila = function (e) {
     var estEncargo = e.tiene_anexo ? 'ejecutado' : (e.tiene_anexo_suscrito ? 'suscrito' : 'no_suscrito');
-    var estNube = e.anexo_nube_firmado_at ? 'firmado' : 'no_suscrito';
+    // El Anexo de Nube es bilateral: `tiene_anexo_nube_ejecutado` es la fase 2
+    // (la contrafirma) y `tiene_anexo_nube_suscrito` la fase 1. Con solo la
+    // fase 1 el instrumento NO está ejecutado.
+    var estNube = e.tiene_anexo_nube_ejecutado ? 'ejecutado'
+      : (e.tiene_anexo_nube_suscrito ? 'suscrito' : 'no_suscrito');
     var cEnc = ESTADO_ENCARGO[estEncargo];
     var cNube = ESTADO_NUBE[estNube];
     return [
@@ -559,6 +568,24 @@
     html.push('<div class="fo-kv"><span class="fo-kv__k">Contrafirma de K+AIR</span><span class="fo-kv__v">'
       + (contrafirmada ? 'Si · ' + _esc(_fmtFecha(sub.contrafirmado_at)) : 'No · el instrumento no esta ejecutado')
       + '</span></div>');
+    // LA FACULTAD DE QUIEN CONTRAFIRMA (P7, 10-nov-2026). Mismo dato que en
+    // el Anexo de Nube: el acta dice con que poder se hizo el segundo acto.
+    if (contrafirmada) {
+      var evidenciaEncargo = sub.contrafirma_evidencia || {};
+      var facultadEncargo = evidenciaEncargo.facultad || null;
+      if (facultadEncargo) {
+        html.push('<div class="fo-kv"><span class="fo-kv__k">Facultad acreditada</span><span class="fo-kv__v">'
+          + _esc(facultadEncargo.nombre || '—')
+          + (facultadEncargo.resultado === 'REPRESENTANTE_LEGAL_ENCARGADO'
+            ? ' · representante legal de Gesstiar'
+            : ' · poder acreditado')
+          + '</span></div>');
+      } else {
+        html.push('<div class="fo-kv"><span class="fo-kv__k">Facultad acreditada</span>'
+          + '<span class="fo-kv__v">NO DECLARADA · el item estado_encargo del gate '
+          + 'no puede quedar ok</span></div>');
+      }
+    }
 
     // Las acciones, en el orden que el service impone.
     html.push('<div class="fo-acciones">');
@@ -583,6 +610,7 @@
     var self = this;
     var html = [];
     var etiqueta = ETIQUETA_SUSCRIPCION[sub.estado] || sub.estado || '—';
+    var contrafirmada = !!sub.contrafirmado_at;
     html.push('<div class="fo-kv"><span class="fo-kv__k">Suscripcion</span><span class="fo-kv__v">#'
       + _esc(sub.id) + ' · ' + _esc(etiqueta) + '</span></div>');
     html.push('<div class="fo-kv"><span class="fo-kv__k">Version del texto</span><span class="fo-kv__v">'
@@ -590,8 +618,35 @@
     html.push('<div class="fo-kv"><span class="fo-kv__k">Correo</span><span class="fo-kv__v">'
       + _esc(sub.correo_firmante || '—') + '</span></div>');
     if (sub.firmado_at) {
-      html.push('<div class="fo-kv"><span class="fo-kv__k">Firmado</span><span class="fo-kv__v">'
+      html.push('<div class="fo-kv"><span class="fo-kv__k">La Empresa suscribio</span><span class="fo-kv__v">'
         + _esc(_fmtFecha(sub.firmado_at)) + '</span></div>');
+    }
+    // EL SEGUNDO ACTO: la contrafirma de K+AIR. El instrumento solo queda
+    // EJECUTADO con ella, y es lo que la habilita para firmar.
+    html.push('<div class="fo-kv"><span class="fo-kv__k">Contrafirma de K+AIR</span><span class="fo-kv__v">'
+      + (contrafirmada
+        ? 'Si · ' + _esc(_fmtFecha(sub.contrafirmado_at))
+        : 'No · el instrumento no esta ejecutado')
+      + '</span></div>');
+    // LA FACULTAD DE QUIEN CONTRAFIRMA (P7, 10-nov-2026). El acta dice con
+    // que poder se hizo el segundo acto; el operador tiene que poder verlo,
+    // porque es lo que distingue una contrafirma acreditada de una que solo
+    // tiene un nombre. Viene en la evidencia del acto.
+    if (contrafirmada) {
+      var evidencia = sub.contrafirma_evidencia || {};
+      var facultad = evidencia.facultad || null;
+      if (facultad) {
+        html.push('<div class="fo-kv"><span class="fo-kv__k">Facultad acreditada</span><span class="fo-kv__v">'
+          + _esc(facultad.nombre || '—')
+          + (facultad.resultado === 'REPRESENTANTE_LEGAL_ENCARGADO'
+            ? ' · representante legal de Gesstiar'
+            : ' · poder acreditado')
+          + '</span></div>');
+      } else {
+        html.push('<div class="fo-kv"><span class="fo-kv__k">Facultad acreditada</span>'
+          + '<span class="fo-kv__v">NO DECLARADA · el item contrafirma_nube del gate '
+          + 'no puede quedar ok</span></div>');
+      }
     }
     if (sub.estado !== 'FIRMADA') {
       html.push('<div class="fo-acciones"><button class="fo-btn fo-btn--peligro" type="button"'

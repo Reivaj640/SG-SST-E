@@ -17,6 +17,73 @@
 
 ## 🚦 ESTADO AL CIERRE
 
+> **Actualización 2026-11-10 (cierre de jornada) — P7 CERRADO: la contrafirma del Anexo de Nube sigue DENTRO del servicio, y la condición del abogado sobre la FACULTAD de quien contrafirma por Gesstiar quedó implementada, verificada y DECIDIDA.**
+>
+> **Las tres decisiones del owner, tomadas hoy:**
+>
+> 1. **El texto no cambia: control interno.** La acreditación de la facultad se queda en el expediente (registro de poderes + acta + evidencia + manifiesto + gate). **No hay v1.3**: la huella de la v1.2 (`242037b3…1f7245`) no se mueve, no hay republicación en `legal/` ni en `sitio/`, y **P8 sigue siendo la suscripción de la v1.2 por ASEPLUS**.
+> 2. **Quien contrafirma es el representante legal**, Javier Robles Fontalvo: no hay que registrar ningún poder a su nombre. `FIRMA_ADMIN_ACTOR=Javier Robles Fontalvo` quedó declarado en los `.env` de ejemplo del **service** — y **no** en el de la app de escritorio, porque ese `.env` viaja **dentro del instalador** y ahí un nombre de persona atribuiría los actos de toda copia instalada a esa persona.
+> 3. **El 📦1047 se commitea como una sola unidad.** Nada pusheado.
+>
+> **El hueco que apareció al verificar.** La línea «Facultad acreditada» del panel del operador se añadió a las dos vistas (Nube y Encargo), pero la lectura `GET /internal/admin/empresas/:id/anexos` solo traía `contrafirma_evidencia` en la forma del Nube: **en la del Encargo faltaba**, y el panel mostraba «NO DECLARADA» con la faculty ya acreditada en el expediente. Es el verde falso del gate, del lado contrario: un falso **negativo** que hace creer que falta lo que ya está. Corregido, con test de la lectura y un guard de UI que exige la línea en las dos vistas. Reglas nuevas: `PROMPT.md` trampa **154** y `BITACORA.md` regla 7 de la entrada del día.
+>
+> **Medido, no de memoria.** Suite del firma-service: **2 574 tests · 2 572 verdes · 0 rojos · 2 omitidos**. App de escritorio: **27/27**. `actualizar-manifiesto-1047.js --check` y `actualizar-manifiesto-anexo-nube.js --check`: **0**. Preflight: **exit 5**, con el bloque de la facultad (representante legal «Javier Robles Fontalvo», 2 poderes de prueba vigentes, y `FIRMA_ADMIN_ACTOR` **sin definir en esta máquina**, porque el `.env` local todavía no existe). Gate `primera_firma` sobre la base de pruebas: **6 bloqueantes** — los tres del instrumento (`firmado_nube`, `contrafirma_nube`, `estado_encargo`), más `acuerdo_v1_1` (la v1.1 sin activar en esta base) y `d03` (la bitácora de excepciones sin el trigger 036). Barrido: limpio; EOL conservados; sin CJK, cirílico ni hangul.
+>
+> **Un test rojo que venía de antes (y que no era culpa de este paquete).** Al correr la suite de escritorio apareció `deploy: retención 14 días` en rojo. **No lo causó este paquete**: en HEAD, el script `deploy/backup-firma.sh` ya usaba una retención **configurable** (`KAIR_RETENCION_DIAS`, 30 días por defecto) y el check seguía exigiendo el literal `mtime +14`. Es exactamente la trampa 28: un check que fija el literal se rompe solo en el próximo cambio, y su mutación queda vacía sin avisar. El check ahora exige lo que importa —que la poda use la **variable** declarada y no un número escrito a mano— y el script no se tocó.
+>
+> **Lo que NO se hizo.** No se firmó nada (la contrafirma de ASEPLUS la hace el owner por el canal administrativo), no se encendió `FIRMA_EXIGIR_ANEXO_NUBE`, no se abrió producción, no se desplegó, no se publicó en `gh-pages` y no se tocó `sitio/`.
+>
+> **La cola, en orden:**
+> 1. **Desplegar** con las migraciones **060, 061 y 062** aplicadas: hasta que el servidor no tenga las rutas de contrafirma, el P8 no se puede ejecutar.
+> 2. **P8**: suscribir la v1.2 y el Encargo 2026-11-09 por ASEPLUS, y contrafirmar el Anexo de Nube con `X-Admin-Actor: Javier Robles Fontalvo` y `X-Admin-Motivo`.
+> 3. **P3** (alias de derechos/PQRS/incidencias en la consola) y **P6** (revocar las 5 app passwords de los buzones de clientes).
+> 4. **P9/P10**: publicar en `sitio/` y `gh-pages`, y desplegar.
+> 5. Lo heredado: Node 22, el destino del respaldo off-site, la sección E del G3 con la Constancia, T8, T6, T7 y J1-J14.
+>
+> **Pendiente de un «pushea»:** `4ac37149` (📦1046) sigue sin subir.
+
+> **Actualización 2026-11-10 (noche) — P1 CERRADO: la aceptación del CDPA quedó registrada con evidencia verificada, y el gate bajó de 6 a 5 pendientes**
+>
+> **El bug que se arregló sin que nadie lo pidiera.** `scripts/actualizar-manifiesto-1047.js` reconstruía `mail_provider` con `aceptada: false`: si P1 se cerraba y alguien volvía a correr el 1047, **el cierre desaparecía sin aviso** y el gate volvía a "no listo". Ahora conserva el bloque `aceptacion` que ya esté puesto (`aceptacionPrevia`), con la fecha de captura del CDPA **2026-11-10** y `fecha_declarada_por_google: null` (la página no declara fecha). Tests `tests/scripts/actualizar-manifiesto-1047.test.js` **4/4** y `--check` en 0 sobre el manifiesto real.
+>
+> **El gate ya no se llena con un "sí" vacío.** `_aceptacionCdpaOk` en `readinessLegal.js` exige **modo + fecha + evidencia**: un `aceptada: true` sin eso ya no habilita `mail_provider_dpa`. `tests/readiness-legal.test.js` **56/56**.
+>
+> **El registro de P1 pasa por un acta, no por una edición a mano.** `scripts/actualizar-manifiesto-aceptacion-cdpa.js` escribe el bloque solo desde un acta JSON: valida modo, fecha no futura, evidencia, responsable, huellas SHA-256 y bytes, y exige que el CDPA citado sea el que declara el manifiesto (exit 5). Endurecido hoy: (1) la captura puede declarar su huella cuando el archivo vive en otra máquina → `verificado_localmente: false`; si el archivo está, la huella declarada se contrasta (exit 3); (2) **rechaza marcadores** (`PENDIENTE`, `por definir`, `[nombre del owner]`…) en fecha, evidencia, responsable, cuenta y atestación (exit 2). Tests **39/39**.
+>
+> **Acta aplicada el 10-nov-2026 (20:29): ya no es plantilla.** `scripts/fixtures/aceptacion-cdpa-p1-2026-11-10.json` (modo `aceptado_por_administrador`) pasó de los 4 pasos pendientes al acta real: el acto ocurrió (la consola declara «Aceptado por kair@gesstiar.com el Nov 10, 2026» y ofrece el botón CANCELAR, que solo aparece cuando ya está aceptado). Se llenó con la fecha **2026-11-10** y la captura `captura-consola-cdpa-i-accept-2026-11-10.png` (96 520 bytes, SHA-256 `9d989067…560`, `verificado_localmente: true`); `--aplicar` y el `--check` posterior salen en 0. **No se tocaron** los otros dos botones de esa ventana (certificación GDPR y enmienda HIPAA): ninguno aplica a la operación colombiana. **Modo elegido:** `aceptado_por_administrador`: los términos vigentes del Acuerdo (`Last modified: October 12, 2026`) entran en el próximo renewal y el TOS de 2021 no incorporaba el CDPA, así que `incorporado_por_referencia` no es afirmable sin la fecha de renovación ⚠️ No verificado.
+>
+> **Gate medido (no de memoria), tras cerrar P1:** `primera_firma` → **no listo, 5 pendientes**: `firmado_nube`, `contrafirma_nube`, `estado_encargo`, más `publicado` y `aprobacion_operativa_vigente` (artefactos de la base local vacía: `acuerdo_activo: null`, 0 empresas). **`mail_provider_dpa` = `ok`** (P1 cerrado). 42 ítems: 33 ok, 5 pendientes, 1 aviso, 3 no_aplica.
+>
+> **El token `kair-release-pc` quedó documentado.** `token-fine-grained-kair-release-pc-2026-11-10.md`: no hay ruta de API para editar su expiración (4 rutas dieron 404), son 4 clics en la interfaz de GitHub → 90 días → **2027-02-08**; sin valor del token. Fila nueva en `tabla-instrumentos-vigentes-2026-11-09.md`; P1 detallado en `decision-regularizacion-correo-2026-11-09.md` §0.1; trampa nueva en `PROMPT.md` §9 (fila 152): "un script que declara el estado pendiente puede borrar un cierre ya hecho".
+>
+> **Higiene de esta entrada y la anterior.** El mojibake de la entrada del 2026-11-10 (acentos escritos en Latin-1 dentro de un archivo UTF-8, 64 bytes) se recodificó a UTF-8: HEAD estaba limpio (0 bytes invalidos), así que la reparación solo toca lineas aún no commiteadas.
+>
+> **Lo que NO se hizo.** Nada commiteado, nada pusheado, nada desplegado. La cola del owner queda así: expiración del token, revocación de las 5 app passwords, respuesta del abogado (P7) y suscripción de la v1.2 + Encargo (P8).
+
+> **Actualización 2026-11-10 (noche)  el botón "Enviar por correo" volvió a funcionar, el dominio quedó cerrado y P11 quedó medido (falta una acción del owner):**
+>
+> **Lo que estaba muerto y nadie veía.** `shared/env-loader.js` tenía un `*/` accidental dentro de un comentario de bloque: el patrón de archivos `**/utils/**` lo tiene, y ese `*/` **cerraba el comentario antes de tiempo**. Todo lo que venía después dejó de ser comentario y **se ejecutó como código** (`ReferenceError: utils is not defined` al importar). Eso mataba `utils/emailSender.js` y por tanto el botón **"Enviar por correo"**, en el instalador **y** en desarrollo. Lo caro: **`node --check` pasa** (no es un error de sintaxis) y **2 494 tests en verde** no lo cazaron, porque el test leía el archivo **como texto** y buscaba cadenas. El fix son **2 checks que CARGAN el código** (`main/test-email-env-931.js`: **33/33**) y un guard que **corta el build** si el cargador no carga (`main/_verificar-credenciales-build.js`). Verificado con envío real: **5/5 empresas** (TEMPOACTIVA, TEMPOSUM, ASEPLUS, ASEL, COOTRACOM), cada una con su Message-ID.
+>
+> **El dominio `gesstiar.com` quedó cerrado (P4).** SPF (`v=spf1 include:_spf.google.com ~all`), DKIM (`google._domainkey`) y DMARC (`v=DMARC1; p=none; rua=mailto:kair@gesstiar.com`, TTL 14400, un solo registro) publicados y visibles en el autoritativo y en 8.8.8.8, 1.1.1.1 y 9.9.9.9. El envío externo a un buzón de Gmail da `Authentication-Results: dkim=pass; spf=pass; dmarc=pass`. **P12 también:** el token clásico `ghp_` **fue borrado** en GitHub y el `.bat` de publicación ya no lo tiene (3 ocurrencias sustituidas; ahora lee `GH_TOKEN` del entorno).
+>
+> **P11: lo del repo está cerrado, lo de Google es una acción del owner.** Son **cinco** app passwords en **cuatro** buzones (TEMPOACTIVA y COOTRACOM comparten buzón con claves distintas). Las cinco que **hoy** están instaladas en el `.env` son **las mismas** que están en el historial público (78 commits cada una, alcanzables desde `origin/Dev`, `origin/Dev-Pc` y `origin/HEAD`); en el árbol de trabajo hay **0**. Lo que **cierra** P11 es la **revocación en Google**, no la creación de claves nuevas. Se dejó escrito el paso a paso, sin un solo valor de clave, en `sgsst-electron-app/docs/gestion-humana/firma-electronica/rotacion-app-passwords-p11-2026-11-10.md`. Y se agregó la **guarda que faltaba**: `main/detector-secretos.js` + `main/test-secretos-1047.js` (**16/16**), que escanea los **3 841** archivos versionados, **corta el build** si encuentra un secreto y **nunca imprime el valor** (solo archivo, línea y regla).
+>
+> **Dónde está el gate, medido (no de memoria).** Con `better-sqlite3` recompilado para Node 24, la suite del `firma-service` corre: **2 502 tests · 2 500 verdes · 0 rojos · 2 omitidos**. Gate `publicacion`: 42 ítems, **2 bloqueantes pendientes** (`publicado` y `aprobacion_operativa_vigente`)  **los dos son artefacto de la base local vacía**: hay que medir en la VM. Gate `primera_firma`: **4 bloqueantes reales**  `firmado_nube`, `contrafirma_nube`, `mail_provider_dpa` (P1) y `estado_encargo`  más esos mismos 2 artefactos.
+>
+> **Lo que el CDPA cierra y lo que no (Decisión A del 9-nov).** El CDPA de Google Workspace con Google como **Subencargado** cubre el **canal de correo del servicio de firma** (`kair@gesstiar.com`), que ya está instalado, verificado y con SPF/DKIM/DMARC en verde. **No** cubre las **5 cuentas Gmail de consumo** de los clientes, que son otro canal (el de la app de escritorio) y otro problema. Y el ítem `mail_provider_dpa` **no pasa a `ok`** hasta que la aceptación del CDPA quede **registrada** (modo, fecha, evidencia, responsable) en `legal-readiness.json`: por eso P1 sigue abierto. Aceptar el CDPA en la consola de Workspace y **anotar** la fecha es una acción de 10 minutos que quita uno de los cuatro bloqueantes.
+>
+> **La cola del owner, en orden (nada de esto necesita código):**
+> 1. **Revocar las 5 app passwords** de clientes en Google y registrar los metadatos (empresa, buzón, fecha, quién, evidencia). Es lo que cierra P11.
+> 2. **Aceptar el CDPA** en la consola de Workspace y registrar la aceptación ’ cierra `mail_provider_dpa` (P1).
+> 3. **Expiración del token `kair-release-pc`**: el fine-grained salió **sin fecha de expiración**; hay que editarlo a 90 días.
+> 4. **Respuesta del abogado a las cuatro preguntas** (P7): decide si la contrafirma del Anexo de Nube va dentro o fuera del servicio. Es la compuerta de P8.
+> 5. **Suscribir (vía administrativa) el Anexo de Nube v1.2 y el Encargo 2026-11-09 de ASEPLUS** y contrafirmar el Anexo de Nube ’ cierra `firmado_nube`, `contrafirma_nube` y `estado_encargo`. La contrafirma es **un segundo acto medido aparte**.
+>
+> **Lo que NO cambia.** El texto de los anexos, sus versiones y sus huellas. La **Decisión A** (Google Workspace + CDPA, Google Subencargado). El `p=none` del DMARC al inicio: se endurece a `quarantine` en 24 semanas con reportes limpios. Y **no hay trabajadores reales en producción** hasta cerrar los bloqueantes legales y operativos.
+>
+> **Lo que NO se hizo (y sigue igual que antes de esta sesión).** Nada commiteado, nada pusheado, nada desplegado. La VM corre el código anterior (58 migraciones; falta la `060`). El servicio de firma de la app de escritorio ya manda correo real, pero **el instalador que hay en los clientes hay que reconstruirlo** para que lleve el arreglo.
+>
+
 > **Actualización 2026-11-07 (noche) — el panel de los anexos se mudó de Gestión Humana a Configuración, y de paso se encontró un bug que lo dejaba muerto:**
 > La tanda del 📦1033 al 📦1040 (commiteada y pusheada) se desplegó: el owner corrió `sudo bash /tmp/deploy-1041.sh` en Cockpit a las 12:49 y el service quedó con los dos endpoints nuevos (rollback en `/opt/kair-firma/.prev-deploy-20261107-124931`). La app de escritorio se redesplegó **corriendo desde el repo** (sin bump de versión y sin release, por decisión del owner), con la **admin key** guardada cifrada en `secrets.enc` (64 chars, prefijo `e50ce03a`). Verificado desde afuera: `/health` 200, los dos endpoints nuevos 401 sin key, y `/internal/empresa/anexos` 200 con la key de Aseplus.
 >
@@ -7742,6 +7809,205 @@ El endpoint de cierre además ahora lee `X-Admin-Actor` (antes fijaba `"admin"` 
 
 La errata del nombre en el acta (*"Lilia Maria Vasques Muñoz"*, sin la z) se documenta y no se reescribe: no hay ruta de edición (409 `YA_SUSCRITO`). En la ficha de la Empresa el nombre sí está bien: *"Lilia Maria Vazquez Muñoz"*.
 
+## 📦1047 · Cierre del punto 2: el correo transaccional con DPA (9-nov-2026)
+
+**Lo que se hizo.** El plan para cerrar el punto 2 (migrar el correo transaccional de la cuenta de
+consumo a Google Workspace con DPA, alinear los documentos, el manifiesto y el gate) se ejecuto de
+punta a punta. No se commiteo ni se pusheo nada en esta ronda: la autorizacion fue de ejecucion, y la
+publicacion y el despliegue los ejecuta el owner.
+
+**El instrumento no era un "DPA".** La URL que daba el plan (`workspace.google.com/terms/dpa_terms/`)
+devuelve 404. El instrumento vigente es el **Cloud Data Processing Addendum (CDPA)**, texto del
+**30 de octubre de 2026**, con URL canonica `admin.google.com/terms/apps/8/1/en/dpa_terms.html`. Se
+descargo, se verifico y se registraron sus tres huellas SHA-256. La decision quedo escrita en
+`docs/gestion-humana/firma-electronica/decision-regularizacion-correo-2026-11-09.md` (Decision A): la
+evidencia, el criterio juridico condicional, el alcance, la excepcion de los canales de derechos,
+PQRS e incidentes, y **diez pendientes P1 a P10 con responsable**.
+
+**La redaccion que gobierna.** Ni "Google es Responsable" ni "Google es Subencargado" en forma
+absoluta: Google interviene como Subencargado de los datos del **servicio de correo** *mientras el CDPA
+este vigente y aplicable a la cuenta* (secciones 4.3, 5.1 y 5.1.3). Y el CDPA **no elimina** la
+transferencia internacional (seccion 10.1): siguen rigiendo el numeral 3.2 del Titulo V de la Circular
+Unica y el articulo 26 de la Ley 1581.
+
+**Los dos textos, publicados y verificados.**
+
+| Documento | Archivo | Bytes | SHA-256 |
+|---|---|---|---|
+| Anexo de Nube v1.2 | `sgsst-electron-app/legal/anexo-nube-v1.2.html` y `sitio/` | 84.062 | `242037b3a98f2152b7c1db1f5c562fbe1f9f3e3be4422c03bfcf404e581f7245` |
+| Anexo de Encargo 2026-11-09 | `sgsst-electron-app/legal/anexo-encargo.html` y `sitio/` | 93.860 | `4a64709386d23c2d81cd4e4eae1cd732bb300890f89dc38b8b5e7d8d08035b01` |
+
+Las dos copias de cada uno son **byte a byte** iguales, y los dos textos pasan el analizador real del
+gate (`analizarAnexoNube` y `analizarAnexoEncargo`): sin clausulas faltantes, sin marcadores, sin huecos
+bloqueantes. La v1.1 y la v1.0 del Anexo de Nube quedan **intactas** como versiones historicas. Ninguno de
+los dos textos afirma que este suscrito.
+
+**El codigo.** El gate (`readinessLegal.js`) ya no dice "Anexo firmado" cuando la firma es de otra
+version: `firmadoOk` contrasta version y huella contra el **texto vigente**, y lo mismo hace
+`encargoFirmadoOk` con el Anexo de Encargo (el mismo falso positivo, aplicado al otro instrumento). El
+item `google_dpa` paso a `no_aplica` — ni en `ok` (verde falso) ni en pendiente (bloqueo permanente) —
+y el item vigente es `mail_provider_dpa`, que exige la cuenta de empresa, el rol de subencargado, las
+clausulas del CDPA y **la evidencia de aceptacion por la cuenta**. La devolucion/supresion y la auditoria
+ya no tienen la rama de "el de consumo es aceptable".
+
+**La identidad del texto vigente vive en un solo lugar.** Nuevo modulo `src/services/anexoNubeModelo.js`
+(sin dependencias, para que `empresa.js` pueda comprobarlo sin ciclo de imports): declara la version, la
+ruta y la huella real. Lo leen el servicio que suscribe, la compuerta, el preflight y la habilitacion de
+la Empresa. Antes la compuerta miraba `legal/anexo-nube-v1.1.html` con la ruta escrita a mano mientras
+el modulo que suscribe declaraba la suya: dos controles hablando de dos textos (PROMPT.md, trampa 138).
+
+**La habilitacion de la Empresa tambien exige el texto vigente.** Con la compuerta encendida, una
+suscripcion de otra version ya no habilita a firmar: la fecha de suscripcion no dice que se firmo, la
+huella si.
+
+**El manifiesto es la salida de un script.** `scripts/actualizar-manifiesto-1047.js` recalcula las
+huellas desde los archivos reales, exige que las dos copias de cada HTML sean byte a byte iguales y
+edita el manifiesto sobre el objeto (diff minimo). No declara ninguna firma que no exista: con el texto
+vigente publicado y sin suscribir, dice `firmado: false` y `estado: "no_firmado"`, y las
+suscripciones anteriores quedan en `versiones_firmadas`. El manifiesto quedo ASCII puro.
+
+**El gate, medido.** En `primera_firma`, el item legado `google_dpa` sale **N/A** y el pendiente real
+es `mail_provider_dpa`, con el motivo y la accion que lo cierran. `FIRMA_EXIGIR_ANEXO_NUBE` sigue
+**apagada** y el preflight aborta con el motivo real: no hay ninguna Empresa activa con el Anexo de
+Nube suscrito sobre el texto vigente. Un preflight que aborta con el motivo correcto es un preflight
+que funciona.
+
+**Lo que queda, con responsable.** Diez pendientes, todos del owner: la aceptacion del CDPA en la
+consola de Workspace (P1), la cuenta `kair@gesstiar.com` activa con 2SV y el metodo de autenticacion
+(P2), los alias de los canales de derechos y PQRS (P3), SPF/DKIM/DMARC (P4), el envio real de prueba con
+`Message-ID` de `@gesstiar.com` (P5), la revocacion de las app passwords de la cuenta de consumo (P6),
+la respuesta escrita del abogado a las cuatro preguntas del §8 del plan (P7), la suscripcion de la
+v1.2 y la re-suscripcion del Encargo 2026-11-09 por ASEPLUS (P8), la publicacion en `sitio/` y
+`gh-pages` (P9) y el despliegue (P10). Los canales de derechos, PQRS e incidentes **no se migraron**:
+los alias de Workspace no estan verificados y publicar una direccion de derechos que no recibe
+solicitudes dejaria sin canal real a los titulares. Esa excepcion quedo **escrita**, con motivo y
+accion de cierre, en la Decision A, en el manifiesto (`canales.excepcion_documentada`) y en
+`src/config.js`.
+
+**Lo que sigue abierto de antes.** El commit `4ac37149` (📦1046) sigue **sin pushear**. Siguen
+pendientes las 5 app passwords de Gmail sin rotar, Node 20.20.2 en EOL y la copia off-site con
+`rclone`, la seccion E (G3), la Constancia firmada, T8, T6 (E2E con datos sinteticos), T7 (reversion
+probada) y definir `FIRMA_ADMIN_ACTOR`. **Cerrar el punto 2 no abre produccion.**
+
+**Lo que NO se hizo, por diseno.** No se encendio la compuerta, no se desplego, no se publico en
+`gh-pages`, no se firmo nada y no se toco el Acuerdo v1.5 ni sus clausulas 10.1 y 10.5(f). La
+matriz de finalidades solo cambio de version y fecha: **ninguna finalidad, ninguna base juridica ni
+ningun estado de habilitacion** cambio, porque ese reparto lo valida el abogado.
+
+**La leccion, en `sgsst-electron-app/BITACORA.md`.** El gate comparaba el estado con una fecha en
+vez de con el texto; la compuerta miraba una ruta escrita a mano; y el item que ya no aplicaba se
+contabilizaba como pendiente. Tres trampas nuevas quedaron en PROMPT.md: **137** (el estado "firmado"
+se contrasta contra el TEXTO, no contra la fecha), **138** (un control que mira una RUTA escrita a mano
+analiza un documento que el servicio no firma) y **139** (un item que ya no aplica NO se marca "ok":
+`no_aplica` no es "cumplido").
+
+---
+
+
+## 📦1047 · Cierre del punto 3: alineación de código, manifiesto y Anexo (9-nov-2026)
+
+**Lo que se hizo.** El plan del punto 3 (alinear código, manifiesto y Anexo, cerrar la evidencia del
+proveedor y dejar el paquete listo para publicar) se ejecutó de punta a punta, en el mismo patrón que
+la orden anterior: ejecución completa, **sin commit, sin push y sin despliegue**. La publicación y el
+despliegue los ejecuta el owner.
+
+**El estado real del punto 3 no era el que decía el `Historial.md`.** La entrada anterior afirmaba que
+"el pendiente real es `mail_provider_dpa`". Con el manifiesto vigente hay **tres** pendientes de este
+punto: `mail_provider_dpa` (falta la aceptación del CDPA), `firmado_nube` (la v1.2 no está suscrita) y
+`estado_encargo` (el Encargo 2026-11-09 no está suscrito). El 39/40 no era el estado actual.
+
+**El plan traía una premisa que era falsa.** Afirmaba que las pruebas no corren en este equipo por el
+desajuste de ABI de `better-sqlite3`. **Sí corren**: con el Node de Electron (`ELECTRON_RUN_AS_NODE=1`
++ `electron.exe`), que es el runtime para el que se compiló el binding. La suite completa se corrió en
+este equipo, sin concurrencia: **2 436 tests · 2 434 verdes · 0 rojos · 2 omitidos**.
+
+**Lo que se encontró y se corrigió en el propio paquete.**
+
+1. **El Anexo de Encargo 2026-11-09 llevaba dentro enlaces al Anexo de Nube histórico.** El §5 decía
+   «Anexo de Nube, versión 1.2» con su enlace correcto, pero el §1 y el §9 apuntaban a
+   `anexo-nube-v1.1.html`. Corregidos los dos enlaces con recuento exacto de coincidencias. **La huella
+   del Encargo cambió**: de `4a647093…5b01` a `0cd6c05f0574bbcdbb8277306a9084784a48815edd862cd31e97eb5435c22a1e`,
+   y el manifiesto se recalculó con su script. El texto que se había citado en el plan quedó obsoleto.
+2. **El Anexo de Encargo firmado 2026-11-06 se archivó antes de que lo sustituyera.** Hoy solo existía
+   `legal/anexo-encargo.html`, que la versión nueva sobrescribió: la copia pública del texto firmado se
+   perdía. Se archivaron `legal/anexo-encargo-2026-11-06.html` y `sitio/anexo-encargo-2026-11-06.html`,
+   byte a byte desde `HEAD`, con la huella `5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72`
+   — la que pedía el plan. Un texto suscrito no se edita jamás.
+3. **El manifiesto no tenía script para el Anexo de Nube.** El plan lo pedía y no existía: la firma
+   tenía que escribirse a mano. Se creó `scripts/actualizar-manifiesto-anexo-nube.js`, que lee
+   `gh_firma_anexo_nube_suscripciones` y la ficha de la Empresa, y **solo declara `firmado: true` si la
+   suscripción corresponde al TEXTO VIGENTE** (versión y huella del archivo). Sin suscripción del texto
+   vigente escribe `firmado: false`: eso es un estado, no un error. Con 25 pruebas.
+4. **Dos scripts escribían el mismo bloque y el segundo borraba al primero.** `actualizar-manifiesto-1047.js`
+   reconstruía `anexo_nube` con `firmado: false` SIEMPRE: correrlo después del script nuevo **borraba una
+   firma real** sin que nadie tocara la base. Se ajustó para que conserve la firma que describe el texto
+   vigente y la mueva a `versiones_firmadas` si describe otro. Los dos órdenes se prueban.
+
+**El escaneo de secretos: el paquete limpio, el historial no.** El plan pedía en su tabla de riesgos
+«falta escaneo del historial y de artefactos». Se escanearon los 33 archivos del paquete (limpio) y los
+**25 105 blobs del historial completo**, y en el historial aparecieron dos cosas que no están en el árbol
+de trabajo:
+
+- **Un token personal de GitHub** (`ghp_…`) en `sgsst-electron-app/docs/05-updates/v0.1.83-python-optimization.md`,
+  en la línea que documenta `export GH_TOKEN=…` para el build. El archivo se borró en el 📦580, pero el
+  commit que lo introduce está en `origin/Dev` y **el repositorio es público**
+  (`https://api.github.com/repos/Reivaj640/SG-SST-E` responde `"private": false`).
+- **Cuatro app passwords de Gmail de cuentas de clientes** (ASEPLUS, ASEL, TEMPOACTIVA, TEMPOSUM) en
+  `sgsst-electron-app/Portear/src/remision_utils.py` y `Remisiones_v1.0.py`, desde el 📦 #31 hasta el 📦931
+  que las sacó del código. El propio código lo dice: «este repo es público y estas app passwords de Gmail
+  quedaron en el historial de git».
+
+**Eso es lo más urgente que queda, y es del owner:** revocar el token de GitHub y rotar las cuatro app
+passwords. Sacar el secreto del código no lo saca del historial, y purgar el historial sin revocar no
+sirve de nada (las copias quedan en los clones, en los forks y en las cachés), y purgarlo rompe las
+huellas de los anexos que viven en el historial. Queda como **P11** y **P12** en la tabla de instrumentos.
+
+**La brecha de contrafirma del Anexo de Nube es de modelo de datos, no de manifiesto.** El texto dice que
+el Anexo se suscribe por ambas partes, pero el flujo digital registra **solo** la suscripción de la
+Empresa: la tabla `gh_firma_anexo_nube_suscripciones` no tiene columnas de contrafirma, no hay
+`/anexo-nube/contrafirmar`, no hay segundo canal y no hay acta (el Anexo de Nube no genera acta, a
+diferencia del Anexo de Encargo). El ítem `firmado_nube` del gate mide la suscripción de la Empresa. Cómo
+se cierre esa brecha es decisión del owner: agregar el acto al servicio, firmarlo fuera y registrar la
+evidencia, o dejarla escrita como limitación.
+
+**El sitio público sigue desalineado, y es a propósito.** `sitio/politica-firma.html`,
+`sitio/terminos.html`, `sitio/privacidad.html`, `sitio/autorizacion-trabajadores.html` y `sitio/index.html`
+siguen diciendo «cuenta gratuita de Gmail (cuenta de consumidor)», «no se utiliza Google Workspace» y «Google
+no actúa como encargado». Cambiar solo el enlace del menú a la v1.2 habría dejado un texto falso con un
+enlace nuevo: peor que un sitio viejo coherente. Corregir esos textos exige los **hechos verificados** (P1
+aceptación del CDPA, P2 cuenta activa, P5 envío real), no una decisión de redacción. Queda escrito, con su
+dependencia, y se corrige en la Fase 3 junto con el despliegue.
+
+**La tabla única de instrumentos** quedó en
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/tabla-instrumentos-vigentes-2026-11-09.md`:
+documento → versión → hash → fecha → suscripción → evidencia, con los once pendientes y lo que se midió.
+
+**Lo que se midió.**
+
+| Control | Resultado |
+|---|---|
+| `actualizar-manifiesto-1047.js --check` | 0 — el manifiesto está al día |
+| `generar-anexo-encargo.js --check` | 0 — el Encargo es reproducible desde sus dos fuentes |
+| Suite completa del `firma-service` | 2 436 tests · 2 434 verdes · 0 rojos · 2 omitidos |
+| Pruebas del script nuevo del Anexo de Nube | 25 · 25 verdes |
+| Preflight del Anexo de Nube | Aborta con **exit 5** y el motivo real |
+| Gate `primera_firma` | 6 bloqueantes (3 de este punto, 2 del Acuerdo, 1 de la migración 036 que no se aplica en la base de pruebas) |
+| Barrido de los 37 archivos del paquete | Limpio |
+
+**Lo que queda abierto, con responsable.** Del plan: **P1** (aceptación del CDPA en la consola de
+Workspace), **P2/P4/P5/P6** (cuenta activa, SPF/DKIM/DMARC, envío real, revocación de las app passwords
+de `adminkair@gmail.com`), **P7** (respuesta escrita del abogado a las cuatro preguntas del §8),
+**P8** (suscripción de la v1.2 y del Encargo 2026-11-09 por ASEPLUS, por el canal administrativo y con
+motivo, más la contrafirma), **P9/P10** (publicación en `sitio/` y `gh-pages`, y despliegue, con P8
+cerrado). De esta ronda: **P11** (rotar las cuatro app passwords de clientes) y **P12** (revocar el token de
+GitHub). Siguen abiertos los del punto 2 que no dependen de la elección jurídica: Node 22, el destino
+del respaldo off-site (disco cifrado o nube, y si es nube hay que declarar al proveedor en el Anexo y en
+el manifiesto antes de usarlo), T6, T7, la sección E del G3 con la Constancia firmada, T8 y J1-J14.
+
+**Dos decisiones del owner quedaron sin respuesta y el paquete se dejó listo sin commit:** (a) cómo se
+contrafirma el Anexo de Nube v1.2, y (b) si el 📦1047 se commitea como unidad. El `push` del
+📦1046 (`4ac37149`) sigue esperando la palabra.
+
 ## 🔻 Regla de cierre (obligatoria)
 
 **Antes de terminar cualquier trabajo o sección, el modelo DEBE preguntar al owner:**
@@ -7761,3 +8027,255 @@ Al owner le corresponde responder. Si dice que sí, se actualizan:
 | `CONTEXT.md` | Si cambió el estado del proyecto o el foco |
 | `BITACORA.md` | La lección del bug, con su "por qué se rompió" |
 | `CHANGELOG.md` + `README.md` + `release-notes.md` | Al commitear, no al cerrar |
+
+
+---
+
+## 📦1047 · Punto 3 (bis): la contrafirma del Anexo de Nube, el segundo acto que faltaba (9-nov-2026)
+
+**Por qué esta entrada.** La entrada anterior cerró el punto 3 sobre el papel: texto vigente,
+manifiesto, CDPA y el Anexo de Encargo. Al medir el gate otra vez, con el detalle de cada item, salió
+un **verde falso que no era de escribir una mentira**: el item `firmado_nube` daba `ok` y el manifiesto
+decía `firmado: true` describiendo **la mitad** del instrumento. El texto vigente del Anexo de Nube
+(v1.2, §10) lo suscribe la Empresa **y** lo contrafirma K+AIR, y el propio texto dice que el
+instrumento solo queda *ejecutado* cuando los dos actos se han producido. El código solo registraba
+el primero: no había contrafirma que registrar, ni columna que la guardara, ni ruta que la pidiera.
+
+**Lo que se implementó (el camino del plan).** El plan del punto 3 daba dos caminos para cerrar la
+brecha: agregar el acto de contrafirma al flujo del Anexo de Nube, o firmarlo fuera del servicio y
+registrar PDF, hash y fecha. Se implementó **el primero**, que es el que el plan recomienda cuando el
+servicio es el sistema de registro: el servicio es el expediente, y un acta que vive fuera del
+sistema es un acta que nadie puede contrastar.
+
+- **Migración `060_anexo_nube_contrafirma.sql`**: en `gh_firma_anexo_nube_suscripciones`, las columnas
+  del segundo acto (`contrafirmado_at`, `contrafirma_actor`, `contrafirma_motivo`,
+  `contrafirma_codigo_enviado_at`, `contrafirma_canal`, `contrafirma_otp_*`, `contrafirma_estado`,
+  `contrafirma_ip`, `contrafirma_user_agent`, `contrafirma_evidencia`, `contrafirma_acta_hash`,
+  `contrafirma_acta_bytes`, `contrafirma_acta_archivo`); en `gh_firma_empresas`,
+  `anexo_nube_ejecutado_at`. Todo aditivo, con valor NULL: las filas que ya existieran siguen válidas.
+- **`src/services/anexoNube.js`**: `solicitarContrafirmaAnexoNube` (el código sale al **buzón de
+  protección de datos de K+AIR**, que es fijo en la configuración del servicio y nunca a un buzón que
+  la Empresa pueda leer) y `contrafirmarAnexoNube` (valida el código con un propósito de derivación
+  DISTINTO al de la suscripción, coteja quién firmó por la Empresa, genera el acta, y escribe las dos
+  fechas —la del segundo acto y la de ejecución en la ficha— en una sola transacción).
+- **`src/services/actaAnexoNube.js`**: el acta del segundo acto, con su nombre de archivo, su
+  SHA-256 y su tamaño, en la misma forma que el acta del Anexo de Encargo.
+- **`src/routes/admin-empresas.js`**: las dos rutas administrativas, con `X-Admin-Actor` y
+  `X-Admin-Motivo` obligatorios, como las del Anexo de Encargo.
+
+**Lo que se corrigió en el código que ya existía.** El instrumento no cambió, pero todo lo que
+dependía de él tenía que cambiar con él:
+
+- **`scripts/actualizar-manifiesto-anexo-nube.js`**: declara los **dos** actos (`firmado` y
+  `contrafirmado`, con fecha, actor, motivo y evidencia de cada uno). Y falla **cerrado por partes**:
+  sin la migración 060 sigue declarando "no hay suscripción del texto vigente" (eso no depende del
+  segundo acto), pero si HAY una suscripción del texto vigente y no puede leer la contrafirma, **no
+  escribe** y sale con 3 diciendo qué migración falta. La regla se sacó a una función pura
+  (`puedeDeclararFirma`) para poder atestiguarla.
+- **`scripts/actualizar-manifiesto-1047.js`**: conserva los campos del segundo acto cuando la firma
+  describe el texto vigente, y los mueve a la historia cuando describe otro. Los dos scripts siguen
+  pudiendo correr en cualquier orden.
+- **`src/services/readinessLegal.js`**: el gate mide los dos actos por separado. El item `firmado_nube`
+  sigue siendo el primero (y su detalle nombra el texto vigente), y hay un item nuevo,
+  `contrafirma_nube`, que mide el segundo y dice **cuál de los dos falta**. Los dos bloquean el gate de
+  primera firma.
+- **`src/services/empresa.js`**: la habilitación de la Empresa para pedir firmas exige ahora el
+  instrumento **ejecutado**, no solo suscrito: es el espejo del Anexo de Encargo, cuya habilitación ya
+  exigía la fecha de la contrafirma. La columna se lee con tolerancia (si no existe, ninguna Empresa
+  puede estar ejecutada) para no romper el servicio si la migración aún no está aplicada.
+- **`scripts/preflight-anexo-nube.js`**: distingue los dos motivos de aborto —"nadie lo ha suscrito"
+  y "lo suscribieron pero no lo contrafirmaron"— porque no se arreglan con la misma acción.
+
+**Lo que NO se hizo, por diseño.** No se encendió `FIRMA_EXIGIR_ANEXO_NUBE`, no se abrió producción,
+no se desplegó, no se publicó en `gh-pages` y **no se firmó nada**: la contrafirma de ASEPLUS la
+hace el owner por el canal administrativo, con su motivo y su evidencia (P8). El código queda
+construido y probado; el acto, no.
+
+**Lo que sigue abierto, con responsable.** Los diez pendientes del punto 3 siguen abiertos (P1 a
+P10), más los dos hallazgos del escaneo del historial (rotar las cuatro app passwords de clientes y
+revocar el token de GitHub), más la pregunta al abogado de si la contrafirma del Anexo de Nube se
+hace en el servicio o fuera de él (P7), que es la compuerta de P8. El commit `4ac37149` (📦1046)
+sigue **sin pushear**, y este paquete sigue **sin commitear**.
+
+**La lección, en `sgsst-electron-app/BITACORA.md`.** Un instrumento de dos partes no se mide con un
+acto. Tres trampas nuevas quedaron en PROMPT.md: **145** (un instrumento bilateral exige dos actos y
+cada uno se mide en su propio item), **146** (fallar cerrado se decide *por partes*: lo que no depende
+del dato ausente se declara igual, lo que sí depende no se declara) y **147** (cuando un instrumento se
+vuelve bilateral, se revisa todo lo que dependía de él: la habilitación, el gate, el preflight y el
+manifiesto).
+
+**La Ampliación del cierre: una cuarta trampa y el documento de operación del segundo acto.** La
+bitácora del día terminó con cinco reglas; al cerrarla quedaron **dos** cosas más escritas, porque
+eran la puerta de entrada de la próxima jornada:
+
+- **La trampa 148** (`PROMPT.md`): *una negativa escrita en un comentario es una afirmación que
+  caduca sola*. Al hacer bilateral el Anexo de Nube quedaron **tres** textos diciendo "el Anexo de
+  Nube NO es bilateral" — un comentario en `src/routes/empresaAnexos.js`, la tabla comparativa de
+  `FLOWS.md` y la nota de `API.md`. Eran verdad el día anterior y pasaron a ser mentira sin que nadie
+  los tocara. El peor era el comentario, pegado a la función que devolvía el estado, que decía la
+  razón de por qué ese estado era un `firmado` a secas.
+- **El documento de operación del segundo acto**:
+  `sgsst-electron-app/docs/gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md`.
+  Es la nota que enlaza el código ya construido con la respuesta que falta del abogado (P7): qué
+  exige la contrafirma, qué escribe, cómo se ejecuta por las dos rutas HTTP y **qué NO cierra**
+  (no firma nada, no sustituye la verificación documental, no abre producción). Su apartado 5 dice
+  qué queda por hacer **si P7 responde que la contrafirma se firma fuera del servicio**: el
+  manifiesto y el gate solo leen la base del servicio, y la habilitación de la Empresa depende de
+  `anexo_nube_ejecutado_at`, que escribe el servicio. Sin ese apartado, la respuesta del abogado
+  habría tenido que reconstruir el razonamiento para saber qué había que rehacer primero.
+
+**Y tres huecos que quedaban donde el estado SE MUESTRA.** Cerrar el segundo acto del Anexo de
+Nube no era solo el gate, el manifiesto y la habilitación: al verificar, aparecieron **tres**
+defectos que seguían midiendo el instrumento con un solo acto.
+
+1. **La lectura del operador devolvía `null` en los campos de la contrafirma.**
+   `GET /internal/admin/empresas/:id_empresa/anexos` tenía la fase 2 clavada en `null`, y el
+   comentario de la función afirmaba "el Anexo de Nube NO es bilateral". Eso no era una
+   descripción: era una fuente de verdad en falso. Ahora los campos del segundo acto **se leen de
+   la fila** (`contrafirmado_at`, `contrafirma_actor`, `contrafirma_motivo`, `contrafirma_canal`,
+   `contrafirma_estado`, `contrafirma_evidencia`, `contrafirma_acta_*`), con lectura tolerante: sin
+   la migración 060 aplicada vienen en `null` y no se inventa nada.
+2. **El panel del operador pintaba un badge verde "Firmado" con solo la suscripción.** La columna
+   del listado usaba `anexo_nube_firmado_at` — que es la **fase 1** — para decir "firmado". El
+   operador veía un instrumento listo cuando la Empresa seguía sin poder firmar. Ahora son los
+   mismos tres estados que el Anexo de Encargo (no suscrito / suscrito sin contrafirma /
+   ejecutado), con dos indicadores nuevos del listado: `tiene_anexo_nube_suscrito` y
+   `tiene_anexo_nube_ejecutado`.
+3. **`API.md` listaba dos canales IPC que no existen.** `firma:anexo:nube-contrafirma-codigo` y
+   `firma:anexo:nube-contrafirmar` **nunca se escribieron** en `main/firma-bridge.js`. La tabla
+   decía trece canales y el título del apartado decía once: el título era el que cuadraba. El
+   documento afirmaba una capacidad que el código no tenía, y nadie lo notó porque el documento
+   es texto y el código es código, y nadie los comparó.
+
+**La lección de estos tres**: **cerrar un instrumento no es cerrar el código**. El gate, el
+manifiesto y la habilitación se corrigieron primero, pero lo que *muestra* el estado —la lectura
+del operador y la vista que la pinta— seguía con la regla anterior. Un instrumento que todos los
+actos miden bien pero que se muestra mal sigue siendo un verde falso: esta vez, hacia el
+operador.
+
+**Dos reglas nuevas en `PROMPT.md`**: la **149** (un documento que promete una capacidad que el
+código NO tiene es un verde falso por la vía del papel: toda fila que nombre un canal, un método
+o un endpoint se contrasta contra el archivo que lo implementa antes de escribirla, y el recuento
+del apartado tiene que cuadrar con las filas) y la ampliación de la **148** (una negativa escrita
+en un comentario es una afirmación que caduca sola). Y en `BITACORA.md`, la **regla 8** de la
+lección del día: cuando un instrumento cambia de forma, se recorre **todo** lo que lo muestra, no
+solo lo que lo declara.
+
+**Lo que NO se hizo, por diseño.** No se puso el segundo acto en la app de escritorio: las dos
+rutas existen en el servicio, pero **no hay canal IPC ni botón**, y el operador lo hace por HTTP
+contra el servicio (está escrito paso a paso en `contrafirma-anexo-nube-v1-2.md` §3.2). Un botón
+sin canal no se pone: el operador lo pulsa y no pasa nada. No se encendió
+`FIRMA_EXIGIR_ANEXO_NUBE`, no se abrió producción, no se desplegó, no se publicó en `gh-pages` y
+**no se firmó nada**: la contrafirma de ASEPLUS la hace el owner por el canal administrativo
+(P8), con su motivo y su evidencia.
+
+## 📦1047 (bis) · P7 respondido: la acreditación de la facultad de quien contrafirma por Gesstiar (10-nov-2026)
+
+**El abogado respondió P7.** La contrafirma del Anexo de Nube v1.2 **va dentro** del servicio, con el mecanismo de firma electrónica ya implementado, conservando identificación del firmante, manifestación expresa, código de un solo uso, cotejo de representación, fecha y hora, motivo, IP, trazabilidad append-only, acta y huella SHA-256. Su recomendación: **mantener exactamente la arquitectura ya construida**, no sacar la contrafirma del sistema. El owner cerró además **P11** y **P12** (la rotación de las app passwords y la del token), y confirmó que **P8 va en consecuencia de P7**.
+
+**El contraste con el código salió con una grieta.** De las tres condiciones de la respuesta, la segunda **no se cumplía**:
+
+> «La ejecución por una persona distinta del representante legal de Gesstiar S.A.S. requerirá
+> acreditar previamente la facultad de representación o poder suficiente, que deberá conservarse en
+> el expediente.»
+
+El código demostraba la facultad de un lado —la **Empresa**: `_cotejarFirmante` contrasta quién
+firmó contra el representante legal de su ficha, y sin coincidencia no hay contrafirma— y del otro
+lado —**Gesstiar**, el segundo firmante del instrumento bilateral— **no demostraba nada**. El
+segundo acto se cerraba con el nombre que llegaba en `X-Admin-Actor`: un dato declarado, sin
+acreditación. El acta declaraba **quién** firmó por K+AIR pero no **con qué poder**, y el gate no
+lo exigía: `contrafirma_nube` daba `ok` con fecha, actor y evidencia, y ninguno de esos tres campos
+era la facultad. Es el mismo patrón de verde falso de las rondas anteriores, con la ropa puesta:
+el instrumento se cerraba en el papel y no en el expediente.
+
+**Lo que se implementó** (migraciones `061` y `062`, servicio `poderesEncargado`, cuatro rutas, el
+acto, el acta, la evidencia, el manifiesto y el gate):
+
+1. **El registro de poderes.** `gh_firma_encargado_poderes` guarda, por poder o delegación, el
+   nombre de quien tiene la facultad, su cargo, el tipo, **la referencia del documento** y **su
+   huella SHA-256** (las dos obligatorias: sin referencia no hay contra qué contrastar y sin huella
+   el expediente no puede verificar el documento), su vigencia y el motivo del registro. El rastro
+   (`gh_firma_encargado_poderes_eventos`) es **append-only** (triggers en la 062, con la misma
+   directiva `@skip-when-env test` que la 055). La revocación **no borra**: deja la fila en
+   `REVOCADO` con su fecha y su motivo, y escribe el evento.
+2. **La comprobación.** `verificarFacultadContrafirmante(actor)`: si quien contrafirma es el
+   representante legal que declara el manifiesto legal, vale; si es otra persona, tiene que haber
+   un poder **vigente** a su nombre; si no hay actor declarado, o el poder está vencido, revocado
+   o todavía no empieza, la respuesta es `409 FACULTAD_NO_ACREDITADA` y **el acto no se cierra**.
+   El cotejo de nombres no depende de las tildes ni de las mayúsculas.
+3. **El mismo control en las DOS contrafirmas.** La del Anexo de Encargo tenía exactamente la
+   misma grieta: arreglar solo una es dejar el hueco abierto en el gemelo.
+4. **El dato por todas partes.** El acta (sección nueva, con la faculty, el instrumento y su
+   huella), la evidencia del acto (`facultad`), el manifiesto (`contrafirma_facultad`, leído de la
+   evidencia, no inventado) y el gate, que ahora **exige** la acreditación: `contrafirma_nube` y
+   `estado_encargo` no pueden quedar `ok` sin ella, y el detalle dice por qué.
+5. **Las vías administrativas.** `GET`/`POST /internal/admin/encargado/poderes` y
+   `POST /internal/admin/encargado/poderes/:id/revocar` (con `X-Admin-Motivo` obligatorio), más
+   `POST /internal/admin/empresas/:id_empresa/anexo-nube/contrafirma/facultad`, que **certifica**
+   la faculty de una contrafirma hecha con un despliegue anterior: comprueba el poder de quien hizo
+   el acto y lo escribe en la evidencia y en el rastro, **sin tocar** `contrafirmado_at`, la huella
+   del acta ni `anexo_nube_ejecutado_at`.
+
+**La tercera condición (la contrafirma externa) ya se cumplía por diseño, y queda atestado.**
+`contrafirmado_at` y `anexo_nube_ejecutado_at` los escribe **solo** el servicio: un acta firmada
+por fuera y dejada en un correo no cambia una sola fila, así que `contrafirma_nube` no puede
+cerrarse y el instrumento no se habilita — exactamente lo que el abogado pide. Lo que **no** se
+implementó es una vía para *incorporar* una contrafirma externa con su evidencia: la condición
+exige una noción de «evidencia íntegra y vinculada inequívocamente al instrumento» que hay que
+definir con detalle, y el owner recomendó mantener la arquitectura. Queda anotado en
+`acreditacion-facultad-contrafirmante.md` §5.
+
+**La decisión sobre el texto la tomó el owner: control interno (opción A).** El §10 del texto
+vigente del Anexo de Nube v1.2 **no menciona** esta exigencia (ni el §12 del Anexo de Encargo), y
+**va a seguir sin mencionarla**: la acreditación se queda en el expediente (registro de poderes +
+acta + evidencia + manifiesto + gate). **No hay v1.3**, la huella de la v1.2 no se mueve, no hay
+repetición en `legal/` ni en `sitio/`, y **P8 sigue siendo la suscripción de la v1.2 por ASEPLUS**.
+Lo que esta decisión NO cierra: si más adelante el abogado quiere que la condición quede **también**
+en el texto, eso es una v1.3 y hay que hacerla **antes** de que ASEPLUS firme.
+
+**Un efecto operativo que hay que decir de frente**: la contrafirma ahora exige un actor que sea
+**el nombre de una persona**. El valor por defecto de la app (`K+AIR usuario@EQUIPO`) no lo es y no
+tiene faculty acreditada, así que con él la contrafirma se rechaza. **Quedó definido** (owner,
+10-nov-2026): `FIRMA_ADMIN_ACTOR=Javier Robles Fontalvo`, el representante legal de Gesstiar, que
+es justo el caso que el abogado excluyó de la exigencia, así que **no hay que registrar ningún
+poder** para su nombre. (Si llegara a cambiar la persona que contrafirma, hay que **registrar su
+poder antes**.) La variable quedó declarada en los `.env` de ejemplo del **service**, no en el de
+la app de escritorio: ese `.env` viaja **dentro del instalador**, y ahí un nombre de persona
+atribuiría los actos administrativos de toda copia instalada a esa persona. El preflight lo dice:
+`scripts/preflight-anexo-nube.js` ahora dice quién es el representante legal, qué poderes hay
+vigentes y si el actor configurado tiene la faculty; y cuando lo que falta es la faculty, el
+motivo del preflight lo distingue de «falta la contrafirma», porque son dos acciones distintas.
+
+**Documentos**: documento nuevo `acreditacion-facultad-contrafirmante.md`; `API.md` (§6.21.5.1 con
+las cuatro rutas y el detalle de la regla), `FLOWS.md` (los dos diagramas de contrafirma con el
+paso nuevo), `CONTEXT.md`, `PROMPT.md` (trampa **153**: un acta que dice QUIÉN firmó pero no
+CON QUÉ PODER es un acta a medias), `BITACORA.md` (la entrada del día con sus siete reglas) y la
+tabla de instrumentos.
+
+**Verificación**: suite del firma-service **2 574 tests · 2 572 pass · 0 fail · 2 skipped**;
+`poderes-encargado.test.js` **20/20** (registro, revocación, vigencia, cotejo de nombres, la
+contrafirma con y sin faculty, la certificación posterior, las rutas y el trigger append-only contra
+el archivo real); `anexo-nube-contrafirma.test.js` **20/20**; `readiness-legal.test.js` **59/59**
+(incluye «sin la acreditación, el ítem NO puede quedar ok», para los dos instrumentos);
+`admin-empresas-anexos.test.js` (la lectura trae la acreditación en las **dos** formas);
+`actualizar-manifiesto-1047.js --check` **0**; `actualizar-manifiesto-anexo-nube.js --check` **0**;
+app de escritorio **27/27**; barrido limpio.
+
+**Lo que NO se hizo, por diseño.** No se firmó nada: la contrafirma de ASEPLUS la hace el owner
+por el canal administrativo (P8), y ahora con la faculty acreditada. No se encendió
+`FIRMA_EXIGIR_ANEXO_NUBE`, no se abrió producción, no se desplegó, no se publicó en `gh-pages`, no
+se tocó `sitio/` y **no se commiteó ni se pusheó nada**: el 📦1047 sigue siendo un paquete sin
+commitear, con el 📦1046 (`4ac37149`) todavía sin pushear.
+
+**El panel del operador también participa, y tenía su propio hueco.** La vista de los anexos muestra,
+en las dos vistas (Anexo de Nube y Anexo de Encargo), la línea «Facultad acreditada»: quién
+contrafirmó y si lo hizo como representante legal de Gesstiar o con un poder acreditado. Para que esa
+línea tuviera algo que leer, la lectura (`GET /internal/admin/empresas/:id/anexos`) tiene que traer el
+`contrafirma_evidencia` en las **dos** formas, y en la del Anexo de Encargo **faltaba**: el panel
+mostraba «NO DECLARADA» con la faculty ya acreditada en el expediente. Es el verde falso del gate,
+del lado contrario: un falso **negativo**, que hace creer que falta lo que ya está. Corregido (la
+lectura trae `contrafirma_evidencia`, `contrafirma_actor` y `contrafirma_motivo` en las dos formas),
+con su prueba en `tests/routes/admin-empresas-anexos.test.js` y un guard de UI en
+`main/test-anexos-1038.js` que exige la línea en las dos vistas. El `?v=` del panel se bumpeó
+(`GH-20261110-facultad-contrafirmante`) porque se tocó su JS de UI.
+

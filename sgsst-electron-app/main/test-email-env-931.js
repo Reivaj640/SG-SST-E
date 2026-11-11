@@ -196,4 +196,30 @@ chk('.env.example documenta las cinco variables de correo (con placeholders vaci
   !/KAIR_EMAIL_[A-Z_]+=[ \t]*\S/.test(envExampleSrc),
   'sin valores');
 
+// ── 9. El cargador CARGA (no solo se lee como texto) ─────────────────────────
+// 📦1047 — Un comentario de bloque se cierra antes de tiempo si su texto
+// contiene `*/`. Un patron de archivos como `**/utils/**` lo tiene: el `*/` de
+// `**/` cierra el comentario y lo que sigue se ejecuta como codigo. Eso NO es
+// un error de sintaxis — `node --check` pasa — y el fallo aparece al IMPORTAR
+// el modulo, como ReferenceError. Un test que solo lee el archivo como texto
+// no lo ve nunca: por eso 2494 tests en verde dejaron pasar un cargador que
+// reventaba al cargarlo, y el boton "Enviar por correo" murio en el
+// instalador sin que nadie lo notara.
+//
+// Estos dos checks IMPORTAN el codigo real, que es lo que hace la app.
+function cargar(ruta) {
+  try {
+    require(ruta);
+    return null;
+  } catch (e) {
+    return (e && e.message) ? e.message : String(e);
+  }
+}
+const falloLoader = cargar(loaderPath);
+chk('shared/env-loader.js SE CARGA (lo que importa la app, no lo que se lee)',
+  falloLoader === null, falloLoader === null ? '' : falloLoader.split('\n')[0].slice(0, 120));
+const falloSender = cargar(senderPath);
+chk('utils/emailSender.js SE CARGA (el boton "Enviar por correo")',
+  falloSender === null, falloSender === null ? '' : falloSender.split('\n')[0].slice(0, 120));
+
 correr();

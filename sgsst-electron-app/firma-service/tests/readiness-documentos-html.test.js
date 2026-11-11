@@ -19,6 +19,10 @@ const assert = require('node:assert/strict');
 
 const readiness = require('../src/services/readinessLegal');
 const { MARCADORES_PROHIBIDOS, reDeMarcador } = require('../src/utils/textoLegal');
+// La identidad del texto vigente del Anexo de Nube: la version y la ruta.
+// Vive en un modulo SIN dependencias, asi que este archivo no puede
+// quedar mirando un texto que ya no es el que se suscribe.
+const { VERSION_MODELO, RUTA_MODELO } = require('../src/services/anexoNubeModelo');
 
 /**
  * Un Anexo de Nube escrito como el real: HTML con entidades. Las frases son
@@ -221,13 +225,27 @@ test('la excepcion de la Empresa es de CONTENIDO EXACTO', function () {
   assert.equal(r.modeloOk, false);
 });
 
+/**
+ * El texto que la Empresa lee, sin las etiquetas.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function sinEtiquetas(html) {
+  return String(html).replace(/<[^>]*>/g, ' ');
+}
+
 test('el Anexo de Nube del repo es el MODELO y no le falta ningun dato del owner', function () {
   const fs = require('node:fs');
   const path = require('node:path');
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'legal', 'anexo-nube-v1.0.html'),
-    'utf8',
-  );
+  // El texto que se verifica es el VIGENTE: el que declara el modulo que
+  // suscribe. Su nombre lleva la version, y esa version no esta escrita
+  // a mano en ningun lado de este archivo.
+  assert.ok(RUTA_MODELO.endsWith(`anexo-nube-v${VERSION_MODELO}.html`),
+    'el texto vigente es el archivo cuya version declara el modulo que suscribe');
+  assert.ok(fs.existsSync(RUTA_MODELO),
+    `el texto vigente del Anexo de Nube no esta en legal/: ${RUTA_MODELO}`);
+  const html = fs.readFileSync(RUTA_MODELO, 'utf8');
   const r = readiness.analizarAnexoNube(html);
   assert.equal(r.clausulasOk, true, `faltan: ${JSON.stringify(r.faltan)}`);
   assert.equal(
@@ -236,31 +254,40 @@ test('el Anexo de Nube del repo es el MODELO y no le falta ningun dato del owner
     `los tres campos de la Empresa: ${JSON.stringify(r.de_la_empresa)}`,
   );
   // Los catorce apartados del owner estan diligenciados (31-oct-2026): el modelo
-  // no le falta ningun dato. El unico corchete que queda es la MENCION del
-  // marcador en el aviso de no firmar, que no es un hueco por llenar.
+  // no le falta ningun dato por llenar.
   assert.equal(
     r.huecosBloqueantes,
     0,
     `huecos bloqueantes: ${JSON.stringify(r.huecos_bloqueantes.unicos)}`,
   );
-  assert.equal(r.menciones.total, 1, 'la mencion se lista: nada queda escondido');
+  // Las menciones de un marcador (el texto NOMBRA "[PENDIENTE]" en una regla)
+  // no son huecos: se listan, no bloquean. El texto vigente puede no tener
+  // ninguna: lo que no puede es que el analizador esconda una mencion que
+  // el texto tiene. El conteo sale del TEXTO, no de una constante.
+  const mencionesEnElTexto = (sinEtiquetas(html).match(
+    /\bmarcadores?\s*(?:&[a-zA-Z]+;|\s)*\[\s*pendiente\s*\]/gi) || []).length;
+  assert.equal(
+    r.menciones.total,
+    mencionesEnElTexto,
+    'las menciones que el analizador lista son las que el texto tiene: nada queda escondido',
+  );
   assert.equal(r.modeloOk, true, 'el modelo esta completo');
 });
 
 test('los dos arboles del Anexo de Nube estan identicos (legal/ y sitio/)', function () {
   const fs = require('node:fs');
   const path = require('node:path');
-  const legal = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'legal', 'anexo-nube-v1.0.html'),
-    'utf8',
-  );
-  const sitio = fs.readFileSync(
-    path.join(__dirname, '..', '..', '..', 'sitio', 'anexo-nube-v1.0.html'),
-    'utf8',
-  );
-  assert.equal(
-    sitio,
-    legal,
-    'el Anexo de Nube publicado y el del repo tienen que ser el mismo archivo',
+  // Los DOS arboles tienen que llevar el MISMO nombre de archivo: el del
+  // modelo vigente, el que declara el modulo que suscribe.
+  const nombre = path.basename(RUTA_MODELO);
+  const legal = RUTA_MODELO;
+  const sitio = path.join(__dirname, '..', '..', '..', 'sitio', nombre);
+  assert.ok(fs.existsSync(legal),
+    `el texto vigente del Anexo de Nube no esta en legal/: ${legal}`);
+  assert.ok(fs.existsSync(sitio),
+    `falta la copia PUBLICADA del Anexo de Nube en sitio/: ${sitio}`);
+  assert.ok(
+    fs.readFileSync(sitio).equals(fs.readFileSync(legal)),
+    'el Anexo de Nube publicado y el del repo tienen que ser el mismo archivo, byte a byte',
   );
 });

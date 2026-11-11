@@ -80,18 +80,33 @@ function _estadoAnexoEncargo(empresa) {
 /**
  * El estado del Anexo de Nube de la Empresa.
  *
- * El Anexo de Nube NO es bilateral: lo suscribe la Empresa y ya está. Por eso
- * no tiene el par "suscrito/ejecutado" del de Encargo, sino un `firmado` que
- * dice si la Empresa tiene el Anexo de Nube y con qué versión y huella.
+ * 📦1047 · punto 3 EL ANEXO DE NUBE ES BILATERAL. El texto vigente (la v1.2,
+ * §10) lo suscribe la Empresa y lo contrafirma K+AIR, y el instrumento solo
+ * queda EJECUTADO cuando los dos actos se han producido. Antes de esto el
+ * bloque decía "firmado" y nada más, con un comentario que afirmaba que el
+ * Anexo de Nube no era bilateral: era exactamente la mitad del instrumento
+ * presentada como si fuera el todo, y el mismo verde falso del gate.
+ *
+ * Ahora tiene el par del Anexo de Encargo: TRES ESTADOS, no dos.
+ *
+ *   "ejecutado"   · la Empresa lo suscribió y K+AIR lo contrafirmó
+ *   "suscrito"    · la Empresa lo suscribió; falta el segundo acto
+ *   "no_suscrito" · la Empresa no tiene el Anexo de Nube
  *
  * @param {object|null} empresa - la fila de la Empresa, o null si no existe.
+ * @param {string} id_empresa - para leer la fecha de ejecución.
  * @returns {object} el bloque `anexo_nube`.
  */
-function _estadoAnexoNube(empresa) {
+function _estadoAnexoNube(empresa, id_empresa) {
   const fecha = empresa ? (empresa.anexo_nube_firmado_at || null) : null;
+  // La fecha de EJECUCIÓN (la de la contrafirma), no la de la suscripción.
+  const ejecutadoAt = id_empresa ? empresaService.fechaEjecucionAnexoNube(id_empresa) : null;
   return {
+    estado: ejecutadoAt ? 'ejecutado' : (fecha ? 'suscrito' : 'no_suscrito'),
     firmado: Boolean(fecha),
     fecha,
+    ejecutado: Boolean(ejecutadoAt),
+    fecha_ejecucion: ejecutadoAt,
     version: empresa ? (empresa.anexo_nube_version || null) : null,
     hash: empresa ? (empresa.anexo_nube_hash || null) : null,
   };
@@ -121,7 +136,7 @@ router.get('/empresa/anexos', requireEmpresaScopeAndLimit(), (req, res, next) =>
     res.json({
       id_empresa,
       anexo_encargo: _estadoAnexoEncargo(empresa),
-      anexo_nube: _estadoAnexoNube(empresa),
+      anexo_nube: _estadoAnexoNube(empresa, id_empresa),
       // Se devuelve TAL COMO lo da el service: ese mensaje es el que
       // distingue "suscribió pero K+AIR no contrafirmó" de "no tiene Anexo",
       // y la UI lo muestra, no lo reescribe.

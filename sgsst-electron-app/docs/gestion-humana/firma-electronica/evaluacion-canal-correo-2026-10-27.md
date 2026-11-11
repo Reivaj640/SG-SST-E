@@ -13,6 +13,19 @@ citadas, y **las confirma o corrige el abogado**.
 > aplicables. Esos puntos requieren determinación profesional escrita. El análisis siguiente
 > se conserva como antecedente de la decisión del 27-oct y no debe usarse como posición vigente.
 
+> **Actualizacion del 9 de noviembre de 2026 (URL del instrumento y estado de la verificacion).**
+> Este documento cita el "DPA de Google Workspace" con una **URL archivada** que ya no resuelve
+> (la ruta `workspace.google.com/terms/dpa_terms/` devuelve 404). El instrumento vigente ya no se
+> llama "DPA": es el **Cloud Data Processing Addendum (CDPA)**, cuyo texto vigente es el del
+> **30 de octubre de 2026**, con URL canonica
+> `https://admin.google.com/terms/apps/8/1/en/dpa_terms.html`. Las tres huellas SHA-256 del
+> texto, del CDPA de la nube y del aviso de subencargados quedaron registradas en la
+> `decision-regularizacion-correo-2026-11-09.md`, junto con lo que se verifico y lo que NO.
+> La redaccion que deben usar los anexos (Google como Subencargado **condicionado** a la
+> vigencia y aplicabilidad del CDPA, y la distincion entre los datos del correo y los datos de
+> cuenta y telemetria de Google) quedo fijada en esa decision, que **manda** sobre este
+> documento en todo lo que se refiere al canal de correo.
+
 ---
 
 ## 1. Qué pregunta el abogado

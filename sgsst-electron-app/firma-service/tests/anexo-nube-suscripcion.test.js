@@ -70,10 +70,10 @@ function ultimoCodigo() {
 // EL TEXTO Y SU HUELLA
 // ===========================================================================
 
-test('el modelo vigente es la v1.1 y su huella es la de los bytes del archivo', () => {
+test('el modelo vigente es el que declara el servicio y su huella es la de los bytes del archivo', () => {
   resetDb();
   const m = anexoNube.modeloVigente();
-  assert.equal(m.version, '1.1');
+  assert.equal(m.version, anexoNube.VERSION_MODELO);
   const bytes = fs.readFileSync(anexoNube.RUTA_MODELO);
   const esperado = crypto.createHash('sha256').update(bytes).digest('hex');
   assert.equal(m.hash, esperado,
@@ -100,21 +100,44 @@ function sinEntidades(html) {
     .replace(/&mdash;/g, '—')
     .replace(/&laquo;/g, '«')
     .replace(/&raquo;/g, '»')
-    .replace(/&sect;/g, '§');
+    .replace(/&sect;/g, '§')
+    .replace(/&Aacute;/g, 'Á')
+    .replace(/&Eacute;/g, 'É')
+    .replace(/&Iacute;/g, 'Í')
+    .replace(/&Oacute;/g, 'Ó')
+    .replace(/&Uacute;/g, 'Ú');
 }
 
-test('la v1.1 ya no se prohíbe a sí misma: no dice que no se firma hasta completar pendientes', () => {
+test('el modelo vigente ya no se prohíbe a sí mismo: no dice que no se firma hasta completar pendientes', () => {
   const plano = sinEntidades(fs.readFileSync(anexoNube.RUTA_MODELO, 'utf8'));
   assert.ok(!/no se firma hasta/i.test(plano),
-    'la v1.1 no puede decir que no se firma hasta completar los pendientes');
+    'el modelo vigente no puede decir que no se firma hasta completar los pendientes');
   assert.ok(!/LO QUE TODAVÍA FALTA ANTES DE FIRMAR/i.test(plano),
-    'la v1.1 no puede conservar el bloque que impedía firmar');
-  assert.ok(/ESTADO DECLARADO DEL SERVICIO Y LIMITACIONES CONOCIDAS/i.test(plano),
-    'la v1.1 declara el estado del servicio');
-  assert.ok(/todavía no están implementados/i.test(plano),
-    'la v1.1 declara los controles que no están implementados');
-  assert.ok(/Cifrado en reposo del disco: verificado el 31-oct-2026 y NO implementado/i.test(plano),
-    'la v1.1 no puede suavizar el cifrado en reposo, que no está implementado');
+    'el modelo vigente no puede conservar el bloque que impedía firmar');
+  assert.ok(/ESTADO DECLARADO/i.test(plano) || /LIMITACIONES CONOCIDAS/i.test(plano),
+    'el modelo vigente declara el estado del servicio y sus limitaciones conocidas');
+  assert.ok(/(?:todavía )?no (?:están |está |se han )?implementad/i.test(plano),
+    'el modelo vigente declara los controles que no están implementados');
+  assert.ok(/Cifrado en reposo del disco[^.]{0,200}no implementad/i.test(plano),
+    'el modelo vigente no puede suavizar el cifrado en reposo, que no está implementado');
+});
+
+test('el modelo vigente declara el vinculo con Google (CDPA) y no afirma que Google sea Responsable', () => {
+  const plano = sinEntidades(fs.readFileSync(anexoNube.RUTA_MODELO, 'utf8'));
+  // El vinculo con el proveedor de correo se declara por su instrumento.
+  assert.ok(/Cloud Data Processing Addendum/i.test(plano) || /\bCDPA\b/.test(plano),
+    'el modelo vigente declara el Cloud Data Processing Addendum (CDPA) del proveedor de correo');
+  // Y el papel de Google NO se afirma en forma absoluta: la negacion va
+  // entre "Google" y el verbo, asi que un "no" la deja pasar.
+  assert.ok(!/Google(?:\s+LLC)?\s+es\s+Responsable/i.test(plano),
+    'el modelo vigente no puede afirmar que Google es Responsable');
+  assert.ok(!/Google(?:\s+LLC)?\s+act[uú]a\s+como\s+Responsable/i.test(plano),
+    'el modelo vigente no puede afirmar que Google actua como Responsable');
+  // El remitente transaccional del servicio es el del vinculo con el
+  // CDPA: la cuenta de Google Workspace que la Decision A del 9-nov-2026
+  // declara como ruta transaccional.
+  assert.ok(/kair@gesstiar\.com/.test(plano),
+    'el modelo vigente declara la cuenta transaccional del servicio (kair@gesstiar.com)');
 });
 
 // ===========================================================================
@@ -134,7 +157,7 @@ test('crearSuscripcion abre la suscripción, manda el enlace y devuelve la huell
 
   assert.match(r.url, /\/anexo-nube\/[A-Za-z0-9_-]+$/,
     'el enlace tiene que llevar el token');
-  assert.equal(r.version, '1.1');
+  assert.equal(r.version, anexoNube.VERSION_MODELO);
   assert.equal(r.hash, anexoNube.modeloVigente().hash);
 
   // El correo de invitación SALE, y lo manda K+AIR.
@@ -187,7 +210,7 @@ test('el contexto público enmascara el correo y no expone el enlace', async () 
 
   const ctx = anexoNube.contextoPublico(r.token, '1.1.1.1', 'navegador');
   assert.equal(ctx.empresa, 'EMPRESA DE PRUEBA SAS');
-  assert.equal(ctx.version, '1.1');
+  assert.equal(ctx.version, anexoNube.VERSION_MODELO);
   assert.ok(ctx.correo_firmante.includes('***'),
     'el correo va enmascarado');
   assert.ok(!ctx.correo_firmante.includes('representante'),
@@ -306,17 +329,17 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
   );
 
   assert.equal(res.firmado, true);
-  assert.equal(res.version, '1.1');
+  assert.equal(res.version, anexoNube.VERSION_MODELO);
   assert.equal(res.hash, anexoNube.modeloVigente().hash);
 
   const empresa = empresaService.getById(ID_EMPRESA);
   assert.ok(empresa.anexo_nube_firmado_at, 'la fecha de suscripción tiene que quedar');
-  assert.equal(empresa.anexo_nube_version, '1.1');
+  assert.equal(empresa.anexo_nube_version, anexoNube.VERSION_MODELO);
   assert.equal(empresa.anexo_nube_hash, anexoNube.modeloVigente().hash);
 
   const evidencia = JSON.parse(empresa.anexo_nube_evidencia);
   assert.equal(evidencia.fuente, 'enlace_suscripcion');
-  assert.equal(evidencia.version, '1.1');
+  assert.equal(evidencia.version, anexoNube.VERSION_MODELO);
   assert.equal(evidencia.hash, anexoNube.modeloVigente().hash);
   assert.equal(evidencia.correo_firmante, CORREO_FIRMANTE);
   assert.equal(evidencia.ip, '203.0.113.9');
@@ -431,7 +454,7 @@ test('si el texto cambia después de abrir la suscripción, no se firma', async 
   // El texto del servidor cambia. Se usa una COPIA temporal con un byte
   // distinto, para no tocar el archivo legal del repo.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'anexo-nube-'));
-  const copia = path.join(dir, 'anexo-nube-v1.1.html');
+  const copia = path.join(dir, `anexo-nube-v${anexoNube.VERSION_MODELO}.html`);
   fs.writeFileSync(copia,
     fs.readFileSync(anexoNube.RUTA_MODELO).toString('utf8') + '\n<!-- cambio -->');
 

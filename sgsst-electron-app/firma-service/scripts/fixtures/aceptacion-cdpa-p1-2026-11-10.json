@@ -1,0 +1,18 @@
+{
+  "_acta": "ACTA REAL de la aceptación del Cloud Data Processing Addendum (CDPA) de Google Workspace — P1. El acto ocurrió: el superadministrador de la cuenta gesstiar.com aceptó el CDPA en la consola de Google Workspace y la propia consola lo declara («Anexo de Procesamiento de Datos de Cloud (CDPA) — Aceptado por kair@gesstiar.com el Nov 10, 2026»). La evidencia es la captura captura-consola-cdpa-i-accept-2026-11-10.png (96520 bytes, SHA-256 9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560), tomada el 2026-11-10 a las 20:29 (hora local) y verificada en esta máquina.",
+  "_como_se_aplica": "node scripts/actualizar-manifiesto-aceptacion-cdpa.js --check --acta=scripts/fixtures/aceptacion-cdpa-p1-2026-11-10.json --hoy=2026-11-10  (después --aplicar).",
+  "modo": "aceptado_por_administrador",
+  "fecha": "2026-11-10",
+  "responsable": "Javier Robles Fontalvo (representante legal, Gesstiar S.A.S., NIT 900987987-4)",
+  "cuenta": "gesstiar.com (Google Workspace); la aceptación en la consola la hizo la cuenta kair@gesstiar.com",
+  "evidencia": "Consola de Google Workspace de gesstiar.com, ventana «Condiciones adicionales de seguridad y privacidad» (Cuenta > Configuración de la cuenta > Cumplimiento legal > Seguridad y privacidad > Términos adicionales), que declara textualmente: «Anexo de Procesamiento de Datos de Cloud (CDPA) — Aceptado por kair@gesstiar.com el Nov 10, 2026», y ofrece el botón CANCELAR, que solo aparece cuando la aceptación ya está hecha. Prueba: captura-consola-cdpa-i-accept-2026-11-10.png, 96520 bytes, SHA-256 9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560, tomada el 2026-11-10 a las 20:29 (hora local) y verificada en esta máquina.",
+  "captura": {
+    "archivo": "captura-consola-cdpa-i-accept-2026-11-10.png",
+    "descripcion": "Pantalla «Condiciones adicionales de seguridad y privacidad» de la consola de Google Workspace: Cloud Data Processing Addendum con estado Aceptado por kair@gesstiar.com el Nov 10, 2026.",
+    "hash": "9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560",
+    "bytes": 96520
+  },
+  "fecha_efectividad_addendum": null,
+  "observaciones": "Modo elegido: aceptado_por_administrador (decisión del 10-nov-2026): los términos vigentes del Acuerdo de Google Workspace (Last modified: October 12, 2026) entran en el próximo renewal y el TOS archivado de 2021 no incorporaba el CDPA, así que incorporado_por_referencia no es afirmable sin la fecha de renovación. La pantalla de la consola NO muestra una Addendum Effective Date: el campo queda en null porque no consta en la fuente, no porque falte el acto. ⚠️ No verificado: si la cuenta ya renovó al Acuerdo vigente y cuál es esa fecha de renovación. La misma ventana ofrece dos elementos que NO forman parte de este acta y que no se tocaron: la certificación GDPR (CERTIFICAR SI CORRESPONDE) y la enmienda HIPAA (REVISAR Y ACEPTAR); ninguno es P1 y ninguno aplica a la operación colombiana. El campo responsable declara quien responde por el registro; la consola atribuye la aceptación a la cuenta kair@gesstiar.com.",
+  "aceptada": true
+}

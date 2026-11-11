@@ -148,7 +148,8 @@ function aAscii(valor) {
  * @param {string} texto
  * @param {string} bloque
  * @param {string} clave
- * @param {string} valor
+ * @param {string|object|null} valor - un string, un objeto PLANO (la
+ *   acreditacion de la facultad, P7) o null.
  * @returns {string}
  */
 function ponerEnBloque(texto, bloque, clave, valor) {
@@ -159,16 +160,17 @@ function ponerEnBloque(texto, bloque, clave, valor) {
   const antes = texto.slice(0, i);
   const cuerpo = texto.slice(i, fin);
   const despues = texto.slice(fin);
-  // El valor puede ser un string O `null`: en el manifiesto las claves `fecha`
-  // y `evidencia` arrancan en null (todavia no hay un acto que las llene) y
-  // este patron solo aceptaba strings, asi que el script fallaba al intentar
-  // escribir el estado sobre el manifiesto de verdad.
-  const m = new RegExp('("' + clave + '"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|null\\b)').exec(cuerpo);
+  // El valor puede ser un string, un objeto plano O `null`: en el manifiesto
+  // las claves `fecha` y `evidencia` arrancan en null (todavia no hay un acto
+  // que las llene) y este patron solo aceptaba strings, asi que el script
+  // fallaba al intentar escribir el estado sobre el manifiesto de verdad.
+  const m = new RegExp('("' + clave + '"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|null\\b|\\{[^{}]*\\})')
+    .exec(cuerpo);
   if (!m) throw error('El bloque "' + bloque + '" no tiene la clave "' + clave + '".');
-  const nuevoCuerpo = cuerpo.replace(
-    m[0],
-    m[1] + '"' + String(valor).replace(/"/g, '\\"') + '"',
-  );
+  const serializado = (valor !== null && typeof valor === 'object')
+    ? JSON.stringify(valor)
+    : '"' + String(valor).replace(/"/g, '\\"') + '"';
+  const nuevoCuerpo = cuerpo.replace(m[0], m[1] + serializado);
   return antes + nuevoCuerpo + despues;
 }
 
@@ -283,6 +285,31 @@ function construirEvidencia(fila) {
     );
   }
 
+  // La FACULTAD de quien contrafirma por Gesstiar (P7, 10-nov-2026).
+  const facultad = leerFacultad(fila);
+  if (facultad) {
+    partes.push(
+      'La facultad de quien contrafirma por K+AIR quedo acreditada antes del acto: '
+      + aAscii(facultad.nombre)
+      + (facultad.cargo ? ', ' + aAscii(facultad.cargo) : '')
+      + '. Con que facultad: '
+      + (facultad.resultado === 'REPRESENTANTE_LEGAL_ENCARGADO'
+        ? 'representante legal de Gesstiar S.A.S.'
+        : 'poder acreditado (' + aAscii(facultad.tipo) + ')')
+      + '. Instrumento: ' + aAscii(facultad.instrumento_ref)
+      + (facultad.instrumento_sha256
+        ? ' (SHA-256 ' + aAscii(facultad.instrumento_sha256) + ')' : '')
+      + '. Verificada el ' + aAscii(facultad.verificado_at) + '.',
+    );
+  } else {
+    partes.push(
+      'La contrafirma NO tiene acreditada la facultad de quien la hizo: se registro '
+      + 'con un despliegue anterior a la exigencia del abogado. El item estado_encargo '
+      + 'del gate NO puede quedar ok hasta que la facultad se certifique por la via '
+      + 'administrativa.',
+    );
+  }
+
   partes.push(
     'La fecha de ejecucion del instrumento quedo en la ficha de la Empresa '
     + '(gh_firma_empresas.anexo_encargo_firmado_at = '
@@ -306,6 +333,41 @@ function construirEvidencia(fila) {
   );
 
   return partes.join(' ');
+}
+
+// ---------------------------------------------------------------------------
+// LA FACULTAD DE QUIEN CONTRAFIRMA
+// ---------------------------------------------------------------------------
+
+/**
+ * La faculty acreditada de quien contrafirma por Gesstiar, leida de la
+ * EVIDENCIA del segundo acto (P7, 10-nov-2026).
+ *
+ * @param {object} fila
+ * @returns {object|null}
+ */
+function leerFacultad(fila) {
+  if (!fila.contrafirmado_at) return null;
+  let evidencia = {};
+  try {
+    evidencia = fila.contrafirma_evidencia ? JSON.parse(fila.contrafirma_evidencia) : {};
+  } catch (e) {
+    evidencia = {};
+  }
+  const fac = evidencia.facultad;
+  if (!fac || typeof fac !== 'object') return null;
+  const resultado = aAscii(fac.resultado);
+  if (!resultado) return null;
+  return {
+    resultado,
+    nombre: aAscii(fac.nombre) || null,
+    cargo: aAscii(fac.cargo) || null,
+    tipo: aAscii(fac.tipo) || null,
+    instrumento_ref: aAscii(fac.instrumento_ref) || null,
+    instrumento_sha256: aAscii(fac.instrumento_sha256) || null,
+    id_poder: (fac.id_poder === null || fac.id_poder === undefined) ? null : fac.id_poder,
+    verificado_at: aAscii(fac.verificado_at) || null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +454,11 @@ function main(args) {
   m = ponerEnBloque(m, 'anexo_encargo', 'estado', 'firmado');
   m = ponerEnBloque(m, 'anexo_encargo', 'fecha', aAscii(fecha));
   m = ponerEnBloque(m, 'anexo_encargo', 'evidencia', evidencia);
+  // La facultad acreditada de quien contrafirma por Gesstiar (P7). Si sale
+  // `null`, es que la contrafirma se hizo con un despliegue anterior a la
+  // exigencia: el manifiesto se escribe igual, pero el item `estado_encargo`
+  // del gate NO puede quedar ok.
+  m = ponerEnBloque(m, 'anexo_encargo', 'contrafirma_facultad', leerFacultad(principal));
 
   // --- validaciones ------------------------------------------------------
   let datos;

@@ -11,8 +11,8 @@
  * - La ruta no se confunde con un enlace de suscripción (el caso "documento"
  *   como si fuera un token).
  *
- * Antes de este trabajo, `urlDocumento()` apuntaba a `/anexo-nube-v1.1.html`,
- * una dirección que NO servía nadie: el correo de invitación mandaba a la
+ * Antes de este trabajo, `urlDocumento()` apuntaba a un archivo con la versión
+ * en el nombre, una dirección que NO servía nadie: el correo de invitación mandaba a la
  * Empresa a un 404 y el texto que se iba a firmar era invisible.
  */
 'use strict';

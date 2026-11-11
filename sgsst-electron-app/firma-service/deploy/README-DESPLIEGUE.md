@@ -139,7 +139,11 @@ Pega el contenido de `deploy/.env.production.example` y completa:
   ```
 - `ADMIN_API_KEY`: otra NUEVA distinta (guárdala en tu gestor de contraseñas;
   la necesitas para crear clientes por empresa).
-- `SMTP_PASS`: el App Password de Gmail que ya usas en desarrollo.
+- `SMTP_PASS`: la contraseña de aplicación de la cuenta **de empresa** del canal
+  transaccional (`kair@gesstiar.com`), no la de la cuenta de consumo. La cuenta
+  tiene que estar activa, con verificación en dos pasos, y la credencial se
+  cambia en la ventana de mantenimiento del plan (P5), con copia del `.env`
+  antes.
 
 ## Paso 7 — Dependencias + servicio + HTTPS
 

@@ -69,6 +69,12 @@ const CAMPOS_TRAZABLES = [
   'conservacion_por_deber_legal', 'dominios_corporativos',
   'anexo_nube_firmado_at', 'anexo_nube_version',
   'anexo_nube_hash', 'anexo_nube_evidencia',
+  // 📦1047 · punto 3 La fecha de EJECUCIÓN del Anexo de Nube (la del segundo
+  // acto, la contrafirma de K+AIR). No es un campo editable por la Empresa:
+  // lo escribe el servicio al contrafirmar. Va en el rastro igual, porque es
+  // un cambio de la ficha que tiene que quedar escrito con su actor y su
+  // motivo.
+  'anexo_nube_ejecutado_at',
 ];
 
 /**

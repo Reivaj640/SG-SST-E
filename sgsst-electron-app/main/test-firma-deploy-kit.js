@@ -82,7 +82,14 @@ if (src.caddy) {
 if (src.backup) {
   [
     [/\.backup/, 'backup: usa sqlite3 .backup (seguro en WAL)'],
-    [/mtime \+14/, 'backup: retención 14 días'],
+    // La retención de COPIAS es configurable (KAIR_RETENCION_DIAS, 30 por
+    // defecto) y la poda la usa con `mtime +$RETENCION_DIAS`. El check NO
+    // puede fijar el literal del día: cuando el valor cambie (y va a
+    // cambiar), el test se rompe solo y su mutación queda vacía sin avisar
+    // (PROMPT.md, trampa 28). Lo que se comprueba es que la poda use la
+    // variable, no un número escrito a mano.
+    [/RETENCION_DIAS=\$\{KAIR_RETENCION_DIAS:-\d+\}/, 'backup: la retención de copias es configurable'],
+    [/mtime \+\$RETENCION_DIAS/, 'backup: la poda usa la retención declarada'],
     [/rclone/, 'backup: opción de nube documentada (rclone)'],
     [/cron/, 'backup: instrucción de cron'],
   ].forEach(function (c) { add(c[1], c[0].test(src.backup)); });

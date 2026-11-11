@@ -37,6 +37,7 @@ const anexoEncargoRouter = require('./routes/anexoEncargo');
 const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const adminEmpresasRouter = require('./routes/admin-empresas');
+const adminEncargadoRouter = require('./routes/admin-encargado');
 const adminExcepcionesRouter = require('./routes/admin-excepciones');
 const adminAprobacionesRouter = require('./routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('./routes/admin-solicitudes');
@@ -213,6 +214,10 @@ function createApp() {
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
   app.use('/internal/admin', adminEmpresasRouter);
+  // El REGISTRO DE PODERES DEL ENCARGADO (migracion 061): donde se acredita
+  // la facultad de quien contrafirma por Gesstiar. Ver
+  // services/poderesEncargado.js.
+  app.use('/internal/admin', adminEncargadoRouter);
   app.use('/internal/admin', adminExcepcionesRouter);
   // Las aprobaciones de publicacion del Acuerdo (decision 1.f): por esta ruta
   // se registra la autorizacion operativa que exige la barrera de publicacion.

@@ -129,6 +129,68 @@ if (contrasenasFaltan.length) {
   process.exit(1);
 }
 
+// 📦1047 — El cargador del `.env` tiene que CARGAR, no solo existir.
+//
+// Un comentario de bloque se cierra antes de tiempo si su texto contiene `*/`.
+// Un patron de archivos como `**/utils/**` lo tiene. Eso no es un error de
+// sintaxis: `node --check` pasa, y el fallo aparece al IMPORTAR el modulo
+// (ReferenceError). Con eso, "Enviar por correo" queda muerto en el
+// instalador y el unico sintoma es un error interno que no menciona K+AIR.
+// Este guard corta el build aqui, en la maquina que compila.
+let falloCargador = null;
+try {
+  require(path.join(__dirname, '..', 'shared', 'env-loader.js'));
+} catch (e) {
+  falloCargador = (e && e.message) ? e.message : String(e);
+}
+if (falloCargador) {
+  console.error('');
+  console.error('╔══════════════════════════════════════════════════════════════╗');
+  console.error('║  BUILD DETENIDO: el cargador del .env no carga                ║');
+  console.error('╚══════════════════════════════════════════════════════════════╝');
+  console.error('');
+  console.error('  shared/env-loader.js no se pudo cargar:');
+  console.error('    ' + String(falloCargador).split('\n')[0]);
+  console.error('');
+  console.error('  Sin ese modulo, el boton "Enviar por correo" sale muerto en');
+  console.error('  el instalador. Revisa el comentario de cabecera del archivo:');
+  console.error('  si dentro hay un patron como `**/utils/**`, el `*/` cierra el');
+  console.error('  comentario antes de tiempo y el resto se ejecuta como codigo.');
+  console.error('');
+  process.exit(1);
+}
+
+// 📦1047 — El árbol versionado no puede llevar un secreto.
+//
+// P11 y P12 fueron dos secretos publicados en un repo público: las app
+// passwords de los clientes y el token de GitHub. Los dos se quitaron del
+// código, pero el código no se guarda solo: este guard corta el build si
+// un secreto vuelve a aparecer en un archivo versionado.
+//
+// El informe dice archivo, línea y regla. NUNCA el valor: el log de un build
+// no puede ser el lugar donde queda el secreto.
+let barridoSecretos = null;
+try {
+  barridoSecretos = require(path.join(__dirname, 'detector-secretos.js')).escanear();
+} catch (e) {
+  barridoSecretos = null;
+}
+if (barridoSecretos && barridoSecretos.disponible && barridoSecretos.hallazgos.length) {
+  console.error('');
+  console.error('╔══════════════════════════════════════════════════════════════╗');
+  console.error('║  BUILD DETENIDO: hay un secreto en un archivo versionado       ║');
+  console.error('╚══════════════════════════════════════════════════════════════╝');
+  console.error('');
+  barridoSecretos.hallazgos.forEach(function (h) {
+    console.error('  ' + h.archivo + ':' + h.linea + '  [' + h.regla + ']');
+  });
+  console.error('');
+  console.error('  Quitalo del archivo, rotalo en Google (o en GitHub) y deja el');
+  console.error('  valor solo en el `.env` local, que esta en `.gitignore`.');
+  console.error('');
+  process.exit(1);
+}
+
 // Aviso de formato: no corta el build, pero avisa si algo está claramente mal,
 // porque una credencial con formato raro NO da error al empaquetar: da error
 // cuando el cliente intenta conectarse, que es peor.

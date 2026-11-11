@@ -211,7 +211,11 @@ test('crearSuscripcion abre la suscripción, manda el enlace y devuelve la huell
 
   assert.match(r.url, /\/anexo-encargo\/[A-Za-z0-9_-]+$/,
     'el enlace tiene que llevar el token');
-  assert.equal(r.version, '2026-11-06');
+  // La version se deriva del TEXTO VIGENTE, no de una constante escrita a mano:
+  // un test que fija la version literal se rompe solo cuando el texto cambia,
+  // y ese es el falso positivo que el gate tiene que cerrar (PROMPT.md,
+  // trampa 138).
+  assert.equal(r.version, anexoEncargo.modeloVigente().version);
   assert.equal(r.hash, anexoEncargo.modeloVigente().hash);
 
   // El correo de invitación SALE, y lo manda K+AIR.
@@ -267,7 +271,7 @@ test('el contexto público enmascara el correo y no expone el enlace', async () 
 
   const ctx = anexoEncargo.contextoPublico(r.token, '1.1.1.1', 'navegador');
   assert.equal(ctx.empresa, 'EMPRESA DE PRUEBA SAS');
-  assert.equal(ctx.version, '2026-11-06');
+  assert.equal(ctx.version, anexoEncargo.modeloVigente().version);
   assert.ok(ctx.correo_firmante.includes('***'),
     'el correo va enmascarado');
   assert.ok(!ctx.correo_firmante.includes('representante'),
@@ -452,7 +456,7 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
   );
 
   assert.equal(res.firmado, true);
-  assert.equal(res.version, '2026-11-06');
+  assert.equal(res.version, anexoEncargo.modeloVigente().version);
   assert.equal(res.hash, anexoEncargo.modeloVigente().hash);
 
   const empresa = empresaService.getById(ID_EMPRESA);
@@ -464,7 +468,7 @@ test('con el código correcto la Empresa suscribe y queda registrado con versió
 
   const evidencia = JSON.parse(res.evidencia ? JSON.stringify(res.evidencia) : '{}');
   assert.equal(evidencia.fuente, 'enlace_suscripcion');
-  assert.equal(evidencia.version, '2026-11-06');
+  assert.equal(evidencia.version, anexoEncargo.modeloVigente().version);
   assert.equal(evidencia.hash, anexoEncargo.modeloVigente().hash);
   assert.equal(evidencia.correo_firmante, CORREO_FIRMANTE);
   assert.equal(evidencia.canal_codigo, 'se***@empresa-prueba.test',

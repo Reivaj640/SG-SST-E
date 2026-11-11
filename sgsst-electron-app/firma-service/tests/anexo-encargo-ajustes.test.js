@@ -353,7 +353,9 @@ test('la suscripción escribe la versión y la huella del texto suscrito', async
   await suscribir();
 
   const empresa = empresaService.getById(ID_EMPRESA);
-  assert.equal(empresa.anexo_encargo_suscrito_version, '2026-11-06');
+  // La version se deriva del TEXTO VIGENTE: una constante escrita a mano se
+  // rompe sola cuando el texto cambia (PROMPT.md, trampa 138).
+  assert.equal(empresa.anexo_encargo_suscrito_version, anexoEncargo.modeloVigente().version);
   assert.equal(empresa.anexo_encargo_suscrito_hash, anexoEncargo.modeloVigente().hash);
   assert.ok(empresa.anexo_encargo_suscrito_evidencia);
 });

@@ -57,6 +57,7 @@ const {
   verificarRepresentanteBody,
   contrafirmaCodigoBody,
   contrafirmaBody,
+  contrafirmaFacultadBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,
@@ -316,6 +317,18 @@ function _suscripcionEncargo(fila) {
     cargo_firmante: fila.cargo_firmante || null,
     firmado_at: fila.firmado_at || null,
     contrafirmado_at: fila.contrafirmado_at || null,
+    // El SEGUNDO ACTO, en la misma forma que lo expone el Anexo de Nube
+    // (`_suscripcionNube`): el actor que hizo la contrafirma y la EVIDENCIA
+    // del acto.
+    //
+    // La evidencia es la que lleva la ACREDITACION DE LA FACULTAD de quien
+    // contrafirmo por Gesstiar (P7, 10-nov-2026). Sin este campo, el panel
+    // del operador no tiene de donde sacarla y muestra "NO DECLARADA" en un
+    // Anexo de Encargo que si la tiene acreditada: un falso negativo en la
+    // pantalla que hace creer que falta lo que ya esta en el expediente.
+    contrafirma_actor: fila.contrafirma_actor || null,
+    contrafirma_motivo: fila.contrafirma_motivo || null,
+    contrafirma_evidencia: _json(fila.contrafirma_evidencia),
     representante_verificacion: _json(fila.representante_verificacion),
     representante_verificado_at: fila.representante_verificado_at || null,
     // El canal de la CONTRAFIRMA va enmascarado: es el buzón de K+AIR, y la
@@ -335,9 +348,27 @@ function _suscripcionEncargo(fila) {
 /**
  * La suscripción del Anexo de NUBE, en la forma que la lee el operador.
  *
- * El Anexo de Nube NO es bilateral: no hay contrafirma ni verificación del
- * representante. Los campos de esas fases van en `null` para que el panel
- * pueda leer los dos anexos con la misma forma.
+ * 📦1047 · punto 3 El Anexo de Nube SÍ es bilateral (el texto vigente, §10): lo
+ * suscribe la Empresa (fase 1) y lo contrafirma K+AIR (fase 2), y el
+ * instrumento solo queda EJECUTADO con los dos actos. Antes esta forma
+ * devolvía `null` en todos los campos de la fase 2 y el comentario decía que
+ * "el Anexo de Nube NO es bilateral": era verdad el día anterior y pasó a ser
+ * mentira sin que nadie lo tocara (ver la trampa 148 de PROMPT.md). Ahora
+ * devuelve los datos REALES del segundo acto.
+ *
+ * `estado = FIRMADA` sigue siendo el de la FASE 1 (que la Empresa suscribió),
+ * NO el del instrumento: para eso está `contrafirmado_at` (fase 2). Es lo
+ * mismo que en el gemelo del Anexo de Encargo.
+ *
+ * `representante_verificacion` y `representante_verificado_at` van en `null`
+ * porque el Anexo de Nube NO tiene verificación documental (no hay columna ni
+ * ruta: el cotejo es contra el `representante_legal` de la ficha). Eso NO es
+ * una falta de la fase 2: es una diferencia real con el Anexo de Encargo, y
+ * por eso el panel puede leer los dos anexos con la misma forma.
+ *
+ * La lectura es TOLERANTE: si la migración 060 no está aplicada en la base de
+ * destino, las columnas no existen y estos campos vienen en `null` (fallo
+ * CERRADO: no se inventa una contrafirma que no se puede leer).
  *
  * @param {object|null} fila - la fila cruda, o null si no hay suscripción.
  * @returns {object|null}
@@ -350,17 +381,32 @@ function _suscripcionNube(fila) {
     version: fila.version,
     hash: fila.hash_texto,
     correo_firmante: fila.correo_firmante,
+    // El SEGUNDO canal del código. En el Anexo de Nube NO existe: la
+    // suscripción manda su código al correo del firmante
+    // (`correo_firmante`), y el de la CONTRAFIRMA va al buzón fijo de K+AIR
+    // (`contrafirma_canal`, más abajo). Va en `null` para que el panel pueda
+    // leer los dos anexos con la misma forma.
     canal_codigo: null,
     nombre_firmante: fila.nombre_firmante || null,
     cargo_firmante: fila.cargo_firmante || null,
     firmado_at: fila.firmado_at || null,
-    contrafirmado_at: null,
+    // EL SEGUNDO ACTO.
+    contrafirmado_at: fila.contrafirmado_at || null,
+    contrafirma_actor: fila.contrafirma_actor || null,
+    contrafirma_motivo: fila.contrafirma_motivo || null,
+    contrafirma_codigo_enviado_at: fila.contrafirma_codigo_enviado_at || null,
+    contrafirma_canal: fila.contrafirma_canal
+      ? actaEncargoService.enmascararCorreo(fila.contrafirma_canal) : null,
+    contrafirma_estado: fila.contrafirma_estado || null,
+    contrafirma_evidencia: _json(fila.contrafirma_evidencia),
+    // La verificación documental no existe en este instrumento: el cotejo es
+    // contra el representante legal de la ficha.
     representante_verificacion: null,
     representante_verificado_at: null,
-    contrafirma_canal: null,
     evidencia: _json(fila.evidencia),
-    contrafirma_acta_archivo: null,
-    contrafirma_acta_hash: null,
+    contrafirma_acta_archivo: fila.contrafirma_acta_archivo || null,
+    contrafirma_acta_hash: fila.contrafirma_acta_hash || null,
+    contrafirma_acta_bytes: fila.contrafirma_acta_bytes || null,
     created_at: fila.created_at,
     updated_at: fila.updated_at,
   };
@@ -626,6 +672,115 @@ router.post('/empresas/:id_empresa/anexo-encargo/contrafirmar',
       next(err);
     }
   });
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube/contrafirmar/codigo
+// Manda el código de la CONTRAFIRMA al buzón de protección de datos de K+AIR.
+//
+// EL CANAL NO SE DECLARA
+// ----------------------
+// El código sale al buzón que dice la CONFIGURACIÓN
+// (FIRMA_CANAL_PROTECCION_DATOS), no a uno que elija quien pide la
+// contrafirma. Es la misma razón por la que el código de la suscripción no
+// sale al buzón de la Empresa: un canal elegido por quien pide el acto no
+// probaría nada.
+//
+// ESTA RUTA NO CONTRAFIRMA NADA
+// -----------------------------
+// Solo manda el código. El acto es otra ruta, la de la contrafirma, que pide
+// el código, la aceptación expresa y el motivo. Separarlas deja claro que
+// pedir el código no es contrafirmar.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube/contrafirmar/codigo',
+  adminApiAuth(), validateBody(contrafirmaCodigoBody), async (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const r = await anexoNubeService.solicitarContrafirmaAnexoNube(
+        id, req.body.id_suscripcion, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube/contrafirmar
+// Contrafirma el Anexo de Nube: el SEGUNDO acto del instrumento.
+//
+// QUÉ HACE
+//   Verifica el código (que salió al buzón de K+AIR), exige la aceptación
+//   expresa y el motivo, genera el acta de la contrafirma con su huella
+//   SHA-256 y escribe la fecha de EJECUCIÓN del instrumento en la ficha de la
+//   Empresa. Con esa fecha, y solo con ella, el Anexo de Nube queda
+//   EJECUTADO para esa Empresa.
+//
+// LO QUE EXIGE (y por qué)
+//   - Que la Empresa haya suscrito: no se contrafirma lo que no se firmó.
+//   - Que se sepa quién firmó por la Empresa: el §10 del texto vigente exige
+//     verificarlo antes de contrafirmar.
+//   - El código: sale al buzón de K+AIR, no al de la Empresa.
+//   - La aceptación expresa: la contrafirma no es un valor por omisión.
+//   - El motivo (`X-Admin-Motivo`): es un acto que ejecuta el instrumento.
+//
+// LO QUE NO HACE
+//   No toca `anexo_nube_firmado_at`: esa es la fecha del PRIMER acto (la
+//   suscripción). La fecha del segundo acto va en `anexo_nube_ejecutado_at`.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube/contrafirmar',
+  adminApiAuth(), validateBody(contrafirmaBody), async (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const r = await anexoNubeService.contrafirmarAnexoNube(
+        id, req.body.id_suscripcion, req.body, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-nube/contrafirma/facultad
+// Certifica la FACULTAD de una contrafirma del Anexo de Nube YA HECHA.
+//
+// CUANDO SE USA
+// -------------
+// Cuando la contrafirma se hizo con un despliegue anterior a la exigencia del
+// abogado (P7, 10-nov-2026): el segundo acto quedo registrado sin la
+// acreditacion de la facultad. El manifiesto declara entonces
+// `contrafirma_facultad: null` y el item `contrafirma_nube` del gate NO puede
+// quedar ok.
+//
+// QUE HACE
+// --------
+// Comprueba que la persona que HIZO EL ACTO tenga la facultad acreditada (es
+// el `contrafirma_actor` que quedo registrado, no quien llama) y escribe esa
+// acreditacion en la evidencia del acto y en su rastro, con su actor y su
+// motivo.
+//
+// QUE NO HACE
+// -----------
+// No toca `contrafirmado_at`, ni la huella del acta, ni
+// `anexo_nube_ejecutado_at`: el segundo acto ya ocurrio y no se reescribe. Lo
+// que se anade es el dato que le faltaba.
+//
+// ES UN ACTO ADMINISTRATIVO
+// --------------------------
+// Exige `X-Admin-Actor` y `X-Admin-Motivo`, como todos los de este servicio.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-nube/contrafirma/facultad',
+  adminApiAuth(), validateBody(contrafirmaFacultadBody), (req, res, next) => {
+    try {
+      const id = _parseId(req);
+      const r = anexoNubeService.registrarFacultadEnContrafirma(
+        id, req.body.id_suscripcion, _contextoAuditoria(req),
+      );
+      res.json(r);
+    } catch (err) {
+      next(err);
+    }
+  });
+
 // ============================================================================
 // POST /internal/admin/empresas/:id_empresa/anexo-firmado/quitar
 // Quita la fecha de firma del Anexo de Encargo.

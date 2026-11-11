@@ -59,8 +59,9 @@ function sembrarEmpresa(id_empresa, anexos = {}) {
        responsable_tratamiento_correo, representante_legal, activo,
        anexo_encargo_suscrito_at, anexo_encargo_suscrito_version,
        anexo_encargo_suscrito_hash, anexo_encargo_firmado_at,
-       anexo_nube_firmado_at, anexo_nube_version, anexo_nube_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+       anexo_nube_firmado_at, anexo_nube_version, anexo_nube_hash,
+       anexo_nube_ejecutado_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id_empresa,
     `EMPRESA ${id_empresa}`,
@@ -76,6 +77,9 @@ function sembrarEmpresa(id_empresa, anexos = {}) {
     anexos.nube_firmado_at || null,
     anexos.nube_version || null,
     anexos.nube_hash || null,
+    // 📦1047 · punto 3 La fecha de EJECUCIÓN del Anexo de Nube: la del
+    // segundo acto (la contrafirma de K+AIR).
+    anexos.nube_ejecutado_at || null,
   );
 }
 
@@ -151,13 +155,20 @@ test('el estado de los anexos tiene la forma exacta que espera la app', async ()
   assert.equal(res.body.anexo_encargo.suscrito_hash, 'a'.repeat(64));
   assert.equal(res.body.anexo_encargo.firmado_at, '2026-11-07T12:00:00.000Z');
 
-  // El bloque del Anexo de Nube: cuatro claves.
+  // El bloque del Anexo de Nube: siete claves. 📦1047 · punto 3 El Anexo de
+  // Nube es BILATERAL, asi que el bloque dice los TRES estados ("ejecutado",
+  // "suscrito", "no_suscrito") como el del Anexo de Encargo: un `firmado` a
+  // secas describia la mitad del instrumento.
   assert.deepEqual(Object.keys(res.body.anexo_nube).sort(),
-    ['fecha', 'firmado', 'hash', 'version']);
+    ['ejecutado', 'estado', 'fecha', 'fecha_ejecucion', 'firmado', 'hash', 'version']);
   assert.equal(res.body.anexo_nube.firmado, true);
   assert.equal(res.body.anexo_nube.fecha, '2026-11-07T13:00:00.000Z');
   assert.equal(res.body.anexo_nube.version, '1.1');
   assert.equal(res.body.anexo_nube.hash, 'b'.repeat(64));
+  // Esta Empresa suscribio pero NO fue contrafirmada: el estado lo dice.
+  assert.equal(res.body.anexo_nube.estado, 'suscrito');
+  assert.equal(res.body.anexo_nube.ejecutado, false);
+  assert.equal(res.body.anexo_nube.fecha_ejecucion, null);
 
   // El bloque de habilitacion: lo que produce el service, sin reescribirlo.
   assert.equal(typeof res.body.habilitacion.ok, 'boolean');
@@ -288,6 +299,8 @@ test('una empresa sin anexo de encargo esta no_suscrito', async () => {
   assert.equal(res.body.anexo_encargo.firmado_at, null);
   assert.equal(res.body.anexo_nube.firmado, false);
   assert.equal(res.body.anexo_nube.fecha, null);
+  assert.equal(res.body.anexo_nube.estado, 'no_suscrito');
+  assert.equal(res.body.anexo_nube.ejecutado, false);
 });
 
 test('una empresa que suscribio pero no fue contrafirmada esta suscrito', async () => {
@@ -311,6 +324,52 @@ test('una empresa que suscribio pero no fue contrafirmada esta suscrito', async 
   assert.equal(res.body.anexo_encargo.suscrito_hash, 'e'.repeat(64));
   assert.equal(res.body.anexo_encargo.firmado_at, null,
     'sin contrafirma no hay fecha de ejecucion');
+});
+
+test('el Anexo de Nube de una empresa suscribida pero no contrafirmada esta suscrito', async () => {
+  // 📦1047 · punto 3 El Anexo de Nube es bilateral como el de Encargo: con un
+  // solo acto, el estado es "suscrito" y NO "ejecutado".
+  resetDb();
+  seedTestClients();
+  sembrarEmpresa(TEST_EMPRESA_A, {
+    nube_firmado_at: '2026-11-09T13:00:00.000Z',
+    nube_version: '1.2',
+    nube_hash: 'c'.repeat(64),
+  });
+
+  const res = await request(makeApp())
+    .get('/internal/empresa/anexos')
+    .set('X-Internal-API-Key', TEST_API_KEY_CLIENT_A);
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.anexo_nube.estado, 'suscrito',
+    'suscrita sin contrafirmar NO es ejecutada: el instrumento es bilateral');
+  assert.equal(res.body.anexo_nube.ejecutado, false);
+  assert.equal(res.body.anexo_nube.fecha_ejecucion, null);
+  assert.equal(res.body.anexo_nube.firmado, true);
+});
+
+test('el Anexo de Nube de una empresa contrafirmada esta ejecutado', async () => {
+  resetDb();
+  seedTestClients();
+  sembrarEmpresa(TEST_EMPRESA_A, {
+    nube_firmado_at: '2026-11-09T13:00:00.000Z',
+    nube_version: '1.2',
+    nube_hash: 'c'.repeat(64),
+    nube_ejecutado_at: '2026-11-09T14:00:00.000Z',
+  });
+
+  const res = await request(makeApp())
+    .get('/internal/empresa/anexos')
+    .set('X-Internal-API-Key', TEST_API_KEY_CLIENT_A);
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.anexo_nube.estado, 'ejecutado');
+  assert.equal(res.body.anexo_nube.ejecutado, true);
+  assert.equal(res.body.anexo_nube.fecha_ejecucion, '2026-11-09T14:00:00.000Z',
+    'la fecha de ejecucion es la del segundo acto, no la de la suscripcion');
+  assert.equal(res.body.anexo_nube.fecha, '2026-11-09T13:00:00.000Z',
+    'la fecha de la suscripcion se conserva: es el primer acto');
 });
 
 test('una empresa contrafirmada esta ejecutada, con la fecha de ejecucion', async () => {

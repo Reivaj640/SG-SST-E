@@ -18,6 +18,10 @@ const assert = require('node:assert/strict');
 
 const readiness = require('../src/services/readinessLegal');
 const { analizarTextoLegal, listarPlaceholders } = require('../src/utils/textoLegal');
+// La version del Anexo de Nube vigente la decide el modulo que suscribe. Un
+// test que la fija como constante no comprueba el documento: comprueba la
+// constante (PROMPT.md §5.19 y la trampa 136).
+const VERSION_MODELO_NUBE = require('../src/services/anexoNube').VERSION_MODELO;
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -149,27 +153,104 @@ function manifiestoCompleto() {
         auditoria: true,
         evidencia: 'dpa-cloudflare.pdf',
       },
-      google: {
+      // 📦1047 El proveedor de CORREO. Con la cuenta de Workspace y el CDPA
+      // incorporado al Acuerdo, Google interviene como Subencargado de los
+      // datos del servicio de correo: el item exige el vinculo, su vigencia,
+      // la evidencia de la aceptacion por la cuenta y sus clausulas.
+      mail_provider: {
+        proveedor: 'Google Ireland Limited',
+        servicio: 'Google Workspace',
         cuenta: 'workspace',
+        rol: 'subencargado',
         dpa: true,
-        version: '2026-01',
-        fecha: '2026-10-23',
+        version: 'CDPA',
+        fecha: '2026-10-30',
         devolucion_supresion: true,
         auditoria: true,
-        evidencia: 'dpa-google.pdf',
+        evidencia: 'cdpa-workspace.html',
+        // 📦1047 · P1 La aceptacion del CDPA tiene que decir COMO se acepta:
+        // el modo, la fecha y la evidencia del modo. Un `aceptada: true` sin
+        // modo es una afirmacion sin respaldo, y el item no lo habilita.
+        aceptacion: {
+          aceptada: true,
+          modo: 'incorporado_por_referencia',
+          fecha: '2026-11-10',
+          evidencia: 'El CDPA esta incorporado al Acuerdo (evidencia de prueba).',
+          cuenta: 'gesstiar.com (Google Workspace)',
+          at_testacion: 'Atestacion escrita del owner (prueba).',
+          acuerdo: {
+            url: 'https://workspace.google.com/terms/premier_terms/?hl=en',
+            hash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            bytes: 467263,
+            descargado: '2026-11-10',
+          },
+          cdpa: {
+            url: 'https://admin.google.com/terms/apps/8/1/en/dpa_terms.html',
+            hash: '0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1',
+            bytes: 97831,
+            descargado: '2026-11-10',
+          },
+        },
       },
     },
+    // 📦1047 La firma del Anexo de Encargo tambien se contrasta con el texto
+    // vigente: el manifiesto declara la huella del archivo que el servidor
+    // lee, y una firma de otra version no describe ese texto.
     anexo_encargo: {
       estado: 'firmado',
       fecha: '2026-10-21',
       evidencia: 'anexo-encargo-firmado.pdf',
+      // 📦1047 · punto 3 · P7 La FACULTAD acreditada de quien contrafirma por
+      // Gesstiar: sin ella, el item estado_encargo NO puede quedar ok.
+      contrafirma_facultad: {
+        resultado: 'REPRESENTANTE_LEGAL_ENCARGADO',
+        nombre: 'Javier Robles Fontalvo',
+        cargo: 'Representante Legal',
+        tipo: 'REPRESENTACION',
+        instrumento_ref: 'Representante legal declarado en el manifiesto legal',
+        instrumento_sha256: null,
+        id_poder: null,
+        verificado_at: '2026-10-21',
+      },
+      version: '2026-10-21',
+      hash: readiness._internos._hash(ENCARGO_OK),
     },
+    // 📦1047 La suscripcion tiene que ser del TEXTO VIGENTE. El manifiesto
+    // declara el modelo (version y huella) y la suscripcion se compara
+    // contra el: sin esa comparacion, publicar la v1.2 dejaba el item en ok
+    // citando la suscripcion de la v1.1.
     anexo_nube: {
       firmado: true,
       fecha: '2026-10-23',
-      version: '1.0',
-      hash: readiness._internos._hash('anexo-nube-firmado'),
+      version: VERSION_MODELO_NUBE,
+      hash: readiness._internos._hash(NUBE_OK),
       evidencia: 'anexo-nube-firmado.pdf',
+      // 📦1047 · punto 3 El Anexo de Nube es bilateral (el texto vigente, §10):
+      // lo susceptibility la Empresa (primer acto) y lo contrafirma K+AIR
+      // (segundo acto). El item contrafirma_nube mide el segundo.
+      contrafirmado: true,
+      contrafirma_fecha: '2026-10-24',
+      contrafirma_actor: 'kair',
+      contrafirma_motivo: 'Contrafirma de prueba.',
+      contrafirma_evidencia: 'anexo-nube-contrafirmado.pdf',
+      // 📦1047 · punto 3 · P7 La FACULTAD acreditada de quien contrafirma por
+      // Gesstiar. Sin ella, el item contrafirma_nube NO puede quedar ok: el
+      // segundo acto tiene que decir con que poder se firmo.
+      contrafirma_facultad: {
+        resultado: 'REPRESENTANTE_LEGAL_ENCARGADO',
+        nombre: 'Javier Robles Fontalvo',
+        cargo: 'Representante Legal',
+        tipo: 'REPRESENTACION',
+        instrumento_ref: 'Representante legal declarado en el manifiesto legal',
+        instrumento_sha256: null,
+        id_poder: null,
+        verificado_at: '2026-10-24',
+      },
+      modelo: {
+        version: VERSION_MODELO_NUBE,
+        hash: readiness._internos._hash(NUBE_OK),
+        bytes: NUBE_OK.length,
+      },
     },
     n9a: { probada: true, evidencia: 'prueba-9a.txt' },
     n10_4: { probada: true, evidencia: 'prueba-10-4.txt' },
@@ -715,42 +796,72 @@ test('readiness · las URLs declaradas apuntan a documentos que estan en sitio/'
   }
 });
 
-// =============================================================================
-// 📦956 · Una cuenta de Google de CONSUMIDOR no es subencargado
-//
-// El dato vino del servidor (26-oct-2026): SMTP_USER=adminkair@gmail.com es
-// una cuenta de consumo. Una cuenta gratuita no tiene Data Processing
-// Addendum, asi que no hay DPA que exigirle: el envio de correo con datos
-// personales es una transferencia internacional (art. 26 de la Ley 1581).
-//
-// El check decia `cf && gg` para las clausulas de devolucion y auditoria, y
-// `ggOk` solo era verdadero con cuenta Workspace/Cloud: con una cuenta de
-// consumidor esos TRES items no podian quedar ok nunca. El gate no abria por
-// mas que el owner llenara todo lo demas.
-// =============================================================================
+// 📦1047 · La cuenta de consumo se sustituyó por Google Workspace con el
+// CDPA incorporado al Acuerdo (Decision A del 9-nov-2026). Los tests de este
+// bloque son los del ESTADO VIGENTE; los del estado anterior (la cuenta de
+// consumo, 📦956 y 📦957) se retiraron porque ese estado ya no existe en el
+// servicio, y el item legado `google_dpa` queda en `no_aplica` para
+// dejar constancia de la historia.
 
-function manifiestoConCuentaGoogle(cuenta, extra = {}) {
+// El manifiesto con el proveedor de correo declarado de una manera
+// concreta: la cuenta, el papel, el CDPA y la evidencia de la aceptacion por
+// la cuenta son los cuatro datos que el item exige.
+function manifiestoConMailProvider(cuenta, extra = {}) {
   const man = manifiestoCompleto();
-  man.subencargados.google = {
+  man.subencargados.mail_provider = Object.assign({
+    proveedor: 'Google Ireland Limited',
+    servicio: 'Google Workspace',
     cuenta,
+    rol: 'subencargado',
     dpa: false,
     version: null,
     fecha: null,
     devolucion_supresion: false,
     auditoria: false,
     evidencia: null,
-    ...extra,
-  };
+    aceptacion: { aceptada: false, evidencia: null },
+  }, extra);
   return man;
 }
 
+// La aceptacion del CDPA COMPLETA, con el modo, la fecha y la evidencia que
+// ese modo exige. Los tests que la usan quieren comprobar OTRA cosa (la
+// cuenta, el papel, las clausulas): si la aceptacion esta incompleta, el
+// item quedaria pendiente por la aceptacion y el test no mediria lo que dice
+// medir.
+function aceptacionCompleta(extra = {}) {
+  return Object.assign({
+    aceptada: true,
+    modo: 'incorporado_por_referencia',
+    fecha: '2026-11-10',
+    evidencia: 'El CDPA esta incorporado al Acuerdo (evidencia de prueba).',
+    cuenta: 'gesstiar.com (Google Workspace)',
+    at_testacion: 'Atestacion escrita del owner (prueba).',
+    acuerdo: {
+      url: 'https://workspace.google.com/terms/premier_terms/?hl=en',
+      hash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      bytes: 467263,
+      descargado: '2026-11-10',
+    },
+    cdpa: {
+      url: 'https://admin.google.com/terms/apps/8/1/en/dpa_terms.html',
+      hash: '0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1',
+      bytes: 97831,
+      descargado: '2026-11-10',
+    },
+  }, extra);
+}
+
+// Los textos se inyectan: el gate compara la suscripcion contra el TEXTO
+// VIGENTE, y con los textos inyectados esa comparacion es determinista (la
+// huella del texto inyectado es la que declara la fixture).
 function reporteDe(man) {
   return readiness.evaluar({
     gate: 'primera_firma',
     db: null,
     config: CONFIG_TEST,
     manifiesto: man,
-    textos: { acuerdoV11: null, anexoNube: null, anexoEncargo: null },
+    textos: { acuerdoV11: ACUERDO_OK, anexoNube: NUBE_OK, anexoEncargo: ENCARGO_OK },
   });
 }
 
@@ -758,85 +869,250 @@ function idsPendientesDe(man) {
   return reporteDe(man).pendientes.map((p) => p.id);
 }
 
-test('readiness · con una cuenta Workspace/Cloud y el DPA completo, los items de subencargados quedan ok', () => {
-  // La via normal no se toca: Google sigue siendo subencargado y le aplican
-  // las mismas clausulas que a Cloudflare.
+// =============================================================================
+// 📦1047 · EL PROVEEDOR DE CORREO Y EL VÍNCULO CON EL CDPA
+//
+// La cuenta gratuita de consumo se sustituyó por una cuenta de Google
+// Workspace con el Cloud Data Processing Addendum (CDPA) incorporado al
+// Acuerdo (Decision A del 9-nov-2026). Con ese vínculo, Google interviene
+// como SUBCONTRATADO de los datos del servicio de correo, y el item tiene que
+// exigir lo que le corresponde: el vínculo, su vigencia, la evidencia de la
+// aceptación por la cuenta y sus cláusulas.
+//
+// El item LEGADO `google_dpa` pasa a `no_aplica`: un item que ya no aplica
+// no es un item cumplido, y marcarlo `ok` sería un verde falso.
+// =============================================================================
+
+test('readiness · con una cuenta Workspace y el CDPA completo, los items de subencargados quedan ok', () => {
+  // La via normal: el proveedor de correo es un subencargado con vinculo
+  // contractual, y le aplican las mismas clausulas que a Cloudflare.
   const ids = idsPendientesDe(manifiestoCompleto());
-  for (const id of ['google_dpa', 'devolucion_supresion', 'auditoria']) {
+  for (const id of ['mail_provider_dpa', 'devolucion_supresion', 'auditoria']) {
     assert.ok(!ids.includes(id), `${id} quedo pendiente: ${JSON.stringify(ids)}`);
   }
 });
 
-test('readiness · una cuenta de consumidor no habilita el servicio: el item de Google sigue pendiente y dice cual es la salida', () => {
-  // 📦957 El Acuerdo (10.1 y 10.5(f)) prohibe transmitir datos personales a
-  // un proveedor sin contrato o DPA. Con una cuenta de consumo Google no es
-  // subencargado y la cuenta de correo no habilita el servicio: el item NO
-  // puede quedar ok. Lo que tiene que hacer el check es decir el motivo y
-  // la salida, para que no sea un bloqueo sin nombre.
-  //
-  // 📦978 (v1.2, salida B): la salida ya NO es "conseguir un DPA de Google"
-  // ni "cambiar de proveedor". Con una cuenta de consumo, Google es
-  // RESPONSABLE y el envio es una transferencia internacional a un pais con
-  // nivel adecuado: la base es ese nivel (Titulo V, 3.2), NO la
-  // autorizacion expresa del Titular (que es la excepcion del art. 26 de la
-  // Ley 1581, para cuando el destino NO tiene nivel). Lo que hay que hacer
-  // es DOCUMENTAR la transferencia, y el item tiene que decir cuales son
-  // los pasos: el papel de Google escrito, las medidas demostradas, la
-  // validacion con la Circular 2 de 2025 y la declaracion en el RNBD.
-  const r = reporteDe(manifiestoConCuentaGoogle('consumidor'));
+test('readiness · el item legado google_dpa queda en no_aplica, NO en ok', () => {
+  // El item del estado anterior (la cuenta de consumo) se conserva como
+  // marca de la historia, en estado `no_aplica`. NO se marca ok: un item
+  // que ya no aplica no es un item cumplido. Y NO queda pendiente: eso seria
+  // un bloqueo permanente sin salida.
+  const r = reporteDe(manifiestoCompleto());
+  const item = r.grupos
+    .flatMap((g) => g.items)
+    .find((i) => i.id === 'google_dpa');
+  assert.ok(item, 'el item legado google_dpa tiene que seguir existiendo');
+  assert.equal(item.estado, 'no_aplica',
+    `el item legado quedo en ${item.estado}`);
+  assert.ok(/mail_provider_dpa/.test(item.detalle),
+    `el detalle tiene que apuntar al item que lo sustituye: ${item.detalle}`);
+  assert.ok(!r.pendientes.some((p) => p.id === 'google_dpa'),
+    'el item legado no puede quedar pendiente');
+});
+
+test('readiness · una cuenta de consumidor no habilita el servicio: el item del proveedor de correo sigue pendiente', () => {
+  // Una cuenta de consumo no tiene CDPA: Google no es subencargado y el
+  // Acuerdo (10.1 y 10.5(f)) prohibe transmitir datos personales a un
+  // proveedor no vinculado. El item NO puede quedar ok, y tiene que decir
+  // el motivo y la salida.
+  const r = reporteDe(manifiestoConMailProvider('consumidor', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: aceptacionCompleta(),
+  }));
   const ids = r.pendientes.map((p) => p.id);
   assert.ok(
-    ids.includes('google_dpa'),
-    `google_dpa quedo ok con una cuenta de consumidor: ${JSON.stringify(ids)}`,
+    ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok con una cuenta de consumidor: ${JSON.stringify(ids)}`,
   );
-  const item = r.pendientes.find((p) => p.id === 'google_dpa');
-  assert.ok(/TRANSFERENCIA INTERNACIONAL/.test(item.detalle),
-    `el detalle no dice que es una transferencia internacional: ${item.detalle}`);
-  assert.ok(/nivel adecuado/.test(item.detalle),
-    `el detalle no dice la base de la transferencia: ${item.detalle}`);
-  assert.ok(/NO la autorizaci[oó]n expresa/.test(item.detalle),
-    `el detalle no aclara que la autorizacion expresa NO es la base: ${item.detalle}`);
-  assert.ok(/RNBD/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
-  assert.ok(/Circular 2 de 2025/.test(item.accion), `la accion no dice la salida: ${item.accion}`);
+  const item = r.pendientes.find((p) => p.id === 'mail_provider_dpa');
+  assert.ok(/workspace|cloud|empresarial|transaccional/.test(item.detalle),
+    `el detalle no dice que tipo de cuenta se espera: ${item.detalle}`);
+  assert.ok(/Workspace/.test(item.accion),
+    `la accion no dice la salida: ${item.accion}`);
 });
 
-test('readiness · la accion del pendiente nombra la version vigente del Acuerdo, no una version superada', () => {
-  // 📦1046 La accion del item de Google decia, con la version ESCRITA A MANO,
-  // que "la v1.2 del Acuerdo es la que sostiene ese regimen". La v1.2 ya no
-  // es candidata: la superaron la v1.3, la v1.4 y la v1.5, y su texto ni
-  // siquiera esta en el repo (esta en el .gitignore, a la espera del
-  // abogado). El gate mandaba a buscar la aprobacion de una version muerta,
-  // y de paso contradecía al manifiesto, que ya declara la determinacion del
-  // papel de Google por operacion (punto J6 del abogado, 30-oct-2026).
-  //
-  // Ahora la version sale del MANIFIESTO. Este test lo comprueba de las dos
-  // formas: lo que declara el manifiesto es lo que dice la accion, y la
-  // version superada no aparece.
-  //
-  // La version se cambia en una COPIA del manifiesto y no en el compartido:
-  // `manifiestoCompleto()` lo usan muchas pruebas y tocarlo ahi movia el
-  // control de la version del texto para todas.
-  const man = manifiestoConCuentaGoogle('consumidor');
-  man.acuerdo.version = 'v9.9';
-
-  const item = reporteDe(man).pendientes.find((p) => p.id === 'google_dpa');
-  assert.ok(item, 'google_dpa no quedo pendiente: el item tiene que existir');
-  assert.ok(item.accion.includes('v9.9'),
-    `la accion no nombra la version que declara el manifiesto: ${item.accion}`);
-  assert.ok(!/v1\.2/.test(item.accion),
-    `la accion sigue nombrando una version superada: ${item.accion}`);
+test('readiness · sin la evidencia de aceptacion del CDPA por la cuenta, el item sigue pendiente', () => {
+  // El CDPA se incorpora al Acuerdo por referencia, o el administrador lo
+  // acepta en la consola. Sin ese dato, el vinculo no esta verificado: el
+  // item no puede quedar ok aunque el resto de las clausulas esten.
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: { aceptada: false, evidencia: null },
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok sin la aceptacion: ${JSON.stringify(ids)}`);
 });
 
-test('readiness · con una cuenta de consumidor, la devolucion y la auditoria se resuelven con Cloudflare', () => {
-  const ids = idsPendientesDe(manifiestoConCuentaGoogle('consumidor'));
-  assert.ok(!ids.includes('devolucion_supresion'), `devolucion_supresion pendiente: ${JSON.stringify(ids)}`);
-  assert.ok(!ids.includes('auditoria'), `auditoria pendiente: ${JSON.stringify(ids)}`);
+// 📦1047 · P1 La aceptacion no se declara con un `true` y una frase: se
+// declara con el MODO, la FECHA y la evidencia de ESE modo. Un item que
+// acepta `aceptada: true` sin mas es un verde falso por la via del papel: el
+// manifiesto podria decir que el CDPA esta aceptado sin que nadie diga COMO
+// se acepto ni que evidencia lo sostiene.
+test('readiness · una aceptacion sin modo no habilita el item', () => {
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: { aceptada: true, evidencia: 'admin-console.html' },
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok con una aceptacion sin modo: ${JSON.stringify(ids)}`);
 });
 
-test('readiness · la salida de consumidor no le perdona a Cloudflare sus propias clausulas', () => {
-  // La segunda salida es para Google, no para todos: si Cloudflare no trae
-  // la clausula, el item sigue pendiente.
-  const man = manifiestoConCuentaGoogle('consumidor');
+test('readiness · una aceptacion sin fecha no habilita el item', () => {
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: {
+      aceptada: true,
+      modo: 'incorporado_por_referencia',
+      evidencia: 'admin-console.html',
+    },
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok con una aceptacion sin fecha: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · la incorporacion por referencia exige las huellas de los dos textos', () => {
+  // Sin la huella del Acuerdo y del CDPA, la evidencia no dice QUE texto se
+  // esta aplicando: el item no puede quedar ok.
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: {
+      aceptada: true,
+      modo: 'incorporado_por_referencia',
+      fecha: '2026-11-10',
+      evidencia: 'admin-console.html',
+      cuenta: 'gesstiar.com',
+      at_testacion: 'Atestacion del owner.',
+      acuerdo: { url: 'https://workspace.google.com/terms/premier_terms/?hl=en' },
+    },
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok sin las huellas de los textos: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · la aceptacion en la consola exige la captura del acto', () => {
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: {
+      aceptada: true,
+      modo: 'aceptado_por_administrador',
+      fecha: '2026-11-10',
+      evidencia: 'admin-console.html',
+    },
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok sin la captura: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · una aceptacion completa por consola (con captura) habilita el item', () => {
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: {
+      aceptada: true,
+      modo: 'aceptado_por_administrador',
+      fecha: '2026-11-10',
+      evidencia: 'El administrador acepto el CDPA en la consola.',
+      captura: {
+        archivo: 'captura-consola.png',
+        hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        bytes: 1234,
+      },
+    },
+  }));
+  assert.ok(!ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo pendiente con la aceptacion completa: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · el papel del proveedor tiene que quedar declarado como subencargado', () => {
+  // El rol no se deduce: se declara. Un proveedor con CDPA que no dice que
+  // papelplaying no habilita el servicio.
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    rol: 'responsable',
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: aceptacionCompleta(),
+  }));
+  assert.ok(ids.includes('mail_provider_dpa'),
+    `mail_provider_dpa quedo ok con un rol que no es subencargado: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · sin declarar el tipo de cuenta, los tres items siguen pendientes', () => {
+  // Declarar el tipo de cuenta es lo que abre la salida: sin declararlo no
+  // se puede asumir nada del vinculo.
+  const ids = idsPendientesDe(manifiestoConMailProvider(null));
+  for (const id of ['mail_provider_dpa', 'devolucion_supresion', 'auditoria']) {
+    assert.ok(ids.includes(id), `${id} quedo ok sin declarar la cuenta: ${JSON.stringify(ids)}`);
+  }
+});
+
+test('readiness · la devolucion y la auditoria exigen los DOS subencargados', () => {
+  // Ya no hay una rama de "el de consumo es aceptable": en el servicio no hay
+  // una cuenta de consumo. Los dos subencargados existen y los dos tienen que
+  // cumplir sus propias clausulas.
+  const ids = idsPendientesDe(manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: false,
+    auditoria: false,
+    evidencia: 'cdpa.html',
+    aceptacion: aceptacionCompleta(),
+  }));
+  for (const id of ['devolucion_supresion', 'auditoria']) {
+    assert.ok(ids.includes(id), `${id} quedo ok sin la clausula del proveedor: ${JSON.stringify(ids)}`);
+  }
+});
+
+test('readiness · una clausula que falta en Cloudflare no la tapa el proveedor de correo', () => {
+  // La segunda salida es para el proveedor de correo, no para todos: si
+  // Cloudflare no trae la clausula, el item sigue pendiente.
+  const man = manifiestoConMailProvider('workspace', {
+    dpa: true,
+    version: 'CDPA',
+    fecha: '2026-10-30',
+    devolucion_supresion: true,
+    auditoria: true,
+    evidencia: 'cdpa.html',
+    aceptacion: aceptacionCompleta(),
+  });
   man.subencargados.cloudflare.devolucion_supresion = false;
   man.subencargados.cloudflare.auditoria = false;
   const ids = idsPendientesDe(man);
@@ -844,19 +1120,179 @@ test('readiness · la salida de consumidor no le perdona a Cloudflare sus propia
   assert.ok(ids.includes('auditoria'), `auditoria no quedo pendiente: ${JSON.stringify(ids)}`);
 });
 
-test('readiness · sin declarar el tipo de cuenta, los tres items siguen pendientes', () => {
-  // Declarar el tipo de cuenta es lo que abre la salida: sin declararlo no
-  // se puede asumir que Google no es subencargado.
-  const ids = idsPendientesDe(manifiestoConCuentaGoogle(null));
-  for (const id of ['google_dpa', 'devolucion_supresion', 'auditoria']) {
-    assert.ok(ids.includes(id), `${id} quedo ok sin declarar la cuenta: ${JSON.stringify(ids)}`);
+// ── El hallazgo 3.3 del plan del 9-nov-2026: el gate no comparaba la
+//    suscripcion con el texto vigente ──────────────────────────────────────────
+
+test('readiness · una suscripcion del Anexo de Nube de otra version NO puede quedar ok', () => {
+  // El hallazgo 3.3: `firmado_nube` exigia firmado, fecha, version, hash y
+  // evidencia, pero NO comparaba la suscripcion con el TEXTO VIGENTE. Con la
+  // v1.2 publicada, el gate seguiria diciendo "Anexo de Nube firmado"
+  // citando la suscripcion de la v1.1. Este test ata el arreglo.
+  const man = manifiestoCompleto();
+  man.anexo_nube.version = '1.1';
+  man.anexo_nube.hash = readiness._internos._hash('otra-version');
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('firmado_nube'),
+    `firmado_nube quedo ok con una suscripcion de otra version: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · una suscripcion con la huella de otro texto NO puede quedar ok', () => {
+  // La misma comprobacion por el otro lado: la huella es la que dice QUE
+  // texto se firmo. La version sola no alcanza.
+  const man = manifiestoCompleto();
+  man.anexo_nube.hash = readiness._internos._hash('otro-texto');
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('firmado_nube'),
+    `firmado_nube quedo ok con la huella de otro texto: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · el detalle de firmado_nube dice el motivo real', () => {
+  // "Falta el Anexo firmado" es verdad a medias cuando lo que falta es la
+  // RE-suscripcion del texto vigente: son dos cosas distintas.
+  const man = manifiestoCompleto();
+  man.anexo_nube.version = '1.1';
+  const r = reporteDe(man);
+  const item = r.pendientes.find((p) => p.id === 'firmado_nube');
+  assert.ok(item, 'firmado_nube no quedo pendiente');
+  assert.ok(new RegExp('v' + VERSION_MODELO_NUBE).test(item.detalle),
+    `el detalle no nombra el texto vigente: ${item.detalle}`);
+  assert.ok(/v1\.1/.test(item.detalle),
+    `el detalle no dice que la suscripcion es de otra version: ${item.detalle}`);
+});
+
+test('readiness · la accion del documento nombra la version vigente, no una version escrita a mano', () => {
+  // La accion de `documento_nube` decia, con la version ESCRITA A MANO,
+  // "la v1.1, susceptible de suscripcion". Con la v1.2 publicada, eso manda a
+  // buscar un texto que ya no esta vigente. La version sale del modulo que
+  // suscribe, no de una constante.
+  const r = reporteDe(manifiestoCompleto());
+  const item = r.grupos.flatMap((g) => g.items).find((i) => i.id === 'documento_nube');
+  assert.ok(item, 'documento_nube tiene que existir');
+  assert.ok(item.accion.includes('v' + VERSION_MODELO_NUBE),
+    `la accion no nombra la version vigente: ${item.accion}`);
+  assert.ok(!/la v1\.1/.test(item.accion),
+    `la accion sigue nombrando una version superada: ${item.accion}`);
+});
+
+// ── 📦1047 · punto 3: el Anexo de Nube es BILATERAL. El gate no puede
+//    declarar el instrumento firmado con un solo acto ─────────────────────────
+
+test('readiness · el Anexo de Nube sin contrafirma NO queda ok en el gate', () => {
+  // El texto vigente (parrafo 10) exige DOS actos: la suscripcion de la
+  // Empresa y la contrafirma de K+AIR. Con solo el primero, el item
+  // `contrafirma_nube` queda pendiente y el gate de primera firma NO pasa.
+  const man = manifiestoCompleto();
+  man.anexo_nube.contrafirmado = false;
+  man.anexo_nube.contrafirma_fecha = null;
+  man.anexo_nube.contrafirma_actor = null;
+  man.anexo_nube.contrafirma_evidencia = null;
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('contrafirma_nube'),
+    `contrafirma_nube quedo ok sin el segundo acto: ${JSON.stringify(ids)}`);
+  assert.ok(!ids.includes('firmado_nube'),
+    `el primer acto esta: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · con los dos actos, el Anexo de Nube queda ok', () => {
+  const ids = idsPendientesDe(manifiestoCompleto());
+  assert.ok(!ids.includes('contrafirma_nube'),
+    `contrafirma_nube quedo pendiente: ${JSON.stringify(ids)}`);
+  assert.ok(!ids.includes('firmado_nube'),
+    `firmado_nube quedo pendiente: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · una contrafirma sin fecha, sin actor o sin evidencia NO puede quedar ok', () => {
+  for (const campo of ['contrafirma_fecha', 'contrafirma_actor', 'contrafirma_evidencia']) {
+    const man = manifiestoCompleto();
+    man.anexo_nube[campo] = null;
+    const ids = idsPendientesDe(man);
+    assert.ok(ids.includes('contrafirma_nube'),
+      `contrafirma_nube quedo ok sin ${campo}: ${JSON.stringify(ids)}`);
   }
 });
 
-test('readiness · con una cuenta Workspace/Cloud sin DPA, el item de Google sigue pendiente', () => {
-  const ids = idsPendientesDe(manifiestoConCuentaGoogle('workspace'));
-  assert.ok(
-    ids.includes('google_dpa'),
-    `google_dpa quedo ok sin el DPA de Google: ${JSON.stringify(ids)}`,
-  );
+test('readiness · una contrafirma SIN la facultad acreditada NO puede quedar ok', () => {
+  // 📦1047 · punto 3 · P7 La condicion del abogado: "La ejecucion por una
+  // persona distinta del representante legal de Gesstiar S.A.S. requerira
+  // acreditar previamente la facultad de representacion o poder suficiente,
+  // que debera conservarse en el expediente". Un segundo acto que no dice con
+  // que poder se firmo no describe el instrumento entero.
+  for (const valor of [null, undefined, {}, { resultado: 'ALGO' }]) {
+    const man = manifiestoCompleto();
+    man.anexo_nube.contrafirma_facultad = valor;
+    const ids = idsPendientesDe(man);
+    assert.ok(ids.includes('contrafirma_nube'),
+      `contrafirma_nube quedo ok sin la facultad (${JSON.stringify(valor)}): ${JSON.stringify(ids)}`);
+  }
 });
+
+test('readiness · un poder acreditado sin referencia ni huella NO puede quedar ok', () => {
+  const man = manifiestoCompleto();
+  man.anexo_nube.contrafirma_facultad = {
+    resultado: 'PODER_ACREDITADO',
+    nombre: 'PERSONA DE PRUEBA',
+    tipo: 'PODER',
+    instrumento_ref: null,
+    instrumento_sha256: null,
+  };
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('contrafirma_nube'),
+    `un poder sin documento no es una acreditacion: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · el Anexo de Encargo SIN la facultad acreditada NO puede quedar ok', () => {
+  // 📦1047 · punto 3 · P7 El mismo control que en el Anexo de Nube: la
+  // contrafirma del Anexo de Encargo es tambien un acto de K+AIR por Gesstiar.
+  const man = manifiestoCompleto();
+  man.anexo_encargo.contrafirma_facultad = null;
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('estado_encargo'),
+    `estado_encargo quedo ok sin la facultad: ${JSON.stringify(ids)}`);
+});
+
+test('readiness · el detalle de contrafirma_nube dice QUE acto falta', () => {
+  // Decir "falta el Anexo firmado" cuando lo que falta es la contrafirma
+  // manda a la Empresa a hacer un acto que ya hizo.
+  const man = manifiestoCompleto();
+  man.anexo_nube.contrafirmado = false;
+  man.anexo_nube.contrafirma_fecha = null;
+  man.anexo_nube.contrafirma_actor = null;
+  man.anexo_nube.contrafirma_evidencia = null;
+  const r = reporteDe(man);
+  const item = r.pendientes.find((p) => p.id === 'contrafirma_nube');
+  assert.ok(item, 'contrafirma_nube no quedo pendiente');
+  assert.ok(/contrafirma de K\+AIR/.test(item.detalle),
+    `el detalle no nombra el segundo acto: ${item.detalle}`);
+  assert.ok(!/no está suscrito todavía/.test(item.detalle),
+    `el detalle atribuye a la Empresa un acto que ya hizo: ${item.detalle}`);
+});
+
+test('readiness · el detalle de contrafirma_nube cuando faltan los DOS actos', () => {
+  const man = manifiestoCompleto();
+  man.anexo_nube.firmado = false;
+  man.anexo_nube.fecha = null;
+  man.anexo_nube.version = null;
+  man.anexo_nube.hash = null;
+  man.anexo_nube.evidencia = null;
+  man.anexo_nube.contrafirmado = false;
+  man.anexo_nube.contrafirma_fecha = null;
+  man.anexo_nube.contrafirma_actor = null;
+  man.anexo_nube.contrafirma_evidencia = null;
+  const r = reporteDe(man);
+  const item = r.pendientes.find((p) => p.id === 'contrafirma_nube');
+  assert.ok(item, 'contrafirma_nube no quedo pendiente');
+  assert.ok(/los dos actos/.test(item.detalle),
+    `el detalle no dice que faltan los dos: ${item.detalle}`);
+});
+
+test('readiness · la firma del Anexo de Encargo tambien se contrasta con el texto vigente', () => {
+  // El mismo falso positivo del hallazgo 3.3, aplicado al otro instrumento:
+  // el manifiesto decia "firmado" sobre un texto que el servidor ya no
+  // tenia. El gate tiene que notar la diferencia.
+  const man = manifiestoCompleto();
+  man.anexo_encargo.hash = readiness._internos._hash('otro-texto');
+  const ids = idsPendientesDe(man);
+  assert.ok(ids.includes('estado_encargo'),
+    `estado_encargo quedo ok con la huella de otro texto: ${JSON.stringify(ids)}`);
+});
+

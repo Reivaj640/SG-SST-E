@@ -128,6 +128,9 @@ const manifiestoLegal = require('./manifiestoLegal');
 const actaEncargo = require('./actaEncargo');
 const textosAceptacion = require('./anexoEncargoTextos');
 const representanteService = require('./representante');
+// La acreditacion de la facultad de quien contrafirma POR GESSTIAR (condicion
+// del abogado a P7, 10-nov-2026). Ver `services/poderesEncargado.js`.
+const poderesEncargado = require('./poderesEncargado');
 
 // La raíz del repo que contiene el Servicio (sgsst-electron-app): ahí vive
 // la carpeta `legal/` con el texto del Anexo de Encargo.
@@ -1614,6 +1617,18 @@ async function contrafirmar(id_empresa, id_suscripcion, datos, ctx = {}) {
   const contrafirmadoAt = new Date().toISOString();
   const actor = ctx.actor || null;
 
+  // QUIEN CONTRAFIRMA POR GESSTIAR, Y CON QUE FACULTAD.
+  //
+  // Mismo criterio que en el Anexo de Nube (P7, 10-nov-2026): el cotejo del
+  // representante de la EMPRESA demuestra la facultad de un lado, y este
+  // demuestra la del otro. Los dos actos son de K+AIR firmando por la
+  // empresa, y ninguno de los dos puede quedar sin el dato de con que poder
+  // se hizo.
+  const facultad = poderesEncargado.verificarFacultadContrafirmante(actor);
+  _evento(fila.id, fila.id_empresa, 'CONTRAFIRMA_FACULTAD_VERIFICADA',
+    `resultado=${facultad.resultado} instrumento=${facultad.instrumento_ref}`,
+    ctx.ip, ctx.user_agent);
+
   const evidencia = {
     fuente: 'contrafirma_kair',
     id_suscripcion: fila.id,
@@ -1635,6 +1650,9 @@ async function contrafirmar(id_empresa, id_suscripcion, datos, ctx = {}) {
     // La verificación documental de quien firmó por la Empresa: es lo que
     // sostiene esta contrafirma.
     representante_verificacion: verificacion,
+    // La acreditacion de la facultad de quien contrafirma POR GESSTIAR: con
+    // que poder se hizo el segundo acto (P7, 10-nov-2026).
+    facultad,
     fase: 2,
   };
 
@@ -1666,6 +1684,9 @@ async function contrafirmar(id_empresa, id_suscripcion, datos, ctx = {}) {
       ip: ctx.ip || null,
       user_agent: ctx.user_agent || null,
       verificacion_representante: verificacion,
+      // La facultad acreditada de quien contrafirma por Gesstiar: es la
+      // seccion 5 del acta.
+      facultad_contrafirmante: facultad,
       datos_empresa: datosS11,
     });
     actaEncargo.guardarActa(acta.filename, acta.buffer);

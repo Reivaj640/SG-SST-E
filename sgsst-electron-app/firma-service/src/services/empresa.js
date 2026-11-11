@@ -54,6 +54,13 @@ const auditoriaService = require('./empresaAuditoria');
 const conservacionService = require('./conservacion');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
+// La identidad del texto vigente del Anexo de Nube y su huella real. Se
+// requiere desde aqui y NO desde `services/anexoNube.js`: ese modulo requiere
+// a este, y exigirlo seria un ciclo.
+const {
+  VERSION_MODELO: VERSION_MODELO_NUBE,
+  huellaModeloVigente,
+} = require('./anexoNubeModelo');
 
 // 8B-C · El snapshot de la Empresa también contiene el documento del
 // representante legal. Se cifra con un propósito y un campo PROPIOS: así el
@@ -1217,6 +1224,36 @@ function list() {
 }
 
 /**
+ * Los ids de las Empresas cuyo Anexo de Nube está EJECUTADO (el segundo acto).
+ *
+ * 📦1047 · punto 3 El Anexo de Nube es bilateral: lo suscribe la Empresa (fase
+ * 1) y lo contrafirma K+AIR (fase 2). El operador tiene que ver los TRES
+ * estados —no suscrito, suscrito y sin contrafirmar, y ejecutado— y no solo
+ * "tiene el campo `anexo_nube_firmado_at`": ese campo es la FASE 1, y usarlo
+ * como si fuera el instrumento entero es el mismo verde falso que se corrigió
+ * en el gate.
+ *
+ * La lectura es TOLERANTE: la columna `anexo_nube_ejecutado_at` llega con la
+ * migración 060. Si no está aplicada, NO se declara ninguna Empresa ejecutada
+ * (fallo CERRADO) y el servicio no se rompe.
+ *
+ * @returns {Set<string>} los ids de las Empresas con el instrumento ejecutado.
+ */
+function _idsConAnexoNubeEjecutado() {
+  try {
+    const columnas = db.prepare('PRAGMA table_info(gh_firma_empresas)').all()
+      .map((c) => c.name);
+    if (!columnas.includes('anexo_nube_ejecutado_at')) return new Set();
+    const filas = db.prepare(
+      'SELECT id_empresa FROM gh_firma_empresas WHERE anexo_nube_ejecutado_at IS NOT NULL',
+    ).all();
+    return new Set(filas.map((f) => f.id_empresa));
+  } catch (e) {
+    return new Set();
+  }
+}
+
+/**
  * Resumen de completitud para el admin: qué campos de identificación faltan
  * en cada empresa. Sirve para no activar una empresa con la identificación a
  * medias sin que nadie lo note.
@@ -1224,6 +1261,7 @@ function list() {
  * @returns {Array<object>}
  */
 function listConPendientes() {
+  const ejecutadasNube = _idsConAnexoNubeEjecutado();
   return list().map((e) => {
     const requeridos = ['razon_social', 'nit', 'domicilio'];
     const deseables = [
@@ -1248,8 +1286,62 @@ function listConPendientes() {
       // estar a la espera de la contrafirma de K+AIR. Con las dos columnas el
       // operador ve el estado sin abrir la base.
       tiene_anexo_suscrito: Boolean(e.anexo_encargo_suscrito_at),
+      // Lo mismo para el Anexo de Nube, que también es bilateral: la fase 1 es
+      // `anexo_nube_firmado_at` (la suscripción) y la fase 2 es la contrafirma.
+      // Sin las dos, el operador ve "Firmado" en una Empresa que solo se
+      // suscribió.
+      tiene_anexo_nube_suscrito: Boolean(e.anexo_nube_firmado_at),
+      tiene_anexo_nube_ejecutado: ejecutadasNube.has(e.id_empresa),
     };
   });
+}
+
+/**
+ * La fecha de EJECUCIÓN del Anexo de Nube: la del SEGUNDO acto (la
+ * contrafirma de K+AIR).
+ *
+ * 📦1047 · punto 3 El Anexo de Nube es bilateral (el texto vigente, §10): lo
+ * susceptibility la Empresa y lo contrafirma K+AIR, y el instrumento solo
+ * queda EJECUTADO con los dos actos. Para el Anexo de Encargo, la habilitación
+ * ya exigía la fecha del segundo acto (`anexo_encargo_firmado_at`); el Anexo de
+ * Nube queda igual.
+ *
+ * La columna llega con la migración 060. Si no está, la respuesta es `null`
+ * (fallo CERRADO: ninguna Empresa puede estar ejecutada) y NO se rompe el
+ * servicio: la ficha se lee con la columna que exista.
+ *
+ * @param {string} id_empresa
+ * @returns {string|null} la fecha ISO, o null.
+ */
+function _fechaEjecucionAnexoNube(id_empresa) {
+  try {
+    const columnas = db.prepare('PRAGMA table_info(gh_firma_empresas)').all()
+      .map((c) => c.name);
+    if (!columnas.includes('anexo_nube_ejecutado_at')) return null;
+    const fila = db.prepare(
+      'SELECT anexo_nube_ejecutado_at FROM gh_firma_empresas WHERE id_empresa = ?',
+    ).get(id_empresa);
+    return fila && fila.anexo_nube_ejecutado_at ? fila.anexo_nube_ejecutado_at : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * La fecha de ejecución del Anexo de Nube, para quien la necesite sin el
+ * snapshot.
+ *
+ * El snapshot (`getById`) NO expone esta columna a propósito: la lista de
+ * columnas del snapshot está fijada por la base y agregar una columna que llega
+ * con una migración rompería el servicio en un servidor donde esa migración
+ * todavía no está aplicada. Quien la necesita la lee por aquí, que falla
+ * CERRADO (null) y no rompe.
+ *
+ * @param {string} id_empresa
+ * @returns {string|null} la fecha ISO de la contrafirma, o null.
+ */
+function fechaEjecucionAnexoNube(id_empresa) {
+  return _fechaEjecucionAnexoNube(id_empresa);
 }
 
 /**
@@ -1319,10 +1411,32 @@ function verificarHabilitacionFirma(id_empresa) {
   // Empresas sin poder firmar. La regla queda construida y probada; el
   // encendido es un acto posterior, con la misma disciplina que la compuerta
   // de conservacion. Ver el comentario de `config.exigirAnexoNube`.
-  if (config.exigirAnexoNube === true
-      && (!empresa.anexo_nube_firmado_at || !empresa.anexo_nube_version
-        || !/^[0-9a-f]{64}$/i.test(empresa.anexo_nube_hash || ''))) {
-    pendientes.push('anexo_nube_firmado');
+  // Con la compuerta encendida, la Empresa tiene que haber suscrito el
+  // TEXTO VIGENTE, no cualquier version: la fecha de suscripcion no dice
+  // que se firmo. La huella es la que lo dice, y es la misma que usa el
+  // preflight (`con_anexo_nube_vigente`) y la compuerta de readiness.
+  //
+  // 📦1047 · punto 3 Y tiene que estar EJECUTADO: el Anexo de Nube es
+  // bilateral (el texto vigente, §10), asi que la suscripcion es el primer
+  // acto y la contrafirma de K+AIR el segundo. Es el espejo del Anexo de
+  // Encargo, cuya habilitación ya exigia la fecha del segundo acto.
+  //
+  // Si el archivo del modelo no esta en el servidor, la huella no se puede
+  // calcular y la comprobacion falla CERRADO: no hay texto vigente que
+  // pueda estar suscrito.
+  if (config.exigirAnexoNube === true) {
+    const huellaVigente = huellaModeloVigente();
+    const suscritoDelTextoVigente = huellaVigente !== null
+      && empresa.anexo_nube_version === VERSION_MODELO_NUBE
+      && String(empresa.anexo_nube_hash || '').trim().toLowerCase() === huellaVigente;
+    const ejecutado = _fechaEjecucionAnexoNube(id_empresa);
+    if (!empresa.anexo_nube_firmado_at
+      || !empresa.anexo_nube_version
+      || !/^[0-9a-f]{64}$/i.test(empresa.anexo_nube_hash || '')
+      || !suscritoDelTextoVigente
+      || !ejecutado) {
+      pendientes.push('anexo_nube_firmado');
+    }
   }
   if (!empresa.canal_pqrs) pendientes.push('canal_pqrs');
 
@@ -1696,6 +1810,7 @@ module.exports = {
   marcarAnexoFirmado,
   marcarAnexoSuscrito,
   marcarAnexoNubeFirmado,
+  fechaEjecucionAnexoNube,
   desmarcarAnexoFirmado,
   desmarcarAnexoSuscrito,
   setActivo,

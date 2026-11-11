@@ -725,6 +725,8 @@ function makeSubject(tipo) {
       return 'K+AIR — Tu código para firmar el Anexo de Encargo';
     case 'anexo_encargo_contrafirma':
       return 'K+AIR — Tu código para contrafirmar el Anexo de Encargo';
+    case 'anexo_nube_contrafirma':
+      return 'K+AIR — Tu código para contrafirmar el Anexo de Nube';
     default:
       return 'K+AIR — Notificación';
   }
@@ -780,6 +782,18 @@ function makeBody({ otp, tipo, context }) {
       'K+AIR está contrafirmando el Anexo de Encargo de una Empresa, como Encargado',
       'del tratamiento de datos. Este código es para la CONTRAFIRMA: no es el código',
       'de la Empresa, no autoriza a firmar nada en su nombre y no debe reenviarse.',
+      '',
+      `Tu código de verificación es: ${otp}`,
+      '',
+      'Este código expira en 10 minutos.',
+      'Si no esperabas esta contrafirma, no lo compartas con nadie y avisa al',
+      'responsable legal de K+AIR.',
+    );
+  } else if (tipo === 'anexo_nube_contrafirma') {
+    lines.push(
+      'K+AIR está contrafirmando el Anexo de Nube de una Empresa. Este código es para la',
+      'CONTRAFIRMA: no es el código de la Empresa, no autoriza a firmar nada en su nombre',
+      'y no debe reenviarse.',
       '',
       `Tu código de verificación es: ${otp}`,
       '',

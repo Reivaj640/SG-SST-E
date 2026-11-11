@@ -25,6 +25,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('../../src/db/connection');
+const empresaService = require('../../src/services/empresa');
 const {
   resetDb, makeApp, TEST_ADMIN_API_KEY,
 } = require('../helpers');
@@ -262,4 +263,81 @@ test('admin empresas · la consulta devuelve la empresa y 404 si no existe', asy
     .set(ADMIN)
     .timeout({ response: 3000 });
   assert.equal(noExiste.status, 404);
+});
+
+// ===========================================================================
+// EL ESTADO DE LOS ANEXOS EN EL LISTADO
+// ===========================================================================
+//
+// 📦1047 · punto 3 El Anexo de Nube es BILATERAL: lo suscribe la Empresa (fase
+// 1) y lo contrafirma K+AIR (fase 2). El listado tiene que distinguir las dos
+// fases: con una sola, el panel del operador muestra un badge VERDE en una
+// Empresa que solo se ha suscrito, que es el mismo verde falso que se corrigio
+// en el gate.
+
+test('admin empresas · el listado distingue los tres estados del Anexo de Nube', async () => {
+  limpiar();
+  const app = makeApp();
+  await request(app).post('/internal/admin/empresas').set(ADMIN).send(ALTA);
+
+  // 1. Sin nada: no suscrito.
+  let lista = await request(app)
+    .get('/internal/admin/empresas')
+    .set(ADMIN)
+    .timeout({ response: 3000 });
+  assert.equal(lista.status, 200);
+  let item = lista.body.items[0];
+  assert.equal(item.tiene_anexo_nube_suscrito, false, 'sin suscribir no hay fase 1');
+  assert.equal(item.tiene_anexo_nube_ejecutado, false, 'sin suscribir no hay fase 2');
+
+  // 2. Suscrito (fase 1): NO ejecutado. Este es el caso que el panel mostraba
+  //    como "Firmado" en verde.
+  db.prepare('UPDATE gh_firma_empresas SET anexo_nube_firmado_at = ? WHERE id_empresa = ?')
+    .run('2026-11-09 10:00:00', EMPRESA);
+
+  lista = await request(app)
+    .get('/internal/admin/empresas')
+    .set(ADMIN)
+    .timeout({ response: 3000 });
+  item = lista.body.items[0];
+  assert.equal(item.tiene_anexo_nube_suscrito, true, 'la fase 1 se ve');
+  assert.equal(item.tiene_anexo_nube_ejecutado, false,
+    'suscrita NO es ejecutada: el instrumento necesita los dos actos');
+
+  // 3. Contrafirmada (fase 2): ejecutada.
+  db.prepare('UPDATE gh_firma_empresas SET anexo_nube_ejecutado_at = ? WHERE id_empresa = ?')
+    .run('2026-11-09 15:30:00', EMPRESA);
+
+  lista = await request(app)
+    .get('/internal/admin/empresas')
+    .set(ADMIN)
+    .timeout({ response: 3000 });
+  item = lista.body.items[0];
+  assert.equal(item.tiene_anexo_nube_ejecutado, true, 'con la contrafirma el instrumento esta ejecutado');
+});
+
+test('admin empresas · la fase 1 del Anexo de Nube no declara el instrumento ejecutado', async () => {
+  limpiar();
+  const app = makeApp();
+  await request(app).post('/internal/admin/empresas').set(ADMIN).send(ALTA);
+  db.prepare('UPDATE gh_firma_empresas SET anexo_nube_firmado_at = ? WHERE id_empresa = ?')
+    .run('2026-11-09 10:00:00', EMPRESA);
+
+  const res = await request(app)
+    .get('/internal/admin/empresas')
+    .set(ADMIN)
+    .timeout({ response: 3000 });
+
+  assert.equal(res.status, 200, 'el listado no puede romperse');
+  const item = res.body.items[0];
+  assert.equal(item.tiene_anexo_nube_suscrito, true,
+    'la fase 1 se lee igual: no depende de la migracion 060');
+  assert.equal(item.tiene_anexo_nube_ejecutado, false,
+    'SOLO la suscripcion NO ejecuta el instrumento: sin la contrafirma no hay fase 2');
+
+  // Y el helper que lee la fecha de ejecucion es tolerante: sin la columna
+  // (migracion 060 no aplicada) devuelve null, y con la columna pero sin
+  // fecha, tambien.
+  assert.equal(empresaService.fechaEjecucionAnexoNube(EMPRESA), null,
+    'sin contrafirma no hay fecha de ejecucion');
 });

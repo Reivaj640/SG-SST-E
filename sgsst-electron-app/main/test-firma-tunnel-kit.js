@@ -78,10 +78,21 @@ if (fs.existsSync(reg)) {
 
 if (fs.existsSync(doc)) {
   const s = fs.readFileSync(doc, 'utf8');
+  // La guia cambio y estos checks seguian exigiendo los literales de la
+  // version vieja. Se comprueba lo que la guia TIENE que decir HOY, no la
+  // frase que ayer (PROMPT.md, trampa 28).
+  //
+  // - El respaldo tiene que ser WAL-safe: la guia NO da un `cp` de la base,
+  //   nombra el script que usa `sqlite3 .backup` y dice donde estan los
+  //   comandos exactos.
+  // - El tunel: la "Ruta B" (el casero, en el portatil) esta muerta; la guia
+  //   tiene que decir donde vive el tunel hoy.
   [
-    [/sqlite3 .*\.backup/, 'migración: usa sqlite3 .backup (WAL-safe)'],
+    [/deploy\/backup-firma\.sh/, 'migración: el respaldo WAL-safe (backup-firma.sh) queda documentado'],
+    [/plan-continuidad-2026-10-26\.md/, 'migración: los comandos exactos del respaldo quedan en el plan de continuidad'],
     [/storage/, 'migración: incluye los PDFs de evidencia'],
-    [/Ruta B/, 'migración: documenta limitación de Ruta B'],
+    [/cloudflared tunnel run kair-firma/, 'migración: documenta el túnel con nombre que se usa hoy'],
+    [/tunnel vive ahora en el servidor/, 'migración: documenta dónde vive el túnel (la Ruta B, la casera, está muerta)'],
   ].forEach(function (c) { add(c[1], c[0].test(s)); });
 }
 

@@ -40,6 +40,11 @@ const CANAL_CODIGO = 'segundo-canal@empresa-contrafirma.test';
 const CONFIRMACION_CANAL = 'Confirmado por llamada de prueba';
 const REPRESENTANTE = { documento: '900123456', calidad: 'REPRESENTANTE_LEGAL' };
 const MOTIVO = 'Verificado el certificado de la cámara de comercio';
+// El ACTOR de la contrafirma. La ejecucion por Gesstiar exige la facultad
+// acreditada de quien la hace (P7, 10-nov-2026): el actor se declara en la
+// cabecera `X-Admin-Actor` y tiene que tener un poder vigente. El arnes de
+// tests siembra uno a nombre de 'admin' (ver tests/helpers.js).
+const ACTOR = 'admin';
 
 const DATOS_S11 = {
   razon_social: RAZON_SOCIAL,
@@ -215,6 +220,7 @@ test('el flujo completo: la Empresa suscribe, K+AIR contrafirma', async () => {
   const res = await request(app)
     .post(rutaAdmin('contrafirmar'))
     .set(ADMIN)
+    .set('X-Admin-Actor', ACTOR)
     .set('X-Admin-Motivo', MOTIVO)
     .send({ id_suscripcion: idSuscripcion, otp: correo.otp, acepta: true });
   assert.equal(res.status, 200);

@@ -5,8 +5,8 @@
  *
  * 📦931 — Este módulo existe por DOS razones, y las dos importan:
  *
- * 1. POR QUÉ NO ESTÁ EN `utils/`. `package.json` mete `**/utils/**` en
- *    `asarUnpack`: en un build, `utils/emailSender.js` queda en
+ * 1. POR QUÉ NO ESTÁ EN `utils/`. `package.json` mete la carpeta `utils/**`
+ *    en `asarUnpack`: en un build, `utils/emailSender.js` queda en
  *    `resources/app.asar.unpacked/utils/`, y su `__dirname` da
  *    `app.asar.unpacked/utils` — ahí NO hay `.env` (el `.env` viaja DENTRO de
  *    `app.asar`). En cambio `shared/` NO está en `asarUnpack`: su `__dirname`

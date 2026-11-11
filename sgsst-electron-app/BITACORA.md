@@ -4,6 +4,90 @@ Relato de bugs, incidentes, trampas y releases. No es un archivo de reglas: se b
 
 Las reglas operativas viven en `AGENTS.md`.
 
+## 🐗 El comentario que se cerraba antes de tiempo (📦1047, 2026-11-10)
+
+### El botón "Enviar por correo" que estaba muerto y nadie veía
+
+El botón de enviar la remisión por correo **no funcionaba ni en el instalador ni en
+desarrollo**. No había ningún error visible: el usuario pretaba "no envía", y el log
+del servidor de Google era el único que decía algo. La causa estaba en la cabecera
+de `shared/env-loader.js`:
+
+```js
+/*  1. POR QUÉ NO ESTÁ EN `utils/`. `package.json` mete `**/utils/**` en
+ *    `asarUnpack`: ...
+```
+
+El patrón de archivos `**/utils/**` **contiene `*/`**. Dentro de un comentario de
+bloque, ese `*/` **cierra el comentario antes de tiempo**: todo lo que venía
+después dejó de ser comentario y **se ejecutó como código**. La primera sentencia
+que se ejecutó fue `utils/...`, que no está definido → `ReferenceError: utils is not
+defined` **al importar el módulo**.
+
+Y aquí está la parte que cuesta: **`node --check` pasa**. No es un error de
+sintaxis; el archivo es JavaScript válido. El fallo solo aparece cuando alguien
+**importa** el módulo. Por eso 2 494 tests en verde no lo cazaron: el test de
+este repo (`main/test-email-env-931.js`) leía el archivo **como texto** y buscaba
+cadenas. Buscaba el texto correcto en un archivo que al cargarse reventaba.
+
+### La regla
+
+1. **Un test que lee el archivo como texto no prueba que el archivo funcione.**
+   Si el módulo se importa en runtime, el test tiene que **importarlo**
+   (`require`) y afirmar que no lanza. El fix son **2 checks**:
+   `shared/env-loader.js SE CARGA` y `utils/emailSender.js SE CARGA`.
+2. **Dentro de un comentario de bloque no puede haber `*/`.** El fix fue
+   **describir el patrón con palabras** ("la carpeta `utils/**`") en vez de
+   escribirlo: el patrón completo, en el comentario, cerraba el comentario.
+3. **El guard va en el build, no solo en el test.** `main/_verificar-credenciales-build.js`
+   ahora **corta el build** si el cargador no carga: el síntoma ("error de Gmail que
+   no menciona K+AIR") es el peor posible, porque el que lo ve es el cliente final.
+4. **Un comentario no puede romper el archivo que documenta.** Si el archivo que
+   se carga es el que explica por qué el archivo que se carga funciona, el
+   comentario **es** código: un error de sintaxis ahí es un incidente de
+   producción disfrazado de documentación.
+
+### Lo que se hizo
+
+`shared/env-loader.js` corregido (el `*/` del patrón se partió para que no cierre
+el comentario); `main/test-email-env-931.js` ahora **carga** el cargador y el
+sender (**33/33 OK**); `main/_verificar-credenciales-build.js` corta el build si
+el cargador no carga. Verificado con un envío real por cada una de las 5 empresas
+(TEMPOACTIVA, TEMPOSUM, ASEPLUS, ASEL, COOTRACOM): **5/5 OK**, cada uno con su
+Message-ID.
+
+## 🐗 Un escaneo de secretos que no distingue una huella de un token (📦1047, 2026-11-10)
+
+### 46 "secretos" que eran mitades de hashes
+
+Al barrer el árbol en busca de secretos, el patrón flojo `[a-z0-9]{32}` marcó **46
+coincidencias**: **todas** eran **las mitades de hashes SHA-256 de 64 hexes**, que
+son las huellas legítimas de los anexos. Un escaneo que no distingue lo que el repo
+hace de lo que se busca produce un informe que **nadie puede usar** y que entrena
+al equipo a ignorar el reporte.
+
+### La regla
+
+1. **Un escaneo se calibra contra los falsos positivos que produce.** Cada
+   coincidencia se mira **una por una** y se clasifica: o es un secreto, o es una
+   huella, o es prosa.
+2. **La prosa castellana tiene 16 letras en 4 palabras.** "cada html sean byte",
+   "solo esta capa deja" tienen exactamente la forma de una app password de
+   Google. Por eso la regla de texto libre exige **delimitadores** (comillas,
+   backticks) **y** al menos una letra que no aparece en las palabras
+   corrientes (`k`, `q`, `w`, `z`).
+3. **La regla precisa es la de ASIGNACIÓN**, no la de texto libre: un valor con
+   forma de app password **asignado a un campo** que se llama `password`,
+   `secret`, `token`, `clave` o `contrasena` es un secreto, y ahí no hay falsos
+   positivos. Ahí es donde vivieron P11 y P12.
+4. **El detector nunca imprime el valor.** Dice archivo, línea y regla: el log de
+   un build no puede ser el lugar donde queda el secreto.
+
+Lo que quedó: `main/detector-secretos.js` (las reglas) y
+`main/test-secretos-1047.js` (**16/16**), hooked en
+`main/_verificar-credenciales-build.js`: **el build se corta** si un secreto vuelve
+a un archivo versionado.
+
 ## 🐗 El script que no miraba donde debía (📦930, 2026-10-22)
 
 ### El "nada que mover" que no significaba nada
@@ -9261,3 +9345,310 @@ Reglas:
    («el texto no puede prometer lo que el código no cumple») admite una excepción, y la excepción tiene
    que tener la misma forma que la regla: escrita, con fecha, con responsable y con la condición que la
    cierra.
+
+## 🐛 La puerta que comparaba el texto con una fecha, y el ítem que ya no aplicaba (9-nov-2026 — línea legal, cierre del punto 2)
+
+**El caso.** El plan para cerrar el punto 2 (correo transaccional con DPA) traia tres hallazgos que no eran
+de configuración sino de **control**: el gate decía "Anexo de Nube firmado" sin comprobar que la
+firma fuera sobre el texto vigente; la compuerta de habilitación de la Empresa aceptaba cualquier
+versión; y el ítem `google_dpa` seguía pendiente cuando la cuenta de consumo ya no existía.
+
+**El falso positivo del hallazgo 3.3.** `firmadoOk` en `readinessLegal.js` exigía `firmado`, `fecha`,
+`version`, `hash` y `evidencia`, y ya está. Lo que NO hacía era comparar esa `version` y ese
+`hash` con el **modelo vigente**. Con la v1.1 publicada, el gate decía "suscrito" citando una suscripción
+de la v1.1 — y cuando la v1.2 saliera, habría seguido diciéndolo. Un control que compara el
+documento contra una constante no comprueba el documento: comprueba la constante.
+
+La corrección se hizo **antes** de cambiar la versión, que es el orden que el plan pedía. Y se
+aplicó al **otro** instrumento por la misma razón: el Anexo de Encargo tenía el mismo problema (su
+`estado: "firmado"` declaraba una firma sobre un texto que el manifiesto ya describía distinto), así
+que `encargoFirmadoOk` ahora también contrasta la huella con el texto vigente.
+
+**La ruta escrita a mano (trampa 138).** La compuerta de readiness leía `legal/anexo-nube-v1.1.html`
+mientras el módulo que suscribe `anexoNube.js` declaraba su propia ruta. Con la v1.2 publicada, los dos
+controles habrían hablado de **textos distintos** y ninguno se habría enterado. La solución no fue
+"actualizar la constante": fue sacarle la decisión al módulo. Ahora existe `src/services/anexoNubeModelo.js`,
+sin dependencias, que declara `VERSION_MODELO`, `RUTA_MODELO` y `huellaModeloVigente()`; lo leen el
+servicio que suscribe, la compuerta, el preflight y la habilitación de la Empresa. No puede vivir en
+`anexoNube.js` porque ese módulo requiere a `empresa.js`, y `empresa.js` necesita la identidad del
+modelo para comprobar que la Empresa suscribió el texto vigente: importarlo desde ahí sería un
+ciclo. Un módulo sin dependencias no puede entrar en ningún ciclo.
+
+**El ítem que ya no aplica no es un ítem cumplido (trampa 139).** El ítem legado `google_dpa` pasó
+a `no_aplica`: **no** en `ok` (sería un verde falso) ni en pendiente (sería un bloqueo
+permanente). El ítem vigente es `mail_provider_dpa`, que exige cuenta de empresa, rol de subencargado,
+las cláusulas del CDPA y **la evidencia de que la cuenta lo tiene incorporado o aceptado**. Ese
+último dato no lo tiene nadie todavía: por eso el gate lo deja honestamente pendiente, con la
+acción que lo cierra.
+
+**Lo que el CDPA no hace.** Tener DPA **no elimina la transferencia internacional**: la sección 10.1
+deja que los datos se procesen en cualquier país donde Google o sus subencargados tengan
+instalaciones. El texto del Anexo de Nube v1.2 y el del Anexo de Encargo 2026-11-09 lo dicen así, y
+siguen rigiendo el numeral 3.2 del Título V de la Circular Única y el artículo 26 de la Ley 1581.
+Tampoco se afirma en forma absoluta que "Google es Responsable" ni que "Google es Subencargado": el
+papel queda **condicionado** a que el CDPA esté vigente y sea aplicable a la cuenta.
+
+**Los datos de cuenta y de telemetria de Google no son los datos de la Empresa.** El CDPA obliga a
+Google respecto de los datos del **servicio de correo**; los datos de la cuenta del administrador de
+Workspace y la telemetria del servicio los trata Google por cuenta propia. La distinción queda
+escrita en los dos anexos y en el manifiesto, porque es la que impide que K+AIR invoque contra Google
+obligaciones que no puede invocar.
+
+**El instrumento no se llamaba "DPA".** El plan apuntaba a `workspace.google.com/terms/dpa_terms/`, que
+hoy da 404. El instrumento vigente es el **Cloud Data Processing Addendum**, texto del 30-oct-2026, con
+URL canónica `admin.google.com/terms/apps/8/1/en/dpa_terms.html` y sus tres huellas SHA-256
+registradas en la decisión A. Los documentos que lo llamaban "DPA" y apuntaban a una URL archivada de
+2022 quedaron marcados como superados.
+
+**El manifiesto es la salida de un script, no un archivo que se edita a mano.** `scripts/actualizar-manifiesto-1047.js`
+recalcula las huellas desde los archivos reales, exige que las dos copias de cada HTML (`legal/` y
+`sitio/`) sean **byte a byte** iguales y edita el manifiesto sobre el objeto, no sobre el texto: el
+diff sale mínimo y legible. No declara ninguna firma que no exista: con el texto vigente publicado y
+sin suscribir, el manifiesto dice `firmado: false` y `estado: "no_firmado"`, y las suscripciones
+anteriores quedan en `versiones_firmadas`.
+
+**Lo que queda, con responsable.** Diez pendientes, P1 a P10, todos del owner: la aceptación del CDPA
+en la consola de Workspace (P1), la cuenta activa con 2SV y el método de autenticación (P2), los
+alias de los canales de derechos y PQRS (P3), SPF/DKIM/DMARC (P4), el envío real de prueba (P5), la
+revocación de las app passwords de la cuenta de consumo (P6), la respuesta escrita del abogado a las
+cuatro preguntas del §8 del plan (P7), la suscripción de la v1.2 y la re-suscripción del Encargo por
+ASEPLUS (P8), la publicación en `sitio/` y `gh-pages` (P9) y el despliegue (P10). Los canales de
+derechos, PQRS e incidentes **no se migraron**: los alias de Workspace no están verificados, y
+publicar una dirección de derechos que no recibe solicitudes dejaría sin canal real a los
+titulares. Esa excepción queda **escrita**, con motivo y acción de cierre, en la decisión A, en el
+manifiesto (`canales.excepcion_documentada`) y en el propio código (`src/config.js`).
+
+**El texto de la v1.2 no afirma que esté suscrito.** Ni la v1.2 del Anexo de Nube ni la 2026-11-09
+del Anexo de Encargo declaran una firma que no existe. Los dos textos dicen que son los que se
+publicarán y remiten al otro instrumento con la cláusula de prevalencia del bilateral más
+reciente.
+
+**La compuerta no se encendió.** `FIRMA_EXIGIR_ANEXO_NUBE` sigue apagada y el preflight aborta con el
+motivo real: no hay ninguna Empresa activa con el Anexo de Nube suscrito sobre el texto vigente. Un
+preflight que aborta con el motivo correcto es un preflight que funciona.
+## 🐗 El día que un documento vigente llevaba dentro un enlace al texto que ya no lo era (2026-11-09)
+
+Al cerrar el punto 3 se revisó el Anexo de Encargo 2026-11-09 contra el Anexo de Nube v1.2, que es
+el texto vigente. El §5 del Encargo decía, con su enlace correcto, «Anexo de Nube, versión 1.2». Pero
+el §1 (la definición de Encargado) y el §9 (el servicio en la nube) tenían un `href` a
+`anexo-nube-v1.1.html`: la versión histórica, la que Hayward suscribió el 5-nov-2026.
+
+Nadie lo había notado porque las dos versiones del Anexo de Nube tienen casi el mismo nombre y el
+mismo formato, y porque el documento se revisaba por su **prosa**, que sí estaba correcta. El error
+no estaba en lo que el documento decía: estaba en **a dónde mandaba**. El lector del contrato
+vigente terminaba en un texto que ya no era el vigente, y el manifiesto declaraba la huella de un
+documento que remitía a otro.
+
+Reglas:
+
+1. **Un enlace interno es parte del contrato.** Al publicar una versión nueva se revisan los
+   enlaces de todos los documentos vigentes, no solo su prosa: `grep -n 'href="anexo-' legal/ sitio/`.
+2. **Un enlace a una versión anterior no es neutro**: es una remisión contractual a un texto
+   histórico, y el lector no tiene forma de saberlo.
+3. **Corregir un enlace cambia la huella del documento.** La del Encargo 2026-11-09 pasó de
+   `4a647093…5b01` a `0cd6c05f…2a1e`. Toda huella citada fuera del manifiesto (plan, informe,
+   mensaje) queda obsoleta en el mismo instante, y el manifiesto se recalcula con su script, nunca a
+   mano.
+4. **Un texto ya suscrito no se corrige jamás.** El Encargo 2026-11-06 se archivó byte a byte
+   (`5cc7a346…0aa72`) antes de que el 2026-11-09 lo sustituyera: su huella es la que firmó ASEPLUS.
+   Sus enlaces describen el estado del día en que se firmó, y eso es correcto.
+
+## 🐗 El día que el manifiesto tuvo dos autores y el último borraba al primero (2026-11-09)
+
+El manifiesto legal `legal-readiness.json` lo escribían dos scripts distintos y cada uno tenía su
+propio bloque `anexo_nube`. El primero (`actualizar-manifiesto-1047.js`) publica el texto vigente y
+reencontraba el bloque **entero**, con `firmado: false` SIEMPRE. El segundo
+(`actualizar-manifiesto-anexo-nube.js`, nuevo en esta ronda) lee `gh_firma_anexo_nube_suscripciones`
+y escribe el estado real de la firma.
+
+En el orden natural —el que publica el texto, después el que lee la base— nada pasaba. En el orden
+inverso, **el primero borraba la firma del segundo**: el manifiesto volvía a `firmado: false` sin
+que nadie hubiera tocado la base, y el ítem `firmado_nube` del gate se caía solo. Es el mismo verde
+falso del riesgo R1 del plan, pero por una vía que nadie había mirado: no por escribir una firma
+inventada, sino por **borrar** una firma real.
+
+Reglas:
+
+1. **El script que publica el TEXTO conserva la firma si describe el texto vigente** (versión Y
+   huella) y la mueve a `versiones_firmadas` si describe otro texto. La comparación es contra la
+   huella del archivo, no contra la fecha.
+2. **El script que lee la BASE es el único que declara una firma.** Nadie la escribe a mano: es lo
+   único que hace que el `--check` de cualquiera de los dos scripts —que leen la base— detecte un
+   `firmado: true` inventado.
+3. **Los dos scripts se prueban en los dos órdenes**, no solo en el que conviene.
+4. **Un script que "reinicia" un bloque no puede reiniciar un campo que otro script escribe.** Si
+   dos scripts tocan el mismo objeto, uno de los dos tiene que leer lo que el otro dejó.
+
+## 🐗 El día que el escaneo de secretos del historial encontró lo que el del paquete no (2026-11-09)
+
+El plan del punto 3 decía, en la tabla de riesgos: «Secretos en el historial de Git: rotación hecha;
+falta escaneo del historial y de artefactos». El escaneo del **paquete** salió limpio. El del
+**historial** no:
+
+- **Un token personal de GitHub** (`ghp_…`, 36 caracteres) en
+  `sgsst-electron-app/docs/05-updates/v0.1.83-python-optimization.md`, en la línea que documenta
+  `export GH_TOKEN=…` para el build. El archivo se borró en el 📦580 (limpieza de docs), pero el
+  commit `5606ad1a` que lo introduce **está en `origin/Dev`**, y el repositorio es **público**:
+  `https://api.github.com/repos/Reivaj640/SG-SST-E` responde `"private": false`. Es decir: el token
+  estuvo —o está— en manos de cualquiera que sepa leer un historial.
+- **Cuatro app passwords de Gmail de cuentas de clientes** (ASEPLUS, ASEL, TEMPOACTIVA, TEMPOSUM)
+  en `sgsst-electron-app/Portear/src/remision_utils.py` y `Remisiones_v1.0.py`, desde el 📦 #31
+  hasta el 📦931, que es el commit que las sacó del código y las pasó al `.env`.
+
+Lo notable es que **el código del repo ya lo sabía**: el comentario que dejaron al sacar las
+credenciales dice, literalmente, «este repo es público y estas app passwords de Gmail quedaron en el
+historial de git». La contraseña dejó de estar en el código, pero no dejó de estar en el historial.
+Y el código nuevo lee la contraseña del entorno con el nombre de la variable, de modo que el
+problema **parecía** resuelto: el `.env` no estaba, el historial no se miraba.
+
+Reglas:
+
+1. **Sacar un secreto del código no lo saca del historial.** `git log -p` los devuelve: el
+   `git grep` del árbol de trabajo no los encuentra y el escaneo del diff tampoco. Los dos escaneos
+   que se hicieron (paquete e historial) tapaban zonas distintas: el primero no habría encontrado
+   ninguno de estos dos.
+2. **El escaneo del historial se hace con `git cat-file --batch` POR LOTES.** Con el filtro
+   `--filter=blob:none` los blobs no están en local y `cat-file` responde «bad file» por cada uno;
+   sin filtro, un solo volcado de los 25 105 blobs del repo revienta el búfer y el proceso muere sin
+   decir nada útil. Un escaneo que termina sin imprimir su conteo de blobs revisados no es un
+   escaneo: es un fallo silencioso.
+3. **El patrón de la app password de Google matchea frases en cualquier idioma.** Cuatro palabras
+   de cuatro letras: en el paquete marcaron «cada HTML sean byte» y «solo esta capa deja»; en el
+   historial, 1 515 falsos positivos. Un escaneo que no distingue lo que el repo hace de lo que se
+   busca produce un informe que nadie puede usar.
+4. **Lo que un escaneo encuentra hay que reportarlo sin el secreto.** En los documentos del repo
+   se escribe el prefijo y la ubicación, nunca el valor: publicar el token en el documento que
+   denuncia el token lo publica otra vez.
+
+Queda pendiente del owner, y es lo más urgente de la cola: **revocar el token de GitHub** y
+**rotar las cuatro app passwords de Gmail**. Purgar el historial sin revocar no sirve: las copias
+quedan en los clones, en los forks y en las cachés. Y purgarlo rompe las huellas de los anexos que
+viven en el historial, así que es una decisión del owner, no una tarea de la noche.
+
+## 🐗 El día que un instrumento de dos partes se midió con un solo acto (2026-11-09)
+
+El texto vigente del Anexo de Nube (la v1.2, §10) no es un contrato de una parte: lo **suscribe** la
+Empresa y lo **contrafirma** K+AIR, y el propio texto dice que el instrumento solo queda *ejecutado*
+cuando los dos actos se han producido. El código, en cambio, solo sabía registrar el primero: la
+suscripción por el enlace de un solo uso. No había una contrafirma que registrar, ni una columna que
+la guardara, ni una ruta que la pidiera.
+
+El resultado era un **verde falso de manual**: el manifiesto decía `firmado: true` y el ítem
+`firmado_nube` del gate daba `ok` describiendo **la mitad** del instrumento. Nadie había escrito una
+mentira: el código y el gate decían exactamente lo que sabían. Lo que no sabían era la otra mitad.
+
+Lo interesante es que el hermano de este instrumento ya tenía la regla bien puesta. El **Anexo de
+Encargo** separa los dos actos desde la migración 056/059 (`anexo_encargo_suscrito_*` para el
+primero, `anexo_encargo_firmado_at` para el segundo), y la habilitación de la Empresa ya exigía la
+fecha del **segundo** acto: el abogado lo había dicho textualmente —«la empresa no debería empezar a
+usar el servicio hasta que K+AIR firme la otra parte»—. El Anexo de Nube se había quedado con la regla
+anterior, que era correcta cuando el texto no exigía contrafirma.
+
+Reglas:
+
+1. **Antes de dar por cumplido un instrumento, se lee su texto y se cuentan los actos que exige.**
+   No basta con que exista "la firma": hay que contar los actos. Un instrumento bilateral medido con
+   un acto no es un instrumento: es su mitad.
+2. **Cada acto se mide en su propio ítem del gate, con su propio detalle.** "Falta la suscripción" y
+   "falta la contrafirma" son dos motivos y dos acciones: mandarlos al mismo texto obliga a la
+   Empresa a repetir un acto que ya hizo, y esconde el que falta de verdad.
+3. **El manifiesto declara los dos actos por separado** (`firmado` y `contrafirmado`, con fecha, actor
+   y motivo de cada uno). Un solo campo que se pueda leer como "el instrumento está" vuelve a ser el
+   verde falso por la vía del archivo.
+4. **La habilitación de la Empresa cambia con el instrumento, no con el código.** Cuando un
+   instrumento se vuelve bilateral, hay que revisar TODO lo que dependía de él: la habilitación, el
+   gate, el preflight y el manifiesto. La compuerta apagada no justifica dejar la regla como estaba:
+   la regla se escribe correcta y el encendido es otro acto.
+5. **Fallar cerrado se decide por partes.** Sin la migración 060 en la base, el script que escribe el
+   manifiesto sigue declarando "no hay suscripción del texto vigente" (eso no depende del segundo
+   acto), pero **no** declara una firma: sale con 3 diciendo qué migración falta. Cerrar a secas
+   rompía el preflight en un servidor sano; abrir declaraba una firma que nadie podía verificar.
+6. **Una negativa escrita en un comentario es una afirmación que caduca sola.** Al hacer bilateral el
+   Anexo de Nube quedaron tres textos diciendo "el Anexo de Nube NO es bilateral": un comentario en
+   `src/routes/empresaAnexos.js`, la tabla comparativa de `FLOWS.md` y la nota de `API.md`. Eran
+   verdad el día anterior y pasaron a ser mentira sin que nadie los tocara: un comentario no se
+   actualiza solo, y un documento de API no se rederiva solo. El peor era el comentario, pegado a la
+   función que devolvía el estado, que decía la razón de por qué ese estado era un `firmado` a
+   secas. Cuando cambia la **naturaleza** de un instrumento, se busca el texto que afirma lo
+   contrario y se corrige: `grep -rn "no es bilateral\|no tiene contrafirma\|no hay fase de" src/ docs/`.
+7. **El camino descartado se documenta, no se borra.** La contrafirma se implementó **en el
+   servicio** (que es lo que el plan recomienda cuando el servicio es el sistema de registro), pero
+   la respuesta del abogado a P7 puede decidir que se firma **fuera**. En ese caso el código queda
+   como andamiaje construido y no usado, y dos cosas dejan de poder funcionar: el manifiesto y el
+   gate solo leen la base del servicio, y la habilitación de la Empresa depende de
+   `anexo_nube_ejecutado_at`, una columna que escribe el servicio. Eso quedó escrito en
+   `sgsst-electron-app/docs/gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md` (§5),
+   que es el documento de operación del segundo acto: qué exige, qué escribe, cómo se ejecuta por
+   HTTP y qué queda por hacer si P7 responde lo otro. Un andamiaje construido sin destino se confunde
+   con una función terminada, y cuando la respuesta llegue, la próxima jornada no tiene que
+   reconstruir el razonamiento para saber qué había que hacer primero.
+8. **Cerrar el instrumento no es cerrar el código: el que MUESTRA el estado también hay que
+   arreglarlo.** El gate, el manifiesto y la habilitación se corrigieron en la misma tarde, pero
+   quedaron dos huecos donde el estado se ve: la lectura que hace el operador y el panel que lo
+   pinta. Los dos seguían Midiendo el instrumento con un acto — la lectura devolvía `null` en los
+   campos del segundo acto, y el panel pintaba un badge **verde** ("Firmado") con solo la
+   suscripción. El detalle que más duele: el comentario de la función afirmaba "el Anexo de Nube
+   NO es bilateral", y su propio código devolvía `null` en los campos de la contrafirma. Eso ya
+   no era una descripción: era una fuente de verdad en falso. Y `API.md` listaba dos canales IPC
+   de contrafirma del Anexo de Nube que **nunca se escribieron**: el documento afirmaba una
+   capacidad que el código no tenía, y el título del apartado ("los once canales") era el que sí
+   cuadraba sobre una tabla de trece filas. Reglas: (1) cuando un instrumento cambia de forma, se
+   recorre **todo** lo que lo muestra, no solo lo que lo declara: el gate, el manifiesto, la
+   habilitación, la lectura del operador y la vista; (2) una función que devuelve el estado de un
+   instrumento lee la fila: si devuelve constantes, su comentario y sus constantes se contradicen y
+   el que miente es el que se lee; (3) toda fila de un documento que nombre un canal, un método o un
+   endpoint se contrasta contra el archivo que lo implementa antes de escribirla; (4) un botón sin
+   canal IPC no se pone: el operador lo pulsa y no pasa nada, y eso es peor que un botón que no
+   existe.
+
+## 🐗 El día que el script que declaraba el estado pendiente estaba a punto de borrar el cierre que ya estaba hecho (2026-11-11)
+
+Es la continuación directa de «El día que el manifiesto tuvo dos autores y el último borraba al primero» (2026-11-09). Esa vez el campo en disputa fue `anexo_nube.firmado`; esta vez es `subencargados.mail_provider.aceptacion`, que es el que enciende el ítem `mail_provider_dpa` del gate (P1).
+
+El mismo `actualizar-manifiesto-1047.js` reconstruía el bloque `mail_provider` con `aceptada: false` SIEMPRE. El cierre de P1 lo escribe otro script (`actualizar-manifiesto-aceptacion-cdpa.js`, desde un acta). En el orden en que se corre todo —cerrar P1 y después regenerar el manifiesto— **el 1047 borraba la aceptación recién hecha** sin aviso: el gate volvía a «no listo» sobre un manifiesto que sí estaba cerrado. Nadie lo vio porque aún no existía el cierre que borrar.
+
+El fix no es solo conservar el bloque: hay que conservar el «estado inicial» del verde. Mientras tanto se midieron dos cosas más:
+
+1. **La fecha del CDPA era mentira.** El manifiesto declaraba `fecha: 2026-10-30`, una fecha que la página no declara (0 apariciones de «2026», «October» o «Last modified» en el texto). Ahora es la fecha de captura verificada (`2026-11-10`) con `fecha_declarada_por_google: null`: **lo que no consta queda en null, no en una fecha redonda**.
+2. **Un `aceptada: true` sin evidencia habilitaba el ítem.** El gate leía solo el booleano. Ahora `_aceptacionCdpaOk` exige **modo + fecha + evidencia** (y el modo tiene que estar en `MODOS_ACEPTACION_CDPA`): un «sí» vacío ya no pasa.
+3. **El acta podía registrarse con marcadores.** El registro de P1 se hace desde un acta JSON, pero una plantilla por completar («PENDIENTE», «por definir», «[nombre del owner]») habría quedado escrita como si el clic ya hubiera ocurrido. Ahora fecha, evidencia, responsable, cuenta y atestación rechazan marcadores (exit 2), y la captura acepta dos caminos honestos: el archivo en esta máquina (la huella se calcula y `verificado_localmente: true`) o la huella declarada desde otra máquina (`verificado_localmente: false`; si el archivo está y no coincide, exit 3).
+
+Reglas:
+
+1. **El `false` que escribe un script es el estado INICIAL, no el vigente.** Cuando dos scripts tocan el mismo objeto, el que regenera tiene que leer lo que el otro dejó (`aceptacionPrevia`) — misma regla 4 del caso «dos autores».
+2. **Un campo de fecha solo se llena con lo que la fuente declara.** Si la fuente no declara fecha, el campo queda `null` y el manifiesto dice por qué; una fecha adivinada es tan mala como una evidencia inventada.
+3. **Un control booleano sin sus campos de soporte es un verde falso al revés:** habilita sin evidencia. El gate tiene que exigir el conjunto completo (modo + fecha + evidencia), no un «inicio de cadena».
+4. **Una plantilla nunca se registra como cumplida.** Los marcadores de «por llenar» se rechazan campo por campo, y la prueba de que funciona es que el acta real de P1 (`scripts/fixtures/aceptacion-cdpa-p1-2026-11-10.json`) **salió con exit 2 a propósito mientras el acto no existía** (la fecha era un marcador) y **el 10-nov-2026 se aplicó con la captura real** (la consola declara «Aceptado por kair@gesstiar.com el Nov 10, 2026»; `--aplicar` y `--check` en 0).
+5. **Pruebas:** `actualizar-manifiesto-1047.test.js` 4/4 (incluye «conserva la aceptación previa»), `actualizar-manifiesto-aceptacion-cdpa.test.js` **39/39**, `readiness-legal.test.js` **56/56**.
+
+**De paso, higiene de la entrada anterior.** La nota de estado del 2026-11-10 que se agregó a `Historial.md` quedó con 64 bytes de acentos en Latin-1 dentro de un archivo UTF-8 (mojibake, prohibido por `PROMPT.md` §5.5). Se repararon a UTF-8: HEAD tenía 0 bytes inválidos, así que la reparación solo tocó líneas sin commitear. Lección: **antes de dar por buena una escritura en estos documentos, validar el archivo entero como UTF-8** (un texto ilegible no lo atrapa `git diff` a simple vista).
+
+## 🐗 El día que el acta decía QUIÉN firmó pero no CON QUÉ PODER (2026-11-11)
+
+El abogado respondió P7: la contrafirma del Anexo de Nube **va dentro** del servicio, con el mecanismo que ya está construido. Y puso dos condiciones.
+
+La primera —«La ejecución por una persona distinta del representante legal de Gesstiar S.A.S. requerirá acreditar previamente la facultad de representación o poder suficiente, que deberá conservarse en el expediente»— **no se cumplía**. El código demostraba la facultad de un lado y del otro no demostraba nada.
+
+El cotejo que existía era el de la **Empresa**: `_cotejarFirmante` contrasta quién firmó contra el representante legal de la ficha de esa Empresa, y sin coincidencia no hay contrafirma. Del lado de **Gesstiar** —que es el otro firmante del instrumento bilateral— no había nada: el segundo acto se cerraba con el nombre que llegaba en la cabecera `X-Admin-Actor`, y ese nombre era un dato declarado, sin acreditación. El acta de contrafirma declaraba **quién** firmó por K+AIR pero no **con qué poder**. El manifiesto tampoco lo pedía: `contrafirma_nube` daba `ok` con fecha, actor y evidencia, y ninguno de esos tres campos era la facultad.
+
+Es el mismo patrón de la entrada anterior, con la ropa puesta: **el instrumento se cerraba en el papel y no en el expediente**. Y el hueco estaba donde nadie mira: en un acta que se lee una vez.
+
+Lo construido:
+
+1. **El registro de poderes** (migraciones `061` y `062`): una fila por poder o delegación, con su documento (referencia **y** huella SHA-256), su vigencia y su motivo; y su rastro append-only. La revocación **no borra**: deja la fila en `REVOCADO` con su fecha y su motivo, y escribe el evento.
+2. **La comprobación** (`services/poderesEncargado.js`): si quien contrafirma es el representante legal que declara el manifiesto legal, vale; si es otra persona, tiene que haber un poder **vigente** a su nombre. Sin actor declarado, o sin poder, o con uno vencido o revocado: `409 FACULTAD_NO_ACREDITADA` y el acto **no** se cierra.
+3. **La misma comprobación en las DOS contrafirmas**: el Anexo de Encargo tenía exactamente la misma grieta. Arreglar solo una es dejar el hueco abierto en el gemelo.
+4. **El dato por todas partes**: el acta (sección nueva), la evidencia del acto, el manifiesto (`contrafirma_facultad`) y el gate, que ahora **exige** la acreditación (`contrafirma_nube` y `estado_encargo` no pueden quedar `ok` sin ella).
+5. **La vía administrativa**: tres rutas para el registro (alta, lectura, revocación) y una cuarta para **certificar** una contrafirma que se hizo con un despliegue anterior, sin tocar el acto ya ocurrido.
+
+Y un efecto operativo que hay que decir de frente: **la contrafirma ahora exige un actor que sea el nombre de una persona**. El valor por defecto de la app (`K+AIR usuario@EQUIPO`) no lo es, así que con él la contrafirma se rechaza. Hay que definir `FIRMA_ADMIN_ACTOR` (o declarar `X-Admin-Actor` en cada llamada) y, si quien contrafirma no es el representante legal, registrar su poder antes.
+
+Reglas:
+
+1. **Un dato de identidad no es un dato de facultad.** Para poder firmar por una empresa hay que probar el poder: el poder se **guarda** (documento + huella + vigencia), no se deduce de un nombre. Un `actor` es una atribución; un poder es una acreditación.
+2. **Una condición del abogado se implementa o se declara incumplida.** El texto de la respuesta se contrasta contra el código antes de dar el punto por cerrado: `grep -rn "contrafirmar\|X-Admin-Actor" src/services/`. Lo que se cumple a medias es peor que lo que no se cumple: aquí el acta afirmaba un acto completo.
+3. **Lo que se exige en el acto se exige también en el manifiesto y en el gate.** Si el servicio exige la acreditación pero el gate no la mira, el manifiesto sigue diciendo «ejecutado» y el hueco queda abierto por el otro lado.
+4. **La comprobación falla cerrada.** Sin la tabla de poderes (migración sin aplicar en el servidor) o sin actor declarado, la contrafirma se rechaza: no se «deja pasar por si acaso».
+5. **El gemelo también.** Cuando un control se aplica a un instrumento, se busca su gemelo y se contrasta: la contrafirma del Anexo de Encargo y la del Anexo de Nube son el mismo acto con otro texto.
+6. **Pruebas:** `poderes-encargado.test.js` **20/20** (registro, revocación, vigencia, cotejo de nombres, la contrafirma con y sin faculty, la certificación posterior, las rutas y el trigger append-only contra el archivo real), `anexo-nube-contrafirma.test.js` **20/20**, `readiness-legal.test.js` **59/59** (incluye «sin la acreditación, el ítem NO puede quedar ok», para los dos instrumentos), `admin-empresas-anexos.test.js` (la lectura trae la acreditación en las **dos** formas) y el guard de UI de `main/test-anexos-1038.js` (exige la línea en las dos vistas). Suite completa del firma-service: **2 574 tests · 2 572 pass · 0 fail**.
+7. **El falso negativo es tan peligroso como el falso positivo.** La vista del Anexo de Encargo mostraba «Facultad acreditada: NO DECLARADA» con la faculty **ya acreditada en el expediente**, porque la lectura (`GET /internal/admin/empresas/:id/anexos`) no traía el `contrafirma_evidencia` en la forma del Encargo (en la del Nube sí venía). El operador concluía que faltaba un poder que ya estaba, y el trabajo de acreditación se repetía o se bloquea: es el mismo modo de falla del «FIRMADO» en verde, del lado contrario. **Regla de bolsillo: cuando se agrega un dato a una forma de lectura, hay que buscar las DOS formas — la del gemelo no se actualiza sola.** Y el falso negativo es el más caro de los dos, porque nadie se queja de una falta que no existe: se la cree.

@@ -1,5 +1,15 @@
 # Especificacion de cierre de la linea legal (30 de octubre de 2026)
 
+> **Actualizacion del 9 de noviembre de 2026.** Este documento se conserva como
+> antecedente. En lo que se refiere al **canal de correo y al papel de Google**, queda
+> superado por la `decision-regularizacion-correo-2026-11-09.md`, que verificó el
+> instrumento vigente (el **Cloud Data Processing Addendum**, texto del 30-oct-2026, no un
+> "DPA" como se le llamaba) y fijo el alcance, la excepcion de los canales de
+> derechos/PQRS/incidentes y la redaccion condicional que deben usar los anexos. El resto
+> de esta especificacion (los cambios de la v1.3 del Acuerdo y del Anexo de Encargo que no
+> tocan el canal de correo) sigue vigente. Cuando este documento y la decision del 9-nov
+> se contradigan sobre el canal de correo, **manda la decision del 9-nov**.
+
 Documento de trabajo que registra, en texto fiel, la especificacion que el abogado
 entrego el 30 de octubre de 2026 (12:59). Es la **fuente** de los cambios de la v1.3 del
 Acuerdo, del Anexo de Encargo y del Anexo de Nube.

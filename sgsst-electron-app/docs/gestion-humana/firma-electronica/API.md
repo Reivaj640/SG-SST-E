@@ -1920,6 +1920,27 @@ plazo declarado.
 }
 ```
 
+**Los cuatro indicadores del estado de los Anexos, en `GET /internal/admin/empresas`.**
+El listado devuelve, además de la identificación, cuatro booleanos que dicen en
+qué fase está cada instrumento:
+
+| Campo | Qué mide | De qué columna sale |
+|---|---|---|
+| `tiene_anexo` | El Anexo de Encargo está **ejecutado** (las dos partes) | `anexo_encargo_firmado_at` |
+| `tiene_anexo_suscrito` | El Anexo de Encargo está **suscrito** (fase 1), a la espera de la contrafirma | `anexo_encargo_suscrito_at` |
+| `tiene_anexo_nube_suscrito` | El Anexo de Nube está **suscrito** (fase 1) | `anexo_nube_firmado_at` |
+| `tiene_anexo_nube_ejecutado` | El Anexo de Nube está **ejecutado** (fase 2: la contrafirma de K+AIR) | `anexo_nube_ejecutado_at` |
+
+> 📦1047 · punto 3 (9-nov-2026) Los dos indicadores del Anexo de Nube son
+> **nuevos**, y sin ellos el panel del operador mostraba un badge **verde**
+> ("Firmado") en una Empresa que solo se había suscrito: `anexo_nube_firmado_at`
+> es la **fase 1**, y usarlo como si fuera el instrumento entero es el mismo
+> verde falso que se corrigió en el gate. El Anexo de Nube también es bilateral.
+>
+> La lectura de `anexo_nube_ejecutado_at` es **tolerante**: la columna llega con
+> la migración 060. Si no está aplicada, **ninguna** Empresa aparece como
+> ejecutada (fallo CERRADO) y el listado no se rompe.
+
 `plazo_retencion` y `plazo_retencion_dias` son opcionales en el body, pero
 **declarar el plazo es condición para que las firmas de esa Empresa puedan
 suprimirse algún día**.
@@ -3352,6 +3373,7 @@ y la Empresa queda habilitada** para firmar documentos de sus trabajadores.
 |---|---|
 | Que la Empresa haya suscrito | No se contrafirma lo que no se firmó |
 | La verificación documental del representante | Es lo que el dictamen del abogado señala como la grieta del método |
+| **La facultad acreditada de quien contrafirma por Gesstiar** | Condición del abogado a P7 (10-nov-2026): «La ejecución por una persona distinta del representante legal de Gesstiar S.A.S. requerirá acreditar previamente la facultad de representación o poder suficiente, que deberá conservarse en el expediente». Sin ella: `409 FACULTAD_NO_ACREDITADA` y el acto **no** se cierra |
 | El código | Sale al buzón de K+AIR, no al de la Empresa |
 | La aceptación expresa (`acepta: true`) | La contrafirma no es un valor por omisión |
 | El motivo (`X-Admin-Motivo`) | Es un acto que habilita a la Empresa |
@@ -3390,6 +3412,16 @@ y la Empresa queda habilitada** para firmar documentos de sus trabajadores.
       "referencia": "Radicado 2026-11-07-14",
       "verificado_por": "nombre-del-operador",
       "verificado_at": "2026-11-07T16:00:00.000Z"
+    },
+    "facultad": {
+      "resultado": "REPRESENTANTE_LEGAL_ENCARGADO",
+      "nombre": "Javier Robles Fontalvo",
+      "cargo": "Representante Legal",
+      "tipo": "REPRESENTACION",
+      "instrumento_ref": "Representante legal declarado en el manifiesto legal",
+      "instrumento_sha256": null,
+      "id_poder": null,
+      "verificado_at": "2026-11-07T16:30:00.000Z"
     },
     "fase": 2,
     "acta_hash": "b7d2...",
@@ -3434,6 +3466,201 @@ suscripción y el de la contrafirma.
 | `404` | `EMPRESA_NOT_FOUND` |
 | `500` | `ACTA_NO_GENERADA` |
 | `400` | `INVALID_REQUEST_BODY` (body malformado) |
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-nube/contrafirmar/codigo` — el código de la contrafirma del Anexo de Nube
+
+Manda el código de la contrafirma al buzón de protección de datos de K+AIR.
+**No contrafirma nada**: es una ruta aparte del acto, para que pedir el
+código no se confunda con contrafirmar.
+
+**El canal no se declara**: sale al buzón que dice la configuración
+(`FIRMA_CANAL_PROTECCION_DATOS`), nunca a un buzón que la Empresa pueda leer.
+Mandar un `canal_codigo` en el body es `400 INVALID_REQUEST_BODY`.
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `id_suscripcion` | number | sí | Entero positivo |
+
+**Errores**: `404 SUSCRIPCION_NO_ENCONTRADA`, `409 SUSCRIPCION_NO_FIRMADA`,
+`409 YA_CONTRAFIRMADO`, `409 REPRESENTANTE_NO_VERIFICADO`,
+`409 FIRMANTE_NO_COINCIDE`, `404 EMPRESA_NOT_FOUND`,
+`503 CANAL_CONTRAFIRMA_NO_DEFINIDO`, `429 LIMITE_ENVIOS`, `502 ENVIO_FALLIDO`,
+`400 INVALID_REQUEST_BODY`.
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-nube/contrafirmar` — la fase 2 del Anexo de Nube
+
+Contrafirma el Anexo de Nube. **Con este acto el instrumento queda EJECUTADO y
+la Empresa queda habilitada** para firmar documentos de sus trabajadores.
+
+**Lo que exige** (y por qué):
+
+| Exigencia | Por qué |
+|---|---|
+| Que la Empresa haya suscrito | No se contrafirma lo que no se firmó |
+| Que se sepa quién firmó por la Empresa | El §10 del texto vigente lo pide antes de contrafirmar. El cotejo es contra el `representante_legal` de la ficha: sin coincidencia, `FIRMANTE_NO_COINCIDE` y no hay contrafirma |
+| **La facultad acreditada de quien contrafirma por Gesstiar** | Condición del abogado a P7 (10-nov-2026). Es el mismo control que en el Anexo de Encargo: sin ella, `409 FACULTAD_NO_ACREDITADA` y el acto **no** se cierra. Ver §6.21.5.1 |
+| El código | Sale al buzón de K+AIR, no al de la Empresa, y con un **propósito de derivación propio** (`otp-contrafirma`): los mismos seis dígitos de la suscripción no contrafirman |
+| La aceptación expresa (`acepta: true`) | La contrafirma no es un valor por omisión |
+| El motivo (`X-Admin-Motivo`) | Es un acto que habilita a la Empresa |
+
+**Body**: `id_suscripcion` (number, sí), `otp` (string, sí) y `acepta`
+(boolean, sí). **El motivo NO va en el body**: va en `X-Admin-Motivo`.
+
+**Lo que escribe**, en una sola transacción (si una de las dos falla, las dos se
+deshacen, y el acta se borra):
+
+- En `gh_firma_anexo_nube_suscripciones`: `contrafirmado_at`,
+  `contrafirma_actor`, `contrafirma_motivo`, `contrafirma_evidencia`,
+  `contrafirma_acta_hash`, `contrafirma_acta_bytes`, `contrafirma_acta_archivo`.
+  **No toca** `anexo_nube_firmado_at` ni el `estado` de la suscripción: esos son
+  los de la **fase 1**.
+- En `gh_firma_empresas`: `anexo_nube_ejecutado_at` — la fecha de **ejecución**
+  del instrumento. La habilitación de la Empresa lo exige.
+
+**El acta**: `acta-{id_suscripcion}-contrafirma-anexo-nube.pdf`, con su SHA-256
+y su tamaño, en la misma forma que el acta del Anexo de Encargo. El Anexo de
+Nube **no tiene acta de suscripción** (la Empresa no se lleva PDF: su
+constancia es la pantalla), así que el acta de contrafirma cita el primer acto
+por **versión + huella del texto + fecha**.
+
+**Errores**: los de `anexo-encargo/contrafirmar`, más `409 FIRMANTE_NO_COINCIDE`
+(el firmante de la suscripción no coincide con el representante legal de la
+ficha) y `409 REPRESENTANTE_NO_VERIFICADO` (no hay firmante en la suscripción o
+no hay representante en la ficha).
+
+> 📦1047 · punto 3 (9-nov-2026) **Por qué esto existe.** El texto vigente del
+> Anexo de Nube (la v1.2, §10) es bilateral, y el código solo registraba el
+> primer acto: el manifiesto decía `firmado: true` y el ítem `firmado_nube` del
+> gate daba `ok` describiendo la mitad del instrumento. Con estas dos rutas, el
+> segundo acto se produce **dentro** del sistema de registro, con su código, su
+> actor, su motivo y su acta.
+
+### 6.21.5.1 El registro de poderes del Encargado (la facultad de quien contrafirma)
+
+> 📦1047 · punto 3 · P7 (10-nov-2026) **Qué es esto.** El abogado condicionó la
+> contrafirma: «La ejecución por una persona distinta del representante legal de
+> Gesstiar S.A.S. requerirá acreditar previamente la facultad de representación
+> o poder suficiente, que deberá conservarse en el expediente». Estas tres rutas
+> son el **registro** de esos poderes: lo que existe antes del acto y lo que el
+> acto comprueba.
+
+Las tres rutas exigen `X-Admin-API-Key` (llave de admin) y `X-Admin-Motivo`
+(el motivo, en cabecera como en el resto de los actos administrativos).
+
+#### `GET /internal/admin/encargado/poderes`
+
+El registro completo, con su rastro, y el representante legal que declara el
+manifiesto legal (el caso en el que **no** hace falta ningún poder).
+
+**Response — `200 OK`**:
+
+```json
+{
+  "items": [
+    {
+      "id": 3,
+      "nombre": "Nombre Apellido",
+      "cargo": "Apoderado",
+      "tipo": "PODER",
+      "instrumento_ref": "Poder del 1-nov-2026",
+      "instrumento_sha256": "cccc...cccc",
+      "documento_archivo": "poder-1.pdf",
+      "vigente_desde": "2026-11-01",
+      "vigente_hasta": "2027-11-01",
+      "estado": "VIGENTE",
+      "registrado_por": "admin",
+      "motivo": "Se recibio el poder firmado",
+      "created_at": "2026-11-10 15:00:00",
+      "eventos": [
+        { "evento": "PODER_REGISTRADO", "fecha_hora": "2026-11-10 15:00:00" }
+      ]
+    }
+  ],
+  "representante_legal_encargado": "Javier Robles Fontalvo",
+  "registro_disponible": true
+}
+```
+
+#### `POST /internal/admin/encargado/poderes`
+
+Registra un poder (o una delegación) a nombre de una persona.
+
+**Body**:
+
+| Campo | Tipo | Obligatorio | Qué es |
+|---|---|---|---|
+| `nombre` | string | sí | Quién tiene la facultad. Es el dato que se coteja con el actor del acto |
+| `cargo` | string | no | El cargo que declara el instrumento |
+| `tipo` | enum | sí | `PODER`, `DELEGACION` o `REPRESENTACION` |
+| `instrumento_ref` | string | sí | La referencia del documento (número y fecha del poder) |
+| `instrumento_sha256` | string | sí | La huella SHA-256 del documento acreditativo (64 hex) |
+| `documento_archivo` | string | no | El nombre del archivo en el expediente |
+| `emitido_at` | string | no | Fecha ISO 8601 |
+| `vigente_desde` | string | no | Fecha ISO 8601 |
+| `vigente_hasta` | string | no | Fecha ISO 8601. Ausente = sin término declarado |
+
+**El motivo NO va en el body**: va en `X-Admin-Motivo`.
+
+**Errores**: `400 NOMBRE_REQUERIDO`, `400 TIPO_INVALIDO`,
+`400 INSTRUMENTO_REQUERIDO`, `400 INSTRUMENTO_HASH_INVALIDO`,
+`400 MOTIVO_REQUERIDO`, `400 FECHA_INVALIDA`, `400 VIGENCIA_INVALIDA`,
+`503 REGISTRO_NO_DISPONIBLE` (la migración 061 no está aplicada en el servidor).
+
+#### `POST /internal/admin/encargado/poderes/{id}/revocar`
+
+Revoca un poder. **No borra la fila**: la deja en `REVOCADO`, con `revocado_at`
+y `revocado_motivo`, y escribe el evento `PODER_REVOCADO`. El expediente puede
+así decir que hubo un poder vigente y que dejó de estarlo.
+
+**Errores**: `404 PODER_NO_ENCONTRADO`, `409 PODER_YA_REVOCADO`,
+`400 MOTIVO_REQUERIDO`.
+
+#### `POST /internal/admin/empresas/{id_empresa}/anexo-nube/contrafirma/facultad`
+
+**Certifica la facultad de una contrafirma YA registrada** (el caso de una
+contrafirma hecha con un despliegue anterior a la exigencia: el manifiesto
+declara entonces `contrafirma_facultad: null` y el ítem `contrafirma_nube` del
+gate **no** puede quedar `ok`).
+
+Comprueba que la persona que **hizo el acto** (el `contrafirma_actor` que quedó
+registrado, no quien llama) tenga la faculty acreditada, y escribe esa
+acreditación en la evidencia del acto y en su rastro, con su actor y su motivo.
+
+**No toca** `contrafirmado_at`, ni la huella del acta, ni
+`anexo_nube_ejecutado_at`: el segundo acto ya ocurrió y no se reescribe. El acta
+ya sellada **no** se regenera: el dato vive en la evidencia, que es donde el
+manifiesto lo lee.
+
+**Body**: `id_suscripcion` (number, sí).
+
+**Errores**: `404 SUSCRIPCION_NO_ENCONTRADA`, `409 CONTRAFIRMA_NO_REGISTRADA`,
+`409 FACULTAD_YA_REGISTRADA`, `409 FACULTAD_NO_ACREDITADA`,
+`400 ACTOR_REQUERIDO`, `400 MOTIVO_REQUERIDO`.
+
+#### La regla que decide si una contrafirma se cierra
+
+| Quién contrafirma | Qué se exige | Resultado |
+|---|---|---|
+| El representante legal que declara el manifiesto legal | Nada más | `REPRESENTANTE_LEGAL_ENCARGADO` |
+| Otra persona | Un poder **VIGENTE** a su nombre, con referencia y huella | `PODER_ACREDITADO` |
+| Otra persona, sin poder (o con uno vencido, revocado o que aún no empieza) | — | `409 FACULTAD_NO_ACREDITADA`: el acto **no** se cierra |
+
+> **Ojo operativo:** el actor se declara en `X-Admin-Actor` (o en
+> `FIRMA_ADMIN_ACTOR`). Sin actor no hay contrafirma. El valor por defecto de la
+> app (`K+AIR usuario@EQUIPO`) **no** es el nombre de una persona y, por tanto,
+> **no** tiene faculty acreditada: con él, la contrafirma se rechaza.
+>
+> **Decidido (owner, 10-nov-2026):** `FIRMA_ADMIN_ACTOR=Javier Robles Fontalvo`, el
+> representante legal de Gesstiar. No hace falta registrar ningún poder para ese
+> nombre. La variable se declara en el entorno del **service** (`.env` del
+> `firma-service`), no en el de la app de escritorio: ese `.env` viaja **dentro
+> del instalador**, y ahí un nombre de persona atribuiría los actos
+> administrativos de toda copia instalada a esa persona.
+
+El detalle completo está en
+[`acreditacion-facultad-contrafirmante.md`](acreditacion-facultad-contrafirmante.md).
 
 ### 6.21.6 El recorrido completo, de punta a punta
 
@@ -3529,8 +3756,11 @@ datos de alguna Empresa.
     "firmado_at": null
   },
   "anexo_nube": {
+    "estado": "suscrito",
     "firmado": true,
     "fecha": "2026-11-05T22:51:34.349Z",
+    "ejecutado": false,
+    "fecha_ejecucion": null,
     "version": "1.1",
     "hash": "e9517536...1482"
   },
@@ -3556,6 +3786,14 @@ instrumento es **bilateral**:
 `firmado_at` es la fecha de **ejecución** (la de la contrafirma), no la de la
 suscripción: esa está en `suscrito_at`. `suscrito_version` y `suscrito_hash`
 son la versión y la huella del **texto** que la Empresa suscribió.
+
+> 📦1047 · punto 3 (9-nov-2026) **El bloque `anexo_nube` tiene los TRES estados
+> del de Encargo.** Antes tenía un `firmado` a secas (y un comentario que decía
+> que el Anexo de Nube no era bilateral: era falso desde que el texto vigente
+> —la v1.2, §10— exige los dos actos). Ahora trae `estado` (`ejecutado`,
+> `suscrito`, `no_suscrito`), `ejecutado` y `fecha_ejecucion`, y son las mismas
+> tres reglas del Anexo de Encargo: `fecha_ejecucion` es la fecha de la
+> **contrafirma**, y `fecha` es la de la suscripción (el primer acto).
 
 **El bloque `habilitacion` se devuelve TAL COMO lo produce
 `empresaService.verificarHabilitacionFirma()`**: la UI lo **muestra**, no lo
@@ -3609,6 +3847,9 @@ operador tenía que abrir una consola para descubrirlo.
       "cargo_firmante": "Representante legal",
       "firmado_at": "2026-11-07T15:30:00.000Z",
       "contrafirmado_at": null,
+      "contrafirma_actor": null,
+      "contrafirma_motivo": null,
+      "contrafirma_evidencia": null,
       "representante_verificacion": {
         "tipo_documento": "CERTIFICADO_CAMARA",
         "referencia": "Radicado 2026-11-07-14",
@@ -3640,7 +3881,7 @@ operador tenía que abrir una consola para descubrirlo.
 }
 ```
 
-**La suscripción del Anexo de Encargo** trae los dieciocho campos de arriba.
+**La suscripción del Anexo de Encargo** trae los veintiún campos de arriba.
 Dos cosas que hay que leer con cuidado:
 
 - **`estado = FIRMADA` significa que la EMPRESA suscribió** (fase 1), **NO** que
@@ -3649,11 +3890,50 @@ Dos cosas que hay que leer con cuidado:
   (`actaEncargoService.enmascararCorreo`) que usa el acta. Si fueran dos
   implementaciones distintas, el operador vería un correo y el acta otro.
 
-**La suscripción del Anexo de Nube** tiene **la misma forma**, pero con los
-campos de la fase 2 en `null`: `canal_codigo`, `contrafirmado_at`,
-`representante_verificacion`, `representante_verificado_at`,
-`contrafirma_canal`, `contrafirma_acta_archivo` y `contrafirma_acta_hash`. El
-Anexo de Nube **no es bilateral**: lo suscribe la Empresa y ya está.
+> 📦1047 · P7 (10-nov-2026) `contrafirma_actor`, `contrafirma_motivo` y
+> `contrafirma_evidencia` se agregaron a esta forma. **Sin `contrafirma_evidencia`
+> el panel del operador no tenía de dónde sacar la acreditación de la facultad
+> de quien contrafirmó por Gesstiar**: la vista del Anexo de Encargo mostraba
+> siempre "NO DECLARADA", incluso con la contrafirma hecha y con la facultad
+> acreditada en el expediente. Es un falso negativo en la pantalla, y por eso
+> el campo es obligatorio en la lectura: la evidencia es JSON en texto y sale
+> **parseada** (si saliera como texto, el panel leería `evidencia.facultad`
+> sobre una cadena y nunca encontraría la facultad).
+
+**La suscripción del Anexo de Nube** tiene **la misma forma**, con los campos de
+la fase 2 que antes estaban en `null`: `contrafirmado_at`, `contrafirma_actor`,
+`contrafirma_motivo`, `contrafirma_codigo_enviado_at`, `contrafirma_canal`,
+`contrafirma_estado`, `contrafirma_evidencia`, `contrafirma_acta_archivo`,
+`contrafirma_acta_hash` y `contrafirma_acta_bytes`.
+
+> 📦1047 · punto 3 (9-nov-2026) **Estos campos ya no están en `null` fijo: se
+> leen de la fila.** La forma devolvía `null` en todos ellos (y el comentario
+> decía que "el Anexo de Nube NO es bilateral"), así que el operador no veía
+> el segundo acto aunque existiera. Ahora la lectura es **tolerante**: si la
+> migración 060 no está aplicada en la base de destino, las columnas no
+> existen y los campos vienen en `null` —fallo CERRADO: no se inventa una
+> contrafirma que no se puede leer.
+>
+> `representante_verificacion` y `representante_verificado_at` **siguen en
+> `null`, y es correcto**: el Anexo de Nube **no tiene verificación
+> documental** (no hay columna ni ruta). El cotejo de quién firmó por la
+> Empresa se hace contra el `representante_legal` de la ficha, en el momento
+> de la contrafirma. Esa es una diferencia real con el Anexo de Encargo, no
+> una fase que falte.
+
+> 📦1047 · punto 3 (9-nov-2026) **El Anexo de Nube SÍ es bilateral.** Antes
+> Afirmaba lo contrario porque el segundo acto no existía en el código: lo
+> suscribe la Empresa (fase 1) y lo contrafirma K+AIR (fase 2), y el instrumento
+> solo queda **ejecutado** con los dos. Lo mismo que el Anexo de Encargo: la
+> fase 1 **no habilita** a la Empresa para firmar documentos de sus
+> trabajadores.
+>
+> El `estado` sigue siendo el de la **fase 1** (`FIRMADA` cuando la Empresa
+> suscribió). El estado del segundo acto va en `contrafirma_estado`
+> (`PENDIENTE`, `CODIGO_ENVIADO`, `BLOQUEADA`, `CONTRAFIRMADA`), y por eso el
+> manifiesto no filtra por `estado` para leer la contrafirma: si el código de
+> contrafirma se bloqueara y moviera `estado`, la suscripción dejaría de
+> aparecer.
 
 **Cada evento** trae cinco campos: `evento`, `detalle`, `fecha_hora`, `ip` y
 `user_agent`, en orden `id ASC` (del primero al último).
@@ -3701,6 +3981,24 @@ La respuesta de un canal es `{ success: true, data }` o
 | `firma:anexo:nube-anular` | Operador (admin key) | `POST .../anexo-nube/suscripcion/:id_suscripcion/anular` | **Sí** | Da de baja una suscripción del Anexo de Nube |
 | `firma:empresa:anexos` | **Cliente** (la key de **su** Empresa) | `GET /internal/empresa/anexos` | No | El estado de los anexos de la empresa activa |
 | `firma:config:admin-diag` | Diagnóstico | (ninguno: no sale a la red) | No | Dice si hay admin key configurada y **de dónde** |
+
+> 📦1047 · punto 3 (9-nov-2026) **La contrafirma del Anexo de Nube NO tiene canal
+> IPC todavía.** Las dos rutas del servicio existen y funcionan
+> (`POST .../anexo-nube/contrafirmar/codigo` y `POST .../anexo-nube/contrafirmar`),
+> pero **la app de escritorio no las expone**: no hay handler en
+> `main/firma-bridge.js` ni método en `preload.js`. El segundo acto se hace
+> **por HTTP contra el servicio**, con la admin key, y está escrito paso a paso
+> en `contrafirma-anexo-nube-v1-2.md` (§3.2).
+>
+> Antes esta tabla listaba dos canales (`firma:anexo:nube-contrafirma-codigo` y
+> `firma:anexo:nube-contrafirmar`) que **nunca se escribieron**: el documento
+> afirmaba una capacidad que el código no tenía, y el título del apartado
+> ("los once canales") era el que sí cuadraba. Un canal documentado que no
+> existe es un verde falso por la vía del documento.
+>
+> Lo que **sí** hace la app es **mostrar** el estado de los dos actos del
+> Anexo de Nube: la columna del listado dice "Suscrito · falta contrafirma" o
+> "Ejecutado", y el detalle trae la fecha de la contrafirma.
 
 **El motivo va en `X-Admin-Motivo`, no en el body.** Los cuatro canales que lo
 exigen (`verificar-representante`, `contrafirmar`, `anular` y `nube-anular`) lo

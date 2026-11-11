@@ -1,6 +1,6 @@
 {
-  "version": "2026-11-06",
-  "actualizado_at": "2026-11-06",
+  "version": "2026-11-10",
+  "actualizado_at": "2026-11-10",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
     "archivo": "scripts/fixtures/acuerdo-v1.5.txt",
@@ -21,10 +21,10 @@
   },
   "matriz_finalidades": {
     "archivo": "config/matriz-finalidades.json",
-    "hash": "7f604680c491b4c46ce8eed13f2474f2970f883b9c17588007869b869ad3b91d",
+    "hash": "1a549539c73fe3c27b9438d75c80c255536f5cce63f46a28be7f9f443e79f154",
     "version": "1.0",
-    "actualizado_at": "2026-11-06",
-    "nota": "Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos anexos. La matriz esta en estado de propuesta: ninguna finalidad queda habilitada en produccion hasta que el abogado valide el reparto entre Grupo A y Grupo B, la base juridica de cada finalidad y el estado de habilitacion. El 6-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque instruccion) sin cambiar ninguna finalidad, ninguna base juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que esa instruccion identifica."
+    "actualizado_at": "2026-11-09",
+    "nota": "Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos anexos. El 9-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque instruccion) a la 2026-11-09, sin cambiar ninguna finalidad, ninguna base juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que esa instruccion identifica."
   },
   "encargado": {
     "nit": "900987987-4",
@@ -63,30 +63,99 @@
       "devolucion_supresion": false,
       "auditoria": false,
       "evidencia": null,
-      "nota": "Cuenta de consumo Gmail: decision operativa de mantener el proveedor. La especificacion del 30-oct exige documentar el flujo sin atribuir a Google un DPA empresarial o un subencargo contractual. La determinacion escrita del 30-oct-2026 (punto J6 del abogado) ya califica la operacion: por la operacion concreta, y contrastada con los terminos aplicables de la cuenta de consumo, Google LLC decide sobre la finalidad y los medios de su propio servicio y trata los datos por cuenta propia; en esta operacion actua como Responsable del Tratamiento (art. 3, literales d) y e), de la Ley 1581 de 2012) y el flujo constituye una transferencia internacional de datos personales (art. 2.2.2.25.1.3, numeral 4, del Decreto 1074 de 2015) a un Responsable ubicado en Estados Unidos, pais con nivel adecuado de proteccion (numeral 3.2 del Titulo V de la Circular Unica). No existe DPA empresarial ni contrato de transmision con Google, y esta determinacion no atribuye al Encargado facultades de supresion sobre las copias del proveedor ni le impone obligaciones contractuales a este. Pendientes externos, que no abren de nuevo la calificacion: la evidencia de que la Empresa ha implementado medidas apropiadas y efectivas para la transferencia (art. 2.2.2.25.6.1 del Decreto 1074, si el abogado confirma que es exigible en una transferencia a pais con nivel adecuado), la declaracion de la transferencia en el RNBD a cargo de la Empresa y la politica de tratamiento que informa al Titular. El OTP sale de la cuenta de K+AIR; el enlace y los avisos salen de la cuenta de la Empresa cuando esta configura una."
+      "nota": "ESTADO ANTERIOR, conservado como historico: la cuenta gratuita de Gmail de consumo. El 9-nov-2026 se sustituyo por Google Workspace con el CDPA incorporado al Acuerdo (Decision A del 9-nov-2026, apartado 3). Este bloque NO se lee para calificar nada: el item vigente del gate es mail_provider_dpa, y el item google_dpa queda en no_aplica.",
+      "estado": "sustituido",
+      "sustituido_por": "mail_provider"
+    },
+    "mail_provider": {
+      "proveedor": "Google Ireland Limited (Google Workspace)",
+      "servicio": "Google Workspace: canal de correo del servicio de firma (Gmail, smtp.gmail.com:587 con STARTTLS)",
+      "cuenta": "workspace",
+      "rol": "subencargado",
+      "dpa": true,
+      "instrumento": "Cloud Data Processing Addendum (Customers)",
+      "version": "CDPA, texto que NO declara fecha, capturado el 2026-11-10",
+      "fecha": "2026-11-10",
+      "fecha_declarada_por_google": null,
+      "url": "https://admin.google.com/terms/apps/8/1/en/dpa_terms.html",
+      "hash": "0e1c729406410a15758ae1ceb6d93b6b4e200208b325abf17b09ef74f0dc69b1",
+      "bytes": 97831,
+      "devolucion_supresion": true,
+      "auditoria": true,
+      "evidencia": "https://admin.google.com/terms/apps/8/1/en/dpa_terms.html (texto publico descargado el 2026-11-10, sin sesion autenticada; la pagina no declara fecha de version, el texto se identifica por su SHA-256)",
+      "aceptacion": {
+        "aceptada": true,
+        "modo": "aceptado_por_administrador",
+        "fecha": "2026-11-10",
+        "fecha_efectividad_addendum": null,
+        "evidencia": "Consola de Google Workspace de gesstiar.com, ventana \u00abCondiciones adicionales de seguridad y privacidad\u00bb (Cuenta > Configuraci\u00f3n de la cuenta > Cumplimiento legal > Seguridad y privacidad > T\u00e9rminos adicionales), que declara textualmente: \u00abAnexo de Procesamiento de Datos de Cloud (CDPA) \u2014 Aceptado por kair@gesstiar.com el Nov 10, 2026\u00bb, y ofrece el bot\u00f3n CANCELAR, que solo aparece cuando la aceptaci\u00f3n ya est\u00e1 hecha. Prueba: captura-consola-cdpa-i-accept-2026-11-10.png, 96520 bytes, SHA-256 9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560, tomada el 2026-11-10 a las 20:29 (hora local) y verificada en esta m\u00e1quina.",
+        "responsable": "Javier Robles Fontalvo (representante legal, Gesstiar S.A.S., NIT 900987987-4)",
+        "cuenta": "gesstiar.com (Google Workspace); la aceptaci\u00f3n en la consola la hizo la cuenta kair@gesstiar.com",
+        "at_testacion": null,
+        "acuerdo": null,
+        "cdpa": null,
+        "captura": {
+          "archivo": "captura-consola-cdpa-i-accept-2026-11-10.png",
+          "hash": "9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560",
+          "bytes": 96520,
+          "descripcion": "Pantalla \u00abCondiciones adicionales de seguridad y privacidad\u00bb de la consola de Google Workspace: Cloud Data Processing Addendum con estado Aceptado por kair@gesstiar.com el Nov 10, 2026.",
+          "verificado_localmente": true
+        },
+        "observaciones": "Modo elegido: aceptado_por_administrador (decisi\u00f3n del 10-nov-2026): los t\u00e9rminos vigentes del Acuerdo de Google Workspace (Last modified: October 12, 2026) entran en el pr\u00f3ximo renewal y el TOS archivado de 2021 no incorporaba el CDPA, as\u00ed que incorporado_por_referencia no es afirmable sin la fecha de renovaci\u00f3n. La pantalla de la consola NO muestra una Addendum Effective Date: el campo queda en null porque no consta en la fuente, no porque falte el acto. \u26a0\ufe0f No verificado: si la cuenta ya renov\u00f3 al Acuerdo vigente y cu\u00e1l es esa fecha de renovaci\u00f3n. La misma ventana ofrece dos elementos que NO forman parte de este acta y que no se tocaron: la certificaci\u00f3n GDPR (CERTIFICAR SI CORRESPONDE) y la enmienda HIPAA (REVISAR Y ACEPTAR); ninguno es P1 y ninguno aplica a la operaci\u00f3n colombiana. El campo responsable declara quien responde por el registro; la consola atribuye la aceptaci\u00f3n a la cuenta kair@gesstiar.com.",
+        "registrado_por": "scripts/actualizar-manifiesto-aceptacion-cdpa.js",
+        "nota": "Modo aceptado_por_administrador: el administrador acepto el CDPA en la consola de Workspace el 2026-11-10. La evidencia es la captura captura-consola-cdpa-i-accept-2026-11-10.png (SHA-256 9d989067baf9f7908d144dcdb86c04f9b62efa6e34e4714f7dd3132e5d825560, 96520 bytes, verificada en esta maquina)."
+      },
+      "pais": "Estados Unidos. El CDPA (seccion 10.1) permite que los datos se procesen en cualquier pais donde Google o sus subencargados tengan instalaciones.",
+      "nivel_adecuado": true,
+      "transferencia": "Transferencia internacional a Estados Unidos, pais con nivel adecuado de proteccion (numeral 3.2 del Titulo V de la Circular Unica de la SIC). El CDPA NO la elimina: la seccion 10.1 deja abierto el procesamiento en cualquier pais de facilities de Google o de sus subencargados. El envio sigue rigiendo por el articulo 26 de la Ley 1581 de 2012.",
+      "nota": "El papel del proveedor NO se afirma en forma absoluta: Google interviene como Subencargado de los datos del SERVICIO DE CORREO mientras el CDPA este vigente y aplicable a la cuenta, conforme a sus secciones 4.3, 5.1 y 5.1.3. Los datos de CUENTA del administrador de Workspace y la TELEMETRIA del servicio no son datos del cliente: Google los trata por cuenta propia conforme a sus terminos, con su propia base de proteccion de datos, y no quedan cubiertos por las obligaciones que K+AIR puede invocar contra Google en nombre de la Empresa. Decision A del 9-nov-2026, apartado 2.4."
     }
   },
   "anexo_encargo": {
-    "estado": "firmado",
-    "fecha": "2026-11-07T20:33:22.748Z",
-    "evidencia": "ASEPLUS CARIBE S.A.S. (NIT 900.829.731-1). Anexo de Encargo version 2026-11-06, huella SHA-256 5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72. PRIMER ACTO (la Empresa): suscripcion id 1; el codigo de verificacion salio al segundo canal declarado por K+AIR; la Empresa acepto las condiciones del texto vigente y declaro los cinco datos del parrafo 11; la suscripcion quedo FIRMADA el 2026-11-07T19:30:14.503Z. Acta de la suscripcion: acta-1-anexo-encargo.pdf (SHA-256 f4a96beedd41f5990fc6174bed13ed416a9a4b5b648479f4c6cfdc194c95bdf3). SEGUNDO ACTO (la contrafirma de K+AIR): el codigo de contrafirma salio al buzon de proteccion de datos de K+AIR, que es fijo en la configuracion del servicio; K+AIR verifico documentalmente a quien firmo por la Empresa y la contrafirma quedo registrada el 2026-11-07T20:33:22.748Z por kair (motivo: Contrafirma del Anexo de Encargo de ASEPLUS CARIBE S.A.S. por parte de K+AIR (Gesstiar S.A.S.), con la representacion legal verificada contra el RUT que K+AIR tiene en la ficha de la Empresa. Piloto del 7-nov-2026.). Acta de la contrafirma: acta-1-contrafirma-anexo-encargo.pdf (SHA-256 b1ec9fa25395ef2063b1d9687af6471259a6ba7179f333fa4eb8a429c235513c). La fecha de ejecucion del instrumento quedo en la ficha de la Empresa (gh_firma_empresas.anexo_encargo_firmado_at = 2026-11-07T20:33:22.748Z). Con esa fecha, y solo con ella, la Empresa queda habilitada para firmar documentos de sus trabajadores. Rastro append-only en gh_firma_anexo_encargo_eventos: SUSCRIPCION_CREADA (2026-11-07 19:17:25), ENLACE_ABIERTO (2026-11-07 19:19:25), CODIGO_ENVIADO (2026-11-07 19:28:52), SUSCRIPCION_FIRMADA (2026-11-07 19:30:15), ACTA_GENERADA (2026-11-07 19:30:15), REPRESENTANTE_VERIFICADO (2026-11-07 20:25:39), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-07 20:26:11), CONTRAFIRMA_FIRMADA (2026-11-07 20:33:23), CONTRAFIRMA_ACTA_GENERADA (2026-11-07 20:33:23). La copia firmada del Anexo la conserva cada parte (parrafo 12): el servicio no la almacena. Lo que queda en el expediente son las dos actas, con la huella de sus bytes.",
-    "version": "2026-11-06",
-    "hash": "5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72",
-    "nota": "Modelo sin firmar. El 30-oct-2026 se aplico la revision juridica: J4 (bases juridicas literales de 10.3(a), (b), (c) y (e), con su estado de habilitacion, taken de config/matriz-finalidades.json), J14-1 (seccion 4 y seccion 6: el deber de no designar subencargados sin informar previamente y sin contrato o DPA queda en las obligaciones del Encargado; en las del responsable queda informarse y oponerse, y no usar un proveedor de correo propio sin autorizacion escrita), J9 (seccion 6), J5 (fuera del calendario de Google) y C-1 (seccion 9: sin copia firmada del Anexo de Nube la Constancia no puede emitirse). J6/D1: la determinacion del papel de Google por operacion quedo con el texto literal en las secciones 4, 5 y 8, y se retiraron las frases que quedaban falsas al lado de esa determinacion. El contenido es coherente con el Acuerdo v1.4 candidato, que elimina la retencion indefinida: la tabla supletoria que administra K+AIR da un plazo por defecto por categoria y la tabla de retencion documental de la Empresa tiene precedencia. Los plazos de diez (10) y cinco (5) anos no se activan en produccion hasta que el abogado los valide; el mecanismo queda construido y la activacion es otra decision, con el orden que fijo la revision: validar, alinear el catalogo, reejecutar las pruebas y solo entonces abrir la compuerta con validacion escrita. Para las categorias SG-SST el computo de veinte (20) anos exige la fecha real de cese; si falta, no se sustituye por la firma y el registro queda pendiente, sin fecha de supresion calculada. Firma y fecha las declara el owner. El 5-nov-2026 el numeral 12 se corrigio para que diga lo que el servicio registra: la fecha y hora de la firma del Anexo de Encargo y su bitacora de auditoria, y la version y la huella SHA-256 del texto canonico que rigio la firma, que quedan en el registro de la firma y en la Constancia. La copia firmada, con su propia huella, no se almacena en el servicio: la conservan la Empresa y K+AIR en su expediente, y el campo evidencia de este manifiesto es la referencia a esa copia. En la misma pasada el texto remite al Anexo de Nube v1.1, que es la version susceptible de suscripcion; la v1.0 sigue publicada como modelo historico. El 6-nov-2026 se alineo la etiqueta de version del documento: el texto ya habia cambiado el 5-nov (el numeral 12 y la remision al Anexo de Nube v1.1) sin que la etiqueta interna subiera, y el manifiesto declaraba 2026-11-05 mientras el documento decia 2026-10-30. Con dos textos distintos, la huella que firma la Empresa no es la que el manifiesto describe, y el cambio de etiqueta despues de la firma invalidaria la copia suscrita. Por eso la alineacion se hizo ANTES de enviar el documento a la Empresa. Ahora la etiqueta (encabezado, linea de fecha y pie) la pone scripts/generar-anexo-encargo.js desde la fuente config/matriz-finalidades.json, bloque instruccion, de modo que el documento y el manifiesto no pueden volver a desalinearse. El contenido contractual no cambio: el 6-nov-2026 solo cambia lo que el Anexo dice de si mismo, y la huella de arriba es la del texto vigente que la Empresa va a firmar."
+    "estado": "no_firmado",
+    "fecha": null,
+    "evidencia": null,
+    "contrafirma_facultad": null,
+    "version": "2026-11-09",
+    "hash": "0cd6c05f0574bbcdbb8277306a9084784a48815edd862cd31e97eb5435c22a1e",
+    "nota": "Texto vigente del Anexo de Encargo: la version 2026-11-09. Actualiza las secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion y auditoria conforme al CDPA) y anade la clausula de prevalencia del instrumento bilateral mas reciente. El texto vigente NO esta suscrito: la version suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora es append-only.",
+    "versiones_firmadas": [
+      {
+        "version": "2026-11-06",
+        "hash": "5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72",
+        "fecha": "2026-11-07T20:33:22.748Z",
+        "evidencia": "ASEPLUS CARIBE S.A.S. (NIT 900.829.731-1). Anexo de Encargo version 2026-11-06, huella SHA-256 5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72. PRIMER ACTO (la Empresa): suscripcion id 1; el codigo de verificacion salio al segundo canal declarado por K+AIR; la Empresa acepto las condiciones del texto vigente y declaro los cinco datos del parrafo 11; la suscripcion quedo FIRMADA el 2026-11-07T19:30:14.503Z. Acta de la suscripcion: acta-1-anexo-encargo.pdf (SHA-256 f4a96beedd41f5990fc6174bed13ed416a9a4b5b648479f4c6cfdc194c95bdf3). SEGUNDO ACTO (la contrafirma de K+AIR): el codigo de contrafirma salio al buzon de proteccion de datos de K+AIR, que es fijo en la configuracion del servicio; K+AIR verifico documentalmente a quien firmo por la Empresa y la contrafirma quedo registrada el 2026-11-07T20:33:22.748Z por kair (motivo: Contrafirma del Anexo de Encargo de ASEPLUS CARIBE S.A.S. por parte de K+AIR (Gesstiar S.A.S.), con la representacion legal verificada contra el RUT que K+AIR tiene en la ficha de la Empresa. Piloto del 7-nov-2026.). Acta de la contrafirma: acta-1-contrafirma-anexo-encargo.pdf (SHA-256 b1ec9fa25395ef2063b1d9687af6471259a6ba7179f333fa4eb8a429c235513c). La fecha de ejecucion del instrumento quedo en la ficha de la Empresa (gh_firma_empresas.anexo_encargo_firmado_at = 2026-11-07T20:33:22.748Z). Con esa fecha, y solo con ella, la Empresa queda habilitada para firmar documentos de sus trabajadores. Rastro append-only en gh_firma_anexo_encargo_eventos: SUSCRIPCION_CREADA (2026-11-07 19:17:25), ENLACE_ABIERTO (2026-11-07 19:19:25), CODIGO_ENVIADO (2026-11-07 19:28:52), SUSCRIPCION_FIRMADA (2026-11-07 19:30:15), ACTA_GENERADA (2026-11-07 19:30:15), REPRESENTANTE_VERIFICADO (2026-11-07 20:25:39), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-07 20:26:11), CONTRAFIRMA_FIRMADA (2026-11-07 20:33:23), CONTRAFIRMA_ACTA_GENERADA (2026-11-07 20:33:23). La copia firmada del Anexo la conserva cada parte (parrafo 12): el servicio no la almacena. Lo que queda en el expediente son las dos actas, con la huella de sus bytes.",
+        "estado": "firmado"
+      }
+    ]
   },
   "anexo_nube": {
-    "firmado": true,
-    "fecha": "2026-11-05T22:51:34.349Z",
-    "version": "1.1",
-    "hash": "e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482",
-    "evidencia": "5-nov-2026. Suscripcion id 1 del Anexo de Nube v1.1 por ASEPLUS CARIBE S.A.S. (NIT 900829731). Firmante: Lilia Maria Vasquez Munoz, Representante legal, correo jrf2011@live.com. Enlace de un solo uso abierto el 2026-11-05T19:52:31.469Z; se enviaron 2 codigos de verificacion (20:20:43Z y 22:50:32Z); la suscripcion quedo FIRMADA el 2026-11-05T22:51:34.349Z. Version 1.1 con huella SHA-256 e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482, la misma del texto vigente. IP de firma 181.63.26.145. Rastro append-only en gh_firma_anexo_nube_eventos: SUSCRIPCION_CREADA (18:54:18Z), ENLACE_ABIERTO (19:52:31Z), CODIGO_ENVIADO intento 1 (20:20:43Z), CODIGO_ENVIADO intento 2 (22:50:32Z) y SUSCRIPCION_FIRMADA (22:51:34Z).",
+    "firmado": false,
+    "fecha": null,
+    "version": null,
+    "hash": null,
+    "evidencia": null,
+    "contrafirmado": false,
+    "contrafirma_fecha": null,
+    "contrafirma_actor": null,
+    "contrafirma_motivo": null,
+    "contrafirma_evidencia": null,
+    "contrafirma_facultad": null,
     "modelo": {
-      "version": "1.1",
-      "hash": "e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482",
-      "bytes": 62198,
-      "actualizado": "2026-11-05",
-      "nota": "Version 1.1 del Anexo de Nube: es la primera version SUSCEPTIBLE DE SUSCRIPCION por la Empresa. El 5-nov-2026 el bloque de pendientes del modelo 1.0 paso a ser DECLARACION DE ESTADO DEL SERVICIO Y LIMITACIONES CONOCIDAS (declaracion de estado, no condicion de firma) y se elimino la clausula que prohibia firmar hasta completar ese bloque; lo que no esta implementado se declara sin suavizar. La v1.0 sigue publicada en el sitio como modelo historico: nunca fue susceptible de suscripcion. La v1.1 se publico en el sitio publico el 5-nov-2026. El 5-nov-2026 a las 22:51:34Z ASEPLUS CARIBE S.A.S. (900829731) suscribio la v1.1 por el enlace de un solo uso con codigo de verificacion; esa suscripcion quedo registrada en version y hash y desde entonces firmado=true. El servicio sirve el texto desde su propia ruta /anexo-nube/documento, de modo que lo que la Empresa lee es byte a byte lo que se firma. El 31-oct-2026 se completaron los catorce (14) marcadores que el bloque de pendientes dejaba abiertos: cuatro del RNBD y diez de la ficha tecnica del canal de correo. RNBD: Gesstiar S.A.S. es una sociedad por acciones simplificada (S.A.S.), categoria que juridicamente es una sociedad; el certificado de existencia y representacion pendiente confirmara el tipo societario exacto. sigue pendiente de adjuntar. El umbral del articulo 2.2.2.26.1.2 del Decreto 1074 de 2015 son 100.000 UVT, que con la UVT 2026 de $52.374 (Resolucion DIAN 000238 de 2025) son $5.237.400.000 COP; la declaracion del owner ($1.000.000 COP, 19,09 UVT) queda por debajo del umbral, pero no acredita por si sola los activos totales a la fecha de corte; la posible no obligacion depende de verificarlo con el certificado de existencia y representacion y los estados financieros. No esta inscrita en el RNBD. Ficha del canal: el servidor SMTP es smtp.gmail.com puerto 587 con STARTTLS, verificado con TLSv1.3 y TLS_AES_256_GCM_SHA384 y cadena valida (verify 0); el remitente efectivo es adminkair@gmail.com; la cuenta tiene verificacion en dos pasos activada, corroborado porque una contrasena de aplicacion del proveedor solo existe con esa verificacion activada; la plantilla del OTP es la vigente del codigo y hay cuatro envios reales del 26-oct-2026; el registro de envios y de errores es gh_firma_eventos, con el evento OTP_SEND_FAILED ya implementado en el codigo; y no hay ninguna revocacion registrada porque nunca se ha revocado una credencial. Quedan pendientes y el Anexo los declara de forma expresa en su bloque de ESTADO DECLARADO: la rotacion de la credencial y su periodicidad; el escalamiento de un codigo de un solo uso rechazado (el codigo bloquea con OTP_LOCKED pero no escala a ninguna persona); la fecha de generacion de la contrasena de aplicacion (el proveedor no la expone y el expediente no la registra); el certificado de existencia y representacion y la consulta al portal de la SIC; el minimo privilegio del sistema de archivos del despliegue (el T4 del 31-oct-2026 verifico que no cumple: permisos 777 y una base de datos de prueba dentro del despliegue); su correccion esta pendiente a cargo del owner, sin fecha de ejecucion confirmada; el cifrado en reposo del disco (verificado el 31-oct-2026: la raiz del servidor se monta sobre LVM sin cifrado y el area de intercambio es un archivo sin cifrar, de modo que no se declara implementado); y la validacion de las tres respuestas que este Anexo incorpora, que es del abogado. El 30-oct-2026 se aplico la revision juridica: el 6 quedo con el texto literal de D2; el 3 define el RTO como objetivo de recuperacion dependiente de la deteccion y del inicio de la respuesta; el 10 declara los cuatro datos con que el servicio registra la suscripcion (fecha, version, huella SHA-256 y evidencia); el 1 fija la prevalencia del Anexo de Nube sobre el Anexo de Encargo tambien en conservacion, devolucion, supresion y auditoria; el 9 fija que toda modificacion se publica como version nueva con su propia huella SHA-256, se suscribe nuevamente por ambas partes y no altera las versiones ya suscritas ni sus efectos sobre los registros ya generados; el 8 corrige la promesa de auditoria, que ya no atribuye a Cloudflare certificaciones que pueden no existir. El papel de Google LLC se documenta como proveedor de un Gmail de consumo, sin afirmar DPA empresarial ni subencargado contractual ni contrato de transmision. El papel por operacion y la clasificacion juridica estan determinados (Google LLC actua como Responsable del Tratamiento y el flujo es una transferencia internacional a un pais con nivel adecuado); la Circular Externa 002 de 2025 no aplica a este canal. La suscripcion de la Empresa se registra por el enlace de un solo uso con codigo de verificacion al correo del firmante, y quedan la version, la huella SHA-256, la evidencia (fecha, correo, IP y navegador) y el rastro append-only; cuando exista, esa suscripcion es la que se registra en version y hash."
-    }
+      "version": "1.2",
+      "hash": "242037b3a98f2152b7c1db1f5c562fbe1f9f3e3be4422c03bfcf404e581f7245",
+      "bytes": 84062,
+      "actualizado": "2026-11-09",
+      "nota": "Texto vigente del Anexo de Nube: la v1.2. Cambia el canal de correo a Google Workspace con el Cloud Data Processing Addendum (CDPA) incorporado al Acuerdo, y el papel del proveedor pasa de Responsable a Subencargado de los datos del servicio de correo, con la formula condicional de la Decision A del 9-nov-2026. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: el texto vigente todavia no esta suscrito y por eso el item firmado_nube del gate esta pendiente."
+    },
+    "versiones_firmadas": [
+      {
+        "version": "1.1",
+        "hash": "e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482",
+        "fecha": "2026-11-05T22:51:34.349Z",
+        "evidencia": "5-nov-2026. Suscripcion id 1 del Anexo de Nube v1.1 por ASEPLUS CARIBE S.A.S. (NIT 900829731). Firmante: Lilia Maria Vasquez Munoz, Representante legal, correo jrf2011@live.com. Enlace de un solo uso abierto el 2026-11-05T19:52:31.469Z; se enviaron 2 codigos de verificacion (20:20:43Z y 22:50:32Z); la suscripcion quedo FIRMADA el 2026-11-05T22:51:34.349Z. Version 1.1 con huella SHA-256 e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482, la misma del texto vigente. IP de firma 181.63.26.145. Rastro append-only en gh_firma_anexo_nube_eventos: SUSCRIPCION_CREADA (18:54:18Z), ENLACE_ABIERTO (19:52:31Z), CODIGO_ENVIADO intento 1 (20:20:43Z), CODIGO_ENVIADO intento 2 (22:50:32Z) y SUSCRIPCION_FIRMADA (22:51:34Z)."
+      }
+    ]
   },
   "n9a": {
     "probada": true,
@@ -112,5 +181,35 @@
     "canal": "adminkair@gmail.com",
     "responsable": "Javier Robles Fontalvo",
     "plazo_dias": 2
+  },
+  "canales": {
+    "transaccional": {
+      "cuenta": "kair@gesstiar.com",
+      "proveedor": "Google Workspace (Gmail), smtp.gmail.com:587 con STARTTLS",
+      "rol": "subencargado",
+      "instrumento": "Cloud Data Processing Addendum (Customers), texto del 2026-11-10",
+      "estado": "pendiente_de_migracion",
+      "nota": "La cuenta y el remitente del canal transaccional (codigo OTP, enlace de acceso a la solicitud de firma, avisos del procedimiento e invitacion a suscribir el Anexo de Nube) pasan a kair@gesstiar.com. El cambio de la credencial en el servidor, el reinicio y el ENVIO REAL de prueba los ejecuta el owner (Fase 1 del plan del 9-nov-2026, pendientes P2, P4 y P5). Hasta que ese envio real exista, el remitente efectivo sigue siendo el anterior: este manifiesto no declara un envio que no se ha hecho."
+    },
+    "derechos": {
+      "direccion": "privacidad.kair@gmail.com",
+      "estado": "excepcion_documentada"
+    },
+    "pqrs": {
+      "direccion": "adminkair@gmail.com",
+      "estado": "excepcion_documentada"
+    },
+    "incidentes": {
+      "direccion": "privacidad.kair@gmail.com",
+      "estado": "excepcion_documentada"
+    },
+    "excepcion_documentada": {
+      "motivo": "Los alias de Workspace (privacidad@gesstiar.com, soporte@gesstiar.com, incidentes@gesstiar.com) NO estan verificados: no consta que existan en la consola. Publicar una direccion de derechos que no recibe solicitudes dejaria sin canal real a los titulares, y publicar un remitente que no envia dejaria al servicio sin correo.",
+      "responsable": "owner",
+      "pendiente": "P3",
+      "accion": "Crear los alias en la consola de Workspace, verificar cada uno con un envio real y migrar despues los canales en los documentos publicos y en src/config.js.",
+      "referencia": "decision-regularizacion-correo-2026-11-09.md, apartado 3",
+      "efecto": "La ruta TRANSACCIONAL no tiene ninguna referencia a una cuenta de consumo. Los tres canales de esta tabla si la tienen, y su excepcion queda escrita con motivo, responsable y accion de cierre. La cuenta adminkair@gmail.com deja de ser la identidad de envio (eso lo ejecuta el owner en P6) pero sigue existiendo como buzon humano de soporte y PQRS."
+    }
   }
 }

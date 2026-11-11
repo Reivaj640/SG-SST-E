@@ -38,9 +38,13 @@
  * POR QUÉ NO SE TOCA EL TEXTO DEL ANEXO
  * ------------------------------------
  * El texto canónico (`legal/anexo-encargo.html`) NO se toca: ni una línea.
- * Su huella (`5cc7a346…`) es la que declara el manifiesto y la que se registra
- * en cada suscripción. Estos textos son OTRA cosa: son lo que la Empresa
- * acepta en la pantalla, y por eso tienen su propia huella.
+ * Su huella es la que declara el manifiesto y la que se registra en cada
+ * suscripción, y se calcula sobre los bytes del archivo, en cada ejecución:
+ * no hay ninguna huella escrita a mano en el código. (La huella que queda
+ * escrita en un comentario se vuelve vieja en cuanto se publica una versión
+ * nueva del Anexo: el 9-nov-2026 el texto vigente pasó a la 2026-11-09 y la
+ * 2026-11-06 quedó archivada con la suya.) Estos textos son OTRA cosa: son lo
+ * que la Empresa acepta en la pantalla, y por eso tienen su propia huella.
  */
 'use strict';
 

@@ -22,6 +22,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const db = require('../src/db/connection');
+const crypto = require('crypto');
 const empresaService = require('../src/services/empresa');
 const readiness = require('../src/services/readinessLegal');
 const { resetDb } = require('./helpers');
@@ -43,10 +44,51 @@ const TEXTOS = {
   anexoEncargo: 'Anexo de Nube. Cláusula de otrosí.',
 };
 
+/**
+ * La huella del texto del Anexo de Encargo que se inyecta.
+ *
+ * La compuerta contrasta la huella que declara el manifiesto con la del TEXTO
+ * vigente: una firma sobre una huella que no es la del texto que se leyo son
+ * dos textos y una sola firma (PROMPT.md, trampa 137). El manifiesto que
+ * inyecta este test tiene que declarar la huella de lo que se leyo.
+ */
+const HASH_ENCARGO_INYECTADO = crypto.createHash('sha256')
+  .update(TEXTOS.anexoEncargo, 'utf8')
+  .digest('hex');
+
+// La FACULTAD acreditada de quien contrafirma por Gesstiar (P7, 10-nov-2026).
+// El gate la exige: un Anexo de Encargo firmado sin ese dato no describe el
+// instrumento entero.
+const FACULTAD_OK = {
+  resultado: 'REPRESENTANTE_LEGAL_ENCARGADO',
+  nombre: 'Javier Robles Fontalvo',
+  cargo: 'Representante Legal',
+  tipo: 'REPRESENTACION',
+  instrumento_ref: 'Representante legal declarado en el manifiesto legal',
+  instrumento_sha256: null,
+  id_poder: null,
+  verificado_at: '2026-10-21',
+};
+
 function manifiesto(anexo) {
+  const original = anexo || { estado: 'no_firmado', fecha: null, evidencia: null };
+  // El hash acompaña al estado 'firmado': sin el, la firma no se puede
+  // contrastar contra el texto y el item no puede salir OK.
+  //
+  // 📦1047 · punto 3 · P7 La firma del Anexo de Encargo exige además la
+  // acreditación de la FACULTAD de quien contrafirma por Gesstiar: sin ella,
+  // el item `estado_encargo` —y con él `empresas_base`— no puede salir OK.
+  const bloque = original.estado === 'firmado'
+    ? Object.assign(
+      {},
+      original,
+      original.hash ? {} : { hash: HASH_ENCARGO_INYECTADO },
+      original.contrafirma_facultad ? {} : { contrafirma_facultad: FACULTAD_OK },
+    )
+    : original;
   return {
     version: 'test',
-    anexo_encargo: anexo || { estado: 'no_firmado', fecha: null, evidencia: null },
+    anexo_encargo: bloque,
   };
 }
 

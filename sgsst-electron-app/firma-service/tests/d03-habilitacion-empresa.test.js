@@ -31,6 +31,10 @@ const db = require('../src/db/connection');
 const config = require('../src/config');
 const empresaService = require('../src/services/empresa');
 const {
+  VERSION_MODELO: VERSION_MODELO_NUBE,
+  huellaModeloVigente,
+} = require('../src/services/anexoNubeModelo');
+const {
   resetDb, seedActiveAgreement, createSignRequestWithIdentificacion, capturarLogs,
 } = require('./helpers');
 
@@ -290,15 +294,25 @@ test('C-1 · con la compuerta encendida y sin Anexo de Nube, la solicitud NO se 
   }
 });
 
-test('C-1 · con la compuerta encendida y el Anexo de Nube firmado, la solicitud se crea', async () => {
+test('C-1 · con la compuerta encendida y el Anexo de Nube EJECUTADO, la solicitud se crea', async () => {
   limpiar();
   registrarEmpresa({ conAnexo: true, conCanal: true });
+  // La suscripcion tiene que ser del TEXTO VIGENTE: la compuerta contrasta la
+  // version y la huella con el archivo que el servicio firma (PROMPT.md,
+  // trampa 137). Una huella inventada ya no habilita: eso es lo que hace
+  // falso positivo al gate.
   empresaService.marcarAnexoNubeFirmado(EMPRESA, {
     fecha: '2026-10-30',
-    version: 'v1.0',
-    hash: 'a'.repeat(64),
+    version: VERSION_MODELO_NUBE,
+    hash: huellaModeloVigente(),
     evidencia: 'PDF firmado por la Empresa, en el expediente',
   }, { actor: 'el owner', motivo: 'firma registrada' });
+  // 📦1047 · punto 3 Y tiene que estar EJECUTADO: el Anexo de Nube es
+  // bilateral (el texto vigente, §10), y el segundo acto (la contrafirma de
+  // K+AIR) es lo que ejecuta el instrumento. Es el espejo del Anexo de
+  // Encargo, cuya habilitación ya exigía la fecha de la contrafirma.
+  db.prepare('UPDATE gh_firma_empresas SET anexo_nube_ejecutado_at = ? WHERE id_empresa = ?')
+    .run('2026-10-31', EMPRESA);
 
   config.exigirAnexoNube = true;
   try {
@@ -308,6 +322,62 @@ test('C-1 · con la compuerta encendida y el Anexo de Nube firmado, la solicitud
 
     const { signRequest } = await createSignRequestWithIdentificacion({ id_empresa: EMPRESA });
     assert.ok(signRequest && signRequest.id_solicitud);
+  } finally {
+    config.exigirAnexoNube = false;
+  }
+});
+
+test('C-1 · con la compuerta encendida y el Anexo de Nube SIN contrafirmar, la solicitud NO se crea', async () => {
+  // El caso que este test ata: la Empresa YA SUSCRIBIO el texto vigente, pero
+  // K+AIR no ha contrafirmado. El instrumento esta suscrito a medias y NO
+  // esta ejecutado: habilitar aqui seria un verde falso.
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conCanal: true });
+  empresaService.marcarAnexoNubeFirmado(EMPRESA, {
+    fecha: '2026-10-30',
+    version: VERSION_MODELO_NUBE,
+    hash: huellaModeloVigente(),
+    evidencia: 'PDF firmado por la Empresa, en el expediente',
+  }, { actor: 'el owner', motivo: 'firma registrada' });
+
+  config.exigirAnexoNube = true;
+  try {
+    const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+    assert.equal(h.ok, false);
+    assert.deepEqual(h.pendientes, ['anexo_nube_firmado']);
+
+    await assert.rejects(
+      () => createSignRequestWithIdentificacion({ id_empresa: EMPRESA, consent_id: null }),
+      (e) => {
+        assert.equal(e.code, 'EMPRESA_NO_HABILITADA');
+        assert.ok(e.details.pendientes.includes('anexo_nube_firmado'));
+        return true;
+      },
+    );
+  } finally {
+    config.exigirAnexoNube = false;
+  }
+});
+
+test('C-1 · con la compuerta encendida, una suscripcion de OTRA version NO habilita', async () => {
+  // El caso que la compuerta nueva cierra: la Empresa suscribio una version
+  // anterior del Anexo de Nube. La fecha de suscripcion no dice que version se
+  // firmo: la huella si. Con la comparacion contra el texto vigente, una
+  // suscripcion vieja queda como pendiente en vez de pasar.
+  limpiar();
+  registrarEmpresa({ conAnexo: true, conCanal: true });
+  empresaService.marcarAnexoNubeFirmado(EMPRESA, {
+    fecha: '2026-10-30',
+    version: 'v0.9',
+    hash: 'a'.repeat(64),
+    evidencia: 'PDF firmado por la Empresa, en el expediente',
+  }, { actor: 'el owner', motivo: 'firma registrada' });
+
+  config.exigirAnexoNube = true;
+  try {
+    const h = empresaService.verificarHabilitacionFirma(EMPRESA);
+    assert.equal(h.ok, false);
+    assert.deepEqual(h.pendientes, ['anexo_nube_firmado']);
   } finally {
     config.exigirAnexoNube = false;
   }

@@ -36,6 +36,7 @@ const empresaAnexosRouter = require('../src/routes/empresaAnexos');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const adminEmpresasRouter = require('../src/routes/admin-empresas');
+const adminEncargadoRouter = require('../src/routes/admin-encargado');
 const adminExcepcionesRouter = require('../src/routes/admin-excepciones');
 const adminAprobacionesRouter = require('../src/routes/admin-aprobaciones');
 const adminSolicitudesRouter = require('../src/routes/admin-solicitudes');
@@ -65,6 +66,14 @@ const TEST_API_KEY_CLIENT_A = 'test-clientA-internal-api-key-32bytes!!';
 const TEST_API_KEY_CLIENT_B = 'test-clientB-internal-api-key-32bytes!!';
 const TEST_EMPRESA_A = '900123456';
 const TEST_EMPRESA_B = '900999999';
+
+// Los ACTORES que tienen faculty acreditada en el ambiente de test.
+//
+// La contrafirma de un anexo bilateral exige la faculty de quien la hace por
+// Gesstiar (condicion del abogado a P7, 10-nov-2026). Estos dos nombres son
+// los que usan los tests de contrafirma, asi que el arnes les siembra un
+// poder vigente. Ver `sembrarPoderesDePrueba`.
+const ACTORES_CON_FACULTAD = ['admin', 'admin:operador'];
 
 // Sobrescribir las API keys en config (objeto mutable) para que los
 // middlewares de auth usen las keys de test.
@@ -251,6 +260,16 @@ const TABLES = [
   // memoria.
   'gh_firma_anexo_encargo_eventos',
   'gh_firma_anexo_encargo_suscripciones',
+  // El REGISTRO DE PODERES DEL ENCARGADO (migracion 061): los poderes
+  // acreditados y su rastro. Los eventos van PRIMERO: tienen FK al poder.
+  //
+  // El rastro tiene trigger append-only, pero la migracion 062 lleva
+  // `@skip-when-env test`: en el ambiente de test el trigger NO esta
+  // instalado y la tabla se puede limpiar. La inmutabilidad se comprueba en
+  // tests/poderes-encargado.test.js, que aplica el SQL de la 062 a una base
+  // en memoria.
+  'gh_firma_encargado_poderes_eventos',
+  'gh_firma_encargado_poderes',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
@@ -338,6 +357,49 @@ function resetDb() {
       }
     } catch (e) { /* ignore */ }
   }
+  // Los poderes acreditados de prueba (ver sembrarPoderesDePrueba).
+  sembrarPoderesDePrueba();
+}
+
+/**
+ * LOS PODERES ACREDITADOS DE PRUEBA.
+ * ============================================================================
+ *
+ * La contrafirma de un anexo bilateral exige la FACULTAD acreditada de quien
+ * la hace por Gesstiar (condicion del abogado a P7, 10-nov-2026). Los tests
+ * de contrafirma usan los actores 'admin' y 'admin:operador', asi que esos
+ * dos nombres tienen que tener un poder VIGENTE: sin el, ninguno de esos
+ * tests podria cerrar su segundo acto.
+ *
+ * Es una siembra de TEST, no una excepcion en el codigo: la comprobacion de
+ * la facultad es la misma en los tests que en produccion, y lo unico que
+ * cambia es que aqui el poder se registra por el atajo del arnes. El test que
+ * comprueba que NO se contrafirma sin facultad (tests/poderes-encargado.test.js)
+ * usa un nombre que no esta sembrado.
+ *
+ * @returns {number} cuantos poderes se sembraron.
+ */
+function sembrarPoderesDePrueba() {
+  const poderes = require('../src/services/poderesEncargado');
+  if (!poderes.hayTabla()) return 0;
+  let sembrados = 0;
+  for (const nombre of ACTORES_CON_FACULTAD) {
+    poderes.registrarPoder({
+      nombre,
+      cargo: 'Operador de pruebas',
+      tipo: 'DELEGACION',
+      instrumento_ref: 'Poder de pruebas',
+      instrumento_sha256: 'a'.repeat(64),
+      vigente_desde: '2026-01-01',
+    }, {
+      actor: 'test:arnas',
+      motivo: 'Poder de prueba del arnes de tests',
+      ip: '10.0.0.1',
+      user_agent: 'test',
+    });
+    sembrados += 1;
+  }
+  return sembrados;
 }
 
 /**
@@ -419,6 +481,9 @@ function makeApp() {
   app.use('/internal/admin', adminRouter);
   app.use('/internal/admin', adminClientesRouter);
   app.use('/internal/admin', adminEmpresasRouter);
+  // El REGISTRO DE PODERES DEL ENCARGADO (migracion 061). Montado por la misma
+  // razon que los de arriba: si nadie lo monta, sus endpoints no se ejercitan.
+  app.use('/internal/admin', adminEncargadoRouter);
   app.use('/internal/admin', adminExcepcionesRouter);
   app.use('/internal/admin', adminSolicitudesRouter);
   // El reporte de carga accidental de datos de salud (el 10.8(d)). Montado
@@ -1068,6 +1133,7 @@ module.exports = {
   manifiestoSinFirmar,
   asegurarTablasPurga,
   seedActiveAgreement,
+  sembrarPoderesDePrueba,
   tablaConservacionActivada,
   makeApp,
   obtenerConsentimientoAceptado,
@@ -1091,6 +1157,7 @@ module.exports = {
   capturarLogs,
   TEST_API_KEY,
   TEST_ADMIN_API_KEY,
+  ACTORES_CON_FACULTAD,
   TEST_API_KEY_CLIENT_A,
   TEST_API_KEY_CLIENT_B,
   TEST_EMPRESA_A,

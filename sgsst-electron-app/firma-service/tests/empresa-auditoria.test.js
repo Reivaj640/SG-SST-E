@@ -489,6 +489,10 @@ test('rastro · la lista de campos trazados cubre toda la ficha editable', () =>
     // escrito.
     'anexo_nube_firmado_at', 'anexo_nube_version',
     'anexo_nube_hash', 'anexo_nube_evidencia',
+    // 📦1047 · punto 3 Y la fecha de EJECUCIÓN (el segundo acto): lo escribe
+    // el servicio al contrafirmar, y su cambio también tiene que quedar
+    // escrito.
+    'anexo_nube_ejecutado_at',
   ]) {
     assert.ok(trazables.has(campo), `el campo ${campo} no esta en CAMPOS_TRAZABLES`);
   }

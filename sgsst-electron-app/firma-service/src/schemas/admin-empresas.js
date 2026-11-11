@@ -393,6 +393,20 @@ const fechaTerminacionBody = z.object({
     .nullish(),
 });
 
+/**
+ * Body de la CERTIFICACION DE LA FACULTAD de una contrafirma ya registrada.
+ *
+ * Solo dice QUE suscripcion se certifica. La facultad se deduce del registro
+ * de poderes (o del representante legal del Encargado), nunca del body: si
+ * el operador pudiera declarar la facultad, la acreditacion no probaria nada.
+ */
+const contrafirmaFacultadBody = z.object({
+  id_suscripcion: z
+    .number()
+    .int('id_suscripcion tiene que ser un numero entero')
+    .positive('id_suscripcion tiene que ser un id valido'),
+}).strict();
+
 module.exports = {
   idEmpresa,
   createEmpresaBody,
@@ -404,6 +418,7 @@ module.exports = {
   verificarRepresentanteBody,
   contrafirmaCodigoBody,
   contrafirmaBody,
+  contrafirmaFacultadBody,
   setActivoBody,
   cuentaEnvioBody,
   probarCuentaEnvioBody,

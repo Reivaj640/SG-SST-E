@@ -99,6 +99,15 @@ const config = {
   //
   // El valor por defecto es el mismo que publica el Anexo de Encargo de
   // Tratamiento de Datos Personales (§9, datos de contacto del Encargado).
+  //
+  // 📦1047 · EXCEPCION DOCUMENTADA. El canal TRANSACCIONAL del servicio
+  // (SMTP_USER) si migró a Google Workspace el 9-nov-2026, pero este buzón NO:
+  // es un buzón humano de PQRS e incidentes, y el alias equivalente
+  // (incidentes@gesstiar.com) no está verificado. Publicar una dirección que
+  // no recibe avisos dejaría al Firmante sin a quién avisarle. La excepción
+  // queda escrita, con motivo, responsable y acción de cierre, en
+  // legal-readiness.json (bloque `canales`) y en la Decision A del 9-nov-2026,
+  // apartado 3. El pendiente es P3 y lo cierra el owner.
   canalIncidentes: required('FIRMA_CANAL_INCIDENCIAS', 'adminkair@gmail.com'),
 
   // Canal de PROTECCIÓN DE DATOS de K+AIR (el 10.7(b) del Acuerdo).
@@ -114,6 +123,15 @@ const config = {
   //
   // ⚠️ Antes de publicar la v1.1, este buzón tiene que existir y estar
   // monitoreado: es la dirección que el Titular va a usar.
+  //
+  // 📦1047 · EXCEPCION DOCUMENTADA. Igual que el canal de incidentes: la
+  // migración del canal transaccional a Google Workspace (9-nov-2026) NO
+  // alcanza a este buzón, porque el alias equivalente
+  // (privacidad@gesstiar.com) no está verificado. Un canal de derechos que
+  // no recibe solicitudes deja sin salida a los titulares, que es peor que
+  // un buzón feo. La excepción está escrita, con motivo, responsable y acción
+  // de cierre, en legal-readiness.json (bloque `canales`) y en la Decision A
+  // del 9-nov-2026, apartado 3. El pendiente es P3 y lo cierra el owner.
   canalProteccionDatos: required('FIRMA_CANAL_PROTECCION_DATOS', 'privacidad.kair@gmail.com'),
 
   // El plazo de trasmisión a la Empresa, en días HÁBILES. Lo define la

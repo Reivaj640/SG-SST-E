@@ -6,7 +6,7 @@ REM USO:
 REM   1. Cambia la version en package.json (ej "0.1.118")
 REM   2. Commitea y pushea los cambios a Dev-Pc
 REM   3. Ejecuta este script desde Git Bash o cmd.exe:
-REM        export GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+REM        export GH_TOKEN=github_pat_TU_TOKEN_AQUI
 REM        ./build-and-publish.bat
 REM
 REM Que hace automaticamente:
@@ -61,9 +61,9 @@ echo ========================================
 if "%GH_TOKEN%"=="" (
     echo [ERROR] GH_TOKEN no esta definido.
     echo         Antes de correr este script, ejecuta:
-    echo           export GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+    echo           export GH_TOKEN=github_pat_TU_TOKEN_AQUI
     echo         o en PowerShell:
-    echo           $env:GH_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
+    echo           $env:GH_TOKEN="github_pat_TU_TOKEN_AQUI"
     exit /b 1
 )
 echo [OK] GH_TOKEN presente (longitud: %GH_TOKEN:~0,4%...)

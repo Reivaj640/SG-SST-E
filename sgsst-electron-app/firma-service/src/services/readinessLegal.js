@@ -33,6 +33,13 @@ const crypto = require('crypto');
 
 const db = require('../db/connection');
 const config = require('../config');
+// La identidad del texto vigente del Anexo de Nube (que version es y donde
+// esta el archivo) vive en su propio modulo, sin dependencias. La compuerta
+// lo lee de ahi para no poder quedar desalineada del modulo que suscribe.
+const {
+  VERSION_MODELO: VERSION_MODELO_NUBE,
+  RUTA_MODELO: RUTA_MODELO_NUBE,
+} = require('./anexoNubeModelo');
 const {
   listarPlaceholders,
   buscarPlaceholders,
@@ -48,12 +55,12 @@ const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(SERVICE_ROOT, '..');
 
 const RUTAS_DEFAULT = {
-  // El Anexo de Nube que el SERVICIO firma es la v1.1 (la primera susceptible
-  // de suscripcion). La v1.0 sigue publicada en el sitio como modelo
-  // historico: no era firmable. Si esto no coincide con la version que
-  // suscribe `services/anexoNube.js`, el readiness analiza un documento que
-  // no es el que se firma.
-  anexoNube: path.join(REPO_ROOT, 'legal', 'anexo-nube-v1.1.html'),
+  // El Anexo de Nube que el SERVICIO firma. La ruta NO es una constante
+  // escrita a mano: sale de `services/anexoNubeModelo.js`, el modulo que
+  // declara la identidad del texto vigente. Con una ruta escrita a mano,
+  // publicar la v1.2 dejaba al readiness analizando la v1.1 y el gate
+  // diciendo "Anexo firmado" sobre un texto que ya no era el vigente.
+  anexoNube: RUTA_MODELO_NUBE,
   anexoEncargo: path.join(REPO_ROOT, 'legal', 'anexo-encargo.html'),
   acuerdoV11: path.join(SERVICE_ROOT, 'scripts', 'fixtures', 'acuerdo-v1.1.txt'),
   manifiesto: path.join(SERVICE_ROOT, 'legal-readiness.json'),
@@ -97,6 +104,39 @@ function _enteroNoNegativo(valor) {
 
 function _esHashSha256(valor) {
   return typeof valor === 'string' && /^[a-f0-9]{64}$/i.test(valor.trim());
+}
+
+/**
+ * La FACULTAD acreditada de quien contrafirma por K+AIR.
+ *
+ * La condicion del abogado (respuesta a P7, 10-nov-2026): "La ejecucion por una
+ * persona distinta del representante legal de Gesstiar S.A.S. requerira
+ * acreditar previamente la facultad de representacion o poder suficiente, que
+ * debera conservarse en el expediente".
+ *
+ * El manifiesto declara esa facultad en `anexo_nube.contrafirma_facultad`, y
+ * el gate la EXIGE: un segundo acto que no dice con que poder se firmo no
+ * describe el instrumento entero, y declararlo ok seria un verde falso.
+ *
+ * Que la facultad sea del Representante Legal del Encargado no exime de nada:
+ * lo que se comprueba es que el dato existe y es completo, que es lo que
+ * permite despues contrastarlo con el expediente.
+ *
+ * @param {*} valor
+ * @returns {boolean}
+ */
+function _facultadContrafirmanteOk(valor) {
+  if (!valor || typeof valor !== 'object') return false;
+  const resultado = _texto(valor.resultado);
+  if (!resultado) return false;
+  if (!['REPRESENTANTE_LEGAL_ENCARGADO', 'PODER_ACREDITADO'].includes(resultado)) {
+    return false;
+  }
+  if (!_texto(valor.nombre)) return false;
+  if (!resultado.endsWith('PODER_ACREDITADO')) return true;
+  // Un poder acreditado tiene que decir contra que documento: sin referencia
+  // ni huella, el expediente no tiene nada que contrastar.
+  return !!_texto(valor.instrumento_ref) && _esHashSha256(valor.instrumento_sha256);
 }
 
 /**
@@ -303,15 +343,18 @@ function _triggerExiste(dbConn, nombre) {
   }
 }
 
-function _resumenEmpresas(dbConn) {
+function _resumenEmpresas(dbConn, hashModeloNube) {
   const base = {
     disponible: false,
     total: 0,
     con_anexo_base: 0,
     con_anexo_nube: 0,
+    con_anexo_nube_suscrito_vigente: 0,
+    con_anexo_nube_vigente: 0,
     con_canal_pqrs: 0,
     fechas_antes_del_alta: 0,
     columna_anexo_nube: false,
+    columna_ejecucion_nube: false,
     error: null,
   };
   if (!dbConn) {
@@ -328,6 +371,18 @@ function _resumenEmpresas(dbConn) {
     const tieneNube = columnas.includes('anexo_nube_firmado_at');
     const seleccion = ['anexo_encargo_firmado_at', 'canal_pqrs', 'created_at'];
     if (tieneNube) seleccion.push('anexo_nube_firmado_at');
+    // La huella del Anexo de Nube que la Empresa suscribio. Sin ella no se
+    // puede saber que texto se firmo: la fecha de suscripcion no lo dice, y
+    // una Empresa puede haber suscrito la v1.1 cuando el modelo vigente ya
+    // era otro.
+    const tieneHashNube = columnas.includes('anexo_nube_hash');
+    if (tieneHashNube) seleccion.push('anexo_nube_hash');
+    // 📦1047 · punto 3 La fecha de EJECUCION del Anexo de Nube: la del
+    // SEGUNDO acto (la contrafirma de K+AIR). Es el espejo de
+    // `anexo_encargo_firmado_at`, que para el Anexo de Encargo tambien es la
+    // del segundo acto. Sin esta columna, la comprobacion falla CERRADO.
+    const tieneEjecucion = columnas.includes('anexo_nube_ejecutado_at');
+    if (tieneEjecucion) seleccion.push('anexo_nube_ejecutado_at');
     const filas = dbConn.prepare(
       `SELECT ${seleccion.join(', ')} FROM gh_firma_empresas WHERE activo = 1`,
     ).all();
@@ -340,6 +395,13 @@ function _resumenEmpresas(dbConn) {
       const alta = new Date(String(f.created_at).replace(' ', 'T') + 'Z').getTime();
       return Number.isFinite(anexo) && Number.isFinite(alta) && anexo < alta;
     }).length;
+    // El texto vigente, sea cual sea. La comparacion es por HUELLA: la fecha
+    // de suscripcion no dice que texto se firmo.
+    const esDelTextoVigente = (f) => !!f.anexo_nube_firmado_at
+      && tieneHashNube
+      && _esHashSha256(hashModeloNube)
+      && String(f.anexo_nube_hash || '').trim().toLowerCase()
+        === String(hashModeloNube).trim().toLowerCase();
     return {
       ...base,
       disponible: true,
@@ -348,9 +410,25 @@ function _resumenEmpresas(dbConn) {
       con_anexo_nube: tieneNube
         ? filas.filter((f) => !!f.anexo_nube_firmado_at).length
         : 0,
+      // Las Empresas cuyo Anexo de Nube suscrito es el TEXTO VIGENTE (el
+      // PRIMER acto). Es el mismo criterio que usa
+      // `scripts/preflight-anexo-nube.js`: contar solo la fecha de suscripcion
+      // cuenta Empresas que suscribieron un texto que ya no esta vigente.
+      con_anexo_nube_suscrito_vigente: tieneNube && tieneHashNube && _esHashSha256(hashModeloNube)
+        ? filas.filter(esDelTextoVigente).length
+        : 0,
+      // Las Empresas cuyo Anexo de Nube esta EJECUTADO: suscrito sobre el
+      // texto vigente Y contrafirmado por K+AIR. El Anexo de Nube es
+      // bilateral, y una Empresa que solo suscribio no tiene el instrumento
+      // ejecutado.
+      con_anexo_nube_vigente: tieneNube && tieneHashNube && tieneEjecucion
+        && _esHashSha256(hashModeloNube)
+        ? filas.filter((f) => esDelTextoVigente(f) && !!f.anexo_nube_ejecutado_at).length
+        : 0,
       con_canal_pqrs: filas.filter((f) => !!_texto(f.canal_pqrs)).length,
       fechas_antes_del_alta: antesDelAlta,
       columna_anexo_nube: tieneNube,
+      columna_ejecucion_nube: tieneEjecucion,
       error: null,
     };
   } catch (err) {
@@ -952,6 +1030,53 @@ function _proveedorOk(p) {
     && _texto(p.evidencia);
 }
 
+// 📦1047 · P1 LA ACEPTACION DEL CDPA, CON EL MODO Y SU EVIDENCIA.
+//
+// Un `aceptada: true` con una frase de evidencia NO alcanza: el manifiesto
+// podria decir que el CDPA esta aceptado sin que nadie diga COMO se acepto
+// ni que evidencia lo sostiene. Eso es un verde falso por la via del papel, y
+// el gate lo cierra.
+//
+// Los dos modos, y lo que cada uno tiene que traer:
+//
+//   `incorporado_por_referencia`  el Acuerdo y el CDPA, con su URL, su huella
+//                                 SHA-256, sus bytes y su fecha de descarga; la
+//                                 cuenta a la que se aplican; y la atestado
+//                                 escrita del owner que los vincula.
+//
+//   `aceptado_por_administrador`  la captura del acto, con su archivo, su
+//                                 huella y sus bytes.
+//
+// El manifiesto los escribe `scripts/actualizar-manifiesto-aceptacion-cdpa.js`
+// desde un acta. Esta funcion es la MISMA regla vista desde el gate: si el
+// manifiesto dice algo que el acta no podria haber escrito, el item no pasa.
+const MODOS_ACEPTACION_CDPA = ['aceptado_por_administrador', 'incorporado_por_referencia'];
+
+function _aceptacionCdpaOk(a) {
+  if (!a || a.aceptada !== true) return false;
+  if (!_texto(a.evidencia)) return false;
+  if (MODOS_ACEPTACION_CDPA.indexOf(a.modo) === -1) return false;
+  if (!_fechaValida(a.fecha)) return false;
+
+  if (a.modo === 'aceptado_por_administrador') {
+    const cap = a.captura || {};
+    return !!_texto(cap.archivo)
+      && _esHashSha256(cap.hash)
+      && _numeroPositivo(cap.bytes);
+  }
+
+  const acuerdo = a.acuerdo || {};
+  const cdpa = a.cdpa || {};
+  const textoOficial = (t) => !!_texto(t.url)
+    && _esHashSha256(t.hash)
+    && _numeroPositivo(t.bytes)
+    && _fechaValida(t.descargado);
+  return textoOficial(acuerdo)
+    && textoOficial(cdpa)
+    && !!_texto(a.cuenta)
+    && !!_texto(a.at_testacion);
+}
+
 // =============================================================================
 // Carga de documentos
 // =============================================================================
@@ -978,7 +1103,8 @@ function _cargarDocumentos(opciones = {}) {
     rutas,
     versionAcuerdo: _versionAcuerdoEsperada(datos, rutas.acuerdoV11),
     docNube: _textoDocumento(
-      textos, 'anexoNube', rutas.anexoNube, 'legal/anexo-nube-v1.1.html',
+      textos, 'anexoNube', rutas.anexoNube,
+      'legal/anexo-nube-v' + VERSION_MODELO_NUBE + '.html',
     ),
     docEncargo: _textoDocumento(
       textos, 'anexoEncargo', rutas.anexoEncargo, 'legal/anexo-encargo.html',
@@ -1043,6 +1169,11 @@ function evaluar(opciones = {}) {
   const { manifiesto, datos, docNube, docEncargo, docAcuerdo, versionAcuerdo } = _cargarDocumentos(opciones);
 
   const anNube = analizarAnexoNube(docNube.texto);
+  // La identidad del Anexo de Nube vigente: la version que suscribe el
+  // servicio y la huella REAL del texto que se leyo. Las dos salen de una
+  // sola fuente (el modulo que suscribe y el archivo del disco), nunca de
+  // constantes escritas a mano.
+  const modeloNube = { version: VERSION_MODELO_NUBE, hash: anNube.hash };
   const anEncargo = analizarAnexoEncargo(docEncargo.texto);
   const anAcuerdo = analizarAcuerdo(docAcuerdo.texto, versionAcuerdo);
   const retencion = _codigoRetencion(RUTAS_DEFAULT.retencion);
@@ -1052,7 +1183,7 @@ function evaluar(opciones = {}) {
   const retencionTexto = _textoRetencionV13(docAcuerdo);
   const token = _codigoToken(RUTAS_DEFAULT.signRequest);
 
-  const empresas = _resumenEmpresas(dbConn);
+  const empresas = _resumenEmpresas(dbConn, modeloNube.hash);
   const acuerdoActivo = _acuerdoActivo(dbConn);
   const tablas = {
     medios_trabajador: _tablaExiste(dbConn, 'gh_firma_medios_trabajador'),
@@ -1074,7 +1205,10 @@ function evaluar(opciones = {}) {
   const inf = datos.infraestructura || {};
   const sub = datos.subencargados || {};
   const cf = sub.cloudflare || {};
-  const gg = sub.google || {};
+  // El proveedor de CORREO del servicio. La bloque `subencargados.google` es
+  // el estado ANTERIOR (la cuenta de consumo): no se lee para calificar nada,
+  // y queda como historico con estado "sustituido" en el manifiesto.
+  const mp = sub.mail_provider || {};
   const anexoEncargoMan = datos.anexo_encargo || {};
   const anexoNubeMan = datos.anexo_nube || {};
   const n9a = datos.n9a || {};
@@ -1492,11 +1626,33 @@ function evaluar(opciones = {}) {
   const partesOk = _nitValido(enc.nit)
     && !!_texto(enc.representante_legal)
     && !!_texto(enc.domicilio);
+  // La suscripcion tiene que ser del TEXTO VIGENTE. La fecha de
+  // suscripcion no dice que version se firmo: la huella es la que lo dice.
+  // Sin esta comparacion, publicar la v1.2 dejaba el item en ok citando la
+  // suscripcion de la v1.1 (el falso positivo del hallazgo 3.3 del plan del
+  // 9-nov-2026).
   const firmadoOk = anexoNubeMan.firmado === true
     && _fechaValida(anexoNubeMan.fecha)
     && !!_texto(anexoNubeMan.version)
     && _esHashSha256(anexoNubeMan.hash)
-    && !!_texto(anexoNubeMan.evidencia);
+    && !!_texto(anexoNubeMan.evidencia)
+    && _texto(anexoNubeMan.version) === modeloNube.version
+    && String(anexoNubeMan.hash || '').trim().toLowerCase() === modeloNube.hash;
+  // 📦1047 · punto 3 El Anexo de Nube es BILATERAL (el texto vigente, seccion
+  // 10): lo susceptibility la Empresa y lo contrafirma K+AIR, y el instrumento
+  // solo queda EJECUTADO cuando los dos actos existen. El codigo solo
+  // registraba el primero, asi que el gate podia declarar el Anexo "firmado"
+  // describiendo la mitad del instrumento. Este item mide el SEGUNDO acto por
+  // separado: el detalle dice cual de los dos falta, que son dos cierres
+  // distintos y dos acciones distintas.
+  // El segundo acto esta REGISTRADO: hay fecha, actor y evidencia.
+  const contrafirmaRegistrada = anexoNubeMan.contrafirmado === true
+    && _fechaValida(anexoNubeMan.contrafirma_fecha)
+    && !!_texto(anexoNubeMan.contrafirma_actor)
+    && !!_texto(anexoNubeMan.contrafirma_evidencia);
+  // Y esta COMPLETO: ademas dice con que poder se firmo (P7).
+  const contrafirmadoOk = contrafirmaRegistrada
+    && _facultadContrafirmanteOk(anexoNubeMan.contrafirma_facultad);
   const ubicacionOk = !!_texto(inf.ubicacion_servidor);
   const operacionOk = !!_texto(inf.respaldos)
     && !!_texto(inf.monitoreo)
@@ -1506,34 +1662,39 @@ function evaluar(opciones = {}) {
     && _numeroPositivo(inf.rpo_horas)
     && !!_texto(inf.plan_continuidad);
   const cfOk = _proveedorOk(cf);
-  // 📦956 Una cuenta de Google de CONSUMIDOR no es subencargado: una cuenta
-  // gratuita no tiene Data Processing Addendum, y el envio de correo con
-  // datos personales es una transferencia internacional (art. 26 de la Ley
-  // 1581). Antes el check exigia las clausulas de los DOS subencargados
-  // (`cf && gg`), asi que con una cuenta de consumidor estos tres items no
-  // podian quedar `ok` nunca: el gate no abria por mas que se llenara todo
-  // lo demas. Google cuenta como subencargado solo si la cuenta es
-  // Workspace/Cloud; en ese caso le aplican las mismas clausulas.
+  // 📦1047 El proveedor de CORREO. La cuenta de consumo se sustituyo por una
+  // cuenta de Google Workspace con el Cloud Data Processing Addendum (CDPA)
+  // incorporado al Acuerdo: con ese vinculo, Google interviene como
+  // Subencargado de los datos del servicio de correo.
   //
-  // 📦957 Y con una cuenta de consumidor el item de Google NO puede quedar
-  // ok: el Acuerdo (10.1 y 10.5(f)) condiciona el papel de subencargado al
-  // vinculo por contrato o DPA y prohibe transmitir datos personales a un
-  // proveedor no vinculado. La cuenta de correo de consumo no habilita el
-  // servicio: el item sigue pendiente, pero con el motivo real y las tres
-  // salidas (cuenta Workspace/Cloud con DPA, otro proveedor de correo, o un
-  // otrosi del Acuerdo aprobado por el abogado).
-  const ggCuentaOk = gg.cuenta === 'workspace' || gg.cuenta === 'cloud';
-  const ggEsConsumidor = gg.cuenta === 'consumidor';
-  const ggOk = ggCuentaOk && _proveedorOk(gg);
-  const googleOk = ggOk;
+  // Las carpetas 84 y 85 de PROMPT.md ordenan el error que se corrigio el
+  // 26-oct-2026: un check que exige clausulas a quien no es parte del
+  // contrato es un bloqueo permanente, y un check que valida el estado del
+  // contrato en vez del estado de la parte es un verde falso. Con la cuenta
+  // de Workspace el proveedor ES subencargado, asi que el item tiene que
+  // exigir lo que le corresponde: el vinculo, su vigencia, su aceite de
+  // aceptacion y sus clausulas.
+  const CUENTAS_MAIL_PROVIDER = ['workspace', 'cloud', 'empresarial', 'transaccional'];
+  const mpCuenta = String(mp.cuenta || '').trim().toLowerCase();
+  const mpCuentaOk = CUENTAS_MAIL_PROVIDER.indexOf(mpCuenta) !== -1;
+  const mpRolOk = mp.rol === 'subencargado';
+  // Como se incorpora el CDPA a la cuenta: incorporado por referencia al
+  // Acuerdo, o aceptado por el administrador en la consola. Sin ese dato, el
+  // vinculo no esta verificado y el item no puede quedar ok.
+  const mpAceptacion = mp.aceptacion || {};
+  const mpAceptada = _aceptacionCdpaOk(mpAceptacion);
+  const mpOk = mpCuentaOk && mpRolOk && _proveedorOk(mp) && mpAceptada;
+  // Los dos subencargados son reales y los dos tienen que cumplir sus propias
+  // clausulas. No queda rama de "el de consumo es aceptable": en el servicio
+  // ya no hay una cuenta de consumo.
   const devolucionOk = cf.devolucion_supresion === true
-    && (ggEsConsumidor || (ggCuentaOk && gg.devolucion_supresion === true));
+    && mp.devolucion_supresion === true;
   const auditoriaOk = cf.auditoria === true
-    && (ggEsConsumidor || (ggCuentaOk && gg.auditoria === true));
+    && mp.auditoria === true;
   const exigirNube = cfg.exigirAnexoNube === true;
   const empresasNubeOk = !exigirNube
     ? true
-    : (empresas.total > 0 && empresas.con_anexo_nube === empresas.total);
+    : (empresas.total > 0 && empresas.con_anexo_nube_vigente === empresas.total);
 
   const grupoNube = _grupo('anexo_nube', 'Anexo de Nube y subencargados', [
     _item(
@@ -1543,7 +1704,7 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: _detalleModelo(anNube),
-        accion: 'Revisar el texto vigente del Anexo de Nube (la v1.1, susceptible de suscripción). Los tres campos de la Empresa los llena cada Empresa en la copia que firma: no se diligencian en el modelo.',
+        accion: 'Revisar el texto vigente del Anexo de Nube (la v' + modeloNube.version + ', susceptible de suscripción). Los tres campos de la Empresa los llena cada Empresa en la copia que firma: no se diligencian en el modelo.',
         referencia: docNube.archivo,
       },
     ),
@@ -1562,15 +1723,44 @@ function evaluar(opciones = {}) {
     ),
     _item(
       'firmado_nube',
-      'Anexo de Nube firmado, con versión y hash',
+      'Anexo de Nube suscrito por la Empresa, con versión y hash',
       _estado(firmadoOk),
       {
         bloquea: GATE_PRIMERA,
+        // El detalle dice POR QUE no esta. "Falta el Anexo firmado" es
+        // verdad a medias cuando lo que falta es la RE-suscripcion del texto
+        // vigente: son dos cosas distintas y la Empresa tiene que hacer
+        // una sola.
         detalle: firmadoOk
-          ? 'Anexo firmado con fecha, versión, hash y evidencia.'
-          : 'Falta el Anexo de Nube firmado o su evidencia (fecha, versión, hash).',
-        accion: 'Firmar el Anexo de Nube y registrar la evidencia en el manifiesto.',
+          ? `Anexo suscrito con fecha, versión, hash y evidencia, sobre el texto vigente (v${modeloNube.version}).`
+          : (anexoNubeMan.firmado !== true
+            ? `El Anexo de Nube vigente (v${modeloNube.version}) no está suscrito todavía: la Empresa tiene que suscribirlo.`
+            : `La suscripción es de la v${_texto(anexoNubeMan.version) || '?'} y el texto vigente es la v${modeloNube.version}: la Empresa tiene que volver a suscribir el texto vigente.`),
+        accion: 'Suscribir el Anexo de Nube del texto vigente (v' + modeloNube.version
+          + ') por el enlace de un solo uso y registrar la evidencia en el manifiesto.',
         referencia: 'legal-readiness.json → anexo_nube',
+      },
+    ),
+    _item(
+      'contrafirma_nube',
+      'Anexo de Nube contrafirmado por K+AIR (segundo acto del instrumento bilateral)',
+      _estado(contrafirmadoOk),
+      {
+        bloquea: GATE_PRIMERA,
+        // El Anexo de Nube se suscribe por AMBAS partes (texto vigente,
+        // seccion 10). Este item mide el segundo acto: sin el, el Anexo esta
+        // suscrito pero NO ejecutado. Decir "falta el Anexo firmado" cuando lo
+        // que falta es la contrafirma de K+AIR manda a la Empresa a hacer un
+        // acto que ya hizo.
+        detalle: contrafirmadoOk
+          ? `Contrafirma de K+AIR registrada el ${anexoNubeMan.contrafirma_fecha} por ${anexoNubeMan.contrafirma_actor}, con su evidencia y con la facultad acreditada (${anexoNubeMan.contrafirma_facultad.resultado}).`
+          : (contrafirmaRegistrada
+            ? `La contrafirma de K+AIR está registrada (el ${anexoNubeMan.contrafirma_fecha}, por ${anexoNubeMan.contrafirma_actor}) pero NO tiene acreditada la facultad de quien la hizo: la ejecución por una persona distinta del representante legal de Gesstiar S.A.S. exige acreditarla y conservarla en el expediente, y sin eso el segundo acto no describe el instrumento entero.`
+            : (firmadoOk
+              ? `La Empresa suscribió el texto vigente (v${modeloNube.version}), pero falta el segundo acto: la contrafirma de K+AIR. El Anexo de Nube no está EJECUTADO mientras no exista.`
+              : `Faltan los dos actos: la suscripción de la Empresa al texto vigente (v${modeloNube.version}) y la contrafirma de K+AIR.`)),
+        accion: 'Registrar la contrafirma de K+AIR sobre la suscripción vigente del Anexo de Nube, con su actor, su motivo, la huella de su acta y la acreditación de la facultad de quien contrafirma.',
+        referencia: 'legal-readiness.json → anexo_nube.contrafirmado',
       },
     ),
     _item(
@@ -1639,56 +1829,56 @@ function evaluar(opciones = {}) {
       },
     ),
     _item(
-      'google_dpa',
-      'Vínculo con Google: DPA, o transferencia internacional documentada',
-      _estado(googleOk),
+      'mail_provider_dpa',
+      'Proveedor de correo: vinculo contractual y DPA vigentes',
+      _estado(mpOk),
       {
         bloquea: GATE_PRIMERA,
-        detalle: ggEsConsumidor
-          ? 'La cuenta es de consumidor: no hay DPA y Google NO actúa como subencargado. '
-            + 'En la operación concreta, Google es Responsable del dato y el envío es una '
-            + 'TRANSFERENCIA INTERNACIONAL a Estados Unidos, un país con nivel adecuado de '
-            + 'protección (numeral 3.2 del Título V de la Circular Única de la SIC). La '
-            + 'base de la transferencia es ese nivel adecuado, NO la autorización expresa '
-            + 'del Titular: esa es la excepción del artículo 26 de la Ley 1581 de 2012 para '
-            + 'cuando el destino NO tiene nivel adecuado. Lo que falta es documentarla: el '
-            + 'papel de Google escrito en el expediente, las medidas de seguridad '
-            + 'demostradas, la validación conforme a la Circular 2 de 2025 y la declaración '
-            + 'de la transferencia en el RNBD.'
-          : (ggOk
-            ? 'DPA de Google con cuenta Workspace/Cloud y evidencia.'
-            : (ggCuentaOk
-              ? 'Falta el DPA de Google o alguna de sus cláusulas (devolución/supresión o auditoría).'
-              : 'Falta declarar el tipo de cuenta de Google (Workspace/Cloud o de consumidor).')),
-        // POR QUE la version sale del manifiesto y no esta escrita aqui
-        // -----------------------------------------------------------
-        // Esta accion vivio con el texto "La v1.2 del Acuerdo es la que
-        // sostiene ese regimen" desde el 27-oct-2026. La v1.2 ya no es
-        // candidata: esta superada por la v1.3, la v1.4 y la v1.5, y su
-        // texto ni siquiera esta en el repo (esta en el .gitignore, a la
-        // espera del abogado). El gate seguia mandando a buscar la
-        // aprobacion de una version muerta, y de paso CONTRADECIA al
-        // manifiesto, que ya declara la determinacion del papel de Google
-        // por operacion (punto J6 del abogado, 30-oct-2026) y sus tres
-        // pendientes externos.
-        //
-        // La version que se nombra sale de `versionAcuerdo`, que se deriva
-        // del manifiesto (y, si el manifiesto no la declara, del nombre del
-        // archivo). Un texto que compara contra una constante no comprueba
-        // el documento: comprueba la constante. Cuando el owner publique
-        // la v1.6, esta accion la nombra sola.
-        accion: ggEsConsumidor
-          ? 'Documentar la transferencia en el expediente (el Anexo de Nube ya declara el '
-            + 'papel de Google como Responsable y la base del nivel adecuado): demostrar '
-            + 'las medidas de seguridad que la Empresa ha implementado, validar con la '
-            + 'Circular 2 de 2025 y declarar la transferencia en el RNBD a cargo de la '
-            + 'Empresa, junto con la política de tratamiento que informa al Titular. El '
-            + 'papel de Google por operación ya está determinado por escrito (punto J6 '
-            + 'del abogado, 30-oct-2026) y lo sostiene la versión vigente del Acuerdo '
-            + `(${versionAcuerdo}): lo que falta es la evidencia externa, no la `
-            + 'calificación.'
-          : 'Usar una cuenta Workspace/Cloud con DPA, o documentar la transferencia y la autorización.',
-        referencia: 'legal-readiness.json → subencargados.google',
+        // El detalle dice POR QUE no esta, y la accion dice COMO se
+        // resuelve: un pendiente que no dice como se cierra es una pared.
+        detalle: mpOk
+          ? 'Proveedor de correo con cuenta '
+            + mpCuenta
+            + ', rol de subencargado y CDPA vigente: version, fecha, devolucion/supresion, '
+            + 'auditoria y evidencia de la aceptacion por la cuenta.'
+          : (!mpCuentaOk
+            ? 'Falta declarar el tipo de cuenta del proveedor de correo (workspace, cloud, '
+              + 'empresarial o transaccional).'
+            : (!mpRolOk
+              ? 'El papel del proveedor de correo no queda declarado como subencargado '
+                + 'mientras el CDPA este vigente y aplicable a la cuenta.'
+              : (!mpAceptada
+                ? 'Falta la evidencia de que la cuenta tiene el CDPA incorporado por '
+                  + 'referencia al Acuerdo, o aceptado por el administrador en la consola '
+                  + '(la fecha de efectividad del Addendum).'
+                : (mp.dpa !== true
+                  ? 'El CDPA del proveedor de correo no esta declarado.'
+                  : 'Faltan las clausulas de devolucion/supresion o de auditoria del CDPA '
+                    + 'del proveedor de correo.')))),
+        accion: 'Usar una cuenta de Google Workspace con el CDPA incorporado al Acuerdo, '
+          + 'o aceptado por el administrador en la consola; registrar el instrumento, su '
+          + 'fecha de vigencia, la huella SHA-256 del texto descargado, la fecha de '
+          + 'efectividad del Addendum y la evidencia de la aceptacion. El registro lo '
+          + 'escribe scripts/actualizar-manifiesto-aceptacion-cdpa.js desde un acta: el '
+          + 'item exige el MODO de la aceptacion (incorporado_por_referencia o '
+          + 'aceptado_por_administrador), su fecha y la evidencia de ese modo.',
+        referencia: 'legal-readiness.json → subencargados.mail_provider',
+      },
+    ),
+    _item(
+      'google_dpa',
+      'Ítem legado: el vinculo con Google bajo la cuenta de consumo',
+      ESTADOS.NO_APLICA,
+      {
+        // NO se marca OK: un item que ya no aplica no es un item cumplido.
+        // Marcarlo en ok seria un verde falso, y dejarlo pendiente seria un
+        // bloqueo permanente. Se queda en no_aplica, con el motivo y el
+        // puntero al item que lo sustituye.
+        bloquea: [],
+        detalle: 'No aplica al estado anterior: la cuenta de consumo se sustituyo por '
+          + 'Google Workspace con DPA. Ver mail_provider_dpa.',
+        accion: '',
+        referencia: 'legal-readiness.json → subencargados.mail_provider',
       },
     ),
     _item(
@@ -1698,10 +1888,8 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: devolucionOk
-          ? (ggEsConsumidor
-            ? 'Cloudflare acepta devolución y supresión; Google no es subencargado en una cuenta de consumidor.'
-            : 'Cloudflare y Google aceptan devolución y supresión.')
-          : 'Falta la cláusula de devolución/supresión en Cloudflare o Google.',
+          ? 'Cloudflare y el proveedor de correo aceptan devolucion y supresion.'
+          : 'Falta la clausula de devolucion/supresion en Cloudflare o en el proveedor de correo.',
         accion: 'Verificar y documentar la devolución/supresión en los DPAs de los subencargados.',
         referencia: 'legal-readiness.json → subencargados',
       },
@@ -1713,10 +1901,8 @@ function evaluar(opciones = {}) {
       {
         bloquea: GATE_PRIMERA,
         detalle: auditoriaOk
-          ? (ggEsConsumidor
-            ? 'Cloudflare permite auditoría; Google no es subencargado en una cuenta de consumidor.'
-            : 'Cloudflare y Google permiten auditoría.')
-          : 'Falta la cláusula de auditoría en Cloudflare o Google.',
+          ? 'Cloudflare y el proveedor de correo permiten auditoria.'
+          : 'Falta la clausula de auditoria en Cloudflare o en el proveedor de correo.',
         accion: 'Verificar y documentar la auditoría en los DPAs de los subencargados.',
         referencia: 'legal-readiness.json → subencargados',
       },
@@ -1736,9 +1922,12 @@ function evaluar(opciones = {}) {
           : (empresas.total === 0
             ? 'No hay empresas activas: no hay primera firma posible.'
             : (empresasNubeOk
-              ? 'Todas las empresas activas tienen Anexo de Nube registrado.'
-              : `${empresas.total - empresas.con_anexo_nube} empresa(s) no tienen Anexo de Nube registrado.`)),
-        accion: 'Registrar el Anexo de Nube firmado por cada empresa antes de la primera firma.',
+              ? `Todas las empresas activas tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) EJECUTADO: suscrito y contrafirmado.`
+              : (empresas.con_anexo_nube_suscrito_vigente > 0
+                ? `${empresas.con_anexo_nube_suscrito_vigente} empresa(s) tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) suscrito, pero sin la contrafirma de K+AIR: el instrumento no está EJECUTADO.`
+                : `${empresas.total - empresas.con_anexo_nube_vigente} empresa(s) no tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) registrado.`))),
+        accion: 'Registrar el Anexo de Nube del texto vigente (v' + modeloNube.version
+          + ') firmado por cada empresa antes de la primera firma.',
         referencia: 'gh_firma_empresas.anexo_nube_firmado_at',
       },
     ),
@@ -1748,9 +1937,24 @@ function evaluar(opciones = {}) {
   // 8. Anexo de Encargo
   // -------------------------------------------------------------------------
   const estadoEncargo = _texto(anexoEncargoMan.estado) || 'desconocido';
+  // La firma tiene que ser del TEXTO VIGENTE. El manifiesto declara el
+  // hash del archivo que el servidor lee (es lo que exige
+  // `modeloVigente()` en `services/anexoEncargo.js`); si el manifiesto
+  // dice "firmado" sobre una huella que no es la del archivo, hay dos
+  // textos y una sola firma no los describe a los dos. Es el mismo falso
+  // positivo del hallazgo 3.3 del plan del 9-nov-2026, aplicado al otro
+  // instrumento.
+  const encargoHashOk = _esHashSha256(anexoEncargoMan.hash)
+    && String(anexoEncargoMan.hash || '').trim().toLowerCase() === anEncargo.hash;
+  // 📦1047 · punto 3 · P7 La facultad acreditada de quien contrafirma POR
+  // GESSTIAR: sin ella, el segundo acto no dice con que poder se firmo. El
+  // item no puede quedar ok sin ese dato.
+  const encargoFacultadOk = _facultadContrafirmanteOk(anexoEncargoMan.contrafirma_facultad);
   const encargoFirmadoOk = estadoEncargo === 'firmado'
     && _fechaValida(anexoEncargoMan.fecha)
-    && !!_texto(anexoEncargoMan.evidencia);
+    && !!_texto(anexoEncargoMan.evidencia)
+    && encargoHashOk
+    && encargoFacultadOk;
   const encargoEstadoOk = encargoFirmadoOk;
   const encargoDocumentoOk = anEncargo.clausulasOk;
   // Una fecha no nula en la ficha NO es evidencia por si sola: puede ser una
@@ -1795,13 +1999,25 @@ function evaluar(opciones = {}) {
         bloquea: GATE_PRIMERA,
         detalle: estadoEncargo === 'firmado'
           ? (encargoFirmadoOk
-            ? 'Firmado con fecha y evidencia.'
-            : 'Está marcado como firmado, pero falta la fecha o la evidencia.')
+            ? 'Firmado con fecha y evidencia, sobre el texto vigente, con la facultad de quien contrafirma acreditada.'
+            : (!encargoHashOk
+              ? 'Está marcado como firmado, pero la huella declarada no es la del texto '
+                + 'vigente: hay que volver a suscribir el texto vigente.'
+              : (!encargoFacultadOk
+                ? 'Está marcado como firmado, pero NO tiene acreditada la facultad de quien '
+                  + 'contrafirmó por Gesstiar: la ejecución por una persona distinta del '
+                  + 'representante legal de Gesstiar S.A.S. exige acreditarla y conservarla '
+                  + 'en el expediente.'
+                : 'Está marcado como firmado, pero falta la fecha o la evidencia.')))
           : (estadoEncargo === 'no_firmado'
-            ? 'No está firmado.'
+            ? 'El texto vigente del Anexo de Encargo no está suscrito: la Empresa tiene que '
+              + 'suscribirlo y K+AIR contrafirmarlo.'
             : 'El estado es desconocido.'),
         accion: estadoEncargo === 'firmado'
-          ? 'Adjuntar la fecha y la evidencia del Anexo firmado.'
+          ? (encargoHashOk
+            ? 'Adjuntar la fecha y la evidencia del Anexo firmado.'
+            : 'Volver a suscribir el texto vigente del Anexo de Encargo y registrar su '
+              + 'fecha, su huella y su evidencia.')
           : 'Resolver el estado real: firmar el Anexo de Encargo vigente (el que incorpora '
             + 'el Anexo de Nube) y registrar la fecha y la evidencia en el manifiesto.',
         referencia: 'legal-readiness.json → anexo_encargo',
@@ -1990,6 +2206,7 @@ function evaluar(opciones = {}) {
       anexo_nube: {
         archivo: docNube.archivo,
         existe: anNube.existe,
+        version: modeloNube.version,
         hash: anNube.hash,
         placeholders: anNube.placeholders,
         marcadores: anNube.marcadores,

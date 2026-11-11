@@ -128,10 +128,16 @@ test('panel · el CSS tiene el modo embebido', function () {
     'y el contenido embebido es de flujo');
 });
 
-test('panel · el token del ?v= del panel no cambio (mismo archivo, misma version)', function () {
-  // 📦1042 no toco el panel en si: el ?v= sigue siendo el de 📦1038/1039.
-  // Si alguien lo cambia, es porque cambio el archivo, y eso se ve en el diff.
+test('panel · el token del ?v= del panel no retrocede (mismo archivo, version mas nueva)', function () {
+  // 📦1042 no toco el panel en si: el ?v= era el de 📦1038/1039.
+  // 📦1047 SI lo toco (el estado del Anexo de Nube), asi que el token sube.
+  // Lo que importa NO es el texto del sello (PROMPT.md, trampa 28: un check
+  // que fija el literal se rompe en el proximo bumpeo, y su mutacion queda
+  // vacia sin avisar), sino que el token NO retroceda a uno anterior.
   const m = srcConfig.match(/firma-operador\/index\.js\?v=([^\s"']+)/);
   assert.ok(m, 'el panel se carga con su ?v=');
-  assert.equal(m[1], 'GH-20261107-anexos-operador');
+  const fecha = /(\d{8})/.exec(m[1]);
+  assert.ok(fecha, 'el token tiene que traer la fecha del paquete: ' + m[1]);
+  assert.ok(Number(fecha[1]) >= 20261107,
+    'el token del panel no puede retrocede a uno anterior al de 20261107: ' + m[1]);
 });

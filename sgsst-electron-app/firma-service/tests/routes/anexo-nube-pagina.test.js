@@ -147,7 +147,7 @@ test('la dirección que declara el script de la pantalla existe en el servicio',
 
   assert.equal(res.status, 200,
     `la pantalla pide ${base}<token> y esa ruta tiene que existir en el servicio`);
-  assert.equal(res.body.version, '1.1');
+  assert.equal(res.body.version, anexoNube.VERSION_MODELO);
   assert.equal(res.body.empresa, RAZON_SOCIAL);
   assert.equal(res.body.vigente, true,
     'el texto que la Empresa va a ver tiene que ser el vigente');

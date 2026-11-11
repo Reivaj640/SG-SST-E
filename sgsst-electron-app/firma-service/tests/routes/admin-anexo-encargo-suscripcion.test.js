@@ -29,6 +29,7 @@ const request = require('supertest');
 const db = require('../../src/db/connection');
 const empresaService = require('../../src/services/empresa');
 const mailer = require('../../src/services/mailer');
+const anexoEncargo = require('../../src/services/anexoEncargo');
 const {
   resetDb, makeApp, TEST_ADMIN_API_KEY,
 } = require('../helpers');
@@ -118,7 +119,10 @@ test('la ruta abre la suscripción y devuelve el enlace, la versión y la huella
   assert.equal(res.status, 201);
   assert.ok(res.body.token, 'la ruta tiene que devolver el enlace en claro');
   assert.match(res.body.url, /\/anexo-encargo\//, 'el enlace tiene que apuntar a la pantalla');
-  assert.equal(res.body.version, '2026-11-06', 'la versión sale del manifiesto');
+  // La version sale del manifiesto, que a su vez declara el texto vigente: no
+  // se fija una constante escrita a mano (PROMPT.md, trampa 138).
+  assert.equal(res.body.version, anexoEncargo.modeloVigente().version,
+    'la versión sale del manifiesto');
   assert.match(res.body.hash, /^[0-9a-f]{64}$/, 'la huella sale del manifiesto');
   assert.equal(res.body.datos_empresa.razon_social, RAZON_SOCIAL,
     'el prellenado del §11 tiene que salir de la ficha');

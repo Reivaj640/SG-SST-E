@@ -62,8 +62,10 @@ function sembrarSuscripcionEncargo(id_empresa, extra = {}) {
        canal_codigo, firmado_at, contrafirmado_at,
        representante_verificacion, representante_verificado_at,
        contrafirma_canal, evidencia, contrafirma_acta_archivo,
-       contrafirma_acta_hash, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       contrafirma_acta_hash, creado_por,
+       contrafirma_actor, contrafirma_motivo, contrafirma_evidencia)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?)
   `).run(
     id_empresa,
     extra.token_hash || `token-hash-${id_empresa}-${Date.now()}-${Math.random()}`,
@@ -94,6 +96,9 @@ function sembrarSuscripcionEncargo(id_empresa, extra = {}) {
     extra.contrafirma_acta_hash !== undefined
       ? extra.contrafirma_acta_hash : null,
     extra.creado_por !== undefined ? extra.creado_por : 'admin',
+    extra.contrafirma_actor !== undefined ? extra.contrafirma_actor : null,
+    extra.contrafirma_motivo !== undefined ? extra.contrafirma_motivo : null,
+    extra.contrafirma_evidencia !== undefined ? extra.contrafirma_evidencia : null,
   );
   return info.lastInsertRowid;
 }
@@ -110,8 +115,12 @@ function sembrarSuscripcionNube(id_empresa, extra = {}) {
     INSERT INTO gh_firma_anexo_nube_suscripciones
       (id_empresa, token_hash, version, hash_texto, correo_firmante,
        nombre_firmante, cargo_firmante, estado, expira_enlace_at,
-       firmado_at, evidencia, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       firmado_at, evidencia, creado_por,
+       contrafirmado_at, contrafirma_actor, contrafirma_motivo,
+       contrafirma_canal, contrafirma_estado, contrafirma_evidencia,
+       contrafirma_acta_archivo, contrafirma_acta_hash, contrafirma_acta_bytes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id_empresa,
     extra.token_hash || `token-nube-${id_empresa}-${Date.now()}-${Math.random()}`,
@@ -129,6 +138,21 @@ function sembrarSuscripcionNube(id_empresa, extra = {}) {
     extra.firmado_at !== undefined ? extra.firmado_at : '2026-11-07T10:00:00.000Z',
     extra.evidencia !== undefined ? extra.evidencia : null,
     extra.creado_por !== undefined ? extra.creado_por : 'admin',
+    // El SEGUNDO ACTO. Vienen en `null` por defecto: una suscripcion sin
+    // contrafirmar es el caso normal de una Empresa que todavia no ha
+    // contrafirmado.
+    extra.contrafirmado_at !== undefined ? extra.contrafirmado_at : null,
+    extra.contrafirma_actor !== undefined ? extra.contrafirma_actor : null,
+    extra.contrafirma_motivo !== undefined ? extra.contrafirma_motivo : null,
+    extra.contrafirma_canal !== undefined ? extra.contrafirma_canal : null,
+    extra.contrafirma_estado !== undefined ? extra.contrafirma_estado : null,
+    extra.contrafirma_evidencia !== undefined ? extra.contrafirma_evidencia : null,
+    extra.contrafirma_acta_archivo !== undefined
+      ? extra.contrafirma_acta_archivo : null,
+    extra.contrafirma_acta_hash !== undefined
+      ? extra.contrafirma_acta_hash : null,
+    extra.contrafirma_acta_bytes !== undefined
+      ? extra.contrafirma_acta_bytes : null,
   );
   return info.lastInsertRowid;
 }
@@ -272,6 +296,55 @@ test('la lectura devuelve la suscripcion del anexo de encargo y sus eventos', as
   }
 });
 
+test('la lectura del anexo de encargo trae la acreditacion de la facultad de quien contrafirmo', async () => {
+  // 📦1047 · P7 (10-nov-2026). El panel del operador muestra "Facultad
+  // acreditada" en las DOS vistas (Anexo de Encargo y Anexo de Nube). Para
+  // eso la lectura tiene que traer la EVIDENCIA del segundo acto, que es
+  // donde vive el bloque `facultad`.
+  //
+  // Sin esto el panel del Encargo mostraba SIEMPRE "NO DECLARADA", incluso
+  // con la contrafirma hecha y con la facultad acreditada en el expediente:
+  // un falso negativo en la pantalla, que hace creer que falta lo que ya
+  // esta.
+  resetDb();
+  const idSuscripcion = sembrarSuscripcionEncargo(ID_EMPRESA, {
+    contrafirmado_at: '2026-11-09T12:00:00.000Z',
+    contrafirma_actor: 'Javier Robles Fontalvo',
+    contrafirma_motivo: 'Cierre del Anexo de Encargo',
+    contrafirma_evidencia: JSON.stringify({
+      fase: 2,
+      verificacion_firmante: { resultado: 'REPRESENTANTE_LEGAL_COINCIDE' },
+      facultad: {
+        resultado: 'REPRESENTANTE_LEGAL_ENCARGADO',
+        nombre: 'Javier Robles Fontalvo',
+        cargo: 'Representante Legal',
+        tipo: 'REPRESENTACION',
+        instrumento_ref: 'Representante legal declarado en el manifiesto legal',
+      },
+    }),
+  });
+  sembrarEventoEncargo(idSuscripcion, ID_EMPRESA, 'CONTRAFIRMA_FACULTAD_VERIFICADA',
+    'resultado=REPRESENTANTE_LEGAL_ENCARGADO');
+
+  const res = await request(makeApp())
+    .get(`/internal/admin/empresas/${ID_EMPRESA}/anexos`)
+    .set(ADMIN);
+
+  assert.equal(res.status, 200);
+  const s = res.body.anexo_encargo.suscripcion;
+  assert.equal(s.contrafirmado_at, '2026-11-09T12:00:00.000Z');
+  assert.equal(s.contrafirma_actor, 'Javier Robles Fontalvo');
+  assert.equal(s.contrafirma_motivo, 'Cierre del Anexo de Encargo');
+  // La evidencia sale PARSEADA (es una columna JSON en texto): si saliera
+  // como texto, el panel leeria `evidencia.facultad` sobre una cadena y
+  // nunca encontraria la facultad.
+  assert.equal(typeof s.contrafirma_evidencia, 'object');
+  assert.ok(s.contrafirma_evidencia, 'la evidencia tiene que estar');
+  assert.equal(s.contrafirma_evidencia.fase, 2);
+  assert.equal(s.contrafirma_evidencia.facultad.resultado, 'REPRESENTANTE_LEGAL_ENCARGADO');
+  assert.equal(s.contrafirma_evidencia.facultad.nombre, 'Javier Robles Fontalvo');
+});
+
 test('la lectura devuelve la suscripcion del anexo de nube y sus eventos', async () => {
   resetDb();
   const idSuscripcion = sembrarSuscripcionNube(ID_EMPRESA, {
@@ -297,8 +370,10 @@ test('la lectura devuelve la suscripcion del anexo de nube y sus eventos', async
   assert.equal(s.hash, 'e'.repeat(64));
   assert.equal(s.firmado_at, '2026-11-07T10:00:00.000Z');
 
-  // El Anexo de Nube no tiene contrafirma ni canal de codigo: esos campos
-  // van en null para que el panel los lea con la misma forma.
+  // El Anexo de Nube NO tiene segundo canal del codigo de la SUSCRIPCION
+  // (ese va al correo del firmante) ni verificacion documental: esos campos
+  // van en null para que el panel lea los dos anexos con la misma forma.
+  // El SEGUNDO ACTO, en cambio, si existe: se lee de la fila.
   assert.equal(s.canal_codigo, null);
   assert.equal(s.contrafirmado_at, null);
   assert.equal(s.representante_verificacion, null);
@@ -457,7 +532,126 @@ test('un texto JSON que no parsea se devuelve como null, sin reventar', async ()
 });
 
 // ===========================================================================
-// 7. UNA EMPRESA CON NIT INVALIDO
+// 8. EL SEGUNDO ACTO DEL ANEXO DE NUBE
+// ===========================================================================
+//
+// 📦1047 · punto 3 El Anexo de Nube es BILATERAL (el texto vigente, §10): lo
+// suscribe la Empresa (fase 1) y lo contrafirma K+AIR (fase 2). Antes la
+// lectura devolvia `null` en todos los campos de la fase 2 y el comentario
+// decia que "el Anexo de Nube NO es bilateral": era verdad el dia anterior y
+// paso a ser mentira sin que nadie lo tocara. Estos tests fijan que la
+// lectura devuelve el segundo acto REAL.
+
+test('la suscripcion del anexo de nube trae el segundo acto cuando existe', async () => {
+  resetDb();
+  const idSuscripcion = sembrarSuscripcionNube(ID_EMPRESA, {
+    estado: 'FIRMADA',
+    version: '1.2',
+    hash_texto: 'c'.repeat(64),
+    firmado_at: '2026-11-09T10:00:00.000Z',
+    contrafirmado_at: '2026-11-09T15:30:00.000Z',
+    contrafirma_actor: 'admin:operador',
+    contrafirma_motivo: 'Contrafirma sobre el texto vigente',
+    contrafirma_canal: CANAL_CONTRAFIRMA,
+    contrafirma_estado: 'CONTRAFIRMADA',
+    contrafirma_evidencia: JSON.stringify({ fase: 2, fuente: 'contrafirma_kair' }),
+    contrafirma_acta_archivo: 'acta-1-contrafirma-anexo-nube.pdf',
+    contrafirma_acta_hash: 'd'.repeat(64),
+    contrafirma_acta_bytes: 19804,
+  });
+  sembrarEventoNube(idSuscripcion, ID_EMPRESA, 'CONTRAFIRMA_CODIGO_ENVIADO', 'intento=1');
+  sembrarEventoNube(idSuscripcion, ID_EMPRESA, 'CONTRAFIRMA_FIRMADA', null);
+
+  const res = await request(makeApp())
+    .get(`/internal/admin/empresas/${ID_EMPRESA}/anexos`)
+    .set(ADMIN);
+
+  assert.equal(res.status, 200);
+  const s = res.body.anexo_nube.suscripcion;
+  assert.ok(s, 'la suscripcion tiene que estar');
+
+  // EL SEGUNDO ACTO: sale de la fila, no en null fijo.
+  assert.equal(s.contrafirmado_at, '2026-11-09T15:30:00.000Z',
+    'la contrafirma tiene que LEERSE: el operador no puede ver un null en un acto que ya ocurrio');
+  assert.equal(s.contrafirma_actor, 'admin:operador');
+  assert.equal(s.contrafirma_motivo, 'Contrafirma sobre el texto vigente');
+  assert.equal(s.contrafirma_estado, 'CONTRAFIRMADA');
+  assert.equal(s.contrafirma_acta_archivo, 'acta-1-contrafirma-anexo-nube.pdf');
+  assert.equal(s.contrafirma_acta_hash, 'd'.repeat(64));
+  assert.equal(s.contrafirma_acta_bytes, 19804);
+  assert.equal(typeof s.contrafirma_evidencia, 'object');
+  assert.equal(s.contrafirma_evidencia.fase, 2);
+
+  // Y el estado de la fase 1 NO se mueve: sigue siendo el de la suscripcion.
+  assert.equal(s.estado, 'FIRMADA',
+    'el estado es el de la FASE 1: la suscripcion sigue firmada');
+  assert.equal(s.firmado_at, '2026-11-09T10:00:00.000Z');
+});
+
+test('el canal de la contrafirma del anexo de nube va enmascarado', async () => {
+  resetDb();
+  const idSuscripcion = sembrarSuscripcionNube(ID_EMPRESA, {
+    contrafirmado_at: '2026-11-09T15:30:00.000Z',
+    contrafirma_canal: CANAL_CONTRAFIRMA,
+  });
+  sembrarEventoNube(idSuscripcion, ID_EMPRESA, 'CONTRAFIRMA_CODIGO_ENVIADO', null);
+
+  const res = await request(makeApp())
+    .get(`/internal/admin/empresas/${ID_EMPRESA}/anexos`)
+    .set(ADMIN);
+
+  assert.equal(res.status, 200);
+  const canal = res.body.anexo_nube.suscripcion.contrafirma_canal;
+  assert.equal(typeof canal, 'string');
+  assert.notEqual(canal, CANAL_CONTRAFIRMA,
+    'el buzon de K+AIR no puede salir entero');
+  assert.match(canal, /\*\*\*/, 'el correo enmascarado lleva los asteriscos');
+  assert.ok(!JSON.stringify(res.body).includes(CANAL_CONTRAFIRMA));
+});
+
+test('la suscripcion del anexo de nube no trae la huella del codigo de contrafirma', async () => {
+  resetDb();
+  const idSuscripcion = sembrarSuscripcionNube(ID_EMPRESA, {
+    contrafirmado_at: '2026-11-09T15:30:00.000Z',
+  });
+  const hashOtp = '7'.repeat(64);
+  db.prepare(`
+    UPDATE gh_firma_anexo_nube_suscripciones
+    SET contrafirma_otp_hash = ? WHERE id = ?
+  `).run(hashOtp, idSuscripcion);
+
+  const res = await request(makeApp())
+    .get(`/internal/admin/empresas/${ID_EMPRESA}/anexos`)
+    .set(ADMIN);
+
+  assert.equal(res.status, 200);
+  const claves = Object.keys(res.body.anexo_nube.suscripcion);
+  assert.ok(!claves.includes('contrafirma_otp_hash'),
+    'la huella del codigo no puede salir en la lectura');
+  assert.ok(!JSON.stringify(res.body).includes(hashOtp));
+});
+
+test('una suscripcion sin contrafirmar sigue con el segundo acto en null', async () => {
+  resetDb();
+  const idSuscripcion = sembrarSuscripcionNube(ID_EMPRESA, { estado: 'FIRMADA' });
+  sembrarEventoNube(idSuscripcion, ID_EMPRESA, 'SUSCRIPCION_FIRMADA', null);
+
+  const res = await request(makeApp())
+    .get(`/internal/admin/empresas/${ID_EMPRESA}/anexos`)
+    .set(ADMIN);
+
+  assert.equal(res.status, 200);
+  const s = res.body.anexo_nube.suscripcion;
+  assert.equal(s.contrafirmado_at, null,
+    'sin contrafirma el segundo acto no existe: y se dice');
+  assert.equal(s.contrafirma_actor, null);
+  assert.equal(s.contrafirma_motivo, null);
+  assert.equal(s.contrafirma_estado, null);
+  assert.equal(s.contrafirma_acta_hash, null);
+});
+
+// ===========================================================================
+// 9. UNA EMPRESA CON NIT INVALIDO
 // ===========================================================================
 
 test('un id de empresa invalido se rechaza con 400', async () => {

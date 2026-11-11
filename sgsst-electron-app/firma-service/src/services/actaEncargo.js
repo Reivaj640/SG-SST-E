@@ -616,6 +616,8 @@ function nombreActaContrafirma(id_suscripcion) {
  * @param {string} [datos.user_agent]
  * @param {object} [datos.verificacion_representante] - la verificación
  *   documental: { tipo_documento, referencia, verificado_por, verificado_at }.
+ * @param {object} [datos.facultad_contrafirmante] - la facultad acreditada de
+ *   quien contrafirma por Gesstiar (P7, 10-nov-2026).
  * @param {object} [datos.datos_empresa] - los cinco datos del §11.
  * @returns {Promise<{buffer: Buffer, hash: string, bytes: number, filename: string}>}
  */
@@ -706,8 +708,34 @@ async function generarActaContrafirma(datos) {
     + 'contrafirma. Es la respuesta al punto que el abogado señaló sobre quién es el '
     + 'representante que suscribe.', { size: 8.5, lh: 11 });
 
-  // ─── 5. Los cinco datos del §11 ───────────────────────────────────────────
-  c.seccion('5. Los cinco datos del parrafo 11 declarados por la Empresa');
+  // ─── 5. La facultad de quien contrafirma por K+AIR ─────────────────────────
+  c.seccion('5. La facultad de quien contrafirma por K+AIR');
+  const fac = d.facultad_contrafirmante || null;
+  if (fac) {
+    c.dato('Quién contrafirma', _texto(fac.nombre, 200), { bold: true });
+    c.dato('Cargo', _texto(fac.cargo, 200));
+    c.dato('Con qué facultad', fac.resultado === 'REPRESENTANTE_LEGAL_ENCARGADO'
+      ? 'Representante legal de Gesstiar S.A.S.'
+      : `Poder acreditado (${_texto(fac.tipo, 40)})`);
+    c.dato('Instrumento', _texto(fac.instrumento_ref, 300));
+    c.dato('Huella SHA-256 del instrumento', _texto(fac.instrumento_sha256, 64));
+    if (fac.vigente_desde || fac.vigente_hasta) {
+      c.dato('Vigencia', _texto(fac.vigente_desde, 40) + ' - '
+        + (fac.vigente_hasta ? _texto(fac.vigente_hasta, 40) : 'sin término declarado'));
+    }
+    c.dato('Facultad verificada el', _texto(fac.verificado_at, 40));
+  } else {
+    c.dato('Facultad acreditada', 'NO DECLARADA');
+  }
+  c.bloque('La ejecución por una persona distinta del representante legal de Gesstiar S.A.S. exige '
+    + 'acreditar previamente la facultad de representación o poder suficiente, que queda '
+    + 'conservada en el expediente. Lo que se acredita aquí es la FACULTAD (con qué poder se '
+    + 'firmó), no la IDENTIDAD de quien estaba escribiendo: esa identidad descansa en la llave '
+    + 'administrativa del servicio y en el nombre que el operador declaró al hacer el acto.',
+  { size: 8.5, lh: 11 });
+
+  // ─── 6. Los cinco datos del §11 ───────────────────────────────────────────
+  c.seccion('6. Los cinco datos del parrafo 11 declarados por la Empresa');
   const s11 = d.datos_empresa || {};
   c.dato('Razón social', _texto(s11.razon_social, 200));
   c.dato('NIT o C.C.', _texto(s11.nit, 60));
@@ -715,8 +743,8 @@ async function generarActaContrafirma(datos) {
   c.dato('Correo', _texto(s11.correo, 254));
   c.dato('Representante legal', _texto(s11.representante, 200));
 
-  // ─── 6. Dónde queda el registro ───────────────────────────────────────────
-  c.seccion('6. Donde queda el registro');
+  // ─── 7. Dónde queda el registro ───────────────────────────────────────────
+  c.seccion('7. Donde queda el registro');
   c.bloque('Los dos actos quedaron registrados en el servicio de firma electrónica K+AIR, con '
     + 'su rastro inalterable: cada paso (apertura del enlace, envío del código, verificación '
     + 'del código, suscripción, verificación documental del representante, envío del código de '
