@@ -39,12 +39,18 @@
  *
  * EL MANIFIESTO ES ASCII PURO
  * ---------------------------
- * Las notas del manifiesto van sin tildes. Por eso este script edita el
- * archivo con REEMPLAZO LITERAL sobre el texto crudo (nunca con
- * JSON.stringify, que convertiria cada escape en el caracter real y dejaria
- * el diff entero), y despues valida que siga siendo JSON valido y ASCII
- * puro. La evidencia tambien sale en ASCII: las razones sociales y los
- * nombres que trae la base se transcriben sin acentos.
+ * Las notas del manifiesto van sin tildes. Por eso este script busca las
+ * claves con REEMPLAZO LITERAL sobre el texto crudo y despues valida que
+ * siga siendo JSON valido y ASCII puro. La evidencia tambien sale en ASCII:
+ * las razones sociales y los nombres que trae la base se transcriben sin
+ * acentos.
+ *
+ * El archivo se escribe en la FORMA CANONICA (ver `scripts/lib/manifiesto.js`):
+ * el manifiesto lo escriben dos scripts y tiene que quedar siempre igual, o
+ * los dos `--check` se contradicen. Un `JSON.stringify` SIN `asciiEscape`
+ * convertiria cada escape en el caracter real y moveria el diff entero; con
+ * el `asciiEscape`, los escapes se conservan y el resultado es byte a byte
+ * el mismo archivo.
  *
  * USO
  * ---
@@ -73,6 +79,10 @@ const SERVICE_ROOT = path.resolve(__dirname, '..');
 const APP_ROOT = path.resolve(SERVICE_ROOT, '..');
 const MANIFIESTO = path.join(SERVICE_ROOT, 'legal-readiness.json');
 const TEXTO_ENCARGO = path.join(APP_ROOT, 'legal', 'anexo-encargo.html');
+
+// La forma del manifiesto y la comparacion de estado: las mismas que usa el
+// script del Anexo de Nube (ver `scripts/lib/manifiesto.js`).
+const { formaCanonica, mismoEstado } = require('./lib/manifiesto');
 
 // ---------------------------------------------------------------------------
 // SALIDA INJECTABLE (para los tests)
@@ -155,8 +165,18 @@ function aAscii(valor) {
 function ponerEnBloque(texto, bloque, clave, valor) {
   const i = texto.indexOf('"' + bloque + '": {');
   if (i < 0) throw error('El manifiesto no tiene el bloque "' + bloque + '".');
-  const fin = texto.indexOf('\n  },', i);
-  if (fin < 0) throw error('No se pudo cerrar el bloque "' + bloque + '".');
+  // La sangria del bloque se saca de la linea donde EMPIEZA, no de una fija.
+  // El manifiesto lo escriben dos scripts y el archivo puede llegar con otra
+  // sangria (por ejemplo, si alguien lo reserializo entero): con una sangria
+  // fija el script no encontraba el cierre del bloque y se rompia con un
+  // error que no decia nada util.
+  const inicioLinea = texto.lastIndexOf('\n', i) + 1;
+  const sangria = texto.slice(inicioLinea, i).match(/^[ \t]*/)[0];
+  let fin = texto.indexOf('\n' + sangria + '},', i);
+  if (fin < 0) fin = texto.indexOf('\n' + sangria + '}', i);
+  if (fin < 0) {
+    throw error('No se pudo cerrar el bloque "' + bloque + '".');
+  }
   const antes = texto.slice(0, i);
   const cuerpo = texto.slice(i, fin);
   const despues = texto.slice(fin);
@@ -423,14 +443,30 @@ function main(args) {
   }
 
   const suscripciones = leerSuscripciones();
-  const contrafirmadas = suscripciones.filter((s) => Boolean(s.contrafirmado_at));
+  // SOLO declara el estado la suscripcion del TEXTO VIGENTE. Una suscripcion
+  // de otro texto no dice NADA del vigente: sin este filtro, una suscripcion
+  // vieja ya contrafirmada (la 2026-11-06 de ASEPLUS, por ejemplo) podia
+  // hacer que el manifiesto dijera "firmado" mientras el bloque
+  // `anexo_encargo` declara la huella de OTRO texto, el vigente. El gate
+  // compara esa huella con la del archivo que el servidor lee, asi que el
+  // bloque quedaria diciendo "firmado" sobre un texto que nadie ha suscrito.
+  // Es un verde falso. El script del Anexo de Nube filtra por la huella desde
+  // siempre; este no lo hacia.
+  const contrafirmadas = suscripciones.filter((s) => Boolean(s.contrafirmado_at)
+    && (!hashTexto || String(s.hash_texto || '').trim().toLowerCase() === hashTexto));
+  const contrafirmadasDeOtrosTextos = suscripciones.filter((s) => Boolean(s.contrafirmado_at)
+    && !contrafirmadas.includes(s)).length;
 
   if (contrafirmadas.length === 0) {
     throw error(
-      'No hay ninguna suscripcion del Anexo de Encargo con contrafirma: el '
-      + 'manifiesto NO puede decir "firmado". El Anexo de Encargo es bilateral y '
-      + 'el instrumento solo queda ejecutado cuando las dos partes firman. '
-      + 'Suscripciones cerradas en total: ' + suscripciones.length + '.',
+      'No hay ninguna suscripcion del TEXTO VIGENTE del Anexo de Encargo con '
+      + 'contrafirma: el manifiesto NO puede decir "firmado". El Anexo de Encargo '
+      + 'es bilateral y el instrumento solo queda ejecutado cuando las dos partes '
+      + 'firman. Suscripciones cerradas en total: ' + suscripciones.length
+      + (contrafirmadasDeOtrosTextos > 0
+        ? '; con contrafirma pero de OTRO texto: ' + contrafirmadasDeOtrosTextos
+          + ' (esos actos no dicen nada del texto vigente)'
+        : '') + '.',
       4,
     );
   }
@@ -497,8 +533,10 @@ function main(args) {
   };
 
   if (soloCheck) {
-    // Con --check no se escribe: se compara lo que HABRIA con lo que hay.
-    const coincide = m === crudo;
+    // Con --check no se escribe: se compara el ESTADO que HABRIA con el que
+    // hay. La comparacion es de estado y no de bytes: el archivo lo escriben
+    // dos scripts y una diferencia de forma no es una diferencia de estado.
+    const coincide = mismoEstado(datos, manifiesto);
     salida.coincide = coincide;
     if (!coincide) {
       // --check informa del estado que HAY, no del que habria.
@@ -507,7 +545,9 @@ function main(args) {
       salida.evidencia = manifiesto.anexo_encargo.evidencia;
     }
   } else {
-    fs.writeFileSync(rutaManifiesto, m, 'utf8');
+    // Se escribe la forma CANONICA: el mismo archivo, con la misma forma,
+    // lo escriba el script que lo escriba.
+    fs.writeFileSync(rutaManifiesto, formaCanonica(datos), 'utf8');
   }
 
   if (comoJson) {

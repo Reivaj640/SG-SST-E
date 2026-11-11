@@ -9,6 +9,61 @@
 
 ---
 
+## 0. Lo que hay que aplicar desde el 11-nov-2026 (lo que habilita P8)
+
+> **Este bloque es lo que hace falta para que la contrafirma exista en el servidor.** Sin las
+> migraciones 060/061/062, las rutas de contrafirma devuelven **404** y la compuerta
+> `contrafirma_nube` no puede quedar `ok`. Sin `FIRMA_ADMIN_ACTOR`, la contrafirma se rechaza con
+> **409 `FACULTAD_NO_ACREDITADA`**. Son tres cosas, y las tres son de este documento.
+
+| # | Qué | Por qué | Dónde se aplica |
+|---|---|---|---|
+| 1 | **Migraciones `060`, `061` y `062`** | La 060 crea la segunda mitad del Anexo de Nube (la contrafirma); la 061, el registro de poderes del Encargado; la 062, el rastro append-only de ese registro | Paso 4 de §5.1 + verificación del §0.1 |
+| 2 | **`FIRMA_ADMIN_ACTOR=Javier Robles Fontalvo`** en `/opt/kair-firma/.env` | El contrafirma declara **quien** firma por Gesstiar y esa nombre se coteja con la facultad acreditada. Es el representante legal, así que **no hay que registrar ningún poder**. Sin la variable, el valor por defecto de la app (`K+AIR <usuario>@<equipo>`) no es el nombre de una persona y el acto se rechaza | §3 |
+| 3 | **Node 22 y `better-sqlite3` recompilado (ABI 127)** | `better-sqlite3` 11.10.0 **no compila** contra la V8 de Node 26 (`v8::Object::GetPrototype` ya no existe) y **no hay prebuild para Node 24**. El único runtime viable es Node 22 | §8.1 |
+
+> ⚠️ **Lo que NO se verificó desde esta máquina (11-nov-2026):** el estado real del servidor
+> (qué versión de Node corre, cuántas migraciones tiene aplicadas, si el `.env` ya trae la
+> variable). Lo de arriba es lo que **debe** quedar, no lo que **quedó**. El §8 de este documento
+> tiene la lista de pendientes.
+
+### 0.1 Cómo se comprueba que las tres migraciones quedaron aplicadas
+
+```bash
+# Con el servicio PARADO (o en la ventana de mantenimiento), en el servidor:
+
+# 060: la segunda mitad del Anexo de Nube
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT contrafirmado_at, contrafirma_actor, contrafirma_evidencia FROM gh_firma_anexo_nube_suscripciones LIMIT 1;"
+
+# 060: la fecha de ejecucion del instrumento, en la ficha de la empresa
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT anexo_nube_ejecutado_at FROM gh_firma_empresas LIMIT 1;"
+
+# 061 y 062: el registro de poderes y su rastro append-only
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('gh_firma_encargado_poderes','gh_firma_encargado_poderes_eventos');"
+```
+
+Las tres consultas tienen que **responder**, no fallar: `no such table` significa que la
+migración no está aplicada. Y el servicio, arriba, tiene que contestar la ruta de contrafirma
+**con 401/403 y no con 404**:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST \
+  https://firma.kair.fyi/internal/admin/empresas/1/anexo-nube/contrafirmar/codigo
+# 404 = el servidor corre el codigo viejo: falta el despliegue de las migraciones
+# 401/403 = la ruta EXISTE: lo que falta es la llave (bien, el gate ya se puede medir)
+```
+
+### 0.2 El orden que no se negocia
+
+El paso 4 de §5.1 corre las migraciones **con el servicio parado y antes de arrancar**. El
+servicio llama a `migrate()` al arrancar, así que si una migración falla el proceso sale con
+código 1 y el systemd lo reintenta en bucle: la caída se ve en el `journalctl`, no en el alta.
+
+---
+
 ## 1. Arquitectura real
 
 ```
@@ -82,7 +137,21 @@ SMTP_PASS=<app password de 16 caracteres, SIN ESPACIOS>
 SMTP_FROM_NAME=K+AIR
 SMTP_FROM_EMAIL=<mismo que SMTP_USER>
 FIRMA_CANAL_PROTECCION_DATOS=privacidad.kair@gmail.com
+FIRMA_ADMIN_ACTOR=Javier Robles Fontalvo
 ```
+
+**`FIRMA_ADMIN_ACTOR` es el nombre de QUIEN contrafirma por Gesstiar.** Es el representante legal
+de Gesstiar S.A.S. (NIT 900987987-4), así que **no hay que registrar ningún poder** a su
+nombre: el servicio lo reconoce como representante legal y lo acepta sin acreditación adicional.
+Sin esta variable, el valor por defecto (`K+AIR <usuario>@<equipo>`, compuesto en tiempo de
+ejecución con el usuario y el nombre del equipo) **no es el nombre de una persona** y la
+contrafirma se rechaza con **409 `FACULTAD_NO_ACREDITADA`**.
+
+> **El `.env` de la app de escritorio NO lleva esta variable, a propósito.** Ese `.env` viaja
+> **dentro del instalador**: poner ahí un nombre de persona atribuiría los actos administrativos
+> de **toda** copia instalada a esa persona. La variable se declara en el entorno del **service**
+> (aquí) o como variable del sistema en la máquina del operador. El detalle está en
+> `docs/gestion-humana/firma-electronica/acreditacion-facultad-contrafirmante.md` §4.2.
 
 **El canal de proteccion de datos tiene que ser UNO solo.** `src/config.js` lo lee de
 `FIRMA_CANAL_PROTECCION_DATOS` y el manifiesto `legal-readiness.json` lo declara en
@@ -227,7 +296,9 @@ sha256sum /opt/kair-firma/app/config/tabla-conservacion.json
 # El texto del Acuerdo que declara el manifiesto: sin este archivo el
 # readiness lee un archivo inexistente y reporta huecos que son puro
 # artefacto del empaquetado.
-ls -l /opt/kair-firma/app/scripts/fixtures/acuerdo-v1.4.txt
+# La version la dice el manifiesto (legal-readiness.json -> acuerdo.archivo):
+# hoy es la v1.6. Si el manifiesto cambia de version, cambia esta linea.
+ls -l /opt/kair-firma/app/scripts/fixtures/acuerdo-v1.6.txt
 
 # Y los PERMISOS, que el chown no corrige (ver 5.1.3):
 # lo esperado: drwxr-x--- en app/, drwxr-xr-x en app/src/, -rw-r--r-- en los
@@ -245,6 +316,18 @@ ls -l /opt/kair-firma/app/data/
 #    sale con el stack terminando en Module._compile y no dice nada de la base.
 #    (Pasa el 26-oct-2026 con el despliegue del 📦954.)
 sudo -u kairfirma bash -c 'set -a; . /opt/kair-firma/.env; set +a; cd /opt/kair-firma/app && node src/db/migrate.js' 2>&1 | tail -20
+
+# 4b. VERIFICAR que las migraciones del 11-nov quedaron aplicadas.
+#     Sin esto el servicio arranca, responde, y las rutas de contrafirma
+#     devuelven 404: el codigo viejo se ve IGUAL de sano.
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('gh_firma_encargado_poderes','gh_firma_encargado_poderes_eventos');"
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT contrafirmado_at FROM gh_firma_anexo_nube_suscripciones LIMIT 1;"
+sudo -u kairfirma sqlite3 /opt/kair-firma/data/firma.sqlite \
+  "SELECT anexo_nube_ejecutado_at FROM gh_firma_empresas LIMIT 1;"
+# Y que el actor esta declarado (sin esto, la contrafirma se rechaza con 409)
+sudo -u kairfirma bash -c 'grep -c "^FIRMA_ADMIN_ACTOR=" /opt/kair-firma/.env'
 
 # 5. Arrancar: el proceso nuevo carga lo que esta en disco
 sudo systemctl start kair-firma
@@ -313,9 +396,13 @@ git archive --format=tar.gz --output="$env:TEMP\kair-deploy\svc.tar.gz" HEAD `
 tar -xzf "$env:TEMP\kair-deploy\svc.tar.gz" -C "$stage\app" --strip-components=2
 
 # 2. Los documentos legales que el readiness lee
-#    (solo los del servicio en la nube: el Anexo de Nube y el Anexo de Encargo)
+#    (solo los del servicio en la nube: el Anexo de Nube VIGENTE y el Anexo de Encargo).
+#    La version del Anexo de Nube NO se escribe a mano: la declara
+#    src/services/anexoNubeModelo.js (VERSION_MODELO) y el manifiesto la confirma.
+#    Hoy es la v1.3. Si se empaqueta la v1.0 o la v1.1, el readiness busca un
+#    archivo que no esta y reporta huecos que son puro artefacto del empaquetado.
 git archive --format=tar.gz --output="$env:TEMP\kair-deploy\legal.tar.gz" HEAD `
-  'sgsst-electron-app/legal/anexo-nube-v1.0.html' 'sgsst-electron-app/legal/anexo-encargo.html'
+  'sgsst-electron-app/legal/anexo-nube-v1.3.html' 'sgsst-electron-app/legal/anexo-encargo.html'
 tar -xzf "$env:TEMP\kair-deploy\legal.tar.gz" -C $stage --strip-components=1
 
 # 3. El tar final, con la forma que el servidor espera
@@ -338,8 +425,8 @@ extractción va en `/opt/kair-firma` y no en `/opt/kair-firma/app`.
 consecuencias que hay que tener presentes, porque las dos fallan **en silencio**:
 
 - **El texto del Acuerdo que declara el manifiesto tiene que estar versionado**, porque el
-  readiness lo lee en el servidor (`acuerdo.v1_1_archivo` ->
-  `scripts/fixtures/acuerdo-v1.4.txt`). Si no estuviera commiteado, el paquete viajaria
+  readiness lo lee en el servidor (`legal-readiness.json` -> `acuerdo.archivo` ->
+  `scripts/fixtures/acuerdo-v1.6.txt`). Si no estuviera commiteado, el paquete viajaria
   sin el y el readiness leeria un archivo inexistente: reportaria huecos que son puro
   artefacto del empaquetado.
 - **`config/` tiene que estar versionado**, porque es ahi donde vive la tabla de
@@ -912,16 +999,22 @@ la suite contra `firma.sqlite` y se perdio `SIGN-2026-037663`.
 
 ---
 
-## 7. Estado de la suite (2026-10-23)
+## 7. Estado de la suite (2026-11-11)
 
 ```
-tests 1639 | pass 1633 | fail 4 | skipped 2
+tests 2574 | pass 2572 | fail 0 | skipped 2
 ```
 
-Los **4 fallos** son de `tests/scripts/seed-dev-acuerdo.test.js`: la guarda
-`TEXTO_LEGAL_CON_PLACEHOLDERS` de `src/services/agreement.js` rechaza las versiones
-v2.0/v3.0/v4.0/v9.0 que siembra ese script. **No son de la migracion de las etapas 1 a 5** y
-no se tocan desde ahi.
+Medido con **Node 22.23.4** (ABI 127) y `better-sqlite3` recompilado para ese ABI: 220 s.
+
+Los **4 fallos** que se veian el 2026-10-23 (de `tests/scripts/seed-dev-acuerdo.test.js`, la
+guarda `TEXTO_LEGAL_CON_PLACEHOLDERS` de `src/services/agreement.js` contra las versiones
+v2.0/v3.0/v4.0/v9.0) **ya no estan**: hoy la suite completa corre en verde.
+
+> **Ojo con correr la suite a mano.** `tests/` y el `data/test.sqlite` son **una sola cosa**: sin
+> `--test-concurrency=1` los archivos compiten por la misma base y salen falsos rojos (15 falsos
+> al correr tres archivos de `tests/routes/` a la vez). Con la concurrency en 1, los tres dan
+> **45/45**.
 
 Los dos fallos de la medicion del 2026-10-15 (`pdfValidator.test.js` §6.2, por sensibilidad a la
 carga, e `idempotency-isolation.test.js` caso 2, por el `CreationDate` que pdf-lib escribe en
@@ -935,22 +1028,95 @@ router del recibo de supresion montado.
 
 ## 8. Pendientes
 
-- [ ] Registrar al menos una empresa en el backend desde un equipo cliente (el servidor esta listo
-      pero nadie le esta hablando todavia).
+- [x] Registrar al menos una empresa en el backend desde un equipo cliente. **Hecho:** ASEPLUS
+      CARIBE S.A.S. esta registrada y hay dos instrumentos con actos — el Anexo de Nube v1.1
+      suscrito el 2026-11-05 y el Anexo de Encargo 2026-11-06 suscrito (2026-11-07T19:30:14Z)
+      y contrafirmado por K+AIR (2026-11-07T20:33:22Z). Lo que falta no es hablar con el
+      servidor: es **P8** (suscribir el Anexo de Nube v1.3 y el Encargo 2026-11-11, y
+      contrafirmar los dos). Ver §8.3.
+- [ ] **P8 — los cuatro actos que cierran el instrumento bilateral.** Requiere el despliegue
+      habilitante (§0) y despues, en este orden: (1) **publicar el Acuerdo v1.6** → **HECHO el
+      11-nov-2026**: quedo publicada (`publicado: true` en el manifiesto), es la version activa en
+      la base de produccion con su huella `08e1eb8b...52f13e`, y su autorizacion operativa quedo
+      registrada (id 4, tipo OPERATIVA, 11-nov-2026); la **Constancia de version y autorizacion**
+      se completo ese mismo dia con los datos del registro del owner (huella `aaf68b4e...d0b413`,
+      9 794 B) y su seccion 5 y su seccion 6 siguen vacias por diseno: la autorizacion vive en el
+      registro de aprobaciones del servicio, no en el documento;
+      (2) suscripcion ASEPLUS del Anexo de Nube v1.3 (`fdd10551...2b585d`, 85 143 B),
+      (3) contrafirma de K+AIR dentro del servicio, (4) re-suscripcion administrativa del Anexo
+      de Encargo 2026-11-11 (`6308b1f7...75b8948`, 94 923 B), (5) contrafirma del Encargo. El
+      paso a paso esta en
+      [`docs/gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md`](gestion-humana/firma-electronica/contrafirma-anexo-nube-v1-2.md).
+      Los textos v1.6 / v1.3 / 2026-11-11 son los vigentes desde el 11-nov-2026; el fundamento
+      esta en
+      [`docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md`](gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md).
+      **Errata del 11-nov-2026 (antes de los actos).** Los dos textos que P8 firma se corrigieron
+      antes de ser susceptibles de suscripcion: el parrafo 12 del Anexo de Nube v1.3 decia «Esta
+      version 1.2 remite» al Anexo de Encargo (donde decia «1.3»), y el Anexo de Encargo 2026-11-11
+      remitia en cuatro puntos (menu, 1, 5 y 9) al Anexo de Nube v1.2, un texto superado que su
+      propia seccion 5 incorpora por remision (articulo 44 de la Ley 527 de 1999). Son correcciones
+      de cita: no cambian las partes, el objeto, las obligaciones ni el riesgo. **Las etiquetas NO
+      cambian** (v1.3 y 2026-11-11); lo que cambia es la huella, y la anterior queda declarada en la
+      nota del manifiesto y en el Historial. Las versiones ya suscritas (v1.1 y 2026-11-06) no se
+      tocaron. Fundamento:
+      [`docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md`](gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md).
+      **Despliegue de la errata en el servidor: HECHO el 11-nov-2026 a las 15:56** (hora de
+      Colombia), con `sudo bash /tmp/kair-errata/instalar-errata.sh`. Los tres artefactos (los dos
+      textos y el manifiesto) se instalan **JUNTOS**, porque la compuerta compara la huella que
+      declara el manifiesto con la del archivo que el servidor lee: instalarlos por separado deja
+      un estado rojo. El script verifica los SHA-256, respalda, instala, reinicia el servicio,
+      vuelve a medir la compuerta y comprueba que los actos de P8 siguen pendientes; el respaldo
+      quedo en `/opt/kair-firma/backup-errata-20261111-155647` (con las huellas viejas
+      `45500569...3abf9f` y `c7c42a18...70bfd95`) y el log en `/tmp/kair-instalar-errata.log`.
+      **Verificado por SSH, por fuera del script:** las tres huellas del servidor son
+      `fdd10551...2b585d` (Anexo de Nube v1.3), `6308b1f7...75b8948` (Anexo de Encargo
+      2026-11-11) y `cad606a9...df0d3a` (manifiesto, byte a byte igual al del repo); el servicio
+      esta `active` con `NRestarts=0` y el health en `ok`; la compuerta queda en `publicado: ok`,
+      `aprobacion_operativa_vigente: ok` y **0 bloqueantes pendientes**; y `firmado_nube`,
+      `contrafirma_nube` y `estado_encargo` **siguen pendientes** (una errata no fabrica una firma).
+      **La base no se toco:** 1 empresa, 3 consentimientos (2 `ACCEPTED` + 1 `OTP_PENDING`), la
+      v1.6 activa con `08e1eb8b...f13e`, 4 aprobaciones de publicacion (una sola por version) y
+      las dos suscripciones intactas (Nube v1.1 y Encargo 2026-11-06, ambas FIRMADAS). **A ASEPLUS
+      se le dice en una linea, antes de pedir la firma, que el texto que va a firmar es el texto
+      corregido.**
+      **La re-suscripcion del Anexo de Encargo: la ruta EXISTE y esta desplegada (11-nov-2026).**
+      El manifiesto y este documento ya prometian que «la re-suscripcion va por el canal
+      administrativo, con su motivo», pero la ruta **no existia**: el servicio tenia
+      `desmarcarAnexoSuscrito()` (probada, con motivo obligatorio y rastro campo por campo), y
+      **ninguna ruta HTTP la llamaba** — solo habia `anexo-firmado/quitar`, que deshace el SEGUNDO
+      acto. Sin la ruta nueva el Anexo de Encargo no se podia volver a suscribir: el 409
+      `SUSCRIPCION_EXISTENTE` (`anexoEncargo.js:1099-1116`) solo se levanta si las **dos** fechas de
+      la ficha (`anexo_encargo_suscrito_at` y `anexo_encargo_firmado_at`) quedan en NULL. Era una
+      capacidad prometida y no existente. **La ruta nueva** es
+      `POST /internal/admin/empresas/:id_empresa/anexo-suscrito/quitar` (`adminApiAuth`;
+      `X-Admin-Motivo` **obligatorio**; actor opcional; no toca las filas de suscripcion ni la fecha
+      de firma). **El orden importa:** primero `anexo-firmado/quitar` (fase 2) y despues
+      `anexo-suscrito/quitar` (fase 1). La suscripcion anterior queda **FIRMADA** en el rastro: solo
+      se deshace el puntero de la ficha. **Verificado por SSH:** hash en disco
+      `ae0fff23...7aa2f0` (el del repo), servicio `active` con `NRestarts=0`, salud `ok`, y la ruta
+      respondiendo **401** sin llave mientras una ruta inexistente responde **404** (o sea: existe).
+      Pruebas: `tests/anexo-encargo-resuscripcion.test.js` (8 casos). API: `API.md` §6.13.2 («Los
+      nueve endpoints»).
+- [ ] **Correr los tests en el servidor** (§6). La suite completa nunca se ha corrido ahi: en el
+      portatil no corren por el ABI. El comando exacto esta en §6.
 - [ ] Correr los tests de extremo a extremo con datos reales: crear sign request, enviar la
       invitacion por correo, firmar desde el celular y descargar la constancia.
 - [ ] Eliminar la tarea `KairFirmaTunnel` del portatil. **Esta muerta**: el script corre
       `cloudflared tunnel run kair-firma`, que lee `~/.cloudflared/config.yml`, y ese directorio ya
       no existe en ninguna maquina. El tunnel vive ahora en el servidor.
-- [ ] Backup automatico diario de la BD. **Los 3 scripts estan listos y probados en el PC**
-      (`deploy/backup-firma.sh`, `deploy/probar-restauracion.sh`, `deploy/health-check.sh`),
-      pero no hay cron instalado en el servidor. Los comandos exactos estan en
+- [x] Backup automatico diario de la BD. **Hecho (verificado el 11-nov-2026 por SSH):** los cuatro
+      crons estan instalados en `/etc/cron.d` (`kair-firma-backup`, `kair-firma-health`,
+      `kair-firma-purga`, `kair-firma-restauracion`) y hay respaldos cifrados hasta
+      `storage-20261110-220001.tar.gz.enc`. Los comandos exactos estan en
       `sgsst-electron-app/docs/gestion-humana/firma-electronica/plan-continuidad-2026-10-26.md`
-      (seccion 5) y en `firma-service/deploy/README-DESPLIEGUE.md` (Paso 9). El respaldo
+      (seccion 5) y en `firma-service/deploy/README-DESPLIEGUE.md` (Paso 9). Los scripts que
+      las ejecutan son `firma-service/deploy/backup-firma.sh` (WAL-safe: usa `sqlite3 .backup`,
+      no un `cp` de la base), `firma-service/deploy/probar-restauracion.sh` y
+      `firma-service/deploy/health-check.sh`. El respaldo
       diario queda programado para las **22:00 (hora de Colombia)** y la **prueba de restauracion
-      mensual** para el dia 1 de cada mes (04:00 UTC = 23:00 de Colombia), que es lo que hace
-      verdadera la frase del Anexo de Nube "se verifica mensualmente que el respaldo se restaura
-      correctamente".
+      mensual** para el dia 1 de cada mes, a las **04:00 hora local del servidor** (la equivalencia
+      horaria esta corregida en el README), que es lo que hace verdadera la frase del Anexo de
+      Nube "se verifica mensualmente que el respaldo se restaura correctamente".
 - [ ] Arreglar el test de idempotency (ver seccion 7).
 - [ ] Revisar las 6 vulnerabilidades que reporto `npm audit` al desplegar. No se corrio `npm audit
       fix` a proposito.
@@ -959,12 +1125,11 @@ router del recibo de supresion montado.
       Falta la **alerta externa**: el log no despierta a nadie. Hay que crear un monitor de
       uptime en el panel de Cloudflare (del owner). Sin eso, el RTO de 4 h declarado en el
       Anexo de Nube cuenta desde que el owner se entere, no desde que la caida ocurre.
-- [ ] **La hora del servidor esta en `Etc/UTC`** (medido el 26-oct-2026). Esto rompe tres cosas a la vez:
-      el cron de las 22:00 cae a las **17:00 de Colombia**, los plazos en dias habiles (2 dias habiles de PQRS y
-      5 dias habiles de la copia permanente) se cuentan con el **dia UTC** (`src/services/solicitudes.js`,
-      `_sumarDiasHabiles` usa `getDay()`), y la **constancia PDF** imprime la hora de UTC. El codigo dice que el
-      dia debe ser local (`solicitudes.js:144`); lo que esta mal puesto es el servidor. Se corrige con
-      `sudo timedatectl set-timezone America/Bogota` (reversible, no toca los datos: la base guarda ISO en UTC).
+- [x] **La hora del servidor esta en `America/Bogota`** (verificado el 11-nov-2026 por SSH:
+      `timedatectl` devuelve `-05:00`). **Se corrigió** con `sudo timedatectl set-timezone
+      America/Bogota` (reversible, no toca los datos: la base guarda ISO en UTC). Los tres
+      efectos que rompia (cron de las 22:00 en hora de Colombia, plazos en dias habiles contados
+      con el dia local y hora en la constancia PDF) quedaron resueltos.
 - [ ] Copia **off-site** de los respaldos (hoy viven en el mismo servidor que los datos).
       Es la brecha mas grande del plan de continuidad y la mas facil de cerrar: una linea de
       `rclone` mas una cuenta.
@@ -980,6 +1145,38 @@ retomarlo estan en
 Estado al 2026-10-25: **Node 20.20.2** (EOL 2026-04-30), `npm audit --omit=dev` con **7
 vulnerabilidades** (1 critica, 4 altas, 2 moderadas) y el **§7 del SECURITY.md con 0/39
 casillas**. No se presenta como resuelto.
+
+### 8.2. Node 22: la decision del 11-nov-2026 (ya no es "sugerencia")
+
+El owner decidio el **2026-11-11** que el servidor corra **Node 22 (ABI 127)**. No es una
+preferencia de version: es la **unica** que funciona con este `better-sqlite3`.
+
+| | |
+|---|---|
+| `better-sqlite3` | 11.10.0 |
+| Node 22 (ABI 127) | **funciona** (compila y hay prebuild oficial) |
+| Node 24 (ABI 137) | **no hay prebuild** y el paquete no trae campo `binary`: siempre compila, y el codigo de `better-sqlite3` 11.10.0 **no compila** contra la V8 de Node 26 (`v8::Object::GetPrototype` ya no existe) |
+| Node 26 (ABI 147) | no compila, por lo mismo |
+
+> La compilacion **si** funciona en la maquina: hay Visual Studio Build Tools 18. El problema no
+> es el compilador, es la combinacion de versiones.
+
+**Consecuencia para el despliegue:** si se sube el runtime, hay que **recompilar**
+`better-sqlite3` en el servidor (el binario es especifico de un ABI). Con el runtime actual (Node
+20, ABI 115) el modulo ya instalado funciona; si se cambia a Node 22, hay que recompilar **antes**
+de arrancar el servicio, o el proceso muere al abrir la base.
+
+```bash
+# Con Node 22 en el PATH (el script de compilacion resuelve `node` del PATH):
+cd /opt/kair-firma/app
+sudo -u kairfirma npm rebuild better-sqlite3
+```
+
+El detalle completo (mediciones, release oficial verificado, comando exacto) esta en
+[`docs/gestion-humana/firma-electronica/node-22-rebuild-better-sqlite3-2026-11-11.md`](gestion-humana/firma-electronica/node-22-rebuild-better-sqlite3-2026-11-11.md).
+
+> **El npm audit y el cierre A/B/C del `SECURITY.md` siguen aplazados** (decision del 2026-10-25).
+> Lo que cambio el 11-nov es **el runtime**, no el resto de la deuda.
 
 ---
 

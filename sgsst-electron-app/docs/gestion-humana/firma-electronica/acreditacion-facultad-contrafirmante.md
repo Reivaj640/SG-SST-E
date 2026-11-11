@@ -8,10 +8,20 @@
 > la evidencia, el manifiesto y el gate). **El acto no se ha hecho**: lo hace el operador de
 > K+AIR sobre las suscripciones reales (P8).
 >
-> **Decidido por el owner (10-nov-2026):** la acreditación se queda como **control interno**
-> (opción A). El texto vigente **no cambia**: no hay v1.3, la huella de la v1.2 no se mueve y P8
-> sigue siendo la suscripción de la v1.2 por ASEPLUS. Quien contrafirma es **Javier Robles
-> Fontalvo**, representante legal de Gesstiar, así que no hay que registrar ningún poder. Ver §7.
+> **Decidido por el owner (10-nov-2026) — decisión REVISADA el 11-nov-2026.** Tal como se decidió
+> aquel día, la acreditación se quedaba como **control interno** (opción A): el texto vigente **no
+> cambiaba**, no había v1.3, la huella de la v1.2 no se movía y P8 seguía siendo la suscripción de la
+> v1.2 por ASEPLUS. Quien contrafirma es **Javier Robles Fontalvo**, representante legal de
+> Gesstiar, así que no hay que registrar ningún poder. Ver §7.
+>
+> ⚠️ **Revisión del 11-nov-2026.** Esa decisión **se conserva como registro**, pero fue revisada:
+> el fundamento está en
+> `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md`.
+> El texto **sí cambia**, por versión nueva y con huella propia —el Anexo de Nube pasa a la **v1.3**
+> (`fdd10551…2b585d`, 85 143 B, 11-nov-2026) y el Acuerdo a la **v1.6**—, porque los textos
+> vigentes afirmaban hechos que dejaron de ser ciertos el 10-nov-2026. El **control interno de la
+> acreditación se mantiene**: la v1.3 tampoco recoge la exigencia de la facultad en su §10. **P8
+> es ahora la suscripción de la v1.3** por ASEPLUS. Ver §7.1.
 
 ---
 
@@ -34,6 +44,12 @@
 
 De las tres condiciones, la segunda es la que el código **no cumplía**: es la que se implementó
 en esta jornada.
+
+> La cita de arriba se transcribe **tal como el abogado la respondió el 10-nov-2026**, cuando el
+> texto vigente era la v1.2. Se conserva literal. **Sigue valiendo** para el texto vigente: la
+> v1.3 conserva el §10 y la misma arquitectura de dos actos, y la acreditación de la facultad se
+> sigue haciendo **dentro del servicio** y por las mismas dos rutas. Lo que cambió el 11-nov-2026
+> fue la **versión del texto** (§7.1), no el camino.
 
 ---
 
@@ -161,10 +177,12 @@ Quien certifica es un testigo: la facultad que se certifica es la de quien hizo 
 El actor llega en la cabecera `X-Admin-Actor` (o en `FIRMA_ADMIN_ACTOR` del lado de la app). Sin
 actor, la contrafirma se rechaza con 409 `FACULTAD_NO_ACREDITADA`.
 
-> **Ojo operativo:** el valor por defecto de la app es `K+AIR usuario@EQUIPO`, que **no** es el
-> nombre de una persona y, por tanto, **no** tiene facultad acreditada. Con ese valor la
-> contrafirma se rechaza. Hay que definir `FIRMA_ADMIN_ACTOR` con el nombre de quien va a
-> contrafirmar (y acreditarlo si no es el representante legal).
+> **Ojo operativo:** el valor por defecto de la app se **compone en tiempo de ejecución** con el
+> usuario del sistema y el nombre del equipo (`K+AIR <usuario>@<EQUIPO>`, en
+> `main/firma-bridge.js:1513-1527`): **no** es el nombre de una persona y, por tanto, **no** tiene
+> facultad acreditada. Con ese valor la contrafirma se rechaza. Hay que definir
+> `FIRMA_ADMIN_ACTOR` con el nombre de quien va a contrafirmar (y acreditarlo si no es el
+> representante legal).
 
 > **Dónde se define, y por qué NO en el `.env` de la app de escritorio.** La app lee
 > `FIRMA_ADMIN_ACTOR` del **entorno del proceso** (`process.env`), no de su `.env`: el cargador de
@@ -205,7 +223,7 @@ Lo que hace el código hoy:
 **Lo que NO se implementó** (y hay que decidir): una vía administrativa para *incorporar* una
 contrafirma externa con su evidencia. No se hizo porque la condición del abogado exige, de
 entrada, una noción de "evidencia íntegra y vinculada inequívocamente al instrumento" que hay
-que definir con detalle (qué documento, quéChecks, quién lo certifica), y porque el owner
+que definir con detalle (qué documento, qué controles, quién lo certifica), y porque el owner
 recomendó mantener exactamente la arquitectura ya construida. Si más adelante se quiere esa vía,
 el sitio natural es una ruta admin análoga a `.../contrafirma/facultad`, con su actor, su motivo
 y su rastro.
@@ -229,9 +247,9 @@ y su rastro.
 
 ---
 
-## 7. La decisión del texto: TOMADA (10-nov-2026)
+## 7. La decisión del texto: TOMADA (10-nov-2026) y REVISADA (11-nov-2026)
 
-El §10 del texto vigente del Anexo de Nube v1.2 **no menciona** esta exigencia: describe el
+El §10 del texto vigente del Anexo de Nube **no menciona** esta exigencia: describe el
 segundo acto (fecha, actor, motivo y huella del acta) y el cotejo de quién firmó por la
 Empresa, pero no la faculty de quien contrafirma por Gesstiar.
 
@@ -239,23 +257,58 @@ Empresa, pero no la faculty de quien contrafirma por Gesstiar.
 > expediente (registro de poderes + acta + evidencia + manifiesto + gate). **El texto no cambia:**
 > no hay versión nueva, la huella de la v1.2 no se mueve, no hay nada que republicar en `legal/`
 > ni en `sitio/`, y **P8 sigue siendo la suscripción de la v1.2 por ASEPLUS**, sin delaying.
+>
+> **Este registro se conserva tal como se decidió el 10-nov-2026.** Lo que sigue es su revisión.
 
-Lo que se resolvió en el momento de la decisión:
+Lo que se resolvió en el momento de la decisión (**estado del 10-nov-2026**):
 
 | Pregunta | Respuesta | Consecuencia |
 |---|---|---|
 | ¿El §10 declara la exigencia? | **No.** Se queda como control interno | La v1.2 se suscribe tal cual está |
-| ¿Hay v1.3? | **No** | La huella `242037b3…1f7245` no se mueve |
+| ¿Hay v1.3? | **No** (aquel día) | La huella `242037b3…1f7245` no se mueve |
 | ¿Otrosí del Anexo de Encargo? | **No** (tampoco hacía falta: el texto tampoco la menciona) | El Encargo 2026-11-09 se suscribe tal cual |
 | ¿Quién contrafirma? | **Javier Robles Fontalvo**, representante legal de Gesstiar | No hay que registrar ningún poder |
 | ¿Dónde se declara el actor? | `FIRMA_ADMIN_ACTOR` en el entorno del service | El preflight lo comprueba antes de pedir el código |
 
-> **Lo que esta decisión NO cierra.** El control interno acredita que quien contrafirmó **podía**
+> **Lo que esta decisión NO cerraba.** El control interno acredita que quien contrafirmó **podía**
 > firmar por Gesstiar; no lo dice el texto que la Empresa suscribió. Si más adelante el abogado
-> quiere que la condición quede **también** en el texto (por ejemplo, para un tercero que lea solo el
-> Anexo), eso es una v1.3 y hay que hacerla **antes** de que ASEPLUS firme, con huella nueva y
+> quería que la condición quedara **también** en el texto (por ejemplo, para un tercero que lea solo
+> el Anexo), eso era una v1.3 y había que hacerla **antes** de que ASEPLUS firme, con huella nueva y
 > republicación. Queda anotado en la tabla de instrumentos y en el checklist, para que la decisión
 > no se pierda.
+
+### 7.1 La revisión del 11-nov-2026
+
+⚠️ **La decisión del 10-nov-2026 (opción A · control interno) fue REVISADA el 11-nov-2026.** El
+fundamento está en
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md`.
+
+| | 10-nov-2026 (decisión) | 11-nov-2026 (revisión) |
+|---|---|---|
+| Texto del Anexo de Nube | v1.2, sin cambios | **v1.3** (`fdd10551…2b585d`, 85 143 B, 11-nov-2026), versión nueva con huella propia |
+| Texto del Acuerdo | v1.5 | **v1.6** (`08e1eb8b…52f13e`, 75 961 B, 11-nov-2026) |
+| Anexo de Encargo | 2026-11-09, sin cambios | **2026-11-11** (`6308b1f7…75b8948`, 94 923 B, 11-nov-2026) |
+| ¿La v1.3 recoge la exigencia de la facultad? | — | **No.** El §10 sigue sin mencionarla: la acreditación **sigue siendo control interno** |
+| P8 | Suscripción de la v1.2 | **Suscripción de la v1.3** (y del Encargo 2026-11-11) por ASEPLUS |
+
+**Por qué se revisó:** no por la faculty, sino porque los textos vigentes afirmaban hechos que
+dejaron de ser ciertos el 10-nov-2026 (el canal de correo ya no es una cuenta gratuita de Gmail
+para consumidores, y el papel de Google no estaba delimitado). El §9.4 del Acuerdo obliga a
+publicar una versión nueva con su propia huella, y la huella de la v1.2 no se puede reescribir.
+
+**Lo que NO cambia de la acreditación:** todo lo que este documento describe sigue vigente —el
+registro de poderes (migración 061), su rastro append-only (062), la comprobación en el acto, el
+dato en el acta, en la evidencia y en el manifiesto, y la compuerta del gate. Quien contrafirma
+sigue siendo **Javier Robles Fontalvo**, representante legal de Gesstiar, así que **no hay que
+registrar ningún poder**.
+
+**Lo que la revisión agregaba a la cola de P8 ya se hizo:** la **v1.6** quedó **publicada** el
+11-nov-2026 (`publicado: true` en el manifiesto) con su autorización operativa registrada (id 4) y es
+la versión activa en la base de producción; y la Constancia de versión y autorización
+(`sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html`, SHA-256 `aaf68b4e…d0b413`,
+9 794 B) se **completó** con los datos del registro del owner —sus secciones 5 y 6 siguen vacías porque
+la autorización vive en el registro de aprobaciones del servicio—. Los actos que **quedan** de P8 son,
+en orden: **suscribir la v1.3** y el **Encargo 2026-11-11** por ASEPLUS, y **contrafirmar**.
 
 ---
 

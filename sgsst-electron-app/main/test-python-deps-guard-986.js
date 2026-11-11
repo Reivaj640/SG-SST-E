@@ -65,13 +65,14 @@ const depsSrc = fs.readFileSync(depsPath, 'utf8');
 const mainSrc = fs.readFileSync(mainPath, 'utf8');
 
 // ───────────────────────── evaluador del modulo (permite mutarlo)
-function cargarModulo(src) {
+function cargarModulo(src, cp) {
   const mod = { exports: {} };
+  const child = cp || childProcess;
   const sandbox = {
     module: mod,
     exports: mod.exports,
     require: function (id) {
-      if (id === 'child_process') return childProcess;
+      if (id === 'child_process') return child;
       throw new Error('modulo no permitido en el sandbox: ' + id);
     },
     console: { warn: function () {}, log: function () {}, error: function () {} },
@@ -94,6 +95,48 @@ const hayEmbed = fs.existsSync(EMBED);
 // JS invalido, sale con codigo != 0 y falla de inmediato.
 const NO_PYTHON = process.execPath;
 const RUTA_INEXISTENTE = path.join(os.tmpdir(), 'kair-986-no-existe-python.exe');
+
+// ───────────────────────── dobles deterministas para las mutaciones
+// El mutante "nunca dice que tiene las dependencias" SOLO se distingue del
+// codigo bueno en UN caso: un interprete que SI tiene las dependencias. En una
+// maquina sin `Portear/python-embed/python.exe` ese caso no existe (el
+// bloque lo salta con `hayEmbed === false`), el mutante queda indetectable y
+// el check se pone rojo sin que el producto haya cambiado. Para que el guard
+// muerda en CUALQUIER maquina, las mutaciones se juzgan contra un doble de
+// `child_process` que simula dos interpretes: uno que importa pandas y
+// openpyxl, otro que no. Todo lo demas (ejecutable que NO es Python, ruta
+// inexistente, embed REAL si esta) sigue yendo al `child_process` de verdad.
+const PYTHON_CON_DEPS = path.join(os.tmpdir(), 'kair-986-python-con-deps.exe');
+const PYTHON_SIN_DEPS = path.join(os.tmpdir(), 'kair-986-python-sin-deps.exe');
+
+function dobleChildProcess() {
+  const real = childProcess.execFile;
+  return {
+    execFile: function (cmd, args, opts, cb) {
+      if (typeof opts === 'function') { cb = opts; opts = {}; }
+      if (cmd === PYTHON_CON_DEPS) { cb(null, '', ''); return; }
+      if (cmd === PYTHON_SIN_DEPS) {
+        const e = new Error('simulado: el interprete no tiene las dependencias');
+        e.stdout = '';
+        e.stderr = '';
+        cb(e, '', '');
+        return;
+      }
+      real(cmd, args, opts, cb);
+    }
+  };
+}
+
+// Casos de referencia con los que se juzga a un modulo (vivo o mutado):
+// un interprete con dependencias, uno sin ellas, y las dos entradas vacias.
+async function evaluarModulo(m) {
+  const r = {};
+  r.rCon = await m.pythonTieneDependencias(PYTHON_CON_DEPS);
+  r.rSin = await m.pythonTieneDependencias(PYTHON_SIN_DEPS);
+  r.rNulo = await m.pythonTieneDependencias(null);
+  r.rVacio = await m.pythonTieneDependencias('');
+  return r;
+}
 
 // ───────────────────────── checks del modulo, contra una lista destino
 function checksModulo(m, destino) {
@@ -121,6 +164,98 @@ function guardsMain(src) {
   return g;
 }
 
+// ───────────────────────── derivacion de las mutaciones desde el codigo VIVO
+// PROMPT.md §7 y la trampa 28: una mutacion escrita con un literal pegado a
+// mano se rompe en el siguiente bumpeo (el codigo deja de coincidir, el
+// mutante queda vacio y el guard deja de mirar lo que dice mirar). Ahi las
+// mutaciones se DERIVAN del fuente que se acaba de leer: se localiza el
+// cuerpo de `pythonTieneDependencias` y se altera SU codigo de retorno. Si la
+// derivacion no encuentra lo que busca NO se degrada en silencio: el mutante
+// se reporta como desfasado y el check queda rojo.
+
+// Devuelve el indice del cierre que corresponde a `abre` en `txt[i]`,
+// saltando cadenas, plantillas y comentarios.
+function empareja(txt, i, abre, cierra) {
+  let nivel = 0;
+  let k = i;
+  while (k < txt.length) {
+    const c = txt[k];
+    if (c === '/' && txt[k + 1] === '/') {
+      const nl = txt.indexOf('\n', k);
+      k = nl < 0 ? txt.length : nl + 1;
+      continue;
+    }
+    if (c === '/' && txt[k + 1] === '*') {
+      const fc = txt.indexOf('*/', k + 2);
+      k = fc < 0 ? txt.length : fc + 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      const q = c;
+      k++;
+      while (k < txt.length) {
+        if (txt[k] === '\\') { k += 2; continue; }
+        if (txt[k] === q) { k++; break; }
+        k++;
+      }
+      continue;
+    }
+    if (c === abre) nivel++;
+    else if (c === cierra) {
+      nivel--;
+      if (nivel === 0) return k;
+    }
+    k++;
+  }
+  return -1;
+}
+
+// Ubica el cuerpo de una funcion nombrada en el fuente vivo.
+function cuerpoDe(src, nombre) {
+  const re = new RegExp('^[ \\t]*(?:async\\s+)?function\\s+' + nombre + '\\s*\\(', 'm');
+  const m = re.exec(src);
+  if (!m) return null;
+  const abreParen = src.indexOf('(', m.index);
+  if (abreParen < 0) return null;
+  const cierraParen = empareja(src, abreParen, '(', ')');
+  if (cierraParen < 0) return null;
+  const llave = src.indexOf('{', cierraParen);
+  if (llave < 0) return null;
+  const fin = empareja(src, llave, '{', '}');
+  if (fin < 0) return null;
+  return { inicio: llave, fin: fin };
+}
+
+// Cambia los `return <de>;` del cuerpo vivo por `return <a>;`.
+function mutarRetornos(src, de, a) {
+  const c = cuerpoDe(src, 'pythonTieneDependencias');
+  if (!c) return { ok: false, src: src, motivo: 'no se encontro la funcion pythonTieneDependencias' };
+  const interior = src.slice(c.inicio + 1, c.fin);
+  const re = new RegExp('return\\s+' + de + '\\s*;', 'g');
+  const n = (interior.match(re) || []).length;
+  if (n === 0) return { ok: false, src: src, motivo: 'la funcion no devuelve ' + de };
+  const nuevo = interior.replace(re, 'return ' + a + ';');
+  return { ok: true, src: src.slice(0, c.inicio + 1) + nuevo + src.slice(c.fin), motivo: '' };
+}
+
+// Cambia el `return` del bloque `catch` por un `throw` de lo capturado.
+function mutarLanza(src) {
+  const c = cuerpoDe(src, 'pythonTieneDependencias');
+  if (!c) return { ok: false, src: src, motivo: 'no se encontro la funcion pythonTieneDependencias' };
+  const interior = src.slice(c.inicio + 1, c.fin);
+  const mc = /catch\s*\(\s*(\w+)\s*\)/.exec(interior);
+  if (!mc) return { ok: false, src: src, motivo: 'la funcion no tiene bloque catch' };
+  const llave = interior.indexOf('{', mc.index + mc[0].length);
+  if (llave < 0) return { ok: false, src: src, motivo: 'no se pudo leer el bloque catch' };
+  const fin = empareja(interior, llave, '{', '}');
+  if (fin < 0) return { ok: false, src: src, motivo: 'no se pudo leer el bloque catch' };
+  const bloque = interior.slice(llave + 1, fin);
+  const nuevoBloque = bloque.replace(/return\s+[^;]+;/, 'throw ' + mc[1] + ';');
+  if (nuevoBloque === bloque) return { ok: false, src: src, motivo: 'el catch no devuelve nada que lanzar' };
+  const nuevoInterior = interior.slice(0, llave + 1) + nuevoBloque + interior.slice(fin);
+  return { ok: true, src: src.slice(0, c.inicio + 1) + nuevoInterior + src.slice(c.fin), motivo: '' };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 (async function () {
   const mod = cargarModulo(depsSrc);
@@ -145,38 +280,64 @@ function guardsMain(src) {
   guardsMain(mainSrc).forEach(function (g) { chk(g.name, g.ok, g.extra); });
 
   // ───────────────────────── mutaciones del modulo
+  // Cada mutacion se deriva del codigo vivo (ver `mutarRetornos` /
+  // `mutarLanza`) y se juzga contra los casos de referencia: un mutante que
+  // no rompe NINGUN caso de referencia es un mutante que el guard no
+  // detectaria, y por lo tanto un guard caido.
   const MUT = [
     ['siempre dice que tiene las dependencias',
-      function (s) { return s.replace('    return true;\n  } catch (e) {\n    return false;', '    return true;\n  } catch (e) {\n    return true;'); }],
+      function (s) { return mutarRetornos(s, 'false', 'true'); }],
     ['nunca dice que tiene las dependencias',
-      function (s) { return s.replace('    await _execFilePromise(pythonPath, [\'-c\', \'import \' + requeridas.join(\', \')]);\n    return true;', '    return false;'); }],
+      function (s) { return mutarRetornos(s, 'true', 'false'); }],
     ['lanza en vez de devolver false',
-      function (s) { return s.replace('  } catch (e) {\n    return false;\n  }\n}', '  } catch (e) {\n    throw e;\n  }\n}'); }]
+      function (s) { return mutarLanza(s); }]
   ];
+
+  const doble = dobleChildProcess();
+
+  // El modulo SIN mutar tiene que ser verde contra las MISMAS referencias con
+  // las que se juzga a los mutantes. Si el bueno falla, un mutante "fallaria"
+  // por la razon equivocada y el guard no estaria midiendo lo que dice medir.
+  let base = null;
+  try {
+    base = await evaluarModulo(cargarModulo(depsSrc, doble));
+  } catch (e) {
+    base = { lanzo: e };
+  }
+  const baseOk = !!base && !base.lanzo && base.rCon === true && base.rSin === false &&
+    base.rNulo === false && base.rVacio === false;
+  chk('el modulo sin mutar distingue un Python con deps de uno que no', baseOk,
+    base && base.lanzo ? ('lanzo: ' + base.lanzo.message)
+      : ('con-deps=' + base.rCon + ' sin-deps=' + base.rSin));
 
   for (const m of MUT) {
     const nombre = m[0];
-    const mutado = m[1](depsSrc);
-    if (mutado === depsSrc) {
-      chk('MUTANTE detectado: ' + nombre, false, 'la mutacion no cambio el codigo (patron desfasado)');
+    const res = m[1](depsSrc);
+    if (!res.ok || res.src === depsSrc) {
+      chk('MUTANTE detectado: ' + nombre, false,
+        res.motivo || 'la mutacion no cambio el codigo (patron desfasado)');
       continue;
     }
     let fallo = false;
+    let detalle = '';
     try {
-      const mm = cargarModulo(mutado);
-      const r1 = await mm.pythonTieneDependencias(NO_PYTHON);
-      const r2 = await mm.pythonTieneDependencias(RUTA_INEXISTENTE);
-      const r3 = hayEmbed ? await mm.pythonTieneDependencias(EMBED) : null;
-      // Lo que debe fallar:
-      //  - "siempre true": el caso del NO-Python debe dar false.
-      //  - "siempre false": el caso del embed debe dar true (si hay embed).
-      //  - "lanza": alguno de los tres debe lanzar en vez de devolver false.
-      if (r1 !== false || r2 !== false) fallo = true;
-      if (hayEmbed && r3 !== true) fallo = true;
+      const mm = cargarModulo(res.src, doble);
+      const r = await evaluarModulo(mm);
+      // El mutante tiene que romper AL MENOS un caso de referencia.
+      if (!(r.rCon === true && r.rSin === false && r.rNulo === false && r.rVacio === false)) {
+        fallo = true;
+      }
+      detalle = 'con-deps=' + r.rCon + ' sin-deps=' + r.rSin;
+      // Y, si esta el Python embebido de verdad, tambien tiene que fallar alli.
+      if (hayEmbed) {
+        const r3 = await mm.pythonTieneDependencias(EMBED);
+        if (r3 !== true) fallo = true;
+      }
     } catch (e) {
       fallo = true;
+      detalle = 'lanzo: ' + (e && e.message);
     }
-    chk('MUTANTE detectado: ' + nombre, fallo);
+    chk('MUTANTE detectado: ' + nombre, fallo && baseOk, detalle);
   }
 
   // ───────────────────────── mutaciones de main.js

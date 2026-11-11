@@ -47,6 +47,7 @@ const mailer = require('../../src/services/mailer');
 const { resetDb } = require('../helpers');
 const script = require('../../scripts/actualizar-manifiesto-anexo-nube');
 const publicador = require('../../scripts/actualizar-manifiesto-1047');
+const { ponerEnBloque } = require('../../scripts/actualizar-manifiesto-anexo-encargo');
 
 const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
 const MANIFIESTO_REAL = path.join(SERVICE_ROOT, 'legal-readiness.json');
@@ -514,6 +515,37 @@ test('--check, despues de escribir, dice que coincide', async () => {
   assert.equal(salida.coincide, true);
   assert.equal(salida.firmado, true);
   assert.equal(fs.readFileSync(copia, 'utf8'), despues, '--check no escribe');
+});
+
+test('--check compara el ESTADO y no los bytes', async () => {
+  // El caso real del 11-nov-2026: el manifiesto lo habian escrito los DOS
+  // scripts y cada uno lo habia dejado con una forma distinta (el objeto de
+  // la facultad en una sola linea en el del Encargo, en varias lineas en el
+  // del Nube). Los dos `--check` comparaban BYTES, asi que se contradecian y
+  // el del Nube reportaba "el manifiesto tiene un estado distinto del que se
+  // escribiria" sobre un manifiesto cuyo estado era exactamente el que habia.
+  //
+  // El check compara el ESTADO: una diferencia de forma no es una diferencia
+  // de estado.
+  await sembrarFlujo({ firmar: true });
+  script.main(['--manifiesto', copia]);
+  const despues = fs.readFileSync(copia, 'utf8');
+
+  // Se reproduce lo que dejaba el script del Anexo de Encargo: el objeto de la
+  // facultad en UNA SOLA LINEA. El estado es el mismo; la forma no.
+  const conFacultad = ponerEnBloque(
+    despues,
+    'anexo_encargo',
+    'contrafirma_facultad',
+    { resultado: 'REPRESENTANTE_LEGAL_ENCARGADO', nombre: 'Javier Robles Fontalvo' },
+  );
+  assert.notEqual(conFacultad, despues, 'la forma del archivo cambio');
+  fs.writeFileSync(copia, conFacultad, 'utf8');
+
+  const salida = script.main(['--manifiesto', copia, '--check']);
+  assert.equal(salida.coincide, true,
+    'el estado es el mismo: el check no puede reportar una diferencia de estado');
+  assert.equal(salida.firmado, true);
 });
 
 // ===========================================================================

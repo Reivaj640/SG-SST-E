@@ -21,8 +21,12 @@
 
 /* ══════════ 0. TIPOGRAFÍA ══════════ */
 /* Mismo par tipográfico que el resto del premium (Manrope display + UI sans).
-   El @import va antes de toda regla (requisito de CSS). Si no hay red, cae a
-   las fuentes del sistema por el stack de fallback de cada token. */
+   📦1049 · Las fuentes YA NO se piden por @import desde acá: las trae la hoja
+   local `assets/css/google-fonts.css` (los .woff2 están descargados en el
+   repo, así que la interfaz abre sin internet) y esta vista la carga con su
+   PROPIO <link>, porque es un documento aparte y no hereda las del shell.
+   Si el archivo no está, cae a las fuentes del sistema por el stack de
+   fallback de cada token. */
 
 
 /* ══════════ 1. TOKENS PREMIUM v2 ══════════ */

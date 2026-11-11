@@ -1887,7 +1887,7 @@ la firma.
 **Tipo:** entero positivo, máximo 36500 (100 años). `null` o ausente = sin
 plazo declarado.
 
-### 6.13.2 Los ocho endpoints
+### 6.13.2 Los nueve endpoints
 
 | Método | Ruta | Qué hace |
 |---|---|---|
@@ -1898,6 +1898,7 @@ plazo declarado.
 | `GET` | `/internal/admin/empresas/:id_empresa/historial` | El **rastro de los cambios** de la ficha: un renglón por campo que realmente cambió, con el valor anterior, el nuevo, quién, desde dónde, cuándo y por qué. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado` | Registra la fecha de firma del Anexo de Encargo (art. 25 Decreto 1377/2013). Endpoint aparte: ese dato sustenta el cumplimiento legal y no debe cambiar en una actualización de rutina. |
 | `POST` | `/internal/admin/empresas/:id_empresa/anexo-firmado/quitar` | **Quita** la fecha del Anexo de Encargo. Es la salida auditada para una marca equivocada: exige `X-Admin-Motivo`, escribe el valor anterior y `null` en el historial append-only y deja un WARN en el log. Después de quitarla, D-03 vuelve a bloquear la Empresa hasta que se registre una fecha respaldada por el PDF. |
+| `POST` | `/internal/admin/empresas/:id_empresa/anexo-suscrito/quitar` | **Quita** el registro de la SUSCRIPCIÓN del Anexo de Encargo (el PRIMER acto). Es la vía administrativa de la re-suscripción: cuando el texto vigente cambia, la suscripción pública se rechaza con `409 SUSCRIPCION_EXISTENTE` y esta ruta es la que deja re-suscribirse a la Empresa. Exige `X-Admin-Motivo` y **no toca** ninguna fila de suscripción ni la fecha de firma. |
 | `POST` | `/internal/admin/empresas/:id_empresa/estado` | Alta/baja lógica. Una empresa inactiva no muestra bloque en la mini-app, pero sus firmas históricas se conservan intactas. |
 
 **Body de `POST` / `PUT`** (los campos de identificación):
@@ -1999,6 +2000,35 @@ nuevo, el actor y el motivo.
 > `legal-readiness.json → anexo_encargo` tiene `estado: "firmado"`, fecha y
 > archivo de evidencia. Si hay fecha sin evidencia, el ítem queda en `aviso`,
 > que también bloquea el gate de primera firma.
+
+**Quitar la suscripción (`POST .../anexo-suscrito/quitar`)**. No recibe body.
+Exige `X-Admin-Motivo` y devuelve la empresa con `anexo_encargo_suscrito_at`,
+`_version`, `_hash` y `_evidencia` en `null`. Los cuatro cambios quedan en el
+historial con el valor anterior, `null` como valor nuevo, el actor y el motivo.
+
+Es la **vía administrativa de la re-suscripción**. El Anexo de Encargo se
+versiona por fecha: cuando el texto vigente cambia, la Empresa tiene que
+suscribir de nuevo, y la suscripción pública se rechaza con
+`409 SUSCRIPCION_EXISTENTE` mientras la ficha tenga el Anexo de otro texto. La
+re-suscripción se hace entonces por esta ruta (y, si el instrumento estaba
+contrafirmado, por `anexo-firmado/quitar`, que es el segundo acto y lleva su
+propio motivo).
+
+**No tiene canal IPC:** como la contrafirma del Anexo de Nube, se hace por HTTP
+contra el servicio (`curl`), no desde la app de escritorio. El panel del
+operador **muestra** el estado de los dos actos, pero no los ejecuta.
+
+**Lo que NO hace:** no toca ninguna fila de
+`gh_firma_anexo_encargo_suscripciones` — la suscripción anterior queda
+`FIRMADA`, con su evidencia, su acta y su contrafirma. Lo que se deshace es el
+puntero de la ficha, no el hecho. Y no toca `anexo_encargo_firmado_at`: esa es
+la fecha del segundo acto.
+
+| Situación | HTTP | Código |
+|---|---|---|
+| La empresa no existe | `404` | `EMPRESA_NOT_FOUND` |
+| Se intenta quitar sin `X-Admin-Motivo` | `400` | `MOTIVO_REQUERIDO` |
+| La empresa no tiene suscripción registrada | `409` | `ANEXO_NO_REGISTRADO` |
 
 ### 6.13.3 El hold legal de conservación
 

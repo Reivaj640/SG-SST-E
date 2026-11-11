@@ -25,6 +25,12 @@ const path = require('path');
 
 const APP = path.join(__dirname, '..');
 
+// La FECHA en que 📦883 (2026-10-14) subió el token del iframe de
+// Configuración. Esto NO es un sello de cache-bust: es un hecho histórico, no
+// se bumpea, así que puede quedar escrito. Lo que se bumpea es el token vivo,
+// y por eso los checks de acá miran la FECHA y no el texto del sello.
+const PISO_TOKEN_883 = 20261014;
+
 function leer(p) { return fs.readFileSync(p, 'utf8'); }
 
 // Comentarios fuera: un guard que matchea su propio comentario no guarda nada.
@@ -95,7 +101,22 @@ function evaluar(F) {
 
   // 5 · Que el arreglo exista en la versión que el shell pide. Si el token no
   //    cambiara, el usuario vería el bug aunque el CSS esté bien en el repo.
-  chk(/cfg-tabs883/.test(ren), 'el token del iframe nombra este paquete');
+  //
+  //    📦883 (2026-10-14) subió el token de `20261006-oauth-embebido` a
+  //    `20261014-cfg-tabs883`. Después lo volvieron a subir 📦927-928
+  //    (20261022) y 📦1042 (20261107), así que el sello YA NO dice
+  //    "cfg-tabs883". Exigir ese texto rompía con cada bumpeo posterior y
+  //    dejaba la mutación correspondiente VACÍA, sin avisar (PROMPT.md,
+  //    trampa 28).
+  //
+  //    Lo que sobrevive —y es lo que de verdad protege el arreglo— es la FECHA:
+  //    el token no puede retroceder a uno anterior a 883, porque con un token
+  //    viejo el navegador vuelve a pedir la versión sin el `overflow-y:
+  //    hidden`. Mismo criterio que test-anexos-1042.js: se vigila el
+  //    INVARIANTE, no el texto del sello.
+  const fechaToken = /(\d{8})/.exec(token);
+  chk(!!fechaToken && Number(fechaToken[1]) >= PISO_TOKEN_883,
+    'el token del iframe no retrocede al de antes de 883', token);
 
   // 6 · Ejes explícitos, no heredados. El patrón correcto en TODO el archivo es
   //    declarar overflow-x y overflow-y juntos; un `overflow: auto` suelto
@@ -138,6 +159,15 @@ for (const r of registro) checks.push({ n: r.n, c: r.c, e: '' });
 // ── Mutaciones ──────────────────────────────────────────────────────────────
 function clonar(o) { return JSON.parse(JSON.stringify(o)); }
 
+// Reescribe el `?v=` del iframe de Configuración. Las mutaciones se derivan
+// con ESTA función y no con un literal: el token vivo cambia con cada
+// bumpeo y una mutación atada a un texto viejo se vuelve vacía sin avisar
+// (PROMPT.md, trampa 28). Con el regex, la mutación muerde siempre, sea cual
+// sea el token que haya vivo.
+function conToken(ren, nuevo) {
+  return ren.replace(/(config-viewer\.html\?v=)[^'"]+/, (m, pre) => pre + nuevo);
+}
+
 const MUT = [
   ['se quita el overflow-y de .settings-top-nav',
     f => { f.cfg = f.cfg.replace('.settings-top-nav', '.settings-top-nav-X').replace('overflow-y: hidden;', 'X'); }],
@@ -152,9 +182,9 @@ const MUT = [
   ['se le quita el role tablist',
     f => { f.cfg = f.cfg.replace('role="tablist"', ''); }],
   ['el iframe se queda con el token viejo de 868',
-    f => { f.ren = f.ren.replace('?v=20261014-cfg-tabs883', '?v=20261006-oauth-embebido'); }],
+    f => { f.ren = conToken(f.ren, '20261006-oauth-embebido'); }],
   ['el token del iframe queda sin formato de fecha',
-    f => { f.ren = f.ren.replace('?v=20261014-cfg-tabs883', '?v=cfg-tabs883'); }]
+    f => { f.ren = conToken(f.ren, 'sin-fecha'); }]
 ];
 
 let mutDetectados = 0, mutVacios = 0;

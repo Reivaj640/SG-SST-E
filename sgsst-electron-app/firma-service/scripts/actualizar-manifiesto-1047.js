@@ -58,14 +58,14 @@ const APP_ROOT = path.resolve(SERVICE_ROOT, '..');
 const REPO_ROOT = path.resolve(APP_ROOT, '..');
 const MANIFIESTO = path.join(SERVICE_ROOT, 'legal-readiness.json');
 
-const FECHA = '2026-11-09';
-const VERSION_NUBE = '1.2';
-const VERSION_ENCARGO = '2026-11-09';
+const FECHA = '2026-11-11';
+const VERSION_NUBE = '1.3';
+const VERSION_ENCARGO = '2026-11-11';
 
 // La fecha del MANIFIESTO (la cabecera `version` / `actualizado_at`). No es la
 // fecha de ningun instrumento: los textos que el manifiesto referencia tienen su
 // propia fecha, y esa no se mueve porque el manifiesto se actualice.
-const FECHA_MANIFIESTO = '2026-11-10';
+const FECHA_MANIFIESTO = '2026-11-11';
 
 // La fecha de la CAPTURA del texto del CDPA. La pagina publicada por Google NO
 // declara ninguna fecha de version: se verifico el 10-nov-2026 sobre el texto
@@ -359,12 +359,26 @@ function main(args = process.argv.slice(2)) {
       hash: hashNube,
       bytes: bytesNube,
       actualizado: FECHA,
-      nota: 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. Cambia el canal de correo '
-        + 'a Google Workspace con el Cloud Data Processing Addendum (CDPA) incorporado al Acuerdo, '
-        + 'y el papel del proveedor pasa de Responsable a Subencargado de los datos del servicio de '
-        + 'correo, con la formula condicional de la Decision A del 9-nov-2026. La v1.1 (suscrita por '
-        + 'ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: el texto vigente todavia no esta '
-        + 'suscrito y por eso el item firmado_nube del gate esta pendiente.',
+      nota: 'Texto vigente del Anexo de Nube: la v' + VERSION_NUBE + '. Corrige el bloque de pendientes '
+        + 'del texto, que declaraba como no cumplidos P1 (la aceptacion del CDPA en la consola de '
+        + 'Workspace), P2 (la cuenta kair@gesstiar.com activa, con verificacion en dos pasos), P4 (SPF, '
+        + 'DKIM y DMARC de gesstiar.com publicados) y P5 (el envio real desde el dominio): los cuatro se '
+        + 'cerraron el 10-nov-2026, y el texto nuevo declara ese envio real con su Message-ID y su '
+        + 'Authentication-Results. Siguen pendientes P3 (los alias del dominio) y P6 (revocar las app '
+        + 'passwords de la cuenta anterior). La v1.2, del 9-nov-2026, nunca llego a suscribirse y queda '
+        + 'como referencia. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: '
+        + 'el texto vigente todavia no esta suscrito y por eso el item firmado_nube del gate esta '
+        + 'pendiente. El papel del proveedor del canal de correo sigue siendo el de Subencargado, con la '
+        + 'formula condicional del dictamen legal del 11-nov-2026.'
+        + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el parrafo 12 de la v1.3 decia '
+        + '"Esta version 1.2 remite" al Anexo de Encargo, dentro de un texto que es la v1.3, y se corrigio '
+        + 'a "Esta version 1.3 remite". Es una correccion de cita: no cambian las partes, el objeto, las '
+        + 'obligaciones ni la distribucion del riesgo, y la frase siguiente del mismo parrafo ya decia que '
+        + 'esta version 1.3 no sustituye ese instrumento. El texto no estaba suscrito ni publicado cuando '
+        + 'se corrigio, y las versiones ya suscritas (la v1.1 del 5-nov-2026) no se tocaron. La huella '
+        + 'anterior de la v1.3 era '
+        + '45500569d02b876e8bc273385db934d77f5464642b75aab2a6b734e8ed3abf9f. Dictamen: '
+        + 'docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.',
     },
     versiones_firmadas: firmadoPrevio,
   };
@@ -394,15 +408,35 @@ function main(args = process.argv.slice(2)) {
     contrafirma_facultad: null,
     version: VERSION_ENCARGO,
     hash: hashEncargo,
-    nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. Actualiza las '
-      + 'secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, '
-      + 'supresion y auditoria conforme al CDPA) y anade la clausula de prevalencia del instrumento '
-      + 'bilateral mas reciente. El texto vigente NO esta suscrito: la version suscrita por ASEPLUS '
-      + 'el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso el item '
-      + 'estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza una '
-      + 'nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el '
+    nota: 'Texto vigente del Anexo de Encargo: la version ' + VERSION_ENCARGO + '. Corrige el parrafo '
+      + '"Lo que queda pendiente" de la seccion 5, que declaraba como no cumplidos P5 (la aceptacion '
+      + 'del CDPA en la consola de Workspace) y P6 (la cuenta empresarial activa, con la credencial del '
+      + 'servidor migrada y comprobada con un envio real), los dos cerrados el 10-nov-2026: el texto '
+      + 'nuevo declara los pasos cumplidos con su evidencia y deja los que siguen abiertos con su '
+      + 'responsable. El paso (viii), la confirmacion escrita sobre el instrumento bilateral, la '
+      + 'contrafirma, el alcance de los canales y el papel de Google para los datos de cuenta y la '
+      + 'telemetria, quedo respondido el 11-nov-2026 en el dictamen legal del expediente. Mantiene las '
+      + 'secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion '
+      + 'y auditoria conforme al CDPA) y la clausula de prevalencia del instrumento bilateral mas '
+      + 'reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente NO esta suscrito: la version '
+      + 'suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso '
+      + 'el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza '
+      + 'una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el '
       + 'canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora '
-      + 'es append-only.',
+      + 'es append-only.'
+      + ' ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el menu, la seccion 1 (Partes), la seccion 5 '
+      + '(Proveedores externos y subencargados) y la seccion 9 remitian al Anexo de Nube v1.2, un texto '
+      + 'superado cuyo bloque de pendientes estaba desactualizado, y los cuatro puntos remiten ahora a la '
+      + 'v1.3, que es el texto vigente y el que la clausula de prevalencia de la seccion 5 ya nombraba. '
+      + 'No es un detalle de redaccion: la seccion 5 dice que el Anexo de Nube "forma parte integral de '
+      + 'este documento", y eso es una incorporacion por remision (articulo 44 de la Ley 527 de 1999): lo '
+      + 'que queda incorporado es el texto al que apunta el vinculo, y con el vinculo apuntando a la v1.2 '
+      + 'este Anexo incorporaba un texto que el propio documento declara superado. Es una correccion de '
+      + 'cita: no cambian las partes, el objeto, las obligaciones ni la distribucion del riesgo. El texto '
+      + 'no estaba suscrito ni publicado cuando se corrigio, y la version suscrita por ASEPLUS el '
+      + '7-nov-2026 (la 2026-11-06) no se toco. La huella anterior era '
+      + 'c7c42a1897b44222c09cbdbfc6f8617f29b7250b9c9e0c8b12f1e502770bfd95. Dictamen: '
+      + 'docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.',
     versiones_firmadas: encargoFirmados,
   };
 
@@ -410,8 +444,8 @@ function main(args = process.argv.slice(2)) {
   // 5 · La matriz de finalidades: su huella y su version son las del archivo
   // ---------------------------------------------------------------------------
   // El manifiesto declara la huella de la matriz, y el test del manifiesto la
-  // contrasta contra el archivo real. La matriz cambio (la instruccion aponta
-  // a la version 2026-11-09 del Anexo de Encargo), asi que su huella cambio
+  // contrasta contra el archivo real. La matriz cambio (la instruccion apunta
+  // a la version 2026-11-11 del Anexo de Encargo), asi que su huella cambio
   // con ella: declarar la vieja seria una huella que no describe el archivo.
   m.matriz_finalidades = Object.assign({}, m.matriz_finalidades, {
     archivo: 'config/matriz-finalidades.json',
@@ -421,7 +455,7 @@ function main(args = process.argv.slice(2)) {
     nota: 'Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la '
       + 'huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla '
       + 'de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos '
-      + 'anexos. El 9-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque '
+      + 'anexos. El 11-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque '
       + 'instruccion) a la ' + VERSION_ENCARGO + ', sin cambiar ninguna finalidad, ninguna base '
       + 'juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que '
       + 'esa instruccion identifica.',
@@ -436,13 +470,21 @@ function main(args = process.argv.slice(2)) {
       proveedor: 'Google Workspace (Gmail), smtp.gmail.com:587 con STARTTLS',
       rol: 'subencargado',
       instrumento: CDPA.instrumento + ', texto del ' + CDPA.fecha,
-      estado: 'pendiente_de_migracion',
+      estado: 'migrado',
       nota: 'La cuenta y el remitente del canal transaccional (codigo OTP, enlace de acceso a la '
         + 'solicitud de firma, avisos del procedimiento e invitacion a suscribir el Anexo de Nube) '
-        + 'pasan a kair@gesstiar.com. El cambio de la credencial en el servidor, el reinicio y el '
-        + 'ENVIO REAL de prueba los ejecuta el owner (Fase 1 del plan del 9-nov-2026, pendientes '
-        + 'P2, P4 y P5). Hasta que ese envio real exista, el remitente efectivo sigue siendo el '
-        + 'anterior: este manifiesto no declara un envio que no se ha hecho.',
+        + 'estan en kair@gesstiar.com. P2, P4 y P5 se CERRARON el 10-nov-2026: la cuenta esta '
+        + 'activa con verificacion en dos pasos y app password (P2); SPF, DKIM y DMARC estan '
+        + 'publicados y visibles en el autoritativo (P4); y el ENVIO REAL quedo probado con el '
+        + 'Message-ID <5db3377d-4565-e49b-0b64-cd0b5ce2b4ca@gesstiar.com> y '
+        + 'Authentication-Results: dkim=pass; spf=pass; dmarc=pass (P5). Lo que queda abierto NO '
+        + 'es el canal: es P11 (revocar en Google las app passwords de la cuenta anterior) y P3 '
+        + '(los alias de derechos, que tienen su propia excepcion documentada mas abajo). '
+        + 'Correccion del 11-nov-2026: este bloque decia "pendiente_de_migracion" y afirmaba que '
+        + 'el remitente efectivo seguia siendo el anterior, cuando los tres pendientes ya estaban '
+        + 'cerrados. Era un falso negativo documental: no creaba un verde falso (la compuerta '
+        + 'canal_datos lee otro campo), pero dejaba en el expediente una contradiccion con '
+        + 'mail_provider.aceptacion.aceptada = true.',
     },
     derechos: {
       direccion: (m.encargado && m.encargado.canal_proteccion_datos) || null,

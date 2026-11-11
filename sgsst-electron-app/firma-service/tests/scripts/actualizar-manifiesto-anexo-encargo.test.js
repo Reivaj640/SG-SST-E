@@ -41,6 +41,7 @@ const mailer = require('../../src/services/mailer');
 const storage = require('../../src/services/storage');
 const { resetDb, manifiestoSinFirmar } = require('../helpers');
 const script = require('../../scripts/actualizar-manifiesto-anexo-encargo');
+const { formaCanonica, asciiEscape } = require('../../scripts/lib/manifiesto');
 
 const SERVICE_ROOT = path.resolve(__dirname, '..', '..');
 const MANIFIESTO_REAL = path.join(SERVICE_ROOT, 'legal-readiness.json');
@@ -401,6 +402,75 @@ test('--check, despues de escribir, dice que coincide', async () => {
   assert.equal(salida.coincide, true);
   assert.equal(salida.estado, 'firmado');
   assert.equal(fs.readFileSync(copia, 'utf8'), despues, '--check no escribe');
+});
+
+test('el manifiesto que escribe queda en la FORMA CANONICA', async () => {
+  // El manifiesto lo escriben DOS scripts (el del Anexo de Nube y este). Si
+  // cada uno lo deja con una forma distinta, los dos `--check` se contradicen:
+  // el del Nube reportaba "el manifiesto tiene un estado distinto del que se
+  // escribiria" sobre un manifiesto cuyo estado era exactamente el que habia
+  // (11-nov-2026, en la copia de prueba: el objeto de la facultad quedaba en
+  // una sola linea aqui y en varias lineas alla).
+  //
+  // La forma canonica es una sola, y la comparten los dos scripts
+  // (`scripts/lib/manifiesto.js`).
+  await sembrarFlujo({ contrafirmar: true });
+  script.main(['--manifiesto', copia]);
+
+  const contenido = fs.readFileSync(copia, 'utf8');
+  assert.equal(formaCanonica(JSON.parse(contenido)), contenido,
+    'el archivo que escribe este script es el mismo que escribiria el otro');
+});
+
+test('el --check dice que coincide aunque el archivo tenga otra FORMA', async () => {
+  // El check compara el ESTADO, no los bytes: dos archivos con el mismo estado
+  // y distinta forma son el mismo manifiesto.
+  await sembrarFlujo({ contrafirmar: true });
+  script.main(['--manifiesto', copia]);
+  const despues = fs.readFileSync(copia, 'utf8');
+
+  // Se cambia la FORMA (la sangria), no el estado. El archivo sigue siendo
+  // ASCII puro: el manifiesto escapa lo que no es ASCII.
+  const otraForma = asciiEscape(JSON.stringify(JSON.parse(despues), null, 4)) + '\n';
+  assert.notEqual(otraForma, despues, 'la forma cambio');
+  fs.writeFileSync(copia, otraForma, 'utf8');
+
+  const salida = script.main(['--manifiesto', copia, '--check']);
+  assert.equal(salida.coincide, true,
+    'el estado es el mismo: el check no puede reportar una diferencia');
+  assert.equal(fs.readFileSync(copia, 'utf8'), otraForma, '--check no escribe');
+});
+
+test('una suscripcion contrafirmada de OTRO texto NO hace que el manifiesto diga "firmado"', async () => {
+  // El caso real: ASEPLUS tiene el Anexo de Encargo 2026-11-06 suscrito Y
+  // contrafirmado, y el texto vigente es el 2026-11-11. Si el script tomara
+  // la ultima suscripcion contrafirmada sin mirar de que texto es, el
+  // manifiesto diria "firmado" mientras el bloque declara la huella del texto
+  // vigente: un VERDE FALSO sobre un texto que nadie ha suscrito.
+  await sembrarFlujo({ contrafirmar: false });
+  const ahora = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO gh_firma_anexo_encargo_suscripciones
+      (id_empresa, token_hash, version, hash_texto, correo_firmante,
+       nombre_firmante, estado, expira_enlace_at, firmado_at, contrafirmado_at,
+       contrafirma_actor, contrafirma_evidencia, evidencia)
+    VALUES (?, ?, ?, ?, ?, ?, 'FIRMADA', ?, ?, ?, ?, ?, ?)
+  `).run(
+    ID_EMPRESA, 'hist-texto-viejo', '2026-11-06',
+    '5cc7a34603ea2e300e6c82ed695454eb705363345a3165ae2e75b5733960aa72',
+    CORREO_FIRMANTE, 'PERSONA DE PRUEBA', ahora, ahora, ahora, 'kair',
+    JSON.stringify({ fuente: 'prueba' }), JSON.stringify({ fuente: 'prueba' }),
+  );
+
+  assert.throws(
+    () => script.main(['--manifiesto', copia]),
+    (e) => e.codigo === 4,
+    'el manifiesto NO puede decir "firmado" por una suscripcion de otro texto',
+  );
+
+  const bloque = leerCopia().anexo_encargo;
+  assert.equal(bloque.estado, 'no_firmado',
+    'el manifiesto sigue diciendo que el texto vigente no esta suscrito');
 });
 
 // ===========================================================================

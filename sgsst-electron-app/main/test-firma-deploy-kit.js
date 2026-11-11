@@ -47,9 +47,20 @@ if (src.env) {
 
 // Script de setup
 if (src.setup) {
+  // 📦1048 · El literal "setup_20.x" se venció el 11-nov-2026: el runtime
+  // vigente pasó a Node 22 (decisión del owner), `setup-vm.sh` ya instala esa
+  // versión y la guía que acompaña al script lo dice. La versión sale DEL
+  // DATO —la guía, que es el documento vivo del mismo procedure— y no de una
+  // constante escrita a mano: si alguien cambia el script o la guía sin
+  // cambiar la otra, el check muerde (PROMPT.md §5.19 y trampa 28).
+  const mGuia = (src.readme || '').match(/Instala Node (\d+)/);
+  const majorNode = mGuia ? mGuia[1] : '';
+  const nodo = majorNode || '?';
+  add('setup: la guia declara qué versión de Node instala', majorNode !== '');
+  add('setup: instala Node ' + nodo, majorNode !== '' && new RegExp('setup_' + majorNode + '\\.x').test(src.setup));
+  add('setup: el umbral de versión del script es ' + nodo, majorNode !== '' && new RegExp('-lt ' + majorNode + '\\b').test(src.setup));
   [
     [/set -euo pipefail/, 'setup: falla rápido ante errores'],
-    [/setup_20\.x/, 'setup: instala Node 20'],
     [/caddy/, 'setup: instala Caddy (HTTPS)'],
     [/useradd.*kairfirma/s, 'setup: usuario de servicio sin privilegios'],
     [/ufw deny 3001/, 'setup: el puerto del servicio NO queda expuesto'],

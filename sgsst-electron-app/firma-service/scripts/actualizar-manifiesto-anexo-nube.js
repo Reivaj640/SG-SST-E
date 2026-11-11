@@ -172,27 +172,14 @@ function aAscii(valor) {
 /**
  * Escapa lo que no es ASCII, para que el manifiesto sea JSON ASCII puro.
  *
+ * La funcion vive en `scripts/lib/manifiesto.js`: la forma del manifiesto la
+ * escriben DOS scripts y tiene que ser UNA sola, o los dos `--check` se
+ * contradicen (ver el archivo de la lib).
+ *
  * @param {string} s
  * @returns {string}
  */
-function asciiEscape(s) {
-  let out = '';
-  for (const ch of s) {
-    const c = ch.codePointAt(0);
-    if (c > 0x7f) {
-      if (c > 0xffff) {
-        const v = c - 0x10000;
-        out += '\\u' + (0xd800 + (v >> 10)).toString(16).padStart(4, '0')
-          + '\\u' + (0xdc00 + (v & 0x3ff)).toString(16).padStart(4, '0');
-      } else {
-        out += '\\u' + c.toString(16).padStart(4, '0');
-      }
-    } else {
-      out += ch;
-    }
-  }
-  return out;
-}
+const { asciiEscape, formaCanonica, mismoEstado } = require('./lib/manifiesto');
 
 // ---------------------------------------------------------------------------
 // LA BASE
@@ -723,7 +710,9 @@ function main(args) {
   m.anexo_nube.versiones_firmadas = previas;
 
   // --- validaciones ------------------------------------------------------
-  const salidaCruda = asciiEscape(JSON.stringify(m, null, 2)) + '\n';
+  // La forma canonica del manifiesto: una sola para los dos scripts que lo
+  // escriben (ver `scripts/lib/manifiesto.js`).
+  const salidaCruda = formaCanonica(m);
   let datos;
   try {
     datos = JSON.parse(salidaCruda);
@@ -778,7 +767,11 @@ function main(args) {
   };
 
   if (soloCheck) {
-    const coincide = salidaCruda === crudo;
+    // El check compara el ESTADO, no los BYTES. El archivo lo escriben dos
+    // scripts y cada uno puede dejarlo con distinta forma: eso no es una
+    // diferencia de estado. Comparar bytes hacia que el check del Nube
+    // contradijera al del Encargo sobre el mismo manifiesto (11-nov-2026).
+    const coincide = mismoEstado(datos, manifiesto);
     salida.coincide = coincide;
     if (!coincide) {
       // --check informa del estado que HAY, no del que habria.

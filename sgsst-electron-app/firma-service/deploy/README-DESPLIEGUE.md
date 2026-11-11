@@ -10,6 +10,13 @@
 > Se conserva porque sigue siendo útil para un escenario distinto: el día que se quiera una **IP
 > publica propia sin depender de Cloudflare**, los pasos de abajo (crear la VM, instalar Node,
 > usuario sin privilegios, systemd, backups) son válidos. Solo cambian el proxy y el dominio.
+>
+> ⚠️ **Node: el runtime vigente es Node 22** (decision del owner del 11-nov-2026).
+> `better-sqlite3` 11.10.0 no compila contra la V8 de Node 26 y no hay prebuild
+> para Node 24: el unico runtime viable es **Node 22 (ABI 127)**. Esta guia y
+> `deploy/setup-vm.sh` ya instalan esa version (`setup_22.x`); lo que hay que
+> hacer **despues** de instalarlo es **recompilar** `better-sqlite3` contra ese
+> runtime. Ver `docs/MIGRACION-SERVIDOR-FIRMA.md` §8.2.
 
 > Guía paso a paso para poner el servicio de firmas en internet de forma
 > permanente **sin pagar nada**: VM gratis de Oracle Cloud, dominio gratis
@@ -28,7 +35,7 @@ Celular del firmante (internet)
    Caddy (443)  ← certificado Let's Encrypt automático
         │  solo 127.0.0.1:3001
         ▼
-   firma-service (Node 20 + SQLite, usuario sin privilegios)
+   firma-service (Node 22 + SQLite, usuario sin privilegios)
         │
         ▼
    /opt/kair-firma/data + storage + backups diarios
@@ -96,7 +103,7 @@ chmod +x setup-vm.sh
 ./setup-vm.sh
 ```
 
-Instala Node 20, Caddy, sqlite3; crea usuario y carpetas; configura firewall.
+Instala Node 22, Caddy, sqlite3; crea usuario y carpetas; configura firewall.
 
 ## Paso 5 — Subir el código del servicio
 
@@ -285,9 +292,15 @@ sqlite3 /tmp/firma-restaurada.sqlite "PRAGMA integrity_check;"
 `probar-restauracion.sh` imprime en el log el comando exacto que corresponde a
 la herramienta instalada.
 
-El tercer cron (día 1 de cada mes a las 04:00 UTC = 23:00 de Colombia) corre
+El tercer cron (día 1 de cada mes a las **04:00 hora local del servidor**) corre
 la prueba de restauracion: es lo que hace verdadera la frase del Anexo de
 Nube "se verifica mensualmente que el respaldo se restaura correctamente".
+
+> **Ojo con la equivalencia horaria.** El cron usa la hora **local** del servidor, y el
+> servidor debe estar en **America/Bogota** (ver más arriba). `0 4 1 * *` corre entonces a las
+> **04:00 de Colombia**, que son las **23:00 UTC del día anterior** — al revés de como estaba
+> escrito antes ("04:00 UTC = 23:00 de Colombia"). Si el servidor queda en `Etc/UTC`, el
+> respaldo cae a las 17:00 de Colombia y los dias habiles se cuentan con el dia equivocado.
 
 ### 9.5 La purga de los respaldos (lo que cumple el numeral 8.7)
 

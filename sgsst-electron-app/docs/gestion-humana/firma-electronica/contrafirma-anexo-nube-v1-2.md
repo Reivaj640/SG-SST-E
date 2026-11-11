@@ -1,26 +1,44 @@
-# La contrafirma del Anexo de Nube v1.2 — el segundo acto (9-nov-2026)
+# La contrafirma del Anexo de Nube v1.3 — el segundo acto (9-nov-2026)
 
 > Documento de operación. Es la nota que enlaza **el código que ya está construido** con **la
 > respuesta que falta del abogado (P7)**, para que la próxima jornada no tenga que reconstruir ese
 > razonamiento ni adivinar qué había que hacer primero.
 >
+> **El nombre del archivo no cambia** (`contrafirma-anexo-nube-v1-2.md`): lo citan otros documentos
+> del expediente y no se renombra. **El texto vigente del Anexo de Nube, desde el 11-nov-2026, es la
+> v1.3** (`sgsst-electron-app/legal/anexo-nube-v1.3.html`, 85 143 B, SHA-256 `fdd10551…2b585d`, fecha
+> 11-nov-2026). La v1.2 (84 062 B, `242037b3…1f7245`, 9-nov-2026) **nunca fue suscrita** y queda como
+> referencia. La v1.1 es la que **está suscrita** por ASEPLUS y no se toca.
+>
 > **Estado:** la contrafirma está **implementada en el servicio** (migración `060`, dos rutas
 > administrativas, acta propia, manifiesto y gate leyendo los dos actos). **El ACTO no se ha
 > hecho**: lo hace el operador de K+AIR, sobre la suscripción real de ASEPLUS (P8).
-> **Pendiente de P7:** si el abogado responde que la contrafirma del Anexo de Nube se firma
-> **fuera** del servicio, el apartado 5 dice qué queda por hacer en ese caso.
 >
-> **ACTUALIZADO 10-nov-2026: P7 ya respondió.** La contrafirma va **dentro** del servicio, con la
+> **P7 ya respondió (10-nov-2026):** la contrafirma va **dentro** del servicio, con la
 > arquitectura que este documento describe. La condición del abogado sobre la **facultad de quien
 > contrafirma por Gesstiar** está implementada (§5 y
-> `acreditacion-facultad-contrafirmante.md`). Queda una decisión de texto (si esa exigencia entra
-> en el §10, lo que obligaría a una v1.3) y la vía para incorporar una contrafirma externa.
+> `acreditacion-facultad-contrafirmante.md`). **Lo que queda abierto:** la vía para incorporar una
+> contrafirma externa (sin decidir) y el **despliegue habilitante** en el servidor (migraciones
+> 060/061/062 y `FIRMA_ADMIN_ACTOR`, con los comandos en
+> `sgsst-electron-app/docs/MIGRACION-SERVIDOR-FIRMA.md` §0).
+>
+> **La decisión de texto del 10-nov-2026 (opción A · control interno) queda registrada tal como se
+> tomó:** la acreditación se quedaba en el expediente y **el texto vigente NO cambiaba**: no había
+> v1.3, la huella `242037b3…1f7245` no se movía y P8 seguía siendo la suscripción de la v1.2 por
+> ASEPLUS. Ver `acreditacion-facultad-contrafirmante.md` §7.
+>
+> ⚠️ **Esa decisión fue REVISADA el 11-nov-2026.** El fundamento está en
+> `sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md`:
+> el texto **sí cambia**, por versión nueva y con huella propia —el Anexo de Nube pasa a la **v1.3**
+> y el Acuerdo a la **v1.6**—, porque los textos vigentes afirmaban hechos que dejaron de ser
+> ciertos el 10-nov-2026. El control interno de la acreditación **se mantiene**. **P8 es ahora la
+> suscripción de la v1.3** por ASEPLUS.
 
 ---
 
 ## 1. Por qué existe este segundo acto
 
-El texto vigente del Anexo de Nube (la **v1.2**, §10) no es un contrato de una parte: lo
+El texto vigente del Anexo de Nube (la **v1.3**, §10) no es un contrato de una parte: lo
 **suscribe** la Empresa y lo **contrafirma** K+AIR, y el propio texto dice que el instrumento
 solo queda **ejecutado** cuando los dos actos se han producido.
 
@@ -53,6 +71,7 @@ exigía contrafirma.
 | Listado del operador | `firma-service/src/services/empresa.js` | `tiene_anexo_nube_suscrito` y `tiene_anexo_nube_ejecutado`: los dos actos, por separado |
 | Panel del operador | `modules/gestion-humana/firma-operador/index.js` | Muestra los tres estados del Anexo de Nube (no suscrito / suscrito sin contrafirma / ejecutado) y la fecha de la contrafirma |
 | Pruebas | `firma-service/tests/anexo-nube-contrafirma.test.js` | 20 pruebas del segundo acto, incluidas las dos rutas por HTTP |
+| Re-suscripción | `firma-service/src/routes/admin-empresas.js` | `POST .../anexo-suscrito/quitar`: la vía administrativa para volver a suscribir el Anexo de Encargo cuando el texto vigente cambia. Ver §3.6 |
 
 ---
 
@@ -125,6 +144,110 @@ el gate con `firmado_nube` y `contrafirma_nube` en `ok`. **Ninguna firma se escr
 si el script no puede leer la contrafirma, no escribe y sale con el código 3 diciendo qué
 migración falta.
 
+**Y el manifiesto solo declara el TEXTO VIGENTE.** Los dos scripts comparan por **huella**: el
+estado del bloque solo se escribe si la suscripción (y su contrafirma) es del texto que el
+servidor está sirviendo ahora. Una suscripción de otro texto —la 2026-11-06 de ASEPLUS, que ya
+está suscrita y contrafirmada— **no dice nada** del 2026-11-11. Sin esa comparación, el
+manifiesto declararía «firmado» sobre un texto que nadie ha suscrito, con la huella del texto
+vigente al lado: el gate compararía esa huella con la del archivo, no encontraría diferencia, y
+cerraría un instrumento que no está. Cuando no hay suscripción contrafirmada del texto vigente,
+el script **se niega** (código 4) y lo dice: cuántas contrafirmas hay y de qué textos son.
+
+### 3.5. Antes de pedir la firma: la errata del 11-nov-2026
+
+**El texto que ASEPLUS va a firmar es el texto corregido, y hay que decírselo.** El 11-nov-2026, antes
+de la suscripción, se corrigieron dos defectos de cita en los dos textos de P8:
+
+- El **§12 del Anexo de Nube v1.3** decía «Esta versión **1.2** remite» al Anexo de Encargo,
+  dentro de un documento que es la v1.3 y contradiciendo la frase siguiente del mismo párrafo.
+- El **Anexo de Encargo 2026-11-11** remitía en cuatro puntos (menú, §1, §5 y §9) al Anexo de Nube
+  **v1.2**, un texto superado que su propia §5 incorpora por remisión (art. 44 de la Ley 527 de
+  1999): lo que el vínculo incorporaba era el texto equivocado.
+
+Son correcciones de cita: no cambian las partes, el objeto, las obligaciones ni la distribución del
+riesgo. **Las etiquetas de versión no cambian** (v1.3 y 2026-11-11) y las versiones ya suscritas
+(v1.1 y 2026-11-06) no se tocaron. Lo que cambia es la huella, y la anterior queda declarada en la
+nota del manifiesto y en el Historial.
+
+**La línea que hay que incluirle a ASEPLUS** (por correo, antes de pedirle la firma):
+
+> Antes de la suscripción les informamos que el Anexo de Nube v1.3 y el Anexo de Encargo
+> 2026-11-11 que van a firmar se corrigieron el 11 de noviembre de 2026, antes de ser susceptibles de
+> suscripción: se corrigieron dos referencias de versión (en el §12 del Anexo de Nube y en cuatro
+> puntos del Anexo de Encargo) que apuntaban a una versión anterior del Anexo de Nube. La corrección
+> no cambia ninguna cláusula, obligación ni condición: son correcciones de cita. El texto vigente es
+> el que adjuntamos, con su huella SHA-256, y es el que se firma.
+
+Por qué la línea importa: el principio de buena fe del art. 3 de la Ley 527 de 1999 y el hecho de
+que el firmante tiene que poder **aprobar inequívocamente** el contenido que firma (art. 7, literal
+a). Un texto que se contradice a sí mismo no permite esa aprobación; y una errata disclosed no es
+una sorpresa.
+
+Detalle completo: `dictamen-legal-errata-textos-2026-11-11.md`.
+
+### 3.6. La re-suscripción del Anexo de Encargo: la ruta que faltaba (11-nov-2026)
+
+**P8 no es solo contrafirmar: el Anexo de Encargo de ASEPLUS está suscrito y contrafirmado sobre
+el texto 2026-11-06, y hay que suscribir el 2026-11-11.** El servicio lo bloquea con `409
+SUSCRIPCION_EXISTENTE`, y ese 409 solo se levanta si las **dos** fechas de la ficha
+(`anexo_encargo_suscrito_at` y `anexo_encargo_firmado_at`) están en NULL: en un instrumento ya
+firmado, las dos tienen fecha.
+
+El manifiesto y la documentación ya prometían que «la re-suscripción va por el canal administrativo,
+con su motivo». **La promesa no se cumplía**: el servicio tenía `desmarcarAnexoSuscrito()` —con
+motivo obligatorio, rastro campo por campo y pruebas— y **ninguna ruta HTTP la llamaba**. La única
+ruta de baja era `anexo-firmado/quitar`, que deshace el SEGUNDO acto y deja la fase 1 intacta. Sin
+la ruta nueva, el instrumento no se podía volver a suscribir: era una capacidad prometida y no
+existente.
+
+```powershell
+# 1. PRIMERO el segundo acto: la contrafirma (fase 2).
+curl -X POST "https://firma.kair.fyi/internal/admin/empresas/<ID>/anexo-firmado/quitar" `
+  -H "X-Admin-API-Key: <ADMIN_KEY>" `
+  -H "X-Admin-Motivo: <POR QUE>" `
+  -H "X-Admin-Actor: <QUIEN>"
+
+# 2. DESPUES el primer acto: la suscripcion (fase 1).
+curl -X POST "https://firma.kair.fyi/internal/admin/empresas/<ID>/anexo-suscrito/quitar" `
+  -H "X-Admin-API-Key: <ADMIN_KEY>" `
+  -H "X-Admin-Motivo: <POR QUE>" `
+  -H "X-Admin-Actor: <QUIEN>"
+
+# 3. Y ahora la suscripcion nueva, por el canal publico (el de la Empresa).
+curl -X POST "https://firma.kair.fyi/internal/admin/empresas/<ID>/anexo-encargo/suscripcion" `
+  -H "X-Admin-API-Key: <ADMIN_KEY>" `
+  -H "Content-Type: application/json" `
+  -d '{ "id_canal": "<SEGUNDO CANAL>" }'
+```
+
+**El orden importa**: al revés, la segunda llamada no encuentra la fase 2.
+
+**Qué escribe y qué NO.** La ruta pone en NULL los **cuatro** campos de la fase 1 en la ficha
+(`anexo_encargo_suscrito_at`, `_suscrito_version`, `_suscrito_hash` y `_suscrito_evidencia`), con el
+valor anterior en el rastro append-only, el actor y el motivo. **No toca**
+`anexo_encargo_firmado_at` (esa es la fecha del segundo acto: es otra ruta y otro motivo) y **no
+toca ninguna fila** de `gh_firma_anexo_encargo_suscripciones`: la suscripción anterior queda
+**FIRMADA**, con su evidencia, su acta y su contrafirma. Lo que se deshace es el puntero de la
+ficha, no el hecho.
+
+**Los errores que puede devolver**: `404 EMPRESA_NOT_FOUND`, `409 ANEXO_NO_REGISTRADO` (esa empresa
+no tiene una suscripción registrada) y `400 MOTIVO_REQUERIDO` (sin `X-Admin-Motivo` la ruta no
+quita nada). Sin llave, `401`.
+
+**La vía del Anexo de Nube es otra y no usa esta ruta.** El Nube se desbloquea con la **premarca**
+(`POST .../anexo-nube-firmado`, que registra en la ficha la versión y la huella del texto vigente
+antes de que la Empresa suscriba) y después con una suscripción pública nueva. La premarca no toca
+la suscripción anterior, que queda en la historia como texto ya suscrito.
+
+**Verificado.** La ruta se desplegó el 11-nov-2026 y se comprobó por SSH: hash en disco
+`ae0fff23…7aa2f0` (el del repo), servicio `active` con `NRestarts=0`, salud `ok`, y la ruta
+respondiendo **401** sin llave mientras una ruta inexistente responde **404** (o sea: existe). Las
+pruebas están en `tests/anexo-encargo-resuscripcion.test.js` (8 casos) y el detalle de la API, con
+sus errores, en `API.md` §6.13.2 («Los nueve endpoints»).
+
+**No tiene canal IPC**: como la contrafirma del Anexo de Nube, se ejecuta por HTTP contra el
+servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.
+
 ---
 
 ## 4. Lo que este documento NO cierra
@@ -141,6 +264,15 @@ migración falta.
   **la app no las expone**: no hay canal IPC ni botón. Por eso §3.2 usa `curl` contra el
   servicio. La app sí **muestra** el estado de los dos actos (columna del listado y detalle de la
   suscripción), pero no permite ejecutarlo.
+- **La v1.6 del Acuerdo ya está publicada; la Constancia ya tiene los datos del registro.** La
+  publicación y el registro de la Constancia son actos del owner, distintos de la contrafirma, y ya
+  se hicieron el 11-nov-2026: la v1.6 quedó **publicada** (`publicado: true` en el manifiesto) con su
+  autorización operativa registrada (id 4) y es la versión activa en la base de producción; la
+  Constancia de versión y autorización (`sgsst-electron-app/legal/constancia-aprobacion-acuerdo.html`,
+  SHA-256 `aaf68b4e…d0b413`, 9 794 B) se **completó** con los datos del registro (el responsable del
+  registro y la fecha del registro); sus secciones 5 y 6 siguen vacías porque la autorización vive en
+  el registro de aprobaciones del servicio. Los actos que **quedan** de P8 son, en orden: **suscribir
+  la v1.3** del Anexo de Nube y el **Anexo de Encargo 2026-11-11** por ASEPLUS, y contrafirmar.
 
 ---
 
@@ -183,6 +315,11 @@ huella SHA-256. Su recomendación: **mantener exactamente la arquitectura que ya
 sacar la contrafirma del sistema. El código de este documento es, por tanto, el camino definitivo
 y no andamiaje.
 
+> La respuesta se dio sobre el texto de entonces (la v1.2) y **sigue valiendo** para el texto
+> vigente: la v1.3 conserva el §10 y la misma arquitectura de dos actos, así que **la contrafirma
+> se sigue haciendo dentro del servicio**, por las mismas dos rutas. Lo único que cambió el
+> 11-nov-2026 es la **versión del texto** (§5, al final), no el camino.
+
 **La condición que sí abría trabajo** (y que no se cumplía): «La ejecución por una persona distinta
 del representante legal de Gesstiar S.A.S. requerirá acreditar previamente la facultad de
 representación o poder suficiente, que deberá conservarse en el expediente». Está implementada:
@@ -198,9 +335,21 @@ cierra `contrafirma_nube` ni habilita el instrumento.
 «evidencia íntegra, verificable y vinculada inequívocamente al instrumento» que hay que definir
 con detalle; mientras tanto, una contrafirma externa **no habilita nada**.
 
-**La otra decisión que queda**: si esa exigencia debe **decirse** en el §10 del texto vigente
-(implicaría una v1.3, con huella nueva y republicación, antes de que ASEPLUS firme) o si se queda
-como control interno, cuyo expediente es el registro de poderes, el acta y la evidencia.
+**La decisión de texto del 10-nov-2026 ya NO está abierta:** se queda como **control interno**
+(opción A). Tal como se decidió aquel día, el texto vigente **no cambiaba**: no había v1.3, ni
+huella nueva, ni republicación. La condición queda documentada en el expediente (registro de
+poderes, acta, evidencia y manifiesto) y exigida por el gate. Ver
+`acreditacion-facultad-contrafirmante.md` §7 y la tabla de instrumentos.
+
+⚠️ **Esa decisión fue REVISADA el 11-nov-2026.** El fundamento está en
+`sgsst-electron-app/docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md`:
+el texto **sí cambia**, por versión nueva y con huella propia. El Anexo de Nube pasa a la **v1.3**
+(`fdd10551…2b585d`, 85 143 B, 11-nov-2026) y el Acuerdo a la **v1.6** (`08e1eb8b…52f13e`,
+75 961 B, 11-nov-2026). Los motivos son otros: los textos vigentes afirmaban hechos que dejaron
+de ser ciertos el 10-nov-2026 (el canal de correo y el papel de Google). El **control interno de
+la acreditación se mantiene** y, además, la v1.3 tampoco recoge la exigencia de la faculty en
+su §10: la acreditación sigue siendo lo que acredita la facultad, no lo que la dice el texto.
+**P8 es ahora la suscripción de la v1.3** por ASEPLUS.
 
 ---
 
@@ -210,8 +359,12 @@ como control interno, cuyo expediente es el registro de poderes, el acta y la ev
   canal de correo y del CDPA.
 - **Tabla única de instrumentos**: `tabla-instrumentos-vigentes-2026-11-09.md` — documento,
   versión, hash, fecha, suscripción y evidencia.
-- **El texto vigente**: `sgsst-electron-app/legal/anexo-nube-v1.2.html` (84 062 B, SHA-256
-  `242037b3…1f7245`), con su copia byte a byte igual en `sitio/`.
+- **El texto vigente**: `sgsst-electron-app/legal/anexo-nube-v1.3.html` (85 143 B, SHA-256
+  `fdd10551…2b585d`, fecha de vigencia 11-nov-2026), con su copia byte a byte igual en `sitio/`.
+- **La v1.2, como referencia** (nunca fue suscrita): `sgsst-electron-app/legal/anexo-nube-v1.2.html`
+  (84 062 B, SHA-256 `242037b3…1f7245`, 9-nov-2026). Su huella no se mueve: no se reescribe.
+- **La v1.1, la que está suscrita** por ASEPLUS el 5-nov-2026 (62 198 B, SHA-256 `e9517536…591482`):
+  no se toca.
 - **La API**: `API.md` §6.21.5 (las dos rutas administrativas del Anexo de Nube), §6.13 (los
   cuatro indicadores del estado de los Anexos en el listado) y §6.22.2 (la forma de la
   suscripción del Anexo de Nube, con el segundo acto leído de la fila). La §6.22.1 lleva el

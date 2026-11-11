@@ -72,6 +72,18 @@ Skills de `addyosmani/agent-skills` seleccionadas por complementar Superpowers s
 
 **Origen:** [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (98k★, MIT). Todas Safe / Low Risk. Docs: `.agents/skills/<nombre>/SKILL.md`.
 
+### Skill de control de deriva (`.agents/skills/`)
+
+Port adaptado de un pack externo. Se activa con `skill({ name: "egm-drift-report" })`.
+
+| Skill | Cuando usarlo | Activacion |
+|-------|--------------|------------|
+| **egm-drift-report** | Compara los documentos versionados de un directorio contra el codigo fuente actual y reporta SOLO las divergencias: afirmaciones que el codigo no tiene, literales vencidos, rutas que ya no existen, promesas que la forma no cumple y estado del mundo que cambio. No arregla nada: el informe es el entregable | Antes de commitear un paquete; cuando el owner pida "verificar si los documentos siguen siendo ciertos", "detectar deriva" o "revisar que el doc y el codigo digan lo mismo" |
+
+**Salida:** `tmp/DRIFT/<YYYY-MM-DD>_DRIFT_REPORT.md` (una seccion por documento, solo las divergencias, con linea del documento y linea del codigo). `tmp/` esta en `.gitignore`, asi que el reporte no entra a un commit por accidente.
+
+**Origen:** [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model) (Apache-2.0, Google LLC). Adaptado a las derivas reales de este repo, no traducido literal. Procedencia completa en `.agents/skills/egm-drift-report/references/adaptacion.md`.
+
 ### Skills de Testing Electron (`.agents/skills/`)
 
 | Skill | Cuando usarlo | Activacion |

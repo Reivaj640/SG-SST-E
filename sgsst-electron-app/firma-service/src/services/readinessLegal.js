@@ -350,6 +350,7 @@ function _resumenEmpresas(dbConn, hashModeloNube) {
     con_anexo_base: 0,
     con_anexo_nube: 0,
     con_anexo_nube_suscrito_vigente: 0,
+    con_anexo_nube_suscrito_sin_contrafirma: 0,
     con_anexo_nube_vigente: 0,
     con_canal_pqrs: 0,
     fechas_antes_del_alta: 0,
@@ -416,6 +417,17 @@ function _resumenEmpresas(dbConn, hashModeloNube) {
       // cuenta Empresas que suscribieron un texto que ya no esta vigente.
       con_anexo_nube_suscrito_vigente: tieneNube && tieneHashNube && _esHashSha256(hashModeloNube)
         ? filas.filter(esDelTextoVigente).length
+        : 0,
+      // Las Empresas que suscribieron el TEXTO VIGENTE y todavia NO tienen la
+      // contrafirma de K+AIR. Es un contador PROPIO y no una resta: "suscritas
+      // al texto vigente" incluye a las que ya estan contrafirmadas, asi que
+      // usarlo para decir "X empresas sin contrafirma" cuenta tambien a las
+      // que si la tienen. En la copia de prueba del 11-nov-2026 eso produjo un
+      // mensaje que echaba la culpa a la empresa que estaba contrafirmada y
+      // escondia a la que tenia el texto viejo: el operador iba a
+      // contrafirmar un instrumento que ya estaba ejecutado.
+      con_anexo_nube_suscrito_sin_contrafirma: tieneNube && tieneHashNube && _esHashSha256(hashModeloNube)
+        ? filas.filter((f) => esDelTextoVigente(f) && !f.anexo_nube_ejecutado_at).length
         : 0,
       // Las Empresas cuyo Anexo de Nube esta EJECUTADO: suscrito sobre el
       // texto vigente Y contrafirmado por K+AIR. El Anexo de Nube es
@@ -1229,10 +1241,29 @@ function evaluar(opciones = {}) {
   // la versión que está en vigor no tiene la evidencia técnica que autoriza
   // su publicación.
   const aprobacionOperativa = _aprobacionOperativaVigente(dbConn, acuerdoActivo);
-  const publicadoV11 = dbConn
-    ? _versionEsAlMenosV11(versionActiva)
-    : acMan.publicado === true;
   const hashManifiesto = _hashAcuerdoManifiesto(acMan);
+  // 📦1049 · LA VERSIÓN QUE ESTÁ EN VIGOR TIENE QUE SER LA QUE DECLARA EL
+  // MANIFIESTO. Antes este item solo miraba que la versión activa fuera
+  // ">= v1.1", sin compararla con la que el manifiesto declara: un texto viejo
+  // podía quedar activo y el item lo daba por publicado. Medido el
+  // 11-nov-2026 en producción: la v1.5 activa y autorizada (5-nov) con la
+  // v1.6 declarada en el manifiesto daba `publicado: ok`, y el gate de
+  // publicación quedaba con 0 bloqueantes mientras el manifiesto decía
+  // `publicado: false`. La compuerta ahora compara las dos cosas: la versión
+  // (sale del manifiesto, o del nombre del archivo si el manifiesto no la
+  // declara) y la huella (si el manifiesto la declara).
+  const versionEsperada = versionAcuerdo;
+  const hashActivoCoincide = !_esHashSha256(hashManifiesto)
+    || !acuerdoActivo
+    || !acuerdoActivo.texto_hash
+    || String(acuerdoActivo.texto_hash).toLowerCase() === hashManifiesto.toLowerCase();
+  const publicadoV11 = dbConn
+    ? (!!versionActiva
+      && _versionEsAlMenosV11(versionActiva)
+      && !!versionEsperada
+      && versionActiva === versionEsperada
+      && hashActivoCoincide)
+    : acMan.publicado === true;
   const hashV11Ok = _esHashSha256(hashManifiesto)
     && anAcuerdo.existe
     && _hash(docAcuerdo.texto) === hashManifiesto.toLowerCase();
@@ -1286,14 +1317,26 @@ function evaluar(opciones = {}) {
     ),
     _item(
       'publicado',
-      'Versión v1.1 activa en la base',
+      'La versión vigente en la base es la que declara el manifiesto',
       _estado(publicadoV11),
       {
         bloquea: GATE_AMBOS,
-        detalle: versionActiva
-          ? `La versión activa es ${versionActiva}.`
-          : 'No hay una versión activa del Acuerdo.',
-        accion: 'Publicar la v1.1 como versión activa después de cerrar los bloqueantes de publicación.',
+        // 📦1049 · El detalle dice lo que el item MIDE (la versión que está en
+        // vigor contra la que declara el manifiesto), no solo el número de la
+        // versión activa. Antes decía "La versión activa es v1.5" y daba el
+        // item por bueno con un texto viejo en vigor.
+        detalle: !versionActiva
+          ? 'No hay una versión activa del Acuerdo.'
+          : (versionActiva === versionEsperada
+            ? `La versión activa es ${versionActiva}, la misma que declara el manifiesto.`
+            : `La versión activa es ${versionActiva}, pero el manifiesto declara ${versionEsperada || 'ninguna'}: `
+              + 'el texto que está en vigor no es el texto vigente declarado.'),
+        accion: _accionSi(
+          publicadoV11,
+          'No hay nada que publicar: la versión en vigor es la que declara el manifiesto.',
+          'Registrar en la base la versión que declara el manifiesto (con su huella) para que el '
+            + 'texto que está en vigor sea el vigente.',
+        ),
         referencia: 'gh_firma_acuerdo_versiones',
       },
     ),
@@ -1695,6 +1738,10 @@ function evaluar(opciones = {}) {
   const empresasNubeOk = !exigirNube
     ? true
     : (empresas.total > 0 && empresas.con_anexo_nube_vigente === empresas.total);
+  // Las empresas que YA suscribieron el texto vigente y les falta el SEGUNDO
+  // acto. Es un contador propio del resumen, no una resta: ver el comentario
+  // de `con_anexo_nube_suscrito_sin_contrafirma`.
+  const empresasNubeSinContrafirma = empresas.con_anexo_nube_suscrito_sin_contrafirma || 0;
 
   const grupoNube = _grupo('anexo_nube', 'Anexo de Nube y subencargados', [
     _item(
@@ -1923,11 +1970,20 @@ function evaluar(opciones = {}) {
             ? 'No hay empresas activas: no hay primera firma posible.'
             : (empresasNubeOk
               ? `Todas las empresas activas tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) EJECUTADO: suscrito y contrafirmado.`
-              : (empresas.con_anexo_nube_suscrito_vigente > 0
-                ? `${empresas.con_anexo_nube_suscrito_vigente} empresa(s) tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) suscrito, pero sin la contrafirma de K+AIR: el instrumento no está EJECUTADO.`
-                : `${empresas.total - empresas.con_anexo_nube_vigente} empresa(s) no tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) registrado.`))),
-        accion: 'Registrar el Anexo de Nube del texto vigente (v' + modeloNube.version
-          + ') firmado por cada empresa antes de la primera firma.',
+              : (empresasNubeSinContrafirma > 0
+                ? `${empresasNubeSinContrafirma} empresa(s) tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) suscrito, pero sin la contrafirma de K+AIR: el instrumento no está EJECUTADO.`
+                : `${empresas.total - empresas.con_anexo_nube_vigente} empresa(s) no tienen el Anexo de Nube del texto vigente (v${modeloNube.version}) registrado: lo que tienen es otra versión, o nada.`))),
+        // La accion depende del caso real. Si la empresa ya suscribio el texto
+        // vigente, lo que falta es el SEGUNDO acto; si no lo suscribio, lo que
+        // falta es la suscripcion. Decir siempre "registrar el Anexo firmado"
+        // manda al operador a hacer un acto que ya esta hecho. En un ambiente
+        // que NO exige el Anexo de Nube la accion no cambia: ese item es un
+        // aviso y su texto es el de siempre.
+        accion: (exigirNube && empresasNubeSinContrafirma > 0)
+          ? 'K+AIR contrafirma el Anexo de Nube del texto vigente (v' + modeloNube.version
+            + ') de las empresas que ya lo suscribieron: sin ese segundo acto el instrumento no queda EJECUTADO.'
+          : 'Registrar el Anexo de Nube del texto vigente (v' + modeloNube.version
+            + ') firmado por cada empresa antes de la primera firma.',
         referencia: 'gh_firma_empresas.anexo_nube_firmado_at',
       },
     ),

@@ -19,6 +19,11 @@ const app = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
 const premium = fs.readFileSync(path.join(dir, 'premium.css'), 'utf8');
 const legacy = fs.readFileSync(path.join(dir, 'styles.css'), 'utf8');
 const rendererJs = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
+// 📦1048 · Las fuentes ya NO se piden por @import: el 📦900 (5b35cd37) las
+// paso a la hoja local `assets/css/google-fonts.css`, que esta vista carga
+// con su propio <link> porque es un documento aparte y no hereda las del
+// shell. El test tiene que poder mirar ESA hoja, no una ruta inventada.
+const fuentes = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'google-fonts.css'), 'utf8');
 
 const checks = [];
 function check(name, ok) { checks.push({ name: name, ok: !!ok }); }
@@ -33,6 +38,75 @@ function soloCodigo(x) {
   return x.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
 }
 const appCodigo = soloCodigo(app);
+
+// ── Checks evaluables (una sola definicion, compartida por la corrida y
+// ── por las mutaciones de la seccion 7) ──────────────────────────────
+// Cada check se escribe UNA sola vez aca. Las mutaciones pasan por la MISMA
+// funcion que corre los checks base: si el mutante y el check leyeran
+// cosas distintas, el mutante no morderia por otro motivo y el conteo
+// mentiria (PROMPT.md §7.5: "el mutante y el check leen el mismo valor,
+// con la misma funcion?").
+
+// 📦1048 · El token del iframe de la Bandeja es un CONTADOR entero, no un
+// sello de fecha: sube de uno en uno cada vez que cambia la vista
+// (PROMPT.md §5.3). Por eso el piso es un MINIMO y no una igualdad: un
+// `?v=697` clavado se rompe en el proximo bumpeo sin que haya ningun bug
+// (PROMPT.md §7.4). El piso sube, nunca baja: por eso no caduca.
+const PISO_TOKEN_IFRAME = 684;
+
+function tokenIframe(ren) {
+  const m = ren.match(/bandeja-integrada\/index\.html\?v=([^'"]+)/);
+  return m ? m[1] : '';
+}
+
+// 📦1048 · La tipografia YA NO se pide por @import: el 📦900 (5b35cd37) movio
+// las fuentes a assets/css/google-fonts.css (copia local, sin internet) y
+// esta vista las carga con su PROPIO <link>, porque es un documento aparte y
+// no hereda las del shell. El check viejo exigia el @import de Google Fonts:
+// un literal VENCIDO que se rompio solo en el 900, sin que hubiera ningun
+// bug (PROMPT.md §7.4: un test viejo es defecto del test, no del producto).
+// Ahora se comprueba la verdad de HOY: premium.css declara los tokens de
+// Manrope e Inter, la vista carga la hoja local de fuentes, y esa hoja
+// define de verdad las dos familias.
+function evaluarTipografia(css, doc, hojas) {
+  const codigo = soloCodigo(css);
+  // La familia tiene que existir COMO @font-face Y apuntar a un .woff2 LOCAL:
+  // si apuntara a internet, la interfaz no abriría sin red, que es justo lo
+  // que el 📦900 vino a resolver. El src tiene que ser una ruta RELATIVA
+  // terminada en .woff2 (un .woff2 remoto también es .woff2, y no sirve
+  // sin internet). Se miran los bloques completos, no la palabra suelta:
+  // "font-family: 'Inter'" en un comentario no declara nada.
+  function defineLocal(hojas, familia) {
+    const re = new RegExp("@font-face\\s*\\{[^}]*font-family:\\s*'" + familia + "'[^}]*\\}", 'g');
+    const bloques = hojas.match(re) || [];
+    return bloques.length > 0 && bloques.every(function (b) {
+      const src = (b.match(/src:\s*url\(['"]?([^'")]+)['"]?\)/) || [])[1] || '';
+      return /\.woff2$/.test(src) && !/^https?:/i.test(src);
+    });
+  }
+  return [
+    { n: 'CSS: tipografia premium (Manrope + Inter) declarada en los tokens',
+      c: /--kair-font-t:\s*'Manrope'/.test(codigo) && /--kair-font-b:\s*'Inter'/.test(codigo) },
+    { n: 'CSS: la vista carga la hoja local de fuentes (sin internet)',
+      c: /<link[^>]+href="[^"]*assets\/css\/google-fonts\.css"/.test(doc) },
+    { n: 'CSS: la hoja local de fuentes define Manrope e Inter',
+      c: defineLocal(hojas, 'Manrope') && defineLocal(hojas, 'Inter') },
+    { n: 'CSS: premium.css NO vuelve a pedir fuentes por internet',
+      c: !/@import\s+url\(\s*['"]?https?:/.test(codigo) }
+  ];
+}
+
+function evaluarCacheBust(ren, doc) {
+  const tok = tokenIframe(ren);
+  const n = /^\d+$/.test(tok) ? parseInt(tok, 10) : 0;
+  return [
+    { n: 'Cache-bust: el iframe de la Bandeja lleva token ?v= en renderer.js', c: tok !== '' },
+    { n: 'Cache-bust: el token del iframe es un contador entero, no un sello de fecha', c: /^\d+$/.test(tok) },
+    { n: 'Cache-bust: iframe ?v= bumpeado a >= ' + PISO_TOKEN_IFRAME + ' (actual: ' + tok + ')', c: n >= PISO_TOKEN_IFRAME },
+    { n: 'Cache-bust: app.js con ?v= en index.html', c: /app\.js\?v=/.test(doc) },
+    { n: 'Cache-bust: premium.css con ?v= en index.html', c: /premium\.css\?v=/.test(doc) }
+  ];
+}
 
 check('HTML: breadcrumb "Inicio > Bandeja integrada"', /kair-top__crumb[\s\S]*?Inicio[\s\S]*?Bandeja integrada/.test(html));
 check('HTML: icono + H1 + subtítulo del módulo', /kair-top__icon/.test(html) && /kair-top__h1">Bandeja integrada</.test(html) && /kair-top__sub">/.test(html));
@@ -121,7 +195,14 @@ const premiumLink = html.indexOf('<link rel="stylesheet" href="premium.css');
 check('CSS: premium.css cargado DESPUÉS de styles.css', legacyLink >= 0 && premiumLink > legacyLink);
 check('CSS: tokens premium v2 definidos (surface/blue/amber/sh)', /--kair-surface: #FFFFFF/.test(premium) && /--kair-blue: #2057B8/.test(premium) && /--kair-sh-sm/.test(premium));
 check('CSS: remapeo de tokens legacy a premium', /--kair-primary: var\(--kair-blue\)/.test(premium) && /--kair-bg-card: var\(--kair-surface\)/.test(premium) && /--kair-text-muted: var\(--kair-text-2\)/.test(premium));
-check('CSS: tipografía premium (Manrope + Inter)', /@import url\(/.test(premium) && /Manrope/.test(premium) && /Inter/.test(premium));
+// 📦1048 · Este check exigía el `@import` de Google Fonts DENTRO de premium.css.
+// Ese literal se venció solo en el 📦900 (5b35cd37), que movió las fuentes a
+// la hoja local `assets/css/google-fonts.css`: el producto no tenía ningún
+// bug, el test era lo que estaba viejo (PROMPT.md §7.4). Se reemplaza por los
+// checks de `evaluarTipografia`, que miden la verdad de HOY: los tokens que
+// premium.css declara, el <link> con que la vista carga la hoja local, y las
+// familias que esa hoja define de verdad.
+evaluarTipografia(premium, html, fuentes).forEach(function (t) { check(t.n, t.c); });
 check('CSS: topbar y segmentado', /\.kair-top__crumb/.test(premium) && /\.kair-seg__b\[aria-selected="true"\]/.test(premium));
 check('CSS: "Tu día" (tuday__i + tiles por color + fila vacía atenuada)',
   /\.tuday__i \{/.test(premium) && /\.tuday__ico--blue/.test(premium)
@@ -140,11 +221,12 @@ check('CSS: scrollbar + responsive premium', /::-webkit-scrollbar-thumb/.test(pr
 check('CSS: legacy styles.css NO fue reescrito (sigue teniendo .email-row)', /\.email-row \{/.test(legacy));
 
 // ── 5. Cache-bust ────────────────────────────────────────────────
-const iframeMatch = rendererJs.match(/bandeja-integrada\/index\.html\?v=(\d+)/);
-const iframeV = iframeMatch ? parseInt(iframeMatch[1], 10) : 0;
-check('Cache-bust: iframe ?v= bumpeado a >= 684 (actual: ' + iframeV + ')', iframeV >= 684);
-check('Cache-bust: app.js con ?v= en index.html', /app\.js\?v=/.test(html));
-check('Cache-bust: premium.css con ?v= en index.html', /premium\.css\?v=/.test(html));
+// 📦1048 · Los checks de cache-bust vivían sueltos y con literales clavados.
+// Ahora salen de `evaluarCacheBust` — la MISMA función que corre la corrida
+// base y las mutaciones de la sección 7 (PROMPT.md §7.2). El piso del token
+// del iframe (684) es un MÍNIMO y no una igualdad: sube, nunca baja, así que
+// no caduca en el próximo bumpeo (§7.4).
+evaluarCacheBust(rendererJs, html).forEach(function (t) { check(t.n, t.c); });
 
 // ── 6. Regresiones de la primera pasada (bugs reales vistos en pantalla) ──
 // 6.a El layout legacy tenía 3 columnas (sidebar · botón-flecha · contenido).
@@ -176,6 +258,69 @@ check('MODAL: el display:flex vive en :not([hidden])', /\.kair-modal-overlay:not
 //     capturar clicks, pero la píldora sí.
 check('TOAST: .kair-toast captura clicks (botones Deshacer/Posponer)', /\.kair-toast\s*\{[^}]*pointer-events:\s*auto/.test(premium));
 
+// ── 7. Mutation testing (PROMPT.md §7.2) ──────────────────────────
+// Las mutaciones pasan por la MISMA función que corre los checks base: si el
+// mutante y el check leyeran cosas distintas, el conteo mentiría (§7.5).
+// Tres guards obligatorios: (1) normalizar a LF antes de mutar, (2) contar
+// los mutantes vacíos POR SEPARADO y hacerlos fallar, (3) verificar
+// mut(x) !== x antes de culparle al check (§7.2).
+const BASE = {
+  css: premium.replace(/\r\n/g, '\n'),
+  doc: html.replace(/\r\n/g, '\n'),
+  hojas: fuentes.replace(/\r\n/g, '\n'),
+  ren: rendererJs.replace(/\r\n/g, '\n'),
+};
+
+function evaluarNuevo(b) {
+  return evaluarTipografia(b.css, b.doc, b.hojas).concat(evaluarCacheBust(b.ren, b.doc));
+}
+
+const MUT = [
+  ['premium.css deja de declarar el token de Manrope', 'css',
+    c => c.replace("--kair-font-t: 'Manrope'", "--kair-font-t: 'Sin Fuente'")],
+  ['premium.css cambia la familia de Inter', 'css',
+    c => c.replace("--kair-font-b: 'Inter'", "--kair-font-b: 'Roboto'")],
+  ['premium.css vuelve a pedir las fuentes por internet', 'css',
+    c => '@import url("https://fonts.googleapis.com/css2?family=Manrope&display=swap");\n' + c],
+  ['la vista deja de cargar la hoja local de fuentes', 'doc',
+    d => d.replace('<link rel="stylesheet" href="../../assets/css/google-fonts.css" />', '')],
+  ['la hoja local de fuentes deja de definir Manrope', 'hojas',
+    h => h.replace(/font-family: 'Manrope';/g, "font-family: 'ManropeX';")],
+  ['la hoja local de fuentes deja de definir Inter', 'hojas',
+    h => h.replace(/font-family: 'Inter';/g, "font-family: 'InterX';")],
+  ['la hoja local de fuentes pasa a pedir las fuentes por internet', 'hojas',
+    h => h.replace(/url\('\.\.\/fonts\/google\/inter-400\.woff2'\)/g, "url('https://fonts.gstatic.com/s/inter/v1/inter.woff2')")],
+  ['el iframe de la bandeja pierde el token ?v=', 'ren',
+    r => r.replace(/bandeja-integrada\/index\.html\?v=\d+/, 'bandeja-integrada/index.html')],
+  ['el token del iframe deja de ser un contador entero', 'ren',
+    r => r.replace(/bandeja-integrada\/index\.html\?v=\d+/, 'bandeja-integrada/index.html?v=2026-11-11')],
+  ['el token del iframe retrocede por debajo del piso', 'ren',
+    r => r.replace(/bandeja-integrada\/index\.html\?v=\d+/, 'bandeja-integrada/index.html?v=600')],
+  ['app.js se sirve sin token de cache-bust', 'doc',
+    d => d.replace('app.js?v=', 'app.js')],
+];
+
+let mFallos = 0;
+let vacios = 0;
+console.log('\n--- mutation testing (' + MUT.length + ' mutantes) ---');
+MUT.forEach(function (m) {
+  const b = Object.assign({}, BASE);
+  b[m[1]] = m[2](BASE[m[1]]);
+  // Un mutante que NO cambia el archivo no prueba nada: el check "pasaría"
+  // siempre y se reportaría como si el check no mordiera. Se cuenta aparte.
+  if (b[m[1]] === BASE[m[1]]) {
+    vacios++;
+    console.log('FAIL MUTANTE VACIO ' + m[0] + '  [la mutacion no cambio nada]');
+    return;
+  }
+  const rotos = evaluarNuevo(b).filter(function (t) { return !t.c; });
+  const detectado = rotos.length > 0;
+  if (!detectado) mFallos++;
+  console.log((detectado ? 'OK  detecta      ' : 'FAIL NO muerde   ') + m[0]
+    + (detectado ? '' : '   [los checks siguen verdes con el defecto]'));
+});
+console.log('---');
+
 // ── Reporte ──────────────────────────────────────────────────────
 let failed = 0;
 checks.forEach(function (c) {
@@ -183,5 +328,12 @@ checks.forEach(function (c) {
   else { failed++; console.log('[FAIL] ' + c.name); }
 });
 console.log('\n' + (checks.length - failed) + '/' + checks.length + ' checks OK');
-if (failed) { console.log('❌ ' + failed + ' checks FALLARON'); process.exit(1); }
+console.log('mutaciones detectadas: ' + (MUT.length - mFallos - vacios) + '/' + MUT.length
+  + (vacios ? '  ·  mutantes vacios: ' + vacios : ''));
+if (failed || mFallos || vacios) {
+  if (failed) console.log('❌ ' + failed + ' checks FALLARON');
+  if (mFallos) console.log('❌ ' + mFallos + ' mutantes NO fueron detectados');
+  if (vacios) console.log('❌ ' + vacios + ' mutantes VACIOS');
+  process.exit(1);
+}
 console.log('✅ Bandeja Integrada Premium v2 OK');

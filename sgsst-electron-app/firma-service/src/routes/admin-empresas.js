@@ -22,6 +22,11 @@
  *   PUT    /internal/admin/empresas/:id        actualizar identidad
  *   POST   /internal/admin/empresas/:id/anexo-firmado
  *   POST   /internal/admin/empresas/:id/anexo-firmado/quitar
+ *   POST   /internal/admin/empresas/:id/anexo-suscrito/quitar
+ *   POST   /internal/admin/empresas/:id/anexo-nube/suscripcion
+ *   POST   /internal/admin/empresas/:id/anexo-nube/suscripcion/:id_suscripcion/anular
+ *   POST   /internal/admin/empresas/:id/anexo-nube/contrafirmar/codigo
+ *   POST   /internal/admin/empresas/:id/anexo-nube/contrafirmar
  *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion
  *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion/:id_suscripcion/anular
  *   POST   /internal/admin/empresas/:id/anexo-encargo/suscripcion/:id_suscripcion/verificar-representante
@@ -797,6 +802,56 @@ router.post('/empresas/:id_empresa/anexo-firmado/quitar', adminApiAuth(), (req, 
   try {
     const id = _parseId(req);
     const empresa = empresaService.desmarcarAnexoFirmado(id, _contextoAuditoria(req));
+    res.json(empresa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// POST /internal/admin/empresas/:id_empresa/anexo-suscrito/quitar
+// Quita el registro de la SUSCRIPCIÓN (fase 1) del Anexo de Encargo.
+//
+// POR QUÉ ESTA RUTA EXISTE
+// ------------------------
+// El Anexo de Encargo se versiona por fecha: cuando el texto vigente cambia,
+// la Empresa tiene que SUSCRIBIR DE NUEVO, porque la suscripción anterior
+// describe un texto que ya no rige. `services/anexoEncargo.js` lo dice
+// expressly: si la Empresa ya tiene un Anexo (suscrito o firmado) y la
+// suscripción nueva es de OTRO texto, la suscripción pública se rechaza con
+// 409 SUSCRIPCION_EXISTENTE y avisa de que "la corrección se registra por el
+// canal administrativo, con su motivo".
+//
+// Ese canal administrativo NO existía por HTTP: la función que deshace la
+// fase 1 (`empresaService.desmarcarAnexoSuscrito`) estaba escrita, probada y
+// exportada, pero ninguna ruta la llamaba. El resultado era un callejón: el
+// Anexo de Encargo no se podía re-suscribir.
+//
+// LO QUE HACE
+// ------------
+// Pone en NULL los cuatro campos de la fase 1 en la ficha de la Empresa
+// (`anexo_encargo_suscrito_at`, `_version`, `_hash` y `_evidencia`), con el
+// valor anterior en el historial append-only, el actor y el motivo.
+//
+// LO QUE NO HACE
+// ---------------
+// - No toca `anexo_encargo_firmado_at`: esa es la fecha del SEGUNDO acto
+//   (la contrafirma de K+AIR). Si hay que quitarla, es otra ruta y otro
+//   motivo: `POST .../anexo-firmado/quitar`.
+// - No toca NINGUNA fila de `gh_firma_anexo_encargo_suscripciones`: la
+//   suscripción anterior queda FIRMADA, con su evidencia, su acta y su
+//   contrafirma. Lo que se deshace es el puntero de la ficha, no el hecho.
+// - No borra nada del historial: el rastro es append-only.
+//
+// EL MOTIVO ES OBLIGATORIO
+// ------------------------
+// Es un acto que deshace un registro jurídico de la ficha: sin motivo, el
+// rastro registra que alguien borró una suscripción y no por qué.
+// ============================================================================
+router.post('/empresas/:id_empresa/anexo-suscrito/quitar', adminApiAuth(), (req, res, next) => {
+  try {
+    const id = _parseId(req);
+    const empresa = empresaService.desmarcarAnexoSuscrito(id, _contextoAuditoria(req));
     res.json(empresa);
   } catch (err) {
     next(err);

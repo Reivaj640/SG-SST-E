@@ -40,8 +40,18 @@ const checks = [];
   ['pdfGen: exporta getPdfPageCount', /getPdfPageCount/],
   ['pdfGen: mantiene constancia en una sola generación con valor diferido', /paginasConstanciaSlot/],
   ['pdfGen: muestra identificación con últimos 4 dígitos', /fmtIdentificacionParcial/],
-  ['pdfGen: firmante usa identificación parcial', /campo\(\'Identificación\', fmtIdentificacionParcial/],
-].forEach(function (c) { checks.push({ name: c[0], ok: c[1].test(pdfGenSrc) }); });
+  // La identificación del firmante NUNCA va en claro a la constancia: sale
+  // enmascarada, ya sea por la huella archivada (`identificacion_enmascarada`,
+  // p.ej. 'CC ce3a59…') o por el fallback parcial (últimos 4 dígitos o
+  // 'número protegido'). Truth comprobada en
+  // firma-service/src/services/pdfGen.js:629-630. El tercer elemento `true`
+  // invierte el check: exige que el literal NO aparezca.
+  ['pdfGen: firmante usa identificación parcial', /campo\(\s*\'Identificación\',\s*[^;]*?(?:identificacion_enmascarada|fmtIdentificacionParcial)\b/],
+  ['pdfGen: no imprime la identificación del firmante en claro', /campo\(\s*\'Identificación\',[^;]*?metadata\.identificacion(?![\w])/, true],
+].forEach(function (c) {
+  var ok = c[2] ? !c[1].test(pdfGenSrc) : c[1].test(pdfGenSrc);
+  checks.push({ name: c[0], ok: ok });
+});
 
 [
   ['schema: acepta nombre_trabajador', /nombre_trabajador:\s*z\.string\(\)\.max\(255\)\.optional\(\)/],

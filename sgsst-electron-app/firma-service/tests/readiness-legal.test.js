@@ -1296,3 +1296,102 @@ test('readiness · la firma del Anexo de Encargo tambien se contrasta con el tex
     `estado_encargo quedo ok con la huella de otro texto: ${JSON.stringify(ids)}`);
 });
 
+// =============================================================================
+// 📦1049 · LA VERSIÓN EN VIGOR TIENE QUE SER LA QUE DECLARA EL MANIFIESTO
+// =============================================================================
+// El caso real (11-nov-2026, producción): la v1.5 estaba activa en la base y
+// con su autorización operativa, el manifiesto declaraba la v1.6, y el item
+// `publicado` daba `ok`. Solo miraba que la versión activa fuera ">= v1.1",
+// sin compararla con la que declara el manifiesto: con un texto viejo en
+// vigor, la compuerta de publicación quedaba con 0 bloqueantes.
+//
+// Estos tests aplican el SQL REAL de la 001 (no una copia a mano): si alguien
+// renombra la tabla o sus columnas, el test se rompe y avisa.
+
+function bdConAcuerdo(ruta, versiones) {
+  const bd = new Database(ruta);
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'db', 'schema', '001_initial.sql'),
+    'utf8',
+  );
+  bd.exec(sql);
+  const ins = bd.prepare(
+    'INSERT INTO gh_firma_acuerdo_versiones '
+    + '(version, texto, texto_hash, fecha_vigencia_inicio, activa, fecha_creacion) '
+    + 'VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  for (const v of versiones) {
+    ins.run(
+      v.version,
+      'TEXTO DE PRUEBA',
+      v.hash,
+      '2026-11-05T00:00:00.000Z',
+      v.activa ? 1 : 0,
+      '2026-11-05T00:00:00.000Z',
+    );
+  }
+  return bd;
+}
+
+function reporteConBd(bd, man) {
+  return readiness.evaluar({
+    gate: 'publicacion',
+    db: bd,
+    config: CONFIG_TEST,
+    manifiesto: man,
+    textos: { acuerdoV11: ACUERDO_OK, anexoNube: NUBE_OK, anexoEncargo: ENCARGO_OK },
+  });
+}
+
+function rutaTemporal(nombre) {
+  return path.join(os.tmpdir(), nombre + '-' + process.pid + '-' + Date.now() + '.sqlite');
+}
+
+test('readiness · con una versión activa distinta de la que declara el manifiesto, `publicado` queda pendiente', () => {
+  // El caso de producción: en vigor la v1.5, en el manifiesto la v1.1 (aquí
+  // el texto del test). La compuerta tiene que NOTAR la diferencia.
+  const man = manifiestoCompleto();
+  const ruta = rutaTemporal('kair-readiness-publicado-distinta');
+  const bd = bdConAcuerdo(ruta, [{ version: 'v1.5', hash: 'f'.repeat(64), activa: true }]);
+  try {
+    const r = reporteConBd(bd, man);
+    const item = r.pendientes.find((p) => p.id === 'publicado');
+    assert.ok(item, 'publicado no quedo pendiente con la v1.5 activa y otra declarada');
+    assert.ok(
+      /v1\.5/.test(item.detalle),
+      `el detalle no dice que la version en vigor es otra: ${item.detalle}`,
+    );
+  } finally {
+    bd.close();
+  }
+});
+
+test('readiness · con la versión activa igual a la del manifiesto y su huella, `publicado` queda ok', () => {
+  const man = manifiestoCompleto();
+  const hash = readiness._internos._hash(ACUERDO_OK);
+  const ruta = rutaTemporal('kair-readiness-publicado-igual');
+  const bd = bdConAcuerdo(ruta, [{ version: 'v1.1', hash: hash, activa: true }]);
+  try {
+    const r = reporteConBd(bd, man);
+    const item = r.pendientes.find((p) => p.id === 'publicado');
+    assert.equal(item, undefined, `publicado quedo pendiente con la version del manifiesto activa: ${JSON.stringify(item)}`);
+  } finally {
+    bd.close();
+  }
+});
+
+test('readiness · la misma versión con OTRA huella no está publicada (el texto cambió sin cambiar de versión)', () => {
+  // El número de versión igual no basta: si el texto que se registra en la
+  // base no es el que declara el manifiesto, lo que está en vigor es otro.
+  const man = manifiestoCompleto();
+  const ruta = rutaTemporal('kair-readiness-publicado-huella');
+  const bd = bdConAcuerdo(ruta, [{ version: 'v1.1', hash: 'a'.repeat(64), activa: true }]);
+  try {
+    const r = reporteConBd(bd, man);
+    const item = r.pendientes.find((p) => p.id === 'publicado');
+    assert.ok(item, 'publicado quedo ok con la misma version y otra huella');
+  } finally {
+    bd.close();
+  }
+});
+

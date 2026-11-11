@@ -1,30 +1,30 @@
 {
-  "version": "2026-11-10",
-  "actualizado_at": "2026-11-10",
+  "version": "2026-11-11",
+  "actualizado_at": "2026-11-11",
   "nota": "Inventario de evidencias legales del servicio de firma. No contiene datos de trabajadores. Cada campo se completa solo con evidencia verificable (fecha, archivo o huella); no se rellena con valores de ejemplo. El reporte de readiness no inventa lo que falta: lo marca como pendiente.",
   "acuerdo": {
-    "archivo": "scripts/fixtures/acuerdo-v1.5.txt",
-    "hash": "952592f078eb3e8ca6a913361beb6a5eb7c32f22bba2c9fa30d17ab09825be28",
-    "version": "v1.5",
-    "fecha": "2026-11-05",
+    "archivo": "scripts/fixtures/acuerdo-v1.6.txt",
+    "hash": "08e1eb8b09449fbc57eebdda89518482b0063285d2f0f56ed335d2977532f13e",
+    "version": "v1.6",
+    "fecha": "2026-11-11",
     "publicado": true,
-    "nota": "Candidata v1.4, NO aprobada y NO publicada. El 30-oct-2026 la revision juridica del abogado no emitio aprobacion sobre la v1.3 (49eab0c5...f4de12) y fijan tres cambios que obligan a publicar una v1.4 con huella recalculada: C-1 (la Constancia no puede vincular un modelo de Anexo de Nube sin firmar), C-2 (la aceptacion registra la version y la huella del Anexo de Encargo y del Anexo de Nube, y pone a disposicion la matriz de finalidades antes de habilitar la casilla) y C-3 (deber propio del Encargado frente a la SIC, art. 18(k) de la Ley 1581). La v1.5 sale de la v1.4 con un unico cambio de fondo: la fecha de vigencia del encabezado, que el owner fijo el 5-nov-2026 (la v1.4 ya estaba publicada desde el 5-nov-2026 y su base la registro con esa fecha). El texto sigue nombrando su version en el encabezado y en el bloque de Manifestacion de Voluntad, y los dos pasan a v1.5: son exactamente tres lineas que difieren de la v1.4, sobre 579. El texto se arma desde la v1.0 sellada con scripts/empalmar-acuerdo-v1.1.js --version=v1.5 --base=scripts/fixtures/acuerdo-v1.0.txt --cambios=scripts/fixtures/acuerdo-v1.5-cambios.json; la fecha la pone el propio empalme (fecha_vigencia), que es una propiedad de la version y no del texto del abogado. La v1.4 queda archivada con su texto integro cuando la v1.5 se publique, y la publicacion es de un solo sentido: no hay API para volver a activarla. El campo publicado se pone en true en cuanto conste la publicacion en la base. Las claves del bloque se renombraron a archivo, hash y fecha (J14-5): las anteriores v1_1_* contenian el valor de otra version y hacian ambigua la comprobacion automatica que exige la Constancia seccion 3. El texto se arma desde la v1.0 sellada con scripts/empalmar-acuerdo-v1.1.js --version=v1.4 --cambios=scripts/fixtures/acuerdo-v1.4-cambios.json; ese JSON se construye con scripts/construir-acuerdo-v1.4.js a partir del de la v1.3, de modo que la diferencia entre las dos versiones queda escrita y no transcrita. La v1.3 queda como historico y nunca se publico. La fecha de vigencia la declara el owner antes de publicar y no se inventa."
+    "nota": "Acuerdo vigente en el repo: v1.6, huella 08e1eb8b09449fbc57eebdda89518482b0063285d2f0f56ed335d2977532f13e, fecha de vigencia 2026-11-11, texto en scripts/fixtures/acuerdo-v1.6.txt. La v1.6 sale de la v1.5 con un cambio acotado a los numerales 8.7, 10.1 y 10.5(f): el canal de correo ya no es una cuenta gratuita de Gmail para consumidores sino una cuenta empresarial de Google Workspace con el CDPA aceptado el 10-nov-2026, y el papel de Google queda delimitado en dos planos (Responsable por cuenta propia en los datos de la cuenta del administrador y la telemetria; Encargado del Encargado, vinculado por el CDPA, en los datos del cliente que transitan por el canal). \"Subencargado\" queda declarado como figura contractual y no como categoria de la Ley 1581 de 2012. Esta publicada: la v1.6 es la version activa en la base desde el 11-nov-2026, con su autorizacion operativa registrada (tipo OPERATIVA) para ese texto y esa huella, y con la Constancia de la v1.6 en legal/constancia-aprobacion-acuerdo.html; su seccion 5 y su seccion 6 siguen vacios, como la Constancia de la v1.4, porque la autorizacion operativa no se documenta en ese documento sino en el registro de aprobaciones de publicacion del servicio (gh_firma_aprobaciones_publicacion). El fundamento esta en docs/gestion-humana/firma-electronica/dictamen-legal-textos-2026-11-11.md."
   },
   "constancia": {
     "archivo": "legal/constancia-aprobacion-acuerdo.html",
-    "hash": "3fd45c658e5160e2c63005d348ec1fd200abb5f26593c6adf6aabd0ccd6a736c",
-    "version": "v1.4",
+    "hash": "aaf68b4e7df5e2757d5885840056218d97a0cbb1c9fa624bf7861962c8d0b413",
+    "version": "v1.6",
     "estado": "no_firmada",
     "fecha": null,
     "evidencia": null,
-    "nota": "Modelo sin firmar. Desde el 03-nov-2026 es una constancia interna de version y autorizacion operativa de publicacion a cargo del representante legal; no declara ni requiere una aprobacion juridica del abogado. Identifica la version y huella exactas, y solo registra autorizacion de publicacion cuando las condiciones tecnicas y operativas hayan sido verificadas. El estado no_firmada significa que este modelo no esta suscrito; no representa una compuerta tecnica. Las recomendaciones del asesor se conservan en su documento original, y el owner registra por escrito sus decisiones J1-J14 en la seccion E del checklist, incluso si deja puntos pendientes."
+    "nota": "Modelo reemitido contra la v1.6 del Acuerdo el 11-nov-2026 y completado el mismo dia con los datos que el owner confirmo: el responsable del registro (Javier Robles Fontalvo, Representante Legal de Gesstiar S.A.S.) y la fecha del registro (2026-11-11). Identifica la version y la huella exacta del texto que se somete a autorizacion operativa, y no la del Acuerdo que este mismo dia se sustituye. Desde el 03-nov-2026 es una constancia interna de version y autorizacion operativa de publicacion a cargo del representante legal; no declara ni requiere una aprobacion juridica del abogado. Lo que NO esta: la firma del representante legal ni los datos de la autorizacion operativa (su seccion 5 y su seccion 6 siguen vacios, igual que en la Constancia de la v1.4), porque esa autorizacion no se documenta en este documento sino en el registro append-only de aprobaciones de publicacion del servicio (gh_firma_aprobaciones_publicacion, tipo OPERATIVA). La autorizacion operativa de la v1.6 quedo registrada el 11-nov-2026 en el mismo servicio, con la garantia, el resultado de las verificaciones y el responsable del despliegue; el gate de publicacion deja de reportar bloqueantes."
   },
   "matriz_finalidades": {
     "archivo": "config/matriz-finalidades.json",
-    "hash": "1a549539c73fe3c27b9438d75c80c255536f5cce63f46a28be7f9f443e79f154",
+    "hash": "c414a71e628eca1509c1367f618ee8d979ab36e6e4ef80dafa1ac5c5c517369d",
     "version": "1.0",
-    "actualizado_at": "2026-11-09",
-    "nota": "Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos anexos. El 9-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque instruccion) a la 2026-11-09, sin cambiar ninguna finalidad, ninguna base juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que esa instruccion identifica."
+    "actualizado_at": "2026-11-11",
+    "nota": "Fuente unica de la matriz de finalidades (Anexo de Encargo, seccion 2). La version y la huella son las que el servicio pone a disposicion del Firmante antes de habilitar la casilla de aceptacion, y las que la aceptacion registra junto con la version y la huella de los dos anexos. El 11-nov-2026 se actualizo la referencia a la version del Anexo de Encargo (bloque instruccion) a la 2026-11-11, sin cambiar ninguna finalidad, ninguna base juridica ni ningun estado de habilitacion: la huella cambio porque cambio el documento que esa instruccion identifica."
   },
   "encargado": {
     "nit": "900987987-4",
@@ -116,9 +116,9 @@
     "fecha": null,
     "evidencia": null,
     "contrafirma_facultad": null,
-    "version": "2026-11-09",
-    "hash": "0cd6c05f0574bbcdbb8277306a9084784a48815edd862cd31e97eb5435c22a1e",
-    "nota": "Texto vigente del Anexo de Encargo: la version 2026-11-09. Actualiza las secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion y auditoria conforme al CDPA) y anade la clausula de prevalencia del instrumento bilateral mas reciente. El texto vigente NO esta suscrito: la version suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora es append-only.",
+    "version": "2026-11-11",
+    "hash": "6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948",
+    "nota": "Texto vigente del Anexo de Encargo: la version 2026-11-11. Corrige el parrafo \"Lo que queda pendiente\" de la seccion 5, que declaraba como no cumplidos P5 (la aceptacion del CDPA en la consola de Workspace) y P6 (la cuenta empresarial activa, con la credencial del servidor migrada y comprobada con un envio real), los dos cerrados el 10-nov-2026: el texto nuevo declara los pasos cumplidos con su evidencia y deja los que siguen abiertos con su responsable. El paso (viii), la confirmacion escrita sobre el instrumento bilateral, la contrafirma, el alcance de los canales y el papel de Google para los datos de cuenta y la telemetria, quedo respondido el 11-nov-2026 en el dictamen legal del expediente. Mantiene las secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion y auditoria conforme al CDPA) y la clausula de prevalencia del instrumento bilateral mas reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente NO esta suscrito: la version suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora es append-only. ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el menu, la seccion 1 (Partes), la seccion 5 (Proveedores externos y subencargados) y la seccion 9 remitian al Anexo de Nube v1.2, un texto superado cuyo bloque de pendientes estaba desactualizado, y los cuatro puntos remiten ahora a la v1.3, que es el texto vigente y el que la clausula de prevalencia de la seccion 5 ya nombraba. No es un detalle de redaccion: la seccion 5 dice que el Anexo de Nube \"forma parte integral de este documento\", y eso es una incorporacion por remision (articulo 44 de la Ley 527 de 1999): lo que queda incorporado es el texto al que apunta el vinculo, y con el vinculo apuntando a la v1.2 este Anexo incorporaba un texto que el propio documento declara superado. Es una correccion de cita: no cambian las partes, el objeto, las obligaciones ni la distribucion del riesgo. El texto no estaba suscrito ni publicado cuando se corrigio, y la version suscrita por ASEPLUS el 7-nov-2026 (la 2026-11-06) no se toco. La huella anterior era c7c42a1897b44222c09cbdbfc6f8617f29b7250b9c9e0c8b12f1e502770bfd95. Dictamen: docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.",
     "versiones_firmadas": [
       {
         "version": "2026-11-06",
@@ -142,11 +142,11 @@
     "contrafirma_evidencia": null,
     "contrafirma_facultad": null,
     "modelo": {
-      "version": "1.2",
-      "hash": "242037b3a98f2152b7c1db1f5c562fbe1f9f3e3be4422c03bfcf404e581f7245",
-      "bytes": 84062,
-      "actualizado": "2026-11-09",
-      "nota": "Texto vigente del Anexo de Nube: la v1.2. Cambia el canal de correo a Google Workspace con el Cloud Data Processing Addendum (CDPA) incorporado al Acuerdo, y el papel del proveedor pasa de Responsable a Subencargado de los datos del servicio de correo, con la formula condicional de la Decision A del 9-nov-2026. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: el texto vigente todavia no esta suscrito y por eso el item firmado_nube del gate esta pendiente."
+      "version": "1.3",
+      "hash": "fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d",
+      "bytes": 85143,
+      "actualizado": "2026-11-11",
+      "nota": "Texto vigente del Anexo de Nube: la v1.3. Corrige el bloque de pendientes del texto, que declaraba como no cumplidos P1 (la aceptacion del CDPA en la consola de Workspace), P2 (la cuenta kair@gesstiar.com activa, con verificacion en dos pasos), P4 (SPF, DKIM y DMARC de gesstiar.com publicados) y P5 (el envio real desde el dominio): los cuatro se cerraron el 10-nov-2026, y el texto nuevo declara ese envio real con su Message-ID y su Authentication-Results. Siguen pendientes P3 (los alias del dominio) y P6 (revocar las app passwords de la cuenta anterior). La v1.2, del 9-nov-2026, nunca llego a suscribirse y queda como referencia. La v1.1 (suscrita por ASEPLUS el 5-nov-2026) queda en `versiones_firmadas`: el texto vigente todavia no esta suscrito y por eso el item firmado_nube del gate esta pendiente. El papel del proveedor del canal de correo sigue siendo el de Subencargado, con la formula condicional del dictamen legal del 11-nov-2026. ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el parrafo 12 de la v1.3 decia \"Esta version 1.2 remite\" al Anexo de Encargo, dentro de un texto que es la v1.3, y se corrigio a \"Esta version 1.3 remite\". Es una correccion de cita: no cambian las partes, el objeto, las obligaciones ni la distribucion del riesgo, y la frase siguiente del mismo parrafo ya decia que esta version 1.3 no sustituye ese instrumento. El texto no estaba suscrito ni publicado cuando se corrigio, y las versiones ya suscritas (la v1.1 del 5-nov-2026) no se tocaron. La huella anterior de la v1.3 era 45500569d02b876e8bc273385db934d77f5464642b75aab2a6b734e8ed3abf9f. Dictamen: docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md."
     },
     "versiones_firmadas": [
       {
@@ -188,8 +188,8 @@
       "proveedor": "Google Workspace (Gmail), smtp.gmail.com:587 con STARTTLS",
       "rol": "subencargado",
       "instrumento": "Cloud Data Processing Addendum (Customers), texto del 2026-11-10",
-      "estado": "pendiente_de_migracion",
-      "nota": "La cuenta y el remitente del canal transaccional (codigo OTP, enlace de acceso a la solicitud de firma, avisos del procedimiento e invitacion a suscribir el Anexo de Nube) pasan a kair@gesstiar.com. El cambio de la credencial en el servidor, el reinicio y el ENVIO REAL de prueba los ejecuta el owner (Fase 1 del plan del 9-nov-2026, pendientes P2, P4 y P5). Hasta que ese envio real exista, el remitente efectivo sigue siendo el anterior: este manifiesto no declara un envio que no se ha hecho."
+      "estado": "migrado",
+      "nota": "La cuenta y el remitente del canal transaccional (codigo OTP, enlace de acceso a la solicitud de firma, avisos del procedimiento e invitacion a suscribir el Anexo de Nube) estan en kair@gesstiar.com. P2, P4 y P5 se CERRARON el 10-nov-2026: la cuenta esta activa con verificacion en dos pasos y app password (P2); SPF, DKIM y DMARC estan publicados y visibles en el autoritativo (P4); y el ENVIO REAL quedo probado con el Message-ID <5db3377d-4565-e49b-0b64-cd0b5ce2b4ca@gesstiar.com> y Authentication-Results: dkim=pass; spf=pass; dmarc=pass (P5). Lo que queda abierto NO es el canal: es P11 (revocar en Google las app passwords de la cuenta anterior) y P3 (los alias de derechos, que tienen su propia excepcion documentada mas abajo). Correccion del 11-nov-2026: este bloque decia \"pendiente_de_migracion\" y afirmaba que el remitente efectivo seguia siendo el anterior, cuando los tres pendientes ya estaban cerrados. Era un falso negativo documental: no creaba un verde falso (la compuerta canal_datos lee otro campo), pero dejaba en el expediente una contradiccion con mail_provider.aceptacion.aceptada = true."
     },
     "derechos": {
       "direccion": "privacidad.kair@gmail.com",

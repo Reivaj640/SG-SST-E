@@ -1266,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     bandejaIntegradaFrame = document.createElement('iframe');
     bandejaIntegradaFrame.id = 'bandeja-integrada-frame';
-    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=697';
+    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=698';
     // 📦879 · El iframe ocupa TODA la ventana, de 0 a 100vh.
     //
     // Antes arrancaba en `top: headerHeight` con un piso duro de 40px (F4-fix, de

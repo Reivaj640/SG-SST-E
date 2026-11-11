@@ -51,12 +51,14 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
  *
  * La v1.0 era un MODELO: su propio texto decía que no se firmaba hasta
  * completar el bloque de pendientes. La v1.1 fue la primera susceptible de
- * suscripción (la suscribió ASEPLUS el 5-nov-2026). La v1.2 es la vigente:
- * cambia el canal de correo a Google Workspace con el Cloud Data Processing
- * Addendum (CDPA) incorporado al Acuerdo, y el papel del proveedor pasa de
- * Responsable a Subencargado de los datos del servicio de correo.
+ * suscripción (la suscribió ASEPLUS el 5-nov-2026). La v1.2 no llegó a
+ * suscribirse: declaraba como pendientes P1, P2, P4 y P5, que se cerraron el
+ * 10-nov-2026. La v1.3 es la vigente: corrige ese bloque de pendientes,
+ * declara el envío real con el dominio @gesstiar.com que ya existe, remite
+ * al Anexo de Encargo versión 2026-11-11 y conserva el papel de Subencargado
+ * del proveedor del canal de correo.
  */
-const VERSION_MODELO = '1.2';
+const VERSION_MODELO = '1.3';
 
 /**
  * El archivo del texto vigente. El nombre lleva la versión: las versiones
