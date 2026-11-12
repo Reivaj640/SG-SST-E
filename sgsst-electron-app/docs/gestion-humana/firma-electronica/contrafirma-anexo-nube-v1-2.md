@@ -267,6 +267,15 @@ pruebas están en `tests/anexo-encargo-resuscripcion.test.js` (8 casos) y el det
 sus errores, en `API.md` §6.13.2 («Los once endpoints»; la del Anexo de Encargo no cambió, la tabla
 creció con las dos del Nube).
 
+**Un código a la vez (12-nov-2026).** Los dos correos de contrafirma llegan al **mismo
+buzón** (`privacidad.kair@gmail.com`) y sus asuntos son casi idénticos — «K+AIR - Tu código para
+contrafirmar el Anexo de Nube» y «... del Anexo de Encargo». La primera corrida los pidió **los dos a
+la vez** y se tecleó el del otro instrumento: 400 `CODIGO_INVALIDO`. El código es de un solo uso y de
+un solo instrumento, así que **se pide uno, se usa, y solo entonces se pide el otro**; se distingue
+por el **cuerpo** del correo, no por el asunto. Un error de tecleo se reintenta con el **mismo**
+código (hasta 3 veces): gasta un *intento* (hay 5) y no un *envío* (el límite de 5 envíos **no se
+resetea**). Y la contrafirma se confirma **contra la base**, no contra el HTTP 200.
+
 **No tiene canal IPC**: como la contrafirma del Anexo de Nube, se ejecuta por HTTP contra el
 servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.
 
@@ -274,8 +283,15 @@ servicio. La app de escritorio **muestra** el estado; no ejecuta el acto.
 
 ## 4. Lo que este documento NO cierra
 
-- **No firma nada.** La contrafirma de ASEPLUS la hace el operador, sobre la suscripción real,
-  dentro de P8.
+- **No firma nada.** La contrafirma de ASEPLUS la hace el operador, sobre la suscripción real.
+  **Ya se hizo el 12-nov-2026, en producción**: el Anexo de Nube v1.3 quedó contrafirmado el
+  `2026-11-12T16:13:54.106Z` (acta `050f223a…4a501`) y el Anexo de Encargo 2026-11-11 el
+  `2026-11-12T16:14:31.105Z` (acta `5dcb2149…4b062`), ambos por Javier Robles Fontalvo con la
+  facultad acreditada `REPRESENTANTE_LEGAL_ENCARGADO`. El manifiesto de producción lo declara
+  (`anexo_nube.firmado: true`, `anexo_nube.contrafirmado: true`, `anexo_encargo.estado: firmado`),
+  las cuatro fases de la ficha tienen fecha y la compuerta quedó en `listo: true` con **0
+  bloqueantes**. Las suscripciones viejas (v1.1 y 2026-11-06) siguen **intactas**.
+  El paso a paso, con la hora de cada acto, está en `MIGRACION-SERVIDOR-FIRMA.md` §8.3.
 - **No sustituye la verificación documental.** El Anexo de Encargo tiene un paso propio
   (`verificar-representante`: certificado de cámara, RUT o poder). El Anexo de Nube **no tiene
   esa columna ni esa ruta**, y por eso el cotejo es contra el representante legal de la ficha.

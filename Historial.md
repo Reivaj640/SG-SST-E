@@ -8574,3 +8574,111 @@ apagado: P8 es un ensayo, no la apertura.
 📦1049, esperando el «dale», y su push, esperando el «pushea»; (3) lo heredado: P3 (los alias de
 Workspace), Node 22 en el servidor, el respaldo off-site, `npm audit`, T6/T7/T8 y la ratificación
 externa del abogado (J6/J8/J9 y la pregunta de la errata).
+---
+
+## Novena ronda — 12-nov-2026 (tarde): el P8 se EJECUTÓ en producción. Los cuatro actos, de punta a punta.
+
+> **Lo que se hizo.** El P8 dejó de ser un plan y pasó a ser un hecho: en producción, sobre los textos
+> vigentes (Anexo de Nube v1.3 y Anexo de Encargo 2026-11-11), **las dos Empresas** —que en realidad
+> es **una**, ASEPLUS— suscribió y K+AIR contrafirmó los dos instrumentos, con las cuatro fases de la
+> ficha escritas y la compuerta de primera firma en **verde**. El runbook era `/tmp/kair-p8/p8-aseplus.sh`;
+> lo ejecutó el owner con `sudo` en su terminal del servidor, tecleando **un código por vez**.
+
+> **Los cuatro actos, con su hora.** (1) **Suscripción del Anexo de Nube v1.3** por la Empresa:
+> suscripción id 2, huella `fdd10551…2b585d`, FIRMADA el **2026-11-12T15:38:27.990Z**, código de
+> verificación al correo del firmante (`jrf2011@live.com`), IP `181.63.26.145`. (2) **Suscripción del
+> Anexo de Encargo 2026-11-11**: suscripción id 2, huella `6308b1f7…75b8948`, FIRMADA el
+> **2026-11-12T15:40:06.992Z**, con su acta de suscripción `c0ca4211…d21f6` (7 693 B), y el código al
+> **segundo canal** (`reivaj640@gmail.com`), no al buzón del enlace. (3) **Verificación documental de
+> la representante legal** (RUT de ASEPLUS, `900.829.731-1`), el **2026-11-12T15:40:32.516Z**, por
+> Javier Robles Fontalvo — *precondición* de la contrafirma del Encargo: sin ella el servicio responde
+> 409 `REPRESENTANTE_NO_VERIFICADO`. (4) **Las dos contrafirmas**: Anexo de Nube el
+> **2026-11-12T16:13:54.106Z** (acta `050f223a…4a501`) y Anexo de Encargo el
+> **2026-11-12T16:14:31.105Z** (acta `5dcb2149…4b062`), las dos por Javier Robles Fontalvo con la
+> facultad acreditada `REPRESENTANTE_LEGAL_ENCARGADO`.
+
+> **El manifiesto y la compuerta.** El manifiesto de producción pasó de `cad606a9…df0d3a` a
+> **`191c08b8…f8a4013f`**: `anexo_nube.firmado: true`, `anexo_nube.contrafirmado: true` (con su fecha, su
+> actor, su motivo y su evidencia), `anexo_encargo.estado: firmado` (con su fecha y su evidencia), y los
+> dos `contrafirma_facultad` con el resultado y el instrumento. El `--check` de los dos scripts salió en
+> **0**: el manifiesto en disco es el que se escribiría. La compuerta `primera_firma` quedó **`listo:
+> true`**, con **40 ítems `ok`, 0 bloqueantes**, 1 `no_aplica` y 1 `aviso`. Los tres ítems que el P8
+> tenía que cerrar pasaron: `firmado_nube` (ok, "sobre el texto vigente (v1.3)"), `contrafirma_nube` (ok,
+> "con su evidencia y con la facultad acreditada") y `estado_encargo` (ok, "con la facultad de quien
+> contrafirma acreditada"). El único `aviso` es `empresas_nube`, y **no bloquea**: el código lo declara
+> así a propósito (`readinessLegal.js:1960-1966`: sin `FIRMA_EXIGIR_ANEXO_NUBE` el ítem es `aviso` y su
+> `bloquea` va vacío). **El gate de producción sigue apagado**: P8 fue un ensayo, no la apertura.
+
+> **Lo que NO se tocó.** Las dos suscripciones viejas siguen **intactas**: la v1.1 del Nube (suscrita el
+> 5-nov, sin contrafirma) y la del Encargo 2026-11-06 (suscrita el 7-nov, contrafirmada el 7-nov con su
+> acta `b1ec9fa2…c235513`). Ninguna fila de suscripción se reescribió ni se borró: lo que se deshizo en la
+> fase 1 fueron los **punteros de la ficha**, no los hechos. Los textos ya suscritos no se editaron. Y el
+> rastro append-only cuenta los diez eventos de cada suscripción nueva, **con el intento fallido
+> incluido**: `CONTRAFIRMA_CODIGO_INVALIDO (2026-11-12 15:41:11)`.
+
+> **Tres fallos del runbook que se encontraron antes de que costaran un acto.** (1) **El paso 7
+> (regenerar los manifiestos) no funcionaba**: `src/config.js` carga el `.env` con
+> `path.join(__dirname, '..', '.env')`, o sea `/opt/kair-firma/app/.env`, que **no existe** (el archivo
+> real está en `/opt/kair-firma/.env`, el que declara el `EnvironmentFile` de la unidad systemd). Sin esas
+> variables el script abortaba con `Variable de entorno requerida: INTERNAL_API_KEY` y **el manifiesto se
+> quedaba en `firmado: false`**: los cuatro actos estaban hechos y el gate los seguía viendo pendientes.
+> Se comprobó **contra el código y contra el servidor** antes de tocar nada, y se corrigió con variables
+> explícitas (el `DB_PATH` de verdad; el resto, de mentira, porque esos scripts solo leen la base).
+> (2) **La ruta de error del runbook abortaba el script**: con `set -euo pipefail`, el `grep` del código de
+> error sin coincidencia hacía fallar el pipe y tumbaba el script *justo cuando fallaba la contrafirma*, que
+> es donde hace falta que siga. Le faltó un `|| true`. (3) **La verificación del representante se
+> reescribía**: ya estaba hecha desde las 15:40:32, y el script la volvía a registrar; ahora la muestra y
+> no la duplica (un acto registrado no se reescribe).
+
+> **Lo que se mejoró del runbook para que el error de las 15:41 no se repitiera.** El 12-nov-2026, a las
+> 15:40, se pidieron **los dos códigos a la vez**; el del Nube se tecleó con el número del Encargo y salió
+> 400 `CODIGO_INVALIDO` (un intento de 5). El arreglo no fue de código: fue de **guion**. Ahora el runbook
+> pide **un código, lo usa, y solo entonces pide el otro**; distingue los correos por el **cuerpo** (que
+> dice «contrafirmando el Anexo de Nube de una Empresa» o «…del Anexo de Encargo de una Empresa»), no por
+> el asunto, que es casi idéntico; y **un error de tecleo se reintenta con el mismo código** (hasta 3
+> veces), porque teclear mal un dígito gasta un *intento* (hay 5) y no un *envío* (el límite de 5 envíos
+> **no se resetea** y sí es firme). La contrafirma se confirma **contra la base**, no contra el HTTP 200: un
+> 200 con la base sin fecha es un falso verde.
+
+> **El manifiesto del repo se sincronizó, y por qué era necesario.** `legal-readiness.json` **viaja en el
+> paquete de despliegue** (`git archive … "$svc/legal-readiness.json"`, `MIGRACION-SERVIDOR-FIRMA.md` §0), así
+> que un repo con el manifiesto viejo **pisa el estado real** en el próximo despliegue y devuelve el gate a
+> `firmado: false`. Se regeneró con los mismos scripts, sobre una copia, y se comprobó que es
+> **determinista**: el archivo regenerado y el de producción salen **byte a byte iguales**
+> (`191c08b8…f8a4013f`). El manifiesto del repo ya era, por diseño, una copia del estado real (llevaba la
+> evidencia de la v1.1 del 5-nov desde antes), así que esto no introduce nada nuevo: lo pone al día.
+
+> **Medido** — suite del firma-service con el manifiesto actualizado: **2 606 tests · 2 604 pass · 0 fail ·
+> 2 skipped**. El manifiesto es un dato, no una lógica, así que **no cambió el número de pruebas**: lo que
+> cambió fue **un test que quedó en rojo** y se corrigió. El motivo: el manifiesto real pasó a declarar la
+> firma de ASEPLUS, y el fixture que los tests usan para medir el caso «sin suscripción» limpiaba nueve
+> campos del bloque del Anexo de Nube pero **no** `contrafirma_facultad` (el que se agregó en el 📦1047).
+> Con el manifiesto real de producción, el script —que hace bien: sin suscripción del texto vigente no hay
+> contrafirma, y una facultad sin contrafirma no describe ningún acto— lo ponía en `null` y el test
+> detectaba el cambio. Se corrigió el **fixture**, no el script: ahora deja el bloque en la línea base de
+> «nada firmado». Lo mismo se hizo con el helper del Anexo de Encargo, y su `ponerEnBloque` ahora reconoce
+> también un objeto plano, que antes no encontraba la clave. **Un fixture que hereda el estado real deja de
+> medir lo que dice medir** —es el mismo motivo por el que ese helper existía desde el 7-nov.
+> EOL y BOM: correctos (el `Historial.md` conserva su perfil mixto —7 684 CRLF y 892 LF— y este bloque se
+> empalmó a nivel de bytes). Barrido de secretos: limpio. Unicode: el bloque nuevo no trae CJK, cirílico,
+> hangul ni caracteres de control (los cuatro controles U+0013/U+0014 que aparecen en las líneas 238-257
+> son **preexistentes**: están en `HEAD`, son marcas de fin de bloque de una ronda anterior, y esta no los
+> tocó). Compuerta de producción, medida por SSH con un script de **solo lectura**:
+> `listo: true`, 40 ítems `ok`, **0 bloqueantes**, 1 `aviso` (`empresas_nube`, que no bloquea mientras el
+> flag siga apagado) y 1 `no_aplica`. Servicio `active` con `NRestarts=0` y salud `ok`. La instancia de
+> prueba del puerto 3002 sigue **parada** (`inactive`), y el 3002 no escucha. El verificador de cierre
+> (`/tmp/kair-p8/verificar-cierre-p8.js`) cierra con **«P8 CERRADO: las cuatro fases, los dos instrumentos
+> y la compuerta»**.
+
+> **Decisiones del owner** — (1) el runbook lo ejecuta **el owner** en su terminal del servidor, con
+> `sudo`: la admin key es `600 kairfirma` y `sudo` pide contraseña, y el código de contrafirma llega al
+> buzón de protección de datos, que es del owner. (2) **ASEPLUS es una empresa de prueba**, aclarado el
+> 12-nov-2026: eso baja el riesgo del P8, pero **no habilita producción** ni cambia el camino.
+
+> **Cola** — (1) el commit de esta ronda (manifiesto sincronizado + documentos), esperando el «dale», y su
+> push, esperando el «pushea»; (2) lo heredado: **P3** (los alias de Workspace), **Node 22 en el
+> servidor** (recompilar `better-sqlite3` para ABI 127), el **respaldo off-site**, `npm audit`, T6/T7/T8 y
+> la **ratificación externa del abogado** (J6/J8/J9 y la pregunta de la errata); (3) decidir, con el
+> abogado, si la v1.1 del Nube (suscrita, sin contrafirma) se contrafirma retroactiva o queda como
+> registro histórico.
+

@@ -1246,6 +1246,17 @@ huella, no por fecha), registra la verificacion documental de la representante l
 que es fijo en la configuracion: un canal elegido por quien pide el acto no probaria nada),
 contraforma los dos instrumentos, **regenera los dos manifiestos** y mide la compuerta.
 
+**UN CODIGO A LA VEZ (correccion del 12-nov-2026).** La primera corrida pidio los **dos** codigos
+a la vez y se mezclaron: los dos correos de contrafirma llegan al **mismo buzon** (`privacidad.kair@gmail.com`) y sus asuntos son casi identicos — «K+AIR - Tu codigo para
+contrafirmar el Anexo de Nube» y «... del Anexo de Encargo». El codigo se tecleo con el del otro
+instrumento y el servicio respondio 400 `CODIGO_INVALIDO`. **El script pide un codigo, lo usa, y
+solo entonces pide el otro**, y lo distingue por el **cuerpo** del correo (que dice «K+AIR esta
+contrafirmando el Anexo de Nube de una Empresa» o «... del Anexo de Encargo de una Empresa»), no
+por el asunto. Un error de tecleo se reintenta con el **mismo** codigo (hasta 3 veces): teclear mal
+un digito gasta un *intento* (hay 5) y no un *envio* (el limite de 5 envios **no se resetea** y si
+es firme). La contrafirma se confirma **contra la base**, no contra el HTTP 200: un 200 con la base
+sin fecha es un falso verde.
+
 #### Lo que hay que mirar al terminar
 
 | Que | Donde |
@@ -1255,6 +1266,25 @@ contraforma los dos instrumentos, **regenera los dos manifiestos** y mide la com
 | Las suscripciones | las dos nuevas `FIRMADA` y `CONTRAFIRMADA`; las dos viejas (v1.1 y 2026-11-06) **intactas** |
 | El manifiesto | `--check` en 0 en los dos scripts (comparan **estado**, no bytes) |
 | La habilitacion | `GET /internal/empresa/anexos` responde `habilitacion.ok = true` sin pendientes |
+
+#### El resultado real (12-nov-2026): los cuatro actos quedaron ejecutados
+
+El P8 **se ejecuto en produccion** el 12-nov-2026. Los cuatro actos, con su hora:
+
+| Acto | Cuando | Que quedo |
+|---|---|---|
+| Suscripcion del Anexo de Nube v1.3 por la Empresa | 2026-11-12T15:38:27.990Z | Suscripcion id 2, huella `fdd10551...2b585d`; el codigo de verificacion salio al correo del firmante, nunca a un buzon que la Empresa pueda leer |
+| Suscripcion del Anexo de Encargo 2026-11-11 por la Empresa | 2026-11-12T15:40:06.992Z | Suscripcion id 2, huella `6308b1f7...75b8948`, acta de suscripcion `c0ca4211...d21f6`; el codigo salio al **segundo canal** |
+| Verificacion documental de la representante legal (RUT) | 2026-11-12T15:40:32.516Z | Por Javier Robles Fontalvo. **Precondicion** de la contrafirma del Encargo: sin ella el servicio responde 409 `REPRESENTANTE_NO_VERIFICADO` |
+| Las dos contrafirmas de K+AIR | Nube 16:13:54.106Z · Encargo 16:14:31.105Z | Actas `050f223a...4a501` y `5dcb2149...4b062`; las dos con la facultad acreditada `REPRESENTANTE_LEGAL_ENCARGADO` |
+
+**Medido despues, por SSH, con un script de solo lectura:** las cuatro fases de la ficha con fecha (`anexo_nube_firmado_at`, `anexo_nube_ejecutado_at`, `anexo_encargo_suscrito_at`, `anexo_encargo_firmado_at`); las dos suscripciones nuevas `FIRMADA` **y** contrafirmadas; **las dos viejas intactas** (la v1.1 del 5-nov y la del Encargo 2026-11-06, contrafirmada el 7-nov con su acta `b1ec9fa2...c235513`); el manifiesto en `191c08b8...f8a4013f` (canonico, ASCII puro, sin BOM, con `anexo_nube.firmado: true`, `anexo_nube.contrafirmado: true` y `anexo_encargo.estado: firmado`), y la compuerta `primera_firma` en **`listo: true`**, con 40 items `ok`, **0 bloqueantes** y los tres items del P8 en `ok`.
+
+**El `aviso` que queda no bloquea:** el item `empresas_nube` dice «En este ambiente no se exige el Anexo de Nube» porque `FIRMA_EXIGIR_ANEXO_NUBE` sigue **apagada**. El codigo lo declara asi a proposito (`readinessLegal.js`: sin ese flag el item es `aviso` y su `bloquea` va vacio). **P8 fue un ensayo sobre una empresa de prueba, no la apertura a produccion.**
+
+**El manifiesto del repo se sincronizo.** `legal-readiness.json` viaja en el paquete de despliegue (`git archive ... "$svc/legal-readiness.json"`, §0), asi que un repo con el manifiesto viejo **pisaria el estado real** en el proximo despliegue y devolveria el gate a `firmado: false`. Se regenero con los mismos scripts y se comprobo que es **determinista**: el archivo regenerado y el de produccion salen **byte a byte iguales** (`191c08b8...f8a4013f`).
+
+**Dos holes del runbook que se encontraron antes de que costaran un acto.** (1) **El paso de regenerar los manifiestos no funcionaba**: `src/config.js` carga el `.env` con `path.join(__dirname, '..', '.env')`, o sea `/opt/kair-firma/app/.env`, que **no existe** (el archivo real esta en `/opt/kair-firma/.env`, el que declara el `EnvironmentFile` de la unidad systemd). Sin esas variables el script abortaba con `Variable de entorno requerida: INTERNAL_API_KEY` y **el manifiesto se quedaba en `firmado: false`**: los cuatro actos estaban hechos y el gate los seguia viendo pendientes. (2) **La ruta de error del script abortaba el runbook**: con `set -euo pipefail`, el `grep` del codigo de error sin coincidencia hacia fallar el pipe y tumbaba el script *justo cuando fallaba la contrafirma*, que es donde hace falta que siga. Le falto un `|| true`.
 
 **Lo que NO debe pasar:** que la suscripcion nueva se escriba sobre la vieja, que un manifiesto
 declare «firmado» sin que exista la suscripcion del texto vigente, o que la compuerta se cierre con

@@ -212,6 +212,14 @@ function leerCopia() {
  * una firma, los tests que comprueban "no dice firmado" pasarian por la razón
  * equivocada.
  *
+ * `contrafirma_facultad` tambien se limpia (12-nov-2026). El manifiesto real
+ * pasó a declarar la firma de ASEPLUS (v1.3, 2026-11-12), así que el campo
+ * trae un valor de verdad; si el fixture lo dejaba, el test "sin suscripcion el
+ * manifiesto dice firmado: false" fallaba porque el script lo pone en `null`
+ * (sin suscripcion del texto vigente no hay contrafirma, y una facultad sin
+ * contrafirma es un dato que no describe ningun acto). El fixture tiene que
+ * dejar el bloque en la linea base de "nada firmado", no en la de "firmado".
+ *
  * @param {string} texto
  * @returns {string}
  */
@@ -227,6 +235,7 @@ function manifiestoSinFirmarNube(texto) {
   man.anexo_nube.contrafirma_actor = null;
   man.anexo_nube.contrafirma_motivo = null;
   man.anexo_nube.contrafirma_evidencia = null;
+  man.anexo_nube.contrafirma_facultad = null;
   return script.asciiEscape(JSON.stringify(man, null, 2)) + '\n';
 }
 

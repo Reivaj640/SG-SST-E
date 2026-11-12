@@ -112,10 +112,19 @@
     }
   },
   "anexo_encargo": {
-    "estado": "no_firmado",
-    "fecha": null,
-    "evidencia": null,
-    "contrafirma_facultad": null,
+    "estado": "firmado",
+    "fecha": "2026-11-12T16:14:31.105Z",
+    "evidencia": "ASEPLUS CARIBE S.A.S. (NIT 900.829.731-1). Anexo de Encargo version 2026-11-11, huella SHA-256 6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948. PRIMER ACTO (la Empresa): suscripcion id 2; el codigo de verificacion salio al segundo canal declarado por K+AIR; la Empresa acepto las condiciones del texto vigente y declaro los cinco datos del parrafo 11; la suscripcion quedo FIRMADA el 2026-11-12T15:40:06.992Z. Acta de la suscripcion: acta-2-anexo-encargo.pdf (SHA-256 c0ca4211dbb2c67dfed259583ef2e73c10c56c79436b012147790619b22d21f6). SEGUNDO ACTO (la contrafirma de K+AIR): el codigo de contrafirma salio al buzon de proteccion de datos de K+AIR, que es fijo en la configuracion del servicio; K+AIR verifico documentalmente a quien firmo por la Empresa y la contrafirma quedo registrada el 2026-11-12T16:14:31.105Z por Javier Robles Fontalvo (motivo: P8 (12-nov-2026): re-suscripcion del Anexo de Nube v1.3 y del Anexo de Encargo 2026-11-11, los textos vigentes tras la errata de cita del 11-nov-2026). Acta de la contrafirma: acta-2-contrafirma-anexo-encargo.pdf (SHA-256 5dcb214928927f08eed3ee17712a952f46b87bb4479cf0bb9e668e814404b062). La facultad de quien contrafirma por K+AIR quedo acreditada antes del acto: Javier Robles Fontalvo, Representante Legal. Con que facultad: representante legal de Gesstiar S.A.S.. Instrumento: Representante legal declarado en el manifiesto legal (legal-readiness.json -> encargado.representante_legal). Verificada el 2026-11-12T16:14:31.105Z. La fecha de ejecucion del instrumento quedo en la ficha de la Empresa (gh_firma_empresas.anexo_encargo_firmado_at = 2026-11-12T16:14:31.105Z). Con esa fecha, y solo con ella, la Empresa queda habilitada para firmar documentos de sus trabajadores. Rastro append-only en gh_firma_anexo_encargo_eventos: SUSCRIPCION_CREADA (2026-11-12 15:01:55), ENLACE_ABIERTO (2026-11-12 15:10:34), CODIGO_ENVIADO (2026-11-12 15:39:11), SUSCRIPCION_FIRMADA (2026-11-12 15:40:07), ACTA_GENERADA (2026-11-12 15:40:07), REPRESENTANTE_VERIFICADO (2026-11-12 15:40:32), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 15:40:34), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 16:13:54), CONTRAFIRMA_FACULTAD_VERIFICADA (2026-11-12 16:14:31), CONTRAFIRMA_FIRMADA (2026-11-12 16:14:31), CONTRAFIRMA_ACTA_GENERADA (2026-11-12 16:14:31). La copia firmada del Anexo la conserva cada parte (parrafo 12): el servicio no la almacena. Lo que queda en el expediente son las dos actas, con la huella de sus bytes.",
+    "contrafirma_facultad": {
+      "resultado": "REPRESENTANTE_LEGAL_ENCARGADO",
+      "nombre": "Javier Robles Fontalvo",
+      "cargo": "Representante Legal",
+      "tipo": "REPRESENTACION",
+      "instrumento_ref": "Representante legal declarado en el manifiesto legal (legal-readiness.json -> encargado.representante_legal)",
+      "instrumento_sha256": null,
+      "id_poder": null,
+      "verificado_at": "2026-11-12T16:14:31.105Z"
+    },
     "version": "2026-11-11",
     "hash": "6308b1f7a51007cb1e973de0210d1e5659d3b3ceb8e3e3b7a3ee52a7275b8948",
     "nota": "Texto vigente del Anexo de Encargo: la version 2026-11-11. Corrige el parrafo \"Lo que queda pendiente\" de la seccion 5, que declaraba como no cumplidos P5 (la aceptacion del CDPA en la consola de Workspace) y P6 (la cuenta empresarial activa, con la credencial del servidor migrada y comprobada con un envio real), los dos cerrados el 10-nov-2026: el texto nuevo declara los pasos cumplidos con su evidencia y deja los que siguen abiertos con su responsable. El paso (viii), la confirmacion escrita sobre el instrumento bilateral, la contrafirma, el alcance de los canales y el papel de Google para los datos de cuenta y la telemetria, quedo respondido el 11-nov-2026 en el dictamen legal del expediente. Mantiene las secciones 4 y 5 (el vinculo con el proveedor de correo), la 3.4 y la 12 (devolucion, supresion y auditoria conforme al CDPA) y la clausula de prevalencia del instrumento bilateral mas reciente, y remite ahora al Anexo de Nube v1.3. El texto vigente NO esta suscrito: la version suscrita por ASEPLUS el 7-nov-2026 es la 2026-11-06, que queda en `versiones_firmadas`. Por eso el item estado_encargo del gate esta pendiente y el flujo de suscripcion del servicio rechaza una nueva firma por la via directa (409 SUSCRIPCION_EXISTENTE): la re-suscripcion va por el canal administrativo, con su motivo. La suscripcion anterior NO se reescribe: la bitacora es append-only. ERRATA DEL 11-nov-2026, ANTES DE LA SUSCRIPCION: el menu, la seccion 1 (Partes), la seccion 5 (Proveedores externos y subencargados) y la seccion 9 remitian al Anexo de Nube v1.2, un texto superado cuyo bloque de pendientes estaba desactualizado, y los cuatro puntos remiten ahora a la v1.3, que es el texto vigente y el que la clausula de prevalencia de la seccion 5 ya nombraba. No es un detalle de redaccion: la seccion 5 dice que el Anexo de Nube \"forma parte integral de este documento\", y eso es una incorporacion por remision (articulo 44 de la Ley 527 de 1999): lo que queda incorporado es el texto al que apunta el vinculo, y con el vinculo apuntando a la v1.2 este Anexo incorporaba un texto que el propio documento declara superado. Es una correccion de cita: no cambian las partes, el objeto, las obligaciones ni la distribucion del riesgo. El texto no estaba suscrito ni publicado cuando se corrigio, y la version suscrita por ASEPLUS el 7-nov-2026 (la 2026-11-06) no se toco. La huella anterior era c7c42a1897b44222c09cbdbfc6f8617f29b7250b9c9e0c8b12f1e502770bfd95. Dictamen: docs/gestion-humana/firma-electronica/dictamen-legal-errata-textos-2026-11-11.md.",
@@ -130,17 +139,26 @@
     ]
   },
   "anexo_nube": {
-    "firmado": false,
-    "fecha": null,
-    "version": null,
-    "hash": null,
-    "evidencia": null,
-    "contrafirmado": false,
-    "contrafirma_fecha": null,
-    "contrafirma_actor": null,
-    "contrafirma_motivo": null,
-    "contrafirma_evidencia": null,
-    "contrafirma_facultad": null,
+    "firmado": true,
+    "fecha": "2026-11-12T15:38:27.990Z",
+    "version": "1.3",
+    "hash": "fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d",
+    "evidencia": "ASEPLUS CARIBE S.A.S. (NIT 900.829.731-1). Anexo de Nube version 1.3, huella SHA-256 fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d. ACTO (la Empresa): suscripcion id 2; el codigo de verificacion salio al correo del firmante (jrf2011@live.com), nunca a un buzon que la Empresa pueda leer; la Empresa acepto las condiciones del texto vigente y la suscripcion quedo FIRMADA el 2026-11-12T15:38:27.990Z. Firmante: Lilia Maria Vasquez Munoz, Representante legal. Representante legal declarado: Lilia Maria Vasquez Munoz. IP de la firma: 181.63.26.145. Navegador: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 OPR/139.0.0.0. La suscripcion quedo registrada en la ficha de la Empresa (gh_firma_empresas.anexo_nube_firmado_at = 2026-11-12T15:38:27.990Z, con la version 1.3 y la huella fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d). Con esa fecha, y solo con ella, la Empresa queda habilitada para firmar documentos de sus trabajadores. La huella del texto suscrito es la del archivo que el servicio sirve (fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d): si ese archivo cambia, la firma deja de describir el texto vigente y el item firmado_nube vuelve a quedar pendiente. Rastro append-only en gh_firma_anexo_nube_eventos: SUSCRIPCION_CREADA (2026-11-12 15:01:50), ENLACE_ABIERTO (2026-11-12 15:10:34), CODIGO_ENVIADO (2026-11-12 15:38:09), SUSCRIPCION_FIRMADA (2026-11-12 15:38:27), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 15:40:32), CONTRAFIRMA_CODIGO_INVALIDO (2026-11-12 15:41:11), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 16:12:54), CONTRAFIRMA_FACULTAD_VERIFICADA (2026-11-12 16:13:54), CONTRAFIRMA_FIRMADA (2026-11-12 16:13:54), CONTRAFIRMA_ACTA_GENERADA (2026-11-12 16:13:54). Este es el PRIMER acto (la Empresa). El SEGUNDO acto (la contrafirma de K+AIR) quedo registrado el 2026-11-12T16:13:54.106Z y se declara en `contrafirmado` y `contrafirma_evidencia`: con los dos, el Anexo de Nube queda EJECUTADO. El Anexo de Nube no genera acta de suscripcion: la evidencia de este acto son las columnas de la suscripcion y su rastro, con la huella del texto suscrito. La del segundo acto, si existe, lleva su propia acta y su propia huella.",
+    "contrafirmado": true,
+    "contrafirma_fecha": "2026-11-12T16:13:54.106Z",
+    "contrafirma_actor": "Javier Robles Fontalvo",
+    "contrafirma_motivo": "P8 (12-nov-2026): re-suscripcion del Anexo de Nube v1.3 y del Anexo de Encargo 2026-11-11, los textos vigentes tras la errata de cita del 11-nov-2026",
+    "contrafirma_evidencia": "SEGUNDO ACTO (la contrafirma de K+AIR): el codigo de contrafirma salio al buzon de proteccion de datos de K+AIR, que es fijo en la configuracion del servicio y nunca a un buzon que la Empresa pueda leer; K+AIR verifico documentalmente quien firmo por la Empresa y la contrafirma quedo registrada el 2026-11-12T16:13:54.106Z por Javier Robles Fontalvo (motivo: P8 (12-nov-2026): re-suscripcion del Anexo de Nube v1.3 y del Anexo de Encargo 2026-11-11, los textos vigentes tras la errata de cita del 11-nov-2026). Acta de la contrafirma: acta-2-contrafirma-anexo-nube.pdf (SHA-256 050f223a3665cf7d0f159a30669085238125f733688c31ba6e2385512c74a501). La facultad de quien contrafirma por K+AIR quedo acreditada antes del acto: Javier Robles Fontalvo, Representante Legal. Con que facultad: representante legal de Gesstiar S.A.S.. Instrumento: Representante legal declarado en el manifiesto legal (legal-readiness.json -> encargado.representante_legal). Verificada el 2026-11-12T16:13:54.100Z. Con esta fecha, y solo con ella, el Anexo de Nube queda EJECUTADO para esa Empresa. La fecha de ejecucion del instrumento quedo en la ficha de la Empresa (gh_firma_empresas.anexo_nube_ejecutado_at = 2026-11-12T16:13:54.106Z). Rastro append-only de la contrafirma en gh_firma_anexo_nube_eventos: CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 15:40:32), CONTRAFIRMA_CODIGO_INVALIDO (2026-11-12 15:41:11), CONTRAFIRMA_CODIGO_ENVIADO (2026-11-12 16:12:54), CONTRAFIRMA_FACULTAD_VERIFICADA (2026-11-12 16:13:54), CONTRAFIRMA_FIRMADA (2026-11-12 16:13:54), CONTRAFIRMA_ACTA_GENERADA (2026-11-12 16:13:54).",
+    "contrafirma_facultad": {
+      "resultado": "REPRESENTANTE_LEGAL_ENCARGADO",
+      "nombre": "Javier Robles Fontalvo",
+      "cargo": "Representante Legal",
+      "tipo": "REPRESENTACION",
+      "instrumento_ref": "Representante legal declarado en el manifiesto legal (legal-readiness.json -> encargado.representante_legal)",
+      "instrumento_sha256": null,
+      "id_poder": null,
+      "verificado_at": "2026-11-12T16:13:54.100Z"
+    },
     "modelo": {
       "version": "1.3",
       "hash": "fdd10551c2106e186d62a2b70922530ff9494a8538fc67816f6f5ad5ca2b585d",
@@ -153,7 +171,8 @@
         "version": "1.1",
         "hash": "e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482",
         "fecha": "2026-11-05T22:51:34.349Z",
-        "evidencia": "5-nov-2026. Suscripcion id 1 del Anexo de Nube v1.1 por ASEPLUS CARIBE S.A.S. (NIT 900829731). Firmante: Lilia Maria Vasquez Munoz, Representante legal, correo jrf2011@live.com. Enlace de un solo uso abierto el 2026-11-05T19:52:31.469Z; se enviaron 2 codigos de verificacion (20:20:43Z y 22:50:32Z); la suscripcion quedo FIRMADA el 2026-11-05T22:51:34.349Z. Version 1.1 con huella SHA-256 e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482, la misma del texto vigente. IP de firma 181.63.26.145. Rastro append-only en gh_firma_anexo_nube_eventos: SUSCRIPCION_CREADA (18:54:18Z), ENLACE_ABIERTO (19:52:31Z), CODIGO_ENVIADO intento 1 (20:20:43Z), CODIGO_ENVIADO intento 2 (22:50:32Z) y SUSCRIPCION_FIRMADA (22:51:34Z)."
+        "evidencia": "5-nov-2026. Suscripcion id 1 del Anexo de Nube v1.1 por ASEPLUS CARIBE S.A.S. (NIT 900829731). Firmante: Lilia Maria Vasquez Munoz, Representante legal, correo jrf2011@live.com. Enlace de un solo uso abierto el 2026-11-05T19:52:31.469Z; se enviaron 2 codigos de verificacion (20:20:43Z y 22:50:32Z); la suscripcion quedo FIRMADA el 2026-11-05T22:51:34.349Z. Version 1.1 con huella SHA-256 e95175368dcb8aed7227ab35522a55db065da0f9620b52555d16254ae4591482, la misma del texto vigente. IP de firma 181.63.26.145. Rastro append-only en gh_firma_anexo_nube_eventos: SUSCRIPCION_CREADA (18:54:18Z), ENLACE_ABIERTO (19:52:31Z), CODIGO_ENVIADO intento 1 (20:20:43Z), CODIGO_ENVIADO intento 2 (22:50:32Z) y SUSCRIPCION_FIRMADA (22:51:34Z).",
+        "contrafirmado": false
       }
     ]
   },

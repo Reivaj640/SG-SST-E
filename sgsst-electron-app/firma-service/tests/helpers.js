@@ -1077,20 +1077,27 @@ function buildEvidenciaFirma(fila, consentimiento) {
 
 /**
  * El manifiesto con el bloque `anexo_encargo` devuelto a su linea base SIN
- * FIRMAR: estado "no_firmado", sin fecha y sin evidencia.
+ * FIRMAR: estado "no_firmado", sin fecha, sin evidencia y sin facultad.
  *
  * POR QUE NO SE USA EL MANIFIESTO REAL TAL CUAL
  * -----------------------------------------------
  * El manifiesto real cambia de estado cuando ocurre una firma: el piloto de
- * ASEPLUS (7-nov-2026) lo dejo en "firmado" con fecha y evidencia. Un test
- * que hereda ese estado deja de medir lo que dice medir: el que comprueba
- * "sin contrafirma el script NO escribe firmado" pasaria porque el manifiesto
- * ya decia "firmado", y el que comprueba "--exigir-firmado aborta con 7" no
- * abortaria nunca. El fixture tiene que ser DETERMINISTA.
+ * ASEPLUS (7-nov-2026) lo dejo en "firmado" con fecha y evidencia, y el P8
+ * (12-nov-2026) lo dejo otra vez en "firmado", ahora con la contrafirma y su
+ * `contrafirma_facultad`. Un test que hereda ese estado deja de medir lo que
+ * dice medir: el que comprueba "sin contrafirma el script NO escribe firmado"
+ * pasaria porque el manifiesto ya decia "firmado", y el que comprueba
+ * "--exigir-firmado aborta con 7" no abortaria nunca. El fixture tiene que
+ * ser DETERMINISTA.
+ *
+ * `contrafirma_facultad` tambien se limpia (12-nov-2026): el script lo escribe
+ * SIEMPRE (sale de la evidencia del acto), asi que un fixture que lo dejara
+ * con el valor de una contrafirma real haria que el test midiera el estado
+ * equivocado. Una facultad sin contrafirma no describe ningun acto.
  *
  * La copia conserva todo lo demas byte a byte: la `version`, la `huella` y
  * la `nota` son la identidad del TEXTO, y el script las contrasta contra el
- * archivo real. Solo se tocan los tres campos que el script escribe.
+ * archivo real. Solo se tocan los cuatro campos que el script escribe.
  *
  * @param {string} texto El manifiesto crudo (el del repo).
  * @returns {string} El mismo manifiesto con el Anexo de Encargo sin firmar.
@@ -1100,6 +1107,7 @@ function manifiestoSinFirmar(texto) {
   salida = _ponerEnBloque(salida, 'anexo_encargo', 'estado', '"no_firmado"');
   salida = _ponerEnBloque(salida, 'anexo_encargo', 'fecha', 'null');
   salida = _ponerEnBloque(salida, 'anexo_encargo', 'evidencia', 'null');
+  salida = _ponerEnBloque(salida, 'anexo_encargo', 'contrafirma_facultad', 'null');
   return salida;
 }
 
@@ -1110,6 +1118,10 @@ function manifiestoSinFirmar(texto) {
  * El valor se pasa CRUDO (`"firmado"`, `null`) porque el destino puede ser
  * un null y no un string: el JSON del manifiesto distingue las dos cosas y
  * una fecha en null es la ausencia de fecha, no una fecha vacia.
+ *
+ * El patron reconoce tambien un OBJETO PLANO (`{...}` sin llaves anidadas):
+ * la acreditacion de la facultad de quien contrafirma (P7) se escribe asi, y
+ * sin ese patron la clave no se encuentra y el helper revienta (12-nov-2026).
  *
  * @param {string} texto El manifiesto crudo.
  * @param {string} bloque El bloque donde vive la clave.
@@ -1123,7 +1135,7 @@ function _ponerEnBloque(texto, bloque, clave, valor) {
   const fin = texto.indexOf('\n  },', i);
   if (fin < 0) throw new Error('No se pudo cerrar el bloque "' + bloque + '".');
   const cuerpo = texto.slice(i, fin);
-  const m = new RegExp('("' + clave + '"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|null)').exec(cuerpo);
+  const m = new RegExp('("' + clave + '"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|null\\b|\\{[^{}]*\\})').exec(cuerpo);
   if (!m) throw new Error('El bloque "' + bloque + '" no tiene la clave "' + clave + '".');
   return texto.slice(0, i) + cuerpo.replace(m[0], m[1] + valor) + texto.slice(fin);
 }
